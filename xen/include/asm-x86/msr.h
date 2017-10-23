@@ -196,9 +196,17 @@ static inline void wrgsbase(unsigned long base)
         wrmsrl(MSR_GS_BASE, base);
 }
 
-DECLARE_PER_CPU(u64, efer);
-u64 read_efer(void);
-void write_efer(u64 val);
+DECLARE_PER_CPU(uint64_t, efer);
+static inline uint64_t read_efer(void)
+{
+    return this_cpu(efer);
+}
+
+static inline void write_efer(uint64_t val)
+{
+    this_cpu(efer) = val;
+    wrmsrl(MSR_EFER, val);
+}
 
 DECLARE_PER_CPU(u32, ler_msr);
 
