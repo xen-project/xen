@@ -159,9 +159,15 @@ static void vpl011_write_data(struct domain *d, uint8_t data)
     {
         vpl011->uartfr |= TXFF;
         vpl011->uartris &= ~TXI;
-    }
 
-    vpl011->uartfr |= BUSY;
+        /*
+         * This bit is set only when FIFO becomes full. This ensures that
+         * the SBSA UART driver can write the early console data as fast as
+         * possible, without waiting for the BUSY bit to get cleared before
+         * writing each byte.
+         */
+        vpl011->uartfr |= BUSY;
+    }
 
     vpl011->uartfr &= ~TXFE;
 
@@ -371,11 +377,16 @@ static void vpl011_data_avail(struct domain *d)
     {
         vpl011->uartfr &= ~TXFF;
         vpl011->uartris |= TXI;
+
+        /*
+         * Clear the BUSY bit as soon as space becomes available
+         * so that the SBSA UART driver can start writing more data
+         * without any further delay.
+         */
+        vpl011->uartfr &= ~BUSY;
+
         if ( out_ring_qsize == 0 )
-        {
-            vpl011->uartfr &= ~BUSY;
             vpl011->uartfr |= TXFE;
-        }
     }
 
     vpl011_update_interrupt_status(d);
