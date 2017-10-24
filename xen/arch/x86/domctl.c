@@ -1454,8 +1454,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     bool_t compat = is_pv_32bit_domain(d) || is_pvh_32bit_domain(d);
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
 
-    if ( !is_pv_domain(d) )
-        memset(c.nat, 0, sizeof(*c.nat));
     memcpy(&c.nat->fpu_ctxt, v->arch.fpu_ctxt, sizeof(c.nat->fpu_ctxt));
     c(flags = v->arch.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
     if ( v->fpu_initialised )

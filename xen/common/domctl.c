@@ -875,7 +875,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                      < sizeof(struct compat_vcpu_guest_context));
 #endif
         ret = -ENOMEM;
-        if ( (c.nat = xmalloc(struct vcpu_guest_context)) == NULL )
+        if ( (c.nat = xzalloc(struct vcpu_guest_context)) == NULL )
             goto getvcpucontext_out;
 
         vcpu_pause(v);
