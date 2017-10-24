@@ -301,7 +301,7 @@
 #define MSR_IA32_APICBASE_BSP		(1<<8)
 #define MSR_IA32_APICBASE_EXTD		(1<<10)
 #define MSR_IA32_APICBASE_ENABLE	(1<<11)
-#define MSR_IA32_APICBASE_BASE		(0xfffff<<12)
+#define MSR_IA32_APICBASE_BASE		0x000ffffffffff000ul
 #define MSR_IA32_APICBASE_MSR           0x800
 #define MSR_IA32_APICTPR_MSR            0x808
 #define MSR_IA32_APICPPR_MSR            0x80a
