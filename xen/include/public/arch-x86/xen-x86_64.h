@@ -168,8 +168,8 @@ struct cpu_user_regs {
     uint16_t ss, _pad2[3];
     uint16_t es, _pad3[3];
     uint16_t ds, _pad4[3];
-    uint16_t fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.     */
-    uint16_t gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_usr. */
+    uint16_t fs, _pad5[3]; /* Non-nul => takes precedence over fs_base.      */
+    uint16_t gs, _pad6[3]; /* Non-nul => takes precedence over gs_base_user. */
 };
 typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);
