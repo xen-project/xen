@@ -1664,6 +1664,18 @@ arch_do_vcpu_op(
     return rc;
 }
 
+/*
+ * Loading a nul selector does not clear bases and limits on AMD CPUs. Be on
+ * the safe side and re-initialize both to flat segment values before loading
+ * a nul selector.
+ */
+#define preload_segment(seg, value) do {              \
+    if ( !((value) & ~3) &&                           \
+         boot_cpu_data.x86_vendor == X86_VENDOR_AMD ) \
+        asm volatile ( "movl %k0, %%" #seg            \
+                       :: "r" (FLAT_USER_DS32) );     \
+} while ( false )
+
 #define loadsegment(seg,value) ({               \
     int __r = 1;                                \
     asm volatile (                              \
@@ -1702,36 +1714,40 @@ static void load_segments(struct vcpu *n)
 
     /* Either selector != 0 ==> reload. */
     if ( unlikely((dirty_segment_mask & DIRTY_DS) | uregs->ds) )
+    {
+        preload_segment(ds, uregs->ds);
         all_segs_okay &= loadsegment(ds, uregs->ds);
+    }
 
     /* Either selector != 0 ==> reload. */
     if ( unlikely((dirty_segment_mask & DIRTY_ES) | uregs->es) )
-        all_segs_okay &= loadsegment(es, uregs->es);
-
-    /*
-     * Either selector != 0 ==> reload.
-     * Also reload to reset FS_BASE if it was non-zero.
-     */
-    if ( unlikely((dirty_segment_mask & (DIRTY_FS | DIRTY_FS_BASE)) |
-                  uregs->fs) )
-        all_segs_okay &= loadsegment(fs, uregs->fs);
-
-    /*
-     * Either selector != 0 ==> reload.
-     * Also reload to reset GS_BASE if it was non-zero.
-     */
-    if ( unlikely((dirty_segment_mask & (DIRTY_GS | DIRTY_GS_BASE_USER)) |
-                  uregs->gs) )
     {
-        /* Reset GS_BASE with user %gs? */
-        if ( (dirty_segment_mask & DIRTY_GS) || !n->arch.pv_vcpu.gs_base_user )
-            all_segs_okay &= loadsegment(gs, uregs->gs);
+        preload_segment(es, uregs->es);
+        all_segs_okay &= loadsegment(es, uregs->es);
+    }
+
+    /* Either selector != 0 ==> reload. */
+    if ( unlikely((dirty_segment_mask & DIRTY_FS) | uregs->fs) )
+    {
+        all_segs_okay &= loadsegment(fs, uregs->fs);
+        /* non-nul selector updates fs_base */
+        if ( uregs->fs & ~3 )
+            dirty_segment_mask &= ~DIRTY_FS_BASE;
+    }
+
+    /* Either selector != 0 ==> reload. */
+    if ( unlikely((dirty_segment_mask & DIRTY_GS) | uregs->gs) )
+    {
+        all_segs_okay &= loadsegment(gs, uregs->gs);
+        /* non-nul selector updates gs_base_user */
+        if ( uregs->gs & ~3 )
+            dirty_segment_mask &= ~DIRTY_GS_BASE_USER;
     }
 
     if ( !is_pv_32bit_vcpu(n) )
     {
         /* This can only be non-zero if selector is NULL. */
-        if ( n->arch.pv_vcpu.fs_base )
+        if ( n->arch.pv_vcpu.fs_base | (dirty_segment_mask & DIRTY_FS_BASE) )
             wrfsbase(n->arch.pv_vcpu.fs_base);
 
         /* Most kernels have non-zero GS base, so don't bother testing. */
@@ -1739,7 +1755,8 @@ static void load_segments(struct vcpu *n)
         wrmsrl(MSR_SHADOW_GS_BASE, n->arch.pv_vcpu.gs_base_kernel);
 
         /* This can only be non-zero if selector is NULL. */
-        if ( n->arch.pv_vcpu.gs_base_user )
+        if ( n->arch.pv_vcpu.gs_base_user |
+             (dirty_segment_mask & DIRTY_GS_BASE_USER) )
             wrgsbase(n->arch.pv_vcpu.gs_base_user);
 
         /* If in kernel mode then switch the GS bases around. */
@@ -1874,22 +1891,22 @@ static void save_segments(struct vcpu *v)
     if ( regs->fs || is_pv_32bit_vcpu(v) )
     {
         dirty_segment_mask |= DIRTY_FS;
-        v->arch.pv_vcpu.fs_base = 0; /* != 0 selector kills fs_base */
+        /* non-nul selector kills fs_base */
+        if ( regs->fs & ~3 )
+            v->arch.pv_vcpu.fs_base = 0;
     }
-    else if ( v->arch.pv_vcpu.fs_base )
-    {
+    if ( v->arch.pv_vcpu.fs_base )
         dirty_segment_mask |= DIRTY_FS_BASE;
-    }
 
     if ( regs->gs || is_pv_32bit_vcpu(v) )
     {
         dirty_segment_mask |= DIRTY_GS;
-        v->arch.pv_vcpu.gs_base_user = 0; /* != 0 selector kills gs_base_user */
+        /* non-nul selector kills gs_base_user */
+        if ( regs->gs & ~3 )
+            v->arch.pv_vcpu.gs_base_user = 0;
     }
-    else if ( v->arch.pv_vcpu.gs_base_user )
-    {
+    if ( v->arch.pv_vcpu.gs_base_user )
         dirty_segment_mask |= DIRTY_GS_BASE_USER;
-    }
 
     this_cpu(dirty_segment_mask) = dirty_segment_mask;
 }
