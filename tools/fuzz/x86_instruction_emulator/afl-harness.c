@@ -77,6 +77,17 @@ int main(int argc, char **argv)
                 exit(-1);
             }
         }
+#ifdef __AFL_HAVE_MANUAL_CONTROL
+        else
+        {
+            /* 
+             * This will ensure we're dealing with a clean stream
+             * state after the afl-fuzz process messes with the open
+             * file handle.
+             */
+            fseek(fp, 0, SEEK_SET);
+        }
+#endif
 
         size = fread(input, 1, INPUT_SIZE, fp);
 
