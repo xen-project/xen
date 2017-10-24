@@ -1479,7 +1479,8 @@ static void save_segments(struct vcpu *v)
         if ( regs->gs & ~3 )
             v->arch.pv_vcpu.gs_base_user = 0;
     }
-    if ( v->arch.pv_vcpu.gs_base_user )
+    if ( v->arch.flags & TF_kernel_mode ? v->arch.pv_vcpu.gs_base_kernel
+                                        : v->arch.pv_vcpu.gs_base_user )
         dirty_segment_mask |= DIRTY_GS_BASE_USER;
 
     this_cpu(dirty_segment_mask) = dirty_segment_mask;
