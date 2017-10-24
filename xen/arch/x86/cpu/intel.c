@@ -21,9 +21,18 @@ static bool __init probe_intel_cpuid_faulting(void)
 {
 	uint64_t x;
 
-	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) ||
-	    !(x & MSR_PLATFORM_INFO_CPUID_FAULTING))
+	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x))
 		return 0;
+
+	setup_force_cpu_cap(X86_FEATURE_MSR_PLATFORM_INFO);
+
+	if (!(x & MSR_PLATFORM_INFO_CPUID_FAULTING)) {
+		if (!rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, x))
+			setup_force_cpu_cap(X86_FEATURE_MSR_MISC_FEATURES);
+		return 0;
+	}
+
+	setup_force_cpu_cap(X86_FEATURE_MSR_MISC_FEATURES);
 
 	expected_levelling_cap |= LCAP_faulting;
 	levelling_caps |=  LCAP_faulting;
