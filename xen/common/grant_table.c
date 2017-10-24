@@ -2317,9 +2317,20 @@ __acquire_grant_for_copy(
         td = page_get_owner_and_reference(*page);
         /*
          * act->pin being non-zero should guarantee the page to have a
-         * non-zero refcount and hence a valid owner.
+         * non-zero refcount and hence a valid owner (matching the one on
+         * record), with one exception: If the owning domain is dying we
+         * had better not make implications from pin count (map_grant_ref()
+         * updates pin counts before obtaining page references, for
+         * example).
          */
-        ASSERT(td);
+        if ( td != rd || rd->is_dying )
+        {
+            if ( td )
+                put_page(*page);
+            *page = NULL;
+            rc = GNTST_bad_domain;
+            goto unlock_out_clear;
+        }
     }
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
@@ -2438,6 +2449,11 @@ static void gnttab_copy_release_buf(struct gnttab_copy_buf *buf)
         unmap_domain_page(buf->virt);
         buf->virt = NULL;
     }
+    if ( buf->have_grant )
+    {
+        __release_grant_for_copy(buf->domain, buf->ptr.u.ref, buf->read_only);
+        buf->have_grant = 0;
+    }
     if ( buf->have_type )
     {
         put_page_type(buf->page);
@@ -2447,11 +2463,6 @@ static void gnttab_copy_release_buf(struct gnttab_copy_buf *buf)
     {
         put_page(buf->page);
         buf->page = NULL;
-    }
-    if ( buf->have_grant )
-    {
-        __release_grant_for_copy(buf->domain, buf->ptr.u.ref, buf->read_only);
-        buf->have_grant = 0;
     }
 }
 
