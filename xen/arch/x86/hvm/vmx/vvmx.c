@@ -2028,12 +2028,6 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     return r;
 }
 
-int nvmx_msr_write_intercept(unsigned int msr, u64 msr_content)
-{
-    /* silently ignore for now */
-    return 1;
-}
-
 /* This function uses L2_gpa to walk the P2M page table in L1. If the
  * walk is successful, the translated value is returned in
  * L1_gpa. The result value tells what to do next.
