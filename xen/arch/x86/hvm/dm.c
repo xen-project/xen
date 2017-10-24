@@ -178,11 +178,9 @@ static int modified_memory(struct domain *d,
         struct xen_dm_op_modified_memory_extent extent;
         unsigned int batch_nr;
         xen_pfn_t pfn, end_pfn;
-        int rc;
 
-        rc = COPY_FROM_GUEST_BUF_OFFSET(extent,
-            bufs, EXTENTS_BUFFER, (*rem_extents - 1) * sizeof(extent));
-        if ( rc )
+        if ( !COPY_FROM_GUEST_BUF_OFFSET(extent, bufs, EXTENTS_BUFFER,
+                                         (*rem_extents - 1) * sizeof(extent)) )
             return -EFAULT;
 
         if ( extent.pad )
