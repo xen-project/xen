@@ -2505,8 +2505,7 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         return X86EMUL_OKAY;
 
     case MSR_INTEL_PLATFORM_INFO:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             rdmsr_safe(MSR_INTEL_PLATFORM_INFO, *val) )
+        if ( !boot_cpu_has(X86_FEATURE_MSR_PLATFORM_INFO) )
             break;
         *val = 0;
         if ( this_cpu(cpuid_faulting_enabled) )
@@ -2514,8 +2513,7 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         return X86EMUL_OKAY;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, *val) )
+        if ( !boot_cpu_has(X86_FEATURE_MSR_MISC_FEATURES) )
             break;
         *val = 0;
         if ( curr->arch.cpuid_faulting )
@@ -2718,15 +2716,12 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         return X86EMUL_OKAY;
 
     case MSR_INTEL_PLATFORM_INFO:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             val || rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val) )
-            break;
-        return X86EMUL_OKAY;
+        /* The MSR is read-only. */
+        break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-             (val & ~MSR_MISC_FEATURES_CPUID_FAULTING) ||
-             rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES, temp) )
+        if ( !boot_cpu_has(X86_FEATURE_MSR_MISC_FEATURES) ||
+             (val & ~MSR_MISC_FEATURES_CPUID_FAULTING) )
             break;
         if ( (val & MSR_MISC_FEATURES_CPUID_FAULTING) &&
              !this_cpu(cpuid_faulting_enabled) )
