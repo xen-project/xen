@@ -2086,7 +2086,23 @@ __acquire_grant_for_copy(
     {
         ASSERT(mfn_valid(act->frame));
         *page = mfn_to_page(act->frame);
-        (void)page_get_owner_and_reference(*page);
+        td = page_get_owner_and_reference(*page);
+        /*
+         * act->pin being non-zero should guarantee the page to have a
+         * non-zero refcount and hence a valid owner (matching the one on
+         * record), with one exception: If the owning domain is dying we
+         * had better not make implications from pin count (map_grant_ref()
+         * updates pin counts before obtaining page references, for
+         * example).
+         */
+        if ( td != rd || rd->is_dying )
+        {
+            if ( td )
+                put_page(*page);
+            *page = NULL;
+            rc = GNTST_bad_domain;
+            goto unlock_out_clear;
+        }
     }
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
@@ -2223,14 +2239,14 @@ __gnttab_copy(
 
     put_page_type(d_pg);
  error_out:
-    if ( d_pg )
-        put_page(d_pg);
-    if ( s_pg )
-        put_page(s_pg);
     if ( have_s_grant )
         __release_grant_for_copy(sd, op->source.u.ref, 1);
     if ( have_d_grant )
         __release_grant_for_copy(dd, op->dest.u.ref, 0);
+    if ( d_pg )
+        put_page(d_pg);
+    if ( s_pg )
+        put_page(s_pg);
     if ( sd )
         rcu_unlock_domain(sd);
     if ( dd )
