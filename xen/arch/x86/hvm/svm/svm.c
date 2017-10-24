@@ -570,6 +570,24 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
         if ( paging_mode_hap(v->domain) )
             value &= ~X86_CR4_PAE;
         value |= v->arch.hvm_vcpu.guest_cr[4];
+
+        if ( !hvm_paging_enabled(v) )
+        {
+            /*
+             * When the guest thinks paging is disabled, Xen may need to hide
+             * the effects of shadow paging, as hardware runs with the host
+             * paging settings, rather than the guests settings.
+             *
+             * Without CR0.PG, all memory accesses are user mode, so
+             * _PAGE_USER must be set in the shadow pagetables for guest
+             * userspace to function.  This in turn trips up guest supervisor
+             * mode if SMEP/SMAP are left active in context.  They wouldn't
+             * have any effect if paging was actually disabled, so hide them
+             * behind the back of the guest.
+             */
+            value &= ~(X86_CR4_SMEP | X86_CR4_SMAP);
+        }
+
         vmcb_set_cr4(vmcb, value);
         break;
     default:
