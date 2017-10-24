@@ -2013,7 +2013,6 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
-        /* Translate foreign guest addresses. */
         struct page_info *page = NULL;
 
         if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom)) )
@@ -2023,9 +2022,35 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             return -EINVAL;
         }
 
+        /* Translate foreign guest address. */
         if ( paging_mode_translate(pg_dom) )
         {
-            page = get_page_from_gfn(pg_dom, l1e_get_pfn(nl1e), NULL, P2M_ALLOC);
+            p2m_type_t p2mt;
+            p2m_query_t q = l1e_get_flags(nl1e) & _PAGE_RW ?
+                            P2M_ALLOC | P2M_UNSHARE : P2M_ALLOC;
+
+            page = get_page_from_gfn(pg_dom, l1e_get_pfn(nl1e), &p2mt, q);
+
+            if ( p2m_is_paged(p2mt) )
+            {
+                if ( page )
+                    put_page(page);
+                p2m_mem_paging_populate(pg_dom, l1e_get_pfn(nl1e));
+                return -ENOENT;
+            }
+
+            if ( p2mt == p2m_ram_paging_in && !page )
+                return -ENOENT;
+
+            /* Did our attempt to unshare fail? */
+            if ( (q & P2M_UNSHARE) && p2m_is_shared(p2mt) )
+            {
+                /* We could not have obtained a page ref. */
+                ASSERT(!page);
+                /* And mem_sharing_notify has already been called. */
+                return -ENOMEM;
+            }
+
             if ( !page )
                 return -EINVAL;
             nl1e = l1e_from_pfn(page_to_mfn(page), l1e_get_flags(nl1e));
@@ -3977,47 +4002,10 @@ long do_mmu_update(
                 switch ( page->u.inuse.type_info & PGT_type_mask )
                 {
                 case PGT_l1_page_table:
-                {
-                    l1_pgentry_t l1e = l1e_from_intpte(req.val);
-                    p2m_type_t l1e_p2mt = p2m_ram_rw;
-                    struct page_info *target = NULL;
-                    p2m_query_t q = (l1e_get_flags(l1e) & _PAGE_RW) ?
-                                        P2M_UNSHARE : P2M_ALLOC;
-
-                    if ( paging_mode_translate(pg_owner) )
-                        target = get_page_from_gfn(pg_owner, l1e_get_pfn(l1e),
-                                                   &l1e_p2mt, q);
-
-                    if ( p2m_is_paged(l1e_p2mt) )
-                    {
-                        if ( target )
-                            put_page(target);
-                        p2m_mem_paging_populate(pg_owner, l1e_get_pfn(l1e));
-                        rc = -ENOENT;
-                        break;
-                    }
-                    else if ( p2m_ram_paging_in == l1e_p2mt && !target )
-                    {
-                        rc = -ENOENT;
-                        break;
-                    }
-                    /* If we tried to unshare and failed */
-                    else if ( (q & P2M_UNSHARE) && p2m_is_shared(l1e_p2mt) )
-                    {
-                        /* We could not have obtained a page ref. */
-                        ASSERT(target == NULL);
-                        /* And mem_sharing_notify has already been called. */
-                        rc = -ENOMEM;
-                        break;
-                    }
-
-                    rc = mod_l1_entry(va, l1e, mfn,
+                    rc = mod_l1_entry(va, l1e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
                                       pg_owner);
-                    if ( target )
-                        put_page(target);
-                }
-                break;
+                    break;
                 case PGT_l2_page_table:
                     rc = mod_l2_entry(va, l2e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
@@ -4029,7 +4017,7 @@ long do_mmu_update(
                 case PGT_l4_page_table:
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                break;
+                    break;
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
                     if ( paging_write_guest_entry(v, va, req.val, _mfn(mfn)) )
