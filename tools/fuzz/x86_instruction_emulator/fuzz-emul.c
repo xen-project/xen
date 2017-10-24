@@ -139,7 +139,18 @@ static int fuzz_read(
     struct x86_emulate_ctxt *ctxt)
 {
     /* Reads expected for all user and system segments. */
-    assert(is_x86_user_segment(seg) || is_x86_system_segment(seg));
+    if ( is_x86_user_segment(seg) )
+        assert(ctxt->addr_size == 64 || !(offset >> 32));
+    else if ( seg == x86_seg_tr )
+        /*
+         * The TSS is special in that accesses below the segment base are
+         * possible, as the Interrupt Redirection Bitmap starts 32 bytes
+         * ahead of the I/O Bitmap, regardless of the value of the latter.
+         */
+        assert((long)offset < 0 ? (long)offset > -32 : !(offset >> 17));
+    else
+        assert(is_x86_system_segment(seg) &&
+               (ctxt->lma ? offset <= 0x10007 : !(offset >> 16)));
 
     return data_read(ctxt, seg, "read", p_data, bytes);
 }
@@ -161,6 +172,13 @@ static int fuzz_insn_fetch(
     struct x86_emulate_ctxt *ctxt)
 {
     assert(seg == x86_seg_cs);
+
+    /* Minimal segment limit checking, until full one is being put in place. */
+    if ( ctxt->addr_size < 64 && (offset >> 32) )
+    {
+        x86_emul_hw_exception(13, 0, ctxt);
+        return X86EMUL_EXCEPTION;
+    }
 
     /*
      * Zero-length instruction fetches are made at the destination of jumps,
@@ -232,6 +250,7 @@ static int fuzz_rep_ins(
     struct x86_emulate_ctxt *ctxt)
 {
     assert(dst_seg == x86_seg_es);
+    assert(ctxt->addr_size == 64 || !(dst_offset >> 32));
 
     return _fuzz_rep_read(ctxt, "rep_ins", reps);
 }
@@ -247,6 +266,7 @@ static int fuzz_rep_movs(
 {
     assert(is_x86_user_segment(src_seg));
     assert(dst_seg == x86_seg_es);
+    assert(ctxt->addr_size == 64 || !((src_offset | dst_offset) >> 32));
 
     return _fuzz_rep_read(ctxt, "rep_movs", reps);
 }
@@ -260,6 +280,7 @@ static int fuzz_rep_outs(
     struct x86_emulate_ctxt *ctxt)
 {
     assert(is_x86_user_segment(src_seg));
+    assert(ctxt->addr_size == 64 || !(src_offset >> 32));
 
     return _fuzz_rep_write(ctxt, "rep_outs", reps);
 }
@@ -277,6 +298,7 @@ static int fuzz_rep_stos(
      * for CLZERO.
      */
     assert(is_x86_user_segment(seg));
+    assert(ctxt->addr_size == 64 || !(offset >> 32));
 
     return _fuzz_rep_write(ctxt, "rep_stos", reps);
 }
@@ -290,6 +312,7 @@ static int fuzz_write(
 {
     /* Writes not expected for any system segments. */
     assert(is_x86_user_segment(seg));
+    assert(ctxt->addr_size == 64 || !(offset >> 32));
 
     return maybe_fail(ctxt, "write", true);
 }
@@ -306,8 +329,10 @@ static int fuzz_cmpxchg(
      * Cmpxchg expected for user segments, and setting accessed/busy bits in
      * GDT/LDT enties, but not expected for any IDT or TR accesses.
      */
-    assert(is_x86_user_segment(seg) ||
-           seg == x86_seg_gdtr || seg == x86_seg_ldtr);
+    if ( is_x86_user_segment(seg) )
+        assert(ctxt->addr_size == 64 || !(offset >> 32));
+    else
+        assert((seg == x86_seg_gdtr || seg == x86_seg_ldtr) && !(offset >> 16));
 
     return maybe_fail(ctxt, "cmpxchg", true);
 }
@@ -319,6 +344,7 @@ static int fuzz_invlpg(
 {
     /* invlpg(), unlike all other hooks, may be called with x86_seg_none. */
     assert(is_x86_user_segment(seg) || seg == x86_seg_none);
+    assert(ctxt->addr_size == 64 || !(offset >> 32));
 
     return maybe_fail(ctxt, "invlpg", false);
 }
