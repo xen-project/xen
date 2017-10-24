@@ -171,45 +171,45 @@ long arch_do_sysctl(
 
         break;
 
-    case XEN_SYSCTL_psr_cat_op:
-        switch ( sysctl->u.psr_cat_op.cmd )
+    case XEN_SYSCTL_psr_alloc:
+        switch ( sysctl->u.psr_alloc.cmd )
         {
             uint32_t data[PSR_INFO_ARRAY_SIZE];
 
-        case XEN_SYSCTL_PSR_CAT_get_l3_info:
+        case XEN_SYSCTL_PSR_get_l3_info:
         {
-            ret = psr_get_info(sysctl->u.psr_cat_op.target,
+            ret = psr_get_info(sysctl->u.psr_alloc.target,
                                PSR_CBM_TYPE_L3, data, ARRAY_SIZE(data));
             if ( ret )
                 break;
 
-            sysctl->u.psr_cat_op.u.cat_info.cos_max =
+            sysctl->u.psr_alloc.u.cat_info.cos_max =
                                       data[PSR_INFO_IDX_COS_MAX];
-            sysctl->u.psr_cat_op.u.cat_info.cbm_len =
+            sysctl->u.psr_alloc.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
-            sysctl->u.psr_cat_op.u.cat_info.flags =
+            sysctl->u.psr_alloc.u.cat_info.flags =
                                       data[PSR_INFO_IDX_CAT_FLAG];
 
-            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
+            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
                 ret = -EFAULT;
             break;
         }
 
-        case XEN_SYSCTL_PSR_CAT_get_l2_info:
+        case XEN_SYSCTL_PSR_get_l2_info:
         {
-            ret = psr_get_info(sysctl->u.psr_cat_op.target,
+            ret = psr_get_info(sysctl->u.psr_alloc.target,
                                PSR_CBM_TYPE_L2, data, ARRAY_SIZE(data));
             if ( ret )
                 break;
 
-            sysctl->u.psr_cat_op.u.cat_info.cos_max =
+            sysctl->u.psr_alloc.u.cat_info.cos_max =
                                       data[PSR_INFO_IDX_COS_MAX];
-            sysctl->u.psr_cat_op.u.cat_info.cbm_len =
+            sysctl->u.psr_alloc.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
-            sysctl->u.psr_cat_op.u.cat_info.flags =
+            sysctl->u.psr_alloc.u.cat_info.flags =
                                       data[PSR_INFO_IDX_CAT_FLAG];
 
-            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
+            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
                 ret = -EFAULT;
             break;
         }

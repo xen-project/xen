@@ -743,8 +743,8 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_psr_cmt_op:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__PSR_CMT_OP);
 
-    case XEN_DOMCTL_psr_cat_op:
-        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__PSR_CAT_OP);
+    case XEN_DOMCTL_psr_alloc:
+        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__PSR_ALLOC);
 
     case XEN_DOMCTL_soft_reset:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SOFT_RESET);
@@ -810,9 +810,9 @@ static int flask_sysctl(int cmd)
     case XEN_SYSCTL_psr_cmt_op:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__PSR_CMT_OP, NULL);
-    case XEN_SYSCTL_psr_cat_op:
+    case XEN_SYSCTL_psr_alloc:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
-                                    XEN2__PSR_CAT_OP, NULL);
+                                    XEN2__PSR_ALLOC, NULL);
 
     case XEN_SYSCTL_tmem_op:
         return domain_has_xen(current->domain, XEN__TMEM_CONTROL);

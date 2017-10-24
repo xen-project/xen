@@ -14,7 +14,7 @@ allow dom0_t xen_t:xen {
 	tmem_control getscheduler setscheduler
 };
 allow dom0_t xen_t:xen2 {
-	resource_op psr_cmt_op psr_cat_op pmu_ctrl get_symbol
+	resource_op psr_cmt_op psr_alloc pmu_ctrl get_symbol
 	get_cpu_levelling_caps get_cpu_featureset livepatch_op
 	gcov_op set_parameter
 };
@@ -39,7 +39,7 @@ allow dom0_t dom0_t:domain {
 };
 allow dom0_t dom0_t:domain2 {
 	set_cpuid gettsc settsc setscheduler set_max_evtchn set_vnumainfo
-	get_vnumainfo psr_cmt_op psr_cat_op set_gnttab_limits
+	get_vnumainfo psr_cmt_op psr_alloc set_gnttab_limits
 };
 allow dom0_t dom0_t:resource { add remove };
 
