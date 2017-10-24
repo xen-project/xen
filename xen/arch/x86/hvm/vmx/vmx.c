@@ -3100,6 +3100,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
     }
     case MSR_IA32_FEATURE_CONTROL:
+    case MSR_INTEL_PLATFORM_INFO:
     case MSR_IA32_VMX_BASIC ... MSR_IA32_VMX_VMFUNC:
         /* None of these MSRs are writeable. */
         goto gp_fault;
@@ -3111,12 +3112,6 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_IA32_PEBS_ENABLE:
     case MSR_IA32_DS_AREA:
          if ( vpmu_do_wrmsr(msr, msr_content, 0) )
-            goto gp_fault;
-        break;
-
-    case MSR_INTEL_PLATFORM_INFO:
-        if ( msr_content ||
-             rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msr_content) )
             goto gp_fault;
         break;
 
