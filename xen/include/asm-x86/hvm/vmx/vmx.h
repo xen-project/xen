@@ -104,9 +104,14 @@ void vmx_update_secondary_exec_control(struct vcpu *v);
 
 #define POSTED_INTR_ON  0
 #define POSTED_INTR_SN  1
-static inline int pi_test_and_set_pir(int vector, struct pi_desc *pi_desc)
+static inline int pi_test_and_set_pir(uint8_t vector, struct pi_desc *pi_desc)
 {
     return test_and_set_bit(vector, pi_desc->pir);
+}
+
+static inline int pi_test_pir(uint8_t vector, const struct pi_desc *pi_desc)
+{
+    return test_bit(vector, pi_desc->pir);
 }
 
 static inline int pi_test_and_set_on(struct pi_desc *pi_desc)

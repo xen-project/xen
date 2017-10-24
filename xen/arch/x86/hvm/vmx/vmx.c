@@ -2125,6 +2125,11 @@ static void vmx_sync_pir_to_irr(struct vcpu *v)
         vlapic_set_vector(i, &vlapic->regs->data[APIC_IRR]);
 }
 
+static bool vmx_test_pir(const struct vcpu *v, uint8_t vec)
+{
+    return pi_test_pir(vec, &v->arch.hvm_vmx.pi_desc);
+}
+
 static void vmx_handle_eoi(u8 vector)
 {
     unsigned long status;
@@ -2352,6 +2357,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .process_isr          = vmx_process_isr,
     .deliver_posted_intr  = vmx_deliver_posted_intr,
     .sync_pir_to_irr      = vmx_sync_pir_to_irr,
+    .test_pir             = vmx_test_pir,
     .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .enable_msr_interception = vmx_enable_msr_interception,
@@ -2499,6 +2505,7 @@ const struct hvm_function_table * __init start_vmx(void)
     {
         vmx_function_table.deliver_posted_intr = NULL;
         vmx_function_table.sync_pir_to_irr = NULL;
+        vmx_function_table.test_pir = NULL;
     }
 
     if ( cpu_has_vmx_tsc_scaling )

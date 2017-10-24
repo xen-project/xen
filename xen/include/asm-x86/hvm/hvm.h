@@ -195,6 +195,7 @@ struct hvm_function_table {
     void (*process_isr)(int isr, struct vcpu *v);
     void (*deliver_posted_intr)(struct vcpu *v, u8 vector);
     void (*sync_pir_to_irr)(struct vcpu *v);
+    bool (*test_pir)(const struct vcpu *v, uint8_t vector);
     void (*handle_eoi)(u8 vector);
 
     /*Walk nested p2m  */

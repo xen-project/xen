@@ -110,6 +110,7 @@ static inline void vlapic_set_reg(
 
 bool_t is_vlapic_lvtpc_enabled(struct vlapic *vlapic);
 
+bool vlapic_test_irq(const struct vlapic *vlapic, uint8_t vec);
 void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig);
 
 int vlapic_has_pending_irq(struct vcpu *v);
