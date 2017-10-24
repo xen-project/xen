@@ -25,6 +25,7 @@
 #define X86_FEATURE_CPUID_FAULTING	((FSCAPINTS+0)*32+ 6) /* cpuid faulting */
 #define X86_FEATURE_CLFLUSH_MONITOR	((FSCAPINTS+0)*32+ 7) /* clflush reqd with monitor */
 #define X86_FEATURE_APERFMPERF		((FSCAPINTS+0)*32+ 8) /* APERFMPERF */
+#define X86_FEATURE_MSR_PLATFORM_INFO	((FSCAPINTS+0)*32+ 9) /* PLATFORM_INFO MSR present */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)

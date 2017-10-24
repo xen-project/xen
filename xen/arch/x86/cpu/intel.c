@@ -22,8 +22,12 @@ static bool_t __init probe_intel_cpuid_faulting(void)
 {
 	uint64_t x;
 
-	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) ||
-	    !(x & MSR_PLATFORM_INFO_CPUID_FAULTING))
+	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x))
+		return 0;
+
+	__set_bit(X86_FEATURE_MSR_PLATFORM_INFO, boot_cpu_data.x86_capability);
+
+	if (!(x & MSR_PLATFORM_INFO_CPUID_FAULTING))
 		return 0;
 
 	expected_levelling_cap |= LCAP_faulting;
@@ -321,6 +325,8 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 
 	if (test_bit(X86_FEATURE_CPUID_FAULTING, boot_cpu_data.x86_capability))
 		__set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
+	if (test_bit(X86_FEATURE_MSR_PLATFORM_INFO, boot_cpu_data.x86_capability))
+		__set_bit(X86_FEATURE_MSR_PLATFORM_INFO, c->x86_capability);
 
 	intel_ctxt_switch_levelling(NULL);
 }

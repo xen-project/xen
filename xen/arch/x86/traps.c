@@ -2866,11 +2866,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case MSR_INTEL_PLATFORM_INFO:
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-                 msr_content ||
-                 rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msr_content) )
-                goto fail;
-            break;
+            /* The MSR is read-only. */
+            goto fail;
 
         case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
         case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
@@ -3001,8 +2998,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case MSR_INTEL_PLATFORM_INFO:
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-                 rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val) )
+            if ( !boot_cpu_has(X86_FEATURE_MSR_PLATFORM_INFO) )
                 goto fail;
             regs->eax = regs->edx = 0;
             break;
