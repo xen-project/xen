@@ -201,10 +201,10 @@ struct vmx_inst_decoded {
             unsigned long mem;
             unsigned int  len;
         };
-        enum vmx_regs_enc reg1;
+        unsigned int reg1;
     };
 
-    enum vmx_regs_enc reg2;
+    unsigned int reg2;
 };
 
 enum vmx_ops_result {
@@ -345,7 +345,7 @@ enum vmx_insn_errno set_vvmcs_real_safe(const struct vcpu *v, u32 encoding,
 }
 
 static unsigned long reg_read(struct cpu_user_regs *regs,
-                              enum vmx_regs_enc index)
+                              unsigned int index)
 {
     unsigned long *pval = decode_register(index, regs, 0);
 
@@ -353,7 +353,7 @@ static unsigned long reg_read(struct cpu_user_regs *regs,
 }
 
 static void reg_write(struct cpu_user_regs *regs,
-                      enum vmx_regs_enc index,
+                      unsigned int index,
                       unsigned long value)
 {
     unsigned long *pval = decode_register(index, regs, 0);
