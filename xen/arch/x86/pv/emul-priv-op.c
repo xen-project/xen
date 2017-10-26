@@ -137,7 +137,7 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
          * read as 0xff (no access allowed).
          */
         if ( user_mode )
-            toggle_guest_mode(v);
+            toggle_guest_pt(v);
 
         switch ( __copy_from_guest_offset(x.bytes, v->arch.pv_vcpu.iobmp,
                                           port>>3, 2) )
@@ -150,7 +150,7 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
         }
 
         if ( user_mode )
-            toggle_guest_mode(v);
+            toggle_guest_pt(v);
 
         if ( (x.mask & (((1 << bytes) - 1) << (port & 7))) == 0 )
             return true;

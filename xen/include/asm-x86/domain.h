@@ -76,6 +76,8 @@ void mapcache_override_current(struct vcpu *);
 
 /* x86/64: toggle guest between kernel and user modes. */
 void toggle_guest_mode(struct vcpu *);
+/* x86/64: toggle guest page tables between kernel and user modes. */
+void toggle_guest_pt(struct vcpu *);
 
 /*
  * Initialise a hypercall-transfer page. The given pointer must be mapped
