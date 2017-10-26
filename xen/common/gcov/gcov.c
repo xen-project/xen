@@ -239,7 +239,7 @@ int sysctl_gcov_op(struct xen_sysctl_gcov_op *op)
         break;
 
     default:
-        ret = -EINVAL;
+        ret = -ENOSYS;
         break;
     }
 
