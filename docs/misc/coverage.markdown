@@ -1,6 +1,6 @@
 # Coverage support for Xen
 
-Coverare support allow you to get coverage information from Xen execution.
+Coverage support allows you to get coverage information from Xen execution.
 You can see how many times a line is executed.
 
 Some compilers have specific options that enable the collection of this
