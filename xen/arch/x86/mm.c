@@ -1901,9 +1901,10 @@ void page_unlock(struct page_info *page)
 
 /* Update the L1 entry at pl1e to new value nl1e. */
 static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
-                        unsigned long gl1mfn, int preserve_ad,
+                        unsigned long gl1mfn, unsigned int cmd,
                         struct vcpu *pt_vcpu, struct domain *pg_dom)
 {
+    bool preserve_ad = (cmd == MMU_PT_UPDATE_PRESERVE_AD);
     l1_pgentry_t ol1e;
     struct domain *pt_dom = pt_vcpu->domain;
     int rc = 0;
@@ -1925,7 +1926,8 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
         }
 
         /* Translate foreign guest address. */
-        if ( paging_mode_translate(pg_dom) )
+        if ( cmd != MMU_PT_UPDATE_NO_TRANSLATE &&
+             paging_mode_translate(pg_dom) )
         {
             p2m_type_t p2mt;
             p2m_query_t q = l1e_get_flags(nl1e) & _PAGE_RW ?
@@ -3617,6 +3619,7 @@ long do_mmu_update(
              */
         case MMU_NORMAL_PT_UPDATE:
         case MMU_PT_UPDATE_PRESERVE_AD:
+        case MMU_PT_UPDATE_NO_TRANSLATE:
         {
             p2m_type_t p2mt;
 
@@ -3676,8 +3679,7 @@ long do_mmu_update(
                 {
                 case PGT_l1_page_table:
                     rc = mod_l1_entry(va, l1e_from_intpte(req.val), mfn,
-                                      cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
-                                      pg_owner);
+                                      cmd, v, pg_owner);
                     break;
 
                 case PGT_l2_page_table:
@@ -3988,7 +3990,8 @@ static int __do_update_va_mapping(
         goto out;
     }
 
-    rc = mod_l1_entry(pl1e, val, mfn_x(gl1mfn), 0, v, pg_owner);
+    rc = mod_l1_entry(pl1e, val, mfn_x(gl1mfn), MMU_NORMAL_PT_UPDATE, v,
+                      pg_owner);
 
     page_unlock(gl1pg);
     put_page(gl1pg);
