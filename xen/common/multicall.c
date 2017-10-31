@@ -66,6 +66,13 @@ do_multicall(
 
         disp = arch_do_multicall_call(mcs);
 
+        /*
+         * In the unlikely event that a hypercall has left interrupts,
+         * spinlocks, or other things in a bad way, continuing the multicall
+         * will typically lead to far more subtle issues to debug.
+         */
+        ASSERT_NOT_IN_ATOMIC();
+
 #ifndef NDEBUG
         {
             /*
