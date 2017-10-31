@@ -359,6 +359,7 @@ typedef union
     struct
     {
         u64 lbr_enable:1;
+        u64 vloadsave_enable:1;
     } fields;
 } virt_ext_t;
 
