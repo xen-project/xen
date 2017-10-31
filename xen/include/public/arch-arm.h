@@ -274,6 +274,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_core_regs_t);
 
 typedef uint64_t xen_pfn_t;
 #define PRI_xen_pfn PRIx64
+#define PRIu_xen_pfn PRIu64
 
 /* Maximum number of virtual CPUs in legacy multi-processor guests. */
 /* Only one. All other VCPUS must use VCPUOP_register_vcpu_info */
