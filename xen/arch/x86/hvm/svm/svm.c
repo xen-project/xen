@@ -1997,7 +1997,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         vmcb_set_debugctlmsr(vmcb, msr_content);
         if ( !msr_content || !cpu_has_svm_lbrv )
             break;
-        vmcb->lbr_control.fields.enable = 1;
+        vmcb->virt_ext.fields.lbr_enable = 1;
         svm_disable_intercept_for_msr(v, MSR_IA32_DEBUGCTLMSR);
         svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHFROMIP);
         svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHTOIP);
