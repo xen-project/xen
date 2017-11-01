@@ -140,9 +140,9 @@ extern vaddr_t xenheap_virt_start;
 #ifdef CONFIG_ARM_32
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                                 \
-    unsigned long _mfn = (mfn);                                 \
-    (_mfn >= mfn_x(xenheap_mfn_start) &&                        \
-     _mfn < mfn_x(xenheap_mfn_end));                            \
+    unsigned long mfn_ = (mfn);                                 \
+    (mfn_ >= mfn_x(xenheap_mfn_start) &&                        \
+     mfn_ < mfn_x(xenheap_mfn_end));                            \
 })
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
