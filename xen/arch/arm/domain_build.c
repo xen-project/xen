@@ -49,6 +49,8 @@ struct map_range_data
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+#undef page_to_mfn
+#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
 
 //#define DEBUG_11_ALLOCATION
 #ifdef DEBUG_11_ALLOCATION
@@ -103,16 +105,16 @@ static bool insert_11_bank(struct domain *d,
                            unsigned int order)
 {
     int res, i;
-    paddr_t spfn;
+    mfn_t smfn;
     paddr_t start, size;
 
-    spfn = page_to_mfn(pg);
-    start = pfn_to_paddr(spfn);
-    size = pfn_to_paddr((1 << order));
+    smfn = page_to_mfn(pg);
+    start = mfn_to_maddr(smfn);
+    size = pfn_to_paddr(1UL << order);
 
     D11PRINT("Allocated %#"PRIpaddr"-%#"PRIpaddr" (%ldMB/%ldMB, order %d)\n",
              start, start + size,
-             1UL << (order+PAGE_SHIFT-20),
+             1UL << (order + PAGE_SHIFT - 20),
              /* Don't want format this as PRIpaddr (16 digit hex) */
              (unsigned long)(kinfo->unassigned_mem >> 20),
              order);
@@ -125,7 +127,7 @@ static bool insert_11_bank(struct domain *d,
         goto fail;
     }
 
-    res = guest_physmap_add_page(d, _gfn(spfn), _mfn(spfn), order);
+    res = guest_physmap_add_page(d, _gfn(mfn_x(smfn)), smfn, order);
     if ( res )
         panic("Failed map pages to DOM0: %d", res);
 
@@ -166,7 +168,8 @@ static bool insert_11_bank(struct domain *d,
          */
         if ( start + size < bank->start && kinfo->mem.nr_banks < NR_MEM_BANKS )
         {
-            memmove(bank + 1, bank, sizeof(*bank)*(kinfo->mem.nr_banks - i));
+            memmove(bank + 1, bank,
+                    sizeof(*bank) * (kinfo->mem.nr_banks - i));
             kinfo->mem.nr_banks++;
             bank->start = start;
             bank->size = size;
