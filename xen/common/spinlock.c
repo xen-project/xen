@@ -44,7 +44,13 @@ static void check_lock(struct lock_debug *debug)
     if ( unlikely(debug->irq_safe != irq_safe) )
     {
         int seen = cmpxchg(&debug->irq_safe, -1, irq_safe);
-        BUG_ON(seen == !irq_safe);
+
+        if ( seen == !irq_safe )
+        {
+            printk("CHECKLOCK FAILURE: prev irqsafe: %d, curr irqsafe %d\n",
+                   seen, irq_safe);
+            BUG();
+        }
     }
 }
 
