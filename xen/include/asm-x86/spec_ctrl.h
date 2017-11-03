@@ -20,7 +20,16 @@
 #ifndef __X86_SPEC_CTRL_H__
 #define __X86_SPEC_CTRL_H__
 
+#include <asm/current.h>
+
 void init_speculation_mitigations(void);
+
+static inline void init_shadow_spec_ctrl_state(void)
+{
+    struct cpu_info *info = get_cpu_info();
+
+    info->shadow_spec_ctrl = info->use_shadow_spec_ctrl = 0;
+}
 
 #endif /* !__X86_SPEC_CTRL_H__ */
 

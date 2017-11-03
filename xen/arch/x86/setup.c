@@ -678,6 +678,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     set_processor_id(0);
     set_current(INVALID_VCPU); /* debug sanity. */
     idle_vcpu[0] = current;
+    init_shadow_spec_ctrl_state();
 
     percpu_init_areas();
 
