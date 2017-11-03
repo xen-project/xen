@@ -358,6 +358,12 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         return ERROR_FAIL;
     }
 
+    if (xc_domain_set_gnttab_limits(ctx->xch, domid, info->max_grant_frames,
+                                    info->max_maptrack_frames) != 0) {
+        LOG(ERROR, "Couldn't set grant table limits");
+        return ERROR_FAIL;
+    }
+
     /*
      * Check if the domain has any CPU or node affinity already. If not, try
      * to build up the latter via automatic NUMA placement. In fact, in case
@@ -809,9 +815,6 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     dom->xenstore_domid = state->store_domid;
     dom->claim_enabled = libxl_defbool_val(info->claim_mode);
 
-    dom->max_grant_frames    = info->max_grant_frames;
-    dom->max_maptrack_frames = info->max_maptrack_frames;
-
     if (info->num_vnuma_nodes != 0) {
         unsigned int i;
 
@@ -1147,9 +1150,6 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     dom->console_domid = state->console_domid;
     dom->xenstore_evtchn = state->store_port;
     dom->xenstore_domid = state->store_domid;
-
-    dom->max_grant_frames    = info->max_grant_frames;
-    dom->max_maptrack_frames = info->max_maptrack_frames;
 
     /* The params from the configuration file are in Mb, which are then
      * multiplied by 1 Kb. This was then divided off when calling

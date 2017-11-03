@@ -784,9 +784,6 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     dom->console_domid = INVALID_DOMID;
     dom->xenstore_domid = INVALID_DOMID;
 
-    dom->max_grant_frames = -1;
-    dom->max_maptrack_frames = -1;
-
     dom->flags = SIF_VIRT_P2M_4TOOLS;
 
     dom->alloc_malloc += sizeof(*dom);

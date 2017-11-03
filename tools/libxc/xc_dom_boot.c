@@ -420,22 +420,6 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
 
 int xc_dom_gnttab_init(struct xc_dom_image *dom)
 {
-    int rc;
-
-    if ( dom->max_grant_frames == -1 || dom->max_maptrack_frames == -1 )
-    {
-        xc_dom_panic(dom->xch, XC_INVALID_PARAM,
-                     "%s: Caller didn't set grant limit information", __func__);
-        errno = EINVAL;
-
-        return -1;
-    }
-
-    if ( (rc = xc_domain_set_gnttab_limits(dom->xch, dom->guest_domid,
-                                           dom->max_grant_frames,
-                                           dom->max_maptrack_frames)) != 0 )
-        return rc;
-
     if ( xc_dom_translated(dom) ) {
         return xc_dom_gnttab_hvm_seed(dom->xch, dom->guest_domid,
                                       dom->console_gfn, dom->xenstore_gfn,
