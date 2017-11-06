@@ -257,23 +257,24 @@ static xen_pfn_t xc_dom_gnttab_setup(xc_interface *xch, uint32_t domid)
 }
 
 int xc_dom_gnttab_seed(xc_interface *xch, uint32_t domid,
-                       xen_pfn_t console_gfn,
-                       xen_pfn_t xenstore_gfn,
+                       xen_pfn_t console_gmfn,
+                       xen_pfn_t xenstore_gmfn,
                        uint32_t console_domid,
                        uint32_t xenstore_domid)
 {
-    xen_pfn_t gnttab_gfn;
+
+    xen_pfn_t gnttab_gmfn;
     grant_entry_v1_t *gnttab;
 
-    gnttab_gfn = xc_dom_gnttab_setup(xch, domid);
-    if ( gnttab_gfn == -1 )
+    gnttab_gmfn = xc_dom_gnttab_setup(xch, domid);
+    if ( gnttab_gmfn == -1 )
         return -1;
 
     gnttab = xc_map_foreign_range(xch,
                                   domid,
                                   PAGE_SIZE,
                                   PROT_READ|PROT_WRITE,
-                                  gnttab_gfn);
+                                  gnttab_gmfn);
     if ( gnttab == NULL )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
@@ -283,17 +284,17 @@ int xc_dom_gnttab_seed(xc_interface *xch, uint32_t domid,
         return -1;
     }
 
-    if ( domid != console_domid && console_gfn != -1 )
+    if ( domid != console_domid  && console_gmfn != -1)
     {
         gnttab[GNTTAB_RESERVED_CONSOLE].flags = GTF_permit_access;
         gnttab[GNTTAB_RESERVED_CONSOLE].domid = console_domid;
-        gnttab[GNTTAB_RESERVED_CONSOLE].frame = console_gfn;
+        gnttab[GNTTAB_RESERVED_CONSOLE].frame = console_gmfn;
     }
-    if ( domid != xenstore_domid && xenstore_gfn != -1 )
+    if ( domid != xenstore_domid && xenstore_gmfn != -1)
     {
         gnttab[GNTTAB_RESERVED_XENSTORE].flags = GTF_permit_access;
         gnttab[GNTTAB_RESERVED_XENSTORE].domid = xenstore_domid;
-        gnttab[GNTTAB_RESERVED_XENSTORE].frame = xenstore_gfn;
+        gnttab[GNTTAB_RESERVED_XENSTORE].frame = xenstore_gmfn;
     }
 
     if ( munmap(gnttab, PAGE_SIZE) == -1 )
@@ -307,19 +308,19 @@ int xc_dom_gnttab_seed(xc_interface *xch, uint32_t domid,
 
     /* Guest shouldn't really touch its grant table until it has
      * enabled its caches. But lets be nice. */
-    xc_domain_cacheflush(xch, domid, gnttab_gfn, 1);
+    xc_domain_cacheflush(xch, domid, gnttab_gmfn, 1);
 
     return 0;
 }
 
 int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
-                           xen_pfn_t console_gfn,
-                           xen_pfn_t xenstore_gfn,
+                           xen_pfn_t console_gpfn,
+                           xen_pfn_t xenstore_gpfn,
                            uint32_t console_domid,
                            uint32_t xenstore_domid)
 {
     int rc;
-    xen_pfn_t scratch_gfn;
+    xen_pfn_t scratch_gpfn;
     struct xen_add_to_physmap xatp = {
         .domid = domid,
         .space = XENMAPSPACE_grant_table,
@@ -329,7 +330,7 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
         .domid = domid,
     };
 
-    rc = xc_core_arch_get_scratch_gpfn(xch, domid, &scratch_gfn);
+    rc = xc_core_arch_get_scratch_gpfn(xch, domid, &scratch_gpfn);
     if ( rc < 0 )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
@@ -338,10 +339,11 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
                      __FUNCTION__, errno);
         return -1;
     }
-    xatp.gpfn = xrfp.gpfn = scratch_gfn;
+    xatp.gpfn = scratch_gpfn;
+    xrfp.gpfn = scratch_gpfn;
 
-    xc_dom_printf(xch, "%s: called, scratch gfn=0x%"PRI_xen_pfn, __FUNCTION__,
-                  scratch_gfn);
+    xc_dom_printf(xch, "%s: called, pfn=0x%"PRI_xen_pfn, __FUNCTION__,
+                  scratch_gpfn);
 
 
     rc = do_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
@@ -355,7 +357,7 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
     }
 
     rc = xc_dom_gnttab_seed(xch, domid,
-                            console_gfn, xenstore_gfn,
+                            console_gpfn, xenstore_gpfn,
                             console_domid, xenstore_domid);
     if (rc != 0)
     {
@@ -383,11 +385,12 @@ int xc_dom_gnttab_init(struct xc_dom_image *dom)
 {
     if ( xc_dom_translated(dom) ) {
         return xc_dom_gnttab_hvm_seed(dom->xch, dom->guest_domid,
-                                      dom->console_gfn, dom->xenstore_gfn,
+                                      dom->console_pfn, dom->xenstore_pfn,
                                       dom->console_domid, dom->xenstore_domid);
     } else {
         return xc_dom_gnttab_seed(dom->xch, dom->guest_domid,
-                                  dom->console_gfn, dom->xenstore_gfn,
+                                  xc_dom_p2m(dom, dom->console_pfn),
+                                  xc_dom_p2m(dom, dom->xenstore_pfn),
                                   dom->console_domid, dom->xenstore_domid);
     }
 }

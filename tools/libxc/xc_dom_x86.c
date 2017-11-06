@@ -536,23 +536,21 @@ static int alloc_p2m_list_x86_64(struct xc_dom_image *dom)
 
 static int alloc_magic_pages_pv(struct xc_dom_image *dom)
 {
-    xen_pfn_t pfn;
-
     dom->start_info_pfn = xc_dom_alloc_page(dom, "start info");
     if ( dom->start_info_pfn == INVALID_PFN )
         return -1;
 
-    pfn = xc_dom_alloc_page(dom, "xenstore");
-    if ( pfn == INVALID_PFN )
+    dom->xenstore_pfn = xc_dom_alloc_page(dom, "xenstore");
+    if ( dom->xenstore_pfn == INVALID_PFN )
         return -1;
-    dom->xenstore_gfn = xc_dom_p2m(dom, pfn);
-    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_gfn);
+    xc_clear_domain_page(dom->xch, dom->guest_domid,
+                         xc_dom_p2m(dom, dom->xenstore_pfn));
 
-    pfn = xc_dom_alloc_page(dom, "console");
-    if ( pfn == INVALID_PFN )
+    dom->console_pfn = xc_dom_alloc_page(dom, "console");
+    if ( dom->console_pfn == INVALID_PFN )
         return -1;
-    dom->console_gfn = xc_dom_p2m(dom, pfn);
-    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_gfn);
+    xc_clear_domain_page(dom->xch, dom->guest_domid,
+                         xc_dom_p2m(dom, dom->console_pfn));
 
     dom->alloc_bootstack = 1;
 
@@ -614,19 +612,14 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
                                X86_HVM_NR_SPECIAL_PAGES) )
             goto error_out;
 
-    dom->xenstore_gfn = special_pfn(SPECIALPAGE_XENSTORE);
-    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_gfn);
-    xc_hvm_param_set(xch, domid, HVM_PARAM_STORE_PFN, dom->xenstore_gfn);
-
+    xc_hvm_param_set(xch, domid, HVM_PARAM_STORE_PFN,
+                     special_pfn(SPECIALPAGE_XENSTORE));
     xc_hvm_param_set(xch, domid, HVM_PARAM_BUFIOREQ_PFN,
                      special_pfn(SPECIALPAGE_BUFIOREQ));
     xc_hvm_param_set(xch, domid, HVM_PARAM_IOREQ_PFN,
                      special_pfn(SPECIALPAGE_IOREQ));
-
-    dom->console_gfn = special_pfn(SPECIALPAGE_CONSOLE);
-    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_gfn);
-    xc_hvm_param_set(xch, domid, HVM_PARAM_CONSOLE_PFN, dom->console_gfn);
-
+    xc_hvm_param_set(xch, domid, HVM_PARAM_CONSOLE_PFN,
+                     special_pfn(SPECIALPAGE_CONSOLE));
     xc_hvm_param_set(xch, domid, HVM_PARAM_PAGING_RING_PFN,
                      special_pfn(SPECIALPAGE_PAGING));
     xc_hvm_param_set(xch, domid, HVM_PARAM_MONITOR_RING_PFN,
@@ -706,6 +699,12 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     xc_hvm_param_set(xch, domid, HVM_PARAM_IDENT_PT,
                      special_pfn(SPECIALPAGE_IDENT_PT) << PAGE_SHIFT);
 
+    dom->console_pfn = special_pfn(SPECIALPAGE_CONSOLE);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_pfn);
+
+    dom->xenstore_pfn = special_pfn(SPECIALPAGE_XENSTORE);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_pfn);
+
     dom->parms.virt_hypercall = -1;
 
     rc = 0;
@@ -745,9 +744,9 @@ static int start_info_x86_32(struct xc_dom_image *dom)
     start_info->mfn_list = dom->p2m_seg.vstart;
 
     start_info->flags = dom->flags;
-    start_info->store_mfn = dom->xenstore_gfn;
+    start_info->store_mfn = xc_dom_p2m(dom, dom->xenstore_pfn);
     start_info->store_evtchn = dom->xenstore_evtchn;
-    start_info->console.domU.mfn = dom->console_gfn;
+    start_info->console.domU.mfn = xc_dom_p2m(dom, dom->console_pfn);
     start_info->console.domU.evtchn = dom->console_evtchn;
 
     if ( dom->ramdisk_blob )
@@ -796,9 +795,9 @@ static int start_info_x86_64(struct xc_dom_image *dom)
     }
 
     start_info->flags = dom->flags;
-    start_info->store_mfn = dom->xenstore_gfn;
+    start_info->store_mfn = xc_dom_p2m(dom, dom->xenstore_pfn);
     start_info->store_evtchn = dom->xenstore_evtchn;
-    start_info->console.domU.mfn = dom->console_gfn;
+    start_info->console.domU.mfn = xc_dom_p2m(dom, dom->console_pfn);
     start_info->console.domU.evtchn = dom->console_evtchn;
 
     if ( dom->ramdisk_blob )
