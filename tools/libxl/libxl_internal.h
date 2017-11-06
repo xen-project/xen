@@ -117,6 +117,7 @@
 #define STUBDOM_SPECIAL_CONSOLES 3
 #define TAP_DEVICE_SUFFIX "-emu"
 #define DOMID_XS_PATH "domid"
+#define INVALID_DOMID ~0
 
 /* Size macros. */
 #define __AC(X,Y)   (X##Y)

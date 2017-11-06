@@ -99,7 +99,7 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
             dom->xenstore_gfn);
     xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_MONITOR_RING_PFN,
             base + MEMACCESS_PFN_OFFSET);
-
+    /* allocated by toolstack */
     xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_EVTCHN,
             dom->console_evtchn);
     xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_STORE_EVTCHN,

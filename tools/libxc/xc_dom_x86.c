@@ -617,8 +617,6 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     dom->xenstore_gfn = special_pfn(SPECIALPAGE_XENSTORE);
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_gfn);
     xc_hvm_param_set(xch, domid, HVM_PARAM_STORE_PFN, dom->xenstore_gfn);
-    xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_STORE_EVTCHN,
-                     dom->xenstore_evtchn);
 
     xc_hvm_param_set(xch, domid, HVM_PARAM_BUFIOREQ_PFN,
                      special_pfn(SPECIALPAGE_BUFIOREQ));
@@ -628,8 +626,6 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
     dom->console_gfn = special_pfn(SPECIALPAGE_CONSOLE);
     xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_gfn);
     xc_hvm_param_set(xch, domid, HVM_PARAM_CONSOLE_PFN, dom->console_gfn);
-    xc_hvm_param_set(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_EVTCHN,
-                     dom->console_evtchn);
 
     xc_hvm_param_set(xch, domid, HVM_PARAM_PAGING_RING_PFN,
                      special_pfn(SPECIALPAGE_PAGING));

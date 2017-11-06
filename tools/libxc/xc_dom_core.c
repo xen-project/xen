@@ -779,11 +779,6 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     dom->parms.elf_paddr_offset = UNSET_ADDR;
     dom->parms.p2m_base = UNSET_ADDR;
 
-    dom->console_evtchn = INVALID_EVTCHN;
-    dom->xenstore_evtchn = INVALID_EVTCHN;
-    dom->console_domid = INVALID_DOMID;
-    dom->xenstore_domid = INVALID_DOMID;
-
     dom->flags = SIF_VIRT_P2M_4TOOLS;
 
     dom->alloc_malloc += sizeof(*dom);
