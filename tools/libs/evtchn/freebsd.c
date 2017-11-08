@@ -19,6 +19,7 @@
  * Split off from xc_freebsd_osdep.c
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 

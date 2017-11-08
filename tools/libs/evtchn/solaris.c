@@ -19,6 +19,7 @@
  * Split out from xc_solaris.c
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 

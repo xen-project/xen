@@ -19,6 +19,7 @@
  * Split out from xc_netbsd.c
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
