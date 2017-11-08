@@ -95,7 +95,7 @@ static const char *str_7b0[32] =
     [ 0] = "fsgsbase", [ 1] = "tsc-adj",
     [ 2] = "sgx",      [ 3] = "bmi1",
     [ 4] = "hle",      [ 5] = "avx2",
-    [ 6] = "REZ",      [ 7] = "smep",
+    [ 6] = "fdp_exn",  [ 7] = "smep",
     [ 8] = "bmi2",     [ 9] = "erms",
     [10] = "invpcid",  [11] = "rtm",
     [12] = "pqm",      [13] = "depfpp",
@@ -121,23 +121,28 @@ static const char *str_Da1[32] =
 static const char *str_7c0[32] =
 {
     [ 0] = "prechwt1", [ 1] = "avx512vbmi",
-    [ 2] = "REZ",      [ 3] = "pku",
+    [ 2] = "umip",     [ 3] = "pku",
     [ 4] = "ospke",
 
     [5 ... 13] = "REZ",
 
     [14] = "avx512_vpopcntdq",
 
-    [15 ... 31] = "REZ",
+    [15 ... 21] = "REZ",
+
+    [22] = "rdpid",
+
+    [23 ... 31] = "REZ",
 };
 
 static const char *str_e7d[32] =
 {
     [0 ... 7] = "REZ",
 
-    [ 8] = "itsc",
+    [ 8] = "itsc",     [ 9] = "REZ",
+    [10] = "efro",
 
-    [9 ... 31] = "REZ",
+    [11 ... 31] = "REZ",
 };
 
 static const char *str_e8b[32] =

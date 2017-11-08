@@ -239,8 +239,8 @@ XEN_CPUFEATURE(EFRO,          7*32+10) /*   APERF/MPERF Read Only interface */
 XEN_CPUFEATURE(CLZERO,        8*32+ 0) /*A  CLZERO instruction */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0.edx, word 9 */
-XEN_CPUFEATURE(AVX512_4VNNIW, 9*32+ 2) /*A AVX512 Neural Network Instructions */
-XEN_CPUFEATURE(AVX512_4FMAPS, 9*32+ 3) /*A AVX512 Multiply Accumulation Single Precision */
+XEN_CPUFEATURE(AVX512_4VNNIW, 9*32+ 2) /*A  AVX512 Neural Network Instructions */
+XEN_CPUFEATURE(AVX512_4FMAPS, 9*32+ 3) /*A  AVX512 Multiply Accumulation Single Precision */
 
 #endif /* XEN_CPUFEATURE */
 
