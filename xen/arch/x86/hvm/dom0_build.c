@@ -818,6 +818,17 @@ static bool __init pvh_acpi_table_allowed(const char *sig)
     return true;
 }
 
+static bool __init pvh_acpi_xsdt_table_allowed(const char *sig)
+{
+    /*
+     * DSDT and FACS are pointed to from FADT and thus don't belong
+     * in XSDT.
+     */
+    return (pvh_acpi_table_allowed(sig) &&
+            strncmp(sig, ACPI_SIG_DSDT, ACPI_NAME_SIZE) &&
+            strncmp(sig, ACPI_SIG_FACS, ACPI_NAME_SIZE));
+}
+
 static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
                                       paddr_t *addr)
 {
@@ -841,7 +852,7 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     {
         const char *sig = acpi_gbl_root_table_list.tables[i].signature.ascii;
 
-        if ( pvh_acpi_table_allowed(sig) )
+        if ( pvh_acpi_xsdt_table_allowed(sig) )
             num_tables++;
     }
 
@@ -888,7 +899,7 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     {
         const char *sig = acpi_gbl_root_table_list.tables[i].signature.ascii;
 
-        if ( pvh_acpi_table_allowed(sig) )
+        if ( pvh_acpi_xsdt_table_allowed(sig) )
             xsdt->table_offset_entry[j++] =
                 acpi_gbl_root_table_list.tables[i].address;
     }
