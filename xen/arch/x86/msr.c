@@ -120,17 +120,32 @@ int init_vcpu_msr_policy(struct vcpu *v)
 
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
+    const struct cpuid_policy *cp = v->domain->arch.cpuid;
     const struct msr_domain_policy *dp = v->domain->arch.msr;
     const struct msr_vcpu_policy *vp = v->arch.msr;
 
     switch ( msr )
     {
+    case MSR_PRED_CMD:
+        /* Write-only */
+        goto gp_fault;
+
+    case MSR_SPEC_CTRL:
+        if ( !cp->feat.ibrsb )
+            goto gp_fault;
+        *val = vp->spec_ctrl.raw;
+        break;
+
     case MSR_INTEL_PLATFORM_INFO:
         if ( !dp->plaform_info.available )
             goto gp_fault;
         *val = (uint64_t)dp->plaform_info.cpuid_faulting <<
                _MSR_PLATFORM_INFO_CPUID_FAULTING;
         break;
+
+    case MSR_ARCH_CAPABILITIES:
+        /* Not implemented yet. */
+        goto gp_fault;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
         if ( !vp->misc_features_enables.available )
@@ -153,13 +168,43 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     const struct vcpu *curr = current;
     struct domain *d = v->domain;
+    const struct cpuid_policy *cp = d->arch.cpuid;
     struct msr_domain_policy *dp = d->arch.msr;
     struct msr_vcpu_policy *vp = v->arch.msr;
 
     switch ( msr )
     {
     case MSR_INTEL_PLATFORM_INFO:
+    case MSR_ARCH_CAPABILITIES:
+        /* Read-only */
         goto gp_fault;
+
+    case MSR_SPEC_CTRL:
+        if ( !cp->feat.ibrsb )
+            goto gp_fault; /* MSR available? */
+
+        /*
+         * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
+         * when STIBP isn't enumerated in hardware.
+         */
+
+        if ( val & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+            goto gp_fault; /* Rsvd bit set? */
+
+        vp->spec_ctrl.raw = val;
+        break;
+
+    case MSR_PRED_CMD:
+        if ( !cp->feat.ibrsb && !cp->extd.ibpb )
+            goto gp_fault; /* MSR available? */
+
+        /*
+         * The only defined behaviour is when writing PRED_CMD_IBPB.  In
+         * practice, real hardware accepts any value without faulting.
+         */
+        if ( v == curr && (val & PRED_CMD_IBPB) )
+            wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+        break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
     {
