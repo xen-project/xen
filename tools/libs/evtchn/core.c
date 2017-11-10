@@ -56,6 +56,7 @@ xenevtchn_handle *xenevtchn_open(xentoollog_logger *logger, unsigned open_flags)
 
 err:
     osdep_evtchn_close(xce);
+    xentoolcore__deregister_active_handle(&xce->tc_ah);
     xtl_logger_destroy(xce->logger_tofree);
     free(xce);
     return NULL;
@@ -69,6 +70,7 @@ int xenevtchn_close(xenevtchn_handle *xce)
         return 0;
 
     rc = osdep_evtchn_close(xce);
+    xentoolcore__deregister_active_handle(&xce->tc_ah);
     xtl_logger_destroy(xce->logger_tofree);
     free(xce);
     return rc;
