@@ -1,5 +1,5 @@
 /******************************************************************************
- * asm-x86/guest.h
+ * asm-x86/guest/shim.h
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms and conditions of the GNU General Public
@@ -16,15 +16,20 @@
  * Copyright (c) 2017 Citrix Systems Ltd.
  */
 
-#ifndef __X86_GUEST_H__
-#define __X86_GUEST_H__
+#ifndef __X86_PV_SHIM_H__
+#define __X86_PV_SHIM_H__
 
-#include <asm/guest/hypercall.h>
-#include <asm/guest/pvh-boot.h>
-#include <asm/guest/xen.h>
-#include <asm/pv/shim.h>
+#include <xen/types.h>
 
-#endif /* __X86_GUEST_H__ */
+#if defined(CONFIG_PV_SHIM_EXCLUSIVE)
+# define pv_shim 1
+#elif defined(CONFIG_PV_SHIM)
+extern bool pv_shim;
+#else
+# define pv_shim 0
+#endif /* CONFIG_PV_SHIM{,_EXCLUSIVE} */
+
+#endif /* __X86_PV_SHIM_H__ */
 
 /*
  * Local variables:

@@ -11,6 +11,7 @@ obj-y += iret.o
 obj-y += misc-hypercalls.o
 obj-y += mm.o
 obj-y += ro-page-fault.o
+obj-$(CONFIG_PV_SHIM) += shim.o
 obj-y += traps.o
 
 obj-bin-y += dom0_build.init.o

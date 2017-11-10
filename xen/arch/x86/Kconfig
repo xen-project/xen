@@ -134,6 +134,28 @@ config PVH_GUEST
 	  Support booting using the PVH ABI.
 
 	  If unsure, say N.
+
+config PV_SHIM
+	def_bool n
+	prompt "PV Shim"
+	depends on PV && XEN_GUEST
+	---help---
+	  Build Xen with a mode which acts as a shim to allow PV guest to run
+	  in an HVM/PVH container. This mode can only be enabled with command
+	  line option.
+
+	  If unsure, say N.
+
+config PV_SHIM_EXCLUSIVE
+	def_bool n
+	prompt "PV Shim Exclusive"
+	depends on PV_SHIM
+	---help---
+	  Build Xen in a way which unconditionally assumes PV_SHIM mode.  This
+	  option is only intended for use when building a dedicated PV Shim
+	  firmware, and will not function correctly in other scenarios.
+
+	  If unsure, say N.
 endmenu
 
 source "common/Kconfig"

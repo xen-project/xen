@@ -1445,6 +1445,17 @@ do; there may be other custom operating systems which do.  If you're
 certain you don't plan on having PV guests which use this feature,
 turning it off can reduce the attack surface.
 
+### pv-shim (x86)
+> `= <boolean>`
+
+> Default: `false`
+
+This option is intended for use by a toolstack, when choosing to run a PV
+guest compatibly inside an HVM container.
+
+In this mode, the kernel and initrd passed as modules to the hypervisor are
+constructed into a plain unprivileged PV domain.
+
 ### rcu-idle-timer-period-ms
 > `= <integer>`
 
