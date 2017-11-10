@@ -34,7 +34,7 @@ OUTPUT_ARCH(i386:x86-64)
 PHDRS
 {
   text PT_LOAD ;
-#if defined(BUILD_ID) && !defined(EFI)
+#if (defined(BUILD_ID) || defined (CONFIG_PVH_GUEST)) && !defined(EFI)
   note PT_NOTE ;
 #endif
 }
@@ -127,6 +127,12 @@ SECTIONS
        *(.data.param)
        __param_end = .;
   } :text
+
+#if defined(CONFIG_PVH_GUEST) && !defined(EFI)
+  DECL_SECTION(.note.Xen) {
+      *(.note.Xen)
+  } :note :text
+#endif
 
 #if defined(BUILD_ID)
 #if !defined(EFI)
@@ -279,6 +285,7 @@ SECTIONS
 #ifdef EFI
        *(.comment)
        *(.comment.*)
+       *(.note.Xen)
 #endif
   }
 

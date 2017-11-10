@@ -323,6 +323,7 @@ xen/xsm/flask/xenpolicy-*
 tools/flask/policy/policy.conf
 tools/flask/policy/xenpolicy-*
 xen/xen
+xen/xen-shim
 xen/xen-syms
 xen/xen-syms.map
 xen/xen.*

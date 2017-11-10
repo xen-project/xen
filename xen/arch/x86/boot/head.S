@@ -7,6 +7,7 @@
 #include <asm/page.h>
 #include <asm/msr.h>
 #include <asm/cpufeature.h>
+#include <public/elfnote.h>
 
         .text
         .code32
@@ -373,6 +374,14 @@ cs32_switch:
 
         /* Jump to earlier loaded address. */
         jmp     *%edi
+
+#ifdef CONFIG_PVH_GUEST
+ELFNOTE(Xen, XEN_ELFNOTE_PHYS32_ENTRY, .long sym_offs(__pvh_start))
+
+__pvh_start:
+        ud2a
+
+#endif /* CONFIG_PVH_GUEST */
 
 __start:
         cld
