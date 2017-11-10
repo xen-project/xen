@@ -117,6 +117,23 @@ config TBOOT
 	  Technology (TXT)
 
 	  If unsure, say Y.
+
+config XEN_GUEST
+	def_bool n
+	prompt "Xen Guest"
+	---help---
+	  Support for Xen detecting when it is running under Xen.
+
+	  If unsure, say N.
+
+config PVH_GUEST
+	def_bool n
+	prompt "PVH Guest"
+	depends on XEN_GUEST
+	---help---
+	  Support booting using the PVH ABI.
+
+	  If unsure, say N.
 endmenu
 
 source "common/Kconfig"
