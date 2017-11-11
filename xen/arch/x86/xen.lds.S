@@ -172,7 +172,11 @@ SECTIONS
   __2M_init_start = .;         /* Start of 2M superpages, mapped RWX (boot only). */
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
+#ifdef EFI /* EFI wants to merge all of .init.*  ELF doesn't. */
   DECL_SECTION(.init) {
+#else
+  DECL_SECTION(.init.text) {
+#endif
        _sinittext = .;
        *(.init.text)
        /*
@@ -183,7 +187,12 @@ SECTIONS
        *(.altinstr_replacement)
        _einittext = .;
 
+#ifdef EFI /* EFI wants to merge all of .init.*  ELF doesn't. */
        . = ALIGN(SMP_CACHE_BYTES);
+#else
+  } :text
+  DECL_SECTION(.init.data) {
+#endif
 
        *(.init.rodata)
        *(.init.rodata.rel)
