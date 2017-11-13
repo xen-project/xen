@@ -52,6 +52,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/cpuid.h>
 #include <asm/spec_ctrl.h>
+#include <asm/guest.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool __initdata opt_nosmp;
@@ -650,8 +651,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
     unsigned int initrdidx, domcr_flags = DOMCRF_s3_integrity;
-    multiboot_info_t *mbi = __va(mbi_p);
-    module_t *mod = (module_t *)__va(mbi->mods_addr);
+    multiboot_info_t *mbi;
+    module_t *mod;
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
     bool acpi_boot_table_init_done = false, relocated = false;
@@ -680,6 +681,16 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     setup_virtual_regions(__start___ex_table, __stop___ex_table);
 
     /* Full exception support from here on in. */
+
+    if ( pvh_boot )
+    {
+        ASSERT(mbi_p == 0);
+        mbi = pvh_init();
+    }
+    else
+        mbi = __va(mbi_p);
+
+    mod = __va(mbi->mods_addr);
 
     loader = (mbi->flags & MBI_LOADERNAME)
         ? (char *)__va(mbi->boot_loader_name) : "unknown";
@@ -719,6 +730,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     ns16550_init(1, &ns16550);
     ehci_dbgp_init();
     console_init_preirq();
+
+    if ( pvh_boot )
+        pvh_print_info();
 
     printk("Bootloader: %s\n", loader);
 
