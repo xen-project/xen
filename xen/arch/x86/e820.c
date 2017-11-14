@@ -134,8 +134,7 @@ static struct change_member *change_point[2*E820MAX] __initdata;
 static struct e820entry *overlap_list[E820MAX] __initdata;
 static struct e820entry new_bios[E820MAX] __initdata;
 
-static int __init sanitize_e820_map(struct e820entry *biosmap,
-                                    unsigned int *pnr_map)
+int __init sanitize_e820_map(struct e820entry *biosmap, unsigned int *pnr_map)
 {
     struct change_member *change_tmp;
     unsigned long current_type, last_type;

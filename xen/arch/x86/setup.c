@@ -796,7 +796,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
         panic("dom0 kernel not specified. Check bootloader configuration.");
 
-    if ( efi_enabled(EFI_LOADER) )
+    if ( pvh_boot )
+    {
+        /* pvh_init() already filled in e820_raw */
+        memmap_type = "PVH-e820";
+    }
+    else if ( efi_enabled(EFI_LOADER) )
     {
         set_pdx_range(xen_phys_start >> PAGE_SHIFT,
                       (xen_phys_start + BOOTSTRAP_MAP_BASE) >> PAGE_SHIFT);
