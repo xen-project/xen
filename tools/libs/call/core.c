@@ -59,8 +59,8 @@ xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
     return xcall;
 
 err:
-    osdep_xencall_close(xcall);
     xentoolcore__deregister_active_handle(&xcall->tc_ah);
+    osdep_xencall_close(xcall);
     xtl_logger_destroy(xcall->logger_tofree);
     free(xcall);
     return NULL;
@@ -73,8 +73,8 @@ int xencall_close(xencall_handle *xcall)
     if ( !xcall )
         return 0;
 
-    rc = osdep_xencall_close(xcall);
     xentoolcore__deregister_active_handle(&xcall->tc_ah);
+    rc = osdep_xencall_close(xcall);
     buffer_release_cache(xcall);
     xtl_logger_destroy(xcall->logger_tofree);
     free(xcall);

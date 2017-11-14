@@ -54,8 +54,8 @@ xengnttab_handle *xengnttab_open(xentoollog_logger *logger, unsigned open_flags)
     return xgt;
 
 err:
-    osdep_gnttab_close(xgt);
     xentoolcore__deregister_active_handle(&xgt->tc_ah);
+    osdep_gnttab_close(xgt);
     xtl_logger_destroy(xgt->logger_tofree);
     free(xgt);
     return NULL;
@@ -68,8 +68,8 @@ int xengnttab_close(xengnttab_handle *xgt)
     if ( !xgt )
         return 0;
 
-    rc = osdep_gnttab_close(xgt);
     xentoolcore__deregister_active_handle(&xgt->tc_ah);
+    rc = osdep_gnttab_close(xgt);
     xtl_logger_destroy(xgt->logger_tofree);
     free(xgt);
     return rc;
