@@ -52,6 +52,7 @@ static int update_domain_cpuid_info(struct domain *d,
     struct cpuid_policy *p = d->arch.cpuid;
     const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
     int old_vendor = p->x86_vendor;
+    unsigned int old_7d0 = p->feat.raw[0].d, old_e8b = p->extd.raw[8].b;
     bool call_policy_changed = false; /* Avoid for_each_vcpu() unnecessarily */
 
     /*
@@ -217,6 +218,14 @@ static int update_domain_cpuid_info(struct domain *d,
 
             d->arch.pv_domain.cpuidmasks->_7ab0 = mask;
         }
+
+        /*
+         * If the IBRS/IBPB policy has changed, we need to recalculate the MSR
+         * interception bitmaps.
+         */
+        call_policy_changed = (is_hvm_domain(d) &&
+                               ((old_7d0 ^ p->feat.raw[0].d) &
+                                cpufeat_mask(X86_FEATURE_IBRSB)));
         break;
 
     case 0xa:
@@ -290,6 +299,16 @@ static int update_domain_cpuid_info(struct domain *d,
 
             d->arch.pv_domain.cpuidmasks->e1cd = mask;
         }
+        break;
+
+    case 0x80000008:
+        /*
+         * If the IBPB policy has changed, we need to recalculate the MSR
+         * interception bitmaps.
+         */
+        call_policy_changed = (is_hvm_domain(d) &&
+                               ((old_e8b ^ p->extd.raw[8].b) &
+                                cpufeat_mask(X86_FEATURE_IBPB)));
         break;
     }
 
