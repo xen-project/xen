@@ -91,6 +91,11 @@ static inline long xen_hypercall_sched_op(unsigned int cmd, void *arg)
     return _hypercall64_2(long, __HYPERVISOR_sched_op, cmd, arg);
 }
 
+static inline long xen_hypercall_memory_op(unsigned int cmd, void *arg)
+{
+    return _hypercall64_2(long, __HYPERVISOR_memory_op, cmd, arg);
+}
+
 /*
  * Higher level hypercall helpers
  */

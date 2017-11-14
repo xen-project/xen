@@ -22,6 +22,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 
+#include <asm/e820.h>
 #include <asm/guest.h>
 
 #include <public/arch-x86/hvm/start_info.h>
@@ -70,9 +71,28 @@ static void __init convert_pvh_info(void)
     }
 }
 
+static void __init get_memory_map(void)
+{
+    struct xen_memory_map memmap = {
+        .nr_entries = E820MAX,
+    };
+
+    set_xen_guest_handle(memmap.buffer, e820_raw.map);
+    BUG_ON(xen_hypercall_memory_op(XENMEM_memory_map, &memmap));
+    e820_raw.nr_map = memmap.nr_entries;
+
+    /* :( Various toolstacks don't sort the memory map. */
+    sanitize_e820_map(e820_raw.map, &e820_raw.nr_map);
+}
+
 multiboot_info_t *__init pvh_init(void)
 {
     convert_pvh_info();
+
+    probe_hypervisor();
+    ASSERT(xen_guest);
+
+    get_memory_map();
 
     return &pvh_mbi;
 }
