@@ -2002,15 +2002,15 @@ static void initrd_load(struct kernel_info *kinfo)
 
     for ( offs = 0; offs < len; )
     {
-        int rc;
-        paddr_t s, l, ma;
+        uint64_t par;
+        paddr_t s, l, ma = 0;
         void *dst;
 
         s = offs & ~PAGE_MASK;
         l = min(PAGE_SIZE - s, len);
 
-        rc = gvirt_to_maddr(load_addr + offs, &ma, GV2M_WRITE);
-        if ( rc )
+        par = gvirt_to_maddr(load_addr + offs, &ma, GV2M_WRITE);
+        if ( par )
         {
             panic("Unable to translate guest address");
             return;

@@ -1414,7 +1414,7 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct page_info *page = NULL;
     paddr_t maddr = 0;
-    int rc;
+    uint64_t par;
 
     /*
      * XXX: To support a different vCPU, we would need to load the
@@ -1425,9 +1425,9 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
 
     p2m_read_lock(p2m);
 
-    rc = gvirt_to_maddr(va, &maddr, flags);
+    par = gvirt_to_maddr(va, &maddr, flags);
 
-    if ( rc )
+    if ( par )
         goto err;
 
     if ( !mfn_valid(maddr_to_mfn(maddr)) )
