@@ -1428,16 +1428,29 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     par = gvirt_to_maddr(va, &maddr, flags);
 
     if ( par )
+    {
+        dprintk(XENLOG_G_DEBUG,
+                "%pv: gvirt_to_maddr failed va=%#"PRIvaddr" flags=0x%lx par=%#"PRIx64"\n",
+                v, va, flags, par);
         goto err;
+    }
 
     if ( !mfn_valid(maddr_to_mfn(maddr)) )
+    {
+        dprintk(XENLOG_G_DEBUG, "%pv: Invalid MFN %#"PRI_mfn"\n",
+                v, mfn_x(maddr_to_mfn(maddr)));
         goto err;
+    }
 
     page = mfn_to_page(maddr_to_mfn(maddr));
     ASSERT(page);
 
     if ( unlikely(!get_page(page, d)) )
+    {
+        dprintk(XENLOG_G_DEBUG, "%pv: Failing to acquire the MFN %#"PRI_mfn"\n",
+                v, mfn_x(maddr_to_mfn(maddr)));
         page = NULL;
+    }
 
 err:
     if ( !page && p2m->mem_access_enabled )
