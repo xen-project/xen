@@ -595,7 +595,7 @@ static inline void guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr,
                                           void *eff_l1e)
 {
     bool_t user_mode = !(v->arch.flags & TF_kernel_mode);
-#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_pt(v)
 
     TOGGLE_MODE();
     guest_get_eff_l1e(addr, eff_l1e);
