@@ -214,6 +214,15 @@ static int construct_vmcb(struct vcpu *v)
         vmcb->_exception_intercepts |= (1U << TRAP_page_fault);
     }
 
+    /* if available, enable and configure virtual gif */
+    if ( cpu_has_svm_vgif )
+    {
+        vmcb->_vintr.fields.vgif = 1;
+        vmcb->_vintr.fields.vgif_enable = 1;
+        vmcb->_general2_intercepts &= ~GENERAL2_INTERCEPT_STGI;
+        vmcb->_general2_intercepts &= ~GENERAL2_INTERCEPT_CLGI;
+    }
+
     if ( cpu_has_pause_filter )
     {
         vmcb->_pause_filter_count = SVM_PAUSEFILTER_INIT;

@@ -1597,8 +1597,13 @@ bool_t
 nestedsvm_gif_isset(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    return (!!svm->ns_gif);
+    /* get the vmcb gif value if using vgif */
+    if ( vmcb->_vintr.fields.vgif_enable )
+        return vmcb->_vintr.fields.vgif;
+    else
+        return svm->ns_gif;
 }
 
 void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
