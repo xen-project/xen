@@ -1067,7 +1067,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
             "     jmp  1b             \n"
             ".previous                \n"
             _ASM_EXTABLE(1b, 2b)
-            : : "r" (base&0xffff) );
+            : "+r" (base) );
         break;
 
     default:
