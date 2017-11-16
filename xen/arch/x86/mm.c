@@ -2477,26 +2477,19 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                 break;
             }
 
-#ifdef CONFIG_PV_LINEAR_PT
-            if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
+            if ( !ptpg || !PGT_type_equal(x, ptpg->u.inuse.type_info) )
             {
                 /*
                  * set_tlbflush_timestamp() accesses the same union
-                 * linear_pt_count lives in. Unvalidated page table pages,
-                 * however, should occur during domain destruction only
-                 * anyway.  Updating of linear_pt_count luckily is not
-                 * necessary anymore for a dying domain.
+                 * linear_pt_count lives in. Pages (including page table ones),
+                 * however, don't need their flush time stamp set except when
+                 * the last reference is being dropped. For page table pages
+                 * this happens in _put_final_page_type().
                  */
-                ASSERT(page_get_owner(page)->is_dying);
-                ASSERT(page->linear_pt_count < 0);
-                ASSERT(ptpg->linear_pt_count > 0);
-                ptpg = NULL;
+                set_tlbflush_timestamp(page);
             }
-#else /* CONFIG_PV_LINEAR_PT */
-            BUG_ON(ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info));
-#endif
-
-            set_tlbflush_timestamp(page);
+            else
+                BUG_ON(!IS_ENABLED(CONFIG_PV_LINEAR_PT));
         }
         else if ( unlikely((nx & (PGT_locked | PGT_count_mask)) ==
                            (PGT_locked | 1)) )
