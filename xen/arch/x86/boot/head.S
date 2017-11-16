@@ -173,10 +173,11 @@ not_multiboot:
 .Lget_vtb:
         mov     sym_esi(vga_text_buffer),%edi
 .Lsend_chr:
-        mov     (%esi),%bl
-        test    %bl,%bl        # Terminate on '\0' sentinel
+        lodsb
+        test    %al,%al        # Terminate on '\0' sentinel
         je      .Lhalt
         mov     $0x3f8+5,%dx   # UART Line Status Register
+        mov     %al,%bl
 2:      in      %dx,%al
         test    $0x20,%al      # Test THR Empty flag
         je      2b
@@ -185,7 +186,7 @@ not_multiboot:
         out     %al,%dx        # Send a character over the serial line
         test    %edi,%edi      # Is the VGA text buffer available?
         jz      .Lsend_chr
-        movsb                  # Write a character to the VGA text buffer
+        stosb                  # Write a character to the VGA text buffer
         mov     $7,%al
         stosb                  # Write an attribute to the VGA text buffer
         jmp     .Lsend_chr
