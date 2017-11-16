@@ -4255,11 +4255,18 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
 
     /* Carefully look in the shadow linear map for the l1e we expect */
 #if SHADOW_PAGING_LEVELS >= 4
-    /* Is a shadow linear map is installed in the first place? */
-    sl4p  = v->arch.paging.shadow.guest_vtable;
-    sl4p += shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
-    if ( !(shadow_l4e_get_flags(*sl4p) & _PAGE_PRESENT) )
-        return 0;
+    /*
+     * Non-external guests (i.e. PV) have a SHADOW_LINEAR mapping from the
+     * moment their shadows are created.  External guests (i.e. HVM) may not,
+     * but always have a regular linear mapping, which we can use to observe
+     * whether a SHADOW_LINEAR mapping is present.
+     */
+    if ( paging_mode_external(v->domain) )
+    {
+        sl4p =  __linear_l4_table + l4_linear_offset(SH_LINEAR_PT_VIRT_START);
+        if ( !(shadow_l4e_get_flags(*sl4p) & _PAGE_PRESENT) )
+            return 0;
+    }
     sl4p = sh_linear_l4_table(v) + shadow_l4_linear_offset(vaddr);
     if ( !(shadow_l4e_get_flags(*sl4p) & _PAGE_PRESENT) )
         return 0;
