@@ -226,10 +226,6 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         if ( !vpmu->xenpmu_data )
             return;
 
-        if ( !(vpmu_mode & XENPMU_MODE_ALL) &&
-             !vpmu->arch_vpmu_ops->do_interrupt(regs) )
-            return;
-
         if ( vpmu_is_set(vpmu, VPMU_CACHED) )
             return;
 
