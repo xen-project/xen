@@ -734,6 +734,9 @@ static void dec_linear_uses(struct page_info *pg)
  *     frame if it is mapped by a different root table. This is sufficient and
  *     also necessary to allow validation of a root table mapping itself.
  */
+static bool_t __read_mostly opt_pv_linear_pt = 1;
+boolean_param("pv-linear-pt", opt_pv_linear_pt);
+
 #define define_get_linear_pagetable(level)                                  \
 static int                                                                  \
 get_##level##_linear_pagetable(                                             \
@@ -742,6 +745,12 @@ get_##level##_linear_pagetable(                                             \
     unsigned long x, y;                                                     \
     struct page_info *page;                                                 \
     unsigned long pfn;                                                      \
+                                                                            \
+    if ( !opt_pv_linear_pt )                                                \
+    {                                                                       \
+        MEM_LOG("Attempt to create linear p.t. (feature disabled)\n");      \
+        return 0;                                                           \
+    }                                                                       \
                                                                             \
     if ( (level##e_get_flags(pde) & _PAGE_RW) )                             \
     {                                                                       \
