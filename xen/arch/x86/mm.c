@@ -2647,34 +2647,22 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                 break;
             }
 
-#ifdef CONFIG_PV_LINEAR_PT
-            if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
-            {
-                /*
-                 * set_tlbflush_timestamp() accesses the same union
-                 * linear_pt_count lives in. Unvalidated page table pages,
-                 * however, should occur during domain destruction only
-                 * anyway.  Updating of linear_pt_count luckily is not
-                 * necessary anymore for a dying domain.
-                 */
-                ASSERT(page_get_owner(page)->is_dying);
-                ASSERT(page->linear_pt_count < 0);
-                ASSERT(ptpg->linear_pt_count > 0);
-                ptpg = NULL;
-            }
-#else /* CONFIG_PV_LINEAR_PT */
-            BUG_ON(ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info));
-#endif
-
             /*
              * Record TLB information for flush later. We do not stamp page
              * tables when running in shadow mode:
              *  1. Pointless, since it's the shadow pt's which must be tracked.
              *  2. Shadow mode reuses this field for shadowed page tables to
              *     store flags info -- we don't want to conflict with that.
+             * Also page_set_tlbflush_timestamp() accesses the same union
+             * linear_pt_count lives in. Pages (including page table ones),
+             * however, don't need their flush time stamp set except when
+             * the last reference is being dropped. For page table pages
+             * this happens in _put_final_page_type().
              */
-            if ( !(shadow_mode_enabled(page_get_owner(page)) &&
-                   (page->count_info & PGC_page_table)) )
+            if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
+                BUG_ON(!IS_ENABLED(CONFIG_PV_LINEAR_PT));
+            else if ( !(shadow_mode_enabled(page_get_owner(page)) &&
+                        (page->count_info & PGC_page_table)) )
                 page_set_tlbflush_timestamp(page);
         }
         else if ( unlikely((nx & (PGT_locked | PGT_count_mask)) ==
