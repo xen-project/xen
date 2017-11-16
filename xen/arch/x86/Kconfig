@@ -32,6 +32,25 @@ menu "Architecture Features"
 
 source "arch/Kconfig"
 
+config PV_LINEAR_PT
+       bool "Support for PV linear pagetables"
+       default y
+       ---help---
+         Linear pagetables (also called "recursive pagetables") refers
+         to the practice of a guest operating system having pagetable
+         entries pointing to other pagetables of the same level (i.e.,
+         allowing L2 PTEs to point to other L2 pages).  Some operating
+         systems use it as a simple way to consistently map the current
+         process's pagetables into its own virtual address space.
+
+         Linux and MiniOS don't use this technique.  NetBSD and Novell
+         Netware do; there may be other custom operating systems which
+         do.  If you're certain you don't plan on having PV guests
+         which use this feature, turning it off can reduce the attack
+         surface.
+
+         If unsure, say Y.
+
 config SHADOW_PAGING
         bool "Shadow Paging"
         default y

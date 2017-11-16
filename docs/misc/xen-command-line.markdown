@@ -1350,6 +1350,25 @@ The following resources are available:
     CDP, one COS will corespond two CBMs other than one with CAT, due to the
     sum of CBMs is fixed, that means actual `cos_max` in use will automatically
     reduce to half when CDP is enabled.
+	
+### pv-linear-pt
+> `= <boolean>`
+
+> Default: `true`
+
+Only available if Xen is compiled with CONFIG\_PV\_LINEAR\_PT support
+enabled.
+
+Allow PV guests to have pagetable entries pointing to other pagetables
+of the same level (i.e., allowing L2 PTEs to point to other L2 pages).
+This technique is often called "linear pagetables", and is sometimes
+used to allow operating systems a simple way to consistently map the
+current process's pagetables into its own virtual address space.
+
+Linux and MiniOS don't use this technique.  NetBSD and Novell Netware
+do; there may be other custom operating systems which do.  If you're
+certain you don't plan on having PV guests which use this feature,
+turning it off can reduce the attack surface.
 
 ### reboot
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | P[ower] | e[fi] | n[o] [, [w]arm | [c]old]`
