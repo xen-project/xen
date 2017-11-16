@@ -635,13 +635,9 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
 
 HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, hpet_load, 1, HVMSR_PER_DOM);
 
-void hpet_init(struct domain *d)
+static void hpet_set(HPETState *h)
 {
-    HPETState *h = domain_vhpet(d);
     int i;
-
-    if ( !has_vhpet(d) )
-        return;
 
     memset(h, 0, sizeof(HPETState));
 
@@ -668,7 +664,14 @@ void hpet_init(struct domain *d)
         h->hpet.comparator64[i] = ~0ULL;
         h->pt[i].source = PTSRC_isa;
     }
+}
 
+void hpet_init(struct domain *d)
+{
+    if ( !has_vhpet(d) )
+        return;
+
+    hpet_set(domain_vhpet(d));
     register_mmio_handler(d, &hpet_mmio_ops);
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
 }
@@ -697,8 +700,11 @@ void hpet_deinit(struct domain *d)
 
 void hpet_reset(struct domain *d)
 {
+    if ( !has_vhpet(d) )
+        return;
+
     hpet_deinit(d);
-    hpet_init(d);
+    hpet_set(domain_vhpet(d));
 }
 
 /*
