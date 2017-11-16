@@ -747,6 +747,8 @@ static void put_data_page(
         put_page(page);
 }
 
+#ifdef CONFIG_PV_LINEAR_PT
+
 static bool inc_linear_entries(struct page_info *pg)
 {
     typeof(pg->linear_pt_count) nc = read_atomic(&pg->linear_pt_count), oc;
@@ -814,6 +816,9 @@ static void dec_linear_uses(struct page_info *pg)
  *     frame if it is mapped by a different root table. This is sufficient and
  *     also necessary to allow validation of a root table mapping itself.
  */
+static bool __read_mostly opt_pv_linear_pt = true;
+boolean_param("pv-linear-pt", opt_pv_linear_pt);
+
 #define define_get_linear_pagetable(level)                                  \
 static int                                                                  \
 get_##level##_linear_pagetable(                                             \
@@ -822,6 +827,13 @@ get_##level##_linear_pagetable(                                             \
     unsigned long x, y;                                                     \
     struct page_info *page;                                                 \
     unsigned long pfn;                                                      \
+                                                                            \
+    if ( !opt_pv_linear_pt )                                                \
+    {                                                                       \
+        gdprintk(XENLOG_WARNING,                                            \
+                 "Attempt to create linear p.t. (feature disabled)\n");     \
+        return 0;                                                           \
+    }                                                                       \
                                                                             \
     if ( (level##e_get_flags(pde) & _PAGE_RW) )                             \
     {                                                                       \
@@ -880,6 +892,27 @@ get_##level##_linear_pagetable(                                             \
     return 1;                                                               \
 }
 
+#else /* CONFIG_PV_LINEAR_PT */
+
+#define define_get_linear_pagetable(level)                              \
+static int                                                              \
+get_##level##_linear_pagetable(                                         \
+        level##_pgentry_t pde, unsigned long pde_pfn, struct domain *d) \
+{                                                                       \
+        return 0;                                                       \
+}
+
+static void dec_linear_uses(struct page_info *pg)
+{
+    ASSERT(pg->linear_pt_count == 0);
+}
+
+static void dec_linear_entries(struct page_info *pg)
+{
+    ASSERT(pg->linear_pt_count == 0);
+}
+
+#endif /* CONFIG_PV_LINEAR_PT */
 
 bool is_iomem_page(mfn_t mfn)
 {
@@ -2614,6 +2647,7 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                 break;
             }
 
+#ifdef CONFIG_PV_LINEAR_PT
             if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
             {
                 /*
@@ -2628,6 +2662,9 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                 ASSERT(ptpg->linear_pt_count > 0);
                 ptpg = NULL;
             }
+#else /* CONFIG_PV_LINEAR_PT */
+            BUG_ON(ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info));
+#endif
 
             /*
              * Record TLB information for flush later. We do not stamp page
