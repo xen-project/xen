@@ -1946,7 +1946,7 @@ static int guest_io_okay(
 {
     /* If in user mode, switch to kernel mode just to read I/O bitmap. */
     int user_mode = !(v->arch.flags & TF_kernel_mode);
-#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_pt(v)
 
     if ( iopl_ok(v, regs) )
         return 1;
