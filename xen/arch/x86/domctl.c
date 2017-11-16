@@ -294,12 +294,12 @@ static int update_domain_cpuid_info(struct domain *d,
         break;
     }
 
-    if ( is_hvm_domain(d) && call_policy_changed )
+    if ( call_policy_changed )
     {
         struct vcpu *v;
 
         for_each_vcpu( d, v )
-            hvm_cpuid_policy_changed(v);
+            cpuid_policy_updated(v);
     }
 
     return 0;
