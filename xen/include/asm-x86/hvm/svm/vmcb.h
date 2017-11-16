@@ -325,12 +325,14 @@ typedef union
     {
         u64 tpr:          8;
         u64 irq:          1;
-        u64 rsvd0:        7;
+        u64 vgif:         1;
+        u64 rsvd0:        6;
         u64 prio:         4;
         u64 ign_tpr:      1;
         u64 rsvd1:        3;
         u64 intr_masking: 1;
-        u64 rsvd2:        7;
+        u64 vgif_enable:  1;
+        u64 rsvd2:        6;
         u64 vector:       8;
         u64 rsvd3:       24;
     } fields;
