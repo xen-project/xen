@@ -6419,6 +6419,27 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
              */
             if ( (nf & _PAGE_PRESENT) || ((v != e) && (l1_table_offset(v) != 0)) )
                 continue;
+            if ( locking )
+                spin_lock(&map_pgdir_lock);
+
+            /*
+             * L2E may be already cleared, or set to a superpage, by
+             * concurrent paging structure modifications on other CPUs.
+             */
+            if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+            {
+                if ( locking )
+                    spin_unlock(&map_pgdir_lock);
+                goto check_l3;
+            }
+
+            if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
+            {
+                if ( locking )
+                    spin_unlock(&map_pgdir_lock);
+                continue;
+            }
+
             pl1e = l2e_to_l1e(*pl2e);
             for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
                 if ( l1e_get_intpte(pl1e[i]) != 0 )
@@ -6427,11 +6448,16 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
             {
                 /* Empty: zap the L2E and free the L1 page. */
                 l2e_write_atomic(pl2e, l2e_empty());
+                if ( locking )
+                    spin_unlock(&map_pgdir_lock);
                 flush_area(NULL, FLUSH_TLB_GLOBAL); /* flush before free */
                 free_xen_pagetable(pl1e);
             }
+            else if ( locking )
+                spin_unlock(&map_pgdir_lock);
         }
 
+ check_l3:
         /*
          * If we are not destroying mappings, or not done with the L3E,
          * skip the empty&free check.
@@ -6439,6 +6465,21 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
         if ( (nf & _PAGE_PRESENT) ||
              ((v != e) && (l2_table_offset(v) + l1_table_offset(v) != 0)) )
             continue;
+        if ( locking )
+            spin_lock(&map_pgdir_lock);
+
+        /*
+         * L3E may be already cleared, or set to a superpage, by
+         * concurrent paging structure modifications on other CPUs.
+         */
+        if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) ||
+              (l3e_get_flags(*pl3e) & _PAGE_PSE) )
+        {
+            if ( locking )
+                spin_unlock(&map_pgdir_lock);
+            continue;
+        }
+
         pl2e = l3e_to_l2e(*pl3e);
         for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
             if ( l2e_get_intpte(pl2e[i]) != 0 )
@@ -6447,9 +6488,13 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
         {
             /* Empty: zap the L3E and free the L2 page. */
             l3e_write_atomic(pl3e, l3e_empty());
+            if ( locking )
+                spin_unlock(&map_pgdir_lock);
             flush_area(NULL, FLUSH_TLB_GLOBAL); /* flush before free */
             free_xen_pagetable(pl2e);
         }
+        else if ( locking )
+            spin_unlock(&map_pgdir_lock);
     }
 
     flush_area(NULL, FLUSH_TLB_GLOBAL);
