@@ -37,6 +37,7 @@ static enum ind_thunk {
 static int8_t __initdata opt_ibrs = -1;
 static bool __initdata opt_rsb_native = true;
 static bool __initdata opt_rsb_vmexit = true;
+bool __read_mostly opt_ibpb = true;
 uint8_t __read_mostly default_bti_ist_info;
 
 static int __init parse_bti(const char *s)
@@ -64,6 +65,8 @@ static int __init parse_bti(const char *s)
         }
         else if ( (val = parse_boolean("ibrs", s, ss)) >= 0 )
             opt_ibrs = val;
+        else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
+            opt_ibpb = val;
         else if ( (val = parse_boolean("rsb_native", s, ss)) >= 0 )
             opt_rsb_native = val;
         else if ( (val = parse_boolean("rsb_vmexit", s, ss)) >= 0 )
@@ -104,13 +107,14 @@ static void __init print_details(enum ind_thunk thunk)
         printk(XENLOG_DEBUG "  Compiled-in support: INDIRECT_THUNK\n");
 
     printk(XENLOG_INFO
-           "BTI mitigations: Thunk %s, Others:%s%s%s\n",
+           "BTI mitigations: Thunk %s, Others:%s%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
            thunk == THUNK_JMP       ? "JMP" : "?",
            boot_cpu_has(X86_FEATURE_XEN_IBRS_SET)    ? " IBRS+" :
            boot_cpu_has(X86_FEATURE_XEN_IBRS_CLEAR)  ? " IBRS-"      : "",
+           opt_ibpb                                  ? " IBPB"       : "",
            boot_cpu_has(X86_FEATURE_RSB_NATIVE)      ? " RSB_NATIVE" : "",
            boot_cpu_has(X86_FEATURE_RSB_VMEXIT)      ? " RSB_VMEXIT" : "");
 }
@@ -278,6 +282,10 @@ void __init init_speculation_mitigations(void)
      */
     if ( opt_rsb_vmexit )
         setup_force_cpu_cap(X86_FEATURE_RSB_VMEXIT);
+
+    /* Check we have hardware IBPB support before using it... */
+    if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
+        opt_ibpb = false;
 
     /* (Re)init BSP state now that default_bti_ist_info has been calculated. */
     init_shadow_spec_ctrl_state();
