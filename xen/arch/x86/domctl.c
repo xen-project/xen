@@ -1284,6 +1284,7 @@ long arch_do_domctl(
         struct xen_domctl_vcpu_msr msr = {};
         struct vcpu *v;
         static const uint32_t msrs_to_send[] = {
+            MSR_SPEC_CTRL,
             MSR_INTEL_MISC_FEATURES_ENABLES,
         };
         uint32_t nr_msrs = ARRAY_SIZE(msrs_to_send);
@@ -1407,6 +1408,7 @@ long arch_do_domctl(
 
                 switch ( msr.index )
                 {
+                case MSR_SPEC_CTRL:
                 case MSR_INTEL_MISC_FEATURES_ENABLES:
                     if ( guest_wrmsr(v, msr.index, msr.value) != X86EMUL_OKAY )
                         break;
