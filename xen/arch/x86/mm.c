@@ -6152,9 +6152,29 @@ int map_pages_to_xen(
             {
                 unsigned long base_mfn;
 
-                pl1e = l2e_to_l1e(*pl2e);
                 if ( locking )
                     spin_lock(&map_pgdir_lock);
+
+                ol2e = *pl2e;
+                /*
+                 * L2E may be already cleared, or set to a superpage, by
+                 * concurrent paging structure modifications on other CPUs.
+                 */
+                if ( !(l2e_get_flags(ol2e) & _PAGE_PRESENT) )
+                {
+                    if ( locking )
+                        spin_unlock(&map_pgdir_lock);
+                    continue;
+                }
+
+                if ( l2e_get_flags(ol2e) & _PAGE_PSE )
+                {
+                    if ( locking )
+                        spin_unlock(&map_pgdir_lock);
+                    goto check_l3;
+                }
+
+                pl1e = l2e_to_l1e(ol2e);
                 base_mfn = l1e_get_pfn(*pl1e) & ~(L1_PAGETABLE_ENTRIES - 1);
                 for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++, pl1e++ )
                     if ( (l1e_get_pfn(*pl1e) != (base_mfn + i)) ||
@@ -6162,7 +6182,6 @@ int map_pages_to_xen(
                         break;
                 if ( i == L1_PAGETABLE_ENTRIES )
                 {
-                    ol2e = *pl2e;
                     l2e_write_atomic(pl2e, l2e_from_pfn(base_mfn,
                                                         l1f_to_lNf(flags)));
                     if ( locking )
@@ -6188,7 +6207,20 @@ int map_pages_to_xen(
 
             if ( locking )
                 spin_lock(&map_pgdir_lock);
+
             ol3e = *pl3e;
+            /*
+             * L3E may be already cleared, or set to a superpage, by
+             * concurrent paging structure modifications on other CPUs.
+             */
+            if ( !(l3e_get_flags(ol3e) & _PAGE_PRESENT) ||
+                (l3e_get_flags(ol3e) & _PAGE_PSE) )
+            {
+                if ( locking )
+                    spin_unlock(&map_pgdir_lock);
+                continue;
+            }
+
             pl2e = l3e_to_l2e(ol3e);
             base_mfn = l2e_get_pfn(*pl2e) & ~(L2_PAGETABLE_ENTRIES *
                                               L1_PAGETABLE_ENTRIES - 1);
