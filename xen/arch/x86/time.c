@@ -964,6 +964,30 @@ static unsigned long get_cmos_time(void)
     return mktime(rtc.year, rtc.mon, rtc.day, rtc.hour, rtc.min, rtc.sec);
 }
 
+static unsigned long get_wallclock_time(void)
+{
+#ifdef CONFIG_XEN_GUEST
+    if ( xen_guest )
+    {
+        struct shared_info *sh_info = XEN_shared_info;
+        uint32_t wc_version;
+        uint64_t wc_sec;
+
+        do {
+            wc_version = sh_info->wc_version & ~1;
+            smp_rmb();
+
+            wc_sec  = sh_info->wc_sec;
+            smp_rmb();
+        } while ( wc_version != sh_info->wc_version );
+
+        return wc_sec + read_xen_timer() / 1000000000;
+    }
+#endif
+
+    return get_cmos_time();
+}
+
 /***************************************************************************
  * System Time
  ***************************************************************************/
@@ -1759,8 +1783,8 @@ int __init init_xen_time(void)
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
-    /* NB. get_cmos_time() can take over one second to execute. */
-    do_settime(get_cmos_time(), 0, NOW());
+    /* NB. get_wallclock_time() can take over one second to execute. */
+    do_settime(get_wallclock_time(), 0, NOW());
 
     /* Finish platform timer initialization. */
     try_platform_timer_tail(false);
@@ -1870,7 +1894,7 @@ int time_suspend(void)
 {
     if ( smp_processor_id() == 0 )
     {
-        cmos_utc_offset = -get_cmos_time();
+        cmos_utc_offset = -get_wallclock_time();
         cmos_utc_offset += get_sec();
         kill_timer(&calibration_timer);
 
@@ -1897,7 +1921,7 @@ int time_resume(void)
 
     set_timer(&calibration_timer, NOW() + EPOCH);
 
-    do_settime(get_cmos_time() + cmos_utc_offset, 0, NOW());
+    do_settime(get_wallclock_time() + cmos_utc_offset, 0, NOW());
 
     update_vcpu_system_time(current);
 
