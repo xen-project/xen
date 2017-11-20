@@ -268,8 +268,8 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 5920a9d16b1ab887c2858224316a98e961d71b05
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.9.0
-MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.9.0
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.9.1
+MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.9.1
 # Wed Feb 22 11:03:37 2017 +0000
 # Include libxendevicemodel with libxc
 
@@ -280,7 +280,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.0
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.9.0
+QEMU_TRADITIONAL_REVISION ?= xen-4.9.1
 # Thu Mar 9 11:14:55 2017 +0000
 # cirrus/vnc: zap drop bitblit support from console code.
 
