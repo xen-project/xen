@@ -229,7 +229,7 @@ void vmx_intr_assist(void)
     struct vcpu *v = current;
     unsigned int tpr_threshold = 0;
     enum hvm_intblk intblk;
-    int pt_vector = -1;
+    int pt_vector;
 
     /* Block event injection when single step with MTF. */
     if ( unlikely(v->arch.hvm_vcpu.single_step) )
@@ -240,8 +240,7 @@ void vmx_intr_assist(void)
     }
 
     /* Crank the handle on interrupt state. */
-    if ( is_hvm_vcpu(v) )
-        pt_vector = pt_update_irq(v);
+    pt_vector = pt_update_irq(v);
 
     do {
         unsigned long intr_info;
