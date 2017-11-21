@@ -1506,6 +1506,9 @@ Specify the host reboot method.
 'efi' instructs Xen to reboot using the EFI reboot call (in EFI mode by
  default it will use that method first).
 
+`xen` instructs Xen to reboot using Xen's SCHEDOP hypercall (this is the default
+when running nested Xen)
+
 ### rmrr
 > '= start<-end>=[s1]bdf1[,[s1]bdf2[,...]];start<-end>=[s2]bdf1[,[s2]bdf2[,...]]
 
