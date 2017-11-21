@@ -66,6 +66,7 @@ SECTIONS
         _stext = .;            /* Text and read-only data */
        *(.text)
        *(.text.__x86_indirect_thunk_*)
+       *(.text.page_aligned)
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)

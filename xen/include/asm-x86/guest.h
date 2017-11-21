@@ -19,6 +19,7 @@
 #ifndef __X86_GUEST_H__
 #define __X86_GUEST_H__
 
+#include <asm/guest/hypercall.h>
 #include <asm/guest/pvh-boot.h>
 #include <asm/guest/xen.h>
 
