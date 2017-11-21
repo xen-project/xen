@@ -65,6 +65,7 @@ SECTIONS
   DECL_SECTION(.text) {
         _stext = .;            /* Text and read-only data */
        *(.text)
+       *(.text.page_aligned)
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)

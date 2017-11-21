@@ -22,6 +22,7 @@
 #include <xen/types.h>
 
 #include <asm/guest.h>
+#include <asm/msr.h>
 #include <asm/processor.h>
 
 #include <public/arch-x86/cpuid.h>
@@ -29,6 +30,7 @@
 bool __read_mostly xen_guest;
 
 static __read_mostly uint32_t xen_cpuid_base;
+extern char hypercall_page[];
 
 static void __init find_xen_leaves(void)
 {
@@ -60,6 +62,9 @@ void __init probe_hypervisor(void)
 
     if ( !xen_cpuid_base )
         return;
+
+    /* Fill the hypercall page. */
+    wrmsrl(cpuid_ebx(xen_cpuid_base + 2), __pa(hypercall_page));
 
     xen_guest = true;
 }
