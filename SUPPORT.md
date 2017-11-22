@@ -140,6 +140,61 @@ Output of information in machine-parseable JSON format
 
     Status: Supported, Security support external
 
+## Debugging, analysis, and crash post-mortem
+
+### Host serial console
+
+    Status, NS16550: Supported
+    Status, EHCI: Supported
+    Status, Cadence UART (ARM): Supported
+    Status, PL011 UART (ARM): Supported
+    Status, Exynos 4210 UART (ARM): Supported
+    Status, OMAP UART (ARM): Supported
+    Status, SCI(F) UART: Supported
+
+### Hypervisor 'debug keys'
+
+    Status: Supported, not security supported
+
+These are functions triggered either from the host serial console,
+or via the xl 'debug-keys' command,
+which cause Xen to dump various hypervisor state to the console.
+
+### Hypervisor synchronous console output (sync_console)
+
+    Status: Supported, not security supported
+
+Xen command-line flag to force synchronous console output.
+Useful for debugging, but not suitable for production environments
+due to incurred overhead.
+
+### gdbsx
+
+    Status, x86: Supported, not security supported
+
+Debugger to debug ELF guests
+
+### Soft-reset for PV guests
+
+    Status: Supported
+
+Soft-reset allows a new kernel to start 'from scratch' with a fresh VM state,
+but with all the memory from the previous state of the VM intact.
+This is primarily designed to allow "crash kernels",
+which can do core dumps of memory to help with debugging in the event of a crash.
+
+### xentrace
+
+    Status, x86: Supported
+
+Tool to capture Xen trace buffer data
+
+### gcov
+
+    Status: Supported, Not security supported
+
+Export hypervisor coverage data suitable for analysis by gcov or lcov.
+
 ## Memory Management
 
 ### Dynamic memory control
