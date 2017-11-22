@@ -37,10 +37,10 @@ default: build
 .PHONY: dist
 dist: install
 
-build install:: include/config/auto.conf
+build install build-shim:: include/config/auto.conf
 
-.PHONY: build install uninstall clean distclean cscope TAGS tags MAP gtags tests
-build install uninstall debug clean distclean cscope TAGS tags MAP gtags tests::
+.PHONY: build install uninstall clean distclean cscope TAGS tags MAP gtags tests install-shim build-shim
+build install uninstall debug clean distclean cscope TAGS tags MAP gtags tests install-shim build-shim::
 ifneq ($(XEN_TARGET_ARCH),x86_32)
 	$(MAKE) -f Rules.mk _$@
 else
@@ -79,6 +79,13 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 			echo 'EFI installation only partially done (EFI_VENDOR not set)' >&2; \
 		fi; \
 	fi
+
+.PHONY: _build-shim
+_build-shim: $(TARGET)-shim
+
+.PHONY: _install-shim
+_install-shim: build-shim
+	$(INSTALL_DATA) $(TARGET)-shim $(DESTDIR)
 
 .PHONY: _tests
 _tests:
@@ -143,6 +150,9 @@ $(TARGET): delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/asm-$(TARGET_ARCH)/asm-offsets.h
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $(TARGET)
+
+$(TARGET)-shim: $(TARGET)
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $(TARGET)-shim
 
 # drivers/char/console.o contains static banner/compile info. Blow it away.
 # Don't refresh these files during e.g., 'sudo make install'
