@@ -130,6 +130,10 @@ Output of information in machine-parseable JSON format
 
     Status: Supported
 
+### QEMU backend hotplugging for xl
+
+    Status: Supported
+
 ## Toolstack/3rd party
 
 ### libvirt driver for xl
@@ -226,6 +230,152 @@ This is a useful label for a set of hypervisor features
 which add paravirtualized functionality to HVM guests
 for improved performance and scalability.
 This includes exposing event channels to HVM guests.
+
+## Virtual driver support, guest side
+
+### Blkfront
+
+    Status, Linux: Supported
+    Status, FreeBSD: Supported, Security support external
+    Status, NetBSD: Supported, Security support external
+    Status, OpenBSD: Supported, Security support external
+    Status, Windows: Supported
+
+Guest-side driver capable of speaking the Xen PV block protocol
+
+### Netfront
+
+    Status, Linux: Supported
+    Status, FreeBSD: Supported, Security support external
+    Status, NetBSD: Supported, Security support external
+    Status, OpenBSD: Supported, Security support external
+    States, Windows: Supported
+
+Guest-side driver capable of speaking the Xen PV networking protocol
+
+### PV Framebuffer (frontend)
+
+    Status, Linux (xen-fbfront): Supported
+
+Guest-side driver capable of speaking the Xen PV Framebuffer protocol
+
+### PV Console (frontend)
+
+    Status, Linux (hvc_xen): Supported
+    Status, FreeBSD: Supported, Security support external
+    Status, NetBSD: Supported, Security support external
+    Status, Windows: Supported
+
+Guest-side driver capable of speaking the Xen PV console protocol
+
+### PV keyboard (frontend)
+
+    Status, Linux (xen-kbdfront): Supported
+
+Guest-side driver capable of speaking the Xen PV keyboard protocol
+
+### PV USB (frontend)
+
+    Status, Linux: Supported
+
+### PV SCSI protocol (frontend)
+
+    Status, Linux: Supported, with caveats
+
+NB that while the PV SCSI frontend is in Linux and tested regularly,
+there is currently no xl support.
+
+### PV TPM (frontend)
+
+    Status, Linux (xen-tpmfront): Tech Preview
+
+Guest-side driver capable of speaking the Xen PV TPM protocol
+
+### PV 9pfs frontend
+
+    Status, Linux: Tech Preview
+
+Guest-side driver capable of speaking the Xen 9pfs protocol
+
+### PVCalls (frontend)
+
+    Status, Linux: Tech Preview
+
+Guest-side driver capable of making pv system calls
+
+## Virtual device support, host side
+
+For host-side virtual device support,
+"Supported" and "Tech preview" include xl/libxl support
+unless otherwise noted.
+
+### Blkback
+
+    Status, Linux (xen-blkback): Supported
+    Status, QEMU (xen_disk): Supported
+    Status, FreeBSD (blkback): Supported, Security support external
+    Status, NetBSD (xbdback): Supported, security support external
+    Status, Blktap2: Deprecated
+
+Host-side implementations of the Xen PV block protocol
+
+### Netback
+
+    Status, Linux (xen-netback): Supported
+    Status, FreeBSD (netback): Supported, Security support external
+    Status, NetBSD (xennetback): Supported, Security support external
+
+Host-side implementations of Xen PV network protocol
+
+### PV Framebuffer (backend)
+
+    Status, QEMU: Supported
+
+Host-side implementation of the Xen PV framebuffer protocol
+
+### PV Console (xenconsoled)
+
+    Status: Supported
+
+Host-side implementation of the Xen PV console protocol
+
+### PV keyboard (backend)
+
+    Status, QEMU: Supported
+
+Host-side implementation fo the Xen PV keyboard protocol
+
+### PV USB (backend)
+
+    Status, QEMU: Supported
+
+Host-side implementation of the Xen PV USB protocol
+
+### PV SCSI protocol (backend)
+
+    Status, Linux: Experimental
+
+NB that while the PV SCSI backend is in Linux and tested regularly,
+there is currently no xl support.
+
+### PV TPM (backend)
+
+    Status: Tech Preview
+
+### PV 9pfs (backend)
+
+    Status, QEMU: Tech Preview
+
+### PVCalls (backend)
+
+    Status, Linux: Experimental
+
+PVCalls backend has been checked into Linux,
+but has no xl support.
+
+### Online resize of virtual disks
+
+    Status: Supported
 
 # Format and definitions
 
