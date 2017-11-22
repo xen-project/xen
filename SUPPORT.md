@@ -96,6 +96,46 @@ Requires hardware virtualisation support (Intel VMX / AMD SVM)
 
 ARM only has one guest type at the moment
 
+## Toolstack
+
+### xl
+
+    Status: Supported
+
+### Direct-boot kernel image format
+
+    Supported, x86: bzImage, ELF
+    Supported, ARM32: zImage
+    Supported, ARM64: Image
+
+Format which the toolstack accepts for direct-boot kernels
+
+### Dom0 init support for xl
+
+    Status, SysV: Supported
+    Status, systemd: Supported
+    Status, BSD-style: Supported
+
+### JSON output support for xl
+
+    Status: Experimental
+
+Output of information in machine-parseable JSON format
+
+### Open vSwitch integration for xl
+
+    Status, Linux: Supported
+
+### Virtual cpu hotplug
+
+    Status: Supported
+
+## Toolstack/3rd party
+
+### libvirt driver for xl
+
+    Status: Supported, Security support external
+
 ## Memory Management
 
 ### Dynamic memory control
