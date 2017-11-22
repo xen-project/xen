@@ -448,6 +448,46 @@ but has no xl support.
 
     Status: Supported
 
+## Security
+
+### Device Model Stub Domains
+
+    Status: Supported
+
+### KCONFIG Expert
+
+    Status: Experimental
+
+### Live Patching
+
+    Status, x86: Supported
+    Status, ARM: Experimental
+
+Compile time disabled for ARM by default.
+
+### Virtual Machine Introspection
+
+    Status, x86: Supported, not security supported
+
+### XSM & FLASK
+
+    Status: Experimental
+
+Compile time disabled by default.
+
+Also note that using XSM
+to delegate various domain control hypercalls
+to particular other domains, rather than only permitting use by dom0,
+is also specifically excluded from security support for many hypercalls.
+Please see XSA-77 for more details.
+
+### FLASK default policy
+
+    Status: Experimental
+
+The default policy includes FLASK labels and roles for a "typical" Xen-based system
+with dom0, driver domains, stub domains, domUs, and so on.
+
 ## Virtual Hardware, Hypervisor
 
 ### x86/Nested PV
