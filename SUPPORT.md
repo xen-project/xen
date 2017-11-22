@@ -487,9 +487,23 @@ but has no xl support.
 
 ## Security
 
+### Driver Domains
+
+    Status: Supported, with caveats
+
+"Driver domains" means allowing non-Domain 0 domains
+with access to physical devices to act as back-ends.
+
+See the appropriate "Device Passthrough" section
+for more information about security support.
+
 ### Device Model Stub Domains
 
-    Status: Supported
+    Status: Supported, with caveats
+
+Vulnerabilities of a device model stub domain
+to a hostile driver domain (either compromised or untrusted)
+are excluded from security support.
 
 ### KCONFIG Expert
 
@@ -559,6 +573,24 @@ Virtual Performance Management Unit for HVM guests
 
 Disabled by default (enable with hypervisor command line option).
 This feature is not security supported: see http://xenbits.xen.org/xsa/advisory-163.html
+
+### x86/PCI Device Passthrough
+
+    Status, x86 PV: Supported, with caveats
+    Status, x86 HVM: Supported, with caveats
+
+Only systems using IOMMUs are supported.
+
+Not compatible with migration, populate-on-demand, altp2m,
+introspection, memory sharing, or memory paging.
+
+Because of hardware limitations
+(affecting any operating system or hypervisor),
+it is generally not safe to use this feature
+to expose a physical device to completely untrusted guests.
+However, this feature can still confer significant security benefit
+when used to remove drivers and backends from domain 0
+(i.e., Driver Domains).
 
 ### ARM/Non-PCI device passthrough
 
