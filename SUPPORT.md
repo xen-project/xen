@@ -412,6 +412,27 @@ Virtual Performance Management Unit for HVM guests
 Disabled by default (enable with hypervisor command line option).
 This feature is not security supported: see http://xenbits.xen.org/xsa/advisory-163.html
 
+### ARM/Non-PCI device passthrough
+
+    Status: Supported, not security supported
+
+Note that this still requires an IOMMU
+that covers the DMA of the device to be passed through.
+
+### ARM: 16K and 64K page granularity in guests
+
+    Status: Supported, with caveats
+
+No support for QEMU backends in a 16K or 64K domain.
+
+### ARM: Guest Device Tree support
+
+    Status: Supported
+
+### ARM: Guest ACPI support
+
+    Status: Supported
+
 ## Virtual Hardware, QEMU
 
 These are devices available in HVM mode using a qemu devicemodel (the default).
