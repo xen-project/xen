@@ -377,6 +377,112 @@ but has no xl support.
 
     Status: Supported
 
+## Virtual Hardware, Hypervisor
+
+### x86/Nested PV
+
+    Status, x86 Xen HVM: Tech Preview
+
+This means running a Xen hypervisor inside an HVM domain on a Xen system,
+with support for PV L2 guests only
+(i.e., hardware virtualization extensions not provided
+to the guest).
+
+This works, but has performance limitations
+because the L1 dom0 can only access emulated L1 devices.
+
+Xen may also run inside other hypervisors (KVM, Hyper-V, VMWare),
+but nobody has reported on performance.
+
+### x86/Nested HVM
+
+    Status, x86 HVM: Experimental
+
+This means providing hardware virtulization support to guest VMs
+allowing, for instance, a nested Xen to support both PV and HVM guests.
+It also implies support for other hypervisors,
+such as KVM, Hyper-V, Bromium, and so on as guests.
+
+### vPMU
+
+    Status, x86: Supported, Not security supported
+
+Virtual Performance Management Unit for HVM guests
+
+Disabled by default (enable with hypervisor command line option).
+This feature is not security supported: see http://xenbits.xen.org/xsa/advisory-163.html
+
+## Virtual Hardware, QEMU
+
+These are devices available in HVM mode using a qemu devicemodel (the default).
+Note that other devices are available but not security supported.
+
+### x86/Emulated platform devices (QEMU):
+
+    Status, piix3: Supported
+
+### x86/Emulated network (QEMU):
+
+    Status, e1000: Supported
+    Status, rtl8193: Supported
+    Status, virtio-net: Supported
+
+### x86/Emulated storage (QEMU):
+
+    Status, piix3 ide: Supported
+    Status, ahci: Supported
+
+### x86/Emulated graphics (QEMU):
+
+    Status, cirrus-vga: Supported
+    Status, stgvga: Supported
+
+### x86/Emulated audio (QEMU):
+
+    Status, sb16: Supported
+    Status, es1370: Supported
+    Status, ac97: Supported
+
+### x86/Emulated input (QEMU):
+
+    Status, usbmouse: Supported
+    Status, usbtablet: Supported
+    Status, ps/2 keyboard: Supported
+    Status, ps/2 mouse: Supported
+
+### x86/Emulated serial card (QEMU):
+
+    Status, UART 16550A: Supported
+
+### x86/Host USB passthrough (QEMU):
+
+    Status: Supported, not security supported
+
+## Virtual Firmware
+
+### x86/HVM iPXE
+
+    Status: Supported, with caveats
+
+Booting a guest via PXE.
+PXE inherently places full trust of the guest in the network,
+and so should only be used
+when the guest network is under the same administrative control
+as the guest itself.
+
+### x86/HVM BIOS
+
+    Status, SeaBIOS (qemu-xen): Supported
+    Status, ROMBIOS (qemu-xen-traditional): Supported
+
+Booting a guest via guest BIOS firmware
+
+### x86/HVM OVMF
+
+    Status, qemu-xen: Supported
+
+OVMF firmware implements the UEFI boot protocol.
+
 # Format and definitions
 
 This file contains prose, and machine-readable fragments.
