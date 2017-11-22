@@ -158,6 +158,35 @@ on embedded platforms.
 
 Enables NUMA aware scheduling in Xen
 
+## Scalability
+
+### Super page support
+
+    Status, x86 HVM/PVH, HAP: Supported
+    Status, x86 HVM/PVH, Shadow, 2MiB: Supported
+    Status, ARM: Supported
+
+NB that this refers to the ability of guests
+to have higher-level page table entries point directly to memory,
+improving TLB performance.
+On ARM, and on x86 in HAP mode,
+the guest has whatever support is enabled by the hardware.
+On x86 in shadow mode, only 2MiB (L2) superpages are available;
+furthermore, they do not have the performance characteristics
+of hardware superpages.
+
+Also note is feature independent
+of the ARM "page granularity" feature (see below).
+
+### x86/PVHVM
+
+    Status: Supported
+
+This is a useful label for a set of hypervisor features
+which add paravirtualized functionality to HVM guests
+for improved performance and scalability.
+This includes exposing event channels to HVM guests.
+
 # Format and definitions
 
 This file contains prose, and machine-readable fragments.
