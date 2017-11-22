@@ -204,6 +204,43 @@ Export hypervisor coverage data suitable for analysis by gcov or lcov.
 Allows a guest to add or remove memory after boot-time.
 This is typically done by a guest kernel agent known as a "balloon driver".
 
+### Populate-on-demand memory
+
+    Status, x86 HVM: Supported
+
+This is a mechanism that allows normal operating systems with only a balloon driver
+to boot with memory < maxmem.
+
+### Memory Sharing
+
+    Status, x86 HVM: Expermental
+
+Allow sharing of identical pages between guests
+
+### Memory Paging
+
+    Status, x86 HVM: Experimenal
+
+Allow pages belonging to guests to be paged to disk
+
+### Transcendent Memory
+
+    Status: Experimental
+
+Transcendent Memory (tmem) allows the creation of hypervisor memory pools
+which guests can use to store memory
+rather than caching in its own memory or swapping to disk.
+Having these in the hypervisor
+can allow more efficient aggregate use of memory across VMs.
+
+### Alternative p2m
+
+    Status, x86 HVM: Tech Preview
+    Status, ARM: Tech Preview
+
+Allows external monitoring of hypervisor memory
+by maintaining multiple physical to machine (p2m) memory mappings.
+
 ## Resource Management
 
 ### CPU Pools
