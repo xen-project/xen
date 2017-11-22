@@ -286,6 +286,22 @@ which add paravirtualized functionality to HVM guests
 for improved performance and scalability.
 This includes exposing event channels to HVM guests.
 
+## High Availability and Fault Tolerance
+
+### Remus Fault Tolerance
+
+    Status: Experimental
+
+### COLO Manager
+
+    Status: Experimental
+
+### x86/vMCE
+
+    Status: Supported
+
+Forward Machine Check Exceptions to appropriate guests
+
 ## Virtual driver support, guest side
 
 ### Blkfront
