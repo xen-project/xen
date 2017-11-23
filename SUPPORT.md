@@ -22,6 +22,14 @@ for the definitions of the support status levels etc.
 
     Status: Supported
 
+### ARM v7 + Virtualization Extensions
+
+    Status: Supported
+
+### ARM v8
+
+    Status: Supported
+
 ## Host hardware support
 
 ### Physical CPU Hotplug
@@ -35,6 +43,7 @@ for the definitions of the support status levels etc.
 ### Host ACPI (via Domain 0)
 
     Status, x86 PV: Supported
+    Status, ARM: Experimental
 
 ### x86/Intel Platform QoS Technologies
 
@@ -44,6 +53,14 @@ for the definitions of the support status levels etc.
 
     Status, AMD IOMMU: Supported
     Status, Intel VT-d: Supported
+    Status, ARM SMMUv1: Supported
+    Status, ARM SMMUv2: Supported
+
+### ARM/GICv3 ITS
+
+    Status: Experimental
+
+Extension to the GICv3 interrupt controller to support MSI.
 
 ## Guest Type
 
@@ -72,6 +89,12 @@ designed to take advantage of hardware virtualization support when possible.
 During development this was sometimes called HVMLite or PVHv2.
 
 Requires hardware virtualisation support (Intel VMX / AMD SVM)
+
+### ARM guest
+
+    Status: Supported
+
+ARM only has one guest type at the moment
 
 ## Memory Management
 
