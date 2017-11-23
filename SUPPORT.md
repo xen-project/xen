@@ -16,6 +16,68 @@ for the definitions of the support status levels etc.
 
 # Feature Support
 
+## Memory Management
+
+### Dynamic memory control
+
+    Status: Supported
+
+Allows a guest to add or remove memory after boot-time.
+This is typically done by a guest kernel agent known as a "balloon driver".
+
+## Resource Management
+
+### CPU Pools
+
+    Status: Supported
+
+Groups physical cpus into distinct groups called "cpupools",
+with each pool having the capability
+of using different schedulers and scheduling properties.
+
+### Credit Scheduler
+
+    Status: Supported
+
+A weighted proportional fair share virtual CPU scheduler.
+This is the default scheduler.
+
+### Credit2 Scheduler
+
+    Status: Supported
+
+A general purpose scheduler for Xen,
+designed with particular focus on fairness, responsiveness, and scalability
+
+### RTDS based Scheduler
+
+    Status: Experimental
+
+A soft real-time CPU scheduler
+built to provide guaranteed CPU capacity to guest VMs on SMP hosts
+
+### ARINC653 Scheduler
+
+    Status: Supported
+
+A periodically repeating fixed timeslice scheduler.
+Currently only single-vcpu domains are supported.
+
+### Null Scheduler
+
+    Status: Experimental
+
+A very simple, very static scheduling policy
+that always schedules the same vCPU(s) on the same pCPU(s).
+It is designed for maximum determinism and minimum overhead
+on embedded platforms.
+
+### NUMA scheduler affinity
+
+    Status, x86: Supported
+
+Enables NUMA aware scheduling in Xen
+
 # Format and definitions
 
 This file contains prose, and machine-readable fragments.
