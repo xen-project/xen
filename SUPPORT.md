@@ -16,6 +16,63 @@ for the definitions of the support status levels etc.
 
 # Feature Support
 
+## Host Architecture
+
+### x86-64
+
+    Status: Supported
+
+## Host hardware support
+
+### Physical CPU Hotplug
+
+    Status, x86: Supported
+
+### Physical Memory Hotplug
+
+    Status, x86: Supported
+
+### Host ACPI (via Domain 0)
+
+    Status, x86 PV: Supported
+
+### x86/Intel Platform QoS Technologies
+
+    Status: Tech Preview
+
+### IOMMU
+
+    Status, AMD IOMMU: Supported
+    Status, Intel VT-d: Supported
+
+## Guest Type
+
+### x86/PV
+
+    Status: Supported
+
+Traditional Xen PV guest
+
+No hardware requirements
+
+### x86/HVM
+
+    Status: Supported
+
+Fully virtualised guest using hardware virtualisation extensions
+
+Requires hardware virtualisation support (Intel VMX / AMD SVM)
+
+### x86/PVH guest
+
+    Status: Supported
+
+PVH is a next-generation paravirtualized mode
+designed to take advantage of hardware virtualization support when possible.
+During development this was sometimes called HVMLite or PVHv2.
+
+Requires hardware virtualisation support (Intel VMX / AMD SVM)
+
 ## Memory Management
 
 ### Dynamic memory control
