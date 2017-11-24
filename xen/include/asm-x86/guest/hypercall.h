@@ -105,6 +105,11 @@ static inline int xen_hypercall_vcpu_op(unsigned int cmd, unsigned int vcpu,
     return _hypercall64_3(long, __HYPERVISOR_vcpu_op, cmd, vcpu, arg);
 }
 
+static inline long xen_hypercall_event_channel_op(unsigned int cmd, void *arg)
+{
+    return _hypercall64_2(long, __HYPERVISOR_event_channel_op, cmd, arg);
+}
+
 static inline long xen_hypercall_hvm_op(unsigned int op, void *arg)
 {
     return _hypercall64_2(long, __HYPERVISOR_hvm_op, op, arg);
@@ -124,6 +129,34 @@ static inline long xen_hypercall_shutdown(unsigned int reason)
 {
     struct sched_shutdown s = { .reason = reason };
     return xen_hypercall_sched_op(SCHEDOP_shutdown, &s);
+}
+
+static inline long xen_hypercall_evtchn_send(evtchn_port_t port)
+{
+    struct evtchn_send send = { .port = port };
+
+    return xen_hypercall_event_channel_op(EVTCHNOP_send, &send);
+}
+
+static inline long xen_hypercall_evtchn_unmask(evtchn_port_t port)
+{
+    struct evtchn_unmask unmask = { .port = port };
+
+    return xen_hypercall_event_channel_op(EVTCHNOP_unmask, &unmask);
+}
+
+static inline long xen_hypercall_hvm_get_param(uint32_t index, uint64_t *value)
+{
+    struct xen_hvm_param xhv = {
+        .domid = DOMID_SELF,
+        .index = index,
+    };
+    long ret = xen_hypercall_hvm_op(HVMOP_get_param, &xhv);
+
+    if ( ret == 0 )
+        *value = xhv.value;
+
+    return ret;
 }
 
 static inline long xen_hypercall_set_evtchn_upcall_vector(
