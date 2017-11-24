@@ -381,7 +381,7 @@ The following are examples of correct specifications:
 Specify the size of the console ring buffer.
 
 ### console
-> `= List of [ vga | com1[H,L] | com2[H,L] | dbgp | none ]`
+> `= List of [ vga | com1[H,L] | com2[H,L] | pv | dbgp | none ]`
 
 > Default: `console=com1,vga`
 
@@ -396,6 +396,9 @@ set, while received characters must have their MSB set.  `L` indicates
 the converse; transmitted and received characters will have their MSB
 cleared.  This allows a single port to be shared by two subsystems
 (e.g. console and debugger).
+
+`pv` indicates that Xen should use Xen's PV console. This option is
+only available when used together with `pv-in-pvh`.
 
 `dbgp` indicates that Xen should use a USB debug port.
 

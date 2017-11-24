@@ -23,6 +23,7 @@
 #include <xen/pfn.h>
 #include <xen/rangeset.h>
 #include <xen/types.h>
+#include <xen/pv_console.h>
 
 #include <asm/apic.h>
 #include <asm/e820.h>
@@ -193,6 +194,8 @@ static void xen_evtchn_upcall(struct cpu_user_regs *regs)
 
     vcpu_info->evtchn_upcall_pending = 0;
     write_atomic(&vcpu_info->evtchn_pending_sel, 0);
+
+    pv_console_rx(regs);
 
     ack_APIC_irq();
 }
