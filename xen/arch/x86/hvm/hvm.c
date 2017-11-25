@@ -1322,7 +1322,10 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 }
 
 #define HVM_CPU_MSR_SIZE(cnt) offsetof(struct hvm_msr, msr[cnt])
-static unsigned int __read_mostly msr_count_max;
+static const uint32_t msrs_to_send[] = {
+    MSR_INTEL_MISC_FEATURES_ENABLES,
+};
+static unsigned int __read_mostly msr_count_max = ARRAY_SIZE(msrs_to_send);
 
 static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 {
@@ -1339,6 +1342,33 @@ static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
             return 1;
         ctxt = (struct hvm_msr *)&h->data[h->cur];
         ctxt->count = 0;
+
+        for ( i = 0; i < ARRAY_SIZE(msrs_to_send); ++i )
+        {
+            uint64_t val;
+            int rc = guest_rdmsr(v, msrs_to_send[i], &val);
+
+            /*
+             * It is the programmers responsibility to ensure that
+             * msrs_to_send[] contain generally-read/write MSRs.
+             * X86EMUL_EXCEPTION here implies a missing feature, and that the
+             * guest doesn't have access to the MSR.
+             */
+            if ( rc == X86EMUL_EXCEPTION )
+                continue;
+
+            if ( rc != X86EMUL_OKAY )
+            {
+                ASSERT_UNREACHABLE();
+                return -ENXIO;
+            }
+
+            if ( !val )
+                continue; /* Skip empty MSRs. */
+
+            ctxt->msr[ctxt->count].index = msrs_to_send[i];
+            ctxt->msr[ctxt->count++].val = val;
+        }
 
         if ( hvm_funcs.save_msr )
             hvm_funcs.save_msr(v, ctxt);
@@ -1426,6 +1456,15 @@ static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
     {
         switch ( ctxt->msr[i].index )
         {
+            int rc;
+
+        case MSR_INTEL_MISC_FEATURES_ENABLES:
+            rc = guest_wrmsr(v, ctxt->msr[i].index, ctxt->msr[i].val);
+
+            if ( rc != X86EMUL_OKAY )
+                err = -ENXIO;
+            break;
+
         default:
             if ( !ctxt->msr[i]._rsvd )
                 err = -ENXIO;

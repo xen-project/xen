@@ -231,6 +231,9 @@ int init_vcpu_msr_policy(struct vcpu *v);
  * not (yet) handled by it and must be processed by legacy handlers. Such
  * behaviour is needed for transition period until all rd/wrmsr are handled
  * by the new MSR infrastructure.
+ *
+ * These functions are also used by the migration logic, so need to cope with
+ * being used outside of v's context.
  */
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val);
 int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val);
