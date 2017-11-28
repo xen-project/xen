@@ -1063,7 +1063,6 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
 int __init dom0_construct_pvh(struct domain *d, const module_t *image,
                               unsigned long image_headroom,
                               module_t *initrd,
-                              void *(*bootstrap_map)(const module_t *),
                               char *cmdline)
 {
     paddr_t entry, start_info;

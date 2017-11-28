@@ -17,13 +17,11 @@ int dom0_setup_permissions(struct domain *d);
 int dom0_construct_pv(struct domain *d, const module_t *image,
                       unsigned long image_headroom,
                       module_t *initrd,
-                      void *(*bootstrap_map)(const module_t *),
                       char *cmdline);
 
 int dom0_construct_pvh(struct domain *d, const module_t *image,
                        unsigned long image_headroom,
                        module_t *initrd,
-                       void *(*bootstrap_map)(const module_t *),
                        char *cmdline);
 
 unsigned long dom0_paging_pages(const struct domain *d,

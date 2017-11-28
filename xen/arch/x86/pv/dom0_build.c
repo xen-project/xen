@@ -275,7 +275,6 @@ int __init dom0_construct_pv(struct domain *d,
                              const module_t *image,
                              unsigned long image_headroom,
                              module_t *initrd,
-                             void *(*bootstrap_map)(const module_t *),
                              char *cmdline)
 {
     int i, cpu, rc, compatible, compat32, order, machine;

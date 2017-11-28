@@ -319,7 +319,7 @@ static void __init normalise_cpu_order(void)
  * Ensure a given physical memory range is present in the bootstrap mappings.
  * Use superpage mappings to ensure that pagetable memory needn't be allocated.
  */
-static void *__init bootstrap_map(const module_t *mod)
+void *__init bootstrap_map(const module_t *mod)
 {
     static unsigned long __initdata map_cur = BOOTSTRAP_MAP_BASE;
     uint64_t start, end, mask = (1L << L2_PAGETABLE_SHIFT) - 1;
@@ -1654,8 +1654,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      */
     if ( construct_dom0(dom0, mod, modules_headroom,
                         (initrdidx > 0) && (initrdidx < mbi->mods_count)
-                        ? mod + initrdidx : NULL,
-                        bootstrap_map, cmdline) != 0)
+                        ? mod + initrdidx : NULL, cmdline) != 0)
         panic("Could not set up DOM0 guest OS");
 
     if ( cpu_has_smap )
