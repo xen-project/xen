@@ -1073,9 +1073,8 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          * NOTE: In a fine-grained p2m locking scenario this operation
          * may need to promote its locking from gfn->1g superpage
          */
-        p2m_set_entry(p2m, gfn_aligned, INVALID_MFN, PAGE_ORDER_2M,
-                      p2m_populate_on_demand, p2m->default_access);
-        return 0;
+        return p2m_set_entry(p2m, gfn_aligned, INVALID_MFN, PAGE_ORDER_2M,
+                             p2m_populate_on_demand, p2m->default_access);
     }
 
     /* Only reclaim if we're in actual need of more cache. */
@@ -1106,8 +1105,12 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 
     gfn_aligned = (gfn >> order) << order;
 
-    p2m_set_entry(p2m, gfn_aligned, mfn, order, p2m_ram_rw,
-                  p2m->default_access);
+    if ( p2m_set_entry(p2m, gfn_aligned, mfn, order, p2m_ram_rw,
+                       p2m->default_access) )
+    {
+        p2m_pod_cache_add(p2m, p, order);
+        goto out_fail;
+    }
 
     for( i = 0; i < (1UL << order); i++ )
     {
@@ -1152,13 +1155,18 @@ remap_and_retry:
     BUG_ON(order != PAGE_ORDER_2M);
     pod_unlock(p2m);
 
-    /* Remap this 2-meg region in singleton chunks */
-    /* NOTE: In a p2m fine-grained lock scenario this might
-     * need promoting the gfn lock from gfn->2M superpage */
+    /*
+     * Remap this 2-meg region in singleton chunks. See the comment on the
+     * 1G page splitting path above for why a single call suffices.
+     *
+     * NOTE: In a p2m fine-grained lock scenario this might
+     * need promoting the gfn lock from gfn->2M superpage.
+     */
     gfn_aligned = (gfn>>order)<<order;
-    for(i=0; i<(1<<order); i++)
-        p2m_set_entry(p2m, gfn_aligned + i, INVALID_MFN, PAGE_ORDER_4K,
-                      p2m_populate_on_demand, p2m->default_access);
+    if ( p2m_set_entry(p2m, gfn_aligned, INVALID_MFN, PAGE_ORDER_4K,
+                       p2m_populate_on_demand, p2m->default_access) )
+        return -1;
+
     if ( tb_init_done )
     {
         struct {
