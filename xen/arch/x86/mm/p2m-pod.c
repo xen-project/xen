@@ -565,8 +565,18 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
          * All PoD: Mark the whole region invalid and tell caller
          * we're done.
          */
-        p2m_set_entry(p2m, gfn, INVALID_MFN, order, p2m_invalid,
-                      p2m->default_access);
+        if ( p2m_set_entry(p2m, gfn, INVALID_MFN, order, p2m_invalid,
+                           p2m->default_access) )
+        {
+            /*
+             * If this fails, we can't tell how much of the range was changed.
+             * Best to crash the domain unless we're sure a partial change is
+             * impossible.
+             */
+            if ( order != 0 )
+                domain_crash(d);
+            goto out_unlock;
+        }
         p2m->pod.entry_count -= 1UL << order;
         BUG_ON(p2m->pod.entry_count < 0);
         ret = 1;
@@ -609,8 +619,14 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
         n = 1UL << cur_order;
         if ( t == p2m_populate_on_demand )
         {
-            p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
-                          p2m_invalid, p2m->default_access);
+            /* This shouldn't be able to fail */
+            if ( p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
+                               p2m_invalid, p2m->default_access) )
+            {
+                ASSERT_UNREACHABLE();
+                domain_crash(d);
+                goto out_unlock;
+            }
             p2m->pod.entry_count -= n;
             BUG_ON(p2m->pod.entry_count < 0);
             pod -= n;
@@ -631,8 +647,14 @@ p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn, unsigned int order)
 
             page = mfn_to_page(mfn);
 
-            p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
-                          p2m_invalid, p2m->default_access);
+            /* This shouldn't be able to fail */
+            if ( p2m_set_entry(p2m, gfn_add(gfn, i), INVALID_MFN, cur_order,
+                               p2m_invalid, p2m->default_access) )
+            {
+                ASSERT_UNREACHABLE();
+                domain_crash(d);
+                goto out_unlock;
+            }
             p2m_tlb_flush_sync(p2m);
             for ( j = 0; j < n; ++j )
                 set_gpfn_from_mfn(mfn_x(mfn), INVALID_M2P_ENTRY);
