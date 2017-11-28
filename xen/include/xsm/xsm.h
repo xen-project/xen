@@ -696,11 +696,9 @@ static inline int xsm_xen_version (xsm_default_t def, uint32_t op)
 
 #ifdef CONFIG_MULTIBOOT
 extern int xsm_multiboot_init(unsigned long *module_map,
-                              const multiboot_info_t *mbi,
-                              void *(*bootstrap_map)(const module_t *));
+                              const multiboot_info_t *mbi);
 extern int xsm_multiboot_policy_init(unsigned long *module_map,
                                      const multiboot_info_t *mbi,
-                                     void *(*bootstrap_map)(const module_t *),
                                      void **policy_buffer,
                                      size_t *policy_size);
 #endif
@@ -735,8 +733,7 @@ extern const unsigned int xsm_init_policy_size;
 
 #ifdef CONFIG_MULTIBOOT
 static inline int xsm_multiboot_init (unsigned long *module_map,
-                                      const multiboot_info_t *mbi,
-                                      void *(*bootstrap_map)(const module_t *))
+                                      const multiboot_info_t *mbi)
 {
     return 0;
 }
