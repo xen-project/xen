@@ -4081,6 +4081,9 @@ int xenmem_add_to_physmap_one(
     mfn_t mfn = INVALID_MFN;
     p2m_type_t p2mt;
 
+    if ( !paging_mode_translate(d) )
+        return -EACCES;
+
     switch ( space )
     {
         case XENMAPSPACE_shared_info:
@@ -4117,7 +4120,7 @@ int xenmem_add_to_physmap_one(
             break;
     }
 
-    if ( !paging_mode_translate(d) || mfn_eq(mfn, INVALID_MFN) )
+    if ( mfn_eq(mfn, INVALID_MFN) )
     {
         rc = -EINVAL;
         goto put_both;
