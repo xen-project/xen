@@ -457,6 +457,7 @@ static void __init setup_max_pdx(unsigned long top_page)
 /* A temporary copy of the e820 map that we can mess with during bootstrap. */
 static struct e820map __initdata boot_e820;
 
+#ifdef CONFIG_VIDEO
 struct boot_video_info {
     u8  orig_x;             /* 0x00 */
     u8  orig_y;             /* 0x01 */
@@ -487,9 +488,11 @@ struct boot_video_info {
     u16 vesa_attrib;        /* 0x28 */
 };
 extern struct boot_video_info boot_vid_info;
+#endif
 
 static void __init parse_video_info(void)
 {
+#ifdef CONFIG_VIDEO
     struct boot_video_info *bvi = &bootsym(boot_vid_info);
 
     /* vga_console_info is filled directly on EFI platform. */
@@ -525,6 +528,7 @@ static void __init parse_video_info(void)
         vga_console_info.u.vesa_lfb.gbl_caps = bvi->capabilities;
         vga_console_info.u.vesa_lfb.mode_attrs = bvi->vesa_attrib;
     }
+#endif
 }
 
 static void __init kexec_reserve_area(struct e820map *e820)
@@ -742,6 +746,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     printk("Xen image load base address: %#lx\n", xen_phys_start);
 
+#ifdef CONFIG_VIDEO
     printk("Video information:\n");
 
     /* Print VGA display mode information. */
@@ -785,6 +790,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                 printk("of reasons unknown\n");
         }
     }
+#endif
 
     printk("Disc information:\n");
     printk(" Found %d MBR signatures\n",

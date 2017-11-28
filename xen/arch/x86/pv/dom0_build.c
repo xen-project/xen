@@ -827,11 +827,13 @@ int __init dom0_construct_pv(struct domain *d,
     if ( cmdline != NULL )
         strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
 
+#ifdef CONFIG_VIDEO
     if ( fill_console_start_info((void *)(si + 1)) )
     {
         si->console.dom0.info_off  = sizeof(struct start_info);
         si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
+#endif
 
     if ( is_pv_32bit_domain(d) )
         xlat_start_info(si, XLAT_start_info_console_dom0);
