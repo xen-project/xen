@@ -479,16 +479,19 @@ static void __init efi_arch_edd(void)
 
 static void __init efi_arch_console_init(UINTN cols, UINTN rows)
 {
+#ifdef CONFIG_VIDEO
     vga_console_info.video_type = XEN_VGATYPE_TEXT_MODE_3;
     vga_console_info.u.text_mode_3.columns = cols;
     vga_console_info.u.text_mode_3.rows = rows;
     vga_console_info.u.text_mode_3.font_height = 16;
+#endif
 }
 
 static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
                                        UINTN info_size,
                                        EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info)
 {
+#ifdef CONFIG_VIDEO
     int bpp = 0;
 
     switch ( mode_info->PixelFormat )
@@ -550,6 +553,7 @@ static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
         vga_console_info.u.vesa_lfb.lfb_size =
             (gop->Mode->FrameBufferSize + 0xffff) >> 16;
     }
+#endif
 }
 
 static void __init efi_arch_memory_setup(void)

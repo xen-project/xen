@@ -219,7 +219,9 @@ trampoline_boot_cpu_entry:
          */
         call    get_memory_map
         call    get_edd
+#ifdef CONFIG_VIDEO
         call    video
+#endif
 
         mov     $0x0200,%ax
         int     $0x16
@@ -267,10 +269,13 @@ opt_edid:
         .byte   0                               /* EDID parsing option (force/no/default). */
 /* Padding. */
         .byte   0
+
+#ifdef CONFIG_VIDEO
 GLOBAL(boot_vid_mode)
         .word   VIDEO_80x25                     /* If we don't run at all, assume basic video mode 3 at 80x25. */
 vesa_size:
         .word   0,0,0                           /* width x depth x height */
+#endif
 
 GLOBAL(kbd_shift_flags)
         .byte   0
@@ -279,4 +284,6 @@ rm_idt: .word   256*4-1, 0, 0
 
 #include "mem.S"
 #include "edd.S"
+#ifdef CONFIG_VIDEO
 #include "video.S"
+#endif
