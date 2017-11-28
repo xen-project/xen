@@ -650,11 +650,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
         show_execution_state(regs);
 
         if ( trapnr == TRAP_page_fault )
-        {
-            unsigned long cr2 = read_cr2();
-            printk("Faulting linear address: %p\n", _p(cr2));
-            show_page_walk(cr2);
-        }
+            show_page_walk(read_cr2());
 
         if ( show_remote )
         {
