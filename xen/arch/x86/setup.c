@@ -716,6 +716,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      * allocing any xenheap structures wanted in lower memory. */
     kexec_early_calculations();
 
+    probe_hypervisor();
+
     parse_video_info();
 
     rdmsrl(MSR_EFER, this_cpu(efer));
