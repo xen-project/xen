@@ -1473,7 +1473,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     xsm_multiboot_init(module_map, mbi);
 
-    microcode_grab_module(module_map, mbi, bootstrap_map);
+    microcode_grab_module(module_map, mbi);
 
     timer_init();
 
