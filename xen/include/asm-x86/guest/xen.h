@@ -1,5 +1,5 @@
 /******************************************************************************
- * asm-x86/guest.h
+ * asm-x86/guest/xen.h
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms and conditions of the GNU General Public
@@ -16,13 +16,25 @@
  * Copyright (c) 2017 Citrix Systems Ltd.
  */
 
-#ifndef __X86_GUEST_H__
-#define __X86_GUEST_H__
+#ifndef __X86_GUEST_XEN_H__
+#define __X86_GUEST_XEN_H__
 
-#include <asm/guest/pvh-boot.h>
-#include <asm/guest/xen.h>
+#include <xen/types.h>
 
-#endif /* __X86_GUEST_H__ */
+#ifdef CONFIG_XEN_GUEST
+
+extern bool xen_guest;
+
+void probe_hypervisor(void);
+
+#else
+
+#define xen_guest 0
+
+static inline void probe_hypervisor(void) {};
+
+#endif /* CONFIG_XEN_GUEST */
+#endif /* __X86_GUEST_XEN_H__ */
 
 /*
  * Local variables:
