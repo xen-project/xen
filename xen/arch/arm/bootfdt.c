@@ -110,8 +110,8 @@ int __init device_tree_for_each_node(const void *fdt,
             continue;
         }
 
-        as = depth > 0 ? address_cells[depth-1] : 0;
-        ss = depth > 0 ? size_cells[depth-1] : 0;
+        as = depth > 0 ? address_cells[depth-1] : DT_ROOT_NODE_ADDR_CELLS_DEFAULT;
+        ss = depth > 0 ? size_cells[depth-1] : DT_ROOT_NODE_SIZE_CELLS_DEFAULT;
 
         address_cells[depth] = device_tree_get_u32(fdt, node,
                                                    "#address-cells", as);
