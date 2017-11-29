@@ -479,8 +479,8 @@ void detect_extended_topology(struct cpuinfo_x86 *c)
 	initial_apicid = edx;
 
 	/* Populate HT related information from sub-leaf level 0 */
-	core_level_siblings = c->x86_num_siblings = LEVEL_MAX_SIBLINGS(ebx);
 	core_plus_mask_width = ht_mask_width = BITS_SHIFT_NEXT_LEVEL(eax);
+	core_level_siblings = c->x86_num_siblings = 1 << ht_mask_width;
 
 	sub_index = 1;
 	do {
@@ -488,8 +488,8 @@ void detect_extended_topology(struct cpuinfo_x86 *c)
 
 		/* Check for the Core type in the implemented sub leaves */
 		if ( LEAFB_SUBTYPE(ecx) == CORE_TYPE ) {
-			core_level_siblings = LEVEL_MAX_SIBLINGS(ebx);
 			core_plus_mask_width = BITS_SHIFT_NEXT_LEVEL(eax);
+			core_level_siblings = 1 << core_plus_mask_width;
 			break;
 		}
 
