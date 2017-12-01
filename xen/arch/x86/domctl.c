@@ -1284,7 +1284,7 @@ long arch_do_domctl(
     case XEN_DOMCTL_set_vcpu_msrs:
     {
         struct xen_domctl_vcpu_msrs *vmsrs = &domctl->u.vcpu_msrs;
-        struct xen_domctl_vcpu_msr msr;
+        struct xen_domctl_vcpu_msr msr = {};
         struct vcpu *v;
         static const uint32_t msrs_to_send[] = {
             MSR_INTEL_MISC_FEATURES_ENABLES,
@@ -1347,7 +1347,6 @@ long arch_do_domctl(
                     if ( i < vmsrs->msr_count && !ret )
                     {
                         msr.index = msrs_to_send[j];
-                        msr.reserved = 0;
                         msr.value = val;
                         if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                             ret = -EFAULT;
@@ -1362,7 +1361,6 @@ long arch_do_domctl(
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
-                            msr.reserved = 0;
                             msr.value = v->arch.pv_vcpu.dr_mask[0];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
@@ -1377,7 +1375,6 @@ long arch_do_domctl(
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
-                            msr.reserved = 0;
                             msr.value = v->arch.pv_vcpu.dr_mask[1 + j];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
