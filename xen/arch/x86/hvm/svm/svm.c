@@ -413,72 +413,6 @@ static int svm_load_vmcb_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
-static unsigned int __init svm_init_msr(void)
-{
-    return boot_cpu_has(X86_FEATURE_DBEXT) ? 4 : 0;
-}
-
-static void svm_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
-{
-    if ( boot_cpu_has(X86_FEATURE_DBEXT) )
-    {
-        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[0];
-        if ( ctxt->msr[ctxt->count].val )
-            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR0_ADDRESS_MASK;
-
-        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[1];
-        if ( ctxt->msr[ctxt->count].val )
-            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR1_ADDRESS_MASK;
-
-        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[2];
-        if ( ctxt->msr[ctxt->count].val )
-            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR2_ADDRESS_MASK;
-
-        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[3];
-        if ( ctxt->msr[ctxt->count].val )
-            ctxt->msr[ctxt->count++].index = MSR_AMD64_DR3_ADDRESS_MASK;
-    }
-}
-
-static int svm_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
-{
-    unsigned int i, idx;
-    int err = 0;
-
-    for ( i = 0; i < ctxt->count; ++i )
-    {
-        switch ( idx = ctxt->msr[i].index )
-        {
-        case MSR_AMD64_DR0_ADDRESS_MASK:
-            if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
-                err = -ENXIO;
-            else if ( ctxt->msr[i].val >> 32 )
-                err = -EDOM;
-            else
-                v->arch.msrs->dr_mask[0] = ctxt->msr[i].val;
-            break;
-
-        case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
-            if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
-                err = -ENXIO;
-            else if ( ctxt->msr[i].val >> 32 )
-                err = -EDOM;
-            else
-                v->arch.msrs->dr_mask[idx - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
-                    ctxt->msr[i].val;
-            break;
-
-        default:
-            continue;
-        }
-        if ( err )
-            break;
-        ctxt->msr[i]._rsvd = 1;
-    }
-
-    return err;
-}
-
 static void svm_fpu_enter(struct vcpu *v)
 {
     struct vmcb_struct *n1vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
@@ -2094,19 +2028,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto gpf;
         break;
 
-    case MSR_AMD64_DR0_ADDRESS_MASK:
-        if ( !v->domain->arch.cpuid->extd.dbext )
-            goto gpf;
-        *msr_content = v->arch.msrs->dr_mask[0];
-        break;
-
-    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
-        if ( !v->domain->arch.cpuid->extd.dbext )
-            goto gpf;
-        *msr_content =
-            v->arch.msrs->dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1];
-        break;
-
     case MSR_AMD_OSVW_ID_LENGTH:
     case MSR_AMD_OSVW_STATUS:
         if ( !d->arch.cpuid->extd.osvw )
@@ -2290,19 +2211,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
          * all write accesses. This behaviour matches real HW, so guests should
          * have no problem with this.
          */
-        break;
-
-    case MSR_AMD64_DR0_ADDRESS_MASK:
-        if ( !v->domain->arch.cpuid->extd.dbext || (msr_content >> 32) )
-            goto gpf;
-        v->arch.msrs->dr_mask[0] = msr_content;
-        break;
-
-    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
-        if ( !v->domain->arch.cpuid->extd.dbext || (msr_content >> 32) )
-            goto gpf;
-        v->arch.msrs->dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
-            msr_content;
         break;
 
     case MSR_AMD_OSVW_ID_LENGTH:
@@ -2627,9 +2535,6 @@ static struct hvm_function_table __initdata svm_function_table = {
     .vcpu_destroy         = svm_vcpu_destroy,
     .save_cpu_ctxt        = svm_save_vmcb_ctxt,
     .load_cpu_ctxt        = svm_load_vmcb_ctxt,
-    .init_msr             = svm_init_msr,
-    .save_msr             = svm_save_msr,
-    .load_msr             = svm_load_msr,
     .get_interrupt_shadow = svm_get_interrupt_shadow,
     .set_interrupt_shadow = svm_set_interrupt_shadow,
     .guest_x86_mode       = svm_guest_x86_mode,

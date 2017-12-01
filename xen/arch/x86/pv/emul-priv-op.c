@@ -912,18 +912,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
         *val = guest_misc_enable(*val);
         return X86EMUL_OKAY;
 
-    case MSR_AMD64_DR0_ADDRESS_MASK:
-        if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
-            break;
-        *val = curr->arch.msrs->dr_mask[0];
-        return X86EMUL_OKAY;
-
-    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
-        if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
-            break;
-        *val = curr->arch.msrs->dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1];
-        return X86EMUL_OKAY;
-
     case MSR_IA32_PERF_CAPABILITIES:
         /* No extra capabilities are supported. */
         *val = 0;
@@ -1105,22 +1093,6 @@ static int write_msr(unsigned int reg, uint64_t val,
              wrmsr_safe(reg, val) == 0 )
             return X86EMUL_OKAY;
         break;
-
-    case MSR_AMD64_DR0_ADDRESS_MASK:
-        if ( !boot_cpu_has(X86_FEATURE_DBEXT) || (val >> 32) )
-            break;
-        curr->arch.msrs->dr_mask[0] = val;
-        if ( curr->arch.dr7 & DR7_ACTIVE_MASK )
-            wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, val);
-        return X86EMUL_OKAY;
-
-    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
-        if ( !boot_cpu_has(X86_FEATURE_DBEXT) || (val >> 32) )
-            break;
-        curr->arch.msrs->dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1] = val;
-        if ( curr->arch.dr7 & DR7_ACTIVE_MASK )
-            wrmsrl(reg, val);
-        return X86EMUL_OKAY;
 
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):
     case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(3):

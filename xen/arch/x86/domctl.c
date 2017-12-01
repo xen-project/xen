@@ -1274,6 +1274,10 @@ long arch_do_domctl(
         static const uint32_t msrs_to_send[] = {
             MSR_SPEC_CTRL,
             MSR_INTEL_MISC_FEATURES_ENABLES,
+            MSR_AMD64_DR0_ADDRESS_MASK,
+            MSR_AMD64_DR1_ADDRESS_MASK,
+            MSR_AMD64_DR2_ADDRESS_MASK,
+            MSR_AMD64_DR3_ADDRESS_MASK,
         };
         uint32_t nr_msrs = ARRAY_SIZE(msrs_to_send);
 
@@ -1340,35 +1344,6 @@ long arch_do_domctl(
                     ++i;
                 }
 
-                if ( boot_cpu_has(X86_FEATURE_DBEXT) )
-                {
-                    if ( v->arch.msrs->dr_mask[0] )
-                    {
-                        if ( i < vmsrs->msr_count && !ret )
-                        {
-                            msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
-                            msr.value = v->arch.msrs->dr_mask[0];
-                            if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
-                                ret = -EFAULT;
-                        }
-                        ++i;
-                    }
-
-                    for ( j = 0; j < 3; ++j )
-                    {
-                        if ( !v->arch.msrs->dr_mask[1 + j] )
-                            continue;
-                        if ( i < vmsrs->msr_count && !ret )
-                        {
-                            msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
-                            msr.value = v->arch.msrs->dr_mask[1 + j];
-                            if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
-                                ret = -EFAULT;
-                        }
-                        ++i;
-                    }
-                }
-
                 vcpu_unpause(v);
 
                 if ( i > vmsrs->msr_count && !ret )
@@ -1398,24 +1373,10 @@ long arch_do_domctl(
                 {
                 case MSR_SPEC_CTRL:
                 case MSR_INTEL_MISC_FEATURES_ENABLES:
+                case MSR_AMD64_DR0_ADDRESS_MASK:
+                case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
                     if ( guest_wrmsr(v, msr.index, msr.value) != X86EMUL_OKAY )
                         break;
-                    continue;
-
-                case MSR_AMD64_DR0_ADDRESS_MASK:
-                    if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
-                         (msr.value >> 32) )
-                        break;
-                    v->arch.msrs->dr_mask[0] = msr.value;
-                    continue;
-
-                case MSR_AMD64_DR1_ADDRESS_MASK ...
-                    MSR_AMD64_DR3_ADDRESS_MASK:
-                    if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
-                         (msr.value >> 32) )
-                        break;
-                    msr.index -= MSR_AMD64_DR1_ADDRESS_MASK - 1;
-                    v->arch.msrs->dr_mask[msr.index] = msr.value;
                     continue;
                 }
                 break;

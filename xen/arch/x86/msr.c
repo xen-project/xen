@@ -21,7 +21,10 @@
 
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/nospec.h>
 #include <xen/sched.h>
+
+#include <asm/debugreg.h>
 #include <asm/msr.h>
 
 DEFINE_PER_CPU(uint32_t, tsc_aux);
@@ -159,6 +162,27 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         ret = guest_rdmsr_xen(v, msr, val);
         break;
 
+    case MSR_AMD64_DR0_ADDRESS_MASK:
+    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
+        if ( !cp->extd.dbext )
+            goto gp_fault;
+
+        /*
+         * In HVM context when we've allowed the guest direct access to debug
+         * registers, the value in msrs->dr_mask[] may be stale.  Re-read it
+         * out of hardware.
+         */
+#ifdef CONFIG_HVM
+        if ( v == current && is_hvm_domain(d) && v->arch.hvm.flag_dr_dirty )
+            rdmsrl(msr, *val);
+        else
+#endif
+            *val = msrs->dr_mask[
+                array_index_nospec((msr == MSR_AMD64_DR0_ADDRESS_MASK)
+                                   ? 0 : (msr - MSR_AMD64_DR1_ADDRESS_MASK + 1),
+                                   ARRAY_SIZE(msrs->dr_mask))];
+        break;
+
     default:
         return X86EMUL_UNHANDLEABLE;
     }
@@ -283,6 +307,20 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         /* Fallthrough. */
     case 0x40000200 ... 0x400002ff:
         ret = guest_wrmsr_xen(v, msr, val);
+        break;
+
+    case MSR_AMD64_DR0_ADDRESS_MASK:
+    case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
+        if ( !cp->extd.dbext || val != (uint32_t)val )
+            goto gp_fault;
+
+        msrs->dr_mask[
+            array_index_nospec((msr == MSR_AMD64_DR0_ADDRESS_MASK)
+                               ? 0 : (msr - MSR_AMD64_DR1_ADDRESS_MASK + 1),
+                               ARRAY_SIZE(msrs->dr_mask))] = val;
+
+        if ( v == curr && (curr->arch.dr7 & DR7_ACTIVE_MASK) )
+            wrmsrl(msr, val);
         break;
 
     default:
