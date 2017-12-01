@@ -56,8 +56,9 @@ t=RELEASE-$r
 # if main version number has changed (eg 4.7 -> 4.8) rerun ./autogen.sh
 * rerun ./autogen.sh to update version number in configure
 #    - XEN_EXTRAVERSION should be `.0-rc$(XEN_VENDORVERSION)'
-#    - debug ?= n on stable branches
-#    - Kconfig.debug default n on stable branches
+#    - turn off debug on stable branches
+#           - tools/Rules.mk debug ?= n
+#           - Kconfig.debug default n
 * tag xen-unstable
 
 # In xen.git
