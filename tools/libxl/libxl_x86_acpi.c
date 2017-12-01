@@ -22,8 +22,6 @@
 
  /* Number of pages holding ACPI tables */
 #define NUM_ACPI_PAGES 16
-/* Store RSDP in the last 64 bytes of BIOS RO memory */
-#define RSDP_ADDRESS (0x100000 - 64)
 #define ACPI_INFO_PHYSICAL_ADDRESS 0xfc000000
 
 struct libxl_acpi_ctxt {
@@ -220,7 +218,8 @@ int libxl__dom_load_acpi(libxl__gc *gc,
 
     dom->acpi_modules[0].data = (void *)config.rsdp;
     dom->acpi_modules[0].length = 64;
-    dom->acpi_modules[0].guest_addr_out = RSDP_ADDRESS;
+    dom->acpi_modules[0].guest_addr_out = ACPI_INFO_PHYSICAL_ADDRESS +
+        (1 + acpi_pages_num) * libxl_ctxt.page_size;
 
     dom->acpi_modules[1].data = (void *)config.infop;
     dom->acpi_modules[1].length = 4096;

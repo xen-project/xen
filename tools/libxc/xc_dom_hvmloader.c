@@ -136,7 +136,7 @@ static int module_init_one(struct xc_dom_image *dom,
     struct xc_dom_seg seg;
     void *dest;
 
-    if ( module->length )
+    if ( module->length && !module->guest_addr_out )
     {
         if ( xc_dom_alloc_segment(dom, &seg, name, 0, module->length) )
             goto err;
