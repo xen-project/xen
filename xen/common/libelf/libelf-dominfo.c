@@ -269,6 +269,7 @@ elf_errorstatus elf_xen_parse_guest_info(struct elf_binary *elf,
     elf_ptrval h;
     unsigned char name[32], value[128];
     unsigned len;
+    elf_errorstatus ret = 0;
 
     h = parms->guest_info;
 #define STAR(h) (elf_access_unsigned(elf, (h), 0, 1))
@@ -336,16 +337,23 @@ elf_errorstatus elf_xen_parse_guest_info(struct elf_binary *elf,
         if ( !strcmp(name, "ELF_PADDR_OFFSET") )
             parms->elf_paddr_offset = strtoull(value, NULL, 0);
         if ( !strcmp(name, "HYPERCALL_PAGE") )
-            parms->virt_hypercall = (strtoull(value, NULL, 0) << 12) +
-                parms->virt_base;
+            parms->virt_hypercall = strtoull(value, NULL, 0) << 12;
 
         /* other */
         if ( !strcmp(name, "FEATURES") )
             if ( elf_xen_parse_features(value, parms->f_supported,
                                         parms->f_required) )
-                return -1;
+            {
+                ret = -1;
+                break;
+            }
     }
-    return 0;
+
+    if ( (parms->virt_base != UNSET_ADDR) &&
+         (parms->virt_hypercall != UNSET_ADDR) )
+        parms->virt_hypercall += parms->virt_base;
+
+    return ret;
 }
 
 /* ------------------------------------------------------------------------ */
