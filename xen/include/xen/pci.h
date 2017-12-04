@@ -38,6 +38,26 @@
 #define PCI_SBDF2(s,bdf) ((((s) & 0xffff) << 16) | ((bdf) & 0xffff))
 #define PCI_SBDF3(s,b,df) ((((s) & 0xffff) << 16) | PCI_BDF2(b, df))
 
+typedef union {
+    uint32_t sbdf;
+    struct {
+        union {
+            uint16_t bdf;
+            struct {
+                union {
+                    struct {
+                        uint8_t func : 3,
+                                dev  : 5;
+                    };
+                    uint8_t     extfunc;
+                };
+                uint8_t         bus;
+            };
+        };
+        uint16_t                seg;
+    };
+} pci_sbdf_t;
+
 struct pci_dev_info {
     /*
      * VF's 'is_extfn' field is used to indicate whether its PF is an extended

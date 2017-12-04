@@ -265,17 +265,12 @@ void register_g2m_portio_handler(struct domain *d)
 }
 
 unsigned int hvm_pci_decode_addr(unsigned int cf8, unsigned int addr,
-                                 unsigned int *bus, unsigned int *slot,
-                                 unsigned int *func)
+                                 pci_sbdf_t *sbdf)
 {
-    unsigned int bdf;
-
     ASSERT(CF8_ENABLED(cf8));
 
-    bdf = CF8_BDF(cf8);
-    *bus = PCI_BUS(bdf);
-    *slot = PCI_SLOT(bdf);
-    *func = PCI_FUNC(bdf);
+    sbdf->bdf = CF8_BDF(cf8);
+    sbdf->seg = 0;
     /*
      * NB: the lower 2 bits of the register address are fetched from the
      * offset into the 0xcfc register when reading/writing to it.
