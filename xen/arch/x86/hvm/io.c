@@ -157,8 +157,11 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
         break;
 
     case X86EMUL_RETRY:
-        /* We should not advance RIP/EIP if the domain is shutting down */
-        if ( curr->domain->is_shutting_down )
+        /*
+         * We should not advance RIP/EIP if the domain is shutting down or
+         * if X86EMUL_RETRY has been returned by an internal handler.
+         */
+        if ( curr->domain->is_shutting_down || !hvm_io_pending(curr) )
             return false;
         break;
 
