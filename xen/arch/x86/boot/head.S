@@ -161,7 +161,7 @@ not_multiboot:
          */
         add     $sym_offs(.Lbad_ldr_nbs),%esi   # Error message
         xor     %edi,%edi                       # No VGA text buffer
-        jmp     .Lsend_chr
+        jmp     .Lprint_err
 .Lmb2_efi_ia_32:
         /*
          * Here we are on EFI IA-32 platform. Then reliable vga_text_buffer zap is
@@ -169,10 +169,10 @@ not_multiboot:
          */
         add     $sym_offs(.Lbad_efi_msg),%esi   # Error message
         xor     %edi,%edi                       # No VGA text buffer
-        jmp     .Lsend_chr
+        jmp     .Lprint_err
 .Lget_vtb:
         mov     sym_esi(vga_text_buffer),%edi
-.Lsend_chr:
+.Lprint_err:
         lodsb
         test    %al,%al        # Terminate on '\0' sentinel
         je      .Lhalt
@@ -185,11 +185,11 @@ not_multiboot:
         mov     %bl,%al
         out     %al,%dx        # Send a character over the serial line
         test    %edi,%edi      # Is the VGA text buffer available?
-        jz      .Lsend_chr
+        jz      .Lprint_err
         stosb                  # Write a character to the VGA text buffer
         mov     $7,%al
         stosb                  # Write an attribute to the VGA text buffer
-        jmp     .Lsend_chr
+        jmp     .Lprint_err
 .Lhalt: hlt
         jmp     .Lhalt
 
