@@ -794,9 +794,12 @@ void __init console_init_preirq(void)
     serial_set_rx_handler(sercon_handle, serial_rx);
 
     /* HELLO WORLD --- start-of-day banner text. */
-    spin_lock(&console_lock);
-    __putstr(xen_banner());
-    spin_unlock(&console_lock);
+    if ( 2 < xenlog_lower_thresh ) {
+        /* Only display at XENLOG_INFO level */
+        spin_lock(&console_lock);
+        __putstr(xen_banner());
+        spin_unlock(&console_lock);
+    }
     printk("Xen version %d.%d%s (%s@%s) (%s) debug=%c " gcov_string " %s\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
            xen_compile_by(), xen_compile_domain(),
