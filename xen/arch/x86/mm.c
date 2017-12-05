@@ -3627,18 +3627,18 @@ long do_mmu_update(
             gmfn = req.ptr >> PAGE_SHIFT;
             page = get_page_from_gfn(pt_owner, gmfn, &p2mt, P2M_ALLOC);
 
-            if ( p2m_is_paged(p2mt) )
+            if ( unlikely(!page) || p2mt != p2m_ram_rw )
             {
-                ASSERT(!page);
-                p2m_mem_paging_populate(pt_owner, gmfn);
-                rc = -ENOENT;
-                break;
-            }
-
-            if ( unlikely(!page) )
-            {
-                gdprintk(XENLOG_WARNING,
-                         "Could not get page for normal update\n");
+                if ( page )
+                    put_page(page);
+                if ( p2m_is_paged(p2mt) )
+                {
+                    p2m_mem_paging_populate(pt_owner, gmfn);
+                    rc = -ENOENT;
+                }
+                else
+                    gdprintk(XENLOG_WARNING,
+                             "Could not get page for normal update\n");
                 break;
             }
 
