@@ -2845,9 +2845,7 @@ int new_guest_cr3(mfn_t mfn)
         return 0;
     }
 
-    rc = paging_mode_refcounts(d)
-         ? (get_page_from_mfn(mfn, d) ? 0 : -EINVAL)
-         : get_page_and_type_from_mfn(mfn, PGT_root_page_table, d, 0, 1);
+    rc = get_page_and_type_from_mfn(mfn, PGT_root_page_table, d, 0, 1);
     switch ( rc )
     {
     case 0:
