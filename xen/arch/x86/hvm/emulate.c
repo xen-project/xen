@@ -163,7 +163,8 @@ static int hvmemul_do_io(
              (p.count > *reps) ||
              (p.dir != dir) ||
              (p.df != df) ||
-             (p.data_is_ptr != data_is_addr) )
+             (p.data_is_ptr != data_is_addr) ||
+             (data_is_addr && (p.data != data)) )
             domain_crash(currd);
 
         if ( data_is_addr )
