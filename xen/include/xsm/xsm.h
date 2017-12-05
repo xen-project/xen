@@ -97,9 +97,9 @@ struct xsm_operations {
 
     char *(*show_irq_sid) (int irq);
     int (*map_domain_pirq) (struct domain *d);
-    int (*map_domain_irq) (struct domain *d, int irq, void *data);
+    int (*map_domain_irq) (struct domain *d, int irq, const void *data);
     int (*unmap_domain_pirq) (struct domain *d);
-    int (*unmap_domain_irq) (struct domain *d, int irq, void *data);
+    int (*unmap_domain_irq) (struct domain *d, int irq, const void *data);
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*unbind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);

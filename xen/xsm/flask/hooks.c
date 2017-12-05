@@ -877,13 +877,13 @@ static int flask_map_domain_pirq (struct domain *d)
     return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
 }
 
-static int flask_map_domain_msi (struct domain *d, int irq, void *data,
+static int flask_map_domain_msi (struct domain *d, int irq, const void *data,
                                  u32 *sid, struct avc_audit_data *ad)
 {
 #ifdef CONFIG_HAS_PCI
-    struct msi_info *msi = data;
-
+    const struct msi_info *msi = data;
     u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
+
     AVC_AUDIT_DATA_INIT(ad, DEV);
     ad->device = machine_bdf;
 
@@ -912,7 +912,7 @@ static u32 flask_iommu_resource_use_perm(void)
     return perm;
 }
 
-static int flask_map_domain_irq (struct domain *d, int irq, void *data)
+static int flask_map_domain_irq (struct domain *d, int irq, const void *data)
 {
     u32 sid, dsid;
     int rc = -EPERM;
@@ -943,7 +943,7 @@ static int flask_unmap_domain_pirq (struct domain *d)
     return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
 }
 
-static int flask_unmap_domain_msi (struct domain *d, int irq, void *data,
+static int flask_unmap_domain_msi (struct domain *d, int irq, const void *data,
                                    u32 *sid, struct avc_audit_data *ad)
 {
 #ifdef CONFIG_HAS_PCI
@@ -959,7 +959,7 @@ static int flask_unmap_domain_msi (struct domain *d, int irq, void *data,
 #endif
 }
 
-static int flask_unmap_domain_irq (struct domain *d, int irq, void *data)
+static int flask_unmap_domain_irq (struct domain *d, int irq, const void *data)
 {
     u32 sid;
     int rc = -EPERM;
