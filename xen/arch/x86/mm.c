@@ -3662,18 +3662,28 @@ long do_mmu_update(
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
                                       pg_owner);
                     break;
+
                 case PGT_l2_page_table:
+                    if ( unlikely(pg_owner != pt_owner) )
+                        break;
                     rc = mod_l2_entry(va, l2e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                     break;
+
                 case PGT_l3_page_table:
+                    if ( unlikely(pg_owner != pt_owner) )
+                        break;
                     rc = mod_l3_entry(va, l3e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                     break;
+
                 case PGT_l4_page_table:
+                    if ( unlikely(pg_owner != pt_owner) )
+                        break;
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                     break;
+
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
                     if ( paging_write_guest_entry(v, va, req.val, _mfn(mfn)) )
