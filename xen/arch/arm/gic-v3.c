@@ -769,8 +769,12 @@ static int gicv3_secondary_cpu_init(void)
     spin_lock(&gicv3.lock);
 
     res = gicv3_cpu_init();
+    if ( res )
+        goto out;
+
     gicv3_hyp_init();
 
+out:
     spin_unlock(&gicv3.lock);
 
     return res;
@@ -1543,8 +1547,12 @@ static int __init gicv3_init(void)
 
     gicv3_dist_init();
     res = gicv3_cpu_init();
+    if ( res )
+        goto out;
+
     gicv3_hyp_init();
 
+out:
     spin_unlock(&gicv3.lock);
 
     return res;
