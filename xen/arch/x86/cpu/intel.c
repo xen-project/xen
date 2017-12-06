@@ -15,8 +15,6 @@
 
 #include "cpu.h"
 
-#define select_idle_routine(x) ((void)0)
-
 static bool __init probe_intel_cpuid_faulting(void)
 {
 	uint64_t x;
@@ -375,7 +373,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 	/* Detect the extended topology information if available */
 	detect_extended_topology(c);
 
-	select_idle_routine(c);
 	l2 = init_intel_cacheinfo(c);
 	if (c->cpuid_level > 9) {
 		unsigned eax = cpuid_eax(10);
