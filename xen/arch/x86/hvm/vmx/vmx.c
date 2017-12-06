@@ -62,8 +62,6 @@
 static bool_t __initdata opt_force_ept;
 boolean_param("force-ept", opt_force_ept);
 
-enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
-
 static void vmx_ctxt_switch_from(struct vcpu *v);
 static void vmx_ctxt_switch_to(struct vcpu *v);
 
@@ -484,8 +482,7 @@ static void vmx_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
-static enum handler_return
-long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
+static int long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *v = current;
 
@@ -520,16 +517,15 @@ long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
         break;
 
     default:
-        return HNDL_unhandled;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     HVM_DBG_LOG(DBG_LEVEL_MSR, "msr %#x content %#"PRIx64, msr, *msr_content);
 
-    return HNDL_done;
+    return X86EMUL_OKAY;
 }
 
-static enum handler_return
-long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
+static int long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
 
@@ -541,7 +537,7 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:
         if ( !is_canonical_address(msr_content) )
-            return HNDL_exception_raised;
+            return X86EMUL_EXCEPTION;
 
         if ( msr == MSR_FS_BASE )
             __vmwrite(GUEST_FS_BASE, msr_content);
@@ -559,14 +555,14 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
     case MSR_LSTAR:
         if ( !is_canonical_address(msr_content) )
-            return HNDL_exception_raised;
+            return X86EMUL_EXCEPTION;
         v->arch.hvm_vmx.lstar = msr_content;
         wrmsrl(MSR_LSTAR, msr_content);
         break;
 
     case MSR_CSTAR:
         if ( !is_canonical_address(msr_content) )
-            return HNDL_exception_raised;
+            return X86EMUL_EXCEPTION;
         v->arch.hvm_vmx.cstar = msr_content;
         break;
 
@@ -576,10 +572,10 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
         break;
 
     default:
-        return HNDL_unhandled;
+        return X86EMUL_UNHANDLEABLE;
     }
 
-    return HNDL_done;
+    return X86EMUL_OKAY;
 }
 
 /*
@@ -2934,12 +2930,11 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto done;
         switch ( long_mode_do_msr_read(msr, msr_content) )
         {
-            case HNDL_unhandled:
-                break;
-            case HNDL_exception_raised:
-                return X86EMUL_EXCEPTION;
-            case HNDL_done:
-                goto done;
+        case X86EMUL_EXCEPTION:
+            return X86EMUL_EXCEPTION;
+
+        case X86EMUL_OKAY:
+            goto done;
         }
 
         if ( vmx_read_guest_msr(msr, msr_content) == 0 )
@@ -3158,24 +3153,23 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         switch ( long_mode_do_msr_write(msr, msr_content) )
         {
-            case HNDL_unhandled:
-                if ( (vmx_write_guest_msr(msr, msr_content) != 0) &&
-                     !is_last_branch_msr(msr) )
-                    switch ( wrmsr_hypervisor_regs(msr, msr_content) )
-                    {
-                    case -ERESTART:
-                        return X86EMUL_RETRY;
-                    case 0:
-                    case 1:
-                        break;
-                    default:
-                        goto gp_fault;
-                    }
-                break;
-            case HNDL_exception_raised:
-                return X86EMUL_EXCEPTION;
-            case HNDL_done:
-                break;
+        case X86EMUL_UNHANDLEABLE:
+            if ( (vmx_write_guest_msr(msr, msr_content) != 0) &&
+                 !is_last_branch_msr(msr) )
+                switch ( wrmsr_hypervisor_regs(msr, msr_content) )
+                {
+                case -ERESTART:
+                    return X86EMUL_RETRY;
+                case 0:
+                case 1:
+                    break;
+                default:
+                    goto gp_fault;
+                }
+            break;
+
+        case X86EMUL_EXCEPTION:
+            return X86EMUL_EXCEPTION;
         }
         break;
     }
