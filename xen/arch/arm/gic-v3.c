@@ -811,8 +811,12 @@ static int gicv3_secondary_cpu_init(void)
     spin_lock(&gicv3.lock);
 
     res = gicv3_cpu_init();
+    if ( res )
+        goto out;
+
     gicv3_hyp_init();
 
+out:
     spin_unlock(&gicv3.lock);
 
     return res;
@@ -1637,8 +1641,12 @@ static int __init gicv3_init(void)
         panic("GICv3: ITS: initialization failed: %d\n", res);
 
     res = gicv3_cpu_init();
+    if ( res )
+        goto out;
+
     gicv3_hyp_init();
 
+out:
     spin_unlock(&gicv3.lock);
 
     return res;
