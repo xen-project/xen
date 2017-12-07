@@ -1276,7 +1276,7 @@ static DEFINE_PER_CPU(unsigned int, dirty_segment_mask);
 #define DIRTY_FS           0x04
 #define DIRTY_GS           0x08
 #define DIRTY_FS_BASE      0x10
-#define DIRTY_GS_BASE_USER 0x20
+#define DIRTY_GS_BASE      0x20
 
 static void load_segments(struct vcpu *n)
 {
@@ -1317,7 +1317,7 @@ static void load_segments(struct vcpu *n)
         all_segs_okay &= loadsegment(gs, uregs->gs);
         /* non-nul selector updates gs_base_user */
         if ( uregs->gs & ~3 )
-            dirty_segment_mask &= ~DIRTY_GS_BASE_USER;
+            dirty_segment_mask &= ~DIRTY_GS_BASE;
     }
 
     if ( !is_pv_32bit_vcpu(n) )
@@ -1332,7 +1332,7 @@ static void load_segments(struct vcpu *n)
 
         /* This can only be non-zero if selector is NULL. */
         if ( n->arch.pv_vcpu.gs_base_user |
-             (dirty_segment_mask & DIRTY_GS_BASE_USER) )
+             (dirty_segment_mask & DIRTY_GS_BASE) )
             wrgsbase(n->arch.pv_vcpu.gs_base_user);
 
         /* If in kernel mode then switch the GS bases around. */
@@ -1483,7 +1483,7 @@ static void save_segments(struct vcpu *v)
     }
     if ( v->arch.flags & TF_kernel_mode ? v->arch.pv_vcpu.gs_base_kernel
                                         : v->arch.pv_vcpu.gs_base_user )
-        dirty_segment_mask |= DIRTY_GS_BASE_USER;
+        dirty_segment_mask |= DIRTY_GS_BASE;
 
     this_cpu(dirty_segment_mask) = dirty_segment_mask;
 }
