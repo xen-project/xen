@@ -85,6 +85,12 @@
 #define PRINT(s)
 #endif /* !CONFIG_EARLY_PRINTK */
 
+/* Load the physical address of a symbol into xb */
+.macro load_paddr xb, sym
+        ldr \xb, =\sym
+        add \xb, \xb, x20
+.endm
+
         /*.aarch64*/
 
         /*
@@ -247,8 +253,7 @@ real_start_efi:
 
         /* Using the DTB in the .dtb section? */
 #ifdef CONFIG_DTB_FILE
-        ldr   x21, =_sdtb
-        add   x21, x21, x20          /* x21 := paddr(DTB) */
+        load_paddr x21, _sdtb
 #endif
 
         mov   x22, #0                /* x22 := is_secondary_cpu */
@@ -281,8 +286,7 @@ common_start:
         /* Non-boot CPUs wait here until __cpu_up is ready for them */
         cbz   x22, 1f
 
-        ldr   x0, =smp_up_cpu
-        add   x0, x0, x20            /* Apply physical offset */
+        load_paddr x0, smp_up_cpu
         dsb   sy
 2:      ldr   x1, [x0]
         cmp   x1, x24
@@ -323,10 +327,8 @@ el2:    PRINT("- Xen starting at EL2 -\r\n")
         cbnz  x26, skip_bss
 
         PRINT("- Zero BSS -\r\n")
-        ldr   x0, =__bss_start       /* Load start & end of bss */
-        ldr   x1, =__bss_end
-        add   x0, x0, x20            /* Apply physical offset */
-        add   x1, x1, x20
+        load_paddr x0, __bss_start    /* Load paddr of start & end of bss */
+        load_paddr x1, __bss_end
 
 1:      str   xzr, [x0], #8
         cmp   x0, x1
@@ -386,13 +388,11 @@ skip_bss:
         cset  x25, eq                /* x25 := identity map in place, or not */
 
         /* Write Xen's PT's paddr into TTBR0_EL2 */
-        ldr   x4, =boot_pgtable
-        add   x4, x4, x20            /* x4 := paddr (boot_pagetable) */
+        load_paddr x4, boot_pgtable
         msr   TTBR0_EL2, x4
 
         /* Setup boot_pgtable: */
-        ldr   x1, =boot_first
-        add   x1, x1, x20            /* x1 := paddr (boot_first) */
+        load_paddr x1, boot_first
 
         /* ... map boot_first in boot_pgtable[0] */
         mov   x3, #PT_PT             /* x2 := table map of boot_first */
@@ -407,16 +407,14 @@ skip_bss:
         /* Level zero does not support superpage mappings, so we have
          * to use an extra first level page in which we create a 1GB mapping.
          */
-        ldr   x2, =boot_first_id
-        add   x2, x2, x20            /* x2 := paddr (boot_first_id) */
+        load_paddr x2, boot_first_id
 
         mov   x3, #PT_PT             /* x2 := table map of boot_first_id */
         orr   x2, x2, x3             /*       + rights for linear PT */
         lsl   x1, x1, #3             /* x1 := Slot offset */
         str   x2, [x4, x1]
 
-        ldr   x4, =boot_first_id     /* Next level into boot_first_id */
-        add   x4, x4, x20            /* x4 := paddr(boot_first_id) */
+        load_paddr x4, boot_first_id
 
         lsr   x1, x19, #FIRST_SHIFT  /* x1 := Offset of base paddr in boot_first_id */
         lsl   x2, x1, #FIRST_SHIFT   /* x2 := Base address for 1GB mapping */
@@ -428,12 +426,10 @@ skip_bss:
         mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_first: */
-        ldr   x4, =boot_first        /* Next level into boot_first */
-        add   x4, x4, x20            /* x4 := paddr(boot_first) */
+        load_paddr x4, boot_first   /* Next level into boot_first */
 
         /* ... map boot_second in boot_first[0] */
-        ldr   x1, =boot_second
-        add   x1, x1, x20            /* x1 := paddr(boot_second) */
+        load_paddr x1, boot_second
         mov   x3, #PT_PT             /* x2 := table map of boot_second */
         orr   x2, x1, x3             /*       + rights for linear PT */
         str   x2, [x4, #0]           /* Map it in slot 0 */
@@ -452,12 +448,10 @@ skip_bss:
         mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_second: */
-        ldr   x4, =boot_second       /* Next level into boot_second */
-        add   x4, x4, x20            /* x4 := paddr(boot_second) */
+        load_paddr x4, boot_second
 
         /* ... map boot_third in boot_second[1] */
-        ldr   x1, =boot_third
-        add   x1, x1, x20            /* x1 := paddr(boot_third) */
+        load_paddr x1, boot_third
         mov   x3, #PT_PT             /* x2 := table map of boot_third */
         orr   x2, x1, x3             /*       + rights for linear PT */
         str   x2, [x4, #8]           /* Map it in slot 1 */
@@ -477,8 +471,7 @@ skip_bss:
         mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_third: */
-        ldr   x4, =boot_third
-        add   x4, x4, x20            /* x4 := paddr (boot_third) */
+        load_paddr x4, boot_third
 
         lsr   x2, x19, #THIRD_SHIFT  /* Base address for 4K mapping */
         lsl   x2, x2, #THIRD_SHIFT
@@ -538,8 +531,7 @@ paging:
 
         /* Map fixmap into boot_second */
         ldr   x4, =boot_second       /* x4 := vaddr (boot_second) */
-        ldr   x2, =xen_fixmap
-        add   x2, x2, x20            /* x2 := paddr (xen_fixmap) */
+        load_paddr x2, xen_fixmap
         mov   x3, #PT_PT
         orr   x2, x2, x3             /* x2 := table map of xen_fixmap */
         ldr   x1, =FIXMAP_ADDR(0)
