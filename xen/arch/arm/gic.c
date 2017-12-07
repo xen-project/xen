@@ -411,15 +411,6 @@ void gic_remove_from_lr_pending(struct vcpu *v, struct pending_irq *p)
     list_del_init(&p->lr_queue);
 }
 
-void gic_remove_irq_from_queues(struct vcpu *v, struct pending_irq *p)
-{
-    ASSERT(spin_is_locked(&v->arch.vgic.lock));
-
-    clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
-    list_del_init(&p->inflight);
-    gic_remove_from_lr_pending(v, p);
-}
-
 void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
 {
     struct pending_irq *n = irq_to_pending(v, virtual_irq);

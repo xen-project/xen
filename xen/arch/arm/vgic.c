@@ -281,7 +281,7 @@ bool vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq)
     /* If the IRQ is still lr_pending, re-inject it to the new vcpu */
     if ( !list_empty(&p->lr_queue) )
     {
-        gic_remove_irq_from_queues(old, p);
+        vgic_remove_irq_from_queues(old, p);
         irq_set_affinity(p->desc, cpumask_of(new->processor));
         spin_unlock_irqrestore(&old->arch.vgic.lock, flags);
         vgic_vcpu_inject_irq(new, irq);
@@ -506,6 +506,15 @@ void vgic_clear_pending_irqs(struct vcpu *v)
         list_del_init(&p->inflight);
     gic_clear_pending_irqs(v);
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+}
+
+void vgic_remove_irq_from_queues(struct vcpu *v, struct pending_irq *p)
+{
+    ASSERT(spin_is_locked(&v->arch.vgic.lock));
+
+    clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
+    list_del_init(&p->inflight);
+    gic_remove_from_lr_pending(v, p);
 }
 
 void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int virq)
