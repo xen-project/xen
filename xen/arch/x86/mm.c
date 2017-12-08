@@ -2426,7 +2426,6 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
     {
         ASSERT((page->u.inuse.type_info &
                 (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
-        set_tlbflush_timestamp(page);
         smp_wmb();
         page->u.inuse.type_info |= PGT_validated;
     }
