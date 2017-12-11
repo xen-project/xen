@@ -840,7 +840,10 @@ void send_global_virq(uint32_t virq)
     ASSERT(virq < NR_VIRQS);
     ASSERT(virq_is_global(virq));
 
-    send_guest_global_virq(global_virq_handlers[virq] ?: hardware_domain, virq);
+    if ( global_virq_handlers[virq] )
+        send_guest_global_virq(global_virq_handlers[virq], virq);
+    else if ( !is_vixen() )
+        send_guest_global_virq(hardware_domain, virq);
 }
 
 int set_global_virq_handler(struct domain *d, uint32_t virq)
