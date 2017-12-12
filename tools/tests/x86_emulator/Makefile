@@ -45,17 +45,17 @@ define simd-defs
 $(1)-cflags := \
 	$(foreach vec,$($(1)-vecs), \
 	  $(foreach int,$($(1)-ints), \
-	    "-D_$(vec)i$(int) -m$(1) $(call non-sse,$(1)) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-	    "-D_$(vec)u$(int) -m$(1) $(call non-sse,$(1)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
+	    "-D_$(vec)i$(int) -m$(1) $(call non-sse,$(1)) -Os -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+	    "-D_$(vec)u$(int) -m$(1) $(call non-sse,$(1)) -Os -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)") \
 	  $(foreach flt,$($(1)-flts), \
-	    "-D_$(vec)f$(flt) -m$(1) $(call non-sse,$(1)) -O2 -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
+	    "-D_$(vec)f$(flt) -m$(1) $(call non-sse,$(1)) -Os -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
 	$(foreach flt,$($(1)-flts), \
-	  "-D_f$(flt) -m$(1) $(call non-sse,$(1)) -mfpmath=sse -O2 -DFLOAT_SIZE=$(flt)")
+	  "-D_f$(flt) -m$(1) $(call non-sse,$(1)) -mfpmath=sse -Os -DFLOAT_SIZE=$(flt)")
 $(1)-avx-cflags := \
 	$(foreach vec,$($(1)-vecs), \
 	  $(foreach int,$($(1)-ints), \
-	    "-D_$(vec)i$(int) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-	    "-D_$(vec)u$(int) -m$(1) $(sse2avx-$(1)) -O2 -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)"))
+	    "-D_$(vec)i$(int) -m$(1) $(sse2avx-$(1)) -Os -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
+	    "-D_$(vec)u$(int) -m$(1) $(sse2avx-$(1)) -Os -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)"))
 endef
 
 $(foreach flavor,$(SIMD),$(eval $(call simd-defs,$(flavor))))
