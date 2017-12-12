@@ -7,11 +7,13 @@
 
 #define COPY_flush_dcache   (1U << 0)
 
-static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
-                                              unsigned len, int flags)
+static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
+                                unsigned int flags)
 {
     /* XXX needs to handle faults */
-    unsigned offset = (vaddr_t)to & ~PAGE_MASK;
+    unsigned offset = addr & ~PAGE_MASK;
+
+    BUILD_BUG_ON((sizeof(addr)) < sizeof(vaddr_t));
 
     while ( len )
     {
@@ -19,21 +21,21 @@ static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
         struct page_info *page;
 
-        page = get_page_from_gva(current, (vaddr_t) to, GV2M_WRITE);
+        page = get_page_from_gva(current, addr, GV2M_WRITE);
         if ( page == NULL )
             return len;
 
         p = __map_domain_page(page);
         p += offset;
-        memcpy(p, from, size);
+        memcpy(p, buf, size);
         if ( flags & COPY_flush_dcache )
             clean_dcache_va_range(p, size);
 
         unmap_domain_page(p - offset);
         put_page(page);
         len -= size;
-        from += size;
-        to += size;
+        buf += size;
+        addr += size;
         /*
          * After the first iteration, guest virtual address is correctly
          * aligned to PAGE_SIZE.
@@ -46,13 +48,13 @@ static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
 
 unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
 {
-    return raw_copy_to_guest_helper(to, from, len, 0);
+    return copy_guest((void *)from, (vaddr_t)to, len, 0);
 }
 
 unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
                                              unsigned len)
 {
-    return raw_copy_to_guest_helper(to, from, len, COPY_flush_dcache);
+    return copy_guest((void *)from, (vaddr_t)to, len, COPY_flush_dcache);
 }
 
 unsigned long raw_clear_guest(void *to, unsigned len)
