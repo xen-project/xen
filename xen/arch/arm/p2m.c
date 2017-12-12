@@ -131,10 +131,17 @@ void p2m_restore_state(struct vcpu *n)
     *last_vcpu_ran = n->vcpu_id;
 }
 
-static void p2m_tlb_flush(struct p2m_domain *p2m)
+/*
+ * Force a synchronous P2M TLB flush.
+ *
+ * Must be called with the p2m lock held.
+ */
+static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
 {
     unsigned long flags = 0;
     uint64_t ovttbr;
+
+    ASSERT(p2m_is_write_locked(p2m));
 
     /*
      * ARM only provides an instruction to flush TLBs for the current
@@ -156,18 +163,7 @@ static void p2m_tlb_flush(struct p2m_domain *p2m)
         isb();
         local_irq_restore(flags);
     }
-}
 
-/*
- * Force a synchronous P2M TLB flush.
- *
- * Must be called with the p2m lock held.
- */
-static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
-{
-    ASSERT(p2m_is_write_locked(p2m));
-
-    p2m_tlb_flush(p2m);
     p2m->need_flush = false;
 }
 
@@ -1142,7 +1138,9 @@ static int p2m_alloc_table(struct domain *d)
      * Make sure that all TLBs corresponding to the new VMID are flushed
      * before using it
      */
-    p2m_tlb_flush(p2m);
+    p2m_write_lock(p2m);
+    p2m_force_tlb_flush_sync(p2m);
+    p2m_write_unlock(p2m);
 
     return 0;
 }
