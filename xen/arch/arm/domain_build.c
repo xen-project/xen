@@ -2135,6 +2135,7 @@ int construct_dom0(struct domain *d)
     d->max_pages = ~0U;
 
     kinfo.unassigned_mem = dom0_mem;
+    kinfo.d = d;
 
     rc = kernel_probe(&kinfo);
     if ( rc < 0 )
