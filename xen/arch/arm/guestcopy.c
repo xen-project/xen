@@ -130,6 +130,15 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
                       COPY_from_guest | COPY_linear);
 }
 
+unsigned long copy_to_guest_phys_flush_dcache(struct domain *d,
+                                              paddr_t gpa,
+                                              void *buf,
+                                              unsigned int len)
+{
+    return copy_guest(buf, gpa, len, GPA_INFO(d),
+                      COPY_to_guest | COPY_ipa | COPY_flush_dcache);
+}
+
 int access_guest_memory_by_ipa(struct domain *d, paddr_t gpa, void *buf,
                                uint32_t size, bool is_write)
 {
