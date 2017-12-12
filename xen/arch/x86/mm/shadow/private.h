@@ -532,7 +532,7 @@ static inline int sh_get_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
     x = sp->u.sh.count;
     nx = x + 1;
 
-    if ( unlikely(nx >= 1U<<26) )
+    if ( unlikely(nx >= (1U << PAGE_SH_REFCOUNT_WIDTH)) )
     {
         SHADOW_PRINTK("shadow ref overflow, gmfn=%lx smfn=%lx\n",
                        __backpointer(sp), mfn_x(smfn));
