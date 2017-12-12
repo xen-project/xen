@@ -51,21 +51,15 @@ static const paddr_t level_masks[] =
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
-static void p2m_tlb_flush(struct p2m_domain *p2m);
-
 /* Unlock the flush and do a P2M TLB flush if necessary */
 void p2m_write_unlock(struct p2m_domain *p2m)
 {
-    if ( p2m->need_flush )
-    {
-        p2m->need_flush = false;
-        /*
-         * The final flush is done with the P2M write lock taken to
-         * to avoid someone else modify the P2M before the TLB
-         * invalidation has completed.
-         */
-        p2m_tlb_flush(p2m);
-    }
+    /*
+     * The final flush is done with the P2M write lock taken to avoid
+     * someone else modifying the P2M wbefore the TLB invalidation has
+     * completed.
+     */
+    p2m_tlb_flush_sync(p2m);
 
     write_unlock(&p2m->lock);
 }
@@ -175,6 +169,12 @@ static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
 
     p2m_tlb_flush(p2m);
     p2m->need_flush = false;
+}
+
+void p2m_tlb_flush_sync(struct p2m_domain *p2m)
+{
+    if ( p2m->need_flush )
+        p2m_force_tlb_flush_sync(p2m);
 }
 
 /*
@@ -673,8 +673,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
      * XXX: Should we defer the free of the page table to avoid the
      * flush?
      */
-    if ( p2m->need_flush )
-        p2m_force_tlb_flush_sync(p2m);
+    p2m_tlb_flush_sync(p2m);
 
     mfn = _mfn(entry.p2m.base);
     ASSERT(mfn_valid(mfn));

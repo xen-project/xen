@@ -204,6 +204,8 @@ static inline int p2m_is_write_locked(struct p2m_domain *p2m)
     return rw_is_write_locked(&p2m->lock);
 }
 
+void p2m_tlb_flush_sync(struct p2m_domain *p2m);
+
 /* Look up the MFN corresponding to a domain's GFN. */
 mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t);
 
