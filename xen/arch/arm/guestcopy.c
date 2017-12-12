@@ -6,6 +6,8 @@
 #include <asm/guest_access.h>
 
 #define COPY_flush_dcache   (1U << 0)
+#define COPY_from_guest     (0U << 1)
+#define COPY_to_guest       (1U << 1)
 
 static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
                                 unsigned int flags)
@@ -21,13 +23,18 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
         struct page_info *page;
 
-        page = get_page_from_gva(current, addr, GV2M_WRITE);
+        page = get_page_from_gva(current, addr,
+                                 (flags & COPY_to_guest) ? GV2M_WRITE : GV2M_READ);
         if ( page == NULL )
             return len;
 
         p = __map_domain_page(page);
         p += offset;
-        memcpy(p, buf, size);
+        if ( flags & COPY_to_guest )
+            memcpy(p, buf, size);
+        else
+            memcpy(buf, p, size);
+
         if ( flags & COPY_flush_dcache )
             clean_dcache_va_range(p, size);
 
@@ -48,13 +55,14 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
 
 unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
 {
-    return copy_guest((void *)from, (vaddr_t)to, len, 0);
+    return copy_guest((void *)from, (vaddr_t)to, len, COPY_to_guest);
 }
 
 unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
                                              unsigned len)
 {
-    return copy_guest((void *)from, (vaddr_t)to, len, COPY_flush_dcache);
+    return copy_guest((void *)from, (vaddr_t)to, len,
+                      COPY_to_guest | COPY_flush_dcache);
 }
 
 unsigned long raw_clear_guest(void *to, unsigned len)
@@ -92,35 +100,7 @@ unsigned long raw_clear_guest(void *to, unsigned len)
 
 unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned len)
 {
-    unsigned offset = (vaddr_t)from & ~PAGE_MASK;
-
-    while ( len )
-    {
-        void *p;
-        unsigned size = min(len, (unsigned)(PAGE_SIZE - offset));
-        struct page_info *page;
-
-        page = get_page_from_gva(current, (vaddr_t) from, GV2M_READ);
-        if ( page == NULL )
-            return len;
-
-        p = __map_domain_page(page);
-        p += ((vaddr_t)from & (~PAGE_MASK));
-
-        memcpy(to, p, size);
-
-        unmap_domain_page(p);
-        put_page(page);
-        len -= size;
-        from += size;
-        to += size;
-        /*
-         * After the first iteration, guest virtual address is correctly
-         * aligned to PAGE_SIZE.
-         */
-        offset = 0;
-    }
-    return 0;
+    return copy_guest(to, (vaddr_t)from, len, COPY_from_guest);
 }
 
 /*
