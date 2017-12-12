@@ -51,7 +51,7 @@ static const paddr_t level_masks[] =
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
-static void p2m_flush_tlb(struct p2m_domain *p2m);
+static void p2m_tlb_flush(struct p2m_domain *p2m);
 
 /* Unlock the flush and do a P2M TLB flush if necessary */
 void p2m_write_unlock(struct p2m_domain *p2m)
@@ -64,7 +64,7 @@ void p2m_write_unlock(struct p2m_domain *p2m)
          * to avoid someone else modify the P2M before the TLB
          * invalidation has completed.
          */
-        p2m_flush_tlb(p2m);
+        p2m_tlb_flush(p2m);
     }
 
     write_unlock(&p2m->lock);
@@ -137,7 +137,7 @@ void p2m_restore_state(struct vcpu *n)
     *last_vcpu_ran = n->vcpu_id;
 }
 
-static void p2m_flush_tlb(struct p2m_domain *p2m)
+static void p2m_tlb_flush(struct p2m_domain *p2m)
 {
     unsigned long flags = 0;
     uint64_t ovttbr;
@@ -169,11 +169,11 @@ static void p2m_flush_tlb(struct p2m_domain *p2m)
  *
  * Must be called with the p2m lock held.
  */
-static void p2m_flush_tlb_sync(struct p2m_domain *p2m)
+static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
 {
     ASSERT(p2m_is_write_locked(p2m));
 
-    p2m_flush_tlb(p2m);
+    p2m_tlb_flush(p2m);
     p2m->need_flush = false;
 }
 
@@ -674,7 +674,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
      * flush?
      */
     if ( p2m->need_flush )
-        p2m_flush_tlb_sync(p2m);
+        p2m_force_tlb_flush_sync(p2m);
 
     mfn = _mfn(entry.p2m.base);
     ASSERT(mfn_valid(mfn));
@@ -863,7 +863,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
          * For more details see (D4.7.1 in ARM DDI 0487A.j).
          */
         p2m_remove_pte(entry, p2m->clean_pte);
-        p2m_flush_tlb_sync(p2m);
+        p2m_force_tlb_flush_sync(p2m);
 
         p2m_write_pte(entry, split_pte, p2m->clean_pte);
 
@@ -939,7 +939,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         {
             if ( likely(!p2m->mem_access_enabled) ||
                  P2M_CLEAR_PERM(pte) != P2M_CLEAR_PERM(orig_pte) )
-                p2m_flush_tlb_sync(p2m);
+                p2m_force_tlb_flush_sync(p2m);
             else
                 p2m->need_flush = true;
         }
@@ -1143,7 +1143,7 @@ static int p2m_alloc_table(struct domain *d)
      * Make sure that all TLBs corresponding to the new VMID are flushed
      * before using it
      */
-    p2m_flush_tlb(p2m);
+    p2m_tlb_flush(p2m);
 
     return 0;
 }
