@@ -896,7 +896,7 @@ static int shadow_set_l4e(struct vcpu *v,
                           shadow_l4e_t new_sl4e, 
                           mfn_t sl4mfn)
 {
-    int flags = 0, ok;
+    int flags = 0;
     shadow_l4e_t old_sl4e;
     paddr_t paddr;
     ASSERT(sl4e != NULL);
@@ -911,15 +911,16 @@ static int shadow_set_l4e(struct vcpu *v,
     {
         /* About to install a new reference */        
         mfn_t sl3mfn = shadow_l4e_get_mfn(new_sl4e);
-        ok = sh_get_ref(v, sl3mfn, paddr);
-        /* Are we pinning l3 shadows to handle wierd linux behaviour? */
-        if ( sh_type_is_pinnable(v, SH_type_l3_64_shadow) )
-            ok |= sh_pin(v, sl3mfn);
-        if ( !ok )
+
+        if ( !sh_get_ref(v, sl3mfn, paddr) )
         {
             domain_crash(v->domain);
             return SHADOW_SET_ERROR;
         }
+
+        /* Are we pinning l3 shadows to handle weird Linux behaviour? */
+        if ( sh_type_is_pinnable(v, SH_type_l3_64_shadow) )
+            sh_pin(v, sl3mfn);
     }
 
     /* Write the new entry */
@@ -3881,13 +3882,14 @@ sh_set_toplevel_shadow(struct vcpu *v,
 
     /* Take a ref to this page: it will be released in sh_detach_old_tables()
      * or the next call to set_toplevel_shadow() */
-    if ( !sh_get_ref(v, smfn, 0) )
+    if ( sh_get_ref(v, smfn, 0) )
+        new_entry = pagetable_from_mfn(smfn);
+    else
     {
         SHADOW_ERROR("can't install %#lx as toplevel shadow\n", mfn_x(smfn));
         domain_crash(v->domain);
+        new_entry = pagetable_null();
     }
-
-    new_entry = pagetable_from_mfn(smfn);
 
  install_new_entry:
     /* Done.  Install it */
