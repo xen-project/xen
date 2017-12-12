@@ -29,7 +29,6 @@
 typedef struct
 {
     struct hsr_dabt dabt;
-    vaddr_t gva;
     paddr_t gpa;
 } mmio_info_t;
 

@@ -2000,6 +2000,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
 {
     const struct hsr_dabt dabt = hsr.dabt;
     int rc;
+    vaddr_t gva;
     mmio_info_t info;
     uint8_t fsc = hsr.dabt.dfsc & ~FSC_LL_MASK;
     mfn_t mfn;
@@ -2013,13 +2014,13 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
 
     info.dabt = dabt;
 
-    info.gva = get_hfar(true /* is_data */);
+    gva = get_hfar(true /* is_data */);
 
     if ( hpfar_is_valid(dabt.s1ptw, fsc) )
-        info.gpa = get_faulting_ipa(info.gva);
+        info.gpa = get_faulting_ipa(gva);
     else
     {
-        rc = gva_to_ipa(info.gva, &info.gpa, GV2M_READ);
+        rc = gva_to_ipa(gva, &info.gpa, GV2M_READ);
         /*
          * We may not be able to translate because someone is
          * playing with the Stage-2 page table of the domain.
@@ -2040,7 +2041,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
             .kind = dabt.s1ptw ? npfec_kind_in_gpt : npfec_kind_with_gla
         };
 
-        p2m_mem_access_check(info.gpa, info.gva, npfec);
+        p2m_mem_access_check(info.gpa, gva, npfec);
         /*
          * The only way to get here right now is because of mem_access,
          * thus reinjecting the exception to the guest is never required.
@@ -2077,8 +2078,8 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     }
 
     gdprintk(XENLOG_DEBUG, "HSR=0x%x pc=%#"PRIregister" gva=%#"PRIvaddr
-             " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, info.gva, info.gpa);
-    inject_dabt_exception(regs, info.gva, hsr.len);
+             " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, gva, info.gpa);
+    inject_dabt_exception(regs, gva, hsr.len);
 }
 
 static void enter_hypervisor_head(struct cpu_user_regs *regs)
