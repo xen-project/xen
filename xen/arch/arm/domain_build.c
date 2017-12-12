@@ -1968,11 +1968,11 @@ static void initrd_load(struct kernel_info *kinfo)
     const struct bootmodule *mod = kinfo->initrd_bootmodule;
     paddr_t load_addr = kinfo->initrd_paddr;
     paddr_t paddr, len;
-    unsigned long offs;
     int node;
     int res;
     __be32 val[2];
     __be32 *cellp;
+    void __iomem *initrd;
 
     if ( !mod || !mod->size )
         return;
@@ -2002,29 +2002,14 @@ static void initrd_load(struct kernel_info *kinfo)
     if ( res )
         panic("Cannot fix up \"linux,initrd-end\" property");
 
-    for ( offs = 0; offs < len; )
-    {
-        uint64_t par;
-        paddr_t s, l, ma = 0;
-        void *dst;
+    initrd = ioremap_wc(paddr, len);
+    if ( !initrd )
+        panic("Unable to map the hwdom initrd");
 
-        s = offs & ~PAGE_MASK;
-        l = min(PAGE_SIZE - s, len);
-
-        par = gvirt_to_maddr(load_addr + offs, &ma, GV2M_WRITE);
-        if ( par )
-        {
-            panic("Unable to translate guest address");
-            return;
-        }
-
-        dst = map_domain_page(maddr_to_mfn(ma));
-
-        copy_from_paddr(dst + s, paddr + offs, l);
-
-        unmap_domain_page(dst);
-        offs += l;
-    }
+    res = copy_to_guest_phys_flush_dcache(kinfo->d, load_addr,
+                                          initrd, len);
+    if ( res != 0 )
+        panic("Unable to copy the initrd in the hwdom memory");
 }
 
 static void evtchn_fixup(struct domain *d, struct kernel_info *kinfo)
