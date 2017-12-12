@@ -83,7 +83,8 @@ struct page_info
             unsigned long type:5;   /* What kind of shadow is this? */
             unsigned long pinned:1; /* Is the shadow pinned? */
             unsigned long head:1;   /* Is this the first page of the shadow? */
-            unsigned long count:25; /* Reference count */
+#define PAGE_SH_REFCOUNT_WIDTH 25
+            unsigned long count:PAGE_SH_REFCOUNT_WIDTH; /* Reference count */
         } sh;
 
         /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
