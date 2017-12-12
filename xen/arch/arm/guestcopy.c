@@ -31,7 +31,16 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
         p = __map_domain_page(page);
         p += offset;
         if ( flags & COPY_to_guest )
-            memcpy(p, buf, size);
+        {
+            /*
+             * buf will be NULL when the caller request to zero the
+             * guest memory.
+             */
+            if ( buf )
+                memcpy(p, buf, size);
+            else
+                memset(p, 0, size);
+        }
         else
             memcpy(buf, p, size);
 
@@ -67,35 +76,7 @@ unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
 
 unsigned long raw_clear_guest(void *to, unsigned len)
 {
-    /* XXX needs to handle faults */
-    unsigned offset = (vaddr_t)to & ~PAGE_MASK;
-
-    while ( len )
-    {
-        void *p;
-        unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
-        struct page_info *page;
-
-        page = get_page_from_gva(current, (vaddr_t) to, GV2M_WRITE);
-        if ( page == NULL )
-            return len;
-
-        p = __map_domain_page(page);
-        p += offset;
-        memset(p, 0x00, size);
-
-        unmap_domain_page(p - offset);
-        put_page(page);
-        len -= size;
-        to += size;
-        /*
-         * After the first iteration, guest virtual address is correctly
-         * aligned to PAGE_SIZE.
-         */
-        offset = 0;
-    }
-
-    return 0;
+    return copy_guest(NULL, (vaddr_t)to, len, COPY_to_guest);
 }
 
 unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned len)
