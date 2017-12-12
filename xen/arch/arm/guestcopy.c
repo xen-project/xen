@@ -5,8 +5,10 @@
 #include <asm/current.h>
 #include <asm/guest_access.h>
 
+#define COPY_flush_dcache   (1U << 0)
+
 static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
-                                              unsigned len, int flush_dcache)
+                                              unsigned len, int flags)
 {
     /* XXX needs to handle faults */
     unsigned offset = (vaddr_t)to & ~PAGE_MASK;
@@ -24,7 +26,7 @@ static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
         p = __map_domain_page(page);
         p += offset;
         memcpy(p, from, size);
-        if ( flush_dcache )
+        if ( flags & COPY_flush_dcache )
             clean_dcache_va_range(p, size);
 
         unmap_domain_page(p - offset);
@@ -50,7 +52,7 @@ unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
 unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
                                              unsigned len)
 {
-    return raw_copy_to_guest_helper(to, from, len, 1);
+    return raw_copy_to_guest_helper(to, from, len, COPY_flush_dcache);
 }
 
 unsigned long raw_clear_guest(void *to, unsigned len)
