@@ -1935,9 +1935,14 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
 }
 
 static bool try_handle_mmio(struct cpu_user_regs *regs,
-                            mmio_info_t *info)
+                            const union hsr hsr,
+                            paddr_t gpa)
 {
-    const struct hsr_dabt dabt = info->dabt;
+    const struct hsr_dabt dabt = hsr.dabt;
+    mmio_info_t info = {
+        .gpa = gpa,
+        .dabt = dabt
+    };
     int rc;
 
     /* stage-1 page table should never live in an emulated MMIO region */
@@ -1955,7 +1960,7 @@ static bool try_handle_mmio(struct cpu_user_regs *regs,
     if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) &&
          dabt.write )
     {
-        rc = decode_instruction(regs, &info->dabt);
+        rc = decode_instruction(regs, &info.dabt);
         if ( rc )
         {
             gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
@@ -1963,7 +1968,7 @@ static bool try_handle_mmio(struct cpu_user_regs *regs,
         }
     }
 
-    return !!handle_mmio(info);
+    return !!handle_mmio(&info);
 }
 
 /*
@@ -2001,7 +2006,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     const struct hsr_dabt dabt = hsr.dabt;
     int rc;
     vaddr_t gva;
-    mmio_info_t info;
+    paddr_t gpa;
     uint8_t fsc = hsr.dabt.dfsc & ~FSC_LL_MASK;
     mfn_t mfn;
 
@@ -2012,15 +2017,13 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     if ( dabt.eat )
         return __do_trap_serror(regs, true);
 
-    info.dabt = dabt;
-
     gva = get_hfar(true /* is_data */);
 
     if ( hpfar_is_valid(dabt.s1ptw, fsc) )
-        info.gpa = get_faulting_ipa(gva);
+        gpa = get_faulting_ipa(gva);
     else
     {
-        rc = gva_to_ipa(gva, &info.gpa, GV2M_READ);
+        rc = gva_to_ipa(gva, &gpa, GV2M_READ);
         /*
          * We may not be able to translate because someone is
          * playing with the Stage-2 page table of the domain.
@@ -2041,7 +2044,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
             .kind = dabt.s1ptw ? npfec_kind_in_gpt : npfec_kind_with_gla
         };
 
-        p2m_mem_access_check(info.gpa, gva, npfec);
+        p2m_mem_access_check(gpa, gva, npfec);
         /*
          * The only way to get here right now is because of mem_access,
          * thus reinjecting the exception to the guest is never required.
@@ -2053,7 +2056,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
          * Attempt first to emulate the MMIO as the data abort will
          * likely happen in an emulated region.
          */
-        if ( try_handle_mmio(regs, &info) )
+        if ( try_handle_mmio(regs, hsr, gpa) )
         {
             advance_pc(regs, hsr);
             return;
@@ -2064,11 +2067,11 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
          * with the Stage-2 page table. Walk the Stage-2 PT to check
          * if the entry exists. If it's the case, return to the guest
          */
-        mfn = gfn_to_mfn(current->domain, gaddr_to_gfn(info.gpa));
+        mfn = gfn_to_mfn(current->domain, gaddr_to_gfn(gpa));
         if ( !mfn_eq(mfn, INVALID_MFN) )
             return;
 
-        if ( try_map_mmio(gaddr_to_gfn(info.gpa)) )
+        if ( try_map_mmio(gaddr_to_gfn(gpa)) )
             return;
 
         break;
@@ -2078,7 +2081,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     }
 
     gdprintk(XENLOG_DEBUG, "HSR=0x%x pc=%#"PRIregister" gva=%#"PRIvaddr
-             " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, gva, info.gpa);
+             " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, gva, gpa);
     inject_dabt_exception(regs, gva, hsr.len);
 }
 
