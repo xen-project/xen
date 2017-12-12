@@ -9,8 +9,18 @@
 #define COPY_from_guest     (0U << 1)
 #define COPY_to_guest       (1U << 1)
 
+typedef union
+{
+    struct
+    {
+        struct vcpu *v;
+    } gva;
+} copy_info_t;
+
+#define GVA_INFO(vcpu) ((copy_info_t) { .gva = { vcpu } })
+
 static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
-                                unsigned int flags)
+                                copy_info_t info, unsigned int flags)
 {
     /* XXX needs to handle faults */
     unsigned offset = addr & ~PAGE_MASK;
@@ -23,7 +33,7 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
         struct page_info *page;
 
-        page = get_page_from_gva(current, addr,
+        page = get_page_from_gva(info.gva.v, addr,
                                  (flags & COPY_to_guest) ? GV2M_WRITE : GV2M_READ);
         if ( page == NULL )
             return len;
@@ -64,24 +74,27 @@ static unsigned long copy_guest(void *buf, uint64_t addr, unsigned int len,
 
 unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
 {
-    return copy_guest((void *)from, (vaddr_t)to, len, COPY_to_guest);
+    return copy_guest((void *)from, (vaddr_t)to, len,
+                      GVA_INFO(current), COPY_to_guest);
 }
 
 unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
                                              unsigned len)
 {
-    return copy_guest((void *)from, (vaddr_t)to, len,
+    return copy_guest((void *)from, (vaddr_t)to, len, GVA_INFO(current),
                       COPY_to_guest | COPY_flush_dcache);
 }
 
 unsigned long raw_clear_guest(void *to, unsigned len)
 {
-    return copy_guest(NULL, (vaddr_t)to, len, COPY_to_guest);
+    return copy_guest(NULL, (vaddr_t)to, len, GVA_INFO(current),
+                      COPY_to_guest);
 }
 
 unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned len)
 {
-    return copy_guest(to, (vaddr_t)from, len, COPY_from_guest);
+    return copy_guest(to, (vaddr_t)from, len, GVA_INFO(current),
+                      COPY_from_guest);
 }
 
 /*
