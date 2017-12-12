@@ -276,7 +276,7 @@ void paging_mark_gfn_dirty(struct domain *d, unsigned long pfn)
         return;
 
     /* Shared MFNs should NEVER be marked dirty */
-    BUG_ON(SHARED_M2P(pfn));
+    BUG_ON(paging_mode_translate(d) && SHARED_M2P(pfn));
 
     /*
      * Values with the MSB set denote MFNs that aren't really part of the
