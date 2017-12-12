@@ -69,9 +69,6 @@
 #define paging_mode_translate(_d) (!!((_d)->arch.paging.mode & PG_translate))
 #define paging_mode_external(_d)  (!!((_d)->arch.paging.mode & PG_external))
 
-#define paging_mode_only_log_dirty(_d)                  \
-    (((_d)->arch.paging.mode & PG_MASK) == PG_log_dirty)
-
 /* flags used for paging debug */
 #define PAGING_DEBUG_LOGDIRTY 0
 
