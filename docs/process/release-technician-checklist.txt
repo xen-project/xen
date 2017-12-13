@@ -68,6 +68,7 @@ t=RELEASE-$r
   git-show # should show commit updating version to right version
   git-tag -u 'xen tree' -s -m "Xen $r$rc" $t
   git-push origin $t
+  git-push origin staging-$x
 ##  hg tag <tag_name> ; hg sign -k "Xen tree" <tag_name>
 
 
