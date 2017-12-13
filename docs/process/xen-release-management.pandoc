@@ -211,7 +211,12 @@ https://wiki.xenproject.org/wiki/Category:Xen_4.9
     Ask them to dry-run their checklist and confirm everything is OK. If not,
     arrange another RC and restart this checklist.
 
-7. Give PR Personnel final go-ahead, and instruct Release Technician to make
+7. Do not commit to a release date until
+
+    * The exact xen.git commit id to be released is known.
+    * That commit id has been satisfactorily tested.
+
+8. Give PR Personnel final go-ahead, and instruct Release Technician to make
 release deliverables (tags and tarballs - will usually be in place the day
 before the release). At this point, PR collateral will be sent to reporters
 (typically 2-3 working days before the release date) and we cannot undo
@@ -219,7 +224,7 @@ publications without questions being asked and risk of negative PR. It is
 acceptable to make a xen-devel@ announcement *before* the PR release date
 (blog, xen-announce@, press release).
 
-8. Make the announcement on various mailing list, publish the blog post.
+9. Make the announcement on various mailing list, publish the blog post.
 
 Allow for contingencies. It is not uncommon that some last minute (security or
 not) bugs are discovered. To provide a fix takes time, the test of the fix
