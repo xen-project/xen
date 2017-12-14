@@ -118,6 +118,8 @@
 #define TAP_DEVICE_SUFFIX "-emu"
 #define DOMID_XS_PATH "domid"
 #define INVALID_DOMID ~0
+#define PVSHIM_BASENAME "xen-shim"
+#define PVSHIM_CMDLINE "pv-shim console=xen,pv sched=null loglvl=all guest_loglvl=all apic_verbosity=debug e820-verbose"
 
 /* Size macros. */
 #define __AC(X,Y)   (X##Y)
@@ -1136,6 +1138,8 @@ typedef struct {
 
     libxl__file_reference pv_kernel;
     libxl__file_reference pv_ramdisk;
+    const char * shim_path;
+    const char * shim_cmdline;
     const char * pv_cmdline;
 
     xen_vmemrange_t *vmemranges;

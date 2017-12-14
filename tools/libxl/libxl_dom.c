@@ -1025,22 +1025,51 @@ static int libxl__domain_firmware(libxl__gc *gc,
 
     if (state->pv_kernel.path != NULL &&
         info->type == LIBXL_DOMAIN_TYPE_PVH) {
-        /* Try to load a kernel instead of the firmware. */
-        if (state->pv_kernel.mapped) {
-            rc = xc_dom_kernel_mem(dom, state->pv_kernel.data,
-                                   state->pv_kernel.size);
-            if (rc) {
-                LOGE(ERROR, "xc_dom_kernel_mem failed");
-                goto out;
-            }
-        } else {
-            rc = xc_dom_kernel_file(dom, state->pv_kernel.path);
+
+        if (state->shim_path) {
+            rc = xc_dom_kernel_file(dom, state->shim_path);
             if (rc) {
                 LOGE(ERROR, "xc_dom_kernel_file failed");
                 goto out;
             }
-        }
 
+            /* We've loaded the shim, so load the kernel as a secondary module */
+            if (state->pv_kernel.mapped) {
+                LOG(WARN, "xc_dom_module_mem, cmdline %s",
+                    state->pv_cmdline);
+                rc = xc_dom_module_mem(dom, state->pv_kernel.data,
+                                       state->pv_kernel.size, state->pv_cmdline);
+                if (rc) {
+                    LOGE(ERROR, "xc_dom_kernel_mem failed");
+                    goto out;
+                }
+            } else {
+                LOG(WARN, "xc_dom_module_file, path %s cmdline %s",
+                    state->pv_kernel.path, state->pv_cmdline);
+                rc = xc_dom_module_file(dom, state->pv_kernel.path, state->pv_cmdline);
+                if (rc) {
+                    LOGE(ERROR, "xc_dom_kernel_file failed");
+                    goto out;
+                }
+            }
+        } else {
+            /* No shim, so load the kernel directly */
+            if (state->pv_kernel.mapped) {
+                rc = xc_dom_kernel_mem(dom, state->pv_kernel.data,
+                                       state->pv_kernel.size);
+                if (rc) {
+                    LOGE(ERROR, "xc_dom_kernel_mem failed");
+                    goto out;
+                }
+            } else {
+                rc = xc_dom_kernel_file(dom, state->pv_kernel.path);
+                if (rc) {
+                    LOGE(ERROR, "xc_dom_kernel_file failed");
+                    goto out;
+                }
+            }
+        }
+        
         if (state->pv_ramdisk.path && strlen(state->pv_ramdisk.path)) {
             if (state->pv_ramdisk.mapped) {
                 rc = xc_dom_module_mem(dom, state->pv_ramdisk.data,
@@ -1154,8 +1183,14 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
 
     xc_dom_loginit(ctx->xch);
 
+    /* 
+     * If PVH and we have a shim override, use the shim cmdline.
+     * If PVH and no shim override, use the pv cmdline.
+     * If not PVH, use info->cmdline.
+     */
     dom = xc_dom_allocate(ctx->xch, info->type == LIBXL_DOMAIN_TYPE_PVH ?
-                          state->pv_cmdline : info->cmdline, NULL);
+                          (state->shim_path ? state->shim_cmdline : state->pv_cmdline) :
+                          info->cmdline, NULL);
     if (!dom) {
         LOGE(ERROR, "xc_dom_allocate failed");
         rc = ERROR_NOMEM;
