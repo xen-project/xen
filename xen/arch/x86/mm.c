@@ -2450,7 +2450,6 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                           struct page_info *ptpg)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
-    int rc = 0;
 
     for ( ; ; )
     {
@@ -2464,6 +2463,8 @@ static int _put_page_type(struct page_info *page, bool preemptible,
             if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) &&
                  likely(nx & (PGT_validated|PGT_partial)) )
             {
+                int rc;
+
                 /*
                  * Page-table pages must be unvalidated when count is zero. The
                  * 'free' is safe because the refcnt is non-zero and validated
@@ -2475,10 +2476,10 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                     continue;
                 /* We cleared the 'valid bit' so we do the clean up. */
                 rc = _put_final_page_type(page, x, preemptible, ptpg);
-                ptpg = NULL;
                 if ( x & PGT_partial )
                     put_page(page);
-                break;
+
+                return rc;
             }
 
             if ( !ptpg || !PGT_type_equal(x, ptpg->u.inuse.type_info) )
@@ -2516,12 +2517,11 @@ static int _put_page_type(struct page_info *page, bool preemptible,
 
     if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
     {
-        ASSERT(!rc);
         dec_linear_uses(page);
         dec_linear_entries(ptpg);
     }
 
-    return rc;
+    return 0;
 }
 
 
