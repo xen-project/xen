@@ -2458,8 +2458,9 @@ static int _put_page_type(struct page_info *page, bool preemptible,
 
         ASSERT((x & PGT_count_mask) != 0);
 
-        if ( unlikely((nx & PGT_count_mask) == 0) )
+        switch ( nx & (PGT_locked | PGT_count_mask) )
         {
+        case 0:
             if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) &&
                  likely(nx & (PGT_validated|PGT_partial)) )
             {
@@ -2495,10 +2496,14 @@ static int _put_page_type(struct page_info *page, bool preemptible,
             }
             else
                 BUG_ON(!IS_ENABLED(CONFIG_PV_LINEAR_PT));
-        }
-        else if ( unlikely((nx & (PGT_locked | PGT_count_mask)) ==
-                           (PGT_locked | 1)) )
-        {
+
+            break;
+
+        case PGT_locked:
+            ASSERT_UNREACHABLE();
+            return -EILSEQ;
+
+        case PGT_locked | 1:
             /*
              * We must not drop the second to last reference when the page is
              * locked, as page_unlock() doesn't do any cleanup of the type.
