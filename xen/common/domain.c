@@ -615,13 +615,21 @@ int domain_kill(struct domain *d)
     if ( d == current->domain )
         return -EINVAL;
 
-    /* Protected by domctl_lock. */
+    /* Protected by d->domain_lock. */
     switch ( d->is_dying )
     {
     case DOMDYING_alive:
+        domain_unlock(d);
         domain_pause(d);
+        domain_lock(d);
+        /*
+         * With the domain lock dropped, d->is_dying may have changed. Call
+         * ourselves recursively if so, which is safe as then we won't come
+         * back here.
+         */
+        if ( d->is_dying != DOMDYING_alive )
+            return domain_kill(d);
         d->is_dying = DOMDYING_dying;
-        spin_barrier(&d->domain_lock);
         evtchn_destroy(d);
         gnttab_release_mappings(d);
         tmem_destroy(d->tmem_client);

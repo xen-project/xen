@@ -665,11 +665,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         break;
 
     case XEN_DOMCTL_destroydomain:
+        domctl_lock_release();
+        domain_lock(d);
         ret = domain_kill(d);
+        domain_unlock(d);
         if ( ret == -ERESTART )
             ret = hypercall_create_continuation(
                 __HYPERVISOR_domctl, "h", u_domctl);
-        break;
+        goto domctl_out_unlock_domonly;
 
     case XEN_DOMCTL_setnodeaffinity:
     {
