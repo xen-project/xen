@@ -1349,28 +1349,41 @@ static int hvmemul_rep_ins(
 }
 
 static int hvmemul_rep_outs_set_context(
-    enum x86_segment src_seg,
-    unsigned long src_offset,
     uint16_t dst_port,
     unsigned int bytes_per_rep,
-    unsigned long *reps,
-    struct x86_emulate_ctxt *ctxt)
+    unsigned long *reps)
 {
-    unsigned int bytes = *reps * bytes_per_rep;
-    char *buf;
-    int rc;
+    const struct arch_vm_event *ev = current->arch.vm_event;
+    const uint8_t *ptr;
+    unsigned int avail;
+    unsigned long done;
+    int rc = X86EMUL_OKAY;
 
-    buf = xmalloc_array(char, bytes);
-
-    if ( buf == NULL )
+    ASSERT(bytes_per_rep <= 4);
+    if ( !ev )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = set_context_data(buf, bytes);
+    ptr = ev->emul.read.data;
+    avail = ev->emul.read.size;
 
-    if ( rc == X86EMUL_OKAY )
-        rc = hvmemul_do_pio_buffer(dst_port, bytes, IOREQ_WRITE, buf);
+    for ( done = 0; done < *reps; ++done )
+    {
+        unsigned int size = min(bytes_per_rep, avail);
+        uint32_t data = 0;
 
-    xfree(buf);
+        if ( done && hypercall_preempt_check() )
+            break;
+
+        memcpy(&data, ptr, size);
+        avail -= size;
+        ptr += size;
+
+        rc = hvmemul_do_pio_buffer(dst_port, bytes_per_rep, IOREQ_WRITE, &data);
+        if ( rc != X86EMUL_OKAY )
+            break;
+    }
+
+    *reps = done;
 
     return rc;
 }
@@ -1392,8 +1405,7 @@ static int hvmemul_rep_outs(
     int rc;
 
     if ( unlikely(hvmemul_ctxt->set_context) )
-        return hvmemul_rep_outs_set_context(src_seg, src_offset, dst_port,
-                                            bytes_per_rep, reps, ctxt);
+        return hvmemul_rep_outs_set_context(dst_port, bytes_per_rep, reps);
 
     rc = hvmemul_virtual_to_linear(
         src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
