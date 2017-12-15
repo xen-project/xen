@@ -1941,7 +1941,7 @@ int nvmx_handle_invept(struct cpu_user_regs *regs)
     }
     case INVEPT_ALL_CONTEXT:
         p2m_flush_nestedp2m(current->domain);
-        __invept(INVEPT_ALL_CONTEXT, 0, 0);
+        __invept(INVEPT_ALL_CONTEXT, 0);
         break;
     default:
         vmfail_invalid(regs);

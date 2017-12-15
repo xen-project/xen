@@ -452,11 +452,11 @@ static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
     return ret;
 }
 
-static always_inline void __invept(unsigned long type, u64 eptp, u64 gpa)
+static always_inline void __invept(unsigned long type, uint64_t eptp)
 {
     struct {
-        u64 eptp, gpa;
-    } operand = {eptp, gpa};
+        uint64_t eptp, rsvd;
+    } operand = { eptp };
 
     /*
      * If single context invalidation is not supported, we escalate to
@@ -519,7 +519,7 @@ static always_inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
 
 static inline void ept_sync_all(void)
 {
-    __invept(INVEPT_ALL_CONTEXT, 0, 0);
+    __invept(INVEPT_ALL_CONTEXT, 0);
 }
 
 void ept_sync_domain(struct p2m_domain *p2m);
