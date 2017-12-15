@@ -1113,15 +1113,11 @@ get_page_from_l2e(
         return -EINVAL;
     }
 
-    if ( !(l2e_get_flags(l2e) & _PAGE_PSE) )
-    {
-        rc = get_page_and_type_from_mfn(_mfn(mfn), PGT_l1_page_table, d, 0, 0);
-        if ( unlikely(rc == -EINVAL) && get_l2_linear_pagetable(l2e, pfn, d) )
-            rc = 0;
-        return rc;
-    }
+    rc = get_page_and_type_from_mfn(_mfn(mfn), PGT_l1_page_table, d, 0, 0);
+    if ( unlikely(rc == -EINVAL) && get_l2_linear_pagetable(l2e, pfn, d) )
+        rc = 0;
 
-    return -EINVAL;
+    return rc;
 }
 
 
