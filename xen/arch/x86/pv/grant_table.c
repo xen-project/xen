@@ -80,7 +80,8 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
 
         gl1mfn = _mfn(addr >> PAGE_SHIFT);
 
-        if ( !get_page_from_mfn(gl1mfn, currd) )
+        page = get_page_from_mfn(gl1mfn, currd);
+        if ( !page )
             goto out;
 
         pl1e = map_domain_page(gl1mfn) + (addr & ~PAGE_MASK);
@@ -101,11 +102,11 @@ int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
             goto out;
         }
 
-        if ( !get_page_from_mfn(gl1mfn, currd) )
+        page = get_page_from_mfn(gl1mfn, currd);
+        if ( !page )
             goto out_unmap;
     }
 
-    page = mfn_to_page(gl1mfn);
     if ( !page_lock(page) )
         goto out_put;
 
@@ -159,10 +160,10 @@ static bool steal_linear_address(unsigned long linear, l1_pgentry_t *out)
         goto out;
     }
 
-    if ( !get_page_from_mfn(gl1mfn, currd) )
+    page = get_page_from_mfn(gl1mfn, currd);
+    if ( !page )
         goto out_unmap;
 
-    page = mfn_to_page(gl1mfn);
     if ( !page_lock(page) )
         goto out_put;
 
@@ -235,7 +236,8 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
 
         gl1mfn = _mfn(addr >> PAGE_SHIFT);
 
-        if ( !get_page_from_mfn(gl1mfn, currd) )
+        page = get_page_from_mfn(gl1mfn, currd);
+        if ( !page )
             goto out;
 
         pl1e = map_domain_page(gl1mfn) + (addr & ~PAGE_MASK);
@@ -263,11 +265,10 @@ int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
         if ( !pl1e )
             goto out;
 
-        if ( !get_page_from_mfn(gl1mfn, currd) )
+        page = get_page_from_mfn(gl1mfn, currd);
+        if ( !page )
             goto out_unmap;
     }
-
-    page = mfn_to_page(gl1mfn);
 
     if ( !page_lock(page) )
         goto out_put;

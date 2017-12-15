@@ -711,7 +711,6 @@ get_##level##_linear_pagetable(                                             \
     level##_pgentry_t pde, unsigned long pde_pfn, struct domain *d)         \
 {                                                                           \
     unsigned long x, y;                                                     \
-    struct page_info *page;                                                 \
     unsigned long pfn;                                                      \
                                                                             \
     if ( !opt_pv_linear_pt )                                                \
@@ -730,14 +729,15 @@ get_##level##_linear_pagetable(                                             \
                                                                             \
     if ( (pfn = level##e_get_pfn(pde)) != pde_pfn )                         \
     {                                                                       \
-        struct page_info *ptpg = mfn_to_page(_mfn(pde_pfn));                \
+        struct page_info *page, *ptpg = mfn_to_page(_mfn(pde_pfn));         \
                                                                             \
         /* Make sure the page table belongs to the correct domain. */       \
         if ( unlikely(page_get_owner(ptpg) != d) )                          \
             return 0;                                                       \
                                                                             \
         /* Make sure the mapped frame belongs to the correct domain. */     \
-        if ( unlikely(!get_page_from_mfn(_mfn(pfn), d)) )                   \
+        page = get_page_from_mfn(_mfn(pfn), d);                             \
+        if ( unlikely(!page) )                                              \
             return 0;                                                       \
                                                                             \
         /*                                                                  \
@@ -747,7 +747,6 @@ get_##level##_linear_pagetable(                                             \
          * elsewhere.                                                       \
          * If so, atomically increment the count (checking for overflow).   \
          */                                                                 \
-        page = mfn_to_page(_mfn(pfn));                                      \
         if ( !inc_linear_entries(ptpg) )                                    \
         {                                                                   \
             put_page(page);                                                 \
@@ -3730,7 +3729,8 @@ long do_mmu_update(
                 xsm_checked = xsm_needed;
             }
 
-            if ( unlikely(!get_page_from_mfn(_mfn(mfn), pg_owner)) )
+            page = get_page_from_mfn(_mfn(mfn), pg_owner);
+            if ( unlikely(!page) )
             {
                 gdprintk(XENLOG_WARNING,
                          "Could not get page for mach->phys update\n");
@@ -3742,7 +3742,7 @@ long do_mmu_update(
 
             paging_mark_dirty(pg_owner, _mfn(mfn));
 
-            put_page(mfn_to_page(_mfn(mfn)));
+            put_page(page);
             break;
 
         default:
@@ -3927,10 +3927,10 @@ static int __do_update_va_mapping(
 
     rc = -EINVAL;
     pl1e = map_guest_l1e(va, &gl1mfn);
-    if ( unlikely(!pl1e || !get_page_from_mfn(gl1mfn, d)) )
+    gl1pg = pl1e ? get_page_from_mfn(gl1mfn, d) : NULL;
+    if ( unlikely(!gl1pg) )
         goto out;
 
-    gl1pg = mfn_to_page(gl1mfn);
     if ( !page_lock(gl1pg) )
     {
         put_page(gl1pg);
@@ -4126,10 +4126,10 @@ int xenmem_add_to_physmap_one(
                 put_gfn(d, gfn);
                 return -ENOMEM;
             }
-            if ( !get_page_from_mfn(_mfn(idx), d) )
-                break;
             mfn = _mfn(idx);
-            page = mfn_to_page(mfn);
+            page = get_page_from_mfn(mfn, d);
+            if ( unlikely(!page) )
+                mfn = INVALID_MFN;
             break;
         }
         case XENMAPSPACE_gmfn_foreign:
