@@ -2530,8 +2530,8 @@ static int _put_page_type(struct page_info *page, bool preemptible,
 }
 
 
-static int __get_page_type(struct page_info *page, unsigned long type,
-                           int preemptible)
+static int _get_page_type(struct page_info *page, unsigned long type,
+                          bool preemptible)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
     int rc = 0, iommu_ret = 0;
@@ -2693,7 +2693,8 @@ void put_page_type(struct page_info *page)
 
 int get_page_type(struct page_info *page, unsigned long type)
 {
-    int rc = __get_page_type(page, type, 0);
+    int rc = _get_page_type(page, type, false);
+
     if ( likely(rc == 0) )
         return 1;
     ASSERT(rc != -EINTR && rc != -ERESTART);
@@ -2708,7 +2709,8 @@ int put_page_type_preemptible(struct page_info *page)
 int get_page_type_preemptible(struct page_info *page, unsigned long type)
 {
     ASSERT(!current->arch.old_guest_table);
-    return __get_page_type(page, type, 1);
+
+    return _get_page_type(page, type, true);
 }
 
 int put_old_guest_table(struct vcpu *v)
