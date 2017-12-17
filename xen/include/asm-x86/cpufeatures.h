@@ -22,3 +22,4 @@ XEN_CPUFEATURE(APERFMPERF,      (FSCAPINTS+0)*32+ 8) /* APERFMPERF */
 XEN_CPUFEATURE(MFENCE_RDTSC,    (FSCAPINTS+0)*32+ 9) /* MFENCE synchronizes RDTSC */
 XEN_CPUFEATURE(XEN_SMEP,        (FSCAPINTS+0)*32+10) /* SMEP gets used by Xen itself */
 XEN_CPUFEATURE(XEN_SMAP,        (FSCAPINTS+0)*32+11) /* SMAP gets used by Xen itself */
+XEN_CPUFEATURE(LFENCE_DISPATCH, (FSCAPINTS+0)*32+12) /* lfence set as Dispatch Serialising */
