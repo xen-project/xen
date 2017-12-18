@@ -203,12 +203,14 @@ void check_wakeup_from_wait(void)
 
     /*
      * Hand-rolled longjmp().  Returns to the pointer on the top of
-     * wqv->stack, and lands on a `rep movs` instruction.
+     * wqv->stack, and lands on a `rep movs` instruction.  All other GPRs are
+     * restored from the stack, so are available for use here.
      */
     asm volatile (
-        "mov %1,%%"__OP"sp; jmp *(%0)"
+        "mov %1,%%"__OP"sp; INDIRECT_JMP %[ip]"
         : : "S" (wqv->stack), "D" (wqv->esp),
-        "c" ((char *)get_cpu_info() - (char *)wqv->esp)
+          "c" ((char *)get_cpu_info() - (char *)wqv->esp),
+          [ip] "r" (*(unsigned long *)wqv->stack)
         : "memory" );
     unreachable();
 }
