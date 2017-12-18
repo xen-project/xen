@@ -54,6 +54,7 @@ static void vpl011_update_interrupt_status(struct domain *d)
      */
     ASSERT(spin_is_locked(&vpl011->lock));
 
+#ifndef CONFIG_NEW_VGIC
     /*
      * TODO: PL011 interrupts are level triggered which means
      * that interrupt needs to be set/clear instead of being
@@ -71,6 +72,9 @@ static void vpl011_update_interrupt_status(struct domain *d)
         vgic_inject_irq(d, NULL, GUEST_VPL011_SPI, true);
 
     vpl011->shadow_uartmis = uartmis;
+#else
+    vgic_inject_irq(d, NULL, GUEST_VPL011_SPI, uartmis);
+#endif
 }
 
 static uint8_t vpl011_read_data(struct domain *d)
