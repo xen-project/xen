@@ -138,6 +138,12 @@ static const struct feat_props {
 
     /* write_msr is used to write out feature MSR register. */
     void (*write_msr)(unsigned int cos, uint32_t val, enum psr_type type);
+
+    /*
+     * sanitize is used to check if input val fulfills SDM requirement.
+     * And change it to valid value if SDM allows.
+     */
+    bool (*sanitize)(const struct feat_node *feat, uint32_t *val);
 } *feat_props[FEAT_TYPE_NUM];
 
 /*
@@ -274,11 +280,14 @@ static enum psr_feat_type psr_type_to_feat_type(enum psr_type type)
     return feat_type;
 }
 
-static bool psr_check_cbm(unsigned int cbm_len, unsigned long cbm)
+/* Implementation of allocation features' functions. */
+static bool cat_check_cbm(const struct feat_node *feat, uint32_t *val)
 {
     unsigned int first_bit, zero_bit;
+    unsigned int cbm_len = feat->cat.cbm_len;
+    unsigned long cbm = *val;
 
-    /* Set bits should only in the range of [0, cbm_len]. */
+    /* Set bits should only in the range of [0, cbm_len). */
     if ( cbm & (~0ul << cbm_len) )
         return false;
 
@@ -297,7 +306,6 @@ static bool psr_check_cbm(unsigned int cbm_len, unsigned long cbm)
     return true;
 }
 
-/* Implementation of allocation features' functions. */
 static bool cat_init_feature(const struct cpuid_leaf *regs,
                              struct feat_node *feat,
                              struct psr_socket_info *info,
@@ -434,6 +442,7 @@ static const struct feat_props l3_cat_props = {
     .alt_type = PSR_TYPE_UNKNOWN,
     .get_feat_info = cat_get_feat_info,
     .write_msr = l3_cat_write_msr,
+    .sanitize = cat_check_cbm,
 };
 
 /* L3 CDP props */
@@ -464,6 +473,7 @@ static const struct feat_props l3_cdp_props = {
     .alt_type = PSR_TYPE_L3_CBM,
     .get_feat_info = l3_cdp_get_feat_info,
     .write_msr = l3_cdp_write_msr,
+    .sanitize = cat_check_cbm,
 };
 
 /* L2 CAT props */
@@ -479,6 +489,7 @@ static const struct feat_props l2_cat_props = {
     .alt_type = PSR_TYPE_UNKNOWN,
     .get_feat_info = cat_get_feat_info,
     .write_msr = l2_cat_write_msr,
+    .sanitize = cat_check_cbm,
 };
 
 /* MBA props */
@@ -499,6 +510,32 @@ static bool mba_get_feat_info(const struct feat_node *feat,
 static void mba_write_msr(unsigned int cos, uint32_t val,
                           enum psr_type type)
 {
+    wrmsrl(MSR_IA32_PSR_MBA_MASK(cos), val);
+}
+
+static bool mba_sanitize_thrtl(const struct feat_node *feat, uint32_t *thrtl)
+{
+    /*
+     * Per SDM (chapter "Memory Bandwidth Allocation Configuration"):
+     * 1. Linear mode: In the linear mode the input precision is defined
+     *    as 100-(MBA_MAX). For instance, if the MBA_MAX value is 90, the
+     *    input precision is 10%. Values not an even multiple of the
+     *    precision (e.g., 12%) will be rounded down (e.g., to 10% delay
+     *    applied).
+     * 2. Non-linear mode: Input delay values are powers-of-two from zero
+     *    to the MBA_MAX value from CPUID. In this case any values not a
+     *    power of two will be rounded down the next nearest power of two.
+     */
+    if ( feat->mba.linear )
+        *thrtl -= *thrtl % (100 - feat->mba.thrtl_max);
+    else
+    {
+        /* Not power of 2. */
+        if ( *thrtl & (*thrtl - 1) )
+            *thrtl = 1 << (fls(*thrtl) - 1);
+    }
+
+    return *thrtl <= feat->mba.thrtl_max;
 }
 
 static const struct feat_props mba_props = {
@@ -507,6 +544,7 @@ static const struct feat_props mba_props = {
     .alt_type = PSR_TYPE_UNKNOWN,
     .get_feat_info = mba_get_feat_info,
     .write_msr = mba_write_msr,
+    .sanitize = mba_sanitize_thrtl,
 };
 
 static bool __init parse_psr_bool(const char *s, const char *delim,
@@ -972,7 +1010,7 @@ static int insert_val_into_array(uint32_t val[],
     if ( array_len < props->cos_num )
         return -ENOSPC;
 
-    if ( !psr_check_cbm(feat->cat.cbm_len, new_val) )
+    if ( !props->sanitize(feat, &new_val) )
         return -EINVAL;
 
     /*
