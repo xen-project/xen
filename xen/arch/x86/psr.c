@@ -263,6 +263,10 @@ static enum psr_feat_type psr_type_to_feat_type(enum psr_type type)
         feat_type = FEAT_TYPE_L2_CAT;
         break;
 
+    case PSR_TYPE_MBA_THRTL:
+        feat_type = FEAT_TYPE_MBA;
+        break;
+
     default:
         ASSERT_UNREACHABLE();
     }
@@ -481,7 +485,15 @@ static const struct feat_props l2_cat_props = {
 static bool mba_get_feat_info(const struct feat_node *feat,
                               uint32_t data[], unsigned int array_len)
 {
-    return false;
+    ASSERT(array_len == PSR_INFO_ARRAY_SIZE);
+
+    data[PSR_INFO_IDX_COS_MAX] = feat->cos_max;
+    data[PSR_INFO_IDX_MBA_THRTL_MAX] = feat->mba.thrtl_max;
+
+    if ( feat->mba.linear )
+        data[PSR_INFO_IDX_MBA_FLAGS] |= XEN_SYSCTL_PSR_MBA_LINEAR;
+
+    return true;
 }
 
 static void mba_write_msr(unsigned int cos, uint32_t val,

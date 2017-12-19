@@ -698,6 +698,7 @@ struct xen_sysctl_pcitopoinfo {
 
 #define XEN_SYSCTL_PSR_get_l3_info               0
 #define XEN_SYSCTL_PSR_get_l2_info               1
+#define XEN_SYSCTL_PSR_get_mba_info              2
 struct xen_sysctl_psr_alloc {
     uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_* */
     uint32_t target;    /* IN */
@@ -708,6 +709,13 @@ struct xen_sysctl_psr_alloc {
 #define XEN_SYSCTL_PSR_CAT_L3_CDP       (1u << 0)
             uint32_t flags;     /* OUT: CAT flags */
         } cat_info;
+
+        struct {
+            uint32_t thrtl_max; /* OUT: Maximum throttle */
+            uint32_t cos_max;   /* OUT: Maximum COS */
+#define XEN_SYSCTL_PSR_MBA_LINEAR      (1u << 0)
+            uint32_t flags;     /* OUT: MBA flags */
+        } mba_info;
     } u;
 };
 
