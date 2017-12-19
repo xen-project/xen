@@ -2495,6 +2495,28 @@ enum xc_psr_cat_type {
 };
 typedef enum xc_psr_cat_type xc_psr_cat_type;
 
+enum xc_psr_feat_type {
+    XC_PSR_CAT_L3,
+    XC_PSR_CAT_L2,
+    XC_PSR_MBA,
+};
+typedef enum xc_psr_feat_type xc_psr_feat_type;
+
+union xc_psr_hw_info {
+    struct {
+        uint32_t cos_max;
+        uint32_t cbm_len;
+        bool     cdp_enabled;
+    } cat;
+
+    struct {
+        uint32_t cos_max;
+        uint32_t thrtl_max;
+        bool     linear;
+    } mba;
+};
+typedef union xc_psr_hw_info xc_psr_hw_info;
+
 int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid);
 int xc_psr_cmt_detach(xc_interface *xch, uint32_t domid);
 int xc_psr_cmt_get_domain_rmid(xc_interface *xch, uint32_t domid,
@@ -2516,9 +2538,8 @@ int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
 int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
                                xc_psr_cat_type type, uint32_t target,
                                uint64_t *data);
-int xc_psr_cat_get_info(xc_interface *xch, uint32_t socket, unsigned int lvl,
-                        uint32_t *cos_max, uint32_t *cbm_len,
-                        bool *cdp_enabled);
+int xc_psr_get_hw_info(xc_interface *xch, uint32_t socket,
+                       xc_psr_feat_type type, xc_psr_hw_info *hw_info);
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,

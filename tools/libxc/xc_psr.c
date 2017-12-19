@@ -323,37 +323,52 @@ int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
     return rc;
 }
 
-int xc_psr_cat_get_info(xc_interface *xch, uint32_t socket, unsigned int lvl,
-                        uint32_t *cos_max, uint32_t *cbm_len, bool *cdp_enabled)
+int xc_psr_get_hw_info(xc_interface *xch, uint32_t socket,
+                       xc_psr_feat_type type, xc_psr_hw_info *hw_info)
 {
     int rc = -1;
     DECLARE_SYSCTL;
 
+    if ( !hw_info )
+    {
+        errno = EINVAL;
+        return rc;
+    }
+
     sysctl.cmd = XEN_SYSCTL_psr_alloc;
     sysctl.u.psr_alloc.target = socket;
 
-    switch ( lvl )
+    switch ( type )
     {
-    case 2:
-        sysctl.u.psr_alloc.cmd = XEN_SYSCTL_PSR_get_l2_info;
+    case XC_PSR_CAT_L2:
+    case XC_PSR_CAT_L3:
+        sysctl.u.psr_alloc.cmd = (type == XC_PSR_CAT_L2) ?
+                                 XEN_SYSCTL_PSR_get_l2_info :
+                                 XEN_SYSCTL_PSR_get_l3_info;
+
         rc = xc_sysctl(xch, &sysctl);
-        if ( !rc )
-        {
-            *cos_max = sysctl.u.psr_alloc.u.cat_info.cos_max;
-            *cbm_len = sysctl.u.psr_alloc.u.cat_info.cbm_len;
-            *cdp_enabled = false;
-        }
+        if ( rc )
+            break;
+
+        hw_info->cat.cos_max = sysctl.u.psr_alloc.u.cat_info.cos_max;
+        hw_info->cat.cbm_len = sysctl.u.psr_alloc.u.cat_info.cbm_len;
+        hw_info->cat.cdp_enabled = (type == XC_PSR_CAT_L2) ?
+                                   false :
+                                   (sysctl.u.psr_alloc.u.cat_info.flags &
+                                    XEN_SYSCTL_PSR_CAT_L3_CDP);
+
         break;
-    case 3:
-        sysctl.u.psr_alloc.cmd = XEN_SYSCTL_PSR_get_l3_info;
+    case XC_PSR_MBA:
+        sysctl.u.psr_alloc.cmd = XEN_SYSCTL_PSR_get_mba_info;
         rc = xc_sysctl(xch, &sysctl);
-        if ( !rc )
-        {
-            *cos_max = sysctl.u.psr_alloc.u.cat_info.cos_max;
-            *cbm_len = sysctl.u.psr_alloc.u.cat_info.cbm_len;
-            *cdp_enabled = sysctl.u.psr_alloc.u.cat_info.flags &
-                           XEN_SYSCTL_PSR_CAT_L3_CDP;
-        }
+        if ( rc )
+            break;
+
+        hw_info->mba.cos_max = sysctl.u.psr_alloc.u.mba_info.cos_max;
+        hw_info->mba.thrtl_max = sysctl.u.psr_alloc.u.mba_info.thrtl_max;
+        hw_info->mba.linear = sysctl.u.psr_alloc.u.mba_info.flags &
+                              XEN_SYSCTL_PSR_MBA_LINEAR;
+
         break;
     default:
         errno = EOPNOTSUPP;
