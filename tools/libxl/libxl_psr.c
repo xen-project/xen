@@ -328,32 +328,7 @@ int libxl_psr_cat_set_cbm(libxl_ctx *ctx, uint32_t domid,
                           libxl_psr_cbm_type type, libxl_bitmap *target_map,
                           uint64_t cbm)
 {
-    GC_INIT(ctx);
-    int rc;
-    int socketid, nr_sockets;
-
-    rc = libxl__count_physical_sockets(gc, &nr_sockets);
-    if (rc) {
-        LOGED(ERROR, domid, "failed to get system socket count");
-        goto out;
-    }
-
-    libxl_for_each_set_bit(socketid, *target_map) {
-        xc_psr_type xc_type = libxl__psr_type_to_libxc_psr_type(type);
-
-        if (socketid >= nr_sockets)
-            break;
-
-        if (xc_psr_cat_set_domain_data(ctx->xch, domid, xc_type,
-                                       socketid, cbm)) {
-            libxl__psr_alloc_log_err_msg(gc, errno, type);
-            rc = ERROR_FAIL;
-        }
-    }
-
-out:
-    GC_FREE;
-    return rc;
+    return libxl_psr_set_val(ctx, domid, type, target_map, cbm);
 }
 
 int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
@@ -453,7 +428,30 @@ int libxl_psr_set_val(libxl_ctx *ctx, uint32_t domid,
                       libxl_psr_type type, libxl_bitmap *target_map,
                       uint64_t val)
 {
-    return ERROR_FAIL;
+    GC_INIT(ctx);
+    int rc, socketid, nr_sockets;
+    xc_psr_type xc_type = libxl__psr_type_to_libxc_psr_type(type);
+
+    rc = libxl__count_physical_sockets(gc, &nr_sockets);
+    if (rc) {
+        LOG(ERROR, "failed to get system socket count");
+        goto out;
+    }
+
+    libxl_for_each_set_bit(socketid, *target_map) {
+        if (socketid >= nr_sockets)
+            break;
+
+        if (xc_psr_set_domain_data(ctx->xch, domid, xc_type,
+                                   socketid, val)) {
+            libxl__psr_alloc_log_err_msg(gc, errno, type);
+            rc = ERROR_FAIL;
+        }
+    }
+
+out:
+    GC_FREE;
+    return rc;
 }
 
 int libxl_psr_get_val(libxl_ctx *ctx, uint32_t domid,

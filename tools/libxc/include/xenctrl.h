@@ -2533,9 +2533,9 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
                         uint64_t *tsc);
 int xc_psr_cmt_enabled(xc_interface *xch);
 
-int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
-                               xc_psr_type type, uint32_t target,
-                               uint64_t data);
+int xc_psr_set_domain_data(xc_interface *xch, uint32_t domid,
+                           xc_psr_type type, uint32_t target,
+                           uint64_t data);
 int xc_psr_get_domain_data(xc_interface *xch, uint32_t domid,
                            xc_psr_type type, uint32_t target,
                            uint64_t *data);

@@ -552,6 +552,61 @@ int main_psr_mba_show(int argc, char **argv)
     return psr_val_show(domid, LIBXL_PSR_FEAT_TYPE_MBA, 0);
 }
 
+int main_psr_mba_set(int argc, char **argv)
+{
+    uint32_t domid;
+    libxl_psr_type type;
+    uint64_t thrtl;
+    int ret, opt = 0;
+    libxl_bitmap target_map;
+    char *value;
+    libxl_string_list socket_list;
+    unsigned long start, end;
+    unsigned int i, j, len;
+
+    static const struct option opts[] = {
+        {"socket", 1, 0, 's'},
+        COMMON_LONG_OPTS
+    };
+
+    libxl_socket_bitmap_alloc(ctx, &target_map, 0);
+    libxl_bitmap_set_none(&target_map);
+
+    SWITCH_FOREACH_OPT(opt, "s:", opts, "psr-mba-set", 0) {
+    case 's':
+        trim(isspace, optarg, &value);
+        split_string_into_string_list(value, ",", &socket_list);
+        len = libxl_string_list_length(&socket_list);
+        for (i = 0; i < len; i++) {
+            parse_range(socket_list[i], &start, &end);
+            for (j = start; j <= end; j++)
+                libxl_bitmap_set(&target_map, j);
+        }
+
+        libxl_string_list_dispose(&socket_list);
+        free(value);
+        break;
+    }
+
+    type = LIBXL_PSR_CBM_TYPE_MBA_THRTL;
+
+    if (libxl_bitmap_is_empty(&target_map))
+        libxl_bitmap_set_any(&target_map);
+
+    if (argc != optind + 2) {
+        help("psr-mba-set");
+        return EXIT_FAILURE;
+    }
+
+    domid = find_domain(argv[optind]);
+    thrtl = strtoll(argv[optind + 1], NULL , 0);
+
+    ret = libxl_psr_set_val(ctx, domid, type, &target_map, thrtl);
+
+    libxl_bitmap_dispose(&target_map);
+    return ret;
+}
+
 static int psr_mba_hwinfo(void)
 {
     int rc;

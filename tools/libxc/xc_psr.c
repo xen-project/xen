@@ -248,9 +248,9 @@ int xc_psr_cmt_enabled(xc_interface *xch)
 
     return 0;
 }
-int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
-                               xc_psr_type type, uint32_t target,
-                               uint64_t data)
+int xc_psr_set_domain_data(xc_interface *xch, uint32_t domid,
+                           xc_psr_type type, uint32_t target,
+                           uint64_t data)
 {
     DECLARE_DOMCTL;
     uint32_t cmd;
@@ -268,6 +268,9 @@ int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
         break;
     case XC_PSR_CAT_L2_CBM:
         cmd = XEN_DOMCTL_PSR_SET_L2_CBM;
+        break;
+    case XC_PSR_MBA_THRTL:
+        cmd = XEN_DOMCTL_PSR_SET_MBA_THRTL;
         break;
     default:
         errno = EINVAL;
