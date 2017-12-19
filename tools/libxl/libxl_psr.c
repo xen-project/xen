@@ -303,11 +303,11 @@ out:
     return rc;
 }
 
-static inline xc_psr_cat_type libxl__psr_cbm_type_to_libxc_psr_cat_type(
+static inline xc_psr_type libxl__psr_cbm_type_to_libxc_psr_type(
     libxl_psr_cbm_type type)
 {
-    BUILD_BUG_ON(sizeof(libxl_psr_cbm_type) != sizeof(xc_psr_cat_type));
-    return (xc_psr_cat_type)type;
+    BUILD_BUG_ON(sizeof(libxl_psr_cbm_type) != sizeof(xc_psr_type));
+    return (xc_psr_type)type;
 }
 
 int libxl_psr_cat_set_cbm(libxl_ctx *ctx, uint32_t domid,
@@ -325,12 +325,11 @@ int libxl_psr_cat_set_cbm(libxl_ctx *ctx, uint32_t domid,
     }
 
     libxl_for_each_set_bit(socketid, *target_map) {
-        xc_psr_cat_type xc_type;
+        xc_psr_type xc_type = libxl__psr_cbm_type_to_libxc_psr_type(type);
 
         if (socketid >= nr_sockets)
             break;
 
-        xc_type = libxl__psr_cbm_type_to_libxc_psr_cat_type(type);
         if (xc_psr_cat_set_domain_data(ctx->xch, domid, xc_type,
                                        socketid, cbm)) {
             libxl__psr_cat_log_err_msg(gc, errno);
@@ -349,7 +348,7 @@ int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
 {
     GC_INIT(ctx);
     int rc = 0;
-    xc_psr_cat_type xc_type = libxl__psr_cbm_type_to_libxc_psr_cat_type(type);
+    xc_psr_type xc_type = libxl__psr_cbm_type_to_libxc_psr_type(type);
 
     if (xc_psr_cat_get_domain_data(ctx->xch, domid, xc_type,
                                    target, cbm_r)) {

@@ -249,7 +249,7 @@ int xc_psr_cmt_enabled(xc_interface *xch)
     return 0;
 }
 int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
-                               xc_psr_cat_type type, uint32_t target,
+                               xc_psr_type type, uint32_t target,
                                uint64_t data)
 {
     DECLARE_DOMCTL;
@@ -284,7 +284,7 @@ int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
 }
 
 int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
-                               xc_psr_cat_type type, uint32_t target,
+                               xc_psr_type type, uint32_t target,
                                uint64_t *data)
 {
     int rc;
