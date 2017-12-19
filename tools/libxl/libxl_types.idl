@@ -1037,6 +1037,7 @@ libxl_psr_cbm_type = Enumeration("psr_cbm_type", [
     (2, "L3_CBM_CODE"),
     (3, "L3_CBM_DATA"),
     (4, "L2_CBM"),
+    (5, "MBA_THRTL"),
     ])
 
 libxl_psr_cat_info = Struct("psr_cat_info", [
@@ -1045,3 +1046,24 @@ libxl_psr_cat_info = Struct("psr_cat_info", [
     ("cbm_len", uint32),
     ("cdp_enabled", bool),
     ])
+
+libxl_psr_feat_type = Enumeration("psr_feat_type", [
+    (1, "CAT"),
+    (2, "MBA"),
+    ])
+
+libxl_psr_hw_info = Struct("psr_hw_info", [
+    ("id", uint32),
+    ("u", KeyedUnion(None, libxl_psr_feat_type, "type",
+          [("cat", Struct(None, [
+                                    ("cos_max",     uint32),
+                                    ("cbm_len",     uint32),
+                                    ("cdp_enabled", bool),
+                               ])),
+           ("mba", Struct(None, [
+                                    ("cos_max",     uint32),
+                                    ("thrtl_max",   uint32),
+                                    ("linear",      bool),
+                               ])),
+          ]))
+    ], dir=DIR_OUT)
