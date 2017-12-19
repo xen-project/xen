@@ -71,16 +71,30 @@ static void libxl__psr_cmt_log_err_msg(libxl__gc *gc, int err)
     LOGE(ERROR, "%s", msg);
 }
 
-static void libxl__psr_cat_log_err_msg(libxl__gc *gc, int err)
+static void libxl__psr_alloc_log_err_msg(libxl__gc *gc,
+                                         int err,
+                                         libxl_psr_type type)
 {
+    /*
+     * Index is 'libxl_psr_type' so we set two 'CDP' to correspond to
+     * DATA and CODE.
+     */
+    const char * const feat_name[] = {
+        [LIBXL_PSR_CBM_TYPE_UNKNOWN] = "UNKNOWN",
+        [LIBXL_PSR_CBM_TYPE_L3_CBM] = "L3 CAT",
+        [LIBXL_PSR_CBM_TYPE_L3_CBM_CODE...LIBXL_PSR_CBM_TYPE_L3_CBM_DATA] =
+                                      "CDP",
+        [LIBXL_PSR_CBM_TYPE_L2_CBM] = "L2 CAT",
+        [LIBXL_PSR_CBM_TYPE_MBA_THRTL] = "MBA",
+    };
     char *msg;
 
     switch (err) {
     case ENODEV:
-        msg = "CAT is not supported in this system";
+        msg = "is not supported in this system";
         break;
     case ENOENT:
-        msg = "CAT is not enabled on the socket";
+        msg = "is not enabled on the socket";
         break;
     case EOVERFLOW:
         msg = "no free COS available";
@@ -106,7 +120,7 @@ static void libxl__psr_cat_log_err_msg(libxl__gc *gc, int err)
         return;
     }
 
-    LOGE(ERROR, "%s", msg);
+    LOG(ERROR, "%s: %s", feat_name[type], msg);
 }
 
 static int libxl__pick_socket_cpu(libxl__gc *gc, uint32_t socketid)
@@ -303,10 +317,10 @@ out:
     return rc;
 }
 
-static inline xc_psr_type libxl__psr_cbm_type_to_libxc_psr_type(
-    libxl_psr_cbm_type type)
+static inline xc_psr_type libxl__psr_type_to_libxc_psr_type(
+    libxl_psr_type type)
 {
-    BUILD_BUG_ON(sizeof(libxl_psr_cbm_type) != sizeof(xc_psr_type));
+    BUILD_BUG_ON(sizeof(libxl_psr_type) != sizeof(xc_psr_type));
     return (xc_psr_type)type;
 }
 
@@ -325,14 +339,14 @@ int libxl_psr_cat_set_cbm(libxl_ctx *ctx, uint32_t domid,
     }
 
     libxl_for_each_set_bit(socketid, *target_map) {
-        xc_psr_type xc_type = libxl__psr_cbm_type_to_libxc_psr_type(type);
+        xc_psr_type xc_type = libxl__psr_type_to_libxc_psr_type(type);
 
         if (socketid >= nr_sockets)
             break;
 
         if (xc_psr_cat_set_domain_data(ctx->xch, domid, xc_type,
                                        socketid, cbm)) {
-            libxl__psr_cat_log_err_msg(gc, errno);
+            libxl__psr_alloc_log_err_msg(gc, errno, type);
             rc = ERROR_FAIL;
         }
     }
@@ -346,18 +360,7 @@ int libxl_psr_cat_get_cbm(libxl_ctx *ctx, uint32_t domid,
                           libxl_psr_cbm_type type, uint32_t target,
                           uint64_t *cbm_r)
 {
-    GC_INIT(ctx);
-    int rc = 0;
-    xc_psr_type xc_type = libxl__psr_cbm_type_to_libxc_psr_type(type);
-
-    if (xc_psr_cat_get_domain_data(ctx->xch, domid, xc_type,
-                                   target, cbm_r)) {
-        libxl__psr_cat_log_err_msg(gc, errno);
-        rc = ERROR_FAIL;
-    }
-
-    GC_FREE;
-    return rc;
+    return libxl_psr_get_val(ctx, domid, type, target, cbm_r);
 }
 
 static xc_psr_feat_type libxl__feat_type_to_libxc_feat_type(
@@ -457,7 +460,18 @@ int libxl_psr_get_val(libxl_ctx *ctx, uint32_t domid,
                       libxl_psr_type type, unsigned int target,
                       uint64_t *val)
 {
-    return ERROR_FAIL;
+    GC_INIT(ctx);
+    int rc = 0;
+    xc_psr_type xc_type = libxl__psr_type_to_libxc_psr_type(type);
+
+    if (xc_psr_get_domain_data(ctx->xch, domid, xc_type,
+                               target, val)) {
+        libxl__psr_alloc_log_err_msg(gc, errno, type);
+        rc = ERROR_FAIL;
+    }
+
+    GC_FREE;
+    return rc;
 }
 
 static void libxl__xc_hw_info_to_libxl_hw_info(
