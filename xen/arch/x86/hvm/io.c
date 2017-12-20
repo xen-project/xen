@@ -91,7 +91,7 @@ int handle_mmio(void)
 
     rc = hvm_emulate_one(&ctxt);
 
-    if ( hvm_vcpu_io_need_completion(vio) || vio->mmio_retry )
+    if ( hvm_vcpu_io_need_completion(vio) )
         vio->io_completion = HVMIO_mmio_completion;
     else
         vio->mmio_access = (struct npfec){};

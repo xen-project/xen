@@ -111,7 +111,7 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 
     rc = hvm_emulate_one(hvmemul_ctxt);
 
-    if ( hvm_vcpu_io_need_completion(vio) || vio->mmio_retry )
+    if ( hvm_vcpu_io_need_completion(vio) )
         vio->io_completion = HVMIO_realmode_completion;
 
     if ( rc == X86EMUL_UNHANDLEABLE )
