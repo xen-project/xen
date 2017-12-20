@@ -668,7 +668,7 @@ static bool __init efi_arch_use_config_file(EFI_SYSTEM_TABLE *SystemTable)
     return true; /* x86 always uses a config file */
 }
 
-static void efi_arch_flush_dcache_area(const void *vaddr, UINTN size) { }
+static void __init efi_arch_flush_dcache_area(const void *vaddr, UINTN size) { }
 
 void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
