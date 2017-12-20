@@ -5107,8 +5107,12 @@ int xenmem_add_to_physmap_one(
     /* Unmap from old location, if any. */
     old_gpfn = get_gpfn_from_mfn(mfn);
     ASSERT( old_gpfn != SHARED_M2P_ENTRY );
-    if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
-        ASSERT( old_gpfn == gfn );
+    if ( (space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range) &&
+         old_gpfn != gfn )
+    {
+        rc = -EXDEV;
+        goto put_both;
+    }
     if ( old_gpfn != INVALID_M2P_ENTRY )
         rc = guest_physmap_remove_page(d, old_gpfn, mfn, PAGE_ORDER_4K);
 
