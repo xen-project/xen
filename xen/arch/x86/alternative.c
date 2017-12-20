@@ -76,7 +76,7 @@ static const unsigned char * const p6_nops[ASM_NOP_MAX+1] init_or_livepatch_cons
 };
 #endif
 
-static const unsigned char * const *ideal_nops init_or_livepatch_data = k8_nops;
+static const unsigned char * const *ideal_nops init_or_livepatch_data = p6_nops;
 
 static int __init mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
 {
@@ -85,19 +85,32 @@ static int __init mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
 
 static void __init arch_init_ideal_nops(void)
 {
-    /*
-     * Due to a decoder implementation quirk, some
-     * specific Intel CPUs actually perform better with
-     * the "k8_nops" than with the SDM-recommended NOPs.
-     */
-    if ( (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) &&
-         !(boot_cpu_data.x86 == 6 &&
-           boot_cpu_data.x86_model >= 0x0f &&
-           boot_cpu_data.x86_model != 0x1c &&
-           boot_cpu_data.x86_model != 0x26 &&
-           boot_cpu_data.x86_model != 0x27 &&
-           boot_cpu_data.x86_model < 0x30) )
-        ideal_nops = p6_nops;
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        /*
+         * Due to a decoder implementation quirk, some specific Intel CPUs
+         * actually perform better with the "k8_nops" than with the SDM-
+         * recommended NOPs.
+         */
+        if ( boot_cpu_data.x86 != 6 )
+            break;
+
+        switch ( boot_cpu_data.x86_model )
+        {
+        case 0x0f ... 0x1b:
+        case 0x1d ... 0x25:
+        case 0x28 ... 0x2f:
+            ideal_nops = k8_nops;
+            break;
+        }
+        break;
+
+    case X86_VENDOR_AMD:
+        if ( boot_cpu_data.x86 <= 0xf )
+            ideal_nops = k8_nops;
+        break;
+    }
 }
 
 /* Use this to add nops to a buffer, then text_poke the whole buffer. */
