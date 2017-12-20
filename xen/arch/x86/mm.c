@@ -5027,6 +5027,9 @@ int xenmem_add_to_physmap_one(
     int rc = 0;
     p2m_type_t p2mt;
 
+    if ( !paging_mode_translate(d) )
+        return -EACCES;
+
     switch ( space )
     {
         case XENMAPSPACE_shared_info:
@@ -5083,7 +5086,7 @@ int xenmem_add_to_physmap_one(
             break;
     }
 
-    if ( !paging_mode_translate(d) || (mfn == 0) )
+    if ( mfn == 0 )
     {
         if ( page )
             put_page(page);
