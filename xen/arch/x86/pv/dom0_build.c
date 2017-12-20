@@ -870,6 +870,13 @@ int __init dom0_construct_pv(struct domain *d,
     regs->rsi = vstartinfo_start;
     regs->eflags = X86_EFLAGS_IF;
 
+    /*
+     * We don't call arch_set_info_guest(), so some initialisation needs doing
+     * by hand:
+     *  - Reset the GDT to reference zero_page
+     */
+    destroy_gdt(v);
+
     if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
         panic("Dom0 requires supervisor-mode execution");
 
