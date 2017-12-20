@@ -591,6 +591,7 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
                     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
 
     host_cntrl &= ~apicv_bit;
+    host_cntrl &= ~SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
     shadow_cntrl = get_vvmcs(v, SECONDARY_VM_EXEC_CONTROL);
 
     /* No vAPIC-v support, so it shouldn't be set in vmcs12. */
