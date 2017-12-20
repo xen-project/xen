@@ -594,7 +594,7 @@ static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
 {
 }
 
-static void efi_arch_flush_dcache_area(const void *vaddr, UINTN size)
+static void __init efi_arch_flush_dcache_area(const void *vaddr, UINTN size)
 {
     __flush_dcache_area(vaddr, size);
 }
