@@ -55,15 +55,15 @@
 #define _ASM_MK_NOP(x) ".byte " __stringify(x) "\n"
 #endif
 
-#define ASM_NOP1 _ASM_MK_NOP(K8_NOP1)
-#define ASM_NOP2 _ASM_MK_NOP(K8_NOP2)
-#define ASM_NOP3 _ASM_MK_NOP(K8_NOP3)
-#define ASM_NOP4 _ASM_MK_NOP(K8_NOP4)
-#define ASM_NOP5 _ASM_MK_NOP(K8_NOP5)
-#define ASM_NOP6 _ASM_MK_NOP(K8_NOP6)
-#define ASM_NOP7 _ASM_MK_NOP(K8_NOP7)
-#define ASM_NOP8 _ASM_MK_NOP(K8_NOP8)
-#define ASM_NOP9 _ASM_MK_NOP(K8_NOP9)
+#define ASM_NOP1 _ASM_MK_NOP(P6_NOP1)
+#define ASM_NOP2 _ASM_MK_NOP(P6_NOP2)
+#define ASM_NOP3 _ASM_MK_NOP(P6_NOP3)
+#define ASM_NOP4 _ASM_MK_NOP(P6_NOP4)
+#define ASM_NOP5 _ASM_MK_NOP(P6_NOP5)
+#define ASM_NOP6 _ASM_MK_NOP(P6_NOP6)
+#define ASM_NOP7 _ASM_MK_NOP(P6_NOP7)
+#define ASM_NOP8 _ASM_MK_NOP(P6_NOP8)
+#define ASM_NOP9 _ASM_MK_NOP(P6_NOP9)
 
 #define ASM_NOP_MAX 9
 
