@@ -541,7 +541,7 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:
         if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
+            return HNDL_exception_raised;
 
         if ( msr == MSR_FS_BASE )
             __vmwrite(GUEST_FS_BASE, msr_content);
@@ -559,14 +559,14 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
     case MSR_LSTAR:
         if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
+            return HNDL_exception_raised;
         v->arch.hvm_vmx.lstar = msr_content;
         wrmsrl(MSR_LSTAR, msr_content);
         break;
 
     case MSR_CSTAR:
         if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
+            return HNDL_exception_raised;
         v->arch.hvm_vmx.cstar = msr_content;
         break;
 
@@ -580,11 +580,6 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     }
 
     return HNDL_done;
-
- uncanonical_address:
-    HVM_DBG_LOG(DBG_LEVEL_MSR, "Not cano address of msr write %x", msr);
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
-    return HNDL_exception_raised;
 }
 
 /*
