@@ -671,8 +671,7 @@ int __init dom0_construct_pv(struct domain *d,
     }
 
     /* Pages that are part of page tables must be read only. */
-    if  ( is_pv_domain(d) )
-        mark_pv_pt_pages_rdonly(d, l4start, vpt_start, nr_pt_pages);
+    mark_pv_pt_pages_rdonly(d, l4start, vpt_start, nr_pt_pages);
 
     /* Mask all upcalls... */
     for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
@@ -751,7 +750,7 @@ int __init dom0_construct_pv(struct domain *d,
     count = d->tot_pages;
 
     /* Set up the phys->machine table if not part of the initial mapping. */
-    if ( is_pv_domain(d) && parms.p2m_base != UNSET_ADDR )
+    if ( parms.p2m_base != UNSET_ADDR )
     {
         pfn = pagetable_get_pfn(v->arch.guest_table);
         setup_pv_physmap(d, pfn, v_start, v_end, vphysmap_start, vphysmap_end,
