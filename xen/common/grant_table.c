@@ -1614,7 +1614,7 @@ gnttab_setup_table(
     XEN_GUEST_HANDLE_PARAM(gnttab_setup_table_t) uop, unsigned int count)
 {
     struct gnttab_setup_table op;
-    struct domain *d;
+    struct domain *d = NULL;
     struct grant_table *gt;
     int            i;
     xen_pfn_t  gmfn;
@@ -1634,7 +1634,7 @@ gnttab_setup_table(
                 " per domain.\n",
                 max_grant_frames);
         op.status = GNTST_general_error;
-        goto out1;
+        goto out;
     }
 
     if ( !guest_handle_okay(op.frame_list, op.nr_frames) )
@@ -1645,13 +1645,13 @@ gnttab_setup_table(
     {
         gdprintk(XENLOG_INFO, "Bad domid %d.\n", op.dom);
         op.status = GNTST_bad_domain;
-        goto out2;
+        goto out;
     }
 
     if ( xsm_grant_setup(XSM_TARGET, current->domain, d) )
     {
         op.status = GNTST_permission_denied;
-        goto out2;
+        goto out;
     }
 
     gt = d->grant_table;
@@ -1669,7 +1669,7 @@ gnttab_setup_table(
                  "Expand grant table to %u failed. Current: %u Max: %u\n",
                  op.nr_frames, nr_grant_frames(gt), max_grant_frames);
         op.status = GNTST_general_error;
-        goto out3;
+        goto unlock;
     }
  
     op.status = GNTST_okay;
@@ -1682,11 +1682,12 @@ gnttab_setup_table(
             op.status = GNTST_bad_virt_addr;
     }
 
- out3:
+ unlock:
     grant_write_unlock(gt);
- out2:
-    rcu_unlock_domain(d);
- out1:
+ out:
+    if ( d )
+        rcu_unlock_domain(d);
+
     if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
         return -EFAULT;
 
