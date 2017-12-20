@@ -3801,8 +3801,7 @@ sh_update_linear_entries(struct vcpu *v)
 
 #elif SHADOW_PAGING_LEVELS == 3
 
-    /* PV: XXX
-     *
+    /*
      * HVM: To give ourselves a linear map of the  shadows, we need to
      * extend a PAE shadow to 4 levels.  We do this by  having a monitor
      * l3 in slot 0 of the monitor l4 table, and  copying the PAE l3
@@ -3811,7 +3810,7 @@ sh_update_linear_entries(struct vcpu *v)
      * the shadows.
      */
 
-    if ( shadow_mode_external(d) )
+    ASSERT(shadow_mode_external(d));
     {
         /* Install copies of the shadow l3es into the monitor l2 table
          * that maps SH_LINEAR_PT_VIRT_START. */
@@ -3857,8 +3856,6 @@ sh_update_linear_entries(struct vcpu *v)
         if ( v != current )
             unmap_domain_page(ml2e);
     }
-    else
-        domain_crash(d); /* XXX */
 
 #else
 #error this should not happen
@@ -4087,12 +4084,9 @@ sh_update_cr3(struct vcpu *v, int do_locking)
       * until the next CR3 write makes us refresh our cache. */
      ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
 
-     if ( shadow_mode_external(d) )
-         /* Find where in the page the l3 table is */
-         guest_idx = guest_index((void *)v->arch.hvm_vcpu.guest_cr[3]);
-     else
-         /* PV guest: l3 is at the start of a page */
-         guest_idx = 0;
+     ASSERT(shadow_mode_external(d));
+     /* Find where in the page the l3 table is */
+     guest_idx = guest_index((void *)v->arch.hvm_vcpu.guest_cr[3]);
 
      // Ignore the low 2 bits of guest_idx -- they are really just
      // cache control.
@@ -4103,17 +4097,13 @@ sh_update_cr3(struct vcpu *v, int do_locking)
          v->arch.paging.shadow.gl3e[i] = gl3e[i];
      unmap_domain_page(gl3e);
 #elif GUEST_PAGING_LEVELS == 2
-    if ( shadow_mode_external(d) || shadow_mode_translate(d) )
-    {
-        if ( v->arch.paging.shadow.guest_vtable )
-            unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
-        v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
-        /* Does this really need map_domain_page_global?  Handle the
-         * error properly if so. */
-        BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */
-    }
-    else
-        v->arch.paging.shadow.guest_vtable = __linear_l2_table;
+    ASSERT(shadow_mode_external(d));
+    if ( v->arch.paging.shadow.guest_vtable )
+        unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+    v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
+    /* Does this really need map_domain_page_global?  Handle the
+     * error properly if so. */
+    BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */
 #else
 #error this should never happen
 #endif
@@ -4222,21 +4212,15 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     {
         make_cr3(v, pagetable_get_mfn(v->arch.monitor_table));
     }
+#if SHADOW_PAGING_LEVELS == 4
     else // not shadow_mode_external...
     {
         /* We don't support PV except guest == shadow == config levels */
-        BUG_ON(GUEST_PAGING_LEVELS != SHADOW_PAGING_LEVELS);
-#if SHADOW_PAGING_LEVELS == 3
-        /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated.
-         * Don't use make_cr3 because (a) we know it's below 4GB, and
-         * (b) it's not necessarily page-aligned, and make_cr3 takes a pfn */
-        ASSERT(virt_to_maddr(&v->arch.paging.shadow.l3table) <= 0xffffffe0ULL);
-        v->arch.cr3 = virt_to_maddr(&v->arch.paging.shadow.l3table);
-#else
-        /* 4-on-4: Just use the shadow top-level directly */
+        BUILD_BUG_ON(GUEST_PAGING_LEVELS != SHADOW_PAGING_LEVELS);
+        /* Just use the shadow top-level directly */
         make_cr3(v, pagetable_get_mfn(v->arch.shadow_table[0]));
-#endif
     }
+#endif
 
 
     ///
