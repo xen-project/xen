@@ -37,7 +37,8 @@ static const unsigned char k8nops[] init_or_livepatch_const = {
     K8_NOP5,
     K8_NOP6,
     K8_NOP7,
-    K8_NOP8
+    K8_NOP8,
+    K8_NOP9,
 };
 static const unsigned char * const k8_nops[ASM_NOP_MAX+1] init_or_livepatch_constrel = {
     NULL,
@@ -48,7 +49,8 @@ static const unsigned char * const k8_nops[ASM_NOP_MAX+1] init_or_livepatch_cons
     k8nops + 1 + 2 + 3 + 4,
     k8nops + 1 + 2 + 3 + 4 + 5,
     k8nops + 1 + 2 + 3 + 4 + 5 + 6,
-    k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7
+    k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
+    k8nops + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8,
 };
 #endif
 
@@ -61,7 +63,8 @@ static const unsigned char p6nops[] init_or_livepatch_const = {
     P6_NOP5,
     P6_NOP6,
     P6_NOP7,
-    P6_NOP8
+    P6_NOP8,
+    P6_NOP9,
 };
 static const unsigned char * const p6_nops[ASM_NOP_MAX+1] init_or_livepatch_constrel = {
     NULL,
@@ -72,7 +75,8 @@ static const unsigned char * const p6_nops[ASM_NOP_MAX+1] init_or_livepatch_cons
     p6nops + 1 + 2 + 3 + 4,
     p6nops + 1 + 2 + 3 + 4 + 5,
     p6nops + 1 + 2 + 3 + 4 + 5 + 6,
-    p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7
+    p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7,
+    p6nops + 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8,
 };
 #endif
 
