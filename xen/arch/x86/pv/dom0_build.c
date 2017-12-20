@@ -18,6 +18,7 @@
 #include <asm/bzimage.h>
 #include <asm/dom0_build.h>
 #include <asm/page.h>
+#include <asm/pv/mm.h>
 #include <asm/setup.h>
 
 /* Allow ring-3 access in long mode as guest cannot use ring 1 ... */
@@ -865,6 +866,13 @@ int __init dom0_construct_pv(struct domain *d,
     regs->rsp = vstack_end;
     regs->rsi = vstartinfo_start;
     regs->eflags = X86_EFLAGS_IF;
+
+    /*
+     * We don't call arch_set_info_guest(), so some initialisation needs doing
+     * by hand:
+     *  - Reset the GDT to reference zero_page
+     */
+    pv_destroy_gdt(v);
 
     if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
         panic("Dom0 requires supervisor-mode execution");
