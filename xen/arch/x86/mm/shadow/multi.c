@@ -3952,17 +3952,15 @@ sh_set_toplevel_shadow(struct vcpu *v,
     }
     ASSERT(mfn_valid(smfn));
 
-    /* Pin the shadow and put it (back) on the list of pinned shadows */
-    if ( sh_pin(d, smfn) == 0 )
-    {
-        SHADOW_ERROR("can't pin %#lx as toplevel shadow\n", mfn_x(smfn));
-        domain_crash(d);
-    }
-
     /* Take a ref to this page: it will be released in sh_detach_old_tables()
      * or the next call to set_toplevel_shadow() */
     if ( sh_get_ref(d, smfn, 0) )
+    {
+        /* Pin the shadow and put it (back) on the list of pinned shadows */
+        sh_pin(d, smfn);
+
         new_entry = pagetable_from_mfn(smfn);
+    }
     else
     {
         SHADOW_ERROR("can't install %#lx as toplevel shadow\n", mfn_x(smfn));
