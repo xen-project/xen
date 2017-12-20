@@ -3007,7 +3007,7 @@ gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) uop,
     return 0;
 }
 
-static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
+static int __gnttab_cache_flush(const gnttab_cache_flush_t *cflush,
                                 unsigned int *ref_count)
 {
     struct domain *d, *owner;
@@ -3018,18 +3018,16 @@ static int __gnttab_cache_flush(gnttab_cache_flush_t *cflush,
 
     if ( (cflush->offset >= PAGE_SIZE) ||
          (cflush->length > PAGE_SIZE) ||
-         (cflush->offset + cflush->length > PAGE_SIZE) )
+         (cflush->offset + cflush->length > PAGE_SIZE) ||
+         (cflush->op & ~(GNTTAB_CACHE_INVAL | GNTTAB_CACHE_CLEAN)) )
         return -EINVAL;
 
     if ( cflush->length == 0 || cflush->op == 0 )
-        return 0;
+        return !*ref_count ? 0 : -EILSEQ;
 
     /* currently unimplemented */
     if ( cflush->op & GNTTAB_CACHE_SOURCE_GREF )
         return -EOPNOTSUPP;
-
-    if ( cflush->op & ~(GNTTAB_CACHE_INVAL|GNTTAB_CACHE_CLEAN) )
-        return -EINVAL;
 
     d = rcu_lock_current_domain();
     mfn = cflush->a.dev_bus_addr >> PAGE_SHIFT;
@@ -3110,6 +3108,9 @@ gnttab_cache_flush(XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) uop,
         *ref_count = 0;
         guest_handle_add_offset(uop, 1);
     }
+
+    *ref_count = 0;
+
     return 0;
 }
 
