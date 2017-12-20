@@ -642,13 +642,10 @@ int __init dom0_construct_pv(struct domain *d,
                                     L1_PROT : COMPAT_L1_PROT));
         l1tab++;
 
-        if ( !paging_mode_translate(d) )
-        {
-            page = mfn_to_page(mfn);
-            if ( !page->u.inuse.type_info &&
-                 !get_page_and_type(page, d, PGT_writable_page) )
-                BUG();
-        }
+        page = mfn_to_page(mfn);
+        if ( !page->u.inuse.type_info &&
+             !get_page_and_type(page, d, PGT_writable_page) )
+            BUG();
     }
 
     if ( is_pv_32bit_domain(d) )
@@ -790,7 +787,7 @@ int __init dom0_construct_pv(struct domain *d,
         if ( get_gpfn_from_mfn(mfn) >= count )
         {
             BUG_ON(is_pv_32bit_domain(d));
-            if ( !paging_mode_translate(d) && !page->u.inuse.type_info &&
+            if ( !page->u.inuse.type_info &&
                  !get_page_and_type(page, d, PGT_writable_page) )
                 BUG();
 
