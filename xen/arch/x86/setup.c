@@ -638,7 +638,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
-    bool_t acpi_boot_table_init_done = 0;
+    bool acpi_boot_table_init_done = false, relocated = false;
     struct domain *dom0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
@@ -889,8 +889,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         mod[i].reserved = 0;
     }
 
-    if ( efi_enabled(EFI_LOADER) )
+    if ( xen_phys_start )
     {
+        relocated = true;
+
         /*
          * This needs to remain in sync with xen_in_range() and the
          * respective reserve_e820_ram() invocation below.
@@ -1083,8 +1085,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
             /* Don't overlap with other modules (or Xen itself). */
             end = consider_modules(s, e, size, mod,
-                                   mbi->mods_count + efi_enabled(EFI_LOADER),
-                                   j);
+                                   mbi->mods_count + relocated, j);
 
             if ( highmem_start && end > highmem_start )
                 continue;
@@ -1111,7 +1112,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         {
             /* Don't overlap with modules (or Xen itself). */
             e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size), mod,
-                                 mbi->mods_count + efi_enabled(EFI_LOADER), -1);
+                                 mbi->mods_count + relocated, -1);
             if ( s >= e )
                 break;
             if ( e > kexec_crash_area_limit )
