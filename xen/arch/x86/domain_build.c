@@ -1512,6 +1512,13 @@ int __init construct_dom0(
     regs->esi = vstartinfo_start;
     regs->eflags = X86_EFLAGS_IF;
 
+    /*
+     * We don't call arch_set_info_guest(), so some initialisation needs doing
+     * by hand:
+     *  - Reset the GDT to reference zero_page
+     */
+    destroy_gdt(v);
+
 #ifdef CONFIG_SHADOW_PAGING
     if ( opt_dom0_shadow )
     {
