@@ -1790,20 +1790,22 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     else
         hvmemul_ctxt->ctxt.swint_emulate = x86_swint_emulate_all;
 
-    rc = x86_emulate(&hvmemul_ctxt->ctxt, ops);
-
-    if ( rc == X86EMUL_OKAY && vio->mmio_retry )
-        rc = X86EMUL_RETRY;
-    if ( rc != X86EMUL_RETRY )
+    switch ( rc = x86_emulate(&hvmemul_ctxt->ctxt, ops) )
     {
+    case X86EMUL_OKAY:
+        if ( vio->mmio_retry )
+            rc = X86EMUL_RETRY;
+        /* fall through */
+    default:
         vio->mmio_cache_count = 0;
         vio->mmio_insn_bytes = 0;
-    }
-    else
-    {
+        break;
+
+    case X86EMUL_RETRY:
         BUILD_BUG_ON(sizeof(vio->mmio_insn) < sizeof(hvmemul_ctxt->insn_buf));
         vio->mmio_insn_bytes = hvmemul_ctxt->insn_buf_bytes;
         memcpy(vio->mmio_insn, hvmemul_ctxt->insn_buf, vio->mmio_insn_bytes);
+        break;
     }
 
     if ( rc != X86EMUL_OKAY )
