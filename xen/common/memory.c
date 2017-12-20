@@ -805,6 +805,11 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
     guest_handle_add_offset(xatpb->errs, start);
     xatpb->size -= start;
 
+    if ( !guest_handle_okay(xatpb->idxs, xatpb->size) ||
+         !guest_handle_okay(xatpb->gpfns, xatpb->size) ||
+         !guest_handle_okay(xatpb->errs, xatpb->size) )
+        return -EFAULT;
+
     while ( xatpb->size > done )
     {
         xen_ulong_t idx;
@@ -1123,10 +1128,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( start_extent != (typeof(xatpb.size))start_extent )
             return -EDOM;
 
-        if ( copy_from_guest(&xatpb, arg, 1) ||
-             !guest_handle_okay(xatpb.idxs, xatpb.size) ||
-             !guest_handle_okay(xatpb.gpfns, xatpb.size) ||
-             !guest_handle_okay(xatpb.errs, xatpb.size) )
+        if ( copy_from_guest(&xatpb, arg, 1) )
             return -EFAULT;
 
         /* This mapspace is unsupported for this hypercall. */
