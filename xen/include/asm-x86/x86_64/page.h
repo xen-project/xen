@@ -28,6 +28,9 @@
 #define PADDR_MASK              ((1UL << PADDR_BITS)-1)
 #define VADDR_MASK              ((1UL << VADDR_BITS)-1)
 
+#define VADDR_TOP_BIT           (1UL << (VADDR_BITS - 1))
+#define CANONICAL_MASK          (~0UL & ~VADDR_MASK)
+
 #define is_canonical_address(x) (((long)(x) >> 47) == ((long)(x) >> 63))
 
 #ifndef __ASSEMBLY__
