@@ -1143,13 +1143,7 @@ const u8 sh_type_to_size[] = {
  * worth to make sure we never return zero. */
 static unsigned int shadow_min_acceptable_pages(struct domain *d)
 {
-    u32 vcpu_count = 1;
-    struct vcpu *v;
-
-    for_each_vcpu(d, v)
-        vcpu_count++;
-
-    return (vcpu_count * 128);
+    return (d->max_vcpus + 1) * 128;
 }
 
 /* Dispatcher function: call the per-mode function that will unhook the

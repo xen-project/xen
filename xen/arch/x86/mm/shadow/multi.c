@@ -1476,16 +1476,14 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
          * pinning l3es.  This is not very quick but it doesn't happen
          * very often. */
         struct page_info *sp, *t;
-        struct vcpu *v2;
-        int l4count = 0, vcpus = 0;
+        unsigned int l4count = 0;
+
         page_list_for_each(sp, &d->arch.paging.shadow.pinned_shadows)
         {
             if ( sp->u.sh.type == SH_type_l4_64_shadow )
                 l4count++;
         }
-        for_each_vcpu ( d, v2 )
-            vcpus++;
-        if ( l4count > 2 * vcpus )
+        if ( l4count > 2 * d->max_vcpus )
         {
             /* Unpin all the pinned l3 tables, and don't pin any more. */
             page_list_for_each_safe(sp, t, &d->arch.paging.shadow.pinned_shadows)
