@@ -3377,7 +3377,10 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
     }
 
     /* Update the bits */
-    sh_new_mode(d, d->arch.paging.mode & ~mode);
+    mode = d->arch.paging.mode & ~mode;
+    if ( mode == PG_SH_enable )
+        mode = 0;
+    sh_new_mode(d, mode);
     if ( d->arch.paging.mode == 0 )
     {
         /* Get this domain off shadows */
