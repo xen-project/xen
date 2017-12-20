@@ -798,6 +798,14 @@ static void complete_domain_destroy(struct rcu_head *head)
     struct vcpu *v;
     int i;
 
+    /*
+     * Flush all state for the vCPU previously having run on the current CPU.
+     * This is in particular relevant for x86 HVM ones on VMX, so that this
+     * flushing of state won't happen from the TLB flush IPI handler behind
+     * the back of a vmx_vmcs_enter() / vmx_vmcs_exit() section.
+     */
+    sync_local_execstate();
+
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
     {
         if ( (v = d->vcpu[i]) == NULL )
