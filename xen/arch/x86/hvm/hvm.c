@@ -4484,12 +4484,18 @@ static int do_altp2m_op(
 
         if ( a.u.enable_notify.pad || a.domain != DOMID_SELF ||
              a.u.enable_notify.vcpu_id != curr->vcpu_id )
+        {
             rc = -EINVAL;
+            break;
+        }
 
         if ( !gfn_eq(vcpu_altp2m(curr).veinfo_gfn, INVALID_GFN) ||
              mfn_eq(get_gfn_query_unlocked(curr->domain,
                     a.u.enable_notify.gfn, &p2mt), INVALID_MFN) )
-            return -EINVAL;
+        {
+            rc = -EINVAL;
+            break;
+        }
 
         vcpu_altp2m(curr).veinfo_gfn = _gfn(a.u.enable_notify.gfn);
         altp2m_vcpu_update_vmfunc_ve(curr);
