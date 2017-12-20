@@ -1486,12 +1486,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
      */
     if ( paging_mode_enabled(d) && !paging_mode_external(d) )
     {
-        int ret;
+        int ret = paging_fault(addr, regs);
 
-        /* Logdirty mode is the only expected paging mode for PV guests. */
-        ASSERT(paging_mode_only_log_dirty(d));
-
-        ret = paging_fault(addr, regs);
         if ( ret == EXCRET_fault_fixed )
             trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->rip, addr);
         return ret;
