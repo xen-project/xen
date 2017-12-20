@@ -786,10 +786,10 @@ static int _set_status(unsigned gt_version,
         return _set_status_v2(domid, readonly, mapflag, shah, act, status);
 }
 
-static int grant_map_exists(const struct domain *ld,
-                            struct grant_table *rgt,
-                            unsigned long mfn,
-                            grant_ref_t *cur_ref)
+static struct active_grant_entry *grant_map_exists(const struct domain *ld,
+                                                   struct grant_table *rgt,
+                                                   unsigned long mfn,
+                                                   grant_ref_t *cur_ref)
 {
     grant_ref_t ref, max_iter;
 
@@ -805,28 +805,20 @@ static int grant_map_exists(const struct domain *ld,
                    nr_grant_entries(rgt));
     for ( ref = *cur_ref; ref < max_iter; ref++ )
     {
-        struct active_grant_entry *act;
-        bool_t exists;
+        struct active_grant_entry *act = active_entry_acquire(rgt, ref);
 
-        act = active_entry_acquire(rgt, ref);
-
-        exists = act->pin
-            && act->domid == ld->domain_id
-            && act->frame == mfn;
-
+        if ( act->pin && act->domid == ld->domain_id && act->frame == mfn )
+            return act;
         active_entry_release(act);
-
-        if ( exists )
-            return 0;
     }
 
     if ( ref < nr_grant_entries(rgt) )
     {
         *cur_ref = ref;
-        return 1;
+        return NULL;
     }
 
-    return -EINVAL;
+    return ERR_PTR(-EINVAL);
 }
 
 #define MAPKIND_READ 1
@@ -3213,6 +3205,7 @@ static int cache_flush(const gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
     struct domain *d, *owner;
     struct page_info *page;
     unsigned long mfn;
+    struct active_grant_entry *act = NULL;
     void *v;
     int ret;
 
@@ -3250,13 +3243,13 @@ static int cache_flush(const gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
     {
         grant_read_lock(owner->grant_table);
 
-        ret = grant_map_exists(d, owner->grant_table, mfn, cur_ref);
-        if ( ret != 0 )
+        act = grant_map_exists(d, owner->grant_table, mfn, cur_ref);
+        if ( IS_ERR_OR_NULL(act) )
         {
             grant_read_unlock(owner->grant_table);
             rcu_unlock_domain(d);
             put_page(page);
-            return ret;
+            return act ? PTR_ERR(act) : 1;
         }
     }
 
@@ -3273,7 +3266,11 @@ static int cache_flush(const gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
         ret = 0;
 
     if ( d != owner )
+    {
+        active_entry_release(act);
         grant_read_unlock(owner->grant_table);
+    }
+
     unmap_domain_page(v);
     put_page(page);
 
