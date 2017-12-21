@@ -505,19 +505,36 @@ void dump_pageframe_info(struct domain *d)
 
 }
 
+/*
+ * The new VGIC has a bigger per-IRQ structure, so we need more than one
+ * page on ARM64. Cowardly increase the limit in this case.
+ */
+#if defined(CONFIG_NEW_VGIC) && defined(CONFIG_ARM_64)
+#define MAX_PAGES_PER_VCPU  2
+#else
+#define MAX_PAGES_PER_VCPU  1
+#endif
+
 struct vcpu *alloc_vcpu_struct(void)
 {
     struct vcpu *v;
-    BUILD_BUG_ON(sizeof(*v) > PAGE_SIZE);
-    v = alloc_xenheap_pages(0, 0);
+
+    BUILD_BUG_ON(sizeof(*v) > MAX_PAGES_PER_VCPU * PAGE_SIZE);
+    v = alloc_xenheap_pages(get_order_from_bytes(sizeof(*v)), 0);
     if ( v != NULL )
-        clear_page(v);
+    {
+        unsigned int i;
+
+        for ( i = 0; i < DIV_ROUND_UP(sizeof(*v), PAGE_SIZE); i++ )
+            clear_page((void *)v + i * PAGE_SIZE);
+    }
+
     return v;
 }
 
 void free_vcpu_struct(struct vcpu *v)
 {
-    free_xenheap_page(v);
+    free_xenheap_pages(v, get_order_from_bytes(sizeof(*v)));
 }
 
 int vcpu_initialise(struct vcpu *v)
