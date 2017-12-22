@@ -1552,6 +1552,56 @@ static void parse_config_data(const char *config_source,
     xlu_cfg_get_defbool(config, "driver_domain", &c_info->driver_domain, 0);
     xlu_cfg_get_defbool(config, "acpi", &b_info->acpi, 0);
 
+    if (b_info->type == LIBXL_DOMAIN_TYPE_PV) {
+        xlu_cfg_replace_string (config, "bootloader",
+                                &b_info->u.pv.bootloader, 0);
+        switch (xlu_cfg_get_list_as_string_list(config, "bootloader_args",
+                                      &b_info->u.pv.bootloader_args, 1))
+        {
+
+        case 0: break; /* Success */
+        case ESRCH: break; /* Option not present */
+        case EINVAL:
+            if (!xlu_cfg_get_string(config, "bootloader_args", &buf, 0)) {
+
+                fprintf(stderr, "WARNING: Specifying \"bootloader_args\""
+                        " as a string is deprecated. "
+                        "Please use a list of arguments.\n");
+                split_string_into_string_list(buf, " \t\n",
+                                              &b_info->u.pv.bootloader_args);
+            }
+            break;
+        default:
+            fprintf(stderr,"xl: Unable to parse bootloader_args.\n");
+            exit(-ERROR_FAIL);
+        }
+    } else {
+        if (!xlu_cfg_get_long(config, "timer_mode", &l, 1)) {
+            const char *s = libxl_timer_mode_to_string(l);
+            fprintf(stderr, "WARNING: specifying \"timer_mode\" as an integer is deprecated. "
+                    "Please use the named parameter variant. %s%s%s\n",
+                    s ? "e.g. timer_mode=\"" : "",
+                    s ? s : "",
+                    s ? "\"" : "");
+
+            if (l < LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS ||
+                l > LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING) {
+                fprintf(stderr, "ERROR: invalid value %ld for \"timer_mode\"\n", l);
+                exit (1);
+            }
+            b_info->u.hvm.timer_mode = l;
+        } else if (!xlu_cfg_get_string(config, "timer_mode", &buf, 0)) {
+            if (libxl_timer_mode_from_string(buf, &b_info->u.hvm.timer_mode)) {
+                fprintf(stderr, "ERROR: invalid value \"%s\" for \"timer_mode\"\n",
+                        buf);
+                exit (1);
+            }
+        }
+
+        xlu_cfg_get_defbool(config, "nestedhvm", &b_info->u.hvm.nested_hvm, 0);
+
+    }
+    
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         kernel_basename = libxl_basename(b_info->kernel);
@@ -1648,29 +1698,6 @@ static void parse_config_data(const char *config_source,
                 exit (1);
             }
         }
-        if (!xlu_cfg_get_long(config, "timer_mode", &l, 1)) {
-            const char *s = libxl_timer_mode_to_string(l);
-            fprintf(stderr, "WARNING: specifying \"timer_mode\" as an integer is deprecated. "
-                    "Please use the named parameter variant. %s%s%s\n",
-                    s ? "e.g. timer_mode=\"" : "",
-                    s ? s : "",
-                    s ? "\"" : "");
-
-            if (l < LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS ||
-                l > LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING) {
-                fprintf(stderr, "ERROR: invalid value %ld for \"timer_mode\"\n", l);
-                exit (1);
-            }
-            b_info->u.hvm.timer_mode = l;
-        } else if (!xlu_cfg_get_string(config, "timer_mode", &buf, 0)) {
-            if (libxl_timer_mode_from_string(buf, &b_info->u.hvm.timer_mode)) {
-                fprintf(stderr, "ERROR: invalid value \"%s\" for \"timer_mode\"\n",
-                        buf);
-                exit (1);
-            }
-        }
-
-        xlu_cfg_get_defbool(config, "nestedhvm", &b_info->u.hvm.nested_hvm, 0);
 
         xlu_cfg_get_defbool(config, "altp2mhvm", &b_info->u.hvm.altp2m, 0);
 
@@ -1699,28 +1726,6 @@ static void parse_config_data(const char *config_source,
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {
-        xlu_cfg_replace_string (config, "bootloader", &b_info->u.pv.bootloader, 0);
-        switch (xlu_cfg_get_list_as_string_list(config, "bootloader_args",
-                                      &b_info->u.pv.bootloader_args, 1))
-        {
-
-        case 0: break; /* Success */
-        case ESRCH: break; /* Option not present */
-        case EINVAL:
-            if (!xlu_cfg_get_string(config, "bootloader_args", &buf, 0)) {
-
-                fprintf(stderr, "WARNING: Specifying \"bootloader_args\""
-                        " as a string is deprecated. "
-                        "Please use a list of arguments.\n");
-                split_string_into_string_list(buf, " \t\n",
-                                              &b_info->u.pv.bootloader_args);
-            }
-            break;
-        default:
-            fprintf(stderr,"xl: Unable to parse bootloader_args.\n");
-            exit(-ERROR_FAIL);
-        }
-
         if (!b_info->u.pv.bootloader && !b_info->kernel) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
             exit(1);
