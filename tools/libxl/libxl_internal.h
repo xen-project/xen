@@ -4303,6 +4303,16 @@ static inline bool libxl__acpi_defbool_val(const libxl_domain_build_info *b_info
     return libxl_defbool_val(b_info->acpi) &&
            libxl_defbool_val(b_info->u.hvm.acpi);
 }
+
+static inline bool libxl__timer_mode_is_default(libxl_timer_mode *tm)
+{
+    return *tm == LIBXL_TIMER_MODE_DEFAULT;
+}
+
+static inline bool libxl__string_is_default(char **s)
+{
+    return *s == NULL;
+}
 #endif
 
 /*

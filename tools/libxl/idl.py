@@ -302,7 +302,8 @@ string = Builtin("char *", namespace = None, copy_fn = "libxl_string_copy", disp
                  json_gen_fn = "libxl__string_gen_json",
                  json_parse_type = "JSON_STRING | JSON_NULL",
                  json_parse_fn = "libxl__string_parse_json",
-                 autogenerate_json = False)
+                 autogenerate_json = False,
+                 check_default_fn="libxl__string_is_default")
 
 class Array(Type):
     """An array of the same type"""
