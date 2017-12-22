@@ -508,6 +508,41 @@ Load the specified file as firmware for the guest.
 Currently there's no firmware available for PVH guests, they should be
 booted using the B<Direct Kernel Boot> method or the B<bootloader> option.
 
+=over 4
+
+=item B<pvshim=BOOLEAN>
+
+Whether to boot this guest as a PV guest within a PVH container.
+Ie, the guest will experience a PV environment,
+but
+processor hardware extensions are used to
+separate its address space
+to mitigate the Meltdown attack (CVE-2017-5754).
+
+Default is false.
+
+=item B<pvshim_path="PATH">
+
+The PV shim is a specially-built firmware-like executable
+constructed from the hypervisor source tree.
+This option specifies to use a non-default shim.
+Ignored if pvhsim is false.
+
+=item B<pvshim_cmdline="STRING">
+
+Command line for the shim.
+Default is "pv-shim console=xen,pv sched=null".
+Ignored if pvhsim is false.
+
+=item B<pvshim_extra="STRING">
+
+Extra command line arguments for the shim.
+If supplied, appended to the value for pvshim_cmdline.
+Default is empty.
+Ignored if pvhsim is false.
+
+=back
+
 =head3 Other Options
 
 =over 4
