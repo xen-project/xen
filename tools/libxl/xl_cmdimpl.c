@@ -1611,8 +1611,8 @@ static void parse_config_data(const char *config_source,
     }
 
     if (U_HVM_OK(b_info)) {
-        xlu_cfg_get_defbool(config, "nestedhvm", U_HVM_F(b_info, nested_hvm), 0);
-        xlu_cfg_get_defbool(config, "apic", U_HVM_F(b_info, apic), 0);
+        xlu_cfg_get_defbool(config, "nestedhvm", U_HVM_F(b_info,nested_hvm), 0);
+        xlu_cfg_get_defbool(config, "apic", U_HVM_F(b_info,apic), 0);
     }
     
     switch(b_info->type) {
@@ -1738,7 +1738,7 @@ static void parse_config_data(const char *config_source,
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {
-        if (!b_info->U_PV bootloader && !b_info->kernel) {
+        if (!*U_PV_F(b_info,bootloader) && !b_info->kernel) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
             exit(1);
         }

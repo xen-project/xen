@@ -410,7 +410,6 @@ static void bootloader_disk_attached_cb(libxl__egc *egc,
     }
 
     LOG(DEBUG, "Config bootloader value: %s", *U_PV_F(info,bootloader));
-
     if ( !strcmp(*U_PV_F(info,bootloader), "/usr/bin/pygrub") )
         LOG(WARN, "bootloader='/usr/bin/pygrub' is deprecated; use " \
             "bootloader='pygrub' instead");

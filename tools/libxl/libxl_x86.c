@@ -12,7 +12,7 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
         if (d_config->b_info.device_model_version !=
             LIBXL_DEVICE_MODEL_VERSION_NONE) {
             xc_config->emulation_flags = XEN_X86_EMU_ALL;
-        } else if (libxl_defbool_val(d_config->b_info.u.hvm.apic)) {
+        } else if (libxl_defbool_val(*U_HVM_F(&d_config->b_info,apic))) {
             /*
              * HVM guests without device model may want
              * to have LAPIC emulation.

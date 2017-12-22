@@ -290,7 +290,7 @@ static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
     xc_hvm_param_set(handle, domid, HVM_PARAM_VPT_ALIGN,
                     libxl_defbool_val(info->u.hvm.vpt_align));
     xc_hvm_param_set(handle, domid, HVM_PARAM_NESTEDHVM,
-                    libxl_defbool_val(info->u.hvm.nested_hvm));
+                    libxl_defbool_val(*U_HVM_F(info,nested_hvm)));
     xc_hvm_param_set(handle, domid, HVM_PARAM_ALTP2M,
                     libxl_defbool_val(info->u.hvm.altp2m));
 }
