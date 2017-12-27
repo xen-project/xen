@@ -38,6 +38,7 @@
 #include <asm/desc.h>
 #include <asm/div64.h>
 #include <asm/flushtlb.h>
+#include <asm/guest.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/time.h>
@@ -374,6 +375,9 @@ void start_secondary(void *unused)
     setup_vector_irq(cpu);
     cpumask_set_cpu(cpu, &cpu_online_map);
     unlock_vector_lock();
+
+    if ( xen_guest )
+        hypervisor_ap_setup();
 
     /* We can take interrupts now: we're officially "up". */
     local_irq_enable();
