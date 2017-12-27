@@ -32,8 +32,11 @@ extern bool xen_guest;
 
 void probe_hypervisor(void);
 void hypervisor_setup(void);
+void hypervisor_ap_setup(void);
 int hypervisor_alloc_unused_page(mfn_t *mfn);
 int hypervisor_free_unused_page(mfn_t mfn);
+
+DECLARE_PER_CPU(unsigned int, vcpu_id);
 
 #else
 
@@ -41,6 +44,10 @@ int hypervisor_free_unused_page(mfn_t mfn);
 
 static inline void probe_hypervisor(void) {};
 static inline void hypervisor_setup(void)
+{
+    ASSERT_UNREACHABLE();
+}
+static inline void hypervisor_ap_setup(void)
 {
     ASSERT_UNREACHABLE();
 }
