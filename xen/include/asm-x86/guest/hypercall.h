@@ -26,6 +26,8 @@
 #include <public/xen.h>
 #include <public/sched.h>
 
+#include <public/vcpu.h>
+
 /*
  * Hypercall primatives for 64bit
  *
@@ -94,6 +96,12 @@ static inline long xen_hypercall_sched_op(unsigned int cmd, void *arg)
 static inline long xen_hypercall_memory_op(unsigned int cmd, void *arg)
 {
     return _hypercall64_2(long, __HYPERVISOR_memory_op, cmd, arg);
+}
+
+static inline int xen_hypercall_vcpu_op(unsigned int cmd, unsigned int vcpu,
+                                        void *arg)
+{
+    return _hypercall64_3(long, __HYPERVISOR_vcpu_op, cmd, vcpu, arg);
 }
 
 /*
