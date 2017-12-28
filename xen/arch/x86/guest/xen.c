@@ -39,6 +39,10 @@ static struct rangeset *mem;
 
 DEFINE_PER_CPU(unsigned int, vcpu_id);
 
+static struct vcpu_info *vcpu_info;
+static unsigned long vcpu_info_mapped[BITS_TO_LONGS(NR_CPUS)];
+DEFINE_PER_CPU(struct vcpu_info *, vcpu_info);
+
 static void __init find_xen_leaves(void)
 {
     uint32_t eax, ebx, ecx, edx, base;
@@ -104,6 +108,41 @@ static void map_shared_info(void)
         write_atomic(&XEN_shared_info->evtchn_mask[i], ~0ul);
 }
 
+static int map_vcpuinfo(void)
+{
+    unsigned int vcpu = this_cpu(vcpu_id);
+    struct vcpu_register_vcpu_info info;
+    int rc;
+
+    if ( !vcpu_info )
+    {
+        this_cpu(vcpu_info) = &XEN_shared_info->vcpu_info[vcpu];
+        return 0;
+    }
+
+    if ( test_bit(vcpu, vcpu_info_mapped) )
+    {
+        this_cpu(vcpu_info) = &vcpu_info[vcpu];
+        return 0;
+    }
+
+    info.mfn = virt_to_mfn(&vcpu_info[vcpu]);
+    info.offset = (unsigned long)&vcpu_info[vcpu] & ~PAGE_MASK;
+    rc = xen_hypercall_vcpu_op(VCPUOP_register_vcpu_info, vcpu, &info);
+    if ( rc )
+    {
+        BUG_ON(vcpu >= XEN_LEGACY_MAX_VCPUS);
+        this_cpu(vcpu_info) = &XEN_shared_info->vcpu_info[vcpu];
+    }
+    else
+    {
+        this_cpu(vcpu_info) = &vcpu_info[vcpu];
+        set_bit(vcpu, vcpu_info_mapped);
+    }
+
+    return rc;
+}
+
 static void set_vcpu_id(void)
 {
     uint32_t eax, ebx, ecx, edx;
@@ -154,11 +193,29 @@ void __init hypervisor_setup(void)
     map_shared_info();
 
     set_vcpu_id();
+    vcpu_info = xzalloc_array(struct vcpu_info, nr_cpu_ids);
+    if ( map_vcpuinfo() )
+    {
+        xfree(vcpu_info);
+        vcpu_info = NULL;
+    }
+    if ( !vcpu_info && nr_cpu_ids > XEN_LEGACY_MAX_VCPUS )
+    {
+        unsigned int i;
+
+        for ( i = XEN_LEGACY_MAX_VCPUS; i < nr_cpu_ids; i++ )
+            __cpumask_clear_cpu(i, &cpu_present_map);
+        nr_cpu_ids = XEN_LEGACY_MAX_VCPUS;
+        printk(XENLOG_WARNING
+               "unable to map vCPU info, limiting vCPUs to: %u\n",
+               XEN_LEGACY_MAX_VCPUS);
+    }
 }
 
 void hypervisor_ap_setup(void)
 {
     set_vcpu_id();
+    map_vcpuinfo();
 }
 
 int hypervisor_alloc_unused_page(mfn_t *mfn)
