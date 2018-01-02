@@ -227,8 +227,8 @@ struct acpi_20_fadt {
 /*
  * FADT Boot Architecture Flags.
  */
-#define ACPI_LEGACY_DEVICES (1 << 0)
-#define ACPI_8042           (1 << 1)
+#define ACPI_FADT_LEGACY_DEVICES    (1 << 0)
+#define ACPI_FADT_8042              (1 << 1)
 
 /*
  * FADT Fixed Feature Flags.
