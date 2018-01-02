@@ -33,6 +33,7 @@
 #define ACPI_HAS_PMTIMER     (1<<10)
 #define ACPI_HAS_BUTTONS     (1<<11)
 #define ACPI_HAS_VGA         (1<<12)
+#define ACPI_HAS_8042        (1<<13)
 
 struct xen_vmemrange;
 struct acpi_numa {
