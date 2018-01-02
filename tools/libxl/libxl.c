@@ -5157,7 +5157,6 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
         switch (libxl__device_model_version_running(gc, domid)) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
         case LIBXL_DEVICE_MODEL_VERSION_NONE:
-            rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap, &info);
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             rc = libxl__set_vcpuonline_qmp(gc, domid, cpumap, &info);
@@ -5167,11 +5166,14 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
         }
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap, &info);
         break;
     default:
         rc = ERROR_INVAL;
     }
+
+    if (!rc)
+        rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap, &info);
+
 out:
     libxl_dominfo_dispose(&info);
     GC_FREE;
