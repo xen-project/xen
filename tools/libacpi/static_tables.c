@@ -38,11 +38,9 @@ struct acpi_20_facs Facs = {
 #define ACPI_PM_TMR_BLK_BIT_WIDTH           0x20
 #define ACPI_PM_TMR_BLK_BIT_OFFSET          0x00
 
-struct acpi_20_fadt Fadt = {
+struct acpi_fadt Fadt = {
     .header = {
-        .signature    = ACPI_2_0_FADT_SIGNATURE,
-        .length       = sizeof(struct acpi_20_fadt),
-        .revision     = ACPI_2_0_FADT_REVISION,
+        .signature    = ACPI_FADT_SIGNATURE,
         .oem_id       = ACPI_OEM_ID, 
         .oem_table_id = ACPI_OEM_TABLE_ID,
         .oem_revision = ACPI_OEM_REVISION,

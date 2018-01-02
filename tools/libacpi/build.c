@@ -33,7 +33,7 @@
 extern struct acpi_20_rsdp Rsdp;
 extern struct acpi_20_rsdt Rsdt;
 extern struct acpi_20_xsdt Xsdt;
-extern struct acpi_20_fadt Fadt;
+extern struct acpi_fadt Fadt;
 extern struct acpi_20_facs Facs;
 extern struct acpi_20_waet Waet;
 
@@ -503,12 +503,13 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     struct acpi_20_rsdp *rsdp;
     struct acpi_20_rsdt *rsdt;
     struct acpi_20_xsdt *xsdt;
-    struct acpi_20_fadt *fadt;
+    struct acpi_fadt    *fadt;
     struct acpi_10_fadt *fadt_10;
     struct acpi_20_facs *facs;
     unsigned char       *dsdt;
     unsigned long        secondary_tables[ACPI_MAX_SECONDARY_TABLES];
     int                  nr_secondaries, i;
+    unsigned int         fadt_size;
 
     acpi_info = (struct acpi_info *)config->infop;
     memset(acpi_info, 0, sizeof(*acpi_info));
@@ -572,7 +573,23 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_10_fadt));
 
-    fadt = ctxt->mem_ops.alloc(ctxt, sizeof(struct acpi_20_fadt), 16);
+    switch ( config->acpi_revision )
+    {
+    case 4:
+        /*
+         * NB: we can use offsetof because there's no padding between
+         * x_gpe1_blk and sleep_control.
+         */
+        fadt_size = offsetof(struct acpi_fadt, sleep_control);
+        break;
+    case 5:
+        fadt_size = sizeof(*fadt);
+        break;
+    default:
+        printf("ACPI revision %u not supported\n", config->acpi_revision);
+        return -1;
+    }
+    fadt = ctxt->mem_ops.alloc(ctxt, fadt_size, 16);
     if (!fadt) goto oom;
     if ( !(config->table_flags & ACPI_HAS_PMTIMER) )
     {
@@ -581,7 +598,13 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     }
     if ( !(config->table_flags & ACPI_HAS_BUTTONS) )
         Fadt.flags |= (ACPI_PWR_BUTTON | ACPI_SLP_BUTTON);
-    memcpy(fadt, &Fadt, sizeof(struct acpi_20_fadt));
+    memcpy(fadt, &Fadt, fadt_size);
+    /*
+     * For both ACPI 4 and 5 the revision of the FADT matches the ACPI
+     * revision.
+     */
+    fadt->header.revision = config->acpi_revision;
+    fadt->header.length = fadt_size;
     fadt->dsdt   = ctxt->mem_ops.v2p(ctxt, dsdt);
     fadt->x_dsdt = ctxt->mem_ops.v2p(ctxt, dsdt);
     fadt->firmware_ctrl   = ctxt->mem_ops.v2p(ctxt, facs);
@@ -590,9 +613,7 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
         fadt->iapc_boot_arch |= ACPI_FADT_NO_VGA;
     if ( config->table_flags & ACPI_HAS_8042 )
         fadt->iapc_boot_arch |= ACPI_FADT_8042;
-    set_checksum(fadt,
-                 offsetof(struct acpi_header, checksum),
-                 sizeof(struct acpi_20_fadt));
+    set_checksum(fadt, offsetof(struct acpi_header, checksum), fadt_size);
 
     nr_secondaries = construct_secondary_tables(ctxt, secondary_tables,
                  config, acpi_info);
