@@ -438,7 +438,7 @@ uint32_t get_s3_waking_vector(void)
 {
     struct acpi_20_rsdp *rsdp = find_rsdp();
     struct acpi_20_xsdt *xsdt;
-    struct acpi_20_fadt *fadt;
+    struct acpi_fadt *fadt;
     struct acpi_20_facs *facs;
     uint32_t vector;
 
@@ -449,8 +449,8 @@ uint32_t get_s3_waking_vector(void)
     if (!xsdt)
         return 0;
 
-    fadt = (struct acpi_20_fadt *)(long)xsdt->entry[0];
-    if (!fadt || (fadt->header.signature != ACPI_2_0_FADT_SIGNATURE))
+    fadt = (struct acpi_fadt *)(long)xsdt->entry[0];
+    if (!fadt || (fadt->header.signature != ACPI_FADT_SIGNATURE))
         return 0;
 
     facs = (struct acpi_20_facs *)(long)fadt->x_firmware_ctrl;
