@@ -233,6 +233,7 @@ struct acpi_fadt {
 #define ACPI_FADT_LEGACY_DEVICES    (1 << 0)
 #define ACPI_FADT_8042              (1 << 1)
 #define ACPI_FADT_NO_VGA            (1 << 2)
+#define ACPI_FADT_NO_CMOS_RTC       (1 << 5)
 
 /*
  * FADT Fixed Feature Flags.
