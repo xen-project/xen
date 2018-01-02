@@ -586,6 +586,8 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
     fadt->x_dsdt = ctxt->mem_ops.v2p(ctxt, dsdt);
     fadt->firmware_ctrl   = ctxt->mem_ops.v2p(ctxt, facs);
     fadt->x_firmware_ctrl = ctxt->mem_ops.v2p(ctxt, facs);
+    if ( !(config->table_flags & ACPI_HAS_VGA) )
+        fadt->iapc_boot_arch |= ACPI_FADT_NO_VGA;
     set_checksum(fadt,
                  offsetof(struct acpi_header, checksum),
                  sizeof(struct acpi_20_fadt));

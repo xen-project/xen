@@ -950,7 +950,7 @@ void hvmloader_acpi_build_tables(struct acpi_config *config,
 
     config->table_flags |= (ACPI_HAS_TCPA | ACPI_HAS_IOAPIC |
                             ACPI_HAS_WAET | ACPI_HAS_PMTIMER |
-                            ACPI_HAS_BUTTONS);
+                            ACPI_HAS_BUTTONS | ACPI_HAS_VGA);
 
     config->tis_hdr = (uint16_t *)ACPI_TIS_HDR_ADDRESS;
 
