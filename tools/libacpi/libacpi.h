@@ -30,6 +30,7 @@
 #define ACPI_HAS_TCPA        (1<<7)
 #define ACPI_HAS_IOAPIC      (1<<8)
 #define ACPI_HAS_WAET        (1<<9)
+#define ACPI_HAS_PMTIMER     (1<<10)
 
 struct xen_vmemrange;
 struct acpi_numa {
