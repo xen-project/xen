@@ -579,6 +579,8 @@ int acpi_build_tables(struct acpi_ctxt *ctxt, struct acpi_config *config)
         Fadt.pm_tmr_blk = Fadt.pm_tmr_len = 0;
         memset(&Fadt.x_pm_tmr_blk, 0, sizeof(Fadt.x_pm_tmr_blk));
     }
+    if ( !(config->table_flags & ACPI_HAS_BUTTONS) )
+        Fadt.flags |= (ACPI_PWR_BUTTON | ACPI_SLP_BUTTON);
     memcpy(fadt, &Fadt, sizeof(struct acpi_20_fadt));
     fadt->dsdt   = ctxt->mem_ops.v2p(ctxt, dsdt);
     fadt->x_dsdt = ctxt->mem_ops.v2p(ctxt, dsdt);
