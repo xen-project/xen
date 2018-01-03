@@ -26,12 +26,19 @@
 extern bool xen_guest;
 
 void probe_hypervisor(void);
+void hypervisor_setup(void);
+int hypervisor_alloc_unused_page(mfn_t *mfn);
+int hypervisor_free_unused_page(mfn_t mfn);
 
 #else
 
 #define xen_guest 0
 
 static inline void probe_hypervisor(void) {};
+static inline void hypervisor_setup(void)
+{
+    ASSERT_UNREACHABLE();
+}
 
 #endif /* CONFIG_XEN_GUEST */
 #endif /* __X86_GUEST_XEN_H__ */
