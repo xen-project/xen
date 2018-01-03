@@ -135,7 +135,7 @@ void rb_insert_color(struct rb_node *node, struct rb_root *root)
 				 *      / \          / \
 				 *     p   u  -->   P   U
 				 *    /            /
-				 *   n            N
+				 *   n            n
 				 *
 				 * However, since g's parent might be red, and
 				 * 4) does not allow this, we need to recurse
