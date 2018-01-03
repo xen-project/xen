@@ -1472,6 +1472,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         max_cpus = nr_cpu_ids;
     }
 
+    if ( xen_guest )
+        hypervisor_setup();
+
     /* Low mappings were only needed for some BIOS table parsing. */
     zap_low_mappings();
 
