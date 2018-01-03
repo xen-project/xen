@@ -334,6 +334,55 @@ bool vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
     }
 }
 
+static void vtimer_update_irq(struct vcpu *v, struct vtimer *vtimer,
+                              uint32_t vtimer_ctl)
+{
+    bool level;
+
+    /* Filter for the three bits that determine the status of the timer */
+    vtimer_ctl &= (CNTx_CTL_ENABLE | CNTx_CTL_PENDING | CNTx_CTL_MASK);
+
+    /* The level is high if the timer is pending and enabled, but not masked. */
+    level = (vtimer_ctl == (CNTx_CTL_ENABLE | CNTx_CTL_PENDING));
+
+    /*
+     * This is mostly here to *lower* the virtual interrupt line if the timer
+     * is no longer pending.
+     * We would have injected an IRQ already via SOFTIRQ when the timer expired.
+     * Doing it here again is basically a NOP if the line was already high.
+     */
+    vgic_inject_irq(v->domain, v, vtimer->irq, level);
+}
+
+/**
+ * vtimer_update_irqs() - update the virtual timers' IRQ lines after a guest run
+ * @vcpu: The VCPU to sync the timer state
+ *
+ * After returning from a guest, update the state of the timers' virtual
+ * interrupt lines, to model the level triggered interrupts correctly.
+ * If the guest has handled a timer interrupt, the virtual interrupt line
+ * needs to be lowered explicitly. vgic_inject_irq() takes care of that.
+ */
+void vtimer_update_irqs(struct vcpu *v)
+{
+    /*
+     * For the virtual timer we read the current state from the hardware.
+     * Technically we should keep the CNTx_CTL_MASK bit here, to catch if
+     * the timer interrupt is masked. However Xen *always* masks the timer
+     * upon entering the hypervisor, leaving it up to the guest to un-mask it.
+     * So we would always read a "low" level, despite the condition being
+     * actually "high".  Ignoring the mask bit solves this (for now).
+     *
+     * TODO: The proper fix for this is to make vtimer vIRQ hardware mapped,
+     * but this requires reworking the arch timer to implement this.
+     */
+    vtimer_update_irq(v, &v->arch.virt_timer,
+                      READ_SYSREG32(CNTV_CTL_EL0) & ~CNTx_CTL_MASK);
+
+    /* For the physical timer we rely on our emulated state. */
+    vtimer_update_irq(v, &v->arch.phys_timer, v->arch.phys_timer.ctl);
+}
+
 /*
  * Local variables:
  * mode: C

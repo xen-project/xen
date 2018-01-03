@@ -2024,6 +2024,17 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
         if ( current->arch.hcr_el2 & HCR_VA )
             current->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
 
+#ifdef CONFIG_NEW_VGIC
+        /*
+         * We need to update the state of our emulated devices using level
+         * triggered interrupts before syncing back the VGIC state.
+         *
+         * TODO: Investigate whether this is necessary to do on every
+         * trap and how it can be optimised.
+         */
+        vtimer_update_irqs(current);
+#endif
+
         vgic_sync_from_lrs(current);
     }
 }
