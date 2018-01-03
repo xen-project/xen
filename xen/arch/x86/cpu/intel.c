@@ -283,31 +283,29 @@ static void __init noinline intel_init_levelling(void)
 
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
+	u64 misc_enable, disable;
+
 	/* Netburst reports 64 bytes clflush size, but does IO in 128 bytes */
 	if (c->x86 == 15 && c->x86_cache_alignment == 64)
 		c->x86_cache_alignment = 128;
 
 	/* Unmask CPUID levels and NX if masked: */
-	if (c->x86 > 6 || (c->x86 == 6 && c->x86_model >= 0xd)) {
-		u64 misc_enable, disable;
+	rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 
-		rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
+	disable = misc_enable & (MSR_IA32_MISC_ENABLE_LIMIT_CPUID |
+				 MSR_IA32_MISC_ENABLE_XD_DISABLE);
+	if (disable) {
+		wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable & ~disable);
+		bootsym(trampoline_misc_enable_off) |= disable;
+	}
 
-		disable = misc_enable & (MSR_IA32_MISC_ENABLE_LIMIT_CPUID |
-					 MSR_IA32_MISC_ENABLE_XD_DISABLE);
-		if (disable) {
-			wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable & ~disable);
-			bootsym(trampoline_misc_enable_off) |= disable;
-		}
-
-		if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID)
-			printk(KERN_INFO "revised cpuid level: %d\n",
-			       cpuid_eax(0));
-		if (disable & MSR_IA32_MISC_ENABLE_XD_DISABLE) {
-			write_efer(read_efer() | EFER_NX);
-			printk(KERN_INFO
-			       "re-enabled NX (Execute Disable) protection\n");
-		}
+	if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID)
+		printk(KERN_INFO "revised cpuid level: %d\n",
+		       cpuid_eax(0));
+	if (disable & MSR_IA32_MISC_ENABLE_XD_DISABLE) {
+		write_efer(read_efer() | EFER_NX);
+		printk(KERN_INFO
+		       "re-enabled NX (Execute Disable) protection\n");
 	}
 
 	/* CPUID workaround for Intel 0F33/0F34 CPU */
