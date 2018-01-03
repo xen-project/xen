@@ -810,67 +810,41 @@ static int xenmem_add_to_physmap(struct domain *d,
 
 static int xenmem_add_to_physmap_batch(struct domain *d,
                                        struct xen_add_to_physmap_batch *xatpb,
-                                       unsigned int start)
+                                       unsigned int extent)
 {
-    unsigned int done = 0;
-    int rc;
-
-    if ( xatpb->size < start )
+    if ( xatpb->size < extent )
         return -EILSEQ;
 
-    guest_handle_add_offset(xatpb->idxs, start);
-    guest_handle_add_offset(xatpb->gpfns, start);
-    guest_handle_add_offset(xatpb->errs, start);
-    xatpb->size -= start;
-
-    if ( !guest_handle_okay(xatpb->idxs, xatpb->size) ||
-         !guest_handle_okay(xatpb->gpfns, xatpb->size) ||
-         !guest_handle_okay(xatpb->errs, xatpb->size) )
+    if ( !guest_handle_subrange_okay(xatpb->idxs, extent, xatpb->size - 1) ||
+         !guest_handle_subrange_okay(xatpb->gpfns, extent, xatpb->size - 1) ||
+         !guest_handle_subrange_okay(xatpb->errs, extent, xatpb->size - 1) )
         return -EFAULT;
 
-    while ( xatpb->size > done )
+    while ( xatpb->size > extent )
     {
         xen_ulong_t idx;
         xen_pfn_t gpfn;
+        int rc;
 
-        if ( unlikely(__copy_from_guest_offset(&idx, xatpb->idxs, 0, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
-
-        if ( unlikely(__copy_from_guest_offset(&gpfn, xatpb->gpfns, 0, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
+        if ( unlikely(__copy_from_guest_offset(&idx, xatpb->idxs,
+                                               extent, 1)) ||
+             unlikely(__copy_from_guest_offset(&gpfn, xatpb->gpfns,
+                                               extent, 1)) )
+            return -EFAULT;
 
         rc = xenmem_add_to_physmap_one(d, xatpb->space,
                                        xatpb->u,
                                        idx, _gfn(gpfn));
 
-        if ( unlikely(__copy_to_guest_offset(xatpb->errs, 0, &rc, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
-
-        guest_handle_add_offset(xatpb->idxs, 1);
-        guest_handle_add_offset(xatpb->gpfns, 1);
-        guest_handle_add_offset(xatpb->errs, 1);
+        if ( unlikely(__copy_to_guest_offset(xatpb->errs, extent, &rc, 1)) )
+            return -EFAULT;
 
         /* Check for continuation if it's not the last iteration. */
-        if ( xatpb->size > ++done && hypercall_preempt_check() )
-        {
-            rc = start + done;
-            goto out;
-        }
+        if ( xatpb->size > ++extent && hypercall_preempt_check() )
+            return extent;
     }
 
-    rc = 0;
-
-out:
-    return rc;
+    return 0;
 }
 
 static int construct_memop_from_reservation(
