@@ -74,16 +74,19 @@ bool hvm_monitor_emul_unimplemented(void)
         monitor_traps(curr, true, &req) == 1;
 }
 
-void hvm_monitor_msr(unsigned int msr, uint64_t value)
+void hvm_monitor_msr(unsigned int msr, uint64_t new_value, uint64_t old_value)
 {
     struct vcpu *curr = current;
 
-    if ( monitored_msr(curr->domain, msr) )
+    if ( monitored_msr(curr->domain, msr) &&
+         (!monitored_msr_onchangeonly(curr->domain, msr) ||
+           new_value != old_value) )
     {
         vm_event_request_t req = {
             .reason = VM_EVENT_REASON_MOV_TO_MSR,
             .u.mov_to_msr.msr = msr,
-            .u.mov_to_msr.value = value,
+            .u.mov_to_msr.new_value = new_value,
+            .u.mov_to_msr.old_value = old_value
         };
 
         monitor_traps(curr, 1, &req);

@@ -3534,7 +3534,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 }
 
 int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
-                            bool_t may_defer)
+                            bool may_defer)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
@@ -3545,6 +3545,12 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     if ( may_defer && unlikely(monitored_msr(v->domain, msr)) )
     {
+        uint64_t msr_old_content;
+
+        ret = hvm_msr_read_intercept(msr, &msr_old_content);
+        if ( ret != X86EMUL_OKAY )
+            return ret;
+
         ASSERT(v->arch.vm_event);
 
         /* The actual write will occur in hvm_do_resume() (if permitted). */
@@ -3552,7 +3558,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         v->arch.vm_event->write_data.msr = msr;
         v->arch.vm_event->write_data.value = msr_content;
 
-        hvm_monitor_msr(msr, msr_content);
+        hvm_monitor_msr(msr, msr_content, msr_old_content);
         return X86EMUL_OKAY;
     }
 

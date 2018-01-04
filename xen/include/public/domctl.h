@@ -1050,6 +1050,8 @@ struct xen_domctl_monitor_op {
 
         struct {
             uint32_t msr;
+            /* Send event only on a change of value */
+            uint8_t onchangeonly;
         } mov_to_msr;
 
         struct {

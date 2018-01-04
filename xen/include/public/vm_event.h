@@ -29,7 +29,7 @@
 
 #include "xen.h"
 
-#define VM_EVENT_INTERFACE_VERSION 0x00000002
+#define VM_EVENT_INTERFACE_VERSION 0x00000003
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
@@ -260,7 +260,8 @@ struct vm_event_debug {
 
 struct vm_event_mov_to_msr {
     uint64_t msr;
-    uint64_t value;
+    uint64_t new_value;
+    uint64_t old_value;
 };
 
 #define VM_EVENT_DESC_IDTR           1

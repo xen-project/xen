@@ -2048,7 +2048,7 @@ int xc_monitor_write_ctrlreg(xc_interface *xch, uint32_t domain_id,
  * non-architectural indices.
  */
 int xc_monitor_mov_to_msr(xc_interface *xch, uint32_t domain_id, uint32_t msr,
-                          bool enable);
+                          bool enable, bool onchangeonly);
 int xc_monitor_singlestep(xc_interface *xch, uint32_t domain_id, bool enable);
 int xc_monitor_software_breakpoint(xc_interface *xch, uint32_t domain_id,
                                    bool enable);

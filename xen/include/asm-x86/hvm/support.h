@@ -154,7 +154,7 @@ void hvm_ud_intercept(struct cpu_user_regs *);
 int __must_check hvm_msr_read_intercept(
     unsigned int msr, uint64_t *msr_content);
 int __must_check hvm_msr_write_intercept(
-    unsigned int msr, uint64_t msr_content, bool_t may_defer);
+    unsigned int msr, uint64_t msr_content, bool may_defer);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */
 
