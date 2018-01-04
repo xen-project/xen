@@ -243,6 +243,15 @@ static void gicv2_poke_irq(struct irq_desc *irqd, uint32_t offset)
     writel_gicd(1U << (irqd->irq % 32), offset + (irqd->irq / 32) * 4);
 }
 
+static bool gicv2_peek_irq(struct irq_desc *irqd, uint32_t offset)
+{
+    uint32_t reg;
+
+    reg = readl_gicd(offset + (irqd->irq / 32) * 4) & (1U << (irqd->irq % 32));
+
+    return reg;
+}
+
 /*
  * This is forcing the active state of an interrupt, somewhat circumventing
  * the normal interrupt flow and the GIC state machine. So use with care
@@ -583,6 +592,11 @@ static unsigned int gicv2_read_vmcr_priority(void)
 static unsigned int gicv2_read_apr(int apr_reg)
 {
    return readl_gich(GICH_APR);
+}
+
+static bool gicv2_read_pending_state(struct irq_desc *irqd)
+{
+    return gicv2_peek_irq(irqd, GICD_ISPENDR);
 }
 
 static void gicv2_irq_enable(struct irq_desc *desc)
@@ -1330,6 +1344,7 @@ const static struct gic_hw_operations gicv2_ops = {
     .write_lr            = gicv2_write_lr,
     .read_vmcr_priority  = gicv2_read_vmcr_priority,
     .read_apr            = gicv2_read_apr,
+    .read_pending_state  = gicv2_read_pending_state,
     .make_hwdom_dt_node  = gicv2_make_hwdom_dt_node,
     .make_hwdom_madt     = gicv2_make_hwdom_madt,
     .get_hwdom_extra_madt_size = gicv2_get_hwdom_extra_madt_size,

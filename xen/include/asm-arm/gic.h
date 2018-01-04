@@ -373,6 +373,8 @@ struct gic_hw_operations {
     unsigned int (*read_vmcr_priority)(void);
     /* Read APRn register */
     unsigned int (*read_apr)(int apr_reg);
+    /* Query the pending state of an interrupt at the distributor level. */
+    bool (*read_pending_state)(struct irq_desc *irqd);
     /* Secondary CPU init */
     int (*secondary_init)(void);
     /* Create GIC node for the hardware domain */
@@ -415,6 +417,15 @@ static inline void gic_set_active_state(struct irq_desc *irqd, bool state)
 static inline void gic_set_pending_state(struct irq_desc *irqd, bool state)
 {
     gic_hw_ops->set_pending_state(irqd, state);
+}
+
+/*
+ * Read the pending state of an interrupt from the distributor.
+ * For private IRQs this only works for those of the current CPU.
+ */
+static inline bool gic_read_pending_state(struct irq_desc *irqd)
+{
+    return gic_hw_ops->read_pending_state(irqd);
 }
 
 void register_gic_ops(const struct gic_hw_operations *ops);

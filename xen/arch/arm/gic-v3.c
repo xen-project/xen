@@ -444,6 +444,19 @@ static void gicv3_poke_irq(struct irq_desc *irqd, u32 offset, bool wait_for_rwp)
         gicv3_wait_for_rwp(irqd->irq);
 }
 
+static bool gicv3_peek_irq(struct irq_desc *irqd, u32 offset)
+{
+    void __iomem *base;
+    unsigned int irq = irqd->irq;
+
+    if ( irq >= NR_GIC_LOCAL_IRQS)
+        base = GICD + (irq / 32) * 4;
+    else
+        base = GICD_RDIST_SGI_BASE;
+
+    return !!(readl(base + offset) & (1U << (irq % 32)));
+}
+
 static void gicv3_unmask_irq(struct irq_desc *irqd)
 {
     gicv3_poke_irq(irqd, GICD_ISENABLER, false);
@@ -1149,6 +1162,11 @@ static unsigned int gicv3_read_apr(int apr_reg)
     }
 }
 
+static bool gicv3_read_pending_state(struct irq_desc *irqd)
+{
+    return gicv3_peek_irq(irqd, GICD_ISPENDR);
+}
+
 static void gicv3_irq_enable(struct irq_desc *desc)
 {
     unsigned long flags;
@@ -1817,6 +1835,7 @@ static const struct gic_hw_operations gicv3_ops = {
     .write_lr            = gicv3_write_lr,
     .read_vmcr_priority  = gicv3_read_vmcr_priority,
     .read_apr            = gicv3_read_apr,
+    .read_pending_state  = gicv3_read_pending_state,
     .secondary_init      = gicv3_secondary_cpu_init,
     .make_hwdom_dt_node  = gicv3_make_hwdom_dt_node,
     .make_hwdom_madt     = gicv3_make_hwdom_madt,
