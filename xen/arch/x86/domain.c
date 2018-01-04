@@ -382,6 +382,9 @@ void vcpu_destroy(struct vcpu *v)
 
     vcpu_destroy_fpu(v);
 
+    xfree(v->arch.msr);
+    v->arch.msr = NULL;
+
     if ( !is_idle_domain(v->domain) )
         vpmu_destroy(v);
 
