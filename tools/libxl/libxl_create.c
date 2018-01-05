@@ -512,7 +512,10 @@ int libxl__domain_build(libxl__gc *gc,
         break;
     case LIBXL_DOMAIN_TYPE_PVH:
         state->shim_path = info->u.pvh.pvshim_path;
-        state->shim_cmdline = info->u.pvh.pvshim_cmdline;
+        state->shim_cmdline = GCSPRINTF("%s%s%s",
+                    info->u.pvh.pvshim_cmdline,
+                    info->u.pvh.pvshim_extra ? " " : "",
+                    info->u.pvh.pvshim_extra ? info->u.pvh.pvshim_extra : "");
 
         ret = libxl__build_hvm(gc, domid, d_config, state);
         if (ret)

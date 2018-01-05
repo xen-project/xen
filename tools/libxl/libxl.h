@@ -1105,7 +1105,7 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  * LIBXL_HAVE_PV_SHIM
  *
  * If this is defined, libxl_domain_build_info's pvh type information
- * contains members pvshim, pvshim_path, pvshim_cmdline.
+ * contains members pvshim, pvshim_path, pvshim_cmdline, pvshim_extra.
  */
 #define LIBXL_HAVE_PV_SHIM 1
 
