@@ -119,7 +119,7 @@
 #define DOMID_XS_PATH "domid"
 #define INVALID_DOMID ~0
 #define PVSHIM_BASENAME "xen-shim"
-#define PVSHIM_CMDLINE "pv-shim console=xen,pv sched=null loglvl=all guest_loglvl=all apic_verbosity=debug e820-verbose"
+#define PVSHIM_CMDLINE "pv-shim console=xen,pv sched=null"
 
 /* Size macros. */
 #define __AC(X,Y)   (X##Y)
