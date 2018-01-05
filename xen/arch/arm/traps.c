@@ -2033,6 +2033,7 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
          * trap and how it can be optimised.
          */
         vtimer_update_irqs(current);
+        vcpu_update_evtchn_irq(current);
 #endif
 
         vgic_sync_from_lrs(current);

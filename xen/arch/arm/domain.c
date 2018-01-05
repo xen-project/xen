@@ -953,6 +953,13 @@ void vcpu_mark_events_pending(struct vcpu *v)
     vgic_inject_irq(v->domain, v, v->domain->arch.evtchn_irq, true);
 }
 
+void vcpu_update_evtchn_irq(struct vcpu *v)
+{
+    bool pending = vcpu_info(v, evtchn_upcall_pending);
+
+    vgic_inject_irq(v->domain, v, v->domain->arch.evtchn_irq, pending);
+}
+
 /* The ARM spec declares that even if local irqs are masked in
  * the CPSR register, an irq should wake up a cpu from WFI anyway.
  * For this reason we need to check for irqs that need delivery,
