@@ -9,6 +9,7 @@
 #include <asm/processor.h>
 #include <asm/mtrr.h>
 #include <asm/msr.h>
+#include <asm/guest/vixen.h>
 
 /*
  * opt_mem: Limit maximum address of physical RAM.
@@ -698,6 +699,11 @@ unsigned long __init init_e820(const char *str, struct e820map *raw)
         print_e820_memory_map(raw->map, raw->nr_map);
     }
 
+    if ( is_vixen() )
+    {
+        /* Pretend that passed through special pages are RAM */
+        e820_change_range_type(raw, 0xfeffc000, 0xff000000, E820_RESERVED, E820_RAM);
+    }
     machine_specific_memory_setup(raw);
 
     printk("%s RAM map:\n", str);
