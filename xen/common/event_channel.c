@@ -199,9 +199,33 @@ static int allocate_port(struct domain *d, int port)
     return port;
 }
 
+static int vixen_get_free_port(struct domain *d)
+{
+    int rc;
+    struct evtchn_alloc_unbound unbound = { .dom = DOMID_SELF,
+                                            .remote_dom = DOMID_SELF };
+
+    rc = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &unbound);
+    if ( rc )
+        return rc;
+
+    rc = allocate_port(d, unbound.port);
+    if ( rc < 0 )
+    {
+        struct evtchn_close close = { .port = unbound.port };
+        HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+        printk("Vixen: failed to allocate event channel %d => %d\n",
+               unbound.port, rc);
+    }
+    return rc;
+}
+
 static int get_free_port(struct domain *d)
 {
     int port;
+
+    if ( is_vixen() )
+        return vixen_get_free_port(d);
 
     for ( port = 0; port_is_valid(d, port); port++ )
     {
@@ -252,6 +276,11 @@ static void free_evtchn(struct domain *d, struct evtchn *chn)
     xsm_evtchn_close_post(chn);
 }
 
+static bool is_loopback(domid_t ldom, domid_t rdom)
+{
+    return ldom == DOMID_SELF && rdom == DOMID_SELF;
+}
+
 static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 {
     struct evtchn *chn;
@@ -265,6 +294,23 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
         return -ESRCH;
 
     spin_lock(&d->event_lock);
+
+    if ( is_vixen() && !is_loopback(alloc->dom, alloc->remote_dom) ) {
+        rc = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, alloc);
+        if ( rc )
+            goto out;
+
+        rc = evtchn_alloc_proxy(d, alloc->port, ECS_UNBOUND);
+        if ( rc )
+        {
+            struct evtchn_close close = { .port = alloc->port };
+            HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+            printk("Vixen: failed to reserve unbound event channel %d => %ld\n",
+                   alloc->port, rc);
+        }
+
+        goto out;
+    }
 
     if ( (port = get_free_port(d)) < 0 )
         ERROR_EXIT_DOM(port, d);
@@ -315,6 +361,27 @@ static void double_evtchn_unlock(struct evtchn *lchn, struct evtchn *rchn)
         spin_unlock(&rchn->lock);
 }
 
+static long vixen_evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
+{
+    struct domain *d = current->domain;
+    long rc;
+
+    rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, bind);
+    if ( rc )
+        return rc;
+
+    rc = evtchn_alloc_proxy(d, bind->local_port, ECS_INTERDOMAIN);
+    if ( rc )
+    {
+        struct evtchn_close close = { .port = bind->local_port };
+        HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+        printk("Vixen: failed to reserve inter-domain event channel %d => %ld\n",
+               bind->local_port, rc);
+    }
+
+    return rc;
+}
+
 static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 {
     struct evtchn *lchn, *rchn;
@@ -322,6 +389,9 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     int            lport, rport = bind->remote_port;
     domid_t        rdom = bind->remote_dom;
     long           rc;
+
+    if ( is_vixen() && !is_loopback(DOMID_SELF, bind->remote_dom) )
+        return vixen_evtchn_bind_interdomain(bind);
 
     if ( rdom == DOMID_SELF )
         rdom = current->domain->domain_id;
@@ -579,6 +649,13 @@ static long evtchn_close(struct domain *d1, int port1, bool_t guest)
     {
         rc = -EINVAL;
         goto out;
+    }
+
+    if ( is_vixen() ) {
+        struct evtchn_close close = { .port = port1 };
+        rc = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+        if (rc != 0)
+            goto out;
     }
 
     switch ( chn1->state )
@@ -1215,6 +1292,10 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case EVTCHNOP_init_control: {
         struct evtchn_init_control init_control;
+
+        if ( is_vixen() )
+            return -ENOSYS;
+
         if ( copy_from_guest(&init_control, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_fifo_init_control(&init_control);
