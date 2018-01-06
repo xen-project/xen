@@ -1275,6 +1275,9 @@ int arch_set_info_guest(
 
     update_cr3(v);
 
+    if ( is_vixen() )
+        vixen_vcpu_initialize(v);
+
  out:
     if ( flags & VGCF_online )
         clear_bit(_VPF_down, &v->pause_flags);

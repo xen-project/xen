@@ -76,4 +76,10 @@ void __init early_vixen_init(void);
 
 u64 vixen_get_cpu_freq(void);
 
+bool vixen_has_per_cpu_notifications(void);
+
+void vixen_vcpu_initialize(struct vcpu *v);
+
+void __init vixen_transform(struct domain *dom0);
+
 #endif

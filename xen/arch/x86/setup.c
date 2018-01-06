@@ -1586,6 +1586,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     dom0->is_privileged = 1;
     dom0->target = NULL;
 
+    if ( is_vixen() )
+        vixen_transform(dom0);
+
     /* Grab the DOM0 command line. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
     if ( (cmdline != NULL) || (kextra != NULL) )
