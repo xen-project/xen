@@ -70,4 +70,8 @@ HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args)
 
 bool is_vixen(void);
 
+void __init init_vixen(void);
+
+void __init early_vixen_init(void);
+
 #endif
