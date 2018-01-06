@@ -202,7 +202,7 @@ static int late_hwdom_init(struct domain *d)
     struct domain *dom0;
     int rv;
 
-    if ( d != hardware_domain || d->domain_id == 0 )
+    if ( d != hardware_domain || d->domain_id == dom0_domid )
         return 0;
 
     rv = xsm_init_hardware_domain(XSM_HOOK, d);
@@ -307,7 +307,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     else
         d->guest_type = guest_type_pv;
 
-    if ( domid == 0 || domid == hardware_domid )
+    if ( domid == dom0_domid || domid == hardware_domid )
     {
         if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
             panic("The value of hardware_dom must be a valid domain ID");

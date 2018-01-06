@@ -1574,7 +1574,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, domcr_flags, 0, &config);
+    dom0 = domain_create(dom0_domid, domcr_flags, 0, &config);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 

@@ -27,6 +27,8 @@
 #include <public/vcpu.h>
 #include <public/vm_event.h>
 #include <public/event_channel.h>
+#include <asm/guest.h>
+#include <asm/guest/vixen.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
@@ -53,6 +55,8 @@ extern domid_t hardware_domid;
 #else
 #define hardware_domid 0
 #endif
+
+#define dom0_domid (is_vixen() ? 1 : 0)
 
 #ifndef CONFIG_COMPAT
 #define BITS_PER_EVTCHN_WORD(d) BITS_PER_XEN_ULONG
@@ -859,7 +863,7 @@ void watchdog_domain_destroy(struct domain *d);
  *    (that is, this would not be suitable for a driver domain)
  *  - There is never a reason to deny the hardware domain access to this
  */
-#define is_hardware_domain(_d) ((_d) == hardware_domain)
+#define is_hardware_domain(_d) (!is_vixen() && ((_d) == hardware_domain))
 
 /* This check is for functionality specific to a control domain */
 #define is_control_domain(_d) ((_d)->is_privileged)

@@ -449,7 +449,7 @@ int __init construct_dom0(struct domain *d, const module_t *image,
                           char *cmdline)
 {
     /* Sanity! */
-    BUG_ON(d->domain_id != 0);
+    BUG_ON(d->domain_id != dom0_domid);
     BUG_ON(d->vcpu[0] == NULL);
     BUG_ON(d->vcpu[0]->is_initialised);
 
