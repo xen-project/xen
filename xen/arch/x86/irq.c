@@ -25,6 +25,7 @@
 #include <asm/flushtlb.h>
 #include <asm/mach-generic/mach_apic.h>
 #include <public/physdev.h>
+#include <asm/guest/vixen.h>
 
 static void parse_irq_vector_map_param(char *s);
 
@@ -185,7 +186,7 @@ int create_irq(nodeid_t node)
         desc->arch.used = IRQ_UNUSED;
         irq = ret;
     }
-    else if ( hardware_domain )
+    else if ( !is_vixen() && hardware_domain )
     {
         ret = irq_permit_access(hardware_domain, irq);
         if ( ret )
