@@ -42,6 +42,7 @@
 #include <xen/trace.h>
 #include <xen/tmem.h>
 #include <asm/setup.h>
+#include <asm/guest/vixen.h>
 
 /* Linux config option: propageted to domain0 */
 /* xen_processor_pmbits: xen control Cx, Px, ... */
@@ -686,6 +687,17 @@ void __domain_crash_synchronous(void)
 }
 
 
+static void vixen_shutdown(u8 reason)
+{
+    struct sched_shutdown sched_shutdown = { .reason = reason };
+
+    if (!opt_noreboot)
+        HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+
+    /* Fallback, in case the hypercall fails */
+    hwdom_shutdown(reason);
+}
+ 
 void domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;
@@ -696,6 +708,8 @@ void domain_shutdown(struct domain *d, u8 reason)
         d->shutdown_code = reason;
     reason = d->shutdown_code;
 
+    if ( is_vixen() )
+        vixen_shutdown(reason);
     if ( is_hardware_domain(d) )
         hwdom_shutdown(reason);
 
