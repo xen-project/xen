@@ -74,4 +74,6 @@ void __init init_vixen(void);
 
 void __init early_vixen_init(void);
 
+u64 vixen_get_cpu_freq(void);
+
 #endif

@@ -36,6 +36,7 @@
 #include <io_ports.h>
 #include <asm/setup.h> /* for early_time_init */
 #include <public/arch-x86/cpuid.h>
+#include <asm/guest/vixen.h>
 
 /* opt_clocksource: Force clocksource to one of: pit, hpet, acpi. */
 static char __initdata opt_clocksource[10];
@@ -1686,6 +1687,12 @@ void __init early_time_init(void)
 
     preinit_pit();
     tmp = init_platform_timer();
+
+    /* We cannot trust calibrated values when running under
+     * a hypervisor. */
+    if ( is_vixen() )
+        tmp = vixen_get_cpu_freq();
+
     plt_tsc.frequency = tmp;
 
     set_time_scale(&t->tsc_scale, tmp);
@@ -2009,7 +2016,7 @@ void tsc_set_info(struct domain *d,
                   uint32_t tsc_mode, uint64_t elapsed_nsec,
                   uint32_t gtsc_khz, uint32_t incarnation)
 {
-    if ( is_idle_domain(d) || is_hardware_domain(d) )
+    if ( is_idle_domain(d) || is_vixen() || is_hardware_domain(d) )
     {
         d->arch.vtsc = 0;
         return;
