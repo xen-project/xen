@@ -1392,6 +1392,12 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !guest_handle_okay(area.addr.h, 1) )
             break;
 
+        if ( is_vixen() ) {
+            rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
+                                    vcpuid, &area);
+            break;
+        }
+
         rc = 0;
         runstate_guest(v) = area.addr.h;
 
