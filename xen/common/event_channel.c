@@ -30,6 +30,7 @@
 #include <public/xen.h>
 #include <public/event_channel.h>
 #include <xsm/xsm.h>
+#include <asm/guest/vixen.h>
 
 #define ERROR_EXIT(_errno)                                          \
     do {                                                            \
@@ -156,25 +157,25 @@ static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
     xfree(bucket);
 }
 
-static int get_free_port(struct domain *d)
+static int allocate_port(struct domain *d, int port)
 {
     struct evtchn *chn;
     struct evtchn **grp;
-    int            port;
 
     if ( d->is_dying )
         return -EINVAL;
 
-    for ( port = 0; port_is_valid(d, port); port++ )
+    if ( port_is_valid(d, port) )
     {
         if ( port > d->max_evtchn_port )
             return -ENOSPC;
         if ( evtchn_from_port(d, port)->state == ECS_FREE
              && !evtchn_port_is_busy(d, port) )
             return port;
+        return -EINVAL;
     }
 
-    if ( port == d->max_evtchns || port > d->max_evtchn_port )
+    if ( port >= d->max_evtchns || port > d->max_evtchn_port )
         return -ENOSPC;
 
     if ( !group_from_port(d, port) )
@@ -185,14 +186,57 @@ static int get_free_port(struct domain *d)
         group_from_port(d, port) = grp;
     }
 
-    chn = alloc_evtchn_bucket(d, port);
-    if ( !chn )
-        return -ENOMEM;
-    bucket_from_port(d, port) = chn;
+    while ( d->valid_evtchns <= port )
+    {
+        chn = alloc_evtchn_bucket(d, d->valid_evtchns);
+        if ( !chn )
+            return -ENOMEM;
+        bucket_from_port(d, d->valid_evtchns) = chn;
 
-    write_atomic(&d->valid_evtchns, d->valid_evtchns + EVTCHNS_PER_BUCKET);
+        write_atomic(&d->valid_evtchns, d->valid_evtchns + EVTCHNS_PER_BUCKET);
+    }
 
     return port;
+}
+
+static int get_free_port(struct domain *d)
+{
+    int port;
+
+    for ( port = 0; port_is_valid(d, port); port++ )
+    {
+        if ( port > d->max_evtchn_port )
+            return -ENOSPC;
+        if ( evtchn_from_port(d, port)->state == ECS_FREE
+             && !evtchn_port_is_busy(d, port) )
+            break;
+    }
+
+    return allocate_port(d, port);
+}
+
+int evtchn_alloc_proxy(struct domain *d, int port, u8 ecs)
+{
+    struct evtchn *chn;
+    int rc;
+
+    if ( !is_vixen() )
+        return -ENOSYS;
+
+    rc = allocate_port(d, port);
+    if ( rc < 0 )
+        return rc;
+
+    chn = evtchn_from_port(d, port);
+    spin_lock(&chn->lock);
+    chn->state = ECS_PROXY;
+    evtchn_port_init(d, chn);
+
+    if ( ecs == ECS_INTERDOMAIN )
+        evtchn_port_set_pending(d, chn->notify_vcpu_id, chn);
+    spin_unlock(&chn->lock);
+
+    return 0;
 }
 
 static void free_evtchn(struct domain *d, struct evtchn *chn)
@@ -628,6 +672,9 @@ static long evtchn_close(struct domain *d1, int port1, bool_t guest)
 
         goto out;
 
+    case ECS_PROXY:
+        break;
+
     default:
         BUG();
     }
@@ -689,6 +736,14 @@ int evtchn_send(struct domain *ld, unsigned int lport)
         break;
     case ECS_UNBOUND:
         /* silently drop the notification */
+        break;
+    case ECS_PROXY:
+        ret = -EINVAL;
+        if ( is_vixen() )
+        {
+            struct evtchn_send send = { .port = lport };
+            ret = HYPERVISOR_event_channel_op(EVTCHNOP_send, &send);
+        }
         break;
     default:
         ret = -EINVAL;
@@ -892,6 +947,10 @@ static long evtchn_status(evtchn_status_t *status)
     case ECS_IPI:
         status->status = EVTCHNSTAT_ipi;
         break;
+    case ECS_PROXY:
+        BUG_ON(!is_vixen());
+        rc = HYPERVISOR_event_channel_op(EVTCHNOP_status, status);
+        break;
     default:
         BUG();
     }
@@ -942,6 +1001,14 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
         break;
     case ECS_UNBOUND:
     case ECS_INTERDOMAIN:
+        chn->notify_vcpu_id = vcpu_id;
+        break;
+    case ECS_PROXY:
+        if ( is_vixen() && vixen_has_per_cpu_notifications() )
+        {
+            struct evtchn_bind_vcpu bind = { .port = port, .vcpu = vcpu_id };
+            HYPERVISOR_event_channel_op(EVTCHNOP_bind_vcpu, &bind);
+        }
         chn->notify_vcpu_id = vcpu_id;
         break;
     case ECS_PIRQ:
@@ -1276,7 +1343,7 @@ int evtchn_init(struct domain *d)
     d->valid_evtchns = EVTCHNS_PER_BUCKET;
 
     spin_lock_init_prof(d, event_lock);
-    if ( get_free_port(d) != 0 )
+    if ( allocate_port(d, 0) != 0 )
     {
         free_evtchn_bucket(d, d->evtchn);
         return -EINVAL;

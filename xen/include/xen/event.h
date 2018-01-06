@@ -71,6 +71,9 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
 /* Inject an event channel notification into the guest */
 void arch_evtchn_inject(struct vcpu *v);
 
+/* Allocate a specific event channel as proxy. */
+int evtchn_alloc_proxy(struct domain *d, int port, u8 ecs);
+
 /*
  * Internal event channel object storage.
  *

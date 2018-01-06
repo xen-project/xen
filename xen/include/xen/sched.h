@@ -93,6 +93,7 @@ struct evtchn
 #define ECS_PIRQ         4 /* Channel is bound to a physical IRQ line.       */
 #define ECS_VIRQ         5 /* Channel is bound to a virtual IRQ line.        */
 #define ECS_IPI          6 /* Channel is bound to a virtual IPI line.        */
+#define ECS_PROXY        7 /* Channel is proxied to parent hypervisor.       */
     u8  state;             /* ECS_* */
     u8  xen_consumer:XEN_CONSUMER_BITS; /* Consumer in Xen if nonzero */
     u8  pending:1;
