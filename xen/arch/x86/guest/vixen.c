@@ -280,6 +280,23 @@ bool vixen_ring_process(uint16_t port)
     return true;
 }
 
+static int hvm_get_parameter(int idx, uint64_t *value)
+{
+    struct xen_hvm_param xhv;
+    int r;
+
+    xhv.domid = DOMID_SELF;
+    xhv.index = idx;
+    r = HYPERVISOR_hvm_op(HVMOP_get_param, &xhv);
+    if (r < 0) {
+        printk("Cannot get hvm parameter %d: %d!\n",
+               idx, r);
+        return r;
+    }
+    *value = xhv.value;
+    return r;
+}
+
 static int hvm_set_parameter(int idx, uint64_t value)
 {
     struct xen_hvm_param xhv;
@@ -390,8 +407,54 @@ bool vixen_has_per_cpu_notifications(void)
 }
 
 void __init
-vixen_transform(struct domain *dom0)
+vixen_transform(struct domain *dom0,
+                xen_pfn_t *pstore_mfn, uint32_t *pstore_evtchn,
+                xen_pfn_t *pconsole_mfn, uint32_t *pconsole_evtchn)
 {
+    uint64_t v = 0;
+    long rc;
+    struct evtchn_unmask unmask;
+    struct evtchn_alloc_unbound alloc;
+
+    /* Setup Xenstore */
+    hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+    *pstore_evtchn = unmask.port = v;
+    HYPERVISOR_event_channel_op(EVTCHNOP_unmask, &unmask);
+
+    hvm_get_parameter(HVM_PARAM_STORE_PFN, &v);
+    *pstore_mfn = v;
+
+    printk("Vixen Xenstore evtchn is %d, pfn is 0x%" PRIx64 "\n",
+           *pstore_evtchn, *pstore_mfn);
+
+    /* Setup Xencons */
+    alloc.dom = DOMID_SELF;
+    alloc.remote_dom = DOMID_SELF;
+
+    rc = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &alloc);
+    if ( rc )
+    {
+        printk("Failed to alloc unbound event channel: %ld\n", rc);
+        *pconsole_evtchn = 0;
+        *pconsole_mfn = 0;
+    }
+    else
+    {
+        void *console_data;
+
+        console_data = alloc_xenheap_page();
+
+        *pconsole_evtchn = alloc.port;
+        *pconsole_mfn = virt_to_mfn(console_data);
+
+        memset(console_data, 0, 4096);
+        vixen_xencons_iface = console_data;
+        vixen_xencons_port = alloc.port;
+    }
+
+    printk("Vixen Xencons evtchn is %d, pfn is 0x%" PRIx64 "\n",
+           *pconsole_evtchn, *pconsole_mfn);
+
     /* Setup event channel forwarding */
     alloc_direct_apic_vector(&vixen_evtchn_vector, vixen_evtchn_notify);
     printk("Vixen evtchn vector is %d\n", vixen_evtchn_vector);

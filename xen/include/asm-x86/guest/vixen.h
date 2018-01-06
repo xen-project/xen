@@ -80,7 +80,10 @@ bool vixen_has_per_cpu_notifications(void);
 
 void vixen_vcpu_initialize(struct vcpu *v);
 
-void __init vixen_transform(struct domain *dom0);
+void __init
+vixen_transform(struct domain *dom0,
+                xen_pfn_t *pstore_mfn, uint32_t *pstore_evtchn,
+                xen_pfn_t *pconsole_mfn, uint32_t *pconsole_evtchn);
 
 bool vixen_ring_process(uint16_t port);
 

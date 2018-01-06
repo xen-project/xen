@@ -648,6 +648,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         .stop_bits = 1
     };
     struct xen_arch_domainconfig config = { .emulation_flags = 0 };
+    xen_pfn_t store_mfn = 0, console_mfn = 0;
+    uint32_t store_evtchn = 0, console_evtchn = 0;
 
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
@@ -1578,6 +1580,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         config.emulation_flags = XEN_X86_EMU_LAPIC|XEN_X86_EMU_IOAPIC;
     }
 
+    if ( is_vixen() )
+        config.emulation_flags = XEN_X86_EMU_PIT;
+
     /* Create initial domain 0. */
     dom0 = domain_create(dom0_domid, domcr_flags, 0, &config);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
@@ -1587,7 +1592,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     dom0->target = NULL;
 
     if ( is_vixen() )
-        vixen_transform(dom0);
+        vixen_transform(dom0, &store_mfn, &store_evtchn,
+                        &console_mfn, &console_evtchn);
 
     /* Grab the DOM0 command line. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
@@ -1650,7 +1656,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( construct_dom0(dom0, mod, modules_headroom,
                         (initrdidx > 0) && (initrdidx < mbi->mods_count)
                         ? mod + initrdidx : NULL,
-                        bootstrap_map, cmdline) != 0)
+                        bootstrap_map, cmdline,
+                        store_mfn, store_evtchn,
+                        console_mfn, console_evtchn) != 0)
         panic("Could not set up DOM0 guest OS");
 
     if ( cpu_has_smap )

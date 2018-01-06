@@ -7,6 +7,7 @@
 #include <xen/console.h>
 #include <xen/domain.h>
 #include <xen/domain_page.h>
+#include <xen/event.h>
 #include <xen/init.h>
 #include <xen/libelf.h>
 #include <xen/multiboot.h>
@@ -277,7 +278,9 @@ int __init dom0_construct_pv(struct domain *d,
                              unsigned long image_headroom,
                              module_t *initrd,
                              void *(*bootstrap_map)(const module_t *),
-                             char *cmdline)
+                             char *cmdline,
+                             xen_pfn_t store_mfn, uint32_t store_evtchn,
+                             xen_pfn_t console_mfn, uint32_t console_evtchn)
 {
     int i, cpu, rc, compatible, compat32, order, machine;
     struct cpu_user_regs *regs;
@@ -300,6 +303,7 @@ int __init dom0_construct_pv(struct domain *d,
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
+    xen_pfn_t saved_pfn = ~0UL;
 
     /*
      * This fully describes the memory layout of the initial domain. All
@@ -442,8 +446,24 @@ int __init dom0_construct_pv(struct domain *d,
         vphysmap_end = vphysmap_start;
     vstartinfo_start = round_pgup(vphysmap_end);
     vstartinfo_end   = (vstartinfo_start +
-                        sizeof(struct start_info) +
-                        sizeof(struct dom0_vga_console_info));
+                        sizeof(struct start_info));
+    if ( !is_vixen() )
+        vstartinfo_end += sizeof(struct dom0_vga_console_info);
+    vstartinfo_end   = round_pgup(vstartinfo_end);
+
+    if ( is_vixen() ) {
+        struct page_info *pg;
+
+        saved_pfn = (vstartinfo_end - v_start) / PAGE_SIZE;
+
+        pg = mfn_to_page(store_mfn);
+        share_xen_page_with_guest(pg, d, XENSHARE_writable);
+        vstartinfo_end   += PAGE_SIZE;
+
+        pg = mfn_to_page(console_mfn);
+        share_xen_page_with_guest(pg, d, XENSHARE_writable);
+        vstartinfo_end   += PAGE_SIZE;
+    }
 
     vpt_start        = round_pgup(vstartinfo_end);
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
@@ -634,7 +654,13 @@ int __init dom0_construct_pv(struct domain *d,
             *l2tab = l2e_from_paddr(__pa(l1start), L2_PROT);
             l2tab++;
         }
-        if ( count < initrd_pfn || count >= initrd_pfn + PFN_UP(initrd_len) )
+        if ( count == saved_pfn ) {
+            mfn = store_mfn;
+            pfn++;
+        } else if ( count == saved_pfn + 1 ) {
+            mfn = console_mfn;
+            pfn++;
+        } else if ( count < initrd_pfn || count >= initrd_pfn + PFN_UP(initrd_len) )
             mfn = pfn++;
         else
             mfn = initrd_mfn++;
@@ -741,7 +767,8 @@ int __init dom0_construct_pv(struct domain *d,
 
     si->shared_info = virt_to_maddr(d->shared_info);
 
-    si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
+    si->flags        = is_vixen() ? 0 : (SIF_PRIVILEGED | SIF_INITDOMAIN);
+
     if ( !vinitrd_start && initrd_len )
         si->flags   |= SIF_MOD_START_PFN;
     si->flags       |= (xen_processor_pmbits << 8) & SIF_PM_MASK;
@@ -822,6 +849,32 @@ int __init dom0_construct_pv(struct domain *d,
         }
     }
 
+    if ( is_vixen() )
+    {
+        dom0_update_physmap(d, saved_pfn, store_mfn, vphysmap_start);
+        dom0_update_physmap(d, saved_pfn + 1, console_mfn, vphysmap_start);
+
+        rc = evtchn_alloc_proxy(d, store_evtchn, ECS_INTERDOMAIN);
+        if ( rc )
+        {
+            printk("Vixen: failed to reserve Xenstore event channel %d => %d\n",
+                   store_evtchn, rc);
+            goto out;
+        }
+        rc = evtchn_alloc_proxy(d, console_evtchn, ECS_INTERDOMAIN);
+        if ( rc )
+        {
+            printk("Vixen: failed to reserve Console event channel %d => %d\n",
+                   console_evtchn, rc);
+            goto out;
+        }
+
+        si->store_mfn = store_mfn;
+        si->store_evtchn = store_evtchn;
+        si->console.domU.mfn = console_mfn;
+        si->console.domU.evtchn = console_evtchn;
+    }
+
     if ( initrd_len != 0 )
     {
         si->mod_start = vinitrd_start ?: initrd_pfn;
@@ -832,14 +885,15 @@ int __init dom0_construct_pv(struct domain *d,
     if ( cmdline != NULL )
         strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
 
-    if ( fill_console_start_info((void *)(si + 1)) )
+    if ( !is_vixen() && fill_console_start_info((void *)(si + 1)) )
     {
         si->console.dom0.info_off  = sizeof(struct start_info);
         si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
 
     if ( is_pv_32bit_domain(d) )
-        xlat_start_info(si, XLAT_start_info_console_dom0);
+        xlat_start_info(si, is_vixen() ? XLAT_start_info_console_domU :
+                                         XLAT_start_info_console_dom0);
 
     /* Return to idle domain's page tables. */
     mapcache_override_current(NULL);
@@ -873,15 +927,20 @@ int __init dom0_construct_pv(struct domain *d,
     if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
         panic("Dom0 requires supervisor-mode execution");
 
-    rc = dom0_setup_permissions(d);
-    BUG_ON(rc != 0);
-
+    if ( !is_vixen() )
+    {
+        rc = dom0_setup_permissions(d);
+        BUG_ON(rc != 0);
+    }
     if ( elf_check_broken(&elf) )
         printk(" Xen warning: dom0 kernel broken ELF: %s\n",
                elf_check_broken(&elf));
 
     if ( d->domain_id == hardware_domid )
         iommu_hwdom_init(d);
+
+    if ( is_vixen() )
+        d->max_pages = d->tot_pages;
 
     return 0;
 

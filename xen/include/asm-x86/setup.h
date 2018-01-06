@@ -39,7 +39,9 @@ int construct_dom0(
     const module_t *kernel, unsigned long kernel_headroom,
     module_t *initrd,
     void *(*bootstrap_map)(const module_t *),
-    char *cmdline);
+    char *cmdline,
+    xen_pfn_t store_mfn, uint32_t store_evtchn,
+    xen_pfn_t console_mfn, uint32_t console_evtchn);
 void setup_io_bitmap(struct domain *d);
 
 unsigned long initial_images_nrpages(nodeid_t node);

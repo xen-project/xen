@@ -18,13 +18,17 @@ int dom0_construct_pv(struct domain *d, const module_t *image,
                       unsigned long image_headroom,
                       module_t *initrd,
                       void *(*bootstrap_map)(const module_t *),
-                      char *cmdline);
+                      char *cmdline,
+                      xen_pfn_t store_mfn, uint32_t store_evtchn,
+                      xen_pfn_t console_mfn, uint32_t console_evtchn);
 
 int dom0_construct_pvh(struct domain *d, const module_t *image,
                        unsigned long image_headroom,
                        module_t *initrd,
                        void *(*bootstrap_map)(const module_t *),
-                       char *cmdline);
+                       char *cmdline,
+                       xen_pfn_t store_mfn, uint32_t store_evtchn,
+                       xen_pfn_t console_mfn, uint32_t console_evtchn);
 
 unsigned long dom0_paging_pages(const struct domain *d,
                                 unsigned long nr_pages);
