@@ -91,6 +91,7 @@ extern void printk(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
 extern void guest_printk(const struct domain *d, const char *format, ...)
     __attribute__ ((format (printf, 2, 3)));
+extern void guest_puts(const struct domain *d, const char *message);
 extern void noreturn panic(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
 extern long vm_assist(struct domain *, unsigned int cmd, unsigned int type,

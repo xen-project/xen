@@ -23,6 +23,7 @@
 #include <public/version.h>
 #include <xen/event.h>
 #include <asm/apic.h>
+#include <public/io/console.h>
 
 static int in_vixen;
 static uint8_t global_si_data[4 << 10] __attribute__((aligned(4096)));
@@ -31,6 +32,9 @@ static bool vixen_per_cpu_notifications = true;
 static uint8_t vixen_evtchn_vector;
 static bool vixen_needs_apic_ack = true;
 struct irqaction vixen_irqaction;
+static volatile struct xencons_interface *vixen_xencons_iface;
+static uint16_t vixen_xencons_port;
+static spinlock_t vixen_xencons_lock;
 
 void __init init_vixen(void)
 {
@@ -48,6 +52,8 @@ void __init init_vixen(void)
     minor = version & 0xffff;
 
     printk("Vixen running under Xen %d.%d\n", major, minor);
+
+    spin_lock_init(&vixen_xencons_lock);
 
     in_vixen = 1;
 }
@@ -237,6 +243,41 @@ static void vixen_evtchn_notify(struct cpu_user_regs *regs)
 static void vixen_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     vixen_upcall(smp_processor_id());
+}
+
+bool vixen_ring_process(uint16_t port)
+{
+    volatile struct xencons_interface *r = vixen_xencons_iface;
+    char buffer[128];
+    size_t n;
+
+    if (r == NULL || port != vixen_xencons_port) {
+        return false;
+    }
+
+    spin_lock(&vixen_xencons_lock);
+
+    n = 0;
+    while (r->out_prod != r->out_cons) {
+        char ch = r->out[MASK_XENCONS_IDX(r->out_cons, r->out)];
+        if (n == sizeof(buffer) - 1) {
+            buffer[n] = 0;
+            guest_puts(hardware_domain, buffer);
+            n = 0;
+        }
+        buffer[n++] = ch;
+        rmb();
+        r->out_cons++;
+    }
+
+    if (n) {
+        buffer[n] = 0;
+        guest_puts(hardware_domain, buffer);
+    }
+
+    spin_unlock(&vixen_xencons_lock);
+
+    return true;
 }
 
 static int hvm_set_parameter(int idx, uint64_t value)

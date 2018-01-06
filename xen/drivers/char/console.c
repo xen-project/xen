@@ -757,6 +757,22 @@ void guest_printk(const struct domain *d, const char *fmt, ...)
     va_end(args);
 }
 
+void guest_puts(const struct domain *d, const char *kbuf)
+{
+    spin_lock_irq(&console_lock);
+
+    sercon_puts(kbuf);
+    video_puts(kbuf);
+
+    if ( opt_console_to_ring )
+    {
+        conring_puts(kbuf);
+        tasklet_schedule(&notify_dom0_con_ring_tasklet);
+    }
+
+    spin_unlock_irq(&console_lock);
+}
+
 void __init console_init_preirq(void)
 {
     char *p;

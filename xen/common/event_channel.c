@@ -1241,7 +1241,10 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct evtchn_send send;
         if ( copy_from_guest(&send, arg, 1) != 0 )
             return -EFAULT;
-        rc = evtchn_send(current->domain, send.port);
+        if ( vixen_ring_process(send.port) )
+            rc = 0;
+        else
+            rc = evtchn_send(current->domain, send.port);
         break;
     }
 

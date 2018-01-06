@@ -82,4 +82,6 @@ void vixen_vcpu_initialize(struct vcpu *v);
 
 void __init vixen_transform(struct domain *dom0);
 
+bool vixen_ring_process(uint16_t port);
+
 #endif
