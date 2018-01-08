@@ -918,9 +918,6 @@ void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_string(config, "builder", &buf, 0)) {
         libxl_domain_type builder_type;
 
-        if (c_info->type == LIBXL_DOMAIN_TYPE_INVALID)
-            fprintf(stderr,
-"The \"builder\" option is being deprecated, please use \"type\" instead.\n");
         if (!strncmp(buf, "hvm", strlen(buf)))
             builder_type = LIBXL_DOMAIN_TYPE_HVM;
         else if (!strncmp(buf, "generic", strlen(buf)))
