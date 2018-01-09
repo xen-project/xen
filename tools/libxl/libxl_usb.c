@@ -45,13 +45,13 @@ static int libxl__device_usbctrl_setdefault(libxl__gc *gc, uint32_t domid,
     libxl_domain_type domtype = libxl__domain_type(gc, domid);
 
     if (usbctrl->type == LIBXL_USBCTRL_TYPE_AUTO) {
-        if (domtype == LIBXL_DOMAIN_TYPE_PV) {
+        if (domtype != LIBXL_DOMAIN_TYPE_HVM) {
             rc = usbback_is_loaded(gc);
             if (rc < 0)
                 goto out;
             usbctrl->type = rc ? LIBXL_USBCTRL_TYPE_PV
                                : LIBXL_USBCTRL_TYPE_QUSB;
-        } else if (domtype == LIBXL_DOMAIN_TYPE_HVM) {
+        } else {
             /* FIXME: See if we can detect PV frontend */
             usbctrl->type = LIBXL_USBCTRL_TYPE_DEVICEMODEL;
         }
