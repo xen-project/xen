@@ -21,6 +21,11 @@
 
 #include <xen/types.h>
 
+#include <asm/e820.h>
+#include <asm/fixmap.h>
+
+#define XEN_shared_info ((struct shared_info *)fix_to_virt(FIX_XEN_SHARED_INFO))
+
 #ifdef CONFIG_XEN_GUEST
 
 extern bool xen_guest;

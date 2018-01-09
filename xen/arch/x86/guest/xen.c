@@ -77,6 +77,31 @@ void __init probe_hypervisor(void)
     xen_guest = true;
 }
 
+static void map_shared_info(void)
+{
+    mfn_t mfn;
+    struct xen_add_to_physmap xatp = {
+        .domid = DOMID_SELF,
+        .space = XENMAPSPACE_shared_info,
+    };
+    unsigned int i;
+    unsigned long rc;
+
+    if ( hypervisor_alloc_unused_page(&mfn) )
+        panic("unable to reserve shared info memory page");
+
+    xatp.gpfn = mfn_x(mfn);
+    rc = xen_hypercall_memory_op(XENMEM_add_to_physmap, &xatp);
+    if ( rc )
+        panic("failed to map shared_info page: %ld", rc);
+
+    set_fixmap(FIX_XEN_SHARED_INFO, mfn_x(mfn) << PAGE_SHIFT);
+
+    /* Mask all upcalls */
+    for ( i = 0; i < ARRAY_SIZE(XEN_shared_info->evtchn_mask); i++ )
+        write_atomic(&XEN_shared_info->evtchn_mask[i], ~0ul);
+}
+
 static void __init init_memmap(void)
 {
     unsigned int i;
@@ -109,6 +134,8 @@ static void __init init_memmap(void)
 void __init hypervisor_setup(void)
 {
     init_memmap();
+
+    map_shared_info();
 }
 
 int hypervisor_alloc_unused_page(mfn_t *mfn)
