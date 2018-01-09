@@ -91,17 +91,17 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!nic->nictype) {
-            if (hotplug ||
-                (libxl__device_model_version_running(gc, domid) ==
-                 LIBXL_DEVICE_MODEL_VERSION_NONE))
+            if (hotplug)
                 nic->nictype = LIBXL_NIC_TYPE_VIF;
             else
                 nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
         }
         break;
+    case LIBXL_DOMAIN_TYPE_PVH:
     case LIBXL_DOMAIN_TYPE_PV:
         if (nic->nictype == LIBXL_NIC_TYPE_VIF_IOEMU) {
-            LOG(ERROR, "trying to create PV guest with an emulated interface");
+            LOG(ERROR,
+                "trying to create PV or PVH guest with an emulated interface");
             return ERROR_INVAL;
         }
         nic->nictype = LIBXL_NIC_TYPE_VIF;
