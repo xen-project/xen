@@ -1044,14 +1044,6 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
 #define LIBXL_HAVE_GFX_PASSTHRU_KIND
 
 /*
- * LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE
- *
- * In the case that LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE is set libxl
- * allows the creation of HVM guests without a device model.
- */
-#define LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE 1
-
-/*
  * LIBXL_HAVE_CHECKPOINTED_STREAM
  *
  * If this is defined, then libxl_checkpointed_stream exists.
