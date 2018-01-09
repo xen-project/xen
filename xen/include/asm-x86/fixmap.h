@@ -45,6 +45,9 @@ enum fixed_addresses {
     FIX_COM_BEGIN,
     FIX_COM_END,
     FIX_EHCI_DBGP,
+#ifdef CONFIG_XEN_GUEST
+    FIX_XEN_SHARED_INFO,
+#endif /* CONFIG_XEN_GUEST */
     /* Everything else should go further down. */
     FIX_APIC_BASE,
     FIX_IO_APIC_BASE_0,
