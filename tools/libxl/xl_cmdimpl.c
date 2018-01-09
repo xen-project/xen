@@ -1771,9 +1771,56 @@ static void parse_config_data(const char *config_source,
 
         if (!xlu_cfg_get_long (config, "rdm_mem_boundary", &l, 0))
             b_info->u.hvm.rdm_mem_boundary_memkb = l * 1024;
+        
+        /*
+         * The firmware config option can be used as a simplification
+         * instead of setting bios or firmware_override. It has the
+         * following meanings for HVM guests:
+         *
+         *  - ovmf | seabios | rombios: maps directly into the "bios"
+         *    option.
+         *  - uefi | bios: maps into one of the above options and is set
+         *    in the bios field.
+         *  - Anything else is treated as a path that is copied into
+         *    firmware.
+         */
+        if (!xlu_cfg_get_string (config, "firmware", &buf, 0) &&
+            libxl_bios_type_from_string(buf, &b_info->u.hvm.bios)) {
+            if (!strncmp(buf, "uefi", strlen(buf)))
+                b_info->u.hvm.bios = LIBXL_BIOS_TYPE_OVMF;
+            else if (strncmp(buf, "bios", strlen(buf)))
+                /* Assume it's a path to a custom firmware. */
+                xlu_cfg_replace_string(config, "firmware",
+                                       &b_info->u.hvm.firmware, 0);
+            /*
+             * BIOS is the default, and will be chosen by libxl based on
+             * the device model specified.
+             */
+        }
+
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {
+        /*
+         * The firmware config option can be used as a simplification
+         * instead of directly setting kernel. It will be translated to
+         * XENFIRMWAREDIR/<string>.bin
+         */
+        if (!xlu_cfg_get_string (config, "firmware", &buf, 0)) {
+            if (b_info->kernel) {
+                fprintf(stderr,
+                        "ERROR: both kernel and firmware specified\n");
+                exit(1);
+            }
+            if (strncmp(buf, "pvgrub32", strlen(buf)) &&
+                strncmp(buf, "pvgrub64", strlen(buf))) {
+                fprintf(stderr,
+            "ERROR: only pvgrub{32|64} supported as firmware options\n");
+                exit(1);
+            }
+
+            xasprintf(&b_info->kernel, XENFIRMWAREDIR "/%s.bin", buf);
+        }
         if (!*U_PV_F(b_info,bootloader) && !b_info->kernel) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
             exit(1);
