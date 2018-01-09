@@ -7,20 +7,22 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
                                       xc_domain_configuration_t *xc_config)
 {
-
-    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM) {
-        if (d_config->b_info.device_model_version !=
-            LIBXL_DEVICE_MODEL_VERSION_NONE) {
-            xc_config->emulation_flags = XEN_X86_EMU_ALL;
-        } else if (libxl_defbool_val(*U_HVM_F(&d_config->b_info,apic))) {
-            /*
-             * HVM guests without device model may want
-             * to have LAPIC emulation.
-             */
+    switch(d_config->c_info.type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        xc_config->emulation_flags = XEN_X86_EMU_ALL;
+        break;
+    case LIBXL_DOMAIN_TYPE_PVH:
+        if (libxl_defbool_val(d_config->b_info.u.pvh.apic))
+            /* PVH guests may want to have LAPIC emulation. */
             xc_config->emulation_flags = XEN_X86_EMU_LAPIC;
-        }
-    } else {
+        else
+            xc_config->emulation_flags = 0;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
         xc_config->emulation_flags = 0;
+        break;
+    default:
+        abort();
     }
 
     return 0;
@@ -266,7 +268,7 @@ static int libxl__e820_alloc(libxl__gc *gc, uint32_t domid,
     struct e820entry map[E820MAX];
     libxl_domain_build_info *b_info;
 
-    if (d_config == NULL || d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM)
+    if (d_config == NULL || d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV)
         return ERROR_INVAL;
 
     b_info = &d_config->b_info;
@@ -338,8 +340,7 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (rtc_timeoffset)
         xc_domain_set_time_offset(ctx->xch, domid, rtc_timeoffset);
 
-    if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM ||
-        libxl_defbool_val(d_config->c_info.pvh)) {
+    if (d_config->b_info.type != LIBXL_DOMAIN_TYPE_PV) {
 
         unsigned long shadow;
         shadow = (d_config->b_info.shadow_memkb + 1023) / 1024;
@@ -382,8 +383,7 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
 {
     int rc = 0;
 
-    if ((info->type == LIBXL_DOMAIN_TYPE_HVM) &&
-        (info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_NONE)) {
+    if (info->type == LIBXL_DOMAIN_TYPE_PVH) {
         rc = libxl__dom_load_acpi(gc, info, dom);
         if (rc != 0)
             LOGE(ERROR, "libxl_dom_load_acpi failed");

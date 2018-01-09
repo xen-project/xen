@@ -168,8 +168,7 @@ int libxl__dom_load_acpi(libxl__gc *gc,
     void *acpi_pages;
     unsigned long page_mask;
 
-    if ((b_info->type != LIBXL_DOMAIN_TYPE_HVM) ||
-        (b_info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_NONE))
+    if (b_info->type != LIBXL_DOMAIN_TYPE_PVH)
         goto out;
 
     libxl_ctxt.page_size = XC_DOM_PAGE_SIZE(dom);
