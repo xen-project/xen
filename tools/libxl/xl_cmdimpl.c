@@ -1367,11 +1367,47 @@ static void parse_config_data(const char *config_source,
     }
 
     libxl_defbool_set(&c_info->run_hotplug_scripts, run_hotplug_scripts);
-    c_info->type = LIBXL_DOMAIN_TYPE_PV;
-    if (!xlu_cfg_get_string (config, "builder", &buf, 0) &&
-        !strncmp(buf, "hvm", strlen(buf)))
-        c_info->type = LIBXL_DOMAIN_TYPE_HVM;
+    
+    if (!xlu_cfg_get_string(config, "type", &buf, 0)) {
+        if (!strncmp(buf, "hvm", strlen(buf)))
+            c_info->type = LIBXL_DOMAIN_TYPE_HVM;
+        else if (!strncmp(buf, "pv", strlen(buf)))
+            c_info->type = LIBXL_DOMAIN_TYPE_PV;
+        else {
+            fprintf(stderr, "Invalid domain type %s.\n", buf);
+            exit(1);
+        }
+    }
 
+    /* Deprecated since Xen 4.10. */
+    if (!xlu_cfg_get_string(config, "builder", &buf, 0)) {
+        libxl_domain_type builder_type;
+
+        if (c_info->type == LIBXL_DOMAIN_TYPE_INVALID)
+            fprintf(stderr,
+"The \"builder\" option is being deprecated, please use \"type\" instead.\n");
+        if (!strncmp(buf, "hvm", strlen(buf)))
+            builder_type = LIBXL_DOMAIN_TYPE_HVM;
+        else if (!strncmp(buf, "generic", strlen(buf)))
+            builder_type = LIBXL_DOMAIN_TYPE_PV;
+        else {
+            fprintf(stderr, "Invalid domain type %s.\n", buf);
+            exit(1);
+        }
+
+        if (c_info->type != LIBXL_DOMAIN_TYPE_INVALID &&
+            c_info->type != builder_type) {
+            fprintf(stderr,
+            "Contradicting \"builder\" and \"type\" options specified.\n");
+            exit(1);
+        }
+        c_info->type = builder_type;
+    }
+
+    if (c_info->type == LIBXL_DOMAIN_TYPE_INVALID)
+        c_info->type = LIBXL_DOMAIN_TYPE_PV;
+
+    
     xlu_cfg_get_defbool(config, "pvh", &c_info->pvh, 0);
     xlu_cfg_get_defbool(config, "hap", &c_info->hap, 0);
 
