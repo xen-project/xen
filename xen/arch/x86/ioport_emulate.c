@@ -35,6 +35,8 @@ static void ioemul_handle_proliant_quirk(
     io_emul_stub[8] = 0x9d;
     /*    ret */
     io_emul_stub[9] = 0xc3;
+
+    BUILD_BUG_ON(IOEMUL_QUIRK_STUB_BYTES < 10);
 }
 
 static int __init proliant_quirk(struct dmi_system_id *d)

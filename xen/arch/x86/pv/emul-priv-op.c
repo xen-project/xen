@@ -89,18 +89,23 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
     /* callq *%rcx */
     ctxt->io_emul_stub[10] = 0xff;
     ctxt->io_emul_stub[11] = 0xd1;
-    /* data16 or nop */
-    ctxt->io_emul_stub[12] = (bytes != 2) ? 0x90 : 0x66;
-    /* <io-access opcode> */
-    ctxt->io_emul_stub[13] = opcode;
-    /* imm8 or nop */
-    ctxt->io_emul_stub[14] = !(opcode & 8) ? port : 0x90;
-    /* ret (jumps to guest_to_host_gpr_switch) */
-    ctxt->io_emul_stub[15] = 0xc3;
-    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < 16);
 
-    if ( ioemul_handle_quirk )
+    if ( likely(!ioemul_handle_quirk) )
+    {
+        /* data16 or nop */
+        ctxt->io_emul_stub[12] = (bytes != 2) ? 0x90 : 0x66;
+        /* <io-access opcode> */
+        ctxt->io_emul_stub[13] = opcode;
+        /* imm8 or nop */
+        ctxt->io_emul_stub[14] = !(opcode & 8) ? port : 0x90;
+        /* ret (jumps to guest_to_host_gpr_switch) */
+        ctxt->io_emul_stub[15] = 0xc3;
+    }
+    else
         ioemul_handle_quirk(opcode, &ctxt->io_emul_stub[12], ctxt->ctxt.regs);
+
+    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX(16, /* Regular stubs */
+                                         12 + IOEMUL_QUIRK_STUB_BYTES));
 
     /* Handy function-typed pointer to the stub. */
     return (void *)(this_cpu(stubs.addr) + STUB_BUF_SIZE / 2);
