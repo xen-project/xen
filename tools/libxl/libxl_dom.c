@@ -38,9 +38,31 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
         LOG(ERROR, "unable to get domain type for domid=%"PRIu32, domid);
         return LIBXL_DOMAIN_TYPE_INVALID;
     }
-    if (info.flags & XEN_DOMINF_hvm_guest)
-        return LIBXL_DOMAIN_TYPE_HVM;
-    else
+    if (info.flags & XEN_DOMINF_hvm_guest) {
+        const char *type_path = GCSPRINTF("%s/type",
+                                          libxl__xs_libxl_path(gc, domid));
+        const char *type;
+        libxl_domain_type t;
+        int rc;
+
+        rc = libxl__xs_read_mandatory(gc, XBT_NULL, type_path, &type);
+        if (rc) {
+            LOG(WARN,
+            "unable to get domain type for domid=%"PRIu32", assuming HVM",
+                domid);
+            return LIBXL_DOMAIN_TYPE_HVM;
+        }
+
+        rc = libxl_domain_type_from_string(type, &t);
+        if (rc) {
+            LOG(WARN,
+            "unable to get domain type for domid=%"PRIu32", assuming HVM",
+                domid);
+            return LIBXL_DOMAIN_TYPE_HVM;
+        }
+
+        return t;
+    } else
         return LIBXL_DOMAIN_TYPE_PV;
 }
 

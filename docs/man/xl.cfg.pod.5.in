@@ -80,6 +80,12 @@ single host must be unique.
 Specifies that this is to be a PV domain, suitable for hosting Xen-aware
 guest operating systems. This is the default.
 
+=item B<type="pvh">
+
+Specifies that this is to be an PVH domain. That is a lightweight HVM-like
+guest without a device model and without many of the emulated devices
+available to HVM guests. Note that this mode requires a PVH aware kernel.
+
 =item B<type="hvm">
 
 Specifies that this is to be an HVM domain. That is, a fully virtualised
@@ -494,6 +500,11 @@ Boot the guest using the OVMF UEFI firmware.
 Load the specified file as firmware for the guest.
 
 =back
+
+=head4 PVH guest options
+
+Currently there's no firmware available for PVH guests, they should be
+booted using the B<Direct Kernel Boot> method or the B<bootloader> option.
 
 =head3 Other Options
 
@@ -1971,6 +1982,116 @@ specified, enabling the use of XenServer PV drivers in the guest.
 
 This parameter only takes effect when device_model_version=qemu-xen.
 See F<docs/misc/pci-device-reservations.txt> for more information.
+
+=back
+
+=head2 PVH Guest Specific Options
+
+=over 4
+
+=item B<nestedhvm=BOOLEAN>
+
+Enable or disables guest access to hardware virtualisation features,
+e.g. it allows a guest Operating System to also function as a hypervisor.
+You may want this option if you want to run another hypervisor (including
+another copy of Xen) within a Xen guest or to support a guest Operating
+System which uses hardware virtualisation extensions (e.g. Windows XP
+compatibility mode on more modern Windows OS).
+
+This option is disabled by default.
+
+=item B<apic=BOOLEAN>
+
+Enable the local APIC emulation for the guest. The local APIC information
+will be exposed to the guest in the ACPI tables. This option is enabled by
+default.
+
+=item B<bootloader="PROGRAM">
+
+Run C<PROGRAM> to find the kernel image and ramdisk to use.  Normally
+C<PROGRAM> would be C<pygrub>, which is an emulation of
+grub/grub2/syslinux. Either B<kernel> or B<bootloader> must be specified
+for PV guests.
+
+=item B<bootloader_args=[ "ARG", "ARG", ...]>
+
+Append B<ARG>s to the arguments to the B<bootloader>
+program. Alternatively if the argument is a simple string then it will
+be split into words at whitespace B<(this second option is deprecated)>.
+
+=item B<timer_mode="MODE">
+
+Specifies the mode for Virtual Timers. The valid values are as follows:
+
+=over 4
+
+=item B<delay_for_missed_ticks>
+
+Delay for missed ticks. Do not advance a vCPU's time beyond the
+correct delivery time for interrupts that have been missed due to
+preemption. Deliver missed interrupts when the vCPU is rescheduled and
+advance the vCPU's virtual time stepwise for each one.
+
+=item B<no_delay_for_missed_ticks>
+
+No delay for missed ticks. As above, missed interrupts are delivered,
+but guest time always tracks wallclock (i.e., real) time while doing
+so.
+
+=item B<no_missed_ticks_pending>
+
+No missed interrupts are held pending. Instead, to ensure ticks are
+delivered at some non-zero rate, if we detect missed ticks then the
+internal tick alarm is not disabled if the vCPU is preempted during
+the next tick period.
+
+=item B<one_missed_tick_pending>
+
+One missed tick pending. Missed interrupts are collapsed
+together and delivered as one 'late tick'.  Guest time always tracks
+wallclock (i.e., real) time.
+
+=back
+
+=back
+
+=head3 Paging
+
+The following options control the mechanisms used to virtualise guest
+memory.  The defaults are selected to give the best results for the
+common cases so you should normally leave these options
+unspecified.
+
+=over 4
+
+=item B<hap=BOOLEAN>
+
+Turns "hardware assisted paging" (the use of the hardware nested page
+table feature) on or off.  This feature is called EPT (Extended Page
+Tables) by Intel and NPT (Nested Page Tables) or RVI (Rapid
+Virtualisation Indexing) by AMD. If turned
+off, Xen will run the guest in "shadow page table" mode where the
+guest's page table updates and/or TLB flushes etc. will be emulated.
+Use of HAP is the default when available.
+
+=item B<oos=BOOLEAN>
+
+Turns "out of sync pagetables" on or off.  When running in shadow page
+table mode, the guest's page table updates may be deferred as
+specified in the Intel/AMD architecture manuals.  However, this may
+expose unexpected bugs in the guest, or find bugs in Xen, so it is
+possible to disable this feature.  Use of out of sync page tables,
+when Xen thinks it appropriate, is the default.
+
+=item B<shadow_memory=MBYTES>
+
+Number of megabytes to set aside for shadowing guest pagetable pages
+(effectively acting as a cache of translated pages) or to use for HAP
+state. By default this is 1MB per guest vCPU plus 8KB per MB of guest
+RAM. You should not normally need to adjust this value. However, if you
+are not using hardware assisted paging (i.e. you are using shadow
+mode) and your guest workload consists of a very large number of
+similar processes then increasing this value may improve performance.
 
 =back
 

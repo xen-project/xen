@@ -75,6 +75,7 @@ libxl_domain_type = Enumeration("domain_type", [
     (-1, "INVALID"),
     (1, "HVM"),
     (2, "PV"),
+    (3, "PVH"),
     ], init_val = "LIBXL_DOMAIN_TYPE_INVALID")
 
 libxl_rdm_reserve_strategy = Enumeration("rdm_reserve_strategy", [
@@ -561,6 +562,12 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                       # Use host's E820 for PCI passthrough.
                                       ("e820_host", libxl_defbool),
                                       ])),
+                 ("pvh", Struct(None, [("bootloader",       string),
+                                       ("bootloader_args",  libxl_string_list),
+                                       ("timer_mode",       libxl_timer_mode),
+                                       ("nested_hvm",       libxl_defbool),
+                                       ("apic",             libxl_defbool),
+                                       ])),
                  ("invalid", None),
                  ], keyvar_init_val = "LIBXL_DOMAIN_TYPE_INVALID")),
 

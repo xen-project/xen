@@ -361,18 +361,22 @@
 
 #define LIBXL_BUILDINFO_ACCESS_PVH_PV(b_info, field_name)               \
   ((b_info)->type == LIBXL_DOMAIN_TYPE_PV  ? &(b_info)->u.pv .field_name : \
+   (b_info)->type == LIBXL_DOMAIN_TYPE_PVH ? &(b_info)->u.pvh.field_name : \
    (abort(), (typeof(&(b_info)->u.pv. field_name))0))
 
 #define LIBXL_BUILDINFO_ACCESS_PVH_HVM(b_info, field_name)              \
   ((b_info)->type == LIBXL_DOMAIN_TYPE_HVM ? &(b_info)->u.hvm.field_name : \
+   (b_info)->type == LIBXL_DOMAIN_TYPE_PVH ? &(b_info)->u.pvh.field_name : \
    (abort(), (typeof(&(b_info)->u.hvm.field_name))0))
 
 #define LIBXL_BUILDINFO_ACCESS_PVH_PV_OK(b_info, field_name)    \
   ((b_info)->type == LIBXL_DOMAIN_TYPE_PV  ? 1 :               \
+   (b_info)->type == LIBXL_DOMAIN_TYPE_PVH ? 1 :               \
    0)
 
 #define LIBXL_BUILDINFO_ACCESS_PVH_HVM_OK(b_info, field_name)   \
   ((b_info)->type == LIBXL_DOMAIN_TYPE_HVM ? 1 :               \
+   (b_info)->type == LIBXL_DOMAIN_TYPE_PVH ? 1 :               \
    0)
 
 #define LIBXL_BUILDINFO_SUBFIELD_PVH  UNAVAILABLE_BECAUSE_NO_PVH_SUPPORT_XEN_TOO_OLD
