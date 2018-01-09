@@ -652,9 +652,9 @@ int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
     usbctrlinfo->devid = usbctrl->devid;
 
 #define READ_SUBPATH(path, subpath) ({                                  \
-        rc = libxl__xs_read_checked(gc, XBT_NULL,                       \
-                                    GCSPRINTF("%s/" subpath, path),     \
-                                    &tmp);                              \
+        rc = libxl__xs_read_mandatory(gc, XBT_NULL,                     \
+                                      GCSPRINTF("%s/" subpath, path),   \
+                                      &tmp);                            \
         if (rc) goto out;                                               \
         (char *)tmp;                                                    \
     })

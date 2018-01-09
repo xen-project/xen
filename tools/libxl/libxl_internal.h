@@ -736,6 +736,13 @@ int libxl__xs_mknod(libxl__gc *gc, xs_transaction_t t,
 
 /* On success, *result_out came from the gc.
  * On error, *result_out is undefined.
+ * ENOENT is regarded as error.
+ */
+int libxl__xs_read_mandatory(libxl__gc *gc, xs_transaction_t t,
+                             const char *path, const char **result_out);
+
+/* On success, *result_out came from the gc.
+ * On error, *result_out is undefined.
  * ENOENT counts as success but sets *result_out=0
  */
 int libxl__xs_read_checked(libxl__gc *gc, xs_transaction_t t,
