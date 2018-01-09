@@ -926,7 +926,7 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
-    if (d_config->c_info.type != LIBXL_DOMAIN_TYPE_PV &&
+    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
         libxl_defbool_val(d_config->b_info.u.hvm.altp2m) &&
         pod_enabled) {
         ret = ERROR_INVAL;
