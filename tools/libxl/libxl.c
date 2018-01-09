@@ -1859,6 +1859,7 @@ static int libxl__primary_console_find(libxl_ctx *ctx, uint32_t domid_vm,
             *cons_num = 0;
             *type = LIBXL_CONSOLE_TYPE_SERIAL;
             break;
+        case LIBXL_DOMAIN_TYPE_PVH:
         case LIBXL_DOMAIN_TYPE_PV:
             *domid = domid_vm;
             *cons_num = 0;
