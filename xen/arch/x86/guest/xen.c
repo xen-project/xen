@@ -24,6 +24,7 @@
 #include <xen/rangeset.h>
 #include <xen/types.h>
 
+#include <asm/apic.h>
 #include <asm/e820.h>
 #include <asm/guest.h>
 #include <asm/msr.h>
@@ -186,6 +187,43 @@ static void __init init_memmap(void)
     }
 }
 
+static void xen_evtchn_upcall(struct cpu_user_regs *regs)
+{
+    struct vcpu_info *vcpu_info = this_cpu(vcpu_info);
+
+    vcpu_info->evtchn_upcall_pending = 0;
+    write_atomic(&vcpu_info->evtchn_pending_sel, 0);
+
+    ack_APIC_irq();
+}
+
+static void init_evtchn(void)
+{
+    static uint8_t evtchn_upcall_vector;
+    int rc;
+
+    if ( !evtchn_upcall_vector )
+        alloc_direct_apic_vector(&evtchn_upcall_vector, xen_evtchn_upcall);
+
+    ASSERT(evtchn_upcall_vector);
+
+    rc = xen_hypercall_set_evtchn_upcall_vector(this_cpu(vcpu_id),
+                                                evtchn_upcall_vector);
+    if ( rc )
+        panic("Unable to set evtchn upcall vector: %d", rc);
+
+    /* Trick toolstack to think we are enlightened */
+    {
+        struct xen_hvm_param a = {
+            .domid = DOMID_SELF,
+            .index = HVM_PARAM_CALLBACK_IRQ,
+            .value = 1,
+        };
+
+        BUG_ON(xen_hypercall_hvm_op(HVMOP_set_param, &a));
+    }
+}
+
 void __init hypervisor_setup(void)
 {
     init_memmap();
@@ -210,12 +248,15 @@ void __init hypervisor_setup(void)
                "unable to map vCPU info, limiting vCPUs to: %u\n",
                XEN_LEGACY_MAX_VCPUS);
     }
+
+    init_evtchn();
 }
 
 void hypervisor_ap_setup(void)
 {
     set_vcpu_id();
     map_vcpuinfo();
+    init_evtchn();
 }
 
 int hypervisor_alloc_unused_page(mfn_t *mfn)
