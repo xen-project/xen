@@ -157,6 +157,11 @@ void libxl__domain_suspend_common_switch_qemu_logdirty
     /* Convenience aliases. */
     libxl__logdirty_switch *const lds = &dss->logdirty;
 
+    if (dss->type == LIBXL_DOMAIN_TYPE_PVH) {
+        domain_suspend_switch_qemu_logdirty_done(egc, lds, 0);
+        return;
+    }
+
     lds->callback = domain_suspend_switch_qemu_logdirty_done;
     libxl__domain_common_switch_qemu_logdirty(egc, domid, enable, lds);
 }
@@ -174,9 +179,6 @@ void libxl__domain_common_switch_qemu_logdirty(libxl__egc *egc,
         break;
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
         domain_suspend_switch_qemu_xen_logdirty(egc, domid, enable, lds);
-        break;
-    case LIBXL_DEVICE_MODEL_VERSION_NONE:
-        lds->callback(egc, lds, 0);
         break;
     default:
         LOG(ERROR,"logdirty switch failed"
@@ -362,6 +364,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
     if (rc) goto out;
 
     switch (type) {
+    case LIBXL_DOMAIN_TYPE_PVH:
     case LIBXL_DOMAIN_TYPE_HVM: {
         dss->hvm = 1;
         break;

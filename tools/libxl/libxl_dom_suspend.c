@@ -90,8 +90,6 @@ int libxl__domain_suspend_device_model(libxl__gc *gc,
         if (ret)
             unlink(filename);
         break;
-    case LIBXL_DEVICE_MODEL_VERSION_NONE:
-        break;
     default:
         return ERROR_INVAL;
     }
@@ -148,14 +146,14 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     /* Convenience aliases */
     const uint32_t domid = dsps->domid;
 
-    if (dsps->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (dsps->type != LIBXL_DOMAIN_TYPE_PV) {
         xc_hvm_param_get(CTX->xch, domid, HVM_PARAM_CALLBACK_IRQ, &hvm_pvdrv);
         xc_hvm_param_get(CTX->xch, domid, HVM_PARAM_ACPI_S_STATE, &hvm_s_state);
     }
 
     if ((hvm_s_state == 0) && (dsps->guest_evtchn.port >= 0)) {
         LOG(DEBUG, "issuing %s suspend request via event channel",
-            dsps->type == LIBXL_DOMAIN_TYPE_HVM ? "PVHVM" : "PV");
+            dsps->type != LIBXL_DOMAIN_TYPE_PV ? "PVH/HVM" : "PV");
         ret = xenevtchn_notify(CTX->xce, dsps->guest_evtchn.port);
         if (ret < 0) {
             LOG(ERROR, "xenevtchn_notify failed ret=%d", ret);
@@ -190,7 +188,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     }
 
     LOG(DEBUG, "issuing %s suspend request via XenBus control node",
-        dsps->type == LIBXL_DOMAIN_TYPE_HVM ? "PVHVM" : "PV");
+        dsps->type != LIBXL_DOMAIN_TYPE_PV ? "PVH/HVM" : "PV");
 
     libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, "suspend");
 
