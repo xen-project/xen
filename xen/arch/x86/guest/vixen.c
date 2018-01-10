@@ -350,6 +350,13 @@ void vixen_vcpu_initialize(struct vcpu *v)
             if ( !rc )
                 vixen_needs_apic_ack = false;
         }
+    } else {
+        /*
+         * XXX Upcall vector setup succeeded. Trick xl to think the guest is
+         * enlightened!
+         */
+        if ( hvm_set_parameter(HVM_PARAM_CALLBACK_IRQ, -1) )
+            printk("Setting dummy value for callback_via didn't work\n");
     }
 
     if ( rc )
