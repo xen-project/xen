@@ -751,6 +751,69 @@ static long pv_shim_grant_table_op(unsigned int cmd,
     return rc;
 }
 
+long pv_shim_cpu_up(void *data)
+{
+    struct vcpu *v = data;
+    struct domain *d = v->domain;
+    bool wake;
+
+    BUG_ON(smp_processor_id() != 0);
+
+    domain_lock(d);
+    if ( !v->is_initialised )
+    {
+        domain_unlock(d);
+        return -EINVAL;
+    }
+
+    if ( !cpu_online(v->vcpu_id) )
+    {
+        long rc = cpu_up_helper((void *)(unsigned long)v->vcpu_id);
+
+        if ( rc )
+        {
+            domain_unlock(d);
+            gprintk(XENLOG_ERR, "Failed to bring up CPU#%u: %ld\n",
+                    v->vcpu_id, rc);
+            return rc;
+        }
+    }
+
+    wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
+    domain_unlock(d);
+    if ( wake )
+        vcpu_wake(v);
+
+    return 0;
+}
+
+long pv_shim_cpu_down(void *data)
+{
+    struct vcpu *v = data;
+    long rc;
+
+    BUG_ON(smp_processor_id() != 0);
+
+    if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
+        vcpu_sleep_sync(v);
+
+    if ( cpu_online(v->vcpu_id) )
+    {
+        rc = cpu_down_helper((void *)(unsigned long)v->vcpu_id);
+        if ( rc )
+            gprintk(XENLOG_ERR, "Failed to bring down CPU#%u: %ld\n",
+                    v->vcpu_id, rc);
+        /*
+         * NB: do not propagate errors from cpu_down_helper failing. The shim
+         * is going to run with extra CPUs, but that's not going to prevent
+         * normal operation. OTOH most guests are not prepared to handle an
+         * error on VCPUOP_down failing, and will likely panic.
+         */
+    }
+
+    return 0;
+}
+
 domid_t get_initial_domain_id(void)
 {
     uint32_t eax, ebx, ecx, edx;
