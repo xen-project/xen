@@ -29,12 +29,15 @@
 #ifdef CONFIG_XEN_GUEST
 
 extern bool xen_guest;
+extern bool pv_console;
 
 void probe_hypervisor(void);
 void hypervisor_setup(void);
 void hypervisor_ap_setup(void);
 int hypervisor_alloc_unused_page(mfn_t *mfn);
 int hypervisor_free_unused_page(mfn_t mfn);
+void hypervisor_fixup_e820(struct e820map *e820);
+const unsigned long *hypervisor_reserved_pages(unsigned int *size);
 
 DECLARE_PER_CPU(unsigned int, vcpu_id);
 DECLARE_PER_CPU(struct vcpu_info *, vcpu_info);
@@ -42,6 +45,7 @@ DECLARE_PER_CPU(struct vcpu_info *, vcpu_info);
 #else
 
 #define xen_guest 0
+#define pv_console 0
 
 static inline void probe_hypervisor(void) {};
 static inline void hypervisor_setup(void)
@@ -52,6 +56,16 @@ static inline void hypervisor_ap_setup(void)
 {
     ASSERT_UNREACHABLE();
 }
+
+static inline void hypervisor_fixup_e820(struct e820map *e820)
+{
+    ASSERT_UNREACHABLE();
+}
+static inline const unsigned long *hypervisor_reserved_pages(unsigned int *size)
+{
+    ASSERT_UNREACHABLE();
+    return NULL;
+};
 
 #endif /* CONFIG_XEN_GUEST */
 #endif /* __X86_GUEST_XEN_H__ */

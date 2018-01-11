@@ -35,6 +35,8 @@ static evtchn_port_t cons_evtchn;
 static serial_rx_fn cons_rx_handler;
 static DEFINE_SPINLOCK(tx_lock);
 
+bool pv_console;
+
 void __init pv_console_init(void)
 {
     long r;
@@ -60,6 +62,8 @@ void __init pv_console_init(void)
 
     printk("Initialised PV console at 0x%p with pfn %#lx and evtchn %#x\n",
             cons_ring, raw_pfn, cons_evtchn);
+    pv_console = true;
+
     return;
 
  error:
