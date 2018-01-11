@@ -48,6 +48,9 @@ static unsigned int nr_grant_list;
 static unsigned long *grant_frames;
 static DEFINE_SPINLOCK(grant_lock);
 
+static PAGE_LIST_HEAD(balloon);
+static DEFINE_SPINLOCK(balloon_lock);
+
 static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 static long pv_shim_grant_table_op(unsigned int cmd,
                                    XEN_GUEST_HANDLE_PARAM(void) uop,
@@ -812,6 +815,115 @@ long pv_shim_cpu_down(void *data)
     }
 
     return 0;
+}
+
+static unsigned long batch_memory_op(unsigned int cmd, unsigned int order,
+                                     const struct page_list_head *list)
+{
+    struct xen_memory_reservation xmr = {
+        .domid = DOMID_SELF,
+        .extent_order = order,
+    };
+    unsigned long pfns[64];
+    const struct page_info *pg;
+    unsigned long done = 0;
+
+    set_xen_guest_handle(xmr.extent_start, pfns);
+    page_list_for_each ( pg, list )
+    {
+        pfns[xmr.nr_extents++] = page_to_mfn(pg);
+        if ( xmr.nr_extents == ARRAY_SIZE(pfns) || !page_list_next(pg, list) )
+        {
+            long nr = xen_hypercall_memory_op(cmd, &xmr);
+
+            done += nr > 0 ? nr : 0;
+            if ( nr != xmr.nr_extents )
+                break;
+            xmr.nr_extents = 0;
+        }
+    }
+
+    return done;
+}
+
+void pv_shim_online_memory(unsigned int nr, unsigned int order)
+{
+    struct page_info *page, *tmp;
+    PAGE_LIST_HEAD(list);
+
+    spin_lock(&balloon_lock);
+    page_list_for_each_safe ( page, tmp, &balloon )
+    {
+        /* TODO: add support for splitting high order memory chunks. */
+        if ( page->v.free.order != order )
+            continue;
+
+        page_list_del(page, &balloon);
+        page_list_add_tail(page, &list);
+        if ( !--nr )
+            break;
+    }
+    spin_unlock(&balloon_lock);
+
+    if ( nr )
+        gprintk(XENLOG_WARNING,
+                "failed to allocate %u extents of order %u for onlining\n",
+                nr, order);
+
+    nr = batch_memory_op(XENMEM_populate_physmap, order, &list);
+    while ( nr-- )
+    {
+        BUG_ON((page = page_list_remove_head(&list)) == NULL);
+        free_domheap_pages(page, order);
+    }
+
+    if ( !page_list_empty(&list) )
+    {
+        gprintk(XENLOG_WARNING,
+                "failed to online some of the memory regions\n");
+        spin_lock(&balloon_lock);
+        page_list_splice(&list, &balloon);
+        spin_unlock(&balloon_lock);
+    }
+}
+
+void pv_shim_offline_memory(unsigned int nr, unsigned int order)
+{
+    struct page_info *page;
+    PAGE_LIST_HEAD(list);
+
+    while ( nr-- )
+    {
+        page = alloc_domheap_pages(NULL, order, 0);
+        if ( !page )
+            break;
+
+        page_list_add_tail(page, &list);
+        page->v.free.order = order;
+    }
+
+    if ( nr + 1 )
+        gprintk(XENLOG_WARNING,
+                "failed to reserve %u extents of order %u for offlining\n",
+                nr + 1, order);
+
+
+    nr = batch_memory_op(XENMEM_decrease_reservation, order, &list);
+    spin_lock(&balloon_lock);
+    while ( nr-- )
+    {
+        BUG_ON((page = page_list_remove_head(&list)) == NULL);
+        page_list_add_tail(page, &balloon);
+    }
+    spin_unlock(&balloon_lock);
+
+    if ( !page_list_empty(&list) )
+    {
+        gprintk(XENLOG_WARNING,
+                "failed to offline some of the memory regions\n");
+        while ( (page = page_list_remove_head(&list)) != NULL )
+            free_domheap_pages(page, order);
+    }
 }
 
 domid_t get_initial_domain_id(void)
