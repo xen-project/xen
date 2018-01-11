@@ -1078,7 +1078,7 @@ static int xc_dom_load_acpi(struct xc_dom_image *dom)
 
     while ( (i < MAX_ACPI_MODULES) && dom->acpi_modules[i].length )
     {
-        DOMPRINTF("%s: %d bytes at address %" PRIx64 "\n", __FUNCTION__,
+        DOMPRINTF("%s: %d bytes at address %" PRIx64, __FUNCTION__,
                   dom->acpi_modules[i].length,
                   dom->acpi_modules[i].guest_addr_out);
 
