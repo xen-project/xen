@@ -25,6 +25,8 @@
 #include <xen/iocap.h>
 #include <xen/shutdown.h>
 #include <xen/types.h>
+#include <xen/consoled.h>
+#include <xen/pv_console.h>
 
 #include <asm/apic.h>
 #include <asm/dom0_build.h>
@@ -127,13 +129,28 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
 })
     SET_AND_MAP_PARAM(HVM_PARAM_STORE_PFN, si->store_mfn, store_va);
     SET_AND_MAP_PARAM(HVM_PARAM_STORE_EVTCHN, si->store_evtchn, 0);
+    SET_AND_MAP_PARAM(HVM_PARAM_CONSOLE_EVTCHN, si->console.domU.evtchn, 0);
     if ( !pv_console )
-    {
         SET_AND_MAP_PARAM(HVM_PARAM_CONSOLE_PFN, si->console.domU.mfn,
                           console_va);
-        SET_AND_MAP_PARAM(HVM_PARAM_CONSOLE_EVTCHN, si->console.domU.evtchn, 0);
-    }
 #undef SET_AND_MAP_PARAM
+    else
+    {
+        /* Allocate a new page for DomU's PV console */
+        void *page = alloc_xenheap_pages(0, MEMF_bits(32));
+        uint64_t console_mfn;
+
+        ASSERT(page);
+        clear_page(page);
+        console_mfn = virt_to_mfn(page);
+        si->console.domU.mfn = console_mfn;
+        share_xen_page_with_guest(mfn_to_page(console_mfn), d,
+                                  XENSHARE_writable);
+        replace_va_mapping(d, l4start, console_va, console_mfn);
+        dom0_update_physmap(d, (console_va - va_start) >> PAGE_SHIFT,
+                            console_mfn, vphysmap);
+        consoled_set_ring_addr(page);
+    }
     pv_hypercall_table_replace(__HYPERVISOR_event_channel_op,
                                (hypercall_fn_t *)pv_shim_event_channel_op,
                                (hypercall_fn_t *)pv_shim_event_channel_op);
@@ -341,7 +358,13 @@ static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&send, arg, 1) != 0 )
             return -EFAULT;
 
-        rc = xen_hypercall_event_channel_op(EVTCHNOP_send, &send);
+        if ( pv_console && send.port == pv_console_evtchn() )
+        {
+            consoled_guest_rx();
+            rc = 0;
+        }
+        else
+            rc = xen_hypercall_event_channel_op(EVTCHNOP_send, &send);
 
         break;
     }
