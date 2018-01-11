@@ -107,7 +107,7 @@ idt_entry_t idt_table[IDT_ENTRIES];
 /* Pointer to the IDT of every CPU. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
-void (*ioemul_handle_quirk)(
+bool (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
 static int debug_stack_lines = 20;

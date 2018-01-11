@@ -52,7 +52,7 @@ extern void (*pv_post_outb_hook)(unsigned int port, u8 value);
 
 /* Function pointer used to handle platform specific I/O port emulation. */
 #define IOEMUL_QUIRK_STUB_BYTES 10
-extern void (*ioemul_handle_quirk)(
+extern bool (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
 #endif

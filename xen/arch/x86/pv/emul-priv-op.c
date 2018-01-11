@@ -76,6 +76,8 @@ typedef void io_emul_stub_t(struct cpu_user_regs *);
 static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
                                           unsigned int port, unsigned int bytes)
 {
+    bool use_quirk_stub = false;
+
     if ( !ctxt->io_emul_stub )
         ctxt->io_emul_stub = map_domain_page(_mfn(this_cpu(stubs.mfn))) +
                                              (this_cpu(stubs.addr) &
@@ -90,7 +92,11 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
     ctxt->io_emul_stub[10] = 0xff;
     ctxt->io_emul_stub[11] = 0xd1;
 
-    if ( likely(!ioemul_handle_quirk) )
+    if ( unlikely(ioemul_handle_quirk) )
+        use_quirk_stub = ioemul_handle_quirk(opcode, &ctxt->io_emul_stub[12],
+                                             ctxt->ctxt.regs);
+
+    if ( !use_quirk_stub )
     {
         /* data16 or nop */
         ctxt->io_emul_stub[12] = (bytes != 2) ? 0x90 : 0x66;
@@ -101,10 +107,8 @@ static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
         /* ret (jumps to guest_to_host_gpr_switch) */
         ctxt->io_emul_stub[15] = 0xc3;
     }
-    else
-        ioemul_handle_quirk(opcode, &ctxt->io_emul_stub[12], ctxt->ctxt.regs);
 
-    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX(16, /* Regular stubs */
+    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX(16, /* Default emul stub */
                                          12 + IOEMUL_QUIRK_STUB_BYTES));
 
     /* Handy function-typed pointer to the stub. */
