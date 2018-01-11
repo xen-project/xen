@@ -345,6 +345,8 @@ void arch_get_domain_info(const struct domain *d,
 {
     if ( paging_mode_hap(d) )
         info->flags |= XEN_DOMINF_hap;
+
+    info->arch_config.emulation_flags = d->arch.emulation_flags;
 }
 
 #define MAX_IOPORTS 0x10000
