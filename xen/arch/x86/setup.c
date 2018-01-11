@@ -632,8 +632,8 @@ static char * __init cmdline_cook(char *p, const char *loader_name)
     while ( *p == ' ' )
         p++;
 
-    /* GRUB2 does not include image name as first item on command line. */
-    if ( loader_is_grub2(loader_name) )
+    /* GRUB2 and PVH don't not include image name as first item on command line. */
+    if ( xen_guest || loader_is_grub2(loader_name) )
         return p;
 
     /* Strip image name plus whitespace. */
