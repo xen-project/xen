@@ -204,6 +204,12 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
                                (hypercall_fn_t *)pv_shim_grant_table_op,
                                (hypercall_fn_t *)pv_shim_grant_table_op);
     guest = d;
+
+    /*
+     * Set the max pages to the current number of pages to prevent the
+     * guest from depleting the shim memory pool.
+     */
+    d->max_pages = d->tot_pages;
 }
 
 static void write_start_info(struct domain *d)
