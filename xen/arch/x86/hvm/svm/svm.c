@@ -1786,6 +1786,12 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
     if ( (inst_len = __get_instruction_length(curr, INSTR_CPUID)) == 0 )
         return;
 
+    if ( hvm_check_cpuid_faulting(curr) )
+    {
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        return;
+    }
+
     guest_cpuid(curr, regs->eax, regs->ecx, &res);
     HVMTRACE_5D(CPUID, regs->eax, res.a, res.b, res.c, res.d);
 
