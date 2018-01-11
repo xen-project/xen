@@ -32,12 +32,14 @@
 #include <asm/processor.h>
 
 #include <public/arch-x86/cpuid.h>
+#include <public/hvm/params.h>
 
 bool __read_mostly xen_guest;
 
 static __read_mostly uint32_t xen_cpuid_base;
 extern char hypercall_page[];
 static struct rangeset *mem;
+static unsigned long __initdata reserved_pages[2];
 
 DEFINE_PER_CPU(unsigned int, vcpu_id);
 
@@ -277,6 +279,47 @@ int hypervisor_alloc_unused_page(mfn_t *mfn)
 int hypervisor_free_unused_page(mfn_t mfn)
 {
     return rangeset_remove_range(mem, mfn_x(mfn), mfn_x(mfn));
+}
+
+static void __init mark_pfn_as_ram(struct e820map *e820, uint64_t pfn)
+{
+    if ( !e820_add_range(e820, pfn << PAGE_SHIFT,
+                         (pfn << PAGE_SHIFT) + PAGE_SIZE, E820_RAM) )
+        if ( !e820_change_range_type(e820, pfn << PAGE_SHIFT,
+                                     (pfn << PAGE_SHIFT) + PAGE_SIZE,
+                                     E820_RESERVED, E820_RAM) )
+            panic("Unable to add/change memory type of pfn %#lx to RAM", pfn);
+}
+
+void __init hypervisor_fixup_e820(struct e820map *e820)
+{
+    uint64_t pfn = 0;
+    unsigned int i = 0;
+    long rc;
+
+    ASSERT(xen_guest);
+
+#define MARK_PARAM_RAM(p) ({                    \
+    rc = xen_hypercall_hvm_get_param(p, &pfn);  \
+    if ( rc )                                   \
+        panic("Unable to get " #p);             \
+    mark_pfn_as_ram(e820, pfn);                 \
+    ASSERT(i < ARRAY_SIZE(reserved_pages));     \
+    reserved_pages[i++] = pfn << PAGE_SHIFT;    \
+})
+    MARK_PARAM_RAM(HVM_PARAM_STORE_PFN);
+    if ( !pv_console )
+        MARK_PARAM_RAM(HVM_PARAM_CONSOLE_PFN);
+#undef MARK_PARAM_RAM
+}
+
+const unsigned long *__init hypervisor_reserved_pages(unsigned int *size)
+{
+    ASSERT(xen_guest);
+
+    *size = ARRAY_SIZE(reserved_pages);
+
+    return reserved_pages;
 }
 
 /*
