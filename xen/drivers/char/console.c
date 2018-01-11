@@ -32,6 +32,7 @@
 #include <xen/warning.h>
 
 #ifdef CONFIG_X86
+#include <xen/consoled.h>
 #include <xen/pv_console.h>
 #include <asm/guest.h>
 #endif
@@ -415,6 +416,11 @@ static void __serial_rx(char c, struct cpu_user_regs *regs)
         serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod++)] = c;
     /* Always notify the guest: prevents receive path from getting stuck. */
     send_global_virq(VIRQ_CONSOLE);
+
+#ifdef CONFIG_X86
+    if ( pv_shim && pv_console )
+        consoled_guest_tx(c);
+#endif
 }
 
 static void serial_rx(char c, struct cpu_user_regs *regs)
