@@ -20,12 +20,15 @@
  */
 #include <xen/hypercall.h>
 #include <xen/init.h>
+#include <xen/shutdown.h>
 #include <xen/types.h>
 
 #include <asm/apic.h>
 #include <asm/dom0_build.h>
 #include <asm/guest.h>
 #include <asm/pv/mm.h>
+
+#include <public/arch-x86/cpuid.h>
 
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
 bool pv_shim;
@@ -89,6 +92,24 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
         SET_AND_MAP_PARAM(HVM_PARAM_CONSOLE_EVTCHN, si->console.domU.evtchn, 0);
     }
 #undef SET_AND_MAP_PARAM
+}
+
+void pv_shim_shutdown(uint8_t reason)
+{
+    /* XXX: handle suspend */
+    xen_hypercall_shutdown(reason);
+}
+
+domid_t get_initial_domain_id(void)
+{
+    uint32_t eax, ebx, ecx, edx;
+
+    if ( !pv_shim )
+        return 0;
+
+    cpuid(hypervisor_cpuid_base() + 4, &eax, &ebx, &ecx, &edx);
+
+    return (eax & XEN_HVM_CPUID_DOMID_PRESENT) ? ecx : 1;
 }
 
 /*
