@@ -273,10 +273,10 @@ CAMLprim value stub_xc_domain_shutdown(value xch, value domid, value reason)
 static value alloc_domaininfo(xc_domaininfo_t * info)
 {
 	CAMLparam0();
-	CAMLlocal2(result, tmp);
+	CAMLlocal5(result, tmp, arch_config, x86_arch_config, emul_list);
 	int i;
 
-	result = caml_alloc_tuple(16);
+	result = caml_alloc_tuple(17);
 
 	Store_field(result,  0, Val_int(info->domain));
 	Store_field(result,  1, Val_bool(info->flags & XEN_DOMINF_dying));
@@ -301,6 +301,28 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 	}
 
 	Store_field(result, 15, tmp);
+
+	/* emulation_flags: x86_arch_emulation_flags list; */
+	tmp = emul_list = Val_emptylist;
+	for (i = 0; i < 10; i++) {
+		if ((info->arch_config.emulation_flags >> i) & 1) {
+			tmp = caml_alloc_small(2, Tag_cons);
+			Field(tmp, 0) = Val_int(i);
+			Field(tmp, 1) = emul_list;
+			emul_list = tmp;
+		}
+	}
+
+	/* xen_x86_arch_domainconfig */
+	x86_arch_config = caml_alloc_tuple(1);
+	Store_field(x86_arch_config, 0, emul_list);
+
+	/* arch_config: arch_domainconfig */
+	arch_config = caml_alloc_small(1, 1);
+
+	Store_field(arch_config, 0, x86_arch_config);
+
+	Store_field(result, 16, arch_config);
 
 	CAMLreturn(result);
 }
