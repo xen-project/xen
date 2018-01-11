@@ -105,6 +105,12 @@ unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;
 #define SMEP_HVM_ONLY (-1)
 static s8 __initdata opt_smep = 1;
 
+/*
+ * Initial domain place holder. Needs to be global so it can be created in
+ * __start_xen and unpaused in init_done.
+ */
+static struct domain *__initdata dom0;
+
 static int __init parse_smep_param(const char *s)
 {
     if ( !*s )
@@ -577,10 +583,10 @@ static void noinline init_done(void)
 
     system_state = SYS_STATE_active;
 
+    domain_unpause_by_systemcontroller(dom0);
+
     /* MUST be done prior to removing .init data. */
     unregister_init_virtual_region();
-
-    domain_unpause_by_systemcontroller(hardware_domain);
 
     /* Zero the .init code and data. */
     for ( va = __init_begin; va < _p(__init_end); va += PAGE_SIZE )
@@ -660,7 +666,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
     bool acpi_boot_table_init_done = false, relocated = false;
-    struct domain *dom0;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -1620,11 +1625,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     /* Create initial domain 0. */
-    dom0 = domain_create(0, domcr_flags, 0, &config);
+    dom0 = domain_create(get_initial_domain_id(), domcr_flags, 0, &config);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 
-    dom0->is_privileged = 1;
+    if ( !pv_shim )
+        dom0->is_privileged = 1;
     dom0->target = NULL;
 
     /* Grab the DOM0 command line. */

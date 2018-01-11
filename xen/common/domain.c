@@ -43,6 +43,10 @@
 #include <xen/tmem.h>
 #include <asm/setup.h>
 
+#ifdef CONFIG_X86
+#include <asm/guest.h>
+#endif
+
 /* Linux config option: propageted to domain0 */
 /* xen_processor_pmbits: xen control Cx, Px, ... */
 unsigned int xen_processor_pmbits = XEN_PROCESSOR_PM_PX;
@@ -696,6 +700,14 @@ void __domain_crash_synchronous(void)
 void domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;
+
+#ifdef CONFIG_X86
+    if ( pv_shim )
+    {
+        pv_shim_shutdown(reason);
+        return;
+    }
+#endif
 
     spin_lock(&d->shutdown_lock);
 

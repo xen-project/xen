@@ -322,6 +322,11 @@ const unsigned long *__init hypervisor_reserved_pages(unsigned int *size)
     return reserved_pages;
 }
 
+uint32_t hypervisor_cpuid_base(void)
+{
+    return xen_cpuid_base;
+}
+
 /*
  * Local variables:
  * mode: C
