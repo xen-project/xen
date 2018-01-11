@@ -37,7 +37,7 @@ static DEFINE_SPINLOCK(tx_lock);
 
 bool pv_console;
 
-void __init pv_console_init(void)
+void pv_console_init(void)
 {
     long r;
     uint64_t raw_pfn = 0, raw_evtchn = 0;

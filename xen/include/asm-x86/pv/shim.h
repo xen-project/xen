@@ -35,7 +35,7 @@ void pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
                        unsigned long va_start, unsigned long store_va,
                        unsigned long console_va, unsigned long vphysmap,
                        start_info_t *si);
-void pv_shim_shutdown(uint8_t reason);
+int pv_shim_shutdown(uint8_t reason);
 void pv_shim_inject_evtchn(unsigned int port);
 domid_t get_initial_domain_id(void);
 
@@ -50,9 +50,10 @@ static inline void pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
 {
     ASSERT_UNREACHABLE();
 }
-static inline void pv_shim_shutdown(uint8_t reason)
+static inline int pv_shim_shutdown(uint8_t reason)
 {
     ASSERT_UNREACHABLE();
+    return 0;
 }
 static inline void pv_shim_inject_evtchn(unsigned int port)
 {
