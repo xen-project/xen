@@ -5248,12 +5248,12 @@ void __set_fixmap(
     enum fixed_addresses idx, unsigned long mfn, unsigned long flags)
 {
     BUG_ON(idx >= __end_of_fixed_addresses);
-    map_pages_to_xen(fix_to_virt(idx), mfn, 1, flags);
+    map_pages_to_xen(__fix_to_virt(idx), mfn, 1, flags);
 }
 
 void *__init arch_vmap_virt_end(void)
 {
-    return (void *)fix_to_virt(__end_of_fixed_addresses);
+    return fix_to_virt(__end_of_fixed_addresses);
 }
 
 void __iomem *ioremap(paddr_t pa, size_t len)

@@ -79,7 +79,7 @@ extern void __set_fixmap(
 #define __fix_to_virt(x) (FIXADDR_TOP - ((x) << PAGE_SHIFT))
 #define __virt_to_fix(x) ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
 
-#define fix_to_virt(x)   (__fix_to_virt(x))
+#define fix_to_virt(x)   ((void *)__fix_to_virt(x))
 
 static inline unsigned long virt_to_fix(const unsigned long vaddr)
 {

@@ -960,8 +960,7 @@ static int msix_capability_init(struct pci_dev *dev,
             xfree(entry);
             return idx;
         }
-        base = (void *)(fix_to_virt(idx) +
-                        ((unsigned long)entry_paddr & (PAGE_SIZE - 1)));
+        base = fix_to_virt(idx) + (entry_paddr & (PAGE_SIZE - 1));
 
         /* Mask interrupt here */
         writel(1, base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
