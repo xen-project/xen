@@ -12,12 +12,14 @@
 #define FORMAT "pei-x86-64"
 #undef __XEN_VIRT_START
 #define __XEN_VIRT_START __image_base__
+#define SECTION_ALIGN MB(2)
 
 ENTRY(efi_start)
 
 #else /* !EFI */
 
 #define FORMAT "elf64-x86-64"
+#define SECTION_ALIGN PAGE_SIZE
 
 ENTRY(start)
 
@@ -67,11 +69,7 @@ SECTIONS
        _etext = .;             /* End of text section */
   } :text = 0x9090
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __2M_text_end = .;
 
   __2M_rodata_start = .;       /* Start of 2M superpages, mapped RO. */
@@ -149,11 +147,7 @@ SECTIONS
 #endif
   _erodata = .;
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __2M_rodata_end = .;
 
   __2M_init_start = .;         /* Start of 2M superpages, mapped RWX (boot only). */
@@ -215,11 +209,7 @@ SECTIONS
        __ctors_end = .;
   } :text
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __init_end = .;
   __2M_init_end = .;
 
@@ -257,11 +247,7 @@ SECTIONS
   } :text
   _end = . ;
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __2M_rwdata_end = .;
 
 #ifdef EFI
@@ -310,23 +296,13 @@ ASSERT(__image_base__ > XEN_VIRT_START ||
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
 
-#ifdef EFI
-ASSERT(IS_ALIGNED(__2M_text_end,     MB(2)), "__2M_text_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_start, MB(2)), "__2M_rodata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_end,   MB(2)), "__2M_rodata_end misaligned")
-ASSERT(IS_ALIGNED(__2M_init_start,   MB(2)), "__2M_init_start misaligned")
-ASSERT(IS_ALIGNED(__2M_init_end,     MB(2)), "__2M_init_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_start, MB(2)), "__2M_rwdata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_end,   MB(2)), "__2M_rwdata_end misaligned")
-#else
-ASSERT(IS_ALIGNED(__2M_text_end,     PAGE_SIZE), "__2M_text_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_start, PAGE_SIZE), "__2M_rodata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_end,   PAGE_SIZE), "__2M_rodata_end misaligned")
-ASSERT(IS_ALIGNED(__2M_init_start,   PAGE_SIZE), "__2M_init_start misaligned")
-ASSERT(IS_ALIGNED(__2M_init_end,     PAGE_SIZE), "__2M_init_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_start, PAGE_SIZE), "__2M_rwdata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_end,   PAGE_SIZE), "__2M_rwdata_end misaligned")
-#endif
+ASSERT(IS_ALIGNED(__2M_text_end,     SECTION_ALIGN), "__2M_text_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_start, SECTION_ALIGN), "__2M_rodata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_end,   SECTION_ALIGN), "__2M_rodata_end misaligned")
+ASSERT(IS_ALIGNED(__2M_init_start,   SECTION_ALIGN), "__2M_init_start misaligned")
+ASSERT(IS_ALIGNED(__2M_init_end,     SECTION_ALIGN), "__2M_init_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_start, SECTION_ALIGN), "__2M_rwdata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_end,   SECTION_ALIGN), "__2M_rwdata_end misaligned")
 
 ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")
 
