@@ -69,8 +69,8 @@ long do_event_channel_op_compat(XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop)
     case EVTCHNOP_bind_ipi:
     case EVTCHNOP_bind_vcpu:
     case EVTCHNOP_unmask:
-        return do_event_channel_op(op.cmd,
-                                   guest_handle_from_ptr(&uop.p->u, void));
+        return pv_get_hypercall_handler(__HYPERVISOR_event_channel_op, false)
+               (op.cmd, (unsigned long)&uop.p->u, 0, 0, 0, 0);
 
     default:
         return -ENOSYS;

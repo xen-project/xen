@@ -48,6 +48,21 @@ int evtchn_send(struct domain *d, unsigned int lport);
 /* Bind a local event-channel port to the specified VCPU. */
 long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id);
 
+/* Bind a VIRQ. */
+int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port);
+
+/* Get the status of an event channel port. */
+int evtchn_status(evtchn_status_t *status);
+
+/* Close an event channel. */
+int evtchn_close(struct domain *d1, int port1, bool guest);
+
+/* Free an event channel. */
+void evtchn_free(struct domain *d, struct evtchn *chn);
+
+/* Allocate a specific event channel port. */
+int evtchn_allocate_port(struct domain *d, unsigned int port);
+
 /* Unmask a local event-channel port. */
 int evtchn_unmask(unsigned int port);
 

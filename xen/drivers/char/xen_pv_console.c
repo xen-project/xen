@@ -88,6 +88,11 @@ static void notify_daemon(void)
     xen_hypercall_evtchn_send(cons_evtchn);
 }
 
+evtchn_port_t pv_console_evtchn(void)
+{
+    return cons_evtchn;
+}
+
 size_t pv_console_rx(struct cpu_user_regs *regs)
 {
     char c;
@@ -95,10 +100,6 @@ size_t pv_console_rx(struct cpu_user_regs *regs)
     size_t recv = 0;
 
     if ( !cons_ring )
-        return 0;
-
-    /* TODO: move this somewhere */
-    if ( !test_bit(cons_evtchn, XEN_shared_info->evtchn_pending) )
         return 0;
 
     prod = ACCESS_ONCE(cons_ring->in_prod);
@@ -124,8 +125,6 @@ size_t pv_console_rx(struct cpu_user_regs *regs)
     barrier();
     ACCESS_ONCE(cons_ring->in_cons) = cons;
     notify_daemon();
-
-    clear_bit(cons_evtchn, XEN_shared_info->evtchn_pending);
 
     return recv;
 }
