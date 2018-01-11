@@ -122,6 +122,7 @@
 #include <asm/fixmap.h>
 #include <asm/io_apic.h>
 #include <asm/pci.h>
+#include <asm/guest.h>
 
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
@@ -288,8 +289,12 @@ void __init arch_init_memory(void)
     dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0, NULL);
     BUG_ON(IS_ERR(dom_cow));
 
-    /* First 1MB of RAM is historically marked as I/O. */
-    for ( i = 0; i < 0x100; i++ )
+    /*
+     * First 1MB of RAM is historically marked as I/O.  If we booted PVH,
+     * reclaim the space.  Irrespective, leave MFN 0 as special for the sake
+     * of 0 being a very common default value.
+     */
+    for ( i = 0; i < (pvh_boot ? 1 : 0x100); i++ )
         share_xen_page_with_guest(mfn_to_page(_mfn(i)),
                                   dom_io, XENSHARE_writable);
 
