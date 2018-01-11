@@ -29,6 +29,27 @@ extern bool pv_shim;
 # define pv_shim 0
 #endif /* CONFIG_PV_SHIM{,_EXCLUSIVE} */
 
+#ifdef CONFIG_PV_SHIM
+
+void pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
+                       unsigned long va_start, unsigned long store_va,
+                       unsigned long console_va, unsigned long vphysmap,
+                       start_info_t *si);
+
+#else
+
+static inline void pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
+                                     unsigned long va_start,
+                                     unsigned long store_va,
+                                     unsigned long console_va,
+                                     unsigned long vphysmap,
+                                     start_info_t *si)
+{
+    ASSERT_UNREACHABLE();
+}
+
+#endif
+
 #endif /* __X86_PV_SHIM_H__ */
 
 /*
