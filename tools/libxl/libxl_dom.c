@@ -796,12 +796,12 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
 
     if ( state->pv_ramdisk.path && strlen(state->pv_ramdisk.path) ) {
         if (state->pv_ramdisk.mapped) {
-            if ( (ret = xc_dom_ramdisk_mem(dom, state->pv_ramdisk.data, state->pv_ramdisk.size)) != 0 ) {
+            if ( (ret = xc_dom_module_mem(dom, state->pv_ramdisk.data, state->pv_ramdisk.size, NULL)) != 0 ) {
                 LOGE(ERROR, "xc_dom_ramdisk_mem failed");
                 goto out;
             }
         } else {
-            if ( (ret = xc_dom_ramdisk_file(dom, state->pv_ramdisk.path)) != 0 ) {
+            if ( (ret = xc_dom_module_file(dom, state->pv_ramdisk.path, NULL)) != 0 ) {
                 LOGE(ERROR, "xc_dom_ramdisk_file failed");
                 goto out;
             }
@@ -1043,14 +1043,14 @@ static int libxl__domain_firmware(libxl__gc *gc,
 
         if (state->pv_ramdisk.path && strlen(state->pv_ramdisk.path)) {
             if (state->pv_ramdisk.mapped) {
-                rc = xc_dom_ramdisk_mem(dom, state->pv_ramdisk.data,
-                                        state->pv_ramdisk.size);
+                rc = xc_dom_module_mem(dom, state->pv_ramdisk.data,
+                                       state->pv_ramdisk.size, NULL);
                 if (rc) {
                     LOGE(ERROR, "xc_dom_ramdisk_mem failed");
                     goto out;
                 }
             } else {
-                rc = xc_dom_ramdisk_file(dom, state->pv_ramdisk.path);
+                rc = xc_dom_module_file(dom, state->pv_ramdisk.path, NULL);
                 if (rc) {
                     LOGE(ERROR, "xc_dom_ramdisk_file failed");
                     goto out;
