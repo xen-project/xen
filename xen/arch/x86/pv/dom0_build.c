@@ -398,7 +398,8 @@ int __init dom0_construct_pv(struct domain *d,
     if ( parms.pae == XEN_PAE_EXTCR3 )
             set_bit(VMASST_TYPE_pae_extended_cr3, &d->vm_assist);
 
-    if ( (parms.virt_hv_start_low != UNSET_ADDR) && elf_32bit(&elf) )
+    if ( !pv_shim && (parms.virt_hv_start_low != UNSET_ADDR) &&
+         elf_32bit(&elf) )
     {
         unsigned long mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
         value = (parms.virt_hv_start_low + mask) & ~mask;
