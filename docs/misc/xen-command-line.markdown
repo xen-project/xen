@@ -1489,16 +1489,17 @@ constructed into a plain unprivileged PV domain.
 ### shim\_mem (x86)
 > `= List of ( min:<size> | max:<size> | <size> )`
 
-Set the amount of memory that xen-shim reserves for itself. Only has effect
-if pv-shim mode is enabled.
+Set the amount of memory that xen-shim uses. Only has effect if pv-shim mode is
+enabled. Note that this value accounts for the memory used by the shim itself
+plus the free memory slack given to the shim for runtime allocations.
 
 * `min:<size>` specifies the minimum amount of memory. Ignored if greater
-   than max. Default: 10M.
-* `max:<size>` specifies the maximum amount of memory. Default: 128M.
+   than max.
+* `max:<size>` specifies the maximum amount of memory.
 * `<size>` specifies the exact amount of memory. Overrides both min and max.
 
-By default, 1/16th of total HVM container's memory is reserved for xen-shim
-with minimum amount being 10MB and maximum amount 128MB.
+By default, the amount of free memory slack given to the shim for runtime usage
+is 1MB.
 
 ### rcu-idle-timer-period-ms
 > `= <integer>`

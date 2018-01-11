@@ -290,17 +290,9 @@ unsigned long __init dom0_compute_nr_pages(
          * for things like DMA buffers. This reservation is clamped to a
          * maximum of 128MB.
          */
-        if ( nr_pages == 0 )
-        {
-            uint64_t rsvd = min(avail / 16, 128UL << (20 - PAGE_SHIFT));
-            if ( pv_shim )
-            {
-                rsvd = pv_shim_mem(avail);
-                printk("Reserved %lu pages for xen-shim\n", rsvd);
-
-            }
-            nr_pages = -rsvd;
-        }
+        if ( !nr_pages )
+            nr_pages = -(pv_shim ? pv_shim_mem(avail)
+                                 : min(avail / 16, 128UL << (20 - PAGE_SHIFT)));
 
         /* Negative specification means "all memory - specified amount". */
         if ( (long)nr_pages  < 0 ) nr_pages  += avail;

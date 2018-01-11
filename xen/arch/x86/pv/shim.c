@@ -57,9 +57,8 @@ static long pv_shim_grant_table_op(unsigned int cmd,
                                    unsigned int count);
 
 /*
- * By default, 1/16th of total HVM container's memory is reserved for xen-shim
- * with minimum amount being 10MB and maximum amount 128MB. Some users may wish
- * to tune this constants for better memory utilization. This can be achieved
+ * By default give the shim 1MB of free memory slack. Some users may wish to
+ * tune this constants for better memory utilization. This can be achieved
  * using the following xen-shim's command line option:
  *
  * shim_mem=[min:<min_amt>,][max:<max_amt>,][<amt>]
@@ -71,8 +70,8 @@ static long pv_shim_grant_table_op(unsigned int cmd,
  *            (overrides both min and max)
  */
 static uint64_t __initdata shim_nrpages;
-static uint64_t __initdata shim_min_nrpages = 10UL << (20 - PAGE_SHIFT);
-static uint64_t __initdata shim_max_nrpages = 128UL << (20 - PAGE_SHIFT);
+static uint64_t __initdata shim_min_nrpages;
+static uint64_t __initdata shim_max_nrpages;
 
 static int __init parse_shim_mem(const char *s)
 {
@@ -91,15 +90,24 @@ custom_param("shim_mem", parse_shim_mem);
 
 uint64_t pv_shim_mem(uint64_t avail)
 {
-    uint64_t rsvd = min(avail / 16, shim_max_nrpages);
+    if ( !shim_nrpages )
+    {
+        shim_nrpages = max(shim_min_nrpages,
+                           total_pages - avail + (1UL << (20 - PAGE_SHIFT)));
+        if ( shim_max_nrpages )
+            shim_max_nrpages = min(shim_nrpages, shim_max_nrpages);
+    }
 
-    if ( shim_nrpages )
-        return shim_nrpages;
+    if ( total_pages - avail > shim_nrpages )
+        panic("pages used by shim > shim_nrpages (%#lx > %#lx)",
+              total_pages - avail, shim_nrpages);
 
-    if ( shim_min_nrpages <= shim_max_nrpages )
-        rsvd = max(rsvd, shim_min_nrpages);
+    shim_nrpages -= total_pages - avail;
 
-    return rsvd;
+    printk("shim used pages %#lx reserving %#lx free pages\n",
+           total_pages - avail, shim_nrpages);
+
+    return shim_nrpages;
 }
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER| \
