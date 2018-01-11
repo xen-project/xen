@@ -381,6 +381,13 @@ static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
          return 0;
     }
 
+    /* PVH only requires one ELF note to be set */
+    if ( parms->phys_entry != UNSET_ADDR32 )
+    {
+        elf_msg(elf, "ELF: Found PVH image\n");
+        return 0;
+    }
+
     /* Check the contents of the Xen notes or guest string. */
     if ( ((strlen(parms->loader) == 0) ||
           strncmp(parms->loader, "generic", 7)) &&
@@ -389,7 +396,7 @@ static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
     {
         elf_err(elf,
                 "ERROR: Will only load images built for the generic loader or Linux images"
-                " (Not '%.*s' and '%.*s')\n",
+                " (Not '%.*s' and '%.*s') or with PHYS32_ENTRY set\n",
                 (int)sizeof(parms->loader), parms->loader,
                 (int)sizeof(parms->guest_os), parms->guest_os);
         return -1;

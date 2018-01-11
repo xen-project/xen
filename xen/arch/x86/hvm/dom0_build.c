@@ -484,10 +484,6 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
         return -EINVAL;
     }
 
-    printk("OS: %s version: %s loader: %s bitness: %s\n", parms.guest_os,
-           parms.guest_ver, parms.loader,
-           elf_64bit(&elf) ? "64-bit" : "32-bit");
-
     /* Copy the OS image and free temporary buffer. */
     elf.dest_base = (void *)(parms.virt_kstart - parms.virt_base);
     elf.dest_size = parms.virt_kend - parms.virt_kstart;
