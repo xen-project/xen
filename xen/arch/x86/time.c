@@ -708,7 +708,8 @@ static u64 __init init_platform_timer(void)
         }
     }
 
-    BUG_ON(rc <= 0);
+    if ( rc <= 0 )
+        panic("Unable to find usable platform timer");
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
