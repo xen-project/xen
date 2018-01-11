@@ -427,7 +427,7 @@ struct domain
     xen_domain_handle_t handle;
 
     /* hvm_print_line() and guest_console_write() logging. */
-#define DOMAIN_PBUF_SIZE 80
+#define DOMAIN_PBUF_SIZE 200
     char       *pbuf;
     unsigned    pbuf_idx;
     spinlock_t  pbuf_lock;
