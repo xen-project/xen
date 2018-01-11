@@ -22,6 +22,33 @@ type vcpuinfo = {
   cputime : int64;
   cpumap : int32;
 }
+
+type xen_arm_arch_domainconfig = {
+  gic_version: int;
+  nr_spis: int;
+  clock_frequency: int32;
+}
+
+type x86_arch_emulation_flags =
+  | X86_EMU_LAPIC
+  | X86_EMU_HPET
+  | X86_EMU_PM
+  | X86_EMU_RTC
+  | X86_EMU_IOAPIC
+  | X86_EMU_PIC
+  | X86_EMU_VGA
+  | X86_EMU_IOMMU
+  | X86_EMU_PIT
+  | X86_EMU_USE_PIRQ
+
+type xen_x86_arch_domainconfig = {
+  emulation_flags: x86_arch_emulation_flags list;
+}
+
+type arch_domainconfig =
+  | ARM of xen_arm_arch_domainconfig
+  | X86 of xen_x86_arch_domainconfig
+
 type domaininfo = {
   domid : domid;
   dying : bool;
@@ -39,6 +66,7 @@ type domaininfo = {
   max_vcpu_id : int;
   ssidref : int32;
   handle : int array;
+  arch_config : arch_domainconfig;
 }
 type sched_control = { weight : int; cap : int; }
 type physinfo_cap_flag = CAP_HVM | CAP_DirectIO
