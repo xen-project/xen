@@ -714,6 +714,8 @@ any dom0 autoballooning feature present in your toolstack. See the
 _xl.conf(5)_ man page or [Xen Best
 Practices](http://wiki.xen.org/wiki/Xen_Best_Practices#Xen_dom0_dedicated_memory_and_preventing_dom0_memory_ballooning).
 
+This option doesn't have effect if pv-shim mode is enabled.
+
 ### dom0\_nodes
 
 > `= List of [ <integer> | relaxed | strict ]`
@@ -1483,6 +1485,20 @@ guest compatibly inside an HVM container.
 
 In this mode, the kernel and initrd passed as modules to the hypervisor are
 constructed into a plain unprivileged PV domain.
+
+### shim\_mem (x86)
+> `= List of ( min:<size> | max:<size> | <size> )`
+
+Set the amount of memory that xen-shim reserves for itself. Only has effect
+if pv-shim mode is enabled.
+
+* `min:<size>` specifies the minimum amount of memory. Ignored if greater
+   than max. Default: 10M.
+* `max:<size>` specifies the maximum amount of memory. Default: 128M.
+* `<size>` specifies the exact amount of memory. Overrides both min and max.
+
+By default, 1/16th of total HVM container's memory is reserved for xen-shim
+with minimum amount being 10MB and maximum amount 128MB.
 
 ### rcu-idle-timer-period-ms
 > `= <integer>`

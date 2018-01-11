@@ -51,6 +51,13 @@ static long __init parse_amt(const char *s, const char **ps)
 
 static int __init parse_dom0_mem(const char *s)
 {
+    /* xen-shim uses shim_mem parameter instead of dom0_mem */
+    if ( pv_shim )
+    {
+        printk("Ignoring dom0_mem param in pv-shim mode\n");
+        return 0;
+    }
+
     do {
         if ( !strncmp(s, "min:", 4) )
             dom0_min_nrpages = parse_amt(s+4, &s);
@@ -284,7 +291,16 @@ unsigned long __init dom0_compute_nr_pages(
          * maximum of 128MB.
          */
         if ( nr_pages == 0 )
-            nr_pages = -min(avail / 16, 128UL << (20 - PAGE_SHIFT));
+        {
+            uint64_t rsvd = min(avail / 16, 128UL << (20 - PAGE_SHIFT));
+            if ( pv_shim )
+            {
+                rsvd = pv_shim_mem(avail);
+                printk("Reserved %lu pages for xen-shim\n", rsvd);
+
+            }
+            nr_pages = -rsvd;
+        }
 
         /* Negative specification means "all memory - specified amount". */
         if ( (long)nr_pages  < 0 ) nr_pages  += avail;

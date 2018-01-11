@@ -53,6 +53,52 @@ static long pv_shim_grant_table_op(unsigned int cmd,
                                    XEN_GUEST_HANDLE_PARAM(void) uop,
                                    unsigned int count);
 
+/*
+ * By default, 1/16th of total HVM container's memory is reserved for xen-shim
+ * with minimum amount being 10MB and maximum amount 128MB. Some users may wish
+ * to tune this constants for better memory utilization. This can be achieved
+ * using the following xen-shim's command line option:
+ *
+ * shim_mem=[min:<min_amt>,][max:<max_amt>,][<amt>]
+ *
+ * <min_amt>: The minimum amount of memory that should be allocated for xen-shim
+ *            (ignored if greater than max)
+ * <max_amt>: The maximum amount of memory that should be allocated for xen-shim
+ * <amt>:     The precise amount of memory to allocate for xen-shim
+ *            (overrides both min and max)
+ */
+static uint64_t __initdata shim_nrpages;
+static uint64_t __initdata shim_min_nrpages = 10UL << (20 - PAGE_SHIFT);
+static uint64_t __initdata shim_max_nrpages = 128UL << (20 - PAGE_SHIFT);
+
+static int __init parse_shim_mem(const char *s)
+{
+    do {
+        if ( !strncmp(s, "min:", 4) )
+            shim_min_nrpages = parse_size_and_unit(s+4, &s) >> PAGE_SHIFT;
+        else if ( !strncmp(s, "max:", 4) )
+            shim_max_nrpages = parse_size_and_unit(s+4, &s) >> PAGE_SHIFT;
+        else
+            shim_nrpages = parse_size_and_unit(s, &s) >> PAGE_SHIFT;
+    } while ( *s++ == ',' );
+
+    return s[-1] ? -EINVAL : 0;
+}
+custom_param("shim_mem", parse_shim_mem);
+
+uint64_t pv_shim_mem(uint64_t avail)
+{
+    uint64_t rsvd = min(avail / 16, shim_max_nrpages);
+
+    if ( shim_nrpages )
+        return shim_nrpages;
+
+    if ( shim_min_nrpages <= shim_max_nrpages )
+        rsvd = max(rsvd, shim_min_nrpages);
+
+    return rsvd;
+}
+
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER| \
                  _PAGE_GUEST_KERNEL)
 #define COMPAT_L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
