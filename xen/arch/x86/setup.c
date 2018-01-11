@@ -1584,18 +1584,26 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     do_presmp_initcalls();
 
-    for_each_present_cpu ( i )
+    /*
+     * NB: when running as a PV shim VCPUOP_up/down is wired to the shim
+     * physical cpu_add/remove functions, so launch the guest with only
+     * the BSP online and let it bring up the other CPUs as required.
+     */
+    if ( !pv_shim )
     {
-        /* Set up cpu_to_node[]. */
-        srat_detect_node(i);
-        /* Set up node_to_cpumask based on cpu_to_node[]. */
-        numa_add_cpu(i);        
-
-        if ( (num_online_cpus() < max_cpus) && !cpu_online(i) )
+        for_each_present_cpu ( i )
         {
-            int ret = cpu_up(i);
-            if ( ret != 0 )
-                printk("Failed to bring up CPU %u (error %d)\n", i, ret);
+            /* Set up cpu_to_node[]. */
+            srat_detect_node(i);
+            /* Set up node_to_cpumask based on cpu_to_node[]. */
+            numa_add_cpu(i);
+
+            if ( (num_online_cpus() < max_cpus) && !cpu_online(i) )
+            {
+                int ret = cpu_up(i);
+                if ( ret != 0 )
+                    printk("Failed to bring up CPU %u (error %d)\n", i, ret);
+            }
         }
     }
 

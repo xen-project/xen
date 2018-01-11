@@ -138,9 +138,18 @@ struct vcpu *__init dom0_setup_vcpu(struct domain *d,
 
     if ( v )
     {
-        if ( !d->is_pinned && !dom0_affinity_relaxed )
-            cpumask_copy(v->cpu_hard_affinity, &dom0_cpus);
-        cpumask_copy(v->cpu_soft_affinity, &dom0_cpus);
+        if ( pv_shim )
+        {
+
+            cpumask_setall(v->cpu_hard_affinity);
+            cpumask_setall(v->cpu_soft_affinity);
+        }
+        else
+        {
+            if ( !d->is_pinned && !dom0_affinity_relaxed )
+                cpumask_copy(v->cpu_hard_affinity, &dom0_cpus);
+            cpumask_copy(v->cpu_soft_affinity, &dom0_cpus);
+        }
     }
 
     return v;
@@ -152,6 +161,21 @@ unsigned int __init dom0_max_vcpus(void)
 {
     unsigned int i, max_vcpus, limit;
     nodeid_t node;
+
+    if ( pv_shim )
+    {
+        nodes_setall(dom0_nodes);
+
+        /*
+         * When booting in shim mode APs are not started until the guest brings
+         * other vCPUs up.
+         */
+        cpumask_set_cpu(0, &dom0_cpus);
+
+        /* On PV shim mode allow the guest to have as many CPUs as available. */
+        return nr_cpu_ids;
+    }
+
 
     for ( i = 0; i < dom0_nr_pxms; ++i )
         if ( (node = pxm_to_node(dom0_pxms[i])) != NUMA_NO_NODE )
