@@ -31,9 +31,8 @@
 #define L3_PROT (BASE_PROT|_PAGE_DIRTY)
 #define L4_PROT (BASE_PROT|_PAGE_DIRTY)
 
-static __init void dom0_update_physmap(struct domain *d, unsigned long pfn,
-                                       unsigned long mfn,
-                                       unsigned long vphysmap_s)
+void __init dom0_update_physmap(struct domain *d, unsigned long pfn,
+                                unsigned long mfn, unsigned long vphysmap_s)
 {
     if ( !is_pv_32bit_domain(d) )
         ((unsigned long *)vphysmap_s)[pfn] = mfn;
@@ -315,6 +314,10 @@ int __init dom0_construct_pv(struct domain *d,
     unsigned long vphysmap_end;
     unsigned long vstartinfo_start;
     unsigned long vstartinfo_end;
+    unsigned long vxenstore_start = 0;
+    unsigned long vxenstore_end = 0;
+    unsigned long vconsole_start = 0;
+    unsigned long vconsole_end = 0;
     unsigned long vstack_start;
     unsigned long vstack_end;
     unsigned long vpt_start;
@@ -440,11 +443,22 @@ int __init dom0_construct_pv(struct domain *d,
     if ( parms.p2m_base != UNSET_ADDR )
         vphysmap_end = vphysmap_start;
     vstartinfo_start = round_pgup(vphysmap_end);
-    vstartinfo_end   = (vstartinfo_start +
-                        sizeof(struct start_info) +
-                        sizeof(struct dom0_vga_console_info));
+    vstartinfo_end   = vstartinfo_start + sizeof(struct start_info);
 
-    vpt_start        = round_pgup(vstartinfo_end);
+    if ( pv_shim )
+    {
+        vxenstore_start  = round_pgup(vstartinfo_end);
+        vxenstore_end    = vxenstore_start + PAGE_SIZE;
+        vconsole_start   = vxenstore_end;
+        vconsole_end     = vconsole_start + PAGE_SIZE;
+        vpt_start        = vconsole_end;
+    }
+    else
+    {
+        vpt_start        = round_pgup(vstartinfo_end);
+        vstartinfo_end  += sizeof(struct dom0_vga_console_info);
+    }
+
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
         vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
@@ -537,6 +551,8 @@ int __init dom0_construct_pv(struct domain *d,
            " Init. ramdisk: %p->%p\n"
            " Phys-Mach map: %p->%p\n"
            " Start info:    %p->%p\n"
+           " Xenstore ring: %p->%p\n"
+           " Console ring:  %p->%p\n"
            " Page tables:   %p->%p\n"
            " Boot stack:    %p->%p\n"
            " TOTAL:         %p->%p\n",
@@ -544,6 +560,8 @@ int __init dom0_construct_pv(struct domain *d,
            _p(vinitrd_start), _p(vinitrd_end),
            _p(vphysmap_start), _p(vphysmap_end),
            _p(vstartinfo_start), _p(vstartinfo_end),
+           _p(vxenstore_start), _p(vxenstore_end),
+           _p(vconsole_start), _p(vconsole_end),
            _p(vpt_start), _p(vpt_end),
            _p(vstack_start), _p(vstack_end),
            _p(v_start), _p(v_end));
@@ -737,7 +755,8 @@ int __init dom0_construct_pv(struct domain *d,
 
     si->shared_info = virt_to_maddr(d->shared_info);
 
-    si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
+    if ( !pv_shim )
+        si->flags    = SIF_PRIVILEGED | SIF_INITDOMAIN;
     if ( !vinitrd_start && initrd_len )
         si->flags   |= SIF_MOD_START_PFN;
     si->flags       |= (xen_processor_pmbits << 8) & SIF_PM_MASK;
@@ -829,15 +848,24 @@ int __init dom0_construct_pv(struct domain *d,
         strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
 
 #ifdef CONFIG_VIDEO
-    if ( fill_console_start_info((void *)(si + 1)) )
+    if ( !pv_shim && fill_console_start_info((void *)(si + 1)) )
     {
         si->console.dom0.info_off  = sizeof(struct start_info);
         si->console.dom0.info_size = sizeof(struct dom0_vga_console_info);
     }
 #endif
 
+    /*
+     * TODO: provide an empty stub for fill_console_start_info in the
+     * !CONFIG_VIDEO case so the logic here can be simplified.
+     */
+    if ( pv_shim )
+        pv_shim_setup_dom(d, l4start, v_start, vxenstore_start, vconsole_start,
+                          vphysmap_start, si);
+
     if ( is_pv_32bit_domain(d) )
-        xlat_start_info(si, XLAT_start_info_console_dom0);
+        xlat_start_info(si, pv_shim ? XLAT_start_info_console_domU
+                                    : XLAT_start_info_console_dom0);
 
     /* Return to idle domain's page tables. */
     mapcache_override_current(NULL);

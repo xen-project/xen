@@ -1,6 +1,7 @@
 #ifndef _DOM0_BUILD_H_
 #define _DOM0_BUILD_H_
 
+#include <xen/libelf.h>
 #include <xen/sched.h>
 
 #include <asm/setup.h>
@@ -26,6 +27,9 @@ int dom0_construct_pvh(struct domain *d, const module_t *image,
 
 unsigned long dom0_paging_pages(const struct domain *d,
                                 unsigned long nr_pages);
+
+void dom0_update_physmap(struct domain *d, unsigned long pfn,
+                         unsigned long mfn, unsigned long vphysmap_s);
 
 #endif	/* _DOM0_BUILD_H_ */
 
