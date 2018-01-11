@@ -642,7 +642,12 @@ void machine_restart(unsigned int delay_millisecs)
             break;
 
         case BOOT_XEN:
-            xen_hypercall_shutdown(SHUTDOWN_reboot);
+            /*
+             * When running in PV shim mode guest shutdown calls are
+             * forwarded to L0, hence the only way to get here is if a
+             * shim crash happens.
+             */
+            xen_hypercall_shutdown(pv_shim ? SHUTDOWN_crash : SHUTDOWN_reboot);
             break;
         }
     }
