@@ -421,6 +421,7 @@ int xc_domain_getinfo(xc_interface *xch,
         info->nr_online_vcpus = domctl.u.getdomaininfo.nr_online_vcpus;
         info->max_vcpu_id = domctl.u.getdomaininfo.max_vcpu_id;
         info->cpupool = domctl.u.getdomaininfo.cpupool;
+        info->arch_config = domctl.u.getdomaininfo.arch_config;
 
         memcpy(info->handle, domctl.u.getdomaininfo.handle,
                sizeof(xen_domain_handle_t));
