@@ -603,7 +603,7 @@ static inline struct domain *rcu_lock_current_domain(void)
 struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
 int domain_kill(struct domain *d);
-void domain_shutdown(struct domain *d, u8 reason);
+int domain_shutdown(struct domain *d, u8 reason);
 void domain_resume(struct domain *d);
 void domain_pause_for_debugger(void);
 

@@ -348,6 +348,35 @@ uint32_t hypervisor_cpuid_base(void)
     return xen_cpuid_base;
 }
 
+static void ap_resume(void *unused)
+{
+    map_vcpuinfo();
+    init_evtchn();
+}
+
+void hypervisor_resume(void)
+{
+    /* Reset shared info page. */
+    map_shared_info();
+
+    /*
+     * Reset vcpu_info. Just clean the mapped bitmap and try to map the vcpu
+     * area again. On failure to map (when it was previously mapped) panic
+     * since it's impossible to safely shut down running guest vCPUs in order
+     * to meet the new XEN_LEGACY_MAX_VCPUS requirement.
+     */
+    bitmap_zero(vcpu_info_mapped, NR_CPUS);
+    if ( map_vcpuinfo() && nr_cpu_ids > XEN_LEGACY_MAX_VCPUS )
+        panic("unable to remap vCPU info and vCPUs > legacy limit");
+
+    /* Setup event channel upcall vector. */
+    init_evtchn();
+    smp_call_function(ap_resume, NULL, 1);
+
+    if ( pv_console )
+        pv_console_init();
+}
+
 /*
  * Local variables:
  * mode: C

@@ -160,10 +160,159 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
     guest = d;
 }
 
-void pv_shim_shutdown(uint8_t reason)
+static void write_start_info(struct domain *d)
 {
-    /* XXX: handle suspend */
-    xen_hypercall_shutdown(reason);
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    start_info_t *si = map_domain_page(_mfn(is_pv_32bit_domain(d) ? regs->edx
+                                                                  : regs->rdx));
+    uint64_t param;
+
+    snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%s",
+             is_pv_32bit_domain(d) ? "32p" : "64");
+    si->nr_pages = d->tot_pages;
+    si->shared_info = virt_to_maddr(d->shared_info);
+    si->flags = 0;
+    BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_STORE_PFN, &si->store_mfn));
+    BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_STORE_EVTCHN, &param));
+    si->store_evtchn = param;
+    BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_CONSOLE_EVTCHN, &param));
+    si->console.domU.evtchn = param;
+    if ( pv_console )
+        si->console.domU.mfn = virt_to_mfn(consoled_get_ring_addr());
+    else if ( xen_hypercall_hvm_get_param(HVM_PARAM_CONSOLE_PFN,
+                                          &si->console.domU.mfn) )
+        BUG();
+
+    if ( is_pv_32bit_domain(d) )
+        xlat_start_info(si, XLAT_start_info_console_domU);
+
+    unmap_domain_page(si);
+}
+
+int pv_shim_shutdown(uint8_t reason)
+{
+    struct domain *d = current->domain;
+    struct vcpu *v;
+    unsigned int i;
+    uint64_t old_store_pfn, old_console_pfn = 0, store_pfn, console_pfn;
+    uint64_t store_evtchn, console_evtchn;
+    long rc;
+
+    if ( reason != SHUTDOWN_suspend )
+        /* Forward to L0. */
+        return xen_hypercall_shutdown(reason);
+
+    BUG_ON(current->vcpu_id != 0);
+
+    BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_STORE_PFN, &old_store_pfn));
+    if ( !pv_console )
+        BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_CONSOLE_PFN,
+                                           &old_console_pfn));
+
+    /* Pause the other vcpus before starting the migration. */
+    for_each_vcpu(d, v)
+        if ( v != current )
+            vcpu_pause_by_systemcontroller(v);
+
+    rc = xen_hypercall_shutdown(SHUTDOWN_suspend);
+    if ( rc )
+    {
+        for_each_vcpu(d, v)
+            if ( v != current )
+                vcpu_unpause_by_systemcontroller(v);
+
+        return rc;
+    }
+
+    /* Resume the shim itself first. */
+    hypervisor_resume();
+
+    /*
+     * ATM there's nothing Xen can do if the console/store pfn changes,
+     * because Xen won't have a page_info struct for it.
+     */
+    BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_STORE_PFN, &store_pfn));
+    BUG_ON(old_store_pfn != store_pfn);
+    if ( !pv_console )
+    {
+        BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_CONSOLE_PFN,
+                                           &console_pfn));
+        BUG_ON(old_console_pfn != console_pfn);
+    }
+
+    /* Update domain id. */
+    d->domain_id = get_initial_domain_id();
+
+    /* Clean the iomem range. */
+    BUG_ON(iomem_deny_access(d, 0, ~0UL));
+
+    /* Clean grant frames. */
+    xfree(grant_frames);
+    grant_frames = NULL;
+    nr_grant_list = 0;
+
+    /* Clean event channels. */
+    for ( i = 0; i < EVTCHN_2L_NR_CHANNELS; i++ )
+    {
+        if ( !port_is_valid(d, i) )
+            continue;
+
+        if ( evtchn_handled(d, i) )
+            evtchn_close(d, i, false);
+        else
+            evtchn_free(d, evtchn_from_port(d, i));
+    }
+
+    /* Reserve store/console event channel. */
+    BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_STORE_EVTCHN, &store_evtchn));
+    BUG_ON(evtchn_allocate_port(d, store_evtchn));
+    evtchn_reserve(d, store_evtchn);
+    BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_CONSOLE_EVTCHN,
+                                       &console_evtchn));
+    BUG_ON(evtchn_allocate_port(d, console_evtchn));
+    evtchn_reserve(d, console_evtchn);
+
+    /* Clean watchdogs. */
+    watchdog_domain_destroy(d);
+    watchdog_domain_init(d);
+
+    /* Clean the PIRQ EOI page. */
+    if ( d->arch.pirq_eoi_map != NULL )
+    {
+        unmap_domain_page_global(d->arch.pirq_eoi_map);
+        put_page_and_type(mfn_to_page(d->arch.pirq_eoi_map_mfn));
+        d->arch.pirq_eoi_map = NULL;
+        d->arch.pirq_eoi_map_mfn = 0;
+        d->arch.auto_unmask = 0;
+    }
+
+    /*
+     * NB: there's no need to fixup the p2m, since the mfns assigned
+     * to the PV guest have not changed at all. Just re-write the
+     * start_info fields with the appropriate value.
+     */
+    write_start_info(d);
+
+    for_each_vcpu(d, v)
+    {
+        /* Unmap guest vcpu_info pages. */
+        unmap_vcpu_info(v);
+
+        /* Reset the periodic timer to the default value. */
+        v->periodic_period = MILLISECS(10);
+        /* Stop the singleshot timer. */
+        stop_timer(&v->singleshot_timer);
+
+        if ( test_bit(_VPF_down, &v->pause_flags) )
+            BUG_ON(vcpu_reset(v));
+
+        if ( v != current )
+            vcpu_unpause_by_systemcontroller(v);
+        else
+            vcpu_force_reschedule(v);
+    }
+
+    return 0;
 }
 
 static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
