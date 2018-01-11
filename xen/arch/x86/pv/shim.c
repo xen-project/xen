@@ -22,6 +22,7 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/init.h>
+#include <xen/iocap.h>
 #include <xen/shutdown.h>
 #include <xen/types.h>
 
@@ -32,6 +33,8 @@
 
 #include <public/arch-x86/cpuid.h>
 
+#include <compat/grant_table.h>
+
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
 bool pv_shim;
 boolean_param("pv-shim", pv_shim);
@@ -39,7 +42,14 @@ boolean_param("pv-shim", pv_shim);
 
 static struct domain *guest;
 
+static unsigned int nr_grant_list;
+static unsigned long *grant_frames;
+static DEFINE_SPINLOCK(grant_lock);
+
 static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
+static long pv_shim_grant_table_op(unsigned int cmd,
+                                   XEN_GUEST_HANDLE_PARAM(void) uop,
+                                   unsigned int count);
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER| \
                  _PAGE_GUEST_KERNEL)
@@ -127,6 +137,9 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
     pv_hypercall_table_replace(__HYPERVISOR_event_channel_op,
                                (hypercall_fn_t *)pv_shim_event_channel_op,
                                (hypercall_fn_t *)pv_shim_event_channel_op);
+    pv_hypercall_table_replace(__HYPERVISOR_grant_table_op,
+                               (hypercall_fn_t *)pv_shim_grant_table_op,
+                               (hypercall_fn_t *)pv_shim_grant_table_op);
     guest = d;
 }
 
@@ -361,6 +374,157 @@ void pv_shim_inject_evtchn(unsigned int port)
 
          evtchn_port_set_pending(guest, chn->notify_vcpu_id, chn);
     }
+}
+
+static long pv_shim_grant_table_op(unsigned int cmd,
+                                   XEN_GUEST_HANDLE_PARAM(void) uop,
+                                   unsigned int count)
+{
+    struct domain *d = current->domain;
+    long rc = 0;
+
+    if ( count != 1 )
+        return -EINVAL;
+
+    switch ( cmd )
+    {
+    case GNTTABOP_setup_table:
+    {
+        bool compat = is_pv_32bit_domain(d);
+        struct gnttab_setup_table nat;
+        struct compat_gnttab_setup_table cmp;
+        unsigned int i;
+
+        if ( unlikely(compat ? copy_from_guest(&cmp, uop, 1)
+                             : copy_from_guest(&nat, uop, 1)) ||
+             unlikely(compat ? !compat_handle_okay(cmp.frame_list,
+                                                   cmp.nr_frames)
+                             : !guest_handle_okay(nat.frame_list,
+                                                  nat.nr_frames)) )
+        {
+            rc = -EFAULT;
+            break;
+        }
+        if ( compat )
+#define XLAT_gnttab_setup_table_HNDL_frame_list(d, s)
+                XLAT_gnttab_setup_table(&nat, &cmp);
+#undef XLAT_gnttab_setup_table_HNDL_frame_list
+
+        nat.status = GNTST_okay;
+
+        spin_lock(&grant_lock);
+        if ( !nr_grant_list )
+        {
+            struct gnttab_query_size query_size = {
+                .dom = DOMID_SELF,
+            };
+
+            rc = xen_hypercall_grant_table_op(GNTTABOP_query_size,
+                                              &query_size, 1);
+            if ( rc )
+            {
+                spin_unlock(&grant_lock);
+                break;
+            }
+
+            ASSERT(!grant_frames);
+            grant_frames = xzalloc_array(unsigned long,
+                                         query_size.max_nr_frames);
+            if ( !grant_frames )
+            {
+                spin_unlock(&grant_lock);
+                rc = -ENOMEM;
+                break;
+            }
+
+            nr_grant_list = query_size.max_nr_frames;
+        }
+
+        if ( nat.nr_frames > nr_grant_list )
+        {
+            spin_unlock(&grant_lock);
+            rc = -EINVAL;
+            break;
+        }
+
+        for ( i = 0; i < nat.nr_frames; i++ )
+        {
+            if ( !grant_frames[i] )
+            {
+                struct xen_add_to_physmap xatp = {
+                    .domid = DOMID_SELF,
+                    .idx = i,
+                    .space = XENMAPSPACE_grant_table,
+                };
+                mfn_t mfn;
+
+                rc = hypervisor_alloc_unused_page(&mfn);
+                if ( rc )
+                {
+                    gprintk(XENLOG_ERR,
+                            "unable to get memory for grant table\n");
+                    break;
+                }
+
+                xatp.gpfn = mfn_x(mfn);
+                rc = xen_hypercall_memory_op(XENMEM_add_to_physmap, &xatp);
+                if ( rc )
+                {
+                    hypervisor_free_unused_page(mfn);
+                    break;
+                }
+
+                BUG_ON(iomem_permit_access(d, mfn_x(mfn), mfn_x(mfn)));
+                grant_frames[i] = mfn_x(mfn);
+            }
+
+            ASSERT(grant_frames[i]);
+            if ( compat )
+            {
+                compat_pfn_t pfn = grant_frames[i];
+
+                if ( __copy_to_compat_offset(cmp.frame_list, i, &pfn, 1) )
+                {
+                    nat.status = GNTST_bad_virt_addr;
+                    rc = -EFAULT;
+                    break;
+                }
+            }
+            else if ( __copy_to_guest_offset(nat.frame_list, i,
+                                             &grant_frames[i], 1) )
+            {
+                nat.status = GNTST_bad_virt_addr;
+                rc = -EFAULT;
+                break;
+            }
+        }
+        spin_unlock(&grant_lock);
+
+        if ( compat )
+#define XLAT_gnttab_setup_table_HNDL_frame_list(d, s)
+                XLAT_gnttab_setup_table(&cmp, &nat);
+#undef XLAT_gnttab_setup_table_HNDL_frame_list
+
+        if ( unlikely(compat ? __copy_to_guest(uop, &cmp, 1)
+                             : __copy_to_guest(uop, &nat, 1)) )
+        {
+            rc = -EFAULT;
+            break;
+        }
+
+        break;
+    }
+
+    case GNTTABOP_query_size:
+        rc = xen_hypercall_grant_table_op(GNTTABOP_query_size, uop.p, count);
+        break;
+
+    default:
+        rc = -EOPNOTSUPP;
+        break;
+    }
+
+    return rc;
 }
 
 domid_t get_initial_domain_id(void)

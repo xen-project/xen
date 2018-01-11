@@ -110,6 +110,12 @@ static inline long xen_hypercall_event_channel_op(unsigned int cmd, void *arg)
     return _hypercall64_2(long, __HYPERVISOR_event_channel_op, cmd, arg);
 }
 
+static inline long xen_hypercall_grant_table_op(unsigned int cmd, void *arg,
+                                                unsigned int count)
+{
+    return _hypercall64_3(long, __HYPERVISOR_grant_table_op, cmd, arg, count);
+}
+
 static inline long xen_hypercall_hvm_op(unsigned int op, void *arg)
 {
     return _hypercall64_2(long, __HYPERVISOR_hvm_op, op, arg);
