@@ -17,6 +17,7 @@
 
 #include <asm/bzimage.h>
 #include <asm/dom0_build.h>
+#include <asm/guest.h>
 #include <asm/page.h>
 #include <asm/pv/mm.h>
 #include <asm/setup.h>
@@ -373,7 +374,7 @@ int __init dom0_construct_pv(struct domain *d,
 
     if ( parms.elf_notes[XEN_ELFNOTE_SUPPORTED_FEATURES].type != XEN_ENT_NONE )
     {
-        if ( !test_bit(XENFEAT_dom0, parms.f_supported) )
+        if ( !pv_shim && !test_bit(XENFEAT_dom0, parms.f_supported) )
         {
             printk("Kernel does not support Dom0 operation\n");
             rc = -EINVAL;
