@@ -1327,7 +1327,7 @@ static void __init ehci_dbgp_init_preirq(struct serial_port *port)
      * than enough.  1k is the biggest that was seen.
      */
     set_fixmap_nocache(FIX_EHCI_DBGP, dbgp->bar_val);
-    ehci_bar = (void __iomem *)fix_to_virt(FIX_EHCI_DBGP);
+    ehci_bar = fix_to_virt(FIX_EHCI_DBGP);
     ehci_bar += dbgp->bar_val & ~PAGE_MASK;
     dbgp_printk("ehci_bar: %p\n", ehci_bar);
 

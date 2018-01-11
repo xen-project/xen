@@ -119,7 +119,7 @@
 /* Only available in x2APIC mode */
 #define		APIC_SELF_IPI	0x3F0
 
-#define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
+#define APIC_BASE __fix_to_virt(FIX_APIC_BASE)
 
 /* It's only used in x2APIC mode of an x2APIC unit. */
 #define APIC_MSR_BASE 0x800

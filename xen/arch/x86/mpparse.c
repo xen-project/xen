@@ -703,7 +703,7 @@ static void __init efi_check_config(void)
 		return;
 
 	__set_fixmap(FIX_EFI_MPF, PFN_DOWN(efi.mps), __PAGE_HYPERVISOR);
-	mpf = (void *)fix_to_virt(FIX_EFI_MPF) + ((long)efi.mps & (PAGE_SIZE-1));
+	mpf = fix_to_virt(FIX_EFI_MPF) + ((long)efi.mps & (PAGE_SIZE-1));
 
 	if (memcmp(mpf->mpf_signature, "_MP_", 4) == 0 &&
 	    mpf->mpf_length == 1 &&

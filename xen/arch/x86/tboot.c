@@ -82,7 +82,7 @@ static void __init tboot_copy_memory(unsigned char *va, uint32_t size,
         {
             map_base = PFN_DOWN(pa + i);
             set_fixmap(FIX_TBOOT_MAP_ADDRESS, map_base << PAGE_SHIFT);
-            map_addr = (unsigned char *)fix_to_virt(FIX_TBOOT_MAP_ADDRESS);
+            map_addr = fix_to_virt(FIX_TBOOT_MAP_ADDRESS);
         }
         va[i] = map_addr[pa + i - (map_base << PAGE_SHIFT)];
     }
@@ -98,7 +98,7 @@ void __init tboot_probe(void)
 
     /* Map and check for tboot UUID. */
     set_fixmap(FIX_TBOOT_SHARED_BASE, opt_tboot_pa);
-    tboot_shared = (tboot_shared_t *)fix_to_virt(FIX_TBOOT_SHARED_BASE);
+    tboot_shared = fix_to_virt(FIX_TBOOT_SHARED_BASE);
     if ( tboot_shared == NULL )
         return;
     if ( memcmp(&tboot_shared_uuid, (uuid_t *)tboot_shared, sizeof(uuid_t)) )
