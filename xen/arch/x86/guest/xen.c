@@ -18,6 +18,7 @@
  *
  * Copyright (c) 2017 Citrix Systems Ltd.
  */
+#include <xen/event.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/pfn.h>
@@ -193,11 +194,31 @@ static void __init init_memmap(void)
 static void xen_evtchn_upcall(struct cpu_user_regs *regs)
 {
     struct vcpu_info *vcpu_info = this_cpu(vcpu_info);
+    unsigned long pending;
 
     vcpu_info->evtchn_upcall_pending = 0;
-    write_atomic(&vcpu_info->evtchn_pending_sel, 0);
+    pending = xchg(&vcpu_info->evtchn_pending_sel, 0);
 
-    pv_console_rx(regs);
+    while ( pending )
+    {
+        unsigned int l1 = find_first_set_bit(pending);
+        unsigned long evtchn = xchg(&XEN_shared_info->evtchn_pending[l1], 0);
+
+        __clear_bit(l1, &pending);
+        evtchn &= ~XEN_shared_info->evtchn_mask[l1];
+        while ( evtchn )
+        {
+            unsigned int port = find_first_set_bit(evtchn);
+
+            __clear_bit(port, &evtchn);
+            port += l1 * BITS_PER_LONG;
+
+            if ( pv_console && port == pv_console_evtchn() )
+                pv_console_rx(regs);
+            else if ( pv_shim )
+                pv_shim_inject_evtchn(port);
+        }
+    }
 
     ack_APIC_irq();
 }
