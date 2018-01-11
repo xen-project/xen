@@ -1301,22 +1301,36 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         break;
 
-    case VCPUOP_up: {
-        bool_t wake = 0;
-        domain_lock(d);
-        if ( !v->is_initialised )
-            rc = -EINVAL;
+    case VCPUOP_up:
+#ifdef CONFIG_X86
+        if ( pv_shim )
+            rc = continue_hypercall_on_cpu(0, pv_shim_cpu_up, v);
         else
-            wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
-        domain_unlock(d);
-        if ( wake )
-            vcpu_wake(v);
+#endif
+        {
+            bool wake = false;
+
+            domain_lock(d);
+            if ( !v->is_initialised )
+                rc = -EINVAL;
+            else
+                wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
+            domain_unlock(d);
+            if ( wake )
+                vcpu_wake(v);
+        }
+
         break;
-    }
 
     case VCPUOP_down:
-        if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
-            vcpu_sleep_nosync(v);
+#ifdef CONFIG_X86
+        if ( pv_shim )
+            rc = continue_hypercall_on_cpu(0, pv_shim_cpu_down, v);
+        else
+#endif
+            if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
+                vcpu_sleep_nosync(v);
+
         break;
 
     case VCPUOP_is_up:
