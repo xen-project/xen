@@ -165,6 +165,15 @@
 /* Convert pfn to physical address space. */
 #define pfn_to_paddr(x) ((uint64_t)(x) << XC_PAGE_SHIFT)
 
+/* see libxl.h's definitions of LIBXL_BUILDINFO_SUBFIELD_PVH etc. */
+# define U_PV_OK( b) LIBXL_BUILDINFO_ACCESS_PVH_PV_OK( (b))
+# define U_HVM_OK(b) LIBXL_BUILDINFO_ACCESS_PVH_HVM_OK((b))
+# define U_PV_F( b, f) LIBXL_BUILDINFO_ACCESS_PVH_PV( (b),f)
+# define U_HVM_F(b, f) LIBXL_BUILDINFO_ACCESS_PVH_HVM((b),f)
+# define U_PVH LIBXL_BUILDINFO_SUBFIELD_PVH
+# define U_PV  LIBXL_BUILDINFO_SUBFIELD_PV
+# define U_HVM LIBXL_BUILDINFO_SUBFIELD_HVM
+
 /* logging */
 _hidden void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file /* may be 0 */, int line /* ignored if !file */,

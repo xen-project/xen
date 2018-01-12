@@ -65,7 +65,7 @@ void libxl__rdm_setdefault(libxl__gc *gc, libxl_domain_build_info *b_info)
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
-    int i;
+    int i, rc;
 
     if (b_info->type != LIBXL_DOMAIN_TYPE_HVM &&
         b_info->type != LIBXL_DOMAIN_TYPE_PV) {
@@ -94,7 +94,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (b_info->device_model_version
                 == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             const char *dm;
-            int rc;
 
             dm = libxl__domain_device_model(gc, b_info);
             rc = access(dm, X_OK);
@@ -307,9 +306,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             break;
         }
 
-        if (b_info->u.hvm.timer_mode == LIBXL_TIMER_MODE_DEFAULT)
-            b_info->u.hvm.timer_mode =
-                LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
+        if (libxl__timer_mode_is_default(&b_info->u.hvm.timer_mode))
+            b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
 
         libxl_defbool_setdefault(&b_info->u.hvm.pae,                true);
         libxl_defbool_setdefault(&b_info->u.hvm.apic,               true);
