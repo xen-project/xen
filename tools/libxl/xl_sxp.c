@@ -74,12 +74,12 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
     fprintf(fh, "\t(nomigrate %s)\n",
            libxl_defbool_to_string(b_info->disable_migrate));
 
-    if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->u.pv.bootloader) {
-        fprintf(fh, "\t(bootloader %s)\n", b_info->u.pv.bootloader);
-        if (b_info->u.pv.bootloader_args) {
+    if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->U_PV bootloader) {
+        fprintf(fh, "\t(bootloader %s)\n", b_info->U_PV bootloader);
+        if (b_info->U_PV bootloader_args) {
             fprintf(fh, "\t(bootloader_args");
-            for (i=0; b_info->u.pv.bootloader_args[i]; i++)
-                fprintf(fh, " %s", b_info->u.pv.bootloader_args[i]);
+            for (i=0; b_info->U_PV bootloader_args[i]; i++)
+                fprintf(fh, " %s", b_info->U_PV bootloader_args[i]);
             fprintf(fh, ")\n");
         }
     }
@@ -93,7 +93,7 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
         fprintf(fh, "\t\t\t(shadow_memkb %"PRId64")\n", b_info->shadow_memkb);
         fprintf(fh, "\t\t\t(pae %s)\n", libxl_defbool_to_string(b_info->u.hvm.pae));
         fprintf(fh, "\t\t\t(apic %s)\n",
-               libxl_defbool_to_string(b_info->u.hvm.apic));
+               libxl_defbool_to_string(b_info->U_HVM apic));
         fprintf(fh, "\t\t\t(acpi %s)\n",
                libxl_defbool_to_string(b_info->u.hvm.acpi));
         fprintf(fh, "\t\t\t(nx %s)\n", libxl_defbool_to_string(b_info->u.hvm.nx));
@@ -104,9 +104,9 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
         fprintf(fh, "\t\t\t(vpt_align %s)\n",
                libxl_defbool_to_string(b_info->u.hvm.vpt_align));
         fprintf(fh, "\t\t\t(timer_mode %s)\n",
-               libxl_timer_mode_to_string(b_info->u.hvm.timer_mode));
+               libxl_timer_mode_to_string(b_info->U_HVM timer_mode));
         fprintf(fh, "\t\t\t(nestedhvm %s)\n",
-               libxl_defbool_to_string(b_info->u.hvm.nested_hvm));
+               libxl_defbool_to_string(b_info->U_HVM nested_hvm));
         fprintf(fh, "\t\t\t(stdvga %s)\n", b_info->u.hvm.vga.kind ==
                                       LIBXL_VGA_INTERFACE_TYPE_STD ?
                                       "True" : "False");

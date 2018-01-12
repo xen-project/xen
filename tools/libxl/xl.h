@@ -216,6 +216,38 @@ extern void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
 #define XL_GLOBAL_CONFIG XEN_CONFIG_DIR "/xl.conf"
 #define XL_LOCK_FILE XEN_LOCK_DIR "/xl"
 
+
+/*
+ * straight out of libxl.h
+ * we don't need all this compat but it's harmless
+ */
+#if defined(LIBXL_BUILDINFO_PVH_ACCESS_PVH_HVM) // post-Meltdown
+# define U_PV_OK( b) LIBXL_BUILDINFO_ACCESS_PVH_PV_OK( (b))
+# define U_HVM_OK(b) LIBXL_BUILDINFO_ACCESS_PVH_HVM_OK((b))
+# define U_PV_F( b, f) LIBXL_BUILDINFO_ACCESS_PVH_PV( (b),f)
+# define U_HVM_F(b, f) LIBXL_BUILDINFO_ACCESS_PVH_HVM((b),f)
+# define U_PVH LIBXL_BUILDINFO_SUBFIELD_PVH
+# define U_PV  LIBXL_BUILDINFO_SUBFIELD_PV
+# define U_HVM LIBXL_BUILDINFO_SUBFIELD_HVM
+#elif defined(LIBXL_HAVE_BUILDINFO_APIC) // >= 4.10 pre-Meltdown
+# define U_PV_OK( b) 1
+# define U_HVM_OK(b) 1
+# define U_PV_F( b, f) (&(b)->f)
+# define U_HVM_F(b, f) (&(b)->f)
+* define U_PVH // empty
+* define U_PV  // empty
+* define U_HVM // empty
+#else // Xen <= 4.9 pre-Meltdown
+# define U_PV_OK( b) ((b)->type == LIBXL_DOMAIN_TYPE_PV )
+# define U_HVM_OK(b) ((b)->type == LIBXL_DOMAIN_TYPE_HVM)
+# define U_PV_F( b, f) (&(b)->u.pv .f)
+# define U_HVM_F(b, f) (&(b)->u.hvm.f)
+# define U_PVH UNAVAILABLE_BECAUSE_NO_PVH_SUPPORT_XEN_TOO_OLD
+# define U_PV  u.pv.
+# define U_HVM u.hvm.
+#endif
+
+
 #endif /* XL_H */
 
 /*
