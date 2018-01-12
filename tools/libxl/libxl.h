@@ -288,6 +288,98 @@
 #define LIBXL_HAVE_SCHED_CREDIT2_PARAMS 1
 
 /*
+ * LIBXL_BUILDINFO_SUBFIELD_PVH     #defined to simply   u.pvh.  or empty
+ * LIBXL_BUILDINFO_SUBFIELD_PV      #defined to simply   u.pv.   or empty
+ * LIBXL_BUILDINFO_SUBFIELD_HVM     #defined to simply   u.hvm.  or empty
+ *
+ * int LIBXL_BUILDINFO_ACCESS_PVH_{PV,HVM}_OK(
+ *                 libxl_domain_build_info *b_info,
+ *            )
+ * field_type *LIBXL_BUILDINFO_ACCESS_PVH_{PV,HVM}(
+ *                 libxl_domain_build_info *b_info,
+ *                 field_name
+ *            )
+ *
+ * Maybe used to access these fields of libxl_domain_build_info
+ *
+ *     Xen 4.9 and earlier      Xen <= 4.9        Xen 4.10 and later
+ *      HVM and PV guests        PVH guests        all guests
+ *
+ *       .u.pv.bootloader        .u.pvh.bootloader         .bootloader
+ *       .u.pv.bootloader_args   .u.pvh.bootloader_args    .bootloader_args
+ *       .u.hvm.timer_mode       .u.pvh.timer_mode         .timer_mode
+ *       .u.hvm.apic             .u.pvh.apic               .apic
+ *       .u.hvm.nested_hvm       .u.pvh.nested_hvm         .nested_hvm
+ *
+ *     [1] introduced, like this macro, in the PVH backport series
+ #       for Meltdown.
+ *
+ * _SUBFIELD_FOO can be used when the guest type is known to be FOO
+ * (specifically, when b_info->type is LIBXL_DOMAIN_TYPE_FOO)
+ *
+ * _ACCESS_PVH_FOO should be used for fields which were in .u.foo,
+ * at points in the code where the guest type is not fully known.
+ * It is only safe to evaluate if the guest type is PVH or FOO.
+ * This can be checked with _ACCESS_PVH_FOO_OK.
+ *
+ * We recommend the folllowing idiom:
+ *
+ *    #if defined(LIBXL_BUILDINFO_PVH_ACCESS_PVH_HVM) // post-Meltdown
+ *    # define U_PV_OK( b) LIBXL_BUILDINFO_ACCESS_PVH_PV_OK( (b))
+ *    # define U_HVM_OK(b) LIBXL_BUILDINFO_ACCESS_PVH_HVM_OK((b))
+ *    # define U_PV_F( b, f) LIBXL_BUILDINFO_ACCESS_PVH_PV( (b),f)
+ *    # define U_HVM_F(b, f) LIBXL_BUILDINFO_ACCESS_PVH_HVM((b),f)
+ *    # define U_PVH LIBXL_BUILDINFO_SUBFIELD_PVH
+ *    # define U_PV  LIBXL_BUILDINFO_SUBFIELD_PV
+ *    # define U_HVM LIBXL_BUILDINFO_SUBFIELD_HVM
+ #    #elif defined(LIBXL_HAVE_BUILDINFO_APIC) // >= 4.10 pre-Meltdown
+ *    # define U_PV_OK( b) 1
+ *    # define U_HVM_OK(b) 1
+ *    # define U_PV_F( b, f) (&(b)->f)
+ *    # define U_HVM_F(b, f) (&(b)->f)
+ *    * define U_PVH // empty
+ *    * define U_PV  // empty
+ *    * define U_HVM // empty
+ *    #else // Xen <= 4.9 pre-Meltdown
+ #    # define U_PV_OK( b) ((b)->type == LIBXL_DOMAIN_TYPE_PV )
+ #    # define U_HVM_OK(b) ((b)->type == LIBXL_DOMAIN_TYPE_HVM)
+ *    # define U_PV_F( b, f) (&(b)->u.pv .f)
+ *    # define U_HVM_F(b, f) (&(b)->u.hvm.f)
+ *    # define U_PVH UNAVAILABLE_BECAUSE_NO_PVH_SUPPORT_XEN_TOO_OLD
+ *    # define U_PV  u.pv.
+ *    # define U_HVM u.hvm.
+ *    #endif
+ *
+ * And then something like this:
+ *
+ *     if (U_HVM_OK(b_info))
+ *         libxl_defbool_set(U_HVM(b_info, apic), 1);
+ *
+ *     case LIBXL_DOMAIN_TYPE_PV:
+ *         if (b_info->U_PV bootloader) {
+ */
+
+#define LIBXL_BUILDINFO_ACCESS_PVH_PV(b_info, field_name)               \
+  ((b_info)->type == LIBXL_DOMAIN_TYPE_PV  ? &(b_info)->u.pv .field_name : \
+   (abort(), (typeof(&(b_info)->u.pv. field_name))0))
+
+#define LIBXL_BUILDINFO_ACCESS_PVH_HVM(b_info, field_name)              \
+  ((b_info)->type == LIBXL_DOMAIN_TYPE_HVM ? &(b_info)->u.hvm.field_name : \
+   (abort(), (typeof(&(b_info)->u.hvm.field_name))0))
+
+#define LIBXL_BUILDINFO_ACCESS_PVH_PV_OK(b_info, field_name)    \
+  ((b_info)->type == LIBXL_DOMAIN_TYPE_PV  ? 1 :               \
+   0)
+
+#define LIBXL_BUILDINFO_ACCESS_PVH_HVM_OK(b_info, field_name)   \
+  ((b_info)->type == LIBXL_DOMAIN_TYPE_HVM ? 1 :               \
+   0)
+
+#define LIBXL_BUILDINFO_SUBFIELD_PVH  UNAVAILABLE_BECAUSE_NO_PVH_SUPPORT_XEN_TOO_OLD
+#define LIBXL_BUILDINFO_SUBFIELD_PV   u.pv.
+#define LIBXL_BUILDINFO_SUBFIELD_HVM  u.hvm.
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
