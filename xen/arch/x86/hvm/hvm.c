@@ -3479,6 +3479,11 @@ void hvm_hypervisor_cpuid_leaf(uint32_t sub_idx,
         /* Indicate presence of vcpu id and set it in ebx */
         *eax |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
         *ebx = current->vcpu_id;
+
+        /* Indicate presence of domain id and set it on ecx */
+        *eax |= XEN_HVM_CPUID_DOMID_PRESENT;
+        *ecx = current->domain->domain_id;
+
     }
 }
 
