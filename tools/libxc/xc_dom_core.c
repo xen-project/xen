@@ -314,16 +314,16 @@ int xc_dom_kernel_check_size(struct xc_dom_image *dom, size_t sz)
     return 0;
 }
 
-int xc_dom_ramdisk_check_size(struct xc_dom_image *dom, size_t sz)
+int xc_dom_module_check_size(struct xc_dom_image *dom, size_t sz)
 {
     /* No limit */
-    if ( !dom->max_ramdisk_size )
+    if ( !dom->max_module_size )
         return 0;
 
-    if ( sz > dom->max_ramdisk_size )
+    if ( sz > dom->max_module_size )
     {
         xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
-                     "ramdisk image too large");
+                     "module image too large");
         return 1;
     }
 
@@ -763,7 +763,7 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     dom->xch = xch;
 
     dom->max_kernel_size = XC_DOM_DECOMPRESS_MAX;
-    dom->max_ramdisk_size = XC_DOM_DECOMPRESS_MAX;
+    dom->max_module_size = XC_DOM_DECOMPRESS_MAX;
     dom->max_devicetree_size = XC_DOM_DECOMPRESS_MAX;
 
     if ( cmdline )
@@ -796,10 +796,10 @@ int xc_dom_kernel_max_size(struct xc_dom_image *dom, size_t sz)
     return 0;
 }
 
-int xc_dom_ramdisk_max_size(struct xc_dom_image *dom, size_t sz)
+int xc_dom_module_max_size(struct xc_dom_image *dom, size_t sz)
 {
-    DOMPRINTF("%s: ramdisk_max_size=%zx", __FUNCTION__, sz);
-    dom->max_ramdisk_size = sz;
+    DOMPRINTF("%s: module_max_size=%zx", __FUNCTION__, sz);
+    dom->max_module_size = sz;
     return 0;
 }
 
@@ -820,16 +820,30 @@ int xc_dom_kernel_file(struct xc_dom_image *dom, const char *filename)
     return xc_dom_try_gunzip(dom, &dom->kernel_blob, &dom->kernel_size);
 }
 
-int xc_dom_ramdisk_file(struct xc_dom_image *dom, const char *filename)
+int xc_dom_module_file(struct xc_dom_image *dom, const char *filename, const char *cmdline)
 {
-    DOMPRINTF("%s: filename=\"%s\"", __FUNCTION__, filename);
-    dom->ramdisk_blob =
-        xc_dom_malloc_filemap(dom, filename, &dom->ramdisk_size,
-                              dom->max_ramdisk_size);
+    unsigned int mod = dom->num_modules++;
 
-    if ( dom->ramdisk_blob == NULL )
+    DOMPRINTF("%s: filename=\"%s\"", __FUNCTION__, filename);
+    dom->modules[mod].blob =
+        xc_dom_malloc_filemap(dom, filename, &dom->modules[mod].size,
+                              dom->max_module_size);
+
+    if ( dom->modules[mod].blob == NULL )
         return -1;
-//    return xc_dom_try_gunzip(dom, &dom->ramdisk_blob, &dom->ramdisk_size);
+
+    if ( cmdline )
+    {
+        dom->modules[mod].cmdline = xc_dom_strdup(dom, cmdline);
+
+        if ( dom->modules[mod].cmdline == NULL )
+            return -1;
+    }
+    else
+    {
+        dom->modules[mod].cmdline = NULL;
+    }
+
     return 0;
 }
 
@@ -858,13 +872,28 @@ int xc_dom_kernel_mem(struct xc_dom_image *dom, const void *mem, size_t memsize)
     return xc_dom_try_gunzip(dom, &dom->kernel_blob, &dom->kernel_size);
 }
 
-int xc_dom_ramdisk_mem(struct xc_dom_image *dom, const void *mem,
-                       size_t memsize)
+int xc_dom_module_mem(struct xc_dom_image *dom, const void *mem,
+                      size_t memsize, const char *cmdline)
 {
+    unsigned int mod = dom->num_modules++;
+
     DOMPRINTF_CALLED(dom->xch);
-    dom->ramdisk_blob = (void *)mem;
-    dom->ramdisk_size = memsize;
-//    return xc_dom_try_gunzip(dom, &dom->ramdisk_blob, &dom->ramdisk_size);
+
+    dom->modules[mod].blob = (void *)mem;
+    dom->modules[mod].size = memsize;
+
+    if ( cmdline )
+    {
+        dom->modules[mod].cmdline = xc_dom_strdup(dom, cmdline);
+
+        if ( dom->modules[mod].cmdline == NULL )
+            return -1;
+    }
+    else
+    {
+        dom->modules[mod].cmdline = NULL;
+    }
+
     return 0;
 }
 
@@ -998,41 +1027,42 @@ int xc_dom_update_guest_p2m(struct xc_dom_image *dom)
     return 0;
 }
 
-static int xc_dom_build_ramdisk(struct xc_dom_image *dom)
+static int xc_dom_build_module(struct xc_dom_image *dom, unsigned int mod)
 {
-    size_t unziplen, ramdisklen;
-    void *ramdiskmap;
+    size_t unziplen, modulelen;
+    void *modulemap;
+    char name[10];
 
-    if ( !dom->ramdisk_seg.vstart )
+    if ( !dom->modules[mod].seg.vstart )
     {
         unziplen = xc_dom_check_gzip(dom->xch,
-                                     dom->ramdisk_blob, dom->ramdisk_size);
-        if ( xc_dom_ramdisk_check_size(dom, unziplen) != 0 )
+                                     dom->modules[mod].blob, dom->modules[mod].size);
+        if ( xc_dom_module_check_size(dom, unziplen) != 0 )
             unziplen = 0;
     }
     else
         unziplen = 0;
 
-    ramdisklen = unziplen ? unziplen : dom->ramdisk_size;
-
-    if ( xc_dom_alloc_segment(dom, &dom->ramdisk_seg, "ramdisk",
-                              dom->ramdisk_seg.vstart, ramdisklen) != 0 )
+    modulelen = unziplen ? unziplen : dom->modules[mod].size;
+    snprintf(name, sizeof(name), "module%u", mod);
+    if ( xc_dom_alloc_segment(dom, &dom->modules[mod].seg, name,
+                              dom->modules[mod].seg.vstart, modulelen) != 0 )
         goto err;
-    ramdiskmap = xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg);
-    if ( ramdiskmap == NULL )
+    modulemap = xc_dom_seg_to_ptr(dom, &dom->modules[mod].seg);
+    if ( modulemap == NULL )
     {
-        DOMPRINTF("%s: xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg) => NULL",
-                  __FUNCTION__);
+        DOMPRINTF("%s: xc_dom_seg_to_ptr(dom, &dom->modules[%u].seg) => NULL",
+                  __FUNCTION__, mod);
         goto err;
     }
     if ( unziplen )
     {
-        if ( xc_dom_do_gunzip(dom->xch, dom->ramdisk_blob, dom->ramdisk_size,
-                              ramdiskmap, ramdisklen) == -1 )
+        if ( xc_dom_do_gunzip(dom->xch, dom->modules[mod].blob, dom->modules[mod].size,
+                              modulemap, modulelen) == -1 )
             goto err;
     }
     else
-        memcpy(ramdiskmap, dom->ramdisk_blob, dom->ramdisk_size);
+        memcpy(modulemap, dom->modules[mod].blob, dom->modules[mod].size);
 
     return 0;
 
@@ -1139,6 +1169,7 @@ int xc_dom_build_image(struct xc_dom_image *dom)
 {
     unsigned int page_size;
     bool unmapped_initrd;
+    unsigned int mod;
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -1162,15 +1193,24 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     if ( dom->kernel_loader->loader(dom) != 0 )
         goto err;
 
-    /* Don't load ramdisk now if no initial mapping required. */
-    unmapped_initrd = dom->parms.unmapped_initrd && !dom->ramdisk_seg.vstart;
-
-    if ( dom->ramdisk_blob && !unmapped_initrd )
+    /* Don't load ramdisk / other modules now if no initial mapping required. */
+    for ( mod = 0; mod < dom->num_modules; mod++ )
     {
-        if ( xc_dom_build_ramdisk(dom) != 0 )
-            goto err;
-        dom->initrd_start = dom->ramdisk_seg.vstart;
-        dom->initrd_len = dom->ramdisk_seg.vend - dom->ramdisk_seg.vstart;
+        unmapped_initrd = (dom->parms.unmapped_initrd &&
+                           !dom->modules[mod].seg.vstart);
+
+        if ( dom->modules[mod].blob && !unmapped_initrd )
+        {
+            if ( xc_dom_build_module(dom, mod) != 0 )
+                goto err;
+
+            if ( mod == 0 )
+            {
+                dom->initrd_start = dom->modules[mod].seg.vstart;
+                dom->initrd_len =
+                    dom->modules[mod].seg.vend - dom->modules[mod].seg.vstart;
+            }
+        }
     }
 
     /* load devicetree */
@@ -1224,14 +1264,24 @@ int xc_dom_build_image(struct xc_dom_image *dom)
     if ( dom->virt_pgtab_end && xc_dom_alloc_pad(dom, dom->virt_pgtab_end) )
         return -1;
 
-    /* Load ramdisk if no initial mapping required. */
-    if ( dom->ramdisk_blob && unmapped_initrd )
+    for ( mod = 0; mod < dom->num_modules; mod++ )
     {
-        if ( xc_dom_build_ramdisk(dom) != 0 )
-            goto err;
-        dom->flags |= SIF_MOD_START_PFN;
-        dom->initrd_start = dom->ramdisk_seg.pfn;
-        dom->initrd_len = page_size * dom->ramdisk_seg.pages;
+        unmapped_initrd = (dom->parms.unmapped_initrd &&
+                           !dom->modules[mod].seg.vstart);
+
+        /* Load ramdisk / other modules if no initial mapping required. */
+        if ( dom->modules[mod].blob && unmapped_initrd )
+        {
+            if ( xc_dom_build_module(dom, mod) != 0 )
+                goto err;
+
+            if ( mod == 0 )
+            {
+                dom->flags |= SIF_MOD_START_PFN;
+                dom->initrd_start = dom->modules[mod].seg.pfn;
+                dom->initrd_len = page_size * dom->modules[mod].seg.pages;
+            }
+        }
     }
 
     /* Allocate p2m list if outside of initial kernel mapping. */

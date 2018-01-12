@@ -134,10 +134,10 @@ static int build(xc_interface *xch)
 
     if ( ramdisk )
     {
-        rv = xc_dom_ramdisk_file(dom, ramdisk);
+        rv = xc_dom_module_file(dom, ramdisk, NULL);
         if ( rv )
         {
-            fprintf(stderr, "xc_dom_ramdisk_file failed\n");
+            fprintf(stderr, "xc_dom_module_file failed\n");
             goto err;
         }
     }
