@@ -413,62 +413,6 @@ long arch_do_domctl(
         break;
     }
 
-    case XEN_DOMCTL_getmemlist:
-    {
-        unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
-        uint64_t mfn;
-        struct page_info *page;
-
-        if ( unlikely(d->is_dying) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        /*
-         * XSA-74: This sub-hypercall is broken in several ways:
-         * - lock order inversion (p2m locks inside page_alloc_lock)
-         * - no preemption on huge max_pfns input
-         * - not (re-)checking d->is_dying with page_alloc_lock held
-         * - not honoring start_pfn input (which libxc also doesn't set)
-         * Additionally it is rather useless, as the result is stale by the
-         * time the caller gets to look at it.
-         * As it only has a single, non-production consumer (xen-mceinj),
-         * rather than trying to fix it we restrict it for the time being.
-         */
-        if ( /* No nested locks inside copy_to_guest_offset(). */
-             paging_mode_external(currd) ||
-             /* Arbitrary limit capping processing time. */
-             max_pfns > GB(4) / PAGE_SIZE )
-        {
-            ret = -EOPNOTSUPP;
-            break;
-        }
-
-        spin_lock(&d->page_alloc_lock);
-
-        ret = i = 0;
-        page_list_for_each(page, &d->page_list)
-        {
-            if ( i >= max_pfns )
-                break;
-            mfn = page_to_mfn(page);
-            if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                      i, &mfn, 1) )
-            {
-                ret = -EFAULT;
-                break;
-            }
-			++i;
-		}
-
-        spin_unlock(&d->page_alloc_lock);
-
-        domctl->u.getmemlist.num_pfns = i;
-        copyback = true;
-        break;
-    }
-
     case XEN_DOMCTL_getpageframeinfo3:
     {
         unsigned int num = domctl->u.getpageframeinfo3.num;

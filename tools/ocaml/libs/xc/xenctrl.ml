@@ -244,9 +244,6 @@ external map_foreign_range: handle -> domid -> int
                          -> nativeint -> Xenmmap.mmap_interface
        = "stub_map_foreign_range"
 
-external domain_get_pfn_list: handle -> domid -> nativeint -> nativeint array
-       = "stub_xc_domain_get_pfn_list"
-
 external domain_assign_device: handle -> domid -> (int * int * int * int) -> unit
        = "stub_xc_domain_assign_device"
 external domain_deassign_device: handle -> domid -> (int * int * int * int) -> unit

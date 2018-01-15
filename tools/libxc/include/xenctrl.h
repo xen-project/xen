@@ -1514,13 +1514,6 @@ unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
                                            int vcpu, unsigned long long virt);
 
 
-/**
- * DEPRECATED.  Avoid using this, as it does not correctly account for PFNs
- * without a backing MFN.
- */
-int xc_get_pfn_list(xc_interface *xch, uint32_t domid, uint64_t *pfn_buf,
-                    unsigned long max_pfns);
-
 int xc_copy_to_domain_page(xc_interface *xch, uint32_t domid,
                            unsigned long dst_pfn, const char *src_page);
 

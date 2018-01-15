@@ -1113,7 +1113,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_pausedomain                    3
 #define XEN_DOMCTL_unpausedomain                  4
 #define XEN_DOMCTL_getdomaininfo                  5
-#define XEN_DOMCTL_getmemlist                     6
+/* #define XEN_DOMCTL_getmemlist                  6 Removed */
 /* #define XEN_DOMCTL_getpageframeinfo            7 Obsolete - use getpageframeinfo3 */
 /* #define XEN_DOMCTL_getpageframeinfo2           8 Obsolete - use getpageframeinfo3 */
 #define XEN_DOMCTL_setvcpuaffinity                9
