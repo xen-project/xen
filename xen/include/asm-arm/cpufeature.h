@@ -35,7 +35,8 @@
 #endif
 #define cpu_has_security  (boot_cpu_feature32(security) > 0)
 
-#define ARM_NCAPS           0
+#define ARM_HARDEN_BRANCH_PREDICTOR 0
+#define ARM_NCAPS           1
 
 #ifndef __ASSEMBLY__
 
