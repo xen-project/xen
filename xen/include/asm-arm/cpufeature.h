@@ -74,6 +74,7 @@ struct arm_cpu_capabilities {
     const char *desc;
     u16 capability;
     bool_t (*matches)(const struct arm_cpu_capabilities *);
+    int (*enable)(void *); /* Called on every active CPUs */
     union {
         struct {    /* To be used for eratum handling only */
             u32 midr_model;
@@ -84,6 +85,8 @@ struct arm_cpu_capabilities {
 
 void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
                              const char *info);
+
+void enable_cpu_capabilities(const struct arm_cpu_capabilities *caps);
 
 #endif /* __ASSEMBLY__ */
 
