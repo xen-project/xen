@@ -1924,7 +1924,7 @@ advance the vCPU's virtual time stepwise for each one.
 
 No delay for missed ticks. As above, missed interrupts are delivered,
 but guest time always tracks wallclock (i.e., real) time while doing
-so.
+so. This is the default.
 
 =item B<no_missed_ticks_pending>
 
@@ -2389,7 +2389,7 @@ advance the vCPU's virtual time stepwise for each one.
 
 No delay for missed ticks. As above, missed interrupts are delivered,
 but guest time always tracks wallclock (i.e., real) time while doing
-so.
+so. This is the default.
 
 =item B<no_missed_ticks_pending>
 
