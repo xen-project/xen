@@ -318,8 +318,9 @@ struct cpuinfo_arm {
             unsigned long fp:4;   /* Floating Point */
             unsigned long simd:4; /* Advanced SIMD */
             unsigned long gic:4;  /* GIC support */
-            unsigned long __res0:4;
-            unsigned long __res1;
+            unsigned long __res0:28;
+            unsigned long csv2:4;
+            unsigned long __res1:4;
         };
     } pfr64;
 
