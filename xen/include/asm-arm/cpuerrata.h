@@ -6,6 +6,7 @@
 #include <asm/alternative.h>
 
 void check_local_cpu_errata(void);
+void enable_errata_workarounds(void);
 
 #ifdef CONFIG_HAS_ALTERNATIVE
 

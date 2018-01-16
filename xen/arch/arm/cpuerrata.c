@@ -65,6 +65,12 @@ void check_local_cpu_errata(void)
 {
     update_cpu_capabilities(arm_errata, "enabled workaround for");
 }
+
+void __init enable_errata_workarounds(void)
+{
+    enable_cpu_capabilities(arm_errata);
+}
+
 /*
  * Local variables:
  * mode: C
