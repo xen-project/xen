@@ -328,7 +328,7 @@ void start_secondary(void *unused)
     spin_debug_disable();
 
     get_cpu_info()->xen_cr3 = 0;
-    get_cpu_info()->pv_cr3 = __pa(this_cpu(root_pgt));
+    get_cpu_info()->pv_cr3 = this_cpu(root_pgt) ? __pa(this_cpu(root_pgt)) : 0;
 
     load_system_tables();
 
@@ -734,14 +734,20 @@ static int clone_mapping(const void *ptr, root_pgentry_t *rpt)
     return 0;
 }
 
+static __read_mostly int8_t opt_xpti = -1;
+boolean_param("xpti", opt_xpti);
 DEFINE_PER_CPU(root_pgentry_t *, root_pgt);
 
 static int setup_cpu_root_pgt(unsigned int cpu)
 {
-    root_pgentry_t *rpt = alloc_xen_pagetable();
+    root_pgentry_t *rpt;
     unsigned int off;
     int rc;
 
+    if ( !opt_xpti )
+        return 0;
+
+    rpt = alloc_xen_pagetable();
     if ( !rpt )
         return -ENOMEM;
 
@@ -992,10 +998,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
     stack_base[0] = stack_start;
 
+    if ( opt_xpti < 0 )
+        opt_xpti = boot_cpu_data.x86_vendor != X86_VENDOR_AMD;
+
     rc = setup_cpu_root_pgt(0);
     if ( rc )
         panic("Error %d setting up PV root page table\n", rc);
-    get_cpu_info()->pv_cr3 = __pa(per_cpu(root_pgt, 0));
+    if ( per_cpu(root_pgt, 0) )
+        get_cpu_info()->pv_cr3 = __pa(per_cpu(root_pgt, 0));
 
     set_nr_sockets();
 
@@ -1067,6 +1077,7 @@ void __init smp_prepare_boot_cpu(void)
 #endif
 
     get_cpu_info()->xen_cr3 = 0;
+    get_cpu_info()->pv_cr3 = 0;
 }
 
 static void
