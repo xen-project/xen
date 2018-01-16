@@ -8,6 +8,12 @@
     .midr_range_min = min,              \
     .midr_range_max = max
 
+#define MIDR_ALL_VERSIONS(model)        \
+    .matches = is_affected_midr_range,  \
+    .midr_model = model,                \
+    .midr_range_min = 0,                \
+    .midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
+
 static bool_t __maybe_unused
 is_affected_midr_range(const struct arm_cpu_capabilities *entry)
 {
