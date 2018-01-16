@@ -161,7 +161,10 @@ __initcall(update_serrors_cpu_caps);
 
 void init_traps(void)
 {
-    /* Setup Hyp vector base */
+    /*
+     * Setup Hyp vector base. Note they might get updated with the
+     * branch predictor hardening.
+     */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
     /* Trap Debug and Performance Monitor accesses */
