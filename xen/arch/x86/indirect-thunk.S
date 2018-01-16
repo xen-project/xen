@@ -31,7 +31,7 @@
 .endm
 
 /*
- * Build the __x86.indirect_thunk.* symbols.  Execution lands on an
+ * Build the __x86_indirect_thunk_* symbols.  Execution lands on an
  * alternative patch point which implements one of the above THUNK_*'s
  */
 .macro GEN_INDIRECT_THUNK reg:req
