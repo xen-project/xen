@@ -4,8 +4,10 @@
 #include <xen/smp.h>
 #include <xen/spinlock.h>
 #include <xen/vmap.h>
+#include <xen/warning.h>
 #include <asm/cpufeature.h>
 #include <asm/cpuerrata.h>
+#include <asm/psci.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
@@ -141,6 +143,31 @@ install_bp_hardening_vec(const struct arm_cpu_capabilities *entry,
     return ret;
 }
 
+extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
+
+static int enable_psci_bp_hardening(void *data)
+{
+    bool ret = true;
+    static bool warned = false;
+
+    /*
+     * The mitigation is using PSCI version function to invalidate the
+     * branch predictor. This function is only available with PSCI 0.2
+     * and later.
+     */
+    if ( psci_ver >= PSCI_VERSION(0, 2) )
+        ret = install_bp_hardening_vec(data, __psci_hyp_bp_inval_start,
+                                       __psci_hyp_bp_inval_end);
+    else if ( !warned )
+    {
+        ASSERT(system_state < SYS_STATE_active);
+        warning_add("PSCI 0.2 or later is required for the branch predictor hardening.\n");
+        warned = true;
+    }
+
+    return !ret;
+}
+
 #endif /* CONFIG_ARM64_HARDEN_BRANCH_PREDICTOR */
 
 #define MIDR_RANGE(model, min, max)     \
@@ -203,6 +230,28 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         .capability = ARM64_WORKAROUND_834220,
         MIDR_RANGE(MIDR_CORTEX_A57, 0x00,
                    (1 << MIDR_VARIANT_SHIFT) | 2),
+    },
+#endif
+#ifdef CONFIG_ARM64_HARDEN_BRANCH_PREDICTOR
+    {
+        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+        .enable = enable_psci_bp_hardening,
+    },
+    {
+        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+        .enable = enable_psci_bp_hardening,
+    },
+    {
+        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
+        .enable = enable_psci_bp_hardening,
+    },
+    {
+        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
+        .enable = enable_psci_bp_hardening,
     },
 #endif
     {},
