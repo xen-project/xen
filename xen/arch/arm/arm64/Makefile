@@ -10,3 +10,4 @@ obj-y += domctl.o
 obj-y += cache.o
 
 obj-$(EARLY_PRINTK) += debug.o
+obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR) += bpi.o
