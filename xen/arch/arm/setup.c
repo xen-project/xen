@@ -849,6 +849,7 @@ void __init start_xen(unsigned long boot_phys_offset,
      * stop_machine (tasklets initialized via an initcall).
      */
     apply_alternatives_all();
+    enable_errata_workarounds();
 
     /* Create initial domain 0. */
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */
