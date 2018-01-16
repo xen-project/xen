@@ -2,6 +2,7 @@
 #define __ARM_CPUERRATA_H__
 
 void check_local_cpu_errata(void);
+void enable_errata_workarounds(void);
 
 #endif /* __ARM_CPUERRATA_H__ */
 /*

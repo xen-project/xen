@@ -840,6 +840,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     do_initcalls();
 
+    enable_errata_workarounds();
+
     /* Create initial domain 0. */
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */
     config.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
