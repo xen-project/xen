@@ -1511,6 +1511,9 @@ void paravirt_ctxt_switch_to(struct vcpu *v)
 {
     unsigned long cr4;
 
+    this_cpu(root_pgt)[root_table_offset(PERDOMAIN_VIRT_START)] =
+        l4e_from_page(v->domain->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
+
     cr4 = pv_guest_cr4_to_real_cr4(v);
     if ( unlikely(cr4 != read_cr4()) )
         write_cr4(cr4);
@@ -1681,6 +1684,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     cpumask_t dirty_mask;
 
     ASSERT(local_irq_is_enabled());
+
+    get_cpu_info()->xen_cr3 = 0;
 
     cpumask_copy(&dirty_mask, next->vcpu_dirty_cpumask);
     /* Allow at most one CPU at a time to be dirty. */

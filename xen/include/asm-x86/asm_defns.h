@@ -93,9 +93,30 @@ void ret_from_intr(void);
         UNLIKELY_DONE(mp, tag);   \
         __UNLIKELY_END(tag)
 
+        .equ .Lrax, 0
+        .equ .Lrcx, 1
+        .equ .Lrdx, 2
+        .equ .Lrbx, 3
+        .equ .Lrsp, 4
+        .equ .Lrbp, 5
+        .equ .Lrsi, 6
+        .equ .Lrdi, 7
+        .equ .Lr8,  8
+        .equ .Lr9,  9
+        .equ .Lr10, 10
+        .equ .Lr11, 11
+        .equ .Lr12, 12
+        .equ .Lr13, 13
+        .equ .Lr14, 14
+        .equ .Lr15, 15
+
 #define STACK_CPUINFO_FIELD(field) (1 - CPUINFO_sizeof + CPUINFO_##field)
 #define GET_STACK_END(reg)                        \
+        .if .Lr##reg > 8;                         \
+        movq $STACK_SIZE-1, %r##reg;              \
+        .else;                                    \
         movl $STACK_SIZE-1, %e##reg;              \
+        .endif;                                   \
         orq  %rsp, %r##reg
 
 #define GET_CPUINFO_FIELD(field, reg)             \
@@ -176,6 +197,15 @@ void ret_from_intr(void);
 
 #define ASM_STAC ASM_AC(STAC)
 #define ASM_CLAC ASM_AC(CLAC)
+
+.macro write_cr3 val:req, tmp1:req, tmp2:req
+        mov   %cr4, %\tmp1
+        mov   %\tmp1, %\tmp2
+        and   $~X86_CR4_PGE, %\tmp1
+        mov   %\tmp1, %cr4
+        mov   %\val, %cr3
+        mov   %\tmp2, %cr4
+.endm
 
 #define CR4_PV32_RESTORE                                           \
         667: ASM_NOP5;                                             \
