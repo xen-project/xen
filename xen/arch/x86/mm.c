@@ -3509,6 +3509,7 @@ long do_mmu_update(
     struct vcpu *curr = current, *v = curr;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
     mfn_t map_mfn = INVALID_MFN;
+    bool sync_guest = false;
     uint32_t xsm_needed = 0;
     uint32_t xsm_checked = 0;
     int rc = put_old_guest_table(curr);
@@ -3663,6 +3664,8 @@ long do_mmu_update(
                 case PGT_l4_page_table:
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
+                    if ( !rc )
+                        sync_guest = true;
                     break;
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
@@ -3764,6 +3767,24 @@ long do_mmu_update(
 
     if ( va )
         unmap_domain_page(va);
+
+    if ( sync_guest )
+    {
+        /*
+         * Force other vCPU-s of the affected guest to pick up L4 entry
+         * changes (if any). Issue a flush IPI with empty operation mask to
+         * facilitate this (including ourselves waiting for the IPI to
+         * actually have arrived). Utilize the fact that FLUSH_VA_VALID is
+         * meaningless without FLUSH_CACHE, but will allow to pass the no-op
+         * check in flush_area_mask().
+         */
+        unsigned int cpu = smp_processor_id();
+        cpumask_t *mask = per_cpu(scratch_cpumask, cpu);
+
+        cpumask_andnot(mask, pt_owner->domain_dirty_cpumask, cpumask_of(cpu));
+        if ( !cpumask_empty(mask) )
+            flush_area_mask(mask, ZERO_BLOCK_PTR, FLUSH_VA_VALID);
+    }
 
     perfc_add(num_page_updates, i);
 

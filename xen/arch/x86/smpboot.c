@@ -327,6 +327,9 @@ void start_secondary(void *unused)
      */
     spin_debug_disable();
 
+    get_cpu_info()->xen_cr3 = 0;
+    get_cpu_info()->pv_cr3 = __pa(this_cpu(root_pgt));
+
     load_system_tables();
 
     /* Full exception support from here on in. */
@@ -635,6 +638,187 @@ void cpu_exit_clear(unsigned int cpu)
     set_cpu_state(CPU_STATE_DEAD);
 }
 
+static int clone_mapping(const void *ptr, root_pgentry_t *rpt)
+{
+    unsigned long linear = (unsigned long)ptr, pfn;
+    unsigned int flags;
+    l3_pgentry_t *pl3e = l4e_to_l3e(idle_pg_table[root_table_offset(linear)]) +
+                         l3_table_offset(linear);
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+
+    if ( linear < DIRECTMAP_VIRT_START )
+        return 0;
+
+    flags = l3e_get_flags(*pl3e);
+    ASSERT(flags & _PAGE_PRESENT);
+    if ( flags & _PAGE_PSE )
+    {
+        pfn = (l3e_get_pfn(*pl3e) & ~((1UL << (2 * PAGETABLE_ORDER)) - 1)) |
+              (PFN_DOWN(linear) & ((1UL << (2 * PAGETABLE_ORDER)) - 1));
+        flags &= ~_PAGE_PSE;
+    }
+    else
+    {
+        pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(linear);
+        flags = l2e_get_flags(*pl2e);
+        ASSERT(flags & _PAGE_PRESENT);
+        if ( flags & _PAGE_PSE )
+        {
+            pfn = (l2e_get_pfn(*pl2e) & ~((1UL << PAGETABLE_ORDER) - 1)) |
+                  (PFN_DOWN(linear) & ((1UL << PAGETABLE_ORDER) - 1));
+            flags &= ~_PAGE_PSE;
+        }
+        else
+        {
+            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(linear);
+            flags = l1e_get_flags(*pl1e);
+            if ( !(flags & _PAGE_PRESENT) )
+                return 0;
+            pfn = l1e_get_pfn(*pl1e);
+        }
+    }
+
+    if ( !(root_get_flags(rpt[root_table_offset(linear)]) & _PAGE_PRESENT) )
+    {
+        pl3e = alloc_xen_pagetable();
+        if ( !pl3e )
+            return -ENOMEM;
+        clear_page(pl3e);
+        l4e_write(&rpt[root_table_offset(linear)],
+                  l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
+    }
+    else
+        pl3e = l4e_to_l3e(rpt[root_table_offset(linear)]);
+
+    pl3e += l3_table_offset(linear);
+
+    if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
+    {
+        pl2e = alloc_xen_pagetable();
+        if ( !pl2e )
+            return -ENOMEM;
+        clear_page(pl2e);
+        l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
+    }
+    else
+    {
+        ASSERT(!(l3e_get_flags(*pl3e) & _PAGE_PSE));
+        pl2e = l3e_to_l2e(*pl3e);
+    }
+
+    pl2e += l2_table_offset(linear);
+
+    if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+    {
+        pl1e = alloc_xen_pagetable();
+        if ( !pl1e )
+            return -ENOMEM;
+        clear_page(pl1e);
+        l2e_write(pl2e, l2e_from_paddr(__pa(pl1e), __PAGE_HYPERVISOR));
+    }
+    else
+    {
+        ASSERT(!(l2e_get_flags(*pl2e) & _PAGE_PSE));
+        pl1e = l2e_to_l1e(*pl2e);
+    }
+
+    pl1e += l1_table_offset(linear);
+
+    if ( l1e_get_flags(*pl1e) & _PAGE_PRESENT )
+    {
+        ASSERT(l1e_get_pfn(*pl1e) == pfn);
+        ASSERT(l1e_get_flags(*pl1e) == flags);
+    }
+    else
+        l1e_write(pl1e, l1e_from_pfn(pfn, flags));
+
+    return 0;
+}
+
+DEFINE_PER_CPU(root_pgentry_t *, root_pgt);
+
+static int setup_cpu_root_pgt(unsigned int cpu)
+{
+    root_pgentry_t *rpt = alloc_xen_pagetable();
+    unsigned int off;
+    int rc;
+
+    if ( !rpt )
+        return -ENOMEM;
+
+    clear_page(rpt);
+    per_cpu(root_pgt, cpu) = rpt;
+
+    rpt[root_table_offset(RO_MPT_VIRT_START)] =
+        idle_pg_table[root_table_offset(RO_MPT_VIRT_START)];
+    /* SH_LINEAR_PT inserted together with guest mappings. */
+    /* PERDOMAIN inserted during context switch. */
+    rpt[root_table_offset(XEN_VIRT_START)] =
+        idle_pg_table[root_table_offset(XEN_VIRT_START)];
+
+    /* Install direct map page table entries for stack, IDT, and TSS. */
+    for ( off = rc = 0; !rc && off < STACK_SIZE; off += PAGE_SIZE )
+        rc = clone_mapping(__va(__pa(stack_base[cpu])) + off, rpt);
+
+    if ( !rc )
+        rc = clone_mapping(idt_tables[cpu], rpt);
+    if ( !rc )
+        rc = clone_mapping(&per_cpu(init_tss, cpu), rpt);
+
+    return rc;
+}
+
+static void cleanup_cpu_root_pgt(unsigned int cpu)
+{
+    root_pgentry_t *rpt = per_cpu(root_pgt, cpu);
+    unsigned int r;
+
+    if ( !rpt )
+        return;
+
+    per_cpu(root_pgt, cpu) = NULL;
+
+    for ( r = root_table_offset(DIRECTMAP_VIRT_START);
+          r < root_table_offset(HYPERVISOR_VIRT_END); ++r )
+    {
+        l3_pgentry_t *l3t;
+        unsigned int i3;
+
+        if ( !(root_get_flags(rpt[r]) & _PAGE_PRESENT) )
+            continue;
+
+        l3t = l4e_to_l3e(rpt[r]);
+
+        for ( i3 = 0; i3 < L3_PAGETABLE_ENTRIES; ++i3 )
+        {
+            l2_pgentry_t *l2t;
+            unsigned int i2;
+
+            if ( !(l3e_get_flags(l3t[i3]) & _PAGE_PRESENT) )
+                continue;
+
+            ASSERT(!(l3e_get_flags(l3t[i3]) & _PAGE_PSE));
+            l2t = l3e_to_l2e(l3t[i3]);
+
+            for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; ++i2 )
+            {
+                if ( !(l2e_get_flags(l2t[i2]) & _PAGE_PRESENT) )
+                    continue;
+
+                ASSERT(!(l2e_get_flags(l2t[i2]) & _PAGE_PSE));
+                free_xen_pagetable(l2e_to_l1e(l2t[i2]));
+            }
+
+            free_xen_pagetable(l2t);
+        }
+
+        free_xen_pagetable(l3t);
+    }
+
+    free_xen_pagetable(rpt);
+}
+
 static void cpu_smpboot_free(unsigned int cpu)
 {
     unsigned int order, socket = cpu_to_socket(cpu);
@@ -672,6 +856,8 @@ static void cpu_smpboot_free(unsigned int cpu)
         if ( i == STUBS_PER_PAGE )
             free_domheap_page(mfn_to_page(mfn));
     }
+
+    cleanup_cpu_root_pgt(cpu);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     free_xenheap_pages(per_cpu(gdt_table, cpu), order);
@@ -728,6 +914,9 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
     set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
 
+    if ( setup_cpu_root_pgt(cpu) )
+        goto oom;
+
     for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
           i < nr_cpu_ids && i <= (cpu | (STUBS_PER_PAGE - 1)); ++i )
         if ( cpu_online(i) && cpu_to_node(i) == node )
@@ -783,6 +972,8 @@ static struct notifier_block cpu_smpboot_nfb = {
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
+    int rc;
+
     register_cpu_notifier(&cpu_smpboot_nfb);
 
     mtrr_aps_sync_begin();
@@ -795,6 +986,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
     stack_base[0] = stack_start;
+
+    rc = setup_cpu_root_pgt(0);
+    if ( rc )
+        panic("Error %d setting up PV root page table\n", rc);
+    get_cpu_info()->pv_cr3 = __pa(per_cpu(root_pgt, 0));
 
     set_nr_sockets();
 
@@ -864,6 +1060,8 @@ void __init smp_prepare_boot_cpu(void)
 #if NR_CPUS > 2 * BITS_PER_LONG
     per_cpu(scratch_cpumask, cpu) = &scratch_cpu0mask;
 #endif
+
+    get_cpu_info()->xen_cr3 = 0;
 }
 
 static void

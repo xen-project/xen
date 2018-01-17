@@ -137,6 +137,8 @@ void __dummy__(void)
     OFFSET(CPUINFO_processor_id, struct cpu_info, processor_id);
     OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
     OFFSET(CPUINFO_cr4, struct cpu_info, cr4);
+    OFFSET(CPUINFO_xen_cr3, struct cpu_info, xen_cr3);
+    OFFSET(CPUINFO_pv_cr3, struct cpu_info, pv_cr3);
     DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
     BLANK();
 
