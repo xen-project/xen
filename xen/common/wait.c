@@ -128,7 +128,6 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     unsigned long dummy;
     u32 entry_vector = cpu_info->guest_cpu_user_regs.entry_vector;
 
-    cpu_info->guest_cpu_user_regs.entry_vector &= ~TRAP_regs_partial;
     ASSERT(wqv->esp == 0);
 
     /* Save current VCPU affinity; force wakeup on *this* CPU only. */
