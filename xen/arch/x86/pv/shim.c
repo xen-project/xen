@@ -264,14 +264,14 @@ int pv_shim_shutdown(uint8_t reason)
                                            &old_console_pfn));
 
     /* Pause the other vcpus before starting the migration. */
-    for_each_vcpu(d, v)
+    for_each_vcpu ( d, v )
         if ( v != current )
             vcpu_pause_by_systemcontroller(v);
 
     rc = xen_hypercall_shutdown(SHUTDOWN_suspend);
     if ( rc )
     {
-        for_each_vcpu(d, v)
+        for_each_vcpu ( d, v )
             if ( v != current )
                 vcpu_unpause_by_systemcontroller(v);
 
@@ -347,7 +347,7 @@ int pv_shim_shutdown(uint8_t reason)
      */
     write_start_info(d);
 
-    for_each_vcpu(d, v)
+    for_each_vcpu ( d, v )
     {
         /* Unmap guest vcpu_info pages. */
         unmap_vcpu_info(v);
@@ -428,7 +428,7 @@ static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
          */
         rc = xen_hypercall_event_channel_op(EVTCHNOP_alloc_unbound, &alloc);
         if ( rc )
-           break;
+            break;
 
         /* Force L1 to use the event channel port allocated on L0. */
         rc = evtchn_bind_virq(&virq, alloc.port);
@@ -477,7 +477,7 @@ static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         {
             rc = xen_hypercall_event_channel_op(EVTCHNOP_bind_vcpu, &vcpu);
             if ( !rc )
-                 evtchn_assign_vcpu(d, vcpu.port, vcpu.vcpu);
+                evtchn_assign_vcpu(d, vcpu.port, vcpu.vcpu);
         }
 
         break;
@@ -596,9 +596,9 @@ void pv_shim_inject_evtchn(unsigned int port)
 {
     if ( port_is_valid(guest, port) )
     {
-         struct evtchn *chn = evtchn_from_port(guest, port);
+        struct evtchn *chn = evtchn_from_port(guest, port);
 
-         evtchn_port_set_pending(guest, chn->notify_vcpu_id, chn);
+        evtchn_port_set_pending(guest, chn->notify_vcpu_id, chn);
     }
 }
 
@@ -633,7 +633,7 @@ static long pv_shim_grant_table_op(unsigned int cmd,
         }
         if ( compat )
 #define XLAT_gnttab_setup_table_HNDL_frame_list(d, s)
-                XLAT_gnttab_setup_table(&nat, &cmp);
+            XLAT_gnttab_setup_table(&nat, &cmp);
 #undef XLAT_gnttab_setup_table_HNDL_frame_list
 
         nat.status = GNTST_okay;
@@ -728,7 +728,7 @@ static long pv_shim_grant_table_op(unsigned int cmd,
 
         if ( compat )
 #define XLAT_gnttab_setup_table_HNDL_frame_list(d, s)
-                XLAT_gnttab_setup_table(&cmp, &nat);
+            XLAT_gnttab_setup_table(&cmp, &nat);
 #undef XLAT_gnttab_setup_table_HNDL_frame_list
 
         if ( unlikely(compat ? __copy_to_guest(uop, &cmp, 1)
