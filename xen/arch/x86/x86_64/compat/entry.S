@@ -270,6 +270,17 @@ ENTRY(cstar_enter)
         pushq $0
         movl  $TRAP_syscall, 4(%rsp)
         SAVE_ALL
+
+        GET_STACK_END(bx)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        neg   %rcx
+        jz    .Lcstar_cr3_okay
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        neg   %rcx
+        write_cr3 rcx, rdi, rsi
+        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+.Lcstar_cr3_okay:
+
         GET_CURRENT(bx)
         movq  VCPU_domain(%rbx),%rcx
         cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
