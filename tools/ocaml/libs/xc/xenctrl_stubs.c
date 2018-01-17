@@ -176,10 +176,14 @@ CAMLprim value stub_xc_domain_create(value xch, value ssidref,
 		break;
 
 	case 1: /* X86 - emulation flags in the block */
+#if defined(__i386__) || defined(__x86_64__)
 		for (l = Field(Field(domconfig, 0), 0);
 		     l != Val_none;
 		     l = Field(l, 1))
 			config.emulation_flags |= 1u << Int_val(Field(l, 0));
+#else
+		caml_failwith("Unhandled: x86");
+#endif
 		break;
 
 	default:
@@ -320,6 +324,7 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 
 	Store_field(result, 15, tmp);
 
+#if defined(__i386__) || defined(__x86_64__)
 	/* emulation_flags: x86_arch_emulation_flags list; */
 	tmp = emul_list = Val_emptylist;
 	for (i = 0; i < 10; i++) {
@@ -341,6 +346,7 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 	Store_field(arch_config, 0, x86_arch_config);
 
 	Store_field(result, 16, arch_config);
+#endif
 
 	CAMLreturn(result);
 }
