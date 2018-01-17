@@ -1505,10 +1505,13 @@ void paravirt_ctxt_switch_from(struct vcpu *v)
 
 void paravirt_ctxt_switch_to(struct vcpu *v)
 {
+    root_pgentry_t *root_pgt = this_cpu(root_pgt);
     unsigned long cr4;
 
-    this_cpu(root_pgt)[root_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_page(v->domain->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
+    if ( root_pgt )
+        root_pgt[root_table_offset(PERDOMAIN_VIRT_START)] =
+            l4e_from_page(v->domain->arch.perdomain_l3_pg,
+                          __PAGE_HYPERVISOR_RW);
 
     cr4 = pv_guest_cr4_to_real_cr4(v);
     if ( unlikely(cr4 != read_cr4()) )
