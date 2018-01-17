@@ -98,7 +98,8 @@ ENTRY(lstar_enter)
         pushq $FLAT_KERNEL_CS64
         pushq %rcx
         pushq $0
-        SAVE_VOLATILE TRAP_syscall
+        movl  $TRAP_syscall, 4(%rsp)
+        SAVE_ALL
         GET_CURRENT(bx)
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
@@ -140,7 +141,6 @@ test_guest_events:
 /* %rbx: struct vcpu */
 process_softirqs:
         sti       
-        SAVE_PRESERVED
         call do_softirq
         jmp  test_all_events
 
@@ -190,7 +190,8 @@ GLOBAL(sysenter_eflags_saved)
         pushq $3 /* ring 3 null cs */
         pushq $0 /* null rip */
         pushq $0
-        SAVE_VOLATILE TRAP_syscall
+        movl  $TRAP_syscall, 4(%rsp)
+        SAVE_ALL
         GET_CURRENT(bx)
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
@@ -207,7 +208,6 @@ UNLIKELY_END(sysenter_nt_set)
         leal  (,%rcx,TBF_INTERRUPT),%ecx
 UNLIKELY_START(z, sysenter_gpf)
         movq  VCPU_trap_ctxt(%rbx),%rsi
-        SAVE_PRESERVED
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         movl  %eax,TRAPBOUNCE_error_code(%rdx)
         movq  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rsi),%rax
@@ -225,7 +225,8 @@ UNLIKELY_END(sysenter_gpf)
 ENTRY(int80_direct_trap)
         ASM_CLAC
         pushq $0
-        SAVE_VOLATILE 0x80
+        movl  $0x80, 4(%rsp)
+        SAVE_ALL
 
         cmpb  $0,untrusted_msi(%rip)
 UNLIKELY_START(ne, msi_check)
@@ -253,7 +254,6 @@ int80_slow_path:
          * IDT entry with DPL==0.
          */
         movl  $((0x80 << 3) | X86_XEC_IDT),UREGS_error_code(%rsp)
-        SAVE_PRESERVED
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         /* A GPF wouldn't have incremented the instruction pointer. */
         subq  $2,UREGS_rip(%rsp)
