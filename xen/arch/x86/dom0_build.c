@@ -140,9 +140,8 @@ struct vcpu *__init dom0_setup_vcpu(struct domain *d,
     {
         if ( pv_shim )
         {
-
-            cpumask_setall(v->cpu_hard_affinity);
-            cpumask_setall(v->cpu_soft_affinity);
+            __cpumask_set_cpu(vcpu_id, v->cpu_hard_affinity);
+            __cpumask_set_cpu(vcpu_id, v->cpu_soft_affinity);
         }
         else
         {
