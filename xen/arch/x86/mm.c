@@ -292,9 +292,14 @@ void __init arch_init_memory(void)
     /*
      * First 1MB of RAM is historically marked as I/O.  If we booted PVH,
      * reclaim the space.  Irrespective, leave MFN 0 as special for the sake
-     * of 0 being a very common default value.
+     * of 0 being a very common default value. Also reserve the RAM needed by
+     * the trampoline on PVH starting at MFN 1.
      */
-    for ( i = 0; i < (pvh_boot ? 1 : 0x100); i++ )
+    BUG_ON(pvh_boot && trampoline_phys != 0x1000);
+    for ( i = 0;
+          i < (pvh_boot ? (1 + PFN_UP(trampoline_end - trampoline_start))
+                        : 0x100);
+          i++ )
         share_xen_page_with_guest(mfn_to_page(_mfn(i)),
                                   dom_io, XENSHARE_writable);
 
