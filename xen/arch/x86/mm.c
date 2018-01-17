@@ -1296,11 +1296,23 @@ get_page_from_l4e(
                                          _PAGE_USER|_PAGE_RW);      \
     } while ( 0 )
 
+/*
+ * When shadowing an L4 behind the guests back (e.g. for per-pcpu
+ * purposes), we cannot efficiently sync access bit updates from hardware
+ * (on the shadow tables) back into the guest view.
+ *
+ * We therefore unconditionally set _PAGE_ACCESSED even in the guests
+ * view.  This will appear to the guest as a CPU which proactively pulls
+ * all valid L4e's into its TLB, which is compatible with the x86 ABI.
+ *
+ * At the time of writing, all PV guests set the access bit anyway, so
+ * this is no actual change in their behaviour.
+ */
 #define adjust_guest_l4e(pl4e, d)                               \
     do {                                                        \
         if ( likely(l4e_get_flags((pl4e)) & _PAGE_PRESENT) &&   \
              likely(!is_pv_32bit_domain(d)) )                   \
-            l4e_add_flags((pl4e), _PAGE_USER);                  \
+            l4e_add_flags((pl4e), _PAGE_USER | _PAGE_ACCESSED); \
     } while ( 0 )
 
 #define unadjust_guest_l3e(pl3e, d)                                         \
