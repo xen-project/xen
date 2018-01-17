@@ -36,6 +36,32 @@ ENTRY(switch_to_kernel)
 /* %rbx: struct vcpu, interrupts disabled */
 restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
+
+        /* Copy guest mappings and switch to per-CPU root page table. */
+        mov   %cr3, %r9
+        GET_STACK_BASE(%rdx)
+        mov   STACK_CPUINFO_FIELD(pv_cr3)(%rdx), %rdi
+        movabs $PADDR_MASK & PAGE_MASK, %rsi
+        movabs $DIRECTMAP_VIRT_START, %rcx
+        mov   %rdi, %rax
+        and   %rsi, %rdi
+        and   %r9, %rsi
+        add   %rcx, %rdi
+        add   %rcx, %rsi
+        mov   $ROOT_PAGETABLE_FIRST_XEN_SLOT, %ecx
+        mov   root_table_offset(SH_LINEAR_PT_VIRT_START)*8(%rsi), %r8
+        mov   %r8, root_table_offset(SH_LINEAR_PT_VIRT_START)*8(%rdi)
+        rep movsq
+        mov   $ROOT_PAGETABLE_ENTRIES - \
+               ROOT_PAGETABLE_LAST_XEN_SLOT - 1, %ecx
+        sub   $(ROOT_PAGETABLE_FIRST_XEN_SLOT - \
+                ROOT_PAGETABLE_LAST_XEN_SLOT - 1) * 8, %rsi
+        sub   $(ROOT_PAGETABLE_FIRST_XEN_SLOT - \
+                ROOT_PAGETABLE_LAST_XEN_SLOT - 1) * 8, %rdi
+        rep movsq
+        mov   %r9, STACK_CPUINFO_FIELD(xen_cr3)(%rdx)
+        write_cr3 rax, rdi, rsi
+
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
         jz    iret_exit_to_guest
@@ -100,6 +126,22 @@ failsafe_callback:
         ALIGN
 /* No special register assumptions. */
 restore_all_xen:
+        /*
+         * Check whether we need to switch to the per-CPU page tables, in
+         * case we return to late PV exit code (from an NMI or #MC).
+         */
+        GET_STACK_BASE(%rax)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rax), %rdx
+        mov   STACK_CPUINFO_FIELD(pv_cr3)(%rax), %rax
+        test  %rdx, %rdx
+        /*
+         * Ideally the condition would be "nsz", but such doesn't exist,
+         * so "g" will have to do.
+         */
+UNLIKELY_START(g, exit_cr3)
+        write_cr3 rax, rdi, rsi
+UNLIKELY_END(exit_cr3)
+
         RESTORE_ALL adj=8
         iretq
 
@@ -129,7 +171,18 @@ ENTRY(lstar_enter)
         pushq $0
         movl  $TRAP_syscall, 4(%rsp)
         SAVE_ALL
-        GET_CURRENT(%rbx)
+
+        GET_STACK_BASE(%rbx)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        neg   %rcx
+        jz    .Llstar_cr3_okay
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        neg   %rcx
+        write_cr3 rcx, r11, r12
+        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+.Llstar_cr3_okay:
+
+        __GET_CURRENT(%rbx)
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
 
@@ -278,7 +331,18 @@ GLOBAL(sysenter_eflags_saved)
         pushq $0
         movl  $TRAP_syscall, 4(%rsp)
         SAVE_ALL
-        GET_CURRENT(%rbx)
+
+        GET_STACK_BASE(%rbx)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        neg   %rcx
+        jz    .Lsyse_cr3_okay
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        neg   %rcx
+        write_cr3 rcx, rdi, rsi
+        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+.Lsyse_cr3_okay:
+
+        __GET_CURRENT(%rbx)
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
@@ -314,6 +378,16 @@ ENTRY(int80_direct_trap)
         movl  $0x80, 4(%rsp)
         SAVE_ALL
 
+        GET_STACK_BASE(%rbx)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
+        neg   %rcx
+        jz    .Lint80_cr3_okay
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        neg   %rcx
+        write_cr3 rcx, rdi, rsi
+        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+.Lint80_cr3_okay:
+
         cmpb  $0,untrusted_msi(%rip)
 UNLIKELY_START(ne, msi_check)
         movl  $0x80,%edi
@@ -321,7 +395,7 @@ UNLIKELY_START(ne, msi_check)
         LOAD_C_CLOBBERED
 UNLIKELY_END(msi_check)
 
-        GET_CURRENT(%rbx)
+        __GET_CURRENT(%rbx)
 
         /* Check that the callback is non-null. */
         leaq  VCPU_int80_bounce(%rbx),%rdx
@@ -483,9 +557,27 @@ ENTRY(dom_crash_sync_extable)
 
 ENTRY(common_interrupt)
         SAVE_ALL CLAC
+
+        GET_STACK_BASE(%r14)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
+        mov   %rcx, %r15
+        neg   %rcx
+        jz    .Lintr_cr3_okay
+        jns   .Lintr_cr3_load
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        neg   %rcx
+.Lintr_cr3_load:
+        write_cr3 rcx, rdi, rsi
+        xor   %ecx, %ecx
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        testb $3, UREGS_cs(%rsp)
+        cmovnz %rcx, %r15
+.Lintr_cr3_okay:
+
         CR4_PV32_RESTORE
         movq %rsp,%rdi
         callq do_IRQ
+        mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         jmp ret_from_intr
 
 /* No special register assumptions. */
@@ -503,6 +595,23 @@ ENTRY(page_fault)
 /* No special register assumptions. */
 GLOBAL(handle_exception)
         SAVE_ALL CLAC
+
+        GET_STACK_BASE(%r14)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
+        mov   %rcx, %r15
+        neg   %rcx
+        jz    .Lxcpt_cr3_okay
+        jns   .Lxcpt_cr3_load
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        neg   %rcx
+.Lxcpt_cr3_load:
+        write_cr3 rcx, rdi, rsi
+        xor   %ecx, %ecx
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        testb $3, UREGS_cs(%rsp)
+        cmovnz %rcx, %r15
+.Lxcpt_cr3_okay:
+
 handle_exception_saved:
         GET_CURRENT(%rbx)
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
@@ -567,6 +676,7 @@ handle_exception_saved:
         leaq  exception_table(%rip),%rdx
         PERFC_INCR(exceptions, %rax, %rbx)
         callq *(%rdx,%rax,8)
+        mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         leaq  VCPU_trap_bounce(%rbx),%rdx
@@ -599,6 +709,7 @@ exception_with_ints_disabled:
         rep;  movsq                     # make room for ec/ev
 1:      movq  UREGS_error_code(%rsp),%rax # ec/ev
         movq  %rax,UREGS_kernel_sizeof(%rsp)
+        mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         jmp   restore_all_xen           # return to fixup code
 
 /* No special register assumptions. */
@@ -676,6 +787,17 @@ ENTRY(double_fault)
         movl  $TRAP_double_fault,4(%rsp)
         /* Set AC to reduce chance of further SMAP faults */
         SAVE_ALL STAC
+
+        GET_STACK_BASE(%rbx)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rbx
+        test  %rbx, %rbx
+        jz    .Ldblf_cr3_okay
+        jns   .Ldblf_cr3_load
+        neg   %rbx
+.Ldblf_cr3_load:
+        write_cr3 rbx, rdi, rsi
+.Ldblf_cr3_okay:
+
         movq  %rsp,%rdi
         call  do_double_fault
         ud2
@@ -694,10 +816,28 @@ ENTRY(nmi)
         movl  $TRAP_nmi,4(%rsp)
 handle_ist_exception:
         SAVE_ALL CLAC
+
+        GET_STACK_BASE(%r14)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
+        mov   %rcx, %r15
+        neg   %rcx
+        jz    .List_cr3_okay
+        jns   .List_cr3_load
+        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        neg   %rcx
+.List_cr3_load:
+        write_cr3 rcx, rdi, rsi
+        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+.List_cr3_okay:
+
         CR4_PV32_RESTORE
         testb $3,UREGS_cs(%rsp)
         jz    1f
-        /* Interrupted guest context. Copy the context to stack bottom. */
+        /*
+         * Interrupted guest context. Clear the restore value for xen_cr3
+         * and copy the context to stack bottom.
+         */
+        xor   %r15, %r15
         GET_CPUINFO_FIELD(guest_cpu_user_regs,%rdi)
         movq  %rsp,%rsi
         movl  $UREGS_kernel_sizeof/8,%ecx
@@ -707,6 +847,7 @@ handle_ist_exception:
         movzbl UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         callq *(%rdx,%rax,8)
+        mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         cmpb  $TRAP_nmi,UREGS_entry_vector(%rsp)
         jne   ret_from_intr
 

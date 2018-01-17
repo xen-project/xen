@@ -149,6 +149,15 @@ void ret_from_intr(void);
 #define ASM_STAC ASM_AC(STAC)
 #define ASM_CLAC ASM_AC(CLAC)
 
+.macro write_cr3 val:req, tmp1:req, tmp2:req
+        mov   %cr4, %\tmp1
+        mov   %\tmp1, %\tmp2
+        and   $~X86_CR4_PGE, %\tmp1
+        mov   %\tmp1, %cr4
+        mov   %\val, %cr3
+        mov   %\tmp2, %cr4
+.endm
+
 #define CR4_PV32_RESTORE                                           \
         667: ASM_NOP5;                                             \
         .pushsection .altinstr_replacement, "ax";                  \
