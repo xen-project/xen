@@ -1559,10 +1559,10 @@ decode_register(
     case  9: p = &regs->r9;  break;
     case 10: p = &regs->r10; break;
     case 11: p = &regs->r11; break;
-    case 12: mark_regs_dirty(regs); p = &regs->r12; break;
-    case 13: mark_regs_dirty(regs); p = &regs->r13; break;
-    case 14: mark_regs_dirty(regs); p = &regs->r14; break;
-    case 15: mark_regs_dirty(regs); p = &regs->r15; break;
+    case 12: p = &regs->r12; break;
+    case 13: p = &regs->r13; break;
+    case 14: p = &regs->r14; break;
+    case 15: p = &regs->r15; break;
 #endif
     default: BUG(); p = NULL; break;
     }

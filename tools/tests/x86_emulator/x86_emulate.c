@@ -33,7 +33,6 @@ typedef bool bool_t;
 #define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
 
 #define cpu_has_amd_erratum(nr) 0
-#define mark_regs_dirty(r) ((void)(r))
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #ifdef __i386__

@@ -3049,7 +3049,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
         if ( admin_io_okay(port, op_bytes, currd) )
         {
-            mark_regs_dirty(regs);
             io_emul(regs);            
         }
         else
@@ -3079,7 +3078,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
         if ( admin_io_okay(port, op_bytes, currd) )
         {
-            mark_regs_dirty(regs);
             io_emul(regs);            
             if ( (op_bytes == 1) && pv_post_outb_hook )
                 pv_post_outb_hook(port, regs->eax);
