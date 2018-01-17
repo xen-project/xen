@@ -1908,6 +1908,7 @@ int map_domain_pirq(
     struct irq_desc *desc;
     unsigned long flags;
     DECLARE_BITMAP(prepared, MAX_MSI_IRQS) = {};
+    DECLARE_BITMAP(granted, MAX_MSI_IRQS) = {};
 
     ASSERT(spin_is_locked(&d->event_lock));
 
@@ -1941,13 +1942,17 @@ int map_domain_pirq(
         return ret;
     }
 
-    ret = irq_permit_access(d, irq);
-    if ( ret )
+    if ( likely(!irq_access_permitted(d, irq)) )
     {
-        printk(XENLOG_G_ERR
-               "dom%d: could not permit access to IRQ%d (pirq %d)\n",
-               d->domain_id, irq, pirq);
-        return ret;
+        ret = irq_permit_access(d, irq);
+        if ( ret )
+        {
+            printk(XENLOG_G_ERR
+                   "dom%d: could not permit access to IRQ%d (pirq %d)\n",
+                  d->domain_id, irq, pirq);
+            return ret;
+        }
+        __set_bit(0, granted);
     }
 
     ret = prepare_domain_irq_pirq(d, irq, pirq, &info);
@@ -2032,10 +2037,15 @@ int map_domain_pirq(
                 __set_bit(nr, prepared);
             msi_desc[nr].irq = irq;
 
-            if ( irq_permit_access(d, irq) != 0 )
-                printk(XENLOG_G_WARNING
-                       "dom%d: could not permit access to IRQ%d (pirq %d)\n",
-                       d->domain_id, irq, pirq);
+            if ( likely(!irq_access_permitted(d, irq)) )
+            {
+                if ( irq_permit_access(d, irq) )
+                    printk(XENLOG_G_WARNING
+                           "dom%d: could not permit access to IRQ%d (pirq %d)\n",
+                           d->domain_id, irq, pirq);
+                else
+                    __set_bit(nr, granted);
+            }
 
             desc = irq_to_desc(irq);
             spin_lock_irqsave(&desc->lock, flags);
@@ -2064,7 +2074,8 @@ int map_domain_pirq(
             }
             while ( nr )
             {
-                if ( irq >= 0 && irq_deny_access(d, irq) )
+                if ( irq >= 0 && test_bit(nr, granted) &&
+                     irq_deny_access(d, irq) )
                     printk(XENLOG_G_ERR
                            "dom%d: could not revoke access to IRQ%d (pirq %d)\n",
                            d->domain_id, irq, pirq);
@@ -2095,7 +2106,7 @@ done:
         if ( test_bit(0, prepared) )
             cleanup_domain_irq_pirq(d, irq, info);
  revoke:
-        if ( irq_deny_access(d, irq) )
+        if ( test_bit(0, granted) && irq_deny_access(d, irq) )
             printk(XENLOG_G_ERR
                    "dom%d: could not revoke access to IRQ%d (pirq %d)\n",
                    d->domain_id, irq, pirq);
