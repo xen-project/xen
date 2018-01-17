@@ -45,6 +45,7 @@ restore_all_guest:
         movabs $DIRECTMAP_VIRT_START, %rcx
         mov   %rdi, %rax
         and   %rsi, %rdi
+        jz    .Lrag_keep_cr3
         and   %r9, %rsi
         add   %rcx, %rdi
         add   %rcx, %rsi
@@ -61,6 +62,7 @@ restore_all_guest:
         rep movsq
         mov   %r9, STACK_CPUINFO_FIELD(xen_cr3)(%rdx)
         write_cr3 rax, rdi, rsi
+.Lrag_keep_cr3:
 
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
