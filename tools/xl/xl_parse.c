@@ -939,12 +939,8 @@ void parse_config_data(const char *config_source,
         c_info->type = builder_type;
     }
 
-    static bool pvshim_default_enable = 0;
-
-    if (c_info->type == LIBXL_DOMAIN_TYPE_INVALID) {
-        c_info->type = LIBXL_DOMAIN_TYPE_PVH;
-        pvshim_default_enable = 1;
-    }
+    if (c_info->type == LIBXL_DOMAIN_TYPE_INVALID)
+        c_info->type = LIBXL_DOMAIN_TYPE_PV;
 
     xlu_cfg_get_defbool(config, "hap", &c_info->hap, 0);
 
@@ -970,10 +966,7 @@ void parse_config_data(const char *config_source,
     libxl_domain_build_info_init_type(b_info, c_info->type);
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_PVH) {
-        if (xlu_cfg_get_defbool(config, "pvshim", &b_info->u.pvh.pvshim, 0)
-            && pvshim_default_enable)
-            libxl_defbool_set(&b_info->u.pvh.pvshim, 1);
-
+        xlu_cfg_get_defbool(config, "pvshim", &b_info->u.pvh.pvshim, 0);
         if (!xlu_cfg_get_string(config, "pvshim_path", &buf, 0))
             xlu_cfg_replace_string(config, "pvshim_path",
                                    &b_info->u.pvh.pvshim_path, 0);
