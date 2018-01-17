@@ -411,6 +411,9 @@ __pvh_start:
         /* Skip bootloader setup and bios setup, go straight to trampoline */
         movb    $1, sym_esi(pvh_boot)
         movb    $1, sym_esi(skip_realmode)
+
+        /* Set trampoline_phys to use mfn 1 to avoid having a mapping at VA 0 */
+        movw    $0x1000, sym_esi(trampoline_phys)
         jmp     trampoline_setup
 
 #endif /* CONFIG_PVH_GUEST */
