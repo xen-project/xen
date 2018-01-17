@@ -22,11 +22,10 @@ get_memory_map:
         cmpl    $SMAP,%eax                      # check the return is `SMAP'
         jne     .Lmem88
 
-        movb    bootsym(e820nr),%al             # up to 128 entries
-        cmpb    $E820MAX,%al
+        incw    bootsym(e820nr)
+        cmpw    $E820MAX,bootsym(e820nr)        # up to this many entries
         jae     .Lmem88
 
-        incb    bootsym(e820nr)
         movw    %di,%ax
         addw    $20,%ax
         movw    %ax,%di
