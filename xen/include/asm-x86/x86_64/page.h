@@ -25,8 +25,8 @@
 /* These are architectural limits. Current CPUs support only 40-bit phys. */
 #define PADDR_BITS              52
 #define VADDR_BITS              48
-#define PADDR_MASK              ((1UL << PADDR_BITS)-1)
-#define VADDR_MASK              ((1UL << VADDR_BITS)-1)
+#define PADDR_MASK              ((_AC(1,UL) << PADDR_BITS) - 1)
+#define VADDR_MASK              ((_AC(1,UL) << VADDR_BITS) - 1)
 
 #define is_canonical_address(x) (((long)(x) >> 47) == ((long)(x) >> 63))
 
@@ -117,6 +117,7 @@ typedef l4_pgentry_t root_pgentry_t;
       : (((_s) < ROOT_PAGETABLE_FIRST_XEN_SLOT) ||  \
          ((_s) > ROOT_PAGETABLE_LAST_XEN_SLOT)))
 
+#define root_table_offset         l4_table_offset
 #define root_get_pfn              l4e_get_pfn
 #define root_get_flags            l4e_get_flags
 #define root_get_intpte           l4e_get_intpte

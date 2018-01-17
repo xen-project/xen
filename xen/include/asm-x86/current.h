@@ -42,6 +42,18 @@ struct cpu_info {
     struct vcpu *current_vcpu;
     unsigned long per_cpu_offset;
     unsigned long cr4;
+    /*
+     * Of the two following fields the latter is being set to the CR3 value
+     * to be used on the given pCPU for loading whenever 64-bit PV guest
+     * context is being entered. The value never changes once set.
+     * The former is the value to restore when re-entering Xen, if any. IOW
+     * its value being zero means there's nothing to restore. However, its
+     * value can also be negative, indicating to the exit-to-Xen code that
+     * restoring is not necessary, but allowing any nested entry code paths
+     * to still know the value to put back into CR3.
+     */
+    unsigned long xen_cr3;
+    unsigned long pv_cr3;
     /* get_stack_bottom() must be 16-byte aligned */
 };
 
