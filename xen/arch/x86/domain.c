@@ -148,7 +148,6 @@ static void noreturn continue_idle_domain(struct vcpu *v)
 static void noreturn continue_nonidle_domain(struct vcpu *v)
 {
     check_wakeup_from_wait();
-    mark_regs_dirty(guest_cpu_user_regs());
     reset_stack_and_jump(ret_from_intr);
 }
 
