@@ -14,8 +14,8 @@
 
 /*
  * This entry point is entered from xen/arch/x86/boot/head.S with:
- *   - 0x4(%esp) = MULTIBOOT_MAGIC,
- *   - 0x8(%esp) = MULTIBOOT_INFORMATION_ADDRESS,
+ *   - 0x4(%esp) = MAGIC,
+ *   - 0x8(%esp) = INFORMATION_ADDRESS,
  *   - 0xc(%esp) = TOPMOST_LOW_MEMORY_STACK_ADDRESS.
  */
 asm (
@@ -28,6 +28,9 @@ asm (
 #include "defs.h"
 #include "../../../include/xen/multiboot.h"
 #include "../../../include/xen/multiboot2.h"
+
+#include "../../../include/xen/kconfig.h"
+#include <public/arch-x86/hvm/start_info.h>
 
 #define get_mb2_data(tag, type, member)   (((multiboot2_tag_##type##_t *)(tag))->member)
 #define get_mb2_string(tag, type, member) ((u32)get_mb2_data(tag, type, member))
@@ -69,6 +72,36 @@ static u32 copy_string(u32 src)
         continue;
 
     return copy_mem(src, p - src + 1);
+}
+
+static struct hvm_start_info *pvh_info_reloc(u32 in)
+{
+    struct hvm_start_info *out;
+
+    out = _p(copy_mem(in, sizeof(*out)));
+
+    if ( out->cmdline_paddr )
+        out->cmdline_paddr = copy_string(out->cmdline_paddr);
+
+    if ( out->nr_modules )
+    {
+        unsigned int i;
+        struct hvm_modlist_entry *mods;
+
+        out->modlist_paddr =
+            copy_mem(out->modlist_paddr,
+                     out->nr_modules * sizeof(struct hvm_modlist_entry));
+
+        mods = _p(out->modlist_paddr);
+
+        for ( i = 0; i < out->nr_modules; i++ )
+        {
+            if ( mods[i].cmdline_paddr )
+                mods[i].cmdline_paddr = copy_string(mods[i].cmdline_paddr);
+        }
+    }
+
+    return out;
 }
 
 static multiboot_info_t *mbi_reloc(u32 mbi_in)
@@ -226,14 +259,27 @@ static multiboot_info_t *mbi2_reloc(u32 mbi_in)
     return mbi_out;
 }
 
-multiboot_info_t __stdcall *reloc(u32 mb_magic, u32 mbi_in, u32 trampoline)
+void * __stdcall reloc(u32 magic, u32 in, u32 trampoline)
 {
     alloc = trampoline;
 
-    if ( mb_magic == MULTIBOOT2_BOOTLOADER_MAGIC )
-        return mbi2_reloc(mbi_in);
-    else
-        return mbi_reloc(mbi_in);
+    switch ( magic )
+    {
+    case MULTIBOOT_BOOTLOADER_MAGIC:
+        return mbi_reloc(in);
+
+    case MULTIBOOT2_BOOTLOADER_MAGIC:
+        return mbi2_reloc(in);
+
+    case XEN_HVM_START_MAGIC_VALUE:
+        if ( IS_ENABLED(CONFIG_PVH_GUEST) )
+            return pvh_info_reloc(in);
+        /* Fallthrough */
+
+    default:
+        /* Nothing we can do */
+        return NULL;
+    }
 }
 
 /*

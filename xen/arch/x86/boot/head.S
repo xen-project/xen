@@ -414,6 +414,7 @@ __pvh_start:
 
         /* Set trampoline_phys to use mfn 1 to avoid having a mapping at VA 0 */
         movw    $0x1000, sym_esi(trampoline_phys)
+        mov     (%ebx), %eax /* mov $XEN_HVM_START_MAGIC_VALUE, %eax */
         jmp     trampoline_setup
 
 #endif /* CONFIG_PVH_GUEST */
@@ -578,18 +579,20 @@ trampoline_setup:
         /* Get bottom-most low-memory stack address. */
         add     $TRAMPOLINE_SPACE,%ecx
 
-#ifdef CONFIG_PVH_GUEST
-        cmpb    $0, sym_fs(pvh_boot)
-        jne     1f
-#endif
-
-        /* Save the Multiboot info struct (after relocation) for later use. */
+        /* Save Multiboot / PVH info struct (after relocation) for later use. */
         push    %ecx                /* Bottom-most low-memory stack address. */
-        push    %ebx                /* Multiboot information address. */
-        push    %eax                /* Multiboot magic. */
+        push    %ebx                /* Multiboot / PVH information address. */
+        push    %eax                /* Magic number. */
         call    reloc
-        mov     %eax,sym_fs(multiboot_ptr)
+#ifdef CONFIG_PVH_GUEST
+        cmp     $0, sym_fs(pvh_boot)
+        je      1f
+        mov     %eax, sym_fs(pvh_start_info_pa)
+        jmp     2f
+#endif
 1:
+        mov     %eax, sym_fs(multiboot_ptr)
+2:
 
         /*
          * Now trampoline_phys points to the following structure (lowest address
@@ -598,12 +601,12 @@ trampoline_setup:
          * +------------------------+
          * | TRAMPOLINE_STACK_SPACE |
          * +------------------------+
-         * |        mbi data        |
+         * |     Data (MBI / PVH)   |
          * +- - - - - - - - - - - - +
          * |    TRAMPOLINE_SPACE    |
          * +------------------------+
          *
-         * mbi data grows downwards from the highest address of TRAMPOLINE_SPACE
+         * Data grows downwards from the highest address of TRAMPOLINE_SPACE
          * region to the end of the trampoline. The rest of TRAMPOLINE_SPACE is
          * reserved for trampoline code and data.
          */
