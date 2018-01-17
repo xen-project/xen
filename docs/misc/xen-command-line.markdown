@@ -1687,6 +1687,18 @@ In the case that x2apic is in use, this option switches between physical and
 clustered mode.  The default, given no hint from the **FADT**, is cluster
 mode.
 
+### xpti
+> `= <boolean>`
+
+> Default: `false` on AMD hardware
+> Default: `true` everywhere else
+
+Override default selection of whether to isolate 64-bit PV guest page
+tables.
+
+** WARNING: Not yet a complete isolation implementation, but better than
+nothing. **
+
 ### xsave
 > `= <boolean>`
 

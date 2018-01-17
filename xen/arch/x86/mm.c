@@ -4011,7 +4011,7 @@ long do_mmu_update(
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
                     if ( !rc )
-                        sync_guest = true;
+                        sync_guest = this_cpu(root_pgt);
                     break;
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
