@@ -349,6 +349,9 @@ void start_secondary(void *unused)
     else
         microcode_resume_cpu(cpu);
 
+    if ( xen_guest )
+        hypervisor_ap_setup();
+
     smp_callin();
 
     init_percpu_time();
@@ -375,9 +378,6 @@ void start_secondary(void *unused)
     setup_vector_irq(cpu);
     cpumask_set_cpu(cpu, &cpu_online_map);
     unlock_vector_lock();
-
-    if ( xen_guest )
-        hypervisor_ap_setup();
 
     /* We can take interrupts now: we're officially "up". */
     local_irq_enable();
