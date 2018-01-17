@@ -117,21 +117,12 @@ uint64_t pv_shim_mem(uint64_t avail)
 static void __init replace_va_mapping(struct domain *d, l4_pgentry_t *l4start,
                                       unsigned long va, unsigned long mfn)
 {
-    struct page_info *page;
-    l4_pgentry_t *pl4e;
-    l3_pgentry_t *pl3e;
-    l2_pgentry_t *pl2e;
-    l1_pgentry_t *pl1e;
+    l4_pgentry_t *pl4e = l4start + l4_table_offset(va);
+    l3_pgentry_t *pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(va);
+    l2_pgentry_t *pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(va);
+    l1_pgentry_t *pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
+    struct page_info *page = mfn_to_page(l1e_get_pfn(*pl1e));
 
-    pl4e = l4start + l4_table_offset(va);
-    pl3e = l4e_to_l3e(*pl4e);
-    pl3e += l3_table_offset(va);
-    pl2e = l3e_to_l2e(*pl3e);
-    pl2e += l2_table_offset(va);
-    pl1e = l2e_to_l1e(*pl2e);
-    pl1e += l1_table_offset(va);
-
-    page = mfn_to_page(l1e_get_pfn(*pl1e));
     put_page_and_type(page);
 
     *pl1e = l1e_from_pfn(mfn, (!is_pv_32bit_domain(d) ? L1_PROT
