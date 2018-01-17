@@ -324,6 +324,7 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
     unsigned int gsi=0, pdev=0, pintx=0;
     uint8_t via_type;
+    struct vcpu *v;
 
     via_type = (uint8_t)MASK_EXTR(via, HVM_PARAM_CALLBACK_IRQ_TYPE_MASK) + 1;
     if ( ((via_type == HVMIRQ_callback_gsi) && (via == 0)) ||
@@ -385,6 +386,10 @@ void hvm_set_callback_via(struct domain *d, uint64_t via)
     }
 
     spin_unlock(&d->arch.hvm_domain.irq_lock);
+
+    for_each_vcpu ( d, v )
+        if ( is_vcpu_online(v) )
+            hvm_assert_evtchn_irq(v);
 
 #ifndef NDEBUG
     printk(XENLOG_G_INFO "Dom%u callback via changed to ", d->domain_id);
