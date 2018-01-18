@@ -1035,7 +1035,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
 
             /* We've loaded the shim, so load the kernel as a secondary module */
             if (state->pv_kernel.mapped) {
-                LOG(WARN, "xc_dom_module_mem, cmdline %s",
+                LOG(DEBUG, "xc_dom_module_mem, cmdline %s",
                     state->pv_cmdline);
                 rc = xc_dom_module_mem(dom, state->pv_kernel.data,
                                        state->pv_kernel.size, state->pv_cmdline);
@@ -1044,7 +1044,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
                     goto out;
                 }
             } else {
-                LOG(WARN, "xc_dom_module_file, path %s cmdline %s",
+                LOG(DEBUG, "xc_dom_module_file, path %s cmdline %s",
                     state->pv_kernel.path, state->pv_cmdline);
                 rc = xc_dom_module_file(dom, state->pv_kernel.path, state->pv_cmdline);
                 if (rc) {
