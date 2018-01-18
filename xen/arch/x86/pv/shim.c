@@ -37,6 +37,11 @@
 
 #include <compat/grant_table.h>
 
+#undef mfn_to_page
+#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
+#undef virt_to_mfn
+#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
 bool pv_shim;
 boolean_param("pv-shim", pv_shim);
@@ -115,17 +120,17 @@ uint64_t pv_shim_mem(uint64_t avail)
 #define COMPAT_L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 
 static void __init replace_va_mapping(struct domain *d, l4_pgentry_t *l4start,
-                                      unsigned long va, unsigned long mfn)
+                                      unsigned long va, mfn_t mfn)
 {
     l4_pgentry_t *pl4e = l4start + l4_table_offset(va);
     l3_pgentry_t *pl3e = l4e_to_l3e(*pl4e) + l3_table_offset(va);
     l2_pgentry_t *pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(va);
     l1_pgentry_t *pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(va);
-    struct page_info *page = mfn_to_page(l1e_get_pfn(*pl1e));
+    struct page_info *page = mfn_to_page(l1e_get_mfn(*pl1e));
 
     put_page_and_type(page);
 
-    *pl1e = l1e_from_pfn(mfn, (!is_pv_32bit_domain(d) ? L1_PROT
+    *pl1e = l1e_from_mfn(mfn, (!is_pv_32bit_domain(d) ? L1_PROT
                                                       : COMPAT_L1_PROT));
 }
 
@@ -165,8 +170,9 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
     (si) = param;                                                              \
     if ( va )                                                                  \
     {                                                                          \
-        share_xen_page_with_guest(mfn_to_page(param), d, XENSHARE_writable);   \
-        replace_va_mapping(d, l4start, va, param);                             \
+        share_xen_page_with_guest(mfn_to_page(_mfn(param)), d,                 \
+                                  XENSHARE_writable);                          \
+        replace_va_mapping(d, l4start, va, _mfn(param));                       \
         dom0_update_physmap(d, PFN_DOWN((va) - va_start), param, vphysmap);    \
     }                                                                          \
     else                                                                       \
@@ -186,17 +192,17 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
     {
         /* Allocate a new page for DomU's PV console */
         void *page = alloc_xenheap_pages(0, MEMF_bits(32));
-        uint64_t console_mfn;
+        mfn_t console_mfn;
 
         ASSERT(page);
         clear_page(page);
         console_mfn = virt_to_mfn(page);
-        si->console.domU.mfn = console_mfn;
+        si->console.domU.mfn = mfn_x(console_mfn);
         share_xen_page_with_guest(mfn_to_page(console_mfn), d,
                                   XENSHARE_writable);
         replace_va_mapping(d, l4start, console_va, console_mfn);
         dom0_update_physmap(d, (console_va - va_start) >> PAGE_SHIFT,
-                            console_mfn, vphysmap);
+                            mfn_x(console_mfn), vphysmap);
         consoled_set_ring_addr(page);
     }
     pv_hypercall_table_replace(__HYPERVISOR_event_channel_op,
@@ -232,7 +238,7 @@ static void write_start_info(struct domain *d)
     BUG_ON(xen_hypercall_hvm_get_param(HVM_PARAM_CONSOLE_EVTCHN, &param));
     si->console.domU.evtchn = param;
     if ( pv_console )
-        si->console.domU.mfn = virt_to_mfn(consoled_get_ring_addr());
+        si->console.domU.mfn = mfn_x(virt_to_mfn(consoled_get_ring_addr()));
     else if ( xen_hypercall_hvm_get_param(HVM_PARAM_CONSOLE_PFN,
                                           &si->console.domU.mfn) )
         BUG();
@@ -334,7 +340,7 @@ int pv_shim_shutdown(uint8_t reason)
     if ( d->arch.pirq_eoi_map != NULL )
     {
         unmap_domain_page_global(d->arch.pirq_eoi_map);
-        put_page_and_type(mfn_to_page(d->arch.pirq_eoi_map_mfn));
+        put_page_and_type(mfn_to_page(_mfn(d->arch.pirq_eoi_map_mfn)));
         d->arch.pirq_eoi_map = NULL;
         d->arch.pirq_eoi_map_mfn = 0;
         d->arch.auto_unmask = 0;
