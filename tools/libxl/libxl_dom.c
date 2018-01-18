@@ -1069,7 +1069,7 @@ static int libxl__domain_firmware(libxl__gc *gc,
                 }
             }
         }
-        
+
         if (state->pv_ramdisk.path && strlen(state->pv_ramdisk.path)) {
             if (state->pv_ramdisk.mapped) {
                 rc = xc_dom_module_mem(dom, state->pv_ramdisk.data,
@@ -1183,7 +1183,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
 
     xc_dom_loginit(ctx->xch);
 
-    /* 
+    /*
      * If PVH and we have a shim override, use the shim cmdline.
      * If PVH and no shim override, use the pv cmdline.
      * If not PVH, use info->cmdline.
