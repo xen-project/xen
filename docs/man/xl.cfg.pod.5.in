@@ -531,7 +531,7 @@ Ignored if pvhsim is false.
 =item B<pvshim_cmdline="STRING">
 
 Command line for the shim.
-Default is "pv-shim console=xen,pv sched=null".
+Default is "pv-shim console=xen,pv".
 Ignored if pvhsim is false.
 
 =item B<pvshim_extra="STRING">
