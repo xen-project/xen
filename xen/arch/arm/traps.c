@@ -2126,6 +2126,9 @@ void do_trap_guest_sync(struct cpu_user_regs *regs)
         do_trap_smc(regs, hsr);
         break;
     case HSR_EC_HVC32:
+    {
+        register_t nr;
+
         GUEST_BUG_ON(!psr_mode_is_32bit(regs->cpsr));
         perfc_incr(trap_hvc32);
 #ifndef NDEBUG
@@ -2134,8 +2137,11 @@ void do_trap_guest_sync(struct cpu_user_regs *regs)
 #endif
         if ( hsr.iss == 0 )
             return do_trap_hvc_smccc(regs);
-        do_trap_hypercall(regs, (register_t *)&regs->r12, hsr.iss);
+        nr = regs->r12;
+        do_trap_hypercall(regs, &nr, hsr.iss);
+        regs->r12 = (uint32_t)nr;
         break;
+    }
 #ifdef CONFIG_ARM_64
     case HSR_EC_HVC64:
         GUEST_BUG_ON(psr_mode_is_32bit(regs->cpsr));
