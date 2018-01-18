@@ -49,7 +49,8 @@ DECLARE_PER_CPU(struct vcpu_info *, vcpu_info);
 #define xen_guest 0
 #define pv_console 0
 
-static inline void probe_hypervisor(void) {};
+static inline void probe_hypervisor(void) {}
+
 static inline void hypervisor_setup(void)
 {
     ASSERT_UNREACHABLE();
@@ -63,20 +64,12 @@ static inline void hypervisor_fixup_e820(struct e820map *e820)
 {
     ASSERT_UNREACHABLE();
 }
+
 static inline const unsigned long *hypervisor_reserved_pages(unsigned int *size)
 {
     ASSERT_UNREACHABLE();
     return NULL;
-};
-static inline uint32_t hypervisor_cpuid_base(void)
-{
-    ASSERT_UNREACHABLE();
-    return 0;
-};
-static inline void hypervisor_resume(void)
-{
-    ASSERT_UNREACHABLE();
-};
+}
 
 #endif /* CONFIG_XEN_GUEST */
 #endif /* __X86_GUEST_XEN_H__ */
