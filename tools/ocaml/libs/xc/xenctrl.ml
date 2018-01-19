@@ -126,14 +126,6 @@ exception Error of string
 
 type handle
 
-(* this is only use by coredumping *)
-external sizeof_core_header: unit -> int
-       = "stub_sizeof_core_header"
-external sizeof_vcpu_guest_context: unit -> int
-       = "stub_sizeof_vcpu_guest_context"
-external sizeof_xen_pfn: unit -> int = "stub_sizeof_xen_pfn"
-(* end of use *)
-
 external interface_open: unit -> handle = "stub_xc_interface_open"
 external interface_close: handle -> unit = "stub_xc_interface_close"
 
@@ -274,84 +266,6 @@ external get_cpu_featureset : handle -> featureset_index -> int64 array = "stub_
 
 external watchdog : handle -> int -> int32 -> int
   = "stub_xc_watchdog"
-
-(* core dump structure *)
-type core_magic = Magic_hvm | Magic_pv
-
-type core_header = {
-	xch_magic: core_magic;
-	xch_nr_vcpus: int;
-	xch_nr_pages: nativeint;
-	xch_index_offset: int64;
-	xch_ctxt_offset: int64;
-	xch_pages_offset: int64;
-}
-
-external marshall_core_header: core_header -> string = "stub_marshall_core_header"
-
-(* coredump *)
-let coredump xch domid fd =
-	let dump s =
-		let wd = Unix.write fd s 0 (String.length s) in
-		if wd <> String.length s then
-			failwith "error while writing";
-		in
-
-	let info = domain_getinfo xch domid in
-
-	let nrpages = info.total_memory_pages in
-	let ctxt = Array.make info.max_vcpu_id None in
-	let nr_vcpus = ref 0 in
-	for i = 0 to info.max_vcpu_id - 1
-	do
-		ctxt.(i) <- try
-			let v = vcpu_context_get xch domid i in
-			incr nr_vcpus;
-			Some v
-			with _ -> None
-	done;
-
-	(* FIXME page offset if not rounded to sup *)
-	let page_offset =
-		Int64.add
-			(Int64.of_int (sizeof_core_header () +
-			 (sizeof_vcpu_guest_context () * !nr_vcpus)))
-			(Int64.of_nativeint (
-				Nativeint.mul
-					(Nativeint.of_int (sizeof_xen_pfn ()))
-					nrpages)
-				)
-		in
-
-	let header = {
-		xch_magic = if info.hvm_guest then Magic_hvm else Magic_pv;
-		xch_nr_vcpus = !nr_vcpus;
-		xch_nr_pages = nrpages;
-		xch_ctxt_offset = Int64.of_int (sizeof_core_header ());
-		xch_index_offset = Int64.of_int (sizeof_core_header ()
-					+ sizeof_vcpu_guest_context ());
-		xch_pages_offset = page_offset;
-	} in
-
-	dump (marshall_core_header header);
-	for i = 0 to info.max_vcpu_id - 1
-	do
-		match ctxt.(i) with
-		| None -> ()
-		| Some ctxt_i -> dump ctxt_i
-	done;
-	let pfns = domain_get_pfn_list xch domid nrpages in
-	if Array.length pfns <> Nativeint.to_int nrpages then
-		failwith "could not get the page frame list";
-
-	let page_size = Xenmmap.getpagesize () in
-	for i = 0 to Nativeint.to_int nrpages - 1
-	do
-		let page = map_foreign_range xch domid page_size pfns.(i) in
-		let data = Xenmmap.read page 0 page_size in
-		Xenmmap.unmap page;
-		dump data
-	done
 
 (* ** Misc ** *)
 

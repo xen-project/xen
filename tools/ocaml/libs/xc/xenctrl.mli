@@ -95,10 +95,6 @@ type domain_create_flag = CDF_HVM | CDF_HAP
 
 exception Error of string
 type handle
-external sizeof_core_header : unit -> int = "stub_sizeof_core_header"
-external sizeof_vcpu_guest_context : unit -> int
-  = "stub_sizeof_vcpu_guest_context"
-external sizeof_xen_pfn : unit -> int = "stub_sizeof_xen_pfn"
 external interface_open : unit -> handle = "stub_xc_interface_open"
 external interface_close : handle -> unit = "stub_xc_interface_close"
 val with_intf : (handle -> 'a) -> 'a
@@ -179,18 +175,6 @@ external version_capabilities : handle -> string
 type featureset_index = Featureset_raw | Featureset_host | Featureset_pv | Featureset_hvm
 external get_cpu_featureset : handle -> featureset_index -> int64 array = "stub_xc_get_cpu_featureset"
 
-type core_magic = Magic_hvm | Magic_pv
-type core_header = {
-  xch_magic : core_magic;
-  xch_nr_vcpus : int;
-  xch_nr_pages : nativeint;
-  xch_index_offset : int64;
-  xch_ctxt_offset : int64;
-  xch_pages_offset : int64;
-}
-external marshall_core_header : core_header -> string
-  = "stub_marshall_core_header"
-val coredump : handle -> domid -> Unix.file_descr -> unit
 external pages_to_kib : int64 -> int64 = "stub_pages_to_kib"
 val pages_to_mib : int64 -> int64
 external watchdog : handle -> int -> int32 -> int
