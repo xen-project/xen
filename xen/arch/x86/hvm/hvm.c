@@ -544,7 +544,11 @@ static int hvm_print_line(
     struct domain *cd = current->domain;
     char c = *val;
 
-    BUG_ON(bytes != 1);
+    ASSERT(bytes == 1 && port == 0xe9);
+
+    /* Deny any input requests. */
+    if ( dir != IOREQ_WRITE )
+        return X86EMUL_UNHANDLEABLE;
 
     /* Accept only printable characters, newline, and horizontal tab. */
     if ( !isprint(c) && (c != '\n') && (c != '\t') )
