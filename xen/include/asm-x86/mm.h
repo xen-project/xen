@@ -18,6 +18,77 @@
  */
 #define PFN_ORDER(_pfn) ((_pfn)->v.free.order)
 
+#define PG_shift(idx)   (BITS_PER_LONG - (idx))
+#define PG_mask(x, idx) (x ## UL << PG_shift(idx))
+
+ /* The following page types are MUTUALLY EXCLUSIVE. */
+#define PGT_none          PG_mask(0, 3)  /* no special uses of this page   */
+#define PGT_l1_page_table PG_mask(1, 3)  /* using as an L1 page table?     */
+#define PGT_l2_page_table PG_mask(2, 3)  /* using as an L2 page table?     */
+#define PGT_l3_page_table PG_mask(3, 3)  /* using as an L3 page table?     */
+#define PGT_l4_page_table PG_mask(4, 3)  /* using as an L4 page table?     */
+#define PGT_seg_desc_page PG_mask(5, 3)  /* using this page in a GDT/LDT?  */
+#define PGT_shared_page   PG_mask(6, 3)  /* CoW sharable page              */
+#define PGT_writable_page PG_mask(7, 3)  /* has writable mappings?         */
+#define PGT_type_mask     PG_mask(7, 3)  /* Bits 61-63.                    */
+
+ /* Page is locked? */
+#define _PGT_locked       PG_shift(4)
+#define PGT_locked        PG_mask(1, 4)
+ /* Owning guest has pinned this page to its current type? */
+#define _PGT_pinned       PG_shift(5)
+#define PGT_pinned        PG_mask(1, 5)
+ /* Has this page been validated for use as its current type? */
+#define _PGT_validated    PG_shift(6)
+#define PGT_validated     PG_mask(1, 6)
+ /* PAE only: is this an L2 page directory containing Xen-private mappings? */
+#define _PGT_pae_xen_l2   PG_shift(7)
+#define PGT_pae_xen_l2    PG_mask(1, 7)
+/* Has this page been *partially* validated for use as its current type? */
+#define _PGT_partial      PG_shift(8)
+#define PGT_partial       PG_mask(1, 8)
+
+ /* Count of uses of this frame as its current type. */
+#define PGT_count_width   PG_shift(8)
+#define PGT_count_mask    ((1UL<<PGT_count_width)-1)
+
+/* Are the 'type mask' bits identical? */
+#define PGT_type_equal(x, y) (!(((x) ^ (y)) & PGT_type_mask))
+
+ /* Cleared when the owning guest 'frees' this page. */
+#define _PGC_allocated    PG_shift(1)
+#define PGC_allocated     PG_mask(1, 1)
+ /* Page is Xen heap? */
+#define _PGC_xen_heap     PG_shift(2)
+#define PGC_xen_heap      PG_mask(1, 2)
+ /* Set when is using a page as a page table */
+#define _PGC_page_table   PG_shift(3)
+#define PGC_page_table    PG_mask(1, 3)
+ /* 3-bit PAT/PCD/PWT cache-attribute hint. */
+#define PGC_cacheattr_base PG_shift(6)
+#define PGC_cacheattr_mask PG_mask(7, 6)
+ /* Page is broken? */
+#define _PGC_broken       PG_shift(7)
+#define PGC_broken        PG_mask(1, 7)
+ /* Mutually-exclusive page states: { inuse, offlining, offlined, free }. */
+#define PGC_state         PG_mask(3, 9)
+#define PGC_state_inuse   PG_mask(0, 9)
+#define PGC_state_offlining PG_mask(1, 9)
+#define PGC_state_offlined PG_mask(2, 9)
+#define PGC_state_free    PG_mask(3, 9)
+#define page_state_is(pg, st) (((pg)->count_info&PGC_state) == PGC_state_##st)
+
+ /* Count of references to this frame. */
+#define PGC_count_width   PG_shift(9)
+#define PGC_count_mask    ((1UL<<PGC_count_width)-1)
+
+/*
+ * Page needs to be scrubbed. Since this bit can only be set on a page that is
+ * free (i.e. in PGC_state_free) we can reuse PGC_allocated bit.
+ */
+#define _PGC_need_scrub   _PGC_allocated
+#define PGC_need_scrub    PGC_allocated
+
 #ifndef CONFIG_BIGMEM
 /*
  * This definition is solely for the use in struct page_info (and
@@ -82,7 +153,7 @@ struct page_info
             unsigned long type:5;   /* What kind of shadow is this? */
             unsigned long pinned:1; /* Is the shadow pinned? */
             unsigned long head:1;   /* Is this the first page of the shadow? */
-#define PAGE_SH_REFCOUNT_WIDTH 25
+#define PAGE_SH_REFCOUNT_WIDTH (PGT_count_width - 7)
             unsigned long count:PAGE_SH_REFCOUNT_WIDTH; /* Reference count */
         } sh;
 
@@ -197,77 +268,6 @@ struct page_info
 };
 
 #undef __pdx_t
-
-#define PG_shift(idx)   (BITS_PER_LONG - (idx))
-#define PG_mask(x, idx) (x ## UL << PG_shift(idx))
-
- /* The following page types are MUTUALLY EXCLUSIVE. */
-#define PGT_none          PG_mask(0, 3)  /* no special uses of this page   */
-#define PGT_l1_page_table PG_mask(1, 3)  /* using as an L1 page table?     */
-#define PGT_l2_page_table PG_mask(2, 3)  /* using as an L2 page table?     */
-#define PGT_l3_page_table PG_mask(3, 3)  /* using as an L3 page table?     */
-#define PGT_l4_page_table PG_mask(4, 3)  /* using as an L4 page table?     */
-#define PGT_seg_desc_page PG_mask(5, 3)  /* using this page in a GDT/LDT?  */
-#define PGT_shared_page   PG_mask(6, 3)  /* CoW sharable page              */
-#define PGT_writable_page PG_mask(7, 3)  /* has writable mappings?         */
-#define PGT_type_mask     PG_mask(7, 3)  /* Bits 61-63.                    */
-
- /* Page is locked? */
-#define _PGT_locked       PG_shift(4)
-#define PGT_locked        PG_mask(1, 4)
- /* Owning guest has pinned this page to its current type? */
-#define _PGT_pinned       PG_shift(5)
-#define PGT_pinned        PG_mask(1, 5)
- /* Has this page been validated for use as its current type? */
-#define _PGT_validated    PG_shift(6)
-#define PGT_validated     PG_mask(1, 6)
- /* PAE only: is this an L2 page directory containing Xen-private mappings? */
-#define _PGT_pae_xen_l2   PG_shift(7)
-#define PGT_pae_xen_l2    PG_mask(1, 7)
-/* Has this page been *partially* validated for use as its current type? */
-#define _PGT_partial      PG_shift(8)
-#define PGT_partial       PG_mask(1, 8)
-
- /* Count of uses of this frame as its current type. */
-#define PGT_count_width   PG_shift(8)
-#define PGT_count_mask    ((1UL<<PGT_count_width)-1)
-
-/* Are the 'type mask' bits identical? */
-#define PGT_type_equal(x, y) (!(((x) ^ (y)) & PGT_type_mask))
-
- /* Cleared when the owning guest 'frees' this page. */
-#define _PGC_allocated    PG_shift(1)
-#define PGC_allocated     PG_mask(1, 1)
- /* Page is Xen heap? */
-#define _PGC_xen_heap     PG_shift(2)
-#define PGC_xen_heap      PG_mask(1, 2)
- /* Set when is using a page as a page table */
-#define _PGC_page_table   PG_shift(3)
-#define PGC_page_table    PG_mask(1, 3)
- /* 3-bit PAT/PCD/PWT cache-attribute hint. */
-#define PGC_cacheattr_base PG_shift(6)
-#define PGC_cacheattr_mask PG_mask(7, 6)
- /* Page is broken? */
-#define _PGC_broken       PG_shift(7)
-#define PGC_broken        PG_mask(1, 7)
- /* Mutually-exclusive page states: { inuse, offlining, offlined, free }. */
-#define PGC_state         PG_mask(3, 9)
-#define PGC_state_inuse   PG_mask(0, 9)
-#define PGC_state_offlining PG_mask(1, 9)
-#define PGC_state_offlined PG_mask(2, 9)
-#define PGC_state_free    PG_mask(3, 9)
-#define page_state_is(pg, st) (((pg)->count_info&PGC_state) == PGC_state_##st)
-
- /* Count of references to this frame. */
-#define PGC_count_width   PG_shift(9)
-#define PGC_count_mask    ((1UL<<PGC_count_width)-1)
-
-/*
- * Page needs to be scrubbed. Since this bit can only be set on a page that is
- * free (i.e. in PGC_state_free) we can reuse PGC_allocated bit.
- */
-#define _PGC_need_scrub   _PGC_allocated
-#define PGC_need_scrub    PGC_allocated
 
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
