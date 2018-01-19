@@ -433,14 +433,11 @@ static void teardown_vp_assist(struct vcpu *v)
     put_page_and_type(page);
 }
 
-void viridian_start_apic_assist(struct vcpu *v, int vector)
+void viridian_apic_assist_set(struct vcpu *v)
 {
     uint32_t *va = v->arch.hvm_vcpu.viridian.vp_assist.va;
 
     if ( !va )
-        return;
-
-    if ( vector < 0x10 )
         return;
 
     /*
@@ -448,31 +445,32 @@ void viridian_start_apic_assist(struct vcpu *v, int vector)
      * wrong and the VM will most likely hang so force a crash now
      * to make the problem clear.
      */
-    if ( v->arch.hvm_vcpu.viridian.vp_assist.vector )
+    if ( v->arch.hvm_vcpu.viridian.vp_assist.pending )
         domain_crash(v->domain);
 
-    v->arch.hvm_vcpu.viridian.vp_assist.vector = vector;
+    v->arch.hvm_vcpu.viridian.vp_assist.pending = true;
     *va |= 1u;
 }
 
-int viridian_complete_apic_assist(struct vcpu *v)
+bool viridian_apic_assist_completed(struct vcpu *v)
 {
     uint32_t *va = v->arch.hvm_vcpu.viridian.vp_assist.va;
-    int vector;
 
     if ( !va )
-        return 0;
+        return false;
 
-    if ( *va & 1u )
-        return 0; /* Interrupt not yet processed by the guest. */
+    if ( v->arch.hvm_vcpu.viridian.vp_assist.pending &&
+         !(*va & 1u) )
+    {
+        /* An EOI has been avoided */
+        v->arch.hvm_vcpu.viridian.vp_assist.pending = false;
+        return true;
+    }
 
-    vector = v->arch.hvm_vcpu.viridian.vp_assist.vector;
-    v->arch.hvm_vcpu.viridian.vp_assist.vector = 0;
-
-    return vector;
+    return false;
 }
 
-void viridian_abort_apic_assist(struct vcpu *v)
+void viridian_apic_assist_clear(struct vcpu *v)
 {
     uint32_t *va = v->arch.hvm_vcpu.viridian.vp_assist.va;
 
@@ -480,7 +478,7 @@ void viridian_abort_apic_assist(struct vcpu *v)
         return;
 
     *va &= ~1u;
-    v->arch.hvm_vcpu.viridian.vp_assist.vector = 0;
+    v->arch.hvm_vcpu.viridian.vp_assist.pending = false;
 }
 
 static void update_reference_tsc(struct domain *d, bool_t initialize)
@@ -1040,7 +1038,7 @@ static int viridian_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     for_each_vcpu( d, v ) {
         struct hvm_viridian_vcpu_context ctxt = {
             .vp_assist_msr = v->arch.hvm_vcpu.viridian.vp_assist.msr.raw,
-            .vp_assist_vector = v->arch.hvm_vcpu.viridian.vp_assist.vector,
+            .vp_assist_pending = v->arch.hvm_vcpu.viridian.vp_assist.pending,
         };
 
         if ( hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt) != 0 )
@@ -1075,7 +1073,7 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
          !v->arch.hvm_vcpu.viridian.vp_assist.va )
         initialize_vp_assist(v);
 
-    v->arch.hvm_vcpu.viridian.vp_assist.vector = ctxt.vp_assist_vector;
+    v->arch.hvm_vcpu.viridian.vp_assist.pending = !!ctxt.vp_assist_pending;
 
     return 0;
 }
