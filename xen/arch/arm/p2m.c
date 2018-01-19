@@ -388,10 +388,10 @@ int guest_physmap_mark_populate_on_demand(struct domain *d,
     return -ENOSYS;
 }
 
-int p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn,
-                                 unsigned int order)
+unsigned long p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn,
+                                           unsigned int order)
 {
-    return -ENOSYS;
+    return 0;
 }
 
 static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)

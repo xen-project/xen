@@ -288,13 +288,16 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
 #ifdef CONFIG_X86
     mfn = get_gfn_query(d, gmfn, &p2mt);
+    if ( unlikely(p2mt == p2m_invalid) || unlikely(p2mt == p2m_mmio_dm) )
+        return -ENOENT;
+
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
         rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
-        put_gfn(d, gmfn);
-
         if ( rc )
-            return rc;
+            goto out_put_gfn;
+
+        put_gfn(d, gmfn);
 
         /* If the page hasn't yet been paged out, there is an
          * actual page that needs to be released. */
@@ -312,9 +315,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( p2mt == p2m_mmio_direct )
     {
         rc = clear_mmio_p2m_entry(d, gmfn, mfn, PAGE_ORDER_4K);
-        put_gfn(d, gmfn);
-
-        return rc;
+        goto out_put_gfn;
     }
 #else
     mfn = gfn_to_mfn(d, _gfn(gmfn));
@@ -339,10 +340,8 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         rc = mem_sharing_unshare_page(d, gmfn, 0);
         if ( rc )
         {
-            put_gfn(d, gmfn);
             (void)mem_sharing_notify_enomem(d, gmfn, 0);
-
-            return rc;
+            goto out_put_gfn;
         }
         /* Maybe the mfn changed */
         mfn = get_gfn_query_unlocked(d, gmfn, &p2mt);
@@ -379,9 +378,14 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         put_page(page);
 
     put_page(page);
+ out_put_gfn: __maybe_unused
     put_gfn(d, gmfn);
 
-    return rc;
+    /*
+     * Filter out -ENOENT return values that aren't a result of an empty p2m
+     * entry.
+     */
+    return rc != -ENOENT ? rc : -EINVAL;
 }
 
 static void decrease_reservation(struct memop_args *a)
@@ -396,6 +400,8 @@ static void decrease_reservation(struct memop_args *a)
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
+        unsigned long pod_done;
+
         if ( i != a->nr_done && hypercall_preempt_check() )
         {
             a->preempted = 1;
@@ -420,14 +426,33 @@ static void decrease_reservation(struct memop_args *a)
         }
 
         /* See if populate-on-demand wants to handle this */
-        if ( is_hvm_domain(a->domain)
-             && p2m_pod_decrease_reservation(a->domain, _gfn(gmfn),
-                                             a->extent_order) )
-            continue;
+        pod_done = is_hvm_domain(a->domain) ?
+                   p2m_pod_decrease_reservation(a->domain, _gfn(gmfn),
+                                                a->extent_order) : 0;
 
-        for ( j = 0; j < (1 << a->extent_order); j++ )
-            if ( guest_remove_page(a->domain, gmfn + j) )
+        /*
+         * Look for pages not handled by p2m_pod_decrease_reservation().
+         *
+         * guest_remove_page() will return -ENOENT for pages which have already
+         * been removed by p2m_pod_decrease_reservation(); so expect to see
+         * exactly pod_done failures.  Any more means that there were invalid
+         * entries before p2m_pod_decrease_reservation() was called.
+         */
+        for ( j = 0; j + pod_done < (1UL << a->extent_order); j++ )
+        {
+            switch ( guest_remove_page(a->domain, gmfn + j) )
+            {
+            case 0:
+                break;
+            case -ENOENT:
+                if ( !pod_done )
+                    goto out;
+                --pod_done;
+                break;
+            default:
                 goto out;
+            }
+        }
     }
 
  out:
