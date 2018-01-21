@@ -93,29 +93,22 @@ static uint8_t get_xen_consumer(xen_event_channel_notification_t fn)
 /* Get the notification function for a given Xen-bound event channel. */
 #define xen_notification_fn(e) (xen_consumers[(e)->xen_consumer-1])
 
-static int virq_is_global(uint32_t virq)
+static bool virq_is_global(unsigned int virq)
 {
-    int rc;
-
-    ASSERT(virq < NR_VIRQS);
-
     switch ( virq )
     {
     case VIRQ_TIMER:
     case VIRQ_DEBUG:
     case VIRQ_XENOPROF:
     case VIRQ_XENPMU:
-        rc = 0;
-        break;
+        return false;
+
     case VIRQ_ARCH_0 ... VIRQ_ARCH_7:
-        rc = arch_virq_is_global(virq);
-        break;
-    default:
-        rc = 1;
-        break;
+        return arch_virq_is_global(virq);
     }
 
-    return rc;
+    ASSERT(virq < NR_VIRQS);
+    return true;
 }
 
 
@@ -809,7 +802,6 @@ static DEFINE_SPINLOCK(global_virq_handlers_lock);
 
 void send_global_virq(uint32_t virq)
 {
-    ASSERT(virq < NR_VIRQS);
     ASSERT(virq_is_global(virq));
 
     send_guest_global_virq(global_virq_handlers[virq] ?: hardware_domain, virq);
