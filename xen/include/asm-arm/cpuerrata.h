@@ -1,7 +1,6 @@
 #ifndef __ARM_CPUERRATA_H__
 #define __ARM_CPUERRATA_H__
 
-#include <xen/percpu.h>
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>
 
