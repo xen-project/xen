@@ -62,8 +62,13 @@ void __init acpi_os_vprintf(const char *fmt, va_list args)
 	printk("%s", buffer);
 }
 
+acpi_physical_address __initdata rsdp_hint;
+
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
+	if (rsdp_hint)
+		return rsdp_hint;
+
 	if (efi_enabled(EFI_BOOT)) {
 		if (efi.acpi20 != EFI_INVALID_TABLE_ADDR)
 			return efi.acpi20;

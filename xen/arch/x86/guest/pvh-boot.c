@@ -69,6 +69,9 @@ static void __init convert_pvh_info(void)
         mod[i].mod_end   = entry[i].paddr + entry[i].size;
         mod[i].string    = entry[i].cmdline_paddr;
     }
+
+    BUG_ON(!pvh_info->rsdp_paddr);
+    rsdp_hint = pvh_info->rsdp_paddr;
 }
 
 static void __init get_memory_map(void)
