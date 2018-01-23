@@ -1697,7 +1697,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
                   !cpumask_empty(&dirty_mask)) )
     {
         /* Other cpus call __sync_local_execstate from flush ipi handler. */
-        flush_tlb_mask(&dirty_mask);
+        flush_mask(&dirty_mask, FLUSH_TLB | FLUSH_VCPU_STATE);
     }
 
     if ( prev != next )
@@ -1806,7 +1806,7 @@ void sync_vcpu_execstate(struct vcpu *v)
         sync_local_execstate();
 
     /* Other cpus call __sync_local_execstate from flush ipi handler. */
-    flush_tlb_mask(v->vcpu_dirty_cpumask);
+    flush_mask(v->vcpu_dirty_cpumask, FLUSH_TLB | FLUSH_VCPU_STATE);
 }
 
 static int relinquish_memory(

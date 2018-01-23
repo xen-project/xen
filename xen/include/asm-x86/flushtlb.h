@@ -101,6 +101,8 @@ void write_cr3(unsigned long cr3);
 #define FLUSH_CACHE      0x400
  /* VA for the flush has a valid mapping */
 #define FLUSH_VA_VALID   0x800
+ /* Flush CPU state */
+#define FLUSH_VCPU_STATE 0x1000
 
 /* Flush local TLBs/caches. */
 unsigned int flush_area_local(const void *va, unsigned int flags);
