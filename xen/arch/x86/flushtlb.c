@@ -50,6 +50,8 @@ static u32 pre_flush(void)
         raise_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ);
 
  skip_clocktick:
+    hvm_flush_guest_tlbs();
+
     return t2;
 }
 
@@ -72,15 +74,14 @@ static void post_flush(u32 t)
 
 void write_cr3(unsigned long cr3)
 {
-    unsigned long flags, cr4 = read_cr4();
+    unsigned long flags, cr4;
     u32 t;
 
     /* This non-reentrant function is sometimes called in interrupt context. */
     local_irq_save(flags);
 
     t = pre_flush();
-
-    hvm_flush_guest_tlbs();
+    cr4 = read_cr4();
 
     write_cr4(cr4 & ~X86_CR4_PGE);
     asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
@@ -121,8 +122,6 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
         {
             u32 t = pre_flush();
             unsigned long cr4 = read_cr4();
-
-            hvm_flush_guest_tlbs();
 
             write_cr4(cr4 & ~X86_CR4_PGE);
             barrier();
