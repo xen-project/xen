@@ -995,7 +995,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         }
         else
             end = 0;
-        if ( end > s )
+
+        /*
+         * Is the region size greater than zero and does it begin
+         * at or above the end of current Xen image placement?
+         */
+        if ( (end > s) && (end - reloc_size + XEN_IMG_OFFSET >= __pa(_end)) )
         {
             l4_pgentry_t *pl4e;
             l3_pgentry_t *pl3e;
