@@ -1637,6 +1637,11 @@ static unsigned long gicv3_get_hwdom_extra_madt_size(const struct domain *d)
 }
 #endif
 
+static bool gic_dist_supports_lpis(void)
+{
+    return (readl_relaxed(GICD + GICD_TYPER) & GICD_TYPE_LPIS);
+}
+
 /* Set up the GIC */
 static int __init gicv3_init(void)
 {
@@ -1699,9 +1704,12 @@ static int __init gicv3_init(void)
 
     gicv3_dist_init();
 
-    res = gicv3_its_init();
-    if ( res )
-        panic("GICv3: ITS: initialization failed: %d\n", res);
+    if ( gic_dist_supports_lpis() )
+    {
+        res = gicv3_its_init();
+        if ( res )
+            panic("GICv3: ITS: initialization failed: %d\n", res);
+    }
 
     res = gicv3_cpu_init();
     if ( res )
