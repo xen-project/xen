@@ -135,6 +135,7 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
+    v->dirty_cpu = VCPU_CPU_CLEAN;
 
     spin_lock_init(&v->virq_lock);
 
@@ -145,8 +146,7 @@ struct vcpu *alloc_vcpu(
     if ( !zalloc_cpumask_var(&v->cpu_hard_affinity) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_tmp) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||
-         !zalloc_cpumask_var(&v->cpu_soft_affinity) ||
-         !zalloc_cpumask_var(&v->vcpu_dirty_cpumask) )
+         !zalloc_cpumask_var(&v->cpu_soft_affinity) )
         goto fail_free;
 
     if ( is_idle_domain(d) )
@@ -175,7 +175,6 @@ struct vcpu *alloc_vcpu(
         free_cpumask_var(v->cpu_hard_affinity_tmp);
         free_cpumask_var(v->cpu_hard_affinity_saved);
         free_cpumask_var(v->cpu_soft_affinity);
-        free_cpumask_var(v->vcpu_dirty_cpumask);
         free_vcpu_struct(v);
         return NULL;
     }
@@ -863,7 +862,6 @@ static void complete_domain_destroy(struct rcu_head *head)
             free_cpumask_var(v->cpu_hard_affinity_tmp);
             free_cpumask_var(v->cpu_hard_affinity_saved);
             free_cpumask_var(v->cpu_soft_affinity);
-            free_cpumask_var(v->vcpu_dirty_cpumask);
             free_vcpu_struct(v);
         }
 

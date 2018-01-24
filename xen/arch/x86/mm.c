@@ -1212,7 +1212,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
             for_each_vcpu ( pg_owner, v )
             {
                 if ( pv_destroy_ldt(v) )
-                    flush_tlb_mask(v->vcpu_dirty_cpumask);
+                    flush_tlb_mask(cpumask_of(v->dirty_cpu));
             }
         }
         put_page(page);
@@ -2937,8 +2937,8 @@ static inline int vcpumask_to_pcpumask(
             vcpu_id += vcpu_bias;
             if ( (vcpu_id >= d->max_vcpus) )
                 return 0;
-            if ( ((v = d->vcpu[vcpu_id]) != NULL) )
-                cpumask_or(pmask, pmask, v->vcpu_dirty_cpumask);
+            if ( ((v = d->vcpu[vcpu_id]) != NULL) && vcpu_cpu_dirty(v) )
+                __cpumask_set_cpu(v->dirty_cpu, pmask);
         }
     }
 }

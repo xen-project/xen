@@ -146,7 +146,7 @@ void startup_cpu_idle_loop(void)
 
     ASSERT(is_idle_vcpu(v));
     cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
-    cpumask_set_cpu(v->processor, v->vcpu_dirty_cpumask);
+    v->dirty_cpu = v->processor;
 
     reset_stack_and_jump(idle_loop);
 }
@@ -1602,7 +1602,7 @@ static void __context_switch(void)
     struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
-    ASSERT(cpumask_empty(n->vcpu_dirty_cpumask));
+    ASSERT(!vcpu_cpu_dirty(n));
 
     if ( !is_idle_domain(pd) )
     {
@@ -1618,7 +1618,7 @@ static void __context_switch(void)
      */
     if ( pd != nd )
         cpumask_set_cpu(cpu, nd->domain_dirty_cpumask);
-    cpumask_set_cpu(cpu, n->vcpu_dirty_cpumask);
+    n->dirty_cpu = cpu;
 
     if ( !is_idle_domain(nd) )
     {
@@ -1674,7 +1674,7 @@ static void __context_switch(void)
 
     if ( pd != nd )
         cpumask_clear_cpu(cpu, pd->domain_dirty_cpumask);
-    cpumask_clear_cpu(cpu, p->vcpu_dirty_cpumask);
+    p->dirty_cpu = VCPU_CPU_CLEAN;
 
     per_cpu(curr_vcpu, cpu) = n;
 }
@@ -1684,20 +1684,16 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
     const struct domain *prevd = prev->domain, *nextd = next->domain;
-    cpumask_t dirty_mask;
+    unsigned int dirty_cpu = next->dirty_cpu;
 
     ASSERT(local_irq_is_enabled());
 
     get_cpu_info()->xen_cr3 = 0;
 
-    cpumask_copy(&dirty_mask, next->vcpu_dirty_cpumask);
-    /* Allow at most one CPU at a time to be dirty. */
-    ASSERT(cpumask_weight(&dirty_mask) <= 1);
-    if ( unlikely(!cpumask_test_cpu(cpu, &dirty_mask) &&
-                  !cpumask_empty(&dirty_mask)) )
+    if ( unlikely(dirty_cpu != cpu) && dirty_cpu != VCPU_CPU_CLEAN )
     {
-        /* Other cpus call __sync_local_execstate from flush ipi handler. */
-        flush_mask(&dirty_mask, FLUSH_TLB | FLUSH_VCPU_STATE);
+        /* Remote CPU calls __sync_local_execstate() from flush IPI handler. */
+        flush_mask(cpumask_of(dirty_cpu), FLUSH_TLB | FLUSH_VCPU_STATE);
     }
 
     if ( prev != next )
@@ -1802,11 +1798,14 @@ void sync_local_execstate(void)
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-    if ( cpumask_test_cpu(smp_processor_id(), v->vcpu_dirty_cpumask) )
+    if ( v->dirty_cpu == smp_processor_id() )
         sync_local_execstate();
 
-    /* Other cpus call __sync_local_execstate from flush ipi handler. */
-    flush_mask(v->vcpu_dirty_cpumask, FLUSH_TLB | FLUSH_VCPU_STATE);
+    if ( vcpu_cpu_dirty(v) )
+    {
+        /* Remote CPU calls __sync_local_execstate() from flush IPI handler. */
+        flush_mask(cpumask_of(v->dirty_cpu), FLUSH_TLB | FLUSH_VCPU_STATE);
+    }
 }
 
 static int relinquish_memory(

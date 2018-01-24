@@ -340,8 +340,9 @@ static void dump_domains(unsigned char key)
                    v->is_running ? 'T':'F', v->poll_evtchn,
                    vcpu_info(v, evtchn_upcall_pending),
                    !vcpu_event_delivery_is_enabled(v));
-            cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
-            printk("dirty_cpus=%s\n", tmpstr);
+            if ( vcpu_cpu_dirty(v) )
+                printk("dirty_cpu=%u", v->dirty_cpu);
+            printk("\n");
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_hard_affinity);
             printk("    cpu_hard_affinity=%s ", tmpstr);
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_soft_affinity);
