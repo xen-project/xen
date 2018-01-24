@@ -160,6 +160,7 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
                               unsigned long console_va, unsigned long vphysmap,
                               start_info_t *si)
 {
+    hypercall_table_t *rw_pv_hypercall_table;
     uint64_t param = 0;
     long rc;
 
@@ -205,12 +206,20 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
                             mfn_x(console_mfn), vphysmap);
         consoled_set_ring_addr(page);
     }
-    pv_hypercall_table_replace(__HYPERVISOR_event_channel_op,
-                               (hypercall_fn_t *)pv_shim_event_channel_op,
-                               (hypercall_fn_t *)pv_shim_event_channel_op);
-    pv_hypercall_table_replace(__HYPERVISOR_grant_table_op,
-                               (hypercall_fn_t *)pv_shim_grant_table_op,
-                               (hypercall_fn_t *)pv_shim_grant_table_op);
+
+    /*
+     * Locate pv_hypercall_table[] (usually .rodata) in the directmap (which
+     * is writeable) and insert some shim-specific hypercall handlers.
+     */
+    rw_pv_hypercall_table = __va(__pa(pv_hypercall_table));
+    rw_pv_hypercall_table[__HYPERVISOR_event_channel_op].native =
+        rw_pv_hypercall_table[__HYPERVISOR_event_channel_op].compat =
+        (hypercall_fn_t *)pv_shim_event_channel_op;
+
+    rw_pv_hypercall_table[__HYPERVISOR_grant_table_op].native =
+        rw_pv_hypercall_table[__HYPERVISOR_grant_table_op].compat =
+        (hypercall_fn_t *)pv_shim_grant_table_op;
+
     guest = d;
 
     /*
