@@ -195,44 +195,11 @@ out:
      return rc;
 }
 
-int libxl_devid_to_device_vdispl(libxl_ctx *ctx, uint32_t domid,
-                                 int devid, libxl_device_vdispl *vdispl)
-{
-    GC_INIT(ctx);
-
-    libxl_device_vdispl *vdispls = NULL;
-    int n, i;
-    int rc;
-
-    libxl_device_vdispl_init(vdispl);
-
-    vdispls = libxl__device_list(gc, &libxl__vdispl_devtype, domid, &n);
-
-    if (!vdispls) { rc = ERROR_NOTFOUND; goto out; }
-
-    for (i = 0; i < n; ++i) {
-        if (devid == vdispls[i].devid) {
-            libxl_device_vdispl_copy(ctx, vdispl, &vdispls[i]);
-            rc = 0;
-            goto out;
-        }
-    }
-
-    rc = ERROR_NOTFOUND;
-
-out:
-
-    if (vdispls)
-        libxl__device_list_free(&libxl__vdispl_devtype, vdispls, n);
-
-    GC_FREE;
-    return rc;
-}
-
 static LIBXL_DEFINE_DEVICE_FROM_TYPE(vdispl)
 static LIBXL_DEFINE_UPDATE_DEVID(vdispl)
 static LIBXL_DEFINE_DEVICES_ADD(vdispl)
 
+LIBXL_DEFINE_DEVID_TO_DEVICE(vdispl)
 LIBXL_DEFINE_DEVICE_ADD(vdispl)
 LIBXL_DEFINE_DEVICE_REMOVE(vdispl)
 LIBXL_DEFINE_DEVICE_LIST(vdispl)

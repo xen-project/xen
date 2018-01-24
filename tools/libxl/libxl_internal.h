@@ -3490,6 +3490,44 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
         return 0;                                                       \
     }
 
+#define LIBXL_DEFINE_DEVID_TO_DEVICE(name)                              \
+    int libxl_devid_to_device_##name(libxl_ctx *ctx, uint32_t domid,    \
+                                     int devid,                         \
+                                     libxl_device_##name *type)         \
+    {                                                                   \
+        GC_INIT(ctx);                                                   \
+                                                                        \
+        char *device_path;                                              \
+        const char *tmp;                                                \
+        int rc;                                                         \
+                                                                        \
+        libxl_device_##name##_init(type);                               \
+                                                                        \
+        device_path = GCSPRINTF("%s/device/%s/%d",                      \
+                                libxl__xs_libxl_path(gc, domid),        \
+                                libxl__device_kind_to_string(           \
+                                libxl__##name##_devtype.type),          \
+                                devid);                                 \
+                                                                        \
+        if (libxl__xs_read_mandatory(gc, XBT_NULL, device_path, &tmp)) {\
+            rc = ERROR_NOTFOUND; goto out;                              \
+        }                                                               \
+                                                                        \
+        if (libxl__##name##_devtype.from_xenstore) {                    \
+            rc = libxl__##name##_devtype.from_xenstore(gc, device_path, \
+                                                       devid, type);    \
+            if (rc) goto out;                                           \
+        }                                                               \
+                                                                        \
+        rc = 0;                                                         \
+                                                                        \
+    out:                                                                \
+                                                                        \
+        GC_FREE;                                                        \
+        return rc;                                                      \
+    }
+
+
 #define LIBXL_DEFINE_DEVICE_REMOVE(type)                                \
     LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, remove, 0)            \
     LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, destroy, 1)
