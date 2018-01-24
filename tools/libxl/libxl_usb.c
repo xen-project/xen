@@ -430,7 +430,7 @@ static int libxl__device_usbdev_del_hvm(libxl__gc *gc, uint32_t domid,
     return libxl__qmp_run_command_flexarray(gc, domid, "device_del", qmp_args);
 }
 
-static LIBXL_DEFINE_UPDATE_DEVID(usbctrl, "vusb")
+static LIBXL_DEFINE_UPDATE_DEVID(usbctrl)
 
 /* AO operation to add a usb controller.
  *

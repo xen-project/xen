@@ -1423,7 +1423,8 @@ out:
 }
 
 /* common function to get next device id */
-int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
+int libxl__device_nextid(libxl__gc *gc, uint32_t domid,
+                         libxl__device_kind device)
 {
     char *libxl_dom_path, **l;
     unsigned int nb;
@@ -1433,8 +1434,8 @@ int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
         return nextid;
 
     l = libxl__xs_directory(gc, XBT_NULL,
-        GCSPRINTF("%s/device/%s", libxl_dom_path, device),
-                            &nb);
+        GCSPRINTF("%s/device/%s", libxl_dom_path,
+                  libxl__device_kind_to_string(device)), &nb);
     if (l == NULL || nb == 0)
         nextid = 0;
     else

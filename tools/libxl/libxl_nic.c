@@ -138,7 +138,7 @@ static void libxl__update_config_nic(libxl__gc *gc, libxl_device_nic *dst,
     libxl_mac_copy(CTX, &dst->mac, &src->mac);
 }
 
-static LIBXL_DEFINE_UPDATE_DEVID(nic, "vif")
+static LIBXL_DEFINE_UPDATE_DEVID(nic)
 
 static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
                                    libxl_device_nic *nic,

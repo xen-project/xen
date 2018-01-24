@@ -49,7 +49,7 @@ static void libxl__update_config_vtpm(libxl__gc *gc, libxl_device_vtpm *dst,
     libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
 }
 
-static LIBXL_DEFINE_UPDATE_DEVID(vtpm, "vtpm")
+static LIBXL_DEFINE_UPDATE_DEVID(vtpm)
 
 static int libxl__set_xenstore_vtpm(libxl__gc *gc, uint32_t domid,
                                     libxl_device_vtpm *vtpm,

@@ -37,7 +37,7 @@ static int libxl__device_from_p9(libxl__gc *gc, uint32_t domid,
    return 0;
 }
 
-static LIBXL_DEFINE_UPDATE_DEVID(p9, "9pfs")
+static LIBXL_DEFINE_UPDATE_DEVID(p9)
 
 static int libxl__set_xenstore_p9(libxl__gc *gc, uint32_t domid,
                                   libxl_device_p9 *p9,

@@ -1242,7 +1242,8 @@ _hidden int libxl__init_console_from_channel(libxl__gc *gc,
                                              libxl__device_console *console,
                                              int dev_num,
                                              libxl_device_channel *channel);
-_hidden int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device);
+_hidden int libxl__device_nextid(libxl__gc *gc, uint32_t domid,
+                                 libxl__device_kind device);
 _hidden int libxl__resolve_domid(libxl__gc *gc, const char *name,
                                  uint32_t *domid);
 
@@ -3461,13 +3462,14 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
         return AO_INPROGRESS;                                           \
     }
 
-#define LIBXL_DEFINE_UPDATE_DEVID(type, name)                           \
-    int libxl__device_##type##_update_devid(libxl__gc *gc,              \
+#define LIBXL_DEFINE_UPDATE_DEVID(name)                                 \
+    int libxl__device_##name##_update_devid(libxl__gc *gc,              \
                                             uint32_t domid,             \
-                                            libxl_device_##type *type)  \
+                                            libxl_device_##name *type)  \
     {                                                                   \
         if (type->devid == -1)                                          \
-            type->devid = libxl__device_nextid(gc, domid, name);        \
+            type->devid = libxl__device_nextid(gc, domid,               \
+                          libxl__##name##_devtype.type);                \
         if (type->devid < 0)                                            \
             return ERROR_FAIL;                                          \
         return 0;                                                       \
