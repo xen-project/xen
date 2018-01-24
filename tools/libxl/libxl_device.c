@@ -24,14 +24,26 @@ static char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
 
     /* Console 0 is a special case */
     if (device->kind == LIBXL__DEVICE_KIND_CONSOLE && device->devid == 0)
-        return GCSPRINTF("%s/console", dom_path);
+        return GCSPRINTF("%s/%s", dom_path,
+                         libxl__device_kind_to_string(device->kind));
 
     if (device->kind == LIBXL__DEVICE_KIND_VUART)
-        return GCSPRINTF("%s/vuart/%d", dom_path, device->devid);
+        return GCSPRINTF("%s/%s/%d", dom_path,
+                         libxl__device_kind_to_string(device->kind),
+                         device->devid);
 
     return GCSPRINTF("%s/device/%s/%d", dom_path,
                      libxl__device_kind_to_string(device->kind),
                      device->devid);
+}
+
+char *libxl__domain_device_frontend_path(libxl__gc *gc, uint32_t domid, uint32_t devid,
+                                         libxl__device_kind device_kind)
+{
+    char *dom_path = libxl__xs_get_dompath(gc, domid);
+
+    return GCSPRINTF("%s/device/%s/%d", dom_path,
+                     libxl__device_kind_to_string(device_kind), devid);
 }
 
 char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
@@ -43,6 +55,17 @@ char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
                      device->domid, device->devid);
 }
 
+char *libxl__domain_device_backend_path(libxl__gc *gc, uint32_t backend_domid,
+                                        uint32_t domid, uint32_t devid,
+                                        libxl__device_kind backend_kind)
+{
+    char *dom_path = libxl__xs_get_dompath(gc, backend_domid);
+
+    return GCSPRINTF("%s/backend/%s/%u/%d", dom_path,
+                     libxl__device_kind_to_string(backend_kind),
+                     domid, devid);
+}
+
 char *libxl__device_libxl_path(libxl__gc *gc, libxl__device *device)
 {
     char *libxl_dom_path = libxl__xs_libxl_path(gc, device->domid);
@@ -50,6 +73,15 @@ char *libxl__device_libxl_path(libxl__gc *gc, libxl__device *device)
     return GCSPRINTF("%s/device/%s/%d", libxl_dom_path,
                      libxl__device_kind_to_string(device->kind),
                      device->devid);
+}
+
+char *libxl__domain_device_libxl_path(libxl__gc *gc,  uint32_t domid, uint32_t devid,
+                                      libxl__device_kind device_kind)
+{
+    char *libxl_dom_path = libxl__xs_libxl_path(gc, domid);
+
+    return GCSPRINTF("%s/device/%s/%d", libxl_dom_path,
+                     libxl__device_kind_to_string(device_kind), devid);
 }
 
 /* Returns 1 if device exists, 0 if not, ERROR_* (<0) on error. */
@@ -2007,7 +2039,8 @@ void *libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
     *num = 0;
 
     libxl_path = GCSPRINTF("%s/device/%s",
-                           libxl__xs_libxl_path(gc, domid), dt->entry);
+                           libxl__xs_libxl_path(gc, domid),
+                           libxl__device_kind_to_string(dt->type));
 
     dir = libxl__xs_directory(gc, XBT_NULL, libxl_path, &ndirs);
 

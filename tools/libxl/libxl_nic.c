@@ -400,15 +400,13 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                               int devid, libxl_device_nic *nic)
 {
     GC_INIT(ctx);
-    char *libxl_dom_path, *libxl_path;
+    char *libxl_path;
     int rc = ERROR_FAIL;
 
     libxl_device_nic_init(nic);
-    libxl_dom_path = libxl__xs_libxl_path(gc, domid);
-    if (!libxl_dom_path)
-        goto out;
 
-    libxl_path = GCSPRINTF("%s/device/vif/%d", libxl_dom_path, devid);
+    libxl_path = libxl__domain_device_libxl_path(gc, domid, devid,
+                                                 LIBXL__DEVICE_KIND_VIF);
 
     rc = libxl__nic_from_xenstore(gc, libxl_path, devid, nic);
     if (rc) goto out;
@@ -441,16 +439,16 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_nic *nic, libxl_nicinfo *nicinfo)
 {
     GC_INIT(ctx);
-    char *dompath, *nicpath, *libxl_path;
+    char *nicpath, *libxl_path;
     char *val;
     int rc;
 
-    dompath = libxl__xs_get_dompath(gc, domid);
     nicinfo->devid = nic->devid;
 
-    nicpath = GCSPRINTF("%s/device/vif/%d", dompath, nicinfo->devid);
-    libxl_path = GCSPRINTF("%s/device/vif/%d",
-                           libxl__xs_libxl_path(gc, domid), nicinfo->devid);
+    nicpath = libxl__domain_device_frontend_path(gc, domid, nicinfo->devid,
+                                                 LIBXL__DEVICE_KIND_VIF);
+    libxl_path = libxl__domain_device_libxl_path(gc, domid, nicinfo->devid,
+                                                 LIBXL__DEVICE_KIND_VIF);
     nicinfo->backend = xs_read(ctx->xsh, XBT_NULL,
                                 GCSPRINTF("%s/backend", libxl_path), NULL);
     if (!nicinfo->backend) {
@@ -539,7 +537,7 @@ LIBXL_DEFINE_DEVICE_ADD(nic)
 LIBXL_DEFINE_DEVICES_ADD(nic)
 LIBXL_DEFINE_DEVICE_REMOVE(nic)
 
-DEFINE_DEVICE_TYPE_STRUCT_X(nic, nic, vif,
+DEFINE_DEVICE_TYPE_STRUCT(nic, VIF,
     .update_config = libxl_device_nic_update_config,
     .from_xenstore = (device_from_xenstore_fn_t)libxl__nic_from_xenstore,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)

@@ -1222,8 +1222,15 @@ _hidden int libxl__device_exists(libxl__gc *gc, xs_transaction_t t,
                                  libxl__device *device);
 _hidden int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
         libxl__device *device, char **bents, char **fents, char **ro_fents);
+_hidden char *libxl__domain_device_frontend_path(libxl__gc *gc, uint32_t domid, uint32_t devid,
+                                                 libxl__device_kind device_kind);
 _hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
+_hidden char *libxl__domain_device_backend_path(libxl__gc *gc, uint32_t backend_domid,
+                                                uint32_t domid, uint32_t devid,
+                                                libxl__device_kind device_kind);
 _hidden char *libxl__device_libxl_path(libxl__gc *gc, libxl__device *device);
+_hidden char *libxl__domain_device_libxl_path(libxl__gc *gc, uint32_t domid, uint32_t devid,
+                                              libxl__device_kind device_kind);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
@@ -3513,8 +3520,7 @@ typedef int (*device_set_xenstore_config_fn_t)(libxl__gc *, uint32_t, void *,
                                                flexarray_t *);
 
 struct libxl_device_type {
-    char *type;
-    char *entry;
+    libxl__device_kind type;
     int skip_attach;   /* Skip entry in domcreate_attach_devices() if 1 */
     int ptr_offset;    /* Offset of device array ptr in libxl_domain_config */
     int num_offset;    /* Offset of # of devices in libxl_domain_config */
@@ -3534,10 +3540,9 @@ struct libxl_device_type {
     device_set_xenstore_config_fn_t set_xenstore_config;
 };
 
-#define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, sentry, ...)                  \
+#define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, kind, ...)                    \
     const struct libxl_device_type libxl__ ## name ## _devtype = {             \
-        .type          = #sname,                                               \
-        .entry         = #sentry,                                              \
+        .type          = LIBXL__DEVICE_KIND_ ## kind,                       \
         .ptr_offset    = offsetof(libxl_domain_config, name ## s),             \
         .num_offset    = offsetof(libxl_domain_config, num_ ## name ## s),     \
         .dev_elem_size = sizeof(libxl_device_ ## sname),                       \
@@ -3556,8 +3561,8 @@ struct libxl_device_type {
         __VA_ARGS__                                                            \
     }
 
-#define DEFINE_DEVICE_TYPE_STRUCT(name, ...)                                   \
-    DEFINE_DEVICE_TYPE_STRUCT_X(name, name, name, __VA_ARGS__)
+#define DEFINE_DEVICE_TYPE_STRUCT(name, kind, ...)                             \
+    DEFINE_DEVICE_TYPE_STRUCT_X(name, name, kind, __VA_ARGS__)
 
 static inline void **libxl__device_type_get_ptr(
     const struct libxl_device_type *dt, const libxl_domain_config *d_config)
