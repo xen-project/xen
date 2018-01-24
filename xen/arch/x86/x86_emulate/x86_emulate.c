@@ -877,7 +877,8 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
 
 #ifdef __XEN__
 # define invoke_stub(pre, post, constraints...) do {                    \
-    union stub_exception_token res_ = { .raw = ~0 };                    \
+    stub_exn.info = (union stub_exception_token) { .raw = ~0 };         \
+    stub_exn.line = __LINE__; /* Utility outweighs livepatching cost */ \
     asm volatile ( pre "\n\tINDIRECT_CALL %[stub]\n\t" post "\n"        \
                    ".Lret%=:\n\t"                                       \
                    ".pushsection .fixup,\"ax\"\n"                       \
@@ -886,21 +887,11 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
                    "jmp .Lret%=\n\t"                                    \
                    ".popsection\n\t"                                    \
                    _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
-                   : [exn] "+g" (res_), constraints,                    \
+                   : [exn] "+g" (stub_exn.info), constraints,           \
                      [stub] "r" (stub.func),                            \
                      "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.ptr) );   \
-    if ( unlikely(~res_.raw) )                                          \
-    {                                                                   \
-        gprintk(XENLOG_WARNING,                                         \
-                "exception %u (ec=%04x) in emulation stub (line %u)\n", \
-                res_.fields.trapnr, res_.fields.ec, __LINE__);          \
-        gprintk(XENLOG_INFO, "stub: %"__stringify(MAX_INST_LEN)"ph\n",  \
-                stub.func);                                             \
-        generate_exception_if(res_.fields.trapnr == EXC_UD, EXC_UD);    \
-        domain_crash(current->domain);                                  \
-        rc = X86EMUL_UNHANDLEABLE;                                      \
-        goto done;                                                      \
-    }                                                                   \
+    if ( unlikely(~stub_exn.info.raw) )                                 \
+        goto emulation_stub_failure;                                    \
 } while (0)
 #else
 # define invoke_stub(pre, post, constraints...)                         \
@@ -3030,6 +3021,12 @@ x86_emulate(
     struct fpu_insn_ctxt fic = { .type = X86EMUL_FPU_none, .exn_raised = -1 };
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
+#ifdef __XEN__
+    struct {
+        union stub_exception_token info;
+        unsigned int line;
+    } stub_exn;
+#endif
 
     ASSERT(ops->read);
 
@@ -8130,6 +8127,20 @@ x86_emulate(
     put_stub(stub);
     return rc;
 #undef state
+
+#ifdef __XEN__
+ emulation_stub_failure:
+    gprintk(XENLOG_WARNING,
+            "exception %u (ec=%04x) in emulation stub (line %u)\n",
+            stub_exn.info.fields.trapnr, stub_exn.info.fields.ec,
+            stub_exn.line);
+    gprintk(XENLOG_INFO, "  stub: %"__stringify(MAX_INST_LEN)"ph\n",
+            stub.func);
+    generate_exception_if(stub_exn.info.fields.trapnr == EXC_UD, EXC_UD);
+    domain_crash(current->domain);
+    rc = X86EMUL_UNHANDLEABLE;
+    goto done;
+#endif
 }
 
 #undef op_bytes
