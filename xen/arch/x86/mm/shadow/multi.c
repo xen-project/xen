@@ -3134,7 +3134,7 @@ static int sh_page_fault(struct vcpu *v,
         perfc_incr(shadow_rm_write_flush_tlb);
         smp_wmb();
         atomic_inc(&d->arch.paging.shadow.gtable_dirty_version);
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -4114,7 +4114,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
      * (old) shadow linear maps in the writeable mapping heuristics. */
 #if GUEST_PAGING_LEVELS == 2
     if ( sh_remove_write_access(d, gmfn, 2, 0) != 0 )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l2_shadow);
 #elif GUEST_PAGING_LEVELS == 3
     /* PAE guests have four shadow_table entries, based on the
@@ -4137,7 +4137,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
             }
         }
         if ( flush )
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            flush_tlb_mask(d->dirty_cpumask);
         /* Now install the new shadows. */
         for ( i = 0; i < 4; i++ )
         {
@@ -4158,7 +4158,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     }
 #elif GUEST_PAGING_LEVELS == 4
     if ( sh_remove_write_access(d, gmfn, 4, 0) != 0 )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow);
     if ( !shadow_mode_external(d) && !is_pv_32bit_domain(d) )
     {
@@ -4605,7 +4605,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
         }
     }
     if ( flush )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
 
     /* Remember that we've seen the guest use this interface, so we
      * can rely on it using it in future, instead of guessing at
@@ -4641,7 +4641,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
         mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
         shadow_unhook_mappings(d, smfn, 1/* user pages only */);
         /* Now flush the TLB: we removed toplevel mappings. */
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     }
 
     /* Remember that we've seen the guest use this interface, so we

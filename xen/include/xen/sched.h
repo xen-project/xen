@@ -417,7 +417,7 @@ struct domain
     unsigned long    vm_assist;
 
     /* Bitmask of CPUs which are holding onto this domain's state. */
-    cpumask_var_t    domain_dirty_cpumask;
+    cpumask_var_t    dirty_cpumask;
 
     struct arch_domain arch;
 

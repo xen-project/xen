@@ -619,7 +619,7 @@ void paging_log_dirty_range(struct domain *d,
 
     p2m_unlock(p2m);
 
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(d->dirty_cpumask);
 }
 
 /*

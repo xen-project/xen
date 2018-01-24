@@ -298,7 +298,7 @@ static void dump_domains(unsigned char key)
         process_pending_softirqs();
 
         printk("General information for domain %u:\n", d->domain_id);
-        cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
+        cpuset_print(tmpstr, sizeof(tmpstr), d->dirty_cpumask);
         printk("    refcnt=%d dying=%d pause_count=%d\n",
                atomic_read(&d->refcnt), d->is_dying,
                atomic_read(&d->pause_count));

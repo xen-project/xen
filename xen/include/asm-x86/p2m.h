@@ -193,7 +193,8 @@ struct p2m_domain {
     /* Shadow translated domain: p2m mapping */
     pagetable_t        phys_table;
 
-    /* Same as domain_dirty_cpumask but limited to
+    /*
+     * Same as a domain's dirty_cpumask but limited to
      * this p2m and those physical cpus whose vcpu's are in
      * guestmode.
      */

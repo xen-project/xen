@@ -2546,7 +2546,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
                 cpumask_t *mask = this_cpu(scratch_cpumask);
 
                 BUG_ON(in_irq());
-                cpumask_copy(mask, d->domain_dirty_cpumask);
+                cpumask_copy(mask, d->dirty_cpumask);
 
                 /* Don't flush if the timestamp is old enough */
                 tlbflush_filter(mask, page->tlbflush_timestamp);
@@ -3277,7 +3277,7 @@ long do_mmuext_op(
 
         case MMUEXT_TLB_FLUSH_ALL:
             if ( likely(currd == pg_owner) )
-                flush_tlb_mask(currd->domain_dirty_cpumask);
+                flush_tlb_mask(currd->dirty_cpumask);
             else
                 rc = -EPERM;
             break;
@@ -3286,8 +3286,7 @@ long do_mmuext_op(
             if ( unlikely(currd != pg_owner) )
                 rc = -EPERM;
             else if ( __addr_ok(op.arg1.linear_addr) )
-                flush_tlb_one_mask(currd->domain_dirty_cpumask,
-                                   op.arg1.linear_addr);
+                flush_tlb_one_mask(currd->dirty_cpumask, op.arg1.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -3772,7 +3771,7 @@ long do_mmu_update(
         unsigned int cpu = smp_processor_id();
         cpumask_t *mask = per_cpu(scratch_cpumask, cpu);
 
-        cpumask_andnot(mask, pt_owner->domain_dirty_cpumask, cpumask_of(cpu));
+        cpumask_andnot(mask, pt_owner->dirty_cpumask, cpumask_of(cpu));
         if ( !cpumask_empty(mask) )
             flush_area_mask(mask, ZERO_BLOCK_PTR, FLUSH_VA_VALID);
     }
@@ -3955,7 +3954,7 @@ static int __do_update_va_mapping(
             flush_tlb_local();
             break;
         case UVMF_ALL:
-            mask = d->domain_dirty_cpumask;
+            mask = d->dirty_cpumask;
             break;
         default:
             mask = this_cpu(scratch_cpumask);
@@ -3975,7 +3974,7 @@ static int __do_update_va_mapping(
             paging_invlpg(v, va);
             break;
         case UVMF_ALL:
-            mask = d->domain_dirty_cpumask;
+            mask = d->dirty_cpumask;
             break;
         default:
             mask = this_cpu(scratch_cpumask);

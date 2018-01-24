@@ -929,7 +929,7 @@ static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
     unmap_domain_page(tab);
 
     if ( changed )
-         flush_tlb_mask(p2m->domain->domain_dirty_cpumask);
+         flush_tlb_mask(p2m->domain->dirty_cpumask);
 }
 
 static int p2m_pt_change_entry_type_range(struct p2m_domain *p2m,

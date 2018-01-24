@@ -145,7 +145,7 @@ void startup_cpu_idle_loop(void)
     struct vcpu *v = current;
 
     ASSERT(is_idle_vcpu(v));
-    cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
+    cpumask_set_cpu(v->processor, v->domain->dirty_cpumask);
     v->dirty_cpu = v->processor;
 
     reset_stack_and_jump(idle_loop);
@@ -1617,7 +1617,7 @@ static void __context_switch(void)
      * which is synchronised on that function.
      */
     if ( pd != nd )
-        cpumask_set_cpu(cpu, nd->domain_dirty_cpumask);
+        cpumask_set_cpu(cpu, nd->dirty_cpumask);
     n->dirty_cpu = cpu;
 
     if ( !is_idle_domain(nd) )
@@ -1673,7 +1673,7 @@ static void __context_switch(void)
     }
 
     if ( pd != nd )
-        cpumask_clear_cpu(cpu, pd->domain_dirty_cpumask);
+        cpumask_clear_cpu(cpu, pd->dirty_cpumask);
     p->dirty_cpu = VCPU_CPU_CLEAN;
 
     per_cpu(curr_vcpu, cpu) = n;
@@ -1922,7 +1922,7 @@ int domain_relinquish_resources(struct domain *d)
     int ret;
     struct vcpu *v;
 
-    BUG_ON(!cpumask_empty(d->domain_dirty_cpumask));
+    BUG_ON(!cpumask_empty(d->dirty_cpumask));
 
     switch ( d->arch.relmem )
     {

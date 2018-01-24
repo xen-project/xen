@@ -305,7 +305,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     rwlock_init(&d->vnuma_rwlock);
 
     err = -ENOMEM;
-    if ( !zalloc_cpumask_var(&d->domain_dirty_cpumask) )
+    if ( !zalloc_cpumask_var(&d->dirty_cpumask) )
         goto fail;
 
     if ( domcr_flags & DOMCRF_hvm )
@@ -423,7 +423,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         watchdog_domain_destroy(d);
     if ( init_status & INIT_xsm )
         xsm_free_security_domain(d);
-    free_cpumask_var(d->domain_dirty_cpumask);
+    free_cpumask_var(d->dirty_cpumask);
     free_domain_struct(d);
     return ERR_PTR(err);
 }
@@ -873,7 +873,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     radix_tree_destroy(&d->pirq_tree, free_pirq_struct);
 
     xsm_free_security_domain(d);
-    free_cpumask_var(d->domain_dirty_cpumask);
+    free_cpumask_var(d->dirty_cpumask);
     xfree(d->vcpu);
     free_domain_struct(d);
 

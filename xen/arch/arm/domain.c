@@ -470,7 +470,7 @@ void startup_cpu_idle_loop(void)
 
     ASSERT(is_idle_vcpu(v));
     /* TODO
-       cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
+       cpumask_set_cpu(v->processor, v->domain->dirty_cpumask);
        v->dirty_cpu = v->processor;
     */
 

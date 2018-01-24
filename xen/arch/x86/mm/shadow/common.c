@@ -637,7 +637,7 @@ static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
     }
 
     if ( ftlb )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
 
     return 0;
 }
@@ -1064,7 +1064,7 @@ sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
     rc = sh_validate_guest_entry(v, gmfn, entry, size);
     if ( rc & SHADOW_SET_FLUSH )
         /* Need to flush TLBs to pick up shadow PT changes */
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     if ( rc & SHADOW_SET_ERROR )
     {
         /* This page is probably not a pagetable any more: tear it out of the
@@ -1227,7 +1227,7 @@ static void _shadow_prealloc(struct domain *d, unsigned int pages)
                 /* See if that freed up enough space */
                 if ( d->arch.paging.shadow.free_pages >= pages )
                 {
-                    flush_tlb_mask(d->domain_dirty_cpumask);
+                    flush_tlb_mask(d->dirty_cpumask);
                     return;
                 }
             }
@@ -1281,7 +1281,7 @@ static void shadow_blow_tables(struct domain *d)
                                pagetable_get_mfn(v->arch.shadow_table[i]), 0);
 
     /* Make sure everyone sees the unshadowings */
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(d->dirty_cpumask);
 }
 
 void shadow_blow_tables_per_domain(struct domain *d)
@@ -1385,7 +1385,7 @@ mfn_t shadow_alloc(struct domain *d,
         sp = page_list_remove_head(&d->arch.paging.shadow.freelist);
         /* Before we overwrite the old contents of this page,
          * we need to be sure that no TLB holds a pointer to it. */
-        cpumask_copy(&mask, d->domain_dirty_cpumask);
+        cpumask_copy(&mask, d->dirty_cpumask);
         tlbflush_filter(&mask, sp->tlbflush_timestamp);
         if ( unlikely(!cpumask_empty(&mask)) )
         {
@@ -2797,7 +2797,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 
     /* Need to flush TLBs now, so that linear maps are safe next time we
      * take a fault. */
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(d->dirty_cpumask);
 
     paging_unlock(d);
 }
@@ -3481,7 +3481,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
         {
             sh_remove_all_shadows_and_parents(d, mfn);
             if ( sh_remove_all_mappings(d, mfn, _gfn(gfn)) )
-                flush_tlb_mask(d->domain_dirty_cpumask);
+                flush_tlb_mask(d->dirty_cpumask);
         }
     }
 
@@ -3517,8 +3517,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                     sh_remove_all_shadows_and_parents(d, omfn);
                     if ( sh_remove_all_mappings(d, omfn,
                                                 _gfn(gfn + (i << PAGE_SHIFT))) )
-                        cpumask_or(&flushmask, &flushmask,
-                                   d->domain_dirty_cpumask);
+                        cpumask_or(&flushmask, &flushmask, d->dirty_cpumask);
                 }
                 omfn = _mfn(mfn_x(omfn) + 1);
             }
@@ -3795,7 +3794,7 @@ int shadow_track_dirty_vram(struct domain *d,
         }
     }
     if ( flush_tlb )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     goto out;
 
 out_sl1ma:
