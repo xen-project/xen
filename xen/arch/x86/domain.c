@@ -1693,7 +1693,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     if ( unlikely(dirty_cpu != cpu) && dirty_cpu != VCPU_CPU_CLEAN )
     {
         /* Remote CPU calls __sync_local_execstate() from flush IPI handler. */
-        flush_mask(cpumask_of(dirty_cpu), FLUSH_TLB | FLUSH_VCPU_STATE);
+        flush_mask(cpumask_of(dirty_cpu), FLUSH_VCPU_STATE);
     }
 
     if ( prev != next )
@@ -1800,11 +1800,10 @@ void sync_vcpu_execstate(struct vcpu *v)
 {
     if ( v->dirty_cpu == smp_processor_id() )
         sync_local_execstate();
-
-    if ( vcpu_cpu_dirty(v) )
+    else if ( vcpu_cpu_dirty(v) )
     {
         /* Remote CPU calls __sync_local_execstate() from flush IPI handler. */
-        flush_mask(cpumask_of(v->dirty_cpu), FLUSH_TLB | FLUSH_VCPU_STATE);
+        flush_mask(cpumask_of(v->dirty_cpu), FLUSH_VCPU_STATE);
     }
 }
 
