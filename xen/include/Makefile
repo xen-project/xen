@@ -35,8 +35,13 @@ cppflags-y                := -include public/xen-compat.h -DXEN_GENERATING_COMPA
 cppflags-$(CONFIG_X86)    += -m32
 
 # 8-byte types are 4-byte aligned on x86_32 ...
+ifeq ($(clang),y)
+prefix-$(CONFIG_X86)      := \#pragma pack(push, 4)
+suffix-$(CONFIG_X86)      := \#pragma pack(pop)
+else
 prefix-$(CONFIG_X86)      := \#pragma pack(4)
 suffix-$(CONFIG_X86)      := \#pragma pack()
+endif
 
 endif
 
