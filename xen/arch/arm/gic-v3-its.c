@@ -515,21 +515,6 @@ static int gicv3_its_init_single_its(struct host_its *hw_its)
     return 0;
 }
 
-int gicv3_its_init(void)
-{
-    struct host_its *hw_its;
-    int ret;
-
-    list_for_each_entry(hw_its, &host_its_list, entry)
-    {
-        ret = gicv3_its_init_single_its(hw_its);
-        if ( ret )
-            return ret;
-    }
-
-    return 0;
-}
-
 /*
  * TODO: Investigate the interaction when a guest removes a device while
  * some LPIs are still in flight.
@@ -1019,7 +1004,7 @@ static void add_to_host_its_list(paddr_t addr, paddr_t size,
 }
 
 /* Scan the DT for any ITS nodes and create a list of host ITSes out of it. */
-void gicv3_its_dt_init(const struct dt_device_node *node)
+static void gicv3_its_dt_init(const struct dt_device_node *node)
 {
     const struct dt_device_node *its = NULL;
 
@@ -1056,7 +1041,7 @@ static int gicv3_its_acpi_probe(struct acpi_subtable_header *header,
     return 0;
 }
 
-void gicv3_its_acpi_init(void)
+static void gicv3_its_acpi_init(void)
 {
     /* Parse ITS information */
     acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
@@ -1081,7 +1066,35 @@ unsigned long gicv3_its_make_hwdom_madt(const struct domain *d, void *base_ptr)
 
     return sizeof(struct acpi_madt_generic_translator) * vgic_v3_its_count(d);
 }
+#else /* !CONFIG_ACPI */
+
+static void gicv3_its_acpi_init(void)
+{
+    ASSERT_UNREACHABLE();
+}
+
 #endif
+
+int gicv3_its_init(void)
+{
+    struct host_its *hw_its;
+    int ret;
+
+    if ( acpi_disabled )
+        gicv3_its_dt_init(dt_interrupt_controller);
+    else
+        gicv3_its_acpi_init();
+
+    list_for_each_entry(hw_its, &host_its_list, entry)
+    {
+        ret = gicv3_its_init_single_its(hw_its);
+        if ( ret )
+            return ret;
+    }
+
+    return 0;
+}
+
 
 /*
  * Local variables:

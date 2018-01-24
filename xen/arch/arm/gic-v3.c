@@ -1314,9 +1314,6 @@ static void __init gicv3_dt_init(void)
     if ( !res )
         dt_device_get_address(node, 1 + gicv3.rdist_count + 2,
                               &vbase, &vsize);
-
-    /* Check for ITS child nodes and build the host ITS list accordingly. */
-    gicv3_its_dt_init(node);
 }
 
 static int gicv3_iomem_deny_access(const struct domain *d)
@@ -1607,8 +1604,6 @@ static void __init gicv3_acpi_init(void)
         panic("GICv3: No valid GICC entries exists");
 
     gicv3.rdist_stride = 0;
-
-    gicv3_its_acpi_init();
 
     /*
      * In ACPI, 0 is considered as the invalid address. However the rest
