@@ -617,16 +617,6 @@ void __domain_crash(struct domain *d);
 } while (0)
 
 /*
- * Mark current domain as crashed and synchronously deschedule from the local
- * processor. This function never returns.
- */
-void noreturn __domain_crash_synchronous(void);
-#define domain_crash_synchronous() do {                                   \
-    printk("domain_crash_sync called from %s:%d\n", __FILE__, __LINE__);  \
-    __domain_crash_synchronous();                                         \
-} while (0)
-
-/*
  * Called from assembly code, with an optional address to help indicate why
  * the crash occured.  If addr is 0, look up address from last extable
  * redirection.

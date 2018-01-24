@@ -20,6 +20,7 @@
  */
 
 #include <xen/sched.h>
+#include <xen/softirq.h>
 #include <xen/wait.h>
 #include <xen/errno.h>
 
@@ -135,7 +136,10 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     if ( vcpu_set_hard_affinity(curr, cpumask_of(wqv->wakeup_cpu)) )
     {
         gdprintk(XENLOG_ERR, "Unable to set vcpu affinity\n");
-        domain_crash_synchronous();
+        domain_crash(current->domain);
+
+        for ( ; ; )
+            do_softirq();
     }
 
     /* Hand-rolled setjmp(). */
@@ -166,7 +170,10 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     if ( unlikely(wqv->esp == 0) )
     {
         gdprintk(XENLOG_ERR, "Stack too large in %s\n", __func__);
-        domain_crash_synchronous();
+        domain_crash(current->domain);
+
+        for ( ; ; )
+            do_softirq();
     }
 
     cpu_info->guest_cpu_user_regs.entry_vector = entry_vector;
@@ -196,7 +203,7 @@ void check_wakeup_from_wait(void)
         if ( vcpu_set_hard_affinity(curr, cpumask_of(wqv->wakeup_cpu)) )
         {
             gdprintk(XENLOG_ERR, "Unable to set vcpu affinity\n");
-            domain_crash_synchronous();
+            domain_crash(current->domain);
         }
         wait(); /* takes us back into the scheduler */
     }

@@ -700,17 +700,6 @@ void __domain_crash(struct domain *d)
 }
 
 
-void __domain_crash_synchronous(void)
-{
-    __domain_crash(current->domain);
-
-    vcpu_end_shutdown_deferral(current);
-
-    for ( ; ; )
-        do_softirq();
-}
-
-
 int domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;

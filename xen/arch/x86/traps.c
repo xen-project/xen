@@ -2215,7 +2215,10 @@ void asm_domain_crash_synchronous(unsigned long addr)
     printk("domain_crash_sync called from entry.S: fault at %p %pS\n",
            _p(addr), _p(addr));
 
-    __domain_crash_synchronous();
+    __domain_crash(current->domain);
+
+    for ( ; ; )
+        do_softirq();
 }
 
 /*
