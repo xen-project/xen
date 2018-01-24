@@ -27,8 +27,6 @@
 
 #define HAP_PRINTK(_f, _a...)                                         \
     debugtrace_printk("hap: %s(): " _f, __func__, ##_a)
-#define HAP_ERROR(_f, _a...)                                          \
-    printk("hap error: %s(): " _f, __func__, ##_a)
 
 /************************************************/
 /*        hap domain level functions            */

@@ -2155,7 +2155,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
                           mfn_x(sl4mfn), shadow_index, new_sl4e.l4);
             if ( shadow_l4e_get_flags(new_sl4e) & _PAGE_PRESENT )
             {
-                SHADOW_ERROR("out-of-range l4e update\n");
+                printk(XENLOG_G_ERR "out-of-range l4e update\n");
                 result |= SHADOW_SET_ERROR;
             }
 
@@ -2478,9 +2478,7 @@ sh_map_and_validate_gl4e(struct vcpu *v, mfn_t gl4mfn,
                                 shadow_l4_index,
                                 validate_gl4e);
 #else // ! GUEST_PAGING_LEVELS >= 4
-    SHADOW_ERROR("called in wrong paging mode!\n");
-    BUG();
-    return 0;
+    BUG(); /* Called in wrong paging mode! */
 #endif
 }
 
@@ -2494,9 +2492,7 @@ sh_map_and_validate_gl3e(struct vcpu *v, mfn_t gl3mfn,
                                 shadow_l3_index,
                                 validate_gl3e);
 #else // ! GUEST_PAGING_LEVELS >= 4
-    SHADOW_ERROR("called in wrong paging mode!\n");
-    BUG();
-    return 0;
+    BUG(); /* Called in wrong paging mode! */
 #endif
 }
 
@@ -2520,9 +2516,7 @@ sh_map_and_validate_gl2he(struct vcpu *v, mfn_t gl2mfn,
                                 shadow_l2_index,
                                 validate_gl2e);
 #else /* Non-PAE guests don't have different kinds of l2 table */
-    SHADOW_ERROR("called in wrong paging mode!\n");
-    BUG();
-    return 0;
+    BUG(); /* Called in wrong paging mode! */
 #endif
 }
 
@@ -2966,8 +2960,8 @@ static int sh_page_fault(struct vcpu *v,
      * a BUG() when we try to take the lock again. */
     if ( unlikely(paging_locked_by_me(d)) )
     {
-        SHADOW_ERROR("Recursive shadow fault: lock was taken by %s\n",
-                     d->arch.paging.lock.locker_function);
+        printk(XENLOG_G_ERR "Recursive shadow fault: lock taken by %s\n",
+               d->arch.paging.lock.locker_function);
         return 0;
     }
 
@@ -3952,7 +3946,8 @@ sh_set_toplevel_shadow(struct vcpu *v,
     }
     else
     {
-        SHADOW_ERROR("can't install %#lx as toplevel shadow\n", mfn_x(smfn));
+        printk(XENLOG_G_ERR "can't install %"PRI_mfn" as toplevel shadow\n",
+               mfn_x(smfn));
         domain_crash(d);
         new_entry = pagetable_null();
     }
@@ -3972,7 +3967,7 @@ sh_set_toplevel_shadow(struct vcpu *v,
          * shadow and it's not safe to free it yet. */
         if ( !mfn_to_page(old_smfn)->u.sh.pinned && !sh_pin(d, old_smfn) )
         {
-            SHADOW_ERROR("can't re-pin %#lx\n", mfn_x(old_smfn));
+            printk(XENLOG_G_ERR "can't re-pin %"PRI_mfn"\n", mfn_x(old_smfn));
             domain_crash(d);
         }
         sh_put_ref(d, old_smfn, 0);

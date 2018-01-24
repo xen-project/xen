@@ -325,7 +325,8 @@ void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn)
             return;
     }
 
-    SHADOW_ERROR("gmfn %lx marked OOS but not in hash table\n", mfn_x(gmfn));
+    printk(XENLOG_ERR "gmfn %"PRI_mfn" marked OOS but not in hash table\n",
+           mfn_x(gmfn));
     BUG();
 }
 #endif
@@ -429,7 +430,8 @@ void oos_fixup_add(struct domain *d, mfn_t gmfn,
         }
     }
 
-    SHADOW_ERROR("gmfn %lx was OOS but not in hash table\n", mfn_x(gmfn));
+    printk(XENLOG_ERR "gmfn %"PRI_mfn" was OOS but not in hash table\n",
+           mfn_x(gmfn));
     BUG();
 }
 
@@ -579,7 +581,8 @@ static void oos_hash_remove(struct domain *d, mfn_t gmfn)
         }
     }
 
-    SHADOW_ERROR("gmfn %lx was OOS but not in hash table\n", mfn_x(gmfn));
+    printk(XENLOG_ERR "gmfn %"PRI_mfn" was OOS but not in hash table\n",
+           mfn_x(gmfn));
     BUG();
 }
 
@@ -603,7 +606,8 @@ mfn_t oos_snapshot_lookup(struct domain *d, mfn_t gmfn)
         }
     }
 
-    SHADOW_ERROR("gmfn %lx was OOS but not in hash table\n", mfn_x(gmfn));
+    printk(XENLOG_ERR "gmfn %"PRI_mfn" was OOS but not in hash table\n",
+           mfn_x(gmfn));
     BUG();
 }
 
@@ -633,7 +637,8 @@ void sh_resync(struct domain *d, mfn_t gmfn)
         }
     }
 
-    SHADOW_ERROR("gmfn %lx was OOS but not in hash table\n", mfn_x(gmfn));
+    printk(XENLOG_ERR "gmfn %"PRI_mfn" was OOS but not in hash table\n",
+           mfn_x(gmfn));
     BUG();
 }
 
@@ -648,8 +653,8 @@ static int sh_skip_sync(struct vcpu *v, mfn_t gl1mfn)
         return SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, 3)(v, gl1mfn);
     else if ( pg->shadow_flags & SHF_L1_64 )
         return SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, 4)(v, gl1mfn);
-    SHADOW_ERROR("gmfn %#lx was OOS but not shadowed as an l1.\n",
-                 mfn_x(gl1mfn));
+    printk(XENLOG_ERR "gmfn %"PRI_mfn" was OOS but not shadowed as an l1\n",
+           mfn_x(gl1mfn));
     BUG();
 }
 
@@ -990,7 +995,7 @@ void shadow_unhook_mappings(struct domain *d, mfn_t smfn, int user_only)
         SHADOW_INTERNAL_NAME(sh_unhook_64b_mappings, 4)(d, smfn, user_only);
         break;
     default:
-        SHADOW_ERROR("top-level shadow has bad type %08x\n", sp->u.sh.type);
+        printk(XENLOG_ERR "Bad top-level shadow type %08x\n", sp->u.sh.type);
         BUG();
     }
 }
@@ -1060,12 +1065,12 @@ static void _shadow_prealloc(struct domain *d, unsigned int pages)
 
     /* Nothing more we can do: all remaining shadows are of pages that
      * hold Xen mappings for some vcpu.  This can never happen. */
-    SHADOW_ERROR("Can't pre-allocate %u shadow pages!\n"
-                 "  shadow pages total = %u, free = %u, p2m=%u\n",
-                 pages,
-                 d->arch.paging.shadow.total_pages,
-                 d->arch.paging.shadow.free_pages,
-                 d->arch.paging.shadow.p2m_pages);
+    printk(XENLOG_ERR "Can't pre-allocate %u shadow pages!\n"
+           "  shadow pages total = %u, free = %u, p2m=%u\n",
+           pages,
+           d->arch.paging.shadow.total_pages,
+           d->arch.paging.shadow.free_pages,
+           d->arch.paging.shadow.p2m_pages);
     BUG();
 }
 
@@ -1185,7 +1190,7 @@ mfn_t shadow_alloc(struct domain *d,
          * correctly before we allocated.  We can't recover by calling
          * prealloc here, because we might free up higher-level pages
          * that the caller is working on. */
-        SHADOW_ERROR("Can't allocate %i shadow pages!\n", pages);
+        printk(XENLOG_ERR "Can't allocate %u shadow pages!\n", pages);
         BUG();
     }
     d->arch.paging.shadow.free_pages -= pages;
@@ -1337,10 +1342,11 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     /* Should still have no owner and count zero. */
     if ( owner || (pg->count_info & PGC_count_mask) )
     {
-        SHADOW_ERROR("d%d: Odd p2m page %"PRI_mfn" d=%d c=%lx t=%"PRtype_info"\n",
-                     d->domain_id, mfn_x(page_to_mfn(pg)),
-                     owner ? owner->domain_id : DOMID_INVALID,
-                     pg->count_info, pg->u.inuse.type_info);
+        printk(XENLOG_ERR
+               "d%d: Odd p2m page %"PRI_mfn" d=%d c=%lx t=%"PRtype_info"\n",
+               d->domain_id, mfn_x(page_to_mfn(pg)),
+               owner ? owner->domain_id : DOMID_INVALID,
+               pg->count_info, pg->u.inuse.type_info);
         pg->count_info &= ~PGC_count_mask;
         page_set_owner(pg, NULL);
     }
@@ -1506,11 +1512,11 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
                 {
                     if ( !page_is_out_of_sync(gpg) )
                     {
-                        SHADOW_ERROR("MFN %#"PRI_mfn" shadowed (by %#"PRI_mfn")"
-                                     " and not OOS but has typecount %#lx\n",
-                                     __backpointer(sp),
-                                     mfn_x(page_to_mfn(sp)),
-                                     gpg->u.inuse.type_info);
+                        printk(XENLOG_ERR
+                               "MFN %"PRI_mfn" shadowed (by %"PRI_mfn")"
+                               " and not OOS but has typecount %#lx\n",
+                               __backpointer(sp), mfn_x(page_to_mfn(sp)),
+                               gpg->u.inuse.type_info);
                         BUG();
                     }
                 }
@@ -1520,10 +1526,10 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
             if ( (gpg->u.inuse.type_info & PGT_type_mask) == PGT_writable_page
                  && (gpg->u.inuse.type_info & PGT_count_mask) != 0 )
             {
-                SHADOW_ERROR("MFN %#"PRI_mfn" shadowed (by %#"PRI_mfn")"
-                             " but has typecount %#lx\n",
-                             __backpointer(sp), mfn_x(page_to_mfn(sp)),
-                             gpg->u.inuse.type_info);
+                printk(XENLOG_ERR "MFN %"PRI_mfn" shadowed (by %"PRI_mfn")"
+                       " but has typecount %#lx\n",
+                       __backpointer(sp), mfn_x(page_to_mfn(sp)),
+                       gpg->u.inuse.type_info);
                 BUG();
             }
         }
@@ -1863,8 +1869,7 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn)
         break;
 
     default:
-        SHADOW_ERROR("tried to destroy shadow of bad type %08lx\n",
-                     (unsigned long)t);
+        printk(XENLOG_ERR "tried to destroy shadow of bad type %08x\n", t);
         BUG();
     }
 }
@@ -1950,9 +1955,9 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
      * put pagetables in special memory of some kind.  We can't allow that. */
     if ( (pg->u.inuse.type_info & PGT_type_mask) != PGT_writable_page )
     {
-        SHADOW_ERROR("can't remove write access to mfn %lx, type_info is %"
-                      PRtype_info "\n",
-                      mfn_x(gmfn), mfn_to_page(gmfn)->u.inuse.type_info);
+        printk(XENLOG_G_ERR "can't remove write access to mfn %"PRI_mfn
+               ", type_info is %"PRtype_info "\n",
+               mfn_x(gmfn), mfn_to_page(gmfn)->u.inuse.type_info);
         domain_crash(d);
     }
 
@@ -2099,9 +2104,9 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
         if ( level == 0 )
             return -1;
 
-        SHADOW_ERROR("can't remove write access to mfn %lx: guest has "
-                      "%lu special-use mappings of it\n", mfn_x(gmfn),
-                      (mfn_to_page(gmfn)->u.inuse.type_info&PGT_count_mask));
+        printk(XENLOG_G_ERR "can't remove write access to mfn %"PRI_mfn
+               ": guest has %lu special-use mappings\n", mfn_x(gmfn),
+               mfn_to_page(gmfn)->u.inuse.type_info & PGT_count_mask);
         domain_crash(d);
     }
 
@@ -2206,13 +2211,12 @@ static int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
                && ((page->u.inuse.type_info & PGT_count_mask)
                    == (is_xen_heap_page(page) ||
                        (is_hvm_domain(d) && is_ioreq_server_page(d, page))))) )
-        {
-            SHADOW_ERROR("can't find all mappings of mfn %lx (gfn %lx): "
-                          "c=%lx t=%lx x=%d i=%d\n", mfn_x(gmfn), gfn_x(gfn),
-                          page->count_info, page->u.inuse.type_info,
-                          !!is_xen_heap_page(page),
-                          is_hvm_domain(d) && is_ioreq_server_page(d, page));
-        }
+            printk(XENLOG_G_ERR "can't find all mappings of mfn %"PRI_mfn
+                   " (gfn %"PRI_gfn"): c=%lx t=%lx x=%d i=%d\n",
+                   mfn_x(gmfn), gfn_x(gfn),
+                   page->count_info, page->u.inuse.type_info,
+                   !!is_xen_heap_page(page),
+                   (is_hvm_domain(d) && is_ioreq_server_page(d, page)));
     }
 
     paging_unlock(d);
@@ -2364,9 +2368,9 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     smfn = shadow_hash_lookup(d, mfn_x(gmfn), t);                       \
     if ( unlikely(!mfn_valid(smfn)) )                                   \
     {                                                                   \
-        SHADOW_ERROR(": gmfn %#lx has flags %#"PRIx32                   \
-                     " but no type-%#"PRIx32" shadow\n",                \
-                     mfn_x(gmfn), (uint32_t)pg->shadow_flags, t);       \
+        printk(XENLOG_G_ERR "gmfn %"PRI_mfn" has flags %#x"             \
+               " but no type-%#x shadow\n",                             \
+               mfn_x(gmfn), pg->shadow_flags, t);                       \
         break;                                                          \
     }                                                                   \
     if ( sh_type_is_pinnable(d, t) )                                    \
@@ -2395,9 +2399,8 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     /* If that didn't catch the shadows, something is wrong */
     if ( !fast && all && (pg->count_info & PGC_page_table) )
     {
-        SHADOW_ERROR("can't find all shadows of mfn %"PRI_mfn" "
-                     "(shadow_flags=%08x)\n",
-                      mfn_x(gmfn), pg->shadow_flags);
+        printk(XENLOG_G_ERR "can't find all shadows of mfn %"PRI_mfn
+               " (shadow_flags=%08x)\n", mfn_x(gmfn), pg->shadow_flags);
         domain_crash(d);
     }
 
@@ -2477,8 +2480,7 @@ static void sh_update_paging_modes(struct vcpu *v)
         v->arch.paging.vtlb = xzalloc_array(struct shadow_vtlb, VTLB_ENTRIES);
         if ( unlikely(!v->arch.paging.vtlb) )
         {
-            SHADOW_ERROR("Could not allocate vTLB space for dom %u vcpu %u\n",
-                         d->domain_id, v->vcpu_id);
+            printk(XENLOG_G_ERR "Could not allocate vTLB space for %pv\n", v);
             domain_crash(v->domain);
             return;
         }
@@ -2581,10 +2583,10 @@ static void sh_update_paging_modes(struct vcpu *v)
 
                 if ( v != current && vcpu_runnable(v) )
                 {
-                    SHADOW_ERROR("Some third party (%pv) is changing "
-                                 "this HVM vcpu's (%pv) paging mode "
-                                 "while it is running.\n",
-                                 current, v);
+                    printk(XENLOG_G_ERR
+                           "Some third party (%pv) is changing this HVM vcpu's"
+                           " (%pv) paging mode while it is running\n",
+                           current, v);
                     /* It's not safe to do that because we can't change
                      * the host CR3 for a running domain */
                     domain_crash(v->domain);
@@ -2901,10 +2903,11 @@ out:
         /* Complain here in cases where shadow_free_p2m_page() won't. */
         else if ( !page_get_owner(unpaged_pagetable) &&
                   !(unpaged_pagetable->count_info & PGC_count_mask) )
-            SHADOW_ERROR("d%d: Odd unpaged pt %"PRI_mfn" c=%lx t=%"PRtype_info"\n",
-                         d->domain_id, mfn_x(page_to_mfn(unpaged_pagetable)),
-                         unpaged_pagetable->count_info,
-                         unpaged_pagetable->u.inuse.type_info);
+            printk(XENLOG_ERR
+                   "d%d: Odd unpaged pt %"PRI_mfn" c=%lx t=%"PRtype_info"\n",
+                   d->domain_id, mfn_x(page_to_mfn(unpaged_pagetable)),
+                   unpaged_pagetable->count_info,
+                   unpaged_pagetable->u.inuse.type_info);
         shadow_free_p2m_page(d, unpaged_pagetable);
     }
 }
@@ -3468,8 +3471,8 @@ int shadow_domctl(struct domain *d,
         {
             /* Can't set the allocation to zero unless the domain stops using
              * shadow pagetables first */
-            SHADOW_ERROR("Can't set shadow allocation to zero, domain %u"
-                         " is still using shadows.\n", d->domain_id);
+            dprintk(XENLOG_G_ERR, "Can't set shadow allocation to zero, "
+                    "d%d is still using shadows\n", d->domain_id);
             paging_unlock(d);
             return -EINVAL;
         }
@@ -3485,7 +3488,6 @@ int shadow_domctl(struct domain *d,
         return rc;
 
     default:
-        SHADOW_ERROR("Bad shadow op %u\n", sc->op);
         return -EINVAL;
     }
 }

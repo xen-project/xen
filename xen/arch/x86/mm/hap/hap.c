@@ -304,10 +304,11 @@ static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
     /* Should still have no owner and count zero. */
     if ( owner || (pg->count_info & PGC_count_mask) )
     {
-        HAP_ERROR("d%d: Odd p2m page %"PRI_mfn" d=%d c=%lx t=%"PRtype_info"\n",
-                  d->domain_id, mfn_x(page_to_mfn(pg)),
-                  owner ? owner->domain_id : DOMID_INVALID,
-                  pg->count_info, pg->u.inuse.type_info);
+        printk(XENLOG_WARNING
+               "d%d: Odd p2m page %"PRI_mfn" d=%d c=%lx t=%"PRtype_info"\n",
+               d->domain_id, mfn_x(page_to_mfn(pg)),
+               owner ? owner->domain_id : DOMID_INVALID,
+               pg->count_info, pg->u.inuse.type_info);
         WARN();
         pg->count_info &= ~PGC_count_mask;
         page_set_owner(pg, NULL);
@@ -407,7 +408,7 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
     return m4mfn;
 
  oom:
-    HAP_ERROR("out of memory building monitor pagetable\n");
+    printk(XENLOG_G_ERR "out of memory building monitor pagetable\n");
     domain_crash(d);
     return INVALID_MFN;
 }
@@ -639,7 +640,7 @@ static int hap_page_fault(struct vcpu *v, unsigned long va,
 {
     struct domain *d = v->domain;
 
-    HAP_ERROR("Intercepted a guest #PF (%pv) with HAP enabled\n", v);
+    printk(XENLOG_G_ERR "Intercepted #PF from %pv with HAP enabled\n", v);
     domain_crash(d);
     return 0;
 }
