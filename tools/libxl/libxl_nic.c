@@ -116,20 +116,6 @@ static int libxl__device_nic_setdefault(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
-static int libxl__device_from_nic(libxl__gc *gc, uint32_t domid,
-                                  libxl_device_nic *nic,
-                                  libxl__device *device)
-{
-    device->backend_devid    = nic->devid;
-    device->backend_domid    = nic->backend_domid;
-    device->backend_kind     = LIBXL__DEVICE_KIND_VIF;
-    device->devid            = nic->devid;
-    device->domid            = domid;
-    device->kind             = LIBXL__DEVICE_KIND_VIF;
-
-    return 0;
-}
-
 static void libxl__update_config_nic(libxl__gc *gc, libxl_device_nic *dst,
                                      const libxl_device_nic *src)
 {
@@ -137,8 +123,6 @@ static void libxl__update_config_nic(libxl__gc *gc, libxl_device_nic *dst,
     dst->nictype = src->nictype;
     libxl_mac_copy(CTX, &dst->mac, &src->mac);
 }
-
-static LIBXL_DEFINE_UPDATE_DEVID(nic)
 
 static int libxl__set_xenstore_nic(libxl__gc *gc, uint32_t domid,
                                    libxl_device_nic *nic,
@@ -532,6 +516,9 @@ int libxl__device_nic_set_devids(libxl__gc *gc, libxl_domain_config *d_config,
 out:
     return ret;
 }
+
+static LIBXL_DEFINE_UPDATE_DEVID(nic)
+static LIBXL_DEFINE_DEVICE_FROM_TYPE(nic)
 
 LIBXL_DEFINE_DEVICE_ADD(nic)
 LIBXL_DEFINE_DEVICES_ADD(nic)

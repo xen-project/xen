@@ -3475,6 +3475,21 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
         return 0;                                                       \
     }
 
+#define LIBXL_DEFINE_DEVICE_FROM_TYPE(name)                             \
+    int libxl__device_from_##name(libxl__gc *gc, uint32_t domid,        \
+                                  libxl_device_##name *type,            \
+                                  libxl__device *device)                \
+    {                                                                   \
+        device->backend_devid   = type->devid;                          \
+        device->backend_domid   = type->backend_domid;                  \
+        device->backend_kind    = libxl__##name##_devtype.type;         \
+        device->devid           = type->devid;                          \
+        device->domid           = domid;                                \
+        device->kind            = libxl__##name##_devtype.type;         \
+                                                                        \
+        return 0;                                                       \
+    }
+
 #define LIBXL_DEFINE_DEVICE_REMOVE(type)                                \
     LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, remove, 0)            \
     LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, destroy, 1)

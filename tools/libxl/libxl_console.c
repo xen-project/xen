@@ -698,19 +698,6 @@ static int libxl__device_vfb_setdefault(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
-static int libxl__device_from_vfb(libxl__gc *gc, uint32_t domid,
-                                  libxl_device_vfb *vfb,
-                                  libxl__device *device)
-{
-    device->backend_devid = vfb->devid;
-    device->backend_domid = vfb->backend_domid;
-    device->backend_kind = LIBXL__DEVICE_KIND_VFB;
-    device->devid = vfb->devid;
-    device->domid = domid;
-    device->kind = LIBXL__DEVICE_KIND_VFB;
-    return 0;
-}
-
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
                          const libxl_asyncop_how *ao_how)
 {
@@ -727,8 +714,6 @@ out:
     libxl__ao_complete(egc, ao, rc);
     return AO_INPROGRESS;
 }
-
-static LIBXL_DEFINE_UPDATE_DEVID(vfb)
 
 static int libxl__set_xenstore_vfb(libxl__gc *gc, uint32_t domid,
                                    libxl_device_vfb *vfb,
@@ -783,6 +768,9 @@ DEFINE_DEVICE_TYPE_STRUCT(vkb, VKBD,
 #define libxl__add_vfbs NULL
 #define libxl_device_vfb_list NULL
 #define libxl_device_vfb_compare NULL
+
+static LIBXL_DEFINE_UPDATE_DEVID(vfb)
+static LIBXL_DEFINE_DEVICE_FROM_TYPE(vfb)
 
 /* vfb */
 LIBXL_DEFINE_DEVICE_REMOVE(vfb)

@@ -22,20 +22,6 @@ static int libxl__device_vdispl_setdefault(libxl__gc *gc, uint32_t domid,
                                 &vdispl->backend_domid);
 }
 
-static int libxl__device_from_vdispl(libxl__gc *gc, uint32_t domid,
-                                     libxl_device_vdispl *vdispl,
-                                     libxl__device *device)
-{
-   device->backend_devid   = vdispl->devid;
-   device->backend_domid   = vdispl->backend_domid;
-   device->backend_kind    = LIBXL__DEVICE_KIND_VDISPL;
-   device->devid           = vdispl->devid;
-   device->domid           = domid;
-   device->kind            = LIBXL__DEVICE_KIND_VDISPL;
-
-   return 0;
-}
-
 static int libxl__vdispl_from_xenstore(libxl__gc *gc, const char *libxl_path,
                                        libxl_devid devid,
                                        libxl_device_vdispl *vdispl)
@@ -243,10 +229,12 @@ out:
     return rc;
 }
 
-LIBXL_DEFINE_DEVICE_ADD(vdispl)
-static LIBXL_DEFINE_DEVICES_ADD(vdispl)
-LIBXL_DEFINE_DEVICE_REMOVE(vdispl)
+static LIBXL_DEFINE_DEVICE_FROM_TYPE(vdispl)
 static LIBXL_DEFINE_UPDATE_DEVID(vdispl)
+static LIBXL_DEFINE_DEVICES_ADD(vdispl)
+
+LIBXL_DEFINE_DEVICE_ADD(vdispl)
+LIBXL_DEFINE_DEVICE_REMOVE(vdispl)
 LIBXL_DEFINE_DEVICE_LIST(vdispl)
 
 DEFINE_DEVICE_TYPE_STRUCT(vdispl, VDISPL,
