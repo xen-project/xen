@@ -1813,9 +1813,55 @@ static int free_l4_table(struct page_info *page)
     return rc;
 }
 
+#ifndef NDEBUG
+/*
+ * We must never call _put_page_type() while holding a page_lock() for
+ * that page; doing so may cause a deadlock under the right
+ * conditions.
+ *
+ * Furthermore, there is no discipline for the order in which page locks
+ * are grabbed; if there are any paths that grab the locks for two
+ * different pages at once, we risk creating the conditions for a deadlock
+ * to occur.
+ *
+ * These are believed to be safe, because it is believed that:
+ * 1. No hypervisor paths ever lock two pages at once, and
+ * 2. We never call _put_page_type() on a page while holding its page lock.
+ *
+ * Add a check to debug builds to catch any violations of these
+ * assumpitons.
+ *
+ * NB that if we find valid, safe reasons to hold two page locks at
+ * once, these checks will need to be adjusted.
+ */
+static DEFINE_PER_CPU(struct page_info *, current_locked_page);
+
+static inline void current_locked_page_set(struct page_info *page) {
+    this_cpu(current_locked_page) = page;
+}
+
+static inline bool current_locked_page_check(struct page_info *page) {
+    return this_cpu(current_locked_page) == page;
+}
+
+/*
+ * We need a separate "not-equal" check so the non-debug stubs can
+ * always return true.
+ */
+static inline bool current_locked_page_ne_check(struct page_info *page) {
+    return this_cpu(current_locked_page) != page;
+}
+#else
+#define current_locked_page_set(x)
+#define current_locked_page_check(x) true
+#define current_locked_page_ne_check(x) true
+#endif
+
 int page_lock(struct page_info *page)
 {
     unsigned long x, nx;
+
+    ASSERT(current_locked_page_check(NULL));
 
     do {
         while ( (x = page->u.inuse.type_info) & PGT_locked )
@@ -1827,12 +1873,16 @@ int page_lock(struct page_info *page)
             return 0;
     } while ( cmpxchg(&page->u.inuse.type_info, x, nx) != x );
 
+    current_locked_page_set(page);
+
     return 1;
 }
 
 void page_unlock(struct page_info *page)
 {
     unsigned long x, nx, y = page->u.inuse.type_info;
+
+    ASSERT(current_locked_page_check(page));
 
     do {
         x = y;
@@ -1842,6 +1892,8 @@ void page_unlock(struct page_info *page)
         /* We must not drop the last reference here. */
         ASSERT(nx & PGT_count_mask);
     } while ( (y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x );
+
+    current_locked_page_set(NULL);
 }
 
 /*
@@ -2419,6 +2471,8 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                           struct page_info *ptpg)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
+
+    ASSERT(current_locked_page_ne_check(page));
 
     for ( ; ; )
     {
