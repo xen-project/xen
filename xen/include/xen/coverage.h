@@ -3,7 +3,7 @@
 
 #ifdef CONFIG_GCOV
 #include <public/sysctl.h>
-int sysctl_gcov_op(struct xen_sysctl_gcov_op *op);
+int sysctl_cov_op(struct xen_sysctl_coverage_op *op);
 #endif
 
 #endif	/* _XEN_GCOV_H */

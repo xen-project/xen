@@ -646,11 +646,11 @@ struct xen_sysctl_scheduler_op {
 
 #define XEN_GCOV_FORMAT_MAGIC    0x58434f56 /* XCOV */
 
-#define XEN_SYSCTL_GCOV_get_size 0 /* Get total size of output data */
-#define XEN_SYSCTL_GCOV_read     1 /* Read output data */
-#define XEN_SYSCTL_GCOV_reset    2 /* Reset all counters */
+#define XEN_SYSCTL_COVERAGE_get_size 0 /* Get total size of output data */
+#define XEN_SYSCTL_COVERAGE_read     1 /* Read output data */
+#define XEN_SYSCTL_COVERAGE_reset    2 /* Reset all counters */
 
-struct xen_sysctl_gcov_op {
+struct xen_sysctl_coverage_op {
     uint32_t cmd;
     uint32_t size; /* IN/OUT: size of the buffer  */
     XEN_GUEST_HANDLE_64(char) buffer; /* OUT */
@@ -1073,7 +1073,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_numainfo                      17
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
-#define XEN_SYSCTL_gcov_op                       20
+#define XEN_SYSCTL_coverage_op                   20
 #define XEN_SYSCTL_psr_cmt_op                    21
 #define XEN_SYSCTL_pcitopoinfo                   22
 #define XEN_SYSCTL_psr_alloc                     23
@@ -1103,7 +1103,7 @@ struct xen_sysctl {
         struct xen_sysctl_lockprof_op       lockprof_op;
         struct xen_sysctl_cpupool_op        cpupool_op;
         struct xen_sysctl_scheduler_op      scheduler_op;
-        struct xen_sysctl_gcov_op           gcov_op;
+        struct xen_sysctl_coverage_op       coverage_op;
         struct xen_sysctl_psr_cmt_op        psr_cmt_op;
         struct xen_sysctl_psr_alloc         psr_alloc;
         struct xen_sysctl_tmem_op           tmem_op;

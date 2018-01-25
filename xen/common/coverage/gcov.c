@@ -209,18 +209,18 @@ static int gcov_dump_all(XEN_GUEST_HANDLE_PARAM(char) buffer,
     return ret;
 }
 
-int sysctl_gcov_op(struct xen_sysctl_gcov_op *op)
+int sysctl_cov_op(struct xen_sysctl_coverage_op *op)
 {
     int ret;
 
     switch ( op->cmd )
     {
-    case XEN_SYSCTL_GCOV_get_size:
+    case XEN_SYSCTL_COVERAGE_get_size:
         op->size = gcov_get_size();
         ret = 0;
         break;
 
-    case XEN_SYSCTL_GCOV_read:
+    case XEN_SYSCTL_COVERAGE_read:
     {
         XEN_GUEST_HANDLE_PARAM(char) buf;
         uint32_t size = op->size;
@@ -233,7 +233,7 @@ int sysctl_gcov_op(struct xen_sysctl_gcov_op *op)
         break;
     }
 
-    case XEN_SYSCTL_GCOV_reset:
+    case XEN_SYSCTL_COVERAGE_reset:
         gcov_reset_all_counters();
         ret = 0;
         break;
