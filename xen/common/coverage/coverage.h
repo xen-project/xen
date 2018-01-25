@@ -8,6 +8,7 @@ struct cov_sysctl_ops {
     void     (*reset_counters)(void);
     int      (*dump)(XEN_GUEST_HANDLE_PARAM(char), uint32_t *);
 };
+extern const struct cov_sysctl_ops cov_ops;
 
 #endif
 

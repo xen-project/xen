@@ -210,48 +210,11 @@ static int gcov_dump_all(XEN_GUEST_HANDLE_PARAM(char) buffer,
     return ret;
 }
 
-static const struct cov_sysctl_ops cov_ops = {
+const struct cov_sysctl_ops cov_ops = {
     .get_size = gcov_get_size,
     .reset_counters = gcov_reset_all_counters,
     .dump = gcov_dump_all,
 };
-
-int sysctl_cov_op(struct xen_sysctl_coverage_op *op)
-{
-    int ret;
-
-    switch ( op->cmd )
-    {
-    case XEN_SYSCTL_COVERAGE_get_size:
-        op->size = cov_ops.get_size();
-        ret = 0;
-        break;
-
-    case XEN_SYSCTL_COVERAGE_read:
-    {
-        XEN_GUEST_HANDLE_PARAM(char) buf;
-        uint32_t size = op->size;
-
-        buf = guest_handle_cast(op->buffer, char);
-
-        ret = cov_ops.dump(buf, &size);
-        op->size = size;
-
-        break;
-    }
-
-    case XEN_SYSCTL_COVERAGE_reset:
-        cov_ops.reset_counters();
-        ret = 0;
-        break;
-
-    default:
-        ret = -EOPNOTSUPP;
-        break;
-    }
-
-    return ret;
-}
 
 /*
  * Local variables:
