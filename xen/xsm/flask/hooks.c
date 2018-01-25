@@ -825,9 +825,9 @@ static int flask_sysctl(int cmd)
     case XEN_SYSCTL_livepatch_op:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__LIVEPATCH_OP, NULL);
-    case XEN_SYSCTL_gcov_op:
+    case XEN_SYSCTL_coverage_op:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
-                                    XEN2__GCOV_OP, NULL);
+                                    XEN2__COVERAGE_OP, NULL);
     case XEN_SYSCTL_set_parameter:
         return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN2,
                                     XEN2__SET_PARAMETER, NULL);

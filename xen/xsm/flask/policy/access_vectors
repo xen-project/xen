@@ -99,8 +99,8 @@ class xen2
     get_cpu_featureset
 # XEN_SYSCTL_livepatch_op
     livepatch_op
-# XEN_SYSCTL_gcov_op
-    gcov_op
+# XEN_SYSCTL_coverage_op
+    coverage_op
 # XEN_SYSCTL_set_parameter
     set_parameter
 }
