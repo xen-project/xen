@@ -217,6 +217,7 @@ QEMU_XEN_ENABLE_DEBUG :=
 endif
 
 subdir-all-qemu-xen-dir: qemu-xen-dir-find
+	unset MAKELEVEL; \
 	if test -d $(QEMU_UPSTREAM_LOC) ; then \
 		source=$(QEMU_UPSTREAM_LOC); \
 	else \

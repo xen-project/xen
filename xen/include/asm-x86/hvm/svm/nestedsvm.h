@@ -46,8 +46,8 @@ struct nestedsvm {
     uint32_t ns_general1_intercepts;
     uint32_t ns_general2_intercepts;
 
-    /* Cached real lbr of the l2 guest */
-    lbrctrl_t ns_lbr_control;
+    /* Cached real lbr and other virtual extentions of the l2 guest */
+    virt_ext_t ns_virt_ext;
 
     /* Cached real MSR permission bitmaps of the l2 guest */
     unsigned long *ns_cached_msrpm;

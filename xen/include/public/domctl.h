@@ -38,7 +38,7 @@
 #include "hvm/save.h"
 #include "memory.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000e
+#define XEN_DOMCTL_INTERFACE_VERSION 0x0000000f
 
 /*
  * NB. xen_domctl.domain is an IN/OUT parameter for this operation.
@@ -116,6 +116,7 @@ struct xen_domctl_getdomaininfo {
     uint32_t ssidref;
     xen_domain_handle_t handle;
     uint32_t cpupool;
+    struct xen_arch_domainconfig arch_config;
 };
 typedef struct xen_domctl_getdomaininfo xen_domctl_getdomaininfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
@@ -1050,6 +1051,8 @@ struct xen_domctl_monitor_op {
 
         struct {
             uint32_t msr;
+            /* Send event only on a change of value */
+            uint8_t onchangeonly;
         } mov_to_msr;
 
         struct {
@@ -1065,16 +1068,18 @@ struct xen_domctl_monitor_op {
     } u;
 };
 
-struct xen_domctl_psr_cat_op {
-#define XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM     0
-#define XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM     1
-#define XEN_DOMCTL_PSR_CAT_OP_SET_L3_CODE    2
-#define XEN_DOMCTL_PSR_CAT_OP_SET_L3_DATA    3
-#define XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE    4
-#define XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA    5
-#define XEN_DOMCTL_PSR_CAT_OP_SET_L2_CBM     6
-#define XEN_DOMCTL_PSR_CAT_OP_GET_L2_CBM     7
-    uint32_t cmd;       /* IN: XEN_DOMCTL_PSR_CAT_OP_* */
+struct xen_domctl_psr_alloc {
+#define XEN_DOMCTL_PSR_SET_L3_CBM     0
+#define XEN_DOMCTL_PSR_GET_L3_CBM     1
+#define XEN_DOMCTL_PSR_SET_L3_CODE    2
+#define XEN_DOMCTL_PSR_SET_L3_DATA    3
+#define XEN_DOMCTL_PSR_GET_L3_CODE    4
+#define XEN_DOMCTL_PSR_GET_L3_DATA    5
+#define XEN_DOMCTL_PSR_SET_L2_CBM     6
+#define XEN_DOMCTL_PSR_GET_L2_CBM     7
+#define XEN_DOMCTL_PSR_SET_MBA_THRTL  8
+#define XEN_DOMCTL_PSR_GET_MBA_THRTL  9
+    uint32_t cmd;       /* IN: XEN_DOMCTL_PSR_* */
     uint32_t target;    /* IN */
     uint64_t data;      /* IN/OUT */
 };
@@ -1180,7 +1185,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_setvnumainfo                  74
 #define XEN_DOMCTL_psr_cmt_op                    75
 #define XEN_DOMCTL_monitor_op                    77
-#define XEN_DOMCTL_psr_cat_op                    78
+#define XEN_DOMCTL_psr_alloc                     78
 #define XEN_DOMCTL_soft_reset                    79
 #define XEN_DOMCTL_set_gnttab_limits             80
 #define XEN_DOMCTL_vuart_op                      81
@@ -1245,7 +1250,7 @@ struct xen_domctl {
         struct xen_domctl_vnuma             vnuma;
         struct xen_domctl_psr_cmt_op        psr_cmt_op;
         struct xen_domctl_monitor_op        monitor_op;
-        struct xen_domctl_psr_cat_op        psr_cat_op;
+        struct xen_domctl_psr_alloc         psr_alloc;
         struct xen_domctl_set_gnttab_limits set_gnttab_limits;
         struct xen_domctl_vuart_op          vuart_op;
         uint8_t                             pad[128];

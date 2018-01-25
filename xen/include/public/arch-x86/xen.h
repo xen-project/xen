@@ -75,6 +75,7 @@ __DeFiNe__ __DECL_REG_LO16(name) e ## name
 #ifndef __ASSEMBLY__
 typedef unsigned long xen_pfn_t;
 #define PRI_xen_pfn "lx"
+#define PRIu_xen_pfn "lu"
 #endif
 
 #define XEN_HAVE_PV_GUEST_ENTRY 1

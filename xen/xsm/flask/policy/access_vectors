@@ -85,8 +85,8 @@ class xen2
     resource_op
 # XEN_SYSCTL_psr_cmt_op
     psr_cmt_op
-# XEN_SYSCTL_psr_cat_op
-    psr_cat_op
+# XEN_SYSCTL_psr_alloc
+    psr_alloc
 # XENPF_get_symbol
     get_symbol
 # PMU control
@@ -246,8 +246,8 @@ class domain2
     mem_paging
 # XENMEM_sharing_op
     mem_sharing
-# XEN_DOMCTL_psr_cat_op
-    psr_cat_op
+# XEN_DOMCTL_psr_alloc
+    psr_alloc
 # XEN_DOMCTL_set_gnttab_limits
     set_gnttab_limits
 }

@@ -15,6 +15,8 @@
 #include <xen/gunzip.h>
 #include <xen/vmap.h>
 
+#include <asm/guest_access.h>
+
 #include "kernel.h"
 
 #define UIMAGE_MAGIC          0x27051956
@@ -157,7 +159,8 @@ static void kernel_zimage_load(struct kernel_info *info)
     paddr_t load_addr = kernel_zimage_place(info);
     paddr_t paddr = info->zimage.kernel_addr;
     paddr_t len = info->zimage.len;
-    unsigned long offs;
+    void *kernel;
+    int rc;
 
     info->entry = load_addr;
 
@@ -165,29 +168,17 @@ static void kernel_zimage_load(struct kernel_info *info)
 
     printk("Loading zImage from %"PRIpaddr" to %"PRIpaddr"-%"PRIpaddr"\n",
            paddr, load_addr, load_addr + len);
-    for ( offs = 0; offs < len; )
-    {
-        int rc;
-        paddr_t s, l, ma;
-        void *dst;
 
-        s = offs & ~PAGE_MASK;
-        l = min(PAGE_SIZE - s, len);
+    kernel = ioremap_wc(paddr, len);
+    if ( !kernel )
+        panic("Unable to map the hwdom kernel");
 
-        rc = gvirt_to_maddr(load_addr + offs, &ma, GV2M_WRITE);
-        if ( rc )
-        {
-            panic("Unable to map translate guest address");
-            return;
-        }
+    rc = copy_to_guest_phys_flush_dcache(info->d, load_addr,
+                                         kernel, len);
+    if ( rc != 0 )
+        panic("Unable to copy the kernel in the hwdom memory");
 
-        dst = map_domain_page(maddr_to_mfn(ma));
-
-        copy_from_paddr(dst + s, paddr + offs, l);
-
-        unmap_domain_page(dst);
-        offs += l;
-    }
+    iounmap(kernel);
 }
 
 /*

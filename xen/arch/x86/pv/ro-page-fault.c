@@ -253,10 +253,10 @@ static int ptwr_do_page_fault(struct x86_emulate_ctxt *ctxt,
     struct page_info *page;
     int rc;
 
-    if ( !get_page_from_mfn(l1e_get_mfn(pte), current->domain) )
+    page = get_page_from_mfn(l1e_get_mfn(pte), current->domain);
+    if ( !page )
         return X86EMUL_UNHANDLEABLE;
 
-    page = l1e_get_page(pte);
     if ( !page_lock(page) )
     {
         put_page(page);

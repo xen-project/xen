@@ -174,7 +174,7 @@ int nsvm_vcpu_reset(struct vcpu *v)
     svm->ns_exception_intercepts = 0;
     svm->ns_general1_intercepts = 0;
     svm->ns_general2_intercepts = 0;
-    svm->ns_lbr_control.bytes = 0;
+    svm->ns_virt_ext.bytes = 0;
 
     svm->ns_hap_enabled = 0;
     svm->ns_vmcb_guestcr3 = 0;
@@ -521,12 +521,12 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     /* Pending Interrupts */
     n2vmcb->eventinj = ns_vmcb->eventinj;
 
-    /* LBR virtualization */
+    /* LBR and other virtualization */
     if (!vcleanbit_set(lbr)) {
-        svm->ns_lbr_control = ns_vmcb->lbr_control;
+        svm->ns_virt_ext = ns_vmcb->virt_ext;
     }
-    n2vmcb->lbr_control.bytes =
-        n1vmcb->lbr_control.bytes | ns_vmcb->lbr_control.bytes;
+    n2vmcb->virt_ext.bytes =
+        n1vmcb->virt_ext.bytes | ns_vmcb->virt_ext.bytes;
 
     /* NextRIP - only evaluated on #VMEXIT. */
 
@@ -1597,8 +1597,13 @@ bool_t
 nestedsvm_gif_isset(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    return (!!svm->ns_gif);
+    /* get the vmcb gif value if using vgif */
+    if ( vmcb->_vintr.fields.vgif_enable )
+        return vmcb->_vintr.fields.vgif;
+    else
+        return svm->ns_gif;
 }
 
 void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)

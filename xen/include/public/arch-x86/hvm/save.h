@@ -600,7 +600,7 @@ DECLARE_HVM_SAVE_TYPE(VIRIDIAN_DOMAIN, 15, struct hvm_viridian_domain_context);
 
 struct hvm_viridian_vcpu_context {
     uint64_t vp_assist_msr;
-    uint8_t  vp_assist_vector;
+    uint8_t  vp_assist_pending;
     uint8_t  _pad[7];
 };
 

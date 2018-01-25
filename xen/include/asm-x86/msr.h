@@ -196,9 +196,17 @@ static inline void wrgsbase(unsigned long base)
         wrmsrl(MSR_GS_BASE, base);
 }
 
-DECLARE_PER_CPU(u64, efer);
-u64 read_efer(void);
-void write_efer(u64 val);
+DECLARE_PER_CPU(uint64_t, efer);
+static inline uint64_t read_efer(void)
+{
+    return this_cpu(efer);
+}
+
+static inline void write_efer(uint64_t val)
+{
+    this_cpu(efer) = val;
+    wrmsrl(MSR_EFER, val);
+}
 
 DECLARE_PER_CPU(u32, ler_msr);
 
@@ -231,6 +239,9 @@ int init_vcpu_msr_policy(struct vcpu *v);
  * not (yet) handled by it and must be processed by legacy handlers. Such
  * behaviour is needed for transition period until all rd/wrmsr are handled
  * by the new MSR infrastructure.
+ *
+ * These functions are also used by the migration logic, so need to cope with
+ * being used outside of v's context.
  */
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val);
 int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val);

@@ -39,7 +39,8 @@ static void __init calculate_hvm_max_policy(void)
         return;
 
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
+         boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
     {
         dp->plaform_info.available = true;
         dp->plaform_info.cpuid_faulting = true;
@@ -150,6 +151,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 
 int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
+    const struct vcpu *curr = current;
     struct domain *d = v->domain;
     struct msr_domain_policy *dp = d->arch.msr;
     struct msr_vcpu_policy *vp = v->arch.msr;
@@ -176,7 +178,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         vp->misc_features_enables.cpuid_faulting =
             val & MSR_MISC_FEATURES_CPUID_FAULTING;
 
-        if ( is_hvm_domain(d) && cpu_has_cpuid_faulting &&
+        if ( v == curr && is_hvm_domain(d) && cpu_has_cpuid_faulting &&
              (old_cpuid_faulting ^ vp->misc_features_enables.cpuid_faulting) )
             ctxt_switch_levelling(v);
         break;

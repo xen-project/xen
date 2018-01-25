@@ -2063,7 +2063,7 @@ csched2_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
         update_load(ops, svc->rqd, svc, -1, NOW());
         runq_remove(svc);
     }
-    else if ( svc->flags & CSFLAG_delayed_runq_add )
+    else
         __clear_bit(__CSFLAG_delayed_runq_add, &svc->flags);
 }
 

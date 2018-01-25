@@ -304,7 +304,9 @@ extern const unsigned long
 
 static inline const cpumask_t *cpumask_of(unsigned int cpu)
 {
-	const unsigned long *p = cpu_bit_bitmap[1 + cpu % BITS_PER_LONG];
+	const unsigned long *p = cpu_bit_bitmap[1 + cpumask_check(cpu) %
+                                                   BITS_PER_LONG];
+
 	return (const cpumask_t *)(p - cpu / BITS_PER_LONG);
 }
 

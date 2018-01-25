@@ -140,9 +140,9 @@ extern vaddr_t xenheap_virt_start;
 #ifdef CONFIG_ARM_32
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                                 \
-    unsigned long _mfn = (mfn);                                 \
-    (_mfn >= mfn_x(xenheap_mfn_start) &&                        \
-     _mfn < mfn_x(xenheap_mfn_end));                            \
+    unsigned long mfn_ = (mfn);                                 \
+    (mfn_ >= mfn_x(xenheap_mfn_start) &&                        \
+     mfn_ < mfn_x(xenheap_mfn_end));                            \
 })
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
@@ -266,11 +266,16 @@ static inline void *maddr_to_virt(paddr_t ma)
 }
 #endif
 
-static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa, unsigned int flags)
+/*
+ * Translate a guest virtual address to a machine address.
+ * Return the fault information if the translation has failed else 0.
+ */
+static inline uint64_t gvirt_to_maddr(vaddr_t va, paddr_t *pa,
+                                      unsigned int flags)
 {
     uint64_t par = gva_to_ma_par(va, flags);
     if ( par & PAR_F )
-        return -EFAULT;
+        return par;
     *pa = (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
     return 0;
 }

@@ -923,7 +923,7 @@ static int shadow_set_l4e(struct domain *d,
                           shadow_l4e_t new_sl4e,
                           mfn_t sl4mfn)
 {
-    int flags = 0, ok;
+    int flags = 0;
     shadow_l4e_t old_sl4e;
     paddr_t paddr;
     ASSERT(sl4e != NULL);
@@ -938,15 +938,16 @@ static int shadow_set_l4e(struct domain *d,
     {
         /* About to install a new reference */
         mfn_t sl3mfn = shadow_l4e_get_mfn(new_sl4e);
-        ok = sh_get_ref(d, sl3mfn, paddr);
-        /* Are we pinning l3 shadows to handle wierd linux behaviour? */
-        if ( sh_type_is_pinnable(d, SH_type_l3_64_shadow) )
-            ok |= sh_pin(d, sl3mfn);
-        if ( !ok )
+
+        if ( !sh_get_ref(d, sl3mfn, paddr) )
         {
             domain_crash(d);
             return SHADOW_SET_ERROR;
         }
+
+        /* Are we pinning l3 shadows to handle weird Linux behaviour? */
+        if ( sh_type_is_pinnable(d, SH_type_l3_64_shadow) )
+            sh_pin(d, sl3mfn);
     }
 
     /* Write the new entry */
@@ -1475,16 +1476,14 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
          * pinning l3es.  This is not very quick but it doesn't happen
          * very often. */
         struct page_info *sp, *t;
-        struct vcpu *v2;
-        int l4count = 0, vcpus = 0;
+        unsigned int l4count = 0;
+
         page_list_for_each(sp, &d->arch.paging.shadow.pinned_shadows)
         {
             if ( sp->u.sh.type == SH_type_l4_64_shadow )
                 l4count++;
         }
-        for_each_vcpu ( d, v2 )
-            vcpus++;
-        if ( l4count > 2 * vcpus )
+        if ( l4count > 2 * d->max_vcpus )
         {
             /* Unpin all the pinned l3 tables, and don't pin any more. */
             page_list_for_each_safe(sp, t, &d->arch.paging.shadow.pinned_shadows)
@@ -3135,7 +3134,7 @@ static int sh_page_fault(struct vcpu *v,
         perfc_incr(shadow_rm_write_flush_tlb);
         smp_wmb();
         atomic_inc(&d->arch.paging.shadow.gtable_dirty_version);
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     }
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
@@ -3800,8 +3799,7 @@ sh_update_linear_entries(struct vcpu *v)
 
 #elif SHADOW_PAGING_LEVELS == 3
 
-    /* PV: XXX
-     *
+    /*
      * HVM: To give ourselves a linear map of the  shadows, we need to
      * extend a PAE shadow to 4 levels.  We do this by  having a monitor
      * l3 in slot 0 of the monitor l4 table, and  copying the PAE l3
@@ -3810,7 +3808,7 @@ sh_update_linear_entries(struct vcpu *v)
      * the shadows.
      */
 
-    if ( shadow_mode_external(d) )
+    ASSERT(shadow_mode_external(d));
     {
         /* Install copies of the shadow l3es into the monitor l2 table
          * that maps SH_LINEAR_PT_VIRT_START. */
@@ -3856,8 +3854,6 @@ sh_update_linear_entries(struct vcpu *v)
         if ( v != current )
             unmap_domain_page(ml2e);
     }
-    else
-        domain_crash(d); /* XXX */
 
 #else
 #error this should not happen
@@ -3956,22 +3952,21 @@ sh_set_toplevel_shadow(struct vcpu *v,
     }
     ASSERT(mfn_valid(smfn));
 
-    /* Pin the shadow and put it (back) on the list of pinned shadows */
-    if ( sh_pin(d, smfn) == 0 )
-    {
-        SHADOW_ERROR("can't pin %#lx as toplevel shadow\n", mfn_x(smfn));
-        domain_crash(d);
-    }
-
     /* Take a ref to this page: it will be released in sh_detach_old_tables()
      * or the next call to set_toplevel_shadow() */
-    if ( !sh_get_ref(d, smfn, 0) )
+    if ( sh_get_ref(d, smfn, 0) )
+    {
+        /* Pin the shadow and put it (back) on the list of pinned shadows */
+        sh_pin(d, smfn);
+
+        new_entry = pagetable_from_mfn(smfn);
+    }
+    else
     {
         SHADOW_ERROR("can't install %#lx as toplevel shadow\n", mfn_x(smfn));
         domain_crash(d);
+        new_entry = pagetable_null();
     }
-
-    new_entry = pagetable_from_mfn(smfn);
 
  install_new_entry:
     /* Done.  Install it */
@@ -4085,12 +4080,9 @@ sh_update_cr3(struct vcpu *v, int do_locking)
       * until the next CR3 write makes us refresh our cache. */
      ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
 
-     if ( shadow_mode_external(d) )
-         /* Find where in the page the l3 table is */
-         guest_idx = guest_index((void *)v->arch.hvm_vcpu.guest_cr[3]);
-     else
-         /* PV guest: l3 is at the start of a page */
-         guest_idx = 0;
+     ASSERT(shadow_mode_external(d));
+     /* Find where in the page the l3 table is */
+     guest_idx = guest_index((void *)v->arch.hvm_vcpu.guest_cr[3]);
 
      // Ignore the low 2 bits of guest_idx -- they are really just
      // cache control.
@@ -4101,17 +4093,13 @@ sh_update_cr3(struct vcpu *v, int do_locking)
          v->arch.paging.shadow.gl3e[i] = gl3e[i];
      unmap_domain_page(gl3e);
 #elif GUEST_PAGING_LEVELS == 2
-    if ( shadow_mode_external(d) || shadow_mode_translate(d) )
-    {
-        if ( v->arch.paging.shadow.guest_vtable )
-            unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
-        v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
-        /* Does this really need map_domain_page_global?  Handle the
-         * error properly if so. */
-        BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */
-    }
-    else
-        v->arch.paging.shadow.guest_vtable = __linear_l2_table;
+    ASSERT(shadow_mode_external(d));
+    if ( v->arch.paging.shadow.guest_vtable )
+        unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
+    v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
+    /* Does this really need map_domain_page_global?  Handle the
+     * error properly if so. */
+    BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */
 #else
 #error this should never happen
 #endif
@@ -4126,7 +4114,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
      * (old) shadow linear maps in the writeable mapping heuristics. */
 #if GUEST_PAGING_LEVELS == 2
     if ( sh_remove_write_access(d, gmfn, 2, 0) != 0 )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l2_shadow);
 #elif GUEST_PAGING_LEVELS == 3
     /* PAE guests have four shadow_table entries, based on the
@@ -4149,7 +4137,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
             }
         }
         if ( flush )
-            flush_tlb_mask(d->domain_dirty_cpumask);
+            flush_tlb_mask(d->dirty_cpumask);
         /* Now install the new shadows. */
         for ( i = 0; i < 4; i++ )
         {
@@ -4170,7 +4158,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     }
 #elif GUEST_PAGING_LEVELS == 4
     if ( sh_remove_write_access(d, gmfn, 4, 0) != 0 )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     sh_set_toplevel_shadow(v, 0, gmfn, SH_type_l4_shadow);
     if ( !shadow_mode_external(d) && !is_pv_32bit_domain(d) )
     {
@@ -4220,21 +4208,15 @@ sh_update_cr3(struct vcpu *v, int do_locking)
     {
         make_cr3(v, pagetable_get_mfn(v->arch.monitor_table));
     }
+#if SHADOW_PAGING_LEVELS == 4
     else // not shadow_mode_external...
     {
         /* We don't support PV except guest == shadow == config levels */
-        BUG_ON(GUEST_PAGING_LEVELS != SHADOW_PAGING_LEVELS);
-#if SHADOW_PAGING_LEVELS == 3
-        /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated.
-         * Don't use make_cr3 because (a) we know it's below 4GB, and
-         * (b) it's not necessarily page-aligned, and make_cr3 takes a pfn */
-        ASSERT(virt_to_maddr(&v->arch.paging.shadow.l3table) <= 0xffffffe0ULL);
-        v->arch.cr3 = virt_to_maddr(&v->arch.paging.shadow.l3table);
-#else
-        /* 4-on-4: Just use the shadow top-level directly */
+        BUILD_BUG_ON(GUEST_PAGING_LEVELS != SHADOW_PAGING_LEVELS);
+        /* Just use the shadow top-level directly */
         make_cr3(v, pagetable_get_mfn(v->arch.shadow_table[0]));
-#endif
     }
+#endif
 
 
     ///
@@ -4350,11 +4332,18 @@ static int sh_guess_wrmap(struct vcpu *v, unsigned long vaddr, mfn_t gmfn)
 
     /* Carefully look in the shadow linear map for the l1e we expect */
 #if SHADOW_PAGING_LEVELS >= 4
-    /* Is a shadow linear map is installed in the first place? */
-    sl4p  = v->arch.paging.shadow.guest_vtable;
-    sl4p += shadow_l4_table_offset(SH_LINEAR_PT_VIRT_START);
-    if ( !(shadow_l4e_get_flags(*sl4p) & _PAGE_PRESENT) )
-        return 0;
+    /*
+     * Non-external guests (i.e. PV) have a SHADOW_LINEAR mapping from the
+     * moment their shadows are created.  External guests (i.e. HVM) may not,
+     * but always have a regular linear mapping, which we can use to observe
+     * whether a SHADOW_LINEAR mapping is present.
+     */
+    if ( paging_mode_external(d) )
+    {
+        sl4p =  __linear_l4_table + l4_linear_offset(SH_LINEAR_PT_VIRT_START);
+        if ( !(shadow_l4e_get_flags(*sl4p) & _PAGE_PRESENT) )
+            return 0;
+    }
     sl4p = sh_linear_l4_table(v) + shadow_l4_linear_offset(vaddr);
     if ( !(shadow_l4e_get_flags(*sl4p) & _PAGE_PRESENT) )
         return 0;
@@ -4616,7 +4605,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
         }
     }
     if ( flush )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
 
     /* Remember that we've seen the guest use this interface, so we
      * can rely on it using it in future, instead of guessing at
@@ -4652,7 +4641,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
         mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
         shadow_unhook_mappings(d, smfn, 1/* user pages only */);
         /* Now flush the TLB: we removed toplevel mappings. */
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     }
 
     /* Remember that we've seen the guest use this interface, so we

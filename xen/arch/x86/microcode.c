@@ -40,7 +40,6 @@
 #include <asm/microcode.h>
 
 static module_t __initdata ucode_mod;
-static void *(*__initdata ucode_mod_map)(const module_t *);
 static signed int __initdata ucode_mod_idx;
 static bool_t __initdata ucode_mod_forced;
 
@@ -96,8 +95,7 @@ custom_param("ucode", parse_ucode);
 
 void __init microcode_scan_module(
     unsigned long *module_map,
-    const multiboot_info_t *mbi,
-    void *(*bootmap)(const module_t *))
+    const multiboot_info_t *mbi)
 {
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     uint64_t *_blob_start;
@@ -126,7 +124,7 @@ void __init microcode_scan_module(
         if ( !test_bit(i, module_map) )
             continue;
 
-        _blob_start = bootmap(&mod[i]);
+        _blob_start = bootstrap_map(&mod[i]);
         _blob_size = mod[i].mod_end;
         if ( !_blob_start )
         {
@@ -157,18 +155,17 @@ void __init microcode_scan_module(
                 else
                     memcpy(ucode_blob.data, cd.data, cd.size);
         }
-        bootmap(NULL);
+        bootstrap_map(NULL);
         if ( cd.data )
             break;
     }
     return;
 err:
-    bootmap(NULL);
+    bootstrap_map(NULL);
 }
 void __init microcode_grab_module(
     unsigned long *module_map,
-    const multiboot_info_t *mbi,
-    void *(*map)(const module_t *))
+    const multiboot_info_t *mbi)
 {
     module_t *mod = (module_t *)__va(mbi->mods_addr);
 
@@ -178,10 +175,9 @@ void __init microcode_grab_module(
          !__test_and_clear_bit(ucode_mod_idx, module_map) )
         goto scan;
     ucode_mod = mod[ucode_mod_idx];
-    ucode_mod_map = map;
 scan:
     if ( ucode_scan )
-        microcode_scan_module(module_map, mbi, map);
+        microcode_scan_module(module_map, mbi);
 }
 
 const struct microcode_ops *microcode_ops;
@@ -358,7 +354,7 @@ static int __init microcode_init(void)
     }
     else if ( ucode_mod.mod_end )
     {
-        ucode_mod_map(NULL);
+        bootstrap_map(NULL);
         ucode_mod.mod_end = 0;
     }
 
@@ -399,7 +395,7 @@ int __init early_microcode_update_cpu(bool start_update)
     else if ( ucode_mod.mod_end )
     {
         len = ucode_mod.mod_end;
-        data = ucode_mod_map(&ucode_mod);
+        data = bootstrap_map(&ucode_mod);
     }
     if ( data )
     {

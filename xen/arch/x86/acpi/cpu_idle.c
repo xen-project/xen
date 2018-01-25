@@ -352,7 +352,10 @@ static void dump_cx(unsigned char key)
     printk("'%c' pressed -> printing ACPI Cx structures\n", key);
     for_each_online_cpu ( cpu )
         if (processor_powers[cpu])
+        {
             print_acpi_power(cpu, processor_powers[cpu]);
+            process_pending_softirqs();
+        }
 }
 
 static int __init cpu_idle_key_init(void)
@@ -1340,8 +1343,6 @@ void cpuidle_disable_deep_cstate(void)
         else
             max_cstate = 1;
     }
-
-    mb();
 
     hpet_disable_legacy_broadcast();
 }

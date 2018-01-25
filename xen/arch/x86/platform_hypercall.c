@@ -388,6 +388,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         }
         case XEN_FW_VBEDDC_INFO:
             ret = -ESRCH;
+#ifdef CONFIG_VIDEO
             if ( op->u.firmware_info.index != 0 )
                 break;
             if ( *(u32 *)bootsym(boot_edid_info) == 0x13131313 )
@@ -406,6 +407,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
                  copy_to_compat(op->u.firmware_info.u.vbeddc_info.edid,
                                 bootsym(boot_edid_info), 128) )
                 ret = -EFAULT;
+#endif
             break;
         case XEN_FW_EFI_INFO:
             ret = efi_get_info(op->u.firmware_info.index,

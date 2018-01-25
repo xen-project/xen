@@ -392,7 +392,16 @@ static void gicv3_restore_state(const struct vcpu *v)
         val |= GICC_SRE_EL2_ENEL1;
     WRITE_SYSREG32(val, ICC_SRE_EL2);
 
+    /*
+     * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a Group0
+     * interrupt (as generated in GICv2 mode) to be delivered as a FIQ
+     * to the guest, with potentially consequence. So we must make sure
+     * that ICC_SRE_EL1 has been actually programmed with the value we
+     * want before starting to mess with the rest of the GIC, and
+     * VMCR_EL1 in particular.
+     */
     WRITE_SYSREG32(v->arch.gic.v3.sre_el1, ICC_SRE_EL1);
+    isb();
     WRITE_SYSREG32(v->arch.gic.v3.vmcr, ICH_VMCR_EL2);
     restore_aprn_regs(&v->arch.gic);
     gicv3_restore_lrs(v);
@@ -568,6 +577,13 @@ static void __init gicv3_dist_init(void)
     /* Disable all global interrupts */
     for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
         writel_relaxed(0xffffffff, GICD + GICD_ICENABLER + (i / 32) * 4);
+
+    /*
+     * Configure SPIs as non-secure Group-1. This will only matter
+     * if the GIC only has a single security state.
+     */
+    for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
+        writel_relaxed(GENMASK(31, 0), GICD + GICD_IGROUPR + (i / 32) * 4);
 
     gicv3_dist_wait_for_rwp();
 
@@ -775,6 +791,8 @@ static int gicv3_cpu_init(void)
      */
     writel_relaxed(0xffff0000, GICD_RDIST_SGI_BASE + GICR_ICENABLER0);
     writel_relaxed(0x0000ffff, GICD_RDIST_SGI_BASE + GICR_ISENABLER0);
+    /* Configure SGIs/PPIs as non-secure Group-1 */
+    writel_relaxed(GENMASK(31, 0), GICD_RDIST_SGI_BASE + GICR_IGROUPR0);
 
     gicv3_redist_wait_for_rwp();
 
@@ -829,8 +847,12 @@ static int gicv3_secondary_cpu_init(void)
     spin_lock(&gicv3.lock);
 
     res = gicv3_cpu_init();
+    if ( res )
+        goto out;
+
     gicv3_hyp_init();
 
+out:
     spin_unlock(&gicv3.lock);
 
     return res;
@@ -1687,8 +1709,12 @@ static int __init gicv3_init(void)
         panic("GICv3: ITS: initialization failed: %d\n", res);
 
     res = gicv3_cpu_init();
+    if ( res )
+        goto out;
+
     gicv3_hyp_init();
 
+out:
     spin_unlock(&gicv3.lock);
 
     return res;

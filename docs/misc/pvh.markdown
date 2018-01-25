@@ -1,6 +1,3 @@
-**NOTE**: this document will be merged into `pvh.markdown` once PVH is replaced
-with the HVMlite implementation.
-
 # x86/HVM direct boot ABI #
 
 Since the Xen entry point into the kernel can be different from the
@@ -38,7 +35,7 @@ All other processor registers and flag bits are unspecified. The OS is in
 charge of setting up it's own stack, GDT and IDT.
 
 The format of the boot start info structure (pointed to by %ebx) can be found
-in xen/include/public/arch-x86/hvm/start_info.h
+in xen/include/public/arch-x86/hvm/start\_info.h
 
 Other relevant information needed in order to boot a guest kernel
 (console page address, xenstore event channel...) can be obtained
@@ -53,7 +50,7 @@ AP startup can be performed using hypercalls or the local APIC if present.
 The following VCPU hypercalls can be used in order to bring up secondary vCPUs:
 
  * `VCPUOP_initialise` is used to set the initial state of the vCPU. The
-   argument passed to the hypercall must be of the type vcpu_hvm_context.
+   argument passed to the hypercall must be of the type vcpu\_hvm\_context.
    See `public/hvm/hvm_vcpu.h` for the layout of the structure. Note that
    this hypercall allows starting the vCPU in several modes (16/32/64bits),
    regardless of the mode the BSP is currently running on.
@@ -71,7 +68,7 @@ PVHv2 guests that have access to hardware (either emulated or real) will also
 have ACPI tables with the description of the hardware that's available to the
 guest. This applies to both privileged and unprivileged guests. A pointer to
 the position of the RSDP in memory (if present) can be fetched from the start
-info structure that's passed at boot time (field rsdp_paddr).
+info structure that's passed at boot time (field rsdp\_paddr).
 
 Description of paravirtualized devices will come from XenStore, just as it's
 done for HVM guests.
@@ -93,5 +90,5 @@ Interrupts from paravirtualized devices are delivered using event channels, see
 [Event Channel Internals][event_channels] for more detailed information about
 event channels. Delivery of those interrupts can be configured in the same way
 as HVM guests, check xen/include/public/hvm/params.h and
-xen/include/public/hvm/hvm_op.h for more information about available delivery
+xen/include/public/hvm/hvm\_op.h for more information about available delivery
 methods.

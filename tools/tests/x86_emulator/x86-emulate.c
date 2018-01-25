@@ -3,7 +3,6 @@
 #include <sys/mman.h>
 
 #define cpu_has_amd_erratum(nr) 0
-#define mark_regs_dirty(r) ((void)(r))
 #define cpu_has_mpx false
 #define read_bndcfgu() 0
 #define xstate_set_init(what)

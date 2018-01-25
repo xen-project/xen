@@ -15,7 +15,6 @@
 #include <xen/types.h>
 
 #include <asm/current.h>
-#include <asm/gic.h>
 #include <asm/vgic.h>
 #include <asm/psci.h>
 #include <asm/event.h>

@@ -1,6 +1,10 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+ifneq ($(XEN_TARGET_ARCH),x86_32)
+CONFIG_PV_SHIM := y
+endif
+
 # hvmloader is a 32-bit protected mode binary.
 TARGET      := hvmloader/hvmloader
 INST_DIR := $(DESTDIR)$(XENFIRMWAREDIR)
@@ -11,6 +15,7 @@ SUBDIRS-$(CONFIG_SEABIOS) += seabios-dir
 SUBDIRS-$(CONFIG_ROMBIOS) += rombios
 SUBDIRS-$(CONFIG_ROMBIOS) += vgabios
 SUBDIRS-$(CONFIG_ROMBIOS) += etherboot
+SUBDIRS-$(CONFIG_PV_SHIM) += xen-dir
 SUBDIRS-y += hvmloader
 
 LD32BIT-$(CONFIG_FreeBSD) := LD32BIT_FLAG=-melf_i386_fbsd
@@ -48,6 +53,9 @@ endif
 ifeq ($(CONFIG_OVMF),y)
 	$(INSTALL_DATA) ovmf-dir/ovmf.bin $(INST_DIR)/ovmf.bin
 endif
+ifeq ($(CONFIG_PV_SHIM),y)
+	$(INSTALL_DATA) xen-dir/xen-shim $(INST_DIR)/xen-shim
+endif
 
 .PHONY: uninstall
 uninstall:
@@ -57,6 +65,9 @@ ifeq ($(CONFIG_SEABIOS),y)
 endif
 ifeq ($(CONFIG_OVMF),y)
 	rm -f $(INST_DIR)/ovmf.bin
+endif
+ifeq ($(CONFIG_PV_SHIM),y)
+	rm -f $(INST_DIR)/xen-shim
 endif
 
 .PHONY: clean

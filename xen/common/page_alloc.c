@@ -143,6 +143,7 @@
 #include <asm/numa.h>
 #include <asm/flushtlb.h>
 #ifdef CONFIG_X86
+#include <asm/guest.h>
 #include <asm/p2m.h>
 #include <asm/setup.h> /* for highmem_start only */
 #else
@@ -301,6 +302,20 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
             bootmem_region_zap(*badpage >> PAGE_SHIFT,
                                (*badpage >> PAGE_SHIFT) + 1);
             badpage++;
+        }
+    }
+
+    if ( xen_guest )
+    {
+        badpage = hypervisor_reserved_pages(&array_size);
+        if ( badpage )
+        {
+            for ( i = 0; i < array_size; i++ )
+            {
+                bootmem_region_zap(*badpage >> PAGE_SHIFT,
+                                   (*badpage >> PAGE_SHIFT) + 1);
+                badpage++;
+            }
         }
     }
 #endif
@@ -1546,7 +1561,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     if ( (pg->count_info & PGC_broken) && (owner = page_get_owner(pg)) )
     {
         *status = PG_OFFLINE_AGAIN;
-        domain_shutdown(owner, SHUTDOWN_crash);
+        domain_crash(owner);
         return 0;
     }
 

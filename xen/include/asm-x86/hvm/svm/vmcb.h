@@ -325,12 +325,14 @@ typedef union
     {
         u64 tpr:          8;
         u64 irq:          1;
-        u64 rsvd0:        7;
+        u64 vgif:         1;
+        u64 rsvd0:        6;
         u64 prio:         4;
         u64 ign_tpr:      1;
         u64 rsvd1:        3;
         u64 intr_masking: 1;
-        u64 rsvd2:        7;
+        u64 vgif_enable:  1;
+        u64 rsvd2:        6;
         u64 vector:       8;
         u64 rsvd3:       24;
     } fields;
@@ -358,9 +360,10 @@ typedef union
     u64 bytes;
     struct
     {
-        u64 enable:1;
+        u64 lbr_enable:1;
+        u64 vloadsave_enable:1;
     } fields;
-} lbrctrl_t;
+} virt_ext_t;
 
 typedef union
 {
@@ -427,7 +430,7 @@ struct vmcb_struct {
     u64 res08[2];
     eventinj_t  eventinj;       /* offset 0xA8 */
     u64 _h_cr3;                 /* offset 0xB0 - cleanbit 4 */
-    lbrctrl_t lbr_control;      /* offset 0xB8 */
+    virt_ext_t virt_ext;        /* offset 0xB8 */
     vmcbcleanbits_t cleanbits;  /* offset 0xC0 */
     u32 res09;                  /* offset 0xC4 */
     u64 nextrip;                /* offset 0xC8 */

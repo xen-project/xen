@@ -88,7 +88,7 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
 
     rc = hvm_emulate_one(&ctxt);
 
-    if ( hvm_vcpu_io_need_completion(vio) || vio->mmio_retry )
+    if ( hvm_vcpu_io_need_completion(vio) )
         vio->io_completion = HVMIO_mmio_completion;
     else
         vio->mmio_access = (struct npfec){};
@@ -157,8 +157,11 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
         break;
 
     case X86EMUL_RETRY:
-        /* We should not advance RIP/EIP if the domain is shutting down */
-        if ( curr->domain->is_shutting_down )
+        /*
+         * We should not advance RIP/EIP if the domain is shutting down or
+         * if X86EMUL_RETRY has been returned by an internal handler.
+         */
+        if ( curr->domain->is_shutting_down || !hvm_io_pending(curr) )
             return false;
         break;
 
@@ -262,17 +265,12 @@ void register_g2m_portio_handler(struct domain *d)
 }
 
 unsigned int hvm_pci_decode_addr(unsigned int cf8, unsigned int addr,
-                                 unsigned int *bus, unsigned int *slot,
-                                 unsigned int *func)
+                                 pci_sbdf_t *sbdf)
 {
-    unsigned int bdf;
-
     ASSERT(CF8_ENABLED(cf8));
 
-    bdf = CF8_BDF(cf8);
-    *bus = PCI_BUS(bdf);
-    *slot = PCI_SLOT(bdf);
-    *func = PCI_FUNC(bdf);
+    sbdf->bdf = CF8_BDF(cf8);
+    sbdf->seg = 0;
     /*
      * NB: the lower 2 bits of the register address are fetched from the
      * offset into the 0xcfc register when reading/writing to it.

@@ -80,7 +80,4 @@ static always_inline __uint128_t __cmpxchg16b(
     _rc;                                                                \
 })
 
-#define mb()                    \
-    asm volatile ( "mfence" : : : "memory" )
-
 #endif /* __X86_64_SYSTEM_H__ */

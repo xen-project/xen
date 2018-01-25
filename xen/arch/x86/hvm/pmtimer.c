@@ -61,7 +61,7 @@ static void pmt_update_sci(PMTState *s)
     ASSERT(spin_is_locked(&s->lock));
 
     if ( acpi->pm1a_en & acpi->pm1a_sts & SCI_MASK )
-        hvm_isa_irq_assert(s->vcpu->domain, SCI_IRQ);
+        hvm_isa_irq_assert(s->vcpu->domain, SCI_IRQ, NULL);
     else
         hvm_isa_irq_deassert(s->vcpu->domain, SCI_IRQ);
 }

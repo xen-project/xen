@@ -102,16 +102,6 @@
 struct domain;
 struct vcpu;
 
-/*
- * Default implementation of macro that returns current
- * instruction pointer ("program counter").
- */
-#define current_text_addr() ({                      \
-    void *pc;                                       \
-    asm ( "leaq 1f(%%rip),%0\n1:" : "=r" (pc) );    \
-    pc;                                             \
-})
-
 struct x86_cpu_id {
     uint16_t vendor;
     uint16_t family;
@@ -151,7 +141,9 @@ extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
-extern void (*ctxt_switch_levelling)(const struct vcpu *next);
+extern bool probe_cpuid_faulting(void);
+extern void ctxt_switch_levelling(const struct vcpu *next);
+extern void (*ctxt_switch_masking)(const struct vcpu *next);
 
 extern u64 host_pat;
 extern bool_t opt_cpu_info;
@@ -373,37 +365,6 @@ static inline bool_t read_pkru_wd(uint32_t pkru, unsigned int pkey)
     return (pkru >> (pkey * PKRU_ATTRS + PKRU_WRITE)) & 1;
 }
 
-/*
- *      NSC/Cyrix CPU configuration register indexes
- */
-
-#define CX86_PCR0 0x20
-#define CX86_GCR  0xb8
-#define CX86_CCR0 0xc0
-#define CX86_CCR1 0xc1
-#define CX86_CCR2 0xc2
-#define CX86_CCR3 0xc3
-#define CX86_CCR4 0xe8
-#define CX86_CCR5 0xe9
-#define CX86_CCR6 0xea
-#define CX86_CCR7 0xeb
-#define CX86_PCR1 0xf0
-#define CX86_DIR0 0xfe
-#define CX86_DIR1 0xff
-#define CX86_ARR_BASE 0xc4
-#define CX86_RCR_BASE 0xdc
-
-/*
- *      NSC/Cyrix CPU indexed register access macros
- */
-
-#define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
-
-#define setCx86(reg, data) do { \
-    outb((reg), 0x22); \
-    outb((data), 0x23); \
-} while (0)
-
 static always_inline void __monitor(const void *eax, unsigned long ecx,
                                     unsigned long edx)
 {
@@ -457,11 +418,26 @@ static always_inline void set_ist(idt_entry_t *idt, unsigned long ist)
     _write_gate_lower(idt, &new);
 }
 
+static inline void enable_each_ist(idt_entry_t *idt)
+{
+    set_ist(&idt[TRAP_double_fault],  IST_DF);
+    set_ist(&idt[TRAP_nmi],           IST_NMI);
+    set_ist(&idt[TRAP_machine_check], IST_MCE);
+}
+
+static inline void disable_each_ist(idt_entry_t *idt)
+{
+    set_ist(&idt[TRAP_double_fault],  IST_NONE);
+    set_ist(&idt[TRAP_nmi],           IST_NONE);
+    set_ist(&idt[TRAP_machine_check], IST_NONE);
+}
+
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];
 
 DECLARE_PER_CPU(struct tss_struct, init_tss);
+DECLARE_PER_CPU(root_pgentry_t *, root_pgt);
 
 extern void init_int80_direct_trap(struct vcpu *v);
 

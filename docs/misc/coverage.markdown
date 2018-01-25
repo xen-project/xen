@@ -1,6 +1,6 @@
 # Coverage support for Xen
 
-Coverare support allow you to get coverage information from Xen execution.
+Coverage support allows you to get coverage information from Xen execution.
 You can see how many times a line is executed.
 
 Some compilers have specific options that enable the collection of this
@@ -10,38 +10,26 @@ down your hypervisor.
 
 ## Enable coverage
 
-Test coverage support can be turned on compiling Xen with the `coverage` option set
-to `y`.
+Test coverage support can be turned on compiling Xen with the `CONFIG_GCOV`
+option set to `y`.
 
-Something like:
-
-    cd xen
-    make coverage=y
-
-(or change your `.config` file).
+Change your `.config` or run `make -C xen menuconfig`.
 
 ## Extract coverage data
 
-The way GCC and other tools deal with coverage information is to use some files
-created during build phase (.gcno) and some files produced by executing the
-*program* (.gcda). The program in this case is Xen but Xen cannot write files
-so the way you can use coverage from Xen is extract coverage data from Xen and
-then split these information into files.
-
-To extract data you use a simple utility called `xencov`. Mainly `xencore`
-allows you to do 3 operations:
+To extract data you use a simple utility called `xencov`.
+It allows you to do 2 operations:
 
 * `xencov read` extract data
 * `xencov reset` reset all coverage counters
-* `xencov read-reset` extract data and reset counters at the same time.
 
-Another utility (`xencov_split`) is used to split extracted data file into files
-needed by userspace tools.
+Another utility (`xencov_split`) is used to split extracted data file into
+files needed by userspace tools.
 
 ## Split coverage data
 
-Once you extracted data from Xen, it is time to create files which the coverage tools
-can understand. To do it you need to run `xencov_split` utility.
+Once you extracted data from Xen, it is time to create files which the coverage
+tools can understand. To do it you need to run `xencov_split` utility.
 
 The utility just takes an input file and splits the blob into gcc .gcda files
 in the same directory that you execute the script. As file names are generated

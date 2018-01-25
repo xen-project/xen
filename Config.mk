@@ -273,10 +273,10 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 947f3737abf65fda63f3ffd97fddfa6986986868
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.10.0-rc1
-MINIOS_UPSTREAM_REVISION ?= xen-4.10.0-rc1
-# Tue Oct 3 19:45:19 2017 +0100
-# Link against libxentoolcore
+QEMU_UPSTREAM_REVISION ?= master
+MINIOS_UPSTREAM_REVISION ?= 0b4b7897e08b967a09bed2028a79fabff82342dd
+# Mon Oct 16 16:36:41 2017 +0100
+# Update Xen header files again
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
 # Wed Jun 22 14:53:24 2016 +0800
@@ -285,7 +285,7 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.10.0-rc1
+QEMU_TRADITIONAL_REVISION ?= c8ea0457495342c417c3dc033bba25148b279f60
 # Fri Sep 15 19:37:27 2017 +0100
 # qemu-xen-traditional: Link against xentoolcore
 

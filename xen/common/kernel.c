@@ -244,6 +244,29 @@ int parse_bool(const char *s, const char *e)
     return -1;
 }
 
+int parse_boolean(const char *name, const char *s, const char *e)
+{
+    size_t slen, nlen;
+    int val = !!strncmp(s, "no-", 3);
+
+    if ( !val )
+        s += 3;
+
+    slen = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
+    nlen = strlen(name);
+
+    /* Does s now start with name? */
+    if ( slen < nlen || strncmp(s, name, nlen) )
+        return -1;
+
+    switch ( s[nlen] )
+    {
+    case '\0': return val;
+    case '=':  return parse_bool(&s[nlen + 1], e);
+    default:   return -1;
+    }
+}
+
 unsigned int tainted;
 
 /**

@@ -1,5 +1,5 @@
 % Credit2 Scheduler
-% Revision 1
+% Revision 2
 
 \clearpage
 
@@ -60,14 +60,6 @@ limiting, is only available from Xen 4.8 onward. In libxl, the
 `LIBXL\_HAVE\_SCHED\_CREDIT2\_PARAMS` symbol is introduced to
 indicate their availability.
 
-# Limitations
-
-The Credit1 scheduler comes with vCPU hard-affinity, vCPU soft-affinity
-and caps (see `docs/man/xl.pod.1.in` for more details). In Credit2,
-vCPU hard affinity is supported starting from Xen 4.8, while soft-affinity
-and caps, while being worked on, are not yet available in any released
-hypervisor.
-
 # Testing
 
 Any change done in Credit2 wants to be tested by doing at least the
@@ -87,8 +79,6 @@ following:
 
 # Areas for improvement
 
-* Close the feature gap with Credit1 (i.e., finishing implementing vCPU
-  soft-affinity and caps);
 * vCPUs' reservations (similar to caps, but providing a vCPU with guarantees
   about some pCPU time it will always be able to execute for);
 * benchmarking for assessing the best combination of values for the various
@@ -115,4 +105,5 @@ following:
 Date       Revision Version  Notes
 ---------- -------- -------- -------------------------------------------
 2016-10-14 1        Xen 4.8  Document written
+2017-11-6  2        Xen 4.10 Soft-affinity and caps implemented
 ---------- -------- -------- -------------------------------------------

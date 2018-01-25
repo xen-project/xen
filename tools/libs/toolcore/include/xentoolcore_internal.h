@@ -48,8 +48,10 @@
  *     4. ONLY THEN actually open the relevant fd or whatever
  *
  *   III. during the "close handle" function
- *     1. FIRST close the relevant fd or whatever
- *     2. call xentoolcore__deregister_active_handle
+ *     1. FIRST call xentoolcore__deregister_active_handle
+ *     2. close the relevant fd or whatever
+ *
+ * [ III(b). Do the same as III for error exit from the open function. ]
  *
  *   IV. in the restrict_callback function
  *     * Arrange that the fd (or other handle) can no longer by used

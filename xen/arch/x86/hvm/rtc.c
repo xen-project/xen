@@ -75,7 +75,7 @@ static void rtc_update_irq(RTCState *s)
     s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
     if ( rtc_mode_is(s, no_ack) )
         hvm_isa_irq_deassert(vrtc_domain(s), RTC_IRQ);
-    hvm_isa_irq_assert(vrtc_domain(s), RTC_IRQ);
+    hvm_isa_irq_assert(vrtc_domain(s), RTC_IRQ, NULL);
 }
 
 /* Called by the VPT code after it's injected a PF interrupt for us.

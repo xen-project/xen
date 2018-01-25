@@ -43,6 +43,10 @@
 #include <xen/tmem.h>
 #include <asm/setup.h>
 
+#ifdef CONFIG_X86
+#include <asm/guest.h>
+#endif
+
 /* Linux config option: propageted to domain0 */
 /* xen_processor_pmbits: xen control Cx, Px, ... */
 unsigned int xen_processor_pmbits = XEN_PROCESSOR_PM_PX;
@@ -131,6 +135,7 @@ struct vcpu *alloc_vcpu(
 
     v->domain = d;
     v->vcpu_id = vcpu_id;
+    v->dirty_cpu = VCPU_CPU_CLEAN;
 
     spin_lock_init(&v->virq_lock);
 
@@ -141,8 +146,7 @@ struct vcpu *alloc_vcpu(
     if ( !zalloc_cpumask_var(&v->cpu_hard_affinity) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_tmp) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||
-         !zalloc_cpumask_var(&v->cpu_soft_affinity) ||
-         !zalloc_cpumask_var(&v->vcpu_dirty_cpumask) )
+         !zalloc_cpumask_var(&v->cpu_soft_affinity) )
         goto fail_free;
 
     if ( is_idle_domain(d) )
@@ -171,7 +175,6 @@ struct vcpu *alloc_vcpu(
         free_cpumask_var(v->cpu_hard_affinity_tmp);
         free_cpumask_var(v->cpu_hard_affinity_saved);
         free_cpumask_var(v->cpu_soft_affinity);
-        free_cpumask_var(v->vcpu_dirty_cpumask);
         free_vcpu_struct(v);
         return NULL;
     }
@@ -302,7 +305,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     rwlock_init(&d->vnuma_rwlock);
 
     err = -ENOMEM;
-    if ( !zalloc_cpumask_var(&d->domain_dirty_cpumask) )
+    if ( !zalloc_cpumask_var(&d->dirty_cpumask) )
         goto fail;
 
     if ( domcr_flags & DOMCRF_hvm )
@@ -420,7 +423,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         watchdog_domain_destroy(d);
     if ( init_status & INIT_xsm )
         xsm_free_security_domain(d);
-    free_cpumask_var(d->domain_dirty_cpumask);
+    free_cpumask_var(d->dirty_cpumask);
     free_domain_struct(d);
     return ERR_PTR(err);
 }
@@ -615,13 +618,21 @@ int domain_kill(struct domain *d)
     if ( d == current->domain )
         return -EINVAL;
 
-    /* Protected by domctl_lock. */
+    /* Protected by d->domain_lock. */
     switch ( d->is_dying )
     {
     case DOMDYING_alive:
+        domain_unlock(d);
         domain_pause(d);
+        domain_lock(d);
+        /*
+         * With the domain lock dropped, d->is_dying may have changed. Call
+         * ourselves recursively if so, which is safe as then we won't come
+         * back here.
+         */
+        if ( d->is_dying != DOMDYING_alive )
+            return domain_kill(d);
         d->is_dying = DOMDYING_dying;
-        spin_barrier(&d->domain_lock);
         evtchn_destroy(d);
         gnttab_release_mappings(d);
         tmem_destroy(d->tmem_client);
@@ -685,9 +696,14 @@ void __domain_crash_synchronous(void)
 }
 
 
-void domain_shutdown(struct domain *d, u8 reason)
+int domain_shutdown(struct domain *d, u8 reason)
 {
     struct vcpu *v;
+
+#ifdef CONFIG_X86
+    if ( pv_shim )
+        return pv_shim_shutdown(reason);
+#endif
 
     spin_lock(&d->shutdown_lock);
 
@@ -701,7 +717,7 @@ void domain_shutdown(struct domain *d, u8 reason)
     if ( d->is_shutting_down )
     {
         spin_unlock(&d->shutdown_lock);
-        return;
+        return 0;
     }
 
     d->is_shutting_down = 1;
@@ -723,6 +739,8 @@ void domain_shutdown(struct domain *d, u8 reason)
     __domain_finalise_shutdown(d);
 
     spin_unlock(&d->shutdown_lock);
+
+    return 0;
 }
 
 void domain_resume(struct domain *d)
@@ -794,6 +812,14 @@ static void complete_domain_destroy(struct rcu_head *head)
     struct vcpu *v;
     int i;
 
+    /*
+     * Flush all state for the vCPU previously having run on the current CPU.
+     * This is in particular relevant for x86 HVM ones on VMX, so that this
+     * flushing of state won't happen from the TLB flush IPI handler behind
+     * the back of a vmx_vmcs_enter() / vmx_vmcs_exit() section.
+     */
+    sync_local_execstate();
+
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
     {
         if ( (v = d->vcpu[i]) == NULL )
@@ -836,7 +862,6 @@ static void complete_domain_destroy(struct rcu_head *head)
             free_cpumask_var(v->cpu_hard_affinity_tmp);
             free_cpumask_var(v->cpu_hard_affinity_saved);
             free_cpumask_var(v->cpu_soft_affinity);
-            free_cpumask_var(v->vcpu_dirty_cpumask);
             free_vcpu_struct(v);
         }
 
@@ -848,7 +873,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     radix_tree_destroy(&d->pirq_tree, free_pirq_struct);
 
     xsm_free_security_domain(d);
-    free_cpumask_var(d->domain_dirty_cpumask);
+    free_cpumask_var(d->dirty_cpumask);
     xfree(d->vcpu);
     free_domain_struct(d);
 
@@ -1274,22 +1299,36 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         break;
 
-    case VCPUOP_up: {
-        bool_t wake = 0;
-        domain_lock(d);
-        if ( !v->is_initialised )
-            rc = -EINVAL;
+    case VCPUOP_up:
+#ifdef CONFIG_X86
+        if ( pv_shim )
+            rc = continue_hypercall_on_cpu(0, pv_shim_cpu_up, v);
         else
-            wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
-        domain_unlock(d);
-        if ( wake )
-            vcpu_wake(v);
+#endif
+        {
+            bool wake = false;
+
+            domain_lock(d);
+            if ( !v->is_initialised )
+                rc = -EINVAL;
+            else
+                wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
+            domain_unlock(d);
+            if ( wake )
+                vcpu_wake(v);
+        }
+
         break;
-    }
 
     case VCPUOP_down:
-        if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
-            vcpu_sleep_nosync(v);
+#ifdef CONFIG_X86
+        if ( pv_shim )
+            rc = continue_hypercall_on_cpu(0, pv_shim_cpu_down, v);
+        else
+#endif
+            if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
+                vcpu_sleep_nosync(v);
+
         break;
 
     case VCPUOP_is_up:

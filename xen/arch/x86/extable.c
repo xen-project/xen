@@ -158,7 +158,7 @@ static int __init stub_selftest(void)
         memcpy(ptr, tests[i].opc, ARRAY_SIZE(tests[i].opc));
         unmap_domain_page(ptr);
 
-        asm volatile ( "call *%[stb]\n"
+        asm volatile ( "INDIRECT_CALL %[stb]\n"
                        ".Lret%=:\n\t"
                        ".pushsection .fixup,\"ax\"\n"
                        ".Lfix%=:\n\t"
@@ -167,7 +167,7 @@ static int __init stub_selftest(void)
                        ".popsection\n\t"
                        _ASM_EXTABLE(.Lret%=, .Lfix%=)
                        : [exn] "+m" (res)
-                       : [stb] "rm" (addr), "a" (tests[i].rax));
+                       : [stb] "r" (addr), "a" (tests[i].rax));
         ASSERT(res == tests[i].res.raw);
     }
 

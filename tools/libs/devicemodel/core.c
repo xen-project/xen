@@ -68,8 +68,8 @@ xendevicemodel_handle *xendevicemodel_open(xentoollog_logger *logger,
 
 err:
     xtl_logger_destroy(dmod->logger_tofree);
-    xencall_close(dmod->xcall);
     xentoolcore__deregister_active_handle(&dmod->tc_ah);
+    xencall_close(dmod->xcall);
     free(dmod);
     return NULL;
 }
@@ -83,8 +83,8 @@ int xendevicemodel_close(xendevicemodel_handle *dmod)
 
     rc = osdep_xendevicemodel_close(dmod);
 
-    xencall_close(dmod->xcall);
     xentoolcore__deregister_active_handle(&dmod->tc_ah);
+    xencall_close(dmod->xcall);
     xtl_logger_destroy(dmod->logger_tofree);
     free(dmod);
     return rc;

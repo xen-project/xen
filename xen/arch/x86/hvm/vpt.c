@@ -252,7 +252,7 @@ int pt_update_irq(struct vcpu *v)
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt, *temp, *earliest_pt;
     uint64_t max_lag;
-    int irq, is_lapic;
+    int irq, is_lapic, pt_vector;
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
@@ -292,25 +292,38 @@ int pt_update_irq(struct vcpu *v)
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 
-    if ( is_lapic )
-        vlapic_set_irq(vcpu_vlapic(v), irq, 0);
-    else
-    {
-        hvm_isa_irq_deassert(v->domain, irq);
-        hvm_isa_irq_assert(v->domain, irq);
-    }
-
     /*
      * If periodic timer interrut is handled by lapic, its vector in
      * IRR is returned and used to set eoi_exit_bitmap for virtual
-     * interrupt delivery case. Otherwise return -1 to do nothing.  
-     */ 
-    if ( !is_lapic &&
-         platform_legacy_irq(irq) && vlapic_accept_pic_intr(v) &&
-         (&v->domain->arch.hvm_domain)->vpic[irq >> 3].int_output )
-        return -1;
-    else 
-        return pt_irq_vector(earliest_pt, hvm_intsrc_lapic);
+     * interrupt delivery case. Otherwise return -1 to do nothing.
+     */
+    if ( is_lapic )
+    {
+        vlapic_set_irq(vcpu_vlapic(v), irq, 0);
+        pt_vector = irq;
+    }
+    else
+    {
+        hvm_isa_irq_deassert(v->domain, irq);
+        if ( platform_legacy_irq(irq) && vlapic_accept_pic_intr(v) &&
+             v->domain->arch.hvm_domain.vpic[irq >> 3].int_output )
+        {
+            hvm_isa_irq_assert(v->domain, irq, NULL);
+            pt_vector = -1;
+        }
+        else
+        {
+            pt_vector = hvm_isa_irq_assert(v->domain, irq, vioapic_get_vector);
+            /*
+             * hvm_isa_irq_assert may not set the corresponding bit in vIRR
+             * when mask field of IOAPIC RTE is set. Check it again.
+             */
+            if ( pt_vector < 0 || !vlapic_test_irq(vcpu_vlapic(v), pt_vector) )
+                pt_vector = -1;
+        }
+    }
+
+    return pt_vector;
 }
 
 static struct periodic_time *is_pt_irq(

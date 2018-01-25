@@ -31,24 +31,65 @@
 #undef page_to_mfn
 #define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
 
-/*******************
- * Descriptor Tables
+/*
+ * Flush the LDT, dropping any typerefs.  Returns a boolean indicating whether
+ * mappings have been removed (i.e. a TLB flush is needed).
  */
+bool pv_destroy_ldt(struct vcpu *v)
+{
+    l1_pgentry_t *pl1e;
+    unsigned int i, mappings_dropped = 0;
+    struct page_info *page;
+
+    ASSERT(!in_irq());
+
+    spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
+
+    if ( v->arch.pv_vcpu.shadow_ldt_mapcnt == 0 )
+        goto out;
+
+    pl1e = pv_ldt_ptes(v);
+
+    for ( i = 0; i < 16; i++ )
+    {
+        if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
+            continue;
+
+        page = l1e_get_page(pl1e[i]);
+        l1e_write(&pl1e[i], l1e_empty());
+        mappings_dropped++;
+
+        ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
+        ASSERT_PAGE_IS_DOMAIN(page, v->domain);
+        put_page_and_type(page);
+    }
+
+    ASSERT(v->arch.pv_vcpu.shadow_ldt_mapcnt == mappings_dropped);
+    v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
+
+ out:
+    spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
+
+    return mappings_dropped;
+}
 
 void pv_destroy_gdt(struct vcpu *v)
 {
-    l1_pgentry_t *pl1e;
+    l1_pgentry_t *pl1e = pv_gdt_ptes(v);
+    mfn_t zero_mfn = _mfn(virt_to_mfn(zero_page));
+    l1_pgentry_t zero_l1e = l1e_from_mfn(zero_mfn, __PAGE_HYPERVISOR_RO);
     unsigned int i;
-    unsigned long pfn, zero_pfn = PFN_DOWN(__pa(zero_page));
 
     v->arch.pv_vcpu.gdt_ents = 0;
-    pl1e = pv_gdt_ptes(v);
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
-        pfn = l1e_get_pfn(pl1e[i]);
-        if ( (l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) && pfn != zero_pfn )
-            put_page_and_type(mfn_to_page(_mfn(pfn)));
-        l1e_write(&pl1e[i], l1e_from_pfn(zero_pfn, __PAGE_HYPERVISOR_RO));
+        mfn_t mfn = l1e_get_mfn(pl1e[i]);
+
+        if ( (l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) &&
+             !mfn_eq(mfn, zero_mfn) )
+            put_page_and_type(mfn_to_page(mfn));
+
+        l1e_write(&pl1e[i], zero_l1e);
         v->arch.pv_vcpu.gdt_frames[i] = 0;
     }
 }
@@ -57,14 +98,13 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
 {
     struct domain *d = v->domain;
     l1_pgentry_t *pl1e;
-    /* NB. There are 512 8-byte entries per GDT page. */
-    unsigned int i, nr_pages = (entries + 511) / 512;
+    unsigned int i, nr_frames = DIV_ROUND_UP(entries, 512);
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
 
     /* Check the pages in the new GDT. */
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_frames; i++ )
     {
         struct page_info *page;
 
@@ -85,7 +125,7 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
     /* Install the new GDT. */
     v->arch.pv_vcpu.gdt_ents = entries;
     pl1e = pv_gdt_ptes(v);
-    for ( i = 0; i < nr_pages; i++ )
+    for ( i = 0; i < nr_frames; i++ )
     {
         v->arch.pv_vcpu.gdt_frames[i] = frames[i];
         l1e_write(&pl1e[i], l1e_from_pfn(frames[i], __PAGE_HYPERVISOR_RW));
@@ -104,7 +144,7 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
 long do_set_gdt(XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
                 unsigned int entries)
 {
-    int nr_pages = (entries + 511) / 512;
+    unsigned int nr_frames = DIV_ROUND_UP(entries, 512);
     unsigned long frames[16];
     struct vcpu *curr = current;
     long ret;
@@ -113,8 +153,44 @@ long do_set_gdt(XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
 
-    if ( copy_from_guest(frames, frame_list, nr_pages) )
+    if ( copy_from_guest(frames, frame_list, nr_frames) )
         return -EFAULT;
+
+    domain_lock(curr->domain);
+
+    if ( (ret = pv_set_gdt(curr, frames, entries)) == 0 )
+        flush_tlb_local();
+
+    domain_unlock(curr->domain);
+
+    return ret;
+}
+
+int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
+                   unsigned int entries)
+{
+    struct vcpu *curr = current;
+    unsigned int i, nr_frames = DIV_ROUND_UP(entries, 512);
+    unsigned long frames[16];
+    int ret;
+
+    /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
+    if ( entries > FIRST_RESERVED_GDT_ENTRY )
+        return -EINVAL;
+
+    if ( !guest_handle_okay(frame_list, nr_frames) )
+        return -EFAULT;
+
+    for ( i = 0; i < nr_frames; ++i )
+    {
+        unsigned int frame;
+
+        if ( __copy_from_guest(&frame, frame_list, 1) )
+            return -EFAULT;
+
+        frames[i] = frame;
+        guest_handle_add_offset(frame_list, 1);
+    }
 
     domain_lock(curr->domain);
 
@@ -177,39 +253,6 @@ long do_update_descriptor(uint64_t pa, uint64_t desc)
 
  out:
     put_page(page);
-
-    return ret;
-}
-
-int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
-{
-    unsigned int i, nr_pages = (entries + 511) / 512;
-    unsigned long frames[16];
-    int ret;
-
-    /* Rechecked in set_gdt, but ensures a sane limit for copy_from_user(). */
-    if ( entries > FIRST_RESERVED_GDT_ENTRY )
-        return -EINVAL;
-
-    if ( !guest_handle_okay(frame_list, nr_pages) )
-        return -EFAULT;
-
-    for ( i = 0; i < nr_pages; ++i )
-    {
-        unsigned int frame;
-
-        if ( __copy_from_guest(&frame, frame_list, 1) )
-            return -EFAULT;
-        frames[i] = frame;
-        guest_handle_add_offset(frame_list, 1);
-    }
-
-    domain_lock(current->domain);
-
-    if ( (ret = pv_set_gdt(current, frames, entries)) == 0 )
-        flush_tlb_local();
-
-    domain_unlock(current->domain);
 
     return ret;
 }

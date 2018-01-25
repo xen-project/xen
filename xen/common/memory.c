@@ -29,6 +29,10 @@
 #include <public/memory.h>
 #include <xsm/xsm.h>
 
+#ifdef CONFIG_X86
+#include <asm/guest.h>
+#endif
+
 struct memop_args {
     /* INPUT */
     struct domain *domain;     /* Domain to be affected. */
@@ -284,13 +288,16 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
 #ifdef CONFIG_X86
     mfn = get_gfn_query(d, gmfn, &p2mt);
+    if ( unlikely(p2mt == p2m_invalid) || unlikely(p2mt == p2m_mmio_dm) )
+        return -ENOENT;
+
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
         rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
-        put_gfn(d, gmfn);
-
         if ( rc )
-            return rc;
+            goto out_put_gfn;
+
+        put_gfn(d, gmfn);
 
         /* If the page hasn't yet been paged out, there is an
          * actual page that needs to be released. */
@@ -308,9 +315,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( p2mt == p2m_mmio_direct )
     {
         rc = clear_mmio_p2m_entry(d, gmfn, mfn, PAGE_ORDER_4K);
-        put_gfn(d, gmfn);
-
-        return rc;
+        goto out_put_gfn;
     }
 #else
     mfn = gfn_to_mfn(d, _gfn(gmfn));
@@ -335,10 +340,8 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         rc = mem_sharing_unshare_page(d, gmfn, 0);
         if ( rc )
         {
-            put_gfn(d, gmfn);
             (void)mem_sharing_notify_enomem(d, gmfn, 0);
-
-            return rc;
+            goto out_put_gfn;
         }
         /* Maybe the mfn changed */
         mfn = get_gfn_query_unlocked(d, gmfn, &p2mt);
@@ -375,9 +378,14 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         put_page(page);
 
     put_page(page);
+ out_put_gfn: __maybe_unused
     put_gfn(d, gmfn);
 
-    return rc;
+    /*
+     * Filter out -ENOENT return values that aren't a result of an empty p2m
+     * entry.
+     */
+    return rc != -ENOENT ? rc : -EINVAL;
 }
 
 static void decrease_reservation(struct memop_args *a)
@@ -392,6 +400,8 @@ static void decrease_reservation(struct memop_args *a)
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
     {
+        unsigned long pod_done;
+
         if ( i != a->nr_done && hypercall_preempt_check() )
         {
             a->preempted = 1;
@@ -416,14 +426,33 @@ static void decrease_reservation(struct memop_args *a)
         }
 
         /* See if populate-on-demand wants to handle this */
-        if ( is_hvm_domain(a->domain)
-             && p2m_pod_decrease_reservation(a->domain, _gfn(gmfn),
-                                             a->extent_order) )
-            continue;
+        pod_done = is_hvm_domain(a->domain) ?
+                   p2m_pod_decrease_reservation(a->domain, _gfn(gmfn),
+                                                a->extent_order) : 0;
 
-        for ( j = 0; j < (1 << a->extent_order); j++ )
-            if ( guest_remove_page(a->domain, gmfn + j) )
+        /*
+         * Look for pages not handled by p2m_pod_decrease_reservation().
+         *
+         * guest_remove_page() will return -ENOENT for pages which have already
+         * been removed by p2m_pod_decrease_reservation(); so expect to see
+         * exactly pod_done failures.  Any more means that there were invalid
+         * entries before p2m_pod_decrease_reservation() was called.
+         */
+        for ( j = 0; j + pod_done < (1UL << a->extent_order); j++ )
+        {
+            switch ( guest_remove_page(a->domain, gmfn + j) )
+            {
+            case 0:
+                break;
+            case -ENOENT:
+                if ( !pod_done )
+                    goto out;
+                --pod_done;
+                break;
+            default:
                 goto out;
+            }
+        }
     }
 
  out:
@@ -810,62 +839,41 @@ static int xenmem_add_to_physmap(struct domain *d,
 
 static int xenmem_add_to_physmap_batch(struct domain *d,
                                        struct xen_add_to_physmap_batch *xatpb,
-                                       unsigned int start)
+                                       unsigned int extent)
 {
-    unsigned int done = 0;
-    int rc;
-
-    if ( xatpb->size < start )
+    if ( xatpb->size < extent )
         return -EILSEQ;
 
-    guest_handle_add_offset(xatpb->idxs, start);
-    guest_handle_add_offset(xatpb->gpfns, start);
-    guest_handle_add_offset(xatpb->errs, start);
-    xatpb->size -= start;
+    if ( !guest_handle_subrange_okay(xatpb->idxs, extent, xatpb->size - 1) ||
+         !guest_handle_subrange_okay(xatpb->gpfns, extent, xatpb->size - 1) ||
+         !guest_handle_subrange_okay(xatpb->errs, extent, xatpb->size - 1) )
+        return -EFAULT;
 
-    while ( xatpb->size > done )
+    while ( xatpb->size > extent )
     {
         xen_ulong_t idx;
         xen_pfn_t gpfn;
+        int rc;
 
-        if ( unlikely(__copy_from_guest_offset(&idx, xatpb->idxs, 0, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
-
-        if ( unlikely(__copy_from_guest_offset(&gpfn, xatpb->gpfns, 0, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
+        if ( unlikely(__copy_from_guest_offset(&idx, xatpb->idxs,
+                                               extent, 1)) ||
+             unlikely(__copy_from_guest_offset(&gpfn, xatpb->gpfns,
+                                               extent, 1)) )
+            return -EFAULT;
 
         rc = xenmem_add_to_physmap_one(d, xatpb->space,
                                        xatpb->u,
                                        idx, _gfn(gpfn));
 
-        if ( unlikely(__copy_to_guest_offset(xatpb->errs, 0, &rc, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
-
-        guest_handle_add_offset(xatpb->idxs, 1);
-        guest_handle_add_offset(xatpb->gpfns, 1);
-        guest_handle_add_offset(xatpb->errs, 1);
+        if ( unlikely(__copy_to_guest_offset(xatpb->errs, extent, &rc, 1)) )
+            return -EFAULT;
 
         /* Check for continuation if it's not the last iteration. */
-        if ( xatpb->size > ++done && hypercall_preempt_check() )
-        {
-            rc = start + done;
-            goto out;
-        }
+        if ( xatpb->size > ++extent && hypercall_preempt_check() )
+            return extent;
     }
 
-    rc = 0;
-
-out:
-    return rc;
+    return 0;
 }
 
 static int construct_memop_from_reservation(
@@ -1014,6 +1022,12 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return start_extent;
         }
 
+#ifdef CONFIG_X86
+        if ( pv_shim && op != XENMEM_decrease_reservation && !args.preempted )
+            /* Avoid calling pv_shim_online_memory when preempted. */
+            pv_shim_online_memory(args.nr_extents, args.extent_order);
+#endif
+
         switch ( op )
         {
         case XENMEM_increase_reservation:
@@ -1035,6 +1049,17 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return hypercall_create_continuation(
                 __HYPERVISOR_memory_op, "lh",
                 op | (rc << MEMOP_EXTENT_SHIFT), arg);
+
+#ifdef CONFIG_X86
+        if ( pv_shim && op == XENMEM_decrease_reservation )
+            /*
+             * Only call pv_shim_offline_memory when the hypercall has
+             * finished. Note that nr_done is used to cope in case the
+             * hypercall has failed and only part of the extents where
+             * processed.
+             */
+            pv_shim_offline_memory(args.nr_extents, args.nr_done);
+#endif
 
         break;
 
@@ -1141,10 +1166,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( start_extent != (typeof(xatpb.size))start_extent )
             return -EDOM;
 
-        if ( copy_from_guest(&xatpb, arg, 1) ||
-             !guest_handle_okay(xatpb.idxs, xatpb.size) ||
-             !guest_handle_okay(xatpb.gpfns, xatpb.size) ||
-             !guest_handle_okay(xatpb.errs, xatpb.size) )
+        if ( copy_from_guest(&xatpb, arg, 1) )
             return -EFAULT;
 
         /* This mapspace is unsupported for this hypercall. */

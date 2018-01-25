@@ -176,7 +176,7 @@ static void __init __maybe_unused *ebmalloc(size_t size)
 {
     void *ptr = ebmalloc_mem + ebmalloc_allocated;
 
-    ebmalloc_allocated += (size + sizeof(void *) - 1) & ~(sizeof(void *) - 1);
+    ebmalloc_allocated += ROUNDUP(size, sizeof(void *));
 
     if ( ebmalloc_allocated > sizeof(ebmalloc_mem) )
         blexit(L"Out of static memory\r\n");

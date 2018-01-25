@@ -276,7 +276,7 @@ static inline void grant_write_unlock(struct grant_table *gt)
 static inline void gnttab_flush_tlb(const struct domain *d)
 {
     if ( !paging_mode_external(d) )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
 }
 
 static inline unsigned int
@@ -786,10 +786,10 @@ static int _set_status(unsigned gt_version,
         return _set_status_v2(domid, readonly, mapflag, shah, act, status);
 }
 
-static int grant_map_exists(const struct domain *ld,
-                            struct grant_table *rgt,
-                            unsigned long mfn,
-                            grant_ref_t *cur_ref)
+static struct active_grant_entry *grant_map_exists(const struct domain *ld,
+                                                   struct grant_table *rgt,
+                                                   unsigned long mfn,
+                                                   grant_ref_t *cur_ref)
 {
     grant_ref_t ref, max_iter;
 
@@ -805,28 +805,20 @@ static int grant_map_exists(const struct domain *ld,
                    nr_grant_entries(rgt));
     for ( ref = *cur_ref; ref < max_iter; ref++ )
     {
-        struct active_grant_entry *act;
-        bool_t exists;
+        struct active_grant_entry *act = active_entry_acquire(rgt, ref);
 
-        act = active_entry_acquire(rgt, ref);
-
-        exists = act->pin
-            && act->domid == ld->domain_id
-            && act->frame == mfn;
-
+        if ( act->pin && act->domid == ld->domain_id && act->frame == mfn )
+            return act;
         active_entry_release(act);
-
-        if ( exists )
-            return 0;
     }
 
     if ( ref < nr_grant_entries(rgt) )
     {
         *cur_ref = ref;
-        return 1;
+        return NULL;
     }
 
-    return -EINVAL;
+    return ERR_PTR(-EINVAL);
 }
 
 #define MAPKIND_READ 1
@@ -2525,9 +2517,20 @@ acquire_grant_for_copy(
         td = page_get_owner_and_reference(*page);
         /*
          * act->pin being non-zero should guarantee the page to have a
-         * non-zero refcount and hence a valid owner.
+         * non-zero refcount and hence a valid owner (matching the one on
+         * record), with one exception: If the owning domain is dying we
+         * had better not make implications from pin count (map_grant_ref()
+         * updates pin counts before obtaining page references, for
+         * example).
          */
-        ASSERT(td);
+        if ( td != rd || rd->is_dying )
+        {
+            if ( td )
+                put_page(*page);
+            *page = NULL;
+            rc = GNTST_bad_domain;
+            goto unlock_out_clear;
+        }
     }
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
@@ -2639,6 +2642,11 @@ static void gnttab_copy_release_buf(struct gnttab_copy_buf *buf)
         unmap_domain_page(buf->virt);
         buf->virt = NULL;
     }
+    if ( buf->have_grant )
+    {
+        release_grant_for_copy(buf->domain, buf->ptr.u.ref, buf->read_only);
+        buf->have_grant = 0;
+    }
     if ( buf->have_type )
     {
         put_page_type(buf->page);
@@ -2648,11 +2656,6 @@ static void gnttab_copy_release_buf(struct gnttab_copy_buf *buf)
     {
         put_page(buf->page);
         buf->page = NULL;
-    }
-    if ( buf->have_grant )
-    {
-        release_grant_for_copy(buf->domain, buf->ptr.u.ref, buf->read_only);
-        buf->have_grant = 0;
     }
 }
 
@@ -3197,28 +3200,27 @@ gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) uop,
     return 0;
 }
 
-static int cache_flush(gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
+static int cache_flush(const gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
 {
     struct domain *d, *owner;
     struct page_info *page;
     unsigned long mfn;
+    struct active_grant_entry *act = NULL;
     void *v;
     int ret;
 
     if ( (cflush->offset >= PAGE_SIZE) ||
          (cflush->length > PAGE_SIZE) ||
-         (cflush->offset + cflush->length > PAGE_SIZE) )
+         (cflush->offset + cflush->length > PAGE_SIZE) ||
+         (cflush->op & ~(GNTTAB_CACHE_INVAL | GNTTAB_CACHE_CLEAN)) )
         return -EINVAL;
 
     if ( cflush->length == 0 || cflush->op == 0 )
-        return 0;
+        return !*cur_ref ? 0 : -EILSEQ;
 
     /* currently unimplemented */
     if ( cflush->op & GNTTAB_CACHE_SOURCE_GREF )
         return -EOPNOTSUPP;
-
-    if ( cflush->op & ~(GNTTAB_CACHE_INVAL|GNTTAB_CACHE_CLEAN) )
-        return -EINVAL;
 
     d = rcu_lock_current_domain();
     mfn = cflush->a.dev_bus_addr >> PAGE_SHIFT;
@@ -3241,13 +3243,13 @@ static int cache_flush(gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
     {
         grant_read_lock(owner->grant_table);
 
-        ret = grant_map_exists(d, owner->grant_table, mfn, cur_ref);
-        if ( ret != 0 )
+        act = grant_map_exists(d, owner->grant_table, mfn, cur_ref);
+        if ( IS_ERR_OR_NULL(act) )
         {
             grant_read_unlock(owner->grant_table);
             rcu_unlock_domain(d);
             put_page(page);
-            return ret;
+            return act ? PTR_ERR(act) : 1;
         }
     }
 
@@ -3264,7 +3266,11 @@ static int cache_flush(gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
         ret = 0;
 
     if ( d != owner )
+    {
+        active_entry_release(act);
         grant_read_unlock(owner->grant_table);
+    }
+
     unmap_domain_page(v);
     put_page(page);
 
@@ -3299,6 +3305,9 @@ gnttab_cache_flush(XEN_GUEST_HANDLE_PARAM(gnttab_cache_flush_t) uop,
         *cur_ref = 0;
         guest_handle_add_offset(uop, 1);
     }
+
+    *cur_ref = 0;
+
     return 0;
 }
 

@@ -31,6 +31,12 @@
 #include <xen/early_printk.h>
 #include <xen/warning.h>
 
+#ifdef CONFIG_X86
+#include <xen/consoled.h>
+#include <xen/pv_console.h>
+#include <asm/guest.h>
+#endif
+
 /* console: comma-separated list of console outputs. */
 static char __initdata opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
@@ -82,6 +88,10 @@ static uint32_t __read_mostly conring_size = _CONRING_SIZE;
 static uint32_t conringc, conringp;
 
 static int __read_mostly sercon_handle = -1;
+
+#ifdef CONFIG_X86
+static bool __read_mostly opt_console_xen; /* console=xen */
+#endif
 
 static DEFINE_SPINLOCK(console_lock);
 
@@ -336,6 +346,11 @@ static void sercon_puts(const char *s)
         (*serial_steal_fn)(s);
     else
         serial_puts(sercon_handle, s);
+
+#ifdef CONFIG_X86
+    /* Copy all serial output into PV console */
+    pv_console_puts(s);
+#endif
 }
 
 static void dump_console_ring_key(unsigned char key)
@@ -401,6 +416,11 @@ static void __serial_rx(char c, struct cpu_user_regs *regs)
         serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod++)] = c;
     /* Always notify the guest: prevents receive path from getting stuck. */
     send_global_virq(VIRQ_CONSOLE);
+
+#ifdef CONFIG_X86
+    if ( pv_shim && pv_console )
+        consoled_guest_tx(c);
+#endif
 }
 
 static void serial_rx(char c, struct cpu_user_regs *regs)
@@ -432,6 +452,16 @@ static void notify_dom0_con_ring(unsigned long unused)
 static DECLARE_SOFTIRQ_TASKLET(notify_dom0_con_ring_tasklet,
                                notify_dom0_con_ring, 0);
 
+#ifdef CONFIG_X86
+static inline void xen_console_write_debug_port(const char *buf, size_t len)
+{
+    unsigned long tmp;
+    asm volatile ( "rep outsb;"
+                   : "=&S" (tmp), "=&c" (tmp)
+                   : "0" (buf), "1" (len), "d" (0xe9) );
+}
+#endif
+
 static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 {
     char kbuf[128];
@@ -457,6 +487,18 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 
             sercon_puts(kbuf);
             video_puts(kbuf);
+
+#ifdef CONFIG_X86
+            if ( opt_console_xen )
+            {
+                size_t len = strlen(kbuf);
+
+                if ( xen_guest )
+                    xen_hypercall_console_write(kbuf, len);
+                else
+                    xen_console_write_debug_port(kbuf, len);
+            }
+#endif
 
             if ( opt_console_to_ring )
             {
@@ -566,6 +608,18 @@ static void __putstr(const char *str)
 
     sercon_puts(str);
     video_puts(str);
+
+#ifdef CONFIG_X86
+    if ( opt_console_xen )
+    {
+        size_t len = strlen(str);
+
+        if ( xen_guest )
+            xen_hypercall_console_write(str, len);
+        else
+            xen_console_write_debug_port(str, len);
+    }
+#endif
 
     conring_puts(str);
 
@@ -762,6 +816,12 @@ void __init console_init_preirq(void)
             p++;
         if ( !strncmp(p, "vga", 3) )
             video_init();
+#ifdef CONFIG_X86
+	else if ( !strncmp(p, "pv", 2) )
+            pv_console_init();
+        else if ( !strncmp(p, "xen", 3) )
+            opt_console_xen = true;
+#endif
         else if ( !strncmp(p, "none", 4) )
             continue;
         else if ( (sh = serial_parse_handle(p)) >= 0 )
@@ -781,6 +841,10 @@ void __init console_init_preirq(void)
     }
 
     serial_set_rx_handler(sercon_handle, serial_rx);
+
+#ifdef CONFIG_X86
+    pv_console_set_rx_handler(serial_rx);
+#endif
 
     /* HELLO WORLD --- start-of-day banner text. */
     spin_lock(&console_lock);
@@ -833,6 +897,10 @@ void __init console_init_ring(void)
 void __init console_init_postirq(void)
 {
     serial_init_postirq();
+
+#ifdef CONFIG_X86
+    pv_console_init_postirq();
+#endif
 
     if ( conring != _conring )
         return;
@@ -1185,7 +1253,11 @@ void panic(const char *fmt, ...)
     if ( opt_noreboot )
         printk("Manual reset required ('noreboot' specified)\n");
     else
+#ifdef CONFIG_X86
+        printk("%s in five seconds...\n", pv_shim ? "Crash" : "Reboot");
+#else
         printk("Reboot in five seconds...\n");
+#endif
 
     spin_unlock_irqrestore(&lock, flags);
 

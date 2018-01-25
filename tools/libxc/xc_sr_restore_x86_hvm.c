@@ -148,6 +148,15 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
               ctx->restore.guest_page_size);
         return -1;
     }
+#ifdef __i386__
+    /* Very large domains (> 1TB) will exhaust virtual address space. */
+    if ( ctx->restore.p2m_size > 0x0fffffff )
+    {
+        errno = E2BIG;
+        PERROR("Cannot restore this big a guest");
+        return -1;
+    }
+#endif
 
     return 0;
 }

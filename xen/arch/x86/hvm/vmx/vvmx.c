@@ -201,10 +201,10 @@ struct vmx_inst_decoded {
             unsigned long mem;
             unsigned int  len;
         };
-        enum vmx_regs_enc reg1;
+        unsigned int reg1;
     };
 
-    enum vmx_regs_enc reg2;
+    unsigned int reg2;
 };
 
 enum vmx_ops_result {
@@ -345,7 +345,7 @@ enum vmx_insn_errno set_vvmcs_real_safe(const struct vcpu *v, u32 encoding,
 }
 
 static unsigned long reg_read(struct cpu_user_regs *regs,
-                              enum vmx_regs_enc index)
+                              unsigned int index)
 {
     unsigned long *pval = decode_register(index, regs, 0);
 
@@ -353,7 +353,7 @@ static unsigned long reg_read(struct cpu_user_regs *regs,
 }
 
 static void reg_write(struct cpu_user_regs *regs,
-                      enum vmx_regs_enc index,
+                      unsigned int index,
                       unsigned long value)
 {
     unsigned long *pval = decode_register(index, regs, 0);
@@ -633,6 +633,7 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
                     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
 
     host_cntrl &= ~apicv_bit;
+    host_cntrl &= ~SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
     shadow_cntrl = get_vvmcs(v, SECONDARY_VM_EXEC_CONTROL);
 
     /* No vAPIC-v support, so it shouldn't be set in vmcs12. */
@@ -1940,7 +1941,7 @@ int nvmx_handle_invept(struct cpu_user_regs *regs)
     }
     case INVEPT_ALL_CONTEXT:
         p2m_flush_nestedp2m(current->domain);
-        __invept(INVEPT_ALL_CONTEXT, 0, 0);
+        __invept(INVEPT_ALL_CONTEXT, 0);
         break;
     default:
         vmfail_invalid(regs);

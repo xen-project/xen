@@ -104,9 +104,14 @@ void vmx_update_secondary_exec_control(struct vcpu *v);
 
 #define POSTED_INTR_ON  0
 #define POSTED_INTR_SN  1
-static inline int pi_test_and_set_pir(int vector, struct pi_desc *pi_desc)
+static inline int pi_test_and_set_pir(uint8_t vector, struct pi_desc *pi_desc)
 {
     return test_and_set_bit(vector, pi_desc->pir);
+}
+
+static inline int pi_test_pir(uint8_t vector, const struct pi_desc *pi_desc)
+{
+    return test_bit(vector, pi_desc->pir);
 }
 
 static inline int pi_test_and_set_on(struct pi_desc *pi_desc)
@@ -447,11 +452,11 @@ static inline enum vmx_insn_errno vmwrite_safe(unsigned long field,
     return ret;
 }
 
-static always_inline void __invept(unsigned long type, u64 eptp, u64 gpa)
+static always_inline void __invept(unsigned long type, uint64_t eptp)
 {
     struct {
-        u64 eptp, gpa;
-    } operand = {eptp, gpa};
+        uint64_t eptp, rsvd;
+    } operand = { eptp };
 
     /*
      * If single context invalidation is not supported, we escalate to
@@ -514,7 +519,7 @@ static always_inline void __invvpid(unsigned long type, u16 vpid, u64 gva)
 
 static inline void ept_sync_all(void)
 {
-    __invept(INVEPT_ALL_CONTEXT, 0, 0);
+    __invept(INVEPT_ALL_CONTEXT, 0);
 }
 
 void ept_sync_domain(struct p2m_domain *p2m);

@@ -171,54 +171,69 @@ long arch_do_sysctl(
 
         break;
 
-    case XEN_SYSCTL_psr_cat_op:
-        switch ( sysctl->u.psr_cat_op.cmd )
-        {
-            uint32_t data[PSR_INFO_ARRAY_SIZE];
+    case XEN_SYSCTL_psr_alloc:
+    {
+        uint32_t data[PSR_INFO_ARRAY_SIZE] = { };
 
-        case XEN_SYSCTL_PSR_CAT_get_l3_info:
+        switch ( sysctl->u.psr_alloc.cmd )
         {
-            ret = psr_get_info(sysctl->u.psr_cat_op.target,
-                               PSR_CBM_TYPE_L3, data, ARRAY_SIZE(data));
+        case XEN_SYSCTL_PSR_get_l3_info:
+            ret = psr_get_info(sysctl->u.psr_alloc.target,
+                               PSR_TYPE_L3_CBM, data, ARRAY_SIZE(data));
             if ( ret )
                 break;
 
-            sysctl->u.psr_cat_op.u.cat_info.cos_max =
+            sysctl->u.psr_alloc.u.cat_info.cos_max =
                                       data[PSR_INFO_IDX_COS_MAX];
-            sysctl->u.psr_cat_op.u.cat_info.cbm_len =
+            sysctl->u.psr_alloc.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
-            sysctl->u.psr_cat_op.u.cat_info.flags =
-                                      data[PSR_INFO_IDX_CAT_FLAG];
+            sysctl->u.psr_alloc.u.cat_info.flags =
+                                      data[PSR_INFO_IDX_CAT_FLAGS];
 
-            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
+            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
                 ret = -EFAULT;
             break;
-        }
 
-        case XEN_SYSCTL_PSR_CAT_get_l2_info:
-        {
-            ret = psr_get_info(sysctl->u.psr_cat_op.target,
-                               PSR_CBM_TYPE_L2, data, ARRAY_SIZE(data));
+        case XEN_SYSCTL_PSR_get_l2_info:
+            ret = psr_get_info(sysctl->u.psr_alloc.target,
+                               PSR_TYPE_L2_CBM, data, ARRAY_SIZE(data));
             if ( ret )
                 break;
 
-            sysctl->u.psr_cat_op.u.cat_info.cos_max =
+            sysctl->u.psr_alloc.u.cat_info.cos_max =
                                       data[PSR_INFO_IDX_COS_MAX];
-            sysctl->u.psr_cat_op.u.cat_info.cbm_len =
+            sysctl->u.psr_alloc.u.cat_info.cbm_len =
                                       data[PSR_INFO_IDX_CAT_CBM_LEN];
-            sysctl->u.psr_cat_op.u.cat_info.flags =
-                                      data[PSR_INFO_IDX_CAT_FLAG];
+            sysctl->u.psr_alloc.u.cat_info.flags =
+                                      data[PSR_INFO_IDX_CAT_FLAGS];
 
-            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_cat_op) )
+            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
                 ret = -EFAULT;
             break;
-        }
+
+        case XEN_SYSCTL_PSR_get_mba_info:
+            ret = psr_get_info(sysctl->u.psr_alloc.target,
+                               PSR_TYPE_MBA_THRTL, data, ARRAY_SIZE(data));
+            if ( ret )
+                break;
+
+            sysctl->u.psr_alloc.u.mba_info.cos_max =
+                                      data[PSR_INFO_IDX_COS_MAX];
+            sysctl->u.psr_alloc.u.mba_info.thrtl_max =
+                                      data[PSR_INFO_IDX_MBA_THRTL_MAX];
+            sysctl->u.psr_alloc.u.mba_info.flags =
+                                      data[PSR_INFO_IDX_MBA_FLAGS];
+
+            if ( __copy_field_to_guest(u_sysctl, sysctl, u.psr_alloc) )
+                ret = -EFAULT;
+            break;
 
         default:
             ret = -EOPNOTSUPP;
             break;
         }
         break;
+    }
 
     case XEN_SYSCTL_get_cpu_levelling_caps:
         sysctl->u.cpu_levelling_caps.caps = levelling_caps;

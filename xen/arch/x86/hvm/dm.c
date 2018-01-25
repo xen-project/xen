@@ -143,7 +143,7 @@ static int set_isa_irq_level(struct domain *d, uint8_t isa_irq,
         hvm_isa_irq_deassert(d, isa_irq);
         break;
     case 1:
-        hvm_isa_irq_assert(d, isa_irq);
+        hvm_isa_irq_assert(d, isa_irq, NULL);
         break;
     default:
         return -EINVAL;

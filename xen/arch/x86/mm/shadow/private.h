@@ -520,7 +520,7 @@ void sh_destroy_shadow(struct domain *d, mfn_t smfn);
  * Returns 0 for failure, 1 for success. */
 static inline int sh_get_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
 {
-    u32 x, nx;
+    unsigned long x, nx;
     struct page_info *sp = mfn_to_page(smfn);
 
     ASSERT(mfn_valid(smfn));
@@ -529,7 +529,7 @@ static inline int sh_get_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
     x = sp->u.sh.count;
     nx = x + 1;
 
-    if ( unlikely(nx >= 1U<<26) )
+    if ( unlikely(nx >= (1UL << PAGE_SH_REFCOUNT_WIDTH)) )
     {
         SHADOW_PRINTK("shadow ref overflow, gmfn=%lx smfn=%lx\n",
                        __backpointer(sp), mfn_x(smfn));
@@ -553,7 +553,7 @@ static inline int sh_get_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
  * physical address of the shadow entry that held this reference. */
 static inline void sh_put_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
 {
-    u32 x, nx;
+    unsigned long x, nx;
     struct page_info *sp = mfn_to_page(smfn);
 
     ASSERT(mfn_valid(smfn));
@@ -571,8 +571,8 @@ static inline void sh_put_ref(struct domain *d, mfn_t smfn, paddr_t entry_pa)
 
     if ( unlikely(x == 0) )
     {
-        SHADOW_ERROR("shadow ref underflow, smfn=%lx oc=%08x t=%#x\n",
-                     mfn_x(smfn), sp->u.sh.count, sp->u.sh.type);
+        SHADOW_ERROR("shadow ref underflow, smfn=%lx oc=%#lx t=%#x\n",
+                     mfn_x(smfn), sp->u.sh.count + 0UL, sp->u.sh.type);
         BUG();
     }
 

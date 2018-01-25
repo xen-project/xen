@@ -1,5 +1,5 @@
-#ifndef _XEN_GCOV_H
-#define _XEN_GCOV_H
+#ifndef _XEN_COV_H
+#define _XEN_COV_H
 
 #ifdef CONFIG_GCOV
 #include <public/sysctl.h>

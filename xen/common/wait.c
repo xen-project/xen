@@ -127,7 +127,6 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     unsigned long dummy;
     u32 entry_vector = cpu_info->guest_cpu_user_regs.entry_vector;
 
-    cpu_info->guest_cpu_user_regs.entry_vector &= ~TRAP_regs_partial;
     ASSERT(wqv->esp == 0);
 
     /* Save current VCPU affinity; force wakeup on *this* CPU only. */
@@ -139,14 +138,26 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         domain_crash_synchronous();
     }
 
+    /* Hand-rolled setjmp(). */
     asm volatile (
-        "push %%rax; push %%rbx; push %%rdx; "
-        "push %%rbp; push %%r8; push %%r9; push %%r10; push %%r11; "
-        "push %%r12; push %%r13; push %%r14; push %%r15; call 1f; "
-        "1: addq $2f-1b,(%%rsp); sub %%esp,%%ecx; cmp %3,%%ecx; ja 3f; "
-        "mov %%rsp,%%rsi; 2: rep movsb; mov %%rsp,%%rsi; 3: pop %%rax; "
-        "pop %%r15; pop %%r14; pop %%r13; pop %%r12; "
-        "pop %%r11; pop %%r10; pop %%r9; pop %%r8; "
+        "push %%rax; push %%rbx; push %%rdx; push %%rbp;"
+        "push %%r8;  push %%r9;  push %%r10; push %%r11;"
+        "push %%r12; push %%r13; push %%r14; push %%r15;"
+
+        "call 1f;"
+        "1: addq $2f-1b,(%%rsp);"
+        "sub %%esp,%%ecx;"
+        "cmp %3,%%ecx;"
+        "ja 3f;"
+        "mov %%rsp,%%rsi;"
+
+        /* check_wakeup_from_wait() longjmp()'s to this point. */
+        "2: rep movsb;"
+        "mov %%rsp,%%rsi;"
+        "3: pop %%rax;"
+
+        "pop %%r15; pop %%r14; pop %%r13; pop %%r12;"
+        "pop %%r11; pop %%r10; pop %%r9;  pop %%r8;"
         "pop %%rbp; pop %%rdx; pop %%rbx; pop %%rax"
         : "=&S" (wqv->esp), "=&c" (dummy), "=&D" (dummy)
         : "i" (PAGE_SIZE), "0" (0), "1" (cpu_info), "2" (wqv->stack)
@@ -190,11 +201,18 @@ void check_wakeup_from_wait(void)
         wait(); /* takes us back into the scheduler */
     }
 
+    /*
+     * Hand-rolled longjmp().  Returns to the pointer on the top of
+     * wqv->stack, and lands on a `rep movs` instruction.  All other GPRs are
+     * restored from the stack, so are available for use here.
+     */
     asm volatile (
-        "mov %1,%%"__OP"sp; jmp *(%0)"
+        "mov %1,%%"__OP"sp; INDIRECT_JMP %[ip]"
         : : "S" (wqv->stack), "D" (wqv->esp),
-        "c" ((char *)get_cpu_info() - (char *)wqv->esp)
+          "c" ((char *)get_cpu_info() - (char *)wqv->esp),
+          [ip] "r" (*(unsigned long *)wqv->stack)
         : "memory" );
+    unreachable();
 }
 
 #else /* !CONFIG_X86 */

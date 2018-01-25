@@ -187,8 +187,16 @@ void hvm_pci_intx_assert(struct domain *d, unsigned int device,
 void hvm_pci_intx_deassert(struct domain *d, unsigned int device,
                            unsigned int intx);
 
-/* Modify state of an ISA device's IRQ wire. */
-void hvm_isa_irq_assert(struct domain *d, unsigned int isa_irq);
+/*
+ * Modify state of an ISA device's IRQ wire. For some cases, we are
+ * interested in the interrupt vector of the irq, but once the irq_lock
+ * is released, the vector may be changed by others. get_vector() callback
+ * allows us to get the interrupt vector in the protection of irq_lock.
+ * For most cases, just set get_vector to NULL.
+ */
+int hvm_isa_irq_assert(struct domain *d, unsigned int isa_irq,
+                       int (*get_vector)(const struct domain *d,
+                                         unsigned int gsi));
 void hvm_isa_irq_deassert(struct domain *d, unsigned int isa_irq);
 
 /* Modify state of GSIs. */

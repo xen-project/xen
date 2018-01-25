@@ -64,28 +64,6 @@ struct nestedvmx {
 /* bit 0-8, and 12 must be 1 */
 #define VMX_ENTRY_CTLS_DEFAULT1		0x11ff
 
-/*
- * Encode of VMX instructions base on Table 24-11 & 24-12 of SDM 3B
- */
-
-enum vmx_regs_enc {
-    VMX_REG_RAX,
-    VMX_REG_RCX,
-    VMX_REG_RDX,
-    VMX_REG_RBX,
-    VMX_REG_RSP,
-    VMX_REG_RBP,
-    VMX_REG_RSI,
-    VMX_REG_RDI,
-    VMX_REG_R8,
-    VMX_REG_R9,
-    VMX_REG_R10,
-    VMX_REG_R11,
-    VMX_REG_R12,
-    VMX_REG_R13,
-    VMX_REG_R14,
-    VMX_REG_R15,
-};
 
 union vmx_inst_info {
     struct {

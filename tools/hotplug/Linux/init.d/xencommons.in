@@ -58,6 +58,7 @@ do_start () {
 
 	mkdir -p ${XEN_RUN_DIR}
 	mkdir -p ${XEN_LOCK_DIR}
+	mkdir -p ${XEN_LOG_DIR}
 
 	@XEN_SCRIPT_DIR@/launch-xenstore || exit 1
 

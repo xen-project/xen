@@ -36,6 +36,22 @@ static void print_xen_info(void)
 
 enum context { CTXT_hypervisor, CTXT_pv_guest, CTXT_hvm_guest };
 
+/* (ab)use crs[5..7] for fs/gs bases. */
+static void read_registers(struct cpu_user_regs *regs, unsigned long crs[8])
+{
+    crs[0] = read_cr0();
+    crs[2] = read_cr2();
+    crs[3] = read_cr3();
+    crs[4] = read_cr4();
+    regs->ds = read_sreg(ds);
+    regs->es = read_sreg(es);
+    regs->fs = read_sreg(fs);
+    regs->gs = read_sreg(gs);
+    crs[5] = rdfsbase();
+    crs[6] = rdgsbase();
+    rdmsrl(MSR_SHADOW_GS_BASE, crs[7]);
+}
+
 static void _show_registers(
     const struct cpu_user_regs *regs, unsigned long crs[8],
     enum context context, const struct vcpu *v)
@@ -64,16 +80,13 @@ static void _show_registers(
            regs->rbp, regs->rsp, regs->r8);
     printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
            regs->r9,  regs->r10, regs->r11);
-    if ( !(regs->entry_vector & TRAP_regs_partial) )
-    {
-        printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
-               regs->r12, regs->r13, regs->r14);
-        printk("r15: %016lx   cr0: %016lx   cr4: %016lx\n",
-               regs->r15, crs[0], crs[4]);
-    }
-    else
-        printk("cr0: %016lx   cr4: %016lx\n", crs[0], crs[4]);
+    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
+           regs->r12, regs->r13, regs->r14);
+    printk("r15: %016lx   cr0: %016lx   cr4: %016lx\n",
+           regs->r15, crs[0], crs[4]);
     printk("cr3: %016lx   cr2: %016lx\n", crs[3], crs[2]);
+    printk("fsb: %016lx   gsb: %016lx   gss: %016lx\n",
+           crs[5], crs[6], crs[7]);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
            "ss: %04x   cs: %04x\n",
            regs->ds, regs->es, regs->fs,
@@ -103,13 +116,18 @@ void show_registers(const struct cpu_user_regs *regs)
         fault_regs.es = sreg.sel;
         hvm_get_segment_register(v, x86_seg_fs, &sreg);
         fault_regs.fs = sreg.sel;
+        fault_crs[5] = sreg.base;
         hvm_get_segment_register(v, x86_seg_gs, &sreg);
         fault_regs.gs = sreg.sel;
+        fault_crs[6] = sreg.base;
         hvm_get_segment_register(v, x86_seg_ss, &sreg);
         fault_regs.ss = sreg.sel;
+        fault_crs[7] = hvm_get_shadow_gs_base(v);
     }
     else
     {
+        read_registers(&fault_regs, fault_crs);
+
         if ( guest_mode(regs) )
         {
             context = CTXT_pv_guest;
@@ -120,14 +138,6 @@ void show_registers(const struct cpu_user_regs *regs)
             context = CTXT_hypervisor;
             fault_crs[2] = read_cr2();
         }
-
-        fault_crs[0] = read_cr0();
-        fault_crs[3] = read_cr3();
-        fault_crs[4] = read_cr4();
-        fault_regs.ds = read_sreg(ds);
-        fault_regs.es = read_sreg(es);
-        fault_regs.fs = read_sreg(fs);
-        fault_regs.gs = read_sreg(gs);
     }
 
     print_xen_info();
@@ -146,6 +156,7 @@ void show_registers(const struct cpu_user_regs *regs)
 void vcpu_show_registers(const struct vcpu *v)
 {
     const struct cpu_user_regs *regs = &v->arch.user_regs;
+    bool kernel = guest_kernel_mode(v, regs);
     unsigned long crs[8];
 
     /* Only handle PV guests for now */
@@ -154,10 +165,13 @@ void vcpu_show_registers(const struct vcpu *v)
 
     crs[0] = v->arch.pv_vcpu.ctrlreg[0];
     crs[2] = arch_get_cr2(v);
-    crs[3] = pagetable_get_paddr(guest_kernel_mode(v, regs) ?
+    crs[3] = pagetable_get_paddr(kernel ?
                                  v->arch.guest_table :
                                  v->arch.guest_table_user);
     crs[4] = v->arch.pv_vcpu.ctrlreg[4];
+    crs[5] = v->arch.pv_vcpu.fs_base;
+    crs[6 + !kernel] = v->arch.pv_vcpu.gs_base_kernel;
+    crs[7 - !kernel] = v->arch.pv_vcpu.gs_base_user;
 
     _show_registers(regs, crs, CTXT_pv_guest, v);
 }
@@ -237,14 +251,7 @@ void do_double_fault(struct cpu_user_regs *regs)
     printk("*** DOUBLE FAULT ***\n");
     print_xen_info();
 
-    crs[0] = read_cr0();
-    crs[2] = read_cr2();
-    crs[3] = read_cr3();
-    crs[4] = read_cr4();
-    regs->ds = read_sreg(ds);
-    regs->es = read_sreg(es);
-    regs->fs = read_sreg(fs);
-    regs->gs = read_sreg(gs);
+    read_registers(regs, crs);
 
     printk("CPU:    %d\n", cpu);
     _show_registers(regs, crs, CTXT_hypervisor, NULL);

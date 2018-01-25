@@ -72,12 +72,12 @@ static l1_pgentry_t guest_get_eff_kern_l1e(unsigned long linear)
     l1_pgentry_t l1e;
 
     if ( user_mode )
-        toggle_guest_mode(curr);
+        toggle_guest_pt(curr);
 
     l1e = guest_get_eff_l1e(linear);
 
     if ( user_mode )
-        toggle_guest_mode(curr);
+        toggle_guest_pt(curr);
 
     return l1e;
 }

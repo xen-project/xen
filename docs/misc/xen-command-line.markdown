@@ -245,6 +245,22 @@ and not running softirqs. Reduce this if softirqs are not being run frequently
 enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
+### bti (x86)
+> `= List of [ thunk=retpoline|lfence|jmp ]`
+
+Branch Target Injection controls.  By default, Xen will pick the most
+appropriate BTI mitigations based on compiled in support, loaded microcode,
+and hardware details.
+
+**WARNING: Any use of this option may interfere with heuristics.  Use with
+extreme care.**
+
+If Xen was compiled with INDIRECT_THUNK support, `thunk=` can be used to
+select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
+locations.  The default thunk is `retpoline` (generally preferred for Intel
+hardware), with the alternatives being `jmp` (a `jmp *%reg` gadget, minimal
+overhead), and `lfence` (an `lfence; jmp *%reg` gadget, preferred for AMD).
+
 ### xenheap\_megabytes (arm32)
 > `= <size>`
 
@@ -365,7 +381,7 @@ The following are examples of correct specifications:
 Specify the size of the console ring buffer.
 
 ### console
-> `= List of [ vga | com1[H,L] | com2[H,L] | dbgp | none ]`
+> `= List of [ vga | com1[H,L] | com2[H,L] | pv | dbgp | none ]`
 
 > Default: `console=com1,vga`
 
@@ -380,6 +396,9 @@ set, while received characters must have their MSB set.  `L` indicates
 the converse; transmitted and received characters will have their MSB
 cleared.  This allows a single port to be shared by two subsystems
 (e.g. console and debugger).
+
+`pv` indicates that Xen should use Xen's PV console. This option is
+only available when used together with `pv-in-pvh`.
 
 `dbgp` indicates that Xen should use a USB debug port.
 
@@ -454,6 +473,18 @@ choice of `dom0-kernel` is deprecated and not supported by all Dom0 kernels.
 * `<maxfreq>` and `<minfreq>` are integers which represent max and min processor frequencies
   respectively.
 * `verbose` option can be included as a string or also as `verbose=<integer>`
+
+### cpuid (x86)
+> `= List of comma separated booleans`
+
+This option allows for fine tuning of the facilities Xen will use, after
+accounting for hardware capabilities as enumerated via CPUID.
+
+Currently accepted:
+
+The Speculation Control hardware features `ibrsb`, `stibp`, `ibpb` are used by
+default if avaiable.  They can be ignored, e.g. `no-ibrsb`, at which point Xen
+won't use them itself, and won't offer them to guests.
 
 ### cpuid\_mask\_cpu (AMD only)
 > `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
@@ -682,6 +713,8 @@ If you use this option then it is highly recommended that you disable
 any dom0 autoballooning feature present in your toolstack. See the
 _xl.conf(5)_ man page or [Xen Best
 Practices](http://wiki.xen.org/wiki/Xen_Best_Practices#Xen_dom0_dedicated_memory_and_preventing_dom0_memory_ballooning).
+
+This option doesn't have effect if pv-shim mode is enabled.
 
 ### dom0\_nodes
 
@@ -1422,6 +1455,51 @@ The following resources are available:
     CDP, one COS will corespond two CBMs other than one with CAT, due to the
     sum of CBMs is fixed, that means actual `cos_max` in use will automatically
     reduce to half when CDP is enabled.
+	
+### pv-linear-pt
+> `= <boolean>`
+
+> Default: `true`
+
+Only available if Xen is compiled with CONFIG\_PV\_LINEAR\_PT support
+enabled.
+
+Allow PV guests to have pagetable entries pointing to other pagetables
+of the same level (i.e., allowing L2 PTEs to point to other L2 pages).
+This technique is often called "linear pagetables", and is sometimes
+used to allow operating systems a simple way to consistently map the
+current process's pagetables into its own virtual address space.
+
+Linux and MiniOS don't use this technique.  NetBSD and Novell Netware
+do; there may be other custom operating systems which do.  If you're
+certain you don't plan on having PV guests which use this feature,
+turning it off can reduce the attack surface.
+
+### pv-shim (x86)
+> `= <boolean>`
+
+> Default: `false`
+
+This option is intended for use by a toolstack, when choosing to run a PV
+guest compatibly inside an HVM container.
+
+In this mode, the kernel and initrd passed as modules to the hypervisor are
+constructed into a plain unprivileged PV domain.
+
+### shim\_mem (x86)
+> `= List of ( min:<size> | max:<size> | <size> )`
+
+Set the amount of memory that xen-shim uses. Only has effect if pv-shim mode is
+enabled. Note that this value accounts for the memory used by the shim itself
+plus the free memory slack given to the shim for runtime allocations.
+
+* `min:<size>` specifies the minimum amount of memory. Ignored if greater
+   than max.
+* `max:<size>` specifies the maximum amount of memory.
+* `<size>` specifies the exact amount of memory. Overrides both min and max.
+
+By default, the amount of free memory slack given to the shim for runtime usage
+is 1MB.
 
 ### rcu-idle-timer-period-ms
 > `= <integer>`
@@ -1458,6 +1536,9 @@ Specify the host reboot method.
 
 'efi' instructs Xen to reboot using the EFI reboot call (in EFI mode by
  default it will use that method first).
+
+`xen` instructs Xen to reboot using Xen's SCHEDOP hypercall (this is the default
+when running nested Xen)
 
 ### rmrr
 > '= start<-end>=[s1]bdf1[,[s1]bdf2[,...]];start<-end>=[s2]bdf1[,[s2]bdf2[,...]]
@@ -1829,6 +1910,18 @@ Permit use of x2apic setup for SMP environments.
 In the case that x2apic is in use, this option switches between physical and
 clustered mode.  The default, given no hint from the **FADT**, is cluster
 mode.
+
+### xpti
+> `= <boolean>`
+
+> Default: `false` on AMD hardware
+> Default: `true` everywhere else
+
+Override default selection of whether to isolate 64-bit PV guest page
+tables.
+
+** WARNING: Not yet a complete isolation implementation, but better than
+nothing. **
 
 ### xsave
 > `= <boolean>`

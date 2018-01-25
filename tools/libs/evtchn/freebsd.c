@@ -19,6 +19,7 @@
  * Split off from xc_freebsd_osdep.c
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -45,6 +46,12 @@ int osdep_evtchn_close(xenevtchn_handle *xce)
         return 0;
 
     return close(xce->fd);
+}
+
+int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid)
+{
+    errno = -EOPNOTSUPP;
+    return -1;
 }
 
 int xenevtchn_fd(xenevtchn_handle *xce)

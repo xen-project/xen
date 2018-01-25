@@ -964,6 +964,20 @@ void parse_config_data(const char *config_source,
         xlu_cfg_replace_string(config, "pool", &c_info->pool_name, 0);
 
     libxl_domain_build_info_init_type(b_info, c_info->type);
+
+    if (b_info->type == LIBXL_DOMAIN_TYPE_PVH) {
+        xlu_cfg_get_defbool(config, "pvshim", &b_info->u.pvh.pvshim, 0);
+        if (!xlu_cfg_get_string(config, "pvshim_path", &buf, 0))
+            xlu_cfg_replace_string(config, "pvshim_path",
+                                   &b_info->u.pvh.pvshim_path, 0);
+        if (!xlu_cfg_get_string(config, "pvshim_cmdline", &buf, 0))
+            xlu_cfg_replace_string(config, "pvshim_cmdline",
+                                   &b_info->u.pvh.pvshim_cmdline, 0);
+        if (!xlu_cfg_get_string(config, "pvshim_extra", &buf, 0))
+            xlu_cfg_replace_string(config, "pvshim_extra",
+                                   &b_info->u.pvh.pvshim_extra, 0);
+    }
+
     if (blkdev_start)
         b_info->blkdev_start = strdup(blkdev_start);
 

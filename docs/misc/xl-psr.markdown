@@ -186,6 +186,68 @@ Setting data CBM for a domain:
 Setting the same code and data CBM for a domain:
 `xl psr-cat-set <domid> <cbm>`
 
+## Memory Bandwidth Allocation (MBA)
+
+Memory Bandwidth Allocation (MBA) is a new feature available on Intel
+Skylake and later server platforms that allows an OS or Hypervisor/VMM to
+slow misbehaving apps/VMs by using a credit-based throttling mechanism. To
+enforce bandwidth on a specific domain, just set throttling value (THRTL)
+into Class of Service (COS). MBA provides two THRTL mode. One is linear mode
+and the other is non-linear mode.
+
+In the linear mode the input precision is defined as 100-(THRTL_MAX). Values
+not an even multiple of the precision (e.g., 12%) will be rounded down (e.g.,
+to 10% delay by the hardware).
+
+If linear values are not supported then input delay values are powers-of-two
+from zero to the THRTL_MAX value from CPUID. In this case any values not a power
+of two will be rounded down the next nearest power of two.
+
+For example, assuming a system with 2 domains:
+
+ * A THRTL of 0x0 for every domain means each domain can access the whole cache
+   without any delay. This is the default.
+
+ * Linear mode: Giving one domain a THRTL of 0xC and the other domain's 0 means
+   that the first domain gets 10% delay to access the cache and the other one
+   without any delay.
+
+ * Non-linear mode: Giving one domain a THRTL of 0xC and the other domain's 0
+   means that the first domain gets 8% delay to access the cache and the other
+   one without any delay.
+
+For more detailed information please refer to Intel SDM chapter
+"Introduction to Memory Bandwidth Allocation".
+
+In Xen's implementation, THRTL can be configured with libxl/xl interfaces but
+COS is maintained in hypervisor only. The cache partition granularity is per
+domain, each domain has COS=0 assigned by default, the corresponding THRTL is
+0, which means all the cache resource can be accessed without delay.
+
+### xl interfaces
+
+System MBA information such as maximum COS and maximum THRTL can be obtained by:
+
+`xl psr-hwinfo --mba`
+
+The simplest way to change a domain's THRTL from its default is running:
+
+`xl psr-mba-set  [OPTIONS] <domid> <thrtl>`
+
+In a multi-socket system, the same thrtl will be set on each socket by default.
+Per socket thrtl can be specified with the `--socket SOCKET` option.
+
+Setting the THRTL may not be successful if insufficient COS is available. In
+such case unused COS(es) may be freed by setting THRTL of all related domains to
+its default value(0).
+
+Per domain THRTL settings can be shown by:
+
+`xl psr-mba-show [OPTIONS] <domid>`
+
+For linear mode, it shows the decimal value. For non-linear mode, it shows
+hexadecimal value.
+
 ## Reference
 
 [1] Intel SDM

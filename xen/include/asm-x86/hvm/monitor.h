@@ -37,7 +37,7 @@ bool hvm_monitor_cr(unsigned int index, unsigned long value,
                     unsigned long old);
 #define hvm_monitor_crX(cr, new, old) \
                         hvm_monitor_cr(VM_EVENT_X86_##cr, new, old)
-void hvm_monitor_msr(unsigned int msr, uint64_t value);
+void hvm_monitor_msr(unsigned int msr, uint64_t value, uint64_t old_value);
 void hvm_monitor_descriptor_access(uint64_t exit_info,
                                    uint64_t vmx_exit_qualification,
                                    uint8_t descriptor, bool is_write);

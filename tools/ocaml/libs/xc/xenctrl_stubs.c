@@ -144,7 +144,8 @@ static int domain_create_flag_table[] = {
 };
 
 CAMLprim value stub_xc_domain_create(value xch, value ssidref,
-                                     value flags, value handle)
+                                     value flags, value handle,
+                                     value domconfig)
 {
 	CAMLparam4(xch, ssidref, flags, handle);
 
@@ -155,6 +156,7 @@ CAMLprim value stub_xc_domain_create(value xch, value ssidref,
 	uint32_t c_ssidref = Int32_val(ssidref);
 	unsigned int c_flags = 0;
 	value l;
+	xc_domain_configuration_t config = {};
 
         if (Wosize_val(handle) != 16)
 		caml_invalid_argument("Handle not a 16-integer array");
@@ -168,8 +170,28 @@ CAMLprim value stub_xc_domain_create(value xch, value ssidref,
 		c_flags |= domain_create_flag_table[v];
 	}
 
+	switch(Tag_val(domconfig)) {
+	case 0: /* ARM - nothing to do */
+		caml_failwith("Unhandled: ARM");
+		break;
+
+	case 1: /* X86 - emulation flags in the block */
+#if defined(__i386__) || defined(__x86_64__)
+		for (l = Field(Field(domconfig, 0), 0);
+		     l != Val_none;
+		     l = Field(l, 1))
+			config.emulation_flags |= 1u << Int_val(Field(l, 0));
+#else
+		caml_failwith("Unhandled: x86");
+#endif
+		break;
+
+	default:
+		caml_failwith("Unhandled domconfig type");
+	}
+
 	caml_enter_blocking_section();
-	result = xc_domain_create(_H(xch), c_ssidref, h, c_flags, &domid, NULL);
+	result = xc_domain_create(_H(xch), c_ssidref, h, c_flags, &domid, &config);
 	caml_leave_blocking_section();
 
 	if (result < 0)
@@ -273,10 +295,10 @@ CAMLprim value stub_xc_domain_shutdown(value xch, value domid, value reason)
 static value alloc_domaininfo(xc_domaininfo_t * info)
 {
 	CAMLparam0();
-	CAMLlocal2(result, tmp);
+	CAMLlocal5(result, tmp, arch_config, x86_arch_config, emul_list);
 	int i;
 
-	result = caml_alloc_tuple(16);
+	result = caml_alloc_tuple(17);
 
 	Store_field(result,  0, Val_int(info->domain));
 	Store_field(result,  1, Val_bool(info->flags & XEN_DOMINF_dying));
@@ -301,6 +323,30 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 	}
 
 	Store_field(result, 15, tmp);
+
+#if defined(__i386__) || defined(__x86_64__)
+	/* emulation_flags: x86_arch_emulation_flags list; */
+	tmp = emul_list = Val_emptylist;
+	for (i = 0; i < 10; i++) {
+		if ((info->arch_config.emulation_flags >> i) & 1) {
+			tmp = caml_alloc_small(2, Tag_cons);
+			Field(tmp, 0) = Val_int(i);
+			Field(tmp, 1) = emul_list;
+			emul_list = tmp;
+		}
+	}
+
+	/* xen_x86_arch_domainconfig */
+	x86_arch_config = caml_alloc_tuple(1);
+	Store_field(x86_arch_config, 0, emul_list);
+
+	/* arch_config: arch_domainconfig */
+	arch_config = caml_alloc_small(1, 1);
+
+	Store_field(arch_config, 0, x86_arch_config);
+
+	Store_field(result, 16, arch_config);
+#endif
 
 	CAMLreturn(result);
 }

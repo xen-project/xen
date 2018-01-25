@@ -31,7 +31,6 @@
 #include <xen/acpi.h>
 #include <asm/system.h>
 #include <asm/time.h>
-#include <asm/gic.h>
 #include <asm/vgic.h>
 #include <asm/cpufeature.h>
 #include <asm/platform.h>

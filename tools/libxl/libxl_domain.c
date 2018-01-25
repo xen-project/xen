@@ -599,7 +599,7 @@ int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid)
     if (domtype == LIBXL_DOMAIN_TYPE_INVALID)
         return ERROR_FAIL;
 
-    if (domtype == LIBXL_DOMAIN_TYPE_PV)
+    if (domtype != LIBXL_DOMAIN_TYPE_HVM)
         return 1;
 
     ret = xc_hvm_param_get(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);

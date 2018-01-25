@@ -484,10 +484,6 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
         return -EINVAL;
     }
 
-    printk("OS: %s version: %s loader: %s bitness: %s\n", parms.guest_os,
-           parms.guest_ver, parms.loader,
-           elf_64bit(&elf) ? "64-bit" : "32-bit");
-
     /* Copy the OS image and free temporary buffer. */
     elf.dest_base = (void *)(parms.virt_kstart - parms.virt_base);
     elf.dest_size = parms.virt_kend - parms.virt_kstart;
@@ -818,6 +814,17 @@ static bool __init pvh_acpi_table_allowed(const char *sig)
     return true;
 }
 
+static bool __init pvh_acpi_xsdt_table_allowed(const char *sig)
+{
+    /*
+     * DSDT and FACS are pointed to from FADT and thus don't belong
+     * in XSDT.
+     */
+    return (pvh_acpi_table_allowed(sig) &&
+            strncmp(sig, ACPI_SIG_DSDT, ACPI_NAME_SIZE) &&
+            strncmp(sig, ACPI_SIG_FACS, ACPI_NAME_SIZE));
+}
+
 static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
                                       paddr_t *addr)
 {
@@ -841,7 +848,7 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     {
         const char *sig = acpi_gbl_root_table_list.tables[i].signature.ascii;
 
-        if ( pvh_acpi_table_allowed(sig) )
+        if ( pvh_acpi_xsdt_table_allowed(sig) )
             num_tables++;
     }
 
@@ -888,7 +895,7 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     {
         const char *sig = acpi_gbl_root_table_list.tables[i].signature.ascii;
 
-        if ( pvh_acpi_table_allowed(sig) )
+        if ( pvh_acpi_xsdt_table_allowed(sig) )
             xsdt->table_offset_entry[j++] =
                 acpi_gbl_root_table_list.tables[i].address;
     }
@@ -1052,7 +1059,6 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
 int __init dom0_construct_pvh(struct domain *d, const module_t *image,
                               unsigned long image_headroom,
                               module_t *initrd,
-                              void *(*bootstrap_map)(const module_t *),
                               char *cmdline)
 {
     paddr_t entry, start_info;

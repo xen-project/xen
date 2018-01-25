@@ -184,6 +184,8 @@ int do_control(struct connection *conn, struct buffered_data *in)
 		return EACCES;
 
 	num = xs_count_strings(in->buffer, in->used);
+	if (num < 1)
+		return EINVAL;
 	vec = talloc_array(in, char *, num);
 	if (!vec)
 		return ENOMEM;

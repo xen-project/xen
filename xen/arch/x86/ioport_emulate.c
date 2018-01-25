@@ -8,14 +8,14 @@
 #include <xen/sched.h>
 #include <xen/dmi.h>
 
-static void ioemul_handle_proliant_quirk(
+static bool ioemul_handle_proliant_quirk(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs)
 {
     uint16_t port = regs->dx;
     uint8_t value = regs->al;
 
     if ( (opcode != 0xee) || (port != 0xcd4) || !(value & 0x80) )
-        return;
+        return false;
 
     /*    pushf */
     io_emul_stub[0] = 0x9c;
@@ -35,6 +35,10 @@ static void ioemul_handle_proliant_quirk(
     io_emul_stub[8] = 0x9d;
     /*    ret */
     io_emul_stub[9] = 0xc3;
+
+    BUILD_BUG_ON(IOEMUL_QUIRK_STUB_BYTES < 10);
+
+    return true;
 }
 
 static int __init proliant_quirk(struct dmi_system_id *d)

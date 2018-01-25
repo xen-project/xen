@@ -200,10 +200,27 @@ static int construct_vmcb(struct vcpu *v)
 
         /* PAT is under complete control of SVM when using nested paging. */
         svm_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
+
+        /* Use virtual VMLOAD/VMSAVE if available. */
+        if ( cpu_has_svm_vloadsave )
+        {
+            vmcb->virt_ext.fields.vloadsave_enable = 1;
+            vmcb->_general2_intercepts &= ~GENERAL2_INTERCEPT_VMLOAD;
+            vmcb->_general2_intercepts &= ~GENERAL2_INTERCEPT_VMSAVE;
+        }
     }
     else
     {
         vmcb->_exception_intercepts |= (1U << TRAP_page_fault);
+    }
+
+    /* if available, enable and configure virtual gif */
+    if ( cpu_has_svm_vgif )
+    {
+        vmcb->_vintr.fields.vgif = 1;
+        vmcb->_vintr.fields.vgif_enable = 1;
+        vmcb->_general2_intercepts &= ~GENERAL2_INTERCEPT_STGI;
+        vmcb->_general2_intercepts &= ~GENERAL2_INTERCEPT_CLGI;
     }
 
     if ( cpu_has_pause_filter )

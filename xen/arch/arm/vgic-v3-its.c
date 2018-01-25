@@ -381,7 +381,7 @@ static int its_handle_clear(struct virt_its *its, uint64_t *cmdptr)
      * have no active state, we don't need to care about this here.
      */
     if ( !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
-        gic_remove_irq_from_queues(vcpu, p);
+        vgic_remove_irq_from_queues(vcpu, p);
 
     spin_unlock_irqrestore(&vcpu->arch.vgic.lock, flags);
     ret = 0;
@@ -619,7 +619,7 @@ static int its_discard_event(struct virt_its *its,
     }
 
     /* Cleanup the pending_irq and disconnect it from the LPI. */
-    gic_remove_irq_from_queues(vcpu, p);
+    vgic_remove_irq_from_queues(vcpu, p);
     vgic_init_pending_irq(p, INVALID_LPI);
 
     spin_unlock_irqrestore(&vcpu->arch.vgic.lock, flags);

@@ -15,43 +15,6 @@
 
 #include "cpu.h"
 
-#define select_idle_routine(x) ((void)0)
-
-static bool __init probe_intel_cpuid_faulting(void)
-{
-	uint64_t x;
-
-	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, x) ||
-	    !(x & MSR_PLATFORM_INFO_CPUID_FAULTING))
-		return 0;
-
-	expected_levelling_cap |= LCAP_faulting;
-	levelling_caps |=  LCAP_faulting;
-	setup_force_cpu_cap(X86_FEATURE_CPUID_FAULTING);
-	return 1;
-}
-
-DEFINE_PER_CPU(bool, cpuid_faulting_enabled);
-
-static void set_cpuid_faulting(bool enable)
-{
-	bool *this_enabled = &this_cpu(cpuid_faulting_enabled);
-	uint32_t hi, lo;
-
-	ASSERT(cpu_has_cpuid_faulting);
-
-	if (*this_enabled == enable)
-		return;
-
-	rdmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
-	lo &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
-	if (enable)
-		lo |= MSR_MISC_FEATURES_CPUID_FAULTING;
-	wrmsr(MSR_INTEL_MISC_FEATURES_ENABLES, lo, hi);
-
-	*this_enabled = enable;
-}
-
 /*
  * Set caps in expected_levelling_cap, probe a specific masking MSR, and set
  * caps in levelling_caps if it is found, or clobber the MSR index if missing.
@@ -147,40 +110,17 @@ static void __init probe_masking_msrs(void)
 }
 
 /*
- * Context switch levelling state to the next domain.  A parameter of NULL is
- * used to context switch to the default host state (by the cpu bringup-code,
- * crash path, etc).
+ * Context switch CPUID masking state to the next domain.  Only called if
+ * CPUID Faulting isn't available, but masking MSRs have been detected.  A
+ * parameter of NULL is used to context switch to the default host state (by
+ * the cpu bringup-code, crash path, etc).
  */
-static void intel_ctxt_switch_levelling(const struct vcpu *next)
+static void intel_ctxt_switch_masking(const struct vcpu *next)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
 	const struct domain *nextd = next ? next->domain : NULL;
-	const struct cpuidmasks *masks;
-
-	if (cpu_has_cpuid_faulting) {
-		/*
-		 * We *should* be enabling faulting for the control domain.
-		 *
-		 * Unfortunately, the domain builder (having only ever been a
-		 * PV guest) expects to be able to see host cpuid state in a
-		 * native CPUID instruction, to correctly build a CPUID policy
-		 * for HVM guests (notably the xstate leaves).
-		 *
-		 * This logic is fundimentally broken for HVM toolstack
-		 * domains, and faulting causes PV guests to behave like HVM
-		 * guests from their point of view.
-		 *
-		 * Future development plans will move responsibility for
-		 * generating the maximum full cpuid policy into Xen, at which
-		 * this problem will disappear.
-		 */
-		set_cpuid_faulting(nextd && !is_control_domain(nextd) &&
-				   (is_pv_domain(nextd) ||
-				    next->arch.msr->misc_features_enables.cpuid_faulting));
-		return;
-	}
-
-	masks = (nextd && is_pv_domain(nextd) && nextd->arch.pv_domain.cpuidmasks)
+	const struct cpuidmasks *masks =
+		(nextd && is_pv_domain(nextd) && nextd->arch.pv_domain.cpuidmasks)
 		? nextd->arch.pv_domain.cpuidmasks : &cpuidmask_defaults;
 
         if (msr_basic) {
@@ -225,8 +165,10 @@ static void intel_ctxt_switch_levelling(const struct vcpu *next)
  */
 static void __init noinline intel_init_levelling(void)
 {
-	if (!probe_intel_cpuid_faulting())
-		probe_masking_msrs();
+	if (probe_cpuid_faulting())
+		return;
+
+	probe_masking_msrs();
 
 	if (msr_basic) {
 		uint32_t ecx, edx, tmp;
@@ -280,36 +222,34 @@ static void __init noinline intel_init_levelling(void)
 	}
 
 	if (levelling_caps)
-		ctxt_switch_levelling = intel_ctxt_switch_levelling;
+		ctxt_switch_masking = intel_ctxt_switch_masking;
 }
 
 static void early_init_intel(struct cpuinfo_x86 *c)
 {
+	u64 misc_enable, disable;
+
 	/* Netburst reports 64 bytes clflush size, but does IO in 128 bytes */
 	if (c->x86 == 15 && c->x86_cache_alignment == 64)
 		c->x86_cache_alignment = 128;
 
 	/* Unmask CPUID levels and NX if masked: */
-	if (c->x86 > 6 || (c->x86 == 6 && c->x86_model >= 0xd)) {
-		u64 misc_enable, disable;
+	rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 
-		rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
+	disable = misc_enable & (MSR_IA32_MISC_ENABLE_LIMIT_CPUID |
+				 MSR_IA32_MISC_ENABLE_XD_DISABLE);
+	if (disable) {
+		wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable & ~disable);
+		bootsym(trampoline_misc_enable_off) |= disable;
+	}
 
-		disable = misc_enable & (MSR_IA32_MISC_ENABLE_LIMIT_CPUID |
-					 MSR_IA32_MISC_ENABLE_XD_DISABLE);
-		if (disable) {
-			wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable & ~disable);
-			bootsym(trampoline_misc_enable_off) |= disable;
-		}
-
-		if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID)
-			printk(KERN_INFO "revised cpuid level: %d\n",
-			       cpuid_eax(0));
-		if (disable & MSR_IA32_MISC_ENABLE_XD_DISABLE) {
-			write_efer(read_efer() | EFER_NX);
-			printk(KERN_INFO
-			       "re-enabled NX (Execute Disable) protection\n");
-		}
+	if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID)
+		printk(KERN_INFO "revised cpuid level: %d\n",
+		       cpuid_eax(0));
+	if (disable & MSR_IA32_MISC_ENABLE_XD_DISABLE) {
+		write_efer(read_efer() | EFER_NX);
+		printk(KERN_INFO
+		       "re-enabled NX (Execute Disable) protection\n");
 	}
 
 	/* CPUID workaround for Intel 0F33/0F34 CPU */
@@ -320,7 +260,7 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	if (c == &boot_cpu_data)
 		intel_init_levelling();
 
-	intel_ctxt_switch_levelling(NULL);
+	ctxt_switch_levelling(NULL);
 }
 
 /*
@@ -375,7 +315,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 	/* Detect the extended topology information if available */
 	detect_extended_topology(c);
 
-	select_idle_routine(c);
 	l2 = init_intel_cacheinfo(c);
 	if (c->cpuid_level > 9) {
 		unsigned eax = cpuid_eax(10);

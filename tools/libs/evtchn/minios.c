@@ -82,6 +82,12 @@ int osdep_evtchn_close(xenevtchn_handle *xce)
     return close(xce->fd);
 }
 
+int osdep_evtchn_restrict(xenevtchn_handle *xce, domid_t domid)
+{
+    errno = -EOPNOTSUPP;
+    return -1;
+}
+
 void minios_evtchn_close_fd(int fd)
 {
     struct evtchn_port_info *port_info, *tmp;

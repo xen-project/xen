@@ -1,6 +1,7 @@
 subdir-y += acpi
 subdir-y += cpu
 subdir-y += genapic
+subdir-$(CONFIG_XEN_GUEST) += guest
 subdir-$(CONFIG_HVM) += hvm
 subdir-y += mm
 subdir-$(CONFIG_XENOPROF) += oprofile
@@ -36,6 +37,7 @@ obj-y += io_apic.o
 obj-$(CONFIG_LIVEPATCH) += alternative.o livepatch.o
 obj-y += msi.o
 obj-y += msr.o
+obj-$(CONFIG_INDIRECT_THUNK) += indirect-thunk.o
 obj-y += ioport_emulate.o
 obj-y += irq.o
 obj-$(CONFIG_KEXEC) += machine_kexec.o
@@ -56,6 +58,7 @@ obj-y += setup.o
 obj-y += shutdown.o
 obj-y += smp.o
 obj-y += smpboot.o
+obj-y += spec_ctrl.o
 obj-y += srat.o
 obj-y += string.o
 obj-y += sysctl.o
@@ -74,6 +77,8 @@ x86_emulate.o: x86_emulate/x86_emulate.c x86_emulate/x86_emulate.h
 efi-y := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
                       -O $(BASEDIR)/include/xen/compile.h ]; then \
                          echo '$(TARGET).efi'; fi)
+
+shim-$(CONFIG_PVH_GUEST) := $(TARGET)-shim
 
 ifneq ($(build_id_linker),)
 notes_phdrs = --notes
@@ -144,6 +149,11 @@ $(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
 		>$(@D)/$(@F).map
 	rm -f $(@D)/.$(@F).[0-9]*
 
+# Use elf32-x86-64 if toolchain support exists, elf32-i386 otherwise.
+$(TARGET)-shim: FORMAT = $(firstword $(filter elf32-x86-64,$(shell $(OBJCOPY) --help)) elf32-i386)
+$(TARGET)-shim: $(TARGET)-syms
+	$(OBJCOPY) -O $(FORMAT) $< $@
+
 note.o: $(TARGET)-syms
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id  $(BASEDIR)/xen-syms $@.bin
 	$(OBJCOPY) -I binary -O elf64-x86-64 -B i386:x86-64 \
@@ -168,30 +178,34 @@ ifeq ($(call ld-ver-build-id,$(LD) $(filter -m%,$(EFI_LDFLAGS))),y)
 CFLAGS += -DBUILD_ID_EFI
 EFI_LDFLAGS += $(build_id_linker)
 note_file := efi/buildid.o
+# NB: this must be the last input in the linker call, because inputs following
+# the -b option will all be treated as being in the specified format.
+note_file_option := -b pe-x86-64 $(note_file)
 else
 note_file := note.o
 endif
 else
 note_file :=
 endif
+note_file_option ?= $(note_file)
 
 $(TARGET).efi: prelink-efi.o $(note_file) efi.lds efi/relocs-dummy.o $(BASEDIR)/common/symbols-dummy.o efi/mkreloc
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
 	          $(guard) $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< efi/relocs-dummy.o \
-	                $(BASEDIR)/common/symbols-dummy.o $(note_file) -o $(@D)/.$(@F).$(base).0 &&) :
+	                $(BASEDIR)/common/symbols-dummy.o $(note_file_option) -o $(@D)/.$(@F).$(base).0 &&) :
 	$(guard) efi/mkreloc $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).0) >$(@D)/.$(@F).0r.S
 	$(guard) $(NM) -pa --format=sysv $(@D)/.$(@F).$(VIRT_BASE).0 \
 		| $(guard) $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).0s.S
 	$(guard) $(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o
 	$(foreach base, $(VIRT_BASE) $(ALT_BASE), \
 	          $(guard) $(LD) $(call EFI_LDFLAGS,$(base)) -T efi.lds -N $< \
-	                $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o $(note_file) -o $(@D)/.$(@F).$(base).1 &&) :
+	                $(@D)/.$(@F).0r.o $(@D)/.$(@F).0s.o $(note_file_option) -o $(@D)/.$(@F).$(base).1 &&) :
 	$(guard) efi/mkreloc $(foreach base,$(VIRT_BASE) $(ALT_BASE),$(@D)/.$(@F).$(base).1) >$(@D)/.$(@F).1r.S
 	$(guard) $(NM) -pa --format=sysv $(@D)/.$(@F).$(VIRT_BASE).1 \
 		| $(guard) $(BASEDIR)/tools/symbols $(all_symbols) --sysv --sort >$(@D)/.$(@F).1s.S
 	$(guard) $(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o
 	$(guard) $(LD) $(call EFI_LDFLAGS,$(VIRT_BASE)) -T efi.lds -N $< \
-	                $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o $(note_file) -o $@
+	                $(@D)/.$(@F).1r.o $(@D)/.$(@F).1s.o $(note_file_option) -o $@
 	if $(guard) false; then rm -f $@; echo 'EFI support disabled'; \
 	else $(NM) -pa --format=sysv $(@D)/$(@F) \
 		| $(BASEDIR)/tools/symbols --xensyms --sysv --sort >$(@D)/$(@F).map; fi
@@ -224,5 +238,6 @@ clean::
 	rm -f asm-offsets.s *.lds boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
 	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.efi efi/disabled efi/mkreloc
+	rm -f $(BASEDIR)/xen-shim
 	rm -f boot/cmdline.S boot/reloc.S boot/*.lnk boot/*.bin
 	rm -f note.o

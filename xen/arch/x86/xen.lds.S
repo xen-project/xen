@@ -12,14 +12,18 @@
 #define FORMAT "pei-x86-64"
 #undef __XEN_VIRT_START
 #define __XEN_VIRT_START __image_base__
+#define SECTION_ALIGN MB(2)
+#define DECL_SECTION(x) x :
 
 ENTRY(efi_start)
 
 #else /* !EFI */
 
 #define FORMAT "elf64-x86-64"
+#define SECTION_ALIGN PAGE_SIZE
+#define DECL_SECTION(x) x : AT(ADDR(x) - __XEN_VIRT_START)
 
-ENTRY(start)
+ENTRY(start_pa)
 
 #endif /* EFI */
 
@@ -30,7 +34,7 @@ OUTPUT_ARCH(i386:x86-64)
 PHDRS
 {
   text PT_LOAD ;
-#if defined(BUILD_ID) && !defined(EFI)
+#if (defined(BUILD_ID) || defined (CONFIG_PVH_GUEST)) && !defined(EFI)
   note PT_NOTE ;
 #endif
 }
@@ -54,11 +58,15 @@ SECTIONS
   __2M_text_start = .;         /* Start of 2M superpages, mapped RX. */
 #endif
 
+  start_pa = ABSOLUTE(start - __XEN_VIRT_START);
+
   . = __XEN_VIRT_START + XEN_IMG_OFFSET;
   _start = .;
-  .text : {
+  DECL_SECTION(.text) {
         _stext = .;            /* Text and read-only data */
        *(.text)
+       *(.text.__x86_indirect_thunk_*)
+       *(.text.page_aligned)
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)
@@ -67,15 +75,11 @@ SECTIONS
        _etext = .;             /* End of text section */
   } :text = 0x9090
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __2M_text_end = .;
 
   __2M_rodata_start = .;       /* Start of 2M superpages, mapped RO. */
-  .rodata : {
+  DECL_SECTION(.rodata) {
        _srodata = .;
        /* Bug frames table */
        __start_bug_frames = .;
@@ -126,6 +130,12 @@ SECTIONS
        __param_end = .;
   } :text
 
+#if defined(CONFIG_PVH_GUEST) && !defined(EFI)
+  DECL_SECTION(.note.Xen) {
+      *(.note.Xen)
+  } :note :text
+#endif
+
 #if defined(BUILD_ID)
 #if !defined(EFI)
 /*
@@ -134,13 +144,13 @@ SECTIONS
  * compiler may want to inject other things in the .note which we don't care
  * about - hence this unique name.
  */
-  .note.gnu.build-id : {
+  DECL_SECTION(.note.gnu.build-id) {
        __note_gnu_build_id_start = .;
        *(.note.gnu.build-id)
        __note_gnu_build_id_end = .;
   } :note :text
 #elif defined(BUILD_ID_EFI)
-  .buildid : {
+  DECL_SECTION(.buildid) {
        __note_gnu_build_id_start = .;
        *(.buildid)
        __note_gnu_build_id_end = .;
@@ -149,17 +159,13 @@ SECTIONS
 #endif
   _erodata = .;
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __2M_rodata_end = .;
 
   __2M_init_start = .;         /* Start of 2M superpages, mapped RWX (boot only). */
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
-  .init : {
+  DECL_SECTION(.init) {
        _sinittext = .;
        *(.init.text)
        /*
@@ -215,17 +221,13 @@ SECTIONS
        __ctors_end = .;
   } :text
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __init_end = .;
   __2M_init_end = .;
 
   __2M_rwdata_start = .;       /* Start of 2M superpages, mapped RW. */
   . = ALIGN(SMP_CACHE_BYTES);
-  .data.read_mostly : {
+  DECL_SECTION(.data.read_mostly) {
        *(.data.read_mostly)
        . = ALIGN(8);
        __start_schedulers_array = .;
@@ -233,7 +235,7 @@ SECTIONS
        __end_schedulers_array = .;
   } :text
 
-  .data : {                    /* Data */
+  DECL_SECTION(.data) {
        *(.data.page_aligned)
        *(.data)
        *(.data.rel)
@@ -241,7 +243,7 @@ SECTIONS
        CONSTRUCTORS
   } :text
 
-  .bss : {                     /* BSS */
+  DECL_SECTION(.bss) {
        __bss_start = .;
        *(.bss.stack_aligned)
        *(.bss.page_aligned*)
@@ -257,11 +259,7 @@ SECTIONS
   } :text
   _end = . ;
 
-#ifdef EFI
-  . = ALIGN(MB(2));
-#else
-  . = ALIGN(PAGE_SIZE);
-#endif
+  . = ALIGN(SECTION_ALIGN);
   __2M_rwdata_end = .;
 
 #ifdef EFI
@@ -289,6 +287,7 @@ SECTIONS
 #ifdef EFI
        *(.comment)
        *(.comment.*)
+       *(.note.Xen)
 #endif
   }
 
@@ -310,23 +309,13 @@ ASSERT(__image_base__ > XEN_VIRT_START ||
 ASSERT(kexec_reloc_size - kexec_reloc <= PAGE_SIZE, "kexec_reloc is too large")
 #endif
 
-#ifdef EFI
-ASSERT(IS_ALIGNED(__2M_text_end,     MB(2)), "__2M_text_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_start, MB(2)), "__2M_rodata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_end,   MB(2)), "__2M_rodata_end misaligned")
-ASSERT(IS_ALIGNED(__2M_init_start,   MB(2)), "__2M_init_start misaligned")
-ASSERT(IS_ALIGNED(__2M_init_end,     MB(2)), "__2M_init_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_start, MB(2)), "__2M_rwdata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_end,   MB(2)), "__2M_rwdata_end misaligned")
-#else
-ASSERT(IS_ALIGNED(__2M_text_end,     PAGE_SIZE), "__2M_text_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_start, PAGE_SIZE), "__2M_rodata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rodata_end,   PAGE_SIZE), "__2M_rodata_end misaligned")
-ASSERT(IS_ALIGNED(__2M_init_start,   PAGE_SIZE), "__2M_init_start misaligned")
-ASSERT(IS_ALIGNED(__2M_init_end,     PAGE_SIZE), "__2M_init_end misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_start, PAGE_SIZE), "__2M_rwdata_start misaligned")
-ASSERT(IS_ALIGNED(__2M_rwdata_end,   PAGE_SIZE), "__2M_rwdata_end misaligned")
-#endif
+ASSERT(IS_ALIGNED(__2M_text_end,     SECTION_ALIGN), "__2M_text_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_start, SECTION_ALIGN), "__2M_rodata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rodata_end,   SECTION_ALIGN), "__2M_rodata_end misaligned")
+ASSERT(IS_ALIGNED(__2M_init_start,   SECTION_ALIGN), "__2M_init_start misaligned")
+ASSERT(IS_ALIGNED(__2M_init_end,     SECTION_ALIGN), "__2M_init_end misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_start, SECTION_ALIGN), "__2M_rwdata_start misaligned")
+ASSERT(IS_ALIGNED(__2M_rwdata_end,   SECTION_ALIGN), "__2M_rwdata_end misaligned")
 
 ASSERT(IS_ALIGNED(cpu0_stack, STACK_SIZE), "cpu0_stack misaligned")
 

@@ -22,16 +22,15 @@ get_memory_map:
         cmpl    $SMAP,%eax                      # check the return is `SMAP'
         jne     .Lmem88
 
-        movb    bootsym(e820nr),%al             # up to 128 entries
-        cmpb    $E820_BIOS_MAX,%al
+        incw    bootsym(e820nr)
+        cmpw    $E820_BIOS_MAX,bootsym(e820nr)  # up to this many entries
         jae     .Lmem88
 
-        incb    bootsym(e820nr)
         movw    %di,%ax
         addw    $20,%ax
         movw    %ax,%di
-        cmpl    $0,%ebx                         # check to see if
-        jne     1b                              # %ebx is set to EOF
+        testl   %ebx,%ebx                       # check to see if
+        jnz     1b                              # %ebx is set to EOF
 
 .Lmem88:
         movb    $0x88, %ah
@@ -49,17 +48,17 @@ get_memory_map:
         int     $0x15
         jc      .Lint12
 
-        cmpw    $0x0, %cx                       # Kludge to handle BIOSes
-        jne     1f                              # which report their extended
-        cmpw    $0x0, %dx                       # memory in AX/BX rather than
-        jne     1f                              # CX/DX.  The spec I have read
+        testw   %cx, %cx                        # Kludge to handle BIOSes
+        jnz     1f                              # which report their extended
+        testw   %dx, %dx                        # memory in AX/BX rather than
+        jnz     1f                              # CX/DX.  The spec I have read
         movw    %ax, %cx                        # seems to indicate AX/BX 
         movw    %bx, %dx                        # are more reasonable anyway...
-1:      andl    $0xffff,%edx                    # clear sign extend
+1:      movzwl  %dx, %edx
         shll    $6,%edx                         # and go from 64k to 1k chunks
+        movzwl  %cx, %ecx
+        addl    %ecx, %edx                      # add in lower memory
         movl    %edx,bootsym(highmem_kb)        # store extended memory size
-        andl    $0xffff,%ecx                    # clear sign extend
-        addl    %ecx,bootsym(highmem_kb)        # and add lower memory into
 
 .Lint12:
         int     $0x12

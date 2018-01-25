@@ -24,6 +24,7 @@
 /* Resource Type Enumeration */
 #define PSR_RESOURCE_TYPE_L3            0x2
 #define PSR_RESOURCE_TYPE_L2            0x4
+#define PSR_RESOURCE_TYPE_MBA           0x8
 
 /* L3 Monitoring Features */
 #define PSR_CMT_L3_OCCUPANCY            0x1
@@ -37,7 +38,9 @@
 /* Used by psr_get_info() */
 #define PSR_INFO_IDX_COS_MAX            0
 #define PSR_INFO_IDX_CAT_CBM_LEN        1
-#define PSR_INFO_IDX_CAT_FLAG           2
+#define PSR_INFO_IDX_CAT_FLAGS          2
+#define PSR_INFO_IDX_MBA_THRTL_MAX      1
+#define PSR_INFO_IDX_MBA_FLAGS          2
 #define PSR_INFO_ARRAY_SIZE             3
 
 struct psr_cmt_l3 {
@@ -53,12 +56,13 @@ struct psr_cmt {
     struct psr_cmt_l3 l3;
 };
 
-enum cbm_type {
-    PSR_CBM_TYPE_L3,
-    PSR_CBM_TYPE_L3_CODE,
-    PSR_CBM_TYPE_L3_DATA,
-    PSR_CBM_TYPE_L2,
-    PSR_CBM_TYPE_UNKNOWN,
+enum psr_type {
+    PSR_TYPE_L3_CBM,
+    PSR_TYPE_L3_CODE,
+    PSR_TYPE_L3_DATA,
+    PSR_TYPE_L2_CBM,
+    PSR_TYPE_MBA_THRTL,
+    PSR_TYPE_UNKNOWN,
 };
 
 extern struct psr_cmt *psr_cmt;
@@ -72,12 +76,12 @@ int psr_alloc_rmid(struct domain *d);
 void psr_free_rmid(struct domain *d);
 void psr_ctxt_switch_to(struct domain *d);
 
-int psr_get_info(unsigned int socket, enum cbm_type type,
+int psr_get_info(unsigned int socket, enum psr_type type,
                  uint32_t data[], unsigned int array_len);
 int psr_get_val(struct domain *d, unsigned int socket,
-                uint32_t *val, enum cbm_type type);
+                uint32_t *val, enum psr_type type);
 int psr_set_val(struct domain *d, unsigned int socket,
-                uint64_t val, enum cbm_type type);
+                uint64_t val, enum psr_type type);
 
 void psr_domain_init(struct domain *d);
 void psr_domain_free(struct domain *d);

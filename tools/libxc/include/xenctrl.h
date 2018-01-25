@@ -456,6 +456,7 @@ typedef struct xc_dominfo {
     unsigned int  max_vcpu_id;
     xen_domain_handle_t handle;
     unsigned int  cpupool;
+    struct xen_arch_domainconfig arch_config;
 } xc_dominfo_t;
 
 typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
@@ -2052,7 +2053,7 @@ int xc_monitor_write_ctrlreg(xc_interface *xch, uint32_t domain_id,
  * non-architectural indices.
  */
 int xc_monitor_mov_to_msr(xc_interface *xch, uint32_t domain_id, uint32_t msr,
-                          bool enable);
+                          bool enable, bool onchangeonly);
 int xc_monitor_singlestep(xc_interface *xch, uint32_t domain_id, bool enable);
 int xc_monitor_software_breakpoint(xc_interface *xch, uint32_t domain_id,
                                    bool enable);
@@ -2490,13 +2491,36 @@ enum xc_psr_cmt_type {
 };
 typedef enum xc_psr_cmt_type xc_psr_cmt_type;
 
-enum xc_psr_cat_type {
+enum xc_psr_type {
     XC_PSR_CAT_L3_CBM      = 1,
     XC_PSR_CAT_L3_CBM_CODE = 2,
     XC_PSR_CAT_L3_CBM_DATA = 3,
     XC_PSR_CAT_L2_CBM      = 4,
+    XC_PSR_MBA_THRTL       = 5,
 };
-typedef enum xc_psr_cat_type xc_psr_cat_type;
+typedef enum xc_psr_type xc_psr_type;
+
+enum xc_psr_feat_type {
+    XC_PSR_CAT_L3,
+    XC_PSR_CAT_L2,
+    XC_PSR_MBA,
+};
+typedef enum xc_psr_feat_type xc_psr_feat_type;
+
+union xc_psr_hw_info {
+    struct {
+        uint32_t cos_max;
+        uint32_t cbm_len;
+        bool     cdp_enabled;
+    } cat;
+
+    struct {
+        uint32_t cos_max;
+        uint32_t thrtl_max;
+        bool     linear;
+    } mba;
+};
+typedef union xc_psr_hw_info xc_psr_hw_info;
 
 int xc_psr_cmt_attach(xc_interface *xch, uint32_t domid);
 int xc_psr_cmt_detach(xc_interface *xch, uint32_t domid);
@@ -2513,15 +2537,14 @@ int xc_psr_cmt_get_data(xc_interface *xch, uint32_t rmid, uint32_t cpu,
                         uint64_t *tsc);
 int xc_psr_cmt_enabled(xc_interface *xch);
 
-int xc_psr_cat_set_domain_data(xc_interface *xch, uint32_t domid,
-                               xc_psr_cat_type type, uint32_t target,
-                               uint64_t data);
-int xc_psr_cat_get_domain_data(xc_interface *xch, uint32_t domid,
-                               xc_psr_cat_type type, uint32_t target,
-                               uint64_t *data);
-int xc_psr_cat_get_info(xc_interface *xch, uint32_t socket, unsigned int lvl,
-                        uint32_t *cos_max, uint32_t *cbm_len,
-                        bool *cdp_enabled);
+int xc_psr_set_domain_data(xc_interface *xch, uint32_t domid,
+                           xc_psr_type type, uint32_t target,
+                           uint64_t data);
+int xc_psr_get_domain_data(xc_interface *xch, uint32_t domid,
+                           xc_psr_type type, uint32_t target,
+                           uint64_t *data);
+int xc_psr_get_hw_info(xc_interface *xch, uint32_t socket,
+                       xc_psr_feat_type type, xc_psr_hw_info *hw_info);
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps);
 int xc_get_cpu_featureset(xc_interface *xch, uint32_t index,

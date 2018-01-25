@@ -21,6 +21,7 @@
 #include <xsm/xsm.h>
 #ifdef CONFIG_MULTIBOOT
 #include <xen/multiboot.h>
+#include <asm/setup.h>
 #endif
 #include <xen/bitops.h>
 #ifdef CONFIG_HAS_DEVICE_TREE
@@ -31,7 +32,6 @@
 #ifdef CONFIG_MULTIBOOT
 int __init xsm_multiboot_policy_init(unsigned long *module_map,
                                      const multiboot_info_t *mbi,
-                                     void *(*bootstrap_map)(const module_t *),
                                      void **policy_buffer,
                                      size_t *policy_size)
 {

@@ -128,10 +128,10 @@ static inline void _write_gate_lower(volatile idt_entry_t *gate,
 #define _set_gate(gate_addr,type,dpl,addr)               \
 do {                                                     \
     (gate_addr)->a = 0;                                  \
-    wmb(); /* disable gate /then/ rewrite */             \
+    smp_wmb(); /* disable gate /then/ rewrite */         \
     (gate_addr)->b =                                     \
         ((unsigned long)(addr) >> 32);                   \
-    wmb(); /* rewrite /then/ enable gate */              \
+    smp_wmb(); /* rewrite /then/ enable gate */          \
     (gate_addr)->a =                                     \
         (((unsigned long)(addr) & 0xFFFF0000UL) << 32) | \
         ((unsigned long)(dpl) << 45) |                   \
@@ -174,11 +174,11 @@ static inline void _update_gate_addr_lower(idt_entry_t *gate, void *addr)
 #define _set_tssldt_desc(desc,addr,limit,type)           \
 do {                                                     \
     (desc)[0].b = (desc)[1].b = 0;                       \
-    wmb(); /* disable entry /then/ rewrite */            \
+    smp_wmb(); /* disable entry /then/ rewrite */        \
     (desc)[0].a =                                        \
         ((u32)(addr) << 16) | ((u32)(limit) & 0xFFFF);   \
     (desc)[1].a = (u32)(((unsigned long)(addr)) >> 32);  \
-    wmb(); /* rewrite /then/ enable entry */             \
+    smp_wmb(); /* rewrite /then/ enable entry */         \
     (desc)[0].b =                                        \
         ((u32)(addr) & 0xFF000000U) |                    \
         ((u32)(type) << 8) | 0x8000U |                   \
@@ -196,6 +196,26 @@ extern struct desc_struct boot_cpu_compat_gdt_table[];
 DECLARE_PER_CPU(struct desc_struct *, compat_gdt_table);
 
 extern void load_TR(void);
+
+static inline void lgdt(const struct desc_ptr *gdtr)
+{
+    __asm__ __volatile__ ( "lgdt %0" :: "m" (*gdtr) : "memory" );
+}
+
+static inline void lidt(const struct desc_ptr *idtr)
+{
+    __asm__ __volatile__ ( "lidt %0" :: "m" (*idtr) : "memory" );
+}
+
+static inline void lldt(unsigned int sel)
+{
+    __asm__ __volatile__ ( "lldt %w0" :: "rm" (sel) : "memory" );
+}
+
+static inline void ltr(unsigned int sel)
+{
+    __asm__ __volatile__ ( "ltr %w0" :: "rm" (sel) : "memory" );
+}
 
 #endif /* !__ASSEMBLY__ */
 

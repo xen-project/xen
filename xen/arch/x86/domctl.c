@@ -53,6 +53,7 @@ static int update_domain_cpuid_info(struct domain *d,
     struct cpuid_policy *p = d->arch.cpuid;
     const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
     int old_vendor = p->x86_vendor;
+    bool call_policy_changed = false; /* Avoid for_each_vcpu() unnecessarily */
 
     /*
      * Skip update for leaves we don't care about.  This avoids the overhead
@@ -128,13 +129,7 @@ static int update_domain_cpuid_info(struct domain *d,
     switch ( ctl->input[0] )
     {
     case 0:
-        if ( is_hvm_domain(d) && (p->x86_vendor != old_vendor) )
-        {
-            struct vcpu *v;
-
-            for_each_vcpu( d, v )
-                hvm_update_guest_vendor(v);
-        }
+        call_policy_changed = (p->x86_vendor != old_vendor);
         break;
 
     case 1:
@@ -299,6 +294,14 @@ static int update_domain_cpuid_info(struct domain *d,
         break;
     }
 
+    if ( call_policy_changed )
+    {
+        struct vcpu *v;
+
+        for_each_vcpu( d, v )
+            cpuid_policy_updated(v);
+    }
+
     return 0;
 }
 
@@ -345,6 +348,8 @@ void arch_get_domain_info(const struct domain *d,
 {
     if ( paging_mode_hap(d) )
         info->flags |= XEN_DOMINF_hap;
+
+    info->arch_config.emulation_flags = d->arch.emulation_flags;
 }
 
 #define MAX_IOPORTS 0x10000
@@ -1284,9 +1289,12 @@ long arch_do_domctl(
     case XEN_DOMCTL_set_vcpu_msrs:
     {
         struct xen_domctl_vcpu_msrs *vmsrs = &domctl->u.vcpu_msrs;
-        struct xen_domctl_vcpu_msr msr;
+        struct xen_domctl_vcpu_msr msr = {};
         struct vcpu *v;
-        uint32_t nr_msrs = 0;
+        static const uint32_t msrs_to_send[] = {
+            MSR_INTEL_MISC_FEATURES_ENABLES,
+        };
+        uint32_t nr_msrs = ARRAY_SIZE(msrs_to_send);
 
         ret = -ESRCH;
         if ( (vmsrs->vcpu >= d->max_vcpus) ||
@@ -1311,20 +1319,53 @@ long arch_do_domctl(
                 vmsrs->msr_count = nr_msrs;
             else
             {
+                unsigned int j;
+
                 i = 0;
 
                 vcpu_pause(v);
 
+                for ( j = 0; j < ARRAY_SIZE(msrs_to_send); ++j )
+                {
+                    uint64_t val;
+                    int rc = guest_rdmsr(v, msrs_to_send[j], &val);
+
+                    /*
+                     * It is the programmers responsibility to ensure that
+                     * msrs_to_send[] contain generally-read/write MSRs.
+                     * X86EMUL_EXCEPTION here implies a missing feature, and
+                     * that the guest doesn't have access to the MSR.
+                     */
+                    if ( rc == X86EMUL_EXCEPTION )
+                        continue;
+
+                    if ( rc != X86EMUL_OKAY )
+                    {
+                        ASSERT_UNREACHABLE();
+                        ret = -ENXIO;
+                        break;
+                    }
+
+                    if ( !val )
+                        continue; /* Skip empty MSRs. */
+
+                    if ( i < vmsrs->msr_count && !ret )
+                    {
+                        msr.index = msrs_to_send[j];
+                        msr.value = val;
+                        if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
+                            ret = -EFAULT;
+                    }
+                    ++i;
+                }
+
                 if ( boot_cpu_has(X86_FEATURE_DBEXT) )
                 {
-                    unsigned int j;
-
                     if ( v->arch.pv_vcpu.dr_mask[0] )
                     {
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
-                            msr.reserved = 0;
                             msr.value = v->arch.pv_vcpu.dr_mask[0];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
@@ -1339,7 +1380,6 @@ long arch_do_domctl(
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
-                            msr.reserved = 0;
                             msr.value = v->arch.pv_vcpu.dr_mask[1 + j];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
@@ -1375,6 +1415,11 @@ long arch_do_domctl(
 
                 switch ( msr.index )
                 {
+                case MSR_INTEL_MISC_FEATURES_ENABLES:
+                    if ( guest_wrmsr(v, msr.index, msr.value) != X86EMUL_OKAY )
+                        break;
+                    continue;
+
                 case MSR_AMD64_DR0_ADDRESS_MASK:
                     if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
                          (msr.value >> 32) )
@@ -1438,67 +1483,76 @@ long arch_do_domctl(
         }
         break;
 
-    case XEN_DOMCTL_psr_cat_op:
-        switch ( domctl->u.psr_cat_op.cmd )
+    case XEN_DOMCTL_psr_alloc:
+        switch ( domctl->u.psr_alloc.cmd )
         {
-            uint32_t val32;
-
-        case XEN_DOMCTL_PSR_CAT_OP_SET_L3_CBM:
-            ret = psr_set_val(d, domctl->u.psr_cat_op.target,
-                              domctl->u.psr_cat_op.data,
-                              PSR_CBM_TYPE_L3);
+        case XEN_DOMCTL_PSR_SET_L3_CBM:
+            ret = psr_set_val(d, domctl->u.psr_alloc.target,
+                              domctl->u.psr_alloc.data,
+                              PSR_TYPE_L3_CBM);
             break;
 
-        case XEN_DOMCTL_PSR_CAT_OP_SET_L3_CODE:
-            ret = psr_set_val(d, domctl->u.psr_cat_op.target,
-                              domctl->u.psr_cat_op.data,
-                              PSR_CBM_TYPE_L3_CODE);
+        case XEN_DOMCTL_PSR_SET_L3_CODE:
+            ret = psr_set_val(d, domctl->u.psr_alloc.target,
+                              domctl->u.psr_alloc.data,
+                              PSR_TYPE_L3_CODE);
             break;
 
-        case XEN_DOMCTL_PSR_CAT_OP_SET_L3_DATA:
-            ret = psr_set_val(d, domctl->u.psr_cat_op.target,
-                              domctl->u.psr_cat_op.data,
-                              PSR_CBM_TYPE_L3_DATA);
+        case XEN_DOMCTL_PSR_SET_L3_DATA:
+            ret = psr_set_val(d, domctl->u.psr_alloc.target,
+                              domctl->u.psr_alloc.data,
+                              PSR_TYPE_L3_DATA);
             break;
 
-        case XEN_DOMCTL_PSR_CAT_OP_SET_L2_CBM:
-            ret = psr_set_val(d, domctl->u.psr_cat_op.target,
-                              domctl->u.psr_cat_op.data,
-                              PSR_CBM_TYPE_L2);
+        case XEN_DOMCTL_PSR_SET_L2_CBM:
+            ret = psr_set_val(d, domctl->u.psr_alloc.target,
+                              domctl->u.psr_alloc.data,
+                              PSR_TYPE_L2_CBM);
             break;
 
-        case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CBM:
-            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
-                              &val32, PSR_CBM_TYPE_L3);
-            domctl->u.psr_cat_op.data = val32;
-            copyback = true;
+        case XEN_DOMCTL_PSR_SET_MBA_THRTL:
+            ret = psr_set_val(d, domctl->u.psr_alloc.target,
+                              domctl->u.psr_alloc.data,
+                              PSR_TYPE_MBA_THRTL);
             break;
 
-        case XEN_DOMCTL_PSR_CAT_OP_GET_L3_CODE:
-            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
-                              &val32, PSR_CBM_TYPE_L3_CODE);
-            domctl->u.psr_cat_op.data = val32;
-            copyback = true;
+#define domctl_psr_get_val(d, domctl, type, copyback) ({    \
+    uint32_t v_;                                            \
+    int r_ = psr_get_val((d), (domctl)->u.psr_alloc.target, \
+                         &v_, (type));                      \
+                                                            \
+    (domctl)->u.psr_alloc.data = v_;                        \
+    (copyback) = true;                                      \
+    r_;                                                     \
+})
+
+        case XEN_DOMCTL_PSR_GET_L3_CBM:
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L3_CBM, copyback);
             break;
 
-        case XEN_DOMCTL_PSR_CAT_OP_GET_L3_DATA:
-            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
-                              &val32, PSR_CBM_TYPE_L3_DATA);
-            domctl->u.psr_cat_op.data = val32;
-            copyback = true;
+        case XEN_DOMCTL_PSR_GET_L3_CODE:
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L3_CODE, copyback);
             break;
 
-        case XEN_DOMCTL_PSR_CAT_OP_GET_L2_CBM:
-            ret = psr_get_val(d, domctl->u.psr_cat_op.target,
-                              &val32, PSR_CBM_TYPE_L2);
-            domctl->u.psr_cat_op.data = val32;
-            copyback = true;
+        case XEN_DOMCTL_PSR_GET_L3_DATA:
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L3_DATA, copyback);
             break;
+
+        case XEN_DOMCTL_PSR_GET_L2_CBM:
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_L2_CBM, copyback);
+            break;
+
+        case XEN_DOMCTL_PSR_GET_MBA_THRTL:
+            ret = domctl_psr_get_val(d, domctl, PSR_TYPE_MBA_THRTL, copyback);
+            break;
+
+#undef domctl_psr_get_val
 
         default:
             ret = -EOPNOTSUPP;
             break;
         }
+
         break;
 
     case XEN_DOMCTL_disable_migrate:

@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <argp.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>

@@ -33,13 +33,20 @@
  *
  * Does not prevent effects that amount only to
  *   - denial of service, possibly host-wide, by resource exhaustion etc.
- *   - leak of not-very-interesting metainformation about other domains
- *     eg, specifically, event channel signals relating to other domains
  *
  * If this cannot be achieved, returns -1 and sets errno.
  * If called again with the same domid, it may succeed, or it may
  * fail (even though such a call is potentially meaningful).
  * (If called again with a different domid, it will necessarily fail.)
+ *
+ * Note for multi-threaded programs: If xentoolcore_restrict_all is
+ * called concurrently with a function which /or closes Xen library
+ * handles (e.g.  libxl_ctx_free, xs_close), the restriction is only
+ * guaranteed to be effective after all of the closing functions have
+ * returned, even if that is later than the return from
+ * xentoolcore_restrict_all.  (Of course if xentoolcore_restrict_all
+ * it is called concurrently with opening functions, the new handles
+ * might or might not be restricted.)
  *
  *  ====================================================================
  *  IMPORTANT - IMPLEMENTATION STATUS

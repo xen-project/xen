@@ -163,7 +163,8 @@ static int hvmemul_do_io(
              (p.count > *reps) ||
              (p.dir != dir) ||
              (p.df != df) ||
-             (p.data_is_ptr != data_is_addr) )
+             (p.data_is_ptr != data_is_addr) ||
+             (data_is_addr && (p.data != data)) )
             domain_crash(currd);
 
         if ( data_is_addr )
@@ -1348,28 +1349,41 @@ static int hvmemul_rep_ins(
 }
 
 static int hvmemul_rep_outs_set_context(
-    enum x86_segment src_seg,
-    unsigned long src_offset,
     uint16_t dst_port,
     unsigned int bytes_per_rep,
-    unsigned long *reps,
-    struct x86_emulate_ctxt *ctxt)
+    unsigned long *reps)
 {
-    unsigned int bytes = *reps * bytes_per_rep;
-    char *buf;
-    int rc;
+    const struct arch_vm_event *ev = current->arch.vm_event;
+    const uint8_t *ptr;
+    unsigned int avail;
+    unsigned long done;
+    int rc = X86EMUL_OKAY;
 
-    buf = xmalloc_array(char, bytes);
-
-    if ( buf == NULL )
+    ASSERT(bytes_per_rep <= 4);
+    if ( !ev )
         return X86EMUL_UNHANDLEABLE;
 
-    rc = set_context_data(buf, bytes);
+    ptr = ev->emul.read.data;
+    avail = ev->emul.read.size;
 
-    if ( rc == X86EMUL_OKAY )
-        rc = hvmemul_do_pio_buffer(dst_port, bytes, IOREQ_WRITE, buf);
+    for ( done = 0; done < *reps; ++done )
+    {
+        unsigned int size = min(bytes_per_rep, avail);
+        uint32_t data = 0;
 
-    xfree(buf);
+        if ( done && hypercall_preempt_check() )
+            break;
+
+        memcpy(&data, ptr, size);
+        avail -= size;
+        ptr += size;
+
+        rc = hvmemul_do_pio_buffer(dst_port, bytes_per_rep, IOREQ_WRITE, &data);
+        if ( rc != X86EMUL_OKAY )
+            break;
+    }
+
+    *reps = done;
 
     return rc;
 }
@@ -1391,8 +1405,7 @@ static int hvmemul_rep_outs(
     int rc;
 
     if ( unlikely(hvmemul_ctxt->set_context) )
-        return hvmemul_rep_outs_set_context(src_seg, src_offset, dst_port,
-                                            bytes_per_rep, reps, ctxt);
+        return hvmemul_rep_outs_set_context(dst_port, bytes_per_rep, reps);
 
     rc = hvmemul_virtual_to_linear(
         src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
@@ -2109,20 +2122,22 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
 
     vio->mmio_retry = 0;
 
-    rc = x86_emulate(&hvmemul_ctxt->ctxt, ops);
-
-    if ( rc == X86EMUL_OKAY && vio->mmio_retry )
-        rc = X86EMUL_RETRY;
-    if ( rc != X86EMUL_RETRY )
+    switch ( rc = x86_emulate(&hvmemul_ctxt->ctxt, ops) )
     {
+    case X86EMUL_OKAY:
+        if ( vio->mmio_retry )
+            rc = X86EMUL_RETRY;
+        /* fall through */
+    default:
         vio->mmio_cache_count = 0;
         vio->mmio_insn_bytes = 0;
-    }
-    else
-    {
+        break;
+
+    case X86EMUL_RETRY:
         BUILD_BUG_ON(sizeof(vio->mmio_insn) < sizeof(hvmemul_ctxt->insn_buf));
         vio->mmio_insn_bytes = hvmemul_ctxt->insn_buf_bytes;
         memcpy(vio->mmio_insn, hvmemul_ctxt->insn_buf, vio->mmio_insn_bytes);
+        break;
     }
 
     if ( hvmemul_ctxt->ctxt.retire.singlestep )

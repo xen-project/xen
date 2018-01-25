@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if __GNUC__ >= 6
+#pragma GCC target("no-sse")
+#endif
+
 #include <xen/xen.h>
 
 #include <asm/msr-index.h>

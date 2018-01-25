@@ -22,7 +22,6 @@
 #include <xen/vmap.h>
 #include <xen/device_tree.h>
 #include <asm/io.h>
-#include <asm/gic.h>
 
 /* XGENE RESET Specific defines */
 #define XGENE_RESET_ADDR        0x17000014UL

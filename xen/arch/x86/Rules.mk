@@ -24,9 +24,26 @@ $(call as-insn-check,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      -U__OBJECT_LABEL__ -DHAVE_GAS_QUOTED_SYM \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
 
-CFLAGS += -mno-red-zone -mno-sse -fpic
-CFLAGS += -fno-asynchronous-unwind-tables
+CFLAGS += -mno-red-zone -fpic -fno-asynchronous-unwind-tables
+
+# Xen doesn't use SSE interally.  If the compiler supports it, also skip the
+# SSE setup for variadic function calls.
+CFLAGS += -mno-sse $(call cc-option,$(CC),-mskip-rax-setup)
+
 # -fvisibility=hidden reduces -fpic cost, if it's available
 ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
+endif
+
+# Compile with thunk-extern, indirect-branch-register if avaiable.
+ifneq ($(call cc-option,$(CC),-mindirect-branch-register,n),n)
+CFLAGS += -mindirect-branch=thunk-extern -mindirect-branch-register
+CFLAGS += -DCONFIG_INDIRECT_THUNK
+export CONFIG_INDIRECT_THUNK=y
+endif
+
+# Set up the assembler include path properly for older GCC toolchains.  Clang
+# objects to the agument being passed however.
+ifneq ($(clang),y)
+CFLAGS += -Wa,-I$(BASEDIR)/include
 endif

@@ -118,6 +118,8 @@
 #define TAP_DEVICE_SUFFIX "-emu"
 #define DOMID_XS_PATH "domid"
 #define INVALID_DOMID ~0
+#define PVSHIM_BASENAME "xen-shim"
+#define PVSHIM_CMDLINE "pv-shim console=xen,pv"
 
 /* Size macros. */
 #define __AC(X,Y)   (X##Y)
@@ -635,6 +637,7 @@ static inline int libxl__gc_is_real(const libxl__gc *gc)
  */
 /* register ptr in gc for free on exit from outermost libxl callframe. */
 
+#define NN(...) __attribute__((nonnull(__VA_ARGS__)))
 #define NN1 __attribute__((nonnull(1)))
  /* It used to be legal to pass NULL for gc_opt.  Get the compiler to
   * warn about this if any slip through. */
@@ -1135,6 +1138,8 @@ typedef struct {
 
     libxl__file_reference pv_kernel;
     libxl__file_reference pv_ramdisk;
+    const char * shim_path;
+    const char * shim_cmdline;
     const char * pv_cmdline;
 
     xen_vmemrange_t *vmemranges;
@@ -1711,7 +1716,7 @@ _hidden char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid);
 _hidden char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid);
 
 _hidden int libxl__enum_from_string(const libxl_enum_string_table *t,
-                                    const char *s, int *e);
+                                    const char *s, int *e) NN(2);
 
 _hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
 

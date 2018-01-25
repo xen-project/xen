@@ -135,7 +135,7 @@ struct hvm_function_table {
     void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
     void (*update_guest_efer)(struct vcpu *v);
 
-    void (*update_guest_vendor)(struct vcpu *v);
+    void (*cpuid_policy_changed)(struct vcpu *v);
 
     void (*fpu_leave)(struct vcpu *v);
 
@@ -195,6 +195,7 @@ struct hvm_function_table {
     void (*process_isr)(int isr, struct vcpu *v);
     void (*deliver_posted_intr)(struct vcpu *v, u8 vector);
     void (*sync_pir_to_irr)(struct vcpu *v);
+    bool (*test_pir)(const struct vcpu *v, uint8_t vector);
     void (*handle_eoi)(u8 vector);
 
     /*Walk nested p2m  */
@@ -333,9 +334,9 @@ static inline void hvm_update_guest_efer(struct vcpu *v)
     hvm_funcs.update_guest_efer(v);
 }
 
-static inline void hvm_update_guest_vendor(struct vcpu *v)
+static inline void hvm_cpuid_policy_changed(struct vcpu *v)
 {
-    hvm_funcs.update_guest_vendor(v);
+    hvm_funcs.cpuid_policy_changed(v);
 }
 
 /*

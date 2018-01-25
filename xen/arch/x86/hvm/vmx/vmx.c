@@ -72,7 +72,6 @@ static void vmx_free_vlapic_mapping(struct domain *d);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
 static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
 static void vmx_update_guest_efer(struct vcpu *v);
-static void vmx_update_guest_vendor(struct vcpu *v);
 static void vmx_wbinvd_intercept(void);
 static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
@@ -542,7 +541,7 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:
         if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
+            return HNDL_exception_raised;
 
         if ( msr == MSR_FS_BASE )
             __vmwrite(GUEST_FS_BASE, msr_content);
@@ -560,14 +559,14 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
 
     case MSR_LSTAR:
         if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
+            return HNDL_exception_raised;
         v->arch.hvm_vmx.lstar = msr_content;
         wrmsrl(MSR_LSTAR, msr_content);
         break;
 
     case MSR_CSTAR:
         if ( !is_canonical_address(msr_content) )
-            goto uncanonical_address;
+            return HNDL_exception_raised;
         v->arch.hvm_vmx.cstar = msr_content;
         break;
 
@@ -581,11 +580,6 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     }
 
     return HNDL_done;
-
- uncanonical_address:
-    HVM_DBG_LOG(DBG_LEVEL_MSR, "Not cano address of msr write %x", msr);
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
-    return HNDL_exception_raised;
 }
 
 /*
@@ -660,7 +654,7 @@ void vmx_update_exception_bitmap(struct vcpu *v)
         __vmwrite(EXCEPTION_BITMAP, bitmap);
 }
 
-static void vmx_update_guest_vendor(struct vcpu *v)
+static void vmx_cpuid_policy_changed(struct vcpu *v)
 {
     if ( opt_hvm_fep ||
          (v->domain->arch.cpuid->x86_vendor != boot_cpu_data.x86_vendor) )
@@ -2125,6 +2119,11 @@ static void vmx_sync_pir_to_irr(struct vcpu *v)
         vlapic_set_vector(i, &vlapic->regs->data[APIC_IRR]);
 }
 
+static bool vmx_test_pir(const struct vcpu *v, uint8_t vec)
+{
+    return pi_test_pir(vec, &v->arch.hvm_vmx.pi_desc);
+}
+
 static void vmx_handle_eoi(u8 vector)
 {
     unsigned long status;
@@ -2318,7 +2317,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
-    .update_guest_vendor  = vmx_update_guest_vendor,
+    .cpuid_policy_changed = vmx_cpuid_policy_changed,
     .fpu_leave            = vmx_fpu_leave,
     .set_guest_pat        = vmx_set_guest_pat,
     .get_guest_pat        = vmx_get_guest_pat,
@@ -2352,6 +2351,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .process_isr          = vmx_process_isr,
     .deliver_posted_intr  = vmx_deliver_posted_intr,
     .sync_pir_to_irr      = vmx_sync_pir_to_irr,
+    .test_pir             = vmx_test_pir,
     .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .enable_msr_interception = vmx_enable_msr_interception,
@@ -2499,6 +2499,7 @@ const struct hvm_function_table * __init start_vmx(void)
     {
         vmx_function_table.deliver_posted_intr = NULL;
         vmx_function_table.sync_pir_to_irr = NULL;
+        vmx_function_table.test_pir = NULL;
     }
 
     if ( cpu_has_vmx_tsc_scaling )
@@ -4274,9 +4275,9 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
         {
             cpumask_clear_cpu(cpu, ept->invalidate);
             if ( nestedhvm_enabled(curr->domain) )
-                __invept(INVEPT_ALL_CONTEXT, 0, 0);
+                __invept(INVEPT_ALL_CONTEXT, 0);
             else
-                __invept(INVEPT_SINGLE_CONTEXT, ept->eptp, 0);
+                __invept(INVEPT_SINGLE_CONTEXT, ept->eptp);
         }
     }
 

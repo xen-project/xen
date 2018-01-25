@@ -10,7 +10,6 @@
 #include <xen/xmalloc.h>
 #include <public/vm_event.h>
 #include <asm/flushtlb.h>
-#include <asm/gic.h>
 #include <asm/event.h>
 #include <asm/hardirq.h>
 #include <asm/page.h>
@@ -52,21 +51,15 @@ static const paddr_t level_masks[] =
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
-static void p2m_flush_tlb(struct p2m_domain *p2m);
-
 /* Unlock the flush and do a P2M TLB flush if necessary */
 void p2m_write_unlock(struct p2m_domain *p2m)
 {
-    if ( p2m->need_flush )
-    {
-        p2m->need_flush = false;
-        /*
-         * The final flush is done with the P2M write lock taken to
-         * to avoid someone else modify the P2M before the TLB
-         * invalidation has completed.
-         */
-        p2m_flush_tlb(p2m);
-    }
+    /*
+     * The final flush is done with the P2M write lock taken to avoid
+     * someone else modifying the P2M wbefore the TLB invalidation has
+     * completed.
+     */
+    p2m_tlb_flush_sync(p2m);
 
     write_unlock(&p2m->lock);
 }
@@ -138,10 +131,17 @@ void p2m_restore_state(struct vcpu *n)
     *last_vcpu_ran = n->vcpu_id;
 }
 
-static void p2m_flush_tlb(struct p2m_domain *p2m)
+/*
+ * Force a synchronous P2M TLB flush.
+ *
+ * Must be called with the p2m lock held.
+ */
+static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
 {
     unsigned long flags = 0;
     uint64_t ovttbr;
+
+    ASSERT(p2m_is_write_locked(p2m));
 
     /*
      * ARM only provides an instruction to flush TLBs for the current
@@ -163,19 +163,14 @@ static void p2m_flush_tlb(struct p2m_domain *p2m)
         isb();
         local_irq_restore(flags);
     }
+
+    p2m->need_flush = false;
 }
 
-/*
- * Force a synchronous P2M TLB flush.
- *
- * Must be called with the p2m lock held.
- */
-static void p2m_flush_tlb_sync(struct p2m_domain *p2m)
+void p2m_tlb_flush_sync(struct p2m_domain *p2m)
 {
-    ASSERT(p2m_is_write_locked(p2m));
-
-    p2m_flush_tlb(p2m);
-    p2m->need_flush = false;
+    if ( p2m->need_flush )
+        p2m_force_tlb_flush_sync(p2m);
 }
 
 /*
@@ -393,10 +388,10 @@ int guest_physmap_mark_populate_on_demand(struct domain *d,
     return -ENOSYS;
 }
 
-int p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn,
-                                 unsigned int order)
+unsigned long p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn,
+                                           unsigned int order)
 {
-    return -ENOSYS;
+    return 0;
 }
 
 static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
@@ -674,8 +669,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
      * XXX: Should we defer the free of the page table to avoid the
      * flush?
      */
-    if ( p2m->need_flush )
-        p2m_flush_tlb_sync(p2m);
+    p2m_tlb_flush_sync(p2m);
 
     mfn = _mfn(entry.p2m.base);
     ASSERT(mfn_valid(mfn));
@@ -864,7 +858,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
          * For more details see (D4.7.1 in ARM DDI 0487A.j).
          */
         p2m_remove_pte(entry, p2m->clean_pte);
-        p2m_flush_tlb_sync(p2m);
+        p2m_force_tlb_flush_sync(p2m);
 
         p2m_write_pte(entry, split_pte, p2m->clean_pte);
 
@@ -940,7 +934,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         {
             if ( likely(!p2m->mem_access_enabled) ||
                  P2M_CLEAR_PERM(pte) != P2M_CLEAR_PERM(orig_pte) )
-                p2m_flush_tlb_sync(p2m);
+                p2m_force_tlb_flush_sync(p2m);
             else
                 p2m->need_flush = true;
         }
@@ -1144,7 +1138,9 @@ static int p2m_alloc_table(struct domain *d)
      * Make sure that all TLBs corresponding to the new VMID are flushed
      * before using it
      */
-    p2m_flush_tlb(p2m);
+    p2m_write_lock(p2m);
+    p2m_force_tlb_flush_sync(p2m);
+    p2m_write_unlock(p2m);
 
     return 0;
 }
@@ -1414,7 +1410,7 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct page_info *page = NULL;
     paddr_t maddr = 0;
-    int rc;
+    uint64_t par;
 
     /*
      * XXX: To support a different vCPU, we would need to load the
@@ -1425,19 +1421,32 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
 
     p2m_read_lock(p2m);
 
-    rc = gvirt_to_maddr(va, &maddr, flags);
+    par = gvirt_to_maddr(va, &maddr, flags);
 
-    if ( rc )
+    if ( par )
+    {
+        dprintk(XENLOG_G_DEBUG,
+                "%pv: gvirt_to_maddr failed va=%#"PRIvaddr" flags=0x%lx par=%#"PRIx64"\n",
+                v, va, flags, par);
         goto err;
+    }
 
     if ( !mfn_valid(maddr_to_mfn(maddr)) )
+    {
+        dprintk(XENLOG_G_DEBUG, "%pv: Invalid MFN %#"PRI_mfn"\n",
+                v, mfn_x(maddr_to_mfn(maddr)));
         goto err;
+    }
 
     page = mfn_to_page(maddr_to_mfn(maddr));
     ASSERT(page);
 
     if ( unlikely(!get_page(page, d)) )
+    {
+        dprintk(XENLOG_G_DEBUG, "%pv: Failing to acquire the MFN %#"PRI_mfn"\n",
+                v, mfn_x(maddr_to_mfn(maddr)));
         page = NULL;
+    }
 
 err:
     if ( !page && p2m->mem_access_enabled )

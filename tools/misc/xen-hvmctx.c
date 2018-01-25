@@ -379,9 +379,9 @@ static void dump_viridian_vcpu(void)
 {
     HVM_SAVE_TYPE(VIRIDIAN_VCPU) p;
     READ(p);
-    printf("    VIRIDIAN_VCPU: vp_assist_msr 0x%llx, vp_assist_vector 0x%x\n",
+    printf("    VIRIDIAN_VCPU: vp_assist_msr 0x%llx, vp_assist_pending %s\n",
 	   (unsigned long long) p.vp_assist_msr,
-	   p.vp_assist_vector);
+	   p.vp_assist_pending ? "true" : "false");
 }
 
 static void dump_vmce_vcpu(void)

@@ -1850,6 +1850,39 @@ processed.
 
 =back
 
+=head2 Memory Bandwidth Allocation
+
+Intel Skylake and later server platforms offer capabilities to configure and
+make use of the Memory Bandwidth Allocation (MBA) mechanisms, which provides
+OS/VMMs the ability to slow misbehaving apps/VMs by using a credit-based
+throttling mechanism. In the Xen implementation, MBA is used to control memory
+bandwidth on VM basis. To enforce bandwidth on a specific domain, just set
+throttling value (THRTL) for the domain.
+
+=over 4
+
+=item B<psr-mba-set> [I<OPTIONS>] I<domain-id> I<thrtl>
+
+Set throttling value (THRTL) for a domain. For how to specify I<thrtl>
+please refer to L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-s SOCKET>, B<--socket=SOCKET>
+
+Specify the socket to process, otherwise all sockets are processed.
+
+=back
+
+=item B<psr-mba-show> [I<domain-id>]
+
+Show MBA settings for a certain domain or all domains. For linear mode, it
+shows the decimal value. For non-linear mode, it shows hexadecimal value.
+
+=back
+
 =head1 IGNORED FOR COMPATIBILITY WITH XM
 
 xl is mostly command-line compatible with the old xm utility used with

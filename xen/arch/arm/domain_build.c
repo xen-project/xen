@@ -21,7 +21,6 @@
 #include <asm/setup.h>
 #include <asm/cpufeature.h>
 
-#include <asm/gic.h>
 #include <xen/irq.h>
 #include <xen/grant_table.h>
 #include "kernel.h"
@@ -50,6 +49,8 @@ struct map_range_data
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
+#undef page_to_mfn
+#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
 
 //#define DEBUG_11_ALLOCATION
 #ifdef DEBUG_11_ALLOCATION
@@ -104,16 +105,16 @@ static bool insert_11_bank(struct domain *d,
                            unsigned int order)
 {
     int res, i;
-    paddr_t spfn;
+    mfn_t smfn;
     paddr_t start, size;
 
-    spfn = page_to_mfn(pg);
-    start = pfn_to_paddr(spfn);
-    size = pfn_to_paddr((1 << order));
+    smfn = page_to_mfn(pg);
+    start = mfn_to_maddr(smfn);
+    size = pfn_to_paddr(1UL << order);
 
     D11PRINT("Allocated %#"PRIpaddr"-%#"PRIpaddr" (%ldMB/%ldMB, order %d)\n",
              start, start + size,
-             1UL << (order+PAGE_SHIFT-20),
+             1UL << (order + PAGE_SHIFT - 20),
              /* Don't want format this as PRIpaddr (16 digit hex) */
              (unsigned long)(kinfo->unassigned_mem >> 20),
              order);
@@ -126,7 +127,7 @@ static bool insert_11_bank(struct domain *d,
         goto fail;
     }
 
-    res = guest_physmap_add_page(d, _gfn(spfn), _mfn(spfn), order);
+    res = guest_physmap_add_page(d, _gfn(mfn_x(smfn)), smfn, order);
     if ( res )
         panic("Failed map pages to DOM0: %d", res);
 
@@ -167,7 +168,8 @@ static bool insert_11_bank(struct domain *d,
          */
         if ( start + size < bank->start && kinfo->mem.nr_banks < NR_MEM_BANKS )
         {
-            memmove(bank + 1, bank, sizeof(*bank)*(kinfo->mem.nr_banks - i));
+            memmove(bank + 1, bank,
+                    sizeof(*bank) * (kinfo->mem.nr_banks - i));
             kinfo->mem.nr_banks++;
             bank->start = start;
             bank->size = size;
@@ -1948,14 +1950,15 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 #endif
 static void dtb_load(struct kernel_info *kinfo)
 {
-    void * __user dtb_virt = (void * __user)(register_t)kinfo->dtb_paddr;
     unsigned long left;
 
     printk("Loading dom0 DTB to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            kinfo->dtb_paddr, kinfo->dtb_paddr + fdt_totalsize(kinfo->fdt));
 
-    left = raw_copy_to_guest_flush_dcache(dtb_virt, kinfo->fdt,
-                                        fdt_totalsize(kinfo->fdt));
+    left = copy_to_guest_phys_flush_dcache(kinfo->d, kinfo->dtb_paddr,
+                                           kinfo->fdt,
+                                           fdt_totalsize(kinfo->fdt));
+
     if ( left != 0 )
         panic("Unable to copy the DTB to dom0 memory (left = %lu bytes)", left);
     xfree(kinfo->fdt);
@@ -1966,11 +1969,11 @@ static void initrd_load(struct kernel_info *kinfo)
     const struct bootmodule *mod = kinfo->initrd_bootmodule;
     paddr_t load_addr = kinfo->initrd_paddr;
     paddr_t paddr, len;
-    unsigned long offs;
     int node;
     int res;
     __be32 val[2];
     __be32 *cellp;
+    void __iomem *initrd;
 
     if ( !mod || !mod->size )
         return;
@@ -2000,29 +2003,14 @@ static void initrd_load(struct kernel_info *kinfo)
     if ( res )
         panic("Cannot fix up \"linux,initrd-end\" property");
 
-    for ( offs = 0; offs < len; )
-    {
-        int rc;
-        paddr_t s, l, ma;
-        void *dst;
+    initrd = ioremap_wc(paddr, len);
+    if ( !initrd )
+        panic("Unable to map the hwdom initrd");
 
-        s = offs & ~PAGE_MASK;
-        l = min(PAGE_SIZE - s, len);
-
-        rc = gvirt_to_maddr(load_addr + offs, &ma, GV2M_WRITE);
-        if ( rc )
-        {
-            panic("Unable to translate guest address");
-            return;
-        }
-
-        dst = map_domain_page(maddr_to_mfn(ma));
-
-        copy_from_paddr(dst + s, paddr + offs, l);
-
-        unmap_domain_page(dst);
-        offs += l;
-    }
+    res = copy_to_guest_phys_flush_dcache(kinfo->d, load_addr,
+                                          initrd, len);
+    if ( res != 0 )
+        panic("Unable to copy the initrd in the hwdom memory");
 }
 
 static void evtchn_fixup(struct domain *d, struct kernel_info *kinfo)
@@ -2133,6 +2121,7 @@ int construct_dom0(struct domain *d)
     d->max_pages = ~0U;
 
     kinfo.unassigned_mem = dom0_mem;
+    kinfo.d = d;
 
     rc = kernel_probe(&kinfo);
     if ( rc < 0 )

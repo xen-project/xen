@@ -15,6 +15,8 @@ struct kernel_info {
     enum domain_type type;
 #endif
 
+    struct domain *d;
+
     void *fdt; /* flat device tree */
     paddr_t unassigned_mem; /* RAM not (yet) assigned to a bank */
     struct meminfo mem;

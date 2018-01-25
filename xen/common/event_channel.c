@@ -156,46 +156,62 @@ static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
     xfree(bucket);
 }
 
+int evtchn_allocate_port(struct domain *d, evtchn_port_t port)
+{
+    if ( port > d->max_evtchn_port || port >= d->max_evtchns )
+        return -ENOSPC;
+
+    if ( port_is_valid(d, port) )
+    {
+        if ( evtchn_from_port(d, port)->state != ECS_FREE ||
+             evtchn_port_is_busy(d, port) )
+            return -EBUSY;
+    }
+    else
+    {
+        struct evtchn *chn;
+        struct evtchn **grp;
+
+        if ( !group_from_port(d, port) )
+        {
+            grp = xzalloc_array(struct evtchn *, BUCKETS_PER_GROUP);
+            if ( !grp )
+                return -ENOMEM;
+            group_from_port(d, port) = grp;
+        }
+
+        chn = alloc_evtchn_bucket(d, port);
+        if ( !chn )
+            return -ENOMEM;
+        bucket_from_port(d, port) = chn;
+
+        write_atomic(&d->valid_evtchns, d->valid_evtchns + EVTCHNS_PER_BUCKET);
+    }
+
+    return 0;
+}
+
 static int get_free_port(struct domain *d)
 {
-    struct evtchn *chn;
-    struct evtchn **grp;
     int            port;
 
     if ( d->is_dying )
         return -EINVAL;
 
-    for ( port = 0; port_is_valid(d, port); port++ )
+    for ( port = 0; port <= d->max_evtchn_port; port++ )
     {
-        if ( port > d->max_evtchn_port )
-            return -ENOSPC;
-        if ( evtchn_from_port(d, port)->state == ECS_FREE
-             && !evtchn_port_is_busy(d, port) )
-            return port;
+        int rc = evtchn_allocate_port(d, port);
+
+        if ( rc == -EBUSY )
+            continue;
+
+        return port;
     }
 
-    if ( port == d->max_evtchns || port > d->max_evtchn_port )
-        return -ENOSPC;
-
-    if ( !group_from_port(d, port) )
-    {
-        grp = xzalloc_array(struct evtchn *, BUCKETS_PER_GROUP);
-        if ( !grp )
-            return -ENOMEM;
-        group_from_port(d, port) = grp;
-    }
-
-    chn = alloc_evtchn_bucket(d, port);
-    if ( !chn )
-        return -ENOMEM;
-    bucket_from_port(d, port) = chn;
-
-    write_atomic(&d->valid_evtchns, d->valid_evtchns + EVTCHNS_PER_BUCKET);
-
-    return port;
+    return -ENOSPC;
 }
 
-static void free_evtchn(struct domain *d, struct evtchn *chn)
+void evtchn_free(struct domain *d, struct evtchn *chn)
 {
     /* Clear pending event to avoid unexpected behavior on re-bind. */
     evtchn_port_clear_pending(d, chn);
@@ -345,13 +361,13 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 }
 
 
-static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
+int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
 {
     struct evtchn *chn;
     struct vcpu   *v;
     struct domain *d = current->domain;
-    int            port, virq = bind->virq, vcpu = bind->vcpu;
-    long           rc = 0;
+    int            virq = bind->virq, vcpu = bind->vcpu;
+    int            rc = 0;
 
     if ( (virq < 0) || (virq >= ARRAY_SIZE(v->virq_to_evtchn)) )
         return -EINVAL;
@@ -368,8 +384,19 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     if ( v->virq_to_evtchn[virq] != 0 )
         ERROR_EXIT(-EEXIST);
 
-    if ( (port = get_free_port(d)) < 0 )
-        ERROR_EXIT(port);
+    if ( port != 0 )
+    {
+        if ( (rc = evtchn_allocate_port(d, port)) != 0 )
+            ERROR_EXIT(rc);
+    }
+    else
+    {
+        int alloc_port = get_free_port(d);
+
+        if ( alloc_port < 0 )
+            ERROR_EXIT(alloc_port);
+        port = alloc_port;
+    }
 
     chn = evtchn_from_port(d, port);
 
@@ -511,7 +538,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 }
 
 
-static long evtchn_close(struct domain *d1, int port1, bool_t guest)
+int evtchn_close(struct domain *d1, int port1, bool guest)
 {
     struct domain *d2 = NULL;
     struct vcpu   *v;
@@ -619,7 +646,7 @@ static long evtchn_close(struct domain *d1, int port1, bool_t guest)
 
         double_evtchn_lock(chn1, chn2);
 
-        free_evtchn(d1, chn1);
+        evtchn_free(d1, chn1);
 
         chn2->state = ECS_UNBOUND;
         chn2->u.unbound.remote_domid = d1->domain_id;
@@ -633,7 +660,7 @@ static long evtchn_close(struct domain *d1, int port1, bool_t guest)
     }
 
     spin_lock(&chn1->lock);
-    free_evtchn(d1, chn1);
+    evtchn_free(d1, chn1);
     spin_unlock(&chn1->lock);
 
  out:
@@ -839,7 +866,7 @@ static void clear_global_virq_handlers(struct domain *d)
     }
 }
 
-static long evtchn_status(evtchn_status_t *status)
+int evtchn_status(evtchn_status_t *status)
 {
     struct domain   *d;
     domid_t          dom = status->dom;
@@ -1056,7 +1083,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct evtchn_bind_virq bind_virq;
         if ( copy_from_guest(&bind_virq, arg, 1) != 0 )
             return -EFAULT;
-        rc = evtchn_bind_virq(&bind_virq);
+        rc = evtchn_bind_virq(&bind_virq, 0);
         if ( !rc && __copy_to_guest(arg, &bind_virq, 1) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;

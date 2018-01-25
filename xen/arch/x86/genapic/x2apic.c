@@ -106,12 +106,12 @@ static void send_IPI_mask_x2apic_phys(const cpumask_t *cpumask, int vector)
      * CPU is seen by notified remote CPUs. The WRMSR contained within
      * apic_icr_write() can otherwise be executed early.
      * 
-     * The reason mb() is sufficient here is subtle: the register arguments
+     * The reason smp_mb() is sufficient here is subtle: the register arguments
      * to WRMSR must depend on a memory read executed after the barrier. This
      * is guaranteed by cpu_physical_id(), which reads from a global array (and
      * so cannot be hoisted above the barrier even by a clever compiler).
      */
-    mb();
+    smp_mb();
 
     local_irq_save(flags);
 
@@ -135,7 +135,7 @@ static void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
     const cpumask_t *cluster_cpus;
     unsigned long flags;
 
-    mb(); /* See above for an explanation. */
+    smp_mb(); /* See above for an explanation. */
 
     local_irq_save(flags);
 

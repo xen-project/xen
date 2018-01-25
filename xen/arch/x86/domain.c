@@ -145,8 +145,8 @@ void startup_cpu_idle_loop(void)
     struct vcpu *v = current;
 
     ASSERT(is_idle_vcpu(v));
-    cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
-    cpumask_set_cpu(v->processor, v->vcpu_dirty_cpumask);
+    cpumask_set_cpu(v->processor, v->domain->dirty_cpumask);
+    v->dirty_cpu = v->processor;
 
     reset_stack_and_jump(idle_loop);
 }
@@ -363,6 +363,8 @@ int vcpu_initialise(struct vcpu *v)
 
         if ( (rc = init_vcpu_msr_policy(v)) )
             goto fail;
+
+        cpuid_policy_updated(v);
     }
 
     return rc;
@@ -381,6 +383,9 @@ void vcpu_destroy(struct vcpu *v)
     v->arch.vm_event = NULL;
 
     vcpu_destroy_fpu(v);
+
+    xfree(v->arch.msr);
+    v->arch.msr = NULL;
 
     if ( !is_idle_domain(v->domain) )
         vpmu_destroy(v);
@@ -1017,12 +1022,14 @@ int arch_set_info_guest(
     else
     {
         unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames)];
-        unsigned int n = (c.cmp->gdt_ents + 511) / 512;
+        unsigned int nr_frames = DIV_ROUND_UP(c.cmp->gdt_ents, 512);
 
-        if ( n > ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames) )
+        if ( nr_frames > ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames) )
             return -EINVAL;
-        for ( i = 0; i < n; ++i )
+
+        for ( i = 0; i < nr_frames; ++i )
             gdt_frames[i] = c.cmp->gdt_frames[i];
+
         rc = (int)pv_set_gdt(v, gdt_frames, c.cmp->gdt_ents);
     }
     if ( rc != 0 )
@@ -1274,7 +1281,7 @@ static DEFINE_PER_CPU(unsigned int, dirty_segment_mask);
 #define DIRTY_FS           0x04
 #define DIRTY_GS           0x08
 #define DIRTY_FS_BASE      0x10
-#define DIRTY_GS_BASE_USER 0x20
+#define DIRTY_GS_BASE      0x20
 
 static void load_segments(struct vcpu *n)
 {
@@ -1315,7 +1322,7 @@ static void load_segments(struct vcpu *n)
         all_segs_okay &= loadsegment(gs, uregs->gs);
         /* non-nul selector updates gs_base_user */
         if ( uregs->gs & ~3 )
-            dirty_segment_mask &= ~DIRTY_GS_BASE_USER;
+            dirty_segment_mask &= ~DIRTY_GS_BASE;
     }
 
     if ( !is_pv_32bit_vcpu(n) )
@@ -1330,7 +1337,7 @@ static void load_segments(struct vcpu *n)
 
         /* This can only be non-zero if selector is NULL. */
         if ( n->arch.pv_vcpu.gs_base_user |
-             (dirty_segment_mask & DIRTY_GS_BASE_USER) )
+             (dirty_segment_mask & DIRTY_GS_BASE) )
             wrgsbase(n->arch.pv_vcpu.gs_base_user);
 
         /* If in kernel mode then switch the GS bases around. */
@@ -1479,8 +1486,9 @@ static void save_segments(struct vcpu *v)
         if ( regs->gs & ~3 )
             v->arch.pv_vcpu.gs_base_user = 0;
     }
-    if ( v->arch.pv_vcpu.gs_base_user )
-        dirty_segment_mask |= DIRTY_GS_BASE_USER;
+    if ( v->arch.flags & TF_kernel_mode ? v->arch.pv_vcpu.gs_base_kernel
+                                        : v->arch.pv_vcpu.gs_base_user )
+        dirty_segment_mask |= DIRTY_GS_BASE;
 
     this_cpu(dirty_segment_mask) = dirty_segment_mask;
 }
@@ -1501,7 +1509,13 @@ void paravirt_ctxt_switch_from(struct vcpu *v)
 
 void paravirt_ctxt_switch_to(struct vcpu *v)
 {
+    root_pgentry_t *root_pgt = this_cpu(root_pgt);
     unsigned long cr4;
+
+    if ( root_pgt )
+        root_pgt[root_table_offset(PERDOMAIN_VIRT_START)] =
+            l4e_from_page(v->domain->arch.perdomain_l3_pg,
+                          __PAGE_HYPERVISOR_RW);
 
     cr4 = pv_guest_cr4_to_real_cr4(v);
     if ( unlikely(cr4 != read_cr4()) )
@@ -1588,7 +1602,7 @@ static void __context_switch(void)
     struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
-    ASSERT(cpumask_empty(n->vcpu_dirty_cpumask));
+    ASSERT(!vcpu_cpu_dirty(n));
 
     if ( !is_idle_domain(pd) )
     {
@@ -1603,8 +1617,8 @@ static void __context_switch(void)
      * which is synchronised on that function.
      */
     if ( pd != nd )
-        cpumask_set_cpu(cpu, nd->domain_dirty_cpumask);
-    cpumask_set_cpu(cpu, n->vcpu_dirty_cpumask);
+        cpumask_set_cpu(cpu, nd->dirty_cpumask);
+    n->dirty_cpu = cpu;
 
     if ( !is_idle_domain(nd) )
     {
@@ -1643,7 +1657,8 @@ static void __context_switch(void)
     {
         gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY);
-        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+
+        lgdt(&gdt_desc);
     }
 
     write_ptbase(n);
@@ -1653,12 +1668,13 @@ static void __context_switch(void)
     {
         gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
         gdt_desc.base = GDT_VIRT_START(n);
-        asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
+
+        lgdt(&gdt_desc);
     }
 
     if ( pd != nd )
-        cpumask_clear_cpu(cpu, pd->domain_dirty_cpumask);
-    cpumask_clear_cpu(cpu, p->vcpu_dirty_cpumask);
+        cpumask_clear_cpu(cpu, pd->dirty_cpumask);
+    p->dirty_cpu = VCPU_CPU_CLEAN;
 
     per_cpu(curr_vcpu, cpu) = n;
 }
@@ -1668,18 +1684,16 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     unsigned int cpu = smp_processor_id();
     const struct domain *prevd = prev->domain, *nextd = next->domain;
-    cpumask_t dirty_mask;
+    unsigned int dirty_cpu = next->dirty_cpu;
 
     ASSERT(local_irq_is_enabled());
 
-    cpumask_copy(&dirty_mask, next->vcpu_dirty_cpumask);
-    /* Allow at most one CPU at a time to be dirty. */
-    ASSERT(cpumask_weight(&dirty_mask) <= 1);
-    if ( unlikely(!cpumask_test_cpu(cpu, &dirty_mask) &&
-                  !cpumask_empty(&dirty_mask)) )
+    get_cpu_info()->xen_cr3 = 0;
+
+    if ( unlikely(dirty_cpu != cpu) && dirty_cpu != VCPU_CPU_CLEAN )
     {
-        /* Other cpus call __sync_local_execstate from flush ipi handler. */
-        flush_tlb_mask(&dirty_mask);
+        /* Remote CPU calls __sync_local_execstate() from flush IPI handler. */
+        flush_mask(cpumask_of(dirty_cpu), FLUSH_VCPU_STATE);
     }
 
     if ( prev != next )
@@ -1784,11 +1798,13 @@ void sync_local_execstate(void)
 
 void sync_vcpu_execstate(struct vcpu *v)
 {
-    if ( cpumask_test_cpu(smp_processor_id(), v->vcpu_dirty_cpumask) )
+    if ( v->dirty_cpu == smp_processor_id() )
         sync_local_execstate();
-
-    /* Other cpus call __sync_local_execstate from flush ipi handler. */
-    flush_tlb_mask(v->vcpu_dirty_cpumask);
+    else if ( vcpu_cpu_dirty(v) )
+    {
+        /* Remote CPU calls __sync_local_execstate() from flush IPI handler. */
+        flush_mask(cpumask_of(v->dirty_cpu), FLUSH_VCPU_STATE);
+    }
 }
 
 static int relinquish_memory(
@@ -1906,7 +1922,7 @@ int domain_relinquish_resources(struct domain *d)
     int ret;
     struct vcpu *v;
 
-    BUG_ON(!cpumask_empty(d->domain_dirty_cpumask));
+    BUG_ON(!cpumask_empty(d->dirty_cpumask));
 
     switch ( d->arch.relmem )
     {
@@ -2012,6 +2028,16 @@ int domain_relinquish_resources(struct domain *d)
         hvm_domain_relinquish_resources(d);
 
     return 0;
+}
+
+/*
+ * Called during vcpu construction, and each time the toolstack changes the
+ * CPUID configuration for the domain.
+ */
+void cpuid_policy_updated(struct vcpu *v)
+{
+    if ( is_hvm_vcpu(v) )
+        hvm_cpuid_policy_changed(v);
 }
 
 void arch_dump_domain_info(struct domain *d)

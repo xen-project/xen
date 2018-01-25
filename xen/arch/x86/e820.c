@@ -9,6 +9,7 @@
 #include <asm/processor.h>
 #include <asm/mtrr.h>
 #include <asm/msr.h>
+#include <asm/guest.h>
 
 /*
  * opt_mem: Limit maximum address of physical RAM.
@@ -134,8 +135,7 @@ static struct change_member *change_point[2*E820MAX] __initdata;
 static struct e820entry *overlap_list[E820MAX] __initdata;
 static struct e820entry new_bios[E820MAX] __initdata;
 
-static int __init sanitize_e820_map(struct e820entry *biosmap,
-                                    unsigned int *pnr_map)
+int __init sanitize_e820_map(struct e820entry *biosmap, unsigned int *pnr_map)
 {
     struct change_member *change_tmp;
     unsigned long current_type, last_type;
@@ -699,6 +699,9 @@ unsigned long __init init_e820(const char *str, struct e820map *raw)
     }
 
     machine_specific_memory_setup(raw);
+
+    if ( xen_guest )
+        hypervisor_fixup_e820(&e820);
 
     printk("%s RAM map:\n", str);
     print_e820_memory_map(e820.map, e820.nr_map);

@@ -613,7 +613,7 @@ static void svm_update_guest_efer(struct vcpu *v)
     vmcb_set_efer(vmcb, new_efer);
 }
 
-static void svm_update_guest_vendor(struct vcpu *v)
+static void svm_cpuid_policy_changed(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
@@ -1038,9 +1038,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_vmload_pa(per_cpu(host_vmcb, cpu));
 
     /* Resume use of ISTs now that the host TR is reinstated. */
-    set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
-    set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NMI);
-    set_ist(&idt_tables[cpu][TRAP_machine_check], IST_MCE);
+    enable_each_ist(idt_tables[cpu]);
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
@@ -1059,9 +1057,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
      * Cannot use ISTs for NMI/#MC/#DF while we are running with the guest TR.
      * But this doesn't matter: the IST is only req'd to handle SYSCALL/SYSRET.
      */
-    set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
+    disable_each_ist(idt_tables[cpu]);
 
     svm_restore_dr(v);
 
@@ -1669,6 +1665,8 @@ const struct hvm_function_table * __init start_svm(void)
     P(cpu_has_svm_nrips, "Next-RIP Saved on #VMEXIT");
     P(cpu_has_svm_cleanbits, "VMCB Clean Bits");
     P(cpu_has_svm_decode, "DecodeAssists");
+    P(cpu_has_svm_vloadsave, "Virtual VMLOAD/VMSAVE");
+    P(cpu_has_svm_vgif, "Virtual GIF");
     P(cpu_has_pause_filter, "Pause-Intercept Filter");
     P(cpu_has_tsc_ratio, "TSC Rate MSR");
 #undef P
@@ -1783,6 +1781,12 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
 
     if ( (inst_len = __get_instruction_length(curr, INSTR_CPUID)) == 0 )
         return;
+
+    if ( hvm_check_cpuid_faulting(curr) )
+    {
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        return;
+    }
 
     guest_cpuid(curr, regs->eax, regs->ecx, &res);
     HVMTRACE_5D(CPUID, regs->eax, res.a, res.b, res.c, res.d);
@@ -1997,7 +2001,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         vmcb_set_debugctlmsr(vmcb, msr_content);
         if ( !msr_content || !cpu_has_svm_lbrv )
             break;
-        vmcb->lbr_control.fields.enable = 1;
+        vmcb->virt_ext.fields.lbr_enable = 1;
         svm_disable_intercept_for_msr(v, MSR_IA32_DEBUGCTLMSR);
         svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHFROMIP);
         svm_disable_intercept_for_msr(v, MSR_IA32_LASTBRANCHTOIP);
@@ -2318,7 +2322,7 @@ static int svm_is_erratum_383(struct cpu_user_regs *regs)
     wrmsrl(MSR_IA32_MCG_STATUS, msr_content & ~(1ULL << 2));
 
     /* flush TLB */
-    flush_tlb_mask(v->domain->domain_dirty_cpumask);
+    flush_tlb_mask(v->domain->dirty_cpumask);
 
     return 1;
 }
@@ -2422,7 +2426,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .get_shadow_gs_base   = svm_get_shadow_gs_base,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
-    .update_guest_vendor  = svm_update_guest_vendor,
+    .cpuid_policy_changed = svm_cpuid_policy_changed,
     .fpu_leave            = svm_fpu_leave,
     .set_guest_pat        = svm_set_guest_pat,
     .get_guest_pat        = svm_get_guest_pat,

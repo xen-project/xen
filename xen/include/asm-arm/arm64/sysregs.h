@@ -32,11 +32,11 @@
 
 /* These are used to decode traps with HSR.EC==HSR_EC_SYSREG */
 #define HSR_SYSREG(op0,op1,crn,crm,op2) \
-    ((__HSR_SYSREG_##op0) << HSR_SYSREG_OP0_SHIFT) | \
-    ((__HSR_SYSREG_##op1) << HSR_SYSREG_OP1_SHIFT) | \
-    ((__HSR_SYSREG_##crn) << HSR_SYSREG_CRN_SHIFT) | \
-    ((__HSR_SYSREG_##crm) << HSR_SYSREG_CRM_SHIFT) | \
-    ((__HSR_SYSREG_##op2) << HSR_SYSREG_OP2_SHIFT)
+    (((__HSR_SYSREG_##op0) << HSR_SYSREG_OP0_SHIFT) | \
+     ((__HSR_SYSREG_##op1) << HSR_SYSREG_OP1_SHIFT) | \
+     ((__HSR_SYSREG_##crn) << HSR_SYSREG_CRN_SHIFT) | \
+     ((__HSR_SYSREG_##crm) << HSR_SYSREG_CRM_SHIFT) | \
+     ((__HSR_SYSREG_##op2) << HSR_SYSREG_OP2_SHIFT))
 
 #define HSR_SYSREG_DCISW          HSR_SYSREG(1,0,c7,c6,2)
 #define HSR_SYSREG_DCCSW          HSR_SYSREG(1,0,c7,c10,2)

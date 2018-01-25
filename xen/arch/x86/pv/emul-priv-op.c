@@ -73,37 +73,58 @@ void (*pv_post_outb_hook)(unsigned int port, u8 value);
 
 typedef void io_emul_stub_t(struct cpu_user_regs *);
 
+void __x86_indirect_thunk_rcx(void);
+
 static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
                                           unsigned int port, unsigned int bytes)
 {
+    struct stubs *this_stubs = &this_cpu(stubs);
+    unsigned long stub_va = this_stubs->addr + STUB_BUF_SIZE / 2;
+    bool use_quirk_stub = false;
+
     if ( !ctxt->io_emul_stub )
-        ctxt->io_emul_stub = map_domain_page(_mfn(this_cpu(stubs.mfn))) +
-                                             (this_cpu(stubs.addr) &
-                                              ~PAGE_MASK) +
-                                             STUB_BUF_SIZE / 2;
+        ctxt->io_emul_stub =
+            map_domain_page(_mfn(this_stubs->mfn)) + (stub_va & ~PAGE_MASK);
 
     /* movq $host_to_guest_gpr_switch,%rcx */
     ctxt->io_emul_stub[0] = 0x48;
     ctxt->io_emul_stub[1] = 0xb9;
     *(void **)&ctxt->io_emul_stub[2] = (void *)host_to_guest_gpr_switch;
+
+#ifdef CONFIG_INDIRECT_THUNK
+    /* callq __x86_indirect_thunk_rcx */
+    ctxt->io_emul_stub[10] = 0xe8;
+    *(int32_t *)&ctxt->io_emul_stub[11] =
+        (long)__x86_indirect_thunk_rcx - (stub_va + 11 + 4);
+#else
     /* callq *%rcx */
     ctxt->io_emul_stub[10] = 0xff;
     ctxt->io_emul_stub[11] = 0xd1;
-    /* data16 or nop */
-    ctxt->io_emul_stub[12] = (bytes != 2) ? 0x90 : 0x66;
-    /* <io-access opcode> */
-    ctxt->io_emul_stub[13] = opcode;
-    /* imm8 or nop */
-    ctxt->io_emul_stub[14] = !(opcode & 8) ? port : 0x90;
-    /* ret (jumps to guest_to_host_gpr_switch) */
-    ctxt->io_emul_stub[15] = 0xc3;
-    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < 16);
+    /* TODO: untangle ideal_nops from init/livepatch Kconfig options. */
+    memcpy(&ctxt->io_emul_stub[12], "\x0f\x1f\x00", 3); /* P6_NOP3 */
+#endif
 
-    if ( ioemul_handle_quirk )
-        ioemul_handle_quirk(opcode, &ctxt->io_emul_stub[12], ctxt->ctxt.regs);
+    if ( unlikely(ioemul_handle_quirk) )
+        use_quirk_stub = ioemul_handle_quirk(opcode, &ctxt->io_emul_stub[15],
+                                             ctxt->ctxt.regs);
+
+    if ( !use_quirk_stub )
+    {
+        /* data16 or nop */
+        ctxt->io_emul_stub[15] = (bytes != 2) ? 0x90 : 0x66;
+        /* <io-access opcode> */
+        ctxt->io_emul_stub[16] = opcode;
+        /* imm8 or nop */
+        ctxt->io_emul_stub[17] = !(opcode & 8) ? port : 0x90;
+        /* ret (jumps to guest_to_host_gpr_switch) */
+        ctxt->io_emul_stub[18] = 0xc3;
+    }
+
+    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < MAX(19, /* Default emul stub */
+                                         15 + IOEMUL_QUIRK_STUB_BYTES));
 
     /* Handy function-typed pointer to the stub. */
-    return (void *)(this_cpu(stubs.addr) + STUB_BUF_SIZE / 2);
+    return (void *)stub_va;
 }
 
 
@@ -137,7 +158,7 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
          * read as 0xff (no access allowed).
          */
         if ( user_mode )
-            toggle_guest_mode(v);
+            toggle_guest_pt(v);
 
         switch ( __copy_from_guest_offset(x.bytes, v->arch.pv_vcpu.iobmp,
                                           port>>3, 2) )
@@ -150,7 +171,7 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
         }
 
         if ( user_mode )
-            toggle_guest_mode(v);
+            toggle_guest_pt(v);
 
         if ( (x.mask & (((1 << bytes) - 1) << (port & 7))) == 0 )
             return true;
@@ -337,7 +358,6 @@ static int read_io(unsigned int port, unsigned int bytes,
         io_emul_stub_t *io_emul =
             io_emul_stub_setup(poc, ctxt->opcode, port, bytes);
 
-        mark_regs_dirty(ctxt->regs);
         io_emul(ctxt->regs);
         return X86EMUL_DONE;
     }
@@ -436,7 +456,6 @@ static int write_io(unsigned int port, unsigned int bytes,
         io_emul_stub_t *io_emul =
             io_emul_stub_setup(poc, ctxt->opcode, port, bytes);
 
-        mark_regs_dirty(ctxt->regs);
         io_emul(ctxt->regs);
         if ( (bytes == 1) && pv_post_outb_hook )
             pv_post_outb_hook(port, val);
@@ -928,8 +947,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
         goto normal;
 
     case MSR_IA32_MISC_ENABLE:
-        if ( rdmsr_safe(reg, *val) )
-            break;
+        rdmsrl(reg, *val);
         *val = guest_misc_enable(*val);
         return X86EMUL_OKAY;
 
@@ -1098,8 +1116,7 @@ static int write_msr(unsigned int reg, uint64_t val,
         return X86EMUL_OKAY;
 
     case MSR_IA32_MISC_ENABLE:
-        if ( rdmsr_safe(reg, temp) )
-            break;
+        rdmsrl(reg, temp);
         if ( val != guest_misc_enable(temp) )
             goto invalid;
         return X86EMUL_OKAY;

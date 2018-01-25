@@ -20,6 +20,7 @@
 #define __ASM_X86_HVM_IO_H__
 
 #include <xen/mm.h>
+#include <xen/pci.h>
 #include <asm/hvm/vpic.h>
 #include <asm/hvm/vioapic.h>
 #include <public/hvm/ioreq.h>
@@ -151,8 +152,7 @@ extern void hvm_dpci_msi_eoi(struct domain *d, int vector);
 
 /* Decode a PCI port IO access into a bus/slot/func/reg. */
 unsigned int hvm_pci_decode_addr(unsigned int cf8, unsigned int addr,
-                                 unsigned int *bus, unsigned int *slot,
-                                 unsigned int *func);
+                                 pci_sbdf_t *sbdf);
 
 /*
  * HVM port IO handler that performs forwarding of guest IO ports into machine

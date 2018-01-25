@@ -33,7 +33,10 @@ const char *type_check_kinds[] = {
 	"member call on",
 	"constructor call on",
 	"downcast of",
-	"downcast of"
+	"downcast of",
+	"upcast of",
+	"cast to virtual base of",
+	"_Nonnull binding to",
 };
 
 #define REPORTED_BIT 31
@@ -333,6 +336,26 @@ void __ubsan_handle_type_mismatch(struct type_mismatch_data *data,
 }
 EXPORT_SYMBOL(__ubsan_handle_type_mismatch);
 
+void __ubsan_handle_type_mismatch_v1(struct type_mismatch_data_v1 *data,
+				unsigned long ptr)
+{
+	struct type_mismatch_data d = {
+		.location = data->location,
+		.type = data->type,
+		.alignment = 1ul << data->log_alignment,
+		.type_check_kind = data->type_check_kind,
+	};
+
+	/*
+	 * NB: do the check with data->location, d->location is just a local
+	 * copy and the modifications will be lost.
+	 */
+	if (suppress_report(&data->location))
+		return;
+
+	__ubsan_handle_type_mismatch(&d, ptr);
+}
+
 void __ubsan_handle_nonnull_arg(struct nonnull_arg_data *data)
 {
 	unsigned long flags;
@@ -478,3 +501,20 @@ void __ubsan_handle_load_invalid_value(struct invalid_value_data *data,
 	ubsan_epilogue(&flags);
 }
 EXPORT_SYMBOL(__ubsan_handle_load_invalid_value);
+
+void __ubsan_handle_pointer_overflow(struct pointer_overflow_data *data,
+				unsigned long base, unsigned long result)
+{
+	unsigned long flags;
+
+	if (suppress_report(&data->location))
+		return;
+
+	ubsan_prologue(&data->location, &flags);
+
+	pr_err("pointer operation %s %p to %p\n",
+	       base > result ? "underflowed" : "overflowed",
+	       _p(base), _p(result));
+
+	ubsan_epilogue(&flags);
+}

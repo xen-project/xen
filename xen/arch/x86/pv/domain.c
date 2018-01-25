@@ -20,7 +20,6 @@
 static void noreturn continue_nonidle_domain(struct vcpu *v)
 {
     check_wakeup_from_wait();
-    mark_regs_dirty(guest_cpu_user_regs());
     reset_stack_and_jump(ret_from_intr);
 }
 
@@ -233,8 +232,17 @@ void toggle_guest_mode(struct vcpu *v)
         else
             v->arch.pv_vcpu.gs_base_user = __rdgsbase();
     }
-    v->arch.flags ^= TF_kernel_mode;
     asm volatile ( "swapgs" );
+
+    toggle_guest_pt(v);
+}
+
+void toggle_guest_pt(struct vcpu *v)
+{
+    if ( is_pv_32bit_vcpu(v) )
+        return;
+
+    v->arch.flags ^= TF_kernel_mode;
     update_cr3(v);
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
     asm volatile ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );

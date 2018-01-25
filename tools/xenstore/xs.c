@@ -279,9 +279,9 @@ err:
 	saved_errno = errno;
 
 	if (h) {
+		xentoolcore__deregister_active_handle(&h->tc_ah);
 		if (h->fd >= 0)
 			close(h->fd);
-		xentoolcore__deregister_active_handle(&h->tc_ah);
 	}
 	free(h);
 
@@ -342,8 +342,8 @@ static void close_fds_free(struct xs_handle *h) {
 		close(h->watch_pipe[1]);
 	}
 
-        close(h->fd);
 	xentoolcore__deregister_active_handle(&h->tc_ah);
+        close(h->fd);
         
 	free(h);
 }

@@ -57,8 +57,8 @@ xenforeignmemory_handle *xenforeignmemory_open(xentoollog_logger *logger,
     return fmem;
 
 err:
-    osdep_xenforeignmemory_close(fmem);
     xentoolcore__deregister_active_handle(&fmem->tc_ah);
+    osdep_xenforeignmemory_close(fmem);
     xtl_logger_destroy(fmem->logger_tofree);
     free(fmem);
     return NULL;
@@ -71,8 +71,8 @@ int xenforeignmemory_close(xenforeignmemory_handle *fmem)
     if ( !fmem )
         return 0;
 
-    rc = osdep_xenforeignmemory_close(fmem);
     xentoolcore__deregister_active_handle(&fmem->tc_ah);
+    rc = osdep_xenforeignmemory_close(fmem);
     xtl_logger_destroy(fmem->logger_tofree);
     free(fmem);
     return rc;

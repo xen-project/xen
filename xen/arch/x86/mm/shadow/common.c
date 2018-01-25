@@ -637,7 +637,7 @@ static int oos_remove_write_access(struct vcpu *v, mfn_t gmfn,
     }
 
     if ( ftlb )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
 
     return 0;
 }
@@ -1064,7 +1064,7 @@ sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
     rc = sh_validate_guest_entry(v, gmfn, entry, size);
     if ( rc & SHADOW_SET_FLUSH )
         /* Need to flush TLBs to pick up shadow PT changes */
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     if ( rc & SHADOW_SET_ERROR )
     {
         /* This page is probably not a pagetable any more: tear it out of the
@@ -1143,13 +1143,7 @@ const u8 sh_type_to_size[] = {
  * worth to make sure we never return zero. */
 static unsigned int shadow_min_acceptable_pages(struct domain *d)
 {
-    u32 vcpu_count = 1;
-    struct vcpu *v;
-
-    for_each_vcpu(d, v)
-        vcpu_count++;
-
-    return (vcpu_count * 128);
+    return (d->max_vcpus + 1) * 128;
 }
 
 /* Dispatcher function: call the per-mode function that will unhook the
@@ -1233,7 +1227,7 @@ static void _shadow_prealloc(struct domain *d, unsigned int pages)
                 /* See if that freed up enough space */
                 if ( d->arch.paging.shadow.free_pages >= pages )
                 {
-                    flush_tlb_mask(d->domain_dirty_cpumask);
+                    flush_tlb_mask(d->dirty_cpumask);
                     return;
                 }
             }
@@ -1287,7 +1281,7 @@ static void shadow_blow_tables(struct domain *d)
                                pagetable_get_mfn(v->arch.shadow_table[i]), 0);
 
     /* Make sure everyone sees the unshadowings */
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(d->dirty_cpumask);
 }
 
 void shadow_blow_tables_per_domain(struct domain *d)
@@ -1391,7 +1385,7 @@ mfn_t shadow_alloc(struct domain *d,
         sp = page_list_remove_head(&d->arch.paging.shadow.freelist);
         /* Before we overwrite the old contents of this page,
          * we need to be sure that no TLB holds a pointer to it. */
-        cpumask_copy(&mask, d->domain_dirty_cpumask);
+        cpumask_copy(&mask, d->dirty_cpumask);
         tlbflush_filter(&mask, sp->tlbflush_timestamp);
         if ( unlikely(!cpumask_empty(&mask)) )
         {
@@ -1503,32 +1497,29 @@ shadow_alloc_p2m_page(struct domain *d)
     pg = mfn_to_page(shadow_alloc(d, SH_type_p2m_table, 0));
     d->arch.paging.shadow.p2m_pages++;
     d->arch.paging.shadow.total_pages--;
+    ASSERT(!page_get_owner(pg) && !(pg->count_info & PGC_count_mask));
 
     paging_unlock(d);
 
-    /* Unlike shadow pages, mark p2m pages as owned by the domain.
-     * Marking the domain as the owner would normally allow the guest to
-     * create mappings of these pages, but these p2m pages will never be
-     * in the domain's guest-physical address space, and so that is not
-     * believed to be a concern. */
-    page_set_owner(pg, d);
-    pg->count_info |= 1;
     return pg;
 }
 
 static void
 shadow_free_p2m_page(struct domain *d, struct page_info *pg)
 {
-    ASSERT(page_get_owner(pg) == d);
-    /* Should have just the one ref we gave it in alloc_p2m_page() */
-    if ( (pg->count_info & PGC_count_mask) != 1 )
+    struct domain *owner = page_get_owner(pg);
+
+    /* Should still have no owner and count zero. */
+    if ( owner || (pg->count_info & PGC_count_mask) )
     {
-        SHADOW_ERROR("Odd p2m page count c=%#lx t=%"PRtype_info"\n",
+        SHADOW_ERROR("d%d: Odd p2m page %"PRI_mfn" d=%d c=%lx t=%"PRtype_info"\n",
+                     d->domain_id, mfn_x(page_to_mfn(pg)),
+                     owner ? owner->domain_id : DOMID_INVALID,
                      pg->count_info, pg->u.inuse.type_info);
+        pg->count_info &= ~PGC_count_mask;
+        page_set_owner(pg, NULL);
     }
-    pg->count_info &= ~PGC_count_mask;
     pg->u.sh.type = SH_type_p2m_table; /* p2m code reuses type-info */
-    page_set_owner(pg, NULL);
 
     /* This is called both from the p2m code (which never holds the
      * paging lock) and the log-dirty code (which always does). */
@@ -2806,7 +2797,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
 
     /* Need to flush TLBs now, so that linear maps are safe next time we
      * take a fault. */
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(d->dirty_cpumask);
 
     paging_unlock(d);
 }
@@ -3132,7 +3123,9 @@ int shadow_enable(struct domain *d, u32 mode)
         e = __map_domain_page(pg);
         write_32bit_pse_identmap(e);
         unmap_domain_page(e);
+        pg->count_info = 1;
         pg->u.inuse.type_info = PGT_l2_page_table | 1 | PGT_validated;
+        page_set_owner(pg, d);
     }
 
     paging_lock(d);
@@ -3170,7 +3163,11 @@ int shadow_enable(struct domain *d, u32 mode)
     if ( rv != 0 && !pagetable_is_null(p2m_get_pagetable(p2m)) )
         p2m_teardown(p2m);
     if ( rv != 0 && pg != NULL )
+    {
+        pg->count_info &= ~PGC_count_mask;
+        page_set_owner(pg, NULL);
         shadow_free_p2m_page(d, pg);
+    }
     domain_unpause(d);
     return rv;
 }
@@ -3279,7 +3276,22 @@ out:
 
     /* Must be called outside the lock */
     if ( unpaged_pagetable )
+    {
+        if ( page_get_owner(unpaged_pagetable) == d &&
+             (unpaged_pagetable->count_info & PGC_count_mask) == 1 )
+        {
+            unpaged_pagetable->count_info &= ~PGC_count_mask;
+            page_set_owner(unpaged_pagetable, NULL);
+        }
+        /* Complain here in cases where shadow_free_p2m_page() won't. */
+        else if ( !page_get_owner(unpaged_pagetable) &&
+                  !(unpaged_pagetable->count_info & PGC_count_mask) )
+            SHADOW_ERROR("d%d: Odd unpaged pt %"PRI_mfn" c=%lx t=%"PRtype_info"\n",
+                         d->domain_id, mfn_x(page_to_mfn(unpaged_pagetable)),
+                         unpaged_pagetable->count_info,
+                         unpaged_pagetable->u.inuse.type_info);
         shadow_free_p2m_page(d, unpaged_pagetable);
+    }
 }
 
 void shadow_final_teardown(struct domain *d)
@@ -3365,7 +3377,10 @@ static int shadow_one_bit_disable(struct domain *d, u32 mode)
     }
 
     /* Update the bits */
-    sh_new_mode(d, d->arch.paging.mode & ~mode);
+    mode = d->arch.paging.mode & ~mode;
+    if ( mode == PG_SH_enable )
+        mode = 0;
+    sh_new_mode(d, mode);
     if ( d->arch.paging.mode == 0 )
     {
         /* Get this domain off shadows */
@@ -3466,7 +3481,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
         {
             sh_remove_all_shadows_and_parents(d, mfn);
             if ( sh_remove_all_mappings(d, mfn, _gfn(gfn)) )
-                flush_tlb_mask(d->domain_dirty_cpumask);
+                flush_tlb_mask(d->dirty_cpumask);
         }
     }
 
@@ -3502,8 +3517,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                     sh_remove_all_shadows_and_parents(d, omfn);
                     if ( sh_remove_all_mappings(d, omfn,
                                                 _gfn(gfn + (i << PAGE_SHIFT))) )
-                        cpumask_or(&flushmask, &flushmask,
-                                   d->domain_dirty_cpumask);
+                        cpumask_or(&flushmask, &flushmask, d->dirty_cpumask);
                 }
                 omfn = _mfn(mfn_x(omfn) + 1);
             }
@@ -3780,7 +3794,7 @@ int shadow_track_dirty_vram(struct domain *d,
         }
     }
     if ( flush_tlb )
-        flush_tlb_mask(d->domain_dirty_cpumask);
+        flush_tlb_mask(d->dirty_cpumask);
     goto out;
 
 out_sl1ma:

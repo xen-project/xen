@@ -172,13 +172,8 @@
 
 /* Fixmap slots */
 #define FIXMAP_CONSOLE  0  /* The primary UART */
-#define FIXMAP_PT       1  /* Temporary mappings of pagetable pages */
-#define FIXMAP_MISC     2  /* Ephemeral mappings of hardware */
-#define FIXMAP_GICD     3  /* Interrupt controller: distributor registers */
-#define FIXMAP_GICC1    4  /* Interrupt controller: CPU registers (first page) */
-#define FIXMAP_GICC2    5  /* Interrupt controller: CPU registers (second page) */
-#define FIXMAP_GICH     6  /* Interrupt controller: virtual interface control registers */
-#define FIXMAP_ACPI_BEGIN  7  /* Start mappings of ACPI tables */
+#define FIXMAP_MISC     1  /* Ephemeral mappings of hardware */
+#define FIXMAP_ACPI_BEGIN  2  /* Start mappings of ACPI tables */
 #define FIXMAP_ACPI_END    (FIXMAP_ACPI_BEGIN + NUM_FIXMAP_ACPI_PAGES - 1)  /* End mappings of ACPI tables */
 
 #define PAGE_SHIFT              12

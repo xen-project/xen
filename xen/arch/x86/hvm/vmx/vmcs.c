@@ -806,7 +806,6 @@ static void vmx_set_host_env(struct vcpu *v)
               (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY));
     __vmwrite(HOST_IDTR_BASE, (unsigned long)idt_tables[cpu]);
 
-    __vmwrite(HOST_TR_SELECTOR, TSS_ENTRY << 3);
     __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(init_tss, cpu));
 
     __vmwrite(HOST_SYSENTER_ESP, get_stack_bottom());
@@ -995,8 +994,6 @@ static void pi_desc_init(struct vcpu *v)
 static int construct_vmcs(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    uint16_t sysenter_cs;
-    unsigned long sysenter_eip;
     u32 vmexit_ctl = vmx_vmexit_control;
     u32 vmentry_ctl = vmx_vmentry_control;
 
@@ -1144,6 +1141,7 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_GS_SELECTOR, 0);
     __vmwrite(HOST_FS_BASE, 0);
     __vmwrite(HOST_GS_BASE, 0);
+    __vmwrite(HOST_TR_SELECTOR, TSS_ENTRY << 3);
 
     /* Host control registers. */
     v->arch.hvm_vmx.host_cr0 = read_cr0() | X86_CR0_TS;
@@ -1155,10 +1153,8 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
 
     /* Host SYSENTER CS:RIP. */
-    rdmsrl(MSR_IA32_SYSENTER_CS, sysenter_cs);
-    __vmwrite(HOST_SYSENTER_CS, sysenter_cs);
-    rdmsrl(MSR_IA32_SYSENTER_EIP, sysenter_eip);
-    __vmwrite(HOST_SYSENTER_EIP, sysenter_eip);
+    __vmwrite(HOST_SYSENTER_CS, __HYPERVISOR_CS);
+    __vmwrite(HOST_SYSENTER_EIP, (unsigned long)sysenter_entry);
 
     /* MSR intercepts. */
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);

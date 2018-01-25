@@ -42,8 +42,9 @@
 #define LIVEPATCH_FEATURE   4
 #define SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT 5
 #define SKIP_CTXT_SWITCH_SERROR_SYNC 6
+#define ARM_HARDEN_BRANCH_PREDICTOR 7
 
-#define ARM_NCAPS           7
+#define ARM_NCAPS           8
 
 #ifndef __ASSEMBLY__
 
@@ -74,6 +75,7 @@ struct arm_cpu_capabilities {
     const char *desc;
     u16 capability;
     bool (*matches)(const struct arm_cpu_capabilities *);
+    int (*enable)(void *); /* Called on every active CPUs */
     union {
         struct {    /* To be used for eratum handling only */
             u32 midr_model;
@@ -84,6 +86,8 @@ struct arm_cpu_capabilities {
 
 void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
                              const char *info);
+
+void enable_cpu_capabilities(const struct arm_cpu_capabilities *caps);
 
 #endif /* __ASSEMBLY__ */
 

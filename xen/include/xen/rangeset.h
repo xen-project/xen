@@ -55,9 +55,11 @@ void rangeset_limit(
 bool_t __must_check rangeset_is_empty(
     const struct rangeset *r);
 
-/* Add/remove/query a numeric range. */
+/* Add/claim/remove/query a numeric range. */
 int __must_check rangeset_add_range(
     struct rangeset *r, unsigned long s, unsigned long e);
+int __must_check rangeset_claim_range(struct rangeset *r, unsigned long size,
+                                      unsigned long *s);
 int __must_check rangeset_remove_range(
     struct rangeset *r, unsigned long s, unsigned long e);
 bool_t __must_check rangeset_contains_range(

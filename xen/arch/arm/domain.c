@@ -330,7 +330,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 {
     ASSERT(local_irq_is_enabled());
     ASSERT(prev != next);
-    ASSERT(cpumask_empty(next->vcpu_dirty_cpumask));
+    ASSERT(!vcpu_cpu_dirty(next));
 
     if ( prev != next )
         update_runstate_area(prev);
@@ -470,8 +470,8 @@ void startup_cpu_idle_loop(void)
 
     ASSERT(is_idle_vcpu(v));
     /* TODO
-       cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
-       cpumask_set_cpu(v->processor, v->vcpu_dirty_cpumask);
+       cpumask_set_cpu(v->processor, v->domain->dirty_cpumask);
+       v->dirty_cpu = v->processor;
     */
 
     reset_stack_and_jump(idle_loop);

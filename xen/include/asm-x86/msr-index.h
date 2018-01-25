@@ -31,6 +31,14 @@
 #define EFER_LMSLE		(1<<_EFER_LMSLE)
 #define EFER_FFXSE		(1<<_EFER_FFXSE)
 
+/* Speculation Controls. */
+#define MSR_SPEC_CTRL			0x00000048
+#define SPEC_CTRL_IBRS			(_AC(1, ULL) << 0)
+#define SPEC_CTRL_STIBP			(_AC(1, ULL) << 1)
+
+#define MSR_PRED_CMD			0x00000049
+#define PRED_CMD_IBPB			(_AC(1, ULL) << 0)
+
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
 #define MSR_IA32_A_PERFCTR0		0x000004c1
@@ -207,6 +215,7 @@
 #define MSR_AMD64_IC_CFG		0xc0011021
 #define MSR_AMD64_DC_CFG		0xc0011022
 #define MSR_AMD64_DE_CFG		0xc0011029
+#define AMD64_DE_CFG_LFENCE_SERIALISE	(_AC(1, ULL) << 1)
 
 #define MSR_AMD64_DR0_ADDRESS_MASK	0xc0011027
 #define MSR_AMD64_DR1_ADDRESS_MASK	0xc0011019
@@ -348,6 +357,7 @@
 #define MSR_IA32_PSR_L3_MASK_CODE(n)	(0x00000c90 + (n) * 2 + 1)
 #define MSR_IA32_PSR_L3_MASK_DATA(n)	(0x00000c90 + (n) * 2)
 #define MSR_IA32_PSR_L2_MASK(n)		(0x00000d10 + (n))
+#define MSR_IA32_PSR_MBA_MASK(n)	(0x00000d50 + (n))
 
 /* Intel Model 6 */
 #define MSR_P6_PERFCTR(n)		(0x000000c1 + (n))

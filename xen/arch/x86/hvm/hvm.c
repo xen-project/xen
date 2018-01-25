@@ -544,7 +544,11 @@ static int hvm_print_line(
     struct domain *cd = current->domain;
     char c = *val;
 
-    BUG_ON(bytes != 1);
+    ASSERT(bytes == 1 && port == 0xe9);
+
+    /* Deny any input requests. */
+    if ( dir != IOREQ_WRITE )
+        return X86EMUL_UNHANDLEABLE;
 
     /* Accept only printable characters, newline, and horizontal tab. */
     if ( !isprint(c) && (c != '\n') && (c != '\t') )
@@ -1322,7 +1326,10 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 }
 
 #define HVM_CPU_MSR_SIZE(cnt) offsetof(struct hvm_msr, msr[cnt])
-static unsigned int __read_mostly msr_count_max;
+static const uint32_t msrs_to_send[] = {
+    MSR_INTEL_MISC_FEATURES_ENABLES,
+};
+static unsigned int __read_mostly msr_count_max = ARRAY_SIZE(msrs_to_send);
 
 static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 {
@@ -1330,6 +1337,7 @@ static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu ( d, v )
     {
+        struct hvm_save_descriptor *d = _p(&h->data[h->cur]);
         struct hvm_msr *ctxt;
         unsigned int i;
 
@@ -1338,6 +1346,33 @@ static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
             return 1;
         ctxt = (struct hvm_msr *)&h->data[h->cur];
         ctxt->count = 0;
+
+        for ( i = 0; i < ARRAY_SIZE(msrs_to_send); ++i )
+        {
+            uint64_t val;
+            int rc = guest_rdmsr(v, msrs_to_send[i], &val);
+
+            /*
+             * It is the programmers responsibility to ensure that
+             * msrs_to_send[] contain generally-read/write MSRs.
+             * X86EMUL_EXCEPTION here implies a missing feature, and that the
+             * guest doesn't have access to the MSR.
+             */
+            if ( rc == X86EMUL_EXCEPTION )
+                continue;
+
+            if ( rc != X86EMUL_OKAY )
+            {
+                ASSERT_UNREACHABLE();
+                return -ENXIO;
+            }
+
+            if ( !val )
+                continue; /* Skip empty MSRs. */
+
+            ctxt->msr[ctxt->count].index = msrs_to_send[i];
+            ctxt->msr[ctxt->count++].val = val;
+        }
 
         if ( hvm_funcs.save_msr )
             hvm_funcs.save_msr(v, ctxt);
@@ -1348,8 +1383,13 @@ static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
             ctxt->msr[i]._rsvd = 0;
 
         if ( ctxt->count )
+        {
+            /* Rewrite length to indicate how much space we actually used. */
+            d->length = HVM_CPU_MSR_SIZE(ctxt->count);
             h->cur += HVM_CPU_MSR_SIZE(ctxt->count);
+        }
         else
+            /* or rewind and remove the descriptor from the stream. */
             h->cur -= sizeof(struct hvm_save_descriptor);
     }
 
@@ -1420,6 +1460,15 @@ static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
     {
         switch ( ctxt->msr[i].index )
         {
+            int rc;
+
+        case MSR_INTEL_MISC_FEATURES_ENABLES:
+            rc = guest_wrmsr(v, ctxt->msr[i].index, ctxt->msr[i].val);
+
+            if ( rc != X86EMUL_OKAY )
+                err = -ENXIO;
+            break;
+
         default:
             if ( !ctxt->msr[i]._rsvd )
                 err = -ENXIO;
@@ -1509,8 +1558,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
         /* Init guest TSC to start from zero. */
         hvm_set_guest_tsc(v, 0);
     }
-
-    hvm_update_guest_vendor(v);
 
     return 0;
 
@@ -3489,7 +3536,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 }
 
 int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
-                            bool_t may_defer)
+                            bool may_defer)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
@@ -3500,6 +3547,12 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     if ( may_defer && unlikely(monitored_msr(v->domain, msr)) )
     {
+        uint64_t msr_old_content;
+
+        ret = hvm_msr_read_intercept(msr, &msr_old_content);
+        if ( ret != X86EMUL_OKAY )
+            return ret;
+
         ASSERT(v->arch.vm_event);
 
         /* The actual write will occur in hvm_do_resume() (if permitted). */
@@ -3507,7 +3560,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         v->arch.vm_event->write_data.msr = msr;
         v->arch.vm_event->write_data.value = msr_content;
 
-        hvm_monitor_msr(msr, msr_content);
+        hvm_monitor_msr(msr, msr_content, msr_old_content);
         return X86EMUL_OKAY;
     }
 
@@ -3992,7 +4045,7 @@ static int hvmop_flush_tlb_all(void)
         paging_update_cr3(v);
 
     /* Flush all dirty TLBs. */
-    flush_tlb_mask(d->domain_dirty_cpumask);
+    flush_tlb_mask(d->dirty_cpumask);
 
     /* Done. */
     for_each_vcpu ( d, v )
@@ -4024,6 +4077,7 @@ static int hvmop_set_evtchn_upcall_vector(
     printk(XENLOG_G_INFO "%pv: upcall vector %02x\n", v, op.vector);
 
     v->arch.hvm_vcpu.evtchn_upcall_vector = op.vector;
+    hvm_assert_evtchn_irq(v);
     return 0;
 }
 
@@ -4534,12 +4588,18 @@ static int do_altp2m_op(
 
         if ( a.u.enable_notify.pad || a.domain != DOMID_SELF ||
              a.u.enable_notify.vcpu_id != curr->vcpu_id )
+        {
             rc = -EINVAL;
+            break;
+        }
 
         if ( !gfn_eq(vcpu_altp2m(curr).veinfo_gfn, INVALID_GFN) ||
              mfn_eq(get_gfn_query_unlocked(curr->domain,
                     a.u.enable_notify.gfn, &p2mt), INVALID_MFN) )
-            return -EINVAL;
+        {
+            rc = -EINVAL;
+            break;
+        }
 
         vcpu_altp2m(curr).veinfo_gfn = _gfn(a.u.enable_notify.gfn);
         altp2m_vcpu_update_vmfunc_ve(curr);

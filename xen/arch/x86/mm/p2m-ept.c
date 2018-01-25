@@ -1195,12 +1195,12 @@ void ept_sync_domain(struct p2m_domain *p2m)
         return;
     }
 
-    ept_sync_domain_mask(p2m, d->domain_dirty_cpumask);
+    ept_sync_domain_mask(p2m, d->dirty_cpumask);
 }
 
 static void ept_tlb_flush(struct p2m_domain *p2m)
 {
-    ept_sync_domain_mask(p2m, p2m->domain->domain_dirty_cpumask);
+    ept_sync_domain_mask(p2m, p2m->domain->dirty_cpumask);
 }
 
 static void ept_enable_pml(struct p2m_domain *p2m)

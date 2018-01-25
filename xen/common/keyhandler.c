@@ -298,7 +298,7 @@ static void dump_domains(unsigned char key)
         process_pending_softirqs();
 
         printk("General information for domain %u:\n", d->domain_id);
-        cpuset_print(tmpstr, sizeof(tmpstr), d->domain_dirty_cpumask);
+        cpuset_print(tmpstr, sizeof(tmpstr), d->dirty_cpumask);
         printk("    refcnt=%d dying=%d pause_count=%d\n",
                atomic_read(&d->refcnt), d->is_dying,
                atomic_read(&d->pause_count));
@@ -340,8 +340,9 @@ static void dump_domains(unsigned char key)
                    v->is_running ? 'T':'F', v->poll_evtchn,
                    vcpu_info(v, evtchn_upcall_pending),
                    !vcpu_event_delivery_is_enabled(v));
-            cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
-            printk("dirty_cpus=%s\n", tmpstr);
+            if ( vcpu_cpu_dirty(v) )
+                printk("dirty_cpu=%u", v->dirty_cpu);
+            printk("\n");
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_hard_affinity);
             printk("    cpu_hard_affinity=%s ", tmpstr);
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_soft_affinity);

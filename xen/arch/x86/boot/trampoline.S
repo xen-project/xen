@@ -153,8 +153,28 @@ trampoline_protmode_entry:
         .code64
 start64:
         /* Jump to high mappings. */
-        movabs  $__high_start,%rax
-        jmpq    *%rax
+        movabs  $__high_start, %rdi
+
+#ifdef CONFIG_INDIRECT_THUNK
+        /*
+         * If booting virtualised, or hot-onlining a CPU, sibling threads can
+         * attempt Branch Target Injection against this jmp.
+         *
+         * We've got no usable stack so can't use a RETPOLINE thunk, and are
+         * further than disp32 from the high mappings so couldn't use
+         * JUMP_THUNK even if it was a non-RETPOLINE thunk.  Furthermore, an
+         * LFENCE isn't necessarily safe to use at this point.
+         *
+         * As this isn't a hotpath, use a fully serialising event to reduce
+         * the speculation window as much as possible.  %ebx needs preserving
+         * for __high_start.
+         */
+        mov     %ebx, %esi
+        cpuid
+        mov     %esi, %ebx
+#endif
+
+        jmpq    *%rdi
 
 #include "wakeup.S"
 
@@ -219,7 +239,9 @@ trampoline_boot_cpu_entry:
          */
         call    get_memory_map
         call    get_edd
+#ifdef CONFIG_VIDEO
         call    video
+#endif
 
         mov     $0x0200,%ax
         int     $0x16
@@ -267,10 +289,13 @@ opt_edid:
         .byte   0                               /* EDID parsing option (force/no/default). */
 /* Padding. */
         .byte   0
+
+#ifdef CONFIG_VIDEO
 GLOBAL(boot_vid_mode)
         .word   VIDEO_80x25                     /* If we don't run at all, assume basic video mode 3 at 80x25. */
 vesa_size:
         .word   0,0,0                           /* width x depth x height */
+#endif
 
 GLOBAL(kbd_shift_flags)
         .byte   0
@@ -279,4 +304,6 @@ rm_idt: .word   256*4-1, 0, 0
 
 #include "mem.S"
 #include "edd.S"
+#ifdef CONFIG_VIDEO
 #include "video.S"
+#endif

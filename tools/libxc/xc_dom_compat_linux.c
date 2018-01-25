@@ -56,7 +56,7 @@ int xc_linux_build(xc_interface *xch, uint32_t domid,
     if ( (rc = xc_dom_kernel_file(dom, image_name)) != 0 )
         goto out;
     if ( initrd_name && strlen(initrd_name) &&
-         ((rc = xc_dom_ramdisk_file(dom, initrd_name)) != 0) )
+         ((rc = xc_dom_module_file(dom, initrd_name, NULL)) != 0) )
         goto out;
 
     dom->flags |= flags;

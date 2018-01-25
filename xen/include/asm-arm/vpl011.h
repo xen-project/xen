@@ -28,6 +28,8 @@
 #define VPL011_LOCK(d,flags) spin_lock_irqsave(&(d)->arch.vpl011.lock, flags)
 #define VPL011_UNLOCK(d,flags) spin_unlock_irqrestore(&(d)->arch.vpl011.lock, flags)
 
+#define SBSA_UART_FIFO_SIZE 32
+
 struct vpl011 {
     void *ring_buf;
     struct page_info *ring_page;

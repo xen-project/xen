@@ -38,6 +38,7 @@
 #include <asm/desc.h>
 #include <asm/div64.h>
 #include <asm/flushtlb.h>
+#include <asm/guest.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/time.h>
@@ -85,7 +86,7 @@ static enum cpu_state {
     CPU_STATE_CALLIN,   /* slave -> master: Completed phase 2 */
     CPU_STATE_ONLINE    /* master -> slave: Go fully online now. */
 } cpu_state;
-#define set_cpu_state(state) do { mb(); cpu_state = (state); } while (0)
+#define set_cpu_state(state) do { smp_mb(); cpu_state = (state); } while (0)
 
 void *stack_base[NR_CPUS];
 
@@ -132,7 +133,7 @@ static void synchronize_tsc_master(unsigned int slave)
     for ( i = 1; i <= 5; i++ )
     {
         tsc_value = rdtsc_ordered();
-        wmb();
+        smp_wmb();
         atomic_inc(&tsc_count);
         while ( atomic_read(&tsc_count) != (i<<1) )
             cpu_relax();
@@ -157,7 +158,7 @@ static void synchronize_tsc_slave(unsigned int slave)
     {
         while ( atomic_read(&tsc_count) != ((i<<1)-1) )
             cpu_relax();
-        rmb();
+        smp_rmb();
         /*
          * If a CPU has been physically hotplugged, we may as well write
          * to its TSC in spite of X86_FEATURE_TSC_RELIABLE. The platform does
@@ -327,6 +328,9 @@ void start_secondary(void *unused)
      */
     spin_debug_disable();
 
+    get_cpu_info()->xen_cr3 = 0;
+    get_cpu_info()->pv_cr3 = this_cpu(root_pgt) ? __pa(this_cpu(root_pgt)) : 0;
+
     load_system_tables();
 
     /* Full exception support from here on in. */
@@ -345,6 +349,9 @@ void start_secondary(void *unused)
     else
         microcode_resume_cpu(cpu);
 
+    if ( xen_guest )
+        hypervisor_ap_setup();
+
     smp_callin();
 
     init_percpu_time();
@@ -361,7 +368,6 @@ void start_secondary(void *unused)
     spin_debug_enable();
     set_cpu_sibling_map(cpu);
     notify_cpu_starting(cpu);
-    wmb();
 
     /*
      * We need to hold vector_lock so there the set of online cpus
@@ -377,7 +383,6 @@ void start_secondary(void *unused)
     local_irq_enable();
     mtrr_ap_init();
 
-    wmb();
     startup_cpu_idle_loop();
 }
 
@@ -561,13 +566,13 @@ static int do_boot_cpu(int apicid, int cpu)
         }
         else if ( cpu_state == CPU_STATE_DEAD )
         {
-            rmb();
+            smp_rmb();
             rc = cpu_error;
         }
         else
         {
             boot_error = 1;
-            mb();
+            smp_mb();
             if ( bootsym(trampoline_cpu_started) == 0xA5 )
                 /* trampoline started but...? */
                 printk("Stuck ??\n");
@@ -585,7 +590,7 @@ static int do_boot_cpu(int apicid, int cpu)
 
     /* mark "stuck" area as not stuck */
     bootsym(trampoline_cpu_started) = 0;
-    mb();
+    smp_mb();
 
     smpboot_restore_warm_reset_vector();
 
@@ -635,6 +640,193 @@ void cpu_exit_clear(unsigned int cpu)
     set_cpu_state(CPU_STATE_DEAD);
 }
 
+static int clone_mapping(const void *ptr, root_pgentry_t *rpt)
+{
+    unsigned long linear = (unsigned long)ptr, pfn;
+    unsigned int flags;
+    l3_pgentry_t *pl3e = l4e_to_l3e(idle_pg_table[root_table_offset(linear)]) +
+                         l3_table_offset(linear);
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+
+    if ( linear < DIRECTMAP_VIRT_START )
+        return 0;
+
+    flags = l3e_get_flags(*pl3e);
+    ASSERT(flags & _PAGE_PRESENT);
+    if ( flags & _PAGE_PSE )
+    {
+        pfn = (l3e_get_pfn(*pl3e) & ~((1UL << (2 * PAGETABLE_ORDER)) - 1)) |
+              (PFN_DOWN(linear) & ((1UL << (2 * PAGETABLE_ORDER)) - 1));
+        flags &= ~_PAGE_PSE;
+    }
+    else
+    {
+        pl2e = l3e_to_l2e(*pl3e) + l2_table_offset(linear);
+        flags = l2e_get_flags(*pl2e);
+        ASSERT(flags & _PAGE_PRESENT);
+        if ( flags & _PAGE_PSE )
+        {
+            pfn = (l2e_get_pfn(*pl2e) & ~((1UL << PAGETABLE_ORDER) - 1)) |
+                  (PFN_DOWN(linear) & ((1UL << PAGETABLE_ORDER) - 1));
+            flags &= ~_PAGE_PSE;
+        }
+        else
+        {
+            pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(linear);
+            flags = l1e_get_flags(*pl1e);
+            if ( !(flags & _PAGE_PRESENT) )
+                return 0;
+            pfn = l1e_get_pfn(*pl1e);
+        }
+    }
+
+    if ( !(root_get_flags(rpt[root_table_offset(linear)]) & _PAGE_PRESENT) )
+    {
+        pl3e = alloc_xen_pagetable();
+        if ( !pl3e )
+            return -ENOMEM;
+        clear_page(pl3e);
+        l4e_write(&rpt[root_table_offset(linear)],
+                  l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
+    }
+    else
+        pl3e = l4e_to_l3e(rpt[root_table_offset(linear)]);
+
+    pl3e += l3_table_offset(linear);
+
+    if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
+    {
+        pl2e = alloc_xen_pagetable();
+        if ( !pl2e )
+            return -ENOMEM;
+        clear_page(pl2e);
+        l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
+    }
+    else
+    {
+        ASSERT(!(l3e_get_flags(*pl3e) & _PAGE_PSE));
+        pl2e = l3e_to_l2e(*pl3e);
+    }
+
+    pl2e += l2_table_offset(linear);
+
+    if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+    {
+        pl1e = alloc_xen_pagetable();
+        if ( !pl1e )
+            return -ENOMEM;
+        clear_page(pl1e);
+        l2e_write(pl2e, l2e_from_paddr(__pa(pl1e), __PAGE_HYPERVISOR));
+    }
+    else
+    {
+        ASSERT(!(l2e_get_flags(*pl2e) & _PAGE_PSE));
+        pl1e = l2e_to_l1e(*pl2e);
+    }
+
+    pl1e += l1_table_offset(linear);
+
+    if ( l1e_get_flags(*pl1e) & _PAGE_PRESENT )
+    {
+        ASSERT(l1e_get_pfn(*pl1e) == pfn);
+        ASSERT(l1e_get_flags(*pl1e) == flags);
+    }
+    else
+        l1e_write(pl1e, l1e_from_pfn(pfn, flags));
+
+    return 0;
+}
+
+static __read_mostly int8_t opt_xpti = -1;
+boolean_param("xpti", opt_xpti);
+DEFINE_PER_CPU(root_pgentry_t *, root_pgt);
+
+static int setup_cpu_root_pgt(unsigned int cpu)
+{
+    root_pgentry_t *rpt;
+    unsigned int off;
+    int rc;
+
+    if ( !opt_xpti )
+        return 0;
+
+    rpt = alloc_xen_pagetable();
+    if ( !rpt )
+        return -ENOMEM;
+
+    clear_page(rpt);
+    per_cpu(root_pgt, cpu) = rpt;
+
+    rpt[root_table_offset(RO_MPT_VIRT_START)] =
+        idle_pg_table[root_table_offset(RO_MPT_VIRT_START)];
+    /* SH_LINEAR_PT inserted together with guest mappings. */
+    /* PERDOMAIN inserted during context switch. */
+    rpt[root_table_offset(XEN_VIRT_START)] =
+        idle_pg_table[root_table_offset(XEN_VIRT_START)];
+
+    /* Install direct map page table entries for stack, IDT, and TSS. */
+    for ( off = rc = 0; !rc && off < STACK_SIZE; off += PAGE_SIZE )
+        rc = clone_mapping(__va(__pa(stack_base[cpu])) + off, rpt);
+
+    if ( !rc )
+        rc = clone_mapping(idt_tables[cpu], rpt);
+    if ( !rc )
+        rc = clone_mapping(&per_cpu(init_tss, cpu), rpt);
+
+    return rc;
+}
+
+static void cleanup_cpu_root_pgt(unsigned int cpu)
+{
+    root_pgentry_t *rpt = per_cpu(root_pgt, cpu);
+    unsigned int r;
+
+    if ( !rpt )
+        return;
+
+    per_cpu(root_pgt, cpu) = NULL;
+
+    for ( r = root_table_offset(DIRECTMAP_VIRT_START);
+          r < root_table_offset(HYPERVISOR_VIRT_END); ++r )
+    {
+        l3_pgentry_t *l3t;
+        unsigned int i3;
+
+        if ( !(root_get_flags(rpt[r]) & _PAGE_PRESENT) )
+            continue;
+
+        l3t = l4e_to_l3e(rpt[r]);
+
+        for ( i3 = 0; i3 < L3_PAGETABLE_ENTRIES; ++i3 )
+        {
+            l2_pgentry_t *l2t;
+            unsigned int i2;
+
+            if ( !(l3e_get_flags(l3t[i3]) & _PAGE_PRESENT) )
+                continue;
+
+            ASSERT(!(l3e_get_flags(l3t[i3]) & _PAGE_PSE));
+            l2t = l3e_to_l2e(l3t[i3]);
+
+            for ( i2 = 0; i2 < L2_PAGETABLE_ENTRIES; ++i2 )
+            {
+                if ( !(l2e_get_flags(l2t[i2]) & _PAGE_PRESENT) )
+                    continue;
+
+                ASSERT(!(l2e_get_flags(l2t[i2]) & _PAGE_PSE));
+                free_xen_pagetable(l2e_to_l1e(l2t[i2]));
+            }
+
+            free_xen_pagetable(l2t);
+        }
+
+        free_xen_pagetable(l3t);
+    }
+
+    free_xen_pagetable(rpt);
+}
+
 static void cpu_smpboot_free(unsigned int cpu)
 {
     unsigned int order, socket = cpu_to_socket(cpu);
@@ -673,6 +865,8 @@ static void cpu_smpboot_free(unsigned int cpu)
             free_domheap_page(mfn_to_page(mfn));
     }
 
+    cleanup_cpu_root_pgt(cpu);
+
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     free_xenheap_pages(per_cpu(gdt_table, cpu), order);
 
@@ -696,37 +890,41 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     nodeid_t node = cpu_to_node(cpu);
     struct desc_struct *gdt;
     unsigned long stub_page;
+    int rc = -ENOMEM;
 
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
 
     stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
     if ( stack_base[cpu] == NULL )
-        goto oom;
+        goto out;
     memguard_guard_stack(stack_base[cpu]);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
     if ( gdt == NULL )
-        goto oom;
+        goto out;
     memcpy(gdt, boot_cpu_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     BUILD_BUG_ON(NR_CPUS > 0x10000);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
     per_cpu(compat_gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
     if ( gdt == NULL )
-        goto oom;
+        goto out;
     memcpy(gdt, boot_cpu_compat_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
     order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
     idt_tables[cpu] = alloc_xenheap_pages(order, memflags);
     if ( idt_tables[cpu] == NULL )
-        goto oom;
+        goto out;
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
-    set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
-    set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
+    disable_each_ist(idt_tables[cpu]);
+
+    rc = setup_cpu_root_pgt(cpu);
+    if ( rc )
+        goto out;
+    rc = -ENOMEM;
 
     for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
           i < nr_cpu_ids && i <= (cpu | (STUBS_PER_PAGE - 1)); ++i )
@@ -738,21 +936,25 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     BUG_ON(i == cpu);
     stub_page = alloc_stub_page(cpu, &per_cpu(stubs.mfn, cpu));
     if ( !stub_page )
-        goto oom;
+        goto out;
     per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
 
     if ( secondary_socket_cpumask == NULL &&
          (secondary_socket_cpumask = xzalloc(cpumask_t)) == NULL )
-        goto oom;
+        goto out;
 
-    if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
-         zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) &&
-         alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu)) )
-        return 0;
+    if ( !(zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
+           zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) &&
+           alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu))) )
+        goto out;
 
- oom:
-    cpu_smpboot_free(cpu);
-    return -ENOMEM;
+    rc = 0;
+
+ out:
+    if ( rc )
+        cpu_smpboot_free(cpu);
+
+    return rc;
 }
 
 static int cpu_smpboot_callback(
@@ -783,6 +985,8 @@ static struct notifier_block cpu_smpboot_nfb = {
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
+    int rc;
+
     register_cpu_notifier(&cpu_smpboot_nfb);
 
     mtrr_aps_sync_begin();
@@ -795,6 +999,15 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
     stack_base[0] = stack_start;
+
+    if ( opt_xpti < 0 )
+        opt_xpti = boot_cpu_data.x86_vendor != X86_VENDOR_AMD;
+
+    rc = setup_cpu_root_pgt(0);
+    if ( rc )
+        panic("Error %d setting up PV root page table\n", rc);
+    if ( per_cpu(root_pgt, 0) )
+        get_cpu_info()->pv_cr3 = __pa(per_cpu(root_pgt, 0));
 
     set_nr_sockets();
 
@@ -864,6 +1077,9 @@ void __init smp_prepare_boot_cpu(void)
 #if NR_CPUS > 2 * BITS_PER_LONG
     per_cpu(scratch_cpumask, cpu) = &scratch_cpu0mask;
 #endif
+
+    get_cpu_info()->xen_cr3 = 0;
+    get_cpu_info()->pv_cr3 = 0;
 }
 
 static void

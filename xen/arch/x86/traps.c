@@ -93,7 +93,7 @@ static char __read_mostly opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
-DEFINE_PER_CPU(u64, efer);
+DEFINE_PER_CPU(uint64_t, efer);
 static DEFINE_PER_CPU(unsigned long, last_extable_addr);
 
 DEFINE_PER_CPU_READ_MOSTLY(u32, ler_msr);
@@ -107,7 +107,7 @@ idt_entry_t idt_table[IDT_ENTRIES];
 /* Pointer to the IDT of every CPU. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
-void (*ioemul_handle_quirk)(
+bool (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
 static int debug_stack_lines = 20;
@@ -650,11 +650,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
         show_execution_state(regs);
 
         if ( trapnr == TRAP_page_fault )
-        {
-            unsigned long cr2 = read_cr2();
-            printk("Faulting linear address: %p\n", _p(cr2));
-            show_page_walk(cr2);
-        }
+            show_page_walk(read_cr2());
 
         if ( show_remote )
         {
@@ -928,6 +924,11 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
         /* Indicate presence of vcpu id and set it in ebx */
         res->a |= XEN_HVM_CPUID_VCPU_ID_PRESENT;
         res->b = v->vcpu_id;
+
+        /* Indicate presence of domain id and set it in ecx */
+        res->a |= XEN_HVM_CPUID_DOMID_PRESENT;
+        res->c = d->domain_id;
+
         break;
 
     case 5: /* PV-specific parameters */
@@ -1097,6 +1098,48 @@ static void reserved_bit_page_fault(unsigned long addr,
     show_execution_state(regs);
 }
 
+static int handle_ldt_mapping_fault(unsigned int offset,
+                                    struct cpu_user_regs *regs)
+{
+    struct vcpu *curr = current;
+
+    /*
+     * Not in PV context?  Something is very broken.  Leave it to the #PF
+     * handler, which will probably result in a panic().
+     */
+    if ( !is_pv_vcpu(curr) )
+        return 0;
+
+    /* Try to copy a mapping from the guest's LDT, if it is valid. */
+    if ( likely(pv_map_ldt_shadow_page(offset)) )
+    {
+        if ( guest_mode(regs) )
+            trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
+                                regs->rip, offset);
+    }
+    else
+    {
+        /* In hypervisor mode? Leave it to the #PF handler to fix up. */
+        if ( !guest_mode(regs) )
+            return 0;
+
+        /* Access would have become non-canonical? Pass #GP[sel] back. */
+        if ( unlikely(!is_canonical_address(
+                          curr->arch.pv_vcpu.ldt_base + offset)) )
+        {
+            uint16_t ec = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) | X86_XEC_TI;
+
+            pv_inject_hw_exception(TRAP_gp_fault, ec);
+        }
+        else
+            /* else pass the #PF back, with adjusted %cr2. */
+            pv_inject_page_fault(regs->error_code,
+                                 curr->arch.pv_vcpu.ldt_base + offset);
+    }
+
+    return EXCRET_fault_fixed;
+}
+
 static int handle_gdt_ldt_mapping_fault(unsigned long offset,
                                         struct cpu_user_regs *regs)
 {
@@ -1118,40 +1161,11 @@ static int handle_gdt_ldt_mapping_fault(unsigned long offset,
     offset &= (1UL << (GDT_LDT_VCPU_VA_SHIFT-1)) - 1UL;
 
     if ( likely(is_ldt_area) )
-    {
-        /* LDT fault: Copy a mapping from the guest's LDT, if it is valid. */
-        if ( likely(pv_map_ldt_shadow_page(offset)) )
-        {
-            if ( guest_mode(regs) )
-                trace_trap_two_addr(TRC_PV_GDT_LDT_MAPPING_FAULT,
-                                    regs->rip, offset);
-        }
-        else
-        {
-            /* In hypervisor mode? Leave it to the #PF handler to fix up. */
-            if ( !guest_mode(regs) )
-                return 0;
+        return handle_ldt_mapping_fault(offset, regs);
 
-            /* Access would have become non-canonical? Pass #GP[sel] back. */
-            if ( unlikely(!is_canonical_address(
-                              curr->arch.pv_vcpu.ldt_base + offset)) )
-            {
-                uint16_t ec = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) | X86_XEC_TI;
-
-                pv_inject_hw_exception(TRAP_gp_fault, ec);
-            }
-            else
-                /* else pass the #PF back, with adjusted %cr2. */
-                pv_inject_page_fault(regs->error_code,
-                                     curr->arch.pv_vcpu.ldt_base + offset);
-        }
-    }
-    else
-    {
-        /* GDT fault: handle the fault as #GP(selector). */
-        regs->error_code = offset & ~(X86_XEC_EXT | X86_XEC_IDT | X86_XEC_TI);
-        (void)do_general_protection(regs);
-    }
+    /* GDT fault: handle the fault as #GP[sel]. */
+    regs->error_code = offset & ~(X86_XEC_EXT | X86_XEC_IDT | X86_XEC_TI);
+    do_general_protection(regs);
 
     return EXCRET_fault_fixed;
 }
@@ -1338,12 +1352,8 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
      */
     if ( paging_mode_enabled(d) && !paging_mode_external(d) )
     {
-        int ret;
+        int ret = paging_fault(addr, regs);
 
-        /* Logdirty mode is the only expected paging mode for PV guests. */
-        ASSERT(paging_mode_only_log_dirty(d));
-
-        ret = paging_fault(addr, regs);
         if ( ret == EXCRET_fault_fixed )
             trace_trap_two_addr(TRC_PV_PAGING_FIXUP, regs->rip, addr);
         return ret;
@@ -1726,17 +1736,6 @@ void do_device_not_available(struct cpu_user_regs *regs)
     return;
 }
 
-u64 read_efer(void)
-{
-    return this_cpu(efer);
-}
-
-void write_efer(u64 val)
-{
-    this_cpu(efer) = val;
-    wrmsrl(MSR_EFER, val);
-}
-
 static void ler_enable(void)
 {
     u64 debugctl;
@@ -1903,9 +1902,7 @@ void __init init_idt_traps(void)
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
 
     /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
-    set_ist(&idt_table[TRAP_double_fault],  IST_DF);
-    set_ist(&idt_table[TRAP_nmi],           IST_NMI);
-    set_ist(&idt_table[TRAP_machine_check], IST_MCE);
+    enable_each_ist(idt_table);
 
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;

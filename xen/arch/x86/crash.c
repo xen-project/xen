@@ -146,9 +146,6 @@ static void nmi_shootdown_cpus(void)
     write_atomic((unsigned long *)__va(__pa(&exception_table[TRAP_nmi])),
                  (unsigned long)&do_nmi_crash);
 
-    /* Ensure the new callback function is set before sending out the NMI. */
-    wmb();
-
     smp_send_nmi_allbutself();
 
     msecs = 1000; /* Wait at most a second for the other cpus to stop */

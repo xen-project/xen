@@ -13,17 +13,16 @@
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>
 
-#ifndef __ASSEMBLY__
-void ret_from_intr(void);
+#ifdef __ASSEMBLY__
+# include <asm/indirect_thunk_asm.h>
+#else
+asm ( "\t.equ CONFIG_INDIRECT_THUNK, "
+      __stringify(IS_ENABLED(CONFIG_INDIRECT_THUNK)) );
+asm ( "\t.include \"asm/indirect_thunk_asm.h\"" );
 #endif
 
-#ifdef CONFIG_FRAME_POINTER
-/* Indicate special exception stack frame by inverting the frame pointer. */
-#define SETUP_EXCEPTION_FRAME_POINTER(offs)     \
-        leaq  offs(%rsp),%rbp;                  \
-        notq  %rbp
-#else
-#define SETUP_EXCEPTION_FRAME_POINTER(offs)
+#ifndef __ASSEMBLY__
+void ret_from_intr(void);
 #endif
 
 #ifndef NDEBUG
@@ -41,31 +40,6 @@ void ret_from_intr(void);
     ASSERT_INTERRUPT_STATUS(nz, "INTERRUPTS ENABLED")
 #define ASSERT_INTERRUPTS_DISABLED \
     ASSERT_INTERRUPT_STATUS(z, "INTERRUPTS DISABLED")
-
-/*
- * This flag is set in an exception frame when registers R12-R15 did not get
- * saved.
- */
-#define _TRAP_regs_partial 16
-#define TRAP_regs_partial  (1 << _TRAP_regs_partial)
-/*
- * This flag gets set in an exception frame when registers R12-R15 possibly
- * get modified from their originally saved values and hence need to be
- * restored even if the normal call flow would restore register values.
- *
- * The flag being set implies _TRAP_regs_partial to be unset. Restoring
- * R12-R15 thus is
- * - required when this flag is set,
- * - safe when _TRAP_regs_partial is unset.
- */
-#define _TRAP_regs_dirty   17
-#define TRAP_regs_dirty    (1 << _TRAP_regs_dirty)
-
-#define mark_regs_dirty(r) ({ \
-        struct cpu_user_regs *r__ = (r); \
-        ASSERT(!((r__)->entry_vector & TRAP_regs_partial)); \
-        r__->entry_vector |= TRAP_regs_dirty; \
-})
 
 #ifdef __ASSEMBLY__
 # define _ASM_EX(p) p-.
@@ -127,9 +101,30 @@ void ret_from_intr(void);
         UNLIKELY_DONE(mp, tag);   \
         __UNLIKELY_END(tag)
 
+        .equ .Lrax, 0
+        .equ .Lrcx, 1
+        .equ .Lrdx, 2
+        .equ .Lrbx, 3
+        .equ .Lrsp, 4
+        .equ .Lrbp, 5
+        .equ .Lrsi, 6
+        .equ .Lrdi, 7
+        .equ .Lr8,  8
+        .equ .Lr9,  9
+        .equ .Lr10, 10
+        .equ .Lr11, 11
+        .equ .Lr12, 12
+        .equ .Lr13, 13
+        .equ .Lr14, 14
+        .equ .Lr15, 15
+
 #define STACK_CPUINFO_FIELD(field) (1 - CPUINFO_sizeof + CPUINFO_##field)
 #define GET_STACK_END(reg)                        \
+        .if .Lr##reg > 8;                         \
+        movq $STACK_SIZE-1, %r##reg;              \
+        .else;                                    \
         movl $STACK_SIZE-1, %e##reg;              \
+        .endif;                                   \
         orq  %rsp, %r##reg
 
 #define GET_CPUINFO_FIELD(field, reg)             \
@@ -211,6 +206,15 @@ void ret_from_intr(void);
 #define ASM_STAC ASM_AC(STAC)
 #define ASM_CLAC ASM_AC(CLAC)
 
+.macro write_cr3 val:req, tmp1:req, tmp2:req
+        mov   %cr4, %\tmp1
+        mov   %\tmp1, %\tmp2
+        and   $~X86_CR4_PGE, %\tmp1
+        mov   %\tmp1, %cr4
+        mov   %\val, %cr3
+        mov   %\tmp2, %cr4
+.endm
+
 #define CR4_PV32_RESTORE                                           \
         667: ASM_NOP5;                                             \
         .pushsection .altinstr_replacement, "ax";                  \
@@ -236,7 +240,7 @@ static always_inline void stac(void)
 #endif
 
 #ifdef __ASSEMBLY__
-.macro SAVE_ALL op
+.macro SAVE_ALL op, compat=0
 .ifeqs "\op", "CLAC"
         ASM_CLAC
 .else
@@ -251,66 +255,45 @@ static always_inline void stac(void)
         addq  $-(UREGS_error_code-UREGS_r15), %rsp
         cld
         movq  %rdi,UREGS_rdi(%rsp)
+        xor   %edi, %edi
         movq  %rsi,UREGS_rsi(%rsp)
+        xor   %esi, %esi
         movq  %rdx,UREGS_rdx(%rsp)
+        xor   %edx, %edx
         movq  %rcx,UREGS_rcx(%rsp)
+        xor   %ecx, %ecx
         movq  %rax,UREGS_rax(%rsp)
-        movq  %r8,UREGS_r8(%rsp)
-        movq  %r9,UREGS_r9(%rsp)
-        movq  %r10,UREGS_r10(%rsp)
-        movq  %r11,UREGS_r11(%rsp)
-        movq  %rbx,UREGS_rbx(%rsp)
-        movq  %rbp,UREGS_rbp(%rsp)
-        SETUP_EXCEPTION_FRAME_POINTER(UREGS_rbp)
-        movq  %r12,UREGS_r12(%rsp)
-        movq  %r13,UREGS_r13(%rsp)
-        movq  %r14,UREGS_r14(%rsp)
-        movq  %r15,UREGS_r15(%rsp)
-.endm
-
-/*
- * Save all registers not preserved by C code or used in entry/exit code. Mark
- * the frame as partial.
- *
- * @type: exception type
- * @compat: R8-R15 don't need saving, and the frame nevertheless is complete
- */
-.macro SAVE_VOLATILE type compat=0
-.if \compat
-        movl  $\type,UREGS_entry_vector-UREGS_error_code(%rsp)
-.else
-        movl  $\type|TRAP_regs_partial,\
-              UREGS_entry_vector-UREGS_error_code(%rsp)
-.endif
-        addq  $-(UREGS_error_code-UREGS_r15),%rsp
-        cld
-        movq  %rdi,UREGS_rdi(%rsp)
-        movq  %rsi,UREGS_rsi(%rsp)
-        movq  %rdx,UREGS_rdx(%rsp)
-        movq  %rcx,UREGS_rcx(%rsp)
-        movq  %rax,UREGS_rax(%rsp)
+        xor   %eax, %eax
 .if !\compat
         movq  %r8,UREGS_r8(%rsp)
         movq  %r9,UREGS_r9(%rsp)
         movq  %r10,UREGS_r10(%rsp)
         movq  %r11,UREGS_r11(%rsp)
 .endif
+        xor   %r8, %r8
+        xor   %r9, %r9
+        xor   %r10, %r10
+        xor   %r11, %r11
         movq  %rbx,UREGS_rbx(%rsp)
+        xor   %ebx, %ebx
         movq  %rbp,UREGS_rbp(%rsp)
-        SETUP_EXCEPTION_FRAME_POINTER(UREGS_rbp)
-.endm
-
-/*
- * Complete a frame potentially only partially saved.
- */
-.macro SAVE_PRESERVED
-        btrl  $_TRAP_regs_partial,UREGS_entry_vector(%rsp)
-        jnc   987f
+#ifdef CONFIG_FRAME_POINTER
+/* Indicate special exception stack frame by inverting the frame pointer. */
+        leaq  UREGS_rbp(%rsp), %rbp
+        notq  %rbp
+#else
+        xor   %ebp, %ebp
+#endif
+.if !\compat
         movq  %r12,UREGS_r12(%rsp)
         movq  %r13,UREGS_r13(%rsp)
         movq  %r14,UREGS_r14(%rsp)
         movq  %r15,UREGS_r15(%rsp)
-987:
+.endif
+        xor   %r12, %r12
+        xor   %r13, %r13
+        xor   %r14, %r14
+        xor   %r15, %r15
 .endm
 
 #define LOAD_ONE_REG(reg, compat) \
@@ -330,7 +313,19 @@ static always_inline void stac(void)
  */
 .macro RESTORE_ALL adj=0 compat=0
 .if !\compat
-        testl $TRAP_regs_dirty,UREGS_entry_vector(%rsp)
+        movq  UREGS_r15(%rsp), %r15
+        movq  UREGS_r14(%rsp), %r14
+        movq  UREGS_r13(%rsp), %r13
+        movq  UREGS_r12(%rsp), %r12
+.else
+        xor %r15, %r15
+        xor %r14, %r14
+        xor %r13, %r13
+        xor %r12, %r12
+.endif
+        LOAD_ONE_REG(bp, \compat)
+        LOAD_ONE_REG(bx, \compat)
+.if !\compat
         movq  UREGS_r11(%rsp),%r11
         movq  UREGS_r10(%rsp),%r10
         movq  UREGS_r9(%rsp),%r9
@@ -346,36 +341,6 @@ static always_inline void stac(void)
         LOAD_ONE_REG(dx, \compat)
         LOAD_ONE_REG(si, \compat)
         LOAD_ONE_REG(di, \compat)
-.if !\compat
-        jz    987f
-        movq  UREGS_r15(%rsp),%r15
-        movq  UREGS_r14(%rsp),%r14
-        movq  UREGS_r13(%rsp),%r13
-        movq  UREGS_r12(%rsp),%r12
-#ifndef NDEBUG
-        .subsection 1
-987:    testl $TRAP_regs_partial,UREGS_entry_vector(%rsp)
-        jnz   987f
-        cmpq  UREGS_r15(%rsp),%r15
-        jne   789f
-        cmpq  UREGS_r14(%rsp),%r14
-        jne   789f
-        cmpq  UREGS_r13(%rsp),%r13
-        jne   789f
-        cmpq  UREGS_r12(%rsp),%r12
-        je    987f
-789:    BUG   /* Corruption of partial register state. */
-        .subsection 0
-#endif
-.else
-        xor %r15, %r15
-        xor %r14, %r14
-        xor %r13, %r13
-        xor %r12, %r12
-.endif
-987:
-        LOAD_ONE_REG(bp, \compat)
-        LOAD_ONE_REG(bx, \compat)
         subq  $-(UREGS_error_code-UREGS_r15+\adj), %rsp
 .endm
 
@@ -408,5 +373,17 @@ static always_inline void stac(void)
 #else
 #define REX64_PREFIX "rex64/"
 #endif
+
+#define ELFNOTE(name, type, desc)           \
+    .pushsection .note.name, "a", @note   ; \
+    .p2align 2                            ; \
+    .long 2f - 1f       /* namesz */      ; \
+    .long 4f - 3f       /* descsz */      ; \
+    .long type          /* type   */      ; \
+1:  .asciz #name        /* name   */      ; \
+2:  .p2align 2                            ; \
+3:  desc                /* desc   */      ; \
+4:  .p2align 2                            ; \
+    .popsection
 
 #endif /* __X86_ASM_DEFNS_H__ */

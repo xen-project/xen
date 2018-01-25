@@ -91,7 +91,7 @@ static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
     {
         unsigned int state = p->state;
 
-        rmb();
+        smp_rmb();
         switch ( state )
         {
         case STATE_IOREQ_NONE:
@@ -1183,17 +1183,15 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
          (p->addr & ~3) == 0xcfc &&
          CF8_ENABLED(cf8) )
     {
-        uint32_t sbdf, x86_fam;
-        unsigned int bus, slot, func, reg;
+        uint32_t x86_fam;
+        pci_sbdf_t sbdf;
+        unsigned int reg;
 
-        reg = hvm_pci_decode_addr(cf8, p->addr, &bus, &slot, &func);
+        reg = hvm_pci_decode_addr(cf8, p->addr, &sbdf);
 
         /* PCI config data cycle */
-
-        sbdf = XEN_DMOP_PCI_SBDF(0, bus, slot, func);
-
         type = XEN_DMOP_IO_RANGE_PCI;
-        addr = ((uint64_t)sbdf << 32) | reg;
+        addr = ((uint64_t)sbdf.sbdf << 32) | reg;
         /* AMD extended configuration space access? */
         if ( CF8_ADDR_HI(cf8) &&
              d->arch.cpuid->x86_vendor == X86_VENDOR_AMD &&
@@ -1331,7 +1329,7 @@ static int hvm_send_buffered_ioreq(struct hvm_ioreq_server *s, ioreq_t *p)
     }
 
     /* Make the ioreq_t visible /before/ write_pointer. */
-    wmb();
+    smp_wmb();
     pg->ptrs.write_pointer += qw ? 2 : 1;
 
     /* Canonicalize read/write pointers to prevent their overflow. */

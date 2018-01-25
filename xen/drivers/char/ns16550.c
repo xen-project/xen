@@ -697,7 +697,7 @@ static void __init ns16550_init_preirq(struct serial_port *port)
         enum fixed_addresses idx = FIX_COM_BEGIN + (uart - ns16550_com);
 
         set_fixmap_nocache(idx, uart->io_base);
-        uart->remapped_io_base = (void __iomem *)fix_to_virt(idx);
+        uart->remapped_io_base = fix_to_virt(idx);
         uart->remapped_io_base += uart->io_base & ~PAGE_MASK;
 #else
         uart->remapped_io_base = (char *)ioremap(uart->io_base, uart->io_size);

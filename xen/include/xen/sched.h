@@ -210,6 +210,9 @@ struct vcpu
     bool             hcall_compat;
 #endif
 
+    /* The CPU, if any, which is holding onto this VCPU's state. */
+#define VCPU_CPU_CLEAN (~0u)
+    unsigned int     dirty_cpu;
 
     /*
      * > 0: a single port is being polled;
@@ -247,9 +250,6 @@ struct vcpu
 
     /* Bitmask of CPUs on which this VCPU prefers to run. */
     cpumask_var_t    cpu_soft_affinity;
-
-    /* Bitmask of CPUs which are holding onto this VCPU's state. */
-    cpumask_var_t    vcpu_dirty_cpumask;
 
     /* Tasklet for continue_hypercall_on_cpu(). */
     struct tasklet   continue_hypercall_tasklet;
@@ -417,7 +417,7 @@ struct domain
     unsigned long    vm_assist;
 
     /* Bitmask of CPUs which are holding onto this domain's state. */
-    cpumask_var_t    domain_dirty_cpumask;
+    cpumask_var_t    dirty_cpumask;
 
     struct arch_domain arch;
 
@@ -427,7 +427,7 @@ struct domain
     xen_domain_handle_t handle;
 
     /* hvm_print_line() and guest_console_write() logging. */
-#define DOMAIN_PBUF_SIZE 80
+#define DOMAIN_PBUF_SIZE 200
     char       *pbuf;
     unsigned    pbuf_idx;
     spinlock_t  pbuf_lock;
@@ -603,7 +603,7 @@ static inline struct domain *rcu_lock_current_domain(void)
 struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
 int domain_kill(struct domain *d);
-void domain_shutdown(struct domain *d, u8 reason);
+int domain_shutdown(struct domain *d, u8 reason);
 void domain_resume(struct domain *d);
 void domain_pause_for_debugger(void);
 
@@ -801,6 +801,12 @@ static inline int vcpu_runnable(struct vcpu *v)
     return !(v->pause_flags |
              atomic_read(&v->pause_count) |
              atomic_read(&v->domain->pause_count));
+}
+
+static inline bool vcpu_cpu_dirty(const struct vcpu *v)
+{
+    BUILD_BUG_ON(NR_CPUS >= VCPU_CPU_CLEAN);
+    return v->dirty_cpu != VCPU_CPU_CLEAN;
 }
 
 void vcpu_block(void);
