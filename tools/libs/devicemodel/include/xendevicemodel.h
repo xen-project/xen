@@ -346,7 +346,7 @@ int xendevicemodel_relocate_memory(
  * @parm domid the domain id to be serviced
  * @parm start Start gfn
  * @parm end End gfn
- * @parm type XEN_DOMCTL_MEM_CACHEATTR_*
+ * @parm type XEN_DMOP_MEM_CACHEATTR_*
  * @return 0 on success, -1 on failure.
  */
 int xendevicemodel_pin_memory_cacheattr(

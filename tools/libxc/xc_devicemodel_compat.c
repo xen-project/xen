@@ -128,6 +128,14 @@ int xc_hvm_inject_trap(
                                        type, error_code, insn_len, cr2);
 }
 
+int xc_domain_pin_memory_cacheattr(
+    xc_interface *xch, uint32_t domid, uint64_t start, uint64_t end,
+    uint32_t type)
+{
+    return xendevicemodel_pin_memory_cacheattr(xch->dmod, domid, start, end,
+                                               type);
+}
+
 /*
  * Local variables:
  * mode: C

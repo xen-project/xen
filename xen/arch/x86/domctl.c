@@ -23,7 +23,6 @@
 #include <asm/irq.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
-#include <asm/hvm/cacheattr.h>
 #include <asm/processor.h>
 #include <asm/acpi.h> /* for hvm_acpi_power_button */
 #include <xen/hypercall.h> /* for arch_do_domctl */
@@ -858,13 +857,6 @@ long arch_do_domctl(
             memory_type_changed(d);
         break;
     }
-
-    case XEN_DOMCTL_pin_mem_cacheattr:
-        ret = hvm_set_mem_pinned_cacheattr(
-            d, domctl->u.pin_mem_cacheattr.start,
-            domctl->u.pin_mem_cacheattr.end,
-            domctl->u.pin_mem_cacheattr.type);
-        break;
 
     case XEN_DOMCTL_set_ext_vcpucontext:
     case XEN_DOMCTL_get_ext_vcpucontext:

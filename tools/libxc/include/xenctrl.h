@@ -1473,12 +1473,6 @@ int xc_domain_iomem_permission(xc_interface *xch,
                                unsigned long nr_mfns,
                                uint8_t allow_access);
 
-int xc_domain_pin_memory_cacheattr(xc_interface *xch,
-                                   uint32_t domid,
-                                   uint64_t start,
-                                   uint64_t end,
-                                   uint32_t type);
-
 unsigned long xc_make_page_below_4G(xc_interface *xch, uint32_t domid,
                                     unsigned long mfn);
 

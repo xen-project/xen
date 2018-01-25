@@ -57,7 +57,7 @@ define(`create_domain_common', `
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op updatemp };
 	allow $1 $2:grant setup;
-	allow $1 $2:hvm { cacheattr getparam hvmctl sethvmc
+	allow $1 $2:hvm { getparam hvmctl sethvmc
 			setparam nested altp2mhvm altp2mhvm_op dm };
 ')
 
@@ -151,7 +151,7 @@ define(`device_model', `
 
 	allow $1 $2_target:domain { getdomaininfo shutdown };
 	allow $1 $2_target:mmu { map_read map_write adjust physmap target_hack };
-	allow $1 $2_target:hvm { getparam setparam hvmctl cacheattr dm };
+	allow $1 $2_target:hvm { getparam setparam hvmctl dm };
 ')
 
 # make_device_model(priv, dm_dom, hvm_dom)

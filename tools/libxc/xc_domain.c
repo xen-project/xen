@@ -720,21 +720,6 @@ int xc_domain_setmaxmem(xc_interface *xch,
     return do_domctl(xch, &domctl);
 }
 
-int xc_domain_pin_memory_cacheattr(xc_interface *xch,
-                                   uint32_t domid,
-                                   uint64_t start,
-                                   uint64_t end,
-                                   uint32_t type)
-{
-    DECLARE_DOMCTL;
-    domctl.cmd = XEN_DOMCTL_pin_mem_cacheattr;
-    domctl.domain = domid;
-    domctl.u.pin_mem_cacheattr.start = start;
-    domctl.u.pin_mem_cacheattr.end = end;
-    domctl.u.pin_mem_cacheattr.type = type;
-    return do_domctl(xch, &domctl);
-}
-
 #if defined(__i386__) || defined(__x86_64__)
 int xc_domain_set_memory_map(xc_interface *xch,
                                uint32_t domid,
