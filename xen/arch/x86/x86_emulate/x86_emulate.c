@@ -1935,36 +1935,67 @@ load_seg(
     return rc;
 }
 
+/* Map GPRs by ModRM encoding to their offset within struct cpu_user_regs. */
+static const uint8_t cpu_user_regs_gpr_offsets[] = {
+    offsetof(struct cpu_user_regs, r(ax)),
+    offsetof(struct cpu_user_regs, r(cx)),
+    offsetof(struct cpu_user_regs, r(dx)),
+    offsetof(struct cpu_user_regs, r(bx)),
+    offsetof(struct cpu_user_regs, r(sp)),
+    offsetof(struct cpu_user_regs, r(bp)),
+    offsetof(struct cpu_user_regs, r(si)),
+    offsetof(struct cpu_user_regs, r(di)),
+#ifdef __x86_64__
+    offsetof(struct cpu_user_regs, r8),
+    offsetof(struct cpu_user_regs, r9),
+    offsetof(struct cpu_user_regs, r10),
+    offsetof(struct cpu_user_regs, r11),
+    offsetof(struct cpu_user_regs, r12),
+    offsetof(struct cpu_user_regs, r13),
+    offsetof(struct cpu_user_regs, r14),
+    offsetof(struct cpu_user_regs, r15),
+#endif
+};
+
 void *
 decode_register(
     uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs)
 {
-    void *p;
+    static const uint8_t byte_reg_offsets[] = {
+        offsetof(struct cpu_user_regs, al),
+        offsetof(struct cpu_user_regs, cl),
+        offsetof(struct cpu_user_regs, dl),
+        offsetof(struct cpu_user_regs, bl),
+        offsetof(struct cpu_user_regs, ah),
+        offsetof(struct cpu_user_regs, ch),
+        offsetof(struct cpu_user_regs, dh),
+        offsetof(struct cpu_user_regs, bh),
+    };
 
-    switch ( modrm_reg )
+    if ( !highbyte_regs )
     {
-    case  0: p = &regs->r(ax); break;
-    case  1: p = &regs->r(cx); break;
-    case  2: p = &regs->r(dx); break;
-    case  3: p = &regs->r(bx); break;
-    case  4: p = (highbyte_regs ? &regs->ah : (void *)&regs->r(sp)); break;
-    case  5: p = (highbyte_regs ? &regs->ch : (void *)&regs->r(bp)); break;
-    case  6: p = (highbyte_regs ? &regs->dh : (void *)&regs->r(si)); break;
-    case  7: p = (highbyte_regs ? &regs->bh : (void *)&regs->r(di)); break;
-#if defined(__x86_64__)
-    case  8: p = &regs->r8;  break;
-    case  9: p = &regs->r9;  break;
-    case 10: p = &regs->r10; break;
-    case 11: p = &regs->r11; break;
-    case 12: p = &regs->r12; break;
-    case 13: p = &regs->r13; break;
-    case 14: p = &regs->r14; break;
-    case 15: p = &regs->r15; break;
-#endif
-    default: BUG(); p = NULL; break;
+        /* Check that the array is a power of two. */
+        BUILD_BUG_ON(ARRAY_SIZE(cpu_user_regs_gpr_offsets) &
+                     (ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1));
+
+        ASSERT(modrm_reg < ARRAY_SIZE(cpu_user_regs_gpr_offsets));
+
+        /* For safety in release builds.  Debug builds will hit the ASSERT() */
+        modrm_reg &= ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1;
+
+        return (void *)regs + cpu_user_regs_gpr_offsets[modrm_reg];
     }
 
-    return p;
+    /* Check that the array is a power of two. */
+    BUILD_BUG_ON(ARRAY_SIZE(byte_reg_offsets) &
+                 (ARRAY_SIZE(byte_reg_offsets) - 1));
+
+    ASSERT(modrm_reg < ARRAY_SIZE(byte_reg_offsets));
+
+    /* For safety in release builds.  Debug builds will hit the ASSERT() */
+    modrm_reg &= ARRAY_SIZE(byte_reg_offsets) - 1;
+
+    return (void *)regs + byte_reg_offsets[modrm_reg];
 }
 
 static void *decode_vex_gpr(unsigned int vex_reg, struct cpu_user_regs *regs,
