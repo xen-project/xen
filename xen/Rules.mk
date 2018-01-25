@@ -43,7 +43,13 @@ ALL_OBJS-$(CONFIG_CRYPTO)   += $(BASEDIR)/crypto/built_in.o
 ifeq ($(CONFIG_DEBUG),y)
 CFLAGS += -O1
 else
-CFLAGS += -O2 -fomit-frame-pointer
+CFLAGS += -O2
+endif
+
+ifeq ($(CONFIG_FRAME_POINTER),y)
+CFLAGS += -fno-omit-frame-pointer
+else
+CFLAGS += -fomit-frame-pointer
 endif
 
 CFLAGS += -nostdinc -fno-builtin -fno-common
@@ -57,8 +63,6 @@ ifneq ($(clang),y)
 # but has an excessively large symbol table.
 CFLAGS += -Wa,--strip-local-absolute
 endif
-
-CFLAGS-$(CONFIG_FRAME_POINTER) += -fno-omit-frame-pointer
 
 ifneq ($(max_phys_irqs),)
 CFLAGS-y                += -DMAX_PHYS_IRQS=$(max_phys_irqs)
