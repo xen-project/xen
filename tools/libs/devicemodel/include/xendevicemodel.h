@@ -340,6 +340,20 @@ int xendevicemodel_relocate_memory(
     uint64_t dst_gfn);
 
 /**
+ * Pins caching type of RAM space.
+ *
+ * @parm dmod a handle to an open devicemodel interface.
+ * @parm domid the domain id to be serviced
+ * @parm start Start gfn
+ * @parm end End gfn
+ * @parm type XEN_DOMCTL_MEM_CACHEATTR_*
+ * @return 0 on success, -1 on failure.
+ */
+int xendevicemodel_pin_memory_cacheattr(
+    xendevicemodel_handle *dmod, domid_t domid, uint64_t start, uint64_t end,
+    uint32_t type);
+
+/**
  * This function restricts the use of this handle to the specified
  * domain.
  *
