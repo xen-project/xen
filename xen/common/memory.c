@@ -770,9 +770,8 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
     return rc;
 }
 
-static int xenmem_add_to_physmap(struct domain *d,
-                                 struct xen_add_to_physmap *xatp,
-                                 unsigned int start)
+int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
+                          unsigned int start)
 {
     unsigned int done = 0;
     long rc = 0;

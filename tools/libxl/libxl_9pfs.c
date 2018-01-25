@@ -23,22 +23,6 @@ static int libxl__device_p9_setdefault(libxl__gc *gc, uint32_t domid,
     return libxl__resolve_domid(gc, p9->backend_domname, &p9->backend_domid);
 }
 
-static int libxl__device_from_p9(libxl__gc *gc, uint32_t domid,
-                                 libxl_device_p9 *p9,
-                                 libxl__device *device)
-{
-   device->backend_devid   = p9->devid;
-   device->backend_domid   = p9->backend_domid;
-   device->backend_kind    = LIBXL__DEVICE_KIND_9PFS;
-   device->devid           = p9->devid;
-   device->domid           = domid;
-   device->kind            = LIBXL__DEVICE_KIND_9PFS;
-
-   return 0;
-}
-
-static LIBXL_DEFINE_UPDATE_DEVID(p9, "9pfs")
-
 static int libxl__set_xenstore_p9(libxl__gc *gc, uint32_t domid,
                                   libxl_device_p9 *p9,
                                   flexarray_t *back, flexarray_t *front,
@@ -56,9 +40,12 @@ static int libxl__set_xenstore_p9(libxl__gc *gc, uint32_t domid,
 #define libxl_device_p9_list NULL
 #define libxl_device_p9_compare NULL
 
+static LIBXL_DEFINE_UPDATE_DEVID(p9)
+static LIBXL_DEFINE_DEVICE_FROM_TYPE(p9)
+
 LIBXL_DEFINE_DEVICE_REMOVE(p9)
 
-DEFINE_DEVICE_TYPE_STRUCT(p9,
+DEFINE_DEVICE_TYPE_STRUCT(p9, 9PFS,
     .skip_attach = 1,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)
                            libxl__set_xenstore_p9,

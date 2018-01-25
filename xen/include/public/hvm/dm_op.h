@@ -368,6 +368,45 @@ struct xen_dm_op_remote_shutdown {
                            /* (Other reason values are not blocked) */
 };
 
+/*
+ * XEN_DMOP_relocate_memory : Relocate GFNs for the specified guest.
+ *                            Identical to XENMEM_add_to_physmap with
+ *                            space == XENMAPSPACE_gmfn_range.
+ */
+#define XEN_DMOP_relocate_memory 17
+
+struct xen_dm_op_relocate_memory {
+    /* All fields are IN/OUT, with their OUT state undefined. */
+    /* Number of GFNs to process. */
+    uint32_t size;
+    uint32_t pad;
+    /* Starting GFN to relocate. */
+    uint64_aligned_t src_gfn;
+    /* Starting GFN where GFNs should be relocated. */
+    uint64_aligned_t dst_gfn;
+};
+
+/*
+ * XEN_DMOP_pin_memory_cacheattr : Pin caching type of RAM space.
+ *                                 Identical to XEN_DOMCTL_pin_mem_cacheattr.
+ */
+#define XEN_DMOP_pin_memory_cacheattr 18
+
+struct xen_dm_op_pin_memory_cacheattr {
+    uint64_aligned_t start; /* Start gfn. */
+    uint64_aligned_t end;   /* End gfn. */
+/* Caching types: these happen to be the same as x86 MTRR/PAT type codes. */
+#define XEN_DMOP_MEM_CACHEATTR_UC  0
+#define XEN_DMOP_MEM_CACHEATTR_WC  1
+#define XEN_DMOP_MEM_CACHEATTR_WT  4
+#define XEN_DMOP_MEM_CACHEATTR_WP  5
+#define XEN_DMOP_MEM_CACHEATTR_WB  6
+#define XEN_DMOP_MEM_CACHEATTR_UCM 7
+#define XEN_DMOP_DELETE_MEM_CACHEATTR (~(uint32_t)0)
+    uint32_t type;          /* XEN_DMOP_MEM_CACHEATTR_* */
+    uint32_t pad;
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -389,6 +428,8 @@ struct xen_dm_op {
         struct xen_dm_op_map_mem_type_to_ioreq_server
                 map_mem_type_to_ioreq_server;
         struct xen_dm_op_remote_shutdown remote_shutdown;
+        struct xen_dm_op_relocate_memory relocate_memory;
+        struct xen_dm_op_pin_memory_cacheattr pin_memory_cacheattr;
     } u;
 };
 

@@ -325,6 +325,34 @@ int xendevicemodel_inject_event(
 int xendevicemodel_shutdown(
     xendevicemodel_handle *dmod, domid_t domid, unsigned int reason);
 
+/*
+ * Relocate GFNs for the specified domain.
+ *
+ * @parm dmod a handle to an open devicemodel interface.
+ * @parm domid the domain id to be serviced
+ * @parm size Number of GFNs to process
+ * @parm src_gfn Starting GFN to relocate
+ * @parm dst_gfn Starting GFN where GFNs should be relocated
+ * @return 0 on success, -1 on failure.
+ */
+int xendevicemodel_relocate_memory(
+    xendevicemodel_handle *dmod, domid_t domid, uint32_t size, uint64_t src_gfn,
+    uint64_t dst_gfn);
+
+/**
+ * Pins caching type of RAM space.
+ *
+ * @parm dmod a handle to an open devicemodel interface.
+ * @parm domid the domain id to be serviced
+ * @parm start Start gfn
+ * @parm end End gfn
+ * @parm type XEN_DMOP_MEM_CACHEATTR_*
+ * @return 0 on success, -1 on failure.
+ */
+int xendevicemodel_pin_memory_cacheattr(
+    xendevicemodel_handle *dmod, domid_t domid, uint64_t start, uint64_t end,
+    uint32_t type);
+
 /**
  * This function restricts the use of this handle to the specified
  * domain.

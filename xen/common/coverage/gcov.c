@@ -22,6 +22,7 @@
 
 #include <public/sysctl.h>
 
+#include "coverage.h"
 #include "gcov.h"
 
 /**
@@ -209,42 +210,11 @@ static int gcov_dump_all(XEN_GUEST_HANDLE_PARAM(char) buffer,
     return ret;
 }
 
-int sysctl_gcov_op(struct xen_sysctl_gcov_op *op)
-{
-    int ret;
-
-    switch ( op->cmd )
-    {
-    case XEN_SYSCTL_GCOV_get_size:
-        op->size = gcov_get_size();
-        ret = 0;
-        break;
-
-    case XEN_SYSCTL_GCOV_read:
-    {
-        XEN_GUEST_HANDLE_PARAM(char) buf;
-        uint32_t size = op->size;
-
-        buf = guest_handle_cast(op->buffer, char);
-
-        ret = gcov_dump_all(buf, &size);
-        op->size = size;
-
-        break;
-    }
-
-    case XEN_SYSCTL_GCOV_reset:
-        gcov_reset_all_counters();
-        ret = 0;
-        break;
-
-    default:
-        ret = -EOPNOTSUPP;
-        break;
-    }
-
-    return ret;
-}
+const struct cov_sysctl_ops cov_ops = {
+    .get_size = gcov_get_size,
+    .reset_counters = gcov_reset_all_counters,
+    .dump = gcov_dump_all,
+};
 
 /*
  * Local variables:

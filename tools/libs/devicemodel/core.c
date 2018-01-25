@@ -564,6 +564,45 @@ int xendevicemodel_shutdown(
     return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
 }
 
+int xendevicemodel_relocate_memory(
+    xendevicemodel_handle *dmod, domid_t domid, uint32_t size, uint64_t src_gfn,
+    uint64_t dst_gfn)
+{
+    struct xen_dm_op op;
+    struct xen_dm_op_relocate_memory *data;
+
+    memset(&op, 0, sizeof(op));
+
+    op.op = XEN_DMOP_relocate_memory;
+    data = &op.u.relocate_memory;
+
+    data->size = size;
+    data->pad = 0;
+    data->src_gfn = src_gfn;
+    data->dst_gfn = dst_gfn;
+
+    return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
+}
+
+int xendevicemodel_pin_memory_cacheattr(
+    xendevicemodel_handle *dmod, domid_t domid, uint64_t start, uint64_t end,
+    uint32_t type)
+{
+    struct xen_dm_op op;
+    struct xen_dm_op_pin_memory_cacheattr *data;
+
+    memset(&op, 0, sizeof(op));
+
+    op.op = XEN_DMOP_pin_memory_cacheattr;
+    data = &op.u.pin_memory_cacheattr;
+
+    data->start = start;
+    data->end = end;
+    data->type = type;
+
+    return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
+}
+
 int xendevicemodel_restrict(xendevicemodel_handle *dmod, domid_t domid)
 {
     return osdep_xendevicemodel_restrict(dmod, domid);

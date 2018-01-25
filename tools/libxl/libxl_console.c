@@ -37,8 +37,9 @@ static int libxl__console_tty_path(libxl__gc *gc, uint32_t domid, int cons_num,
         if (cons_num == 0)
             *tty_path = GCSPRINTF("%s/console/tty", dom_path);
         else
-            *tty_path = GCSPRINTF("%s/device/console/%d/tty", dom_path,
-                                  cons_num);
+            *tty_path = GCSPRINTF("%s/tty",
+                                  libxl__domain_device_frontend_path(gc, domid,
+                                  cons_num, LIBXL__DEVICE_KIND_CONSOLE));
         rc = 0;
         break;
     default:
@@ -498,8 +499,10 @@ static int libxl__append_channel_list(libxl__gc *gc,
     libxl_device_channel *next = NULL;
     int rc = 0, i;
 
-    libxl_dir_path = GCSPRINTF("%s/device/console",
-                               libxl__xs_libxl_path(gc, domid));
+    libxl_dir_path = GCSPRINTF("%s/device/%s",
+                               libxl__xs_libxl_path(gc, domid),
+                               libxl__device_kind_to_string(
+                               LIBXL__DEVICE_KIND_CONSOLE));
     dir = libxl__xs_directory(gc, XBT_NULL, libxl_dir_path, &n);
     if (!dir || !n)
       goto out;
@@ -564,18 +567,19 @@ int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
                                  libxl_channelinfo *channelinfo)
 {
     GC_INIT(ctx);
-    char *dompath, *fe_path, *libxl_path;
+    char *fe_path, *libxl_path;
     char *val;
     int rc;
 
-    dompath = libxl__xs_get_dompath(gc, domid);
     channelinfo->devid = channel->devid;
 
-    fe_path = GCSPRINTF("%s/device/console/%d", dompath,
-                        channelinfo->devid + 1);
-    libxl_path = GCSPRINTF("%s/device/console/%d",
-                           libxl__xs_libxl_path(gc, domid),
-                           channelinfo->devid + 1);
+    fe_path = libxl__domain_device_frontend_path(gc, domid,
+                                                 channelinfo->devid + 1,
+                                                 LIBXL__DEVICE_KIND_CONSOLE);
+    libxl_path = libxl__domain_device_libxl_path(gc, domid,
+                                                 channelinfo->devid + 1,
+                                                 LIBXL__DEVICE_KIND_CONSOLE);
+
     channelinfo->backend = xs_read(ctx->xsh, XBT_NULL,
                                    GCSPRINTF("%s/backend", libxl_path), NULL);
     if (!channelinfo->backend) {
@@ -668,7 +672,7 @@ out:
     return AO_INPROGRESS;
 }
 
-static LIBXL_DEFINE_UPDATE_DEVID(vkb, "vkb")
+static LIBXL_DEFINE_UPDATE_DEVID(vkb)
 
 static int libxl__device_vfb_setdefault(libxl__gc *gc, uint32_t domid,
                                         libxl_device_vfb *vfb, bool hotplug)
@@ -694,19 +698,6 @@ static int libxl__device_vfb_setdefault(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
-static int libxl__device_from_vfb(libxl__gc *gc, uint32_t domid,
-                                  libxl_device_vfb *vfb,
-                                  libxl__device *device)
-{
-    device->backend_devid = vfb->devid;
-    device->backend_domid = vfb->backend_domid;
-    device->backend_kind = LIBXL__DEVICE_KIND_VFB;
-    device->devid = vfb->devid;
-    device->domid = domid;
-    device->kind = LIBXL__DEVICE_KIND_VFB;
-    return 0;
-}
-
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
                          const libxl_asyncop_how *ao_how)
 {
@@ -723,8 +714,6 @@ out:
     libxl__ao_complete(egc, ao, rc);
     return AO_INPROGRESS;
 }
-
-static LIBXL_DEFINE_UPDATE_DEVID(vfb, "vfb")
 
 static int libxl__set_xenstore_vfb(libxl__gc *gc, uint32_t domid,
                                    libxl_device_vfb *vfb,
@@ -772,7 +761,7 @@ static int libxl__set_xenstore_vfb(libxl__gc *gc, uint32_t domid,
 
 LIBXL_DEFINE_DEVICE_REMOVE(vkb)
 
-DEFINE_DEVICE_TYPE_STRUCT(vkb,
+DEFINE_DEVICE_TYPE_STRUCT(vkb, VKBD,
     .skip_attach = 1
 );
 
@@ -780,10 +769,13 @@ DEFINE_DEVICE_TYPE_STRUCT(vkb,
 #define libxl_device_vfb_list NULL
 #define libxl_device_vfb_compare NULL
 
+static LIBXL_DEFINE_UPDATE_DEVID(vfb)
+static LIBXL_DEFINE_DEVICE_FROM_TYPE(vfb)
+
 /* vfb */
 LIBXL_DEFINE_DEVICE_REMOVE(vfb)
 
-DEFINE_DEVICE_TYPE_STRUCT(vfb,
+DEFINE_DEVICE_TYPE_STRUCT(vfb, VFB,
     .skip_attach = 1,
     .set_xenstore_config = (device_set_xenstore_config_fn_t)
                            libxl__set_xenstore_vfb,

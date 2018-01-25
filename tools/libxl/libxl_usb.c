@@ -310,8 +310,8 @@ static void libxl__device_usbctrl_del_xenstore(libxl__gc *gc, uint32_t domid,
     xs_transaction_t t = XBT_NULL;
     int rc;
 
-    libxl_path = GCSPRINTF("%s/device/vusb/%d",
-                           libxl__xs_libxl_path(gc, domid), usbctrl->devid);
+    libxl_path = libxl__domain_device_libxl_path(gc, domid, usbctrl->devid,
+                                                 LIBXL__DEVICE_KIND_VUSB);
     be_path = vusb_be_from_xs_libxl_type(gc, libxl_path, usbctrl->type);
 
     for (;;) {
@@ -430,7 +430,7 @@ static int libxl__device_usbdev_del_hvm(libxl__gc *gc, uint32_t domid,
     return libxl__qmp_run_command_flexarray(gc, domid, "device_del", qmp_args);
 }
 
-static LIBXL_DEFINE_UPDATE_DEVID(usbctrl, "vusb")
+static LIBXL_DEFINE_UPDATE_DEVID(usbctrl)
 
 /* AO operation to add a usb controller.
  *
@@ -574,8 +574,9 @@ libxl_device_usbctrl_list(libxl_ctx *ctx, uint32_t domid, int *num)
 
     *num = 0;
 
-    libxl_vusbs_path = GCSPRINTF("%s/device/vusb",
-                     libxl__xs_libxl_path(gc, domid));
+    libxl_vusbs_path = GCSPRINTF("%s/device/%s",
+                     libxl__xs_libxl_path(gc, domid),
+                     libxl__device_kind_to_string(LIBXL__DEVICE_KIND_VUSB));
     entry = libxl__xs_directory(gc, XBT_NULL, libxl_vusbs_path, &nentries);
 
     if (entry && nentries) {
@@ -644,8 +645,8 @@ int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
                                  libxl_usbctrlinfo *usbctrlinfo)
 {
     GC_INIT(ctx);
-    const char *dompath, *fe_path, *be_path, *tmp;
-    const char *libxl_dom_path, *libxl_path;
+    const char *fe_path, *be_path, *tmp;
+    const char *libxl_path;
     int rc;
 
     usbctrlinfo->devid = usbctrl->devid;
@@ -666,14 +667,14 @@ int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
         tmp ? atoi(tmp) : -1;                                           \
     })
 
-    libxl_dom_path = libxl__xs_libxl_path(gc, domid);
-    libxl_path = GCSPRINTF("%s/device/vusb/%d", libxl_dom_path, usbctrl->devid);
+    libxl_path = libxl__domain_device_libxl_path(gc, domid, usbctrl->devid,
+                                                 LIBXL__DEVICE_KIND_VUSB);
     libxl_usbctrl_type_from_string(READ_SUBPATH(libxl_path, "type"),
                                    &usbctrlinfo->type);
 
     if (usbctrlinfo->type != LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
-        dompath = libxl__xs_get_dompath(gc, domid);
-        fe_path = GCSPRINTF("%s/device/vusb/%d", dompath, usbctrl->devid);
+        fe_path = libxl__domain_device_frontend_path(gc, domid, usbctrl->devid,
+                                                     LIBXL__DEVICE_KIND_VUSB);
         be_path = READ_SUBPATH(libxl_path, "backend");
         usbctrlinfo->backend = libxl__strdup(NOGC, be_path);
         rc = libxl__backendpath_parse_domid(gc, be_path,
@@ -821,8 +822,9 @@ static int get_assigned_devices(libxl__gc *gc,
         unsigned int nc = 0;
         uint32_t domid = atoi(domlist[i]);
 
-        libxl_vusbs_path = GCSPRINTF("%s/device/vusb",
-                                     libxl__xs_libxl_path(gc, domid));
+        libxl_vusbs_path = GCSPRINTF("%s/device/%s",
+                                     libxl__xs_libxl_path(gc, domid),
+                                     libxl__device_kind_to_string(LIBXL__DEVICE_KIND_VUSB));
         usbctrls = libxl__xs_directory(gc, XBT_NULL,
                                        libxl_vusbs_path, &nc);
 
@@ -900,8 +902,8 @@ libxl__device_usbdev_list_for_usbctrl(libxl__gc *gc,
     *usbdevs = NULL;
     *num = 0;
 
-    libxl_path = GCSPRINTF("%s/device/vusb/%d",
-                           libxl__xs_libxl_path(gc, domid), usbctrl);
+    libxl_path = libxl__domain_device_libxl_path(gc, domid, usbctrl,
+                                                 LIBXL__DEVICE_KIND_VUSB);
 
     be_path = vusb_be_from_xs_libxl(gc, libxl_path);
     if (!be_path) {
@@ -959,8 +961,10 @@ libxl_device_usbdev_list(libxl_ctx *ctx, uint32_t domid, int *num)
 
     *num = 0;
 
-    libxl_vusbs_path = GCSPRINTF("%s/device/vusb",
-                                 libxl__xs_libxl_path(gc, domid));
+    libxl_vusbs_path = GCSPRINTF("%s/device/%s",
+                                 libxl__xs_libxl_path(gc, domid),
+                                 libxl__device_kind_to_string(
+                                 LIBXL__DEVICE_KIND_VUSB));
     usbctrls = libxl__xs_directory(gc, XBT_NULL, libxl_vusbs_path, &nc);
 
     for (i = 0; i < nc; i++) {
@@ -990,7 +994,8 @@ static char *vusb_get_port_path(libxl__gc *gc, uint32_t domid,
     char *path;
 
     if (type == LIBXL_USBCTRL_TYPE_DEVICEMODEL)
-        path = GCSPRINTF("%s/device/vusb", libxl__xs_libxl_path(gc, domid));
+        path = GCSPRINTF("%s/device/%s", libxl__xs_libxl_path(gc, domid),
+                         libxl__device_kind_to_string(LIBXL__DEVICE_KIND_VUSB));
     else
         path = GCSPRINTF("%s/backend/%s/%d",
                          libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID),
@@ -1096,9 +1101,8 @@ static int libxl__device_usbdev_setdefault(libxl__gc *gc,
         /* A controller was specified; look it up */
         const char *libxl_path, *be_path, *tmp;
 
-        libxl_path = GCSPRINTF("%s/device/vusb/%d",
-                            libxl__xs_libxl_path(gc, domid),
-                            usbdev->ctrl);
+        libxl_path = libxl__domain_device_libxl_path(gc, domid, usbdev->ctrl,
+	                                                 LIBXL__DEVICE_KIND_VUSB);
 
         be_path = vusb_be_from_xs_libxl(gc, libxl_path);
         if (!be_path) {
@@ -1888,12 +1892,11 @@ int libxl_ctrlport_to_device_usbdev(libxl_ctx *ctx,
                                     libxl_device_usbdev *usbdev)
 {
     GC_INIT(ctx);
-    const char *libxl_dom_path, *libxl_path, *be_path, *busid;
+    const char *libxl_path, *be_path, *busid;
     int rc;
 
-    libxl_dom_path = libxl__xs_libxl_path(gc, domid);
-
-    libxl_path = GCSPRINTF("%s/device/vusb/%d", libxl_dom_path, ctrl);
+    libxl_path = libxl__domain_device_libxl_path(gc, domid, ctrl,
+                 LIBXL__DEVICE_KIND_VUSB);
     be_path = vusb_be_from_xs_libxl(gc, libxl_path);
     if (!be_path) {
         rc = ERROR_FAIL;
@@ -1962,14 +1965,14 @@ void libxl_device_usbdev_list_free(libxl_device_usbdev *list, int nr)
 
 #define libxl__device_usbctrl_update_devid NULL
 
-DEFINE_DEVICE_TYPE_STRUCT(usbctrl,
+DEFINE_DEVICE_TYPE_STRUCT(usbctrl, VUSB,
     .dm_needed = libxl_device_usbctrl_dm_needed
 );
 
 #define libxl__device_from_usbdev NULL
 #define libxl__device_usbdev_update_devid NULL
 
-DEFINE_DEVICE_TYPE_STRUCT(usbdev);
+DEFINE_DEVICE_TYPE_STRUCT(usbdev, VUSB);
 
 /*
  * Local variables:

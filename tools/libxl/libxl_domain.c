@@ -1689,7 +1689,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
             p = libxl__device_list(gc, dt, domid, &num);
             if (p == NULL) {
                 LOGD(DEBUG, domid, "No %s from xenstore",
-                     dt->type);
+                     libxl__device_kind_to_string(dt->type));
             }
             devs = libxl__device_type_get_ptr(dt, d_config);
 

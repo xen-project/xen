@@ -27,3 +27,9 @@ VERS_1.1 {
 	global:
 		xendevicemodel_shutdown;
 } VERS_1.0;
+
+VERS_1.2 {
+	global:
+		xendevicemodel_relocate_memory;
+		xendevicemodel_pin_memory_cacheattr;
+} VERS_1.1;

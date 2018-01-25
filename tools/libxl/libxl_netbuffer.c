@@ -126,8 +126,10 @@ static const char *get_vifname(libxl__checkpoint_device *dev,
     /* Convenience aliases */
     const uint32_t domid = dev->cds->domid;
 
-    path = GCSPRINTF("%s/backend/vif/%d/%d/vifname",
-                     libxl__xs_get_dompath(gc, 0), domid, nic->devid);
+    path = GCSPRINTF("%s/vifname",
+                     libxl__domain_device_backend_path(gc, 0, domid,
+                     nic->devid, LIBXL__DEVICE_KIND_VIF));
+
     rc = libxl__xs_read_checked(gc, XBT_NULL, path, &vifname);
     if (!rc && !vifname) {
         vifname = libxl__device_nic_devname(gc, domid,

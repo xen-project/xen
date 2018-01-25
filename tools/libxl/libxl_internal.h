@@ -1222,8 +1222,15 @@ _hidden int libxl__device_exists(libxl__gc *gc, xs_transaction_t t,
                                  libxl__device *device);
 _hidden int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
         libxl__device *device, char **bents, char **fents, char **ro_fents);
+_hidden char *libxl__domain_device_frontend_path(libxl__gc *gc, uint32_t domid, uint32_t devid,
+                                                 libxl__device_kind device_kind);
 _hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
+_hidden char *libxl__domain_device_backend_path(libxl__gc *gc, uint32_t backend_domid,
+                                                uint32_t domid, uint32_t devid,
+                                                libxl__device_kind device_kind);
 _hidden char *libxl__device_libxl_path(libxl__gc *gc, libxl__device *device);
+_hidden char *libxl__domain_device_libxl_path(libxl__gc *gc, uint32_t domid, uint32_t devid,
+                                              libxl__device_kind device_kind);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
@@ -1235,7 +1242,8 @@ _hidden int libxl__init_console_from_channel(libxl__gc *gc,
                                              libxl__device_console *console,
                                              int dev_num,
                                              libxl_device_channel *channel);
-_hidden int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device);
+_hidden int libxl__device_nextid(libxl__gc *gc, uint32_t domid,
+                                 libxl__device_kind device);
 _hidden int libxl__resolve_domid(libxl__gc *gc, const char *name,
                                  uint32_t *domid);
 
@@ -3454,17 +3462,71 @@ _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
         return AO_INPROGRESS;                                           \
     }
 
-#define LIBXL_DEFINE_UPDATE_DEVID(type, name)                           \
-    int libxl__device_##type##_update_devid(libxl__gc *gc,              \
+#define LIBXL_DEFINE_UPDATE_DEVID(name)                                 \
+    int libxl__device_##name##_update_devid(libxl__gc *gc,              \
                                             uint32_t domid,             \
-                                            libxl_device_##type *type)  \
+                                            libxl_device_##name *type)  \
     {                                                                   \
         if (type->devid == -1)                                          \
-            type->devid = libxl__device_nextid(gc, domid, name);        \
+            type->devid = libxl__device_nextid(gc, domid,               \
+                          libxl__##name##_devtype.type);                \
         if (type->devid < 0)                                            \
             return ERROR_FAIL;                                          \
         return 0;                                                       \
     }
+
+#define LIBXL_DEFINE_DEVICE_FROM_TYPE(name)                             \
+    int libxl__device_from_##name(libxl__gc *gc, uint32_t domid,        \
+                                  libxl_device_##name *type,            \
+                                  libxl__device *device)                \
+    {                                                                   \
+        device->backend_devid   = type->devid;                          \
+        device->backend_domid   = type->backend_domid;                  \
+        device->backend_kind    = libxl__##name##_devtype.type;         \
+        device->devid           = type->devid;                          \
+        device->domid           = domid;                                \
+        device->kind            = libxl__##name##_devtype.type;         \
+                                                                        \
+        return 0;                                                       \
+    }
+
+#define LIBXL_DEFINE_DEVID_TO_DEVICE(name)                              \
+    int libxl_devid_to_device_##name(libxl_ctx *ctx, uint32_t domid,    \
+                                     int devid,                         \
+                                     libxl_device_##name *type)         \
+    {                                                                   \
+        GC_INIT(ctx);                                                   \
+                                                                        \
+        char *device_path;                                              \
+        const char *tmp;                                                \
+        int rc;                                                         \
+                                                                        \
+        libxl_device_##name##_init(type);                               \
+                                                                        \
+        device_path = GCSPRINTF("%s/device/%s/%d",                      \
+                                libxl__xs_libxl_path(gc, domid),        \
+                                libxl__device_kind_to_string(           \
+                                libxl__##name##_devtype.type),          \
+                                devid);                                 \
+                                                                        \
+        if (libxl__xs_read_mandatory(gc, XBT_NULL, device_path, &tmp)) {\
+            rc = ERROR_NOTFOUND; goto out;                              \
+        }                                                               \
+                                                                        \
+        if (libxl__##name##_devtype.from_xenstore) {                    \
+            rc = libxl__##name##_devtype.from_xenstore(gc, device_path, \
+                                                       devid, type);    \
+            if (rc) goto out;                                           \
+        }                                                               \
+                                                                        \
+        rc = 0;                                                         \
+                                                                        \
+    out:                                                                \
+                                                                        \
+        GC_FREE;                                                        \
+        return rc;                                                      \
+    }
+
 
 #define LIBXL_DEFINE_DEVICE_REMOVE(type)                                \
     LIBXL_DEFINE_DEVICE_REMOVE_EXT(type, generic, remove, 0)            \
@@ -3513,8 +3575,7 @@ typedef int (*device_set_xenstore_config_fn_t)(libxl__gc *, uint32_t, void *,
                                                flexarray_t *);
 
 struct libxl_device_type {
-    char *type;
-    char *entry;
+    libxl__device_kind type;
     int skip_attach;   /* Skip entry in domcreate_attach_devices() if 1 */
     int ptr_offset;    /* Offset of device array ptr in libxl_domain_config */
     int num_offset;    /* Offset of # of devices in libxl_domain_config */
@@ -3534,10 +3595,9 @@ struct libxl_device_type {
     device_set_xenstore_config_fn_t set_xenstore_config;
 };
 
-#define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, sentry, ...)                  \
+#define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, kind, ...)                    \
     const struct libxl_device_type libxl__ ## name ## _devtype = {             \
-        .type          = #sname,                                               \
-        .entry         = #sentry,                                              \
+        .type          = LIBXL__DEVICE_KIND_ ## kind,                       \
         .ptr_offset    = offsetof(libxl_domain_config, name ## s),             \
         .num_offset    = offsetof(libxl_domain_config, num_ ## name ## s),     \
         .dev_elem_size = sizeof(libxl_device_ ## sname),                       \
@@ -3556,8 +3616,8 @@ struct libxl_device_type {
         __VA_ARGS__                                                            \
     }
 
-#define DEFINE_DEVICE_TYPE_STRUCT(name, ...)                                   \
-    DEFINE_DEVICE_TYPE_STRUCT_X(name, name, name, __VA_ARGS__)
+#define DEFINE_DEVICE_TYPE_STRUCT(name, kind, ...)                             \
+    DEFINE_DEVICE_TYPE_STRUCT_X(name, name, kind, __VA_ARGS__)
 
 static inline void **libxl__device_type_get_ptr(
     const struct libxl_device_type *dt, const libxl_domain_config *d_config)

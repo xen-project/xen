@@ -693,9 +693,6 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_mem_sharing_op:
         return current_has_perm(d, SECCLASS_HVM, HVM__MEM_SHARING);
 
-    case XEN_DOMCTL_pin_mem_cacheattr:
-        return current_has_perm(d, SECCLASS_HVM, HVM__CACHEATTR);
-
     case XEN_DOMCTL_sendtrigger:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);
 
