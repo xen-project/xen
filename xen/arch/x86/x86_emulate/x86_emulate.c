@@ -1957,9 +1957,8 @@ const uint8_t cpu_user_regs_gpr_offsets[] = {
 #endif
 };
 
-void *
-decode_register(
-    uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs)
+static void *_decode_gpr(
+    struct cpu_user_regs *regs, unsigned int modrm_reg, bool legacy)
 {
     static const uint8_t byte_reg_offsets[] = {
         offsetof(struct cpu_user_regs, al),
@@ -1972,7 +1971,7 @@ decode_register(
         offsetof(struct cpu_user_regs, bh),
     };
 
-    if ( !highbyte_regs )
+    if ( !legacy )
         return decode_gpr(regs, modrm_reg);
 
     /* Check that the array is a power of two. */
@@ -1987,10 +1986,11 @@ decode_register(
     return (void *)regs + byte_reg_offsets[modrm_reg];
 }
 
-static void *decode_vex_gpr(unsigned int vex_reg, struct cpu_user_regs *regs,
-                            const struct x86_emulate_ctxt *ctxt)
+static unsigned long *decode_vex_gpr(
+    unsigned int vex_reg, struct cpu_user_regs *regs,
+    const struct x86_emulate_ctxt *ctxt)
 {
-    return decode_register(~vex_reg & (mode_64bit() ? 0xf : 7), regs, 0);
+    return decode_gpr(regs, ~vex_reg & (mode_64bit() ? 0xf : 7));
 }
 
 static bool is_aligned(enum x86_segment seg, unsigned long offs,
@@ -2799,8 +2799,7 @@ x86_decode(
                 sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
                 sib_base  = (sib & 7) | ((rex_prefix << 3) & 8);
                 if ( sib_index != 4 && !(d & vSIB) )
-                    ea.mem.off = *(long *)decode_register(sib_index,
-                                                          state->regs, 0);
+                    ea.mem.off = *decode_gpr(state->regs, sib_index);
                 ea.mem.off <<= (sib >> 6) & 3;
                 if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
                     ea.mem.off += insn_fetch_type(int32_t);
@@ -2819,15 +2818,13 @@ x86_decode(
                     ea.mem.off += state->regs->r(bp);
                 }
                 else
-                    ea.mem.off += *(long *)decode_register(sib_base,
-                                                           state->regs, 0);
+                    ea.mem.off += *decode_gpr(state->regs, sib_base);
             }
             else
             {
                 generate_exception_if(d & vSIB, EXC_UD);
                 modrm_rm |= (rex_prefix & 1) << 3;
-                ea.mem.off = *(long *)decode_register(modrm_rm,
-                                                      state->regs, 0);
+                ea.mem.off = *decode_gpr(state->regs, modrm_rm);
                 if ( (modrm_rm == 5) && (modrm_mod != 0) )
                     ea.mem.seg = x86_seg_ss;
             }
@@ -3052,8 +3049,7 @@ x86_emulate(
     generate_exception_if(state->not_64bit && mode_64bit(), EXC_UD);
 
     if ( ea.type == OP_REG )
-        ea.reg = decode_register(modrm_rm, &_regs,
-                                 (d & ByteOp) && !rex_prefix);
+        ea.reg = _decode_gpr(&_regs, modrm_rm, (d & ByteOp) && !rex_prefix);
 
     memset(mmvalp, 0xaa /* arbitrary */, sizeof(*mmvalp));
 
@@ -3067,13 +3063,13 @@ x86_emulate(
         src.type = OP_REG;
         if ( d & ByteOp )
         {
-            src.reg = decode_register(modrm_reg, &_regs, (rex_prefix == 0));
+            src.reg = _decode_gpr(&_regs, modrm_reg, !rex_prefix);
             src.val = *(uint8_t *)src.reg;
             src.bytes = 1;
         }
         else
         {
-            src.reg = decode_register(modrm_reg, &_regs, 0);
+            src.reg = decode_gpr(&_regs, modrm_reg);
             switch ( (src.bytes = op_bytes) )
             {
             case 2: src.val = *(uint16_t *)src.reg; break;
@@ -3143,13 +3139,13 @@ x86_emulate(
         dst.type = OP_REG;
         if ( d & ByteOp )
         {
-            dst.reg = decode_register(modrm_reg, &_regs, (rex_prefix == 0));
+            dst.reg = _decode_gpr(&_regs, modrm_reg, !rex_prefix);
             dst.val = *(uint8_t *)dst.reg;
             dst.bytes = 1;
         }
         else
         {
-            dst.reg = decode_register(modrm_reg, &_regs, 0);
+            dst.reg = decode_gpr(&_regs, modrm_reg);
             switch ( (dst.bytes = op_bytes) )
             {
             case 2: dst.val = *(uint16_t *)dst.reg; break;
@@ -3339,7 +3335,7 @@ x86_emulate(
 
     case 0x40 ... 0x4f: /* inc/dec reg */
         dst.type  = OP_REG;
-        dst.reg   = decode_register(b & 7, &_regs, 0);
+        dst.reg   = decode_gpr(&_regs, b & 7);
         dst.bytes = op_bytes;
         dst.val   = *dst.reg;
         if ( b & 8 )
@@ -3349,14 +3345,12 @@ x86_emulate(
         break;
 
     case 0x50 ... 0x57: /* push reg */
-        src.val = *(unsigned long *)decode_register(
-            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
+        src.val = *decode_gpr(&_regs, (b & 7) | ((rex_prefix & 1) << 3));
         goto push;
 
     case 0x58 ... 0x5f: /* pop reg */
         dst.type  = OP_REG;
-        dst.reg   = decode_register(
-            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
+        dst.reg   = decode_gpr(&_regs, (b & 7) | ((rex_prefix & 1) << 3));
         dst.bytes = op_bytes;
         if ( mode_64bit() && (dst.bytes == 4) )
             dst.bytes = 8;
@@ -3370,7 +3364,7 @@ x86_emulate(
         ea.val = _regs.esp;
         for ( i = 0; i < 8; i++ )
         {
-            void *reg = decode_register(i, &_regs, 0);
+            void *reg = decode_gpr(&_regs, i);
 
             if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(op_bytes),
                                   reg != &_regs.esp ? reg : &ea.val,
@@ -3382,7 +3376,7 @@ x86_emulate(
     case 0x61: /* popa */
         for ( i = 0; i < 8; i++ )
         {
-            void *reg = decode_register(7 - i, &_regs, 0);
+            void *reg = decode_gpr(&_regs, 7 - i);
 
             if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                                   &dst.val, op_bytes, ctxt, ops)) != 0 )
@@ -3662,8 +3656,7 @@ x86_emulate(
     case 0x91 ... 0x97: /* xchg reg,%%rax */
         dst.type = OP_REG;
         dst.bytes = op_bytes;
-        dst.reg  = decode_register(
-            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
+        dst.reg  = decode_gpr(&_regs, (b & 7) | ((rex_prefix & 1) << 3));
         dst.val  = *dst.reg;
         goto xchg;
 
@@ -3895,14 +3888,13 @@ x86_emulate(
     }
 
     case 0xb0 ... 0xb7: /* mov imm8,r8 */
-        dst.reg = decode_register(
-            (b & 7) | ((rex_prefix & 1) << 3), &_regs, (rex_prefix == 0));
+        dst.reg = _decode_gpr(&_regs, (b & 7) | ((rex_prefix & 1) << 3),
+                              !rex_prefix);
         dst.val = src.val;
         break;
 
     case 0xb8 ... 0xbf: /* mov imm{16,32,64},r{16,32,64} */
-        dst.reg = decode_register(
-            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
+        dst.reg = decode_gpr(&_regs, (b & 7) | ((rex_prefix & 1) << 3));
         dst.val = src.val;
         break;
 
@@ -5684,7 +5676,7 @@ x86_emulate(
         opc[2] = 0xc3;
 
         copy_REX_VEX(opc, rex_prefix, vex);
-        ea.reg = decode_register(modrm_reg, &_regs, 0);
+        ea.reg = decode_gpr(&_regs, modrm_reg);
         invoke_stub("", "", "=a" (*ea.reg), "+m" (fic.exn_raised)
                             : "c" (mmvalp), "m" (*mmvalp));
 
@@ -6461,7 +6453,7 @@ x86_emulate(
         else
         {
             shift = src.val;
-            src.reg = decode_register(modrm_reg, &_regs, 0);
+            src.reg = decode_gpr(&_regs, modrm_reg);
             src.val = truncate_word(*src.reg, dst.bytes);
         }
         if ( (shift &= width - 1) == 0 )
@@ -6580,7 +6572,7 @@ x86_emulate(
         fail_if(!ops->read_segment);
         if ( (rc = ops->read_segment(seg, &sreg, ctxt)) != X86EMUL_OKAY )
             goto done;
-        dst.reg = decode_register(modrm_rm, &_regs, 0);
+        dst.reg = decode_gpr(&_regs, modrm_rm);
         if ( !(modrm_reg & 2) )
         {
             /* rd{f,g}sbase */
@@ -6640,7 +6632,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xb6): /* movzx rm8,r{16,32,64} */
         /* Recompute DstReg as we may have decoded AH/BH/CH/DH. */
-        dst.reg   = decode_register(modrm_reg, &_regs, 0);
+        dst.reg   = decode_gpr(&_regs, modrm_reg);
         dst.bytes = op_bytes;
         dst.val   = (uint8_t)src.val;
         break;
@@ -6732,7 +6724,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xbe): /* movsx rm8,r{16,32,64} */
         /* Recompute DstReg as we may have decoded AH/BH/CH/DH. */
-        dst.reg   = decode_register(modrm_reg, &_regs, 0);
+        dst.reg   = decode_gpr(&_regs, modrm_reg);
         dst.bytes = op_bytes;
         dst.val   = (int8_t)src.val;
         break;
@@ -6957,8 +6949,7 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xc8) ... X86EMUL_OPC(0x0f, 0xcf): /* bswap */
         dst.type = OP_REG;
-        dst.reg  = decode_register(
-            (b & 7) | ((rex_prefix & 1) << 3), &_regs, 0);
+        dst.reg  = decode_gpr(&_regs, (b & 7) | ((rex_prefix & 1) << 3));
         switch ( dst.bytes = op_bytes )
         {
         default: /* case 2: */
