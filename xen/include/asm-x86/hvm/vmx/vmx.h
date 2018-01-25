@@ -232,18 +232,25 @@ static inline void pi_clear_sn(struct pi_desc *pi_desc)
 /*
  * Exit Qualifications for MOV for Control Register Access
  */
- /* 3:0 - control register number (CRn) */
-#define VMX_CONTROL_REG_ACCESS_NUM(eq)  ((eq) & 0xf)
- /* 5:4 - access type (CR write, CR read, CLTS, LMSW) */
-#define VMX_CONTROL_REG_ACCESS_TYPE(eq) (((eq) >> 4) & 0x3)
-# define VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR   0
-# define VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR 1
-# define VMX_CONTROL_REG_ACCESS_TYPE_CLTS        2
-# define VMX_CONTROL_REG_ACCESS_TYPE_LMSW        3
- /* 11:8 - general purpose register operand */
-#define VMX_CONTROL_REG_ACCESS_GPR(eq)  (((eq) >> 8) & 0xf)
- /* 31:16 - LMSW source data */
-#define VMX_CONTROL_REG_ACCESS_DATA(eq)  ((uint32_t)(eq) >> 16)
+enum {
+    VMX_CR_ACCESS_TYPE_MOV_TO_CR,
+    VMX_CR_ACCESS_TYPE_MOV_FROM_CR,
+    VMX_CR_ACCESS_TYPE_CLTS,
+    VMX_CR_ACCESS_TYPE_LMSW,
+};
+typedef union cr_access_qual {
+    unsigned long raw;
+    struct {
+        uint16_t cr:4,
+                 access_type:2,  /* VMX_CR_ACCESS_TYPE_* */
+                 lmsw_op_type:1, /* 0 => reg, 1 => mem   */
+                 :1,
+                 gpr:4,
+                 :4;
+        uint16_t lmsw_data;
+        uint32_t :32;
+    };
+} __transparent__ cr_access_qual_t;
 
 /*
  * Access Rights

@@ -2563,23 +2563,20 @@ static int vmx_vmfunc_intercept(struct cpu_user_regs *regs)
     return X86EMUL_EXCEPTION;
 }
 
-static int vmx_cr_access(unsigned long exit_qualification)
+static int vmx_cr_access(cr_access_qual_t qual)
 {
     struct vcpu *curr = current;
 
-    switch ( VMX_CONTROL_REG_ACCESS_TYPE(exit_qualification) )
+    switch ( qual.access_type )
     {
-    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR: {
-        unsigned long gp = VMX_CONTROL_REG_ACCESS_GPR(exit_qualification);
-        unsigned long cr = VMX_CONTROL_REG_ACCESS_NUM(exit_qualification);
-        return hvm_mov_to_cr(cr, gp);
-    }
-    case VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR: {
-        unsigned long gp = VMX_CONTROL_REG_ACCESS_GPR(exit_qualification);
-        unsigned long cr = VMX_CONTROL_REG_ACCESS_NUM(exit_qualification);
-        return hvm_mov_from_cr(cr, gp);
-    }
-    case VMX_CONTROL_REG_ACCESS_TYPE_CLTS: {
+    case VMX_CR_ACCESS_TYPE_MOV_TO_CR:
+        return hvm_mov_to_cr(qual.cr, qual.gpr);
+
+    case VMX_CR_ACCESS_TYPE_MOV_FROM_CR:
+        return hvm_mov_from_cr(qual.cr, qual.gpr);
+
+    case VMX_CR_ACCESS_TYPE_CLTS:
+    {
         unsigned long old = curr->arch.hvm_vcpu.guest_cr[0];
         unsigned long value = old & ~X86_CR0_TS;
 
@@ -2594,13 +2591,15 @@ static int vmx_cr_access(unsigned long exit_qualification)
         HVMTRACE_0D(CLTS);
         break;
     }
-    case VMX_CONTROL_REG_ACCESS_TYPE_LMSW: {
+
+    case VMX_CR_ACCESS_TYPE_LMSW:
+    {
         unsigned long value = curr->arch.hvm_vcpu.guest_cr[0];
         int rc;
 
         /* LMSW can (1) set PE; (2) set or clear MP, EM, and TS. */
         value = (value & ~(X86_CR0_MP|X86_CR0_EM|X86_CR0_TS)) |
-                (VMX_CONTROL_REG_ACCESS_DATA(exit_qualification) &
+                (qual.lmsw_data &
                  (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS));
         HVMTRACE_LONG_1D(LMSW, value);
 
@@ -2609,8 +2608,10 @@ static int vmx_cr_access(unsigned long exit_qualification)
 
         return rc;
     }
+
     default:
-        BUG();
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
     }
 
     return X86EMUL_OKAY;

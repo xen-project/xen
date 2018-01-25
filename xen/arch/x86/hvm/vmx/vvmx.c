@@ -2448,27 +2448,28 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         break;
     case EXIT_REASON_CR_ACCESS:
     {
-        unsigned long exit_qualification;
-        int cr, write;
+        cr_access_qual_t qual;
         u32 mask = 0;
 
-        __vmread(EXIT_QUALIFICATION, &exit_qualification);
-        cr = VMX_CONTROL_REG_ACCESS_NUM(exit_qualification);
-        write = VMX_CONTROL_REG_ACCESS_TYPE(exit_qualification);
+        __vmread(EXIT_QUALIFICATION, &qual.raw);
         /* also according to guest exec_control */
         ctrl = __n2_exec_control(v);
 
-        if ( cr == 3 )
+        /* CLTS/LMSW strictly act on CR0 */
+        if ( qual.access_type >= VMX_CR_ACCESS_TYPE_CLTS )
+            ASSERT(qual.cr == 0);
+
+        if ( qual.cr == 3 )
         {
-            mask = write? CPU_BASED_CR3_STORE_EXITING:
-                          CPU_BASED_CR3_LOAD_EXITING;
+            mask = qual.access_type ? CPU_BASED_CR3_STORE_EXITING
+                                    : CPU_BASED_CR3_LOAD_EXITING;
             if ( ctrl & mask )
                 nvcpu->nv_vmexit_pending = 1;
         }
-        else if ( cr == 8 )
+        else if ( qual.cr == 8 )
         {
-            mask = write? CPU_BASED_CR8_STORE_EXITING:
-                          CPU_BASED_CR8_LOAD_EXITING;
+            mask = qual.access_type ? CPU_BASED_CR8_STORE_EXITING
+                                    : CPU_BASED_CR8_LOAD_EXITING;
             if ( ctrl & mask )
                 nvcpu->nv_vmexit_pending = 1;
         }
@@ -2481,14 +2482,14 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
              * Otherwise, L0 will handle it and sync the value to L1 virtual VMCS.
              */
             unsigned long old_val, val, changed_bits;
-            switch ( VMX_CONTROL_REG_ACCESS_TYPE(exit_qualification) )
-            {
-            case VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR:
-            {
-                unsigned long gp = VMX_CONTROL_REG_ACCESS_GPR(exit_qualification);
-                val = *decode_gpr(guest_cpu_user_regs(), gp);
 
-                if ( cr == 0 )
+            switch ( qual.access_type )
+            {
+            case VMX_CR_ACCESS_TYPE_MOV_TO_CR:
+            {
+                val = *decode_gpr(guest_cpu_user_regs(), qual.gpr);
+
+                if ( qual.cr == 0 )
                 {
                     u64 cr0_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
 
@@ -2504,7 +2505,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                                   (guest_cr0 & cr0_gh_mask) | (val & ~cr0_gh_mask));
                     }
                 }
-                else if ( cr == 4 )
+                else if ( qual.cr == 4 )
                 {
                     u64 cr4_gh_mask = get_vvmcs(v, CR4_GUEST_HOST_MASK);
 
@@ -2524,7 +2525,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                     nvcpu->nv_vmexit_pending = 1;
                 break;
             }
-            case VMX_CONTROL_REG_ACCESS_TYPE_CLTS:
+
+            case VMX_CR_ACCESS_TYPE_CLTS:
             {
                 u64 cr0_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
 
@@ -2538,13 +2540,14 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                 }
                 break;
             }
-            case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
+
+            case VMX_CR_ACCESS_TYPE_LMSW:
             {
                 u64 cr0_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
 
                 __vmread(CR0_READ_SHADOW, &old_val);
                 old_val &= X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS;
-                val = VMX_CONTROL_REG_ACCESS_DATA(exit_qualification) &
+                val = qual.lmsw_data &
                       (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS);
                 changed_bits = old_val ^ val;
                 if ( changed_bits & cr0_gh_mask )
@@ -2557,7 +2560,9 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                 }
                 break;
             }
+
             default:
+                ASSERT_UNREACHABLE();
                 break;
             }
         }
