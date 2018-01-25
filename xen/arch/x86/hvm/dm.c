@@ -20,6 +20,7 @@
 #include <xen/sched.h>
 
 #include <asm/hap.h>
+#include <asm/hvm/cacheattr.h>
 #include <asm/hvm/ioreq.h>
 #include <asm/shadow.h>
 
@@ -671,6 +672,22 @@ static int dm_op(const struct dmop_args *op_args)
         break;
     }
 
+    case XEN_DMOP_pin_memory_cacheattr:
+    {
+        const struct xen_dm_op_pin_memory_cacheattr *data =
+            &op.u.pin_memory_cacheattr;
+
+        if ( data->pad )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        rc = hvm_set_mem_pinned_cacheattr(d, data->start, data->end,
+                                          data->type);
+        break;
+    }
+
     default:
         rc = -EOPNOTSUPP;
         break;
@@ -701,6 +718,7 @@ CHECK_dm_op_inject_event;
 CHECK_dm_op_inject_msi;
 CHECK_dm_op_remote_shutdown;
 CHECK_dm_op_relocate_memory;
+CHECK_dm_op_pin_memory_cacheattr;
 
 int compat_dm_op(domid_t domid,
                  unsigned int nr_bufs,

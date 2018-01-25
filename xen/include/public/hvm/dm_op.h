@@ -386,6 +386,19 @@ struct xen_dm_op_relocate_memory {
     uint64_aligned_t dst_gfn;
 };
 
+/*
+ * XEN_DMOP_pin_memory_cacheattr : Pin caching type of RAM space.
+ *                                 Identical to XEN_DOMCTL_pin_mem_cacheattr.
+ */
+#define XEN_DMOP_pin_memory_cacheattr 18
+
+struct xen_dm_op_pin_memory_cacheattr {
+    uint64_aligned_t start; /* Start gfn. */
+    uint64_aligned_t end;   /* End gfn. */
+    uint32_t type;          /* XEN_DOMCTL_MEM_CACHEATTR_* */
+    uint32_t pad;
+};
+
 struct xen_dm_op {
     uint32_t op;
     uint32_t pad;
@@ -408,6 +421,7 @@ struct xen_dm_op {
                 map_mem_type_to_ioreq_server;
         struct xen_dm_op_remote_shutdown remote_shutdown;
         struct xen_dm_op_relocate_memory relocate_memory;
+        struct xen_dm_op_pin_memory_cacheattr pin_memory_cacheattr;
     } u;
 };
 
