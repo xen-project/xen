@@ -1936,7 +1936,7 @@ load_seg(
 }
 
 /* Map GPRs by ModRM encoding to their offset within struct cpu_user_regs. */
-static const uint8_t cpu_user_regs_gpr_offsets[] = {
+const uint8_t cpu_user_regs_gpr_offsets[] = {
     offsetof(struct cpu_user_regs, r(ax)),
     offsetof(struct cpu_user_regs, r(cx)),
     offsetof(struct cpu_user_regs, r(dx)),
@@ -1973,18 +1973,7 @@ decode_register(
     };
 
     if ( !highbyte_regs )
-    {
-        /* Check that the array is a power of two. */
-        BUILD_BUG_ON(ARRAY_SIZE(cpu_user_regs_gpr_offsets) &
-                     (ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1));
-
-        ASSERT(modrm_reg < ARRAY_SIZE(cpu_user_regs_gpr_offsets));
-
-        /* For safety in release builds.  Debug builds will hit the ASSERT() */
-        modrm_reg &= ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1;
-
-        return (void *)regs + cpu_user_regs_gpr_offsets[modrm_reg];
-    }
+        return decode_gpr(regs, modrm_reg);
 
     /* Check that the array is a power of two. */
     BUILD_BUG_ON(ARRAY_SIZE(byte_reg_offsets) &

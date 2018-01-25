@@ -25,6 +25,14 @@
 
 #define MAX_INST_LEN 15
 
+#if defined(__i386__)
+# define X86_NR_GPRS 8
+#elif defined(__x86_64__)
+# define X86_NR_GPRS 16
+#else
+# error Unknown compilation width
+#endif
+
 struct x86_emulate_ctxt;
 
 /*
@@ -601,14 +609,27 @@ int x86_emulate_wrapper(
 #define x86_emulate x86_emulate_wrapper
 #endif
 
+/* Map GPRs by ModRM encoding to their offset within struct cpu_user_regs. */
+extern const uint8_t cpu_user_regs_gpr_offsets[X86_NR_GPRS];
+
 /*
  * Given the 'reg' portion of a ModRM byte, and a register block, return a
  * pointer into the block that addresses the relevant register.
- * @highbyte_regs specifies whether to decode AH,CH,DH,BH.
  */
-void *
-decode_register(
-    uint8_t modrm_reg, struct cpu_user_regs *regs, int highbyte_regs);
+static inline unsigned long *decode_gpr(struct cpu_user_regs *regs,
+                                        unsigned int modrm)
+{
+    /* Check that the array is a power of two. */
+    BUILD_BUG_ON(ARRAY_SIZE(cpu_user_regs_gpr_offsets) &
+                 (ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1));
+
+    ASSERT(modrm < ARRAY_SIZE(cpu_user_regs_gpr_offsets));
+
+    /* For safety in release builds.  Debug builds will hit the ASSERT() */
+    modrm &= ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1;
+
+    return (void *)regs + cpu_user_regs_gpr_offsets[modrm];
+}
 
 /* Unhandleable read, write or instruction fetch */
 int

@@ -2061,16 +2061,9 @@ static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
 int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
 {
     struct vcpu *curr = current;
-    unsigned long val, *reg;
+    unsigned long val = *decode_gpr(guest_cpu_user_regs(), gpr);
     int rc;
 
-    if ( (reg = decode_register(gpr, guest_cpu_user_regs(), 0)) == NULL )
-    {
-        gdprintk(XENLOG_ERR, "invalid gpr: %u\n", gpr);
-        goto exit_and_crash;
-    }
-
-    val = *reg;
     HVMTRACE_LONG_2D(CR_WRITE, cr, TRC_PAR_LONG(val));
     HVM_DBG_LOG(DBG_LEVEL_1, "CR%u, value = %lx", cr, val);
 
@@ -2111,13 +2104,7 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
 int hvm_mov_from_cr(unsigned int cr, unsigned int gpr)
 {
     struct vcpu *curr = current;
-    unsigned long val = 0, *reg;
-
-    if ( (reg = decode_register(gpr, guest_cpu_user_regs(), 0)) == NULL )
-    {
-        gdprintk(XENLOG_ERR, "invalid gpr: %u\n", gpr);
-        goto exit_and_crash;
-    }
+    unsigned long val = 0, *reg = decode_gpr(guest_cpu_user_regs(), gpr);
 
     switch ( cr )
     {

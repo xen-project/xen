@@ -347,18 +347,14 @@ enum vmx_insn_errno set_vvmcs_real_safe(const struct vcpu *v, u32 encoding,
 static unsigned long reg_read(struct cpu_user_regs *regs,
                               unsigned int index)
 {
-    unsigned long *pval = decode_register(index, regs, 0);
-
-    return *pval;
+    return *decode_gpr(regs, index);
 }
 
 static void reg_write(struct cpu_user_regs *regs,
                       unsigned int index,
                       unsigned long value)
 {
-    unsigned long *pval = decode_register(index, regs, 0);
-
-    *pval = value;
+    *decode_gpr(regs, index) = value;
 }
 
 static inline u32 __n2_pin_exec_control(struct vcpu *v)
@@ -2483,14 +2479,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             case VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR:
             {
                 unsigned long gp = VMX_CONTROL_REG_ACCESS_GPR(exit_qualification);
-                unsigned long *reg;
+                val = *decode_gpr(guest_cpu_user_regs(), gp);
 
-                if ( (reg = decode_register(gp, guest_cpu_user_regs(), 0)) == NULL )
-                {
-                    gdprintk(XENLOG_ERR, "invalid gpr: %lx\n", gp);
-                    break;
-                }
-                val = *reg;
                 if ( cr == 0 )
                 {
                     u64 cr0_gh_mask = get_vvmcs(v, CR0_GUEST_HOST_MASK);
