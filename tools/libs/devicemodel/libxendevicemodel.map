@@ -27,3 +27,8 @@ VERS_1.1 {
 	global:
 		xendevicemodel_shutdown;
 } VERS_1.0;
+
+VERS_1.2 {
+	global:
+		xendevicemodel_relocate_memory;
+} VERS_1.1;
