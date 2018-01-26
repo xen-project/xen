@@ -9,6 +9,7 @@
 #include <xen/domain_page.h>
 #include <xen/virtual_region.h>
 #include <xen/livepatch.h>
+#include <xen/warning.h>
 
 #define EX_FIELD(ptr, field) ((unsigned long)&(ptr)->field + (ptr)->field)
 
@@ -145,6 +146,7 @@ static int __init stub_selftest(void)
     };
     unsigned long addr = this_cpu(stubs.addr) + STUB_BUF_SIZE / 2;
     unsigned int i;
+    bool fail = false;
 
     printk("Running stub recovery selftests...\n");
 
@@ -152,7 +154,7 @@ static int __init stub_selftest(void)
     {
         uint8_t *ptr = map_domain_page(_mfn(this_cpu(stubs.mfn))) +
                        (addr & ~PAGE_MASK);
-        unsigned long res = ~0;
+        union stub_exception_token res = { .raw = ~0 };
 
         memset(ptr, 0xcc, STUB_BUF_SIZE / 2);
         memcpy(ptr, tests[i].opc, ARRAY_SIZE(tests[i].opc));
@@ -168,8 +170,21 @@ static int __init stub_selftest(void)
                        _ASM_EXTABLE(.Lret%=, .Lfix%=)
                        : [exn] "+m" (res)
                        : [stb] "r" (addr), "a" (tests[i].rax));
-        ASSERT(res == tests[i].res.raw);
+
+        if ( res.raw != tests[i].res.raw )
+        {
+            printk("Selftest %u failed: Opc %*ph "
+                   "expected %u[%04x], got %u[%04x]\n",
+                   i, (int)ARRAY_SIZE(tests[i].opc), tests[i].opc,
+                   tests[i].res.fields.trapnr, tests[i].res.fields.ec,
+                   res.fields.trapnr, res.fields.ec);
+
+            fail = true;
+        }
     }
+
+    if ( fail )
+        warning_add("SELFTEST FAILURE: CORRECT BEHAVIOR CANNOT BE GUARANTEED\n");
 
     return 0;
 }
