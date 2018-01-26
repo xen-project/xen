@@ -243,6 +243,45 @@ static void gicv2_poke_irq(struct irq_desc *irqd, uint32_t offset)
     writel_gicd(1U << (irqd->irq % 32), offset + (irqd->irq / 32) * 4);
 }
 
+/*
+ * This is forcing the active state of an interrupt, somewhat circumventing
+ * the normal interrupt flow and the GIC state machine. So use with care
+ * and only if you know what you are doing. For this reason we also have to
+ * tinker with the _IRQ_INPROGRESS bit here, since the normal IRQ handler
+ * will not be involved.
+ */
+static void gicv2_set_active_state(struct irq_desc *irqd, bool active)
+{
+    ASSERT(spin_is_locked(&irqd->lock));
+
+    if ( active )
+    {
+        set_bit(_IRQ_INPROGRESS, &irqd->status);
+        gicv2_poke_irq(irqd, GICD_ISACTIVER);
+    }
+    else
+    {
+        clear_bit(_IRQ_INPROGRESS, &irqd->status);
+        gicv2_poke_irq(irqd, GICD_ICACTIVER);
+    }
+}
+
+static void gicv2_set_pending_state(struct irq_desc *irqd, bool pending)
+{
+    ASSERT(spin_is_locked(&irqd->lock));
+
+    if ( pending )
+    {
+        /* The _IRQ_INPROGRESS bit will be set when the interrupt fires. */
+        gicv2_poke_irq(irqd, GICD_ISPENDR);
+    }
+    else
+    {
+        /* The _IRQ_INPROGRESS remains unchanged. */
+        gicv2_poke_irq(irqd, GICD_ICPENDR);
+    }
+}
+
 static void gicv2_set_irq_type(struct irq_desc *desc, unsigned int type)
 {
     uint32_t cfg, actual, edgebit;
@@ -1278,6 +1317,8 @@ const static struct gic_hw_operations gicv2_ops = {
     .eoi_irq             = gicv2_eoi_irq,
     .deactivate_irq      = gicv2_dir_irq,
     .read_irq            = gicv2_read_irq,
+    .set_active_state    = gicv2_set_active_state,
+    .set_pending_state   = gicv2_set_pending_state,
     .set_irq_type        = gicv2_set_irq_type,
     .set_irq_priority    = gicv2_set_irq_priority,
     .send_SGI            = gicv2_send_SGI,

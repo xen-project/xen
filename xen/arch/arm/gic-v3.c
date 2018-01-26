@@ -477,6 +477,41 @@ static unsigned int gicv3_read_irq(void)
     return irq;
 }
 
+/*
+ * This is forcing the active state of an interrupt, somewhat circumventing
+ * the normal interrupt flow and the GIC state machine. So use with care
+ * and only if you know what you are doing. For this reason we also have to
+ * tinker with the _IRQ_INPROGRESS bit here, since the normal IRQ handler
+ * will not be involved.
+ */
+static void gicv3_set_active_state(struct irq_desc *irqd, bool active)
+{
+    ASSERT(spin_is_locked(&irqd->lock));
+
+    if ( active )
+    {
+        set_bit(_IRQ_INPROGRESS, &irqd->status);
+        gicv3_poke_irq(irqd, GICD_ISACTIVER, false);
+    }
+    else
+    {
+        clear_bit(_IRQ_INPROGRESS, &irqd->status);
+        gicv3_poke_irq(irqd, GICD_ICACTIVER, false);
+    }
+}
+
+static void gicv3_set_pending_state(struct irq_desc *irqd, bool pending)
+{
+    ASSERT(spin_is_locked(&irqd->lock));
+
+    if ( pending )
+        /* The _IRQ_INPROGRESS bit will be set when the interrupt fires. */
+        gicv3_poke_irq(irqd, GICD_ISPENDR, false);
+    else
+        /* The _IRQ_INPROGRESS bit will remain unchanged. */
+        gicv3_poke_irq(irqd, GICD_ICPENDR, false);
+}
+
 static inline uint64_t gicv3_mpidr_to_affinity(int cpu)
 {
      uint64_t mpidr = cpu_logical_map(cpu);
@@ -1769,6 +1804,8 @@ static const struct gic_hw_operations gicv3_ops = {
     .eoi_irq             = gicv3_eoi_irq,
     .deactivate_irq      = gicv3_dir_irq,
     .read_irq            = gicv3_read_irq,
+    .set_active_state    = gicv3_set_active_state,
+    .set_pending_state   = gicv3_set_pending_state,
     .set_irq_type        = gicv3_set_irq_type,
     .set_irq_priority    = gicv3_set_irq_priority,
     .send_SGI            = gicv3_send_sgi,

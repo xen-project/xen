@@ -345,6 +345,10 @@ struct gic_hw_operations {
     void (*deactivate_irq)(struct irq_desc *irqd);
     /* Read IRQ id and Ack */
     unsigned int (*read_irq)(void);
+    /* Force the active state of an IRQ by accessing the distributor */
+    void (*set_active_state)(struct irq_desc *irqd, bool state);
+    /* Force the pending state of an IRQ by accessing the distributor */
+    void (*set_pending_state)(struct irq_desc *irqd, bool state);
     /* Set IRQ type */
     void (*set_irq_type)(struct irq_desc *desc, unsigned int type);
     /* Set IRQ priority */
@@ -391,6 +395,26 @@ extern const struct gic_hw_operations *gic_hw_ops;
 static inline unsigned int gic_get_nr_lrs(void)
 {
     return gic_hw_ops->info->nr_lrs;
+}
+
+/*
+ * Set the active state of an IRQ. This should be used with care, as this
+ * directly forces the active bit, without considering the GIC state machine.
+ * For private IRQs this only works for those of the current CPU.
+ */
+static inline void gic_set_active_state(struct irq_desc *irqd, bool state)
+{
+    gic_hw_ops->set_active_state(irqd, state);
+}
+
+/*
+ * Set the pending state of an IRQ. This should be used with care, as this
+ * directly forces the pending bit, without considering the GIC state machine.
+ * For private IRQs this only works for those of the current CPU.
+ */
+static inline void gic_set_pending_state(struct irq_desc *irqd, bool state)
+{
+    gic_hw_ops->set_pending_state(irqd, state);
 }
 
 void register_gic_ops(const struct gic_hw_operations *ops);
