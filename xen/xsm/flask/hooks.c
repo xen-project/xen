@@ -669,9 +669,6 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_getpageframeinfo3:
         return current_has_perm(d, SECCLASS_MMU, MMU__PAGEINFO);
 
-    case XEN_DOMCTL_getmemlist:
-        return current_has_perm(d, SECCLASS_MMU, MMU__PAGELIST);
-
     case XEN_DOMCTL_hypercall_init:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__HYPERCALL);
 

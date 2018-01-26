@@ -357,8 +357,6 @@ class mmu
     map_write
 # XEN_DOMCTL_getpageframeinfo3
     pageinfo
-# XEN_DOMCTL_getmemlist
-    pagelist
 # XENMEM_{increase,decrease}_reservation, XENMEM_populate_physmap
     adjust
 # XENMEM_{current,maximum}_reservation, XENMEM_maximum_gpfn

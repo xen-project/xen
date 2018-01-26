@@ -122,19 +122,6 @@ typedef struct xen_domctl_getdomaininfo xen_domctl_getdomaininfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
 
 
-/* XEN_DOMCTL_getmemlist */
-struct xen_domctl_getmemlist {
-    /* IN variables. */
-    /* Max entries to write to output buffer. */
-    uint64_aligned_t max_pfns;
-    /* Start index in guest's page list. */
-    uint64_aligned_t start_pfn;
-    XEN_GUEST_HANDLE_64(uint64) buffer;
-    /* OUT variables. */
-    uint64_aligned_t num_pfns;
-};
-
-
 /* XEN_DOMCTL_getpageframeinfo */
 
 #define XEN_DOMCTL_PFINFO_LTAB_SHIFT 28
@@ -1194,7 +1181,6 @@ struct xen_domctl {
     union {
         struct xen_domctl_createdomain      createdomain;
         struct xen_domctl_getdomaininfo     getdomaininfo;
-        struct xen_domctl_getmemlist        getmemlist;
         struct xen_domctl_getpageframeinfo3 getpageframeinfo3;
         struct xen_domctl_nodeaffinity      nodeaffinity;
         struct xen_domctl_vcpuaffinity      vcpuaffinity;
