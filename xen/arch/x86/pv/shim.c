@@ -757,7 +757,10 @@ static long pv_shim_grant_table_op(unsigned int cmd,
     }
 
     case GNTTABOP_query_size:
+        /* Disable SMAP so L0 can access the buffer. */
+        stac();
         rc = xen_hypercall_grant_table_op(GNTTABOP_query_size, uop.p, count);
+        clac();
         break;
 
     default:
