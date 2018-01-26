@@ -1064,7 +1064,7 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
     paddr_t entry, start_info;
     int rc;
 
-    printk("** Building a PVH Dom0 **\n");
+    printk(XENLOG_INFO "*** Building a PVH Dom%d ***\n", d->domain_id);
 
     iommu_hwdom_init(d);
 

@@ -328,7 +328,7 @@ int __init dom0_construct_pv(struct domain *d,
     /* Machine address of next candidate page-table page. */
     paddr_t mpt_alloc;
 
-    printk("*** LOADING DOMAIN 0 ***\n");
+    printk(XENLOG_INFO "*** Building a PV Dom%d ***\n", d->domain_id);
 
     d->max_pages = ~0U;
 
