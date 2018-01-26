@@ -904,7 +904,11 @@ out:
         ept_free_entry(p2m, &old_entry, target);
 
     if ( entry_written && p2m_is_hostp2m(p2m) )
-        p2m_altp2m_propagate_change(d, _gfn(gfn), mfn, order, p2mt, p2ma);
+    {
+        ret = p2m_altp2m_propagate_change(d, _gfn(gfn), mfn, order, p2mt, p2ma);
+        if ( !rc )
+            rc = ret;
+    }
 
     return rc;
 }

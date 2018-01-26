@@ -690,8 +690,9 @@ void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg);
 
 /* Directly set a p2m entry: only for use by p2m code. Does not need
  * a call to put_gfn afterwards/ */
-int p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
-                  unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma);
+int __must_check p2m_set_entry(struct p2m_domain *p2m, gfn_t gfn, mfn_t mfn,
+                               unsigned int page_order, p2m_type_t p2mt,
+                               p2m_access_t p2ma);
 
 /* Set up function pointers for PT implementation: only for use by p2m code */
 extern void p2m_pt_init(struct p2m_domain *p2m);
@@ -831,9 +832,9 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
                           gfn_t old_gfn, gfn_t new_gfn);
 
 /* Propagate a host p2m change to all alternate p2m's */
-void p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
-                                 mfn_t mfn, unsigned int page_order,
-                                 p2m_type_t p2mt, p2m_access_t p2ma);
+int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
+                                mfn_t mfn, unsigned int page_order,
+                                p2m_type_t p2mt, p2m_access_t p2ma);
 
 /*
  * p2m type to IOMMU flags
