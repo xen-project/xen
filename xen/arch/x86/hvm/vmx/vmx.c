@@ -2277,21 +2277,6 @@ static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
     return rc;
 }
 
-static int vmx_set_mode(struct vcpu *v, int mode)
-{
-    unsigned long attr;
-
-    ASSERT((mode == 4) || (mode == 8));
-
-    attr = (mode == 4) ? 0xc09b : 0xa09b;
-
-    vmx_vmcs_enter(v);
-    __vmwrite(GUEST_CS_AR_BYTES, attr);
-    vmx_vmcs_exit(v);
-
-    return 0;
-}
-
 static bool vmx_get_pending_event(struct vcpu *v, struct x86_event *info)
 {
     unsigned long intr_info, error_code;
@@ -2373,7 +2358,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .enable_msr_interception = vmx_enable_msr_interception,
     .is_singlestep_supported = vmx_is_singlestep_supported,
-    .set_mode = vmx_set_mode,
     .altp2m_vcpu_update_p2m = vmx_vcpu_update_eptp,
     .altp2m_vcpu_update_vmfunc_ve = vmx_vcpu_update_vmfunc_ve,
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,

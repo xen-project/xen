@@ -4848,29 +4848,6 @@ void hvm_toggle_singlestep(struct vcpu *v)
     v->arch.hvm_vcpu.single_step = !v->arch.hvm_vcpu.single_step;
 }
 
-int hvm_set_mode(struct vcpu *v, int mode)
-{
-
-    switch ( mode )
-    {
-    case 4:
-        v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
-        break;
-    case 8:
-        v->arch.hvm_vcpu.guest_efer |= (EFER_LMA | EFER_LME);
-        break;
-    default:
-        return -EOPNOTSUPP;
-    }
-
-    hvm_update_guest_efer(v);
-
-    if ( hvm_funcs.set_mode )
-        return hvm_funcs.set_mode(v, mode);
-
-    return 0;
-}
-
 void hvm_domain_soft_reset(struct domain *d)
 {
     hvm_destroy_all_ioreq_servers(d);
