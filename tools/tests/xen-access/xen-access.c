@@ -654,6 +654,8 @@ int main(int argc, char *argv[])
                 rc = xc_monitor_cpuid(xch, domain_id, 0);
             if ( desc_access )
                 rc = xc_monitor_descriptor_access(xch, domain_id, 0);
+            if ( write_ctrlreg_cr4 )
+                rc = xc_monitor_write_ctrlreg(xch, domain_id, VM_EVENT_X86_CR4, 0, 0, 0, 0);
 
             if ( privcall )
                 rc = xc_monitor_privileged_call(xch, domain_id, 0);
