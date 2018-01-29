@@ -171,7 +171,7 @@ ENTRY(lstar_enter)
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Llstar_cr3_okay:
 
-        __GET_CURRENT(bx)
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
         jz    switch_to_kernel
 
@@ -277,7 +277,7 @@ GLOBAL(sysenter_eflags_saved)
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lsyse_cr3_okay:
 
-        __GET_CURRENT(bx)
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
@@ -332,7 +332,7 @@ UNLIKELY_START(ne, msi_check)
         call  check_for_unexpected_msi
 UNLIKELY_END(msi_check)
 
-        __GET_CURRENT(bx)
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
 
         /* Check that the callback is non-null. */
         leaq  VCPU_int80_bounce(%rbx),%rdx
@@ -477,7 +477,7 @@ ENTRY(dom_crash_sync_extable)
         GET_STACK_END(ax)
         leaq  STACK_CPUINFO_FIELD(guest_cpu_user_regs)(%rax),%rsp
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
-        __GET_CURRENT(ax)
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rax), %rax
         movq  VCPU_domain(%rax),%rax
         testb $1,DOMAIN_is_32bit_pv(%rax)
         setz  %al

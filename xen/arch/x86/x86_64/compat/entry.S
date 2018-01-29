@@ -224,7 +224,7 @@ ENTRY(cstar_enter)
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lcstar_cr3_okay:
 
-        GET_CURRENT(bx)
+        movq  STACK_CPUINFO_FIELD(current_vcpu)(%rbx), %rbx
         movq  VCPU_domain(%rbx),%rcx
         cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
         je    switch_to_kernel

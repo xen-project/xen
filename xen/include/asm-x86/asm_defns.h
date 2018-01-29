@@ -132,11 +132,9 @@ void ret_from_intr(void);
         GET_STACK_END(reg);                       \
         addq $STACK_CPUINFO_FIELD(field), %r##reg
 
-#define __GET_CURRENT(reg)                        \
-        movq STACK_CPUINFO_FIELD(current_vcpu)(%r##reg), %r##reg
 #define GET_CURRENT(reg)                          \
         GET_STACK_END(reg);                       \
-        __GET_CURRENT(reg)
+        movq STACK_CPUINFO_FIELD(current_vcpu)(%r##reg), %r##reg
 
 #ifndef NDEBUG
 #define ASSERT_NOT_IN_ATOMIC                                             \
