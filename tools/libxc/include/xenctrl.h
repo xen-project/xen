@@ -1416,6 +1416,10 @@ int xc_domain_add_to_physmap_batch(xc_interface *xch,
                                    xen_pfn_t *gfpns,
                                    int *errs);
 
+int xc_domain_remove_from_physmap(xc_interface *xch,
+                                  uint32_t domid,
+                                  xen_pfn_t gpfn);
+
 int xc_domain_populate_physmap(xc_interface *xch,
                                uint32_t domid,
                                unsigned long nr_extents,
