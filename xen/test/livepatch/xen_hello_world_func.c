@@ -29,7 +29,7 @@ const char *xen_hello_world(void)
     rc = __get_user(tmp, non_canonical_addr);
     BUG_ON(rc != -EFAULT);
 #endif
-#if defined(CONFIG_ARM) && defined(CONFIG_HAS_ALTERNATIVE)
+#if defined(CONFIG_ARM)
     asm(ALTERNATIVE("nop", "nop", LIVEPATCH_FEATURE));
 #endif
 

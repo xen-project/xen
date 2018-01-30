@@ -3,8 +3,6 @@
 
 #include <asm/cpufeature.h>
 
-#ifdef CONFIG_HAS_ALTERNATIVE
-
 #ifndef __ASSEMBLY__
 
 #include <xen/init.h>
@@ -151,18 +149,5 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
  */
 #define ALTERNATIVE(oldinstr, newinstr, ...)   \
 	_ALTERNATIVE_CFG(oldinstr, newinstr, __VA_ARGS__, 1)
-
-#else /* !CONFIG_HAS_ALTERNATIVE */
-
-static inline void apply_alternatives_all(void)
-{
-}
-
-static inline int apply_alternatives(void *start, size_t length)
-{
-    return 0;
-}
-
-#endif
 
 #endif /* __ASM_ALTERNATIVE_H */
