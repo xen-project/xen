@@ -442,6 +442,21 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing xchg %bl,%ah...");
+    instr[0] = 0x86; instr[1] = 0xdc;
+    regs.eflags = X86_EFLAGS_IF;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0xaaaabbcc;
+    regs.ebx    = 0xddddeeff;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.eax != 0xaaaaffcc) ||
+         (regs.ebx != 0xddddeebb) ||
+         (regs.eflags != X86_EFLAGS_IF) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
     printf("%-40s", "Testing lock cmpxchgl %ecx,(%ebx)...");
     instr[0] = 0xf0; instr[1] = 0x0f; instr[2] = 0xb1; instr[3] = 0x0b;
     regs.eflags = 0x200;
