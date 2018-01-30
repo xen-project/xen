@@ -1147,10 +1147,9 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
                                     const struct dt_device_node *gic,
                                     void *fdt)
 {
-    const void *compatible = NULL;
-    uint32_t len;
-    __be32 *new_cells, *tmp;
-    int i, res = 0;
+    const void *compatible, *hw_reg;
+    uint32_t len, new_len;
+    int res;
 
     compatible = dt_get_property(gic, "compatible", &len);
     if ( !compatible )
@@ -1173,27 +1172,21 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
     if ( res )
         return res;
 
-    len = dt_cells_to_size(dt_n_addr_cells(gic) + dt_n_size_cells(gic));
+    new_len = dt_cells_to_size(dt_n_addr_cells(gic) + dt_n_size_cells(gic));
     /*
      * GIC has two memory regions: Distributor + rdist regions
      * CPU interface and virtual cpu interfaces accessesed as System registers
      * So cells are created only for Distributor and rdist regions
      */
-    len = len * (d->arch.vgic.nr_regions + 1);
-    new_cells = xzalloc_bytes(len);
-    if ( new_cells == NULL )
-        return -FDT_ERR_XEN(ENOMEM);
+    new_len = new_len * (d->arch.vgic.nr_regions + 1);
 
-    tmp = new_cells;
+    hw_reg = dt_get_property(gic, "reg", &len);
+    if ( !hw_reg )
+        return -FDT_ERR_XEN(ENOENT);
+    if ( new_len > len )
+        return -FDT_ERR_XEN(ERANGE);
 
-    dt_set_range(&tmp, gic, d->arch.vgic.dbase, SZ_64K);
-
-    for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
-        dt_set_range(&tmp, gic, d->arch.vgic.rdist_regions[i].base,
-                     d->arch.vgic.rdist_regions[i].size);
-
-    res = fdt_property(fdt, "reg", new_cells, len);
-    xfree(new_cells);
+    res = fdt_property(fdt, "reg", hw_reg, new_len);
     if ( res )
         return res;
 
