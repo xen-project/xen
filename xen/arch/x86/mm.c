@@ -4105,20 +4105,18 @@ int xenmem_add_to_physmap_one(
             if ( rc )
                 return rc;
             break;
-        case XENMAPSPACE_gmfn_range:
         case XENMAPSPACE_gmfn:
         {
             p2m_type_t p2mt;
 
             gfn = idx;
-            idx = mfn_x(get_gfn_unshare(d, idx, &p2mt));
+            mfn = get_gfn_unshare(d, gfn, &p2mt);
             /* If the page is still shared, exit early */
             if ( p2m_is_shared(p2mt) )
             {
                 put_gfn(d, gfn);
                 return -ENOMEM;
             }
-            mfn = _mfn(idx);
             page = get_page_from_mfn(mfn, d);
             if ( unlikely(!page) )
                 mfn = INVALID_MFN;
@@ -4156,8 +4154,7 @@ int xenmem_add_to_physmap_one(
     /* Unmap from old location, if any. */
     old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
     ASSERT( old_gpfn != SHARED_M2P_ENTRY );
-    if ( (space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range) &&
-         old_gpfn != gfn )
+    if ( space == XENMAPSPACE_gmfn && old_gpfn != gfn )
     {
         rc = -EXDEV;
         goto put_both;
@@ -4170,8 +4167,8 @@ int xenmem_add_to_physmap_one(
         rc = guest_physmap_add_page(d, gpfn, mfn, PAGE_ORDER_4K);
 
  put_both:
-    /* In the XENMAPSPACE_gmfn, we took a ref of the gfn at the top */
-    if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
+    /* In the XENMAPSPACE_gmfn case, we took a ref of the gfn at the top. */
+    if ( space == XENMAPSPACE_gmfn )
         put_gfn(d, gfn);
 
     if ( page )

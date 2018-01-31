@@ -800,7 +800,7 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
 
     while ( xatp->size > done )
     {
-        rc = xenmem_add_to_physmap_one(d, xatp->space, extra,
+        rc = xenmem_add_to_physmap_one(d, XENMAPSPACE_gmfn, extra,
                                        xatp->idx, _gfn(xatp->gpfn));
         if ( rc < 0 )
             break;
