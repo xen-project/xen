@@ -259,12 +259,16 @@ int parse_boolean(const char *name, const char *s, const char *e)
     if ( slen < nlen || strncmp(s, name, nlen) )
         return -1;
 
-    switch ( s[nlen] )
-    {
-    case '\0': return val;
-    case '=':  return parse_bool(&s[nlen + 1], e);
-    default:   return -1;
-    }
+    /* Exact, unadorned name?  Result depends on the 'no-' prefix. */
+    if ( slen == nlen )
+        return val;
+
+    /* =$SOMETHING?  Defer to the regular boolean parsing. */
+    if ( s[nlen] == '=' )
+        return parse_bool(&s[nlen + 1], e);
+
+    /* Unrecognised.  Give up. */
+    return -1;
 }
 
 unsigned int tainted;
