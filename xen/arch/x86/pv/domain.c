@@ -220,28 +220,8 @@ int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
     return rc;
 }
 
-void toggle_guest_mode(struct vcpu *v)
+static void _toggle_guest_pt(struct vcpu *v)
 {
-    if ( is_pv_32bit_vcpu(v) )
-        return;
-
-    if ( cpu_has_fsgsbase )
-    {
-        if ( v->arch.flags & TF_kernel_mode )
-            v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
-        else
-            v->arch.pv_vcpu.gs_base_user = __rdgsbase();
-    }
-    asm volatile ( "swapgs" );
-
-    toggle_guest_pt(v);
-}
-
-void toggle_guest_pt(struct vcpu *v)
-{
-    if ( is_pv_32bit_vcpu(v) )
-        return;
-
     v->arch.flags ^= TF_kernel_mode;
     update_cr3(v);
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
@@ -258,6 +238,28 @@ void toggle_guest_pt(struct vcpu *v)
          update_secondary_system_time(v,
                                       &v->arch.pv_vcpu.pending_system_time) )
         v->arch.pv_vcpu.pending_system_time.version = 0;
+}
+
+void toggle_guest_mode(struct vcpu *v)
+{
+    ASSERT(!is_pv_32bit_vcpu(v));
+
+    if ( cpu_has_fsgsbase )
+    {
+        if ( v->arch.flags & TF_kernel_mode )
+            v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
+        else
+            v->arch.pv_vcpu.gs_base_user = __rdgsbase();
+    }
+    asm volatile ( "swapgs" );
+
+    _toggle_guest_pt(v);
+}
+
+void toggle_guest_pt(struct vcpu *v)
+{
+    if ( !is_pv_32bit_vcpu(v) )
+        _toggle_guest_pt(v);
 }
 
 /*
