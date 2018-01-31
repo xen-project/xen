@@ -15,7 +15,9 @@
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <xen/delay.h>
 #include <xen/types.h>
+#include <asm/apic.h>
 #include <asm/processor.h>
 #include <asm/alternative.h>
 #include <xen/init.h>
@@ -81,11 +83,6 @@ static const unsigned char * const p6_nops[ASM_NOP_MAX+1] init_or_livepatch_cons
 #endif
 
 static const unsigned char * const *ideal_nops init_or_livepatch_data = p6_nops;
-
-static int __init mask_nmi_callback(const struct cpu_user_regs *regs, int cpu)
-{
-    return 1;
-}
 
 static void __init arch_init_ideal_nops(void)
 {
@@ -202,23 +199,50 @@ void init_or_livepatch apply_alternatives(const struct alt_instr *start,
     }
 }
 
+static bool __initdata alt_done;
+
+/*
+ * At boot time, we patch alternatives in NMI context.  This means that the
+ * active NMI-shadow will defer any further NMIs, removing the slim race
+ * condition where an NMI hits while we are midway though patching some
+ * instructions in the NMI path.
+ */
+static int __init nmi_apply_alternatives(const struct cpu_user_regs *regs,
+                                         int cpu)
+{
+    /*
+     * More than one NMI may occur between the two set_nmi_callback() below.
+     * We only need to apply alternatives once.
+     */
+    if ( !alt_done )
+    {
+        unsigned long cr0;
+
+        cr0 = read_cr0();
+
+        /* Disable WP to allow patching read-only pages. */
+        write_cr0(cr0 & ~X86_CR0_WP);
+
+        apply_alternatives(__alt_instructions, __alt_instructions_end);
+
+        write_cr0(cr0);
+
+        alt_done = true;
+    }
+
+    return 1;
+}
+
 /*
  * This routine is called with local interrupt disabled and used during
  * bootup.
  */
 void __init alternative_instructions(void)
 {
+    unsigned int i;
     nmi_callback_t *saved_nmi_callback;
-    unsigned long cr0 = read_cr0();
 
     arch_init_ideal_nops();
-
-    /*
-     * The patching is not fully atomic, so try to avoid local interruptions
-     * that might execute the to be patched code.
-     * Other CPUs are not running.
-     */
-    saved_nmi_callback = set_nmi_callback(mask_nmi_callback);
 
     /*
      * Don't stop machine check exceptions while patching.
@@ -232,13 +256,26 @@ void __init alternative_instructions(void)
      */
     ASSERT(!local_irq_is_enabled());
 
-    /* Disable WP to allow application of alternatives to read-only pages. */
-    write_cr0(cr0 & ~X86_CR0_WP);
+    /*
+     * As soon as the callback is set up, the next NMI will trigger patching,
+     * even an NMI ahead of our explicit self-NMI.
+     */
+    saved_nmi_callback = set_nmi_callback(nmi_apply_alternatives);
 
-    apply_alternatives(__alt_instructions, __alt_instructions_end);
+    /* Send ourselves an NMI to trigger the callback. */
+    self_nmi();
 
-    /* Reinstate WP. */
-    write_cr0(cr0);
+    /*
+     * In practice, the self_nmi() above appears to act synchronously.
+     * However, synchronous behaviour is not architecturally guaranteed.  To
+     * cover the (hopefully never) async case, poll alt_done for up to one
+     * second.
+     */
+    for ( i = 0; !ACCESS_ONCE(alt_done) && i < 1000; ++i )
+        mdelay(1);
+
+    if ( !ACCESS_ONCE(alt_done) )
+        panic("Timed out waiting for alternatives self-NMI to hit");
 
     set_nmi_callback(saved_nmi_callback);
 }
