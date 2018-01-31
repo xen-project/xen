@@ -501,7 +501,6 @@ DECLARE_TRAP_HANDLER(entry_int82);
 
 void trap_nop(void);
 void enable_nmis(void);
-void do_reserved_trap(struct cpu_user_regs *regs);
 
 void sysenter_entry(void);
 void sysenter_eflags_saved(void);
