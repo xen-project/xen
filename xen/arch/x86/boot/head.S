@@ -585,7 +585,7 @@ trampoline_setup:
         push    %eax                /* Magic number. */
         call    reloc
 #ifdef CONFIG_PVH_GUEST
-        cmp     $0, sym_fs(pvh_boot)
+        cmpb    $0, sym_fs(pvh_boot)
         je      1f
         mov     %eax, sym_fs(pvh_start_info_pa)
         jmp     2f
