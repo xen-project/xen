@@ -237,7 +237,7 @@ enum simd_opsize {
 };
 typedef uint8_t simd_opsize_t;
 
-static const struct {
+static const struct twobyte_table {
     opcode_desc_t desc;
     simd_opsize_t size;
 } twobyte_table[256] = {
@@ -360,7 +360,7 @@ static const struct {
  * (one of which possibly also allowing to be a memory one). The named
  * operand counts do not include any immediate operands.
  */
-static const struct {
+static const struct ext0f38_table {
     uint8_t simd_size:5;
     uint8_t to_mem:1;
     uint8_t two_op:1;
@@ -400,7 +400,7 @@ static const struct {
 /* Shift values between src and dst sizes of pmov{s,z}x{b,w,d}{w,d,q}. */
 static const uint8_t pmov_convert_delta[] = { 1, 2, 3, 1, 2, 1 };
 
-static const struct {
+static const struct ext0f3a_table {
     uint8_t simd_size:5;
     uint8_t to_mem:1;
     uint8_t two_op:1;
