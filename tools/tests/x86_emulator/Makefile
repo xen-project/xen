@@ -12,7 +12,8 @@ run: $(TARGET)
 	./$(TARGET)
 
 SIMD := sse sse2 sse4 avx
-TESTCASES := blowfish $(SIMD) sse2-avx sse4-avx
+FMA := fma4
+TESTCASES := blowfish $(SIMD) sse2-avx sse4-avx $(FMA)
 
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
@@ -29,6 +30,9 @@ sse4-flts := $(sse2-flts)
 avx-vecs := 16 32
 avx-ints :=
 avx-flts := 4 8
+fma4-vecs := $(avx-vecs)
+fma4-ints :=
+fma4-flts := $(avx-flts)
 
 # When converting SSE to AVX, have the compiler avoid XMM0 to widen
 # coverage of the VEX.vvvv checks in the emulator. We must not do this,
@@ -58,7 +62,7 @@ $(1)-avx-cflags := \
 	    "-D_$(vec)u$(int) -m$(1) $(sse2avx-$(1)) -Os -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)"))
 endef
 
-$(foreach flavor,$(SIMD),$(eval $(call simd-defs,$(flavor))))
+$(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-defs,$(flavor))))
 
 $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	rm -f $@.new $*.bin
@@ -76,6 +80,11 @@ $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 
 $(addsuffix .c,$(SIMD)) $(addsuffix -avx.c,$(filter sse%,$(SIMD))):
 	ln -sf simd.c $@
+
+$(addsuffix .c,$(FMA)):
+	ln -sf simd-fma.c $@
+
+$(addsuffix .o,$(SIMD) $(FMA)) $(addsuffix -avx.o,$(filter sse%,$(SIMD))): simd.h
 
 $(TARGET): x86-emulate.o test_x86_emulator.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
