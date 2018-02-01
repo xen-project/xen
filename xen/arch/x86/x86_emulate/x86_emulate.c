@@ -369,6 +369,7 @@ static const struct {
     [0x00 ... 0x0b] = { .simd_size = simd_packed_int },
     [0x0c ... 0x0f] = { .simd_size = simd_packed_fp },
     [0x10] = { .simd_size = simd_packed_int },
+    [0x13] = { .simd_size = simd_other, .two_op = 1 },
     [0x14 ... 0x15] = { .simd_size = simd_packed_fp },
     [0x17] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x18 ... 0x19] = { .simd_size = simd_scalar_fp, .two_op = 1 },
@@ -411,6 +412,7 @@ static const struct {
     [0x14 ... 0x17] = { .simd_size = simd_none, .to_mem = 1, .two_op = 1 },
     [0x18] = { .simd_size = simd_128 },
     [0x19] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
+    [0x1d] = { .simd_size = simd_other, .to_mem = 1, .two_op = 1 },
     [0x20] = { .simd_size = simd_none },
     [0x21] = { .simd_size = simd_other },
     [0x22] = { .simd_size = simd_none },
@@ -1602,6 +1604,7 @@ static bool vcpu_has(
 #define vcpu_has_popcnt()      vcpu_has(         1, ECX, 23, ctxt, ops)
 #define vcpu_has_aesni()       vcpu_has(         1, ECX, 25, ctxt, ops)
 #define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
+#define vcpu_has_f16c()        vcpu_has(         1, ECX, 29, ctxt, ops)
 #define vcpu_has_rdrand()      vcpu_has(         1, ECX, 30, ctxt, ops)
 #define vcpu_has_mmxext()     (vcpu_has(0x80000001, EDX, 22, ctxt, ops) || \
                                vcpu_has_sse())
@@ -7241,6 +7244,12 @@ x86_emulate(
         host_and_vcpu_must_have(sse4_1);
         goto simd_0f38_common;
 
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x13): /* vcvtph2ps xmm/mem,{x,y}mm */
+        generate_exception_if(vex.w, EXC_UD);
+        host_and_vcpu_must_have(f16c);
+        op_bytes = 8 << vex.l;
+        goto simd_0f_ymm;
+
     case X86EMUL_OPC_VEX_66(0x0f38, 0x20): /* vpmovsxbw xmm/mem,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x21): /* vpmovsxbd xmm/mem,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x22): /* vpmovsxbq xmm/mem,{x,y}mm */
@@ -7631,6 +7640,50 @@ x86_emulate(
         get_fpu(X86EMUL_FPU_ymm, &fic);
         opc = init_prefixes(stub);
         goto pextr;
+
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x1d): /* vcvtps2ph $imm8,{x,y}mm,xmm/mem */
+    {
+        uint32_t mxcsr;
+
+        generate_exception_if(vex.w || vex.reg != 0xf, EXC_UD);
+        host_and_vcpu_must_have(f16c);
+        fail_if(!ops->write);
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        if ( ea.type == OP_MEM )
+        {
+            /* Convert memory operand to (%rAX). */
+            vex.b = 1;
+            opc[1] &= 0x38;
+        }
+        opc[2] = imm1;
+        fic.insn_bytes = PFX_BYTES + 3;
+        opc[3] = 0xc3;
+
+        copy_VEX(opc, vex);
+        /* Latch MXCSR - we may need to restore it below. */
+        invoke_stub("stmxcsr %[mxcsr]", "",
+                    "=m" (*mmvalp), "+m" (fic.exn_raised), [mxcsr] "=m" (mxcsr)
+                    : "a" (mmvalp));
+
+        put_stub(stub);
+        check_xmm_exn(&fic);
+
+        if ( ea.type == OP_MEM )
+        {
+            rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp, 8 << vex.l, ctxt);
+            if ( rc != X86EMUL_OKAY )
+            {
+                asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );
+                goto done;
+            }
+        }
+
+        state->simd_size = simd_none;
+        break;
+    }
 
     case X86EMUL_OPC_66(0x0f3a, 0x20): /* pinsrb $imm8,r32/m8,xmm */
     case X86EMUL_OPC_66(0x0f3a, 0x22): /* pinsr{d,q} $imm8,r/m,xmm */

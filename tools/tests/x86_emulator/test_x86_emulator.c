@@ -3068,6 +3068,47 @@ int main(int argc, char **argv)
         printf("skipped\n");
 #endif
 
+    printf("%-40s", "Testing vcvtph2ps (%ecx),%ymm1...");
+    if ( stack_exec && cpu_has_f16c )
+    {
+        decl_insn(vcvtph2ps);
+        decl_insn(vcvtps2ph);
+
+        asm volatile ( "vxorps %%xmm1, %%xmm1, %%xmm1\n"
+                       put_insn(vcvtph2ps, "vcvtph2ps (%0), %%ymm1")
+                       :: "c" (NULL) );
+
+        set_insn(vcvtph2ps);
+        res[1] = 0x40003c00; /* (1.0, 2.0) */
+        res[2] = 0x44004200; /* (3.0, 4.0) */
+        res[3] = 0x3400b800; /* (-.5, .25) */
+        res[4] = 0xbc000000; /* (0.0, -1.) */
+        memset(res + 5, 0xff, 16);
+        regs.ecx = (unsigned long)(res + 1);
+        rc = x86_emulate(&ctxt, &emulops);
+        asm volatile ( "vmovups %%ymm1, %0" : "=m" (res[16]) );
+        if ( rc != X86EMUL_OKAY || !check_eip(vcvtph2ps) )
+            goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing vcvtps2ph $0,%ymm1,(%edx)...");
+        asm volatile ( "vmovups %0, %%ymm1\n"
+                       put_insn(vcvtps2ph, "vcvtps2ph $0, %%ymm1, (%1)")
+                       :: "m" (res[16]), "d" (NULL) );
+
+        set_insn(vcvtps2ph);
+        memset(res + 7, 0, 32);
+        regs.edx = (unsigned long)(res + 7);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vcvtps2ph) ||
+             memcmp(res + 1, res + 7, 16) ||
+             res[11] || res[12] || res[13] || res[14] )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
 #undef decl_insn
 #undef put_insn
 #undef set_insn

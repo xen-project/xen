@@ -60,6 +60,7 @@
 #define cpu_has_aesni           boot_cpu_has(X86_FEATURE_AESNI)
 #define cpu_has_xsave           boot_cpu_has(X86_FEATURE_XSAVE)
 #define cpu_has_avx             boot_cpu_has(X86_FEATURE_AVX)
+#define cpu_has_f16c            boot_cpu_has(X86_FEATURE_F16C)
 #define cpu_has_rdrand          boot_cpu_has(X86_FEATURE_RDRAND)
 #define cpu_has_hypervisor      boot_cpu_has(X86_FEATURE_HYPERVISOR)
 
