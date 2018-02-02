@@ -1471,14 +1471,17 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 #endif
 
 static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
-                              unsigned long iss)
+                              const union hsr hsr)
 {
     arm_hypercall_fn_t call = NULL;
 
     BUILD_BUG_ON(NR_hypercalls < ARRAY_SIZE(arm_hypercall_table) );
 
-    if ( iss != XEN_HYPERCALL_TAG )
-        domain_crash_synchronous();
+    if ( hsr.iss != XEN_HYPERCALL_TAG )
+    {
+        gprintk(XENLOG_WARNING, "Invalid HVC imm 0x%x\n", hsr.iss);
+        return inject_undef_exception(regs, hsr);
+    }
 
     if ( *nr >= ARRAY_SIZE(arm_hypercall_table) )
     {
@@ -2109,7 +2112,7 @@ void do_trap_guest_sync(struct cpu_user_regs *regs)
         if ( hsr.iss == 0 )
             return do_trap_hvc_smccc(regs);
         nr = regs->r12;
-        do_trap_hypercall(regs, &nr, hsr.iss);
+        do_trap_hypercall(regs, &nr, hsr);
         regs->r12 = (uint32_t)nr;
         break;
     }
@@ -2123,7 +2126,7 @@ void do_trap_guest_sync(struct cpu_user_regs *regs)
 #endif
         if ( hsr.iss == 0 )
             return do_trap_hvc_smccc(regs);
-        do_trap_hypercall(regs, &regs->x16, hsr.iss);
+        do_trap_hypercall(regs, &regs->x16, hsr);
         break;
     case HSR_EC_SMC64:
         /*
