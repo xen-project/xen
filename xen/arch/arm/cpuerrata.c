@@ -176,6 +176,7 @@ static int enable_psci_bp_hardening(void *data)
 DEFINE_PER_CPU_READ_MOSTLY(const char *, bp_harden_vecs);
 
 extern char hyp_traps_vector_bp_inv[];
+extern char hyp_traps_vector_ic_inv[];
 
 static void __maybe_unused
 install_bp_hardening_vecs(const struct arm_cpu_capabilities *entry,
@@ -198,6 +199,13 @@ static int enable_bp_inv_hardening(void *data)
 {
     install_bp_hardening_vecs(data, hyp_traps_vector_bp_inv,
                               "execute BPIALL");
+    return 0;
+}
+
+static int enable_ic_inv_hardening(void *data)
+{
+    install_bp_hardening_vecs(data, hyp_traps_vector_ic_inv,
+                              "execute ICIALLU");
     return 0;
 }
 
@@ -256,6 +264,11 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A17),
         .enable = enable_bp_inv_hardening,
+    },
+    {
+        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A15),
+        .enable = enable_ic_inv_hardening,
     },
 #endif
     {},
