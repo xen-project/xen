@@ -23,6 +23,11 @@
 
 #include <asm/processor.h>
 
+void do_trap_reset(struct cpu_user_regs *regs)
+{
+    do_unexpected_trap("Reset", regs);
+}
+
 void do_trap_undefined_instruction(struct cpu_user_regs *regs)
 {
     uint32_t pc = regs->pc;
