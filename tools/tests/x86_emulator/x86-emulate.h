@@ -99,6 +99,14 @@ static inline uint64_t xgetbv(uint32_t xcr)
     (res.c & (1U << 0)) != 0; \
 })
 
+#define cpu_has_fma ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(1, 0, &res, NULL); \
+    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
+        res.c = 0; \
+    (res.c & (1U << 12)) != 0; \
+})
+
 #define cpu_has_sse4_1 ({ \
     struct cpuid_leaf res; \
     emul_test_cpuid(1, 0, &res, NULL); \

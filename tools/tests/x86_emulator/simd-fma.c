@@ -21,24 +21,24 @@ ENTRY(fma_test);
 #if VEC_SIZE == 16
 # if FLOAT_SIZE == 4
 #  define addsub(x, y) __builtin_ia32_addsubps(x, y)
-#  if defined(__FMA4__)
+#  if defined(__FMA4__) || defined(__FMA__)
 #   define fmaddsub(x, y, z) __builtin_ia32_vfmaddsubps(x, y, z)
 #  endif
 # elif FLOAT_SIZE == 8
 #  define addsub(x, y) __builtin_ia32_addsubpd(x, y)
-#  if defined(__FMA4__)
+#  if defined(__FMA4__) || defined(__FMA__)
 #   define fmaddsub(x, y, z) __builtin_ia32_vfmaddsubpd(x, y, z)
 #  endif
 # endif
 #elif VEC_SIZE == 32
 # if FLOAT_SIZE == 4
 #  define addsub(x, y) __builtin_ia32_addsubps256(x, y)
-#  if defined(__FMA4__)
+#  if defined(__FMA4__) || defined(__FMA__)
 #   define fmaddsub(x, y, z) __builtin_ia32_vfmaddsubps256(x, y, z)
 #  endif
 # elif FLOAT_SIZE == 8
 #  define addsub(x, y) __builtin_ia32_addsubpd256(x, y)
-#  if defined(__FMA4__)
+#  if defined(__FMA4__) || defined(__FMA__)
 #   define fmaddsub(x, y, z) __builtin_ia32_vfmaddsubpd256(x, y, z)
 #  endif
 # endif

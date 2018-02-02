@@ -12,7 +12,7 @@ run: $(TARGET)
 	./$(TARGET)
 
 SIMD := sse sse2 sse4 avx
-FMA := fma4
+FMA := fma4 fma
 TESTCASES := blowfish $(SIMD) sse2-avx sse4-avx $(FMA)
 
 blowfish-cflags := ""
@@ -33,6 +33,9 @@ avx-flts := 4 8
 fma4-vecs := $(avx-vecs)
 fma4-ints :=
 fma4-flts := $(avx-flts)
+fma-vecs := $(avx-vecs)
+fma-ints :=
+fma-flts := $(avx-flts)
 
 # When converting SSE to AVX, have the compiler avoid XMM0 to widen
 # coverage of the VEX.vvvv checks in the emulator. We must not do this,

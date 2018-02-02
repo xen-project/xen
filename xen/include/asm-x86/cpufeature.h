@@ -50,6 +50,7 @@
 #define cpu_has_vmx             boot_cpu_has(X86_FEATURE_VMX)
 #define cpu_has_eist            boot_cpu_has(X86_FEATURE_EIST)
 #define cpu_has_ssse3           boot_cpu_has(X86_FEATURE_SSSE3)
+#define cpu_has_fma             boot_cpu_has(X86_FEATURE_FMA)
 #define cpu_has_cx16            boot_cpu_has(X86_FEATURE_CX16)
 #define cpu_has_pdcm            boot_cpu_has(X86_FEATURE_PDCM)
 #define cpu_has_pcid            boot_cpu_has(X86_FEATURE_PCID)

@@ -12,6 +12,7 @@
 #include "sse4-avx.h"
 #include "avx.h"
 #include "fma4.h"
+#include "fma.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -51,6 +52,11 @@ static bool simd_check_avx(void)
 static bool simd_check_fma4(void)
 {
     return cpu_has_fma4;
+}
+
+static bool simd_check_fma(void)
+{
+    return cpu_has_fma;
 }
 
 static void simd_set_regs(struct cpu_user_regs *regs)
@@ -155,6 +161,12 @@ static const struct {
     SIMD(FMA4 scalar double,     fma4,        f8),
     SIMD(FMA4 128bit double,     fma4,      16f8),
     SIMD(FMA4 256bit double,     fma4,      32f8),
+    SIMD(FMA scalar single,      fma,         f4),
+    SIMD(FMA 128bit single,      fma,       16f4),
+    SIMD(FMA 256bit single,      fma,       32f4),
+    SIMD(FMA scalar double,      fma,         f8),
+    SIMD(FMA 128bit double,      fma,       16f8),
+    SIMD(FMA 256bit double,      fma,       32f8),
 #undef SIMD_
 #undef SIMD
 };
