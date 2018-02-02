@@ -26,8 +26,9 @@
 
 #include "decode.h"
 
-static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
-                       mmio_info_t *info)
+static enum io_state handle_read(const struct mmio_handler *handler,
+                                 struct vcpu *v,
+                                 mmio_info_t *info)
 {
     const struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -40,7 +41,7 @@ static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
     uint8_t size = (1 << dabt.size) * 8;
 
     if ( !handler->ops->read(v, info, &r, handler->priv) )
-        return 0;
+        return IO_ABORT;
 
     /*
      * Sign extend if required.
@@ -60,17 +61,20 @@ static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
 
     set_user_reg(regs, dabt.reg, r);
 
-    return 1;
+    return IO_HANDLED;
 }
 
-static int handle_write(const struct mmio_handler *handler, struct vcpu *v,
-                        mmio_info_t *info)
+static enum io_state handle_write(const struct mmio_handler *handler,
+                                  struct vcpu *v,
+                                  mmio_info_t *info)
 {
     const struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+    int ret;
 
-    return handler->ops->write(v, info, get_user_reg(regs, dabt.reg),
-                               handler->priv);
+    ret = handler->ops->write(v, info, get_user_reg(regs, dabt.reg),
+                              handler->priv);
+    return ret ? IO_HANDLED : IO_ABORT;
 }
 
 /* This function assumes that mmio regions are not overlapped */
@@ -103,9 +107,9 @@ static const struct mmio_handler *find_mmio_handler(struct domain *d,
     return handler;
 }
 
-int try_handle_mmio(struct cpu_user_regs *regs,
-                    const union hsr hsr,
-                    paddr_t gpa)
+enum io_state try_handle_mmio(struct cpu_user_regs *regs,
+                              const union hsr hsr,
+                              paddr_t gpa)
 {
     struct vcpu *v = current;
     const struct mmio_handler *handler = NULL;
@@ -119,11 +123,11 @@ int try_handle_mmio(struct cpu_user_regs *regs,
 
     handler = find_mmio_handler(v->domain, info.gpa);
     if ( !handler )
-        return 0;
+        return IO_UNHANDLED;
 
     /* All the instructions used on emulated MMIO region should be valid */
     if ( !dabt.valid )
-        return 0;
+        return IO_ABORT;
 
     /*
      * Erratum 766422: Thumb store translation fault to Hypervisor may
@@ -138,7 +142,7 @@ int try_handle_mmio(struct cpu_user_regs *regs,
         if ( rc )
         {
             gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
-            return 0;
+            return IO_ABORT;
         }
     }
 

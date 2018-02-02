@@ -1964,10 +1964,21 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
          *
          * Note that emulated region cannot be executed
          */
-        if ( is_data && try_handle_mmio(regs, hsr, gpa) )
+        if ( is_data )
         {
-            advance_pc(regs, hsr);
-            return;
+            enum io_state state = try_handle_mmio(regs, hsr, gpa);
+
+            switch ( state )
+            {
+            case IO_ABORT:
+                goto inject_abt;
+            case IO_HANDLED:
+                advance_pc(regs, hsr);
+                return;
+            case IO_UNHANDLED:
+                /* IO unhandled, try another way to handle it. */
+                break;
+            }
         }
 
         /*
@@ -1988,6 +1999,7 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
                 hsr.bits, xabt.fsc);
     }
 
+inject_abt:
     gdprintk(XENLOG_DEBUG, "HSR=0x%x pc=%#"PRIregister" gva=%#"PRIvaddr
              " gpa=%#"PRIpaddr"\n", hsr.bits, regs->pc, gva, gpa);
     if ( is_data )
