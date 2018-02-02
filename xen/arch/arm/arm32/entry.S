@@ -160,6 +160,44 @@ GLOBAL(hyp_traps_vector)
         b trap_irq                      /* 0x18 - IRQ */
         b trap_fiq                      /* 0x1c - FIQ */
 
+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+
+        .align 5
+GLOBAL(hyp_traps_vector_bp_inv)
+        /*
+         * We encode the exception entry in the bottom 3 bits of
+         * SP, and we have to guarantee to be 8 bytes aligned.
+         */
+        add sp, sp, #1                  /* Reset            7 */
+        add sp, sp, #1                  /* Undef            6 */
+        add sp, sp, #1                  /* Hypervisor Call  5 */
+        add sp, sp, #1                  /* Prefetch abort   4 */
+        add sp, sp, #1                  /* Data abort       3 */
+        add sp, sp, #1                  /* Hypervisor       2 */
+        add sp, sp, #1                  /* IRQ              1 */
+        nop                             /* FIQ              0 */
+
+        mcr	p15, 0, r0, c7, c5, 6	    /* BPIALL */
+        isb
+
+.macro vect_br val, targ
+        eor     sp, sp, #\val
+        tst     sp, #7
+        eorne   sp, sp, #\val
+        beq     \targ
+.endm
+
+        vect_br 0, trap_fiq
+        vect_br 1, trap_irq
+        vect_br 2, trap_guest_sync
+        vect_br 3, trap_data_abort
+        vect_br 4, trap_prefetch_abort
+        vect_br 5, trap_hypervisor_call
+        vect_br 6, trap_undefined_instruction
+        vect_br 7, trap_reset
+
+#endif /* CONFIG_HARDEN_BRANCH_PREDICTOR */
+
 DEFINE_TRAP_ENTRY(reset)
 DEFINE_TRAP_ENTRY(undefined_instruction)
 DEFINE_TRAP_ENTRY(hypervisor_call)

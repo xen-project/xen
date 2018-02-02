@@ -198,6 +198,13 @@ install_bp_hardening_vecs(const struct arm_cpu_capabilities *entry,
     this_cpu(bp_harden_vecs) = hyp_vecs;
 }
 
+static int enable_bp_inv_hardening(void *data)
+{
+    install_bp_hardening_vecs(data, hyp_traps_vector_bp_inv,
+                              "execute BPIALL");
+    return 0;
+}
+
 #endif
 
 #define MIDR_RANGE(model, min, max)     \
@@ -282,6 +289,18 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
         .enable = enable_psci_bp_hardening,
+    },
+#endif
+#ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
+    {
+        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A12),
+        .enable = enable_bp_inv_hardening,
+    },
+    {
+        .capability = ARM_HARDEN_BRANCH_PREDICTOR,
+        MIDR_ALL_VERSIONS(MIDR_CORTEX_A17),
+        .enable = enable_bp_inv_hardening,
     },
 #endif
     {},
