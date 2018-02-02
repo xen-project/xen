@@ -125,7 +125,7 @@ trap_##trap:                                                            \
 
         .align 5
 GLOBAL(hyp_traps_vector)
-        .word 0                         /* 0x00 - Reset */
+        b trap_reset                    /* 0x00 - Reset */
         b trap_undefined_instruction    /* 0x04 - Undefined Instruction */
         b trap_supervisor_call          /* 0x08 - Supervisor Call */
         b trap_prefetch_abort           /* 0x0c - Prefetch Abort */
@@ -134,6 +134,7 @@ GLOBAL(hyp_traps_vector)
         b trap_irq                      /* 0x18 - IRQ */
         b trap_fiq                      /* 0x1c - FIQ */
 
+DEFINE_TRAP_ENTRY(reset)
 DEFINE_TRAP_ENTRY(undefined_instruction)
 DEFINE_TRAP_ENTRY(supervisor_call)
 DEFINE_TRAP_ENTRY(prefetch_abort)
