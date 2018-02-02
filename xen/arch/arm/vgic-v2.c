@@ -348,7 +348,6 @@ static int vgic_v2_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
 bad_width:
     printk(XENLOG_G_ERR "%pv: vGICD: bad read width %d r%d offset %#08x\n",
            v, dabt.size, dabt.reg, gicd_reg);
-    domain_crash_synchronous();
     return 0;
 
 read_as_zero_32:
@@ -613,7 +612,6 @@ bad_width:
     printk(XENLOG_G_ERR
            "%pv: vGICD: bad write width %d r%d=%"PRIregister" offset %#08x\n",
            v, dabt.size, dabt.reg, r, gicd_reg);
-    domain_crash_synchronous();
     return 0;
 
 write_ignore_32:

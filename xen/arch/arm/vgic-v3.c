@@ -328,7 +328,6 @@ static int __vgic_v3_rdistr_rd_mmio_read(struct vcpu *v, mmio_info_t *info,
 bad_width:
     printk(XENLOG_G_ERR "%pv vGICR: bad read width %d r%d offset %#08x\n",
            v, dabt.size, dabt.reg, gicr_reg);
-    domain_crash_synchronous();
     return 0;
 
 read_as_zero_64:
@@ -648,7 +647,6 @@ bad_width:
     printk(XENLOG_G_ERR
           "%pv: vGICR: bad write width %d r%d=%"PRIregister" offset %#08x\n",
           v, dabt.size, dabt.reg, r, gicr_reg);
-    domain_crash_synchronous();
     return 0;
 
 write_ignore_64:
@@ -760,7 +758,6 @@ static int __vgic_v3_distr_common_mmio_read(const char *name, struct vcpu *v,
 bad_width:
     printk(XENLOG_G_ERR "%pv: %s: bad read width %d r%d offset %#08x\n",
            v, name, dabt.size, dabt.reg, reg);
-    domain_crash_synchronous();
     return 0;
 
 read_as_zero:
@@ -876,7 +873,6 @@ bad_width:
     printk(XENLOG_G_ERR
            "%pv: %s: bad write width %d r%d=%"PRIregister" offset %#08x\n",
            v, name, dabt.size, dabt.reg, r, reg);
-    domain_crash_synchronous();
     return 0;
 
 write_ignore_32:
@@ -937,7 +933,6 @@ static int vgic_v3_rdistr_sgi_mmio_read(struct vcpu *v, mmio_info_t *info,
 bad_width:
     printk(XENLOG_G_ERR "%pv: vGICR: SGI: bad read width %d r%d offset %#08x\n",
            v, dabt.size, dabt.reg, gicr_reg);
-    domain_crash_synchronous();
     return 0;
 
 read_as_zero_32:
@@ -1017,7 +1012,6 @@ bad_width:
     printk(XENLOG_G_ERR
            "%pv: vGICR: SGI: bad write width %d r%d=%"PRIregister" offset %#08x\n",
            v, dabt.size, dabt.reg, r, gicr_reg);
-    domain_crash_synchronous();
     return 0;
 
 write_ignore_32:
@@ -1268,7 +1262,6 @@ static int vgic_v3_distr_mmio_read(struct vcpu *v, mmio_info_t *info,
 bad_width:
     printk(XENLOG_G_ERR "%pv: vGICD: bad read width %d r%d offset %#08x\n",
            v, dabt.size, dabt.reg, gicd_reg);
-    domain_crash_synchronous();
     return 0;
 
 read_as_zero_32:
@@ -1456,7 +1449,6 @@ bad_width:
     printk(XENLOG_G_ERR
            "%pv: vGICD: bad write width %d r%d=%"PRIregister" offset %#08x\n",
            v, dabt.size, dabt.reg, r, gicd_reg);
-    domain_crash_synchronous();
     return 0;
 
 write_ignore_32:

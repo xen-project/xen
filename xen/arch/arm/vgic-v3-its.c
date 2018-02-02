@@ -1136,7 +1136,6 @@ read_reserved:
 bad_width:
     printk(XENLOG_G_ERR "vGITS: bad read width %d r%d offset %#04lx\n",
            info->dabt.size, info->dabt.reg, (unsigned long)info->gpa & 0xffff);
-    domain_crash_synchronous();
 
     return 0;
 }
@@ -1445,8 +1444,6 @@ write_reserved:
 bad_width:
     printk(XENLOG_G_ERR "vGITS: bad write width %d r%d offset %#08lx\n",
            info->dabt.size, info->dabt.reg, (unsigned long)info->gpa & 0xffff);
-
-    domain_crash_synchronous();
 
     return 0;
 }

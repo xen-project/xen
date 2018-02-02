@@ -296,7 +296,6 @@ static int vpl011_mmio_read(struct vcpu *v,
 bad_width:
     gprintk(XENLOG_ERR, "vpl011: bad read width %d r%d offset %#08x\n",
             dabt.size, dabt.reg, vpl011_reg);
-    domain_crash_synchronous();
     return 0;
 
 }
@@ -366,7 +365,6 @@ write_ignore:
 bad_width:
     gprintk(XENLOG_ERR, "vpl011: bad write width %d r%d offset %#08x\n",
             dabt.size, dabt.reg, vpl011_reg);
-    domain_crash_synchronous();
     return 0;
 
 }
