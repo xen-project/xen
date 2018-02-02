@@ -1,21 +1,21 @@
 /******************************************************************************
  * x86_emulate.h
- * 
+ *
  * Generic x86 (32-bit and 64-bit) instruction decoder and emulator.
- * 
+ *
  * Copyright (c) 2005-2007 Keir Fraser
  * Copyright (c) 2005-2007 XenSource Inc.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
@@ -180,7 +180,7 @@ struct x86_emulate_state;
 /*
  * These operations represent the instruction emulator's interface to memory,
  * I/O ports, privileged state... pretty much everything other than GPRs.
- * 
+ *
  * NOTES:
  *  1. If the access fails (cannot emulate, or a standard access faults) then
  *     it is up to the memop to propagate the fault to the guest VM via
