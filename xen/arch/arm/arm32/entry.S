@@ -127,6 +127,10 @@ trap_##trap:                                                            \
         cpsie iflags;                                                   \
         adr lr, return_from_trap;                                       \
         mov r0, sp;                                                     \
+        /*                                                              \
+         * Save the stack pointer in r11. It will be restored after the \
+         * trap has been handled (see return_from_trap).                \
+         */                                                             \
         mov r11, sp;                                                    \
         bic sp, #7; /* Align the stack pointer (noop on guest trap) */  \
         b do_trap_##trap
@@ -217,6 +221,10 @@ DEFINE_TRAP_ENTRY_NOIRQ(irq)
 DEFINE_TRAP_ENTRY_NOIRQ(fiq)
 
 return_from_trap:
+        /*
+         * Restore the stack pointer from r11. It was saved on exception
+         * entry (see __DEFINE_TRAP_ENTRY).
+         */
         mov sp, r11
 ENTRY(return_to_new_vcpu32)
         ldr r11, [sp, #UREGS_cpsr]
