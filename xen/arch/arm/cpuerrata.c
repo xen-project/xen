@@ -166,6 +166,36 @@ static int enable_psci_bp_hardening(void *data)
 
 #endif /* CONFIG_ARM64_HARDEN_BRANCH_PREDICTOR */
 
+/* Hardening Branch predictor code for Arm32 */
+#ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
+
+/*
+ * Per-CPU vector tables to use when returning to the guests. They will
+ * only be used on platform requiring to harden the branch predictor.
+ */
+DEFINE_PER_CPU_READ_MOSTLY(const char *, bp_harden_vecs);
+
+extern char hyp_traps_vector_bp_inv[];
+
+static void __maybe_unused
+install_bp_hardening_vecs(const struct arm_cpu_capabilities *entry,
+                          const char *hyp_vecs, const char *desc)
+{
+    /*
+     * Enable callbacks are called on every CPU based on the
+     * capabilities. So double-check whether the CPU matches the
+     * entry.
+     */
+    if ( !entry->matches(entry) )
+        return;
+
+    printk(XENLOG_INFO "CPU%u will %s on guest exit\n",
+           smp_processor_id(), desc);
+    this_cpu(bp_harden_vecs) = hyp_vecs;
+}
+
+#endif
+
 #define MIDR_RANGE(model, min, max)     \
     .matches = is_affected_midr_range,  \
     .midr_model = model,                \
