@@ -20,8 +20,11 @@
 #include <xen/spinlock.h>
 #include <xen/sched.h>
 #include <xen/sort.h>
+#include <asm/cpuerrata.h>
 #include <asm/current.h>
 #include <asm/mmio.h>
+
+#include "decode.h"
 
 static int handle_read(const struct mmio_handler *handler, struct vcpu *v,
                        mmio_info_t *info)
@@ -100,19 +103,49 @@ static const struct mmio_handler *find_mmio_handler(struct domain *d,
     return handler;
 }
 
-int handle_mmio(mmio_info_t *info)
+int try_handle_mmio(struct cpu_user_regs *regs,
+                    const union hsr hsr,
+                    paddr_t gpa)
 {
     struct vcpu *v = current;
     const struct mmio_handler *handler = NULL;
+    const struct hsr_dabt dabt = hsr.dabt;
+    mmio_info_t info = {
+        .gpa = gpa,
+        .dabt = dabt
+    };
 
-    handler = find_mmio_handler(v->domain, info->gpa);
+    ASSERT(hsr.ec == HSR_EC_DATA_ABORT_LOWER_EL);
+
+    handler = find_mmio_handler(v->domain, info.gpa);
     if ( !handler )
         return 0;
 
-    if ( info->dabt.write )
-        return handle_write(handler, v, info);
+    /* All the instructions used on emulated MMIO region should be valid */
+    if ( !dabt.valid )
+        return 0;
+
+    /*
+     * Erratum 766422: Thumb store translation fault to Hypervisor may
+     * not have correct HSR Rt value.
+     */
+    if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) &&
+         dabt.write )
+    {
+        int rc;
+
+        rc = decode_instruction(regs, &info.dabt);
+        if ( rc )
+        {
+            gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
+            return 0;
+        }
+    }
+
+    if ( info.dabt.write )
+        return handle_write(handler, v, &info);
     else
-        return handle_read(handler, v, info);
+        return handle_read(handler, v, &info);
 }
 
 void register_mmio_handler(struct domain *d,

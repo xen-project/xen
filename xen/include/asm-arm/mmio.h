@@ -56,7 +56,9 @@ struct vmmio {
     struct mmio_handler *handlers;
 };
 
-extern int handle_mmio(mmio_info_t *info);
+int try_handle_mmio(struct cpu_user_regs *regs,
+                    const union hsr hsr,
+                    paddr_t gpa);
 void register_mmio_handler(struct domain *d,
                            const struct mmio_handler_ops *ops,
                            paddr_t addr, paddr_t size, void *priv);

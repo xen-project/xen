@@ -51,8 +51,6 @@
 #include <asm/vgic.h>
 #include <asm/vtimer.h>
 
-#include "decode.h"
-
 /* The base of the stack must always be double-word aligned, which means
  * that both the kernel half of struct cpu_user_regs (which is pushed in
  * entry.S) and struct cpu_info (which lives at the bottom of a Xen
@@ -1862,45 +1860,6 @@ static inline bool hpfar_is_valid(bool s1ptw, uint8_t fsc)
      * are currently not supported by Xen.
      */
     return s1ptw || (fsc == FSC_FLT_TRANS && !check_workaround_834220());
-}
-
-static bool try_handle_mmio(struct cpu_user_regs *regs,
-                            const union hsr hsr,
-                            paddr_t gpa)
-{
-    const struct hsr_dabt dabt = hsr.dabt;
-    mmio_info_t info = {
-        .gpa = gpa,
-        .dabt = dabt
-    };
-    int rc;
-
-    ASSERT(hsr.ec == HSR_EC_DATA_ABORT_LOWER_EL);
-
-    /* stage-1 page table should never live in an emulated MMIO region */
-    if ( dabt.s1ptw )
-        return false;
-
-    /* All the instructions used on emulated MMIO region should be valid */
-    if ( !dabt.valid )
-        return false;
-
-    /*
-     * Erratum 766422: Thumb store translation fault to Hypervisor may
-     * not have correct HSR Rt value.
-     */
-    if ( check_workaround_766422() && (regs->cpsr & PSR_THUMB) &&
-         dabt.write )
-    {
-        rc = decode_instruction(regs, &info.dabt);
-        if ( rc )
-        {
-            gprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
-            return false;
-        }
-    }
-
-    return !!handle_mmio(&info);
 }
 
 /*
