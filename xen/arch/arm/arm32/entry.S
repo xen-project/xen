@@ -34,6 +34,20 @@
         blne save_guest_regs
 
 save_guest_regs:
+#ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
+        /*
+         * Restore vectors table to the default as it may have been
+         * changed when returning to the guest (see
+         * return_to_hypervisor). We need to do that early (e.g before
+         * any interrupts are unmasked) because hardened vectors requires
+         * SP to be 8 bytes aligned. This does not hold when running in
+         * the hypervisor.
+         */
+        ldr r1, =hyp_traps_vector
+        mcr p15, 4, r1, c12, c0, 0
+        isb
+#endif
+
         ldr r11, =0xffffffff  /* Clobber SP which is only valid for hypervisor frames. */
         str r11, [sp, #UREGS_sp]
         SAVE_ONE_BANKED(SP_usr)
@@ -167,12 +181,37 @@ return_to_guest:
         RESTORE_ONE_BANKED(R11_fiq); RESTORE_ONE_BANKED(R12_fiq);
         /* Fall thru */
 return_to_hypervisor:
-        cpsid i
+        cpsid ai
         ldr lr, [sp, #UREGS_lr]
         ldr r11, [sp, #UREGS_pc]
         msr ELR_hyp, r11
         ldr r11, [sp, #UREGS_cpsr]
         msr SPSR_hyp, r11
+#ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
+        /*
+         * Hardening branch predictor may require to setup a different
+         * vector tables before returning to the guests. Those vectors
+         * may rely on the state of registers that does not hold when
+         * running in the hypervisor (e.g SP is 8 bytes aligned). So setup
+         * HVBAR very late.
+         *
+         * Default vectors table will be restored on exit (see
+         * save_guest_regs).
+         */
+        mov r9, #0                      /* vector tables = NULL */
+        /*
+         * Load vector tables pointer from the per-cpu bp_harden_vecs
+         * when returning to the guest only.
+         */
+        and r11, #PSR_MODE_MASK
+        cmp r11, #PSR_MODE_HYP
+        ldrne r11, =per_cpu__bp_harden_vecs
+        mrcne p15, 4, r10, c13, c0, 2   /* r10 = per-cpu offset (HTPIDR) */
+        addne r11, r11, r10             /* r11 = offset of the vector tables */
+        ldrne r9, [r11]                 /* r9  = vector tables */
+        cmp r9, #0                      /* Only update HVBAR when the vector */
+        mcrne p15, 4, r9, c12, c0, 0    /* tables is not NULL. */
+#endif
         pop {r0-r12}
         add sp, #(UREGS_SP_usr - UREGS_sp); /* SP, LR, SPSR, PC */
         clrex
