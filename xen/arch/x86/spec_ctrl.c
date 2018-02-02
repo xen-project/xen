@@ -50,7 +50,18 @@ static int __init parse_bti(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !strncmp(s, "thunk=", 6) )
+        val = parse_bool(s, ss);
+        if ( !val )
+        {
+            opt_thunk = THUNK_JMP;
+            opt_ibrs = 0;
+            opt_ibpb = false;
+            opt_rsb_native = false;
+            opt_rsb_vmexit = false;
+        }
+        else if ( val > 0 )
+            rc = -EINVAL;
+        else if ( !strncmp(s, "thunk=", 6) )
         {
             s += 6;
 
@@ -71,6 +82,11 @@ static int __init parse_bti(const char *s)
             opt_rsb_native = val;
         else if ( (val = parse_boolean("rsb_vmexit", s, ss)) >= 0 )
             opt_rsb_vmexit = val;
+        else if ( (val = parse_boolean("rsb", s, ss)) >= 0 )
+        {
+            opt_rsb_native = val;
+            opt_rsb_vmexit = val;
+        }
         else
             rc = -EINVAL;
 

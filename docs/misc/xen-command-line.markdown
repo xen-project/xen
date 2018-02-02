@@ -246,7 +246,7 @@ enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
 ### bti (x86)
-> `= List of [ thunk=retpoline|lfence|jmp, ibrs=<bool>, ibpb=<bool>, rsb_{vmexit,native}=<bool> ]`
+> `= List of [ <bool>, thunk=retpoline|lfence|jmp, ibrs=<bool>, ibpb=<bool>, rsb=<bool>, rsb_{vmexit,native}=<bool> ]`
 
 Branch Target Injection controls.  By default, Xen will pick the most
 appropriate BTI mitigations based on compiled in support, loaded microcode,
@@ -254,6 +254,9 @@ and hardware details.
 
 **WARNING: Any use of this option may interfere with heuristics.  Use with
 extreme care.**
+
+A (negative) boolean value can be specified to turn off all mitigations.
+(Use of a positive boolean value is invalid.)
 
 If Xen was compiled with INDIRECT_THUNK support, `thunk=` can be used to
 select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
@@ -268,9 +271,10 @@ functionality is still set up so IBRS can be virtualised for guests.
 On hardware supporting IBPB, the `ibpb=` option can be used to prevent Xen
 from issuing Branch Prediction Barriers on vcpu context switches.
 
-The `rsb_vmexit=` and `rsb_native=` options can be used to fine tune when the
-RSB gets overwritten.  There are individual controls for an entry from HVM
-context, and an entry from a native (PV or Xen) context.
+The `rsb=`, `rsb_vmexit=` and `rsb_native=` options can be used to control
+when the RSB gets overwritten.  The former control all RSB overwriting, while
+the latter two can be used to fine tune overwriting on from HVM context, and
+an entry from a native (PV or Xen) context.
 
 ### xenheap\_megabytes (arm32)
 > `= <size>`
