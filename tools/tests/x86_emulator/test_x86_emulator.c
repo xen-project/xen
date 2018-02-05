@@ -743,13 +743,13 @@ int main(int argc, char **argv)
         regs.eflags |= (i & 0x100) ? X86_EFLAGS_AF : 0;
         if ( i & 0x400 )
             __asm__ (
-                "pushf; and $0xffffffee,(%%esp); or %1,(%%esp); popf; das; "
+                "pushf; andl $~0x11,(%%esp); or %1,(%%esp); popf; das; "
                 "pushf; popl %1"
                 : "=a" (bcdres_native), "=r" (regs.eflags)
                 : "0" (i & 0xff), "1" (regs.eflags) );
         else
             __asm__ (
-                "pushf; and $0xffffffee,(%%esp); or %1,(%%esp); popf; daa; "
+                "pushf; andl $~0x11,(%%esp); or %1,(%%esp); popf; daa; "
                 "pushf; popl %1"
                 : "=a" (bcdres_native), "=r" (regs.eflags)
                 : "0" (i & 0xff), "1" (regs.eflags) );
