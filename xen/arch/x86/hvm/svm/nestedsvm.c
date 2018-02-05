@@ -800,8 +800,13 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct vmcb_struct *ns_vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    ASSERT(svm->ns_gif == 0);
+    if ( vmcb->_vintr.fields.vgif_enable )
+        ASSERT(vmcb->_vintr.fields.vgif == 0);
+    else
+        ASSERT(svm->ns_gif == 0);
+
     ns_vmcb = nv->nv_vvmcx;
 
     if (nv->nv_vmexit_pending) {
@@ -1343,8 +1348,13 @@ nestedsvm_vmexit_defer(struct vcpu *v,
     uint64_t exitcode, uint64_t exitinfo1, uint64_t exitinfo2)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    nestedsvm_vcpu_clgi(v);
+    if ( vmcb->_vintr.fields.vgif_enable )
+        vmcb->_vintr.fields.vgif = 0;
+    else
+        nestedsvm_vcpu_clgi(v);
+
     svm->ns_vmexit.exitcode = exitcode;
     svm->ns_vmexit.exitinfo1 = exitinfo1;
     svm->ns_vmexit.exitinfo2 = exitinfo2;
