@@ -1620,7 +1620,12 @@ void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
 {
     unsigned int inst_len;
 
-    if ( !nestedhvm_enabled(v->domain) ) {
+    /*
+     * STGI doesn't require SVME to be set to be used.  See AMD APM vol
+     * 2 section 15.4 for details.
+     */
+    if ( !nestedhvm_enabled(v->domain) )
+    {
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
@@ -1640,7 +1645,8 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
     uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vintr_t intr;
 
-    if ( !nestedhvm_enabled(v->domain) ) {
+    if ( !nsvm_efer_svm_enabled(v) )
+    {
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }

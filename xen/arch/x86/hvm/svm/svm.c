@@ -2193,7 +2193,6 @@ svm_vmexit_do_vmrun(struct cpu_user_regs *regs,
 {
     if ( !nsvm_efer_svm_enabled(v) )
     {
-        gdprintk(XENLOG_ERR, "VMRUN: nestedhvm disabled, injecting #UD\n");
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
@@ -2248,7 +2247,6 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
 
     if ( !nsvm_efer_svm_enabled(v) ) 
     {
-        gdprintk(XENLOG_ERR, "VMLOAD: nestedhvm disabled, injecting #UD\n");
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
@@ -2284,7 +2282,6 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
 
     if ( !nsvm_efer_svm_enabled(v) ) 
     {
-        gdprintk(XENLOG_ERR, "VMSAVE: nestedhvm disabled, injecting #UD\n");
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
     }
@@ -2758,6 +2755,11 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_INVLPGA:
+        if ( !nsvm_efer_svm_enabled(v) )
+        {
+            hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+            break;
+        }
         if ( (inst_len = __get_instruction_length(v, INSTR_INVLPGA)) == 0 )
             break;
         svm_invlpga_intercept(v, regs->rax, regs->ecx);
