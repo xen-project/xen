@@ -445,6 +445,20 @@ static const opcode_desc_t xop_table[] = {
     DstReg|SrcImm|ModRM,
 };
 
+static const struct ext8f08_table {
+    uint8_t simd_size:5;
+    uint8_t two_op:1;
+    uint8_t four_op:1;
+} ext8f08_table[256] = {
+};
+
+static const struct ext8f09_table {
+    uint8_t simd_size:5;
+    uint8_t two_op:1;
+} ext8f09_table[256] = {
+    [0x01 ... 0x02] = { .two_op = 1 },
+};
+
 #define REX_PREFIX 0x40
 #define REX_B 0x01
 #define REX_X 0x02
@@ -2722,7 +2736,7 @@ x86_decode(
             }
             break;
 
-        case vex_0f38:
+        case ext_0f38:
             d = ext0f38_table[b].to_mem ? DstMem | SrcReg
                                         : DstReg | SrcMem;
             if ( ext0f38_table[b].two_op )
@@ -2732,7 +2746,14 @@ x86_decode(
             state->simd_size = ext0f38_table[b].simd_size;
             break;
 
-        case vex_0f3a:
+        case ext_8f09:
+            if ( ext8f09_table[b].two_op )
+                d |= TwoOp;
+            state->simd_size = ext8f09_table[b].simd_size;
+            break;
+
+        case ext_0f3a:
+        case ext_8f08:
             /*
              * Cannot update d here yet, as the immediate operand still
              * needs fetching.
@@ -2917,6 +2938,15 @@ x86_decode(
         break;
 
     case ext_8f08:
+        d = DstReg | SrcMem;
+        if ( ext8f08_table[b].two_op )
+            d |= TwoOp;
+        else if ( ext8f08_table[b].four_op && !mode_64bit() )
+            imm1 &= 0x7f;
+        state->desc = d;
+        state->simd_size = ext8f08_table[b].simd_size;
+        break;
+
     case ext_8f09:
     case ext_8f0a:
         break;
