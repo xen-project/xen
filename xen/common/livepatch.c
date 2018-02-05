@@ -1170,9 +1170,9 @@ static void livepatch_do_action(void)
     case LIVEPATCH_ACTION_REPLACE:
         rc = 0;
         /*
-	 * N.B: Use 'applied_list' member, not 'list'. We also abuse the
-	 * the 'normal' list iterator as the list is an RCU one.
-	 */
+         * N.B: Use 'applied_list' member, not 'list'. We also abuse the
+         * the 'normal' list iterator as the list is an RCU one.
+         */
         list_for_each_entry_safe_reverse ( other, tmp, &applied_list, applied_list )
         {
             other->rc = revert_payload(other);
