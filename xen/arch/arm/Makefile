@@ -16,6 +16,7 @@ obj-y += domain_build.o
 obj-y += domctl.o
 obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += gic.o
+obj-y += gic-vgic.o
 obj-y += gic-v2.o
 obj-$(CONFIG_HAS_GICV3) += gic-v3.o
 obj-$(CONFIG_HAS_ITS) += gic-v3-its.o

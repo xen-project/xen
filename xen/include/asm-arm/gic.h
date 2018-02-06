@@ -220,6 +220,8 @@ enum gic_version {
     GIC_V3,
 };
 
+DECLARE_PER_CPU(uint64_t, lr_mask);
+
 extern enum gic_version gic_hw_version(void);
 
 /* Program the IRQ type into the GIC */
@@ -372,6 +374,7 @@ struct gic_hw_operations {
     void (*do_LPI)(unsigned int lpi);
 };
 
+extern const struct gic_hw_operations *gic_hw_ops;
 void register_gic_ops(const struct gic_hw_operations *ops);
 int gic_make_hwdom_dt_node(const struct domain *d,
                            const struct dt_device_node *gic,
