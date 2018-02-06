@@ -27,7 +27,7 @@
 #include <asm/gic.h>
 #include <asm/vgic.h>
 
-unsigned int __read_mostly nr_irqs = NR_IRQS;
+const unsigned int nr_irqs = NR_IRQS;
 
 static unsigned int local_irqs_type[NR_LOCAL_IRQS];
 static DEFINE_SPINLOCK(local_irqs_type_lock);

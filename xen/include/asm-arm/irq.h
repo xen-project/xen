@@ -34,7 +34,7 @@ struct arch_irq_desc {
 /* This is a spurious interrupt ID which never makes it into the GIC code. */
 #define INVALID_IRQ     1023
 
-extern unsigned int nr_irqs;
+extern const unsigned int nr_irqs;
 #define nr_static_irqs NR_IRQS
 #define arch_hwdom_irqs(domid) NR_IRQS
 
