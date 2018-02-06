@@ -1784,7 +1784,7 @@ void vmx_vmentry_failure(void)
          error == VMX_INSN_INVALID_HOST_STATE )
         vmcs_dump_vcpu(curr);
 
-    domain_crash_synchronous();
+    domain_crash(curr->domain);
 }
 
 void vmx_do_resume(struct vcpu *v)

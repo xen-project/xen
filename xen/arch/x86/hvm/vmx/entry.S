@@ -128,7 +128,7 @@ UNLIKELY_END(realmode)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         call vmx_vmentry_failure
-        BUG  /* vmx_vmentry_failure() shouldn't return. */
+        jmp  .Lvmx_process_softirqs
 
 ENTRY(vmx_asm_do_vmentry)
         GET_CURRENT(bx)
