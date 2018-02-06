@@ -223,7 +223,7 @@ void __init init_speculation_mitigations(void)
              */
             else if ( retpoline_safe() )
                 thunk = THUNK_RETPOLINE;
-            else
+            else if ( boot_cpu_has(X86_FEATURE_IBRSB) )
                 ibrs = true;
         }
         /* Without compiler thunk support, use IBRS if available. */
