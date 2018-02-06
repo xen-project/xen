@@ -82,9 +82,23 @@ static inline uint32_t smccc_get_owner(register_t funcid)
 #define ARM_SMCCC_OWNER_TRUSTED_OS_END  63
 
 /* List of generic function numbers */
-#define ARM_SMCCC_FUNC_CALL_COUNT       0xFF00
-#define ARM_SMCCC_FUNC_CALL_UID         0xFF01
-#define ARM_SMCCC_FUNC_CALL_REVISION    0xFF03
+#define ARM_SMCCC_CALL_COUNT_FID(owner)             \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_##owner,     \
+                       0xFF00)
+
+#define ARM_SMCCC_CALL_UID_FID(owner)               \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_##owner,     \
+                       0xFF01)
+
+#define ARM_SMCCC_REVISION_FID(owner)               \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_##owner,     \
+                       0xFF03)
 
 /* Only one error code defined in SMCCC */
 #define ARM_SMCCC_ERR_UNKNOWN_FUNCTION  (-1)
