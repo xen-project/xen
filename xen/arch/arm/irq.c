@@ -534,18 +534,15 @@ int release_guest_irq(struct domain *d, unsigned int virq)
     struct irq_desc *desc;
     struct irq_guest *info;
     unsigned long flags;
-    struct pending_irq *p;
     int ret;
 
     /* Only SPIs are supported */
     if ( virq < NR_LOCAL_IRQS || virq >= vgic_num_irqs(d) )
         return -EINVAL;
 
-    p = spi_to_pending(d, virq);
-    if ( !p->desc )
+    desc = vgic_get_hw_irq_desc(d, NULL, virq);
+    if ( !desc )
         return -EINVAL;
-
-    desc = p->desc;
 
     spin_lock_irqsave(&desc->lock, flags);
 

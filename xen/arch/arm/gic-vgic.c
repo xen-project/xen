@@ -397,6 +397,23 @@ void gic_dump_vgic_info(struct vcpu *v)
         printk("Pending irq=%d\n", p->irq);
 }
 
+struct irq_desc *vgic_get_hw_irq_desc(struct domain *d, struct vcpu *v,
+                                      unsigned int virq)
+{
+    struct pending_irq *p;
+
+    ASSERT(!v && virq >= 32);
+
+    if ( !v )
+        v = d->vcpu[0];
+
+    p = irq_to_pending(v, virq);
+    if ( !p )
+        return NULL;
+
+    return p->desc;
+}
+
 int vgic_connect_hw_irq(struct domain *d, struct vcpu *v, unsigned int virq,
                         struct irq_desc *desc, bool connect)
 {
