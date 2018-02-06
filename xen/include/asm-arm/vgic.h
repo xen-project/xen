@@ -219,6 +219,8 @@ int vgic_v2_init(struct domain *d, int *mmio_count);
 int vgic_v3_init(struct domain *d, int *mmio_count);
 
 bool vgic_evtchn_irq_pending(struct vcpu *v);
+int vgic_connect_hw_irq(struct domain *d, struct vcpu *v, unsigned int virq,
+                        struct irq_desc *desc, bool connect);
 
 extern int domain_vgic_register(struct domain *d, int *mmio_count);
 extern int vcpu_vgic_free(struct vcpu *v);

@@ -128,13 +128,7 @@ void gic_route_irq_to_xen(struct irq_desc *desc, unsigned int priority)
 int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
                            struct irq_desc *desc, unsigned int priority)
 {
-    unsigned long flags;
-    /* Use vcpu0 to retrieve the pending_irq struct. Given that we only
-     * route SPIs to guests, it doesn't make any difference. */
-    struct vcpu *v_target = vgic_get_target_vcpu(d->vcpu[0], virq);
-    struct vgic_irq_rank *rank = vgic_rank_irq(v_target, virq);
-    struct pending_irq *p = irq_to_pending(v_target, virq);
-    int res = -EBUSY;
+    int ret;
 
     ASSERT(spin_is_locked(&desc->lock));
     /* Caller has already checked that the IRQ is an SPI */
@@ -142,12 +136,9 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
     ASSERT(virq < vgic_num_irqs(d));
     ASSERT(!is_lpi(virq));
 
-    vgic_lock_rank(v_target, rank, flags);
-
-    if ( p->desc ||
-         /* The VIRQ should not be already enabled by the guest */
-         test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) )
-        goto out;
+    ret = vgic_connect_hw_irq(d, NULL, virq, desc, true);
+    if ( ret )
+        return ret;
 
     desc->handler = gic_hw_ops->gic_guest_irq_type;
     set_bit(_IRQ_GUEST, &desc->status);
@@ -156,30 +147,18 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
         gic_set_irq_type(desc, desc->arch.type);
     gic_set_irq_priority(desc, priority);
 
-    p->desc = desc;
-    res = 0;
-
-out:
-    vgic_unlock_rank(v_target, rank, flags);
-
-    return res;
+    return 0;
 }
 
 /* This function only works with SPIs for now */
 int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
                               struct irq_desc *desc)
 {
-    struct vcpu *v_target = vgic_get_target_vcpu(d->vcpu[0], virq);
-    struct vgic_irq_rank *rank = vgic_rank_irq(v_target, virq);
-    struct pending_irq *p = irq_to_pending(v_target, virq);
-    unsigned long flags;
+    int ret;
 
     ASSERT(spin_is_locked(&desc->lock));
     ASSERT(test_bit(_IRQ_GUEST, &desc->status));
-    ASSERT(p->desc == desc);
     ASSERT(!is_lpi(virq));
-
-    vgic_lock_rank(v_target, rank, flags);
 
     if ( d->is_dying )
     {
@@ -198,18 +177,15 @@ int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
          */
         if ( test_bit(_IRQ_INPROGRESS, &desc->status) ||
              !test_bit(_IRQ_DISABLED, &desc->status) )
-        {
-            vgic_unlock_rank(v_target, rank, flags);
             return -EBUSY;
-        }
     }
+
+    ret = vgic_connect_hw_irq(d, NULL, virq, desc, false);
+    if ( ret )
+        return ret;
 
     clear_bit(_IRQ_GUEST, &desc->status);
     desc->handler = &no_irq_type;
-
-    p->desc = NULL;
-
-    vgic_unlock_rank(v_target, rank, flags);
 
     return 0;
 }

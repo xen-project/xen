@@ -397,6 +397,47 @@ void gic_dump_vgic_info(struct vcpu *v)
         printk("Pending irq=%d\n", p->irq);
 }
 
+int vgic_connect_hw_irq(struct domain *d, struct vcpu *v, unsigned int virq,
+                        struct irq_desc *desc, bool connect)
+{
+    unsigned long flags;
+    /*
+     * Use vcpu0 to retrieve the pending_irq struct. Given that we only
+     * route SPIs to guests, it doesn't make any difference.
+     */
+    struct vcpu *v_target = vgic_get_target_vcpu(d->vcpu[0], virq);
+    struct vgic_irq_rank *rank = vgic_rank_irq(v_target, virq);
+    struct pending_irq *p = irq_to_pending(v_target, virq);
+    int ret = 0;
+
+    /* "desc" is optional when we disconnect an IRQ. */
+    ASSERT(connect && desc);
+
+    /* We are taking to rank lock to prevent parallel connections. */
+    vgic_lock_rank(v_target, rank, flags);
+
+    if ( connect )
+    {
+        /* The VIRQ should not be already enabled by the guest */
+        if ( !p->desc &&
+             !test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) )
+            p->desc = desc;
+        else
+            ret = -EBUSY;
+    }
+    else
+    {
+        if ( desc && p->desc != desc )
+            ret = -EINVAL;
+        else
+            p->desc = NULL;
+    }
+
+    vgic_unlock_rank(v_target, rank, flags);
+
+    return ret;
+}
+
 /*
  * Local variables:
  * mode: C
