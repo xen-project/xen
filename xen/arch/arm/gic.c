@@ -36,8 +36,6 @@
 #include <asm/vgic.h>
 #include <asm/acpi.h>
 
-static void gic_restore_pending_irqs(struct vcpu *v);
-
 static DEFINE_PER_CPU(uint64_t, lr_mask);
 
 #define lr_all_full() (this_cpu(lr_mask) == ((1 << gic_hw_ops->info->nr_lrs) - 1))
@@ -91,8 +89,6 @@ void gic_restore_state(struct vcpu *v)
     gic_hw_ops->restore_state(v);
 
     isb();
-
-    gic_restore_pending_irqs(v);
 }
 
 /* desc->irq needs to be disabled before calling this function */
