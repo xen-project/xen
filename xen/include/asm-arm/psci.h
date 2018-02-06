@@ -37,9 +37,7 @@ int32_t do_psci_0_2_cpu_on(register_t target_cpu, register_t entry_point,
                        register_t context_id);
 int32_t do_psci_0_2_affinity_info(register_t target_affinity,
                               uint32_t lowest_affinity_level);
-int32_t do_psci_0_2_migrate(uint32_t target_cpu);
 uint32_t do_psci_0_2_migrate_info_type(void);
-register_t do_psci_0_2_migrate_info_up_cpu(void);
 void do_psci_0_2_system_off(void);
 void do_psci_0_2_system_reset(void);
 
@@ -57,9 +55,7 @@ void do_psci_0_2_system_reset(void);
 #define PSCI_0_2_FN_CPU_OFF             2
 #define PSCI_0_2_FN_CPU_ON              3
 #define PSCI_0_2_FN_AFFINITY_INFO       4
-#define PSCI_0_2_FN_MIGRATE             5
 #define PSCI_0_2_FN_MIGRATE_INFO_TYPE   6
-#define PSCI_0_2_FN_MIGRATE_INFO_UP_CPU 7
 #define PSCI_0_2_FN_SYSTEM_OFF          8
 #define PSCI_0_2_FN_SYSTEM_RESET        9
 

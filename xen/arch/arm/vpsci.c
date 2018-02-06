@@ -173,19 +173,9 @@ int32_t do_psci_0_2_affinity_info(register_t target_affinity,
     return PSCI_0_2_AFFINITY_LEVEL_OFF;
 }
 
-int32_t do_psci_0_2_migrate(uint32_t target_cpu)
-{
-    return PSCI_NOT_SUPPORTED;
-}
-
 uint32_t do_psci_0_2_migrate_info_type(void)
 {
     return PSCI_0_2_TOS_MP_OR_NOT_PRESENT;
-}
-
-register_t do_psci_0_2_migrate_info_up_cpu(void)
-{
-    return PSCI_NOT_SUPPORTED;
 }
 
 void do_psci_0_2_system_off( void )
