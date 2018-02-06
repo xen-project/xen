@@ -84,7 +84,7 @@ let read_mmap back con s len =
 
 let read con s len =
 	match con.backend with
-	| Fd backfd     -> read_fd backfd con s len
+	| Fd backfd     -> read_fd backfd con (Bytes.of_string s) len
 	| Xenmmap backmmap -> read_mmap backmmap con s len
 
 let write_fd back con s len =
@@ -98,7 +98,7 @@ let write_mmap back con s len =
 
 let write con s len =
 	match con.backend with
-	| Fd backfd     -> write_fd backfd con s len
+	| Fd backfd     -> write_fd backfd con (Bytes.of_string s) len
 	| Xenmmap backmmap -> write_mmap backmmap con s len
 
 (* NB: can throw Reconnect *)
@@ -147,7 +147,7 @@ let input con =
 	| NoHdr (i, buf)      ->
 		(* we complete the partial header *)
 		if sz > 0 then
-			String.blit s 0 buf (Partial.header_size () - i) sz;
+			String.blit s 0 (Bytes.of_string buf) (Partial.header_size () - i) sz;
 		con.partial_in <- if sz = i then
 			HaveHdr (Partial.of_string buf) else NoHdr (i - sz, buf)
 	);
