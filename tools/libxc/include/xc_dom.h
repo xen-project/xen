@@ -298,7 +298,6 @@ int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb);
 int xc_dom_kernel_check_size(struct xc_dom_image *dom, size_t sz);
 int xc_dom_kernel_max_size(struct xc_dom_image *dom, size_t sz);
 
-int xc_dom_module_check_size(struct xc_dom_image *dom, size_t sz);
 int xc_dom_module_max_size(struct xc_dom_image *dom, size_t sz);
 
 int xc_dom_devicetree_max_size(struct xc_dom_image *dom, size_t sz);
