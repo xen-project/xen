@@ -443,20 +443,8 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
 
 void gic_dump_info(struct vcpu *v)
 {
-    struct pending_irq *p;
-
     printk("GICH_LRs (vcpu %d) mask=%"PRIx64"\n", v->vcpu_id, v->arch.lr_mask);
     gic_hw_ops->dump_state(v);
-
-    list_for_each_entry ( p, &v->arch.vgic.inflight_irqs, inflight )
-    {
-        printk("Inflight irq=%u lr=%u\n", p->irq, p->lr);
-    }
-
-    list_for_each_entry( p, &v->arch.vgic.lr_pending, lr_queue )
-    {
-        printk("Pending irq=%d\n", p->irq);
-    }
 }
 
 void init_maintenance_interrupt(void)

@@ -287,6 +287,7 @@ extern void send_SGI_allbutself(enum gic_sgi sgi);
 
 /* print useful debug info */
 extern void gic_dump_info(struct vcpu *v);
+extern void gic_dump_vgic_info(struct vcpu *v);
 
 /* Number of interrupt lines */
 extern unsigned int gic_number_lines(void);

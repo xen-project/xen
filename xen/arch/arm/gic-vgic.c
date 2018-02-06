@@ -386,6 +386,17 @@ void gic_inject(void)
         gic_hw_ops->update_hcr_status(GICH_HCR_UIE, true);
 }
 
+void gic_dump_vgic_info(struct vcpu *v)
+{
+    struct pending_irq *p;
+
+    list_for_each_entry ( p, &v->arch.vgic.inflight_irqs, inflight )
+        printk("Inflight irq=%u lr=%u\n", p->irq, p->lr);
+
+    list_for_each_entry( p, &v->arch.vgic.lr_pending, lr_queue )
+        printk("Pending irq=%d\n", p->irq);
+}
+
 /*
  * Local variables:
  * mode: C

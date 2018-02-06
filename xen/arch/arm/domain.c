@@ -941,6 +941,7 @@ long arch_do_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
 void arch_dump_vcpu_info(struct vcpu *v)
 {
     gic_dump_info(v);
+    gic_dump_vgic_info(v);
 }
 
 void vcpu_mark_events_pending(struct vcpu *v)
