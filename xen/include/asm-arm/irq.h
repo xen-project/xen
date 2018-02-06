@@ -31,6 +31,9 @@ struct arch_irq_desc {
 /* LPIs are always numbered starting at 8192, so 0 is a good invalid case. */
 #define INVALID_LPI     0
 
+/* This is a spurious interrupt ID which never makes it into the GIC code. */
+#define INVALID_IRQ     1023
+
 extern unsigned int nr_irqs;
 #define nr_static_irqs NR_IRQS
 #define arch_hwdom_irqs(domid) NR_IRQS

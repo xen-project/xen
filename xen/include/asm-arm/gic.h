@@ -344,8 +344,8 @@ struct gic_hw_operations {
     /* Disable CPU physical and virtual interfaces */
     void (*disable_interface)(void);
     /* Update LR register with state and priority */
-    void (*update_lr)(int lr, const struct pending_irq *pending_irq,
-                      unsigned int state);
+    void (*update_lr)(int lr, unsigned int virq, uint8_t priority,
+                      unsigned int hw_irq, unsigned int state);
     /* Update HCR status register */
     void (*update_hcr_status)(uint32_t flag, bool set);
     /* Clear LR register */

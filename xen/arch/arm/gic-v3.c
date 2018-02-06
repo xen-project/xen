@@ -966,8 +966,8 @@ static void gicv3_disable_interface(void)
     spin_unlock(&gicv3.lock);
 }
 
-static void gicv3_update_lr(int lr, const struct pending_irq *p,
-                            unsigned int state)
+static void gicv3_update_lr(int lr, unsigned int virq, uint8_t priority,
+                            unsigned int hw_irq, unsigned int state)
 {
     uint64_t val = 0;
 
@@ -983,11 +983,11 @@ static void gicv3_update_lr(int lr, const struct pending_irq *p,
     if ( current->domain->arch.vgic.version == GIC_V3 )
         val |= GICH_LR_GRP1;
 
-    val |= ((uint64_t)p->priority & 0xff) << GICH_LR_PRIORITY_SHIFT;
-    val |= ((uint64_t)p->irq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT;
+    val |= (uint64_t)priority << GICH_LR_PRIORITY_SHIFT;
+    val |= ((uint64_t)virq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT;
 
-   if ( p->desc != NULL )
-       val |= GICH_LR_HW | (((uint64_t)p->desc->irq & GICH_LR_PHYSICAL_MASK)
+   if ( hw_irq != INVALID_IRQ )
+       val |= GICH_LR_HW | (((uint64_t)hw_irq & GICH_LR_PHYSICAL_MASK)
                            << GICH_LR_PHYSICAL_SHIFT);
 
     gicv3_ich_write_lr(lr, val);

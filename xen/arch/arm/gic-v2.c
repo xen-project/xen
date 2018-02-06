@@ -428,8 +428,8 @@ static void gicv2_disable_interface(void)
     spin_unlock(&gicv2.lock);
 }
 
-static void gicv2_update_lr(int lr, const struct pending_irq *p,
-                            unsigned int state)
+static void gicv2_update_lr(int lr, unsigned int virq, uint8_t priority,
+                            unsigned int hw_irq, unsigned int state)
 {
     uint32_t lr_reg;
 
@@ -437,12 +437,12 @@ static void gicv2_update_lr(int lr, const struct pending_irq *p,
     BUG_ON(lr < 0);
 
     lr_reg = (((state & GICH_V2_LR_STATE_MASK) << GICH_V2_LR_STATE_SHIFT)  |
-              ((GIC_PRI_TO_GUEST(p->priority) & GICH_V2_LR_PRIORITY_MASK)
-                                             << GICH_V2_LR_PRIORITY_SHIFT) |
-              ((p->irq & GICH_V2_LR_VIRTUAL_MASK) << GICH_V2_LR_VIRTUAL_SHIFT));
+              ((GIC_PRI_TO_GUEST(priority) & GICH_V2_LR_PRIORITY_MASK)
+                                          << GICH_V2_LR_PRIORITY_SHIFT) |
+              ((virq & GICH_V2_LR_VIRTUAL_MASK) << GICH_V2_LR_VIRTUAL_SHIFT));
 
-    if ( p->desc != NULL )
-        lr_reg |= GICH_V2_LR_HW | ((p->desc->irq & GICH_V2_LR_PHYSICAL_MASK )
+    if ( hw_irq != INVALID_IRQ )
+        lr_reg |= GICH_V2_LR_HW | ((hw_irq & GICH_V2_LR_PHYSICAL_MASK )
                                    << GICH_V2_LR_PHYSICAL_SHIFT);
 
     writel_gich(lr_reg, GICH_LR + lr * 4);

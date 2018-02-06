@@ -38,7 +38,8 @@ static inline void gic_set_lr(int lr, struct pending_irq *p,
 
     clear_bit(GIC_IRQ_GUEST_PRISTINE_LPI, &p->status);
 
-    gic_hw_ops->update_lr(lr, p, state);
+    gic_hw_ops->update_lr(lr, p->irq, p->priority,
+                          p->desc ? p->desc->irq : INVALID_IRQ, state);
 
     set_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
     clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
