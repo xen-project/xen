@@ -16,7 +16,7 @@
 
 #include <asm/current.h>
 #include <asm/vgic.h>
-#include <asm/psci.h>
+#include <asm/vpsci.h>
 #include <asm/event.h>
 
 #include <public/sched.h>
@@ -91,12 +91,12 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     return PSCI_SUCCESS;
 }
 
-int32_t do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
+static int32_t do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
 {
     return do_common_cpu_on(vcpuid, entry_point, 0 , PSCI_VERSION(0, 1));
 }
 
-int32_t do_psci_cpu_off(uint32_t power_state)
+static int32_t do_psci_cpu_off(uint32_t power_state)
 {
     struct vcpu *v = current;
     if ( !test_and_set_bit(_VPF_down, &v->pause_flags) )
@@ -104,13 +104,14 @@ int32_t do_psci_cpu_off(uint32_t power_state)
     return PSCI_SUCCESS;
 }
 
-uint32_t do_psci_0_2_version(void)
+static uint32_t do_psci_0_2_version(void)
 {
     return PSCI_VERSION(0, 2);
 }
 
-register_t do_psci_0_2_cpu_suspend(uint32_t power_state, register_t entry_point,
-                            register_t context_id)
+static register_t do_psci_0_2_cpu_suspend(uint32_t power_state,
+                                          register_t entry_point,
+                                          register_t context_id)
 {
     struct vcpu *v = current;
 
@@ -123,13 +124,14 @@ register_t do_psci_0_2_cpu_suspend(uint32_t power_state, register_t entry_point,
     return PSCI_SUCCESS;
 }
 
-int32_t do_psci_0_2_cpu_off(void)
+static int32_t do_psci_0_2_cpu_off(void)
 {
     return do_psci_cpu_off(0);
 }
 
-int32_t do_psci_0_2_cpu_on(register_t target_cpu, register_t entry_point,
-                       register_t context_id)
+static int32_t do_psci_0_2_cpu_on(register_t target_cpu,
+                                  register_t entry_point,
+                                  register_t context_id)
 {
     return do_common_cpu_on(target_cpu, entry_point, context_id,
                             PSCI_VERSION(0, 2));
@@ -144,8 +146,8 @@ static const unsigned long target_affinity_mask[] = {
 #endif
 };
 
-int32_t do_psci_0_2_affinity_info(register_t target_affinity,
-                              uint32_t lowest_affinity_level)
+static int32_t do_psci_0_2_affinity_info(register_t target_affinity,
+                                         uint32_t lowest_affinity_level)
 {
     struct domain *d = current->domain;
     struct vcpu *v;
@@ -172,21 +174,139 @@ int32_t do_psci_0_2_affinity_info(register_t target_affinity,
     return PSCI_0_2_AFFINITY_LEVEL_OFF;
 }
 
-uint32_t do_psci_0_2_migrate_info_type(void)
+static uint32_t do_psci_0_2_migrate_info_type(void)
 {
     return PSCI_0_2_TOS_MP_OR_NOT_PRESENT;
 }
 
-void do_psci_0_2_system_off( void )
+static void do_psci_0_2_system_off( void )
 {
     struct domain *d = current->domain;
     domain_shutdown(d,SHUTDOWN_poweroff);
 }
 
-void do_psci_0_2_system_reset(void)
+static void do_psci_0_2_system_reset(void)
 {
     struct domain *d = current->domain;
     domain_shutdown(d,SHUTDOWN_reboot);
+}
+
+#define PSCI_SET_RESULT(reg, val) set_user_reg(reg, 0, val)
+#define PSCI_ARG(reg, n) get_user_reg(reg, n)
+
+#ifdef CONFIG_ARM_64
+#define PSCI_ARG32(reg, n) (uint32_t)(get_user_reg(reg, n))
+#else
+#define PSCI_ARG32(reg, n) PSCI_ARG(reg, n)
+#endif
+
+/*
+ * PSCI 0.1 calls. It will return false if the function ID is not
+ * handled.
+ */
+bool do_vpsci_0_1_call(struct cpu_user_regs *regs, uint32_t fid)
+{
+    switch ( (uint32_t)get_user_reg(regs, 0) )
+    {
+    case PSCI_cpu_off:
+    {
+        uint32_t pstate = PSCI_ARG32(regs, 1);
+
+        perfc_incr(vpsci_cpu_off);
+        PSCI_SET_RESULT(regs, do_psci_cpu_off(pstate));
+        return true;
+    }
+    case PSCI_cpu_on:
+    {
+        uint32_t vcpuid = PSCI_ARG32(regs, 1);
+        register_t epoint = PSCI_ARG(regs, 2);
+
+        perfc_incr(vpsci_cpu_on);
+        PSCI_SET_RESULT(regs, do_psci_cpu_on(vcpuid, epoint));
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
+/*
+ * PSCI 0.2 or later calls. It will return false if the function ID is
+ * not handled.
+ */
+bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
+{
+    /*
+     * /!\ VPSCI_NR_FUNCS (in asm-arm/vpsci.h) should be updated when
+     * adding/removing a function. SCCC_SMCCC_*_REVISION should be
+     * updated once per release.
+     */
+    switch ( fid )
+    {
+    case PSCI_0_2_FN32(PSCI_VERSION):
+        perfc_incr(vpsci_version);
+        PSCI_SET_RESULT(regs, do_psci_0_2_version());
+        return true;
+
+    case PSCI_0_2_FN32(CPU_OFF):
+        perfc_incr(vpsci_cpu_off);
+        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_off());
+        return true;
+
+    case PSCI_0_2_FN32(MIGRATE_INFO_TYPE):
+        perfc_incr(vpsci_migrate_info_type);
+        PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_type());
+        return true;
+
+    case PSCI_0_2_FN32(SYSTEM_OFF):
+        perfc_incr(vpsci_system_off);
+        do_psci_0_2_system_off();
+        PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
+        return true;
+
+    case PSCI_0_2_FN32(SYSTEM_RESET):
+        perfc_incr(vpsci_system_reset);
+        do_psci_0_2_system_reset();
+        PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
+        return true;
+
+    case PSCI_0_2_FN32(CPU_ON):
+    case PSCI_0_2_FN64(CPU_ON):
+    {
+        register_t vcpuid = PSCI_ARG(regs, 1);
+        register_t epoint = PSCI_ARG(regs, 2);
+        register_t cid = PSCI_ARG(regs, 3);
+
+        perfc_incr(vpsci_cpu_on);
+        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_on(vcpuid, epoint, cid));
+        return true;
+    }
+
+    case PSCI_0_2_FN32(CPU_SUSPEND):
+    case PSCI_0_2_FN64(CPU_SUSPEND):
+    {
+        uint32_t pstate = PSCI_ARG32(regs, 1);
+        register_t epoint = PSCI_ARG(regs, 2);
+        register_t cid = PSCI_ARG(regs, 3);
+
+        perfc_incr(vpsci_cpu_suspend);
+        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_suspend(pstate, epoint, cid));
+        return true;
+    }
+
+    case PSCI_0_2_FN32(AFFINITY_INFO):
+    case PSCI_0_2_FN64(AFFINITY_INFO):
+    {
+        register_t taff = PSCI_ARG(regs, 1);
+        uint32_t laff = PSCI_ARG32(regs, 2);
+
+        perfc_incr(vpsci_cpu_affinity_info);
+        PSCI_SET_RESULT(regs, do_psci_0_2_affinity_info(taff, laff));
+        return true;
+    }
+    default:
+        return false;
+    }
 }
 
 /*

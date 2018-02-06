@@ -22,25 +22,6 @@ int call_psci_cpu_on(int cpu);
 void call_psci_system_off(void);
 void call_psci_system_reset(void);
 
-/* functions to handle guest PSCI requests */
-int32_t do_psci_cpu_on(uint32_t vcpuid, register_t entry_point);
-int32_t do_psci_cpu_off(uint32_t power_state);
-int32_t do_psci_cpu_suspend(uint32_t power_state, register_t entry_point);
-int32_t do_psci_migrate(uint32_t vcpuid);
-
-/* PSCI 0.2 functions to handle guest PSCI requests */
-uint32_t do_psci_0_2_version(void);
-register_t do_psci_0_2_cpu_suspend(uint32_t power_state, register_t entry_point,
-                            register_t context_id);
-int32_t do_psci_0_2_cpu_off(void);
-int32_t do_psci_0_2_cpu_on(register_t target_cpu, register_t entry_point,
-                       register_t context_id);
-int32_t do_psci_0_2_affinity_info(register_t target_affinity,
-                              uint32_t lowest_affinity_level);
-uint32_t do_psci_0_2_migrate_info_type(void);
-void do_psci_0_2_system_off(void);
-void do_psci_0_2_system_reset(void);
-
 /* PSCI v0.2 interface */
 #define PSCI_0_2_FN32(name) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
                                                ARM_SMCCC_CONV_32,               \

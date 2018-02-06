@@ -19,16 +19,16 @@
 #include <xen/types.h>
 #include <public/arch-arm/smccc.h>
 #include <asm/monitor.h>
-#include <asm/psci.h>
 #include <asm/regs.h>
 #include <asm/smccc.h>
 #include <asm/traps.h>
+#include <asm/vpsci.h>
 
 /* Number of functions currently supported by Hypervisor Service. */
 #define XEN_SMCCC_FUNCTION_COUNT 3
 
 /* Number of functions currently supported by Standard Service Service Calls. */
-#define SSSC_SMCCC_FUNCTION_COUNT 14
+#define SSSC_SMCCC_FUNCTION_COUNT (3 + VPSCI_NR_FUNCS)
 
 static bool fill_uid(struct cpu_user_regs *regs, xen_uuid_t uuid)
 {
@@ -100,41 +100,13 @@ static bool handle_hypervisor(struct cpu_user_regs *regs)
     }
 }
 
-#define PSCI_SET_RESULT(reg, val) set_user_reg(reg, 0, val)
-#define PSCI_ARG(reg, n) get_user_reg(reg, n)
-
-#ifdef CONFIG_ARM_64
-#define PSCI_ARG32(reg, n) (uint32_t)(get_user_reg(reg, n))
-#else
-#define PSCI_ARG32(reg, n) PSCI_ARG(reg, n)
-#endif
-
 /* Existing (pre SMCCC) APIs. This includes PSCI 0.1 interface */
 static bool handle_existing_apis(struct cpu_user_regs *regs)
 {
     /* Only least 32 bits are significant (ARM DEN 0028B, page 12) */
-    switch ( (uint32_t)get_user_reg(regs, 0) )
-    {
-    case PSCI_cpu_off:
-    {
-        uint32_t pstate = PSCI_ARG32(regs, 1);
+    uint32_t fid = (uint32_t)get_user_reg(regs, 0);
 
-        perfc_incr(vpsci_cpu_off);
-        PSCI_SET_RESULT(regs, do_psci_cpu_off(pstate));
-        return true;
-    }
-    case PSCI_cpu_on:
-    {
-        uint32_t vcpuid = PSCI_ARG32(regs, 1);
-        register_t epoint = PSCI_ARG(regs, 2);
-
-        perfc_incr(vpsci_cpu_on);
-        PSCI_SET_RESULT(regs, do_psci_cpu_on(vcpuid, epoint));
-        return true;
-    }
-    default:
-        return false;
-    }
+    return do_vpsci_0_1_call(regs, fid);
 }
 
 /* PSCI 0.2 interface and other Standard Secure Calls */
@@ -142,70 +114,11 @@ static bool handle_sssc(struct cpu_user_regs *regs)
 {
     uint32_t fid = (uint32_t)get_user_reg(regs, 0);
 
+    if ( do_vpsci_0_2_call(regs, fid) )
+        return true;
+
     switch ( fid )
     {
-    case PSCI_0_2_FN32(PSCI_VERSION):
-        perfc_incr(vpsci_version);
-        PSCI_SET_RESULT(regs, do_psci_0_2_version());
-        return true;
-
-    case PSCI_0_2_FN32(CPU_OFF):
-        perfc_incr(vpsci_cpu_off);
-        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_off());
-        return true;
-
-    case PSCI_0_2_FN32(MIGRATE_INFO_TYPE):
-        perfc_incr(vpsci_migrate_info_type);
-        PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_type());
-        return true;
-
-    case PSCI_0_2_FN32(SYSTEM_OFF):
-        perfc_incr(vpsci_system_off);
-        do_psci_0_2_system_off();
-        PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
-        return true;
-
-    case PSCI_0_2_FN32(SYSTEM_RESET):
-        perfc_incr(vpsci_system_reset);
-        do_psci_0_2_system_reset();
-        PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
-        return true;
-
-    case PSCI_0_2_FN32(CPU_ON):
-    case PSCI_0_2_FN64(CPU_ON):
-    {
-        register_t vcpuid = PSCI_ARG(regs, 1);
-        register_t epoint = PSCI_ARG(regs, 2);
-        register_t cid = PSCI_ARG(regs, 3);
-
-        perfc_incr(vpsci_cpu_on);
-        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_on(vcpuid, epoint, cid));
-        return true;
-    }
-
-    case PSCI_0_2_FN32(CPU_SUSPEND):
-    case PSCI_0_2_FN64(CPU_SUSPEND):
-    {
-        uint32_t pstate = PSCI_ARG32(regs, 1);
-        register_t epoint = PSCI_ARG(regs, 2);
-        register_t cid = PSCI_ARG(regs, 3);
-
-        perfc_incr(vpsci_cpu_suspend);
-        PSCI_SET_RESULT(regs, do_psci_0_2_cpu_suspend(pstate, epoint, cid));
-        return true;
-    }
-
-    case PSCI_0_2_FN32(AFFINITY_INFO):
-    case PSCI_0_2_FN64(AFFINITY_INFO):
-    {
-        register_t taff = PSCI_ARG(regs, 1);
-        uint32_t laff = PSCI_ARG32(regs, 2);
-
-        perfc_incr(vpsci_cpu_affinity_info);
-        PSCI_SET_RESULT(regs, do_psci_0_2_affinity_info(taff, laff));
-        return true;
-    }
-
     case ARM_SMCCC_CALL_COUNT_FID(STANDARD):
         return fill_function_call_count(regs, SSSC_SMCCC_FUNCTION_COUNT);
 
