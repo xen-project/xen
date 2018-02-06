@@ -28,7 +28,7 @@
 #define XEN_SMCCC_FUNCTION_COUNT 3
 
 /* Number of functions currently supported by Standard Service Service Calls. */
-#define SSSC_SMCCC_FUNCTION_COUNT 13
+#define SSSC_SMCCC_FUNCTION_COUNT 11
 
 static bool fill_uid(struct cpu_user_regs *regs, xen_uuid_t uuid)
 {
@@ -157,11 +157,6 @@ static bool handle_sssc(struct cpu_user_regs *regs)
         PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_type());
         return true;
 
-    case PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
-        perfc_incr(vpsci_migrate_info_up_cpu);
-        PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_up_cpu());
-        return true;
-
     case PSCI_0_2_FN_SYSTEM_OFF:
         perfc_incr(vpsci_system_off);
         do_psci_0_2_system_off();
@@ -203,15 +198,6 @@ static bool handle_sssc(struct cpu_user_regs *regs)
 
         perfc_incr(vpsci_cpu_affinity_info);
         PSCI_SET_RESULT(regs, do_psci_0_2_affinity_info(taff, laff));
-        return true;
-    }
-
-    case PSCI_0_2_FN_MIGRATE:
-    {
-        uint32_t tcpu = PSCI_ARG32(regs, 1);
-
-        perfc_incr(vpsci_cpu_migrate);
-        PSCI_SET_RESULT(regs, do_psci_0_2_migrate(tcpu));
         return true;
     }
 
