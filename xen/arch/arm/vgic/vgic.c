@@ -715,6 +715,50 @@ bool vgic_evtchn_irq_pending(struct vcpu *v)
     return pending;
 }
 
+bool vgic_reserve_virq(struct domain *d, unsigned int virq)
+{
+    if ( virq >= vgic_num_irqs(d) )
+        return false;
+
+    return !test_and_set_bit(virq, d->arch.vgic.allocated_irqs);
+}
+
+int vgic_allocate_virq(struct domain *d, bool spi)
+{
+    int first, end;
+    unsigned int virq;
+
+    if ( !spi )
+    {
+        /* We only allocate PPIs. SGIs are all reserved */
+        first = 16;
+        end = 32;
+    }
+    else
+    {
+        first = 32;
+        end = vgic_num_irqs(d);
+    }
+
+    /*
+     * There is no spinlock to protect allocated_irqs, therefore
+     * test_and_set_bit may fail. If so retry it.
+     */
+    do
+    {
+        virq = find_next_zero_bit(d->arch.vgic.allocated_irqs, end, first);
+        if ( virq >= end )
+            return -1;
+    } while ( test_and_set_bit(virq, d->arch.vgic.allocated_irqs) );
+
+    return virq;
+}
+
+void vgic_free_virq(struct domain *d, unsigned int virq)
+{
+    clear_bit(virq, d->arch.vgic.allocated_irqs);
+}
+
 struct irq_desc *vgic_get_hw_irq_desc(struct domain *d, struct vcpu *v,
                                       unsigned int virq)
 {
