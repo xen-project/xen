@@ -3528,10 +3528,10 @@ GRUB_VERSION="0.97"
 
 if test "x$OCAML_URL" = "x"; then :
 
-	OCAML_URL="http://caml.inria.fr/pub/distrib/ocaml-3.11"
+	OCAML_URL="http://caml.inria.fr/pub/distrib/ocaml-4.02"
 
 fi
-OCAML_VERSION="3.11.0"
+OCAML_VERSION="4.02.0"
 
 
 
