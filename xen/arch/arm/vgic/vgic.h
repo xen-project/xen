@@ -55,6 +55,9 @@ static inline void vgic_get_irq_kref(struct vgic_irq *irq)
     atomic_inc(&irq->refcount);
 }
 
+void vgic_sync_hardware_irq(struct domain *d,
+                            irq_desc_t *desc, struct vgic_irq *irq);
+
 void vgic_v2_fold_lr_state(struct vcpu *vcpu);
 void vgic_v2_populate_lr(struct vcpu *vcpu, struct vgic_irq *irq, int lr);
 void vgic_v2_set_underflow(struct vcpu *vcpu);

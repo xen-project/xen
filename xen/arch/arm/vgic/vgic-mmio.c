@@ -39,6 +39,123 @@ void vgic_mmio_write_wi(struct vcpu *vcpu, paddr_t addr,
     /* Ignore */
 }
 
+/*
+ * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
+ * of the enabled bit, so there is only one function for both here.
+ */
+unsigned long vgic_mmio_read_enable(struct vcpu *vcpu,
+                                    paddr_t addr, unsigned int len)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    uint32_t value = 0;
+    unsigned int i;
+
+    /* Loop over all IRQs affected by this read */
+    for ( i = 0; i < len * 8; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        if ( irq->enabled )
+            value |= (1U << i);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+
+    return value;
+}
+
+void vgic_mmio_write_senable(struct vcpu *vcpu,
+                             paddr_t addr, unsigned int len,
+                             unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    unsigned int i;
+
+    for_each_set_bit( i, &val, len * 8 )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+        unsigned long flags;
+        irq_desc_t *desc;
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+
+        if ( irq->enabled )            /* skip already enabled IRQs */
+        {
+            spin_unlock_irqrestore(&irq->irq_lock, flags);
+            vgic_put_irq(vcpu->domain, irq);
+            continue;
+        }
+
+        irq->enabled = true;
+        if ( irq->hw )
+        {
+            /*
+             * The irq cannot be a PPI, we only support delivery
+             * of SPIs to guests.
+             */
+            ASSERT(irq->hwintid >= VGIC_NR_PRIVATE_IRQS);
+
+            desc = irq_to_desc(irq->hwintid);
+        }
+        else
+            desc = NULL;
+
+        vgic_queue_irq_unlock(vcpu->domain, irq, flags);
+
+        if ( desc )
+            vgic_sync_hardware_irq(vcpu->domain, desc, irq);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
+void vgic_mmio_write_cenable(struct vcpu *vcpu,
+                             paddr_t addr, unsigned int len,
+                             unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    unsigned int i;
+
+    for_each_set_bit( i, &val, len * 8 )
+    {
+        struct vgic_irq *irq;
+        unsigned long flags;
+        irq_desc_t *desc;
+
+        irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+        spin_lock_irqsave(&irq->irq_lock, flags);
+
+        if ( !irq->enabled )            /* skip already disabled IRQs */
+        {
+            spin_unlock_irqrestore(&irq->irq_lock, flags);
+            vgic_put_irq(vcpu->domain, irq);
+            continue;
+        }
+
+        irq->enabled = false;
+
+        if ( irq->hw )
+        {
+            /*
+             * The irq cannot be a PPI, we only support delivery
+             * of SPIs to guests.
+             */
+            ASSERT(irq->hwintid >= VGIC_NR_PRIVATE_IRQS);
+
+            desc = irq_to_desc(irq->hwintid);
+        }
+        else
+            desc = NULL;
+
+        spin_unlock_irqrestore(&irq->irq_lock, flags);
+
+        if ( desc )
+            vgic_sync_hardware_irq(vcpu->domain, desc, irq);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
 static int match_region(const void *key, const void *elt)
 {
     const unsigned int offset = (unsigned long)key;

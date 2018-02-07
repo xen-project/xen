@@ -692,6 +692,46 @@ void vgic_kick_vcpus(struct domain *d)
     }
 }
 
+static unsigned int translate_irq_type(bool is_level)
+{
+    return is_level ? IRQ_TYPE_LEVEL_HIGH : IRQ_TYPE_EDGE_RISING;
+}
+
+void vgic_sync_hardware_irq(struct domain *d,
+                            irq_desc_t *desc, struct vgic_irq *irq)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&desc->lock, flags);
+    spin_lock(&irq->irq_lock);
+
+    /*
+     * We forbid tinkering with the hardware IRQ association during
+     * a domain's lifetime.
+     */
+    ASSERT(irq->hw && desc->irq == irq->hwintid);
+
+    if ( irq->enabled )
+    {
+        /*
+         * We might end up from various callers, so check that the
+         * interrrupt is disabled before trying to change the config.
+         */
+        if ( irq_type_set_by_domain(d) &&
+             test_bit(_IRQ_DISABLED, &desc->status) )
+            gic_set_irq_type(desc, translate_irq_type(irq->config));
+
+        if ( irq->target_vcpu )
+            irq_set_affinity(desc, cpumask_of(irq->target_vcpu->processor));
+        desc->handler->enable(desc);
+    }
+    else
+        desc->handler->disable(desc);
+
+    spin_unlock(&irq->irq_lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
+}
+
 /*
  * Local variables:
  * mode: C
