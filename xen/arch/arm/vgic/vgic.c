@@ -784,6 +784,14 @@ void gic_dump_vgic_info(struct vcpu *v)
     spin_unlock_irqrestore(&v->arch.vgic.ap_list_lock, flags);
 }
 
+void vgic_clear_pending_irqs(struct vcpu *v)
+{
+    /*
+     * TODO: It is unclear whether we really need this, so we might instead
+     * remove it on the caller site.
+     */
+}
+
 /**
  * arch_move_irqs() - migrate the physical affinity of hardware mapped vIRQs
  * @v:  the vCPU, already assigned to the new pCPU
