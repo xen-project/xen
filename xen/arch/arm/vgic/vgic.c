@@ -520,6 +520,7 @@ retry:
 
 static void vgic_fold_lr_state(struct vcpu *vcpu)
 {
+    vgic_v2_fold_lr_state(vcpu);
 }
 
 /* Requires the irq_lock to be held. */
@@ -527,6 +528,8 @@ static void vgic_populate_lr(struct vcpu *vcpu,
                              struct vgic_irq *irq, int lr)
 {
     ASSERT(spin_is_locked(&irq->irq_lock));
+
+    vgic_v2_populate_lr(vcpu, irq, lr);
 }
 
 static void vgic_set_underflow(struct vcpu *vcpu)
@@ -633,7 +636,10 @@ void vgic_sync_to_lrs(void)
     spin_lock(&current->arch.vgic.ap_list_lock);
     vgic_flush_lr_state(current);
     spin_unlock(&current->arch.vgic.ap_list_lock);
+
+    gic_hw_ops->update_hcr_status(GICH_HCR_EN, 1);
 }
+
 /*
  * Local variables:
  * mode: C

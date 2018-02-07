@@ -27,6 +27,11 @@ static inline bool irq_is_pending(struct vgic_irq *irq)
         return irq->pending_latch || irq->line_level;
 }
 
+static inline bool vgic_irq_is_mapped_level(struct vgic_irq *irq)
+{
+    return irq->config == VGIC_CONFIG_LEVEL && irq->hw;
+}
+
 struct vgic_irq *vgic_get_irq(struct domain *d, struct vcpu *vcpu,
                               uint32_t intid);
 void vgic_put_irq(struct domain *d, struct vgic_irq *irq);
@@ -40,6 +45,10 @@ static inline void vgic_get_irq_kref(struct vgic_irq *irq)
 
     atomic_inc(&irq->refcount);
 }
+
+void vgic_v2_fold_lr_state(struct vcpu *vcpu);
+void vgic_v2_populate_lr(struct vcpu *vcpu, struct vgic_irq *irq, int lr);
+void vgic_v2_set_underflow(struct vcpu *vcpu);
 
 #endif
 
