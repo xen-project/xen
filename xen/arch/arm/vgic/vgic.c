@@ -692,6 +692,29 @@ void vgic_kick_vcpus(struct domain *d)
     }
 }
 
+void arch_evtchn_inject(struct vcpu *v)
+{
+    vgic_inject_irq(v->domain, v, v->domain->arch.evtchn_irq, true);
+}
+
+bool vgic_evtchn_irq_pending(struct vcpu *v)
+{
+    struct vgic_irq *irq;
+    unsigned long flags;
+    bool pending;
+
+    /* Does not work for LPIs. */
+    ASSERT(!is_lpi(v->domain->arch.evtchn_irq));
+
+    irq = vgic_get_irq(v->domain, v, v->domain->arch.evtchn_irq);
+    spin_lock_irqsave(&irq->irq_lock, flags);
+    pending = irq_is_pending(irq);
+    spin_unlock_irqrestore(&irq->irq_lock, flags);
+    vgic_put_irq(v->domain, irq);
+
+    return pending;
+}
+
 struct irq_desc *vgic_get_hw_irq_desc(struct domain *d, struct vcpu *v,
                                       unsigned int virq)
 {
