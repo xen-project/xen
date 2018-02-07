@@ -39,10 +39,6 @@ xenbus.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
 	$(E) " CMO      $@"
 	$(OCAMLC) -pack -o $@ $^
 
-%.mli: %.ml
-	$(E) " MLI      $@"
-	$(Q)$(OCAMLC) $(OCAMLINCLUDE) -i $< $o
-
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
