@@ -640,6 +640,43 @@ void vgic_sync_to_lrs(void)
     gic_hw_ops->update_hcr_status(GICH_HCR_EN, 1);
 }
 
+/**
+ * vgic_vcpu_pending_irq() - determine if interrupts need to be injected
+ * @vcpu: The vCPU on which to check for interrupts.
+ *
+ * Checks whether there is an interrupt on the given VCPU which needs
+ * handling in the guest. This requires at least one IRQ to be pending
+ * and enabled.
+ *
+ * Returns: > 0 if the guest should run to handle interrupts, 0 otherwise.
+ */
+int vgic_vcpu_pending_irq(struct vcpu *vcpu)
+{
+    struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic;
+    struct vgic_irq *irq;
+    unsigned long flags;
+    int ret = 0;
+
+    if ( !vcpu->domain->arch.vgic.enabled )
+        return 0;
+
+    spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
+
+    list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list)
+    {
+        spin_lock(&irq->irq_lock);
+        ret = irq_is_pending(irq) && irq->enabled;
+        spin_unlock(&irq->irq_lock);
+
+        if ( ret )
+            break;
+    }
+
+    spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
+
+    return ret;
+}
+
 /*
  * Local variables:
  * mode: C
