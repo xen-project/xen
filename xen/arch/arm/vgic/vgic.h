@@ -17,9 +17,19 @@
 #ifndef __XEN_ARM_VGIC_VGIC_H__
 #define __XEN_ARM_VGIC_VGIC_H__
 
+static inline bool irq_is_pending(struct vgic_irq *irq)
+{
+    if ( irq->config == VGIC_CONFIG_EDGE )
+        return irq->pending_latch;
+    else
+        return irq->pending_latch || irq->line_level;
+}
+
 struct vgic_irq *vgic_get_irq(struct domain *d, struct vcpu *vcpu,
                               uint32_t intid);
 void vgic_put_irq(struct domain *d, struct vgic_irq *irq);
+void vgic_queue_irq_unlock(struct domain *d, struct vgic_irq *irq,
+                           unsigned long flags);
 
 static inline void vgic_get_irq_kref(struct vgic_irq *irq)
 {
