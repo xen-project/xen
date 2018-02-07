@@ -181,6 +181,83 @@ static void vgic_mmio_write_target(struct vcpu *vcpu,
     }
 }
 
+static unsigned long vgic_mmio_read_sgipend(struct vcpu *vcpu,
+                                            paddr_t addr, unsigned int len)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 8);
+    uint32_t val = 0;
+    unsigned int i;
+
+    ASSERT(intid < VGIC_NR_SGIS);
+
+    for ( i = 0; i < len; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        val |= (uint32_t)irq->source << (i * 8);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+
+    return val;
+}
+
+static void vgic_mmio_write_sgipendc(struct vcpu *vcpu,
+                                     paddr_t addr, unsigned int len,
+                                     unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 8);
+    unsigned int i;
+    unsigned long flags;
+
+    ASSERT(intid < VGIC_NR_SGIS);
+
+    for ( i = 0; i < len; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+
+        irq->source &= ~((val >> (i * 8)) & 0xff);
+        if ( !irq->source )
+            irq->pending_latch = false;
+
+        spin_unlock_irqrestore(&irq->irq_lock, flags);
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
+static void vgic_mmio_write_sgipends(struct vcpu *vcpu,
+                                     paddr_t addr, unsigned int len,
+                                     unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 8);
+    unsigned int i;
+    unsigned long flags;
+
+    ASSERT(intid < VGIC_NR_SGIS);
+
+    for ( i = 0; i < len; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+
+        irq->source |= (val >> (i * 8)) & 0xff;
+
+        if ( irq->source )
+        {
+            irq->pending_latch = true;
+            vgic_queue_irq_unlock(vcpu->domain, irq, flags);
+        }
+        else
+        {
+            spin_unlock_irqrestore(&irq->irq_lock, flags);
+        }
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
 static const struct vgic_register_region vgic_v2_dist_registers[] = {
     REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
         vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
@@ -219,10 +296,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
         vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
         VGIC_ACCESS_32bit),
     REGISTER_DESC_WITH_LENGTH(GICD_CPENDSGIR,
-        vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
+        vgic_mmio_read_sgipend, vgic_mmio_write_sgipendc, 16,
         VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
     REGISTER_DESC_WITH_LENGTH(GICD_SPENDSGIR,
-        vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
+        vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16,
         VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
 };
 
