@@ -119,8 +119,13 @@ subdir-all := $(subdir-y) $(subdir-n)
 
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -DINIT_SECTIONS_ONLY
 
-ifeq ($(CONFIG_GCOV),y)
-$(filter-out %.init.o $(nogcov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -fprofile-arcs -ftest-coverage
+ifeq ($(CONFIG_COVERAGE),y)
+ifeq ($(clang),y)
+    COV_FLAGS := -fprofile-instr-generate -fcoverage-mapping
+else
+    COV_FLAGS := -fprofile-arcs -ftest-coverage
+endif
+$(filter-out %.init.o $(nocov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += $(COV_FLAGS)
 endif
 
 ifeq ($(CONFIG_UBSAN),y)

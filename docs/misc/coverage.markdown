@@ -10,7 +10,7 @@ down your hypervisor.
 
 ## Enable coverage
 
-Test coverage support can be turned on compiling Xen with the `CONFIG_GCOV`
+Test coverage support can be turned on compiling Xen with the `CONFIG_COVERAGE`
 option set to `y`.
 
 Change your `.config` or run `make -C xen menuconfig`.

@@ -28,12 +28,12 @@ config FRAME_POINTER
 	  maybe slower, but it gives very useful debugging information
 	  in case of any Xen bugs.
 
-config GCOV
-	bool "Gcov Support"
+config COVERAGE
+	bool "Code coverage support"
 	depends on !LIVEPATCH
 	select SUPPRESS_DUPLICATE_SYMBOL_WARNINGS
 	---help---
-	  Enable gcov (a test coverage program in GCC) support.
+	  Enable code coverage support.
 
 	  If unsure, say N here.
 

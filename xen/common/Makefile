@@ -74,7 +74,7 @@ tmem-y := tmem.o tmem_xen.o tmem_control.o
 tmem-$(CONFIG_COMPAT) += compat/tmem_xen.o
 obj-$(CONFIG_TMEM) += $(tmem-y)
 
-subdir-$(CONFIG_GCOV) += coverage
+subdir-$(CONFIG_COVERAGE) += coverage
 subdir-$(CONFIG_UBSAN) += ubsan
 
 subdir-y += libelf
