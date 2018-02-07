@@ -807,6 +807,13 @@ struct irq_desc *vgic_get_hw_irq_desc(struct domain *d, struct vcpu *v,
     return desc;
 }
 
+bool vgic_emulate(struct cpu_user_regs *regs, union hsr hsr)
+{
+    ASSERT(current->domain->arch.vgic.version == GIC_V3);
+
+    return false;
+}
+
 /*
  * was:
  *      int kvm_vgic_map_phys_irq(struct vcpu *vcpu, u32 virt_irq, u32 phys_irq)
