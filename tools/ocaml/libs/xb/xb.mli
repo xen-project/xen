@@ -76,10 +76,10 @@ type t = {
 val init_partial_in : unit -> partial_buf
 val reconnect : t -> unit
 val queue : t -> Packet.t -> unit
-val read_fd : backend_fd -> 'a -> string -> int -> int
+val read_fd : backend_fd -> 'a -> bytes -> int -> int
 val read_mmap : backend_mmap -> 'a -> string -> int -> int
 val read : t -> string -> int -> int
-val write_fd : backend_fd -> 'a -> string -> int -> int
+val write_fd : backend_fd -> 'a -> bytes -> int -> int
 val write_mmap : backend_mmap -> 'a -> string -> int -> int
 val write : t -> string -> int -> int
 val output : t -> bool
