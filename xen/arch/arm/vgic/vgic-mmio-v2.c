@@ -81,6 +81,49 @@ static void vgic_mmio_write_v2_misc(struct vcpu *vcpu,
     }
 }
 
+static void vgic_mmio_write_sgir(struct vcpu *source_vcpu,
+                                 paddr_t addr, unsigned int len,
+                                 unsigned long val)
+{
+    struct domain *d = source_vcpu->domain;
+    unsigned int nr_vcpus = d->max_vcpus;
+    unsigned int intid = val & GICD_SGI_INTID_MASK;
+    unsigned long targets = (val & GICD_SGI_TARGET_MASK) >>
+                            GICD_SGI_TARGET_SHIFT;
+    unsigned int vcpu_id;
+
+    switch ( val & GICD_SGI_TARGET_LIST_MASK )
+    {
+    case GICD_SGI_TARGET_LIST:                    /* as specified by targets */
+        targets &= GENMASK(nr_vcpus - 1, 0);      /* limit to existing VCPUs */
+        break;
+    case GICD_SGI_TARGET_OTHERS:
+        targets = GENMASK(nr_vcpus - 1, 0);       /* all, ...   */
+        targets &= ~(1U << source_vcpu->vcpu_id); /*   but self */
+        break;
+    case GICD_SGI_TARGET_SELF:                    /* this very vCPU only */
+        targets = (1U << source_vcpu->vcpu_id);
+        break;
+    case 0x3:                                     /* reserved */
+        return;
+    }
+
+    for_each_set_bit( vcpu_id, &targets, 8 )
+    {
+        struct vcpu *vcpu = d->vcpu[vcpu_id];
+        struct vgic_irq *irq = vgic_get_irq(d, vcpu, intid);
+        unsigned long flags;
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+
+        irq->pending_latch = true;
+        irq->source |= 1U << source_vcpu->vcpu_id;
+
+        vgic_queue_irq_unlock(d, irq, flags);
+        vgic_put_irq(d, irq);
+    }
+}
+
 static unsigned long vgic_mmio_read_target(struct vcpu *vcpu,
                                            paddr_t addr, unsigned int len)
 {
@@ -173,7 +216,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
         vgic_mmio_read_config, vgic_mmio_write_config, 2,
         VGIC_ACCESS_32bit),
     REGISTER_DESC_WITH_LENGTH(GICD_SGIR,
-        vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+        vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
         VGIC_ACCESS_32bit),
     REGISTER_DESC_WITH_LENGTH(GICD_CPENDSGIR,
         vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
