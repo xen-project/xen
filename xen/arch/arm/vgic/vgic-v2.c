@@ -249,6 +249,12 @@ void vgic_v2_populate_lr(struct vcpu *vcpu, struct vgic_irq *irq, int lr)
     gic_hw_ops->write_lr(lr, &lr_val);
 }
 
+void vgic_v2_enable(struct vcpu *vcpu)
+{
+    /* Get the show on the road... */
+    gic_hw_ops->update_hcr_status(GICH_HCR_EN, true);
+}
+
 /*
  * Local variables:
  * mode: C
