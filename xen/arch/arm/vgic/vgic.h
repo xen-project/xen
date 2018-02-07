@@ -25,6 +25,8 @@
 #define VARIANT_ID_XEN          0x01
 #define IMPLEMENTER_ARM         0x43b
 
+#define VGIC_PRI_BITS       5
+
 #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
 
 static inline bool irq_is_pending(struct vgic_irq *irq)
