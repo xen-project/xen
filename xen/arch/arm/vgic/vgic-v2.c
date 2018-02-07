@@ -255,6 +255,72 @@ void vgic_v2_enable(struct vcpu *vcpu)
     gic_hw_ops->update_hcr_status(GICH_HCR_EN, true);
 }
 
+int vgic_v2_map_resources(struct domain *d)
+{
+    struct vgic_dist *dist = &d->arch.vgic;
+    paddr_t cbase, csize;
+    paddr_t vbase;
+    int ret;
+
+    /*
+     * The hardware domain gets the hardware address.
+     * Guests get the virtual platform layout.
+     */
+    if ( is_hardware_domain(d) )
+    {
+        d->arch.vgic.vgic_dist_base = gic_v2_hw_data.dbase;
+        /*
+         * For the hardware domain, we always map the whole HW CPU
+         * interface region in order to match the device tree (the "reg"
+         * properties is copied as it is).
+         * Note that we assume the size of the CPU interface is always
+         * aligned to PAGE_SIZE.
+         */
+        cbase = gic_v2_hw_data.cbase;
+        csize = gic_v2_hw_data.csize;
+        vbase = gic_v2_hw_data.vbase;
+    }
+    else
+    {
+        d->arch.vgic.vgic_dist_base = GUEST_GICD_BASE;
+        /*
+         * The CPU interface exposed to the guest is always 8kB. We may
+         * need to add an offset to the virtual CPU interface base
+         * address when in the GIC is aliased to get a 8kB contiguous
+         * region.
+         */
+        BUILD_BUG_ON(GUEST_GICC_SIZE != SZ_8K);
+        cbase = GUEST_GICC_BASE;
+        csize = GUEST_GICC_SIZE;
+        vbase = gic_v2_hw_data.vbase + gic_v2_hw_data.aliased_offset;
+    }
+
+
+    ret = vgic_register_dist_iodev(d, gaddr_to_gfn(dist->vgic_dist_base),
+                                   VGIC_V2);
+    if ( ret )
+    {
+        gdprintk(XENLOG_ERR, "Unable to register VGIC MMIO regions\n");
+        return ret;
+    }
+
+    /*
+     * Map the gic virtual cpu interface in the gic cpu interface
+     * region of the guest.
+     */
+    ret = map_mmio_regions(d, gaddr_to_gfn(cbase), csize / PAGE_SIZE,
+                           maddr_to_mfn(vbase));
+    if ( ret )
+    {
+        gdprintk(XENLOG_ERR, "Unable to remap VGIC CPU to VCPU\n");
+        return ret;
+    }
+
+    dist->ready = true;
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

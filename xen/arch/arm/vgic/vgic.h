@@ -67,6 +67,7 @@ void vgic_v2_fold_lr_state(struct vcpu *vcpu);
 void vgic_v2_populate_lr(struct vcpu *vcpu, struct vgic_irq *irq, int lr);
 void vgic_v2_set_underflow(struct vcpu *vcpu);
 void vgic_v2_enable(struct vcpu *vcpu);
+int vgic_v2_map_resources(struct domain *d);
 int vgic_register_dist_iodev(struct domain *d, gfn_t dist_base_fn,
                              enum vgic_type);
 
