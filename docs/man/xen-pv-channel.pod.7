@@ -122,6 +122,8 @@ SUBSYSTEM=="xen", DEVPATH=="/devices/console-[0-9]", RUN+="xen-console-setup"
 
 where the "xen-console-setup" script would read the channel name and
 make a symlink in /dev/xen-channel/org.my.cloud.software.agent.version1
+pointing to /dev/hvcN. N is the same number as the number in "/devices/console-[0-9]".
+In other words, "/devices/console-2" maps to /dev/hvc2.
 
 
 =item 8.
