@@ -285,6 +285,97 @@ void vgic_mmio_write_cpending(struct vcpu *vcpu,
     }
 }
 
+/*
+ * The actual active bit for a virtual IRQ is held in the LR. Our shadow
+ * copy in struct vgic_irq is only synced when needed and may not be
+ * up-to-date all of the time.
+ * Returning the actual active state is quite costly (stopping all
+ * VCPUs processing any affected vIRQs), so we use a simple implementation
+ * to get the best possible answer.
+ */
+unsigned long vgic_mmio_read_active(struct vcpu *vcpu,
+                                    paddr_t addr, unsigned int len)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    uint32_t value = 0;
+    unsigned int i;
+
+    /* Loop over all IRQs affected by this read */
+    for ( i = 0; i < len * 8; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        if ( irq->active )
+            value |= (1U << i);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+
+    return value;
+}
+
+/*
+ * We don't actually support clearing the active state of an IRQ (yet).
+ * However there is a chance that most guests use this for initialization.
+ * We check whether this MMIO access would actually affect any active IRQ,
+ * and only print our warning in this case. So clearing already non-active
+ * IRQs would not be moaned about in the logs.
+ */
+void vgic_mmio_write_cactive(struct vcpu *vcpu,
+                             paddr_t addr, unsigned int len,
+                             unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    unsigned int i;
+
+    for_each_set_bit( i, &val, len * 8 )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        /*
+         * If we know that the IRQ is active or we can't be sure about
+         * it (because it is currently in a CPU), log the not properly
+         * emulated MMIO access.
+         */
+        if ( irq->active || irq->vcpu )
+            printk(XENLOG_G_ERR
+                   "%pv: vGICD: IRQ%u: clearing active state not supported\n",
+                   vcpu, irq->intid);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
+/*
+ * We don't actually support setting the active state of an IRQ (yet).
+ * We check whether this MMIO access would actually affect any non-active IRQ,
+ * and only print our warning in this case.
+ */
+void vgic_mmio_write_sactive(struct vcpu *vcpu,
+                             paddr_t addr, unsigned int len,
+                             unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    unsigned int i;
+
+    for_each_set_bit( i, &val, len * 8 )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        /*
+         * If we know that the IRQ is not active or we can't be sure about
+         * it (because it is currently in a CPU), log the not properly
+         * emulated MMIO access.
+         */
+        if ( !irq->active || irq->vcpu )
+            printk(XENLOG_G_ERR
+                   "%pv: vGICD: IRQ%u: setting active state not supported\n",
+                   vcpu, irq->intid);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
 static int match_region(const void *key, const void *elt)
 {
     const unsigned int offset = (unsigned long)key;
