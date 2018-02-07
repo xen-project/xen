@@ -692,6 +692,77 @@ void vgic_kick_vcpus(struct domain *d)
     }
 }
 
+struct irq_desc *vgic_get_hw_irq_desc(struct domain *d, struct vcpu *v,
+                                      unsigned int virq)
+{
+    struct irq_desc *desc = NULL;
+    struct vgic_irq *irq = vgic_get_irq(d, v, virq);
+    unsigned long flags;
+
+    if ( !irq )
+        return NULL;
+
+    spin_lock_irqsave(&irq->irq_lock, flags);
+    if ( irq->hw )
+    {
+        ASSERT(irq->hwintid >= VGIC_NR_PRIVATE_IRQS);
+        desc = irq_to_desc(irq->hwintid);
+    }
+    spin_unlock_irqrestore(&irq->irq_lock, flags);
+
+    vgic_put_irq(d, irq);
+
+    return desc;
+}
+
+/*
+ * was:
+ *      int kvm_vgic_map_phys_irq(struct vcpu *vcpu, u32 virt_irq, u32 phys_irq)
+ *      int kvm_vgic_unmap_phys_irq(struct vcpu *vcpu, unsigned int virt_irq)
+ */
+int vgic_connect_hw_irq(struct domain *d, struct vcpu *vcpu,
+                        unsigned int virt_irq, struct irq_desc *desc,
+                        bool connect)
+{
+    struct vgic_irq *irq = vgic_get_irq(d, vcpu, virt_irq);
+    unsigned long flags;
+    int ret = 0;
+
+    if ( !irq )
+        return -EINVAL;
+
+    spin_lock_irqsave(&irq->irq_lock, flags);
+
+    if ( connect )                      /* assign a mapped IRQ */
+    {
+        /* The VIRQ should not be already enabled by the guest */
+        if ( !irq->hw && !irq->enabled )
+        {
+            irq->hw = true;
+            irq->hwintid = desc->irq;
+        }
+        else
+            ret = -EBUSY;
+    }
+    else                                /* remove a mapped IRQ */
+    {
+        if ( desc && irq->hwintid != desc->irq )
+        {
+            ret = -EINVAL;
+        }
+        else
+        {
+            irq->hw = false;
+            irq->hwintid = 0;
+        }
+    }
+
+    spin_unlock_irqrestore(&irq->irq_lock, flags);
+    vgic_put_irq(d, irq);
+
+    return ret;
+}
+
 static unsigned int translate_irq_type(bool is_level)
 {
     return is_level ? IRQ_TYPE_LEVEL_HIGH : IRQ_TYPE_EDGE_RISING;
