@@ -629,10 +629,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     else if ( info->is_extfn )
         pdev_type = "extended function";
     else
-    {
-        info = NULL;
         pdev_type = "device";
-    }
 
     ret = xsm_resource_plug_pci(XSM_PRIV, (seg << 16) | (bus << 8) | devfn);
     if ( ret )
@@ -660,7 +657,8 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
         if ( pdev->info.is_virtfn )
             pdev->info.is_extfn = pf_is_extfn;
     }
-    else if ( !pdev->vf_rlen[0] )
+
+    if ( !pdev->info.is_virtfn && !pdev->vf_rlen[0] )
     {
         unsigned int pos = pci_find_ext_capability(seg, bus, devfn,
                                                    PCI_EXT_CAP_ID_SRIOV);
