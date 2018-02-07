@@ -170,6 +170,31 @@ struct mmio_handler_ops vgic_io_ops = {
     .write = dispatch_mmio_write,
 };
 
+int vgic_register_dist_iodev(struct domain *d, gfn_t dist_base_fn,
+                             enum vgic_type type)
+{
+    struct vgic_io_device *io_device = &d->arch.vgic.dist_iodev;
+    unsigned int len;
+
+    switch ( type )
+    {
+    case VGIC_V2:
+        len = vgic_v2_init_dist_iodev(io_device);
+        break;
+    default:
+        BUG();
+    }
+
+    io_device->base_fn = dist_base_fn;
+    io_device->iodev_type = IODEV_DIST;
+    io_device->redist_vcpu = NULL;
+
+    register_mmio_handler(d, &vgic_io_ops, gfn_to_gaddr(dist_base_fn), len,
+                          io_device);
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C
