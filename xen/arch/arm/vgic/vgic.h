@@ -17,6 +17,8 @@
 #ifndef __XEN_ARM_VGIC_VGIC_H__
 #define __XEN_ARM_VGIC_VGIC_H__
 
+#define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+
 static inline bool irq_is_pending(struct vgic_irq *irq)
 {
     if ( irq->config == VGIC_CONFIG_EDGE )

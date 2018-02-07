@@ -409,6 +409,231 @@ void vgic_inject_irq(struct domain *d, struct vcpu *vcpu, unsigned int intid,
     return;
 }
 
+/**
+ * vgic_prune_ap_list() - Remove non-relevant interrupts from the ap_list
+ *
+ * @vcpu:       The VCPU of which the ap_list should be pruned.
+ *
+ * Go over the list of interrupts on a VCPU's ap_list, and prune those that
+ * we won't have to consider in the near future.
+ * This removes interrupts that have been successfully handled by the guest,
+ * or that have otherwise became obsolete (not pending anymore).
+ * Also this moves interrupts between VCPUs, if their affinity has changed.
+ */
+static void vgic_prune_ap_list(struct vcpu *vcpu)
+{
+    struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic;
+    struct vgic_irq *irq, *tmp;
+    unsigned long flags;
+
+retry:
+    spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
+
+    list_for_each_entry_safe( irq, tmp, &vgic_cpu->ap_list_head, ap_list )
+    {
+        struct vcpu *target_vcpu, *vcpuA, *vcpuB;
+
+        spin_lock(&irq->irq_lock);
+
+        BUG_ON(vcpu != irq->vcpu);
+
+        target_vcpu = vgic_target_oracle(irq);
+
+        if ( !target_vcpu )
+        {
+            /*
+             * We don't need to process this interrupt any
+             * further, move it off the list.
+             */
+            list_del(&irq->ap_list);
+            irq->vcpu = NULL;
+            spin_unlock(&irq->irq_lock);
+
+            /*
+             * This vgic_put_irq call matches the
+             * vgic_get_irq_kref in vgic_queue_irq_unlock,
+             * where we added the LPI to the ap_list. As
+             * we remove the irq from the list, we drop
+             * also drop the refcount.
+             */
+            vgic_put_irq(vcpu->domain, irq);
+            continue;
+        }
+
+        if ( target_vcpu == vcpu )
+        {
+            /* We're on the right CPU */
+            spin_unlock(&irq->irq_lock);
+            continue;
+        }
+
+        /* This interrupt looks like it has to be migrated. */
+
+        spin_unlock(&irq->irq_lock);
+        spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
+
+        /*
+         * Ensure locking order by always locking the smallest
+         * ID first.
+         */
+        if ( vcpu->vcpu_id < target_vcpu->vcpu_id )
+        {
+            vcpuA = vcpu;
+            vcpuB = target_vcpu;
+        }
+        else
+        {
+            vcpuA = target_vcpu;
+            vcpuB = vcpu;
+        }
+
+        spin_lock_irqsave(&vcpuA->arch.vgic.ap_list_lock, flags);
+        spin_lock(&vcpuB->arch.vgic.ap_list_lock);
+        spin_lock(&irq->irq_lock);
+
+        /*
+         * If the affinity has been preserved, move the
+         * interrupt around. Otherwise, it means things have
+         * changed while the interrupt was unlocked, and we
+         * need to replay this.
+         *
+         * In all cases, we cannot trust the list not to have
+         * changed, so we restart from the beginning.
+         */
+        if ( target_vcpu == vgic_target_oracle(irq) )
+        {
+            struct vgic_cpu *new_cpu = &target_vcpu->arch.vgic;
+
+            list_del(&irq->ap_list);
+            irq->vcpu = target_vcpu;
+            list_add_tail(&irq->ap_list, &new_cpu->ap_list_head);
+        }
+
+        spin_unlock(&irq->irq_lock);
+        spin_unlock(&vcpuB->arch.vgic.ap_list_lock);
+        spin_unlock_irqrestore(&vcpuA->arch.vgic.ap_list_lock, flags);
+        goto retry;
+    }
+
+    spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
+}
+
+static void vgic_fold_lr_state(struct vcpu *vcpu)
+{
+}
+
+/* Requires the irq_lock to be held. */
+static void vgic_populate_lr(struct vcpu *vcpu,
+                             struct vgic_irq *irq, int lr)
+{
+    ASSERT(spin_is_locked(&irq->irq_lock));
+}
+
+static void vgic_set_underflow(struct vcpu *vcpu)
+{
+    ASSERT(vcpu == current);
+
+    gic_hw_ops->update_hcr_status(GICH_HCR_UIE, true);
+}
+
+/* Requires the ap_list_lock to be held. */
+static int compute_ap_list_depth(struct vcpu *vcpu)
+{
+    struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic;
+    struct vgic_irq *irq;
+    int count = 0;
+
+    ASSERT(spin_is_locked(&vgic_cpu->ap_list_lock));
+
+    list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list)
+        count++;
+
+    return count;
+}
+
+/* Requires the VCPU's ap_list_lock to be held. */
+static void vgic_flush_lr_state(struct vcpu *vcpu)
+{
+    struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic;
+    struct vgic_irq *irq;
+    int count = 0;
+
+    ASSERT(spin_is_locked(&vgic_cpu->ap_list_lock));
+
+    if ( compute_ap_list_depth(vcpu) > gic_get_nr_lrs() )
+        vgic_sort_ap_list(vcpu);
+
+    list_for_each_entry( irq, &vgic_cpu->ap_list_head, ap_list )
+    {
+        spin_lock(&irq->irq_lock);
+
+        if ( likely(vgic_target_oracle(irq) == vcpu) )
+            vgic_populate_lr(vcpu, irq, count++);
+
+        spin_unlock(&irq->irq_lock);
+
+        if ( count == gic_get_nr_lrs() )
+        {
+            if ( !list_is_last(&irq->ap_list, &vgic_cpu->ap_list_head) )
+                vgic_set_underflow(vcpu);
+            break;
+        }
+    }
+
+    vcpu->arch.vgic.used_lrs = count;
+}
+
+/**
+ * vgic_sync_from_lrs() - Update VGIC state from hardware after a guest's run.
+ * @vcpu: the VCPU for which to transfer from the LRs to the IRQ list.
+ *
+ * Sync back the hardware VGIC state after the guest has run, into our
+ * VGIC emulation structures, It reads the LRs and updates the respective
+ * struct vgic_irq, taking level/edge into account.
+ * This is the high level function which takes care of the conditions,
+ * also bails out early if there were no interrupts queued.
+ * Was: kvm_vgic_sync_hwstate()
+ */
+void vgic_sync_from_lrs(struct vcpu *vcpu)
+{
+    /* An empty ap_list_head implies used_lrs == 0 */
+    if ( list_empty(&vcpu->arch.vgic.ap_list_head) )
+        return;
+
+    vgic_fold_lr_state(vcpu);
+
+    vgic_prune_ap_list(vcpu);
+}
+
+/**
+ * vgic_sync_to_lrs() - flush emulation state into the hardware on guest entry
+ *
+ * Before we enter a guest, we have to translate the virtual GIC state of a
+ * VCPU into the GIC virtualization hardware registers, namely the LRs.
+ * This is the high level function which takes care about the conditions
+ * and the locking, also bails out early if there are no interrupts queued.
+ * Was: kvm_vgic_flush_hwstate()
+ */
+void vgic_sync_to_lrs(void)
+{
+    /*
+     * If there are no virtual interrupts active or pending for this
+     * VCPU, then there is no work to do and we can bail out without
+     * taking any lock.  There is a potential race with someone injecting
+     * interrupts to the VCPU, but it is a benign race as the VCPU will
+     * either observe the new interrupt before or after doing this check,
+     * and introducing additional synchronization mechanism doesn't change
+     * this.
+     */
+    if ( list_empty(&current->arch.vgic.ap_list_head) )
+        return;
+
+    ASSERT(!local_irq_is_enabled());
+
+    spin_lock(&current->arch.vgic.ap_list_lock);
+    vgic_flush_lr_state(current);
+    spin_unlock(&current->arch.vgic.ap_list_lock);
+}
 /*
  * Local variables:
  * mode: C
