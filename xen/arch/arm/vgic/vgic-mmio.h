@@ -97,6 +97,17 @@ void vgic_mmio_write_cenable(struct vcpu *vcpu,
                              paddr_t addr, unsigned int len,
                              unsigned long val);
 
+unsigned long vgic_mmio_read_pending(struct vcpu *vcpu,
+                                     paddr_t addr, unsigned int len);
+
+void vgic_mmio_write_spending(struct vcpu *vcpu,
+                              paddr_t addr, unsigned int len,
+                              unsigned long val);
+
+void vgic_mmio_write_cpending(struct vcpu *vcpu,
+                              paddr_t addr, unsigned int len,
+                              unsigned long val);
+
 unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
 
 #endif

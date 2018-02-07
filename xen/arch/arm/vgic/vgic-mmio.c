@@ -156,6 +156,135 @@ void vgic_mmio_write_cenable(struct vcpu *vcpu,
     }
 }
 
+unsigned long vgic_mmio_read_pending(struct vcpu *vcpu,
+                                     paddr_t addr, unsigned int len)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    uint32_t value = 0;
+    unsigned int i;
+
+    /* Loop over all IRQs affected by this read */
+    for ( i = 0; i < len * 8; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        if ( irq_is_pending(irq) )
+            value |= (1U << i);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+
+    return value;
+}
+
+void vgic_mmio_write_spending(struct vcpu *vcpu,
+                              paddr_t addr, unsigned int len,
+                              unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    unsigned int i;
+    unsigned long flags;
+    irq_desc_t *desc;
+
+    for_each_set_bit( i, &val, len * 8 )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+        irq->pending_latch = true;
+
+        /* To observe the locking order, just take the irq_desc pointer here. */
+        if ( irq->hw )
+            desc = irq_to_desc(irq->hwintid);
+        else
+            desc = NULL;
+
+        vgic_queue_irq_unlock(vcpu->domain, irq, flags);
+
+        /*
+         * When the VM sets the pending state for a HW interrupt on the virtual
+         * distributor we set the active state on the physical distributor,
+         * because the virtual interrupt can become active and then the guest
+         * can deactivate it.
+         */
+        if ( desc )
+        {
+            spin_lock_irqsave(&desc->lock, flags);
+            spin_lock(&irq->irq_lock);
+
+            /* This h/w IRQ should still be assigned to the virtual IRQ. */
+            ASSERT(irq->hw && desc->irq == irq->hwintid);
+
+            gic_set_active_state(desc, true);
+
+            spin_unlock(&irq->irq_lock);
+            spin_unlock_irqrestore(&desc->lock, flags);
+        }
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
+void vgic_mmio_write_cpending(struct vcpu *vcpu,
+                              paddr_t addr, unsigned int len,
+                              unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 1);
+    unsigned int i;
+    unsigned long flags;
+    irq_desc_t *desc;
+
+    for_each_set_bit( i, &val, len * 8 )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+        irq->pending_latch = false;
+
+        /* To observe the locking order, just take the irq_desc pointer here. */
+        if ( irq->hw )
+            desc = irq_to_desc(irq->hwintid);
+        else
+            desc = NULL;
+
+        spin_unlock_irqrestore(&irq->irq_lock, flags);
+
+        /*
+         * We don't want the guest to effectively mask the physical
+         * interrupt by doing a write to SPENDR followed by a write to
+         * CPENDR for HW interrupts, so we clear the active state on
+         * the physical side if the virtual interrupt is not active.
+         * This may lead to taking an additional interrupt on the
+         * host, but that should not be a problem as the worst that
+         * can happen is an additional vgic injection.  We also clear
+         * the pending state to maintain proper semantics for edge HW
+         * interrupts.
+         */
+        if ( desc )
+        {
+            spin_lock_irqsave(&desc->lock, flags);
+            spin_lock(&irq->irq_lock);
+
+            /* This h/w IRQ should still be assigned to the virtual IRQ. */
+            ASSERT(irq->hw && desc->irq == irq->hwintid);
+
+            /* Check that we didn't become pending again meanwhile. */
+            if ( !irq_is_pending(irq) )
+            {
+                gic_set_pending_state(desc, false);
+                if ( !irq->active )
+                    gic_set_active_state(desc, false);
+            }
+
+            spin_unlock(&irq->irq_lock);
+            spin_unlock_irqrestore(&desc->lock, flags);
+        }
+
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
 static int match_region(const void *key, const void *elt)
 {
     const unsigned int offset = (unsigned long)key;
