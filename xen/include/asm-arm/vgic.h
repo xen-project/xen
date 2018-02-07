@@ -18,6 +18,10 @@
 #ifndef __ASM_ARM_VGIC_H__
 #define __ASM_ARM_VGIC_H__
 
+#ifdef CONFIG_NEW_VGIC
+#include <asm/new_vgic.h>
+#else
+
 #include <xen/bitops.h>
 #include <xen/radix-tree.h>
 #include <xen/rbtree.h>
@@ -298,6 +302,8 @@ extern bool vgic_to_sgi(struct vcpu *v, register_t sgir,
                         enum gic_sgi_mode irqmode, int virq,
                         const struct sgi_target *target);
 extern bool vgic_migrate_irq(struct vcpu *old, struct vcpu *new, unsigned int irq);
+
+#endif /* !CONFIG_NEW_VGIC */
 
 /*** Common VGIC functions used by Xen arch code ****/
 
