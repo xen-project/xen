@@ -81,6 +81,63 @@ static void vgic_mmio_write_v2_misc(struct vcpu *vcpu,
     }
 }
 
+static unsigned long vgic_mmio_read_target(struct vcpu *vcpu,
+                                           paddr_t addr, unsigned int len)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 8);
+    uint32_t val = 0;
+    unsigned int i;
+
+    for ( i = 0; i < len; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, vcpu, intid + i);
+
+        val |= (uint32_t)irq->targets << (i * 8);
+
+        vgic_put_irq(vcpu->domain, irq);
+    }
+
+    return val;
+}
+
+static void vgic_mmio_write_target(struct vcpu *vcpu,
+                                   paddr_t addr, unsigned int len,
+                                   unsigned long val)
+{
+    uint32_t intid = VGIC_ADDR_TO_INTID(addr, 8);
+    uint8_t cpu_mask = GENMASK(vcpu->domain->max_vcpus - 1, 0);
+    unsigned int i;
+    unsigned long flags;
+
+    /* GICD_ITARGETSR[0-7] are read-only */
+    if ( intid < VGIC_NR_PRIVATE_IRQS )
+        return;
+
+    for ( i = 0; i < len; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(vcpu->domain, NULL, intid + i);
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+
+        irq->targets = (val >> (i * 8)) & cpu_mask;
+        if ( irq->targets )
+        {
+            irq->target_vcpu = vcpu->domain->vcpu[ffs(irq->targets) - 1];
+            if ( irq->hw )
+            {
+                struct irq_desc *desc = irq_to_desc(irq->hwintid);
+
+                irq_set_affinity(desc, cpumask_of(irq->target_vcpu->processor));
+            }
+        }
+        else
+            irq->target_vcpu = NULL;
+
+        spin_unlock_irqrestore(&irq->irq_lock, flags);
+        vgic_put_irq(vcpu->domain, irq);
+    }
+}
+
 static const struct vgic_register_region vgic_v2_dist_registers[] = {
     REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
         vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
@@ -110,7 +167,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
         vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
         VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
     REGISTER_DESC_WITH_BITS_PER_IRQ(GICD_ITARGETSR,
-        vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+        vgic_mmio_read_target, vgic_mmio_write_target, 8,
         VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
     REGISTER_DESC_WITH_BITS_PER_IRQ(GICD_ICFGR,
         vgic_mmio_read_config, vgic_mmio_write_config, 2,
