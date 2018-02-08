@@ -140,14 +140,10 @@ static elf_negerrnoval xc_dom_probe_elf_kernel(struct xc_dom_image *dom)
     return 0;
 }
 
-static elf_errorstatus xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
-    /*
-     * This function sometimes returns -1 for error and sometimes
-     * an errno value.  ?!?!
-     */
+static elf_negerrnoval xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
 {
     struct elf_binary *elf;
-    elf_errorstatus rc;
+    elf_negerrnoval rc;
 
     rc = check_elf_kernel(dom, 1);
     if ( rc != 0 )
@@ -155,9 +151,9 @@ static elf_errorstatus xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
 
     elf = xc_dom_malloc(dom, sizeof(*elf));
     if ( elf == NULL )
-        return -1;
+        return -ENOMEM;
     dom->private_loader = elf;
-    rc = elf_init(elf, dom->kernel_blob, dom->kernel_size);
+    rc = elf_init(elf, dom->kernel_blob, dom->kernel_size) != 0 ? -EINVAL : 0;
     xc_elf_set_logfile(dom->xch, elf, 1);
     if ( rc != 0 )
     {
@@ -177,8 +173,9 @@ static elf_errorstatus xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
 
     /* parse binary and get xen meta info */
     elf_parse_binary(elf);
-    if ( (rc = elf_xen_parse(elf, &dom->parms)) != 0 )
+    if ( elf_xen_parse(elf, &dom->parms) != 0 )
     {
+        rc = -EINVAL;
         goto out;
     }
 
