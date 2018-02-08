@@ -252,6 +252,22 @@ and not running softirqs. Reduce this if softirqs are not being run frequently
 enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
+### bti (x86)
+> `= List of [ thunk=retpoline|lfence|jmp ]`
+
+Branch Target Injection controls.  By default, Xen will pick the most
+appropriate BTI mitigations based on compiled in support, loaded microcode,
+and hardware details.
+
+**WARNING: Any use of this option may interfere with heuristics.  Use with
+extreme care.**
+
+If Xen was compiled with INDIRECT_THUNK support, `thunk=` can be used to
+select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
+locations.  The default thunk is `retpoline` (generally preferred for Intel
+hardware), with the alternatives being `jmp` (a `jmp *%reg` gadget, minimal
+overhead), and `lfence` (an `lfence; jmp *%reg` gadget, preferred for AMD).
+
 ### xenheap\_megabytes (arm32)
 > `= <size>`
 
