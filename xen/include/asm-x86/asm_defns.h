@@ -120,7 +120,7 @@ void ret_from_intr(void);
 
 #define STACK_CPUINFO_FIELD(field) (1 - CPUINFO_sizeof + CPUINFO_##field)
 #define GET_STACK_END(reg)                        \
-        .if .Lr##reg > 8;                         \
+        .if .Lr##reg >= 8;                        \
         movq $STACK_SIZE-1, %r##reg;              \
         .else;                                    \
         movl $STACK_SIZE-1, %e##reg;              \
