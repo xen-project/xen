@@ -1,17 +1,10 @@
 #ifndef __X86_ALTERNATIVE_H__
 #define __X86_ALTERNATIVE_H__
 
+#include <asm/alternative-asm.h>
 #include <asm/nops.h>
 
-#ifdef __ASSEMBLY__
-.macro altinstruction_entry orig alt feature orig_len alt_len
-        .long \orig - .
-        .long \alt - .
-        .word \feature
-        .byte \orig_len
-        .byte \alt_len
-.endm
-#else
+#ifndef __ASSEMBLY__
 #include <xen/stringify.h>
 #include <xen/types.h>
 
@@ -145,6 +138,6 @@ extern void alternative_instructions(void);
 /* Use this macro(s) if you need more than one output parameter. */
 #define ASM_OUTPUT2(a...) a
 
-#endif  /*  __ASSEMBLY__  */
+#endif /*  !__ASSEMBLY__  */
 
 #endif /* __X86_ALTERNATIVE_H__ */
