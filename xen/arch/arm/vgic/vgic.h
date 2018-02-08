@@ -25,6 +25,9 @@
 #define VARIANT_ID_XEN          0x01
 #define IMPLEMENTER_ARM         0x43b
 
+#define VGIC_ADDR_UNDEF     INVALID_PADDR
+#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
+
 #define VGIC_PRI_BITS       5
 
 #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
