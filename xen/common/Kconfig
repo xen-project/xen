@@ -186,7 +186,7 @@ config SCHED_RTDS
 
 config SCHED_ARINC653
 	bool "ARINC653 scheduler support (EXPERIMENTAL)"
-	default y
+	default DEBUG
 	---help---
 	  The ARINC653 scheduler is a hard real-time scheduler for single
 	  cores, targeted for avionics, drones, and medical devices.
