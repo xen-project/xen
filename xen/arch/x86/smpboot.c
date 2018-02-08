@@ -40,6 +40,7 @@
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
+#include <asm/spec_ctrl.h>
 #include <asm/time.h>
 #include <asm/tboot.h>
 #include <mach_apic.h>
@@ -302,6 +303,7 @@ void start_secondary(void *unused)
     set_current(idle_vcpu[cpu]);
     this_cpu(curr_vcpu) = idle_vcpu[cpu];
     rdmsrl(MSR_EFER, this_cpu(efer));
+    init_shadow_spec_ctrl_state();
 
     /*
      * Just as during early bootstrap, it is convenient here to disable

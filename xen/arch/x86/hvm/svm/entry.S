@@ -77,6 +77,11 @@ UNLIKELY_END(svm_trace)
         or   $X86_EFLAGS_MBS,%rax
         mov  %rax,VMCB_rflags(%rcx)
 
+        mov VCPU_arch_spec_ctrl(%rbx), %eax
+
+        /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
+        SPEC_CTRL_EXIT_TO_GUEST /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
+
         pop  %r15
         pop  %r14
         pop  %r13
@@ -99,8 +104,11 @@ UNLIKELY_END(svm_trace)
         SAVE_ALL
 
         GET_CURRENT(bx)
-        mov  VCPU_svm_vmcb(%rbx),%rcx
 
+        SPEC_CTRL_ENTRY_FROM_VMEXIT /* Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
+        mov  VCPU_svm_vmcb(%rbx),%rcx
         movb $0,VCPU_svm_vmcb_in_sync(%rbx)
         mov  VMCB_rax(%rcx),%rax
         mov  %rax,UREGS_rax(%rsp)

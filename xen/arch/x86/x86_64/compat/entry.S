@@ -16,6 +16,10 @@ ENTRY(entry_int82)
         pushq $0
         movl  $HYPERCALL_VECTOR, 4(%rsp)
         SAVE_ALL compat=1 /* DPL1 gate, restricted to 32bit PV guests only. */
+
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
         CR4_PV32_RESTORE
 
         GET_CURRENT(bx)
@@ -140,6 +144,12 @@ ENTRY(compat_restore_all_guest)
         .popsection
         or    $X86_EFLAGS_IF,%r11
         mov   %r11d,UREGS_eflags(%rsp)
+
+        mov VCPU_arch_spec_ctrl(%rbx), %eax
+
+        /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
+        SPEC_CTRL_EXIT_TO_GUEST /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
+
         RESTORE_ALL adj=8 compat=1
 .Lft0:  iretq
         _ASM_PRE_EXTABLE(.Lft0, handle_exception)
@@ -197,6 +207,9 @@ ENTRY(cstar_enter)
         pushq $0
         movl  $TRAP_syscall, 4(%rsp)
         SAVE_ALL
+
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         GET_STACK_END(bx)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
