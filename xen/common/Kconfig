@@ -164,7 +164,8 @@ menu "Schedulers"
 	visible if EXPERT = "y"
 
 config SCHED_CREDIT
-	def_bool y
+	bool "Credit scheduler support"
+	default y
 	---help---
 	  The traditional credit scheduler is a general purpose scheduler.
 
