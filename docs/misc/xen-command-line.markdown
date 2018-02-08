@@ -253,7 +253,7 @@ enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
 ### bti (x86)
-> `= List of [ thunk=retpoline|lfence|jmp, ibrs=<bool>, rsb_{vmexit,native}=<bool> ]`
+> `= List of [ thunk=retpoline|lfence|jmp, ibrs=<bool>, ibpb=<bool>, rsb_{vmexit,native}=<bool> ]`
 
 Branch Target Injection controls.  By default, Xen will pick the most
 appropriate BTI mitigations based on compiled in support, loaded microcode,
@@ -271,6 +271,9 @@ overhead), and `lfence` (an `lfence; jmp *%reg` gadget, preferred for AMD).
 On hardware supporting IBRS, the `ibrs=` option can be used to force or
 prevent Xen using the feature itself.  If Xen is not using IBRS itself,
 functionality is still set up so IBRS can be virtualised for guests.
+
+On hardware supporting IBPB, the `ibpb=` option can be used to prevent Xen
+from issuing Branch Prediction Barriers on vcpu context switches.
 
 The `rsb_vmexit=` and `rsb_native=` options can be used to fine tune when the
 RSB gets overwritten.  There are individual controls for an entry from HVM
