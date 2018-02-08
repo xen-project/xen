@@ -123,7 +123,7 @@ UNLIKELY_START(g, exit_cr3)
 UNLIKELY_END(exit_cr3)
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        SPEC_CTRL_EXIT_TO_XEN /* Req: %rbx=end, Clob: acd */
+        SPEC_CTRL_EXIT_TO_XEN_IST /* Req: %rbx=end, Clob: acd */
 
         RESTORE_ALL adj=8
         iretq
@@ -729,7 +729,7 @@ ENTRY(double_fault)
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_INTR_IST /* Req: %rsp=regs, %r14=end, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rbx
@@ -762,7 +762,7 @@ handle_ist_exception:
 
         GET_STACK_END(14)
 
-        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, Clob: acd */
+        SPEC_CTRL_ENTRY_FROM_INTR_IST /* Req: %rsp=regs, %r14=end, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
