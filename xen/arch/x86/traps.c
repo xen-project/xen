@@ -2147,37 +2147,54 @@ void (*pv_post_outb_hook)(unsigned int port, u8 value);
 
 typedef void io_emul_stub_t(struct cpu_user_regs *);
 
+void __x86_indirect_thunk_rcx(void);
+
 static io_emul_stub_t *io_emul_stub_setup(struct priv_op_ctxt *ctxt, u8 opcode,
                                           unsigned int port, unsigned int bytes)
 {
+    struct stubs *this_stubs = &this_cpu(stubs);
+    unsigned long stub_va = this_stubs->addr + STUB_BUF_SIZE / 2;
+
     if ( !ctxt->io_emul_stub )
-        ctxt->io_emul_stub = map_domain_page(_mfn(this_cpu(stubs.mfn))) +
-                                             (this_cpu(stubs.addr) &
-                                              ~PAGE_MASK) +
-                                             STUB_BUF_SIZE / 2;
+        ctxt->io_emul_stub =
+            map_domain_page(_mfn(this_stubs->mfn)) + (stub_va & ~PAGE_MASK);
 
     /* movq $host_to_guest_gpr_switch,%rcx */
     ctxt->io_emul_stub[0] = 0x48;
     ctxt->io_emul_stub[1] = 0xb9;
     *(void **)&ctxt->io_emul_stub[2] = (void *)host_to_guest_gpr_switch;
+
+#ifdef CONFIG_INDIRECT_THUNK
+    /* callq __x86_indirect_thunk_rcx */
+    ctxt->io_emul_stub[10] = 0xe8;
+    *(int32_t *)&ctxt->io_emul_stub[11] =
+        (long)__x86_indirect_thunk_rcx - (stub_va + 11 + 4);
+#else
     /* callq *%rcx */
     ctxt->io_emul_stub[10] = 0xff;
     ctxt->io_emul_stub[11] = 0xd1;
+    /* TODO: untangle ideal_nops from init/livepatch Kconfig options. */
+    memcpy(&ctxt->io_emul_stub[12], "\x0f\x1f\x00", 3); /* P6_NOP3 */
+#endif
+
     /* data16 or nop */
-    ctxt->io_emul_stub[12] = (bytes != 2) ? 0x90 : 0x66;
+    ctxt->io_emul_stub[15] = (bytes != 2) ? 0x90 : 0x66;
     /* <io-access opcode> */
-    ctxt->io_emul_stub[13] = opcode;
+    ctxt->io_emul_stub[16] = opcode;
     /* imm8 or nop */
-    ctxt->io_emul_stub[14] = !(opcode & 8) ? port : 0x90;
+    ctxt->io_emul_stub[17] = !(opcode & 8) ? port : 0x90;
     /* ret (jumps to guest_to_host_gpr_switch) */
-    ctxt->io_emul_stub[15] = 0xc3;
-    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < 16);
+    ctxt->io_emul_stub[18] = 0xc3;
+    BUILD_BUG_ON(STUB_BUF_SIZE / 2 < 19);
 
     if ( ioemul_handle_quirk )
-        ioemul_handle_quirk(opcode, &ctxt->io_emul_stub[12], ctxt->ctxt.regs);
+    {
+        BUILD_BUG_ON(STUB_BUF_SIZE / 2 < 15 + 10);
+        ioemul_handle_quirk(opcode, &ctxt->io_emul_stub[15], ctxt->ctxt.regs);
+    }
 
     /* Handy function-typed pointer to the stub. */
-    return (void *)(this_cpu(stubs.addr) + STUB_BUF_SIZE / 2);
+    return (void *)stub_va;
 }
 
 static int priv_op_read_io(unsigned int port, unsigned int bytes,

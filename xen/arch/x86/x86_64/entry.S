@@ -583,7 +583,8 @@ handle_exception_saved:
         movzbl UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         PERFC_INCR(exceptions, %rax, %rbx)
-        callq *(%rdx,%rax,8)
+        mov   (%rdx, %rax, 8), %rdx
+        INDIRECT_CALL %rdx
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
@@ -755,7 +756,8 @@ handle_ist_exception:
 1:      movq  %rsp,%rdi
         movzbl UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
-        callq *(%rdx,%rax,8)
+        mov   (%rdx, %rax, 8), %rdx
+        INDIRECT_CALL %rdx
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         cmpb  $TRAP_nmi,UREGS_entry_vector(%rsp)
         jne   ret_from_intr

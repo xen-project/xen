@@ -153,8 +153,28 @@ trampoline_protmode_entry:
         .code64
 start64:
         /* Jump to high mappings. */
-        movabs  $__high_start,%rax
-        jmpq    *%rax
+        movabs  $__high_start, %rdi
+
+#ifdef CONFIG_INDIRECT_THUNK
+        /*
+         * If booting virtualised, or hot-onlining a CPU, sibling threads can
+         * attempt Branch Target Injection against this jmp.
+         *
+         * We've got no usable stack so can't use a RETPOLINE thunk, and are
+         * further than disp32 from the high mappings so couldn't use
+         * JUMP_THUNK even if it was a non-RETPOLINE thunk.  Furthermore, an
+         * LFENCE isn't necessarily safe to use at this point.
+         *
+         * As this isn't a hotpath, use a fully serialising event to reduce
+         * the speculation window as much as possible.  %ebx needs preserving
+         * for __high_start.
+         */
+        mov     %ebx, %esi
+        cpuid
+        mov     %esi, %ebx
+#endif
+
+        jmpq    *%rdi
 
 #include "wakeup.S"
 

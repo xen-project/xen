@@ -828,7 +828,7 @@ do{ asm volatile (                                                      \
 #ifdef __XEN__
 # define invoke_stub(pre, post, constraints...) do {                    \
     union stub_exception_token res_ = { .raw = ~0 };                    \
-    asm volatile ( pre "\n\tcall *%[stub]\n\t" post "\n"                \
+    asm volatile ( pre "\n\tINDIRECT_CALL %[stub]\n\t" post "\n"        \
                    ".Lret%=:\n\t"                                       \
                    ".pushsection .fixup,\"ax\"\n"                       \
                    ".Lfix%=:\n\t"                                       \
@@ -837,7 +837,7 @@ do{ asm volatile (                                                      \
                    ".popsection\n\t"                                    \
                    _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
                    : [exn] "+g" (res_), constraints,                    \
-                     [stub] "rm" (stub.func),                           \
+                     [stub] "r" (stub.func),                            \
                      "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.ptr) );   \
     if ( unlikely(~res_.raw) )                                          \
     {                                                                   \
