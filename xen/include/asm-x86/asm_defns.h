@@ -289,6 +289,19 @@ static always_inline void stac(void)
  */
 .macro RESTORE_ALL adj=0 compat=0
 .if !\compat
+        movq  UREGS_r15(%rsp), %r15
+        movq  UREGS_r14(%rsp), %r14
+        movq  UREGS_r13(%rsp), %r13
+        movq  UREGS_r12(%rsp), %r12
+.else
+        xor %r15, %r15
+        xor %r14, %r14
+        xor %r13, %r13
+        xor %r12, %r12
+.endif
+        LOAD_ONE_REG(bp, \compat)
+        LOAD_ONE_REG(bx, \compat)
+.if !\compat
         movq  UREGS_r11(%rsp),%r11
         movq  UREGS_r10(%rsp),%r10
         movq  UREGS_r9(%rsp),%r9
@@ -304,19 +317,6 @@ static always_inline void stac(void)
         LOAD_ONE_REG(dx, \compat)
         LOAD_ONE_REG(si, \compat)
         LOAD_ONE_REG(di, \compat)
-.if !\compat
-        movq  UREGS_r15(%rsp),%r15
-        movq  UREGS_r14(%rsp),%r14
-        movq  UREGS_r13(%rsp),%r13
-        movq  UREGS_r12(%rsp),%r12
-.else
-        xor %r15, %r15
-        xor %r14, %r14
-        xor %r13, %r13
-        xor %r12, %r12
-.endif
-        LOAD_ONE_REG(bp, \compat)
-        LOAD_ONE_REG(bx, \compat)
         subq  $-(UREGS_error_code-UREGS_r15+\adj), %rsp
 .endm
 
