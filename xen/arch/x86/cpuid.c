@@ -389,6 +389,16 @@ static void __init calculate_pv_max_policy(void)
     /* Unconditionally claim to be able to set the hypervisor bit. */
     __set_bit(X86_FEATURE_HYPERVISOR, pv_featureset);
 
+    /* On hardware with IBRS/IBPB support, there are further adjustments. */
+    if ( test_bit(X86_FEATURE_IBRSB, pv_featureset) )
+    {
+        /* Offer STIBP unconditionally.  It is a nop on non-HT hardware. */
+        __set_bit(X86_FEATURE_STIBP, pv_featureset);
+
+        /* AMD's IBPB is a subset of IBRS/IBPB. */
+        __set_bit(X86_FEATURE_IBPB, pv_featureset);
+    }
+
     sanitise_featureset(pv_featureset);
     cpuid_featureset_to_policy(pv_featureset, p);
     recalculate_xstate(p);
@@ -443,6 +453,16 @@ static void __init calculate_hvm_max_policy(void)
 
         if ( !cpu_has_vmx_xsaves )
             __clear_bit(X86_FEATURE_XSAVES, hvm_featureset);
+    }
+
+    /* On hardware with IBRS/IBPB support, there are further adjustments. */
+    if ( test_bit(X86_FEATURE_IBRSB, hvm_featureset) )
+    {
+        /* Offer STIBP unconditionally.  It is a nop on non-HT hardware. */
+        __set_bit(X86_FEATURE_STIBP, hvm_featureset);
+
+        /* AMD's IBPB is a subset of IBRS/IBPB. */
+        __set_bit(X86_FEATURE_IBPB, hvm_featureset);
     }
 
     sanitise_featureset(hvm_featureset);
@@ -585,6 +605,14 @@ void recalculate_cpuid_policy(struct domain *d)
 
     recalculate_xstate(p);
     recalculate_misc(p);
+
+    /*
+     * Override STIBP to match IBRS.  Guests can safely use STIBP
+     * functionality on non-HT hardware, but can't necesserily protect
+     * themselves from SP2/Spectre/Branch Target Injection if STIBP is hidden
+     * on HT-capable hardware.
+     */
+    p->feat.stibp = p->feat.ibrsb;
 
     for ( i = 0; i < ARRAY_SIZE(p->cache.raw); ++i )
     {

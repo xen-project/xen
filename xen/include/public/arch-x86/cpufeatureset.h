@@ -242,7 +242,7 @@ XEN_CPUFEATURE(IBPB,          8*32+12) /*   IBPB support only (no IBRS, used by 
 XEN_CPUFEATURE(AVX512_4VNNIW, 9*32+ 2) /*A  AVX512 Neural Network Instructions */
 XEN_CPUFEATURE(AVX512_4FMAPS, 9*32+ 3) /*A  AVX512 Multiply Accumulation Single Precision */
 XEN_CPUFEATURE(IBRSB,         9*32+26) /*   IBRS and IBPB support (used by Intel) */
-XEN_CPUFEATURE(STIBP,         9*32+27) /*   STIBP */
+XEN_CPUFEATURE(STIBP,         9*32+27) /*!  STIBP */
 
 #endif /* XEN_CPUFEATURE */
 
