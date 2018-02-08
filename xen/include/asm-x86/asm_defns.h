@@ -310,7 +310,6 @@ static always_inline void stac(void)
  * @compat: R8-R15 don't need reloading
  */
 .macro RESTORE_ALL adj=0 compat=0
-        LOAD_C_CLOBBERED \compat
 .if !\compat
         movq  UREGS_r15(%rsp),%r15
         movq  UREGS_r14(%rsp),%r14
@@ -319,6 +318,7 @@ static always_inline void stac(void)
 .endif
         LOAD_ONE_REG(bp, \compat)
         LOAD_ONE_REG(bx, \compat)
+        LOAD_C_CLOBBERED \compat
         subq  $-(UREGS_error_code-UREGS_r15+\adj), %rsp
 .endm
 
