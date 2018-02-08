@@ -787,18 +787,28 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 static unsigned int __init vmx_init_msr(void)
 {
     return 1 /* MISC_FEATURES_ENABLES */ +
+           !!boot_cpu_has(X86_FEATURE_IBRSB) +
            (cpu_has_mpx && cpu_has_vmx_mpx) +
            (cpu_has_xsaves && cpu_has_vmx_xsaves);
 }
 
 static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
 {
+    uint32_t edx, dummy;
+
     vmx_vmcs_enter(v);
 
     if ( v->arch.cpuid_faulting )
     {
         ctxt->msr[ctxt->count].index = MSR_INTEL_MISC_FEATURES_ENABLES;
         ctxt->msr[ctxt->count++].val = MSR_MISC_FEATURES_CPUID_FAULTING;
+    }
+
+    domain_cpuid(v->domain, 7, 0, &dummy, &dummy, &dummy, &edx);
+    if ( (edx & cpufeat_mask(X86_FEATURE_IBRSB)) && v->arch.spec_ctrl )
+    {
+        ctxt->msr[ctxt->count].index = MSR_SPEC_CTRL;
+        ctxt->msr[ctxt->count++].val = v->arch.spec_ctrl;
     }
 
     if ( cpu_has_mpx && cpu_has_vmx_mpx )
@@ -829,6 +839,19 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
     {
         switch ( ctxt->msr[i].index )
         {
+        case MSR_SPEC_CTRL:
+            if ( !boot_cpu_has(X86_FEATURE_IBRSB) )
+                err = -ENXIO; /* MSR available? */
+            /*
+             * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e.
+             * ignored) when STIBP isn't enumerated in hardware.
+             */
+            else if ( ctxt->msr[i].val &
+                      ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+                err = -ENXIO;
+            else
+                v->arch.spec_ctrl = ctxt->msr[i].val;
+            break;
         case MSR_INTEL_MISC_FEATURES_ENABLES:
             v->arch.cpuid_faulting = !!(ctxt->msr[i].val &
                                         MSR_MISC_FEATURES_CPUID_FAULTING);
