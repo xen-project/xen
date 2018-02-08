@@ -759,6 +759,31 @@ void vgic_free_virq(struct domain *d, unsigned int virq)
     clear_bit(virq, d->arch.vgic.allocated_irqs);
 }
 
+void gic_dump_vgic_info(struct vcpu *v)
+{
+    struct vgic_cpu *vgic_cpu = &v->arch.vgic;
+    struct vgic_irq *irq;
+    unsigned long flags;
+
+    spin_lock_irqsave(&v->arch.vgic.ap_list_lock, flags);
+
+    if ( !list_empty(&vgic_cpu->ap_list_head) )
+        printk("   active or pending interrupts queued:\n");
+
+    list_for_each_entry ( irq, &vgic_cpu->ap_list_head, ap_list )
+    {
+        spin_lock(&irq->irq_lock);
+        printk("     %s %s irq %u: %spending, %sactive, %senabled\n",
+               irq->hw ? "hardware" : "virtual",
+               irq->config == VGIC_CONFIG_LEVEL ? "level" : "edge",
+               irq->intid, irq_is_pending(irq) ? "" : "not ",
+               irq->active ? "" : "not ", irq->enabled ? "" : "not ");
+        spin_unlock(&irq->irq_lock);
+    }
+
+    spin_unlock_irqrestore(&v->arch.vgic.ap_list_lock, flags);
+}
+
 struct irq_desc *vgic_get_hw_irq_desc(struct domain *d, struct vcpu *v,
                                       unsigned int virq)
 {
