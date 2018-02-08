@@ -49,7 +49,7 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 }
 
 static void update_domain_cpuid_info(struct domain *d,
-                                     const xen_domctl_cpuid_t *ctl)
+                                     cpuid_input_t *ctl)
 {
     bool call_policy_changed = false; /* Avoid for_each_vcpu() unnecessarily */
 
@@ -169,6 +169,18 @@ static void update_domain_cpuid_info(struct domain *d,
 
             d->arch.pv_domain.cpuidmasks->_7ab0 = mask;
         }
+
+        /*
+         * Override STIBP to match IBRS.  Guests can safely use STIBP
+         * functionality on non-HT hardware, but can't necesserily protect
+         * themselves from SP2/Spectre/Branch Target Injection if STIBP is
+         * hidden on HT-capable hardware.
+         */
+        if ( ctl->edx & cpufeat_mask(X86_FEATURE_IBRSB) )
+            ctl->edx |= cpufeat_mask(X86_FEATURE_STIBP);
+        else
+            ctl->edx &= ~cpufeat_mask(X86_FEATURE_STIBP);
+
         break;
 
     case 0xd:
@@ -902,16 +914,18 @@ long arch_do_domctl(
         {
             if ( i < MAX_CPUID_INPUT )
                 cpuid->input[0] = XEN_CPUID_INPUT_UNUSED;
+            else
+                cpuid = NULL;
         }
         else if ( i < MAX_CPUID_INPUT )
             *cpuid = *ctl;
         else if ( unused )
-            *unused = *ctl;
+            *(cpuid = unused) = *ctl;
         else
             ret = -ENOENT;
 
-        if ( !ret )
-            update_domain_cpuid_info(d, ctl);
+        if ( !ret && cpuid )
+            update_domain_cpuid_info(d, cpuid);
 
         domain_unpause(d);
         break;

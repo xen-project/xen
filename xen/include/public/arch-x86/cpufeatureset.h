@@ -237,7 +237,7 @@ XEN_CPUFEATURE(IBPB,          8*32+12) /*   IBPB support only (no IBRS, used by 
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0.edx, word 9 */
 XEN_CPUFEATURE(IBRSB,         9*32+26) /*   IBRS and IBPB support (used by Intel) */
-XEN_CPUFEATURE(STIBP,         9*32+27) /*   STIBP */
+XEN_CPUFEATURE(STIBP,         9*32+27) /*!  STIBP */
 
 #endif /* XEN_CPUFEATURE */
 
