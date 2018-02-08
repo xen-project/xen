@@ -17,6 +17,41 @@ uint32_t __read_mostly raw_featureset[FSCAPINTS];
 uint32_t __read_mostly pv_featureset[FSCAPINTS];
 uint32_t __read_mostly hvm_featureset[FSCAPINTS];
 
+static int __init parse_xen_cpuid(const char *s)
+{
+    const char *ss;
+    int val, rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_IBPB);
+        }
+        else if ( (val = parse_boolean("ibrsb", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_IBRSB);
+        }
+        else if ( (val = parse_boolean("stibp", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_STIBP);
+        }
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("cpuid", parse_xen_cpuid);
+
 static void __init sanitise_featureset(uint32_t *fs)
 {
     /* for_each_set_bit() uses unsigned longs.  Extend with zeroes. */

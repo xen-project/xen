@@ -68,6 +68,13 @@ struct domain;
 void cmdline_parse(const char *cmdline);
 int parse_bool(const char *s);
 
+/**
+ * Given a specific name, parses a string of the form:
+ *   [no-]$NAME[=...]
+ * returning 0 or 1 for a recognised boolean, or -1 for an error.
+ */
+int parse_boolean(const char *name, const char *s, const char *e);
+
 /*#define DEBUG_TRACE_DUMP*/
 #ifdef DEBUG_TRACE_DUMP
 extern void debugtrace_dump(void);
