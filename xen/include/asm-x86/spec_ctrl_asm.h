@@ -20,6 +20,11 @@
 #ifndef __X86_SPEC_CTRL_ASM_H__
 #define __X86_SPEC_CTRL_ASM_H__
 
+/* Encoding of the bottom bits in cpuinfo.bti_ist_info */
+#define BTI_IST_IBRS  (1 << 0)
+#define BTI_IST_WRMSR (1 << 1)
+#define BTI_IST_RSB   (1 << 2)
+
 #ifdef __ASSEMBLY__
 #include <asm/msr-index.h>
 
@@ -254,6 +259,68 @@
     ALTERNATIVE_2 __stringify(ASM_NOP24),                               \
         DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_XEN_IBRS_SET,           \
         DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_XEN_IBRS_CLEAR
+
+/* TODO: Drop these when the alternatives infrastructure is NMI/#MC safe. */
+.macro SPEC_CTRL_ENTRY_FROM_INTR_IST
+/*
+ * Requires %rsp=regs, %r14=stack_end
+ * Clobbers %rax, %rcx, %rdx
+ *
+ * This is logical merge of DO_OVERWRITE_RSB and DO_SPEC_CTRL_ENTRY
+ * maybexen=1, but with conditionals rather than alternatives.
+ */
+    movzbl STACK_CPUINFO_FIELD(bti_ist_info)(%r14), %eax
+
+    testb $BTI_IST_RSB, %al
+    jz .L\@_skip_rsb
+
+    DO_OVERWRITE_RSB
+
+.L\@_skip_rsb:
+
+    testb $BTI_IST_WRMSR, %al
+    jz .L\@_skip_wrmsr
+
+    xor %edx, %edx
+    testb $3, UREGS_cs(%rsp)
+    setz %dl
+    and %dl, STACK_CPUINFO_FIELD(use_shadow_spec_ctrl)(%r14)
+
+.L\@_entry_from_xen:
+    /*
+     * Load Xen's intended value.  SPEC_CTRL_IBRS vs 0 is encoded in the
+     * bottom bit of bti_ist_info, via a deliberate alias with BTI_IST_IBRS.
+     */
+    mov $MSR_SPEC_CTRL, %ecx
+    and $BTI_IST_IBRS, %eax
+    wrmsr
+
+    /* Opencoded UNLIKELY_START() with no condition. */
+UNLIKELY_DISPATCH_LABEL(\@_serialise):
+    .subsection 1
+    /*
+     * In the case that we might need to set SPEC_CTRL.IBRS for safety, we
+     * need to ensure that an attacker can't poison the `jz .L\@_skip_wrmsr`
+     * to speculate around the WRMSR.  As a result, we need a dispatch
+     * serialising instruction in the else clause.
+     */
+.L\@_skip_wrmsr:
+    lfence
+    UNLIKELY_END(\@_serialise)
+.endm
+
+.macro SPEC_CTRL_EXIT_TO_XEN_IST
+/*
+ * Requires %rbx=stack_end
+ * Clobbers %rax, %rcx, %rdx
+ */
+    testb $BTI_IST_WRMSR, STACK_CPUINFO_FIELD(bti_ist_info)(%rbx)
+    jz .L\@_skip
+
+    DO_SPEC_CTRL_EXIT_TO_XEN
+
+.L\@_skip:
+.endm
 
 #endif /* __ASSEMBLY__ */
 #endif /* !__X86_SPEC_CTRL_ASM_H__ */

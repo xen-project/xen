@@ -20,8 +20,10 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 
+#include <asm/msr-index.h>
 #include <asm/processor.h>
 #include <asm/spec_ctrl.h>
+#include <asm/spec_ctrl_asm.h>
 
 static enum ind_thunk {
     THUNK_DEFAULT, /* Decide which thunk to use at boot time. */
@@ -148,6 +150,12 @@ void __init init_speculation_mitigations(void)
         setup_force_cpu_cap(X86_FEATURE_IND_THUNK_JMP);
 
     print_details(thunk);
+}
+
+static void __init __maybe_unused build_assertions(void)
+{
+    /* The optimised assembly relies on this alias. */
+    BUILD_BUG_ON(BTI_IST_IBRS != SPEC_CTRL_IBRS);
 }
 
 /*
