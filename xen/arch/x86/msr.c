@@ -39,7 +39,8 @@ static void __init calculate_hvm_max_policy(void)
         return;
 
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
+         boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
     {
         dp->plaform_info.available = true;
         dp->plaform_info.cpuid_faulting = true;
