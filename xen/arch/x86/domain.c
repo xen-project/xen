@@ -485,6 +485,8 @@ int vcpu_initialise(struct vcpu *v)
         if ( is_pv_domain(d) )
             xfree(v->arch.pv_vcpu.trap_ctxt);
     }
+    else if ( !is_idle_domain(v->domain) )
+        cpuid_policy_updated(v);
 
     return rc;
 }
@@ -2657,6 +2659,16 @@ int domain_relinquish_resources(struct domain *d)
         hvm_domain_relinquish_resources(d);
 
     return 0;
+}
+
+/*
+ * Called during vcpu construction, and each time the toolstack changes the
+ * CPUID configuration for the domain.
+ */
+void cpuid_policy_updated(struct vcpu *v)
+{
+    if ( is_hvm_vcpu(v) )
+        hvm_cpuid_policy_changed(v);
 }
 
 void arch_dump_domain_info(struct domain *d)
