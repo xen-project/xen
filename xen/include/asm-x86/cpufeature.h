@@ -21,6 +21,7 @@ XEN_CPUFEATURE(XEN_SMEP,        (FSCAPINTS+0)*32+ 10) /* SMEP gets used by Xen i
 XEN_CPUFEATURE(XEN_SMAP,        (FSCAPINTS+0)*32+ 11) /* SMAP gets used by Xen itself */
 XEN_CPUFEATURE(MSR_PLATFORM_INFO, (FSCAPINTS+0)*32+12) /* PLATFORM_INFO MSR present */
 XEN_CPUFEATURE(MSR_MISC_FEATURES, (FSCAPINTS+0)*32+13) /* MISC_FEATURES_ENABLES MSR present */
+XEN_CPUFEATURE(LFENCE_DISPATCH, (FSCAPINTS+0)*32+14) /* lfence set as Dispatch Serialising */
 
 #define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
 
@@ -96,6 +97,7 @@ XEN_CPUFEATURE(MSR_MISC_FEATURES, (FSCAPINTS+0)*32+13) /* MISC_FEATURES_ENABLES 
 #define cpu_has_eist		boot_cpu_has(X86_FEATURE_EIST)
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 #define cpu_has_cmp_legacy	boot_cpu_has(X86_FEATURE_CMP_LEGACY)
+#define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,

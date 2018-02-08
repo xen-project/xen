@@ -559,8 +559,41 @@ static void init_amd(struct cpuinfo_x86 *c)
 			wrmsr_amd_safe(0xc001100d, l, h & ~1);
 	}
 
+	/*
+	 * Attempt to set lfence to be Dispatch Serialising.  This MSR almost
+	 * certainly isn't virtualised (and Xen at least will leak the real
+	 * value in but silently discard writes), as well as being per-core
+	 * rather than per-thread, so do a full safe read/write/readback cycle
+	 * in the worst case.
+	 */
+	if (c->x86 == 0x0f || c->x86 == 0x11)
+		/* Always dispatch serialising on this hardare. */
+		__set_bit(X86_FEATURE_LFENCE_DISPATCH, c->x86_capability);
+	else /* Implicily "== 0x10 || >= 0x12" by being 64bit. */ {
+		if (rdmsr_safe(MSR_AMD64_DE_CFG, value))
+			/* Unable to read.  Assume the safer default. */
+			__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
+				    c->x86_capability);
+		else if (value & AMD64_DE_CFG_LFENCE_SERIALISE)
+			/* Already dispatch serialising. */
+			__set_bit(X86_FEATURE_LFENCE_DISPATCH,
+				  c->x86_capability);
+		else if (wrmsr_safe(MSR_AMD64_DE_CFG,
+				    value | AMD64_DE_CFG_LFENCE_SERIALISE) ||
+			 rdmsr_safe(MSR_AMD64_DE_CFG, value) ||
+			 !(value & AMD64_DE_CFG_LFENCE_SERIALISE))
+			/* Attempt to set failed.  Assume the safer default. */
+			__clear_bit(X86_FEATURE_LFENCE_DISPATCH,
+				    c->x86_capability);
+		else
+			/* Successfully enabled! */
+			__set_bit(X86_FEATURE_LFENCE_DISPATCH,
+				  c->x86_capability);
+	}
+
 	/* MFENCE stops RDTSC speculation */
-	__set_bit(X86_FEATURE_MFENCE_RDTSC, c->x86_capability);
+	if (!cpu_has_lfence_dispatch)
+		__set_bit(X86_FEATURE_MFENCE_RDTSC, c->x86_capability);
 
 	switch(c->x86)
 	{
