@@ -30,23 +30,10 @@
 #define VMLAUNCH     .byte 0x0f,0x01,0xc2
 
 ENTRY(vmx_asm_vmexit_handler)
-        push %rdi
-        push %rsi
-        push %rdx
-        push %rcx
-        push %rax
+        SAVE_ALL
+
         mov  %cr2,%rax
-        push %r8
-        push %r9
-        push %r10
-        push %r11
-        push %rbx
         GET_CURRENT(bx)
-        push %rbp
-        push %r12
-        push %r13
-        push %r14
-        push %r15
 
         movb $1,VCPU_vmx_launched(%rbx)
         mov  %rax,VCPU_hvm_guest_cr2(%rbx)
