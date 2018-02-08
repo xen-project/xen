@@ -3840,7 +3840,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     switch ( msr )
     {
-        unsigned int eax, ebx, ecx, index;
+        unsigned int eax, ebx, ecx, edx, index;
 
     case MSR_EFER:
         *msr_content = v->arch.hvm_vcpu.guest_efer;
@@ -3927,6 +3927,21 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto gp_fault;
         break;
 
+    case MSR_PRED_CMD:
+        /* Write-only */
+        goto gp_fault;
+
+    case MSR_SPEC_CTRL:
+        hvm_cpuid(7, NULL, NULL, NULL, &edx);
+        if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
+            goto gp_fault;
+        *msr_content = v->arch.spec_ctrl;
+        break;
+
+    case MSR_ARCH_CAPABILITIES:
+        /* Not implemented yet. */
+        goto gp_fault;
+
     case MSR_K8_ENABLE_C1E:
     case MSR_AMD64_NB_CFG:
          /*
@@ -3993,7 +4008,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     switch ( msr )
     {
-        unsigned int eax, ebx, ecx, index;
+        unsigned int eax, ebx, ecx, edx, index;
 
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
@@ -4093,6 +4108,41 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
              !hvm_set_guest_bndcfgs(v, msr_content) )
             goto gp_fault;
         break;
+
+    case MSR_SPEC_CTRL:
+        hvm_cpuid(7, NULL, NULL, NULL, &edx);
+        if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
+            goto gp_fault; /* MSR available? */
+
+        /*
+         * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
+         * when STIBP isn't enumerated in hardware.
+         */
+
+        if ( msr_content & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+            goto gp_fault; /* Rsvd bit set? */
+
+        v->arch.spec_ctrl = msr_content;
+        break;
+
+    case MSR_PRED_CMD:
+        hvm_cpuid(7, NULL, NULL, NULL, &edx);
+        hvm_cpuid(0x80000008, NULL, &ebx, NULL, NULL);
+        if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) &&
+             !(ebx & cpufeat_mask(X86_FEATURE_IBPB)) )
+            goto gp_fault; /* MSR available? */
+
+        /*
+         * The only defined behaviour is when writing PRED_CMD_IBPB.  In
+         * practice, real hardware accepts any value without faulting.
+         */
+        if ( msr_content & PRED_CMD_IBPB )
+            wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+        break;
+
+    case MSR_ARCH_CAPABILITIES:
+        /* Read-only */
+        goto gp_fault;
 
     case MSR_AMD64_NB_CFG:
         /* ignore the write */

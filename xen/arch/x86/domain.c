@@ -2684,7 +2684,7 @@ void arch_dump_vcpu_info(struct vcpu *v)
 }
 
 void domain_cpuid(
-    struct domain *d,
+    const struct domain *d,
     unsigned int  input,
     unsigned int  sub_input,
     unsigned int  *eax,
@@ -2692,12 +2692,11 @@ void domain_cpuid(
     unsigned int  *ecx,
     unsigned int  *edx)
 {
-    cpuid_input_t *cpuid;
     int i;
 
     for ( i = 0; i < MAX_CPUID_INPUT; i++ )
     {
-        cpuid = &d->arch.cpuids[i];
+        const cpuid_input_t *cpuid = &d->arch.cpuids[i];
 
         if ( (cpuid->input[0] == input) &&
              ((cpuid->input[1] == XEN_CPUID_INPUT_UNUSED) ||
