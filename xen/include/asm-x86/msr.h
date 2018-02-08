@@ -215,6 +215,16 @@ struct msr_domain_policy
 /* MSR policy object for per-vCPU MSRs */
 struct msr_vcpu_policy
 {
+    /* 0x00000048 - MSR_SPEC_CTRL */
+    struct {
+        /*
+         * Only the bottom two bits are defined, so no need to waste space
+         * with uint64_t at the moment, but use uint32_t for the convenience
+         * of the assembly code.
+         */
+        uint32_t raw;
+    } spec_ctrl;
+
     /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
     struct {
         bool available; /* This MSR is non-architectural */
