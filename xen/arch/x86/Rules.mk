@@ -32,3 +32,9 @@ CFLAGS += -mindirect-branch=thunk-extern -mindirect-branch-register
 CFLAGS += -DCONFIG_INDIRECT_THUNK
 export CONFIG_INDIRECT_THUNK=y
 endif
+
+# Set up the assembler include path properly for older GCC toolchains.  Clang
+# objects to the agument being passed however.
+ifneq ($(clang),y)
+CFLAGS += -Wa,-I$(BASEDIR)/include
+endif

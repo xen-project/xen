@@ -880,8 +880,8 @@ do {                                                                    \
     struct fpu_insn_ctxt fic_ = { .insn_bytes = nr_ };                  \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
     get_fpu(X86EMUL_FPU_fpu, &fic_);                                    \
-    asm volatile ( "call *%[stub]" : "+m" (fic_) :                      \
-                   [stub] "rm" (stub.func) );                           \
+    asm volatile ( "INDIRECT_CALL %[stub]" : "+m" (fic_) :              \
+                   [stub] "r" (stub.func) );                            \
     put_fpu(&fic_);                                                     \
     put_stub(stub);                                                     \
 } while (0)
@@ -894,11 +894,11 @@ do {                                                                    \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
     get_fpu(X86EMUL_FPU_fpu, &fic_);                                    \
     asm volatile ( _PRE_EFLAGS("[eflags]", "[mask]", "[tmp]")           \
-                   "call *%[func];"                                     \
+                   "INDIRECT_CALL %[func];"                             \
                    _POST_EFLAGS("[eflags]", "[mask]", "[tmp]")          \
                    : [eflags] "+g" (_regs.eflags),                      \
                      [tmp] "=&r" (tmp_), "+m" (fic_)                    \
-                   : [func] "rm" (stub.func),                           \
+                   : [func] "r" (stub.func),                            \
                      [mask] "i" (EFLG_ZF|EFLG_PF|EFLG_CF) );            \
     put_fpu(&fic_);                                                     \
     put_stub(stub);                                                     \
@@ -4766,8 +4766,8 @@ x86_emulate(
         if ( !rc )
         {
            copy_REX_VEX(buf, rex_prefix, vex);
-           asm volatile ( "call *%0" : : "r" (stub.func), "a" (mmvalp)
-                                     : "memory" );
+           asm volatile ( "INDIRECT_CALL %0" : : "r" (stub.func), "a" (mmvalp)
+                                             : "memory" );
         }
         put_fpu(&fic);
         put_stub(stub);
@@ -5058,8 +5058,8 @@ x86_emulate(
         if ( !rc )
         {
            copy_REX_VEX(buf, rex_prefix, vex);
-           asm volatile ( "call *%0" : : "r" (stub.func), "a" (ea.reg)
-                                     : "memory" );
+           asm volatile ( "INDIRECT_CALL %0" : : "r" (stub.func), "a" (ea.reg)
+                                             : "memory" );
         }
         put_fpu(&fic);
         put_stub(stub);

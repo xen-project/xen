@@ -72,8 +72,8 @@ endif
 
 AFLAGS-y                += -D__ASSEMBLY__
 
-# Clang's built-in assembler can't handle .code16/.code32/.code64 yet
-AFLAGS-$(clang)         += -no-integrated-as
+# Clang's built-in assembler can't handle embedded .include's
+CFLAGS-$(clang)         += -no-integrated-as
 
 ALL_OBJS := $(ALL_OBJS-y)
 
