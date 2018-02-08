@@ -64,7 +64,7 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
         xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
                      "%s: image not capable of booting inside a HVM container",
                      __FUNCTION__);
-        return "xen-3.0-unknown";
+        return NULL;
     }
 
     switch ( machine )
@@ -86,7 +86,10 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
     case EM_X86_64:
         return "xen-3.0-x86_64";
     default:
-        return "xen-3.0-unknown";
+        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                     "%s: unkown image type %"PRIu64,
+                     __FUNCTION__, machine);
+        return NULL;
     }
 }
 
@@ -192,6 +195,8 @@ static elf_negerrnoval xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     dom->kernel_seg.vend   = dom->parms.virt_kend;
 
     dom->guest_type = xc_dom_guest_type(dom, elf);
+    if ( dom->guest_type == NULL )
+        return -EINVAL;
     DOMPRINTF("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "",
               __FUNCTION__, dom->guest_type,
               dom->kernel_seg.vstart, dom->kernel_seg.vend);
