@@ -90,12 +90,11 @@ static int __init pvh_populate_memory_range(struct domain *d,
                                             unsigned long start,
                                             unsigned long nr_pages)
 {
-    unsigned int order, i = 0;
+    unsigned int order = MAX_ORDER, i = 0;
     struct page_info *page;
     int rc;
 #define MAP_MAX_ITER 64
 
-    order = MAX_ORDER;
     while ( nr_pages != 0 )
     {
         unsigned int range_order = get_order_from_pages(nr_pages + 1);
@@ -375,13 +374,11 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
 static int __init pvh_setup_p2m(struct domain *d)
 {
     struct vcpu *v = d->vcpu[0];
-    unsigned long nr_pages;
+    unsigned long nr_pages = dom0_compute_nr_pages(d, NULL, 0);
     unsigned int i;
     int rc;
     bool preempted;
 #define MB1_PAGES PFN_DOWN(MB(1))
-
-    nr_pages = dom0_compute_nr_pages(d, NULL, 0);
 
     pvh_setup_e820(d, nr_pages);
     do {
@@ -564,7 +561,7 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
                                  paddr_t start_info)
 {
     struct vcpu *v = d->vcpu[0];
-    unsigned int cpu, i;
+    unsigned int cpu = v->processor, i;
     int rc;
     /*
      * This sets the vCPU state according to the state described in
@@ -585,7 +582,6 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
         .cpu_regs.x86_32.tr_ar = 0x8b,
     };
 
-    cpu = v->processor;
     for ( i = 1; i < d->max_vcpus; i++ )
     {
         const struct vcpu *p = dom0_setup_vcpu(d, i, cpu);
@@ -619,7 +615,6 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
 static int __init acpi_count_intr_ovr(struct acpi_subtable_header *header,
                                      const unsigned long end)
 {
-
     acpi_intr_overrides++;
     return 0;
 }
@@ -639,7 +634,6 @@ static int __init acpi_set_intr_ovr(struct acpi_subtable_header *header,
 static int __init acpi_count_nmi_src(struct acpi_subtable_header *header,
                                      const unsigned long end)
 {
-
     acpi_nmi_sources++;
     return 0;
 }
@@ -779,10 +773,9 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
 static bool __init acpi_memory_banned(unsigned long address,
                                       unsigned long size)
 {
-    unsigned long mfn, nr_pages, i;
+    unsigned long mfn = PFN_DOWN(address);
+    unsigned long nr_pages = PFN_UP((address & ~PAGE_MASK) + size), i;
 
-    mfn = PFN_DOWN(address);
-    nr_pages = PFN_UP((address & ~PAGE_MASK) + size);
     for ( i = 0 ; i < nr_pages; i++ )
         if ( !page_is_ram_type(mfn + i, RAM_TYPE_RESERVED) &&
              !page_is_ram_type(mfn + i, RAM_TYPE_ACPI) )
