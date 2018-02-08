@@ -1292,6 +1292,19 @@ long arch_do_domctl(
                     }
                 }
 
+                if ( v->arch.cpuid_faulting )
+                {
+                    if ( i < vmsrs->msr_count && !ret )
+                    {
+                        msr.index = MSR_INTEL_MISC_FEATURES_ENABLES;
+                        msr.reserved = 0;
+                        msr.value = MSR_MISC_FEATURES_CPUID_FAULTING;
+                        if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
+                            ret = -EFAULT;
+                    }
+                    ++i;
+                }
+
                 vcpu_unpause(v);
 
                 if ( i > vmsrs->msr_count && !ret )
@@ -1319,6 +1332,11 @@ long arch_do_domctl(
 
                 switch ( msr.index )
                 {
+                case MSR_INTEL_MISC_FEATURES_ENABLES:
+                    v->arch.cpuid_faulting = !!(msr.value &
+                                                MSR_MISC_FEATURES_CPUID_FAULTING);
+                    continue;
+
                 case MSR_AMD64_DR0_ADDRESS_MASK:
                     if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
                          (msr.value >> 32) )
