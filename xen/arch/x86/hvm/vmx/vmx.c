@@ -897,13 +897,20 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 
 static unsigned int __init vmx_init_msr(void)
 {
-    return (cpu_has_mpx && cpu_has_vmx_mpx) +
+    return 1 /* MISC_FEATURES_ENABLES */ +
+           (cpu_has_mpx && cpu_has_vmx_mpx) +
            (cpu_has_xsaves && cpu_has_vmx_xsaves);
 }
 
 static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
 {
     vmx_vmcs_enter(v);
+
+    if ( v->arch.cpuid_faulting )
+    {
+        ctxt->msr[ctxt->count].index = MSR_INTEL_MISC_FEATURES_ENABLES;
+        ctxt->msr[ctxt->count++].val = MSR_MISC_FEATURES_CPUID_FAULTING;
+    }
 
     if ( cpu_has_mpx && cpu_has_vmx_mpx )
     {
@@ -933,6 +940,10 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
     {
         switch ( ctxt->msr[i].index )
         {
+        case MSR_INTEL_MISC_FEATURES_ENABLES:
+            v->arch.cpuid_faulting = !!(ctxt->msr[i].val &
+                                        MSR_MISC_FEATURES_CPUID_FAULTING);
+            break;
         case MSR_IA32_BNDCFGS:
             if ( cpu_has_mpx && cpu_has_vmx_mpx &&
                  is_canonical_address(ctxt->msr[i].val) &&
