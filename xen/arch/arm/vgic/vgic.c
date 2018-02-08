@@ -677,6 +677,21 @@ int vgic_vcpu_pending_irq(struct vcpu *vcpu)
     return ret;
 }
 
+void vgic_kick_vcpus(struct domain *d)
+{
+    struct vcpu *vcpu;
+
+    /*
+     * We've injected an interrupt, time to find out who deserves
+     * a good kick...
+     */
+    for_each_vcpu( d, vcpu )
+    {
+        if ( vgic_vcpu_pending_irq(vcpu) )
+            vcpu_kick(vcpu);
+    }
+}
+
 /*
  * Local variables:
  * mode: C

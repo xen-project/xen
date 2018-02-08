@@ -17,6 +17,14 @@
 #ifndef __XEN_ARM_VGIC_VGIC_H__
 #define __XEN_ARM_VGIC_VGIC_H__
 
+/*
+ * We piggy-back on the already used KVM product ID,  but use a different
+ * variant (major revision) for Xen.
+ */
+#define PRODUCT_ID_KVM          0x4b        /* ASCII code K */
+#define VARIANT_ID_XEN          0x01
+#define IMPLEMENTER_ARM         0x43b
+
 #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
 
 static inline bool irq_is_pending(struct vgic_irq *irq)
@@ -37,6 +45,7 @@ struct vgic_irq *vgic_get_irq(struct domain *d, struct vcpu *vcpu,
 void vgic_put_irq(struct domain *d, struct vgic_irq *irq);
 void vgic_queue_irq_unlock(struct domain *d, struct vgic_irq *irq,
                            unsigned long flags);
+void vgic_kick_vcpus(struct domain *d);
 
 static inline void vgic_get_irq_kref(struct vgic_irq *irq)
 {
