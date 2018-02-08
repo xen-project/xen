@@ -140,7 +140,20 @@ static const char *str_e8b[32] =
 {
     [ 0] = "clzero",
 
-    [1 ... 31] = "REZ",
+    [1 ... 11] = "REZ",
+
+    [12] = "ibpb",
+
+    [13 ... 31] = "REZ",
+};
+
+static const char *str_7d0[32] =
+{
+    [0 ... 25] = "REZ",
+
+    [26] = "ibrsb",         [27] = "stibp",
+
+    [28 ... 31] = "REZ",
 };
 
 static struct {
@@ -158,6 +171,7 @@ static struct {
     { "0x00000007:0.ecx", "7c0", str_7c0 },
     { "0x80000007.edx",   "e7d", str_e7d },
     { "0x80000008.ebx",   "e8b", str_e8b },
+    { "0x00000007:0.edx", "7d0", str_7d0 },
 };
 
 #define COL_ALIGN "18"

@@ -254,6 +254,11 @@ def crunch_numbers(state):
         # are built on top of AVX512F
         AVX512F: [AVX512DQ, AVX512IFMA, AVX512PF, AVX512ER, AVX512CD,
                   AVX512BW, AVX512VL, AVX512VBMI],
+
+        # Single Thread Indirect Branch Predictors enumerates a new bit in the
+        # MSR enumerated by Indirect Branch Restricted Speculation/Indirect
+        # Branch Prediction Barrier enumeration.
+        IBRSB: [STIBP],
     }
 
     deep_features = tuple(sorted(deps.keys()))
