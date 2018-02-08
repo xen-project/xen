@@ -244,6 +244,33 @@ int parse_bool(const char *s, const char *e)
     return -1;
 }
 
+int parse_boolean(const char *name, const char *s, const char *e)
+{
+    size_t slen, nlen;
+    int val = !!strncmp(s, "no-", 3);
+
+    if ( !val )
+        s += 3;
+
+    slen = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
+    nlen = strlen(name);
+
+    /* Does s now start with name? */
+    if ( slen < nlen || strncmp(s, name, nlen) )
+        return -1;
+
+    /* Exact, unadorned name?  Result depends on the 'no-' prefix. */
+    if ( slen == nlen )
+        return val;
+
+    /* =$SOMETHING?  Defer to the regular boolean parsing. */
+    if ( s[nlen] == '=' )
+        return parse_bool(&s[nlen + 1], e);
+
+    /* Unrecognised.  Give up. */
+    return -1;
+}
+
 unsigned int tainted;
 
 /**
