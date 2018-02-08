@@ -74,6 +74,44 @@
  *  - SPEC_CTRL_EXIT_TO_GUEST
  */
 
+.macro DO_OVERWRITE_RSB
+/*
+ * Requires nothing
+ * Clobbers %rax, %rcx
+ *
+ * Requires 256 bytes of stack space, but %rsp has no net change. Based on
+ * Google's performance numbers, the loop is unrolled to 16 iterations and two
+ * calls per iteration.
+ *
+ * The call filling the RSB needs a nonzero displacement.  A nop would do, but
+ * we use "1: pause; lfence; jmp 1b" to safely contains any ret-based
+ * speculation, even if the loop is speculatively executed prematurely.
+ *
+ * %rsp is preserved by using an extra GPR because a) we've got plenty spare,
+ * b) the two movs are shorter to encode than `add $32*8, %rsp`, and c) can be
+ * optimised with mov-elimination in modern cores.
+ */
+    mov $16, %ecx                   /* 16 iterations, two calls per loop */
+    mov %rsp, %rax                  /* Store the current %rsp */
+
+.L\@_fill_rsb_loop:
+
+    .irp n, 1, 2                    /* Unrolled twice. */
+    call .L\@_insert_rsb_entry_\n   /* Create an RSB entry. */
+
+.L\@_capture_speculation_\n:
+    pause
+    lfence
+    jmp .L\@_capture_speculation_\n /* Capture rogue speculation. */
+
+.L\@_insert_rsb_entry_\n:
+    .endr
+
+    sub $1, %ecx
+    jnz .L\@_fill_rsb_loop
+    mov %rax, %rsp                  /* Restore old %rsp */
+.endm
+
 .macro DO_SPEC_CTRL_ENTRY_FROM_VMEXIT ibrs_val:req
 /*
  * Requires %rbx=current, %rsp=regs/cpuinfo
@@ -173,6 +211,8 @@
 
 /* Use after a VMEXIT from an HVM guest. */
 #define SPEC_CTRL_ENTRY_FROM_VMEXIT                                     \
+    ALTERNATIVE __stringify(ASM_NOP40),                                 \
+        DO_OVERWRITE_RSB, X86_FEATURE_RSB_VMEXIT;                       \
     ALTERNATIVE_2 __stringify(ASM_NOP32),                               \
         __stringify(DO_SPEC_CTRL_ENTRY_FROM_VMEXIT                      \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
@@ -183,6 +223,8 @@
 
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
+    ALTERNATIVE __stringify(ASM_NOP40),                                 \
+        DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
     ALTERNATIVE_2 __stringify(ASM_NOP21),                               \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=0                       \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
@@ -192,6 +234,8 @@
 
 /* Use in interrupt/exception context.  May interrupt Xen or PV context. */
 #define SPEC_CTRL_ENTRY_FROM_INTR                                       \
+    ALTERNATIVE __stringify(ASM_NOP40),                                 \
+        DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
     ALTERNATIVE_2 __stringify(ASM_NOP29),                               \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=1                       \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
