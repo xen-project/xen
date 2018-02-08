@@ -142,7 +142,7 @@ struct hvm_function_table {
     void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
     void (*update_guest_efer)(struct vcpu *v);
 
-    void (*update_guest_vendor)(struct vcpu *v);
+    void (*cpuid_policy_changed)(struct vcpu *v);
 
     int  (*get_guest_pat)(struct vcpu *v, u64 *);
     int  (*set_guest_pat)(struct vcpu *v, u64);
@@ -348,9 +348,9 @@ static inline void hvm_update_guest_efer(struct vcpu *v)
     hvm_funcs.update_guest_efer(v);
 }
 
-static inline void hvm_update_guest_vendor(struct vcpu *v)
+static inline void hvm_cpuid_policy_changed(struct vcpu *v)
 {
-    hvm_funcs.update_guest_vendor(v);
+    hvm_funcs.cpuid_policy_changed(v);
 }
 
 /*

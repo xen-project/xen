@@ -607,7 +607,7 @@ static void svm_update_guest_efer(struct vcpu *v)
     vmcb_set_efer(vmcb, new_efer);
 }
 
-static void svm_update_guest_vendor(struct vcpu *v)
+static void svm_cpuid_policy_changed(struct vcpu *v)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
@@ -2252,7 +2252,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .get_shadow_gs_base   = svm_get_shadow_gs_base,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
-    .update_guest_vendor  = svm_update_guest_vendor,
+    .cpuid_policy_changed = svm_cpuid_policy_changed,
     .set_guest_pat        = svm_set_guest_pat,
     .get_guest_pat        = svm_get_guest_pat,
     .set_tsc_offset       = svm_set_tsc_offset,
