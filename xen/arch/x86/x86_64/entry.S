@@ -38,6 +38,10 @@ ENTRY(switch_to_kernel)
 restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
 
+        /* Stash guest SPEC_CTRL value while we can read struct vcpu. */
+        mov VCPU_arch_msr(%rbx), %rdx
+        mov VCPUMSR_spec_ctrl_raw(%rdx), %r15d
+
         /* Copy guest mappings and switch to per-CPU root page table. */
         mov   %cr3, %r9
         GET_STACK_END(dx)
@@ -64,6 +68,12 @@ restore_all_guest:
         mov   %r9, STACK_CPUINFO_FIELD(xen_cr3)(%rdx)
         write_cr3 rax, rdi, rsi
 .Lrag_keep_cr3:
+
+        /* Restore stashed SPEC_CTRL value. */
+        mov   %r15d, %eax
+
+        /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
+        SPEC_CTRL_EXIT_TO_GUEST /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
 
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
@@ -103,9 +113,9 @@ restore_all_xen:
          * Check whether we need to switch to the per-CPU page tables, in
          * case we return to late PV exit code (from an NMI or #MC).
          */
-        GET_STACK_END(ax)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rax), %rdx
-        mov   STACK_CPUINFO_FIELD(pv_cr3)(%rax), %rax
+        GET_STACK_END(bx)
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rdx
+        mov   STACK_CPUINFO_FIELD(pv_cr3)(%rbx), %rax
         test  %rdx, %rdx
         /*
          * Ideally the condition would be "nsz", but such doesn't exist,
@@ -114,6 +124,9 @@ restore_all_xen:
 UNLIKELY_START(g, exit_cr3)
         write_cr3 rax, rdi, rsi
 UNLIKELY_END(exit_cr3)
+
+        /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
+        SPEC_CTRL_EXIT_TO_XEN /* Req: %rbx=end, Clob: acd */
 
         RESTORE_ALL adj=8
         iretq
@@ -144,6 +157,9 @@ ENTRY(lstar_enter)
         pushq $0
         movl  $TRAP_syscall, 4(%rsp)
         SAVE_ALL
+
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         GET_STACK_END(bx)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
@@ -248,6 +264,9 @@ GLOBAL(sysenter_eflags_saved)
         movl  $TRAP_syscall, 4(%rsp)
         SAVE_ALL
 
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
         GET_STACK_END(bx)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
         neg   %rcx
@@ -293,6 +312,9 @@ ENTRY(int80_direct_trap)
         pushq $0
         movl  $0x80, 4(%rsp)
         SAVE_ALL
+
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         GET_STACK_END(bx)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
@@ -469,6 +491,10 @@ ENTRY(common_interrupt)
         SAVE_ALL CLAC
 
         GET_STACK_END(14)
+
+        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         mov   %rcx, %r15
         neg   %rcx
@@ -507,6 +533,10 @@ GLOBAL(handle_exception)
         SAVE_ALL CLAC
 
         GET_STACK_END(14)
+
+        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         mov   %rcx, %r15
         neg   %rcx
@@ -700,8 +730,12 @@ ENTRY(double_fault)
         /* Set AC to reduce chance of further SMAP faults */
         SAVE_ALL STAC
 
-        GET_STACK_END(bx)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rbx
+        GET_STACK_END(14)
+
+        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
+        mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rbx
         test  %rbx, %rbx
         jz    .Ldblf_cr3_okay
         jns   .Ldblf_cr3_load
@@ -730,6 +764,10 @@ handle_ist_exception:
         SAVE_ALL CLAC
 
         GET_STACK_END(14)
+
+        SPEC_CTRL_ENTRY_FROM_INTR /* Req: %rsp=regs, %r14=end, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
         mov   %rcx, %r15
         neg   %rcx
