@@ -2636,6 +2636,16 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         *val = 0;
         return X86EMUL_OKAY;
 
+    case MSR_PRED_CMD:
+        /* Write-only */
+        break;
+
+    case MSR_SPEC_CTRL:
+        if ( !currd->arch.cpuid->feat.ibrsb )
+            break;
+        *val = curr->arch.spec_ctrl;
+        return X86EMUL_OKAY;
+
     case MSR_INTEL_PLATFORM_INFO:
         if ( !boot_cpu_has(X86_FEATURE_MSR_PLATFORM_INFO) )
             break;
@@ -2643,6 +2653,10 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         if ( this_cpu(cpuid_faulting_enabled) )
             *val |= MSR_PLATFORM_INFO_CPUID_FAULTING;
         return X86EMUL_OKAY;
+
+    case MSR_ARCH_CAPABILITIES:
+        /* Not implemented yet. */
+        break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
         if ( !boot_cpu_has(X86_FEATURE_MSR_MISC_FEATURES) )
@@ -2843,8 +2857,36 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         return X86EMUL_OKAY;
 
     case MSR_INTEL_PLATFORM_INFO:
+    case MSR_ARCH_CAPABILITIES:
         /* The MSR is read-only. */
         break;
+
+    case MSR_SPEC_CTRL:
+        if ( !currd->arch.cpuid->feat.ibrsb )
+            break; /* MSR available? */
+
+        /*
+         * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
+         * when STIBP isn't enumerated in hardware.
+         */
+
+        if ( val & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+            break; /* Rsvd bit set? */
+
+        curr->arch.spec_ctrl = val;
+        return X86EMUL_OKAY;
+
+    case MSR_PRED_CMD:
+        if ( !currd->arch.cpuid->feat.ibrsb && !currd->arch.cpuid->extd.ibpb )
+            break; /* MSR available? */
+
+        /*
+         * The only defined behaviour is when writing PRED_CMD_IBPB.  In
+         * practice, real hardware accepts any value without faulting.
+         */
+        if ( val & PRED_CMD_IBPB )
+            wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+        return X86EMUL_OKAY;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
         if ( !boot_cpu_has(X86_FEATURE_MSR_MISC_FEATURES) ||

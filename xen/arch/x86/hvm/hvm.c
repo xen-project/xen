@@ -3422,6 +3422,20 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto gp_fault;
         break;
 
+    case MSR_PRED_CMD:
+        /* Write-only */
+        goto gp_fault;
+
+    case MSR_SPEC_CTRL:
+        if ( !d->arch.cpuid->feat.ibrsb )
+            goto gp_fault;
+        *msr_content = v->arch.spec_ctrl;
+        break;
+
+    case MSR_ARCH_CAPABILITIES:
+        /* Not implemented yet. */
+        goto gp_fault;
+
     case MSR_K8_ENABLE_C1E:
     case MSR_AMD64_NB_CFG:
          /*
@@ -3573,6 +3587,37 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
              !hvm_set_guest_bndcfgs(v, msr_content) )
             goto gp_fault;
         break;
+
+    case MSR_SPEC_CTRL:
+        if ( !d->arch.cpuid->feat.ibrsb )
+            goto gp_fault; /* MSR available? */
+
+        /*
+         * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
+         * when STIBP isn't enumerated in hardware.
+         */
+
+        if ( msr_content & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+            goto gp_fault; /* Rsvd bit set? */
+
+        v->arch.spec_ctrl = msr_content;
+        break;
+
+    case MSR_PRED_CMD:
+        if ( !d->arch.cpuid->feat.ibrsb && !d->arch.cpuid->extd.ibpb )
+            goto gp_fault; /* MSR available? */
+
+        /*
+         * The only defined behaviour is when writing PRED_CMD_IBPB.  In
+         * practice, real hardware accepts any value without faulting.
+         */
+        if ( msr_content & PRED_CMD_IBPB )
+            wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+        break;
+
+    case MSR_ARCH_CAPABILITIES:
+        /* Read-only */
+        goto gp_fault;
 
     case MSR_AMD64_NB_CFG:
         /* ignore the write */
