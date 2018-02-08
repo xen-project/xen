@@ -788,24 +788,29 @@ static bool __init pvh_acpi_table_allowed(const char *sig,
                                           unsigned long address,
                                           unsigned long size)
 {
-    static const char __initconst banned_tables[][ACPI_NAME_SIZE] = {
-        ACPI_SIG_HPET, ACPI_SIG_SLIT, ACPI_SIG_SRAT, ACPI_SIG_MPST,
-        ACPI_SIG_PMTT, ACPI_SIG_MADT, ACPI_SIG_DMAR};
+    static const char __initconst allowed_tables[][ACPI_NAME_SIZE] = {
+        ACPI_SIG_DSDT, ACPI_SIG_FADT, ACPI_SIG_FACS, ACPI_SIG_PSDT,
+        ACPI_SIG_SSDT, ACPI_SIG_SBST, ACPI_SIG_MCFG, ACPI_SIG_SLIC,
+        ACPI_SIG_MSDM, ACPI_SIG_WDAT, ACPI_SIG_FPDT, ACPI_SIG_S3PT,
+    };
     unsigned int i;
 
-    for ( i = 0 ; i < ARRAY_SIZE(banned_tables); i++ )
-        if ( strncmp(sig, banned_tables[i], ACPI_NAME_SIZE) == 0 )
-            return false;
-
-    /* Make sure table doesn't reside in a RAM region. */
-    if ( acpi_memory_banned(address, size) )
+    for ( i = 0 ; i < ARRAY_SIZE(allowed_tables); i++ )
     {
-        printk("Skipping table %.4s because resides in a non-ACPI, non-reserved region\n",
-               sig);
-        return false;
+        if ( strncmp(sig, allowed_tables[i], ACPI_NAME_SIZE) )
+            continue;
+
+        if ( !acpi_memory_banned(address, size) )
+            return true;
+        else
+        {
+            printk("Skipping table %.4s in non-ACPI non-reserved region\n",
+                   sig);
+            return false;
+        }
     }
 
-    return true;
+    return false;
 }
 
 static bool __init pvh_acpi_xsdt_table_allowed(const char *sig,
