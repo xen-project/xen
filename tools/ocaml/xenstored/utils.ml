@@ -45,23 +45,23 @@ let get_hierarchy path =
 
 let hexify s =
 	let hexseq_of_char c = sprintf "%02x" (Char.code c) in
-	let hs = Bytes.create (String.length s * 2) in
+	let hs = String.create (String.length s * 2) in
 	for i = 0 to String.length s - 1
 	do
 		let seq = hexseq_of_char s.[i] in
-		Bytes.set hs (i * 2) seq.[0];
-		Bytes.set hs (i * 2 + 1) seq.[1];
+		hs.[i * 2] <- seq.[0];
+		hs.[i * 2 + 1] <- seq.[1];
 	done;
-	Bytes.to_string hs
+	hs
 
 let unhexify hs =
 	let char_of_hexseq seq0 seq1 = Char.chr (int_of_string (sprintf "0x%c%c" seq0 seq1)) in
-	let s = Bytes.create (String.length hs / 2) in
-	for i = 0 to Bytes.length s - 1
+	let s = String.create (String.length hs / 2) in
+	for i = 0 to String.length s - 1
 	do
-		Bytes.set s i (char_of_hexseq hs.[i * 2] hs.[i * 2 + 1])
+		s.[i] <- char_of_hexseq hs.[i * 2] hs.[i * 2 + 1]
 	done;
-	Bytes.to_string s
+	s
 
 let trim_path path =
 	try
@@ -85,7 +85,7 @@ let create_unix_socket name =
 let read_file_single_integer filename =
 	let fd = Unix.openfile filename [ Unix.O_RDONLY ] 0o640 in
 	let buf = String.make 20 (char_of_int 0) in
-	let sz = Unix.read fd (Bytes.of_string buf) 0 20 in
+	let sz = Unix.read fd buf 0 20 in
 	Unix.close fd;
 	int_of_string (String.sub buf 0 sz)
 
