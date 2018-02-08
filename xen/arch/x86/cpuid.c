@@ -18,6 +18,41 @@ static const uint32_t hvm_shadow_featuremask[] = INIT_HVM_SHADOW_FEATURES;
 static const uint32_t hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
 static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
+static int __init parse_xen_cpuid(const char *s)
+{
+    const char *ss;
+    int val, rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_IBPB);
+        }
+        else if ( (val = parse_boolean("ibrsb", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_IBRSB);
+        }
+        else if ( (val = parse_boolean("stibp", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_STIBP);
+        }
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("cpuid", parse_xen_cpuid);
+
 #define EMPTY_LEAF ((struct cpuid_leaf){})
 static void zero_leaves(struct cpuid_leaf *l,
                         unsigned int first, unsigned int last)
