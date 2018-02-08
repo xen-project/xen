@@ -545,6 +545,8 @@ void vmx_update_exception_bitmap(struct vcpu *v)
 
 static void vmx_cpuid_policy_changed(struct vcpu *v)
 {
+    uint32_t _7d0, e8b, dummy;
+
     if ( opt_hvm_fep ||
          (v->domain->arch.x86_vendor != boot_cpu_data.x86_vendor) )
         v->arch.hvm_vmx.exception_bitmap |= (1U << TRAP_invalid_op);
@@ -554,6 +556,25 @@ static void vmx_cpuid_policy_changed(struct vcpu *v)
     vmx_vmcs_enter(v);
     vmx_update_exception_bitmap(v);
     vmx_vmcs_exit(v);
+
+    domain_cpuid(v->domain, 7, 0, &dummy, &dummy, &dummy, &_7d0);
+    domain_cpuid(v->domain, 0x80000008, 0, &dummy, &e8b, &dummy, &dummy);
+
+    /*
+     * We can safely pass MSR_SPEC_CTRL through to the guest, even if STIBP
+     * isn't enumerated in hardware, as SPEC_CTRL_STIBP is ignored.
+     */
+    if ( _7d0 & cpufeat_mask(X86_FEATURE_IBRSB) )
+        vmx_disable_intercept_for_msr(v, MSR_SPEC_CTRL, MSR_TYPE_R | MSR_TYPE_W);
+    else
+        vmx_enable_intercept_for_msr(v, MSR_SPEC_CTRL, MSR_TYPE_R | MSR_TYPE_W);
+
+    /* MSR_PRED_CMD is safe to pass through if the guest knows about it. */
+    if ( (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ||
+         (e8b & cpufeat_mask(X86_FEATURE_IBPB)) )
+        vmx_disable_intercept_for_msr(v, MSR_PRED_CMD, MSR_TYPE_R | MSR_TYPE_W);
+    else
+        vmx_enable_intercept_for_msr(v, MSR_PRED_CMD, MSR_TYPE_R | MSR_TYPE_W);
 }
 
 static int vmx_guest_x86_mode(struct vcpu *v)
