@@ -55,6 +55,7 @@
 #include <asm/hvm/viridian.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
+#include <asm/spec_ctrl.h>
 #include <asm/traps.h>
 #include <asm/nmi.h>
 #include <asm/mce.h>
@@ -76,9 +77,15 @@ static void paravirt_ctxt_switch_to(struct vcpu *v);
 
 static void default_idle(void)
 {
+    struct cpu_info *info = get_cpu_info();
+
     local_irq_disable();
     if ( cpu_is_haltable(smp_processor_id()) )
+    {
+        spec_ctrl_enter_idle(info);
         safe_halt();
+        spec_ctrl_exit_idle(info);
+    }
     else
         local_irq_enable();
 }
@@ -90,6 +97,7 @@ void default_dead_idle(void)
      * held by the CPUs spinning here indefinitely, and get discarded by
      * a subsequent INIT.
      */
+    spec_ctrl_enter_idle(get_cpu_info());
     wbinvd();
     for ( ; ; )
         halt();

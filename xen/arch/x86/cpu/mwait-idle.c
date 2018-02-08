@@ -58,6 +58,7 @@
 #include <asm/hpet.h>
 #include <asm/mwait.h>
 #include <asm/msr.h>
+#include <asm/spec_ctrl.h>
 #include <acpi/cpufreq/cpufreq.h>
 
 #define MWAIT_IDLE_VERSION "0.4.1"
@@ -702,7 +703,13 @@ static void mwait_idle(void)
 		if (pm_idle_save)
 			pm_idle_save();
 		else
+		{
+			struct cpu_info *info = get_cpu_info();
+
+			spec_ctrl_enter_idle(info);
 			safe_halt();
+			spec_ctrl_exit_idle(info);
+		}
 		return;
 	}
 
