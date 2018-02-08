@@ -144,7 +144,11 @@ static const char *str_e8b[32] =
 {
     [ 0] = "clzero",
 
-    [1 ... 31] = "REZ",
+    [1 ... 11] = "REZ",
+
+    [12] = "ibpb",
+
+    [13 ... 31] = "REZ",
 };
 
 static const char *str_7d0[32] =
@@ -153,7 +157,11 @@ static const char *str_7d0[32] =
 
     [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
 
-    [4 ... 31] = "REZ",
+    [4 ... 25] = "REZ",
+
+    [26] = "ibrsb",         [27] = "stibp",
+
+    [28 ... 31] = "REZ",
 };
 
 static struct {
