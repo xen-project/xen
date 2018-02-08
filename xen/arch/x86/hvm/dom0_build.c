@@ -784,7 +784,9 @@ static bool __init acpi_memory_banned(unsigned long address,
     return false;
 }
 
-static bool __init pvh_acpi_table_allowed(const char *sig)
+static bool __init pvh_acpi_table_allowed(const char *sig,
+                                          unsigned long address,
+                                          unsigned long size)
 {
     static const char __initconst banned_tables[][ACPI_NAME_SIZE] = {
         ACPI_SIG_HPET, ACPI_SIG_SLIT, ACPI_SIG_SRAT, ACPI_SIG_MPST,
@@ -796,8 +798,7 @@ static bool __init pvh_acpi_table_allowed(const char *sig)
             return false;
 
     /* Make sure table doesn't reside in a RAM region. */
-    if ( acpi_memory_banned(acpi_gbl_root_table_list.tables[i].address,
-                            acpi_gbl_root_table_list.tables[i].length) )
+    if ( acpi_memory_banned(address, size) )
     {
         printk("Skipping table %.4s because resides in a non-ACPI, non-reserved region\n",
                sig);
@@ -807,13 +808,15 @@ static bool __init pvh_acpi_table_allowed(const char *sig)
     return true;
 }
 
-static bool __init pvh_acpi_xsdt_table_allowed(const char *sig)
+static bool __init pvh_acpi_xsdt_table_allowed(const char *sig,
+                                               unsigned long address,
+                                               unsigned long size)
 {
     /*
      * DSDT and FACS are pointed to from FADT and thus don't belong
      * in XSDT.
      */
-    return (pvh_acpi_table_allowed(sig) &&
+    return (pvh_acpi_table_allowed(sig, address, size) &&
             strncmp(sig, ACPI_SIG_DSDT, ACPI_NAME_SIZE) &&
             strncmp(sig, ACPI_SIG_FACS, ACPI_NAME_SIZE));
 }
@@ -824,6 +827,7 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     struct acpi_table_xsdt *xsdt;
     struct acpi_table_header *table;
     struct acpi_table_rsdp *rsdp;
+    const struct acpi_table_desc *tables = acpi_gbl_root_table_list.tables;
     unsigned long size = sizeof(*xsdt);
     unsigned int i, j, num_tables = 0;
     paddr_t xsdt_paddr;
@@ -839,9 +843,8 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     /* Count the number of tables that will be added to the XSDT. */
     for( i = 0; i < acpi_gbl_root_table_list.count; i++ )
     {
-        const char *sig = acpi_gbl_root_table_list.tables[i].signature.ascii;
-
-        if ( pvh_acpi_xsdt_table_allowed(sig) )
+        if ( pvh_acpi_xsdt_table_allowed(tables[i].signature.ascii,
+                                         tables[i].address, tables[i].length) )
             num_tables++;
     }
 
@@ -886,11 +889,9 @@ static int __init pvh_setup_acpi_xsdt(struct domain *d, paddr_t madt_addr,
     /* Copy the addresses of the rest of the allowed tables. */
     for( i = 0, j = 1; i < acpi_gbl_root_table_list.count; i++ )
     {
-        const char *sig = acpi_gbl_root_table_list.tables[i].signature.ascii;
-
-        if ( pvh_acpi_xsdt_table_allowed(sig) )
-            xsdt->table_offset_entry[j++] =
-                acpi_gbl_root_table_list.tables[i].address;
+        if ( pvh_acpi_xsdt_table_allowed(tables[i].signature.ascii,
+                                         tables[i].address, tables[i].length) )
+            xsdt->table_offset_entry[j++] = tables[i].address;
     }
 
     xsdt->header.revision = 1;
@@ -954,7 +955,7 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
          * re-using MADT memory.
          */
         if ( strncmp(sig, ACPI_SIG_MADT, ACPI_NAME_SIZE)
-             ? pvh_acpi_table_allowed(sig)
+             ? pvh_acpi_table_allowed(sig, addr, size)
              : !acpi_memory_banned(addr, size) )
              pvh_add_mem_range(d, addr, addr + size, E820_ACPI);
     }
