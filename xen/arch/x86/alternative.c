@@ -159,10 +159,10 @@ text_poke(void *addr, const void *opcode, size_t len)
  * APs have less capabilities than the boot processor are not handled.
  * Tough. Make sure you disable such features by hand.
  */
-void init_or_livepatch apply_alternatives(const struct alt_instr *start,
-                                          const struct alt_instr *end)
+void init_or_livepatch apply_alternatives(struct alt_instr *start,
+                                          struct alt_instr *end)
 {
-    const struct alt_instr *a;
+    struct alt_instr *a, *base;
 
     printk(KERN_INFO "alt table %p -> %p\n", start, end);
 
@@ -175,18 +175,49 @@ void init_or_livepatch apply_alternatives(const struct alt_instr *start,
      * So be careful if you want to change the scan order to any other
      * order.
      */
-    for ( a = start; a < end; a++ )
+    for ( a = base = start; a < end; a++ )
     {
         uint8_t *orig = ALT_ORIG_PTR(a);
         uint8_t *repl = ALT_REPL_PTR(a);
         uint8_t buf[MAX_PATCH_LEN];
+        unsigned int total_len = a->orig_len + a->pad_len;
 
-        BUG_ON(a->repl_len > a->orig_len);
-        BUG_ON(a->orig_len > sizeof(buf));
+        BUG_ON(a->repl_len > total_len);
+        BUG_ON(total_len > sizeof(buf));
         BUG_ON(a->cpuid >= NCAPINTS * 32);
 
+        /*
+         * Detect sequences of alt_instr's patching the same origin site, and
+         * keep base pointing at the first alt_instr entry.  This is so we can
+         * refer to a single ->priv field for patching decisions.  We
+         * deliberately use the alt_instr itself rather than a local variable
+         * in case we end up making multiple passes.
+         *
+         * ->priv being nonzero means that the origin site has already been
+         * modified, and we shouldn't try to optimise the nops again.
+         */
+        if ( ALT_ORIG_PTR(base) != orig )
+            base = a;
+
+        /* If there is no replacement to make, see about optimising the nops. */
         if ( !boot_cpu_has(a->cpuid) )
+        {
+            /* Origin site site already touched?  Don't nop anything. */
+            if ( base->priv )
+                continue;
+
+            base->priv = 1;
+
+            /* Nothing useful to do? */
+            if ( a->pad_len <= 1 )
+                continue;
+
+            add_nops(buf, a->pad_len);
+            text_poke(orig + a->orig_len, buf, a->pad_len);
             continue;
+        }
+
+        base->priv = 1;
 
         memcpy(buf, repl, a->repl_len);
 
@@ -194,8 +225,8 @@ void init_or_livepatch apply_alternatives(const struct alt_instr *start,
         if ( a->repl_len >= 5 && (*buf & 0xfe) == 0xe8 )
             *(int32_t *)(buf + 1) += repl - orig;
 
-        add_nops(buf + a->repl_len, a->orig_len - a->repl_len);
-        text_poke(orig, buf, a->orig_len);
+        add_nops(buf + a->repl_len, total_len - a->repl_len);
+        text_poke(orig, buf, total_len);
     }
 }
 

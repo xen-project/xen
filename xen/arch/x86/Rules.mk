@@ -25,6 +25,10 @@ $(call as-option-add,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
 $(call as-option-add,CFLAGS,CC,"invpcid (%rax)$$(comma)%rax",-DHAVE_AS_INVPCID)
 
+# GAS's idea of true is -1.  Clang's idea is 1
+$(call as-option-add,CFLAGS,CC,\
+    ".if ((1 > 0) < 0); .error \"\";.endif",,-DHAVE_AS_NEGATIVE_TRUE)
+
 CFLAGS += -mno-red-zone -fpic -fno-asynchronous-unwind-tables
 
 # Xen doesn't use SSE interally.  If the compiler supports it, also skip the
