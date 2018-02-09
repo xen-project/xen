@@ -84,6 +84,19 @@ static const unsigned char * const p6_nops[ASM_NOP_MAX+1] init_or_livepatch_cons
 
 static const unsigned char * const *ideal_nops init_or_livepatch_data = p6_nops;
 
+#ifdef HAVE_AS_NOPS_DIRECTIVE
+
+/* Nops in .init.rodata to compare against the runtime ideal nops. */
+asm ( ".pushsection .init.rodata, \"a\", @progbits\n\t"
+      "toolchain_nops: .nops " __stringify(ASM_NOP_MAX) "\n\t"
+      ".popsection\n\t");
+extern char toolchain_nops[ASM_NOP_MAX];
+static bool __read_mostly toolchain_nops_are_ideal;
+
+#else
+# define toolchain_nops_are_ideal false
+#endif
+
 static void __init arch_init_ideal_nops(void)
 {
     switch ( boot_cpu_data.x86_vendor )
@@ -112,6 +125,11 @@ static void __init arch_init_ideal_nops(void)
             ideal_nops = k8_nops;
         break;
     }
+
+#ifdef HAVE_AS_NOPS_DIRECTIVE
+    if ( memcmp(ideal_nops[ASM_NOP_MAX], toolchain_nops, ASM_NOP_MAX) == 0 )
+        toolchain_nops_are_ideal = true;
+#endif
 }
 
 /* Use this to add nops to a buffer, then text_poke the whole buffer. */
@@ -209,7 +227,7 @@ void init_or_livepatch apply_alternatives(struct alt_instr *start,
             base->priv = 1;
 
             /* Nothing useful to do? */
-            if ( a->pad_len <= 1 )
+            if ( toolchain_nops_are_ideal || a->pad_len <= 1 )
                 continue;
 
             add_nops(buf, a->pad_len);

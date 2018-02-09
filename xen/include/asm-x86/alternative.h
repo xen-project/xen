@@ -2,7 +2,6 @@
 #define __X86_ALTERNATIVE_H__
 
 #include <asm/alternative-asm.h>
-#include <asm/nops.h>
 
 #ifndef __ASSEMBLY__
 #include <xen/stringify.h>
@@ -27,6 +26,14 @@ extern void add_nops(void *insns, unsigned int len);
 extern void apply_alternatives(struct alt_instr *start, struct alt_instr *end);
 extern void alternative_instructions(void);
 
+asm ( ".macro mknops nr_bytes\n\t"
+#ifdef HAVE_AS_NOPS_DIRECTIVE
+      ".nops \\nr_bytes, " __stringify(ASM_NOP_MAX) "\n\t"
+#else
+      ".skip \\nr_bytes, 0x90\n\t"
+#endif
+      ".endm\n\t" );
+
 #define alt_orig_len       "(.LXEN%=_orig_e - .LXEN%=_orig_s)"
 #define alt_pad_len        "(.LXEN%=_orig_p - .LXEN%=_orig_e)"
 #define alt_total_len      "(.LXEN%=_orig_p - .LXEN%=_orig_s)"
@@ -46,7 +53,7 @@ extern void alternative_instructions(void);
 #define OLDINSTR(oldinstr, padding)                              \
     ".LXEN%=_orig_s:\n\t" oldinstr "\n .LXEN%=_orig_e:\n\t"      \
     ".LXEN%=_diff = " padding "\n\t"                             \
-    ".skip "AS_TRUE"(.LXEN%=_diff > 0) * .LXEN%=_diff, 0x90\n\t" \
+    "mknops ("AS_TRUE"(.LXEN%=_diff > 0) * .LXEN%=_diff)\n\t"    \
     ".LXEN%=_orig_p:\n\t"
 
 #define OLDINSTR_1(oldinstr, n1)                                 \

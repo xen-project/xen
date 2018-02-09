@@ -1,6 +1,8 @@
 #ifndef _ASM_X86_ALTERNATIVE_ASM_H_
 #define _ASM_X86_ALTERNATIVE_ASM_H_
 
+#include <asm/nops.h>
+
 #ifdef __ASSEMBLY__
 
 /*
@@ -19,6 +21,14 @@
     .byte 0 /* priv */
 .endm
 
+.macro mknops nr_bytes
+#ifdef HAVE_AS_NOPS_DIRECTIVE
+    .nops \nr_bytes, ASM_NOP_MAX
+#else
+    .skip \nr_bytes, 0x90
+#endif
+.endm
+
 /* GAS's idea of true is -1, while Clang's idea is 1. */
 #ifdef HAVE_AS_NEGATIVE_TRUE
 # define as_true(x) (-(x))
@@ -29,7 +39,7 @@
 #define decl_orig(insn, padding)                  \
  .L\@_orig_s: insn; .L\@_orig_e:                  \
  .L\@_diff = padding;                             \
- .skip as_true(.L\@_diff > 0) * .L\@_diff, 0x90;  \
+ mknops (as_true(.L\@_diff > 0) * .L\@_diff);     \
  .L\@_orig_p:
 
 #define orig_len               (.L\@_orig_e       -     .L\@_orig_s)
