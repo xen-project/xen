@@ -163,8 +163,6 @@ void init_or_livepatch apply_alternatives(const struct alt_instr *start,
                                           const struct alt_instr *end)
 {
     const struct alt_instr *a;
-    u8 *instr, *replacement;
-    u8 insnbuf[MAX_PATCH_LEN];
 
     printk(KERN_INFO "alt table %p -> %p\n", start, end);
 
@@ -179,23 +177,25 @@ void init_or_livepatch apply_alternatives(const struct alt_instr *start,
      */
     for ( a = start; a < end; a++ )
     {
-        instr = (u8 *)&a->instr_offset + a->instr_offset;
-        replacement = (u8 *)&a->repl_offset + a->repl_offset;
-        BUG_ON(a->replacementlen > a->instrlen);
-        BUG_ON(a->instrlen > sizeof(insnbuf));
+        uint8_t *orig = ALT_ORIG_PTR(a);
+        uint8_t *repl = ALT_REPL_PTR(a);
+        uint8_t buf[MAX_PATCH_LEN];
+
+        BUG_ON(a->repl_len > a->orig_len);
+        BUG_ON(a->orig_len > sizeof(buf));
         BUG_ON(a->cpuid >= NCAPINTS * 32);
+
         if ( !boot_cpu_has(a->cpuid) )
             continue;
 
-        memcpy(insnbuf, replacement, a->replacementlen);
+        memcpy(buf, repl, a->repl_len);
 
         /* 0xe8/0xe9 are relative branches; fix the offset. */
-        if ( a->replacementlen >= 5 && (*insnbuf & 0xfe) == 0xe8 )
-            *(s32 *)(insnbuf + 1) += replacement - instr;
+        if ( a->repl_len >= 5 && (*buf & 0xfe) == 0xe8 )
+            *(int32_t *)(buf + 1) += repl - orig;
 
-        add_nops(insnbuf + a->replacementlen,
-                 a->instrlen - a->replacementlen);
-        text_poke(instr, insnbuf, a->instrlen);
+        add_nops(buf + a->repl_len, a->orig_len - a->repl_len);
+        text_poke(orig, buf, a->orig_len);
     }
 }
 

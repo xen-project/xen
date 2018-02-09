@@ -9,15 +9,15 @@
 #include <xen/types.h>
 
 struct alt_instr {
-    s32 instr_offset;       /* original instruction */
-    s32 repl_offset;        /* offset to replacement instruction */
-    u16 cpuid;              /* cpuid bit set for replacement */
-    u8  instrlen;           /* length of original instruction */
-    u8  replacementlen;     /* length of new instruction, <= instrlen */
+    int32_t  orig_offset;   /* original instruction */
+    int32_t  repl_offset;   /* offset to replacement instruction */
+    uint16_t cpuid;         /* cpuid bit set for replacement */
+    uint8_t  orig_len;      /* length of original instruction */
+    uint8_t  repl_len;      /* length of new instruction, <= instrlen */
 };
 
-#define __ALT_PTR(a,f)      ((u8 *)((void *)&(a)->f + (a)->f))
-#define ALT_ORIG_PTR(a)     __ALT_PTR(a, instr_offset)
+#define __ALT_PTR(a,f)      ((uint8_t *)((void *)&(a)->f + (a)->f))
+#define ALT_ORIG_PTR(a)     __ALT_PTR(a, orig_offset)
 #define ALT_REPL_PTR(a)     __ALT_PTR(a, repl_offset)
 
 extern void add_nops(void *insns, unsigned int len);
