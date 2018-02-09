@@ -65,11 +65,6 @@ extern void alternative_instructions(void);
 	ALTERNATIVE(oldinstr, newinstr1, feature1)			  \
 	ALTERNATIVE_N(newinstr2, feature2, 2)
 
-#define ALTERNATIVE_3(oldinstr, newinstr1, feature1, newinstr2, feature2, \
-		      newinstr3, feature3)				  \
-	ALTERNATIVE_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
-	ALTERNATIVE_N(newinstr3, feature3, 3)
-
 /*
  * Alternative instructions for different CPU types or capabilities.
  *
@@ -116,23 +111,6 @@ extern void alternative_instructions(void);
 			 feature2, output, input...)			\
 	asm volatile(ALTERNATIVE_2(oldinstr, newinstr1, feature1,	\
 				   newinstr2, feature2)			\
-		     : output : input)
-
-/*
- * This is similar to alternative_io. But it has three features and
- * respective instructions.
- *
- * If CPU has feature3, newinstr3 is used.
- * Otherwise, if CPU has feature2, newinstr2 is used.
- * Otherwise, if CPU has feature1, newinstr1 is used.
- * Otherwise, oldinstr is used.
- */
-#define alternative_io_3(oldinstr, newinstr1, feature1, newinstr2,	\
-			 feature2, newinstr3, feature3, output,		\
-			 input...)					\
-	asm volatile(ALTERNATIVE_3(oldinstr, newinstr1, feature1,	\
-				   newinstr2, feature2, newinstr3,	\
-				   feature3)				\
 		     : output : input)
 
 /* Use this macro(s) if you need more than one output parameter. */
