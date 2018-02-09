@@ -601,23 +601,9 @@ handle_exception_saved:
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
 
-.Lcr4_pv32_orig:
-        jmp   .Lcr4_pv32_done
-        .skip (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt) - (. - .Lcr4_pv32_orig), 0xcc
-        .pushsection .altinstr_replacement, "ax"
-.Lcr4_pv32_alt:
-        mov   VCPU_domain(%rbx),%rax
-.Lcr4_pv32_alt_end:
-        .section .altinstructions, "a"
-        altinstruction_entry .Lcr4_pv32_orig, .Lcr4_pv32_alt, \
-                             X86_FEATURE_XEN_SMEP, \
-                             (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt), \
-                             (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt)
-        altinstruction_entry .Lcr4_pv32_orig, .Lcr4_pv32_alt, \
-                             X86_FEATURE_XEN_SMAP, \
-                             (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt), \
-                             (.Lcr4_pv32_alt_end - .Lcr4_pv32_alt)
-        .popsection
+        ALTERNATIVE_2 "jmp .Lcr4_pv32_done; .skip 2, 0x90", \
+            __stringify(mov VCPU_domain(%rbx), %rax), X86_FEATURE_XEN_SMEP, \
+            __stringify(mov VCPU_domain(%rbx), %rax), X86_FEATURE_XEN_SMAP
 
         testb $3,UREGS_cs(%rsp)
         jz    .Lcr4_pv32_done

@@ -111,13 +111,10 @@ ENTRY(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
         mov   $~(X86_EFLAGS_IOPL|X86_EFLAGS_NT|X86_EFLAGS_VM),%r11d
         and   UREGS_eflags(%rsp),%r11d
-.Lcr4_orig:
-        .skip .Lcr4_alt_end - .Lcr4_alt, 0x90
-.Lcr4_orig_end:
-        .pushsection .altinstr_replacement, "ax"
-.Lcr4_alt:
+
+.macro alt_cr4_pv32
         testb $3,UREGS_cs(%rsp)
-        jpe   .Lcr4_alt_end
+        jpe   2f
         mov   CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp), %rax
         and   $~XEN_CR4_PV32_BITS, %rax
 1:
@@ -135,17 +132,12 @@ ENTRY(compat_restore_all_guest)
          */
         cmp   %rax, CPUINFO_cr4-CPUINFO_guest_cpu_user_regs(%rsp)
         jne   1b
-.Lcr4_alt_end:
-        .section .altinstructions, "a"
-        altinstruction_entry .Lcr4_orig, .Lcr4_orig, X86_FEATURE_ALWAYS, \
-                             (.Lcr4_orig_end - .Lcr4_orig), 0
-        altinstruction_entry .Lcr4_orig, .Lcr4_alt, X86_FEATURE_XEN_SMEP, \
-                             (.Lcr4_orig_end - .Lcr4_orig), \
-                             (.Lcr4_alt_end - .Lcr4_alt)
-        altinstruction_entry .Lcr4_orig, .Lcr4_alt, X86_FEATURE_XEN_SMAP, \
-                             (.Lcr4_orig_end - .Lcr4_orig), \
-                             (.Lcr4_alt_end - .Lcr4_alt)
-        .popsection
+2:
+.endm
+	ALTERNATIVE_2 ".skip 45, 0x90", \
+            alt_cr4_pv32, X86_FEATURE_XEN_SMEP, \
+            alt_cr4_pv32, X86_FEATURE_XEN_SMAP
+
         or    $X86_EFLAGS_IF,%r11
         mov   %r11d,UREGS_eflags(%rsp)
 

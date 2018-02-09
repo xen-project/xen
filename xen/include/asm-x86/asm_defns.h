@@ -195,28 +195,18 @@ void ret_from_intr(void);
 #define __ASM_STAC      .byte 0x0f,0x01,0xcb
 
 #ifdef __ASSEMBLY__
-#define ASM_AC(op)                                                     \
-        661: ASM_NOP3;                                                 \
-        .pushsection .altinstr_replacement, "ax";                      \
-        662: __ASM_##op;                                               \
-        .popsection;                                                   \
-        .pushsection .altinstructions, "a";                            \
-        altinstruction_entry 661b, 661b, X86_FEATURE_ALWAYS, 3, 0;     \
-        altinstruction_entry 661b, 662b, X86_FEATURE_XEN_SMAP, 3, 3;       \
-        .popsection
+#define ASM_STAC                                        \
+    ALTERNATIVE __stringify(ASM_NOP3),                  \
+        __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP
 
-#define ASM_STAC ASM_AC(STAC)
-#define ASM_CLAC ASM_AC(CLAC)
+#define ASM_CLAC                                        \
+    ALTERNATIVE __stringify(ASM_NOP3),                  \
+        __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP
 
-#define CR4_PV32_RESTORE                                           \
-        667: ASM_NOP5;                                             \
-        .pushsection .altinstr_replacement, "ax";                  \
-        668: call cr4_pv32_restore;                                \
-        .section .altinstructions, "a";                            \
-        altinstruction_entry 667b, 667b, X86_FEATURE_ALWAYS, 5, 0; \
-        altinstruction_entry 667b, 668b, X86_FEATURE_XEN_SMEP, 5, 5;   \
-        altinstruction_entry 667b, 668b, X86_FEATURE_XEN_SMAP, 5, 5;   \
-        .popsection
+#define CR4_PV32_RESTORE                                \
+    ALTERNATIVE_2 __stringify(ASM_NOP5),                \
+        "call cr4_pv32_restore", X86_FEATURE_XEN_SMEP,  \
+        "call cr4_pv32_restore", X86_FEATURE_XEN_SMAP
 
 #else
 static always_inline void clac(void)
