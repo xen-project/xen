@@ -216,9 +216,8 @@
 
 /* Use after a VMEXIT from an HVM guest. */
 #define SPEC_CTRL_ENTRY_FROM_VMEXIT                                     \
-    ALTERNATIVE __stringify(ASM_NOP40),                                 \
-        DO_OVERWRITE_RSB, X86_FEATURE_RSB_VMEXIT;                       \
-    ALTERNATIVE_2 __stringify(ASM_NOP32),                               \
+    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_RSB_VMEXIT;           \
+    ALTERNATIVE_2 "",                                                   \
         __stringify(DO_SPEC_CTRL_ENTRY_FROM_VMEXIT                      \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
         X86_FEATURE_XEN_IBRS_SET,                                       \
@@ -228,9 +227,8 @@
 
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
-    ALTERNATIVE __stringify(ASM_NOP40),                                 \
-        DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
-    ALTERNATIVE_2 __stringify(ASM_NOP21),                               \
+    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;           \
+    ALTERNATIVE_2 "",                                                   \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=0                       \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
         X86_FEATURE_XEN_IBRS_SET,                                       \
@@ -239,9 +237,8 @@
 
 /* Use in interrupt/exception context.  May interrupt Xen or PV context. */
 #define SPEC_CTRL_ENTRY_FROM_INTR                                       \
-    ALTERNATIVE __stringify(ASM_NOP40),                                 \
-        DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
-    ALTERNATIVE_2 __stringify(ASM_NOP29),                               \
+    ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;           \
+    ALTERNATIVE_2 "",                                                   \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=1                       \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
         X86_FEATURE_XEN_IBRS_SET,                                       \
@@ -250,13 +247,13 @@
 
 /* Use when exiting to Xen context. */
 #define SPEC_CTRL_EXIT_TO_XEN                                           \
-    ALTERNATIVE_2 __stringify(ASM_NOP17),                               \
+    ALTERNATIVE_2 "",                                                   \
         DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_XEN_IBRS_SET,             \
         DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_XEN_IBRS_CLEAR
 
 /* Use when exiting to guest context. */
 #define SPEC_CTRL_EXIT_TO_GUEST                                         \
-    ALTERNATIVE_2 __stringify(ASM_NOP24),                               \
+    ALTERNATIVE_2 "",                                                   \
         DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_XEN_IBRS_SET,           \
         DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_XEN_IBRS_CLEAR
 

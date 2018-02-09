@@ -134,7 +134,7 @@ ENTRY(compat_restore_all_guest)
         jne   1b
 2:
 .endm
-	ALTERNATIVE_2 ".skip 45, 0x90", \
+	ALTERNATIVE_2 "", \
             alt_cr4_pv32, X86_FEATURE_XEN_SMEP, \
             alt_cr4_pv32, X86_FEATURE_XEN_SMAP
 
