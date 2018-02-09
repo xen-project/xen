@@ -26,44 +26,49 @@ extern void apply_alternatives(const struct alt_instr *start,
                                const struct alt_instr *end);
 extern void alternative_instructions(void);
 
-#define OLDINSTR(oldinstr)      "661:\n\t" oldinstr "\n662:\n"
+#define OLDINSTR(oldinstr) ".LXEN%=_orig_s:\n\t" oldinstr "\n.LXEN%=_orig_e:\n"
 
-#define b_replacement(number)   "663"#number
-#define e_replacement(number)   "664"#number
+#define alt_orig_len       "(.LXEN%=_orig_e - .LXEN%=_orig_s)"
+#define alt_repl_s(num)    ".LXEN%=_repl_s"#num
+#define alt_repl_e(num)    ".LXEN%=_repl_e"#num
+#define alt_repl_len(num)  "(" alt_repl_e(num) " - " alt_repl_s(num) ")"
 
-#define alt_slen "662b-661b"
-#define alt_rlen(number) e_replacement(number)"f-"b_replacement(number)"f"
+#define ALTINSTR_ENTRY(feature, num)                                    \
+        " .long .LXEN%=_orig_s - .\n"             /* label           */ \
+        " .long " alt_repl_s(num)" - .\n"         /* new instruction */ \
+        " .word " __stringify(feature) "\n"       /* feature bit     */ \
+        " .byte " alt_orig_len "\n"               /* source len      */ \
+        " .byte " alt_repl_len(num) "\n"          /* replacement len */
 
-#define ALTINSTR_ENTRY(feature, number)                                       \
-        " .long 661b - .\n"                             /* label           */ \
-        " .long " b_replacement(number)"f - .\n"        /* new instruction */ \
-        " .word " __stringify(feature) "\n"             /* feature bit     */ \
-        " .byte " alt_slen "\n"                         /* source len      */ \
-        " .byte " alt_rlen(number) "\n"                 /* replacement len */
+#define DISCARD_ENTRY(num)                        /* repl <= orig */    \
+        " .byte 0xff + (" alt_repl_len(num) ") - (" alt_orig_len ")\n"
 
-#define DISCARD_ENTRY(number)                           /* rlen <= slen */    \
-        " .byte 0xff + (" alt_rlen(number) ") - (" alt_slen ")\n"
-
-#define ALTINSTR_REPLACEMENT(newinstr, feature, number) /* replacement */     \
-        b_replacement(number)":\n\t" newinstr "\n" e_replacement(number) ":\n\t"
-
-#define ALTERNATIVE_N(newinstr, feature, number)	\
-	".pushsection .altinstructions,\"a\"\n"		\
-	ALTINSTR_ENTRY(feature, number)			\
-	".section .discard,\"a\",@progbits\n"		\
-	DISCARD_ENTRY(number)				\
-	".section .altinstr_replacement, \"ax\"\n"	\
-	ALTINSTR_REPLACEMENT(newinstr, feature, number)	\
-	".popsection\n"
+#define ALTINSTR_REPLACEMENT(newinstr, num)       /* replacement */     \
+        alt_repl_s(num)":\n\t" newinstr "\n" alt_repl_e(num) ":\n\t"
 
 /* alternative assembly primitive: */
-#define ALTERNATIVE(oldinstr, newinstr, feature)			  \
-	OLDINSTR(oldinstr)						  \
-	ALTERNATIVE_N(newinstr, feature, 1)
+#define ALTERNATIVE(oldinstr, newinstr, feature)                        \
+        OLDINSTR(oldinstr)                                              \
+        ".pushsection .altinstructions, \"a\", @progbits\n"             \
+        ALTINSTR_ENTRY(feature, 1)                                      \
+        ".section .discard, \"a\", @progbits\n"                         \
+        DISCARD_ENTRY(1)                                                \
+        ".section .altinstr_replacement, \"ax\", @progbits\n"           \
+        ALTINSTR_REPLACEMENT(newinstr, 1)                               \
+        ".popsection\n"
 
 #define ALTERNATIVE_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
-	ALTERNATIVE(oldinstr, newinstr1, feature1)			  \
-	ALTERNATIVE_N(newinstr2, feature2, 2)
+        OLDINSTR(oldinstr)                                              \
+        ".pushsection .altinstructions, \"a\", @progbits\n"             \
+        ALTINSTR_ENTRY(feature1, 1)                                     \
+        ALTINSTR_ENTRY(feature2, 2)                                     \
+        ".section .discard, \"a\", @progbits\n"                         \
+        DISCARD_ENTRY(1)                                                \
+        DISCARD_ENTRY(2)                                                \
+        ".section .altinstr_replacement, \"ax\", @progbits\n"           \
+        ALTINSTR_REPLACEMENT(newinstr1, 1)                              \
+        ALTINSTR_REPLACEMENT(newinstr2, 2)                              \
+        ".popsection\n"
 
 /*
  * Alternative instructions for different CPU types or capabilities.

@@ -9,59 +9,65 @@
  * enough information for the alternatives patching code to patch an
  * instruction. See apply_alternatives().
  */
-.macro altinstruction_entry orig alt feature orig_len alt_len
+.macro altinstruction_entry orig repl feature orig_len repl_len
     .long \orig - .
-    .long \alt - .
+    .long \repl - .
     .word \feature
     .byte \orig_len
-    .byte \alt_len
+    .byte \repl_len
 .endm
 
+#define decl_orig(insn)         .L\@_orig_s:      insn; .L\@_orig_e:
+#define orig_len               (.L\@_orig_e       -     .L\@_orig_s)
+
+#define decl_repl(insn, nr)     .L\@_repl_s\()nr: insn; .L\@_repl_e\()nr:
+#define repl_len(nr)           (.L\@_repl_e\()nr  -     .L\@_repl_s\()nr)
+
 .macro ALTERNATIVE oldinstr, newinstr, feature
-.Lold_start_\@:
-    \oldinstr
-.Lold_end_\@:
+    decl_orig(\oldinstr)
 
     .pushsection .altinstructions, "a", @progbits
-    altinstruction_entry .Lold_start_\@, .Lnew_start_\@, \feature, \
-        (.Lold_end_\@ - .Lold_start_\@), (.Lnew_end_\@ - .Lnew_start_\@)
+    altinstruction_entry .L\@_orig_s, .L\@_repl_s1, \feature, \
+        orig_len, repl_len(1)
 
     .section .discard, "a", @progbits
     /* Assembler-time check that \newinstr isn't longer than \oldinstr. */
-    .byte 0xff + (.Lnew_end_\@ - .Lnew_start_\@) - (.Lold_end_\@ - .Lold_start_\@)
+    .byte 0xff + repl_len(1) - orig_len
 
     .section .altinstr_replacement, "ax", @progbits
-.Lnew_start_\@:
-    \newinstr
-.Lnew_end_\@:
+
+    decl_repl(\newinstr, 1)
+
     .popsection
 .endm
 
 .macro ALTERNATIVE_2 oldinstr, newinstr1, feature1, newinstr2, feature2
-.Lold_start_\@:
-    \oldinstr
-.Lold_end_\@:
+    decl_orig(\oldinstr)
 
     .pushsection .altinstructions, "a", @progbits
-    altinstruction_entry .Lold_start_\@, .Lnew1_start_\@, \feature1, \
-        (.Lold_end_\@ - .Lold_start_\@), (.Lnew1_end_\@ - .Lnew1_start_\@)
-    altinstruction_entry .Lold_start_\@, .Lnew2_start_\@, \feature2, \
-        (.Lold_end_\@ - .Lold_start_\@), (.Lnew2_end_\@ - .Lnew2_start_\@)
+
+    altinstruction_entry .L\@_orig_s, .L\@_repl_s1, \feature1, \
+        orig_len, repl_len(1)
+    altinstruction_entry .L\@_orig_s, .L\@_repl_s2, \feature2, \
+        orig_len, repl_len(2)
 
     .section .discard, "a", @progbits
     /* Assembler-time check that \newinstr{1,2} aren't longer than \oldinstr. */
-    .byte 0xff + (.Lnew1_end_\@ - .Lnew1_start_\@) - (.Lold_end_\@ - .Lold_start_\@)
-    .byte 0xff + (.Lnew2_end_\@ - .Lnew2_start_\@) - (.Lold_end_\@ - .Lold_start_\@)
+    .byte 0xff + repl_len(1) - orig_len
+    .byte 0xff + repl_len(2) - orig_len
 
     .section .altinstr_replacement, "ax", @progbits
-.Lnew1_start_\@:
-    \newinstr1
-.Lnew1_end_\@:
-.Lnew2_start_\@:
-    \newinstr2
-.Lnew2_end_\@:
+
+    decl_repl(\newinstr1, 1)
+    decl_repl(\newinstr2, 2)
+
     .popsection
 .endm
+
+#undef repl_len
+#undef decl_repl
+#undef orig_len
+#undef decl_orig
 
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_X86_ALTERNATIVE_ASM_H_ */
