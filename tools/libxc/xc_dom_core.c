@@ -225,6 +225,12 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
                      "tried to map file which is too large");
         goto err;
     }
+    else if ( !*size )
+    {
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "'%s': zero length file", filename);
+        goto err;
+    }
 
     block = malloc(sizeof(*block));
     if ( block == NULL ) {
