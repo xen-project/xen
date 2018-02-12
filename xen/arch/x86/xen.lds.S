@@ -67,6 +67,13 @@ SECTIONS
        *(.text)
        *(.text.__x86_indirect_thunk_*)
        *(.text.page_aligned)
+
+       . = ALIGN(PAGE_SIZE);
+       _stextentry = .;
+       *(.text.entry)
+       . = ALIGN(PAGE_SIZE);
+       _etextentry = .;
+
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)

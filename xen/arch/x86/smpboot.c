@@ -622,6 +622,9 @@ unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
         unmap_domain_page(memset(__map_domain_page(pg), 0xcc, PAGE_SIZE));
     }
 
+    /* Confirm that all stubs fit in a single L3 entry. */
+    BUILD_BUG_ON(NR_CPUS * PAGE_SIZE > (1u << L3_PAGETABLE_SHIFT));
+
     stub_va = XEN_VIRT_END - (cpu + 1) * PAGE_SIZE;
     if ( map_pages_to_xen(stub_va, mfn_x(page_to_mfn(pg)), 1,
                           PAGE_HYPERVISOR_RX | MAP_SMALL_PAGES) )
@@ -646,13 +649,24 @@ static int clone_mapping(const void *ptr, root_pgentry_t *rpt)
 {
     unsigned long linear = (unsigned long)ptr, pfn;
     unsigned int flags;
-    l3_pgentry_t *pl3e = l4e_to_l3e(idle_pg_table[root_table_offset(linear)]) +
-                         l3_table_offset(linear);
+    l3_pgentry_t *pl3e;
     l2_pgentry_t *pl2e;
     l1_pgentry_t *pl1e;
 
-    if ( linear < DIRECTMAP_VIRT_START )
-        return 0;
+    /*
+     * Sanity check 'linear'.  We only allow cloning from the Xen virtual
+     * range, and in particular, only from the directmap and .text ranges.
+     */
+    if ( root_table_offset(linear) > ROOT_PAGETABLE_LAST_XEN_SLOT ||
+         root_table_offset(linear) < ROOT_PAGETABLE_FIRST_XEN_SLOT )
+        return -EINVAL;
+
+    if ( linear < XEN_VIRT_START ||
+         (linear >= XEN_VIRT_END && linear < DIRECTMAP_VIRT_START) )
+        return -EINVAL;
+
+    pl3e = l4e_to_l3e(idle_pg_table[root_table_offset(linear)]) +
+        l3_table_offset(linear);
 
     flags = l3e_get_flags(*pl3e);
     ASSERT(flags & _PAGE_PRESENT);
@@ -744,8 +758,12 @@ static __read_mostly int8_t opt_xpti = -1;
 boolean_param("xpti", opt_xpti);
 DEFINE_PER_CPU(root_pgentry_t *, root_pgt);
 
+extern const char _stextentry[], _etextentry[];
+
 static int setup_cpu_root_pgt(unsigned int cpu)
 {
+    static root_pgentry_t common_pgt;
+
     root_pgentry_t *rpt;
     unsigned int off;
     int rc;
@@ -764,8 +782,35 @@ static int setup_cpu_root_pgt(unsigned int cpu)
         idle_pg_table[root_table_offset(RO_MPT_VIRT_START)];
     /* SH_LINEAR_PT inserted together with guest mappings. */
     /* PERDOMAIN inserted during context switch. */
-    rpt[root_table_offset(XEN_VIRT_START)] =
-        idle_pg_table[root_table_offset(XEN_VIRT_START)];
+
+    /* One-time setup of common_pgt, which maps .text.entry and the stubs. */
+    if ( unlikely(!root_get_intpte(common_pgt)) )
+    {
+        unsigned long stubs_linear = XEN_VIRT_END - 1;
+        l3_pgentry_t *stubs_main, *stubs_shadow;
+        const char *ptr;
+
+        for ( rc = 0, ptr = _stextentry;
+              !rc && ptr < _etextentry; ptr += PAGE_SIZE )
+            rc = clone_mapping(ptr, rpt);
+
+        if ( rc )
+            return rc;
+
+        /* Confirm that all stubs fit in a single L3 entry. */
+        BUILD_BUG_ON(NR_CPUS * PAGE_SIZE > (1u << L3_PAGETABLE_SHIFT));
+
+        stubs_main = l4e_to_l3e(idle_pg_table[l4_table_offset(stubs_linear)]);
+        stubs_shadow = l4e_to_l3e(rpt[l4_table_offset(stubs_linear)]);
+
+        /* Splice into the regular L2 mapping the stubs. */
+        stubs_shadow[l3_table_offset(stubs_linear)] =
+            stubs_main[l3_table_offset(stubs_linear)];
+
+        common_pgt = rpt[root_table_offset(XEN_VIRT_START)];
+    }
+
+    rpt[root_table_offset(XEN_VIRT_START)] = common_pgt;
 
     /* Install direct map page table entries for stack, IDT, and TSS. */
     for ( off = rc = 0; !rc && off < STACK_SIZE; off += PAGE_SIZE )
