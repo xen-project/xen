@@ -8,6 +8,8 @@ information. Every basic block in the code will be instrumented by the compiler
 to compute these statistics. It should not be used in production as it slows
 down your hypervisor.
 
+# GCOV (GCC coverage)
+
 ## Enable coverage
 
 Test coverage support can be turned on compiling Xen with the `CONFIG_COVERAGE`
@@ -75,3 +77,48 @@ blob extracted from xencov!**
 * See output in a browser
 
         firefox cov/index.html
+
+# LLVM coverage
+
+## Enable coverage
+
+Coverage can be enabled using a Kconfig option, from the top-level directory
+use the following command to display the Kconfig menu:
+
+    make -C xen menuconfig clang=y
+
+The code coverage option can be found inside of the "Debugging Options"
+section. After enabling it just compile Xen as you would normally do:
+
+    make xen clang=y
+
+## Extract coverage data
+
+LLVM coverage can be extracted from the hypervisor using the `xencov` tool.
+The following actions are available:
+
+* `xencov read` extract data
+* `xencov reset` reset all coverage counters
+* `xencov read-reset` extract data and reset counters at the same time.
+
+## Possible use
+
+**This section is just an example on how to use these tools!**
+
+This example assumes you compiled Xen and copied the xen-syms file from
+xen/xen-syms into your current directory.
+
+* Extract the coverage data from Xen:
+
+    xencov read xen.profraw
+
+* Convert the data into a profile. Note that you can merge more than one
+  profraw file into a single profdata file.
+
+    llvm-profdata merge xen.profraw -o xen.profdata
+
+* Generate a HTML report of the code coverage:
+
+    llvm-cov show -format=html -output-dir=cov/ xen-syms -instr-profile=xen.profdata
+
+* Open cov/index.html with your browser in order to display the profile.
