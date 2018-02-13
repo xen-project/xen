@@ -24,8 +24,22 @@
  * if references remain at link time.
  */
 #define LINKER_BUG_ON(x) do { if (x) __xsm_action_mismatch_detected(); } while (0)
+
+#if defined(CONFIG_COVERAGE) && defined(__clang__)
+/*
+ * LLVM coverage support seems to disable some of the optimizations needed in
+ * order for XSM to compile. Since coverage should not be used in production
+ * provide an implementation of __xsm_action_mismatch_detected to satisfy the
+ * linker.
+ */
+static inline void __xsm_action_mismatch_detected(void)
+{
+    ASSERT_UNREACHABLE();
+}
+#else
 /* DO NOT implement this function; it is supposed to trigger link errors */
 void __xsm_action_mismatch_detected(void);
+#endif
 
 #ifdef CONFIG_XSM
 
