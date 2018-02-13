@@ -166,7 +166,7 @@ void __dummy__(void)
     BLANK();
 #endif
 
-    DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));
+    DEFINE(IRQSTAT_shift, ilog2(sizeof(irq_cpustat_t)));
     OFFSET(IRQSTAT_softirq_pending, irq_cpustat_t, __softirq_pending);
     BLANK();
 
