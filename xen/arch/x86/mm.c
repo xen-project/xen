@@ -2390,9 +2390,7 @@ int free_page_type(struct page_info *page, unsigned long type,
         ASSERT(!shadow_mode_refcounts(owner));
 
         gmfn = mfn_to_gmfn(owner, mfn_x(page_to_mfn(page)));
-        ASSERT(VALID_M2P(gmfn));
-        /* Page sharing not supported for shadowed domains */
-        if(!SHARED_M2P(gmfn))
+        if ( VALID_M2P(gmfn) )
             shadow_remove_all_shadows(owner, _mfn(gmfn));
     }
 
@@ -4217,7 +4215,7 @@ int xenmem_add_to_physmap_one(
 
     /* Unmap from old location, if any. */
     old_gpfn = get_gpfn_from_mfn(mfn_x(mfn));
-    ASSERT( old_gpfn != SHARED_M2P_ENTRY );
+    ASSERT(!SHARED_M2P(old_gpfn));
     if ( space == XENMAPSPACE_gmfn && old_gpfn != gfn )
     {
         rc = -EXDEV;

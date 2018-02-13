@@ -2597,7 +2597,7 @@ void audit_p2m(struct domain *d,
             continue;
         }
 
-        if ( gfn == SHARED_M2P_ENTRY )
+        if ( SHARED_M2P(gfn) )
         {
             P2M_PRINTK("shared mfn (%lx) on domain page list!\n",
                     mfn);

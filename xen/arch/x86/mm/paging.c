@@ -369,8 +369,8 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn)
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = _pfn(get_gpfn_from_mfn(mfn_x(gmfn)));
-    /* Shared pages are always read-only; invalid pages can't be dirty. */
-    if ( unlikely(SHARED_M2P(pfn_x(pfn)) || !VALID_M2P(pfn_x(pfn))) )
+    /* Invalid pages can't be dirty. */
+    if ( unlikely(!VALID_M2P(pfn_x(pfn))) )
         return 0;
 
     mfn = d->arch.paging.log_dirty.top;

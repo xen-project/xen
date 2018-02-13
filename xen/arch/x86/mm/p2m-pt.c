@@ -1059,8 +1059,7 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                         {
                             m2pfn = get_gpfn_from_mfn(mfn+i1);
                             /* Allow shared M2Ps */
-                            if ( (m2pfn != (gfn + i1)) &&
-                                 (m2pfn != SHARED_M2P_ENTRY) )
+                            if ( (m2pfn != (gfn + i1)) && !SHARED_M2P(m2pfn) )
                             {
                                 pmbad++;
                                 P2M_PRINTK("mismatch: gfn %#lx -> mfn %#lx"
