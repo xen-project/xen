@@ -220,14 +220,12 @@ static int modified_memory(struct domain *d,
             page = get_page_from_gfn(d, pfn, NULL, P2M_UNSHARE);
             if ( page )
             {
-                mfn_t gmfn = _mfn(page_to_mfn(page));
-
-                paging_mark_dirty(d, gmfn);
+                paging_mark_pfn_dirty(d, _pfn(pfn));
                 /*
                  * These are most probably not page tables any more
                  * don't take a long time and don't die either.
                  */
-                sh_remove_shadows(d, gmfn, 1, 0);
+                sh_remove_shadows(d, _mfn(page_to_mfn(page)), 1, 0);
                 put_page(page);
             }
         }

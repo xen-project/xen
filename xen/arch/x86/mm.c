@@ -3775,8 +3775,7 @@ long do_mmu_update(
             }
 
             set_gpfn_from_mfn(mfn, gpfn);
-
-            paging_mark_dirty(pg_owner, _mfn(mfn));
+            paging_mark_pfn_dirty(pg_owner, _pfn(gpfn));
 
             put_page(page);
             break;

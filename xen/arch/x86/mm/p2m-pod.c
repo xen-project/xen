@@ -1215,7 +1215,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn,
     for( i = 0; i < (1UL << order); i++ )
     {
         set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_x(gfn_aligned) + i);
-        paging_mark_dirty(d, mfn_add(mfn, i));
+        paging_mark_pfn_dirty(d, _pfn(gfn_x(gfn_aligned) + i));
     }
 
     p2m->pod.entry_count -= (1UL << order);

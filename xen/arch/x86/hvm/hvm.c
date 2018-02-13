@@ -1897,7 +1897,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          */
         if ( npfec.write_access )
         {
-            paging_mark_dirty(currd, mfn);
+            paging_mark_pfn_dirty(currd, _pfn(gfn));
             /*
              * If p2m is really an altp2m, unlock here to avoid lock ordering
              * violation when the change below is propagated from host p2m.
@@ -2582,7 +2582,7 @@ static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
         if ( unlikely(p2m_is_discard_write(p2mt)) )
             *writable = 0;
         else if ( !permanent )
-            paging_mark_dirty(d, _mfn(page_to_mfn(page)));
+            paging_mark_pfn_dirty(d, _pfn(gfn));
     }
 
     if ( !permanent )
@@ -3245,7 +3245,7 @@ static enum hvm_translation_result __hvm_copy(
                     memcpy(p, buf, count);
                 else
                     memset(p, 0, count);
-                paging_mark_dirty(v->domain, _mfn(page_to_mfn(page)));
+                paging_mark_pfn_dirty(v->domain, _pfn(gfn_x(gfn)));
             }
         }
         else
