@@ -646,6 +646,12 @@ struct xen_sysctl_scheduler_op {
 
 #define XEN_GCOV_FORMAT_MAGIC    0x58434f56 /* XCOV */
 
+/*
+ * Ouput format of LLVM coverage data is just a raw stream, as would be
+ * written by the compiler_rt run time library into a .profraw file. There
+ * are no special Xen tags or delimiters because none are needed.
+ */
+
 #define XEN_SYSCTL_COVERAGE_get_size 0 /* Get total size of output data */
 #define XEN_SYSCTL_COVERAGE_read     1 /* Read output data */
 #define XEN_SYSCTL_COVERAGE_reset    2 /* Reset all counters */
