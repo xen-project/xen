@@ -22,7 +22,7 @@ linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 		 (mkdir -p $(D)/$(d); \
 		  cd $(D)/$(d); \
 		  find $(XEN_ROOT)/$(d)/ -type d |\
-			sed 's,^$(XEN_ROOT)/$(d)/,,g' | xargs mkdir -p);) \
+			sed 's,^$(XEN_ROOT)/$(d)/,,g' | xargs mkdir -p .);) \
 	$(foreach d, $(LINK_DIRS), \
 		(cd $(XEN_ROOT); \
 		 find $(d) ! -type l -type f \
