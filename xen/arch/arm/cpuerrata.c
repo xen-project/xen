@@ -230,7 +230,7 @@ static int enable_ic_inv_hardening(void *data)
 static bool __maybe_unused
 is_affected_midr_range(const struct arm_cpu_capabilities *entry)
 {
-    return MIDR_IS_CPU_MODEL_RANGE(boot_cpu_data.midr.bits, entry->midr_model,
+    return MIDR_IS_CPU_MODEL_RANGE(current_cpu_data.midr.bits, entry->midr_model,
                                    entry->midr_range_min,
                                    entry->midr_range_max);
 }
