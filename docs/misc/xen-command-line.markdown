@@ -418,6 +418,18 @@ Indicate where the responsibility for driving power states lies.
   respectively.
 * `verbose` option can be included as a string or also as `verbose=<integer>`
 
+### cpuid (x86)
+> `= List of comma separated booleans`
+
+This option allows for fine tuning of the facilities Xen will use, after
+accounting for hardware capabilities as enumerated via CPUID.
+
+Currently accepted:
+
+The Speculation Control hardware features `ibrsb`, `stibp`, `ibpb` are used by
+default if avaiable.  They can be ignored, e.g. `no-ibrsb`, at which point Xen
+won't use them itself, and won't offer them to guests.
+
 ### cpuid\_mask\_cpu (AMD only)
 > `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
 
