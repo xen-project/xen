@@ -1261,6 +1261,8 @@ long arch_do_domctl(
                 vmsrs->msr_count = nr_msrs;
             else
             {
+                uint32_t edx, dummy;
+
                 i = 0;
 
                 vcpu_pause(v);
@@ -1298,6 +1300,21 @@ long arch_do_domctl(
                     }
                 }
 
+                domain_cpuid(d, 7, 0, &dummy, &dummy, &dummy, &edx);
+                if ( (edx & cpufeat_mask(X86_FEATURE_IBRSB)) &&
+                     v->arch.spec_ctrl )
+                {
+                    if ( i < vmsrs->msr_count && !ret )
+                    {
+                        msr.index = MSR_SPEC_CTRL;
+                        msr.reserved = 0;
+                        msr.value = v->arch.spec_ctrl;
+                        if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
+                            ret = -EFAULT;
+                    }
+                    ++i;
+                }
+
                 vcpu_unpause(v);
 
                 if ( i > vmsrs->msr_count && !ret )
@@ -1325,6 +1342,20 @@ long arch_do_domctl(
 
                 switch ( msr.index )
                 {
+                case MSR_SPEC_CTRL:
+                    if ( !boot_cpu_has(X86_FEATURE_IBRSB) )
+                        break; /* MSR available? */
+
+                    /*
+                     * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e.
+                     * ignored) when STIBP isn't enumerated in hardware.
+                     */
+
+                    if ( msr.value & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+                        break;
+                    v->arch.spec_ctrl = msr.value;
+                    continue;
+
                 case MSR_AMD64_DR0_ADDRESS_MASK:
                     if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
                          (msr.value >> 32) )
