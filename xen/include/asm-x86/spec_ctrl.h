@@ -24,6 +24,7 @@
 
 void init_speculation_mitigations(void);
 
+extern bool_t opt_ibpb;
 extern uint8_t default_bti_ist_info;
 
 static inline void init_shadow_spec_ctrl_state(void)
