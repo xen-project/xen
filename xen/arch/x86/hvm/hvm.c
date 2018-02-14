@@ -1571,8 +1571,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
         hvm_set_guest_tsc(v, 0);
     }
 
-    hvm_cpuid_policy_changed(v);
-
     return 0;
 
  fail6:
