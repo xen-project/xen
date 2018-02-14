@@ -37,6 +37,9 @@ ENTRY(vmx_asm_vmexit_handler)
         movb $1,VCPU_vmx_launched(%rbx)
         mov  %rax,VCPU_hvm_guest_cr2(%rbx)
 
+        SPEC_CTRL_ENTRY_FROM_VMEXIT /* Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
         mov  %rsp,%rdi
         call vmx_vmexit_handler
 
@@ -65,6 +68,12 @@ UNLIKELY_END(realmode)
 
         mov  %rsp,%rdi
         call vmx_vmenter_helper
+
+        mov VCPU_arch_spec_ctrl(%rbx), %eax
+
+        /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
+        SPEC_CTRL_EXIT_TO_GUEST /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
+
         mov  VCPU_hvm_guest_cr2(%rbx),%rax
 
         pop  %r15
@@ -96,6 +105,15 @@ UNLIKELY_END(realmode)
 .Lvmx_vmentry_fail:
         sti
         SAVE_ALL
+
+        /*
+         * PV variant needed here as no guest code has executed (so
+         * MSR_SPEC_CTRL can't have changed value), and NMIs/MCEs are liable
+         * to hit (in which case the HVM variant might corrupt things).
+         */
+        SPEC_CTRL_ENTRY_FROM_PV /* Req: %rsp=regs/cpuinfo Clob: acd */
+        /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
+
         call vmx_vmentry_failure
         BUG  /* vmx_vmentry_failure() shouldn't return. */
 
