@@ -13,6 +13,17 @@
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>
 
+#ifdef __ASSEMBLY__
+# include <asm/indirect_thunk_asm.h>
+#else
+# ifdef CONFIG_INDIRECT_THUNK
+asm ( "\t.equ CONFIG_INDIRECT_THUNK, 1" );
+# else
+asm ( "\t.equ CONFIG_INDIRECT_THUNK, 0" );
+# endif
+asm ( "\t.include \"asm/indirect_thunk_asm.h\"" );
+#endif
+
 #ifndef __ASSEMBLY__
 void ret_from_intr(void);
 #endif
