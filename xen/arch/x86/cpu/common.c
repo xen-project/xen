@@ -357,6 +357,19 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 		if (test_bit(X86_FEATURE_IND_THUNK_JMP,
 			     boot_cpu_data.x86_capability))
 			__set_bit(X86_FEATURE_IND_THUNK_JMP, c->x86_capability);
+		if (test_bit(X86_FEATURE_XEN_IBRS_SET,
+		             boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_XEN_IBRS_SET, c->x86_capability);
+		if (test_bit(X86_FEATURE_XEN_IBRS_CLEAR,
+		             boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_XEN_IBRS_CLEAR,
+			          c->x86_capability);
+		if (test_bit(X86_FEATURE_RSB_NATIVE,
+		             boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_RSB_NATIVE, c->x86_capability);
+		if (test_bit(X86_FEATURE_RSB_VMEXIT,
+		             boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_RSB_VMEXIT, c->x86_capability);
 
 		/* AND the already accumulated flags with these */
 		for ( i = 0 ; i < NCAPINTS ; i++ )

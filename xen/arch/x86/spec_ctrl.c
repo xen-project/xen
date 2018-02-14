@@ -20,6 +20,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 
+#include <asm/microcode.h>
 #include <asm/msr-index.h>
 #include <asm/processor.h>
 #include <asm/spec_ctrl.h>
@@ -33,11 +34,15 @@ static enum ind_thunk {
     THUNK_LFENCE,
     THUNK_JMP,
 } opt_thunk __initdata = THUNK_DEFAULT;
+static int8_t __initdata opt_ibrs = -1;
+static bool_t __initdata opt_rsb_native = 1;
+static bool_t __initdata opt_rsb_vmexit = 1;
+uint8_t __read_mostly default_bti_ist_info;
 
 static int __init parse_bti(const char *s)
 {
     const char *ss;
-    int rc = 0;
+    int val, rc = 0;
 
     do {
         ss = strchr(s, ',');
@@ -57,6 +62,12 @@ static int __init parse_bti(const char *s)
             else
                 rc = -EINVAL;
         }
+        else if ( (val = parse_boolean("ibrs", s, ss)) >= 0 )
+            opt_ibrs = val;
+        else if ( (val = parse_boolean("rsb_native", s, ss)) >= 0 )
+            opt_rsb_native = val;
+        else if ( (val = parse_boolean("rsb_vmexit", s, ss)) >= 0 )
+            opt_rsb_vmexit = val;
         else
             rc = -EINVAL;
 
@@ -94,24 +105,84 @@ static void __init print_details(enum ind_thunk thunk)
 #endif
 
     printk(XENLOG_INFO
-           "BTI mitigations: Thunk %s\n",
+           "BTI mitigations: Thunk %s, Others:%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
-           thunk == THUNK_JMP       ? "JMP" : "?");
+           thunk == THUNK_JMP       ? "JMP" : "?",
+           boot_cpu_has(X86_FEATURE_XEN_IBRS_SET)    ? " IBRS+" :
+           boot_cpu_has(X86_FEATURE_XEN_IBRS_CLEAR)  ? " IBRS-"      : "",
+           boot_cpu_has(X86_FEATURE_RSB_NATIVE)      ? " RSB_NATIVE" : "",
+           boot_cpu_has(X86_FEATURE_RSB_VMEXIT)      ? " RSB_VMEXIT" : "");
+}
+
+/* Calculate whether Retpoline is known-safe on this CPU. */
+static bool_t __init __maybe_unused retpoline_safe(void)
+{
+    unsigned int ucode_rev = this_cpu(ucode_cpu_info).cpu_sig.rev;
+
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        return 1;
+
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return 0;
+
+    switch ( boot_cpu_data.x86_model )
+    {
+    case 0x17: /* Penryn */
+    case 0x1d: /* Dunnington */
+    case 0x1e: /* Nehalem */
+    case 0x1f: /* Auburndale / Havendale */
+    case 0x1a: /* Nehalem EP */
+    case 0x2e: /* Nehalem EX */
+    case 0x25: /* Westmere */
+    case 0x2c: /* Westmere EP */
+    case 0x2f: /* Westmere EX */
+    case 0x2a: /* SandyBridge */
+    case 0x2d: /* SandyBridge EP/EX */
+    case 0x3a: /* IvyBridge */
+    case 0x3e: /* IvyBridge EP/EX */
+    case 0x3c: /* Haswell */
+    case 0x3f: /* Haswell EX/EP */
+    case 0x45: /* Haswell D */
+    case 0x46: /* Haswell H */
+        return 1;
+
+        /*
+         * Broadwell processors are retpoline-safe after specific microcode
+         * versions.
+         */
+    case 0x3d: /* Broadwell */
+        return ucode_rev >= 0x28;
+    case 0x47: /* Broadwell H */
+        return ucode_rev >= 0x1b;
+    case 0x4f: /* Broadwell EP/EX */
+        return ucode_rev >= 0xb000025;
+    case 0x56: /* Broadwell D */
+        return 0; /* TBD. */
+
+        /*
+         * Skylake and later processors are not retpoline-safe.
+         */
+    default:
+        return 0;
+    }
 }
 
 void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
+    bool_t ibrs = 0;
 
     /*
      * Has the user specified any custom BTI mitigations?  If so, follow their
      * instructions exactly and disable all heuristics.
      */
-    if ( opt_thunk != THUNK_DEFAULT )
+    if ( opt_thunk != THUNK_DEFAULT || opt_ibrs != -1 )
     {
         thunk = opt_thunk;
+        ibrs  = !!opt_ibrs;
     }
     else
     {
@@ -126,7 +197,16 @@ void __init init_speculation_mitigations(void)
          */
         if ( cpu_has_lfence_dispatch )
             thunk = THUNK_LFENCE;
+        /*
+         * On Intel hardware, we'd like to use retpoline in preference to
+         * IBRS, but only if it is safe on this hardware.
+         */
+        else if ( retpoline_safe() )
+            thunk = THUNK_RETPOLINE;
+        else
 #endif
+        if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+            ibrs = 1;
     }
 
     /*
@@ -136,6 +216,13 @@ void __init init_speculation_mitigations(void)
 #ifndef CONFIG_INDIRECT_THUNK
     thunk = THUNK_NONE;
 #endif
+
+    /*
+     * If IBRS is in use and thunks are compiled in, there is no point
+     * suffering extra overhead.  Switch to the least-overhead thunk.
+     */
+    if ( ibrs && thunk == THUNK_DEFAULT )
+        thunk = THUNK_JMP;
 
     /*
      * If there are still no thunk preferences, the compiled default is
@@ -149,6 +236,50 @@ void __init init_speculation_mitigations(void)
         __set_bit(X86_FEATURE_IND_THUNK_LFENCE, boot_cpu_data.x86_capability);
     else if ( thunk == THUNK_JMP )
         __set_bit(X86_FEATURE_IND_THUNK_JMP, boot_cpu_data.x86_capability);
+
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+    {
+        /*
+         * Even if we've chosen to not have IBRS set in Xen context, we still
+         * need the IBRS entry/exit logic to virtualise IBRS support for
+         * guests.
+         */
+        if ( ibrs )
+            __set_bit(X86_FEATURE_XEN_IBRS_SET, boot_cpu_data.x86_capability);
+        else
+            __set_bit(X86_FEATURE_XEN_IBRS_CLEAR, boot_cpu_data.x86_capability);
+
+        default_bti_ist_info |= BTI_IST_WRMSR | ibrs;
+    }
+
+    /*
+     * PV guests can poison the RSB to any virtual address from which
+     * they can execute a call instruction.  This is necessarily outside
+     * of the Xen supervisor mappings.
+     *
+     * With SMEP enabled, the processor won't speculate into user mappings.
+     * Therefore, in this case, we don't need to worry about poisoned entries
+     * from 64bit PV guests.
+     *
+     * 32bit PV guest kernels run in ring 1, so use supervisor mappings.
+     * If a processors speculates to 32bit PV guest kernel mappings, it is
+     * speculating in 64bit supervisor mode, and can leak data.
+     */
+    if ( opt_rsb_native )
+    {
+        __set_bit(X86_FEATURE_RSB_NATIVE, boot_cpu_data.x86_capability);
+        default_bti_ist_info |= BTI_IST_RSB;
+    }
+
+    /*
+     * HVM guests can always poison the RSB to point at Xen supervisor
+     * mappings.
+     */
+    if ( opt_rsb_vmexit )
+        __set_bit(X86_FEATURE_RSB_VMEXIT, boot_cpu_data.x86_capability);
+
+    /* (Re)init BSP state now that default_bti_ist_info has been calculated. */
+    init_shadow_spec_ctrl_state();
 
     print_details(thunk);
 }

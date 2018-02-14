@@ -24,12 +24,14 @@
 
 void init_speculation_mitigations(void);
 
+extern uint8_t default_bti_ist_info;
+
 static inline void init_shadow_spec_ctrl_state(void)
 {
     struct cpu_info *info = get_cpu_info();
 
     info->shadow_spec_ctrl = info->use_shadow_spec_ctrl = 0;
-    info->bti_ist_info = 0;
+    info->bti_ist_info = default_bti_ist_info;
 }
 
 #endif /* !__X86_SPEC_CTRL_H__ */
