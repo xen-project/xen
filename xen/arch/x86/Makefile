@@ -49,6 +49,7 @@ obj-y += setup.o
 obj-y += shutdown.o
 obj-y += smp.o
 obj-y += smpboot.o
+obj-y += spec_ctrl.o
 obj-y += srat.o
 obj-y += string.o
 obj-y += sysctl.o
