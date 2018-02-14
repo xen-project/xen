@@ -67,6 +67,8 @@
 #define X86_FEATURE_XEN_IBPB        (3*32+ 3) /* IBRSB || IBPB */
 #define X86_FEATURE_XEN_IBRS_SET    (3*32+ 4) /* IBRSB && IRBS set in Xen */
 #define X86_FEATURE_XEN_IBRS_CLEAR  (3*32+ 5) /* IBRSB && IBRS clear in Xen */
+#define X86_FEATURE_RSB_NATIVE      (3*32+ 6) /* RSB overwrite needed for native */
+#define X86_FEATURE_RSB_VMEXIT      (3*32+ 7) /* RSB overwrite needed for vmexit */
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
 #define X86_FEATURE_NONSTOP_TSC	(3*32+ 9) /* TSC does not stop in C states */
 #define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
