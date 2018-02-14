@@ -56,6 +56,7 @@
 #include <asm/mwait.h>
 #include <xen/notifier.h>
 #include <xen/cpu.h>
+#include <asm/spec_ctrl.h>
 
 /*#define DEBUG_PM_CX*/
 
@@ -399,8 +400,14 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
      */
     if ( (expires > NOW() || expires == 0) && !softirq_pending(cpu) )
     {
+        struct cpu_info *info = get_cpu_info();
+
         cpumask_set_cpu(cpu, &cpuidle_mwait_flags);
+
+        spec_ctrl_enter_idle(info);
         __mwait(eax, ecx);
+        spec_ctrl_exit_idle(info);
+
         cpumask_clear_cpu(cpu, &cpuidle_mwait_flags);
     }
 
@@ -415,6 +422,8 @@ static void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
 
 static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 {
+    struct cpu_info *info = get_cpu_info();
+
     switch ( cx->entry_method )
     {
     case ACPI_CSTATE_EM_FFH:
@@ -422,15 +431,19 @@ static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
         acpi_processor_ffh_cstate_enter(cx);
         return;
     case ACPI_CSTATE_EM_SYSIO:
+        spec_ctrl_enter_idle(info);
         /* IO port based C-state */
         inb(cx->address);
         /* Dummy wait op - must do something useless after P_LVL2 read
            because chipsets cannot guarantee that STPCLK# signal
            gets asserted in time to freeze execution properly. */
         inl(pmtmr_ioport);
+        spec_ctrl_exit_idle(info);
         return;
     case ACPI_CSTATE_EM_HALT:
+        spec_ctrl_enter_idle(info);
         safe_halt();
+        spec_ctrl_exit_idle(info);
         local_irq_disable();
         return;
     }
@@ -558,7 +571,13 @@ static void acpi_processor_idle(void)
         if ( pm_idle_save )
             pm_idle_save();
         else
+        {
+            struct cpu_info *info = get_cpu_info();
+
+            spec_ctrl_enter_idle(info);
             safe_halt();
+            spec_ctrl_exit_idle(info);
+        }
         return;
     }
 
@@ -737,6 +756,7 @@ void acpi_dead_idle(void)
          * Otherwise, CPU may still hold dirty data, breaking cache coherency,
          * leading to strange errors.
          */
+        spec_ctrl_enter_idle(get_cpu_info());
         wbinvd();
 
         while ( 1 )
@@ -766,6 +786,7 @@ void acpi_dead_idle(void)
         u32 address = cx->address;
         u32 pmtmr_ioport_local = pmtmr_ioport;
 
+        spec_ctrl_enter_idle(get_cpu_info());
         wbinvd();
 
         while ( 1 )
