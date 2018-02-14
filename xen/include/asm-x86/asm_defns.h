@@ -7,6 +7,7 @@
 #include <asm/asm-offsets.h>
 #endif
 #include <asm/bug.h>
+#include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/percpu.h>
 #include <xen/stringify.h>
@@ -328,5 +329,7 @@ static always_inline void stac(void)
 #else
 #define REX64_PREFIX "rex64/"
 #endif
+
+#include <asm/spec_ctrl_asm.h>
 
 #endif /* __X86_ASM_DEFNS_H__ */
