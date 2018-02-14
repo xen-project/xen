@@ -26,6 +26,7 @@
 #define X86_FEATURE_CLFLUSH_MONITOR	((FSCAPINTS+0)*32+ 7) /* clflush reqd with monitor */
 #define X86_FEATURE_APERFMPERF		((FSCAPINTS+0)*32+ 8) /* APERFMPERF */
 #define X86_FEATURE_MSR_PLATFORM_INFO	((FSCAPINTS+0)*32+ 9) /* PLATFORM_INFO MSR present */
+#define X86_FEATURE_LFENCE_DISPATCH	((FSCAPINTS+0)*32+ 10) /* lfence set as Dispatch Serialising */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)
@@ -89,6 +90,7 @@
 #define cpu_has_eist		boot_cpu_has(X86_FEATURE_EIST)
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 #define cpu_has_cmp_legacy	boot_cpu_has(X86_FEATURE_CMP_LEGACY)
+#define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,
