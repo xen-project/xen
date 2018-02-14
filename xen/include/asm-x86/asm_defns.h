@@ -183,7 +183,7 @@ static always_inline void stac(void)
 #endif
 
 #ifdef __ASSEMBLY__
-.macro SAVE_ALL op, compat=0
+.macro SAVE_ALL op, compat=0, clrargs=1
 .ifeqs "\op", "CLAC"
         ASM_CLAC
 .else
@@ -198,22 +198,34 @@ static always_inline void stac(void)
         addq  $-(UREGS_error_code-UREGS_r15), %rsp
         cld
         movq  %rdi,UREGS_rdi(%rsp)
+        xor   %edi, %edi
         movq  %rsi,UREGS_rsi(%rsp)
+        xor   %esi, %esi
         movq  %rdx,UREGS_rdx(%rsp)
+        xor   %edx, %edx
         movq  %rcx,UREGS_rcx(%rsp)
+        xor   %ecx, %ecx
         movq  %rax,UREGS_rax(%rsp)
+        xor   %eax, %eax
 .if !\compat
         movq  %r8,UREGS_r8(%rsp)
         movq  %r9,UREGS_r9(%rsp)
         movq  %r10,UREGS_r10(%rsp)
         movq  %r11,UREGS_r11(%rsp)
 .endif
+        xor   %r8, %r8
+        xor   %r9, %r9
+        xor   %r10, %r10
+        xor   %r11, %r11
         movq  %rbx,UREGS_rbx(%rsp)
+        xor   %ebx, %ebx
         movq  %rbp,UREGS_rbp(%rsp)
 #ifdef CONFIG_FRAME_POINTER
 /* Indicate special exception stack frame by inverting the frame pointer. */
         leaq  UREGS_rbp(%rsp), %rbp
         notq  %rbp
+#else
+        xor   %ebp, %ebp
 #endif
 .if !\compat
         movq  %r12,UREGS_r12(%rsp)
@@ -221,6 +233,10 @@ static always_inline void stac(void)
         movq  %r14,UREGS_r14(%rsp)
         movq  %r15,UREGS_r15(%rsp)
 .endif
+        xor   %r12, %r12
+        xor   %r13, %r13
+        xor   %r14, %r14
+        xor   %r15, %r15
 .endm
 
 /*
@@ -230,19 +246,23 @@ static always_inline void stac(void)
  *
  * For the way it is used in RESTORE_ALL, this macro must preserve EFLAGS.ZF.
  */
-.macro LOAD_C_CLOBBERED compat=0 ax=1
+.macro LOAD_C_CLOBBERED compat=0 cx=1
 .if !\compat
         movq  UREGS_r11(%rsp),%r11
+.if \cx
         movq  UREGS_r10(%rsp),%r10
+.else
+        movq  UREGS_r10(%rsp),%rcx
+.endif
         movq  UREGS_r9(%rsp),%r9
         movq  UREGS_r8(%rsp),%r8
-.if \ax
         movq  UREGS_rax(%rsp),%rax
-.endif
-.elseif \ax
+.else
         movl  UREGS_rax(%rsp),%eax
 .endif
+.if \cx
         movq  UREGS_rcx(%rsp),%rcx
+.endif
         movq  UREGS_rdx(%rsp),%rdx
         movq  UREGS_rsi(%rsp),%rsi
         movq  UREGS_rdi(%rsp),%rdi

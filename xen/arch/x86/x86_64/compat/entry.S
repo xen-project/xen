@@ -23,10 +23,9 @@ ENTRY(compat_hypercall)
 UNLIKELY_START(ne, msi_check)
         movl  $HYPERCALL_VECTOR,%edi
         call  check_for_unexpected_msi
-        LOAD_C_CLOBBERED compat=1 ax=0
 UNLIKELY_END(msi_check)
 
-        movl  UREGS_rax(%rsp),%eax
+        LOAD_C_CLOBBERED compat=1
         GET_CURRENT(%rbx)
 
         cmpl  $NR_hypercalls,%eax

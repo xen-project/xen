@@ -189,7 +189,7 @@ ENTRY(lstar_enter)
         jz    switch_to_kernel
 
 /*hypercall:*/
-        movq  %r10,%rcx
+        LOAD_C_CLOBBERED cx=0
         cmpq  $NR_hypercalls,%rax
         jae   bad_hypercall
 #ifndef NDEBUG
