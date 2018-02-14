@@ -50,8 +50,10 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
     barrier();
     info->use_shadow_spec_ctrl = 1;
     barrier();
-    asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", X86_FEATURE_XEN_IBRS_SET)
-                   :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0) : "memory" );
+    asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", %c3)
+                   :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0),
+                      "i" (X86_FEATURE_XEN_IBRS_SET)
+                   : "memory" );
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe before this call. */
@@ -65,8 +67,10 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
      */
     info->use_shadow_spec_ctrl = 0;
     barrier();
-    asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", X86_FEATURE_XEN_IBRS_SET)
-                   :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0) : "memory" );
+    asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", %c3)
+                   :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0),
+                      "i" (X86_FEATURE_XEN_IBRS_SET)
+                   : "memory" );
 }
 
 #endif /* !__X86_SPEC_CTRL_H__ */
