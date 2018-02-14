@@ -244,6 +244,11 @@ def crunch_numbers(state):
         # AMD K6-2+ and K6-III processors shipped with 3DNow+, beyond the
         # standard 3DNow in the earlier K6 processors.
         _3DNOW: [_3DNOWEXT],
+
+        # Single Thread Indirect Branch Predictors enumerates a new bit in the
+        # MSR enumerated by Indirect Branch Restricted Speculation/Indirect
+        # Branch Prediction Barrier enumeration.
+        IBRSB: [STIBP],
     }
 
     deep_features = tuple(sorted(deps.keys()))

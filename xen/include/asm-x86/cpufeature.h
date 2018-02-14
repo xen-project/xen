@@ -29,6 +29,9 @@
 #define X86_FEATURE_LFENCE_DISPATCH	((FSCAPINTS+0)*32+ 10) /* lfence set as Dispatch Serialising */
 #define X86_FEATURE_IND_THUNK_LFENCE	((FSCAPINTS+0)*32+ 11) /* Use IND_THUNK_LFENCE */
 #define X86_FEATURE_IND_THUNK_JMP	((FSCAPINTS+0)*32+ 12) /* Use IND_THUNK_JMP */
+#define X86_FEATURE_XEN_IBPB		((FSCAPINTS+0)*32+ 13) /* IBRSB || IBPB */
+#define X86_FEATURE_XEN_IBRS_SET	((FSCAPINTS+0)*32+ 14) /* IBRSB && IRBS set in Xen */
+#define X86_FEATURE_XEN_IBRS_CLEAR	((FSCAPINTS+0)*32+ 15) /* IBRSB && IBRS clear in Xen */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)

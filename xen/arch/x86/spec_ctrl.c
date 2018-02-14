@@ -67,7 +67,24 @@ custom_param("bti", parse_bti);
 
 static void __init print_details(enum ind_thunk thunk)
 {
+    unsigned int _7d0 = 0, e8b = 0, tmp;
+
+    /* Collect diagnostics about available mitigations. */
+    if ( boot_cpu_data.cpuid_level >= 7 )
+        cpuid_count(7, 0, &tmp, &tmp, &tmp, &_7d0);
+    if ( boot_cpu_data.extended_cpuid_level >= 0x80000008 )
+        cpuid(0x80000008, &tmp, &e8b, &tmp, &tmp);
+
     printk(XENLOG_DEBUG "Speculative mitigation facilities:\n");
+
+    /* Hardware features which pertain to speculative mitigations. */
+    if ( (_7d0 & (cpufeat_mask(X86_FEATURE_IBRSB) |
+                  cpufeat_mask(X86_FEATURE_STIBP))) ||
+         (e8b & cpufeat_mask(X86_FEATURE_IBPB)) )
+        printk(XENLOG_DEBUG "  Hardware features:%s%s%s\n",
+               (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
+               (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
+               (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "");
 
     /* Compiled-in support which pertains to BTI mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )

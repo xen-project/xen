@@ -31,6 +31,14 @@
 #define EFER_LMSLE		(1<<_EFER_LMSLE)
 #define EFER_FFXSE		(1<<_EFER_FFXSE)
 
+/* Speculation Controls. */
+#define MSR_SPEC_CTRL			0x00000048
+#define SPEC_CTRL_IBRS			(_AC(1, ULL) << 0)
+#define SPEC_CTRL_STIBP			(_AC(1, ULL) << 1)
+
+#define MSR_PRED_CMD			0x00000049
+#define PRED_CMD_IBPB			(_AC(1, ULL) << 0)
+
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
 #define MSR_IA32_A_PERFCTR0		0x000004c1

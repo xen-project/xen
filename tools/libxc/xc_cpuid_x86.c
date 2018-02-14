@@ -540,13 +540,15 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
         {
             regs[1] = info->featureset[featureword_of(X86_FEATURE_FSGSBASE)];
             regs[2] = info->featureset[featureword_of(X86_FEATURE_PREFETCHWT1)];
+            regs[3] = info->featureset[featureword_of(X86_FEATURE_IBRSB)];
         }
         else
         {
             regs[1] = 0;
             regs[2] = 0;
+            regs[3] = 0;
         }
-        regs[0] = regs[3] = 0;
+        regs[0] = 0;
         break;
 
     case 0x0000000d:
@@ -625,13 +627,15 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
         {
             regs[1] = info->featureset[featureword_of(X86_FEATURE_FSGSBASE)];
             regs[2] = info->featureset[featureword_of(X86_FEATURE_PREFETCHWT1)];
+            regs[3] = info->featureset[featureword_of(X86_FEATURE_IBRSB)];
         }
         else
         {
             regs[1] = 0;
             regs[2] = 0;
+            regs[3] = 0;
         }
-        regs[0] = regs[3] = 0;
+        regs[0] = 0;
         break;
 
     case 0x0000000d:
