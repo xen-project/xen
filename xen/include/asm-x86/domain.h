@@ -550,6 +550,8 @@ struct arch_vcpu
 
     struct paging_vcpu paging;
 
+    uint32_t spec_ctrl;
+
     uint32_t gdbsx_vcpu_event;
 
     /* A secondary copy of the vcpu time info. */

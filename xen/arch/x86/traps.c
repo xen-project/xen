@@ -2574,6 +2574,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         vpmu_msr = 0;
         switch ( regs->_ecx )
         {
+            uint32_t ebx, dummy;
+
         case MSR_FS_BASE:
             if ( is_pv_32bit_domain(currd) ||
                  !is_canonical_address(msr_content) )
@@ -2713,10 +2715,39 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case MSR_INTEL_PLATFORM_INFO:
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
-                 msr_content ||
-                 rdmsr_safe(MSR_INTEL_PLATFORM_INFO, msr_content) )
-                goto fail;
+        case MSR_ARCH_CAPABILITIES:
+            /* The MSR is read-only. */
+            goto fail;
+
+        case MSR_SPEC_CTRL:
+            domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+            if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
+                goto fail; /* MSR available? */
+
+            /*
+             * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
+             * when STIBP isn't enumerated in hardware.
+             */
+
+            if ( eax & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+                goto fail; /* Rsvd bit set? */
+
+            v->arch.spec_ctrl = eax;
+            break;
+
+        case MSR_PRED_CMD:
+            domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+            domain_cpuid(currd, 0x80000008, 0, &dummy, &ebx, &dummy, &dummy);
+            if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) &&
+                 !(ebx & cpufeat_mask(X86_FEATURE_IBPB)) )
+                goto fail; /* MSR available? */
+
+            /*
+             * The only defined behaviour is when writing PRED_CMD_IBPB.  In
+             * practice, real hardware accepts any value without faulting.
+             */
+            if ( eax & PRED_CMD_IBPB )
+                wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
             break;
 
         case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
@@ -2777,6 +2808,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         vpmu_msr = 0;
         switch ( regs->_ecx )
         {
+            uint32_t edx, dummy;
+
         case MSR_FS_BASE:
             if ( is_pv_32bit_domain(currd) )
                 goto fail;
@@ -2847,12 +2880,28 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->eax = regs->edx = 0;
             break;
 
+        case MSR_PRED_CMD:
+            /* Write-only */
+            goto fail;
+
+        case MSR_SPEC_CTRL:
+            domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+            if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
+                goto fail;
+            regs->eax = v->arch.spec_ctrl;
+            regs->edx = 0;
+            break;
+
         case MSR_INTEL_PLATFORM_INFO:
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
                  rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val) )
                 goto fail;
             regs->eax = regs->edx = 0;
             break;
+
+        case MSR_ARCH_CAPABILITIES:
+            /* Not implemented yet. */
+            goto fail;
 
         case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
         case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
