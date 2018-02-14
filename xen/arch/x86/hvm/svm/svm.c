@@ -615,6 +615,7 @@ static void svm_cpuid_policy_changed(struct vcpu *v)
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
     struct vmcb_struct *vmcb = arch_svm->vmcb;
     u32 bitmap = vmcb_get_exception_intercepts(vmcb);
+    uint32_t ebx, dummy;
 
     if ( opt_hvm_fep ||
          (v->domain->arch.x86_vendor != boot_cpu_data.x86_vendor) )
@@ -623,6 +624,12 @@ static void svm_cpuid_policy_changed(struct vcpu *v)
         bitmap &= ~(1U << TRAP_invalid_op);
 
     vmcb_set_exception_intercepts(vmcb, bitmap);
+
+    /* Give access to MSR_PRED_CMD if the guest has been told about it. */
+    domain_cpuid(v->domain, 0x80000008, 0, &dummy, &ebx, &dummy, &dummy);
+    svm_intercept_msr(v, MSR_PRED_CMD,
+                      ebx & cpufeat_mask(X86_FEATURE_IBPB) ? MSR_INTERCEPT_NONE
+                                                           : MSR_INTERCEPT_RW);
 }
 
 static void svm_sync_vmcb(struct vcpu *v)

@@ -181,6 +181,11 @@ static void update_domain_cpuid_info(struct domain *d,
         else
             ctl->edx &= ~cpufeat_mask(X86_FEATURE_STIBP);
 
+        /*
+         * If the IBRS/IBPB policy has changed, we need to recalculate the MSR
+         * interception bitmaps.
+         */
+        call_policy_changed = is_hvm_domain(d);
         break;
 
     case 0xd:
@@ -240,6 +245,14 @@ static void update_domain_cpuid_info(struct domain *d,
 
             d->arch.pv_domain.cpuidmasks->e1cd = mask;
         }
+        break;
+
+    case 0x80000008:
+        /*
+         * If the IBPB policy has changed, we need to recalculate the MSR
+         * interception bitmaps.
+         */
+        call_policy_changed = is_hvm_domain(d);
         break;
     }
 
