@@ -43,6 +43,7 @@ SECTIONS
   .text : {
         _stext = .;            /* Text and read-only data */
        *(.text)
+       *(.text.__x86_indirect_thunk_*)
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)

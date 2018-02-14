@@ -29,6 +29,7 @@ obj-y += i387.o
 obj-y += i8259.o
 obj-y += io_apic.o
 obj-y += msi.o
+obj-$(CONFIG_INDIRECT_THUNK) += indirect-thunk.o
 obj-y += ioport_emulate.o
 obj-y += irq.o
 obj-y += microcode_amd.o
