@@ -1664,6 +1664,36 @@ void vmx_do_resume(struct vcpu *v)
         hvm_asid_flush_vcpu(v);
     }
 
+    if ( !(v->arch.flags & TF_launched) )
+    {
+        uint32_t _7d0, e8b, dummy;
+
+        domain_cpuid(v->domain, 7, 0, &dummy, &dummy, &dummy, &_7d0);
+        domain_cpuid(v->domain, 0x80000008, 0, &dummy, &e8b, &dummy, &dummy);
+
+        /*
+         * We can safely pass MSR_SPEC_CTRL through to the guest, even if STIBP
+         * isn't enumerated in hardware, as SPEC_CTRL_STIBP is ignored.
+         */
+        if ( _7d0 & cpufeat_mask(X86_FEATURE_IBRSB) )
+            vmx_disable_intercept_for_msr(v, MSR_SPEC_CTRL,
+                                          MSR_TYPE_R | MSR_TYPE_W);
+        else
+            vmx_enable_intercept_for_msr(v, MSR_SPEC_CTRL,
+                                         MSR_TYPE_R | MSR_TYPE_W);
+
+        /* MSR_PRED_CMD is safe to pass through if the guest knows about it. */
+        if ( (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ||
+             (e8b & cpufeat_mask(X86_FEATURE_IBPB)) )
+            vmx_disable_intercept_for_msr(v, MSR_PRED_CMD,
+                                          MSR_TYPE_R | MSR_TYPE_W);
+        else
+            vmx_enable_intercept_for_msr(v, MSR_PRED_CMD,
+                                         MSR_TYPE_R | MSR_TYPE_W);
+
+        v->arch.flags |= TF_launched;
+    }
+
     debug_state = v->domain->debugger_attached
                   || v->domain->arch.monitor.software_breakpoint_enabled
                   || v->domain->arch.monitor.singlestep_enabled;

@@ -1043,6 +1043,19 @@ static void noreturn svm_do_resume(struct vcpu *v)
     if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
         vcpu_guestmode = 1;
 
+    if ( !(v->arch.flags & TF_launched) )
+    {
+        uint32_t ebx, dummy;
+
+        /* Give access to MSR_PRED_CMD if the guest has been told about it. */
+        domain_cpuid(v->domain, 0x80000008, 0, &dummy, &ebx, &dummy, &dummy);
+        svm_intercept_msr(v, MSR_PRED_CMD,
+                          ebx & cpufeat_mask(X86_FEATURE_IBPB)
+                          ? MSR_INTERCEPT_NONE : MSR_INTERCEPT_RW);
+
+        v->arch.flags |= TF_launched;
+    }
+
     if ( !vcpu_guestmode &&
         unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
     {

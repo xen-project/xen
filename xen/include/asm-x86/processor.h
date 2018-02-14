@@ -133,6 +133,8 @@
 /* 'arch_vcpu' flags values */
 #define _TF_kernel_mode        0
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
+#define _TF_launched           1
+#define TF_launched            (1u << _TF_launched)
 
 /* #PF error code values. */
 #define PFEC_page_present   (_AC(1,U) << 0)
