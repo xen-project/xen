@@ -27,6 +27,8 @@
 #define X86_FEATURE_APERFMPERF		((FSCAPINTS+0)*32+ 8) /* APERFMPERF */
 #define X86_FEATURE_MSR_PLATFORM_INFO	((FSCAPINTS+0)*32+ 9) /* PLATFORM_INFO MSR present */
 #define X86_FEATURE_LFENCE_DISPATCH	((FSCAPINTS+0)*32+ 10) /* lfence set as Dispatch Serialising */
+#define X86_FEATURE_IND_THUNK_LFENCE	((FSCAPINTS+0)*32+ 11) /* Use IND_THUNK_LFENCE */
+#define X86_FEATURE_IND_THUNK_JMP	((FSCAPINTS+0)*32+ 12) /* Use IND_THUNK_JMP */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)

@@ -21,15 +21,26 @@
         ret
 .endm
 
+.macro IND_THUNK_LFENCE reg:req
+        lfence
+        jmp *%\reg
+.endm
+
+.macro IND_THUNK_JMP reg:req
+        jmp *%\reg
+.endm
+
 /*
- * Build the __x86_indirect_thunk_* symbols.  Currently implement the
- * retpoline thunk only.
+ * Build the __x86.indirect_thunk.* symbols.  Execution lands on an
+ * alternative patch point which implements one of the above THUNK_*'s
  */
 .macro GEN_INDIRECT_THUNK reg:req
         .section .text.__x86_indirect_thunk_\reg, "ax", @progbits
 
 ENTRY(__x86_indirect_thunk_\reg)
-        IND_THUNK_RETPOLINE \reg
+        ALTERNATIVE_2 __stringify(IND_THUNK_RETPOLINE \reg),              \
+        __stringify(IND_THUNK_LFENCE \reg), X86_FEATURE_IND_THUNK_LFENCE, \
+        __stringify(IND_THUNK_JMP \reg),    X86_FEATURE_IND_THUNK_JMP
 .endm
 
 /* Instantiate GEN_INDIRECT_THUNK for each register except %rsp. */
