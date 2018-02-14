@@ -843,9 +843,10 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
         switch ( cpuid_leaf )
         {
+            unsigned int _eax, _ebx, _ecx, _edx;
+
         case XSTATE_CPUID:
         {
-            unsigned int _eax, _ebx, _ecx, _edx;
             /* EBX value of main leaf 0 depends on enabled xsave features */
             if ( sub_leaf == 0 && curr->arch.xcr0 )
             {
@@ -863,6 +864,29 @@ void pv_cpuid(struct cpu_user_regs *regs)
             }
             goto xstate;
         }
+
+        case 0x00000007:
+            if ( regs->_ecx == 0 )
+            {
+                /*
+                 * Override STIBP to match IBRS.  Guests can safely use STIBP
+                 * functionality on non-HT hardware, but can't necesserily protect
+                 * themselves from SP2/Spectre/Branch Target Injection if STIBP is
+                 * hidden on HT-capable hardware.
+                 */
+                if ( d & cpufeat_mask(X86_FEATURE_IBRSB) )
+                    d |= cpufeat_mask(X86_FEATURE_STIBP);
+                else
+                    d &= ~cpufeat_mask(X86_FEATURE_STIBP);
+            }
+            break;
+
+        case 0x80000008:
+            /* AMD's IBPB is a subset of IBRS/IBPB. */
+            domain_cpuid(currd, 7, 0, &_eax, &_ebx, &_ecx, &_edx);
+            if ( _edx & cpufeat_mask(X86_FEATURE_IBRSB) )
+                b |= cpufeat_mask(X86_FEATURE_IBPB);
+            break;
         }
         goto out;
     }
@@ -920,6 +944,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
     case 0x00000007:
         if ( regs->_ecx == 0 )
+        {
             b &= (cpufeat_mask(X86_FEATURE_BMI1) |
                   cpufeat_mask(X86_FEATURE_HLE)  |
                   cpufeat_mask(X86_FEATURE_AVX2) |
@@ -929,9 +954,18 @@ void pv_cpuid(struct cpu_user_regs *regs)
                   cpufeat_mask(X86_FEATURE_RDSEED)  |
                   cpufeat_mask(X86_FEATURE_ADX)  |
                   cpufeat_mask(X86_FEATURE_FSGSBASE));
+
+            d &= cpufeat_mask(X86_FEATURE_IBRSB);
+
+            /* Override STIBP to match IBRS (see above). */
+            if ( d & cpufeat_mask(X86_FEATURE_IBRSB) )
+                d |= cpufeat_mask(X86_FEATURE_STIBP);
+            else
+                d &= ~cpufeat_mask(X86_FEATURE_STIBP);
+        }
         else
-            b = 0;
-        a = c = d = 0;
+            b = d = 0;
+        a = c = 0;
         break;
 
     case XSTATE_CPUID:
@@ -973,6 +1007,12 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_NODEID_MSR % 32, &c);
         __clear_bit(X86_FEATURE_TOPOEXT % 32, &c);
         __clear_bit(X86_FEATURE_MWAITX % 32, &c);
+        break;
+
+    case 0x80000008:
+        /* AMD's IBPB is a subset of IBRS/IBPB. */
+        if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+            b |= cpufeat_mask(X86_FEATURE_IBPB);
         break;
 
     case 0x0000000a: /* Architectural Performance Monitor Features (Intel) */

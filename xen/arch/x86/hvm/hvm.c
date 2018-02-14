@@ -4596,6 +4596,20 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         /* Don't expose INVPCID to non-hap hvm. */
         if ( (count == 0) && !hap_enabled(d) )
             *ebx &= ~cpufeat_mask(X86_FEATURE_INVPCID);
+
+        if ( count == 0 )
+        {
+            /*
+             * Override STIBP to match IBRS.  Guests can safely use STIBP
+             * functionality on non-HT hardware, but can't necesserily protect
+             * themselves from SP2/Spectre/Branch Target Injection if STIBP is
+             * hidden on HT-capable hardware.
+             */
+            if ( *edx & cpufeat_mask(X86_FEATURE_IBRSB) )
+                *edx |= cpufeat_mask(X86_FEATURE_STIBP);
+            else
+                *edx &= ~cpufeat_mask(X86_FEATURE_STIBP);
+        }
         break;
     case 0xb:
         /* Fix the x2APIC identifier. */
@@ -4650,6 +4664,11 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         hvm_cpuid(0x80000001, NULL, NULL, NULL, &_edx);
         *eax = (*eax & ~0xffff00) | (_edx & cpufeat_mask(X86_FEATURE_LM)
                                      ? 0x3000 : 0x2000);
+
+        /* AMD's IBPB is a subset of IBRS/IBPB. */
+        hvm_cpuid(7, NULL, &_ebx, NULL, NULL);
+        if ( _ebx & cpufeat_mask(X86_FEATURE_IBRSB) )
+            *ebx |= cpufeat_mask(X86_FEATURE_IBPB);
         break;
     }
 }
