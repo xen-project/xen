@@ -51,6 +51,8 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 static void update_domain_cpuid_info(struct domain *d,
                                      const xen_domctl_cpuid_t *ctl)
 {
+    bool_t call_policy_changed = 0; /* Avoid for_each_vcpu() unnecessarily */
+
     switch ( ctl->input[0] )
     {
     case 0: {
@@ -69,14 +71,7 @@ static void update_domain_cpuid_info(struct domain *d,
         int old_vendor = d->arch.x86_vendor;
 
         d->arch.x86_vendor = get_cpu_vendor(vendor_id.str, gcv_guest);
-
-        if ( is_hvm_domain(d) && (d->arch.x86_vendor != old_vendor) )
-        {
-            struct vcpu *v;
-
-            for_each_vcpu( d, v )
-                hvm_update_guest_vendor(v);
-        }
+        call_policy_changed = (d->arch.x86_vendor != old_vendor);
 
         break;
     }
@@ -234,6 +229,14 @@ static void update_domain_cpuid_info(struct domain *d,
             d->arch.pv_domain.cpuidmasks->e1cd = mask;
         }
         break;
+    }
+
+    if ( is_hvm_domain(d) && call_policy_changed )
+    {
+        struct vcpu *v;
+
+        for_each_vcpu( d, v )
+            hvm_cpuid_policy_changed(v);
     }
 }
 
