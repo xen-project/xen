@@ -32,6 +32,8 @@
 #define X86_FEATURE_XEN_IBPB		((FSCAPINTS+0)*32+ 13) /* IBRSB || IBPB */
 #define X86_FEATURE_XEN_IBRS_SET	((FSCAPINTS+0)*32+ 14) /* IBRSB && IRBS set in Xen */
 #define X86_FEATURE_XEN_IBRS_CLEAR	((FSCAPINTS+0)*32+ 15) /* IBRSB && IBRS clear in Xen */
+#define X86_FEATURE_RSB_NATIVE		((FSCAPINTS+0)*32+ 16) /* RSB overwrite needed for native */
+#define X86_FEATURE_RSB_VMEXIT		((FSCAPINTS+0)*32+ 17) /* RSB overwrite needed for vmexit */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)
