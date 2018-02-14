@@ -61,6 +61,7 @@
 
 /* Other features, Linux-defined mapping, word 3 */
 /* This range is used for feature bits which conflict or are synthesized */
+#define X86_FEATURE_LFENCE_DISPATCH (3*32+ 0) /* lfence set as Dispatch Serialising */
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
 #define X86_FEATURE_NONSTOP_TSC	(3*32+ 9) /* TSC does not stop in C states */
 #define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
@@ -220,6 +221,7 @@
 #define cpu_has_vmx		boot_cpu_has(X86_FEATURE_VMXE)
 
 #define cpu_has_cpuid_faulting	boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
+#define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
 
 #define cpu_has_cx16            boot_cpu_has(X86_FEATURE_CX16)
 
