@@ -348,6 +348,15 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	 * executed, c == &boot_cpu_data.
 	 */
 	if ( c != &boot_cpu_data ) {
+		/* Inherit certain bits from the boot CPU. */
+		if (test_bit(X86_FEATURE_IND_THUNK_LFENCE,
+		             boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_IND_THUNK_LFENCE,
+			          c->x86_capability);
+		if (test_bit(X86_FEATURE_IND_THUNK_JMP,
+			     boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_IND_THUNK_JMP, c->x86_capability);
+
 		/* AND the already accumulated flags with these */
 		for ( i = 0 ; i < NCAPINTS ; i++ )
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];

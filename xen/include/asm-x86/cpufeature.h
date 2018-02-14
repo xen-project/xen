@@ -62,6 +62,8 @@
 /* Other features, Linux-defined mapping, word 3 */
 /* This range is used for feature bits which conflict or are synthesized */
 #define X86_FEATURE_LFENCE_DISPATCH (3*32+ 0) /* lfence set as Dispatch Serialising */
+#define X86_FEATURE_IND_THUNK_LFENCE (3*32+ 1) /* Use IND_THUNK_LFENCE */
+#define X86_FEATURE_IND_THUNK_JMP   (3*32+ 2) /* Use IND_THUNK_JMP */
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
 #define X86_FEATURE_NONSTOP_TSC	(3*32+ 9) /* TSC does not stop in C states */
 #define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
