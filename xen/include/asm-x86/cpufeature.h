@@ -9,7 +9,7 @@
 #define __ASM_I386_CPUFEATURE_H
 #endif
 
-#define NCAPINTS	8	/* N 32-bit words worth of info */
+#define NCAPINTS	10	/* N 32-bit words worth of info */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
 #define X86_FEATURE_FPU		(0*32+ 0) /* Onboard FPU */
@@ -64,6 +64,9 @@
 #define X86_FEATURE_LFENCE_DISPATCH (3*32+ 0) /* lfence set as Dispatch Serialising */
 #define X86_FEATURE_IND_THUNK_LFENCE (3*32+ 1) /* Use IND_THUNK_LFENCE */
 #define X86_FEATURE_IND_THUNK_JMP   (3*32+ 2) /* Use IND_THUNK_JMP */
+#define X86_FEATURE_XEN_IBPB        (3*32+ 3) /* IBRSB || IBPB */
+#define X86_FEATURE_XEN_IBRS_SET    (3*32+ 4) /* IBRSB && IRBS set in Xen */
+#define X86_FEATURE_XEN_IBRS_CLEAR  (3*32+ 5) /* IBRSB && IBRS clear in Xen */
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
 #define X86_FEATURE_NONSTOP_TSC	(3*32+ 9) /* TSC does not stop in C states */
 #define X86_FEATURE_ARAT	(3*32+ 10) /* Always running APIC timer */
@@ -157,6 +160,13 @@
 #define X86_FEATURE_RDSEED	(7*32+18) /* RDSEED instruction */
 #define X86_FEATURE_ADX		(7*32+19) /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
+
+/* AMD-defined CPU features, CPUID level 0x80000008.ebx, word 8 */
+#define X86_FEATURE_IBPB	(8*32+12) /* IBPB support only (no IBRS, used by AMD) */
+
+/* Intel-defined CPU features, CPUID level 0x00000007:0.edx, word 9 */
+#define X86_FEATURE_IBRSB	(9*32+26) /* IBRS and IBPB support (used by Intel) */
+#define X86_FEATURE_STIBP	(9*32+27) /* STIBP */
 
 /* An alias of a feature we know is always going to be present. */
 #define X86_FEATURE_ALWAYS      X86_FEATURE_LM

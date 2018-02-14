@@ -212,7 +212,7 @@ static void __init early_cpu_detect(void)
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 {
-	u32 tfms, capability, excap, ebx, eax;
+	u32 tfms, capability, excap, ebx, eax, edx, dummy;
 
 	/* Get vendor name */
 	cpuid(0x00000000, &c->cpuid_level,
@@ -250,9 +250,10 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		if ( c->extended_cpuid_level >= 0x80000004 )
 			get_model_name(c); /* Default name */
 		if ( c->extended_cpuid_level >= 0x80000008 ) {
-			eax = cpuid_eax(0x80000008);
+			cpuid(0x80000008, &eax, &ebx, &dummy, &dummy);
 			paddr_bits = eax & 0xff;
 			hap_paddr_bits = ((eax >> 16) & 0xff) ?: paddr_bits;
+			c->x86_capability[X86_FEATURE_IBPB / 32] = ebx;
 		}
 	}
 
@@ -261,9 +262,9 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 
 	/* Intel-defined flags: level 0x00000007 */
 	if ( c->cpuid_level >= 0x00000007 ) {
-		u32 dummy;
-		cpuid_count(0x00000007, 0, &dummy, &ebx, &dummy, &dummy);
+		cpuid_count(0x00000007, 0, &dummy, &ebx, &dummy, &edx);
 		c->x86_capability[X86_FEATURE_FSGSBASE / 32] = ebx;
+		c->x86_capability[X86_FEATURE_IBRSB / 32] = edx;
 	}
 }
 

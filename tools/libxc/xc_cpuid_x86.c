@@ -368,9 +368,11 @@ static void xc_cpuid_hvm_policy(
                         bitmaskof(X86_FEATURE_ADX)  |
                         bitmaskof(X86_FEATURE_SMAP) |
                         bitmaskof(X86_FEATURE_FSGSBASE));
+            regs[3] &= (bitmaskof(X86_FEATURE_IBRSB) |
+                        bitmaskof(X86_FEATURE_STIBP));
         } else
-            regs[1] = 0;
-        regs[0] = regs[2] = regs[3] = 0;
+            regs[1] = regs[3] = 0;
+        regs[0] = regs[2] = 0;
         break;
 
     case 0x0000000d:
@@ -403,7 +405,8 @@ static void xc_cpuid_hvm_policy(
 
     case 0x80000008:
         regs[0] &= 0x0000ffffu;
-        regs[1] = regs[3] = 0;
+        regs[3] &= bitmaskof(X86_FEATURE_IBPB);
+        regs[1] = 0;
         break;
 
     case 0x00000002: /* Intel cache info (dumped by AMD policy) */
@@ -498,6 +501,7 @@ static void xc_cpuid_pv_policy(
 
     case 0x00000007:
         if ( input[1] == 0 )
+        {
             regs[1] &= (bitmaskof(X86_FEATURE_BMI1) |
                         bitmaskof(X86_FEATURE_HLE)  |
                         bitmaskof(X86_FEATURE_AVX2) |
@@ -507,9 +511,12 @@ static void xc_cpuid_pv_policy(
                         bitmaskof(X86_FEATURE_RDSEED)  |
                         bitmaskof(X86_FEATURE_ADX)  |
                         bitmaskof(X86_FEATURE_FSGSBASE));
+            regs[3] &= (bitmaskof(X86_FEATURE_IBRSB) |
+                        bitmaskof(X86_FEATURE_STIBP));
+        }
         else
-            regs[1] = 0;
-        regs[0] = regs[2] = regs[3] = 0;
+            regs[1] = regs[3] = 0;
+        regs[0] = regs[2] = 0;
         break;
 
     case 0x0000000d:

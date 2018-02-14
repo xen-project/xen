@@ -141,5 +141,11 @@
 #define X86_FEATURE_ADX         19 /* ADCX, ADOX instructions */
 #define X86_FEATURE_SMAP        20 /* Supervisor Mode Access Protection */
 
+/* AMD-defined CPU features, CPUID level 0x80000008, ebx */
+#define X86_FEATURE_IBPB        12 /* IBPB support only (no IBRS, used by AMD) */
+
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (edx) */
+#define X86_FEATURE_IBRSB       26 /* IBRS and IBPB support (used by Intel) */
+#define X86_FEATURE_STIBP       27 /* STIBP */
 
 #endif /* __LIBXC_CPUFEATURE_H */
