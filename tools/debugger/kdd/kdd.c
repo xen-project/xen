@@ -710,11 +710,13 @@ static void kdd_handle_read_ctrl(kdd_state *s)
 static void kdd_handle_read_msr(kdd_state *s)
 {
     uint32_t msr = s->rxp.cmd.msr.msr;
+    uint64_t val;
     int ok;
     KDD_LOG(s, "Read MSR 0x%"PRIx32"\n", msr);
 
-    ok = (kdd_rdmsr(s->guest, s->cpuid, msr, &s->txp.cmd.msr.val) == 0);
+    ok = (kdd_rdmsr(s->guest, s->cpuid, msr, &val) == 0);
     s->txp.cmd.msr.msr = msr;
+    s->txp.cmd.msr.val = val;
     s->txp.cmd.msr.status = (ok ? KDD_STATUS_SUCCESS : KDD_STATUS_FAILURE);
     kdd_send_cmd(s, KDD_CMD_READ_MSR, 0);
 }
