@@ -26,6 +26,9 @@
 #include "xc_bitops.h"
 #include <xen/hvm/params.h>
 
+#define __AC(X,Y) (X##Y)
+#define _AC(X,Y)  __AC(X,Y)
+
 enum {
 #define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = value,
 #include <xen/arch-x86/cpufeatureset.h>
