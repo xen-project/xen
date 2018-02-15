@@ -60,6 +60,7 @@
 #include <asm/apic.h>
 #include <asm/debugger.h>
 #include <asm/hvm/monitor.h>
+#include <asm/monitor.h>
 #include <asm/xstate.h>
 
 void svm_asm_do_resume(void);
@@ -558,6 +559,16 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
                 hw_cr0_mask |= X86_CR0_TS;
             else if ( vmcb_get_cr0(vmcb) & X86_CR0_TS )
                 svm_fpu_enter(v);
+        }
+
+        if ( paging_mode_hap(v->domain) )
+        {
+            uint32_t intercepts = vmcb_get_cr_intercepts(vmcb);
+
+            /* Trap CR3 updates if CR3 memory events are enabled. */
+            if ( v->domain->arch.monitor.write_ctrlreg_enabled &
+                 monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3) )
+               vmcb_set_cr_intercepts(vmcb, intercepts | CR_INTERCEPT_CR3_WRITE);
         }
 
         value = v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
