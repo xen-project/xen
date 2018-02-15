@@ -77,13 +77,13 @@ static inline uint32_t arch_monitor_get_capabilities(struct domain *d)
     if ( !is_hvm_domain(d) )
         return capabilities;
 
-    capabilities = (1U << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST);
+    capabilities = ((1U << XEN_DOMCTL_MONITOR_EVENT_GUEST_REQUEST) |
+                    (1U << XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT));
 
     if ( cpu_has_vmx )
     {
         capabilities |= ((1U << XEN_DOMCTL_MONITOR_EVENT_WRITE_CTRLREG) |
                          (1U << XEN_DOMCTL_MONITOR_EVENT_MOV_TO_MSR) |
-                         (1U << XEN_DOMCTL_MONITOR_EVENT_SOFTWARE_BREAKPOINT) |
                          (1U << XEN_DOMCTL_MONITOR_EVENT_DEBUG_EXCEPTION) |
                          (1U << XEN_DOMCTL_MONITOR_EVENT_CPUID) |
                          (1U << XEN_DOMCTL_MONITOR_EVENT_INTERRUPT) |

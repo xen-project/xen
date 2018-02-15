@@ -3703,11 +3703,6 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                                        HVM_MONITOR_DEBUG_EXCEPTION,
                                        trap_type, insn_len);
 
-                /*
-                 * rc < 0 error in monitor/vm_event, crash
-                 * !rc    continue normally
-                 * rc > 0 paused waiting for response, work here is done
-                 */
                 if ( rc < 0 )
                     goto exit_and_crash;
                 if ( !rc )

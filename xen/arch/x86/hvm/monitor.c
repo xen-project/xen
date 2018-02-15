@@ -133,6 +133,11 @@ static inline unsigned long gfn_of_rip(unsigned long rip)
 int hvm_monitor_debug(unsigned long rip, enum hvm_monitor_debug_type type,
                       unsigned long trap_type, unsigned long insn_length)
 {
+   /*
+    * rc < 0 error in monitor/vm_event, crash
+    * !rc    continue normally
+    * rc > 0 paused waiting for response, work here is done
+    */
     struct vcpu *curr = current;
     struct arch_domain *ad = &curr->domain->arch;
     vm_event_request_t req = {};

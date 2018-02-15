@@ -59,6 +59,7 @@
 #include <asm/hap.h>
 #include <asm/apic.h>
 #include <asm/debugger.h>
+#include <asm/hvm/monitor.h>
 #include <asm/xstate.h>
 
 void svm_asm_do_resume(void);
@@ -1079,7 +1080,8 @@ static void svm_ctxt_switch_to(struct vcpu *v)
 static void noreturn svm_do_resume(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    bool_t debug_state = v->domain->debugger_attached;
+    bool debug_state = (v->domain->debugger_attached ||
+                        v->domain->arch.monitor.software_breakpoint_enabled);
     bool_t vcpu_guestmode = 0;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
@@ -2404,6 +2406,19 @@ static bool svm_get_pending_event(struct vcpu *v, struct x86_event *info)
     return true;
 }
 
+static void svm_propagate_intr(struct vcpu *v, unsigned long insn_len)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct x86_event event = {
+        .vector = vmcb->eventinj.fields.type,
+        .type = vmcb->eventinj.fields.type,
+        .error_code = vmcb->exitinfo1,
+    };
+
+    event.insn_len = insn_len;
+    hvm_inject_event(&event);
+}
+
 static struct hvm_function_table __initdata svm_function_table = {
     .name                 = "SVM",
     .cpu_up_prepare       = svm_cpu_up_prepare,
@@ -2616,14 +2631,31 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_EXCEPTION_BP:
-        if ( !v->domain->debugger_attached )
-            goto unexpected_exit_type;
-        /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
-        if ( (inst_len = __get_instruction_length(v, INSTR_INT3)) == 0 )
-            break;
-        __update_guest_eip(regs, inst_len);
-        current->arch.gdbsx_vcpu_event = TRAP_int3;
-        domain_pause_for_debugger();
+        inst_len = __get_instruction_length(v, INSTR_INT3);
+
+        if ( inst_len == 0 )
+             break;
+
+        if ( v->domain->debugger_attached )
+        {
+            /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
+            __update_guest_eip(regs, inst_len);
+            current->arch.gdbsx_vcpu_event = TRAP_int3;
+            domain_pause_for_debugger();
+        }
+        else
+        {
+           int rc;
+
+           rc = hvm_monitor_debug(regs->rip,
+                                  HVM_MONITOR_SOFTWARE_BREAKPOINT,
+                                  X86_EVENTTYPE_SW_EXCEPTION,
+                                  inst_len);
+           if ( rc < 0 )
+               goto unexpected_exit_type;
+           if ( !rc )
+               svm_propagate_intr(v, inst_len);
+        }
         break;
 
     case VMEXIT_EXCEPTION_NM:
