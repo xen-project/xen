@@ -163,6 +163,14 @@ void svm_intercept_msr(struct vcpu *v, uint32_t msr, int flags)
         __clear_bit(msr * 2 + 1, msr_bit);
 }
 
+static void svm_enable_msr_interception(struct domain *d, uint32_t msr)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+        svm_intercept_msr(v, msr, MSR_INTERCEPT_WRITE);
+}
+
 static void svm_save_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -2457,6 +2465,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .fpu_dirty_intercept  = svm_fpu_dirty_intercept,
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
+    .enable_msr_interception = svm_enable_msr_interception,
     .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
     .set_descriptor_access_exiting = svm_set_descriptor_access_exiting,
     .get_insn_bytes       = svm_get_insn_bytes,
