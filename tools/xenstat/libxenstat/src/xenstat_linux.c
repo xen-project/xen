@@ -69,7 +69,7 @@ void getBridge(char *excludeName, char *result, size_t resultLen)
 	struct dirent *de;
 	DIR *d;
 
-	char tmp[256] = { 0 };
+	char tmp[512] = { 0 };
 
 	d = opendir("/sys/class/net");
 	while ((de = readdir(d)) != NULL) {
