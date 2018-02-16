@@ -39,7 +39,7 @@ bool hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old)
     if ( (ad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask) &&
          (!(ad->monitor.write_ctrlreg_onchangeonly & ctrlreg_bitmask) ||
           value != old) &&
-         (!((value ^ old) & ad->monitor.write_ctrlreg_mask[index])) )
+         ((value ^ old) & ~ad->monitor.write_ctrlreg_mask[index]) )
     {
         bool sync = ad->monitor.write_ctrlreg_sync & ctrlreg_bitmask;
 
