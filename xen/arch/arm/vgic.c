@@ -118,6 +118,13 @@ int domain_vgic_init(struct domain *d, unsigned int nr_spis)
 
     d->arch.vgic.ctlr = 0;
 
+    /*
+     * The vGIC relies on having a pending_irq available for every IRQ
+     * described in the ranks. As each rank describes 32 interrupts, we
+     * need to make sure the number of SPIs is a multiple of 32.
+     */
+    nr_spis = ROUNDUP(nr_spis, 32);
+
     /* Limit the number of virtual SPIs supported to (1020 - 32) = 988  */
     if ( nr_spis > (1020 - NR_LOCAL_IRQS) )
         return -EINVAL;
