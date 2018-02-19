@@ -156,7 +156,7 @@ XEN_CPUFEATURE(NX,            2*32+20) /*A  Execute Disable */
 XEN_CPUFEATURE(MMXEXT,        2*32+22) /*A  AMD MMX extensions */
 XEN_CPUFEATURE(FFXSR,         2*32+25) /*A  FFXSR instruction optimizations */
 XEN_CPUFEATURE(PAGE1GB,       2*32+26) /*H  1Gb large page support */
-XEN_CPUFEATURE(RDTSCP,        2*32+27) /*S  RDTSCP */
+XEN_CPUFEATURE(RDTSCP,        2*32+27) /*A  RDTSCP */
 XEN_CPUFEATURE(LM,            2*32+29) /*A  Long Mode (x86-64) */
 XEN_CPUFEATURE(3DNOWEXT,      2*32+30) /*A  AMD 3DNow! extensions */
 XEN_CPUFEATURE(3DNOW,         2*32+31) /*A  3DNow! */

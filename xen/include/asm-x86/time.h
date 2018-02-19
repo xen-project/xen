@@ -17,7 +17,6 @@
 #define TSC_MODE_DEFAULT          0
 #define TSC_MODE_ALWAYS_EMULATE   1
 #define TSC_MODE_NEVER_EMULATE    2
-#define TSC_MODE_PVRDTSCP         3
 
 typedef u64 cycles_t;
 
