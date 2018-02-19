@@ -51,9 +51,6 @@ struct priv_op_ctxt {
     } cs;
     char *io_emul_stub;
     unsigned int bpmatch;
-    unsigned int tsc;
-#define TSC_BASE 1
-#define TSC_AUX 2
 };
 
 /* I/O emulation support. Helper routines for, and type of, the stack stub. */
@@ -810,7 +807,6 @@ static inline bool is_cpufreq_controller(const struct domain *d)
 static int read_msr(unsigned int reg, uint64_t *val,
                     struct x86_emulate_ctxt *ctxt)
 {
-    struct priv_op_ctxt *poc = container_of(ctxt, struct priv_op_ctxt, ctxt);
     const struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
     bool vpmu_msr = false;
@@ -847,19 +843,11 @@ static int read_msr(unsigned int reg, uint64_t *val,
         *val = curr->arch.pv.gs_base_user;
         return X86EMUL_OKAY;
 
-    /*
-     * In order to fully retain original behavior, defer calling
-     * pv_soft_rdtsc() until after emulation. This may want/need to be
-     * reconsidered.
-     */
     case MSR_IA32_TSC:
-        poc->tsc |= TSC_BASE;
-        goto normal;
+        *val = currd->arch.vtsc ? pv_soft_rdtsc(curr, ctxt->regs) : rdtsc();
+        return X86EMUL_OKAY;
 
     case MSR_TSC_AUX:
-        poc->tsc |= TSC_AUX;
-        if ( cpu_has_rdtscp )
-            goto normal;
         *val = 0;
         return X86EMUL_OKAY;
 
@@ -1313,20 +1301,6 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
     switch ( rc )
     {
     case X86EMUL_OKAY:
-        if ( ctxt.tsc & TSC_BASE )
-        {
-            if ( currd->arch.vtsc || (ctxt.tsc & TSC_AUX) )
-            {
-                msr_split(regs, pv_soft_rdtsc(curr, regs));
-
-                if ( ctxt.tsc & TSC_AUX )
-                    regs->rcx = (currd->arch.tsc_mode == TSC_MODE_PVRDTSCP
-                                 ? currd->arch.incarnation : 0);
-            }
-            else
-                msr_split(regs, rdtsc());
-        }
-
         if ( ctxt.ctxt.retire.singlestep )
             ctxt.bpmatch |= DR_STEP;
         if ( ctxt.bpmatch )
