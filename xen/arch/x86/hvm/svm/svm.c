@@ -1099,7 +1099,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_tsc_ratio_load(v);
 
     if ( cpu_has_rdtscp )
-        wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
+        wrmsr_tsc_aux(hvm_msr_tsc_aux(v));
 }
 
 static void noreturn svm_do_resume(struct vcpu *v)

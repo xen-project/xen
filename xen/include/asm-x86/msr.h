@@ -115,8 +115,6 @@ static inline uint64_t rdtsc_ordered(void)
     __write_tsc(val);                                           \
 })
 
-#define write_rdtscp_aux(val) wrmsr(MSR_TSC_AUX, (val), 0)
-
 #define rdpmc(counter,low,high) \
      __asm__ __volatile__("rdpmc" \
 			  : "=a" (low), "=d" (high) \
@@ -209,6 +207,20 @@ static inline void write_efer(uint64_t val)
 }
 
 DECLARE_PER_CPU(u32, ler_msr);
+
+DECLARE_PER_CPU(uint32_t, tsc_aux);
+
+/* Lazy update of MSR_TSC_AUX */
+static inline void wrmsr_tsc_aux(uint32_t val)
+{
+    uint32_t *this_tsc_aux = &this_cpu(tsc_aux);
+
+    if ( *this_tsc_aux != val )
+    {
+        wrmsr(MSR_TSC_AUX, val, 0);
+        *this_tsc_aux = val;
+    }
+}
 
 /* MSR policy object for shared per-domain MSRs */
 struct msr_domain_policy
