@@ -24,11 +24,30 @@
 #include <xen/sched.h>
 #include <asm/msr.h>
 
-struct msr_domain_policy __read_mostly hvm_max_msr_domain_policy,
+struct msr_domain_policy __read_mostly     raw_msr_domain_policy,
+                         __read_mostly    host_msr_domain_policy,
+                         __read_mostly hvm_max_msr_domain_policy,
                          __read_mostly  pv_max_msr_domain_policy;
 
 struct msr_vcpu_policy __read_mostly hvm_max_msr_vcpu_policy,
                        __read_mostly  pv_max_msr_vcpu_policy;
+
+static void __init calculate_raw_policy(void)
+{
+    /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
+    /* Was already added by probe_cpuid_faulting() */
+}
+
+static void __init calculate_host_policy(void)
+{
+    struct msr_domain_policy *dp = &host_msr_domain_policy;
+
+    *dp = raw_msr_domain_policy;
+
+    /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
+    /* probe_cpuid_faulting() sanity checks presence of MISC_FEATURES_ENABLES */
+    dp->plaform_info.cpuid_faulting = cpu_has_cpuid_faulting;
+}
 
 static void __init calculate_hvm_max_policy(void)
 {
@@ -38,7 +57,10 @@ static void __init calculate_hvm_max_policy(void)
     if ( !hvm_enabled )
         return;
 
+    *dp = host_msr_domain_policy;
+
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
+    /* It's always possible to emulate CPUID faulting for HVM guests */
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
          boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
     {
@@ -47,7 +69,7 @@ static void __init calculate_hvm_max_policy(void)
     }
 
     /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
-    vp->misc_features_enables.available = dp->plaform_info.available;
+    vp->misc_features_enables.available = dp->plaform_info.cpuid_faulting;
 }
 
 static void __init calculate_pv_max_policy(void)
@@ -55,19 +77,16 @@ static void __init calculate_pv_max_policy(void)
     struct msr_domain_policy *dp = &pv_max_msr_domain_policy;
     struct msr_vcpu_policy *vp = &pv_max_msr_vcpu_policy;
 
-    /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
-    if ( cpu_has_cpuid_faulting )
-    {
-        dp->plaform_info.available = true;
-        dp->plaform_info.cpuid_faulting = true;
-    }
+    *dp = host_msr_domain_policy;
 
     /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
-    vp->misc_features_enables.available = dp->plaform_info.available;
+    vp->misc_features_enables.available = dp->plaform_info.cpuid_faulting;
 }
 
 void __init init_guest_msr_policy(void)
 {
+    calculate_raw_policy();
+    calculate_host_policy();
     calculate_hvm_max_policy();
     calculate_pv_max_policy();
 }

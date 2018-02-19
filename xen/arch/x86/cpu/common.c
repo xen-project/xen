@@ -119,8 +119,18 @@ void (* __read_mostly ctxt_switch_masking)(const struct vcpu *next);
 bool __init probe_cpuid_faulting(void)
 {
 	uint64_t val;
+	int rc;
 
-	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val) ||
+	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val)) == 0)
+	{
+		struct msr_domain_policy *dp = &raw_msr_domain_policy;
+
+		dp->plaform_info.available = true;
+		if (val & MSR_PLATFORM_INFO_CPUID_FAULTING)
+			dp->plaform_info.cpuid_faulting = true;
+	}
+
+	if (rc ||
 	    !(val & MSR_PLATFORM_INFO_CPUID_FAULTING) ||
 	    rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES,
 		       this_cpu(msr_misc_features)))

@@ -220,6 +220,14 @@ struct msr_domain_policy
     } plaform_info;
 };
 
+/* RAW msr domain policy: contains the actual values from H/W MSRs */
+extern struct msr_domain_policy raw_msr_domain_policy;
+/*
+ * HOST msr domain policy: features that Xen actually decided to use,
+ * a subset of RAW policy.
+ */
+extern struct msr_domain_policy host_msr_domain_policy;
+
 /* MSR policy object for per-vCPU MSRs */
 struct msr_vcpu_policy
 {
