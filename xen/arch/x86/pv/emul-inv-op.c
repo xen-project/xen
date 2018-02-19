@@ -46,6 +46,7 @@ static int emulate_invalid_rdtscp(struct cpu_user_regs *regs)
     char opcode[3];
     unsigned long eip, rc;
     struct vcpu *v = current;
+    const struct domain *currd = v->domain;
 
     eip = regs->rip;
     if ( (rc = copy_from_user(opcode, (char *)eip, sizeof(opcode))) != 0 )
@@ -56,7 +57,11 @@ static int emulate_invalid_rdtscp(struct cpu_user_regs *regs)
     if ( memcmp(opcode, "\xf\x1\xf9", sizeof(opcode)) )
         return 0;
     eip += sizeof(opcode);
-    pv_soft_rdtsc(v, regs, 1);
+
+    msr_split(regs, pv_soft_rdtsc(v, regs));
+    regs->rcx = (currd->arch.tsc_mode == TSC_MODE_PVRDTSCP
+                 ? currd->arch.incarnation : 0);
+
     pv_emul_instruction_done(regs, eip);
     return EXCRET_fault_fixed;
 }

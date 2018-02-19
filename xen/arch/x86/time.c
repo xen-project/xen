@@ -2024,7 +2024,7 @@ u64 gtsc_to_gtime(struct domain *d, u64 tsc)
     return time;
 }
 
-void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
+uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs)
 {
     s_time_t now = get_s_time();
     struct domain *d = v->domain;
@@ -2045,11 +2045,7 @@ void pv_soft_rdtsc(struct vcpu *v, struct cpu_user_regs *regs, int rdtscp)
 
     spin_unlock(&d->arch.vtsc_lock);
 
-    msr_split(regs, gtime_to_gtsc(d, now));
-
-    if ( rdtscp )
-         regs->rcx =
-             (d->arch.tsc_mode == TSC_MODE_PVRDTSCP) ? d->arch.incarnation : 0;
+    return gtime_to_gtsc(d, now);
 }
 
 bool clocksource_is_tsc(void)

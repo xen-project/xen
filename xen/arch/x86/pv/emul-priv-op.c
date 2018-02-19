@@ -1374,10 +1374,14 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
     case X86EMUL_OKAY:
         if ( ctxt.tsc & TSC_BASE )
         {
-            if ( ctxt.tsc & TSC_AUX )
-                pv_soft_rdtsc(curr, regs, 1);
-            else if ( currd->arch.vtsc )
-                pv_soft_rdtsc(curr, regs, 0);
+            if ( currd->arch.vtsc || (ctxt.tsc & TSC_AUX) )
+            {
+                msr_split(regs, pv_soft_rdtsc(curr, regs));
+
+                if ( ctxt.tsc & TSC_AUX )
+                    regs->rcx = (currd->arch.tsc_mode == TSC_MODE_PVRDTSCP
+                                 ? currd->arch.incarnation : 0);
+            }
             else
                 msr_split(regs, rdtsc());
         }
