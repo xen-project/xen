@@ -1321,6 +1321,22 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case VCPUOP_down:
+        for_each_vcpu ( d, v )
+            if ( v->vcpu_id != vcpuid && !test_bit(_VPF_down, &v->pause_flags) )
+            {
+               rc = 1;
+               break;
+            }
+
+        if ( !rc ) /* Last vcpu going down? */
+        {
+            domain_shutdown(d, SHUTDOWN_poweroff);
+            break;
+        }
+
+        rc = 0;
+        v = d->vcpu[vcpuid];
+
 #ifdef CONFIG_X86
         if ( pv_shim )
             rc = continue_hypercall_on_cpu(0, pv_shim_cpu_down, v);
