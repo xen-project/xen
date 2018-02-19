@@ -2165,21 +2165,6 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
         *elapsed_nsec = scale_delta(tsc, &d->arch.vtsc_to_ns);
         *gtsc_khz = enable_tsc_scaling ? d->arch.tsc_khz : cpu_khz;
         break;
-    case TSC_MODE_PVRDTSCP:
-        if ( d->arch.vtsc )
-        {
-            *elapsed_nsec = get_s_time() - d->arch.vtsc_offset;
-            *gtsc_khz = cpu_khz;
-        }
-        else
-        {
-            tsc = rdtsc();
-            *elapsed_nsec = scale_delta(tsc, &this_cpu(cpu_time).tsc_scale) -
-                            d->arch.vtsc_offset;
-            *gtsc_khz = enable_tsc_scaling ? d->arch.tsc_khz
-                                           : 0 /* ignored by tsc_set_info */;
-        }
-        break;
     }
 
     if ( (int64_t)*elapsed_nsec < 0 )
@@ -2208,8 +2193,6 @@ int tsc_set_info(struct domain *d,
 
     switch ( tsc_mode )
     {
-        bool enable_tsc_scaling;
-
     case TSC_MODE_DEFAULT:
     case TSC_MODE_ALWAYS_EMULATE:
         d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
@@ -2234,24 +2217,6 @@ int tsc_set_info(struct domain *d,
         }
         d->arch.vtsc = 1;
         d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
-        break;
-    case TSC_MODE_PVRDTSCP:
-        d->arch.vtsc = !boot_cpu_has(X86_FEATURE_RDTSCP) ||
-                       !host_tsc_is_safe();
-        enable_tsc_scaling = is_hvm_domain(d) && !d->arch.vtsc &&
-                             hvm_get_tsc_scaling_ratio(gtsc_khz ?: cpu_khz);
-        d->arch.tsc_khz = (enable_tsc_scaling && gtsc_khz) ? gtsc_khz : cpu_khz;
-        set_time_scale(&d->arch.vtsc_to_ns, d->arch.tsc_khz * 1000 );
-        d->arch.ns_to_vtsc = scale_reciprocal(d->arch.vtsc_to_ns);
-        if ( d->arch.vtsc )
-            d->arch.vtsc_offset = get_s_time() - elapsed_nsec;
-        else {
-            /* when using native TSC, offset is nsec relative to power-on
-             * of physical machine */
-            d->arch.vtsc_offset = scale_delta(rdtsc(),
-                                              &this_cpu(cpu_time).tsc_scale) -
-                                  elapsed_nsec;
-        }
         break;
 
     default:
