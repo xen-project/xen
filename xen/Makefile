@@ -139,7 +139,8 @@ $(TARGET).gz: $(TARGET)
 	gzip -n -f -9 < $< > $@.new
 	mv $@.new $@
 
-$(TARGET): delete-unfresh-files
+.PHONY: $(TARGET)-common
+$(TARGET)-common: delete-unfresh-files
 	$(MAKE) -C tools
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
@@ -149,10 +150,9 @@ $(TARGET): delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/asm-$(TARGET_ARCH)/asm-offsets.h
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $(TARGET)
 
-$(TARGET)-shim: $(TARGET)
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $(TARGET)-shim
+$(TARGET) $(TARGET)-shim: $(TARGET)-common
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) $@
 
 # drivers/char/console.o contains static banner/compile info. Blow it away.
 # Don't refresh these files during e.g., 'sudo make install'
