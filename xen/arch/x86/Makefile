@@ -78,8 +78,6 @@ efi-y := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
                       -O $(BASEDIR)/include/xen/compile.h ]; then \
                          echo '$(TARGET).efi'; fi)
 
-shim-$(CONFIG_PVH_GUEST) := $(TARGET)-shim
-
 ifneq ($(build_id_linker),)
 notes_phdrs = --notes
 else
