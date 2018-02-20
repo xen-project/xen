@@ -631,6 +631,12 @@ static void svm_update_guest_efer(struct vcpu *v)
     if ( lma )
         new_efer |= EFER_LME;
     vmcb_set_efer(vmcb, new_efer);
+
+    ASSERT(nestedhvm_enabled(v->domain) ||
+           !(v->arch.hvm_vcpu.guest_efer & EFER_SVME));
+
+    if ( nestedhvm_enabled(v->domain) )
+        svm_nested_features_on_efer_update(v);
 }
 
 static void svm_cpuid_policy_changed(struct vcpu *v)

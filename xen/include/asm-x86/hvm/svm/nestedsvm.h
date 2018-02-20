@@ -104,6 +104,7 @@ nestedsvm_vmexit_n2n1(struct vcpu *v, struct cpu_user_regs *regs);
 enum nestedhvm_vmexits
 nestedsvm_check_intercepts(struct vcpu *v, struct cpu_user_regs *regs,
     uint64_t exitcode);
+void svm_nested_features_on_efer_update(struct vcpu *v);
 
 /* Interface methods */
 void nsvm_vcpu_destroy(struct vcpu *v);

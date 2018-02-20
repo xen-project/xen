@@ -1665,3 +1665,69 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
 
     __update_guest_eip(regs, inst_len);
 }
+
+/*
+ * This runs on EFER change to see if nested features need to either be
+ * turned off or on.
+ */
+void svm_nested_features_on_efer_update(struct vcpu *v)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct nestedsvm *svm = &vcpu_nestedsvm(v);
+    u32 general2_intercepts;
+    vintr_t vintr;
+
+    /*
+     * Need state for transfering the nested gif status so only write on
+     * the hvm_vcpu EFER.SVME changing.
+     */
+    if ( v->arch.hvm_vcpu.guest_efer & EFER_SVME )
+    {
+        if ( !vmcb->virt_ext.fields.vloadsave_enable &&
+             paging_mode_hap(v->domain) &&
+             cpu_has_svm_vloadsave )
+        {
+            vmcb->virt_ext.fields.vloadsave_enable = 1;
+            general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
+            general2_intercepts &= ~(GENERAL2_INTERCEPT_VMLOAD |
+                                     GENERAL2_INTERCEPT_VMSAVE);
+            vmcb_set_general2_intercepts(vmcb, general2_intercepts);
+        }
+
+        if ( !vmcb->_vintr.fields.vgif_enable &&
+             cpu_has_svm_vgif )
+        {
+            vintr = vmcb_get_vintr(vmcb);
+            vintr.fields.vgif = svm->ns_gif;
+            vintr.fields.vgif_enable = 1;
+            vmcb_set_vintr(vmcb, vintr);
+            general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
+            general2_intercepts &= ~(GENERAL2_INTERCEPT_STGI |
+                                     GENERAL2_INTERCEPT_CLGI);
+            vmcb_set_general2_intercepts(vmcb, general2_intercepts);
+        }
+    }
+    else
+    {
+        if ( vmcb->virt_ext.fields.vloadsave_enable )
+        {
+            vmcb->virt_ext.fields.vloadsave_enable = 0;
+            general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
+            general2_intercepts |= (GENERAL2_INTERCEPT_VMLOAD |
+                                    GENERAL2_INTERCEPT_VMSAVE);
+            vmcb_set_general2_intercepts(vmcb, general2_intercepts);
+        }
+
+        if ( vmcb->_vintr.fields.vgif_enable )
+        {
+            vintr = vmcb_get_vintr(vmcb);
+            svm->ns_gif = vintr.fields.vgif;
+            vintr.fields.vgif_enable = 0;
+            vmcb_set_vintr(vmcb, vintr);
+            general2_intercepts  = vmcb_get_general2_intercepts(vmcb);
+            general2_intercepts |= (GENERAL2_INTERCEPT_STGI |
+                                    GENERAL2_INTERCEPT_CLGI);
+            vmcb_set_general2_intercepts(vmcb, general2_intercepts);
+        }
+    }
+}
