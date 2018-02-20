@@ -157,17 +157,17 @@ ifndef XEN_HAS_CHECKPOLICY
 endif
 
 # as-insn: Check whether assembler supports an instruction.
-# Usage: cflags-y += $(call as-insn "insn",option-yes,option-no)
+# Usage: cflags-y += $(call as-insn,CC FLAGS,"insn",option-yes,option-no)
 as-insn = $(if $(shell echo 'void _(void) { asm volatile ( $(2) ); }' \
-                       | $(1) $(filter-out -M% %.d -include %/include/xen/config.h,$(AFLAGS)) \
+                       | $(filter-out -M% %.d -include %/include/xen/config.h,$(1)) \
                               -c -x c -o /dev/null - 2>&1),$(4),$(3))
 
 # as-insn-check: Add an option to compilation flags, but only if insn is
 #                supported by assembler.
-# Usage: $(call as-insn-check CFLAGS,CC,"nop",-DHAVE_GAS_NOP)
+# Usage: $(call as-insn-check,CFLAGS,CC,"nop",-DHAVE_GAS_NOP)
 as-insn-check = $(eval $(call as-insn-check-closure,$(1),$(2),$(3),$(4)))
 define as-insn-check-closure
-    ifeq ($$(call as-insn,$$($(2)),$(3),y,n),y)
+    ifeq ($$(call as-insn,$$($(2)) $$($(1)),$(3),y,n),y)
         $(1) += $(4)
     endif
 endef
