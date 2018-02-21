@@ -156,8 +156,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 
         /* Fallthrough. */
     case 0x40000200 ... 0x400002ff:
-        ret = (rdmsr_hypervisor_regs(msr, val)
-               ? X86EMUL_OKAY : X86EMUL_EXCEPTION);
+        ret = guest_rdmsr_xen(v, msr, val);
         break;
 
     default:
@@ -283,12 +282,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
         /* Fallthrough. */
     case 0x40000200 ... 0x400002ff:
-        switch ( wrmsr_hypervisor_regs(msr, val) )
-        {
-        case -ERESTART: ret = X86EMUL_RETRY;     break;
-        case 1:         ret = X86EMUL_OKAY;      break;
-        default:        ret = X86EMUL_EXCEPTION; break;
-        }
+        ret = guest_wrmsr_xen(v, msr, val);
         break;
 
     default:

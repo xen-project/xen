@@ -768,29 +768,25 @@ static void do_trap(struct cpu_user_regs *regs)
           trapnr, trapstr(trapnr), regs->error_code);
 }
 
-/* Returns 0 if not handled, and non-0 for success. */
-int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val)
+int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val)
 {
-    struct domain *d = current->domain;
+    const struct domain *d = v->domain;
     /* Optionally shift out of the way of Viridian architectural MSRs. */
     uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
 
     switch ( idx - base )
     {
     case 0: /* Write hypercall page MSR.  Read as zero. */
-    {
         *val = 0;
-        return 1;
-    }
+        return X86EMUL_OKAY;
     }
 
-    return 0;
+    return X86EMUL_EXCEPTION;
 }
 
-/* Returns 1 if handled, 0 if not and -Exx for error. */
-int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
+int guest_wrmsr_xen(struct vcpu *v, uint32_t idx, uint64_t val)
 {
-    struct domain *d = current->domain;
+    struct domain *d = v->domain;
     /* Optionally shift out of the way of Viridian architectural MSRs. */
     uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
 
@@ -809,7 +805,7 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
             gdprintk(XENLOG_WARNING,
                      "wrmsr hypercall page index %#x unsupported\n",
                      page_index);
-            return 0;
+            return X86EMUL_EXCEPTION;
         }
 
         page = get_page_from_gfn(d, gmfn, &t, P2M_ALLOC);
@@ -822,13 +818,13 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
             if ( p2m_is_paging(t) )
             {
                 p2m_mem_paging_populate(d, gmfn);
-                return -ERESTART;
+                return X86EMUL_RETRY;
             }
 
             gdprintk(XENLOG_WARNING,
                      "Bad GMFN %lx (MFN %#"PRI_mfn") to MSR %08x\n",
                      gmfn, mfn_x(page ? page_to_mfn(page) : INVALID_MFN), base);
-            return 0;
+            return X86EMUL_EXCEPTION;
         }
 
         hypercall_page = __map_domain_page(page);
@@ -836,11 +832,12 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
         unmap_domain_page(hypercall_page);
 
         put_page_and_type(page);
-        return 1;
-    }
+        return X86EMUL_OKAY;
     }
 
-    return 0;
+    default:
+        return X86EMUL_EXCEPTION;
+    }
 }
 
 void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,

@@ -554,8 +554,8 @@ unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn);
 
 void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
                              uint32_t subleaf, struct cpuid_leaf *res);
-int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val);
-int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val);
+int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val);
+int guest_wrmsr_xen(struct vcpu *v, uint32_t idx, uint64_t val);
 
 void microcode_set_module(unsigned int);
 int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void), unsigned long len);
