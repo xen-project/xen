@@ -1539,7 +1539,7 @@ int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
         next_gfn = gfn_next_boundary(start, order);
 
         /* Skip hole and non-RAM page */
-        if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_ram(t) )
+        if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_any_ram(t) )
             continue;
 
         /* XXX: Implement preemption */
