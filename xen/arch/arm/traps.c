@@ -681,8 +681,7 @@ static void inject_vabt_exception(struct cpu_user_regs *regs)
         break;
     }
 
-    current->arch.hcr_el2 |= HCR_VA;
-    WRITE_SYSREG(current->arch.hcr_el2, HCR_EL2);
+    vcpu_hcr_set_flags(current, HCR_VA);
 }
 
 /*

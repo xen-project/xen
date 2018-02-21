@@ -490,6 +490,24 @@ register_t get_default_hcr_flags(void);
                                  : : : "memory");                 \
     } while (0)
 
+/*
+ * Clear/Set flags in HCR_EL2 for a given vCPU. It only supports the current
+ * vCPU for now.
+ */
+#define vcpu_hcr_clear_flags(v, flags)              \
+    do {                                            \
+        ASSERT((v) == current);                     \
+        (v)->arch.hcr_el2 &= ~(flags);              \
+        WRITE_SYSREG((v)->arch.hcr_el2, HCR_EL2);   \
+    } while (0)
+
+#define vcpu_hcr_set_flags(v, flags)                \
+    do {                                            \
+        ASSERT((v) == current);                     \
+        (v)->arch.hcr_el2 |= (flags);               \
+        WRITE_SYSREG((v)->arch.hcr_el2, HCR_EL2);   \
+    } while (0)
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARM_PROCESSOR_H */
 /*
