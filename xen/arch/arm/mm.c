@@ -1408,7 +1408,7 @@ void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
     } while (cmpxchg(addr, old, old & mask) != old);
 }
 
-void gnttab_mark_dirty(struct domain *d, unsigned long l)
+void gnttab_mark_dirty(struct domain *d, mfn_t mfn)
 {
     /* XXX: mark dirty */
     static int warning;

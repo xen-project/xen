@@ -19,7 +19,7 @@ int create_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
 #define gnttab_host_mapping_get_page_type(ro, ld, rd) (0)
 int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                                unsigned long new_gpaddr, unsigned int flags);
-void gnttab_mark_dirty(struct domain *d, unsigned long l);
+void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
 #define gnttab_create_status_page(d, t, i) do {} while (0)
 #define gnttab_release_host_mappings(domain) 1
 static inline int replace_grant_supported(void)
