@@ -6,6 +6,7 @@
 
 #include <asm/event.h>
 #include <asm/flushtlb.h>
+#include <asm/guest_walk.h>
 #include <asm/page.h>
 
 #define MAX_VMID_8_BIT  (1UL << 8)
@@ -1430,6 +1431,8 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     struct page_info *page = NULL;
     paddr_t maddr = 0;
     uint64_t par;
+    mfn_t mfn;
+    p2m_type_t t;
 
     /*
      * XXX: To support a different vCPU, we would need to load the
@@ -1446,8 +1449,29 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     par = gvirt_to_maddr(va, &maddr, flags);
     p2m_read_unlock(p2m);
 
+    /*
+     * gvirt_to_maddr may fail if the entry does not have the valid bit
+     * set. Fallback to the second method:
+     *  1) Translate the VA to IPA using software lookup -> Stage-1 page-table
+     *  may not be accessible because the stage-2 entries may have valid
+     *  bit unset.
+     *  2) Software lookup of the MFN
+     *
+     * Note that when memaccess is enabled, we instead call directly
+     * p2m_mem_access_check_and_get_page(...). Because the function is a
+     * a variant of the methods described above, it will be able to
+     * handle entries with valid bit unset.
+     *
+     * TODO: Integrate more nicely memaccess with the rest of the
+     * function.
+     * TODO: Use the fault error in PAR_EL1 to avoid pointless
+     *  translation.
+     */
     if ( par )
     {
+        paddr_t ipa;
+        unsigned int s1_perms;
+
         /*
          * When memaccess is enabled, the translation GVA to MADDR may
          * have failed because of a permission fault.
@@ -1455,20 +1479,48 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
         if ( p2m->mem_access_enabled )
             return p2m_mem_access_check_and_get_page(va, flags, v);
 
-        dprintk(XENLOG_G_DEBUG,
-                "%pv: gvirt_to_maddr failed va=%#"PRIvaddr" flags=0x%lx par=%#"PRIx64"\n",
-                v, va, flags, par);
-        return NULL;
-    }
+        /*
+         * The software stage-1 table walk can still fail, e.g, if the
+         * GVA is not mapped.
+         */
+        if ( !guest_walk_tables(v, va, &ipa, &s1_perms) )
+        {
+            dprintk(XENLOG_G_DEBUG,
+                    "%pv: Failed to walk page-table va %#"PRIvaddr"\n", v, va);
+            return NULL;
+        }
 
-    if ( !mfn_valid(maddr_to_mfn(maddr)) )
+        mfn = p2m_lookup(d, gaddr_to_gfn(ipa), &t);
+        if ( mfn_eq(INVALID_MFN, mfn) || !p2m_is_ram(t) )
+            return NULL;
+
+        /*
+         * Check permission that are assumed by the caller. For instance
+         * in case of guestcopy, the caller assumes that the translated
+         * page can be accessed with the requested permissions. If this
+         * is not the case, we should fail.
+         *
+         * Please note that we do not check for the GV2M_EXEC
+         * permission. This is fine because the hardware-based translation
+         * instruction does not test for execute permissions.
+         */
+        if ( (flags & GV2M_WRITE) && !(s1_perms & GV2M_WRITE) )
+            return NULL;
+
+        if ( (flags & GV2M_WRITE) && t != p2m_ram_rw )
+            return NULL;
+    }
+    else
+        mfn = maddr_to_mfn(maddr);
+
+    if ( !mfn_valid(mfn) )
     {
         dprintk(XENLOG_G_DEBUG, "%pv: Invalid MFN %#"PRI_mfn"\n",
-                v, mfn_x(maddr_to_mfn(maddr)));
+                v, mfn_x(mfn));
         return NULL;
     }
 
-    page = mfn_to_page(maddr_to_mfn(maddr));
+    page = mfn_to_page(mfn);
     ASSERT(page);
 
     if ( unlikely(!get_page(page, d)) )
