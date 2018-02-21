@@ -171,12 +171,12 @@ void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
         vcpu_kick(target);
 }
 
-static int vlapic_find_highest_isr(struct vlapic *vlapic)
+static int vlapic_find_highest_isr(const struct vlapic *vlapic)
 {
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_ISR]);
 }
 
-static uint32_t vlapic_get_ppr(struct vlapic *vlapic)
+static uint32_t vlapic_get_ppr(const struct vlapic *vlapic)
 {
     uint32_t tpr, isrv, ppr;
     int isr;
@@ -550,9 +550,9 @@ void vlapic_ipi(
     }
 }
 
-static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
+static uint32_t vlapic_get_tmcct(const struct vlapic *vlapic)
 {
-    struct vcpu *v = current;
+    const struct vcpu *v = const_vlapic_vcpu(vlapic);
     uint32_t tmcct = 0, tmict = vlapic_get_reg(vlapic, APIC_TMICT);
     uint64_t counter_passed;
 
@@ -590,7 +590,8 @@ static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
                 "timer_divisor: %d", vlapic->hw.timer_divisor);
 }
 
-static uint32_t vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset)
+static uint32_t vlapic_read_aligned(const struct vlapic *vlapic,
+                                    unsigned int offset)
 {
     switch ( offset )
     {
@@ -680,7 +681,7 @@ int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
             REGBLOCK(ISR) | REGBLOCK(TMR) | REGBLOCK(IRR)
 #undef REGBLOCK
         };
-    struct vlapic *vlapic = vcpu_vlapic(v);
+    const struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t high = 0, reg = msr - MSR_IA32_APICBASE_MSR, offset = reg << 4;
 
     if ( !vlapic_x2apic_mode(vlapic) ||
