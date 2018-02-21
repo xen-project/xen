@@ -43,6 +43,8 @@ asm(".file \"" __FILE__ "\"");
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef page_to_mfn
 #define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
+#undef mfn_to_page
+#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
 
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
@@ -160,7 +162,8 @@ static int m2p_mapped(unsigned long spfn)
 
 static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
 {
-    unsigned long i, n, v, m2p_start_mfn = 0;
+    unsigned long i, n, v;
+    mfn_t m2p_start_mfn = INVALID_MFN;
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
 
@@ -180,15 +183,16 @@ static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
             l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
             if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
                 continue;
-            m2p_start_mfn = l2e_get_pfn(l2e);
+            m2p_start_mfn = l2e_get_mfn(l2e);
         }
         else
             continue;
 
         for ( i = 0; i < n; i++ )
         {
-            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
-            if (hotadd_mem_valid(m2p_start_mfn + i, info))
+            struct page_info *page = mfn_to_page(mfn_add(m2p_start_mfn, i));
+
+            if ( hotadd_mem_valid(mfn_x(mfn_add(m2p_start_mfn, i)), info) )
                 share_xen_page_with_privileged_guests(page, SHARE_ro);
         }
     }
@@ -204,12 +208,13 @@ static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
         l2e = l3e_to_l2e(l3e)[l2_table_offset(v)];
         if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
             continue;
-        m2p_start_mfn = l2e_get_pfn(l2e);
+        m2p_start_mfn = l2e_get_mfn(l2e);
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
         {
-            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
-            if (hotadd_mem_valid(m2p_start_mfn + i, info))
+            struct page_info *page = mfn_to_page(mfn_add(m2p_start_mfn, i));
+
+            if ( hotadd_mem_valid(mfn_x(mfn_add(m2p_start_mfn, i)), info) )
                 share_xen_page_with_privileged_guests(page, SHARE_ro);
         }
     }
@@ -720,10 +725,10 @@ static void cleanup_frame_table(struct mem_hotadd_info *info)
     unsigned long sva, eva;
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
-    unsigned long spfn, epfn;
+    mfn_t spfn, epfn;
 
-    spfn = info->spfn;
-    epfn = info->epfn;
+    spfn = _mfn(info->spfn);
+    epfn = _mfn(info->epfn);
 
     sva = (unsigned long)mfn_to_page(spfn);
     eva = (unsigned long)mfn_to_page(epfn);
@@ -795,16 +800,17 @@ static int setup_frametable_chunk(void *start, void *end,
 
 static int extend_frame_table(struct mem_hotadd_info *info)
 {
-    unsigned long cidx, nidx, eidx, spfn, epfn;
+    unsigned long cidx, nidx, eidx;
+    mfn_t spfn, epfn;
 
-    spfn = info->spfn;
-    epfn = info->epfn;
+    spfn = _mfn(info->spfn);
+    epfn = _mfn(info->epfn);
 
-    eidx = (pfn_to_pdx(epfn) + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
-    nidx = cidx = pfn_to_pdx(spfn)/PDX_GROUP_COUNT;
+    eidx = (mfn_to_pdx(epfn) + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
+    nidx = cidx = mfn_to_pdx(spfn)/PDX_GROUP_COUNT;
 
-    ASSERT( pfn_to_pdx(epfn) <= (DIRECTMAP_SIZE >> PAGE_SHIFT) &&
-            pfn_to_pdx(epfn) <= FRAMETABLE_NR );
+    ASSERT( mfn_to_pdx(epfn) <= (DIRECTMAP_SIZE >> PAGE_SHIFT) &&
+            mfn_to_pdx(epfn) <= FRAMETABLE_NR );
 
     if ( test_bit(cidx, pdx_group_valid) )
         cidx = find_next_zero_bit(pdx_group_valid, eidx, cidx);
@@ -866,7 +872,7 @@ void __init subarch_init_memory(void)
 
         for ( i = 0; i < n; i++ )
             share_xen_page_with_privileged_guests(
-                mfn_to_page(m2p_start_mfn + i), SHARE_ro);
+                mfn_to_page(_mfn(m2p_start_mfn + i)), SHARE_ro);
     }
 
     for ( v  = RDWR_COMPAT_MPT_VIRT_START;
@@ -884,7 +890,7 @@ void __init subarch_init_memory(void)
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
             share_xen_page_with_privileged_guests(
-                mfn_to_page(m2p_start_mfn + i), SHARE_ro);
+                mfn_to_page(_mfn(m2p_start_mfn + i)), SHARE_ro);
     }
 
     /* Mark all of direct map NX if hardware supports it. */
@@ -1270,7 +1276,7 @@ static int transfer_pages_to_heap(struct mem_hotadd_info *info)
      */
     for (i = info->spfn; i < info->cur; i++)
     {
-        pg = mfn_to_page(i);
+        pg = mfn_to_page(_mfn(i));
         pg->count_info = PGC_state_inuse;
     }
 
