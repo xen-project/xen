@@ -35,6 +35,9 @@ static inline unsigned long pdx_to_pfn(unsigned long pdx)
            ((pdx << pfn_pdx_hole_shift) & pfn_top_mask);
 }
 
+#define mfn_to_pdx(mfn) pfn_to_pdx(mfn_x(mfn))
+#define pdx_to_mfn(pdx) _mfn(pdx_to_pfn(pdx))
+
 extern void pfn_pdx_hole_setup(unsigned long);
 
 #endif /* HAS_PDX */
