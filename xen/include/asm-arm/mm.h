@@ -313,32 +313,19 @@ static inline void *page_to_virt(const struct page_info *pg)
 struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
                                     unsigned long flags);
 
-/*
- * The MPT (machine->physical mapping table) is an array of word-sized
- * values, indexed on machine frame number. It is expected that guest OSes
- * will use it to store a "physical" frame number to give the appearance of
- * contiguous (or near contiguous) physical memory.
- */
-#undef  machine_to_phys_mapping
-#define machine_to_phys_mapping  ((unsigned long *)RDWR_MPT_VIRT_START)
-#define INVALID_M2P_ENTRY        (~0UL)
-#define VALID_M2P(_e)            (!((_e) & (1UL<<(BITS_PER_LONG-1))))
-#define SHARED_M2P_ENTRY         (~0UL - 1UL)
-#define SHARED_M2P(_e)           ((_e) == SHARED_M2P_ENTRY)
-
-#define _set_gpfn_from_mfn(mfn, pfn) ({                        \
-    struct domain *d = page_get_owner(__mfn_to_page(mfn));     \
-    if(d && (d == dom_cow))                                    \
-        machine_to_phys_mapping[(mfn)] = SHARED_M2P_ENTRY;     \
-    else                                                       \
-        machine_to_phys_mapping[(mfn)] = (pfn);                \
-    })
-
 static inline void put_gfn(struct domain *d, unsigned long gfn) {}
 static inline int relinquish_shared_pages(struct domain *d)
 {
     return 0;
 }
+
+/*
+ * Arm does not have an M2P, but common code expects a handful of
+ * M2P-related defines and functions. Provide dummy versions of these.
+ */
+#define INVALID_M2P_ENTRY        (~0UL)
+#define SHARED_M2P_ENTRY         (~0UL - 1UL)
+#define SHARED_M2P(_e)           ((_e) == SHARED_M2P_ENTRY)
 
 /* Xen always owns P2M on ARM */
 #define set_gpfn_from_mfn(mfn, pfn) do { (void) (mfn), (void)(pfn); } while (0)
