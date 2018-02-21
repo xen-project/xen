@@ -40,6 +40,10 @@ asm(".file \"" __FILE__ "\"");
 #include <asm/mem_sharing.h>
 #include <public/memory.h>
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef page_to_mfn
+#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
+
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
 l2_pgentry_t *compat_idle_pg_table_l2;
@@ -111,14 +115,14 @@ static int hotadd_mem_valid(unsigned long pfn, struct mem_hotadd_info *info)
     return (pfn < info->epfn && pfn >= info->spfn);
 }
 
-static unsigned long alloc_hotadd_mfn(struct mem_hotadd_info *info)
+static mfn_t alloc_hotadd_mfn(struct mem_hotadd_info *info)
 {
-    unsigned mfn;
+    mfn_t mfn;
 
     ASSERT((info->cur + ( 1UL << PAGETABLE_ORDER) < info->epfn) &&
             info->cur >= info->spfn);
 
-    mfn = info->cur;
+    mfn = _mfn(info->cur);
     info->cur += (1UL << PAGETABLE_ORDER);
     return mfn;
 }
@@ -317,7 +321,8 @@ static void destroy_m2p_mapping(struct mem_hotadd_info *info)
  */
 static int setup_compat_m2p_table(struct mem_hotadd_info *info)
 {
-    unsigned long i, va, smap, emap, rwva, epfn = info->epfn, mfn;
+    unsigned long i, va, smap, emap, rwva, epfn = info->epfn;
+    mfn_t mfn;
     unsigned int n;
     l3_pgentry_t *l3_ro_mpt = NULL;
     l2_pgentry_t *l2_ro_mpt = NULL;
@@ -378,7 +383,7 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
         memset((void *)rwva, 0xFF, 1UL << L2_PAGETABLE_SHIFT);
         /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
         l2e_write(&l2_ro_mpt[l2_table_offset(va)],
-                  l2e_from_pfn(mfn, _PAGE_PSE|_PAGE_PRESENT));
+                  l2e_from_mfn(mfn, _PAGE_PSE|_PAGE_PRESENT));
     }
 #undef CNT
 #undef MFN
@@ -438,7 +443,7 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
                 break;
         if ( n < CNT )
         {
-            unsigned long mfn = alloc_hotadd_mfn(info);
+            mfn_t mfn = alloc_hotadd_mfn(info);
 
             ret = map_pages_to_xen(
                         RDWR_MPT_VIRT_START + i * sizeof(unsigned long),
@@ -473,7 +478,7 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
             }
 
             /* NB. Cannot be GLOBAL: guest user mode should not see it. */
-            l2e_write(l2_ro_mpt, l2e_from_pfn(mfn,
+            l2e_write(l2_ro_mpt, l2e_from_mfn(mfn,
                    /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
         }
         if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
@@ -692,7 +697,7 @@ void __init zap_low_mappings(void)
     flush_local(FLUSH_TLB_GLOBAL);
 
     /* Replace with mapping of the boot trampoline only. */
-    map_pages_to_xen(trampoline_phys, trampoline_phys >> PAGE_SHIFT,
+    map_pages_to_xen(trampoline_phys, maddr_to_mfn(trampoline_phys),
                      PFN_UP(trampoline_end - trampoline_start),
                      __PAGE_HYPERVISOR);
 }
@@ -769,7 +774,7 @@ static int setup_frametable_chunk(void *start, void *end,
 {
     unsigned long s = (unsigned long)start;
     unsigned long e = (unsigned long)end;
-    unsigned long mfn;
+    mfn_t mfn;
     int err;
 
     ASSERT(!(s & ((1 << L2_PAGETABLE_SHIFT) - 1)));
@@ -1364,7 +1369,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     i = virt_to_mfn(HYPERVISOR_VIRT_END - 1) + 1;
     if ( spfn < i )
     {
-        ret = map_pages_to_xen((unsigned long)mfn_to_virt(spfn), spfn,
+        ret = map_pages_to_xen((unsigned long)mfn_to_virt(spfn), _mfn(spfn),
                                min(epfn, i) - spfn, PAGE_HYPERVISOR);
         if ( ret )
             goto destroy_directmap;
@@ -1373,7 +1378,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     {
         if ( i < spfn )
             i = spfn;
-        ret = map_pages_to_xen((unsigned long)mfn_to_virt(i), i,
+        ret = map_pages_to_xen((unsigned long)mfn_to_virt(i), _mfn(i),
                                epfn - i, __PAGE_HYPERVISOR_RW);
         if ( ret )
             goto destroy_directmap;

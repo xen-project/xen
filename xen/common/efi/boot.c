@@ -1464,7 +1464,7 @@ void __init efi_init_memory(void)
             if ( (unsigned long)mfn_to_virt(emfn - 1) >= HYPERVISOR_VIRT_END )
                 prot &= ~_PAGE_GLOBAL;
             if ( map_pages_to_xen((unsigned long)mfn_to_virt(smfn),
-                                  smfn, emfn - smfn, prot) == 0 )
+                                  _mfn(smfn), emfn - smfn, prot) == 0 )
                 desc->VirtualStart =
                     (unsigned long)maddr_to_virt(desc->PhysicalStart);
             else

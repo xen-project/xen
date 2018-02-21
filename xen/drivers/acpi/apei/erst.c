@@ -799,7 +799,7 @@ int __init erst_init(void)
 		printk(KERN_WARNING "Failed to get ERST table: %s\n", msg);
 		return -EINVAL;
 	}
-	map_pages_to_xen((unsigned long)__va(erst_addr), PFN_DOWN(erst_addr),
+	map_pages_to_xen((unsigned long)__va(erst_addr), maddr_to_mfn(erst_addr),
 			 PFN_UP(erst_addr + erst_len) - PFN_DOWN(erst_addr),
 			 PAGE_HYPERVISOR);
 	erst_tab = __va(erst_addr);

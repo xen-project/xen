@@ -1008,7 +1008,7 @@ int __init acpi_dmar_init(void)
     if ( ACPI_SUCCESS(acpi_get_table_phys(ACPI_SIG_DMAR, 0,
                                           &dmar_addr, &dmar_len)) )
     {
-        map_pages_to_xen((unsigned long)__va(dmar_addr), PFN_DOWN(dmar_addr),
+        map_pages_to_xen((unsigned long)__va(dmar_addr), maddr_to_mfn(dmar_addr),
                          PFN_UP(dmar_addr + dmar_len) - PFN_DOWN(dmar_addr),
                          PAGE_HYPERVISOR);
         dmar_table = __va(dmar_addr);

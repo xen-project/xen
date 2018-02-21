@@ -357,8 +357,8 @@ void *__init bootstrap_map(const module_t *mod)
     if ( end - start > BOOTSTRAP_MAP_LIMIT - map_cur )
         return NULL;
 
-    map_pages_to_xen(map_cur, start >> PAGE_SHIFT,
-                     (end - start) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+    map_pages_to_xen(map_cur, maddr_to_mfn(start),
+                     PFN_DOWN(end - start), PAGE_HYPERVISOR);
     map_cur += end - start;
     return ret;
 }
@@ -982,8 +982,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         {
             end = min(e, limit);
             set_pdx_range(s >> PAGE_SHIFT, end >> PAGE_SHIFT);
-            map_pages_to_xen((unsigned long)__va(s), s >> PAGE_SHIFT,
-                             (end - s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+            map_pages_to_xen((unsigned long)__va(s), maddr_to_mfn(s),
+                             PFN_DOWN(end - s), PAGE_HYPERVISOR);
         }
 
         if ( e > min(HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START,
@@ -1297,7 +1297,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
             if ( map_e < end )
             {
-                map_pages_to_xen((unsigned long)__va(map_e), PFN_DOWN(map_e),
+                map_pages_to_xen((unsigned long)__va(map_e), maddr_to_mfn(map_e),
                                  PFN_DOWN(end - map_e), PAGE_HYPERVISOR);
                 init_boot_pages(map_e, end);
                 map_e = end;
@@ -1307,13 +1307,13 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         {
             /* This range must not be passed to the boot allocator and
              * must also not be mapped with _PAGE_GLOBAL. */
-            map_pages_to_xen((unsigned long)__va(map_e), PFN_DOWN(map_e),
+            map_pages_to_xen((unsigned long)__va(map_e), maddr_to_mfn(map_e),
                              PFN_DOWN(e - map_e), __PAGE_HYPERVISOR_RW);
         }
         if ( s < map_s )
         {
-            map_pages_to_xen((unsigned long)__va(s), s >> PAGE_SHIFT,
-                             (map_s - s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
+            map_pages_to_xen((unsigned long)__va(s), maddr_to_mfn(s),
+                             PFN_DOWN(map_s - s), PAGE_HYPERVISOR);
             init_boot_pages(s, map_s);
         }
     }
@@ -1323,7 +1323,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         set_pdx_range(mod[i].mod_start,
                       mod[i].mod_start + PFN_UP(mod[i].mod_end));
         map_pages_to_xen((unsigned long)mfn_to_virt(mod[i].mod_start),
-                         mod[i].mod_start,
+                         _mfn(mod[i].mod_start),
                          PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
     }
 
@@ -1336,7 +1336,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
         if ( e > s ) 
             map_pages_to_xen((unsigned long)__va(kexec_crash_area.start),
-                             s, e - s, PAGE_HYPERVISOR);
+                             _mfn(s), e - s, PAGE_HYPERVISOR);
     }
 #endif
 

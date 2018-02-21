@@ -214,7 +214,7 @@ static void __init init_frametable_chunk(void *start, void *end)
         while ( step && s + (step << PAGE_SHIFT) > e + (4 << PAGE_SHIFT) )
             step >>= PAGETABLE_ORDER;
         mfn = alloc_boot_pages(step, step);
-        map_pages_to_xen(s, mfn_x(mfn), step, PAGE_HYPERVISOR);
+        map_pages_to_xen(s, mfn, step, PAGE_HYPERVISOR);
     }
 
     memset(start, 0, end - start);
@@ -788,12 +788,12 @@ static int update_xen_mappings(unsigned long mfn, unsigned int cacheattr)
         XEN_VIRT_START + ((mfn - PFN_DOWN(xen_phys_start)) << PAGE_SHIFT);
 
     if ( unlikely(alias) && cacheattr )
-        err = map_pages_to_xen(xen_va, mfn, 1, 0);
+        err = map_pages_to_xen(xen_va, _mfn(mfn), 1, 0);
     if ( !err )
-        err = map_pages_to_xen((unsigned long)mfn_to_virt(mfn), mfn, 1,
+        err = map_pages_to_xen((unsigned long)mfn_to_virt(mfn), _mfn(mfn), 1,
                      PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
     if ( unlikely(alias) && !cacheattr && !err )
-        err = map_pages_to_xen(xen_va, mfn, 1, PAGE_HYPERVISOR);
+        err = map_pages_to_xen(xen_va, _mfn(mfn), 1, PAGE_HYPERVISOR);
     return err;
 }
 
@@ -4695,7 +4695,7 @@ l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
 
 int map_pages_to_xen(
     unsigned long virt,
-    unsigned long mfn,
+    mfn_t mfn,
     unsigned long nr_mfns,
     unsigned int flags)
 {
@@ -4727,13 +4727,13 @@ int map_pages_to_xen(
         ol3e = *pl3e;
 
         if ( cpu_has_page1gb &&
-             !(((virt >> PAGE_SHIFT) | mfn) &
+             !(((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
                ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1)) &&
              nr_mfns >= (1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) &&
              !(flags & (_PAGE_PAT | MAP_SMALL_PAGES)) )
         {
             /* 1GB-page mapping. */
-            l3e_write_atomic(pl3e, l3e_from_pfn(mfn, l1f_to_lNf(flags)));
+            l3e_write_atomic(pl3e, l3e_from_mfn(mfn, l1f_to_lNf(flags)));
 
             if ( (l3e_get_flags(ol3e) & _PAGE_PRESENT) )
             {
@@ -4777,8 +4777,8 @@ int map_pages_to_xen(
             }
 
             virt    += 1UL << L3_PAGETABLE_SHIFT;
-            if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
-                mfn += 1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT);
+            if ( !mfn_eq(mfn, INVALID_MFN) )
+                mfn  = mfn_add(mfn, 1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT));
             nr_mfns -= 1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT);
             continue;
         }
@@ -4793,18 +4793,18 @@ int map_pages_to_xen(
             if ( ((l3e_get_pfn(ol3e) & ~(L2_PAGETABLE_ENTRIES *
                                          L1_PAGETABLE_ENTRIES - 1)) +
                   (l2_table_offset(virt) << PAGETABLE_ORDER) +
-                  l1_table_offset(virt) == mfn) &&
+                  l1_table_offset(virt) == mfn_x(mfn)) &&
                  ((lNf_to_l1f(l3e_get_flags(ol3e)) ^ flags) &
                   ~(_PAGE_ACCESSED|_PAGE_DIRTY)) == 0 )
             {
                 /* We can skip to end of L3 superpage if we got a match. */
                 i = (1u << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) -
-                    (mfn & ((1 << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1));
+                    (mfn_x(mfn) & ((1 << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1));
                 if ( i > nr_mfns )
                     i = nr_mfns;
                 virt    += i << PAGE_SHIFT;
-                if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
-                    mfn += i;
+                if ( !mfn_eq(mfn, INVALID_MFN) )
+                    mfn = mfn_add(mfn, i);
                 nr_mfns -= i;
                 continue;
             }
@@ -4842,14 +4842,14 @@ int map_pages_to_xen(
         if ( !pl2e )
             return -ENOMEM;
 
-        if ( ((((virt >> PAGE_SHIFT) | mfn) &
+        if ( ((((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
                ((1u << PAGETABLE_ORDER) - 1)) == 0) &&
              (nr_mfns >= (1u << PAGETABLE_ORDER)) &&
              !(flags & (_PAGE_PAT|MAP_SMALL_PAGES)) )
         {
             /* Super-page mapping. */
             ol2e = *pl2e;
-            l2e_write_atomic(pl2e, l2e_from_pfn(mfn, l1f_to_lNf(flags)));
+            l2e_write_atomic(pl2e, l2e_from_mfn(mfn, l1f_to_lNf(flags)));
 
             if ( (l2e_get_flags(ol2e) & _PAGE_PRESENT) )
             {
@@ -4872,8 +4872,8 @@ int map_pages_to_xen(
             }
 
             virt    += 1UL << L2_PAGETABLE_SHIFT;
-            if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
-                mfn += 1UL << PAGETABLE_ORDER;
+            if ( !mfn_eq(mfn, INVALID_MFN) )
+                mfn = mfn_add(mfn, 1UL << PAGETABLE_ORDER);
             nr_mfns -= 1UL << PAGETABLE_ORDER;
         }
         else
@@ -4892,18 +4892,18 @@ int map_pages_to_xen(
 
                 /* Skip this PTE if there is no change. */
                 if ( (((l2e_get_pfn(*pl2e) & ~(L1_PAGETABLE_ENTRIES - 1)) +
-                       l1_table_offset(virt)) == mfn) &&
+                       l1_table_offset(virt)) == mfn_x(mfn)) &&
                      (((lNf_to_l1f(l2e_get_flags(*pl2e)) ^ flags) &
                        ~(_PAGE_ACCESSED|_PAGE_DIRTY)) == 0) )
                 {
                     /* We can skip to end of L2 superpage if we got a match. */
                     i = (1u << (L2_PAGETABLE_SHIFT - PAGE_SHIFT)) -
-                        (mfn & ((1u << (L2_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1));
+                        (mfn_x(mfn) & ((1u << (L2_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1));
                     if ( i > nr_mfns )
                         i = nr_mfns;
                     virt    += i << L1_PAGETABLE_SHIFT;
-                    if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
-                        mfn += i;
+                    if ( !mfn_eq(mfn, INVALID_MFN) )
+                        mfn = mfn_add(mfn, i);
                     nr_mfns -= i;
                     goto check_l3;
                 }
@@ -4938,7 +4938,7 @@ int map_pages_to_xen(
 
             pl1e  = l2e_to_l1e(*pl2e) + l1_table_offset(virt);
             ol1e  = *pl1e;
-            l1e_write_atomic(pl1e, l1e_from_pfn(mfn, flags));
+            l1e_write_atomic(pl1e, l1e_from_mfn(mfn, flags));
             if ( (l1e_get_flags(ol1e) & _PAGE_PRESENT) )
             {
                 unsigned int flush_flags = FLUSH_TLB | FLUSH_ORDER(0);
@@ -4948,13 +4948,13 @@ int map_pages_to_xen(
             }
 
             virt    += 1UL << L1_PAGETABLE_SHIFT;
-            if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
-                mfn += 1UL;
+            if ( !mfn_eq(mfn, INVALID_MFN) )
+                mfn = mfn_add(mfn, 1UL);
             nr_mfns -= 1UL;
 
             if ( (flags == PAGE_HYPERVISOR) &&
                  ((nr_mfns == 0) ||
-                  ((((virt >> PAGE_SHIFT) | mfn) &
+                  ((((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
                     ((1u << PAGETABLE_ORDER) - 1)) == 0)) )
             {
                 unsigned long base_mfn;
@@ -5007,7 +5007,7 @@ int map_pages_to_xen(
         if ( cpu_has_page1gb &&
              (flags == PAGE_HYPERVISOR) &&
              ((nr_mfns == 0) ||
-              !(((virt >> PAGE_SHIFT) | mfn) &
+              !(((virt >> PAGE_SHIFT) | mfn_x(mfn)) &
                 ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1))) )
         {
             unsigned long base_mfn;
@@ -5059,7 +5059,7 @@ int map_pages_to_xen(
 
 int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 {
-    return map_pages_to_xen(virt, mfn_x(INVALID_MFN), nr_mfns, MAP_SMALL_PAGES);
+    return map_pages_to_xen(virt, INVALID_MFN, nr_mfns, MAP_SMALL_PAGES);
 }
 
 /*
@@ -5320,7 +5320,7 @@ void __set_fixmap(
     enum fixed_addresses idx, unsigned long mfn, unsigned long flags)
 {
     BUG_ON(idx >= __end_of_fixed_addresses);
-    map_pages_to_xen(__fix_to_virt(idx), mfn, 1, flags);
+    map_pages_to_xen(__fix_to_virt(idx), _mfn(mfn), 1, flags);
 }
 
 void *__init arch_vmap_virt_end(void)
@@ -5591,7 +5591,7 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     if ( guard )
         flags &= ~_PAGE_PRESENT;
 
-    map_pages_to_xen(_p, mfn_x(virt_to_mfn(p)), PFN_DOWN(_l), flags);
+    map_pages_to_xen(_p, virt_to_mfn(p), PFN_DOWN(_l), flags);
 }
 
 void memguard_guard_range(void *p, unsigned long l)

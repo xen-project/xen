@@ -1065,11 +1065,11 @@ out:
 }
 
 int map_pages_to_xen(unsigned long virt,
-                     unsigned long mfn,
+                     mfn_t mfn,
                      unsigned long nr_mfns,
                      unsigned int flags)
 {
-    return create_xen_entries(INSERT, virt, _mfn(mfn), nr_mfns, flags);
+    return create_xen_entries(INSERT, virt, mfn, nr_mfns, flags);
 }
 
 int populate_pt_range(unsigned long virt, unsigned long nr_mfns)

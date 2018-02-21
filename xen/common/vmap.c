@@ -9,6 +9,10 @@
 #include <xen/vmap.h>
 #include <asm/page.h>
 
+/* Override macros from asm/page.h to make them work with mfn_t */
+#undef page_to_mfn
+#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
+
 static DEFINE_SPINLOCK(vm_lock);
 static void *__read_mostly vm_base[VMAP_REGION_NR];
 #define vm_bitmap(x) ((unsigned long *)vm_base[x])
@@ -208,7 +212,7 @@ void *__vmap(const mfn_t *mfn, unsigned int granularity,
 
     for ( ; va && nr--; ++mfn, cur += PAGE_SIZE * granularity )
     {
-        if ( map_pages_to_xen(cur, mfn_x(*mfn), granularity, flags) )
+        if ( map_pages_to_xen(cur, *mfn, granularity, flags) )
         {
             vunmap(va);
             va = NULL;
@@ -234,7 +238,7 @@ void vunmap(const void *va)
 #ifndef _PAGE_NONE
     destroy_xen_mappings(addr, addr + PAGE_SIZE * pages);
 #else /* Avoid tearing down intermediate page tables. */
-    map_pages_to_xen(addr, 0, pages, _PAGE_NONE);
+    map_pages_to_xen(addr, INVALID_MFN, pages, _PAGE_NONE);
 #endif
     vm_free(va);
 }
@@ -258,7 +262,7 @@ static void *vmalloc_type(size_t size, enum vmap_region type)
         pg = alloc_domheap_page(NULL, 0);
         if ( pg == NULL )
             goto error;
-        mfn[i] = _mfn(page_to_mfn(pg));
+        mfn[i] = page_to_mfn(pg);
     }
 
     va = __vmap(mfn, 1, pages, 1, PAGE_HYPERVISOR, type);

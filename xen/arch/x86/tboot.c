@@ -336,22 +336,23 @@ static void tboot_gen_frametable_integrity(const uint8_t key[TB_KEY_SIZE],
 
 void tboot_shutdown(uint32_t shutdown_type)
 {
-    uint32_t map_base, map_size;
+    mfn_t map_base;
+    uint32_t map_size;
     int err;
 
     g_tboot_shared->shutdown_type = shutdown_type;
 
     /* Create identity map for tboot shutdown code. */
     /* do before S3 integrity because mapping tboot may change xenheap */
-    map_base = PFN_DOWN(g_tboot_shared->tboot_base);
+    map_base = maddr_to_mfn(g_tboot_shared->tboot_base);
     map_size = PFN_UP(g_tboot_shared->tboot_size);
 
-    err = map_pages_to_xen(map_base << PAGE_SHIFT, map_base, map_size,
+    err = map_pages_to_xen(mfn_to_maddr(map_base), map_base, map_size,
                            __PAGE_HYPERVISOR);
     if ( err != 0 )
     {
-        printk("error (%#x) mapping tboot pages (mfns) @ %#x, %#x\n", err,
-               map_base, map_size);
+        printk("error (%#x) mapping tboot pages (mfns) @ %"PRI_mfn", %#x\n",
+               err, mfn_x(map_base), map_size);
         return;
     }
 

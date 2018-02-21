@@ -184,7 +184,7 @@ void __init acpi_hest_init(void)
 		       acpi_format_exception(status));
 		goto err;
 	}
-	map_pages_to_xen((unsigned long)__va(hest_addr), PFN_DOWN(hest_addr),
+	map_pages_to_xen((unsigned long)__va(hest_addr), maddr_to_mfn(hest_addr),
 			 PFN_UP(hest_addr + hest_len) - PFN_DOWN(hest_addr),
 			 PAGE_HYPERVISOR);
 	hest_tab = __va(hest_addr);

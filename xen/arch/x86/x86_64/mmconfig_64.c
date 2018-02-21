@@ -125,9 +125,9 @@ static void __iomem *mcfg_ioremap(const struct acpi_mcfg_allocation *cfg,
         return NULL;
 
     if (map_pages_to_xen(virt,
-                         (cfg->address >> PAGE_SHIFT) +
-                         (cfg->start_bus_number << (20 - PAGE_SHIFT)),
-                         size >> PAGE_SHIFT, prot))
+                         mfn_add(maddr_to_mfn(cfg->address),
+                                 (cfg->start_bus_number << (20 - PAGE_SHIFT))),
+                         PFN_DOWN(size), prot))
         return NULL;
 
     return (void __iomem *) virt;

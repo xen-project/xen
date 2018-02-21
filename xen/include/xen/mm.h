@@ -165,7 +165,7 @@ bool scrub_free_pages(void);
 /* Map machine page range in Xen virtual address space. */
 int map_pages_to_xen(
     unsigned long virt,
-    unsigned long mfn,
+    mfn_t mfn,
     unsigned long nr_mfns,
     unsigned int flags);
 /* Alter the permissions of a range of Xen virtual address space. */
