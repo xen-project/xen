@@ -41,11 +41,11 @@ ENTRY(compat_test_all_events)
         leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
         cmpl  $0,(%rcx,%rax,1)
         jne   compat_process_softirqs
-        testb $1,VCPU_mce_pending(%rbx)
-        jnz   compat_process_mce
+        cmpb  $0, VCPU_mce_pending(%rbx)
+        jne   compat_process_mce
 .Lcompat_test_guest_nmi:
-        testb $1,VCPU_nmi_pending(%rbx)
-        jnz   compat_process_nmi
+        cmpb  $0, VCPU_nmi_pending(%rbx)
+        jne   compat_process_nmi
 compat_test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
         movzwl COMPAT_VCPUINFO_upcall_pending(%rax),%eax

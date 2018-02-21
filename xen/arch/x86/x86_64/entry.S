@@ -190,11 +190,11 @@ test_all_events:
         leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
         cmpl  $0,(%rcx,%rax,1)
         jne   process_softirqs
-        testb $1,VCPU_mce_pending(%rbx)
-        jnz   process_mce
+        cmpb  $0, VCPU_mce_pending(%rbx)
+        jne   process_mce
 .Ltest_guest_nmi:
-        testb $1,VCPU_nmi_pending(%rbx)
-        jnz   process_nmi
+        cmpb  $0, VCPU_nmi_pending(%rbx)
+        jne   process_nmi
 test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
         movzwl VCPUINFO_upcall_pending(%rax),%eax
@@ -305,8 +305,8 @@ UNLIKELY_END(sysenter_gpf)
         movq  VCPU_domain(%rbx),%rdi
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
-        testb $1,DOMAIN_is_32bit_pv(%rdi)
-        jnz   compat_sysenter
+        cmpb  $0, DOMAIN_is_32bit_pv(%rdi)
+        jne   compat_sysenter
         jmp   .Lbounce_exception
 
 ENTRY(int80_direct_trap)
@@ -342,8 +342,8 @@ UNLIKELY_END(msi_check)
         jz    int80_slow_path
 
         movq  VCPU_domain(%rbx),%rax
-        testb $1,DOMAIN_is_32bit_pv(%rax)
-        jnz   compat_int80_direct_trap
+        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
+        jne   compat_int80_direct_trap
 
         call  create_bounce_frame
         jmp   test_all_events
@@ -484,8 +484,8 @@ ENTRY(dom_crash_sync_extable)
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
         movq  STACK_CPUINFO_FIELD(current_vcpu)(%rax), %rax
         movq  VCPU_domain(%rax),%rax
-        testb $1,DOMAIN_is_32bit_pv(%rax)
-        setz  %al
+        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
+        sete  %al
         leal  (%rax,%rax,2),%eax
         orb   %al,UREGS_cs(%rsp)
         xorl  %edi,%edi
@@ -529,8 +529,8 @@ ENTRY(ret_from_intr)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         movq  VCPU_domain(%rbx),%rax
-        testb $1,DOMAIN_is_32bit_pv(%rax)
-        jz    test_all_events
+        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
+        je    test_all_events
         jmp   compat_test_all_events
 
 ENTRY(page_fault)
@@ -629,8 +629,8 @@ handle_exception_saved:
         jz    restore_all_xen
         leaq  VCPU_trap_bounce(%rbx),%rdx
         movq  VCPU_domain(%rbx),%rax
-        testb $1,DOMAIN_is_32bit_pv(%rax)
-        jnz   compat_post_handle_exception
+        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
+        jne   compat_post_handle_exception
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
 .Lbounce_exception:
