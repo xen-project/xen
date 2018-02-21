@@ -136,6 +136,8 @@
 #define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
 #undef page_to_mfn
 #define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
+#undef virt_to_mfn
+#define virt_to_mfn(v) _mfn(__virt_to_mfn(v))
 
 /* Mapping of the fixmap space needed early. */
 l1_pgentry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
@@ -380,7 +382,7 @@ void __init arch_init_memory(void)
                         l3tab[i] = l3idle[i];
                     for ( ; i < L3_PAGETABLE_ENTRIES; ++i )
                         l3tab[i] = l3e_empty();
-                    split_l4e = l4e_from_pfn(virt_to_mfn(l3tab),
+                    split_l4e = l4e_from_mfn(virt_to_mfn(l3tab),
                                              __PAGE_HYPERVISOR_RW);
                 }
                 else
@@ -4153,7 +4155,7 @@ int xenmem_add_to_physmap_one(
     {
         case XENMAPSPACE_shared_info:
             if ( idx == 0 )
-                mfn = _mfn(virt_to_mfn(d->shared_info));
+                mfn = virt_to_mfn(d->shared_info);
             break;
         case XENMAPSPACE_grant_table:
             rc = gnttab_map_frame(d, idx, gpfn, &mfn);
@@ -4825,7 +4827,7 @@ int map_pages_to_xen(
             if ( (l3e_get_flags(*pl3e) & _PAGE_PRESENT) &&
                  (l3e_get_flags(*pl3e) & _PAGE_PSE) )
             {
-                l3e_write_atomic(pl3e, l3e_from_pfn(virt_to_mfn(pl2e),
+                l3e_write_atomic(pl3e, l3e_from_mfn(virt_to_mfn(pl2e),
                                                     __PAGE_HYPERVISOR));
                 pl2e = NULL;
             }
@@ -4923,7 +4925,7 @@ int map_pages_to_xen(
                 if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) &&
                      (l2e_get_flags(*pl2e) & _PAGE_PSE) )
                 {
-                    l2e_write_atomic(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
+                    l2e_write_atomic(pl2e, l2e_from_mfn(virt_to_mfn(pl1e),
                                                         __PAGE_HYPERVISOR));
                     pl1e = NULL;
                 }
@@ -5132,7 +5134,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
             if ( (l3e_get_flags(*pl3e) & _PAGE_PRESENT) &&
                  (l3e_get_flags(*pl3e) & _PAGE_PSE) )
             {
-                l3e_write_atomic(pl3e, l3e_from_pfn(virt_to_mfn(pl2e),
+                l3e_write_atomic(pl3e, l3e_from_mfn(virt_to_mfn(pl2e),
                                                     __PAGE_HYPERVISOR));
                 pl2e = NULL;
             }
@@ -5186,7 +5188,7 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int nf)
                 if ( (l2e_get_flags(*pl2e) & _PAGE_PRESENT) &&
                      (l2e_get_flags(*pl2e) & _PAGE_PSE) )
                 {
-                    l2e_write_atomic(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
+                    l2e_write_atomic(pl2e, l2e_from_mfn(virt_to_mfn(pl1e),
                                                         __PAGE_HYPERVISOR));
                     pl1e = NULL;
                 }
@@ -5590,8 +5592,7 @@ static void __memguard_change_range(void *p, unsigned long l, int guard)
     if ( guard )
         flags &= ~_PAGE_PRESENT;
 
-    map_pages_to_xen(
-        _p, virt_to_maddr(p) >> PAGE_SHIFT, _l >> PAGE_SHIFT, flags);
+    map_pages_to_xen(_p, mfn_x(virt_to_mfn(p)), PFN_DOWN(_l), flags);
 }
 
 void memguard_guard_range(void *p, unsigned long l)
