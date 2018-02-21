@@ -23,23 +23,23 @@
 
 #ifdef CONFIG_PV
 
-int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
+int create_grant_pv_mapping(uint64_t addr, mfn_t frame,
                             unsigned int flags, unsigned int cache_flags);
-int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
+int replace_grant_pv_mapping(uint64_t addr, mfn_t frame,
                              uint64_t new_addr, unsigned int flags);
 
 #else
 
 #include <public/grant_table.h>
 
-static inline int create_grant_pv_mapping(uint64_t addr, unsigned long frame,
+static inline int create_grant_pv_mapping(uint64_t addr, mfn_t frame,
                                           unsigned int flags,
                                           unsigned int cache_flags)
 {
     return GNTST_general_error;
 }
 
-static inline int replace_grant_pv_mapping(uint64_t addr, unsigned long frame,
+static inline int replace_grant_pv_mapping(uint64_t addr, mfn_t frame,
                                            uint64_t new_addr, unsigned int flags)
 {
     return GNTST_general_error;

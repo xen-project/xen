@@ -1071,7 +1071,7 @@ map_grant_ref(
 
         if ( op->flags & GNTMAP_host_map )
         {
-            rc = create_grant_host_mapping(op->host_addr, frame, op->flags,
+            rc = create_grant_host_mapping(op->host_addr, _mfn(frame), op->flags,
                                            cache_flags);
             if ( rc != GNTST_okay )
                 goto undo_out;
@@ -1111,7 +1111,7 @@ map_grant_ref(
                 typecnt++;
             }
 
-            rc = create_grant_host_mapping(op->host_addr, frame, op->flags, 0);
+            rc = create_grant_host_mapping(op->host_addr, _mfn(frame), op->flags, 0);
             if ( rc != GNTST_okay )
                 goto undo_out;
 
@@ -1188,7 +1188,7 @@ map_grant_ref(
  undo_out:
     if ( host_map_created )
     {
-        replace_grant_host_mapping(op->host_addr, frame, 0, op->flags);
+        replace_grant_host_mapping(op->host_addr, _mfn(frame), 0, op->flags);
         gnttab_flush_tlb(ld);
     }
 
@@ -1374,7 +1374,7 @@ unmap_common(
     if ( op->host_addr && (flags & GNTMAP_host_map) )
     {
         if ( (rc = replace_grant_host_mapping(op->host_addr,
-                                              op->frame, op->new_addr,
+                                              _mfn(op->frame), op->new_addr,
                                               flags)) < 0 )
             goto act_release_out;
 

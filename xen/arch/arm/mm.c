@@ -1418,7 +1418,7 @@ void gnttab_mark_dirty(struct domain *d, unsigned long l)
     }
 }
 
-int create_grant_host_mapping(unsigned long addr, unsigned long frame,
+int create_grant_host_mapping(unsigned long addr, mfn_t frame,
                               unsigned int flags, unsigned int cache_flags)
 {
     int rc;
@@ -1431,7 +1431,7 @@ int create_grant_host_mapping(unsigned long addr, unsigned long frame,
         t = p2m_grant_map_ro;
 
     rc = guest_physmap_add_entry(current->domain, gaddr_to_gfn(addr),
-                                 _mfn(frame), 0, t);
+                                 frame, 0, t);
 
     if ( rc )
         return GNTST_general_error;
@@ -1439,8 +1439,8 @@ int create_grant_host_mapping(unsigned long addr, unsigned long frame,
         return GNTST_okay;
 }
 
-int replace_grant_host_mapping(unsigned long addr, unsigned long mfn,
-        unsigned long new_addr, unsigned int flags)
+int replace_grant_host_mapping(unsigned long addr, mfn_t mfn,
+                               unsigned long new_addr, unsigned int flags)
 {
     gfn_t gfn = gaddr_to_gfn(addr);
     struct domain *d = current->domain;
@@ -1449,7 +1449,7 @@ int replace_grant_host_mapping(unsigned long addr, unsigned long mfn,
     if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
         return GNTST_general_error;
 
-    rc = guest_physmap_remove_page(d, gfn, _mfn(mfn), 0);
+    rc = guest_physmap_remove_page(d, gfn, mfn, 0);
 
     return rc ? GNTST_general_error : GNTST_okay;
 }
