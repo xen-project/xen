@@ -42,7 +42,7 @@ void __init vm_init_type(enum vmap_region type, void *start, void *end)
     bitmap_fill(vm_bitmap(type), vm_low[type]);
 
     /* Populate page tables for the bitmap if necessary. */
-    populate_pt_range(va, 0, vm_low[type] - nr);
+    populate_pt_range(va, vm_low[type] - nr);
 }
 
 static void *vm_alloc(unsigned int nr, unsigned int align,

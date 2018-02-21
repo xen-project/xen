@@ -5057,10 +5057,9 @@ int map_pages_to_xen(
     return 0;
 }
 
-int populate_pt_range(unsigned long virt, unsigned long mfn,
-                      unsigned long nr_mfns)
+int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 {
-    return map_pages_to_xen(virt, mfn, nr_mfns, MAP_SMALL_PAGES);
+    return map_pages_to_xen(virt, mfn_x(INVALID_MFN), nr_mfns, MAP_SMALL_PAGES);
 }
 
 /*

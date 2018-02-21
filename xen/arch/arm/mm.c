@@ -1072,10 +1072,9 @@ int map_pages_to_xen(unsigned long virt,
     return create_xen_entries(INSERT, virt, _mfn(mfn), nr_mfns, flags);
 }
 
-int populate_pt_range(unsigned long virt, unsigned long mfn,
-                      unsigned long nr_mfns)
+int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 {
-    return create_xen_entries(RESERVE, virt, _mfn(mfn), nr_mfns, 0);
+    return create_xen_entries(RESERVE, virt, INVALID_MFN, nr_mfns, 0);
 }
 
 int destroy_xen_mappings(unsigned long v, unsigned long e)
