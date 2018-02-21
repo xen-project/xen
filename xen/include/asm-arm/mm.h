@@ -314,10 +314,6 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
                                     unsigned long flags);
 
 static inline void put_gfn(struct domain *d, unsigned long gfn) {}
-static inline int relinquish_shared_pages(struct domain *d)
-{
-    return 0;
-}
 
 /*
  * Arm does not have an M2P, but common code expects a handful of
