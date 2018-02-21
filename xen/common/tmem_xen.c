@@ -14,10 +14,6 @@
 #include <xen/cpu.h>
 #include <xen/init.h>
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef page_to_mfn
-#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
-
 bool __read_mostly opt_tmem;
 boolean_param("tmem", opt_tmem);
 

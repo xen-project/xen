@@ -825,8 +825,8 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
             }
 
             gdprintk(XENLOG_WARNING,
-                     "Bad GMFN %lx (MFN %lx) to MSR %08x\n",
-                     gmfn, page ? page_to_mfn(page) : -1UL, base);
+                     "Bad GMFN %lx (MFN %#"PRI_mfn") to MSR %08x\n",
+                     gmfn, mfn_x(page ? page_to_mfn(page) : INVALID_MFN), base);
             return 0;
         }
 

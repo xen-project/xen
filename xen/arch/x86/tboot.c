@@ -184,7 +184,7 @@ static void update_pagetable_mac(vmac_ctx_t *ctx)
 
     for ( mfn = 0; mfn < max_page; mfn++ )
     {
-        struct page_info *page = mfn_to_page(mfn);
+        struct page_info *page = mfn_to_page(_mfn(mfn));
 
         if ( !mfn_valid(_mfn(mfn)) )
             continue;
@@ -276,7 +276,7 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
     vmac_set_key((uint8_t *)key, &ctx);
     for ( mfn = 0; mfn < max_page; mfn++ )
     {
-        struct page_info *page = __mfn_to_page(mfn);
+        struct page_info *page = mfn_to_page(_mfn(mfn));
 
         if ( !mfn_valid(_mfn(mfn)) )
             continue;

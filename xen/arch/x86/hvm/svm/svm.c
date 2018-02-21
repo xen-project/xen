@@ -1571,7 +1571,7 @@ static int svm_cpu_up_prepare(unsigned int cpu)
         if ( !pg )
             goto err;
 
-        clear_domain_page(_mfn(page_to_mfn(pg)));
+        clear_domain_page(page_to_mfn(pg));
         *this_hsa = page_to_maddr(pg);
     }
 
@@ -1581,7 +1581,7 @@ static int svm_cpu_up_prepare(unsigned int cpu)
         if ( !pg )
             goto err;
 
-        clear_domain_page(_mfn(page_to_mfn(pg)));
+        clear_domain_page(page_to_mfn(pg));
         *this_vmcb = page_to_maddr(pg);
     }
 

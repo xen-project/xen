@@ -2255,7 +2255,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
             v->arch.guest_table = pagetable_from_page(page);
 
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
-                        v->arch.hvm_vcpu.guest_cr[3], page_to_mfn(page));
+                        v->arch.hvm_vcpu.guest_cr[3], mfn_x(page_to_mfn(page)));
         }
     }
     else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
@@ -2639,7 +2639,7 @@ void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent)
 
 void hvm_unmap_guest_frame(void *p, bool_t permanent)
 {
-    unsigned long mfn;
+    mfn_t mfn;
     struct page_info *page;
 
     if ( !p )
@@ -2660,7 +2660,7 @@ void hvm_unmap_guest_frame(void *p, bool_t permanent)
         list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
             if ( track->page == page )
             {
-                paging_mark_dirty(d, _mfn(mfn));
+                paging_mark_dirty(d, mfn);
                 list_del(&track->list);
                 xfree(track);
                 break;
@@ -2677,7 +2677,7 @@ void hvm_mapped_guest_frames_mark_dirty(struct domain *d)
 
     spin_lock(&d->arch.hvm_domain.write_map.lock);
     list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
-        paging_mark_dirty(d, _mfn(page_to_mfn(track->page)));
+        paging_mark_dirty(d, page_to_mfn(track->page));
     spin_unlock(&d->arch.hvm_domain.write_map.lock);
 }
 
@@ -3251,8 +3251,8 @@ static enum hvm_translation_result __hvm_copy(
 
                 if ( xchg(&lastpage, gfn_x(gfn)) != gfn_x(gfn) )
                     dprintk(XENLOG_G_DEBUG,
-                            "%pv attempted write to read-only gfn %#lx (mfn=%#lx)\n",
-                            v, gfn_x(gfn), page_to_mfn(page));
+                            "%pv attempted write to read-only gfn %#lx (mfn=%#"PRI_mfn")\n",
+                            v, gfn_x(gfn), mfn_x(page_to_mfn(page)));
             }
             else
             {

@@ -242,7 +242,7 @@ static int alloc_trace_bufs(unsigned int pages)
         /* Now share the trace pages */
         for ( i = 0; i < pages; i++ )
             share_xen_page_with_privileged_guests(
-                mfn_to_page(t_info_mfn_list[offset + i]), SHARE_rw);
+                mfn_to_page(_mfn(t_info_mfn_list[offset + i])), SHARE_rw);
     }
 
     /* Finally, share the t_info page */
@@ -271,7 +271,7 @@ out_dealloc:
             uint32_t mfn = t_info_mfn_list[offset + i];
             if ( !mfn )
                 break;
-            ASSERT(!(mfn_to_page(mfn)->count_info & PGC_allocated));
+            ASSERT(!(mfn_to_page(_mfn(mfn))->count_info & PGC_allocated));
             free_xenheap_pages(mfn_to_virt(mfn), 0);
         }
     }

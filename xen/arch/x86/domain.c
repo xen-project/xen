@@ -195,7 +195,7 @@ void dump_pageframe_info(struct domain *d)
                 }
             }
             printk("    DomPage %p: caf=%08lx, taf=%" PRtype_info "\n",
-                   _p(page_to_mfn(page)),
+                   _p(mfn_x(page_to_mfn(page))),
                    page->count_info, page->u.inuse.type_info);
         }
         spin_unlock(&d->page_alloc_lock);
@@ -208,7 +208,7 @@ void dump_pageframe_info(struct domain *d)
     page_list_for_each ( page, &d->xenpage_list )
     {
         printk("    XenPage %p: caf=%08lx, taf=%" PRtype_info "\n",
-               _p(page_to_mfn(page)),
+               _p(mfn_x(page_to_mfn(page))),
                page->count_info, page->u.inuse.type_info);
     }
     spin_unlock(&d->page_alloc_lock);
@@ -637,7 +637,8 @@ int arch_domain_soft_reset(struct domain *d)
     struct page_info *page = virt_to_page(d->shared_info), *new_page;
     int ret = 0;
     struct domain *owner;
-    unsigned long mfn, gfn;
+    mfn_t mfn;
+    unsigned long gfn;
     p2m_type_t p2mt;
     unsigned int i;
 
@@ -671,7 +672,7 @@ int arch_domain_soft_reset(struct domain *d)
     ASSERT( owner == d );
 
     mfn = page_to_mfn(page);
-    gfn = mfn_to_gmfn(d, mfn);
+    gfn = mfn_to_gmfn(d, mfn_x(mfn));
 
     /*
      * gfn == INVALID_GFN indicates that the shared_info page was never mapped
@@ -680,7 +681,7 @@ int arch_domain_soft_reset(struct domain *d)
     if ( gfn == gfn_x(INVALID_GFN) )
         goto exit_put_page;
 
-    if ( mfn_x(get_gfn_query(d, gfn, &p2mt)) != mfn )
+    if ( !mfn_eq(get_gfn_query(d, gfn, &p2mt), mfn) )
     {
         printk(XENLOG_G_ERR "Failed to get Dom%d's shared_info GFN (%lx)\n",
                d->domain_id, gfn);
@@ -697,7 +698,7 @@ int arch_domain_soft_reset(struct domain *d)
         goto exit_put_gfn;
     }
 
-    ret = guest_physmap_remove_page(d, _gfn(gfn), _mfn(mfn), PAGE_ORDER_4K);
+    ret = guest_physmap_remove_page(d, _gfn(gfn), mfn, PAGE_ORDER_4K);
     if ( ret )
     {
         printk(XENLOG_G_ERR "Failed to remove Dom%d's shared_info frame %lx\n",
@@ -706,7 +707,7 @@ int arch_domain_soft_reset(struct domain *d)
         goto exit_put_gfn;
     }
 
-    ret = guest_physmap_add_page(d, _gfn(gfn), _mfn(page_to_mfn(new_page)),
+    ret = guest_physmap_add_page(d, _gfn(gfn), page_to_mfn(new_page),
                                  PAGE_ORDER_4K);
     if ( ret )
     {
@@ -1002,7 +1003,7 @@ int arch_set_info_guest(
                 {
                     if ( (page->u.inuse.type_info & PGT_type_mask) ==
                          PGT_l4_page_table )
-                        done = !fill_ro_mpt(_mfn(page_to_mfn(page)));
+                        done = !fill_ro_mpt(page_to_mfn(page));
 
                     page_unlock(page);
                 }
@@ -1131,7 +1132,7 @@ int arch_set_info_guest(
         l4_pgentry_t *l4tab;
 
         l4tab = map_domain_page(pagetable_get_mfn(v->arch.guest_table));
-        *l4tab = l4e_from_pfn(page_to_mfn(cr3_page),
+        *l4tab = l4e_from_mfn(page_to_mfn(cr3_page),
             _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
         unmap_domain_page(l4tab);
     }
@@ -2000,7 +2001,7 @@ int domain_relinquish_resources(struct domain *d)
         if ( d->arch.pirq_eoi_map != NULL )
         {
             unmap_domain_page_global(d->arch.pirq_eoi_map);
-            put_page_and_type(mfn_to_page(d->arch.pirq_eoi_map_mfn));
+            put_page_and_type(mfn_to_page(_mfn(d->arch.pirq_eoi_map_mfn)));
             d->arch.pirq_eoi_map = NULL;
             d->arch.auto_unmask = 0;
         }

@@ -173,7 +173,7 @@ nept_walk_tables(struct vcpu *v, unsigned long l2ga, ept_walk_t *gw)
             goto map_err;
         gw->lxe[lvl] = lxp[ept_lvl_table_offset(l2ga, lvl)];
         unmap_domain_page(lxp);
-        put_page(mfn_to_page(mfn_x(lxmfn)));
+        put_page(mfn_to_page(lxmfn));
 
         if ( nept_non_present_check(gw->lxe[lvl]) )
             goto non_present;

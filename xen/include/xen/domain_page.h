@@ -34,7 +34,7 @@ void unmap_domain_page(const void *va);
 /* 
  * Given a VA from map_domain_page(), return its underlying MFN.
  */
-unsigned long domain_page_map_to_mfn(const void *va);
+mfn_t domain_page_map_to_mfn(const void *va);
 
 /*
  * Similar to the above calls, except the mapping is accessible in all
@@ -44,11 +44,11 @@ unsigned long domain_page_map_to_mfn(const void *va);
 void *map_domain_page_global(mfn_t mfn);
 void unmap_domain_page_global(const void *va);
 
-#define __map_domain_page(pg)        map_domain_page(_mfn(__page_to_mfn(pg)))
+#define __map_domain_page(pg)        map_domain_page(page_to_mfn(pg))
 
 static inline void *__map_domain_page_global(const struct page_info *pg)
 {
-    return map_domain_page_global(_mfn(__page_to_mfn(pg)));
+    return map_domain_page_global(page_to_mfn(pg));
 }
 
 #else /* !CONFIG_DOMAIN_PAGE */
@@ -56,7 +56,7 @@ static inline void *__map_domain_page_global(const struct page_info *pg)
 #define map_domain_page(mfn)                __mfn_to_virt(mfn_x(mfn))
 #define __map_domain_page(pg)               page_to_virt(pg)
 #define unmap_domain_page(va)               ((void)(va))
-#define domain_page_map_to_mfn(va)          virt_to_mfn((unsigned long)(va))
+#define domain_page_map_to_mfn(va)          _mfn(virt_to_mfn((unsigned long)(va)))
 
 static inline void *map_domain_page_global(mfn_t mfn)
 {

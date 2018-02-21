@@ -1230,7 +1230,7 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     }
 
     v->vcpu_info = new_info;
-    v->vcpu_info_mfn = _mfn(page_to_mfn(page));
+    v->vcpu_info_mfn = page_to_mfn(page);
 
     /* Set new vcpu_info pointer /before/ setting pending flags. */
     smp_wmb();
@@ -1263,7 +1263,7 @@ void unmap_vcpu_info(struct vcpu *v)
 
     vcpu_info_reset(v); /* NB: Clobbers v->vcpu_info_mfn */
 
-    put_page_and_type(mfn_to_page(mfn_x(mfn)));
+    put_page_and_type(mfn_to_page(mfn));
 }
 
 int default_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)

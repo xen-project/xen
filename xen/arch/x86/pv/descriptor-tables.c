@@ -25,12 +25,6 @@
 #include <asm/p2m.h>
 #include <asm/pv/mm.h>
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef mfn_to_page
-#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
-#undef page_to_mfn
-#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
-
 /*
  * Flush the LDT, dropping any typerefs.  Returns a boolean indicating whether
  * mappings have been removed (i.e. a TLB flush is needed).

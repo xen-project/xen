@@ -25,7 +25,7 @@
 typedef uint32_t pagesize_t;  /* like size_t, must handle largest PAGE_SIZE */
 
 #define IS_PAGE_ALIGNED(addr) IS_ALIGNED((unsigned long)(addr), PAGE_SIZE)
-#define IS_VALID_PAGE(_pi)    mfn_valid(_mfn(page_to_mfn(_pi)))
+#define IS_VALID_PAGE(_pi)    mfn_valid(page_to_mfn(_pi))
 
 extern struct page_list_head tmem_page_list;
 extern spinlock_t tmem_page_list_lock;

@@ -58,7 +58,7 @@ int arch_iommu_populate_page_table(struct domain *d)
         if ( is_hvm_domain(d) ||
             (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
         {
-            unsigned long mfn = page_to_mfn(page);
+            unsigned long mfn = mfn_x(page_to_mfn(page));
             unsigned long gfn = mfn_to_gmfn(d, mfn);
 
             if ( gfn != gfn_x(INVALID_GFN) )

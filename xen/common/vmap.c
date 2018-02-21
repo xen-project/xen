@@ -9,10 +9,6 @@
 #include <xen/vmap.h>
 #include <asm/page.h>
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef page_to_mfn
-#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
-
 static DEFINE_SPINLOCK(vm_lock);
 static void *__read_mostly vm_base[VMAP_REGION_NR];
 #define vm_bitmap(x) ((unsigned long *)vm_base[x])
@@ -274,7 +270,7 @@ static void *vmalloc_type(size_t size, enum vmap_region type)
 
  error:
     while ( i-- )
-        free_domheap_page(mfn_to_page(mfn_x(mfn[i])));
+        free_domheap_page(mfn_to_page(mfn[i]));
     xfree(mfn);
     return NULL;
 }

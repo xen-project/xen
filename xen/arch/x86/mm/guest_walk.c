@@ -469,20 +469,20 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     if ( l3p )
     {
         unmap_domain_page(l3p);
-        put_page(mfn_to_page(mfn_x(gw->l3mfn)));
+        put_page(mfn_to_page(gw->l3mfn));
     }
 #endif
 #if GUEST_PAGING_LEVELS >= 3
     if ( l2p )
     {
         unmap_domain_page(l2p);
-        put_page(mfn_to_page(mfn_x(gw->l2mfn)));
+        put_page(mfn_to_page(gw->l2mfn));
     }
 #endif
     if ( l1p )
     {
         unmap_domain_page(l1p);
-        put_page(mfn_to_page(mfn_x(gw->l1mfn)));
+        put_page(mfn_to_page(gw->l1mfn));
     }
 
     return walk_ok;

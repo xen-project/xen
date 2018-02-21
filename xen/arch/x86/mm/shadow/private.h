@@ -315,7 +315,7 @@ static inline int page_is_out_of_sync(struct page_info *p)
 
 static inline int mfn_is_out_of_sync(mfn_t gmfn)
 {
-    return page_is_out_of_sync(mfn_to_page(mfn_x(gmfn)));
+    return page_is_out_of_sync(mfn_to_page(gmfn));
 }
 
 static inline int page_oos_may_write(struct page_info *p)
@@ -326,7 +326,7 @@ static inline int page_oos_may_write(struct page_info *p)
 
 static inline int mfn_oos_may_write(mfn_t gmfn)
 {
-    return page_oos_may_write(mfn_to_page(mfn_x(gmfn)));
+    return page_oos_may_write(mfn_to_page(gmfn));
 }
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
@@ -454,18 +454,6 @@ void sh_reset_l3_up_pointers(struct vcpu *v);
 /******************************************************************************
  * MFN/page-info handling
  */
-
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef mfn_to_page
-#define mfn_to_page(_m) __mfn_to_page(mfn_x(_m))
-#undef page_to_mfn
-#define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
-
-/* Override pagetable_t <-> struct page_info conversions to work with mfn_t */
-#undef pagetable_get_page
-#define pagetable_get_page(x)   mfn_to_page(pagetable_get_mfn(x))
-#undef pagetable_from_page
-#define pagetable_from_page(pg) pagetable_from_mfn(page_to_mfn(pg))
 
 #define backpointer(sp) _mfn(pdx_to_pfn((unsigned long)(sp)->v.sh.back))
 static inline unsigned long __backpointer(const struct page_info *sp)

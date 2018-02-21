@@ -330,13 +330,13 @@ void unmap_domain_page_global(const void *ptr)
 }
 
 /* Translate a map-domain-page'd address to the underlying MFN */
-unsigned long domain_page_map_to_mfn(const void *ptr)
+mfn_t domain_page_map_to_mfn(const void *ptr)
 {
     unsigned long va = (unsigned long)ptr;
     const l1_pgentry_t *pl1e;
 
     if ( va >= DIRECTMAP_VIRT_START )
-        return virt_to_mfn(ptr);
+        return _mfn(virt_to_mfn(ptr));
 
     if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
     {
@@ -349,5 +349,5 @@ unsigned long domain_page_map_to_mfn(const void *ptr)
         pl1e = &__linear_l1_table[l1_linear_offset(va)];
     }
 
-    return l1e_get_pfn(*pl1e);
+    return l1e_get_mfn(*pl1e);
 }

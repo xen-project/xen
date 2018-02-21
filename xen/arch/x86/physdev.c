@@ -239,7 +239,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
 
         if ( cmpxchg(&currd->arch.pirq_eoi_map_mfn,
-                     0, page_to_mfn(page)) != 0 )
+                     0, mfn_x(page_to_mfn(page))) != 0 )
         {
             put_page_and_type(page);
             ret = -EBUSY;

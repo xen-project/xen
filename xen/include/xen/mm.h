@@ -277,13 +277,8 @@ struct page_list_head
 # define PAGE_LIST_NULL ((typeof(((struct page_info){}).list.next))~0)
 
 # if !defined(pdx_to_page) && !defined(page_to_pdx)
-#  if defined(__page_to_mfn) || defined(__mfn_to_page)
-#   define page_to_pdx __page_to_mfn
-#   define pdx_to_page __mfn_to_page
-#  else
 #   define page_to_pdx page_to_mfn
 #   define pdx_to_page mfn_to_page
-#  endif
 # endif
 
 # define PAGE_LIST_HEAD_INIT(name) { NULL, NULL }

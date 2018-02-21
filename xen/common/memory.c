@@ -33,12 +33,6 @@
 #include <asm/guest.h>
 #endif
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef page_to_mfn
-#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
-#undef mfn_to_page
-#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
-
 struct memop_args {
     /* INPUT */
     struct domain *domain;     /* Domain to be affected. */

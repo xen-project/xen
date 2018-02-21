@@ -83,7 +83,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
         *pfec &= ~PFEC_page_present;
         goto out_tweak_pfec;
     }
-    top_mfn = _mfn(page_to_mfn(top_page));
+    top_mfn = page_to_mfn(top_page);
 
     /* Map the top-level table and call the tree-walker */
     ASSERT(mfn_valid(top_mfn));

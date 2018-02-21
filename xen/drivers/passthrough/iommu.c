@@ -184,7 +184,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
 
         page_list_for_each ( page, &d->page_list )
         {
-            unsigned long mfn = page_to_mfn(page);
+            unsigned long mfn = mfn_x(page_to_mfn(page));
             unsigned long gfn = mfn_to_gmfn(d, mfn);
             unsigned int mapping = IOMMUF_readable;
             int ret;

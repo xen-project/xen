@@ -451,7 +451,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
     BUG_ON( table == NULL || level < IOMMU_PAGING_MODE_LEVEL_1 || 
             level > IOMMU_PAGING_MODE_LEVEL_6 );
 
-    next_table_mfn = page_to_mfn(table);
+    next_table_mfn = mfn_x(page_to_mfn(table));
 
     if ( level == IOMMU_PAGING_MODE_LEVEL_1 )
     {
@@ -493,7 +493,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
                 return 1;
             }
 
-            next_table_mfn = page_to_mfn(table);
+            next_table_mfn = mfn_x(page_to_mfn(table));
             set_iommu_pde_present((u32*)pde, next_table_mfn, next_level, 
                                   !!IOMMUF_writable, !!IOMMUF_readable);
 
@@ -520,7 +520,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
                     unmap_domain_page(next_table_vaddr);
                     return 1;
                 }
-                next_table_mfn = page_to_mfn(table);
+                next_table_mfn = mfn_x(page_to_mfn(table));
                 set_iommu_pde_present((u32*)pde, next_table_mfn, next_level,
                                       !!IOMMUF_writable, !!IOMMUF_readable);
             }
@@ -577,7 +577,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
         }
 
         new_root_vaddr = __map_domain_page(new_root);
-        old_root_mfn = page_to_mfn(old_root);
+        old_root_mfn = mfn_x(page_to_mfn(old_root));
         set_iommu_pde_present(new_root_vaddr, old_root_mfn, level,
                               !!IOMMUF_writable, !!IOMMUF_readable);
         level++;
@@ -712,7 +712,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
         }
 
         /* Deallocate lower level page table */
-        free_amd_iommu_pgtable(mfn_to_page(pt_mfn[merge_level - 1]));
+        free_amd_iommu_pgtable(mfn_to_page(_mfn(pt_mfn[merge_level - 1])));
     }
 
 out:
@@ -802,7 +802,7 @@ void amd_iommu_share_p2m(struct domain *d)
     mfn_t pgd_mfn;
 
     pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
-    p2m_table = mfn_to_page(mfn_x(pgd_mfn));
+    p2m_table = mfn_to_page(pgd_mfn);
 
     if ( hd->arch.root_table != p2m_table )
     {

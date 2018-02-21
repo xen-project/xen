@@ -88,10 +88,10 @@
     ((paddr_t)(((x).l4 & (PADDR_MASK&PAGE_MASK))))
 
 /* Get pointer to info structure of page mapped by pte (struct page_info *). */
-#define l1e_get_page(x)           (__mfn_to_page(l1e_get_pfn(x)))
-#define l2e_get_page(x)           (__mfn_to_page(l2e_get_pfn(x)))
-#define l3e_get_page(x)           (__mfn_to_page(l3e_get_pfn(x)))
-#define l4e_get_page(x)           (__mfn_to_page(l4e_get_pfn(x)))
+#define l1e_get_page(x)           mfn_to_page(l1e_get_mfn(x))
+#define l2e_get_page(x)           mfn_to_page(l2e_get_mfn(x))
+#define l3e_get_page(x)           mfn_to_page(l3e_get_mfn(x))
+#define l4e_get_page(x)           mfn_to_page(l4e_get_mfn(x))
 
 /* Get pte access flags (unsigned int). */
 #define l1e_get_flags(x)           (get_pte_flags((x).l1))
@@ -157,10 +157,10 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #define l4e_from_intpte(intpte)    ((l4_pgentry_t) { (intpte_t)(intpte) })
 
 /* Construct a pte from a page pointer and access flags. */
-#define l1e_from_page(page, flags) l1e_from_pfn(__page_to_mfn(page), (flags))
-#define l2e_from_page(page, flags) l2e_from_pfn(__page_to_mfn(page), (flags))
-#define l3e_from_page(page, flags) l3e_from_pfn(__page_to_mfn(page), (flags))
-#define l4e_from_page(page, flags) l4e_from_pfn(__page_to_mfn(page), (flags))
+#define l1e_from_page(page, flags) l1e_from_mfn(page_to_mfn(page), flags)
+#define l2e_from_page(page, flags) l2e_from_mfn(page_to_mfn(page), flags)
+#define l3e_from_page(page, flags) l3e_from_mfn(page_to_mfn(page), flags)
+#define l4e_from_page(page, flags) l4e_from_mfn(page_to_mfn(page), flags)
 
 /* Add extra flags to an existing pte. */
 #define l1e_add_flags(x, flags)    ((x).l1 |= put_pte_flags(flags))
@@ -215,13 +215,13 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 /* Page-table type. */
 typedef struct { u64 pfn; } pagetable_t;
 #define pagetable_get_paddr(x)  ((paddr_t)(x).pfn << PAGE_SHIFT)
-#define pagetable_get_page(x)   __mfn_to_page((x).pfn)
+#define pagetable_get_page(x)   mfn_to_page(pagetable_get_mfn(x))
 #define pagetable_get_pfn(x)    ((x).pfn)
 #define pagetable_get_mfn(x)    _mfn(((x).pfn))
 #define pagetable_is_null(x)    ((x).pfn == 0)
 #define pagetable_from_pfn(pfn) ((pagetable_t) { (pfn) })
 #define pagetable_from_mfn(mfn) ((pagetable_t) { mfn_x(mfn) })
-#define pagetable_from_page(pg) pagetable_from_pfn(__page_to_mfn(pg))
+#define pagetable_from_page(pg) pagetable_from_mfn(page_to_mfn(pg))
 #define pagetable_from_paddr(p) pagetable_from_pfn((p)>>PAGE_SHIFT)
 #define pagetable_null()        pagetable_from_pfn(0)
 
@@ -240,12 +240,12 @@ void copy_page_sse2(void *, const void *);
 #define __mfn_to_virt(mfn)  (maddr_to_virt((paddr_t)(mfn) << PAGE_SHIFT))
 
 /* Convert between machine frame numbers and page-info structures. */
-#define __mfn_to_page(mfn)  (frame_table + pfn_to_pdx(mfn))
-#define __page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table))
+#define mfn_to_page(mfn)    (frame_table + mfn_to_pdx(mfn))
+#define page_to_mfn(pg)     pdx_to_mfn((unsigned long)((pg) - frame_table))
 
 /* Convert between machine addresses and page-info structures. */
-#define __maddr_to_page(ma) __mfn_to_page((ma) >> PAGE_SHIFT)
-#define __page_to_maddr(pg) ((paddr_t)__page_to_mfn(pg) << PAGE_SHIFT)
+#define __maddr_to_page(ma) mfn_to_page(maddr_to_mfn(ma))
+#define __page_to_maddr(pg) mfn_to_maddr(page_to_mfn(pg))
 
 /* Convert between frame number and address formats.  */
 #define __pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
@@ -264,8 +264,6 @@ void copy_page_sse2(void *, const void *);
 #define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
 #define virt_to_maddr(va)   __virt_to_maddr((unsigned long)(va))
 #define maddr_to_virt(ma)   __maddr_to_virt((unsigned long)(ma))
-#define mfn_to_page(mfn)    __mfn_to_page(mfn)
-#define page_to_mfn(pg)     __page_to_mfn(pg)
 #define maddr_to_page(ma)   __maddr_to_page(ma)
 #define page_to_maddr(pg)   __page_to_maddr(pg)
 #define virt_to_page(va)    __virt_to_page(va)
@@ -273,7 +271,7 @@ void copy_page_sse2(void *, const void *);
 #define pfn_to_paddr(pfn)   __pfn_to_paddr(pfn)
 #define paddr_to_pfn(pa)    __paddr_to_pfn(pa)
 #define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
-#define vmap_to_mfn(va)     l1e_get_pfn(*virt_to_xen_l1e((unsigned long)(va)))
+#define vmap_to_mfn(va)     _mfn(l1e_get_pfn(*virt_to_xen_l1e((unsigned long)(va))))
 #define vmap_to_page(va)    mfn_to_page(vmap_to_mfn(va))
 
 #endif /* !defined(__ASSEMBLY__) */

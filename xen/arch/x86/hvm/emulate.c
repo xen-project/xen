@@ -591,7 +591,7 @@ static void *hvmemul_map_linear_addr(
             goto unhandleable;
         }
 
-        *mfn++ = _mfn(page_to_mfn(page));
+        *mfn++ = page_to_mfn(page);
 
         if ( p2m_is_discard_write(p2mt) )
         {
@@ -623,7 +623,7 @@ static void *hvmemul_map_linear_addr(
  out:
     /* Drop all held references. */
     while ( mfn-- > hvmemul_ctxt->mfn )
-        put_page(mfn_to_page(mfn_x(*mfn)));
+        put_page(mfn_to_page(*mfn));
 
     return err;
 }
@@ -649,7 +649,7 @@ static void hvmemul_unmap_linear_addr(
     {
         ASSERT(mfn_valid(*mfn));
         paging_mark_dirty(currd, *mfn);
-        put_page(mfn_to_page(mfn_x(*mfn)));
+        put_page(mfn_to_page(*mfn));
 
         *mfn++ = _mfn(0); /* Clean slot for map()'s error checking. */
     }

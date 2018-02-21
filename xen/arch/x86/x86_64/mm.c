@@ -40,12 +40,6 @@ asm(".file \"" __FILE__ "\"");
 #include <asm/mem_sharing.h>
 #include <public/memory.h>
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef page_to_mfn
-#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
-#undef mfn_to_page
-#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
-
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
 l2_pgentry_t *compat_idle_pg_table_l2;

@@ -2928,7 +2928,7 @@ gp_fault:
 static int vmx_alloc_vlapic_mapping(struct domain *d)
 {
     struct page_info *pg;
-    unsigned long mfn;
+    mfn_t mfn;
 
     if ( !cpu_has_vmx_virtualize_apic_accesses )
         return 0;
@@ -2937,10 +2937,10 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     if ( !pg )
         return -ENOMEM;
     mfn = page_to_mfn(pg);
-    clear_domain_page(_mfn(mfn));
+    clear_domain_page(mfn);
     share_xen_page_with_guest(pg, d, SHARE_rw);
-    d->arch.hvm_domain.vmx.apic_access_mfn = mfn;
-    set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), _mfn(mfn),
+    d->arch.hvm_domain.vmx.apic_access_mfn = mfn_x(mfn);
+    set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), mfn,
                        PAGE_ORDER_4K, p2m_get_hostp2m(d)->default_access);
 
     return 0;
@@ -2951,7 +2951,7 @@ static void vmx_free_vlapic_mapping(struct domain *d)
     unsigned long mfn = d->arch.hvm_domain.vmx.apic_access_mfn;
 
     if ( mfn != 0 )
-        free_shared_domheap_page(mfn_to_page(mfn));
+        free_shared_domheap_page(mfn_to_page(_mfn(mfn)));
 }
 
 static void vmx_install_vlapic_mapping(struct vcpu *v)

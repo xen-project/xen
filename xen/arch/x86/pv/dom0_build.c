@@ -64,7 +64,7 @@ static __init void mark_pv_pt_pages_rdonly(struct domain *d,
     for ( count = 0; count < nr_pt_pages; count++ )
     {
         l1e_remove_flags(*pl1e, _PAGE_RW);
-        page = mfn_to_page(l1e_get_pfn(*pl1e));
+        page = mfn_to_page(l1e_get_mfn(*pl1e));
 
         /* Read-only mapping + PGC_allocated + page-table page. */
         page->count_info         = PGC_allocated | 3;
@@ -496,7 +496,7 @@ int __init dom0_construct_pv(struct domain *d,
     page = alloc_domheap_pages(d, order, 0);
     if ( page == NULL )
         panic("Not enough RAM for domain 0 allocation");
-    alloc_spfn = page_to_mfn(page);
+    alloc_spfn = mfn_x(page_to_mfn(page));
     alloc_epfn = alloc_spfn + d->tot_pages;
 
     if ( initrd_len )
@@ -524,12 +524,12 @@ int __init dom0_construct_pv(struct domain *d,
             mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
             init_domheap_pages(mpt_alloc,
                                mpt_alloc + PAGE_ALIGN(initrd_len));
-            initrd->mod_start = initrd_mfn = page_to_mfn(page);
+            initrd->mod_start = initrd_mfn = mfn_x(page_to_mfn(page));
         }
         else
         {
             while ( count-- )
-                if ( assign_pages(d, mfn_to_page(mfn++), 0, 0) )
+                if ( assign_pages(d, mfn_to_page(_mfn(mfn++)), 0, 0) )
                     BUG();
         }
         initrd->mod_end = 0;
@@ -661,7 +661,7 @@ int __init dom0_construct_pv(struct domain *d,
                                     L1_PROT : COMPAT_L1_PROT));
         l1tab++;
 
-        page = mfn_to_page(mfn);
+        page = mfn_to_page(_mfn(mfn));
         if ( !page->u.inuse.type_info &&
              !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
@@ -801,7 +801,7 @@ int __init dom0_construct_pv(struct domain *d,
     si->nr_p2m_frames = d->tot_pages - count;
     page_list_for_each ( page, &d->page_list )
     {
-        mfn = page_to_mfn(page);
+        mfn = mfn_x(page_to_mfn(page));
         BUG_ON(SHARED_M2P(get_gpfn_from_mfn(mfn)));
         if ( get_gpfn_from_mfn(mfn) >= count )
         {
@@ -826,7 +826,7 @@ int __init dom0_construct_pv(struct domain *d,
             panic("Not enough RAM for DOM0 reservation");
         while ( pfn < d->tot_pages )
         {
-            mfn = page_to_mfn(page);
+            mfn = mfn_x(page_to_mfn(page));
 #ifndef NDEBUG
 #define pfn (nr_pages - 1 - (pfn - (alloc_epfn - alloc_spfn)))
 #endif

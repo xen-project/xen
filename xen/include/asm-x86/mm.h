@@ -271,7 +271,7 @@ struct page_info
 
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
-    (__mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
+    (__mfn_valid(mfn) && is_xen_heap_page(mfn_to_page(_mfn(mfn))))
 #define is_xen_fixed_mfn(mfn)                     \
     ((((mfn) << PAGE_SHIFT) >= __pa(&_stext)) &&  \
      (((mfn) << PAGE_SHIFT) <= __pa(&__2M_rwdata_end)))
@@ -376,7 +376,7 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner);
 
 static inline struct page_info *get_page_from_mfn(mfn_t mfn, struct domain *d)
 {
-    struct page_info *page = __mfn_to_page(mfn_x(mfn));
+    struct page_info *page = mfn_to_page(mfn);
 
     if ( unlikely(!mfn_valid(mfn)) || unlikely(!get_page(page, d)) )
     {
@@ -471,7 +471,7 @@ extern paddr_t mem_hotplug;
 
 #define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
 #define _set_gpfn_from_mfn(mfn, pfn) ({                        \
-    struct domain *d = page_get_owner(__mfn_to_page(mfn));     \
+    struct domain *d = page_get_owner(mfn_to_page(_mfn(mfn))); \
     unsigned long entry = (d && (d == dom_cow)) ?              \
         SHARED_M2P_ENTRY : (pfn);                              \
     ((void)((mfn) >= (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) / 4 || \

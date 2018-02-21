@@ -1434,7 +1434,7 @@ int vmx_vcpu_enable_pml(struct vcpu *v)
 
     vmx_vmcs_enter(v);
 
-    __vmwrite(PML_ADDRESS, page_to_mfn(v->arch.hvm_vmx.pml_pg) << PAGE_SHIFT);
+    __vmwrite(PML_ADDRESS, page_to_maddr(v->arch.hvm_vmx.pml_pg));
     __vmwrite(GUEST_PML_INDEX, NR_PML_ENTRIES - 1);
 
     v->arch.hvm_vmx.secondary_exec_control |= SECONDARY_EXEC_ENABLE_PML;

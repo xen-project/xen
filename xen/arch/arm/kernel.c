@@ -286,7 +286,7 @@ static __init int kernel_decompress(struct bootmodule *mod)
         iounmap(input);
         return -ENOMEM;
     }
-    mfn = _mfn(page_to_mfn(pages));
+    mfn = page_to_mfn(pages);
     output = __vmap(&mfn, 1 << kernel_order_out, 1, 1, PAGE_HYPERVISOR, VMAP_DEFAULT);
 
     rc = perform_gunzip(output, input, size);

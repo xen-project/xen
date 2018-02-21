@@ -37,12 +37,6 @@ static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
 
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
-/* Override macros from asm/mm.h to make them work with mfn_t */
-#undef mfn_to_page
-#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
-#undef page_to_mfn
-#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
-
 unsigned int __read_mostly p2m_ipa_bits;
 
 /* Helpers to lookup the properties of each level */
@@ -90,8 +84,8 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
 
     printk("dom%d IPA 0x%"PRIpaddr"\n", d->domain_id, addr);
 
-    printk("P2M @ %p mfn:0x%lx\n",
-           p2m->root, __page_to_mfn(p2m->root));
+    printk("P2M @ %p mfn:%#"PRI_mfn"\n",
+           p2m->root, mfn_x(page_to_mfn(p2m->root)));
 
     dump_pt_walk(page_to_maddr(p2m->root), addr,
                  P2M_ROOT_LEVEL, P2M_ROOT_PAGES);

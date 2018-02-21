@@ -37,8 +37,6 @@
 
 #include <compat/grant_table.h>
 
-#undef mfn_to_page
-#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
@@ -846,7 +844,7 @@ static unsigned long batch_memory_op(unsigned int cmd, unsigned int order,
     set_xen_guest_handle(xmr.extent_start, pfns);
     page_list_for_each ( pg, list )
     {
-        pfns[xmr.nr_extents++] = page_to_mfn(pg);
+        pfns[xmr.nr_extents++] = mfn_x(page_to_mfn(pg));
         if ( xmr.nr_extents == ARRAY_SIZE(pfns) || !page_list_next(pg, list) )
         {
             long nr = xen_hypercall_memory_op(cmd, &xmr);

@@ -84,7 +84,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         }
         v->arch.hvm_vmx.vmread_bitmap = vmread_bitmap;
 
-        clear_domain_page(_mfn(page_to_mfn(vmread_bitmap)));
+        clear_domain_page(page_to_mfn(vmread_bitmap));
 
         vmwrite_bitmap = alloc_domheap_page(NULL, 0);
         if ( !vmwrite_bitmap )
@@ -1733,7 +1733,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
                 nvcpu->nv_vvmcx = vvmcx;
                 nvcpu->nv_vvmcxaddr = gpa;
                 v->arch.hvm_vmx.vmcs_shadow_maddr =
-                    pfn_to_paddr(domain_page_map_to_mfn(vvmcx));
+                    mfn_to_maddr(domain_page_map_to_mfn(vvmcx));
             }
             else
             {
@@ -1819,7 +1819,7 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         {
             if ( writable )
                 clear_vvmcs_launched(&nvmx->launched_list,
-                                     domain_page_map_to_mfn(vvmcs));
+                                     mfn_x(domain_page_map_to_mfn(vvmcs)));
             else
                 rc = VMFAIL_VALID;
             hvm_unmap_guest_frame(vvmcs, 0);

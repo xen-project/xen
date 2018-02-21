@@ -274,7 +274,7 @@ static inline struct page_info *get_page_from_gfn(
 {
     struct page_info *page;
     p2m_type_t p2mt;
-    unsigned long mfn = mfn_x(p2m_lookup(d, _gfn(gfn), &p2mt));
+    mfn_t mfn = p2m_lookup(d, _gfn(gfn), &p2mt);
 
     if (t)
         *t = p2mt;
@@ -282,7 +282,7 @@ static inline struct page_info *get_page_from_gfn(
     if ( !p2m_is_any_ram(p2mt) )
         return NULL;
 
-    if ( !mfn_valid(_mfn(mfn)) )
+    if ( !mfn_valid(mfn) )
         return NULL;
     page = mfn_to_page(mfn);
 

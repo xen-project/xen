@@ -212,7 +212,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
     if ( t != p2m_ram_rw )
         goto err;
 
-    page = mfn_to_page(mfn_x(mfn));
+    page = mfn_to_page(mfn);
 
     if ( unlikely(!get_page(page, v->domain)) )
         page = NULL;

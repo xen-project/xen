@@ -138,7 +138,7 @@ extern vaddr_t xenheap_virt_start;
 #endif
 
 #ifdef CONFIG_ARM_32
-#define is_xen_heap_page(page) is_xen_heap_mfn(__page_to_mfn(page))
+#define is_xen_heap_page(page) is_xen_heap_mfn(mfn_x(page_to_mfn(page)))
 #define is_xen_heap_mfn(mfn) ({                                 \
     unsigned long mfn_ = (mfn);                                 \
     (mfn_ >= mfn_x(xenheap_mfn_start) &&                        \
@@ -147,7 +147,7 @@ extern vaddr_t xenheap_virt_start;
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
-    (mfn_valid(_mfn(mfn)) && is_xen_heap_page(__mfn_to_page(mfn)))
+    (mfn_valid(_mfn(mfn)) && is_xen_heap_page(mfn_to_page(_mfn(mfn))))
 #endif
 
 #define is_xen_fixed_mfn(mfn)                                   \
@@ -213,12 +213,14 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 })
 
 /* Convert between machine frame numbers and page-info structures. */
-#define __mfn_to_page(mfn)  (frame_table + (pfn_to_pdx(mfn) - frametable_base_pdx))
-#define __page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table) + frametable_base_pdx)
+#define mfn_to_page(mfn)                                            \
+    (frame_table + (mfn_to_pdx(mfn) - frametable_base_pdx))
+#define page_to_mfn(pg)                                             \
+    pdx_to_mfn((unsigned long)((pg) - frame_table) + frametable_base_pdx)
 
 /* Convert between machine addresses and page-info structures. */
-#define maddr_to_page(ma) __mfn_to_page((ma) >> PAGE_SHIFT)
-#define page_to_maddr(pg) ((paddr_t)__page_to_mfn(pg) << PAGE_SHIFT)
+#define maddr_to_page(ma) mfn_to_page(maddr_to_mfn(ma))
+#define page_to_maddr(pg) (mfn_to_maddr(page_to_mfn(pg)))
 
 /* Convert between frame number and address formats.  */
 #define pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
@@ -228,7 +230,7 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 #define gaddr_to_gfn(ga)    _gfn(paddr_to_pfn(ga))
 #define mfn_to_maddr(mfn)   pfn_to_paddr(mfn_x(mfn))
 #define maddr_to_mfn(ma)    _mfn(paddr_to_pfn(ma))
-#define vmap_to_mfn(va)     paddr_to_pfn(virt_to_maddr((vaddr_t)va))
+#define vmap_to_mfn(va)     maddr_to_mfn(virt_to_maddr((vaddr_t)va))
 #define vmap_to_page(va)    mfn_to_page(vmap_to_mfn(va))
 
 /* Page-align address and convert to frame number format */
@@ -286,8 +288,6 @@ static inline uint64_t gvirt_to_maddr(vaddr_t va, paddr_t *pa,
  * These are overriden in various source files while underscored version
  * remain intact.
  */
-#define mfn_to_page(mfn)    __mfn_to_page(mfn)
-#define page_to_mfn(pg)     __page_to_mfn(pg)
 #define virt_to_mfn(va)     __virt_to_mfn(va)
 #define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
 
@@ -307,7 +307,7 @@ static inline struct page_info *virt_to_page(const void *v)
 
 static inline void *page_to_virt(const struct page_info *pg)
 {
-    return mfn_to_virt(page_to_mfn(pg));
+    return mfn_to_virt(mfn_x(page_to_mfn(pg)));
 }
 
 struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,

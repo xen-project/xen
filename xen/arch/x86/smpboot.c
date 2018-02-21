@@ -48,12 +48,6 @@
 #include <mach_wakecpu.h>
 #include <smpboot_hooks.h>
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef mfn_to_page
-#define mfn_to_page(mfn) __mfn_to_page(mfn_x(mfn))
-#undef page_to_mfn
-#define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
-
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
 unsigned long __read_mostly trampoline_phys;

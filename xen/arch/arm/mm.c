@@ -477,7 +477,7 @@ void unmap_domain_page(const void *va)
     local_irq_restore(flags);
 }
 
-unsigned long domain_page_map_to_mfn(const void *ptr)
+mfn_t domain_page_map_to_mfn(const void *ptr)
 {
     unsigned long va = (unsigned long)ptr;
     lpae_t *map = this_cpu(xen_dommap);
@@ -485,12 +485,12 @@ unsigned long domain_page_map_to_mfn(const void *ptr)
     unsigned long offset = (va>>THIRD_SHIFT) & LPAE_ENTRY_MASK;
 
     if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
-        return __virt_to_mfn(va);
+        return virt_to_mfn(va);
 
     ASSERT(slot >= 0 && slot < DOMHEAP_ENTRIES);
     ASSERT(map[slot].pt.avail != 0);
 
-    return map[slot].pt.base + offset;
+    return _mfn(map[slot].pt.base + offset);
 }
 #endif
 
@@ -1282,7 +1282,7 @@ int xenmem_add_to_physmap_one(
             return -EINVAL;
         }
 
-        mfn = _mfn(page_to_mfn(page));
+        mfn = page_to_mfn(page);
         t = p2m_map_foreign;
 
         rcu_unlock_domain(od);

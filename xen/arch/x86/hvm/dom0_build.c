@@ -120,7 +120,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
             continue;
         }
 
-        rc = guest_physmap_add_page(d, _gfn(start), _mfn(page_to_mfn(page)),
+        rc = guest_physmap_add_page(d, _gfn(start), page_to_mfn(page),
                                     order);
         if ( rc != 0 )
         {
@@ -270,7 +270,7 @@ static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
     }
     write_32bit_pse_identmap(ident_pt);
     unmap_domain_page(ident_pt);
-    put_page(mfn_to_page(mfn_x(mfn)));
+    put_page(mfn_to_page(mfn));
     d->arch.hvm_domain.params[HVM_PARAM_IDENT_PT] = gaddr;
     if ( pvh_add_mem_range(d, gaddr, gaddr + PAGE_SIZE, E820_RESERVED) )
             printk("Unable to set identity page tables as reserved in the memory map\n");
@@ -288,7 +288,7 @@ static void __init pvh_steal_low_ram(struct domain *d, unsigned long start,
 
     for ( mfn = start; mfn < start + nr_pages; mfn++ )
     {
-        struct page_info *pg = mfn_to_page(mfn);
+        struct page_info *pg = mfn_to_page(_mfn(mfn));
         int rc;
 
         rc = unshare_xen_page_with_guest(pg, dom_io);

@@ -193,7 +193,7 @@ static int modified_memory(struct domain *d,
                  * These are most probably not page tables any more
                  * don't take a long time and don't die either.
                  */
-                sh_remove_shadows(d, _mfn(page_to_mfn(page)), 1, 0);
+                sh_remove_shadows(d, page_to_mfn(page), 1, 0);
                 put_page(page);
             }
         }

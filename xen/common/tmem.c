@@ -243,7 +243,7 @@ static void tmem_persistent_pool_page_put(void *page_va)
     struct page_info *pi;
 
     ASSERT(IS_PAGE_ALIGNED(page_va));
-    pi = mfn_to_page(virt_to_mfn(page_va));
+    pi = mfn_to_page(_mfn(virt_to_mfn(page_va)));
     ASSERT(IS_VALID_PAGE(pi));
     __tmem_free_page_thispool(pi);
 }
