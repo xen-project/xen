@@ -10,6 +10,30 @@
 # include <asm/arm64/traps.h>
 #endif
 
+/*
+ * GUEST_BUG_ON is intended for checking that the guest state has not been
+ * corrupted in hardware and/or that the hardware behaves as we
+ * believe it should (i.e. that certain traps can only occur when the
+ * guest is in a particular mode).
+ *
+ * The intention is to limit the damage such h/w bugs (or spec
+ * misunderstandings) can do by turning them into Denial of Service
+ * attacks instead of e.g. information leaks or privilege escalations.
+ *
+ * GUEST_BUG_ON *MUST* *NOT* be used to check for guest controllable state!
+ *
+ * Compared with regular BUG_ON it dumps the guest vcpu state instead
+ * of Xen's state.
+ */
+#define guest_bug_on_failed(p)                          \
+do {                                                    \
+    show_execution_state(guest_cpu_user_regs());        \
+    panic("Guest Bug: %pv: '%s', line %d, file %s\n",   \
+          current, p, __LINE__, __FILE__);              \
+} while (0)
+#define GUEST_BUG_ON(p) \
+    do { if ( unlikely(p) ) guest_bug_on_failed(#p); } while (0)
+
 int check_conditional_instr(struct cpu_user_regs *regs, const union hsr hsr);
 
 void advance_pc(struct cpu_user_regs *regs, const union hsr hsr);
