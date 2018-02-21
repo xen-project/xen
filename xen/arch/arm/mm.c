@@ -1431,7 +1431,7 @@ int create_grant_host_mapping(unsigned long addr, unsigned long frame,
     if ( flags & GNTMAP_readonly )
         t = p2m_grant_map_ro;
 
-    rc = guest_physmap_add_entry(current->domain, _gfn(addr >> PAGE_SHIFT),
+    rc = guest_physmap_add_entry(current->domain, gaddr_to_gfn(addr),
                                  _mfn(frame), 0, t);
 
     if ( rc )
@@ -1443,7 +1443,7 @@ int create_grant_host_mapping(unsigned long addr, unsigned long frame,
 int replace_grant_host_mapping(unsigned long addr, unsigned long mfn,
         unsigned long new_addr, unsigned int flags)
 {
-    gfn_t gfn = _gfn(addr >> PAGE_SHIFT);
+    gfn_t gfn = gaddr_to_gfn(addr);
     struct domain *d = current->domain;
     int rc;
 
