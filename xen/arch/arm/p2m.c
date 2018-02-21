@@ -212,17 +212,26 @@ static p2m_access_t p2m_mem_access_radix_get(struct p2m_domain *p2m, gfn_t gfn)
 }
 
 /*
+ * In the case of the P2M, the valid bit is used for other purpose. Use
+ * the type to check whether an entry is valid.
+ */
+static inline bool p2m_is_valid(lpae_t pte)
+{
+    return pte.p2m.type != p2m_invalid;
+}
+
+/*
  * lpae_is_* helpers don't check whether the valid bit is set in the
  * PTE. Provide our own overlay to check the valid bit.
  */
 static inline bool p2m_is_mapping(lpae_t pte, unsigned int level)
 {
-    return lpae_is_valid(pte) && lpae_is_mapping(pte, level);
+    return p2m_is_valid(pte) && lpae_is_mapping(pte, level);
 }
 
 static inline bool p2m_is_superpage(lpae_t pte, unsigned int level)
 {
-    return lpae_is_valid(pte) && lpae_is_superpage(pte, level);
+    return p2m_is_valid(pte) && lpae_is_superpage(pte, level);
 }
 
 #define GUEST_TABLE_MAP_FAILED 0
@@ -256,7 +265,7 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
 
     entry = *table + offset;
 
-    if ( !lpae_is_valid(*entry) )
+    if ( !p2m_is_valid(*entry) )
     {
         if ( read_only )
             return GUEST_TABLE_MAP_FAILED;
@@ -348,7 +357,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
 
     entry = table[offsets[level]];
 
-    if ( lpae_is_valid(entry) )
+    if ( p2m_is_valid(entry) )
     {
         *t = entry.p2m.type;
 
@@ -536,8 +545,11 @@ static lpae_t page_to_p2m_table(struct page_info *page)
     /*
      * The access value does not matter because the hardware will ignore
      * the permission fields for table entry.
+     *
+     * We use p2m_ram_rw so the entry has a valid type. This is important
+     * for p2m_is_valid() to return valid on table entries.
      */
-    return mfn_to_p2m_entry(page_to_mfn(page), p2m_invalid, p2m_access_rwx);
+    return mfn_to_p2m_entry(page_to_mfn(page), p2m_ram_rw, p2m_access_rwx);
 }
 
 static inline void p2m_write_pte(lpae_t *p, lpae_t pte, bool clean_pte)
@@ -561,7 +573,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
     struct page_info *page;
     lpae_t *p;
 
-    ASSERT(!lpae_is_valid(*entry));
+    ASSERT(!p2m_is_valid(*entry));
 
     page = alloc_domheap_page(NULL, 0);
     if ( page == NULL )
@@ -618,7 +630,7 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, gfn_t gfn,
  */
 static void p2m_put_l3_page(const lpae_t pte)
 {
-    ASSERT(lpae_is_valid(pte));
+    ASSERT(p2m_is_valid(pte));
 
     /*
      * TODO: Handle other p2m types
@@ -646,7 +658,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     struct page_info *pg;
 
     /* Nothing to do if the entry is invalid. */
-    if ( !lpae_is_valid(entry) )
+    if ( !p2m_is_valid(entry) )
         return;
 
     /* Nothing to do but updating the stats if the entry is a super-page. */
@@ -943,7 +955,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
             else
                 p2m->need_flush = true;
         }
-        else /* new mapping */
+        else if ( !p2m_is_valid(orig_pte) ) /* new mapping */
             p2m->stats.mappings[level]++;
 
         p2m_write_pte(entry, pte, p2m->clean_pte);
@@ -957,7 +969,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
      * Free the entry only if the original pte was valid and the base
      * is different (to avoid freeing when permission is changed).
      */
-    if ( lpae_is_valid(orig_pte) &&
+    if ( p2m_is_valid(orig_pte) &&
          !mfn_eq(lpae_get_mfn(*entry), lpae_get_mfn(orig_pte)) )
         p2m_free_entry(p2m, orig_pte, level);
 
