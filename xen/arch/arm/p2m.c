@@ -1514,10 +1514,9 @@ int relinquish_p2m_mapping(struct domain *d)
     return rc;
 }
 
-int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
+int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    gfn_t end = gfn_add(start, nr);
     gfn_t next_gfn;
     p2m_type_t t;
     unsigned int order;

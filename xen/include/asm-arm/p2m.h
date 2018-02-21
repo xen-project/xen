@@ -228,8 +228,11 @@ int p2m_set_entry(struct p2m_domain *p2m,
 
 bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn);
 
-/* Clean & invalidate caches corresponding to a region of guest address space */
-int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr);
+/*
+ * Clean & invalidate caches corresponding to a region [start,end) of guest
+ * address space.
+ */
+int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end);
 
 /*
  * Map a region in the guest p2m with a specific p2m type.

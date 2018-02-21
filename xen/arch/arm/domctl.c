@@ -61,7 +61,7 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
         if ( e < s )
             return -EINVAL;
 
-        return p2m_cache_flush(d, _gfn(s), domctl->u.cacheflush.nr_pfns);
+        return p2m_cache_flush_range(d, _gfn(s), _gfn(e));
     }
     case XEN_DOMCTL_bind_pt_irq:
     {
