@@ -7,6 +7,7 @@ endif
 # Convenient variables
 comma   := ,
 squote  := '
+#' Balancing squote, to help syntax highlighting
 empty   :=
 space   := $(empty) $(empty)
 
