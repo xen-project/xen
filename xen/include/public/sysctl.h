@@ -684,7 +684,7 @@ struct xen_sysctl_psr_cmt_op {
 #define XEN_INVALID_DEV (XEN_INVALID_NODE_ID - 1)
 struct xen_sysctl_pcitopoinfo {
     /*
-     * IN: Number of elements in 'pcitopo' and 'nodes' arrays.
+     * IN: Number of elements in 'devs' and 'nodes' arrays.
      * OUT: Number of processed elements of those arrays.
      */
     uint32_t num_devs;
