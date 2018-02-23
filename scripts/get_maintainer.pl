@@ -444,10 +444,12 @@ foreach my $file (@ARGV) {
 	    my $patch_line = $_;
 	    if (m/^\+\+\+\s+(\S+)/ or m/^---\s+(\S+)/) {
 		my $filename = $1;
-		$filename =~ s@^[^/]*/@@;
-		$filename =~ s@\n@@;
-		$lastfile = $filename;
-		push(@files, $filename);
+		if ($1 ne "/dev/null") { #Ignore the no-file placeholder
+		    $filename =~ s@^[^/]*/@@;
+		    $filename =~ s@\n@@;
+		    $lastfile = $filename;
+		    push(@files, $filename);
+		}
 		$patch_prefix = "^[+-].*";	#Now parsing the actual patch
 	    } elsif (m/^\@\@ -(\d+),(\d+)/) {
 		if ($email_git_blame) {
