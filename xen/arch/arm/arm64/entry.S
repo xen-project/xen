@@ -1,6 +1,7 @@
 #include <asm/asm_defns.h>
 #include <asm/regs.h>
 #include <asm/alternative.h>
+#include <asm/smccc.h>
 #include <public/xen.h>
 
 /*
@@ -90,8 +91,12 @@ lr      .req    x30             /* link register */
         .endm
 /*
  * Save state on entry to hypervisor, restore on exit
+ *
+ * save_x0_x1: Does the macro needs to save x0/x1? Defaults to 1
+ * If 0, we rely on the on x0/x1 to have been saved at the correct
+ * position on the stack before.
  */
-        .macro  entry, hyp, compat
+        .macro  entry, hyp, compat, save_x0_x1=1
         sub     sp, sp, #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
         push    x28, x29
         push    x26, x27
@@ -107,7 +112,16 @@ lr      .req    x30             /* link register */
         push    x6, x7
         push    x4, x5
         push    x2, x3
+        /*
+         * The caller may already have saved x0/x1 on the stack at the
+         * correct address and corrupt them with another value. Only
+         * save them if save_x0_x1 == 1.
+         */
+        .if \save_x0_x1 == 1
         push    x0, x1
+        .else
+        sub     sp, sp, #16
+        .endif
 
         .if \hyp == 1        /* Hypervisor mode */
 
@@ -200,7 +214,48 @@ hyp_irq:
         exit    hyp=1
 
 guest_sync:
-        entry   hyp=0, compat=0
+        /*
+         * Save x0, x1 in advance
+         */
+        stp     x0, x1, [sp, #-(UREGS_kernel_sizeof - UREGS_X0)]
+
+        /*
+         * x1 is used because x0 may contain the function identifier.
+         * This avoids to restore x0 from the stack.
+         */
+        mrs     x1, esr_el2
+        lsr     x1, x1, #HSR_EC_SHIFT           /* x1 = ESR_EL2.EC */
+        cmp     x1, #HSR_EC_HVC64
+        b.ne    1f                              /* Not a HVC skip fastpath. */
+
+        mrs     x1, esr_el2
+        and     x1, x1, #0xffff                 /* Check the immediate [0:16] */
+        cbnz    x1, 1f                          /* should be 0 for HVC #0 */
+
+        /*
+         * Fastest path possible for ARM_SMCCC_ARCH_WORKAROUND_1.
+         * The workaround has already been applied on the exception
+         * entry from the guest, so let's quickly get back to the guest.
+         *
+         * Note that eor is used because the function identifier cannot
+         * be encoded as an immediate for cmp.
+         */
+        eor     w0, w0, #ARM_SMCCC_ARCH_WORKAROUND_1_FID
+        cbnz    w0, 1f
+
+        /*
+         * Clobber both x0 and x1 to prevent leakage. Note that thanks
+         * the eor, x0 = 0.
+         */
+        mov     x1, xzr
+        eret
+
+1:
+        /*
+         * x0/x1 may have been scratch by the fast path above, so avoid
+         * to save them.
+         */
+        entry   hyp=0, compat=0, save_x0_x1=0
         /*
          * The vSError will be checked while SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
          * is not set. If a vSError took place, the initial exception will be
