@@ -186,7 +186,7 @@ static int32_t do_psci_0_2_affinity_info(register_t target_affinity,
     return PSCI_0_2_AFFINITY_LEVEL_OFF;
 }
 
-static uint32_t do_psci_0_2_migrate_info_type(void)
+static int32_t do_psci_0_2_migrate_info_type(void)
 {
     return PSCI_0_2_TOS_MP_OR_NOT_PRESENT;
 }
