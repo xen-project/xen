@@ -16,8 +16,20 @@
 #ifndef __ASM_ARM_SMCCC_H__
 #define __ASM_ARM_SMCCC_H__
 
-#define ARM_SMCCC_VERSION_1_0   0x10000
-#define ARM_SMCCC_VERSION_1_1   0x10001
+#define SMCCC_VERSION_MAJOR_SHIFT            16
+#define SMCCC_VERSION_MINOR_MASK             \
+        ((1U << SMCCC_VERSION_MAJOR_SHIFT) - 1)
+#define SMCCC_VERSION_MAJOR_MASK             ~SMCCC_VERSION_MINOR_MASK
+#define SMCCC_VERSION_MAJOR(ver)             \
+        (((ver) & SMCCC_VERSION_MAJOR_MASK) >> SMCCC_VERSION_MAJOR_SHIFT)
+#define SMCCC_VERSION_MINOR(ver)             \
+        ((ver) & SMCCC_VERSION_MINOR_MASK)
+
+#define SMCCC_VERSION(major, minor)          \
+    (((major) << SMCCC_VERSION_MAJOR_SHIFT) | (minor))
+
+#define ARM_SMCCC_VERSION_1_0   SMCCC_VERSION(1, 0)
+#define ARM_SMCCC_VERSION_1_1   SMCCC_VERSION(1, 1)
 
 /*
  * This file provides common defines for ARM SMC Calling Convention as
