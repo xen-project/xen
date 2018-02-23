@@ -79,7 +79,8 @@ static bool copy_hyp_vect_bpi(unsigned int slot, const char *hyp_vec_start,
 static bool __maybe_unused
 install_bp_hardening_vec(const struct arm_cpu_capabilities *entry,
                          const char *hyp_vec_start,
-                         const char *hyp_vec_end)
+                         const char *hyp_vec_end,
+                         const char *desc)
 {
     static int last_slot = -1;
     static DEFINE_SPINLOCK(bp_lock);
@@ -93,6 +94,9 @@ install_bp_hardening_vec(const struct arm_cpu_capabilities *entry,
      */
     if ( !entry->matches(entry) )
         return true;
+
+    printk(XENLOG_INFO "CPU%u will %s on exception entry\n",
+           smp_processor_id(), desc);
 
     /*
      * No need to install hardened vector when the processor has
@@ -157,7 +161,8 @@ static int enable_psci_bp_hardening(void *data)
      */
     if ( psci_ver >= PSCI_VERSION(0, 2) )
         ret = install_bp_hardening_vec(data, __psci_hyp_bp_inval_start,
-                                       __psci_hyp_bp_inval_end);
+                                       __psci_hyp_bp_inval_end,
+                                       "call PSCI get version");
     else if ( !warned )
     {
         ASSERT(system_state < SYS_STATE_active);
