@@ -16,6 +16,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <asm/smccc.h>
+
 .macro ventry target
     .rept 31
     nop
@@ -80,6 +82,17 @@ ENTRY(__psci_hyp_bp_inval_start)
     ldp     x0, x1, [sp, #(16 * 8)]
     add     sp, sp, #(8 * 18)
 ENTRY(__psci_hyp_bp_inval_end)
+
+ENTRY(__smccc_workaround_1_smc_start)
+    sub     sp, sp, #(8 * 4)
+    stp     x0, x1, [sp, #(8 * 2)]
+    stp     x2, x3, [sp, #(8 * 0)]
+    mov     w0, #ARM_SMCCC_ARCH_WORKAROUND_1_FID
+    smc     #0
+    ldp     x2, x3, [sp, #(8 * 0)]
+    ldp     x0, x1, [sp, #(8 * 2)]
+    add     sp, sp, #(8 * 4)
+ENTRY(__smccc_workaround_1_smc_end)
 
 /*
  * Local variables:
