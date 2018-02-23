@@ -22,7 +22,7 @@
 #include <public/sched.h>
 
 static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
-                       register_t context_id,int ver)
+                            register_t context_id)
 {
     struct vcpu *v;
     struct domain *d = current->domain;
@@ -40,8 +40,7 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     if ( is_64bit_domain(d) && is_thumb )
         return PSCI_INVALID_PARAMETERS;
 
-    if ( (ver == PSCI_VERSION(0, 2)) &&
-            !test_bit(_VPF_down, &v->pause_flags) )
+    if ( !test_bit(_VPF_down, &v->pause_flags) )
         return PSCI_ALREADY_ON;
 
     if ( (ctxt = alloc_vcpu_guest_context()) == NULL )
@@ -55,18 +54,21 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     ctxt->ttbr0 = 0;
     ctxt->ttbr1 = 0;
     ctxt->ttbcr = 0; /* Defined Reset Value */
+
+    /*
+     * x0/r0_usr are always updated because for PSCI 0.1 the general
+     * purpose registers are undefined upon CPU_on.
+     */
     if ( is_32bit_domain(d) )
     {
         ctxt->user_regs.cpsr = PSR_GUEST32_INIT;
-        if ( ver == PSCI_VERSION(0, 2) )
-            ctxt->user_regs.r0_usr = context_id;
+        ctxt->user_regs.r0_usr = context_id;
     }
 #ifdef CONFIG_ARM_64
     else
     {
         ctxt->user_regs.cpsr = PSR_GUEST64_INIT;
-        if ( ver == PSCI_VERSION(0, 2) )
-            ctxt->user_regs.x0 = context_id;
+        ctxt->user_regs.x0 = context_id;
     }
 #endif
 
@@ -93,7 +95,14 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
 
 static int32_t do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
 {
-    return do_common_cpu_on(vcpuid, entry_point, 0 , PSCI_VERSION(0, 1));
+    int32_t ret;
+
+    ret = do_common_cpu_on(vcpuid, entry_point, 0);
+    /*
+     * PSCI 0.1 does not define the return code PSCI_ALREADY_ON.
+     * Instead, return PSCI_INVALID_PARAMETERS.
+     */
+    return (ret == PSCI_ALREADY_ON) ? PSCI_INVALID_PARAMETERS : ret;
 }
 
 static int32_t do_psci_cpu_off(uint32_t power_state)
@@ -137,8 +146,7 @@ static int32_t do_psci_0_2_cpu_on(register_t target_cpu,
                                   register_t entry_point,
                                   register_t context_id)
 {
-    return do_common_cpu_on(target_cpu, entry_point, context_id,
-                            PSCI_VERSION(0, 2));
+    return do_common_cpu_on(target_cpu, entry_point, context_id);
 }
 
 static const unsigned long target_affinity_mask[] = {
