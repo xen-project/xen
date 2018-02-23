@@ -25,18 +25,20 @@
  * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
  */
 
-#define ARM_SMCCC_STD_CALL              0U
-#define ARM_SMCCC_FAST_CALL             1U
+#define ARM_SMCCC_STD_CALL              _AC(0,U)
+#define ARM_SMCCC_FAST_CALL             _AC(1,U)
 #define ARM_SMCCC_TYPE_SHIFT            31
 
-#define ARM_SMCCC_CONV_32               0U
-#define ARM_SMCCC_CONV_64               1U
+#define ARM_SMCCC_CONV_32               _AC(0,U)
+#define ARM_SMCCC_CONV_64               _AC(1,U)
 #define ARM_SMCCC_CONV_SHIFT            30
 
-#define ARM_SMCCC_OWNER_MASK            0x3FU
+#define ARM_SMCCC_OWNER_MASK            _AC(0x3F,U)
 #define ARM_SMCCC_OWNER_SHIFT           24
 
-#define ARM_SMCCC_FUNC_MASK             0xFFFFU
+#define ARM_SMCCC_FUNC_MASK             _AC(0xFFFF,U)
+
+#ifndef __ASSEMBLY__
 
 /* Check if this is fast call. */
 static inline bool smccc_is_fast_call(register_t funcid)
@@ -61,6 +63,8 @@ static inline uint32_t smccc_get_owner(register_t funcid)
 {
     return (funcid >> ARM_SMCCC_OWNER_SHIFT) & ARM_SMCCC_OWNER_MASK;
 }
+
+#endif
 
 /*
  * Construct function identifier from call type (fast or standard),
