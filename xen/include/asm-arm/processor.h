@@ -306,6 +306,8 @@
 #define HDCR_TPM        (_AC(1,U)<<6)           /* Trap Performance Monitors accesses */
 #define HDCR_TPMCR      (_AC(1,U)<<5)           /* Trap PMCR accesses */
 
+#define HSR_EC_SHIFT                26
+
 #define HSR_EC_UNKNOWN              0x00
 #define HSR_EC_WFI_WFE              0x01
 #define HSR_EC_CP15_32              0x03
