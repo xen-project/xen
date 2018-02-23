@@ -37,6 +37,7 @@
 #endif
 
 uint32_t psci_ver;
+uint32_t smccc_ver;
 
 static uint32_t psci_cpu_on_nr;
 
@@ -55,6 +56,14 @@ void call_psci_system_reset(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
         call_smc(PSCI_0_2_FN32_SYSTEM_RESET, 0, 0, 0);
+}
+
+static int __init psci_features(uint32_t psci_func_id)
+{
+    if ( psci_ver < PSCI_VERSION(1, 0) )
+        return PSCI_NOT_SUPPORTED;
+
+    return call_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id, 0, 0);
 }
 
 int __init psci_is_smc_method(const struct dt_device_node *psci)
@@ -80,6 +89,24 @@ int __init psci_is_smc_method(const struct dt_device_node *psci)
     }
 
     return 0;
+}
+
+static void __init psci_init_smccc(void)
+{
+    /* PSCI is using at least SMCCC 1.0 calling convention. */
+    smccc_ver = ARM_SMCCC_VERSION_1_0;
+
+    if ( psci_features(ARM_SMCCC_VERSION_FID) != PSCI_NOT_SUPPORTED )
+    {
+        uint32_t ret;
+
+        ret = call_smc(ARM_SMCCC_VERSION_FID, 0, 0, 0);
+        if ( ret != ARM_SMCCC_NOT_SUPPORTED )
+            smccc_ver = ret;
+    }
+
+    printk(XENLOG_INFO "Using SMC Calling Convention v%u.%u\n",
+           SMCCC_VERSION_MAJOR(smccc_ver), SMCCC_VERSION_MINOR(smccc_ver));
 }
 
 int __init psci_init_0_1(void)
@@ -173,7 +200,12 @@ int __init psci_init(void)
     if ( ret )
         ret = psci_init_0_1();
 
-    return ret;
+    if ( ret )
+        return ret;
+
+    psci_init_smccc();
+
+    return 0;
 }
 
 /*

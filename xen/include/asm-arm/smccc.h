@@ -52,6 +52,8 @@
 
 #ifndef __ASSEMBLY__
 
+extern uint32_t smccc_ver;
+
 /* Check if this is fast call. */
 static inline bool smccc_is_fast_call(register_t funcid)
 {
