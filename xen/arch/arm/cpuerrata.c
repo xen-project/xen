@@ -149,10 +149,11 @@ install_bp_hardening_vec(const struct arm_cpu_capabilities *entry,
 
 extern char __smccc_workaround_1_smc_start[], __smccc_workaround_1_smc_end[];
 
-static bool
-check_smccc_arch_workaround_1(const struct arm_cpu_capabilities *entry)
+static int enable_smccc_arch_workaround_1(void *data)
 {
     struct arm_smccc_res res;
+    static bool warned = false;
+    const struct arm_cpu_capabilities *entry = data;
 
     /*
      * Enable callbacks are called on every CPU based on the
@@ -160,47 +161,30 @@ check_smccc_arch_workaround_1(const struct arm_cpu_capabilities *entry)
      * entry.
      */
     if ( !entry->matches(entry) )
-        return false;
+        return 0;
 
     if ( smccc_ver < SMCCC_VERSION(1, 1) )
-        return false;
+        goto warn;
 
     arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
                       ARM_SMCCC_ARCH_WORKAROUND_1_FID, &res);
     if ( res.a0 != ARM_SMCCC_SUCCESS )
-        return false;
+        goto warn;
 
-    return install_bp_hardening_vec(entry,__smccc_workaround_1_smc_start,
-                                    __smccc_workaround_1_smc_end,
-                                    "call ARM_SMCCC_ARCH_WORKAROUND_1");
-}
+    return !install_bp_hardening_vec(entry,__smccc_workaround_1_smc_start,
+                                     __smccc_workaround_1_smc_end,
+                                     "call ARM_SMCCC_ARCH_WORKAROUND_1");
 
-extern char __psci_hyp_bp_inval_start[], __psci_hyp_bp_inval_end[];
-
-static int enable_psci_bp_hardening(void *data)
-{
-    bool ret = true;
-    static bool warned = false;
-
-    if ( check_smccc_arch_workaround_1(data) )
-        return 0;
-    /*
-     * The mitigation is using PSCI version function to invalidate the
-     * branch predictor. This function is only available with PSCI 0.2
-     * and later.
-     */
-    else if ( psci_ver >= PSCI_VERSION(0, 2) )
-        ret = install_bp_hardening_vec(data, __psci_hyp_bp_inval_start,
-                                       __psci_hyp_bp_inval_end,
-                                       "call PSCI get version");
-    else if ( !warned )
+warn:
+    if ( !warned )
     {
         ASSERT(system_state < SYS_STATE_active);
-        warning_add("PSCI 0.2 or later is required for the branch predictor hardening.\n");
-        warned = true;
+        warning_add("No support for ARM_SMCCC_ARCH_WORKAROUND_1.\n"
+                    "Please update your firmware.\n");
+        warned = false;
     }
 
-    return !ret;
+    return 0;
 }
 
 #endif /* CONFIG_ARM64_HARDEN_BRANCH_PREDICTOR */
@@ -316,22 +300,22 @@ static const struct arm_cpu_capabilities arm_errata[] = {
     {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
-        .enable = enable_psci_bp_hardening,
+        .enable = enable_smccc_arch_workaround_1,
     },
     {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
-        .enable = enable_psci_bp_hardening,
+        .enable = enable_smccc_arch_workaround_1,
     },
     {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-        .enable = enable_psci_bp_hardening,
+        .enable = enable_smccc_arch_workaround_1,
     },
     {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A75),
-        .enable = enable_psci_bp_hardening,
+        .enable = enable_smccc_arch_workaround_1,
     },
 #endif
 #ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
