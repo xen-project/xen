@@ -79,6 +79,8 @@ ALL_OBJS := $(ALL_OBJS-y)
 CFLAGS-y += -MMD -MF $(@D)/.$(@F).d
 
 CFLAGS += $(CFLAGS-y)
+# allow extra CFLAGS externally via EXTRA_CFLAGS_XEN_CORE
+CFLAGS += $(EXTRA_CFLAGS_XEN_CORE)
 
 # Most CFLAGS are safe for assembly files:
 #  -std=gnu{89,99} gets confused by #-prefixed end-of-line comments

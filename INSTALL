@@ -247,6 +247,10 @@ EXTRA_CFLAGS_XEN_TOOLS=
 EXTRA_CFLAGS_QEMU_TRADITIONAL=
 EXTRA_CFLAGS_QEMU_XEN=
 
+Additional CFLAGS may be supplied to the build of the hypervisor by
+using this variable.
+EXTRA_CFLAGS_XEN_CORE=
+
 This variable can be used to use DIR/include and DIR/lib during build.
 This is the same as PREPEND_LIB and PREPEND_INCLUDES. APPEND_LIB and
 APPEND_INCLUDES= will be appended to the CFLAGS/LDFLAGS variable.
