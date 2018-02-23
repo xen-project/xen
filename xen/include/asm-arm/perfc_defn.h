@@ -31,6 +31,7 @@ PERFCOUNTER(vpsci_system_off,          "vpsci: system_off")
 PERFCOUNTER(vpsci_system_reset,        "vpsci: system_reset")
 PERFCOUNTER(vpsci_cpu_suspend,         "vpsci: cpu_suspend")
 PERFCOUNTER(vpsci_cpu_affinity_info,   "vpsci: cpu_affinity_info")
+PERFCOUNTER(vpsci_features,            "vpsci: features")
 
 PERFCOUNTER(vgicd_reads,                "vgicd: read")
 PERFCOUNTER(vgicd_writes,               "vgicd: write")
