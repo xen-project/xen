@@ -261,6 +261,7 @@ struct arm_smccc_res {
 /* SMCCC error codes */
 #define ARM_SMCCC_ERR_UNKNOWN_FUNCTION  (-1)
 #define ARM_SMCCC_NOT_SUPPORTED         (-1)
+#define ARM_SMCCC_SUCCESS               (0)
 
 /* SMCCC function identifier range which is reserved for existing APIs */
 #define ARM_SMCCC_RESERVED_RANGE_START  0x0
