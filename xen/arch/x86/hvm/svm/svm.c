@@ -1700,6 +1700,7 @@ const struct hvm_function_table * __init start_svm(void)
     P(cpu_has_svm_vloadsave, "Virtual VMLOAD/VMSAVE");
     P(cpu_has_svm_vgif, "Virtual GIF");
     P(cpu_has_pause_filter, "Pause-Intercept Filter");
+    P(cpu_has_pause_thresh, "Pause-Intercept Filter Threshold");
     P(cpu_has_tsc_ratio, "TSC Rate MSR");
 #undef P
 

@@ -210,6 +210,9 @@ static int construct_vmcb(struct vcpu *v)
     {
         vmcb->_pause_filter_count = SVM_PAUSEFILTER_INIT;
         vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_PAUSE;
+
+        if ( cpu_has_pause_thresh )
+            vmcb->_pause_filter_thresh = SVM_PAUSETHRESH_INIT;
     }
 
     vmcb->cleanbits.bytes = 0;
