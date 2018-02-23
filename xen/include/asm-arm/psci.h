@@ -13,6 +13,7 @@
 #define PSCI_INTERNAL_FAILURE       -6
 #define PSCI_NOT_PRESENT            -7
 #define PSCI_DISABLED               -8
+#define PSCI_INVALID_ADDRESS        -9
 
 /* availability of PSCI on the host for SMP bringup */
 extern uint32_t psci_ver;
