@@ -115,6 +115,12 @@ static inline uint32_t smccc_get_owner(register_t funcid)
                        ARM_SMCCC_OWNER_ARCH,        \
                        0x1)
 
+#define ARM_SMCCC_ARCH_WORKAROUND_1_FID             \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                      ARM_SMCCC_CONV_32,            \
+                      ARM_SMCCC_OWNER_ARCH,         \
+                      0x8000)
+
 /* SMCCC error codes */
 #define ARM_SMCCC_ERR_UNKNOWN_FUNCTION  (-1)
 #define ARM_SMCCC_NOT_SUPPORTED         (-1)

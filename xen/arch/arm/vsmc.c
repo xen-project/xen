@@ -18,6 +18,7 @@
 #include <xen/lib.h>
 #include <xen/types.h>
 #include <public/arch-arm/smccc.h>
+#include <asm/cpufeature.h>
 #include <asm/monitor.h>
 #include <asm/regs.h>
 #include <asm/smccc.h>
@@ -93,8 +94,25 @@ static bool handle_arch(struct cpu_user_regs *regs)
         return true;
 
     case ARM_SMCCC_ARCH_FEATURES_FID:
-        /* Nothing supported yet */
-        set_user_reg(regs, 0, ARM_SMCCC_NOT_SUPPORTED);
+    {
+        uint32_t arch_func_id = get_user_reg(regs, 1);
+        int ret = ARM_SMCCC_NOT_SUPPORTED;
+
+        switch ( arch_func_id )
+        {
+        case ARM_SMCCC_ARCH_WORKAROUND_1_FID:
+            if ( cpus_have_cap(ARM_HARDEN_BRANCH_PREDICTOR) )
+                ret = 0;
+            break;
+        }
+
+        set_user_reg(regs, 0, ret);
+
+        return true;
+    }
+
+    case ARM_SMCCC_ARCH_WORKAROUND_1_FID:
+        /* No return value */
         return true;
     }
 
