@@ -1297,6 +1297,8 @@ long arch_do_domctl(
         /* Count maximum number of optional msrs. */
         if ( boot_cpu_has(X86_FEATURE_DBEXT) )
             nr_msrs += 4;
+        nr_msrs += !!cpu_has_cpuid_faulting +
+                   d->arch.cpuid->feat.ibrsb;
 
         if ( domctl->cmd == XEN_DOMCTL_get_vcpu_msrs )
         {
