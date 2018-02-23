@@ -38,7 +38,7 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
 
     /* THUMB set is not allowed with 64-bit domain */
     if ( is_64bit_domain(d) && is_thumb )
-        return PSCI_INVALID_PARAMETERS;
+        return PSCI_INVALID_ADDRESS;
 
     if ( !test_bit(_VPF_down, &v->pause_flags) )
         return PSCI_ALREADY_ON;
@@ -99,10 +99,14 @@ static int32_t do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
 
     ret = do_common_cpu_on(vcpuid, entry_point, 0);
     /*
-     * PSCI 0.1 does not define the return code PSCI_ALREADY_ON.
+     * PSCI 0.1 does not define the return codes PSCI_ALREADY_ON and
+     * PSCI_INVALID_ADDRESS.
      * Instead, return PSCI_INVALID_PARAMETERS.
      */
-    return (ret == PSCI_ALREADY_ON) ? PSCI_INVALID_PARAMETERS : ret;
+    if ( ret == PSCI_ALREADY_ON || ret == PSCI_INVALID_ADDRESS )
+        ret = PSCI_INVALID_PARAMETERS;
+
+    return ret;
 }
 
 static int32_t do_psci_cpu_off(uint32_t power_state)
