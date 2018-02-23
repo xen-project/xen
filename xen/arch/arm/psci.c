@@ -136,8 +136,6 @@ int __init psci_init_0_1(void)
 
     psci_ver = PSCI_VERSION(0, 1);
 
-    printk(XENLOG_INFO "Using PSCI-0.1 for SMP bringup\n");
-
     return 0;
 }
 
@@ -183,9 +181,6 @@ int __init psci_init_0_2(void)
 
     psci_cpu_on_nr = PSCI_0_2_FN_NATIVE(CPU_ON);
 
-    printk(XENLOG_INFO "Using PSCI-%u.%u for SMP bringup\n",
-           PSCI_VERSION_MAJOR(psci_ver), PSCI_VERSION_MINOR(psci_ver));
-
     return 0;
 }
 
@@ -204,6 +199,9 @@ int __init psci_init(void)
         return ret;
 
     psci_init_smccc();
+
+    printk(XENLOG_INFO "Using PSCI v%u.%u\n",
+           PSCI_VERSION_MAJOR(psci_ver), PSCI_VERSION_MINOR(psci_ver));
 
     return 0;
 }
