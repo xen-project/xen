@@ -412,7 +412,7 @@ struct vmcb_struct {
     u64 res04;                  /* offset 0x28 */
     u64 res05;                  /* offset 0x30 */
     u32 res06;                  /* offset 0x38 */
-    u16 res06a;                 /* offset 0x3C */
+    u16 _pause_filter_thresh;   /* offset 0x3C - cleanbit 0 */
     u16 _pause_filter_count;    /* offset 0x3E - cleanbit 0 */
     u64 _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */
     u64 _msrpm_base_pa;         /* offset 0x48 - cleanbit 1 */
@@ -568,6 +568,7 @@ VMCB_ACCESSORS(exception_intercepts, intercepts)
 VMCB_ACCESSORS(general1_intercepts, intercepts)
 VMCB_ACCESSORS(general2_intercepts, intercepts)
 VMCB_ACCESSORS(pause_filter_count, intercepts)
+VMCB_ACCESSORS(pause_filter_thresh, intercepts)
 VMCB_ACCESSORS(tsc_offset, intercepts)
 VMCB_ACCESSORS(iopm_base_pa, iopm)
 VMCB_ACCESSORS(msrpm_base_pa, iopm)
