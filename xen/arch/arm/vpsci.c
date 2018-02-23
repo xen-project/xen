@@ -212,6 +212,7 @@ static int32_t do_psci_1_0_features(uint32_t psci_func_id)
     case PSCI_0_2_FN32_SYSTEM_OFF:
     case PSCI_0_2_FN32_SYSTEM_RESET:
     case PSCI_1_0_FN32_PSCI_FEATURES:
+    case ARM_SMCCC_VERSION_FID:
         return 0;
     default:
         return PSCI_NOT_SUPPORTED;
