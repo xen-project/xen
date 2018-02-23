@@ -1260,7 +1260,8 @@ long arch_do_domctl(
         struct xen_domctl_vcpu_msrs *vmsrs = &domctl->u.vcpu_msrs;
         struct xen_domctl_vcpu_msr msr;
         struct vcpu *v;
-        uint32_t nr_msrs = 0;
+        uint32_t nr_msrs = 0, edx, dummy;
+        bool has_ibrsb;
 
         ret = -ESRCH;
         if ( (vmsrs->vcpu >= d->max_vcpus) ||
@@ -1276,6 +1277,10 @@ long arch_do_domctl(
         if ( boot_cpu_has(X86_FEATURE_DBEXT) )
             nr_msrs += 4;
 
+        domain_cpuid(d, 7, 0, &dummy, &dummy, &dummy, &edx);
+        has_ibrsb = (edx & cpufeat_mask(X86_FEATURE_IBRSB));
+        nr_msrs += !!cpu_has_cpuid_faulting + has_ibrsb;
+
         if ( domctl->cmd == XEN_DOMCTL_get_vcpu_msrs )
         {
             ret = 0; copyback = 1;
@@ -1285,8 +1290,6 @@ long arch_do_domctl(
                 vmsrs->msr_count = nr_msrs;
             else
             {
-                uint32_t edx, dummy;
-
                 i = 0;
 
                 vcpu_pause(v);
@@ -1337,9 +1340,7 @@ long arch_do_domctl(
                     ++i;
                 }
 
-                domain_cpuid(d, 7, 0, &dummy, &dummy, &dummy, &edx);
-                if ( (edx & cpufeat_mask(X86_FEATURE_IBRSB)) &&
-                     v->arch.spec_ctrl )
+                if ( has_ibrsb && v->arch.spec_ctrl )
                 {
                     if ( i < vmsrs->msr_count && !ret )
                     {
