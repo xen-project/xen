@@ -66,7 +66,7 @@ static int __init psci_features(uint32_t psci_func_id)
     return call_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id, 0, 0);
 }
 
-int __init psci_is_smc_method(const struct dt_device_node *psci)
+static int __init psci_is_smc_method(const struct dt_device_node *psci)
 {
     int ret;
     const char *prop_str;
@@ -109,7 +109,7 @@ static void __init psci_init_smccc(void)
            SMCCC_VERSION_MAJOR(smccc_ver), SMCCC_VERSION_MINOR(smccc_ver));
 }
 
-int __init psci_init_0_1(void)
+static int __init psci_init_0_1(void)
 {
     int ret;
     const struct dt_device_node *psci;
@@ -139,7 +139,7 @@ int __init psci_init_0_1(void)
     return 0;
 }
 
-int __init psci_init_0_2(void)
+static int __init psci_init_0_2(void)
 {
     static const struct dt_device_match psci_ids[] __initconst =
     {
