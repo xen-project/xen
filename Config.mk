@@ -163,13 +163,14 @@ as-insn = $(if $(shell echo 'void _(void) { asm volatile ( $(2) ); }' \
                        | $(filter-out -M% %.d -include %/include/xen/config.h,$(1)) \
                               -c -x c -o /dev/null - 2>&1),$(4),$(3))
 
-# as-option-add: Add an option to compilation flags, but only if insn is
-#                supported by assembler.
-# Usage: $(call as-option-add,CFLAGS,CC,"insn",option-yes)
-as-option-add = $(eval $(call as-option-add-closure,$(1),$(2),$(3),$(4)))
+# as-option-add: Conditionally add options to flags
+# Usage: $(call as-option-add,CFLAGS,CC,"insn",option-yes,option-no)
+as-option-add = $(eval $(call as-option-add-closure,$(1),$(2),$(3),$(4),$(5)))
 define as-option-add-closure
     ifeq ($$(call as-insn,$$($(2)) $$($(1)),$(3),y,n),y)
         $(1) += $(4)
+    else
+        $(1) += $(5)
     endif
 endef
 

@@ -70,8 +70,12 @@ endif
 
 AFLAGS-y                += -D__ASSEMBLY__
 
-# Clang's built-in assembler can't handle embedded .include's
-CFLAGS-$(clang)         += -no-integrated-as
+# Older clang's built-in assembler doesn't understand .skip with labels:
+# https://bugs.llvm.org/show_bug.cgi?id=27369
+ifeq ($(clang),y)
+$(call as-option-add,CFLAGS,CC,".L0:\n.L1:\n.skip (.L1 - .L0)",,\
+                     -no-integrated-as)
+endif
 
 ALL_OBJS := $(ALL_OBJS-y)
 
