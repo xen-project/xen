@@ -107,7 +107,11 @@ static int32_t do_psci_cpu_off(uint32_t power_state)
 
 static uint32_t do_psci_0_2_version(void)
 {
-    return PSCI_VERSION(0, 2);
+    /*
+     * PSCI is backward compatible from 0.2. So we can bump the version
+     * without any issue.
+     */
+    return PSCI_VERSION(1, 1);
 }
 
 static register_t do_psci_0_2_cpu_suspend(uint32_t power_state,
@@ -190,6 +194,29 @@ static void do_psci_0_2_system_reset(void)
 {
     struct domain *d = current->domain;
     domain_shutdown(d,SHUTDOWN_reboot);
+}
+
+static int32_t do_psci_1_0_features(uint32_t psci_func_id)
+{
+    /* /!\ Ordered by function ID and not name */
+    switch ( psci_func_id )
+    {
+    case PSCI_0_2_FN32_PSCI_VERSION:
+    case PSCI_0_2_FN32_CPU_SUSPEND:
+    case PSCI_0_2_FN64_CPU_SUSPEND:
+    case PSCI_0_2_FN32_CPU_OFF:
+    case PSCI_0_2_FN32_CPU_ON:
+    case PSCI_0_2_FN64_CPU_ON:
+    case PSCI_0_2_FN32_AFFINITY_INFO:
+    case PSCI_0_2_FN64_AFFINITY_INFO:
+    case PSCI_0_2_FN32_MIGRATE_INFO_TYPE:
+    case PSCI_0_2_FN32_SYSTEM_OFF:
+    case PSCI_0_2_FN32_SYSTEM_RESET:
+    case PSCI_1_0_FN32_PSCI_FEATURES:
+        return 0;
+    default:
+        return PSCI_NOT_SUPPORTED;
+    }
 }
 
 #define PSCI_SET_RESULT(reg, val) set_user_reg(reg, 0, val)
@@ -305,6 +332,16 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
         PSCI_SET_RESULT(regs, do_psci_0_2_affinity_info(taff, laff));
         return true;
     }
+
+    case PSCI_1_0_FN32_PSCI_FEATURES:
+    {
+        uint32_t psci_func_id = PSCI_ARG32(regs, 1);
+
+        perfc_incr(vpsci_features);
+        PSCI_SET_RESULT(regs, do_psci_1_0_features(psci_func_id));
+        return true;
+    }
+
     default:
         return false;
     }

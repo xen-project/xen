@@ -635,6 +635,7 @@ static int make_psci_node(void *fdt, const struct dt_device_node *parent)
 {
     int res;
     const char compat[] =
+        "arm,psci-1.0""\0"
         "arm,psci-0.2""\0"
         "arm,psci";
 
