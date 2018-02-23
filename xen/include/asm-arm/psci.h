@@ -23,22 +23,27 @@ void call_psci_system_off(void);
 void call_psci_system_reset(void);
 
 /* PSCI v0.2 interface */
-#define PSCI_0_2_FN32(name) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
-                                               ARM_SMCCC_CONV_32,               \
-                                               ARM_SMCCC_OWNER_STANDARD,        \
-                                               PSCI_0_2_FN_##name)
-#define PSCI_0_2_FN64(name) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
-                                               ARM_SMCCC_CONV_64,               \
-                                               ARM_SMCCC_OWNER_STANDARD,        \
-                                               PSCI_0_2_FN_##name)
-#define PSCI_0_2_FN_PSCI_VERSION        0
-#define PSCI_0_2_FN_CPU_SUSPEND         1
-#define PSCI_0_2_FN_CPU_OFF             2
-#define PSCI_0_2_FN_CPU_ON              3
-#define PSCI_0_2_FN_AFFINITY_INFO       4
-#define PSCI_0_2_FN_MIGRATE_INFO_TYPE   6
-#define PSCI_0_2_FN_SYSTEM_OFF          8
-#define PSCI_0_2_FN_SYSTEM_RESET        9
+#define PSCI_0_2_FN32(nr) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
+                                             ARM_SMCCC_CONV_32,               \
+                                             ARM_SMCCC_OWNER_STANDARD,        \
+                                             nr)
+#define PSCI_0_2_FN64(nr) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,             \
+                                             ARM_SMCCC_CONV_64,               \
+                                             ARM_SMCCC_OWNER_STANDARD,        \
+                                             nr)
+
+#define PSCI_0_2_FN32_PSCI_VERSION        PSCI_0_2_FN32(0)
+#define PSCI_0_2_FN32_CPU_SUSPEND         PSCI_0_2_FN32(1)
+#define PSCI_0_2_FN32_CPU_OFF             PSCI_0_2_FN32(2)
+#define PSCI_0_2_FN32_CPU_ON              PSCI_0_2_FN32(3)
+#define PSCI_0_2_FN32_AFFINITY_INFO       PSCI_0_2_FN32(4)
+#define PSCI_0_2_FN32_MIGRATE_INFO_TYPE   PSCI_0_2_FN32(6)
+#define PSCI_0_2_FN32_SYSTEM_OFF          PSCI_0_2_FN32(8)
+#define PSCI_0_2_FN32_SYSTEM_RESET        PSCI_0_2_FN32(9)
+
+#define PSCI_0_2_FN64_CPU_SUSPEND         PSCI_0_2_FN64(1)
+#define PSCI_0_2_FN64_CPU_ON              PSCI_0_2_FN64(3)
+#define PSCI_0_2_FN64_AFFINITY_INFO       PSCI_0_2_FN64(4)
 
 /* PSCI v0.2 affinity level state returned by AFFINITY_INFO */
 #define PSCI_0_2_AFFINITY_LEVEL_ON      0

@@ -243,35 +243,35 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
      */
     switch ( fid )
     {
-    case PSCI_0_2_FN32(PSCI_VERSION):
+    case PSCI_0_2_FN32_PSCI_VERSION:
         perfc_incr(vpsci_version);
         PSCI_SET_RESULT(regs, do_psci_0_2_version());
         return true;
 
-    case PSCI_0_2_FN32(CPU_OFF):
+    case PSCI_0_2_FN32_CPU_OFF:
         perfc_incr(vpsci_cpu_off);
         PSCI_SET_RESULT(regs, do_psci_0_2_cpu_off());
         return true;
 
-    case PSCI_0_2_FN32(MIGRATE_INFO_TYPE):
+    case PSCI_0_2_FN32_MIGRATE_INFO_TYPE:
         perfc_incr(vpsci_migrate_info_type);
         PSCI_SET_RESULT(regs, do_psci_0_2_migrate_info_type());
         return true;
 
-    case PSCI_0_2_FN32(SYSTEM_OFF):
+    case PSCI_0_2_FN32_SYSTEM_OFF:
         perfc_incr(vpsci_system_off);
         do_psci_0_2_system_off();
         PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
         return true;
 
-    case PSCI_0_2_FN32(SYSTEM_RESET):
+    case PSCI_0_2_FN32_SYSTEM_RESET:
         perfc_incr(vpsci_system_reset);
         do_psci_0_2_system_reset();
         PSCI_SET_RESULT(regs, PSCI_INTERNAL_FAILURE);
         return true;
 
-    case PSCI_0_2_FN32(CPU_ON):
-    case PSCI_0_2_FN64(CPU_ON):
+    case PSCI_0_2_FN32_CPU_ON:
+    case PSCI_0_2_FN64_CPU_ON:
     {
         register_t vcpuid = PSCI_ARG(regs, 1);
         register_t epoint = PSCI_ARG(regs, 2);
@@ -282,8 +282,8 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
         return true;
     }
 
-    case PSCI_0_2_FN32(CPU_SUSPEND):
-    case PSCI_0_2_FN64(CPU_SUSPEND):
+    case PSCI_0_2_FN32_CPU_SUSPEND:
+    case PSCI_0_2_FN64_CPU_SUSPEND:
     {
         uint32_t pstate = PSCI_ARG32(regs, 1);
         register_t epoint = PSCI_ARG(regs, 2);
@@ -294,8 +294,8 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
         return true;
     }
 
-    case PSCI_0_2_FN32(AFFINITY_INFO):
-    case PSCI_0_2_FN64(AFFINITY_INFO):
+    case PSCI_0_2_FN32_AFFINITY_INFO:
+    case PSCI_0_2_FN64_AFFINITY_INFO:
     {
         register_t taff = PSCI_ARG(regs, 1);
         uint32_t laff = PSCI_ARG32(regs, 2);
