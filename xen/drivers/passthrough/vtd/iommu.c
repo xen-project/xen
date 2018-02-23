@@ -1105,7 +1105,13 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FEDATA_REG, msg.data);
-    dmar_writeq(iommu->reg, DMAR_FEADDR_REG, msg.address);
+    dmar_writel(iommu->reg, DMAR_FEADDR_REG, msg.address_lo);
+    /*
+     * When x2APIC is not enabled, DMAR_FEUADDR_REG is reserved and
+     * it's not necessary to update it.
+     */
+    if ( x2apic_enabled )
+        dmar_writel(iommu->reg, DMAR_FEUADDR_REG, msg.address_hi);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
