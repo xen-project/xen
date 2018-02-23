@@ -210,11 +210,11 @@ struct csched_private {
     cpumask_var_t cpus;
     uint32_t *balance_bias;
     uint32_t runq_sort;
-    unsigned int ratelimit_us;
+    uint32_t ncpus;
 
     /* Period of master and tick in milliseconds */
-    unsigned int tslice_ms, tick_period_us, ticks_per_tslice;
-    uint32_t ncpus;
+    unsigned int tick_period_us, ticks_per_tslice;
+    s_time_t ratelimit, tslice;
 
     struct list_head active_sdom;
     uint32_t weight;
@@ -570,8 +570,7 @@ init_pdata(struct csched_private *prv, struct csched_pcpu *spc, int cpu)
     {
         prv->master = cpu;
         init_timer(&prv->master_ticker, csched_acct, prv, cpu);
-        set_timer(&prv->master_ticker,
-                  NOW() + MILLISECS(prv->tslice_ms));
+        set_timer(&prv->master_ticker, NOW() + prv->tslice);
     }
 
     cpumask_and(cpumask_scratch, prv->cpus, &node_to_cpumask(cpu_to_node(cpu)));
@@ -1224,14 +1223,14 @@ csched_dom_cntl(
 }
 
 static inline void
-__csched_set_tslice(struct csched_private *prv, unsigned timeslice)
+__csched_set_tslice(struct csched_private *prv, unsigned int timeslice_ms)
 {
-    prv->tslice_ms = timeslice;
+    prv->tslice = MILLISECS(timeslice_ms);
     prv->ticks_per_tslice = CSCHED_TICKS_PER_TSLICE;
-    if ( prv->tslice_ms < prv->ticks_per_tslice )
+    if ( timeslice_ms < prv->ticks_per_tslice )
         prv->ticks_per_tslice = 1;
-    prv->tick_period_us = prv->tslice_ms * 1000 / prv->ticks_per_tslice;
-    prv->credits_per_tslice = CSCHED_CREDITS_PER_MSEC * prv->tslice_ms;
+    prv->tick_period_us = timeslice_ms * 1000 / prv->ticks_per_tslice;
+    prv->credits_per_tslice = CSCHED_CREDITS_PER_MSEC * timeslice_ms;
     prv->credit = prv->credits_per_tslice * prv->ncpus;
 }
 
@@ -1257,17 +1256,17 @@ csched_sys_cntl(const struct scheduler *ops,
 
         spin_lock_irqsave(&prv->lock, flags);
         __csched_set_tslice(prv, params->tslice_ms);
-        if ( !prv->ratelimit_us && params->ratelimit_us )
+        if ( !prv->ratelimit && params->ratelimit_us )
             printk(XENLOG_INFO "Enabling context switch rate limiting\n");
-        else if ( prv->ratelimit_us && !params->ratelimit_us )
+        else if ( prv->ratelimit && !params->ratelimit_us )
             printk(XENLOG_INFO "Disabling context switch rate limiting\n");
-        prv->ratelimit_us = params->ratelimit_us;
+        prv->ratelimit = MICROSECS(params->ratelimit_us);
         spin_unlock_irqrestore(&prv->lock, flags);
 
         /* FALLTHRU */
     case XEN_SYSCTL_SCHEDOP_getinfo:
-        params->tslice_ms = prv->tslice_ms;
-        params->ratelimit_us = prv->ratelimit_us;
+        params->tslice_ms = prv->tslice / MILLISECS(1);
+        params->ratelimit_us = prv->ratelimit / MICROSECS(1);
         rc = 0;
         break;
     }
@@ -1576,8 +1575,7 @@ csched_acct(void* dummy)
     prv->runq_sort++;
 
 out:
-    set_timer( &prv->master_ticker,
-               NOW() + MILLISECS(prv->tslice_ms));
+    set_timer( &prv->master_ticker, NOW() + prv->tslice);
 }
 
 static void
@@ -1901,21 +1899,21 @@ csched_schedule(
      */
     if ( !test_bit(CSCHED_FLAG_VCPU_YIELD, &scurr->flags)
          && !tasklet_work_scheduled
-         && prv->ratelimit_us
+         && prv->ratelimit
          && vcpu_runnable(current)
          && !is_idle_vcpu(current)
-         && runtime < MICROSECS(prv->ratelimit_us) )
+         && runtime < prv->ratelimit )
     {
         snext = scurr;
         snext->start_time += now;
         perfc_incr(delay_ms);
         /*
          * Next timeslice must last just until we'll have executed for
-         * ratelimit_us. However, to avoid setting a really short timer, which
+         * ratelimit. However, to avoid setting a really short timer, which
          * will most likely be inaccurate and counterproductive, we never go
          * below CSCHED_MIN_TIMER.
          */
-        tslice = MICROSECS(prv->ratelimit_us) - runtime;
+        tslice = prv->ratelimit - runtime;
         if ( unlikely(runtime < CSCHED_MIN_TIMER) )
             tslice = CSCHED_MIN_TIMER;
         if ( unlikely(tb_init_done) )
@@ -1934,7 +1932,7 @@ csched_schedule(
         ret.migrated = 0;
         goto out;
     }
-    tslice = MILLISECS(prv->tslice_ms);
+    tslice = prv->tslice;
 
     /*
      * Select next runnable local VCPU (ie top of local runq)
@@ -2112,8 +2110,8 @@ csched_dump(const struct scheduler *ops)
            "\tweight             = %u\n"
            "\trunq_sort          = %u\n"
            "\tdefault-weight     = %d\n"
-           "\ttslice             = %dms\n"
-           "\tratelimit          = %dus\n"
+           "\ttslice             = %"PRI_stime"ms\n"
+           "\tratelimit          = %"PRI_stime"us\n"
            "\tcredits per msec   = %d\n"
            "\tticks per tslice   = %d\n"
            "\tmigration delay    = %uus\n",
@@ -2124,8 +2122,8 @@ csched_dump(const struct scheduler *ops)
            prv->weight,
            prv->runq_sort,
            CSCHED_DEFAULT_WEIGHT,
-           prv->tslice_ms,
-           prv->ratelimit_us,
+           prv->tslice / MILLISECS(1),
+           prv->ratelimit / MICROSECS(1),
            CSCHED_CREDITS_PER_MSEC,
            prv->ticks_per_tslice,
            vcpu_migration_delay);
@@ -2206,11 +2204,11 @@ csched_init(struct scheduler *ops)
     {
         printk("WARNING: sched_ratelimit_us >" 
                "sched_credit_tslice_ms is undefined\n"
-               "Setting ratelimit_us to 1000 * tslice_ms\n");
-        prv->ratelimit_us = 1000 * prv->tslice_ms;
+               "Setting ratelimit to tslice\n");
+        prv->ratelimit = prv->tslice;
     }
     else
-        prv->ratelimit_us = sched_ratelimit_us;
+        prv->ratelimit = MICROSECS(sched_ratelimit_us);
     return 0;
 }
 
