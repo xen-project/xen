@@ -997,6 +997,13 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
             goto out;
         }
 
+        /* if state_path is empty, assume backend is gone (backend domain
+         * shutdown?), cleanup frontend only; rc=0 */
+        if (!state) {
+            LOG(INFO, "backend %s already removed, cleanup frontend only", be_path);
+            goto out;
+        }
+
         rc = libxl__xs_write_checked(gc, t, online_path, "0");
         if (rc)
             goto out;
