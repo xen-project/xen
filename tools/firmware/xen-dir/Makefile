@@ -48,13 +48,14 @@ shim-%config: $(D) FORCE
 		KCONFIG_CONFIG=$(CURDIR)/shim.config
 
 xen-shim: $(D) shim-olddefconfig
-	$(MAKE) -C $(D)/xen install-shim \
+	$(MAKE) -C $(D)/xen build \
 		XEN_CONFIG_EXPERT=y \
-		KCONFIG_CONFIG=$(CURDIR)/shim.config \
-		DESTDIR=$(CURDIR)
+		KCONFIG_CONFIG=$(CURDIR)/shim.config
+	ln -sf $(D)/xen/xen $@
+	ln -sf $(D)/xen/xen-syms $@-syms
 
 .PHONY: distclean clean
 distclean clean:
-	rm -f xen-shim *.old
+	rm -f xen-shim xen-shim-syms *.old
 	rm -rf $(D)
 	rm -f linkfarm.stamp*
