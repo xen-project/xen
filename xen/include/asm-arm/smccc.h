@@ -16,6 +16,9 @@
 #ifndef __ASM_ARM_SMCCC_H__
 #define __ASM_ARM_SMCCC_H__
 
+#define ARM_SMCCC_VERSION_1_0   0x10000
+#define ARM_SMCCC_VERSION_1_1   0x10001
+
 /*
  * This file provides common defines for ARM SMC Calling Convention as
  * specified in
@@ -100,8 +103,21 @@ static inline uint32_t smccc_get_owner(register_t funcid)
                        ARM_SMCCC_OWNER_##owner,     \
                        0xFF03)
 
-/* Only one error code defined in SMCCC */
+#define ARM_SMCCC_VERSION_FID                       \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_ARCH,        \
+                       0x0)                         \
+
+#define ARM_SMCCC_ARCH_FEATURES_FID                 \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_ARCH,        \
+                       0x1)
+
+/* SMCCC error codes */
 #define ARM_SMCCC_ERR_UNKNOWN_FUNCTION  (-1)
+#define ARM_SMCCC_NOT_SUPPORTED         (-1)
 
 /* SMCCC function identifier range which is reserved for existing APIs */
 #define ARM_SMCCC_RESERVED_RANGE_START  0x0

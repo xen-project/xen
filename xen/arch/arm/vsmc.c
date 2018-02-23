@@ -81,6 +81,26 @@ static bool fill_function_call_count(struct cpu_user_regs *regs, uint32_t cnt)
     return true;
 }
 
+/* SMCCC interface for ARM Architecture */
+static bool handle_arch(struct cpu_user_regs *regs)
+{
+    uint32_t fid = (uint32_t)get_user_reg(regs, 0);
+
+    switch ( fid )
+    {
+    case ARM_SMCCC_VERSION_FID:
+        set_user_reg(regs, 0, ARM_SMCCC_VERSION_1_1);
+        return true;
+
+    case ARM_SMCCC_ARCH_FEATURES_FID:
+        /* Nothing supported yet */
+        set_user_reg(regs, 0, ARM_SMCCC_NOT_SUPPORTED);
+        return true;
+    }
+
+    return false;
+}
+
 /* SMCCC interface for hypervisor. Tell about itself. */
 static bool handle_hypervisor(struct cpu_user_regs *regs)
 {
@@ -188,6 +208,9 @@ static bool vsmccc_handle_call(struct cpu_user_regs *regs)
     {
         switch ( smccc_get_owner(funcid) )
         {
+        case ARM_SMCCC_OWNER_ARCH:
+            handled = handle_arch(regs);
+            break;
         case ARM_SMCCC_OWNER_HYPERVISOR:
             handled = handle_hypervisor(regs);
             break;
