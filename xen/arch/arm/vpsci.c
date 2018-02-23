@@ -29,7 +29,7 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     struct domain *d = current->domain;
     struct vcpu_guest_context *ctxt;
     int rc;
-    int is_thumb = entry_point & 1;
+    bool is_thumb = entry_point & 1;
     register_t vcpuid;
 
     vcpuid = vaffinity_to_vcpuid(target_cpu);
@@ -63,6 +63,13 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
     if ( is_32bit_domain(d) )
     {
         ctxt->user_regs.cpsr = PSR_GUEST32_INIT;
+        /* Start the VCPU with THUMB set if it's requested by the kernel */
+        if ( is_thumb )
+        {
+            ctxt->user_regs.cpsr |= PSR_THUMB;
+            ctxt->user_regs.pc64 &= ~(u64)1;
+        }
+
         ctxt->user_regs.r0_usr = context_id;
     }
 #ifdef CONFIG_ARM_64
@@ -72,10 +79,6 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
         ctxt->user_regs.x0 = context_id;
     }
 #endif
-
-    /* Start the VCPU with THUMB set if it's requested by the kernel */
-    if ( is_thumb )
-        ctxt->user_regs.cpsr |= PSR_THUMB;
     ctxt->flags = VGCF_online;
 
     domain_lock(d);
