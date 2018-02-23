@@ -2302,6 +2302,7 @@ static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu ( d, v )
     {
+        struct hvm_save_descriptor *d = _p(&h->data[h->cur]);
         struct hvm_msr *ctxt;
         unsigned int i;
 
@@ -2320,8 +2321,13 @@ static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
             ctxt->msr[i]._rsvd = 0;
 
         if ( ctxt->count )
+        {
+            /* Rewrite length to indicate how much space we actually used. */
+            d->length = HVM_CPU_MSR_SIZE(ctxt->count);
             h->cur += HVM_CPU_MSR_SIZE(ctxt->count);
+        }
         else
+            /* or rewind and remove the descriptor from the stream. */
             h->cur -= sizeof(struct hvm_save_descriptor);
     }
 
