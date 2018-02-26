@@ -401,6 +401,9 @@ int libxl__init_console_from_channel(libxl__gc *gc,
 
     /* Perform validation first, allocate second. */
 
+    if (channel->devid == -1)
+        channel->devid = dev_num;
+
     if (!channel->name) {
         LOG(ERROR, "channel %d has no name", channel->devid);
         return ERROR_INVAL;
@@ -446,7 +449,7 @@ int libxl__init_console_from_channel(libxl__gc *gc,
             abort();
     }
 
-    console->devid = dev_num;
+    console->devid = channel->devid;
     console->consback = LIBXL__CONSOLE_BACKEND_IOEMU;
     console->backend_domid = channel->backend_domid;
     console->name = libxl__strdup(NOGC, channel->name);
