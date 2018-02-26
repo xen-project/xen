@@ -100,6 +100,10 @@ libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 xs.opic: CFLAGS += -DUSE_PTHREAD
+ifeq ($(CONFIG_Linux),y)
+xs.opic: CFLAGS += -DUSE_DLSYM
+libxenstore.so.$(MAJOR).$(MINOR): LDFLAGS += -ldl
+endif
 
 libxenstore.so.$(MAJOR).$(MINOR): xs.opic xs_lib.opic
 	$(CC) $(LDFLAGS) $(PTHREAD_LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenstore.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LDLIBS_libxentoolcore) $(SOCKET_LIBS) $(PTHREAD_LIBS) $(APPEND_LDFLAGS)

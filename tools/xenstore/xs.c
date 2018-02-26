@@ -16,6 +16,8 @@
     License along with this library; If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _GNU_SOURCE
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -46,6 +48,10 @@ struct xs_stored_msg {
 #ifdef USE_PTHREAD
 
 #include <pthread.h>
+
+#ifdef USE_DLSYM
+#include <dlfcn.h>
+#endif
 
 struct xs_handle {
 	/* Communications channel to xenstore daemon. */
@@ -810,12 +816,25 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	if (!h->read_thr_exists) {
 		sigset_t set, old_set;
 		pthread_attr_t attr;
+		static size_t stack_size;
+#ifdef USE_DLSYM
+		size_t (*getsz)(pthread_attr_t *attr);
+#endif
 
 		if (pthread_attr_init(&attr) != 0) {
 			mutex_unlock(&h->request_mutex);
 			return false;
 		}
-		if (pthread_attr_setstacksize(&attr, READ_THREAD_STACKSIZE) != 0) {
+		if (!stack_size) {
+#ifdef USE_DLSYM
+			getsz = dlsym(RTLD_DEFAULT, "__pthread_get_minstack");
+			if (getsz)
+				stack_size = getsz(&attr);
+#endif
+			if (stack_size < READ_THREAD_STACKSIZE)
+				stack_size = READ_THREAD_STACKSIZE;
+		}
+		if (pthread_attr_setstacksize(&attr, stack_size) != 0) {
 			pthread_attr_destroy(&attr);
 			mutex_unlock(&h->request_mutex);
 			return false;
