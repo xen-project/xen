@@ -649,33 +649,39 @@ static int vlapic_mmio_read(struct vcpu *v, unsigned long address,
     return X86EMUL_OKAY;
 }
 
-int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
+int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
-    static const unsigned long readable[] =
-        {
+    static const unsigned long readable[] = {
 #define REG(x) (1UL << (APIC_ ## x >> 4))
-            REG(ID)    | REG(LVR)  | REG(TASKPRI) | REG(PROCPRI) |
-            REG(LDR)   | REG(SPIV) | REG(ESR)     | REG(ICR)     |
-            REG(CMCI)  | REG(LVTT) | REG(LVTTHMR) | REG(LVTPC)   |
-            REG(LVT0)  | REG(LVT1) | REG(LVTERR)  | REG(TMICT)   |
-            REG(TMCCT) | REG(TDCR) |
+        REG(ID)    | REG(LVR)  | REG(TASKPRI) | REG(PROCPRI) |
+        REG(LDR)   | REG(SPIV) | REG(ESR)     | REG(ICR)     |
+        REG(CMCI)  | REG(LVTT) | REG(LVTTHMR) | REG(LVTPC)   |
+        REG(LVT0)  | REG(LVT1) | REG(LVTERR)  | REG(TMICT)   |
+        REG(TMCCT) | REG(TDCR) |
 #undef REG
 #define REGBLOCK(x) (((1UL << (NR_VECTORS / 32)) - 1) << (APIC_ ## x >> 4))
-            REGBLOCK(ISR) | REGBLOCK(TMR) | REGBLOCK(IRR)
+        REGBLOCK(ISR) | REGBLOCK(TMR) | REGBLOCK(IRR)
 #undef REGBLOCK
-        };
+    };
     const struct vlapic *vlapic = vcpu_vlapic(v);
-    uint32_t high = 0, reg = msr - MSR_X2APIC_FIRST, offset = reg << 4;
+    uint64_t high = 0;
+    uint32_t reg = msr - MSR_X2APIC_FIRST, offset = reg << 4;
+
+    /*
+     * The read side looks as if it might be safe to use outside of current
+     * context, but the write side is most certainly not.  As we don't need
+     * any non-current access, enforce symmetry with the write side.
+     */
+    ASSERT(v == current);
 
     if ( !vlapic_x2apic_mode(vlapic) ||
          (reg >= sizeof(readable) * 8) || !test_bit(reg, readable) )
-        return X86EMUL_UNHANDLEABLE;
+        return X86EMUL_EXCEPTION;
 
     if ( offset == APIC_ICR )
-        high = vlapic_read_aligned(vlapic, APIC_ICR2);
+        high = (uint64_t)vlapic_read_aligned(vlapic, APIC_ICR2) << 32;
 
-    *msr_content = ((uint64_t)high << 32) |
-                   vlapic_read_aligned(vlapic, offset);
+    *val = high | vlapic_read_aligned(vlapic, offset);
 
     return X86EMUL_OKAY;
 }
@@ -957,49 +963,52 @@ int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
     return X86EMUL_OKAY;
 }
 
-int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
+int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t msr_content)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t offset = (msr - MSR_X2APIC_FIRST) << 4;
 
+    /* The timer handling at least is unsafe outside of current context. */
+    ASSERT(v == current);
+
     if ( !vlapic_x2apic_mode(vlapic) )
-        return X86EMUL_UNHANDLEABLE;
+        return X86EMUL_EXCEPTION;
 
     switch ( offset )
     {
     case APIC_TASKPRI:
         if ( msr_content & ~APIC_TPRI_MASK )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         break;
 
     case APIC_SPIV:
         if ( msr_content & ~(APIC_VECTOR_MASK | APIC_SPIV_APIC_ENABLED |
                              (VLAPIC_VERSION & APIC_LVR_DIRECTED_EOI
                               ? APIC_SPIV_DIRECTED_EOI : 0)) )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVTT:
         if ( msr_content & ~(LVT_MASK | APIC_TIMER_MODE_MASK) )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVTTHMR:
     case APIC_LVTPC:
     case APIC_CMCI:
         if ( msr_content & ~(LVT_MASK | APIC_MODE_MASK) )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVT0:
     case APIC_LVT1:
         if ( msr_content & ~LINT_MASK )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         break;
 
     case APIC_LVTERR:
         if ( msr_content & ~LVT_MASK )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         break;
 
     case APIC_TMICT:
@@ -1007,20 +1016,20 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
 
     case APIC_TDCR:
         if ( msr_content & ~APIC_TDR_DIV_1 )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         break;
 
     case APIC_ICR:
         if ( (uint32_t)msr_content & ~(APIC_VECTOR_MASK | APIC_MODE_MASK |
                                        APIC_DEST_MASK | APIC_INT_ASSERT |
                                        APIC_INT_LEVELTRIG | APIC_SHORT_MASK) )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         vlapic_set_reg(vlapic, APIC_ICR2, msr_content >> 32);
         break;
 
     case APIC_SELF_IPI:
         if ( msr_content & ~APIC_VECTOR_MASK )
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
         offset = APIC_ICR;
         msr_content = APIC_DEST_SELF | (msr_content & APIC_VECTOR_MASK);
         break;
@@ -1028,8 +1037,10 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
     case APIC_EOI:
     case APIC_ESR:
         if ( msr_content )
+        {
     default:
-            return X86EMUL_UNHANDLEABLE;
+            return X86EMUL_EXCEPTION;
+        }
     }
 
     vlapic_reg_write(v, offset, msr_content);

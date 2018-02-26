@@ -117,6 +117,7 @@ int init_vcpu_msr_policy(struct vcpu *v)
 
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
+    const struct vcpu *curr = current;
     const struct domain *d = v->domain;
     const struct cpuid_policy *cp = d->arch.cpuid;
     const struct msr_policy *mp = d->arch.msr;
@@ -148,6 +149,13 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
         *val = msrs->misc_features_enables.raw;
+        break;
+
+    case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
+        if ( !is_hvm_domain(d) || v != curr )
+            goto gp_fault;
+
+        ret = guest_rdmsr_x2apic(v, msr, val);
         break;
 
     case 0x40000000 ... 0x400001ff:
@@ -296,6 +304,13 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
             ctxt_switch_levelling(v);
         break;
     }
+
+    case MSR_X2APIC_FIRST ... MSR_X2APIC_LAST:
+        if ( !is_hvm_domain(d) || v != curr )
+            goto gp_fault;
+
+        ret = guest_wrmsr_x2apic(v, msr, val);
+        break;
 
     case 0x40000000 ... 0x400001ff:
         if ( is_viridian_domain(d) )
