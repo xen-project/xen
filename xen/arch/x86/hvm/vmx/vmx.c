@@ -483,102 +483,6 @@ static void vmx_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
-static int long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
-{
-    struct vcpu *v = current;
-
-    switch ( msr )
-    {
-    case MSR_FS_BASE:
-        __vmread(GUEST_FS_BASE, msr_content);
-        break;
-
-    case MSR_GS_BASE:
-        __vmread(GUEST_GS_BASE, msr_content);
-        break;
-
-    case MSR_SHADOW_GS_BASE:
-        rdmsrl(MSR_SHADOW_GS_BASE, *msr_content);
-        break;
-
-    case MSR_STAR:
-        *msr_content = v->arch.hvm_vmx.star;
-        break;
-
-    case MSR_LSTAR:
-        *msr_content = v->arch.hvm_vmx.lstar;
-        break;
-
-    case MSR_CSTAR:
-        *msr_content = v->arch.hvm_vmx.cstar;
-        break;
-
-    case MSR_SYSCALL_MASK:
-        *msr_content = v->arch.hvm_vmx.sfmask;
-        break;
-
-    default:
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    HVM_DBG_LOG(DBG_LEVEL_MSR, "msr %#x content %#"PRIx64, msr, *msr_content);
-
-    return X86EMUL_OKAY;
-}
-
-static int long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
-{
-    struct vcpu *v = current;
-
-    HVM_DBG_LOG(DBG_LEVEL_MSR, "msr %#x content %#"PRIx64, msr, msr_content);
-
-    switch ( msr )
-    {
-    case MSR_FS_BASE:
-    case MSR_GS_BASE:
-    case MSR_SHADOW_GS_BASE:
-        if ( !is_canonical_address(msr_content) )
-            return X86EMUL_EXCEPTION;
-
-        if ( msr == MSR_FS_BASE )
-            __vmwrite(GUEST_FS_BASE, msr_content);
-        else if ( msr == MSR_GS_BASE )
-            __vmwrite(GUEST_GS_BASE, msr_content);
-        else
-            wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
-
-        break;
-
-    case MSR_STAR:
-        v->arch.hvm_vmx.star = msr_content;
-        wrmsrl(MSR_STAR, msr_content);
-        break;
-
-    case MSR_LSTAR:
-        if ( !is_canonical_address(msr_content) )
-            return X86EMUL_EXCEPTION;
-        v->arch.hvm_vmx.lstar = msr_content;
-        wrmsrl(MSR_LSTAR, msr_content);
-        break;
-
-    case MSR_CSTAR:
-        if ( !is_canonical_address(msr_content) )
-            return X86EMUL_EXCEPTION;
-        v->arch.hvm_vmx.cstar = msr_content;
-        break;
-
-    case MSR_SYSCALL_MASK:
-        v->arch.hvm_vmx.sfmask = msr_content;
-        wrmsrl(MSR_SYSCALL_MASK, msr_content);
-        break;
-
-    default:
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    return X86EMUL_OKAY;
-}
-
 /*
  * To avoid MSR save/restore at every VM exit/entry time, we restore
  * the x86_64 specific MSRs at domain switch time. Since these MSRs
@@ -2928,6 +2832,35 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_IA32_SYSENTER_EIP:
         __vmread(GUEST_SYSENTER_EIP, msr_content);
         break;
+
+    case MSR_FS_BASE:
+        __vmread(GUEST_FS_BASE, msr_content);
+        break;
+
+    case MSR_GS_BASE:
+        __vmread(GUEST_GS_BASE, msr_content);
+        break;
+
+    case MSR_SHADOW_GS_BASE:
+        rdmsrl(MSR_SHADOW_GS_BASE, *msr_content);
+        break;
+
+    case MSR_STAR:
+        *msr_content = curr->arch.hvm_vmx.star;
+        break;
+
+    case MSR_LSTAR:
+        *msr_content = curr->arch.hvm_vmx.lstar;
+        break;
+
+    case MSR_CSTAR:
+        *msr_content = curr->arch.hvm_vmx.cstar;
+        break;
+
+    case MSR_SYSCALL_MASK:
+        *msr_content = curr->arch.hvm_vmx.sfmask;
+        break;
+
     case MSR_IA32_DEBUGCTLMSR:
         __vmread(GUEST_IA32_DEBUGCTL, msr_content);
         break;
@@ -2962,14 +2895,6 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     default:
         if ( passive_domain_do_rdmsr(msr, msr_content) )
             goto done;
-        switch ( long_mode_do_msr_read(msr, msr_content) )
-        {
-        case X86EMUL_EXCEPTION:
-            return X86EMUL_EXCEPTION;
-
-        case X86EMUL_OKAY:
-            goto done;
-        }
 
         if ( vmx_read_guest_msr(msr, msr_content) == 0 )
             break;
@@ -3124,6 +3049,45 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             goto gp_fault;
         __vmwrite(GUEST_SYSENTER_EIP, msr_content);
         break;
+
+    case MSR_FS_BASE:
+    case MSR_GS_BASE:
+    case MSR_SHADOW_GS_BASE:
+        if ( !is_canonical_address(msr_content) )
+            goto gp_fault;
+
+        if ( msr == MSR_FS_BASE )
+            __vmwrite(GUEST_FS_BASE, msr_content);
+        else if ( msr == MSR_GS_BASE )
+            __vmwrite(GUEST_GS_BASE, msr_content);
+        else
+            wrmsrl(MSR_SHADOW_GS_BASE, msr_content);
+
+        break;
+
+    case MSR_STAR:
+        v->arch.hvm_vmx.star = msr_content;
+        wrmsrl(MSR_STAR, msr_content);
+        break;
+
+    case MSR_LSTAR:
+        if ( !is_canonical_address(msr_content) )
+            goto gp_fault;
+        v->arch.hvm_vmx.lstar = msr_content;
+        wrmsrl(MSR_LSTAR, msr_content);
+        break;
+
+    case MSR_CSTAR:
+        if ( !is_canonical_address(msr_content) )
+            goto gp_fault;
+        v->arch.hvm_vmx.cstar = msr_content;
+        break;
+
+    case MSR_SYSCALL_MASK:
+        v->arch.hvm_vmx.sfmask = msr_content;
+        wrmsrl(MSR_SYSCALL_MASK, msr_content);
+        break;
+
     case MSR_IA32_DEBUGCTLMSR: {
         int i, rc = 0;
         uint64_t supported = IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF;
@@ -3185,32 +3149,26 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( wrmsr_viridian_regs(msr, msr_content) ) 
             break;
 
-        switch ( long_mode_do_msr_write(msr, msr_content) )
-        {
-        case X86EMUL_UNHANDLEABLE:
-            if ( (vmx_write_guest_msr(msr, msr_content) != 0) &&
-                 !is_last_branch_msr(msr) )
-                switch ( wrmsr_hypervisor_regs(msr, msr_content) )
-                {
-                case -ERESTART:
-                    return X86EMUL_RETRY;
-                case 0:
-                    /*
-                     * Match up with the RDMSR side for now; ultimately this
-                     * entire case block should go away.
-                     */
-                    if ( rdmsr_safe(msr, msr_content) == 0 )
-                        break;
-                    goto gp_fault;
-                case 1:
-                    break;
-                default:
-                    goto gp_fault;
-                }
+        if ( vmx_write_guest_msr(msr, msr_content) == 0 ||
+             is_last_branch_msr(msr) )
             break;
 
-        case X86EMUL_EXCEPTION:
-            return X86EMUL_EXCEPTION;
+        switch ( wrmsr_hypervisor_regs(msr, msr_content) )
+        {
+        case -ERESTART:
+            return X86EMUL_RETRY;
+        case 0:
+            /*
+             * Match up with the RDMSR side for now; ultimately this
+             * entire case block should go away.
+             */
+            if ( rdmsr_safe(msr, msr_content) == 0 )
+                break;
+            goto gp_fault;
+        case 1:
+            break;
+        default:
+            goto gp_fault;
         }
         break;
     }
