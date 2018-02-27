@@ -20,6 +20,17 @@ static inline int replace_grant_supported(void)
     return 1;
 }
 
+#define gnttab_set_frame_gfn(d, st, idx, gfn)                            \
+    do {                                                                 \
+        ((st) ? (d)->arch.grant_status_gfn                               \
+              : (d)->arch.grant_shared_gfn)[idx] = (gfn);                \
+    } while ( 0 )
+
+#define gnttab_get_frame_gfn(d, st, idx) ({                              \
+   _gfn((st) ? gnttab_status_gmfn(d, (d)->grant_table, idx)              \
+             : gnttab_shared_gmfn(d, (d)->grant_table, idx));            \
+})
+
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
         share_xen_page_with_guest(                                       \
