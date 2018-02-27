@@ -136,7 +136,7 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
     if ( iopl_ok(v, regs) )
         return true;
 
-    if ( v->arch.pv_vcpu.iobmp_limit > (port + bytes) )
+    if ( (port + bytes) <= v->arch.pv_vcpu.iobmp_limit )
     {
         union { uint8_t bytes[2]; uint16_t mask; } x;
 
