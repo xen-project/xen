@@ -165,6 +165,9 @@ struct arch_vmx_struct {
 
     struct page_info     *pml_pg;
 
+    /* Bitmask of trapped CR4 bits. */
+    unsigned long        cr4_host_mask;
+
     /*
      * Before it is blocked, vCPU is added to the per-cpu list.
      * VT-d engine can send wakeup notification event to the

@@ -189,10 +189,11 @@ int arch_monitor_domctl_event(struct domain *d,
             ad->monitor.write_ctrlreg_enabled &= ~ctrlreg_bitmask;
         }
 
-        if ( VM_EVENT_X86_CR3 == mop->u.mov_to_cr.index )
+        if ( VM_EVENT_X86_CR3 == mop->u.mov_to_cr.index ||
+             VM_EVENT_X86_CR4 == mop->u.mov_to_cr.index )
         {
             struct vcpu *v;
-            /* Latches new CR3 mask through CR0 code. */
+            /* Latches new CR3 or CR4 mask through CR0 code. */
             for_each_vcpu ( d, v )
                 hvm_update_guest_cr(v, 0);
         }

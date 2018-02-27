@@ -1684,6 +1684,36 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         }
 
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
+
+        if ( !paging_mode_hap(v->domain) )
+            /*
+             * Shadow path has not been optimized because it requires
+             * unconditionally trapping more CR4 bits, at which point the
+             * performance benefit of doing this is quite dubious.
+             */
+            v->arch.hvm_vmx.cr4_host_mask = ~0UL;
+        else
+        {
+            /*
+             * Update CR4 host mask to only trap when the guest tries to set
+             * bits that are controlled by the hypervisor.
+             */
+            v->arch.hvm_vmx.cr4_host_mask = HVM_CR4_HOST_MASK | X86_CR4_PKE |
+                                            ~hvm_cr4_guest_valid_bits(v, 0);
+            v->arch.hvm_vmx.cr4_host_mask |= v->arch.hvm_vmx.vmx_realmode ?
+                                             X86_CR4_VME : 0;
+            v->arch.hvm_vmx.cr4_host_mask |= !hvm_paging_enabled(v) ?
+                                             (X86_CR4_PSE | X86_CR4_SMEP |
+                                              X86_CR4_SMAP)
+                                             : 0;
+            if ( v->domain->arch.monitor.write_ctrlreg_enabled &
+                 monitor_ctrlreg_bitmask(VM_EVENT_X86_CR4) )
+                v->arch.hvm_vmx.cr4_host_mask |=
+                ~v->domain->arch.monitor.write_ctrlreg_mask[VM_EVENT_X86_CR4];
+
+        }
+        __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm_vmx.cr4_host_mask);
+
         break;
 
     case 2:
@@ -3512,6 +3542,15 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     if ( paging_mode_hap(v->domain) )
     {
+        /*
+         * Xen allows the guest to modify some CR4 bits directly, update cached
+         * values to match.
+         */
+        __vmread(GUEST_CR4, &v->arch.hvm_vcpu.hw_cr[4]);
+        v->arch.hvm_vcpu.guest_cr[4] &= v->arch.hvm_vmx.cr4_host_mask;
+        v->arch.hvm_vcpu.guest_cr[4] |= v->arch.hvm_vcpu.hw_cr[4] &
+                                        ~v->arch.hvm_vmx.cr4_host_mask;
+
         __vmread(GUEST_CR3, &v->arch.hvm_vcpu.hw_cr[3]);
         if ( vmx_unrestricted_guest(v) || hvm_paging_enabled(v) )
             v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3];

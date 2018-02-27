@@ -1100,6 +1100,8 @@ static void load_shadow_guest_state(struct vcpu *v)
     cr_read_shadow = (get_vvmcs(v, GUEST_CR4) & ~cr_gh_mask) |
                      (get_vvmcs(v, CR4_READ_SHADOW) & cr_gh_mask);
     __vmwrite(CR4_READ_SHADOW, cr_read_shadow);
+    /* Add the nested host mask to the one set by vmx_update_guest_cr. */
+    __vmwrite(CR4_GUEST_HOST_MASK, cr_gh_mask | v->arch.hvm_vmx.cr4_host_mask);
 
     /* TODO: CR3 target control */
 }
