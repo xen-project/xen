@@ -1129,11 +1129,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             copyback = 1;
         break;
 
-    case XEN_DOMCTL_set_gnttab_limits:
-        ret = grant_table_set_limits(d, op->u.set_gnttab_limits.grant_frames,
-                                     op->u.set_gnttab_limits.maptrack_frames);
-        break;
-
     default:
         ret = arch_do_domctl(op, d, u_domctl);
         break;

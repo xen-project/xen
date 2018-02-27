@@ -112,13 +112,6 @@ static int build(xc_interface *xch)
         fprintf(stderr, "xc_domain_setmaxmem failed\n");
         goto err;
     }
-    rv = xc_domain_set_gnttab_limits(xch, domid, config.max_grant_frames,
-                                     config.max_maptrack_frames);
-    if ( rv )
-    {
-        fprintf(stderr, "xc_domain_set_gnttab_limits failed\n");
-        goto err;
-    }
     rv = xc_domain_set_memmap_limit(xch, domid, limit_kb);
     if ( rv )
     {

@@ -246,8 +246,6 @@ class domain2
     mem_sharing
 # XEN_DOMCTL_psr_alloc
     psr_alloc
-# XEN_DOMCTL_set_gnttab_limits
-    set_gnttab_limits
 # XENMEM_resource_map
     resource_map
 }

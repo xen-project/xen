@@ -1069,11 +1069,6 @@ struct xen_domctl_psr_alloc {
     uint64_t data;      /* IN/OUT */
 };
 
-struct xen_domctl_set_gnttab_limits {
-    uint32_t grant_frames;     /* IN */
-    uint32_t maptrack_frames;  /* IN */
-};
-
 /* XEN_DOMCTL_vuart_op */
 struct xen_domctl_vuart_op {
 #define XEN_DOMCTL_VUART_OP_INIT  0
@@ -1172,7 +1167,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_monitor_op                    77
 #define XEN_DOMCTL_psr_alloc                     78
 #define XEN_DOMCTL_soft_reset                    79
-#define XEN_DOMCTL_set_gnttab_limits             80
+/* #define XEN_DOMCTL_set_gnttab_limits          80 - Moved into XEN_DOMCTL_createdomain */
 #define XEN_DOMCTL_vuart_op                      81
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
@@ -1233,7 +1228,6 @@ struct xen_domctl {
         struct xen_domctl_psr_cmt_op        psr_cmt_op;
         struct xen_domctl_monitor_op        monitor_op;
         struct xen_domctl_psr_alloc         psr_alloc;
-        struct xen_domctl_set_gnttab_limits set_gnttab_limits;
         struct xen_domctl_vuart_op          vuart_op;
         uint8_t                             pad[128];
     } u;
