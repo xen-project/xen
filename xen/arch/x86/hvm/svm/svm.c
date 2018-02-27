@@ -1806,19 +1806,15 @@ static void svm_fpu_dirty_intercept(void)
         vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
 }
 
-static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
+static int svm_vmexit_do_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
 {
     struct vcpu *curr = current;
-    unsigned int inst_len;
     struct cpuid_leaf res;
-
-    if ( (inst_len = __get_instruction_length(curr, INSTR_CPUID)) == 0 )
-        return;
 
     if ( hvm_check_cpuid_faulting(curr) )
     {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
-        return;
+        return 1; /* Don't advance the guest IP! */
     }
 
     guest_cpuid(curr, regs->eax, regs->ecx, &res);
@@ -1829,7 +1825,7 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
     regs->rcx = res.c;
     regs->rdx = res.d;
 
-    __update_guest_eip(regs, inst_len);
+    return hvm_monitor_cpuid(inst_len, regs->eax, regs->ecx);
 }
 
 static void svm_vmexit_do_cr_access(
@@ -2775,9 +2771,22 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     case VMEXIT_CPUID:
-        svm_vmexit_do_cpuid(regs);
-        break;
+    {
+        unsigned int inst_len = __get_instruction_length(v, INSTR_CPUID);
+        int rc = 0;
 
+        if ( inst_len == 0 )
+            break;
+
+        rc = svm_vmexit_do_cpuid(regs, inst_len);
+
+        if ( rc < 0 )
+            goto unexpected_exit_type;
+        if ( !rc )
+            __update_guest_eip(regs, inst_len); /* Safe: CPUID */
+
+        break;
+    }
     case VMEXIT_HLT:
         svm_vmexit_do_hlt(vmcb, regs);
         break;
