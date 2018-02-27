@@ -3273,6 +3273,7 @@ static int cache_flush(const gnttab_cache_flush_t *cflush, grant_ref_t *cur_ref)
 
     unmap_domain_page(v);
     put_page(page);
+    rcu_unlock_domain(d);
 
     return ret;
 }
