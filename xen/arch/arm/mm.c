@@ -1182,12 +1182,22 @@ int xenmem_add_to_physmap_one(
                 mfn = mfn_x(INVALID_MFN);
         }
 
+        if ( mfn != mfn_x(INVALID_MFN) &&
+             !gfn_eq(gnttab_get_frame_gfn(d, status, idx), INVALID_GFN) )
+        {
+            rc = guest_physmap_remove_page(d,
+                                           gnttab_get_frame_gfn(d, status, idx),
+                                           _mfn(mfn), 0);
+            if ( rc )
+            {
+                grant_write_unlock(d->grant_table);
+                return rc;
+            }
+        }
+
         if ( mfn != mfn_x(INVALID_MFN) )
         {
-            if ( status )
-                d->arch.grant_status_gfn[idx] = gfn;
-            else
-                d->arch.grant_shared_gfn[idx] = gfn;
+            gnttab_set_frame_gfn(d, status, idx, gfn);
 
             t = p2m_ram_rw;
         }

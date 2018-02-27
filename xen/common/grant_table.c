@@ -1516,23 +1516,74 @@ status_alloc_failed:
     return -ENOMEM;
 }
 
-static void
+static int
 gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
 {
-    int i;
+    unsigned int i;
 
     for ( i = 0; i < nr_status_frames(gt); i++ )
     {
         struct page_info *pg = virt_to_page(gt->status[i]);
+        gfn_t gfn = gnttab_get_frame_gfn(d, true, i);
+
+        /*
+         * For translated domains, recovering from failure after partial
+         * changes were made is more complicated than it seems worth
+         * implementing at this time. Hence respective error paths below
+         * crash the domain in such a case.
+         */
+        if ( paging_mode_translate(d) )
+        {
+            int rc = gfn_eq(gfn, INVALID_GFN)
+                     ? 0
+                     : guest_physmap_remove_page(d, gfn,
+                                                 _mfn(page_to_mfn(pg)), 0);
+
+            if ( rc )
+            {
+                gprintk(XENLOG_ERR,
+                        "Could not remove status frame %u (GFN %#lx) from P2M\n",
+                        i, gfn_x(gfn));
+                domain_crash(d);
+                return rc;
+            }
+            gnttab_set_frame_gfn(d, true, i, INVALID_GFN);
+        }
 
         BUG_ON(page_get_owner(pg) != d);
         if ( test_and_clear_bit(_PGC_allocated, &pg->count_info) )
             put_page(pg);
-        BUG_ON(pg->count_info & ~PGC_xen_heap);
+
+        if ( pg->count_info & ~PGC_xen_heap )
+        {
+            if ( paging_mode_translate(d) )
+            {
+                gprintk(XENLOG_ERR,
+                        "Wrong page state %#lx of status frame %u (GFN %#lx)\n",
+                        pg->count_info, i, gfn_x(gfn));
+                domain_crash(d);
+            }
+            else
+            {
+                if ( get_page(pg, d) )
+                    set_bit(_PGC_allocated, &pg->count_info);
+                while ( i-- )
+                    gnttab_create_status_page(d, gt, i);
+            }
+            return -EBUSY;
+        }
+
+        page_set_owner(pg, NULL);
+    }
+
+    for ( i = 0; i < nr_status_frames(gt); i++ )
+    {
         free_xenheap_page(gt->status[i]);
         gt->status[i] = NULL;
     }
     gt->nr_status_frames = 0;
+
+    return 0;
 }
 
 /*
@@ -2774,8 +2825,9 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
         break;
     }
 
-    if ( op.version < 2 && gt->gt_version == 2 )
-        gnttab_unpopulate_status_frames(currd, gt);
+    if ( op.version < 2 && gt->gt_version == 2 &&
+         (res = gnttab_unpopulate_status_frames(currd, gt)) != 0 )
+        goto out_unlock;
 
     /* Make sure there's no crud left over from the old version. */
     for ( i = 0; i < nr_grant_frames(gt); i++ )
