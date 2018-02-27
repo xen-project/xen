@@ -357,11 +357,6 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
     rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
 
-#ifdef _PGT_pinned
-    if ( !rc && test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
-        put_page_and_type(page);
-#endif
-
     /*
      * With the lack of an IOMMU on some platforms, domains with DMA-capable
      * device must retrieve the same pfn when the hypercall populate_physmap
