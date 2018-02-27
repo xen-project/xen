@@ -2145,20 +2145,20 @@ int construct_dom0(struct domain *d)
     allocate_memory(d, &kinfo);
     find_gnttab_region(d, &kinfo);
 
-    if ( acpi_disabled )
-        rc = prepare_dtb(d, &kinfo);
-    else
-        rc = prepare_acpi(d, &kinfo);
-
-    if ( rc < 0 )
-        return rc;
-
     /* Map extra GIC MMIO, irqs and other hw stuffs to dom0. */
     rc = gic_map_hwdom_extra_mappings(d);
     if ( rc < 0 )
         return rc;
 
     rc = platform_specific_mapping(d);
+    if ( rc < 0 )
+        return rc;
+
+    if ( acpi_disabled )
+        rc = prepare_dtb(d, &kinfo);
+    else
+        rc = prepare_acpi(d, &kinfo);
+
     if ( rc < 0 )
         return rc;
 
