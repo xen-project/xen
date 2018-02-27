@@ -51,7 +51,8 @@ struct arch_domain
     uint64_t vttbr;
 
     struct hvm_domain hvm_domain;
-    xen_pfn_t *grant_table_gpfn;
+    gfn_t *grant_shared_gfn;
+    gfn_t *grant_status_gfn;
 
     struct vmmio vmmio;
 
