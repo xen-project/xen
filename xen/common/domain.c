@@ -268,7 +268,6 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
     int err, init_status = 0;
-    int poolid = CPUPOOLID_NONE;
 
     if ( (d = alloc_domain_struct()) == NULL )
         return ERR_PTR(-ENOMEM);
@@ -282,9 +281,6 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     if ( (err = xsm_alloc_security_domain(d)) != 0 )
         goto fail;
     init_status |= INIT_xsm;
-
-    watchdog_domain_init(d);
-    init_status |= INIT_watchdog;
 
     atomic_set(&d->refcnt, 1);
     spin_lock_init_prof(d, domain_lock);
@@ -313,35 +309,38 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     else
         d->guest_type = guest_type_pv;
 
-    if ( domid == 0 || domid == hardware_domid )
-    {
-        if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
-            panic("The value of hardware_dom must be a valid domain ID");
-        d->is_pinned = opt_dom0_vcpus_pin;
-        d->disable_migrate = 1;
-        old_hwdom = hardware_domain;
-        hardware_domain = d;
-    }
-
-    if ( domcr_flags & DOMCRF_xs_domain )
-    {
-        d->is_xenstore = 1;
-        d->disable_migrate = 1;
-    }
-
     rangeset_domain_initialise(d);
     init_status |= INIT_rangeset;
-
-    d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
-    d->irq_caps   = rangeset_new(d, "Interrupts", 0);
-    if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
-        goto fail;
 
     if ( domcr_flags & DOMCRF_dummy )
         return d;
 
     if ( !is_idle_domain(d) )
     {
+        watchdog_domain_init(d);
+        init_status |= INIT_watchdog;
+
+        if ( domid == 0 || domid == hardware_domid )
+        {
+            if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
+                panic("The value of hardware_dom must be a valid domain ID");
+            d->is_pinned = opt_dom0_vcpus_pin;
+            d->disable_migrate = 1;
+            old_hwdom = hardware_domain;
+            hardware_domain = d;
+        }
+
+        if ( domcr_flags & DOMCRF_xs_domain )
+        {
+            d->is_xenstore = 1;
+            d->disable_migrate = 1;
+        }
+
+        d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
+        d->irq_caps   = rangeset_new(d, "Interrupts", 0);
+        if ( !d->iomem_caps || !d->irq_caps )
+            goto fail;
+
         if ( (err = xsm_domain_create(XSM_HOOK, d, ssidref)) != 0 )
             goto fail;
 
@@ -366,8 +365,6 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
             goto fail;
         init_status |= INIT_gnttab;
 
-        poolid = 0;
-
         err = -ENOMEM;
 
         d->pbuf = xzalloc_array(char, DOMAIN_PBUF_SIZE);
@@ -379,14 +376,14 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         goto fail;
     init_status |= INIT_arch;
 
-    if ( (err = sched_init_domain(d, poolid)) != 0 )
-        goto fail;
-
-    if ( (err = late_hwdom_init(d)) != 0 )
-        goto fail;
-
     if ( !is_idle_domain(d) )
     {
+        if ( (err = sched_init_domain(d, 0)) != 0 )
+            goto fail;
+
+        if ( (err = late_hwdom_init(d)) != 0 )
+            goto fail;
+
         spin_lock(&domlist_update_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of domid. */
         for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
