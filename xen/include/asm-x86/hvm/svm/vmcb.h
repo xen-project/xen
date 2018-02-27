@@ -493,6 +493,14 @@ struct vmcb_struct {
 };
 
 struct svm_domain {
+    /* OSVW MSRs */
+    union {
+        uint64_t raw[2];
+        struct {
+            uint64_t length;
+            uint64_t status;
+        };
+    } osvw;
 };
 
 /*
@@ -536,12 +544,6 @@ struct arch_svm_struct {
 
     /* data breakpoint extension MSRs */
     uint32_t dr_mask[4];
-
-    /* OSVW MSRs */
-    struct {
-        u64 length;
-        u64 status;
-    } osvw;
 };
 
 struct vmcb_struct *alloc_vmcb(void);

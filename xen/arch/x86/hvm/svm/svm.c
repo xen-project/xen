@@ -1195,17 +1195,18 @@ void svm_vmenter_helper(const struct cpu_user_regs *regs)
     vmcb->rflags = regs->rflags | X86_EFLAGS_MBS;
 }
 
-static void svm_guest_osvw_init(struct vcpu *vcpu)
+static void svm_guest_osvw_init(struct domain *d)
 {
-    if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
-        return;
+    struct svm_domain *svm = &d->arch.hvm_domain.svm;
+
+    spin_lock(&osvw_lock);
 
     /*
      * Guests should see errata 400 and 415 as fixed (assuming that
      * HLT and IO instructions are intercepted).
      */
-    vcpu->arch.hvm_svm.osvw.length = (osvw_length >= 3) ? osvw_length : 3;
-    vcpu->arch.hvm_svm.osvw.status = osvw_status & ~(6ULL);
+    svm->osvw.length = min(max(3ul, osvw_length), 64ul);
+    svm->osvw.status = osvw_status & ~6;
 
     /*
      * By increasing VCPU's osvw.length to 3 we are telling the guest that
@@ -1216,7 +1217,9 @@ static void svm_guest_osvw_init(struct vcpu *vcpu)
      * is present (because we really don't know).
      */
     if ( osvw_length == 0 && boot_cpu_data.x86 == 0x10 )
-        vcpu->arch.hvm_svm.osvw.status |= 1;
+        svm->osvw.status |= 1;
+
+    spin_unlock(&osvw_lock);
 }
 
 void svm_host_osvw_reset()
@@ -1268,6 +1271,8 @@ static int svm_domain_initialise(struct domain *d)
 
     d->arch.ctxt_switch = &csw;
 
+    svm_guest_osvw_init(d);
+
     return 0;
 }
 
@@ -1288,8 +1293,6 @@ static int svm_vcpu_initialise(struct vcpu *v)
                 v->vcpu_id, rc);
         return rc;
     }
-
-    svm_guest_osvw_init(v);
 
     return 0;
 }
@@ -1627,23 +1630,6 @@ static void svm_init_erratum_383(const struct cpuinfo_x86 *c)
     }
 }
 
-static int svm_handle_osvw(struct vcpu *v, uint32_t msr, uint64_t *val, bool_t read)
-{
-    if ( !v->domain->arch.cpuid->extd.osvw )
-        return -1;
-
-    if ( read )
-    {
-        if (msr == MSR_AMD_OSVW_ID_LENGTH)
-            *val = v->arch.hvm_svm.osvw.length;
-        else
-            *val = v->arch.hvm_svm.osvw.status;
-    }
-    /* Writes are ignored */
-
-    return 0;
-}
-
 static int _svm_cpu_up(bool bsp)
 {
     uint64_t msr_content;
@@ -1875,6 +1861,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
     int ret;
     struct vcpu *v = current;
+    const struct domain *d = v->domain;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     switch ( msr )
@@ -2017,9 +2004,10 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     case MSR_AMD_OSVW_ID_LENGTH:
     case MSR_AMD_OSVW_STATUS:
-        ret = svm_handle_osvw(v, msr, msr_content, 1);
-        if ( ret < 0 )
+        if ( !d->arch.cpuid->extd.osvw )
             goto gpf;
+        *msr_content =
+            d->arch.hvm_domain.svm.osvw.raw[msr - MSR_AMD_OSVW_ID_LENGTH];
         break;
 
     default:
@@ -2063,6 +2051,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     int ret, result = X86EMUL_OKAY;
     struct vcpu *v = current;
+    struct domain *d = v->domain;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
     switch ( msr )
@@ -2218,9 +2207,9 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     case MSR_AMD_OSVW_ID_LENGTH:
     case MSR_AMD_OSVW_STATUS:
-        ret = svm_handle_osvw(v, msr, &msr_content, 0);
-        if ( ret < 0 )
+        if ( !d->arch.cpuid->extd.osvw )
             goto gpf;
+        /* Write-discard */
         break;
 
     default:
