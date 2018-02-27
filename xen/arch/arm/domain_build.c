@@ -503,9 +503,10 @@ static void set_interrupt_ppi(gic_interrupt_t interrupt, unsigned int irq,
 {
     __be32 *cells = interrupt;
 
-    BUG_ON(irq < 16 && irq >= 32);
+    BUG_ON(irq < 16);
+    BUG_ON(irq >= 32);
 
-    /* See linux Documentation/devictree/bindings/arm/gic.txt */
+    /* See linux Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt */
     dt_set_cell(&cells, 1, 1); /* is a PPI */
     dt_set_cell(&cells, 1, irq - 16); /* PPIs start at 16 */
     dt_set_cell(&cells, 1, (cpumask << 8) | level);
