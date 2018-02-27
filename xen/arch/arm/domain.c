@@ -463,19 +463,37 @@ void startup_cpu_idle_loop(void)
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
+    unsigned int i, max_status_frames;
+
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
     d = alloc_xenheap_pages(0, 0);
     if ( d == NULL )
         return NULL;
 
     clear_page(d);
-    d->arch.grant_table_gfn = xzalloc_array(gfn_t, max_grant_frames);
+
+    d->arch.grant_shared_gfn = xmalloc_array(gfn_t, max_grant_frames);
+    max_status_frames = grant_to_status_frames(max_grant_frames);
+    d->arch.grant_status_gfn = xmalloc_array(gfn_t, max_status_frames);
+    if ( !d->arch.grant_shared_gfn || !d->arch.grant_status_gfn )
+    {
+        free_domain_struct(d);
+        return NULL;
+    }
+
+    for ( i = 0; i < max_grant_frames; ++i )
+        d->arch.grant_shared_gfn[i] = INVALID_GFN;
+
+    for ( i = 0; i < max_status_frames; ++i )
+        d->arch.grant_status_gfn[i] = INVALID_GFN;
+
     return d;
 }
 
 void free_domain_struct(struct domain *d)
 {
-    xfree(d->arch.grant_table_gfn);
+    xfree(d->arch.grant_shared_gfn);
+    xfree(d->arch.grant_status_gfn);
     free_xenheap_page(d);
 }
 

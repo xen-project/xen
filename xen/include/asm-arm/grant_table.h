@@ -14,7 +14,6 @@ int replace_grant_host_mapping(unsigned long gpaddr, unsigned long mfn,
         unsigned long new_gpaddr, unsigned int flags);
 void gnttab_mark_dirty(struct domain *d, unsigned long l);
 #define gnttab_create_status_page(d, t, i) do {} while (0)
-#define gnttab_status_gmfn(d, t, i) (0)
 #define gnttab_release_host_mappings(domain) 1
 static inline int replace_grant_supported(void)
 {
@@ -29,8 +28,12 @@ static inline int replace_grant_supported(void)
     } while ( 0 )
 
 #define gnttab_shared_gmfn(d, t, i)                                      \
-    ( ((i >= nr_grant_frames(d->grant_table)) &&                         \
-     (i < max_grant_frames)) ? 0 : gfn_x(d->arch.grant_table_gfn[i]))
+    gfn_x(((i) >= nr_grant_frames(t)) ? INVALID_GFN                      \
+                                      : (d)->arch.grant_shared_gfn[i])
+
+#define gnttab_status_gmfn(d, t, i)                                      \
+    gfn_x(((i) >= nr_status_frames(t)) ? INVALID_GFN                     \
+                                       : (d)->arch.grant_status_gfn[i])
 
 #define gnttab_need_iommu_mapping(d)                    \
     (is_domain_direct_mapped(d) && need_iommu(d))
