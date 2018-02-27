@@ -47,6 +47,12 @@ static inline unsigned int gnttab_dom0_max(void)
 #define gnttab_init_arch(gt) 0
 #define gnttab_destroy_arch(gt) do {} while ( 0 )
 #define gnttab_set_frame_gfn(gt, st, idx, gfn) do {} while ( 0 )
+#define gnttab_get_frame_gfn(gt, st, idx) ({                             \
+    unsigned long mfn_ = (st) ? gnttab_status_mfn(gt, idx)               \
+                              : gnttab_shared_mfn(gt, idx);              \
+    unsigned long gpfn_ = get_gpfn_from_mfn(mfn_);                       \
+    VALID_M2P(gpfn_) ? _gfn(gpfn_) : INVALID_GFN;                        \
+})
 
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
@@ -63,11 +69,11 @@ static inline unsigned int gnttab_dom0_max(void)
     } while ( 0 )
 
 
-#define gnttab_shared_mfn(d, t, i)                      \
+#define gnttab_shared_mfn(t, i)                         \
     ((virt_to_maddr((t)->shared_raw[i]) >> PAGE_SHIFT))
 
 #define gnttab_shared_gmfn(d, t, i)                     \
-    (mfn_to_gmfn(d, gnttab_shared_mfn(d, t, i)))
+    (mfn_to_gmfn(d, gnttab_shared_mfn(t, i)))
 
 
 #define gnttab_status_mfn(t, i)                         \
