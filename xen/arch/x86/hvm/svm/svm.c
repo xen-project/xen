@@ -2128,6 +2128,13 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             result = X86EMUL_RETRY;
             break;
         case 0:
+            /*
+             * Match up with the RDMSR side for now; ultimately this entire
+             * case block should go away.
+             */
+            if ( rdmsr_safe(msr, msr_content) == 0 )
+                break;
+            goto gpf;
         case 1:
             break;
         default:
