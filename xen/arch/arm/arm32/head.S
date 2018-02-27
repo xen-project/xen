@@ -349,6 +349,13 @@ virtphys_clash:
 1:
         PRINT("- Turning on paging -\r\n")
 
+        /*
+         * The state of the TLBs is unknown before turning on the MMU.
+         * Flush them to avoid stale one.
+         */
+        mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLBs */
+        dsb   nsh
+
         ldr   r1, =paging            /* Explicit vaddr, not RIP-relative */
         mrc   CP32(r0, HSCTLR)
         orr   r0, r0, #(SCTLR_M|SCTLR_C) /* Enable MMU and D-cache */
