@@ -820,7 +820,7 @@ rt_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 
     sdom = xzalloc(struct rt_dom);
     if ( sdom == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     INIT_LIST_HEAD(&sdom->sdom_elem);
     sdom->dom = dom;
@@ -836,14 +836,19 @@ rt_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 static void
 rt_free_domdata(const struct scheduler *ops, void *data)
 {
-    unsigned long flags;
     struct rt_dom *sdom = data;
     struct rt_private *prv = rt_priv(ops);
 
-    spin_lock_irqsave(&prv->lock, flags);
-    list_del_init(&sdom->sdom_elem);
-    spin_unlock_irqrestore(&prv->lock, flags);
-    xfree(data);
+    if ( sdom )
+    {
+        unsigned long flags;
+
+        spin_lock_irqsave(&prv->lock, flags);
+        list_del_init(&sdom->sdom_elem);
+        spin_unlock_irqrestore(&prv->lock, flags);
+
+        xfree(sdom);
+    }
 }
 
 static int
@@ -856,8 +861,8 @@ rt_dom_init(const struct scheduler *ops, struct domain *dom)
         return 0;
 
     sdom = rt_alloc_domdata(ops, dom);
-    if ( sdom == NULL )
-        return -ENOMEM;
+    if ( IS_ERR(sdom) )
+        return PTR_ERR(sdom);
 
     dom->sched_priv = sdom;
 

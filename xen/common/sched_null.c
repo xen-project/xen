@@ -231,7 +231,7 @@ static void * null_alloc_domdata(const struct scheduler *ops,
 
     ndom = xzalloc(struct null_dom);
     if ( ndom == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     ndom->dom = d;
 
@@ -239,20 +239,24 @@ static void * null_alloc_domdata(const struct scheduler *ops,
     list_add_tail(&ndom->ndom_elem, &null_priv(ops)->ndom);
     spin_unlock_irqrestore(&prv->lock, flags);
 
-    return (void*)ndom;
+    return ndom;
 }
 
 static void null_free_domdata(const struct scheduler *ops, void *data)
 {
-    unsigned long flags;
     struct null_dom *ndom = data;
     struct null_private *prv = null_priv(ops);
 
-    spin_lock_irqsave(&prv->lock, flags);
-    list_del_init(&ndom->ndom_elem);
-    spin_unlock_irqrestore(&prv->lock, flags);
+    if ( ndom )
+    {
+        unsigned long flags;
 
-    xfree(data);
+        spin_lock_irqsave(&prv->lock, flags);
+        list_del_init(&ndom->ndom_elem);
+        spin_unlock_irqrestore(&prv->lock, flags);
+
+        xfree(ndom);
+    }
 }
 
 static int null_dom_init(const struct scheduler *ops, struct domain *d)
@@ -263,8 +267,8 @@ static int null_dom_init(const struct scheduler *ops, struct domain *d)
         return 0;
 
     ndom = null_alloc_domdata(ops, d);
-    if ( ndom == NULL )
-        return -ENOMEM;
+    if ( IS_ERR(ndom) )
+        return PTR_ERR(ndom);
 
     d->sched_priv = ndom;
 

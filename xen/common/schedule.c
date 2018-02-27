@@ -318,14 +318,14 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
             return -EBUSY;
     }
 
-    domdata = SCHED_OP(c->sched, alloc_domdata, d);
-    if ( domdata == NULL )
-        return -ENOMEM;
+    domdata = sched_alloc_domdata(c->sched, d);
+    if ( IS_ERR(domdata) )
+        return PTR_ERR(domdata);
 
     vcpu_priv = xzalloc_array(void *, d->max_vcpus);
     if ( vcpu_priv == NULL )
     {
-        SCHED_OP(c->sched, free_domdata, domdata);
+        sched_free_domdata(c->sched, domdata);
         return -ENOMEM;
     }
 
@@ -337,7 +337,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
             for_each_vcpu ( d, v )
                 xfree(vcpu_priv[v->vcpu_id]);
             xfree(vcpu_priv);
-            SCHED_OP(c->sched, free_domdata, domdata);
+            sched_free_domdata(c->sched, domdata);
             return -ENOMEM;
         }
     }
@@ -393,7 +393,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
     domain_unpause(d);
 
-    SCHED_OP(old_ops, free_domdata, old_domdata);
+    sched_free_domdata(old_ops, old_domdata);
 
     xfree(vcpu_priv);
 

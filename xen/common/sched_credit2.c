@@ -3012,7 +3012,7 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 
     sdom = xzalloc(struct csched2_dom);
     if ( sdom == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     /* Initialize credit, cap and weight */
     INIT_LIST_HEAD(&sdom->sdom_elem);
@@ -3032,7 +3032,7 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 
     write_unlock_irqrestore(&prv->lock, flags);
 
-    return (void *)sdom;
+    return sdom;
 }
 
 static int
@@ -3044,8 +3044,8 @@ csched2_dom_init(const struct scheduler *ops, struct domain *dom)
         return 0;
 
     sdom = csched2_alloc_domdata(ops, dom);
-    if ( sdom == NULL )
-        return -ENOMEM;
+    if ( IS_ERR(sdom) )
+        return PTR_ERR(sdom);
 
     dom->sched_priv = sdom;
 
@@ -3055,19 +3055,21 @@ csched2_dom_init(const struct scheduler *ops, struct domain *dom)
 static void
 csched2_free_domdata(const struct scheduler *ops, void *data)
 {
-    unsigned long flags;
     struct csched2_dom *sdom = data;
     struct csched2_private *prv = csched2_priv(ops);
 
-    kill_timer(&sdom->repl_timer);
+    if ( sdom )
+    {
+        unsigned long flags;
 
-    write_lock_irqsave(&prv->lock, flags);
+        kill_timer(&sdom->repl_timer);
 
-    list_del_init(&sdom->sdom_elem);
+        write_lock_irqsave(&prv->lock, flags);
+        list_del_init(&sdom->sdom_elem);
+        write_unlock_irqrestore(&prv->lock, flags);
 
-    write_unlock_irqrestore(&prv->lock, flags);
-
-    xfree(data);
+        xfree(sdom);
+    }
 }
 
 static void

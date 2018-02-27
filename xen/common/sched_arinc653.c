@@ -455,34 +455,6 @@ a653sched_free_vdata(const struct scheduler *ops, void *priv)
 }
 
 /**
- * This function allocates scheduler-specific data for a domain
- *
- * We do not actually make use of any per-domain data but the hypervisor
- * expects a non-NULL return value
- *
- * @param ops       Pointer to this instance of the scheduler structure
- *
- * @return          Pointer to the allocated data
- */
-static void *
-a653sched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
-{
-    /* return a non-NULL value to keep schedule.c happy */
-    return SCHED_PRIV(ops);
-}
-
-/**
- * This function frees scheduler-specific data for a domain
- *
- * @param ops       Pointer to this instance of the scheduler structure
- */
-static void
-a653sched_free_domdata(const struct scheduler *ops, void *data)
-{
-    /* nop */
-}
-
-/**
  * Xen scheduler callback function to sleep a VCPU
  *
  * @param ops       Pointer to this instance of the scheduler structure
@@ -739,9 +711,6 @@ static const struct scheduler sched_arinc653_def = {
 
     .free_vdata     = a653sched_free_vdata,
     .alloc_vdata    = a653sched_alloc_vdata,
-
-    .free_domdata   = a653sched_free_domdata,
-    .alloc_domdata  = a653sched_alloc_domdata,
 
     .init_domain    = NULL,
     .destroy_domain = NULL,

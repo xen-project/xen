@@ -1281,7 +1281,7 @@ csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 
     sdom = xzalloc(struct csched_dom);
     if ( sdom == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->active_vcpu);
@@ -1289,7 +1289,7 @@ csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     sdom->dom = dom;
     sdom->weight = CSCHED_DEFAULT_WEIGHT;
 
-    return (void *)sdom;
+    return sdom;
 }
 
 static int
@@ -1301,8 +1301,8 @@ csched_dom_init(const struct scheduler *ops, struct domain *dom)
         return 0;
 
     sdom = csched_alloc_domdata(ops, dom);
-    if ( sdom == NULL )
-        return -ENOMEM;
+    if ( IS_ERR(sdom) )
+        return PTR_ERR(sdom);
 
     dom->sched_priv = sdom;
 
