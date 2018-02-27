@@ -1148,6 +1148,7 @@ int xenmem_add_to_physmap_one(
     int rc;
     p2m_type_t t;
     struct page_info *page = NULL;
+    bool status = false;
 
     switch ( space )
     {
@@ -1165,6 +1166,7 @@ int xenmem_add_to_physmap_one(
                 mfn = virt_to_mfn(d->grant_table->status[idx]);
             else
                 mfn = mfn_x(INVALID_MFN);
+            status = true;
         }
         else
         {
@@ -1180,7 +1182,10 @@ int xenmem_add_to_physmap_one(
 
         if ( mfn != mfn_x(INVALID_MFN) )
         {
-            d->arch.grant_table_gfn[idx] = gfn;
+            if ( status )
+                d->arch.grant_status_gfn[idx] = gfn;
+            else
+                d->arch.grant_shared_gfn[idx] = gfn;
 
             t = p2m_ram_rw;
         }

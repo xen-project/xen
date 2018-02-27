@@ -50,7 +50,8 @@ struct arch_domain
     struct p2m_domain p2m;
 
     struct hvm_domain hvm_domain;
-    gfn_t *grant_table_gfn;
+    gfn_t *grant_shared_gfn;
+    gfn_t *grant_status_gfn;
 
     struct vmmio vmmio;
 
