@@ -71,6 +71,8 @@ struct xen_domctl_createdomain {
      * mapping space, xenheap, etc) a guest may consume.
      */
     uint32_t max_evtchn_port;
+    uint32_t max_grant_frames;
+    uint32_t max_maptrack_frames;
 
     struct xen_arch_domainconfig arch;
 };

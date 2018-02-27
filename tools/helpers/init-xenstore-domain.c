@@ -67,6 +67,14 @@ static int build(xc_interface *xch)
         .ssidref = SECINITSID_DOMU,
         .flags = XEN_DOMCTL_CDF_xs_domain,
         .max_evtchn_port = -1, /* No limit. */
+
+        /*
+         * 1 grant frame is enough: we don't need many grants.
+         * Mini-OS doesn't like less than 4, though, so use 4.
+         * 128 maptrack frames: 256 entries per frame, enough for 32768 domains.
+         */
+        .max_grant_frames = 4,
+        .max_maptrack_frames = 128,
     };
 
     xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);
@@ -104,12 +112,8 @@ static int build(xc_interface *xch)
         fprintf(stderr, "xc_domain_setmaxmem failed\n");
         goto err;
     }
-    /*
-     * 1 grant frame is enough: we don't need many grants.
-     * Mini-OS doesn't like less than 4, though, so use 4.
-     * 128 maptrack frames: 256 entries per frame, enough for 32768 domains.
-     */
-    rv = xc_domain_set_gnttab_limits(xch, domid, 4, 128);
+    rv = xc_domain_set_gnttab_limits(xch, domid, config.max_grant_frames,
+                                     config.max_maptrack_frames);
     if ( rv )
     {
         fprintf(stderr, "xc_domain_set_gnttab_limits failed\n");
