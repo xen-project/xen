@@ -540,6 +540,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
+        d->max_evtchn_port = min_t(unsigned int,
+                                   op->u.createdomain.max_evtchn_port, INT_MAX);
+
         ret = 0;
         op->domain = d->domain_id;
         copyback = 1;
@@ -1101,12 +1104,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_set_virq_handler:
         ret = set_global_virq_handler(d, op->u.set_virq_handler.virq);
-        break;
-
-    case XEN_DOMCTL_set_max_evtchn:
-        d->max_evtchn_port = min_t(unsigned int,
-                                   op->u.set_max_evtchn.max_port,
-                                   INT_MAX);
         break;
 
     case XEN_DOMCTL_setvnumainfo:

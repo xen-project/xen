@@ -554,6 +554,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     /* convenience aliases */
     libxl_domain_create_info *info = &d_config->c_info;
+    libxl_domain_build_info *b_info = &d_config->b_info;
 
     uuid_string = libxl__uuid2string(gc, info->uuid);
     if (!uuid_string) {
@@ -565,6 +566,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     if (!libxl_domid_valid_guest(*domid)) {
         struct xen_domctl_createdomain create = {
             .ssidref = info->ssidref,
+            .max_evtchn_port = b_info->event_channels,
         };
 
         if (info->type != LIBXL_DOMAIN_TYPE_PV) {

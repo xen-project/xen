@@ -63,6 +63,7 @@ type domctl_create_config =
 	ssidref: int32;
 	handle: string;
 	flags: domain_create_flag list;
+	max_evtchn_port: int;
 	arch: arch_domainconfig;
 }
 

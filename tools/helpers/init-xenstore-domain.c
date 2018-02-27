@@ -66,6 +66,7 @@ static int build(xc_interface *xch)
     struct xen_domctl_createdomain config = {
         .ssidref = SECINITSID_DOMU,
         .flags = XEN_DOMCTL_CDF_xs_domain,
+        .max_evtchn_port = -1, /* No limit. */
     };
 
     xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);

@@ -728,9 +728,6 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_audit_p2m:
         return current_has_perm(d, SECCLASS_HVM, HVM__AUDIT_P2M);
 
-    case XEN_DOMCTL_set_max_evtchn:
-        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SET_MAX_EVTCHN);
-
     case XEN_DOMCTL_cacheflush:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__CACHEFLUSH);
 

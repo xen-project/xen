@@ -65,6 +65,13 @@ struct xen_domctl_createdomain {
 #define _XEN_DOMCTL_CDF_xs_domain     4
 #define XEN_DOMCTL_CDF_xs_domain      (1U<<_XEN_DOMCTL_CDF_xs_domain)
     uint32_t flags;
+
+    /*
+     * Various domain limits, which impact the quantity of resources (global
+     * mapping space, xenheap, etc) a guest may consume.
+     */
+    uint32_t max_evtchn_port;
+
     struct xen_arch_domainconfig arch;
 };
 
@@ -875,15 +882,6 @@ struct xen_domctl_set_broken_page_p2m {
 };
 
 /*
- * XEN_DOMCTL_set_max_evtchn: sets the maximum event channel port
- * number the guest may use.  Use this limit the amount of resources
- * (global mapping space, xenheap) a guest may use for event channels.
- */
-struct xen_domctl_set_max_evtchn {
-    uint32_t max_port;
-};
-
-/*
  * ARM: Clean and invalidate caches associated with given region of
  * guest memory.
  */
@@ -1163,7 +1161,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_broken_page_p2m           67
 #define XEN_DOMCTL_setnodeaffinity               68
 #define XEN_DOMCTL_getnodeaffinity               69
-#define XEN_DOMCTL_set_max_evtchn                70
+/* #define XEN_DOMCTL_set_max_evtchn             70 - Moved into XEN_DOMCTL_createdomain */
 #define XEN_DOMCTL_cacheflush                    71
 #define XEN_DOMCTL_get_vcpu_msrs                 72
 #define XEN_DOMCTL_set_vcpu_msrs                 73
@@ -1224,7 +1222,6 @@ struct xen_domctl {
         struct xen_domctl_set_access_required access_required;
         struct xen_domctl_audit_p2m         audit_p2m;
         struct xen_domctl_set_virq_handler  set_virq_handler;
-        struct xen_domctl_set_max_evtchn    set_max_evtchn;
         struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
         struct xen_domctl_set_broken_page_p2m set_broken_page_p2m;
         struct xen_domctl_cacheflush        cacheflush;

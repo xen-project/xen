@@ -125,6 +125,7 @@ static PyObject *pyxc_domain_create(XcObject *self,
             0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
             0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
         },
+        .max_evtchn_port = -1, /* No limit. */
     };
 
     static char *kwd_list[] = { "domid", "ssidref", "handle", "flags", "target", NULL };
