@@ -576,7 +576,10 @@ static int make_memory_node(const struct domain *d,
     return res;
 }
 
-static int make_hypervisor_node(const struct kernel_info *kinfo,
+static void evtchn_allocate(struct domain *d);
+
+static int make_hypervisor_node(struct domain *d,
+                                const struct kernel_info *kinfo,
                                 const struct dt_device_node *parent)
 {
     const char compat[] =
@@ -620,10 +623,18 @@ static int make_hypervisor_node(const struct kernel_info *kinfo,
         return res;
 
     /*
-     * Placeholder for the event channel interrupt.  The values will be
-     * replaced later.
+     * It is safe to allocate the event channel here because all the
+     * PPIs used by the hardware domain have been registered.
      */
-    set_interrupt_ppi(intr, ~0, 0xf, IRQ_TYPE_INVALID);
+    evtchn_allocate(d);
+
+    /*
+     * Interrupt event channel upcall:
+     *  - Active-low level-sensitive
+     *  - All CPUs
+     *  TODO: Handle properly the cpumask;
+     */
+    set_interrupt_ppi(intr, d->arch.evtchn_irq, 0xf, IRQ_TYPE_LEVEL_LOW);
     res = fdt_property_interrupts(fdt, &intr, 1);
     if ( res )
         return res;
@@ -1282,7 +1293,11 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     if ( node == dt_host )
     {
-        res = make_hypervisor_node(kinfo, node);
+        /*
+         * The hypervisor node should always be created after all nodes
+         * from the host DT have been parsed.
+         */
+        res = make_hypervisor_node(d, kinfo, node);
         if ( res )
             return res;
 
@@ -1939,6 +1954,12 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     if ( rc != 0 )
         return rc;
 
+    /*
+     * All PPIs have been registered, allocate the event channel
+     * interrupts.
+     */
+    evtchn_allocate(d);
+
     return 0;
 }
 #else
@@ -2014,16 +2035,18 @@ static void initrd_load(struct kernel_info *kinfo)
         panic("Unable to copy the initrd in the hwdom memory");
 }
 
-static void evtchn_fixup(struct domain *d, struct kernel_info *kinfo)
+/*
+ * Allocate the event channel PPIs and setup the HVM_PARAM_CALLBACK_IRQ.
+ * The allocated IRQ will be found in d->arch.evtchn_irq.
+ *
+ * Note that this should only be called once all PPIs used by the
+ * hardware domain have been registered.
+ */
+static void evtchn_allocate(struct domain *d)
 {
-    int res, node;
+    int res;
     u64 val;
-    gic_interrupt_t intr;
 
-    /*
-     * The allocation of the event channel IRQ has been deferred until
-     * now. At this time, all PPIs used by DOM0 have been registered.
-     */
     res = vgic_allocate_ppi(d);
     if ( res < 0 )
         panic("Unable to allocate a PPI for the event channel interrupt\n");
@@ -2041,31 +2064,6 @@ static void evtchn_fixup(struct domain *d, struct kernel_info *kinfo)
                      HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_MASK);
     val |= d->arch.evtchn_irq;
     d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ] = val;
-
-    /*
-     * When booting Dom0 using ACPI, Dom0 can only get the event channel
-     * interrupt via hypercall.
-     */
-    if ( !acpi_disabled )
-        return;
-
-    /* Fix up "interrupts" in /hypervisor node */
-    node = fdt_path_offset(kinfo->fdt, "/hypervisor");
-    if ( node < 0 )
-        panic("Cannot find the /hypervisor node");
-
-    /* Interrupt event channel upcall:
-     *  - Active-low level-sensitive
-     *  - All CPUs
-     *
-     *  TODO: Handle properly the cpumask
-     */
-    set_interrupt_ppi(intr, d->arch.evtchn_irq, 0xf,
-                      IRQ_TYPE_LEVEL_LOW);
-    res = fdt_setprop_inplace(kinfo->fdt, node, "interrupts",
-                              &intr, sizeof(intr));
-    if ( res )
-        panic("Cannot fix up \"interrupts\" property of the hypervisor node");
 }
 
 static void __init find_gnttab_region(struct domain *d,
@@ -2177,8 +2175,6 @@ int construct_dom0(struct domain *d)
     kernel_load(&kinfo);
     /* initrd_load will fix up the fdt, so call it before dtb_load */
     initrd_load(&kinfo);
-    /* Allocate the event channel IRQ and fix up the device tree */
-    evtchn_fixup(d, &kinfo);
     dtb_load(&kinfo);
 
     /* Now that we are done restore the original p2m and current. */
