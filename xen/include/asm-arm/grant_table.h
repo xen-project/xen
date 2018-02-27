@@ -73,6 +73,11 @@ static inline unsigned int gnttab_dom0_max(void)
             (gfn);                                                       \
     } while ( 0 )
 
+#define gnttab_get_frame_gfn(gt, st, idx) ({                             \
+   _gfn((st) ? gnttab_status_gmfn(NULL, gt, idx)                         \
+             : gnttab_shared_gmfn(NULL, gt, idx));                       \
+})
+
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
         share_xen_page_with_guest(                                       \
