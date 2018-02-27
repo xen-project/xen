@@ -155,9 +155,6 @@ struct scheduler {
     void         (*switch_sched)   (struct scheduler *, unsigned int,
                                     void *, void *);
 
-    int          (*init_domain)    (const struct scheduler *, struct domain *);
-    void         (*destroy_domain) (const struct scheduler *, struct domain *);
-
     /* Activate / deactivate vcpus in a cpu pool */
     void         (*insert_vcpu)    (const struct scheduler *, struct vcpu *);
     void         (*remove_vcpu)    (const struct scheduler *, struct vcpu *);

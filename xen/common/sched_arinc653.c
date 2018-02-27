@@ -712,9 +712,6 @@ static const struct scheduler sched_arinc653_def = {
     .free_vdata     = a653sched_free_vdata,
     .alloc_vdata    = a653sched_alloc_vdata,
 
-    .init_domain    = NULL,
-    .destroy_domain = NULL,
-
     .insert_vcpu    = NULL,
     .remove_vcpu    = NULL,
 

@@ -259,26 +259,6 @@ static void null_free_domdata(const struct scheduler *ops, void *data)
     }
 }
 
-static int null_dom_init(const struct scheduler *ops, struct domain *d)
-{
-    struct null_dom *ndom;
-
-    if ( is_idle_domain(d) )
-        return 0;
-
-    ndom = null_alloc_domdata(ops, d);
-    if ( IS_ERR(ndom) )
-        return PTR_ERR(ndom);
-
-    d->sched_priv = ndom;
-
-    return 0;
-}
-static void null_dom_destroy(const struct scheduler *ops, struct domain *d)
-{
-    null_free_domdata(ops, null_dom(d));
-}
-
 /*
  * vCPU to pCPU assignment and placement. This _only_ happens:
  *  - on insert,
@@ -922,9 +902,6 @@ const struct scheduler sched_null_def = {
     .free_vdata     = null_free_vdata,
     .alloc_domdata  = null_alloc_domdata,
     .free_domdata   = null_free_domdata,
-
-    .init_domain    = null_dom_init,
-    .destroy_domain = null_dom_destroy,
 
     .insert_vcpu    = null_vcpu_insert,
     .remove_vcpu    = null_vcpu_remove,

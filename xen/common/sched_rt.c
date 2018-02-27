@@ -851,30 +851,6 @@ rt_free_domdata(const struct scheduler *ops, void *data)
     }
 }
 
-static int
-rt_dom_init(const struct scheduler *ops, struct domain *dom)
-{
-    struct rt_dom *sdom;
-
-    /* IDLE Domain does not link on rt_private */
-    if ( is_idle_domain(dom) )
-        return 0;
-
-    sdom = rt_alloc_domdata(ops, dom);
-    if ( IS_ERR(sdom) )
-        return PTR_ERR(sdom);
-
-    dom->sched_priv = sdom;
-
-    return 0;
-}
-
-static void
-rt_dom_destroy(const struct scheduler *ops, struct domain *dom)
-{
-    rt_free_domdata(ops, rt_dom(dom));
-}
-
 static void *
 rt_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
 {
@@ -1585,8 +1561,6 @@ static const struct scheduler sched_rtds_def = {
     .deinit_pdata   = rt_deinit_pdata,
     .alloc_domdata  = rt_alloc_domdata,
     .free_domdata   = rt_free_domdata,
-    .init_domain    = rt_dom_init,
-    .destroy_domain = rt_dom_destroy,
     .alloc_vdata    = rt_alloc_vdata,
     .free_vdata     = rt_free_vdata,
     .insert_vcpu    = rt_vcpu_insert,

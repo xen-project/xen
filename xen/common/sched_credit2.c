@@ -3035,23 +3035,6 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     return sdom;
 }
 
-static int
-csched2_dom_init(const struct scheduler *ops, struct domain *dom)
-{
-    struct csched2_dom *sdom;
-
-    if ( is_idle_domain(dom) )
-        return 0;
-
-    sdom = csched2_alloc_domdata(ops, dom);
-    if ( IS_ERR(sdom) )
-        return PTR_ERR(sdom);
-
-    dom->sched_priv = sdom;
-
-    return 0;
-}
-
 static void
 csched2_free_domdata(const struct scheduler *ops, void *data)
 {
@@ -3070,14 +3053,6 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
 
         xfree(sdom);
     }
-}
-
-static void
-csched2_dom_destroy(const struct scheduler *ops, struct domain *dom)
-{
-    ASSERT(csched2_dom(dom)->nr_vcpus == 0);
-
-    csched2_free_domdata(ops, csched2_dom(dom));
 }
 
 static void
@@ -4015,9 +3990,6 @@ static const struct scheduler sched_credit2_def = {
     .opt_name       = "credit2",
     .sched_id       = XEN_SCHEDULER_CREDIT2,
     .sched_data     = NULL,
-
-    .init_domain    = csched2_dom_init,
-    .destroy_domain = csched2_dom_destroy,
 
     .insert_vcpu    = csched2_vcpu_insert,
     .remove_vcpu    = csched2_vcpu_remove,

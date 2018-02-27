@@ -413,25 +413,37 @@ void sched_destroy_vcpu(struct vcpu *v)
 
 int sched_init_domain(struct domain *d, int poolid)
 {
+    void *sdom;
     int ret;
 
     ASSERT(d->cpupool == NULL);
+    ASSERT(d->domain_id < DOMID_FIRST_RESERVED);
 
     if ( (ret = cpupool_add_domain(d, poolid)) )
         return ret;
 
     SCHED_STAT_CRANK(dom_init);
     TRACE_1D(TRC_SCHED_DOM_ADD, d->domain_id);
-    return SCHED_OP(dom_scheduler(d), init_domain, d);
+
+    sdom = sched_alloc_domdata(dom_scheduler(d), d);
+    if ( IS_ERR(sdom) )
+        return PTR_ERR(sdom);
+
+    d->sched_priv = sdom;
+
+    return 0;
 }
 
 void sched_destroy_domain(struct domain *d)
 {
     ASSERT(d->cpupool != NULL || is_idle_domain(d));
+    ASSERT(d->domain_id < DOMID_FIRST_RESERVED);
 
     SCHED_STAT_CRANK(dom_destroy);
     TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
-    SCHED_OP(dom_scheduler(d), destroy_domain, d);
+
+    sched_free_domdata(dom_scheduler(d), d->sched_priv);
+    d->sched_priv = NULL;
 
     cpupool_rm_domain(d);
 }
