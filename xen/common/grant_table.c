@@ -3775,6 +3775,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
 {
     int rc = 0;
     struct grant_table *gt = d->grant_table;
+    bool status = false;
 
     grant_write_lock(gt);
 
@@ -3785,6 +3786,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
          (idx & XENMAPIDX_grant_table_status) )
     {
         idx &= ~XENMAPIDX_grant_table_status;
+        status = true;
         if ( idx < nr_status_frames(gt) )
             *mfn = _mfn(virt_to_mfn(gt->status[idx]));
         else
@@ -3802,7 +3804,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
     }
 
     if ( !rc )
-        gnttab_set_frame_gfn(gt, idx, gfn);
+        gnttab_set_frame_gfn(gt, status, idx, gfn);
 
     grant_write_unlock(gt);
 

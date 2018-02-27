@@ -46,7 +46,7 @@ static inline unsigned int gnttab_dom0_max(void)
 
 #define gnttab_init_arch(gt) 0
 #define gnttab_destroy_arch(gt) do {} while ( 0 )
-#define gnttab_set_frame_gfn(gt, idx, gfn) do {} while ( 0 )
+#define gnttab_set_frame_gfn(gt, st, idx, gfn) do {} while ( 0 )
 
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
