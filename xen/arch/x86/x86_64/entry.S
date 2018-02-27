@@ -239,7 +239,8 @@ UNLIKELY_START(ne, trace)
 UNLIKELY_END(trace)
         leaq  hypercall_table(%rip),%r10
         PERFC_INCR(hypercalls, %rax, %rbx)
-        callq *(%r10,%rax,8)
+        mov   (%r10, %rax, 8), %rax
+        INDIRECT_CALL %rax
 #ifndef NDEBUG
         /* Deliberately corrupt parameter regs used by this hypercall. */
         popq  %r10         # Shadow RIP
