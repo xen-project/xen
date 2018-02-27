@@ -547,7 +547,7 @@ struct csched2_dom {
     s_time_t tot_budget;        /* Total amount of budget                     */
     s_time_t budget;            /* Currently available budget                 */
 
-    struct timer *repl_timer;   /* Timer for periodic replenishment of budget */
+    struct timer repl_timer;    /* Timer for periodic replenishment of budget */
     s_time_t next_repl;         /* Time at which next replenishment occurs    */
     struct list_head parked_vcpus; /* List of CPUs waiting for budget         */
 
@@ -1974,7 +1974,7 @@ static void replenish_domain_budget(void* data)
     unpark_parked_vcpus(sdom->dom->cpupool->sched, &parked);
 
  out:
-    set_timer(sdom->repl_timer, sdom->next_repl);
+    set_timer(&sdom->repl_timer, sdom->next_repl);
 }
 
 #ifndef NDEBUG
@@ -2874,7 +2874,7 @@ csched2_dom_cntl(
                  */
                 sdom->budget = sdom->tot_budget;
                 sdom->next_repl = NOW() + CSCHED2_BDGT_REPL_PERIOD;
-                set_timer(sdom->repl_timer, sdom->next_repl);
+                set_timer(&sdom->repl_timer, sdom->next_repl);
 
                 /*
                  * Now, let's enable budget accounting for all the vCPUs.
@@ -2933,7 +2933,7 @@ csched2_dom_cntl(
         {
             LIST_HEAD(parked);
 
-            stop_timer(sdom->repl_timer);
+            stop_timer(&sdom->repl_timer);
 
             /* Disable budget accounting for all the vCPUs. */
             for_each_vcpu ( d, v )
@@ -3014,13 +3014,6 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     if ( sdom == NULL )
         return NULL;
 
-    sdom->repl_timer = xzalloc(struct timer);
-    if ( sdom->repl_timer == NULL )
-    {
-        xfree(sdom);
-        return NULL;
-    }
-
     /* Initialize credit, cap and weight */
     INIT_LIST_HEAD(&sdom->sdom_elem);
     sdom->dom = dom;
@@ -3028,7 +3021,7 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     sdom->cap = 0U;
     sdom->nr_vcpus = 0;
 
-    init_timer(sdom->repl_timer, replenish_domain_budget, sdom,
+    init_timer(&sdom->repl_timer, replenish_domain_budget, sdom,
                cpumask_any(cpupool_domain_cpumask(dom)));
     spin_lock_init(&sdom->budget_lock);
     INIT_LIST_HEAD(&sdom->parked_vcpus);
@@ -3066,7 +3059,7 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
     struct csched2_dom *sdom = data;
     struct csched2_private *prv = csched2_priv(ops);
 
-    kill_timer(sdom->repl_timer);
+    kill_timer(&sdom->repl_timer);
 
     write_lock_irqsave(&prv->lock, flags);
 
@@ -3074,7 +3067,6 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
 
     write_unlock_irqrestore(&prv->lock, flags);
 
-    xfree(sdom->repl_timer);
     xfree(data);
 }
 
