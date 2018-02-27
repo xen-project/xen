@@ -128,15 +128,17 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 #define VAL_SSIDREF             Field(config, 0)
 #define VAL_HANDLE              Field(config, 1)
 #define VAL_FLAGS               Field(config, 2)
-#define VAL_MAX_EVTCHN_PORT     Field(config, 3)
-#define VAL_MAX_GRANT_FRAMES    Field(config, 4)
-#define VAL_MAX_MAPTRACK_FRAMES Field(config, 5)
-#define VAL_ARCH                Field(config, 6)
+#define VAL_MAX_VCPUS           Field(config, 3)
+#define VAL_MAX_EVTCHN_PORT     Field(config, 4)
+#define VAL_MAX_GRANT_FRAMES    Field(config, 5)
+#define VAL_MAX_MAPTRACK_FRAMES Field(config, 6)
+#define VAL_ARCH                Field(config, 7)
 
 	uint32_t domid = 0;
 	int result;
 	struct xen_domctl_createdomain cfg = {
 		.ssidref = Int32_val(VAL_SSIDREF),
+		.max_vcpus = Int_val(VAL_MAX_VCPUS),
 		.max_evtchn_port = Int_val(VAL_MAX_EVTCHN_PORT),
 		.max_grant_frames = Int_val(VAL_MAX_GRANT_FRAMES),
 		.max_maptrack_frames = Int_val(VAL_MAX_MAPTRACK_FRAMES),
@@ -178,6 +180,7 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 #undef VAL_MAX_MAPTRACK_FRAMES
 #undef VAL_MAX_GRANT_FRAMES
 #undef VAL_MAX_EVTCHN_PORT
+#undef VAL_MAX_VCPUS
 #undef VAL_FLAGS
 #undef VAL_HANDLE
 #undef VAL_SSIDREF

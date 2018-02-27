@@ -63,6 +63,7 @@ type domctl_create_config =
 	ssidref: int32;
 	handle: string;
 	flags: domain_create_flag list;
+	max_vcpus: int;
 	max_evtchn_port: int;
 	max_grant_frames: int;
 	max_maptrack_frames: int;

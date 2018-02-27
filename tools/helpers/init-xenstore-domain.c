@@ -66,6 +66,7 @@ static int build(xc_interface *xch)
     struct xen_domctl_createdomain config = {
         .ssidref = SECINITSID_DOMU,
         .flags = XEN_DOMCTL_CDF_xs_domain,
+        .max_vcpus = 1,
         .max_evtchn_port = -1, /* No limit. */
 
         /*
@@ -100,7 +101,7 @@ static int build(xc_interface *xch)
         fprintf(stderr, "xc_domain_create failed\n");
         goto err;
     }
-    rv = xc_domain_max_vcpus(xch, domid, 1);
+    rv = xc_domain_max_vcpus(xch, domid, config.max_vcpus);
     if ( rv )
     {
         fprintf(stderr, "xc_domain_max_vcpus failed\n");

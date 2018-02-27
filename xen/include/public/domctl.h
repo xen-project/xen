@@ -70,6 +70,7 @@ struct xen_domctl_createdomain {
      * Various domain limits, which impact the quantity of resources (global
      * mapping space, xenheap, etc) a guest may consume.
      */
+    uint32_t max_vcpus;
     uint32_t max_evtchn_port;
     uint32_t max_grant_frames;
     uint32_t max_maptrack_frames;

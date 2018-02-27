@@ -125,16 +125,19 @@ static PyObject *pyxc_domain_create(XcObject *self,
             0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
             0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
         },
+        .max_vcpus = 1,
         .max_evtchn_port = -1, /* No limit. */
         .max_grant_frames = 32,
         .max_maptrack_frames = 1024,
     };
 
-    static char *kwd_list[] = { "domid", "ssidref", "handle", "flags", "target", NULL };
+    static char *kwd_list[] = { "domid", "ssidref", "handle", "flags",
+                                "target", "max_vcpus", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOiii", kwd_list,
                                       &dom, &config.ssidref, &pyhandle,
-                                      &config.flags, &target))
+                                      &config.flags, &target,
+                                      &config.max_vcpus) )
         return NULL;
     if ( pyhandle != NULL )
     {
