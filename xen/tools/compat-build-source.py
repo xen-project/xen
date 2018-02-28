@@ -26,4 +26,4 @@ for pat in pats:
 for line in sys.stdin.readlines():
     for pat in pats:
         line = re.sub(pat[0], pat[1], line)
-    print line.rstrip()
+    print(line.rstrip())

@@ -139,7 +139,7 @@ handle_field ()
 		local tag=$(echo "$5" | ${PYTHON} -c '
 import re,sys
 for line in sys.stdin.readlines():
-    print re.subn(r"\s*(struct|union)\s+(compat_)?(\w+)\s.*", r"\3", line)[0].rstrip()
+    sys.stdout.write(re.subn(r"\s*(struct|union)\s+(compat_)?(\w+)\s.*", r"\3", line)[0].rstrip() + "\n")
 ')
 		echo " \\"
 		printf %s "${1}XLAT_$tag(&(_d_)->$3, &(_s_)->$3);"

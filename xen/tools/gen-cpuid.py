@@ -3,6 +3,10 @@
 
 import sys, os, re
 
+if (sys.version_info > (3, 0)):
+    def xrange(x):
+        return range(x)
+
 class Fail(Exception):
     pass
 
@@ -98,13 +102,13 @@ def parse_definitions(state):
 def featureset_to_uint32s(fs, nr):
     """ Represent a featureset as a list of C-compatible uint32_t's """
 
-    bitmap = 0L
+    bitmap = 0
     for f in fs:
-        bitmap |= 1L << f
+        bitmap |= 1 << f
 
     words = []
     while bitmap:
-        words.append(bitmap & ((1L << 32) - 1))
+        words.append(bitmap & ((1 << 32) - 1))
         bitmap >>= 32
 
     assert len(words) <= nr
@@ -276,8 +280,8 @@ def crunch_numbers(state):
             # To debug, uncomment the following lines:
             # def repl(l):
             #     return "[" + ", ".join((state.names[x] for x in l)) + "]"
-            # print >>sys.stderr, "Feature %s, seen %s, to_process %s " % \
-            #     (state.names[feat], repl(seen), repl(to_process))
+            # sys.stderr.write("Feature %s, seen %s, to_process %s \n" % \
+            #     (state.names[feat], repl(seen), repl(to_process)))
 
             f = to_process.pop(0)
 
@@ -293,7 +297,12 @@ def crunch_numbers(state):
     state.deep_features = featureset_to_uint32s(deps.keys(), nr_entries)
     state.nr_deep_deps = len(state.deep_deps.keys())
 
-    for k, v in state.deep_deps.iteritems():
+    try:
+        _tmp = state.deep_deps.iteritems()
+    except AttributeError:
+        _tmp = state.deep_deps.items()
+
+    for k, v in _tmp:
         state.deep_deps[k] = featureset_to_uint32s(v, nr_entries)
 
     # Calculate the bitfield name declarations
@@ -410,7 +419,8 @@ def open_file_or_fd(val, mode, buffering):
         else:
             return open(val, mode, buffering)
 
-    except StandardError, e:
+    except StandardError:
+        e = sys.exc_info()[1]
         if fd != -1:
             raise Fail("Unable to open fd %d: %s: %s" %
                        (fd, e.__class__.__name__, e))
@@ -453,10 +463,14 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Fail, e:
-        print >>sys.stderr, "%s:" % (sys.argv[0],), e
+    except Fail:
+        e = sys.exc_info()[1]
+        sys.stderr.write("%s:" % (sys.argv[0],))
+        sys.stderr.write(e)
+        sys.stderr.write("\n")
         sys.exit(1)
-    except SystemExit, e:
+    except SystemExit:
+        e = sys.exc_info()[1]
         sys.exit(e.code)
     except KeyboardInterrupt:
         sys.exit(2)
