@@ -25,6 +25,7 @@
 #include <xen/init.h>
 
 #include <asm/msr.h>
+#include <asm/system.h>
 
 #include "private.h"
 
@@ -266,6 +267,8 @@ static int apply_microcode(const struct microcode_patch *patch)
 
     if ( microcode_update_match(patch) != NEW_UCODE )
         return -EINVAL;
+
+    wbinvd();
 
     /* write microcode via MSR 0x79 */
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)patch->data);
