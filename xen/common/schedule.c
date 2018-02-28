@@ -436,16 +436,18 @@ int sched_init_domain(struct domain *d, int poolid)
 
 void sched_destroy_domain(struct domain *d)
 {
-    ASSERT(d->cpupool != NULL || is_idle_domain(d));
     ASSERT(d->domain_id < DOMID_FIRST_RESERVED);
 
-    SCHED_STAT_CRANK(dom_destroy);
-    TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
+    if ( d->cpupool )
+    {
+        SCHED_STAT_CRANK(dom_destroy);
+        TRACE_1D(TRC_SCHED_DOM_REM, d->domain_id);
 
-    sched_free_domdata(dom_scheduler(d), d->sched_priv);
-    d->sched_priv = NULL;
+        sched_free_domdata(dom_scheduler(d), d->sched_priv);
+        d->sched_priv = NULL;
 
-    cpupool_rm_domain(d);
+        cpupool_rm_domain(d);
+    }
 }
 
 void vcpu_sleep_nosync(struct vcpu *v)

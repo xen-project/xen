@@ -404,6 +404,9 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         hardware_domain = old_hwdom;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
     xfree(d->pbuf);
+
+    sched_destroy_domain(d);
+
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
     if ( init_status & INIT_gnttab )
