@@ -46,7 +46,7 @@ provided by your OS distributor:
         - GCC 4.8 or later
         - GNU Binutils 2.24 or later
     * Development install of zlib (e.g., zlib-dev)
-    * Development install of Python v2.3 or later (e.g., python-dev)
+    * Development install of Python v2.4 or later (e.g., python-dev)
     * Development install of curses (e.g., libncurses-dev)
     * Development install of openssl (e.g., openssl-dev)
     * Development install of x11 (e.g. xorg-x11-dev)
