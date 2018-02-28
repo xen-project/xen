@@ -3173,7 +3173,7 @@ static int sh_page_fault(struct vcpu *v,
          * In any case, in the PAE case, the ASSERT is not true; it can
          * happen because of actions the guest is taking. */
 #if GUEST_PAGING_LEVELS == 3
-        v->arch.paging.mode->update_cr3(v, 0);
+        v->arch.paging.mode->update_cr3(v, 0, false);
 #else
         ASSERT(d->is_shutting_down);
 #endif
@@ -3992,7 +3992,7 @@ sh_set_toplevel_shadow(struct vcpu *v,
 
 
 static void
-sh_update_cr3(struct vcpu *v, int do_locking)
+sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 /* Updates vcpu->arch.cr3 after the guest has changed CR3.
  * Paravirtual guests should set v->arch.guest_table (and guest_table_user,
  * if appropriate).
@@ -4234,7 +4234,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
         v->arch.hvm_vcpu.hw_cr[3] =
             pagetable_get_paddr(v->arch.shadow_table[0]);
 #endif
-        hvm_update_guest_cr(v, 3);
+        hvm_update_guest_cr3(v, noflush);
     }
 
     /* Fix up the linear pagetable mappings */

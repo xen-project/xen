@@ -2297,6 +2297,7 @@ int hvm_set_cr3(unsigned long value, bool_t may_defer)
     struct vcpu *v = current;
     struct page_info *page;
     unsigned long old = v->arch.hvm_vcpu.guest_cr[3];
+    bool noflush = false;
 
     if ( may_defer && unlikely(v->domain->arch.monitor.write_ctrlreg_enabled &
                                monitor_ctrlreg_bitmask(VM_EVENT_X86_CR3)) )
@@ -2311,6 +2312,12 @@ int hvm_set_cr3(unsigned long value, bool_t may_defer)
 
             return X86EMUL_OKAY;
         }
+    }
+
+    if ( hvm_pcid_enabled(v) ) /* Clear the noflush bit. */
+    {
+        noflush = value & X86_CR3_NOFLUSH;
+        value &= ~X86_CR3_NOFLUSH;
     }
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
@@ -2330,7 +2337,7 @@ int hvm_set_cr3(unsigned long value, bool_t may_defer)
     }
 
     v->arch.hvm_vcpu.guest_cr[3] = value;
-    paging_update_cr3(v);
+    paging_update_cr3(v, noflush);
     return X86EMUL_OKAY;
 
  bad_cr3:
@@ -4031,7 +4038,7 @@ static int hvmop_flush_tlb_all(void)
 
     /* Flush paging-mode soft state (e.g., va->gfn cache; PAE PDPE cache). */
     for_each_vcpu ( d, v )
-        paging_update_cr3(v);
+        paging_update_cr3(v, false);
 
     /* Flush all dirty TLBs. */
     flush_tlb_mask(d->dirty_cpumask);
@@ -4193,7 +4200,7 @@ static int hvmop_set_param(
         domain_pause(d);
         d->arch.hvm_domain.params[a.index] = a.value;
         for_each_vcpu ( d, v )
-            paging_update_cr3(v);
+            paging_update_cr3(v, false);
         domain_unpause(d);
 
         domctl_lock_release();

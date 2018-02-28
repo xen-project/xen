@@ -325,9 +325,9 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
     v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    svm_update_guest_cr(v, 0);
-    svm_update_guest_cr(v, 2);
-    svm_update_guest_cr(v, 4);
+    svm_update_guest_cr(v, 0, 0);
+    svm_update_guest_cr(v, 2, 0);
+    svm_update_guest_cr(v, 4, 0);
 
     /* Load sysenter MSRs into both VMCB save area and VCPU fields. */
     vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = c->sysenter_cs;
@@ -543,7 +543,7 @@ static int svm_guest_x86_mode(struct vcpu *v)
     return likely(vmcb->cs.db) ? 4 : 2;
 }
 
-void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
+void svm_update_guest_cr(struct vcpu *v, unsigned int cr, unsigned int flags)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     uint64_t value;
@@ -583,10 +583,13 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
     case 3:
         vmcb_set_cr3(vmcb, v->arch.hvm_vcpu.hw_cr[3]);
         if ( !nestedhvm_enabled(v->domain) )
-            hvm_asid_flush_vcpu(v);
+        {
+            if ( !(flags & HVM_UPDATE_GUEST_CR3_NOFLUSH) )
+                hvm_asid_flush_vcpu(v);
+        }
         else if ( nestedhvm_vmswitch_in_progress(v) )
             ; /* CR3 switches during VMRUN/VMEXIT do not flush the TLB. */
-        else
+        else if ( !(flags & HVM_UPDATE_GUEST_CR3_NOFLUSH) )
             hvm_asid_flush_vcpu_asid(
                 nestedhvm_vcpu_in_guestmode(v)
                 ? &vcpu_nestedhvm(v).nv_n2asid : &v->arch.hvm_vcpu.n1asid);

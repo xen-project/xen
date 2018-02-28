@@ -669,10 +669,10 @@ static bool_t hap_invlpg(struct vcpu *v, unsigned long va)
     return 1;
 }
 
-static void hap_update_cr3(struct vcpu *v, int do_locking)
+static void hap_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 {
     v->arch.hvm_vcpu.hw_cr[3] = v->arch.hvm_vcpu.guest_cr[3];
-    hvm_update_guest_cr(v, 3);
+    hvm_update_guest_cr3(v, noflush);
 }
 
 const struct paging_mode *
@@ -708,7 +708,7 @@ static void hap_update_paging_modes(struct vcpu *v)
     }
 
     /* CR3 is effectively updated by a mode change. Flush ASIDs, etc. */
-    hap_update_cr3(v, 0);
+    hap_update_cr3(v, 0, false);
 
     paging_unlock(d);
     put_gfn(d, cr3_gfn);

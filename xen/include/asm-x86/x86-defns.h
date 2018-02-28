@@ -43,6 +43,11 @@
 #define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
 
 /*
+ * Intel CPU flags in CR3
+ */
+#define X86_CR3_NOFLUSH (_AC(1, ULL) << 63)
+
+/*
  * Intel CPU features in CR4
  */
 #define X86_CR4_VME        0x00000001 /* enable vm86 extensions */

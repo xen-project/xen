@@ -122,7 +122,8 @@ struct paging_mode {
                                             unsigned long cr3,
                                             paddr_t ga, uint32_t *pfec,
                                             unsigned int *page_order);
-    void          (*update_cr3            )(struct vcpu *v, int do_locking);
+    void          (*update_cr3            )(struct vcpu *v, int do_locking,
+                                            bool noflush);
     void          (*update_paging_modes   )(struct vcpu *v);
     void          (*write_p2m_entry       )(struct domain *d, unsigned long gfn,
                                             l1_pgentry_t *p, l1_pgentry_t new,
@@ -276,9 +277,9 @@ static inline unsigned long paging_ga_to_gfn_cr3(struct vcpu *v,
 /* Update all the things that are derived from the guest's CR3.
  * Called when the guest changes CR3; the caller can then use v->arch.cr3
  * as the value to load into the host CR3 to schedule this vcpu */
-static inline void paging_update_cr3(struct vcpu *v)
+static inline void paging_update_cr3(struct vcpu *v, bool noflush)
 {
-    paging_get_hostmode(v)->update_cr3(v, 1);
+    paging_get_hostmode(v)->update_cr3(v, 1, noflush);
 }
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.

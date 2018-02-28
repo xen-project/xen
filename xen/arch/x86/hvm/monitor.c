@@ -36,6 +36,9 @@ bool hvm_monitor_cr(unsigned int index, unsigned long value, unsigned long old)
     struct arch_domain *ad = &curr->domain->arch;
     unsigned int ctrlreg_bitmask = monitor_ctrlreg_bitmask(index);
 
+    if ( index == VM_EVENT_X86_CR3 && hvm_pcid_enabled(curr) )
+        value &= ~X86_CR3_NOFLUSH; /* Clear the noflush bit. */
+
     if ( (ad->monitor.write_ctrlreg_enabled & ctrlreg_bitmask) &&
          (!(ad->monitor.write_ctrlreg_onchangeonly & ctrlreg_bitmask) ||
           value != old) &&

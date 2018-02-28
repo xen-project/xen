@@ -526,7 +526,7 @@ void update_cr3(struct vcpu *v)
 
     if ( paging_mode_enabled(v->domain) )
     {
-        paging_update_cr3(v);
+        paging_update_cr3(v, false);
         return;
     }
 

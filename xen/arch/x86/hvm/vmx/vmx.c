@@ -68,7 +68,8 @@ static void vmx_ctxt_switch_to(struct vcpu *v);
 static int  vmx_alloc_vlapic_mapping(struct domain *d);
 static void vmx_free_vlapic_mapping(struct domain *d);
 static void vmx_install_vlapic_mapping(struct vcpu *v);
-static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr);
+static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
+                                unsigned int flags);
 static void vmx_update_guest_efer(struct vcpu *v);
 static void vmx_wbinvd_intercept(void);
 static void vmx_fpu_dirty_intercept(void);
@@ -836,9 +837,9 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    vmx_update_guest_cr(v, 0);
-    vmx_update_guest_cr(v, 2);
-    vmx_update_guest_cr(v, 4);
+    vmx_update_guest_cr(v, 0, 0);
+    vmx_update_guest_cr(v, 2, 0);
+    vmx_update_guest_cr(v, 4, 0);
 
     v->arch.hvm_vcpu.guest_efer = c->msr_efer;
     vmx_update_guest_efer(v);
@@ -1548,7 +1549,8 @@ void vmx_update_debug_state(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
-static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
+static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
+                                unsigned int flags)
 {
     vmx_vmcs_enter(v);
 
@@ -1730,7 +1732,9 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         }
 
         __vmwrite(GUEST_CR3, v->arch.hvm_vcpu.hw_cr[3]);
-        hvm_asid_flush_vcpu(v);
+
+        if ( !(flags & HVM_UPDATE_GUEST_CR3_NOFLUSH) )
+            hvm_asid_flush_vcpu(v);
         break;
 
     default:
@@ -2682,7 +2686,7 @@ static int vmx_cr_access(unsigned long exit_qualification)
          */
         hvm_monitor_crX(CR0, value, old);
         curr->arch.hvm_vcpu.guest_cr[0] = value;
-        vmx_update_guest_cr(curr, 0);
+        vmx_update_guest_cr(curr, 0, 0);
         HVMTRACE_0D(CLTS);
         break;
     }
