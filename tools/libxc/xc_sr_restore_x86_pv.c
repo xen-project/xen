@@ -770,6 +770,7 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
     {
         DBGPRINTF("Skipping empty %s record for vcpu %u\n",
                   rec_type_to_str(rec->type), vhdr->vcpu_id);
+        rc = 0;
         goto out;
     }
 
