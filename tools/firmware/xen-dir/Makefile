@@ -26,7 +26,7 @@ linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 	$(foreach d, $(LINK_DIRS), \
 		(cd $(XEN_ROOT); \
 		 find $(d) ! -type l -type f \
-		 $(addprefix ! -path , '*.[oda1]' '*.d[12]')) \
+		 $(addprefix ! -name , '*.[oa1]' '.*.d' '.*.d2')) \
 		 >> linkfarm.stamp.tmp ; ) \
 	$(foreach f, $(LINK_FILES), \
 		echo $(f) >> linkfarm.stamp.tmp ;)
