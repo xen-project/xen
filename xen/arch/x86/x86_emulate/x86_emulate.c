@@ -1170,28 +1170,25 @@ static inline bool fpu_check_write(void)
     return !(fsw & FSW_ES);
 }
 
-#define emulate_fpu_insn(_op)                           \
-    asm volatile (                                      \
-        "movb $2f-1f,%0 \n"                             \
-        "1: " _op "     \n"                             \
-        "2:             \n"                             \
-        : "=m" (fic.insn_bytes) : : "memory" )
+#define emulate_fpu_insn_memdst(opc, ext, arg)                          \
+do {                                                                    \
+    /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
+    fic.insn_bytes = 2;                                                 \
+    memcpy(get_stub(stub),                                              \
+           ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
+    invoke_stub("", "", "+m" (fic), "+m" (arg) : "a" (&(arg)));         \
+    put_stub(stub);                                                     \
+} while (0)
 
-#define emulate_fpu_insn_memdst(_op, _arg)              \
-    asm volatile (                                      \
-        "movb $2f-1f,%0 \n"                             \
-        "1: " _op " %1  \n"                             \
-        "2:             \n"                             \
-        : "=m" (fic.insn_bytes), "=m" (_arg)            \
-        : : "memory" )
-
-#define emulate_fpu_insn_memsrc(_op, _arg)              \
-    asm volatile (                                      \
-        "movb $2f-1f,%0 \n"                             \
-        "1: " _op " %1  \n"                             \
-        "2:             \n"                             \
-        : "=m" (fic.insn_bytes)                         \
-        : "m" (_arg) : "memory" )
+#define emulate_fpu_insn_memsrc(opc, ext, arg)                          \
+do {                                                                    \
+    /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
+    fic.insn_bytes = 2;                                                 \
+    memcpy(get_stub(stub),                                              \
+           ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
+    invoke_stub("", "", "+m" (fic) : "m" (arg), "a" (&(arg)));          \
+    put_stub(stub);                                                     \
+} while (0)
 
 #define emulate_fpu_insn_stub(bytes...)                                 \
 do {                                                                    \
@@ -3750,8 +3747,7 @@ x86_emulate(
     case 0x9b:  /* wait/fwait */
         host_and_vcpu_must_have(fpu);
         get_fpu(X86EMUL_FPU_wait, &fic);
-        fic.insn_bytes = 1;
-        asm volatile ( "fwait" ::: "memory" );
+        emulate_fpu_insn_stub(b);
         check_fpu_exn(&fic);
         break;
 
@@ -4169,37 +4165,13 @@ x86_emulate(
             emulate_fpu_insn_stub(0xd8, modrm);
             break;
         default:
+        fpu_memsrc32:
             ASSERT(ea.type == OP_MEM);
             if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
                                  4, ctxt)) != X86EMUL_OKAY )
                 goto done;
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fadd */
-                emulate_fpu_insn_memsrc("fadds", src.val);
-                break;
-            case 1: /* fmul */
-                emulate_fpu_insn_memsrc("fmuls", src.val);
-                break;
-            case 2: /* fcom */
-                emulate_fpu_insn_memsrc("fcoms", src.val);
-                break;
-            case 3: /* fcomp */
-                emulate_fpu_insn_memsrc("fcomps", src.val);
-                break;
-            case 4: /* fsub */
-                emulate_fpu_insn_memsrc("fsubs", src.val);
-                break;
-            case 5: /* fsubr */
-                emulate_fpu_insn_memsrc("fsubrs", src.val);
-                break;
-            case 6: /* fdiv */
-                emulate_fpu_insn_memsrc("fdivs", src.val);
-                break;
-            case 7: /* fdivr */
-                emulate_fpu_insn_memsrc("fdivrs", src.val);
-                break;
-            }
+            emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
+            break;
         }
         check_fpu_exn(&fic);
         break;
@@ -4246,52 +4218,46 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m32fp */
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                     4, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc("flds", src.val);
-                dst.type = OP_NONE;
-                break;
+                goto fpu_memsrc32;
             case 2: /* fst m32fp */
-                emulate_fpu_insn_memdst("fsts", dst.val);
-                dst.bytes = 4;
-                break;
             case 3: /* fstp m32fp */
-                emulate_fpu_insn_memdst("fstps", dst.val);
+            fpu_memdst32:
+                dst = ea;
                 dst.bytes = 4;
+                emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
                 break;
             case 4: /* fldenv - TODO */
                 state->fpu_ctrl = true;
                 goto unimplemented_insn;
             case 5: /* fldcw m2byte */
                 state->fpu_ctrl = true;
+            fpu_memsrc16:
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
                                      2, ctxt)) != X86EMUL_OKAY )
                     goto done;
-                emulate_fpu_insn_memsrc("fldcw", src.val);
-                dst.type = OP_NONE;
+                emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
                 break;
             case 6: /* fnstenv - TODO */
                 state->fpu_ctrl = true;
                 goto unimplemented_insn;
             case 7: /* fnstcw m2byte */
                 state->fpu_ctrl = true;
-                emulate_fpu_insn_memdst("fnstcw", dst.val);
+            fpu_memdst16:
+                dst = ea;
                 dst.bytes = 2;
+                emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
                 break;
             default:
                 generate_exception(EXC_UD);
             }
             /*
              * Control instructions can't raise FPU exceptions, so we need
-             * to consider suppressing writes only for non-control ones. All
-             * of them in this group have data width 4.
+             * to consider suppressing writes only for non-control ones.
              */
-            if ( dst.type == OP_MEM && dst.bytes == 4 && !fpu_check_write() )
+            if ( dst.type == OP_MEM && !state->fpu_ctrl && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
         check_fpu_exn(&fic);
@@ -4314,36 +4280,7 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                 4, ctxt)) != X86EMUL_OKAY )
-                goto done;
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fiadd m32i */
-                emulate_fpu_insn_memsrc("fiaddl", src.val);
-                break;
-            case 1: /* fimul m32i */
-                emulate_fpu_insn_memsrc("fimull", src.val);
-                break;
-            case 2: /* ficom m32i */
-                emulate_fpu_insn_memsrc("ficoml", src.val);
-                break;
-            case 3: /* ficomp m32i */
-                emulate_fpu_insn_memsrc("ficompl", src.val);
-                break;
-            case 4: /* fisub m32i */
-                emulate_fpu_insn_memsrc("fisubl", src.val);
-                break;
-            case 5: /* fisubr m32i */
-                emulate_fpu_insn_memsrc("fisubrl", src.val);
-                break;
-            case 6: /* fidiv m32i */
-                emulate_fpu_insn_memsrc("fidivl", src.val);
-                break;
-            case 7: /* fidivr m32i */
-                emulate_fpu_insn_memsrc("fidivrl", src.val);
-                break;
-            }
+            goto fpu_memsrc32;
         }
         check_fpu_exn(&fic);
         break;
@@ -4373,50 +4310,35 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m32i */
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                     4, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc("fildl", src.val);
-                dst.type = OP_NONE;
-                break;
+                goto fpu_memsrc32;
             case 1: /* fisttp m32i */
                 host_and_vcpu_must_have(sse3);
-                emulate_fpu_insn_memdst("fisttpl", dst.val);
-                dst.bytes = 4;
-                break;
+                /* fall through */
             case 2: /* fist m32i */
-                emulate_fpu_insn_memdst("fistl", dst.val);
-                dst.bytes = 4;
-                break;
             case 3: /* fistp m32i */
-                emulate_fpu_insn_memdst("fistpl", dst.val);
-                dst.bytes = 4;
-                break;
+                goto fpu_memdst32;
             case 5: /* fld m80fp */
+            fpu_memsrc80:
                 if ( (rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp,
                                      10, ctxt)) != X86EMUL_OKAY )
                     goto done;
-                emulate_fpu_insn_memsrc("fldt", *mmvalp);
-                dst.type = OP_NONE;
+                emulate_fpu_insn_memsrc(b, modrm_reg & 7, *mmvalp);
                 break;
             case 7: /* fstp m80fp */
+            fpu_memdst80:
                 fail_if(!ops->write);
-                emulate_fpu_insn_memdst("fstpt", *mmvalp);
+                emulate_fpu_insn_memdst(b, modrm_reg & 7, *mmvalp);
                 if ( fpu_check_write() &&
                      (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
                                       10, ctxt)) != X86EMUL_OKAY )
                     goto done;
-                dst.type = OP_NONE;
                 break;
             default:
                 generate_exception(EXC_UD);
             }
-            if ( dst.type == OP_MEM && !fpu_check_write() )
-                dst.type = OP_NONE;
         }
         check_fpu_exn(&fic);
         break;
@@ -4437,37 +4359,13 @@ x86_emulate(
             emulate_fpu_insn_stub(0xdc, modrm);
             break;
         default:
+        fpu_memsrc64:
             ASSERT(ea.type == OP_MEM);
             if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
                                  8, ctxt)) != X86EMUL_OKAY )
                 goto done;
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fadd m64fp */
-                emulate_fpu_insn_memsrc("faddl", src.val);
-                break;
-            case 1: /* fmul m64fp */
-                emulate_fpu_insn_memsrc("fmull", src.val);
-                break;
-            case 2: /* fcom m64fp */
-                emulate_fpu_insn_memsrc("fcoml", src.val);
-                break;
-            case 3: /* fcomp m64fp */
-                emulate_fpu_insn_memsrc("fcompl", src.val);
-                break;
-            case 4: /* fsub m64fp */
-                emulate_fpu_insn_memsrc("fsubl", src.val);
-                break;
-            case 5: /* fsubr m64fp */
-                emulate_fpu_insn_memsrc("fsubrl", src.val);
-                break;
-            case 6: /* fdiv m64fp */
-                emulate_fpu_insn_memsrc("fdivl", src.val);
-                break;
-            case 7: /* fdivr m64fp */
-                emulate_fpu_insn_memsrc("fdivrl", src.val);
-                break;
-            }
+            emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
+            break;
         }
         check_fpu_exn(&fic);
         break;
@@ -4487,28 +4385,19 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fld m64fp */;
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                     8, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc("fldl", src.val);
-                dst.type = OP_NONE;
-                break;
+                goto fpu_memsrc64;
             case 1: /* fisttp m64i */
                 host_and_vcpu_must_have(sse3);
-                emulate_fpu_insn_memdst("fisttpll", dst.val);
-                dst.bytes = 8;
-                break;
+                /* fall through */
             case 2: /* fst m64fp */
-                emulate_fpu_insn_memdst("fstl", dst.val);
-                dst.bytes = 8;
-                break;
             case 3: /* fstp m64fp */
-                emulate_fpu_insn_memdst("fstpl", dst.val);
+            fpu_memdst64:
+                dst = ea;
                 dst.bytes = 8;
+                emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
                 break;
             case 4: /* frstor - TODO */
             case 6: /* fnsave - TODO */
@@ -4516,18 +4405,15 @@ x86_emulate(
                 goto unimplemented_insn;
             case 7: /* fnstsw m2byte */
                 state->fpu_ctrl = true;
-                emulate_fpu_insn_memdst("fnstsw", dst.val);
-                dst.bytes = 2;
-                break;
+                goto fpu_memdst16;
             default:
                 generate_exception(EXC_UD);
             }
             /*
              * Control instructions can't raise FPU exceptions, so we need
-             * to consider suppressing writes only for non-control ones. All
-             * of them in this group have data width 8.
+             * to consider suppressing writes only for non-control ones.
              */
-            if ( dst.type == OP_MEM && dst.bytes == 8 && !fpu_check_write() )
+            if ( dst.type == OP_MEM && !state->fpu_ctrl && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
         check_fpu_exn(&fic);
@@ -4550,33 +4436,8 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            switch ( modrm_reg & 7 )
-            {
-            case 0: /* fiadd m16i */
-                emulate_fpu_insn_memsrc("fiadds", src.val);
-                break;
-            case 1: /* fimul m16i */
-                emulate_fpu_insn_memsrc("fimuls", src.val);
-                break;
-            case 2: /* ficom m16i */
-                emulate_fpu_insn_memsrc("ficoms", src.val);
-                break;
-            case 3: /* ficomp m16i */
-                emulate_fpu_insn_memsrc("ficomps", src.val);
-                break;
-            case 4: /* fisub m16i */
-                emulate_fpu_insn_memsrc("fisubs", src.val);
-                break;
-            case 5: /* fisubr m16i */
-                emulate_fpu_insn_memsrc("fisubrs", src.val);
-                break;
-            case 6: /* fidiv m16i */
-                emulate_fpu_insn_memsrc("fidivs", src.val);
-                break;
-            case 7: /* fidivr m16i */
-                emulate_fpu_insn_memsrc("fidivrs", src.val);
-                break;
-            }
+            emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
+            break;
         }
         check_fpu_exn(&fic);
         break;
@@ -4592,7 +4453,7 @@ x86_emulate(
             dst.bytes = 2;
             dst.type = OP_REG;
             dst.reg = (void *)&_regs.ax;
-            emulate_fpu_insn_memdst("fnstsw", dst.val);
+            emulate_fpu_insn_memdst(b, modrm_reg & 7, dst.val);
             break;
         case 0xe8 ... 0xef: /* fucomip %stN */
         case 0xf0 ... 0xf7: /* fcomip %stN */
@@ -4607,59 +4468,26 @@ x86_emulate(
             break;
         default:
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
-            dst = ea;
             switch ( modrm_reg & 7 )
             {
             case 0: /* fild m16i */
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                     2, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc("filds", src.val);
-                dst.type = OP_NONE;
-                break;
+                goto fpu_memsrc16;
             case 1: /* fisttp m16i */
                 host_and_vcpu_must_have(sse3);
-                emulate_fpu_insn_memdst("fisttps", dst.val);
-                dst.bytes = 2;
-                break;
+                /* fall through */
             case 2: /* fist m16i */
-                emulate_fpu_insn_memdst("fists", dst.val);
-                dst.bytes = 2;
-                break;
             case 3: /* fistp m16i */
-                emulate_fpu_insn_memdst("fistps", dst.val);
-                dst.bytes = 2;
-                break;
+                goto fpu_memdst16;
             case 4: /* fbld m80dec */
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp,
-                                     10, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc("fbld", *mmvalp);
-                dst.type = OP_NONE;
-                break;
+                goto fpu_memsrc80;
             case 5: /* fild m64i */
-                if ( (rc = ops->read(ea.mem.seg, ea.mem.off, &src.val,
-                                     8, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                emulate_fpu_insn_memsrc("fildll", src.val);
                 dst.type = OP_NONE;
-                break;
+                goto fpu_memsrc64;
             case 6: /* fbstp packed bcd */
-                fail_if(!ops->write);
-                emulate_fpu_insn_memdst("fbstp", *mmvalp);
-                if ( fpu_check_write() &&
-                     (rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp,
-                                      10, ctxt)) != X86EMUL_OKAY )
-                    goto done;
-                dst.type = OP_NONE;
-                break;
+                goto fpu_memdst80;
             case 7: /* fistp m64i */
-                emulate_fpu_insn_memdst("fistpll", dst.val);
-                dst.bytes = 8;
-                break;
+                goto fpu_memdst64;
             }
-            if ( dst.type == OP_MEM && !fpu_check_write() )
-                dst.type = OP_NONE;
         }
         check_fpu_exn(&fic);
         break;
