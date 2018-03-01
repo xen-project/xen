@@ -159,6 +159,7 @@ tools/firmware/xen-dir/*.old
 tools/firmware/xen-dir/linkfarm.stamp*
 tools/firmware/xen-dir/xen-root
 tools/firmware/xen-dir/xen-shim
+tools/firmware/xen-dir/xen-shim-syms
 tools/flask/utils/flask-getenforce
 tools/flask/utils/flask-get-bool
 tools/flask/utils/flask-loadpolicy
@@ -327,7 +328,6 @@ xen/xsm/flask/xenpolicy-*
 tools/flask/policy/policy.conf
 tools/flask/policy/xenpolicy-*
 xen/xen
-xen/xen-shim
 xen/xen-syms
 xen/xen-syms.map
 xen/xen.*
