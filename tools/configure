@@ -684,8 +684,6 @@ AWK
 IASL
 XGETTEXT
 BASH
-XML
-CURL
 FLEX
 BISON
 PERL
@@ -834,8 +832,6 @@ PYTHON
 PERL
 BISON
 FLEX
-CURL
-XML
 BASH
 XGETTEXT
 AS86
@@ -1565,8 +1561,6 @@ Some influential environment variables:
   PERL        Path to Perl parser
   BISON       Path to Bison parser generator
   FLEX        Path to Flex lexical analyser generator
-  CURL        Path to curl-config tool
-  XML         Path to xml2-config tool
   BASH        Path to bash shell
   XGETTEXT    Path to xgetttext tool
   AS86        Path to as86 tool
@@ -4598,8 +4592,6 @@ do
 done
 CPPFLAGS="$PREPEND_CPPFLAGS $CPPFLAGS $APPEND_CPPFLAGS"
 LDFLAGS="$PREPEND_LDFLAGS $LDFLAGS $APPEND_LDFLAGS"
-
-
 
 
 
