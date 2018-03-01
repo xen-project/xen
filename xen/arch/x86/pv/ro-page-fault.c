@@ -65,7 +65,7 @@ static int ptwr_emulated_read(enum x86_segment seg, unsigned long offset,
     return X86EMUL_OKAY;
 }
 
-static int ptwr_emulated_update(unsigned long addr, paddr_t old, paddr_t val,
+static int ptwr_emulated_update(unsigned long addr, intpte_t old, intpte_t val,
                                 unsigned int bytes, unsigned int do_cmpxchg,
                                 struct x86_emulate_ctxt *ctxt)
 {
@@ -88,28 +88,28 @@ static int ptwr_emulated_update(unsigned long addr, paddr_t old, paddr_t val,
     }
 
     /* Turn a sub-word access into a full-word access. */
-    if ( bytes != sizeof(paddr_t) )
+    if ( bytes != sizeof(val) )
     {
-        paddr_t      full;
-        unsigned int rc, offset = addr & (sizeof(paddr_t) - 1);
+        intpte_t full;
+        unsigned int rc, offset = addr & (sizeof(full) - 1);
 
         /* Align address; read full word. */
-        addr &= ~(sizeof(paddr_t) - 1);
-        if ( (rc = copy_from_user(&full, (void *)addr, sizeof(paddr_t))) != 0 )
+        addr &= ~(sizeof(full) - 1);
+        if ( (rc = copy_from_user(&full, (void *)addr, sizeof(full))) != 0 )
         {
             x86_emul_pagefault(0, /* Read fault. */
-                               addr + sizeof(paddr_t) - rc,
+                               addr + sizeof(full) - rc,
                                ctxt);
             return X86EMUL_EXCEPTION;
         }
         /* Mask out bits provided by caller. */
-        full &= ~((((paddr_t)1 << (bytes * 8)) - 1) << (offset * 8));
+        full &= ~((((intpte_t)1 << (bytes * 8)) - 1) << (offset * 8));
         /* Shift the caller value and OR in the missing bits. */
-        val  &= (((paddr_t)1 << (bytes * 8)) - 1);
+        val  &= (((intpte_t)1 << (bytes * 8)) - 1);
         val <<= (offset) * 8;
         val  |= full;
         /* Also fill in missing parts of the cmpxchg old value. */
-        old  &= (((paddr_t)1 << (bytes * 8)) - 1);
+        old  &= (((intpte_t)1 << (bytes * 8)) - 1);
         old <<= (offset) * 8;
         old  |= full;
     }
@@ -200,9 +200,9 @@ static int ptwr_emulated_write(enum x86_segment seg, unsigned long offset,
                                void *p_data, unsigned int bytes,
                                struct x86_emulate_ctxt *ctxt)
 {
-    paddr_t val = 0;
+    intpte_t val = 0;
 
-    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes - 1)) || !bytes )
+    if ( (bytes > sizeof(val)) || (bytes & (bytes - 1)) || !bytes )
     {
         gdprintk(XENLOG_WARNING, "bad write size (addr=%lx, bytes=%u)\n",
                  offset, bytes);
@@ -218,9 +218,9 @@ static int ptwr_emulated_cmpxchg(enum x86_segment seg, unsigned long offset,
                                  void *p_old, void *p_new, unsigned int bytes,
                                  struct x86_emulate_ctxt *ctxt)
 {
-    paddr_t old = 0, new = 0;
+    intpte_t old = 0, new = 0;
 
-    if ( (bytes > sizeof(paddr_t)) || (bytes & (bytes - 1)) )
+    if ( (bytes > sizeof(new)) || (bytes & (bytes - 1)) )
     {
         gdprintk(XENLOG_WARNING, "bad cmpxchg size (addr=%lx, bytes=%u)\n",
                  offset, bytes);
