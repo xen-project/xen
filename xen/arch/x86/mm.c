@@ -5563,17 +5563,17 @@ void memguard_unguard_range(void *p, unsigned long l)
 
 void memguard_guard_stack(void *p)
 {
-    BUILD_BUG_ON((PRIMARY_STACK_SIZE + PAGE_SIZE) > STACK_SIZE);
-    p = (void *)((unsigned long)p + STACK_SIZE -
-                 PRIMARY_STACK_SIZE - PAGE_SIZE);
-    memguard_guard_range(p, PAGE_SIZE);
+    /* IST_MAX IST pages + at least 1 guard page + primary stack. */
+    BUILD_BUG_ON((IST_MAX + 1) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
+
+    memguard_guard_range(p + IST_MAX * PAGE_SIZE,
+                         STACK_SIZE - PRIMARY_STACK_SIZE - IST_MAX * PAGE_SIZE);
 }
 
 void memguard_unguard_stack(void *p)
 {
-    p = (void *)((unsigned long)p + STACK_SIZE -
-                 PRIMARY_STACK_SIZE - PAGE_SIZE);
-    memguard_unguard_range(p, PAGE_SIZE);
+    memguard_unguard_range(p + IST_MAX * PAGE_SIZE,
+                           STACK_SIZE - PRIMARY_STACK_SIZE - IST_MAX * PAGE_SIZE);
 }
 
 void arch_dump_shared_mem_info(void)

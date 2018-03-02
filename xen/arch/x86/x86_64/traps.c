@@ -301,8 +301,8 @@ void subarch_percpu_traps_init(void)
     unsigned char *stub_page;
     unsigned int offset;
 
-    /* IST_MAX IST pages + 1 syscall page + 1 guard page + primary stack. */
-    BUILD_BUG_ON((IST_MAX + 2) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
+    /* IST_MAX IST pages + at least 1 guard page + primary stack. */
+    BUILD_BUG_ON((IST_MAX + 1) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
 
     stub_page = map_domain_page(_mfn(this_cpu(stubs.mfn)));
 

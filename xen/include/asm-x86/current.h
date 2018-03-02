@@ -16,9 +16,9 @@
  *
  * 7 - Primary stack (with a struct cpu_info at the top)
  * 6 - Primary stack
- * 5 - Optionally not preset (MEMORY_GUARD)
- * 4 - unused
- * 3 - Syscall trampolines
+ * 5 - Optionally not present (MEMORY_GUARD)
+ * 4 - Unused; optionally not present (MEMORY_GUARD)
+ * 3 - Unused; optionally not present (MEMORY_GUARD)
  * 2 - MCE IST stack
  * 1 - NMI IST stack
  * 0 - Double Fault IST stack
