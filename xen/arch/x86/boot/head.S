@@ -34,7 +34,7 @@
         .endm
 
         .macro mb2ht_init type:req, req:req, args:vararg
-        .align MULTIBOOT2_TAG_ALIGN
+        .balign MULTIBOOT2_TAG_ALIGN, 0xc2 /* Avoid padding with long nops. */
 .Lmb2ht_init_start\@:
         .short \type
         .short \req
@@ -48,8 +48,8 @@
 ENTRY(start)
         jmp     __start
 
-        .align 4
-multiboot1_header_start:       /*** MULTIBOOT1 HEADER ****/
+        .balign 4
+multiboot1_header:             /*** MULTIBOOT1 HEADER ****/
 #define MULTIBOOT_HEADER_FLAGS (MULTIBOOT_HEADER_MODS_ALIGNED | \
                                 MULTIBOOT_HEADER_WANT_MEMORY)
         /* Magic number indicating a Multiboot header. */
@@ -58,22 +58,24 @@ multiboot1_header_start:       /*** MULTIBOOT1 HEADER ****/
         .long   MULTIBOOT_HEADER_FLAGS
         /* Checksum: must be the negated sum of the first two fields. */
         .long   -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
-multiboot1_header_end:
+
+        .size multiboot1_header, . - multiboot1_header
+        .type multiboot1_header, @object
 
 /*** MULTIBOOT2 HEADER ****/
 /* Some ideas are taken from grub-2.00/grub-core/tests/boot/kernel-i386.S file. */
-        .align  MULTIBOOT2_HEADER_ALIGN
+        .balign MULTIBOOT2_HEADER_ALIGN, 0xc2  /* Avoid padding the MB1 header with long nops. */
 
-multiboot2_header_start:
+multiboot2_header:
         /* Magic number indicating a Multiboot2 header. */
         .long   MULTIBOOT2_HEADER_MAGIC
         /* Architecture: i386. */
         .long   MULTIBOOT2_ARCHITECTURE_I386
         /* Multiboot2 header length. */
-        .long   .Lmultiboot2_header_end - multiboot2_header_start
+        .long   .Lmultiboot2_header_end - multiboot2_header
         /* Multiboot2 header checksum. */
         .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT2_ARCHITECTURE_I386 + \
-                        (.Lmultiboot2_header_end - multiboot2_header_start))
+                        (.Lmultiboot2_header_end - multiboot2_header))
 
         /* Multiboot2 information request tag. */
         mb2ht_init MB2_HT(INFORMATION_REQUEST), MB2_HT(REQUIRED), \
@@ -109,6 +111,9 @@ multiboot2_header_start:
         /* Multiboot2 header end tag. */
         mb2ht_init MB2_HT(END), MB2_HT(REQUIRED)
 .Lmultiboot2_header_end:
+
+        .size multiboot2_header, . - multiboot2_header
+        .type multiboot2_header, @object
 
         .section .init.rodata, "a", @progbits
 
