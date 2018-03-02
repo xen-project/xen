@@ -18,6 +18,7 @@ $(call as-insn-check,CFLAGS,CC,"rdfsbase %rax",-DHAVE_GAS_FSGSBASE)
 $(call as-insn-check,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      -U__OBJECT_LABEL__ -DHAVE_GAS_QUOTED_SYM \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
+$(call as-insn-check,CFLAGS,CC,"invpcid (%rax)$$(comma)%rax",-DHAVE_AS_INVPCID)
 
 CFLAGS += -mno-red-zone -mno-sse -fpic
 CFLAGS += -fno-asynchronous-unwind-tables

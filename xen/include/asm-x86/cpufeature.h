@@ -82,6 +82,7 @@ XEN_CPUFEATURE(SC_MSR_IDLE,     (FSCAPINTS+0)*32+23) /* (SC_MSR_PV || SC_MSR_HVM
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 #define cpu_has_aperfmperf	boot_cpu_has(X86_FEATURE_APERFMPERF)
 #define cpu_has_smep            boot_cpu_has(X86_FEATURE_SMEP)
+#define cpu_has_invpcid         boot_cpu_has(X86_FEATURE_INVPCID)
 #define cpu_has_smap            boot_cpu_has(X86_FEATURE_SMAP)
 #define cpu_has_fpu_sel         (!boot_cpu_has(X86_FEATURE_NO_FPU_SEL))
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
