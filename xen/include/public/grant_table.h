@@ -515,10 +515,9 @@ DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 #if __XEN_INTERFACE_VERSION__ >= 0x0003020a
 /*
  * GNTTABOP_set_version: Request a particular version of the grant
- * table shared table structure.  This operation can only be performed
- * once in any given domain.  It must be performed before any grants
- * are activated; otherwise, the domain will be stuck with version 1.
- * The only defined versions are 1 and 2.
+ * table shared table structure.  This operation may be used to toggle
+ * between different versions, but must be performed while no grants
+ * are active.  The only defined versions are 1 and 2.
  */
 struct gnttab_set_version {
     /* IN/OUT parameters */
