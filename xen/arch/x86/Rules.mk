@@ -23,6 +23,7 @@ $(call as-option-add,CFLAGS,CC,"rdseed %eax",-DHAVE_GAS_RDSEED)
 $(call as-option-add,CFLAGS,CC,".equ \"x\"$$(comma)1", \
                      -U__OBJECT_LABEL__ -DHAVE_GAS_QUOTED_SYM \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
+$(call as-option-add,CFLAGS,CC,"invpcid (%rax)$$(comma)%rax",-DHAVE_AS_INVPCID)
 
 CFLAGS += -mno-red-zone -fpic -fno-asynchronous-unwind-tables
 
