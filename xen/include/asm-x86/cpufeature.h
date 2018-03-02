@@ -214,6 +214,7 @@
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 
 #define cpu_has_smep            boot_cpu_has(X86_FEATURE_SMEP)
+#define cpu_has_invpcid         boot_cpu_has(X86_FEATURE_INVPCID)
 #define cpu_has_smap            boot_cpu_has(X86_FEATURE_SMAP)
 #define cpu_has_fpu_sel         (!boot_cpu_has(X86_FEATURE_NO_FPU_SEL))
 

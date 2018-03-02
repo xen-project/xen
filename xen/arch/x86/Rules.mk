@@ -27,6 +27,7 @@ $(call cc-option-add,CFLAGS,CC,-Wnested-externs)
 $(call as-insn-check,CFLAGS,CC,"vmcall",-DHAVE_GAS_VMX)
 $(call as-insn-check,CFLAGS,CC,"invept (%rax)$$(comma)%rax",-DHAVE_GAS_EPT)
 $(call as-insn-check,CFLAGS,CC,"rdfsbase %rax",-DHAVE_GAS_FSGSBASE)
+$(call as-insn-check,CFLAGS,CC,"invpcid (%rax)$$(comma)%rax",-DHAVE_AS_INVPCID)
 
 x86 := y
 x86_32 := n
