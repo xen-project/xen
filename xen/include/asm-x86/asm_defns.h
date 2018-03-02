@@ -71,7 +71,7 @@ void ret_from_intr(void);
 
 #ifdef __ASSEMBLY__
 
-#ifdef HAVE_GAS_QUOTED_SYM
+#ifdef HAVE_AS_QUOTED_SYM
 #define SUBSECTION_LBL(tag)                        \
         .ifndef .L.tag;                            \
         .equ .L.tag, 1;                            \
@@ -152,7 +152,7 @@ void ret_from_intr(void);
 
 #else
 
-#ifdef HAVE_GAS_QUOTED_SYM
+#ifdef HAVE_AS_QUOTED_SYM
 #define SUBSECTION_LBL(tag)                                          \
         ".ifndef .L." #tag "\n\t"                                    \
         ".equ .L." #tag ", 1\n\t"                                    \

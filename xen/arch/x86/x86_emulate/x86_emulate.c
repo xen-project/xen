@@ -6688,7 +6688,7 @@ x86_emulate(
                 goto unrecognized_insn;
 
             case 6: /* rdrand */
-#ifdef HAVE_GAS_RDRAND
+#ifdef HAVE_AS_RDRAND
                 generate_exception_if(rep_prefix(), EXC_UD);
                 host_and_vcpu_must_have(rdrand);
                 dst = ea;
@@ -6731,7 +6731,7 @@ x86_emulate(
                     dst.bytes = 4;
                     break;
                 }
-#ifdef HAVE_GAS_RDSEED
+#ifdef HAVE_AS_RDSEED
                 generate_exception_if(rep_prefix(), EXC_UD);
                 host_and_vcpu_must_have(rdseed);
                 dst = ea;
@@ -7311,7 +7311,7 @@ x86_emulate(
             ASSERT_UNREACHABLE();
         }
         break;
-#ifdef HAVE_GAS_SSE4_2
+#ifdef HAVE_AS_SSE4_2
     case X86EMUL_OPC_F2(0x0f38, 0xf0): /* crc32 r/m8, r{32,64} */
     case X86EMUL_OPC_F2(0x0f38, 0xf1): /* crc32 r/m{16,32,64}, r{32,64} */
         host_and_vcpu_must_have(sse4_2);

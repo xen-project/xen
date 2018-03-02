@@ -14,14 +14,14 @@ CFLAGS += -msoft-float
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 $(call cc-option-add,CFLAGS,CC,-Wnested-externs)
-$(call as-option-add,CFLAGS,CC,"vmcall",-DHAVE_GAS_VMX)
-$(call as-option-add,CFLAGS,CC,"crc32 %eax$$(comma)%eax",-DHAVE_GAS_SSE4_2)
-$(call as-option-add,CFLAGS,CC,"invept (%rax)$$(comma)%rax",-DHAVE_GAS_EPT)
-$(call as-option-add,CFLAGS,CC,"rdrand %eax",-DHAVE_GAS_RDRAND)
-$(call as-option-add,CFLAGS,CC,"rdfsbase %rax",-DHAVE_GAS_FSGSBASE)
-$(call as-option-add,CFLAGS,CC,"rdseed %eax",-DHAVE_GAS_RDSEED)
+$(call as-option-add,CFLAGS,CC,"vmcall",-DHAVE_AS_VMX)
+$(call as-option-add,CFLAGS,CC,"crc32 %eax$$(comma)%eax",-DHAVE_AS_SSE4_2)
+$(call as-option-add,CFLAGS,CC,"invept (%rax)$$(comma)%rax",-DHAVE_AS_EPT)
+$(call as-option-add,CFLAGS,CC,"rdrand %eax",-DHAVE_AS_RDRAND)
+$(call as-option-add,CFLAGS,CC,"rdfsbase %rax",-DHAVE_AS_FSGSBASE)
+$(call as-option-add,CFLAGS,CC,"rdseed %eax",-DHAVE_AS_RDSEED)
 $(call as-option-add,CFLAGS,CC,".equ \"x\"$$(comma)1", \
-                     -U__OBJECT_LABEL__ -DHAVE_GAS_QUOTED_SYM \
+                     -U__OBJECT_LABEL__ -DHAVE_AS_QUOTED_SYM \
                      '-D__OBJECT_LABEL__=$(subst $(BASEDIR)/,,$(CURDIR))/$$@')
 $(call as-option-add,CFLAGS,CC,"invpcid (%rax)$$(comma)%rax",-DHAVE_AS_INVPCID)
 
