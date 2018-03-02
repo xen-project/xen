@@ -1101,7 +1101,8 @@ static void load_shadow_guest_state(struct vcpu *v)
                      (get_vvmcs(v, CR4_READ_SHADOW) & cr_gh_mask);
     __vmwrite(CR4_READ_SHADOW, cr_read_shadow);
     /* Add the nested host mask to the one set by vmx_update_guest_cr. */
-    __vmwrite(CR4_GUEST_HOST_MASK, cr_gh_mask | v->arch.hvm_vmx.cr4_host_mask);
+    v->arch.hvm_vmx.cr4_host_mask |= cr_gh_mask;
+    __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm_vmx.cr4_host_mask);
 
     /* TODO: CR3 target control */
 }
@@ -1232,6 +1233,10 @@ static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
     /* CR3 sync if exec doesn't want cr3 load exiting: i.e. nested EPT */
     if ( !(__n2_exec_control(v) & CPU_BASED_CR3_LOAD_EXITING) )
         shadow_to_vvmcs(v, GUEST_CR3);
+
+    if ( v->arch.hvm_vmx.cr4_host_mask != ~0UL )
+        /* Only need to update nested GUEST_CR4 if not all bits are trapped. */
+        set_vvmcs(v, GUEST_CR4, v->arch.hvm_vcpu.guest_cr[4]);
 }
 
 static void sync_vvmcs_ro(struct vcpu *v)

@@ -1617,6 +1617,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
                 v->arch.hvm_vmx.cr4_host_mask |=
                 ~v->domain->arch.monitor.write_ctrlreg_mask[VM_EVENT_X86_CR4];
 
+            if ( nestedhvm_vcpu_in_guestmode(v) )
+                /* Add the nested host mask to get the more restrictive one. */
+                v->arch.hvm_vmx.cr4_host_mask |= get_vvmcs(v,
+                                                           CR4_GUEST_HOST_MASK);
         }
         __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm_vmx.cr4_host_mask);
 
