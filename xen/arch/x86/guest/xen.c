@@ -257,8 +257,7 @@ void __init hypervisor_setup(void)
     map_shared_info();
 
     set_vcpu_id();
-    if ( nr_cpu_ids > XEN_LEGACY_MAX_VCPUS )
-        vcpu_info = xzalloc_array(struct vcpu_info, nr_cpu_ids);
+    vcpu_info = xzalloc_array(struct vcpu_info, nr_cpu_ids);
     if ( map_vcpuinfo() )
     {
         xfree(vcpu_info);
