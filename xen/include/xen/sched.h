@@ -427,7 +427,7 @@ struct domain
     xen_domain_handle_t handle;
 
     /* hvm_print_line() and guest_console_write() logging. */
-#define DOMAIN_PBUF_SIZE 80
+#define DOMAIN_PBUF_SIZE 200
     char       *pbuf;
     unsigned    pbuf_idx;
     spinlock_t  pbuf_lock;
@@ -603,7 +603,7 @@ static inline struct domain *rcu_lock_current_domain(void)
 struct domain *get_domain_by_id(domid_t dom);
 void domain_destroy(struct domain *d);
 int domain_kill(struct domain *d);
-void domain_shutdown(struct domain *d, u8 reason);
+int domain_shutdown(struct domain *d, u8 reason);
 void domain_resume(struct domain *d);
 void domain_pause_for_debugger(void);
 

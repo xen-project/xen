@@ -31,8 +31,14 @@ void arch_init_memory(void);
 void subarch_init_memory(void);
 
 void init_IRQ(void);
+
+#ifdef CONFIG_VIDEO
 void vesa_init(void);
 void vesa_mtrr_init(void);
+#else
+static inline void vesa_init(void) {};
+static inline void vesa_mtrr_init(void) {};
+#endif
 
 int construct_dom0(
     struct domain *d,

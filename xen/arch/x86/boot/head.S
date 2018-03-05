@@ -7,6 +7,7 @@
 #include <asm/page.h>
 #include <asm/msr.h>
 #include <asm/cpufeature.h>
+#include <public/elfnote.h>
 
         .text
         .code32
@@ -374,6 +375,49 @@ cs32_switch:
         /* Jump to earlier loaded address. */
         jmp     *%edi
 
+#ifdef CONFIG_PVH_GUEST
+ELFNOTE(Xen, XEN_ELFNOTE_PHYS32_ENTRY, .long sym_offs(__pvh_start))
+
+__pvh_start:
+        cld
+        cli
+
+        /*
+         * We need one push/pop to determine load address.  Use the same
+         * absolute stack address as the native path, for lack of a better
+         * alternative.
+         */
+        mov     $0x1000, %esp
+
+        /* Calculate the load base address. */
+        call    1f
+1:      pop     %esi
+        sub     $sym_offs(1b), %esi
+
+        /* Set up stack. */
+        lea     STACK_SIZE + sym_esi(cpu0_stack), %esp
+
+        mov     %ebx, sym_esi(pvh_start_info_pa)
+
+        /* Prepare gdt and segments */
+        add     %esi, sym_esi(gdt_boot_base)
+        lgdt    sym_esi(gdt_boot_descr)
+
+        mov     $BOOT_DS, %ecx
+        mov     %ecx, %ds
+        mov     %ecx, %es
+        mov     %ecx, %ss
+
+        /* Skip bootloader setup and bios setup, go straight to trampoline */
+        movb    $1, sym_esi(pvh_boot)
+        movb    $1, sym_esi(skip_realmode)
+
+        /* Set trampoline_phys to use mfn 1 to avoid having a mapping at VA 0 */
+        movw    $0x1000, sym_esi(trampoline_phys)
+        jmp     trampoline_setup
+
+#endif /* CONFIG_PVH_GUEST */
+
 __start:
         cld
         cli
@@ -534,12 +578,18 @@ trampoline_setup:
         /* Get bottom-most low-memory stack address. */
         add     $TRAMPOLINE_SPACE,%ecx
 
+#ifdef CONFIG_PVH_GUEST
+        cmpb    $0, sym_fs(pvh_boot)
+        jne     1f
+#endif
+
         /* Save the Multiboot info struct (after relocation) for later use. */
         push    %ecx                /* Bottom-most low-memory stack address. */
         push    %ebx                /* Multiboot information address. */
         push    %eax                /* Multiboot magic. */
         call    reloc
         mov     %eax,sym_fs(multiboot_ptr)
+1:
 
         /*
          * Now trampoline_phys points to the following structure (lowest address

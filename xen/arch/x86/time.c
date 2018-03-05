@@ -29,6 +29,7 @@
 #include <asm/mpspec.h>
 #include <asm/processor.h>
 #include <asm/fixmap.h>
+#include <asm/guest.h>
 #include <asm/mc146818rtc.h>
 #include <asm/div64.h>
 #include <asm/acpi.h>
@@ -525,6 +526,91 @@ static struct platform_timesource __initdata plt_tsc =
     .init = init_tsc,
 };
 
+#ifdef CONFIG_XEN_GUEST
+/************************************************************
+ * PLATFORM TIMER 5: XEN PV CLOCK SOURCE
+ *
+ * Xen clock source is a variant of TSC source.
+ */
+
+static uint64_t xen_timer_cpu_frequency(void)
+{
+    struct vcpu_time_info *info = &this_cpu(vcpu_info)->time;
+    uint64_t freq;
+
+    freq = 1000000000ULL << 32;
+    do_div(freq, info->tsc_to_system_mul);
+    if ( info->tsc_shift < 0 )
+        freq <<= -info->tsc_shift;
+    else
+        freq >>= info->tsc_shift;
+
+    return freq;
+}
+
+static int64_t __init init_xen_timer(struct platform_timesource *pts)
+{
+    if ( !xen_guest )
+        return 0;
+
+    pts->frequency = xen_timer_cpu_frequency();
+
+    return pts->frequency;
+}
+
+static always_inline uint64_t read_cycle(const struct vcpu_time_info *info,
+                                         uint64_t tsc)
+{
+    uint64_t delta = tsc - info->tsc_timestamp;
+    struct time_scale ts = {
+        .shift    = info->tsc_shift,
+        .mul_frac = info->tsc_to_system_mul,
+    };
+    uint64_t offset = scale_delta(delta, &ts);
+
+    return info->system_time + offset;
+}
+
+static uint64_t read_xen_timer(void)
+{
+    struct vcpu_time_info *info = &this_cpu(vcpu_info)->time;
+    uint32_t version;
+    uint64_t ret;
+    uint64_t last;
+    static uint64_t last_value;
+
+    do {
+        version = info->version & ~1;
+        /* Make sure version is read before the data */
+        smp_rmb();
+
+        ret = read_cycle(info, rdtsc_ordered());
+        /* Ignore fancy flags for now */
+
+        /* Make sure version is reread after the data */
+        smp_rmb();
+    } while ( unlikely(version != info->version) );
+
+    /* Maintain a monotonic global value */
+    do {
+        last = read_atomic(&last_value);
+        if ( ret < last )
+            return last;
+    } while ( unlikely(cmpxchg(&last_value, last, ret) != last) );
+
+    return ret;
+}
+
+static struct platform_timesource __initdata plt_xen_timer =
+{
+    .id = "xen",
+    .name = "XEN PV CLOCK",
+    .read_counter = read_xen_timer,
+    .init = init_xen_timer,
+    .counter_bits = 63,
+};
+#endif
+
 /************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
@@ -672,6 +758,9 @@ static s64 __init try_platform_timer(struct platform_timesource *pts)
 static u64 __init init_platform_timer(void)
 {
     static struct platform_timesource * __initdata plt_timers[] = {
+#ifdef CONFIG_XEN_GUEST
+        &plt_xen_timer,
+#endif
         &plt_hpet, &plt_pmtimer, &plt_pit
     };
 
@@ -708,7 +797,8 @@ static u64 __init init_platform_timer(void)
         }
     }
 
-    BUG_ON(rc <= 0);
+    if ( rc <= 0 )
+        panic("Unable to find usable platform timer");
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
@@ -872,6 +962,30 @@ static unsigned long get_cmos_time(void)
         panic("No CMOS RTC found - system must be booted from EFI");
 
     return mktime(rtc.year, rtc.mon, rtc.day, rtc.hour, rtc.min, rtc.sec);
+}
+
+static unsigned long get_wallclock_time(void)
+{
+#ifdef CONFIG_XEN_GUEST
+    if ( xen_guest )
+    {
+        struct shared_info *sh_info = XEN_shared_info;
+        uint32_t wc_version;
+        uint64_t wc_sec;
+
+        do {
+            wc_version = sh_info->wc_version & ~1;
+            smp_rmb();
+
+            wc_sec  = sh_info->wc_sec;
+            smp_rmb();
+        } while ( wc_version != sh_info->wc_version );
+
+        return wc_sec + read_xen_timer() / 1000000000;
+    }
+#endif
+
+    return get_cmos_time();
 }
 
 /***************************************************************************
@@ -1669,8 +1783,8 @@ int __init init_xen_time(void)
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
 
-    /* NB. get_cmos_time() can take over one second to execute. */
-    do_settime(get_cmos_time(), 0, NOW());
+    /* NB. get_wallclock_time() can take over one second to execute. */
+    do_settime(get_wallclock_time(), 0, NOW());
 
     /* Finish platform timer initialization. */
     try_platform_timer_tail(false);
@@ -1780,7 +1894,7 @@ int time_suspend(void)
 {
     if ( smp_processor_id() == 0 )
     {
-        cmos_utc_offset = -get_cmos_time();
+        cmos_utc_offset = -get_wallclock_time();
         cmos_utc_offset += get_sec();
         kill_timer(&calibration_timer);
 
@@ -1807,7 +1921,7 @@ int time_resume(void)
 
     set_timer(&calibration_timer, NOW() + EPOCH);
 
-    do_settime(get_cmos_time() + cmos_utc_offset, 0, NOW());
+    do_settime(get_wallclock_time() + cmos_utc_offset, 0, NOW());
 
     update_vcpu_system_time(current);
 

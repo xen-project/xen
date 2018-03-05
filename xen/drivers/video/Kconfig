@@ -3,8 +3,14 @@ config VIDEO
 	bool
 
 config VGA
-	bool
+	bool "VGA support" if !PV_SHIM_EXCLUSIVE
 	select VIDEO
+	depends on X86
+	default y if !PV_SHIM_EXCLUSIVE
+	---help---
+	  Enable VGA output for the Xen hypervisor.
+
+	  If unsure, say Y.
 
 config HAS_ARM_HDLCD
 	bool

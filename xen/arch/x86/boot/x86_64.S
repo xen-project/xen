@@ -31,7 +31,7 @@ ENTRY(__high_start)
         test    %ebx,%ebx
         jnz     start_secondary
 
-        /* Pass off the Multiboot info structure to C land. */
+        /* Pass off the Multiboot info structure to C land (if applicable). */
         mov     multiboot_ptr(%rip),%edi
         call    __start_xen
         BUG     /* __start_xen() shouldn't return. */
@@ -114,11 +114,10 @@ GLOBAL(__page_tables_start)
 GLOBAL(l2_identmap)
         .quad sym_offs(l1_identmap) + __PAGE_HYPERVISOR
         idx = 1
-        .rept 7
+        .rept 4 * L2_PAGETABLE_ENTRIES - 1
         .quad (idx << L2_PAGETABLE_SHIFT) | PAGE_HYPERVISOR | _PAGE_PSE
         idx = idx + 1
         .endr
-        .fill 4 * L2_PAGETABLE_ENTRIES - 8, 8, 0
         .size l2_identmap, . - l2_identmap
 
 /*

@@ -122,6 +122,7 @@
 #include <asm/fixmap.h>
 #include <asm/io_apic.h>
 #include <asm/pci.h>
+#include <asm/guest.h>
 
 #include <asm/hvm/grant_table.h>
 #include <asm/pv/grant_table.h>
@@ -288,8 +289,17 @@ void __init arch_init_memory(void)
     dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0, NULL);
     BUG_ON(IS_ERR(dom_cow));
 
-    /* First 1MB of RAM is historically marked as I/O. */
-    for ( i = 0; i < 0x100; i++ )
+    /*
+     * First 1MB of RAM is historically marked as I/O.  If we booted PVH,
+     * reclaim the space.  Irrespective, leave MFN 0 as special for the sake
+     * of 0 being a very common default value. Also reserve page 0x1 which is
+     * used by the trampoline code on PVH.
+     */
+    BUG_ON(pvh_boot && trampoline_phys != 0x1000);
+    for ( i = 0;
+          i < (pvh_boot ? (1 + PFN_UP(trampoline_end - trampoline_start))
+                        : 0x100);
+          i++ )
         share_xen_page_with_guest(mfn_to_page(_mfn(i)),
                                   dom_io, XENSHARE_writable);
 
@@ -5226,12 +5236,12 @@ void __set_fixmap(
     enum fixed_addresses idx, unsigned long mfn, unsigned long flags)
 {
     BUG_ON(idx >= __end_of_fixed_addresses);
-    map_pages_to_xen(fix_to_virt(idx), mfn, 1, flags);
+    map_pages_to_xen(__fix_to_virt(idx), mfn, 1, flags);
 }
 
 void *__init arch_vmap_virt_end(void)
 {
-    return (void *)fix_to_virt(__end_of_fixed_addresses);
+    return fix_to_virt(__end_of_fixed_addresses);
 }
 
 void __iomem *ioremap(paddr_t pa, size_t len)

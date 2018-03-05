@@ -28,6 +28,9 @@ extern const hypercall_args_t hypercall_args_table[NR_hypercalls];
 void pv_hypercall(struct cpu_user_regs *regs);
 void hypercall_page_initialise_ring3_kernel(void *hypercall_page);
 void hypercall_page_initialise_ring1_kernel(void *hypercall_page);
+void pv_hypercall_table_replace(unsigned int hypercall, hypercall_fn_t * native,
+                                hypercall_fn_t *compat);
+hypercall_fn_t *pv_get_hypercall_handler(unsigned int hypercall, bool compat);
 
 /*
  * Both do_mmuext_op() and do_mmu_update():

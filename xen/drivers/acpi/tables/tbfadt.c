@@ -95,7 +95,8 @@ static struct acpi_fadt_info __initdata fadt_info_table[] = {
 
 	{"PmTimerBlock", ACPI_FADT_OFFSET(xpm_timer_block),
 	 ACPI_FADT_OFFSET(pm_timer_block),
-	 ACPI_FADT_OFFSET(pm_timer_length), ACPI_FADT_REQUIRED},
+	 ACPI_FADT_OFFSET(pm_timer_length),
+	 ACPI_FADT_SEPARATE_LENGTH}, /* ACPI 5.0A: Timer is optional */
 
 	{"Gpe0Block", ACPI_FADT_OFFSET(xgpe0_block),
 	 ACPI_FADT_OFFSET(gpe0_block),
@@ -437,7 +438,7 @@ static void __init acpi_tb_validate_fadt(void)
 
 		if (fadt_info_table[i].type & ACPI_FADT_REQUIRED) {
 			/*
-			 * Field is required (Pm1a_event, Pm1a_control, pm_timer).
+			 * Field is required (Pm1a_event, Pm1a_control).
 			 * Both the address and length must be non-zero.
 			 */
 			if (!address64->address || !length) {

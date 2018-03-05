@@ -198,11 +198,12 @@ static void __init noinline probe_masking_msrs(void)
 }
 
 /*
- * Context switch levelling state to the next domain.  A parameter of NULL is
- * used to context switch to the default host state (by the cpu bringup-code,
- * crash path, etc).
+ * Context switch CPUID masking state to the next domain.  Only called if
+ * CPUID Faulting isn't available, but masking MSRs have been detected.  A
+ * parameter of NULL is used to context switch to the default host state (by
+ * the cpu bringup-code, crash path, etc).
  */
-static void amd_ctxt_switch_levelling(const struct vcpu *next)
+static void amd_ctxt_switch_masking(const struct vcpu *next)
 {
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
 	const struct domain *nextd = next ? next->domain : NULL;
@@ -262,6 +263,9 @@ static void amd_ctxt_switch_levelling(const struct vcpu *next)
 static void __init noinline amd_init_levelling(void)
 {
 	const struct cpuidmask *m = NULL;
+
+	if (probe_cpuid_faulting())
+		return;
 
 	probe_masking_msrs();
 
@@ -352,7 +356,7 @@ static void __init noinline amd_init_levelling(void)
 	}
 
 	if (levelling_caps)
-		ctxt_switch_levelling = amd_ctxt_switch_levelling;
+		ctxt_switch_masking = amd_ctxt_switch_masking;
 }
 
 /*
@@ -518,7 +522,7 @@ static void early_init_amd(struct cpuinfo_x86 *c)
 	if (c == &boot_cpu_data)
 		amd_init_levelling();
 
-	amd_ctxt_switch_levelling(NULL);
+	ctxt_switch_levelling(NULL);
 }
 
 static void init_amd(struct cpuinfo_x86 *c)

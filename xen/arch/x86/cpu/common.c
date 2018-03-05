@@ -113,12 +113,80 @@ static const struct cpu_dev default_cpu = {
 };
 static const struct cpu_dev *this_cpu = &default_cpu;
 
-static void default_ctxt_switch_levelling(const struct vcpu *next)
+static DEFINE_PER_CPU(uint64_t, msr_misc_features);
+void (* __read_mostly ctxt_switch_masking)(const struct vcpu *next);
+
+bool __init probe_cpuid_faulting(void)
 {
-	/* Nop */
+	uint64_t val;
+
+	if (rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val) ||
+	    !(val & MSR_PLATFORM_INFO_CPUID_FAULTING) ||
+	    rdmsr_safe(MSR_INTEL_MISC_FEATURES_ENABLES,
+		       this_cpu(msr_misc_features)))
+	{
+		setup_clear_cpu_cap(X86_FEATURE_CPUID_FAULTING);
+		return false;
+	}
+
+	expected_levelling_cap |= LCAP_faulting;
+	levelling_caps |=  LCAP_faulting;
+	setup_force_cpu_cap(X86_FEATURE_CPUID_FAULTING);
+
+	return true;
 }
-void (* __read_mostly ctxt_switch_levelling)(const struct vcpu *next) =
-	default_ctxt_switch_levelling;
+
+static void set_cpuid_faulting(bool enable)
+{
+	uint64_t *this_misc_features = &this_cpu(msr_misc_features);
+	uint64_t val = *this_misc_features;
+
+	if (!!(val & MSR_MISC_FEATURES_CPUID_FAULTING) == enable)
+		return;
+
+	val ^= MSR_MISC_FEATURES_CPUID_FAULTING;
+
+	wrmsrl(MSR_INTEL_MISC_FEATURES_ENABLES, val);
+	*this_misc_features = val;
+}
+
+void ctxt_switch_levelling(const struct vcpu *next)
+{
+	const struct domain *nextd = next ? next->domain : NULL;
+
+	if (cpu_has_cpuid_faulting) {
+		/*
+		 * No need to alter the faulting setting if we are switching
+		 * to idle; it won't affect any code running in idle context.
+		 */
+		if (nextd && is_idle_domain(nextd))
+			return;
+		/*
+		 * We *should* be enabling faulting for the control domain.
+		 *
+		 * Unfortunately, the domain builder (having only ever been a
+		 * PV guest) expects to be able to see host cpuid state in a
+		 * native CPUID instruction, to correctly build a CPUID policy
+		 * for HVM guests (notably the xstate leaves).
+		 *
+		 * This logic is fundimentally broken for HVM toolstack
+		 * domains, and faulting causes PV guests to behave like HVM
+		 * guests from their point of view.
+		 *
+		 * Future development plans will move responsibility for
+		 * generating the maximum full cpuid policy into Xen, at which
+		 * this problem will disappear.
+		 */
+		set_cpuid_faulting(nextd && !is_control_domain(nextd) &&
+				   (is_pv_domain(nextd) ||
+				    next->arch.msr->
+				    misc_features_enables.cpuid_faulting));
+		return;
+	}
+
+	if (ctxt_switch_masking)
+		ctxt_switch_masking(next);
+}
 
 bool_t opt_cpu_info;
 boolean_param("cpuinfo", opt_cpu_info);

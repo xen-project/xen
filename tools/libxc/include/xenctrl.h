@@ -456,6 +456,7 @@ typedef struct xc_dominfo {
     unsigned int  max_vcpu_id;
     xen_domain_handle_t handle;
     unsigned int  cpupool;
+    struct xen_arch_domainconfig arch_config;
 } xc_dominfo_t;
 
 typedef xen_domctl_getdomaininfo_t xc_domaininfo_t;
