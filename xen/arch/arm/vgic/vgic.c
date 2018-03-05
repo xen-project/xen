@@ -784,6 +784,45 @@ void gic_dump_vgic_info(struct vcpu *v)
     spin_unlock_irqrestore(&v->arch.vgic.ap_list_lock, flags);
 }
 
+/**
+ * arch_move_irqs() - migrate the physical affinity of hardware mapped vIRQs
+ * @v:  the vCPU, already assigned to the new pCPU
+ *
+ * arch_move_irqs() updates the physical affinity of all virtual IRQs
+ * targetting this given vCPU. This only affects hardware mapped IRQs. The
+ * new pCPU to target is already set in v->processor.
+ * This is called by the core code after a vCPU has been migrated to a new
+ * physical CPU.
+ */
+void arch_move_irqs(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    unsigned int i;
+
+    /* We only target SPIs with this function */
+    for ( i = 0; i < d->arch.vgic.nr_spis; i++ )
+    {
+        struct vgic_irq *irq = vgic_get_irq(d, NULL, i + VGIC_NR_PRIVATE_IRQS);
+        unsigned long flags;
+
+        if ( !irq )
+            continue;
+
+        spin_lock_irqsave(&irq->irq_lock, flags);
+
+        /* Only hardware mapped vIRQs that are targeting this vCPU. */
+        if ( irq->hw && irq->target_vcpu == v)
+        {
+            irq_desc_t *desc = irq_to_desc(irq->hwintid);
+
+            irq_set_affinity(desc, cpumask_of(v->processor));
+        }
+
+        spin_unlock_irqrestore(&irq->irq_lock, flags);
+        vgic_put_irq(d, irq);
+    }
+}
+
 struct irq_desc *vgic_get_hw_irq_desc(struct domain *d, struct vcpu *v,
                                       unsigned int virq)
 {
