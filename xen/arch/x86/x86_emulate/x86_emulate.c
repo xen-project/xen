@@ -391,6 +391,7 @@ static const struct ext0f38_table {
     [0x78 ... 0x79] = { .simd_size = simd_other, .two_op = 1 },
     [0x8c] = { .simd_size = simd_other },
     [0x8e] = { .simd_size = simd_other, .to_mem = 1 },
+    [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1 },
     [0x96 ... 0x9f] = { .simd_size = simd_packed_fp },
     [0xa6 ... 0xaf] = { .simd_size = simd_packed_fp },
     [0xb6 ... 0xbf] = { .simd_size = simd_packed_fp },
@@ -612,6 +613,7 @@ struct x86_emulate_state {
         ext_8f0a,
     } ext;
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
+    uint8_t sib_index, sib_scale;
     uint8_t rex_prefix;
     bool lock_prefix;
     bool not_64bit; /* Instruction not available in 64bit. */
@@ -2432,7 +2434,7 @@ x86_decode(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops  *ops)
 {
-    uint8_t b, d, sib, sib_index, sib_base;
+    uint8_t b, d;
     unsigned int def_op_bytes, def_ad_bytes, opcode;
     enum x86_segment override_seg = x86_seg_none;
     bool pc_rel = false;
@@ -2776,6 +2778,7 @@ x86_decode(
 
         if ( modrm_mod == 3 )
         {
+            generate_exception_if(d & vSIB, EXC_UD);
             modrm_rm |= (rex_prefix & 1) << 3;
             ea.type = OP_REG;
         }
@@ -2836,12 +2839,16 @@ x86_decode(
             ea.type = OP_MEM;
             if ( modrm_rm == 4 )
             {
-                sib = insn_fetch_type(uint8_t);
-                sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
-                sib_base  = (sib & 7) | ((rex_prefix << 3) & 8);
-                if ( sib_index != 4 && !(d & vSIB) )
-                    ea.mem.off = *decode_gpr(state->regs, sib_index);
-                ea.mem.off <<= (sib >> 6) & 3;
+                uint8_t sib = insn_fetch_type(uint8_t);
+                uint8_t sib_base = (sib & 7) | ((rex_prefix << 3) & 8);
+
+                state->sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
+                state->sib_scale = (sib >> 6) & 3;
+                if ( state->sib_index != 4 && !(d & vSIB) )
+                {
+                    ea.mem.off = *decode_gpr(state->regs, state->sib_index);
+                    ea.mem.off <<= state->sib_scale;
+                }
                 if ( (modrm_mod == 0) && ((sib_base & 7) == 5) )
                     ea.mem.off += insn_fetch_type(int32_t);
                 else if ( sib_base == 4 )
@@ -7345,6 +7352,110 @@ x86_emulate(
         opc[1] = modrm & 0x38;
         fic.insn_bytes = PFX_BYTES + 2;
 
+        break;
+    }
+
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x90): /* vpgatherd{d,q} {x,y}mm,mem,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x91): /* vpgatherq{d,q} {x,y}mm,mem,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x92): /* vgatherdp{s,d} {x,y}mm,mem,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x93): /* vgatherqp{s,d} {x,y}mm,mem,{x,y}mm */
+    {
+        unsigned int mask_reg = ~vex.reg & (mode_64bit() ? 0xf : 7);
+        typeof(vex) *pvex;
+        union {
+            int32_t dw[8];
+            int64_t qw[4];
+        } index, mask;
+
+        ASSERT(ea.type == OP_MEM);
+        generate_exception_if(modrm_reg == state->sib_index ||
+                              modrm_reg == mask_reg ||
+                              state->sib_index == mask_reg, EXC_UD);
+        generate_exception_if(!cpu_has_avx, EXC_UD);
+        vcpu_must_have(avx2);
+        get_fpu(X86EMUL_FPU_ymm, &fic);
+
+        /* Read destination, index, and mask registers. */
+        opc = init_prefixes(stub);
+        pvex = copy_VEX(opc, vex);
+        pvex->opcx = vex_0f;
+        opc[0] = 0x7f; /* vmovdqa */
+        /* Use (%rax) as destination and modrm_reg as source. */
+        pvex->r = !mode_64bit() || !(modrm_reg & 8);
+        pvex->b = 1;
+        opc[1] = (modrm_reg & 7) << 3;
+        pvex->reg = 0xf;
+        opc[2] = 0xc3;
+
+        invoke_stub("", "", "=m" (*mmvalp) : "a" (mmvalp));
+
+        pvex->pfx = vex_f3; /* vmovdqu */
+        /* Switch to sib_index as source. */
+        pvex->r = !mode_64bit() || !(state->sib_index & 8);
+        opc[1] = (state->sib_index & 7) << 3;
+
+        invoke_stub("", "", "=m" (index) : "a" (&index));
+
+        /* Switch to mask_reg as source. */
+        pvex->r = !mode_64bit() || !(mask_reg & 8);
+        opc[1] = (mask_reg & 7) << 3;
+
+        invoke_stub("", "", "=m" (mask) : "a" (&mask));
+        put_stub(stub);
+
+        /* Clear untouched parts of the destination and mask values. */
+        n = 1 << (2 + vex.l - ((b & 1) | vex.w));
+        op_bytes = 4 << vex.w;
+        memset((void *)mmvalp + n * op_bytes, 0, 32 - n * op_bytes);
+        memset((void *)&mask + n * op_bytes, 0, 32 - n * op_bytes);
+
+        for ( i = 0; i < n && rc == X86EMUL_OKAY; ++i )
+        {
+            if ( (vex.w ? mask.qw[i] : mask.dw[i]) < 0 )
+            {
+                signed long idx = b & 1 ? index.qw[i] : index.dw[i];
+
+                rc = ops->read(ea.mem.seg,
+                               ea.mem.off + (idx << state->sib_scale),
+                               (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
+                if ( rc != X86EMUL_OKAY )
+                    break;
+
+#ifdef __XEN__
+                if ( i + 1 < n && local_events_need_delivery() )
+                    rc = X86EMUL_RETRY;
+#endif
+            }
+
+            if ( vex.w )
+                mask.qw[i] = 0;
+            else
+                mask.dw[i] = 0;
+        }
+
+        /* Write destination and mask registers. */
+        opc = init_prefixes(stub);
+        pvex = copy_VEX(opc, vex);
+        pvex->opcx = vex_0f;
+        opc[0] = 0x6f; /* vmovdqa */
+        /* Use modrm_reg as destination and (%rax) as source. */
+        pvex->r = !mode_64bit() || !(modrm_reg & 8);
+        pvex->b = 1;
+        opc[1] = (modrm_reg & 7) << 3;
+        pvex->reg = 0xf;
+        opc[2] = 0xc3;
+
+        invoke_stub("", "", "+m" (*mmvalp) : "a" (mmvalp));
+
+        pvex->pfx = vex_f3; /* vmovdqu */
+        /* Switch to mask_reg as destination. */
+        pvex->r = !mode_64bit() || !(mask_reg & 8);
+        opc[1] = (mask_reg & 7) << 3;
+
+        invoke_stub("", "", "+m" (mask) : "a" (&mask));
+        put_stub(stub);
+
+        state->simd_size = simd_none;
         break;
     }
 

@@ -10,6 +10,7 @@
  */
 
 #include <xen/domain_page.h>
+#include <xen/event.h>
 #include <asm/x86_emulate.h>
 #include <asm/processor.h> /* current_cpu_info */
 #include <asm/xstate.h>

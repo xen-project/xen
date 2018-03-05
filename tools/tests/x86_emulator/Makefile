@@ -13,7 +13,8 @@ run: $(TARGET)
 
 SIMD := sse sse2 sse4 avx avx2
 FMA := fma4 fma
-TESTCASES := blowfish $(SIMD) $(FMA)
+SG := avx2-sg
+TESTCASES := blowfish $(SIMD) $(FMA) $(SG)
 
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
@@ -39,6 +40,10 @@ fma-flts := $(avx-flts)
 avx2-vecs := $(avx-vecs)
 avx2-ints := 1 2 4 8
 avx2-flts := 4 8
+avx2-sg-vecs := $(avx2-vecs)
+avx2-sg-idxs := 4 8
+avx2-sg-ints := 4 8
+avx2-sg-flts := 4 8
 
 # For AVX and later, have the compiler avoid XMM0 to widen coverage of
 # the VEX.vvvv checks in the emulator.
@@ -55,8 +60,18 @@ $(1)-cflags := \
 	$(foreach flt,$($(1)-flts), \
 	  "-D_f$(flt) -m$(1) $(call non-sse,$(1)) -mfpmath=sse -Os -DFLOAT_SIZE=$(flt)")
 endef
+define simd-sg-defs
+$(1)-cflags := \
+	$(foreach vec,$($(1)-vecs), \
+	  $(foreach idx,$($(1)-idxs), \
+	   $(foreach int,$($(1)-ints), \
+	     "-D_$(vec)x$(idx)i$(int) -m$(1:-sg=) $(call non-sse,$(1)) -Os -DVEC_MAX=$(vec) -DIDX_SIZE=$(idx) -DINT_SIZE=$(int)") \
+	   $(foreach flt,$($(1)-flts), \
+	     "-D_$(vec)x$(idx)f$(flt) -m$(1:-sg=) $(call non-sse,$(1)) -Os -DVEC_MAX=$(vec) -DIDX_SIZE=$(idx) -DFLOAT_SIZE=$(flt)")))
+endef
 
 $(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-defs,$(flavor))))
+$(foreach flavor,$(SG),$(eval $(call simd-sg-defs,$(flavor))))
 
 $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	rm -f $@.new $*.bin
@@ -78,7 +93,10 @@ $(addsuffix .c,$(SIMD)):
 $(addsuffix .c,$(FMA)):
 	ln -sf simd-fma.c $@
 
-$(addsuffix .o,$(SIMD) $(FMA)): simd.h
+$(addsuffix .c,$(SG)):
+	ln -sf simd-sg.c $@
+
+$(addsuffix .o,$(SIMD) $(FMA) $(SG)): simd.h
 
 $(TARGET): x86-emulate.o test_x86_emulator.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^

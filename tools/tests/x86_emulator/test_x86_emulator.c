@@ -12,6 +12,7 @@
 #include "fma4.h"
 #include "fma.h"
 #include "avx2.h"
+#include "avx2-sg.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -60,6 +61,7 @@ static bool simd_check_avx2(void)
 {
     return cpu_has_avx2;
 }
+#define simd_check_avx2_sg simd_check_avx2
 
 static void simd_set_regs(struct cpu_user_regs *regs)
 {
@@ -173,6 +175,22 @@ static const struct {
     SIMD(AVX2 u32x8,             avx2,      32u4),
     SIMD(AVX2 s64x4,             avx2,      32i8),
     SIMD(AVX2 u64x4,             avx2,      32u8),
+    SIMD(AVX2 S/G f32[4x32],  avx2_sg,    16x4f4),
+    SIMD(AVX2 S/G f64[2x32],  avx2_sg,    16x4f8),
+    SIMD(AVX2 S/G f32[2x64],  avx2_sg,    16x8f4),
+    SIMD(AVX2 S/G f64[2x64],  avx2_sg,    16x8f8),
+    SIMD(AVX2 S/G f32[8x32],  avx2_sg,    32x4f4),
+    SIMD(AVX2 S/G f64[4x32],  avx2_sg,    32x4f8),
+    SIMD(AVX2 S/G f32[4x64],  avx2_sg,    32x8f4),
+    SIMD(AVX2 S/G f64[4x64],  avx2_sg,    32x8f8),
+    SIMD(AVX2 S/G i32[4x32],  avx2_sg,    16x4i4),
+    SIMD(AVX2 S/G i64[2x32],  avx2_sg,    16x4i8),
+    SIMD(AVX2 S/G i32[2x64],  avx2_sg,    16x8i4),
+    SIMD(AVX2 S/G i64[2x64],  avx2_sg,    16x8i8),
+    SIMD(AVX2 S/G i32[8x32],  avx2_sg,    32x4i4),
+    SIMD(AVX2 S/G i64[4x32],  avx2_sg,    32x4i8),
+    SIMD(AVX2 S/G i32[4x64],  avx2_sg,    32x8i4),
+    SIMD(AVX2 S/G i64[4x64],  avx2_sg,    32x8i8),
 #undef SIMD_
 #undef SIMD
 };
