@@ -525,14 +525,6 @@ static int make_gicv3_node(libxl__gc *gc, void *fdt)
     res = fdt_property(fdt, "interrupt-controller", NULL, 0);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "redistributor-stride",
-                            GUEST_GICV3_RDIST_STRIDE);
-    if (res) return res;
-
-    res = fdt_property_cell(fdt, "#redistributor-regions",
-                            GUEST_GICV3_RDIST_REGIONS);
-    if (res) return res;
-
     res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
                             2,
                             gicd_base, gicd_size,
