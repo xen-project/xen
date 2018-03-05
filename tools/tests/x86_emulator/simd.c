@@ -70,7 +70,12 @@ static inline bool _to_bool(byte_vec_t bv)
 
 #if FLOAT_SIZE == 4 && defined(__SSE__)
 # if VEC_SIZE == 32 && defined(__AVX__)
-#  define broadcast(x) ({ float t_ = (x); __builtin_ia32_vbroadcastss256(&t_); })
+#  if defined(__AVX2__)
+#   define broadcast(x) \
+    __builtin_ia32_vbroadcastss_ps256((float __attribute__((vector_size(16)))){ x })
+#  else
+#   define broadcast(x) ({ float t_ = (x); __builtin_ia32_vbroadcastss256(&t_); })
+#  endif
 #  define max(x, y) __builtin_ia32_maxps256(x, y)
 #  define min(x, y) __builtin_ia32_minps256(x, y)
 #  define recip(x) __builtin_ia32_rcpps256(x)
@@ -85,7 +90,9 @@ static inline bool _to_bool(byte_vec_t bv)
     __builtin_ia32_vperm2f128_ps256(t_, t_, 0b00000001); \
 })
 # elif VEC_SIZE == 16
-#  ifdef __AVX__
+#  if defined(__AVX2__)
+#   define broadcast(x) __builtin_ia32_vbroadcastss_ps((vec_t){ x })
+#  elif defined(__AVX__)
 #   define broadcast(x) ({ float t_ = (x); __builtin_ia32_vbroadcastss(&t_); })
 #  endif
 #  define interleave_hi(x, y) __builtin_ia32_unpckhps(x, y)
@@ -106,7 +113,12 @@ static inline bool _to_bool(byte_vec_t bv)
 # endif
 #elif FLOAT_SIZE == 8 && defined(__SSE2__)
 # if VEC_SIZE == 32 && defined(__AVX__)
-#  define broadcast(x) ({ double t_ = (x); __builtin_ia32_vbroadcastsd256(&t_); })
+#  if defined(__AVX2__)
+#   define broadcast(x) \
+    __builtin_ia32_vbroadcastsd_pd256((double __attribute__((vector_size(16)))){ x })
+#  else
+#   define broadcast(x) ({ double t_ = (x); __builtin_ia32_vbroadcastsd256(&t_); })
+#  endif
 #  define max(x, y) __builtin_ia32_maxpd256(x, y)
 #  define min(x, y) __builtin_ia32_minpd256(x, y)
 #  define recip(x) ({ \

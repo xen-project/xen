@@ -7026,12 +7026,16 @@ x86_emulate(
         fic.insn_bytes = PFX_BYTES + 3;
         break;
 
-    case X86EMUL_OPC_VEX_66(0x0f38, 0x19): /* vbroadcastsd m64,ymm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x19): /* vbroadcastsd xmm/m64,ymm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x1a): /* vbroadcastf128 m128,ymm */
         generate_exception_if(!vex.l, EXC_UD);
         /* fall through */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0x18): /* vbroadcastss m32,{x,y}mm */
-        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x18): /* vbroadcastss xmm/m32,{x,y}mm */
+        if ( ea.type != OP_MEM )
+        {
+            generate_exception_if(b & 2, EXC_UD);
+            host_and_vcpu_must_have(avx2);
+        }
         /* fall through */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x0c): /* vpermilps {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x0d): /* vpermilpd {x,y}mm/mem,{x,y}mm,{x,y}mm */
