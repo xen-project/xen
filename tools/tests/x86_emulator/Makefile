@@ -11,7 +11,7 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
-SIMD := sse sse2 sse4 avx avx2
+SIMD := sse sse2 sse4 avx avx2 xop
 FMA := fma4 fma
 SG := avx2-sg
 TESTCASES := blowfish $(SIMD) $(FMA) $(SG)
@@ -44,6 +44,9 @@ avx2-sg-vecs := $(avx2-vecs)
 avx2-sg-idxs := 4 8
 avx2-sg-ints := 4 8
 avx2-sg-flts := 4 8
+xop-vecs := $(avx-vecs)
+xop-ints := 1 2 4 8
+xop-flts := $(avx-flts)
 
 # For AVX and later, have the compiler avoid XMM0 to widen coverage of
 # the VEX.vvvv checks in the emulator.
@@ -97,6 +100,8 @@ $(addsuffix .c,$(SG)):
 	ln -sf simd-sg.c $@
 
 $(addsuffix .o,$(SIMD) $(FMA) $(SG)): simd.h
+
+xop.o: simd-fma.c
 
 $(TARGET): x86-emulate.o test_x86_emulator.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^

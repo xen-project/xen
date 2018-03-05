@@ -1,6 +1,8 @@
 #include "simd.h"
 
+#ifndef __XOP__
 ENTRY(fma_test);
+#endif
 
 #if VEC_SIZE < 16
 # define to_bool(cmp) (!~(cmp)[0])

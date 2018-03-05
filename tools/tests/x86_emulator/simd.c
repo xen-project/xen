@@ -483,6 +483,86 @@ static inline bool _to_bool(byte_vec_t bv)
 #  endif
 # endif
 #endif
+#ifdef __XOP__
+# undef select
+# if VEC_SIZE == 16
+#  if INT_SIZE == 2 || INT_SIZE == 4
+#   include "simd-fma.c"
+#  endif
+#  define select(d, x, y, m) \
+    (*(d) = (vec_t)__builtin_ia32_vpcmov((vdi_t)(x), (vdi_t)(y), (vdi_t)(m)))
+#  if INT_SIZE == 1 || UINT_SIZE == 1
+#   define swap2(x) ((vec_t)__builtin_ia32_vpperm((vqi_t)(x), (vqi_t)(x), (vqi_t)inv - 1))
+#  elif INT_SIZE == 2 || UINT_SIZE == 2
+#   define swap2(x) \
+    ((vec_t)__builtin_ia32_vpperm((vqi_t)(x), (vqi_t)(x), \
+                                  (vqi_t)(__builtin_ia32_vprotwi(2 * (vhi_t)inv - 1, 8) | \
+                                          (2 * inv - 2))))
+#  elif FLOAT_SIZE == 4
+#   define frac(x) __builtin_ia32_vfrczps(x)
+#   undef swap2
+#   define swap2(x) ({ \
+    /* Buggy in gcc 7.1.0 and earlier. */ \
+    /* __builtin_ia32_vpermil2ps((vec_t){}, x, __builtin_ia32_cvtps2dq(inv) + 3, 0) */ \
+    vec_t t_; \
+    asm ( "vpermil2ps $0, %3, %2, %1, %0" : \
+          "=x" (t_) : \
+          "x" ((vec_t){}), "m" (x), "x" (__builtin_ia32_cvtps2dq(inv) + 3) ); \
+    t_; \
+})
+#  elif FLOAT_SIZE == 8
+#   define frac(x) __builtin_ia32_vfrczpd(x)
+#   undef swap2
+#   define swap2(x) ({ \
+    /* Buggy in gcc 7.1.0 and earlier. */ \
+    /* __builtin_ia32_vpermil2pd((vec_t){}, x, */ \
+    /*                            __builtin_ia32_pmovsxdq128( */ \
+    /*                                __builtin_ia32_cvtpd2dq(inv) + 1) << 1, 0) */ \
+    vdi_t s_ = __builtin_ia32_pmovsxdq128( \
+                   __builtin_ia32_cvtpd2dq(inv) + 1) << 1; \
+    vec_t t_; \
+    asm ( "vpermil2pd $0, %3, %2, %1, %0" : \
+          "=x" (t_) : "x" ((vec_t){}), "x" (x), "m" (s_) ); \
+    t_; \
+})
+#  endif
+#  if INT_SIZE == 1
+#   define hadd(x, y) ((vec_t)__builtin_ia32_packsswb128(__builtin_ia32_vphaddbw((vqi_t)(x)), \
+                                                         __builtin_ia32_vphaddbw((vqi_t)(y))))
+#   define hsub(x, y) ((vec_t)__builtin_ia32_packsswb128(__builtin_ia32_vphsubbw((vqi_t)(x)), \
+                                                         __builtin_ia32_vphsubbw((vqi_t)(y))))
+#  elif UINT_SIZE == 1
+#   define hadd(x, y) ((vec_t)__builtin_ia32_packuswb128(__builtin_ia32_vphaddubw((vqi_t)(x)), \
+                                                         __builtin_ia32_vphaddubw((vqi_t)(y))))
+#  elif INT_SIZE == 2
+#   undef hadd
+#   define hadd(x, y) __builtin_ia32_packssdw128(__builtin_ia32_vphaddwd(x), \
+                                                 __builtin_ia32_vphaddwd(y))
+#   undef hsub
+#   define hsub(x, y) __builtin_ia32_packssdw128(__builtin_ia32_vphsubwd(x), \
+                                                 __builtin_ia32_vphsubwd(y))
+#  elif UINT_SIZE == 2
+#   undef hadd
+#   define hadd(x, y) ((vec_t)__builtin_ia32_packusdw128(__builtin_ia32_vphadduwd((vhi_t)(x)), \
+                                                         __builtin_ia32_vphadduwd((vhi_t)(y))))
+#   undef hsub
+#  endif
+# elif VEC_SIZE == 32
+#  define select(d, x, y, m) \
+    (*(d) = (vec_t)__builtin_ia32_vpcmov256((vdi_t)(x), (vdi_t)(y), (vdi_t)(m)))
+#  if FLOAT_SIZE == 4
+#   define frac(x) __builtin_ia32_vfrczps256(x)
+#  elif FLOAT_SIZE == 8
+#   define frac(x) __builtin_ia32_vfrczpd256(x)
+#  endif
+# elif VEC_SIZE == FLOAT_SIZE
+#  if VEC_SIZE == 4
+#   define frac(x) scalar_1op(x, "vfrczss %[in], %[out]")
+#  elif VEC_SIZE == 8
+#   define frac(x) scalar_1op(x, "vfrczsd %[in], %[out]")
+#  endif
+# endif
+#endif
 
 int simd_test(void)
 {
@@ -588,6 +668,29 @@ int simd_test(void)
     if ( !to_bool(y == z) ) return __LINE__;
 # endif
 
+# ifdef frac
+    touch(src);
+    x = frac(src);
+    touch(src);
+    if ( !to_bool(x == 0) ) return __LINE__;
+
+    x = 1 / (src + 1);
+    touch(x);
+    y = frac(x);
+    touch(x);
+    if ( !to_bool(x == y) ) return __LINE__;
+# endif
+
+# if defined(trunc) && defined(frac)
+    x = src / 4;
+    touch(x);
+    y = trunc(x);
+    touch(x);
+    z = frac(x);
+    touch(x);
+    if ( !to_bool(x == y + z) ) return __LINE__;
+# endif
+
 #else
 
 # if ELEM_SIZE > 1
@@ -689,7 +792,7 @@ int simd_test(void)
     y = z << sh;
     if ( !to_bool(x == y + y) ) return __LINE__;
 
-#  if defined(__AVX2__) && ELEM_SIZE >= 4
+#  if (defined(__AVX2__) && ELEM_SIZE >= 4) || defined(__XOP__)
     touch(sh);
     x = y >> sh;
     if ( !to_bool(x == z) ) return __LINE__;
@@ -883,6 +986,8 @@ int simd_test(void)
 #endif
 
 #ifdef hadd
+# if (!defined(INT_SIZE) || INT_SIZE > 1 || ELEM_COUNT < 16) && \
+     (!defined(UINT_SIZE) || UINT_SIZE > 1 || ELEM_COUNT <= 16)
     x = src;
     for ( i = ELEM_COUNT; i >>= 1; )
     {
@@ -890,6 +995,7 @@ int simd_test(void)
         x = hadd((vec_t){}, x);
     }
     if ( x[ELEM_COUNT - 1] != (ELEM_COUNT * (ELEM_COUNT + 1)) / 2 ) return __LINE__;
+# endif
 
 # ifdef hsub
     touch(src);
@@ -901,6 +1007,9 @@ int simd_test(void)
 # endif
 #endif
 
+#if defined(__XOP__) && VEC_SIZE == 16 && (INT_SIZE == 2 || INT_SIZE == 4)
+    return -fma_test();
+#endif
 
     return 0;
 }

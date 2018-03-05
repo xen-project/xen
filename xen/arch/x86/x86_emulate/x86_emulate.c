@@ -435,6 +435,7 @@ static const struct ext0f3a_table {
     [0x42] = { .simd_size = simd_packed_int },
     [0x44] = { .simd_size = simd_packed_int },
     [0x46] = { .simd_size = simd_packed_int },
+    [0x48 ... 0x49] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x4a ... 0x4b] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x4c] = { .simd_size = simd_packed_int, .four_op = 1 },
     [0x5c ... 0x5f] = { .simd_size = simd_packed_fp, .four_op = 1 },
@@ -463,6 +464,17 @@ static const struct ext8f08_table {
     uint8_t two_op:1;
     uint8_t four_op:1;
 } ext8f08_table[256] = {
+    [0xa2] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0x85 ... 0x87] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0x8e ... 0x8f] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0x95 ... 0x97] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0x9e ... 0x9f] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0xa3] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0xa6] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0xb6] = { .simd_size = simd_packed_int, .four_op = 1 },
+    [0xc0 ... 0xc3] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xcc ... 0xcf] = { .simd_size = simd_packed_int },
+    [0xec ... 0xef] = { .simd_size = simd_packed_int },
 };
 
 static const struct ext8f09_table {
@@ -470,6 +482,16 @@ static const struct ext8f09_table {
     uint8_t two_op:1;
 } ext8f09_table[256] = {
     [0x01 ... 0x02] = { .two_op = 1 },
+    [0x80 ... 0x81] = { .simd_size = simd_packed_fp, .two_op = 1 },
+    [0x82 ... 0x83] = { .simd_size = simd_scalar_fp, .two_op = 1 },
+    [0x90 ... 0x9b] = { .simd_size = simd_packed_int },
+    [0xc1 ... 0xc3] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xc6 ... 0xc7] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xcb] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xd1 ... 0xd3] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xd6 ... 0xd7] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xdb] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0xe1 ... 0xe3] = { .simd_size = simd_packed_int, .two_op = 1 },
 };
 
 #define REX_PREFIX 0x40
@@ -528,7 +550,7 @@ union vex {
 #define copy_VEX(ptr, vex) ({ \
     if ( !mode_64bit() ) \
         (vex).reg |= 8; \
-    (ptr)[0 - PFX_BYTES] = 0xc4; \
+    (ptr)[0 - PFX_BYTES] = ext < ext_8f08 ? 0xc4 : 0x8f; \
     (ptr)[1 - PFX_BYTES] = (vex).raw[0]; \
     (ptr)[2 - PFX_BYTES] = (vex).raw[1]; \
     container_of((ptr) + 1 - PFX_BYTES, typeof(vex), raw[0]); \
@@ -1642,6 +1664,7 @@ static bool vcpu_has(
 #define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
 #define vcpu_has_sse4a()       vcpu_has(0x80000001, ECX,  6, ctxt, ops)
 #define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX,  7, ctxt, ops)
+#define vcpu_has_xop()         vcpu_has(0x80000001, ECX, 12, ctxt, ops)
 #define vcpu_has_fma4()        vcpu_has(0x80000001, ECX, 16, ctxt, ops)
 #define vcpu_has_tbm()         vcpu_has(0x80000001, ECX, 21, ctxt, ops)
 #define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
@@ -3002,9 +3025,19 @@ x86_decode(
     case simd_packed_int:
         switch ( vex.pfx )
         {
-        case vex_none: op_bytes = 8;           break;
-        case vex_66:   op_bytes = 16 << vex.l; break;
-        default:       op_bytes = 0;           break;
+        case vex_none:
+            if ( !vex.opcx )
+            {
+                op_bytes = 8;
+                break;
+            }
+            /* fall through */
+        case vex_66:
+            op_bytes = 16 << vex.l;
+            break;
+        default:
+            op_bytes = 0;
+            break;
         }
         break;
 
@@ -7873,6 +7906,13 @@ x86_emulate(
         generate_exception_if(vex.w, EXC_UD);
         goto simd_0f_imm8_avx;
 
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x48): /* vpermil2ps $imm,{x,y}mm/mem,{x,y}mm,{x,y}mm,{x,y}mm */
+                                           /* vpermil2ps $imm,{x,y}mm,{x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x49): /* vpermil2pd $imm,{x,y}mm/mem,{x,y}mm,{x,y}mm,{x,y}mm */
+                                           /* vpermil2pd $imm,{x,y}mm,{x,y}mm/mem,{x,y}mm,{x,y}mm */
+        host_and_vcpu_must_have(xop);
+        goto simd_0f_imm8_ymm;
+
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x4c): /* vpblendvb {x,y}mm,{x,y}mm/mem,{x,y}mm,{x,y}mm */
         generate_exception_if(vex.w, EXC_UD);
         goto simd_0f_int_imm8;
@@ -8010,6 +8050,41 @@ x86_emulate(
             asm ( "rorl %b1,%k0" : "=g" (dst.val) : "c" (imm1), "0" (src.val) );
         break;
 
+    case X86EMUL_OPC_XOP(08, 0x85): /* vpmacssww xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x86): /* vpmacsswd xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x87): /* vpmacssdql xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x8e): /* vpmacssdd xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x8f): /* vpmacssdqh xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x95): /* vpmacsww xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x96): /* vpmacswd xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x97): /* vpmacsdql xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x9e): /* vpmacsdd xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0x9f): /* vpmacsdqh xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xa6): /* vpmadcsswd xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xb6): /* vpmadcswd xmm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xc0): /* vprotb $imm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(08, 0xc1): /* vprotw $imm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(08, 0xc2): /* vprotd $imm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(08, 0xc3): /* vprotq $imm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(08, 0xcc): /* vpcomb $imm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xcd): /* vpcomw $imm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xce): /* vpcomd $imm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xcf): /* vpcomq $imm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xec): /* vpcomub $imm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xed): /* vpcomuw $imm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xee): /* vpcomud $imm,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_XOP(08, 0xef): /* vpcomuq $imm,xmm/m128,xmm,xmm */
+        generate_exception_if(vex.w, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_XOP(08, 0xa3): /* vpperm xmm/m128,xmm,xmm,xmm */
+                                    /* vpperm xmm,xmm/m128,xmm,xmm */
+        generate_exception_if(vex.l, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_XOP(08, 0xa2): /* vpcmov {x,y}mm/mem,{x,y}mm,{x,y}mm,{x,y}mm */
+                                    /* vpcmov {x,y}mm,{x,y}mm/mem,{x,y}mm,{x,y}mm */
+        host_and_vcpu_must_have(xop);
+        goto simd_0f_imm8_ymm;
+
     case X86EMUL_OPC_XOP(09, 0x01): /* XOP Grp1 */
         switch ( modrm_reg & 7 )
         {
@@ -8058,6 +8133,61 @@ x86_emulate(
             goto xop_09_rm_rv;
         }
         goto unrecognized_insn;
+
+    case X86EMUL_OPC_XOP(09, 0x82): /* vfrczss xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x83): /* vfrczsd xmm/m128,xmm */
+        generate_exception_if(vex.l, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_XOP(09, 0x80): /* vfrczps {x,y}mm/mem,{x,y}mm */
+    case X86EMUL_OPC_XOP(09, 0x81): /* vfrczpd {x,y}mm/mem,{x,y}mm */
+        host_and_vcpu_must_have(xop);
+        generate_exception_if(vex.w, EXC_UD);
+        goto simd_0f_ymm;
+
+    case X86EMUL_OPC_XOP(09, 0xc1): /* vphaddbw xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xc2): /* vphaddbd xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xc3): /* vphaddbq xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xc6): /* vphaddwd xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xc7): /* vphaddwq xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xcb): /* vphadddq xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xd1): /* vphaddubw xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xd2): /* vphaddubd xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xd3): /* vphaddubq xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xd6): /* vphadduwd xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xd7): /* vphadduwq xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xdb): /* vphaddudq xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xe2): /* vphsubwd xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xe3): /* vphsubdq xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0xe1): /* vphsubbw xmm/m128,xmm */
+        generate_exception_if(vex.w, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_XOP(09, 0x90): /* vprotb xmm/m128,xmm,xmm */
+                                    /* vprotb xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x91): /* vprotw xmm/m128,xmm,xmm */
+                                    /* vprotw xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x92): /* vprotd xmm/m128,xmm,xmm */
+                                    /* vprotd xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x93): /* vprotq xmm/m128,xmm,xmm */
+                                    /* vprotq xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x94): /* vpshlb xmm/m128,xmm,xmm */
+                                    /* vpshlb xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x95): /* vpshlw xmm/m128,xmm,xmm */
+                                    /* vpshlw xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x96): /* vpshld xmm/m128,xmm,xmm */
+                                    /* vpshld xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x97): /* vpshlq xmm/m128,xmm,xmm */
+                                    /* vpshlq xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x98): /* vpshab xmm/m128,xmm,xmm */
+                                    /* vpshab xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x99): /* vpshaw xmm/m128,xmm,xmm */
+                                    /* vpshaw xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x9a): /* vpshad xmm/m128,xmm,xmm */
+                                    /* vpshad xmm,xmm/m128,xmm */
+    case X86EMUL_OPC_XOP(09, 0x9b): /* vpshaq xmm/m128,xmm,xmm */
+                                    /* vpshaq xmm,xmm/m128,xmm */
+        generate_exception_if(vex.l, EXC_UD);
+        host_and_vcpu_must_have(xop);
+        goto simd_0f_ymm;
 
     case X86EMUL_OPC_XOP(0a, 0x10): /* bextr imm,r/m,r */
     {
