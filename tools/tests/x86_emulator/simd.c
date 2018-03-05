@@ -23,7 +23,9 @@ ENTRY(simd_test);
 #  endif
 # endif
 #elif VEC_SIZE == 32
-# if defined(__AVX__) && ELEM_SIZE == 4
+# if defined(__AVX2__)
+#  define to_bool(cmp) __builtin_ia32_ptestc256(cmp, (vdi_t){} == 0)
+# elif defined(__AVX__) && ELEM_SIZE == 4
 #  define to_bool(cmp) (__builtin_ia32_movmskps256(cmp) == 0xff)
 # elif defined(__AVX__) && ELEM_SIZE == 8
 #  define to_bool(cmp) (__builtin_ia32_movmskpd256(cmp) == 0xf)
@@ -85,10 +87,14 @@ static inline bool _to_bool(byte_vec_t bv)
     vec_t t_ = __builtin_ia32_vpermilps256(x, 0b00011011); \
     __builtin_ia32_vperm2f128_ps256(t_, t_, 0b00000001); \
 })
-#  define swap2(x) ({ \
-    vec_t t_ = __builtin_ia32_vpermilvarps256(x, __builtin_ia32_cvtps2dq256(inv) - 1); \
-    __builtin_ia32_vperm2f128_ps256(t_, t_, 0b00000001); \
+#  ifdef __AVX2__
+#   define swap2(x) __builtin_ia32_permvarsf256(x, __builtin_ia32_cvtps2dq256(inv) - 1)
+#  else
+#   define swap2(x) ({ \
+        vec_t t_ = __builtin_ia32_vpermilvarps256(x, __builtin_ia32_cvtps2dq256(inv) - 1); \
+        __builtin_ia32_vperm2f128_ps256(t_, t_, 0b00000001); \
 })
+#  endif
 # elif VEC_SIZE == 16
 #  if defined(__AVX2__)
 #   define broadcast(x) __builtin_ia32_vbroadcastss_ps((vec_t){ x })
@@ -140,6 +146,9 @@ static inline bool _to_bool(byte_vec_t bv)
     vec_t t_ = __builtin_ia32_vpermilpd256(x, 0b00000101); \
     __builtin_ia32_vperm2f128_pd256(t_, t_, 0b00000001); \
 })
+#  ifdef __AVX2__
+#   define swap2(x) __builtin_ia32_permdf256(x, 0b00011011)
+#  endif
 # elif VEC_SIZE == 16
 #  define interleave_hi(x, y) __builtin_ia32_unpckhpd(x, y)
 #  define interleave_lo(x, y) __builtin_ia32_unpcklpd(x, y)
@@ -196,6 +205,104 @@ static inline bool _to_bool(byte_vec_t bv)
     __builtin_ia32_maskmovdqu((vqi_t)(x),  m_, d_); \
     __builtin_ia32_maskmovdqu((vqi_t)(y), ~m_, d_); \
 })
+#elif VEC_SIZE == 32 && defined(__AVX2__)
+# define swap_lanes(x, y, func, type) ({ \
+    long long __attribute__((vector_size(16))) t_ = __builtin_ia32_extract128i256((vdi_t)(y), 0); \
+    type t1_ = (type)__builtin_ia32_insert128i256((vdi_t)(x), t_, 1), t2_; \
+    t_ = __builtin_ia32_extract128i256((vdi_t)(x), 1); \
+    t2_ = (type)__builtin_ia32_insert128i256((vdi_t)(y), t_, 0); \
+    func(t1_, t2_); \
+})
+# if INT_SIZE == 1 || UINT_SIZE == 1
+#  define broadcast(x) ({ char s_ = (x); vec_t d_; asm ( "vpbroadcastb %1,%0" : "=x" (d_) : "m" (s_)); d_; })
+#  define copysignz(x, y) ((vec_t)__builtin_ia32_psignb256((vqi_t)(x), (vqi_t)(y)))
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr256(__builtin_ia32_permti256((vdi_t)(x), (vdi_t)(x), 0b00000001), \
+                                                       (vdi_t)(x), (n) * 8))
+# elif INT_SIZE == 2 || UINT_SIZE == 2
+#  define broadcast(x) ({ short s_ = (x); vec_t d_; asm ( "vpbroadcastw %1,%0" : "=x" (d_) : "m" (s_)); d_; })
+#  define copysignz(x, y) ((vec_t)__builtin_ia32_psignw256((vhi_t)(x), (vhi_t)(y)))
+#  define hadd(x, y) ((vec_t)swap_lanes(x, y, __builtin_ia32_phaddw256, vhi_t))
+#  define hsub(x, y) ((vec_t)swap_lanes(x, y, __builtin_ia32_phsubw256, vhi_t))
+#  define mix(x, y) ((vec_t)__builtin_ia32_pblendw256((vhi_t)(x), (vhi_t)(y), 0b10101010))
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr256(__builtin_ia32_permti256((vdi_t)(x), (vdi_t)(x), 0b00000001), \
+                                                       (vdi_t)(x), (n) * 16))
+# elif INT_SIZE == 4 || UINT_SIZE == 4
+#  define broadcast(x) ({ int s_ = (x); vec_t d_; asm ( "vpbroadcastd %1,%0" : "=x" (d_) : "m" (s_)); d_; })
+#  define copysignz(x, y) ((vec_t)__builtin_ia32_psignd256((vsi_t)(x), (vsi_t)(y)))
+#  define hadd(x, y) ((vec_t)swap_lanes(x, y, __builtin_ia32_phaddd256, vsi_t))
+#  define hsub(x, y) ((vec_t)swap_lanes(x, y, __builtin_ia32_phsubd256, vsi_t))
+#  define mix(x, y) ((vec_t)__builtin_ia32_pblendd256((vsi_t)(x), (vsi_t)(y), 0b10101010))
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr256(__builtin_ia32_permti256((vdi_t)(x), (vdi_t)(x), 0b00000001), \
+                                                       (vdi_t)(x), (n) * 32))
+#  define select(d, x, y, m) ({ \
+    vsi_t m_ = (vsi_t)(m); \
+    *(d) = (vec_t)__builtin_ia32_maskloadd256((vsi_t *)&(x),  m_); \
+    __builtin_ia32_maskstored256((vsi_t *)(d), ~m_, (vsi_t)(y)); \
+})
+#  define swap(x) ((vec_t)__builtin_ia32_permvarsi256((vsi_t)(x), (vsi_t)inv - 1))
+# elif INT_SIZE == 8 || UINT_SIZE == 8
+#  define mix(x, y) ((vec_t)__builtin_ia32_pblendd256((vsi_t)(x), (vsi_t)(y), 0b11001100))
+#  define rotr(x, n) ((vec_t)__builtin_ia32_palignr256(__builtin_ia32_permti256((vdi_t)(x), (vdi_t)(x), 0b00000001), \
+                                                       (vdi_t)(x), (n) * 64))
+#  define select(d, x, y, m) ({ \
+    vdi_t m_ = (vdi_t)(m); \
+    *(d) = (vec_t)__builtin_ia32_maskloadq256((vdi_t *)&(x),  m_); \
+    __builtin_ia32_maskstoreq256((vdi_t *)(d), ~m_, (vdi_t)(y)); \
+})
+#  define swap(x) ((vec_t)__builtin_ia32_permdi256((vdi_t)(x), 0b00011011))
+#  define swap2(x) ({ \
+    vdi_t t_ = __builtin_ia32_permdi256((vdi_t)(x), 0b10110001); \
+    (vec_t)__builtin_ia32_permti256(t_, t_, 0b00000001); \
+})
+# endif
+# if INT_SIZE == 1
+#  define abs(x) ((vec_t)__builtin_ia32_pabsb256((vqi_t)(x)))
+#  define max(x, y) ((vec_t)__builtin_ia32_pmaxsb256((vqi_t)(x), (vqi_t)(y)))
+#  define min(x, y) ((vec_t)__builtin_ia32_pminsb256((vqi_t)(x), (vqi_t)(y)))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovsxbw256((vqi_t)(x)))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovsxbd256((vqi_t)(x)))
+#  define widen3(x) ((vec_t)__builtin_ia32_pmovsxbq256((vqi_t)(x)))
+# elif UINT_SIZE == 1
+#  define max(x, y) ((vec_t)__builtin_ia32_pmaxub256((vqi_t)(x), (vqi_t)(y)))
+#  define min(x, y) ((vec_t)__builtin_ia32_pminub256((vqi_t)(x), (vqi_t)(y)))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovzxbw256((vqi_t)(x)))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovzxbd256((vqi_t)(x)))
+#  define widen3(x) ((vec_t)__builtin_ia32_pmovzxbq256((vqi_t)(x)))
+# elif INT_SIZE == 2
+#  define abs(x) __builtin_ia32_pabsw256(x)
+#  define max(x, y) __builtin_ia32_pmaxsw256(x, y)
+#  define min(x, y) __builtin_ia32_pminsw256(x, y)
+#  define mul_hi(x, y) __builtin_ia32_pmulhw256(x, y)
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovsxwd256(x))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovsxwq256(x))
+# elif UINT_SIZE == 2
+#  define max(x, y) ((vec_t)__builtin_ia32_pmaxuw256((vhi_t)(x), (vhi_t)(y)))
+#  define min(x, y) ((vec_t)__builtin_ia32_pminuw256((vhi_t)(x), (vhi_t)(y)))
+#  define mul_hi(x, y) ((vec_t)__builtin_ia32_pmulhuw256((vhi_t)(x), (vhi_t)(y)))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovzxwd256((vhi_t)(x)))
+#  define widen2(x) ((vec_t)__builtin_ia32_pmovzxwq256((vhi_t)(x)))
+# elif INT_SIZE == 4
+#  define abs(x) __builtin_ia32_pabsd256(x)
+#  define max(x, y) __builtin_ia32_pmaxsd256(x, y)
+#  define min(x, y) __builtin_ia32_pminsd256(x, y)
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovsxdq256(x))
+# elif UINT_SIZE == 4
+#  define max(x, y) ((vec_t)__builtin_ia32_pmaxud256((vsi_t)(x), (vsi_t)(y)))
+#  define min(x, y) ((vec_t)__builtin_ia32_pminud256((vsi_t)(x), (vsi_t)(y)))
+#  define mul_full(x, y) ((vec_t)__builtin_ia32_pmuludq256((vsi_t)(x), (vsi_t)(y)))
+#  define widen1(x) ((vec_t)__builtin_ia32_pmovzxdq256((vsi_t)(x)))
+# elif INT_SIZE == 8
+#  define broadcast(x) ({ \
+    long long s_ = (x); \
+    long long __attribute__((vector_size(16))) t_; \
+    vec_t d_; \
+    asm ( "vpbroadcastq %1,%0" : "=x" (t_) : "m" (s_)); \
+    asm ( "vbroadcasti128 %1,%0" : "=x" (d_) : "m" (t_)); \
+    d_; \
+})
+# elif UINT_SIZE == 8
+#  define broadcast(x) ({ long long s_ = (x); vec_t d_; asm ( "vpbroadcastq %1,%0" : "=x" (d_) : "m" (s_)); d_; })
+# endif
 #endif
 #if VEC_SIZE == 16 && defined(__SSE3__)
 # if FLOAT_SIZE == 4
@@ -219,25 +326,37 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define addsub(x, y) __builtin_ia32_addsubps256(x, y)
 #  define dup_hi(x) __builtin_ia32_movshdup256(x)
 #  define dup_lo(x) __builtin_ia32_movsldup256(x)
-#  define hadd(x, y) ({ \
+#  ifdef __AVX2__
+#   define hadd(x, y) __builtin_ia32_permvarsf256(__builtin_ia32_haddps256(x, y), \
+                                                  (vsi_t){0, 1, 4, 5, 2, 3, 6, 7})
+#   define hsub(x, y) __builtin_ia32_permvarsf256(__builtin_ia32_hsubps256(x, y), \
+                                                  (vsi_t){0, 1, 4, 5, 2, 3, 6, 7})
+#  else
+#   define hadd(x, y) ({ \
         vec_t t_ = __builtin_ia32_haddps256(x, y); \
         (vec_t){t_[0], t_[1], t_[4], t_[5], t_[2], t_[3], t_[6], t_[7]}; \
 })
-#  define hsub(x, y) ({ \
+#   define hsub(x, y) ({ \
         vec_t t_ = __builtin_ia32_hsubps256(x, y); \
         (vec_t){t_[0], t_[1], t_[4], t_[5], t_[2], t_[3], t_[6], t_[7]}; \
 })
+#  endif
 # elif FLOAT_SIZE == 8
 #  define addsub(x, y) __builtin_ia32_addsubpd256(x, y)
 #  define dup_lo(x) __builtin_ia32_movddup256(x)
-#  define hadd(x, y) ({ \
+#  ifdef __AVX2__
+#   define hadd(x, y) __builtin_ia32_permdf256(__builtin_ia32_haddpd256(x, y), 0b11011000)
+#   define hsub(x, y) __builtin_ia32_permdf256(__builtin_ia32_hsubpd256(x, y), 0b11011000)
+#  else
+#   define hadd(x, y) ({ \
         vec_t t_ = __builtin_ia32_haddpd256(x, y); \
         (vec_t){t_[0], t_[2], t_[1], t_[3]}; \
 })
-#  define hsub(x, y) ({ \
+#   define hsub(x, y) ({ \
         vec_t t_ = __builtin_ia32_hsubpd256(x, y); \
         (vec_t){t_[0], t_[2], t_[1], t_[3]}; \
 })
+#  endif
 # endif
 #endif
 #if VEC_SIZE == 16 && defined(__SSSE3__)
@@ -558,7 +677,7 @@ int simd_test(void)
     z *= alt;
 #  endif
     /*
-     * Zap elements for which the shift count is negative (and the hence the
+     * Zap elements for which the shift count is zero (and the hence the
      * decrement below would yield a negative count.
      */
     z &= (sh > 0);
@@ -568,8 +687,13 @@ int simd_test(void)
     --sh;
     touch(sh);
     y = z << sh;
-    touch(sh);
     if ( !to_bool(x == y + y) ) return __LINE__;
+
+#  if defined(__AVX2__) && ELEM_SIZE >= 4
+    touch(sh);
+    x = y >> sh;
+    if ( !to_bool(x == z) ) return __LINE__;
+#  endif
 
 # endif
 

@@ -11,9 +11,9 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
-SIMD := sse sse2 sse4 avx
+SIMD := sse sse2 sse4 avx avx2
 FMA := fma4 fma
-TESTCASES := blowfish $(SIMD) sse2-avx sse4-avx $(FMA)
+TESTCASES := blowfish $(SIMD) $(FMA)
 
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
@@ -36,13 +36,9 @@ fma4-flts := $(avx-flts)
 fma-vecs := $(avx-vecs)
 fma-ints :=
 fma-flts := $(avx-flts)
-
-# When converting SSE to AVX, have the compiler avoid XMM0 to widen
-# coverage of the VEX.vvvv checks in the emulator. We must not do this,
-# however, for SSE4.1 and later, as there are instructions with XMM0 as
-# an implicit operand.
-sse2avx-sse2 := -ffixed-xmm0 -Wa,-msse2avx
-sse2avx-sse4 := -Wa,-msse2avx
+avx2-vecs := $(avx-vecs)
+avx2-ints := 1 2 4 8
+avx2-flts := 4 8
 
 # For AVX and later, have the compiler avoid XMM0 to widen coverage of
 # the VEX.vvvv checks in the emulator.
@@ -58,11 +54,6 @@ $(1)-cflags := \
 	    "-D_$(vec)f$(flt) -m$(1) $(call non-sse,$(1)) -Os -DVEC_SIZE=$(vec) -DFLOAT_SIZE=$(flt)")) \
 	$(foreach flt,$($(1)-flts), \
 	  "-D_f$(flt) -m$(1) $(call non-sse,$(1)) -mfpmath=sse -Os -DFLOAT_SIZE=$(flt)")
-$(1)-avx-cflags := \
-	$(foreach vec,$($(1)-vecs), \
-	  $(foreach int,$($(1)-ints), \
-	    "-D_$(vec)i$(int) -m$(1) $(sse2avx-$(1)) -Os -DVEC_SIZE=$(vec) -DINT_SIZE=$(int)" \
-	    "-D_$(vec)u$(int) -m$(1) $(sse2avx-$(1)) -Os -DVEC_SIZE=$(vec) -DUINT_SIZE=$(int)"))
 endef
 
 $(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-defs,$(flavor))))
@@ -81,13 +72,13 @@ $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	)
 	mv $@.new $@
 
-$(addsuffix .c,$(SIMD)) $(addsuffix -avx.c,$(filter sse%,$(SIMD))):
+$(addsuffix .c,$(SIMD)):
 	ln -sf simd.c $@
 
 $(addsuffix .c,$(FMA)):
 	ln -sf simd-fma.c $@
 
-$(addsuffix .o,$(SIMD) $(FMA)) $(addsuffix -avx.o,$(filter sse%,$(SIMD))): simd.h
+$(addsuffix .o,$(SIMD) $(FMA)): simd.h
 
 $(TARGET): x86-emulate.o test_x86_emulator.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^

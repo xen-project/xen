@@ -370,7 +370,7 @@ static const struct ext0f38_table {
     [0x0c ... 0x0f] = { .simd_size = simd_packed_fp },
     [0x10] = { .simd_size = simd_packed_int },
     [0x13] = { .simd_size = simd_other, .two_op = 1 },
-    [0x14 ... 0x15] = { .simd_size = simd_packed_fp },
+    [0x14 ... 0x16] = { .simd_size = simd_packed_fp },
     [0x17] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x18 ... 0x19] = { .simd_size = simd_scalar_fp, .two_op = 1 },
     [0x1a] = { .simd_size = simd_128, .two_op = 1 },
@@ -382,9 +382,15 @@ static const struct ext0f38_table {
     [0x2c ... 0x2d] = { .simd_size = simd_other },
     [0x2e ... 0x2f] = { .simd_size = simd_other, .to_mem = 1 },
     [0x30 ... 0x35] = { .simd_size = simd_other, .two_op = 1 },
-    [0x37 ... 0x3f] = { .simd_size = simd_packed_int },
+    [0x36 ... 0x3f] = { .simd_size = simd_packed_int },
     [0x40] = { .simd_size = simd_packed_int },
     [0x41] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0x45 ... 0x47] = { .simd_size = simd_packed_int },
+    [0x58 ... 0x59] = { .simd_size = simd_other, .two_op = 1 },
+    [0x5a] = { .simd_size = simd_128, .two_op = 1 },
+    [0x78 ... 0x79] = { .simd_size = simd_other, .two_op = 1 },
+    [0x8c] = { .simd_size = simd_other },
+    [0x8e] = { .simd_size = simd_other, .to_mem = 1 },
     [0x96 ... 0x9f] = { .simd_size = simd_packed_fp },
     [0xa6 ... 0xaf] = { .simd_size = simd_packed_fp },
     [0xb6 ... 0xbf] = { .simd_size = simd_packed_fp },
@@ -406,6 +412,9 @@ static const struct ext0f3a_table {
     uint8_t two_op:1;
     uint8_t four_op:1;
 } ext0f3a_table[256] = {
+    [0x00] = { .simd_size = simd_packed_int, .two_op = 1 },
+    [0x01] = { .simd_size = simd_packed_fp, .two_op = 1 },
+    [0x02] = { .simd_size = simd_packed_int },
     [0x04 ... 0x05] = { .simd_size = simd_packed_fp, .two_op = 1 },
     [0x06] = { .simd_size = simd_packed_fp },
     [0x08 ... 0x09] = { .simd_size = simd_packed_fp, .two_op = 1 },
@@ -419,9 +428,12 @@ static const struct ext0f3a_table {
     [0x20] = { .simd_size = simd_none },
     [0x21] = { .simd_size = simd_other },
     [0x22] = { .simd_size = simd_none },
+    [0x38] = { .simd_size = simd_128 },
+    [0x39] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
     [0x42] = { .simd_size = simd_packed_int },
     [0x44] = { .simd_size = simd_packed_int },
+    [0x46] = { .simd_size = simd_packed_int },
     [0x4a ... 0x4b] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x4c] = { .simd_size = simd_packed_int, .four_op = 1 },
     [0x5c ... 0x5f] = { .simd_size = simd_packed_fp, .four_op = 1 },
@@ -5947,6 +5959,10 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x40): /* vpmulld {x,y}mm/mem,{x,y}mm,{x,y}mm */
             if ( !vex.l )
                 goto simd_0f_avx;
+            /* fall through */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x45): /* vpsrlv{d,q} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x47): /* vpsllv{d,q} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    simd_0f_avx2:
             host_and_vcpu_must_have(avx2);
             goto simd_0f_ymm;
         }
@@ -6046,7 +6062,10 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x0f): /* vpalignr $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x42): /* vmpsadbw $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
             if ( vex.l )
+            {
+    simd_0f_imm8_avx2:
                 host_and_vcpu_must_have(avx2);
+            }
             else
             {
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x08): /* vroundps $imm8,{x,y}mm/mem,{x,y}mm */
@@ -7134,6 +7153,11 @@ x86_emulate(
         op_bytes = 8 << vex.l;
         goto simd_0f_ymm;
 
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x16): /* vpermps ymm/m256,ymm,ymm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x36): /* vpermd ymm/m256,ymm,ymm */
+        generate_exception_if(!vex.l || vex.w, EXC_UD);
+        goto simd_0f_avx2;
+
     case X86EMUL_OPC_VEX_66(0x0f38, 0x20): /* vpmovsxbw xmm/mem,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x21): /* vpmovsxbd xmm/mem,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x22): /* vpmovsxbq xmm/mem,{x,y}mm */
@@ -7249,6 +7273,80 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x41): /* vphminposuw xmm/m128,xmm,xmm */
         generate_exception_if(vex.l, EXC_UD);
         goto simd_0f_avx;
+
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x58): /* vpbroadcastd xmm/m32,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x59): /* vpbroadcastq xmm/m64,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x78): /* vpbroadcastb xmm/m8,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x79): /* vpbroadcastw xmm/m16,{x,y}mm */
+        op_bytes = 1 << ((!(b & 0x20) * 2) + (b & 1));
+        /* fall through */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x46): /* vpsravd {x,y}mm/mem,{x,y}mm,{x,y}mm */
+        generate_exception_if(vex.w, EXC_UD);
+        goto simd_0f_avx2;
+
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x5a): /* vbroadcasti128 m128,ymm */
+        generate_exception_if(ea.type != OP_MEM || !vex.l || vex.w, EXC_UD);
+        goto simd_0f_avx2;
+
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x8c): /* vpmaskmov{d,q} mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x8e): /* vpmaskmov{d,q} {x,y}mm,{x,y}mm,mem */
+    {
+        typeof(vex) *pvex;
+        unsigned int mask = vex.w ? 0x80808080U : 0x88888888U;
+
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        host_and_vcpu_must_have(avx2);
+        get_fpu(X86EMUL_FPU_ymm, &fic);
+
+        /*
+         * While we can't reasonably provide fully correct behavior here
+         * (in particular, for writes, avoiding the memory read in anticipation
+         * of all elements in the range eventually being written), we can (and
+         * should) still limit the memory access to the smallest possible range
+         * (suppressing it altogether if all mask bits are clear), to provide
+         * correct faulting behavior. Read the mask bits via vmovmskp{s,d}
+         * for that purpose.
+         */
+        opc = init_prefixes(stub);
+        pvex = copy_VEX(opc, vex);
+        pvex->opcx = vex_0f;
+        opc[0] = 0xd7; /* vpmovmskb */
+        /* Use %rax as GPR destination and VEX.vvvv as source. */
+        pvex->r = 1;
+        pvex->b = !mode_64bit() || (vex.reg >> 3);
+        opc[1] = 0xc0 | (~vex.reg & 7);
+        pvex->reg = 0xf;
+        opc[2] = 0xc3;
+
+        invoke_stub("", "", "=a" (ea.val) : [dummy] "i" (0));
+        put_stub(stub);
+
+        /* Convert byte granular result to dword/qword granularity. */
+        ea.val &= mask;
+        if ( !ea.val )
+            goto complete_insn;
+
+        first_byte = __builtin_ctz(ea.val) & ~((4 << vex.w) - 1);
+        ea.val >>= first_byte;
+        op_bytes = 32 - __builtin_clz(ea.val);
+
+        /*
+         * Even for the memory write variant a memory read is needed, unless
+         * all set mask bits are contiguous.
+         */
+        if ( ea.val & (ea.val + ~mask + 1) )
+            d = (d & ~SrcMask) | SrcMem;
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        /* Convert memory operand to (%rAX). */
+        rex_prefix &= ~REX_B;
+        vex.b = 1;
+        opc[1] = modrm & 0x38;
+        fic.insn_bytes = PFX_BYTES + 2;
+
+        break;
+    }
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x96): /* vfmaddsub132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x97): /* vfmsubadd132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
@@ -7457,6 +7555,20 @@ x86_emulate(
             asm ( "mull %3" : "=a" (*ea.reg), "=d" (dst.val)
                             : "0" ((uint32_t)src.val), "rm" (_regs.edx) );
         break;
+
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x00): /* vpermq $imm8,ymm/m256,ymm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x01): /* vpermpd $imm8,ymm/m256,ymm */
+        generate_exception_if(!vex.l || !vex.w, EXC_UD);
+        goto simd_0f_imm8_avx2;
+
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x38): /* vinserti128 $imm8,xmm/m128,ymm,ymm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x39): /* vextracti128 $imm8,ymm,xmm/m128 */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x46): /* vperm2i128 $imm8,ymm/m256,ymm,ymm */
+        generate_exception_if(!vex.l, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x02): /* vpblendd $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
+        generate_exception_if(vex.w, EXC_UD);
+        goto simd_0f_imm8_avx2;
 
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x06): /* vperm2f128 $imm8,ymm/m256,ymm,ymm */
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x18): /* vinsertf128 $imm8,xmm/m128,ymm,ymm */
@@ -7939,6 +8051,7 @@ x86_emulate(
                 {
                 case X86EMUL_OPC_VEX_66(0x0f38, 0x2e): /* vmaskmovps */
                 case X86EMUL_OPC_VEX_66(0x0f38, 0x2f): /* vmaskmovpd */
+                case X86EMUL_OPC_VEX_66(0x0f38, 0x8e): /* vpmaskmov{d,q} */
                     /* These have merge semantics; force write to occur. */
                     d |= Mov;
                     break;
