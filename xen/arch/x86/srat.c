@@ -372,7 +372,7 @@ static int __init nodes_cover_memory(void)
 		}
 
 		start = e820.map[i].addr;
-		end = e820.map[i].addr + e820.map[i].size - 1;
+		end = e820.map[i].addr + e820.map[i].size;
 
 		do {
 			found = 0;
