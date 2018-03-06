@@ -4419,14 +4419,24 @@ x86_emulate(
             _regs.eflags |= EFLG_ZF;
             break;
 
-        case 0xdf: /* invlpga */
-            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
+        case 0xdf: /* invlpga */ {
+            uint64_t msr_val;
+
+            fail_if(!ops->read_msr);
+            if ( (rc = ops->read_msr(MSR_EFER,
+                                     &msr_val, ctxt)) != X86EMUL_OKAY )
+                goto done;
+            /* Finding SVME set implies vcpu_has_svm(). */
+            generate_exception_if(!(msr_val & EFER_SVME) ||
+                                  !in_protmode(ctxt, ops), EXC_UD, -1);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
+            generate_exception_if((uint32_t)_regs.ecx, EXC_UD, -1); /* TODO: Support ASIDs. */
             fail_if(ops->invlpg == NULL);
             if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.eax),
                                    ctxt)) )
                 goto done;
             break;
+        }
 
         case 0xf9: /* rdtscp */
         {
