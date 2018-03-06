@@ -5576,6 +5576,14 @@ void memguard_unguard_stack(void *p)
                            STACK_SIZE - PRIMARY_STACK_SIZE - IST_MAX * PAGE_SIZE);
 }
 
+bool memguard_is_stack_guard_page(unsigned long addr)
+{
+    addr &= STACK_SIZE - 1;
+
+    return addr >= IST_MAX * PAGE_SIZE &&
+           addr < STACK_SIZE - PRIMARY_STACK_SIZE;
+}
+
 void arch_dump_shared_mem_info(void)
 {
     printk("Shared frames %u -- Saved frames %u\n",
