@@ -10,6 +10,7 @@
 
 #include <xen/sched.h>
 #include <asm/cpufeature.h>
+#include <asm/x86-defns.h>
 
 #define FCW_DEFAULT               0x037f
 #define FCW_RESET                 0x0040
@@ -28,34 +29,14 @@ extern uint32_t mxcsr_mask;
 #define XSAVE_HDR_OFFSET          FXSAVE_SIZE
 #define XSTATE_AREA_MIN_SIZE      (FXSAVE_SIZE + XSAVE_HDR_SIZE)
 
-#define _XSTATE_FP                0
-#define XSTATE_FP                 (1ULL << _XSTATE_FP)
-#define _XSTATE_SSE               1
-#define XSTATE_SSE                (1ULL << _XSTATE_SSE)
-#define _XSTATE_YMM               2
-#define XSTATE_YMM                (1ULL << _XSTATE_YMM)
-#define _XSTATE_BNDREGS           3
-#define XSTATE_BNDREGS            (1ULL << _XSTATE_BNDREGS)
-#define _XSTATE_BNDCSR            4
-#define XSTATE_BNDCSR             (1ULL << _XSTATE_BNDCSR)
-#define _XSTATE_OPMASK            5
-#define XSTATE_OPMASK             (1ULL << _XSTATE_OPMASK)
-#define _XSTATE_ZMM               6
-#define XSTATE_ZMM                (1ULL << _XSTATE_ZMM)
-#define _XSTATE_HI_ZMM            7
-#define XSTATE_HI_ZMM             (1ULL << _XSTATE_HI_ZMM)
-#define _XSTATE_PKRU              9
-#define XSTATE_PKRU               (1ULL << _XSTATE_PKRU)
-#define _XSTATE_LWP               62
-#define XSTATE_LWP                (1ULL << _XSTATE_LWP)
-
-#define XSTATE_FP_SSE  (XSTATE_FP | XSTATE_SSE)
-#define XCNTXT_MASK    (XSTATE_FP | XSTATE_SSE | XSTATE_YMM | XSTATE_OPMASK | \
-                        XSTATE_ZMM | XSTATE_HI_ZMM | XSTATE_NONLAZY)
+#define XSTATE_FP_SSE  (X86_XCR0_FP | X86_XCR0_SSE)
+#define XCNTXT_MASK    (X86_XCR0_FP | X86_XCR0_SSE | X86_XCR0_YMM | \
+                        X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM | \
+                        XSTATE_NONLAZY)
 
 #define XSTATE_ALL     (~(1ULL << 63))
-#define XSTATE_NONLAZY (XSTATE_LWP | XSTATE_BNDREGS | XSTATE_BNDCSR | \
-                        XSTATE_PKRU)
+#define XSTATE_NONLAZY (X86_XCR0_LWP | X86_XCR0_BNDREGS | X86_XCR0_BNDCSR | \
+                        X86_XCR0_PKRU)
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
 #define XSTATE_XSAVES_ONLY         0
 #define XSTATE_COMPACTION_ENABLED  (1ULL << 63)

@@ -318,7 +318,7 @@ bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val)
      * enabled in BNDCFGS.
      */
     if ( (val & IA32_BNDCFGS_ENABLE) &&
-         !(v->arch.xcr0_accum & (XSTATE_BNDREGS | XSTATE_BNDCSR)) )
+         !(v->arch.xcr0_accum & (X86_XCR0_BNDREGS | X86_XCR0_BNDCSR)) )
     {
         uint64_t xcr0 = get_xcr0();
         int rc;
@@ -327,7 +327,7 @@ bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val)
             return false;
 
         rc = handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
-                           xcr0 | XSTATE_BNDREGS | XSTATE_BNDCSR);
+                           xcr0 | X86_XCR0_BNDREGS | X86_XCR0_BNDCSR);
 
         if ( rc )
         {
@@ -2416,10 +2416,10 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
      * guest may enable the feature in CR4 without enabling it in XCR0. We
      * need to context switch / migrate PKRU nevertheless.
      */
-    if ( (value & X86_CR4_PKE) && !(v->arch.xcr0_accum & XSTATE_PKRU) )
+    if ( (value & X86_CR4_PKE) && !(v->arch.xcr0_accum & X86_XCR0_PKRU) )
     {
         int rc = handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
-                               get_xcr0() | XSTATE_PKRU);
+                               get_xcr0() | X86_XCR0_PKRU);
 
         if ( rc )
         {
@@ -2428,7 +2428,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
         }
 
         if ( handle_xsetbv(XCR_XFEATURE_ENABLED_MASK,
-                           get_xcr0() & ~XSTATE_PKRU) )
+                           get_xcr0() & ~X86_XCR0_PKRU) )
             /* nothing, best effort only */;
     }
 
@@ -3890,7 +3890,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     fpu_ctxt->mxcsr = MXCSR_DEFAULT;
     if ( v->arch.xsave_area )
     {
-        v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP;
+        v->arch.xsave_area->xsave_hdr.xstate_bv = X86_XCR0_FP;
         v->arch.xsave_area->xsave_hdr.xcomp_bv = 0;
     }
 

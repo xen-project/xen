@@ -304,7 +304,7 @@ void xsave(struct vcpu *v, uint64_t mask)
                            "=m" (*ptr), \
                            "a" (lmask), "d" (hmask), "D" (ptr))
 
-    if ( fip_width == 8 || !(mask & XSTATE_FP) )
+    if ( fip_width == 8 || !(mask & X86_XCR0_FP) )
     {
         XSAVE("0x48,");
     }
@@ -357,7 +357,7 @@ void xsave(struct vcpu *v, uint64_t mask)
             fip_width = 8;
     }
 #undef XSAVE
-    if ( mask & XSTATE_FP )
+    if ( mask & X86_XCR0_FP )
         ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = fip_width;
 }
 
@@ -375,7 +375,7 @@ void xrstor(struct vcpu *v, uint64_t mask)
      * sometimes new user value. Both should be ok. Use the FPU saved
      * data block as a safe address because it should be in L1.
      */
-    if ( (mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) &&
+    if ( (mask & ptr->xsave_hdr.xstate_bv & X86_XCR0_FP) &&
          !(ptr->fpu_sse.fsw & ~ptr->fpu_sse.fcw & 0x003f) &&
          boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
         asm volatile ( "fnclex\n\t"        /* clear exceptions */
@@ -451,8 +451,8 @@ void xrstor(struct vcpu *v, uint64_t mask)
              * Also try to eliminate fault reasons, even if this shouldn't be
              * needed here (other code should ensure the sanity of the data).
              */
-            if ( ((mask & XSTATE_SSE) ||
-                  ((mask & XSTATE_YMM) &&
+            if ( ((mask & X86_XCR0_SSE) ||
+                  ((mask & X86_XCR0_YMM) &&
                    !(ptr->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED))) )
                 ptr->fpu_sse.mxcsr &= mxcsr_mask;
             if ( v->arch.xcr0_accum & XSTATE_XSAVES_ONLY )
@@ -595,7 +595,7 @@ void xstate_init(struct cpuinfo_x86 *c)
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
 
     BUG_ON((eax & XSTATE_FP_SSE) != XSTATE_FP_SSE);
-    BUG_ON((eax & XSTATE_YMM) && !(eax & XSTATE_SSE));
+    BUG_ON((eax & X86_XCR0_YMM) && !(eax & X86_XCR0_SSE));
     feature_mask = (((u64)edx << 32) | eax) & XCNTXT_MASK;
 
     /*
@@ -648,26 +648,26 @@ void xstate_init(struct cpuinfo_x86 *c)
 static bool valid_xcr0(u64 xcr0)
 {
     /* FP must be unconditionally set. */
-    if ( !(xcr0 & XSTATE_FP) )
+    if ( !(xcr0 & X86_XCR0_FP) )
         return false;
 
     /* YMM depends on SSE. */
-    if ( (xcr0 & XSTATE_YMM) && !(xcr0 & XSTATE_SSE) )
+    if ( (xcr0 & X86_XCR0_YMM) && !(xcr0 & X86_XCR0_SSE) )
         return false;
 
-    if ( xcr0 & (XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM) )
+    if ( xcr0 & (X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM) )
     {
         /* OPMASK, ZMM, and HI_ZMM require YMM. */
-        if ( !(xcr0 & XSTATE_YMM) )
+        if ( !(xcr0 & X86_XCR0_YMM) )
             return false;
 
         /* OPMASK, ZMM, and HI_ZMM must be the same. */
-        if ( ~xcr0 & (XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM) )
+        if ( ~xcr0 & (X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM) )
             return false;
     }
 
     /* BNDREGS and BNDCSR must be the same. */
-    return !(xcr0 & XSTATE_BNDREGS) == !(xcr0 & XSTATE_BNDCSR);
+    return !(xcr0 & X86_XCR0_BNDREGS) == !(xcr0 & X86_XCR0_BNDCSR);
 }
 
 int validate_xstate(u64 xcr0, u64 xcr0_accum, const struct xsave_hdr *hdr)
@@ -703,7 +703,7 @@ int handle_xsetbv(u32 index, u64 new_bv)
         return -EINVAL;
 
     /* XCR0.PKRU is disabled on PV mode. */
-    if ( is_pv_vcpu(curr) && (new_bv & XSTATE_PKRU) )
+    if ( is_pv_vcpu(curr) && (new_bv & X86_XCR0_PKRU) )
         return -EOPNOTSUPP;
 
     if ( !set_xcr0(new_bv) )
@@ -714,7 +714,7 @@ int handle_xsetbv(u32 index, u64 new_bv)
     curr->arch.xcr0_accum |= new_bv;
 
     /* LWP sets nonlazy_xstate_used independently. */
-    if ( new_bv & (XSTATE_NONLAZY & ~XSTATE_LWP) )
+    if ( new_bv & (XSTATE_NONLAZY & ~X86_XCR0_LWP) )
         curr->arch.nonlazy_xstate_used = 1;
 
     mask &= curr->fpu_dirtied ? ~XSTATE_FP_SSE : XSTATE_NONLAZY;
@@ -755,7 +755,7 @@ uint64_t read_bndcfgu(void)
     {
         asm ( ".byte 0x0f,0xc7,0x27\n" /* xsavec */
               : "=m" (*xstate)
-              : "a" (XSTATE_BNDCSR), "d" (0), "D" (xstate) );
+              : "a" (X86_XCR0_BNDCSR), "d" (0), "D" (xstate) );
 
         bndcsr = (void *)(xstate + 1);
     }
@@ -763,15 +763,15 @@ uint64_t read_bndcfgu(void)
     {
         asm ( ".byte 0x0f,0xae,0x27\n" /* xsave */
               : "=m" (*xstate)
-              : "a" (XSTATE_BNDCSR), "d" (0), "D" (xstate) );
+              : "a" (X86_XCR0_BNDCSR), "d" (0), "D" (xstate) );
 
-        bndcsr = (void *)xstate + xstate_offsets[_XSTATE_BNDCSR];
+        bndcsr = (void *)xstate + xstate_offsets[X86_XCR0_BNDCSR_POS];
     }
 
     if ( cr0 & X86_CR0_TS )
         write_cr0(cr0);
 
-    return xstate->xsave_hdr.xstate_bv & XSTATE_BNDCSR ? bndcsr->bndcfgu : 0;
+    return xstate->xsave_hdr.xstate_bv & X86_XCR0_BNDCSR ? bndcsr->bndcfgu : 0;
 }
 
 void xstate_set_init(uint64_t mask)

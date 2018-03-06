@@ -1882,8 +1882,8 @@ static int hvmemul_get_fpu(
     case X86EMUL_FPU_xmm:
         break;
     case X86EMUL_FPU_ymm:
-        if ( !(curr->arch.xcr0 & XSTATE_SSE) ||
-             !(curr->arch.xcr0 & XSTATE_YMM) )
+        if ( !(curr->arch.xcr0 & X86_XCR0_SSE) ||
+             !(curr->arch.xcr0 & X86_XCR0_YMM) )
             return X86EMUL_UNHANDLEABLE;
         break;
     default:

@@ -71,4 +71,28 @@
 #define X86_CR4_SMAP       0x00200000 /* enable SMAP */
 #define X86_CR4_PKE        0x00400000 /* enable PKE */
 
+/*
+ * XSTATE component flags in XCR0
+ */
+#define X86_XCR0_FP_POS           0
+#define X86_XCR0_FP               (1ULL << X86_XCR0_FP_POS)
+#define X86_XCR0_SSE_POS          1
+#define X86_XCR0_SSE              (1ULL << X86_XCR0_SSE_POS)
+#define X86_XCR0_YMM_POS          2
+#define X86_XCR0_YMM              (1ULL << X86_XCR0_YMM_POS)
+#define X86_XCR0_BNDREGS_POS      3
+#define X86_XCR0_BNDREGS          (1ULL << X86_XCR0_BNDREGS_POS)
+#define X86_XCR0_BNDCSR_POS       4
+#define X86_XCR0_BNDCSR           (1ULL << X86_XCR0_BNDCSR_POS)
+#define X86_XCR0_OPMASK_POS       5
+#define X86_XCR0_OPMASK           (1ULL << X86_XCR0_OPMASK_POS)
+#define X86_XCR0_ZMM_POS          6
+#define X86_XCR0_ZMM              (1ULL << X86_XCR0_ZMM_POS)
+#define X86_XCR0_HI_ZMM_POS       7
+#define X86_XCR0_HI_ZMM           (1ULL << X86_XCR0_HI_ZMM_POS)
+#define X86_XCR0_PKRU_POS         9
+#define X86_XCR0_PKRU             (1ULL << X86_XCR0_PKRU_POS)
+#define X86_XCR0_LWP_POS          62
+#define X86_XCR0_LWP              (1ULL << X86_XCR0_LWP_POS)
+
 #endif	/* __XEN_X86_DEFNS_H__ */

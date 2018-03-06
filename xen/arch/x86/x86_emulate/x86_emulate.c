@@ -2117,7 +2117,7 @@ static void adjust_bnd(struct x86_emulate_ctxt *ctxt,
          * (in which case executing any suitable non-prefixed branch
          * instruction would do), or use XRSTOR.
          */
-        xstate_set_init(XSTATE_BNDREGS);
+        xstate_set_init(X86_XCR0_BNDREGS);
     }
  done:;
 }

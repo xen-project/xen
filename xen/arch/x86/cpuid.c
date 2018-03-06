@@ -122,42 +122,42 @@ static void recalculate_xstate(struct cpuid_policy *p)
 
     if ( p->basic.avx )
     {
-        xstates |= XSTATE_YMM;
+        xstates |= X86_XCR0_YMM;
         xstate_size = max(xstate_size,
-                          xstate_offsets[_XSTATE_YMM] +
-                          xstate_sizes[_XSTATE_YMM]);
+                          xstate_offsets[X86_XCR0_YMM_POS] +
+                          xstate_sizes[X86_XCR0_YMM_POS]);
     }
 
     if ( p->feat.mpx )
     {
-        xstates |= XSTATE_BNDREGS | XSTATE_BNDCSR;
+        xstates |= X86_XCR0_BNDREGS | X86_XCR0_BNDCSR;
         xstate_size = max(xstate_size,
-                          xstate_offsets[_XSTATE_BNDCSR] +
-                          xstate_sizes[_XSTATE_BNDCSR]);
+                          xstate_offsets[X86_XCR0_BNDCSR_POS] +
+                          xstate_sizes[X86_XCR0_BNDCSR_POS]);
     }
 
     if ( p->feat.avx512f )
     {
-        xstates |= XSTATE_OPMASK | XSTATE_ZMM | XSTATE_HI_ZMM;
+        xstates |= X86_XCR0_OPMASK | X86_XCR0_ZMM | X86_XCR0_HI_ZMM;
         xstate_size = max(xstate_size,
-                          xstate_offsets[_XSTATE_HI_ZMM] +
-                          xstate_sizes[_XSTATE_HI_ZMM]);
+                          xstate_offsets[X86_XCR0_HI_ZMM_POS] +
+                          xstate_sizes[X86_XCR0_HI_ZMM_POS]);
     }
 
     if ( p->feat.pku )
     {
-        xstates |= XSTATE_PKRU;
+        xstates |= X86_XCR0_PKRU;
         xstate_size = max(xstate_size,
-                          xstate_offsets[_XSTATE_PKRU] +
-                          xstate_sizes[_XSTATE_PKRU]);
+                          xstate_offsets[X86_XCR0_PKRU_POS] +
+                          xstate_sizes[X86_XCR0_PKRU_POS]);
     }
 
     if ( p->extd.lwp )
     {
-        xstates |= XSTATE_LWP;
+        xstates |= X86_XCR0_LWP;
         xstate_size = max(xstate_size,
-                          xstate_offsets[_XSTATE_LWP] +
-                          xstate_sizes[_XSTATE_LWP]);
+                          xstate_offsets[X86_XCR0_LWP_POS] +
+                          xstate_sizes[X86_XCR0_LWP_POS]);
     }
 
     p->xstate.max_size  =  xstate_size;
@@ -1016,7 +1016,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         break;
 
     case 0x8000001c:
-        if ( (v->arch.xcr0 & XSTATE_LWP) && cpu_has_svm )
+        if ( (v->arch.xcr0 & X86_XCR0_LWP) && cpu_has_svm )
             /* Turn on available bit and other features specified in lwp_cfg. */
             res->a = (res->d & v->arch.hvm_svm.guest_lwp_cfg) | 1;
         break;
