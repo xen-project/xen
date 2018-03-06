@@ -69,6 +69,7 @@ struct platform_timesource {
 };
 
 static DEFINE_PER_CPU(struct cpu_time, cpu_time);
+DEFINE_PER_CPU(uint32_t, tsc_aux);
 
 /* Calibrate all CPUs to platform timer every EPOCH. */
 #define EPOCH MILLISECS(1000)

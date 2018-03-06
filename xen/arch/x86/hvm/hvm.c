@@ -4027,7 +4027,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         v->arch.hvm_vcpu.msr_tsc_aux = (uint32_t)msr_content;
         if ( cpu_has_rdtscp
              && (v->domain->arch.tsc_mode != TSC_MODE_PVRDTSCP) )
-            wrmsrl(MSR_TSC_AUX, (uint32_t)msr_content);
+            wrmsr_tsc_aux(msr_content);
         break;
 
     case MSR_IA32_APICBASE:

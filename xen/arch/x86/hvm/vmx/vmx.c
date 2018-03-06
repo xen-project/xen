@@ -511,7 +511,7 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     }
 
     if ( cpu_has_rdtscp )
-        wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
+        wrmsr_tsc_aux(hvm_msr_tsc_aux(v));
 }
 
 void vmx_update_cpu_exec_control(struct vcpu *v)
