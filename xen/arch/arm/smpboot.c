@@ -32,6 +32,7 @@
 #include <xen/console.h>
 #include <asm/cpuerrata.h>
 #include <asm/gic.h>
+#include <asm/procinfo.h>
 #include <asm/psci.h>
 #include <asm/acpi.h>
 
@@ -300,6 +301,7 @@ void start_secondary(unsigned long boot_phys_offset,
     set_processor_id(cpuid);
 
     identify_cpu(&current_cpu_data);
+    processor_setup();
 
     init_traps();
 
