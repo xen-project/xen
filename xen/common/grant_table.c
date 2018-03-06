@@ -3125,6 +3125,7 @@ static int __gnttab_cache_flush(const gnttab_cache_flush_t *cflush,
 
     unmap_domain_page(v);
     put_page(page);
+    rcu_unlock_domain(d);
 
     return ret;
 }
