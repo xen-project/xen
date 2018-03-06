@@ -2993,6 +2993,13 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                     case -ERESTART:
                         return X86EMUL_RETRY;
                     case 0:
+                        /*
+                         * Match up with the RDMSR side for now; ultimately this
+                         * entire case block should go away.
+                         */
+                        if ( rdmsr_safe(msr, msr_content) == 0 )
+                            break;
+                        goto gp_fault;
                     case 1:
                         break;
                     default:
