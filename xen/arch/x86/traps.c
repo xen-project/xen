@@ -1669,13 +1669,23 @@ static nmi_callback_t *nmi_callback = dummy_nmi_callback;
 void do_nmi(const struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
-    unsigned char reason;
+    unsigned char reason = 0;
     bool handle_unknown = false;
 
     ++nmi_count(cpu);
 
     if ( nmi_callback(regs, cpu) )
         return;
+
+    /*
+     * Accessing port 0x61 may trap to SMM which has been actually
+     * observed on some production SKX servers. This SMI sometimes
+     * takes enough time for the next NMI tick to happen. By reading
+     * this port before we re-arm the NMI watchdog, we reduce the chance
+     * of having an NMI watchdog expire while in the SMI handler.
+     */
+    if ( cpu == 0 )
+        reason = inb(0x61);
 
     if ( (nmi_watchdog == NMI_NONE) ||
          (!nmi_watchdog_tick(regs) && watchdog_force) )
@@ -1684,7 +1694,6 @@ void do_nmi(const struct cpu_user_regs *regs)
     /* Only the BSP gets external NMIs from the system. */
     if ( cpu == 0 )
     {
-        reason = inb(0x61);
         if ( reason & 0x80 )
             pci_serr_error(regs);
         if ( reason & 0x40 )
