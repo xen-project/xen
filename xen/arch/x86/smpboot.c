@@ -1224,7 +1224,10 @@ int __cpu_up(unsigned int cpu)
 void __init smp_cpus_done(void)
 {
     if ( nmi_watchdog == NMI_LOCAL_APIC )
+    {
+        setup_apic_nmi_watchdog();
         check_nmi_watchdog();
+    }
 
     setup_ioapic_dest();
 
