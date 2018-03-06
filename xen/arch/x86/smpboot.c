@@ -622,9 +622,6 @@ unsigned long alloc_stub_page(unsigned int cpu, unsigned long *mfn)
         unmap_domain_page(memset(__map_domain_page(pg), 0xcc, PAGE_SIZE));
     }
 
-    /* Confirm that all stubs fit in a single L3 entry. */
-    BUILD_BUG_ON(NR_CPUS * PAGE_SIZE > (1u << L3_PAGETABLE_SHIFT));
-
     stub_va = XEN_VIRT_END - (cpu + 1) * PAGE_SIZE;
     if ( map_pages_to_xen(stub_va, mfn_x(page_to_mfn(pg)), 1,
                           PAGE_HYPERVISOR_RX | MAP_SMALL_PAGES) )
@@ -758,12 +755,12 @@ static __read_mostly int8_t opt_xpti = -1;
 boolean_param("xpti", opt_xpti);
 DEFINE_PER_CPU(root_pgentry_t *, root_pgt);
 
+static root_pgentry_t common_pgt;
+
 extern const char _stextentry[], _etextentry[];
 
 static int setup_cpu_root_pgt(unsigned int cpu)
 {
-    static root_pgentry_t common_pgt;
-
     root_pgentry_t *rpt;
     unsigned int off;
     int rc;
@@ -786,8 +783,6 @@ static int setup_cpu_root_pgt(unsigned int cpu)
     /* One-time setup of common_pgt, which maps .text.entry and the stubs. */
     if ( unlikely(!root_get_intpte(common_pgt)) )
     {
-        unsigned long stubs_linear = XEN_VIRT_END - 1;
-        l3_pgentry_t *stubs_main, *stubs_shadow;
         const char *ptr;
 
         for ( rc = 0, ptr = _stextentry;
@@ -796,16 +791,6 @@ static int setup_cpu_root_pgt(unsigned int cpu)
 
         if ( rc )
             return rc;
-
-        /* Confirm that all stubs fit in a single L3 entry. */
-        BUILD_BUG_ON(NR_CPUS * PAGE_SIZE > (1u << L3_PAGETABLE_SHIFT));
-
-        stubs_main = l4e_to_l3e(idle_pg_table[l4_table_offset(stubs_linear)]);
-        stubs_shadow = l4e_to_l3e(rpt[l4_table_offset(stubs_linear)]);
-
-        /* Splice into the regular L2 mapping the stubs. */
-        stubs_shadow[l3_table_offset(stubs_linear)] =
-            stubs_main[l3_table_offset(stubs_linear)];
 
         common_pgt = rpt[root_table_offset(XEN_VIRT_START)];
     }
@@ -820,6 +805,8 @@ static int setup_cpu_root_pgt(unsigned int cpu)
         rc = clone_mapping(idt_tables[cpu], rpt);
     if ( !rc )
         rc = clone_mapping(&per_cpu(init_tss, cpu), rpt);
+    if ( !rc )
+        rc = clone_mapping((void *)per_cpu(stubs.addr, cpu), rpt);
 
     return rc;
 }
@@ -828,6 +815,7 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
 {
     root_pgentry_t *rpt = per_cpu(root_pgt, cpu);
     unsigned int r;
+    unsigned long stub_linear = per_cpu(stubs.addr, cpu);
 
     if ( !rpt )
         return;
@@ -872,6 +860,16 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
     }
 
     free_xen_pagetable(rpt);
+
+    /* Also zap the stub mapping for this CPU. */
+    if ( stub_linear )
+    {
+        l3_pgentry_t *l3t = l4e_to_l3e(common_pgt);
+        l2_pgentry_t *l2t = l3e_to_l2e(l3t[l3_table_offset(stub_linear)]);
+        l1_pgentry_t *l1t = l2e_to_l1e(l2t[l2_table_offset(stub_linear)]);
+
+        l1t[l2_table_offset(stub_linear)] = l1e_empty();
+    }
 }
 
 static void cpu_smpboot_free(unsigned int cpu)
@@ -895,6 +893,8 @@ static void cpu_smpboot_free(unsigned int cpu)
     if ( per_cpu(scratch_cpumask, cpu) != &scratch_cpu0mask )
         free_cpumask_var(per_cpu(scratch_cpumask, cpu));
 
+    cleanup_cpu_root_pgt(cpu);
+
     if ( per_cpu(stubs.addr, cpu) )
     {
         mfn_t mfn = _mfn(per_cpu(stubs.mfn, cpu));
@@ -911,8 +911,6 @@ static void cpu_smpboot_free(unsigned int cpu)
         if ( i == STUBS_PER_PAGE )
             free_domheap_page(mfn_to_page(mfn));
     }
-
-    cleanup_cpu_root_pgt(cpu);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     free_xenheap_pages(per_cpu(gdt_table, cpu), order);
@@ -968,11 +966,6 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
     disable_each_ist(idt_tables[cpu]);
 
-    rc = setup_cpu_root_pgt(cpu);
-    if ( rc )
-        goto out;
-    rc = -ENOMEM;
-
     for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
           i < nr_cpu_ids && i <= (cpu | (STUBS_PER_PAGE - 1)); ++i )
         if ( cpu_online(i) && cpu_to_node(i) == node )
@@ -985,6 +978,11 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( !stub_page )
         goto out;
     per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
+
+    rc = setup_cpu_root_pgt(cpu);
+    if ( rc )
+        goto out;
+    rc = -ENOMEM;
 
     if ( secondary_socket_cpumask == NULL &&
          (secondary_socket_cpumask = xzalloc(cpumask_t)) == NULL )
