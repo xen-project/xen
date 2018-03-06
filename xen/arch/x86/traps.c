@@ -538,7 +538,7 @@ static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
         show_execution_state(regs);
     else
         printk(XENLOG_ERR "CPU%d @ %04x:%08lx (%pS)\n", cpu, regs->cs, regs->rip,
-               guest_mode(regs) ? _p(regs->rip) : NULL);
+               guest_mode(regs) ? NULL : _p(regs->rip));
     cpumask_clear_cpu(cpu, &show_state_mask);
 
     return 1;
