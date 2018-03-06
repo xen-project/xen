@@ -24,6 +24,8 @@
 #include <xen/sched.h>
 #include <asm/msr.h>
 
+DEFINE_PER_CPU(uint32_t, tsc_aux);
+
 struct msr_domain_policy __read_mostly hvm_max_msr_domain_policy,
                          __read_mostly  pv_max_msr_domain_policy;
 
