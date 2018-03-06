@@ -638,7 +638,7 @@ ENTRY(relocate_xen)
         dsb   sy        /* So the CPU issues all writes to the range */
 
         mov   x9, x3
-        ldr   x10, =cacheline_bytes /* x10 := step */
+        ldr   x10, =dcache_line_bytes /* x10 := step */
         ldr   x10, [x10]
         mov   x11, x2
 

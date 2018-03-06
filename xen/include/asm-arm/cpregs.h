@@ -106,6 +106,7 @@
 
 /* CP15 CR0: CPUID and Cache Type Registers */
 #define MIDR            p15,0,c0,c0,0   /* Main ID Register */
+#define CTR             p15,0,c0,c0,1   /* Cache Type Register */
 #define MPIDR           p15,0,c0,c0,5   /* Multiprocessor Affinity Register */
 #define ID_PFR0         p15,0,c0,c1,0   /* Processor Feature Register 0 */
 #define ID_PFR1         p15,0,c0,c1,1   /* Processor Feature Register 1 */
@@ -303,6 +304,7 @@
 #define CPACR_EL1               CPACR
 #define CPTR_EL2                HCPTR
 #define CSSELR_EL1              CSSELR
+#define CTR_EL0                 CTR
 #define DACR32_EL2              DACR
 #define ESR_EL1                 DFSR
 #define ESR_EL2                 HSR

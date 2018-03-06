@@ -680,19 +680,18 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 }
 #endif
 
-size_t __read_mostly cacheline_bytes;
+size_t __read_mostly dcache_line_bytes;
 
 /* Very early check of the CPU cache properties */
 void __init setup_cache(void)
 {
-    uint32_t ccsid;
+    uint32_t ctr;
 
-    /* Read the cache size ID register for the level-0 data cache */
-    WRITE_SYSREG32(0, CSSELR_EL1);
-    ccsid = READ_SYSREG32(CCSIDR_EL1);
+    /* Read CTR */
+    ctr = READ_SYSREG32(CTR_EL0);
 
-    /* Low 3 bits are log2(cacheline size in words) - 2. */
-    cacheline_bytes = 1U << (4 + (ccsid & 0x7));
+    /* Bits 16-19 are the log2 number of words in the cacheline. */
+    dcache_line_bytes = (size_t) (4 << ((ctr >> 16) & 0xf));
 }
 
 /* C entry point for boot CPU */

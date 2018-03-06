@@ -133,8 +133,8 @@
 
 /* Architectural minimum cacheline size is 4 32-bit words. */
 #define MIN_CACHELINE_BYTES 16
-/* Actual cacheline size on the boot CPU. */
-extern size_t cacheline_bytes;
+/* Min dcache line size on the boot CPU. */
+extern size_t dcache_line_bytes;
 
 #define copy_page(dp, sp) memcpy(dp, sp, PAGE_SIZE)
 
@@ -145,7 +145,7 @@ extern size_t cacheline_bytes;
 static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
 {
     const void *end = p + size;
-    size_t cacheline_mask = cacheline_bytes - 1;
+    size_t cacheline_mask = dcache_line_bytes - 1;
 
     dsb(sy);           /* So the CPU issues all writes to the range */
 
@@ -153,7 +153,7 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
     {
         p = (void *)((uintptr_t)p & ~cacheline_mask);
         asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
-        p += cacheline_bytes;
+        p += dcache_line_bytes;
     }
     if ( (uintptr_t)end & cacheline_mask )
     {
@@ -161,7 +161,7 @@ static inline int invalidate_dcache_va_range(const void *p, unsigned long size)
         asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (end));
     }
 
-    for ( ; p < end; p += cacheline_bytes )
+    for ( ; p < end; p += dcache_line_bytes )
         asm volatile (__invalidate_dcache_one(0) : : "r" (p));
 
     dsb(sy);           /* So we know the flushes happen before continuing */
@@ -173,8 +173,8 @@ static inline int clean_dcache_va_range(const void *p, unsigned long size)
 {
     const void *end = p + size;
     dsb(sy);           /* So the CPU issues all writes to the range */
-    p = (void *)((uintptr_t)p & ~(cacheline_bytes - 1));
-    for ( ; p < end; p += cacheline_bytes )
+    p = (void *)((uintptr_t)p & ~(dcache_line_bytes - 1));
+    for ( ; p < end; p += dcache_line_bytes )
         asm volatile (__clean_dcache_one(0) : : "r" (p));
     dsb(sy);           /* So we know the flushes happen before continuing */
     /* ARM callers assume that dcache_* functions cannot fail. */
@@ -186,8 +186,8 @@ static inline int clean_and_invalidate_dcache_va_range
 {
     const void *end = p + size;
     dsb(sy);         /* So the CPU issues all writes to the range */
-    p = (void *)((uintptr_t)p & ~(cacheline_bytes - 1));
-    for ( ; p < end; p += cacheline_bytes )
+    p = (void *)((uintptr_t)p & ~(dcache_line_bytes - 1));
+    for ( ; p < end; p += dcache_line_bytes )
         asm volatile (__clean_and_invalidate_dcache_one(0) : : "r" (p));
     dsb(sy);         /* So we know the flushes happen before continuing */
     /* ARM callers assume that dcache_* functions cannot fail. */
