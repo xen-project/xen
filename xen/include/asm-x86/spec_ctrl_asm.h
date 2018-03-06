@@ -79,10 +79,10 @@
  *  - SPEC_CTRL_EXIT_TO_GUEST
  */
 
-.macro DO_OVERWRITE_RSB
+.macro DO_OVERWRITE_RSB tmp=rax
 /*
  * Requires nothing
- * Clobbers %rax, %rcx
+ * Clobbers \tmp (%rax by default), %rcx
  *
  * Requires 256 bytes of stack space, but %rsp has no net change. Based on
  * Google's performance numbers, the loop is unrolled to 16 iterations and two
@@ -97,7 +97,7 @@
  * optimised with mov-elimination in modern cores.
  */
     mov $16, %ecx                   /* 16 iterations, two calls per loop */
-    mov %rsp, %rax                  /* Store the current %rsp */
+    mov %rsp, %\tmp                 /* Store the current %rsp */
 
 .L\@_fill_rsb_loop:
 
@@ -114,7 +114,7 @@
 
     sub $1, %ecx
     jnz .L\@_fill_rsb_loop
-    mov %rax, %rsp                  /* Restore old %rsp */
+    mov %\tmp, %rsp                 /* Restore old %rsp */
 .endm
 
 .macro DO_SPEC_CTRL_ENTRY_FROM_VMEXIT ibrs_val:req
@@ -274,7 +274,7 @@
     testb $BTI_IST_RSB, %al
     jz .L\@_skip_rsb
 
-    DO_OVERWRITE_RSB
+    DO_OVERWRITE_RSB tmp=rdx /* Clobbers %rcx/%rdx */
 
 .L\@_skip_rsb:
 
@@ -286,13 +286,13 @@
     setz %dl
     and %dl, STACK_CPUINFO_FIELD(use_shadow_spec_ctrl)(%r14)
 
-.L\@_entry_from_xen:
     /*
      * Load Xen's intended value.  SPEC_CTRL_IBRS vs 0 is encoded in the
      * bottom bit of bti_ist_info, via a deliberate alias with BTI_IST_IBRS.
      */
     mov $MSR_SPEC_CTRL, %ecx
     and $BTI_IST_IBRS, %eax
+    xor %edx, %edx
     wrmsr
 
     /* Opencoded UNLIKELY_START() with no condition. */
