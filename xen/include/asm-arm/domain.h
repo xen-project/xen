@@ -63,9 +63,6 @@ struct arch_domain
         RELMEM_done,
     } relmem;
 
-    /* Virtual CPUID */
-    uint32_t vpidr;
-
     struct {
         uint64_t offset;
     } phys_timer_base;

@@ -172,6 +172,8 @@ static void ctxt_switch_from(struct vcpu *p)
 
 static void ctxt_switch_to(struct vcpu *n)
 {
+    uint32_t vpidr;
+
     /* When the idle VCPU is running, Xen will always stay in hypervisor
      * mode. Therefore we don't need to restore the context of an idle VCPU.
      */
@@ -180,7 +182,8 @@ static void ctxt_switch_to(struct vcpu *n)
 
     p2m_restore_state(n);
 
-    WRITE_SYSREG32(n->domain->arch.vpidr, VPIDR_EL2);
+    vpidr = READ_SYSREG32(MIDR_EL1);
+    WRITE_SYSREG32(vpidr, VPIDR_EL2);
     WRITE_SYSREG(n->arch.vmpidr, VMPIDR_EL2);
 
     /* VGIC */
@@ -594,9 +597,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     rc = -ENOMEM;
     if ( (d->shared_info = alloc_xenheap_pages(0, 0)) == NULL )
         goto fail;
-
-    /* Default the virtual ID to match the physical */
-    d->arch.vpidr = boot_cpu_data.midr.bits;
 
     clear_page(d->shared_info);
     share_xen_page_with_guest(

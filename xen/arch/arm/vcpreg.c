@@ -230,7 +230,6 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
 {
     const struct hsr_cp32 cp32 = hsr.cp32;
     int regidx = cp32.reg;
-    struct domain *d = current->domain;
 
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -295,7 +294,8 @@ void do_cp14_32(struct cpu_user_regs *regs, const union hsr hsr)
          *  - Variant and Revision bits match MDIR
          */
         val = (1 << 24) | (5 << 16);
-        val |= ((d->arch.vpidr >> 20) & 0xf) | (d->arch.vpidr & 0xf);
+        val |= ((current_cpu_data.midr.bits >> 20) & 0xf) |
+                (current_cpu_data.midr.bits & 0xf);
         set_user_reg(regs, regidx, val);
 
         break;
