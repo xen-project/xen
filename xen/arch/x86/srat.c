@@ -110,8 +110,8 @@ int valid_numa_range(u64 start, u64 end, nodeid_t node)
 	for (i = 0; i < num_node_memblks; i++) {
 		struct node *nd = &node_memblk_range[i];
 
-		if (nd->start <= start && nd->end > end &&
-			memblk_nodeid[i] == node )
+		if (nd->start <= start && nd->end >= end &&
+			memblk_nodeid[i] == node)
 			return 1;
 	}
 
