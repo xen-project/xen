@@ -3664,8 +3664,18 @@ long do_mmu_update(
                 case PGT_l4_page_table:
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    if ( !rc )
-                        sync_guest = this_cpu(root_pgt);
+                    /*
+                     * No need to sync if all uses of the page can be accounted
+                     * to the page lock we hold, its pinned status, and uses on
+                     * this (v)CPU.
+                     */
+                    if ( !rc && this_cpu(root_pgt) &&
+                         ((page->u.inuse.type_info & PGT_count_mask) >
+                          (1 + !!(page->u.inuse.type_info & PGT_pinned) +
+                           (pagetable_get_pfn(curr->arch.guest_table) == mfn) +
+                           (pagetable_get_pfn(curr->arch.guest_table_user) ==
+                            mfn))) )
+                        sync_guest = true;
                     break;
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
