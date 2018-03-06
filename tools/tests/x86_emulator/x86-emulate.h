@@ -52,6 +52,10 @@ extern uint32_t mxcsr_mask;
 #define MMAP_SZ 16384
 bool emul_test_init(void);
 
+/* Must save and restore FPU state between any call into libc. */
+void emul_save_fpu_state(void);
+void emul_restore_fpu_state(void);
+
 #include "x86_emulate/x86_emulate.h"
 
 static inline uint64_t xgetbv(uint32_t xcr)

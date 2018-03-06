@@ -26,26 +26,70 @@
 
 uint32_t mxcsr_mask = 0x0000ffbf;
 
+static char fpu_save_area[4096] __attribute__((__aligned__((64))));
+static bool use_xsave;
+
+void emul_save_fpu_state(void)
+{
+    if ( use_xsave )
+        asm volatile ( "xsave %[ptr]"
+                       : [ptr] "=m" (fpu_save_area)
+                       : "a" (~0ul), "d" (~0ul) );
+    else
+        asm volatile ( "fxsave %0" : "=m" (fpu_save_area) );
+}
+
+void emul_restore_fpu_state(void)
+{
+    /* Older gcc can't deal with "m" array inputs; make them outputs instead. */
+    if ( use_xsave )
+        asm volatile ( "xrstor %[ptr]"
+                       : [ptr] "+m" (fpu_save_area)
+                       : "a" (~0ul), "d" (~0ul) );
+    else
+        asm volatile ( "fxrstor %0" : "+m" (fpu_save_area) );
+}
+
 bool emul_test_init(void)
 {
+    union {
+        char x[464];
+        struct {
+            uint32_t other[6];
+            uint32_t mxcsr;
+            uint32_t mxcsr_mask;
+            /* ... */
+        };
+    } *fxs = (void *)fpu_save_area;
+
     unsigned long sp;
 
-    if ( cpu_has_fxsr )
+    if ( cpu_has_xsave )
     {
-        static union __attribute__((__aligned__(16))) {
-            char x[464];
-            struct {
-                uint32_t other[6];
-                uint32_t mxcsr;
-                uint32_t mxcsr_mask;
-                /* ... */
-            };
-        } fxs;
+        unsigned int tmp, ebx;
 
-        asm ( "fxsave %0" : "=m" (fxs) );
-        if ( fxs.mxcsr_mask )
-            mxcsr_mask = fxs.mxcsr_mask;
+        asm ( "cpuid"
+              : "=a" (tmp), "=b" (ebx), "=c" (tmp), "=d" (tmp)
+              : "a" (0xd), "c" (0) );
+
+        /*
+         * Sanity check that fpu_save_area[] is large enough.  This assertion
+         * will trip eventually, at which point fpu_save_area[] needs to get
+         * larger.
+         */
+        assert(ebx < sizeof(fpu_save_area));
+
+        /* Use xsave if available... */
+        use_xsave = true;
     }
+    else
+        /* But use fxsave if xsave isn't available. */
+        assert(cpu_has_fxsr);
+
+    /* Reuse the save state buffer to find mcxsr_mask. */
+    asm ( "fxsave %0" : "=m" (*fxs) );
+    if ( fxs->mxcsr_mask )
+        mxcsr_mask = fxs->mxcsr_mask;
 
     /*
      * Mark the entire stack executable so that the stub executions
