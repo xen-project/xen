@@ -30,6 +30,7 @@ asm (
     "    jmp  cmdline_parse_early      \n"
     );
 
+#include <xen/kconfig.h>
 #include "defs.h"
 #include "video.h"
 
@@ -336,5 +337,7 @@ void __stdcall cmdline_parse_early(const char *cmdline, early_boot_opts_t *ebo)
     ebo->skip_realmode = skip_realmode(cmdline);
     ebo->opt_edd = edd_parse(cmdline);
     ebo->opt_edid = edid_parse(cmdline);
-    vga_parse(cmdline, ebo);
+
+    if ( IS_ENABLED(CONFIG_VIDEO) )
+        vga_parse(cmdline, ebo);
 }

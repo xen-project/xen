@@ -38,6 +38,7 @@
 #include <asm/desc.h>
 #include <asm/div64.h>
 #include <asm/flushtlb.h>
+#include <asm/guest.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
 #include <asm/spec_ctrl.h>
@@ -349,6 +350,9 @@ void start_secondary(void *unused)
         early_microcode_update_cpu(false);
     else
         microcode_resume_cpu(cpu);
+
+    if ( xen_guest )
+        hypervisor_ap_setup();
 
     smp_callin();
 

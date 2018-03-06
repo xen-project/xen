@@ -170,6 +170,11 @@
 ^tools/firmware/rombios/32bit/32bitbios_flat\.h$
 ^tools/firmware/vgabios/vbetables-gen$
 ^tools/firmware/vgabios/vbetables\.h$
+^tools/firmware/xen-dir/.*\.old$
+^tools/firmware/xen-dir/linkfarm.stamp.*$
+^tools/firmware/xen-dir/xen-root$
+^tools/firmware/xen-dir/xen-shim$
+^tools/firmware/xen-dir/xen-shim-syms$
 ^tools/flask/utils/flask-getenforce$
 ^tools/flask/utils/flask-get-bool$
 ^tools/flask/utils/flask-loadpolicy$

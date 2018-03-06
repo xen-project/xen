@@ -151,7 +151,9 @@ extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
-extern void (*ctxt_switch_levelling)(const struct vcpu *next);
+extern bool probe_cpuid_faulting(void);
+extern void ctxt_switch_levelling(const struct vcpu *next);
+extern void (*ctxt_switch_masking)(const struct vcpu *next);
 
 extern u64 host_pat;
 extern bool_t opt_cpu_info;

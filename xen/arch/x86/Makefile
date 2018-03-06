@@ -1,6 +1,7 @@
 subdir-y += acpi
 subdir-y += cpu
 subdir-y += genapic
+subdir-$(CONFIG_XEN_GUEST) += guest
 subdir-$(CONFIG_HVM) += hvm
 subdir-y += mm
 subdir-$(CONFIG_XENOPROF) += oprofile
@@ -80,7 +81,9 @@ efi-y := $(shell if [ ! -r $(BASEDIR)/include/xen/compile.h -o \
 ifneq ($(build_id_linker),)
 notes_phdrs = --notes
 else
-notes_phdrs =
+ifeq ($(CONFIG_PVH_GUEST),y)
+notes_phdrs = --notes
+endif
 endif
 
 ifdef CONFIG_LIVEPATCH

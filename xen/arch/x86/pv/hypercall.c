@@ -320,6 +320,23 @@ void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
     *(u16 *)(p+ 6) = (HYPERCALL_VECTOR << 8) | 0xcd; /* int  $xx */
 }
 
+void __init pv_hypercall_table_replace(unsigned int hypercall,
+                                       hypercall_fn_t * native,
+                                       hypercall_fn_t *compat)
+{
+#define HANDLER_POINTER(f) \
+    ((unsigned long *)__va(__pa(&pv_hypercall_table[hypercall].f)))
+    write_atomic(HANDLER_POINTER(native), (unsigned long)native);
+    write_atomic(HANDLER_POINTER(compat), (unsigned long)compat);
+#undef HANDLER_POINTER
+}
+
+hypercall_fn_t *pv_get_hypercall_handler(unsigned int hypercall, bool compat)
+{
+    return compat ? pv_hypercall_table[hypercall].compat
+                  : pv_hypercall_table[hypercall].native;
+}
+
 /*
  * Local variables:
  * mode: C

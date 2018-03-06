@@ -13,6 +13,7 @@
 #include <xen/softirq.h>
 
 #include <asm/dom0_build.h>
+#include <asm/guest.h>
 #include <asm/hpet.h>
 #include <asm/io_apic.h>
 #include <asm/p2m.h>
@@ -50,6 +51,13 @@ static long __init parse_amt(const char *s, const char **ps)
 
 static int __init parse_dom0_mem(const char *s)
 {
+    /* xen-shim uses shim_mem parameter instead of dom0_mem */
+    if ( pv_shim )
+    {
+        printk("Ignoring dom0_mem param in pv-shim mode\n");
+        return 0;
+    }
+
     do {
         if ( !strncmp(s, "min:", 4) )
             dom0_min_nrpages = parse_amt(s+4, &s);
@@ -130,9 +138,17 @@ struct vcpu *__init dom0_setup_vcpu(struct domain *d,
 
     if ( v )
     {
-        if ( !d->is_pinned && !dom0_affinity_relaxed )
-            cpumask_copy(v->cpu_hard_affinity, &dom0_cpus);
-        cpumask_copy(v->cpu_soft_affinity, &dom0_cpus);
+        if ( pv_shim )
+        {
+            __cpumask_set_cpu(vcpu_id, v->cpu_hard_affinity);
+            __cpumask_set_cpu(vcpu_id, v->cpu_soft_affinity);
+        }
+        else
+        {
+            if ( !d->is_pinned && !dom0_affinity_relaxed )
+                cpumask_copy(v->cpu_hard_affinity, &dom0_cpus);
+            cpumask_copy(v->cpu_soft_affinity, &dom0_cpus);
+        }
     }
 
     return v;
@@ -144,6 +160,21 @@ unsigned int __init dom0_max_vcpus(void)
 {
     unsigned int i, max_vcpus, limit;
     nodeid_t node;
+
+    if ( pv_shim )
+    {
+        nodes_setall(dom0_nodes);
+
+        /*
+         * When booting in shim mode APs are not started until the guest brings
+         * other vCPUs up.
+         */
+        cpumask_set_cpu(0, &dom0_cpus);
+
+        /* On PV shim mode allow the guest to have as many CPUs as available. */
+        return nr_cpu_ids;
+    }
+
 
     for ( i = 0; i < dom0_nr_pxms; ++i )
         if ( (node = pxm_to_node(dom0_pxms[i])) != NUMA_NO_NODE )
@@ -282,8 +313,9 @@ unsigned long __init dom0_compute_nr_pages(
          * for things like DMA buffers. This reservation is clamped to a
          * maximum of 128MB.
          */
-        if ( nr_pages == 0 )
-            nr_pages = -min(avail / 16, 128UL << (20 - PAGE_SHIFT));
+        if ( !nr_pages )
+            nr_pages = -(pv_shim ? pv_shim_mem(avail)
+                                 : min(avail / 16, 128UL << (20 - PAGE_SHIFT)));
 
         /* Negative specification means "all memory - specified amount". */
         if ( (long)nr_pages  < 0 ) nr_pages  += avail;
@@ -385,6 +417,9 @@ int __init dom0_setup_permissions(struct domain *d)
     unsigned int i;
     int rc;
 
+    if ( pv_shim )
+        return 0;
+
     /* The hardware domain is initially permitted full I/O capabilities. */
     rc = ioports_permit_access(d, 0, 0xFFFF);
     rc |= iomem_permit_access(d, 0UL, (1UL << (paddr_bits - PAGE_SHIFT)) - 1);
@@ -469,7 +504,7 @@ int __init construct_dom0(struct domain *d, const module_t *image,
     int rc;
 
     /* Sanity! */
-    BUG_ON(d->domain_id != 0);
+    BUG_ON(!pv_shim && d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
     BUG_ON(d->vcpu[0]->is_initialised);
 

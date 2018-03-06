@@ -202,7 +202,7 @@ static void tpm_hash2pcr(struct xc_dom_image *dom, char *cmdline)
 	ASSERT(rv == 0 && resp->status == 0);
 
 	cmd.pcr = bswap_32(5); // PCR #5 for initrd
-	sha1(dom->ramdisk_blob, dom->ramdisk_size, cmd.hash);
+	sha1(dom->modules[0].blob, dom->modules[0].size, cmd.hash);
 	rv = tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), (void*)&resp, &resplen);
 	ASSERT(rv == 0 && resp->status == 0);
 
@@ -231,13 +231,12 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
 
     /* We are using guest owned memory, therefore no limits. */
     xc_dom_kernel_max_size(dom, 0);
-    xc_dom_ramdisk_max_size(dom, 0);
+    xc_dom_module_max_size(dom, 0);
 
     dom->kernel_blob = kernel;
     dom->kernel_size = kernel_size;
 
-    dom->ramdisk_blob = module;
-    dom->ramdisk_size = module_size;
+    xc_dom_module_mem(dom, module, module_size, NULL);
 
     dom->flags = flags;
     dom->console_evtchn = start_info.console.domU.evtchn;

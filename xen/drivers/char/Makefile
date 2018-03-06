@@ -8,3 +8,5 @@ obj-$(CONFIG_HAS_SCIF) += scif-uart.o
 obj-$(CONFIG_HAS_EHCI) += ehci-dbgp.o
 obj-$(CONFIG_ARM) += arm-uart.o
 obj-y += serial.o
+obj-$(CONFIG_XEN_GUEST) += xen_pv_console.o
+obj-$(CONFIG_PV_SHIM) += consoled.o

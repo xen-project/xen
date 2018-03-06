@@ -1149,11 +1149,10 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&sched_shutdown, arg, 1) )
             break;
 
-        ret = 0;
         TRACE_3D(TRC_SCHED_SHUTDOWN,
                  current->domain->domain_id, current->vcpu_id,
                  sched_shutdown.reason);
-        domain_shutdown(current->domain, (u8)sched_shutdown.reason);
+        ret = domain_shutdown(current->domain, (u8)sched_shutdown.reason);
 
         break;
     }

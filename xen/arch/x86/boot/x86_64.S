@@ -31,7 +31,7 @@ ENTRY(__high_start)
         test    %ebx,%ebx
         jnz     start_secondary
 
-        /* Pass off the Multiboot info structure to C land. */
+        /* Pass off the Multiboot info structure to C land (if applicable). */
         mov     multiboot_ptr(%rip),%edi
         call    __start_xen
         BUG     /* __start_xen() shouldn't return. */

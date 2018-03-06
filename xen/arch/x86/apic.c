@@ -36,6 +36,8 @@
 #include <mach_apic.h>
 #include <io_ports.h>
 #include <xen/kexec.h>
+#include <asm/guest.h>
+#include <asm/time.h>
 
 static bool __read_mostly tdt_enabled;
 static bool __initdata tdt_enable = true;
@@ -1091,6 +1093,20 @@ static void setup_APIC_timer(void)
     local_irq_restore(flags);
 }
 
+static void wait_tick_pvh(void)
+{
+    u64 lapse_ns = 1000000000ULL / HZ;
+    s_time_t start, curr_time;
+
+    start = NOW();
+
+    /* Won't wrap around */
+    do {
+        cpu_relax();
+        curr_time = NOW();
+    } while ( curr_time - start < lapse_ns );
+}
+
 /*
  * In this function we calibrate APIC bus clocks to the external
  * timer. Unfortunately we cannot use jiffies and the timer irq
@@ -1123,12 +1139,15 @@ static int __init calibrate_APIC_clock(void)
      */
     __setup_APIC_LVTT(1000000000);
 
-    /*
-     * The timer chip counts down to zero. Let's wait
-     * for a wraparound to start exact measurement:
-     * (the current tick might have been already half done)
-     */
-    wait_8254_wraparound();
+    if ( !xen_guest )
+        /*
+         * The timer chip counts down to zero. Let's wait
+         * for a wraparound to start exact measurement:
+         * (the current tick might have been already half done)
+         */
+        wait_8254_wraparound();
+    else
+        wait_tick_pvh();
 
     /*
      * We wrapped around just now. Let's start:
@@ -1137,10 +1156,13 @@ static int __init calibrate_APIC_clock(void)
     tt1 = apic_read(APIC_TMCCT);
 
     /*
-     * Let's wait LOOPS wraprounds:
+     * Let's wait LOOPS ticks:
      */
     for (i = 0; i < LOOPS; i++)
-        wait_8254_wraparound();
+        if ( !xen_guest )
+            wait_8254_wraparound();
+        else
+            wait_tick_pvh();
 
     tt2 = apic_read(APIC_TMCCT);
     t2 = rdtsc_ordered();
