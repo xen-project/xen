@@ -688,7 +688,7 @@ void setup_local_APIC(void)
         printk("Leaving ESR disabled.\n");
     }
 
-    if (nmi_watchdog == NMI_LOCAL_APIC)
+    if (nmi_watchdog == NMI_LOCAL_APIC && smp_processor_id())
         setup_apic_nmi_watchdog();
     apic_pm_activate();
 }
