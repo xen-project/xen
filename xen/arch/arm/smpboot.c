@@ -266,7 +266,8 @@ void __init smp_init_cpus(void)
 
     if ( opt_hmp_unsafe )
         warning_add("WARNING: HMP COMPUTING HAS BEEN ENABLED.\n"
-                    "It has implications on the security and stability of the system.\n");
+                    "It has implications on the security and stability of the system,\n"
+                    "unless the cpu affinity of all domains is specified.\n");
 }
 
 int __init
@@ -308,13 +309,15 @@ void start_secondary(unsigned long boot_phys_offset,
     /*
      * Currently Xen assumes the platform has only one kind of CPUs.
      * This assumption does not hold on big.LITTLE platform and may
-     * result to instability and insecure platform. Better to park them
-     * for now.
+     * result to instability and insecure platform (unless cpu affinity
+     * is manually specified for all domains). Better to park them for
+     * now.
      */
     if ( !opt_hmp_unsafe &&
          current_cpu_data.midr.bits != boot_cpu_data.midr.bits )
     {
-        printk(XENLOG_ERR "CPU%u MIDR (0x%x) does not match boot CPU MIDR (0x%x).\n",
+        printk(XENLOG_ERR "CPU%u MIDR (0x%x) does not match boot CPU MIDR (0x%x),\n"
+               "disable cpu (see big.LITTLE.txt under docs/).\n",
                smp_processor_id(), current_cpu_data.midr.bits,
                boot_cpu_data.midr.bits);
         stop_cpu();

@@ -1020,7 +1020,12 @@ Control Xens use of the APEI Hardware Error Source Table, should one be found.
 
 Say yes at your own risk if you want to enable heterogenous computing
 (such as big.LITTLE). This may result to an unstable and insecure
-platform. When the option is disabled (default), CPUs that are not
+platform, unless you manually specify the cpu affinity of all domains so
+that all vcpus are scheduled on the same class of pcpus (big or LITTLE
+but not both). vcpu migration between big cores and LITTLE cores is not
+supported. See docs/misc/arm/big.LITTLE.txt for more information.
+
+When the hmp-unsafe option is disabled (default), CPUs that are not
 identical to the boot CPU will be parked and not used by Xen.
 
 ### hpetbroadcast

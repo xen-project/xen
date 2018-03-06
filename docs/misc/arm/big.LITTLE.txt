@@ -1,0 +1,46 @@
+big.LITTLE is a form of heterogeneous computing that comes with two
+types of general purpose cpu cores: big cores, more powerful and with a
+higher power consumption rate, and LITTLE cores, less powerful and
+cheaper to run. For example, Cortex A53 and Cortex A57 cpus. Typically,
+big cores are only recommended for burst activity, especially in
+battery powered environments. Please note that Xen doesn't not use any
+board specific power management techniques at the moment, it only uses
+WFI. It is recommended to check the vendor's big.LITTLE and power
+management documentation before using it in a Xen environment.
+
+
+big and LITTLE cores are fully compatible in terms of instruction sets,
+but can differ in many subtle ways. For example, their cacheline sizes
+might differ. For this reason, vcpu migration between big and LITTLE
+cores can lead to data corruptions.
+
+Today, the Xen scheduler does not have support for big.LITTLE,
+therefore, it might unknowingly move any vcpus between big and LITTLE
+cores, potentially leading to breakages. To avoid this kind of issues,
+at boot time Xen disables all cpus that differ from the boot cpu.
+
+
+Expert users can enable all big.LITTLE cores by passing hmp-unsafe=true
+to the Xen command line [1]. Given the lack of big.LITTLE support in the
+scheduler, it is only safe if the cpu affinity of all domains is
+manually specified, so that the scheduler is not allowed to switch a
+vcpu from big to LITTLE or vice versa.
+
+In the case of dom0, dom0_vcpus_pin needs to be added to the Xen command
+line options [1]. For DomUs, the `cpus' option should be added to all VM
+config files [2].
+
+For example, if the first 4 cpus are big and the last 4 are LITTLE, the
+following options run all domain vcpus on either big or LITTLE cores
+(not both):
+
+  cpus = "0-3"
+  cpus = "4-7"
+
+The following option runs one domain vcpu as big and one as LITTLE:
+
+  cpus = ["0-3", "4-7"]
+
+
+[1] docs/misc/xen-command-line.markdown
+[2] docs/man/xl.cfg.pod.5
