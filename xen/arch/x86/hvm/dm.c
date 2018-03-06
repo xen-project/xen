@@ -53,41 +53,9 @@ static bool _raw_copy_from_guest_buf_offset(void *dst,
                                    offset_bytes, dst_bytes);
 }
 
-static bool _raw_copy_to_guest_buf_offset(const struct dmop_args *args,
-                                          unsigned int buf_idx,
-                                          size_t offset_bytes,
-                                          const void *src,
-                                          size_t src_bytes)
-{
-    size_t buf_bytes;
-
-    if ( buf_idx >= args->nr_bufs )
-        return false;
-
-    buf_bytes = args->buf[buf_idx].size;
-
-
-    if ( (offset_bytes + src_bytes) < offset_bytes ||
-         (offset_bytes + src_bytes) > buf_bytes )
-        return false;
-
-    return !copy_to_guest_offset(args->buf[buf_idx].h, offset_bytes,
-                                 src, src_bytes);
-}
-
 #define COPY_FROM_GUEST_BUF_OFFSET(dst, bufs, buf_idx, offset_bytes) \
     _raw_copy_from_guest_buf_offset(&(dst), bufs, buf_idx, offset_bytes, \
                                     sizeof(dst))
-
-#define COPY_TO_GUEST_BUF_OFFSET(bufs, buf_idx, offset_bytes, src) \
-    _raw_copy_to_guest_buf_offset(bufs, buf_idx, offset_bytes, \
-                                  &(src), sizeof(src))
-
-#define COPY_FROM_GUEST_BUF(dst, bufs, buf_idx) \
-    COPY_FROM_GUEST_BUF_OFFSET(dst, bufs, buf_idx, 0)
-
-#define COPY_TO_GUEST_BUF(bufs, buf_idx, src) \
-    COPY_TO_GUEST_BUF_OFFSET(bufs, buf_idx, 0, src)
 
 static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
                             unsigned int nr, const struct xen_dm_op_buf *buf)
@@ -371,6 +339,26 @@ static int dm_op(const struct dmop_args *op_args)
     struct xen_dm_op op;
     bool const_op = true;
     long rc;
+    size_t offset;
+
+    static const uint8_t op_size[] = {
+        [XEN_DMOP_create_ioreq_server]              = sizeof(struct xen_dm_op_create_ioreq_server),
+        [XEN_DMOP_get_ioreq_server_info]            = sizeof(struct xen_dm_op_get_ioreq_server_info),
+        [XEN_DMOP_map_io_range_to_ioreq_server]     = sizeof(struct xen_dm_op_ioreq_server_range),
+        [XEN_DMOP_unmap_io_range_from_ioreq_server] = sizeof(struct xen_dm_op_ioreq_server_range),
+        [XEN_DMOP_set_ioreq_server_state]           = sizeof(struct xen_dm_op_set_ioreq_server_state),
+        [XEN_DMOP_destroy_ioreq_server]             = sizeof(struct xen_dm_op_destroy_ioreq_server),
+        [XEN_DMOP_track_dirty_vram]                 = sizeof(struct xen_dm_op_track_dirty_vram),
+        [XEN_DMOP_set_pci_intx_level]               = sizeof(struct xen_dm_op_set_pci_intx_level),
+        [XEN_DMOP_set_isa_irq_level]                = sizeof(struct xen_dm_op_set_isa_irq_level),
+        [XEN_DMOP_set_pci_link_route]               = sizeof(struct xen_dm_op_set_pci_link_route),
+        [XEN_DMOP_modified_memory]                  = sizeof(struct xen_dm_op_modified_memory),
+        [XEN_DMOP_set_mem_type]                     = sizeof(struct xen_dm_op_set_mem_type),
+        [XEN_DMOP_inject_event]                     = sizeof(struct xen_dm_op_inject_event),
+        [XEN_DMOP_inject_msi]                       = sizeof(struct xen_dm_op_inject_msi),
+        [XEN_DMOP_map_mem_type_to_ioreq_server]     = sizeof(struct xen_dm_op_map_mem_type_to_ioreq_server),
+        [XEN_DMOP_remote_shutdown]                  = sizeof(struct xen_dm_op_remote_shutdown),
+    };
 
     rc = rcu_lock_remote_domain_by_id(op_args->domid, &d);
     if ( rc )
@@ -383,11 +371,27 @@ static int dm_op(const struct dmop_args *op_args)
     if ( rc )
         goto out;
 
-    if ( !COPY_FROM_GUEST_BUF(op, op_args, 0) )
+    offset = offsetof(struct xen_dm_op, u);
+
+    rc = -EFAULT;
+    if ( op_args->buf[0].size < offset )
+        goto out;
+
+    if ( copy_from_guest_offset((void *)&op, op_args->buf[0].h, 0, offset) )
+        goto out;
+
+    if ( op.op >= ARRAY_SIZE(op_size) )
     {
-        rc = -EFAULT;
+        rc = -EOPNOTSUPP;
         goto out;
     }
+
+    if ( op_args->buf[0].size < offset + op_size[op.op] )
+        goto out;
+
+    if ( copy_from_guest_offset((void *)&op.u, op_args->buf[0].h, offset,
+                                op_size[op.op]) )
+        goto out;
 
     rc = -EINVAL;
     if ( op.pad )
@@ -646,7 +650,8 @@ static int dm_op(const struct dmop_args *op_args)
     }
 
     if ( (!rc || rc == -ERESTART) &&
-         !const_op && !COPY_TO_GUEST_BUF(op_args, 0, op) )
+         !const_op && copy_to_guest_offset(op_args->buf[0].h, offset,
+                                           (void *)&op.u, op_size[op.op]) )
         rc = -EFAULT;
 
  out:
