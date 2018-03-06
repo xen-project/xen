@@ -138,6 +138,17 @@ extern size_t dcache_line_bytes;
 
 #define copy_page(dp, sp) memcpy(dp, sp, PAGE_SIZE)
 
+static inline size_t read_dcache_line_bytes(void)
+{
+    uint32_t ctr;
+
+    /* Read CTR */
+    ctr = READ_SYSREG32(CTR_EL0);
+
+    /* Bits 16-19 are the log2 number of words in the cacheline. */
+    return (size_t) (4 << ((ctr >> 16) & 0xf));
+}
+
 /* Functions for flushing medium-sized areas.
  * if 'range' is large enough we might want to use model-specific
  * full-cache flushes. */

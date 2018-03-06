@@ -682,18 +682,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
 size_t __read_mostly dcache_line_bytes;
 
-/* Very early check of the CPU cache properties */
-void __init setup_cache(void)
-{
-    uint32_t ctr;
-
-    /* Read CTR */
-    ctr = READ_SYSREG32(CTR_EL0);
-
-    /* Bits 16-19 are the log2 number of words in the cacheline. */
-    dcache_line_bytes = (size_t) (4 << ((ctr >> 16) & 0xf));
-}
-
 /* C entry point for boot CPU */
 void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long fdt_paddr,
@@ -707,7 +695,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     struct domain *dom0;
     struct xen_arch_domainconfig config;
 
-    setup_cache();
+    dcache_line_bytes = read_dcache_line_bytes();
 
     percpu_init_areas();
     set_processor_id(0); /* needed early, for smp_processor_id() */

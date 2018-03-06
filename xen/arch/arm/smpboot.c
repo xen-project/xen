@@ -323,6 +323,14 @@ void start_secondary(unsigned long boot_phys_offset,
         stop_cpu();
     }
 
+    if ( dcache_line_bytes != read_dcache_line_bytes() )
+    {
+        printk(XENLOG_ERR "CPU%u dcache line size (%zu) does not match the boot CPU (%zu)\n",
+               smp_processor_id(), read_dcache_line_bytes(),
+               dcache_line_bytes);
+        stop_cpu();
+    }
+
     mmu_init_secondary_cpu();
 
     gic_init_secondary_cpu();
