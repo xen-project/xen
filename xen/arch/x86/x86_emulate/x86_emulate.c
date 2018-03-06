@@ -1678,6 +1678,10 @@ x86_emulate(
     }
  done_prefixes:
 
+    /* %{e,c,s,d}s overrides are ignored in 64bit mode. */
+    if ( mode_64bit() && override_seg < x86_seg_fs )
+        override_seg = x86_seg_none;
+
     if ( rex_prefix & REX_W )
         op_bytes = 8;
 
