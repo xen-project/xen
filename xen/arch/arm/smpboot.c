@@ -27,6 +27,7 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 #include <xen/timer.h>
+#include <xen/warning.h>
 #include <xen/irq.h>
 #include <xen/console.h>
 #include <asm/cpuerrata.h>
@@ -68,6 +69,13 @@ DEFINE_PER_CPU(unsigned int, cpu_id);
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
 /* representing HT and core siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
+
+/*
+ * By default non-boot CPUs not identical to the boot CPU will be
+ * parked.
+ */
+static bool __read_mostly opt_hmp_unsafe = false;
+boolean_param("hmp-unsafe", opt_hmp_unsafe);
 
 static void setup_cpu_sibling_map(int cpu)
 {
@@ -255,6 +263,9 @@ void __init smp_init_cpus(void)
     else
         acpi_smp_init_cpus();
 
+    if ( opt_hmp_unsafe )
+        warning_add("WARNING: HMP COMPUTING HAS BEEN ENABLED.\n"
+                    "It has implications on the security and stability of the system.\n");
 }
 
 int __init
@@ -291,6 +302,21 @@ void start_secondary(unsigned long boot_phys_offset,
     identify_cpu(&current_cpu_data);
 
     init_traps();
+
+    /*
+     * Currently Xen assumes the platform has only one kind of CPUs.
+     * This assumption does not hold on big.LITTLE platform and may
+     * result to instability and insecure platform. Better to park them
+     * for now.
+     */
+    if ( !opt_hmp_unsafe &&
+         current_cpu_data.midr.bits != boot_cpu_data.midr.bits )
+    {
+        printk(XENLOG_ERR "CPU%u MIDR (0x%x) does not match boot CPU MIDR (0x%x).\n",
+               smp_processor_id(), current_cpu_data.midr.bits,
+               boot_cpu_data.midr.bits);
+        stop_cpu();
+    }
 
     mmu_init_secondary_cpu();
 

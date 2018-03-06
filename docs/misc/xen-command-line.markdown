@@ -1013,6 +1013,16 @@ supported only when compiled with XSM on x86.
 
 Control Xens use of the APEI Hardware Error Source Table, should one be found.
 
+### hmp-unsafe (arm)
+> `= <boolean>`
+
+> Default : `false`
+
+Say yes at your own risk if you want to enable heterogenous computing
+(such as big.LITTLE). This may result to an unstable and insecure
+platform. When the option is disabled (default), CPUs that are not
+identical to the boot CPU will be parked and not used by Xen.
+
 ### hpetbroadcast
 > `= <boolean>`
 
