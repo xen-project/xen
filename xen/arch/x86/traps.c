@@ -2061,7 +2061,7 @@ static int guest_io_okay(
     if ( iopl_ok(v, regs) )
         return 1;
 
-    if ( v->arch.pv_vcpu.iobmp_limit > (port + bytes) )
+    if ( (port + bytes) <= v->arch.pv_vcpu.iobmp_limit )
     {
         union { uint8_t bytes[2]; uint16_t mask; } x;
 
