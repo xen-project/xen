@@ -465,6 +465,7 @@
 #define XENSND_OP_MUTE                  6
 #define XENSND_OP_UNMUTE                7
 #define XENSND_OP_TRIGGER               8
+#define XENSND_OP_HW_PARAM_QUERY        9
 
 #define XENSND_OP_TRIGGER_START         0
 #define XENSND_OP_TRIGGER_PAUSE         1
@@ -832,28 +833,142 @@ struct xensnd_trigger_req {
 };
 
 /*
- *---------------------------------- Responses --------------------------------
+ * Request stream parameter ranges: request intervals and
+ *   masks of supported ranges for stream configuration values.
  *
- * All response packets have the same length (64 octets)
+ *   Sound device configuration for a particular stream is a limited subset
+ *   of the multidimensional configuration available on XenStore, e.g.
+ *   once the frame rate has been selected there is a limited supported range
+ *   for sample rates becomes available (which might be the same set configured
+ *   on XenStore or less). For example, selecting 96kHz sample rate may limit
+ *   number of channels available for such configuration from 4 to 2, etc.
+ *   Thus, each call to XENSND_OP_HW_PARAM_QUERY may reduce configuration
+ *   space making it possible to iteratively get the final stream configuration,
+ *   used in XENSND_OP_OPEN request.
  *
- * Response for all requests:
+ *   See response format for this request.
+ *
  *         0                1                 2               3        octet
  * +----------------+----------------+----------------+----------------+
- * |               id                |    operation   |    reserved    | 4
+ * |               id                | _HW_PARAM_QUERY|    reserved    | 4
  * +----------------+----------------+----------------+----------------+
- * |                              status                               | 8
+ * |                             reserved                              | 8
  * +----------------+----------------+----------------+----------------+
- * |                             reserved                              | 12
+ * |                     formats mask low 32-bit                       | 12
+ * +----------------+----------------+----------------+----------------+
+ * |                     formats mask high 32-bit                      | 16
+ * +----------------+----------------+----------------+----------------+
+ * |                              min rate                             | 20
+ * +----------------+----------------+----------------+----------------+
+ * |                              max rate                             | 24
+ * +----------------+----------------+----------------+----------------+
+ * |                            min channels                           | 28
+ * +----------------+----------------+----------------+----------------+
+ * |                            max channels                           | 32
+ * +----------------+----------------+----------------+----------------+
+ * |                         min buffer frames                         | 36
+ * +----------------+----------------+----------------+----------------+
+ * |                         max buffer frames                         | 40
+ * +----------------+----------------+----------------+----------------+
+ * |                         min period frames                         | 44
+ * +----------------+----------------+----------------+----------------+
+ * |                         max period frames                         | 48
+ * +----------------+----------------+----------------+----------------+
+ * |                             reserved                              | 52
  * +----------------+----------------+----------------+----------------+
  * |/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/|
  * +----------------+----------------+----------------+----------------+
  * |                             reserved                              | 64
  * +----------------+----------------+----------------+----------------+
  *
+ * formats - uint64_t, bit mask representing values of the parameter
+ *   made as bitwise OR of (1 << XENSND_PCM_FORMAT_XXX) values
+ *
+ * For interval parameters:
+ *   min - uint32_t, minimum value of the parameter
+ *   max - uint32_t, maximum value of the parameter
+ *
+ * Frame is defined as a product of the number of channels by the
+ * number of octets per one sample.
+ */
+
+struct xensnd_query_hw_param {
+    uint64_t formats;
+    struct {
+        uint32_t min;
+        uint32_t max;
+    } rates;
+    struct {
+        uint32_t min;
+        uint32_t max;
+    } channels;
+    struct {
+        uint32_t min;
+        uint32_t max;
+    } buffer;
+    struct {
+        uint32_t min;
+        uint32_t max;
+    } period;
+};
+
+/*
+ *---------------------------------- Responses --------------------------------
+ *
+ * All response packets have the same length (64 octets)
+ *
+ * All response packets have common header:
+ *         0                1                 2               3        octet
+ * +----------------+----------------+----------------+----------------+
+ * |               id                |    operation   |    reserved    | 4
+ * +----------------+----------------+----------------+----------------+
+ * |                              status                               | 8
+ * +----------------+----------------+----------------+----------------+
+ *
  * id - uint16_t, copied from the request
  * operation - uint8_t, XENSND_OP_* - copied from request
  * status - int32_t, response status, zero on success and -XEN_EXX on failure
  *
+ *
+ * HW parameter query response - response for XENSND_OP_HW_PARAM_QUERY:
+ *         0                1                 2               3        octet
+ * +----------------+----------------+----------------+----------------+
+ * |               id                |    operation   |    reserved    | 4
+ * +----------------+----------------+----------------+----------------+
+ * |                              status                               | 8
+ * +----------------+----------------+----------------+----------------+
+ * |                     formats mask low 32-bit                       | 12
+ * +----------------+----------------+----------------+----------------+
+ * |                     formats mask high 32-bit                      | 16
+ * +----------------+----------------+----------------+----------------+
+ * |                              min rate                             | 20
+ * +----------------+----------------+----------------+----------------+
+ * |                              max rate                             | 24
+ * +----------------+----------------+----------------+----------------+
+ * |                            min channels                           | 28
+ * +----------------+----------------+----------------+----------------+
+ * |                            max channels                           | 32
+ * +----------------+----------------+----------------+----------------+
+ * |                         min buffer frames                         | 36
+ * +----------------+----------------+----------------+----------------+
+ * |                         max buffer frames                         | 40
+ * +----------------+----------------+----------------+----------------+
+ * |                         min period frames                         | 44
+ * +----------------+----------------+----------------+----------------+
+ * |                         max period frames                         | 48
+ * +----------------+----------------+----------------+----------------+
+ * |                             reserved                              | 52
+ * +----------------+----------------+----------------+----------------+
+ * |/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/|
+ * +----------------+----------------+----------------+----------------+
+ * |                             reserved                              | 64
+ * +----------------+----------------+----------------+----------------+
+ *
+ * Meaning of the values in this response is the same as for
+ * XENSND_OP_HW_PARAM_QUERY request.
+ */
+
+/*
  *----------------------------------- Events ----------------------------------
  *
  * Events are sent via shared page allocated by the front and propagated by
@@ -906,6 +1021,7 @@ struct xensnd_req {
         struct xensnd_open_req open;
         struct xensnd_rw_req rw;
         struct xensnd_trigger_req trigger;
+        struct xensnd_query_hw_param hw_param;
         uint8_t reserved[56];
     } op;
 };
@@ -915,7 +1031,10 @@ struct xensnd_resp {
     uint8_t operation;
     uint8_t reserved;
     int32_t status;
-    uint8_t reserved1[56];
+    union {
+        struct xensnd_query_hw_param hw_param;
+        uint8_t reserved1[56];
+    } resp;
 };
 
 struct xensnd_evt {
