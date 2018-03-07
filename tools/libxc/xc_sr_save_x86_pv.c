@@ -882,7 +882,7 @@ static int write_shared_info(struct xc_sr_context *ctx)
 }
 
 /*
- * Normalise a pagetable for the migration stream.  Performs pfn->mfn
+ * Normalise a pagetable for the migration stream.  Performs mfn->pfn
  * conversions on the ptes.
  */
 static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
