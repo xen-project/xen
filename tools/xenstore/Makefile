@@ -15,9 +15,6 @@ CFLAGS += $(CFLAGS_libxentoolcore)
 CFLAGS += -DXEN_LIB_STORED="\"$(XEN_LIB_STORED)\""
 CFLAGS += -DXEN_RUN_STORED="\"$(XEN_RUN_STORED)\""
 
-CFLAGS-$(CONFIG_SYSTEMD)  += $(SYSTEMD_CFLAGS)
-LDFLAGS-$(CONFIG_SYSTEMD) += $(SYSTEMD_LIBS)
-
 CFLAGS  += $(CFLAGS-y)
 LDFLAGS += $(LDFLAGS-y)
 
@@ -72,6 +69,11 @@ xenstored_probes.o: xenstored_solaris.o
 	dtrace -C -G -s xenstored_probes.d xenstored_solaris.o 
 
 CFLAGS += -DHAVE_DTRACE=1
+endif
+
+ifeq ($(CONFIG_SYSTEMD),y)
+$(XENSTORED_OBJS): CFLAGS += $(SYSTEMD_CFLAGS)
+xenstored: LDFLAGS += $(SYSTEMD_LIBS)
 endif
 
 $(XENSTORED_OBJS): CFLAGS += $(CFLAGS_libxengnttab)
