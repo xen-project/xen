@@ -3059,19 +3059,19 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
                 SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
             if ( cpu_has_vmx_apic_reg_virt )
             {
-                for ( msr = MSR_IA32_APICBASE_MSR;
-                      msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
+                for ( msr = MSR_X2APIC_FIRST;
+                      msr <= MSR_X2APIC_FIRST + 0xff; msr++ )
                     vmx_clear_msr_intercept(v, msr, VMX_MSR_R);
 
-                vmx_set_msr_intercept(v, MSR_IA32_APICPPR_MSR, VMX_MSR_R);
-                vmx_set_msr_intercept(v, MSR_IA32_APICTMICT_MSR, VMX_MSR_R);
-                vmx_set_msr_intercept(v, MSR_IA32_APICTMCCT_MSR, VMX_MSR_R);
+                vmx_set_msr_intercept(v, MSR_X2APIC_PPR, VMX_MSR_R);
+                vmx_set_msr_intercept(v, MSR_X2APIC_TMICT, VMX_MSR_R);
+                vmx_set_msr_intercept(v, MSR_X2APIC_TMCCT, VMX_MSR_R);
             }
             if ( cpu_has_vmx_virtual_intr_delivery )
             {
-                vmx_clear_msr_intercept(v, MSR_IA32_APICTPR_MSR, VMX_MSR_W);
-                vmx_clear_msr_intercept(v, MSR_IA32_APICEOI_MSR, VMX_MSR_W);
-                vmx_clear_msr_intercept(v, MSR_IA32_APICSELF_MSR, VMX_MSR_W);
+                vmx_clear_msr_intercept(v, MSR_X2APIC_TPR, VMX_MSR_W);
+                vmx_clear_msr_intercept(v, MSR_X2APIC_EOI, VMX_MSR_W);
+                vmx_clear_msr_intercept(v, MSR_X2APIC_SELF, VMX_MSR_W);
             }
         }
         else
@@ -3080,8 +3080,8 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
     }
     if ( !(v->arch.hvm.vmx.secondary_exec_control &
            SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE) )
-        for ( msr = MSR_IA32_APICBASE_MSR;
-              msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
+        for ( msr = MSR_X2APIC_FIRST;
+              msr <= MSR_X2APIC_FIRST + 0xff; msr++ )
             vmx_set_msr_intercept(v, msr, VMX_MSR_RW);
 
     vmx_update_secondary_exec_control(v);

@@ -326,18 +326,21 @@
 
 #define MSR_IA32_TSC_ADJUST		0x0000003b
 
-#define MSR_IA32_APICBASE		0x0000001b
-#define MSR_IA32_APICBASE_BSP		(1<<8)
-#define MSR_IA32_APICBASE_EXTD		(1<<10)
-#define MSR_IA32_APICBASE_ENABLE	(1<<11)
-#define MSR_IA32_APICBASE_BASE		0x000ffffffffff000ul
-#define MSR_IA32_APICBASE_MSR           0x800
-#define MSR_IA32_APICTPR_MSR            0x808
-#define MSR_IA32_APICPPR_MSR            0x80a
-#define MSR_IA32_APICEOI_MSR            0x80b
-#define MSR_IA32_APICTMICT_MSR          0x838
-#define MSR_IA32_APICTMCCT_MSR          0x839
-#define MSR_IA32_APICSELF_MSR           0x83f
+#define MSR_APIC_BASE                   0x0000001b
+#define  APIC_BASE_BSP                  (1<<8)
+#define  APIC_BASE_EXTD                 (1<<10)
+#define  APIC_BASE_ENABLE               (1<<11)
+#define  APIC_BASE_ADDR_MASK            0x000ffffffffff000ul
+
+#define MSR_X2APIC_FIRST                0x00000800
+#define MSR_X2APIC_LAST                 0x00000bff
+
+#define MSR_X2APIC_TPR                  0x00000808
+#define MSR_X2APIC_PPR                  0x0000080a
+#define MSR_X2APIC_EOI                  0x0000080b
+#define MSR_X2APIC_TMICT                0x00000838
+#define MSR_X2APIC_TMCCT                0x00000839
+#define MSR_X2APIC_SELF                 0x0000083f
 
 #define MSR_IA32_UCODE_WRITE		0x00000079
 #define MSR_IA32_UCODE_REV		0x0000008b

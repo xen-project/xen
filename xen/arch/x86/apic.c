@@ -303,31 +303,31 @@ void disable_local_APIC(void)
 
     if (enabled_via_apicbase) {
         uint64_t msr_content;
-        rdmsrl(MSR_IA32_APICBASE, msr_content);
-        wrmsrl(MSR_IA32_APICBASE, msr_content &
-               ~(MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD));
+        rdmsrl(MSR_APIC_BASE, msr_content);
+        wrmsrl(MSR_APIC_BASE, msr_content &
+               ~(APIC_BASE_ENABLE | APIC_BASE_EXTD));
     }
 
     if ( kexecing && (current_local_apic_mode() != apic_boot_mode) )
     {
         uint64_t msr_content;
-        rdmsrl(MSR_IA32_APICBASE, msr_content);
-        msr_content &= ~(MSR_IA32_APICBASE_ENABLE|MSR_IA32_APICBASE_EXTD);
-        wrmsrl(MSR_IA32_APICBASE, msr_content);
+        rdmsrl(MSR_APIC_BASE, msr_content);
+        msr_content &= ~(APIC_BASE_ENABLE | APIC_BASE_EXTD);
+        wrmsrl(MSR_APIC_BASE, msr_content);
 
         switch ( apic_boot_mode )
         {
         case APIC_MODE_DISABLED:
             break; /* Nothing to do - we did this above */
         case APIC_MODE_XAPIC:
-            msr_content |= MSR_IA32_APICBASE_ENABLE;
-            wrmsrl(MSR_IA32_APICBASE, msr_content);
+            msr_content |= APIC_BASE_ENABLE;
+            wrmsrl(MSR_APIC_BASE, msr_content);
             break;
         case APIC_MODE_X2APIC:
-            msr_content |= MSR_IA32_APICBASE_ENABLE;
-            wrmsrl(MSR_IA32_APICBASE, msr_content);
-            msr_content |= MSR_IA32_APICBASE_EXTD;
-            wrmsrl(MSR_IA32_APICBASE, msr_content);
+            msr_content |= APIC_BASE_ENABLE;
+            wrmsrl(MSR_APIC_BASE, msr_content);
+            msr_content |= APIC_BASE_EXTD;
+            wrmsrl(MSR_APIC_BASE, msr_content);
             break;
         default:
             printk("Default case when reverting #%d lapic to boot state\n",
@@ -479,12 +479,12 @@ static void __enable_x2apic(void)
 {
     uint64_t msr_content;
 
-    rdmsrl(MSR_IA32_APICBASE, msr_content);
-    if ( !(msr_content & MSR_IA32_APICBASE_EXTD) )
+    rdmsrl(MSR_APIC_BASE, msr_content);
+    if ( !(msr_content & APIC_BASE_EXTD) )
     {
-        msr_content |= MSR_IA32_APICBASE_ENABLE | MSR_IA32_APICBASE_EXTD;
+        msr_content |= APIC_BASE_ENABLE | APIC_BASE_EXTD;
         msr_content = (uint32_t)msr_content;
-        wrmsrl(MSR_IA32_APICBASE, msr_content);
+        wrmsrl(MSR_APIC_BASE, msr_content);
     }
 }
 
@@ -744,10 +744,10 @@ int lapic_resume(void)
      */
     if ( !x2apic_enabled )
     {
-        rdmsrl(MSR_IA32_APICBASE, msr_content);
-        msr_content &= ~MSR_IA32_APICBASE_BASE;
-        wrmsrl(MSR_IA32_APICBASE,
-            msr_content | MSR_IA32_APICBASE_ENABLE | mp_lapic_addr);
+        rdmsrl(MSR_APIC_BASE, msr_content);
+        msr_content &= ~APIC_BASE_ADDR_MASK;
+        wrmsrl(MSR_APIC_BASE,
+               msr_content | APIC_BASE_ENABLE | mp_lapic_addr);
     }
     else
         resume_x2apic();
@@ -818,7 +818,8 @@ static int __init detect_init_APIC (void)
     if (enable_local_apic < 0)
         return -1;
 
-    if (rdmsr_safe(MSR_IA32_APICBASE, msr_content)) {
+    if ( rdmsr_safe(MSR_APIC_BASE, msr_content) )
+    {
         printk("No local APIC present\n");
         return -1;
     }
@@ -839,11 +840,12 @@ static int __init detect_init_APIC (void)
          * software for Intel P6 or later and AMD K7
          * (Model > 1) or later.
          */
-        if (!(msr_content & MSR_IA32_APICBASE_ENABLE)) {
+        if ( !(msr_content & APIC_BASE_ENABLE) )
+        {
             printk("Local APIC disabled by BIOS -- reenabling.\n");
-            msr_content &= ~MSR_IA32_APICBASE_BASE;
-            msr_content |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
-            wrmsrl(MSR_IA32_APICBASE, msr_content);
+            msr_content &= ~APIC_BASE_ADDR_MASK;
+            msr_content |= APIC_BASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
+            wrmsrl(MSR_APIC_BASE, msr_content);
             enabled_via_apicbase = true;
         }
     }
@@ -860,8 +862,8 @@ static int __init detect_init_APIC (void)
     mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 
     /* The BIOS may have set up the APIC at some other address */
-    if (msr_content & MSR_IA32_APICBASE_ENABLE)
-        mp_lapic_addr = msr_content & MSR_IA32_APICBASE_BASE;
+    if ( msr_content & APIC_BASE_ENABLE )
+        mp_lapic_addr = msr_content & APIC_BASE_ADDR_MASK;
 
     if (nmi_watchdog != NMI_NONE)
         nmi_watchdog = NMI_LOCAL_APIC;
@@ -1546,23 +1548,21 @@ void __init record_boot_APIC_mode(void)
                 apic_mode_to_str(apic_boot_mode));
 }
 
-/* Look at the bits in MSR_IA32_APICBASE and work out which
- * APIC mode we are in */
+/* Look at the bits in MSR_APIC_BASE and work out which APIC mode we are in */
 enum apic_mode current_local_apic_mode(void)
 {
     u64 msr_contents;
 
-    rdmsrl(MSR_IA32_APICBASE, msr_contents);
+    rdmsrl(MSR_APIC_BASE, msr_contents);
 
     /* Reading EXTD bit from the MSR is only valid if CPUID
      * says so, else reserved */
-    if ( boot_cpu_has(X86_FEATURE_X2APIC)
-         && (msr_contents & MSR_IA32_APICBASE_EXTD) )
+    if ( boot_cpu_has(X86_FEATURE_X2APIC) && (msr_contents & APIC_BASE_EXTD) )
         return APIC_MODE_X2APIC;
 
     /* EN bit should always be valid as long as we can read the MSR
      */
-    if ( msr_contents & MSR_IA32_APICBASE_ENABLE )
+    if ( msr_contents & APIC_BASE_ENABLE )
         return APIC_MODE_XAPIC;
 
     return APIC_MODE_DISABLED;

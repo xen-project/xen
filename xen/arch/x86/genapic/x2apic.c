@@ -254,8 +254,8 @@ void __init check_x2apic_preenabled(void)
         return;
 
     /* Check whether x2apic mode was already enabled by the BIOS. */
-    rdmsr(MSR_IA32_APICBASE, lo, hi);
-    if ( lo & MSR_IA32_APICBASE_EXTD )
+    rdmsr(MSR_APIC_BASE, lo, hi);
+    if ( lo & APIC_BASE_EXTD )
     {
         printk("x2APIC mode is already enabled by BIOS.\n");
         x2apic_enabled = 1;

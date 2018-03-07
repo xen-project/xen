@@ -50,13 +50,13 @@
 #define vlapic_enabled(vlapic)     (!vlapic_disabled(vlapic))
 
 #define vlapic_base_address(vlapic)                             \
-    ((vlapic)->hw.apic_base_msr & MSR_IA32_APICBASE_BASE)
+    ((vlapic)->hw.apic_base_msr & APIC_BASE_ADDR_MASK)
 /* Only check EXTD bit as EXTD can't be set if it is disabled by hardware */
 #define vlapic_x2apic_mode(vlapic)                              \
-    ((vlapic)->hw.apic_base_msr & MSR_IA32_APICBASE_EXTD)
+    ((vlapic)->hw.apic_base_msr & APIC_BASE_EXTD)
 #define vlapic_xapic_mode(vlapic)                               \
     (!vlapic_hw_disabled(vlapic) && \
-     !((vlapic)->hw.apic_base_msr & MSR_IA32_APICBASE_EXTD))
+     !((vlapic)->hw.apic_base_msr & APIC_BASE_EXTD))
 
 /*
  * Generic APIC bitmap vector update & search routines.

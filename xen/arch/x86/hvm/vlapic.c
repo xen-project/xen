@@ -665,7 +665,7 @@ int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
 #undef REGBLOCK
         };
     const struct vlapic *vlapic = vcpu_vlapic(v);
-    uint32_t high = 0, reg = msr - MSR_IA32_APICBASE_MSR, offset = reg << 4;
+    uint32_t high = 0, reg = msr - MSR_X2APIC_FIRST, offset = reg << 4;
 
     if ( !vlapic_x2apic_mode(vlapic) ||
          (reg >= sizeof(readable) * 8) || !test_bit(reg, readable) )
@@ -960,7 +960,7 @@ int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
 int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    uint32_t offset = (msr - MSR_IA32_APICBASE_MSR) << 4;
+    uint32_t offset = (msr - MSR_X2APIC_FIRST) << 4;
 
     if ( !vlapic_x2apic_mode(vlapic) )
         return X86EMUL_UNHANDLEABLE;
@@ -1067,11 +1067,11 @@ bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
     if ( !has_vlapic(vlapic_domain(vlapic)) )
         return 0;
 
-    if ( (vlapic->hw.apic_base_msr ^ value) & MSR_IA32_APICBASE_ENABLE )
+    if ( (vlapic->hw.apic_base_msr ^ value) & APIC_BASE_ENABLE )
     {
-        if ( unlikely(value & MSR_IA32_APICBASE_EXTD) )
+        if ( unlikely(value & APIC_BASE_EXTD) )
             return 0;
-        if ( value & MSR_IA32_APICBASE_ENABLE )
+        if ( value & APIC_BASE_ENABLE )
         {
             vlapic_reset(vlapic);
             vlapic->hw.disabled &= ~VLAPIC_HW_DISABLED;
@@ -1083,7 +1083,7 @@ bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
             pt_may_unmask_irq(vlapic_domain(vlapic), NULL);
         }
     }
-    else if ( ((vlapic->hw.apic_base_msr ^ value) & MSR_IA32_APICBASE_EXTD) &&
+    else if ( ((vlapic->hw.apic_base_msr ^ value) & APIC_BASE_EXTD) &&
               unlikely(!vlapic_xapic_mode(vlapic)) )
         return 0;
 
@@ -1360,10 +1360,9 @@ void vlapic_reset(struct vlapic *vlapic)
     if ( !has_vlapic(v->domain) )
         return;
 
-    vlapic->hw.apic_base_msr = (MSR_IA32_APICBASE_ENABLE |
-                                APIC_DEFAULT_PHYS_BASE);
+    vlapic->hw.apic_base_msr = APIC_BASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
     if ( v->vcpu_id == 0 )
-        vlapic->hw.apic_base_msr |= MSR_IA32_APICBASE_BSP;
+        vlapic->hw.apic_base_msr |= APIC_BASE_BSP;
 
     vlapic_set_reg(vlapic, APIC_ID, (v->vcpu_id * 2) << 24);
     vlapic_do_init(vlapic);
@@ -1472,7 +1471,7 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
     if ( s->loaded.regs )
         lapic_load_fixup(s);
 
-    if ( !(s->hw.apic_base_msr & MSR_IA32_APICBASE_ENABLE) &&
+    if ( !(s->hw.apic_base_msr & APIC_BASE_ENABLE) &&
          unlikely(vlapic_x2apic_mode(s)) )
         return -EINVAL;
 
