@@ -693,7 +693,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     const char *cmdline;
     struct bootmodule *xen_bootmodule;
     struct domain *dom0;
-    struct xen_arch_domainconfig config;
+    struct xen_domctl_createdomain dom0_cfg = {};
 
     dcache_line_bytes = read_dcache_line_bytes();
 
@@ -840,10 +840,10 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     /* Create initial domain 0. */
     /* The vGIC for DOM0 is exactly emulating the hardware GIC */
-    config.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
-    config.nr_spis = gic_number_lines() - 32;
+    dom0_cfg.config.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
+    dom0_cfg.config.nr_spis = gic_number_lines() - 32;
 
-    dom0 = domain_create(0, 0, 0, &config);
+    dom0 = domain_create(0, &dom0_cfg);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
             panic("Error creating domain 0");
 

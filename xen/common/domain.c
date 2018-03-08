@@ -260,9 +260,8 @@ static int __init parse_extra_guest_irqs(const char *s)
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
-struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
-                             uint32_t ssidref,
-                             struct xen_arch_domainconfig *config)
+struct domain *domain_create(domid_t domid,
+                             struct xen_domctl_createdomain *config)
 {
     struct domain *d, **pd, *old_hwdom = NULL;
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
@@ -273,6 +272,9 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         return ERR_PTR(-ENOMEM);
 
     d->domain_id = domid;
+
+    /* Debug sanity. */
+    ASSERT(is_system_domain(d) ? config == NULL : config != NULL);
 
     TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
 
@@ -304,11 +306,6 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     if ( !zalloc_cpumask_var(&d->dirty_cpumask) )
         goto fail;
 
-    if ( domcr_flags & XEN_DOMCTL_CDF_hvm_guest )
-        d->guest_type = guest_type_hvm;
-    else
-        d->guest_type = guest_type_pv;
-
     rangeset_domain_initialise(d);
     init_status |= INIT_rangeset;
 
@@ -318,6 +315,11 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
 
     if ( !is_idle_domain(d) )
     {
+        if ( config->flags & XEN_DOMCTL_CDF_hvm_guest )
+            d->guest_type = guest_type_hvm;
+        else
+            d->guest_type = guest_type_pv;
+
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
 
@@ -331,7 +333,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
             hardware_domain = d;
         }
 
-        if ( domcr_flags & XEN_DOMCTL_CDF_xs_domain )
+        if ( config->flags & XEN_DOMCTL_CDF_xs_domain )
         {
             d->is_xenstore = 1;
             d->disable_migrate = 1;
@@ -342,7 +344,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         if ( !d->iomem_caps || !d->irq_caps )
             goto fail;
 
-        if ( (err = xsm_domain_create(XSM_HOOK, d, ssidref)) != 0 )
+        if ( (err = xsm_domain_create(XSM_HOOK, d, config->ssidref)) != 0 )
             goto fail;
 
         d->controller_pause_count = 1;
@@ -373,7 +375,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
             goto fail;
     }
 
-    if ( (err = arch_domain_create(d, domcr_flags, config)) != 0 )
+    if ( (err = arch_domain_create(d, config)) != 0 )
         goto fail;
     init_status |= INIT_arch;
 
@@ -385,6 +387,11 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         if ( (err = late_hwdom_init(d)) != 0 )
             goto fail;
 
+        /*
+         * Must not fail beyond this point, as our caller doesn't know whether
+         * the domain has been entered into domain_list or not.
+         */
+
         spin_lock(&domlist_update_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of domid. */
         for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_in_list )
@@ -395,6 +402,8 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
         rcu_assign_pointer(*pd, d);
         rcu_assign_pointer(domain_hash[DOMAIN_HASH(domid)], d);
         spin_unlock(&domlist_update_lock);
+
+        memcpy(d->handle, config->handle, sizeof(d->handle));
     }
 
     return d;

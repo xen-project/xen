@@ -573,8 +573,8 @@ void vcpu_switch_to_aarch64_mode(struct vcpu *v)
     v->arch.hcr_el2 |= HCR_RW;
 }
 
-int arch_domain_create(struct domain *d, unsigned int domcr_flags,
-                       struct xen_arch_domainconfig *config)
+int arch_domain_create(struct domain *d,
+                       struct xen_domctl_createdomain *config)
 {
     int rc, count = 0;
 
@@ -602,18 +602,18 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     share_xen_page_with_guest(
         virt_to_page(d->shared_info), d, XENSHARE_writable);
 
-    switch ( config->gic_version )
+    switch ( config->config.gic_version )
     {
     case XEN_DOMCTL_CONFIG_GIC_NATIVE:
         switch ( gic_hw_version () )
         {
         case GIC_V2:
-            config->gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
+            config->config.gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
             d->arch.vgic.version = GIC_V2;
             break;
 
         case GIC_V3:
-            config->gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
+            config->config.gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
             d->arch.vgic.version = GIC_V3;
             break;
 
@@ -641,10 +641,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     if ( (rc = domain_io_init(d, count + MAX_IO_HANDLER)) != 0 )
         goto fail;
 
-    if ( (rc = domain_vgic_init(d, config->nr_spis)) != 0 )
+    if ( (rc = domain_vgic_init(d, config->config.nr_spis)) != 0 )
         goto fail;
 
-    if ( (rc = domain_vtimer_init(d, config)) != 0 )
+    if ( (rc = domain_vtimer_init(d, &config->config)) != 0 )
         goto fail;
 
     update_domain_wallclock_time(d);

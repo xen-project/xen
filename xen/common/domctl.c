@@ -532,9 +532,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             rover = dom;
         }
 
-        d = domain_create(dom, op->u.createdomain.flags,
-                          op->u.createdomain.ssidref,
-                          &op->u.createdomain.config);
+        d = domain_create(dom, &op->u.createdomain);
         if ( IS_ERR(d) )
         {
             ret = PTR_ERR(d);
@@ -543,10 +541,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         }
 
         ret = 0;
-
-        memcpy(d->handle, op->u.createdomain.handle,
-               sizeof(xen_domain_handle_t));
-
         op->domain = d->domain_id;
         copyback = 1;
         d = NULL;

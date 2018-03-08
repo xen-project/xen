@@ -660,7 +660,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
-    unsigned int initrdidx, domcr_flags = XEN_DOMCTL_CDF_s3_integrity;
+    unsigned int initrdidx;
     multiboot_info_t *mbi;
     module_t *mod;
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
@@ -671,7 +671,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         .parity    = 'n',
         .stop_bits = 1
     };
-    struct xen_arch_domainconfig config = { .emulation_flags = 0 };
+    struct xen_domctl_createdomain dom0_cfg = {
+        .flags = XEN_DOMCTL_CDF_s3_integrity,
+    };
 
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
@@ -1632,14 +1634,16 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( dom0_pvh )
     {
-        domcr_flags |= XEN_DOMCTL_CDF_hvm_guest |
-                       ((hvm_funcs.hap_supported && !opt_dom0_shadow) ?
-                         XEN_DOMCTL_CDF_hap : 0);
-        config.emulation_flags = XEN_X86_EMU_LAPIC|XEN_X86_EMU_IOAPIC;
+        dom0_cfg.flags |= (XEN_DOMCTL_CDF_hvm_guest |
+                           ((hvm_funcs.hap_supported && !opt_dom0_shadow) ?
+                            XEN_DOMCTL_CDF_hap : 0));
+
+        dom0_cfg.config.emulation_flags |=
+            XEN_X86_EMU_LAPIC | XEN_X86_EMU_IOAPIC;
     }
 
     /* Create initial domain 0. */
-    dom0 = domain_create(get_initial_domain_id(), domcr_flags, 0, &config);
+    dom0 = domain_create(get_initial_domain_id(), &dom0_cfg);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 

@@ -426,8 +426,8 @@ static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
     return true;
 }
 
-int arch_domain_create(struct domain *d, unsigned int domcr_flags,
-                       struct xen_arch_domainconfig *config)
+int arch_domain_create(struct domain *d,
+                       struct xen_domctl_createdomain *config)
 {
     bool paging_initialised = false;
     uint32_t emflags;
@@ -478,9 +478,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                d->domain_id);
     }
 
-    d->arch.s3_integrity = domcr_flags & XEN_DOMCTL_CDF_s3_integrity;
+    d->arch.s3_integrity = config->flags & XEN_DOMCTL_CDF_s3_integrity;
 
-    emflags = config->emulation_flags;
+    emflags = config->config.emulation_flags;
 
     if ( is_hardware_domain(d) && is_pv_domain(d) )
         emflags |= XEN_X86_EMU_PIT;
@@ -507,9 +507,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     /* Need to determine if HAP is enabled before initialising paging */
     if ( is_hvm_domain(d) )
         d->arch.hvm_domain.hap_enabled =
-            hvm_funcs.hap_supported && (domcr_flags & XEN_DOMCTL_CDF_hap);
+            hvm_funcs.hap_supported && (config->flags & XEN_DOMCTL_CDF_hap);
 
-    if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
+    if ( (rc = paging_domain_init(d, config->flags)) != 0 )
         goto fail;
     paging_initialised = true;
 

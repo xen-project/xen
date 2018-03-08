@@ -538,9 +538,8 @@ void domain_update_node_affinity(struct domain *d);
  * Create a domain: the configuration is only necessary for real domain
  * (domid < DOMID_FIRST_RESERVED).
  */
-struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
-                             uint32_t ssidref,
-                             struct xen_arch_domainconfig *config);
+struct domain *domain_create(domid_t domid,
+                             struct xen_domctl_createdomain *config);
 
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
