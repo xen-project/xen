@@ -494,6 +494,11 @@ extern struct vcpu *idle_vcpu[NR_CPUS];
 #define is_idle_domain(d) ((d)->domain_id == DOMID_IDLE)
 #define is_idle_vcpu(v)   (is_idle_domain((v)->domain))
 
+static inline bool is_system_domain(const struct domain *d)
+{
+    return d->domain_id >= DOMID_FIRST_RESERVED;
+}
+
 #define DOMAIN_DESTROYED (1u << 31) /* assumes atomic_t is >= 32 bits */
 #define put_domain(_d) \
   if ( atomic_dec_and_test(&(_d)->refcnt) ) domain_destroy(_d)
@@ -531,7 +536,7 @@ void domain_update_node_affinity(struct domain *d);
 
 /*
  * Create a domain: the configuration is only necessary for real domain
- * (i.e !DOMCRF_dummy, excluded idle domain).
+ * (domid < DOMID_FIRST_RESERVED).
  */
 struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
                              uint32_t ssidref,
@@ -546,9 +551,6 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
                         by tboot */
 #define _DOMCRF_s3_integrity  2
 #define DOMCRF_s3_integrity   (1U<<_DOMCRF_s3_integrity)
- /* DOMCRF_dummy: Create a dummy domain (not scheduled; not on domain list) */
-#define _DOMCRF_dummy         3
-#define DOMCRF_dummy          (1U<<_DOMCRF_dummy)
  /* DOMCRF_oos_off: dont use out-of-sync optimization for shadow page tables */
 #define _DOMCRF_oos_off         4
 #define DOMCRF_oos_off          (1U<<_DOMCRF_oos_off)

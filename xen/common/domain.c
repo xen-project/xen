@@ -312,7 +312,8 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     rangeset_domain_initialise(d);
     init_status |= INIT_rangeset;
 
-    if ( domcr_flags & DOMCRF_dummy )
+    /* DOMID_{XEN,IO,etc} (other than IDLE) are sufficiently constructed. */
+    if ( is_system_domain(d) && !is_idle_domain(d) )
         return d;
 
     if ( !is_idle_domain(d) )
