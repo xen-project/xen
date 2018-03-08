@@ -568,8 +568,7 @@ static int hvm_print_line(
     return X86EMUL_OKAY;
 }
 
-int hvm_domain_initialise(struct domain *d, unsigned long domcr_flags,
-                          struct xen_arch_domainconfig *config)
+int hvm_domain_initialise(struct domain *d)
 {
     unsigned int nr_gsis;
     int rc;

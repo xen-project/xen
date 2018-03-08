@@ -26,8 +26,7 @@
 void pv_vcpu_destroy(struct vcpu *v);
 int pv_vcpu_initialise(struct vcpu *v);
 void pv_domain_destroy(struct domain *d);
-int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
-                         struct xen_arch_domainconfig *config);
+int pv_domain_initialise(struct domain *d);
 
 #else  /* !CONFIG_PV */
 
@@ -36,12 +35,8 @@ int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
 static inline void pv_vcpu_destroy(struct vcpu *v) {}
 static inline int pv_vcpu_initialise(struct vcpu *v) { return -EOPNOTSUPP; }
 static inline void pv_domain_destroy(struct domain *d) {}
-static inline int pv_domain_initialise(struct domain *d,
-                                       unsigned int domcr_flags,
-                                       struct xen_arch_domainconfig *config);
-{
-    return -EOPNOTSUPP;
-}
+static inline int pv_domain_initialise(struct domain *d) { return -EOPNOTSUPP; }
+
 #endif	/* CONFIG_PV */
 
 void paravirt_ctxt_switch_from(struct vcpu *v);

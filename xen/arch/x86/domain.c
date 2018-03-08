@@ -538,7 +538,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
     if ( is_hvm_domain(d) )
     {
-        if ( (rc = hvm_domain_initialise(d, domcr_flags, config)) != 0 )
+        if ( (rc = hvm_domain_initialise(d)) != 0 )
             goto fail;
     }
     else if ( is_idle_domain(d) )
@@ -553,7 +553,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
     }
     else
     {
-        if ( (rc = pv_domain_initialise(d, domcr_flags, config)) != 0 )
+        if ( (rc = pv_domain_initialise(d)) != 0 )
             goto fail;
     }
 

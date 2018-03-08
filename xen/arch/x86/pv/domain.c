@@ -177,8 +177,7 @@ void pv_domain_destroy(struct domain *d)
 }
 
 
-int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
-                         struct xen_arch_domainconfig *config)
+int pv_domain_initialise(struct domain *d)
 {
     static const struct arch_csw pv_csw = {
         .from = paravirt_ctxt_switch_from,
