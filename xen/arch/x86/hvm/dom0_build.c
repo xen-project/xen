@@ -297,7 +297,7 @@ static void __init pvh_steal_low_ram(struct domain *d, unsigned long start,
             continue;
         }
 
-        share_xen_page_with_guest(pg, d, XENSHARE_writable);
+        share_xen_page_with_guest(pg, d, SHARE_rw);
         rc = guest_physmap_add_entry(d, _gfn(mfn), _mfn(mfn), 0, p2m_ram_rw);
         if ( rc )
             printk("Unable to add mfn %#lx to p2m: %d\n", mfn, rc);

@@ -533,8 +533,7 @@ int arch_domain_create(struct domain *d,
         goto fail;
 
     clear_page(d->shared_info);
-    share_xen_page_with_guest(
-        virt_to_page(d->shared_info), d, XENSHARE_writable);
+    share_xen_page_with_guest(virt_to_page(d->shared_info), d, SHARE_rw);
 
     if ( (rc = init_domain_irq_mapping(d)) != 0 )
         goto fail;

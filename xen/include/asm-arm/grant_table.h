@@ -81,8 +81,7 @@ static inline unsigned int gnttab_dom0_max(void)
 #define gnttab_create_shared_page(d, t, i)                               \
     do {                                                                 \
         share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->shared_raw[i]),                    \
-            (d), XENSHARE_writable);                                     \
+            virt_to_page((char *)(t)->shared_raw[i]), d, SHARE_rw);      \
     } while ( 0 )
 
 #define gnttab_shared_gmfn(d, t, i)                                      \

@@ -171,8 +171,7 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
     (si) = param;                                                              \
     if ( va )                                                                  \
     {                                                                          \
-        share_xen_page_with_guest(mfn_to_page(_mfn(param)), d,                 \
-                                  XENSHARE_writable);                          \
+        share_xen_page_with_guest(mfn_to_page(_mfn(param)), d, SHARE_rw);      \
         replace_va_mapping(d, l4start, va, _mfn(param));                       \
         dom0_update_physmap(d, PFN_DOWN((va) - va_start), param, vphysmap);    \
     }                                                                          \
@@ -199,8 +198,7 @@ void __init pv_shim_setup_dom(struct domain *d, l4_pgentry_t *l4start,
         clear_page(page);
         console_mfn = virt_to_mfn(page);
         si->console.domU.mfn = mfn_x(console_mfn);
-        share_xen_page_with_guest(mfn_to_page(console_mfn), d,
-                                  XENSHARE_writable);
+        share_xen_page_with_guest(mfn_to_page(console_mfn), d, SHARE_rw);
         replace_va_mapping(d, l4start, console_va, console_mfn);
         dom0_update_physmap(d, (console_va - va_start) >> PAGE_SHIFT,
                             mfn_x(console_mfn), vphysmap);

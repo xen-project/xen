@@ -634,4 +634,18 @@ static inline void filtered_flush_tlb_mask(uint32_t tlbflush_timestamp)
     }
 }
 
+enum XENSHARE_flags {
+    SHARE_rw,
+    SHARE_ro,
+};
+void share_xen_page_with_guest(struct page_info *page, struct domain *d,
+                               enum XENSHARE_flags flags);
+int unshare_xen_page_with_guest(struct page_info *page, struct domain *d);
+
+static inline void share_xen_page_with_privileged_guests(
+    struct page_info *page, enum XENSHARE_flags flags)
+{
+    share_xen_page_with_guest(page, dom_xen, flags);
+}
+
 #endif /* __XEN_MM_H__ */

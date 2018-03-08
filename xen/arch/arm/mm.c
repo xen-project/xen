@@ -1187,8 +1187,8 @@ unsigned long domain_get_maximum_gpfn(struct domain *d)
     return gfn_x(d->arch.p2m.max_mapped_gfn);
 }
 
-void share_xen_page_with_guest(struct page_info *page,
-                          struct domain *d, int readonly)
+void share_xen_page_with_guest(struct page_info *page, struct domain *d,
+                               enum XENSHARE_flags flags)
 {
     if ( page_get_owner(page) == d )
         return;
@@ -1196,7 +1196,8 @@ void share_xen_page_with_guest(struct page_info *page,
     spin_lock(&d->page_alloc_lock);
 
     /* The incremented type count pins as writable or read-only. */
-    page->u.inuse.type_info = (readonly ? PGT_none : PGT_writable_page) | 1;
+    page->u.inuse.type_info =
+        (flags == SHARE_ro ? PGT_none : PGT_writable_page) | 1;
 
     page_set_owner(page, d);
     smp_wmb(); /* install valid domain ptr before updating refcnt. */
@@ -1212,12 +1213,6 @@ void share_xen_page_with_guest(struct page_info *page,
     }
 
     spin_unlock(&d->page_alloc_lock);
-}
-
-void share_xen_page_with_privileged_guests(
-    struct page_info *page, int readonly)
-{
-    share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
 int xenmem_add_to_physmap_one(

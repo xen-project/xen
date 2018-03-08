@@ -185,7 +185,7 @@ static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
         {
             struct page_info *page = mfn_to_page(m2p_start_mfn + i);
             if (hotadd_mem_valid(m2p_start_mfn + i, info))
-                share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
+                share_xen_page_with_privileged_guests(page, SHARE_ro);
         }
     }
 
@@ -206,7 +206,7 @@ static int share_hotadd_m2p_table(struct mem_hotadd_info *info)
         {
             struct page_info *page = mfn_to_page(m2p_start_mfn + i);
             if (hotadd_mem_valid(m2p_start_mfn + i, info))
-                share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
+                share_xen_page_with_privileged_guests(page, SHARE_ro);
         }
     }
     return 0;
@@ -860,10 +860,8 @@ void __init subarch_init_memory(void)
         }
 
         for ( i = 0; i < n; i++ )
-        {
-            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
-            share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
-        }
+            share_xen_page_with_privileged_guests(
+                mfn_to_page(m2p_start_mfn + i), SHARE_ro);
     }
 
     for ( v  = RDWR_COMPAT_MPT_VIRT_START;
@@ -880,10 +878,8 @@ void __init subarch_init_memory(void)
         m2p_start_mfn = l2e_get_pfn(l2e);
 
         for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-        {
-            struct page_info *page = mfn_to_page(m2p_start_mfn + i);
-            share_xen_page_with_privileged_guests(page, XENSHARE_readonly);
-        }
+            share_xen_page_with_privileged_guests(
+                mfn_to_page(m2p_start_mfn + i), SHARE_ro);
     }
 
     /* Mark all of direct map NX if hardware supports it. */

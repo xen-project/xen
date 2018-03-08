@@ -301,8 +301,7 @@ void __init arch_init_memory(void)
           i < (pvh_boot ? (1 + PFN_UP(trampoline_end - trampoline_start))
                         : 0x100);
           i++ )
-        share_xen_page_with_guest(mfn_to_page(_mfn(i)),
-                                  dom_io, XENSHARE_writable);
+        share_xen_page_with_guest(mfn_to_page(_mfn(i)), dom_io, SHARE_rw);
 
     /* Any areas not specified as RAM by the e820 map are considered I/O. */
     for ( i = 0, pfn = 0; pfn < max_page; i++ )
@@ -342,8 +341,8 @@ void __init arch_init_memory(void)
         {
             if ( !mfn_valid(_mfn(pfn)) )
                 continue;
-            share_xen_page_with_guest(
-                mfn_to_page(_mfn(pfn)), dom_io, XENSHARE_writable);
+
+            share_xen_page_with_guest(mfn_to_page(_mfn(pfn)), dom_io, SHARE_rw);
         }
 
         /* Skip the RAM region. */
@@ -439,8 +438,8 @@ unsigned long domain_get_maximum_gpfn(struct domain *d)
     return (arch_get_max_pfn(d) ?: 1) - 1;
 }
 
-void share_xen_page_with_guest(
-    struct page_info *page, struct domain *d, int readonly)
+void share_xen_page_with_guest(struct page_info *page, struct domain *d,
+                               enum XENSHARE_flags flags)
 {
     if ( page_get_owner(page) == d )
         return;
@@ -450,7 +449,8 @@ void share_xen_page_with_guest(
     spin_lock(&d->page_alloc_lock);
 
     /* The incremented type count pins as writable or read-only. */
-    page->u.inuse.type_info  = (readonly ? PGT_none : PGT_writable_page);
+    page->u.inuse.type_info =
+        (flags == SHARE_ro ? PGT_none : PGT_writable_page);
     page->u.inuse.type_info |= PGT_validated | 1;
 
     page_set_owner(page, d);
@@ -483,12 +483,6 @@ int __init unshare_xen_page_with_guest(struct page_info *page,
     page_set_owner(page, NULL);
 
     return 0;
-}
-
-void share_xen_page_with_privileged_guests(
-    struct page_info *page, int readonly)
-{
-    share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
 void free_shared_domheap_page(struct page_info *page)

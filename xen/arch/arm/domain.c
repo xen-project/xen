@@ -599,8 +599,7 @@ int arch_domain_create(struct domain *d,
         goto fail;
 
     clear_page(d->shared_info);
-    share_xen_page_with_guest(
-        virt_to_page(d->shared_info), d, XENSHARE_writable);
+    share_xen_page_with_guest(virt_to_page(d->shared_info), d, SHARE_rw);
 
     switch ( config->config.gic_version )
     {

@@ -159,13 +159,6 @@ extern vaddr_t xenheap_virt_start;
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
 
-#define XENSHARE_writable 0
-#define XENSHARE_readonly 1
-extern void share_xen_page_with_guest(
-    struct page_info *page, struct domain *d, int readonly);
-extern void share_xen_page_with_privileged_guests(
-    struct page_info *page, int readonly);
-
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
 /* PDX of the first page in the frame table. */
 extern unsigned long frametable_base_pdx;

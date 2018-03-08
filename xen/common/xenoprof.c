@@ -159,8 +159,7 @@ share_xenoprof_page_with_guest(struct domain *d, mfn_t mfn, int npages)
     }
 
     for ( i = 0; i < npages; i++ )
-        share_xen_page_with_guest(mfn_to_page(mfn_add(mfn, i)),
-                                  d, XENSHARE_writable);
+        share_xen_page_with_guest(mfn_to_page(mfn_add(mfn, i)), d, SHARE_rw);
 
     return 0;
 }
