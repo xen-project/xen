@@ -238,11 +238,6 @@ static inline struct rt_vcpu *rt_vcpu(const struct vcpu *vcpu)
     return vcpu->sched_priv;
 }
 
-static inline struct rt_dom *rt_dom(const struct domain *dom)
-{
-    return dom->sched_priv;
-}
-
 static inline struct list_head *rt_runq(const struct scheduler *ops)
 {
     return &rt_priv(ops)->runq;
