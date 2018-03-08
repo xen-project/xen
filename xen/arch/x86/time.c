@@ -2124,7 +2124,9 @@ void tsc_set_info(struct domain *d,
                   uint32_t tsc_mode, uint64_t elapsed_nsec,
                   uint32_t gtsc_khz, uint32_t incarnation)
 {
-    if ( is_idle_domain(d) || is_hardware_domain(d) )
+    ASSERT(!is_system_domain(d));
+
+    if ( is_hardware_domain(d) )
     {
         d->arch.vtsc = 0;
         return;

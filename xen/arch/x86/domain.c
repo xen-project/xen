@@ -430,20 +430,42 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                        struct xen_arch_domainconfig *config)
 {
     bool paging_initialised = false;
+    uint32_t emflags;
     int rc;
-
-    if ( config == NULL && !is_idle_domain(d) )
-        return -EINVAL;
-
-    d->arch.s3_integrity = domcr_flags & XEN_DOMCTL_CDF_s3_integrity;
 
     INIT_LIST_HEAD(&d->arch.pdev_list);
 
     d->arch.relmem = RELMEM_not_started;
     INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
-    if ( d->domain_id && !is_idle_domain(d) &&
-         cpu_has_amd_erratum(&boot_cpu_data, AMD_ERRATUM_121) )
+    spin_lock_init(&d->arch.e820_lock);
+    spin_lock_init(&d->arch.vtsc_lock);
+
+    /* Minimal initialisation for the idle domain. */
+    if ( unlikely(is_idle_domain(d)) )
+    {
+        static const struct arch_csw idle_csw = {
+            .from = paravirt_ctxt_switch_from,
+            .to   = paravirt_ctxt_switch_to,
+            .tail = continue_idle_domain,
+        };
+
+        d->arch.ctxt_switch = &idle_csw;
+
+        d->arch.cpuid = ZERO_BLOCK_PTR; /* Catch stray misuses. */
+        d->arch.msr = ZERO_BLOCK_PTR;
+
+        return 0;
+    }
+
+    if ( !config )
+    {
+        /* Only IDLE is allowed with no config. */
+        ASSERT_UNREACHABLE();
+        return -EINVAL;
+    }
+
+    if ( d->domain_id && cpu_has_amd_erratum(&boot_cpu_data, AMD_ERRATUM_121) )
     {
         if ( !opt_allow_unsafe )
         {
@@ -456,83 +478,69 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                d->domain_id);
     }
 
-    if ( is_idle_domain(d) )
+    d->arch.s3_integrity = domcr_flags & XEN_DOMCTL_CDF_s3_integrity;
+
+    emflags = config->emulation_flags;
+
+    if ( is_hardware_domain(d) && is_pv_domain(d) )
+        emflags |= XEN_X86_EMU_PIT;
+
+    if ( emflags & ~XEN_X86_EMU_ALL )
     {
-        d->arch.emulation_flags = 0;
-        d->arch.cpuid = ZERO_BLOCK_PTR; /* Catch stray misuses. */
-        d->arch.msr = ZERO_BLOCK_PTR;
-    }
-    else
-    {
-        uint32_t emflags;
-
-        if ( is_hardware_domain(d) && is_pv_domain(d) )
-            config->emulation_flags |= XEN_X86_EMU_PIT;
-
-        emflags = config->emulation_flags;
-        if ( emflags & ~XEN_X86_EMU_ALL )
-        {
-            printk(XENLOG_G_ERR "d%d: Invalid emulation bitmap: %#x\n",
-                   d->domain_id, emflags);
-            return -EINVAL;
-        }
-
-        if ( !emulation_flags_ok(d, emflags) )
-        {
-            printk(XENLOG_G_ERR "d%d: Xen does not allow %s domain creation "
-                   "with the current selection of emulators: %#x\n",
-                   d->domain_id, is_hvm_domain(d) ? "HVM" : "PV", emflags);
-            return -EOPNOTSUPP;
-        }
-        d->arch.emulation_flags = emflags;
+        printk(XENLOG_G_ERR "d%d: Invalid emulation bitmap: %#x\n",
+               d->domain_id, emflags);
+        return -EINVAL;
     }
 
-    mapcache_domain_init(d);
+    if ( !emulation_flags_ok(d, emflags) )
+    {
+        printk(XENLOG_G_ERR "d%d: Xen does not allow %s domain creation "
+               "with the current selection of emulators: %#x\n",
+               d->domain_id, is_hvm_domain(d) ? "HVM" : "PV", emflags);
+        return -EOPNOTSUPP;
+    }
+    d->arch.emulation_flags = emflags;
 
     HYPERVISOR_COMPAT_VIRT_START(d) =
         is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
 
-    if ( !is_idle_domain(d) )
-    {
-        /* Need to determine if HAP is enabled before initialising paging */
-        if ( is_hvm_domain(d) )
-            d->arch.hvm_domain.hap_enabled =
-                hvm_funcs.hap_supported && (domcr_flags & XEN_DOMCTL_CDF_hap);
+    /* Need to determine if HAP is enabled before initialising paging */
+    if ( is_hvm_domain(d) )
+        d->arch.hvm_domain.hap_enabled =
+            hvm_funcs.hap_supported && (domcr_flags & XEN_DOMCTL_CDF_hap);
 
-        if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
-            goto fail;
-        paging_initialised = 1;
+    if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
+        goto fail;
+    paging_initialised = true;
 
-        if ( (rc = init_domain_cpuid_policy(d)) )
-            goto fail;
+    if ( (rc = init_domain_cpuid_policy(d)) )
+        goto fail;
 
-        if ( (rc = init_domain_msr_policy(d)) )
-            goto fail;
+    if ( (rc = init_domain_msr_policy(d)) )
+        goto fail;
 
-        d->arch.ioport_caps = 
-            rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
-        rc = -ENOMEM;
-        if ( d->arch.ioport_caps == NULL )
-            goto fail;
+    d->arch.ioport_caps =
+        rangeset_new(d, "I/O Ports", RANGESETF_prettyprint_hex);
+    rc = -ENOMEM;
+    if ( d->arch.ioport_caps == NULL )
+        goto fail;
 
-        /*
-         * The shared_info machine address must fit in a 32-bit field within a
-         * 32-bit guest's start_info structure. Hence we specify MEMF_bits(32).
-         */
-        if ( (d->shared_info = alloc_xenheap_pages(0, MEMF_bits(32))) == NULL )
-            goto fail;
+    /*
+     * The shared_info machine address must fit in a 32-bit field within a
+     * 32-bit guest's start_info structure. Hence we specify MEMF_bits(32).
+     */
+    if ( (d->shared_info = alloc_xenheap_pages(0, MEMF_bits(32))) == NULL )
+        goto fail;
 
-        clear_page(d->shared_info);
-        share_xen_page_with_guest(
-            virt_to_page(d->shared_info), d, XENSHARE_writable);
+    clear_page(d->shared_info);
+    share_xen_page_with_guest(
+        virt_to_page(d->shared_info), d, XENSHARE_writable);
 
-        if ( (rc = init_domain_irq_mapping(d)) != 0 )
-            goto fail;
+    if ( (rc = init_domain_irq_mapping(d)) != 0 )
+        goto fail;
 
-        if ( (rc = iommu_domain_init(d)) != 0 )
-            goto fail;
-    }
-    spin_lock_init(&d->arch.e820_lock);
+    if ( (rc = iommu_domain_init(d)) != 0 )
+        goto fail;
 
     psr_domain_init(d);
 
@@ -541,25 +549,18 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         if ( (rc = hvm_domain_initialise(d)) != 0 )
             goto fail;
     }
-    else if ( is_idle_domain(d) )
+    else if ( is_pv_domain(d) )
     {
-        static const struct arch_csw idle_csw = {
-            .from = paravirt_ctxt_switch_from,
-            .to   = paravirt_ctxt_switch_to,
-            .tail = continue_idle_domain,
-        };
+        mapcache_domain_init(d);
 
-        d->arch.ctxt_switch = &idle_csw;
-    }
-    else
-    {
         if ( (rc = pv_domain_initialise(d)) != 0 )
             goto fail;
     }
+    else
+        ASSERT_UNREACHABLE(); /* Not HVM and not PV? */
 
     /* initialize default tsc behavior in case tools don't */
     tsc_set_info(d, TSC_MODE_DEFAULT, 0UL, 0, 0);
-    spin_lock_init(&d->arch.vtsc_lock);
 
     /* PV/PVH guests get an emulated PIT too for video BIOSes to use. */
     pit_init(d, cpu_khz);

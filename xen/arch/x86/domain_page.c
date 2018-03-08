@@ -236,8 +236,7 @@ int mapcache_domain_init(struct domain *d)
     struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;
     unsigned int bitmap_pages;
 
-    if ( !is_pv_domain(d) || is_idle_domain(d) )
-        return 0;
+    ASSERT(is_pv_domain(d));
 
 #ifdef NDEBUG
     if ( !mem_hotplug && max_page <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
