@@ -136,6 +136,14 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int virq,
     ASSERT(virq < vgic_num_irqs(d));
     ASSERT(!is_lpi(virq));
 
+    /*
+     * When routing an IRQ to guest, the virtual state is not synced
+     * back to the physical IRQ. To prevent get unsync, restrict the
+     * routing to when the Domain is been created.
+     */
+    if ( d->creation_finished )
+        return -EBUSY;
+
     ret = vgic_connect_hw_irq(d, NULL, virq, desc, true);
     if ( ret )
         return ret;
@@ -160,25 +168,19 @@ int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
     ASSERT(test_bit(_IRQ_GUEST, &desc->status));
     ASSERT(!is_lpi(virq));
 
-    if ( d->is_dying )
-    {
-        desc->handler->shutdown(desc);
+    /*
+     * Removing an interrupt while the domain is running may have
+     * undesirable effect on the vGIC emulation.
+     */
+    if ( !d->is_dying )
+        return -EBUSY;
 
-        /* EOI the IRQ if it has not been done by the guest */
-        if ( test_bit(_IRQ_INPROGRESS, &desc->status) )
-            gic_hw_ops->deactivate_irq(desc);
-        clear_bit(_IRQ_INPROGRESS, &desc->status);
-    }
-    else
-    {
-        /*
-         * TODO: Handle eviction from LRs For now, deny
-         * remove if the IRQ is inflight or not disabled.
-         */
-        if ( test_bit(_IRQ_INPROGRESS, &desc->status) ||
-             !test_bit(_IRQ_DISABLED, &desc->status) )
-            return -EBUSY;
-    }
+    desc->handler->shutdown(desc);
+
+    /* EOI the IRQ if it has not been done by the guest */
+    if ( test_bit(_IRQ_INPROGRESS, &desc->status) )
+        gic_hw_ops->deactivate_irq(desc);
+    clear_bit(_IRQ_INPROGRESS, &desc->status);
 
     ret = vgic_connect_hw_irq(d, NULL, virq, desc, false);
     if ( ret )
