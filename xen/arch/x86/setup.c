@@ -660,7 +660,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
-    unsigned int initrdidx, domcr_flags = DOMCRF_s3_integrity;
+    unsigned int initrdidx, domcr_flags = XEN_DOMCTL_CDF_s3_integrity;
     multiboot_info_t *mbi;
     module_t *mod;
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
@@ -1632,9 +1632,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( dom0_pvh )
     {
-        domcr_flags |= DOMCRF_hvm |
+        domcr_flags |= XEN_DOMCTL_CDF_hvm_guest |
                        ((hvm_funcs.hap_supported && !opt_dom0_shadow) ?
-                         DOMCRF_hap : 0);
+                         XEN_DOMCTL_CDF_hap : 0);
         config.emulation_flags = XEN_X86_EMU_LAPIC|XEN_X86_EMU_IOAPIC;
     }
 

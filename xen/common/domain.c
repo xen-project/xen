@@ -304,7 +304,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
     if ( !zalloc_cpumask_var(&d->dirty_cpumask) )
         goto fail;
 
-    if ( domcr_flags & DOMCRF_hvm )
+    if ( domcr_flags & XEN_DOMCTL_CDF_hvm_guest )
         d->guest_type = guest_type_hvm;
     else
         d->guest_type = guest_type_pv;
@@ -331,7 +331,7 @@ struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
             hardware_domain = d;
         }
 
-        if ( domcr_flags & DOMCRF_xs_domain )
+        if ( domcr_flags & XEN_DOMCTL_CDF_xs_domain )
         {
             d->is_xenstore = 1;
             d->disable_migrate = 1;

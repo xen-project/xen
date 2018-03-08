@@ -541,22 +541,6 @@ void domain_update_node_affinity(struct domain *d);
 struct domain *domain_create(domid_t domid, unsigned int domcr_flags,
                              uint32_t ssidref,
                              struct xen_arch_domainconfig *config);
- /* DOMCRF_hvm: Create an HVM domain, as opposed to a PV domain. */
-#define _DOMCRF_hvm           0
-#define DOMCRF_hvm            (1U<<_DOMCRF_hvm)
- /* DOMCRF_hap: Create a domain with hardware-assisted paging. */
-#define _DOMCRF_hap           1
-#define DOMCRF_hap            (1U<<_DOMCRF_hap)
- /* DOMCRF_s3_integrity: Create a domain with tboot memory integrity protection
-                        by tboot */
-#define _DOMCRF_s3_integrity  2
-#define DOMCRF_s3_integrity   (1U<<_DOMCRF_s3_integrity)
- /* DOMCRF_oos_off: dont use out-of-sync optimization for shadow page tables */
-#define _DOMCRF_oos_off         4
-#define DOMCRF_oos_off          (1U<<_DOMCRF_oos_off)
- /* DOMCRF_xs_domain: xenstore domain */
-#define _DOMCRF_xs_domain       5
-#define DOMCRF_xs_domain        (1U<<_DOMCRF_xs_domain)
 
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().

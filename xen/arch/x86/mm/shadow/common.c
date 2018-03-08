@@ -62,7 +62,7 @@ int shadow_domain_init(struct domain *d, unsigned int domcr_flags)
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
     d->arch.paging.shadow.oos_active = 0;
-    d->arch.paging.shadow.oos_off = (domcr_flags & DOMCRF_oos_off) ?  1 : 0;
+    d->arch.paging.shadow.oos_off = domcr_flags & XEN_DOMCTL_CDF_oos_off;
 #endif
     d->arch.paging.shadow.pagetable_dying_op = 0;
 

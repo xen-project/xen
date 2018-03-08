@@ -498,7 +498,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     {
         domid_t        dom;
         static domid_t rover = 0;
-        unsigned int domcr_flags;
 
         ret = -EINVAL;
         if ( (op->u.createdomain.flags &
@@ -533,19 +532,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             rover = dom;
         }
 
-        domcr_flags = 0;
-        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hvm_guest )
-            domcr_flags |= DOMCRF_hvm;
-        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_hap )
-            domcr_flags |= DOMCRF_hap;
-        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_s3_integrity )
-            domcr_flags |= DOMCRF_s3_integrity;
-        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_oos_off )
-            domcr_flags |= DOMCRF_oos_off;
-        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_xs_domain )
-            domcr_flags |= DOMCRF_xs_domain;
-
-        d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref,
+        d = domain_create(dom, op->u.createdomain.flags,
+                          op->u.createdomain.ssidref,
                           &op->u.createdomain.config);
         if ( IS_ERR(d) )
         {
