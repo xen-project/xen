@@ -25,7 +25,7 @@
 #include <asm/gic.h>
 #include <asm/vgic.h>
 
-#define lr_all_full() (this_cpu(lr_mask) == ((1 << gic_hw_ops->info->nr_lrs) - 1))
+#define lr_all_full() (this_cpu(lr_mask) == ((1 << gic_get_nr_lrs()) - 1))
 
 #undef GIC_DEBUG
 
@@ -110,7 +110,7 @@ static unsigned int gic_find_unused_lr(struct vcpu *v,
                                        struct pending_irq *p,
                                        unsigned int lr)
 {
-    unsigned int nr_lrs = gic_hw_ops->info->nr_lrs;
+    unsigned int nr_lrs = gic_get_nr_lrs();
     unsigned long *lr_mask = (unsigned long *) &this_cpu(lr_mask);
     struct gic_lr lr_val;
 
@@ -137,7 +137,7 @@ void gic_raise_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         unsigned int priority)
 {
     int i;
-    unsigned int nr_lrs = gic_hw_ops->info->nr_lrs;
+    unsigned int nr_lrs = gic_get_nr_lrs();
     struct pending_irq *p = irq_to_pending(v, virtual_irq);
 
     ASSERT(spin_is_locked(&v->arch.vgic.lock));
@@ -251,7 +251,7 @@ void vgic_sync_from_lrs(struct vcpu *v)
 {
     int i = 0;
     unsigned long flags;
-    unsigned int nr_lrs = gic_hw_ops->info->nr_lrs;
+    unsigned int nr_lrs = gic_get_nr_lrs();
 
     /* The idle domain has no LRs to be cleared. Since gic_restore_state
      * doesn't write any LR registers for the idle domain they could be
@@ -278,7 +278,7 @@ static void gic_restore_pending_irqs(struct vcpu *v)
     struct pending_irq *p, *t, *p_r;
     struct list_head *inflight_r;
     unsigned long flags;
-    unsigned int nr_lrs = gic_hw_ops->info->nr_lrs;
+    unsigned int nr_lrs = gic_get_nr_lrs();
     int lrs = nr_lrs;
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);

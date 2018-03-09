@@ -374,6 +374,12 @@ struct gic_hw_operations {
 };
 
 extern const struct gic_hw_operations *gic_hw_ops;
+
+static inline unsigned int gic_get_nr_lrs(void)
+{
+    return gic_hw_ops->info->nr_lrs;
+}
+
 void register_gic_ops(const struct gic_hw_operations *ops);
 int gic_make_hwdom_dt_node(const struct domain *d,
                            const struct dt_device_node *gic,
