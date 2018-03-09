@@ -538,7 +538,7 @@ out:
 }
 
 int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
-                       uint32_t *domid, xc_domain_configuration_t *xc_config)
+                       uint32_t *domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags, ret, rc, nb_vm;
@@ -551,6 +551,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     xs_transaction_t t = 0;
     xen_domain_handle_t handle;
     libxl_vminfo *vm_list;
+    xc_domain_configuration_t xc_config = {};
 
     /* convenience aliases */
     libxl_domain_create_info *info = &d_config->c_info;
@@ -571,7 +572,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
     libxl_uuid_copy(ctx, (libxl_uuid *)handle, &info->uuid);
 
-    ret = libxl__arch_domain_prepare_config(gc, d_config, xc_config);
+    ret = libxl__arch_domain_prepare_config(gc, d_config, &xc_config);
     if (ret < 0) {
         LOGED(ERROR, *domid, "fail to get domain config");
         rc = ERROR_FAIL;
@@ -581,7 +582,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     /* Valid domid here means we're soft resetting. */
     if (!libxl_domid_valid_guest(*domid)) {
         ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid,
-                               xc_config);
+                               &xc_config);
         if (ret < 0) {
             LOGED(ERROR, *domid, "domain creation fail");
             rc = ERROR_FAIL;
@@ -589,7 +590,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         }
     }
 
-    rc = libxl__arch_domain_save_config(gc, d_config, xc_config);
+    rc = libxl__arch_domain_save_config(gc, d_config, &xc_config);
     if (rc < 0)
         goto out;
 
@@ -822,7 +823,6 @@ static void initiate_domain_create(libxl__egc *egc,
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
-    libxl__domain_build_state *const state = &dcs->build_state;
     const int restore_fd = dcs->restore_fd;
 
     domid = dcs->domid_soft_reset;
@@ -957,7 +957,7 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
-    ret = libxl__domain_make(gc, d_config, &domid, &state->config);
+    ret = libxl__domain_make(gc, d_config, &domid);
     if (ret) {
         LOGD(ERROR, domid, "cannot make domain: %d", ret);
         dcs->guest_domid = domid;
