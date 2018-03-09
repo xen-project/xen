@@ -103,7 +103,7 @@ $(addsuffix .o,$(SIMD) $(FMA) $(SG)): simd.h
 
 xop.o: simd-fma.c
 
-$(TARGET): x86-emulate.o test_x86_emulator.o
+$(TARGET): x86-emulate.o test_x86_emulator.o wrappers.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
 .PHONY: clean
@@ -133,8 +133,10 @@ HOSTCFLAGS += $(CFLAGS_xeninclude) -I. $(HOSTCFLAGS-$(XEN_COMPILE_ARCH))
 x86.h := asm/x86-vendors.h asm/x86-defns.h asm/msr-index.h
 x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
-x86-emulate.o: x86-emulate.c x86_emulate/x86_emulate.c $(x86_emulate.h)
-	$(HOSTCC) $(HOSTCFLAGS) -D__XEN_TOOLS__ -c -g -o $@ $<
-
-test_x86_emulator.o: test_x86_emulator.c $(addsuffix .h,$(TESTCASES)) $(x86_emulate.h)
+x86-emulate.o test_x86_emulator.o wrappers.o: %.o: %.c $(x86_emulate.h)
 	$(HOSTCC) $(HOSTCFLAGS) -c -g -o $@ $<
+
+x86-emulate.o: x86_emulate/x86_emulate.c
+x86-emulate.o: HOSTCFLAGS += -D__XEN_TOOLS__
+
+test_x86_emulator.o: $(addsuffix .h,$(TESTCASES))

@@ -56,6 +56,29 @@ bool emul_test_init(void);
 void emul_save_fpu_state(void);
 void emul_restore_fpu_state(void);
 
+/*
+ * In order to reasonably use the above, wrap library calls we use and which we
+ * think might access any of the FPU state into wrappers saving/restoring state
+ * around the actual function.
+ */
+#ifndef WRAP
+# if 0 /* This only works for explicit calls, not for compiler generated ones. */
+#  define WRAP(x) typeof(x) x asm("emul_" #x)
+# else
+# define WRAP(x) asm(".equ " #x ", emul_" #x)
+# endif
+#endif
+
+WRAP(fwrite);
+WRAP(memcmp);
+WRAP(memcpy);
+WRAP(memset);
+WRAP(printf);
+WRAP(putchar);
+WRAP(puts);
+
+#undef WRAP
+
 #include "x86_emulate/x86_emulate.h"
 
 static inline uint64_t xgetbv(uint32_t xcr)
