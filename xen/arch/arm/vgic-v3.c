@@ -1024,10 +1024,9 @@ static struct vcpu *get_vcpu_from_rdist(struct domain *d,
     paddr_t gpa, uint32_t *offset)
 {
     struct vcpu *v;
-    uint32_t stride = d->arch.vgic.rdist_stride;
     unsigned int vcpu_id;
 
-    vcpu_id = region->first_cpu + ((gpa - region->base) / stride);
+    vcpu_id = region->first_cpu + ((gpa - region->base) / GICV3_GICR_SIZE);
     if ( unlikely(vcpu_id >= d->max_vcpus) )
         return NULL;
 
@@ -1586,7 +1585,6 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
 
     /* Convenient alias */
     struct domain *d = v->domain;
-    uint32_t rdist_stride = d->arch.vgic.rdist_stride;
 
     /*
      * Find the region where the re-distributor lives. For this purpose,
@@ -1602,11 +1600,11 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
 
     /* Get the base address of the redistributor */
     rdist_base = region->base;
-    rdist_base += (v->vcpu_id - region->first_cpu) * rdist_stride;
+    rdist_base += (v->vcpu_id - region->first_cpu) * GICV3_GICR_SIZE;
 
     /* Check if a valid region was found for the re-distributor */
     if ( (rdist_base < region->base) ||
-         ((rdist_base + rdist_stride) > (region->base + region->size)) )
+         ((rdist_base + GICV3_GICR_SIZE) > (region->base + region->size)) )
     {
         dprintk(XENLOG_ERR,
                 "d%u: Unable to find a re-distributor for VCPU %u\n",
@@ -1622,7 +1620,7 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
      * VGIC_V3_RDIST_LAST flags.
      * Note that we are assuming max_vcpus will never change.
      */
-    last_cpu = (region->size / rdist_stride) + region->first_cpu - 1;
+    last_cpu = (region->size / GICV3_GICR_SIZE) + region->first_cpu - 1;
 
     if ( v->vcpu_id == last_cpu || (v->vcpu_id == (d->max_vcpus - 1)) )
         v->arch.vgic.flags |= VGIC_V3_RDIST_LAST;
@@ -1693,7 +1691,7 @@ static int vgic_v3_domain_init(struct domain *d)
             /* Set the first CPU handled by this region */
             d->arch.vgic.rdist_regions[i].first_cpu = first_cpu;
 
-            first_cpu += size / d->arch.vgic.rdist_stride;
+            first_cpu += size / GICV3_GICR_SIZE;
         }
 
         d->arch.vgic.intid_bits = vgic_v3_hw.intid_bits;
@@ -1708,7 +1706,7 @@ static int vgic_v3_domain_init(struct domain *d)
         d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
 
         /* The first redistributor should contain enough space for all CPUs */
-        BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GUEST_GICV3_RDIST_STRIDE) < MAX_VIRT_CPUS);
+        BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GICV3_GICR_SIZE) < MAX_VIRT_CPUS);
         d->arch.vgic.rdist_regions[0].base = GUEST_GICV3_GICR0_BASE;
         d->arch.vgic.rdist_regions[0].size = GUEST_GICV3_GICR0_SIZE;
         d->arch.vgic.rdist_regions[0].first_cpu = 0;

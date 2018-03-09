@@ -1162,10 +1162,6 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "redistributor-stride", gicv3.rdist_stride);
-    if ( res )
-        return res;
-
     res = fdt_property_cell(fdt, "#redistributor-regions", gicv3.rdist_count);
     if ( res )
         return res;

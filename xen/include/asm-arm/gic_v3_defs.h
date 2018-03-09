@@ -18,6 +18,8 @@
 #ifndef __ASM_ARM_GIC_V3_DEFS_H__
 #define __ASM_ARM_GIC_V3_DEFS_H__
 
+#include <xen/sizes.h>
+
 /*
  * Additional registers defined in GIC v3.
  * Common GICD registers are defined in gic.h
@@ -67,6 +69,9 @@
  */
 #define GICV3_GICD_IIDR_VAL          0x34c
 #define GICV3_GICR_IIDR_VAL          GICV3_GICD_IIDR_VAL
+
+/* Two pages for the RD_base and SGI_base register frame. */
+#define GICV3_GICR_SIZE              (2 * SZ_64K)
 
 #define GICR_CTLR                    (0x0000)
 #define GICR_IIDR                    (0x0004)
