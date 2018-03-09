@@ -46,7 +46,7 @@ static void phys_timer_expired(void *data)
     if ( !(t->ctl & CNTx_CTL_MASK) )
     {
         perfc_incr(vtimer_phys_inject);
-        vgic_vcpu_inject_irq(t->v, t->irq);
+        vgic_inject_irq(t->v->domain, t->v, t->irq, true);
     }
     else
         perfc_incr(vtimer_phys_masked);
@@ -56,7 +56,7 @@ static void virt_timer_expired(void *data)
 {
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_MASK;
-    vgic_vcpu_inject_irq(t->v, t->irq);
+    vgic_inject_irq(t->v->domain, t->v, t->irq, true);
     perfc_incr(vtimer_virt_inject);
 }
 

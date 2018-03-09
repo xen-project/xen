@@ -68,7 +68,7 @@ static void vpl011_update_interrupt_status(struct domain *d)
      * status bit has been set since the last time.
      */
     if ( uartmis & ~vpl011->shadow_uartmis )
-        vgic_vcpu_inject_spi(d, GUEST_VPL011_SPI);
+        vgic_inject_irq(d, NULL, GUEST_VPL011_SPI, true);
 
     vpl011->shadow_uartmis = uartmis;
 }

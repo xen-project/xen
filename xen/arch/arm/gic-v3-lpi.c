@@ -153,7 +153,7 @@ void vgic_vcpu_inject_lpi(struct domain *d, unsigned int virq)
     if ( vcpu_id >= d->max_vcpus )
           return;
 
-    vgic_vcpu_inject_irq(d->vcpu[vcpu_id], virq);
+    vgic_inject_irq(d, d->vcpu[vcpu_id], virq, true);
 }
 
 /*
