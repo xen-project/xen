@@ -71,57 +71,7 @@ struct arch_domain
         uint64_t offset;
     } virt_timer_base;
 
-    struct {
-        /* Version of the vGIC */
-        enum gic_version version;
-        /* GIC HW version specific vGIC driver handler */
-        const struct vgic_ops *handler;
-        /*
-         * Covers access to other members of this struct _except_ for
-         * shared_irqs where each member contains its own locking.
-         *
-         * If both class of lock is required then this lock must be
-         * taken first. If multiple rank locks are required (including
-         * the per-vcpu private_irqs rank) then they must be taken in
-         * rank order.
-         */
-        spinlock_t lock;
-        uint32_t ctlr;
-        int nr_spis; /* Number of SPIs */
-        unsigned long *allocated_irqs; /* bitmap of IRQs allocated */
-        struct vgic_irq_rank *shared_irqs;
-        /*
-         * SPIs are domain global, SGIs and PPIs are per-VCPU and stored in
-         * struct arch_vcpu.
-         */
-        struct pending_irq *pending_irqs;
-        /* Base address for guest GIC */
-        paddr_t dbase; /* Distributor base address */
-#ifdef CONFIG_HAS_GICV3
-        /* GIC V3 addressing */
-        /* List of contiguous occupied by the redistributors */
-        struct vgic_rdist_region {
-            paddr_t base;                   /* Base address */
-            paddr_t size;                   /* Size */
-            unsigned int first_cpu;         /* First CPU handled */
-        } *rdist_regions;
-        int nr_regions;                     /* Number of rdist regions */
-        unsigned long int nr_lpis;
-        uint64_t rdist_propbase;
-        struct rb_root its_devices;         /* Devices mapped to an ITS */
-        spinlock_t its_devices_lock;        /* Protects the its_devices tree */
-        struct radix_tree_root pend_lpi_tree; /* Stores struct pending_irq's */
-        rwlock_t pend_lpi_tree_lock;        /* Protects the pend_lpi_tree */
-        struct list_head vits_list;         /* List of virtual ITSes */
-        unsigned int intid_bits;
-        /*
-         * TODO: if there are more bool's being added below, consider
-         * a flags variable instead.
-         */
-        bool rdists_enabled;                /* Is any redistributor enabled? */
-        bool has_its;
-#endif
-    } vgic;
+    struct vgic_dist vgic;
 
     struct vuart {
 #define VUART_BUF_SIZE 128
@@ -244,38 +194,7 @@ struct arch_vcpu
     union gic_state_data gic;
     uint64_t lr_mask;
 
-    struct {
-        /*
-         * SGIs and PPIs are per-VCPU, SPIs are domain global and in
-         * struct arch_domain.
-         */
-        struct pending_irq pending_irqs[32];
-        struct vgic_irq_rank *private_irqs;
-
-        /* This list is ordered by IRQ priority and it is used to keep
-         * track of the IRQs that the VGIC injected into the guest.
-         * Depending on the availability of LR registers, the IRQs might
-         * actually be in an LR, and therefore injected into the guest,
-         * or queued in gic.lr_pending.
-         * As soon as an IRQ is EOI'd by the guest and removed from the
-         * corresponding LR it is also removed from this list. */
-        struct list_head inflight_irqs;
-        /* lr_pending is used to queue IRQs (struct pending_irq) that the
-         * vgic tried to inject in the guest (calling gic_set_guest_irq) but
-         * no LRs were available at the time.
-         * As soon as an LR is freed we remove the first IRQ from this
-         * list and write it to the LR register.
-         * lr_pending is a subset of vgic.inflight_irqs. */
-        struct list_head lr_pending;
-        spinlock_t lock;
-
-        /* GICv3: redistributor base and flags for this vCPU */
-        paddr_t rdist_base;
-        uint64_t rdist_pendbase;
-#define VGIC_V3_RDIST_LAST      (1 << 0)        /* last vCPU of the rdist */
-#define VGIC_V3_LPIS_ENABLED    (1 << 1)
-        uint8_t flags;
-    } vgic;
+    struct vgic_cpu vgic;
 
     /* Timer registers  */
     uint32_t cntkctl;
