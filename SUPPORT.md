@@ -380,7 +380,8 @@ Guest-side driver capable of speaking the Xen PV console protocol
 
     Status, Linux (xen-kbdfront): Supported
 
-Guest-side driver capable of speaking the Xen PV keyboard protocol
+Guest-side driver capable of speaking the Xen PV keyboard protocol.
+Note that the "keyboard protocol" includes mouse / pointer support as well.
 
 ### PV USB (frontend)
 
@@ -451,7 +452,8 @@ Host-side implementation of the Xen PV console protocol
 
     Status, QEMU: Supported
 
-Host-side implementation fo the Xen PV keyboard protocol
+Host-side implementation of the Xen PV keyboard protocol.
+Note that the "keyboard protocol" includes mouse / pointer support as well.
 
 ### PV USB (backend)
 
