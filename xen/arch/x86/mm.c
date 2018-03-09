@@ -4775,7 +4775,8 @@ int map_pages_to_xen(
             }
 
             virt    += 1UL << L3_PAGETABLE_SHIFT;
-            mfn     += 1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT);
+            if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
+                mfn += 1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT);
             nr_mfns -= 1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT);
             continue;
         }
@@ -4800,7 +4801,8 @@ int map_pages_to_xen(
                 if ( i > nr_mfns )
                     i = nr_mfns;
                 virt    += i << PAGE_SHIFT;
-                mfn     += i;
+                if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
+                    mfn += i;
                 nr_mfns -= i;
                 continue;
             }
@@ -4868,7 +4870,8 @@ int map_pages_to_xen(
             }
 
             virt    += 1UL << L2_PAGETABLE_SHIFT;
-            mfn     += 1UL << PAGETABLE_ORDER;
+            if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
+                mfn += 1UL << PAGETABLE_ORDER;
             nr_mfns -= 1UL << PAGETABLE_ORDER;
         }
         else
@@ -4897,7 +4900,8 @@ int map_pages_to_xen(
                     if ( i > nr_mfns )
                         i = nr_mfns;
                     virt    += i << L1_PAGETABLE_SHIFT;
-                    mfn     += i;
+                    if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
+                        mfn += i;
                     nr_mfns -= i;
                     goto check_l3;
                 }
@@ -4942,7 +4946,8 @@ int map_pages_to_xen(
             }
 
             virt    += 1UL << L1_PAGETABLE_SHIFT;
-            mfn     += 1UL;
+            if ( !mfn_eq(_mfn(mfn), INVALID_MFN) )
+                mfn += 1UL;
             nr_mfns -= 1UL;
 
             if ( (flags == PAGE_HYPERVISOR) &&
