@@ -828,14 +828,14 @@ static void gicv3_hyp_init(void)
     uint32_t vtr;
 
     vtr = READ_SYSREG32(ICH_VTR_EL2);
-    gicv3_info.nr_lrs  = (vtr & GICH_VTR_NRLRGS) + 1;
-    gicv3.nr_priorities = ((vtr >> GICH_VTR_PRIBITS_SHIFT) &
-                          GICH_VTR_PRIBITS_MASK) + 1;
+    gicv3_info.nr_lrs  = (vtr & ICH_VTR_NRLRGS) + 1;
+    gicv3.nr_priorities = ((vtr >> ICH_VTR_PRIBITS_SHIFT) &
+                          ICH_VTR_PRIBITS_MASK) + 1;
 
     if ( !((gicv3.nr_priorities > 4) && (gicv3.nr_priorities < 8)) )
         panic("GICv3: Invalid number of priority bits\n");
 
-    WRITE_SYSREG32(GICH_VMCR_EOI | GICH_VMCR_VENG1, ICH_VMCR_EL2);
+    WRITE_SYSREG32(ICH_VMCR_EOI | ICH_VMCR_VENG1, ICH_VMCR_EL2);
     WRITE_SYSREG32(GICH_HCR_EN, ICH_HCR_EL2);
 }
 
@@ -974,21 +974,21 @@ static void gicv3_update_lr(int lr, unsigned int virq, uint8_t priority,
     BUG_ON(lr >= gicv3_info.nr_lrs);
     BUG_ON(lr < 0);
 
-    val =  (((uint64_t)state & 0x3) << GICH_LR_STATE_SHIFT);
+    val =  (((uint64_t)state & 0x3) << ICH_LR_STATE_SHIFT);
 
     /*
      * When the guest is GICv3, all guest IRQs are Group 1, as Group0
      * would result in a FIQ in the guest, which it wouldn't expect
      */
     if ( current->domain->arch.vgic.version == GIC_V3 )
-        val |= GICH_LR_GRP1;
+        val |= ICH_LR_GRP1;
 
-    val |= (uint64_t)priority << GICH_LR_PRIORITY_SHIFT;
-    val |= ((uint64_t)virq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT;
+    val |= (uint64_t)priority << ICH_LR_PRIORITY_SHIFT;
+    val |= ((uint64_t)virq & ICH_LR_VIRTUAL_MASK) << ICH_LR_VIRTUAL_SHIFT;
 
    if ( hw_irq != INVALID_IRQ )
-       val |= GICH_LR_HW | (((uint64_t)hw_irq & GICH_LR_PHYSICAL_MASK)
-                           << GICH_LR_PHYSICAL_SHIFT);
+       val |= ICH_LR_HW | (((uint64_t)hw_irq & ICH_LR_PHYSICAL_MASK)
+                           << ICH_LR_PHYSICAL_SHIFT);
 
     gicv3_ich_write_lr(lr, val);
 }
@@ -1004,25 +1004,25 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
 
     lrv = gicv3_ich_read_lr(lr);
 
-    lr_reg->pirq = (lrv >> GICH_LR_PHYSICAL_SHIFT) & GICH_LR_PHYSICAL_MASK;
-    lr_reg->virq = (lrv >> GICH_LR_VIRTUAL_SHIFT) & GICH_LR_VIRTUAL_MASK;
+    lr_reg->pirq = (lrv >> ICH_LR_PHYSICAL_SHIFT) & ICH_LR_PHYSICAL_MASK;
+    lr_reg->virq = (lrv >> ICH_LR_VIRTUAL_SHIFT) & ICH_LR_VIRTUAL_MASK;
 
-    lr_reg->priority  = (lrv >> GICH_LR_PRIORITY_SHIFT) & GICH_LR_PRIORITY_MASK;
-    lr_reg->state     = (lrv >> GICH_LR_STATE_SHIFT) & GICH_LR_STATE_MASK;
-    lr_reg->hw_status = (lrv >> GICH_LR_HW_SHIFT) & GICH_LR_HW_MASK;
-    lr_reg->grp       = (lrv >> GICH_LR_GRP_SHIFT) & GICH_LR_GRP_MASK;
+    lr_reg->priority  = (lrv >> ICH_LR_PRIORITY_SHIFT) & ICH_LR_PRIORITY_MASK;
+    lr_reg->state     = (lrv >> ICH_LR_STATE_SHIFT) & ICH_LR_STATE_MASK;
+    lr_reg->hw_status = (lrv >> ICH_LR_HW_SHIFT) & ICH_LR_HW_MASK;
+    lr_reg->grp       = (lrv >> ICH_LR_GRP_SHIFT) & ICH_LR_GRP_MASK;
 }
 
 static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
 {
     uint64_t lrv = 0;
 
-    lrv = ( ((u64)(lr->pirq & GICH_LR_PHYSICAL_MASK) << GICH_LR_PHYSICAL_SHIFT)|
-        ((u64)(lr->virq & GICH_LR_VIRTUAL_MASK)  << GICH_LR_VIRTUAL_SHIFT) |
-        ((u64)(lr->priority & GICH_LR_PRIORITY_MASK) << GICH_LR_PRIORITY_SHIFT)|
-        ((u64)(lr->state & GICH_LR_STATE_MASK) << GICH_LR_STATE_SHIFT) |
-        ((u64)(lr->hw_status & GICH_LR_HW_MASK) << GICH_LR_HW_SHIFT)  |
-        ((u64)(lr->grp & GICH_LR_GRP_MASK) << GICH_LR_GRP_SHIFT) );
+    lrv = ( ((u64)(lr->pirq & ICH_LR_PHYSICAL_MASK) << ICH_LR_PHYSICAL_SHIFT)|
+        ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
+        ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT)|
+        ((u64)(lr->state & ICH_LR_STATE_MASK) << ICH_LR_STATE_SHIFT) |
+        ((u64)(lr->hw_status & ICH_LR_HW_MASK) << ICH_LR_HW_SHIFT)  |
+        ((u64)(lr->grp & ICH_LR_GRP_MASK) << ICH_LR_GRP_SHIFT) );
 
     gicv3_ich_write_lr(lr_reg, lrv);
 }
@@ -1041,8 +1041,8 @@ static void gicv3_hcr_status(uint32_t flag, bool status)
 
 static unsigned int gicv3_read_vmcr_priority(void)
 {
-   return ((READ_SYSREG32(ICH_VMCR_EL2) >> GICH_VMCR_PRIORITY_SHIFT) &
-            GICH_VMCR_PRIORITY_MASK);
+   return ((READ_SYSREG32(ICH_VMCR_EL2) >> ICH_VMCR_PRIORITY_SHIFT) &
+            ICH_VMCR_PRIORITY_MASK);
 }
 
 /* Only support reading GRP1 APRn registers */

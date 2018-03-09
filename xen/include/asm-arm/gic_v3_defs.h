@@ -160,31 +160,30 @@
 #define LPI_PROP_RES1                (1 << 1)
 #define LPI_PROP_ENABLED             (1 << 0)
 
-#define GICH_VMCR_EOI                (1 << 9)
-#define GICH_VMCR_VENG1              (1 << 1)
+#define ICH_VMCR_EOI                 (1 << 9)
+#define ICH_VMCR_VENG1               (1 << 1)
+#define ICH_VMCR_PRIORITY_MASK       0xff
+#define ICH_VMCR_PRIORITY_SHIFT      24
 
-#define GICH_LR_VIRTUAL_MASK         0xffff
-#define GICH_LR_VIRTUAL_SHIFT        0
-#define GICH_LR_PHYSICAL_MASK        0x3ff
-#define GICH_LR_PHYSICAL_SHIFT       32
-#define GICH_LR_STATE_MASK           0x3
-#define GICH_LR_STATE_SHIFT          62
-#define GICH_LR_PRIORITY_MASK        0xff
-#define GICH_LR_PRIORITY_SHIFT       48
-#define GICH_LR_HW_MASK              0x1
-#define GICH_LR_HW_SHIFT             61
-#define GICH_LR_GRP_MASK             0x1
-#define GICH_LR_GRP_SHIFT            60
-#define GICH_LR_MAINTENANCE_IRQ      (1UL<<41)
-#define GICH_LR_GRP1                 (1UL<<60)
-#define GICH_LR_HW                   (1UL<<61)
+#define ICH_LR_VIRTUAL_MASK          0xffff
+#define ICH_LR_VIRTUAL_SHIFT         0
+#define ICH_LR_PHYSICAL_MASK         0x3ff
+#define ICH_LR_PHYSICAL_SHIFT        32
+#define ICH_LR_STATE_MASK            0x3
+#define ICH_LR_STATE_SHIFT           62
+#define ICH_LR_PRIORITY_MASK         0xff
+#define ICH_LR_PRIORITY_SHIFT        48
+#define ICH_LR_HW_MASK               0x1
+#define ICH_LR_HW_SHIFT              61
+#define ICH_LR_GRP_MASK              0x1
+#define ICH_LR_GRP_SHIFT             60
+#define ICH_LR_MAINTENANCE_IRQ       (1UL<<41)
+#define ICH_LR_GRP1                  (1UL<<60)
+#define ICH_LR_HW                    (1UL<<61)
 
-#define GICH_VTR_NRLRGS              0x3f
-#define GICH_VTR_PRIBITS_MASK        0x7
-#define GICH_VTR_PRIBITS_SHIFT       29
-
-#define GICH_VMCR_PRIORITY_MASK      0xff
-#define GICH_VMCR_PRIORITY_SHIFT     24
+#define ICH_VTR_NRLRGS               0x3f
+#define ICH_VTR_PRIBITS_MASK         0x7
+#define ICH_VTR_PRIBITS_SHIFT        29
 
 #define ICH_SGI_IRQMODE_SHIFT        40
 #define ICH_SGI_IRQMODE_MASK         0x1
