@@ -421,12 +421,17 @@ unless otherwise noted.
 ### Blkback
 
     Status, Linux (xen-blkback): Supported
-    Status, QEMU (xen_disk): Supported
+    Status, QEMU (xen_disk), raw format: Supported
+    Status, QEMU (xen_disk), qcow format: Supported
+    Status, QEMU (xen_disk), qcow2 format: Supported
+    Status, QEMU (xen_disk), vhd format: Supported
     Status, FreeBSD (blkback): Supported, Security support external
     Status, NetBSD (xbdback): Supported, security support external
-    Status, Blktap2: Deprecated
+    Status, Blktap2, raw format: Deprecated
+    Status, Blktap2, vhd format: Deprecated
 
-Host-side implementations of the Xen PV block protocol
+Host-side implementations of the Xen PV block protocol.
+Backends only support raw format unless otherwise specified.
 
 ### Netback
 
@@ -634,6 +639,8 @@ Note that other devices are available but not security supported.
 
     Status, piix3 ide: Supported
     Status, ahci: Supported
+	
+See the section **Blkback** for image formats supported by QEMU.
 
 ### x86/Emulated graphics (QEMU):
 
