@@ -1162,13 +1162,11 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "redistributor-stride",
-                            d->arch.vgic.rdist_stride);
+    res = fdt_property_cell(fdt, "redistributor-stride", gicv3.rdist_stride);
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "#redistributor-regions",
-                            d->arch.vgic.nr_regions);
+    res = fdt_property_cell(fdt, "#redistributor-regions", gicv3.rdist_count);
     if ( res )
         return res;
 
@@ -1178,7 +1176,7 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
      * CPU interface and virtual cpu interfaces accessesed as System registers
      * So cells are created only for Distributor and rdist regions
      */
-    new_len = new_len * (d->arch.vgic.nr_regions + 1);
+    new_len = new_len * (gicv3.rdist_count + 1);
 
     hw_reg = dt_get_property(gic, "reg", &len);
     if ( !hw_reg )
@@ -1406,13 +1404,13 @@ static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
 
     /* Add Generic Redistributor */
     size = sizeof(struct acpi_madt_generic_redistributor);
-    for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
+    for ( i = 0; i < gicv3.rdist_count; i++ )
     {
         gicr = (struct acpi_madt_generic_redistributor *)(base_ptr + table_len);
         gicr->header.type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
         gicr->header.length = size;
-        gicr->base_address = d->arch.vgic.rdist_regions[i].base;
-        gicr->length = d->arch.vgic.rdist_regions[i].size;
+        gicr->base_address = gicv3.rdist_regions[i].base;
+        gicr->length = gicv3.rdist_regions[i].size;
         table_len += size;
     }
 
@@ -1425,8 +1423,7 @@ static unsigned long gicv3_get_hwdom_extra_madt_size(const struct domain *d)
 {
     unsigned long size;
 
-    size = sizeof(struct acpi_madt_generic_redistributor)
-           * d->arch.vgic.nr_regions;
+    size = sizeof(struct acpi_madt_generic_redistributor) * gicv3.rdist_count;
 
     size += sizeof(struct acpi_madt_generic_translator)
             * vgic_v3_its_count(d);
