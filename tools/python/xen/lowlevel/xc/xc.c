@@ -117,17 +117,21 @@ static PyObject *pyxc_domain_create(XcObject *self,
                                     PyObject *args,
                                     PyObject *kwds)
 {
-    uint32_t dom = 0, ssidref = 0, flags = 0, target = 0;
+    uint32_t dom = 0, target = 0;
     int      ret, i;
     PyObject *pyhandle = NULL;
-    xen_domain_handle_t handle = { 
-        0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
-        0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef };
+    struct xen_domctl_createdomain config = {
+        .handle = {
+            0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+            0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef,
+        },
+    };
 
     static char *kwd_list[] = { "domid", "ssidref", "handle", "flags", "target", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiOii", kwd_list,
-                                      &dom, &ssidref, &pyhandle, &flags, &target))
+                                      &dom, &config.ssidref, &pyhandle,
+                                      &config.flags, &target))
         return NULL;
     if ( pyhandle != NULL )
     {
@@ -140,12 +144,20 @@ static PyObject *pyxc_domain_create(XcObject *self,
             PyObject *p = PyList_GetItem(pyhandle, i);
             if ( !PyLongOrInt_Check(p) )
                 goto out_exception;
-            handle[i] = (uint8_t)PyLongOrInt_AsLong(p);
+            config.handle[i] = (uint8_t)PyLongOrInt_AsLong(p);
         }
     }
 
-    if ( (ret = xc_domain_create(self->xc_handle, ssidref,
-                                 handle, flags, &dom, NULL)) < 0 )
+#if defined (__i386) || defined(__x86_64__)
+    if ( config.flags & XEN_DOMCTL_CDF_hvm_guest )
+        config.arch.emulation_flags = (XEN_X86_EMU_ALL & ~XEN_X86_EMU_VPCI);
+#elif defined (__arm__) || defined(__aarch64__)
+    config.arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
+#else
+#error Architecture not supported
+#endif
+
+    if ( (ret = xc_domain_create(self->xc_handle, &dom, &config)) < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     if ( target )

@@ -39,7 +39,7 @@ static const char *gicv_to_string(libxl_gic_version gic_version)
 
 int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
-                                      xc_domain_configuration_t *xc_config)
+                                      struct xen_domctl_createdomain *config)
 {
     uint32_t nr_spis = 0;
     unsigned int i;
@@ -86,18 +86,18 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
 
     LOG(DEBUG, "Configure the domain");
 
-    xc_config->nr_spis = nr_spis;
+    config->arch.nr_spis = nr_spis;
     LOG(DEBUG, " - Allocate %u SPIs", nr_spis);
 
     switch (d_config->b_info.arch_arm.gic_version) {
     case LIBXL_GIC_VERSION_DEFAULT:
-        xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
+        config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
         break;
     case LIBXL_GIC_VERSION_V2:
-        xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
+        config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
         break;
     case LIBXL_GIC_VERSION_V3:
-        xc_config->gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
+        config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
         break;
     default:
         LOG(ERROR, "Unknown GIC version %d",
@@ -111,9 +111,9 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
 int libxl__arch_domain_save_config(libxl__gc *gc,
                                    libxl_domain_config *d_config,
                                    libxl__domain_build_state *state,
-                                   const xc_domain_configuration_t *xc_config)
+                                   const struct xen_domctl_createdomain *config)
 {
-    switch (xc_config->gic_version) {
+    switch (config->arch.gic_version) {
     case XEN_DOMCTL_CONFIG_GIC_V2:
         d_config->b_info.arch_arm.gic_version = LIBXL_GIC_VERSION_V2;
         break;
@@ -121,7 +121,7 @@ int libxl__arch_domain_save_config(libxl__gc *gc,
         d_config->b_info.arch_arm.gic_version = LIBXL_GIC_VERSION_V3;
         break;
     default:
-        LOG(ERROR, "Unexpected gic version %u", xc_config->gic_version);
+        LOG(ERROR, "Unexpected gic version %u", config->arch.gic_version);
         return ERROR_FAIL;
     }
 

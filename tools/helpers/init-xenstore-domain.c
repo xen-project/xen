@@ -60,11 +60,13 @@ static void usage(void)
 static int build(xc_interface *xch)
 {
     char cmdline[512];
-    uint32_t ssid;
-    xen_domain_handle_t handle = { 0 };
     int rv, xs_fd;
     struct xc_dom_image *dom = NULL;
     int limit_kb = (maxmem ? : (memory + 1)) * 1024;
+    struct xen_domctl_createdomain config = {
+        .ssidref = SECINITSID_DOMU,
+        .flags = XEN_DOMCTL_CDF_xs_domain,
+    };
 
     xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);
     if ( xs_fd == -1 )
@@ -75,19 +77,15 @@ static int build(xc_interface *xch)
 
     if ( flask )
     {
-        rv = xc_flask_context_to_sid(xch, flask, strlen(flask), &ssid);
+        rv = xc_flask_context_to_sid(xch, flask, strlen(flask), &config.ssidref);
         if ( rv )
         {
             fprintf(stderr, "xc_flask_context_to_sid failed\n");
             goto err;
         }
     }
-    else
-    {
-        ssid = SECINITSID_DOMU;
-    }
-    rv = xc_domain_create(xch, ssid, handle, XEN_DOMCTL_CDF_xs_domain,
-                          &domid, NULL);
+
+    rv = xc_domain_create(xch, &domid, &config);
     if ( rv )
     {
         fprintf(stderr, "xc_domain_create failed\n");

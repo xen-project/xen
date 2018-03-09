@@ -504,10 +504,8 @@ typedef struct xc_vcpu_extstate {
     void *buffer;
 } xc_vcpu_extstate_t;
 
-typedef struct xen_arch_domainconfig xc_domain_configuration_t;
-int xc_domain_create(xc_interface *xch, uint32_t ssidref,
-                     xen_domain_handle_t handle, uint32_t flags,
-                     uint32_t *pdomid, xc_domain_configuration_t *config);
+int xc_domain_create(xc_interface *xch, uint32_t *pdomid,
+                     struct xen_domctl_createdomain *config);
 
 
 /* Functions to produce a dump of a given domain

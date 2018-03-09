@@ -5,17 +5,17 @@
 
 int libxl__arch_domain_prepare_config(libxl__gc *gc,
                                       libxl_domain_config *d_config,
-                                      xc_domain_configuration_t *xc_config)
+                                      struct xen_domctl_createdomain *config)
 {
     switch(d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        xc_config->emulation_flags = (XEN_X86_EMU_ALL & ~XEN_X86_EMU_VPCI);
+        config->arch.emulation_flags = (XEN_X86_EMU_ALL & ~XEN_X86_EMU_VPCI);
         break;
     case LIBXL_DOMAIN_TYPE_PVH:
-        xc_config->emulation_flags = XEN_X86_EMU_LAPIC;
+        config->arch.emulation_flags = XEN_X86_EMU_LAPIC;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        xc_config->emulation_flags = 0;
+        config->arch.emulation_flags = 0;
         break;
     default:
         abort();
@@ -27,7 +27,7 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
 int libxl__arch_domain_save_config(libxl__gc *gc,
                                    libxl_domain_config *d_config,
                                    libxl__domain_build_state *state,
-                                   const xc_domain_configuration_t *xc_config)
+                                   const struct xen_domctl_createdomain *config)
 {
     return 0;
 }

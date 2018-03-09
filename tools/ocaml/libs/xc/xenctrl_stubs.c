@@ -174,8 +174,7 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 #undef VAL_SSIDREF
 
 	caml_enter_blocking_section();
-	result = xc_domain_create(_H(xch), cfg.ssidref, cfg.handle, cfg.flags,
-				  &domid, &cfg.arch);
+	result = xc_domain_create(_H(xch), &domid, &cfg);
 	caml_leave_blocking_section();
 
 	if (result < 0)

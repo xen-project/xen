@@ -563,35 +563,36 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
     /* Valid domid here means we're soft resetting. */
     if (!libxl_domid_valid_guest(*domid)) {
-        int flags = 0;
-        xen_domain_handle_t handle;
-        xc_domain_configuration_t xc_config = {};
+        struct xen_domctl_createdomain create = {
+            .ssidref = info->ssidref,
+        };
 
         if (info->type != LIBXL_DOMAIN_TYPE_PV) {
-            flags |= XEN_DOMCTL_CDF_hvm_guest;
-            flags |= libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
-            flags |= libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
+            create.flags |= XEN_DOMCTL_CDF_hvm_guest;
+            create.flags |=
+                libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
+            create.flags |=
+                libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
         }
 
         /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
-        libxl_uuid_copy(ctx, (libxl_uuid *)handle, &info->uuid);
+        libxl_uuid_copy(ctx, (libxl_uuid *)&create.handle, &info->uuid);
 
-        ret = libxl__arch_domain_prepare_config(gc, d_config, &xc_config);
+        ret = libxl__arch_domain_prepare_config(gc, d_config, &create);
         if (ret < 0) {
             LOGED(ERROR, *domid, "fail to get domain config");
             rc = ERROR_FAIL;
             goto out;
         }
 
-        ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid,
-                               &xc_config);
+        ret = xc_domain_create(ctx->xch, domid, &create);
         if (ret < 0) {
             LOGED(ERROR, *domid, "domain creation fail");
             rc = ERROR_FAIL;
             goto out;
         }
 
-        rc = libxl__arch_domain_save_config(gc, d_config, state, &xc_config);
+        rc = libxl__arch_domain_save_config(gc, d_config, state, &create);
         if (rc < 0)
             goto out;
     }
