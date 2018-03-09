@@ -105,7 +105,6 @@ struct arch_domain
             unsigned int first_cpu;         /* First CPU handled */
         } *rdist_regions;
         int nr_regions;                     /* Number of rdist regions */
-        uint32_t rdist_stride;              /* Re-Distributor stride */
         unsigned long int nr_lpis;
         uint64_t rdist_propbase;
         struct rb_root its_devices;         /* Devices mapped to an ITS */

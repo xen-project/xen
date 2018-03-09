@@ -58,21 +58,18 @@ static struct {
     /* Re-distributor regions */
     unsigned int nr_rdist_regions;
     const struct rdist_region *regions;
-    uint32_t rdist_stride; /* Re-distributor stride */
     unsigned int intid_bits;  /* Number of interrupt ID bits */
 } vgic_v3_hw;
 
 void vgic_v3_setup_hw(paddr_t dbase,
                       unsigned int nr_rdist_regions,
                       const struct rdist_region *regions,
-                      uint32_t rdist_stride,
                       unsigned int intid_bits)
 {
     vgic_v3_hw.enabled = true;
     vgic_v3_hw.dbase = dbase;
     vgic_v3_hw.nr_rdist_regions = nr_rdist_regions;
     vgic_v3_hw.regions = regions;
-    vgic_v3_hw.rdist_stride = rdist_stride;
     vgic_v3_hw.intid_bits = intid_bits;
 }
 
@@ -1672,15 +1669,6 @@ static int vgic_v3_domain_init(struct domain *d)
 
         d->arch.vgic.dbase = vgic_v3_hw.dbase;
 
-        d->arch.vgic.rdist_stride = vgic_v3_hw.rdist_stride;
-        /*
-         * If the stride is not set, the default stride for GICv3 is 2 * 64K:
-         *     - first 64k page for Control and Physical LPIs
-         *     - second 64k page for Control and Generation of SGIs
-         */
-        if ( !d->arch.vgic.rdist_stride )
-            d->arch.vgic.rdist_stride = 2 * SZ_64K;
-
         for ( i = 0; i < vgic_v3_hw.nr_rdist_regions; i++ )
         {
             paddr_t size = vgic_v3_hw.regions[i].size;
@@ -1702,8 +1690,6 @@ static int vgic_v3_domain_init(struct domain *d)
 
         /* A single Re-distributor region is mapped for the guest. */
         BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
-
-        d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
 
         /* The first redistributor should contain enough space for all CPUs */
         BUILD_BUG_ON((GUEST_GICV3_GICR0_SIZE / GICV3_GICR_SIZE) < MAX_VIRT_CPUS);

@@ -1680,8 +1680,7 @@ static int __init gicv3_init(void)
     reg = readl_relaxed(GICD + GICD_TYPER);
     intid_bits = GICD_TYPE_ID_BITS(reg);
 
-    vgic_v3_setup_hw(dbase, gicv3.rdist_count, gicv3.rdist_regions,
-                     gicv3.rdist_stride, intid_bits);
+    vgic_v3_setup_hw(dbase, gicv3.rdist_count, gicv3.rdist_regions, intid_bits);
     gicv3_init_v2();
 
     spin_lock_init(&gicv3.lock);

@@ -401,7 +401,6 @@ typedef uint64_t xen_callback_t;
 #define GUEST_GICV3_GICD_BASE      xen_mk_ullong(0x03001000)
 #define GUEST_GICV3_GICD_SIZE      xen_mk_ullong(0x00010000)
 
-#define GUEST_GICV3_RDIST_STRIDE   xen_mk_ullong(0x00020000)
 #define GUEST_GICV3_RDIST_REGIONS  1
 
 #define GUEST_GICV3_GICR0_BASE     xen_mk_ullong(0x03020000) /* vCPU0..127 */

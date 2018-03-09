@@ -261,7 +261,6 @@ struct rdist_region;
 void vgic_v3_setup_hw(paddr_t dbase,
                       unsigned int nr_rdist_regions,
                       const struct rdist_region *regions,
-                      uint32_t rdist_stride,
                       unsigned int intid_bits);
 #endif
 
