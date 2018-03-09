@@ -428,9 +428,9 @@ static void gicv3_dump_state(const struct vcpu *v)
     }
 }
 
-static void gicv3_poke_irq(struct irq_desc *irqd, u32 offset)
+static void gicv3_poke_irq(struct irq_desc *irqd, u32 offset, bool wait_for_rwp)
 {
-    u32 mask = 1 << (irqd->irq % 32);
+    u32 mask = 1U << (irqd->irq % 32);
     void __iomem *base;
 
     if ( irqd->irq < NR_GIC_LOCAL_IRQS )
@@ -439,17 +439,19 @@ static void gicv3_poke_irq(struct irq_desc *irqd, u32 offset)
         base = GICD;
 
     writel_relaxed(mask, base + offset + (irqd->irq / 32) * 4);
-    gicv3_wait_for_rwp(irqd->irq);
+
+    if ( wait_for_rwp )
+        gicv3_wait_for_rwp(irqd->irq);
 }
 
 static void gicv3_unmask_irq(struct irq_desc *irqd)
 {
-    gicv3_poke_irq(irqd, GICD_ISENABLER);
+    gicv3_poke_irq(irqd, GICD_ISENABLER, false);
 }
 
 static void gicv3_mask_irq(struct irq_desc *irqd)
 {
-    gicv3_poke_irq(irqd, GICD_ICENABLER);
+    gicv3_poke_irq(irqd, GICD_ICENABLER, true);
 }
 
 static void gicv3_eoi_irq(struct irq_desc *irqd)
