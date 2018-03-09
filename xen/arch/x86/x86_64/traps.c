@@ -49,7 +49,7 @@ static void read_registers(struct cpu_user_regs *regs, unsigned long crs[8])
     regs->gs = read_sreg(gs);
     crs[5] = rdfsbase();
     crs[6] = rdgsbase();
-    rdmsrl(MSR_SHADOW_GS_BASE, crs[7]);
+    crs[7] = rdgsshadow();
 }
 
 static void _show_registers(

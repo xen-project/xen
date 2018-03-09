@@ -170,6 +170,22 @@ static inline unsigned long rdgsbase(void)
     return base;
 }
 
+static inline unsigned long rdgsshadow(void)
+{
+    unsigned long base;
+
+    if ( cpu_has_fsgsbase )
+    {
+        asm volatile ( "swapgs" );
+        base = __rdgsbase();
+        asm volatile ( "swapgs" );
+    }
+    else
+        rdmsrl(MSR_SHADOW_GS_BASE, base);
+
+    return base;
+}
+
 static inline void wrfsbase(unsigned long base)
 {
     if ( cpu_has_fsgsbase )
@@ -192,6 +208,25 @@ static inline void wrgsbase(unsigned long base)
 #endif
     else
         wrmsrl(MSR_GS_BASE, base);
+}
+
+static inline void wrgsshadow(unsigned long base)
+{
+    if ( cpu_has_fsgsbase )
+    {
+        asm volatile ( "swapgs\n\t"
+#ifdef HAVE_AS_FSGSBASE
+                       "wrgsbase %0\n\t"
+                       "swapgs"
+                       :: "r" (base) );
+#else
+                       ".byte 0xf3, 0x48, 0x0f, 0xae, 0xd8\n\t"
+                       "swapgs"
+                       :: "a" (base) );
+#endif
+    }
+    else
+        wrmsrl(MSR_SHADOW_GS_BASE, base);
 }
 
 DECLARE_PER_CPU(uint64_t, efer);

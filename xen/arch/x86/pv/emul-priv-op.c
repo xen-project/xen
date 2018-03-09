@@ -1032,7 +1032,7 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_SHADOW_GS_BASE:
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
-        wrmsrl(MSR_SHADOW_GS_BASE, val);
+        wrgsshadow(val);
         curr->arch.pv_vcpu.gs_base_user = val;
         return X86EMUL_OKAY;
 

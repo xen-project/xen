@@ -1338,9 +1338,12 @@ static void load_segments(struct vcpu *n)
         if ( n->arch.pv_vcpu.fs_base | (dirty_segment_mask & DIRTY_FS_BASE) )
             wrfsbase(n->arch.pv_vcpu.fs_base);
 
-        /* Most kernels have non-zero GS base, so don't bother testing. */
-        /* (This is also a serialising instruction, avoiding AMD erratum #88.) */
-        wrmsrl(MSR_SHADOW_GS_BASE, n->arch.pv_vcpu.gs_base_kernel);
+        /*
+         * Most kernels have non-zero GS base, so don't bother testing.
+         * (For old AMD hardware this is also a serialising instruction,
+         * avoiding erratum #88.)
+         */
+        wrgsshadow(n->arch.pv_vcpu.gs_base_kernel);
 
         /* This can only be non-zero if selector is NULL. */
         if ( n->arch.pv_vcpu.gs_base_user |

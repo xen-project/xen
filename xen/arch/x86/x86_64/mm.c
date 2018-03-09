@@ -1034,7 +1034,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     case SEGBASE_GS_USER:
         if ( is_canonical_address(base) )
         {
-            wrmsrl(MSR_SHADOW_GS_BASE, base);
+            wrgsshadow(base);
             v->arch.pv_vcpu.gs_base_user = base;
         }
         else
