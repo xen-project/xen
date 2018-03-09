@@ -1632,6 +1632,16 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
 
 static inline unsigned int vgic_v3_rdist_count(struct domain *d)
 {
+    /*
+     * Normally there is only one GICv3 redistributor region.
+     * The GICv3 DT binding provisions for multiple regions, since there are
+     * platforms out there which need those (multi-socket systems).
+     * For Dom0 we have to live with the MMIO layout the hardware provides,
+     * so we have to copy the multiple regions - as the first region may not
+     * provide enough space to hold all redistributors we need.
+     * However DomU get a constructed memory map, so we can go with
+     * the architected single redistributor region.
+     */
     return is_hardware_domain(d) ? vgic_v3_hw.nr_rdist_regions :
                GUEST_GICV3_RDIST_REGIONS;
 }
@@ -1692,7 +1702,7 @@ static int vgic_v3_domain_init(struct domain *d)
     {
         d->arch.vgic.dbase = GUEST_GICV3_GICD_BASE;
 
-        /* XXX: Only one Re-distributor region mapped for the guest */
+        /* A single Re-distributor region is mapped for the guest. */
         BUILD_BUG_ON(GUEST_GICV3_RDIST_REGIONS != 1);
 
         d->arch.vgic.rdist_stride = GUEST_GICV3_RDIST_STRIDE;
