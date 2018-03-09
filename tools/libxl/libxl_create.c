@@ -541,7 +541,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
                        uint32_t *domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int flags, ret, rc, nb_vm;
+    int ret, rc, nb_vm;
     const char *dom_type;
     char *uuid_string;
     char *dom_path, *vm_path, *libxl_path;
@@ -549,9 +549,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
     struct xs_permissions rwperm[1];
     struct xs_permissions noperm[1];
     xs_transaction_t t = 0;
-    xen_domain_handle_t handle;
     libxl_vminfo *vm_list;
-    xc_domain_configuration_t xc_config = {};
 
     /* convenience aliases */
     libxl_domain_create_info *info = &d_config->c_info;
@@ -562,25 +560,28 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         goto out;
     }
 
-    flags = 0;
-    if (info->type != LIBXL_DOMAIN_TYPE_PV) {
-        flags |= XEN_DOMCTL_CDF_hvm_guest;
-        flags |= libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
-        flags |= libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
-    }
-
-    /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
-    libxl_uuid_copy(ctx, (libxl_uuid *)handle, &info->uuid);
-
-    ret = libxl__arch_domain_prepare_config(gc, d_config, &xc_config);
-    if (ret < 0) {
-        LOGED(ERROR, *domid, "fail to get domain config");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
     /* Valid domid here means we're soft resetting. */
     if (!libxl_domid_valid_guest(*domid)) {
+        int flags = 0;
+        xen_domain_handle_t handle;
+        xc_domain_configuration_t xc_config = {};
+
+        if (info->type != LIBXL_DOMAIN_TYPE_PV) {
+            flags |= XEN_DOMCTL_CDF_hvm_guest;
+            flags |= libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
+            flags |= libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
+        }
+
+        /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
+        libxl_uuid_copy(ctx, (libxl_uuid *)handle, &info->uuid);
+
+        ret = libxl__arch_domain_prepare_config(gc, d_config, &xc_config);
+        if (ret < 0) {
+            LOGED(ERROR, *domid, "fail to get domain config");
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
         ret = xc_domain_create(ctx->xch, info->ssidref, handle, flags, domid,
                                &xc_config);
         if (ret < 0) {
@@ -588,11 +589,11 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             rc = ERROR_FAIL;
             goto out;
         }
-    }
 
-    rc = libxl__arch_domain_save_config(gc, d_config, &xc_config);
-    if (rc < 0)
-        goto out;
+        rc = libxl__arch_domain_save_config(gc, d_config, &xc_config);
+        if (rc < 0)
+            goto out;
+    }
 
     ret = xc_cpupool_movedomain(ctx->xch, info->poolid, *domid);
     if (ret < 0) {
