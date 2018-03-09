@@ -235,6 +235,11 @@ static unsigned int gicv2_read_irq(void)
     return (readl_gicc(GICC_IAR) & GICC_IA_IRQ);
 }
 
+static void gicv2_poke_irq(struct irq_desc *irqd, uint32_t offset)
+{
+    writel_gicd(1U << (irqd->irq % 32), offset + (irqd->irq / 32) * 4);
+}
+
 static void gicv2_set_irq_type(struct irq_desc *desc, unsigned int type)
 {
     uint32_t cfg, actual, edgebit;
@@ -509,7 +514,6 @@ static unsigned int gicv2_read_apr(int apr_reg)
 static void gicv2_irq_enable(struct irq_desc *desc)
 {
     unsigned long flags;
-    int irq = desc->irq;
 
     ASSERT(spin_is_locked(&desc->lock));
 
@@ -517,20 +521,19 @@ static void gicv2_irq_enable(struct irq_desc *desc)
     clear_bit(_IRQ_DISABLED, &desc->status);
     dsb(sy);
     /* Enable routing */
-    writel_gicd((1u << (irq % 32)), GICD_ISENABLER + (irq / 32) * 4);
+    gicv2_poke_irq(desc, GICD_ISENABLER);
     spin_unlock_irqrestore(&gicv2.lock, flags);
 }
 
 static void gicv2_irq_disable(struct irq_desc *desc)
 {
     unsigned long flags;
-    int irq = desc->irq;
 
     ASSERT(spin_is_locked(&desc->lock));
 
     spin_lock_irqsave(&gicv2.lock, flags);
     /* Disable routing */
-    writel_gicd(1u << (irq % 32), GICD_ICENABLER + (irq / 32) * 4);
+    gicv2_poke_irq(desc, GICD_ICENABLER);
     set_bit(_IRQ_DISABLED, &desc->status);
     spin_unlock_irqrestore(&gicv2.lock, flags);
 }
