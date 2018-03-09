@@ -156,7 +156,6 @@
 #ifndef __ASSEMBLY__
 #include <xen/device_tree.h>
 #include <xen/irq.h>
-#include <asm-arm/vgic.h>
 
 #define DT_COMPAT_GIC_CORTEX_A15 "arm,cortex-a15-gic"
 
@@ -245,7 +244,6 @@ extern void init_maintenance_interrupt(void);
 extern void gic_raise_guest_irq(struct vcpu *v, unsigned int irq,
         unsigned int priority);
 extern void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq);
-extern void gic_remove_from_lr_pending(struct vcpu *v, struct pending_irq *p);
 
 /* Accept an interrupt from the GIC and dispatch its handler */
 extern void gic_interrupt(struct cpu_user_regs *regs, int is_fiq);

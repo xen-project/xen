@@ -8,6 +8,7 @@
 #include <asm/vfp.h>
 #include <asm/mmio.h>
 #include <asm/gic.h>
+#include <asm/vgic.h>
 #include <public/hvm/params.h>
 #include <xen/serial.h>
 #include <xen/rbtree.h>
