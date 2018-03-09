@@ -247,7 +247,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
     }
 }
 
-void gic_clear_lrs(struct vcpu *v)
+void vgic_sync_from_lrs(struct vcpu *v)
 {
     int i = 0;
     unsigned long flags;
@@ -377,7 +377,7 @@ out:
     return rc;
 }
 
-void gic_inject(void)
+void vgic_sync_to_lrs(void)
 {
     ASSERT(!local_irq_is_enabled());
 

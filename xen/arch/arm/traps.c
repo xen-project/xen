@@ -2024,7 +2024,7 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
         if ( current->arch.hcr_el2 & HCR_VA )
             current->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
 
-        gic_clear_lrs(current);
+        vgic_sync_from_lrs(current);
     }
 }
 
@@ -2234,7 +2234,7 @@ void leave_hypervisor_tail(void)
     {
         local_irq_disable();
         if (!softirq_pending(smp_processor_id())) {
-            gic_inject();
+            vgic_sync_to_lrs();
 
             /*
              * If the SErrors handle option is "DIVERSE", we have to prevent
