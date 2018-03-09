@@ -102,7 +102,7 @@ DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table);
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, compat_gdt_table);
 
 /* Master table, used by CPU0. */
-idt_entry_t __section(".data.page_aligned") __aligned(PAGE_SIZE)
+idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
     idt_table[IDT_ENTRIES];
 
 /* Pointer to the IDT of every CPU. */
