@@ -57,10 +57,11 @@
 #define GICH_V2_LR_HW_MASK         0x1
 #define GICH_V2_LR_GRP_SHIFT       30
 #define GICH_V2_LR_GRP_MASK        0x1
-#define GICH_V2_LR_MAINTENANCE_IRQ (1<<19)
-#define GICH_V2_LR_GRP1            (1<<30)
-#define GICH_V2_LR_HW              (1<<31)
-#define GICH_V2_LR_CPUID_SHIFT     9
+#define GICH_V2_LR_MAINTENANCE_IRQ (1U << 19)
+#define GICH_V2_LR_GRP1            (1U << 30)
+#define GICH_V2_LR_HW              (1U << GICH_V2_LR_HW_SHIFT)
+#define GICH_V2_LR_CPUID_SHIFT     10
+#define GICH_V2_LR_CPUID_MASK      0x7
 #define GICH_V2_VTR_NRLRGS         0x3f
 
 #define GICH_V2_VMCR_PRIORITY_MASK   0x1f
