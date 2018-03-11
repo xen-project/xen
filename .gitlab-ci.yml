@@ -1,0 +1,154 @@
+stages:
+  - build
+
+.build-tmpl: &build
+  stage: build
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  script:
+    - ./automation/scripts/build 2>&1 | tee build.log
+  artifacts:
+    paths:
+      - xen/.config
+      - '*.log'
+    when: always
+
+.gcc-tmpl:
+  variabes: &gcc
+    CC: gcc
+    CXX: g++
+
+.clang-tmpl:
+  variables: &clang
+    CC: clang
+    CXX: clang++
+    clang: y
+
+centos-7-2-gcc:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: centos:7.2
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+centos-7-2-gcc-debug:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: centos:7.2
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
+debian-jessie-clang:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: debian:jessie
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+debian-jessie-clang-debug:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: debian:jessie
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
+debian-jessie-gcc:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:jessie
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+debian-jessie-gcc-debug:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:jessie
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
+debian-stretch-clang:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: debian:stretch
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+debian-stretch-clang-debug:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: debian:stretch
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
+debian-stretch-gcc:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:stretch
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+debian-stretch-gcc-debug:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:stretch
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
+# Ubuntu Trusty's Clang is 3.4 while Xen requires 3.5
+
+ubuntu-trusty-gcc:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: ubuntu:trusty
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+ubuntu-trusty-gcc-debug:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: ubuntu:trusty
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
+ubuntu-xenial-clang:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: ubuntu:xenial
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+ubuntu-xenial-clang-debug:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: ubuntu:xenial
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
+ubuntu-xenial-gcc:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: ubuntu:xenial
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+ubuntu-xenial-gcc-debug:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: ubuntu:xenial
+    debug: y
+    XEN_TARGET_ARCH: x86_64

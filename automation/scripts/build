@@ -1,0 +1,31 @@
+#!/bin/bash -ex
+
+$CC --version
+
+# random config or default config
+if [[ "${RANDCONFIG}" == "y" ]]; then
+    make -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
+else
+    make -C xen defconfig
+fi
+
+# build up our configure options
+cfgargs=()
+cfgargs+=("--disable-stubdom") # more work needed into building this
+cfgargs+=("--disable-rombios")
+cfgargs+=("--enable-docs")
+
+# SeaBIOS cannot be built with clang
+if [[ "${CC}" == "clang" ]]; then
+    cfgargs+=("--with-system-seabios=/usr/share/seabios/bios.bin")
+fi
+
+if [[ "${XEN_TARGET_ARCH}" == "x86_64" ]]; then
+    cfgargs+=("--enable-tools")
+else
+    cfgargs+=("--disable-tools") # we don't have the cross depends installed
+fi
+
+./configure "${cfgargs[@]}"
+
+make dist
