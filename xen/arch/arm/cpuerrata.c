@@ -168,7 +168,8 @@ static int enable_smccc_arch_workaround_1(void *data)
 
     arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
                       ARM_SMCCC_ARCH_WORKAROUND_1_FID, &res);
-    if ( res.a0 != ARM_SMCCC_SUCCESS )
+    /* The return value is in the lower 32-bits. */
+    if ( (int)res.a0 < 0 )
         goto warn;
 
     return !install_bp_hardening_vec(entry,__smccc_workaround_1_smc_start,
