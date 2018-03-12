@@ -126,7 +126,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
          * is not mapped.
          */
         if ( guest_walk_tables(v, gva, &ipa, &perms) < 0 )
-            goto err;
+            return NULL;
 
         /*
          * Check permissions that are assumed by the caller. For instance in
@@ -139,10 +139,12 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
          * test for execute permissions this check can be left out.
          */
         if ( (flag & GV2M_WRITE) && !(perms & GV2M_WRITE) )
-            goto err;
+            return NULL;
     }
 
     gfn = gaddr_to_gfn(ipa);
+
+    p2m_read_lock(p2m);
 
     /*
      * We do this first as this is faster in the default case when no
@@ -216,6 +218,8 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
         page = NULL;
 
 err:
+    p2m_read_unlock(p2m);
+
     return page;
 }
 

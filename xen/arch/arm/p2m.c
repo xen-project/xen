@@ -1449,10 +1449,10 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     }
 
 err:
+    p2m_read_unlock(p2m);
+
     if ( !page && p2m->mem_access_enabled )
         page = p2m_mem_access_check_and_get_page(va, flags, v);
-
-    p2m_read_unlock(p2m);
 
     return page;
 }
