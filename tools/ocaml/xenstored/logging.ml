@@ -60,11 +60,11 @@ type logger =
 let truncate_line nb_chars line = 
 	if String.length line > nb_chars - 1 then
 		let len = max (nb_chars - 1) 2 in
-		let dst_line = String.create len in
-		String.blit line 0 dst_line 0 (len - 2);
-		dst_line.[len-2] <- '.'; 
-		dst_line.[len-1] <- '.';
-		dst_line
+		let dst_line = Bytes.create len in
+		Bytes.blit_string line 0 dst_line 0 (len - 2);
+		Bytes.set dst_line (len-2) '.';
+		Bytes.set dst_line (len-1) '.';
+		Bytes.to_string dst_line
 	else line
 
 let log_rotate ref_ch log_file log_nb_files =
@@ -252,13 +252,13 @@ let string_of_access_type = function
 	*)
 
 let sanitize_data data =
-	let data = String.copy data in
-	for i = 0 to String.length data - 1
+	let data = Bytes.copy data in
+	for i = 0 to Bytes.length data - 1
 	do
-		if data.[i] = '\000' then
-			data.[i] <- ' '
+		if Bytes.get data i = '\000' then
+			Bytes.set data i ' '
 	done;
-	String.escaped data
+	String.escaped (Bytes.to_string data)
 
 let activate_access_log = ref true
 let access_log_destination = ref (File (Paths.xen_log_dir ^ "/xenstored-access.log"))
@@ -291,7 +291,7 @@ let access_logging ~con ~tid ?(data="") ~level access_type =
 				let date = string_of_date() in
 				let tid = string_of_tid ~con tid in
 				let access_type = string_of_access_type access_type in
-				let data = sanitize_data data in
+				let data = sanitize_data (Bytes.of_string data) in
 				let prefix = prefix !access_log_destination date in
 				let msg = Printf.sprintf "%s %s %s %s" prefix tid access_type data in
 				logger.write ~level msg)

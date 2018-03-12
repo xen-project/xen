@@ -40,7 +40,7 @@ type backend_fd =
 
 type backend = Fd of backend_fd | Xenmmap of backend_mmap
 
-type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * string
+type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 
 type t =
 {
@@ -52,7 +52,7 @@ type t =
 }
 
 let init_partial_in () = NoHdr
-	(Partial.header_size (), String.make (Partial.header_size()) '\000')
+	(Partial.header_size (), Bytes.make (Partial.header_size()) '\000')
 
 let reconnect t = match t.backend with
 	| Fd _ ->
@@ -69,26 +69,28 @@ let reconnect t = match t.backend with
 
 let queue con pkt = Queue.push pkt con.pkt_out
 
-let read_fd back con s len =
-	let rd = Unix.read back.fd s 0 len in
+let read_fd back con b len =
+	let rd = Unix.read back.fd b 0 len in
 	if rd = 0 then
 		raise End_of_file;
 	rd
 
-let read_mmap back con s len =
+let read_mmap back con b len =
+	let s = String.make len (char_of_int 0) in
 	let rd = Xs_ring.read back.mmap s len in
+	Bytes.blit_string s 0 b 0 rd;
 	back.work_again <- (rd > 0);
 	if rd > 0 then
 		back.eventchn_notify ();
 	rd
 
-let read con s len =
+let read con b len =
 	match con.backend with
-	| Fd backfd     -> read_fd backfd con s len
-	| Xenmmap backmmap -> read_mmap backmmap con s len
+	| Fd backfd     -> read_fd backfd con b len
+	| Xenmmap backmmap -> read_mmap backmmap con b len
 
-let write_fd back con s len =
-	Unix.write back.fd s 0 len
+let write_fd back con b len =
+	Unix.write back.fd b 0 len
 
 let write_mmap back con s len =
 	let ws = Xs_ring.write back.mmap s len in
@@ -98,7 +100,7 @@ let write_mmap back con s len =
 
 let write con s len =
 	match con.backend with
-	| Fd backfd     -> write_fd backfd con s len
+	| Fd backfd     -> write_fd backfd con (Bytes.of_string s) len
 	| Xenmmap backmmap -> write_mmap backmmap con s len
 
 (* NB: can throw Reconnect *)
@@ -129,15 +131,15 @@ let input con =
 		| NoHdr   (i, buf)    -> i in
 
 	(* try to get more data from input stream *)
-	let s = String.make to_read '\000' in
-	let sz = if to_read > 0 then read con s to_read else 0 in
+	let b = Bytes.make to_read '\000' in
+	let sz = if to_read > 0 then read con b to_read else 0 in
 
 	(
 	match con.partial_in with
 	| HaveHdr partial_pkt ->
 		(* we complete the data *)
 		if sz > 0 then
-			Partial.append partial_pkt s sz;
+			Partial.append partial_pkt (Bytes.to_string b) sz;
 		if Partial.to_complete partial_pkt = 0 then (
 			let pkt = Packet.of_partialpkt partial_pkt in
 			con.partial_in <- init_partial_in ();
@@ -147,9 +149,9 @@ let input con =
 	| NoHdr (i, buf)      ->
 		(* we complete the partial header *)
 		if sz > 0 then
-			String.blit s 0 buf (Partial.header_size () - i) sz;
+			Bytes.blit b 0 buf (Partial.header_size () - i) sz;
 		con.partial_in <- if sz = i then
-			HaveHdr (Partial.of_string buf) else NoHdr (i - sz, buf)
+			HaveHdr (Partial.of_string (Bytes.to_string buf)) else NoHdr (i - sz, buf)
 	);
 	!newpacket
 

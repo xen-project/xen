@@ -65,7 +65,7 @@ type backend_mmap = {
 }
 type backend_fd = { fd : Unix.file_descr; }
 type backend = Fd of backend_fd | Xenmmap of backend_mmap
-type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * string
+type partial_buf = HaveHdr of Partial.pkt | NoHdr of int * bytes
 type t = {
   backend : backend;
   pkt_in : Packet.t Queue.t;
@@ -76,10 +76,10 @@ type t = {
 val init_partial_in : unit -> partial_buf
 val reconnect : t -> unit
 val queue : t -> Packet.t -> unit
-val read_fd : backend_fd -> 'a -> string -> int -> int
-val read_mmap : backend_mmap -> 'a -> string -> int -> int
-val read : t -> string -> int -> int
-val write_fd : backend_fd -> 'a -> string -> int -> int
+val read_fd : backend_fd -> 'a -> bytes -> int -> int
+val read_mmap : backend_mmap -> 'a -> bytes -> int -> int
+val read : t -> bytes -> int -> int
+val write_fd : backend_fd -> 'a -> bytes -> int -> int
 val write_mmap : backend_mmap -> 'a -> string -> int -> int
 val write : t -> string -> int -> int
 val output : t -> bool
