@@ -49,6 +49,15 @@ type arch_domainconfig =
   | ARM of xen_arm_arch_domainconfig
   | X86 of xen_x86_arch_domainconfig
 
+type domain_create_flag = CDF_HVM | CDF_HAP
+
+type domctl_create_config = {
+  ssidref: int32;
+  handle: string;
+  flags: domain_create_flag list;
+  arch: arch_domainconfig;
+}
+
 type domaininfo = {
   domid : domid;
   dying : bool;
@@ -91,14 +100,12 @@ type compile_info = {
 }
 type shutdown_reason = Poweroff | Reboot | Suspend | Crash | Watchdog | Soft_reset
 
-type domain_create_flag = CDF_HVM | CDF_HAP
-
 exception Error of string
 type handle
 external interface_open : unit -> handle = "stub_xc_interface_open"
 external interface_close : handle -> unit = "stub_xc_interface_close"
 val with_intf : (handle -> 'a) -> 'a
-external domain_create : handle -> int32 -> domain_create_flag list -> string -> arch_domainconfig -> domid
+external domain_create : handle -> domctl_create_config -> domid
   = "stub_xc_domain_create"
 external domain_sethandle : handle -> domid -> string -> unit = "stub_xc_domain_sethandle"
 external domain_max_vcpus : handle -> domid -> int -> unit

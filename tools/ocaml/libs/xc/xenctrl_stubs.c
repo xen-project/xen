@@ -119,36 +119,46 @@ static void domain_handle_of_uuid_string(xen_domain_handle_t h,
 #undef X
 }
 
-CAMLprim value stub_xc_domain_create(value xch, value ssidref,
-                                     value flags, value handle,
-                                     value domconfig)
+CAMLprim value stub_xc_domain_create(value xch, value config)
 {
-	CAMLparam4(xch, ssidref, flags, handle);
+	CAMLparam2(xch, config);
+	CAMLlocal2(l, arch_domconfig);
+
+	/* Mnemonics for the named fields inside domctl_create_config */
+#define VAL_SSIDREF             Field(config, 0)
+#define VAL_HANDLE              Field(config, 1)
+#define VAL_FLAGS               Field(config, 2)
+#define VAL_ARCH                Field(config, 3)
 
 	uint32_t domid = 0;
-	xen_domain_handle_t h;
 	int result;
-	uint32_t c_ssidref = Int32_val(ssidref);
-	unsigned int c_flags = 0;
-	value l;
-	xc_domain_configuration_t config = {};
+	struct xen_domctl_createdomain cfg = {
+		.ssidref = Int32_val(VAL_SSIDREF),
+	};
 
-	domain_handle_of_uuid_string(h, String_val(handle));
+	domain_handle_of_uuid_string(cfg.handle, String_val(VAL_HANDLE));
 
-	for (l = flags; l != Val_none; l = Field(l, 1))
-		c_flags |= 1u << Int_val(Field(l, 0));
+	for ( l = VAL_FLAGS; l != Val_none; l = Field(l, 1) )
+		cfg.flags |= 1u << Int_val(Field(l, 0));
 
-	switch(Tag_val(domconfig)) {
+	arch_domconfig = Field(VAL_ARCH, 0);
+	switch ( Tag_val(VAL_ARCH) )
+	{
 	case 0: /* ARM - nothing to do */
 		caml_failwith("Unhandled: ARM");
 		break;
 
 	case 1: /* X86 - emulation flags in the block */
 #if defined(__i386__) || defined(__x86_64__)
-		for (l = Field(Field(domconfig, 0), 0);
-		     l != Val_none;
-		     l = Field(l, 1))
-			config.emulation_flags |= 1u << Int_val(Field(l, 0));
+
+        /* Mnemonics for the named fields inside xen_x86_arch_domainconfig */
+#define VAL_EMUL_FLAGS          Field(arch_domconfig, 0)
+
+		for ( l = VAL_EMUL_FLAGS; l != Val_none; l = Field(l, 1) )
+			cfg.arch.emulation_flags |= 1u << Int_val(Field(l, 0));
+
+#undef VAL_EMUL_FLAGS
+
 #else
 		caml_failwith("Unhandled: x86");
 #endif
@@ -158,8 +168,14 @@ CAMLprim value stub_xc_domain_create(value xch, value ssidref,
 		caml_failwith("Unhandled domconfig type");
 	}
 
+#undef VAL_ARCH
+#undef VAL_FLAGS
+#undef VAL_HANDLE
+#undef VAL_SSIDREF
+
 	caml_enter_blocking_section();
-	result = xc_domain_create(_H(xch), c_ssidref, h, c_flags, &domid, &config);
+	result = xc_domain_create(_H(xch), cfg.ssidref, cfg.handle, cfg.flags,
+				  &domid, &cfg.arch);
 	caml_leave_blocking_section();
 
 	if (result < 0)
