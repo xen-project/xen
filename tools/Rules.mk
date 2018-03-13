@@ -164,8 +164,13 @@ LDLIBS_libxenvchan = $(SHDEPS_libxenvchan) $(XEN_LIBVCHAN)/libxenvchan$(libexten
 SHLIB_libxenvchan  = $(SHDEPS_libxenvchan) -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
 ifeq ($(debug),y)
-# Disable optimizations
-CFLAGS += -O0 -fno-omit-frame-pointer
+CFLAGS += -fno-omit-frame-pointer
+# Use optimizations compatible with debugging otherwise disable optimizations
+ifneq ($(call cc-option,$(CC),-Og,n),n)
+CFLAGS += -Og
+else
+CFLAGS += -O0
+endif
 # But allow an override to -O0 in case Python enforces -D_FORTIFY_SOURCE=<n>.
 PY_CFLAGS += $(PY_NOOPT_CFLAGS)
 else
