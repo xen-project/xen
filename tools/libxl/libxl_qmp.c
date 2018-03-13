@@ -75,6 +75,11 @@ struct libxl__qmp_handler {
 
     int last_id_used;
     LIBXL_STAILQ_HEAD(callback_list, callback_id_pair) callback_list;
+    struct {
+        int major;
+        int minor;
+        int micro;
+    } version;
 };
 
 static int qmp_send(libxl__qmp_handler *qmp,
@@ -296,9 +301,22 @@ static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
     LOGD(DEBUG, qmp->domid, "message type: %s", libxl__qmp_message_type_to_string(type));
 
     switch (type) {
-    case LIBXL__QMP_MESSAGE_TYPE_QMP:
+    case LIBXL__QMP_MESSAGE_TYPE_QMP: {
+        const libxl__json_object *o;
+        o = libxl__json_map_get("QMP", resp, JSON_MAP);
+        o = libxl__json_map_get("version", o, JSON_MAP);
+        o = libxl__json_map_get("qemu", o, JSON_MAP);
+        qmp->version.major = libxl__json_object_get_integer(
+            libxl__json_map_get("major", o, JSON_INTEGER));
+        qmp->version.minor = libxl__json_object_get_integer(
+            libxl__json_map_get("minor", o, JSON_INTEGER));
+        qmp->version.micro = libxl__json_object_get_integer(
+            libxl__json_map_get("micro", o, JSON_INTEGER));
+        LOGD(DEBUG, qmp->domid, "QEMU version: %d.%d.%d",
+             qmp->version.major, qmp->version.minor, qmp->version.micro);
         /* On the greeting message from the server, enable QMP capabilities */
         return enable_qmp_capabilities(qmp);
+    }
     case LIBXL__QMP_MESSAGE_TYPE_RETURN: {
         callback_id_pair *pp = qmp_get_callback_from_id(qmp, resp);
 
@@ -331,6 +349,17 @@ static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
     }
     return 0;
 }
+
+#if 0
+static bool qmp_qemu_check_version(libxl__qmp_handler *qmp, int major,
+                                   int minor, int micro)
+{
+    return qmp->version.major > major ||
+        (qmp->version.major == major &&
+            (qmp->version.minor > minor ||
+             (qmp->version.minor == minor && qmp->version.micro >= micro)));
+}
+#endif
 
 /*
  * Handler functions
