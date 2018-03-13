@@ -50,6 +50,7 @@ int main_vdisplattach(int argc, char **argv)
         char *json = libxl_device_vdispl_to_json(ctx, &vdispl);
         printf("vdispl: %s\n", json);
         free(json);
+        rc = 0;
         goto out;
     }
 
