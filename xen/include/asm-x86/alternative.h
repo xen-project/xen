@@ -54,8 +54,8 @@ extern void alternative_instructions(void);
 
 #define OLDINSTR_2(oldinstr, n1, n2)                             \
     OLDINSTR(oldinstr,                                           \
-             as_max((alt_repl_len(n1),                           \
-                     alt_repl_len(n2)) "-" alt_orig_len))
+             as_max(alt_repl_len(n1),                            \
+                    alt_repl_len(n2)) "-" alt_orig_len)
 
 #define ALTINSTR_ENTRY(feature, num)                                    \
         " .long .LXEN%=_orig_s - .\n"             /* label           */ \
