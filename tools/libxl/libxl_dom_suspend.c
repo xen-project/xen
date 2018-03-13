@@ -86,7 +86,7 @@ int libxl__domain_suspend_device_model(libxl__gc *gc,
         if (libxl__qmp_stop(gc, domid))
             return ERROR_FAIL;
         /* Save DM state into filename */
-        ret = libxl__qmp_save(gc, domid, filename);
+        ret = libxl__qmp_save(gc, domid, filename, dsps->live);
         if (ret)
             unlink(filename);
         break;

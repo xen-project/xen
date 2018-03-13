@@ -1822,7 +1822,8 @@ _hidden int libxl__qmp_stop(libxl__gc *gc, int domid);
 /* Resume QEMU. */
 _hidden int libxl__qmp_resume(libxl__gc *gc, int domid);
 /* Save current QEMU state into fd. */
-_hidden int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename);
+_hidden int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename,
+                            bool live);
 /* Load current QEMU state from file. */
 _hidden int libxl__qmp_restore(libxl__gc *gc, int domid, const char *filename);
 /* Set dirty bitmap logging status */
@@ -3264,6 +3265,7 @@ struct libxl__domain_suspend_state {
     /* set by caller of libxl__domain_suspend_init */
     libxl__ao *ao;
     uint32_t domid;
+    bool live;
 
     /* private */
     libxl_domain_type type;

@@ -361,6 +361,7 @@ void libxl__domain_save(libxl__egc *egc, libxl__domain_save_state *dss)
 
     dsps->ao = ao;
     dsps->domid = domid;
+    dsps->live = !!live;
     rc = libxl__domain_suspend_init(egc, dsps, type);
     if (rc) goto out;
 
