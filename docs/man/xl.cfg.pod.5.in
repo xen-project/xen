@@ -986,7 +986,7 @@ settings, from the following list:
 
 =over 4
 
-=item B<devtype=hostdev>
+=item B<type=hostdev>
 
 Specifies USB device type. Currently only "hostdev" is supported.
 
