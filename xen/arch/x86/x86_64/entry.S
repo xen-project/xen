@@ -373,10 +373,10 @@ UNLIKELY_END(msi_check)
         movw  %cx, TRAPBOUNCE_cs(%rdx)
         movq  %rdi, TRAPBOUNCE_eip(%rdx)
 
-        /* TB_flags = TBF_EXCEPTION | (TI_GET_IF(ti) ? TBF_INTERRUPT : 0); */
+        /* TB_flags = (TI_GET_IF(ti) ? TBF_INTERRUPT : 0); */
         testb $4, 0x80 * TRAPINFO_sizeof + TRAPINFO_flags(%rsi)
         setnz %cl
-        lea   TBF_EXCEPTION(, %rcx, TBF_INTERRUPT), %ecx
+        lea   (, %rcx, TBF_INTERRUPT), %ecx
         mov   %cl, TRAPBOUNCE_flags(%rdx)
 
         cmpb  $0, DOMAIN_is_32bit_pv(%rax)
