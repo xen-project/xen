@@ -353,7 +353,7 @@ UNLIKELY_END(msi_check)
         mov   VCPU_domain(%rbx), %rax
 
         /*
-         * if ( null_trap_bounce(v, &v->arch.pv_vcpu.trap_ctxt[0x80]) )
+         * if ( null_trap_info(v, &v->arch.pv_vcpu.trap_ctxt[0x80]) )
          *    goto int80_slow_path;
          */
         mov    0x80 * TRAPINFO_sizeof + TRAPINFO_eip(%rsi), %rdi
@@ -370,8 +370,8 @@ UNLIKELY_END(msi_check)
 
         /* Construct trap_bounce from trap_ctxt[0x80]. */
         lea   VCPU_trap_bounce(%rbx), %rdx
-        movw  %cx, TRAPBOUNCE_cs(%rdx)
-        movq  %rdi, TRAPBOUNCE_eip(%rdx)
+        mov   %cx, TRAPBOUNCE_cs(%rdx)
+        mov   %rdi, TRAPBOUNCE_eip(%rdx)
 
         /* TB_flags = (TI_GET_IF(ti) ? TBF_INTERRUPT : 0); */
         testb $4, 0x80 * TRAPINFO_sizeof + TRAPINFO_flags(%rsi)
