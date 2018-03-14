@@ -599,6 +599,16 @@ However, this feature can still confer significant security benefit
 when used to remove drivers and backends from domain 0
 (i.e., Driver Domains).
 
+### x86/Multiple IOREQ servers
+
+	Status: Experimental
+
+An IOREQ server provides emulated devices to HVM and PVH guests.
+QEMU is normally the only IOREQ server,
+but Xen has support for multiple IOREQ servers.
+This allows for custom or proprietary device emulators
+to be used in addition to QEMU.
+
 ### ARM/Non-PCI device passthrough
 
     Status: Supported, not security supported
@@ -639,7 +649,7 @@ Note that other devices are available but not security supported.
 
     Status, piix3 ide: Supported
     Status, ahci: Supported
-	
+
 See the section **Blkback** for image formats supported by QEMU.
 
 ### x86/Emulated graphics (QEMU):
