@@ -12,11 +12,7 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
         xc_config->emulation_flags = XEN_X86_EMU_ALL;
         break;
     case LIBXL_DOMAIN_TYPE_PVH:
-        if (libxl_defbool_val(d_config->b_info.apic))
-            /* PVH guests may want to have LAPIC emulation. */
-            xc_config->emulation_flags = XEN_X86_EMU_LAPIC;
-        else
-            xc_config->emulation_flags = 0;
+        xc_config->emulation_flags = XEN_X86_EMU_LAPIC;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         xc_config->emulation_flags = 0;

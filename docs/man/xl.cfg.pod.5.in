@@ -2353,12 +2353,6 @@ compatibility mode on more modern Windows OS).
 
 This option is disabled by default.
 
-=item B<apic=BOOLEAN>
-
-Enable the local APIC emulation for the guest. The local APIC information
-will be exposed to the guest in the ACPI tables. This option is enabled by
-default.
-
 =item B<bootloader="PROGRAM">
 
 Run C<PROGRAM> to find the kernel image and ramdisk to use.  Normally

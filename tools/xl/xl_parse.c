@@ -1208,7 +1208,6 @@ void parse_config_data(const char *config_source,
     }
 
     xlu_cfg_get_defbool(config, "nestedhvm", &b_info->nested_hvm, 0);
-    xlu_cfg_get_defbool(config, "apic", &b_info->apic, 0);
 
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
@@ -1243,6 +1242,7 @@ void parse_config_data(const char *config_source,
         xlu_cfg_get_defbool(config, "nx", &b_info->u.hvm.nx, 0);
         xlu_cfg_get_defbool(config, "hpet", &b_info->u.hvm.hpet, 0);
         xlu_cfg_get_defbool(config, "vpt_align", &b_info->u.hvm.vpt_align, 0);
+        xlu_cfg_get_defbool(config, "apic", &b_info->apic, 0);
 
         switch (xlu_cfg_get_list(config, "viridian",
                                  &viridian, &num_viridian, 1))
