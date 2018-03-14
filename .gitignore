@@ -168,10 +168,11 @@ tools/flask/utils/flask-set-bool
 tools/flask/utils/flask-label-pci
 tools/fuzz/libelf/afl-libelf-fuzzer
 tools/fuzz/x86_instruction_emulator/asm
-tools/fuzz/x86_instruction_emulator/x86_emulate
-tools/fuzz/x86_instruction_emulator/x86-emulate.[ch]
 tools/fuzz/x86_instruction_emulator/afl-harness
 tools/fuzz/x86_instruction_emulator/afl-harness-cov
+tools/fuzz/x86_instruction_emulator/wrappers.c
+tools/fuzz/x86_instruction_emulator/x86_emulate
+tools/fuzz/x86_instruction_emulator/x86-emulate.[ch]
 tools/helpers/_paths.h
 tools/helpers/init-xenstore-domain
 tools/helpers/xen-init-dom0
