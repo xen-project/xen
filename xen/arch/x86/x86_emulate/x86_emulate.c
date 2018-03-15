@@ -356,6 +356,41 @@ static const struct twobyte_table {
 };
 
 /*
+ * The next two tables are indexed by high opcode extension byte (the one
+ * that's encoded like an immediate) nibble, with each table element then
+ * bit-indexed by low opcode extension byte nibble.
+ */
+static const uint16_t _3dnow_table[16] = {
+    [0x0] = (1 << 0xd) /* pi2fd */,
+    [0x1] = (1 << 0xd) /* pf2id */,
+    [0x9] = (1 << 0x0) /* pfcmpge */ |
+            (1 << 0x4) /* pfmin */ |
+            (1 << 0x6) /* pfrcp */ |
+            (1 << 0x7) /* pfrsqrt */ |
+            (1 << 0xa) /* pfsub */ |
+            (1 << 0xe) /* pfadd */,
+    [0xa] = (1 << 0x0) /* pfcmpgt */ |
+            (1 << 0x4) /* pfmax */ |
+            (1 << 0x6) /* pfrcpit1 */ |
+            (1 << 0x7) /* pfrsqit1 */ |
+            (1 << 0xa) /* pfsubr */ |
+            (1 << 0xe) /* pfacc */,
+    [0xb] = (1 << 0x0) /* pfcmpeq */ |
+            (1 << 0x4) /* pfmul */ |
+            (1 << 0x6) /* pfrcpit2 */ |
+            (1 << 0x7) /* pmulhrw */ |
+            (1 << 0xf) /* pavgusb */,
+};
+
+static const uint16_t _3dnow_ext_table[16] = {
+    [0x0] = (1 << 0xc) /* pi2fw */,
+    [0x1] = (1 << 0xc) /* pf2iw */,
+    [0x8] = (1 << 0xa) /* pfnacc */ |
+            (1 << 0xe) /* pfpnacc */,
+    [0xb] = (1 << 0xb) /* pswapd */,
+};
+
+/*
  * "two_op" and "four_op" below refer to the number of register operands
  * (one of which possibly also allowing to be a memory one). The named
  * operand counts do not include any immediate operands.
@@ -1659,6 +1694,8 @@ static bool vcpu_has(
 #define vcpu_has_rdrand()      vcpu_has(         1, ECX, 30, ctxt, ops)
 #define vcpu_has_mmxext()     (vcpu_has(0x80000001, EDX, 22, ctxt, ops) || \
                                vcpu_has_sse())
+#define vcpu_has_3dnow_ext()   vcpu_has(0x80000001, EDX, 30, ctxt, ops)
+#define vcpu_has_3dnow()       vcpu_has(0x80000001, EDX, 31, ctxt, ops)
 #define vcpu_has_lahf_lm()     vcpu_has(0x80000001, ECX,  0, ctxt, ops)
 #define vcpu_has_cr8_legacy()  vcpu_has(0x80000001, ECX,  4, ctxt, ops)
 #define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
@@ -5373,6 +5410,26 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x18): /* Grp16 (prefetch/nop) */
     case X86EMUL_OPC(0x0f, 0x19) ... X86EMUL_OPC(0x0f, 0x1f): /* nop */
         break;
+
+    case X86EMUL_OPC(0x0f, 0x0e): /* femms */
+        host_and_vcpu_must_have(3dnow);
+        asm volatile ( "femms" );
+        break;
+
+    case X86EMUL_OPC(0x0f, 0x0f): /* 3DNow! */
+        if ( _3dnow_table[(imm1 >> 4) & 0xf] & (1 << (imm1 & 0xf)) )
+            host_and_vcpu_must_have(3dnow);
+        else if ( _3dnow_ext_table[(imm1 >> 4) & 0xf] & (1 << (imm1 & 0xf)) )
+            host_and_vcpu_must_have(3dnow_ext);
+        else
+            generate_exception(EXC_UD);
+
+        get_fpu(X86EMUL_FPU_mmx, &fic);
+
+        d = DstReg | SrcMem;
+        op_bytes = 8;
+        state->simd_size = simd_other;
+        goto simd_0f_imm8;
 
 #define CASE_SIMD_PACKED_INT(pfx, opc)       \
     case X86EMUL_OPC(pfx, opc):              \

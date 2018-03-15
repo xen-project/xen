@@ -48,6 +48,8 @@ static inline bool _to_bool(byte_vec_t bv)
 
 #if VEC_SIZE == FLOAT_SIZE
 # define to_int(x) ((vec_t){ (int)(x)[0] })
+#elif VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW__)
+# define to_int(x) __builtin_ia32_pi2fd(__builtin_ia32_pf2id(x))
 #elif VEC_SIZE == 16 && defined(__SSE2__)
 # if FLOAT_SIZE == 4
 #  define to_int(x) __builtin_ia32_cvtdq2ps(__builtin_ia32_cvtps2dq(x))
@@ -70,7 +72,24 @@ static inline bool _to_bool(byte_vec_t bv)
 })
 #endif
 
-#if FLOAT_SIZE == 4 && defined(__SSE__)
+#if VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW_A__)
+# define max __builtin_ia32_pfmax
+# define min __builtin_ia32_pfmin
+# define recip(x) ({ \
+    vec_t t_ = __builtin_ia32_pfrcp(x); \
+    touch(x); \
+    t_[1] = __builtin_ia32_pfrcp(__builtin_ia32_pswapdsf(x))[0]; \
+    touch(x); \
+    __builtin_ia32_pfrcpit2(__builtin_ia32_pfrcpit1(t_, x), t_); \
+})
+# define rsqrt(x) ({ \
+    vec_t t_ = __builtin_ia32_pfrsqrt(x); \
+    touch(x); \
+    t_[1] = __builtin_ia32_pfrsqrt(__builtin_ia32_pswapdsf(x))[0]; \
+    touch(x); \
+    __builtin_ia32_pfrcpit2(__builtin_ia32_pfrsqit1(__builtin_ia32_pfmul(t_, t_), x), t_); \
+})
+#elif FLOAT_SIZE == 4 && defined(__SSE__)
 # if VEC_SIZE == 32 && defined(__AVX__)
 #  if defined(__AVX2__)
 #   define broadcast(x) \

@@ -238,6 +238,7 @@ tools/security/xen/*
 tools/security/xensec_tool
 tools/tests/x86_emulator/*.bin
 tools/tests/x86_emulator/*.tmp
+tools/tests/x86_emulator/3dnow*.[ch]
 tools/tests/x86_emulator/asm
 tools/tests/x86_emulator/avx*.[ch]
 tools/tests/x86_emulator/blowfish.h

@@ -5,6 +5,7 @@
 
 #include "x86-emulate.h"
 #include "blowfish.h"
+#include "3dnow.h"
 #include "sse.h"
 #include "sse2.h"
 #include "sse4.h"
@@ -26,6 +27,11 @@ static void blowfish_set_regs(struct cpu_user_regs *regs)
 static bool blowfish_check_regs(const struct cpu_user_regs *regs)
 {
     return regs->eax == 2 && regs->edx == 1;
+}
+
+static bool simd_check__3dnow(void)
+{
+    return cpu_has_3dnow_ext && cpu_has_sse;
 }
 
 static bool simd_check_sse(void)
@@ -117,6 +123,7 @@ static const struct {
 #else
 # define SIMD(desc, feat, form) SIMD_(32, desc, feat, form)
 #endif
+    SIMD(3DNow! single,          _3dnow,     8f4),
     SIMD(SSE scalar single,      sse,         f4),
     SIMD(SSE packed single,      sse,       16f4),
     SIMD(SSE2 scalar single,     sse2,        f4),

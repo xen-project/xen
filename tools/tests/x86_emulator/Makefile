@@ -11,7 +11,7 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
-SIMD := sse sse2 sse4 avx avx2 xop
+SIMD := 3dnow sse sse2 sse4 avx avx2 xop
 FMA := fma4 fma
 SG := avx2-sg
 TESTCASES := blowfish $(SIMD) $(FMA) $(SG)
@@ -19,6 +19,9 @@ TESTCASES := blowfish $(SIMD) $(FMA) $(SG)
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
 
+3dnow-vecs := 8
+3dnow-ints :=
+3dnow-flts := 4
 sse-vecs := 16
 sse-ints :=
 sse-flts := 4
@@ -49,8 +52,13 @@ xop-ints := 1 2 4 8
 xop-flts := $(avx-flts)
 
 # For AVX and later, have the compiler avoid XMM0 to widen coverage of
-# the VEX.vvvv checks in the emulator.
-non-sse = $(if $(filter sse%,$(1)),,-ffixed-xmm0)
+# the VEX.vvvv checks in the emulator.  For 3DNow!, however, force SSE
+# use for floating point operations, to avoid mixing MMX and FPU register
+# uses.  Also enable 3DNow! extensions, but note that we can't use 3dnowa
+# as the test flavor right away since -m3dnowa is being understood only
+# by gcc 7.x and newer (older ones want a specific machine model instead).
+3dnowa := $(call cc-option,$(CC),-m3dnowa,-march=k8)
+non-sse = $(if $(filter sse%,$(1)),,$(if $(filter 3dnow%,$(1)),-msse -mfpmath=sse $(3dnowa),-ffixed-xmm0))
 
 define simd-defs
 $(1)-cflags := \
@@ -81,8 +89,9 @@ $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	$(foreach arch,$(filter-out $(XEN_COMPILE_ARCH),x86_32) $(XEN_COMPILE_ARCH), \
 	    for cflags in $($*-cflags) $($*-cflags-$(arch)); do \
 		$(MAKE) -f testcase.mk TESTCASE=$* XEN_TARGET_ARCH=$(arch) $*-cflags="$$cflags" all; \
+		prefix=$(shell echo $(subst -,_,$*) | sed -e 's,^\([0-9]\),_\1,'); \
 		flavor=$$(echo $${cflags} | sed -e 's, .*,,' -e 'y,-=,__,') ; \
-		(echo "static const unsigned int $(subst -,_,$*)_$(arch)$${flavor}[] = {"; \
+		(echo "static const unsigned int $${prefix}_$(arch)$${flavor}[] = {"; \
 		 od -v -t x $*.bin | sed -e 's/^[0-9]* /0x/' -e 's/ /, 0x/g' -e 's/$$/,/'; \
 		 echo "};") >>$@.new; \
 		rm -f $*.bin; \

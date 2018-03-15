@@ -71,6 +71,8 @@
                                  && boot_cpu_has(X86_FEATURE_FFXSR))
 #define cpu_has_page1gb         boot_cpu_has(X86_FEATURE_PAGE1GB)
 #define cpu_has_rdtscp          boot_cpu_has(X86_FEATURE_RDTSCP)
+#define cpu_has_3dnow_ext       boot_cpu_has(X86_FEATURE_3DNOWEXT)
+#define cpu_has_3dnow           boot_cpu_has(X86_FEATURE_3DNOW)
 
 /* CPUID level 0x80000001.ecx */
 #define cpu_has_cmp_legacy      boot_cpu_has(X86_FEATURE_CMP_LEGACY)
