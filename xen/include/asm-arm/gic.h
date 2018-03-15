@@ -211,7 +211,6 @@ struct gic_lr {
    uint8_t priority;
    uint8_t state;
    uint8_t hw_status;
-   uint8_t grp;
 };
 
 enum gic_version {

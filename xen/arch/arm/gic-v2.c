@@ -469,7 +469,6 @@ static void gicv2_read_lr(int lr, struct gic_lr *lr_reg)
     lr_reg->priority = (lrv >> GICH_V2_LR_PRIORITY_SHIFT) & GICH_V2_LR_PRIORITY_MASK;
     lr_reg->state     = (lrv >> GICH_V2_LR_STATE_SHIFT) & GICH_V2_LR_STATE_MASK;
     lr_reg->hw_status = (lrv >> GICH_V2_LR_HW_SHIFT) & GICH_V2_LR_HW_MASK;
-    lr_reg->grp       = (lrv >> GICH_V2_LR_GRP_SHIFT) & GICH_V2_LR_GRP_MASK;
 }
 
 static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
@@ -483,8 +482,7 @@ static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
           ((uint32_t)(lr_reg->state & GICH_V2_LR_STATE_MASK)
                                    << GICH_V2_LR_STATE_SHIFT) |
           ((uint32_t)(lr_reg->hw_status & GICH_V2_LR_HW_MASK)
-                                       << GICH_V2_LR_HW_SHIFT)  |
-          ((uint32_t)(lr_reg->grp & GICH_V2_LR_GRP_MASK) << GICH_V2_LR_GRP_SHIFT) );
+                                       << GICH_V2_LR_HW_SHIFT));
 
     writel_gich(lrv, GICH_LR + lr * 4);
 }

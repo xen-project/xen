@@ -1012,7 +1012,6 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
     lr_reg->priority  = (lrv >> ICH_LR_PRIORITY_SHIFT) & ICH_LR_PRIORITY_MASK;
     lr_reg->state     = (lrv >> ICH_LR_STATE_SHIFT) & ICH_LR_STATE_MASK;
     lr_reg->hw_status = (lrv >> ICH_LR_HW_SHIFT) & ICH_LR_HW_MASK;
-    lr_reg->grp       = (lrv >> ICH_LR_GRP_SHIFT) & ICH_LR_GRP_MASK;
 }
 
 static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
@@ -1023,8 +1022,14 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
         ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
         ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT)|
         ((u64)(lr->state & ICH_LR_STATE_MASK) << ICH_LR_STATE_SHIFT) |
-        ((u64)(lr->hw_status & ICH_LR_HW_MASK) << ICH_LR_HW_SHIFT)  |
-        ((u64)(lr->grp & ICH_LR_GRP_MASK) << ICH_LR_GRP_SHIFT) );
+        ((u64)(lr->hw_status & ICH_LR_HW_MASK) << ICH_LR_HW_SHIFT) );
+
+    /*
+     * When the guest is using vGICv3, all the IRQs are Group 1. Group 0
+     * would result in a FIQ, which will not be expected by the guest OS.
+     */
+    if ( current->domain->arch.vgic.version == GIC_V3 )
+        lrv |= ICH_LR_GRP1;
 
     gicv3_ich_write_lr(lr_reg, lrv);
 }
