@@ -197,8 +197,8 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         {
             if ( p->desc == NULL )
             {
-                 lr_val.state |= GICH_LR_PENDING;
-                 gic_hw_ops->write_lr(i, &lr_val);
+                lr_val.state |= GICH_LR_PENDING;
+                gic_hw_ops->write_lr(i, &lr_val);
             }
             else
                 gdprintk(XENLOG_WARNING, "unable to inject hw irq=%d into d%dv%d: already active in LR%d\n",
