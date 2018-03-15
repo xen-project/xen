@@ -1676,6 +1676,7 @@ void vmx_vmentry_failure(void)
 void vmx_do_resume(struct vcpu *v)
 {
     bool_t debug_state;
+    unsigned long host_cr4;
 
     if ( v->arch.hvm_vmx.active_cpu == smp_processor_id() )
         vmx_vmcs_reload(v);
@@ -1725,6 +1726,12 @@ void vmx_do_resume(struct vcpu *v)
     }
 
     hvm_do_resume(v);
+
+    /* Sync host CR4 in case its value has changed. */
+    __vmread(HOST_CR4, &host_cr4);
+    if ( host_cr4 != read_cr4() )
+        __vmwrite(HOST_CR4, read_cr4());
+
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 

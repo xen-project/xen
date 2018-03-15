@@ -947,12 +947,6 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
 {
-    unsigned long old_cr4 = read_cr4(), new_cr4 = mmu_cr4_features;
-
-    /* HOST_CR4 in VMCS is always mmu_cr4_features. Sync CR4 now. */
-    if ( old_cr4 != new_cr4 )
-        write_cr4(new_cr4);
-
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
 
