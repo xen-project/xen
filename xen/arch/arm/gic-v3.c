@@ -1006,21 +1006,22 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
 
     lrv = gicv3_ich_read_lr(lr);
 
-    lr_reg->pirq = (lrv >> ICH_LR_PHYSICAL_SHIFT) & ICH_LR_PHYSICAL_MASK;
     lr_reg->virq = (lrv >> ICH_LR_VIRTUAL_SHIFT) & ICH_LR_VIRTUAL_MASK;
 
     lr_reg->priority  = (lrv >> ICH_LR_PRIORITY_SHIFT) & ICH_LR_PRIORITY_MASK;
     lr_reg->pending   = lrv & ICH_LR_STATE_PENDING;
     lr_reg->active    = lrv & ICH_LR_STATE_ACTIVE;
     lr_reg->hw_status = lrv & ICH_LR_HW;
+
+    if ( lr_reg->hw_status )
+        lr_reg->pirq = (lrv >> ICH_LR_PHYSICAL_SHIFT) & ICH_LR_PHYSICAL_MASK;
 }
 
 static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
 {
     uint64_t lrv = 0;
 
-    lrv = ( ((u64)(lr->pirq & ICH_LR_PHYSICAL_MASK) << ICH_LR_PHYSICAL_SHIFT)|
-        ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
+    lrv = ( ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
         ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT) );
 
     if ( lr->active )
@@ -1030,7 +1031,10 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
         lrv |= ICH_LR_STATE_PENDING;
 
     if ( lr->hw_status )
+    {
         lrv |= ICH_LR_HW;
+        lrv |= (uint64_t)lr->pirq << ICH_LR_PHYSICAL_SHIFT;
+    }
 
     /*
      * When the guest is using vGICv3, all the IRQs are Group 1. Group 0

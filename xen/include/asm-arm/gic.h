@@ -204,7 +204,7 @@ union gic_state_data {
  * The LR register format is different for GIC HW version
  */
 struct gic_lr {
-   /* Physical IRQ */
+   /* Physical IRQ -> Only set when hw_status is set. */
    uint32_t pirq;
    /* Virtual IRQ */
    uint32_t virq;
