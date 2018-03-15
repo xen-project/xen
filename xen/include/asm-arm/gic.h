@@ -210,7 +210,7 @@ struct gic_lr {
    uint32_t virq;
    uint8_t priority;
    uint8_t state;
-   uint8_t hw_status;
+   bool hw_status;
 };
 
 enum gic_version {

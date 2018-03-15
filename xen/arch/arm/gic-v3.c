@@ -1011,7 +1011,7 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
 
     lr_reg->priority  = (lrv >> ICH_LR_PRIORITY_SHIFT) & ICH_LR_PRIORITY_MASK;
     lr_reg->state     = (lrv >> ICH_LR_STATE_SHIFT) & ICH_LR_STATE_MASK;
-    lr_reg->hw_status = (lrv >> ICH_LR_HW_SHIFT) & ICH_LR_HW_MASK;
+    lr_reg->hw_status = lrv & ICH_LR_HW;
 }
 
 static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
@@ -1021,8 +1021,10 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
     lrv = ( ((u64)(lr->pirq & ICH_LR_PHYSICAL_MASK) << ICH_LR_PHYSICAL_SHIFT)|
         ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
         ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT)|
-        ((u64)(lr->state & ICH_LR_STATE_MASK) << ICH_LR_STATE_SHIFT) |
-        ((u64)(lr->hw_status & ICH_LR_HW_MASK) << ICH_LR_HW_SHIFT) );
+        ((u64)(lr->state & ICH_LR_STATE_MASK) << ICH_LR_STATE_SHIFT) );
+
+    if ( lr->hw_status )
+        lrv |= ICH_LR_HW;
 
     /*
      * When the guest is using vGICv3, all the IRQs are Group 1. Group 0
