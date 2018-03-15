@@ -393,8 +393,6 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_s3, sizeof(ssdt_s3));
         table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
-    } else {
-        printf("S3 disabled\n");
     }
 
     if ( config->table_flags & ACPI_HAS_SSDT_S4 )
@@ -403,8 +401,6 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_s4, sizeof(ssdt_s4));
         table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
-    } else {
-        printf("S4 disabled\n");
     }
 
     if ( config->table_flags & ACPI_HAS_SSDT_LAPTOP_SLATE )
@@ -413,8 +409,6 @@ static int construct_secondary_tables(struct acpi_ctxt *ctxt,
         if (!ssdt) return -1;
         memcpy(ssdt, ssdt_laptop_slate, sizeof(ssdt_laptop_slate));
         table_ptrs[nr_tables++] = ctxt->mem_ops.v2p(ctxt, ssdt);
-    } else {
-        printf("CONV disabled\n");
     }
 
     /* TPM TCPA and SSDT. */
