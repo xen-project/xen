@@ -1071,14 +1071,24 @@ void set_sched_smt_func(int argc, char *argv[])
 
 void set_vcpu_migration_delay_func(int argc, char *argv[])
 {
+    struct xen_sysctl_credit_schedule sparam;
     int value;
+
+    fprintf(stderr, "WARNING: using xenpm for this purpose is deprecated."
+           " Check out `xl sched-credit -s -m DELAY'\n");
 
     if ( argc != 1 || (value = atoi(argv[0])) < 0 ) {
         fprintf(stderr, "Missing or invalid argument(s)\n");
         exit(EINVAL);
     }
 
-    if ( !xc_set_vcpu_migration_delay(xc_handle, value) )
+    if ( xc_sched_credit_params_get(xc_handle, 0, &sparam) < 0 ) {
+        fprintf(stderr, "getting Credit scheduler parameters failed\n");
+        exit(EINVAL);
+    }
+    sparam.vcpu_migr_delay_us = value;
+
+    if ( !xc_sched_credit_params_set(xc_handle, 0, &sparam) )
         printf("set vcpu migration delay to %d us succeeded\n", value);
     else
         fprintf(stderr, "set vcpu migration delay failed (%d - %s)\n",
@@ -1087,13 +1097,17 @@ void set_vcpu_migration_delay_func(int argc, char *argv[])
 
 void get_vcpu_migration_delay_func(int argc, char *argv[])
 {
-    uint32_t value;
+    struct xen_sysctl_credit_schedule sparam;
+
+    fprintf(stderr, "WARNING: using xenpm for this purpose is deprecated."
+           " Check out `xl sched-credit -s'\n");
 
     if ( argc )
         fprintf(stderr, "Ignoring argument(s)\n");
 
-    if ( !xc_get_vcpu_migration_delay(xc_handle, &value) )
-        printf("Scheduler vcpu migration delay is %d us\n", value);
+    if ( !xc_sched_credit_params_get(xc_handle, 0, &sparam) )
+        printf("Scheduler vcpu migration delay is %d us\n",
+               sparam.vcpu_migr_delay_us);
     else
         fprintf(stderr,
                 "Failed to get scheduler vcpu migration delay (%d - %s)\n",
