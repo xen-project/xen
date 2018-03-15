@@ -449,18 +449,6 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
         break;
     }
 
-    case XEN_SYSCTL_pm_op_set_vcpu_migration_delay:
-    {
-        set_vcpu_migration_delay(op->u.set_vcpu_migration_delay);
-        break;
-    }
-
-    case XEN_SYSCTL_pm_op_get_vcpu_migration_delay:
-    {
-        op->u.get_vcpu_migration_delay = get_vcpu_migration_delay();
-        break;
-    }
-
     case XEN_SYSCTL_pm_op_get_max_cstate:
     {
         op->u.get_max_cstate = acpi_get_cstate_limit();

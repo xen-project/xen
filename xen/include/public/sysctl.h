@@ -36,7 +36,7 @@
 #include "physdev.h"
 #include "tmem.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000010
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000011
 
 /*
  * Read console content from Xen buffer ring.
@@ -351,8 +351,6 @@ struct xen_sysctl_pm_op {
         uint32_t                    set_sched_opt_smt;
         uint32_t                    get_max_cstate;
         uint32_t                    set_max_cstate;
-        uint32_t                    get_vcpu_migration_delay;
-        uint32_t                    set_vcpu_migration_delay;
     } u;
 };
 

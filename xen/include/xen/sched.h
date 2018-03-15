@@ -888,9 +888,6 @@ static inline bool is_vcpu_online(const struct vcpu *v)
     return !test_bit(_VPF_down, &v->pause_flags);
 }
 
-void set_vcpu_migration_delay(unsigned int delay);
-unsigned int get_vcpu_migration_delay(void);
-
 extern bool sched_smt_power_savings;
 
 extern enum cpufreq_controller {
