@@ -91,7 +91,8 @@ $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 		$(MAKE) -f testcase.mk TESTCASE=$* XEN_TARGET_ARCH=$(arch) $*-cflags="$$cflags" all; \
 		prefix=$(shell echo $(subst -,_,$*) | sed -e 's,^\([0-9]\),_\1,'); \
 		flavor=$$(echo $${cflags} | sed -e 's, .*,,' -e 'y,-=,__,') ; \
-		(echo "static const unsigned int $${prefix}_$(arch)$${flavor}[] = {"; \
+		(echo 'static const unsigned int __attribute__((section(".test, \"ax\", @progbits #")))' \
+		      "$${prefix}_$(arch)$${flavor}[] = {"; \
 		 od -v -t x $*.bin | sed -e 's/^[0-9]* /0x/' -e 's/ /, 0x/g' -e 's/$$/,/'; \
 		 echo "};") >>$@.new; \
 		rm -f $*.bin; \

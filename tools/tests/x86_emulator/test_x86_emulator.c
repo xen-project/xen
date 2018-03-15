@@ -4,6 +4,9 @@
 #include <sys/mman.h>
 
 #include "x86-emulate.h"
+
+asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
+
 #include "blowfish.h"
 #include "3dnow.h"
 #include "sse.h"
@@ -1142,9 +1145,9 @@ int main(int argc, char **argv)
 
 #define decl_insn(which) extern const unsigned char which[], \
                          which##_end[] asm ( ".L" #which "_end" )
-#define put_insn(which, insn) ".pushsection .test, \"ax\", @progbits\n" \
-                              #which ": " insn "\n"                     \
-                              ".L" #which "_end:\n"                     \
+#define put_insn(which, insn) ".pushsection .test\n" \
+                              #which ": " insn "\n"  \
+                              ".L" #which "_end:\n"  \
                               ".popsection"
 #define set_insn(which) (regs.eip = (unsigned long)(which))
 #define valid_eip(which) (regs.eip >= (unsigned long)(which) && \
