@@ -498,7 +498,23 @@ DECLARE_TRAP_HANDLER(entry_int82);
 #undef DECLARE_TRAP_HANDLER
 
 void trap_nop(void);
-void enable_nmis(void);
+
+static inline void enable_nmis(void)
+{
+    unsigned long tmp;
+
+    asm volatile ( "mov %%rsp, %[tmp]     \n\t"
+                   "push %[ss]            \n\t"
+                   "push %[tmp]           \n\t"
+                   "pushf                 \n\t"
+                   "push %[cs]            \n\t"
+                   "lea 1f(%%rip), %[tmp] \n\t"
+                   "push %[tmp]           \n\t"
+                   "iretq; 1:             \n\t"
+                   : [tmp] "=&r" (tmp)
+                   : [ss] "i" (__HYPERVISOR_DS),
+                     [cs] "i" (__HYPERVISOR_CS) );
+}
 
 void sysenter_entry(void);
 void sysenter_eflags_saved(void);
