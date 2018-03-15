@@ -214,7 +214,7 @@ struct csched_private {
 
     /* Period of master and tick in milliseconds */
     unsigned int tick_period_us, ticks_per_tslice;
-    s_time_t ratelimit, tslice;
+    s_time_t ratelimit, tslice, vcpu_migr_delay;
 
     struct list_head active_sdom;
     uint32_t weight;
@@ -677,24 +677,24 @@ __csched_vcpu_check(struct vcpu *vc)
  * implicit overheads such as cache-warming. 1ms (1000) has been measured
  * as a good value.
  */
-static unsigned int vcpu_migration_delay;
-integer_param("vcpu_migration_delay", vcpu_migration_delay);
+static unsigned int vcpu_migration_delay_us;
+integer_param("vcpu_migration_delay", vcpu_migration_delay_us);
 
 void set_vcpu_migration_delay(unsigned int delay)
 {
-    vcpu_migration_delay = delay;
+    vcpu_migration_delay_us = delay;
 }
 
 unsigned int get_vcpu_migration_delay(void)
 {
-    return vcpu_migration_delay;
+    return vcpu_migration_delay_us;
 }
 
-static inline int
-__csched_vcpu_is_cache_hot(struct vcpu *v)
+static inline bool
+__csched_vcpu_is_cache_hot(const struct csched_private *prv, struct vcpu *v)
 {
-    int hot = ((NOW() - v->last_run_time) <
-               ((uint64_t)vcpu_migration_delay * 1000u));
+    bool hot = prv->vcpu_migr_delay &&
+               (NOW() - v->last_run_time) < prv->vcpu_migr_delay;
 
     if ( hot )
         SCHED_STAT_CRANK(vcpu_hot);
@@ -703,7 +703,8 @@ __csched_vcpu_is_cache_hot(struct vcpu *v)
 }
 
 static inline int
-__csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu, cpumask_t *mask)
+__csched_vcpu_is_migrateable(const struct csched_private *prv, struct vcpu *vc,
+                             int dest_cpu, cpumask_t *mask)
 {
     /*
      * Don't pick up work that's hot on peer PCPU, or that can't (or
@@ -714,7 +715,7 @@ __csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu, cpumask_t *mask)
      */
     ASSERT(!vc->is_running);
 
-    return !__csched_vcpu_is_cache_hot(vc) &&
+    return !__csched_vcpu_is_cache_hot(prv, vc) &&
            cpumask_test_cpu(dest_cpu, mask);
 }
 
@@ -1251,7 +1252,8 @@ csched_sys_cntl(const struct scheduler *ops,
              || (params->ratelimit_us
                  && (params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX
                      || params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN))
-             || MICROSECS(params->ratelimit_us) > MILLISECS(params->tslice_ms) )
+             || MICROSECS(params->ratelimit_us) > MILLISECS(params->tslice_ms)
+             || params->vcpu_migr_delay_us > XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US )
                 goto out;
 
         spin_lock_irqsave(&prv->lock, flags);
@@ -1261,12 +1263,14 @@ csched_sys_cntl(const struct scheduler *ops,
         else if ( prv->ratelimit && !params->ratelimit_us )
             printk(XENLOG_INFO "Disabling context switch rate limiting\n");
         prv->ratelimit = MICROSECS(params->ratelimit_us);
+        prv->vcpu_migr_delay = MICROSECS(params->vcpu_migr_delay_us);
         spin_unlock_irqrestore(&prv->lock, flags);
 
         /* FALLTHRU */
     case XEN_SYSCTL_SCHEDOP_getinfo:
         params->tslice_ms = prv->tslice / MILLISECS(1);
         params->ratelimit_us = prv->ratelimit / MICROSECS(1);
+        params->vcpu_migr_delay_us = prv->vcpu_migr_delay / MICROSECS(1);
         rc = 0;
         break;
     }
@@ -1585,6 +1589,7 @@ csched_tick(void *_cpu)
 static struct csched_vcpu *
 csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
 {
+    const struct csched_private * const prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
     const struct csched_pcpu * const peer_pcpu = CSCHED_PCPU(peer_cpu);
     struct csched_vcpu *speer;
     struct list_head *iter;
@@ -1634,7 +1639,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
             continue;
 
         affinity_balance_cpumask(vc, balance_step, cpumask_scratch);
-        if ( __csched_vcpu_is_migrateable(vc, cpu, cpumask_scratch) )
+        if ( __csched_vcpu_is_migrateable(prv, vc, cpu, cpumask_scratch) )
         {
             /* We got a candidate. Grab it! */
             TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,
@@ -2091,7 +2096,7 @@ csched_dump(const struct scheduler *ops)
            "\tratelimit          = %"PRI_stime"us\n"
            "\tcredits per msec   = %d\n"
            "\tticks per tslice   = %d\n"
-           "\tmigration delay    = %uus\n",
+           "\tmigration delay    = %"PRI_stime"us\n",
            prv->ncpus,
            prv->master,
            prv->credit,
@@ -2103,7 +2108,7 @@ csched_dump(const struct scheduler *ops)
            prv->ratelimit / MICROSECS(1),
            CSCHED_CREDITS_PER_MSEC,
            prv->ticks_per_tslice,
-           vcpu_migration_delay);
+           prv->vcpu_migr_delay/ MICROSECS(1));
 
     cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), prv->idlers);
     printk("idlers: %s\n", idlers_buf);
@@ -2186,6 +2191,16 @@ csched_init(struct scheduler *ops)
     }
     else
         prv->ratelimit = MICROSECS(sched_ratelimit_us);
+
+    if ( vcpu_migration_delay_us > XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US )
+    {
+        vcpu_migration_delay_us = 0;
+        printk("WARNING: vcpu_migration_delay outside of valid range [0,%d]us.\n"
+               "Resetting to default: %u\n",
+               XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US, vcpu_migration_delay_us);
+    }
+    prv->vcpu_migr_delay = MICROSECS(vcpu_migration_delay_us);
+
     return 0;
 }
 
