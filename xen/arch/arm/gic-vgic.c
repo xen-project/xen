@@ -189,7 +189,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         return;
     }
 
-    if ( lr_val.state & GICH_LR_ACTIVE )
+    if ( lr_val.active )
     {
         set_bit(GIC_IRQ_GUEST_ACTIVE, &p->status);
         if ( test_bit(GIC_IRQ_GUEST_ENABLED, &p->status) &&
@@ -197,7 +197,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         {
             if ( p->desc == NULL )
             {
-                lr_val.state |= GICH_LR_PENDING;
+                lr_val.pending = true;
                 gic_hw_ops->write_lr(i, &lr_val);
             }
             else
@@ -205,7 +205,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
                          irq, v->domain->domain_id, v->vcpu_id, i);
         }
     }
-    else if ( lr_val.state & GICH_LR_PENDING )
+    else if ( lr_val.pending )
     {
         int q __attribute__ ((unused)) = test_and_clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
 #ifdef GIC_DEBUG

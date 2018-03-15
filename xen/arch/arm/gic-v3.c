@@ -1010,7 +1010,8 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
     lr_reg->virq = (lrv >> ICH_LR_VIRTUAL_SHIFT) & ICH_LR_VIRTUAL_MASK;
 
     lr_reg->priority  = (lrv >> ICH_LR_PRIORITY_SHIFT) & ICH_LR_PRIORITY_MASK;
-    lr_reg->state     = (lrv >> ICH_LR_STATE_SHIFT) & ICH_LR_STATE_MASK;
+    lr_reg->pending   = lrv & ICH_LR_STATE_PENDING;
+    lr_reg->active    = lrv & ICH_LR_STATE_ACTIVE;
     lr_reg->hw_status = lrv & ICH_LR_HW;
 }
 
@@ -1020,8 +1021,13 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
 
     lrv = ( ((u64)(lr->pirq & ICH_LR_PHYSICAL_MASK) << ICH_LR_PHYSICAL_SHIFT)|
         ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
-        ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT)|
-        ((u64)(lr->state & ICH_LR_STATE_MASK) << ICH_LR_STATE_SHIFT) );
+        ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT) );
+
+    if ( lr->active )
+        lrv |= ICH_LR_STATE_ACTIVE;
+
+    if ( lr->pending )
+        lrv |= ICH_LR_STATE_PENDING;
 
     if ( lr->hw_status )
         lrv |= ICH_LR_HW;

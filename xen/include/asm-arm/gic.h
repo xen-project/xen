@@ -209,7 +209,8 @@ struct gic_lr {
    /* Virtual IRQ */
    uint32_t virq;
    uint8_t priority;
-   uint8_t state;
+   bool active;
+   bool pending;
    bool hw_status;
 };
 

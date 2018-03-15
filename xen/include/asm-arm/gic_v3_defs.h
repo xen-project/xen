@@ -171,6 +171,8 @@
 #define ICH_LR_PHYSICAL_SHIFT        32
 #define ICH_LR_STATE_MASK            0x3
 #define ICH_LR_STATE_SHIFT           62
+#define ICH_LR_STATE_PENDING         (1ULL << 62)
+#define ICH_LR_STATE_ACTIVE          (1ULL << 63)
 #define ICH_LR_PRIORITY_MASK         0xff
 #define ICH_LR_PRIORITY_SHIFT        48
 #define ICH_LR_HW_MASK               0x1

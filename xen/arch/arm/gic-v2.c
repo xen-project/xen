@@ -51,6 +51,8 @@
 #define GICH_V2_LR_PHYSICAL_SHIFT  10
 #define GICH_V2_LR_STATE_MASK      0x3
 #define GICH_V2_LR_STATE_SHIFT     28
+#define GICH_V2_LR_PENDING         (1U << 28)
+#define GICH_V2_LR_ACTIVE          (1U << 29)
 #define GICH_V2_LR_PRIORITY_SHIFT  23
 #define GICH_V2_LR_PRIORITY_MASK   0x1f
 #define GICH_V2_LR_HW_SHIFT        31
@@ -467,7 +469,8 @@ static void gicv2_read_lr(int lr, struct gic_lr *lr_reg)
     lr_reg->pirq = (lrv >> GICH_V2_LR_PHYSICAL_SHIFT) & GICH_V2_LR_PHYSICAL_MASK;
     lr_reg->virq = (lrv >> GICH_V2_LR_VIRTUAL_SHIFT) & GICH_V2_LR_VIRTUAL_MASK;
     lr_reg->priority = (lrv >> GICH_V2_LR_PRIORITY_SHIFT) & GICH_V2_LR_PRIORITY_MASK;
-    lr_reg->state     = (lrv >> GICH_V2_LR_STATE_SHIFT) & GICH_V2_LR_STATE_MASK;
+    lr_reg->pending = lrv & GICH_V2_LR_PENDING;
+    lr_reg->active = lrv & GICH_V2_LR_ACTIVE;
     lr_reg->hw_status = lrv & GICH_V2_LR_HW;
 }
 
@@ -478,9 +481,13 @@ static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
     lrv = ( ((lr_reg->pirq & GICH_V2_LR_PHYSICAL_MASK) << GICH_V2_LR_PHYSICAL_SHIFT) |
           ((lr_reg->virq & GICH_V2_LR_VIRTUAL_MASK) << GICH_V2_LR_VIRTUAL_SHIFT)   |
           ((uint32_t)(lr_reg->priority & GICH_V2_LR_PRIORITY_MASK)
-                                      << GICH_V2_LR_PRIORITY_SHIFT) |
-          ((uint32_t)(lr_reg->state & GICH_V2_LR_STATE_MASK)
-                                   << GICH_V2_LR_STATE_SHIFT) );
+                                      << GICH_V2_LR_PRIORITY_SHIFT) );
+
+    if ( lr_reg->active )
+        lrv |= GICH_V2_LR_ACTIVE;
+
+    if ( lr_reg->pending )
+        lrv |= GICH_V2_LR_PENDING;
 
     if ( lr_reg->hw_status )
         lrv |= GICH_V2_LR_HW;
