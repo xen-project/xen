@@ -291,6 +291,7 @@ int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,
 
     scinfo->tslice_ms = sparam.tslice_ms;
     scinfo->ratelimit_us = sparam.ratelimit_us;
+    scinfo->vcpu_migr_delay_us = sparam.vcpu_migr_delay_us;
 
     rc = 0;
  out:
@@ -321,9 +322,16 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
         rc = ERROR_INVAL;
         goto out;
     }
+    if (scinfo->vcpu_migr_delay_us > XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US) {
+        LOG(ERROR, "vcpu migration delay should be >= 0 and <= %dus",
+            XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US);
+        rc = ERROR_INVAL;
+        goto out;
+    }
 
     sparam.tslice_ms = scinfo->tslice_ms;
     sparam.ratelimit_us = scinfo->ratelimit_us;
+    sparam.vcpu_migr_delay_us = scinfo->vcpu_migr_delay_us;
 
     r = xc_sched_credit_params_set(ctx->xch, poolid, &sparam);
     if ( r < 0 ) {
@@ -334,6 +342,7 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
 
     scinfo->tslice_ms = sparam.tslice_ms;
     scinfo->ratelimit_us = sparam.ratelimit_us;
+    scinfo->vcpu_migr_delay_us = sparam.vcpu_migr_delay_us;
 
     rc = 0;
  out:

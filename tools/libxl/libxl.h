@@ -300,6 +300,13 @@
 #define LIBXL_HAVE_SCHED_CREDIT2_PARAMS 1
 
 /*
+ * LIBXL_HAVE_SCHED_CREDIT_MIGR_DELAY indicates that there is a field
+ * in libxl_sched_credit_params called vcpu_migr_delay_us which controls
+ * the resistance of the vCPUs of the cpupool to migrations among pCPUs.
+ */
+#define LIBXL_HAVE_SCHED_CREDIT_MIGR_DELAY
+
+/*
  * LIBXL_HAVE_VIRIDIAN_CRASH_CTL indicates that the 'crash_ctl' value
  * is present in the viridian enlightenment enumeration.
  */

@@ -257,6 +257,7 @@ struct cmd_spec cmd_table[] = {
       "-s         --schedparam           Query / modify scheduler parameters\n"
       "-t TSLICE, --tslice_ms=TSLICE     Set the timeslice, in milliseconds\n"
       "-r RLIMIT, --ratelimit_us=RLIMIT  Set the scheduling rate limit, in microseconds\n"
+      "-m DLY, --migration_delay_us=DLY  Set the migration delay, in microseconds\n"
       "-p CPUPOOL, --cpupool=CPUPOOL     Restrict output to CPUPOOL"
     },
     { "sched-credit2",

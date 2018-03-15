@@ -1046,6 +1046,17 @@ we will allow a higher-priority VM to pre-empt it.  The default value
 is 1000 microseconds (1ms).  Valid range is 100 to 500000 (500ms).
 The ratelimit length must be lower than the timeslice length.
 
+=item B<-m DELAY>, B<--migration_delay_us=DELAY>
+
+Migration delay specifies for how long a vCPU, after it stopped running should
+be considered "cache-hot". Basically, if less than DELAY us passed since when
+the vCPU was executing on a CPU, it is likely that most of the vCPU's working
+set is still in the CPU's cache, and therefore the vCPU is not migrated.
+
+Default is 0. Maximum is 100 ms. This can be effective at preventing vCPUs
+to bounce among CPUs too quickly, but, at the same time, the scheduler stops
+being fully work-conserving.
+
 =back
 
 B<COMBINATION>

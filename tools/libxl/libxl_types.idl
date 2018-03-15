@@ -973,6 +973,7 @@ libxl_pcitopology = Struct("pcitopology", [
 libxl_sched_credit_params = Struct("sched_credit_params", [
     ("tslice_ms", integer),
     ("ratelimit_us", integer),
+    ("vcpu_migr_delay_us", integer),
     ], dispose_fn=None)
 
 libxl_sched_credit2_params = Struct("sched_credit2_params", [

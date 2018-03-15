@@ -172,10 +172,11 @@ static int sched_credit_pool_output(uint32_t poolid)
         printf("Cpupool %s: [sched params unavailable]\n",
                poolname);
     } else {
-        printf("Cpupool %s: tslice=%dms ratelimit=%dus\n",
+        printf("Cpupool %s: tslice=%dms ratelimit=%dus migration-delay=%dus\n",
                poolname,
                scparam.tslice_ms,
-               scparam.ratelimit_us);
+               scparam.ratelimit_us,
+               scparam.vcpu_migr_delay_us);
     }
     free(poolname);
     return 0;
@@ -469,10 +470,10 @@ int main_sched_credit(int argc, char **argv)
     const char *dom = NULL;
     const char *cpupool = NULL;
     int weight = 256, cap = 0;
-    int tslice = 0, ratelimit = 0;
+    int tslice = 0, ratelimit = 0, migrdelay = 0;
     bool opt_w = false, opt_c = false;
     bool opt_t = false, opt_r = false;
-    bool opt_s = false;
+    bool opt_s = false, opt_m = false;
     int opt, rc;
     static struct option opts[] = {
         {"domain", 1, 0, 'd'},
@@ -481,11 +482,12 @@ int main_sched_credit(int argc, char **argv)
         {"schedparam", 0, 0, 's'},
         {"tslice_ms", 1, 0, 't'},
         {"ratelimit_us", 1, 0, 'r'},
+        {"migration_delay_us", 1, 0, 'm'},
         {"cpupool", 1, 0, 'p'},
         COMMON_LONG_OPTS
     };
 
-    SWITCH_FOREACH_OPT(opt, "d:w:c:p:t:r:s", opts, "sched-credit", 0) {
+    SWITCH_FOREACH_OPT(opt, "d:w:c:p:t:r:m:s", opts, "sched-credit", 0) {
     case 'd':
         dom = optarg;
         break;
@@ -505,6 +507,10 @@ int main_sched_credit(int argc, char **argv)
         ratelimit = strtol(optarg, NULL, 10);
         opt_r = true;
         break;
+    case 'm':
+        migrdelay = strtol(optarg, NULL, 10);
+        opt_m = true;
+        break;
     case 's':
         opt_s = true;
         break;
@@ -522,7 +528,7 @@ int main_sched_credit(int argc, char **argv)
         fprintf(stderr, "Must specify a domain.\n");
         return EXIT_FAILURE;
     }
-    if (!opt_s && (opt_t || opt_r)) {
+    if (!opt_s && (opt_t || opt_r || opt_m)) {
         fprintf(stderr, "Must specify schedparam to set schedule "
                 "parameter values.\n");
         return EXIT_FAILURE;
@@ -541,7 +547,7 @@ int main_sched_credit(int argc, char **argv)
             }
         }
 
-        if (!opt_t && !opt_r) { /* Output scheduling parameters */
+        if (!opt_t && !opt_r && !opt_m) { /* Output scheduling parameters */
             if (sched_credit_pool_output(poolid))
                 return EXIT_FAILURE;
         } else { /* Set scheduling parameters*/
@@ -553,6 +559,9 @@ int main_sched_credit(int argc, char **argv)
 
             if (opt_r)
                 scparam.ratelimit_us = ratelimit;
+
+            if (opt_m)
+                scparam.vcpu_migr_delay_us = migrdelay;
 
             if (sched_credit_params_set(poolid, &scparam))
                 return EXIT_FAILURE;
