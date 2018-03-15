@@ -147,6 +147,8 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 
     switch ( msr )
     {
+    case MSR_AMD_PATCHLOADER:
+    case MSR_IA32_UCODE_WRITE:
     case MSR_PRED_CMD:
         /* Write-only */
         goto gp_fault;
@@ -199,6 +201,28 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
         goto gp_fault;
+
+    case MSR_AMD_PATCHLOADER:
+        /*
+         * See note on MSR_IA32_UCODE_WRITE below, which may or may not apply
+         * to AMD CPUs as well (at least the architectural/CPUID part does).
+         */
+        if ( is_pv_domain(d) ||
+             d->arch.cpuid->x86_vendor != X86_VENDOR_AMD )
+            goto gp_fault;
+        break;
+
+    case MSR_IA32_UCODE_WRITE:
+        /*
+         * Some versions of Windows at least on certain hardware try to load
+         * microcode before setting up an IDT. Therefore we must not inject #GP
+         * for such attempts. Also the MSR is architectural and not qualified
+         * by any CPUID bit.
+         */
+        if ( is_pv_domain(d) ||
+             d->arch.cpuid->x86_vendor != X86_VENDOR_INTEL )
+            goto gp_fault;
+        break;
 
     case MSR_SPEC_CTRL:
         if ( !cp->feat.ibrsb )
