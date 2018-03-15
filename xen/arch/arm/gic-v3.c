@@ -1014,12 +1014,25 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
     lr_reg->hw_status = lrv & ICH_LR_HW;
 
     if ( lr_reg->hw_status )
-        lr_reg->pirq = (lrv >> ICH_LR_PHYSICAL_SHIFT) & ICH_LR_PHYSICAL_MASK;
+        lr_reg->hw.pirq = (lrv >> ICH_LR_PHYSICAL_SHIFT) & ICH_LR_PHYSICAL_MASK;
+    else
+    {
+        lr_reg->virt.eoi = (lrv & ICH_LR_MAINTENANCE_IRQ);
+        /* Source only exists for SGI and in GICv2 compatible mode */
+        if ( lr_reg->virq < NR_GIC_SGI &&
+             current->domain->arch.vgic.version == GIC_V2 )
+        {
+            lr_reg->virt.source = (lrv >> ICH_LR_CPUID_SHIFT)
+                & ICH_LR_CPUID_MASK;
+        }
+    }
 }
 
 static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
 {
     uint64_t lrv = 0;
+    const enum gic_version vgic_version = current->domain->arch.vgic.version;
+
 
     lrv = ( ((u64)(lr->virq & ICH_LR_VIRTUAL_MASK)  << ICH_LR_VIRTUAL_SHIFT) |
         ((u64)(lr->priority & ICH_LR_PRIORITY_MASK) << ICH_LR_PRIORITY_SHIFT) );
@@ -1033,14 +1046,29 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
     if ( lr->hw_status )
     {
         lrv |= ICH_LR_HW;
-        lrv |= (uint64_t)lr->pirq << ICH_LR_PHYSICAL_SHIFT;
+        lrv |= (uint64_t)lr->hw.pirq << ICH_LR_PHYSICAL_SHIFT;
+    }
+    else
+    {
+        if ( lr->virt.eoi )
+            lrv |= ICH_LR_MAINTENANCE_IRQ;
+        /* Source is only set in GICv2 compatible mode */
+        if ( vgic_version == GIC_V2 )
+        {
+            /*
+             * This is only valid for SGI, but it does not matter to always
+             * read it as it should be 0 by default.
+             */
+            ASSERT(!lr->virt.source || lr->virq < NR_GIC_SGI);
+            lrv |= (uint64_t)lr->virt.source << ICH_LR_CPUID_SHIFT;
+        }
     }
 
     /*
      * When the guest is using vGICv3, all the IRQs are Group 1. Group 0
      * would result in a FIQ, which will not be expected by the guest OS.
      */
-    if ( current->domain->arch.vgic.version == GIC_V3 )
+    if ( vgic_version == GIC_V3 )
         lrv |= ICH_LR_GRP1;
 
     gicv3_ich_write_lr(lr_reg, lrv);

@@ -204,14 +204,26 @@ union gic_state_data {
  * The LR register format is different for GIC HW version
  */
 struct gic_lr {
-   /* Physical IRQ -> Only set when hw_status is set. */
-   uint32_t pirq;
    /* Virtual IRQ */
    uint32_t virq;
    uint8_t priority;
    bool active;
    bool pending;
    bool hw_status;
+   union
+   {
+       /* Only filled when there are a corresponding pIRQ (hw_state = true) */
+       struct
+       {
+           uint32_t pirq;
+       } hw;
+       /* Only filled when there are no corresponding pIRQ (hw_state = false) */
+       struct
+       {
+           bool eoi;
+           uint8_t source;      /* GICv2 only */
+       } virt;
+   };
 };
 
 enum gic_version {

@@ -474,8 +474,17 @@ static void gicv2_read_lr(int lr, struct gic_lr *lr_reg)
 
     if ( lr_reg->hw_status )
     {
-        lr_reg->pirq = lrv >> GICH_V2_LR_PHYSICAL_SHIFT;
-        lr_reg->pirq &= GICH_V2_LR_PHYSICAL_MASK;
+        lr_reg->hw.pirq = lrv >> GICH_V2_LR_PHYSICAL_SHIFT;
+        lr_reg->hw.pirq &= GICH_V2_LR_PHYSICAL_MASK;
+    }
+    else
+    {
+        lr_reg->virt.eoi = (lrv & GICH_V2_LR_MAINTENANCE_IRQ);
+        if ( lr_reg->virq < NR_GIC_SGI )
+        {
+            lr_reg->virt.source = (lrv >> GICH_V2_LR_CPUID_SHIFT)
+                & GICH_V2_LR_CPUID_MASK;
+        }
     }
 }
 
@@ -496,7 +505,18 @@ static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
     if ( lr_reg->hw_status )
     {
         lrv |= GICH_V2_LR_HW;
-        lrv |= lr_reg->pirq << GICH_V2_LR_PHYSICAL_SHIFT;
+        lrv |= lr_reg->hw.pirq << GICH_V2_LR_PHYSICAL_SHIFT;
+    }
+    else
+    {
+        if ( lr_reg->virt.eoi )
+            lrv |= GICH_V2_LR_MAINTENANCE_IRQ;
+        /*
+         * This is only valid for SGI, but it does not matter to always
+         * read it as it should be 0 by default.
+         */
+        ASSERT(!lr_reg->virt.source || lr_reg->virq < NR_GIC_SGI);
+        lrv |= (uint32_t)lr_reg->virt.source << GICH_V2_LR_CPUID_SHIFT;
     }
 
     writel_gich(lrv, GICH_LR + lr * 4);
