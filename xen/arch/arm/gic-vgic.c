@@ -339,15 +339,27 @@ void gic_clear_pending_irqs(struct vcpu *v)
         gic_remove_from_lr_pending(v, p);
 }
 
-int gic_events_need_delivery(void)
+/**
+ * vgic_vcpu_pending_irq() - determine if interrupts need to be injected
+ * @vcpu: The vCPU on which to check for interrupts.
+ *
+ * Checks whether there is an interrupt on the given VCPU which needs
+ * handling in the guest. This requires at least one IRQ to be pending
+ * and enabled.
+ *
+ * Returns: 1 if the guest should run to handle interrupts, 0 otherwise.
+ */
+int vgic_vcpu_pending_irq(struct vcpu *v)
 {
-    struct vcpu *v = current;
     struct pending_irq *p;
     unsigned long flags;
     const unsigned long apr = gic_hw_ops->read_apr(0);
     int mask_priority;
     int active_priority;
     int rc = 0;
+
+    /* We rely on reading the VMCR, which is only accessible locally. */
+    ASSERT(v == current);
 
     mask_priority = gic_hw_ops->read_vmcr_priority();
     active_priority = find_next_bit(&apr, 32, 0);

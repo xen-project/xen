@@ -24,7 +24,7 @@ static inline int local_events_need_delivery_nomask(void)
      * interrupts disabled so this shouldn't be a problem in the general
      * case.
      */
-    if ( gic_events_need_delivery() )
+    if ( vgic_vcpu_pending_irq(current) )
         return 1;
 
     if ( !vcpu_info(current, evtchn_upcall_pending) )
