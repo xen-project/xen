@@ -966,6 +966,18 @@ void vcpu_block_unless_event_pending(struct vcpu *v)
         vcpu_unblock(current);
 }
 
+void vcpu_kick(struct vcpu *vcpu)
+{
+    bool running = vcpu->is_running;
+
+    vcpu_unblock(vcpu);
+    if ( running && vcpu != current )
+    {
+        perfc_incr(vcpu_kick);
+        smp_send_event_check_mask(cpumask_of(vcpu->processor));
+    }
+}
+
 /*
  * Local variables:
  * mode: C

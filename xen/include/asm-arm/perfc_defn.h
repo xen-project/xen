@@ -33,6 +33,8 @@ PERFCOUNTER(vpsci_cpu_suspend,         "vpsci: cpu_suspend")
 PERFCOUNTER(vpsci_cpu_affinity_info,   "vpsci: cpu_affinity_info")
 PERFCOUNTER(vpsci_features,            "vpsci: features")
 
+PERFCOUNTER(vcpu_kick,                 "vcpu: notify other vcpu")
+
 PERFCOUNTER(vgicd_reads,                "vgicd: read")
 PERFCOUNTER(vgicd_writes,               "vgicd: write")
 PERFCOUNTER(vgicr_reads,                "vgicr: read")
@@ -44,7 +46,6 @@ PERFCOUNTER(vgic_sysreg_writes,         "vgic: sysreg write")
 PERFCOUNTER(vgic_sgi_list  ,            "vgic: SGI send to list")
 PERFCOUNTER(vgic_sgi_others,            "vgic: SGI send to others")
 PERFCOUNTER(vgic_sgi_self,              "vgic: SGI send to self")
-PERFCOUNTER(vgic_cross_cpu_intr_inject, "vgic: cross-CPU irq inject")
 PERFCOUNTER(vgic_irq_migrates,          "vgic: irq migration")
 
 PERFCOUNTER(vuart_reads,  "vuart: read")

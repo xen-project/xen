@@ -26,6 +26,7 @@
 #include <xen/sched.h>
 #include <xen/perfc.h>
 
+#include <asm/event.h>
 #include <asm/current.h>
 
 #include <asm/mmio.h>
@@ -530,7 +531,6 @@ void vgic_inject_irq(struct domain *d, struct vcpu *v, unsigned int virq,
     uint8_t priority;
     struct pending_irq *iter, *n;
     unsigned long flags;
-    bool running;
 
     /*
      * For edge triggered interrupts we always ignore a "falling edge".
@@ -590,14 +590,9 @@ void vgic_inject_irq(struct domain *d, struct vcpu *v, unsigned int virq,
     list_add_tail(&n->inflight, &v->arch.vgic.inflight_irqs);
 out:
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+
     /* we have a new higher priority irq, inject it into the guest */
-    running = v->is_running;
-    vcpu_unblock(v);
-    if ( running && v != current )
-    {
-        perfc_incr(vgic_cross_cpu_intr_inject);
-        smp_send_event_check_mask(cpumask_of(v->processor));
-    }
+    vcpu_kick(v);
 
     return;
 }
