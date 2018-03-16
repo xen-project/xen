@@ -97,11 +97,6 @@ CAMLprim value stub_xc_interface_close(value xch)
 	CAMLreturn(Val_unit);
 }
 
-static int domain_create_flag_table[] = {
-	XEN_DOMCTL_CDF_hvm_guest,
-	XEN_DOMCTL_CDF_hap,
-};
-
 CAMLprim value stub_xc_domain_create(value xch, value ssidref,
                                      value flags, value handle,
                                      value domconfig)
@@ -124,10 +119,8 @@ CAMLprim value stub_xc_domain_create(value xch, value ssidref,
 		h[i] = Int_val(Field(handle, i)) & 0xff;
 	}
 
-	for (l = flags; l != Val_none; l = Field(l, 1)) {
-		int v = Int_val(Field(l, 0));
-		c_flags |= domain_create_flag_table[v];
-	}
+	for (l = flags; l != Val_none; l = Field(l, 1))
+		c_flags |= 1u << Int_val(Field(l, 0));
 
 	switch(Tag_val(domconfig)) {
 	case 0: /* ARM - nothing to do */
