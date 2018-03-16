@@ -3791,6 +3791,8 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = var_range_base[index];
         break;
 
+    case MSR_AMD_PATCHLOADER:
+    case MSR_IA32_UCODE_WRITE:
     case MSR_PRED_CMD:
         /* Write-only */
         goto gp_fault;
@@ -3871,6 +3873,26 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
     case MSR_EFER:
         if ( hvm_set_efer(msr_content) )
            return X86EMUL_EXCEPTION;
+        break;
+
+    case MSR_AMD_PATCHLOADER:
+        /*
+         * See note on MSR_IA32_UCODE_WRITE below, which may or may not apply
+         * to AMD CPUs as well (at least the architectural/CPUID part does).
+         */
+        if ( v->domain->arch.x86_vendor != X86_VENDOR_AMD )
+            goto gp_fault;
+        break;
+
+    case MSR_IA32_UCODE_WRITE:
+        /*
+         * Some versions of Windows at least on certain hardware try to load
+         * microcode before setting up an IDT. Therefore we must not inject #GP
+         * for such attempts. Also the MSR is architectural and not qualified
+         * by any CPUID bit.
+         */
+        if ( v->domain->arch.x86_vendor != X86_VENDOR_INTEL )
+            goto gp_fault;
         break;
 
     case MSR_IA32_XSS:
