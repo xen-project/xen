@@ -98,8 +98,9 @@ type handle
 external interface_open : unit -> handle = "stub_xc_interface_open"
 external interface_close : handle -> unit = "stub_xc_interface_close"
 val with_intf : (handle -> 'a) -> 'a
-val domain_create : handle -> int32 -> domain_create_flag list -> string -> arch_domainconfig -> domid
-val domain_sethandle : handle -> domid -> string -> unit
+external domain_create : handle -> int32 -> domain_create_flag list -> string -> arch_domainconfig -> domid
+  = "stub_xc_domain_create"
+external domain_sethandle : handle -> domid -> string -> unit = "stub_xc_domain_sethandle"
 external domain_max_vcpus : handle -> domid -> int -> unit
   = "stub_xc_domain_max_vcpus"
 external domain_pause : handle -> domid -> unit = "stub_xc_domain_pause"

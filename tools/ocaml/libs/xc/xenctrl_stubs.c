@@ -28,6 +28,7 @@
 #include <sys/mman.h>
 #include <stdint.h>
 #include <string.h>
+#include <inttypes.h>
 
 #define XC_WANT_COMPAT_MAP_FOREIGN_API
 #include <xenctrl.h>
@@ -97,6 +98,27 @@ CAMLprim value stub_xc_interface_close(value xch)
 	CAMLreturn(Val_unit);
 }
 
+static void domain_handle_of_uuid_string(xen_domain_handle_t h,
+					 const char *uuid)
+{
+#define X "%02"SCNx8
+#define UUID_FMT (X X X X "-" X X "-" X X "-" X X "-" X X X X X X)
+
+	if ( sscanf(uuid, UUID_FMT, &h[0], &h[1], &h[2], &h[3], &h[4],
+		    &h[5], &h[6], &h[7], &h[8], &h[9], &h[10], &h[11],
+		    &h[12], &h[13], &h[14], &h[15]) != 16 )
+	{
+		char buf[128];
+
+		snprintf(buf, sizeof(buf),
+			 "Xc.int_array_of_uuid_string: %s", uuid);
+
+		caml_invalid_argument(buf);
+	}
+
+#undef X
+}
+
 CAMLprim value stub_xc_domain_create(value xch, value ssidref,
                                      value flags, value handle,
                                      value domconfig)
@@ -104,20 +126,14 @@ CAMLprim value stub_xc_domain_create(value xch, value ssidref,
 	CAMLparam4(xch, ssidref, flags, handle);
 
 	uint32_t domid = 0;
-	xen_domain_handle_t h = { 0 };
+	xen_domain_handle_t h;
 	int result;
-	int i;
 	uint32_t c_ssidref = Int32_val(ssidref);
 	unsigned int c_flags = 0;
 	value l;
 	xc_domain_configuration_t config = {};
 
-        if (Wosize_val(handle) != 16)
-		caml_invalid_argument("Handle not a 16-integer array");
-
-	for (i = 0; i < sizeof(h); i++) {
-		h[i] = Int_val(Field(handle, i)) & 0xff;
-	}
+	domain_handle_of_uuid_string(h, String_val(handle));
 
 	for (l = flags; l != Val_none; l = Field(l, 1))
 		c_flags |= 1u << Int_val(Field(l, 0));
@@ -169,15 +185,10 @@ CAMLprim value stub_xc_domain_max_vcpus(value xch, value domid,
 value stub_xc_domain_sethandle(value xch, value domid, value handle)
 {
 	CAMLparam3(xch, domid, handle);
-	xen_domain_handle_t h = { 0 };
+	xen_domain_handle_t h;
 	int i;
 
-        if (Wosize_val(handle) != 16)
-		caml_invalid_argument("Handle not a 16-integer array");
-
-	for (i = 0; i < sizeof(h); i++) {
-		h[i] = Int_val(Field(handle, i)) & 0xff;
-	}
+	domain_handle_of_uuid_string(h, String_val(handle));
 
 	i = xc_domain_sethandle(_H(xch), _D(domid), h);
 	if (i)
