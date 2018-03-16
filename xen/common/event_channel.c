@@ -1284,10 +1284,10 @@ void evtchn_check_pollers(struct domain *d, unsigned int port)
     }
 }
 
-int evtchn_init(struct domain *d)
+int evtchn_init(struct domain *d, unsigned int max_port)
 {
     evtchn_2l_init(d);
-    d->max_evtchn_port = INT_MAX;
+    d->max_evtchn_port = min_t(unsigned int, max_port, INT_MAX);
 
     d->evtchn = alloc_evtchn_bucket(d, 0);
     if ( !d->evtchn )

@@ -134,7 +134,7 @@ struct evtchn
 #endif
 } __attribute__((aligned(64)));
 
-int  evtchn_init(struct domain *d); /* from domain_create */
+int  evtchn_init(struct domain *d, unsigned int max_port);
 void evtchn_destroy(struct domain *d); /* from domain_kill */
 void evtchn_destroy_final(struct domain *d); /* from complete_domain_destroy */
 

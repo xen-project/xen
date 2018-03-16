@@ -362,7 +362,7 @@ struct domain *domain_create(domid_t domid,
 
         radix_tree_init(&d->pirq_tree);
 
-        if ( (err = evtchn_init(d)) != 0 )
+        if ( (err = evtchn_init(d, config->max_evtchn_port)) != 0 )
             goto fail;
         init_status |= INIT_evtchn;
 

@@ -691,7 +691,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     const char *cmdline;
     struct bootmodule *xen_bootmodule;
     struct domain *dom0;
-    struct xen_domctl_createdomain dom0_cfg = {};
+    struct xen_domctl_createdomain dom0_cfg = {
+        .max_evtchn_port = -1,
+    };
 
     dcache_line_bytes = read_dcache_line_bytes();
 

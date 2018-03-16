@@ -540,9 +540,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
-        d->max_evtchn_port = min_t(unsigned int,
-                                   op->u.createdomain.max_evtchn_port, INT_MAX);
-
         ret = 0;
         op->domain = d->domain_id;
         copyback = 1;
