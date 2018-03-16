@@ -3467,9 +3467,6 @@ do_grant_table_op(
 
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
-        rc = -ENOSYS;
-        if ( unlikely(!replace_grant_supported()) )
-            goto out;
         rc = gnttab_unmap_and_replace(unmap, count);
         if ( rc > 0 )
         {

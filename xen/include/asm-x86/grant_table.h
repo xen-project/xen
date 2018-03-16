@@ -101,9 +101,4 @@ static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
 #define gnttab_need_iommu_mapping(d)                \
     (!paging_mode_translate(d) && need_iommu(d))
 
-static inline int replace_grant_supported(void)
-{
-    return 1;
-}
-
 #endif /* __ASM_GRANT_TABLE_H__ */

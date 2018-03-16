@@ -22,10 +22,6 @@ int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
 void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
 #define gnttab_create_status_page(d, t, i) do {} while (0)
 #define gnttab_release_host_mappings(domain) 1
-static inline int replace_grant_supported(void)
-{
-    return 1;
-}
 
 /*
  * The region used by Xen on the memory will never be mapped in DOM0
