@@ -57,12 +57,12 @@ int xc_domain_create(xc_interface *xch, uint32_t ssidref,
     domctl.u.createdomain.flags   = flags;
     memcpy(domctl.u.createdomain.handle, handle, sizeof(xen_domain_handle_t));
     /* xc_domain_configure_t is an alias of arch_domainconfig_t */
-    memcpy(&domctl.u.createdomain.config, config, sizeof(*config));
+    memcpy(&domctl.u.createdomain.arch, config, sizeof(*config));
     if ( (err = do_domctl(xch, &domctl)) != 0 )
         return err;
 
     *pdomid = (uint16_t)domctl.domain;
-    memcpy(config, &domctl.u.createdomain.config, sizeof(*config));
+    memcpy(config, &domctl.u.createdomain.arch, sizeof(*config));
 
     return 0;
 }

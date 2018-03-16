@@ -482,7 +482,7 @@ int arch_domain_create(struct domain *d,
 
     d->arch.s3_integrity = config->flags & XEN_DOMCTL_CDF_s3_integrity;
 
-    emflags = config->config.emulation_flags;
+    emflags = config->arch.emulation_flags;
 
     if ( is_hardware_domain(d) && is_pv_domain(d) )
         emflags |= XEN_X86_EMU_PIT;

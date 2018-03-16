@@ -1638,7 +1638,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                            ((hvm_funcs.hap_supported && !opt_dom0_shadow) ?
                             XEN_DOMCTL_CDF_hap : 0));
 
-        dom0_cfg.config.emulation_flags |=
+        dom0_cfg.arch.emulation_flags |=
             XEN_X86_EMU_LAPIC | XEN_X86_EMU_IOAPIC | XEN_X86_EMU_VPCI;
     }
 

@@ -65,7 +65,7 @@ struct xen_domctl_createdomain {
 #define _XEN_DOMCTL_CDF_xs_domain     4
 #define XEN_DOMCTL_CDF_xs_domain      (1U<<_XEN_DOMCTL_CDF_xs_domain)
     uint32_t flags;
-    struct xen_arch_domainconfig config;
+    struct xen_arch_domainconfig arch;
 };
 
 /* XEN_DOMCTL_getdomaininfo */
