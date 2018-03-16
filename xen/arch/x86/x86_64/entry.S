@@ -281,6 +281,8 @@ GLOBAL(sysenter_eflags_saved)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         GET_STACK_END(bx)
+        /* PUSHF above has saved EFLAGS.IF clear (the caller had it set). */
+        orl   $X86_EFLAGS_IF, UREGS_eflags(%rsp)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
         neg   %rcx
         jz    .Lsyse_cr3_okay
