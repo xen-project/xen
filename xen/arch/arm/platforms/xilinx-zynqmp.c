@@ -32,7 +32,7 @@ static const struct dt_device_match zynqmp_blacklist_dev[] __initconst =
     { /* sentinel */ },
 };
 
-PLATFORM_START(xgene_storm, "Xilinx ZynqMP")
+PLATFORM_START(xilinx_zynqmp, "Xilinx ZynqMP")
     .compatible = zynqmp_dt_compat,
     .blacklist_dev = zynqmp_blacklist_dev,
 PLATFORM_END
