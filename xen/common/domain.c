@@ -366,8 +366,8 @@ struct domain *domain_create(domid_t domid,
             goto fail;
         init_status |= INIT_evtchn;
 
-        if ( (err = grant_table_create(d, config->max_grant_frames,
-                                       config->max_maptrack_frames)) != 0 )
+        if ( (err = grant_table_init(d, config->max_grant_frames,
+                                     config->max_maptrack_frames)) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
 

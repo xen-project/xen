@@ -1806,22 +1806,31 @@ active_alloc_failed:
     return -ENOMEM;
 }
 
-static int
-grant_table_init(struct domain *d, struct grant_table *gt,
-                 unsigned int grant_frames, unsigned int maptrack_frames)
+int grant_table_init(struct domain *d, unsigned int max_grant_frames,
+                     unsigned int max_maptrack_frames)
 {
+    struct grant_table *gt;
     int ret = -ENOMEM;
 
-    grant_write_lock(gt);
+    if ( max_grant_frames < INITIAL_NR_GRANT_FRAMES ||
+         max_grant_frames > opt_max_grant_frames ||
+         max_maptrack_frames > opt_max_maptrack_frames )
+        return -EINVAL;
 
-    if ( gt->active )
-    {
-        ret = -EBUSY;
-        goto out_no_cleanup;
-    }
+    if ( (gt = xzalloc(struct grant_table)) == NULL )
+        return -ENOMEM;
 
-    gt->max_grant_frames = grant_frames;
-    gt->max_maptrack_frames = maptrack_frames;
+    /* Simple stuff. */
+    percpu_rwlock_resource_init(&gt->lock, grant_rwlock);
+    spin_lock_init(&gt->maptrack_lock);
+
+    gt->gt_version = 1;
+    gt->max_grant_frames = max_grant_frames;
+    gt->max_maptrack_frames = max_maptrack_frames;
+
+    /* Install the structure early to simplify the error path. */
+    gt->domain = d;
+    d->grant_table = gt;
 
     /* Active grant table. */
     gt->active = xzalloc_array(struct active_grant_entry *,
@@ -1848,29 +1857,21 @@ grant_table_init(struct domain *d, struct grant_table *gt,
     if ( gt->status == NULL )
         goto out;
 
+    grant_write_lock(gt);
+
     ret = gnttab_init_arch(gt);
     if ( ret )
-        goto out;
+        goto unlock;
 
     /* gnttab_grow_table() allocates a min number of frames, so 0 is okay. */
     ret = gnttab_grow_table(d, 0);
 
+ unlock:
+    grant_write_unlock(gt);
+
  out:
     if ( ret )
-    {
-        gnttab_destroy_arch(gt);
-        xfree(gt->status);
-        gt->status = NULL;
-        xfree(gt->shared_raw);
-        gt->shared_raw = NULL;
-        vfree(gt->maptrack);
-        gt->maptrack = NULL;
-        xfree(gt->active);
-        gt->active = NULL;
-    }
-
- out_no_cleanup:
-    grant_write_unlock(gt);
+        grant_table_destroy(d);
 
     return ret;
 }
@@ -3567,30 +3568,6 @@ do_grant_table_op(
 #include "compat/grant_table.c"
 #endif
 
-int grant_table_create(struct domain *d, unsigned int max_grant_frames,
-                       unsigned int max_maptrack_frames)
-{
-    struct grant_table *t;
-    int ret = 0;
-
-    if ( (t = xzalloc(struct grant_table)) == NULL )
-        return -ENOMEM;
-
-    /* Simple stuff. */
-    percpu_rwlock_resource_init(&t->lock, grant_rwlock);
-    spin_lock_init(&t->maptrack_lock);
-
-    t->gt_version = 1;
-
-    /* Okay, install the structure. */
-    t->domain = d;
-    d->grant_table = t;
-
-    ret = grant_table_set_limits(d, max_maptrack_frames, max_maptrack_frames);
-
-    return ret;
-}
-
 void
 gnttab_release_mappings(
     struct domain *d)
@@ -3779,22 +3756,6 @@ void grant_table_init_vcpu(struct vcpu *v)
     spin_lock_init(&v->maptrack_freelist_lock);
     v->maptrack_head = MAPTRACK_TAIL;
     v->maptrack_tail = MAPTRACK_TAIL;
-}
-
-int grant_table_set_limits(struct domain *d, unsigned int grant_frames,
-                           unsigned int maptrack_frames)
-{
-    struct grant_table *gt = d->grant_table;
-
-    if ( grant_frames < INITIAL_NR_GRANT_FRAMES ||
-         grant_frames > opt_max_grant_frames ||
-         maptrack_frames > opt_max_maptrack_frames )
-        return -EINVAL;
-    if ( !gt )
-        return -ENOENT;
-
-    /* Set limits. */
-    return grant_table_init(d, gt, grant_frames, maptrack_frames);
 }
 
 #ifdef CONFIG_HAS_MEM_SHARING
