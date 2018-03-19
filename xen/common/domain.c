@@ -322,6 +322,22 @@ struct domain *domain_create(domid_t domid,
         else
             d->guest_type = guest_type_pv;
 
+        if ( !is_hardware_domain(d) )
+            d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
+        else
+            d->nr_pirqs = extra_hwdom_irqs ? nr_static_irqs + extra_hwdom_irqs
+                                           : arch_hwdom_irqs(domid);
+        d->nr_pirqs = min(d->nr_pirqs, nr_irqs);
+
+        radix_tree_init(&d->pirq_tree);
+    }
+
+    if ( (err = arch_domain_create(d, config)) != 0 )
+        goto fail;
+    init_status |= INIT_arch;
+
+    if ( !is_idle_domain(d) )
+    {
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
 
@@ -352,16 +368,6 @@ struct domain *domain_create(domid_t domid,
         d->controller_pause_count = 1;
         atomic_inc(&d->pause_count);
 
-        if ( !is_hardware_domain(d) )
-            d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
-        else
-            d->nr_pirqs = extra_hwdom_irqs ? nr_static_irqs + extra_hwdom_irqs
-                                           : arch_hwdom_irqs(domid);
-        if ( d->nr_pirqs > nr_irqs )
-            d->nr_pirqs = nr_irqs;
-
-        radix_tree_init(&d->pirq_tree);
-
         if ( (err = evtchn_init(d, config->max_evtchn_port)) != 0 )
             goto fail;
         init_status |= INIT_evtchn;
@@ -376,14 +382,7 @@ struct domain *domain_create(domid_t domid,
         d->pbuf = xzalloc_array(char, DOMAIN_PBUF_SIZE);
         if ( !d->pbuf )
             goto fail;
-    }
 
-    if ( (err = arch_domain_create(d, config)) != 0 )
-        goto fail;
-    init_status |= INIT_arch;
-
-    if ( !is_idle_domain(d) )
-    {
         if ( (err = sched_init_domain(d, 0)) != 0 )
             goto fail;
 
