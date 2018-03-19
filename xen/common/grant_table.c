@@ -82,20 +82,11 @@ struct grant_table {
     struct grant_table_arch arch;
 };
 
-#ifndef DEFAULT_MAX_NR_GRANT_FRAMES /* to allow arch to override */
-/* Default maximum size of a grant table. [POLICY] */
-#define DEFAULT_MAX_NR_GRANT_FRAMES   64
-#endif
+unsigned int __read_mostly opt_max_grant_frames = 64;
+integer_runtime_param("gnttab_max_frames", opt_max_grant_frames);
 
-static unsigned int __read_mostly max_grant_frames =
-                                               DEFAULT_MAX_NR_GRANT_FRAMES;
-integer_runtime_param("gnttab_max_frames", max_grant_frames);
-
-#define DEFAULT_MAX_MAPTRACK_FRAMES 1024
-
-static unsigned int __read_mostly max_maptrack_frames =
-                                               DEFAULT_MAX_MAPTRACK_FRAMES;
-integer_runtime_param("gnttab_max_maptrack_frames", max_maptrack_frames);
+unsigned int __read_mostly opt_max_maptrack_frames = 1024;
+integer_runtime_param("gnttab_max_maptrack_frames", opt_max_maptrack_frames);
 
 static unsigned int __read_mostly opt_gnttab_max_version = 2;
 static bool __read_mostly opt_transitive_grants = true;
@@ -3609,7 +3600,8 @@ grant_table_create(
 
     if ( d->domain_id == 0 )
     {
-        ret = grant_table_init(d, t, gnttab_dom0_frames(), max_maptrack_frames);
+        ret = grant_table_init(d, t, gnttab_dom0_frames(),
+                               opt_max_maptrack_frames);
     }
 
     return ret;
@@ -3811,8 +3803,8 @@ int grant_table_set_limits(struct domain *d, unsigned int grant_frames,
     struct grant_table *gt = d->grant_table;
 
     if ( grant_frames < INITIAL_NR_GRANT_FRAMES ||
-         grant_frames > max_grant_frames ||
-         maptrack_frames > max_maptrack_frames )
+         grant_frames > opt_max_grant_frames ||
+         maptrack_frames > opt_max_maptrack_frames )
         return -EINVAL;
     if ( !gt )
         return -ENOENT;
@@ -3992,7 +3984,7 @@ __initcall(gnttab_usage_init);
 
 unsigned int __init gnttab_dom0_frames(void)
 {
-    return min(max_grant_frames, gnttab_dom0_max());
+    return min(opt_max_grant_frames, gnttab_dom0_max());
 }
 
 /*
