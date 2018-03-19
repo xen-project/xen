@@ -2094,7 +2094,7 @@ static void __init find_gnttab_region(struct domain *d,
            kinfo->gnttab_start, kinfo->gnttab_start + kinfo->gnttab_size);
 }
 
-int construct_dom0(struct domain *d)
+int __init construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
     struct vcpu *saved_current;
