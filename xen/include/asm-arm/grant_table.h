@@ -30,10 +30,8 @@ void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
  * Only use the text section as it's always present and will contain
  * enough space for a large grant table
  */
-static inline unsigned int gnttab_dom0_max(void)
-{
-    return PFN_DOWN(_etext - _stext);
-}
+#define gnttab_dom0_frames()                                             \
+    min_t(unsigned int, opt_max_grant_frames, PFN_DOWN(_etext - _stext))
 
 #define gnttab_init_arch(gt)                                             \
 ({                                                                       \

@@ -3567,9 +3567,8 @@ do_grant_table_op(
 #include "compat/grant_table.c"
 #endif
 
-int
-grant_table_create(
-    struct domain *d)
+int grant_table_create(struct domain *d, unsigned int max_grant_frames,
+                       unsigned int max_maptrack_frames)
 {
     struct grant_table *t;
     int ret = 0;
@@ -3587,11 +3586,7 @@ grant_table_create(
     t->domain = d;
     d->grant_table = t;
 
-    if ( d->domain_id == 0 )
-    {
-        ret = grant_table_init(d, t, gnttab_dom0_frames(),
-                               opt_max_maptrack_frames);
-    }
+    ret = grant_table_set_limits(d, max_maptrack_frames, max_maptrack_frames);
 
     return ret;
 }
@@ -4048,11 +4043,6 @@ static int __init gnttab_usage_init(void)
     return 0;
 }
 __initcall(gnttab_usage_init);
-
-unsigned int __init gnttab_dom0_frames(void)
-{
-    return min(opt_max_grant_frames, gnttab_dom0_max());
-}
 
 /*
  * Local variables:

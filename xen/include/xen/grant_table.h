@@ -35,8 +35,8 @@ extern unsigned int opt_max_grant_frames;
 extern unsigned int opt_max_maptrack_frames;
 
 /* Create/destroy per-domain grant table context. */
-int grant_table_create(
-    struct domain *d);
+int grant_table_create(struct domain *d, unsigned int max_grant_frames,
+                       unsigned int max_maptrack_frames);
 void grant_table_destroy(
     struct domain *d);
 void grant_table_init_vcpu(struct vcpu *v);
@@ -62,7 +62,5 @@ int gnttab_get_shared_frame(struct domain *d, unsigned long idx,
                             mfn_t *mfn);
 int gnttab_get_status_frame(struct domain *d, unsigned long idx,
                             mfn_t *mfn);
-
-unsigned int gnttab_dom0_frames(void);
 
 #endif /* __XEN_GRANT_TABLE_H__ */

@@ -20,6 +20,7 @@
 #include <xen/compile.h>
 #include <xen/device_tree.h>
 #include <xen/domain_page.h>
+#include <xen/grant_table.h>
 #include <xen/types.h>
 #include <xen/string.h>
 #include <xen/serial.h>
@@ -693,6 +694,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     struct domain *dom0;
     struct xen_domctl_createdomain dom0_cfg = {
         .max_evtchn_port = -1,
+        .max_grant_frames = gnttab_dom0_frames(),
+        .max_maptrack_frames = opt_max_maptrack_frames,
     };
 
     dcache_line_bytes = read_dcache_line_bytes();
