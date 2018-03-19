@@ -1701,7 +1701,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     /* Create initial domain 0. */
     dom0 = domain_create(get_initial_domain_id(), &dom0_cfg, !pv_shim);
-    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0, dom0_cfg.max_vcpus) == NULL) )
+    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
 
     /* Grab the DOM0 command line. */

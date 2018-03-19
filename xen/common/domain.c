@@ -338,6 +338,19 @@ struct domain *domain_create(domid_t domid,
 
     if ( !is_idle_domain(d) )
     {
+        /* Check d->max_vcpus and allocate d->vcpu[]. */
+        err = -EINVAL;
+        if ( config->max_vcpus < 1 ||
+             config->max_vcpus > domain_max_vcpus(d) )
+            goto fail;
+
+        err = -ENOMEM;
+        d->vcpu = xzalloc_array(struct vcpu *, config->max_vcpus);
+        if ( !d->vcpu )
+            goto fail;
+
+        d->max_vcpus = config->max_vcpus;
+
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
 
@@ -422,6 +435,11 @@ struct domain *domain_create(domid_t domid,
 
     sched_destroy_domain(d);
 
+    if ( d->max_vcpus )
+    {
+        d->max_vcpus = 0;
+        XFREE(d->vcpu);
+    }
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
     if ( init_status & INIT_gnttab )

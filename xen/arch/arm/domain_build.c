@@ -72,14 +72,8 @@ unsigned int __init dom0_max_vcpus(void)
     return opt_dom0_max_vcpus;
 }
 
-struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0,
-                                     unsigned int max_vcpus)
+struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 {
-    dom0->vcpu = xzalloc_array(struct vcpu *, max_vcpus);
-    if ( !dom0->vcpu )
-        return NULL;
-    dom0->max_vcpus = max_vcpus;
-
     return alloc_vcpu(dom0, 0, 0);
 }
 

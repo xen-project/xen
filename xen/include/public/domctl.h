@@ -312,7 +312,14 @@ struct xen_domctl_vcpuaffinity {
 };
 
 
-/* XEN_DOMCTL_max_vcpus */
+/*
+ * XEN_DOMCTL_max_vcpus:
+ *
+ * The parameter passed to XEN_DOMCTL_max_vcpus must match the value passed to
+ * XEN_DOMCTL_createdomain.  This hypercall is in the process of being removed
+ * (once the failure paths in domain_create() have been improved), but is
+ * still required in the short term to allocate the vcpus themselves.
+ */
 struct xen_domctl_max_vcpus {
     uint32_t max;           /* maximum number of vcpus */
 };

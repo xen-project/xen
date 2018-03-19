@@ -955,15 +955,6 @@ unsigned int vgic_max_vcpus(const struct domain *d)
 
     switch ( d->arch.vgic.version )
     {
-    case GIC_INVALID:
-        /*
-         * Since evtchn_init would call domain_max_vcpus for poll_mask
-         * allocation before the VGIC has been initialised, we need to
-         * return some safe value in this case. As this is for allocation
-         * purposes, go with the maximum value.
-         */
-        vgic_vcpu_limit = MAX_VIRT_CPUS;
-        break;
     case GIC_V2:
         vgic_vcpu_limit = VGIC_V2_MAX_CPUS;
         break;

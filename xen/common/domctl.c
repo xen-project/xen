@@ -554,15 +554,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
-             (max > domain_max_vcpus(d)) )
+             (max != d->max_vcpus) )   /* max_vcpus set up in createdomain */
             break;
-
-        /* Until Xenoprof can dynamically grow its vcpu-s array... */
-        if ( d->xenoprof )
-        {
-            ret = -EAGAIN;
-            break;
-        }
 
         /* Needed, for example, to ensure writable p.t. state is synced. */
         domain_pause(d);
@@ -581,38 +574,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             }
         }
 
-        /* We cannot reduce maximum VCPUs. */
-        ret = -EINVAL;
-        if ( (max < d->max_vcpus) && (d->vcpu[max] != NULL) )
-            goto maxvcpu_out;
-
-        /*
-         * For now don't allow increasing the vcpu count from a non-zero
-         * value: This code and all readers of d->vcpu would otherwise need
-         * to be converted to use RCU, but at present there's no tools side
-         * code path that would issue such a request.
-         */
-        ret = -EBUSY;
-        if ( (d->max_vcpus > 0) && (max > d->max_vcpus) )
-            goto maxvcpu_out;
-
         ret = -ENOMEM;
         online = cpupool_domain_cpumask(d);
-        if ( max > d->max_vcpus )
-        {
-            struct vcpu **vcpus;
-
-            BUG_ON(d->vcpu != NULL);
-            BUG_ON(d->max_vcpus != 0);
-
-            if ( (vcpus = xzalloc_array(struct vcpu *, max)) == NULL )
-                goto maxvcpu_out;
-
-            /* Install vcpu array /then/ update max_vcpus. */
-            d->vcpu = vcpus;
-            smp_wmb();
-            d->max_vcpus = max;
-        }
 
         for ( i = 0; i < max; i++ )
         {

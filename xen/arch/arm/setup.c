@@ -854,7 +854,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     dom0_cfg.max_vcpus = dom0_max_vcpus();
 
     dom0 = domain_create(0, &dom0_cfg, true);
-    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0, dom0_cfg.max_vcpus) == NULL) )
+    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
             panic("Error creating domain 0");
 
     if ( construct_dom0(dom0) != 0)

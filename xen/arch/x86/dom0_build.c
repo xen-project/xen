@@ -199,16 +199,10 @@ unsigned int __init dom0_max_vcpus(void)
     return max_vcpus;
 }
 
-struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0,
-                                     unsigned int max_vcpus)
+struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 {
     dom0->node_affinity = dom0_nodes;
     dom0->auto_node_affinity = !dom0_nr_pxms;
-
-    dom0->vcpu = xzalloc_array(struct vcpu *, max_vcpus);
-    if ( !dom0->vcpu )
-        return NULL;
-    dom0->max_vcpus = max_vcpus;
 
     return dom0_setup_vcpu(dom0, 0,
                            cpumask_last(&dom0_cpus) /* so it wraps around to first pcpu */);

@@ -17,7 +17,7 @@ struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
 
 unsigned int dom0_max_vcpus(void);
-struct vcpu *alloc_dom0_vcpu0(struct domain *dom0, unsigned int max_vcpus);
+struct vcpu *alloc_dom0_vcpu0(struct domain *dom0);
 
 int vcpu_reset(struct vcpu *);
 int vcpu_up(struct vcpu *v);

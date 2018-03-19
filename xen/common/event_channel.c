@@ -1303,8 +1303,7 @@ int evtchn_init(struct domain *d, unsigned int max_port)
     evtchn_from_port(d, 0)->state = ECS_RESERVED;
 
 #if MAX_VIRT_CPUS > BITS_PER_LONG
-    d->poll_mask = xzalloc_array(unsigned long,
-                                 BITS_TO_LONGS(domain_max_vcpus(d)));
+    d->poll_mask = xzalloc_array(unsigned long, BITS_TO_LONGS(d->max_vcpus));
     if ( !d->poll_mask )
     {
         free_evtchn_bucket(d, d->evtchn);

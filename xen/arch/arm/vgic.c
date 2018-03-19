@@ -669,16 +669,7 @@ void vgic_free_virq(struct domain *d, unsigned int virq)
 
 unsigned int vgic_max_vcpus(const struct domain *d)
 {
-    /*
-     * Since evtchn_init would call domain_max_vcpus for poll_mask
-     * allocation when the vgic_ops haven't been initialised yet,
-     * we return MAX_VIRT_CPUS if d->arch.vgic.handler is null.
-     */
-    if ( !d->arch.vgic.handler )
-        return MAX_VIRT_CPUS;
-    else
-        return min_t(unsigned int, MAX_VIRT_CPUS,
-                     d->arch.vgic.handler->max_vcpus);
+    return min_t(unsigned int, MAX_VIRT_CPUS, d->arch.vgic.handler->max_vcpus);
 }
 
 /*
