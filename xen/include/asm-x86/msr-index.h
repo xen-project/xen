@@ -40,6 +40,8 @@
 #define PRED_CMD_IBPB			(_AC(1, ULL) << 0)
 
 #define MSR_ARCH_CAPABILITIES		0x0000010a
+#define ARCH_CAPABILITIES_RDCL_NO	(_AC(1, ULL) << 0)
+#define ARCH_CAPABILITIES_IBRS_ALL	(_AC(1, ULL) << 1)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1

@@ -752,8 +752,6 @@ static int clone_mapping(const void *ptr, root_pgentry_t *rpt)
     return 0;
 }
 
-static __read_mostly int8_t opt_xpti = -1;
-boolean_param("xpti", opt_xpti);
 DEFINE_PER_CPU(root_pgentry_t *, root_pgt);
 
 static root_pgentry_t common_pgt;
@@ -766,7 +764,7 @@ static int setup_cpu_root_pgt(unsigned int cpu)
     unsigned int off;
     int rc;
 
-    if ( !opt_xpti )
+    if ( cpu_has_no_xpti )
         return 0;
 
     rpt = alloc_xen_pagetable();
@@ -1046,9 +1044,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
     stack_base[0] = stack_start;
-
-    if ( opt_xpti < 0 )
-        opt_xpti = boot_cpu_data.x86_vendor != X86_VENDOR_AMD;
 
     rc = setup_cpu_root_pgt(0);
     if ( rc )

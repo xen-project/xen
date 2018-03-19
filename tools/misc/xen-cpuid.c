@@ -143,6 +143,7 @@ static const char *str_7d0[32] =
     [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
 
     [26] = "ibrsb",         [27] = "stibp",
+    /* 28 */                [29] = "arch_caps",
 };
 
 static struct {
