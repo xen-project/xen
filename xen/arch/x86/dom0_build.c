@@ -199,10 +199,9 @@ unsigned int __init dom0_max_vcpus(void)
     return max_vcpus;
 }
 
-struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
+struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0,
+                                     unsigned int max_vcpus)
 {
-    unsigned int max_vcpus = dom0_max_vcpus();
-
     dom0->node_affinity = dom0_nodes;
     dom0->auto_node_affinity = !dom0_nr_pxms;
 

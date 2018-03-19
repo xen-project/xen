@@ -44,8 +44,6 @@ unsigned long initial_images_nrpages(nodeid_t node);
 void discard_initial_images(void);
 void *bootstrap_map(const module_t *mod);
 
-unsigned int dom0_max_vcpus(void);
-
 int xen_in_range(unsigned long mfn);
 
 void microcode_grab_module(

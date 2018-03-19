@@ -62,17 +62,23 @@ struct map_range_data
  */
 #define DOM0_FDT_EXTRA_SIZE (128 + sizeof(struct fdt_reserve_entry))
 
-struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
+unsigned int __init dom0_max_vcpus(void)
 {
     if ( opt_dom0_max_vcpus == 0 )
         opt_dom0_max_vcpus = num_online_cpus();
     if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
         opt_dom0_max_vcpus = MAX_VIRT_CPUS;
 
-    dom0->vcpu = xzalloc_array(struct vcpu *, opt_dom0_max_vcpus);
+    return opt_dom0_max_vcpus;
+}
+
+struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0,
+                                     unsigned int max_vcpus)
+{
+    dom0->vcpu = xzalloc_array(struct vcpu *, max_vcpus);
     if ( !dom0->vcpu )
         return NULL;
-    dom0->max_vcpus = opt_dom0_max_vcpus;
+    dom0->max_vcpus = max_vcpus;
 
     return alloc_vcpu(dom0, 0, 0);
 }
