@@ -218,7 +218,7 @@ static void hvm_unmap_ioreq_page(struct hvm_ioreq_server *s, bool buf)
 static int hvm_map_ioreq_page(
     struct hvm_ioreq_server *s, bool buf, unsigned long gfn)
 {
-    struct domain *d = s->domain;
+    struct domain *d = s->target;
     struct hvm_ioreq_page *iorp = buf ? &s->bufioreq : &s->ioreq;
     struct page_info *page;
     void *va;
@@ -315,8 +315,8 @@ static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
 
     spin_lock(&s->lock);
 
-    rc = alloc_unbound_xen_event_channel(v->domain, v->vcpu_id, s->domid,
-                                         NULL);
+    rc = alloc_unbound_xen_event_channel(v->domain, v->vcpu_id,
+                                         s->emulator->domain_id, NULL);
     if ( rc < 0 )
         goto fail2;
 
@@ -324,9 +324,10 @@ static int hvm_ioreq_server_add_vcpu(struct hvm_ioreq_server *s,
 
     if ( v->vcpu_id == 0 && s->bufioreq.va != NULL )
     {
-        struct domain *d = s->domain;
+        struct domain *d = s->target;
 
-        rc = alloc_unbound_xen_event_channel(v->domain, 0, s->domid, NULL);
+        rc = alloc_unbound_xen_event_channel(v->domain, 0,
+                                             s->emulator->domain_id, NULL);
         if ( rc < 0 )
             goto fail3;
 
@@ -434,7 +435,7 @@ static int hvm_ioreq_server_setup_pages(struct hvm_ioreq_server *s,
                                         bool is_default,
                                         bool handle_bufioreq)
 {
-    struct domain *d = s->domain;
+    struct domain *d = s->target;
     unsigned long ioreq_gfn = gfn_x(INVALID_GFN);
     unsigned long bufioreq_gfn = gfn_x(INVALID_GFN);
     int rc;
@@ -471,7 +472,7 @@ static int hvm_ioreq_server_setup_pages(struct hvm_ioreq_server *s,
 static void hvm_ioreq_server_unmap_pages(struct hvm_ioreq_server *s,
                                          bool is_default)
 {
-    struct domain *d = s->domain;
+    struct domain *d = s->target;
     bool handle_bufioreq = !!s->bufioreq.va;
 
     if ( handle_bufioreq )
@@ -521,7 +522,7 @@ static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s,
         if ( rc )
             goto fail;
 
-        s->range[i] = rangeset_new(s->domain, name,
+        s->range[i] = rangeset_new(s->target, name,
                                    RANGESETF_prettyprint_hex);
 
         xfree(name);
@@ -545,7 +546,7 @@ static int hvm_ioreq_server_alloc_rangesets(struct hvm_ioreq_server *s,
 static void hvm_ioreq_server_enable(struct hvm_ioreq_server *s,
                                     bool is_default)
 {
-    struct domain *d = s->domain;
+    struct domain *d = s->target;
     struct hvm_ioreq_vcpu *sv;
     bool handle_bufioreq = !!s->bufioreq.va;
 
@@ -576,7 +577,7 @@ static void hvm_ioreq_server_enable(struct hvm_ioreq_server *s,
 static void hvm_ioreq_server_disable(struct hvm_ioreq_server *s,
                                      bool is_default)
 {
-    struct domain *d = s->domain;
+    struct domain *d = s->target;
     bool handle_bufioreq = !!s->bufioreq.va;
 
     spin_lock(&s->lock);
@@ -602,12 +603,15 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s,
                                  struct domain *d, bool is_default,
                                  int bufioreq_handling, ioservid_t id)
 {
+    struct domain *currd = current->domain;
     struct vcpu *v;
     int rc;
 
     s->id = id;
-    s->domain = d;
-    s->domid = current->domain->domain_id;
+    s->target = d;
+
+    get_knownalive_domain(currd);
+    s->emulator = currd;
 
     spin_lock_init(&s->lock);
     INIT_LIST_HEAD(&s->ioreq_vcpu_list);
@@ -641,6 +645,7 @@ static int hvm_ioreq_server_init(struct hvm_ioreq_server *s,
  fail_map:
     hvm_ioreq_server_free_rangesets(s, is_default);
 
+    put_domain(s->emulator);
     return rc;
 }
 
@@ -651,6 +656,8 @@ static void hvm_ioreq_server_deinit(struct hvm_ioreq_server *s,
     hvm_ioreq_server_remove_all_vcpus(s);
     hvm_ioreq_server_unmap_pages(s, is_default);
     hvm_ioreq_server_free_rangesets(s, is_default);
+
+    put_domain(s->emulator);
 }
 
 static ioservid_t next_ioservid(struct domain *d)

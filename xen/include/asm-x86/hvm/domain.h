@@ -53,13 +53,11 @@ struct hvm_ioreq_vcpu {
 
 struct hvm_ioreq_server {
     struct list_head       list_entry;
-    struct domain          *domain;
+    struct domain          *target, *emulator;
 
     /* Lock to serialize toolstack modifications */
     spinlock_t             lock;
 
-    /* Domain id of emulating domain */
-    domid_t                domid;
     ioservid_t             id;
     struct hvm_ioreq_page  ioreq;
     struct list_head       ioreq_vcpu_list;
