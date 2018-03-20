@@ -519,6 +519,7 @@ void memguard_unguard_range(void *p, unsigned long l);
 
 void memguard_guard_stack(void *p);
 void memguard_unguard_stack(void *p);
+bool __attribute_const__ memguard_is_stack_guard_page(unsigned long addr);
 
 struct mmio_ro_emulate_ctxt {
         unsigned long cr2;
