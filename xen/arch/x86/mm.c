@@ -4124,14 +4124,9 @@ long do_mmu_update(
     {
         /*
          * Force other vCPU-s of the affected guest to pick up L4 entry
-         * changes (if any). Issue a flush IPI with empty operation mask to
-         * facilitate this (including ourselves waiting for the IPI to
-         * actually have arrived). Utilize the fact that FLUSH_VA_VALID is
-         * meaningless without FLUSH_CACHE, but will allow to pass the no-op
-         * check in flush_area_mask().
+         * changes (if any).
          */
-        flush_area_mask(pt_owner->domain_dirty_cpumask,
-                        ZERO_BLOCK_PTR, FLUSH_VA_VALID);
+        flush_mask(pt_owner->domain_dirty_cpumask, FLUSH_TLB_GLOBAL);
     }
 
     perfc_add(num_page_updates, i);
