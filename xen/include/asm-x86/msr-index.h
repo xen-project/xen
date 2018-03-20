@@ -31,6 +31,9 @@
 #define EFER_LMSLE		(1<<_EFER_LMSLE)
 #define EFER_FFXSE		(1<<_EFER_FFXSE)
 
+#define EFER_KNOWN_MASK		(EFER_SCE | EFER_LME | EFER_LMA | EFER_NX | \
+				 EFER_SVME | EFER_LMSLE | EFER_FFXSE)
+
 /* Speculation Controls. */
 #define MSR_SPEC_CTRL			0x00000048
 #define SPEC_CTRL_IBRS			(_AC(1, ULL) << 0)
