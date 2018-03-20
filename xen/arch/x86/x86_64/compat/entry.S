@@ -199,7 +199,7 @@ ENTRY(compat_post_handle_exception)
 
 /* See lstar_enter for entry register state. */
 ENTRY(cstar_enter)
-        sti
+        /* sti could live here when we don't switch page tables below. */
         CR4_PV32_RESTORE
         movq  8(%rsp),%rax /* Restore %rax. */
         movq  $FLAT_KERNEL_SS,8(%rsp)
@@ -219,11 +219,12 @@ ENTRY(cstar_enter)
         jz    .Lcstar_cr3_okay
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
         neg   %rcx
-        write_cr3 rcx, rdi, rsi
+        mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lcstar_cr3_okay:
+        sti
 
-        GET_CURRENT(bx)
+        __GET_CURRENT(bx)
         movq  VCPU_domain(%rbx),%rcx
         cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
         je    switch_to_kernel

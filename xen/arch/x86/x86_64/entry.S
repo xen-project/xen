@@ -147,7 +147,7 @@ UNLIKELY_END(exit_cr3)
  * %ss must be saved into the space left by the trampoline.
  */
 ENTRY(lstar_enter)
-        sti
+        /* sti could live here when we don't switch page tables below. */
         movq  8(%rsp),%rax /* Restore %rax. */
         movq  $FLAT_KERNEL_SS,8(%rsp)
         pushq %r11
@@ -166,9 +166,10 @@ ENTRY(lstar_enter)
         jz    .Llstar_cr3_okay
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
         neg   %rcx
-        write_cr3 rcx, rdi, rsi
+        mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Llstar_cr3_okay:
+        sti
 
         __GET_CURRENT(bx)
         testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
@@ -251,7 +252,7 @@ process_trap:
         jmp  test_all_events
 
 ENTRY(sysenter_entry)
-        sti
+        /* sti could live here when we don't switch page tables below. */
         pushq $FLAT_USER_SS
         pushq $0
         pushfq
@@ -267,14 +268,17 @@ GLOBAL(sysenter_eflags_saved)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         GET_STACK_END(bx)
+        /* PUSHF above has saved EFLAGS.IF clear (the caller had it set). */
+        orl   $X86_EFLAGS_IF, UREGS_eflags(%rsp)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
         neg   %rcx
         jz    .Lsyse_cr3_okay
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
         neg   %rcx
-        write_cr3 rcx, rdi, rsi
+        mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lsyse_cr3_okay:
+        sti
 
         __GET_CURRENT(bx)
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
@@ -321,9 +325,10 @@ ENTRY(int80_direct_trap)
         jz    .Lint80_cr3_okay
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
         neg   %rcx
-        write_cr3 rcx, rdi, rsi
+        mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lint80_cr3_okay:
+        sti
 
         cmpb  $0,untrusted_msi(%rip)
 UNLIKELY_START(ne, msi_check)
@@ -507,7 +512,7 @@ ENTRY(common_interrupt)
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         neg   %rcx
 .Lintr_cr3_load:
-        write_cr3 rcx, rdi, rsi
+        mov   %rcx, %cr3
         xor   %ecx, %ecx
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3, UREGS_cs(%rsp)
@@ -549,7 +554,7 @@ GLOBAL(handle_exception)
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         neg   %rcx
 .Lxcpt_cr3_load:
-        write_cr3 rcx, rdi, rsi
+        mov   %rcx, %cr3
         xor   %ecx, %ecx
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3, UREGS_cs(%rsp)
@@ -745,7 +750,7 @@ ENTRY(double_fault)
         jns   .Ldblf_cr3_load
         neg   %rbx
 .Ldblf_cr3_load:
-        write_cr3 rbx, rdi, rsi
+        mov   %rbx, %cr3
 .Ldblf_cr3_okay:
 
         movq  %rsp,%rdi
@@ -780,7 +785,7 @@ handle_ist_exception:
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         neg   %rcx
 .List_cr3_load:
-        write_cr3 rcx, rdi, rsi
+        mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .List_cr3_okay:
 
