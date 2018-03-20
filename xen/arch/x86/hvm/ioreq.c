@@ -757,6 +757,10 @@ int hvm_destroy_ioreq_server(struct domain *d, ioservid_t id)
         if ( s->id != id )
             continue;
 
+        rc = -EPERM;
+        if ( s->emulator != current->domain )
+            break;
+
         domain_pause(d);
 
         p2m_set_ioreq_server(d, 0, s);
@@ -801,6 +805,10 @@ int hvm_get_ioreq_server_info(struct domain *d, ioservid_t id,
         if ( s->id != id )
             continue;
 
+        rc = -EPERM;
+        if ( s->emulator != current->domain )
+            break;
+
         *ioreq_gfn = s->ioreq.gfn;
 
         if ( s->bufioreq.va != NULL )
@@ -842,6 +850,10 @@ int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
 
         if ( s->id != id )
             continue;
+
+        rc = -EPERM;
+        if ( s->emulator != current->domain )
+            break;
 
         switch ( type )
         {
@@ -897,6 +909,10 @@ int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
 
         if ( s->id != id )
             continue;
+
+        rc = -EPERM;
+        if ( s->emulator != current->domain )
+            break;
 
         switch ( type )
         {
@@ -961,6 +977,10 @@ int hvm_map_mem_type_to_ioreq_server(struct domain *d, ioservid_t id,
         if ( s->id != id )
             continue;
 
+        rc = -EPERM;
+        if ( s->emulator != current->domain )
+            break;
+
         rc = p2m_set_ioreq_server(d, flags, s);
         break;
     }
@@ -999,6 +1019,10 @@ int hvm_set_ioreq_server_state(struct domain *d, ioservid_t id,
 
         if ( s->id != id )
             continue;
+
+        rc = -EPERM;
+        if ( s->emulator != current->domain )
+            break;
 
         domain_pause(d);
 
