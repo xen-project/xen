@@ -955,6 +955,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(0x57, knl),
 	ICPU(0x85, knl),
 	ICPU(0x5c, bxt),
+	ICPU(0x7a, bxt),
 	ICPU(0x5f, dnv),
 	{}
 };
@@ -1100,6 +1101,7 @@ static void __init mwait_idle_state_table_update(void)
 		ivt_idle_state_table_update();
 		break;
 	case 0x5c: /* BXT */
+	case 0x7a:
 		bxt_idle_state_table_update();
 		break;
 	case 0x5e: /* SKL-H */
