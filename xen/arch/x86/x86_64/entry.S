@@ -13,6 +13,8 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
+        .section .text.entry, "ax", @progbits
+
 /* %rbx: struct vcpu */
 ENTRY(switch_to_kernel)
         leaq  VCPU_trap_bounce(%rbx),%rdx
@@ -413,6 +415,9 @@ int80_slow_path:
         subq  $2,UREGS_rip(%rsp)
         jmp   handle_exception_saved
 
+        /* create_bounce_frame & helpers don't need to be in .text.entry */
+        .text
+
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
 /* %rdx: trap_bounce, %rbx: struct vcpu                                  */
@@ -536,6 +541,8 @@ ENTRY(dom_crash_sync_extable)
         orb   %al,UREGS_cs(%rsp)
         xorl  %edi,%edi
         jmp   asm_domain_crash_synchronous /* Does not return */
+
+        .section .text.entry, "ax", @progbits
 
 ENTRY(common_interrupt)
         SAVE_ALL CLAC
@@ -895,8 +902,7 @@ GLOBAL(trap_nop)
 
 
 
-.section .rodata, "a", @progbits
-
+        .pushsection .rodata, "a", @progbits
 ENTRY(exception_table)
         .quad do_divide_error
         .quad do_debug
@@ -1036,9 +1042,10 @@ ENTRY(hypercall_args_table)
         .rept NR_hypercalls-(.-hypercall_args_table)
         .byte 0 /* do_ni_hypercall      */
         .endr
+        .popsection
 
 /* Table of automatically generated entry points.  One per vector. */
-        .section .init.rodata, "a", @progbits
+        .pushsection .init.rodata, "a", @progbits
 GLOBAL(autogen_entrypoints)
         /* pop into the .init.rodata section and record an entry point. */
         .macro entrypoint ent
@@ -1047,7 +1054,7 @@ GLOBAL(autogen_entrypoints)
         .popsection
         .endm
 
-        .text
+        .popsection
 autogen_stubs: /* Automatically generated stubs. */
 
         vec = 0
