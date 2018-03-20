@@ -1839,9 +1839,6 @@ mode.
 Override default selection of whether to isolate 64-bit PV guest page
 tables.
 
-** WARNING: Not yet a complete isolation implementation, but better than
-nothing. **
-
 ### xsave
 > `= <boolean>`
 

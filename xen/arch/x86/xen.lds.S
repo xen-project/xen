@@ -60,6 +60,13 @@ SECTIONS
         _stext = .;            /* Text and read-only data */
        *(.text)
        *(.text.__x86_indirect_thunk_*)
+
+       . = ALIGN(PAGE_SIZE);
+       _stextentry = .;
+       *(.text.entry)
+       . = ALIGN(PAGE_SIZE);
+       _etextentry = .;
+
        *(.text.cold)
        *(.text.unlikely)
        *(.fixup)

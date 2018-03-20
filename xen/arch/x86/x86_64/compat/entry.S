@@ -11,6 +11,8 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
+        .section .text.entry, "ax", @progbits
+
 ENTRY(entry_int82)
         ASM_CLAC
         pushq $0
@@ -266,6 +268,9 @@ ENTRY(compat_int80_direct_trap)
         CR4_PV32_RESTORE
         call  compat_create_bounce_frame
         jmp   compat_test_all_events
+
+        /* compat_create_bounce_frame & helpers don't need to be in .text.entry */
+        .text
 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {[ERRCODE,] EIP, CS, EFLAGS, [ESP, SS]}                             */

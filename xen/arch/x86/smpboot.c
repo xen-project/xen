@@ -644,13 +644,24 @@ static int clone_mapping(const void *ptr, root_pgentry_t *rpt)
 {
     unsigned long linear = (unsigned long)ptr, pfn;
     unsigned int flags;
-    l3_pgentry_t *pl3e = l4e_to_l3e(idle_pg_table[root_table_offset(linear)]) +
-                         l3_table_offset(linear);
+    l3_pgentry_t *pl3e;
     l2_pgentry_t *pl2e;
     l1_pgentry_t *pl1e;
 
-    if ( linear < DIRECTMAP_VIRT_START )
-        return 0;
+    /*
+     * Sanity check 'linear'.  We only allow cloning from the Xen virtual
+     * range, and in particular, only from the directmap and .text ranges.
+     */
+    if ( root_table_offset(linear) > ROOT_PAGETABLE_LAST_XEN_SLOT ||
+         root_table_offset(linear) < ROOT_PAGETABLE_FIRST_XEN_SLOT )
+        return -EINVAL;
+
+    if ( linear < XEN_VIRT_START ||
+         (linear >= XEN_VIRT_END && linear < DIRECTMAP_VIRT_START) )
+        return -EINVAL;
+
+    pl3e = l4e_to_l3e(idle_pg_table[root_table_offset(linear)]) +
+        l3_table_offset(linear);
 
     flags = l3e_get_flags(*pl3e);
     ASSERT(flags & _PAGE_PRESENT);
@@ -742,6 +753,10 @@ static __read_mostly int8_t opt_xpti = -1;
 boolean_param("xpti", opt_xpti);
 DEFINE_PER_CPU(root_pgentry_t *, root_pgt);
 
+static root_pgentry_t common_pgt;
+
+extern const char _stextentry[], _etextentry[];
+
 static int setup_cpu_root_pgt(unsigned int cpu)
 {
     root_pgentry_t *rpt;
@@ -762,8 +777,23 @@ static int setup_cpu_root_pgt(unsigned int cpu)
         idle_pg_table[root_table_offset(RO_MPT_VIRT_START)];
     /* SH_LINEAR_PT inserted together with guest mappings. */
     /* PERDOMAIN inserted during context switch. */
-    rpt[root_table_offset(XEN_VIRT_START)] =
-        idle_pg_table[root_table_offset(XEN_VIRT_START)];
+
+    /* One-time setup of common_pgt, which maps .text.entry and the stubs. */
+    if ( unlikely(!root_get_intpte(common_pgt)) )
+    {
+        const char *ptr;
+
+        for ( rc = 0, ptr = _stextentry;
+              !rc && ptr < _etextentry; ptr += PAGE_SIZE )
+            rc = clone_mapping(ptr, rpt);
+
+        if ( rc )
+            return rc;
+
+        common_pgt = rpt[root_table_offset(XEN_VIRT_START)];
+    }
+
+    rpt[root_table_offset(XEN_VIRT_START)] = common_pgt;
 
     /* Install direct map page table entries for stack, IDT, and TSS. */
     for ( off = rc = 0; !rc && off < STACK_SIZE; off += PAGE_SIZE )
@@ -773,6 +803,8 @@ static int setup_cpu_root_pgt(unsigned int cpu)
         rc = clone_mapping(idt_tables[cpu], rpt);
     if ( !rc )
         rc = clone_mapping(&per_cpu(init_tss, cpu), rpt);
+    if ( !rc )
+        rc = clone_mapping((void *)per_cpu(stubs.addr, cpu), rpt);
 
     return rc;
 }
@@ -781,6 +813,7 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
 {
     root_pgentry_t *rpt = per_cpu(root_pgt, cpu);
     unsigned int r;
+    unsigned long stub_linear = per_cpu(stubs.addr, cpu);
 
     if ( !rpt )
         return;
@@ -825,6 +858,16 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
     }
 
     free_xen_pagetable(rpt);
+
+    /* Also zap the stub mapping for this CPU. */
+    if ( stub_linear )
+    {
+        l3_pgentry_t *l3t = l4e_to_l3e(common_pgt);
+        l2_pgentry_t *l2t = l3e_to_l2e(l3t[l3_table_offset(stub_linear)]);
+        l1_pgentry_t *l1t = l2e_to_l1e(l2t[l2_table_offset(stub_linear)]);
+
+        l1t[l2_table_offset(stub_linear)] = l1e_empty();
+    }
 }
 
 static void cpu_smpboot_free(unsigned int cpu)
@@ -848,6 +891,8 @@ static void cpu_smpboot_free(unsigned int cpu)
     if ( per_cpu(scratch_cpumask, cpu) != &scratch_cpu0mask )
         free_cpumask_var(per_cpu(scratch_cpumask, cpu));
 
+    cleanup_cpu_root_pgt(cpu);
+
     if ( per_cpu(stubs.addr, cpu) )
     {
         unsigned long mfn = per_cpu(stubs.mfn, cpu);
@@ -864,8 +909,6 @@ static void cpu_smpboot_free(unsigned int cpu)
         if ( i == STUBS_PER_PAGE )
             free_domheap_page(mfn_to_page(mfn));
     }
-
-    cleanup_cpu_root_pgt(cpu);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     free_xenheap_pages(per_cpu(gdt_table, cpu), order);
@@ -922,9 +965,6 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
     set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
 
-    if ( setup_cpu_root_pgt(cpu) )
-        goto oom;
-
     for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
           i < nr_cpu_ids && i <= (cpu | (STUBS_PER_PAGE - 1)); ++i )
         if ( cpu_online(i) && cpu_to_node(i) == node )
@@ -937,6 +977,9 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( !stub_page )
         goto oom;
     per_cpu(stubs.addr, cpu) = stub_page + STUB_BUF_CPU_OFFS(cpu);
+
+    if ( setup_cpu_root_pgt(cpu) )
+        goto oom;
 
     if ( secondary_socket_cpumask == NULL &&
          (secondary_socket_cpumask = xzalloc(cpumask_t)) == NULL )
