@@ -161,6 +161,8 @@ void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 
     if ( trig )
         vlapic_set_vector(vec, &vlapic->regs->data[APIC_TMR]);
+    else
+        vlapic_clear_vector(vec, &vlapic->regs->data[APIC_TMR]);
 
     if ( hvm_funcs.update_eoi_exit_bitmap )
         hvm_funcs.update_eoi_exit_bitmap(target, vec, trig);
@@ -434,7 +436,7 @@ void vlapic_handle_EOI(struct vlapic *vlapic, u8 vector)
 {
     struct domain *d = vlapic_domain(vlapic);
 
-    if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
+    if ( vlapic_test_vector(vector, &vlapic->regs->data[APIC_TMR]) )
         vioapic_update_EOI(d, vector);
 
     hvm_dpci_msi_eoi(d, vector);
