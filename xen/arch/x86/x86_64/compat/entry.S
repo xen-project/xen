@@ -56,7 +56,7 @@ UNLIKELY_END(msi_check)
         xchgl %ecx,%esi              /* Arg 2, Arg 4 */
         movl  %edx,%edx              /* Arg 3        */
         movl  %edi,%r8d              /* Arg 5        */
-        movl  %ebp,%r9d              /* Arg 6        */
+        movl  UREGS_rbp(%rsp),%r9d   /* Arg 6        */
         movl  UREGS_rbx(%rsp),%edi   /* Arg 1        */
 #define SHADOW_BYTES 0  /* No on-stack shadow state */
 #endif
