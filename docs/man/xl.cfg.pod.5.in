@@ -277,6 +277,14 @@ memory=8096 will report significantly less memory available for use
 than a system with maxmem=8096 memory=8096 due to the memory overhead
 of having to track the unused pages.
 
+=item B<static_shm=[ "SSHM_SPEC", "SSHM_SPEC", ... ]>
+
+Specifies the static shared memory regions of this guest. Static shared
+memory regions enables guests to communicate with each other through
+one or more shared memory regions, even without grant table support.
+Currently, this only works on ARM guests.
+See L<xl-static-shm-configuration(5)> for more details.
+
 =back
 
 =head3 Guest Virtual NUMA Configuration

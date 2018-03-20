@@ -1196,6 +1196,12 @@ static int flask_map_gmfn_foreign(struct domain *d, struct domain *t)
     return domain_has_perm(d, t, SECCLASS_MMU, MMU__MAP_READ | MMU__MAP_WRITE);
 }
 
+static int flask_map_gmfn_share(struct domain *d, struct domain *t)
+{
+    return current_has_perm(t, SECCLASS_MMU, MMU__MAP_READ | MMU__MAP_WRITE) ?:
+        domain_has_perm(d, t, SECCLASS_MMU, MMU__SHARE_MEM);
+}
+
 static int flask_hvm_param(struct domain *d, unsigned long op)
 {
     u32 perm;
@@ -1815,6 +1821,7 @@ static struct xsm_operations flask_ops = {
     .add_to_physmap = flask_add_to_physmap,
     .remove_from_physmap = flask_remove_from_physmap,
     .map_gmfn_foreign = flask_map_gmfn_foreign,
+    .map_gmfn_share = flask_map_gmfn_share,
 
 #if defined(CONFIG_HAS_PASSTHROUGH) && defined(CONFIG_HAS_PCI)
     .get_device_group = flask_get_device_group,

@@ -118,6 +118,12 @@ int xlu_rdm_parse(XLU_Config *cfg, libxl_rdm_reserve *rdm, const char *str);
 int xlu_vif_parse_rate(XLU_Config *cfg, const char *rate,
                        libxl_device_nic *nic);
 
+/*
+ * static shared memory specification parsing
+ */
+int xlu_sshm_parse(XLU_Config *cfg, const char *spec,
+                   libxl_static_shm *sshm);
+
 #endif /* LIBXLUTIL_H */
 
 /*

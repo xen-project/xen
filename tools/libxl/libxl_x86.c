@@ -603,6 +603,24 @@ void libxl__arch_domain_build_info_acpi_setdefault(
     libxl_defbool_setdefault(&b_info->acpi, true);
 }
 
+bool libxl__arch_domain_support_sshm(const libxl_domain_build_info *b_info)
+{
+    /* FIXME: Mark this as unsupported for calling p2m_add_foreign on two
+     * DomU's is currently not allowd on x86, see the comments in
+     * x86/mm/p2m.c: p2m_add_foreign */
+     return false;
+}
+
+int libxl__arch_domain_sshm_cachepolicy_setdefault(libxl_static_shm *sshm)
+{
+    if (sshm->cache_policy == LIBXL_SSHM_CACHEPOLICY_UNKNOWN)
+        sshm->cache_policy = LIBXL_SSHM_CACHEPOLICY_X86_NORMAL;
+    if (sshm->cache_policy < LIBXL_SSHM_CACHEPOLICY_X86_NORMAL)
+        return ERROR_INVAL;
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

@@ -124,6 +124,7 @@ void __init xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, add_to_physmap);
     set_to_dummy_if_null(ops, remove_from_physmap);
     set_to_dummy_if_null(ops, map_gmfn_foreign);
+    set_to_dummy_if_null(ops, map_gmfn_share);
 
     set_to_dummy_if_null(ops, vm_event_control);
 

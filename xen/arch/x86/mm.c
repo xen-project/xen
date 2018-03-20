@@ -4175,6 +4175,10 @@ int xenmem_add_to_physmap_one(
         }
         case XENMAPSPACE_gmfn_foreign:
             return p2m_add_foreign(d, idx, gfn_x(gpfn), extra.foreign_domid);
+        case XENMAPSPACE_gmfn_share:
+            gdprintk(XENLOG_WARNING,
+                     "XENMAPSPACE_gmfn_share is currently not supported on x86\n");
+            break;
         default:
             break;
     }

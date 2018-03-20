@@ -535,6 +535,12 @@ static XSM_INLINE int xsm_map_gmfn_foreign(XSM_DEFAULT_ARG struct domain *d, str
     return xsm_default_action(action, d, t);
 }
 
+static XSM_INLINE int xsm_map_gmfn_share(XSM_DEFAULT_ARG struct domain *d, struct domain *t)
+{
+    XSM_ASSERT_ACTION(XSM_TARGET);
+    return xsm_default_action(action, current->domain, t);
+}
+
 static XSM_INLINE int xsm_hvm_param(XSM_DEFAULT_ARG struct domain *d, unsigned long op)
 {
     XSM_ASSERT_ACTION(XSM_TARGET);

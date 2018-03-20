@@ -139,7 +139,7 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_dom_suspend.o libxl_dom_save.o libxl_usb.o \
 			libxl_vtpm.o libxl_nic.o libxl_disk.o libxl_console.o \
 			libxl_cpupool.o libxl_mem.o libxl_sched.o libxl_tmem.o \
-			libxl_9pfs.o libxl_domain.o libxl_vdispl.o \
+			libxl_9pfs.o libxl_domain.o libxl_vdispl.o libxl_sshm.o \
                         $(LIBXL_OBJS-y)
 LIBXL_OBJS += libxl_genid.o
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
@@ -176,7 +176,7 @@ AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 AUTOSRCS += _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
-	libxlu_disk_l.o libxlu_disk.o libxlu_vif.o libxlu_pci.o
+	libxlu_disk_l.o libxlu_disk.o libxlu_vif.o libxlu_pci.o libxlu_sshm.o
 $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
 $(TEST_PROG_OBJS) _libxl.api-for-check: CFLAGS += $(CFLAGS_libxentoollog) $(CFLAGS_libxentoolcore)

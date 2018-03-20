@@ -2365,6 +2365,10 @@ int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock);
 int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
                                const char *command_line, char **output);
 
+/* Constants for libxl_static_shm */
+#define LIBXL_SSHM_RANGE_UNKNOWN UINT64_MAX
+#define LIBXL_SSHM_ID_MAXLEN    128
+
 #include <libxl_event.h>
 
 #endif /* LIBXL_H */
