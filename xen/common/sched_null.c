@@ -120,11 +120,6 @@ static inline struct null_vcpu *null_vcpu(const struct vcpu *v)
     return v->sched_priv;
 }
 
-static inline struct null_dom *null_dom(const struct domain *d)
-{
-    return d->sched_priv;
-}
-
 static inline bool vcpu_check_affinity(struct vcpu *v, unsigned int cpu,
                                        unsigned int balance_step)
 {
@@ -677,7 +672,7 @@ static void null_vcpu_migrate(const struct scheduler *ops, struct vcpu *v,
 static inline void null_vcpu_check(struct vcpu *v)
 {
     struct null_vcpu * const nvc = null_vcpu(v);
-    struct null_dom * const ndom = null_dom(v->domain);
+    struct null_dom * const ndom = v->domain->sched_priv;
 
     BUG_ON(nvc->vcpu != v);
 
