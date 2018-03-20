@@ -835,37 +835,37 @@ int hvm_map_io_range_to_ioreq_server(struct domain *d, ioservid_t id,
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
     {
+        struct rangeset *r;
+
         if ( s == d->arch.hvm_domain.default_ioreq_server )
             continue;
 
-        if ( s->id == id )
+        if ( s->id != id )
+            continue;
+
+        switch ( type )
         {
-            struct rangeset *r;
+        case XEN_DMOP_IO_RANGE_PORT:
+        case XEN_DMOP_IO_RANGE_MEMORY:
+        case XEN_DMOP_IO_RANGE_PCI:
+            r = s->range[type];
+            break;
 
-            switch ( type )
-            {
-            case XEN_DMOP_IO_RANGE_PORT:
-            case XEN_DMOP_IO_RANGE_MEMORY:
-            case XEN_DMOP_IO_RANGE_PCI:
-                r = s->range[type];
-                break;
-
-            default:
-                r = NULL;
-                break;
-            }
-
-            rc = -EINVAL;
-            if ( !r )
-                break;
-
-            rc = -EEXIST;
-            if ( rangeset_overlaps_range(r, start, end) )
-                break;
-
-            rc = rangeset_add_range(r, start, end);
+        default:
+            r = NULL;
             break;
         }
+
+        rc = -EINVAL;
+        if ( !r )
+            break;
+
+        rc = -EEXIST;
+        if ( rangeset_overlaps_range(r, start, end) )
+            break;
+
+        rc = rangeset_add_range(r, start, end);
+        break;
     }
 
     spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
@@ -890,37 +890,37 @@ int hvm_unmap_io_range_from_ioreq_server(struct domain *d, ioservid_t id,
                           &d->arch.hvm_domain.ioreq_server.list,
                           list_entry )
     {
+        struct rangeset *r;
+
         if ( s == d->arch.hvm_domain.default_ioreq_server )
             continue;
 
-        if ( s->id == id )
+        if ( s->id != id )
+            continue;
+
+        switch ( type )
         {
-            struct rangeset *r;
+        case XEN_DMOP_IO_RANGE_PORT:
+        case XEN_DMOP_IO_RANGE_MEMORY:
+        case XEN_DMOP_IO_RANGE_PCI:
+            r = s->range[type];
+            break;
 
-            switch ( type )
-            {
-            case XEN_DMOP_IO_RANGE_PORT:
-            case XEN_DMOP_IO_RANGE_MEMORY:
-            case XEN_DMOP_IO_RANGE_PCI:
-                r = s->range[type];
-                break;
-
-            default:
-                r = NULL;
-                break;
-            }
-
-            rc = -EINVAL;
-            if ( !r )
-                break;
-
-            rc = -ENOENT;
-            if ( !rangeset_contains_range(r, start, end) )
-                break;
-
-            rc = rangeset_remove_range(r, start, end);
+        default:
+            r = NULL;
             break;
         }
+
+        rc = -EINVAL;
+        if ( !r )
+            break;
+
+        rc = -ENOENT;
+        if ( !rangeset_contains_range(r, start, end) )
+            break;
+
+        rc = rangeset_remove_range(r, start, end);
+        break;
     }
 
     spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
@@ -958,11 +958,11 @@ int hvm_map_mem_type_to_ioreq_server(struct domain *d, ioservid_t id,
         if ( s == d->arch.hvm_domain.default_ioreq_server )
             continue;
 
-        if ( s->id == id )
-        {
-            rc = p2m_set_ioreq_server(d, flags, s);
-            break;
-        }
+        if ( s->id != id )
+            continue;
+
+        rc = p2m_set_ioreq_server(d, flags, s);
+        break;
     }
 
     spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
