@@ -225,8 +225,8 @@ struct cpu_dbs_info_s {
     struct cpufreq_frequency_table *freq_table;
     int cpu;
     unsigned int enable:1;
-    unsigned int stoppable:1;
     unsigned int turbo_enabled:1;
+    int8_t stoppable;
 };
 
 int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event);
