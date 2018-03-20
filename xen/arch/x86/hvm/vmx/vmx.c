@@ -1952,13 +1952,53 @@ static void __vmx_deliver_posted_interrupt(struct vcpu *v)
     bool_t running = v->is_running;
 
     vcpu_unblock(v);
+    /*
+     * Just like vcpu_kick(), nothing is needed for the following two cases:
+     * 1. The target vCPU is not running, meaning it is blocked or runnable.
+     * 2. The target vCPU is the current vCPU and we're in non-interrupt
+     * context.
+     */
     if ( running && (in_irq() || (v != current)) )
     {
+        /*
+         * Note: Only two cases will reach here:
+         * 1. The target vCPU is running on other pCPU.
+         * 2. The target vCPU is the current vCPU.
+         *
+         * Note2: Don't worry the v->processor may change. The vCPU being
+         * moved to another processor is guaranteed to sync PIR to vIRR,
+         * due to the involved scheduling cycle.
+         */
         unsigned int cpu = v->processor;
 
-        if ( !test_and_set_bit(VCPU_KICK_SOFTIRQ, &softirq_pending(cpu))
-             && (cpu != smp_processor_id()) )
+        /*
+         * For case 1, we send an IPI to the pCPU. When an IPI arrives, the
+         * target vCPU maybe is running in non-root mode, running in root
+         * mode, runnable or blocked. If the target vCPU is running in
+         * non-root mode, the hardware will sync PIR to vIRR for
+         * 'posted_intr_vector' is special to the pCPU. If the target vCPU is
+         * running in root-mode, the interrupt handler starts to run.
+         * Considering an IPI may arrive in the window between the call to
+         * vmx_intr_assist() and interrupts getting disabled, the interrupt
+         * handler should raise a softirq to ensure events will be delivered
+         * in time. If the target vCPU is runnable, it will sync PIR to
+         * vIRR next time it is chose to run. In this case, a IPI and a
+         * softirq is sent to a wrong vCPU which will not have any adverse
+         * effect. If the target vCPU is blocked, since vcpu_block() checks
+         * whether there is an event to be delivered through
+         * local_events_need_delivery() just after blocking, the vCPU must
+         * have synced PIR to vIRR. Similarly, there is a IPI and a softirq
+         * sent to a wrong vCPU.
+         */
+        if ( cpu != smp_processor_id() )
             send_IPI_mask(cpumask_of(cpu), posted_intr_vector);
+        /*
+         * For case 2, raising a softirq ensures PIR will be synced to vIRR.
+         * As any softirq will do, as an optimization we only raise one if
+         * none is pending already.
+         */
+        else if ( !softirq_pending(cpu) )
+            raise_softirq(VCPU_KICK_SOFTIRQ);
     }
 }
 
@@ -2388,13 +2428,9 @@ const struct hvm_function_table * __init start_vmx(void)
 
     if ( cpu_has_vmx_posted_intr_processing )
     {
+        alloc_direct_apic_vector(&posted_intr_vector, pi_notification_interrupt);
         if ( iommu_intpost )
-        {
-            alloc_direct_apic_vector(&posted_intr_vector, pi_notification_interrupt);
             alloc_direct_apic_vector(&pi_wakeup_vector, pi_wakeup_interrupt);
-        }
-        else
-            alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
     }
     else
     {
