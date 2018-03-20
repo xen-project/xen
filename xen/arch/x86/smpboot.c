@@ -790,7 +790,8 @@ static int setup_cpu_root_pgt(unsigned int cpu)
 
     /* Install direct map page table entries for stack, IDT, and TSS. */
     for ( off = rc = 0; !rc && off < STACK_SIZE; off += PAGE_SIZE )
-        rc = clone_mapping(__va(__pa(stack_base[cpu])) + off, rpt);
+        if ( !memguard_is_stack_guard_page(off) )
+            rc = clone_mapping(__va(__pa(stack_base[cpu])) + off, rpt);
 
     if ( !rc )
         rc = clone_mapping(idt_tables[cpu], rpt);
