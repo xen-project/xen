@@ -741,6 +741,7 @@ static int clone_mapping(const void *ptr, root_pgentry_t *rpt)
     }
 
     pl1e += l1_table_offset(linear);
+    flags &= ~_PAGE_GLOBAL;
 
     if ( l1e_get_flags(*pl1e) & _PAGE_PRESENT )
     {
@@ -1050,7 +1051,16 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     if ( rc )
         panic("Error %d setting up PV root page table\n", rc);
     if ( per_cpu(root_pgt, 0) )
+    {
         get_cpu_info()->pv_cr3 = __pa(per_cpu(root_pgt, 0));
+
+        /*
+         * All entry points which may need to switch page tables have to start
+         * with interrupts off. Re-write what pv_trap_init() has put there.
+         */
+        _set_gate(idt_table + LEGACY_SYSCALL_VECTOR, SYS_DESC_irq_gate, 3,
+                  &int80_direct_trap);
+    }
 
     set_nr_sockets();
 
