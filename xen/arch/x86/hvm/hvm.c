@@ -4205,10 +4205,11 @@ static int hvmop_set_param(
         domctl_lock_release();
         break;
     case HVM_PARAM_DM_DOMAIN:
-        if ( a.value == DOMID_SELF )
-            a.value = curr_d->domain_id;
+        /* The only value this should ever be set to is DOMID_SELF */
+        if ( a.value != DOMID_SELF )
+            rc = -EINVAL;
 
-        rc = hvm_set_dm_domain(d, a.value);
+        a.value = curr_d->domain_id;
         break;
     case HVM_PARAM_ACPI_S_STATE:
         rc = 0;
@@ -4449,9 +4450,7 @@ static int hvmop_get_param(
          */
         if ( !d->creation_finished )
         {
-            domid_t domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
-
-            rc = hvm_create_ioreq_server(d, domid, true,
+            rc = hvm_create_ioreq_server(d, true,
                                          HVM_IOREQSRV_BUFIOREQ_LEGACY, NULL);
             if ( rc != 0 && rc != -EEXIST )
                 goto out;

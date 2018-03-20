@@ -599,16 +599,15 @@ static void hvm_ioreq_server_disable(struct hvm_ioreq_server *s,
 }
 
 static int hvm_ioreq_server_init(struct hvm_ioreq_server *s,
-                                 struct domain *d, domid_t domid,
-                                 bool is_default, int bufioreq_handling,
-                                 ioservid_t id)
+                                 struct domain *d, bool is_default,
+                                 int bufioreq_handling, ioservid_t id)
 {
     struct vcpu *v;
     int rc;
 
     s->id = id;
     s->domain = d;
-    s->domid = domid;
+    s->domid = current->domain->domain_id;
 
     spin_lock_init(&s->lock);
     INIT_LIST_HEAD(&s->ioreq_vcpu_list);
@@ -680,9 +679,8 @@ static ioservid_t next_ioservid(struct domain *d)
     return id;
 }
 
-int hvm_create_ioreq_server(struct domain *d, domid_t domid,
-                            bool is_default, int bufioreq_handling,
-                            ioservid_t *id)
+int hvm_create_ioreq_server(struct domain *d, bool is_default,
+                            int bufioreq_handling, ioservid_t *id)
 {
     struct hvm_ioreq_server *s;
     int rc;
@@ -702,7 +700,7 @@ int hvm_create_ioreq_server(struct domain *d, domid_t domid,
     if ( is_default && d->arch.hvm_domain.default_ioreq_server != NULL )
         goto fail2;
 
-    rc = hvm_ioreq_server_init(s, d, domid, is_default, bufioreq_handling,
+    rc = hvm_ioreq_server_init(s, d, is_default, bufioreq_handling,
                                next_ioservid(d));
     if ( rc )
         goto fail3;
@@ -1087,80 +1085,6 @@ void hvm_destroy_all_ioreq_servers(struct domain *d)
     }
 
     spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
-}
-
-static int hvm_replace_event_channel(struct vcpu *v, domid_t remote_domid,
-                                     evtchn_port_t *p_port)
-{
-    int old_port, new_port;
-
-    new_port = alloc_unbound_xen_event_channel(v->domain, v->vcpu_id,
-                                               remote_domid, NULL);
-    if ( new_port < 0 )
-        return new_port;
-
-    /* xchg() ensures that only we call free_xen_event_channel(). */
-    old_port = xchg(p_port, new_port);
-    free_xen_event_channel(v->domain, old_port);
-    return 0;
-}
-
-int hvm_set_dm_domain(struct domain *d, domid_t domid)
-{
-    struct hvm_ioreq_server *s;
-    int rc = 0;
-
-    spin_lock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
-
-    /*
-     * Lack of ioreq server is not a failure. HVM_PARAM_DM_DOMAIN will
-     * still be set and thus, when the server is created, it will have
-     * the correct domid.
-     */
-    s = d->arch.hvm_domain.default_ioreq_server;
-    if ( !s )
-        goto done;
-
-    domain_pause(d);
-    spin_lock(&s->lock);
-
-    if ( s->domid != domid )
-    {
-        struct hvm_ioreq_vcpu *sv;
-
-        list_for_each_entry ( sv,
-                              &s->ioreq_vcpu_list,
-                              list_entry )
-        {
-            struct vcpu *v = sv->vcpu;
-
-            if ( v->vcpu_id == 0 )
-            {
-                rc = hvm_replace_event_channel(v, domid,
-                                               &s->bufioreq_evtchn);
-                if ( rc )
-                    break;
-
-                d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] =
-                    s->bufioreq_evtchn;
-            }
-
-            rc = hvm_replace_event_channel(v, domid, &sv->ioreq_evtchn);
-            if ( rc )
-                break;
-
-            hvm_update_ioreq_evtchn(s, sv);
-        }
-
-        s->domid = domid;
-    }
-
-    spin_unlock(&s->lock);
-    domain_unpause(d);
-
- done:
-    spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
-    return rc;
 }
 
 struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,

@@ -402,7 +402,6 @@ static int dm_op(const struct dmop_args *op_args)
     {
     case XEN_DMOP_create_ioreq_server:
     {
-        struct domain *curr_d = current->domain;
         struct xen_dm_op_create_ioreq_server *data =
             &op.u.create_ioreq_server;
 
@@ -412,8 +411,8 @@ static int dm_op(const struct dmop_args *op_args)
         if ( data->pad[0] || data->pad[1] || data->pad[2] )
             break;
 
-        rc = hvm_create_ioreq_server(d, curr_d->domain_id, false,
-                                     data->handle_bufioreq, &data->id);
+        rc = hvm_create_ioreq_server(d, false, data->handle_bufioreq,
+                                     &data->id);
         break;
     }
 
