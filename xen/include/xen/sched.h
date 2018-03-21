@@ -831,6 +831,9 @@ void scheduler_free(struct scheduler *sched);
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
 int cpu_disable_scheduler(unsigned int cpu);
+/* We need it in dom0_setup_vcpu */
+void sched_set_affinity(struct vcpu *v, const cpumask_t *hard,
+                        const cpumask_t *soft);
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
 int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity);
 void restore_vcpu_affinity(struct domain *d);

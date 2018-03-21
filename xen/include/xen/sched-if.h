@@ -173,6 +173,9 @@ struct scheduler {
                                     unsigned int);
     int          (*adjust)         (const struct scheduler *, struct domain *,
                                     struct xen_domctl_scheduler_op *);
+    void         (*adjust_affinity)(const struct scheduler *, struct vcpu *,
+                                    const struct cpumask *,
+                                    const struct cpumask *);
     int          (*adjust_global)  (const struct scheduler *,
                                     struct xen_sysctl_scheduler_op *);
     void         (*dump_settings)  (const struct scheduler *);
