@@ -270,10 +270,9 @@ static inline cpumask_t* cpupool_domain_cpumask(struct domain *d)
  */
 static inline int has_soft_affinity(const struct vcpu *v)
 {
-    return !cpumask_subset(cpupool_domain_cpumask(v->domain),
-                           v->cpu_soft_affinity) &&
-           !cpumask_subset(v->cpu_hard_affinity, v->cpu_soft_affinity) &&
-           cpumask_intersects(v->cpu_soft_affinity, v->cpu_hard_affinity);
+    return v->soft_aff_effective &&
+           !cpumask_subset(cpupool_domain_cpumask(v->domain),
+                           v->cpu_soft_affinity);
 }
 
 /*

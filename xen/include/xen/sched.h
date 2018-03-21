@@ -210,6 +210,9 @@ struct vcpu
     bool             hcall_compat;
 #endif
 
+    /* Does soft affinity actually play a role (given hard affinity)? */
+    bool             soft_aff_effective;
+
     /* The CPU, if any, which is holding onto this VCPU's state. */
 #define VCPU_CPU_CLEAN (~0u)
     unsigned int     dirty_cpu;
