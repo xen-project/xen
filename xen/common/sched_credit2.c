@@ -299,6 +299,12 @@
  */
 #define __CSFLAG_vcpu_yield 4
 #define CSFLAG_vcpu_yield (1U<<__CSFLAG_vcpu_yield)
+/*
+ * CSFLAGS_pinned: this vcpu is currently 'pinned', i.e., has its hard
+ * affinity set to one and only 1 cpu (and, hence, can only run there).
+ */
+#define __CSFLAG_pinned 5
+#define CSFLAG_pinned (1U<<__CSFLAG_pinned)
 
 static unsigned int __read_mostly opt_migrate_resist = 500;
 integer_param("sched_credit2_migrate_resist", opt_migrate_resist);
@@ -1453,6 +1459,26 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
         __trace_var(TRC_CSCHED2_TICKLE_NEW, 1,
                     sizeof(d),
                     (unsigned char *)&d);
+    }
+
+    /*
+     * Exclusive pinning is when a vcpu has hard-affinity with only one
+     * cpu, and there is no other vcpu that has hard-affinity with that
+     * same cpu. This is infrequent, but if it happens, is for achieving
+     * the most possible determinism, and least possible overhead for
+     * the vcpus in question.
+     *
+     * Try to identify the vast majority of these situations, and deal
+     * with them quickly.
+     */
+    if ( unlikely((new->flags & CSFLAG_pinned) &&
+                  cpumask_test_cpu(cpu, &rqd->idle) &&
+                  !cpumask_test_cpu(cpu, &rqd->tickled)) )
+    {
+        ASSERT(cpumask_cycle(cpu, new->vcpu->cpu_hard_affinity) == cpu);
+        SCHED_STAT_CRANK(tickled_idle_cpu_excl);
+        ipid = cpu;
+        goto tickle;
     }
 
     for_each_affinity_balance_step( bs )
@@ -2971,6 +2997,22 @@ csched2_dom_cntl(
     return rc;
 }
 
+static void
+csched2_aff_cntl(const struct scheduler *ops, struct vcpu *v,
+                 const cpumask_t *hard, const cpumask_t *soft)
+{
+    struct csched2_vcpu *svc = csched2_vcpu(v);
+
+    if ( !hard )
+        return;
+
+    /* Are we becoming exclusively pinned? */
+    if ( cpumask_weight(hard) == 1 )
+        __set_bit(__CSFLAG_pinned, &svc->flags);
+    else
+        __clear_bit(__CSFLAG_pinned, &svc->flags);
+}
+
 static int csched2_sys_cntl(const struct scheduler *ops,
                             struct xen_sysctl_scheduler_op *sc)
 {
@@ -3999,6 +4041,7 @@ static const struct scheduler sched_credit2_def = {
     .yield          = csched2_vcpu_yield,
 
     .adjust         = csched2_dom_cntl,
+    .adjust_affinity= csched2_aff_cntl,
     .adjust_global  = csched2_sys_cntl,
 
     .pick_cpu       = csched2_cpu_pick,

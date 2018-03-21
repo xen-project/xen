@@ -32,6 +32,7 @@ PERFCOUNTER(vcpu_wake_runnable,     "sched: vcpu_wake_runnable")
 PERFCOUNTER(vcpu_wake_not_runnable, "sched: vcpu_wake_not_runnable")
 PERFCOUNTER(tickled_no_cpu,         "sched: tickled_no_cpu")
 PERFCOUNTER(tickled_idle_cpu,       "sched: tickled_idle_cpu")
+PERFCOUNTER(tickled_idle_cpu_excl,  "sched: tickled_idle_cpu_exclusive")
 PERFCOUNTER(tickled_busy_cpu,       "sched: tickled_busy_cpu")
 PERFCOUNTER(vcpu_check,             "sched: vcpu_check")
 

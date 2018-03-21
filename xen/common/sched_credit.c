@@ -73,6 +73,7 @@
 #define CSCHED_FLAG_VCPU_PARKED    0x0  /* VCPU over capped credits */
 #define CSCHED_FLAG_VCPU_YIELD     0x1  /* VCPU yielding */
 #define CSCHED_FLAG_VCPU_MIGRATING 0x2  /* VCPU may have moved to a new pcpu */
+#define CSCHED_FLAG_VCPU_PINNED    0x4  /* VCPU can run only on 1 pcpu */
 
 
 /*
@@ -362,6 +363,25 @@ static inline void __runq_tickle(struct csched_vcpu *new)
     idlers_empty = cpumask_empty(&idle_mask);
 
     /*
+     * Exclusive pinning is when a vcpu has hard-affinity with only one
+     * cpu, and there is no other vcpu that has hard-affinity with that
+     * same cpu. This is infrequent, but if it happens, is for achieving
+     * the most possible determinism, and least possible overhead for
+     * the vcpus in question.
+     *
+     * Try to identify the vast majority of these situations, and deal
+     * with them quickly.
+     */
+    if ( unlikely(test_bit(CSCHED_FLAG_VCPU_PINNED, &new->flags) &&
+                  cpumask_test_cpu(cpu, &idle_mask)) )
+    {
+        ASSERT(cpumask_cycle(cpu, new->vcpu->cpu_hard_affinity) == cpu);
+        SCHED_STAT_CRANK(tickled_idle_cpu_excl);
+        __cpumask_set_cpu(cpu, &mask);
+        goto tickle;
+    }
+
+    /*
      * If the pcpu is idle, or there are no idlers and the new
      * vcpu is a higher priority than the old vcpu, run it here.
      *
@@ -457,6 +477,7 @@ static inline void __runq_tickle(struct csched_vcpu *new)
         }
     }
 
+ tickle:
     if ( !cpumask_empty(&mask) )
     {
         if ( unlikely(tb_init_done) )
@@ -1211,6 +1232,22 @@ csched_dom_cntl(
     spin_unlock_irqrestore(&prv->lock, flags);
 
     return rc;
+}
+
+static void
+csched_aff_cntl(const struct scheduler *ops, struct vcpu *v,
+                const cpumask_t *hard, const cpumask_t *soft)
+{
+    struct csched_vcpu *svc = CSCHED_VCPU(v);
+
+    if ( !hard )
+        return;
+
+    /* Are we becoming exclusively pinned? */
+    if ( cpumask_weight(hard) == 1 )
+        set_bit(CSCHED_FLAG_VCPU_PINNED, &svc->flags);
+    else
+        clear_bit(CSCHED_FLAG_VCPU_PINNED, &svc->flags);
 }
 
 static inline void
@@ -2247,6 +2284,7 @@ static const struct scheduler sched_credit_def = {
     .yield          = csched_vcpu_yield,
 
     .adjust         = csched_dom_cntl,
+    .adjust_affinity= csched_aff_cntl,
     .adjust_global  = csched_sys_cntl,
 
     .pick_cpu       = csched_cpu_pick,
