@@ -227,6 +227,7 @@ struct gic_lr {
 };
 
 enum gic_version {
+    GIC_INVALID = 0,    /* the default until explicitly set up */
     GIC_V2,
     GIC_V3,
 };
