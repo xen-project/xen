@@ -266,16 +266,14 @@ static inline cpumask_t* cpupool_domain_cpumask(struct domain *d)
  * Soft affinity only needs to be considered if:
  * * The cpus in the cpupool are not a subset of soft affinity
  * * The hard affinity is not a subset of soft affinity
- * * There is an overlap between the soft affinity and the mask which is
- *   currently being considered.
+ * * There is an overlap between the soft and hard affinity masks
  */
-static inline int has_soft_affinity(const struct vcpu *v,
-                                    const cpumask_t *mask)
+static inline int has_soft_affinity(const struct vcpu *v)
 {
     return !cpumask_subset(cpupool_domain_cpumask(v->domain),
                            v->cpu_soft_affinity) &&
            !cpumask_subset(v->cpu_hard_affinity, v->cpu_soft_affinity) &&
-           cpumask_intersects(v->cpu_soft_affinity, mask);
+           cpumask_intersects(v->cpu_soft_affinity, v->cpu_hard_affinity);
 }
 
 /*

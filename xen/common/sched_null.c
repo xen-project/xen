@@ -278,8 +278,7 @@ static unsigned int pick_cpu(struct null_private *prv, struct vcpu *v)
 
     for_each_affinity_balance_step( bs )
     {
-        if ( bs == BALANCE_SOFT_AFFINITY &&
-             !has_soft_affinity(v, v->cpu_hard_affinity) )
+        if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(v) )
             continue;
 
         affinity_balance_cpumask(v, bs, cpumask_scratch_cpu(cpu));
@@ -491,8 +490,7 @@ static void _vcpu_remove(struct null_private *prv, struct vcpu *v)
     {
         list_for_each_entry( wvc, &prv->waitq, waitq_elem )
         {
-            if ( bs == BALANCE_SOFT_AFFINITY &&
-                 !has_soft_affinity(wvc->vcpu, wvc->vcpu->cpu_hard_affinity) )
+            if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(wvc->vcpu) )
                 continue;
 
             if ( vcpu_check_affinity(wvc->vcpu, cpu, bs) )
@@ -761,7 +759,7 @@ static struct task_slice null_schedule(const struct scheduler *ops,
             list_for_each_entry( wvc, &prv->waitq, waitq_elem )
             {
                 if ( bs == BALANCE_SOFT_AFFINITY &&
-                     !has_soft_affinity(wvc->vcpu, wvc->vcpu->cpu_hard_affinity) )
+                     !has_soft_affinity(wvc->vcpu) )
                     continue;
 
                 if ( vcpu_check_affinity(wvc->vcpu, cpu, bs) )

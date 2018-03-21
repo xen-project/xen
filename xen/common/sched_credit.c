@@ -410,8 +410,7 @@ static inline void __runq_tickle(struct csched_vcpu *new)
             int new_idlers_empty;
 
             if ( balance_step == BALANCE_SOFT_AFFINITY
-                 && !has_soft_affinity(new->vcpu,
-                                       new->vcpu->cpu_hard_affinity) )
+                 && !has_soft_affinity(new->vcpu) )
                 continue;
 
             /* Are there idlers suitable for new (for this balance step)? */
@@ -733,50 +732,42 @@ __csched_vcpu_is_migrateable(const struct csched_private *prv, struct vcpu *vc,
 static int
 _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
 {
-    cpumask_t cpus;
+    /* We must always use vc->procssor's scratch space */
+    cpumask_t *cpus = cpumask_scratch_cpu(vc->processor);
     cpumask_t idlers;
-    cpumask_t *online;
+    cpumask_t *online = cpupool_domain_cpumask(vc->domain);
     struct csched_pcpu *spc = NULL;
     int cpu = vc->processor;
     int balance_step;
 
-    /* Store in cpus the mask of online cpus on which the domain can run */
-    online = cpupool_domain_cpumask(vc->domain);
-    cpumask_and(&cpus, vc->cpu_hard_affinity, online);
-
     for_each_affinity_balance_step( balance_step )
     {
+        affinity_balance_cpumask(vc, balance_step, cpus);
+        cpumask_and(cpus, online, cpus);
         /*
          * We want to pick up a pcpu among the ones that are online and
-         * can accommodate vc, which is basically what we computed above
-         * and stored in cpus. As far as hard affinity is concerned,
-         * there always will be at least one of these pcpus, hence cpus
-         * is never empty and the calls to cpumask_cycle() and
-         * cpumask_test_cpu() below are ok.
+         * can accommodate vc. As far as hard affinity is concerned, there
+         * always will be at least one of these pcpus in the scratch cpumask,
+         * hence, the calls to cpumask_cycle() and cpumask_test_cpu() below
+         * are ok.
          *
-         * On the other hand, when considering soft affinity too, it
-         * is possible for the mask to become empty (for instance, if the
-         * domain has been put in a cpupool that does not contain any of the
-         * pcpus in its soft affinity), which would result in the ASSERT()-s
-         * inside cpumask_*() operations triggering (in debug builds).
+         * On the other hand, when considering soft affinity, it is possible
+         * that the mask is empty (for instance, if the domain has been put
+         * in a cpupool that does not contain any of the pcpus in its soft
+         * affinity), which would result in the ASSERT()-s inside cpumask_*()
+         * operations triggering (in debug builds).
          *
-         * Therefore, in this case, we filter the soft affinity mask against
-         * cpus and, if the result is empty, we just skip the soft affinity
+         * Therefore, if that is the case, we just skip the soft affinity
          * balancing step all together.
          */
-        if ( balance_step == BALANCE_SOFT_AFFINITY
-             && !has_soft_affinity(vc, &cpus) )
+        if ( balance_step == BALANCE_SOFT_AFFINITY &&
+             (!has_soft_affinity(vc) || cpumask_empty(cpus)) )
             continue;
 
-        /* Pick an online CPU from the proper affinity mask */
-        affinity_balance_cpumask(vc, balance_step, &cpus);
-        cpumask_and(&cpus, &cpus, online);
-
         /* If present, prefer vc's current processor */
-        cpu = cpumask_test_cpu(vc->processor, &cpus)
-                ? vc->processor
-                : cpumask_cycle(vc->processor, &cpus);
-        ASSERT(cpumask_test_cpu(cpu, &cpus));
+        cpu = cpumask_test_cpu(vc->processor, cpus)
+                ? vc->processor : cpumask_cycle(vc->processor, cpus);
+        ASSERT(cpumask_test_cpu(cpu, cpus));
 
         /*
          * Try to find an idle processor within the above constraints.
@@ -797,7 +788,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
         cpumask_and(&idlers, &cpu_online_map, CSCHED_PRIV(ops)->idlers);
         if ( vc->processor == cpu && is_runq_idle(cpu) )
             __cpumask_set_cpu(cpu, &idlers);
-        cpumask_and(&cpus, &cpus, &idlers);
+        cpumask_and(cpus, &idlers, cpus);
 
         /*
          * It is important that cpu points to an idle processor, if a suitable
@@ -811,18 +802,18 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
          * Notice that cpumask_test_cpu() is quicker than cpumask_empty(), so
          * we check for it first.
          */
-        if ( !cpumask_test_cpu(cpu, &cpus) && !cpumask_empty(&cpus) )
-            cpu = cpumask_cycle(cpu, &cpus);
-        __cpumask_clear_cpu(cpu, &cpus);
+        if ( !cpumask_test_cpu(cpu, cpus) && !cpumask_empty(cpus) )
+            cpu = cpumask_cycle(cpu, cpus);
+        __cpumask_clear_cpu(cpu, cpus);
 
-        while ( !cpumask_empty(&cpus) )
+        while ( !cpumask_empty(cpus) )
         {
             cpumask_t cpu_idlers;
             cpumask_t nxt_idlers;
             int nxt, weight_cpu, weight_nxt;
             int migrate_factor;
 
-            nxt = cpumask_cycle(cpu, &cpus);
+            nxt = cpumask_cycle(cpu, cpus);
 
             if ( cpumask_test_cpu(cpu, per_cpu(cpu_core_mask, nxt)) )
             {
@@ -852,14 +843,14 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
                  weight_cpu > weight_nxt :
                  weight_cpu * migrate_factor < weight_nxt )
             {
-                cpumask_and(&nxt_idlers, &cpus, &nxt_idlers);
+                cpumask_and(&nxt_idlers, &nxt_idlers, cpus);
                 spc = CSCHED_PCPU(nxt);
                 cpu = cpumask_cycle(spc->idle_bias, &nxt_idlers);
-                cpumask_andnot(&cpus, &cpus, per_cpu(cpu_sibling_mask, cpu));
+                cpumask_andnot(cpus, cpus, per_cpu(cpu_sibling_mask, cpu));
             }
             else
             {
-                cpumask_andnot(&cpus, &cpus, &nxt_idlers);
+                cpumask_andnot(cpus, cpus, &nxt_idlers);
             }
         }
 
@@ -1660,9 +1651,8 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
          * vCPUs with useful soft affinities in some sort of bitmap
          * or counter.
          */
-        if ( vc->is_running ||
-             (balance_step == BALANCE_SOFT_AFFINITY
-              && !has_soft_affinity(vc, vc->cpu_hard_affinity)) )
+        if ( vc->is_running || (balance_step == BALANCE_SOFT_AFFINITY &&
+                                !has_soft_affinity(vc)) )
             continue;
 
         affinity_balance_cpumask(vc, balance_step, cpumask_scratch);

@@ -700,8 +700,7 @@ static int get_fallback_cpu(struct csched2_vcpu *svc)
     {
         int cpu = v->processor;
 
-        if ( bs == BALANCE_SOFT_AFFINITY &&
-             !has_soft_affinity(v, v->cpu_hard_affinity) )
+        if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(v) )
             continue;
 
         affinity_balance_cpumask(v, bs, cpumask_scratch_cpu(cpu));
@@ -1484,8 +1483,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_vcpu *new, s_time_t now)
     for_each_affinity_balance_step( bs )
     {
         /* Just skip first step, if we don't have a soft affinity */
-        if ( bs == BALANCE_SOFT_AFFINITY &&
-             !has_soft_affinity(new->vcpu, new->vcpu->cpu_hard_affinity) )
+        if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(new->vcpu) )
             continue;
 
         affinity_balance_cpumask(new->vcpu, bs, cpumask_scratch_cpu(cpu));
@@ -2285,7 +2283,7 @@ csched2_cpu_pick(const struct scheduler *ops, struct vcpu *vc)
      *
      * Find both runqueues in one pass.
      */
-    has_soft = has_soft_affinity(vc, vc->cpu_hard_affinity);
+    has_soft = has_soft_affinity(vc);
     for_each_cpu(i, &prv->active_queues)
     {
         struct csched2_runqueue_data *rqd;
@@ -3307,7 +3305,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
     }
 
     /* If scurr has a soft-affinity, let's check whether cpu is part of it */
-    if ( has_soft_affinity(scurr->vcpu, scurr->vcpu->cpu_hard_affinity) )
+    if ( has_soft_affinity(scurr->vcpu) )
     {
         affinity_balance_cpumask(scurr->vcpu, BALANCE_SOFT_AFFINITY,
                                  cpumask_scratch);
