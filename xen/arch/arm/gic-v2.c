@@ -480,11 +480,12 @@ static void gicv2_read_lr(int lr, struct gic_lr *lr_reg)
     else
     {
         lr_reg->virt.eoi = (lrv & GICH_V2_LR_MAINTENANCE_IRQ);
-        if ( lr_reg->virq < NR_GIC_SGI )
-        {
-            lr_reg->virt.source = (lrv >> GICH_V2_LR_CPUID_SHIFT)
-                & GICH_V2_LR_CPUID_MASK;
-        }
+        /*
+         * This is only valid for SGI, but it does not matter to always
+         * read it as it should be 0 by default.
+         */
+        lr_reg->virt.source = (lrv >> GICH_V2_LR_CPUID_SHIFT)
+            & GICH_V2_LR_CPUID_MASK;
     }
 }
 
@@ -512,8 +513,8 @@ static void gicv2_write_lr(int lr, const struct gic_lr *lr_reg)
         if ( lr_reg->virt.eoi )
             lrv |= GICH_V2_LR_MAINTENANCE_IRQ;
         /*
-         * This is only valid for SGI, but it does not matter to always
-         * read it as it should be 0 by default.
+         * Source is only valid for SGIs, the caller should make sure
+         * the field virt.source is always 0 for non-SGI.
          */
         ASSERT(!lr_reg->virt.source || lr_reg->virq < NR_GIC_SGI);
         lrv |= (uint32_t)lr_reg->virt.source << GICH_V2_LR_CPUID_SHIFT;

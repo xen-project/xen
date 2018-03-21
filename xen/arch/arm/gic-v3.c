@@ -1018,10 +1018,13 @@ static void gicv3_read_lr(int lr, struct gic_lr *lr_reg)
     else
     {
         lr_reg->virt.eoi = (lrv & ICH_LR_MAINTENANCE_IRQ);
-        /* Source only exists for SGI and in GICv2 compatible mode */
-        if ( lr_reg->virq < NR_GIC_SGI &&
-             current->domain->arch.vgic.version == GIC_V2 )
+        /* Source only exists in GICv2 compatible mode */
+        if ( current->domain->arch.vgic.version == GIC_V2 )
         {
+            /*
+             * This is only valid for SGI, but it does not matter to always
+             * read it as it should be 0 by default.
+             */
             lr_reg->virt.source = (lrv >> ICH_LR_CPUID_SHIFT)
                 & ICH_LR_CPUID_MASK;
         }
@@ -1056,8 +1059,8 @@ static void gicv3_write_lr(int lr_reg, const struct gic_lr *lr)
         if ( vgic_version == GIC_V2 )
         {
             /*
-             * This is only valid for SGI, but it does not matter to always
-             * read it as it should be 0 by default.
+             * Source is only valid for SGIs, the caller should make
+             * sure the field virt.source is always 0 for non-SGI.
              */
             ASSERT(!lr->virt.source || lr->virq < NR_GIC_SGI);
             lrv |= (uint64_t)lr->virt.source << ICH_LR_CPUID_SHIFT;
