@@ -585,6 +585,37 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing rcll $2,(%edi)...");
+    instr[0] = 0xc1; instr[1] = 0x17; instr[2] = 0x02;
+    *res        = 0x2233445F;
+    regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_CF;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)res;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != ((0x2233445F << 2) | 2)) ||
+         ((regs.eflags & (EFLAGS_MASK & ~X86_EFLAGS_OF))
+          != EFLAGS_ALWAYS_SET) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing shrdl $8,%ecx,(%edi)...");
+    instr[0] = 0x0f; instr[1] = 0xac; instr[2] = 0x0f; instr[3] = 0x08;
+    *res        = 0x22334455;
+    regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_CF;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x44332211;
+    regs.edi    = (unsigned long)res;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x11223344) ||
+         ((regs.eflags & (EFLAGS_MASK & ~(X86_EFLAGS_OF|X86_EFLAGS_AF)))
+          != (EFLAGS_ALWAYS_SET | X86_EFLAGS_PF)) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
     printf("%-40s", "Testing btrl $0x1,(%edi)...");
     instr[0] = 0x0f; instr[1] = 0xba; instr[2] = 0x37; instr[3] = 0x01;
     *res        = 0x2233445F;

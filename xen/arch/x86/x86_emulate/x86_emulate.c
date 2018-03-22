@@ -682,7 +682,16 @@ struct x86_emulate_state {
         rmw_neg,
         rmw_not,
         rmw_or,
+        rmw_rcl,
+        rmw_rcr,
+        rmw_rol,
+        rmw_ror,
+        rmw_sar,
         rmw_sbb,
+        rmw_shl,
+        rmw_shld,
+        rmw_shr,
+        rmw_shrd,
         rmw_sub,
         rmw_xadd,
         rmw_xchg,
@@ -4112,36 +4121,25 @@ x86_emulate(
     case 0xc0 ... 0xc1: grp2: /* Grp2 */
         generate_exception_if(lock_prefix, EXC_UD);
 
-        if ( ops->rmw && dst.type == OP_MEM &&
-             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
-                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
-            goto done;
-        dst.orig_val = dst.val;
-
         switch ( modrm_reg & 7 )
         {
-        case 0: /* rol */
-            emulate_2op_SrcB("rol", src, dst, _regs.eflags);
-            break;
-        case 1: /* ror */
-            emulate_2op_SrcB("ror", src, dst, _regs.eflags);
-            break;
-        case 2: /* rcl */
-            emulate_2op_SrcB("rcl", src, dst, _regs.eflags);
-            break;
-        case 3: /* rcr */
-            emulate_2op_SrcB("rcr", src, dst, _regs.eflags);
-            break;
-        case 4: /* sal/shl */
-        case 6: /* sal/shl */
-            emulate_2op_SrcB("sal", src, dst, _regs.eflags);
-            break;
-        case 5: /* shr */
-            emulate_2op_SrcB("shr", src, dst, _regs.eflags);
-            break;
-        case 7: /* sar */
-            emulate_2op_SrcB("sar", src, dst, _regs.eflags);
-            break;
+#define GRP2(name, ext) \
+        case ext: \
+            if ( ops->rmw && dst.type == OP_MEM ) \
+                state->rmw = rmw_##name; \
+            else \
+                emulate_2op_SrcB(#name, src, dst, _regs.eflags); \
+            break
+
+        GRP2(rol, 0);
+        GRP2(ror, 1);
+        GRP2(rcl, 2);
+        GRP2(rcr, 3);
+        case 6: /* sal/shl alias */
+        GRP2(shl, 4);
+        GRP2(shr, 5);
+        GRP2(sar, 7);
+#undef GRP2
         }
         break;
 
@@ -6571,11 +6569,6 @@ x86_emulate(
 
         generate_exception_if(lock_prefix, EXC_UD);
 
-        if ( ops->rmw && dst.type == OP_MEM &&
-             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
-                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
-            goto done;
-
         if ( b & 1 )
             shift = _regs.cl;
         else
@@ -6584,6 +6577,14 @@ x86_emulate(
             src.reg = decode_gpr(&_regs, modrm_reg);
             src.val = truncate_word(*src.reg, dst.bytes);
         }
+
+        if ( ops->rmw && dst.type == OP_MEM )
+        {
+            ea.orig_val = shift;
+            state->rmw = b & 8 ? rmw_shrd : rmw_shld;
+            break;
+        }
+
         if ( (shift &= width - 1) == 0 )
             break;
         dst.orig_val = dst.val;
@@ -8730,6 +8731,11 @@ int x86_emul_rmw(
                                state->ea.val, dst, bytes, *eflags, \
                                "c" ((long)state->lock_prefix) ); \
         break
+#define SHIFT(op) \
+    case rmw_##op: \
+        ASSERT(!state->lock_prefix); \
+        _emulate_2op_SrcB(#op, state->ea.val, dst, bytes, *eflags); \
+        break
 
     BINOP(adc, );
     BINOP(add, );
@@ -8741,12 +8747,20 @@ int x86_emul_rmw(
      UNOP(inc);
      UNOP(neg);
     BINOP(or, );
+    SHIFT(rcl);
+    SHIFT(rcr);
+    SHIFT(rol);
+    SHIFT(ror);
+    SHIFT(sar);
     BINOP(sbb, );
+    SHIFT(shl);
+    SHIFT(shr);
     BINOP(sub, );
     BINOP(xor, );
 
 #undef UNOP
 #undef BINOP
+#undef SHIFT
 
     case rmw_not:
         switch ( state->op_bytes )
@@ -8770,6 +8784,20 @@ int x86_emul_rmw(
             break;
 #endif
         }
+        break;
+
+    case rmw_shld:
+        ASSERT(!state->lock_prefix);
+        _emulate_2op_SrcV_nobyte("shld",
+                                 state->ea.val, dst, bytes, *eflags,
+                                 "c" (state->ea.orig_val) );
+        break;
+
+    case rmw_shrd:
+        ASSERT(!state->lock_prefix);
+        _emulate_2op_SrcV_nobyte("shrd",
+                                 state->ea.val, dst, bytes, *eflags,
+                                 "c" (state->ea.orig_val) );
         break;
 
     case rmw_xadd:
