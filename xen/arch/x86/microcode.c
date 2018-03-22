@@ -44,7 +44,6 @@ static module_t __initdata ucode_mod;
 static void *(*__initdata ucode_mod_map)(const module_t *);
 static signed int __initdata ucode_mod_idx;
 static bool_t __initdata ucode_mod_forced;
-static cpumask_t __initdata init_mask;
 
 /*
  * If we scan the initramfs.cpio for the early microcode code
@@ -342,50 +341,23 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
     return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 }
 
-static void __init _do_microcode_update(unsigned long data)
-{
-    void *_data = (void *)data;
-    size_t len = ucode_blob.size ? ucode_blob.size : ucode_mod.mod_end;
-
-    microcode_update_cpu(_data, len);
-    cpumask_set_cpu(smp_processor_id(), &init_mask);
-}
-
 static int __init microcode_init(void)
 {
-    void *data;
-    static struct tasklet __initdata tasklet;
-    unsigned int cpu;
-
-    if ( !microcode_ops )
-        return 0;
-
-    if ( !ucode_mod.mod_end && !ucode_blob.size )
-        return 0;
-
-    data = ucode_blob.size ? ucode_blob.data : ucode_mod_map(&ucode_mod);
-
-    if ( !data )
-        return -ENOMEM;
-
-    if ( microcode_ops->start_update && microcode_ops->start_update() != 0 )
-        goto out;
-
-    softirq_tasklet_init(&tasklet, _do_microcode_update, (unsigned long)data);
-
-    for_each_online_cpu ( cpu )
-    {
-        tasklet_schedule_on_cpu(&tasklet, cpu);
-        do {
-            process_pending_softirqs();
-        } while ( !cpumask_test_cpu(cpu, &init_mask) );
-    }
-
-out:
+    /*
+     * At this point, all CPUs should have updated their microcode
+     * via the early_microcode_* paths so free the microcode blob.
+     */
     if ( ucode_blob.size )
-        xfree(data);
-    else
+    {
+        xfree(ucode_blob.data);
+        ucode_blob.size = 0;
+        ucode_blob.data = NULL;
+    }
+    else if ( ucode_mod.mod_end )
+    {
         ucode_mod_map(NULL);
+        ucode_mod.mod_end = 0;
+    }
 
     return 0;
 }
@@ -410,50 +382,55 @@ static struct notifier_block microcode_percpu_nfb = {
     .notifier_call = microcode_percpu_callback,
 };
 
-static int __init microcode_presmp_init(void)
+int __init early_microcode_update_cpu(bool start_update)
 {
+    int rc = 0;
+    void *data = NULL;
+    size_t len;
+
+    if ( ucode_blob.size )
+    {
+        len = ucode_blob.size;
+        data = ucode_blob.data;
+    }
+    else if ( ucode_mod.mod_end )
+    {
+        len = ucode_mod.mod_end;
+        data = ucode_mod_map(&ucode_mod);
+    }
+    if ( data )
+    {
+        if ( start_update && microcode_ops->start_update )
+            rc = microcode_ops->start_update();
+
+        if ( rc )
+            return rc;
+
+        return microcode_update_cpu(data, len);
+    }
+    else
+        return -ENOMEM;
+}
+
+int __init early_microcode_init(void)
+{
+    int rc;
+
+    rc = microcode_init_intel();
+    if ( rc )
+        return rc;
+
+    rc = microcode_init_amd();
+    if ( rc )
+        return rc;
+
     if ( microcode_ops )
     {
         if ( ucode_mod.mod_end || ucode_blob.size )
-        {
-            void *data;
-            size_t len;
-            int rc = 0;
-
-            if ( ucode_blob.size )
-            {
-                len = ucode_blob.size;
-                data = ucode_blob.data;
-            }
-            else
-            {
-                len = ucode_mod.mod_end;
-                data = ucode_mod_map(&ucode_mod);
-            }
-            if ( data )
-                rc = microcode_update_cpu(data, len);
-            else
-                rc = -ENOMEM;
-
-            if ( !ucode_blob.size )
-                ucode_mod_map(NULL);
-
-            if ( rc )
-            {
-                if ( ucode_blob.size )
-                {
-                    xfree(ucode_blob.data);
-                    ucode_blob.size = 0;
-                    ucode_blob.data = NULL;
-                }
-                else
-                    ucode_mod.mod_end = 0;
-            }
-        }
+            rc = early_microcode_update_cpu(true);
 
         register_cpu_notifier(&microcode_percpu_nfb);
     }
 
     return 0;
 }
-presmp_initcall(microcode_presmp_init);
