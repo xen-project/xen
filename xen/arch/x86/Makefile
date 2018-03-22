@@ -38,7 +38,6 @@ obj-y += irq.o
 obj-$(CONFIG_KEXEC) += machine_kexec.o
 obj-y += microcode_amd.o
 obj-y += microcode_intel.o
-# This must come after the vendor specific files.
 obj-y += microcode.o
 obj-y += mm.o x86_64/mm.o
 obj-y += monitor.o

@@ -251,6 +251,8 @@ static void __init early_cpu_detect(void)
 		if (hap_paddr_bits > PADDR_BITS)
 			hap_paddr_bits = PADDR_BITS;
 	}
+
+	initialize_cpu_data(0);
 }
 
 static void generic_identify(struct cpuinfo_x86 *c)

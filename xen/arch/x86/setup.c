@@ -1403,6 +1403,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     timer_init();
 
+    early_microcode_init();
+
     identify_cpu(&boot_cpu_data);
 
     set_in_cr4(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT);
