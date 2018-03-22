@@ -86,7 +86,7 @@ struct shadow_paging_mode {
                                             void *src, u32 bytes,
                                             struct sh_emulate_ctxt *sh_ctxt);
     int           (*x86_emulate_cmpxchg   )(struct vcpu *v, unsigned long va,
-                                            unsigned long old, 
+                                            unsigned long *old,
                                             unsigned long new,
                                             unsigned int bytes,
                                             struct sh_emulate_ctxt *sh_ctxt);

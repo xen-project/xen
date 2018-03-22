@@ -4723,11 +4723,11 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 
 static int
 sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
-                        unsigned long old, unsigned long new,
-                        unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt)
+                       unsigned long *p_old, unsigned long new,
+                       unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt)
 {
     void *addr;
-    unsigned long prev;
+    unsigned long prev, old = *p_old;
     int rv = X86EMUL_OKAY;
 
     /* Unaligned writes are only acceptable on HVM */
@@ -4751,7 +4751,10 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     }
 
     if ( prev != old )
-        rv = X86EMUL_RETRY;
+    {
+        *p_old = prev;
+        rv = X86EMUL_CMPXCHG_FAILED;
+    }
 
     SHADOW_DEBUG(EMULATE, "va %#lx was %#lx expected %#lx"
                   " wanted %#lx now %#lx bytes %u\n",

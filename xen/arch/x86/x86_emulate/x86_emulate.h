@@ -158,6 +158,8 @@ struct x86_emul_fpu_aux {
   * strictly expected for now.
  */
 #define X86EMUL_UNRECOGNIZED   X86EMUL_UNIMPLEMENTED
+ /* (cmpxchg accessor): CMPXCHG failed. */
+#define X86EMUL_CMPXCHG_FAILED 7
 
 /* FPU sub-types which may be requested via ->get_fpu(). */
 enum x86_emulate_fpu_type {
@@ -247,6 +249,8 @@ struct x86_emulate_ops
     /*
      * cmpxchg: Emulate a CMPXCHG operation.
      *  @p_old: [IN ] Pointer to value expected to be current at @addr.
+     *          [OUT] Pointer to value found at @addr (may always be
+     *                updated, meaningful for X86EMUL_CMPXCHG_FAILED only).
      *  @p_new: [IN ] Pointer to value to write to @addr.
      *  @bytes: [IN ] Operation size (up to 8 (x86/32) or 16 (x86/64) bytes).
      *  @lock:  [IN ] atomic (LOCKed) operation

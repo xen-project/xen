@@ -302,8 +302,12 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     memcpy(&old, p_old, bytes);
     memcpy(&new, p_new, bytes);
 
-    return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
-               v, addr, old, new, bytes, sh_ctxt);
+    rc = v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
+             v, addr, &old, new, bytes, sh_ctxt);
+
+    memcpy(p_old, &old, bytes);
+
+    return rc;
 }
 
 static const struct x86_emulate_ops hvm_shadow_emulator_ops = {

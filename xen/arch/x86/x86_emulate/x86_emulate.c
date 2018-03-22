@@ -1959,6 +1959,9 @@ protmode_load_seg(
 
         default:
             return rc;
+
+        case X86EMUL_CMPXCHG_FAILED:
+            return X86EMUL_RETRY;
         }
 
         /* Force the Accessed flag in our local copy. */
@@ -6603,21 +6606,45 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xb0): case X86EMUL_OPC(0x0f, 0xb1): /* cmpxchg */
-        /* Save real source value, then compare EAX against destination. */
-        src.orig_val = src.val;
-        src.val = _regs.r(ax);
-        /* cmp: %%eax - dst ==> dst and src swapped for macro invocation */
-        emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
-        if ( _regs.eflags & X86_EFLAGS_ZF )
+        fail_if(!ops->cmpxchg);
+        _regs.eflags &= ~EFLAGS_MASK;
+        if ( !((dst.val ^ _regs.r(ax)) &
+               (~0UL >> (8 * (sizeof(long) - dst.bytes)))) )
         {
             /* Success: write back to memory. */
-            dst.val = src.orig_val;
+            if ( dst.type == OP_MEM )
+            {
+                dst.val = _regs.r(ax);
+                switch ( rc = ops->cmpxchg(dst.mem.seg, dst.mem.off, &dst.val,
+                                           &src.val, dst.bytes, lock_prefix,
+                                           ctxt) )
+                {
+                case X86EMUL_OKAY:
+                    dst.type = OP_NONE;
+                    _regs.eflags |= X86_EFLAGS_ZF | X86_EFLAGS_PF;
+                    break;
+                case X86EMUL_CMPXCHG_FAILED:
+                    rc = X86EMUL_OKAY;
+                    break;
+                default:
+                    goto done;
+                }
+            }
+            else
+            {
+                dst.val = src.val;
+                _regs.eflags |= X86_EFLAGS_ZF | X86_EFLAGS_PF;
+            }
         }
-        else
+        if ( !(_regs.eflags & X86_EFLAGS_ZF) )
         {
             /* Failure: write the value we saw to EAX. */
             dst.type = OP_REG;
             dst.reg  = (unsigned long *)&_regs.r(ax);
+            /* cmp: %%eax - dst ==> dst and src swapped for macro invocation */
+            src.val = _regs.r(ax);
+            emulate_2op_SrcV("cmp", dst, src, _regs.eflags);
+            ASSERT(!(_regs.eflags & X86_EFLAGS_ZF));
         }
         break;
 
@@ -6918,6 +6945,7 @@ x86_emulate(
 
         if ( memcmp(old, aux, op_bytes) )
         {
+        cmpxchgNb_failed:
             /* Expected != actual: store actual to rDX:rAX and clear ZF. */
             _regs.r(ax) = !(rex_prefix & REX_W) ? old->u32[0] : old->u64[0];
             _regs.r(dx) = !(rex_prefix & REX_W) ? old->u32[1] : old->u64[1];
@@ -6927,7 +6955,7 @@ x86_emulate(
         {
             /*
              * Expected == actual: Get proposed value, attempt atomic cmpxchg
-             * and set ZF.
+             * and set ZF if successful.
              */
             if ( !(rex_prefix & REX_W) )
             {
@@ -6940,11 +6968,20 @@ x86_emulate(
                 aux->u64[1] = _regs.r(cx);
             }
 
-            if ( (rc = ops->cmpxchg(ea.mem.seg, ea.mem.off, old, aux,
-                                    op_bytes, lock_prefix,
-                                    ctxt)) != X86EMUL_OKAY )
+            switch ( rc = ops->cmpxchg(ea.mem.seg, ea.mem.off, old, aux,
+                                       op_bytes, lock_prefix, ctxt) )
+            {
+            case X86EMUL_OKAY:
+                _regs.eflags |= X86_EFLAGS_ZF;
+                break;
+
+            case X86EMUL_CMPXCHG_FAILED:
+                rc = X86EMUL_OKAY;
+                goto cmpxchgNb_failed;
+
+            default:
                 goto done;
-            _regs.eflags |= X86_EFLAGS_ZF;
+            }
         }
         break;
     }
@@ -8394,6 +8431,8 @@ x86_emulate(
             rc = ops->cmpxchg(
                 dst.mem.seg, dst.mem.off, &dst.orig_val,
                 &dst.val, dst.bytes, true, ctxt);
+            if ( rc == X86EMUL_CMPXCHG_FAILED )
+                rc = X86EMUL_RETRY;
         }
         else
         {
