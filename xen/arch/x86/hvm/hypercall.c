@@ -89,6 +89,11 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !has_pirq(curr->domain) )
             return -ENOSYS;
         break;
+
+    case PHYSDEVOP_pci_mmcfg_reserved:
+        if ( !has_vpci(curr->domain) )
+            return -ENOSYS;
+        break;
     }
 
     if ( !curr->hcall_compat )

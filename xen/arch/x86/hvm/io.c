@@ -507,10 +507,9 @@ static const struct hvm_mmio_ops vpci_mmcfg_ops = {
     .write = vpci_mmcfg_write,
 };
 
-int __hwdom_init register_vpci_mmcfg_handler(struct domain *d, paddr_t addr,
-                                             unsigned int start_bus,
-                                             unsigned int end_bus,
-                                             unsigned int seg)
+int register_vpci_mmcfg_handler(struct domain *d, paddr_t addr,
+                                unsigned int start_bus, unsigned int end_bus,
+                                unsigned int seg)
 {
     struct hvm_mmcfg *mmcfg, *new = xmalloc(struct hvm_mmcfg);
 
@@ -535,9 +534,16 @@ int __hwdom_init register_vpci_mmcfg_handler(struct domain *d, paddr_t addr,
         if ( new->addr < mmcfg->addr + mmcfg->size &&
              mmcfg->addr < new->addr + new->size )
         {
+            int ret = -EEXIST;
+
+            if ( new->addr == mmcfg->addr &&
+                 new->start_bus == mmcfg->start_bus &&
+                 new->segment == mmcfg->segment &&
+                 new->size == mmcfg->size )
+                ret = 0;
             write_unlock(&d->arch.hvm_domain.mmcfg_lock);
             xfree(new);
-            return -EEXIST;
+            return ret;
         }
 
     if ( list_empty(&d->arch.hvm_domain.mmcfg_regions) )
