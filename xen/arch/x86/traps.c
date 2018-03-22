@@ -823,6 +823,17 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
     return 1;
 }
 
+static void _domain_cpuid(struct domain *currd,
+                          unsigned int leaf, unsigned int subleaf,
+                          unsigned int *eax, unsigned int *ebx,
+                          unsigned int *ecx, unsigned int *edx)
+{
+    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
+        domain_cpuid(currd, leaf, subleaf, eax, ebx, ecx, edx);
+    else
+        cpuid_count(leaf, subleaf, eax, ebx, ecx, edx);
+}
+
 void pv_cpuid(struct cpu_user_regs *regs)
 {
     uint32_t a, b, c, d;
@@ -2720,7 +2731,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
 
         case MSR_SPEC_CTRL:
-            domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+            _domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
             if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
                 goto fail; /* MSR available? */
 
@@ -2736,8 +2747,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case MSR_PRED_CMD:
-            domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
-            domain_cpuid(currd, 0x80000008, 0, &dummy, &ebx, &dummy, &dummy);
+            _domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+            _domain_cpuid(currd, 0x80000008, 0, &dummy, &ebx, &dummy, &dummy);
             if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) &&
                  !(ebx & cpufeat_mask(X86_FEATURE_IBPB)) )
                 goto fail; /* MSR available? */
@@ -2885,7 +2896,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             goto fail;
 
         case MSR_SPEC_CTRL:
-            domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+            _domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
             if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
                 goto fail;
             regs->eax = v->arch.spec_ctrl;
