@@ -319,7 +319,8 @@ static const struct x86_emulate_ops hvm_shadow_emulator_ops = {
 };
 
 const struct x86_emulate_ops *shadow_init_emulation(
-    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
+    unsigned int pte_size)
 {
     struct segment_register *creg, *sreg;
     struct vcpu *v = current;
@@ -345,6 +346,8 @@ const struct x86_emulate_ops *shadow_init_emulation(
         sh_ctxt->ctxt.addr_size = creg->db ? 32 : 16;
         sh_ctxt->ctxt.sp_size   = sreg->db ? 32 : 16;
     }
+
+    sh_ctxt->pte_size = pte_size;
 
     /* Attempt to prefetch whole instruction. */
     sh_ctxt->insn_buf_eip = regs->rip;
@@ -1770,6 +1773,45 @@ void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
 }
 
 /*
+ * Optimization: If we see two emulated writes of zeros to the same
+ * page-table without another kind of page fault in between, we guess
+ * that this is a batch of changes (for process destruction) and
+ * unshadow the page so we don't take a pagefault on every entry.  This
+ * should also make finding writeable mappings of pagetables much
+ * easier.
+ *
+ * Look to see if this is the second emulated write in a row to this
+ * page, and unshadow if it is.
+ */
+static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
+{
+#if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
+    struct domain *d = v->domain;
+
+    /*
+     * If the domain has never made a "dying" op, use the two-writes
+     * heuristic; otherwise, unshadow as soon as we write a zero for a dying
+     * process.
+     *
+     * Don't bother trying to unshadow if it's not a PT, or if it's > l1.
+     */
+    if ( ( v->arch.paging.shadow.pagetable_dying
+           || ( !d->arch.paging.shadow.pagetable_dying_op
+                && v->arch.paging.shadow.last_emulated_mfn_for_unshadow == mfn_x(gmfn) ) )
+         && sh_mfn_is_a_page_table(gmfn)
+         && (!d->arch.paging.shadow.pagetable_dying_op ||
+             !(mfn_to_page(gmfn)->shadow_flags
+               & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64))) )
+    {
+        perfc_incr(shadow_early_unshadow);
+        sh_remove_shadows(d, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
+        TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EARLY_UNSHADOW);
+    }
+    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(gmfn);
+#endif
+}
+
+/*
  * Tidy up after the emulated write: mark pages dirty, verify the new
  * contents, and undo the mapping.
  */
@@ -1777,6 +1819,21 @@ void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
                            struct sh_emulate_ctxt *sh_ctxt)
 {
     u32 b1 = bytes, b2 = 0, shflags;
+
+    ASSERT(mfn_valid(sh_ctxt->mfn[0]));
+
+    /* If we are writing lots of PTE-aligned zeros, might want to unshadow */
+    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
+    {
+        if ( !((unsigned long)addr & (sh_ctxt->pte_size - 1)) )
+            check_for_early_unshadow(v, sh_ctxt->mfn[0]);
+        /*
+         * Don't reset the heuristic if we're writing zeros at non-aligned
+         * addresses, otherwise it doesn't catch REP MOVSD on PAE guests.
+         */
+    }
+    else
+        sh_reset_early_unshadow(v);
 
     /*
      * We can avoid re-verifying the page contents after the write if:

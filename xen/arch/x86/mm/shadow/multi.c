@@ -2533,52 +2533,6 @@ sh_map_and_validate_gl1e(struct vcpu *v, mfn_t gl1mfn,
 
 
 /**************************************************************************/
-/* Optimization: If we see two emulated writes of zeros to the same
- * page-table without another kind of page fault in between, we guess
- * that this is a batch of changes (for process destruction) and
- * unshadow the page so we don't take a pagefault on every entry.  This
- * should also make finding writeable mappings of pagetables much
- * easier. */
-
-/* Look to see if this is the second emulated write in a row to this
- * page, and unshadow if it is */
-static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
-{
-#if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
-    struct domain *d = v->domain;
-    /* If the domain has never made a "dying" op, use the two-writes
-     * heuristic; otherwise, unshadow as soon as we write a zero for a dying
-     * process.
-     *
-     * Don't bother trying to unshadow if it's not a PT, or if it's > l1.
-     */
-    if ( ( v->arch.paging.shadow.pagetable_dying
-           || ( !d->arch.paging.shadow.pagetable_dying_op
-                && v->arch.paging.shadow.last_emulated_mfn_for_unshadow == mfn_x(gmfn) ) )
-         && sh_mfn_is_a_page_table(gmfn)
-         && (!d->arch.paging.shadow.pagetable_dying_op ||
-             !(mfn_to_page(gmfn)->shadow_flags
-               & (SHF_L2_32|SHF_L2_PAE|SHF_L2H_PAE|SHF_L4_64))) )
-    {
-        perfc_incr(shadow_early_unshadow);
-        sh_remove_shadows(d, gmfn, 1, 0 /* Fast, can fail to unshadow */ );
-        TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EARLY_UNSHADOW);
-    }
-    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(gmfn);
-#endif
-}
-
-/* Stop counting towards early unshadows, as we've seen a real page fault */
-static inline void reset_early_unshadow(struct vcpu *v)
-{
-#if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
-    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(INVALID_MFN);
-#endif
-}
-
-
-
-/**************************************************************************/
 /* Optimization: Prefetch multiple L1 entries.  This is called after we have
  * demand-faulted a shadow l1e in the fault handler, to see if it's
  * worth fetching some more.
@@ -2941,7 +2895,7 @@ static int sh_page_fault(struct vcpu *v,
                  * a not-present fault (by flipping two bits). */
                 ASSERT(regs->error_code & PFEC_page_present);
                 regs->error_code ^= (PFEC_reserved_bit|PFEC_page_present);
-                reset_early_unshadow(v);
+                sh_reset_early_unshadow(v);
                 perfc_incr(shadow_fault_fast_gnp);
                 SHADOW_PRINTK("fast path not-present\n");
                 trace_shadow_gen(TRC_SHADOW_FAST_PROPAGATE, va);
@@ -2957,7 +2911,7 @@ static int sh_page_fault(struct vcpu *v,
             }
             perfc_incr(shadow_fault_fast_mmio);
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
-            reset_early_unshadow(v);
+            sh_reset_early_unshadow(v);
             trace_shadow_gen(TRC_SHADOW_FAST_MMIO, va);
             return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
                     ? EXCRET_fault_fixed : 0);
@@ -3069,7 +3023,7 @@ static int sh_page_fault(struct vcpu *v,
     {
         perfc_incr(shadow_fault_bail_real_fault);
         SHADOW_PRINTK("not a shadow fault\n");
-        reset_early_unshadow(v);
+        sh_reset_early_unshadow(v);
         regs->error_code = gw.pfec & PFEC_arch_mask;
         goto propagate;
     }
@@ -3095,7 +3049,7 @@ static int sh_page_fault(struct vcpu *v,
         perfc_incr(shadow_fault_bail_bad_gfn);
         SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"PRI_mfn"\n",
                       gfn_x(gfn), mfn_x(gmfn));
-        reset_early_unshadow(v);
+        sh_reset_early_unshadow(v);
         put_gfn(d, gfn_x(gfn));
         goto propagate;
     }
@@ -3284,7 +3238,7 @@ static int sh_page_fault(struct vcpu *v,
 
     perfc_incr(shadow_fault_fixed);
     d->arch.paging.log_dirty.fault_count++;
-    reset_early_unshadow(v);
+    sh_reset_early_unshadow(v);
 
     trace_shadow_fixup(gw.l1e, va);
  done:
@@ -3399,7 +3353,7 @@ static int sh_page_fault(struct vcpu *v,
 
     SHADOW_PRINTK("emulate: eip=%#lx esp=%#lx\n", regs->rip, regs->rsp);
 
-    emul_ops = shadow_init_emulation(&emul_ctxt, regs);
+    emul_ops = shadow_init_emulation(&emul_ctxt, regs, GUEST_PTE_SIZE);
 
     r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
@@ -3539,7 +3493,7 @@ static int sh_page_fault(struct vcpu *v,
     sh_audit_gw(v, &gw);
     SHADOW_PRINTK("mmio %#"PRIpaddr"\n", gpa);
     shadow_audit_tables(v);
-    reset_early_unshadow(v);
+    sh_reset_early_unshadow(v);
     paging_unlock(d);
     put_gfn(d, gfn_x(gfn));
     trace_shadow_gen(TRC_SHADOW_MMIO, va);
@@ -3550,7 +3504,7 @@ static int sh_page_fault(struct vcpu *v,
     sh_audit_gw(v, &gw);
     SHADOW_PRINTK("not a shadow fault\n");
     shadow_audit_tables(v);
-    reset_early_unshadow(v);
+    sh_reset_early_unshadow(v);
     paging_unlock(d);
     put_gfn(d, gfn_x(gfn));
 
@@ -4659,29 +4613,6 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
 /**************************************************************************/
 /* Handling guest writes to pagetables. */
 
-/* Tidy up after the emulated write: mark pages dirty, verify the new
- * contents, and undo the mapping */
-static void emulate_unmap_dest(struct vcpu *v,
-                               void *addr,
-                               u32 bytes,
-                               struct sh_emulate_ctxt *sh_ctxt)
-{
-    ASSERT(mfn_valid(sh_ctxt->mfn[0]));
-
-    /* If we are writing lots of PTE-aligned zeros, might want to unshadow */
-    if ( likely(bytes >= 4) && (*(u32 *)addr == 0) )
-    {
-        if ( ((unsigned long) addr & ((sizeof (guest_intpte_t)) - 1)) == 0 )
-            check_for_early_unshadow(v, sh_ctxt->mfn[0]);
-        /* Don't reset the heuristic if we're writing zeros at non-aligned
-         * addresses, otherwise it doesn't catch REP MOVSD on PAE guests */
-    }
-    else
-        reset_early_unshadow(v);
-
-    sh_emulate_unmap_dest(v, addr, bytes, sh_ctxt);
-}
-
 static int
 sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
                      u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
@@ -4715,7 +4646,7 @@ sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
 #endif
     }
 
-    emulate_unmap_dest(v, addr, bytes, sh_ctxt);
+    sh_emulate_unmap_dest(v, addr, bytes, sh_ctxt);
     shadow_audit_tables(v);
     paging_unlock(v->domain);
     return X86EMUL_OKAY;
@@ -4760,7 +4691,7 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
                   " wanted %#lx now %#lx bytes %u\n",
                   vaddr, prev, old, new, *(unsigned long *)addr, bytes);
 
-    emulate_unmap_dest(v, addr, bytes, sh_ctxt);
+    sh_emulate_unmap_dest(v, addr, bytes, sh_ctxt);
     shadow_audit_tables(v);
     paging_unlock(v->domain);
     return rv;

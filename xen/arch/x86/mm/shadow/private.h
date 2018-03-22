@@ -721,6 +721,8 @@ struct sh_emulate_ctxt {
     uint8_t insn_buf_bytes;
     unsigned long insn_buf_eip;
 
+    unsigned int pte_size;
+
     /* Cache of segment registers already gathered for this emulation. */
     unsigned int valid_seg_regs;
     struct segment_register seg_reg[6];
@@ -736,9 +738,18 @@ struct sh_emulate_ctxt {
 };
 
 const struct x86_emulate_ops *shadow_init_emulation(
-    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
+    unsigned int pte_size);
 void shadow_continue_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
+
+/* Stop counting towards early unshadows, as we've seen a real page fault */
+static inline void sh_reset_early_unshadow(struct vcpu *v)
+{
+#if SHADOW_OPTIMIZATIONS & SHOPT_EARLY_UNSHADOW
+    v->arch.paging.shadow.last_emulated_mfn_for_unshadow = mfn_x(INVALID_MFN);
+#endif
+}
 
 #if (SHADOW_OPTIMIZATIONS & SHOPT_VIRTUAL_TLB)
 /**************************************************************************/
