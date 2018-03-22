@@ -960,6 +960,17 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
     return 1;
 }
 
+static void _domain_cpuid(const struct domain *currd,
+                          unsigned int leaf, unsigned int subleaf,
+                          unsigned int *eax, unsigned int *ebx,
+                          unsigned int *ecx, unsigned int *edx)
+{
+    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
+        domain_cpuid(currd, leaf, subleaf, eax, ebx, ecx, edx);
+    else
+        cpuid_count(leaf, subleaf, eax, ebx, ecx, edx);
+}
+
 void pv_cpuid(struct cpu_user_regs *regs)
 {
     uint32_t leaf, subleaf, a, b, c, d;
@@ -983,10 +994,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
          */
         unsigned int limit = (leaf >> 16) != 0x8000 ? 0 : 0x80000000, dummy;
 
-        if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-            domain_cpuid(currd, limit, 0, &limit, &dummy, &dummy, &dummy);
-        else
-            limit = cpuid_eax(limit);
+        _domain_cpuid(currd, limit, 0, &limit, &dummy, &dummy, &dummy);
         if ( leaf > limit )
         {
             regs->eax = 0;
@@ -997,10 +1005,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         }
     }
 
-    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-        domain_cpuid(currd, leaf, subleaf, &a, &b, &c, &d);
-    else
-        cpuid_count(leaf, subleaf, &a, &b, &c, &d);
+    _domain_cpuid(currd, leaf, subleaf, &a, &b, &c, &d);
 
     switch ( leaf )
     {
@@ -1169,11 +1174,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case XSTATE_CPUID:
-
-        if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-            domain_cpuid(currd, 1, 0, &tmp, &tmp, &_ecx, &tmp);
-        else
-            _ecx = cpuid_ecx(1);
+        _domain_cpuid(currd, 1, 0, &tmp, &tmp, &_ecx, &tmp);
         _ecx &= pv_featureset[FEATURESET_1c];
 
         if ( !(_ecx & cpufeat_mask(X86_FEATURE_XSAVE)) || subleaf >= 63 )
@@ -1192,10 +1193,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
                                xstate_sizes[_XSTATE_YMM]);
             }
 
-            if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
-                domain_cpuid(currd, 7, 0, &tmp, &_ebx, &tmp, &tmp);
-            else
-                cpuid_count(7, 0, &tmp, &_ebx, &tmp, &tmp);
+            _domain_cpuid(currd, 7, 0, &tmp, &_ebx, &tmp, &tmp);
             _ebx &= pv_featureset[FEATURESET_7b0];
 
             if ( _ebx & cpufeat_mask(X86_FEATURE_AVX512F) )
@@ -2511,7 +2509,7 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         break;
 
     case MSR_SPEC_CTRL:
-        domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+        _domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
         if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
             break;
         *val = curr->arch.spec_ctrl;
@@ -2739,7 +2737,7 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         break;
 
     case MSR_SPEC_CTRL:
-        domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+        _domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
         if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) )
             break; /* MSR available? */
 
@@ -2755,8 +2753,8 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
         return X86EMUL_OKAY;
 
     case MSR_PRED_CMD:
-        domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
-        domain_cpuid(currd, 0x80000008, 0, &dummy, &ebx, &dummy, &dummy);
+        _domain_cpuid(currd, 7, 0, &dummy, &dummy, &dummy, &edx);
+        _domain_cpuid(currd, 0x80000008, 0, &dummy, &ebx, &dummy, &dummy);
         if ( !(edx & cpufeat_mask(X86_FEATURE_IBRSB)) &&
              !(ebx & cpufeat_mask(X86_FEATURE_IBPB)) )
             break; /* MSR available? */
