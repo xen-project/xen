@@ -112,6 +112,9 @@ struct pci_dev {
 #define PT_FAULT_THRESHOLD 10
     } fault;
     u64 vf_rlen[6];
+
+    /* Data for vPCI. */
+    struct vpci *vpci;
 };
 
 #define for_each_pdev(domain, pdev) \

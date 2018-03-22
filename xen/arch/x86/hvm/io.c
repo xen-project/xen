@@ -25,6 +25,7 @@
 #include <xen/trace.h>
 #include <xen/event.h>
 #include <xen/hypercall.h>
+#include <xen/vpci.h>
 #include <asm/current.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -276,6 +277,110 @@ unsigned int hvm_pci_decode_addr(unsigned int cf8, unsigned int addr,
      * offset into the 0xcfc register when reading/writing to it.
      */
     return CF8_ADDR_LO(cf8) | (addr & 3);
+}
+
+/* Do some sanity checks. */
+static bool vpci_access_allowed(unsigned int reg, unsigned int len)
+{
+    /* Check access size. */
+    if ( len != 1 && len != 2 && len != 4 )
+        return false;
+
+    /* Check that access is size aligned. */
+    if ( (reg & (len - 1)) )
+        return false;
+
+    return true;
+}
+
+/* vPCI config space IO ports handlers (0xcf8/0xcfc). */
+static bool vpci_portio_accept(const struct hvm_io_handler *handler,
+                               const ioreq_t *p)
+{
+    return (p->addr == 0xcf8 && p->size == 4) || (p->addr & ~3) == 0xcfc;
+}
+
+static int vpci_portio_read(const struct hvm_io_handler *handler,
+                            uint64_t addr, uint32_t size, uint64_t *data)
+{
+    const struct domain *d = current->domain;
+    unsigned int reg;
+    pci_sbdf_t sbdf;
+    uint32_t cf8;
+
+    *data = ~(uint64_t)0;
+
+    if ( addr == 0xcf8 )
+    {
+        ASSERT(size == 4);
+        *data = d->arch.hvm_domain.pci_cf8;
+        return X86EMUL_OKAY;
+    }
+
+    ASSERT((addr & ~3) == 0xcfc);
+    cf8 = ACCESS_ONCE(d->arch.hvm_domain.pci_cf8);
+    if ( !CF8_ENABLED(cf8) )
+        return X86EMUL_UNHANDLEABLE;
+
+    reg = hvm_pci_decode_addr(cf8, addr, &sbdf);
+
+    if ( !vpci_access_allowed(reg, size) )
+        return X86EMUL_OKAY;
+
+    *data = vpci_read(sbdf, reg, size);
+
+    return X86EMUL_OKAY;
+}
+
+static int vpci_portio_write(const struct hvm_io_handler *handler,
+                             uint64_t addr, uint32_t size, uint64_t data)
+{
+    struct domain *d = current->domain;
+    unsigned int reg;
+    pci_sbdf_t sbdf;
+    uint32_t cf8;
+
+    if ( addr == 0xcf8 )
+    {
+        ASSERT(size == 4);
+        d->arch.hvm_domain.pci_cf8 = data;
+        return X86EMUL_OKAY;
+    }
+
+    ASSERT((addr & ~3) == 0xcfc);
+    cf8 = ACCESS_ONCE(d->arch.hvm_domain.pci_cf8);
+    if ( !CF8_ENABLED(cf8) )
+        return X86EMUL_UNHANDLEABLE;
+
+    reg = hvm_pci_decode_addr(cf8, addr, &sbdf);
+
+    if ( !vpci_access_allowed(reg, size) )
+        return X86EMUL_OKAY;
+
+    vpci_write(sbdf, reg, size, data);
+
+    return X86EMUL_OKAY;
+}
+
+static const struct hvm_io_ops vpci_portio_ops = {
+    .accept = vpci_portio_accept,
+    .read = vpci_portio_read,
+    .write = vpci_portio_write,
+};
+
+void register_vpci_portio_handler(struct domain *d)
+{
+    struct hvm_io_handler *handler;
+
+    if ( !has_vpci(d) )
+        return;
+
+    handler = hvm_next_io_handler(d);
+    if ( !handler )
+        return;
+
+    handler->type = IOREQ_TYPE_PIO;
+    handler->ops = &vpci_portio_ops;
 }
 
 /*

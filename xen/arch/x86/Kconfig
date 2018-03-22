@@ -23,6 +23,7 @@ config X86
 	select HAS_PCI
 	select HAS_PDX
 	select HAS_UBSAN
+	select HAS_VPCI
 	select NUMA
 
 config ARCH_DEFCONFIG

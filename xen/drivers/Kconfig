@@ -12,4 +12,7 @@ source "drivers/pci/Kconfig"
 
 source "drivers/video/Kconfig"
 
+config HAS_VPCI
+	bool
+
 endmenu

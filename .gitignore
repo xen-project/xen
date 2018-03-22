@@ -254,6 +254,9 @@ tools/tests/regression/build/*
 tools/tests/regression/downloads/*
 tools/tests/mem-sharing/memshrtool
 tools/tests/mce-test/tools/xen-mceinj
+tools/tests/vpci/list.h
+tools/tests/vpci/vpci.[hc]
+tools/tests/vpci/test_vpci
 tools/xcutils/lsevtchn
 tools/xcutils/readnotes
 tools/xenbackendd/_paths.h

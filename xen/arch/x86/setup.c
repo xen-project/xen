@@ -1639,7 +1639,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
                             XEN_DOMCTL_CDF_hap : 0));
 
         dom0_cfg.config.emulation_flags |=
-            XEN_X86_EMU_LAPIC | XEN_X86_EMU_IOAPIC;
+            XEN_X86_EMU_LAPIC | XEN_X86_EMU_IOAPIC | XEN_X86_EMU_VPCI;
     }
 
     /* Create initial domain 0. */

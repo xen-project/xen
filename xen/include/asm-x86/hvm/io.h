@@ -160,6 +160,9 @@ unsigned int hvm_pci_decode_addr(unsigned int cf8, unsigned int addr,
  */
 void register_g2m_portio_handler(struct domain *d);
 
+/* HVM port IO handler for vPCI accesses. */
+void register_vpci_portio_handler(struct domain *d);
+
 #endif /* __ASM_X86_HVM_IO_H__ */
 
 

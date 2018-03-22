@@ -434,6 +434,7 @@ struct arch_domain
 #define has_vpit(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_PIT))
 #define has_pirq(d)        (!!((d)->arch.emulation_flags & \
                             XEN_X86_EMU_USE_PIRQ))
+#define has_vpci(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_VPCI))
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 
