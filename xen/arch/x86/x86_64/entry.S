@@ -718,7 +718,7 @@ ENTRY(device_not_available)
 ENTRY(debug)
         pushq $0
         movl  $TRAP_debug,4(%rsp)
-        jmp   handle_exception
+        jmp   handle_ist_exception
 
 ENTRY(int3)
         pushq $0

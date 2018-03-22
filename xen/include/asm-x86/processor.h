@@ -422,7 +422,8 @@ struct __packed __cacheline_aligned tss_struct {
 #define IST_DF   1UL
 #define IST_NMI  2UL
 #define IST_MCE  3UL
-#define IST_MAX  3UL
+#define IST_DB   4UL
+#define IST_MAX  4UL
 
 /* Set the Interrupt Stack Table used by a particular IDT entry. */
 static inline void set_ist(idt_entry_t *idt, unsigned int ist)
@@ -439,6 +440,7 @@ static inline void enable_each_ist(idt_entry_t *idt)
     set_ist(&idt[TRAP_double_fault],  IST_DF);
     set_ist(&idt[TRAP_nmi],           IST_NMI);
     set_ist(&idt[TRAP_machine_check], IST_MCE);
+    set_ist(&idt[TRAP_debug],         IST_DB);
 }
 
 static inline void disable_each_ist(idt_entry_t *idt)
@@ -446,6 +448,7 @@ static inline void disable_each_ist(idt_entry_t *idt)
     set_ist(&idt[TRAP_double_fault],  IST_NONE);
     set_ist(&idt[TRAP_nmi],           IST_NONE);
     set_ist(&idt[TRAP_machine_check], IST_NONE);
+    set_ist(&idt[TRAP_debug],         IST_NONE);
 }
 
 #define IDT_ENTRIES 256
