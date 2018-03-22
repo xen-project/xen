@@ -1,1 +1,1 @@
-obj-y += vpci.o
+obj-y += vpci.o header.o

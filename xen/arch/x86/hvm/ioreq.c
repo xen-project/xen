@@ -26,6 +26,7 @@
 #include <xen/domain.h>
 #include <xen/event.h>
 #include <xen/paging.h>
+#include <xen/vpci.h>
 
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/ioreq.h>
@@ -47,6 +48,9 @@ bool hvm_io_pending(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct hvm_ioreq_server *s;
+
+    if ( has_vpci(d) && vpci_process_pending(v) )
+        return true;
 
     list_for_each_entry ( s,
                           &d->arch.hvm_domain.ioreq_server.list,

@@ -80,6 +80,7 @@ typedef union {
     };
 } pci_sbdf_t;
 
+#define CONFIG_HAS_VPCI
 #include "vpci.h"
 
 #define __hwdom_init

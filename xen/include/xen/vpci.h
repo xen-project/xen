@@ -1,6 +1,8 @@
 #ifndef _XEN_VPCI_H_
 #define _XEN_VPCI_H_
 
+#ifdef CONFIG_HAS_VPCI
+
 #include <xen/pci.h>
 #include <xen/types.h>
 #include <xen/list.h>
@@ -20,6 +22,9 @@ typedef int vpci_register_init_t(struct pci_dev *dev);
 /* Add vPCI handlers to device. */
 int __must_check vpci_add_handlers(struct pci_dev *dev);
 
+/* Remove all handlers and free vpci related structures. */
+void vpci_remove_device(struct pci_dev *pdev);
+
 /* Add/remove a register handler. */
 int __must_check vpci_add_register(struct vpci *vpci,
                                    vpci_read_t *read_handler,
@@ -34,11 +39,67 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size);
 void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
                 uint32_t data);
 
+/* Passthrough handlers. */
+uint32_t vpci_hw_read16(const struct pci_dev *pdev, unsigned int reg,
+                        void *data);
+uint32_t vpci_hw_read32(const struct pci_dev *pdev, unsigned int reg,
+                        void *data);
+
+/*
+ * Check for pending vPCI operations on this vcpu. Returns true if the vcpu
+ * should not run.
+ */
+bool __must_check vpci_process_pending(struct vcpu *v);
+
 struct vpci {
     /* List of vPCI handlers for a device. */
     struct list_head handlers;
     spinlock_t lock;
+
+#ifdef __XEN__
+    /* Hide the rest of the vpci struct from the user-space test harness. */
+    struct vpci_header {
+        /* Information about the PCI BARs of this device. */
+        struct vpci_bar {
+            uint64_t addr;
+            uint64_t size;
+            enum {
+                VPCI_BAR_EMPTY,
+                VPCI_BAR_IO,
+                VPCI_BAR_MEM32,
+                VPCI_BAR_MEM64_LO,
+                VPCI_BAR_MEM64_HI,
+                VPCI_BAR_ROM,
+            } type;
+            bool prefetchable : 1;
+            /* Store whether the BAR is mapped into guest p2m. */
+            bool enabled      : 1;
+#define PCI_HEADER_NORMAL_NR_BARS        6
+#define PCI_HEADER_BRIDGE_NR_BARS        2
+        } bars[PCI_HEADER_NORMAL_NR_BARS + 1];
+        /* At most 6 BARS + 1 expansion ROM BAR. */
+
+        /*
+         * Store whether the ROM enable bit is set (doesn't imply ROM BAR
+         * is mapped into guest p2m) if there's a ROM BAR on the device.
+         */
+        bool rom_enabled      : 1;
+        /* FIXME: currently there's no support for SR-IOV. */
+    } header;
+#endif
 };
+
+struct vpci_vcpu {
+    /* Per-vcpu structure to store state while {un}mapping of PCI BARs. */
+    struct rangeset *mem;
+    struct pci_dev *pdev;
+    bool map      : 1;
+    bool rom_only : 1;
+};
+
+#else /* !CONFIG_HAS_VPCI */
+struct vpci_vcpu {};
+#endif
 
 #endif
 

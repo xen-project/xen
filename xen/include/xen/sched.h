@@ -20,6 +20,7 @@
 #include <xen/smp.h>
 #include <xen/perfc.h>
 #include <asm/atomic.h>
+#include <xen/vpci.h>
 #include <xen/wait.h>
 #include <public/xen.h>
 #include <public/domctl.h>
@@ -266,6 +267,9 @@ struct vcpu
     mfn_t            vcpu_info_mfn;
 
     struct evtchn_fifo_vcpu *evtchn_fifo;
+
+    /* vPCI per-vCPU area, used to store data for long running operations. */
+    struct vpci_vcpu vpci;
 
     struct arch_vcpu arch;
 };

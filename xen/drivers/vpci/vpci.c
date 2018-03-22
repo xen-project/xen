@@ -34,6 +34,23 @@ struct vpci_register {
     struct list_head node;
 };
 
+void vpci_remove_device(struct pci_dev *pdev)
+{
+    spin_lock(&pdev->vpci->lock);
+    while ( !list_empty(&pdev->vpci->handlers) )
+    {
+        struct vpci_register *r = list_first_entry(&pdev->vpci->handlers,
+                                                   struct vpci_register,
+                                                   node);
+
+        list_del(&r->node);
+        xfree(r);
+    }
+    spin_unlock(&pdev->vpci->lock);
+    xfree(pdev->vpci);
+    pdev->vpci = NULL;
+}
+
 int __hwdom_init vpci_add_handlers(struct pci_dev *pdev)
 {
     unsigned int i;
@@ -57,19 +74,7 @@ int __hwdom_init vpci_add_handlers(struct pci_dev *pdev)
     }
 
     if ( rc )
-    {
-        while ( !list_empty(&pdev->vpci->handlers) )
-        {
-            struct vpci_register *r = list_first_entry(&pdev->vpci->handlers,
-                                                       struct vpci_register,
-                                                       node);
-
-            list_del(&r->node);
-            xfree(r);
-        }
-        xfree(pdev->vpci);
-        pdev->vpci = NULL;
-    }
+        vpci_remove_device(pdev);
 
     return rc;
 }
@@ -100,6 +105,20 @@ static uint32_t vpci_ignored_read(const struct pci_dev *pdev, unsigned int reg,
 static void vpci_ignored_write(const struct pci_dev *pdev, unsigned int reg,
                                uint32_t val, void *data)
 {
+}
+
+uint32_t vpci_hw_read16(const struct pci_dev *pdev, unsigned int reg,
+                        void *data)
+{
+    return pci_conf_read16(pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
+                           PCI_FUNC(pdev->devfn), reg);
+}
+
+uint32_t vpci_hw_read32(const struct pci_dev *pdev, unsigned int reg,
+                        void *data)
+{
+    return pci_conf_read32(pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
+                           PCI_FUNC(pdev->devfn), reg);
 }
 
 int vpci_add_register(struct vpci *vpci, vpci_read_t *read_handler,
