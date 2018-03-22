@@ -24,12 +24,8 @@ distclean: clean
 install:
 
 vpci.c: $(XEN_ROOT)/xen/drivers/vpci/vpci.c
-	# Trick the compiler so it doesn't complain about missing symbols
-	sed -e '/#include/d' \
-	    -e '1s;^;#include "emul.h"\
-	             vpci_register_init_t *const __start_vpci_array[1]\;\
-	             vpci_register_init_t *const __end_vpci_array[1]\;\
-	             ;' <$< >$@
+	# Remove includes and add the test harness header
+	sed -e '/#include/d' -e '1s/^/#include "emul.h"/' <$< >$@
 
 list.h: $(XEN_ROOT)/xen/include/xen/list.h
 vpci.h: $(XEN_ROOT)/xen/include/xen/vpci.h

@@ -90,11 +90,9 @@ struct vpci {
         bool rom_enabled      : 1;
         /* FIXME: currently there's no support for SR-IOV. */
     } header;
-#endif
 
     /* MSI data. */
     struct vpci_msi {
-#ifdef __XEN__
       /* Address. */
         uint64_t address;
         /* Mask bitfield. */
@@ -113,12 +111,10 @@ struct vpci {
         uint8_t vectors     : 5;
         /* Arch-specific data. */
         struct vpci_arch_msi arch;
-#endif
     } *msi;
 
     /* MSI-X data. */
     struct vpci_msix {
-#ifdef __XEN__
         struct pci_dev *pdev;
         /* List link. */
         struct list_head next;
@@ -141,8 +137,8 @@ struct vpci {
             bool updated : 1;
             struct vpci_arch_msix_entry arch;
         } entries[];
-#endif
     } *msix;
+#endif
 };
 
 struct vpci_vcpu {

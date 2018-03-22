@@ -20,10 +20,6 @@
 #include <xen/sched.h>
 #include <xen/vpci.h>
 
-extern vpci_register_init_t *const __start_vpci_array[];
-extern vpci_register_init_t *const __end_vpci_array[];
-#define NUM_VPCI_INIT (__end_vpci_array - __start_vpci_array)
-
 /* Internal struct to store the emulated PCI registers. */
 struct vpci_register {
     vpci_read_t *read;
@@ -33,6 +29,11 @@ struct vpci_register {
     void *private;
     struct list_head node;
 };
+
+#ifdef __XEN__
+extern vpci_register_init_t *const __start_vpci_array[];
+extern vpci_register_init_t *const __end_vpci_array[];
+#define NUM_VPCI_INIT (__end_vpci_array - __start_vpci_array)
 
 void vpci_remove_device(struct pci_dev *pdev)
 {
@@ -80,6 +81,7 @@ int __hwdom_init vpci_add_handlers(struct pci_dev *pdev)
 
     return rc;
 }
+#endif /* __XEN__ */
 
 static int vpci_register_cmp(const struct vpci_register *r1,
                              const struct vpci_register *r2)
