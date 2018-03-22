@@ -446,12 +446,8 @@ struct x86_emulate_ops
 
     /*
      * get_fpu: Load emulated environment's FPU state onto processor.
-     *  @exn_callback: On any FPU or SIMD exception, pass control to
-     *                 (*exception_callback)(exception_callback_arg, regs).
      */
     int (*get_fpu)(
-        void (*exception_callback)(void *, struct cpu_user_regs *),
-        void *exception_callback_arg,
         enum x86_emulate_fpu_type type,
         struct x86_emulate_ctxt *ctxt);
 

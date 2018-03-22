@@ -1890,8 +1890,6 @@ int hvmemul_cpuid(uint32_t leaf, uint32_t subleaf,
 }
 
 static int hvmemul_get_fpu(
-    void (*exception_callback)(void *, struct cpu_user_regs *),
-    void *exception_callback_arg,
     enum x86_emulate_fpu_type type,
     struct x86_emulate_ctxt *ctxt)
 {
@@ -1929,9 +1927,6 @@ static int hvmemul_get_fpu(
         }
     }
 
-    curr->arch.hvm_vcpu.fpu_exception_callback = exception_callback;
-    curr->arch.hvm_vcpu.fpu_exception_callback_arg = exception_callback_arg;
-
     return X86EMUL_OKAY;
 }
 
@@ -1941,8 +1936,6 @@ static void hvmemul_put_fpu(
     const struct x86_emul_fpu_aux *aux)
 {
     struct vcpu *curr = current;
-
-    curr->arch.hvm_vcpu.fpu_exception_callback = NULL;
 
     if ( aux )
     {

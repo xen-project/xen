@@ -263,8 +263,6 @@ int emul_test_read_xcr(
     struct x86_emulate_ctxt *ctxt);
 
 int emul_test_get_fpu(
-    void (*exception_callback)(void *, struct cpu_user_regs *),
-    void *exception_callback_arg,
     enum x86_emulate_fpu_type type,
     struct x86_emulate_ctxt *ctxt);
 

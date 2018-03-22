@@ -1094,23 +1094,8 @@ do {                                                                    \
     ops->write_segment(x86_seg_cs, cs, ctxt);                           \
 })
 
-struct fpu_insn_ctxt {
-    uint8_t insn_bytes;
-    uint8_t type;
-    int8_t exn_raised;
-};
-
-static void fpu_handle_exception(void *_fic, struct cpu_user_regs *regs)
-{
-    struct fpu_insn_ctxt *fic = _fic;
-    ASSERT(regs->entry_vector < 0x20);
-    fic->exn_raised = regs->entry_vector;
-    regs->r(ip) += fic->insn_bytes;
-}
-
 static int _get_fpu(
     enum x86_emulate_fpu_type type,
-    struct fpu_insn_ctxt *fic,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
@@ -1138,14 +1123,13 @@ static int _get_fpu(
         break;
     }
 
-    rc = ops->get_fpu(fpu_handle_exception, fic, type, ctxt);
+    rc = ops->get_fpu(type, ctxt);
 
     if ( rc == X86EMUL_OKAY )
     {
         unsigned long cr0;
 
         fail_if(type == X86EMUL_FPU_fpu && !ops->put_fpu);
-        fic->type = type;
 
         fail_if(!ops->read_cr);
         if ( type >= X86EMUL_FPU_xmm )
@@ -1183,37 +1167,22 @@ static int _get_fpu(
     return rc;
 }
 
-#define get_fpu(_type, _fic)                                    \
+#define get_fpu(type)                                           \
 do {                                                            \
-    rc = _get_fpu(_type, _fic, ctxt, ops);                      \
+    rc = _get_fpu(fpu_type = (type), ctxt, ops);                \
     if ( rc ) goto done;                                        \
 } while (0)
 
-#define check_fpu_exn(fic)                                      \
-do {                                                            \
-    generate_exception_if((fic)->exn_raised >= 0,               \
-                          (fic)->exn_raised);                   \
-} while (0)
-
-#define check_xmm_exn(fic)                                      \
-do {                                                            \
-    if ( (fic)->exn_raised == EXC_XM && ops->read_cr &&         \
-         ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY &&         \
-         !(cr4 & X86_CR4_OSXMMEXCPT) )                          \
-        (fic)->exn_raised = EXC_UD;                             \
-    check_fpu_exn(fic);                                         \
-} while (0)
-
 static void put_fpu(
-    struct fpu_insn_ctxt *fic,
+    enum x86_emulate_fpu_type type,
     bool failed_late,
     const struct x86_emulate_state *state,
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
-    if ( unlikely(failed_late) && fic->type == X86EMUL_FPU_fpu )
+    if ( unlikely(failed_late) && type == X86EMUL_FPU_fpu )
         ops->put_fpu(ctxt, X86EMUL_FPU_fpu, NULL);
-    else if ( unlikely(fic->type == X86EMUL_FPU_fpu) && !state->fpu_ctrl )
+    else if ( unlikely(type == X86EMUL_FPU_fpu) && !state->fpu_ctrl )
     {
         struct x86_emul_fpu_aux aux = {
             .ip = ctxt->regs->r(ip),
@@ -1247,9 +1216,8 @@ static void put_fpu(
         }
         ops->put_fpu(ctxt, X86EMUL_FPU_none, &aux);
     }
-    else if ( fic->type != X86EMUL_FPU_none && ops->put_fpu )
+    else if ( type != X86EMUL_FPU_none && ops->put_fpu )
         ops->put_fpu(ctxt, X86EMUL_FPU_none, NULL);
-    fic->type = X86EMUL_FPU_none;
 }
 
 static inline bool fpu_check_write(void)
@@ -1264,29 +1232,27 @@ static inline bool fpu_check_write(void)
 #define emulate_fpu_insn_memdst(opc, ext, arg)                          \
 do {                                                                    \
     /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
-    fic.insn_bytes = 2;                                                 \
+    insn_bytes = 2;                                                     \
     memcpy(get_stub(stub),                                              \
            ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
-    invoke_stub("", "", "+m" (fic), "+m" (arg) : "a" (&(arg)));         \
+    invoke_stub("", "", "+m" (arg) : "a" (&(arg)));                     \
     put_stub(stub);                                                     \
 } while (0)
 
 #define emulate_fpu_insn_memsrc(opc, ext, arg)                          \
 do {                                                                    \
     /* ModRM: mod=0, reg=ext, rm=0, i.e. a (%rax) operand */            \
-    fic.insn_bytes = 2;                                                 \
     memcpy(get_stub(stub),                                              \
            ((uint8_t[]){ opc, ((ext) & 7) << 3, 0xc3 }), 3);            \
-    invoke_stub("", "", "+m" (fic) : "m" (arg), "a" (&(arg)));          \
+    invoke_stub("", "", "=m" (dummy) : "m" (arg), "a" (&(arg)));        \
     put_stub(stub);                                                     \
 } while (0)
 
 #define emulate_fpu_insn_stub(bytes...)                                 \
 do {                                                                    \
     unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
-    fic.insn_bytes = nr_;                                               \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
-    invoke_stub("", "", "=m" (fic) : "m" (fic));                        \
+    invoke_stub("", "", "=m" (dummy) : "i" (0));                        \
     put_stub(stub);                                                     \
 } while (0)
 
@@ -1294,12 +1260,10 @@ do {                                                                    \
 do {                                                                    \
     unsigned int nr_ = sizeof((uint8_t[]){ bytes });                    \
     unsigned long tmp_;                                                 \
-    fic.insn_bytes = nr_;                                               \
     memcpy(get_stub(stub), ((uint8_t[]){ bytes, 0xc3 }), nr_ + 1);      \
     invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),             \
                 _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),            \
-                [eflags] "+g" (_regs.eflags), [tmp] "=&r" (tmp_),       \
-                "+m" (fic)                                              \
+                [eflags] "+g" (_regs.eflags), [tmp] "=&r" (tmp_)        \
                 : [mask] "i" (X86_EFLAGS_ZF|X86_EFLAGS_PF|X86_EFLAGS_CF)); \
     put_stub(stub);                                                     \
 } while (0)
@@ -3158,14 +3122,14 @@ x86_emulate(
     struct x86_emulate_state state;
     int rc;
     uint8_t b, d, *opc = NULL;
-    unsigned int first_byte = 0;
+    unsigned int first_byte = 0, insn_bytes = 0;
     bool singlestep = (_regs.eflags & X86_EFLAGS_TF) &&
 	    !is_branch_step(ctxt, ops);
     bool sfence = false;
     struct operand src = { .reg = PTR_POISON };
     struct operand dst = { .reg = PTR_POISON };
     unsigned long cr4;
-    struct fpu_insn_ctxt fic = { .type = X86EMUL_FPU_none, .exn_raised = -1 };
+    enum x86_emulate_fpu_type fpu_type = X86EMUL_FPU_none;
     struct x86_emulate_stub stub = {};
     DECLARE_ALIGNED(mmval_t, mmval);
 #ifdef __XEN__
@@ -3859,9 +3823,8 @@ x86_emulate(
 
     case 0x9b:  /* wait/fwait */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_wait, &fic);
+        get_fpu(X86EMUL_FPU_wait);
         emulate_fpu_insn_stub(b);
-        check_fpu_exn(&fic);
         break;
 
     case 0x9c: /* pushf */
@@ -4264,7 +4227,7 @@ x86_emulate(
 
     case 0xd8: /* FPU 0xd8 */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fadd %stN,%st */
@@ -4286,12 +4249,11 @@ x86_emulate(
             emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
             break;
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xd9: /* FPU 0xd9 */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xfb: /* fsincos */
@@ -4373,12 +4335,11 @@ x86_emulate(
             if ( dst.type == OP_MEM && !state->fpu_ctrl && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xda: /* FPU 0xda */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fcmovb %stN */
@@ -4395,12 +4356,11 @@ x86_emulate(
             generate_exception_if(ea.type != OP_MEM, EXC_UD);
             goto fpu_memsrc32;
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xdb: /* FPU 0xdb */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fcmovnb %stN */
@@ -4453,12 +4413,11 @@ x86_emulate(
                 generate_exception(EXC_UD);
             }
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xdc: /* FPU 0xdc */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* fadd %st,%stN */
@@ -4480,12 +4439,11 @@ x86_emulate(
             emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
             break;
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xdd: /* FPU 0xdd */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* ffree %stN */
@@ -4529,12 +4487,11 @@ x86_emulate(
             if ( dst.type == OP_MEM && !state->fpu_ctrl && !fpu_check_write() )
                 dst.type = OP_NONE;
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xde: /* FPU 0xde */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xc0 ... 0xc7: /* faddp %stN */
@@ -4552,12 +4509,11 @@ x86_emulate(
             emulate_fpu_insn_memsrc(b, modrm_reg & 7, src.val);
             break;
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xdf: /* FPU 0xdf */
         host_and_vcpu_must_have(fpu);
-        get_fpu(X86EMUL_FPU_fpu, &fic);
+        get_fpu(X86EMUL_FPU_fpu);
         switch ( modrm )
         {
         case 0xe0:
@@ -4602,7 +4558,6 @@ x86_emulate(
                 goto fpu_memdst64;
             }
         }
-        check_fpu_exn(&fic);
         break;
 
     case 0xe0 ... 0xe2: /* loop{,z,nz} */ {
@@ -5461,7 +5416,7 @@ x86_emulate(
         else
             generate_exception(EXC_UD);
 
-        get_fpu(X86EMUL_FPU_mmx, &fic);
+        get_fpu(X86EMUL_FPU_mmx);
 
         d = DstReg | SrcMem;
         op_bytes = 8;
@@ -5551,7 +5506,7 @@ x86_emulate(
             else
                 vcpu_must_have(sse);
     simd_0f_xmm:
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
@@ -5561,7 +5516,7 @@ x86_emulate(
     simd_0f_avx:
             host_and_vcpu_must_have(avx);
     simd_0f_ymm:
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
     simd_0f_common:
         opc = init_prefixes(stub);
@@ -5574,7 +5529,7 @@ x86_emulate(
             vex.b = 1;
             opc[1] &= 0x38;
         }
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
         break;
 
     case X86EMUL_OPC_66(0x0f, 0x12):       /* movlpd m64,xmm */
@@ -5661,12 +5616,12 @@ x86_emulate(
                 vcpu_must_have(sse2);
             else
                 vcpu_must_have(sse);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
 
         if ( ea.type == OP_MEM )
@@ -5692,14 +5647,14 @@ x86_emulate(
                 vcpu_must_have(sse2);
             else
                 vcpu_must_have(sse);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             generate_exception_if(vex.reg != 0xf, EXC_UD);
             vex.l = 0;
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
 
         opc = init_prefixes(stub);
@@ -5722,17 +5677,14 @@ x86_emulate(
             opc[1] = modrm & 0xc7;
         if ( !mode_64bit() )
             vex.w = 0;
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
         opc[2] = 0xc3;
 
         copy_REX_VEX(opc, rex_prefix, vex);
         ea.reg = decode_gpr(&_regs, modrm_reg);
-        invoke_stub("", "", "=a" (*ea.reg), "+m" (fic.exn_raised)
-                            : "c" (mmvalp), "m" (*mmvalp));
+        invoke_stub("", "", "=a" (*ea.reg) : "c" (mmvalp), "m" (*mmvalp));
 
         put_stub(stub);
-        check_xmm_exn(&fic);
-
         state->simd_size = simd_none;
         break;
 
@@ -5746,13 +5698,13 @@ x86_emulate(
                 vcpu_must_have(sse2);
             else
                 vcpu_must_have(sse);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             generate_exception_if(vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
 
         opc = init_prefixes(stub);
@@ -5770,20 +5722,17 @@ x86_emulate(
             vex.b = 1;
             opc[1] &= 0x38;
         }
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
         opc[2] = 0xc3;
 
         copy_REX_VEX(opc, rex_prefix, vex);
         invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),
                     _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),
                     [eflags] "+g" (_regs.eflags),
-                    [tmp] "=&r" (dummy), "+m" (*mmvalp),
-                    "+m" (fic.exn_raised)
+                    [tmp] "=&r" (dummy), "+m" (*mmvalp)
                     : "a" (mmvalp), [mask] "i" (EFLAGS_MASK));
 
         put_stub(stub);
-        check_xmm_exn(&fic);
-
         ASSERT(!state->simd_size);
         break;
 
@@ -5921,9 +5870,9 @@ x86_emulate(
         if ( !mode_64bit() )
             vex.w = 0;
         opc[1] = modrm & 0xc7;
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
     simd_0f_to_gpr:
-        opc[fic.insn_bytes - PFX_BYTES] = 0xc3;
+        opc[insn_bytes - PFX_BYTES] = 0xc3;
 
         generate_exception_if(ea.type != OP_REG, EXC_UD);
 
@@ -5942,9 +5891,9 @@ x86_emulate(
                     vcpu_must_have(sse);
             }
             if ( b == 0x50 || (vex.pfx & VEX_PREFIX_DOUBLE_MASK) )
-                get_fpu(X86EMUL_FPU_xmm, &fic);
+                get_fpu(X86EMUL_FPU_xmm);
             else
-                get_fpu(X86EMUL_FPU_mmx, &fic);
+                get_fpu(X86EMUL_FPU_mmx);
         }
         else
         {
@@ -5953,14 +5902,13 @@ x86_emulate(
                 host_and_vcpu_must_have(avx);
             else
                 host_and_vcpu_must_have(avx2);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
 
         copy_REX_VEX(opc, rex_prefix, vex);
         invoke_stub("", "", "=a" (dst.val) : [dummy] "i" (0));
 
         put_stub(stub);
-        check_xmm_exn(&fic);
 
         ASSERT(!state->simd_size);
         dst.bytes = 4;
@@ -6126,7 +6074,7 @@ x86_emulate(
             goto simd_0f_sse2;
     simd_0f_mmx:
         host_and_vcpu_must_have(mmx);
-        get_fpu(X86EMUL_FPU_mmx, &fic);
+        get_fpu(X86EMUL_FPU_mmx);
         goto simd_0f_common;
 
     CASE_SIMD_PACKED_INT(0x0f, 0x6e):    /* mov{d,q} r/m,{,x}mm */
@@ -6137,17 +6085,17 @@ x86_emulate(
         {
             generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
         else if ( vex.pfx )
         {
             vcpu_must_have(sse2);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             host_and_vcpu_must_have(mmx);
-            get_fpu(X86EMUL_FPU_mmx, &fic);
+            get_fpu(X86EMUL_FPU_mmx);
         }
 
     simd_0f_rm:
@@ -6159,17 +6107,14 @@ x86_emulate(
         if ( !mode_64bit() )
             vex.w = 0;
         opc[1] = modrm & 0x38;
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
         opc[2] = 0xc3;
 
         copy_REX_VEX(opc, rex_prefix, vex);
-        invoke_stub("", "", "+m" (src.val), "+m" (fic.exn_raised)
-                            : "a" (&src.val));
+        invoke_stub("", "", "+m" (src.val) : "a" (&src.val));
         dst.val = src.val;
 
         put_stub(stub);
-        check_xmm_exn(&fic);
-
         ASSERT(!state->simd_size);
         break;
 
@@ -6235,19 +6180,19 @@ x86_emulate(
                 host_and_vcpu_must_have(avx);
             }
     simd_0f_imm8_ymm:
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
         else if ( vex.pfx )
         {
     simd_0f_imm8_sse2:
             vcpu_must_have(sse2);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             host_and_vcpu_must_have(mmx);
             vcpu_must_have(mmxext);
-            get_fpu(X86EMUL_FPU_mmx, &fic);
+            get_fpu(X86EMUL_FPU_mmx);
         }
     simd_0f_imm8:
         opc = init_prefixes(stub);
@@ -6261,7 +6206,7 @@ x86_emulate(
             opc[1] &= 0x38;
         }
         opc[2] = imm1;
-        fic.insn_bytes = PFX_BYTES + 3;
+        insn_bytes = PFX_BYTES + 3;
         break;
 
     CASE_SIMD_PACKED_INT(0x0f, 0x71):    /* Grp12 */
@@ -6289,33 +6234,31 @@ x86_emulate(
                 host_and_vcpu_must_have(avx2);
             else
                 host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
         else if ( vex.pfx )
         {
             vcpu_must_have(sse2);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             host_and_vcpu_must_have(mmx);
-            get_fpu(X86EMUL_FPU_mmx, &fic);
+            get_fpu(X86EMUL_FPU_mmx);
         }
 
         opc = init_prefixes(stub);
         opc[0] = b;
         opc[1] = modrm;
         opc[2] = imm1;
-        fic.insn_bytes = PFX_BYTES + 3;
+        insn_bytes = PFX_BYTES + 3;
     simd_0f_reg_only:
-        opc[fic.insn_bytes - PFX_BYTES] = 0xc3;
+        opc[insn_bytes - PFX_BYTES] = 0xc3;
 
         copy_REX_VEX(opc, rex_prefix, vex);
         invoke_stub("", "", [dummy_out] "=g" (dummy) : [dummy_in] "i" (0) );
 
         put_stub(stub);
-        check_xmm_exn(&fic);
-
         ASSERT(!state->simd_size);
         break;
 
@@ -6350,7 +6293,7 @@ x86_emulate(
         {
             generate_exception_if(vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
 
 #ifdef __x86_64__
             if ( !mode_64bit() )
@@ -6392,12 +6335,12 @@ x86_emulate(
         else
         {
             host_and_vcpu_must_have(mmx);
-            get_fpu(X86EMUL_FPU_mmx, &fic);
+            get_fpu(X86EMUL_FPU_mmx);
         }
 
         opc = init_prefixes(stub);
         opc[0] = b;
-        fic.insn_bytes = PFX_BYTES + 1;
+        insn_bytes = PFX_BYTES + 1;
         goto simd_0f_reg_only;
 
     case X86EMUL_OPC_66(0x0f, 0x78):     /* Grp17 */
@@ -6413,14 +6356,14 @@ x86_emulate(
         generate_exception_if(ea.type != OP_REG, EXC_UD);
 
         host_and_vcpu_must_have(sse4a);
-        get_fpu(X86EMUL_FPU_xmm, &fic);
+        get_fpu(X86EMUL_FPU_xmm);
 
         opc = init_prefixes(stub);
         opc[0] = b;
         opc[1] = modrm;
         opc[2] = imm1;
         opc[3] = imm2;
-        fic.insn_bytes = PFX_BYTES + 4;
+        insn_bytes = PFX_BYTES + 4;
         goto simd_0f_reg_only;
 
     case X86EMUL_OPC_66(0x0f, 0x79):     /* extrq xmm,xmm */
@@ -6548,7 +6491,7 @@ x86_emulate(
             vcpu_must_have(sse);
         ldmxcsr:
             generate_exception_if(src.type != OP_MEM, EXC_UD);
-            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm, &fic);
+            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm);
             generate_exception_if(src.val & ~mxcsr_mask, EXC_GP, 0);
             asm volatile ( "ldmxcsr %0" :: "m" (src.val) );
             break;
@@ -6558,7 +6501,7 @@ x86_emulate(
             vcpu_must_have(sse);
         stmxcsr:
             generate_exception_if(dst.type != OP_MEM, EXC_UD);
-            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm, &fic);
+            get_fpu(vex.opcx ? X86EMUL_FPU_ymm : X86EMUL_FPU_xmm);
             asm volatile ( "stmxcsr %0" : "=m" (dst.val) );
             break;
 
@@ -6812,7 +6755,7 @@ x86_emulate(
             if ( vex.pfx & VEX_PREFIX_DOUBLE_MASK )
                 goto simd_0f_imm8_sse2;
             vcpu_must_have(sse);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
             goto simd_0f_imm8;
         }
         goto simd_0f_imm8_avx;
@@ -6843,7 +6786,7 @@ x86_emulate(
             vex.w = 0;
         opc[1] = modrm & 0xc7;
         opc[2] = imm1;
-        fic.insn_bytes = PFX_BYTES + 3;
+        insn_bytes = PFX_BYTES + 3;
         goto simd_0f_to_gpr;
 
     case X86EMUL_OPC(0x0f, 0xc7): /* Grp9 */
@@ -7090,18 +7033,18 @@ x86_emulate(
             generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
             d |= TwoOp;
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
         else if ( vex.pfx )
         {
             vcpu_must_have(sse2);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             host_and_vcpu_must_have(mmx);
             vcpu_must_have(mmxext);
-            get_fpu(X86EMUL_FPU_mmx, &fic);
+            get_fpu(X86EMUL_FPU_mmx);
         }
 
         /*
@@ -7121,7 +7064,6 @@ x86_emulate(
         if ( !mode_64bit() )
             vex.w = 0;
         opc[1] = modrm & 0xc7;
-        fic.insn_bytes = PFX_BYTES + 2;
         opc[2] = 0xc3;
 
         copy_REX_VEX(opc, rex_prefix, vex);
@@ -7134,6 +7076,7 @@ x86_emulate(
         opc = init_prefixes(stub);
         opc[0] = b;
         opc[1] = modrm;
+        insn_bytes = PFX_BYTES + 2;
         /* Restore high bit of XMM destination. */
         if ( sfence )
         {
@@ -7180,12 +7123,12 @@ x86_emulate(
         if ( vex.pfx )
         {
     simd_0f38_common:
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             host_and_vcpu_must_have(mmx);
-            get_fpu(X86EMUL_FPU_mmx, &fic);
+            get_fpu(X86EMUL_FPU_mmx);
         }
         opc = init_prefixes(stub);
         opc[0] = 0x38;
@@ -7198,7 +7141,7 @@ x86_emulate(
             vex.b = 1;
             opc[2] &= 0x38;
         }
-        fic.insn_bytes = PFX_BYTES + 3;
+        insn_bytes = PFX_BYTES + 3;
         break;
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x19): /* vbroadcastsd xmm/m64,ymm */
@@ -7226,13 +7169,13 @@ x86_emulate(
         if ( vex.opcx == vex_none )
         {
             host_and_vcpu_must_have(sse4_1);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             generate_exception_if(vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
 
         opc = init_prefixes(stub);
@@ -7251,21 +7194,19 @@ x86_emulate(
             vex.b = 1;
             opc[1] &= 0x38;
         }
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
         opc[2] = 0xc3;
         if ( vex.opcx == vex_none )
         {
             /* Cover for extra prefix byte. */
             --opc;
-            ++fic.insn_bytes;
+            ++insn_bytes;
         }
 
         copy_REX_VEX(opc, rex_prefix, vex);
         emulate_stub("+m" (*mmvalp), "a" (mmvalp));
 
         put_stub(stub);
-        check_xmm_exn(&fic);
-
         state->simd_size = simd_none;
         dst.type = OP_NONE;
         break;
@@ -7354,7 +7295,7 @@ x86_emulate(
 
         generate_exception_if(ea.type != OP_MEM || vex.w, EXC_UD);
         host_and_vcpu_must_have(avx);
-        get_fpu(X86EMUL_FPU_ymm, &fic);
+        get_fpu(X86EMUL_FPU_ymm);
 
         /*
          * While we can't reasonably provide fully correct behavior here
@@ -7403,7 +7344,7 @@ x86_emulate(
         rex_prefix &= ~REX_B;
         vex.b = 1;
         opc[1] = modrm & 0x38;
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
 
         break;
     }
@@ -7452,7 +7393,7 @@ x86_emulate(
 
         generate_exception_if(ea.type != OP_MEM, EXC_UD);
         host_and_vcpu_must_have(avx2);
-        get_fpu(X86EMUL_FPU_ymm, &fic);
+        get_fpu(X86EMUL_FPU_ymm);
 
         /*
          * While we can't reasonably provide fully correct behavior here
@@ -7499,7 +7440,7 @@ x86_emulate(
         rex_prefix &= ~REX_B;
         vex.b = 1;
         opc[1] = modrm & 0x38;
-        fic.insn_bytes = PFX_BYTES + 2;
+        insn_bytes = PFX_BYTES + 2;
 
         break;
     }
@@ -7522,7 +7463,7 @@ x86_emulate(
                               state->sib_index == mask_reg, EXC_UD);
         generate_exception_if(!cpu_has_avx, EXC_UD);
         vcpu_must_have(avx2);
-        get_fpu(X86EMUL_FPU_ymm, &fic);
+        get_fpu(X86EMUL_FPU_ymm);
 
         /* Read destination, index, and mask registers. */
         opc = init_prefixes(stub);
@@ -7859,12 +7800,12 @@ x86_emulate(
         if ( vex.pfx )
         {
     simd_0f3a_common:
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             host_and_vcpu_must_have(mmx);
-            get_fpu(X86EMUL_FPU_mmx, &fic);
+            get_fpu(X86EMUL_FPU_mmx);
         }
         opc = init_prefixes(stub);
         opc[0] = 0x3a;
@@ -7878,7 +7819,7 @@ x86_emulate(
             opc[2] &= 0x38;
         }
         opc[3] = imm1;
-        fic.insn_bytes = PFX_BYTES + 4;
+        insn_bytes = PFX_BYTES + 4;
         break;
 
     case X86EMUL_OPC_66(0x0f3a, 0x14): /* pextrb $imm8,xmm,r/m */
@@ -7886,7 +7827,7 @@ x86_emulate(
     case X86EMUL_OPC_66(0x0f3a, 0x16): /* pextr{d,q} $imm8,xmm,r/m */
     case X86EMUL_OPC_66(0x0f3a, 0x17): /* extractps $imm8,xmm,r/m */
         host_and_vcpu_must_have(sse4_1);
-        get_fpu(X86EMUL_FPU_xmm, &fic);
+        get_fpu(X86EMUL_FPU_xmm);
 
         opc = init_prefixes(stub);
         opc++[0] = 0x3a;
@@ -7899,20 +7840,16 @@ x86_emulate(
             vex.w = 0;
         opc[1] = modrm & 0x38;
         opc[2] = imm1;
-        fic.insn_bytes = PFX_BYTES + 3;
         opc[3] = 0xc3;
         if ( vex.opcx == vex_none )
         {
             /* Cover for extra prefix byte. */
             --opc;
-            ++fic.insn_bytes;
         }
 
         copy_REX_VEX(opc, rex_prefix, vex);
         invoke_stub("", "", "=m" (dst.val) : "a" (&dst.val));
-
         put_stub(stub);
-        check_xmm_exn(&fic);
 
         ASSERT(!state->simd_size);
         dst.bytes = dst.type == OP_REG || b == 0x17 ? 4 : 1 << (b & 3);
@@ -7926,7 +7863,7 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x17): /* vextractps $imm8,xmm,r/m */
         generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
         host_and_vcpu_must_have(avx);
-        get_fpu(X86EMUL_FPU_ymm, &fic);
+        get_fpu(X86EMUL_FPU_ymm);
         opc = init_prefixes(stub);
         goto pextr;
 
@@ -7948,17 +7885,15 @@ x86_emulate(
             opc[1] &= 0x38;
         }
         opc[2] = imm1;
-        fic.insn_bytes = PFX_BYTES + 3;
+        insn_bytes = PFX_BYTES + 3;
         opc[3] = 0xc3;
 
         copy_VEX(opc, vex);
         /* Latch MXCSR - we may need to restore it below. */
         invoke_stub("stmxcsr %[mxcsr]", "",
-                    "=m" (*mmvalp), "+m" (fic.exn_raised), [mxcsr] "=m" (mxcsr)
-                    : "a" (mmvalp));
+                    "=m" (*mmvalp), [mxcsr] "=m" (mxcsr) : "a" (mmvalp));
 
         put_stub(stub);
-        check_xmm_exn(&fic);
 
         if ( ea.type == OP_MEM )
         {
@@ -7977,7 +7912,7 @@ x86_emulate(
     case X86EMUL_OPC_66(0x0f3a, 0x20): /* pinsrb $imm8,r32/m8,xmm */
     case X86EMUL_OPC_66(0x0f3a, 0x22): /* pinsr{d,q} $imm8,r/m,xmm */
         host_and_vcpu_must_have(sse4_1);
-        get_fpu(X86EMUL_FPU_xmm, &fic);
+        get_fpu(X86EMUL_FPU_xmm);
         memcpy(mmvalp, &src.val, op_bytes);
         ea.type = OP_MEM;
         op_bytes = src.bytes;
@@ -8087,13 +8022,13 @@ x86_emulate(
         if ( vex.opcx == vex_none )
         {
             host_and_vcpu_must_have(sse4_2);
-            get_fpu(X86EMUL_FPU_xmm, &fic);
+            get_fpu(X86EMUL_FPU_xmm);
         }
         else
         {
             generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
             host_and_vcpu_must_have(avx);
-            get_fpu(X86EMUL_FPU_ymm, &fic);
+            get_fpu(X86EMUL_FPU_ymm);
         }
 
         opc = init_prefixes(stub);
@@ -8114,13 +8049,13 @@ x86_emulate(
                 goto done;
         }
         opc[2] = imm1;
-        fic.insn_bytes = PFX_BYTES + 3;
+        insn_bytes = PFX_BYTES + 3;
         opc[3] = 0xc3;
         if ( vex.opcx == vex_none )
         {
             /* Cover for extra prefix byte. */
             --opc;
-            ++fic.insn_bytes;
+            ++insn_bytes;
         }
 
         copy_REX_VEX(opc, rex_prefix, vex);
@@ -8351,7 +8286,7 @@ x86_emulate(
 
         if ( !opc )
             BUG();
-        opc[fic.insn_bytes - PFX_BYTES] = 0xc3;
+        opc[insn_bytes - PFX_BYTES] = 0xc3;
         copy_REX_VEX(opc, rex_prefix, vex);
 
         if ( ea.type == OP_MEM )
@@ -8429,13 +8364,11 @@ x86_emulate(
         if ( likely((ctxt->opcode & ~(X86EMUL_OPC_PFX_MASK |
                                       X86EMUL_OPC_ENCODING_MASK)) !=
                     X86EMUL_OPC(0x0f, 0xf7)) )
-            invoke_stub("", "", "+m" (*mmvalp), "+m" (fic.exn_raised)
-                                : "a" (mmvalp));
+            invoke_stub("", "", "+m" (*mmvalp) : "a" (mmvalp));
         else
             invoke_stub("", "", "+m" (*mmvalp) : "D" (mmvalp));
 
         put_stub(stub);
-        check_xmm_exn(&fic);
     }
 
     switch ( dst.type )
@@ -8478,7 +8411,8 @@ x86_emulate(
     }
 
  complete_insn: /* Commit shadow register state. */
-    put_fpu(&fic, false, state, ctxt, ops);
+    put_fpu(fpu_type, false, state, ctxt, ops);
+    fpu_type = X86EMUL_FPU_none;
 
     /* Zero the upper 32 bits of %rip if not in 64-bit mode. */
     if ( !mode_64bit() )
@@ -8502,13 +8436,22 @@ x86_emulate(
     ctxt->regs->eflags &= ~X86_EFLAGS_RF;
 
  done:
-    put_fpu(&fic, fic.insn_bytes > 0 && dst.type == OP_MEM, state, ctxt, ops);
+    put_fpu(fpu_type, insn_bytes > 0 && dst.type == OP_MEM, state, ctxt, ops);
     put_stub(stub);
     return rc;
 #undef state
 
 #ifdef __XEN__
  emulation_stub_failure:
+    generate_exception_if(stub_exn.info.fields.trapnr == EXC_MF, EXC_MF);
+    if ( stub_exn.info.fields.trapnr == EXC_XM )
+    {
+        unsigned long cr4;
+
+        if ( !ops->read_cr || !ops->read_cr(4, &cr4, ctxt) == X86EMUL_OKAY )
+            cr4 = X86_CR4_OSXMMEXCPT;
+        generate_exception(cr4 & X86_CR4_OSXMMEXCPT ? EXC_XM : EXC_UD);
+    }
     gprintk(XENLOG_WARNING,
             "exception %u (ec=%04x) in emulation stub (line %u)\n",
             stub_exn.info.fields.trapnr, stub_exn.info.fields.ec,

@@ -729,7 +729,6 @@ static void do_reserved_trap(struct cpu_user_regs *regs)
 
 static void do_trap(struct cpu_user_regs *regs)
 {
-    struct vcpu *curr = current;
     unsigned int trapnr = regs->entry_vector;
     unsigned long fixup;
 
@@ -746,15 +745,6 @@ static void do_trap(struct cpu_user_regs *regs)
         pv_inject_hw_exception(trapnr,
                                (TRAP_HAVE_EC & (1u << trapnr))
                                ? regs->error_code : X86_EVENT_NO_EC);
-        return;
-    }
-
-    if ( ((trapnr == TRAP_copro_error) || (trapnr == TRAP_simd_error)) &&
-         system_state >= SYS_STATE_active && is_hvm_vcpu(curr) &&
-         curr->arch.hvm_vcpu.fpu_exception_callback )
-    {
-        curr->arch.hvm_vcpu.fpu_exception_callback(
-            curr->arch.hvm_vcpu.fpu_exception_callback_arg, regs);
         return;
     }
 

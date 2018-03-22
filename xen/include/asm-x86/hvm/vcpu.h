@@ -198,10 +198,6 @@ struct hvm_vcpu {
 
     struct hvm_vcpu_io  hvm_io;
 
-    /* Callback into x86_emulate when emulating FPU/MMX/XMM instructions. */
-    void (*fpu_exception_callback)(void *, struct cpu_user_regs *);
-    void *fpu_exception_callback_arg;
-
     /* Pending hw/sw interrupt (.vector = -1 means nothing pending). */
     struct x86_event     inject_event;
 
