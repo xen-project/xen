@@ -31,6 +31,24 @@ static always_inline __uint128_t __cmpxchg16b(
     return prev.raw;
 }
 
+static always_inline __uint128_t cmpxchg16b_local_(
+    void *ptr, const __uint128_t *oldp, const __uint128_t *newp)
+{
+    union {
+        struct { uint64_t lo, hi; };
+        __uint128_t raw;
+    } new = { .raw = *newp }, old = { .raw = *oldp }, prev;
+
+    ASSERT(cpu_has_cx16);
+
+    /* Don't use "=A" here - clang can't deal with that. */
+    asm volatile ( "cmpxchg16b %2"
+                   : "=d" (prev.hi), "=a" (prev.lo), "+m" (*(__uint128_t *)ptr)
+                   : "c" (new.hi), "b" (new.lo), "0" (old.hi), "1" (old.lo) );
+
+    return prev.raw;
+}
+
 #define cmpxchg16b(ptr, o, n) ({                           \
     volatile void *_p = (ptr);                             \
     ASSERT(!((unsigned long)_p & 0xf));                    \

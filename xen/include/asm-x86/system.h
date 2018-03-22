@@ -110,6 +110,38 @@ static always_inline unsigned long __cmpxchg(
     return old;
 }
 
+static always_inline unsigned long cmpxchg_local_(
+    void *ptr, unsigned long old, unsigned long new, unsigned int size)
+{
+    unsigned long prev = ~old;
+
+    switch ( size )
+    {
+    case 1:
+        asm volatile ( "cmpxchgb %b2, %1"
+                       : "=a" (prev), "+m" (*(uint8_t *)ptr)
+                       : "q" (new), "0" (old) );
+        break;
+    case 2:
+        asm volatile ( "cmpxchgw %w2, %1"
+                       : "=a" (prev), "+m" (*(uint16_t *)ptr)
+                       : "r" (new), "0" (old) );
+        break;
+    case 4:
+        asm volatile ( "cmpxchgl %k2, %1"
+                       : "=a" (prev), "+m" (*(uint32_t *)ptr)
+                       : "r" (new), "0" (old) );
+        break;
+    case 8:
+        asm volatile ( "cmpxchgq %2, %1"
+                       : "=a" (prev), "+m" (*(uint64_t *)ptr)
+                       : "r" (new), "0" (old) );
+        break;
+    }
+
+    return prev;
+}
+
 #define cmpxchgptr(ptr,o,n) ({                                          \
     const __typeof__(**(ptr)) *__o = (o);                               \
     __typeof__(**(ptr)) *__n = (n);                                     \

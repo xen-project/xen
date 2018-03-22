@@ -1297,8 +1297,86 @@ static int hvmemul_cmpxchg(
     bool lock,
     struct x86_emulate_ctxt *ctxt)
 {
-    /* Fix this in case the guest is really relying on r-m-w atomicity. */
-    return hvmemul_write(seg, offset, p_new, bytes, ctxt);
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    struct vcpu *curr = current;
+    unsigned long addr, reps = 1;
+    uint32_t pfec = PFEC_page_present | PFEC_write_access;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    int rc;
+    void *mapping = NULL;
+
+    rc = hvmemul_virtual_to_linear(
+        seg, offset, bytes, &reps, hvm_access_write, hvmemul_ctxt, &addr);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    if ( is_x86_system_segment(seg) )
+        pfec |= PFEC_implicit;
+    else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
+        pfec |= PFEC_user_mode;
+
+    mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
+    if ( IS_ERR(mapping) )
+        return ~PTR_ERR(mapping);
+
+    if ( !mapping )
+    {
+        /* Fix this in case the guest is really relying on r-m-w atomicity. */
+        return hvmemul_linear_mmio_write(addr, bytes, p_new, pfec,
+                                         hvmemul_ctxt,
+                                         vio->mmio_access.write_access &&
+                                         vio->mmio_gla == (addr & PAGE_MASK));
+    }
+
+    switch ( bytes )
+    {
+    case 1: case 2: case 4: case 8:
+    {
+        unsigned long old = 0, new = 0, cur;
+
+        memcpy(&old, p_old, bytes);
+        memcpy(&new, p_new, bytes);
+        if ( lock )
+            cur = __cmpxchg(mapping, old, new, bytes);
+        else
+            cur = cmpxchg_local_(mapping, old, new, bytes);
+        if ( cur != old )
+        {
+            memcpy(p_old, &cur, bytes);
+            rc = X86EMUL_CMPXCHG_FAILED;
+        }
+        break;
+    }
+
+    case 16:
+        if ( cpu_has_cx16 )
+        {
+            __uint128_t *old = p_old, cur;
+
+            if ( lock )
+                cur = __cmpxchg16b(mapping, old, p_new);
+            else
+                cur = cmpxchg16b_local_(mapping, old, p_new);
+            if ( cur != *old )
+            {
+                *old = cur;
+                rc = X86EMUL_CMPXCHG_FAILED;
+            }
+        }
+        else
+            rc = X86EMUL_UNHANDLEABLE;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        rc = X86EMUL_UNHANDLEABLE;
+        break;
+    }
+
+    hvmemul_unmap_linear_addr(mapping, addr, bytes, hvmemul_ctxt);
+
+    return rc;
 }
 
 static int hvmemul_validate(
