@@ -406,16 +406,14 @@ struct __packed __cacheline_aligned tss_struct {
 #define IST_MCE  3UL
 #define IST_MAX  3UL
 
-/* Set the interrupt stack table used by a particular interrupt
- * descriptor table entry. */
-static always_inline void set_ist(idt_entry_t *idt, unsigned long ist)
+/* Set the Interrupt Stack Table used by a particular IDT entry. */
+static inline void set_ist(idt_entry_t *idt, unsigned int ist)
 {
-    idt_entry_t new = *idt;
-
     /* IST is a 3 bit field, 32 bits into the IDT entry. */
     ASSERT(ist <= IST_MAX);
-    new.a = (idt->a & ~(7UL << 32)) | (ist << 32);
-    _write_gate_lower(idt, &new);
+
+    /* Typically used on a live idt.  Disuade any clever optimisations. */
+    ACCESS_ONCE(idt->ist) = ist;
 }
 
 static inline void enable_each_ist(idt_entry_t *idt)

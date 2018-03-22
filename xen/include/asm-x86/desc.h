@@ -106,8 +106,19 @@ struct desc_struct {
     u32 a, b;
 };
 
-typedef struct {
-    u64 a, b;
+typedef union {
+    struct {
+        uint64_t a, b;
+    };
+    struct {
+        uint16_t addr0;
+        uint16_t cs;
+        uint8_t  ist; /* :3, 5 bits rsvd, but this yields far better code. */
+        uint8_t  type:4, s:1, dpl:2, p:1;
+        uint16_t addr1;
+        uint32_t addr2;
+        /* 32 bits rsvd. */
+    };
 } idt_entry_t;
 
 /* Write the lower 64 bits of an IDT Entry. This relies on the upper 32
