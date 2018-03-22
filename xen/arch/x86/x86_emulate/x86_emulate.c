@@ -1114,10 +1114,30 @@ static int _get_fpu(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
+    uint64_t xcr0;
     int rc;
 
     fail_if(!ops->get_fpu);
     ASSERT(type != X86EMUL_FPU_none);
+
+    if ( type < X86EMUL_FPU_ymm || !ops->read_xcr ||
+         ops->read_xcr(0, &xcr0, ctxt) != X86EMUL_OKAY )
+    {
+        ASSERT(!ctxt->event_pending);
+        xcr0 = 0;
+    }
+
+    switch ( type )
+    {
+    case X86EMUL_FPU_ymm:
+        if ( !(xcr0 & X86_XCR0_SSE) || !(xcr0 & X86_XCR0_YMM) )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+
+    default:
+        break;
+    }
+
     rc = ops->get_fpu(fpu_handle_exception, fic, type, ctxt);
 
     if ( rc == X86EMUL_OKAY )
@@ -5006,18 +5026,31 @@ x86_emulate(
                 _regs.eflags |= X86_EFLAGS_AC;
             break;
 
-#ifdef __XEN__
-        case 0xd1: /* xsetbv */
+        case 0xd0: /* xgetbv */
             generate_exception_if(vex.pfx, EXC_UD);
-            if ( !ops->read_cr || ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
+            if ( !ops->read_cr || !ops->read_xcr ||
+                 ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
                 cr4 = 0;
             generate_exception_if(!(cr4 & X86_CR4_OSXSAVE), EXC_UD);
-            generate_exception_if(!mode_ring0() ||
-                                  handle_xsetbv(_regs.ecx,
-                                                _regs.eax | (_regs.rdx << 32)),
-                                  EXC_GP, 0);
+            rc = ops->read_xcr(_regs.ecx, &msr_val, ctxt);
+            if ( rc != X86EMUL_OKAY )
+                goto done;
+            _regs.r(ax) = (uint32_t)msr_val;
+            _regs.r(dx) = msr_val >> 32;
             break;
-#endif
+
+        case 0xd1: /* xsetbv */
+            generate_exception_if(vex.pfx, EXC_UD);
+            if ( !ops->read_cr || !ops->write_xcr ||
+                 ops->read_cr(4, &cr4, ctxt) != X86EMUL_OKAY )
+                cr4 = 0;
+            generate_exception_if(!(cr4 & X86_CR4_OSXSAVE), EXC_UD);
+            generate_exception_if(!mode_ring0(), EXC_GP, 0);
+            rc = ops->write_xcr(_regs.ecx,
+                                _regs.eax | ((uint64_t)_regs.edx << 32), ctxt);
+            if ( rc != X86EMUL_OKAY )
+                goto done;
+            break;
 
         case 0xd4: /* vmfunc */
             generate_exception_if(vex.pfx, EXC_UD);

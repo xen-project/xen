@@ -163,6 +163,35 @@ int emul_test_read_cr(
     return X86EMUL_UNHANDLEABLE;
 }
 
+int emul_test_read_xcr(
+    unsigned int reg,
+    uint64_t *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    uint32_t lo, hi;
+
+    ASSERT(cpu_has_xsave);
+
+    switch ( reg )
+    {
+    case 0:
+        break;
+
+    case 1:
+        if ( cpu_has_xgetbv1 )
+            break;
+        /* fall through */
+    default:
+        x86_emul_hw_exception(13 /* #GP */, 0, ctxt);
+        return X86EMUL_EXCEPTION;
+    }
+
+    asm ( "xgetbv" : "=a" (lo), "=d" (hi) : "c" (reg) );
+    *val = lo | ((uint64_t)hi << 32);
+
+    return X86EMUL_OKAY;
+}
+
 int emul_test_get_fpu(
     void (*exception_callback)(void *, struct cpu_user_regs *),
     void *exception_callback_arg,

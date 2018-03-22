@@ -371,6 +371,7 @@ static struct x86_emulate_ops emulops = {
     .read_segment = read_segment,
     .cpuid      = emul_test_cpuid,
     .read_cr    = emul_test_read_cr,
+    .read_xcr   = emul_test_read_xcr,
     .read_msr   = read_msr,
     .get_fpu    = emul_test_get_fpu,
     .put_fpu    = emul_test_put_fpu,

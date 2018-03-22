@@ -1317,6 +1317,7 @@ static const struct x86_emulate_ops priv_op_ops = {
     .write_cr            = write_cr,
     .read_dr             = read_dr,
     .write_dr            = write_dr,
+    .write_xcr           = x86emul_write_xcr,
     .read_msr            = read_msr,
     .write_msr           = write_msr,
     .cpuid               = pv_emul_cpuid,

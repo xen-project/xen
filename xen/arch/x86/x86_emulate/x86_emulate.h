@@ -398,6 +398,24 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt);
 
     /*
+     * read_xcr: Read from extended control register.
+     *  @reg:   [IN ] Register to read.
+     */
+    int (*read_xcr)(
+        unsigned int reg,
+        uint64_t *val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
+     * write_xcr: Write to extended control register.
+     *  @reg:   [IN ] Register to write.
+     */
+    int (*write_xcr)(
+        unsigned int reg,
+        uint64_t val,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
      * read_msr: Read from model-specific register.
      *  @reg:   [IN ] Register to read.
      */
@@ -682,6 +700,11 @@ static inline void x86_emulate_free_state(struct x86_emulate_state *state) {}
 #else
 void x86_emulate_free_state(struct x86_emulate_state *state);
 #endif
+
+int x86emul_read_xcr(unsigned int reg, uint64_t *val,
+                     struct x86_emulate_ctxt *ctxt);
+int x86emul_write_xcr(unsigned int reg, uint64_t val,
+                      struct x86_emulate_ctxt *ctxt);
 
 #endif
 

@@ -186,6 +186,16 @@ static inline uint64_t xgetbv(uint32_t xcr)
     (res.b & (1U << 5)) != 0; \
 })
 
+#define cpu_has_xgetbv1 ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(1, 0, &res, NULL); \
+    if ( !(res.c & (1U << 27)) ) \
+        res.a = 0; \
+    else \
+        emul_test_cpuid(0xd, 1, &res, NULL); \
+    (res.a & (1U << 2)) != 0; \
+})
+
 #define cpu_has_bmi1 ({ \
     struct cpuid_leaf res; \
     emul_test_cpuid(7, 0, &res, NULL); \
@@ -245,6 +255,11 @@ int emul_test_cpuid(
 int emul_test_read_cr(
     unsigned int reg,
     unsigned long *val,
+    struct x86_emulate_ctxt *ctxt);
+
+int emul_test_read_xcr(
+    unsigned int reg,
+    uint64_t *val,
     struct x86_emulate_ctxt *ctxt);
 
 int emul_test_get_fpu(

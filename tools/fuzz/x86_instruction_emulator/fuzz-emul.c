@@ -459,6 +459,8 @@ static int fuzz_write_cr(
     return X86EMUL_OKAY;
 }
 
+#define fuzz_read_xcr emul_test_read_xcr
+
 enum {
     MSRI_IA32_SYSENTER_CS,
     MSRI_IA32_SYSENTER_ESP,
@@ -577,6 +579,7 @@ static const struct x86_emulate_ops all_fuzzer_ops = {
     SET(write_io),
     SET(read_cr),
     SET(write_cr),
+    SET(read_xcr),
     SET(read_msr),
     SET(write_msr),
     SET(wbinvd),
@@ -685,6 +688,7 @@ enum {
     HOOK_write_cr,
     HOOK_read_dr,
     HOOK_write_dr,
+    HOOK_read_xcr,
     HOOK_read_msr,
     HOOK_write_msr,
     HOOK_wbinvd,
@@ -729,6 +733,7 @@ static void disable_hooks(struct x86_emulate_ctxt *ctxt)
     MAYBE_DISABLE_HOOK(write_io);
     MAYBE_DISABLE_HOOK(read_cr);
     MAYBE_DISABLE_HOOK(write_cr);
+    MAYBE_DISABLE_HOOK(read_xcr);
     MAYBE_DISABLE_HOOK(read_msr);
     MAYBE_DISABLE_HOOK(write_msr);
     MAYBE_DISABLE_HOOK(wbinvd);

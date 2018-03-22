@@ -109,6 +109,17 @@ int xstate_alloc_save_area(struct vcpu *v);
 void xstate_init(struct cpuinfo_x86 *c);
 unsigned int xstate_ctxt_size(u64 xcr0);
 
+static inline uint64_t xgetbv(unsigned int index)
+{
+    uint32_t lo, hi;
+
+    ASSERT(index); /* get_xcr0() should be used instead. */
+    asm volatile ( ".byte 0x0f,0x01,0xd0" /* xgetbv */
+                   : "=a" (lo), "=d" (hi) : "c" (index) );
+
+    return lo | ((uint64_t)hi << 32);
+}
+
 static inline bool xstate_all(const struct vcpu *v)
 {
     /*

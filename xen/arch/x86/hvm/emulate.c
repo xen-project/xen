@@ -1826,6 +1826,29 @@ static int hvmemul_write_cr(
     return rc;
 }
 
+static int hvmemul_read_xcr(
+    unsigned int reg,
+    uint64_t *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    int rc = x86emul_read_xcr(reg, val, ctxt);
+
+    if ( rc == X86EMUL_OKAY )
+        HVMTRACE_LONG_2D(XCR_READ, reg, TRC_PAR_LONG(*val));
+
+    return rc;
+}
+
+static int hvmemul_write_xcr(
+    unsigned int reg,
+    uint64_t val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    HVMTRACE_LONG_2D(XCR_WRITE, reg, TRC_PAR_LONG(val));
+
+    return x86emul_write_xcr(reg, val, ctxt);
+}
+
 static int hvmemul_read_msr(
     unsigned int reg,
     uint64_t *val,
@@ -1873,22 +1896,6 @@ static int hvmemul_get_fpu(
     struct x86_emulate_ctxt *ctxt)
 {
     struct vcpu *curr = current;
-
-    switch ( type )
-    {
-    case X86EMUL_FPU_fpu:
-    case X86EMUL_FPU_wait:
-    case X86EMUL_FPU_mmx:
-    case X86EMUL_FPU_xmm:
-        break;
-    case X86EMUL_FPU_ymm:
-        if ( !(curr->arch.xcr0 & X86_XCR0_SSE) ||
-             !(curr->arch.xcr0 & X86_XCR0_YMM) )
-            return X86EMUL_UNHANDLEABLE;
-        break;
-    default:
-        return X86EMUL_UNHANDLEABLE;
-    }
 
     if ( !curr->fpu_dirtied )
         hvm_funcs.fpu_dirty_intercept();
@@ -2073,6 +2080,8 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .write_io      = hvmemul_write_io,
     .read_cr       = hvmemul_read_cr,
     .write_cr      = hvmemul_write_cr,
+    .read_xcr      = hvmemul_read_xcr,
+    .write_xcr     = hvmemul_write_xcr,
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr,
     .wbinvd        = hvmemul_wbinvd,
@@ -2098,6 +2107,8 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .write_io      = hvmemul_write_io_discard,
     .read_cr       = hvmemul_read_cr,
     .write_cr      = hvmemul_write_cr,
+    .read_xcr      = hvmemul_read_xcr,
+    .write_xcr     = hvmemul_write_xcr,
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr_discard,
     .wbinvd        = hvmemul_wbinvd_discard,
