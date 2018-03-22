@@ -603,6 +603,56 @@ static int iommu_add_device(struct pci_dev *pdev);
 static int iommu_enable_device(struct pci_dev *pdev);
 static int iommu_remove_device(struct pci_dev *pdev);
 
+unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
+                              uint64_t *paddr, uint64_t *psize,
+                              unsigned int flags)
+{
+    uint32_t hi = 0, bar = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev,
+                                           sbdf.func, pos);
+    uint64_t size;
+
+    ASSERT((bar & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY);
+    pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos, ~0);
+    if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
+         PCI_BASE_ADDRESS_MEM_TYPE_64 )
+    {
+        if ( flags & PCI_BAR_LAST )
+        {
+            printk(XENLOG_WARNING
+                   "%sdevice %04x:%02x:%02x.%u with 64-bit %sBAR in last slot\n",
+                   (flags & PCI_BAR_VF) ? "SR-IOV " : "", sbdf.seg, sbdf.bus,
+                   sbdf.dev, sbdf.func, (flags & PCI_BAR_VF) ? "vf " : "");
+            *psize = 0;
+            return 1;
+        }
+        hi = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos + 4);
+        pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos + 4, ~0);
+    }
+    size = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos) &
+           PCI_BASE_ADDRESS_MEM_MASK;
+    if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
+         PCI_BASE_ADDRESS_MEM_TYPE_64 )
+    {
+        size |= (uint64_t)pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev,
+                                          sbdf.func, pos + 4) << 32;
+        pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos + 4, hi);
+    }
+    else if ( size )
+        size |= (uint64_t)~0 << 32;
+    pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos, bar);
+    size = -size;
+
+    if ( paddr )
+        *paddr = (bar & PCI_BASE_ADDRESS_MEM_MASK) | ((uint64_t)hi << 32);
+    *psize = size;
+
+    if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
+         PCI_BASE_ADDRESS_MEM_TYPE_64 )
+        return 2;
+
+    return 1;
+}
+
 int pci_add_device(u16 seg, u8 bus, u8 devfn,
                    const struct pci_dev_info *info, nodeid_t node)
 {
@@ -672,11 +722,13 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
             unsigned int i;
 
             BUILD_BUG_ON(ARRAY_SIZE(pdev->vf_rlen) != PCI_SRIOV_NUM_BARS);
-            for ( i = 0; i < PCI_SRIOV_NUM_BARS; ++i )
+            for ( i = 0; i < PCI_SRIOV_NUM_BARS; )
             {
                 unsigned int idx = pos + PCI_SRIOV_BAR + i * 4;
                 u32 bar = pci_conf_read32(seg, bus, slot, func, idx);
-                u32 hi = 0;
+                pci_sbdf_t sbdf = {
+                    .sbdf = PCI_SBDF3(seg, bus, devfn),
+                };
 
                 if ( (bar & PCI_BASE_ADDRESS_SPACE) ==
                      PCI_BASE_ADDRESS_SPACE_IO )
@@ -687,38 +739,12 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
                            seg, bus, slot, func, i);
                     continue;
                 }
-                pci_conf_write32(seg, bus, slot, func, idx, ~0);
-                if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
-                     PCI_BASE_ADDRESS_MEM_TYPE_64 )
-                {
-                    if ( i >= PCI_SRIOV_NUM_BARS )
-                    {
-                        printk(XENLOG_WARNING
-                               "SR-IOV device %04x:%02x:%02x.%u with 64-bit"
-                               " vf BAR in last slot\n",
-                               seg, bus, slot, func);
-                        break;
-                    }
-                    hi = pci_conf_read32(seg, bus, slot, func, idx + 4);
-                    pci_conf_write32(seg, bus, slot, func, idx + 4, ~0);
-                }
-                pdev->vf_rlen[i] = pci_conf_read32(seg, bus, slot, func, idx) &
-                                   PCI_BASE_ADDRESS_MEM_MASK;
-                if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
-                     PCI_BASE_ADDRESS_MEM_TYPE_64 )
-                {
-                    pdev->vf_rlen[i] |= (u64)pci_conf_read32(seg, bus,
-                                                             slot, func,
-                                                             idx + 4) << 32;
-                    pci_conf_write32(seg, bus, slot, func, idx + 4, hi);
-                }
-                else if ( pdev->vf_rlen[i] )
-                    pdev->vf_rlen[i] |= (u64)~0 << 32;
-                pci_conf_write32(seg, bus, slot, func, idx, bar);
-                pdev->vf_rlen[i] = -pdev->vf_rlen[i];
-                if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
-                     PCI_BASE_ADDRESS_MEM_TYPE_64 )
-                    ++i;
+                ret = pci_size_mem_bar(sbdf, idx, NULL, &pdev->vf_rlen[i],
+                                       PCI_BAR_VF |
+                                       ((i == PCI_SRIOV_NUM_BARS - 1) ?
+                                        PCI_BAR_LAST : 0));
+                ASSERT(ret);
+                i += ret;
             }
         }
         else
