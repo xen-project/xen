@@ -2154,10 +2154,14 @@ static bool umip_active(struct x86_emulate_ctxt *ctxt,
 static void adjust_bnd(struct x86_emulate_ctxt *ctxt,
                        const struct x86_emulate_ops *ops, enum vex_pfx pfx)
 {
-    uint64_t bndcfg;
+    uint64_t xcr0, bndcfg;
     int rc;
 
     if ( pfx == vex_f2 || !cpu_has_mpx || !vcpu_has_mpx() )
+        return;
+
+    if ( !ops->read_xcr || ops->read_xcr(0, &xcr0, ctxt) != X86EMUL_OKAY ||
+         !(xcr0 & X86_XCR0_BNDREGS) || !(xcr0 & X86_XCR0_BNDCSR) )
         return;
 
     if ( !mode_ring0() )
