@@ -2743,6 +2743,25 @@ static DEFINE_PER_CPU(int,trace_extra_emulation_count);
 #endif
 static DEFINE_PER_CPU(guest_pa_t,trace_emulate_write_val);
 
+static void trace_emulate_write_val(const void *ptr, unsigned long vaddr,
+                                    const void *src, unsigned int bytes)
+{
+#if GUEST_PAGING_LEVELS == 3
+    if ( vaddr == this_cpu(trace_emulate_initial_va) )
+        memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
+    else if ( (vaddr & ~(GUEST_PTE_SIZE - 1)) ==
+              this_cpu(trace_emulate_initial_va) )
+    {
+        TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATE_FULL_PT);
+        memcpy(&this_cpu(trace_emulate_write_val),
+               (typeof(ptr))((unsigned long)ptr & ~(GUEST_PTE_SIZE - 1)),
+               GUEST_PTE_SIZE);
+    }
+#else
+    memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
+#endif
+}
+
 static inline void trace_shadow_emulate(guest_l1e_t gl1e, unsigned long va)
 {
     if ( tb_init_done )
@@ -4611,93 +4630,6 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
 #endif
 
 /**************************************************************************/
-/* Handling guest writes to pagetables. */
-
-static int
-sh_x86_emulate_write(struct vcpu *v, unsigned long vaddr, void *src,
-                     u32 bytes, struct sh_emulate_ctxt *sh_ctxt)
-{
-    void *addr;
-
-    /* Unaligned writes are only acceptable on HVM */
-    if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
-        return X86EMUL_UNHANDLEABLE;
-
-    addr = sh_emulate_map_dest(v, vaddr, bytes, sh_ctxt);
-    if ( IS_ERR(addr) )
-        return ~PTR_ERR(addr);
-
-    paging_lock(v->domain);
-    memcpy(addr, src, bytes);
-
-    if ( tb_init_done )
-    {
-#if GUEST_PAGING_LEVELS == 3
-        if ( vaddr == this_cpu(trace_emulate_initial_va) )
-            memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
-        else if ( (vaddr & ~(0x7UL)) == this_cpu(trace_emulate_initial_va) )
-        {
-            TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATE_FULL_PT);
-            memcpy(&this_cpu(trace_emulate_write_val),
-                   (void *)(((unsigned long) addr) & ~(0x7UL)), GUEST_PTE_SIZE);
-        }
-#else
-        memcpy(&this_cpu(trace_emulate_write_val), src, bytes);
-#endif
-    }
-
-    sh_emulate_unmap_dest(v, addr, bytes, sh_ctxt);
-    shadow_audit_tables(v);
-    paging_unlock(v->domain);
-    return X86EMUL_OKAY;
-}
-
-static int
-sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
-                       unsigned long *p_old, unsigned long new,
-                       unsigned int bytes, struct sh_emulate_ctxt *sh_ctxt)
-{
-    void *addr;
-    unsigned long prev, old = *p_old;
-    int rv = X86EMUL_OKAY;
-
-    /* Unaligned writes are only acceptable on HVM */
-    if ( (vaddr & (bytes - 1)) && !is_hvm_vcpu(v)  )
-        return X86EMUL_UNHANDLEABLE;
-
-    addr = sh_emulate_map_dest(v, vaddr, bytes, sh_ctxt);
-    if ( IS_ERR(addr) )
-        return ~PTR_ERR(addr);
-
-    paging_lock(v->domain);
-    switch ( bytes )
-    {
-    case 1: prev = cmpxchg(((u8 *)addr), old, new);  break;
-    case 2: prev = cmpxchg(((u16 *)addr), old, new); break;
-    case 4: prev = cmpxchg(((u32 *)addr), old, new); break;
-    case 8: prev = cmpxchg(((u64 *)addr), old, new); break;
-    default:
-        SHADOW_PRINTK("cmpxchg of size %i is not supported\n", bytes);
-        prev = ~old;
-    }
-
-    if ( prev != old )
-    {
-        *p_old = prev;
-        rv = X86EMUL_CMPXCHG_FAILED;
-    }
-
-    SHADOW_DEBUG(EMULATE, "va %#lx was %#lx expected %#lx"
-                  " wanted %#lx now %#lx bytes %u\n",
-                  vaddr, prev, old, new, *(unsigned long *)addr, bytes);
-
-    sh_emulate_unmap_dest(v, addr, bytes, sh_ctxt);
-    shadow_audit_tables(v);
-    paging_unlock(v->domain);
-    return rv;
-}
-
-/**************************************************************************/
 /* Audit tools */
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
@@ -5018,8 +4950,6 @@ const struct paging_mode sh_paging_mode = {
     .write_p2m_entry               = shadow_write_p2m_entry,
     .guest_levels                  = GUEST_PAGING_LEVELS,
     .shadow.detach_old_tables      = sh_detach_old_tables,
-    .shadow.x86_emulate_write      = sh_x86_emulate_write,
-    .shadow.x86_emulate_cmpxchg    = sh_x86_emulate_cmpxchg,
     .shadow.write_guest_entry      = sh_write_guest_entry,
     .shadow.cmpxchg_guest_entry    = sh_cmpxchg_guest_entry,
     .shadow.make_monitor_table     = sh_make_monitor_table,
@@ -5028,6 +4958,7 @@ const struct paging_mode sh_paging_mode = {
     .shadow.guess_wrmap            = sh_guess_wrmap,
 #endif
     .shadow.pagetable_dying        = sh_pagetable_dying,
+    .shadow.trace_emul_write_val   = trace_emulate_write_val,
     .shadow.shadow_levels          = SHADOW_PAGING_LEVELS,
 };
 

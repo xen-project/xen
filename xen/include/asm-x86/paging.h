@@ -82,14 +82,6 @@ struct sh_emulate_ctxt;
 struct shadow_paging_mode {
 #ifdef CONFIG_SHADOW_PAGING
     void          (*detach_old_tables     )(struct vcpu *v);
-    int           (*x86_emulate_write     )(struct vcpu *v, unsigned long va,
-                                            void *src, u32 bytes,
-                                            struct sh_emulate_ctxt *sh_ctxt);
-    int           (*x86_emulate_cmpxchg   )(struct vcpu *v, unsigned long va,
-                                            unsigned long *old,
-                                            unsigned long new,
-                                            unsigned int bytes,
-                                            struct sh_emulate_ctxt *sh_ctxt);
     bool          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
                                             intpte_t new, mfn_t gmfn);
     bool          (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
@@ -100,6 +92,8 @@ struct shadow_paging_mode {
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
     void          (*pagetable_dying       )(struct vcpu *v, paddr_t gpa);
+    void          (*trace_emul_write_val  )(const void *ptr, unsigned long vaddr,
+                                            const void *src, unsigned int bytes);
 #endif
     /* For outsiders to tell what mode we're in */
     unsigned int shadow_levels;

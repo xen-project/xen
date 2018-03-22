@@ -118,6 +118,20 @@ __initcall(shadow_audit_key_init);
  */
 
 /*
+ * Returns a mapped pointer to write to, or one of the following error
+ * indicators.
+ */
+#define MAPPING_UNHANDLEABLE ERR_PTR(~(long)X86EMUL_UNHANDLEABLE)
+#define MAPPING_EXCEPTION    ERR_PTR(~(long)X86EMUL_EXCEPTION)
+#define MAPPING_SILENT_FAIL  ERR_PTR(~(long)X86EMUL_OKAY)
+static void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
+                                 unsigned int bytes,
+                                 struct sh_emulate_ctxt *sh_ctxt);
+static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
+                                  unsigned int bytes,
+                                  struct sh_emulate_ctxt *sh_ctxt);
+
+/*
  * Callers which pass a known in-range x86_segment can rely on the return
  * pointer being valid.  Other callers must explicitly check for errors.
  */
@@ -260,6 +274,7 @@ hvm_emulate_write(enum x86_segment seg,
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
     unsigned long addr;
+    void *ptr;
     int rc;
 
     /* How many emulations could we save if we unshadowed on stack writes? */
@@ -271,8 +286,26 @@ hvm_emulate_write(enum x86_segment seg,
     if ( rc || !bytes )
         return rc;
 
-    return v->arch.paging.mode->shadow.x86_emulate_write(
-        v, addr, p_data, bytes, sh_ctxt);
+    /* Unaligned writes are only acceptable on HVM */
+    if ( (addr & (bytes - 1)) && !is_hvm_vcpu(v)  )
+        return X86EMUL_UNHANDLEABLE;
+
+    ptr = sh_emulate_map_dest(v, addr, bytes, sh_ctxt);
+    if ( IS_ERR(ptr) )
+        return ~PTR_ERR(ptr);
+
+    paging_lock(v->domain);
+    memcpy(ptr, p_data, bytes);
+
+    if ( tb_init_done )
+        v->arch.paging.mode->shadow.trace_emul_write_val(ptr, addr,
+                                                         p_data, bytes);
+
+    sh_emulate_unmap_dest(v, ptr, bytes, sh_ctxt);
+    shadow_audit_tables(v);
+    paging_unlock(v->domain);
+
+    return X86EMUL_OKAY;
 }
 
 static int
@@ -287,7 +320,8 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     struct sh_emulate_ctxt *sh_ctxt =
         container_of(ctxt, struct sh_emulate_ctxt, ctxt);
     struct vcpu *v = current;
-    unsigned long addr, old, new;
+    unsigned long addr, old, new, prev;
+    void *ptr;
     int rc;
 
     if ( bytes > sizeof(long) )
@@ -298,14 +332,43 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     if ( rc )
         return rc;
 
+    /* Unaligned writes are only acceptable on HVM */
+    if ( (addr & (bytes - 1)) && !is_hvm_vcpu(v)  )
+        return X86EMUL_UNHANDLEABLE;
+
+    ptr = sh_emulate_map_dest(v, addr, bytes, sh_ctxt);
+    if ( IS_ERR(ptr) )
+        return ~PTR_ERR(ptr);
+
     old = new = 0;
     memcpy(&old, p_old, bytes);
     memcpy(&new, p_new, bytes);
 
-    rc = v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
-             v, addr, &old, new, bytes, sh_ctxt);
+    paging_lock(v->domain);
+    switch ( bytes )
+    {
+    case 1: prev = cmpxchg((uint8_t  *)ptr, old, new); break;
+    case 2: prev = cmpxchg((uint16_t *)ptr, old, new); break;
+    case 4: prev = cmpxchg((uint32_t *)ptr, old, new); break;
+    case 8: prev = cmpxchg((uint64_t *)ptr, old, new); break;
+    default:
+        SHADOW_PRINTK("cmpxchg size %u is not supported\n", bytes);
+        prev = ~old;
+    }
 
-    memcpy(p_old, &old, bytes);
+    if ( prev != old )
+    {
+        memcpy(p_old, &prev, bytes);
+        rc = X86EMUL_CMPXCHG_FAILED;
+    }
+
+    SHADOW_DEBUG(EMULATE,
+                 "va %#lx was %#lx expected %#lx wanted %#lx now %#lx bytes %u\n",
+                 addr, prev, old, new, *(unsigned long *)ptr, bytes);
+
+    sh_emulate_unmap_dest(v, ptr, bytes, sh_ctxt);
+    shadow_audit_tables(v);
+    paging_unlock(v->domain);
 
     return rc;
 }
@@ -1684,9 +1747,9 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v, unsigned long vaddr,
  * returned, page references will be held on sh_ctxt->mfn[0] and
  * sh_ctxt->mfn[1] iff !INVALID_MFN.
  */
-void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
-                          unsigned int bytes,
-                          struct sh_emulate_ctxt *sh_ctxt)
+static void *sh_emulate_map_dest(struct vcpu *v, unsigned long vaddr,
+                                 unsigned int bytes,
+                                 struct sh_emulate_ctxt *sh_ctxt)
 {
     struct domain *d = v->domain;
     void *map;
@@ -1815,8 +1878,9 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
  * Tidy up after the emulated write: mark pages dirty, verify the new
  * contents, and undo the mapping.
  */
-void sh_emulate_unmap_dest(struct vcpu *v, void *addr, unsigned int bytes,
-                           struct sh_emulate_ctxt *sh_ctxt)
+static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
+                                  unsigned int bytes,
+                                  struct sh_emulate_ctxt *sh_ctxt)
 {
     u32 b1 = bytes, b2 = 0, shflags;
 
