@@ -190,6 +190,7 @@ static int modify_bars(const struct pci_dev *pdev, bool map, bool rom_only)
     struct vpci_header *header = &pdev->vpci->header;
     struct rangeset *mem = rangeset_new(NULL, NULL, 0);
     struct pci_dev *tmp, *dev = NULL;
+    const struct vpci_msix *msix = pdev->vpci->msix;
     unsigned int i;
     int rc;
 
@@ -220,6 +221,24 @@ static int modify_bars(const struct pci_dev *pdev, bool map, bool rom_only)
         if ( rc )
         {
             printk(XENLOG_G_WARNING "Failed to add [%lx, %lx]: %d\n",
+                   start, end, rc);
+            rangeset_destroy(mem);
+            return rc;
+        }
+    }
+
+    /* Remove any MSIX regions if present. */
+    for ( i = 0; msix && i < ARRAY_SIZE(msix->tables); i++ )
+    {
+        unsigned long start = PFN_DOWN(vmsix_table_addr(pdev->vpci, i));
+        unsigned long end = PFN_DOWN(vmsix_table_addr(pdev->vpci, i) +
+                                     vmsix_table_size(pdev->vpci, i) - 1);
+
+        rc = rangeset_remove_range(mem, start, end);
+        if ( rc )
+        {
+            printk(XENLOG_G_WARNING
+                   "Failed to remove MSIX table [%lx, %lx]: %d\n",
                    start, end, rc);
             rangeset_destroy(mem);
             return rc;

@@ -186,6 +186,9 @@ struct hvm_domain {
     struct list_head mmcfg_regions;
     rwlock_t mmcfg_lock;
 
+    /* List of MSI-X tables. */
+    struct list_head msix_tables;
+
     /* List of permanently write-mapped pages. */
     struct {
         spinlock_t lock;

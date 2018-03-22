@@ -1117,7 +1117,7 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
 
     pvh_setup_mmcfg(d);
 
-    panic("Building a PVHv2 Dom0 is not yet supported.");
+    printk("WARNING: PVH is an experimental mode with limited functionality\n");
     return 0;
 }
 

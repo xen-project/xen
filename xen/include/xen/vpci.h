@@ -115,6 +115,34 @@ struct vpci {
         struct vpci_arch_msi arch;
 #endif
     } *msi;
+
+    /* MSI-X data. */
+    struct vpci_msix {
+#ifdef __XEN__
+        struct pci_dev *pdev;
+        /* List link. */
+        struct list_head next;
+        /* Table information. */
+#define VPCI_MSIX_TABLE     0
+#define VPCI_MSIX_PBA       1
+#define VPCI_MSIX_MEM_NUM   2
+        uint32_t tables[VPCI_MSIX_MEM_NUM];
+        /* Maximum number of vectors supported by the device. */
+        uint16_t max_entries : 12;
+        /* MSI-X enabled? */
+        bool enabled         : 1;
+        /* Masked? */
+        bool masked          : 1;
+        /* Entries. */
+        struct vpci_msix_entry {
+            uint64_t addr;
+            uint32_t data;
+            bool masked  : 1;
+            bool updated : 1;
+            struct vpci_arch_msix_entry arch;
+        } entries[];
+#endif
+    } *msix;
 };
 
 struct vpci_vcpu {
@@ -137,6 +165,51 @@ int __must_check vpci_msi_arch_enable(struct vpci_msi *msi,
 void vpci_msi_arch_disable(struct vpci_msi *msi, const struct pci_dev *pdev);
 void vpci_msi_arch_init(struct vpci_msi *msi);
 void vpci_msi_arch_print(const struct vpci_msi *msi);
+
+/* Arch-specific vPCI MSI-X helpers. */
+void vpci_msix_arch_mask_entry(struct vpci_msix_entry *entry,
+                               const struct pci_dev *pdev, bool mask);
+int __must_check vpci_msix_arch_enable_entry(struct vpci_msix_entry *entry,
+                                             const struct pci_dev *pdev,
+                                             paddr_t table_base);
+int __must_check vpci_msix_arch_disable_entry(struct vpci_msix_entry *entry,
+                                              const struct pci_dev *pdev);
+void vpci_msix_arch_init_entry(struct vpci_msix_entry *entry);
+int vpci_msix_arch_print(const struct vpci_msix *msix);
+
+/*
+ * Helper functions to fetch MSIX related data. They are used by both the
+ * emulated MSIX code and the BAR handlers.
+ */
+static inline paddr_t vmsix_table_base(const struct vpci *vpci, unsigned int nr)
+{
+    return vpci->header.bars[vpci->msix->tables[nr] & PCI_MSIX_BIRMASK].addr;
+}
+
+static inline paddr_t vmsix_table_addr(const struct vpci *vpci, unsigned int nr)
+{
+    return vmsix_table_base(vpci, nr) +
+           (vpci->msix->tables[nr] & ~PCI_MSIX_BIRMASK);
+}
+
+/*
+ * Note regarding the size calculation of the PBA: the spec mentions "The last
+ * QWORD will not necessarily be fully populated", so it implies that the PBA
+ * size is 64-bit aligned.
+ */
+static inline size_t vmsix_table_size(const struct vpci *vpci, unsigned int nr)
+{
+    return
+        (nr == VPCI_MSIX_TABLE) ? vpci->msix->max_entries * PCI_MSIX_ENTRY_SIZE
+                                : ROUNDUP(DIV_ROUND_UP(vpci->msix->max_entries,
+                                                       8), 8);
+}
+
+static inline unsigned int vmsix_entry_nr(const struct vpci_msix *msix,
+                                          const struct vpci_msix_entry *entry)
+{
+    return entry - msix->entries;
+}
 #endif /* __XEN__ */
 
 #else /* !CONFIG_HAS_VPCI */

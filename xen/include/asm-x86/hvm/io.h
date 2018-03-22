@@ -132,6 +132,11 @@ struct vpci_arch_msi {
     int pirq;
 };
 
+/* Arch-specific MSI-X entry data for vPCI. */
+struct vpci_arch_msix_entry {
+    int pirq;
+};
+
 enum stdvga_cache_state {
     STDVGA_CACHE_UNINITIALIZED,
     STDVGA_CACHE_ENABLED,

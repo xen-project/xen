@@ -281,11 +281,12 @@ void vpci_dump_msi(void)
         if ( !has_vpci(d) )
             continue;
 
-        printk("vPCI MSI d%d\n", d->domain_id);
+        printk("vPCI MSI/MSI-X d%d\n", d->domain_id);
 
         list_for_each_entry ( pdev, &d->arch.pdev_list, domain_list )
         {
             const struct vpci_msi *msi;
+            const struct vpci_msix *msix;
 
             if ( !pdev->vpci || !spin_trylock(&pdev->vpci->lock) )
                 continue;
@@ -304,6 +305,30 @@ void vpci_dump_msi(void)
                        msi->max_vectors, msi->vectors);
 
                 vpci_msi_arch_print(msi);
+            }
+
+            msix = pdev->vpci->msix;
+            if ( msix && msix->enabled )
+            {
+                int rc;
+
+                printk("%04x:%02x:%02x.%u MSI-X\n", pdev->seg, pdev->bus,
+                       PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+
+                printk("  entries: %u maskall: %d enabled: %d\n",
+                       msix->max_entries, msix->masked, msix->enabled);
+
+                rc = vpci_msix_arch_print(msix);
+                if ( rc )
+                {
+                    /*
+                     * On error vpci_msix_arch_print will always return without
+                     * holding the lock.
+                     */
+                    printk("unable to print all MSI-X entries: %d\n", rc);
+                    process_pending_softirqs();
+                    continue;
+                }
             }
 
             spin_unlock(&pdev->vpci->lock);
