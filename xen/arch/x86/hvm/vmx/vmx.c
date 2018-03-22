@@ -4078,7 +4078,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_XSETBV:
-        if ( hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == 0 )
+        if ( hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == X86EMUL_OKAY )
             update_guest_eip(); /* Safe: XSETBV */
         break;
 

@@ -66,6 +66,7 @@ int x86emul_read_xcr(unsigned int reg, uint64_t *val,
     return X86EMUL_OKAY;
 }
 
+/* Note: May be called with ctxt=NULL. */
 int x86emul_write_xcr(unsigned int reg, uint64_t val,
                       struct x86_emulate_ctxt *ctxt)
 {
@@ -76,7 +77,8 @@ int x86emul_write_xcr(unsigned int reg, uint64_t val,
 
     default:
     gp_fault:
-        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        if ( ctxt )
+            x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
         return X86EMUL_EXCEPTION;
     }
 

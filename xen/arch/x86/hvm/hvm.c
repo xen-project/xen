@@ -1960,10 +1960,11 @@ int hvm_handle_xsetbv(u32 index, u64 new_bv)
 {
     int rc;
 
-    hvm_monitor_crX(XCR0, new_bv, current->arch.xcr0);
+    if ( index == 0 )
+        hvm_monitor_crX(XCR0, new_bv, current->arch.xcr0);
 
-    rc = handle_xsetbv(index, new_bv);
-    if ( rc )
+    rc = x86emul_write_xcr(index, new_bv, NULL);
+    if ( rc != X86EMUL_OKAY )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
     return rc;

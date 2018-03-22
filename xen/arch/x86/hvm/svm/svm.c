@@ -2902,7 +2902,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( vmcb_get_cpl(vmcb) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         else if ( (inst_len = __get_instruction_length(v, INSTR_XSETBV)) &&
-                  hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == 0 )
+                  hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == X86EMUL_OKAY )
             __update_guest_eip(regs, inst_len);
         break;
 
