@@ -30,6 +30,7 @@
 #include <public/physdev.h>
 #include <xen/iommu.h>
 #include <xsm/xsm.h>
+#include <xen/vpci.h>
 
 static s8 __read_mostly use_msi = -1;
 boolean_param("msi", use_msi);
@@ -1527,6 +1528,8 @@ static void dump_msi(unsigned char key)
                attr.guest_masked ? 'G' : ' ',
                mask);
     }
+
+    vpci_dump_msi();
 }
 
 static int __init msi_setup_keyhandler(void)

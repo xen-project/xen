@@ -133,6 +133,7 @@ struct pirq {
     struct arch_pirq arch;
 };
 
+#define INVALID_PIRQ (-1)
 #define pirq_info(d, p) ((struct pirq *)radix_tree_lookup(&(d)->pirq_tree, p))
 
 /* Use this instead of pirq_info() if the structure may need allocating. */

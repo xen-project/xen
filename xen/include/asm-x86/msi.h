@@ -48,6 +48,7 @@
 #define MSI_ADDR_REDIRECTION_SHIFT  3
 #define MSI_ADDR_REDIRECTION_CPU    (0 << MSI_ADDR_REDIRECTION_SHIFT)
 #define MSI_ADDR_REDIRECTION_LOWPRI (1 << MSI_ADDR_REDIRECTION_SHIFT)
+#define MSI_ADDR_REDIRECTION_MASK   (1 << MSI_ADDR_REDIRECTION_SHIFT)
 
 #define MSI_ADDR_DEST_ID_SHIFT		12
 #define	 MSI_ADDR_DEST_ID_MASK		0x00ff000
@@ -152,6 +153,8 @@ int msi_free_irq(struct msi_desc *entry);
 	( (is64bit == 1) ? base+PCI_MSI_DATA_64 : base+PCI_MSI_DATA_32 )
 #define msi_mask_bits_reg(base, is64bit) \
 	( (is64bit == 1) ? base+PCI_MSI_MASK_BIT : base+PCI_MSI_MASK_BIT-4)
+#define msi_pending_bits_reg(base, is64bit) \
+	((base) + PCI_MSI_MASK_BIT + ((is64bit) ? 4 : 0))
 #define msi_disable(control)		control &= ~PCI_MSI_FLAGS_ENABLE
 #define multi_msi_capable(control) \
 	(1 << ((control & PCI_MSI_FLAGS_QMASK) >> 1))

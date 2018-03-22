@@ -127,6 +127,11 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
 void msix_write_completion(struct vcpu *);
 void msixtbl_init(struct domain *d);
 
+/* Arch-specific MSI data for vPCI. */
+struct vpci_arch_msi {
+    int pirq;
+};
+
 enum stdvga_cache_state {
     STDVGA_CACHE_UNINITIALIZED,
     STDVGA_CACHE_ENABLED,
