@@ -22,6 +22,7 @@
 #include <xen/init.h>
 #include <xen/libelf.h>
 #include <xen/multiboot.h>
+#include <xen/pci.h>
 #include <xen/softirq.h>
 
 #include <acpi/actables.h>
@@ -1055,6 +1056,24 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
     return 0;
 }
 
+static void __hwdom_init pvh_setup_mmcfg(struct domain *d)
+{
+    unsigned int i;
+    int rc;
+
+    for ( i = 0; i < pci_mmcfg_config_num; i++ )
+    {
+        rc = register_vpci_mmcfg_handler(d, pci_mmcfg_config[i].address,
+                                         pci_mmcfg_config[i].start_bus_number,
+                                         pci_mmcfg_config[i].end_bus_number,
+                                         pci_mmcfg_config[i].pci_segment);
+        if ( rc )
+            printk("Unable to setup MMCFG handler at %#lx for segment %u\n",
+                   pci_mmcfg_config[i].address,
+                   pci_mmcfg_config[i].pci_segment);
+    }
+}
+
 int __init dom0_construct_pvh(struct domain *d, const module_t *image,
                               unsigned long image_headroom,
                               module_t *initrd,
@@ -1095,6 +1114,8 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
         printk("Failed to setup Dom0 ACPI tables: %d\n", rc);
         return rc;
     }
+
+    pvh_setup_mmcfg(d);
 
     panic("Building a PVHv2 Dom0 is not yet supported.");
     return 0;

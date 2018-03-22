@@ -182,6 +182,10 @@ struct hvm_domain {
     /* List of guest to machine IO ports mapping. */
     struct list_head g2m_ioport_list;
 
+    /* List of MMCFG regions trapped by Xen. */
+    struct list_head mmcfg_regions;
+    rwlock_t mmcfg_lock;
+
     /* List of permanently write-mapped pages. */
     struct {
         spinlock_t lock;

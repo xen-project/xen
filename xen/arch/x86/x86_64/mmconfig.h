@@ -74,10 +74,6 @@ static inline void mmio_config_writel(void __iomem *pos, u32 val)
     asm volatile("movl %%eax,(%1)" :: "a" (val), "r" (pos) : "memory");
 }
 
-/* external variable defines */
-extern int pci_mmcfg_config_num;
-extern struct acpi_mcfg_allocation *pci_mmcfg_config;
-
 /* function prototypes */
 int acpi_parse_mcfg(struct acpi_table_header *header);
 int pci_mmcfg_reserved(uint64_t address, unsigned int segment,
