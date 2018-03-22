@@ -320,6 +320,7 @@ static int cmpxchg(
     void *old,
     void *new,
     unsigned int bytes,
+    bool lock,
     struct x86_emulate_ctxt *ctxt)
 {
     if ( verbose )

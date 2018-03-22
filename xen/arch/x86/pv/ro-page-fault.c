@@ -216,7 +216,7 @@ static int ptwr_emulated_write(enum x86_segment seg, unsigned long offset,
 
 static int ptwr_emulated_cmpxchg(enum x86_segment seg, unsigned long offset,
                                  void *p_old, void *p_new, unsigned int bytes,
-                                 struct x86_emulate_ctxt *ctxt)
+                                 bool lock, struct x86_emulate_ctxt *ctxt)
 {
     intpte_t old = 0, new = 0;
 

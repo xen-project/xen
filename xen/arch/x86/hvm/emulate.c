@@ -1250,6 +1250,7 @@ static int hvmemul_cmpxchg_discard(
     void *p_old,
     void *p_new,
     unsigned int bytes,
+    bool lock,
     struct x86_emulate_ctxt *ctxt)
 {
     return X86EMUL_OKAY;
@@ -1293,6 +1294,7 @@ static int hvmemul_cmpxchg(
     void *p_old,
     void *p_new,
     unsigned int bytes,
+    bool lock,
     struct x86_emulate_ctxt *ctxt)
 {
     /* Fix this in case the guest is really relying on r-m-w atomicity. */

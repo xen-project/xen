@@ -281,6 +281,7 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
                     void *p_old,
                     void *p_new,
                     unsigned int bytes,
+                    bool lock,
                     struct x86_emulate_ctxt *ctxt)
 {
     struct sh_emulate_ctxt *sh_ctxt =

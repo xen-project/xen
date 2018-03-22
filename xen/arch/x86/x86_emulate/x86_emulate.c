@@ -1947,7 +1947,7 @@ protmode_load_seg(
 
         fail_if(!ops->cmpxchg);
         switch ( (rc = ops->cmpxchg(sel_seg, (sel & 0xfff8) + 4, &desc.b,
-                                    &new_desc_b, sizeof(desc.b), ctxt)) )
+                                    &new_desc_b, sizeof(desc.b), true, ctxt)) )
         {
         case X86EMUL_OKAY:
             break;
@@ -6941,7 +6941,8 @@ x86_emulate(
             }
 
             if ( (rc = ops->cmpxchg(ea.mem.seg, ea.mem.off, old, aux,
-                                    op_bytes, ctxt)) != X86EMUL_OKAY )
+                                    op_bytes, lock_prefix,
+                                    ctxt)) != X86EMUL_OKAY )
                 goto done;
             _regs.eflags |= X86_EFLAGS_ZF;
         }
@@ -8392,7 +8393,7 @@ x86_emulate(
             fail_if(!ops->cmpxchg);
             rc = ops->cmpxchg(
                 dst.mem.seg, dst.mem.off, &dst.orig_val,
-                &dst.val, dst.bytes, ctxt);
+                &dst.val, dst.bytes, true, ctxt);
         }
         else
         {

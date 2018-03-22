@@ -245,10 +245,11 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt);
 
     /*
-     * cmpxchg: Emulate an atomic (LOCKed) CMPXCHG operation.
+     * cmpxchg: Emulate a CMPXCHG operation.
      *  @p_old: [IN ] Pointer to value expected to be current at @addr.
      *  @p_new: [IN ] Pointer to value to write to @addr.
      *  @bytes: [IN ] Operation size (up to 8 (x86/32) or 16 (x86/64) bytes).
+     *  @lock:  [IN ] atomic (LOCKed) operation
      */
     int (*cmpxchg)(
         enum x86_segment seg,
@@ -256,6 +257,7 @@ struct x86_emulate_ops
         void *p_old,
         void *p_new,
         unsigned int bytes,
+        bool lock,
         struct x86_emulate_ctxt *ctxt);
 
     /*
