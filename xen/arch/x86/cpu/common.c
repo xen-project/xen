@@ -208,6 +208,8 @@ static void __init early_cpu_detect(void)
 	/* Leaf 0x1 capabilities filled in early for Xen. */
 	c->x86_capability[0] = cap0;
 	c->x86_capability[4] = cap4;
+
+	initialize_cpu_data(0);
 }
 
 static void __cpuinit generic_identify(struct cpuinfo_x86 *c)

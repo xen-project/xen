@@ -1338,6 +1338,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     timer_init();
 
+    early_microcode_init();
+
     identify_cpu(&boot_cpu_data);
 
     if ( cpu_has_fxsr )

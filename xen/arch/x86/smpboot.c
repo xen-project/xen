@@ -82,22 +82,23 @@ static enum cpu_state {
 
 void *stack_base[NR_CPUS];
 
+void initialize_cpu_data(unsigned int cpu)
+{
+    cpu_data[cpu] = boot_cpu_data;
+}
+
 static void smp_store_cpu_info(int id)
 {
     struct cpuinfo_x86 *c = cpu_data + id;
     unsigned int socket;
 
-    *c = boot_cpu_data;
-    if ( id != 0 )
-    {
-        identify_cpu(c);
+    identify_cpu(&cpu_data[id]);
 
-        socket = cpu_to_socket(id);
-        if ( !socket_cpumask[socket] )
-        {
-            socket_cpumask[socket] = secondary_socket_cpumask;
-            secondary_socket_cpumask = NULL;
-        }
+    socket = cpu_to_socket(id);
+    if ( !socket_cpumask[socket] )
+    {
+        socket_cpumask[socket] = secondary_socket_cpumask;
+        secondary_socket_cpumask = NULL;
     }
 
     /*
@@ -371,6 +372,13 @@ void start_secondary(void *unused)
 
     cpu_init();
 
+    initialize_cpu_data(cpu);
+
+    if ( system_state <= SYS_STATE_smp_boot )
+        early_microcode_update_cpu(0);
+    else
+        microcode_resume_cpu(cpu);
+
     smp_callin();
 
     setup_secondary_APIC_clock();
@@ -400,8 +408,6 @@ void start_secondary(void *unused)
     /* We can take interrupts now: we're officially "up". */
     local_irq_enable();
     mtrr_ap_init();
-
-    microcode_resume_cpu(cpu);
 
     wmb();
     startup_cpu_idle_loop();
@@ -1011,7 +1017,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
     mtrr_aps_sync_begin();
 
     /* Setup boot CPU information */
-    smp_store_cpu_info(0); /* Final full version of the data */
+    initialize_cpu_data(0); /* Final full version of the data */
     print_cpu_info(0);
 
     boot_cpu_physical_apicid = get_apic_id();

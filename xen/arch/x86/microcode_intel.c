@@ -404,10 +404,9 @@ static const struct microcode_ops microcode_intel_ops = {
     .apply_microcode                  = apply_microcode,
 };
 
-static __init int microcode_init_intel(void)
+int __init microcode_init_intel(void)
 {
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
         microcode_ops = &microcode_intel_ops;
     return 0;
 }
-presmp_initcall(microcode_init_intel);
