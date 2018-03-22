@@ -111,6 +111,7 @@ static int check_segment(struct segment_register *reg, enum x86_segment seg)
 /* Called by VCPUOP_initialise for HVM guests. */
 int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
 {
+    const struct domain *d = v->domain;
     struct cpu_user_regs *uregs = &v->arch.user_regs;
     struct segment_register cs, ds, ss, es, tr;
     const char *errstr;
@@ -272,7 +273,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
     if ( v->arch.hvm_vcpu.guest_efer & EFER_LME )
         v->arch.hvm_vcpu.guest_efer |= EFER_LMA;
 
-    if ( v->arch.hvm_vcpu.guest_cr[4] & ~hvm_cr4_guest_valid_bits(v, 0) )
+    if ( v->arch.hvm_vcpu.guest_cr[4] & ~hvm_cr4_guest_valid_bits(d, false) )
     {
         gprintk(XENLOG_ERR, "Bad CR4 value: %#016lx\n",
                 v->arch.hvm_vcpu.guest_cr[4]);

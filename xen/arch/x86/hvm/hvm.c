@@ -940,9 +940,8 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
         X86_CR0_CD | X86_CR0_PG)))
 
 /* These bits in CR4 can be set by the guest. */
-unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore)
+unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore)
 {
-    const struct domain *d = v->domain;
     const struct cpuid_policy *p;
     bool mce, vmxe;
 
@@ -1009,7 +1008,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    if ( ctxt.cr4 & ~hvm_cr4_guest_valid_bits(v, 1) )
+    if ( ctxt.cr4 & ~hvm_cr4_guest_valid_bits(d, true) )
     {
         printk(XENLOG_G_ERR "HVM%d restore: bad CR4 %#" PRIx64 "\n",
                d->domain_id, ctxt.cr4);
@@ -2360,7 +2359,7 @@ int hvm_set_cr4(unsigned long value, bool_t may_defer)
     struct vcpu *v = current;
     unsigned long old_cr;
 
-    if ( value & ~hvm_cr4_guest_valid_bits(v, 0) )
+    if ( value & ~hvm_cr4_guest_valid_bits(v->domain, false) )
     {
         HVM_DBG_LOG(DBG_LEVEL_1,
                     "Guest attempts to set reserved bit in CR4: %lx",

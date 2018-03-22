@@ -1598,8 +1598,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
              * Update CR4 host mask to only trap when the guest tries to set
              * bits that are controlled by the hypervisor.
              */
-            v->arch.hvm_vmx.cr4_host_mask = HVM_CR4_HOST_MASK | X86_CR4_PKE |
-                                            ~hvm_cr4_guest_valid_bits(v, 0);
+            v->arch.hvm_vmx.cr4_host_mask =
+                (HVM_CR4_HOST_MASK | X86_CR4_PKE |
+                 ~hvm_cr4_guest_valid_bits(v->domain, false));
+
             v->arch.hvm_vmx.cr4_host_mask |= v->arch.hvm_vmx.vmx_realmode ?
                                              X86_CR4_VME : 0;
             v->arch.hvm_vmx.cr4_host_mask |= !hvm_paging_enabled(v) ?
