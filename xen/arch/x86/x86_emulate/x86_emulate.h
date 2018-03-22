@@ -247,6 +247,20 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt);
 
     /*
+     * rmw: Emulate a memory read-modify-write.
+     * @eflags: [IN/OUT] Pointer to EFLAGS to be updated according to
+     *                   instruction effects.
+     * @state:  [IN/OUT] Pointer to (opaque) emulator state.
+     */
+    int (*rmw)(
+        enum x86_segment seg,
+        unsigned long offset,
+        unsigned int bytes,
+        uint32_t *eflags,
+        struct x86_emulate_state *state,
+        struct x86_emulate_ctxt *ctxt);
+
+    /*
      * cmpxchg: Emulate a CMPXCHG operation.
      *  @p_old: [IN ] Pointer to value expected to be current at @addr.
      *          [OUT] Pointer to value found at @addr (may always be
@@ -709,6 +723,14 @@ int x86emul_write_xcr(unsigned int reg, uint64_t val,
                       struct x86_emulate_ctxt *ctxt);
 
 #endif
+
+int
+x86_emul_rmw(
+    void *ptr,
+    unsigned int bytes,
+    uint32_t *eflags,
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt);
 
 static inline void x86_emul_hw_exception(
     unsigned int vector, int error_code, struct x86_emulate_ctxt *ctxt)

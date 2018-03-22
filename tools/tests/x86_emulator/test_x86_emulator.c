@@ -314,6 +314,17 @@ static int write(
     return X86EMUL_OKAY;
 }
 
+static int rmw(
+    enum x86_segment seg,
+    unsigned long offset,
+    unsigned int bytes,
+    uint32_t *eflags,
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return x86_emul_rmw((void *)offset, bytes, eflags, state, ctxt);
+}
+
 static int cmpxchg(
     enum x86_segment seg,
     unsigned long offset,
@@ -378,6 +389,9 @@ static struct x86_emulate_ops emulops = {
     .put_fpu    = emul_test_put_fpu,
 };
 
+#define EFLAGS_ALWAYS_SET (X86_EFLAGS_IF | X86_EFLAGS_MBS)
+#define EFLAGS_MASK (X86_EFLAGS_ARITH_MASK | EFLAGS_ALWAYS_SET)
+
 int main(int argc, char **argv)
 {
     struct x86_emulate_ctxt ctxt;
@@ -414,6 +428,7 @@ int main(int argc, char **argv)
     if ( !stack_exec )
         printf("Warning: Stack could not be made executable (%d).\n", errno);
 
+ rmw_restart:
     printf("%-40s", "Testing addl %ecx,(%eax)...");
     instr[0] = 0x01; instr[1] = 0x08;
     regs.eflags = 0x200;
@@ -556,6 +571,94 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing notb (%edi)...");
+    instr[0] = 0xf6; instr[1] = 0x17;
+    *res        = 0x22334455;
+    regs.eflags = EFLAGS_MASK;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)res;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x223344aa) ||
+         ((regs.eflags & EFLAGS_MASK) != EFLAGS_MASK) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing btrl $0x1,(%edi)...");
+    instr[0] = 0x0f; instr[1] = 0xba; instr[2] = 0x37; instr[3] = 0x01;
+    *res        = 0x2233445F;
+    regs.eflags = EFLAGS_ALWAYS_SET;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)res;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x2233445D) ||
+         ((regs.eflags & (EFLAGS_ALWAYS_SET | X86_EFLAGS_ZF |
+                          X86_EFLAGS_CF)) !=
+          (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF)) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing btrl %eax,(%edi)...");
+    instr[0] = 0x0f; instr[1] = 0xb3; instr[2] = 0x07;
+    *res        = 0x2233445F;
+    regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_ZF;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = -32;
+    regs.edi    = (unsigned long)(res+1);
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x2233445E) ||
+         ((regs.eflags & (EFLAGS_ALWAYS_SET | X86_EFLAGS_ZF |
+                          X86_EFLAGS_CF)) !=
+          (EFLAGS_ALWAYS_SET | X86_EFLAGS_ZF | X86_EFLAGS_CF)) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+#ifdef __x86_64__
+    printf("%-40s", "Testing btcq %r8,(%r11)...");
+    instr[0] = 0x4d; instr[1] = 0x0f; instr[2] = 0xbb; instr[3] = 0x03;
+    regs.eflags = EFLAGS_ALWAYS_SET;
+    regs.rip    = (unsigned long)&instr[0];
+    regs.r8     = (-1L << 40) + 1;
+    regs.r11    = (unsigned long)(res + (1L << 35));
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x2233445C) ||
+         ((regs.eflags & (EFLAGS_ALWAYS_SET | X86_EFLAGS_ZF |
+                          X86_EFLAGS_CF)) !=
+          (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF)) ||
+         (regs.rip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+#endif
+
+    printf("%-40s", "Testing xadd %ax,(%ecx)...");
+    instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0xc1; instr[3] = 0x01;
+    regs.eflags = EFLAGS_ALWAYS_SET | X86_EFLAGS_ARITH_MASK;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = (unsigned long)res;
+    regs.eax    = 0x12345678;
+    *res        = 0x11111111;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x11116789) ||
+         (regs.eax != 0x12341111) ||
+         ((regs.eflags & EFLAGS_MASK) != EFLAGS_ALWAYS_SET) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    if ( !emulops.rmw )
+    {
+        printf("[Switching to read-modify-write mode]\n");
+        emulops.rmw = rmw;
+        goto rmw_restart;
+    }
+
     printf("%-40s", "Testing rep movsw...");
     instr[0] = 0xf3; instr[1] = 0x66; instr[2] = 0xa5;
     *res        = 0x22334455;
@@ -565,60 +668,15 @@ int main(int argc, char **argv)
     regs.esi    = (unsigned long)res + 0;
     regs.edi    = (unsigned long)res + 2;
     rc = x86_emulate(&ctxt, &emulops);
-    if ( (rc != X86EMUL_OKAY) || 
+    if ( (rc != X86EMUL_OKAY) ||
          (*res != 0x44554455) ||
          (regs.eflags != 0x200) ||
-         (regs.ecx != 22) || 
+         (regs.ecx != 22) ||
          (regs.esi != ((unsigned long)res + 2)) ||
          (regs.edi != ((unsigned long)res + 4)) ||
          (regs.eip != (unsigned long)&instr[0]) )
         goto fail;
     printf("okay\n");
-
-    printf("%-40s", "Testing btrl $0x1,(%edi)...");
-    instr[0] = 0x0f; instr[1] = 0xba; instr[2] = 0x37; instr[3] = 0x01;
-    *res        = 0x2233445F;
-    regs.eflags = 0x200;
-    regs.eip    = (unsigned long)&instr[0];
-    regs.edi    = (unsigned long)res;
-    rc = x86_emulate(&ctxt, &emulops);
-    if ( (rc != X86EMUL_OKAY) ||
-         (*res != 0x2233445D) ||
-         ((regs.eflags&0x201) != 0x201) ||
-         (regs.eip != (unsigned long)&instr[4]) )
-        goto fail;
-    printf("okay\n");
-
-    printf("%-40s", "Testing btrl %eax,(%edi)...");
-    instr[0] = 0x0f; instr[1] = 0xb3; instr[2] = 0x07;
-    *res        = 0x2233445F;
-    regs.eflags = 0x200;
-    regs.eip    = (unsigned long)&instr[0];
-    regs.eax    = -32;
-    regs.edi    = (unsigned long)(res+1);
-    rc = x86_emulate(&ctxt, &emulops);
-    if ( (rc != X86EMUL_OKAY) ||
-         (*res != 0x2233445E) ||
-         ((regs.eflags&0x201) != 0x201) ||
-         (regs.eip != (unsigned long)&instr[3]) )
-        goto fail;
-    printf("okay\n");
-
-#ifdef __x86_64__
-    printf("%-40s", "Testing btcq %r8,(%r11)...");
-    instr[0] = 0x4d; instr[1] = 0x0f; instr[2] = 0xbb; instr[3] = 0x03;
-    regs.eflags = 0x200;
-    regs.rip    = (unsigned long)&instr[0];
-    regs.r8     = (-1L << 40) + 1;
-    regs.r11    = (unsigned long)(res + (1L << 35));
-    rc = x86_emulate(&ctxt, &emulops);
-    if ( (rc != X86EMUL_OKAY) ||
-         (*res != 0x2233445C) ||
-         (regs.eflags != 0x201) ||
-         (regs.rip != (unsigned long)&instr[4]) )
-        goto fail;
-    printf("okay\n");
-#endif
 
     res[0] = 0x12345678;
     res[1] = 0x87654321;
@@ -743,22 +801,6 @@ int main(int argc, char **argv)
         goto fail;
     }
 #endif
-    printf("okay\n");
-
-    printf("%-40s", "Testing xadd %ax,(%ecx)...");
-    instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0xc1; instr[3] = 0x01;
-    regs.eflags = 0x200;
-    regs.eip    = (unsigned long)&instr[0];
-    regs.ecx    = (unsigned long)res;
-    regs.eax    = 0x12345678;
-    *res        = 0x11111111;
-    rc = x86_emulate(&ctxt, &emulops);
-    if ( (rc != X86EMUL_OKAY) ||
-         (*res != 0x11116789) ||
-         (regs.eax != 0x12341111) ||
-         ((regs.eflags&0x240) != 0x200) ||
-         (regs.eip != (unsigned long)&instr[4]) )
-        goto fail;
     printf("okay\n");
 
     printf("%-40s", "Testing dec %ax...");

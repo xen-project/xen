@@ -669,6 +669,25 @@ struct x86_emulate_state {
         ext_8f09,
         ext_8f0a,
     } ext;
+    enum {
+        rmw_NONE,
+        rmw_adc,
+        rmw_add,
+        rmw_and,
+        rmw_btc,
+        rmw_btr,
+        rmw_bts,
+        rmw_dec,
+        rmw_inc,
+        rmw_neg,
+        rmw_not,
+        rmw_or,
+        rmw_sbb,
+        rmw_sub,
+        rmw_xadd,
+        rmw_xchg,
+        rmw_xor,
+    } rmw;
     uint8_t modrm, modrm_mod, modrm_reg, modrm_rm;
     uint8_t sib_index, sib_scale;
     uint8_t rex_prefix;
@@ -823,123 +842,136 @@ typedef union {
 "orl  %"_LO32 _tmp",%"_LO32 _sav"; "
 
 /* Raw emulation: instruction has two explicit operands. */
-#define __emulate_2op_nobyte(_op,_src,_dst,_eflags, wsx,wsy,wdx,wdy,       \
-                             lsx,lsy,ldx,ldy, qsx,qsy,qdx,qdy)             \
+#define __emulate_2op_nobyte(_op, src, dst, sz, eflags, wsx,wsy,wdx,wdy,   \
+                             lsx,lsy,ldx,ldy, qsx,qsy,qdx,qdy, extra...)   \
 do{ unsigned long _tmp;                                                    \
-    switch ( (_dst).bytes )                                                \
+    switch ( sz )                                                          \
     {                                                                      \
     case 2:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"w %"wsx"3,%"wdx"1; "                                       \
             _POST_EFLAGS("0","4","2")                                      \
-            : "+g" (_eflags), "+" wdy ((_dst).val), "=&r" (_tmp)           \
-            : wsy ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : "+g" (eflags), "+" wdy (*(dst)), "=&r" (_tmp)                \
+            : wsy (src), "i" (EFLAGS_MASK), ## extra );                    \
         break;                                                             \
     case 4:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"l %"lsx"3,%"ldx"1; "                                       \
             _POST_EFLAGS("0","4","2")                                      \
-            : "+g" (_eflags), "+" ldy ((_dst).val), "=&r" (_tmp)           \
-            : lsy ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : "+g" (eflags), "+" ldy (*(dst)), "=&r" (_tmp)                \
+            : lsy (src), "i" (EFLAGS_MASK), ## extra );                    \
         break;                                                             \
     case 8:                                                                \
-        __emulate_2op_8byte(_op, _src, _dst, _eflags, qsx, qsy, qdx, qdy); \
+        __emulate_2op_8byte(_op, src, dst, eflags, qsx, qsy, qdx, qdy,     \
+                            ## extra);                                     \
         break;                                                             \
     }                                                                      \
 } while (0)
-#define __emulate_2op(_op,_src,_dst,_eflags,_bx,_by,_wx,_wy,_lx,_ly,_qx,_qy)\
+#define __emulate_2op(_op, src, dst, sz, eflags, _bx, by, wx, wy,          \
+                      lx, ly, qx, qy, extra...)                            \
 do{ unsigned long _tmp;                                                    \
-    switch ( (_dst).bytes )                                                \
+    switch ( sz )                                                          \
     {                                                                      \
     case 1:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","4","2")                                       \
             _op"b %"_bx"3,%1; "                                            \
             _POST_EFLAGS("0","4","2")                                      \
-            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
-            : _by ((_src).val), "i" (EFLAGS_MASK) );                       \
+            : "+g" (eflags), "+m" (*(dst)), "=&r" (_tmp)                   \
+            : by (src), "i" (EFLAGS_MASK), ##extra );                      \
         break;                                                             \
     default:                                                               \
-        __emulate_2op_nobyte(_op,_src,_dst,_eflags, _wx,_wy,"","m",        \
-                             _lx,_ly,"","m", _qx,_qy,"","m");              \
+        __emulate_2op_nobyte(_op, src, dst, sz, eflags, wx, wy, "", "m",   \
+                             lx, ly, "", "m", qx, qy, "", "m", ##extra);   \
         break;                                                             \
     }                                                                      \
 } while (0)
 /* Source operand is byte-sized and may be restricted to just %cl. */
-#define emulate_2op_SrcB(_op, _src, _dst, _eflags)                         \
-    __emulate_2op(_op, _src, _dst, _eflags,                                \
+#define _emulate_2op_SrcB(op, src, dst, sz, eflags)                        \
+    __emulate_2op(op, src, dst, sz, eflags,                                \
                   "b", "c", "b", "c", "b", "c", "b", "c")
+#define emulate_2op_SrcB(op, src, dst, eflags)                             \
+    _emulate_2op_SrcB(op, (src).val, &(dst).val, (dst).bytes, eflags)
 /* Source operand is byte, word, long or quad sized. */
+#define _emulate_2op_SrcV(op, src, dst, sz, eflags, extra...)              \
+    __emulate_2op(op, src, dst, sz, eflags,                                \
+                  "b", "q", "w", "r", _LO32, "r", "", "r", ##extra)
 #define emulate_2op_SrcV(_op, _src, _dst, _eflags)                         \
-    __emulate_2op(_op, _src, _dst, _eflags,                                \
-                  "b", "q", "w", "r", _LO32, "r", "", "r")
+    _emulate_2op_SrcV(_op, (_src).val, &(_dst).val, (_dst).bytes, _eflags)
 /* Source operand is word, long or quad sized. */
+#define _emulate_2op_SrcV_nobyte(op, src, dst, sz, eflags, extra...)       \
+    __emulate_2op_nobyte(op, src, dst, sz, eflags, "w", "r", "", "m",      \
+                         _LO32, "r", "", "m", "", "r", "", "m", ##extra)
 #define emulate_2op_SrcV_nobyte(_op, _src, _dst, _eflags)                  \
-    __emulate_2op_nobyte(_op, _src, _dst, _eflags, "w", "r", "", "m",      \
-                         _LO32, "r", "", "m", "", "r", "", "m")
+    _emulate_2op_SrcV_nobyte(_op, (_src).val, &(_dst).val, (_dst).bytes,   \
+                             _eflags)
 /* Operands are word, long or quad sized and source may be in memory. */
 #define emulate_2op_SrcV_srcmem(_op, _src, _dst, _eflags)                  \
-    __emulate_2op_nobyte(_op, _src, _dst, _eflags, "", "m", "w", "r",      \
+    __emulate_2op_nobyte(_op, (_src).val, &(_dst).val, (_dst).bytes,       \
+                         _eflags, "", "m", "w", "r",                       \
                          "", "m", _LO32, "r", "", "m", "", "r")
 
 /* Instruction has only one explicit operand (no source operand). */
-#define emulate_1op(_op,_dst,_eflags)                                      \
+#define _emulate_1op(_op, dst, sz, eflags, extra...)                       \
 do{ unsigned long _tmp;                                                    \
-    switch ( (_dst).bytes )                                                \
+    switch ( sz )                                                          \
     {                                                                      \
     case 1:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"b %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
-            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "+g" (eflags), "+m" (*(dst)), "=&r" (_tmp)                   \
+            : "i" (EFLAGS_MASK), ##extra );                                \
         break;                                                             \
     case 2:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"w %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
-            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "+g" (eflags), "+m" (*(dst)), "=&r" (_tmp)                   \
+            : "i" (EFLAGS_MASK), ##extra );                                \
         break;                                                             \
     case 4:                                                                \
         asm volatile (                                                     \
             _PRE_EFLAGS("0","3","2")                                       \
             _op"l %1; "                                                    \
             _POST_EFLAGS("0","3","2")                                      \
-            : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)              \
-            : "i" (EFLAGS_MASK) );                                         \
+            : "+g" (eflags), "+m" (*(dst)), "=&r" (_tmp)                   \
+            : "i" (EFLAGS_MASK), ##extra );                                \
         break;                                                             \
     case 8:                                                                \
-        __emulate_1op_8byte(_op, _dst, _eflags);                           \
+        __emulate_1op_8byte(_op, dst, eflags, ##extra);                    \
         break;                                                             \
     }                                                                      \
 } while (0)
+#define emulate_1op(op, dst, eflags)                                       \
+    _emulate_1op(op, &(dst).val, (dst).bytes, eflags)
 
 /* Emulate an instruction with quadword operands (x86/64 only). */
 #if defined(__x86_64__)
-#define __emulate_2op_8byte(_op, _src, _dst, _eflags, qsx, qsy, qdx, qdy) \
+#define __emulate_2op_8byte(_op, src, dst, eflags,                      \
+                            qsx, qsy, qdx, qdy, extra...)               \
 do{ asm volatile (                                                      \
         _PRE_EFLAGS("0","4","2")                                        \
         _op"q %"qsx"3,%"qdx"1; "                                        \
         _POST_EFLAGS("0","4","2")                                       \
-        : "+g" (_eflags), "+" qdy ((_dst).val), "=&r" (_tmp)            \
-        : qsy ((_src).val), "i" (EFLAGS_MASK) );                        \
+        : "+g" (eflags), "+" qdy (*(dst)), "=&r" (_tmp)                 \
+        : qsy (src), "i" (EFLAGS_MASK), ##extra );                      \
 } while (0)
-#define __emulate_1op_8byte(_op, _dst, _eflags)                         \
+#define __emulate_1op_8byte(_op, dst, eflags, extra...)                 \
 do{ asm volatile (                                                      \
         _PRE_EFLAGS("0","3","2")                                        \
         _op"q %1; "                                                     \
         _POST_EFLAGS("0","3","2")                                       \
-        : "+g" (_eflags), "+m" ((_dst).val), "=&r" (_tmp)               \
-        : "i" (EFLAGS_MASK) );                                          \
+        : "+g" (eflags), "+m" (*(dst)), "=&r" (_tmp)                    \
+        : "i" (EFLAGS_MASK), ##extra );                                 \
 } while (0)
 #elif defined(__i386__)
-#define __emulate_2op_8byte(_op, _src, _dst, _eflags, qsx, qsy, qdx, qdy)
-#define __emulate_1op_8byte(_op, _dst, _eflags)
+#define __emulate_2op_8byte(op, src, dst, eflags, qsx, qsy, qdx, qdy, extra...)
+#define __emulate_1op_8byte(op, dst, eflags, extra...)
 #endif /* __i386__ */
 
 #define fail_if(p)                                      \
@@ -3243,7 +3275,7 @@ x86_emulate(
         break;
     }
 
-    /* Decode and fetch the destination operand: register or memory. */
+    /* Decode (but don't fetch) the destination operand: register or memory. */
     switch ( d & DstMask )
     {
     case DstNone: /* case DstImplicit: */
@@ -3329,19 +3361,19 @@ x86_emulate(
             case 8: dst.val = *(uint64_t *)dst.reg; break;
             }
         }
-        else if ( !(d & Mov) ) /* optimisation - avoid slow emulated read */
+        else if ( d & Mov ) /* optimisation - avoid slow emulated read */
+        {
+            /* Lock prefix is allowed only on RMW instructions. */
+            generate_exception_if(lock_prefix, EXC_UD);
+            fail_if(!ops->write);
+        }
+        else if ( !ops->rmw )
         {
             fail_if(lock_prefix ? !ops->cmpxchg : !ops->write);
             if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
                                   &dst.val, dst.bytes, ctxt, ops)) )
                 goto done;
             dst.orig_val = dst.val;
-        }
-        else
-        {
-            /* Lock prefix is allowed only on RMW instructions. */
-            generate_exception_if(lock_prefix, EXC_UD);
-            fail_if(!ops->write);
         }
         break;
     }
@@ -3355,35 +3387,83 @@ x86_emulate(
         unsigned int i, n;
         unsigned long dummy;
 
-    case 0x00 ... 0x05: add: /* add */
-        emulate_2op_SrcV("add", src, dst, _regs.eflags);
+    case 0x00: case 0x01: add: /* add reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_add;
+        else
+        {
+    case 0x02 ... 0x05: /* add */
+            emulate_2op_SrcV("add", src, dst, _regs.eflags);
+        }
         break;
 
-    case 0x08 ... 0x0d: or:  /* or */
-        emulate_2op_SrcV("or", src, dst, _regs.eflags);
+    case 0x08: case 0x09: or: /* or reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_or;
+        else
+        {
+    case 0x0a ... 0x0d: /* or */
+            emulate_2op_SrcV("or", src, dst, _regs.eflags);
+        }
         break;
 
-    case 0x10 ... 0x15: adc: /* adc */
-        emulate_2op_SrcV("adc", src, dst, _regs.eflags);
+    case 0x10: case 0x11: adc: /* adc reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_adc;
+        else
+        {
+    case 0x12 ... 0x15: /* adc */
+            emulate_2op_SrcV("adc", src, dst, _regs.eflags);
+        }
         break;
 
-    case 0x18 ... 0x1d: sbb: /* sbb */
-        emulate_2op_SrcV("sbb", src, dst, _regs.eflags);
+    case 0x18: case 0x19: sbb: /* sbb reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_sbb;
+        else
+        {
+    case 0x1a ... 0x1d: /* sbb */
+            emulate_2op_SrcV("sbb", src, dst, _regs.eflags);
+        }
         break;
 
-    case 0x20 ... 0x25: and: /* and */
-        emulate_2op_SrcV("and", src, dst, _regs.eflags);
+    case 0x20: case 0x21: and: /* and reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_and;
+        else
+        {
+    case 0x22 ... 0x25: /* and */
+            emulate_2op_SrcV("and", src, dst, _regs.eflags);
+        }
         break;
 
-    case 0x28 ... 0x2d: sub: /* sub */
-        emulate_2op_SrcV("sub", src, dst, _regs.eflags);
+    case 0x28: case 0x29: sub: /* sub reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_sub;
+        else
+        {
+    case 0x2a ... 0x2d: /* sub */
+            emulate_2op_SrcV("sub", src, dst, _regs.eflags);
+        }
         break;
 
-    case 0x30 ... 0x35: xor: /* xor */
-        emulate_2op_SrcV("xor", src, dst, _regs.eflags);
+    case 0x30: case 0x31: xor: /* xor reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_xor;
+        else
+        {
+    case 0x32 ... 0x35: /* xor */
+            emulate_2op_SrcV("xor", src, dst, _regs.eflags);
+        }
         break;
 
-    case 0x38 ... 0x3d: cmp: /* cmp */
+    case 0x38: case 0x39: cmp: /* cmp reg,mem */
+        if ( ops->rmw && dst.type == OP_MEM &&
+             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
+                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
+            goto done;
+        /* fall through */
+    case 0x3a ... 0x3d: /* cmp */
         generate_exception_if(lock_prefix, EXC_UD);
         emulate_2op_SrcV("cmp", src, dst, _regs.eflags);
         dst.type = OP_NONE;
@@ -3697,6 +3777,16 @@ x86_emulate(
         break;
 
     case 0x86 ... 0x87: xchg: /* xchg */
+        /*
+         * The lock prefix is implied for this insn (and setting it for the
+         * register operands case here is benign to subsequent code).
+         */
+        lock_prefix = 1;
+        if ( ops->rmw && dst.type == OP_MEM )
+        {
+            state->rmw = rmw_xchg;
+            break;
+        }
         /* Write back the register source. */
         switch ( dst.bytes )
         {
@@ -3705,9 +3795,8 @@ x86_emulate(
         case 4: *src.reg = (uint32_t)dst.val; break; /* 64b reg: zero-extend */
         case 8: *src.reg = dst.val; break;
         }
-        /* Write back the memory destination with implicit LOCK prefix. */
+        /* Arrange for write back of the memory destination. */
         dst.val = src.val;
-        lock_prefix = 1;
         break;
 
     case 0xc6: /* Grp11: mov / xabort */
@@ -4022,6 +4111,13 @@ x86_emulate(
 
     case 0xc0 ... 0xc1: grp2: /* Grp2 */
         generate_exception_if(lock_prefix, EXC_UD);
+
+        if ( ops->rmw && dst.type == OP_MEM &&
+             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
+                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
+            goto done;
+        dst.orig_val = dst.val;
+
         switch ( modrm_reg & 7 )
         {
         case 0: /* rol */
@@ -4660,12 +4756,22 @@ x86_emulate(
 
         case 0 ... 1: /* test */
             generate_exception_if(lock_prefix, EXC_UD);
+            if ( ops->rmw && dst.type == OP_MEM &&
+                 (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
+                                  dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
+                goto done;
             goto test;
         case 2: /* not */
-            dst.val = ~dst.val;
+            if ( ops->rmw && dst.type == OP_MEM )
+                state->rmw = rmw_not;
+            else
+                dst.val = ~dst.val;
             break;
         case 3: /* neg */
-            emulate_1op("neg", dst, _regs.eflags);
+            if ( ops->rmw && dst.type == OP_MEM )
+                state->rmw = rmw_neg;
+            else
+                emulate_1op("neg", dst, _regs.eflags);
             break;
         case 4: /* mul */
             _regs.eflags &= ~(X86_EFLAGS_OF | X86_EFLAGS_CF);
@@ -4889,10 +4995,16 @@ x86_emulate(
         switch ( modrm_reg & 7 )
         {
         case 0: /* inc */
-            emulate_1op("inc", dst, _regs.eflags);
+            if ( ops->rmw && dst.type == OP_MEM )
+                state->rmw = rmw_inc;
+            else
+                emulate_1op("inc", dst, _regs.eflags);
             break;
         case 1: /* dec */
-            emulate_1op("dec", dst, _regs.eflags);
+            if ( ops->rmw && dst.type == OP_MEM )
+                state->rmw = rmw_dec;
+            else
+                emulate_1op("dec", dst, _regs.eflags);
             break;
         case 2: /* call (near) */
             dst.val = _regs.r(ip);
@@ -6441,6 +6553,12 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xa3): bt: /* bt */
         generate_exception_if(lock_prefix, EXC_UD);
+
+        if ( ops->rmw && dst.type == OP_MEM &&
+             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
+                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
+            goto done;
+
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
         dst.type = OP_NONE;
         break;
@@ -6452,6 +6570,12 @@ x86_emulate(
         uint8_t shift, width = dst.bytes << 3;
 
         generate_exception_if(lock_prefix, EXC_UD);
+
+        if ( ops->rmw && dst.type == OP_MEM &&
+             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
+                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
+            goto done;
+
         if ( b & 1 )
             shift = _regs.cl;
         else
@@ -6483,7 +6607,10 @@ x86_emulate(
     }
 
     case X86EMUL_OPC(0x0f, 0xab): bts: /* bts */
-        emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_bts;
+        else
+            emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xae): case X86EMUL_OPC_66(0x0f, 0xae): /* Grp15 */
@@ -6607,6 +6734,12 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0xb0): case X86EMUL_OPC(0x0f, 0xb1): /* cmpxchg */
         fail_if(!ops->cmpxchg);
+
+        if ( ops->rmw && dst.type == OP_MEM &&
+             (rc = read_ulong(dst.mem.seg, dst.mem.off, &dst.val,
+                              dst.bytes, ctxt, ops)) != X86EMUL_OKAY )
+            goto done;
+
         _regs.eflags &= ~EFLAGS_MASK;
         if ( !((dst.val ^ _regs.r(ax)) &
                (~0UL >> (8 * (sizeof(long) - dst.bytes)))) )
@@ -6655,7 +6788,10 @@ x86_emulate(
         goto les;
 
     case X86EMUL_OPC(0x0f, 0xb3): btr: /* btr */
-        emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_btr;
+        else
+            emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xb6): /* movzx rm8,r{16,32,64} */
@@ -6689,7 +6825,10 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xbb): btc: /* btc */
-        emulate_2op_SrcV_nobyte("btc", src, dst, _regs.eflags);
+        if ( ops->rmw && dst.type == OP_MEM )
+            state->rmw = rmw_btc;
+        else
+            emulate_2op_SrcV_nobyte("btc", src, dst, _regs.eflags);
         break;
 
     case X86EMUL_OPC(0x0f, 0xbc): /* bsf or tzcnt */
@@ -6762,6 +6901,11 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC(0x0f, 0xc0): case X86EMUL_OPC(0x0f, 0xc1): /* xadd */
+        if ( ops->rmw && dst.type == OP_MEM )
+        {
+            state->rmw = rmw_xadd;
+            break;
+        }
         /* Write back the register source. */
         switch ( dst.bytes )
         {
@@ -8316,7 +8460,36 @@ x86_emulate(
         goto done;
     }
 
-    if ( state->simd_size )
+    if ( state->rmw )
+    {
+        ea.val = src.val;
+        op_bytes = dst.bytes;
+        rc = ops->rmw(dst.mem.seg, dst.mem.off, dst.bytes, &_regs.eflags,
+                      state, ctxt);
+        if ( rc != X86EMUL_OKAY )
+            goto done;
+
+        /* Some operations require a register to be written. */
+        switch ( state->rmw )
+        {
+        case rmw_xchg:
+        case rmw_xadd:
+            switch ( dst.bytes )
+            {
+            case 1: *(uint8_t  *)src.reg = (uint8_t)ea.val; break;
+            case 2: *(uint16_t *)src.reg = (uint16_t)ea.val; break;
+            case 4: *src.reg = (uint32_t)ea.val; break; /* 64b reg: zero-extend */
+            case 8: *src.reg = ea.val; break;
+            }
+            break;
+
+        default:
+            break;
+        }
+
+        dst.type = OP_NONE;
+    }
+    else if ( state->simd_size )
     {
         generate_exception_if(!op_bytes, EXC_UD);
         generate_exception_if(vex.opcx && (d & TwoOp) && vex.reg != 0xf,
@@ -8516,6 +8689,146 @@ x86_emulate(
 #undef lock_prefix
 #undef vex
 #undef ea
+
+int x86_emul_rmw(
+    void *ptr,
+    unsigned int bytes,
+    uint32_t *eflags,
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt)
+{
+    unsigned long *dst = ptr;
+
+    ASSERT(bytes == state->op_bytes);
+
+/*
+ * We cannot use Jcc below, as this code executes with the guest status flags
+ * loaded into the EFLAGS register. Hence our only choice is J{E,R}CXZ.
+ */
+#ifdef __x86_64__
+# define JCXZ "jrcxz"
+#else
+# define JCXZ "jecxz"
+#endif
+
+#define COND_LOCK(op) \
+    JCXZ " .L" #op "%=\n\t" \
+    "lock\n" \
+    ".L" #op "%=:\n\t" \
+    #op
+
+    switch ( state->rmw )
+    {
+#define UNOP(op) \
+    case rmw_##op: \
+        _emulate_1op(COND_LOCK(op), dst, bytes, *eflags, \
+                     "c" ((long)state->lock_prefix) ); \
+        break
+#define BINOP(op, sfx) \
+    case rmw_##op: \
+        _emulate_2op_SrcV##sfx(COND_LOCK(op), \
+                               state->ea.val, dst, bytes, *eflags, \
+                               "c" ((long)state->lock_prefix) ); \
+        break
+
+    BINOP(adc, );
+    BINOP(add, );
+    BINOP(and, );
+    BINOP(btc, _nobyte);
+    BINOP(bts, _nobyte);
+    BINOP(btr, _nobyte);
+     UNOP(dec);
+     UNOP(inc);
+     UNOP(neg);
+    BINOP(or, );
+    BINOP(sbb, );
+    BINOP(sub, );
+    BINOP(xor, );
+
+#undef UNOP
+#undef BINOP
+
+    case rmw_not:
+        switch ( state->op_bytes )
+        {
+        case 1:
+            asm ( COND_LOCK(notb) " %0"
+                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+            break;
+        case 2:
+            asm ( COND_LOCK(notw) " %0"
+                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+            break;
+        case 4:
+            asm ( COND_LOCK(notl) " %0"
+                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+            break;
+#ifdef __x86_64__
+        case 8:
+            asm ( COND_LOCK(notq) " %0"
+                  : "+m" (*dst) : "c" ((long)state->lock_prefix) );
+            break;
+#endif
+        }
+        break;
+
+    case rmw_xadd:
+        switch ( state->op_bytes )
+        {
+            unsigned long dummy;
+
+#define XADD(sz, cst, mod) \
+        case sz: \
+            asm ( _PRE_EFLAGS("[efl]", "[msk]", "[tmp]") \
+                  COND_LOCK(xadd) " %"#mod"[reg], %[mem]; " \
+                  _POST_EFLAGS("[efl]", "[msk]", "[tmp]") \
+                  : [reg] "+" #cst (state->ea.val), \
+                    [mem] "+m" (*dst), \
+                    [efl] "+g" (*eflags), \
+                    [tmp] "=&r" (dummy) \
+                  : "c" ((long)state->lock_prefix), \
+                    [msk] "i" (EFLAGS_MASK) ); \
+            break
+        XADD(1, q, b);
+        XADD(2, r, w);
+        XADD(4, r, k);
+#ifdef __x86_64__
+        XADD(8, r, );
+#endif
+#undef XADD
+        }
+        break;
+
+    case rmw_xchg:
+        switch ( state->op_bytes )
+        {
+        case 1:
+            asm ( "xchg %b0, %b1" : "+q" (state->ea.val), "+m" (*dst) );
+            break;
+        case 2:
+            asm ( "xchg %w0, %w1" : "+r" (state->ea.val), "+m" (*dst) );
+            break;
+        case 4:
+#ifdef __x86_64__
+            asm ( "xchg %k0, %k1" : "+r" (state->ea.val), "+m" (*dst) );
+            break;
+        case 8:
+#endif
+            asm ( "xchg %0, %1" : "+r" (state->ea.val), "+m" (*dst) );
+            break;
+        }
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+#undef COND_LOCK
+#undef JCXZ
+
+    return X86EMUL_OKAY;
+}
 
 static void __init __maybe_unused build_assertions(void)
 {
