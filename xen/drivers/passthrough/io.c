@@ -645,7 +645,22 @@ int pt_irq_destroy_bind(
         }
         break;
     case PT_IRQ_TYPE_MSI:
+    {
+        unsigned long flags;
+        struct irq_desc *desc = domain_spin_lock_irq_desc(d, machine_gsi,
+                                                          &flags);
+
+        if ( !desc )
+            return -EINVAL;
+        /*
+         * Leave the MSI masked, so that the state when calling
+         * pt_irq_create_bind is consistent across bind/unbinds.
+         */
+        guest_mask_msi_irq(desc, true);
+        spin_unlock_irqrestore(&desc->lock, flags);
         break;
+    }
+
     default:
         return -EOPNOTSUPP;
     }
