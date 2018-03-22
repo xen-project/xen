@@ -610,11 +610,16 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
     uint32_t hi = 0, bar = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev,
                                            sbdf.func, pos);
     uint64_t size;
+    bool is64bits = !(flags & PCI_BAR_ROM) &&
+        (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) == PCI_BASE_ADDRESS_MEM_TYPE_64;
+    uint32_t mask = (flags & PCI_BAR_ROM) ? (uint32_t)PCI_ROM_ADDRESS_MASK
+                                          : (uint32_t)PCI_BASE_ADDRESS_MEM_MASK;
 
-    ASSERT((bar & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY);
+    ASSERT(!((flags & PCI_BAR_VF) && (flags & PCI_BAR_ROM)));
+    ASSERT((flags & PCI_BAR_ROM) ||
+           (bar & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY);
     pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos, ~0);
-    if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
-         PCI_BASE_ADDRESS_MEM_TYPE_64 )
+    if ( is64bits )
     {
         if ( flags & PCI_BAR_LAST )
         {
@@ -628,10 +633,9 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
         hi = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos + 4);
         pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos + 4, ~0);
     }
-    size = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, pos) &
-           PCI_BASE_ADDRESS_MEM_MASK;
-    if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
-         PCI_BASE_ADDRESS_MEM_TYPE_64 )
+    size = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func,
+                           pos) & mask;
+    if ( is64bits )
     {
         size |= (uint64_t)pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev,
                                           sbdf.func, pos + 4) << 32;
@@ -643,14 +647,10 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
     size = -size;
 
     if ( paddr )
-        *paddr = (bar & PCI_BASE_ADDRESS_MEM_MASK) | ((uint64_t)hi << 32);
+        *paddr = (bar & mask) | ((uint64_t)hi << 32);
     *psize = size;
 
-    if ( (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) ==
-         PCI_BASE_ADDRESS_MEM_TYPE_64 )
-        return 2;
-
-    return 1;
+    return is64bits ? 2 : 1;
 }
 
 int pci_add_device(u16 seg, u8 bus, u8 devfn,
