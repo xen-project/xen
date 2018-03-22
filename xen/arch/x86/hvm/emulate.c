@@ -1188,6 +1188,61 @@ static int hvmemul_write(
     return X86EMUL_OKAY;
 }
 
+static int hvmemul_rmw(
+    enum x86_segment seg,
+    unsigned long offset,
+    unsigned int bytes,
+    uint32_t *eflags,
+    struct x86_emulate_state *state,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    unsigned long addr, reps = 1;
+    uint32_t pfec = PFEC_page_present | PFEC_write_access;
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    int rc;
+    void *mapping;
+
+    rc = hvmemul_virtual_to_linear(
+        seg, offset, bytes, &reps, hvm_access_write, hvmemul_ctxt, &addr);
+    if ( rc != X86EMUL_OKAY || !bytes )
+        return rc;
+
+    if ( is_x86_system_segment(seg) )
+        pfec |= PFEC_implicit;
+    else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
+        pfec |= PFEC_user_mode;
+
+    mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
+    if ( IS_ERR(mapping) )
+        return ~PTR_ERR(mapping);
+
+    if ( mapping )
+    {
+        rc = x86_emul_rmw(mapping, bytes, eflags, state, ctxt);
+        hvmemul_unmap_linear_addr(mapping, addr, bytes, hvmemul_ctxt);
+    }
+    else
+    {
+        unsigned long data = 0;
+        bool known_gpfn = vio->mmio_access.write_access &&
+                          vio->mmio_gla == (addr & PAGE_MASK);
+
+        if ( bytes > sizeof(data) )
+            return X86EMUL_UNHANDLEABLE;
+        rc = hvmemul_linear_mmio_read(addr, bytes, &data, pfec, hvmemul_ctxt,
+                                      known_gpfn);
+        if ( rc == X86EMUL_OKAY )
+            rc = x86_emul_rmw(&data, bytes, eflags, state, ctxt);
+        if ( rc == X86EMUL_OKAY )
+            rc = hvmemul_linear_mmio_write(addr, bytes, &data, pfec,
+                                           hvmemul_ctxt, known_gpfn);
+    }
+
+    return rc;
+}
+
 static int hvmemul_write_discard(
     enum x86_segment seg,
     unsigned long offset,
@@ -2141,6 +2196,7 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .read          = hvmemul_read,
     .insn_fetch    = hvmemul_insn_fetch,
     .write         = hvmemul_write,
+    .rmw           = hvmemul_rmw,
     .cmpxchg       = hvmemul_cmpxchg,
     .validate      = hvmemul_validate,
     .rep_ins       = hvmemul_rep_ins,
