@@ -2006,34 +2006,24 @@ void activate_debugregs(const struct vcpu *curr)
  */
 long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
 {
-    int i;
     struct vcpu *curr = current;
 
     switch ( reg )
     {
-    case 0:
+    case 0 ... 3:
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
+
         if ( v == curr )
-            write_debugreg(0, value);
-        break;
-    case 1:
-        if ( !access_ok(value, sizeof(long)) )
-            return -EPERM;
-        if ( v == curr )
-            write_debugreg(1, value);
-        break;
-    case 2:
-        if ( !access_ok(value, sizeof(long)) )
-            return -EPERM;
-        if ( v == curr )
-            write_debugreg(2, value);
-        break;
-    case 3:
-        if ( !access_ok(value, sizeof(long)) )
-            return -EPERM;
-        if ( v == curr )
-            write_debugreg(3, value);
+        {
+            switch ( reg )
+            {
+            case 0: write_debugreg(0, value); break;
+            case 1: write_debugreg(1, value); break;
+            case 2: write_debugreg(2, value); break;
+            case 3: write_debugreg(3, value); break;
+            }
+        }
         break;
 
     case 4:
@@ -2085,7 +2075,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         /* DR7.{G,L}E = 0 => debugging disabled for this domain. */
         if ( value & DR7_ACTIVE_MASK )
         {
-            unsigned int io_enable = 0;
+            unsigned int i, io_enable = 0;
 
             for ( i = DR_CONTROL_SHIFT; i < 32; i += DR_CONTROL_SIZE )
             {
@@ -2113,6 +2103,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( v == curr )
             write_debugreg(7, value);
         break;
+
     default:
         return -ENODEV;
     }
