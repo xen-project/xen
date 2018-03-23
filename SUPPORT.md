@@ -74,23 +74,26 @@ No hardware requirements
 
 ### x86/HVM
 
-    Status: Supported
+    Status, domU: Supported
 
 Fully virtualised guest using hardware virtualisation extensions
 
 Requires hardware virtualisation support (Intel VMX / AMD SVM)
 
-### x86/PVH guest
+### x86/PVH
 
-    Status: Supported
+    Status, domU: Supported
+    Status, dom0: Experimental
 
 PVH is a next-generation paravirtualized mode
 designed to take advantage of hardware virtualization support when possible.
 During development this was sometimes called HVMLite or PVHv2.
 
-Requires hardware virtualisation support (Intel VMX / AMD SVM)
+Requires hardware virtualisation support (Intel VMX / AMD SVM).
 
-### ARM guest
+Dom0 support requires an IOMMU (Intel VT-d / AMD IOMMU).
+
+### ARM
 
     Status: Supported
 
