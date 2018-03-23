@@ -104,7 +104,7 @@ libxenstore.so.$(MAJOR): libxenstore.so.$(MAJOR).$(MINOR)
 xs.opic: CFLAGS += -DUSE_PTHREAD
 ifeq ($(CONFIG_Linux),y)
 xs.opic: CFLAGS += -DUSE_DLSYM
-libxenstore.so.$(MAJOR).$(MINOR): LDFLAGS += -ldl
+libxenstore.so.$(MAJOR).$(MINOR): APPEND_LDFLAGS += -ldl
 else
 PKG_CONFIG_REMOVE += -ldl
 endif
