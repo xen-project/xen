@@ -40,7 +40,7 @@ int xc_domain_create(xc_interface *xch, uint32_t ssidref,
 
 #if defined (__i386) || defined(__x86_64__)
         if ( flags & XEN_DOMCTL_CDF_hvm_guest )
-            lconfig.emulation_flags = XEN_X86_EMU_ALL;
+            lconfig.emulation_flags = (XEN_X86_EMU_ALL & ~XEN_X86_EMU_VPCI);
 #elif defined (__arm__) || defined(__aarch64__)
         lconfig.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
         lconfig.nr_spis = 0;
