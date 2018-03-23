@@ -15,6 +15,7 @@
 #include <asm/processor.h> /* current_cpu_info */
 #include <asm/xstate.h>
 #include <asm/amd.h> /* cpu_has_amd_erratum() */
+#include <asm/debugreg.h>
 
 /* Avoid namespace pollution. */
 #undef cmpxchg
@@ -125,6 +126,29 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
     }
 
     return X86EMUL_OKAY;
+}
+
+int x86emul_write_dr(unsigned int reg, unsigned long val,
+                     struct x86_emulate_ctxt *ctxt)
+{
+    struct vcpu *curr = current;
+
+    /* HVM support requires a bit more plumbing before it will work. */
+    ASSERT(is_pv_vcpu(curr));
+
+    switch ( set_debugreg(curr, reg, val) )
+    {
+    case 0:
+        return X86EMUL_OKAY;
+
+    case -ENODEV:
+        x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
+        return X86EMUL_EXCEPTION;
+
+    default:
+        x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);
+        return X86EMUL_EXCEPTION;
+    }
 }
 
 /*
