@@ -328,7 +328,7 @@ static int msix_write(struct vcpu *v, unsigned long addr, unsigned int len,
             entry->addr = data;
             break;
         }
-        entry->addr &= ~0xffffffff;
+        entry->addr &= ~0xffffffffull;
         entry->addr |= data;
         break;
 
