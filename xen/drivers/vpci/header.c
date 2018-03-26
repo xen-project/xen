@@ -63,7 +63,7 @@ static int map_range(unsigned long s, unsigned long e, void *data,
         {
             printk(XENLOG_G_WARNING
                    "Failed to identity %smap [%lx, %lx] for d%d: %d\n",
-                   map ? "" : "un", s, e, map->d->domain_id, rc);
+                   map->map ? "" : "un", s, e, map->d->domain_id, rc);
             break;
         }
         ASSERT(rc < size);
