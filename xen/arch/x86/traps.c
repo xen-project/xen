@@ -1777,10 +1777,35 @@ static void ler_enable(void)
 
 void do_debug(struct cpu_user_regs *regs)
 {
+    unsigned long dr6;
     struct vcpu *v = current;
+
+    /* Stash dr6 as early as possible. */
+    dr6 = read_debugreg(6);
 
     if ( debugger_trap_entry(TRAP_debug, regs) )
         return;
+
+    /*
+     * At the time of writing (March 2018), on the subject of %dr6:
+     *
+     * The Intel manual says:
+     *   Certain debug exceptions may clear bits 0-3. The remaining contents
+     *   of the DR6 register are never cleared by the processor. To avoid
+     *   confusion in identifying debug exceptions, debug handlers should
+     *   clear the register (except bit 16, which they should set) before
+     *   returning to the interrupted task.
+     *
+     * The AMD manual says:
+     *   Bits 15:13 of the DR6 register are not cleared by the processor and
+     *   must be cleared by software after the contents have been read.
+     *
+     * Some bits are reserved set, some are reserved clear, and some bits
+     * which were previously reserved set are reused and cleared by hardware.
+     * For future compatibility, reset to the default value, which will allow
+     * us to spot any bit being changed by hardware to its non-default value.
+     */
+    write_debugreg(6, X86_DR6_DEFAULT);
 
     if ( !guest_mode(regs) )
     {
@@ -1814,7 +1839,8 @@ void do_debug(struct cpu_user_regs *regs)
     }
 
     /* Save debug status register where guest OS can peek at it */
-    v->arch.debugreg[6] = read_debugreg(6);
+    v->arch.debugreg[6] |= (dr6 & ~X86_DR6_DEFAULT);
+    v->arch.debugreg[6] &= (dr6 | ~X86_DR6_DEFAULT);
 
     ler_enable();
     pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
