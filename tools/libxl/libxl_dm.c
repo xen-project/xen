@@ -808,51 +808,35 @@ enum {
 static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
                                          int unit, const char *format,
                                          const libxl_device_disk *disk,
-                                         int colo_mode)
+                                         int colo_mode, const char **id_ptr)
 {
     char *drive = NULL;
     const char *exportname = disk->colo_export;
     const char *active_disk = disk->active_disk;
     const char *hidden_disk = disk->hidden_disk;
+    const char *id;
 
     switch (colo_mode) {
     case LIBXL__COLO_NONE:
-        drive = libxl__sprintf
-            (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
-             target_path, unit, format);
+        id = GCSPRINTF("scsi0-hd%d", unit);
+        drive = GCSPRINTF("file=%s,if=none,id=%s,format=%s,cache=writeback",
+                          target_path, id, format);
         break;
     case LIBXL__COLO_PRIMARY:
-        /*
-         * primary:
-         *  -dirve if=scsi,bus=0,unit=x,cache=writeback,driver=quorum,\
-         *  id=exportname,\
-         *  children.0.file.filename=target_path,\
-         *  children.0.driver=format,\
-         *  read-pattern=fifo,\
-         *  vote-threshold=1
-         */
+        id = exportname;
         drive = GCSPRINTF(
-            "if=scsi,bus=0,unit=%d,cache=writeback,driver=quorum,"
+            "if=none,cache=writeback,driver=quorum,"
             "id=%s,"
             "children.0.file.filename=%s,"
             "children.0.driver=%s,"
             "read-pattern=fifo,"
             "vote-threshold=1",
-            unit, exportname, target_path, format);
+            id, target_path, format);
         break;
     case LIBXL__COLO_SECONDARY:
-        /*
-         * secondary:
-         *  -drive if=scsi,bus=0,unit=x,cache=writeback,driver=replication,\
-         *  mode=secondary,\
-         *  file.driver=qcow2,\
-         *  file.file.filename=active_disk,\
-         *  file.backing.driver=qcow2,\
-         *  file.backing.file.filename=hidden_disk,\
-         *  file.backing.backing=exportname,
-         */
+        id = "top-colo";
         drive = GCSPRINTF(
-            "if=scsi,id=top-colo,bus=0,unit=%d,cache=writeback,"
+            "if=none,id=%s,cache=writeback,"
             "driver=replication,"
             "mode=secondary,"
             "top-id=top-colo,"
@@ -861,11 +845,13 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
             "file.backing.driver=qcow2,"
             "file.backing.file.filename=%s,"
             "file.backing.backing=%s",
-            unit, active_disk, hidden_disk, exportname);
+            id, active_disk, hidden_disk, exportname);
         break;
     default:
         abort();
     }
+
+    *id_ptr = id;
 
     return drive;
 }
@@ -1103,6 +1089,19 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
         if (b_info->cmdline)
             flexarray_vappend(dm_args, "-append", b_info->cmdline, NULL);
+
+        /* Find out early if one of the disk is on the scsi bus and add a scsi
+         * controller. This is done ahead to keep the same behavior as previous
+         * version of QEMU (have the controller on the same PCI slot). */
+        for (i = 0; i < num_disks; i++) {
+            if (disks[i].is_cdrom) {
+                continue;
+            }
+            if (strncmp(disks[i].vdev, "sd", 2) == 0) {
+                flexarray_vappend(dm_args, "-device", "lsi53c895a", NULL);
+                break;
+            }
+        }
 
         if (b_info->u.hvm.serial || b_info->u.hvm.serial_list) {
             if ( b_info->u.hvm.serial && b_info->u.hvm.serial_list )
@@ -1586,6 +1585,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 }
 
                 if (strncmp(disks[i].vdev, "sd", 2) == 0) {
+                    const char *drive_id;
                     if (colo_mode == LIBXL__COLO_SECONDARY) {
                         drive = libxl__sprintf
                             (gc, "if=none,driver=%s,file=%s,id=%s",
@@ -1597,7 +1597,14 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     drive = qemu_disk_scsi_drive_string(gc, target_path, disk,
                                                         format,
                                                         &disks[i],
-                                                        colo_mode);
+                                                        colo_mode,
+                                                        &drive_id),
+                    flexarray_vappend(dm_args,
+                        "-drive", drive,
+                        "-device", GCSPRINTF("scsi-disk,drive=%s,scsi-id=%d",
+                                             drive_id, disk),
+                        NULL);
+                    continue;
                 } else if (disk < 6 && b_info->u.hvm.hdtype == LIBXL_HDTYPE_AHCI) {
                     if (!disks[i].readwrite) {
                         LOGD(ERROR, guest_domid,
