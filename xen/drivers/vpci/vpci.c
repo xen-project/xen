@@ -320,6 +320,12 @@ uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg, unsigned int size)
     unsigned int data_offset = 0;
     uint32_t data = ~(uint32_t)0;
 
+    if ( !size )
+    {
+        ASSERT_UNREACHABLE();
+        return data;
+    }
+
     /* Find the PCI dev matching the address. */
     pdev = pci_get_pdev_by_domain(d, sbdf.seg, sbdf.bus, sbdf.extfunc);
     if ( !pdev )
@@ -415,6 +421,12 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
     const struct pci_dev *pdev;
     const struct vpci_register *r;
     unsigned int data_offset = 0;
+
+    if ( !size )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
 
     /*
      * Find the PCI dev matching the address.
