@@ -532,9 +532,11 @@ static int flask_domctl_scheduler_op(struct domain *d, int op)
     switch ( op )
     {
     case XEN_DOMCTL_SCHEDOP_putinfo:
+    case XEN_DOMCTL_SCHEDOP_putvcpuinfo:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SETSCHEDULER);
 
     case XEN_DOMCTL_SCHEDOP_getinfo:
+    case XEN_DOMCTL_SCHEDOP_getvcpuinfo:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETSCHEDULER);
 
     default:

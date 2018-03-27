@@ -71,9 +71,9 @@ class xen
     tmem_op
 # XEN_SYSCTL_tmem_op command of tmem (part of sysctl)
     tmem_control
-# XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo, XEN_SYSCTL_sched_id
+# XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo, XEN_SYSCTL_sched_id, XEN_DOMCTL_SCHEDOP_getvcpuinfo
     getscheduler
-# XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo
+# XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo, XEN_DOMCTL_SCHEDOP_putvcpuinfo
     setscheduler
 }
 
