@@ -100,15 +100,15 @@ struct vpci {
         /* Data. */
         uint16_t data;
         /* Maximum number of vectors supported by the device. */
-        uint8_t max_vectors : 5;
-        /* Enabled? */
-        bool enabled        : 1;
+        uint8_t max_vectors : 6;
         /* Supports per-vector masking? */
         bool masking        : 1;
         /* 64-bit address capable? */
         bool address64      : 1;
         /* Number of vectors configured. */
-        uint8_t vectors     : 5;
+        uint8_t vectors     : 6;
+        /* Enabled? */
+        bool enabled        : 1;
         /* Arch-specific data. */
         struct vpci_arch_msi arch;
     } *msi;
