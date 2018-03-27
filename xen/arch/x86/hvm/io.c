@@ -511,18 +511,16 @@ int register_vpci_mmcfg_handler(struct domain *d, paddr_t addr,
                                 unsigned int start_bus, unsigned int end_bus,
                                 unsigned int seg)
 {
-    struct hvm_mmcfg *mmcfg, *new = xmalloc(struct hvm_mmcfg);
+    struct hvm_mmcfg *mmcfg, *new;
 
     ASSERT(is_hardware_domain(d));
 
+    if ( start_bus > end_bus )
+        return -EINVAL;
+
+    new = xmalloc(struct hvm_mmcfg);
     if ( !new )
         return -ENOMEM;
-
-    if ( start_bus > end_bus )
-    {
-        xfree(new);
-        return -EINVAL;
-    }
 
     new->addr = addr + (start_bus << 20);
     new->start_bus = start_bus;
