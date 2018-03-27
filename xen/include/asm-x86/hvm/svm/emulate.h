@@ -38,6 +38,7 @@ enum instruction_index {
     INSTR_STGI,
     INSTR_CLGI,
     INSTR_INVLPGA,
+    INSTR_ICEBP,
     INSTR_MAX_COUNT /* Must be last - Number of instructions supported */
 };
 

@@ -65,6 +65,7 @@ static const struct {
 } opc_tab[INSTR_MAX_COUNT] = {
     [INSTR_PAUSE]   = { X86EMUL_OPC_F3(0, 0x90) },
     [INSTR_INT3]    = { X86EMUL_OPC(   0, 0xcc) },
+    [INSTR_ICEBP]   = { X86EMUL_OPC(   0, 0xf1) },
     [INSTR_HLT]     = { X86EMUL_OPC(   0, 0xf4) },
     [INSTR_XSETBV]  = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 2, 1) },
     [INSTR_VMRUN]   = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 0) },

@@ -209,6 +209,7 @@ struct hvm_function_table {
                                 bool_t access_w, bool_t access_x);
 
     void (*enable_msr_interception)(struct domain *d, uint32_t msr);
+    void (*set_icebp_interception)(struct domain *d, bool enable);
     bool_t (*is_singlestep_supported)(void);
 
     /* Alternate p2m */
@@ -407,6 +408,20 @@ void hvm_migrate_pirqs(struct vcpu *v);
 
 void hvm_inject_event(const struct x86_event *event);
 
+static inline void hvm_inject_exception(
+    unsigned int vector, unsigned int type,
+    unsigned int insn_len, int error_code)
+{
+    struct x86_event event = {
+        .vector = vector,
+        .type = type,
+        .insn_len = insn_len,
+        .error_code = error_code,
+    };
+
+    hvm_inject_event(&event);
+}
+
 static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
 {
     struct x86_event event = {
@@ -579,6 +594,16 @@ static inline bool_t hvm_enable_msr_interception(struct domain *d, uint32_t msr)
     }
 
     return 0;
+}
+
+static inline bool hvm_set_icebp_interception(struct domain *d, bool enable)
+{
+    if ( hvm_funcs.set_icebp_interception )
+    {
+        hvm_funcs.set_icebp_interception(d, enable);
+        return true;
+    }
+    return false;
 }
 
 static inline bool_t hvm_is_singlestep_supported(void)

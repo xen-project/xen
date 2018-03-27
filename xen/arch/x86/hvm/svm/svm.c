@@ -172,6 +172,24 @@ static void svm_enable_msr_interception(struct domain *d, uint32_t msr)
         svm_intercept_msr(v, msr, MSR_INTERCEPT_WRITE);
 }
 
+static void svm_set_icebp_interception(struct domain *d, bool enable)
+{
+    const struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+    {
+        struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+        uint32_t intercepts = vmcb_get_general2_intercepts(vmcb);
+
+        if ( enable )
+            intercepts |= GENERAL2_INTERCEPT_ICEBP;
+        else
+            intercepts &= ~GENERAL2_INTERCEPT_ICEBP;
+
+        vmcb_set_general2_intercepts(vmcb, intercepts);
+    }
+}
+
 static void svm_save_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -1109,7 +1127,8 @@ static void noreturn svm_do_resume(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     bool debug_state = (v->domain->debugger_attached ||
-                        v->domain->arch.monitor.software_breakpoint_enabled);
+                        v->domain->arch.monitor.software_breakpoint_enabled ||
+                        v->domain->arch.monitor.debug_exception_enabled);
     bool_t vcpu_guestmode = 0;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
@@ -2438,19 +2457,6 @@ static bool svm_get_pending_event(struct vcpu *v, struct x86_event *info)
     return true;
 }
 
-static void svm_propagate_intr(struct vcpu *v, unsigned long insn_len)
-{
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    struct x86_event event = {
-        .vector = vmcb->eventinj.fields.type,
-        .type = vmcb->eventinj.fields.type,
-        .error_code = vmcb->exitinfo1,
-    };
-
-    event.insn_len = insn_len;
-    hvm_inject_event(&event);
-}
-
 static struct hvm_function_table __initdata svm_function_table = {
     .name                 = "SVM",
     .cpu_up_prepare       = svm_cpu_up_prepare,
@@ -2490,6 +2496,7 @@ static struct hvm_function_table __initdata svm_function_table = {
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
     .enable_msr_interception = svm_enable_msr_interception,
+    .set_icebp_interception = svm_set_icebp_interception,
     .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
     .set_descriptor_access_exiting = svm_set_descriptor_access_exiting,
     .get_insn_bytes       = svm_get_insn_bytes,
@@ -2656,9 +2663,33 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         HVMTRACE_0D(SMI);
         break;
 
+    case VMEXIT_ICEBP:
     case VMEXIT_EXCEPTION_DB:
         if ( !v->domain->debugger_attached )
-            hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        {
+            int rc;
+            unsigned int trap_type;
+
+            if ( likely(exit_reason != VMEXIT_ICEBP) )
+            {
+                trap_type = X86_EVENTTYPE_HW_EXCEPTION;
+                inst_len = 0;
+            }
+            else
+            {
+                trap_type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
+                inst_len = __get_instruction_length(v, INSTR_ICEBP);
+            }
+
+            rc = hvm_monitor_debug(regs->rip,
+                                   HVM_MONITOR_DEBUG_EXCEPTION,
+                                   trap_type, inst_len);
+            if ( rc < 0 )
+                goto unexpected_exit_type;
+            if ( !rc )
+                hvm_inject_exception(TRAP_debug,
+                                     trap_type, inst_len, X86_EVENT_NO_EC);
+        }
         else
             domain_pause_for_debugger();
         break;
@@ -2687,7 +2718,9 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
            if ( rc < 0 )
                goto unexpected_exit_type;
            if ( !rc )
-               svm_propagate_intr(v, inst_len);
+               hvm_inject_exception(TRAP_int3,
+                                    X86_EVENTTYPE_SW_EXCEPTION,
+                                    inst_len, X86_EVENT_NO_EC);
         }
         break;
 
