@@ -280,9 +280,7 @@ MINIOS_UPSTREAM_REVISION ?= 0b4b7897e08b967a09bed2028a79fabff82342dd
 # Mon Oct 16 16:36:41 2017 +0100
 # Update Xen header files again
 
-SEABIOS_UPSTREAM_REVISION ?= rel-1.10.2
-# Wed Jun 22 14:53:24 2016 +0800
-# fw/msr_feature_control: add support to set MSR_IA32_FEATURE_CONTROL
+SEABIOS_UPSTREAM_REVISION ?= rel-1.11.1
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
