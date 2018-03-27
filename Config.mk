@@ -276,9 +276,9 @@ MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 947f3737abf65fda63f3ffd97fddfa6986986868
 QEMU_UPSTREAM_REVISION ?= master
-MINIOS_UPSTREAM_REVISION ?= 0b4b7897e08b967a09bed2028a79fabff82342dd
-# Mon Oct 16 16:36:41 2017 +0100
-# Update Xen header files again
+MINIOS_UPSTREAM_REVISION ?= 48d3b31ce47156d92255a2fe98334dd15a42a097
+# Tue Mar 27 08:54:20 2018 -0700
+# Save/Restore Support: Add fini_shutdown call to app exit flow.
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.11.1
 
