@@ -624,6 +624,7 @@ void msix_write_completion(struct vcpu *v)
         gdprintk(XENLOG_WARNING, "MSI-X write completion failure\n");
 }
 
+#ifdef CONFIG_HAS_VPCI
 static unsigned int msi_gflags(uint16_t data, uint64_t addr, bool masked)
 {
     /*
@@ -867,3 +868,4 @@ int vpci_msix_arch_print(const struct vpci_msix *msix)
 
     return 0;
 }
+#endif /* CONFIG_HAS_VPCI */

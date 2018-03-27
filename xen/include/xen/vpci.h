@@ -210,6 +210,32 @@ static inline unsigned int vmsix_entry_nr(const struct vpci_msix *msix,
 
 #else /* !CONFIG_HAS_VPCI */
 struct vpci_vcpu {};
+
+static inline int vpci_add_handlers(struct pci_dev *pdev)
+{
+    return 0;
+}
+
+static inline void vpci_dump_msi(void) { }
+
+static inline uint32_t vpci_read(pci_sbdf_t sbdf, unsigned int reg,
+                                 unsigned int size)
+{
+    ASSERT_UNREACHABLE();
+    return ~(uint32_t)0;
+}
+
+static inline void vpci_write(pci_sbdf_t sbdf, unsigned int reg,
+                              unsigned int size, uint32_t data)
+{
+    ASSERT_UNREACHABLE();
+}
+
+static inline bool vpci_process_pending(struct vcpu *v)
+{
+    ASSERT_UNREACHABLE();
+    return false;
+}
 #endif
 
 #endif
