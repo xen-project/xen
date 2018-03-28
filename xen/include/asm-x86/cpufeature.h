@@ -171,6 +171,7 @@
 /* Intel-defined CPU features, CPUID level 0x00000007:0.edx, word 9 */
 #define X86_FEATURE_IBRSB	(9*32+26) /* IBRS and IBPB support (used by Intel) */
 #define X86_FEATURE_STIBP	(9*32+27) /* STIBP */
+#define X86_FEATURE_L1D_FLUSH	(9*32+28) /* MSR_FLUSH_CMD and L1D flush */
 #define X86_FEATURE_ARCH_CAPS	(9*32+29) /* IA32_ARCH_CAPABILITIES MSR */
 #define X86_FEATURE_SSBD	(9*32+31) /* MSR_SPEC_CTRL.SSBD available */
 

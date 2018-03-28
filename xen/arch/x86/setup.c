@@ -148,6 +148,11 @@ static int __init parse_xen_cpuid(const char *s)
             if ( !val )
                 setup_clear_cpu_cap(X86_FEATURE_SSBD);
         }
+        else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_L1D_FLUSH);
+        }
         else
             rc = -EINVAL;
 
