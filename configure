@@ -595,6 +595,7 @@ tools
 xen
 subdirs
 githttp
+DEBUG_DIR
 XEN_DUMP_DIR
 XEN_PAGING_DIR
 XEN_LOCK_DIR
@@ -671,6 +672,7 @@ with_sysconfig_leaf_dir
 with_libexec_leaf_dir
 with_xen_dumpdir
 with_rundir
+with_debugdir
 enable_githttp
 enable_xen
 enable_tools
@@ -1330,6 +1332,8 @@ Optional Packages:
                           [LOCALSTATEDIR/lib/xen/dump]
   --with-rundir=DIR       Path to directory for runtime data.
                           [LOCALSTATEDIR/run]
+  --with-debugdir=DIR     Path to directory for debug symbols.
+                          [PREFIX/lib/debug]
 
 Report bugs to <xen-devel@lists.xen.org>.
 Xen Hypervisor home page: <http://www.xen.org/>.
@@ -1991,6 +1995,15 @@ else
 fi
 
 
+
+# Check whether --with-debugdir was given.
+if test "${with_debugdir+set}" = set; then :
+  withval=$with_debugdir; debugdir_path=$withval
+else
+  debugdir_path=$prefix/lib/debug
+fi
+
+
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     case "$host_os" in
          *netbsd*) ;;
@@ -2052,6 +2065,9 @@ XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 
 
 XEN_DUMP_DIR=$xen_dumpdir_path
+
+
+DEBUG_DIR=$debugdir_path
 
 
 

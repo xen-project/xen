@@ -51,6 +51,7 @@ BASH_COMPLETION_DIR      := $(CONFIG_DIR)/bash_completion.d
 XEN_LOCK_DIR             := @XEN_LOCK_DIR@
 XEN_PAGING_DIR           := @XEN_PAGING_DIR@
 XEN_DUMP_DIR             := @XEN_DUMP_DIR@
+DEBUG_DIR                := @DEBUG_DIR@
 
 XENFIRMWAREDIR           := @XENFIRMWAREDIR@
 

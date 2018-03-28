@@ -710,6 +710,7 @@ ocamltools
 monitors
 githttp
 rpath
+DEBUG_DIR
 XEN_DUMP_DIR
 XEN_PAGING_DIR
 XEN_LOCK_DIR
@@ -796,6 +797,7 @@ with_sysconfig_leaf_dir
 with_libexec_leaf_dir
 with_xen_dumpdir
 with_rundir
+with_debugdir
 enable_rpath
 enable_githttp
 enable_monitors
@@ -1510,6 +1512,8 @@ Optional Packages:
                           [LOCALSTATEDIR/lib/xen/dump]
   --with-rundir=DIR       Path to directory for runtime data.
                           [LOCALSTATEDIR/run]
+  --with-debugdir=DIR     Path to directory for debug symbols.
+                          [PREFIX/lib/debug]
   --with-linux-backend-modules="mod1 mod2"
                           List of Linux backend module or modalias names to be
                           autoloaded on startup.
@@ -3941,6 +3945,15 @@ else
 fi
 
 
+
+# Check whether --with-debugdir was given.
+if test "${with_debugdir+set}" = set; then :
+  withval=$with_debugdir; debugdir_path=$withval
+else
+  debugdir_path=$prefix/lib/debug
+fi
+
+
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     case "$host_os" in
          *netbsd*) ;;
@@ -4002,6 +4015,9 @@ XEN_PAGING_DIR=$localstatedir/lib/xen/xenpaging
 
 
 XEN_DUMP_DIR=$xen_dumpdir_path
+
+
+DEBUG_DIR=$debugdir_path
 
 
 

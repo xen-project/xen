@@ -82,6 +82,12 @@ AC_ARG_WITH([rundir],
     [rundir_path=$withval],
     [rundir_path=$localstatedir/run])
 
+AC_ARG_WITH([debugdir],
+    AS_HELP_STRING([--with-debugdir=DIR],
+    [Path to directory for debug symbols. [PREFIX/lib/debug]]),
+    [debugdir_path=$withval],
+    [debugdir_path=$prefix/lib/debug])
+
 if test "$libexecdir" = '${exec_prefix}/libexec' ; then
     case "$host_os" in
          *netbsd*) ;;
@@ -146,6 +152,9 @@ AC_SUBST(XEN_PAGING_DIR)
 
 XEN_DUMP_DIR=$xen_dumpdir_path
 AC_SUBST(XEN_DUMP_DIR)
+
+DEBUG_DIR=$debugdir_path
+AC_SUBST(DEBUG_DIR)
 ])
 
 case "$host_os" in
