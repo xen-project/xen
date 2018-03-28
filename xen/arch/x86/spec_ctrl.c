@@ -216,7 +216,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (caps & ARCH_CAPABILITIES_IBRS_ALL)      ? " IBRS_ALL"  : "",
            (caps & ARCH_CAPABILITIES_RDCL_NO)       ? " RDCL_NO"   : "",
            (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "",
-           (caps & ARCH_CAPS_SSBD_NO)               ? " SSBD_NO"   : "");
+           (caps & ARCH_CAPS_SSB_NO)                ? " SSB_NO"    : "");
 
     /* Compiled-in support which pertains to BTI mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )
