@@ -1666,21 +1666,11 @@ static int bootlate_hvm(struct xc_dom_image *dom)
     uint32_t domid = dom->guest_domid;
     xc_interface *xch = dom->xch;
     struct hvm_start_info *start_info;
-    size_t start_info_size;
     struct hvm_modlist_entry *modlist;
     unsigned int i;
 
-    start_info_size = sizeof(*start_info) + dom->cmdline_size;
-    start_info_size += sizeof(struct hvm_modlist_entry) * dom->num_modules;
-
-    if ( start_info_size >
-         dom->start_info_seg.pages << XC_DOM_PAGE_SHIFT(dom) )
-    {
-        DOMPRINTF("Trying to map beyond start_info_seg");
-        return -1;
-    }
-
-    start_info = xc_map_foreign_range(xch, domid, start_info_size,
+    start_info = xc_map_foreign_range(xch, domid, dom->start_info_seg.pages <<
+                                                  XC_DOM_PAGE_SHIFT(dom),
                                       PROT_READ | PROT_WRITE,
                                       dom->start_info_seg.pfn);
     if ( start_info == NULL )
@@ -1733,7 +1723,7 @@ static int bootlate_hvm(struct xc_dom_image *dom)
 
     start_info->magic = XEN_HVM_START_MAGIC_VALUE;
 
-    munmap(start_info, start_info_size);
+    munmap(start_info, dom->start_info_seg.pages << XC_DOM_PAGE_SHIFT(dom));
 
     if ( dom->device_model )
     {
