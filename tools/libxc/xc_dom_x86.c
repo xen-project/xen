@@ -1653,10 +1653,9 @@ static void add_module_to_list(struct xc_dom_image *dom,
                < HVMLOADER_MODULE_CMDLINE_SIZE);
         strncpy(modules_cmdline_start + HVMLOADER_MODULE_CMDLINE_SIZE * index,
                 cmdline, HVMLOADER_MODULE_CMDLINE_SIZE);
+        modlist[index].cmdline_paddr = modules_cmdline_paddr +
+                                       HVMLOADER_MODULE_CMDLINE_SIZE * index;
     }
-
-    modlist[index].cmdline_paddr =
-        modules_cmdline_paddr + HVMLOADER_MODULE_CMDLINE_SIZE * index;
 
     start_info->nr_modules++;
 }
