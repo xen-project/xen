@@ -165,7 +165,7 @@ static const char *str_7d0[32] =
     [4 ... 25] = "REZ",
 
     [26] = "ibrsb",         [27] = "stibp",
-    [28] = "REZ",           [29] = "arch_caps",
+    [28] = "l1d_flush",     [29] = "arch_caps",
     [30] = "REZ",           [31] = "ssbd",
 };
 
