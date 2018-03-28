@@ -249,14 +249,16 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     printk("Speculative mitigation facilities:\n");
 
     /* Hardware features which pertain to speculative mitigations. */
-    printk("  Hardware features:%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s\n",
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
+           (_7d0 & cpufeat_mask(X86_FEATURE_L1D_FLUSH)) ? " L1D_FLUSH" : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_SSBD))  ? " SSBD"      : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "",
            (caps & ARCH_CAPABILITIES_IBRS_ALL)      ? " IBRS_ALL"  : "",
            (caps & ARCH_CAPABILITIES_RDCL_NO)       ? " RDCL_NO"   : "",
            (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "",
+           (caps & ARCH_CAPS_SKIP_L1DFL)            ? " SKIP_L1DFL": "",
            (caps & ARCH_CAPS_SSB_NO)                ? " SSB_NO"    : "");
 
     /* Compiled-in support which pertains to mitigations. */

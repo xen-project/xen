@@ -160,6 +160,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"fpu",          0x00000001, NA, CPUID_REG_EDX,  0,  1},
         {"ibrsb",        0x00000007,  0, CPUID_REG_EDX, 26,  1},
         {"stibp",        0x00000007,  0, CPUID_REG_EDX, 27,  1},
+        {"l1d-flush",    0x00000007,  0, CPUID_REG_EDX, 28,  1},
         {"arch-caps",    0x00000007,  0, CPUID_REG_EDX, 29,  1},
         {"ssbd",         0x00000007,  0, CPUID_REG_EDX, 31,  1},
         {"topoext",      0x80000001, NA, CPUID_REG_ECX, 22,  1},
