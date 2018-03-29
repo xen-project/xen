@@ -790,6 +790,12 @@ libxl_device_p9 = Struct("device_p9", [
     ("devid",            libxl_devid),
 ])
 
+libxl_device_pvcallsif = Struct("device_pvcallsif", [
+    ("backend_domid",    libxl_domid),
+    ("backend_domname",  string),
+    ("devid",            libxl_devid),
+])
+
 libxl_device_channel = Struct("device_channel", [
     ("backend_domid", libxl_domid),
     ("backend_domname", string),
@@ -829,6 +835,7 @@ libxl_domain_config = Struct("domain_config", [
     ("vkbs", Array(libxl_device_vkb, "num_vkbs")),
     ("vtpms", Array(libxl_device_vtpm, "num_vtpms")),
     ("p9s", Array(libxl_device_p9, "num_p9s")),
+    ("pvcallsifs", Array(libxl_device_pvcallsif, "num_pvcallsifs")),
     ("vdispls", Array(libxl_device_vdispl, "num_vdispls")),
     # a channel manifests as a console with a name,
     # see docs/misc/channels.txt

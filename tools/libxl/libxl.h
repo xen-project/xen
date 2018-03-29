@@ -2013,6 +2013,16 @@ int libxl_device_p9_destroy(libxl_ctx *ctx, uint32_t domid,
                             const libxl_asyncop_how *ao_how)
                             LIBXL_EXTERNAL_CALLERS_ONLY;
 
+/* pvcalls interface */
+int libxl_device_pvcallsif_remove(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_device_pvcallsif *pvcallsif,
+                                  const libxl_asyncop_how *ao_how)
+                                  LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_device_pvcallsif_destroy(libxl_ctx *ctx, uint32_t domid,
+                                   libxl_device_pvcallsif *pvcallsif,
+                                   const libxl_asyncop_how *ao_how)
+                                   LIBXL_EXTERNAL_CALLERS_ONLY;
+
 /* PCI Passthrough */
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
                          libxl_device_pci *pcidev,

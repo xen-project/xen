@@ -860,7 +860,7 @@ void parse_config_data(const char *config_source,
     long l, vcpus = 0;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms,
-                   *usbctrls, *usbdevs, *p9devs, *vdispls;
+                   *usbctrls, *usbdevs, *p9devs, *vdispls, *pvcallsifs_devs;
     XLU_ConfigList *channels, *ioports, *irqs, *iomem, *viridian, *dtdevs,
                    *mca_caps;
     int num_ioports, num_irqs, num_iomem, num_cpus, num_viridian, num_mca_caps;
@@ -1688,6 +1688,41 @@ void parse_config_data(const char *config_source,
                 fprintf(stderr, "At least one connector should be specified.\n");
                 exit(1);
             }
+        }
+    }
+
+    if (!xlu_cfg_get_list(config, "pvcalls", &pvcallsifs_devs, 0, 0)) {
+        d_config->num_pvcallsifs = 0;
+        d_config->pvcallsifs = NULL;
+        while ((buf = xlu_cfg_get_listitem (pvcallsifs_devs, d_config->num_pvcallsifs)) != NULL) {
+            libxl_device_pvcallsif *pvcallsif;
+            char *backend = NULL;
+            char *p, *p2, *buf2;
+            pvcallsif = ARRAY_EXTEND_INIT(d_config->pvcallsifs,
+                                          d_config->num_pvcallsifs,
+                                          libxl_device_pvcallsif_init);
+
+            buf2 = strdup(buf);
+            p = strtok(buf2, ",");
+            if (p) {
+               do {
+                  while (*p == ' ')
+                     ++p;
+                  if ((p2 = strchr(p, '=')) == NULL)
+                     break;
+                  *p2 = '\0';
+                  if(!strcmp(p, "backend")) {
+                     backend = strdup(p2 + 1);
+                  } else {
+                     fprintf(stderr, "Unknown string `%s' in pvcalls spec\n", p);
+                     exit(1);
+                  }
+               } while ((p = strtok(NULL, ",")) != NULL);
+            }
+            free(buf2);
+
+            if (backend)
+                    replace_string(&pvcallsif->backend_domname, backend);
         }
     }
 

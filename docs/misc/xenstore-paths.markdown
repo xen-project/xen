@@ -299,6 +299,11 @@ A virtual scsi device frontend. Described by
 A virtual usb device frontend. Described by
 [xen/include/public/io/usbif.h][USBIF]
 
+#### ~/device/pvcalls/$DEVID/* []
+
+Paravirtualized POSIX function calls frontend. Described by
+[docs/misc/pvcalls.markdown][PVCALLS]
+
 #### ~/console/* []
 
 The primary PV console device. Described in [console.txt](console.txt)
@@ -377,6 +382,10 @@ A PV SCSI backend.
 
 A PV USB backend. Described by
 [xen/include/public/io/usbif.h][USBIF]
+
+#### ~/backend/pvcalls/$DOMID/$DEVID/* []
+
+A PVCalls backend. Described in [docs/misc/pvcalls.markdown][PVCALLS].
 
 #### ~/backend/console/$DOMID/$DEVID/* []
 
