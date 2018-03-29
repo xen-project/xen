@@ -33,7 +33,7 @@ x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
 # x86-emulate.c will be implicit for both
 x86-emulate.o x86-emulate-cov.o: x86_emulate/x86_emulate.c $(x86_emulate.h)
 
-fuzz-emul.o fuzz-emulate-cov.o: $(x86_emulate.h)
+fuzz-emul.o fuzz-emulate-cov.o wrappers.o: $(x86_emulate.h)
 
 x86-insn-fuzzer.a: fuzz-emul.o x86-emulate.o
 	$(AR) rc $@ $^
