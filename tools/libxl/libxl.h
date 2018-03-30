@@ -1127,6 +1127,13 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_PV_SHIM 1
 
+/*
+ * LIBXL_HAVE_PVCALLS
+ *
+ * If this is defined, libxl supports creating pvcalls interfaces.
+ */
+#define LIBXL_HAVE_PVCALLS 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);

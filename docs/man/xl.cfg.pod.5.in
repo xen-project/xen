@@ -685,6 +685,13 @@ Specify the backend domain name or id, defaults to dom0.
 
 =back
 
+=item B<pvcalls=[ "backend=domain-id", ... ]>
+
+Creates a Xen pvcalls connection to handle pvcalls requests from
+frontend to backend. It can be used as an alternative networking model.
+For more information about the protocol, see
+https://xenbits.xen.org/docs/unstable/misc/pvcalls.html.
+
 =item B<vfb=[ "VFB_SPEC_STRING", "VFB_SPEC_STRING", ...]>
 
 Specifies the paravirtual framebuffer devices which should be supplied
