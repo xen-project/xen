@@ -74,6 +74,8 @@
 #include <public/arch-x86/cpuid.h>
 #include <asm/cpuid.h>
 
+#include <compat/hvm/hvm_op.h>
+
 bool_t __read_mostly hvm_enabled;
 
 #ifdef DBG_LEVEL_0
@@ -4507,8 +4509,10 @@ static int do_altp2m_op(
     case HVMOP_altp2m_destroy_p2m:
     case HVMOP_altp2m_switch_p2m:
     case HVMOP_altp2m_set_mem_access:
+    case HVMOP_altp2m_set_mem_access_multi:
     case HVMOP_altp2m_change_gfn:
         break;
+
     default:
         return -EOPNOTSUPP;
     }
@@ -4630,6 +4634,39 @@ static int do_altp2m_op(
                                     a.u.set_mem_access.view);
         break;
 
+    case HVMOP_altp2m_set_mem_access_multi:
+        if ( a.u.set_mem_access_multi.pad ||
+             a.u.set_mem_access_multi.opaque > a.u.set_mem_access_multi.nr )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        /*
+         * Unlike XENMEM_access_op_set_access_multi, we don't need any bits of
+         * the 'continuation' counter to be zero (to stash a command in).
+         * However, 0x40 is a good 'stride' to make sure that we make
+         * a reasonable amount of forward progress before yielding,
+         * so use a mask of 0x3F here.
+         */
+        rc = p2m_set_mem_access_multi(d, a.u.set_mem_access_multi.pfn_list,
+                                      a.u.set_mem_access_multi.access_list,
+                                      a.u.set_mem_access_multi.nr,
+                                      a.u.set_mem_access_multi.opaque,
+                                      0x3F,
+                                      a.u.set_mem_access_multi.view);
+        if ( rc > 0 )
+        {
+            a.u.set_mem_access_multi.opaque = rc;
+            if ( __copy_field_to_guest(guest_handle_cast(arg, xen_hvm_altp2m_op_t),
+                                       &a, u.set_mem_access_multi.opaque) )
+                rc = -EFAULT;
+            else
+                rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",
+                                                   HVMOP_altp2m, arg);
+        }
+        break;
+
     case HVMOP_altp2m_change_gfn:
         if ( a.u.change_gfn.pad1 || a.u.change_gfn.pad2 )
             rc = -EINVAL;
@@ -4644,6 +4681,110 @@ static int do_altp2m_op(
 
  out:
     rcu_unlock_domain(d);
+
+    return rc;
+}
+
+DEFINE_XEN_GUEST_HANDLE(compat_hvm_altp2m_op_t);
+
+/*
+ * Manually define the CHECK_ macros for hvm_altp2m_op and
+ * hvm_altp2m_set_mem_access_multi as the generated versions can't handle
+ * correctly the translation of all fields from compat_(*) to xen_(*).
+ */
+#ifndef CHECK_hvm_altp2m_op
+#define CHECK_hvm_altp2m_op \
+    CHECK_SIZE_(struct, hvm_altp2m_op); \
+    CHECK_FIELD_(struct, hvm_altp2m_op, version); \
+    CHECK_FIELD_(struct, hvm_altp2m_op, cmd); \
+    CHECK_FIELD_(struct, hvm_altp2m_op, domain); \
+    CHECK_FIELD_(struct, hvm_altp2m_op, pad1); \
+    CHECK_FIELD_(struct, hvm_altp2m_op, pad2)
+#endif /* CHECK_hvm_altp2m_op */
+
+#ifndef CHECK_hvm_altp2m_set_mem_access_multi
+#define CHECK_hvm_altp2m_set_mem_access_multi \
+    CHECK_FIELD_(struct, hvm_altp2m_set_mem_access_multi, view); \
+    CHECK_FIELD_(struct, hvm_altp2m_set_mem_access_multi, pad); \
+    CHECK_FIELD_(struct, hvm_altp2m_set_mem_access_multi, nr); \
+    CHECK_FIELD_(struct, hvm_altp2m_set_mem_access_multi, opaque)
+#endif /* CHECK_hvm_altp2m_set_mem_access_multi */
+
+CHECK_hvm_altp2m_op;
+CHECK_hvm_altp2m_set_mem_access_multi;
+
+static int compat_altp2m_op(
+    XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    int rc = 0;
+    struct compat_hvm_altp2m_op a;
+    union
+    {
+        XEN_GUEST_HANDLE_PARAM(void) hnd;
+        struct xen_hvm_altp2m_op *altp2m_op;
+    } nat;
+
+    if ( !hvm_altp2m_supported() )
+        return -EOPNOTSUPP;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.pad1 || a.pad2 ||
+         (a.version != HVMOP_ALTP2M_INTERFACE_VERSION) )
+        return -EINVAL;
+
+    set_xen_guest_handle(nat.hnd, COMPAT_ARG_XLAT_VIRT_BASE);
+
+    switch ( a.cmd )
+    {
+    case HVMOP_altp2m_set_mem_access_multi:
+#define XLAT_hvm_altp2m_set_mem_access_multi_HNDL_pfn_list(_d_, _s_); \
+        guest_from_compat_handle((_d_)->pfn_list, (_s_)->pfn_list)
+#define XLAT_hvm_altp2m_set_mem_access_multi_HNDL_access_list(_d_, _s_); \
+        guest_from_compat_handle((_d_)->access_list, (_s_)->access_list)
+        XLAT_hvm_altp2m_set_mem_access_multi(&nat.altp2m_op->u.set_mem_access_multi,
+                                             &a.u.set_mem_access_multi);
+#undef XLAT_hvm_altp2m_set_mem_access_multi_HNDL_pfn_list
+#undef XLAT_hvm_altp2m_set_mem_access_multi_HNDL_access_list
+        break;
+
+    default:
+        return do_altp2m_op(arg);
+    }
+
+    /* Manually fill the common part of the xen_hvm_altp2m_op structure. */
+    nat.altp2m_op->version  = a.version;
+    nat.altp2m_op->cmd      = a.cmd;
+    nat.altp2m_op->domain   = a.domain;
+    nat.altp2m_op->pad1     = a.pad1;
+    nat.altp2m_op->pad2     = a.pad2;
+
+    rc = do_altp2m_op(nat.hnd);
+
+    switch ( a.cmd )
+    {
+    case HVMOP_altp2m_set_mem_access_multi:
+        /*
+         * The return code can be positive only if it is the return value
+         * of hypercall_create_continuation. In this case, the opaque value
+         * must be copied back to the guest.
+         */
+        if ( rc > 0 )
+        {
+            ASSERT(rc == __HYPERVISOR_hvm_op);
+            a.u.set_mem_access_multi.opaque =
+                nat.altp2m_op->u.set_mem_access_multi.opaque;
+            if ( __copy_field_to_guest(guest_handle_cast(arg,
+                                                         compat_hvm_altp2m_op_t),
+                                       &a, u.set_mem_access_multi.opaque) )
+                rc = -EFAULT;
+        }
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
 
     return rc;
 }
@@ -4795,7 +4936,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
 
     case HVMOP_altp2m:
-        rc = do_altp2m_op(arg);
+        rc = current->hcall_compat ? compat_altp2m_op(arg) : do_altp2m_op(arg);
         break;
 
     default:

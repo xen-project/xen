@@ -213,3 +213,44 @@ int xc_altp2m_change_gfn(xc_interface *handle, uint32_t domid,
     return rc;
 }
 
+int xc_altp2m_set_mem_access_multi(xc_interface *xch, uint32_t domid,
+                                   uint16_t view_id, uint8_t *access,
+                                   uint64_t *gfns, uint32_t nr)
+{
+    int rc;
+
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_altp2m_op_t, arg);
+    DECLARE_HYPERCALL_BOUNCE(access, nr * sizeof(*access),
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(gfns, nr * sizeof(*gfns),
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_ALTP2M_INTERFACE_VERSION;
+    arg->cmd = HVMOP_altp2m_set_mem_access_multi;
+    arg->domain = domid;
+    arg->u.set_mem_access_multi.view = view_id;
+    arg->u.set_mem_access_multi.nr = nr;
+
+    if ( xc_hypercall_bounce_pre(xch, gfns) ||
+         xc_hypercall_bounce_pre(xch, access) )
+    {
+        PERROR("Could not bounce memory for HVMOP_altp2m_set_mem_access_multi");
+        return -1;
+    }
+
+    set_xen_guest_handle(arg->u.set_mem_access_multi.pfn_list, gfns);
+    set_xen_guest_handle(arg->u.set_mem_access_multi.access_list, access);
+
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
+    xc_hypercall_buffer_free(xch, arg);
+    xc_hypercall_bounce_post(xch, access);
+    xc_hypercall_bounce_post(xch, gfns);
+
+    return rc;
+}

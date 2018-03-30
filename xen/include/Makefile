@@ -26,8 +26,9 @@ headers-$(CONFIG_X86)     += compat/arch-x86/pmu.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen-mca.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen.h
 headers-$(CONFIG_X86)     += compat/arch-x86/xen-$(compat-arch-y).h
-headers-$(CONFIG_X86)     += compat/hvm/hvm_vcpu.h
 headers-$(CONFIG_X86)     += compat/hvm/dm_op.h
+headers-$(CONFIG_X86)     += compat/hvm/hvm_op.h
+headers-$(CONFIG_X86)     += compat/hvm/hvm_vcpu.h
 headers-y                 += compat/arch-$(compat-arch-y).h compat/pmu.h compat/xlat.h
 headers-$(CONFIG_FLASK)   += compat/xsm/flask_op.h
 
