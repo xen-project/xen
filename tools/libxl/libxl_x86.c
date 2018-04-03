@@ -578,6 +578,9 @@ static int domain_construct_memmap(libxl__gc *gc,
         goto out;
     }
 
+    dom->e820 = e820;
+    dom->e820_entries = e820_entries;
+
 out:
     return rc;
 }
