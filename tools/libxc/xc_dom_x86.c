@@ -35,6 +35,8 @@
 #include <xen/arch-x86/hvm/start_info.h>
 #include <xen/io/protocols.h>
 
+#include <xen-tools/libs.h>
+
 #include "xg_private.h"
 #include "xc_dom.h"
 #include "xenctrl.h"
@@ -632,6 +634,9 @@ static int alloc_magic_pages_hvm(struct xc_dom_image *dom)
 
     start_info_size +=
         HVMLOADER_MODULE_CMDLINE_SIZE * HVMLOADER_MODULE_MAX_COUNT;
+
+    start_info_size +=
+        dom->e820_entries * sizeof(struct hvm_memmap_table_entry);
 
     if ( !dom->device_model )
     {
@@ -1665,7 +1670,9 @@ static int bootlate_hvm(struct xc_dom_image *dom)
     uint32_t domid = dom->guest_domid;
     xc_interface *xch = dom->xch;
     struct hvm_start_info *start_info;
+    size_t modsize;
     struct hvm_modlist_entry *modlist;
+    struct hvm_memmap_table_entry *memmap;
     unsigned int i;
 
     start_info = xc_map_foreign_range(xch, domid, dom->start_info_seg.pages <<
@@ -1720,7 +1727,29 @@ static int bootlate_hvm(struct xc_dom_image *dom)
                             ((uintptr_t)modlist - (uintptr_t)start_info);
     }
 
+    /*
+     * Check a couple of XEN_HVM_MEMMAP_TYPEs to verify consistency with
+     * their corresponding e820 numerical values.
+     */
+    BUILD_BUG_ON(XEN_HVM_MEMMAP_TYPE_RAM != E820_RAM);
+    BUILD_BUG_ON(XEN_HVM_MEMMAP_TYPE_ACPI != E820_ACPI);
+
+    modsize = HVMLOADER_MODULE_MAX_COUNT *
+        (sizeof(*modlist) + HVMLOADER_MODULE_CMDLINE_SIZE);
+    memmap = (void*)modlist + modsize;
+
+    start_info->memmap_paddr = (dom->start_info_seg.pfn << PAGE_SHIFT) +
+        ((uintptr_t)modlist - (uintptr_t)start_info) + modsize;
+    start_info->memmap_entries = dom->e820_entries;
+    for ( i = 0; i < dom->e820_entries; i++ )
+    {
+        memmap[i].addr = dom->e820[i].addr;
+        memmap[i].size = dom->e820[i].size;
+        memmap[i].type = dom->e820[i].type;
+    }
+
     start_info->magic = XEN_HVM_START_MAGIC_VALUE;
+    start_info->version = 1;
 
     munmap(start_info, dom->start_info_seg.pages << XC_DOM_PAGE_SHIFT(dom));
 
