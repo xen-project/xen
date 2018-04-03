@@ -1039,7 +1039,8 @@ static void finalise_one_node(libxl__gc *gc, void *fdt, const char *uname,
 }
 
 int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
-                                               libxl_domain_build_info *info,
+                                               uint32_t domid,
+                                               libxl_domain_config *d_config,
                                                struct xc_dom_image *dom)
 {
     void *fdt = dom->devicetree_blob;
@@ -1131,14 +1132,6 @@ int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,
 int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
 {
     return xc_domain_bind_pt_spi_irq(CTX->xch, domid, irq, irq);
-}
-
-int libxl__arch_domain_construct_memmap(libxl__gc *gc,
-                                        libxl_domain_config *d_config,
-                                        uint32_t domid,
-                                        struct xc_dom_image *dom)
-{
-    return 0;
 }
 
 void libxl__arch_domain_build_info_acpi_setdefault(

@@ -488,7 +488,7 @@ int libxl__domain_build(libxl__gc *gc,
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        ret = libxl__build_pv(gc, domid, info, state);
+        ret = libxl__build_pv(gc, domid, d_config, state);
         if (ret)
             goto out;
 

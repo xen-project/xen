@@ -41,7 +41,8 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
 /* finalize arch specific hardware description. */
 _hidden
 int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
-                                      libxl_domain_build_info *info,
+                                      uint32_t domid,
+                                      libxl_domain_config *d_config,
                                       struct xc_dom_image *dom);
 
 /* perform any pending hardware initialization */
@@ -61,13 +62,6 @@ int libxl__arch_vnuma_build_vmemrange(libxl__gc *gc,
 /* arch specific irq map function */
 _hidden
 int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq);
-
-/* arch specific to construct memory mapping function */
-_hidden
-int libxl__arch_domain_construct_memmap(libxl__gc *gc,
-                                        libxl_domain_config *d_config,
-                                        uint32_t domid,
-                                        struct xc_dom_image *dom);
 
 _hidden
 void libxl__arch_domain_build_info_acpi_setdefault(

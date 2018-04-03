@@ -698,9 +698,10 @@ static int set_vnuma_info(libxl__gc *gc, uint32_t domid,
 }
 
 static int libxl__build_dom(libxl__gc *gc, uint32_t domid,
-             libxl_domain_build_info *info, libxl__domain_build_state *state,
+             libxl_domain_config *d_config, libxl__domain_build_state *state,
              struct xc_dom_image *dom)
 {
+    libxl_domain_build_info *const info = &d_config->b_info;
     uint64_t mem_kb;
     int ret;
 
@@ -733,7 +734,7 @@ static int libxl__build_dom(libxl__gc *gc, uint32_t domid,
         LOGE(ERROR, "xc_dom_boot_mem_init failed");
         goto out;
     }
-    if ( (ret = libxl__arch_domain_finalise_hw_description(gc, info, dom)) != 0 ) {
+    if ( (ret = libxl__arch_domain_finalise_hw_description(gc, domid, d_config, dom)) != 0 ) {
         LOGE(ERROR, "libxl__arch_domain_finalise_hw_description failed");
         goto out;
     }
@@ -759,9 +760,10 @@ out:
 }
 
 int libxl__build_pv(libxl__gc *gc, uint32_t domid,
-             libxl_domain_build_info *info, libxl__domain_build_state *state)
+             libxl_domain_config *d_config, libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    libxl_domain_build_info *const info = &d_config->b_info;
     struct xc_dom_image *dom;
     int ret;
     int flags = 0;
@@ -847,7 +849,7 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
             dom->vnode_to_pnode[i] = info->vnuma_nodes[i].pnode;
     }
 
-    ret = libxl__build_dom(gc, domid, info, state, dom);
+    ret = libxl__build_dom(gc, domid, d_config, state, dom);
     if (ret != 0)
         goto out;
 
@@ -1293,15 +1295,9 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
             dom->vnode_to_pnode[i] = info->vnuma_nodes[i].pnode;
     }
 
-    rc = libxl__build_dom(gc, domid, info, state, dom);
+    rc = libxl__build_dom(gc, domid, d_config, state, dom);
     if (rc != 0)
         goto out;
-
-    rc = libxl__arch_domain_construct_memmap(gc, d_config, domid, dom);
-    if (rc != 0) {
-        LOG(ERROR, "setting domain memory map failed");
-        goto out;
-    }
 
     rc = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
                                &state->store_mfn, state->console_port,

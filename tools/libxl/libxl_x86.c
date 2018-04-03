@@ -373,21 +373,6 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
     return 0;
 }
 
-int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
-                                               libxl_domain_build_info *info,
-                                               struct xc_dom_image *dom)
-{
-    int rc = 0;
-
-    if (info->type == LIBXL_DOMAIN_TYPE_PVH) {
-        rc = libxl__dom_load_acpi(gc, info, dom);
-        if (rc != 0)
-            LOGE(ERROR, "libxl_dom_load_acpi failed");
-    }
-
-    return rc;
-}
-
 int libxl__arch_build_dom_finish(libxl__gc *gc,
                                  libxl_domain_build_info *info,
                                  struct xc_dom_image *dom,
@@ -506,10 +491,10 @@ int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
  * to adjust them. Please refer to libxl__domain_device_construct_rdm().
  */
 #define GUEST_LOW_MEM_START_DEFAULT 0x100000
-int libxl__arch_domain_construct_memmap(libxl__gc *gc,
-                                        libxl_domain_config *d_config,
-                                        uint32_t domid,
-                                        struct xc_dom_image *dom)
+static int domain_construct_memmap(libxl__gc *gc,
+                                   libxl_domain_config *d_config,
+                                   uint32_t domid,
+                                   struct xc_dom_image *dom)
 {
     int rc = 0;
     unsigned int nr = 0, i;
@@ -594,6 +579,32 @@ int libxl__arch_domain_construct_memmap(libxl__gc *gc,
     }
 
 out:
+    return rc;
+}
+
+int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
+                                               uint32_t domid,
+                                               libxl_domain_config *d_config,
+                                               struct xc_dom_image *dom)
+{
+    libxl_domain_build_info *const info = &d_config->b_info;
+    int rc;
+
+    if (info->type == LIBXL_DOMAIN_TYPE_PV)
+        return 0;
+
+    if (info->type == LIBXL_DOMAIN_TYPE_PVH) {
+        rc = libxl__dom_load_acpi(gc, info, dom);
+        if (rc != 0) {
+            LOGE(ERROR, "libxl_dom_load_acpi failed");
+            return rc;
+        }
+    }
+
+    rc = domain_construct_memmap(gc, d_config, domid, dom);
+    if (rc != 0)
+        LOGE(ERROR, "setting domain memory map failed");
+
     return rc;
 }
 

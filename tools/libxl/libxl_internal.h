@@ -1159,7 +1159,7 @@ _hidden int libxl__build_post(libxl__gc *gc, uint32_t domid,
                char **vms_ents, char **local_ents);
 
 _hidden int libxl__build_pv(libxl__gc *gc, uint32_t domid,
-             libxl_domain_build_info *info, libxl__domain_build_state *state);
+             libxl_domain_config *const d_config, libxl__domain_build_state *state);
 _hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_config *d_config,
               libxl__domain_build_state *state);
