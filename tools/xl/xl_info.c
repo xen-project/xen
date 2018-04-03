@@ -203,7 +203,7 @@ static void output_physinfo(void)
     maybe_printf("nr_nodes               : %d\n", info.nr_nodes);
     maybe_printf("cores_per_socket       : %d\n", info.cores_per_socket);
     maybe_printf("threads_per_core       : %d\n", info.threads_per_core);
-    maybe_printf("cpu_mhz                : %d\n", info.cpu_khz / 1000);
+    maybe_printf("cpu_mhz                : %d.%03d\n", info.cpu_khz / 1000, info.cpu_khz % 1000);
 
     maybe_printf("hw_caps                : %08x:%08x:%08x:%08x:%08x:%08x:%08x:%08x\n",
          info.hw_cap[0], info.hw_cap[1], info.hw_cap[2], info.hw_cap[3],
