@@ -839,6 +839,14 @@ typedef struct libxl__ctx libxl_ctx;
 #endif
 
 /*
+ * LIBXL_HAVE_DOMAIN_SUSPEND_ONLY
+ *
+ * If this is defined, function libxl_domains_suspend_only() is available.
+ */
+
+#define LIBXL_HAVE_DOMAIN_SUSPEND_ONLY 1
+
+/*
  * LIBXL_HAVE_DEVICE_PCI_SEIZE
  *
  * If this is defined, then the libxl_device_pci struct will contain
@@ -1483,6 +1491,14 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
                          LIBXL_EXTERNAL_CALLERS_ONLY;
 #define LIBXL_SUSPEND_DEBUG 1
 #define LIBXL_SUSPEND_LIVE 2
+
+/*
+ * Only suspend domain, do not save its state to file, do not destroy it.
+ * Suspended domain can be resumed with libxl_domain_resume()
+ */
+int libxl_domain_suspend_only(libxl_ctx *ctx, uint32_t domid,
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* @param suspend_cancel [from xenctrl.h:xc_domain_resume( @param fast )]
  *   If this parameter is true, use co-operative resume. The guest
