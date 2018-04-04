@@ -811,7 +811,10 @@ int hvm_create_ioreq_server(struct domain *d, bool is_default,
 
     rc = hvm_ioreq_server_init(s, d, bufioreq_handling, i);
     if ( rc )
+    {
+        set_ioreq_server(d, i, NULL);
         goto fail;
+    }
 
     if ( i == DEFAULT_IOSERVID )
         hvm_ioreq_server_enable(s);
@@ -825,8 +828,6 @@ int hvm_create_ioreq_server(struct domain *d, bool is_default,
     return 0;
 
  fail:
-    set_ioreq_server(d, i, NULL);
-
     spin_unlock_recursive(&d->arch.hvm_domain.ioreq_server.lock);
     domain_unpause(d);
 
