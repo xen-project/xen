@@ -305,7 +305,7 @@ int xc_set_cpufreq_gov(xc_interface *xch, int cpuid, char *govname)
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = SET_CPUFREQ_GOV;
     sysctl.u.pm_op.cpuid = cpuid;
-    strncpy(scaling_governor, govname, CPUFREQ_NAME_LEN);
+    strncpy(scaling_governor, govname, CPUFREQ_NAME_LEN - 1);
     scaling_governor[CPUFREQ_NAME_LEN - 1] = '\0';
 
     return xc_sysctl(xch, &sysctl);
