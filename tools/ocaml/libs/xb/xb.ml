@@ -100,7 +100,9 @@ let write_mmap back con s len =
 
 let write con s len =
 	match con.backend with
-	| Fd backfd     -> write_fd backfd con (Bytes.of_string s) len
+	(* we can use unsafe_of_string here as the bytes are used immutably
+	   in the Unix.write operation. *)
+	| Fd backfd     -> write_fd backfd con (Bytes.unsafe_of_string s) len
 	| Xenmmap backmmap -> write_mmap backmmap con s len
 
 (* NB: can throw Reconnect *)

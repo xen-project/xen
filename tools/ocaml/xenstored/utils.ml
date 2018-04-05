@@ -52,7 +52,7 @@ let hexify s =
 		Bytes.set hs (i * 2) seq.[0];
 		Bytes.set hs (i * 2 + 1) seq.[1];
 	done;
-	Bytes.to_string hs
+	Bytes.unsafe_to_string hs
 
 let unhexify hs =
 	let char_of_hexseq seq0 seq1 = Char.chr (int_of_string (sprintf "0x%c%c" seq0 seq1)) in
@@ -61,7 +61,7 @@ let unhexify hs =
 	do
 		Bytes.set b i (char_of_hexseq hs.[i * 2] hs.[i * 2 + 1])
 	done;
-	Bytes.to_string b
+	Bytes.unsafe_to_string b
 
 let trim_path path =
 	try
@@ -87,7 +87,7 @@ let read_file_single_integer filename =
 	let buf = Bytes.make 20 (char_of_int 0) in
 	let sz = Unix.read fd buf 0 20 in
 	Unix.close fd;
-	int_of_string (Bytes.to_string (Bytes.sub buf 0 sz))
+	int_of_string (Bytes.sub_string buf 0 sz)
 
 let path_complete path connection_path =
 	if String.get path 0 <> '/' then
