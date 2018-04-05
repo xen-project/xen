@@ -36,6 +36,7 @@ EARLY_PRINTK_hikey960       := pl011,0xfff32000
 EARLY_PRINTK_juno           := pl011,0x7ff80000
 EARLY_PRINTK_lager          := scif,0xe6e60000
 EARLY_PRINTK_midway         := pl011,0xfff36000
+EARLY_PRINTK_mvebu          := mvebu,0xd0012000
 EARLY_PRINTK_omap5432       := 8250,0x48020000,2
 EARLY_PRINTK_rcar3          := scif,0xe6e88000
 EARLY_PRINTK_seattle        := pl011,0xe1010000
