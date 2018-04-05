@@ -186,25 +186,29 @@ void set_attribute_battery_info(char *attrib_name,
 
     if ( strstr(attrib_name, "model number") ) 
     {
-        strncpy(info->model_number, attrib_value, 32);
+        strncpy(info->model_number, attrib_value, 31);
+        info->model_number[31] = '\0';
         return;
     }
 
     if ( strstr(attrib_name, "serial number") ) 
     {
-        strncpy(info->serial_number, attrib_value, 32);
+        strncpy(info->serial_number, attrib_value, 31);
+        info->serial_number[31] = '\0';
         return;
     }
 
     if ( strstr(attrib_name, "battery type") ) 
     {
-        strncpy(info->battery_type, attrib_value, 32);
+        strncpy(info->battery_type, attrib_value, 31);
+        info->battery_type[31] = '\0';
         return;
     }
 
     if ( strstr(attrib_name, "OEM info") ) 
     {
-        strncpy(info->oem_info, attrib_value, 32);
+        strncpy(info->oem_info, attrib_value, 31);
+        info->oem_info[31] = '\0';
         return;
     }
 
