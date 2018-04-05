@@ -695,7 +695,10 @@ static void kdd_handle_read_ctrl(kdd_state *s)
             KDD_LOG(s, "Request outside of known control space\n");
             len = 0;
         } else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
             memcpy(buf, ((uint8_t *)&ctrl.c32) + offset, len);
+#pragma GCC diagnostic pop
         }
     }
 
