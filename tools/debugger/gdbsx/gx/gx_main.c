@@ -382,7 +382,7 @@ prepare_stop_reply(enum target_signal sig, char *buf, vcpuid_t vcpu)
 
     /* TBD: check if we stopped because of watchpoint */
     if (watchpoint_stop()) {
-        strncpy(buf, "watch:", 6);
+        memcpy(buf, "watch:", 6);
         buf += 6;
         /* TBD: **/
     }
