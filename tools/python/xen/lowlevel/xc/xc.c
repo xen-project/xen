@@ -1079,7 +1079,7 @@ static PyObject *pyxc_topologyinfo(XcObject *self)
         }
     }
 
-    ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", num_cpus + 1);
+    ret_obj = Py_BuildValue("{s:i}", "max_cpu_index", num_cpus - 1);
 
     PyDict_SetItemString(ret_obj, "cpu_to_core", cpu_to_core_obj);
     Py_DECREF(cpu_to_core_obj);
