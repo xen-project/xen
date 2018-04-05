@@ -1214,7 +1214,8 @@ int qcow_create(const char *filename, uint64_t total_size,
 			if (p && (p - backing_file) >= 2) {
 				/* URL like but exclude "c:" like filenames */
 				strncpy(backing_filename, backing_file,
-					sizeof(backing_filename));
+					sizeof(backing_filename) - 1);
+				backing_filename[sizeof(backing_filename) - 1] = '\0';
 			} else {
 				if (realpath(backing_file, backing_filename) == NULL ||
 				    stat(backing_filename, &st) != 0) {
