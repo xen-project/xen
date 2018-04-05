@@ -77,7 +77,7 @@ void handle_low_mem(void)
     if (!xs_write(xs_handle, XBT_NULL, 
             "/local/domain/0/memory/target", data, strlen(data)))
     {
-        snprintf(error, BUFSZ,"Failed to write target %s to xenstore", data);
+        snprintf(error, BUFSZ,"Failed to write target %.24s to xenstore", data);
         perror(error);
     }
 }
