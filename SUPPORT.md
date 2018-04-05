@@ -770,40 +770,40 @@ What is the risk of it exhibiting bugs?
 
 General answers to the above:
 
- * **Here be dragons**
+  * **Here be dragons**
 
-   Pretty likely to still crash / fail to work.
-   Not recommended unless you like life on the bleeding edge.
+    Pretty likely to still crash / fail to work.
+    Not recommended unless you like life on the bleeding edge.
 
- * **Quirky**
+  * **Quirky**
 
-   Mostly works but may have odd behavior here and there.
-   Recommended for playing around or for non-production use cases.
+    Mostly works but may have odd behavior here and there.
+    Recommended for playing around or for non-production use cases.
 
- * **Normal**
+  * **Normal**
 
-   Ready for production use
+    Ready for production use
 
 ### Interface stability
 
 If I build a system based on the current interfaces,
 will they still work when I upgrade to the next version?
 
- * **Not stable**
+  * **Not stable**
 
-   Interface is still in the early stages and
-   still fairly likely to be broken in future updates.
+    Interface is still in the early stages and
+    still fairly likely to be broken in future updates.
 
- * **Provisionally stable**
+  * **Provisionally stable**
 
-   We're not yet promising backwards compatibility,
-   but we think this is probably the final form of the interface.
-   It may still require some tweaks.
+    We're not yet promising backwards compatibility,
+    but we think this is probably the final form of the interface.
+    It may still require some tweaks.
 
- * **Stable**
+  * **Stable**
 
-   We will try very hard to avoid breaking backwards  compatibility,
-   and to fix any regressions that are reported.
+    We will try very hard to avoid breaking backwards  compatibility,
+    and to fix any regressions that are reported.
 
 ### Security supported
 
