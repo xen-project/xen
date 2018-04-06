@@ -1595,7 +1595,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     iommu_setup();    /* setup iommu if available */
 
-    smp_prepare_cpus(max_cpus);
+    smp_prepare_cpus();
 
     spin_debug_enable();
 

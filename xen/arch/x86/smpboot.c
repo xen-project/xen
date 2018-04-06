@@ -1022,7 +1022,7 @@ static struct notifier_block cpu_smpboot_nfb = {
     .notifier_call = cpu_smpboot_callback
 };
 
-void __init smp_prepare_cpus(unsigned int max_cpus)
+void __init smp_prepare_cpus(void)
 {
     int rc;
 

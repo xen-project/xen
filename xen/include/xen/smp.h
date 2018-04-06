@@ -17,7 +17,7 @@ extern void smp_send_state_dump(unsigned int cpu);
 /*
  * Prepare machine for booting other CPUs.
  */
-extern void smp_prepare_cpus(unsigned int max_cpus);
+extern void smp_prepare_cpus(void);
 
 /*
  * Final polishing of CPUs
