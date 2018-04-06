@@ -140,6 +140,10 @@ sub dirs($)
     return @dirs;
 }
 
+foreach my $of (grep { !m{/} } @docs) {
+    $top .= make_link($of,'');
+}
+
 foreach my $od (sort { $a cmp $b } uniq map { dirs($_) } @docs) {
     my @d = (grep /^\Q$od\E/, @docs);
     if ( @d == 1 and $d[0] eq "$od/index.html" )
