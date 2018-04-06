@@ -360,7 +360,7 @@ Guest-side driver capable of speaking the Xen PV block protocol
     Status, FreeBSD: Supported, Security support external
     Status, NetBSD: Supported, Security support external
     Status, OpenBSD: Supported, Security support external
-    States, Windows: Supported
+    Status, Windows: Supported
 
 Guest-side driver capable of speaking the Xen PV networking protocol
 
