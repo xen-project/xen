@@ -846,6 +846,9 @@ static int libxl__prepare_dtb(libxl__gc *gc, libxl_domain_build_info *info,
     const libxl_version_info *vers;
     const struct arch_info *ainfo;
 
+    /* convenience aliases */
+    xc_domain_configuration_t *xc_config = &state->config;
+
     vers = libxl_get_version_info(CTX);
     if (vers == NULL) return ERROR_FAIL;
 
@@ -854,8 +857,7 @@ static int libxl__prepare_dtb(libxl__gc *gc, libxl_domain_build_info *info,
 
     LOG(DEBUG, "constructing DTB for Xen version %d.%d guest",
         vers->xen_version_major, vers->xen_version_minor);
-    LOG(DEBUG, " - vGIC version: %s",
-        gicv_to_string(info->arch_arm.gic_version));
+    LOG(DEBUG, " - vGIC version: %s", gicv_to_string(xc_config->gic_version));
 
     if (info->device_tree) {
         LOG(DEBUG, " - Partial device tree provided: %s", info->device_tree);
