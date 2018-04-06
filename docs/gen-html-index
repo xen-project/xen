@@ -20,8 +20,10 @@ our @dirs;
 our %index;
 
 our $outdir;
+our $debug;
 
-GetOptions("i=s" => sub { read_index(@_);} )
+GetOptions("i=s" => sub { read_index(@_);},
+           "D" => \$debug)
     or die;
 
 ($outdir,@docs) = @ARGV;
@@ -64,6 +66,20 @@ sub make_linktext ($) {
     return "$1($2)" if $l =~ m,^man/(.*)\.([0-9].*)\.html,;
     $l =~ s/.(?:html|txt)$//g;
     return $index{$l} if exists $index{$l};
+
+    my $from_html;
+    eval {
+        require HTML::TreeBuilder::XPath;
+        my $tree = new HTML::TreeBuilder::XPath;
+        my $f = "$outdir/$l.html";
+        open F, '<', $f or die "$l $f $!";
+        $tree->parse_file(\*F) or die;
+        close F;
+        $from_html = $tree->findvalue("/html/head/title");
+    };
+    print "$l: get title: $@" if $@ && $debug;
+    return $from_html if $from_html;
+
     return basename($l);
 }
 
