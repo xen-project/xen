@@ -28,7 +28,8 @@ DOC_MAN7 := $(patsubst man/%.pod.7,man7/%.7,$(MAN7SRC-y)) \
 	        $(patsubst man/%.markdown.7,man7/%.7,$(MAN7SRC-y))
 DOC_MAN8 := $(patsubst man/%.pod.8,man8/%.8,$(MAN8SRC-y)) \
 	        $(patsubst man/%.markdown.8,man8/%.8,$(MAN8SRC-y))
-DOC_HTML := $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
+DOC_HTML := html/SUPPORT.html \
+            $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,html/%.html,$(PANDOCSRC-y)) \
             $(patsubst man/%.markdown.1,html/man/%.1.html,$(MAN1SRC-y)) \
             $(patsubst man/%.markdown.5,html/man/%.5.html,$(MAN5SRC-y)) \
@@ -254,6 +255,8 @@ $(eval $(call GENERATE_PANDOC_RULE,pdf,pandoc))   # pdf/%.pdf: %.pandoc
 $(eval $(call GENERATE_PANDOC_RULE,txt,pandoc))   # txt/%.txt: %.pandoc
 $(eval $(call GENERATE_PANDOC_RULE,html,pandoc))  # html/%.html: %.pandoc
 $(eval $(call GENERATE_PANDOC_RULE,pdf,markdown)) # pdf/%.pdf: %.markdown
+
+$(eval $(call GENERATE_PANDOC_RULE_RAW,html/SUPPORT.html,$(XEN_ROOT)/SUPPORT.md)) # pdf/%.pdf: %.markdown
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Docs.mk:
