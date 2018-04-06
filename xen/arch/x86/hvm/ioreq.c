@@ -973,12 +973,12 @@ int hvm_get_ioreq_server_frame(struct domain *d, ioservid_t id,
         if ( !HANDLE_BUFIOREQ(s) )
             goto out;
 
-        *mfn = _mfn(page_to_mfn(s->bufioreq.page));
+        *mfn = page_to_mfn(s->bufioreq.page);
         rc = 0;
         break;
 
     case XENMEM_resource_ioreq_server_frame_ioreq(0):
-        *mfn = _mfn(page_to_mfn(s->ioreq.page));
+        *mfn = page_to_mfn(s->ioreq.page);
         rc = 0;
         break;
 
