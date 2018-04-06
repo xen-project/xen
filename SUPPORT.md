@@ -1,4 +1,4 @@
-# Support statement for this release
+% Support statement for this release
 
 This document describes the support status
 and in particular the security support status of the Xen branch
