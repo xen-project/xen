@@ -12,6 +12,14 @@ config HAS_CADENCE_UART
 	  This selects the Xilinx Zynq Cadence UART. If you have a Xilinx Zynq
 	  based board, say Y.
 
+config HAS_MVEBU
+	bool
+	default y
+	depends on ARM_64
+	help
+	  This selects the Marvell MVEBU UART. If you have a ARMADA 3700
+	  based board, say Y.
+
 config HAS_PL011
 	bool
 	default y
