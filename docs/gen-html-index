@@ -10,6 +10,7 @@ use warnings;
 use Getopt::Long;
 use IO::File;
 use File::Basename;
+use HTML::TreeBuilder::XPath;
 
 Getopt::Long::Configure('bundling');
 
@@ -64,6 +65,18 @@ sub make_linktext ($) {
     return "$1($2)" if $l =~ m,^man/(.*)\.([0-9].*)\.html,;
     $l =~ s/.(?:html|txt)$//g;
     return $index{$l} if exists $index{$l};
+
+    my $from_html;
+    eval {
+        my $tree = new HTML::TreeBuilder::XPath;
+        my $f = "$outdir/$l.html";
+        open F, '<', $f or die "$l $f $!";
+        $tree->parse_file(\*F) or die;
+        close F;
+        $from_html = $tree->findvalue("/html/head/title");
+    };
+    return $from_html if $from_html;
+
     return basename($l);
 }
 
