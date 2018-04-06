@@ -237,17 +237,18 @@ txt/%.txt: %.markdown
 	$(INSTALL_DATA) $< $@
 
 # Metarule for generating pandoc rules.
-define GENERATE_PANDOC_RULE
-# $(1) is the target documentation format. $(2) is the source format.
-
-$(1)/%.$(1): %.$(2)
+define GENERATE_PANDOC_RULE_RAW
+$(1): $(2)
 ifneq ($(PANDOC),)
 	@$(INSTALL_DIR) $$(@D)
 	$(PANDOC) --number-sections --toc --standalone $$< --output $$@
 else
 	@echo "pandoc not installed; skipping $$@"
 endif
-
+endef
+define GENERATE_PANDOC_RULE
+# $(1) is the target documentation format. $(2) is the source format.
+$(call GENERATE_PANDOC_RULE_RAW,$(1)/%.$(1),%.$(2))
 endef
 $(eval $(call GENERATE_PANDOC_RULE,pdf,pandoc))   # pdf/%.pdf: %.pandoc
 $(eval $(call GENERATE_PANDOC_RULE,txt,pandoc))   # txt/%.txt: %.pandoc
