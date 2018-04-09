@@ -283,7 +283,7 @@ smp_get_max_cpus (void)
 }
 
 void __init
-smp_prepare_cpus (unsigned int max_cpus)
+smp_prepare_cpus(void)
 {
     cpumask_copy(&cpu_present_map, &cpu_possible_map);
 

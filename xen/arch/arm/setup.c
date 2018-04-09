@@ -804,7 +804,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     local_irq_enable();
     local_abort_enable();
 
-    smp_prepare_cpus(cpus);
+    smp_prepare_cpus();
 
     initialize_keytable();
 
