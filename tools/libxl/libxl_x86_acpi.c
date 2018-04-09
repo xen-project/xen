@@ -218,8 +218,18 @@ int libxl__dom_load_acpi(libxl__gc *gc,
 
     dom->acpi_modules[0].data = (void *)config.rsdp;
     dom->acpi_modules[0].length = 64;
-    dom->acpi_modules[0].guest_addr_out = ACPI_INFO_PHYSICAL_ADDRESS +
-        (1 + acpi_pages_num) * libxl_ctxt.page_size;
+    /*
+     * Some Linux versions cannot properly process hvm_start_info.rsdp_paddr
+     * and so we need to put RSDP in location that can be discovered by ACPI's
+     * standard search method, in R-O BIOS memory (we chose last 64 bytes)
+     */
+    if (strcmp(dom->parms.guest_os, "linux") ||
+        elf_xen_feature_get(XENFEAT_linux_rsdp_unrestricted,
+                            dom->parms.f_supported))
+        dom->acpi_modules[0].guest_addr_out = ACPI_INFO_PHYSICAL_ADDRESS +
+            (1 + acpi_pages_num) * libxl_ctxt.page_size;
+    else
+        dom->acpi_modules[0].guest_addr_out = 0x100000 - 64;
 
     dom->acpi_modules[1].data = (void *)config.infop;
     dom->acpi_modules[1].length = 4096;

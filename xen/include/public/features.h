@@ -105,6 +105,15 @@
 /* arm: Hypervisor supports ARM SMC calling convention. */
 #define XENFEAT_ARM_SMCCC_supported       14
 
+/*
+ * x86/PVH: If set, ACPI RSDP can be placed at any address. Otherwise RSDP
+ * must be located in lower 1MB, as required by ACPI Specification for IA-PC
+ * systems.
+ * This feature flag is only consulted if XEN_ELFNOTE_GUEST_OS contains
+ * the "linux" string.
+ */
+#define XENFEAT_linux_rsdp_unrestricted   15
+
 #define XENFEAT_NR_SUBMAPS 1
 
 #endif /* __XEN_PUBLIC_FEATURES_H__ */
