@@ -25,6 +25,7 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
 _hidden
 int libxl__arch_domain_save_config(libxl__gc *gc,
                                    libxl_domain_config *d_config,
+                                   libxl__domain_build_state *state,
                                    const xc_domain_configuration_t *xc_config);
 
 /* arch specific internal domain creation function */

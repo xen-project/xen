@@ -1147,6 +1147,9 @@ typedef struct {
 
     xen_pfn_t vuart_gfn;
     evtchn_port_t vuart_port;
+
+    /* ARM only to deal with broken firmware */
+    uint32_t clock_frequency;
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
@@ -1655,6 +1658,7 @@ _hidden  void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd,
   * on exit (even error exit), domid may be valid and refer to a domain */
 _hidden int libxl__domain_make(libxl__gc *gc,
                                libxl_domain_config *d_config,
+                               libxl__domain_build_state *state,
                                uint32_t *domid);
 
 _hidden int libxl__domain_build(libxl__gc *gc,

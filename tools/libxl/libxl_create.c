@@ -538,6 +538,7 @@ out:
 }
 
 int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
+                       libxl__domain_build_state *state,
                        uint32_t *domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -590,7 +591,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             goto out;
         }
 
-        rc = libxl__arch_domain_save_config(gc, d_config, &xc_config);
+        rc = libxl__arch_domain_save_config(gc, d_config, state, &xc_config);
         if (rc < 0)
             goto out;
     }
@@ -958,7 +959,7 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
-    ret = libxl__domain_make(gc, d_config, &domid);
+    ret = libxl__domain_make(gc, d_config, &dcs->build_state, &domid);
     if (ret) {
         LOGD(ERROR, domid, "cannot make domain: %d", ret);
         dcs->guest_domid = domid;
