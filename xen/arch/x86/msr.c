@@ -130,6 +130,22 @@ int init_domain_msr_policy(struct domain *d)
     if ( !opt_dom0_cpuid_faulting && is_control_domain(d) && is_pv_domain(d) )
         mp->platform_info.cpuid_faulting = false;
 
+    /*
+     * Expose the "hardware speculation behaviour" bits of ARCH_CAPS to dom0,
+     * so dom0 can turn off workarounds as appropriate.  Temporary, until the
+     * domain policy logic gains a better understanding of MSRs.
+     */
+    if ( is_hardware_domain(d) && boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+    {
+        uint64_t val;
+
+        rdmsrl(MSR_ARCH_CAPABILITIES, val);
+
+        mp->arch_caps.raw = val &
+            (ARCH_CAPS_RDCL_NO | ARCH_CAPS_IBRS_ALL | ARCH_CAPS_RSBA |
+             ARCH_CAPS_SSB_NO | ARCH_CAPS_MDS_NO | ARCH_CAPS_TAA_NO);
+    }
+
     d->arch.msr = mp;
 
     return 0;

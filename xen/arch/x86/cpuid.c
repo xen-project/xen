@@ -719,6 +719,14 @@ int init_domain_cpuid_policy(struct domain *d)
     if ( d->disable_migrate )
         p->extd.itsc = cpu_has_itsc;
 
+    /*
+     * Expose the "hardware speculation behaviour" bits of ARCH_CAPS to dom0,
+     * so dom0 can turn off workarounds as appropriate.  Temporary, until the
+     * domain policy logic gains a better understanding of MSRs.
+     */
+    if ( is_hardware_domain(d) && boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+        p->feat.arch_caps = true;
+
     d->arch.cpuid = p;
 
     recalculate_cpuid_policy(d);
