@@ -70,6 +70,10 @@ static int update_domain_cpuid_info(struct domain *d,
              ctl->input[1] >= ARRAY_SIZE(p->feat.raw) )
             return 0;
 
+        if ( ctl->input[0] == 0xb &&
+             ctl->input[1] >= ARRAY_SIZE(p->topo.raw) )
+            return 0;
+
         BUILD_BUG_ON(ARRAY_SIZE(p->xstate.raw) < 2);
         if ( ctl->input[0] == XSTATE_CPUID &&
              ctl->input[1] != 1 ) /* Everything else automatically calculated. */
@@ -98,6 +102,10 @@ static int update_domain_cpuid_info(struct domain *d,
 
         case 7:
             p->feat.raw[ctl->input[1]] = leaf;
+            break;
+
+        case 0xb:
+            p->topo.raw[ctl->input[1]] = leaf;
             break;
 
         case XSTATE_CPUID:

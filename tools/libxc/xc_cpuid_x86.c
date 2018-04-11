@@ -734,13 +734,22 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
             if ( (regs[0] & 0x1f) != 0 )
                 continue;
         }
+        /* Extended Topology leaves. */
+        else if ( input[0] == 0xb )
+        {
+            uint8_t level_type = regs[2] >> 8;
+
+            input[1]++;
+            if ( level_type >= 1 && level_type <= 2 )
+                continue;
+        }
 
         input[0]++;
         if ( !(input[0] & 0x80000000u) && (input[0] > base_max ) )
             input[0] = 0x80000000u;
 
         input[1] = XEN_CPUID_INPUT_UNUSED;
-        if ( (input[0] == 4) || (input[0] == 7) )
+        if ( (input[0] == 4) || (input[0] == 7) || (input[0] == 0xb) )
             input[1] = 0;
         else if ( input[0] == 0xd )
             input[1] = 1; /* Xen automatically calculates almost everything. */

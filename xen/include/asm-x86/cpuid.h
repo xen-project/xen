@@ -61,6 +61,7 @@ extern struct cpuidmasks cpuidmask_defaults;
 #define CPUID_GUEST_NR_BASIC      (0xdu + 1)
 #define CPUID_GUEST_NR_FEAT       (0u + 1)
 #define CPUID_GUEST_NR_CACHE      (5u + 1)
+#define CPUID_GUEST_NR_TOPO       (1u + 1)
 #define CPUID_GUEST_NR_XSTATE     (62u + 1)
 #define CPUID_GUEST_NR_EXTD_INTEL (0x8u + 1)
 #define CPUID_GUEST_NR_EXTD_AMD   (0x1cu + 1)
@@ -108,7 +109,11 @@ struct cpuid_policy
             uint64_t :64, :64; /* Leaf 0x9 - DCA */
 
             /* Leaf 0xa - Intel PMU. */
-            uint8_t pmu_version;
+            uint8_t pmu_version, _pmu[15];
+
+            uint64_t :64, :64; /* Leaf 0xb - Topology. */
+            uint64_t :64, :64; /* Leaf 0xc - rsvd */
+            uint64_t :64, :64; /* Leaf 0xd - XSTATE. */
         };
     } basic;
 
@@ -141,6 +146,17 @@ struct cpuid_policy
             };
         };
     } feat;
+
+    /* Extended topology enumeration: 0x0000000B[xx] */
+    union {
+        struct cpuid_leaf raw[CPUID_GUEST_NR_TOPO];
+        struct cpuid_topo_leaf {
+            uint32_t id_shift:5, :27;
+            uint16_t nr_logical, :16;
+            uint8_t level, type, :8, :8;
+            uint32_t x2apic_id;
+        } subleaf[CPUID_GUEST_NR_TOPO];
+    } topo;
 
     /* Xstate feature leaf: 0x0000000D[xx] */
     union {

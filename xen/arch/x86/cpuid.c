@@ -205,7 +205,10 @@ static void recalculate_misc(struct cpuid_policy *p)
     p->basic.raw[0x6] = EMPTY_LEAF; /* Therm/Power not exposed to guests. */
 
     p->basic.raw[0x8] = EMPTY_LEAF;
-    p->basic.raw[0xb] = EMPTY_LEAF; /* TODO: Rework topology logic. */
+
+    /* TODO: Rework topology logic. */
+    memset(p->topo.raw, 0, sizeof(p->topo.raw));
+
     p->basic.raw[0xc] = EMPTY_LEAF;
 
     p->extd.e1d &= ~CPUID_COMMON_1D_FEATURES;
@@ -273,7 +276,7 @@ static void __init calculate_raw_policy(void)
     {
         switch ( i )
         {
-        case 0x4: case 0x7: case 0xd:
+        case 0x4: case 0x7: case 0xb: case 0xd:
             /* Multi-invocation leaves.  Deferred. */
             continue;
         }
@@ -314,6 +317,33 @@ static void __init calculate_raw_policy(void)
         for ( i = 1; i < min(ARRAY_SIZE(p->feat.raw),
                              p->feat.max_subleaf + 1ul); ++i )
             cpuid_count_leaf(7, i, &p->feat.raw[i]);
+    }
+
+    if ( p->basic.max_leaf >= 0xb )
+    {
+        union {
+            struct cpuid_leaf l;
+            struct cpuid_topo_leaf t;
+        } u;
+
+        for ( i = 0; i < ARRAY_SIZE(p->topo.raw); ++i )
+        {
+            cpuid_count_leaf(0xb, i, &u.l);
+
+            if ( u.t.type == 0 )
+                break;
+
+            p->topo.subleaf[i] = u.t;
+        }
+
+        /*
+         * The choice of CPUID_GUEST_NR_TOPO is per the manual.  It may need
+         * to grow for future hardware.
+         */
+        if ( i == ARRAY_SIZE(p->topo.raw) &&
+             (cpuid_count_leaf(0xb, i, &u.l), u.t.type != 0) )
+            printk(XENLOG_WARNING
+                   "CPUID: Insufficient Leaf 0xb space for this hardware\n");
     }
 
     if ( p->basic.max_leaf >= XSTATE_CPUID )
@@ -728,6 +758,13 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                 return;
 
             *res = p->feat.raw[subleaf];
+            break;
+
+        case 0xb:
+            if ( subleaf >= ARRAY_SIZE(p->topo.raw) )
+                return;
+
+            *res = p->topo.raw[subleaf];
             break;
 
         case XSTATE_CPUID:
