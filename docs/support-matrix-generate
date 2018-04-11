@@ -1,0 +1,186 @@
+#!/bin/bash
+
+# usage:
+#   cd xen.git
+#   docs/support-matrix-generate [-D]                               \
+#       refs/remotes/origin/master                                  \
+#           https://xenbits.xen.org/docs/unstable/SUPPORT.html      \
+#       refs/remotes/origin/stable-NN                               \
+#           https://xenbits.xen.org/docs/NN-testing/SUPPORT.html    \
+#
+# NN is a *literal* in the above rune!  It will be substituted with
+# the appropriate version number.
+#
+# The idea is that we use staging's version of this script, and it
+# looks into the git history and various git remote tracking refs to
+# find the various versions of SUPPORT.md.
+#
+# The arguments specify the git refs to look in, and also the URLs for
+# the SUPPORT.html (which are needed so that we can make
+# cross-reference links).  We provide the ref and url (i) for unstable
+# (ii) in template form for all previous versions.
+
+# Algorithm:
+#
+# We start with `refs/remotes/origin/master' and process its
+# SUPPORT.md into json.
+#
+# Then we try to find the next previous revision.  This is done by
+# extracting the current version number from xen/Makefile.  (We make
+# some slight assumption about how xen/Makefile's xenversion target
+# works, because we want to be able to do this without checking out
+# the whole tree for the version in question.)  Then we use git log on
+# xen/Makefile to try to find a commit where the version changed.
+# This gives us the previous version number, NN.
+#
+# That is substituted into the `refs/remotes/origin/stable-NN'
+# argument to get the tip of the relevant branch.  That in turns
+# contains another SUPPORT.md.  We keep going until either the ref
+# itself is missing, or we get to a ref with no SUPPORT.md.
+
+set -e
+set -o posix
+set -o pipefail
+
+fail () { echo >&2 "$0: $1"; exit 12; }
+
+args=()
+
+case "$1" in
+    -D) args+=("$1"); shift ;;
+    -*) fail 'bad usage' ;;
+    --) shift; break ;;
+esac
+
+case "$#" in
+    4) ;;
+    *) fail 'bad usage' ;;
+esac
+
+current_ref=$1
+current_url=$2
+pattern_ref=$3
+pattern_url=$4
+
+tmp_prefix="docs/tmp.support-matrix"
+tmp_mdfile="$tmp_prefix.md"
+tmp_revisions="$tmp_prefix.revisions.html"
+
+versionfile=xen/Makefile
+tmp_versionfile="$tmp_prefix.xen.make"
+
+cat docs/misc/support-matrix-head.html
+
+debug () {
+    echo "<!-- $* -->"
+}
+
+select_commitish () {
+    commitish=$1
+    debug "select_commitish $commitish"
+    obj="$(printf "%s:SUPPORT.md" "$commitish")"
+    exists="$(printf "%s" "$obj" | git cat-file --batch-check)"
+    >"$tmp_mdfile"
+    case "$exists" in
+        *' missing')
+            rm "$tmp_mdfile"
+            ;;
+        *' blob '*)
+            git cat-file blob "$obj" >"$tmp_mdfile"
+            ;;
+        *) fail "?? $current_url $exists ?";;
+    esac
+}
+
+commitish_version () {
+    case "$commitish" in
+        refs/*)
+            # this is how to find out if a ref exists
+            local gfer=$(git for-each-ref "[r]${commitish#r}")
+            if [ "x$gfer" = x ]; then return; fi
+            ;;
+    esac
+
+    git cat-file blob "$commitish:$versionfile" >"$tmp_versionfile"
+    version=$(make --no-print-directory -C docs \
+                   -f "${tmp_versionfile#docs/}" xenversion)
+    case "$version" in
+        *.*.*) version="${version%.*}" ;;
+    esac
+    printf "%s\n" "${version%%-*}"
+}
+
+exec 4>"$tmp_revisions"
+
+while true; do
+    select_commitish "$current_ref"
+    current_version=$(commitish_version)
+    debug "current_version=$current_version"
+
+    if ! [ -e "$tmp_mdfile" ]; then break; fi
+
+    cat >&4 <<END
+<tr>
+<td align="center">$current_version</td>
+END
+    git >&4 log -n1 --pretty=tformat:'
+<td><code>%ci</code></td>
+<td><code>%H</code></td>
+' "$current_ref"
+    cat >&4 <<END
+</tr>
+END
+
+    current_jsonfile="$tmp_prefix.$current_version.json"
+    pandoc -t json <"$tmp_mdfile" >"$current_jsonfile"
+
+    args+=("$current_jsonfile" "$current_url")
+
+    # find previous version
+    search_commit="$current_ref"
+    while true; do
+        search_commit=$(git-log --pretty=format:%H -n1 \
+                        -G 'XEN.*VERSION' $search_commit -- $versionfile)
+        if ! [ "$search_commit" ]; then search_version=''; break; fi
+
+        search_commit="$search_commit~"
+        select_commitish "$search_commit"
+        search_version=$(commitish_version)
+        debug "search_version=$search_version"
+        if [ "x$search_version" != "x$current_version" ]; then break; fi
+    done
+
+    if [ "x$search_version" = x ]; then break; fi
+
+    # have found the previous version
+    current_ref=${pattern_ref/NN/$search_version}
+    current_url=${pattern_url/NN/$search_version}
+done
+
+debug "${args[*]}"
+docs/parse-support-md "${args[@]}"
+
+cat <<END
+    <h2>Source materials</h2>
+      Generated from xen.git
+      by docs/support-matrix-generate and docs/parse-support-md.
+      <p>
+      Input revisions of SUPPORT.md used:
+    <table>
+    <tr>
+      <th>Version</th>
+      <th align="left">Commit date</th>
+      <th align="left">Git commit</th>
+END
+
+cat "$tmp_revisions"
+
+generated=$(TZ=UTC date --iso-8601=minutes)
+
+cat <<END
+    </table>
+    <p>
+    Last checked/updated/regenerated: ${generated/T/ }
+  </body>
+</html>
+END

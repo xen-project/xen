@@ -43,6 +43,7 @@ config/Paths.mk
 
 build-*
 dist/*
+docs/tmp.*
 docs/html/
 docs/man/xl.cfg.pod.5
 docs/man/xl.pod.1
