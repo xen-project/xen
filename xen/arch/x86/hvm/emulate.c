@@ -282,7 +282,11 @@ static int hvmemul_do_io(
             rc = hvm_send_ioreq(s, &p, 0);
             if ( rc != X86EMUL_RETRY || currd->is_shutting_down )
                 vio->io_req.state = STATE_IOREQ_NONE;
-            else if ( data_is_addr )
+            /*
+             * This effectively is !hvm_vcpu_io_need_completion(vio), slightly
+             * optimized and using local variables we have available.
+             */
+            else if ( data_is_addr || (!is_mmio && dir == IOREQ_WRITE) )
                 rc = X86EMUL_OKAY;
         }
         break;
