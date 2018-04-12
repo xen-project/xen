@@ -725,6 +725,11 @@ The file is in markdown format.
 The machine-readable fragments are markdown literals
 containing RFC-822-like (deb822-like) data.
 
+In each case, descriptions which expand on the name of a feature as
+provided in the section heading, precede the Status indications.
+Any paragraphs which follow the Status indication are caveats or
+qualifications of the information provided in Status fields.
+
 ## Keys found in the Feature Support subsections
 
 ### Status
