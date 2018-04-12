@@ -35,6 +35,7 @@ our $toplevel_sectlist = new_sectlist();
 # $sectlist->{KEY}{Key} = KEY
 # $sectlist->{KEY}{RealSect} = containing real section in @insections, so
 # $sectlist->{KEY}{RealSect}{HasCaveat}[VI] = trueish iff other in a Para
+# $sectlist->{KEY}{RealSect}{HasDescription} = VI for some Emph in Para
 # $sectlist->{KEY}{RealSect}{Anchor} = value for < id="" > in the pandoc html
 # A $sectnode represents a single section from the original markdown
 # document.  Its subsections are in Children.
@@ -58,8 +59,10 @@ our @insections;
 # these next are only defined for real sections, not Status elements
 # $insections[]{Anchor} = string
 # $insections[]{HasCaveat} = array, $sectlist->{HasCaveat} will refer to this
+# $insections[]{HasDescription} VI, likewise
 
 our $had_unknown;
+our $had_feature;
 # adding new variable ?  it must be reset in r_toplevel
 
 #---------- parsing ----------
@@ -78,19 +81,28 @@ sub ri_Header {
          Anchor => $id,
          Headline => $hl,
          HasCaveat => [],
+         HasDescription => undef,
         };
 #print STDERR Dumper(\@insections);
+    $had_feature = 0;
 }
 
 sub ri_Para {
-    if (@insections) {
-        $insections[$#insections]{HasCaveat}[$version_index] = 1;
+    return unless @insections;
+    my $insection = $insections[$#insections];
+
+    if ($had_feature) {
+        $insection->{HasCaveat}[$version_index] = 1;
+    } else {
+        $insection->{HasDescription} //= $version_index;
     }
 };
 
 sub parse_feature_entry ($) {
     my ($value) = @_;
     die unless @insections;
+
+    $had_feature = 1;
 
     my $sectnode;
     my $realsect;
@@ -183,6 +195,7 @@ sub r_toplevel ($) {
 
     @insections = ();
     $had_unknown = undef;
+    $had_feature = undef;
 
     foreach my $e (@$i) {
         next unless ref $e eq 'ARRAY';
@@ -346,7 +359,14 @@ sub write_output_row ($) {
         $span->('col', $maxdepth - $heading->{Depth} + 1)
             if !%{ $heading->{Children} };
         o(' align="left">');
+        my $end_a = '';
+        my $desc_i = $heading->{RealSect}{HasDescription};
+        if (defined $desc_i) {
+            o(docref_a $desc_i, $heading->{RealSect});
+            $end_a= '</a>';
+        }
         o($heading->{Headline});
+        o($end_a);
         o('</th>');
     }
     if (%{ $sectnode->{Children} }) {
