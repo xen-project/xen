@@ -318,6 +318,12 @@ sub o { print @_ or die $!; }
 
 our @pending_headings;
 
+sub docref_a ($$) {
+    my ($i, $realsect) = @_;
+    return sprintf '<a href="%s#%s">',
+        $version_urls[$i], $realsect->{Anchor};
+}
+
 sub write_output_row ($) {
     my ($sectnode) = @_;
 #    print STDERR 'WOR ', Dumper($d, $sectnode);
@@ -364,8 +370,8 @@ sub write_output_row ($) {
                 && $sectnode->{RealSect}{Anchor}) {
                 my $rows = $sectnode->{RealSect}{Rows};
                 $nextcell = sprintf '<td rowspan=%d>', $rows;
-                $nextcell .= sprintf '<a href="%s#%s">[*]</a>',
-                    $version_urls[$i], $sectnode->{RealSect}{Anchor};
+                $nextcell .= docref_a $i, $sectnode->{RealSect};
+                $nextcell .= '[*]</a>';
                 $nextcell .= '</td>';
                 $colspan = '';
             }
