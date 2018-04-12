@@ -34,7 +34,7 @@ our $toplevel_sectlist = new_sectlist();
 # $sectlist->{KEY}{Children} = a further $sectlist
 # $sectlist->{KEY}{Key} = KEY
 # $sectlist->{KEY}{RealSect} = containing real section in @insections, so
-# $sectlist->{KEY}{RealSect}{HasText}[VI] = trueish iff there was a Para
+# $sectlist->{KEY}{RealSect}{HasCaveat}[VI] = trueish iff other in a Para
 # $sectlist->{KEY}{RealSect}{Anchor} = value for < id="" > in the pandoc html
 # A $sectnode represents a single section from the original markdown
 # document.  Its subsections are in Children.
@@ -57,7 +57,7 @@ our @insections;
 # $insections[]{Headline} = markdown content
 # these next are only defined for real sections, not Status elements
 # $insections[]{Anchor} = string
-# $insections[]{HasText} = array, $sectlist->{HasText} will refer to this
+# $insections[]{HasCaveat} = array, $sectlist->{HasCaveat} will refer to this
 
 our $had_unknown;
 # adding new variable ?  it must be reset in r_toplevel
@@ -77,14 +77,14 @@ sub ri_Header {
          Key => $id,
          Anchor => $id,
          Headline => $hl,
-         HasText => [],
+         HasCaveat => [],
         };
 #print STDERR Dumper(\@insections);
 }
 
 sub ri_Para {
     if (@insections) {
-        $insections[$#insections]{HasText}[$version_index] = 1;
+        $insections[$#insections]{HasCaveat}[$version_index] = 1;
     }
 };
 
@@ -366,7 +366,7 @@ sub write_output_row ($) {
         my $nextcell = '';
         if (!defined $colspan) { # first row of this RealSect
             $colspan= ' colspan="2"';
-            if ($sectnode->{RealSect}{HasText}[$i] && $st
+            if ($sectnode->{RealSect}{HasCaveat}[$i] && $st
                 && $sectnode->{RealSect}{Anchor}) {
                 my $rows = $sectnode->{RealSect}{Rows};
                 $nextcell = sprintf '<td rowspan=%d>', $rows;
