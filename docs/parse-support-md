@@ -17,6 +17,7 @@ use Tie::IxHash;
 use IO::File;
 use CGI qw(escapeHTML);
 use Data::Dumper;
+use POSIX;
 
 #---------- accumulating input/output ----------
 
@@ -285,8 +286,13 @@ sub count_rows_sectnode ($) {
     $rows++ if $sectnode->{Status};
     $rows += count_rows_sectlist $sectnode->{Children};
     $sectnode->{Rows} = $rows;
+    $sectnode->{RealSect}{Rows} = $rows;
     return $rows;
 }
+
+# Now we have
+#   $sectnode->{Rows}
+#   $sectnode->{RealSect}{Rows}
 
 sub count_rows_sectlist ($) {
     my ($sectlist) = @_;
@@ -349,22 +355,34 @@ sub write_output_row ($) {
     }
     for (my $i=0; $i<@version_urls; $i++) {
         my $st = $sectnode->{Status}[$i];
+
+        my $colspan = $sectnode->{RealSect}{ColSpan}[$i];
+        my $nextcell = '';
+        if (!defined $colspan) { # first row of this RealSect
+            $colspan= ' colspan="2"';
+            if ($sectnode->{RealSect}{HasText}[$i] && $st
+                && $sectnode->{RealSect}{Anchor}) {
+                my $rows = $sectnode->{RealSect}{Rows};
+                $nextcell = sprintf '<td rowspan=%d>', $rows;
+                $nextcell .= sprintf '<a href="%s#%s">[*]</a>',
+                    $version_urls[$i], $sectnode->{RealSect}{Anchor};
+                $nextcell .= '</td>';
+                $colspan = '';
+            }
+            $sectnode->{RealSect}{ColSpan}[$i] = $colspan;
+        }
+
         $st //= '-';
-        o('<td>');
+        o("<td$colspan>");
         my $end_a = '';
         if ($sectnode->{Key} eq 'release-support--xen-version') {
             o(sprintf '<a href="%s">', $version_urls[$i]);
             $end_a = '</a>';
         }
         o(escapeHTML($st));
-        if ($sectnode->{RealSect}{HasText}[$i]
-            && $sectnode->{Status}[$i]
-            && $sectnode->{RealSect}{Anchor}) {
-            o(sprintf '<a href="%s#%s">[*]</a>',
-              $version_urls[$i], $sectnode->{RealSect}{Anchor});
-        }
         o($end_a);
         o('</td>');
+        o($nextcell);
     }
     o("</tr>\n");
 }      
