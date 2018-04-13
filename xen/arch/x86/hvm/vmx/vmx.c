@@ -583,6 +583,12 @@ static void vmx_cpuid_policy_changed(struct vcpu *v)
         vmx_clear_msr_intercept(v, MSR_PRED_CMD,  VMX_MSR_RW);
     else
         vmx_set_msr_intercept(v, MSR_PRED_CMD,  VMX_MSR_RW);
+
+    /* MSR_FLUSH_CMD is safe to pass through if the guest knows about it. */
+    if ( cp->feat.l1d_flush )
+        vmx_clear_msr_intercept(v, MSR_FLUSH_CMD, VMX_MSR_RW);
+    else
+        vmx_set_msr_intercept(v, MSR_FLUSH_CMD, VMX_MSR_RW);
 }
 
 int vmx_guest_x86_mode(struct vcpu *v)

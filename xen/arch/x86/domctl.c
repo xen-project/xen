@@ -225,7 +225,8 @@ static int update_domain_cpuid_info(struct domain *d,
          */
         call_policy_changed = (is_hvm_domain(d) &&
                                ((old_7d0 ^ p->feat.raw[0].d) &
-                                cpufeat_mask(X86_FEATURE_IBRSB)));
+                                (cpufeat_mask(X86_FEATURE_IBRSB) |
+                                 cpufeat_mask(X86_FEATURE_L1D_FLUSH))));
         break;
 
     case 0xa:
