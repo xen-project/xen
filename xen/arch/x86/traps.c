@@ -2626,6 +2626,7 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         return X86EMUL_OKAY;
 
     case MSR_PRED_CMD:
+    case MSR_FLUSH_CMD:
         /* Write-only */
         break;
 
@@ -2874,6 +2875,16 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
             break; /* Rsvd bit set? */
 
         wrmsrl(MSR_PRED_CMD, val);
+        return X86EMUL_OKAY;
+
+    case MSR_FLUSH_CMD:
+        if ( !currd->arch.cpuid->feat.l1d_flush )
+            break; /* MSR available? */
+
+        if ( val & ~FLUSH_CMD_L1D )
+            break; /* Rsvd bit set? */
+
+        wrmsrl(MSR_FLUSH_CMD, val);
         return X86EMUL_OKAY;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
