@@ -10,7 +10,6 @@ use warnings;
 use Getopt::Long;
 use IO::File;
 use File::Basename;
-use HTML::TreeBuilder::XPath;
 
 Getopt::Long::Configure('bundling');
 
@@ -21,8 +20,10 @@ our @dirs;
 our %index;
 
 our $outdir;
+our $debug;
 
-GetOptions("i=s" => sub { read_index(@_);} )
+GetOptions("i=s" => sub { read_index(@_);},
+           "D" => \$debug)
     or die;
 
 ($outdir,@docs) = @ARGV;
@@ -68,6 +69,7 @@ sub make_linktext ($) {
 
     my $from_html;
     eval {
+        require HTML::TreeBuilder::XPath;
         my $tree = new HTML::TreeBuilder::XPath;
         my $f = "$outdir/$l.html";
         open F, '<', $f or die "$l $f $!";
@@ -75,6 +77,7 @@ sub make_linktext ($) {
         close F;
         $from_html = $tree->findvalue("/html/head/title");
     };
+    print "$l: get title: $@" if $@ && $debug;
     return $from_html if $from_html;
 
     return basename($l);
