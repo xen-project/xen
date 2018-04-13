@@ -2924,6 +2924,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             wrmsrl(MSR_PRED_CMD, msr_content);
             break;
 
+        case MSR_FLUSH_CMD:
+            /* Not available to PV guests. */
+            break;
+
         case MSR_P6_PERFCTR(0)...MSR_P6_PERFCTR(7):
         case MSR_P6_EVNTSEL(0)...MSR_P6_EVNTSEL(3):
         case MSR_CORE_PERF_FIXED_CTR0...MSR_CORE_PERF_FIXED_CTR2:
@@ -3055,6 +3059,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case MSR_PRED_CMD:
+        case MSR_FLUSH_CMD:
             /* Write-only */
             goto fail;
 
