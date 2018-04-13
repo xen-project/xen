@@ -14,8 +14,6 @@
 #include <public/xen.h>
 #include <irq_vectors.h>
 
-        .section .text.entry, "ax", @progbits
-
 /* %rbx: struct vcpu */
 ENTRY(switch_to_kernel)
         leaq  VCPU_trap_bounce(%rbx),%rdx
@@ -34,7 +32,110 @@ ENTRY(switch_to_kernel)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
         call  create_bounce_frame
         andl  $~X86_EFLAGS_DF,UREGS_eflags(%rsp)
+/* %rbx: struct vcpu */
+test_all_events:
+        ASSERT_NOT_IN_ATOMIC
+        cli                             # tests must not race interrupts
+/*test_softirqs:*/
+        movl  VCPU_processor(%rbx), %eax
+        shll  $IRQSTAT_shift, %eax
+        leaq  irq_stat+IRQSTAT_softirq_pending(%rip), %rcx
+        cmpl  $0, (%rcx, %rax, 1)
+        jne   process_softirqs
+        cmpb  $0, VCPU_mce_pending(%rbx)
+        jne   process_mce
+.Ltest_guest_nmi:
+        cmpb  $0, VCPU_nmi_pending(%rbx)
+        jne   process_nmi
+test_guest_events:
+        movq  VCPU_vcpu_info(%rbx), %rax
+        movzwl VCPUINFO_upcall_pending(%rax), %eax
+        decl  %eax
+        cmpl  $0xfe, %eax
+        ja    restore_all_guest
+/*process_guest_events:*/
+        sti
+        leaq  VCPU_trap_bounce(%rbx), %rdx
+        movq  VCPU_event_addr(%rbx), %rax
+        movq  %rax, TRAPBOUNCE_eip(%rdx)
+        movb  $TBF_INTERRUPT, TRAPBOUNCE_flags(%rdx)
+        call  create_bounce_frame
         jmp   test_all_events
+
+        ALIGN
+/* %rbx: struct vcpu */
+process_softirqs:
+        sti
+        call do_softirq
+        jmp  test_all_events
+
+        ALIGN
+/* %rbx: struct vcpu */
+process_mce:
+        testb $1 << VCPU_TRAP_MCE, VCPU_async_exception_mask(%rbx)
+        jnz  .Ltest_guest_nmi
+        sti
+        movb $0, VCPU_mce_pending(%rbx)
+        call set_guest_machinecheck_trapbounce
+        test %eax, %eax
+        jz   test_all_events
+        movzbl VCPU_async_exception_mask(%rbx), %edx # save mask for the
+        movb %dl, VCPU_mce_old_mask(%rbx)            # iret hypercall
+        orl  $1 << VCPU_TRAP_MCE, %edx
+        movb %dl, VCPU_async_exception_mask(%rbx)
+        jmp  process_trap
+
+        ALIGN
+/* %rbx: struct vcpu */
+process_nmi:
+        testb $1 << VCPU_TRAP_NMI, VCPU_async_exception_mask(%rbx)
+        jnz  test_guest_events
+        sti
+        movb $0, VCPU_nmi_pending(%rbx)
+        call set_guest_nmi_trapbounce
+        test %eax, %eax
+        jz   test_all_events
+        movzbl VCPU_async_exception_mask(%rbx), %edx # save mask for the
+        movb %dl, VCPU_nmi_old_mask(%rbx)            # iret hypercall
+        orl  $1 << VCPU_TRAP_NMI, %edx
+        movb %dl, VCPU_async_exception_mask(%rbx)
+        /* FALLTHROUGH */
+process_trap:
+        leaq VCPU_trap_bounce(%rbx), %rdx
+        call create_bounce_frame
+        jmp  test_all_events
+
+/* No special register assumptions. */
+ENTRY(ret_from_intr)
+        GET_CURRENT(bx)
+        testb $3, UREGS_cs(%rsp)
+        jz    restore_all_xen
+        movq  VCPU_domain(%rbx), %rax
+        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
+        je    test_all_events
+        jmp   compat_test_all_events
+
+/* Enable NMIs.  No special register assumptions. Only %rax is not preserved. */
+ENTRY(enable_nmis)
+        movq  %rsp, %rax /* Grab RSP before pushing */
+
+        /* Set up stack frame */
+        pushq $0               /* SS */
+        pushq %rax             /* RSP */
+        pushfq                 /* RFLAGS */
+        pushq $__HYPERVISOR_CS /* CS */
+        leaq  1f(%rip),%rax
+        pushq %rax             /* RIP */
+
+/* No op trap handler.  Required for kexec crash path. */
+GLOBAL(trap_nop)
+        iretq /* Disable the hardware NMI latch */
+1:
+        retq
+	.type enable_nmis, @function
+	.size enable_nmis, .-enable_nmis
+
+        .section .text.entry, "ax", @progbits
 
 /* %rbx: struct vcpu, interrupts disabled */
 restore_all_guest:
@@ -190,79 +291,7 @@ ENTRY(lstar_enter)
 
         mov   %rsp, %rdi
         call  pv_hypercall
-
-/* %rbx: struct vcpu */
-test_all_events:
-        ASSERT_NOT_IN_ATOMIC
-        cli                             # tests must not race interrupts
-/*test_softirqs:*/  
-        movl  VCPU_processor(%rbx),%eax
-        shll  $IRQSTAT_shift,%eax
-        leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
-        cmpl  $0,(%rcx,%rax,1)
-        jne   process_softirqs
-        testb $1,VCPU_mce_pending(%rbx)
-        jnz   process_mce
-.Ltest_guest_nmi:
-        testb $1,VCPU_nmi_pending(%rbx)
-        jnz   process_nmi
-test_guest_events:
-        movq  VCPU_vcpu_info(%rbx),%rax
-        movzwl VCPUINFO_upcall_pending(%rax),%eax
-        decl  %eax
-        cmpl  $0xfe,%eax
-        ja    restore_all_guest
-/*process_guest_events:*/
-        sti
-        leaq  VCPU_trap_bounce(%rbx),%rdx
-        movq  VCPU_event_addr(%rbx),%rax
-        movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
         jmp   test_all_events
-
-        ALIGN
-/* %rbx: struct vcpu */
-process_softirqs:
-        sti       
-        call do_softirq
-        jmp  test_all_events
-
-        ALIGN
-/* %rbx: struct vcpu */
-process_mce:
-        testb $1 << VCPU_TRAP_MCE,VCPU_async_exception_mask(%rbx)
-        jnz  .Ltest_guest_nmi
-        sti
-        movb $0,VCPU_mce_pending(%rbx)
-        call set_guest_machinecheck_trapbounce
-        test %eax,%eax
-        jz   test_all_events
-        movzbl VCPU_async_exception_mask(%rbx),%edx # save mask for the
-        movb %dl,VCPU_mce_old_mask(%rbx)            # iret hypercall
-        orl  $1 << VCPU_TRAP_MCE,%edx
-        movb %dl,VCPU_async_exception_mask(%rbx)
-        jmp  process_trap
-
-        ALIGN
-/* %rbx: struct vcpu */
-process_nmi:
-        testb $1 << VCPU_TRAP_NMI,VCPU_async_exception_mask(%rbx)
-        jnz  test_guest_events
-        sti
-        movb $0,VCPU_nmi_pending(%rbx)
-        call set_guest_nmi_trapbounce
-        test %eax,%eax
-        jz   test_all_events
-        movzbl VCPU_async_exception_mask(%rbx),%edx # save mask for the
-        movb %dl,VCPU_nmi_old_mask(%rbx)            # iret hypercall
-        orl  $1 << VCPU_TRAP_NMI,%edx
-        movb %dl,VCPU_async_exception_mask(%rbx)
-        /* FALLTHROUGH */
-process_trap:
-        leaq VCPU_trap_bounce(%rbx),%rdx
-        call create_bounce_frame
-        jmp  test_all_events
 
 ENTRY(sysenter_entry)
         /* sti could live here when we don't switch page tables below. */
@@ -537,16 +566,6 @@ ENTRY(common_interrupt)
         callq do_IRQ
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         jmp ret_from_intr
-
-/* No special register assumptions. */
-ENTRY(ret_from_intr)
-        GET_CURRENT(bx)
-        testb $3,UREGS_cs(%rsp)
-        jz    restore_all_xen
-        movq  VCPU_domain(%rbx),%rax
-        testb $1,DOMAIN_is_32bit_pv(%rax)
-        jz    test_all_events
-        jmp   compat_test_all_events
 
 ENTRY(page_fault)
         movl  $TRAP_page_fault,4(%rsp)
@@ -845,28 +864,6 @@ ENTRY(machine_check)
         pushq $0
         movl  $TRAP_machine_check,4(%rsp)
         jmp   handle_ist_exception
-
-/* Enable NMIs.  No special register assumptions. Only %rax is not preserved. */
-ENTRY(enable_nmis)
-        movq  %rsp, %rax /* Grab RSP before pushing */
-
-        /* Set up stack frame */
-        pushq $0               /* SS */
-        pushq %rax             /* RSP */
-        pushfq                 /* RFLAGS */
-        pushq $__HYPERVISOR_CS /* CS */
-        leaq  1f(%rip),%rax
-        pushq %rax             /* RIP */
-
-        iretq /* Disable the hardware NMI latch */
-1:
-        retq
-
-/* No op trap handler.  Required for kexec crash path. */
-GLOBAL(trap_nop)
-        iretq
-
-
 
         .pushsection .rodata, "a", @progbits
 ENTRY(exception_table)
