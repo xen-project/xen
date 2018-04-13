@@ -197,6 +197,8 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
     switch ( msr )
     {
+        uint64_t rsvd;
+
     case MSR_INTEL_PLATFORM_INFO:
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
@@ -232,8 +234,10 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
          * Note: SPEC_CTRL_STIBP is specified as safe to use (i.e. ignored)
          * when STIBP isn't enumerated in hardware.
          */
+        rsvd = ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
+                 (cp->feat.ssbd ? SPEC_CTRL_SSBD : 0));
 
-        if ( val & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+        if ( val & rsvd )
             goto gp_fault; /* Rsvd bit set? */
 
         vp->spec_ctrl.raw = val;
@@ -252,12 +256,12 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
     {
-        uint64_t rsvd = ~0ull;
         bool old_cpuid_faulting = vp->misc_features_enables.cpuid_faulting;
 
         if ( !vp->misc_features_enables.available )
             goto gp_fault;
 
+        rsvd = ~0ull;
         if ( dp->plaform_info.cpuid_faulting )
             rsvd &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
 
