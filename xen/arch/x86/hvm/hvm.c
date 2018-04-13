@@ -4829,6 +4829,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_PRED_CMD:
+    case MSR_FLUSH_CMD:
         /* Write-only */
         goto gp_fault;
 
@@ -5017,6 +5018,17 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
             goto gp_fault; /* Rsvd bit set? */
 
         wrmsrl(MSR_PRED_CMD, msr_content);
+        break;
+
+    case MSR_FLUSH_CMD:
+        hvm_cpuid(7, NULL, NULL, NULL, &edx);
+        if ( !(edx & cpufeat_mask(X86_FEATURE_L1D_FLUSH)) )
+            goto gp_fault; /* MSR available? */
+
+        if ( msr_content & ~FLUSH_CMD_L1D )
+            goto gp_fault; /* Rsvd bit set? */
+
+        wrmsrl(MSR_FLUSH_CMD, msr_content);
         break;
 
     case MSR_ARCH_CAPABILITIES:

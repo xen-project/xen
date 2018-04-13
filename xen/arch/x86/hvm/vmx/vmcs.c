@@ -1777,6 +1777,14 @@ void vmx_do_resume(struct vcpu *v)
             vmx_enable_intercept_for_msr(v, MSR_PRED_CMD,
                                          MSR_TYPE_R | MSR_TYPE_W);
 
+        /* MSR_FLUSH_CMD is safe to pass through if the guest knows about it. */
+        if ( (_7d0 & cpufeat_mask(X86_FEATURE_L1D_FLUSH)) )
+            vmx_disable_intercept_for_msr(v, MSR_FLUSH_CMD,
+                                          MSR_TYPE_R | MSR_TYPE_W);
+        else
+            vmx_enable_intercept_for_msr(v, MSR_FLUSH_CMD,
+                                         MSR_TYPE_R | MSR_TYPE_W);
+
         v->arch.flags |= TF_launched;
     }
 
