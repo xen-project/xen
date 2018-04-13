@@ -131,6 +131,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_AMD_PATCHLOADER:
     case MSR_IA32_UCODE_WRITE:
     case MSR_PRED_CMD:
+    case MSR_FLUSH_CMD:
         /* Write-only */
         goto gp_fault;
 
@@ -233,6 +234,17 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
         if ( v == curr )
             wrmsrl(MSR_PRED_CMD, val);
+        break;
+
+    case MSR_FLUSH_CMD:
+        if ( !cp->feat.l1d_flush )
+            goto gp_fault; /* MSR available? */
+
+        if ( val & ~FLUSH_CMD_L1D )
+            goto gp_fault; /* Rsvd bit set? */
+
+        if ( v == curr )
+            wrmsrl(MSR_FLUSH_CMD, val);
         break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
