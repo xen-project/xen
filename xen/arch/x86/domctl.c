@@ -1408,7 +1408,8 @@ long arch_do_domctl(
                      * ignored) when STIBP isn't enumerated in hardware.
                      */
 
-                    if ( msr.value & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+                    if ( msr.value & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
+                                       (d->arch.cpuid->feat.ssbd ? SPEC_CTRL_SSBD : 0)) )
                         break;
                     v->arch.spec_ctrl = msr.value;
                     continue;

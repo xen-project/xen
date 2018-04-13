@@ -2858,7 +2858,8 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
          * when STIBP isn't enumerated in hardware.
          */
 
-        if ( val & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+        if ( val & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
+                     (currd->arch.cpuid->feat.ssbd ? SPEC_CTRL_SSBD : 0)) )
             break; /* Rsvd bit set? */
 
         curr->arch.spec_ctrl = val;

@@ -3619,7 +3619,8 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
          * when STIBP isn't enumerated in hardware.
          */
 
-        if ( msr_content & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+        if ( msr_content & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
+                             (d->arch.cpuid->feat.ssbd ? SPEC_CTRL_SSBD : 0)) )
             goto gp_fault; /* Rsvd bit set? */
 
         v->arch.spec_ctrl = msr_content;
