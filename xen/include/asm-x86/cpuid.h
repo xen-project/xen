@@ -253,6 +253,9 @@ static inline void cpuid_featureset_to_policy(
 extern struct cpuid_policy raw_cpuid_policy, host_cpuid_policy,
     pv_max_cpuid_policy, hvm_max_cpuid_policy;
 
+/* Check that all previously present features are still available. */
+bool recheck_cpu_features(unsigned int cpu);
+
 /* Allocate and initialise a CPUID policy suitable for the domain. */
 int init_domain_cpuid_policy(struct domain *d);
 

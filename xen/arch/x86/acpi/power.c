@@ -254,6 +254,9 @@ static int enter_state(u32 state)
 
     microcode_resume_cpu(0);
 
+    if ( !recheck_cpu_features(0) )
+        panic("Missing previously available feature(s).");
+
     ci->bti_ist_info = default_bti_ist_info;
     asm volatile (ALTERNATIVE("", "wrmsr", X86_FEATURE_XEN_IBRS_SET)
                   :: "a" (SPEC_CTRL_IBRS), "c" (MSR_SPEC_CTRL), "d" (0)

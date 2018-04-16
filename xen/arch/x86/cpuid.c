@@ -473,6 +473,28 @@ void __init init_guest_cpuid(void)
     calculate_hvm_max_policy();
 }
 
+bool recheck_cpu_features(unsigned int cpu)
+{
+    bool okay = true;
+    struct cpuinfo_x86 c;
+    const struct cpuinfo_x86 *bsp = &boot_cpu_data;
+    unsigned int i;
+
+    identify_cpu(&c);
+
+    for ( i = 0; i < NCAPINTS; ++i )
+    {
+        if ( !(~c.x86_capability[i] & bsp->x86_capability[i]) )
+            continue;
+
+        printk(XENLOG_ERR "CPU%u: cap[%2u] is %08x (expected %08x)\n",
+               cpu, i, c.x86_capability[i], bsp->x86_capability[i]);
+        okay = false;
+    }
+
+    return okay;
+}
+
 const uint32_t *lookup_deep_deps(uint32_t feature)
 {
     static const struct {

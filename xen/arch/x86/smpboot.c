@@ -90,11 +90,14 @@ void initialize_cpu_data(unsigned int cpu)
     cpu_data[cpu] = boot_cpu_data;
 }
 
-static void smp_store_cpu_info(int id)
+static bool smp_store_cpu_info(unsigned int id)
 {
     unsigned int socket;
 
-    identify_cpu(&cpu_data[id]);
+    if ( system_state != SYS_STATE_resume )
+        identify_cpu(&cpu_data[id]);
+    else if ( !recheck_cpu_features(id) )
+        return false;
 
     socket = cpu_to_socket(id);
     if ( !socket_cpumask[socket] )
@@ -102,6 +105,8 @@ static void smp_store_cpu_info(int id)
         socket_cpumask[socket] = secondary_socket_cpumask;
         secondary_socket_cpumask = NULL;
     }
+
+    return true;
 }
 
 /*
@@ -187,12 +192,19 @@ static void smp_callin(void)
     setup_local_APIC();
 
     /* Save our processor parameters. */
-    smp_store_cpu_info(cpu);
+    if ( !smp_store_cpu_info(cpu) )
+    {
+        printk("CPU%u: Failed to validate features - not coming back online\n",
+               cpu);
+        cpu_error = -ENXIO;
+        goto halt;
+    }
 
     if ( (rc = hvm_cpu_up()) != 0 )
     {
         printk("CPU%d: Failed to initialise HVM. Not coming online.\n", cpu);
         cpu_error = rc;
+    halt:
         clear_local_APIC();
         spin_debug_enable();
         cpu_exit_clear(cpu);

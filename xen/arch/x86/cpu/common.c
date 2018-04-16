@@ -501,6 +501,9 @@ void identify_cpu(struct cpuinfo_x86 *c)
 	printk("\n");
 #endif
 
+	if (system_state == SYS_STATE_resume)
+		return;
+
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are
