@@ -2166,7 +2166,7 @@ void init_domheap_pages(paddr_t ps, paddr_t pe)
     ASSERT(!in_irq());
 
     smfn = maddr_to_mfn(round_pgup(ps));
-    emfn = maddr_to_mfn(round_pgup(pe));
+    emfn = maddr_to_mfn(round_pgdown(pe));
 
     if ( mfn_x(emfn) <= mfn_x(smfn) )
         return;
