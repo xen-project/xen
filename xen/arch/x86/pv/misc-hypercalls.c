@@ -30,22 +30,10 @@ long do_set_debugreg(int reg, unsigned long value)
 
 unsigned long do_get_debugreg(int reg)
 {
-    struct vcpu *curr = current;
+    unsigned long val;
+    int res = x86emul_read_dr(reg, &val, NULL);
 
-    switch ( reg )
-    {
-    case 0 ... 3:
-    case 6:
-        return curr->arch.debugreg[reg];
-    case 7:
-        return (curr->arch.debugreg[7] |
-                curr->arch.debugreg[5]);
-    case 4 ... 5:
-        return ((curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) ?
-                curr->arch.debugreg[reg + 2] : 0);
-    }
-
-    return -EINVAL;
+    return res == X86EMUL_OKAY ? val : -ENODEV;
 }
 
 long do_fpu_taskswitch(int set)

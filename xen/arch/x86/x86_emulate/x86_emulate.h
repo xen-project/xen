@@ -722,6 +722,11 @@ int x86emul_read_xcr(unsigned int reg, uint64_t *val,
 int x86emul_write_xcr(unsigned int reg, uint64_t val,
                       struct x86_emulate_ctxt *ctxt);
 
+int x86emul_read_dr(unsigned int reg, unsigned long *val,
+                    struct x86_emulate_ctxt *ctxt);
+int x86emul_write_dr(unsigned int reg, unsigned long val,
+                     struct x86_emulate_ctxt *ctxt);
+
 #endif
 
 int
