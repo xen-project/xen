@@ -296,7 +296,11 @@ sub count_rows_sectlist ($);
 sub count_rows_sectnode ($) {
     my ($sectnode) = @_;
     my $rows = 0;
-    $rows++ if $sectnode->{Status};
+    $sectnode->{RealSect}{OwnRows} //= 0;
+    if ($sectnode->{Status}) {
+        $rows++;
+        $sectnode->{RealSect}{OwnRows}++;
+    }
     $rows += count_rows_sectlist $sectnode->{Children};
     $sectnode->{Rows} = $rows;
     $sectnode->{RealSect}{Rows} = $rows;
@@ -306,6 +310,7 @@ sub count_rows_sectnode ($) {
 # Now we have
 #   $sectnode->{Rows}
 #   $sectnode->{RealSect}{Rows}
+#   $sectnode->{RealSect}{OwnRows}
 
 sub count_rows_sectlist ($) {
     my ($sectlist) = @_;
@@ -388,8 +393,10 @@ sub write_output_row ($) {
             $colspan= ' colspan="2"';
             if ($sectnode->{RealSect}{HasCaveat}[$i] && $st
                 && $sectnode->{RealSect}{Anchor}) {
-                my $rows = $sectnode->{RealSect}{Rows};
-                $nextcell = sprintf '<td rowspan=%d>', $rows;
+                my $rows = $sectnode->{RealSect}{OwnRows};
+                $nextcell = '<td';
+                $nextcell .= sprintf ' rowspan=%d', $rows if $rows>1;
+                $nextcell .= '>';
                 $nextcell .= docref_a $i, $sectnode->{RealSect};
                 $nextcell .= '[*]</a>';
                 $nextcell .= '</td>';
