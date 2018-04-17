@@ -117,7 +117,7 @@
     mov %\tmp, %rsp                 /* Restore old %rsp */
 .endm
 
-.macro DO_SPEC_CTRL_ENTRY_FROM_VMEXIT ibrs_val:req
+.macro DO_SPEC_CTRL_ENTRY_FROM_VMEXIT
 /*
  * Requires %rbx=current, %rsp=regs/cpuinfo
  * Clobbers %rax, %rcx, %rdx
@@ -138,11 +138,11 @@
     andb $~SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
 
     /* Load Xen's intended value. */
-    mov $\ibrs_val, %eax
+    movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
     wrmsr
 .endm
 
-.macro DO_SPEC_CTRL_ENTRY maybexen:req ibrs_val:req
+.macro DO_SPEC_CTRL_ENTRY maybexen:req
 /*
  * Requires %rsp=regs (also cpuinfo if !maybexen)
  * Requires %r14=stack_end (if maybexen)
@@ -167,12 +167,12 @@
         setnz %al
         not %eax
         and %al, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
+        movzbl STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
     .else
         andb $~SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
+        movzbl CPUINFO_xen_spec_ctrl(%rsp), %eax
     .endif
 
-    /* Load Xen's intended value. */
-    mov $\ibrs_val, %eax
     wrmsr
 .endm
 
@@ -219,45 +219,30 @@
 /* Use after a VMEXIT from an HVM guest. */
 #define SPEC_CTRL_ENTRY_FROM_VMEXIT                                     \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_RSB_VMEXIT;           \
-    ALTERNATIVE_2 "",                                                   \
-        __stringify(DO_SPEC_CTRL_ENTRY_FROM_VMEXIT                      \
-                    ibrs_val=SPEC_CTRL_IBRS),                           \
-        X86_FEATURE_XEN_IBRS_SET,                                       \
-        __stringify(DO_SPEC_CTRL_ENTRY_FROM_VMEXIT                      \
-                    ibrs_val=0),                                        \
-        X86_FEATURE_XEN_IBRS_CLEAR
+    ALTERNATIVE "", DO_SPEC_CTRL_ENTRY_FROM_VMEXIT,                     \
+        X86_FEATURE_SC_MSR
 
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;           \
-    ALTERNATIVE_2 "",                                                   \
-        __stringify(DO_SPEC_CTRL_ENTRY maybexen=0                       \
-                    ibrs_val=SPEC_CTRL_IBRS),                           \
-        X86_FEATURE_XEN_IBRS_SET,                                       \
-        __stringify(DO_SPEC_CTRL_ENTRY maybexen=0 ibrs_val=0),          \
-        X86_FEATURE_XEN_IBRS_CLEAR
+    ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=0),         \
+        X86_FEATURE_SC_MSR
 
 /* Use in interrupt/exception context.  May interrupt Xen or PV context. */
 #define SPEC_CTRL_ENTRY_FROM_INTR                                       \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;           \
-    ALTERNATIVE_2 "",                                                   \
-        __stringify(DO_SPEC_CTRL_ENTRY maybexen=1                       \
-                    ibrs_val=SPEC_CTRL_IBRS),                           \
-        X86_FEATURE_XEN_IBRS_SET,                                       \
-        __stringify(DO_SPEC_CTRL_ENTRY maybexen=1 ibrs_val=0),          \
-        X86_FEATURE_XEN_IBRS_CLEAR
+    ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
+        X86_FEATURE_SC_MSR
 
 /* Use when exiting to Xen context. */
 #define SPEC_CTRL_EXIT_TO_XEN                                           \
-    ALTERNATIVE_2 "",                                                   \
-        DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_XEN_IBRS_SET,             \
-        DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_XEN_IBRS_CLEAR
+    ALTERNATIVE "",                                                     \
+        DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_SC_MSR
 
 /* Use when exiting to guest context. */
 #define SPEC_CTRL_EXIT_TO_GUEST                                         \
-    ALTERNATIVE_2 "",                                                   \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_XEN_IBRS_SET,           \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_XEN_IBRS_CLEAR
+    ALTERNATIVE "",                                                     \
+        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR
 
 /* TODO: Drop these when the alternatives infrastructure is NMI/#MC safe. */
 .macro SPEC_CTRL_ENTRY_FROM_INTR_IST
