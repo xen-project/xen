@@ -399,7 +399,7 @@ sub write_output_row ($) {
         }
 
         $st //= '-';
-        o("<td$colspan>");
+        o("\n<td$colspan>");
         my $end_a = '';
         if ($sectnode->{Key} eq 'release-support--xen-version') {
             o(sprintf '<a href="%s">', $version_urls[$i]);
