@@ -213,7 +213,8 @@ static int enter_state(u32 state)
         error = 0;
 
     ci = get_cpu_info();
-    ci->use_shadow_spec_ctrl = 0;
+    spec_ctrl_enter_idle(ci);
+    /* Avoid NMI/#MC using MSR_SPEC_CTRL until we've reloaded microcode. */
     ci->bti_ist_info = 0;
 
     ACPI_FLUSH_CPU_CACHE();
@@ -257,10 +258,9 @@ static int enter_state(u32 state)
     if ( !recheck_cpu_features(0) )
         panic("Missing previously available feature(s).");
 
+    /* Re-enabled default NMI/#MC use of MSR_SPEC_CTRL. */
     ci->bti_ist_info = default_bti_ist_info;
-    asm volatile (ALTERNATIVE("", "wrmsr", X86_FEATURE_XEN_IBRS_SET)
-                  :: "a" (SPEC_CTRL_IBRS), "c" (MSR_SPEC_CTRL), "d" (0)
-                  : "memory");
+    spec_ctrl_exit_idle(ci);
 
  done:
     spin_debug_enable();
