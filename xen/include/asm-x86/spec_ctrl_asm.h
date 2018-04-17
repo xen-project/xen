@@ -223,34 +223,34 @@
 #define SPEC_CTRL_ENTRY_FROM_HVM                                        \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM;           \
     ALTERNATIVE "", DO_SPEC_CTRL_ENTRY_FROM_HVM,                        \
-        X86_FEATURE_SC_MSR
+        X86_FEATURE_SC_MSR_HVM
 
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;            \
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=0),         \
-        X86_FEATURE_SC_MSR
+        X86_FEATURE_SC_MSR_PV
 
 /* Use in interrupt/exception context.  May interrupt Xen or PV context. */
 #define SPEC_CTRL_ENTRY_FROM_INTR                                       \
     ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;            \
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
-        X86_FEATURE_SC_MSR
+        X86_FEATURE_SC_MSR_PV
 
 /* Use when exiting to Xen context. */
 #define SPEC_CTRL_EXIT_TO_XEN                                           \
     ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_SC_MSR
+        DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_SC_MSR_PV
 
 /* Use when exiting to PV guest context. */
 #define SPEC_CTRL_EXIT_TO_PV                                            \
     ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR
+        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV
 
 /* Use when exiting to HVM guest context. */
 #define SPEC_CTRL_EXIT_TO_HVM                                           \
     ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR
+        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_HVM
 
 /*
  * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
