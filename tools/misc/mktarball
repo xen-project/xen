@@ -29,7 +29,21 @@ mkdir -p $tdir
 
 git_archive_into $xen_root $tdir/xen-$desc
 
-git_archive_into $xen_root/tools/qemu-xen-dir-remote $tdir/xen-$desc/tools/qemu-xen
+# We can't use git_archive_into with qemu upstream because it uses
+# git-submodules.  git-submodules are an inherently broken git feature
+# which should never be used in any circumstance.  Unfortunately, qemu
+# upstream uses them.  Relevantly for us, git archive does not work
+# properly when there are submodules.
+(
+    cd $xen_root/tools/qemu-xen-dir-remote
+    # if it's not clean, the qemu script will call `git stash' !
+    git --no-pager diff --stat HEAD
+    scripts/archive-source.sh $tdir/xen-$desc/tools/qemu-xen.tar
+    cd $tdir/xen-$desc/tools
+    mkdir qemu-xen
+    tar <qemu-xen.tar Cxf qemu-xen -
+    rm qemu-xen.tar
+)
 
 git_archive_into $xen_root/tools/qemu-xen-traditional-dir-remote $tdir/xen-$desc/tools/qemu-xen-traditional
 
