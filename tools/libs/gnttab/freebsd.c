@@ -70,22 +70,21 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
 {
     uint32_t i;
     int fd = xgt->fd;
-    struct ioctl_gntdev_map_grant_ref *map;
+    struct ioctl_gntdev_map_grant_ref map;
     void *addr = NULL;
     int domids_stride;
-    unsigned int map_size = ROUNDUP((sizeof(*map) + (count - 1) *
-                                    sizeof(struct ioctl_gntdev_map_grant_ref)),
-                                    PAGE_SHIFT);
+    unsigned int refs_size = ROUNDUP(count *
+                                     sizeof(struct ioctl_gntdev_map_grant_ref),
+                                     PAGE_SHIFT);
 
     domids_stride = (flags & XENGNTTAB_GRANT_MAP_SINGLE_DOMAIN) ? 0 : 1;
-    if ( map_size <= PAGE_SIZE )
-        map = malloc(sizeof(*map) +
-                     (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
+    if ( refs_size <= PAGE_SIZE )
+        map.refs = malloc(refs_size);
     else
     {
-        map = mmap(NULL, map_size, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | MAP_ANON, -1, 0);
-        if ( map == MAP_FAILED )
+        map.refs = mmap(NULL, refs_size, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANON, -1, 0);
+        if ( map.refs == MAP_FAILED )
         {
             GTERROR(xgt->logger, "anon mmap of map failed");
             return NULL;
@@ -94,26 +93,26 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
 
     for ( i = 0; i < count; i++ )
     {
-        map->refs[i].domid = domids[i * domids_stride];
-        map->refs[i].ref = refs[i];
+        map.refs[i].domid = domids[i * domids_stride];
+        map.refs[i].ref = refs[i];
     }
 
-    map->count = count;
+    map.count = count;
 
-    if ( ioctl(fd, IOCTL_GNTDEV_MAP_GRANT_REF, map) )
+    if ( ioctl(fd, IOCTL_GNTDEV_MAP_GRANT_REF, &map) )
     {
         GTERROR(xgt->logger, "ioctl MAP_GRANT_REF failed");
         goto out;
     }
 
     addr = mmap(NULL, PAGE_SIZE * count, prot, MAP_SHARED, fd,
-                map->index);
+                map.index);
     if ( addr != MAP_FAILED )
     {
         int rv = 0;
         struct ioctl_gntdev_unmap_notify notify;
 
-        notify.index = map->index;
+        notify.index = map.index;
         notify.action = 0;
         if ( notify_offset < PAGE_SIZE * count )
         {
@@ -141,7 +140,7 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
 
         /* Unmap the driver slots used to store the grant information. */
         GTERROR(xgt->logger, "mmap failed");
-        unmap_grant.index = map->index;
+        unmap_grant.index = map.index;
         unmap_grant.count = count;
         ioctl(fd, IOCTL_GNTDEV_UNMAP_GRANT_REF, &unmap_grant);
         errno = saved_errno;
@@ -149,10 +148,10 @@ void *osdep_gnttab_grant_map(xengnttab_handle *xgt,
     }
 
  out:
-    if ( map_size > PAGE_SIZE )
-        munmap(map, map_size);
+    if ( refs_size > PAGE_SIZE )
+        munmap(map.refs, refs_size);
     else
-        free(map);
+        free(map.refs);
 
     return addr;
 }
@@ -239,16 +238,16 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
     void *area = NULL;
     struct ioctl_gntdev_unmap_notify notify;
     struct ioctl_gntdev_dealloc_gref gref_drop;
-    struct ioctl_gntdev_alloc_gref *gref_info = NULL;
+    struct ioctl_gntdev_alloc_gref gref_info;
 
-    gref_info = malloc(sizeof(*gref_info) + count * sizeof(uint32_t));
-    if ( gref_info == NULL )
+    gref_info.gref_ids = malloc(count * sizeof(uint32_t));
+    if ( gref_info.gref_ids == NULL )
         return NULL;
-    gref_info->domid = domid;
-    gref_info->flags = writable ? GNTDEV_ALLOC_FLAG_WRITABLE : 0;
-    gref_info->count = count;
+    gref_info.domid = domid;
+    gref_info.flags = writable ? GNTDEV_ALLOC_FLAG_WRITABLE : 0;
+    gref_info.count = count;
 
-    err = ioctl(fd, IOCTL_GNTDEV_ALLOC_GREF, gref_info);
+    err = ioctl(fd, IOCTL_GNTDEV_ALLOC_GREF, &gref_info);
     if ( err )
     {
         GSERROR(xgs->logger, "ioctl failed");
@@ -256,7 +255,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
     }
 
     area = mmap(NULL, count * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
-                fd, gref_info->index);
+                fd, gref_info.index);
 
     if ( area == MAP_FAILED )
     {
@@ -265,7 +264,7 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
         goto out_remove_fdmap;
     }
 
-    notify.index = gref_info->index;
+    notify.index = gref_info.index;
     notify.action = 0;
     if ( notify_offset < PAGE_SIZE * count )
     {
@@ -286,18 +285,18 @@ void *osdep_gntshr_share_pages(xengntshr_handle *xgs,
         area = NULL;
     }
 
-    memcpy(refs, gref_info->gref_ids, count * sizeof(uint32_t));
+    memcpy(refs, gref_info.gref_ids, count * sizeof(uint32_t));
 
  out_remove_fdmap:
     /*
      * Removing the mapping from the file descriptor does not cause the
      * pages to be deallocated until the mapping is removed.
      */
-    gref_drop.index = gref_info->index;
+    gref_drop.index = gref_info.index;
     gref_drop.count = count;
     ioctl(fd, IOCTL_GNTDEV_DEALLOC_GREF, &gref_drop);
  out:
-    free(gref_info);
+    free(gref_info.gref_ids);
 
     return area;
 }
