@@ -32,3 +32,4 @@ XEN_CPUFEATURE(XEN_IBRS_SET,    (FSCAPINTS+0)*32+18) /* IBRSB && IRBS set in Xen
 XEN_CPUFEATURE(XEN_IBRS_CLEAR,  (FSCAPINTS+0)*32+19) /* IBRSB && IBRS clear in Xen */
 XEN_CPUFEATURE(RSB_NATIVE,      (FSCAPINTS+0)*32+20) /* RSB overwrite needed for native */
 XEN_CPUFEATURE(RSB_VMEXIT,      (FSCAPINTS+0)*32+21) /* RSB overwrite needed for vmexit */
+XEN_CPUFEATURE(NO_XPTI,         (FSCAPINTS+0)*32+22) /* XPTI mitigation not in use */
