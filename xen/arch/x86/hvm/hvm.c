@@ -3497,6 +3497,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
             *ecx &= hvm_featureset[FEATURESET_7c0];
 
+            *edx |= cpufeat_mask(X86_FEATURE_STIBP);
+            *edx &= hvm_featureset[FEATURESET_7d0];
+
             /* Don't expose HAP-only features to non-hap guests. */
             if ( !hap_enabled(d) )
             {
@@ -3654,6 +3657,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
         hvm_cpuid(0x80000001, NULL, NULL, NULL, &_edx);
         *eax |= (_edx & cpufeat_mask(X86_FEATURE_LM) ? vaddr_bits : 32) << 8;
 
+        *ebx |= cpufeat_mask(X86_FEATURE_IBPB);
         *ebx &= hvm_featureset[FEATURESET_e8b];
         break;
     }
