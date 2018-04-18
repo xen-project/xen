@@ -202,7 +202,7 @@ ENTRY(cstar_enter)
         /* sti could live here when we don't switch page tables below. */
         CR4_PV32_RESTORE
         movq  8(%rsp),%rax /* Restore %rax. */
-        movq  $FLAT_KERNEL_SS,8(%rsp)
+        movq  $FLAT_USER_SS32, 8(%rsp) /* Assume a 64bit domain.  Compat handled lower. */
         pushq %r11
         pushq $FLAT_USER_CS32
         pushq %rcx
@@ -228,6 +228,11 @@ ENTRY(cstar_enter)
         movq  VCPU_domain(%rbx),%rcx
         cmpb  $0,DOMAIN_is_32bit_pv(%rcx)
         je    switch_to_kernel
+
+        /* Fix up reported %cs/%ss for compat domains. */
+        movl  $FLAT_COMPAT_USER_SS, UREGS_ss(%rsp)
+        movl  $FLAT_COMPAT_USER_CS, UREGS_cs(%rsp)
+
         cmpb  $0,VCPU_syscall32_disables_events(%rbx)
         movzwl VCPU_syscall32_sel(%rbx),%esi
         movq  VCPU_syscall32_addr(%rbx),%rax
