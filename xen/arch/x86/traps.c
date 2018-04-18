@@ -4223,14 +4223,11 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
             /*
              * If DR7 was previously clear then we need to load all other
              * debug registers at this point as they were not restored during
-             * context switch.
+             * context switch.  Updating DR7 itself happens later.
              */
             if ( (v == curr) &&
                  !(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
-            {
                 activate_debugregs(v);
-                break;
-            }
         }
         if ( v == curr )
             write_debugreg(7, value);
