@@ -224,12 +224,11 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( !cp->feat.ibrsb && !cp->extd.ibpb )
             goto gp_fault; /* MSR available? */
 
-        /*
-         * The only defined behaviour is when writing PRED_CMD_IBPB.  In
-         * practice, real hardware accepts any value without faulting.
-         */
-        if ( v == curr && (val & PRED_CMD_IBPB) )
-            wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+        if ( val & ~PRED_CMD_IBPB )
+            goto gp_fault; /* Rsvd bit set? */
+
+        if ( v == curr )
+            wrmsrl(MSR_PRED_CMD, val);
         break;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
