@@ -4007,12 +4007,10 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
              !(ebx & cpufeat_mask(X86_FEATURE_IBPB)) )
             goto gp_fault; /* MSR available? */
 
-        /*
-         * The only defined behaviour is when writing PRED_CMD_IBPB.  In
-         * practice, real hardware accepts any value without faulting.
-         */
-        if ( msr_content & PRED_CMD_IBPB )
-            wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+        if ( msr_content & ~PRED_CMD_IBPB )
+            goto gp_fault; /* Rsvd bit set? */
+
+        wrmsrl(MSR_PRED_CMD, msr_content);
         break;
 
     case MSR_ARCH_CAPABILITIES:
