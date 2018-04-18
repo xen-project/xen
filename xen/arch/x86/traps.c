@@ -2763,12 +2763,10 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
              !(ebx & cpufeat_mask(X86_FEATURE_IBPB)) )
             break; /* MSR available? */
 
-        /*
-         * The only defined behaviour is when writing PRED_CMD_IBPB.  In
-         * practice, real hardware accepts any value without faulting.
-         */
-        if ( val & PRED_CMD_IBPB )
-            wrmsrl(MSR_PRED_CMD, PRED_CMD_IBPB);
+        if ( val & ~PRED_CMD_IBPB )
+            break; /* Rsvd bit set? */
+
+        wrmsrl(MSR_PRED_CMD, val);
         return X86EMUL_OKAY;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
