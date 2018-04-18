@@ -29,6 +29,7 @@ XEN_CPUFEATURE(XEN_IBRS_SET,    (FSCAPINTS+0)*32+18) /* IBRSB && IRBS set in Xen
 XEN_CPUFEATURE(XEN_IBRS_CLEAR,  (FSCAPINTS+0)*32+19) /* IBRSB && IBRS clear in Xen */
 XEN_CPUFEATURE(RSB_NATIVE,      (FSCAPINTS+0)*32+20) /* RSB overwrite needed for native */
 XEN_CPUFEATURE(RSB_VMEXIT,      (FSCAPINTS+0)*32+21) /* RSB overwrite needed for vmexit */
+XEN_CPUFEATURE(NO_XPTI,         (FSCAPINTS+0)*32+22) /* XPTI mitigation not in use */
 
 #define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
 
@@ -105,6 +106,7 @@ XEN_CPUFEATURE(RSB_VMEXIT,      (FSCAPINTS+0)*32+21) /* RSB overwrite needed for
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 #define cpu_has_cmp_legacy	boot_cpu_has(X86_FEATURE_CMP_LEGACY)
 #define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
+#define cpu_has_no_xpti         boot_cpu_has(X86_FEATURE_NO_XPTI)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,
