@@ -41,16 +41,12 @@ linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 $(D): linkfarm.stamp
 	$(MAKE) -C $(D)/xen distclean
 
-.PHONY: shim-%config
-shim-%config: $(D) FORCE
-	$(MAKE) -C $(D)/xen $*config \
-		XEN_CONFIG_EXPERT=y \
-		KCONFIG_CONFIG=$(CURDIR)/shim.config
+$(D)/xen/.config: shim.config $(D)
+	cp $< $@
+	$(MAKE) -C $(@D) olddefconfig XEN_CONFIG_EXPERT=y
 
-xen-shim: $(D) shim-olddefconfig
-	$(MAKE) -C $(D)/xen build \
-		XEN_CONFIG_EXPERT=y \
-		KCONFIG_CONFIG=$(CURDIR)/shim.config
+xen-shim: $(D)/xen/.config
+	$(MAKE) -C $(<D) build XEN_CONFIG_EXPERT=y
 	ln -sf $(D)/xen/xen $@
 	ln -sf $(D)/xen/xen-syms $@-syms
 
