@@ -76,6 +76,7 @@ int libxl__arch_extra_memory(libxl__gc *gc,
 #if defined(__i386__) || defined(__x86_64__)
 
 #define LAPIC_BASE_ADDRESS  0xfee00000
+#define ACPI_INFO_PHYSICAL_ADDRESS 0xfc000000
 
 int libxl__dom_load_acpi(libxl__gc *gc,
                          const libxl_domain_build_info *b_info,

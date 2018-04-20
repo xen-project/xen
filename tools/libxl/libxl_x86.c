@@ -512,8 +512,8 @@ static int domain_construct_memmap(libxl__gc *gc,
         if (d_config->rdms[i].policy != LIBXL_RDM_RESERVE_POLICY_INVALID)
             e820_entries++;
 
-    /* Add mmio entry for PVH. */
-    if (dom->mmio_size && d_config->b_info.type == LIBXL_DOMAIN_TYPE_PVH)
+    /* Add the HVM special pages to PVH memmap as RESERVED. */
+    if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_PVH)
         e820_entries++;
 
     /* If we should have a highmem range. */
@@ -549,10 +549,11 @@ static int domain_construct_memmap(libxl__gc *gc,
         nr++;
     }
 
-    /* mmio area */
-    if (dom->mmio_size && d_config->b_info.type == LIBXL_DOMAIN_TYPE_PVH) {
-        e820[nr].addr = dom->mmio_start;
-        e820[nr].size = dom->mmio_size;
+    /* HVM special pages */
+    if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_PVH) {
+        e820[nr].addr = (X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
+                        << XC_PAGE_SHIFT;
+        e820[nr].size = X86_HVM_NR_SPECIAL_PAGES << XC_PAGE_SHIFT;
         e820[nr].type = E820_RESERVED;
         nr++;
     }

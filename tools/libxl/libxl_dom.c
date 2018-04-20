@@ -1229,15 +1229,17 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         dom->mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
     else if (dom->mmio_size == 0 && !device_model) {
 #if defined(__i386__) || defined(__x86_64__)
-        if (libxl_defbool_val(info->apic)) {
-            /* Make sure LAPIC_BASE_ADDRESS is below special pages */
-            assert(((((X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
-                      << XC_PAGE_SHIFT) - LAPIC_BASE_ADDRESS)) >= XC_PAGE_SIZE);
-            dom->mmio_size = GB(4) - LAPIC_BASE_ADDRESS;
-        } else
-            dom->mmio_size = GB(4) -
-                ((X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES)
-                 << XC_PAGE_SHIFT);
+        /*
+         * Make sure the local APIC page, the ACPI tables and the special pages
+         * are inside the MMIO hole.
+         */
+        xen_paddr_t start =
+            (X86_HVM_END_SPECIAL_REGION - X86_HVM_NR_SPECIAL_PAGES) <<
+            XC_PAGE_SHIFT;
+
+        start = min_t(xen_paddr_t, start, LAPIC_BASE_ADDRESS);
+        start = min_t(xen_paddr_t, start, ACPI_INFO_PHYSICAL_ADDRESS);
+        dom->mmio_size = GB(4) - start;
 #else
         assert(1);
 #endif

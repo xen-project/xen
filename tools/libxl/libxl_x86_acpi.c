@@ -22,7 +22,6 @@
 
  /* Number of pages holding ACPI tables */
 #define NUM_ACPI_PAGES 16
-#define ACPI_INFO_PHYSICAL_ADDRESS 0xfc000000
 
 struct libxl_acpi_ctxt {
     struct acpi_ctxt c;
