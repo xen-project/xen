@@ -5475,7 +5475,7 @@ void destroy_perdomain_mapping(struct domain *d, unsigned long va,
 
     ASSERT(va >= PERDOMAIN_VIRT_START &&
            va < PERDOMAIN_VIRT_SLOT(PERDOMAIN_SLOTS));
-    ASSERT(!l3_table_offset(va ^ (va + nr * PAGE_SIZE - 1)));
+    ASSERT(!nr || !l3_table_offset(va ^ (va + nr * PAGE_SIZE - 1)));
 
     if ( !d->arch.perdomain_l3_pg )
         return;
