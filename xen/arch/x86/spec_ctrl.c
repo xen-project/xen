@@ -119,7 +119,7 @@ static void __init print_details(enum ind_thunk thunk)
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "",
            (caps & ARCH_CAPABILITIES_IBRS_ALL)      ? " IBRS_ALL"  : "",
            (caps & ARCH_CAPABILITIES_RDCL_NO)       ? " RDCL_NO"   : "",
-           (caps & ARCH_CAPS_RSBA)                  ? " RBSA"      : "");
+           (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "");
 
     /* Compiled-in support which pertains to BTI mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )
