@@ -401,6 +401,12 @@ int80_slow_path:
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         /* A GPF wouldn't have incremented the instruction pointer. */
         subq  $2,UREGS_rip(%rsp)
+        /*
+         * While we've cleared xen_cr3 above already, normal exception handling
+         * code has logic to restore the original value from %r15. Therefore we
+         * need to set up %r14 here, while %r15 is required to still be zero.
+         */
+        GET_STACK_END(14)
         jmp   handle_exception_saved
 
         /* create_bounce_frame & helpers don't need to be in .text.entry */
