@@ -67,6 +67,32 @@ our $had_feature;
 
 #---------- parsing ----------
 
+sub find_current_sectnode () {
+    die unless @insections;
+
+    my $sectnode;
+    my $realsect;
+    foreach my $s (@insections) {
+        my $sectlist = $sectnode
+            ? $sectnode->{Children} : $toplevel_sectlist;
+        my $key = $s->{Key};
+        $realsect = $s if $s->{Anchor};
+        tie %$sectlist, 'Tie::IxHash' unless tied %$sectlist;
+#print STDERR "FIND_CURRENT_SECTNODE ", Dumper($s);
+        $sectlist->{$key} //=
+            {
+             Children => new_sectlist(),
+             Headline => $s->{Headline},
+             Key => $key,
+             RealSect => $realsect,
+             HasCaveat => [],
+            };
+        $sectnode = $sectlist->{$key};
+    }
+    die unless $sectnode;
+    return $sectnode;
+}
+
 sub ri_Header {
     my ($c) = @_;
     my ($level, $infos, $hl) = @$c;
@@ -100,29 +126,9 @@ sub ri_Para {
 
 sub parse_feature_entry ($) {
     my ($value) = @_;
-    die unless @insections;
 
     $had_feature = 1;
-
-    my $sectnode;
-    my $realsect;
-    foreach my $s (@insections) {
-        my $sectlist = $sectnode
-            ? $sectnode->{Children} : $toplevel_sectlist;
-        my $key = $s->{Key};
-        $realsect = $s if $s->{Anchor};
-        tie %$sectlist, 'Tie::IxHash' unless tied %$sectlist;
-#print STDERR "PARSE_FEATURE_ENTRY ", Dumper($s);
-        $sectlist->{$key} //=
-            {
-             Children => new_sectlist(),
-             Headline => $s->{Headline},
-             Key => $key,
-             RealSect => $realsect,
-            };
-        $sectnode = $sectlist->{$key};
-    }
-    die unless $sectnode;
+    my $sectnode = find_current_sectnode();
     $sectnode->{Status}[$version_index] = $value;
 }
 
