@@ -982,6 +982,8 @@ int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid,
         return qmp_run_command(gc, domid, "eject", args, NULL, NULL);
     } else {
         qmp_parameters_add_string(gc, &args, "target", disk->pdev_path);
+        qmp_parameters_add_string(gc, &args, "arg",
+            libxl__qemu_disk_format_string(disk->format));
         return qmp_run_command(gc, domid, "change", args, NULL, NULL);
     }
 }
