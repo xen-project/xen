@@ -139,7 +139,7 @@ END
     # find previous version
     search_commit="$current_ref"
     while true; do
-        search_commit=$(git-log --pretty=format:%H -n1 \
+        search_commit=$(git log --pretty=format:%H -n1 \
                         -G 'XEN.*VERSION' $search_commit -- $versionfile)
         if ! [ "$search_commit" ]; then search_version=''; break; fi
 
