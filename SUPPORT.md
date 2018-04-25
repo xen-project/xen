@@ -653,7 +653,7 @@ See the section **Blkback** for image formats supported by QEMU.
 ### x86/Emulated graphics (QEMU):
 
     Status, cirrus-vga: Supported
-    Status, stgvga: Supported
+    Status, stdvga: Supported
 
 ### x86/Emulated audio (QEMU):
 
