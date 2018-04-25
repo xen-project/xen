@@ -33,8 +33,8 @@ our $toplevel_sectlist = new_sectlist();
 # $sectlist->{KEY}{Status}[VI] = absent or markdown content
 # $sectlist->{KEY}{Children} = a further $sectlist
 # $sectlist->{KEY}{Key} = KEY
+# $sectlist->{KEY}{HasCaveat}[VI] = trueish iff other in a Para
 # $sectlist->{KEY}{RealSect} = containing real section in @insections, so
-# $sectlist->{KEY}{RealSect}{HasCaveat}[VI] = trueish iff other in a Para
 # $sectlist->{KEY}{RealSect}{HasDescription} = VI for some Emph in Para
 # $sectlist->{KEY}{RealSect}{Anchor} = value for < id="" > in the pandoc html
 # A $sectnode represents a single section from the original markdown
@@ -58,7 +58,6 @@ our @insections;
 # $insections[]{Headline} = markdown content
 # these next are only defined for real sections, not Status elements
 # $insections[]{Anchor} = string
-# $insections[]{HasCaveat} = array, $sectlist->{HasCaveat} will refer to this
 # $insections[]{HasDescription} VI, likewise
 
 our $had_unknown;
@@ -106,7 +105,6 @@ sub ri_Header {
          Key => $id,
          Anchor => $id,
          Headline => $hl,
-         HasCaveat => [],
          HasDescription => undef,
         };
 #print STDERR Dumper(\@insections);
@@ -116,9 +114,12 @@ sub ri_Header {
 sub ri_Para {
     return unless @insections;
     my $insection = $insections[$#insections];
+#    print STDERR "ri_Para $version_index $had_feature ".
+#        $insection->{HasCaveat}." $insection->{Key}\n";
 
     if ($had_feature) {
-        $insection->{HasCaveat}[$version_index] = 1;
+        my $sectnode = find_current_sectnode();
+        $sectnode->{HasCaveat}[$version_index] = 1;
     } else {
         $insection->{HasDescription} //= $version_index;
     }
@@ -397,7 +398,7 @@ sub write_output_row ($) {
         my $nextcell = '';
         if (!defined $colspan) { # first row of this RealSect
             $colspan= ' colspan="2"';
-            if ($sectnode->{RealSect}{HasCaveat}[$i] && $st
+            if ($sectnode->{HasCaveat}[$i] && $st
                 && $sectnode->{RealSect}{Anchor}) {
                 my $rows = $sectnode->{RealSect}{OwnRows};
                 $nextcell = '<td';
