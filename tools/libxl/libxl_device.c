@@ -425,6 +425,18 @@ char *libxl__device_disk_string_of_backend(libxl_disk_backend backend)
     }
 }
 
+const char *libxl__qemu_disk_format_string(libxl_disk_format format)
+{
+    switch (format) {
+    case LIBXL_DISK_FORMAT_QCOW: return "qcow";
+    case LIBXL_DISK_FORMAT_QCOW2: return "qcow2";
+    case LIBXL_DISK_FORMAT_VHD: return "vpc";
+    case LIBXL_DISK_FORMAT_RAW: return "raw";
+    case LIBXL_DISK_FORMAT_EMPTY: return NULL;
+    default: return NULL;
+    }
+}
+
 int libxl__device_physdisk_major_minor(const char *physpath, int *major, int *minor)
 {
     struct stat buf;
