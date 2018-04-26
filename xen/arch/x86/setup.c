@@ -112,9 +112,6 @@ struct cpuinfo_x86 __read_mostly boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 unsigned long __read_mostly mmu_cr4_features = XEN_MINIMAL_CR4;
 
-static int8_t __initdata opt_xpti = -1;
-boolean_param("xpti", opt_xpti);
-
 bool_t __read_mostly acpi_disabled;
 bool_t __initdata acpi_force;
 static char __initdata acpi_param[10] = "";
@@ -1423,22 +1420,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         set_in_cr4(X86_CR4_SMAP);
 
     cr4_pv32_mask = mmu_cr4_features & XEN_CR4_PV32_BITS;
-
-    if ( opt_xpti < 0 )
-    {
-        uint64_t caps = 0;
-
-        if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-            caps = ARCH_CAPABILITIES_RDCL_NO;
-        else if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
-            rdmsrl(MSR_ARCH_CAPABILITIES, caps);
-
-        opt_xpti = !(caps & ARCH_CAPABILITIES_RDCL_NO);
-    }
-    if ( opt_xpti )
-        setup_clear_cpu_cap(X86_FEATURE_NO_XPTI);
-    else
-        __set_bit(X86_FEATURE_NO_XPTI, boot_cpu_data.x86_capability);
 
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);

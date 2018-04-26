@@ -1001,6 +1001,7 @@ int __init construct_dom0(
     if ( compat32 )
     {
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
+        d->arch.pv_domain.xpti = 0;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
         if ( setup_compat_arg_xlat(v) != 0 )
             BUG();
