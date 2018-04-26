@@ -500,6 +500,20 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
     v->arch.cr3 = mfn_x(mfn) << PAGE_SHIFT;
 }
 
+unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v)
+{
+    const struct domain *d = v->domain;
+    unsigned long cr4;
+
+    cr4 = v->arch.pv_vcpu.ctrlreg[4] & ~X86_CR4_DE;
+    cr4 |= mmu_cr4_features & (X86_CR4_PSE | X86_CR4_SMEP | X86_CR4_SMAP |
+                               X86_CR4_OSXSAVE | X86_CR4_FSGSBASE);
+    cr4 |= d->arch.pv_domain.xpti  ? 0 : X86_CR4_PGE;
+    cr4 |= d->arch.vtsc ? X86_CR4_TSD : 0;
+
+    return cr4;
+}
+
 void write_ptbase(struct vcpu *v)
 {
     struct cpu_info *cpu_info = get_cpu_info();
