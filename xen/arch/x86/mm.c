@@ -489,20 +489,28 @@ void make_cr3(struct vcpu *v, unsigned long mfn)
 void write_ptbase(struct vcpu *v)
 {
     struct cpu_info *cpu_info = get_cpu_info();
+    unsigned long new_cr4;
+
+    new_cr4 = (is_pv_vcpu(v) && !is_idle_vcpu(v))
+              ? pv_guest_cr4_to_real_cr4(v)
+              : ((read_cr4() & ~X86_CR4_TSD) | X86_CR4_PGE);
 
     if ( is_pv_vcpu(v) && v->domain->arch.pv_domain.xpti )
     {
         cpu_info->root_pgt_changed = 1;
         cpu_info->pv_cr3 = __pa(this_cpu(root_pgt));
-        switch_cr3(v->arch.cr3);
+        switch_cr3_cr4(v->arch.cr3, new_cr4);
     }
     else
     {
-        /* Make sure to clear xen_cr3 before pv_cr3; switch_cr3() serializes. */
+        /* Make sure to clear xen_cr3 before pv_cr3. */
         cpu_info->xen_cr3 = 0;
-        switch_cr3(v->arch.cr3);
+        /* switch_cr3_cr4() serializes. */
+        switch_cr3_cr4(v->arch.cr3, new_cr4);
         cpu_info->pv_cr3 = 0;
     }
+
+    ASSERT(is_pv_vcpu(v) || read_cr4() == mmu_cr4_features);
 }
 
 /*

@@ -91,20 +91,27 @@ static void do_tlb_flush(void)
     post_flush(t);
 }
 
-void switch_cr3(unsigned long cr3)
+void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
 {
-    unsigned long flags, cr4;
+    unsigned long flags, old_cr4;
     u32 t;
 
     /* This non-reentrant function is sometimes called in interrupt context. */
     local_irq_save(flags);
 
     t = pre_flush();
-    cr4 = read_cr4();
 
-    write_cr4(cr4 & ~X86_CR4_PGE);
+    old_cr4 = read_cr4();
+    if ( old_cr4 & X86_CR4_PGE )
+    {
+        old_cr4 = cr4 & ~X86_CR4_PGE;
+        write_cr4(old_cr4);
+    }
+
     write_cr3(cr3);
-    write_cr4(cr4);
+
+    if ( old_cr4 != cr4 )
+        write_cr4(cr4);
 
     post_flush(t);
 
