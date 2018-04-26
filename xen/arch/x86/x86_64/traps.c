@@ -287,7 +287,7 @@ void toggle_guest_pt(struct vcpu *v)
     get_cpu_info()->root_pgt_changed = true;
 
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
-    asm volatile ( "mov %0, %%cr3" : : "r" (v->arch.cr3) : "memory" );
+    write_cr3(v->arch.cr3);
 
     if ( !(v->arch.flags & TF_kernel_mode) )
         return;
