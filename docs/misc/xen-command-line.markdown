@@ -133,6 +133,18 @@ resume.
 `s3_mode` instructs Xen to set up the boot time (option `vga=`) video
 mode during S3 resume.
 
+### allow\_unsafe
+> `= <boolean>`
+
+> Default: `false`
+
+Force boot on potentially unsafe systems. By default Xen will refuse
+to boot on systems with the following errata:
+
+* AMD Erratum 121. Processors with this erratum are subject to a guest
+  triggerable Denial of Service. Override only if you trust all of
+  your PV guests.
+
 ### altp2m (Intel)
 > `= <boolean>`
 
@@ -146,18 +158,6 @@ Permit multiple copies of host p2m.
 Override Xen's logic for choosing the APIC driver.  By default, if
 there are more than 8 CPUs, Xen will switch to `bigsmp` over
 `default`.
-
-### allow\_unsafe
-> `= <boolean>`
-
-> Default: `false`
-
-Force boot on potentially unsafe systems. By default Xen will refuse
-to boot on systems with the following errata:
-
-* AMD Erratum 121. Processors with this erratum are subject to a guest
-  triggerable Denial of Service. Override only if you trust all of
-  your PV guests.
 
 ### apicv
 > `= <boolean>`
@@ -275,17 +275,6 @@ The `rsb=`, `rsb_vmexit=` and `rsb_native=` options can be used to control
 when the RSB gets overwritten.  The former control all RSB overwriting, while
 the latter two can be used to fine tune overwriting on from HVM context, and
 an entry from a native (PV or Xen) context.
-
-### xenheap\_megabytes (arm32)
-> `= <size>`
-
-> Default: `0` (1/32 of RAM)
-
-Amount of RAM to set aside for the Xenheap. Must be an integer multiple of 32.
-
-By default will use 1/32 of the RAM up to a maximum of 1GB and with a
-minimum of 32M, subject to a suitably aligned and sized contiguous
-region of memory being available.
 
 ### clocksource
 > `= pit | hpet | acpi | tsc`
@@ -658,6 +647,24 @@ trace feature is only enabled in debugging builds of Xen.
 
 Specify the bit width of the DMA heap.
 
+### dom0
+> `= List of [ pvh | shadow ]`
+
+> Sub-options:
+
+> `pvh`
+
+> Default: `false`
+
+Flag that makes a dom0 boot in PVHv2 mode.
+
+> `shadow`
+
+> Default: `false`
+
+Flag that makes a dom0 use shadow paging. Only works when "pvh" is
+enabled.
+
 ### dom0\_ioports\_disable
 > `= List of <hex>-<hex>`
 
@@ -750,24 +757,6 @@ affinities to prefer but be not limited to the specified node(s).
 
 Pin dom0 vcpus to their respective pcpus
 
-### dom0
-> `= List of [ pvh | shadow ]`
-
-> Sub-options:
-
-> `pvh`
-
-> Default: `false`
-
-Flag that makes a dom0 boot in PVHv2 mode.
-
-> `shadow`
-
-> Default: `false`
-
-Flag that makes a dom0 use shadow paging. Only works when "pvh" is
-enabled.
-
 ### dtuart (ARM)
 > `= path [:options]`
 
@@ -823,6 +812,30 @@ effect the inverse meaning.
 
 >> Allows mapping of RuntimeServices which have no cachability attribute
 >> set as UC.
+
+### ept (Intel)
+> `= List of ( {no-}pml | {no-}ad )`
+
+Controls EPT related features.
+
+> Sub-options:
+
+> `pml`
+
+> Default: `true`
+
+>> PML is a new hardware feature in Intel's Broadwell Server and further
+>> platforms which reduces hypervisor overhead of log-dirty mechanism by
+>> automatically recording GPAs (guest physical addresses) when guest memory
+>> gets dirty, and therefore significantly reducing number of EPT violation
+>> caused by write protection of guest memory, which is a necessity to
+>> implement log-dirty mechanism before PML.
+
+> `ad`
+
+> Default: Hardware dependent
+
+>> Have hardware keep accessed/dirty (A/D) bits updated.
 
 ### extra\_guest\_irqs
 > `= [<domU number>][,<dom0 number>]`
@@ -888,30 +901,6 @@ or trust the guest administrator who would be using passthrough, then the
 requirement can be relaxed.  This option is particularly useful for nested
 virtualization, to allow the L1 hypervisor to use EPT even if the L0 hypervisor
 does not provide VM\_ENTRY\_LOAD\_GUEST\_PAT.
-
-### ept (Intel)
-> `= List of ( {no-}pml | {no-}ad )`
-
-Controls EPT related features.
-
-> Sub-options:
-
-> `pml`
-
-> Default: `true`
-
->> PML is a new hardware feature in Intel's Broadwell Server and further
->> platforms which reduces hypervisor overhead of log-dirty mechanism by
->> automatically recording GPAs (guest physical addresses) when guest memory
->> gets dirty, and therefore significantly reducing number of EPT violation
->> caused by write protection of guest memory, which is a necessity to
->> implement log-dirty mechanism before PML.
-
-> `ad`
-
-> Default: Hardware dependent
-
->> Have hardware keep accessed/dirty (A/D) bits updated.
 
 ### gdb
 > `= com1[H,L] | com2[H,L] | dbgp`
@@ -1013,6 +1002,12 @@ supported only when compiled with XSM on x86.
 
 Control Xens use of the APEI Hardware Error Source Table, should one be found.
 
+### highmem-start
+> `= <size>`
+
+Specify the memory boundary past which memory will be treated as highmem (x86
+debug hypervisor only).
+
 ### hmp-unsafe (arm)
 > `= <boolean>`
 
@@ -1075,12 +1070,6 @@ security support is provided when this flag is set.
 Specify whether guests are to be given access to physical port 80
 (often used for debugging purposes), to override the DMI based
 detection of systems known to misbehave upon accesses to that port.
-
-### highmem-start
-> `= <size>`
-
-Specify the memory boundary past which memory will be treated as highmem (x86
-debug hypervisor only).
 
 ### idle\_latency\_factor
 > `= <integer>`
@@ -1274,16 +1263,8 @@ with **crashinfo_maxaddr**.
 Specify the threshold below which Xen will inform dom0 that the quantity of
 free memory is getting low.  Specifying `0` will disable this notification.
 
-### memop-max-order
-> `= [<domU>][,[<ctldom>][,[<hwdom>][,<ptdom>]]]`
-
-> x86 default: `9,18,12,12`
-> ARM default: `9,18,10,10`
-
-Change the maximum order permitted for allocation (or allocation-like)
-requests issued by the various kinds of domains (in this order:
-ordinary DomU, control domain, hardware domain, and - when supported
-by the platform - DomU with pass-through device assigned).
+### maxcpus
+> `= <integer>`
 
 ### max\_cstate
 > `= <integer>`
@@ -1293,9 +1274,6 @@ by the platform - DomU with pass-through device assigned).
 
 Specifies the number of interrupts to be use for pin (IO-APIC or legacy PIC)
 based interrupts. Any higher IRQs will be available for use via PCI MSI.
-
-### maxcpus
-> `= <integer>`
 
 ### max\_lpi\_bits
 > `= <integer>`
@@ -1322,6 +1300,17 @@ Specify verbose machine check output.
 
 Specify the maximum address of physical RAM.  Any RAM beyond this
 limit is ignored by Xen.
+
+### memop-max-order
+> `= [<domU>][,[<ctldom>][,[<hwdom>][,<ptdom>]]]`
+
+> x86 default: `9,18,12,12`
+> ARM default: `9,18,10,10`
+
+Change the maximum order permitted for allocation (or allocation-like)
+requests issued by the various kinds of domains (in this order:
+ordinary DomU, control domain, hardware domain, and - when supported
+by the platform - DomU with pass-through device assigned).
 
 ### mmcfg
 > `= <boolean>[,amd-fam10]`
@@ -1442,12 +1431,6 @@ All numbers specified must be hexadecimal ones.
 
 This option can be specified more than once (up to 8 times at present).
 
-### ple\_gap
-> `= <integer>`
-
-### ple\_window
-> `= <integer>`
-
 ### pku
 > `= <boolean>`
 
@@ -1457,6 +1440,12 @@ Flag to enable Memory Protection Keys.
 
 The protection-key feature provides an additional mechanism by which IA-32e
 paging controls access to usermode addresses.
+
+### ple\_gap
+> `= <integer>`
+
+### ple\_window
+> `= <integer>`
 
 ### psr (Intel)
 > `= List of ( cmt:<boolean> | rmid_max:<integer> | cat:<boolean> | cos_max:<integer> | cdp:<boolean> )`
@@ -1528,21 +1517,6 @@ guest compatibly inside an HVM container.
 
 In this mode, the kernel and initrd passed as modules to the hypervisor are
 constructed into a plain unprivileged PV domain.
-
-### shim\_mem (x86)
-> `= List of ( min:<size> | max:<size> | <size> )`
-
-Set the amount of memory that xen-shim uses. Only has effect if pv-shim mode is
-enabled. Note that this value accounts for the memory used by the shim itself
-plus the free memory slack given to the shim for runtime allocations.
-
-* `min:<size>` specifies the minimum amount of memory. Ignored if greater
-   than max.
-* `max:<size>` specifies the maximum amount of memory.
-* `<size>` specifies the exact amount of memory. Overrides both min and max.
-
-By default, the amount of free memory slack given to the shim for runtime usage
-is 1MB.
 
 ### rcu-idle-timer-period-ms
 > `= <integer>`
@@ -1706,6 +1680,21 @@ hypervisors handle SErrors:
   All SErrors will crash the whole system. This option will avoid all overhead
   of the dsb/isb pairs.
 
+### shim\_mem (x86)
+> `= List of ( min:<size> | max:<size> | <size> )`
+
+Set the amount of memory that xen-shim uses. Only has effect if pv-shim mode is
+enabled. Note that this value accounts for the memory used by the shim itself
+plus the free memory slack given to the shim for runtime allocations.
+
+* `min:<size>` specifies the minimum amount of memory. Ignored if greater
+   than max.
+* `max:<size>` specifies the maximum amount of memory.
+* `<size>` specifies the exact amount of memory. Overrides both min and max.
+
+By default, the amount of free memory slack given to the shim for runtime usage
+is 1MB.
+
 ### smap
 > `= <boolean> | hvm`
 
@@ -1845,14 +1834,6 @@ The optional `keep` parameter causes Xen to continue using the vga
 console even after dom0 has been started.  The default behaviour is to
 relinquish control to dom0.
 
-### viridian-version
-> `= [<major>],[<minor>],[<build>]`
-
-> Default: `6,0,0x1772`
-
-<major>, <minor> and <build> must be integers. The values will be
-encoded in guest CPUID 0x40000002 if viridian enlightenments are enabled.
-
 ### viridian-spinlock-retry-count
 > `= <integer>`
 
@@ -1860,6 +1841,14 @@ encoded in guest CPUID 0x40000002 if viridian enlightenments are enabled.
 
 Specify the maximum number of retries before an enlightened Windows
 guest will notify Xen that it has failed to acquire a spinlock.
+
+### viridian-version
+> `= [<major>],[<minor>],[<build>]`
+
+> Default: `6,0,0x1772`
+
+<major>, <minor> and <build> must be integers. The values will be
+encoded in guest CPUID 0x40000002 if viridian enlightenments are enabled.
 
 ### vpid (Intel)
 > `= <boolean>`
@@ -1953,6 +1942,17 @@ Permit use of x2apic setup for SMP environments.
 In the case that x2apic is in use, this option switches between physical and
 clustered mode.  The default, given no hint from the **FADT**, is cluster
 mode.
+
+### xenheap\_megabytes (arm32)
+> `= <size>`
+
+> Default: `0` (1/32 of RAM)
+
+Amount of RAM to set aside for the Xenheap. Must be an integer multiple of 32.
+
+By default will use 1/32 of the RAM up to a maximum of 1GB and with a
+minimum of 32M, subject to a suitably aligned and sized contiguous
+region of memory being available.
 
 ### xpti
 > `= <boolean>`
