@@ -5,6 +5,7 @@
 #include <xen/mm.h>
 #include <xen/stdbool.h>
 #include <asm/flushtlb.h>
+#include <asm/invpcid.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
 #include <asm/msr.h>
@@ -400,8 +401,10 @@ static DEFINE_SPINLOCK(set_atomicity_lock);
  * has been called.
  */
 
-static void prepare_set(void)
+static bool prepare_set(void)
 {
+	unsigned long cr4;
+
 	/*  Note that this is not ideal, since the cache is only flushed/disabled
 	   for this CPU while the MTRRs are changed, but changing this requires
 	   more invasive changes to the way the kernel boots  */
@@ -412,18 +415,24 @@ static void prepare_set(void)
 	write_cr0(read_cr0() | X86_CR0_CD);
 	wbinvd();
 
-	/*  TLB flushing here relies on Xen always using CR4.PGE. */
-	BUILD_BUG_ON(!(XEN_MINIMAL_CR4 & X86_CR4_PGE));
-	write_cr4(read_cr4() & ~X86_CR4_PGE);
+	cr4 = read_cr4();
+	if (cr4 & X86_CR4_PGE)
+		write_cr4(cr4 & ~X86_CR4_PGE);
+	else if (use_invpcid)
+		invpcid_flush_all();
+	else
+		write_cr3(read_cr3());
 
 	/*  Save MTRR state */
 	rdmsrl(MSR_MTRRdefType, deftype);
 
 	/*  Disable MTRRs, and set the default type to uncached  */
 	mtrr_wrmsr(MSR_MTRRdefType, deftype & ~0xcff);
+
+	return cr4 & X86_CR4_PGE;
 }
 
-static void post_set(void)
+static void post_set(bool pge)
 {
 	/* Intel (P6) standard MTRRs */
 	mtrr_wrmsr(MSR_MTRRdefType, deftype);
@@ -432,7 +441,12 @@ static void post_set(void)
 	write_cr0(read_cr0() & ~X86_CR0_CD);
 
 	/*  Reenable CR4.PGE (also flushes the TLB) */
-	write_cr4(read_cr4() | X86_CR4_PGE);
+	if (pge)
+		write_cr4(read_cr4() | X86_CR4_PGE);
+	else if (use_invpcid)
+		invpcid_flush_all();
+	else
+		write_cr3(read_cr3());
 
 	spin_unlock(&set_atomicity_lock);
 }
@@ -441,14 +455,15 @@ static void generic_set_all(void)
 {
 	unsigned long mask, count;
 	unsigned long flags;
+	bool pge;
 
 	local_irq_save(flags);
-	prepare_set();
+	pge = prepare_set();
 
 	/* Actually set the state */
 	mask = set_mtrr_state();
 
-	post_set();
+	post_set(pge);
 	local_irq_restore(flags);
 
 	/*  Use the atomic bitops to update the global mask  */
@@ -457,7 +472,6 @@ static void generic_set_all(void)
 			set_bit(count, &smp_changes_mask);
 		mask >>= 1;
 	}
-	
 }
 
 static void generic_set_mtrr(unsigned int reg, unsigned long base,
@@ -474,11 +488,12 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 {
 	unsigned long flags;
 	struct mtrr_var_range *vr;
+	bool pge;
 
 	vr = &mtrr_state.var_ranges[reg];
 
 	local_irq_save(flags);
-	prepare_set();
+	pge = prepare_set();
 
 	if (size == 0) {
 		/* The invalid bit is kept in the mask, so we simply clear the
@@ -499,7 +514,7 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 		mtrr_wrmsr(MSR_IA32_MTRR_PHYSMASK(reg), vr->mask);
 	}
 
-	post_set();
+	post_set(pge);
 	local_irq_restore(flags);
 }
 
