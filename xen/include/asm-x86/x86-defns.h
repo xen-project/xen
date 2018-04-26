@@ -43,6 +43,13 @@
 #define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
 
 /*
+ * Intel CPU flags in CR3
+ */
+#define X86_CR3_NOFLUSH    (_AC(1, ULL) << 63)
+#define X86_CR3_ADDR_MASK  (PAGE_MASK & PADDR_MASK)
+#define X86_CR3_PCID_MASK  _AC(0x0fff, ULL) /* Mask for PCID */
+
+/*
  * Intel CPU features in CR4
  */
 #define X86_CR4_VME        0x00000001 /* enable vm86 extensions */

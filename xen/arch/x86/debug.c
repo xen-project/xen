@@ -98,7 +98,7 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
     unsigned long cr3 = (pgd3val ? pgd3val : dp->vcpu[0]->arch.cr3);
-    mfn_t mfn = maddr_to_mfn(cr3);
+    mfn_t mfn = maddr_to_mfn(cr3_pa(cr3));
 
     DBGP2("vaddr:%lx domid:%d cr3:%lx pgd3:%lx\n", vaddr, dp->domain_id, 
           cr3, pgd3val);
