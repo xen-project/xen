@@ -45,7 +45,9 @@
 /*
  * Intel CPU flags in CR3
  */
-#define X86_CR3_NOFLUSH (_AC(1, ULL) << 63)
+#define X86_CR3_NOFLUSH    (_AC(1, ULL) << 63)
+#define X86_CR3_ADDR_MASK  (PAGE_MASK & PADDR_MASK)
+#define X86_CR3_PCID_MASK  _AC(0x0fff, ULL) /* Mask for PCID */
 
 /*
  * Intel CPU features in CR4
