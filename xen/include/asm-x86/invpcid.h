@@ -3,6 +3,8 @@
 
 #include <xen/types.h>
 
+extern bool use_invpcid;
+
 #define INVPCID_TYPE_INDIV_ADDR      0
 #define INVPCID_TYPE_SINGLE_CTXT     1
 #define INVPCID_TYPE_ALL_INCL_GLOBAL 2
