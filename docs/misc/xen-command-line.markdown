@@ -258,7 +258,7 @@ extreme care.**
 A (negative) boolean value can be specified to turn off all mitigations.
 (Use of a positive boolean value is invalid.)
 
-If Xen was compiled with INDIRECT_THUNK support, `thunk=` can be used to
+If Xen was compiled with INDIRECT\_THUNK support, `thunk=` can be used to
 select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
 locations.  The default thunk is `retpoline` (generally preferred for Intel
 hardware), with the alternatives being `jmp` (a `jmp *%reg` gadget, minimal
@@ -359,7 +359,7 @@ The accepted name keywords for name=value pairs are:
               Do note - these values are multiplied by 16.
 * `data-bits` - integer between 5 and 8
 * `dev` - accepted values are `pci` OR `amt`. If this option
-          is used to specify if the serial device is pci-based. The io_base
+          is used to specify if the serial device is pci-based. The io\_base
           cannot be specified when `dev=pci` or `dev=amt` is used.
 * `io-base` - accepts integer which specified IO base port for UART registers
 * `irq` - IRQ number to use
@@ -374,8 +374,8 @@ The accepted name keywords for name=value pairs are:
 The following are examples of correct specifications:
 
     com1=115200,8n1,0x3f8,4
-    com1=115200,8n1,0x3f8,4,reg_width=4,reg_shift=2
-    com1=baud=115200,parity=n,stop_bits=1,io_base=0x3f8,reg_width=4
+    com1=115200,8n1,0x3f8,4,reg\_width=4,reg\_shift=2
+    com1=baud=115200,parity=n,stop\_bits=1,io\_base=0x3f8,reg\_width=4
 
 ### conring\_size
 > `= <size>`
@@ -1205,14 +1205,14 @@ established.
 > `= <integer>`
 
 ### irq\_vector\_map
-### ivrs_hpet[`<hpet>`]
+### ivrs\_hpet[`<hpet>`]
 > `=[<seg>:]<bus>:<device>.<func>`
 
 Force the use of `[<seg>:]<bus>:<device>.<func>` as device ID of HPET
 `<hpet>` instead of the one specified by the IVHD sub-tables of the IVRS
 ACPI table.
 
-### ivrs_ioapic[`<ioapic>`]
+### ivrs\_ioapic[`<ioapic>`]
 > `=[<seg>:]<bus>:<device>.<func>`
 
 Force the use of `[<seg>:]<bus>:<device>.<func>` as device ID of IO-APIC
@@ -1247,13 +1247,13 @@ should be rate limited.
 ### low\_crashinfo
 > `= none | min | all`
 
-> Default: `none` if not specified at all, or to `min` if **low_crashinfo** is present without qualification.
+> Default: `none` if not specified at all, or to `min` if **low\_crashinfo** is present without qualification.
 
 This option is only useful for hosts with a 32bit dom0 kernel, wishing
 to use kexec functionality in the case of a crash.  It represents
 which data structures should be deliberately allocated in low memory,
 so the crash kernel may find find them.  Should be used in combination
-with **crashinfo_maxaddr**.
+with **crashinfo\_maxaddr**.
 
 ### low\_mem\_virq\_limit
 > `= <size>`
@@ -1545,7 +1545,7 @@ Specify the host reboot method.
 
 `kbd` instructs Xen to reboot the host via the keyboard controller.
 
-`acpi` instructs Xen to reboot the host using RESET_REG in the ACPI FADT.
+`acpi` instructs Xen to reboot the host using RESET\_REG in the ACPI FADT.
 
 `pci` instructs Xen to reboot the host using PCI reset register (port CF9).
 
