@@ -33,6 +33,10 @@ extern bool bsp_delay_spec_ctrl;
 extern uint8_t default_xen_spec_ctrl;
 extern uint8_t default_spec_ctrl_flags;
 
+extern uint8_t opt_xpti;
+#define OPT_XPTI_DOM0  0x01
+#define OPT_XPTI_DOMU  0x02
+
 static inline void init_shadow_spec_ctrl_state(void)
 {
     struct cpu_info *info = get_cpu_info();

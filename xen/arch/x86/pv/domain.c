@@ -9,6 +9,7 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 
+#include <asm/spec_ctrl.h>
 #include <asm/pv/domain.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
@@ -80,6 +81,8 @@ int switch_compat(struct domain *d)
     recalculate_cpuid_policy(d);
 
     d->arch.x87_fip_width = 4;
+
+    d->arch.pv_domain.xpti = false;
 
     return 0;
 
@@ -211,6 +214,9 @@ int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
 
     /* 64-bit PV guest by default. */
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
+
+    d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
+                                         ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
 
     return 0;
 
