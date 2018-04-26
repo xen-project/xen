@@ -1173,6 +1173,15 @@ Because responsibility for APIC setup is shared between Xen and the
 domain 0 kernel this option is automatically propagated to the domain
 0 command line.
 
+### invpcid (x86)
+> `= <boolean>`
+
+> Default: `true`
+
+By default, Xen will use the INVPCID instruction for TLB management if
+it is available.  This option can be used to cause Xen to fall back to
+older mechanisms, which are generally slower.
+
 ### noirqbalance
 > `= <boolean>`
 

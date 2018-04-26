@@ -68,6 +68,11 @@ invbool_param("smep", disable_smep);
 static bool_t __initdata disable_smap;
 invbool_param("smap", disable_smap);
 
+/* opt_invpcid: If false, don't use INVPCID instruction even if available. */
+static bool_t __initdata opt_invpcid = 1;
+boolean_param("invpcid", opt_invpcid);
+bool_t __read_mostly use_invpcid;
+
 unsigned long __read_mostly cr4_pv32_mask;
 
 /* Boot dom0 in pvh mode */
@@ -1366,6 +1371,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);
+
+    if ( opt_invpcid && cpu_has_invpcid )
+        use_invpcid = 1;
 
     init_speculation_mitigations();
 
