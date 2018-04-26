@@ -7639,6 +7639,7 @@ x86_emulate(
             int32_t dw[8];
             int64_t qw[4];
         } index, mask;
+        bool done = false;
 
         ASSERT(ea.type == OP_MEM);
         generate_exception_if(modrm_reg == state->sib_index ||
@@ -7692,12 +7693,23 @@ x86_emulate(
                                ea.mem.off + (idx << state->sib_scale),
                                (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
                 if ( rc != X86EMUL_OKAY )
+                {
+                    /*
+                     * If we've made any progress and the access did not fault,
+                     * force a retry instead. This is for example necessary to
+                     * cope with the limited capacity of HVM's MMIO cache.
+                     */
+                    if ( rc != X86EMUL_EXCEPTION && done )
+                        rc = X86EMUL_RETRY;
                     break;
+                }
 
 #ifdef __XEN__
                 if ( i + 1 < n && local_events_need_delivery() )
                     rc = X86EMUL_RETRY;
 #endif
+
+                done = true;
             }
 
             if ( vex.w )
