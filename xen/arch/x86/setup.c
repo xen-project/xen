@@ -62,6 +62,11 @@ boolean_param("nosmp", opt_nosmp);
 static unsigned int __initdata max_cpus;
 integer_param("maxcpus", max_cpus);
 
+/* opt_invpcid: If false, don't use INVPCID instruction even if available. */
+static bool __initdata opt_invpcid = true;
+boolean_param("invpcid", opt_invpcid);
+bool __read_mostly use_invpcid;
+
 unsigned long __read_mostly cr4_pv32_mask;
 
 /* Boot dom0 in pvh mode */
@@ -1482,6 +1487,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( cpu_has_fsgsbase )
         set_in_cr4(X86_CR4_FSGSBASE);
+
+    if ( opt_invpcid && cpu_has_invpcid )
+        use_invpcid = true;
 
     init_speculation_mitigations();
 
