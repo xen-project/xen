@@ -610,9 +610,10 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *, unsigned long guest_cr4);
 #define pv_guest_cr4_to_real_cr4(v)                         \
     (((v)->arch.pv_vcpu.ctrlreg[4]                          \
       | (mmu_cr4_features                                   \
-         & (X86_CR4_PGE | X86_CR4_PSE | X86_CR4_SMEP |      \
+         & (X86_CR4_PSE | X86_CR4_SMEP |                    \
             X86_CR4_SMAP | X86_CR4_OSXSAVE |                \
             X86_CR4_FSGSBASE))                              \
+      | ((v)->domain->arch.pv_domain.xpti ? 0 : X86_CR4_PGE) \
       | ((v)->domain->arch.vtsc ? X86_CR4_TSD : 0))         \
      & ~X86_CR4_DE)
 #define real_cr4_to_pv_guest_cr4(c)                         \
