@@ -154,6 +154,7 @@ restore_all_guest:
         rep movsq
 .Lrag_copy_done:
         mov   %r9, STACK_CPUINFO_FIELD(xen_cr3)(%rdx)
+        movb  $1, STACK_CPUINFO_FIELD(use_pv_cr3)(%rdx)
         mov   %rax, %cr3
 .Lrag_keep_cr3:
 
@@ -202,14 +203,9 @@ restore_all_xen:
          * case we return to late PV exit code (from an NMI or #MC).
          */
         GET_STACK_END(bx)
-        mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rdx
+        cmpb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+UNLIKELY_START(ne, exit_cr3)
         mov   STACK_CPUINFO_FIELD(pv_cr3)(%rbx), %rax
-        test  %rdx, %rdx
-        /*
-         * Ideally the condition would be "nsz", but such doesn't exist,
-         * so "g" will have to do.
-         */
-UNLIKELY_START(g, exit_cr3)
         mov   %rax, %cr3
 UNLIKELY_END(exit_cr3)
 
@@ -251,10 +247,9 @@ ENTRY(lstar_enter)
 
         GET_STACK_END(bx)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
-        neg   %rcx
+        test  %rcx, %rcx
         jz    .Llstar_cr3_okay
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
-        neg   %rcx
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Llstar_cr3_okay:
@@ -288,10 +283,9 @@ GLOBAL(sysenter_eflags_saved)
         /* PUSHF above has saved EFLAGS.IF clear (the caller had it set). */
         orl   $X86_EFLAGS_IF, UREGS_eflags(%rsp)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
-        neg   %rcx
+        test  %rcx, %rcx
         jz    .Lsyse_cr3_okay
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
-        neg   %rcx
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lsyse_cr3_okay:
@@ -338,10 +332,9 @@ ENTRY(int80_direct_trap)
 
         GET_STACK_END(bx)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
-        neg   %rcx
+        test  %rcx, %rcx
         jz    .Lint80_cr3_okay
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
-        neg   %rcx
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lint80_cr3_okay:
@@ -552,24 +545,24 @@ ENTRY(common_interrupt)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
+        mov   STACK_CPUINFO_FIELD(use_pv_cr3)(%r14), %bl
         mov   %rcx, %r15
-        neg   %rcx
+        test  %rcx, %rcx
         jz    .Lintr_cr3_okay
-        jns   .Lintr_cr3_load
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
-        neg   %rcx
-.Lintr_cr3_load:
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         xor   %ecx, %ecx
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3, UREGS_cs(%rsp)
         cmovnz %rcx, %r15
+        cmovnz %rcx, %rbx
 .Lintr_cr3_okay:
 
         CR4_PV32_RESTORE
         movq %rsp,%rdi
         callq do_IRQ
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        mov   %bl, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         jmp ret_from_intr
 
 ENTRY(page_fault)
@@ -584,18 +577,17 @@ GLOBAL(handle_exception)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
+        mov   STACK_CPUINFO_FIELD(use_pv_cr3)(%r14), %r13b
         mov   %rcx, %r15
-        neg   %rcx
+        test  %rcx, %rcx
         jz    .Lxcpt_cr3_okay
-        jns   .Lxcpt_cr3_load
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
-        neg   %rcx
-.Lxcpt_cr3_load:
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         xor   %ecx, %ecx
         mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3, UREGS_cs(%rsp)
         cmovnz %rcx, %r15
+        cmovnz %rcx, %r13
 .Lxcpt_cr3_okay:
 
 handle_exception_saved:
@@ -650,6 +642,7 @@ handle_exception_saved:
         mov   (%rdx, %rax, 8), %rdx
         INDIRECT_CALL %rdx
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        mov   %r13b, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
         leaq  VCPU_trap_bounce(%rbx),%rdx
@@ -683,6 +676,7 @@ exception_with_ints_disabled:
 1:      movq  UREGS_error_code(%rsp),%rax # ec/ev
         movq  %rax,UREGS_kernel_sizeof(%rsp)
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        mov   %r13b, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         jmp   restore_all_xen           # return to fixup code
 
 /* No special register assumptions. */
@@ -768,12 +762,9 @@ ENTRY(double_fault)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rbx
-        neg   %rbx
+        test  %rbx, %rbx
         jz    .Ldblf_cr3_okay
-        jns   .Ldblf_cr3_load
-        mov   %rbx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
-        neg   %rbx
-.Ldblf_cr3_load:
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rbx, %cr3
         movq $0, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Ldblf_cr3_okay:
@@ -803,13 +794,11 @@ handle_ist_exception:
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rcx
+        mov   STACK_CPUINFO_FIELD(use_pv_cr3)(%r14), %bl
         mov   %rcx, %r15
-        neg   %rcx
+        test  %rcx, %rcx
         jz    .List_cr3_okay
-        jns   .List_cr3_load
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
-        neg   %rcx
-.List_cr3_load:
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .List_cr3_okay:
@@ -822,6 +811,7 @@ handle_ist_exception:
          * and copy the context to stack bottom.
          */
         xor   %r15, %r15
+        xor   %ebx, %ebx
         GET_CPUINFO_FIELD(guest_cpu_user_regs,di)
         movq  %rsp,%rsi
         movl  $UREGS_kernel_sizeof/8,%ecx
@@ -833,6 +823,7 @@ handle_ist_exception:
         mov   (%rdx, %rax, 8), %rdx
         INDIRECT_CALL %rdx
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        mov   %bl, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         cmpb  $TRAP_nmi,UREGS_entry_vector(%rsp)
         jne   ret_from_intr
 

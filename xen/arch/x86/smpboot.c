@@ -336,6 +336,7 @@ void start_secondary(void *unused)
      */
     spin_debug_disable();
 
+    get_cpu_info()->use_pv_cr3 = false;
     get_cpu_info()->xen_cr3 = 0;
     get_cpu_info()->pv_cr3 = 0;
 
@@ -1135,6 +1136,7 @@ void __init smp_prepare_boot_cpu(void)
     per_cpu(scratch_cpumask, cpu) = &scratch_cpu0mask;
 #endif
 
+    get_cpu_info()->use_pv_cr3 = false;
     get_cpu_info()->xen_cr3 = 0;
     get_cpu_info()->pv_cr3 = 0;
 }

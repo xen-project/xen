@@ -47,10 +47,7 @@ struct cpu_info {
      * context is being entered. A value of zero indicates no setting of CR3
      * is to be performed.
      * The former is the value to restore when re-entering Xen, if any. IOW
-     * its value being zero means there's nothing to restore. However, its
-     * value can also be negative, indicating to the exit-to-Xen code that
-     * restoring is not necessary, but allowing any nested entry code paths
-     * to still know the value to put back into CR3.
+     * its value being zero means there's nothing to restore.
      */
     unsigned long xen_cr3;
     unsigned long pv_cr3;
@@ -67,6 +64,13 @@ struct cpu_info {
      * the field will be reset.
      */
     bool         root_pgt_changed;
+
+    /*
+     * use_pv_cr3 is set in case the value of pv_cr3 is to be written into
+     * CR3 when returning from an interrupt. The main use is when returning
+     * from a NMI or MCE to hypervisor code where pv_cr3 was active.
+     */
+    bool         use_pv_cr3;
 
     unsigned long __pad;
     /* get_stack_bottom() must be 16-byte aligned */

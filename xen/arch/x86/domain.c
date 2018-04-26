@@ -1696,6 +1696,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     ASSERT(local_irq_is_enabled());
 
+    get_cpu_info()->use_pv_cr3 = false;
     get_cpu_info()->xen_cr3 = 0;
 
     if ( unlikely(dirty_cpu != cpu) && dirty_cpu != VCPU_CPU_CLEAN )
