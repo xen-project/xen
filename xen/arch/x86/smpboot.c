@@ -356,6 +356,7 @@ void start_secondary(void *unused)
      */
     spin_debug_disable();
 
+    get_cpu_info()->use_pv_cr3 = 0;
     get_cpu_info()->xen_cr3 = 0;
     get_cpu_info()->pv_cr3 = 0;
 
@@ -1103,6 +1104,7 @@ void __init smp_prepare_boot_cpu(void)
     cpumask_set_cpu(smp_processor_id(), &cpu_online_map);
     cpumask_set_cpu(smp_processor_id(), &cpu_present_map);
 
+    get_cpu_info()->use_pv_cr3 = 0;
     get_cpu_info()->xen_cr3 = 0;
     get_cpu_info()->pv_cr3 = 0;
 }

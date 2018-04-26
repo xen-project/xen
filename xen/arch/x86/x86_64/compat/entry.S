@@ -323,10 +323,9 @@ ENTRY(cstar_enter)
 
         GET_STACK_BASE(%rbx)
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%rbx), %rcx
-        neg   %rcx
+        test  %rcx, %rcx
         jz    .Lcstar_cr3_okay
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
-        neg   %rcx
+        movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         write_cr3 rcx, rdi, rsi
         movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lcstar_cr3_okay:
