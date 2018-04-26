@@ -523,7 +523,8 @@ void write_ptbase(struct vcpu *v)
     }
     else
     {
-        /* Make sure to clear xen_cr3 before pv_cr3. */
+        /* Make sure to clear use_pv_cr3 and xen_cr3 before pv_cr3. */
+        cpu_info->use_pv_cr3 = false;
         cpu_info->xen_cr3 = 0;
         /* switch_cr3_cr4() serializes. */
         switch_cr3_cr4(v->arch.cr3, new_cr4);
