@@ -45,7 +45,8 @@ struct cpu_info {
     /*
      * Of the two following fields the latter is being set to the CR3 value
      * to be used on the given pCPU for loading whenever 64-bit PV guest
-     * context is being entered. The value never changes once set.
+     * context is being entered. A value of zero indicates no setting of CR3
+     * is to be performed.
      * The former is the value to restore when re-entering Xen, if any. IOW
      * its value being zero means there's nothing to restore. However, its
      * value can also be negative, indicating to the exit-to-Xen code that

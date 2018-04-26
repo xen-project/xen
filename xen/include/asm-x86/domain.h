@@ -257,6 +257,9 @@ struct pv_domain
 
     atomic_t nr_l4_pages;
 
+    /* XPTI active? */
+    bool xpti;
+
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
 
