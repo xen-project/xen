@@ -47,7 +47,9 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/xstate.h>
+#include <asm/cpufeature.h>
 #include <asm/cpuidle.h>
+#include <asm/invpcid.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
 #include <asm/hvm/hvm.h>
@@ -65,6 +67,49 @@
 #include <compat/vcpu.h>
 #include <asm/psr.h>
 #include <asm/spec_ctrl.h>
+
+static __read_mostly enum {
+    PCID_OFF,
+    PCID_ALL,
+    PCID_XPTI,
+    PCID_NOXPTI
+} opt_pcid = PCID_XPTI;
+
+static __init int parse_pcid(const char *s)
+{
+    int rc = 0;
+
+    switch ( parse_bool(s) )
+    {
+    case 0:
+        opt_pcid = PCID_OFF;
+        break;
+
+    case 1:
+        opt_pcid = PCID_ALL;
+        break;
+
+    default:
+        switch ( parse_boolean("xpti", s, NULL) )
+        {
+        case 0:
+            opt_pcid = PCID_NOXPTI;
+            break;
+
+        case 1:
+            opt_pcid = PCID_XPTI;
+            break;
+
+        default:
+            rc = -EINVAL;
+            break;
+        }
+        break;
+    }
+
+    return rc;
+}
+custom_param("pcid", parse_pcid);
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
@@ -395,6 +440,7 @@ int switch_compat(struct domain *d)
     d->arch.x87_fip_width = 4;
 
     d->arch.pv_domain.xpti = false;
+    d->arch.pv_domain.pcid = false;
 
     return 0;
 
@@ -679,6 +725,29 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
         d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
                                              ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
+
+        if ( !is_pv_32bit_domain(d) && use_invpcid && cpu_has_pcid )
+            switch ( opt_pcid )
+            {
+            case PCID_OFF:
+                break;
+
+            case PCID_ALL:
+                d->arch.pv_domain.pcid = true;
+                break;
+
+            case PCID_XPTI:
+                d->arch.pv_domain.pcid = d->arch.pv_domain.xpti;
+                break;
+
+            case PCID_NOXPTI:
+                d->arch.pv_domain.pcid = !d->arch.pv_domain.xpti;
+                break;
+
+            default:
+                ASSERT_UNREACHABLE();
+                break;
+            }
     }
 
     /* initialize default tsc behavior in case tools don't */
