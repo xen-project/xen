@@ -72,7 +72,7 @@ static void post_flush(u32 t)
     this_cpu(tlbflush_time) = t;
 }
 
-void write_cr3(unsigned long cr3)
+void switch_cr3(unsigned long cr3)
 {
     unsigned long flags, cr4;
     u32 t;
@@ -84,7 +84,7 @@ void write_cr3(unsigned long cr3)
     cr4 = read_cr4();
 
     write_cr4(cr4 & ~X86_CR4_PGE);
-    asm volatile ( "mov %0, %%cr3" : : "r" (cr3) : "memory" );
+    write_cr3(cr3);
     write_cr4(cr4);
 
     post_flush(t);

@@ -503,7 +503,7 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
 void write_ptbase(struct vcpu *v)
 {
     get_cpu_info()->root_pgt_changed = true;
-    write_cr3(v->arch.cr3);
+    switch_cr3(v->arch.cr3);
 }
 
 /*
