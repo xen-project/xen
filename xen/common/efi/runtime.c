@@ -104,7 +104,7 @@ struct efi_rs_state efi_rs_enter(void)
         asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
     }
 
-    write_cr3(virt_to_maddr(efi_l4_pgtable));
+    switch_cr3(virt_to_maddr(efi_l4_pgtable));
 
     return state;
 }
@@ -113,7 +113,7 @@ void efi_rs_leave(struct efi_rs_state *state)
 {
     if ( !state->cr3 )
         return;
-    write_cr3(state->cr3);
+    switch_cr3(state->cr3);
     if ( is_pv_vcpu(current) && !is_idle_vcpu(current) )
     {
         struct desc_ptr gdt_desc = {
