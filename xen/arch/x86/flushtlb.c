@@ -12,6 +12,7 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 #include <asm/flushtlb.h>
+#include <asm/invpcid.h>
 #include <asm/page.h>
 
 /* Debug builds: Wrap frequently to stress-test the wrap logic. */
@@ -73,6 +74,23 @@ static void post_flush(u32 t)
     this_cpu(tlbflush_time) = t;
 }
 
+static void do_tlb_flush(void)
+{
+    u32 t = pre_flush();
+
+    if ( use_invpcid )
+        invpcid_flush_all();
+    else
+    {
+        unsigned long cr4 = read_cr4();
+
+        write_cr4(cr4 ^ X86_CR4_PGE);
+        write_cr4(cr4);
+    }
+
+    post_flush(t);
+}
+
 void switch_cr3(unsigned long cr3)
 {
     unsigned long flags, cr4;
@@ -120,16 +138,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
                            : : "m" (*(const char *)(va)) : "memory" );
         }
         else
-        {
-            u32 t = pre_flush();
-            unsigned long cr4 = read_cr4();
-
-            write_cr4(cr4 & ~X86_CR4_PGE);
-            barrier();
-            write_cr4(cr4);
-
-            post_flush(t);
-        }
+            do_tlb_flush();
     }
 
     if ( flags & FLUSH_CACHE )
