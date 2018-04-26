@@ -27,6 +27,7 @@
 void init_speculation_mitigations(void);
 
 extern bool opt_ibpb;
+extern bool opt_ssbd;
 
 extern bool bsp_delay_spec_ctrl;
 extern uint8_t default_xen_spec_ctrl;
