@@ -50,7 +50,8 @@ t=RELEASE-$r
 
 * change xen-unstable README (should say "Xen 4.5" in releases and on stable branches, "Xen 4.5-unstable" on unstable)
 * change xen-unstable Config.mk (QEMU_UPSTREAM_REVISION, QEMU_TRADITIONAL_REVISION, MINIOS_UPSTREAM_REVISION)
-* change SUPPORT.md heading
+* change SUPPORT.md heading version number; -unstable or -rc tag
+*     (empty in stable branches after .0 release).
 * change xen-unstable xen/Makefile XEN_EXTRAVERSION
 # if main version number has changed (eg 4.7 -> 4.8) rerun ./autogen.sh
 * rerun ./autogen.sh to update version number in configure
