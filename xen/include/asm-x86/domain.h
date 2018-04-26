@@ -255,6 +255,8 @@ struct pv_domain
 
     /* XPTI active? */
     bool xpti;
+    /* Use PCID feature? */
+    bool pcid;
 
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
@@ -620,7 +622,7 @@ unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v);
 #define real_cr4_to_pv_guest_cr4(c)                         \
     ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD |      \
              X86_CR4_OSXSAVE | X86_CR4_SMEP |               \
-             X86_CR4_FSGSBASE | X86_CR4_SMAP))
+             X86_CR4_FSGSBASE | X86_CR4_SMAP | X86_CR4_PCIDE))
 
 #define domain_max_vcpus(d) (is_hvm_domain(d) ? HVM_MAX_VCPUS : MAX_VIRT_CPUS)
 

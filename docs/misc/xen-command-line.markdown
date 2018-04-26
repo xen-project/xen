@@ -1439,6 +1439,20 @@ Flag to enable Memory Protection Keys.
 The protection-key feature provides an additional mechanism by which IA-32e
 paging controls access to usermode addresses.
 
+### pcid (x86)
+> `= <boolean> | xpti=<bool>`
+
+> Default: `xpti`
+
+> Can be modified at runtime (change takes effect only for domains created
+  afterwards)
+
+If available, control usage of the PCID feature of the processor for
+64-bit pv-domains. PCID can be used either for no domain at all (`false`),
+for all of them (`true`), only for those subject to XPTI (`xpti`) or for
+those not subject to XPTI (`no-xpti`). The feature is used only in case
+INVPCID is supported and not disabled via `invpcid=false`.
+
 ### psr (Intel)
 > `= List of ( cmt:<boolean> | rmid_max:<integer> | cat:<boolean> | cos_max:<integer> | cdp:<boolean> )`
 

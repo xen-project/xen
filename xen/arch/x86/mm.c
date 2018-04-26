@@ -125,6 +125,7 @@
 #include <asm/guest.h>
 
 #include <asm/hvm/grant_table.h>
+#include <asm/pv/domain.h>
 #include <asm/pv/grant_table.h>
 
 #include "pv/mm.h"
@@ -503,7 +504,11 @@ void free_shared_domheap_page(struct page_info *page)
 
 void make_cr3(struct vcpu *v, mfn_t mfn)
 {
+    struct domain *d = v->domain;
+
     v->arch.cr3 = mfn_x(mfn) << PAGE_SHIFT;
+    if ( is_pv_domain(d) && d->arch.pv_domain.pcid )
+        v->arch.cr3 |= get_pcid_bits(v, false);
 }
 
 unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v)
@@ -514,7 +519,12 @@ unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v)
     cr4 = v->arch.pv_vcpu.ctrlreg[4] & ~X86_CR4_DE;
     cr4 |= mmu_cr4_features & (X86_CR4_PSE | X86_CR4_SMEP | X86_CR4_SMAP |
                                X86_CR4_OSXSAVE | X86_CR4_FSGSBASE);
-    cr4 |= d->arch.pv_domain.xpti  ? 0 : X86_CR4_PGE;
+
+    if ( d->arch.pv_domain.pcid )
+        cr4 |= X86_CR4_PCIDE;
+    else if ( !d->arch.pv_domain.xpti )
+        cr4 |= X86_CR4_PGE;
+
     cr4 |= d->arch.vtsc ? X86_CR4_TSD : 0;
 
     return cr4;
@@ -527,12 +537,14 @@ void write_ptbase(struct vcpu *v)
 
     new_cr4 = (is_pv_vcpu(v) && !is_idle_vcpu(v))
               ? pv_guest_cr4_to_real_cr4(v)
-              : ((read_cr4() & ~X86_CR4_TSD) | X86_CR4_PGE);
+              : ((read_cr4() & ~(X86_CR4_PCIDE | X86_CR4_TSD)) | X86_CR4_PGE);
 
     if ( is_pv_vcpu(v) && v->domain->arch.pv_domain.xpti )
     {
         cpu_info->root_pgt_changed = true;
         cpu_info->pv_cr3 = __pa(this_cpu(root_pgt));
+        if ( new_cr4 & X86_CR4_PCIDE )
+            cpu_info->pv_cr3 |= get_pcid_bits(v, true);
         switch_cr3_cr4(v->arch.cr3, new_cr4);
     }
     else
