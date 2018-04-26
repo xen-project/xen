@@ -388,6 +388,7 @@ int __init dom0_construct_pv(struct domain *d,
     {
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
         d->arch.pv_domain.xpti = false;
+        d->arch.pv_domain.pcid = false;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
         if ( setup_compat_arg_xlat(v) != 0 )
             BUG();
@@ -717,7 +718,7 @@ int __init dom0_construct_pv(struct domain *d,
         update_cr3(v);
 
     /* We run on dom0's page tables for the final part of the build process. */
-    switch_cr3_cr4(v->arch.cr3, read_cr4());
+    switch_cr3_cr4(cr3_pa(v->arch.cr3), read_cr4());
     mapcache_override_current(v);
 
     /* Copy the OS image and free temporary buffer. */

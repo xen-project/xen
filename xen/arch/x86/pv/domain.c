@@ -9,8 +9,53 @@
 #include <xen/lib.h>
 #include <xen/sched.h>
 
+#include <asm/cpufeature.h>
+#include <asm/invpcid.h>
 #include <asm/spec_ctrl.h>
 #include <asm/pv/domain.h>
+
+static __read_mostly enum {
+    PCID_OFF,
+    PCID_ALL,
+    PCID_XPTI,
+    PCID_NOXPTI
+} opt_pcid = PCID_XPTI;
+
+static __init int parse_pcid(const char *s)
+{
+    int rc = 0;
+
+    switch ( parse_bool(s, NULL) )
+    {
+    case 0:
+        opt_pcid = PCID_OFF;
+        break;
+
+    case 1:
+        opt_pcid = PCID_ALL;
+        break;
+
+    default:
+        switch ( parse_boolean("xpti", s, NULL) )
+        {
+        case 0:
+            opt_pcid = PCID_NOXPTI;
+            break;
+
+        case 1:
+            opt_pcid = PCID_XPTI;
+            break;
+
+        default:
+            rc = -EINVAL;
+            break;
+        }
+        break;
+    }
+
+    return rc;
+}
+custom_runtime_param("pcid", parse_pcid);
 
 static void noreturn continue_nonidle_domain(struct vcpu *v)
 {
@@ -77,6 +122,7 @@ int switch_compat(struct domain *d)
     d->arch.x87_fip_width = 4;
 
     d->arch.pv_domain.xpti = false;
+    d->arch.pv_domain.pcid = false;
 
     return 0;
 
@@ -211,6 +257,29 @@ int pv_domain_initialise(struct domain *d)
     d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
                                          ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
 
+    if ( !is_pv_32bit_domain(d) && use_invpcid && cpu_has_pcid )
+        switch ( opt_pcid )
+        {
+        case PCID_OFF:
+            break;
+
+        case PCID_ALL:
+            d->arch.pv_domain.pcid = true;
+            break;
+
+        case PCID_XPTI:
+            d->arch.pv_domain.pcid = d->arch.pv_domain.xpti;
+            break;
+
+        case PCID_NOXPTI:
+            d->arch.pv_domain.pcid = !d->arch.pv_domain.xpti;
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            break;
+        }
+
     return 0;
 
   fail:
@@ -221,9 +290,19 @@ int pv_domain_initialise(struct domain *d)
 
 static void _toggle_guest_pt(struct vcpu *v)
 {
+    const struct domain *d = v->domain;
+
     v->arch.flags ^= TF_kernel_mode;
     update_cr3(v);
-    get_cpu_info()->root_pgt_changed = true;
+    if ( d->arch.pv_domain.xpti )
+    {
+        struct cpu_info *cpu_info = get_cpu_info();
+
+        cpu_info->root_pgt_changed = true;
+        cpu_info->pv_cr3 = __pa(this_cpu(root_pgt)) |
+                           (d->arch.pv_domain.pcid
+                            ? get_pcid_bits(v, true) : 0);
+    }
 
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
     write_cr3(v->arch.cr3);
