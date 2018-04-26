@@ -289,6 +289,16 @@ static inline void write_cr3(unsigned long val)
     asm volatile ( "mov %0, %%cr3" : : "r" (val) : "memory" );
 }
 
+static inline unsigned long cr3_pa(unsigned long cr3)
+{
+    return cr3 & X86_CR3_ADDR_MASK;
+}
+
+static inline unsigned long cr3_pcid(unsigned long cr3)
+{
+    return cr3 & X86_CR3_PCID_MASK;
+}
+
 static inline unsigned long read_cr4(void)
 {
     return get_cpu_info()->cr4;
