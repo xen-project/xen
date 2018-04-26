@@ -188,13 +188,8 @@ restore_all_guest:
                 ROOT_PAGETABLE_LAST_XEN_SLOT - 1) * 8, %rdi
         rep movsq
 .Lrag_copy_done:
-        mov   STACK_CPUINFO_FIELD(cr4)(%rdx), %rdi
         mov   %r9, STACK_CPUINFO_FIELD(xen_cr3)(%rdx)
-        mov   %rdi, %rsi
-        and   $~X86_CR4_PGE, %rdi
-        mov   %rdi, %cr4
         mov   %rax, %cr3
-        mov   %rsi, %cr4
 .Lrag_keep_cr3:
 
         /* Restore stashed SPEC_CTRL value. */
@@ -250,12 +245,7 @@ restore_all_xen:
          * so "g" will have to do.
          */
 UNLIKELY_START(g, exit_cr3)
-        mov   %cr4, %rdi
-        mov   %rdi, %rsi
-        and   $~X86_CR4_PGE, %rdi
-        mov   %rdi, %cr4
         mov   %rax, %cr3
-        mov   %rsi, %cr4
 UNLIKELY_END(exit_cr3)
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */

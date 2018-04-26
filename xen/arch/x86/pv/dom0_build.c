@@ -722,7 +722,7 @@ int __init dom0_construct_pv(struct domain *d,
         update_cr3(v);
 
     /* We run on dom0's page tables for the final part of the build process. */
-    write_ptbase(v);
+    switch_cr3_cr4(v->arch.cr3, read_cr4());
     mapcache_override_current(v);
 
     /* Copy the OS image and free temporary buffer. */
@@ -743,7 +743,7 @@ int __init dom0_construct_pv(struct domain *d,
              (parms.virt_hypercall >= v_end) )
         {
             mapcache_override_current(NULL);
-            write_ptbase(current);
+            switch_cr3_cr4(current->arch.cr3, read_cr4());
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
             rc = -1;
             goto out;
@@ -876,7 +876,7 @@ int __init dom0_construct_pv(struct domain *d,
 
     /* Return to idle domain's page tables. */
     mapcache_override_current(NULL);
-    write_ptbase(current);
+    switch_cr3_cr4(current->arch.cr3, read_cr4());
 
     update_domain_wallclock_time(d);
 
