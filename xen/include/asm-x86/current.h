@@ -59,6 +59,14 @@ struct cpu_info {
     bool         use_shadow_spec_ctrl;
     uint8_t      bti_ist_info;
 
+    /*
+     * The following field controls copying of the L4 page table of 64-bit
+     * PV guests to the per-cpu root page table on entering the guest context.
+     * If set the L4 page table is being copied to the root page table and
+     * the field will be reset.
+     */
+    bool         root_pgt_changed;
+
     unsigned long __pad;
     /* get_stack_bottom() must be 16-byte aligned */
 };

@@ -952,6 +952,8 @@ static int shadow_set_l4e(struct domain *d,
 
     /* Write the new entry */
     shadow_write_entries(sl4e, &new_sl4e, 1, sl4mfn);
+    flush_root_pgtbl_domain(d);
+
     flags |= SHADOW_SET_CHANGED;
 
     if ( shadow_l4e_get_flags(old_sl4e) & _PAGE_PRESENT )
@@ -966,6 +968,7 @@ static int shadow_set_l4e(struct domain *d,
         }
         sh_put_ref(d, osl3mfn, paddr);
     }
+
     return flags;
 }
 
