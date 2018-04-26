@@ -341,6 +341,11 @@ static inline unsigned long read_cr2(void)
     return cr2;
 }
 
+static inline void write_cr3(unsigned long val)
+{
+    asm volatile ( "mov %0, %%cr3" : : "r" (val) : "memory" );
+}
+
 static inline unsigned long read_cr4(void)
 {
     return get_cpu_info()->cr4;

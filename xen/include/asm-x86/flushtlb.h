@@ -84,7 +84,7 @@ static inline unsigned long read_cr3(void)
 }
 
 /* Write pagetable base and implicitly tick the tlbflush clock. */
-void write_cr3(unsigned long cr3);
+void switch_cr3(unsigned long cr3);
 
 /* flush_* flag fields: */
  /*
