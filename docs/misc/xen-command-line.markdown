@@ -1655,13 +1655,23 @@ clustered mode.  The default, given no hint from the **FADT**, is cluster
 mode.
 
 ### xpti
-> `= <boolean>`
+> `= List of [ default | <boolean> | dom0=<bool> | domu=<bool> ]`
 
-> Default: `false` on AMD hardware
+> Default: `false` on hardware not to be vulnerable to Meltdown (e.g. AMD)
 > Default: `true` everywhere else
 
 Override default selection of whether to isolate 64-bit PV guest page
 tables.
+
+`true` activates page table isolation even on hardware not vulnerable by
+Meltdown for all domains.
+
+`false` deactivates page table isolation on all systems for all domains.
+
+`default` sets the default behaviour.
+
+With `dom0` and `domu` it is possible to control page table isolation
+for dom0 or guest domains only.
 
 ** WARNING: Not yet a complete isolation implementation, but better than
 nothing. **

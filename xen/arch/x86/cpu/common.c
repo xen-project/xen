@@ -374,6 +374,9 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 		if (test_bit(X86_FEATURE_SC_MSR_IDLE,
 			     boot_cpu_data.x86_capability))
 			__set_bit(X86_FEATURE_SC_MSR_IDLE, c->x86_capability);
+		if (test_bit(X86_FEATURE_NO_XPTI,
+		             boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_NO_XPTI, c->x86_capability);
 
 		/* AND the already accumulated flags with these */
 		for ( i = 0 ; i < NCAPINTS ; i++ )
