@@ -43,6 +43,7 @@ static enum ind_thunk {
 } opt_thunk __initdata = THUNK_DEFAULT;
 static int8_t __initdata opt_ibrs = -1;
 bool __read_mostly opt_ibpb = true;
+bool __read_mostly opt_ssbd = false;
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -164,6 +165,8 @@ static int __init parse_spec_ctrl(const char *s)
             opt_ibrs = val;
         else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
             opt_ibpb = val;
+        else if ( (val = parse_boolean("ssbd", s, ss)) >= 0 )
+            opt_ssbd = val;
         else
             rc = -EINVAL;
 
