@@ -69,6 +69,13 @@
 #define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
 
 /*
+ * Intel CPU flags in CR3
+ */
+#define X86_CR3_NOFLUSH    (_AC(1, ULL) << 63)
+#define X86_CR3_ADDR_MASK  (PAGE_MASK & PADDR_MASK)
+#define X86_CR3_PCID_MASK  _AC(0x0fff, ULL) /* Mask for PCID */
+
+/*
  * Intel CPU features in CR4
  */
 #define X86_CR4_VME        0x00000001 /* enable vm86 extensions */
@@ -332,6 +339,16 @@ static inline unsigned long read_cr2(void)
 static inline void write_cr3(unsigned long val)
 {
     asm volatile ( "mov %0, %%cr3" : : "r" (val) : "memory" );
+}
+
+static inline unsigned long cr3_pa(unsigned long cr3)
+{
+    return cr3 & X86_CR3_ADDR_MASK;
+}
+
+static inline unsigned long cr3_pcid(unsigned long cr3)
+{
+    return cr3 & X86_CR3_PCID_MASK;
 }
 
 static inline unsigned long read_cr4(void)
