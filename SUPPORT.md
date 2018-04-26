@@ -11,8 +11,8 @@ for the definitions of the support status levels etc.
 
     Xen-Version: 4.10
     Initial-Release: 2017-12-13
-    Supported-Until: TBD
-    Security-Support-Until: TBD
+    Supported-Until: 2019-06-13
+    Security-Support-Until: 2020-12-13
 
 # Feature Support
 
