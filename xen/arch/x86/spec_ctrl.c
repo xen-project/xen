@@ -233,8 +233,9 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "");
 
-    printk("XPTI: %s\n",
-           boot_cpu_has(X86_FEATURE_NO_XPTI) ? "disabled" : "enabled");
+    printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s\n",
+           opt_xpti & OPT_XPTI_DOM0 ? "enabled" : "disabled",
+           opt_xpti & OPT_XPTI_DOMU ? "enabled" : "disabled");
 }
 
 /* Calculate whether Retpoline is known-safe on this CPU. */
@@ -319,6 +320,70 @@ static bool __init retpoline_safe(uint64_t caps)
         return false;
     }
 }
+
+#define OPT_XPTI_DEFAULT  0xff
+uint8_t __read_mostly opt_xpti = OPT_XPTI_DEFAULT;
+
+static __init void xpti_init_default(bool force)
+{
+    uint64_t caps = 0;
+
+    if ( !force && (opt_xpti != OPT_XPTI_DEFAULT) )
+        return;
+
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        caps = ARCH_CAPABILITIES_RDCL_NO;
+    else if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+        rdmsrl(MSR_ARCH_CAPABILITIES, caps);
+
+    if ( caps & ARCH_CAPABILITIES_RDCL_NO )
+        opt_xpti = 0;
+    else
+        opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+}
+
+static __init int parse_xpti(char *s)
+{
+    char *ss;
+    int val, rc = 0;
+
+    xpti_init_default(false);
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        switch ( parse_bool(s) )
+        {
+        case 0:
+            opt_xpti = 0;
+            break;
+
+        case 1:
+            opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+            break;
+
+        default:
+            if ( !strcmp(s, "default") )
+                xpti_init_default(true);
+            else if ( (val = parse_boolean("dom0", s, ss)) >= 0 )
+                opt_xpti = (opt_xpti & ~OPT_XPTI_DOM0) |
+                           (val ? OPT_XPTI_DOM0 : 0);
+            else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
+                opt_xpti = (opt_xpti & ~OPT_XPTI_DOMU) |
+                           (val ? OPT_XPTI_DOMU : 0);
+            else
+                rc = -EINVAL;
+            break;
+        }
+
+        s = ss + 1;
+    } while ( ss );
+
+    return rc;
+}
+custom_param("xpti", parse_xpti);
 
 void __init init_speculation_mitigations(void)
 {
@@ -460,6 +525,12 @@ void __init init_speculation_mitigations(void)
     /* If Xen is using any MSR_SPEC_CTRL settings, adjust the idle path. */
     if ( default_xen_spec_ctrl )
         setup_force_cpu_cap(X86_FEATURE_SC_MSR_IDLE);
+
+    xpti_init_default(false);
+    if ( opt_xpti == 0 )
+        setup_force_cpu_cap(X86_FEATURE_NO_XPTI);
+    else
+        setup_clear_cpu_cap(X86_FEATURE_NO_XPTI);
 
     print_details(thunk, caps);
 

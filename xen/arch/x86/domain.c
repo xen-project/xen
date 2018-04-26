@@ -380,6 +380,8 @@ int switch_compat(struct domain *d)
 
     d->arch.x87_fip_width = 4;
 
+    d->arch.pv_domain.xpti = false;
+
     return 0;
 
  undo_and_fail:
@@ -683,6 +685,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
 
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
+
+        d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
+                                             ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
     }
 
     /* initialize default tsc behavior in case tools don't */
