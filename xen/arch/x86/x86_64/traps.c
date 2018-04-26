@@ -279,12 +279,22 @@ void toggle_guest_mode(struct vcpu *v)
 
 void toggle_guest_pt(struct vcpu *v)
 {
+    const struct domain *d = v->domain;
+
     if ( is_pv_32bit_vcpu(v) )
         return;
 
     v->arch.flags ^= TF_kernel_mode;
     update_cr3(v);
-    get_cpu_info()->root_pgt_changed = true;
+    if ( d->arch.pv_domain.xpti )
+    {
+        struct cpu_info *cpu_info = get_cpu_info();
+
+        cpu_info->root_pgt_changed = true;
+        cpu_info->pv_cr3 = __pa(this_cpu(root_pgt)) |
+                           (d->arch.pv_domain.pcid
+                            ? get_pcid_bits(v, true) : 0);
+    }
 
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */
     write_cr3(v->arch.cr3);

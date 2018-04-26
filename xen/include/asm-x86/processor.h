@@ -306,6 +306,9 @@ static inline unsigned long read_cr4(void)
 
 static inline void write_cr4(unsigned long val)
 {
+    /* No global pages in case of PCIDs enabled! */
+    ASSERT(!(val & X86_CR4_PGE) || !(val & X86_CR4_PCIDE));
+
     get_cpu_info()->cr4 = val;
     asm volatile ( "mov %0,%%cr4" : : "r" (val) );
 }

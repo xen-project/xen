@@ -255,12 +255,43 @@ struct pv_domain
 
     /* XPTI active? */
     bool xpti;
+    /* Use PCID feature? */
+    bool pcid;
 
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
 
     struct cpuidmasks *cpuidmasks;
 };
+
+/*
+ * PCID values for the address spaces of 64-bit pv domains:
+ *
+ * We are using 4 PCID values for a 64 bit pv domain subject to XPTI:
+ * - hypervisor active and guest in kernel mode   PCID 0
+ * - hypervisor active and guest in user mode     PCID 1
+ * - guest active and in kernel mode              PCID 2
+ * - guest active and in user mode                PCID 3
+ *
+ * Without XPTI only 2 values are used:
+ * - guest in kernel mode                         PCID 0
+ * - guest in user mode                           PCID 1
+ */
+
+#define PCID_PV_PRIV      0x0000    /* Used for other domains, too. */
+#define PCID_PV_USER      0x0001
+#define PCID_PV_XPTI      0x0002    /* To be ORed to above values. */
+
+/*
+ * Return additional PCID specific cr3 bits.
+ *
+ * Note that X86_CR3_NOFLUSH will not be readable in cr3. Anyone consuming
+ * v->arch.cr3 should mask away X86_CR3_NOFLUSH and X86_CR3_PCIDMASK in case
+ * the value is used to address the root page table.
+ */
+#define get_pcid_bits(v, is_xpti)                                       \
+    (X86_CR3_NOFLUSH | ((is_xpti) ? PCID_PV_XPTI : 0) |                 \
+     (((v)->arch.flags & TF_kernel_mode) ? PCID_PV_PRIV : PCID_PV_USER))
 
 struct monitor_write_data {
     struct {
@@ -618,7 +649,7 @@ unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v);
 #define real_cr4_to_pv_guest_cr4(c)                         \
     ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD |      \
              X86_CR4_OSXSAVE | X86_CR4_SMEP |               \
-             X86_CR4_FSGSBASE | X86_CR4_SMAP))
+             X86_CR4_FSGSBASE | X86_CR4_SMAP | X86_CR4_PCIDE))
 
 #define domain_max_vcpus(d) (is_hvm_domain(d) ? HVM_MAX_VCPUS : MAX_VIRT_CPUS)
 
