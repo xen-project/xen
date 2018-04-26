@@ -337,7 +337,7 @@ void start_secondary(void *unused)
     spin_debug_disable();
 
     get_cpu_info()->xen_cr3 = 0;
-    get_cpu_info()->pv_cr3 = this_cpu(root_pgt) ? __pa(this_cpu(root_pgt)) : 0;
+    get_cpu_info()->pv_cr3 = 0;
 
     load_system_tables();
 
@@ -1056,7 +1056,7 @@ void __init smp_prepare_cpus(void)
         panic("Error %d setting up PV root page table\n", rc);
     if ( per_cpu(root_pgt, 0) )
     {
-        get_cpu_info()->pv_cr3 = __pa(per_cpu(root_pgt, 0));
+        get_cpu_info()->pv_cr3 = 0;
 
         /*
          * All entry points which may need to switch page tables have to start

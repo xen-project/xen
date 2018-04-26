@@ -29,6 +29,10 @@ void init_speculation_mitigations(void);
 extern bool opt_ibpb;
 extern uint8_t default_bti_ist_info;
 
+extern uint8_t opt_xpti;
+#define OPT_XPTI_DOM0  0x01
+#define OPT_XPTI_DOMU  0x02
+
 static inline void init_shadow_spec_ctrl_state(void)
 {
     struct cpu_info *info = get_cpu_info();

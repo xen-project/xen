@@ -502,8 +502,21 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
 
 void write_ptbase(struct vcpu *v)
 {
-    get_cpu_info()->root_pgt_changed = true;
-    switch_cr3(v->arch.cr3);
+    struct cpu_info *cpu_info = get_cpu_info();
+
+    if ( is_pv_vcpu(v) && v->domain->arch.pv_domain.xpti )
+    {
+        cpu_info->root_pgt_changed = true;
+        cpu_info->pv_cr3 = __pa(this_cpu(root_pgt));
+        switch_cr3(v->arch.cr3);
+    }
+    else
+    {
+        /* Make sure to clear xen_cr3 before pv_cr3; switch_cr3() serializes. */
+        cpu_info->xen_cr3 = 0;
+        switch_cr3(v->arch.cr3);
+        cpu_info->pv_cr3 = 0;
+    }
 }
 
 /*
