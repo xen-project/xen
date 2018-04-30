@@ -35,8 +35,8 @@ static enum ind_thunk {
     THUNK_JMP,
 } opt_thunk __initdata = THUNK_DEFAULT;
 static int8_t __initdata opt_ibrs = -1;
-static bool __initdata opt_rsb_native = true;
-static bool __initdata opt_rsb_vmexit = true;
+static bool __initdata opt_rsb_pv = true;
+static bool __initdata opt_rsb_hvm = true;
 bool __read_mostly opt_ibpb = true;
 uint8_t __read_mostly default_xen_spec_ctrl;
 uint8_t __read_mostly default_spec_ctrl_flags;
@@ -57,8 +57,8 @@ static int __init parse_bti(const char *s)
             opt_thunk = THUNK_JMP;
             opt_ibrs = 0;
             opt_ibpb = false;
-            opt_rsb_native = false;
-            opt_rsb_vmexit = false;
+            opt_rsb_pv = false;
+            opt_rsb_hvm = false;
         }
         else if ( val > 0 )
             rc = -EINVAL;
@@ -80,13 +80,13 @@ static int __init parse_bti(const char *s)
         else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
             opt_ibpb = val;
         else if ( (val = parse_boolean("rsb_native", s, ss)) >= 0 )
-            opt_rsb_native = val;
+            opt_rsb_pv = val;
         else if ( (val = parse_boolean("rsb_vmexit", s, ss)) >= 0 )
-            opt_rsb_vmexit = val;
+            opt_rsb_hvm = val;
         else if ( (val = parse_boolean("rsb", s, ss)) >= 0 )
         {
-            opt_rsb_native = val;
-            opt_rsb_vmexit = val;
+            opt_rsb_pv = val;
+            opt_rsb_hvm = val;
         }
         else
             rc = -EINVAL;
@@ -132,8 +132,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            default_xen_spec_ctrl & SPEC_CTRL_IBRS    ? " IBRS+" :
                                                        " IBRS-"      : "",
            opt_ibpb                                  ? " IBPB"       : "",
-           boot_cpu_has(X86_FEATURE_RSB_NATIVE)      ? " RSB_NATIVE" : "",
-           boot_cpu_has(X86_FEATURE_RSB_VMEXIT)      ? " RSB_VMEXIT" : "");
+           boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB_NATIVE" : "",
+           boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB_VMEXIT" : "");
 
     printk("XPTI (64-bit PV only): Dom0 %s, DomU %s\n",
            opt_xpti & OPT_XPTI_DOM0 ? "enabled" : "disabled",
@@ -388,9 +388,9 @@ void __init init_speculation_mitigations(void)
      * If a processors speculates to 32bit PV guest kernel mappings, it is
      * speculating in 64bit supervisor mode, and can leak data.
      */
-    if ( opt_rsb_native )
+    if ( opt_rsb_pv )
     {
-        setup_force_cpu_cap(X86_FEATURE_RSB_NATIVE);
+        setup_force_cpu_cap(X86_FEATURE_SC_RSB_PV);
         default_spec_ctrl_flags |= SCF_ist_rsb;
     }
 
@@ -398,8 +398,8 @@ void __init init_speculation_mitigations(void)
      * HVM guests can always poison the RSB to point at Xen supervisor
      * mappings.
      */
-    if ( opt_rsb_vmexit )
-        setup_force_cpu_cap(X86_FEATURE_RSB_VMEXIT);
+    if ( opt_rsb_hvm )
+        setup_force_cpu_cap(X86_FEATURE_SC_RSB_HVM);
 
     /* Check we have hardware IBPB support before using it... */
     if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
