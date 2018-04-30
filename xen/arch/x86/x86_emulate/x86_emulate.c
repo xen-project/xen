@@ -8519,11 +8519,12 @@ x86_emulate(
 
             if ( op_bytes < 16 ||
                  (vex.opcx
-                  ? /* vmov{{a,nt}p{s,d},dqa,ntdq} are exceptions. */
-                    ext != ext_0f ||
-                    ((b | 1) != 0x29 && b != 0x2b &&
-                     ((b | 0x10) != 0x7f || vex.pfx != vex_66) &&
-                     b != 0xe7)
+                  ? /* vmov{{a,nt}p{s,d},{,nt}dqa,ntdq} are exceptions. */
+                    ext == ext_0f
+                    ? ((b | 1) != 0x29 && b != 0x2b &&
+                       ((b | 0x10) != 0x7f || vex.pfx != vex_66) &&
+                       b != 0xe7)
+                    : (ext != ext_0f38 || b != 0x2a)
                   : /* movup{s,d}, {,mask}movdqu, and lddqu are exceptions. */
                     ext == ext_0f &&
                     ((b | 1) == 0x11 ||
