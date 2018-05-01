@@ -18,7 +18,7 @@ trivial patch so apply some common sense.
 	and variable names.  These aren't as silly as they seem. One
 	job the maintainers do is to keep things looking the same.
 
-	PLEASE see http://wiki.xen.org/wiki/Submitting_Xen_Patches for
+	PLEASE see http://wiki.xenproject.org/wiki/Submitting_Xen_Patches for
 	hints on how to submit a patch to xen-unstable in a suitable
 	form.
 
@@ -46,7 +46,7 @@ trivial patch so apply some common sense.
 The policy for inclusion in a Xen stable release is different to that
 for inclusion in xen-unstable.
 
-Please see http://wiki.xen.org/wiki/Xen_Maintenance_Releases for more
+Please see http://wiki.xenproject.org/wiki/Xen_Maintenance_Releases for more
 information.
 
 Backport requests should be made on the xen-devel@lists.xenproject.org
@@ -169,7 +169,7 @@ ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Julien Grall <julien.grall@arm.com>
 S:	Supported
-L:	xen-devel@lists.xen.org
+L:	xen-devel@lists.xenproject.org
 F:	docs/misc/arm/
 F:	xen/arch/arm/
 F:	xen/drivers/char/arm-uart.c
@@ -296,7 +296,7 @@ MINI-OS
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
 L:	minios-devel@lists.xenproject.org
-T:	git git://xenbits.xen.org/mini-os.git
+T:	git git://xenbits.xenproject.org/mini-os.git
 F:	config/MiniOS.mk
 
 OCAML TOOLS
@@ -309,7 +309,7 @@ OVMF UPSTREAM
 M:	Anthony PERARD <anthony.perard@citrix.com>
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
-T:	git git://xenbits.xen.org/ovmf.git
+T:	git git://xenbits.xenproject.org/ovmf.git
 
 POWER MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
@@ -333,13 +333,13 @@ F:	tools/python
 QEMU-DM
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 S:	Supported
-T:	git git://xenbits.xen.org/qemu-xen-traditional.git
+T:	git git://xenbits.xenproject.org/qemu-xen-traditional.git
 
 QEMU UPSTREAM
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Anthony Perard <anthony.perard@citrix.com>
 S:	Supported
-T:	git git://xenbits.xen.org/qemu-xen.git
+T:	git git://xenbits.xenproject.org/qemu-xen.git
 
 REMUS
 M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
@@ -367,7 +367,7 @@ F:	xen/common/sched*
 SEABIOS UPSTREAM
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
-T:	git git://xenbits.xen.org/seabios.git
+T:	git git://xenbits.xenproject.org/seabios.git
 
 STUB DOMAINS
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
@@ -404,13 +404,13 @@ F:	docs/misc/tmem*
 UNMODIFIED LINUX PV DRIVERS
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Obsolete
-L:	xen-devel@lists.xen.org
+L:	xen-devel@lists.xenproject.org
 F:	unmodified_drivers/linux-2.6/
 
 USB PV DRIVERS
 M:	Noboru Iwamatsu <n_iwamatsu@jp.fujitsu.com>
 S:	Supported
-T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
+T:	hg http://xenbits.xenproject.org/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
 VM EVENT, MEM ACCESS and MONITOR
@@ -447,7 +447,7 @@ X86 ARCHITECTURE
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
 S:	Supported
-L:	xen-devel@lists.xen.org
+L:	xen-devel@lists.xenproject.org
 F:	xen/arch/x86/
 F:	xen/include/asm-x86/
 F:	xen/include/public/arch-x86/
@@ -519,7 +519,7 @@ M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Tim Deegan <tim@xen.org>
 M:	Wei Liu <wei.liu2@citrix.com>
-L:	xen-devel@lists.xen.org
+L:	xen-devel@lists.xenproject.org
 S:	Supported
 F:	*
 F:	*/
