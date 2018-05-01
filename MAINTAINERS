@@ -18,7 +18,7 @@ trivial patch so apply some common sense.
 	and variable names.  These aren't as silly as they seem. One
 	job the maintainers do is to keep things looking the same.
 
-	PLEASE see http://wiki.xenproject.org/wiki/Submitting_Xen_Patches for
+	PLEASE see https://wiki.xenproject.org/wiki/Submitting_Xen_Patches for
 	hints on how to submit a patch to xen-unstable in a suitable
 	form.
 
@@ -46,7 +46,7 @@ trivial patch so apply some common sense.
 The policy for inclusion in a Xen stable release is different to that
 for inclusion in xen-unstable.
 
-Please see http://wiki.xenproject.org/wiki/Xen_Maintenance_Releases for more
+Please see https://wiki.xenproject.org/wiki/Xen_Maintenance_Releases for more
 information.
 
 Backport requests should be made on the xen-devel@lists.xenproject.org
@@ -395,7 +395,7 @@ F:	tools/
 
 TRANSCENDENT MEMORY (TMEM)
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-W:	http://oss.oracle.com/projects/tmem
+W:	https://oss.oracle.com/projects/tmem
 S:	Supported
 F:	xen/common/tmem*
 F:	xen/include/xen/tmem*
@@ -410,7 +410,7 @@ F:	unmodified_drivers/linux-2.6/
 USB PV DRIVERS
 M:	Noboru Iwamatsu <n_iwamatsu@jp.fujitsu.com>
 S:	Supported
-T:	hg http://xenbits.xenproject.org/linux-2.6.18-xen.hg
+T:	hg https://xenbits.xenproject.org/hg/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
 VM EVENT, MEM ACCESS and MONITOR
