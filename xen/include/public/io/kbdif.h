@@ -178,8 +178,10 @@
 #define XENKBD_DRIVER_NAME             "vkbd"
 
 #define XENKBD_FIELD_FEAT_ABS_POINTER  "feature-abs-pointer"
+#define XENKBD_FIELD_FEAT_RAW_POINTER  "feature-raw-pointer"
 #define XENKBD_FIELD_FEAT_MTOUCH       "feature-multi-touch"
 #define XENKBD_FIELD_REQ_ABS_POINTER   "request-abs-pointer"
+#define XENKBD_FIELD_REQ_RAW_POINTER   "request-raw-pointer"
 #define XENKBD_FIELD_REQ_MTOUCH        "request-multi-touch"
 #define XENKBD_FIELD_RING_GREF         "page-gref"
 #define XENKBD_FIELD_EVT_CHANNEL       "event-channel"
