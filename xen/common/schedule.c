@@ -455,6 +455,19 @@ void sched_destroy_domain(struct domain *d)
     }
 }
 
+void vcpu_sleep_nosync_locked(struct vcpu *v)
+{
+    ASSERT(spin_is_locked(per_cpu(schedule_data,v->processor).schedule_lock));
+
+    if ( likely(!vcpu_runnable(v)) )
+    {
+        if ( v->runstate.state == RUNSTATE_runnable )
+            vcpu_runstate_change(v, RUNSTATE_offline, NOW());
+
+        SCHED_OP(vcpu_scheduler(v), sleep, v);
+    }
+}
+
 void vcpu_sleep_nosync(struct vcpu *v)
 {
     unsigned long flags;
@@ -464,13 +477,7 @@ void vcpu_sleep_nosync(struct vcpu *v)
 
     lock = vcpu_schedule_lock_irqsave(v, &flags);
 
-    if ( likely(!vcpu_runnable(v)) )
-    {
-        if ( v->runstate.state == RUNSTATE_runnable )
-            vcpu_runstate_change(v, RUNSTATE_offline, NOW());
-
-        SCHED_OP(vcpu_scheduler(v), sleep, v);
-    }
+    vcpu_sleep_nosync_locked(v);
 
     vcpu_schedule_unlock_irqrestore(lock, flags, v);
 }
