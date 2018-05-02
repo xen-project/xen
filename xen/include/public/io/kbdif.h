@@ -51,6 +51,18 @@
  * corresponding entries in XenStore and puts 1 as the value of the entry.
  * If a feature is not supported then 0 must be set or feature entry omitted.
  *
+ * feature-disable-keyboard
+ *      Values:         <uint>
+ *
+ *      If there is no need to expose a virtual keyboard device by the
+ *      frontend then this must be set to 1.
+ *
+ * feature-disable-pointer
+ *      Values:         <uint>
+ *
+ *      If there is no need to expose a virtual pointer device by the
+ *      frontend then this must be set to 1.
+ *
  * feature-abs-pointer
  *      Values:         <uint>
  *
@@ -177,6 +189,8 @@
 
 #define XENKBD_DRIVER_NAME             "vkbd"
 
+#define XENKBD_FIELD_FEAT_DSBL_KEYBRD  "feature-disable-keyboard"
+#define XENKBD_FIELD_FEAT_DSBL_POINTER "feature-disable-pointer"
 #define XENKBD_FIELD_FEAT_ABS_POINTER  "feature-abs-pointer"
 #define XENKBD_FIELD_FEAT_RAW_POINTER  "feature-raw-pointer"
 #define XENKBD_FIELD_FEAT_MTOUCH       "feature-multi-touch"
