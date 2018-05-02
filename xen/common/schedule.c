@@ -7,7 +7,7 @@
  *        File: common/schedule.c
  *      Author: Rolf Neugebauer & Keir Fraser
  *              Updated for generic API by Mark Williamson
- * 
+ *
  * Description: Generic CPU scheduling code
  *              implements support functionality for the Xen scheduler API.
  *
@@ -49,7 +49,7 @@ string_param("sched", opt_sched);
 bool_t sched_smt_power_savings = 0;
 boolean_param("sched_smt_power_savings", sched_smt_power_savings);
 
-/* Default scheduling rate limit: 1ms 
+/* Default scheduling rate limit: 1ms
  * The behavior when sched_ratelimit_us is greater than sched_credit_tslice_ms is undefined
  * */
 int sched_ratelimit_us = SCHED_DEFAULT_RATELIMIT_US;
@@ -253,7 +253,7 @@ static void sched_spin_unlock_double(spinlock_t *lock1, spinlock_t *lock2,
     spin_unlock_irqrestore(lock1, flags);
 }
 
-int sched_init_vcpu(struct vcpu *v, unsigned int processor) 
+int sched_init_vcpu(struct vcpu *v, unsigned int processor)
 {
     struct domain *d = v->domain;
     cpumask_t allcpus;
@@ -271,7 +271,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
                v, v->processor);
 
     v->sched_priv = SCHED_OP(dom_scheduler(d), alloc_vdata, v,
-		             d->sched_priv);
+                     d->sched_priv);
     if ( v->sched_priv == NULL )
         return 1;
 
@@ -1319,11 +1319,11 @@ long do_set_timer_op(s_time_t timeout)
               unlikely((offset > 0) && ((uint32_t)(offset >> 50) != 0)) )
     {
         /*
-         * Linux workaround: occasionally we will see timeouts a long way in 
-         * the future due to wrapping in Linux's jiffy time handling. We check 
-         * for timeouts wrapped negative, and for positive timeouts more than 
-         * about 13 days in the future (2^50ns). The correct fix is to trigger 
-         * an interrupt immediately (since Linux in fact has pending work to 
+         * Linux workaround: occasionally we will see timeouts a long way in
+         * the future due to wrapping in Linux's jiffy time handling. We check
+         * for timeouts wrapped negative, and for positive timeouts more than
+         * about 13 days in the future (2^50ns). The correct fix is to trigger
+         * an interrupt immediately (since Linux in fact has pending work to
          * do in this situation). However, older guests also set a long timeout
          * when they have *no* pending timers at all: setting an immediate
          * timeout in this case can burn a lot of CPU. We therefore go for a
@@ -1425,7 +1425,7 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
     set_timer(&v->periodic_timer, periodic_next_event);
 }
 
-/* 
+/*
  * The main function
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
@@ -1471,7 +1471,7 @@ static void schedule(void)
     now = NOW();
 
     stop_timer(&sd->s_timer);
-    
+
     /* get policy-specific decision on scheduling... */
     sched = this_cpu(scheduler);
     next_slice = sched->do_schedule(sched, now, tasklet_work_scheduled);
