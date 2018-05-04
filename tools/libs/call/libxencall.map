@@ -21,4 +21,5 @@ VERS_1.0 {
 VERS_1.1 {
 	global:
 		xencall_buffers_never_fault;
+		xencall_fd;
 } VERS_1.0;

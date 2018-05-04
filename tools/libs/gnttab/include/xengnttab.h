@@ -149,6 +149,15 @@ xengnttab_handle *xengnttab_open(struct xentoollog_logger *logger,
  */
 int xengnttab_close(xengnttab_handle *xgt);
 
+
+/*
+ * Return the fd used internally by xengnttab.  selecting on it is not
+ * useful.  But it could be useful for unusual use cases; perhaps,
+ * passing to other programs, calling ioctls on directly, or maybe
+ * calling fcntl.
+ */
+int xengnttab_fd(xengnttab_handle *xgt);
+
 /**
  * Memory maps a grant reference from one domain to a local address range.
  * Mappings should be unmapped with xengnttab_unmap.  Logs errors.
@@ -333,6 +342,14 @@ xengntshr_handle *xengntshr_open(struct xentoollog_logger *logger,
  * must not be called under such circumstances.
  */
 int xengntshr_close(xengntshr_handle *xgs);
+
+/*
+ * Return the fd used internally by xengntshr.  selecting on it is not
+ * useful.  But it could be useful for unusual use cases; perhaps,
+ * passing to other programs, calling ioctls on directly, or maybe
+ * calling fcntl.
+ */
+int xengntshr_fd(xengntshr_handle *xgs);
 
 /**
  * Allocates and shares pages with another domain.

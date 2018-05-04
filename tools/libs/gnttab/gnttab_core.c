@@ -75,6 +75,11 @@ int xengnttab_close(xengnttab_handle *xgt)
     return rc;
 }
 
+int xengnttab_fd(xengnttab_handle *xgt)
+{
+    return xgt->fd;
+}
+
 int xengnttab_set_max_grants(xengnttab_handle *xgt, uint32_t count)
 {
     return osdep_gnttab_set_max_grants(xgt, count);

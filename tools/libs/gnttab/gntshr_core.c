@@ -64,6 +64,12 @@ int xengntshr_close(xengntshr_handle *xgs)
     free(xgs);
     return rc;
 }
+
+int xengntshr_fd(xengntshr_handle *xgs)
+{
+    return xgs->fd;
+}
+
 void *xengntshr_share_pages(xengntshr_handle *xcg, uint32_t domid,
                             int count, uint32_t *refs, int writable)
 {
