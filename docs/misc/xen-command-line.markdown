@@ -1980,7 +1980,7 @@ region of memory being available.
 ### xpti
 > `= List of [ default | <boolean> | dom0=<bool> | domu=<bool> ]`
 
-> Default: `false` on hardware not to be vulnerable to Meltdown (e.g. AMD)
+> Default: `false` on hardware known not to be vulnerable to Meltdown (e.g. AMD)
 > Default: `true` everywhere else
 
 Override default selection of whether to isolate 64-bit PV guest page
