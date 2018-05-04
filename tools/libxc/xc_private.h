@@ -100,9 +100,6 @@ struct xc_interface_core {
     xendevicemodel_handle *dmod;
 };
 
-int osdep_privcmd_open(xc_interface *xch);
-int osdep_privcmd_close(xc_interface *xch);
-
 void *osdep_alloc_hypercall_buffer(xc_interface *xch, int npages);
 void osdep_free_hypercall_buffer(xc_interface *xch, void *ptr, int npages);
 
