@@ -183,6 +183,16 @@ enum xc_open_flags {
  */
 int xc_interface_close(xc_interface *xch);
 
+/**
+ * Return the handles which xch has opened and will use for
+ * hypercalls, foreign memory accesses and device model operations.
+ * These may be used with the corresponding libraries so long as the
+ * xch itself remains open.
+ */
+struct xencall_handle *xc_interface_xcall_handle(xc_interface *xch);
+struct xenforeignmemory_handle *xc_interface_fmem_handle(xc_interface *xch);
+struct xendevicemodel_handle *xc_interface_dmod_handle(xc_interface *xch);
+
 /*
  * HYPERCALL SAFE MEMORY BUFFER
  *
