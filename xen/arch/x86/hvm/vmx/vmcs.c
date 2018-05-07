@@ -1312,58 +1312,62 @@ static int construct_vmcs(struct vcpu *v)
     return rc;
 }
 
-int vmx_read_guest_msr(u32 msr, u64 *val)
+struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type)
 {
     struct vcpu *curr = current;
-    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
-    const struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
+    unsigned int msr_count;
+    struct vmx_msr_entry *msr_area = NULL;
+    unsigned int i;
+
+    switch ( type )
+    {
+    case VMX_MSR_HOST:
+        msr_count = curr->arch.hvm_vmx.host_msr_count;
+        msr_area = curr->arch.hvm_vmx.host_msr_area;
+        break;
+
+    case VMX_MSR_GUEST:
+        msr_count = curr->arch.hvm_vmx.msr_count;
+        msr_area = curr->arch.hvm_vmx.msr_area;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
+
+    if ( msr_area == NULL )
+        return NULL;
 
     for ( i = 0; i < msr_count; i++ )
     {
         if ( msr_area[i].index == msr )
-        {
-            *val = msr_area[i].data;
-            return 0;
-        }
+            return &msr_area[i];
     }
 
-    return -ESRCH;
+    return NULL;
 }
 
-int vmx_write_guest_msr(u32 msr, u64 val)
-{
-    struct vcpu *curr = current;
-    unsigned int i, msr_count = curr->arch.hvm_vmx.msr_count;
-    struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
-
-    for ( i = 0; i < msr_count; i++ )
-    {
-        if ( msr_area[i].index == msr )
-        {
-            msr_area[i].data = val;
-            return 0;
-        }
-    }
-
-    return -ESRCH;
-}
-
-int vmx_add_msr(u32 msr, int type)
+int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
 {
     struct vcpu *curr = current;
     unsigned int idx, *msr_count;
     struct vmx_msr_entry **msr_area, *msr_area_elem;
 
-    if ( type == VMX_GUEST_MSR )
+    switch ( type )
     {
-        msr_count = &curr->arch.hvm_vmx.msr_count;
-        msr_area = &curr->arch.hvm_vmx.msr_area;
-    }
-    else
-    {
-        ASSERT(type == VMX_HOST_MSR);
+    case VMX_MSR_HOST:
         msr_count = &curr->arch.hvm_vmx.host_msr_count;
         msr_area = &curr->arch.hvm_vmx.host_msr_area;
+        break;
+
+    case VMX_MSR_GUEST:
+        msr_count = &curr->arch.hvm_vmx.msr_count;
+        msr_area = &curr->arch.hvm_vmx.msr_area;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return -EINVAL;
     }
 
     if ( *msr_area == NULL )
@@ -1371,13 +1375,17 @@ int vmx_add_msr(u32 msr, int type)
         if ( (*msr_area = alloc_xenheap_page()) == NULL )
             return -ENOMEM;
 
-        if ( type == VMX_GUEST_MSR )
+        switch ( type )
         {
+        case VMX_MSR_HOST:
+            __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
+            break;
+
+        case VMX_MSR_GUEST:
             __vmwrite(VM_EXIT_MSR_STORE_ADDR, virt_to_maddr(*msr_area));
             __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
+            break;
         }
-        else
-            __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
     }
 
     for ( idx = 0; idx < *msr_count; idx++ )
@@ -1393,16 +1401,18 @@ int vmx_add_msr(u32 msr, int type)
 
     ++*msr_count;
 
-    if ( type == VMX_GUEST_MSR )
+    switch ( type )
     {
+    case VMX_MSR_HOST:
+        rdmsrl(msr, msr_area_elem->data);
+        __vmwrite(VM_EXIT_MSR_LOAD_COUNT, *msr_count);
+        break;
+
+    case VMX_MSR_GUEST:
         msr_area_elem->data = 0;
         __vmwrite(VM_EXIT_MSR_STORE_COUNT, *msr_count);
         __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, *msr_count);
-    }
-    else
-    {
-        rdmsrl(msr, msr_area_elem->data);
-        __vmwrite(VM_EXIT_MSR_LOAD_COUNT, *msr_count);
+        break;
     }
 
     return 0;
