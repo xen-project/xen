@@ -128,7 +128,8 @@ struct arch_vmx_struct {
      */
     struct vmx_msr_entry *msr_area;
     struct vmx_msr_entry *host_msr_area;
-    unsigned int         msr_count;
+    unsigned int         msr_load_count;
+    unsigned int         msr_save_count;
     unsigned int         host_msr_count;
 
     unsigned long        eoi_exitmap_changed;
@@ -500,8 +501,18 @@ extern const unsigned int vmx_introspection_force_enabled_msrs_size;
 enum vmx_msr_list_type {
     VMX_MSR_HOST,           /* MSRs loaded on VMExit.                   */
     VMX_MSR_GUEST,          /* MSRs saved on VMExit, loaded on VMEntry. */
+    VMX_MSR_GUEST_LOADONLY, /* MSRs loaded on VMEntry only.             */
 };
 
+/**
+ * Add an MSR to an MSR list.  No-op if the MSR already exists.
+ *
+ * It is undefined behaviour to try and insert the same MSR into both the
+ * GUEST and GUEST_LOADONLY list.
+ *
+ * May fail if unable to allocate memory for the list, or the total number of
+ * entries exceeds the memory allocated.
+ */
 int vmx_add_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type);
 
 static inline int vmx_add_guest_msr(struct vcpu *v, uint32_t msr)
