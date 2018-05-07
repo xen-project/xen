@@ -485,18 +485,56 @@ extern const unsigned int vmx_introspection_force_enabled_msrs_size;
 #define MSR_TYPE_R 1
 #define MSR_TYPE_W 2
 
-#define VMX_GUEST_MSR 0
-#define VMX_HOST_MSR  1
-
 /* VM Instruction error numbers. */
 #define VMX_INSN_INVALID_CONTROL_STATE       7
 #define VMX_INSN_INVALID_HOST_STATE          8
 
+/* MSR load/save list infrastructure. */
+enum vmx_msr_list_type {
+    VMX_MSR_HOST,           /* MSRs loaded on VMExit.                   */
+    VMX_MSR_GUEST,          /* MSRs saved on VMExit, loaded on VMEntry. */
+};
+
+int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type);
+
+static inline int vmx_add_host_load_msr(uint32_t msr)
+{
+    return vmx_add_msr(msr, VMX_MSR_HOST);
+}
+
+static inline int vmx_add_guest_msr(uint32_t msr)
+{
+    return vmx_add_msr(msr, VMX_MSR_GUEST);
+}
+
+struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type);
+
+static inline int vmx_read_guest_msr(uint32_t msr, uint64_t *val)
+{
+    const struct vmx_msr_entry *ent = vmx_find_msr(msr, VMX_MSR_GUEST);
+
+    if ( !ent )
+        return -ESRCH;
+
+    *val = ent->data;
+
+    return 0;
+}
+
+static inline int vmx_write_guest_msr(uint32_t msr, uint64_t val)
+{
+    struct vmx_msr_entry *ent = vmx_find_msr(msr, VMX_MSR_GUEST);
+
+    if ( !ent )
+        return -ESRCH;
+
+    ent->data = val;
+
+    return 0;
+}
+
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
-int vmx_read_guest_msr(u32 msr, u64 *val);
-int vmx_write_guest_msr(u32 msr, u64 val);
-int vmx_add_msr(u32 msr, int type);
 void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to);
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector);
@@ -505,15 +543,6 @@ void virtual_vmcs_enter(void *vvmcs);
 void virtual_vmcs_exit(void *vvmcs);
 u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding);
 void virtual_vmcs_vmwrite(void *vvmcs, u32 vmcs_encoding, u64 val);
-
-static inline int vmx_add_guest_msr(u32 msr)
-{
-    return vmx_add_msr(msr, VMX_GUEST_MSR);
-}
-static inline int vmx_add_host_load_msr(u32 msr)
-{
-    return vmx_add_msr(msr, VMX_HOST_MSR);
-}
 
 DECLARE_PER_CPU(bool_t, vmxon);
 
