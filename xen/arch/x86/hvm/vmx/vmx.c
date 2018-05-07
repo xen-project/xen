@@ -2817,7 +2817,7 @@ static int is_last_branch_msr(u32 ecx)
 
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    const struct vcpu *curr = current;
+    struct vcpu *curr = current;
 
     HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x", msr);
 
@@ -2896,7 +2896,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( passive_domain_do_rdmsr(msr, msr_content) )
             goto done;
 
-        if ( vmx_read_guest_msr(msr, msr_content) == 0 )
+        if ( vmx_read_guest_msr(curr, msr, msr_content) == 0 )
             break;
 
         if ( is_last_branch_msr(msr) )
@@ -3108,7 +3108,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
             for ( ; (rc == 0) && lbr->count; lbr++ )
                 for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
-                    if ( (rc = vmx_add_guest_msr(lbr->base + i)) == 0 )
+                    if ( (rc = vmx_add_guest_msr(v, lbr->base + i)) == 0 )
                     {
                         vmx_clear_msr_intercept(v, lbr->base + i, VMX_MSR_RW);
                         if ( lbr_tsx_fixup_needed )
@@ -3148,7 +3148,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( wrmsr_viridian_regs(msr, msr_content) ) 
             break;
 
-        if ( vmx_write_guest_msr(msr, msr_content) == 0 ||
+        if ( vmx_write_guest_msr(v, msr, msr_content) == 0 ||
              is_last_branch_msr(msr) )
             break;
 
@@ -4163,7 +4163,7 @@ static void lbr_tsx_fixup(void)
     struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
     struct vmx_msr_entry *msr;
 
-    if ( (msr = vmx_find_msr(lbr_from_start, VMX_MSR_GUEST)) != NULL )
+    if ( (msr = vmx_find_msr(curr, lbr_from_start, VMX_MSR_GUEST)) != NULL )
     {
         /*
          * Sign extend into bits 61:62 while preserving bit 63
@@ -4173,20 +4173,22 @@ static void lbr_tsx_fixup(void)
             msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
     }
 
-    if ( (msr = vmx_find_msr(lbr_lastint_from, VMX_MSR_GUEST)) != NULL )
+    if ( (msr = vmx_find_msr(curr, lbr_lastint_from, VMX_MSR_GUEST)) != NULL )
         msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
 }
 
-static void sign_extend_msr(u32 msr, int type)
+static void sign_extend_msr(struct vcpu *v, u32 msr, int type)
 {
     struct vmx_msr_entry *entry;
 
-    if ( (entry = vmx_find_msr(msr, type)) != NULL )
+    if ( (entry = vmx_find_msr(v, msr, type)) != NULL )
         entry->data = canonicalise_addr(entry->data);
 }
 
 static void bdw_erratum_bdf14_fixup(void)
 {
+    struct vcpu *curr = current;
+
     /*
      * Occasionally, on certain Broadwell CPUs MSR_IA32_LASTINTTOIP has
      * been observed to have the top three bits corrupted as though the
@@ -4196,8 +4198,8 @@ static void bdw_erratum_bdf14_fixup(void)
      * erratum BDF14. Fix up MSR_IA32_LASTINT{FROM,TO}IP by
      * sign-extending into bits 48:63.
      */
-    sign_extend_msr(MSR_IA32_LASTINTFROMIP, VMX_MSR_GUEST);
-    sign_extend_msr(MSR_IA32_LASTINTTOIP, VMX_MSR_GUEST);
+    sign_extend_msr(curr, MSR_IA32_LASTINTFROMIP, VMX_MSR_GUEST);
+    sign_extend_msr(curr, MSR_IA32_LASTINTTOIP, VMX_MSR_GUEST);
 }
 
 static void lbr_fixup(void)
