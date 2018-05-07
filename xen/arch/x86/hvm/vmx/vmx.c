@@ -3164,7 +3164,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
                 for ( i = 0; i < lbr->count; i++ )
                 {
-                    int rc = vmx_add_guest_msr(v, lbr->base + i);
+                    int rc = vmx_add_guest_msr(v, lbr->base + i, 0);
 
                     if ( unlikely(rc) )
                     {

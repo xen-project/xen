@@ -541,16 +541,24 @@ enum vmx_msr_list_type {
     VMX_MSR_GUEST,          /* MSRs saved on VMExit, loaded on VMEntry. */
 };
 
-int vmx_add_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type);
+/**
+ * Add an MSR to an MSR list (inserting space for the entry if necessary), and
+ * set the MSRs value.
+ *
+ * May fail if unable to allocate memory for the list, or the total number of
+ * entries exceeds the memory allocated.
+ */
+int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
+                enum vmx_msr_list_type type);
 
-static inline int vmx_add_guest_msr(struct vcpu *v, uint32_t msr)
+static inline int vmx_add_guest_msr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
-    return vmx_add_msr(v, msr, VMX_MSR_GUEST);
+    return vmx_add_msr(v, msr, val, VMX_MSR_GUEST);
 }
-
-static inline int vmx_add_host_load_msr(struct vcpu *v, uint32_t msr)
+static inline int vmx_add_host_load_msr(struct vcpu *v, uint32_t msr,
+                                        uint64_t val)
 {
-    return vmx_add_msr(v, msr, VMX_MSR_HOST);
+    return vmx_add_msr(v, msr, val, VMX_MSR_HOST);
 }
 
 struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
