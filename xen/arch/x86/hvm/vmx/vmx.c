@@ -4169,7 +4169,7 @@ static void lbr_tsx_fixup(void)
     struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
     struct vmx_msr_entry *msr;
 
-    if ( (msr = vmx_find_msr(lbr_from_start, VMX_GUEST_MSR)) != NULL )
+    if ( (msr = vmx_find_msr(lbr_from_start, VMX_MSR_GUEST)) != NULL )
     {
         /*
          * Sign extend into bits 61:62 while preserving bit 63
@@ -4179,7 +4179,7 @@ static void lbr_tsx_fixup(void)
             msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
     }
 
-    if ( (msr = vmx_find_msr(lbr_lastint_from, VMX_GUEST_MSR)) != NULL )
+    if ( (msr = vmx_find_msr(lbr_lastint_from, VMX_MSR_GUEST)) != NULL )
         msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
 }
 
@@ -4207,8 +4207,8 @@ static void bdw_erratum_bdf14_fixup(void)
      * erratum BDF14. Fix up MSR_IA32_LASTINT{FROM,TO}IP by
      * sign-extending into bits 48:63.
      */
-    sign_extend_msr(MSR_IA32_LASTINTFROMIP, VMX_GUEST_MSR);
-    sign_extend_msr(MSR_IA32_LASTINTTOIP, VMX_GUEST_MSR);
+    sign_extend_msr(MSR_IA32_LASTINTFROMIP, VMX_MSR_GUEST);
+    sign_extend_msr(MSR_IA32_LASTINTTOIP, VMX_MSR_GUEST);
 }
 
 static void lbr_fixup(void)
