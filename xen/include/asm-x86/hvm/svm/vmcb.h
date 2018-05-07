@@ -495,12 +495,28 @@ struct vmcb_struct {
 struct svm_domain {
 };
 
+/*
+ * VMRUN doesn't switch fs/gs/tr/ldtr and SHADOWGS/SYSCALL/SYSENTER state.
+ * Therefore, guest state is in the hardware registers when servicing a
+ * VMExit.
+ *
+ * Immediately after a VMExit, the vmcb is stale, and needs to be brought
+ * into sync by VMSAVE.  If state in the vmcb is modified, a VMLOAD is
+ * needed before the following VMRUN.
+ */
+enum vmcb_sync_state {
+    vmcb_in_sync,
+    vmcb_needs_vmsave,    /* VMCB out of sync (VMSAVE needed)? */
+    vmcb_needs_vmload     /* VMCB dirty (VMLOAD needed)? */
+};
+
 struct arch_svm_struct {
     struct vmcb_struct *vmcb;
     u64    vmcb_pa;
     unsigned long *msrpm;
     int    launch_core;
-    bool_t vmcb_in_sync;    /* VMCB sync'ed with VMSAVE? */
+
+    uint8_t vmcb_sync_state; /* enum vmcb_sync_state */
 
     /* VMCB has a cached instruction from #PF/#NPF Decode Assist? */
     uint8_t cached_insn_len; /* Zero if no cached instruction. */

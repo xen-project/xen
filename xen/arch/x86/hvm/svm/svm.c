@@ -680,16 +680,26 @@ static void svm_cpuid_policy_changed(struct vcpu *v)
                       cp->extd.ibpb ? MSR_INTERCEPT_NONE : MSR_INTERCEPT_RW);
 }
 
-static void svm_sync_vmcb(struct vcpu *v)
+static void svm_sync_vmcb(struct vcpu *v, enum vmcb_sync_state new_state)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
 
-    if ( arch_svm->vmcb_in_sync )
-        return;
+    if ( new_state == vmcb_needs_vmsave )
+    {
+        if ( arch_svm->vmcb_sync_state == vmcb_needs_vmload )
+        {
+            svm_vmload(arch_svm->vmcb);
+            arch_svm->vmcb_sync_state = vmcb_in_sync;
+        }
+    }
+    else
+    {
+        if ( arch_svm->vmcb_sync_state == vmcb_needs_vmsave )
+            svm_vmsave(arch_svm->vmcb);
 
-    arch_svm->vmcb_in_sync = 1;
-
-    svm_vmsave(arch_svm->vmcb);
+        if ( arch_svm->vmcb_sync_state != vmcb_needs_vmload )
+            arch_svm->vmcb_sync_state = new_state;
+    }
 }
 
 static unsigned int svm_get_cpl(struct vcpu *v)
@@ -707,7 +717,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
     switch ( seg )
     {
     case x86_seg_fs ... x86_seg_gs:
-        svm_sync_vmcb(v);
+        svm_sync_vmcb(v, vmcb_in_sync);
 
         /* Fallthrough. */
     case x86_seg_es ... x86_seg_ds:
@@ -718,7 +728,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
 
     case x86_seg_tr:
-        svm_sync_vmcb(v);
+        svm_sync_vmcb(v, vmcb_in_sync);
         *reg = vmcb->tr;
         break;
 
@@ -731,7 +741,7 @@ static void svm_get_segment_register(struct vcpu *v, enum x86_segment seg,
         break;
 
     case x86_seg_ldtr:
-        svm_sync_vmcb(v);
+        svm_sync_vmcb(v, vmcb_in_sync);
         *reg = vmcb->ldtr;
         break;
 
@@ -746,7 +756,6 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
                                      struct segment_register *reg)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    bool sync = false;
 
     ASSERT((v == current) || !vcpu_runnable(v));
 
@@ -768,7 +777,8 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
     case x86_seg_gs:
     case x86_seg_tr:
     case x86_seg_ldtr:
-        sync = (v == current);
+        if ( v == current )
+            svm_sync_vmcb(v, vmcb_needs_vmload);
         break;
 
     default:
@@ -776,9 +786,6 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         domain_crash(v->domain);
         return;
     }
-
-    if ( sync )
-        svm_sync_vmcb(v);
 
     switch ( seg )
     {
@@ -813,9 +820,6 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         ASSERT_UNREACHABLE();
         break;
     }
-
-    if ( sync )
-        svm_vmload(vmcb);
 }
 
 static unsigned long svm_get_shadow_gs_base(struct vcpu *v)
@@ -1086,7 +1090,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_lwp_save(v);
     svm_tsc_ratio_save(v);
 
-    svm_sync_vmcb(v);
+    svm_sync_vmcb(v, vmcb_needs_vmload);
     svm_vmload_pa(per_cpu(host_vmcb, cpu));
 
     /* Resume use of ISTs now that the host TR is reinstated. */
@@ -1114,7 +1118,6 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_restore_dr(v);
 
     svm_vmsave_pa(per_cpu(host_vmcb, cpu));
-    svm_vmload(vmcb);
     vmcb->cleanbits.bytes = 0;
     svm_lwp_load(v);
     svm_tsc_ratio_load(v);
@@ -1167,6 +1170,8 @@ static void noreturn svm_do_resume(struct vcpu *v)
     }
 
     hvm_do_resume(v);
+
+    svm_sync_vmcb(v, vmcb_needs_vmsave);
 
     reset_stack_and_jump(svm_asm_do_resume);
 }
@@ -1895,7 +1900,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_FS_BASE:
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:
-        svm_sync_vmcb(v);
+        svm_sync_vmcb(v, vmcb_in_sync);
         break;
     }
 
@@ -2067,7 +2072,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     int ret, result = X86EMUL_OKAY;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    bool sync = false;
 
     switch ( msr )
     {
@@ -2081,12 +2085,9 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_FS_BASE:
     case MSR_GS_BASE:
     case MSR_SHADOW_GS_BASE:
-        sync = true;
+        svm_sync_vmcb(v, vmcb_needs_vmload);
         break;
     }
-
-    if ( sync )
-        svm_sync_vmcb(v);
 
     switch ( msr )
     {
@@ -2261,9 +2262,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
     }
 
-    if ( sync )
-        svm_vmload(vmcb);
-
     return result;
 
  gpf:
@@ -2413,7 +2411,7 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     put_page(page);
 
     /* State in L1 VMCB is stale now */
-    v->arch.hvm_svm.vmcb_in_sync = 0;
+    v->arch.hvm_svm.vmcb_sync_state = vmcb_needs_vmsave;
 
     __update_guest_eip(regs, inst_len);
 }
@@ -2623,6 +2621,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     bool_t vcpu_guestmode = 0;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
+    v->arch.hvm_svm.vmcb_sync_state = vmcb_needs_vmsave;
     hvm_invalidate_regs_fields(regs);
 
     if ( paging_mode_hap(v->domain) )
@@ -3109,6 +3108,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 
   out:
+    svm_sync_vmcb(v, vmcb_needs_vmsave);
+
     if ( vcpu_guestmode || vlapic_hw_disabled(vlapic) )
         return;
 
@@ -3117,6 +3118,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     intr.fields.tpr =
         (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
     vmcb_set_vintr(vmcb, intr);
+    ASSERT(v->arch.hvm_svm.vmcb_sync_state != vmcb_needs_vmload);
 }
 
 void svm_trace_vmentry(void)

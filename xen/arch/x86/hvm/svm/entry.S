@@ -112,7 +112,6 @@ UNLIKELY_END(svm_trace)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov  VCPU_svm_vmcb(%rbx),%rcx
-        movb $0,VCPU_svm_vmcb_in_sync(%rbx)
         mov  VMCB_rax(%rcx),%rax
         mov  %rax,UREGS_rax(%rsp)
         mov  VMCB_rip(%rcx),%rax
