@@ -796,7 +796,7 @@ static inline struct domain *next_domain_in_cpupool(
 #define _VPF_parked          8
 #define VPF_parked           (1UL<<_VPF_parked)
 
-static inline int vcpu_runnable(struct vcpu *v)
+static inline bool vcpu_runnable(const struct vcpu *v)
 {
     return !(v->pause_flags |
              atomic_read(&v->pause_count) |
