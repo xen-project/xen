@@ -559,6 +559,12 @@ enum vmx_msr_list_type {
 int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
                 enum vmx_msr_list_type type);
 
+/**
+ * Remove an MSR entry from an MSR list.  Returns -ESRCH if the MSR was not
+ * found in the list.
+ */
+int vmx_del_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type);
+
 static inline int vmx_add_guest_msr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     return vmx_add_msr(v, msr, val, VMX_MSR_GUEST);
