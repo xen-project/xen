@@ -568,6 +568,16 @@ which would otherwise require escaping of the < option
 ### credit2\_balance\_under
 > `= <integer>`
 
+### credit2\_cap\_period\_ms
+> `= <integer>`
+
+> Default: `10`
+
+Domains subject to a cap receive a replenishment of their runtime budget
+once every cap period interval. Default is 10 ms. The amount of budget
+they receive depends on their cap. For instance, a domain with a 50% cap
+will receive 50% of 10 ms, so 5 ms.
+
 ### credit2\_load\_precision\_shift
 > `= <integer>`
 
