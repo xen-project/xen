@@ -1296,48 +1296,49 @@ static int vmx_msr_entry_key_cmp(const void *key, const void *elt)
 struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type)
 {
     struct vcpu *curr = current;
-    unsigned int msr_count;
-    struct vmx_msr_entry *msr_area = NULL;
+    struct arch_vmx_struct *vmx = &curr->arch.hvm_vmx;
+    struct vmx_msr_entry *start = NULL;
+    unsigned int total;
 
     switch ( type )
     {
     case VMX_MSR_HOST:
-        msr_count = curr->arch.hvm_vmx.host_msr_count;
-        msr_area = curr->arch.hvm_vmx.host_msr_area;
+        start    = vmx->host_msr_area;
+        total    = vmx->host_msr_count;
         break;
 
     case VMX_MSR_GUEST:
-        msr_count = curr->arch.hvm_vmx.msr_count;
-        msr_area = curr->arch.hvm_vmx.msr_area;
+        start    = vmx->msr_area;
+        total    = vmx->msr_count;
         break;
 
     default:
         ASSERT_UNREACHABLE();
     }
 
-    if ( msr_area == NULL )
+    if ( !start )
         return NULL;
 
-    return bsearch(&msr, msr_area, msr_count, sizeof(struct vmx_msr_entry),
-                   vmx_msr_entry_key_cmp);
+    return bsearch(&msr, start, total, sizeof(*start), vmx_msr_entry_key_cmp);
 }
 
 int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
 {
     struct vcpu *curr = current;
-    unsigned int idx, *msr_count;
-    struct vmx_msr_entry **msr_area, *msr_area_elem;
+    struct arch_vmx_struct *vmx = &curr->arch.hvm_vmx;
+    struct vmx_msr_entry **ptr, *start = NULL, *ent, *end;
+    unsigned int total;
 
     switch ( type )
     {
     case VMX_MSR_HOST:
-        msr_count = &curr->arch.hvm_vmx.host_msr_count;
-        msr_area = &curr->arch.hvm_vmx.host_msr_area;
+        ptr      = &vmx->host_msr_area;
+        total    = vmx->host_msr_count;
         break;
 
     case VMX_MSR_GUEST:
-        msr_count = &curr->arch.hvm_vmx.msr_count;
-        msr_area = &curr->arch.hvm_vmx.msr_area;
+        ptr      = &vmx->msr_area;
+        total    = vmx->msr_count;
         break;
 
     default:
@@ -1345,51 +1346,55 @@ int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
         return -EINVAL;
     }
 
-    if ( *msr_area == NULL )
+    /* Allocate memory on first use. */
+    if ( unlikely(!*ptr) )
     {
-        if ( (*msr_area = alloc_xenheap_page()) == NULL )
+        paddr_t addr;
+
+        if ( (*ptr = alloc_xenheap_page()) == NULL )
             return -ENOMEM;
+
+        addr = virt_to_maddr(*ptr);
 
         switch ( type )
         {
         case VMX_MSR_HOST:
-            __vmwrite(VM_EXIT_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
+            __vmwrite(VM_EXIT_MSR_LOAD_ADDR, addr);
             break;
 
         case VMX_MSR_GUEST:
-            __vmwrite(VM_EXIT_MSR_STORE_ADDR, virt_to_maddr(*msr_area));
-            __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, virt_to_maddr(*msr_area));
+            __vmwrite(VM_EXIT_MSR_STORE_ADDR, addr);
+            __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, addr);
             break;
         }
     }
 
-    for ( idx = 0; idx < *msr_count && (*msr_area)[idx].index <= msr; idx++ )
-        if ( (*msr_area)[idx].index == msr )
+    start = *ptr;
+    end   = start + total;
+
+    for ( ent = start; ent < end && ent->index <= msr; ++ent )
+        if ( ent->index == msr )
             return 0;
 
-    if ( *msr_count == (PAGE_SIZE / sizeof(struct vmx_msr_entry)) )
+    if ( total == (PAGE_SIZE / sizeof(*ent)) )
         return -ENOSPC;
 
-    memmove(*msr_area + idx + 1, *msr_area + idx,
-            sizeof(*msr_area_elem) * (*msr_count - idx));
+    memmove(ent + 1, ent, sizeof(*ent) * (end - ent));
 
-    msr_area_elem = *msr_area + idx;
-    msr_area_elem->index = msr;
-    msr_area_elem->mbz = 0;
-
-    ++*msr_count;
+    ent->index = msr;
+    ent->mbz = 0;
 
     switch ( type )
     {
     case VMX_MSR_HOST:
-        rdmsrl(msr, msr_area_elem->data);
-        __vmwrite(VM_EXIT_MSR_LOAD_COUNT, *msr_count);
+        rdmsrl(msr, ent->data);
+        __vmwrite(VM_EXIT_MSR_LOAD_COUNT, ++vmx->host_msr_count);
         break;
 
     case VMX_MSR_GUEST:
-        msr_area_elem->data = 0;
-        __vmwrite(VM_EXIT_MSR_STORE_COUNT, *msr_count);
-        __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, *msr_count);
+        ent->data = 0;
+        __vmwrite(VM_EXIT_MSR_STORE_COUNT, ++vmx->msr_count);
+        __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, vmx->msr_count);
         break;
     }
 
