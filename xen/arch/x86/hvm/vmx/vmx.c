@@ -2838,8 +2838,10 @@ enum
 
 #define LBR_FROM_SIGNEXT_2MSB  ((1ULL << 59) | (1ULL << 60))
 
-#define FIXUP_LBR_TSX            (1u << 0)
-#define FIXUP_BDW_ERRATUM_BDF14  (1u << 1)
+#define LBR_MSRS_INSERTED      (1u << 0)
+#define LBR_FIXUP_TSX          (1u << 1)
+#define LBR_FIXUP_BDF14        (1u << 2)
+#define LBR_FIXUP_MASK         (LBR_FIXUP_TSX | LBR_FIXUP_BDF14)
 
 static bool __read_mostly lbr_tsx_fixup_needed;
 static bool __read_mostly bdw_erratum_bdf14_fixup_needed;
@@ -3125,7 +3127,6 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         __vmwrite(GUEST_SYSENTER_EIP, msr_content);
         break;
     case MSR_IA32_DEBUGCTLMSR: {
-        int i, rc = 0;
         uint64_t supported = IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF;
 
         if ( boot_cpu_has(X86_FEATURE_RTM) )
@@ -3136,30 +3137,65 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             if ( vpmu_do_wrmsr(msr, msr_content, supported) )
                 break;
         }
-        if ( msr_content & IA32_DEBUGCTLMSR_LBR )
+
+        /*
+         * When a guest first enables LBR, arrange to save and restore the LBR
+         * MSRs and allow the guest direct access.
+         *
+         * MSR_DEBUGCTL and LBR has existed almost as long as MSRs have
+         * existed, and there is no architectural way to hide the feature, or
+         * fail the attempt to enable LBR.
+         *
+         * Unknown host LBR MSRs or hitting -ENOSPC with the guest load/save
+         * list are definitely hypervisor bugs, whereas -ENOMEM for allocating
+         * the load/save list is simply unlucky (and shouldn't occur with
+         * sensible management by the toolstack).
+         *
+         * Either way, there is nothing we can do right now to recover, and
+         * the guest won't execute correctly either.  Simply crash the domain
+         * to make the failure obvious.
+         */
+        if ( !(v->arch.hvm_vmx.lbr_flags & LBR_MSRS_INSERTED) &&
+             (msr_content & IA32_DEBUGCTLMSR_LBR) )
         {
             const struct lbr_info *lbr = last_branch_msr_get();
-            if ( lbr == NULL )
-                break;
 
-            for ( ; (rc == 0) && lbr->count; lbr++ )
-                for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
-                    if ( (rc = vmx_add_guest_msr(v, lbr->base + i)) == 0 )
+            if ( unlikely(!lbr) )
+            {
+                gprintk(XENLOG_ERR, "Unknown Host LBR MSRs\n");
+                domain_crash(v->domain);
+                return X86EMUL_OKAY;
+            }
+
+            for ( ; lbr->count; lbr++ )
+            {
+                unsigned int i;
+
+                for ( i = 0; i < lbr->count; i++ )
+                {
+                    int rc = vmx_add_guest_msr(v, lbr->base + i);
+
+                    if ( unlikely(rc) )
                     {
-                        vmx_disable_intercept_for_msr(v, lbr->base + i, MSR_TYPE_R | MSR_TYPE_W);
-                        if ( lbr_tsx_fixup_needed )
-                            v->arch.hvm_vmx.lbr_fixup_enabled |= FIXUP_LBR_TSX;
-                        if ( bdw_erratum_bdf14_fixup_needed )
-                            v->arch.hvm_vmx.lbr_fixup_enabled |=
-                                FIXUP_BDW_ERRATUM_BDF14;
+                        gprintk(XENLOG_ERR,
+                                "Guest load/save list error %d\n", rc);
+                        domain_crash(v->domain);
+                        return X86EMUL_OKAY;
                     }
+
+                    vmx_disable_intercept_for_msr(v, lbr->base + i,
+                                                  MSR_TYPE_R | MSR_TYPE_W);
+                }
+            }
+
+            v->arch.hvm_vmx.lbr_flags |= LBR_MSRS_INSERTED;
+            if ( lbr_tsx_fixup_needed )
+                v->arch.hvm_vmx.lbr_flags |= LBR_FIXUP_TSX;
+            if ( bdw_erratum_bdf14_fixup_needed )
+                v->arch.hvm_vmx.lbr_flags |= LBR_FIXUP_BDF14;
         }
 
-        if ( rc < 0 )
-            hvm_inject_hw_exception(TRAP_machine_check, X86_EVENT_NO_EC);
-        else
-            __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
-
+        __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
         break;
     }
     case MSR_IA32_FEATURE_CONTROL:
@@ -4273,9 +4309,9 @@ static void lbr_fixup(void)
 {
     struct vcpu *curr = current;
 
-    if ( curr->arch.hvm_vmx.lbr_fixup_enabled & FIXUP_LBR_TSX )
+    if ( curr->arch.hvm_vmx.lbr_flags & LBR_FIXUP_TSX )
         lbr_tsx_fixup();
-    if ( curr->arch.hvm_vmx.lbr_fixup_enabled & FIXUP_BDW_ERRATUM_BDF14 )
+    if ( curr->arch.hvm_vmx.lbr_flags & LBR_FIXUP_BDF14 )
         bdw_erratum_bdf14_fixup();
 }
 
@@ -4335,7 +4371,7 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
-    if ( unlikely(curr->arch.hvm_vmx.lbr_fixup_enabled) )
+    if ( unlikely(curr->arch.hvm_vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();
 
     HVMTRACE_ND(VMENTRY, 0, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
