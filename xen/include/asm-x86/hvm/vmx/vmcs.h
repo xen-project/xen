@@ -193,10 +193,17 @@ struct arch_vmx_struct {
     unsigned long        cstar;
 
     unsigned long       *msr_bitmap;
-    unsigned int         msr_count;
+
+    /*
+     * Most accesses to the MSR host/guest load/save lists are in current
+     * context.  However, the data can be modified by toolstack/migration
+     * actions.  Remote access is only permitted for paused vcpus, and is
+     * protected under the domctl lock.
+     */
     struct vmx_msr_entry *msr_area;
-    unsigned int         host_msr_count;
     struct vmx_msr_entry *host_msr_area;
+    unsigned int         msr_count;
+    unsigned int         host_msr_count;
 
     unsigned long        eoi_exitmap_changed;
     DECLARE_BITMAP(eoi_exit_bitmap, NR_VECTORS);
@@ -585,23 +592,25 @@ enum vmx_msr_list_type {
     VMX_MSR_GUEST,          /* MSRs saved on VMExit, loaded on VMEntry. */
 };
 
-int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type);
+int vmx_add_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type);
 
-static inline int vmx_add_host_load_msr(uint32_t msr)
+static inline int vmx_add_guest_msr(struct vcpu *v, uint32_t msr)
 {
-    return vmx_add_msr(msr, VMX_MSR_HOST);
+    return vmx_add_msr(v, msr, VMX_MSR_GUEST);
 }
 
-static inline int vmx_add_guest_msr(uint32_t msr)
+static inline int vmx_add_host_load_msr(struct vcpu *v, uint32_t msr)
 {
-    return vmx_add_msr(msr, VMX_MSR_GUEST);
+    return vmx_add_msr(v, msr, VMX_MSR_HOST);
 }
 
-struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type);
+struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
+                                   enum vmx_msr_list_type type);
 
-static inline int vmx_read_guest_msr(uint32_t msr, uint64_t *val)
+static inline int vmx_read_guest_msr(const struct vcpu *v, uint32_t msr,
+                                     uint64_t *val)
 {
-    const struct vmx_msr_entry *ent = vmx_find_msr(msr, VMX_MSR_GUEST);
+    const struct vmx_msr_entry *ent = vmx_find_msr(v, msr, VMX_MSR_GUEST);
 
     if ( !ent )
         return -ESRCH;
@@ -611,9 +620,10 @@ static inline int vmx_read_guest_msr(uint32_t msr, uint64_t *val)
     return 0;
 }
 
-static inline int vmx_write_guest_msr(uint32_t msr, uint64_t val)
+static inline int vmx_write_guest_msr(struct vcpu *v, uint32_t msr,
+                                      uint64_t val)
 {
-    struct vmx_msr_entry *ent = vmx_find_msr(msr, VMX_MSR_GUEST);
+    struct vmx_msr_entry *ent = vmx_find_msr(v, msr, VMX_MSR_GUEST);
 
     if ( !ent )
         return -ESRCH;

@@ -483,12 +483,12 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
     if ( has_hvm_container_vcpu(v) )
     {
         wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
-        if ( vmx_add_host_load_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
+        if ( vmx_add_host_load_msr(v, MSR_CORE_PERF_GLOBAL_CTRL) )
             goto out_err;
 
-        if ( vmx_add_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL) )
+        if ( vmx_add_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL) )
             goto out_err;
-        vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, 0);
+        vmx_write_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, 0);
     }
 
     core2_vpmu_cxt = xzalloc_bytes(sizeof(*core2_vpmu_cxt) +
@@ -642,7 +642,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
             return -EINVAL;
 
         if ( has_hvm_container_vcpu(v) )
-            vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+            vmx_read_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL,
                                &core2_vpmu_cxt->global_ctrl);
         else
             rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
@@ -711,7 +711,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
                 return -EINVAL;
 
             if ( has_hvm_container_vcpu(v) )
-                vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+                vmx_read_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL,
                                    &core2_vpmu_cxt->global_ctrl);
             else
                 rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, core2_vpmu_cxt->global_ctrl);
@@ -730,7 +730,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     else
     {
         if ( has_hvm_container_vcpu(v) )
-            vmx_write_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+            vmx_write_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
         else
             wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
     }
@@ -764,7 +764,7 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
             break;
         case MSR_CORE_PERF_GLOBAL_CTRL:
             if ( has_hvm_container_vcpu(v) )
-                vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+                vmx_read_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
             else
                 rdmsrl(MSR_CORE_PERF_GLOBAL_CTRL, *msr_content);
             break;

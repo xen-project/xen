@@ -2742,6 +2742,8 @@ static int is_last_branch_msr(u32 ecx)
 
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
+    struct vcpu *curr = current;
+
     HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x", msr);
 
     switch ( msr )
@@ -2804,7 +2806,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
                 goto done;
         }
 
-        if ( vmx_read_guest_msr(msr, msr_content) == 0 )
+        if ( vmx_read_guest_msr(curr, msr, msr_content) == 0 )
             break;
 
         if ( is_last_branch_msr(msr) )
@@ -2984,12 +2986,12 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
             for ( ; (rc == 0) && lbr->count; lbr++ )
                 for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
-                    if ( (rc = vmx_add_guest_msr(lbr->base + i)) == 0 )
+                    if ( (rc = vmx_add_guest_msr(v, lbr->base + i)) == 0 )
                         vmx_disable_intercept_for_msr(v, lbr->base + i, MSR_TYPE_R | MSR_TYPE_W);
         }
 
         if ( (rc < 0) ||
-             (msr_content && (vmx_add_host_load_msr(msr) < 0)) )
+             (msr_content && (vmx_add_host_load_msr(v, msr) < 0)) )
             hvm_inject_hw_exception(TRAP_machine_check, 0);
         else
             __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
@@ -3026,7 +3028,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         switch ( long_mode_do_msr_write(msr, msr_content) )
         {
             case HNDL_unhandled:
-                if ( (vmx_write_guest_msr(msr, msr_content) != 0) &&
+                if ( (vmx_write_guest_msr(v, msr, msr_content) != 0) &&
                      !is_last_branch_msr(msr) )
                     switch ( wrmsr_hypervisor_regs(msr, msr_content) )
                     {
