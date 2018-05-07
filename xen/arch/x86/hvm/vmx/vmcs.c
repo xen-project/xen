@@ -1330,12 +1330,14 @@ static struct vmx_msr_entry *locate_msr_entry(
     return start;
 }
 
-struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type)
+struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
+                                   enum vmx_msr_list_type type)
 {
-    struct vcpu *curr = current;
-    struct arch_vmx_struct *vmx = &curr->arch.hvm_vmx;
+    const struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry *start = NULL, *ent, *end;
     unsigned int total;
+
+    ASSERT(v == current || !vcpu_runnable(v));
 
     switch ( type )
     {
@@ -1362,12 +1364,14 @@ struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type)
     return ((ent < end) && (ent->index == msr)) ? ent : NULL;
 }
 
-int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
+int vmx_add_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type)
 {
-    struct vcpu *curr = current;
-    struct arch_vmx_struct *vmx = &curr->arch.hvm_vmx;
+    struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry **ptr, *start = NULL, *ent, *end;
     unsigned int total;
+    int rc;
+
+    ASSERT(v == current || !vcpu_runnable(v));
 
     switch ( type )
     {
@@ -1386,13 +1390,18 @@ int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
         return -EINVAL;
     }
 
+    vmx_vmcs_enter(v);
+
     /* Allocate memory on first use. */
     if ( unlikely(!*ptr) )
     {
         paddr_t addr;
 
         if ( (*ptr = alloc_xenheap_page()) == NULL )
-            return -ENOMEM;
+        {
+            rc = -ENOMEM;
+            goto out;
+        }
 
         addr = virt_to_maddr(*ptr);
 
@@ -1414,10 +1423,16 @@ int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
     ent   = locate_msr_entry(start, end, msr);
 
     if ( (ent < end) && (ent->index == msr) )
-        return 0;
+    {
+        rc = 0;
+        goto out;
+    }
 
     if ( total == (PAGE_SIZE / sizeof(*ent)) )
-        return -ENOSPC;
+    {
+        rc = -ENOSPC;
+        goto out;
+    }
 
     memmove(ent + 1, ent, sizeof(*ent) * (end - ent));
 
@@ -1438,7 +1453,12 @@ int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
         break;
     }
 
-    return 0;
+    rc = 0;
+
+ out:
+    vmx_vmcs_exit(v);
+
+    return rc;
 }
 
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector)
