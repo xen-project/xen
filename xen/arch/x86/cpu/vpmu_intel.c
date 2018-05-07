@@ -482,13 +482,11 @@ static int core2_vpmu_alloc_resource(struct vcpu *v)
 
     if ( has_hvm_container_vcpu(v) )
     {
-        wrmsrl(MSR_CORE_PERF_GLOBAL_CTRL, 0);
-        if ( vmx_add_host_load_msr(v, MSR_CORE_PERF_GLOBAL_CTRL) )
+        if ( vmx_add_host_load_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, 0) )
             goto out_err;
 
-        if ( vmx_add_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL) )
+        if ( vmx_add_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, 0) )
             goto out_err;
-        vmx_write_guest_msr(v, MSR_CORE_PERF_GLOBAL_CTRL, 0);
     }
 
     core2_vpmu_cxt = xzalloc_bytes(sizeof(*core2_vpmu_cxt) +
