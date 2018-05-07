@@ -110,7 +110,7 @@ domain 0 command line
 Specify which ACPI MADT table to parse for APIC information, if more
 than one is present.
 
-### acpi\_pstate\_strict
+### acpi\_pstate\_strict (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -119,12 +119,12 @@ Enforce checking that P-state transitions by the ACPI cpufreq driver
 actually result in the nominated frequency to be established. A warning
 message will be logged if that isn't the case.
 
-### acpi\_skip\_timer\_override
+### acpi\_skip\_timer\_override (x86)
 > `= <boolean>`
 
 Instruct Xen to ignore timer-interrupt override.
 
-### acpi\_sleep
+### acpi\_sleep (x86)
 > `= s3_bios | s3_mode`
 
 `s3_bios` instructs Xen to invoke video BIOS initialization during S3
@@ -133,7 +133,7 @@ resume.
 `s3_mode` instructs Xen to set up the boot time (option `vga=`) video
 mode during S3 resume.
 
-### allow\_unsafe
+### allow\_unsafe (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -152,14 +152,14 @@ to boot on systems with the following errata:
 
 Permit multiple copies of host p2m.
 
-### apic
+### apic (x86)
 > `= bigsmp | default`
 
 Override Xen's logic for choosing the APIC driver.  By default, if
 there are more than 8 CPUs, Xen will switch to `bigsmp` over
 `default`.
 
-### apicv
+### apicv (Intel)
 > `= <boolean>`
 
 > Default: `true`
@@ -168,12 +168,12 @@ Permit Xen to use APIC Virtualisation Extensions.  This is an optimisation
 available as part of VT-x, and allows hardware to take care of the guests APIC
 handling, rather than requiring emulation in Xen.
 
-### apic\_verbosity
+### apic\_verbosity (x86)
 > `= verbose | debug`
 
 Increase the verbosity of the APIC code from the default value.
 
-### arat
+### arat (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -182,7 +182,7 @@ Permit Xen to use "Always Running APIC Timer" support on compatible hardware
 in combination with cpuidle.  This option is only expected to be useful for
 developers wishing Xen to fall back to older timing methods on newer hardware.
 
-### asid
+### asid (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -191,7 +191,7 @@ Permit Xen to use Address Space Identifiers.  This is an optimisation which
 tags the TLB entries with an ID per vcpu.  This allows for guest TLB flushes
 to be performed without the overhead of a complete TLB flush.
 
-### async-show-all
+### async-show-all (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -199,7 +199,7 @@ to be performed without the overhead of a complete TLB flush.
 Forces all CPUs' full state to be logged upon certain fatal asynchronous
 exceptions (watchdog NMIs and unexpected MCEs).
 
-### ats
+### ats (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -276,7 +276,7 @@ when the RSB gets overwritten.  The former control all RSB overwriting, while
 the latter two can be used to fine tune overwriting on from HVM context, and
 an entry from a native (PV or Xen) context.
 
-### clocksource
+### clocksource (x86)
 > `= pit | hpet | acpi | tsc`
 
 If set, override Xen's default choice for the platform timer.
@@ -287,7 +287,7 @@ the number of allowed CPUs.  When running on platforms that can guarantee a
 monotonic TSC across sockets you may want to adjust the "tsc" command line
 parameter to "stable:socket".
 
-### cmci-threshold
+### cmci-threshold (Intel)
 > `= <integer>`
 
 > Default: `2`
@@ -295,7 +295,7 @@ parameter to "stable:socket".
 Specify the event count threshold for raising Corrected Machine Check
 Interrupts.  Specifying zero disables CMCI handling.
 
-### cmos-rtc-probe
+### cmos-rtc-probe (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -459,7 +459,7 @@ character, but for xen to keep the console.
 
 > Default: `power`
 
-### cpu\_type
+### cpu\_type (x86)
 > `= arch_perfmon`
 
 If set, force use of the performance counters for oprofile, rather than detecting
@@ -499,7 +499,7 @@ pre-canned cpuid mask to mask the current processor down to appear as
 the specified processor. It is important to ensure that all hosts in a
 pool appear the same to guests to allow successful live migration.
 
-### cpuid\_mask\_{{,ext\_}ecx,edx}
+### cpuid\_mask\_{{,ext\_}ecx,edx} (x86)
 > `= <integer>`
 
 > Default: `~0` (all bits set)
@@ -529,10 +529,10 @@ These three command line parameters are also used to specify cpuid
 masks to help with cpuid levelling across a pool of hosts.  See the
 description of the other respective options above.
 
-### cpuidle
+### cpuidle (x86)
 > `= <boolean>`
 
-### cpuinfo
+### cpuinfo (x86)
 > `= <boolean>`
 
 ### crashinfo\_maxaddr
@@ -647,7 +647,7 @@ trace feature is only enabled in debugging builds of Xen.
 
 Specify the bit width of the DMA heap.
 
-### dom0
+### dom0 (x86)
 > `= List of [ pvh | shadow ]`
 
 > Sub-options:
@@ -665,7 +665,7 @@ Flag that makes a dom0 boot in PVHv2 mode.
 Flag that makes a dom0 use shadow paging. Only works when "pvh" is
 enabled.
 
-### dom0\_ioports\_disable
+### dom0\_ioports\_disable (x86)
 > `= List of <hex>-<hex>`
 
 Specify a list of IO ports to be excluded from dom0 access.
@@ -738,7 +738,7 @@ Practices](http://wiki.xen.org/wiki/Xen_Best_Practices#Xen_dom0_dedicated_memory
 
 This option doesn't have effect if pv-shim mode is enabled.
 
-### dom0\_nodes
+### dom0\_nodes (x86)
 
 > `= List of [ <integer> | relaxed | strict ]`
 
@@ -765,7 +765,7 @@ Pin dom0 vcpus to their respective pcpus
 Specify the full path in the device tree for the UART.  If the path doesn't
 start with `/`, it is assumed to be an alias.  The options are device specific.
 
-### e820-mtrr-clip
+### e820-mtrr-clip (x86)
 > `= <boolean>`
 
 Flag that specifies if RAM should be clipped to the highest cacheable
@@ -773,7 +773,7 @@ MTRR.
 
 > Default: `true` on Intel CPUs, otherwise `false`
 
-### e820-verbose
+### e820-verbose (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -961,7 +961,7 @@ more importance will be printed.
 The optional `<rate-limited level>` option instructs which severities
 should be rate limited.
 
-### hap
+### hap (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -969,7 +969,7 @@ should be rate limited.
 Flag to globally enable or disable support for Hardware Assisted
 Paging (HAP)
 
-### hap\_1gb
+### hap\_1gb (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -977,7 +977,7 @@ Paging (HAP)
 Flag to enable 1 GB host page table support for Hardware Assisted
 Paging (HAP).
 
-### hap\_2mb
+### hap\_2mb (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -1002,7 +1002,7 @@ supported only when compiled with XSM on x86.
 
 Control Xens use of the APEI Hardware Error Source Table, should one be found.
 
-### highmem-start
+### highmem-start (x86)
 > `= <size>`
 
 Specify the memory boundary past which memory will be treated as highmem (x86
@@ -1023,10 +1023,10 @@ supported. See docs/misc/arm/big.LITTLE.txt for more information.
 When the hmp-unsafe option is disabled (default), CPUs that are not
 identical to the boot CPU will be parked and not used by Xen.
 
-### hpetbroadcast
+### hpetbroadcast (x86)
 > `= <boolean>`
 
-### hvm\_debug
+### hvm\_debug (x86)
 > `= <integer>`
 
 The specified value is a bit mask with the individual bits having the
@@ -1047,7 +1047,7 @@ following meaning:
 
 Recognized in debug builds of the hypervisor only.
 
-### hvm\_fep
+### hvm\_fep (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -1062,7 +1062,7 @@ As this feature opens up the instruction emulator to arbitrary
 instruction from an HVM guest, don't use this in production system. No
 security support is provided when this flag is set.
 
-### hvm\_port80
+### hvm\_port80 (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -1071,10 +1071,10 @@ Specify whether guests are to be given access to physical port 80
 (often used for debugging purposes), to override the DMI based
 detection of systems known to misbehave upon accesses to that port.
 
-### idle\_latency\_factor
+### idle\_latency\_factor (x86)
 > `= <integer>`
 
-### ioapic\_ack
+### ioapic\_ack (x86)
 > `= old | new`
 
 > Default: `new` unless directed-EOI is supported
@@ -1201,34 +1201,34 @@ Rather than only mapping RAM pages for IOMMU accesses for Dom0, with this
 option all pages not marked as unusable in the E820 table will get a mapping
 established.
 
-### irq\_ratelimit
+### irq\_ratelimit (x86)
 > `= <integer>`
 
-### irq\_vector\_map
-### ivrs\_hpet[`<hpet>`]
+### irq\_vector\_map (x86)
+### ivrs\_hpet[`<hpet>`] (AMD)
 > `=[<seg>:]<bus>:<device>.<func>`
 
 Force the use of `[<seg>:]<bus>:<device>.<func>` as device ID of HPET
 `<hpet>` instead of the one specified by the IVHD sub-tables of the IVRS
 ACPI table.
 
-### ivrs\_ioapic[`<ioapic>`]
+### ivrs\_ioapic[`<ioapic>`] (AMD)
 > `=[<seg>:]<bus>:<device>.<func>`
 
 Force the use of `[<seg>:]<bus>:<device>.<func>` as device ID of IO-APIC
 `<ioapic>` instead of the one specified by the IVHD sub-tables of the IVRS
 ACPI table.
 
-### lapic
+### lapic (x86)
 > `= <boolean>`
 
 Force the use of use of the local APIC on a uniprocessor system, even
 if left disabled by the BIOS.
 
-### lapic\_timer\_c2\_ok
+### lapic\_timer\_c2\_ok (x86)
 > `= <boolean>`
 
-### ler
+### ler (x86)
 > `= <boolean>`
 
 ### loglvl
@@ -1263,19 +1263,19 @@ with **crashinfo\_maxaddr**.
 Specify the threshold below which Xen will inform dom0 that the quantity of
 free memory is getting low.  Specifying `0` will disable this notification.
 
-### maxcpus
+### maxcpus (x86)
 > `= <integer>`
 
-### max\_cstate
+### max\_cstate (x86)
 > `= <integer>`
 
-### max\_gsi\_irqs
+### max\_gsi\_irqs (x86)
 > `= <integer>`
 
 Specifies the number of interrupts to be use for pin (IO-APIC or legacy PIC)
 based interrupts. Any higher IRQs will be available for use via PCI MSI.
 
-### max\_lpi\_bits
+### max\_lpi\_bits (arm)
 > `= <integer>`
 
 Specifies the number of ARM GICv3 LPI interrupts to allocate on the host,
@@ -1284,18 +1284,18 @@ presented as the number of bits needed to encode it. This must be at least
 one pending bit to be allocated.
 Defaults to 20 bits (to cover at most 1048576 interrupts).
 
-### mce
+### mce (x86)
 > `= <integer>`
 
-### mce\_fb
+### mce\_fb (Intel)
 > `= <integer>`
 
-### mce\_verbosity
+### mce\_verbosity (x86)
 > `= verbose`
 
 Specify verbose machine check output.
 
-### mem
+### mem (x86)
 > `= <size>`
 
 Specify the maximum address of physical RAM.  Any RAM beyond this
@@ -1312,14 +1312,14 @@ requests issued by the various kinds of domains (in this order:
 ordinary DomU, control domain, hardware domain, and - when supported
 by the platform - DomU with pass-through device assigned).
 
-### mmcfg
+### mmcfg (x86)
 > `= <boolean>[,amd-fam10]`
 
 > Default: `1`
 
 Specify if the MMConfig space should be enabled.
 
-### mmio-relax
+### mmio-relax (x86)
 > `= <boolean> | all`
 
 > Default: `false`
@@ -1328,21 +1328,21 @@ By default, domains may not create cached mappings to MMIO regions.
 This option relaxes the check for Domain 0 (or when using `all`, all PV
 domains), to permit the use of cacheable MMIO mappings.
 
-### msi
+### msi (x86)
 > `= <boolean>`
 
 > Default: `true`
 
 Force Xen to (not) use PCI-MSI, even if ACPI FADT says otherwise.
 
-### mtrr.show
+### mtrr.show (x86)
 > `= <boolean>`
 
 > Default: `false`
 
-Print boot time MTRR state (x86 only).
+Print boot time MTRR state.
 
-### mwait-idle
+### mwait-idle (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -1350,7 +1350,7 @@ Print boot time MTRR state (x86 only).
 Use the MWAIT idle driver (with model specific C-state knowledge) instead
 of the ACPI based one.
 
-### nmi
+### nmi (x86)
 > `= ignore | dom0 | fatal`
 
 > Default: `fatal` for a debug build, or `dom0` for a non-debug build
@@ -1359,7 +1359,7 @@ Specify what Xen should do in the event of an NMI parity or I/O error.
 `ignore` discards the error; `dom0` causes Xen to report the error to
 dom0, while 'fatal' causes Xen to print diagnostics and then hang.
 
-### noapic
+### noapic (x86)
 
 Instruct Xen to ignore any IOAPICs that are present in the system, and
 instead continue to use the legacy PIC. This is _not_ recommended with
@@ -1378,14 +1378,14 @@ By default, Xen will use the INVPCID instruction for TLB management if
 it is available.  This option can be used to cause Xen to fall back to
 older mechanisms, which are generally slower.
 
-### noirqbalance
+### noirqbalance (x86)
 > `= <boolean>`
 
 Disable software IRQ balancing and affinity. This can be used on
 systems such as Dell 1850/2850 that have workarounds in hardware for
 IRQ routing issues.
 
-### nolapic
+### nolapic (x86)
 > `= <boolean>`
 
 > Default: `false`
@@ -1407,16 +1407,16 @@ Do not automatically reboot after an error.  This is useful for
 catching debug output.  Defaults to automatically reboot after 5
 seconds.
 
-### nosmp
+### nosmp (x86)
 > `= <boolean>`
 
 Disable SMP support.  No secondary processors will be booted.
 Defaults to booting secondary processors.
 
-### nr\_irqs
+### nr\_irqs (x86)
 > `= <integer>`
 
-### numa
+### numa (x86)
 > `= on | off | fake=<integer> | noacpi`
 
 > Default: `on`
@@ -1440,16 +1440,6 @@ All numbers specified must be hexadecimal ones.
 
 This option can be specified more than once (up to 8 times at present).
 
-### pku
-> `= <boolean>`
-
-> Default: `true`
-
-Flag to enable Memory Protection Keys.
-
-The protection-key feature provides an additional mechanism by which IA-32e
-paging controls access to usermode addresses.
-
 ### pcid (x86)
 > `= <boolean> | xpti=<bool>`
 
@@ -1464,10 +1454,20 @@ for all of them (`true`), only for those subject to XPTI (`xpti`) or for
 those not subject to XPTI (`no-xpti`). The feature is used only in case
 INVPCID is supported and not disabled via `invpcid=false`.
 
+### pku (x86)
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable Memory Protection Keys.
+
+The protection-key feature provides an additional mechanism by which IA-32e
+paging controls access to usermode addresses.
+
 ### ple\_gap
 > `= <integer>`
 
-### ple\_window
+### ple\_window (Intel)
 > `= <integer>`
 
 ### psr (Intel)
@@ -1511,7 +1511,7 @@ The following resources are available:
     sum of CBMs is fixed, that means actual `cos_max` in use will automatically
     reduce to half when CDP is enabled.
 	
-### pv-linear-pt
+### pv-linear-pt (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -1551,7 +1551,7 @@ should be woken up to check if the grace period has completed, and the
 callbacks are safe to be executed. Expressed in milliseconds; maximum is
 100, and it can't be 0.
 
-### reboot
+### reboot (x86)
 > `= t[riple] | k[bd] | a[cpi] | p[ci] | P[ower] | e[fi] | n[o] [, [w]arm | [c]old]`
 
 > Default: `0`
@@ -1603,7 +1603,7 @@ rmrr=d5d45=0:0:1d.0;0xd5d46-0xd5d48=0:0:1a.0
 Note: grub2 requires to escape or use quotations if special characters are used,
 namely ';', refer to the grub2 documentation if multiple ranges are specified.
 
-### ro-hpet
+### ro-hpet (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -1718,7 +1718,7 @@ plus the free memory slack given to the shim for runtime allocations.
 By default, the amount of free memory slack given to the shim for runtime usage
 is 1MB.
 
-### smap
+### smap (x86)
 > `= <boolean> | hvm`
 
 > Default: `true`
@@ -1726,7 +1726,7 @@ is 1MB.
 Flag to enable Supervisor Mode Access Prevention
 Use `smap=hvm` to allow SMAP use by HVM guests only.
 
-### smep
+### smep (x86)
 > `= <boolean> | hvm`
 
 > Default: `true`
@@ -1750,7 +1750,7 @@ false disable the quirk workaround, which is also the default.
 Flag to force synchronous console output.  Useful for debugging, but
 not suitable for production environments due to incurred overhead.
 
-### tboot
+### tboot (x86)
 > `= 0x<phys_addr>`
 
 Specify the physical address of the trusted boot shared page.
@@ -1760,7 +1760,7 @@ Specify the physical address of the trusted boot shared page.
 
 Specify the per-cpu trace buffer size in pages.
 
-### tdt
+### tdt (x86)
 > `= <boolean>`
 
 > Default: `true`
@@ -1787,10 +1787,10 @@ pages) must also be specified via the tbuf\_size parameter.
 ### tmem\_compress
 > `= <boolean>`
 
-### tsc
+### tsc (x86)
 > `= unstable | skewed | stable:socket`
 
-### ucode
+### ucode (x86)
 > `= [<integer> | scan]`
 
 Specify how and where to find CPU microcode update blob.
@@ -1812,7 +1812,7 @@ microcode in the cpio name space must be:
   - on Intel: kernel/x86/microcode/GenuineIntel.bin
   - on AMD  : kernel/x86/microcode/AuthenticAMD.bin
 
-### unrestricted\_guest
+### unrestricted\_guest (Intel)
 > `= <boolean>`
 
 ### vcpu\_migration\_delay
@@ -1857,7 +1857,7 @@ The optional `keep` parameter causes Xen to continue using the vga
 console even after dom0 has been started.  The default behaviour is to
 relinquish control to dom0.
 
-### viridian-spinlock-retry-count
+### viridian-spinlock-retry-count (x86)
 > `= <integer>`
 
 > Default: `2047`
@@ -1865,7 +1865,7 @@ relinquish control to dom0.
 Specify the maximum number of retries before an enlightened Windows
 guest will notify Xen that it has failed to acquire a spinlock.
 
-### viridian-version
+### viridian-version (x86)
 > `= [<major>],[<minor>],[<build>]`
 
 > Default: `6,0,0x1772`
@@ -1881,7 +1881,7 @@ encoded in guest CPUID 0x40000002 if viridian enlightenments are enabled.
 Use Virtual Processor ID support if available.  This prevents the need for TLB
 flushes on VM entry and exit, increasing performance.
 
-### vpmu
+### vpmu (x86)
 > `= ( <boolean> | { bts | ipc | arch [, ...] } )`
 
 > Default: `off`
@@ -1917,7 +1917,7 @@ Note that if **watchdog** option is also specified vpmu will be turned off.
 As the virtualisation is not 100% safe, don't use the vpmu flag on
 production systems (see http://xenbits.xen.org/xsa/advisory-163.html)!
 
-### vwfi
+### vwfi (arm)
 > `= trap | native
 
 > Default: `trap`
@@ -1932,7 +1932,7 @@ vwfi to `native` reduces irq latency significantly. It can also lead to
 suboptimal scheduling decisions, but only when the system is
 oversubscribed (i.e., in total there are more vCPUs than pCPUs).
 
-### watchdog
+### watchdog (x86)
 > `= force | <boolean>`
 
 > Default: `false`
@@ -1942,7 +1942,7 @@ longer than the **watchdog\_timeout**, a panic occurs.  When `force` is
 specified, in addition to running an NMI watchdog on each processor,
 unknown NMIs will still be processed.
 
-### watchdog\_timeout
+### watchdog\_timeout (x86)
 > `= <integer>`
 
 > Default: `5`
@@ -1950,14 +1950,14 @@ unknown NMIs will still be processed.
 Set the NMI watchdog timeout in seconds.  Specifying `0` will turn off
 the watchdog.
 
-### x2apic
+### x2apic (x86)
 > `= <boolean>`
 
 > Default: `true`
 
 Permit use of x2apic setup for SMP environments.
 
-### x2apic\_phys
+### x2apic\_phys (x86)
 > `= <boolean>`
 
 > Default: `true` if **FADT** mandates physical mode, `false` otherwise.
@@ -1977,7 +1977,7 @@ By default will use 1/32 of the RAM up to a maximum of 1GB and with a
 minimum of 32M, subject to a suitably aligned and sized contiguous
 region of memory being available.
 
-### xpti
+### xpti (x86)
 > `= List of [ default | <boolean> | dom0=<bool> | domu=<bool> ]`
 
 > Default: `false` on hardware known not to be vulnerable to Meltdown (e.g. AMD)
@@ -1996,7 +1996,7 @@ Meltdown for all domains.
 With `dom0` and `domu` it is possible to control page table isolation
 for dom0 or guest domains only.
 
-### xsave
+### xsave (x86)
 > `= <boolean>`
 
 > Default: `true`
