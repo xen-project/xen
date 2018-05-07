@@ -61,23 +61,8 @@ UNLIKELY_START(ne, nsvm_hap)
         jmp  .Lsvm_do_resume
 __UNLIKELY_END(nsvm_hap)
 
-        call svm_asid_handle_vmrun
-
-        cmpb $0,tb_init_done(%rip)
-UNLIKELY_START(nz, svm_trace)
-        call svm_trace_vmentry
-UNLIKELY_END(svm_trace)
-
-        mov  VCPU_svm_vmcb(%rbx),%rcx
-        mov  UREGS_rax(%rsp),%rax
-        mov  %rax,VMCB_rax(%rcx)
-        mov  UREGS_rip(%rsp),%rax
-        mov  %rax,VMCB_rip(%rcx)
-        mov  UREGS_rsp(%rsp),%rax
-        mov  %rax,VMCB_rsp(%rcx)
-        mov  UREGS_eflags(%rsp),%rax
-        or   $X86_EFLAGS_MBS,%rax
-        mov  %rax,VMCB_rflags(%rcx)
+        mov  %rsp, %rdi
+        call svm_vmenter_helper
 
         mov VCPU_arch_msr(%rbx), %rax
         mov VCPUMSR_spec_ctrl_raw(%rax), %eax
@@ -110,16 +95,6 @@ UNLIKELY_END(svm_trace)
 
         SPEC_CTRL_ENTRY_FROM_VMEXIT /* Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
-
-        mov  VCPU_svm_vmcb(%rbx),%rcx
-        mov  VMCB_rax(%rcx),%rax
-        mov  %rax,UREGS_rax(%rsp)
-        mov  VMCB_rip(%rcx),%rax
-        mov  %rax,UREGS_rip(%rsp)
-        mov  VMCB_rsp(%rcx),%rax
-        mov  %rax,UREGS_rsp(%rsp)
-        mov  VMCB_rflags(%rcx),%rax
-        mov  %rax,UREGS_eflags(%rsp)
 
         STGI
 GLOBAL(svm_stgi_label)

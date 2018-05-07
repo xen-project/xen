@@ -119,12 +119,6 @@ void __dummy__(void)
     OFFSET(DOMAIN_is_32bit_pv, struct domain, arch.is_32bit_pv);
     BLANK();
 
-    OFFSET(VMCB_rax, struct vmcb_struct, rax);
-    OFFSET(VMCB_rip, struct vmcb_struct, rip);
-    OFFSET(VMCB_rsp, struct vmcb_struct, rsp);
-    OFFSET(VMCB_rflags, struct vmcb_struct, rflags);
-    BLANK();
-
     OFFSET(VCPUINFO_upcall_pending, struct vcpu_info, evtchn_upcall_pending);
     OFFSET(VCPUINFO_upcall_mask, struct vcpu_info, evtchn_upcall_mask);
     BLANK();

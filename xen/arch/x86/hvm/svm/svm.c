@@ -687,10 +687,9 @@ static void svm_sync_vmcb(struct vcpu *v, enum vmcb_sync_state new_state)
     if ( new_state == vmcb_needs_vmsave )
     {
         if ( arch_svm->vmcb_sync_state == vmcb_needs_vmload )
-        {
             svm_vmload(arch_svm->vmcb);
-            arch_svm->vmcb_sync_state = vmcb_in_sync;
-        }
+
+        arch_svm->vmcb_sync_state = new_state;
     }
     else
     {
@@ -1171,9 +1170,27 @@ static void noreturn svm_do_resume(struct vcpu *v)
 
     hvm_do_resume(v);
 
-    svm_sync_vmcb(v, vmcb_needs_vmsave);
-
     reset_stack_and_jump(svm_asm_do_resume);
+}
+
+void svm_vmenter_helper(const struct cpu_user_regs *regs)
+{
+    struct vcpu *curr = current;
+    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
+
+    svm_asid_handle_vmrun();
+
+    if ( unlikely(tb_init_done) )
+        HVMTRACE_ND(VMENTRY,
+                    nestedhvm_vcpu_in_guestmode(curr) ? TRC_HVM_NESTEDFLAG : 0,
+                    1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
+
+    svm_sync_vmcb(curr, vmcb_needs_vmsave);
+
+    vmcb->rax = regs->rax;
+    vmcb->rip = regs->rip;
+    vmcb->rsp = regs->rsp;
+    vmcb->rflags = regs->rflags | X86_EFLAGS_MBS;
 }
 
 static void svm_guest_osvw_init(struct vcpu *vcpu)
@@ -2621,7 +2638,11 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     bool_t vcpu_guestmode = 0;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    v->arch.hvm_svm.vmcb_sync_state = vmcb_needs_vmsave;
+    regs->rax = vmcb->rax;
+    regs->rip = vmcb->rip;
+    regs->rsp = vmcb->rsp;
+    regs->rflags = vmcb->rflags;
+
     hvm_invalidate_regs_fields(regs);
 
     if ( paging_mode_hap(v->domain) )
@@ -3108,8 +3129,6 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 
   out:
-    svm_sync_vmcb(v, vmcb_needs_vmsave);
-
     if ( vcpu_guestmode || vlapic_hw_disabled(vlapic) )
         return;
 
@@ -3118,17 +3137,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     intr.fields.tpr =
         (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
     vmcb_set_vintr(vmcb, intr);
-    ASSERT(v->arch.hvm_svm.vmcb_sync_state != vmcb_needs_vmload);
 }
 
-void svm_trace_vmentry(void)
-{
-    struct vcpu *curr = current;
-    HVMTRACE_ND(VMENTRY,
-                nestedhvm_vcpu_in_guestmode(curr) ? TRC_HVM_NESTEDFLAG : 0,
-                1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
-}
-  
 /*
  * Local variables:
  * mode: C
