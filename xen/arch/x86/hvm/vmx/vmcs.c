@@ -1332,12 +1332,37 @@ static int construct_vmcs(struct vcpu *v)
     return rc;
 }
 
+/*
+ * Search an MSR list looking for an MSR entry, or the slot in which it should
+ * live (to keep the data sorted) if an entry is not found.
+ *
+ * The return pointer is guaranteed to be bounded by start and end.  However,
+ * it may point at end, and may be invalid for the caller to dereference.
+ */
+static struct vmx_msr_entry *locate_msr_entry(
+    struct vmx_msr_entry *start, struct vmx_msr_entry *end, uint32_t msr)
+{
+    while ( start < end )
+    {
+        struct vmx_msr_entry *mid = start + (end - start) / 2;
+
+        if ( msr < mid->index )
+            end = mid;
+        else if ( msr > mid->index )
+            start = mid + 1;
+        else
+            return mid;
+    }
+
+    return start;
+}
+
 struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type)
 {
     struct vcpu *curr = current;
     struct arch_vmx_struct *vmx = &curr->arch.hvm_vmx;
-    struct vmx_msr_entry *start = NULL;
-    unsigned int i, total;
+    struct vmx_msr_entry *start = NULL, *ent, *end;
+    unsigned int total;
 
     switch ( type )
     {
@@ -1358,13 +1383,10 @@ struct vmx_msr_entry *vmx_find_msr(uint32_t msr, enum vmx_msr_list_type type)
     if ( !start )
         return NULL;
 
-    for ( i = 0; i < total; i++ )
-    {
-        if ( start[i].index == msr )
-            return &start[i];
-    }
+    end = start + total;
+    ent = locate_msr_entry(start, end, msr);
 
-    return NULL;
+    return ((ent < end) && (ent->index == msr)) ? ent : NULL;
 }
 
 int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
@@ -1416,10 +1438,10 @@ int vmx_add_msr(uint32_t msr, enum vmx_msr_list_type type)
 
     start = *ptr;
     end   = start + total;
+    ent   = locate_msr_entry(start, end, msr);
 
-    for ( ent = start; ent < end && ent->index <= msr; ++ent )
-        if ( ent->index == msr )
-            return 0;
+    if ( (ent < end) && (ent->index == msr) )
+        return 0;
 
     if ( total == (PAGE_SIZE / sizeof(*ent)) )
         return -ENOSPC;
