@@ -4225,7 +4225,7 @@ out:
 static void lbr_tsx_fixup(void)
 {
     struct vcpu *curr = current;
-    unsigned int msr_count = curr->arch.hvm_vmx.msr_count;
+    unsigned int msr_count = curr->arch.hvm_vmx.msr_save_count;
     struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
     struct vmx_msr_entry *msr;
 

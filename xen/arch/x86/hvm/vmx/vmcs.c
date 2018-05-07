@@ -1313,7 +1313,7 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
 {
     const struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry *start = NULL, *ent, *end;
-    unsigned int total;
+    unsigned int substart, subend, total;
 
     ASSERT(v == current || !vcpu_runnable(v));
 
@@ -1321,12 +1321,23 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
     {
     case VMX_MSR_HOST:
         start    = vmx->host_msr_area;
-        total    = vmx->host_msr_count;
+        substart = 0;
+        subend   = vmx->host_msr_count;
+        total    = subend;
         break;
 
     case VMX_MSR_GUEST:
         start    = vmx->msr_area;
-        total    = vmx->msr_count;
+        substart = 0;
+        subend   = vmx->msr_save_count;
+        total    = vmx->msr_load_count;
+        break;
+
+    case VMX_MSR_GUEST_LOADONLY:
+        start    = vmx->msr_area;
+        substart = vmx->msr_save_count;
+        subend   = vmx->msr_load_count;
+        total    = subend;
         break;
 
     default:
@@ -1337,7 +1348,7 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
         return NULL;
 
     end = start + total;
-    ent = locate_msr_entry(start, end, msr);
+    ent = locate_msr_entry(start + substart, start + subend, msr);
 
     return ((ent < end) && (ent->index == msr)) ? ent : NULL;
 }
@@ -1347,7 +1358,7 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
 {
     struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry **ptr, *start = NULL, *ent, *end;
-    unsigned int total;
+    unsigned int substart, subend, total;
     int rc;
 
     ASSERT(v == current || !vcpu_runnable(v));
@@ -1356,12 +1367,23 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
     {
     case VMX_MSR_HOST:
         ptr      = &vmx->host_msr_area;
-        total    = vmx->host_msr_count;
+        substart = 0;
+        subend   = vmx->host_msr_count;
+        total    = subend;
         break;
 
     case VMX_MSR_GUEST:
         ptr      = &vmx->msr_area;
-        total    = vmx->msr_count;
+        substart = 0;
+        subend   = vmx->msr_save_count;
+        total    = vmx->msr_load_count;
+        break;
+
+    case VMX_MSR_GUEST_LOADONLY:
+        ptr      = &vmx->msr_area;
+        substart = vmx->msr_save_count;
+        subend   = vmx->msr_load_count;
+        total    = subend;
         break;
 
     default:
@@ -1391,6 +1413,7 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
             break;
 
         case VMX_MSR_GUEST:
+        case VMX_MSR_GUEST_LOADONLY:
             __vmwrite(VM_EXIT_MSR_STORE_ADDR, addr);
             __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, addr);
             break;
@@ -1399,7 +1422,7 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
 
     start = *ptr;
     end   = start + total;
-    ent   = locate_msr_entry(start, end, msr);
+    ent   = locate_msr_entry(start + substart, start + subend, msr);
 
     if ( (ent < end) && (ent->index == msr) )
         goto found;
@@ -1423,8 +1446,11 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
         break;
 
     case VMX_MSR_GUEST:
-        __vmwrite(VM_EXIT_MSR_STORE_COUNT, ++vmx->msr_count);
-        __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, vmx->msr_count);
+        __vmwrite(VM_EXIT_MSR_STORE_COUNT, ++vmx->msr_save_count);
+
+        /* Fallthrough */
+    case VMX_MSR_GUEST_LOADONLY:
+        __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, ++vmx->msr_load_count);
         break;
     }
 
