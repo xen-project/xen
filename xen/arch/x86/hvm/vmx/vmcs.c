@@ -1331,7 +1331,8 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
     return ((ent < end) && (ent->index == msr)) ? ent : NULL;
 }
 
-int vmx_add_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type)
+int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
+                enum vmx_msr_list_type type)
 {
     struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry **ptr, *start = NULL, *ent, *end;
@@ -1390,11 +1391,9 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type)
     ent   = locate_msr_entry(start, end, msr);
 
     if ( (ent < end) && (ent->index == msr) )
-    {
-        rc = 0;
-        goto out;
-    }
+        goto found;
 
+    /* If there isn't an existing entry for msr, insert room for one. */
     if ( total == (PAGE_SIZE / sizeof(*ent)) )
     {
         rc = -ENOSPC;
@@ -1409,17 +1408,18 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type)
     switch ( type )
     {
     case VMX_MSR_HOST:
-        rdmsrl(msr, ent->data);
         __vmwrite(VM_EXIT_MSR_LOAD_COUNT, ++vmx->host_msr_count);
         break;
 
     case VMX_MSR_GUEST:
-        ent->data = 0;
         __vmwrite(VM_EXIT_MSR_STORE_COUNT, ++vmx->msr_count);
         __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, vmx->msr_count);
         break;
     }
 
+    /* Set the msr's value. */
+ found:
+    ent->data = val;
     rc = 0;
 
  out:
