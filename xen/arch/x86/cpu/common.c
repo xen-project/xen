@@ -672,6 +672,7 @@ void load_system_tables(void)
 	tss->ist[IST_MCE - 1] = stack_top + IST_MCE * PAGE_SIZE;
 	tss->ist[IST_DF  - 1] = stack_top + IST_DF  * PAGE_SIZE;
 	tss->ist[IST_NMI - 1] = stack_top + IST_NMI * PAGE_SIZE;
+	tss->ist[IST_DB  - 1] = stack_top + IST_DB  * PAGE_SIZE;
 
 	_set_tssldt_desc(
 		gdt + TSS_ENTRY,
@@ -692,6 +693,7 @@ void load_system_tables(void)
 	set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
 	set_ist(&idt_tables[cpu][TRAP_nmi],	      IST_NMI);
 	set_ist(&idt_tables[cpu][TRAP_machine_check], IST_MCE);
+	set_ist(&idt_tables[cpu][TRAP_debug],         IST_DB);
 }
 
 /*

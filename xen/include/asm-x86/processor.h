@@ -498,7 +498,8 @@ struct __packed __cacheline_aligned tss_struct {
 #define IST_DF   1UL
 #define IST_NMI  2UL
 #define IST_MCE  3UL
-#define IST_MAX  3UL
+#define IST_DB   4UL
+#define IST_MAX  4UL
 
 /* Set the interrupt stack table used by a particular interrupt
  * descriptor table entry. */

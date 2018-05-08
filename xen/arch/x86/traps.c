@@ -259,13 +259,13 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 /*
  * Notes for get_stack_trace_bottom() and get_stack_dump_bottom()
  *
- * Stack pages 0, 1 and 2:
+ * Stack pages 0 - 3:
  *   These are all 1-page IST stacks.  Each of these stacks have an exception
  *   frame and saved register state at the top.  The interesting bound for a
  *   trace is the word adjacent to this, while the bound for a dump is the
  *   very top, including the exception frame.
  *
- * Stack pages 3, 4 and 5:
+ * Stack pages 4 and 5:
  *   None of these are particularly interesting.  With MEMORY_GUARD, page 5 is
  *   explicitly not present, so attempting to dump or trace it is
  *   counterproductive.  Without MEMORY_GUARD, it is possible for a call chain
@@ -286,12 +286,12 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
 {
     switch ( get_stack_page(sp) )
     {
-    case 0 ... 2:
+    case 0 ... 3:
         return ROUNDUP(sp, PAGE_SIZE) -
             offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
 
 #ifndef MEMORY_GUARD
-    case 3 ... 5:
+    case 4 ... 5:
 #endif
     case 6 ... 7:
         return ROUNDUP(sp, STACK_SIZE) -
@@ -306,11 +306,11 @@ unsigned long get_stack_dump_bottom(unsigned long sp)
 {
     switch ( get_stack_page(sp) )
     {
-    case 0 ... 2:
+    case 0 ... 3:
         return ROUNDUP(sp, PAGE_SIZE) - sizeof(unsigned long);
 
 #ifndef MEMORY_GUARD
-    case 3 ... 5:
+    case 4 ... 5:
 #endif
     case 6 ... 7:
         return ROUNDUP(sp, STACK_SIZE) - sizeof(unsigned long);
@@ -4022,6 +4022,7 @@ void __init init_idt_traps(void)
     set_ist(&idt_table[TRAP_double_fault],  IST_DF);
     set_ist(&idt_table[TRAP_nmi],           IST_NMI);
     set_ist(&idt_table[TRAP_machine_check], IST_MCE);
+    set_ist(&idt_table[TRAP_debug],         IST_DB);
 
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;
