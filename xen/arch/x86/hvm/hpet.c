@@ -264,13 +264,20 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
         diff = (timer_is_32bit(h, tn) && (-diff > HPET_TINY_TIME_SPAN))
             ? (uint32_t)diff : 0;
 
+    destroy_periodic_time(&h->pt[tn]);
     if ( (tn <= 1) && (h->hpet.config & HPET_CFG_LEGACY) )
+    {
         /* if LegacyReplacementRoute bit is set, HPET specification requires
            timer0 be routed to IRQ0 in NON-APIC or IRQ2 in the I/O APIC,
            timer1 be routed to IRQ8 in NON-APIC or IRQ8 in the I/O APIC. */
         irq = (tn == 0) ? 0 : 8;
+        h->pt[tn].source = PTSRC_isa;
+    }
     else
+    {
         irq = timer_int_route(h, tn);
+        h->pt[tn].source = PTSRC_ioapic;
+    }
 
     /*
      * diff is the time from now when the timer should fire, for a periodic
