@@ -952,6 +952,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_NONE);
     set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
     set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
+    set_ist(&idt_tables[cpu][TRAP_debug],         IST_NONE);
 
     if ( setup_cpu_root_pgt(cpu) )
         goto oom;
