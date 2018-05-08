@@ -1048,6 +1048,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
     set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NMI);
     set_ist(&idt_tables[cpu][TRAP_machine_check], IST_MCE);
+    set_ist(&idt_tables[cpu][TRAP_debug],         IST_DB);
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
@@ -1069,6 +1070,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_NONE);
     set_ist(&idt_tables[cpu][TRAP_nmi],           IST_NONE);
     set_ist(&idt_tables[cpu][TRAP_machine_check], IST_NONE);
+    set_ist(&idt_tables[cpu][TRAP_debug],         IST_NONE);
 
     svm_restore_dr(v);
 
