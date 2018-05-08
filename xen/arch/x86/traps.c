@@ -4090,16 +4090,44 @@ void do_debug(struct cpu_user_regs *regs)
                 regs->eflags &= ~X86_EFLAGS_TF;
             }
         }
-        else
+
+        /*
+         * Check for fault conditions.  General Detect, and instruction
+         * breakpoints are faults rather than traps, at which point attempting
+         * to ignore and continue will result in a livelock.
+         */
+        if ( dr6 & DR_GENERAL_DETECT )
         {
-            /*
-             * We ignore watchpoints when they trigger within Xen. This may
-             * happen when a buffer is passed to us which previously had a
-             * watchpoint set on it. No need to bump EIP; the only faulting
-             * trap is an instruction breakpoint, which can't happen to us.
-             */
-            WARN_ON(!search_exception_table(regs->eip));
+            printk(XENLOG_ERR "Hit General Detect in Xen context\n");
+            fatal_trap(regs, 0);
         }
+
+        if ( dr6 & (DR_TRAP3 | DR_TRAP2 | DR_TRAP1 | DR_TRAP0) )
+        {
+            unsigned int bp, dr7 = read_debugreg(7) >> DR_CONTROL_SHIFT;
+
+            for ( bp = 0; bp < 4; ++bp )
+            {
+                if ( (dr6 & (1u << bp)) && /* Breakpoint triggered? */
+                     ((dr7 & (3u << (bp * DR_CONTROL_SIZE))) == 0) /* Insn? */ )
+                {
+                    printk(XENLOG_ERR
+                           "Hit instruction breakpoint in Xen context\n");
+                    fatal_trap(regs, 0);
+                }
+            }
+        }
+
+        /*
+         * Whatever caused this #DB should be a trap.  Note it and continue.
+         * Guests can trigger this in certain corner cases, so ensure the
+         * message is ratelimited.
+         */
+        gprintk(XENLOG_WARNING,
+                "Hit #DB in Xen context: %04x:%p [%ps], stk %04x:%p, dr6 %lx\n",
+                regs->cs, _p(regs->rip), _p(regs->rip),
+                regs->ss, _p(regs->rsp), dr6);
+
         goto out;
     }
 
