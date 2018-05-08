@@ -42,6 +42,12 @@ test_all_events:
         leaq  irq_stat+IRQSTAT_softirq_pending(%rip), %rcx
         cmpl  $0, (%rcx, %rax, 1)
         jne   process_softirqs
+
+        /* Inject exception if pending. */
+        lea   VCPU_trap_bounce(%rbx), %rdx
+        testb $TBF_EXCEPTION, TRAPBOUNCE_flags(%rdx)
+        jnz   .Lprocess_trapbounce
+
         cmpb  $0, VCPU_mce_pending(%rbx)
         jne   process_mce
 .Ltest_guest_nmi:
@@ -68,6 +74,15 @@ process_softirqs:
         sti
         call do_softirq
         jmp  test_all_events
+
+        ALIGN
+/* %rbx: struct vcpu, %rdx struct trap_bounce */
+.Lprocess_trapbounce:
+        sti
+.Lbounce_exception:
+        call  create_bounce_frame
+        movb  $0, TRAPBOUNCE_flags(%rdx)
+        jmp   test_all_events
 
         ALIGN
 /* %rbx: struct vcpu */
@@ -667,15 +682,9 @@ handle_exception_saved:
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3,UREGS_cs(%rsp)
         jz    restore_all_xen
-        leaq  VCPU_trap_bounce(%rbx),%rdx
         movq  VCPU_domain(%rbx),%rax
         testb $1,DOMAIN_is_32bit_pv(%rax)
-        jnz   compat_post_handle_exception
-        testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
-        jz    test_all_events
-.Lbounce_exception:
-        call  create_bounce_frame
-        movb  $0,TRAPBOUNCE_flags(%rdx)
+        jnz   compat_test_all_events
         jmp   test_all_events
 
 /* No special register assumptions. */
