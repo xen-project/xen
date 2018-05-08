@@ -217,12 +217,8 @@ void dump_pageframe_info(struct domain *d)
 void update_guest_memory_policy(struct vcpu *v,
                                 struct guest_memory_policy *policy)
 {
-    smap_check_policy_t old_smap_policy = v->arch.smap_check_policy;
     bool old_guest_mode = nestedhvm_is_n2(v);
     bool new_guest_mode = policy->nested_guest_mode;
-
-    v->arch.smap_check_policy = policy->smap_policy;
-    policy->smap_policy = old_smap_policy;
 
     /*
      * When 'v' is in the nested guest mode, all guest copy
@@ -1541,8 +1537,7 @@ void paravirt_ctxt_switch_to(struct vcpu *v)
 bool update_runstate_area(struct vcpu *v)
 {
     bool rc;
-    struct guest_memory_policy policy =
-        { .smap_policy = SMAP_CHECK_ENABLED, .nested_guest_mode = false };
+    struct guest_memory_policy policy = { .nested_guest_mode = false };
     void __user *guest_handle = NULL;
 
     if ( guest_handle_is_null(runstate_guest(v)) )

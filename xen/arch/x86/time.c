@@ -1106,8 +1106,7 @@ bool update_secondary_system_time(struct vcpu *v,
                                   struct vcpu_time_info *u)
 {
     XEN_GUEST_HANDLE(vcpu_time_info_t) user_u = v->arch.time_info_guest;
-    struct guest_memory_policy policy =
-        { .smap_policy = SMAP_CHECK_ENABLED, .nested_guest_mode = false };
+    struct guest_memory_policy policy = { .nested_guest_mode = false };
 
     if ( guest_handle_is_null(user_u) )
         return true;

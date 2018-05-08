@@ -508,12 +508,6 @@ struct pv_vcpu
     struct vcpu_time_info pending_system_time;
 };
 
-typedef enum __packed {
-    SMAP_CHECK_HONOR_CPL_AC,    /* honor the guest's CPL and AC */
-    SMAP_CHECK_ENABLED,         /* enable the check */
-    SMAP_CHECK_DISABLED,        /* disable the check */
-} smap_check_policy_t;
-
 struct arch_vcpu
 {
     /*
@@ -569,12 +563,6 @@ struct arch_vcpu
      * and thus should be saved/restored. */
     bool_t nonlazy_xstate_used;
 
-    /*
-     * The SMAP check policy when updating runstate_guest(v) and the
-     * secondary system time.
-     */
-    smap_check_policy_t smap_check_policy;
-
     struct vmce vmce;
 
     struct paging_vcpu paging;
@@ -595,7 +583,6 @@ struct arch_vcpu
 
 struct guest_memory_policy
 {
-    smap_check_policy_t smap_policy;
     bool nested_guest_mode;
 };
 
