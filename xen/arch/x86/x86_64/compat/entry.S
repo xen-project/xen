@@ -45,6 +45,12 @@ ENTRY(compat_test_all_events)
         leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
         cmpl  $0,(%rcx,%rax,1)
         jne   compat_process_softirqs
+
+        /* Inject exception if pending. */
+        lea   VCPU_trap_bounce(%rbx), %rdx
+        testb $TBF_EXCEPTION, TRAPBOUNCE_flags(%rdx)
+        jnz   .Lcompat_process_trapbounce
+
         testb $1,VCPU_mce_pending(%rbx)
         jnz   compat_process_mce
 .Lcompat_test_guest_nmi:
@@ -72,6 +78,15 @@ compat_test_guest_events:
 compat_process_softirqs:
         sti
         call  do_softirq
+        jmp   compat_test_all_events
+
+        ALIGN
+/* %rbx: struct vcpu, %rdx: struct trap_bounce */
+.Lcompat_process_trapbounce:
+        sti
+.Lcompat_bounce_exception:
+        call  compat_create_bounce_frame
+        movb  $0, TRAPBOUNCE_flags(%rdx)
         jmp   compat_test_all_events
 
 	ALIGN
@@ -193,15 +208,6 @@ ENTRY(cr4_pv32_restore)
         pop   %rdx
         xor   %eax, %eax
         ret
-
-/* %rdx: trap_bounce, %rbx: struct vcpu */
-ENTRY(compat_post_handle_exception)
-        testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
-        jz    compat_test_all_events
-.Lcompat_bounce_exception:
-        call  compat_create_bounce_frame
-        movb  $0,TRAPBOUNCE_flags(%rdx)
-        jmp   compat_test_all_events
 
         .section .text.entry, "ax", @progbits
 
