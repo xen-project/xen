@@ -207,6 +207,9 @@ int hvm_set_pci_link_route(struct domain *d, u8 link, u8 isa_irq);
 
 int hvm_inject_msi(struct domain *d, uint64_t addr, uint32_t data);
 
+/* Assert an IO APIC pin. */
+int hvm_ioapic_assert(struct domain *d, unsigned int gsi, bool level);
+
 void hvm_maybe_deassert_evtchn_irq(void);
 void hvm_assert_evtchn_irq(struct vcpu *v);
 void hvm_set_callback_via(struct domain *d, uint64_t via);
