@@ -44,6 +44,7 @@ struct periodic_time {
     bool_t warned_timeout_too_short;
 #define PTSRC_isa    1 /* ISA time source */
 #define PTSRC_lapic  2 /* LAPIC time source */
+#define PTSRC_ioapic 3 /* IOAPIC time source */
     u8 source;                  /* PTSRC_ */
     u8 irq;
     struct vcpu *vcpu;          /* vcpu timer interrupt delivers to */
