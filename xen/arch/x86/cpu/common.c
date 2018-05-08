@@ -747,6 +747,7 @@ void load_system_tables(void)
 			[IST_MCE - 1] = stack_top + IST_MCE * PAGE_SIZE,
 			[IST_DF  - 1] = stack_top + IST_DF  * PAGE_SIZE,
 			[IST_NMI - 1] = stack_top + IST_NMI * PAGE_SIZE,
+			[IST_DB  - 1] = stack_top + IST_DB  * PAGE_SIZE,
 
 			[IST_MAX ... ARRAY_SIZE(tss->ist) - 1] =
 				0x8600111111111111ul,
@@ -774,6 +775,7 @@ void load_system_tables(void)
 	set_ist(&idt_tables[cpu][TRAP_double_fault],  IST_DF);
 	set_ist(&idt_tables[cpu][TRAP_nmi],	      IST_NMI);
 	set_ist(&idt_tables[cpu][TRAP_machine_check], IST_MCE);
+	set_ist(&idt_tables[cpu][TRAP_debug],         IST_DB);
 
 	/*
 	 * Bottom-of-stack must be 16-byte aligned!
