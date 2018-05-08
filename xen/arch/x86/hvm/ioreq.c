@@ -87,14 +87,17 @@ static void hvm_io_assist(struct hvm_ioreq_vcpu *sv, uint64_t data)
 
 static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
 {
+    unsigned int prev_state = STATE_IOREQ_NONE;
+
     while ( sv->pending )
     {
         unsigned int state = p->state;
 
-        rmb();
-        switch ( state )
+        smp_rmb();
+
+    recheck:
+        if ( unlikely(state == STATE_IOREQ_NONE) )
         {
-        case STATE_IOREQ_NONE:
             /*
              * The only reason we should see this case is when an
              * emulator is dying and it races with an I/O being
@@ -102,14 +105,30 @@ static bool hvm_wait_for_io(struct hvm_ioreq_vcpu *sv, ioreq_t *p)
              */
             hvm_io_assist(sv, ~0ul);
             break;
+        }
+
+        if ( unlikely(state < prev_state) )
+        {
+            gdprintk(XENLOG_ERR, "Weird HVM ioreq state transition %u -> %u\n",
+                     prev_state, state);
+            sv->pending = false;
+            domain_crash(sv->vcpu->domain);
+            return false; /* bail */
+        }
+
+        switch ( prev_state = state )
+        {
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
             p->state = STATE_IOREQ_NONE;
             hvm_io_assist(sv, p->data);
             break;
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
-            wait_on_xen_event_channel(sv->ioreq_evtchn, p->state != state);
-            break;
+            wait_on_xen_event_channel(sv->ioreq_evtchn,
+                                      ({ state = p->state;
+                                         smp_rmb();
+                                         state != prev_state; }));
+            goto recheck;
         default:
             gdprintk(XENLOG_ERR, "Weird HVM iorequest state %u\n", state);
             sv->pending = false;
