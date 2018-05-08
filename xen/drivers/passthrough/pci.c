@@ -927,10 +927,11 @@ enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn)
     case PCI_CLASS_BRIDGE_HOST:
         return DEV_TYPE_PCI_HOST_BRIDGE;
 
-    case 0x0000: case 0xffff:
+    case 0xffff:
         return DEV_TYPE_PCI_UNKNOWN;
     }
 
+    /* NB: treat legacy pre PCI 2.0 devices (class_device == 0) as endpoints. */
     return pos ? DEV_TYPE_PCIe_ENDPOINT : DEV_TYPE_PCI;
 }
 
