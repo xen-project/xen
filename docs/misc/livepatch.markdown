@@ -85,53 +85,42 @@ mechanism. See `Trampoline (e9 opcode)` section for more details.
 ### Example of trampoline and in-place splicing
 
 As example we will assume the hypervisor does not have XSA-132 (see
-*domctl/sysctl: don't leak hypervisor stack to toolstacks*
-4ff3449f0e9d175ceb9551d3f2aecb59273f639d) and we would like to binary patch
-the hypervisor with it. The original code looks as so:
+[domctl/sysctl: don't leak hypervisor stack to toolstacks](http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=4ff3449f0e9d175ceb9551d3f2aecb59273f639d))
+and we would like to binary patch the hypervisor with it. The original code
+looks as so:
 
-<pre>
-   48 89 e0                  mov    %rsp,%rax  
-   48 25 00 80 ff ff         and    $0xffffffffffff8000,%rax  
-</pre>
+    48 89 e0                  mov    %rsp,%rax
+    48 25 00 80 ff ff         and    $0xffffffffffff8000,%rax
 
 while the new patched hypervisor would be:
 
-<pre>
-   48 c7 45 b8 00 00 00 00   movq   $0x0,-0x48(%rbp)  
-   48 c7 45 c0 00 00 00 00   movq   $0x0,-0x40(%rbp)  
-   48 c7 45 c8 00 00 00 00   movq   $0x0,-0x38(%rbp)  
-   48 89 e0                  mov    %rsp,%rax  
-   48 25 00 80 ff ff         and    $0xffffffffffff8000,%rax  
-</pre>
+    48 c7 45 b8 00 00 00 00   movq   $0x0,-0x48(%rbp)
+    48 c7 45 c0 00 00 00 00   movq   $0x0,-0x40(%rbp)
+    48 c7 45 c8 00 00 00 00   movq   $0x0,-0x38(%rbp)
+    48 89 e0                  mov    %rsp,%rax
+    48 25 00 80 ff ff         and    $0xffffffffffff8000,%rax
 
-This is inside the arch_do_domctl. This new change adds 21 extra
+This is inside the arch\_do\_domctl. This new change adds 21 extra
 bytes of code which alters all the offsets inside the function. To alter
 these offsets and add the extra 21 bytes of code we might not have enough
 space in .text to squeeze this in.
 
 As such we could simplify this problem by only patching the site
-which calls arch_do_domctl:
+which calls arch\_do\_domctl:
 
-<pre>
-do_domctl:  
- e8 4b b1 05 00          callq  ffff82d08015fbb9 <arch_do_domctl>  
-</pre>
+    do_domctl:
+    e8 4b b1 05 00          callq  ffff82d08015fbb9 <arch_do_domctl>
 
 with a new address for where the new `arch_do_domctl` would be (this
 area would be allocated dynamically).
 
 Astute readers will wonder what we need to do if we were to patch `do_domctl`
 - which is not called directly by hypervisor but on behalf of the guests via
-the `compat_hypercall_table` and `hypercall_table`.
-Patching the offset in `hypercall_table` for `do_domctl:
-(ffff82d080103079 <do_domctl>:)
+the `compat_hypercall_table` and `hypercall_table`.  Patching the offset in
+`hypercall_table` for `do_domctl`:
 
-<pre>
-
- ffff82d08024d490:   79 30  
- ffff82d08024d492:   10 80 d0 82 ff ff   
-
-</pre>
+    ffff82d08024d490:   79 30
+    ffff82d08024d492:   10 80 d0 82 ff ff
 
 with the new address where the new `do_domctl` is possible. The other
 place where it is used is in `hvm_hypercall64_table` which would need
@@ -139,10 +128,11 @@ to be patched in a similar way. This would require an in-place splicing
 of the new virtual address of `arch_do_domctl`.
 
 In summary this example patched the callee of the affected function by
- * allocating memory for the new code to live in,
- * changing the virtual address in all the functions which called the old
+
+ * Allocating memory for the new code to live in,
+ * Changing the virtual address in all the functions which called the old
    code (computing the new offset, patching the callq with a new callq).
- * changing the function pointer tables with the new virtual address of
+ * Changing the function pointer tables with the new virtual address of
    the function (splicing in the new virtual address). Since this table
    resides in the .rodata section we would need to temporarily change the
    page table permissions during this part.
@@ -162,21 +152,18 @@ existing function to be patched to jump directly to the new code. This
 lessens the locations to be patched to one but it puts pressure on the
 CPU branching logic (I-cache, but it is just one unconditional jump).
 
-For this example we will assume that the hypervisor has not been compiled
-with fe2e079f642effb3d24a6e1a7096ef26e691d93e (XSA-125: *pre-fill structures
-for certain HYPERVISOR_xen_version sub-ops*) which mem-sets an structure
-in `xen_version` hypercall. This function is not called **anywhere** in
-the hypervisor (it is called by the guest) but referenced in the
-`compat_hypercall_table` and `hypercall_table` (and indirectly called
-from that). Patching the offset in `hypercall_table` for the old
-`do_xen_version` (ffff82d080112f9e <do_xen_version>)
+For this example we will assume that the hypervisor has not been compiled with
+XSA-125 (see
+[pre-fill structures for certain HYPERVISOR\_xen\_version sub-ops](http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=fe2e079f642effb3d24a6e1a7096ef26e691d93e))
+which mem-sets an structure in `xen_version` hypercall. This function is not
+called **anywhere** in the hypervisor (it is called by the guest) but
+referenced in the `compat_hypercall_table` and `hypercall_table` (and
+indirectly called from that). Patching the offset in `hypercall_table` for the
+old `do_xen_version`:
 
-</pre>
- ffff82d08024b270 <hypercall_table>:   
- ...  
- ffff82d08024b2f8:   9e 2f 11 80 d0 82 ff ff  
-
-</pre>
+    ffff82d08024b270 <hypercall_table>:
+    ...
+    ffff82d08024b2f8:   9e 2f 11 80 d0 82 ff ff
 
 with the new address where the new `do_xen_version` is possible. The other
 place where it is used is in `hvm_hypercall64_table` which would need
@@ -184,31 +171,28 @@ to be patched in a similar way. This would require an in-place splicing
 of the new virtual address of `do_xen_version`.
 
 An alternative solution would be to patch insert a trampoline in the
-old `do_xen_version' function to directly jump to the new `do_xen_version`.
+old `do_xen_version` function to directly jump to the new `do_xen_version`:
 
-<pre>
- ffff82d080112f9e do_xen_version:  
- ffff82d080112f9e:       48 c7 c0 da ff ff ff    mov    $0xffffffffffffffda,%rax  
- ffff82d080112fa5:       83 ff 09                cmp    $0x9,%edi  
- ffff82d080112fa8:       0f 87 24 05 00 00       ja     ffff82d0801134d2 ; do_xen_version+0x534  
-</pre>
+    ffff82d080112f9e do_xen_version:
+    ffff82d080112f9e:       48 c7 c0 da ff ff ff    mov    $0xffffffffffffffda,%rax
+    ffff82d080112fa5:       83 ff 09                cmp    $0x9,%edi
+    ffff82d080112fa8:       0f 87 24 05 00 00       ja     ffff82d0801134d2 ; do_xen_version+0x534
 
 with:
 
-<pre>
- ffff82d080112f9e do_xen_version:  
- ffff82d080112f9e:       e9 XX YY ZZ QQ          jmpq   [new do_xen_version]  
-</pre>
+    ffff82d080112f9e do_xen_version:
+    ffff82d080112f9e:       e9 XX YY ZZ QQ          jmpq   [new do_xen_version]
 
 which would lessen the amount of patching to just one location.
 
 In summary this example patched the affected function to jump to the
 new replacement function which required:
- * allocating memory for the new code to live in,
- * inserting trampoline with new offset in the old function to point to the
+
+ * Allocating memory for the new code to live in,
+ * Inserting trampoline with new offset in the old function to point to the
    new function.
  * Optionally we can insert in the old function a trampoline jump to an function
-   providing an BUG_ON to catch errant code.
+   providing an BUG\_ON to catch errant code.
 
 The disadvantage of this are that the unconditional jump will consume a small
 I-cache penalty. However the simplicity of the patching and higher chance
@@ -260,7 +244,7 @@ Note that every structure has padding. This is added so that the hypervisor
 can re-use those fields as it sees fit.
 
 Earlier design attempted to ineptly explain the relations of the ELF sections
-to each other without using proper ELF mechanism (sh_info, sh_link, data
+to each other without using proper ELF mechanism (sh\_info, sh\_link, data
 structures using Elf types, etc). This design will explain the structures
 and how they are used together and not dig in the ELF format - except mention
 that the section names should match the structure names.
@@ -285,60 +269,53 @@ like what the Linux kernel module loader does.
 
 The payload contains at least three sections:
 
- * `.livepatch.funcs` - which is an array of livepatch_func structures.
+ * `.livepatch.funcs` - which is an array of livepatch\_func structures.
  * `.livepatch.depends` - which is an ELF Note that describes what the payload
     depends on. **MUST** have one.
  *  `.note.gnu.build-id` - the build-id of this payload. **MUST** have one.
 
 ### .livepatch.funcs
 
-The `.livepatch.funcs` contains an array of livepatch_func structures
+The `.livepatch.funcs` contains an array of livepatch\_func structures
 which describe the functions to be patched:
 
-<pre>
-struct livepatch_func {  
-    const char *name;  
-    void *new_addr;  
-    void *old_addr;  
-    uint32_t new_size;  
-    uint32_t old_size;  
-    uint8_t version;  
-    uint8_t opaque[31];  
-};  
-</pre>
+    struct livepatch_func {
+        const char *name;
+        void *new_addr;
+        void *old_addr;
+        uint32_t new_size;
+        uint32_t old_size;
+        uint8_t version;
+        uint8_t opaque[31];
+    };
 
 The size of the structure is 64 bytes on 64-bit hypervisors. It will be
 52 on 32-bit hypervisors.
 
-* `name` is the symbol name of the old function. Only used if `old_addr` is
+ * `name` is the symbol name of the old function. Only used if `old_addr` is
    zero, otherwise will be used during dynamic linking (when hypervisor loads
    the payload).
-
-* `old_addr` is the address of the function to be patched and is filled in at
-  payload generation time if hypervisor function address is known. If unknown,
-  the value *MUST* be zero and the hypervisor will attempt to resolve the address.
-
-* `new_addr` can either have a non-zero value or be zero.
-  * If there is a non-zero value, then it is the address of the function that is
-    replacing the old function and the address is recomputed during relocation.
-    The value **MUST** be the address of the new function in the payload file.
-
-  * If the value is zero, then we NOPing out at the `old_addr` location
+ * `old_addr` is the address of the function to be patched and is filled in at
+   payload generation time if hypervisor function address is known. If unknown,
+   the value *MUST* be zero and the hypervisor will attempt to resolve the
+   address.
+ * `new_addr` can either have a non-zero value or be zero.
+   * If there is a non-zero value, then it is the address of the function that
+    is replacing the old function and the address is recomputed during
+    relocation.  The value **MUST** be the address of the new function in the
+    payload file.
+   * If the value is zero, then we NOPing out at the `old_addr` location
     `new_size` bytes.
-
-* `old_size` contains the sizes of the respective `old_addr` function in bytes.
-   The value of `old_size` **MUST** not be zero.
-
-* `new_size` depends on what `new_addr` contains:
-  * If `new_addr` contains an non-zero value, then `new_size` has the size of
-    the new function (which will replace the one at `old_addr`)  in bytes.
-  * If the value of `new_addr` is zero then `new_size` determines how many
+ * `old_size` contains the sizes of the respective `old_addr` function in
+    bytes.  The value of `old_size` **MUST** not be zero.
+ * `new_size` depends on what `new_addr` contains:
+   * If `new_addr` contains an non-zero value, then `new_size` has the size of
+    the new function (which will replace the one at `old_addr`) in bytes.
+   * If the value of `new_addr` is zero then `new_size` determines how many
     instruction bytes to NOP (up to opaque size modulo smallest platform
     instruction - 1 byte x86 and 4 bytes on ARM).
-
-* `version` is to be one.
-
-* `opaque` **MUST** be zero.
+ * `version` is to be one.
+ * `opaque` **MUST** be zero.
 
 The size of the `livepatch_func` array is determined from the ELF section
 size.
@@ -362,38 +339,35 @@ being applied and after being reverted:
 
 A simple example of what a payload file can be:
 
-<pre>
-/* MUST be in sync with hypervisor. */  
-struct livepatch_func {  
-    const char *name;  
-    void *new_addr;  
-    void *old_addr;  
-    uint32_t new_size;  
-    uint32_t old_size;  
-    uint8_t version;
-    uint8_t pad[31];  
-};  
+    /* MUST be in sync with hypervisor. */
+    struct livepatch_func {
+        const char *name;
+        void *new_addr;
+        void *old_addr;
+        uint32_t new_size;
+        uint32_t old_size;
+        uint8_t version;
+        uint8_t pad[31];
+    };
 
-/* Our replacement function for xen_extra_version. */  
-const char *xen_hello_world(void)  
-{  
-    return "Hello World";  
-}  
+    /* Our replacement function for xen_extra_version. */
+    const char *xen_hello_world(void)
+    {
+        return "Hello World";
+    }
 
-static unsigned char patch_this_fnc[] = "xen_extra_version";  
+    static unsigned char patch_this_fnc[] = "xen_extra_version";
 
-struct livepatch_func livepatch_hello_world = {  
-    .version = LIVEPATCH_PAYLOAD_VERSION,
-    .name = patch_this_fnc,  
-    .new_addr = xen_hello_world,  
-    .old_addr = (void *)0xffff82d08013963c, /* Extracted from xen-syms. */  
-    .new_size = 13, /* To be be computed by scripts. */  
-    .old_size = 13, /* -----------""---------------  */  
-} __attribute__((__section__(".livepatch.funcs")));  
+    struct livepatch_func livepatch_hello_world = {
+        .version = LIVEPATCH_PAYLOAD_VERSION,
+        .name = patch_this_fnc,
+        .new_addr = xen_hello_world,
+        .old_addr = (void *)0xffff82d08013963c, /* Extracted from xen-syms. */
+        .new_size = 13, /* To be be computed by scripts. */
+        .old_size = 13, /* -----------""---------------  */
+    } __attribute__((__section__(".livepatch.funcs")));
 
-</pre>
-
-Code must be compiled with -fPIC.
+Code must be compiled with `-fPIC`.
 
 ### .livepatch.hooks.load and .livepatch.hooks.unload
 
@@ -406,10 +380,8 @@ Each entry in this array is eight bytes.
 
 The type definition of the function are as follow:
 
-<pre>
-typedef void (*livepatch_loadcall_t)(void);  
-typedef void (*livepatch_unloadcall_t)(void);   
-</pre>
+    typedef void (*livepatch_loadcall_t)(void);
+    typedef void (*livepatch_unloadcall_t)(void);
 
 ### .livepatch.depends and .note.gnu.build-id
 
@@ -423,10 +395,10 @@ which follows the format of an ELF Note. The contents of this
 build the hypevisor and payload.
 
 If GNU linker is used then the name is `GNU` and the description
-is a NT_GNU_BUILD_ID type ID. The description can be an SHA1
+is a NT\_GNU\_BUILD\_ID type ID. The description can be an SHA1
 checksum, MD5 checksum or any unique value.
 
-The size of these structures varies with the --build-id linker option.
+The size of these structures varies with the `--build-id` linker option.
 
 ## Hypercalls
 
@@ -454,22 +426,20 @@ Furthermore it is possible to have multiple different payloads for the same
 function. As such an unique name per payload has to be visible to allow proper manipulation.
 
 The hypercall is part of the `xen_sysctl`. The top level structure contains
-one uint32_t to determine the sub-operations and one padding field which
+one uint32\_t to determine the sub-operations and one padding field which
 *MUST* always be zero.
 
-<pre>
-struct xen_sysctl_livepatch_op {  
-    uint32_t cmd;                   /* IN: XEN_SYSCTL_LIVEPATCH_*. */  
-    uint32_t pad;                   /* IN: Always zero. */  
-	union {  
-          ... see below ...  
-        } u;  
-};  
+    struct xen_sysctl_livepatch_op {
+        uint32_t cmd;                   /* IN: XEN_SYSCTL_LIVEPATCH_*. */
+        uint32_t pad;                   /* IN: Always zero. */
+	    union {
+              ... see below ...
+            } u;
+    };
 
-</pre>
 while the rest of hypercall specific structures are part of the this structure.
 
-### Basic type: struct xen_livepatch_name
+### Basic type: struct xen\_livepatch\_name
 
 Most of the hypercalls employ an shared structure called `struct xen_livepatch_name`
 which contains:
@@ -480,26 +450,24 @@ which contains:
 
 The structure is as follow:
 
-<pre>
-/*  
- *  Uniquely identifies the payload.  Should be human readable.  
- * Includes the NUL terminator  
- */  
-#define XEN_LIVEPATCH_NAME_SIZE 128  
-struct xen_livepatch_name {  
-    XEN_GUEST_HANDLE_64(char) name;         /* IN, pointer to name. */  
-    uint16_t size;                          /* IN, size of name. May be upto   
-                                               XEN_LIVEPATCH_NAME_SIZE. */  
-    uint16_t pad[3];                        /* IN: MUST be zero. */ 
-};  
-</pre>
+    /*
+     *  Uniquely identifies the payload.  Should be human readable.
+     * Includes the NUL terminator
+     */
+    #define XEN_LIVEPATCH_NAME_SIZE 128
+    struct xen_livepatch_name {
+        XEN_GUEST_HANDLE_64(char) name;         /* IN, pointer to name. */
+        uint16_t size;                          /* IN, size of name. May be upto
+                                                   XEN_LIVEPATCH_NAME_SIZE. */
+        uint16_t pad[3];                        /* IN: MUST be zero. */
+    };
 
-### XEN_SYSCTL_LIVEPATCH_UPLOAD (0)
+### XEN\_SYSCTL\_LIVEPATCH\_UPLOAD (0)
 
 Upload a payload to the hypervisor. The payload is verified
 against basic checks and if there are any issues the proper return code
 will be returned. The payload is not applied at this time - that is
-controlled by *XEN_SYSCTL_LIVEPATCH_ACTION*.
+controlled by *XEN\_SYSCTL\_LIVEPATCH\_ACTION*.
 
 The caller provides:
 
@@ -512,21 +480,19 @@ payload. It can be embedded into the ELF payload at creation time
 and extracted by tools.
 
 The return value is zero if the payload was succesfully uploaded.
-Otherwise an -XEN_EXX return value is provided. Duplicate `name` are not supported.
+Otherwise an -XEN\_EXX return value is provided. Duplicate `name` are not supported.
 
 The `payload` is the ELF payload as mentioned in the `Payload format` section.
 
 The structure is as follow:
 
-<pre>
-struct xen_sysctl_livepatch_upload {  
-    xen_livepatch_name_t name;          /* IN, name of the patch. */  
-    uint64_t size;                      /* IN, size of the ELF file. */  
-    XEN_GUEST_HANDLE_64(uint8) payload; /* IN: ELF file. */  
-};  
-</pre>
+    struct xen_sysctl_livepatch_upload {
+        xen_livepatch_name_t name;          /* IN, name of the patch. */
+        uint64_t size;                      /* IN, size of the ELF file. */
+        XEN_GUEST_HANDLE_64(uint8) payload; /* IN: ELF file. */
+    };
 
-### XEN_SYSCTL_LIVEPATCH_GET (1)
+### XEN\_SYSCTL\_LIVEPATCH\_GET (1)
 
 Retrieve an status of an specific payload. This caller provides:
 
@@ -537,33 +503,29 @@ Retrieve an status of an specific payload. This caller provides:
 Upon completion the `struct xen_livepatch_status` is updated.
 
  * `status` - indicates the current status of the payload:
-   * *LIVEPATCH_STATUS_CHECKED*  (1) loaded and the ELF payload safety checks passed.
-   * *LIVEPATCH_STATUS_APPLIED* (2) loaded, checked, and applied.
+   * *LIVEPATCH\_STATUS\_CHECKED* (1) loaded and the ELF payload safety checks passed.
+   * *LIVEPATCH\_STATUS\_APPLIED* (2) loaded, checked, and applied.
    *  No other value is possible.
- * `rc` - -XEN_EXX type errors encountered while performing the last
-   LIVEPATCH_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
+ * `rc` - -XEN\_EXX type errors encountered while performing the last
+   LIVEPATCH\_ACTION\_\* operation. The normal values can be zero or -XEN\_EAGAIN which
    respectively mean: success or operation in progress. Other values
    imply an error occurred. If there is an error in `rc`, `status` will **NOT**
    have changed.
 
-The return value of the hypercall is zero on success and -XEN_EXX on failure.
-(Note that the `rc`` value can be different from the return value, as in
-rc=-XEN_EAGAIN and return value can be 0).
+The return value of the hypercall is zero on success and -XEN\_EXX on failure.
+(Note that the `rc` value can be different from the return value, as in
+rc=-XEN\_EAGAIN and return value can be 0).
 
 For example, supposing there is an payload:
 
-<pre>
- status: LIVEPATCH_STATUS_CHECKED
- rc: 0
-</pre>
+    status: LIVEPATCH_STATUS_CHECKED
+    rc: 0
 
-We apply an action - LIVEPATCH_ACTION_REVERT - to revert it (which won't work
+We apply an action - LIVEPATCH\_ACTION\_REVERT - to revert it (which won't work
 as we have not even applied it. Afterwards we will have:
 
-<pre>
- status: LIVEPATCH_STATUS_CHECKED
- rc: -XEN_EINVAL
-</pre>
+    status: LIVEPATCH_STATUS_CHECKED
+    rc: -XEN_EINVAL
 
 It has failed but it remains loaded.
 
@@ -571,21 +533,19 @@ This operation is synchronous and does not require preemption.
 
 The structure is as follow:
 
-<pre>
-struct xen_livepatch_status {  
-#define LIVEPATCH_STATUS_CHECKED      1  
-#define LIVEPATCH_STATUS_APPLIED      2  
-    uint32_t state;                 /* OUT: LIVEPATCH_STATE_*. */  
-    int32_t rc;                     /* OUT: 0 if no error, otherwise -XEN_EXX. */  
-};  
+    struct xen_livepatch_status {
+    #define LIVEPATCH_STATUS_CHECKED      1
+    #define LIVEPATCH_STATUS_APPLIED      2
+        uint32_t state;                 /* OUT: LIVEPATCH_STATE_*. */
+        int32_t rc;                     /* OUT: 0 if no error, otherwise -XEN_EXX. */
+    };
 
-struct xen_sysctl_livepatch_get {  
-    xen_livepatch_name_t name;      /* IN, the name of the payload. */  
-    xen_livepatch_status_t status;  /* IN/OUT: status of the payload. */  
-};  
-</pre>
+    struct xen_sysctl_livepatch_get {
+        xen_livepatch_name_t name;      /* IN, the name of the payload. */
+        xen_livepatch_status_t status;  /* IN/OUT: status of the payload. */
+    };
 
-### XEN_SYSCTL_LIVEPATCH_LIST (2)
+### XEN\_SYSCTL\_LIVEPATCH\_LIST (2)
 
 Retrieve an array of abbreviated status and names of payloads that are loaded in the
 hypervisor.
@@ -594,32 +554,32 @@ The caller provides:
 
  * `version`. Version of the payload. Caller should re-use the field provided by
     the hypervisor. If the value differs the data is stale.
- * `idx` index iterator. The index into the hypervisor's payload count. It is
+ * `idx` Index iterator. The index into the hypervisor's payload count. It is
     recommended that on first invocation zero be used so that `nr` (which the
     hypervisor will update with the remaining payload count) be provided.
     Also the hypervisor will provide `version` with the most current value.
- * `nr` the max number of entries to populate. Can be zero which will result
+ * `nr` The max number of entries to populate. Can be zero which will result
     in the hypercall being a probing one and return the number of payloads
     (and update the `version`).
  * `pad` - *MUST* be zero.
- * `status` virtual address of where to write `struct xen_livepatch_status`
+ * `status` Virtual address of where to write `struct xen_livepatch_status`
    structures. Caller *MUST* allocate up to `nr` of them.
- * `name` - virtual address of where to write the unique name of the payload.
+ * `name` - Virtual address of where to write the unique name of the payload.
    Caller *MUST* allocate up to `nr` of them. Each *MUST* be of
-   **XEN_LIVEPATCH_NAME_SIZE** size. Note that **XEN_LIVEPATCH_NAME_SIZE** includes
+   **XEN\_LIVEPATCH\_NAME\_SIZE** size. Note that **XEN\_LIVEPATCH\_NAME\_SIZE** includes
    the NUL terminator.
- * `len` - virtual address of where to write the length of each unique name
+ * `len` - Virtual address of where to write the length of each unique name
    of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST* be
-   of sizeof(uint32_t) (4 bytes).
+   of sizeof(uint32\_t) (4 bytes).
 
 If the hypercall returns an positive number, it is the number (upto `nr`
 provided to the hypercall) of the payloads returned, along with `nr` updated
 with the number of remaining payloads, `version` updated (it may be the same
 across hypercalls - if it varies the data is stale and further calls could
-fail). The `status`, `name`, and `len`' are updated at their designed index
+fail). The `status`, `name`, and `len` are updated at their designed index
 value (`idx`) with the returned value of data.
 
-If the hypercall returns -XEN_E2BIG the `nr` is too big and should be
+If the hypercall returns -XEN\_E2BIG the `nr` is too big and should be
 lowered.
 
 If the hypercall returns an zero value there are no more payloads.
@@ -634,62 +594,60 @@ data and start from scratch. It is OK for the toolstack to use the new
 The `struct xen_livepatch_status` structure contains an status of payload which includes:
 
  * `status` - indicates the current status of the payload:
-   * *LIVEPATCH_STATUS_CHECKED*  (1) loaded and the ELF payload safety checks passed.
-   * *LIVEPATCH_STATUS_APPLIED* (2) loaded, checked, and applied.
+   * *LIVEPATCH\_STATUS\_CHECKED* (1) loaded and the ELF payload safety checks passed.
+   * *LIVEPATCH\_STATUS\_APPLIED* (2) loaded, checked, and applied.
    *  No other value is possible.
- * `rc` - -XEN_EXX type errors encountered while performing the last
-   LIVEPATCH_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
+ * `rc` - -XEN\_EXX type errors encountered while performing the last
+   LIVEPATCH\_ACTION\_\* operation. The normal values can be zero or -XEN\_EAGAIN which
    respectively mean: success or operation in progress. Other values
    imply an error occurred. If there is an error in `rc`, `status` will **NOT**
    have changed.
 
 The structure is as follow:
 
-<pre>
-struct xen_sysctl_livepatch_list {  
-    uint32_t version;                       /* OUT: Hypervisor stamps value.
-                                               If varies between calls, we are  
-                                               getting stale data. */  
-    uint32_t idx;                           /* IN: Index into hypervisor list. */
-    uint32_t nr;                            /* IN: How many status, names, and len  
-                                               should be filled out. Can be zero to get  
-                                               amount of payloads and version.  
-                                               OUT: How many payloads left. */  
-    uint32_t pad;                           /* IN: Must be zero. */  
-    XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough  
-                                               space allocate for nr of them. */  
-    XEN_GUEST_HANDLE_64(char) id;           /* OUT: Array of names. Each member  
-                                               MUST XEN_LIVEPATCH_NAME_SIZE in size.  
-                                               Must have nr of them. */  
-    XEN_GUEST_HANDLE_64(uint32) len;        /* OUT: Array of lengths of name's.  
-                                               Must have nr of them. */  
-};  
-</pre>
+    struct xen_sysctl_livepatch_list {
+        uint32_t version;                       /* OUT: Hypervisor stamps value.
+                                                   If varies between calls, we are
+                                                   getting stale data. */
+        uint32_t idx;                           /* IN: Index into hypervisor list. */
+        uint32_t nr;                            /* IN: How many status, names, and len
+                                                   should be filled out. Can be zero to get
+                                                   amount of payloads and version.
+                                                   OUT: How many payloads left. */
+        uint32_t pad;                           /* IN: Must be zero. */
+        XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough
+                                                   space allocate for nr of them. */
+        XEN_GUEST_HANDLE_64(char) id;           /* OUT: Array of names. Each member
+                                                   MUST XEN_LIVEPATCH_NAME_SIZE in size.
+                                                   Must have nr of them. */
+        XEN_GUEST_HANDLE_64(uint32) len;        /* OUT: Array of lengths of name's.
+                                                   Must have nr of them. */
+    };
 
-### XEN_SYSCTL_LIVEPATCH_ACTION (3)
+### XEN\_SYSCTL\_LIVEPATCH\_ACTION (3)
 
 Perform an operation on the payload structure referenced by the `name` field.
 The operation request is asynchronous and the status should be retrieved
-by using either **XEN_SYSCTL_LIVEPATCH_GET** or **XEN_SYSCTL_LIVEPATCH_LIST** hypercall.
+by using either **XEN\_SYSCTL\_LIVEPATCH\_GET** or **XEN\_SYSCTL\_LIVEPATCH\_LIST** hypercall.
 
 The caller provides:
 
- * A 'struct xen_livepatch_name` `name` containing the unique name.
- * `cmd` the command requested:
-  * *LIVEPATCH_ACTION_UNLOAD* (1) unload the payload.
+ * A `struct xen_livepatch_name` `name` containing the unique name.
+ * `cmd` The command requested:
+  * *LIVEPATCH\_ACTION\_UNLOAD* (1) Unload the payload.
    Any further hypercalls against the `name` will result in failure unless
-   **XEN_SYSCTL_LIVEPATCH_UPLOAD** hypercall is perfomed with same `name`.
-  * *LIVEPATCH_ACTION_REVERT* (2) revert the payload. If the operation takes
-  more time than the upper bound of time the `rc` in `xen_livepatch_status'
-  retrieved via **XEN_SYSCTL_LIVEPATCH_GET** will be -XEN_EBUSY.
-  * *LIVEPATCH_ACTION_APPLY* (3) apply the payload. If the operation takes
-  more time than the upper bound of time the `rc` in `xen_livepatch_status'
-  retrieved via **XEN_SYSCTL_LIVEPATCH_GET** will be -XEN_EBUSY.
-  * *LIVEPATCH_ACTION_REPLACE* (4) revert all applied payloads and apply this
+   **XEN\_SYSCTL\_LIVEPATCH\_UPLOAD** hypercall is perfomed with same `name`.
+  * *LIVEPATCH\_ACTION\_REVERT* (2) Revert the payload. If the operation takes
+  more time than the upper bound of time the `rc` in `xen_livepatch_status`
+  retrieved via **XEN\_SYSCTL\_LIVEPATCH\_GET** will be -XEN\_EBUSY.
+  * *LIVEPATCH\_ACTION\_APPLY* (3) Apply the payload. If the operation takes
+  more time than the upper bound of time the `rc` in `xen_livepatch_status`
+  retrieved via **XEN\_SYSCTL\_LIVEPATCH\_GET** will be -XEN\_EBUSY.
+  * *LIVEPATCH\_ACTION\_REPLACE* (4) Revert all applied payloads and apply this
   payload. If the operation takes more time than the upper bound of time
-  the `rc` in `xen_livepatch_status' retrieved via **XEN_SYSCTL_LIVEPATCH_GET**
-  will be -XEN_EBUSY.
- * `time` the upper bound of time (ns) the cmd should take. Zero means to use
+  the `rc` in `xen_livepatch_status` retrieved via **XEN\_SYSCTL\_LIVEPATCH\_GET**
+  will be -XEN\_EBUSY.
+ * `time` The upper bound of time (ns) the cmd should take. Zero means to use
    the hypervisor default. If within the time the operation does not succeed
    the operation would go in error state.
  * `pad` - *MUST* be zero.
@@ -698,71 +656,64 @@ The return value will be zero unless the provided fields are incorrect.
 
 The structure is as follow:
 
-<pre>
-#define LIVEPATCH_ACTION_UNLOAD  1  
-#define LIVEPATCH_ACTION_REVERT  2  
-#define LIVEPATCH_ACTION_APPLY   3  
-#define LIVEPATCH_ACTION_REPLACE 4  
-struct xen_sysctl_livepatch_action {  
-    xen_livepatch_name_t name;              /* IN, name of the patch. */  
-    uint32_t cmd;                           /* IN: LIVEPATCH_ACTION_* */  
-    uint32_t time;                          /* IN: If zero then uses */
-                                            /* hypervisor default. */
-                                            /* Or upper bound of time (ns) */
-                                            /* for operation to take. */
-};  
+    #define LIVEPATCH_ACTION_UNLOAD  1
+    #define LIVEPATCH_ACTION_REVERT  2
+    #define LIVEPATCH_ACTION_APPLY   3
+    #define LIVEPATCH_ACTION_REPLACE 4
+    struct xen_sysctl_livepatch_action {
+        xen_livepatch_name_t name;              /* IN, name of the patch. */
+        uint32_t cmd;                           /* IN: LIVEPATCH_ACTION_* */
+        uint32_t time;                          /* IN: If zero then uses */
+                                                /* hypervisor default. */
+                                                /* Or upper bound of time (ns) */
+                                                /* for operation to take. */
+    };
 
-</pre>
 
-## State diagrams of LIVEPATCH_ACTION commands.
+## State diagrams of LIVEPATCH\_ACTION commands.
 
 There is a strict ordering state of what the commands can be.
-The LIVEPATCH_ACTION prefix has been dropped to easy reading and
-does not include the LIVEPATCH_STATES:
+The LIVEPATCH\_ACTION prefix has been dropped to easy reading and
+does not include the LIVEPATCH\_STATES:
 
-<pre>
-              /->\  
-              \  /  
- UNLOAD <--- CHECK ---> REPLACE|APPLY --> REVERT --\  
-                \                                  |  
-                 \-------------------<-------------/  
+                 /->\
+                 \  /
+    UNLOAD <--- CHECK ---> REPLACE|APPLY --> REVERT --\
+                   \                                  |
+                    \-------------------<-------------/
 
-</pre>
-## State transition table of LIVEPATCH_ACTION commands and LIVEPATCH_STATUS.
+## State transition table of LIVEPATCH\_ACTION commands and LIVEPATCH\_STATUS.
 
 Note that:
 
- - The CHECKED state is the starting one achieved with *XEN_SYSCTL_LIVEPATCH_UPLOAD* hypercall.
+ - The CHECKED state is the starting one achieved with *XEN\_SYSCTL\_LIVEPATCH\_UPLOAD* hypercall.
  - The REVERT operation on success will automatically move to the CHECKED state.
  - There are two STATES: CHECKED and APPLIED.
  - There are four actions (aka commands): APPLY, REPLACE, REVERT, and UNLOAD.
 
 The state transition table of valid states and action states:
 
-<pre>
-
-+---------+---------+--------------------------------+-------+--------+
-| ACTION  | Current | Result                         | Next STATE:    |
-| ACTION  | STATE   |                                |CHECKED|APPLIED |
-+---------+----------+-------------------------------+-------+--------+
-| UNLOAD  | CHECKED | Unload payload. Always works.  |       |        |
-|         |         | No next states.                |       |        |
-+---------+---------+--------------------------------+-------+--------+
-| APPLY   | CHECKED | Apply payload (success).       |       |   x    |
-+---------+---------+--------------------------------+-------+--------+
-| APPLY   | CHECKED | Apply payload (error|timeout)  |   x   |        |
-+---------+---------+--------------------------------+-------+--------+
-| REPLACE | CHECKED | Revert payloads and apply new  |       |   x    |
-|         |         | payload with success.          |       |        |
-+---------+---------+--------------------------------+-------+--------+
-| REPLACE | CHECKED | Revert payloads and apply new  |   x   |        |
-|         |         | payload with error.            |       |        |
-+---------+---------+--------------------------------+-------+--------+
-| REVERT  | APPLIED | Revert payload (success).      |   x   |        |
-+---------+---------+--------------------------------+-------+--------+
-| REVERT  | APPLIED | Revert payload (error|timeout) |       |   x    |
-+---------+---------+--------------------------------+-------+--------+
-</pre>
+    +---------+---------+--------------------------------+-------+--------+
+    | ACTION  | Current | Result                         |   Next STATE:  |
+    | ACTION  | STATE   |                                |CHECKED|APPLIED |
+    +---------+----------+-------------------------------+-------+--------+
+    | UNLOAD  | CHECKED | Unload payload. Always works.  |       |        |
+    |         |         | No next states.                |       |        |
+    +---------+---------+--------------------------------+-------+--------+
+    | APPLY   | CHECKED | Apply payload (success).       |       |   x    |
+    +---------+---------+--------------------------------+-------+--------+
+    | APPLY   | CHECKED | Apply payload (error|timeout)  |   x   |        |
+    +---------+---------+--------------------------------+-------+--------+
+    | REPLACE | CHECKED | Revert payloads and apply new  |       |   x    |
+    |         |         | payload with success.          |       |        |
+    +---------+---------+--------------------------------+-------+--------+
+    | REPLACE | CHECKED | Revert payloads and apply new  |   x   |        |
+    |         |         | payload with error.            |       |        |
+    +---------+---------+--------------------------------+-------+--------+
+    | REVERT  | APPLIED | Revert payload (success).      |   x   |        |
+    +---------+---------+--------------------------------+-------+--------+
+    | REVERT  | APPLIED | Revert payload (error|timeout) |       |   x    |
+    +---------+---------+--------------------------------+-------+--------+
 
 All the other state transitions are invalid.
 
@@ -770,10 +721,10 @@ All the other state transitions are invalid.
 
 The normal sequence of events is to:
 
- 1. *XEN_SYSCTL_LIVEPATCH_UPLOAD* to upload the payload. If there are errors *STOP* here.
- 2. *XEN_SYSCTL_LIVEPATCH_GET* to check the `->rc`. If *-XEN_EAGAIN* spin. If zero go to next step.
- 3. *XEN_SYSCTL_LIVEPATCH_ACTION* with *LIVEPATCH_ACTION_APPLY* to apply the patch.
- 4. *XEN_SYSCTL_LIVEPATCH_GET* to check the `->rc`. If in *-XEN_EAGAIN* spin. If zero exit with success.
+ 1. *XEN\_SYSCTL\_LIVEPATCH\_UPLOAD* to upload the payload. If there are errors *STOP* here.
+ 2. *XEN\_SYSCTL\_LIVEPATCH\_GET* to check the `->rc`. If *-XEN\_EAGAIN* spin. If zero go to next step.
+ 3. *XEN\_SYSCTL\_LIVEPATCH\_ACTION* with *LIVEPATCH\_ACTION\_APPLY* to apply the patch.
+ 4. *XEN\_SYSCTL\_LIVEPATCH\_GET* to check the `->rc`. If in *-XEN\_EAGAIN* spin. If zero exit with success.
 
 
 ## Addendum
@@ -807,18 +758,18 @@ minimize the chance of the patch not being applied due to safety
 checks failing. Safety checks such as not patching code which
 is on the stack - which can lead to corruption.
 
-#### Rendezvous code instead of stop_machine for patching
+#### Rendezvous code instead of stop\_machine for patching
 
 The hypervisor's time rendezvous code runs synchronously across all CPUs
-every second. Using the stop_machine to patch can stall the time rendezvous
+every second. Using the `stop_machine` to patch can stall the time rendezvous
 code and result in NMI. As such having the patching be done at the tail
 of rendezvous code should avoid this problem.
 
-However the entrance point for that code is
-do_softirq->timer_softirq_action->time_calibration
-which ends up calling on_selected_cpus on remote CPUs.
+However the entrance point for that code is `do_softirq ->
+timer_softirq_action -> time_calibration` which ends up calling
+`on_selected_cpus` on remote CPUs.
 
-The remote CPUs receive CALL_FUNCTION_VECTOR IPI and execute the
+The remote CPUs receive CALL\_FUNCTION\_VECTOR IPI and execute the
 desired function.
 
 #### Before entering the guest code.
@@ -832,16 +783,16 @@ could be adjusted), combined with forcing all other CPUs through the
 hypervisor with IPIs, can be utilized to execute lockstep instructions
 on all CPUs.
 
-The approach is similar in concept to stop_machine and the time rendezvous
+The approach is similar in concept to `stop_machine` and the time rendezvous
 but is time-bound. However the local CPU stack is much shorter and
 a lot more deterministic.
 
-This is implemented in the Xen Project hypervisor.
+This is implemented in the Xen hypervisor.
 
 ### Compiling the hypervisor code
 
 Hotpatch generation often requires support for compiling the target
-with -ffunction-sections / -fdata-sections.  Changes would have to
+with `-ffunction-sections` / `-fdata-sections`.  Changes would have to
 be done to the linker scripts to support this.
 
 ### Generation of Live Patch ELF payloads
@@ -866,7 +817,7 @@ and reorder it afterwards.
 As found almost every patch (XSA) to a non-trivial function requires
 additional entries in the exception table and/or the bug frames.
 
-This is implemented in the Xen Project hypervisor.
+This is implemented in the Xen hypervisor.
 
 ### .rodata sections
 
@@ -882,18 +833,18 @@ To guard against that we must be prepared to do patching similar to
 trampoline patching or in-line depending on the flavour. If we can
 do in-line patching we would need to:
 
- * alter `.rodata` to be writeable.
- * inline patch.
- * alter `.rodata` to be read-only.
+ * Alter `.rodata` to be writeable.
+ * Inline patch.
+ * Alter `.rodata` to be read-only.
 
 If are doing trampoline patching we would need to:
 
- * allocate a new memory location for the string.
- * all locations which use this string will have to be updated to use the
+ * Allocate a new memory location for the string.
+ * All locations which use this string will have to be updated to use the
    offset to the string.
- * mark the region RO when we are done.
+ * Mark the region RO when we are done.
 
-The trampoline patching is implemented in the Xen Project hypervisor.
+The trampoline patching is implemented in the Xen hypervisor.
 
 ### .bss and .data sections.
 
@@ -908,7 +859,7 @@ Patching in the new function will end up also patching in the new .rodata
 section and the new function will reference the new string in the new
 .rodata section.
 
-This is implemented in the Xen Project hypervisor.
+This is implemented in the Xen hypervisor.
 
 ### Security
 
@@ -941,7 +892,7 @@ The old code allows much more flexibility and an additional guard,
 but is more complex to implement.
 
 The second option which requires an build-id of the hypervisor
-is implemented in the Xen Project hypervisor.
+is implemented in the Xen hypervisor.
 
 Specifically each payload has two build-id ELF notes:
  * The build-id of the payload itself (generated via --build-id).
@@ -967,10 +918,10 @@ The implementation must also have a mechanism for (in no particular order):
    the stack, make sure the payload is built with same compiler as hypervisor).
    Specifically we want to make sure that live patching codepaths cannot be patched.
  * NOP out the code sequence if `new_size` is zero.
- * Deal with other relocation types:  R_X86_64_[8,16,32,32S], R_X86_64_PC[8,16,64]
+ * Deal with other relocation types:  R\_X86\_64\_[8,16,32,32S], R\_X86\_64\_PC[8,16,64]
    in payload file.
 
-### Handle inlined __LINE__
+### Handle inlined \_\_LINE\_\_
 
 This problem is related to hotpatch construction
 and potentially has influence on the design of the hotpatching
@@ -1030,7 +981,7 @@ Options:
 For BUG(), WARN(), etc., the line number is embedded into the bug frame, not
 the function itself.
 
-Similar considerations are true to a lesser extent for __FILE__, but it
+Similar considerations are true to a lesser extent for \_\_FILE\_\_, but it
 could be argued that file renaming should be done outside of hotpatches.
 
 ## Signature checking requirements.
@@ -1042,49 +993,46 @@ expecting such that it can properly do signature verification.
 
 The signature is based on the all of the payloads continuously laid out
 in memory. The signature is to be appended at the end of the ELF payload
-prefixed with the string `'~Module signature appended~\n'`, followed by
+prefixed with the string '`~Module signature appended~\n`', followed by
 an signature header then followed by the signature, key identifier, and signers
 name.
 
 Specifically the signature header would be:
 
-<pre>
-#define PKEY_ALGO_DSA       0  
-#define PKEY_ALGO_RSA       1  
+    #define PKEY_ALGO_DSA       0
+    #define PKEY_ALGO_RSA       1
 
-#define PKEY_ID_PGP         0 /* OpenPGP generated key ID */  
-#define PKEY_ID_X509        1 /* X.509 arbitrary subjectKeyIdentifier */  
+    #define PKEY_ID_PGP         0 /* OpenPGP generated key ID */
+    #define PKEY_ID_X509        1 /* X.509 arbitrary subjectKeyIdentifier */
 
-#define HASH_ALGO_MD4          0  
-#define HASH_ALGO_MD5          1  
-#define HASH_ALGO_SHA1         2  
-#define HASH_ALGO_RIPE_MD_160  3  
-#define HASH_ALGO_SHA256       4  
-#define HASH_ALGO_SHA384       5  
-#define HASH_ALGO_SHA512       6  
-#define HASH_ALGO_SHA224       7  
-#define HASH_ALGO_RIPE_MD_128  8  
-#define HASH_ALGO_RIPE_MD_256  9  
-#define HASH_ALGO_RIPE_MD_320 10  
-#define HASH_ALGO_WP_256      11  
-#define HASH_ALGO_WP_384      12  
-#define HASH_ALGO_WP_512      13  
-#define HASH_ALGO_TGR_128     14  
-#define HASH_ALGO_TGR_160     15  
-#define HASH_ALGO_TGR_192     16  
+    #define HASH_ALGO_MD4          0
+    #define HASH_ALGO_MD5          1
+    #define HASH_ALGO_SHA1         2
+    #define HASH_ALGO_RIPE_MD_160  3
+    #define HASH_ALGO_SHA256       4
+    #define HASH_ALGO_SHA384       5
+    #define HASH_ALGO_SHA512       6
+    #define HASH_ALGO_SHA224       7
+    #define HASH_ALGO_RIPE_MD_128  8
+    #define HASH_ALGO_RIPE_MD_256  9
+    #define HASH_ALGO_RIPE_MD_320 10
+    #define HASH_ALGO_WP_256      11
+    #define HASH_ALGO_WP_384      12
+    #define HASH_ALGO_WP_512      13
+    #define HASH_ALGO_TGR_128     14
+    #define HASH_ALGO_TGR_160     15
+    #define HASH_ALGO_TGR_192     16
 
+    struct elf_payload_signature {
+	    u8	algo;		/* Public-key crypto algorithm PKEY_ALGO_*. */
+	    u8	hash;		/* Digest algorithm: HASH_ALGO_*. */
+	    u8	id_type;	/* Key identifier type PKEY_ID*. */
+	    u8	signer_len;	/* Length of signer's name */
+	    u8	key_id_len;	/* Length of key identifier */
+	    u8	__pad[3];
+	    __be32	sig_len;	/* Length of signature data */
+    };
 
-struct elf_payload_signature {  
-	u8	algo;		/* Public-key crypto algorithm PKEY_ALGO_*. */  
-	u8	hash;		/* Digest algorithm: HASH_ALGO_*. */  
-	u8	id_type;	/* Key identifier type PKEY_ID*. */  
-	u8	signer_len;	/* Length of signer's name */  
-	u8	key_id_len;	/* Length of key identifier */  
-	u8	__pad[3];  
-	__be32	sig_len;	/* Length of signature data */  
-};
-
-</pre>
 (Note that this has been borrowed from Linux module signature code.).
 
 
@@ -1128,15 +1076,14 @@ at least five bytes if patching in trampoline.
 Depending on compiler settings, there are several functions in Xen that
 are smaller (without inter-function padding).
 
-<pre> 
-readelf -sW xen-syms | grep " FUNC " | \
-    awk '{ if ($3 < 5) print $3, $4, $5, $8 }'
+    readelf -sW xen-syms | grep " FUNC " | \
+        awk '{ if ($3 < 5) print $3, $4, $5, $8 }'
 
-...
-3 FUNC LOCAL wbinvd_ipi
-3 FUNC LOCAL shadow_l1_index
-...
-</pre>
+    ...
+    3 FUNC LOCAL wbinvd_ipi
+    3 FUNC LOCAL shadow_l1_index
+    ...
+
 A compile-time check for, e.g., a minimum alignment of functions or a
 runtime check that verifies symbol size (+ padding to next symbols) for
 that in the hypervisor is advised.
