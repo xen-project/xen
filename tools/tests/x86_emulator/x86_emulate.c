@@ -53,4 +53,9 @@ typedef bool bool_t;
 #define likely(x)     __builtin_expect(!!(x), true)
 #define unlikely(x)   __builtin_expect(!!(x), false)
 
+/* No Spectre mitigations needed for the test harness. */
+asm (".macro INDIRECT_CALL arg:req\n\t"
+     "call *\\arg\n\t"
+     ".endm");
+
 #include "x86_emulate/x86_emulate.c"
