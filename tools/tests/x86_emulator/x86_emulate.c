@@ -23,6 +23,9 @@ typedef bool bool_t;
 #define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
 #endif
 
+#define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
+#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
+
 #define cpu_has_amd_erratum(nr) 0
 
 #define __packed __attribute__((packed))
