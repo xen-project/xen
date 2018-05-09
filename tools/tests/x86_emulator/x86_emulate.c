@@ -35,4 +35,9 @@ typedef bool bool_t;
 #define get_stub(stb) ((void *)((stb).addr = (uintptr_t)(stb).buf))
 #define put_stub(stb)
 
+/* No Spectre mitigations needed for the test harness. */
+asm (".macro INDIRECT_CALL arg:req\n\t"
+     "call *\\arg\n\t"
+     ".endm");
+
 #include "x86_emulate/x86_emulate.c"
