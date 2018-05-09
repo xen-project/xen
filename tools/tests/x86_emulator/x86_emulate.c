@@ -14,6 +14,7 @@ typedef bool bool_t;
 
 #define EFER_SCE       (1 << 0)
 #define EFER_LMA       (1 << 10)
+#define EFER_SVME      (1 << 12)
 
 #define BUG() abort()
 #define ASSERT assert
