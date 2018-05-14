@@ -1702,8 +1702,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         LOGD(ERROR, guest_domid,
-             "Could not find user %s%d or %s, cannot restrict",
-             LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED);
+ "Could not find user %s%d or %s or range base pseudo-user %s, cannot restrict",
+             LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED,
+             LIBXL_QEMU_USER_RANGE_BASE);
         return ERROR_INVAL;
 
 end_search:
