@@ -34,16 +34,16 @@ our $toplevel_sectlist = new_sectlist();
 # $sectlist->{KEY}{Children} = a further $sectlist
 # $sectlist->{KEY}{Key} = KEY
 # $sectlist->{KEY}{HasCaveat}[VI] = trueish iff other in a Para
-# $sectlist->{KEY}{RealSect} = containing real section in @insections, so
-# $sectlist->{KEY}{RealSect}{HasDescription} = VI for some Emph in Para
-# $sectlist->{KEY}{RealSect}{Anchor} = value for < id="" > in the pandoc html
+# $sectlist->{KEY}{RealInSect} = containing real section in @insections, so
+# $sectlist->{KEY}{RealInSect}{HasDescription} = VI for some Emph in Para
+# $sectlist->{KEY}{RealInSect}{Anchor} = value for < id="" > in the pandoc html
 # A $sectnode represents a single section from the original markdown
 # document.  Its subsections are in Children.
 #
 # Also, the input syntax:
 #    Status, something or other: Supported
 # is treated as a $sectnode, is as if it were a subsection -
-# one called `something or other'.
+# one called `something or other'.  That is not a `real' section.
 #
 # KEY is the Anchor, or derived from the `something or other'.
 # It is used to match up identical features in different versions.
@@ -70,12 +70,12 @@ sub find_current_sectnode () {
     die unless @insections;
 
     my $sectnode;
-    my $realsect;
+    my $realinsect;
     foreach my $s (@insections) {
         my $sectlist = $sectnode
             ? $sectnode->{Children} : $toplevel_sectlist;
         my $key = $s->{Key};
-        $realsect = $s if $s->{Anchor};
+        $realinsect = $s if $s->{Anchor};
         tie %$sectlist, 'Tie::IxHash' unless tied %$sectlist;
 #print STDERR "FIND_CURRENT_SECTNODE ", Dumper($s);
         $sectlist->{$key} //=
@@ -83,7 +83,7 @@ sub find_current_sectnode () {
              Children => new_sectlist(),
              Headline => $s->{Headline},
              Key => $key,
-             RealSect => $realsect,
+             RealInSect => $realinsect,
              HasCaveat => [],
             };
         $sectnode = $sectlist->{$key};
@@ -303,21 +303,21 @@ sub count_rows_sectlist ($);
 sub count_rows_sectnode ($) {
     my ($sectnode) = @_;
     my $rows = 0;
-    $sectnode->{RealSect}{OwnRows} //= 0;
+    $sectnode->{RealInSect}{OwnRows} //= 0;
     if ($sectnode->{Status}) {
         $rows++;
-        $sectnode->{RealSect}{OwnRows}++;
+        $sectnode->{RealInSect}{OwnRows}++;
     }
     $rows += count_rows_sectlist $sectnode->{Children};
     $sectnode->{Rows} = $rows;
-    $sectnode->{RealSect}{Rows} = $rows;
+    $sectnode->{RealInSect}{Rows} = $rows;
     return $rows;
 }
 
 # Now we have
 #   $sectnode->{Rows}
-#   $sectnode->{RealSect}{Rows}
-#   $sectnode->{RealSect}{OwnRows}
+#   $sectnode->{RealInSect}{Rows}
+#   $sectnode->{RealInSect}{OwnRows}
 
 sub count_rows_sectlist ($) {
     my ($sectlist) = @_;
@@ -344,9 +344,9 @@ sub o { print @_ or die $!; }
 our @pending_headings;
 
 sub docref_a ($$) {
-    my ($i, $realsect) = @_;
+    my ($i, $realinsect) = @_;
     return sprintf '<a href="%s#%s">',
-        $version_urls[$i], $realsect->{Anchor};
+        $version_urls[$i], $realinsect->{Anchor};
 }
 
 sub write_output_row ($) {
@@ -372,9 +372,9 @@ sub write_output_row ($) {
             if !%{ $heading->{Children} };
         o(' align="left">');
         my $end_a = '';
-        my $desc_i = $heading->{RealSect}{HasDescription};
+        my $desc_i = $heading->{RealInSect}{HasDescription};
         if (defined $desc_i) {
-            o(docref_a $desc_i, $heading->{RealSect});
+            o(docref_a $desc_i, $heading->{RealInSect});
             $end_a= '</a>';
         }
         o($heading->{Headline});
@@ -394,22 +394,22 @@ sub write_output_row ($) {
     for (my $i=0; $i<@version_urls; $i++) {
         my $st = $sectnode->{Status}[$i];
 
-        my $colspan = $sectnode->{RealSect}{ColSpan}[$i];
+        my $colspan = $sectnode->{RealInSect}{ColSpan}[$i];
         my $nextcell = '';
-        if (!defined $colspan) { # first row of this RealSect
+        if (!defined $colspan) { # first row of this RealInSect
             $colspan= ' colspan="2"';
             if ($sectnode->{HasCaveat}[$i] && $st
-                && $sectnode->{RealSect}{Anchor}) {
-                my $rows = $sectnode->{RealSect}{OwnRows};
+                && $sectnode->{RealInSect}{Anchor}) {
+                my $rows = $sectnode->{RealInSect}{OwnRows};
                 $nextcell = '<td';
                 $nextcell .= sprintf ' rowspan=%d', $rows if $rows>1;
                 $nextcell .= '>';
-                $nextcell .= docref_a $i, $sectnode->{RealSect};
+                $nextcell .= docref_a $i, $sectnode->{RealInSect};
                 $nextcell .= '[*]</a>';
                 $nextcell .= '</td>';
                 $colspan = '';
             }
-            $sectnode->{RealSect}{ColSpan}[$i] = $colspan;
+            $sectnode->{RealInSect}{ColSpan}[$i] = $colspan;
         }
 
         $st //= '-';
