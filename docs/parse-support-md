@@ -33,6 +33,7 @@ our $toplevel_sectlist = new_sectlist();
 # $sectlist->{KEY}{Status}[VI] = absent or markdown content
 # $sectlist->{KEY}{Children} = a further $sectlist
 # $sectlist->{KEY}{Key} = KEY
+# $sectlist->{KEY}{RealSectNode} = us, or our parent
 # $sectlist->{KEY}{HasCaveat}[VI] = trueish iff other in a Para
 # $sectlist->{KEY}{RealInSect} = containing real section in @insections, so
 # $sectlist->{KEY}{RealInSect}{HasDescription} = VI for some Emph in Para
@@ -71,6 +72,7 @@ sub find_current_sectnode () {
 
     my $sectnode;
     my $realinsect;
+    my $realsectnode;
     foreach my $s (@insections) {
         my $sectlist = $sectnode
             ? $sectnode->{Children} : $toplevel_sectlist;
@@ -87,6 +89,8 @@ sub find_current_sectnode () {
              HasCaveat => [],
             };
         $sectnode = $sectlist->{$key};
+        $realsectnode = $sectnode if $s->{Anchor};
+        $sectnode->{RealSectNode} = $realsectnode;
     }
     die unless $sectnode;
     return $sectnode;
