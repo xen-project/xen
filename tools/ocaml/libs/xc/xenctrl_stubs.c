@@ -54,7 +54,7 @@
 
 static void Noreturn failwith_xc(xc_interface *xch)
 {
-	char error_str[1028];
+	char error_str[XC_MAX_ERROR_MSG_LEN + 6];
 	if (xch) {
 		const xc_error *error = xc_get_last_error(xch);
 		if (error->code == XC_ERROR_NONE)
