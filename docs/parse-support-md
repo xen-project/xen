@@ -34,7 +34,7 @@ our $toplevel_sectlist = new_sectlist();
 # $sectlist->{KEY}{Children} = a further $sectlist
 # $sectlist->{KEY}{Key} = KEY
 # $sectlist->{KEY}{RealSectNode} = us, or our parent
-# $sectlist->{KEY}{HasCaveat}[VI] = trueish iff other in a Para
+# $sectlist->{KEY}{RealSectNode}{HasCaveat}[VI] = trueish iff other in a Para
 # $sectlist->{KEY}{RealInSect} = containing real section in @insections, so
 # $sectlist->{KEY}{RealInSect}{HasDescription} = VI for some Emph in Para
 # $sectlist->{KEY}{RealInSect}{Anchor} = value for < id="" > in the pandoc html
@@ -123,7 +123,7 @@ sub ri_Para {
 
     if ($had_feature) {
         my $sectnode = find_current_sectnode();
-        $sectnode->{HasCaveat}[$version_index] = 1;
+        $sectnode->{RealSectNode}{HasCaveat}[$version_index] = 1;
     } else {
         $insection->{HasDescription} //= $version_index;
     }
@@ -402,7 +402,7 @@ sub write_output_row ($) {
         my $nextcell = '';
         if (!defined $colspan) { # first row of this RealInSect
             $colspan= ' colspan="2"';
-            if ($sectnode->{HasCaveat}[$i] && $st
+            if ($sectnode->{RealSectNode}{HasCaveat}[$i] && $st
                 && $sectnode->{RealInSect}{Anchor}) {
                 my $rows = $sectnode->{RealInSect}{OwnRows};
                 $nextcell = '<td';
