@@ -710,7 +710,7 @@ static int vpci_msi_enable(const struct pci_dev *pdev, uint32_t data,
                      "%04x:%02x:%02x.%u: failed to bind PIRQ %u: %d\n",
                      pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
                      PCI_FUNC(pdev->devfn), pirq + i, rc);
-            while ( bind.machine_irq-- )
+            while ( bind.machine_irq-- > pirq )
                 pt_irq_destroy_bind(pdev->domain, &bind);
             spin_lock(&pdev->domain->event_lock);
             unmap_domain_pirq(pdev->domain, pirq);
