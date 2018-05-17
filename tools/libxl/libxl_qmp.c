@@ -627,7 +627,7 @@ static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
 
     id = qmp_send(qmp, cmd, args, callback, opaque, &context);
     if (id <= 0) {
-        return -1;
+        return ERROR_FAIL;
     }
     qmp->wait_for_id = id;
 
