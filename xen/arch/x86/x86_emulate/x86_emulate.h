@@ -664,6 +664,8 @@ void x86_emulate_free_state(struct x86_emulate_state *state);
 
 int x86emul_read_dr(unsigned int reg, unsigned long *val,
                     struct x86_emulate_ctxt *ctxt);
+int x86emul_write_dr(unsigned int reg, unsigned long val,
+                     struct x86_emulate_ctxt *ctxt);
 
 #endif
 
