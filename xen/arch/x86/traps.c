@@ -2494,13 +2494,6 @@ static int priv_op_write_cr(unsigned int reg, unsigned long val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int priv_op_write_dr(unsigned int reg, unsigned long val,
-                            struct x86_emulate_ctxt *ctxt)
-{
-    return do_set_debugreg(reg, val) == 0
-           ? X86EMUL_OKAY : X86EMUL_UNHANDLEABLE;
-}
-
 static inline uint64_t guest_misc_enable(uint64_t val)
 {
     val &= ~(MSR_IA32_MISC_ENABLE_PERF_AVAIL |
@@ -3011,7 +3004,7 @@ static const struct x86_emulate_ops priv_op_ops = {
     .read_cr             = priv_op_read_cr,
     .write_cr            = priv_op_write_cr,
     .read_dr             = x86emul_read_dr,
-    .write_dr            = priv_op_write_dr,
+    .write_dr            = x86emul_write_dr,
     .read_msr            = priv_op_read_msr,
     .write_msr           = priv_op_write_msr,
     .cpuid               = pv_emul_cpuid,
@@ -4187,6 +4180,12 @@ void activate_debugregs(const struct vcpu *curr)
     }
 }
 
+/*
+ * Used by hypercalls and the emulator.
+ *  -ENODEV => #UD
+ *  -EINVAL => #GP Invalid bit
+ *  -EPERM  => #GP Valid bit, but not permitted to use
+ */
 long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
 {
     int i;
@@ -4218,7 +4217,17 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( v == curr ) 
             write_debugreg(3, value);
         break;
+
+    case 4:
+        if ( v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE )
+            return -ENODEV;
+
+        /* Fallthrough */
     case 6:
+        /* The upper 32 bits are strictly reserved. */
+        if ( value != (uint32_t)value )
+            return -EINVAL;
+
         /*
          * DR6: Bits 4-11,16-31 reserved (set to 1).
          *      Bit 12 reserved (set to 0).
@@ -4228,7 +4237,17 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( v == curr ) 
             write_debugreg(6, value);
         break;
+
+    case 5:
+        if ( v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE )
+            return -ENODEV;
+
+        /* Fallthrough */
     case 7:
+        /* The upper 32 bits are strictly reserved. */
+        if ( value != (uint32_t)value )
+            return -EINVAL;
+
         /*
          * DR7: Bit 10 reserved (set to 1).
          *      Bits 11-12,14-15 reserved (set to 0).
@@ -4241,6 +4260,10 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
          */
         if ( value & DR_GENERAL_DETECT )
             return -EPERM;
+
+        /* Zero the IO shadow before recalculating the real %dr7 */
+        v->arch.debugreg[5] = 0;
+
         /* DR7.{G,L}E = 0 => debugging disabled for this domain. */
         if ( value & DR7_ACTIVE_MASK )
         {
@@ -4273,7 +4296,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
             write_debugreg(7, value);
         break;
     default:
-        return -EINVAL;
+        return -ENODEV;
     }
 
     v->arch.debugreg[reg] = value;
