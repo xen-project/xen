@@ -833,6 +833,9 @@ int cpuidle_init_cpu(unsigned int cpu)
             acpi_power->states[i].idx = i;
 
         acpi_power->cpu = cpu;
+
+        spin_lock_init(&acpi_power->stat_lock);
+
         processor_powers[cpu] = acpi_power;
     }
 
@@ -840,7 +843,6 @@ int cpuidle_init_cpu(unsigned int cpu)
     acpi_power->states[1].type = ACPI_STATE_C1;
     acpi_power->states[1].entry_method = ACPI_CSTATE_EM_HALT;
     acpi_power->safe_state = &acpi_power->states[1];
-    spin_lock_init(&acpi_power->stat_lock);
 
     return 0;
 }
