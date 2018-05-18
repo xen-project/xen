@@ -131,9 +131,8 @@ bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
         PRINTF("DR7: bits [63:32] are not zero (%#"PRIx64")\n",
                vmcb_get_dr7(vmcb));
 
-    if ( efer & ~(EFER_SCE | EFER_LME | EFER_LMA | EFER_NX | EFER_SVME |
-                  EFER_LMSLE | EFER_FFXSE) )
-        PRINTF("EFER: undefined bits are not zero (%#"PRIx64")\n", efer);
+    if ( efer & ~EFER_KNOWN_MASK )
+        PRINTF("EFER: unknown bits are not zero (%#"PRIx64")\n", efer);
 
     if ( hvm_efer_valid(v, efer, -1) )
         PRINTF("EFER: %s (%"PRIx64")\n", hvm_efer_valid(v, efer, -1), efer);
