@@ -34,6 +34,7 @@
 #define X86_FEATURE_XEN_IBRS_CLEAR	((FSCAPINTS+0)*32+ 15) /* IBRSB && IBRS clear in Xen */
 #define X86_FEATURE_RSB_NATIVE		((FSCAPINTS+0)*32+ 16) /* RSB overwrite needed for native */
 #define X86_FEATURE_RSB_VMEXIT		((FSCAPINTS+0)*32+ 17) /* RSB overwrite needed for vmexit */
+#define X86_FEATURE_NO_XPTI		((FSCAPINTS+0)*32+ 18) /* XPTI mitigation not in use */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)
@@ -98,6 +99,7 @@
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 #define cpu_has_cmp_legacy	boot_cpu_has(X86_FEATURE_CMP_LEGACY)
 #define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
+#define cpu_has_no_xpti         boot_cpu_has(X86_FEATURE_NO_XPTI)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,
