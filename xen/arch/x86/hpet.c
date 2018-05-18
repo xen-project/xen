@@ -509,6 +509,8 @@ static void hpet_attach_channel(unsigned int cpu,
 static void hpet_detach_channel(unsigned int cpu,
                                 struct hpet_event_channel *ch)
 {
+    unsigned int next;
+
     spin_lock_irq(&ch->lock);
 
     ASSERT(ch == per_cpu(cpu_bc_channel, cpu));
@@ -517,7 +519,7 @@ static void hpet_detach_channel(unsigned int cpu,
 
     if ( cpu != ch->cpu )
         spin_unlock_irq(&ch->lock);
-    else if ( cpumask_empty(ch->cpumask) )
+    else if ( (next = cpumask_first(ch->cpumask)) >= nr_cpu_ids )
     {
         ch->cpu = -1;
         clear_bit(HPET_EVT_USED_BIT, &ch->flags);
@@ -525,7 +527,7 @@ static void hpet_detach_channel(unsigned int cpu,
     }
     else
     {
-        ch->cpu = cpumask_first(ch->cpumask);
+        ch->cpu = next;
         set_channel_irq_affinity(ch);
         local_irq_enable();
     }
