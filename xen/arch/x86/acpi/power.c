@@ -203,6 +203,7 @@ static int enter_state(u32 state)
         printk(XENLOG_ERR "Some devices failed to power down.");
         system_state = SYS_STATE_resume;
         device_power_up(error);
+        console_end_sync();
         error = -EIO;
         goto done;
     }
@@ -243,17 +244,19 @@ static int enter_state(u32 state)
     if ( (state == ACPI_STATE_S3) && error )
         tboot_s3_error(error);
 
+    console_end_sync();
+
+    microcode_resume_cpu(0);
+
  done:
     spin_debug_enable();
     local_irq_restore(flags);
-    console_end_sync();
     acpi_sleep_post(state);
     if ( hvm_cpu_up() )
         BUG();
+    cpufreq_add_cpu(0);
 
  enable_cpu:
-    cpufreq_add_cpu(0);
-    microcode_resume_cpu(0);
     rcu_barrier();
     mtrr_aps_sync_begin();
     enable_nonboot_cpus();
