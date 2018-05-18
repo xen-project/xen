@@ -29,6 +29,7 @@
 #include <asm/tboot.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
+#include <asm/spec_ctrl.h>
 #include <acpi/cpufreq/cpufreq.h>
 
 uint32_t system_reset_counter = 1;
@@ -164,6 +165,7 @@ static int enter_state(u32 state)
 {
     unsigned long flags;
     int error;
+    struct cpu_info *ci;
     unsigned long cr4;
 
     if ( (state <= ACPI_STATE_S0) || (state > ACPI_S_STATES_MAX) )
@@ -211,6 +213,11 @@ static int enter_state(u32 state)
     else
         error = 0;
 
+    ci = get_cpu_info();
+    spec_ctrl_enter_idle(ci);
+    /* Avoid NMI/#MC using MSR_SPEC_CTRL until we've reloaded microcode. */
+    ci->bti_ist_info = 0;
+
     ACPI_FLUSH_CPU_CACHE();
 
     switch ( state )
@@ -248,6 +255,10 @@ static int enter_state(u32 state)
     console_end_sync();
 
     microcode_resume_cpu(0);
+
+    /* Re-enabled default NMI/#MC use of MSR_SPEC_CTRL. */
+    ci->bti_ist_info = default_bti_ist_info;
+    spec_ctrl_exit_idle(ci);
 
  done:
     spin_debug_enable();
