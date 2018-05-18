@@ -2558,9 +2558,16 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
         return X86EMUL_OKAY;
 
     case MSR_EFER:
-        *val = read_efer();
+        /* Hide unknown bits, and unconditionally hide SVME from guests. */
+        *val = read_efer() & EFER_KNOWN_MASK & ~EFER_SVME;
+        /*
+         * Hide the 64-bit features from 32-bit guests.  SCE has
+         * vendor-dependent behaviour.
+         */
         if ( is_pv_32bit_domain(currd) )
-            *val &= ~(EFER_LME | EFER_LMA | EFER_LMSLE);
+            *val &= ~(EFER_LME | EFER_LMA | EFER_LMSLE |
+                      (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL
+                       ? EFER_SCE : 0));
         return X86EMUL_OKAY;
 
     case MSR_K7_FID_VID_CTL:
