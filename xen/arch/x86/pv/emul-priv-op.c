@@ -813,19 +813,6 @@ static int write_cr(unsigned int reg, unsigned long val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-static int read_dr(unsigned int reg, unsigned long *val,
-                   struct x86_emulate_ctxt *ctxt)
-{
-    unsigned long res = do_get_debugreg(reg);
-
-    if ( IS_ERR_VALUE(res) )
-        return X86EMUL_UNHANDLEABLE;
-
-    *val = res;
-
-    return X86EMUL_OKAY;
-}
-
 static int write_dr(unsigned int reg, unsigned long val,
                     struct x86_emulate_ctxt *ctxt)
 {
@@ -1326,7 +1313,7 @@ static const struct x86_emulate_ops priv_op_ops = {
     .read_segment        = read_segment,
     .read_cr             = read_cr,
     .write_cr            = write_cr,
-    .read_dr             = read_dr,
+    .read_dr             = x86emul_read_dr,
     .write_dr            = write_dr,
     .read_msr            = read_msr,
     .write_msr           = write_msr,

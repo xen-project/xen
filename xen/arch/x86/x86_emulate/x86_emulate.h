@@ -662,6 +662,9 @@ static inline void x86_emulate_free_state(struct x86_emulate_state *state) {}
 void x86_emulate_free_state(struct x86_emulate_state *state);
 #endif
 
+int x86emul_read_dr(unsigned int reg, unsigned long *val,
+                    struct x86_emulate_ctxt *ctxt);
+
 #endif
 
 static inline void x86_emul_hw_exception(
