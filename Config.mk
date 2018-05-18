@@ -275,7 +275,7 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= 947f3737abf65fda63f3ffd97fddfa6986986868
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.11.0-rc1
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.11.0-rc6
 MINIOS_UPSTREAM_REVISION ?= xen-4.11.0-rc1.1
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.11.1
