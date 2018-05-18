@@ -1679,6 +1679,25 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
     switch ( msr )
     {
+        /*
+         * Sync not needed while the cross-vendor logic is in unilateral effect.
+    case MSR_IA32_SYSENTER_CS:
+    case MSR_IA32_SYSENTER_ESP:
+    case MSR_IA32_SYSENTER_EIP:
+         */
+    case MSR_STAR:
+    case MSR_LSTAR:
+    case MSR_CSTAR:
+    case MSR_SYSCALL_MASK:
+    case MSR_FS_BASE:
+    case MSR_GS_BASE:
+    case MSR_SHADOW_GS_BASE:
+        svm_sync_vmcb(v);
+        break;
+    }
+
+    switch ( msr )
+    {
         unsigned int ecx;
 
     case MSR_IA32_SYSENTER_CS:
@@ -1689,6 +1708,34 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
     case MSR_IA32_SYSENTER_EIP:
         *msr_content = v->arch.hvm_svm.guest_sysenter_eip;
+        break;
+
+    case MSR_STAR:
+        *msr_content = vmcb->star;
+        break;
+
+    case MSR_LSTAR:
+        *msr_content = vmcb->lstar;
+        break;
+
+    case MSR_CSTAR:
+        *msr_content = vmcb->cstar;
+        break;
+
+    case MSR_SYSCALL_MASK:
+        *msr_content = vmcb->sfmask;
+        break;
+
+    case MSR_FS_BASE:
+        *msr_content = vmcb->fs.base;
+        break;
+
+    case MSR_GS_BASE:
+        *msr_content = vmcb->gs.base;
+        break;
+
+    case MSR_SHADOW_GS_BASE:
+        *msr_content = vmcb->kerngsbase;
         break;
 
     case MSR_IA32_MCx_MISC(4): /* Threshold register */
@@ -1822,34 +1869,83 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     int ret, result = X86EMUL_OKAY;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    int sync = 0;
+    bool sync = false;
 
     switch ( msr )
     {
     case MSR_IA32_SYSENTER_CS:
     case MSR_IA32_SYSENTER_ESP:
     case MSR_IA32_SYSENTER_EIP:
-        sync = 1;
-        break;
-    default:
+    case MSR_STAR:
+    case MSR_LSTAR:
+    case MSR_CSTAR:
+    case MSR_SYSCALL_MASK:
+    case MSR_FS_BASE:
+    case MSR_GS_BASE:
+    case MSR_SHADOW_GS_BASE:
+        sync = true;
         break;
     }
 
     if ( sync )
-        svm_sync_vmcb(v);    
+        svm_sync_vmcb(v);
 
     switch ( msr )
     {
         unsigned int ecx;
 
+    case MSR_IA32_SYSENTER_ESP:
+    case MSR_IA32_SYSENTER_EIP:
+    case MSR_LSTAR:
+    case MSR_CSTAR:
+    case MSR_FS_BASE:
+    case MSR_GS_BASE:
+    case MSR_SHADOW_GS_BASE:
+        if ( !is_canonical_address(msr_content) )
+            goto gpf;
+
+        switch ( msr )
+        {
+        case MSR_IA32_SYSENTER_ESP:
+            vmcb->sysenter_esp = v->arch.hvm_svm.guest_sysenter_esp = msr_content;
+            break;
+
+        case MSR_IA32_SYSENTER_EIP:
+            vmcb->sysenter_eip = v->arch.hvm_svm.guest_sysenter_eip = msr_content;
+            break;
+
+        case MSR_LSTAR:
+            vmcb->lstar = msr_content;
+            break;
+
+        case MSR_CSTAR:
+            vmcb->cstar = msr_content;
+            break;
+
+        case MSR_FS_BASE:
+            vmcb->fs.base = msr_content;
+            break;
+
+        case MSR_GS_BASE:
+            vmcb->gs.base = msr_content;
+            break;
+
+        case MSR_SHADOW_GS_BASE:
+            vmcb->kerngsbase = msr_content;
+            break;
+        }
+        break;
+
     case MSR_IA32_SYSENTER_CS:
         vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = msr_content;
         break;
-    case MSR_IA32_SYSENTER_ESP:
-        vmcb->sysenter_esp = v->arch.hvm_svm.guest_sysenter_esp = msr_content;
+
+    case MSR_STAR:
+        vmcb->star = msr_content;
         break;
-    case MSR_IA32_SYSENTER_EIP:
-        vmcb->sysenter_eip = v->arch.hvm_svm.guest_sysenter_eip = msr_content;
+
+    case MSR_SYSCALL_MASK:
+        vmcb->sfmask = msr_content;
         break;
 
     case MSR_IA32_DEBUGCTLMSR:
