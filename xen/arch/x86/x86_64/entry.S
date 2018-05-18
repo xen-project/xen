@@ -842,12 +842,14 @@ ENTRY(double_fault)
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         mov   STACK_CPUINFO_FIELD(xen_cr3)(%r14), %rbx
-        test  %rbx, %rbx
+        neg   %rbx
         jz    .Ldblf_cr3_okay
         jns   .Ldblf_cr3_load
+        mov   %rbx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         neg   %rbx
 .Ldblf_cr3_load:
         write_cr3 rbx, rdi, rsi
+        movq $0, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Ldblf_cr3_okay:
 
         movq  %rsp,%rdi
