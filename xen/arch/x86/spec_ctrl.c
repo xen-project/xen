@@ -21,7 +21,7 @@
 #include <xen/lib.h>
 
 #include <asm/microcode.h>
-#include <asm/msr-index.h>
+#include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/spec_ctrl.h>
 #include <asm/spec_ctrl_asm.h>
@@ -84,23 +84,26 @@ custom_param("bti", parse_bti);
 static void __init print_details(enum ind_thunk thunk)
 {
     unsigned int _7d0 = 0, e8b = 0, tmp;
+    uint64_t caps = 0;
 
     /* Collect diagnostics about available mitigations. */
     if ( boot_cpu_data.cpuid_level >= 7 )
         cpuid_count(7, 0, &tmp, &tmp, &tmp, &_7d0);
     if ( boot_cpu_data.extended_cpuid_level >= 0x80000008 )
         cpuid(0x80000008, &tmp, &e8b, &tmp, &tmp);
+    if ( _7d0 & cpufeat_mask(X86_FEATURE_ARCH_CAPS) )
+        rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
     printk(XENLOG_DEBUG "Speculative mitigation facilities:\n");
 
     /* Hardware features which pertain to speculative mitigations. */
-    if ( (_7d0 & (cpufeat_mask(X86_FEATURE_IBRSB) |
-                  cpufeat_mask(X86_FEATURE_STIBP))) ||
-         (e8b & cpufeat_mask(X86_FEATURE_IBPB)) )
-        printk(XENLOG_DEBUG "  Hardware features:%s%s%s\n",
-               (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
-               (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
-               (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "");
+    printk(XENLOG_DEBUG "  Hardware features:%s%s%s%s%s%s\n",
+           (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
+           (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
+           (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "",
+           (caps & ARCH_CAPABILITIES_IBRS_ALL)      ? " IBRS_ALL"  : "",
+           (caps & ARCH_CAPABILITIES_RDCL_NO)       ? " RDCL_NO"   : "",
+           (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "");
 
     /* Compiled-in support which pertains to BTI mitigations. */
 #ifdef CONFIG_INDIRECT_THUNK
@@ -132,6 +135,20 @@ static bool_t __init __maybe_unused retpoline_safe(void)
          boot_cpu_data.x86 != 6 )
         return 0;
 
+    if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+    {
+        uint64_t caps;
+
+        rdmsrl(MSR_ARCH_CAPABILITIES, caps);
+
+        /*
+         * RBSA may be set by a hypervisor to indicate that we may move to a
+         * processor which isn't retpoline-safe.
+         */
+        if ( caps & ARCH_CAPS_RSBA )
+            return 0;
+    }
+
     switch ( boot_cpu_data.x86_model )
     {
     case 0x17: /* Penryn */
@@ -158,18 +175,40 @@ static bool_t __init __maybe_unused retpoline_safe(void)
          * versions.
          */
     case 0x3d: /* Broadwell */
-        return ucode_rev >= 0x28;
+        return ucode_rev >= 0x2a;
     case 0x47: /* Broadwell H */
-        return ucode_rev >= 0x1b;
+        return ucode_rev >= 0x1d;
     case 0x4f: /* Broadwell EP/EX */
-        return ucode_rev >= 0xb000025;
+        return ucode_rev >= 0xb000021;
     case 0x56: /* Broadwell D */
-        return 0; /* TBD. */
+        switch ( boot_cpu_data.x86_mask )
+        {
+        case 2:  return ucode_rev >= 0x15;
+        case 3:  return ucode_rev >= 0x7000012;
+        case 4:  return ucode_rev >= 0xf000011;
+        case 5:  return ucode_rev >= 0xe000009;
+        default:
+            printk("Unrecognised CPU stepping %#x - assuming not reptpoline safe\n",
+                   boot_cpu_data.x86_mask);
+            return 0;
+        }
+        break;
 
         /*
-         * Skylake and later processors are not retpoline-safe.
+         * Skylake, Kabylake and Cannonlake processors are not retpoline-safe.
          */
+    case 0x4e:
+    case 0x55:
+    case 0x5e:
+    case 0x66:
+    case 0x67:
+    case 0x8e:
+    case 0x9e:
+        return 0;
+
     default:
+        printk("Unrecognised CPU model %#x - assuming not reptpoline safe\n",
+               boot_cpu_data.x86_model);
         return 0;
     }
 }
