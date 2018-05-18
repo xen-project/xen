@@ -92,7 +92,7 @@ process_mce:
         sti
         movb $0, VCPU_mce_pending(%rbx)
         call set_guest_machinecheck_trapbounce
-        test %eax, %eax
+        test %al, %al
         jz   test_all_events
         movzbl VCPU_async_exception_mask(%rbx), %edx # save mask for the
         movb %dl, VCPU_mce_old_mask(%rbx)            # iret hypercall
@@ -108,7 +108,7 @@ process_nmi:
         sti
         movb $0, VCPU_nmi_pending(%rbx)
         call set_guest_nmi_trapbounce
-        test %eax, %eax
+        test %al, %al
         jz   test_all_events
         movzbl VCPU_async_exception_mask(%rbx), %edx # save mask for the
         movb %dl, VCPU_nmi_old_mask(%rbx)            # iret hypercall
