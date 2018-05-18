@@ -562,12 +562,53 @@ static void vcpu_move_nosched(struct vcpu *v, unsigned int new_cpu)
     sched_move_irqs(v);
 }
 
-static void vcpu_migrate(struct vcpu *v)
+/*
+ * Initiating migration
+ *
+ * In order to migrate, we need the vcpu in question to have stopped
+ * running and had SCHED_OP(sleep) called (to take it off any
+ * runqueues, for instance); and if it is currently running, it needs
+ * to be scheduled out.  Finally, we need to hold the scheduling locks
+ * for both the processor we're migrating from, and the processor
+ * we're migrating to.
+ *
+ * In order to avoid deadlock while satisfying the final requirement,
+ * we must release any scheduling lock we hold, then try to grab both
+ * locks we want, then double-check to make sure that what we started
+ * to do hasn't been changed in the mean time.
+ *
+ * These steps are encapsulated in the following two functions; they
+ * should be called like this:
+ *
+ *     lock = vcpu_schedule_lock_irq(v);
+ *     vcpu_migrate_start(v);
+ *     vcpu_schedule_unlock_irq(lock, v)
+ *     vcpu_migrate_finish(v);
+ *
+ * vcpu_migrate_finish() will do the work now if it can, or simply
+ * return if it can't (because v is still running); in that case
+ * vcpu_migrate_finish() will be called by context_saved().
+ */
+void vcpu_migrate_start(struct vcpu *v)
+{
+    set_bit(_VPF_migrating, &v->pause_flags);
+    vcpu_sleep_nosync_locked(v);
+}
+
+static void vcpu_migrate_finish(struct vcpu *v)
 {
     unsigned long flags;
     unsigned int old_cpu, new_cpu;
     spinlock_t *old_lock, *new_lock;
     bool_t pick_called = 0;
+
+    /*
+     * If the vcpu is currently running, this will be handled by
+     * context_saved(); and in any case, if the bit is cleared, then
+     * someone else has already done the work so we don't need to.
+     */
+    if ( v->is_running || !test_bit(_VPF_migrating, &v->pause_flags) )
+        return;
 
     old_cpu = new_cpu = v->processor;
     for ( ; ; )
@@ -648,14 +689,11 @@ void vcpu_force_reschedule(struct vcpu *v)
     spinlock_t *lock = vcpu_schedule_lock_irq(v);
 
     if ( v->is_running )
-        set_bit(_VPF_migrating, &v->pause_flags);
+        vcpu_migrate_start(v);
+
     vcpu_schedule_unlock_irq(lock, v);
 
-    if ( v->pause_flags & VPF_migrating )
-    {
-        vcpu_sleep_nosync(v);
-        vcpu_migrate(v);
-    }
+    vcpu_migrate_finish(v);
 }
 
 void restore_vcpu_affinity(struct domain *d)
@@ -693,10 +731,9 @@ void restore_vcpu_affinity(struct domain *d)
 
         if ( v->processor == cpu )
         {
-            set_bit(_VPF_migrating, &v->pause_flags);
-            spin_unlock_irq(lock);;
-            vcpu_sleep_nosync(v);
-            vcpu_migrate(v);
+            vcpu_migrate_start(v);
+            spin_unlock_irq(lock);
+            vcpu_migrate_finish(v);
         }
         else
         {
@@ -809,10 +846,10 @@ int cpu_disable_scheduler(unsigned int cpu)
                  *  * the scheduler will always fine a suitable solution, or
                  *    things would have failed before getting in here.
                  */
-                set_bit(_VPF_migrating, &v->pause_flags);
+                vcpu_migrate_start(v);
                 vcpu_schedule_unlock_irqrestore(lock, flags, v);
-                vcpu_sleep_nosync(v);
-                vcpu_migrate(v);
+
+                vcpu_migrate_finish(v);
 
                 /*
                  * The only caveat, in this case, is that if a vcpu active in
@@ -846,18 +883,14 @@ static int vcpu_set_affinity(
          * Always ask the scheduler to re-evaluate placement
          * when changing the affinity.
          */
-        set_bit(_VPF_migrating, &v->pause_flags);
+        vcpu_migrate_start(v);
     }
 
     vcpu_schedule_unlock_irq(lock, v);
 
     domain_update_node_affinity(v->domain);
 
-    if ( v->pause_flags & VPF_migrating )
-    {
-        vcpu_sleep_nosync(v);
-        vcpu_migrate(v);
-    }
+    vcpu_migrate_finish(v);
 
     return ret;
 }
@@ -1085,7 +1118,6 @@ int vcpu_pin_override(struct vcpu *v, int cpu)
         {
             cpumask_copy(v->cpu_hard_affinity, v->cpu_hard_affinity_saved);
             v->affinity_broken = 0;
-            set_bit(_VPF_migrating, &v->pause_flags);
             ret = 0;
         }
     }
@@ -1098,20 +1130,18 @@ int vcpu_pin_override(struct vcpu *v, int cpu)
             cpumask_copy(v->cpu_hard_affinity_saved, v->cpu_hard_affinity);
             v->affinity_broken = 1;
             cpumask_copy(v->cpu_hard_affinity, cpumask_of(cpu));
-            set_bit(_VPF_migrating, &v->pause_flags);
             ret = 0;
         }
     }
+
+    if ( ret == 0 )
+        vcpu_migrate_start(v);
 
     vcpu_schedule_unlock_irq(lock, v);
 
     domain_update_node_affinity(v->domain);
 
-    if ( v->pause_flags & VPF_migrating )
-    {
-        vcpu_sleep_nosync(v);
-        vcpu_migrate(v);
-    }
+    vcpu_migrate_finish(v);
 
     return ret;
 }
@@ -1495,8 +1525,7 @@ void context_saved(struct vcpu *prev)
 
     SCHED_OP(VCPU2OP(prev), context_saved, prev);
 
-    if ( unlikely(prev->pause_flags & VPF_migrating) )
-        vcpu_migrate(prev);
+    vcpu_migrate_finish(prev);
 }
 
 /* The scheduler timer: force a run through the scheduler */
