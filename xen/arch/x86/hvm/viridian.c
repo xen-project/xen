@@ -245,7 +245,7 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
         };
         union {
             HV_PARTITION_PRIVILEGE_MASK mask;
-            uint32_t lo, hi;
+            struct { uint32_t lo, hi; };
         } u;
 
         if ( !(viridian_feature_mask(d) & HVMPV_no_freq) )
@@ -966,12 +966,10 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         gprintk(XENLOG_WARNING, "unimplemented hypercall %04x\n",
                 input.call_code);
         /* Fallthrough. */
-    case HvGetPartitionId:
     case HvExtCallQueryCapabilities:
         /*
-         * These hypercalls seem to be erroneously issued by Windows
-         * despite neither AccessPartitionId nor EnableExtendedHypercalls
-         * being set in CPUID leaf 2.
+         * This hypercall seems to be erroneously issued by Windows
+         * despite EnableExtendedHypercalls not being set in CPUID leaf 2.
          * Given that return a status of 'invalid code' has not so far
          * caused any problems it's not worth logging.
          */
