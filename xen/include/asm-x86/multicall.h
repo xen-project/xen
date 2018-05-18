@@ -34,7 +34,7 @@ enum mc_disposition {
             "    movq  %c2+3*%c3(%0),%%rcx; "                \
             "    movq  %c2+4*%c3(%0),%%r8; "                 \
             "    movq  %c2+5*%c3(%0),%%r9; "                 \
-            "    callq *%%rax; "                             \
+            "    INDIRECT_CALL %%rax; "                      \
             "1:  movq  %%rax,%c4(%0)\n"                      \
             ".section .fixup,\"ax\"\n"                       \
             "2:  movq  %5,%%rax\n"                           \
@@ -67,7 +67,7 @@ enum mc_disposition {
             "    movl  %c2+3*%c3(%0),%%ecx; "                \
             "    movl  %c2+4*%c3(%0),%%r8d; "                \
             "    movl  %c2+5*%c3(%0),%%r9d; "                \
-            "    callq *%%rax; "                             \
+            "    INDIRECT_CALL %%rax; "                      \
             "1:  movl  %%eax,%c4(%0)\n"                      \
             ".section .fixup,\"ax\"\n"                       \
             "2:  movl  %5,%%eax\n"                           \
