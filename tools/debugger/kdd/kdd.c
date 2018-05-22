@@ -687,7 +687,7 @@ static void kdd_handle_read_ctrl(kdd_state *s)
         }
     } else {
         /* 32-bit control-register space starts at 0x[2]cc, for 84 bytes */
-        uint64_t offset = addr;
+        uint32_t offset = addr;
         if (offset > 0x200)
             offset -= 0x200;
         offset -= 0xcc;
@@ -695,10 +695,7 @@ static void kdd_handle_read_ctrl(kdd_state *s)
             KDD_LOG(s, "Request outside of known control space\n");
             len = 0;
         } else {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"
             memcpy(buf, ((uint8_t *)&ctrl.c32) + offset, len);
-#pragma GCC diagnostic pop
         }
     }
 
