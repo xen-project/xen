@@ -795,10 +795,15 @@ static inline int vcpu_runnable(struct vcpu *v)
              atomic_read(&v->domain->pause_count));
 }
 
-static inline bool vcpu_cpu_dirty(const struct vcpu *v)
+static inline bool is_vcpu_dirty_cpu(unsigned int cpu)
 {
     BUILD_BUG_ON(NR_CPUS >= VCPU_CPU_CLEAN);
-    return v->dirty_cpu != VCPU_CPU_CLEAN;
+    return cpu != VCPU_CPU_CLEAN;
+}
+
+static inline bool vcpu_cpu_dirty(const struct vcpu *v)
+{
+    return is_vcpu_dirty_cpu(v->dirty_cpu);
 }
 
 void vcpu_block(void);

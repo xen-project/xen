@@ -1621,7 +1621,7 @@ static void __context_switch(void)
      */
     if ( pd != nd )
         cpumask_set_cpu(cpu, nd->dirty_cpumask);
-    n->dirty_cpu = cpu;
+    write_atomic(&n->dirty_cpu, cpu);
 
     if ( !is_idle_domain(nd) )
     {
@@ -1677,7 +1677,7 @@ static void __context_switch(void)
 
     if ( pd != nd )
         cpumask_clear_cpu(cpu, pd->dirty_cpumask);
-    p->dirty_cpu = VCPU_CPU_CLEAN;
+    write_atomic(&p->dirty_cpu, VCPU_CPU_CLEAN);
 
     per_cpu(curr_vcpu, cpu) = n;
 }

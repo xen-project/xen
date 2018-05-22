@@ -1251,11 +1251,23 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
              unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
              (l1e_owner == pg_owner) )
         {
+            cpumask_t *mask = this_cpu(scratch_cpumask);
+
+            cpumask_clear(mask);
+
             for_each_vcpu ( pg_owner, v )
             {
-                if ( pv_destroy_ldt(v) )
-                    flush_tlb_mask(cpumask_of(v->dirty_cpu));
+                unsigned int cpu;
+
+                if ( !pv_destroy_ldt(v) )
+                    continue;
+                cpu = read_atomic(&v->dirty_cpu);
+                if ( is_vcpu_dirty_cpu(cpu) )
+                    __cpumask_set_cpu(cpu, mask);
             }
+
+            if ( !cpumask_empty(mask) )
+                flush_tlb_mask(mask);
         }
         put_page(page);
     }
@@ -3028,13 +3040,18 @@ static inline int vcpumask_to_pcpumask(
 
         while ( vmask )
         {
+            unsigned int cpu;
+
             vcpu_id = find_first_set_bit(vmask);
             vmask &= ~(1UL << vcpu_id);
             vcpu_id += vcpu_bias;
             if ( (vcpu_id >= d->max_vcpus) )
                 return 0;
-            if ( ((v = d->vcpu[vcpu_id]) != NULL) && vcpu_cpu_dirty(v) )
-                __cpumask_set_cpu(v->dirty_cpu, pmask);
+            if ( (v = d->vcpu[vcpu_id]) == NULL )
+                continue;
+            cpu = read_atomic(&v->dirty_cpu);
+            if ( is_vcpu_dirty_cpu(cpu) )
+                __cpumask_set_cpu(cpu, pmask);
         }
     }
 }
