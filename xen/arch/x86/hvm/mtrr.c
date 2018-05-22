@@ -473,35 +473,40 @@ bool_t mtrr_var_range_msr_set(
     return 1;
 }
 
-bool_t mtrr_pat_not_equal(struct vcpu *vd, struct vcpu *vs)
+bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs)
 {
-    struct mtrr_state *md = &vd->arch.hvm_vcpu.mtrr;
-    struct mtrr_state *ms = &vs->arch.hvm_vcpu.mtrr;
-    int32_t res;
-    uint8_t num_var_ranges = (uint8_t)md->mtrr_cap;
+    const struct mtrr_state *md = &vd->arch.hvm_vcpu.mtrr;
+    const struct mtrr_state *ms = &vs->arch.hvm_vcpu.mtrr;
 
-    /* Test fixed ranges. */
-    res = memcmp(md->fixed_ranges, ms->fixed_ranges,
-            NUM_FIXED_RANGES*sizeof(mtrr_type));
-    if ( res )
-        return 1;
+    if ( (md->enabled ^ ms->enabled) & 2 )
+        return true;
 
-    /* Test var ranges. */
-    res = memcmp(md->var_ranges, ms->var_ranges,
-            num_var_ranges*sizeof(struct mtrr_var_range));
-    if ( res )
-        return 1;
+    if ( md->enabled & 2 )
+    {
+        unsigned int num_var_ranges = (uint8_t)md->mtrr_cap;
 
-    /* Test default type MSR. */
-    if ( (md->def_type != ms->def_type)
-            && (md->enabled != ms->enabled) )
-        return 1;
+        /* Test default type MSR. */
+        if ( md->def_type != ms->def_type )
+            return true;
+
+        /* Test fixed ranges. */
+        if ( (md->enabled ^ ms->enabled) & 1 )
+            return true;
+
+        if ( (md->enabled & 1) &&
+             memcmp(md->fixed_ranges, ms->fixed_ranges,
+                    sizeof(md->fixed_ranges)) )
+            return true;
+
+        /* Test variable ranges. */
+        if ( num_var_ranges != (uint8_t)ms->mtrr_cap ||
+             memcmp(md->var_ranges, ms->var_ranges,
+                    num_var_ranges * sizeof(*md->var_ranges)) )
+            return true;
+    }
 
     /* Test PAT. */
-    if ( vd->arch.hvm_vcpu.pat_cr != vs->arch.hvm_vcpu.pat_cr )
-        return 1;
-
-    return 0;
+    return vd->arch.hvm_vcpu.pat_cr != vs->arch.hvm_vcpu.pat_cr;
 }
 
 struct hvm_mem_pinned_cacheattr_range {
