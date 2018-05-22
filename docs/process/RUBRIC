@@ -1,0 +1,15 @@
+These process documents are used by those involved in releasing Xen to
+help keep the releases high quality, our release preparation
+well-organised, and to help avoid errors.
+
+They are living documents, and no special approval is needed to modify
+them beyond the usual acks for commit.  They should be updated as and
+when it seems expediant.
+
+Also, these documents are not to be slavishly followed.  Intelligent
+application of the guidelines means understanding, and giving effect
+to, the purpose behind any imprecation.
+
+Especially, the shell runes should not be executed blindly.  They are
+prompts to think about what should be done, and in what order; but
+often, the standard runes are not appropriate.
