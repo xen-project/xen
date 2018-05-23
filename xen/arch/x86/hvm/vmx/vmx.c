@@ -462,10 +462,6 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
-    /* %eax == 1 signals full real-mode support to the guest loader. */
-    if ( v->vcpu_id == 0 )
-        v->arch.user_regs.rax = 1;
-
     return 0;
 }
 
