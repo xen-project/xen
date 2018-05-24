@@ -3153,8 +3153,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                     }
         }
 
-        if ( (rc < 0) ||
-             (msr_content && (vmx_add_host_load_msr(msr) < 0)) )
+        if ( rc < 0 )
             hvm_inject_hw_exception(TRAP_machine_check, X86_EVENT_NO_EC);
         else
             __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);

@@ -94,8 +94,6 @@ string_param("nmi", opt_nmi);
 DEFINE_PER_CPU(u64, efer);
 static DEFINE_PER_CPU(unsigned long, last_extable_addr);
 
-DEFINE_PER_CPU_READ_MOSTLY(u32, ler_msr);
-
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table);
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, compat_gdt_table);
 
@@ -114,6 +112,9 @@ integer_param("debug_stack_lines", debug_stack_lines);
 
 static bool_t opt_ler;
 boolean_param("ler", opt_ler);
+
+/* LastExceptionFromIP on this hardware.  Zero if LER is not in use. */
+unsigned int __read_mostly ler_msr;
 
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
@@ -3755,17 +3756,6 @@ void write_efer(u64 val)
     wrmsrl(MSR_EFER, val);
 }
 
-static void ler_enable(void)
-{
-    u64 debugctl;
-
-    if ( !this_cpu(ler_msr) )
-        return;
-
-    rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl);
-    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | IA32_DEBUGCTLMSR_LBR);
-}
-
 void do_debug(struct cpu_user_regs *regs)
 {
     unsigned long dr6;
@@ -3798,6 +3788,10 @@ void do_debug(struct cpu_user_regs *regs)
      */
     write_debugreg(6, X86_DR6_DEFAULT);
 
+    /* #DB automatically disabled LBR.  Reinstate it if debugging Xen. */
+    if ( cpu_has_xen_lbr )
+        wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
+
     if ( !guest_mode(regs) )
     {
         /*
@@ -3815,7 +3809,7 @@ void do_debug(struct cpu_user_regs *regs)
             {
                 if ( regs->rip == (unsigned long)sysenter_eflags_saved )
                     regs->eflags &= ~X86_EFLAGS_TF;
-                goto out;
+                return;
             }
             if ( !debugger_trap_fatal(TRAP_debug, regs) )
             {
@@ -3872,20 +3866,14 @@ void do_debug(struct cpu_user_regs *regs)
                 regs->cs, _p(regs->rip), _p(regs->rip),
                 regs->ss, _p(regs->rsp), dr6);
 
-        goto out;
+        return;
     }
 
     /* Save debug status register where guest OS can peek at it */
     v->arch.debugreg[6] |= (dr6 & ~X86_DR6_DEFAULT);
     v->arch.debugreg[6] &= (dr6 | ~X86_DR6_DEFAULT);
 
-    ler_enable();
     do_guest_trap(TRAP_debug, regs);
-    return;
-
- out:
-    ler_enable();
-    return;
 }
 
 static void __init noinline __set_intr_gate(unsigned int n, uint32_t dpl, void *addr)
@@ -3928,6 +3916,34 @@ void load_TR(void)
         : "=m" (old_gdt) : "rm" (TSS_ENTRY << 3), "m" (tss_gdt) : "memory" );
 }
 
+static unsigned int calc_ler_msr(void)
+{
+    switch ( boot_cpu_data.x86_vendor )
+    {
+    case X86_VENDOR_INTEL:
+        switch ( boot_cpu_data.x86 )
+        {
+        case 6:
+            return MSR_IA32_LASTINTFROMIP;
+
+        case 15:
+            return MSR_P4_LER_FROM_LIP;
+        }
+        break;
+
+    case X86_VENDOR_AMD:
+        switch ( boot_cpu_data.x86 )
+        {
+        case 6:
+        case 0xf ... 0x17:
+            return MSR_IA32_LASTINTFROMIP;
+        }
+        break;
+    }
+
+    return 0;
+}
+
 void percpu_traps_init(void)
 {
     subarch_percpu_traps_init();
@@ -3935,31 +3951,11 @@ void percpu_traps_init(void)
     if ( !opt_ler )
         return;
 
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        switch ( boot_cpu_data.x86 )
-        {
-        case 6:
-            this_cpu(ler_msr) = MSR_IA32_LASTINTFROMIP;
-            break;
-        case 15:
-            this_cpu(ler_msr) = MSR_P4_LER_FROM_LIP;
-            break;
-        }
-        break;
-    case X86_VENDOR_AMD:
-        switch ( boot_cpu_data.x86 )
-        {
-        case 6:
-        case 0xf ... 0x17:
-            this_cpu(ler_msr) = MSR_IA32_LASTINTFROMIP;
-            break;
-        }
-        break;
-    }
+    if ( !ler_msr && (ler_msr = calc_ler_msr()) )
+        setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
 
-    ler_enable();
+    if ( cpu_has_xen_lbr )
+        wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
 }
 
 void __init init_idt_traps(void)
