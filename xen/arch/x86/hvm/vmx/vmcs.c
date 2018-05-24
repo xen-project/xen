@@ -1248,17 +1248,9 @@ static int construct_vmcs(struct vcpu *v)
 
         ept->mfn = pagetable_get_pfn(p2m_get_pagetable(p2m));
         __vmwrite(EPT_POINTER, ept->eptp);
-    }
 
-    if ( paging_mode_hap(d) )
-    {
-        u64 host_pat, guest_pat;
-
-        rdmsrl(MSR_IA32_CR_PAT, host_pat);
-        guest_pat = MSR_IA32_CR_PAT_RESET;
-
-        __vmwrite(HOST_PAT, host_pat);
-        __vmwrite(GUEST_PAT, guest_pat);
+        __vmwrite(HOST_PAT, XEN_MSR_PAT);
+        __vmwrite(GUEST_PAT, MSR_IA32_CR_PAT_RESET);
     }
     if ( cpu_has_vmx_mpx )
         __vmwrite(GUEST_BNDCFGS, 0);
