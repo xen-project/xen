@@ -148,7 +148,7 @@ void (* const exception_table[TRAP_nr])(struct cpu_user_regs *regs) = {
      (ARRAY_SIZE(exception_table) - 1)] = do_reserved_trap,
 };
 
-static void show_code(const struct cpu_user_regs *regs)
+void show_code(const struct cpu_user_regs *regs)
 {
     unsigned char insns_before[8] = {}, insns_after[16] = {};
     unsigned int i, tmp, missing_before, missing_after;
