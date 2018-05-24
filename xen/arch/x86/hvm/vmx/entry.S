@@ -40,6 +40,15 @@ ENTRY(vmx_asm_vmexit_handler)
         SPEC_CTRL_ENTRY_FROM_HVM    /* Req: b=curr %rsp=regs/cpuinfo, Clob: acd */
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
+        /* Hardware clears MSR_DEBUGCTL on VMExit.  Reinstate it if debugging Xen. */
+        .macro restore_lbr
+            mov $IA32_DEBUGCTLMSR_LBR, %eax
+            mov $MSR_IA32_DEBUGCTLMSR, %ecx
+            xor %edx, %edx
+            wrmsr
+        .endm
+        ALTERNATIVE __stringify(ASM_NOP14), restore_lbr, X86_FEATURE_XEN_LBR
+
         mov  %rsp,%rdi
         call vmx_vmexit_handler
 

@@ -3017,8 +3017,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
                         vmx_disable_intercept_for_msr(v, lbr->base + i, MSR_TYPE_R | MSR_TYPE_W);
         }
 
-        if ( (rc < 0) ||
-             (msr_content && (vmx_add_host_load_msr(msr) < 0)) )
+        if ( rc < 0 )
             hvm_inject_hw_exception(TRAP_machine_check, HVM_DELIVER_NO_ERROR_CODE);
         else
             __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
