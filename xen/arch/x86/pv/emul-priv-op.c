@@ -1366,10 +1366,7 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
             ctxt.bpmatch |= DR_STEP;
 
         if ( ctxt.bpmatch )
-        {
-            curr->arch.dr6 |= ctxt.bpmatch | DR_STATUS_RESERVED_ONE;
-            pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
-        }
+            pv_inject_DB(ctxt.bpmatch);
 
         /* fall through */
     case X86EMUL_RETRY:

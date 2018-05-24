@@ -390,7 +390,7 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         /* Fallthrough */
     case X86EMUL_OKAY:
         if ( ctxt.retire.singlestep )
-            pv_inject_hw_exception(X86_EXC_DB, X86_EVENT_NO_EC);
+            pv_inject_DB(X86_DR6_BS);
 
         /* Fallthrough */
     case X86EMUL_RETRY:
