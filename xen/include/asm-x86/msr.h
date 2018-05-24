@@ -241,7 +241,7 @@ static inline void write_efer(uint64_t val)
     wrmsrl(MSR_EFER, val);
 }
 
-DECLARE_PER_CPU(u32, ler_msr);
+extern unsigned int ler_msr;
 
 DECLARE_PER_CPU(uint32_t, tsc_aux);
 

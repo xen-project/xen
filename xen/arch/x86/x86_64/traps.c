@@ -144,11 +144,12 @@ void show_registers(const struct cpu_user_regs *regs)
     printk("CPU:    %d\n", smp_processor_id());
     _show_registers(&fault_regs, fault_crs, context, v);
 
-    if ( this_cpu(ler_msr) && !guest_mode(regs) )
+    if ( ler_msr && !guest_mode(regs) )
     {
         u64 from, to;
-        rdmsrl(this_cpu(ler_msr), from);
-        rdmsrl(this_cpu(ler_msr) + 1, to);
+
+        rdmsrl(ler_msr, from);
+        rdmsrl(ler_msr + 1, to);
         printk("ler: %016lx -> %016lx\n", from, to);
     }
 }
