@@ -95,8 +95,7 @@ void restore_rest_processor_state(void)
     /* Reload FPU state on next FPU use. */
     stts();
 
-    if (cpu_has_pat)
-        wrmsrl(MSR_IA32_CR_PAT, host_pat);
+    wrmsrl(MSR_IA32_CR_PAT, XEN_MSR_PAT);
 
     mtrr_bp_restore();
 }

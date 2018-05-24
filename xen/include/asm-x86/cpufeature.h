@@ -37,7 +37,6 @@
 #define cpu_has_sep             boot_cpu_has(X86_FEATURE_SEP)
 #define cpu_has_mtrr            1
 #define cpu_has_pge             1
-#define cpu_has_pat             1
 #define cpu_has_pse36           boot_cpu_has(X86_FEATURE_PSE36)
 #define cpu_has_clflush         boot_cpu_has(X86_FEATURE_CLFLUSH)
 #define cpu_has_mmx             1

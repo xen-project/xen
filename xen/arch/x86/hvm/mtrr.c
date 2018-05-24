@@ -125,7 +125,7 @@ static int __init hvm_mtrr_pat_init(void)
     {
         for ( j = 0; j < PAT_TYPE_NUMS; j++ )
         {
-            if ( pat_cr_2_paf(host_pat, j) == i )
+            if ( pat_cr_2_paf(XEN_MSR_PAT, j) == i )
             {
                 pat_entry_tbl[i] = j;
                 break;

@@ -97,6 +97,12 @@
                           X86_EFLAGS_NT|X86_EFLAGS_DF|X86_EFLAGS_IF|    \
                           X86_EFLAGS_TF)
 
+/*
+ * Host IA32_CR_PAT value to cover all memory types.  This is not the default
+ * MSR_PAT value, and is an ABI with PV guests.
+ */
+#define XEN_MSR_PAT 0x050100070406ul
+
 #ifndef __ASSEMBLY__
 
 struct domain;
@@ -145,7 +151,6 @@ extern bool probe_cpuid_faulting(void);
 extern void ctxt_switch_levelling(const struct vcpu *next);
 extern void (*ctxt_switch_masking)(const struct vcpu *next);
 
-extern u64 host_pat;
 extern bool_t opt_cpu_info;
 extern u32 cpuid_ext_features;
 extern u64 trampoline_misc_enable_off;

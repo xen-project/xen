@@ -47,12 +47,6 @@ unsigned int paddr_bits __read_mostly = 36;
 unsigned int hap_paddr_bits __read_mostly = 36;
 unsigned int vaddr_bits __read_mostly = VADDR_BITS;
 
-/*
- * Default host IA32_CR_PAT value to cover all memory types.
- * BIOS usually sets it to 0x07040600070406.
- */
-u64 host_pat = 0x050100070406;
-
 static unsigned int cleared_caps[NCAPINTS];
 static unsigned int forced_caps[NCAPINTS];
 
@@ -814,8 +808,7 @@ void cpu_init(void)
 	if (opt_cpu_info)
 		printk("Initializing CPU#%d\n", cpu);
 
-	if (cpu_has_pat)
-		wrmsrl(MSR_IA32_CR_PAT, host_pat);
+	wrmsrl(MSR_IA32_CR_PAT, XEN_MSR_PAT);
 
 	/* Install correct page table. */
 	write_ptbase(current);
