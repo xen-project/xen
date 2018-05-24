@@ -1247,6 +1247,12 @@ if left disabled by the BIOS.
 ### ler (x86)
 > `= <boolean>`
 
+> Default: false
+
+This option is intended for debugging purposes only.  Enable MSR_DEBUGCTL.LBR
+in hypervisor context to be able to dump the Last Interrupt/Exception To/From
+record with other registers.
+
 ### loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 

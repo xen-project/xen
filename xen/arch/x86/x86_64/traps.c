@@ -150,7 +150,12 @@ void show_registers(const struct cpu_user_regs *regs)
 
         rdmsrl(ler_msr, from);
         rdmsrl(ler_msr + 1, to);
-        printk("ler: %016lx -> %016lx\n", from, to);
+
+        /* Upper bits may store metadata.  Re-canonicalise for printing. */
+        printk("ler: from %016"PRIx64" [%ps]\n",
+               from, _p(canonicalise_addr(from)));
+        printk("       to %016"PRIx64" [%ps]\n",
+               to, _p(canonicalise_addr(to)));
     }
 }
 

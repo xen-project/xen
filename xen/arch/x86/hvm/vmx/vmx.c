@@ -4182,12 +4182,7 @@ static void sign_extend_msr(u32 msr, int type)
     struct vmx_msr_entry *entry;
 
     if ( (entry = vmx_find_msr(msr, type)) != NULL )
-    {
-        if ( entry->data & VADDR_TOP_BIT )
-            entry->data |= CANONICAL_MASK;
-        else
-            entry->data &= ~CANONICAL_MASK;
-    }
+        entry->data = canonicalise_addr(entry->data);
 }
 
 static void bdw_erratum_bdf14_fixup(void)
