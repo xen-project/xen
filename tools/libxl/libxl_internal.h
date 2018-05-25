@@ -2037,6 +2037,9 @@ _hidden void libxl__json_object_free(libxl__gc *gc_opt,
 
 _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc_opt, const char *s);
 
+_hidden char *libxl__json_object_to_json(libxl__gc *gc,
+                                         const libxl__json_object *args);
+
   /* Based on /local/domain/$domid/dm-version xenstore key
    * default is qemu xen traditional */
 _hidden int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);

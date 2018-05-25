@@ -1017,6 +1017,38 @@ out:
     return ret;
 }
 
+char *libxl__json_object_to_json(libxl__gc *gc,
+                                 const libxl__json_object *args)
+{
+    const unsigned char *buf;
+    libxl_yajl_length len;
+    yajl_gen_status s;
+    yajl_gen hand;
+    char *ret = NULL;
+    int rc;
+
+    if (!args)
+        return NULL;
+
+    hand = libxl_yajl_gen_alloc(NULL);
+    if (!hand)
+        return NULL;
+
+    rc = libxl__json_object_to_yajl_gen(gc, hand, args);
+    if (rc)
+        goto out;
+
+    s = yajl_gen_get_buf(hand, &buf, &len);
+    if (s)
+        goto out;
+
+    ret = libxl__strndup(gc, (const char *)buf, len);
+
+out:
+    yajl_gen_free(hand);
+    return ret;
+}
+
 yajl_gen_status libxl__uint64_gen_json(yajl_gen hand, uint64_t val)
 {
     char *num;
