@@ -23,8 +23,9 @@ LDLIBS += $(LDLIBS_libxendevicemodel)
 LDLIBS += $(LDLIBS_libxentoolcore)
 LDLIBS += $(LDLIBS_libxentoollog)
 
-TARGETS-y := depriv-fd-checker
-TARGETS := $(TARGETS-y)
+INSTALL_PRIVBIN-y += depriv-fd-checker
+INSTALL_PRIVBIN := $(INSTALL_PRIVBIN-y)
+TARGETS += $(INSTALL_PRIVBIN)
 
 .PHONY: all
 all: build
@@ -39,6 +40,12 @@ clean:
 .PHONY: distclean
 distclean: clean
 
-install uninstall:
+install: all
+	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
+	$(INSTALL_PROG) $(INSTALL_PRIVBIN) $(DESTDIR)$(LIBEXEC_BIN)
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(addprefix $(DESTDIR)$(LIBEXEC_BIN)/, $(INSTALL_PRIVBIN))
 
 -include $(DEPS_INCLUDE)
