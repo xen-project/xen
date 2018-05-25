@@ -112,7 +112,6 @@ struct libxl__qmp_handler {
     int wait_for_id;
 
     char buffer[QMP_RECEIVE_BUFFER_SIZE + 1];
-    libxl__yajl_ctx *yajl_ctx;
 
     libxl_ctx *ctx;
     uint32_t domid;
