@@ -612,7 +612,7 @@ const libxl__json_object *libxl__json_map_get(const char *key,
 
 yajl_status libxl__json_object_to_yajl_gen(libxl__gc *gc,
                                            yajl_gen hand,
-                                           libxl__json_object *obj)
+                                           const libxl__json_object *obj)
 {
     int idx = 0;
     yajl_status rc;
