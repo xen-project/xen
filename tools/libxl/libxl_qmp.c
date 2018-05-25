@@ -273,8 +273,7 @@ static int enable_qmp_capabilities(libxl__qmp_handler *qmp)
  * Helpers
  */
 
-static libxl__qmp_message_type qmp_response_type(libxl__qmp_handler *qmp,
-                                                 const libxl__json_object *o)
+static libxl__qmp_message_type qmp_response_type(const libxl__json_object *o)
 {
     libxl__qmp_message_type type;
     libxl__json_map_node *node = NULL;
@@ -340,7 +339,7 @@ static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
 {
     libxl__qmp_message_type type = LIBXL__QMP_MESSAGE_TYPE_INVALID;
 
-    type = qmp_response_type(qmp, resp);
+    type = qmp_response_type(resp);
     LOGD(DEBUG, qmp->domid, "message type: %s", libxl__qmp_message_type_to_string(type));
 
     switch (type) {
