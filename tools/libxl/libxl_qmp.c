@@ -571,17 +571,16 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
     return rc;
 }
 
-static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
-                              const char *cmd, libxl__json_object *args,
-                              qmp_callback_t callback, void *opaque,
-                              qmp_request_context *context)
+static char *qmp_prepare_cmd(libxl__gc *gc, const char *cmd,
+                             const libxl__json_object *args,
+                             int id)
 {
-    const unsigned char *buf = NULL;
-    char *ret = NULL;
-    libxl_yajl_length len = 0;
+    yajl_gen hand = NULL;
+    /* memory for 'buf' is owned by 'hand' */
+    const unsigned char *buf;
+    libxl_yajl_length len;
     yajl_gen_status s;
-    yajl_gen hand;
-    callback_id_pair *elm = NULL;
+    char *ret = NULL;
 
     hand = libxl_yajl_gen_alloc(NULL);
 
@@ -598,7 +597,7 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
     libxl__yajl_gen_asciiz(hand, "execute");
     libxl__yajl_gen_asciiz(hand, cmd);
     libxl__yajl_gen_asciiz(hand, "id");
-    yajl_gen_integer(hand, ++qmp->last_id_used);
+    yajl_gen_integer(hand, id);
     if (args) {
         libxl__yajl_gen_asciiz(hand, "arguments");
         libxl__json_object_to_yajl_gen(gc, hand, args);
@@ -607,7 +606,27 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
 
     s = yajl_gen_get_buf(hand, &buf, &len);
 
-    if (s) {
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    ret = libxl__sprintf(gc, "%*.*s\r\n", (int)len, (int)len, buf);
+
+out:
+    yajl_gen_free(hand);
+    return ret;
+}
+
+static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
+                              const char *cmd, libxl__json_object *args,
+                              qmp_callback_t callback, void *opaque,
+                              qmp_request_context *context)
+{
+    char *buf;
+    callback_id_pair *elm;
+
+    buf = qmp_prepare_cmd(gc, cmd, args, ++qmp->last_id_used);
+
+    if (!buf) {
         LOGD(ERROR, qmp->domid, "Failed to generate a qmp command");
         goto out;
     }
@@ -623,13 +642,10 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
     elm->context = context;
     LIBXL_STAILQ_INSERT_TAIL(&qmp->callback_list, elm, next);
 
-    ret = libxl__strndup(gc, (const char*)buf, len);
-
     LOGD(DEBUG, qmp->domid, "next qmp command: '%s'", buf);
 
 out:
-    yajl_gen_free(hand);
-    return ret;
+    return buf;
 }
 
 static int qmp_send(libxl__qmp_handler *qmp,
@@ -649,9 +665,6 @@ static int qmp_send(libxl__qmp_handler *qmp,
 
     if (libxl_write_exactly(qmp->ctx, qmp->qmp_fd, buf, strlen(buf),
                             "QMP command", "QMP socket"))
-        goto out;
-    if (libxl_write_exactly(qmp->ctx, qmp->qmp_fd, "\r\n", 2,
-                            "CRLF", "QMP socket"))
         goto out;
 
     rc = qmp->last_id_used;
