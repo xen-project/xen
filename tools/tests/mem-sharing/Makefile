@@ -27,3 +27,5 @@ memshrtool: memshrtool.o
 	$(CC) -o $@ $< $(LDFLAGS) $(LDLIBS_libxenctrl)
 
 -include $(DEPS_INCLUDE)
+
+install uninstall:

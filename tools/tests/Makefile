@@ -13,11 +13,8 @@ endif
 SUBDIRS-$(CONFIG_X86) += x86_emulator
 SUBDIRS-y += xen-access
 SUBDIRS-y += xenstore
+SUBDIRS-y += depriv
 SUBDIRS-$(CONFIG_HAS_PCI) += vpci
 
 .PHONY: all clean install distclean uninstall
-all clean distclean: %: subdirs-%
-
-install:
-
-uninstall:
+all clean distclean install uninstall: %: subdirs-%
