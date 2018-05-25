@@ -105,7 +105,6 @@ typedef struct callback_id_pair {
 } callback_id_pair;
 
 struct libxl__qmp_handler {
-    struct sockaddr_un addr;
     int qmp_fd;
     bool connected;
     time_t timeout;
@@ -431,6 +430,7 @@ static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
 {
     int ret = -1;
     int i = 0;
+    struct sockaddr_un addr;
 
     qmp->qmp_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (qmp->qmp_fd < 0) {
@@ -447,18 +447,16 @@ static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
         goto out;
     }
 
-    if (sizeof (qmp->addr.sun_path) <= strlen(qmp_socket_path)) {
+    if (sizeof(addr.sun_path) <= strlen(qmp_socket_path)) {
         ret = -1;
         goto out;
     }
-    memset(&qmp->addr, 0, sizeof (qmp->addr));
-    qmp->addr.sun_family = AF_UNIX;
-    strncpy(qmp->addr.sun_path, qmp_socket_path,
-            sizeof (qmp->addr.sun_path)-1);
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, qmp_socket_path, sizeof(addr.sun_path));
 
     do {
-        ret = connect(qmp->qmp_fd, (struct sockaddr *) &qmp->addr,
-                      sizeof (qmp->addr));
+        ret = connect(qmp->qmp_fd, (struct sockaddr *) &addr, sizeof(addr));
         if (ret == 0)
             break;
         if (errno == ENOENT || errno == ECONNREFUSED) {
