@@ -1,7 +1,74 @@
 #ifndef __ASM_MSR_INDEX_H
 #define __ASM_MSR_INDEX_H
 
-/* CPU model specific register (MSR) numbers */
+/*
+ * CPU model specific register (MSR) numbers
+ *
+ * Definitions for an MSR should follow this style:
+ *
+ * #define MSR_$NAME                        0x$INDEX
+ * #define  $NAME_$FIELD1                   (_AC($X, ULL) << $POS1)
+ * #define  $NAME_$FIELD2                   (_AC($Y, ULL) << $POS2)
+ *
+ * Blocks of related constants should be sorted by MSR index.  The constant
+ * names should be as concise as possible, and the bit names may have an
+ * abbreviated name.  Exceptions will be considered on a case-by-case basis.
+ */
+
+#define MSR_APIC_BASE                       0x0000001b
+#define  APIC_BASE_BSP                      (_AC(1, ULL) <<  8)
+#define  APIC_BASE_EXTD                     (_AC(1, ULL) << 10)
+#define  APIC_BASE_ENABLE                   (_AC(1, ULL) << 11)
+#define  APIC_BASE_ADDR_MASK                0x000ffffffffff000ULL
+
+#define MSR_TEST_CTRL                       0x00000033
+#define  TEST_CTRL_SPLITLOCK_DETECT         (_AC(1, ULL) << 29)
+#define  TEST_CTRL_SPLITLOCK_DISABLE        (_AC(1, ULL) << 31)
+
+#define MSR_INTEL_CORE_THREAD_COUNT         0x00000035
+#define  MSR_CTC_THREAD_MASK                0x0000ffff
+#define  MSR_CTC_CORE_MASK                  0xffff0000
+
+#define MSR_SPEC_CTRL                       0x00000048
+#define  SPEC_CTRL_IBRS                     (_AC(1, ULL) <<  0)
+#define  SPEC_CTRL_STIBP                    (_AC(1, ULL) <<  1)
+#define  SPEC_CTRL_SSBD                     (_AC(1, ULL) <<  2)
+
+#define MSR_PRED_CMD                        0x00000049
+#define  PRED_CMD_IBPB                      (_AC(1, ULL) <<  0)
+
+#define MSR_PPIN_CTL                        0x0000004e
+#define  PPIN_LOCKOUT                       (_AC(1, ULL) <<  0)
+#define  PPIN_ENABLE                        (_AC(1, ULL) <<  1)
+#define MSR_PPIN                            0x0000004f
+
+#define MSR_CORE_CAPABILITIES               0x000000cf
+#define  CORE_CAPS_SPLITLOCK_DETECT         (_AC(1, ULL) <<  5)
+
+#define MSR_ARCH_CAPABILITIES               0x0000010a
+#define  ARCH_CAPS_RDCL_NO                  (_AC(1, ULL) <<  0)
+#define  ARCH_CAPS_IBRS_ALL                 (_AC(1, ULL) <<  1)
+#define  ARCH_CAPS_RSBA                     (_AC(1, ULL) <<  2)
+#define  ARCH_CAPS_SKIP_L1DFL               (_AC(1, ULL) <<  3)
+#define  ARCH_CAPS_SSB_NO                   (_AC(1, ULL) <<  4)
+#define  ARCH_CAPS_MDS_NO                   (_AC(1, ULL) <<  5)
+#define  ARCH_CAPS_IF_PSCHANGE_MC_NO        (_AC(1, ULL) <<  6)
+#define  ARCH_CAPS_TSX_CTRL                 (_AC(1, ULL) <<  7)
+#define  ARCH_CAPS_TAA_NO                   (_AC(1, ULL) <<  8)
+
+#define MSR_FLUSH_CMD                       0x0000010b
+#define  FLUSH_CMD_L1D                      (_AC(1, ULL) <<  0)
+
+#define MSR_TSX_FORCE_ABORT                 0x0000010f
+#define  TSX_FORCE_ABORT_RTM                (_AC(1, ULL) <<  0)
+
+#define MSR_TSX_CTRL                        0x00000122
+#define  TSX_CTRL_RTM_DISABLE               (_AC(1, ULL) <<  0)
+#define  TSX_CTRL_CPUID_CLEAR               (_AC(1, ULL) <<  1)
+
+/*
+ * Legacy MSR constants in need of cleanup.  No new MSRs below this comment.
+ */
 
 /* x86-64 specific MSRs */
 #define MSR_EFER		0xc0000080 /* extended feature register */
@@ -31,54 +98,6 @@
 
 #define EFER_KNOWN_MASK		(EFER_SCE | EFER_LME | EFER_LMA | EFER_NX | \
 				 EFER_SVME | EFER_FFXSE)
-
-#define MSR_TEST_CTRL                   0x00000033
-#define TEST_CTRL_SPLITLOCK_DETECT      (_AC(1, ULL) << 29)
-#define TEST_CTRL_SPLITLOCK_DISABLE     (_AC(1, ULL) << 31)
-
-#define MSR_INTEL_CORE_THREAD_COUNT     0x00000035
-#define MSR_CTC_THREAD_MASK             0x0000ffff
-#define MSR_CTC_CORE_MASK               0xffff0000
-
-/* Speculation Controls. */
-#define MSR_SPEC_CTRL			0x00000048
-#define SPEC_CTRL_IBRS			(_AC(1, ULL) << 0)
-#define SPEC_CTRL_STIBP			(_AC(1, ULL) << 1)
-#define SPEC_CTRL_SSBD			(_AC(1, ULL) << 2)
-
-#define MSR_PRED_CMD			0x00000049
-#define PRED_CMD_IBPB			(_AC(1, ULL) << 0)
-
-/* Intel Protected Processor Inventory Number */
-#define MSR_PPIN_CTL			0x0000004e
-#define MSR_PPIN			0x0000004f
-
-#define PPIN_LOCKOUT			(_AC(1, ULL) << 0)
-#define PPIN_ENABLE			(_AC(1, ULL) << 1)
-
-#define MSR_CORE_CAPABILITIES           0x000000cf
-#define CORE_CAPS_SPLITLOCK_DETECT      (_AC(1, ULL) <<  5)
-
-#define MSR_ARCH_CAPABILITIES		0x0000010a
-#define ARCH_CAPS_RDCL_NO		(_AC(1, ULL) << 0)
-#define ARCH_CAPS_IBRS_ALL		(_AC(1, ULL) << 1)
-#define ARCH_CAPS_RSBA			(_AC(1, ULL) << 2)
-#define ARCH_CAPS_SKIP_L1DFL		(_AC(1, ULL) << 3)
-#define ARCH_CAPS_SSB_NO		(_AC(1, ULL) << 4)
-#define ARCH_CAPS_MDS_NO		(_AC(1, ULL) << 5)
-#define ARCH_CAPS_IF_PSCHANGE_MC_NO	(_AC(1, ULL) << 6)
-#define ARCH_CAPS_TSX_CTRL		(_AC(1, ULL) << 7)
-#define ARCH_CAPS_TAA_NO		(_AC(1, ULL) << 8)
-
-#define MSR_FLUSH_CMD			0x0000010b
-#define FLUSH_CMD_L1D			(_AC(1, ULL) << 0)
-
-#define MSR_TSX_FORCE_ABORT             0x0000010f
-#define TSX_FORCE_ABORT_RTM             (_AC(1, ULL) <<  0)
-
-#define MSR_TSX_CTRL                    0x00000122
-#define TSX_CTRL_RTM_DISABLE            (_AC(1, ULL) <<  0)
-#define TSX_CTRL_CPUID_CLEAR            (_AC(1, ULL) <<  1)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
@@ -358,12 +377,6 @@
 #define IA32_FEATURE_CONTROL_LMCE_ON                  0x100000
 
 #define MSR_IA32_TSC_ADJUST		0x0000003b
-
-#define MSR_APIC_BASE                   0x0000001b
-#define  APIC_BASE_BSP                  (1<<8)
-#define  APIC_BASE_EXTD                 (1<<10)
-#define  APIC_BASE_ENABLE               (1<<11)
-#define  APIC_BASE_ADDR_MASK            0x000ffffffffff000ul
 
 #define MSR_X2APIC_FIRST                0x00000800
 #define MSR_X2APIC_LAST                 0x00000bff
