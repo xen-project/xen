@@ -1623,8 +1623,8 @@ static void vmx_update_guest_efer(struct vcpu *v)
          * When using shadow pagetables, EFER.NX is a Xen-owned bit and is not
          * under guest control.
          */
-        guest_efer &= ~EFER_NX;
-        guest_efer |= xen_efer & EFER_NX;
+        guest_efer &= ~EFER_NXE;
+        guest_efer |= xen_efer & EFER_NXE;
     }
 
     if ( !vmx_unrestricted_guest(v) )

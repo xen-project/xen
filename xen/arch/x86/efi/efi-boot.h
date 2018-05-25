@@ -692,7 +692,7 @@ static void __init efi_arch_cpu(void)
         caps[cpufeat_word(X86_FEATURE_SYSCALL)] = cpuid_edx(0x80000001);
 
         if ( cpu_has_nx )
-            trampoline_efer |= EFER_NX;
+            trampoline_efer |= EFER_NXE;
     }
 }
 

@@ -376,7 +376,7 @@ int hvm_get_param(struct domain *d, uint32_t index, uint64_t *value);
 #define hvm_smap_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_SMAP))
 #define hvm_nx_enabled(v) \
-    ((v)->arch.hvm.guest_efer & EFER_NX)
+    ((v)->arch.hvm.guest_efer & EFER_NXE)
 #define hvm_pku_enabled(v) \
     (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_PKE))
 

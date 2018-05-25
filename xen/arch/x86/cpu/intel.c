@@ -270,14 +270,14 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	if (disable) {
 		wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable & ~disable);
 		bootsym(trampoline_misc_enable_off) |= disable;
-		bootsym(trampoline_efer) |= EFER_NX;
+		bootsym(trampoline_efer) |= EFER_NXE;
 	}
 
 	if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID)
 		printk(KERN_INFO "revised cpuid level: %d\n",
 		       cpuid_eax(0));
 	if (disable & MSR_IA32_MISC_ENABLE_XD_DISABLE) {
-		write_efer(read_efer() | EFER_NX);
+		write_efer(read_efer() | EFER_NXE);
 		printk(KERN_INFO
 		       "re-enabled NX (Execute Disable) protection\n");
 	}

@@ -639,7 +639,7 @@ trampoline_setup:
         /* Check for NX. Adjust EFER setting if available. */
         bt      $cpufeat_bit(X86_FEATURE_NX), %edx
         jnc     1f
-        orb     $EFER_NX >> 8, 1 + sym_esi(trampoline_efer)
+        orb     $EFER_NXE >> 8, 1 + sym_esi(trampoline_efer)
 1:
 
         /* Check for availability of long mode. */

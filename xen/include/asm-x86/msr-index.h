@@ -119,6 +119,17 @@
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
 
+#define MSR_EFER                            0xc0000080 /* Extended Feature Enable Register */
+#define  EFER_SCE                           (_AC(1, ULL) <<  0) /* SYSCALL Enable */
+#define  EFER_LME                           (_AC(1, ULL) <<  8) /* Long Mode Enable */
+#define  EFER_LMA                           (_AC(1, ULL) << 10) /* Long Mode Active */
+#define  EFER_NXE                           (_AC(1, ULL) << 11) /* No Execute Enable */
+#define  EFER_SVME                          (_AC(1, ULL) << 12) /* Secure Virtual Machine Enable */
+#define  EFER_FFXSE                         (_AC(1, ULL) << 14) /* Fast FXSAVE/FXRSTOR */
+
+#define EFER_KNOWN_MASK \
+    (EFER_SCE | EFER_LME | EFER_LMA | EFER_NXE | EFER_SVME | EFER_FFXSE)
+
 #define MSR_K8_SYSCFG                       0xc0010010
 #define  SYSCFG_MTRR_FIX_DRAM_EN            (_AC(1, ULL) << 18)
 #define  SYSCFG_MTRR_FIX_DRAM_MOD_EN        (_AC(1, ULL) << 19)
@@ -145,7 +156,6 @@
  */
 
 /* x86-64 specific MSRs */
-#define MSR_EFER		0xc0000080 /* extended feature register */
 #define MSR_STAR		0xc0000081 /* legacy mode SYSCALL target */
 #define MSR_LSTAR		0xc0000082 /* long mode SYSCALL target */
 #define MSR_CSTAR		0xc0000083 /* compat mode SYSCALL target */
@@ -154,24 +164,6 @@
 #define MSR_GS_BASE		0xc0000101 /* 64bit GS base */
 #define MSR_SHADOW_GS_BASE	0xc0000102 /* SwapGS GS shadow */
 #define MSR_TSC_AUX		0xc0000103 /* Auxiliary TSC */
-
-/* EFER bits: */
-#define _EFER_SCE		0  /* SYSCALL/SYSRET */
-#define _EFER_LME		8  /* Long mode enable */
-#define _EFER_LMA		10 /* Long mode active (read-only) */
-#define _EFER_NX		11 /* No execute enable */
-#define _EFER_SVME		12 /* AMD: SVM enable */
-#define _EFER_FFXSE		14 /* AMD: Fast FXSAVE/FXRSTOR enable */
-
-#define EFER_SCE		(1<<_EFER_SCE)
-#define EFER_LME		(1<<_EFER_LME)
-#define EFER_LMA		(1<<_EFER_LMA)
-#define EFER_NX			(1<<_EFER_NX)
-#define EFER_SVME		(1<<_EFER_SVME)
-#define EFER_FFXSE		(1<<_EFER_FFXSE)
-
-#define EFER_KNOWN_MASK		(EFER_SCE | EFER_LME | EFER_LMA | EFER_NX | \
-				 EFER_SVME | EFER_FFXSE)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1

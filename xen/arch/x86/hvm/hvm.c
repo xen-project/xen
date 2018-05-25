@@ -952,8 +952,8 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
     if ( (value & EFER_LMA) && (!(value & EFER_LME) || !cr0_pg) )
         return "LMA/LME/CR0.PG inconsistency";
 
-    if ( (value & EFER_NX) && !p->extd.nx )
-        return "NX without feature";
+    if ( (value & EFER_NXE) && !p->extd.nx )
+        return "NXE without feature";
 
     if ( (value & EFER_SVME) && (!p->extd.svm || !nestedhvm_enabled(d)) )
         return "SVME without nested virt";

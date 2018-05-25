@@ -563,8 +563,8 @@ static void svm_update_guest_efer(struct vcpu *v)
     if ( paging_mode_shadow(v->domain) )
     {
         /* EFER.NX is a Xen-owned bit and is not under guest control. */
-        guest_efer &= ~EFER_NX;
-        guest_efer |= xen_efer & EFER_NX;
+        guest_efer &= ~EFER_NXE;
+        guest_efer |= xen_efer & EFER_NXE;
 
         /*
          * CR0.PG is a Xen-owned bit, and remains set even when the guest has
