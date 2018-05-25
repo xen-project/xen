@@ -115,6 +115,16 @@
 #define MSR_PL3_SSP                         0x000006a7
 #define MSR_INTERRUPT_SSP_TABLE             0x000006a8
 
+#define MSR_X2APIC_FIRST                    0x00000800
+#define MSR_X2APIC_LAST                     0x00000bff
+
+#define MSR_X2APIC_TPR                      0x00000808
+#define MSR_X2APIC_PPR                      0x0000080a
+#define MSR_X2APIC_EOI                      0x0000080b
+#define MSR_X2APIC_TMICT                    0x00000838
+#define MSR_X2APIC_TMCCT                    0x00000839
+#define MSR_X2APIC_SELF                     0x0000083f
+
 #define MSR_PASID                           0x00000d93
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
@@ -129,6 +139,15 @@
 
 #define EFER_KNOWN_MASK \
     (EFER_SCE | EFER_LME | EFER_LMA | EFER_NXE | EFER_SVME | EFER_FFXSE)
+
+#define MSR_STAR                            0xc0000081 /* legacy mode SYSCALL target */
+#define MSR_LSTAR                           0xc0000082 /* long mode SYSCALL target */
+#define MSR_CSTAR                           0xc0000083 /* compat mode SYSCALL target */
+#define MSR_SYSCALL_MASK                    0xc0000084 /* EFLAGS mask for syscall */
+#define MSR_FS_BASE                         0xc0000100 /* 64bit FS base */
+#define MSR_GS_BASE                         0xc0000101 /* 64bit GS base */
+#define MSR_SHADOW_GS_BASE                  0xc0000102 /* SwapGS GS shadow */
+#define MSR_TSC_AUX                         0xc0000103 /* Auxiliary TSC */
 
 #define MSR_K8_SYSCFG                       0xc0010010
 #define  SYSCFG_MTRR_FIX_DRAM_EN            (_AC(1, ULL) << 18)
@@ -154,16 +173,6 @@
 /*
  * Legacy MSR constants in need of cleanup.  No new MSRs below this comment.
  */
-
-/* x86-64 specific MSRs */
-#define MSR_STAR		0xc0000081 /* legacy mode SYSCALL target */
-#define MSR_LSTAR		0xc0000082 /* long mode SYSCALL target */
-#define MSR_CSTAR		0xc0000083 /* compat mode SYSCALL target */
-#define MSR_SYSCALL_MASK	0xc0000084 /* EFLAGS mask for syscall */
-#define MSR_FS_BASE		0xc0000100 /* 64bit FS base */
-#define MSR_GS_BASE		0xc0000101 /* 64bit GS base */
-#define MSR_SHADOW_GS_BASE	0xc0000102 /* SwapGS GS shadow */
-#define MSR_TSC_AUX		0xc0000103 /* Auxiliary TSC */
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
@@ -435,16 +444,6 @@
 #define IA32_FEATURE_CONTROL_LMCE_ON                  0x100000
 
 #define MSR_IA32_TSC_ADJUST		0x0000003b
-
-#define MSR_X2APIC_FIRST                0x00000800
-#define MSR_X2APIC_LAST                 0x00000bff
-
-#define MSR_X2APIC_TPR                  0x00000808
-#define MSR_X2APIC_PPR                  0x0000080a
-#define MSR_X2APIC_EOI                  0x0000080b
-#define MSR_X2APIC_TMICT                0x00000838
-#define MSR_X2APIC_TMCCT                0x00000839
-#define MSR_X2APIC_SELF                 0x0000083f
 
 #define MSR_IA32_UCODE_WRITE		0x00000079
 #define MSR_IA32_UCODE_REV		0x0000008b
