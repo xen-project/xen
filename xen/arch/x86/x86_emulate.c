@@ -101,23 +101,29 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
     switch ( reg )
     {
     case 0 ... 3:
-    case 6:
         *val = curr->arch.debugreg[reg];
         break;
 
+    case 4:
+        if ( curr->arch.pv.ctrlreg[4] & X86_CR4_DE )
+            goto ud_fault;
+
+        /* Fallthrough */
+    case 6:
+        *val = curr->arch.debugreg[6];
+        break;
+
+    case 5:
+        if ( curr->arch.pv.ctrlreg[4] & X86_CR4_DE )
+            goto ud_fault;
+
+        /* Fallthrough */
     case 7:
         *val = (curr->arch.debugreg[7] |
                 curr->arch.debugreg[5]);
         break;
 
-    case 4 ... 5:
-        if ( !(curr->arch.pv.ctrlreg[4] & X86_CR4_DE) )
-        {
-            *val = curr->arch.debugreg[reg + 2];
-            break;
-        }
-
-        /* Fallthrough */
+    ud_fault:
     default:
         if ( ctxt )
             x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
