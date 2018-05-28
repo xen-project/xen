@@ -101,7 +101,7 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
     switch ( reg )
     {
     case 0 ... 3:
-        *val = curr->arch.debugreg[reg];
+        *val = curr->arch.dr[reg];
         break;
 
     case 4:
@@ -110,7 +110,7 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
 
         /* Fallthrough */
     case 6:
-        *val = curr->arch.debugreg[6];
+        *val = curr->arch.dr6;
         break;
 
     case 5:
@@ -119,8 +119,7 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
 
         /* Fallthrough */
     case 7:
-        *val = (curr->arch.debugreg[7] |
-                curr->arch.debugreg[5]);
+        *val = curr->arch.dr7 | curr->arch.pv.dr7_emul;
         break;
 
     ud_fault:

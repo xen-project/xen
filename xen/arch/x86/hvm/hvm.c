@@ -791,12 +791,12 @@ static int hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
         .cr2 = v->arch.hvm.guest_cr[2],
         .cr3 = v->arch.hvm.guest_cr[3],
         .cr4 = v->arch.hvm.guest_cr[4],
-        .dr0 = v->arch.debugreg[0],
-        .dr1 = v->arch.debugreg[1],
-        .dr2 = v->arch.debugreg[2],
-        .dr3 = v->arch.debugreg[3],
-        .dr6 = v->arch.debugreg[6],
-        .dr7 = v->arch.debugreg[7],
+        .dr0 = v->arch.dr[0],
+        .dr1 = v->arch.dr[1],
+        .dr2 = v->arch.dr[2],
+        .dr3 = v->arch.dr[3],
+        .dr6 = v->arch.dr6,
+        .dr7 = v->arch.dr7,
         .msr_efer = v->arch.hvm.guest_efer,
     };
 
@@ -1117,12 +1117,12 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.user_regs.r13 = ctxt.r13;
     v->arch.user_regs.r14 = ctxt.r14;
     v->arch.user_regs.r15 = ctxt.r15;
-    v->arch.debugreg[0] = ctxt.dr0;
-    v->arch.debugreg[1] = ctxt.dr1;
-    v->arch.debugreg[2] = ctxt.dr2;
-    v->arch.debugreg[3] = ctxt.dr3;
-    v->arch.debugreg[6] = ctxt.dr6;
-    v->arch.debugreg[7] = ctxt.dr7;
+    v->arch.dr[0] = ctxt.dr0;
+    v->arch.dr[1] = ctxt.dr1;
+    v->arch.dr[2] = ctxt.dr2;
+    v->arch.dr[3] = ctxt.dr3;
+    v->arch.dr6   = ctxt.dr6;
+    v->arch.dr7   = ctxt.dr7;
 
     v->arch.vgc_flags = VGCF_online;
 

@@ -329,9 +329,9 @@ void arch_vcpu_regs_init(struct vcpu *v)
     memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
     v->arch.user_regs.eflags = X86_EFLAGS_MBS;
 
-    memset(v->arch.debugreg, 0, sizeof(v->arch.debugreg));
-    v->arch.debugreg[6] = X86_DR6_DEFAULT;
-    v->arch.debugreg[7] = X86_DR7_DEFAULT;
+    memset(v->arch.dr, 0, sizeof(v->arch.dr));
+    v->arch.dr6 = X86_DR6_DEFAULT;
+    v->arch.dr7 = X86_DR7_DEFAULT;
 }
 
 int arch_vcpu_create(struct vcpu *v)
@@ -885,8 +885,10 @@ int arch_set_info_guest(
 
     if ( is_hvm_domain(d) )
     {
-        for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
-            v->arch.debugreg[i] = c(debugreg[i]);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.dr); ++i )
+            v->arch.dr[i] = c(debugreg[i]);
+        v->arch.dr6 = c(debugreg[6]);
+        v->arch.dr7 = c(debugreg[7]);
 
         hvm_set_info_guest(v);
         goto out;
@@ -974,9 +976,15 @@ int arch_set_info_guest(
     v->arch.pv.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(v, cr4) :
         real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
-    memset(v->arch.debugreg, 0, sizeof(v->arch.debugreg));
-    for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(v, i, c(debugreg[i]));
+    memset(v->arch.dr, 0, sizeof(v->arch.dr));
+    v->arch.dr6 = X86_DR6_DEFAULT;
+    v->arch.dr7 = X86_DR7_DEFAULT;
+    v->arch.pv.dr7_emul = 0;
+
+    for ( i = 0; i < ARRAY_SIZE(v->arch.dr); i++ )
+        set_debugreg(v, i, c(debugreg[i]));
+    set_debugreg(v, 6, c(debugreg[6]));
+    set_debugreg(v, 7, c(debugreg[7]));
 
     if ( v->is_initialised )
         goto out;
@@ -1542,7 +1550,7 @@ void paravirt_ctxt_switch_from(struct vcpu *v)
      * inside Xen, before we get a chance to reload DR7, and this cannot always
      * safely be handled.
      */
-    if ( unlikely(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
+    if ( unlikely(v->arch.dr7 & DR7_ACTIVE_MASK) )
         write_debugreg(7, 0);
 }
 
@@ -1555,7 +1563,7 @@ void paravirt_ctxt_switch_to(struct vcpu *v)
             l4e_from_page(v->domain->arch.perdomain_l3_pg,
                           __PAGE_HYPERVISOR_RW);
 
-    if ( unlikely(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
+    if ( unlikely(v->arch.dr7 & DR7_ACTIVE_MASK) )
         activate_debugregs(v);
 
     if ( cpu_has_rdtscp )

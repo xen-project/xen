@@ -156,7 +156,7 @@ void vm_event_fill_regs(vm_event_request_t *req)
     req->data.regs.x86.rflags = regs->rflags;
     req->data.regs.x86.rip    = regs->rip;
 
-    req->data.regs.x86.dr7 = curr->arch.debugreg[7];
+    req->data.regs.x86.dr7 = curr->arch.dr7;
     req->data.regs.x86.cr0 = curr->arch.hvm.guest_cr[0];
     req->data.regs.x86.cr2 = curr->arch.hvm.guest_cr[2];
     req->data.regs.x86.cr3 = curr->arch.hvm.guest_cr[3];

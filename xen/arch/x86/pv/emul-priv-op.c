@@ -286,19 +286,18 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
     unsigned int width, i, match = 0;
     unsigned long start;
 
-    if ( !(v->arch.debugreg[5]) || !(v->arch.pv.ctrlreg[4] & X86_CR4_DE) )
+    if ( !v->arch.pv.dr7_emul || !(v->arch.pv.ctrlreg[4] & X86_CR4_DE) )
         return 0;
 
     for ( i = 0; i < 4; i++ )
     {
-        if ( !(v->arch.debugreg[5] &
-               (3 << (i * DR_ENABLE_SIZE))) )
+        if ( !(v->arch.pv.dr7_emul & (3 << (i * DR_ENABLE_SIZE))) )
             continue;
 
-        start = v->arch.debugreg[i];
+        start = v->arch.dr[i];
         width = 0;
 
-        switch ( (v->arch.debugreg[7] >>
+        switch ( (v->arch.dr7 >>
                   (DR_CONTROL_SHIFT + i * DR_CONTROL_SIZE)) & 0xc )
         {
         case DR_LEN_1: width = 1; break;
@@ -1112,7 +1111,7 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( !boot_cpu_has(X86_FEATURE_DBEXT) || (val >> 32) )
             break;
         curr->arch.pv.dr_mask[0] = val;
-        if ( curr->arch.debugreg[7] & DR7_ACTIVE_MASK )
+        if ( curr->arch.dr7 & DR7_ACTIVE_MASK )
             wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, val);
         return X86EMUL_OKAY;
 
@@ -1120,7 +1119,7 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( !boot_cpu_has(X86_FEATURE_DBEXT) || (val >> 32) )
             break;
         curr->arch.pv.dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1] = val;
-        if ( curr->arch.debugreg[7] & DR7_ACTIVE_MASK )
+        if ( curr->arch.dr7 & DR7_ACTIVE_MASK )
             wrmsrl(reg, val);
         return X86EMUL_OKAY;
 
@@ -1361,7 +1360,7 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
             ctxt.bpmatch |= DR_STEP;
         if ( ctxt.bpmatch )
         {
-            curr->arch.debugreg[6] |= ctxt.bpmatch | DR_STATUS_RESERVED_ONE;
+            curr->arch.dr6 |= ctxt.bpmatch | DR_STATUS_RESERVED_ONE;
             if ( !(curr->arch.pv.trap_bounce.flags & TBF_EXCEPTION) )
                 pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
         }

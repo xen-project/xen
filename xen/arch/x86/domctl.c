@@ -1576,8 +1576,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         }
     }
 
-    for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
-        c(debugreg[i] = v->arch.debugreg[i]);
+    for ( i = 0; i < ARRAY_SIZE(v->arch.dr); ++i )
+        c(debugreg[i] = v->arch.dr[i]);
+    c(debugreg[6] = v->arch.dr6);
+    c(debugreg[7] = v->arch.dr7 |
+      (is_pv_domain(d) ? v->arch.pv.dr7_emul : 0));
 
     if ( is_hvm_domain(d) )
     {
@@ -1652,10 +1655,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c.nat->ctrlreg[1] =
                 pagetable_is_null(v->arch.guest_table_user) ? 0
                 : xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table_user));
-
-            /* Merge shadow DR7 bits into real DR7. */
-            c.nat->debugreg[7] |= c.nat->debugreg[5];
-            c.nat->debugreg[5] = 0;
         }
         else
         {
@@ -1664,10 +1663,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 
             c.cmp->ctrlreg[3] = compat_pfn_to_cr3(l4e_get_pfn(*l4e));
             unmap_domain_page(l4e);
-
-            /* Merge shadow DR7 bits into real DR7. */
-            c.cmp->debugreg[7] |= c.cmp->debugreg[5];
-            c.cmp->debugreg[5] = 0;
         }
 
         if ( guest_kernel_mode(v, &v->arch.user_regs) )

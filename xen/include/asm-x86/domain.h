@@ -547,6 +547,12 @@ struct pv_vcpu
     spinlock_t shadow_ldt_lock;
 #endif
 
+    /*
+     * %dr7 bits the guest has set, but aren't loaded into hardware, and are
+     * completely emulated.
+     */
+    uint32_t dr7_emul;
+
     /* data breakpoint extension MSRs */
     uint32_t dr_mask[4];
 
@@ -565,7 +571,11 @@ struct arch_vcpu
     void              *fpu_ctxt;
     unsigned long      vgc_flags;
     struct cpu_user_regs user_regs;
-    unsigned long      debugreg[8];
+
+    /* Debug registers. */
+    unsigned long dr[4];
+    unsigned long dr7; /* Ideally int, but __vmread() needs long. */
+    unsigned int dr6;
 
     /* other state */
 

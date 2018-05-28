@@ -216,12 +216,12 @@ static void svm_save_dr(struct vcpu *v)
         rdmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[3]);
     }
 
-    v->arch.debugreg[0] = read_debugreg(0);
-    v->arch.debugreg[1] = read_debugreg(1);
-    v->arch.debugreg[2] = read_debugreg(2);
-    v->arch.debugreg[3] = read_debugreg(3);
-    v->arch.debugreg[6] = vmcb_get_dr6(vmcb);
-    v->arch.debugreg[7] = vmcb_get_dr7(vmcb);
+    v->arch.dr[0] = read_debugreg(0);
+    v->arch.dr[1] = read_debugreg(1);
+    v->arch.dr[2] = read_debugreg(2);
+    v->arch.dr[3] = read_debugreg(3);
+    v->arch.dr6   = vmcb_get_dr6(vmcb);
+    v->arch.dr7   = vmcb_get_dr7(vmcb);
 }
 
 static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
@@ -247,12 +247,12 @@ static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
         wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[3]);
     }
 
-    write_debugreg(0, v->arch.debugreg[0]);
-    write_debugreg(1, v->arch.debugreg[1]);
-    write_debugreg(2, v->arch.debugreg[2]);
-    write_debugreg(3, v->arch.debugreg[3]);
-    vmcb_set_dr6(vmcb, v->arch.debugreg[6]);
-    vmcb_set_dr7(vmcb, v->arch.debugreg[7]);
+    write_debugreg(0, v->arch.dr[0]);
+    write_debugreg(1, v->arch.dr[1]);
+    write_debugreg(2, v->arch.dr[2]);
+    write_debugreg(3, v->arch.dr[3]);
+    vmcb_set_dr6(vmcb, v->arch.dr6);
+    vmcb_set_dr7(vmcb, v->arch.dr7);
 }
 
 /*
@@ -264,7 +264,8 @@ static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
 static void svm_restore_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    if ( unlikely(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
+
+    if ( unlikely(v->arch.dr7 & DR7_ACTIVE_MASK) )
         __restore_debug_registers(vmcb, v);
 }
 

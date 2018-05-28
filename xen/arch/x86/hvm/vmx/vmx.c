@@ -603,13 +603,13 @@ static void vmx_save_dr(struct vcpu *v)
     v->arch.hvm.vmx.exec_control |= CPU_BASED_MOV_DR_EXITING;
     vmx_update_cpu_exec_control(v);
 
-    v->arch.debugreg[0] = read_debugreg(0);
-    v->arch.debugreg[1] = read_debugreg(1);
-    v->arch.debugreg[2] = read_debugreg(2);
-    v->arch.debugreg[3] = read_debugreg(3);
-    v->arch.debugreg[6] = read_debugreg(6);
+    v->arch.dr[0] = read_debugreg(0);
+    v->arch.dr[1] = read_debugreg(1);
+    v->arch.dr[2] = read_debugreg(2);
+    v->arch.dr[3] = read_debugreg(3);
+    v->arch.dr6   = read_debugreg(6);
     /* DR7 must be saved as it is used by vmx_restore_dr(). */
-    __vmread(GUEST_DR7, &v->arch.debugreg[7]);
+    __vmread(GUEST_DR7, &v->arch.dr7);
 }
 
 static void __restore_debug_registers(struct vcpu *v)
@@ -619,11 +619,11 @@ static void __restore_debug_registers(struct vcpu *v)
 
     v->arch.hvm.flag_dr_dirty = 1;
 
-    write_debugreg(0, v->arch.debugreg[0]);
-    write_debugreg(1, v->arch.debugreg[1]);
-    write_debugreg(2, v->arch.debugreg[2]);
-    write_debugreg(3, v->arch.debugreg[3]);
-    write_debugreg(6, v->arch.debugreg[6]);
+    write_debugreg(0, v->arch.dr[0]);
+    write_debugreg(1, v->arch.dr[1]);
+    write_debugreg(2, v->arch.dr[2]);
+    write_debugreg(3, v->arch.dr[3]);
+    write_debugreg(6, v->arch.dr6);
     /* DR7 is loaded from the VMCS. */
 }
 
@@ -636,7 +636,7 @@ static void __restore_debug_registers(struct vcpu *v)
 static void vmx_restore_dr(struct vcpu *v)
 {
     /* NB. __vmread() is not usable here, so we cannot read from the VMCS. */
-    if ( unlikely(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
+    if ( unlikely(v->arch.dr7 & DR7_ACTIVE_MASK) )
         __restore_debug_registers(v);
 }
 
@@ -1917,7 +1917,7 @@ static void vmx_set_info_guest(struct vcpu *v)
 
     vmx_vmcs_enter(v);
 
-    __vmwrite(GUEST_DR7, v->arch.debugreg[7]);
+    __vmwrite(GUEST_DR7, v->arch.dr7);
 
     /* 
      * If the interruptibility-state field indicates blocking by STI,

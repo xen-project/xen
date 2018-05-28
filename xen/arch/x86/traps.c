@@ -1891,8 +1891,8 @@ void do_debug(struct cpu_user_regs *regs)
     }
 
     /* Save debug status register where guest OS can peek at it */
-    v->arch.debugreg[6] |= (dr6 & ~X86_DR6_DEFAULT);
-    v->arch.debugreg[6] &= (dr6 | ~X86_DR6_DEFAULT);
+    v->arch.dr6 |= (dr6 & ~X86_DR6_DEFAULT);
+    v->arch.dr6 &= (dr6 | ~X86_DR6_DEFAULT);
 
     pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
 }
@@ -2055,19 +2055,19 @@ void activate_debugregs(const struct vcpu *curr)
 {
     ASSERT(curr == current);
 
-    write_debugreg(0, curr->arch.debugreg[0]);
-    write_debugreg(1, curr->arch.debugreg[1]);
-    write_debugreg(2, curr->arch.debugreg[2]);
-    write_debugreg(3, curr->arch.debugreg[3]);
-    write_debugreg(6, curr->arch.debugreg[6]);
+    write_debugreg(0, curr->arch.dr[0]);
+    write_debugreg(1, curr->arch.dr[1]);
+    write_debugreg(2, curr->arch.dr[2]);
+    write_debugreg(3, curr->arch.dr[3]);
+    write_debugreg(6, curr->arch.dr6);
 
     /*
      * Avoid writing the subsequently getting replaced value when getting
      * called from set_debugreg() below. Eventual future callers will need
      * to take this into account.
      */
-    if ( curr->arch.debugreg[7] & DR7_ACTIVE_MASK )
-        write_debugreg(7, curr->arch.debugreg[7]);
+    if ( curr->arch.dr7 & DR7_ACTIVE_MASK )
+        write_debugreg(7, curr->arch.dr7);
 
     if ( boot_cpu_has(X86_FEATURE_DBEXT) )
     {
@@ -2094,6 +2094,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( !access_ok(value, sizeof(long)) )
             return -EPERM;
 
+        v->arch.dr[reg] = value;
         if ( v == curr )
         {
             switch ( reg )
@@ -2122,6 +2123,8 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
          */
         value &= ~DR_STATUS_RESERVED_ZERO; /* reserved bits => 0 */
         value |=  DR_STATUS_RESERVED_ONE;  /* reserved bits => 1 */
+
+        v->arch.dr6 = value;
         if ( v == curr )
             write_debugreg(6, value);
         break;
@@ -2164,8 +2167,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
                 }
             }
 
-            /* Guest DR5 is a handy stash for I/O intercept information. */
-            v->arch.debugreg[5] = io_enable;
+            v->arch.pv.dr7_emul = io_enable;
             value &= ~io_enable;
 
             /*
@@ -2173,14 +2175,14 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
              * debug registers at this point as they were not restored during
              * context switch.  Updating DR7 itself happens later.
              */
-            if ( (v == curr) &&
-                 !(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
+            if ( (v == curr) && !(v->arch.dr7 & DR7_ACTIVE_MASK) )
                 activate_debugregs(v);
         }
         else
             /* Zero the emulated controls if %dr7 isn't active. */
-            v->arch.debugreg[5] = 0;
+            v->arch.pv.dr7_emul = 0;
 
+        v->arch.dr7 = value;
         if ( v == curr )
             write_debugreg(7, value);
         break;
@@ -2189,7 +2191,6 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         return -ENODEV;
     }
 
-    v->arch.debugreg[reg] = value;
     return 0;
 }
 
