@@ -108,4 +108,11 @@ struct cpu_policy;
 unsigned int x86_adj_dr6_rsvd(const struct cpu_policy *p, unsigned int dr6);
 unsigned int x86_adj_dr7_rsvd(const struct cpu_policy *p, unsigned int dr7);
 
+/*
+ * Merge new bits into dr6.  'new' is always given in positive polarity,
+ * matching the Intel VMCS PENDING_DBG semantics.
+ */
+unsigned int x86_merge_dr6(const struct cpu_policy *p, unsigned int dr6,
+                           unsigned int new);
+
 #endif /* _X86_DEBUGREG_H */
