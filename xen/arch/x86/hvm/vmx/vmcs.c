@@ -983,6 +983,7 @@ static int construct_vmcs(struct vcpu *v)
     unsigned long sysenter_eip;
     u32 vmexit_ctl = vmx_vmexit_control;
     u32 vmentry_ctl = vmx_vmentry_control;
+    int rc = 0;
 
     vmx_vmcs_enter(v);
 
@@ -1074,8 +1075,8 @@ static int construct_vmcs(struct vcpu *v)
 
         if ( msr_bitmap == NULL )
         {
-            vmx_vmcs_exit(v);
-            return -ENOMEM;
+            rc = -ENOMEM;
+            goto out;
         }
 
         memset(msr_bitmap, ~0, PAGE_SIZE);
@@ -1271,8 +1272,6 @@ static int construct_vmcs(struct vcpu *v)
     if ( cpu_has_vmx_mpx )
         __vmwrite(GUEST_BNDCFGS, 0);
 
-    vmx_vmcs_exit(v);
-
     /* PVH: paging mode is updated by arch_set_info_guest(). */
     if ( is_hvm_domain(d) )
     {
@@ -1282,7 +1281,10 @@ static int construct_vmcs(struct vcpu *v)
         vmx_vlapic_msr_changed(v);
     }
 
-    return 0;
+ out:
+    vmx_vmcs_exit(v);
+
+    return rc;
 }
 
 int vmx_read_guest_msr(u32 msr, u64 *val)
