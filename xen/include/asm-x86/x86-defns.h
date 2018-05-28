@@ -97,4 +97,14 @@
 #define X86_XCR0_LWP_POS          62
 #define X86_XCR0_LWP              (1ULL << X86_XCR0_LWP_POS)
 
+/*
+ * Debug status flags in DR6.
+ */
+#define X86_DR6_DEFAULT         0xffff0ff0  /* Default %dr6 value. */
+
+/*
+ * Debug control flags in DR7.
+ */
+#define X86_DR7_DEFAULT         0x00000400  /* Default %dr7 value. */
+
 #endif	/* __XEN_X86_DEFNS_H__ */
