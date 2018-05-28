@@ -883,7 +883,7 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
         l2_pgentry_t *l2t = l3e_to_l2e(l3t[l3_table_offset(stub_linear)]);
         l1_pgentry_t *l1t = l2e_to_l1e(l2t[l2_table_offset(stub_linear)]);
 
-        l1t[l2_table_offset(stub_linear)] = l1e_empty();
+        l1t[l1_table_offset(stub_linear)] = l1e_empty();
     }
 }
 
