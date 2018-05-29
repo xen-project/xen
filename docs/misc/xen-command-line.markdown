@@ -456,9 +456,10 @@ accounting for hardware capabilities as enumerated via CPUID.
 
 Currently accepted:
 
-The Speculation Control hardware features `ibrsb`, `stibp`, `ibpb` are used by
-default if avaiable.  They can be ignored, e.g. `no-ibrsb`, at which point Xen
-won't use them itself, and won't offer them to guests.
+The Speculation Control hardware features `ibrsb`, `stibp`, `ibpb`, `ssbd` are
+used by default if available and applicable.  They can be ignored,
+e.g. `no-ibrsb`, at which point Xen won't use them itself, and won't offer
+them to guests.
 
 ### cpuid\_mask\_cpu (AMD only)
 > `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
@@ -1545,7 +1546,7 @@ protect itself, and Xen's ability to virtualise support for guests to use.
   respectively.
 * `msr-sc=` offers control over Xen's support for manipulating MSR\_SPEC\_CTRL
   on entry and exit.  These blocks are necessary to virtualise support for
-  guests and if disabled, guests will be unable to use IBRS/STIBP/etc.
+  guests and if disabled, guests will be unable to use IBRS/STIBP/SSBD/etc.
 * `rsb=` offers control over whether to overwrite the Return Stack Buffer /
   Return Address Stack on entry to Xen.
 
@@ -1567,7 +1568,8 @@ prediction barriers on vcpu context switches.
 On hardware supporting SSBD (Speculative Store Bypass Disable), the `ssbd=`
 option can be used to force or prevent Xen using the feature itself.  On AMD
 hardware, this is a global option applied at boot, and not virtualised for
-guest use.
+guest use.  On Intel hardware, the feature is virtualised for guests,
+independently of Xen's choice of setting.
 
 ### sync\_console
 > `= <boolean>`

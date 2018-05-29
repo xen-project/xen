@@ -192,26 +192,31 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     printk("Speculative mitigation facilities:\n");
 
     /* Hardware features which pertain to speculative mitigations. */
-    printk("  Hardware features:%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s\n",
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
+           (_7d0 & cpufeat_mask(X86_FEATURE_SSBD))  ? " SSBD"      : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "",
            (caps & ARCH_CAPABILITIES_IBRS_ALL)      ? " IBRS_ALL"  : "",
            (caps & ARCH_CAPABILITIES_RDCL_NO)       ? " RDCL_NO"   : "",
-           (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "");
+           (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "",
+           (caps & ARCH_CAPS_SSB_NO)                ? " SSB_NO"    : "");
 
     /* Compiled-in support which pertains to BTI mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )
         printk("  Compiled-in support: INDIRECT_THUNK\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s, Other:%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
            thunk == THUNK_JMP       ? "JMP" : "?",
            !use_spec_ctrl                            ?  "No" :
            (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ?  "IBRS+" :  "IBRS-",
+           !use_spec_ctrl || !boot_cpu_has(X86_FEATURE_SSBD)
+                                                     ? "" :
+           (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            opt_ibpb                                  ? " IBPB"  : "");
 
     /*
@@ -414,6 +419,10 @@ void __init init_speculation_mitigations(void)
             default_spec_ctrl_flags |= SCF_ist_wrmsr;
         }
     }
+
+    /* If we have SSBD available, see whether we should use it. */
+    if ( boot_cpu_has(X86_FEATURE_SSBD) && use_spec_ctrl && opt_ssbd )
+        default_xen_spec_ctrl |= SPEC_CTRL_SSBD;
 
     /*
      * PV guests can poison the RSB to any virtual address from which

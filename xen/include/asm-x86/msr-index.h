@@ -35,6 +35,7 @@
 #define MSR_SPEC_CTRL			0x00000048
 #define SPEC_CTRL_IBRS			(_AC(1, ULL) << 0)
 #define SPEC_CTRL_STIBP			(_AC(1, ULL) << 1)
+#define SPEC_CTRL_SSBD			(_AC(1, ULL) << 2)
 
 #define MSR_PRED_CMD			0x00000049
 #define PRED_CMD_IBPB			(_AC(1, ULL) << 0)
@@ -43,6 +44,7 @@
 #define ARCH_CAPABILITIES_RDCL_NO	(_AC(1, ULL) << 0)
 #define ARCH_CAPABILITIES_IBRS_ALL	(_AC(1, ULL) << 1)
 #define ARCH_CAPS_RSBA			(_AC(1, ULL) << 2)
+#define ARCH_CAPS_SSB_NO		(_AC(1, ULL) << 4)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
