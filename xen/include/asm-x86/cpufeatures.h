@@ -30,3 +30,4 @@ XEN_CPUFEATURE(SC_MSR,          (FSCAPINTS+0)*32+16) /* MSR_SPEC_CTRL used by Xe
 XEN_CPUFEATURE(SC_RSB_PV,       (FSCAPINTS+0)*32+18) /* RSB overwrite needed for PV */
 XEN_CPUFEATURE(SC_RSB_HVM,      (FSCAPINTS+0)*32+19) /* RSB overwrite needed for HVM */
 XEN_CPUFEATURE(NO_XPTI,         (FSCAPINTS+0)*32+20) /* XPTI mitigation not in use */
+XEN_CPUFEATURE(SC_MSR_IDLE,     (FSCAPINTS+0)*32+21) /* SC_MSR && default_xen_spec_ctrl */
