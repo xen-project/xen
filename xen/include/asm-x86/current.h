@@ -57,6 +57,7 @@ struct cpu_info {
 
     /* See asm-x86/spec_ctrl_asm.h for usage. */
     unsigned int shadow_spec_ctrl;
+    uint8_t      xen_spec_ctrl;
     bool         use_shadow_spec_ctrl;
     uint8_t      bti_ist_info;
 
