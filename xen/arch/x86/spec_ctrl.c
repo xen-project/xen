@@ -19,11 +19,13 @@
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/warning.h>
 
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/pv/shim.h>
+#include <asm/setup.h>
 #include <asm/spec_ctrl.h>
 #include <asm/spec_ctrl_asm.h>
 
@@ -46,6 +48,7 @@ static int8_t __initdata opt_ibrs = -1;
 bool __read_mostly opt_ibpb = true;
 bool __read_mostly opt_ssbd = false;
 int8_t __read_mostly opt_eager_fpu = -1;
+int8_t __read_mostly opt_l1d_flush = -1;
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -123,6 +126,7 @@ static int __init parse_spec_ctrl(const char *s)
             opt_ibrs = 0;
             opt_ibpb = false;
             opt_ssbd = false;
+            opt_l1d_flush = 0;
         }
         else if ( val > 0 )
             rc = -EINVAL;
@@ -178,6 +182,8 @@ static int __init parse_spec_ctrl(const char *s)
             opt_ssbd = val;
         else if ( (val = parse_boolean("eager-fpu", s, ss)) >= 0 )
             opt_eager_fpu = val;
+        else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
+            opt_l1d_flush = val;
         else
             rc = -EINVAL;
 
@@ -274,7 +280,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -283,7 +289,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ? "IBRS+" :  "IBRS-",
            !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
-           opt_ibpb                                  ? " IBPB"  : "");
+           opt_ibpb                                  ? " IBPB"  : "",
+           opt_l1d_flush                             ? " L1D_FLUSH" : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
     if ( cpu_has_bug_l1tf || opt_pv_l1tf )
@@ -854,6 +861,33 @@ void __init init_speculation_mitigations(void)
         else
             opt_pv_l1tf = OPT_PV_L1TF_DOMU;
     }
+
+    /*
+     * By default, enable L1D_FLUSH on L1TF-vulnerable hardware, unless
+     * instructed to skip the flush on vmentry by our outer hypervisor.
+     */
+    if ( !boot_cpu_has(X86_FEATURE_L1D_FLUSH) )
+        opt_l1d_flush = 0;
+    else if ( opt_l1d_flush == -1 )
+        opt_l1d_flush = cpu_has_bug_l1tf && !(caps & ARCH_CAPS_SKIP_L1DFL);
+
+    /*
+     * We do not disable HT by default on affected hardware.
+     *
+     * Firstly, if the user intends to use exclusively PV, or HVM shadow
+     * guests, HT isn't a concern and should remain fully enabled.  Secondly,
+     * safety for HVM HAP guests can be arranged by the toolstack with core
+     * parking, pinning or cpupool configurations, including mixed setups.
+     *
+     * However, if we are on affected hardware, with HT enabled, and the user
+     * hasn't explicitly chosen whether to use HT or not, nag them to do so.
+     */
+    if ( opt_smt == -1 && cpu_has_bug_l1tf && !pv_shim &&
+         boot_cpu_data.x86_num_siblings > 1 )
+        warning_add(
+            "Booted on L1TF-vulnerable hardware with SMT/Hyperthreading\n"
+            "enabled.  Please assess your configuration and choose an\n"
+            "explicit 'smt=<bool>' setting.  See XSA-273.\n");
 
     print_details(thunk, caps);
 
