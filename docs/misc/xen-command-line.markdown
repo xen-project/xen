@@ -255,6 +255,9 @@ the NMI watchdog is also enabled.
 ### bti (x86)
 > `= List of [ thunk=retpoline|lfence|jmp, ibrs=<bool>, ibpb=<bool>, rsb_{vmexit,native}=<bool> ]`
 
+**WARNING: This command line option is deprecated, and superseded by
+_spec-ctrl=_ - using both options in combination is undefined.**
+
 Branch Target Injection controls.  By default, Xen will pick the most
 appropriate BTI mitigations based on compiled in support, loaded microcode,
 and hardware details.
@@ -1514,6 +1517,52 @@ A true boolean value enables legacy behavior (1s timeout), while `cap`
 enforces the maximum theoretically necessary timeout of 670ms. Any number
 is being interpreted as a custom timeout in milliseconds. Zero or boolean
 false disable the quirk workaround, which is also the default.
+
+### spec-ctrl (x86)
+> `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb}=<bool>,
+>              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb}=<bool> ]`
+
+Controls for speculative execution sidechannel mitigations.  By default, Xen
+will pick the most appropriate mitigations based on compiled in support,
+loaded microcode, and hardware details, and will virtualise appropriate
+mitigations for guests to use.
+
+**WARNING: Any use of this option may interfere with heuristics.  Use with
+extreme care.**
+
+An overall boolean value, `spec-ctrl=no`, can be specified to turn off all
+mitigations, including pieces of infrastructure used to virtualise certain
+mitigation features for guests.  Alternatively, a slightly more restricted
+`spec-ctrl=no-xen` can be used to turn off all of Xen's mitigations, while
+leaving the virtualisation support in place for guests to use.  Use of a
+positive boolean value for either of these options is invalid.
+
+The booleans `pv=`, `hvm=`, `msr-sc=` and `rsb=` offer fine grained control
+over the alternative blocks used by Xen.  These impact Xen's ability to
+protect itself, and Xen's ability to virtualise support for guests to use.
+
+* `pv=` and `hvm=` offer control over all suboptions for PV and HVM guests
+  respectively.
+* `msr-sc=` offers control over Xen's support for manipulating MSR\_SPEC\_CTRL
+  on entry and exit.  These blocks are necessary to virtualise support for
+  guests and if disabled, guests will be unable to use IBRS/STIBP/etc.
+* `rsb=` offers control over whether to overwrite the Return Stack Buffer /
+  Return Address Stack on entry to Xen.
+
+If Xen was compiled with INDIRECT\_THUNK support, `bti-thunk=` can be used to
+select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
+locations.  The default thunk is `retpoline` (generally preferred for Intel
+hardware), with the alternatives being `jmp` (a `jmp *%reg` gadget, minimal
+overhead), and `lfence` (an `lfence; jmp *%reg` gadget, preferred for AMD).
+
+On hardware supporting IBRS (Indirect Branch Restricted Speculation), the
+`ibrs=` option can be used to force or prevent Xen using the feature itself.
+If Xen is not using IBRS itself, functionality is still set up so IBRS can be
+virtualised for guests.
+
+On hardware supporting IBPB (Indirect Branch Prediction Barrier), the `ibpb=`
+option can be used to force (the default) or prevent Xen from issuing branch
+prediction barriers on vcpu context switches.
 
 ### sync\_console
 > `= <boolean>`
