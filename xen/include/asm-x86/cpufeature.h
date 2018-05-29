@@ -65,8 +65,7 @@
 #define X86_FEATURE_IND_THUNK_LFENCE (3*32+ 1) /* Use IND_THUNK_LFENCE */
 #define X86_FEATURE_IND_THUNK_JMP   (3*32+ 2) /* Use IND_THUNK_JMP */
 #define X86_FEATURE_XEN_IBPB        (3*32+ 3) /* IBRSB || IBPB */
-#define X86_FEATURE_XEN_IBRS_SET    (3*32+ 4) /* IBRSB && IRBS set in Xen */
-#define X86_FEATURE_XEN_IBRS_CLEAR  (3*32+ 5) /* IBRSB && IBRS clear in Xen */
+#define X86_FEATURE_SC_MSR          (3*32+ 4) /* MSR_SPEC_CTRL used by Xen */
 #define X86_FEATURE_RSB_NATIVE      (3*32+ 6) /* RSB overwrite needed for native */
 #define X86_FEATURE_RSB_VMEXIT      (3*32+ 7) /* RSB overwrite needed for vmexit */
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
