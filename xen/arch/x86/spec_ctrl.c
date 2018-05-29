@@ -26,6 +26,13 @@
 #include <asm/spec_ctrl.h>
 #include <asm/spec_ctrl_asm.h>
 
+/* Cmdline controls for Xen's alternative blocks. */
+static bool __initdata opt_msr_sc_pv = true;
+static bool __initdata opt_msr_sc_hvm = true;
+static bool __initdata opt_rsb_pv = true;
+static bool __initdata opt_rsb_hvm = true;
+
+/* Cmdline controls for Xen's speculative settings. */
 static enum ind_thunk {
     THUNK_DEFAULT, /* Decide which thunk to use at boot time. */
     THUNK_NONE,    /* Missing compiler support for thunks. */
@@ -35,8 +42,6 @@ static enum ind_thunk {
     THUNK_JMP,
 } opt_thunk __initdata = THUNK_DEFAULT;
 static int8_t __initdata opt_ibrs = -1;
-static bool __initdata opt_rsb_pv = true;
-static bool __initdata opt_rsb_hvm = true;
 bool __read_mostly opt_ibpb = true;
 
 bool __initdata bsp_delay_spec_ctrl;
@@ -84,8 +89,95 @@ static int __init parse_bti(const char *s)
 }
 custom_param("bti", parse_bti);
 
+static int __init parse_spec_ctrl(const char *s)
+{
+    const char *ss;
+    int val, rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        /* Global and Xen-wide disable. */
+        val = parse_bool(s, ss);
+        if ( !val )
+        {
+            opt_msr_sc_pv = false;
+            opt_msr_sc_hvm = false;
+
+        disable_common:
+            opt_rsb_pv = false;
+            opt_rsb_hvm = false;
+
+            opt_thunk = THUNK_JMP;
+            opt_ibrs = 0;
+            opt_ibpb = false;
+        }
+        else if ( val > 0 )
+            rc = -EINVAL;
+        else if ( (val = parse_boolean("xen", s, ss)) >= 0 )
+        {
+            if ( !val )
+                goto disable_common;
+
+            rc = -EINVAL;
+        }
+
+        /* Xen's alternative blocks. */
+        else if ( (val = parse_boolean("pv", s, ss)) >= 0 )
+        {
+            opt_msr_sc_pv = val;
+            opt_rsb_pv = val;
+        }
+        else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
+        {
+            opt_msr_sc_hvm = val;
+            opt_rsb_hvm = val;
+        }
+        else if ( (val = parse_boolean("msr-sc", s, ss)) >= 0 )
+        {
+            opt_msr_sc_pv = val;
+            opt_msr_sc_hvm = val;
+        }
+        else if ( (val = parse_boolean("rsb", s, ss)) >= 0 )
+        {
+            opt_rsb_pv = val;
+            opt_rsb_hvm = val;
+        }
+
+        /* Xen's speculative sidechannel mitigation settings. */
+        else if ( !strncmp(s, "bti-thunk=", 10) )
+        {
+            s += 10;
+
+            if ( !strncmp(s, "retpoline", ss - s) )
+                opt_thunk = THUNK_RETPOLINE;
+            else if ( !strncmp(s, "lfence", ss - s) )
+                opt_thunk = THUNK_LFENCE;
+            else if ( !strncmp(s, "jmp", ss - s) )
+                opt_thunk = THUNK_JMP;
+            else
+                rc = -EINVAL;
+        }
+        else if ( (val = parse_boolean("ibrs", s, ss)) >= 0 )
+            opt_ibrs = val;
+        else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
+            opt_ibpb = val;
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("spec-ctrl", parse_spec_ctrl);
+
 static void __init print_details(enum ind_thunk thunk, uint64_t caps)
 {
+    bool use_spec_ctrl = (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
+                          boot_cpu_has(X86_FEATURE_SC_MSR_HVM));
     unsigned int _7d0 = 0, e8b = 0, tmp;
 
     /* Collect diagnostics about available mitigations. */
@@ -94,10 +186,10 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     if ( boot_cpu_data.extended_cpuid_level >= 0x80000008 )
         cpuid(0x80000008, &tmp, &e8b, &tmp, &tmp);
 
-    printk(XENLOG_DEBUG "Speculative mitigation facilities:\n");
+    printk("Speculative mitigation facilities:\n");
 
     /* Hardware features which pertain to speculative mitigations. */
-    printk(XENLOG_DEBUG "  Hardware features:%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s\n",
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "",
@@ -107,20 +199,31 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
 
     /* Compiled-in support which pertains to BTI mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )
-        printk(XENLOG_DEBUG "  Compiled-in support: INDIRECT_THUNK\n");
+        printk("  Compiled-in support: INDIRECT_THUNK\n");
 
-    printk("BTI mitigations: Thunk %s, Others:%s%s%s%s\n",
+    /* Settings for Xen's protection, irrespective of guests. */
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s, Other:%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
            thunk == THUNK_JMP       ? "JMP" : "?",
+           !use_spec_ctrl                            ?  "No" :
+           (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ?  "IBRS+" :  "IBRS-",
+           opt_ibpb                                  ? " IBPB"  : "");
+
+    /*
+     * Alternatives blocks for protecting against and/or virtualising
+     * mitigation support for guests.
+     */
+    printk("  Support for VMs: PV:%s%s%s, HVM:%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
-            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)) ?
-           default_xen_spec_ctrl & SPEC_CTRL_IBRS    ? " IBRS+" :
-                                                       " IBRS-"      : "",
-           opt_ibpb                                  ? " IBPB"       : "",
-           boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB_NATIVE" : "",
-           boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB_VMEXIT" : "");
+            boot_cpu_has(X86_FEATURE_SC_RSB_PV))     ? ""               : " None",
+           boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
+           boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
+           (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
+            boot_cpu_has(X86_FEATURE_SC_RSB_HVM))    ? ""               : " None",
+           boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
+           boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "");
 
     printk("XPTI: %s\n",
            boot_cpu_has(X86_FEATURE_NO_XPTI) ? "disabled" : "enabled");
@@ -212,7 +315,7 @@ static bool __init retpoline_safe(uint64_t caps)
 void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
-    bool ibrs = false;
+    bool use_spec_ctrl = false, ibrs = false;
     uint64_t caps = 0;
 
     if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
@@ -282,20 +385,31 @@ void __init init_speculation_mitigations(void)
     else if ( thunk == THUNK_JMP )
         setup_force_cpu_cap(X86_FEATURE_IND_THUNK_JMP);
 
+    /*
+     * If we are on hardware supporting MSR_SPEC_CTRL, see about setting up
+     * the alternatives blocks so we can virtualise support for guests.
+     */
     if ( boot_cpu_has(X86_FEATURE_IBRSB) )
     {
-        /*
-         * Even if we've chosen to not have IBRS set in Xen context, we still
-         * need the IBRS entry/exit logic to virtualise IBRS support for
-         * guests.
-         */
-        setup_force_cpu_cap(X86_FEATURE_SC_MSR_PV);
-        setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
+        if ( opt_msr_sc_pv )
+        {
+            use_spec_ctrl = true;
+            setup_force_cpu_cap(X86_FEATURE_SC_MSR_PV);
+        }
 
-        if ( ibrs )
-            default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
+        if ( opt_msr_sc_hvm )
+        {
+            use_spec_ctrl = true;
+            setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
+        }
 
-        default_spec_ctrl_flags |= SCF_ist_wrmsr;
+        if ( use_spec_ctrl )
+        {
+            if ( ibrs )
+                default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
+
+            default_spec_ctrl_flags |= SCF_ist_wrmsr;
+        }
     }
 
     /*
