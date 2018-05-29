@@ -327,6 +327,10 @@ void __init init_speculation_mitigations(void)
     /* (Re)init BSP state now that default_spec_ctrl_flags has been calculated. */
     init_shadow_spec_ctrl_state();
 
+    /* If Xen is using any MSR_SPEC_CTRL settings, adjust the idle path. */
+    if ( default_xen_spec_ctrl )
+        setup_force_cpu_cap(X86_FEATURE_SC_MSR_IDLE);
+
     print_details(thunk, caps);
 }
 
