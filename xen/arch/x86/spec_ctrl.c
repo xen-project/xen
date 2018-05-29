@@ -38,6 +38,8 @@ static int8_t __initdata opt_ibrs = -1;
 static bool __initdata opt_rsb_pv = true;
 static bool __initdata opt_rsb_hvm = true;
 bool __read_mostly opt_ibpb = true;
+
+bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
 uint8_t __read_mostly default_spec_ctrl_flags;
 
@@ -334,6 +336,36 @@ void __init init_speculation_mitigations(void)
         setup_force_cpu_cap(X86_FEATURE_SC_MSR_IDLE);
 
     print_details(thunk, caps);
+
+    /*
+     * If MSR_SPEC_CTRL is available, apply Xen's default setting and discard
+     * any firmware settings.  For performance reasons, when safe to do so, we
+     * delay applying non-zero settings until after dom0 has been constructed.
+     *
+     * "when safe to do so" is based on whether we are virtualised.  A native
+     * boot won't have any other code running in a position to mount an
+     * attack.
+     */
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+    {
+        bsp_delay_spec_ctrl = !cpu_has_hypervisor && default_xen_spec_ctrl;
+
+        /*
+         * If delaying MSR_SPEC_CTRL setup, use the same mechanism as
+         * spec_ctrl_enter_idle(), by using a shadow value of zero.
+         */
+        if ( bsp_delay_spec_ctrl )
+        {
+            struct cpu_info *info = get_cpu_info();
+
+            info->shadow_spec_ctrl = 0;
+            barrier();
+            info->spec_ctrl_flags |= SCF_use_shadow;
+            barrier();
+        }
+
+        wrmsrl(MSR_SPEC_CTRL, bsp_delay_spec_ctrl ? 0 : default_xen_spec_ctrl);
+    }
 }
 
 static void __init __maybe_unused build_assertions(void)

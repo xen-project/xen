@@ -342,6 +342,14 @@ void start_secondary(void *unused)
     else
         microcode_resume_cpu(cpu);
 
+    /*
+     * If MSR_SPEC_CTRL is available, apply Xen's default setting and discard
+     * any firmware settings.  Note: MSR_SPEC_CTRL may only become available
+     * after loading microcode.
+     */
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+        wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
+
     smp_callin();
 
     init_percpu_time();
