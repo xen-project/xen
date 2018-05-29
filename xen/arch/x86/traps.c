@@ -1155,8 +1155,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
                   special_features[FEATURESET_7b0]);
 
             c &= pv_featureset[FEATURESET_7c0];
-
-            d |= cpufeat_mask(X86_FEATURE_STIBP);
             d &= pv_featureset[FEATURESET_7d0];
 
             if ( !is_pvh_domain(currd) )
@@ -1271,7 +1269,6 @@ void pv_cpuid(struct cpu_user_regs *regs)
 
     case 0x80000008:
         a = paddr_bits | (vaddr_bits << 8);
-        b |= cpufeat_mask(X86_FEATURE_IBPB);
         b &= pv_featureset[FEATURESET_e8b];
         break;
 
