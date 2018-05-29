@@ -27,6 +27,7 @@
 void init_speculation_mitigations(void);
 
 extern bool opt_ibpb;
+extern uint8_t default_xen_spec_ctrl;
 extern uint8_t default_bti_ist_info;
 
 static inline void init_shadow_spec_ctrl_state(void)
@@ -34,6 +35,7 @@ static inline void init_shadow_spec_ctrl_state(void)
     struct cpu_info *info = get_cpu_info();
 
     info->shadow_spec_ctrl = info->use_shadow_spec_ctrl = 0;
+    info->xen_spec_ctrl = default_xen_spec_ctrl;
     info->bti_ist_info = default_bti_ist_info;
 }
 
