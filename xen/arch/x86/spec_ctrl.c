@@ -39,7 +39,7 @@ static bool __initdata opt_rsb_native = true;
 static bool __initdata opt_rsb_vmexit = true;
 bool __read_mostly opt_ibpb = true;
 uint8_t __read_mostly default_xen_spec_ctrl;
-uint8_t __read_mostly default_bti_ist_info;
+uint8_t __read_mostly default_spec_ctrl_flags;
 
 static int __init parse_bti(const char *s)
 {
@@ -293,7 +293,7 @@ void __init init_speculation_mitigations(void)
         else
             setup_force_cpu_cap(X86_FEATURE_XEN_IBRS_CLEAR);
 
-        default_bti_ist_info |= BTI_IST_WRMSR;
+        default_spec_ctrl_flags |= SCF_ist_wrmsr;
     }
 
     /*
@@ -312,7 +312,7 @@ void __init init_speculation_mitigations(void)
     if ( opt_rsb_native )
     {
         setup_force_cpu_cap(X86_FEATURE_RSB_NATIVE);
-        default_bti_ist_info |= BTI_IST_RSB;
+        default_spec_ctrl_flags |= SCF_ist_rsb;
     }
 
     /*
@@ -326,7 +326,7 @@ void __init init_speculation_mitigations(void)
     if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
         opt_ibpb = false;
 
-    /* (Re)init BSP state now that default_bti_ist_info has been calculated. */
+    /* (Re)init BSP state now that default_spec_ctrl_flags has been calculated. */
     init_shadow_spec_ctrl_state();
 
     print_details(thunk, caps);
@@ -334,6 +334,8 @@ void __init init_speculation_mitigations(void)
 
 static void __init __maybe_unused build_assertions(void)
 {
+    /* The optimised assembly relies on this alias. */
+    BUILD_BUG_ON(SCF_use_shadow != 1);
 }
 
 /*

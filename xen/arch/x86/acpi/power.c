@@ -216,7 +216,7 @@ static int enter_state(u32 state)
     ci = get_cpu_info();
     spec_ctrl_enter_idle(ci);
     /* Avoid NMI/#MC using MSR_SPEC_CTRL until we've reloaded microcode. */
-    ci->bti_ist_info = 0;
+    ci->spec_ctrl_flags &= ~SCF_ist_wrmsr;
 
     ACPI_FLUSH_CPU_CACHE();
 
@@ -257,7 +257,7 @@ static int enter_state(u32 state)
     microcode_resume_cpu(0);
 
     /* Re-enabled default NMI/#MC use of MSR_SPEC_CTRL. */
-    ci->bti_ist_info = default_bti_ist_info;
+    ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);
     spec_ctrl_exit_idle(ci);
 
  done:
