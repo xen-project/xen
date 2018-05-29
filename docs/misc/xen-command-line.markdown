@@ -1678,7 +1678,8 @@ false disable the quirk workaround, which is also the default.
 
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb}=<bool>,
->              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,eager-fpu}=<bool> ]`
+>              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,eager-fpu,
+>              l1d-flush}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -1732,6 +1733,12 @@ On all hardware, the `eager-fpu=` option can be used to force or prevent Xen
 from using fully eager FPU context switches.  This is currently implemented as
 a global control.  By default, Xen will choose to use fully eager context
 switches on hardware believed to speculate past #NM exceptions.
+
+On hardware supporting L1D_FLUSH, the `l1d-flush=` option can be used to force
+or prevent Xen from issuing an L1 data cache flush on each VMEntry.
+Irrespective of Xen's setting, the feature is virtualised for HVM guests to
+use.  By default, Xen will enable this mitigation on hardware believed to be
+vulnerable to L1TF.
 
 ### sync\_console
 > `= <boolean>`
