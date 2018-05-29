@@ -235,6 +235,7 @@
 #define cpu_has_svm		boot_cpu_has(X86_FEATURE_SVM)
 
 #define cpu_has_vmx		boot_cpu_has(X86_FEATURE_VMXE)
+#define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 
 #define cpu_has_cpuid_faulting	boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
 #define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
