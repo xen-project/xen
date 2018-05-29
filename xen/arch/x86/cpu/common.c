@@ -420,12 +420,12 @@ void identify_cpu(struct cpuinfo_x86 *c)
 		if (test_bit(X86_FEATURE_SC_MSR,
 		             boot_cpu_data.x86_capability))
 			__set_bit(X86_FEATURE_SC_MSR, c->x86_capability);
-		if (test_bit(X86_FEATURE_RSB_NATIVE,
+		if (test_bit(X86_FEATURE_SC_RSB_PV,
 		             boot_cpu_data.x86_capability))
-			__set_bit(X86_FEATURE_RSB_NATIVE, c->x86_capability);
-		if (test_bit(X86_FEATURE_RSB_VMEXIT,
+			__set_bit(X86_FEATURE_SC_RSB_PV, c->x86_capability);
+		if (test_bit(X86_FEATURE_SC_RSB_HVM,
 		             boot_cpu_data.x86_capability))
-			__set_bit(X86_FEATURE_RSB_VMEXIT, c->x86_capability);
+			__set_bit(X86_FEATURE_SC_RSB_HVM, c->x86_capability);
 		if (test_bit(X86_FEATURE_NO_XPTI,
 		             boot_cpu_data.x86_capability))
 			__set_bit(X86_FEATURE_NO_XPTI, c->x86_capability);

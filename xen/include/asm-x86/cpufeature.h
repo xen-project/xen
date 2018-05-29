@@ -31,8 +31,8 @@
 #define X86_FEATURE_IND_THUNK_JMP	((FSCAPINTS+0)*32+ 12) /* Use IND_THUNK_JMP */
 #define X86_FEATURE_XEN_IBPB		((FSCAPINTS+0)*32+ 13) /* IBRSB || IBPB */
 #define X86_FEATURE_SC_MSR		((FSCAPINTS+0)*32+ 14) /* MSR_SPEC_CTRL used by Xen */
-#define X86_FEATURE_RSB_NATIVE		((FSCAPINTS+0)*32+ 16) /* RSB overwrite needed for native */
-#define X86_FEATURE_RSB_VMEXIT		((FSCAPINTS+0)*32+ 17) /* RSB overwrite needed for vmexit */
+#define X86_FEATURE_SC_RSB_PV		((FSCAPINTS+0)*32+ 16) /* RSB overwrite needed for PV */
+#define X86_FEATURE_SC_RSB_HVM		((FSCAPINTS+0)*32+ 17) /* RSB overwrite needed for HVM */
 #define X86_FEATURE_NO_XPTI		((FSCAPINTS+0)*32+ 18) /* XPTI mitigation not in use */
 
 #define cpufeat_word(idx)	((idx) / 32)
