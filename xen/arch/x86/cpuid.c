@@ -368,6 +368,28 @@ static void __init calculate_host_policy(void)
     }
 }
 
+static void __init guest_common_feature_adjustments(uint32_t *fs)
+{
+    /* Unconditionally claim to be able to set the hypervisor bit. */
+    __set_bit(X86_FEATURE_HYPERVISOR, fs);
+
+    /*
+     * If IBRS is offered to the guest, unconditionally offer STIBP.  It is a
+     * nop on non-HT hardware, and has this behaviour to make heterogeneous
+     * setups easier to manage.
+     */
+    if ( test_bit(X86_FEATURE_IBRSB, fs) )
+        __set_bit(X86_FEATURE_STIBP, fs);
+
+    /*
+     * On hardware which supports IBRS/IBPB, we can offer IBPB independently
+     * of IBRS by using the AMD feature bit.  An administrator may wish for
+     * performance reasons to offer IBPB without IBRS.
+     */
+    if ( host_cpuid_policy.feat.ibrsb )
+        __set_bit(X86_FEATURE_IBPB, fs);
+}
+
 static void __init calculate_pv_max_policy(void)
 {
     struct cpuid_policy *p = &pv_max_cpuid_policy;
@@ -380,18 +402,14 @@ static void __init calculate_pv_max_policy(void)
     for ( i = 0; i < ARRAY_SIZE(pv_featureset); ++i )
         pv_featureset[i] &= pv_featuremask[i];
 
-    /* Unconditionally claim to be able to set the hypervisor bit. */
-    __set_bit(X86_FEATURE_HYPERVISOR, pv_featureset);
+    /*
+     * If Xen isn't virtualising MSR_SPEC_CTRL for PV guests because of
+     * administrator choice, hide the feature.
+     */
+    if ( !boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
+        __clear_bit(X86_FEATURE_IBRSB, pv_featureset);
 
-    /* On hardware with IBRS/IBPB support, there are further adjustments. */
-    if ( test_bit(X86_FEATURE_IBRSB, pv_featureset) )
-    {
-        /* Offer STIBP unconditionally.  It is a nop on non-HT hardware. */
-        __set_bit(X86_FEATURE_STIBP, pv_featureset);
-
-        /* AMD's IBPB is a subset of IBRS/IBPB. */
-        __set_bit(X86_FEATURE_IBPB, pv_featureset);
-    }
+    guest_common_feature_adjustments(pv_featureset);
 
     sanitise_featureset(pv_featureset);
     cpuid_featureset_to_policy(pv_featureset, p);
@@ -419,9 +437,6 @@ static void __init calculate_hvm_max_policy(void)
     for ( i = 0; i < ARRAY_SIZE(hvm_featureset); ++i )
         hvm_featureset[i] &= hvm_featuremask[i];
 
-    /* Unconditionally claim to be able to set the hypervisor bit. */
-    __set_bit(X86_FEATURE_HYPERVISOR, hvm_featureset);
-
     /*
      * Xen can provide an APIC emulation to HVM guests even if the host's APIC
      * isn't enabled.
@@ -438,6 +453,13 @@ static void __init calculate_hvm_max_policy(void)
         __set_bit(X86_FEATURE_SEP, hvm_featureset);
 
     /*
+     * If Xen isn't virtualising MSR_SPEC_CTRL for HVM guests because of
+     * administrator choice, hide the feature.
+     */
+    if ( !boot_cpu_has(X86_FEATURE_SC_MSR_HVM) )
+        __clear_bit(X86_FEATURE_IBRSB, hvm_featureset);
+
+    /*
      * With VT-x, some features are only supported by Xen if dedicated
      * hardware support is also available.
      */
@@ -450,15 +472,7 @@ static void __init calculate_hvm_max_policy(void)
             __clear_bit(X86_FEATURE_XSAVES, hvm_featureset);
     }
 
-    /* On hardware with IBRS/IBPB support, there are further adjustments. */
-    if ( test_bit(X86_FEATURE_IBRSB, hvm_featureset) )
-    {
-        /* Offer STIBP unconditionally.  It is a nop on non-HT hardware. */
-        __set_bit(X86_FEATURE_STIBP, hvm_featureset);
-
-        /* AMD's IBPB is a subset of IBRS/IBPB. */
-        __set_bit(X86_FEATURE_IBPB, hvm_featureset);
-    }
+    guest_common_feature_adjustments(hvm_featureset);
 
     sanitise_featureset(hvm_featureset);
     cpuid_featureset_to_policy(hvm_featureset, p);
