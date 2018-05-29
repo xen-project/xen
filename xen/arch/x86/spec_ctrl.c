@@ -112,7 +112,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
            thunk == THUNK_JMP       ? "JMP" : "?",
-           boot_cpu_has(X86_FEATURE_SC_MSR) ?
+           (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
+            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)) ?
            default_xen_spec_ctrl & SPEC_CTRL_IBRS    ? " IBRS+" :
                                                        " IBRS-"      : "",
            opt_ibpb                                  ? " IBPB"       : "",
@@ -286,7 +287,8 @@ void __init init_speculation_mitigations(void)
          * need the IBRS entry/exit logic to virtualise IBRS support for
          * guests.
          */
-        setup_force_cpu_cap(X86_FEATURE_SC_MSR);
+        setup_force_cpu_cap(X86_FEATURE_SC_MSR_PV);
+        setup_force_cpu_cap(X86_FEATURE_SC_MSR_HVM);
 
         if ( ibrs )
             default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
