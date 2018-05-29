@@ -38,6 +38,7 @@
 #include <asm/flushtlb.h>
 #include <asm/monitor.h>
 #include <asm/shadow.h>
+#include <asm/spec_ctrl.h>
 #include <asm/tboot.h>
 #include <asm/apic.h>
 
@@ -1273,6 +1274,10 @@ static int construct_vmcs(struct vcpu *v)
     paging_update_paging_modes(v);
 
     vmx_vlapic_msr_changed(v);
+
+    if ( opt_l1d_flush && paging_mode_hap(d) )
+        rc = vmx_add_msr(v, MSR_FLUSH_CMD, FLUSH_CMD_L1D,
+                         VMX_MSR_GUEST_LOADONLY);
 
  out:
     vmx_vmcs_exit(v);
