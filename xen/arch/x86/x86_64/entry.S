@@ -162,11 +162,15 @@ restore_all_guest:
         mov   VCPU_cr3(%rbx), %r9
         GET_STACK_END(dx)
         mov   STACK_CPUINFO_FIELD(pv_cr3)(%rdx), %rdi
+        test  %rdi, %rdi
+        jz    .Lrag_keep_cr3
+        mov   %rdi, %rax
+        cmpb  $0, STACK_CPUINFO_FIELD(root_pgt_changed)(%rdx)
+        je    .Lrag_copy_done
+        movb  $0, STACK_CPUINFO_FIELD(root_pgt_changed)(%rdx)
         movabs $PADDR_MASK & PAGE_MASK, %rsi
         movabs $DIRECTMAP_VIRT_START, %rcx
-        mov   %rdi, %rax
         and   %rsi, %rdi
-        jz    .Lrag_keep_cr3
         and   %r9, %rsi
         add   %rcx, %rdi
         add   %rcx, %rsi
@@ -181,6 +185,7 @@ restore_all_guest:
         sub   $(ROOT_PAGETABLE_FIRST_XEN_SLOT - \
                 ROOT_PAGETABLE_LAST_XEN_SLOT - 1) * 8, %rdi
         rep movsq
+.Lrag_copy_done:
         mov   STACK_CPUINFO_FIELD(cr4)(%rdx), %rdi
         mov   %r9, STACK_CPUINFO_FIELD(xen_cr3)(%rdx)
         mov   %rdi, %rsi

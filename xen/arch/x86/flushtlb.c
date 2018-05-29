@@ -9,6 +9,7 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
+#include <xen/smp.h>
 #include <xen/softirq.h>
 #include <asm/flushtlb.h>
 #include <asm/page.h>
@@ -160,6 +161,9 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
     }
 
     local_irq_restore(irqfl);
+
+    if ( flags & FLUSH_ROOT_PGTBL )
+        get_cpu_info()->root_pgt_changed = true;
 
     return flags;
 }

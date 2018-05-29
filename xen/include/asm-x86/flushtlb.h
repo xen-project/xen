@@ -101,6 +101,8 @@ void write_cr3(unsigned long cr3);
 #define FLUSH_CACHE      0x400
  /* VA for the flush has a valid mapping */
 #define FLUSH_VA_VALID   0x800
+ /* Flush the per-cpu root page table */
+#define FLUSH_ROOT_PGTBL 0x2000
 
 /* Flush local TLBs/caches. */
 unsigned int flush_area_local(const void *va, unsigned int flags);
@@ -131,6 +133,12 @@ void flush_area_mask(const cpumask_t *, const void *va, unsigned int flags);
     flush_tlb_mask(&cpu_online_map)
 #define flush_tlb_one_all(v)                    \
     flush_tlb_one_mask(&cpu_online_map, v)
+
+#define flush_root_pgtbl_domain(d)                                       \
+{                                                                        \
+    if ( !cpu_has_no_xpti && is_pv_domain(d) && !is_pv_32bit_domain(d) ) \
+        flush_mask((d)->domain_dirty_cpumask, FLUSH_ROOT_PGTBL);         \
+}
 
 static inline void flush_page_to_ram(unsigned long mfn, bool sync_icache) {}
 static inline int invalidate_dcache_va_range(const void *p,
