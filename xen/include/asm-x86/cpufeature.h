@@ -76,6 +76,7 @@
 #define X86_FEATURE_XTOPOLOGY    (3*32+13) /* cpu topology enum extensions */
 #define X86_FEATURE_CPUID_FAULTING (3*32+14) /* cpuid faulting */
 #define X86_FEATURE_CLFLUSH_MONITOR (3*32+15) /* clflush reqd with monitor */
+#define X86_FEATURE_SC_MSR_IDLE     (3*32+16) /* SC_MSR && default_xen_spec_ctrl */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
