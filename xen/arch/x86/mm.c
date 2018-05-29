@@ -3765,7 +3765,7 @@ long do_mmu_update(
                         break;
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    if ( !rc && !cpu_has_no_xpti )
+                    if ( !rc && pt_owner->arch.pv_domain.xpti )
                     {
                         bool local_in_use = false;
 
