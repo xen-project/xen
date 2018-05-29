@@ -144,6 +144,7 @@ void __dummy__(void)
     OFFSET(CPUINFO_shadow_spec_ctrl, struct cpu_info, shadow_spec_ctrl);
     OFFSET(CPUINFO_xen_spec_ctrl, struct cpu_info, xen_spec_ctrl);
     OFFSET(CPUINFO_spec_ctrl_flags, struct cpu_info, spec_ctrl_flags);
+    OFFSET(CPUINFO_root_pgt_changed, struct cpu_info, root_pgt_changed);
     DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
     BLANK();
 

@@ -508,6 +508,7 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
 
 void write_ptbase(struct vcpu *v)
 {
+    get_cpu_info()->root_pgt_changed = true;
     write_cr3(v->arch.cr3);
 }
 
@@ -3674,18 +3675,27 @@ long do_mmu_update(
                 case PGT_l4_page_table:
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    /*
-                     * No need to sync if all uses of the page can be accounted
-                     * to the page lock we hold, its pinned status, and uses on
-                     * this (v)CPU.
-                     */
-                    if ( !rc && !cpu_has_no_xpti &&
-                         ((page->u.inuse.type_info & PGT_count_mask) >
-                          (1 + !!(page->u.inuse.type_info & PGT_pinned) +
-                           (pagetable_get_pfn(curr->arch.guest_table) == mfn) +
-                           (pagetable_get_pfn(curr->arch.guest_table_user) ==
-                            mfn))) )
-                        sync_guest = true;
+                    if ( !rc && !cpu_has_no_xpti )
+                    {
+                        bool local_in_use = false;
+
+                        if ( pagetable_get_pfn(curr->arch.guest_table) == mfn )
+                        {
+                            local_in_use = true;
+                            get_cpu_info()->root_pgt_changed = true;
+                        }
+
+                        /*
+                         * No need to sync if all uses of the page can be
+                         * accounted to the page lock we hold, its pinned
+                         * status, and uses on this (v)CPU.
+                         */
+                        if ( (page->u.inuse.type_info & PGT_count_mask) >
+                             (1 + !!(page->u.inuse.type_info & PGT_pinned) +
+                              (pagetable_get_pfn(curr->arch.guest_table_user) ==
+                               mfn) + local_in_use) )
+                            sync_guest = true;
+                    }
                     break;
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
@@ -3799,7 +3809,7 @@ long do_mmu_update(
 
         cpumask_andnot(mask, pt_owner->domain_dirty_cpumask, cpumask_of(cpu));
         if ( !cpumask_empty(mask) )
-            flush_mask(mask, FLUSH_TLB_GLOBAL);
+            flush_mask(mask, FLUSH_TLB_GLOBAL | FLUSH_ROOT_PGTBL);
     }
 
     perfc_add(num_page_updates, i);
