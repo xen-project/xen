@@ -644,6 +644,19 @@ static inline int vmx_write_guest_msr(struct vcpu *v, uint32_t msr,
     return 0;
 }
 
+static inline int vmx_write_guest_loadonly_msr(struct vcpu *v, uint32_t msr,
+                                               uint64_t val)
+{
+    struct vmx_msr_entry *ent = vmx_find_msr(v, msr, VMX_MSR_GUEST_LOADONLY);
+
+    if ( !ent )
+        return -ESRCH;
+
+    ent->data = val;
+
+    return 0;
+}
+
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 void vmx_vmcs_switch(paddr_t from, paddr_t to);
