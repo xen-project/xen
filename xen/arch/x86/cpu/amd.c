@@ -10,6 +10,7 @@
 #include <asm/amd.h>
 #include <asm/hvm/support.h>
 #include <asm/setup.h> /* amd_init_cpu */
+#include <asm/spec_ctrl.h>
 #include <asm/acpi.h>
 #include <asm/apic.h>
 
@@ -589,6 +590,25 @@ static void init_amd(struct cpuinfo_x86 *c)
 			/* Successfully enabled! */
 			__set_bit(X86_FEATURE_LFENCE_DISPATCH,
 				  c->x86_capability);
+	}
+
+	/*
+	 * If the user has explicitly chosen to disable Memory Disambiguation
+	 * to mitigiate Speculative Store Bypass, poke the appropriate MSR.
+	 */
+	if (opt_ssbd) {
+		int bit = -1;
+
+		switch (c->x86) {
+		case 0x15: bit = 54; break;
+		case 0x16: bit = 33; break;
+		case 0x17: bit = 10; break;
+		}
+
+		if (bit >= 0 && !rdmsr_safe(MSR_AMD64_LS_CFG, value)) {
+			value |= 1ull << bit;
+			wrmsr_safe(MSR_AMD64_LS_CFG, value);
+		}
 	}
 
 	/* MFENCE stops RDTSC speculation */

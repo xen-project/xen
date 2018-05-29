@@ -1520,7 +1520,7 @@ false disable the quirk workaround, which is also the default.
 
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb}=<bool>,
->              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb}=<bool> ]`
+>              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -1563,6 +1563,11 @@ virtualised for guests.
 On hardware supporting IBPB (Indirect Branch Prediction Barrier), the `ibpb=`
 option can be used to force (the default) or prevent Xen from issuing branch
 prediction barriers on vcpu context switches.
+
+On hardware supporting SSBD (Speculative Store Bypass Disable), the `ssbd=`
+option can be used to force or prevent Xen using the feature itself.  On AMD
+hardware, this is a global option applied at boot, and not virtualised for
+guest use.
 
 ### sync\_console
 > `= <boolean>`
