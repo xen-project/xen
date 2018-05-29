@@ -21,7 +21,6 @@
 #define __X86_SPEC_CTRL_ASM_H__
 
 /* Encoding of the bottom bits in cpuinfo.bti_ist_info */
-#define BTI_IST_IBRS  (1 << 0)
 #define BTI_IST_WRMSR (1 << 1)
 #define BTI_IST_RSB   (1 << 2)
 
@@ -285,12 +284,9 @@
     setz %dl
     and %dl, STACK_CPUINFO_FIELD(use_shadow_spec_ctrl)(%r14)
 
-    /*
-     * Load Xen's intended value.  SPEC_CTRL_IBRS vs 0 is encoded in the
-     * bottom bit of bti_ist_info, via a deliberate alias with BTI_IST_IBRS.
-     */
+    /* Load Xen's intended value. */
     mov $MSR_SPEC_CTRL, %ecx
-    and $BTI_IST_IBRS, %eax
+    movzbl STACK_CPUINFO_FIELD(xen_spec_ctrl)(%r14), %eax
     xor %edx, %edx
     wrmsr
 
