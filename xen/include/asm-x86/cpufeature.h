@@ -65,7 +65,8 @@
 #define X86_FEATURE_IND_THUNK_LFENCE (3*32+ 1) /* Use IND_THUNK_LFENCE */
 #define X86_FEATURE_IND_THUNK_JMP   (3*32+ 2) /* Use IND_THUNK_JMP */
 #define X86_FEATURE_XEN_IBPB        (3*32+ 3) /* IBRSB || IBPB */
-#define X86_FEATURE_SC_MSR          (3*32+ 4) /* MSR_SPEC_CTRL used by Xen */
+#define X86_FEATURE_SC_MSR_PV       (3*32+ 4) /* MSR_SPEC_CTRL used by Xen for PV */
+#define X86_FEATURE_SC_MSR_HVM      (3*32+ 5) /* MSR_SPEC_CTRL used by Xen for HVM */
 #define X86_FEATURE_SC_RSB_PV       (3*32+ 6) /* RSB overwrite needed for PV */
 #define X86_FEATURE_SC_RSB_HVM      (3*32+ 7) /* RSB overwrite needed for HVM */
 #define X86_FEATURE_CONSTANT_TSC (3*32+ 8) /* TSC ticks at a constant rate */
@@ -76,7 +77,7 @@
 #define X86_FEATURE_XTOPOLOGY    (3*32+13) /* cpu topology enum extensions */
 #define X86_FEATURE_CPUID_FAULTING (3*32+14) /* cpuid faulting */
 #define X86_FEATURE_CLFLUSH_MONITOR (3*32+15) /* clflush reqd with monitor */
-#define X86_FEATURE_SC_MSR_IDLE     (3*32+16) /* SC_MSR && default_xen_spec_ctrl */
+#define X86_FEATURE_SC_MSR_IDLE     (3*32+16) /* (SC_MSR_PV || SC_MSR_HVM) && default_xen_spec_ctrl */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
 #define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
