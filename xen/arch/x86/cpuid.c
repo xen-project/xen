@@ -136,15 +136,34 @@ static void __init calculate_raw_featureset(void)
               &tmp, &tmp);
 }
 
+static void __init guest_common_feature_adjustments(uint32_t *fs)
+{
+    /* Unconditionally claim to be able to set the hypervisor bit. */
+    __set_bit(X86_FEATURE_HYPERVISOR, fs);
+
+    /*
+     * If IBRS is offered to the guest, unconditionally offer STIBP.  It is a
+     * nop on non-HT hardware, and has this behaviour to make heterogeneous
+     * setups easier to manage.
+     */
+    if ( test_bit(X86_FEATURE_IBRSB, fs) )
+        __set_bit(X86_FEATURE_STIBP, fs);
+
+    /*
+     * On hardware which supports IBRS/IBPB, we can offer IBPB independently
+     * of IBRS by using the AMD feature bit.  An administrator may wish for
+     * performance reasons to offer IBPB without IBRS.
+     */
+    if ( boot_cpu_has(X86_FEATURE_IBRSB) )
+        __set_bit(X86_FEATURE_IBPB, fs);
+}
+
 static void __init calculate_pv_featureset(void)
 {
     unsigned int i;
 
     for ( i = 0; i < FSCAPINTS; ++i )
         pv_featureset[i] = host_featureset[i] & pv_featuremask[i];
-
-    /* Unconditionally claim to be able to set the hypervisor bit. */
-    __set_bit(X86_FEATURE_HYPERVISOR, pv_featureset);
 
     /*
      * Allow the toolstack to set HTT, X2APIC and CMP_LEGACY.  These bits
@@ -154,15 +173,14 @@ static void __init calculate_pv_featureset(void)
     __set_bit(X86_FEATURE_X2APIC, pv_featureset);
     __set_bit(X86_FEATURE_CMP_LEGACY, pv_featureset);
 
-    /* On hardware with IBRS/IBPB support, there are further adjustments. */
-    if ( test_bit(X86_FEATURE_IBRSB, pv_featureset) )
-    {
-        /* Offer STIBP unconditionally.  It is a nop on non-HT hardware. */
-        __set_bit(X86_FEATURE_STIBP, pv_featureset);
+    /*
+     * If Xen isn't virtualising MSR_SPEC_CTRL for PV guests because of
+     * administrator choice, hide the feature.
+     */
+    if ( !boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
+        __clear_bit(X86_FEATURE_IBRSB, pv_featureset);
 
-        /* AMD's IBPB is a subset of IBRS/IBPB. */
-        __set_bit(X86_FEATURE_IBPB, pv_featureset);
-    }
+    guest_common_feature_adjustments(pv_featureset);
 
     sanitise_featureset(pv_featureset);
 }
@@ -180,9 +198,6 @@ static void __init calculate_hvm_featureset(void)
 
     for ( i = 0; i < FSCAPINTS; ++i )
         hvm_featureset[i] = host_featureset[i] & hvm_featuremask[i];
-
-    /* Unconditionally claim to be able to set the hypervisor bit. */
-    __set_bit(X86_FEATURE_HYPERVISOR, hvm_featureset);
 
     /*
      * Allow the toolstack to set HTT, X2APIC and CMP_LEGACY.  These bits
@@ -208,6 +223,13 @@ static void __init calculate_hvm_featureset(void)
         __set_bit(X86_FEATURE_SEP, hvm_featureset);
 
     /*
+     * If Xen isn't virtualising MSR_SPEC_CTRL for HVM guests because of
+     * administrator choice, hide the feature.
+     */
+    if ( !boot_cpu_has(X86_FEATURE_SC_MSR_HVM) )
+        __clear_bit(X86_FEATURE_IBRSB, hvm_featureset);
+
+    /*
      * With VT-x, some features are only supported by Xen if dedicated
      * hardware support is also available.
      */
@@ -220,15 +242,7 @@ static void __init calculate_hvm_featureset(void)
             __clear_bit(X86_FEATURE_XSAVES, hvm_featureset);
     }
 
-    /* On hardware with IBRS/IBPB support, there are further adjustments. */
-    if ( test_bit(X86_FEATURE_IBRSB, hvm_featureset) )
-    {
-        /* Offer STIBP unconditionally.  It is a nop on non-HT hardware. */
-        __set_bit(X86_FEATURE_STIBP, hvm_featureset);
-
-        /* AMD's IBPB is a subset of IBRS/IBPB. */
-        __set_bit(X86_FEATURE_IBPB, hvm_featureset);
-    }
+    guest_common_feature_adjustments(hvm_featureset);
 
     sanitise_featureset(hvm_featureset);
 }
