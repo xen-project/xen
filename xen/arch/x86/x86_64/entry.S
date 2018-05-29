@@ -194,7 +194,7 @@ restore_all_guest:
         mov   %r15d, %eax
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        SPEC_CTRL_EXIT_TO_GUEST /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
+        SPEC_CTRL_EXIT_TO_PV    /* Req: a=spec_ctrl %rsp=regs/cpuinfo, Clob: cd */
 
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)

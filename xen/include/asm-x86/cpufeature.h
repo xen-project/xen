@@ -26,8 +26,8 @@ XEN_CPUFEATURE(IND_THUNK_LFENCE,(FSCAPINTS+0)*32+15) /* Use IND_THUNK_LFENCE */
 XEN_CPUFEATURE(IND_THUNK_JMP,   (FSCAPINTS+0)*32+16) /* Use IND_THUNK_JMP */
 XEN_CPUFEATURE(XEN_IBPB,        (FSCAPINTS+0)*32+17) /* IBRSB || IBPB */
 XEN_CPUFEATURE(SC_MSR,          (FSCAPINTS+0)*32+18) /* MSR_SPEC_CTRL used by Xen */
-XEN_CPUFEATURE(RSB_NATIVE,      (FSCAPINTS+0)*32+20) /* RSB overwrite needed for native */
-XEN_CPUFEATURE(RSB_VMEXIT,      (FSCAPINTS+0)*32+21) /* RSB overwrite needed for vmexit */
+XEN_CPUFEATURE(SC_RSB_PV,       (FSCAPINTS+0)*32+20) /* RSB overwrite needed for PV */
+XEN_CPUFEATURE(SC_RSB_HVM,      (FSCAPINTS+0)*32+21) /* RSB overwrite needed for HVM */
 XEN_CPUFEATURE(NO_XPTI,         (FSCAPINTS+0)*32+22) /* XPTI mitigation not in use */
 
 #define NCAPINTS (FSCAPINTS + 1) /* N 32-bit words worth of info */
