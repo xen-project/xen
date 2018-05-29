@@ -417,13 +417,9 @@ void identify_cpu(struct cpuinfo_x86 *c)
 		if (test_bit(X86_FEATURE_IND_THUNK_JMP,
 			     boot_cpu_data.x86_capability))
 			__set_bit(X86_FEATURE_IND_THUNK_JMP, c->x86_capability);
-		if (test_bit(X86_FEATURE_XEN_IBRS_SET,
+		if (test_bit(X86_FEATURE_SC_MSR,
 		             boot_cpu_data.x86_capability))
-			__set_bit(X86_FEATURE_XEN_IBRS_SET, c->x86_capability);
-		if (test_bit(X86_FEATURE_XEN_IBRS_CLEAR,
-		             boot_cpu_data.x86_capability))
-			__set_bit(X86_FEATURE_XEN_IBRS_CLEAR,
-			          c->x86_capability);
+			__set_bit(X86_FEATURE_SC_MSR, c->x86_capability);
 		if (test_bit(X86_FEATURE_RSB_NATIVE,
 		             boot_cpu_data.x86_capability))
 			__set_bit(X86_FEATURE_RSB_NATIVE, c->x86_capability);

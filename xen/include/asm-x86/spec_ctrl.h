@@ -54,14 +54,14 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
     barrier();
     asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", %c3)
                    :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0),
-                      "i" (X86_FEATURE_XEN_IBRS_SET)
+                      "i" (X86_FEATURE_SC_MSR)
                    : "memory" );
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe before this call. */
 static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
 {
-    uint32_t val = SPEC_CTRL_IBRS;
+    uint32_t val = info->xen_spec_ctrl;
 
     /*
      * Disable shadowing before updating the MSR.  There are no SMP issues
@@ -71,7 +71,7 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
     barrier();
     asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", %c3)
                    :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0),
-                      "i" (X86_FEATURE_XEN_IBRS_SET)
+                      "i" (X86_FEATURE_SC_MSR)
                    : "memory" );
 }
 
