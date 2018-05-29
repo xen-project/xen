@@ -4624,6 +4624,9 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 
         if ( count == 0 )
         {
+            if ( !boot_cpu_has(X86_FEATURE_SC_MSR_HVM) )
+                *edx &= ~cpufeat_mask(X86_FEATURE_IBRSB);
+
             /*
              * Override STIBP to match IBRS.  Guests can safely use STIBP
              * functionality on non-HT hardware, but can't necesserily protect

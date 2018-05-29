@@ -879,6 +879,9 @@ void pv_cpuid(struct cpu_user_regs *regs)
         case 0x00000007:
             if ( regs->_ecx == 0 )
             {
+                if ( !boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
+                    d &= ~cpufeat_mask(X86_FEATURE_IBRSB);
+
                 /*
                  * Override STIBP to match IBRS.  Guests can safely use STIBP
                  * functionality on non-HT hardware, but can't necesserily protect
@@ -966,7 +969,10 @@ void pv_cpuid(struct cpu_user_regs *regs)
                   cpufeat_mask(X86_FEATURE_ADX)  |
                   cpufeat_mask(X86_FEATURE_FSGSBASE));
 
-            d &= cpufeat_mask(X86_FEATURE_IBRSB);
+            if ( boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
+                d &= cpufeat_mask(X86_FEATURE_IBRSB);
+            else
+                d = 0;
 
             /* Override STIBP to match IBRS (see above). */
             if ( d & cpufeat_mask(X86_FEATURE_IBRSB) )
