@@ -880,7 +880,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
             if ( regs->_ecx == 0 )
             {
                 if ( !boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
-                    d &= ~cpufeat_mask(X86_FEATURE_IBRSB);
+                    d &= ~(cpufeat_mask(X86_FEATURE_IBRSB) |
+                           cpufeat_mask(X86_FEATURE_SSBD));
 
                 /*
                  * Override STIBP to match IBRS.  Guests can safely use STIBP
@@ -970,7 +971,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
                   cpufeat_mask(X86_FEATURE_FSGSBASE));
 
             if ( boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
-                d &= cpufeat_mask(X86_FEATURE_IBRSB);
+                d &= cpufeat_mask(X86_FEATURE_IBRSB) |
+                     cpufeat_mask(X86_FEATURE_SSBD);
             else
                 d = 0;
 

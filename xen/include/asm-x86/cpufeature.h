@@ -171,6 +171,7 @@
 #define X86_FEATURE_IBRSB	(9*32+26) /* IBRS and IBPB support (used by Intel) */
 #define X86_FEATURE_STIBP	(9*32+27) /* STIBP */
 #define X86_FEATURE_ARCH_CAPS	(9*32+29) /* IA32_ARCH_CAPABILITIES MSR */
+#define X86_FEATURE_SSBD	(9*32+31) /* MSR_SPEC_CTRL.SSBD available */
 
 /* An alias of a feature we know is always going to be present. */
 #define X86_FEATURE_ALWAYS      X86_FEATURE_LM
