@@ -2748,7 +2748,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
              * when STIBP isn't enumerated in hardware.
              */
 
-            if ( msr_content & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+            if ( msr_content & ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
+                                 (edx & cpufeat_mask(X86_FEATURE_SSBD)
+                                  ? SPEC_CTRL_SSBD : 0)) )
                 goto fail; /* Rsvd bit set? */
 
             v->arch.spec_ctrl = eax;
