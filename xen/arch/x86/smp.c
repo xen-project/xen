@@ -213,7 +213,7 @@ void invalidate_interrupt(struct cpu_user_regs *regs)
     ack_APIC_irq();
     perfc_incr(ipis);
     if ( !__sync_local_execstate() ||
-         (flush_flags & (FLUSH_TLB_GLOBAL | FLUSH_CACHE)) )
+         (flush_flags & (FLUSH_TLB_GLOBAL | FLUSH_CACHE | FLUSH_ROOT_PGTBL)) )
         flush_area_local(flush_va, flush_flags);
     cpumask_clear_cpu(smp_processor_id(), &flush_cpumask);
 }

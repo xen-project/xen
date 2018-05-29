@@ -488,6 +488,7 @@ void make_cr3(struct vcpu *v, unsigned long mfn)
 
 void write_ptbase(struct vcpu *v)
 {
+    get_cpu_info()->root_pgt_changed = 1;
     write_cr3(v->arch.cr3);
 }
 
@@ -3911,9 +3912,13 @@ long do_mmu_update(
                 case PGT_l4_page_table:
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    if ( !rc )
-                        sync_guest = !!this_cpu(root_pgt);
-                break;
+                    if ( !rc && this_cpu(root_pgt) )
+                    {
+                        sync_guest = 1;
+                        if ( pagetable_get_pfn(curr->arch.guest_table) == mfn )
+                            get_cpu_info()->root_pgt_changed = 1;
+                    }
+                    break;
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
                     if ( paging_write_guest_entry(v, va, req.val, _mfn(mfn)) )
@@ -4019,14 +4024,10 @@ long do_mmu_update(
     {
         /*
          * Force other vCPU-s of the affected guest to pick up L4 entry
-         * changes (if any). Issue a flush IPI with empty operation mask to
-         * facilitate this (including ourselves waiting for the IPI to
-         * actually have arrived). Utilize the fact that FLUSH_VA_VALID is
-         * meaningless without FLUSH_CACHE, but will allow to pass the no-op
-         * check in flush_area_mask().
+         * changes (if any).
          */
         flush_area_mask(pt_owner->domain_dirty_cpumask,
-                        ZERO_BLOCK_PTR, FLUSH_VA_VALID);
+                        ZERO_BLOCK_PTR, FLUSH_ROOT_PGTBL);
     }
 
     perfc_add(num_page_updates, i);
