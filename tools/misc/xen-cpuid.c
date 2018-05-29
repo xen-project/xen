@@ -153,8 +153,7 @@ static const char *str_7d0[32] =
 
     [26] = "ibrsb",         [27] = "stibp",
     [28] = "REZ",           [29] = "arch_caps",
-
-    [30 ... 31] = "REZ",
+    [30] = "REZ",           [31] = "ssbd",
 };
 
 static struct {

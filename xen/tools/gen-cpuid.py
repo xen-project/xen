@@ -245,10 +245,19 @@ def crunch_numbers(state):
         # standard 3DNow in the earlier K6 processors.
         _3DNOW: [_3DNOWEXT],
 
-        # Single Thread Indirect Branch Predictors enumerates a new bit in the
-        # MSR enumerated by Indirect Branch Restricted Speculation/Indirect
-        # Branch Prediction Barrier enumeration.
-        IBRSB: [STIBP],
+        # The features:
+        #   * Single Thread Indirect Branch Predictors
+        #   * Speculative Store Bypass Disable
+        #
+        # enumerate new bits in MSR_SPEC_CTRL, which is enumerated by Indirect
+        # Branch Restricted Speculation/Indirect Branch Prediction Barrier.
+        #
+        # In practice, these features also enumerate the presense of
+        # MSR_SPEC_CTRL.  However, no real hardware will exist with SSBD but
+        # not IBRSB, and we pass this MSR directly to guests.  Treating them
+        # as dependent features simplifies Xen's logic, and prevents the guest
+        # from seeing implausible configurations.
+        IBRSB: [STIBP, SSBD],
     }
 
     deep_features = tuple(sorted(deps.keys()))
