@@ -72,11 +72,14 @@
  *
  * The following ASM fragments implement this algorithm.  See their local
  * comments for further details.
- *  - SPEC_CTRL_ENTRY_FROM_VMEXIT
+ *  - SPEC_CTRL_ENTRY_FROM_HVM
  *  - SPEC_CTRL_ENTRY_FROM_PV
  *  - SPEC_CTRL_ENTRY_FROM_INTR
+ *  - SPEC_CTRL_ENTRY_FROM_INTR_IST
+ *  - SPEC_CTRL_EXIT_TO_XEN_IST
  *  - SPEC_CTRL_EXIT_TO_XEN
- *  - SPEC_CTRL_EXIT_TO_GUEST
+ *  - SPEC_CTRL_EXIT_TO_PV
+ *  - SPEC_CTRL_EXIT_TO_HVM
  */
 
 .macro DO_OVERWRITE_RSB tmp=rax
@@ -117,7 +120,7 @@
     mov %\tmp, %rsp                 /* Restore old %rsp */
 .endm
 
-.macro DO_SPEC_CTRL_ENTRY_FROM_VMEXIT
+.macro DO_SPEC_CTRL_ENTRY_FROM_HVM
 /*
  * Requires %rbx=current, %rsp=regs/cpuinfo
  * Clobbers %rax, %rcx, %rdx
@@ -216,23 +219,23 @@
 .endm
 
 /* Use after a VMEXIT from an HVM guest. */
-#define SPEC_CTRL_ENTRY_FROM_VMEXIT                                     \
+#define SPEC_CTRL_ENTRY_FROM_HVM                                        \
     ALTERNATIVE __stringify(ASM_NOP40),                                 \
-        DO_OVERWRITE_RSB, X86_FEATURE_RSB_VMEXIT;                       \
+        DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM;                       \
     ALTERNATIVE __stringify(ASM_NOP36),                                 \
-        DO_SPEC_CTRL_ENTRY_FROM_VMEXIT, X86_FEATURE_SC_MSR
+        DO_SPEC_CTRL_ENTRY_FROM_HVM, X86_FEATURE_SC_MSR
 
 /* Use after an entry from PV context (syscall/sysenter/int80/int82/etc). */
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
     ALTERNATIVE __stringify(ASM_NOP40),                                 \
-        DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
+        DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;                        \
     ALTERNATIVE __stringify(ASM_NOP25),                                 \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=0), X86_FEATURE_SC_MSR
 
 /* Use in interrupt/exception context.  May interrupt Xen or PV context. */
 #define SPEC_CTRL_ENTRY_FROM_INTR                                       \
     ALTERNATIVE __stringify(ASM_NOP40),                                 \
-        DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
+        DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_PV;                        \
     ALTERNATIVE __stringify(ASM_NOP33),                                 \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=1), X86_FEATURE_SC_MSR
 
@@ -241,12 +244,22 @@
     ALTERNATIVE __stringify(ASM_NOP17),                                 \
         DO_SPEC_CTRL_EXIT_TO_XEN, X86_FEATURE_SC_MSR
 
-/* Use when exiting to guest context. */
-#define SPEC_CTRL_EXIT_TO_GUEST                                         \
+/* Use when exiting to PV guest context. */
+#define SPEC_CTRL_EXIT_TO_PV                                            \
     ALTERNATIVE __stringify(ASM_NOP24),                                 \
         DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR
 
-/* TODO: Drop these when the alternatives infrastructure is NMI/#MC safe. */
+/* Use when exiting to HVM guest context. */
+#define SPEC_CTRL_EXIT_TO_HVM                                           \
+    ALTERNATIVE __stringify(ASM_NOP24),                                 \
+        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR
+
+/*
+ * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
+ * Fine grain control of SCF_ist_wrmsr is needed for safety in the S3 resume
+ * path to avoid using MSR_SPEC_CTRL before the microcode introducing it has
+ * been reloaded.
+ */
 .macro SPEC_CTRL_ENTRY_FROM_INTR_IST
 /*
  * Requires %rsp=regs, %r14=stack_end
@@ -293,6 +306,7 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
     UNLIKELY_END(\@_serialise)
 .endm
 
+/* Use when exiting to Xen in IST context. */
 .macro SPEC_CTRL_EXIT_TO_XEN_IST
 /*
  * Requires %rbx=stack_end
