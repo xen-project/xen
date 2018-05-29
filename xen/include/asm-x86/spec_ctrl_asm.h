@@ -20,9 +20,10 @@
 #ifndef __X86_SPEC_CTRL_ASM_H__
 #define __X86_SPEC_CTRL_ASM_H__
 
-/* Encoding of the bottom bits in cpuinfo.bti_ist_info */
-#define BTI_IST_WRMSR (1 << 1)
-#define BTI_IST_RSB   (1 << 2)
+/* Encoding of cpuinfo.spec_ctrl_flags */
+#define SCF_use_shadow (1 << 0)
+#define SCF_ist_wrmsr  (1 << 1)
+#define SCF_ist_rsb    (1 << 2)
 
 #ifdef __ASSEMBLY__
 #include <asm/msr-index.h>
@@ -49,20 +50,20 @@
  * after VMEXIT.  The VMEXIT-specific code reads MSR_SPEC_CTRL and updates
  * current before loading Xen's MSR_SPEC_CTRL setting.
  *
- * Factor 2 is harder.  We maintain a shadow_spec_ctrl value, and
- * use_shadow_spec_ctrl boolean per cpu.  The synchronous use is:
+ * Factor 2 is harder.  We maintain a shadow_spec_ctrl value, and a use_shadow
+ * boolean in the per cpu spec_ctrl_flags.  The synchronous use is:
  *
  *  1) Store guest value in shadow_spec_ctrl
- *  2) Set use_shadow_spec_ctrl boolean
+ *  2) Set the use_shadow boolean
  *  3) Load guest value into MSR_SPEC_CTRL
  *  4) Exit to guest
  *  5) Entry from guest
- *  6) Clear use_shadow_spec_ctrl boolean
+ *  6) Clear the use_shadow boolean
  *  7) Load Xen's value into MSR_SPEC_CTRL
  *
  * The asynchronous use for interrupts/exceptions is:
  *  -  Set/clear IBRS on entry to Xen
- *  -  On exit to Xen, check use_shadow_spec_ctrl
+ *  -  On exit to Xen, check use_shadow
  *  -  If set, load shadow_spec_ctrl
  *
  * Therefore, an interrupt/exception which hits the synchronous path between
@@ -133,7 +134,7 @@
     xor %edx, %edx
 
     /* Clear SPEC_CTRL shadowing *before* loading Xen's value. */
-    movb %dl, CPUINFO_use_shadow_spec_ctrl(%rsp)
+    andb $~SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
 
     /* Load Xen's intended value. */
     mov $\ibrs_val, %eax
@@ -159,12 +160,14 @@
      * block so calculate the position directly.
      */
     .if \maybexen
+        xor %eax, %eax
         /* Branchless `if ( !xen ) clear_shadowing` */
         testb $3, UREGS_cs(%rsp)
-        setz %al
-        and %al, STACK_CPUINFO_FIELD(use_shadow_spec_ctrl)(%r14)
+        setnz %al
+        not %eax
+        and %al, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
     .else
-        movb %dl, CPUINFO_use_shadow_spec_ctrl(%rsp)
+        andb $~SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
     .endif
 
     /* Load Xen's intended value. */
@@ -183,8 +186,8 @@
  */
     xor %edx, %edx
 
-    cmpb %dl, STACK_CPUINFO_FIELD(use_shadow_spec_ctrl)(%rbx)
-    je .L\@_skip
+    testb $SCF_use_shadow, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
+    jz .L\@_skip
 
     mov STACK_CPUINFO_FIELD(shadow_spec_ctrl)(%rbx), %eax
     mov $MSR_SPEC_CTRL, %ecx
@@ -205,7 +208,7 @@
     mov %eax, CPUINFO_shadow_spec_ctrl(%rsp)
 
     /* Set SPEC_CTRL shadowing *before* loading the guest value. */
-    movb $1, CPUINFO_use_shadow_spec_ctrl(%rsp)
+    orb $SCF_use_shadow, CPUINFO_spec_ctrl_flags(%rsp)
 
     mov $MSR_SPEC_CTRL, %ecx
     xor %edx, %edx
@@ -216,7 +219,7 @@
 #define SPEC_CTRL_ENTRY_FROM_VMEXIT                                     \
     ALTERNATIVE __stringify(ASM_NOP40),                                 \
         DO_OVERWRITE_RSB, X86_FEATURE_RSB_VMEXIT;                       \
-    ALTERNATIVE_2 __stringify(ASM_NOP32),                               \
+    ALTERNATIVE_2 __stringify(ASM_NOP33),                               \
         __stringify(DO_SPEC_CTRL_ENTRY_FROM_VMEXIT                      \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
         X86_FEATURE_XEN_IBRS_SET,                                       \
@@ -228,7 +231,7 @@
 #define SPEC_CTRL_ENTRY_FROM_PV                                         \
     ALTERNATIVE __stringify(ASM_NOP40),                                 \
         DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
-    ALTERNATIVE_2 __stringify(ASM_NOP21),                               \
+    ALTERNATIVE_2 __stringify(ASM_NOP22),                               \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=0                       \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
         X86_FEATURE_XEN_IBRS_SET,                                       \
@@ -239,7 +242,7 @@
 #define SPEC_CTRL_ENTRY_FROM_INTR                                       \
     ALTERNATIVE __stringify(ASM_NOP40),                                 \
         DO_OVERWRITE_RSB, X86_FEATURE_RSB_NATIVE;                       \
-    ALTERNATIVE_2 __stringify(ASM_NOP29),                               \
+    ALTERNATIVE_2 __stringify(ASM_NOP33),                               \
         __stringify(DO_SPEC_CTRL_ENTRY maybexen=1                       \
                     ibrs_val=SPEC_CTRL_IBRS),                           \
         X86_FEATURE_XEN_IBRS_SET,                                       \
@@ -267,22 +270,23 @@
  * This is logical merge of DO_OVERWRITE_RSB and DO_SPEC_CTRL_ENTRY
  * maybexen=1, but with conditionals rather than alternatives.
  */
-    movzbl STACK_CPUINFO_FIELD(bti_ist_info)(%r14), %eax
+    movzbl STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14), %eax
 
-    testb $BTI_IST_RSB, %al
+    test $SCF_ist_rsb, %al
     jz .L\@_skip_rsb
 
     DO_OVERWRITE_RSB tmp=rdx /* Clobbers %rcx/%rdx */
 
 .L\@_skip_rsb:
 
-    testb $BTI_IST_WRMSR, %al
+    test $SCF_ist_wrmsr, %al
     jz .L\@_skip_wrmsr
 
     xor %edx, %edx
     testb $3, UREGS_cs(%rsp)
-    setz %dl
-    and %dl, STACK_CPUINFO_FIELD(use_shadow_spec_ctrl)(%r14)
+    setnz %dl
+    not %edx
+    and %dl, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%r14)
 
     /* Load Xen's intended value. */
     mov $MSR_SPEC_CTRL, %ecx
@@ -309,7 +313,7 @@ UNLIKELY_DISPATCH_LABEL(\@_serialise):
  * Requires %rbx=stack_end
  * Clobbers %rax, %rcx, %rdx
  */
-    testb $BTI_IST_WRMSR, STACK_CPUINFO_FIELD(bti_ist_info)(%rbx)
+    testb $SCF_ist_wrmsr, STACK_CPUINFO_FIELD(spec_ctrl_flags)(%rbx)
     jz .L\@_skip
 
     DO_SPEC_CTRL_EXIT_TO_XEN
