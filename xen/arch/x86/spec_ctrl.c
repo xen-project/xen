@@ -81,18 +81,15 @@ static int __init parse_bti(const char *s)
 }
 custom_param("bti", parse_bti);
 
-static void __init print_details(enum ind_thunk thunk)
+static void __init print_details(enum ind_thunk thunk, uint64_t caps)
 {
     unsigned int _7d0 = 0, e8b = 0, tmp;
-    uint64_t caps = 0;
 
     /* Collect diagnostics about available mitigations. */
     if ( boot_cpu_data.cpuid_level >= 7 )
         cpuid_count(7, 0, &tmp, &tmp, &tmp, &_7d0);
     if ( boot_cpu_data.extended_cpuid_level >= 0x80000008 )
         cpuid(0x80000008, &tmp, &e8b, &tmp, &tmp);
-    if ( _7d0 & cpufeat_mask(X86_FEATURE_ARCH_CAPS) )
-        rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
     printk(XENLOG_DEBUG "Speculative mitigation facilities:\n");
 
@@ -124,7 +121,7 @@ static void __init print_details(enum ind_thunk thunk)
 }
 
 /* Calculate whether Retpoline is known-safe on this CPU. */
-static bool_t __init __maybe_unused retpoline_safe(void)
+static bool_t __init __maybe_unused retpoline_safe(uint64_t caps)
 {
     unsigned int ucode_rev = this_cpu(ucode_cpu_info).cpu_sig.rev;
 
@@ -135,19 +132,12 @@ static bool_t __init __maybe_unused retpoline_safe(void)
          boot_cpu_data.x86 != 6 )
         return 0;
 
-    if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
-    {
-        uint64_t caps;
-
-        rdmsrl(MSR_ARCH_CAPABILITIES, caps);
-
-        /*
-         * RBSA may be set by a hypervisor to indicate that we may move to a
-         * processor which isn't retpoline-safe.
-         */
-        if ( caps & ARCH_CAPS_RSBA )
-            return 0;
-    }
+    /*
+     * RSBA may be set by a hypervisor to indicate that we may move to a
+     * processor which isn't retpoline-safe.
+     */
+    if ( caps & ARCH_CAPS_RSBA )
+        return 0;
 
     switch ( boot_cpu_data.x86_model )
     {
@@ -217,6 +207,10 @@ void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
     bool_t ibrs = 0;
+    uint64_t caps = 0;
+
+    if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+        rdmsrl(MSR_ARCH_CAPABILITIES, caps);
 
     /*
      * Has the user specified any custom BTI mitigations?  If so, follow their
@@ -244,7 +238,7 @@ void __init init_speculation_mitigations(void)
          * On Intel hardware, we'd like to use retpoline in preference to
          * IBRS, but only if it is safe on this hardware.
          */
-        else if ( retpoline_safe() )
+        else if ( retpoline_safe(caps) )
             thunk = THUNK_RETPOLINE;
         else
 #endif
@@ -328,7 +322,7 @@ void __init init_speculation_mitigations(void)
     /* (Re)init BSP state now that default_bti_ist_info has been calculated. */
     init_shadow_spec_ctrl_state();
 
-    print_details(thunk);
+    print_details(thunk, caps);
 }
 
 static void __init __maybe_unused build_assertions(void)
