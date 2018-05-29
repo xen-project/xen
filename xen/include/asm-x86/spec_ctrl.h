@@ -28,15 +28,15 @@ void init_speculation_mitigations(void);
 
 extern bool opt_ibpb;
 extern uint8_t default_xen_spec_ctrl;
-extern uint8_t default_bti_ist_info;
+extern uint8_t default_spec_ctrl_flags;
 
 static inline void init_shadow_spec_ctrl_state(void)
 {
     struct cpu_info *info = get_cpu_info();
 
-    info->shadow_spec_ctrl = info->use_shadow_spec_ctrl = 0;
+    info->shadow_spec_ctrl = 0;
     info->xen_spec_ctrl = default_xen_spec_ctrl;
-    info->bti_ist_info = default_bti_ist_info;
+    info->spec_ctrl_flags = default_spec_ctrl_flags;
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe after this call. */
@@ -50,7 +50,7 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
      */
     info->shadow_spec_ctrl = val;
     barrier();
-    info->use_shadow_spec_ctrl = true;
+    info->spec_ctrl_flags |= SCF_use_shadow;
     barrier();
     asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", X86_FEATURE_XEN_IBRS_SET)
                    :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0) : "memory" );
@@ -65,7 +65,7 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
      * Disable shadowing before updating the MSR.  There are no SMP issues
      * here; only local processor ordering concerns.
      */
-    info->use_shadow_spec_ctrl = false;
+    info->spec_ctrl_flags &= ~SCF_use_shadow;
     barrier();
     asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", X86_FEATURE_XEN_IBRS_SET)
                    :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0) : "memory" );
