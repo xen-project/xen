@@ -38,6 +38,7 @@ static int8_t __initdata opt_ibrs = -1;
 static bool_t __initdata opt_rsb_native = 1;
 static bool_t __initdata opt_rsb_vmexit = 1;
 bool_t __read_mostly opt_ibpb = 1;
+uint8_t __read_mostly default_xen_spec_ctrl;
 uint8_t __read_mostly default_bti_ist_info;
 
 static int __init parse_bti(const char *s)
@@ -285,11 +286,14 @@ void __init init_speculation_mitigations(void)
          * guests.
          */
         if ( ibrs )
+        {
+            default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
             __set_bit(X86_FEATURE_XEN_IBRS_SET, boot_cpu_data.x86_capability);
+        }
         else
             __set_bit(X86_FEATURE_XEN_IBRS_CLEAR, boot_cpu_data.x86_capability);
 
-        default_bti_ist_info |= BTI_IST_WRMSR | ibrs;
+        default_bti_ist_info |= BTI_IST_WRMSR;
     }
 
     /*
@@ -330,8 +334,6 @@ void __init init_speculation_mitigations(void)
 
 static void __init __maybe_unused build_assertions(void)
 {
-    /* The optimised assembly relies on this alias. */
-    BUILD_BUG_ON(BTI_IST_IBRS != SPEC_CTRL_IBRS);
 }
 
 /*
