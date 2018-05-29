@@ -54,7 +54,7 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
     barrier();
     asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", %c3)
                    :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0),
-                      "i" (X86_FEATURE_SC_MSR)
+                      "i" (X86_FEATURE_SC_MSR_IDLE)
                    : "memory" );
 }
 
@@ -71,7 +71,7 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
     barrier();
     asm volatile ( ALTERNATIVE(ASM_NOP3, "wrmsr", %c3)
                    :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0),
-                      "i" (X86_FEATURE_SC_MSR)
+                      "i" (X86_FEATURE_SC_MSR_IDLE)
                    : "memory" );
 }
 
