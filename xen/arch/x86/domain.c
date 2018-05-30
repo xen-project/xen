@@ -405,6 +405,43 @@ static void release_compat_l4(struct vcpu *v)
     v->arch.guest_table_user = pagetable_null();
 }
 
+static void set_domain_xpti(struct domain *d)
+{
+    if ( is_pv_32bit_domain(d) )
+    {
+        d->arch.pv_domain.xpti = 0;
+        d->arch.pv_domain.pcid = 0;
+    }
+    else
+    {
+        d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
+                                             ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
+
+        if ( use_invpcid && cpu_has_pcid )
+            switch ( opt_pcid )
+            {
+            case PCID_OFF:
+                break;
+
+            case PCID_ALL:
+                d->arch.pv_domain.pcid = 1;
+                break;
+
+            case PCID_XPTI:
+                d->arch.pv_domain.pcid = d->arch.pv_domain.xpti;
+                break;
+
+            case PCID_NOXPTI:
+                d->arch.pv_domain.pcid = !d->arch.pv_domain.xpti;
+                break;
+
+            default:
+                ASSERT_UNREACHABLE();
+                break;
+            }
+    }
+}
+
 static inline int may_switch_mode(struct domain *d)
 {
     return (!is_hvm_domain(d) && (d->tot_pages == 0));
@@ -428,6 +465,9 @@ int switch_native(struct domain *d)
     }
 
     d->arch.x87_fip_width = cpu_has_fpu_sel ? 0 : 8;
+
+    if ( is_pv_domain(d) )
+        set_domain_xpti(d);
 
     return 0;
 }
@@ -464,8 +504,8 @@ int switch_compat(struct domain *d)
 
     d->arch.x87_fip_width = 4;
 
-    d->arch.pv_domain.xpti = 0;
-    d->arch.pv_domain.pcid = 0;
+    if ( is_pv_domain(d) )
+        set_domain_xpti(d);
 
     return 0;
 
@@ -707,31 +747,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
-        d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
-                                             ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
-
-        if ( !is_pv_32bit_domain(d) && use_invpcid && cpu_has_pcid )
-            switch ( opt_pcid )
-            {
-            case PCID_OFF:
-                break;
-
-            case PCID_ALL:
-                d->arch.pv_domain.pcid = 1;
-                break;
-
-            case PCID_XPTI:
-                d->arch.pv_domain.pcid = d->arch.pv_domain.xpti;
-                break;
-
-            case PCID_NOXPTI:
-                d->arch.pv_domain.pcid = !d->arch.pv_domain.xpti;
-                break;
-
-            default:
-                ASSERT_UNREACHABLE();
-                break;
-            }
+        set_domain_xpti(d);
     }
 
     /* initialize default tsc behavior in case tools don't */
