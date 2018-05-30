@@ -758,7 +758,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         if ( (rc = hvm_domain_initialise(d)) != 0 )
             goto fail;
     }
-    else
+    else if ( !is_idle_domain(d) )
     {
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
