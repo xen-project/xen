@@ -10,6 +10,7 @@
  *    privcmd gntdev evtchn     FD should be appropriate Xen control fd
  *    readonly                  FD is expected to be readonly
  *    appendonly                FD is expected to be append write only
+ #    tun                       FD is expected to be an open tun device
  *
  * In each case FD is probably a reference to an open-file stolen
  * from another process, eg by the use of fishdescriptor.
@@ -22,11 +23,14 @@
  *
  * depriv-fd-checker will perhaps print, for each triplet:
  *   CLASS checking FD INFORMATION... X-INFO
- * and in any case print, for each triplet:
+ * and in any case print, for each triplet, exactly one of:
  *   CLASS pass|fail FD INFORMATION... X-INFO
+ *   tun maybe FD IFNAME X-INFO
  *
  * "pass" means that the descriptor was restricted as expected.
  * "fail" means that the descriptor was unrestricted.
+ * "maybe" means that further information is printed, as detailed above,
+ *         and the caller should check that it is as expected
  */
 /*
  * Copyright (C)2018 Citrix Systems R&D
@@ -320,6 +324,35 @@ static void check_appendonly(void) {
     report("pass", "fcntl", mbuf);
 }
 
+#if defined(__linux__)
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <linux/if.h>
+#include <linux/if_tun.h>
+
+/* linux tun */
+
+static void setup_tun(void) { }
+static void check_tun(void) {
+    struct ifreq ifr;
+    int r;
+
+    memset(&ifr,0,sizeof(ifr));
+    r = ioctl(object_fd, TUNGETIFF, (void*)&ifr);
+    if (r<0) trouble("TUNGETIFF");
+    printf("tun maybe %d %.*s %s\n", object_fd,
+           (int)IFNAMSIZ, ifr.ifr_ifrn.ifrn_name,
+           fd_desc);
+}
+
+#define PLATFORM_CLASSES \
+    DEFCHECK(tun),
+
+#else /* !defined(__linux__) */
+#define PLATFORM_CLASSES /* empty */
+#endif
+
 /* class table and main program */
 
 #define DEFCLASS(cl) \
@@ -341,6 +374,7 @@ static const struct classinfo {
     DEFCLASS(evtchn),
     DEFCHECK(readonly),
     DEFCHECK(appendonly),
+    PLATFORM_CLASSES
     { 0 }
 };
 
