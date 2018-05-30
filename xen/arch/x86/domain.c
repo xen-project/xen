@@ -714,20 +714,15 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         if ( (rc = hvm_domain_initialise(d)) != 0 )
             goto fail;
     }
-    else
+    else if ( !is_idle_domain(d) )
     {
         static const struct arch_csw pv_csw = {
             .from = paravirt_ctxt_switch_from,
             .to   = paravirt_ctxt_switch_to,
             .tail = continue_nonidle_domain,
         };
-        static const struct arch_csw idle_csw = {
-            .from = paravirt_ctxt_switch_from,
-            .to   = paravirt_ctxt_switch_to,
-            .tail = continue_idle_domain,
-        };
 
-        d->arch.ctxt_switch = is_idle_domain(d) ? &idle_csw : &pv_csw;
+        d->arch.ctxt_switch = &pv_csw;
 
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
@@ -757,6 +752,16 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
                 ASSERT_UNREACHABLE();
                 break;
             }
+    }
+    else
+    {
+        static const struct arch_csw idle_csw = {
+            .from = paravirt_ctxt_switch_from,
+            .to   = paravirt_ctxt_switch_to,
+            .tail = continue_idle_domain,
+        };
+
+        d->arch.ctxt_switch = &idle_csw;
     }
 
     /* initialize default tsc behavior in case tools don't */
