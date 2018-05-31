@@ -589,6 +589,11 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
         return NULL;
     }
 
+#if HAVE_YAJL_V2
+    /* Disable beautify for data sent to QEMU */
+    yajl_gen_config(hand, yajl_gen_beautify, 0);
+#endif
+
     yajl_gen_map_open(hand);
     libxl__yajl_gen_asciiz(hand, "execute");
     libxl__yajl_gen_asciiz(hand, cmd);
