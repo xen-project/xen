@@ -76,9 +76,9 @@ let read_fd back con b len =
 	rd
 
 let read_mmap back con b len =
-	let s = String.make len (char_of_int 0) in
+	let s = Bytes.make len '\000' in
 	let rd = Xs_ring.read back.mmap s len in
-	Bytes.blit_string s 0 b 0 rd;
+	Bytes.blit s 0 b 0 rd;
 	back.work_again <- (rd > 0);
 	if rd > 0 then
 		back.eventchn_notify ();
@@ -90,19 +90,17 @@ let read con b len =
 	| Xenmmap backmmap -> read_mmap backmmap con b len
 
 let write_fd back con b len =
-	Unix.write back.fd b 0 len
+	Unix.write_substring back.fd b 0 len
 
 let write_mmap back con s len =
-	let ws = Xs_ring.write back.mmap s len in
+	let ws = Xs_ring.write_substring back.mmap s len in
 	if ws > 0 then
 		back.eventchn_notify ();
 	ws
 
 let write con s len =
 	match con.backend with
-	(* we can use unsafe_of_string here as the bytes are used immutably
-	   in the Unix.write operation. *)
-	| Fd backfd     -> write_fd backfd con (Bytes.unsafe_of_string s) len
+	| Fd backfd     -> write_fd backfd con s len
 	| Xenmmap backmmap -> write_mmap backmmap con s len
 
 (* NB: can throw Reconnect *)

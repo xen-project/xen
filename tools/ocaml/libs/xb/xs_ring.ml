@@ -24,12 +24,14 @@ module Server_features = Set.Make(struct
 	let compare = compare
 end)
 
-external read: Xenmmap.mmap_interface -> string -> int -> int = "ml_interface_read"
-external write: Xenmmap.mmap_interface -> string -> int -> int = "ml_interface_write"
+external read: Xenmmap.mmap_interface -> bytes -> int -> int = "ml_interface_read"
+external write: Xenmmap.mmap_interface -> bytes -> int -> int = "ml_interface_write"
 
-external _internal_set_server_features: Xenmmap.mmap_interface -> int -> unit = "ml_interface_set_server_features" "noalloc"
-external _internal_get_server_features: Xenmmap.mmap_interface -> int = "ml_interface_get_server_features" "noalloc"
+external _internal_set_server_features: Xenmmap.mmap_interface -> int -> unit = "ml_interface_set_server_features" [@@noalloc]
+external _internal_get_server_features: Xenmmap.mmap_interface -> int = "ml_interface_get_server_features" [@@noalloc]
 
+let write_substring mmap buff len =
+	write mmap (Bytes.unsafe_of_string buff) len
 
 let get_server_features mmap =
 	(* NB only one feature currently defined above *)
@@ -43,4 +45,4 @@ let set_server_features mmap set =
 	let x = if set = Server_features.empty then 0 else 1 in
 	_internal_set_server_features mmap x
 
-external close: Xenmmap.mmap_interface -> unit = "ml_interface_close" "noalloc"
+external close: Xenmmap.mmap_interface -> unit = "ml_interface_close" [@@noalloc]
