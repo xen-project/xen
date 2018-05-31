@@ -324,7 +324,7 @@ struct xen_dm_op_inject_event {
     /* IN - error code (or ~0 to skip) */
     uint32_t error_code;
     uint32_t pad1;
-    /* IN - CR2 for page faults */
+    /* IN - type-specific extra data (%cr2 for #PF, pending_dbg for #DB) */
     uint64_aligned_t cr2;
 };
 

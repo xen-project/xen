@@ -309,12 +309,12 @@ int xendevicemodel_set_mem_type(
  * @parm type the event type (see the definition of enum x86_event_type)
  * @parm error_code the error code or ~0 to skip
  * @parm insn_len the instruction length
- * @parm cr2 the value of CR2 for page faults
+ * @parm extra type-specific extra data (%cr2 for #PF, pending_dbg for #DB)
  * @return 0 on success, -1 on failure.
  */
 int xendevicemodel_inject_event(
     xendevicemodel_handle *dmod, domid_t domid, int vcpu, uint8_t vector,
-    uint8_t type, uint32_t error_code, uint8_t insn_len, uint64_t cr2);
+    uint8_t type, uint32_t error_code, uint8_t insn_len, uint64_t extra);
 
 /**
  * Shuts the domain down.

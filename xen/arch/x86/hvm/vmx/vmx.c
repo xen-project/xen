@@ -3872,7 +3872,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
                 rc = hvm_monitor_debug(regs->rip,
                                        HVM_MONITOR_DEBUG_EXCEPTION,
-                                       trap_type, insn_len);
+                                       trap_type, insn_len, 0);
 
                 if ( rc < 0 )
                     goto exit_and_crash;
@@ -3893,7 +3893,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 rc = hvm_monitor_debug(regs->rip,
                                        HVM_MONITOR_SOFTWARE_BREAKPOINT,
                                        X86_EVENTTYPE_SW_EXCEPTION,
-                                       insn_len);
+                                       insn_len, 0);
 
                 if ( rc < 0 )
                     goto exit_and_crash;
@@ -4196,7 +4196,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         {
             hvm_monitor_debug(regs->rip,
                               HVM_MONITOR_SINGLESTEP_BREAKPOINT,
-                              0, 0);
+                              0, 0, 0);
 
             if ( v->domain->debugger_attached )
                 domain_pause_for_debugger();

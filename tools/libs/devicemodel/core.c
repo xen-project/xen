@@ -536,7 +536,7 @@ int xendevicemodel_set_mem_type(
 
 int xendevicemodel_inject_event(
     xendevicemodel_handle *dmod, domid_t domid, int vcpu, uint8_t vector,
-    uint8_t type, uint32_t error_code, uint8_t insn_len, uint64_t cr2)
+    uint8_t type, uint32_t error_code, uint8_t insn_len, uint64_t extra)
 {
     struct xen_dm_op op;
     struct xen_dm_op_inject_event *data;
@@ -551,7 +551,7 @@ int xendevicemodel_inject_event(
     data->type = type;
     data->error_code = error_code;
     data->insn_len = insn_len;
-    data->cr2 = cr2;
+    data->cr2 = extra;
 
     return xendevicemodel_op(dmod, domid, 1, &op, sizeof(op));
 }

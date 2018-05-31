@@ -291,6 +291,7 @@ struct vm_event_fast_singlestep {
 
 struct vm_event_debug {
     uint64_t gfn;
+    uint64_t pending_dbg; /* Behaves like the VT-x PENDING_DBG field. */
     uint32_t insn_length;
     uint8_t type;        /* HVMOP_TRAP_* */
     uint8_t _pad[3];

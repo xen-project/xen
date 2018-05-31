@@ -826,18 +826,19 @@ int main(int argc, char *argv[])
 
                 break;
             case VM_EVENT_REASON_DEBUG_EXCEPTION:
-                printf("Debug exception: rip=%016"PRIx64", vcpu %d. Type: %u. Length: %u\n",
+                printf("Debug exception: rip=%016"PRIx64", vcpu %d. Type: %u. Length: %u. Pending dbg 0x%08"PRIx64"\n",
                        req.data.regs.x86.rip,
                        req.vcpu_id,
                        req.u.debug_exception.type,
-                       req.u.debug_exception.insn_length);
+                       req.u.debug_exception.insn_length,
+                       req.u.debug_exception.pending_dbg);
 
                 /* Reinject */
                 rc = xc_hvm_inject_trap(xch, domain_id, req.vcpu_id,
                                         X86_TRAP_DEBUG,
                                         req.u.debug_exception.type, -1,
                                         req.u.debug_exception.insn_length,
-                                        req.data.regs.x86.cr2);
+                                        req.u.debug_exception.pending_dbg);
                 if (rc < 0)
                 {
                     ERROR("Error %d injecting breakpoint\n", rc);

@@ -2644,7 +2644,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
             rc = hvm_monitor_debug(regs->rip,
                                    HVM_MONITOR_DEBUG_EXCEPTION,
-                                   trap_type, insn_len);
+                                   trap_type, insn_len, 0);
             if ( rc < 0 )
                 goto unexpected_exit_type;
             if ( !rc )
@@ -2673,7 +2673,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
            rc = hvm_monitor_debug(regs->rip,
                                   HVM_MONITOR_SOFTWARE_BREAKPOINT,
                                   X86_EVENTTYPE_SW_EXCEPTION,
-                                  insn_len);
+                                  insn_len, 0);
            if ( rc < 0 )
                goto unexpected_exit_type;
            if ( !rc )
