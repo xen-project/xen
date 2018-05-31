@@ -56,6 +56,7 @@ long do_fpu_taskswitch(int set)
 long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
 {
     struct vcpu *curr = current;
+    const struct cpu_policy *p = curr->domain->arch.cpu_policy;
 
     switch ( reg )
     {
@@ -86,12 +87,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( value != (uint32_t)value )
             return -EINVAL;
 
-        /*
-         * DR6: Bits 4-11,16-31 reserved (set to 1).
-         *      Bit 12 reserved (set to 0).
-         */
-        value &= ~DR_STATUS_RESERVED_ZERO; /* reserved bits => 0 */
-        value |=  DR_STATUS_RESERVED_ONE;  /* reserved bits => 1 */
+        value = x86_adj_dr6_rsvd(p, value);
 
         v->arch.dr6 = value;
         if ( v == curr )
@@ -108,12 +104,8 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( value != (uint32_t)value )
             return -EINVAL;
 
-        /*
-         * DR7: Bit 10 reserved (set to 1).
-         *      Bits 11-12,14-15 reserved (set to 0).
-         */
-        value &= ~DR_CONTROL_RESERVED_ZERO; /* reserved bits => 0 */
-        value |=  DR_CONTROL_RESERVED_ONE;  /* reserved bits => 1 */
+        value = x86_adj_dr7_rsvd(p, value);
+
         /*
          * Privileged bits:
          *      GD (bit 13): must be 0.

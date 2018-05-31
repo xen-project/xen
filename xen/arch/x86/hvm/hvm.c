@@ -33,6 +33,7 @@
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
+#include <asm/debugreg.h>
 #include <asm/e820.h>
 #include <asm/io.h>
 #include <asm/regs.h>
@@ -985,6 +986,7 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d)
 
 static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
+    const struct cpu_policy *p = d->arch.cpu_policy;
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
@@ -1174,8 +1176,8 @@ static int cf_check hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.dr[1] = ctxt.dr1;
     v->arch.dr[2] = ctxt.dr2;
     v->arch.dr[3] = ctxt.dr3;
-    v->arch.dr6   = ctxt.dr6;
-    v->arch.dr7   = ctxt.dr7;
+    v->arch.dr6   = x86_adj_dr6_rsvd(p, ctxt.dr6);
+    v->arch.dr7   = x86_adj_dr7_rsvd(p, ctxt.dr7);
 
     hvmemul_cancel(v);
 

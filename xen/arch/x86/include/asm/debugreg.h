@@ -1,6 +1,7 @@
 #ifndef _X86_DEBUGREG_H
 #define _X86_DEBUGREG_H
 
+#include <asm/x86-defns.h>
 
 /* Indicate the register numbers for a number of the specific
    debug registers.  Registers 0-3 contain the addresses we wish to trap on */
@@ -21,7 +22,6 @@
 #define DR_STEP         (0x4000)        /* single-step */
 #define DR_SWITCH       (0x8000)        /* task switch */
 #define DR_NOT_RTM      (0x10000)       /* clear: #BP inside RTM region */
-#define DR_STATUS_RESERVED_ZERO (~0xffffefffUL) /* Reserved, read as zero */
 #define DR_STATUS_RESERVED_ONE  0xffff0ff0UL /* Reserved, read as one */
 
 /* Now define a bunch of things for manipulating the control register.
@@ -61,8 +61,6 @@
    We can slow the instruction pipeline for instructions coming via the
    gdt or the ldt if we want to.  I am not sure why this is an advantage */
 
-#define DR_CONTROL_RESERVED_ZERO (~0xffff27ffUL) /* Reserved, read as zero */
-#define DR_CONTROL_RESERVED_ONE  (0x00000400UL) /* Reserved, read as one */
 #define DR_LOCAL_EXACT_ENABLE    (0x00000100UL) /* Local exact enable */
 #define DR_GLOBAL_EXACT_ENABLE   (0x00000200UL) /* Global exact enable */
 #define DR_RTM_ENABLE            (0x00000800UL) /* RTM debugging enable */

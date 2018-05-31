@@ -1053,6 +1053,7 @@ int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
+    const struct cpu_policy *p = d->arch.cpu_policy;
     unsigned int i;
     unsigned long flags;
     bool compat;
@@ -1186,8 +1187,8 @@ int arch_set_info_guest(
     {
         for ( i = 0; i < ARRAY_SIZE(v->arch.dr); ++i )
             v->arch.dr[i] = c(debugreg[i]);
-        v->arch.dr6 = c(debugreg[6]);
-        v->arch.dr7 = c(debugreg[7]);
+        v->arch.dr6 = x86_adj_dr6_rsvd(p, c(debugreg[6]));
+        v->arch.dr7 = x86_adj_dr7_rsvd(p, c(debugreg[7]));
 
         if ( v->vcpu_id == 0 )
             d->vm_assist = c.nat->vm_assist;

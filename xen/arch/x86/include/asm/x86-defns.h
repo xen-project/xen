@@ -102,13 +102,30 @@
 
 /*
  * Debug status flags in DR6.
+ *
+ * For backwards compatibility, status flags which overlap with
+ * X86_DR6_DEFAULT have inverted polarity.
  */
-#define X86_DR6_DEFAULT         0xffff0ff0  /* Default %dr6 value. */
+#define X86_DR6_B0              (_AC(1, UL) <<  0)   /* Breakpoint 0                */
+#define X86_DR6_B1              (_AC(1, UL) <<  1)   /* Breakpoint 1                */
+#define X86_DR6_B2              (_AC(1, UL) <<  2)   /* Breakpoint 2                */
+#define X86_DR6_B3              (_AC(1, UL) <<  3)   /* Breakpoint 3                */
+#define X86_DR6_BLD             (_AC(1, UL) << 11)   /* BusLock detect (INV)        */
+#define X86_DR6_BD              (_AC(1, UL) << 13)   /* %dr access                  */
+#define X86_DR6_BS              (_AC(1, UL) << 14)   /* Single step                 */
+#define X86_DR6_BT              (_AC(1, UL) << 15)   /* Task switch                 */
+#define X86_DR6_RTM             (_AC(1, UL) << 16)   /* #DB/#BP in RTM region (INV) */
+
+#define X86_DR6_ZEROS           _AC(0x00001000, UL)  /* %dr6 bits forced to 0       */
+#define X86_DR6_DEFAULT         _AC(0xffff0ff0, UL)  /* Default %dr6 value          */
 
 /*
  * Debug control flags in DR7.
  */
-#define X86_DR7_DEFAULT         0x00000400  /* Default %dr7 value. */
+#define X86_DR7_RTM             (_AC(1, UL) << 11)   /* RTM debugging enable        */
+
+#define X86_DR7_ZEROS           _AC(0x0000d000, UL)  /* %dr7 bits forced to 0       */
+#define X86_DR7_DEFAULT         _AC(0x00000400, UL)  /* Default %dr7 value          */
 
 /*
  * Invalidation types for the INVPCID instruction.
