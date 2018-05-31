@@ -50,7 +50,10 @@ static inline yajl_handle libxl__yajl_alloc(const yajl_callbacks *callbacks,
                                             yajl_alloc_funcs *allocFuncs,
                                             void *ctx)
 {
-    return yajl_alloc(callbacks, allocFuncs, ctx);
+    yajl_handle hand = yajl_alloc(callbacks, allocFuncs, ctx);
+    if (hand)
+        yajl_config(hand, yajl_allow_trailing_garbage, 1);
+    return hand;
 }
 
 static inline yajl_gen libxl_yajl_gen_alloc(const yajl_alloc_funcs *allocFuncs)
