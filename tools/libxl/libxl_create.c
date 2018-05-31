@@ -763,12 +763,17 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
 
 void libxl__domain_build_state_init(libxl__domain_build_state *state)
 {
+    state->dm_monitor_fd = -1;
 }
 
 void libxl__domain_build_state_dispose(libxl__domain_build_state *state)
 {
     libxl__file_reference_unmap(&state->pv_kernel);
     libxl__file_reference_unmap(&state->pv_ramdisk);
+    if (state->dm_monitor_fd >= 0) {
+        close(state->dm_monitor_fd);
+        state->dm_monitor_fd = -1;
+    }
 }
 
 /*----- main domain creation -----*/

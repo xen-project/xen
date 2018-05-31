@@ -1240,6 +1240,7 @@ typedef struct {
     char *console_tty;
 
     char *saved_state;
+    int dm_monitor_fd;
 
     libxl__file_reference pv_kernel;
     libxl__file_reference pv_ramdisk;

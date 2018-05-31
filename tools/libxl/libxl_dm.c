@@ -670,6 +670,8 @@ static int libxl__build_device_model_args_old(libxl__gc *gc,
     dm_args = flexarray_make(gc, 16, 1);
     dm_envs = flexarray_make(gc, 16, 1);
 
+    assert(state->dm_monitor_fd == -1);
+
     libxl__set_qemu_env_for_xsa_180(gc, dm_envs);
 
     flexarray_vappend(dm_args, dm,
@@ -1100,6 +1102,51 @@ static char *qemu_disk_ide_drive_string(libxl__gc *gc, const char *target_path,
     return drive;
 }
 
+static int libxl__pre_open_qmp_socket(libxl__gc *gc, libxl_domid domid,
+                                      int *fd_r)
+{
+    int rc, r;
+    int fd;
+    struct sockaddr_un un;
+    const char *path = libxl__qemu_qmp_path(gc, domid);
+
+    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) {
+        LOGED(ERROR, domid, "socket() failed");
+        return ERROR_FAIL;
+    }
+
+    rc = libxl__prepare_sockaddr_un(gc, &un, path, "QEMU's QMP socket");
+    if (rc)
+        goto out;
+
+    rc = libxl__remove_file(gc, path);
+    if (rc)
+        goto out;
+
+    r = bind(fd, (struct sockaddr *) &un, sizeof(un));
+    if (r < 0) {
+        LOGED(ERROR, domid, "bind('%s') failed", path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    r = listen(fd, 1);
+    if (r < 0) {
+        LOGED(ERROR, domid, "listen() failed");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    *fd_r = fd;
+    rc = 0;
+
+out:
+    if (rc && fd >= 0)
+        close(fd);
+    return rc;
+}
+
 static int libxl__build_device_model_args_new(libxl__gc *gc,
                                         const char *dm, int guest_domid,
                                         const libxl_domain_config *guest_config,
@@ -1132,10 +1179,16 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                       GCSPRINTF("%d", guest_domid), NULL);
 
     flexarray_append(dm_args, "-chardev");
-    flexarray_append(dm_args,
-                     GCSPRINTF("socket,id=libxl-cmd,"
-                               "path=%s,server,nowait",
-                               libxl__qemu_qmp_path(gc, guest_domid)));
+    if (state->dm_monitor_fd >= 0) {
+        flexarray_append(dm_args,
+            GCSPRINTF("socket,id=libxl-cmd,fd=%d,server,nowait",
+                      state->dm_monitor_fd));
+    } else {
+        flexarray_append(dm_args,
+                         GCSPRINTF("socket,id=libxl-cmd,"
+                                   "path=%s,server,nowait",
+                                   libxl__qemu_qmp_path(gc, guest_domid)));
+    }
 
     flexarray_append(dm_args, "-no-shutdown");
     flexarray_append(dm_args, "-mon");
@@ -2436,6 +2489,16 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     rc = libxl__domain_get_device_model_uid(gc, dmss);
     if (rc)
         goto out;
+
+    if (b_info->device_model_version
+            == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN &&
+        libxl_defbool_val(b_info->dm_restrict)) {
+        /* If we have to use dm_restrict, QEMU needs to be new enough
+         * and will have the new interface where we can pre-open the
+         * QMP socket. */
+        rc = libxl__pre_open_qmp_socket(gc, domid, &state->dm_monitor_fd);
+        if (rc) goto out;
+    }
 
     rc = libxl__build_device_model_args(gc, dm, domid, guest_config,
                                           &args, &envs, state,
