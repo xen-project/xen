@@ -2063,10 +2063,12 @@ retry_transaction:
 
 static void dmss_init(libxl__dm_spawn_state *dmss)
 {
+    libxl__ev_qmp_init(&dmss->qmp);
 }
 
 static void dmss_dispose(libxl__gc *gc, libxl__dm_spawn_state *dmss)
 {
+    libxl__ev_qmp_dispose(gc, &dmss->qmp);
 }
 
 static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
@@ -2451,6 +2453,9 @@ static void device_model_startup_failed(libxl__egc *egc,
                                         int rc);
 static void device_model_detached(libxl__egc *egc,
                                   libxl__spawn_state *spawn);
+static void device_model_qmp_cb(libxl__egc *egc, libxl__ev_qmp *ev,
+                                const libxl__json_object *response,
+                                int rc);
 
 /* our "next step" function, called from those callbacks and elsewhere */
 static void device_model_spawn_outcome(libxl__egc *egc,
@@ -2605,6 +2610,17 @@ retry_transaction:
     spawn->failure_cb = device_model_startup_failed;
     spawn->detached_cb = device_model_detached;
 
+    if (state->dm_monitor_fd >= 0) {
+        /* There is a valid QMP socket available now,
+         * use it to find out when QEMU is ready */
+        dmss->qmp.ao = ao;
+        dmss->qmp.callback = device_model_qmp_cb;
+        dmss->qmp.domid = domid;
+        dmss->qmp.payload_fd = -1;
+        rc = libxl__ev_qmp_send(gc, &dmss->qmp, "query-status", NULL);
+        if (rc) goto out_close;
+    }
+
     rc = libxl__spawn_spawn(egc, spawn);
     if (rc < 0)
         goto out_close;
@@ -2676,6 +2692,43 @@ static void device_model_detached(libxl__egc *egc,
 {
     libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
     device_model_spawn_outcome(egc, dmss, 0);
+}
+
+static void device_model_qmp_cb(libxl__egc *egc, libxl__ev_qmp *ev,
+                                const libxl__json_object *response,
+                                int rc)
+{
+    EGC_GC;
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(ev, *dmss, qmp);
+    const libxl__json_object *o;
+    const char *status;
+
+    libxl__ev_qmp_dispose(gc, ev);
+
+    if (rc)
+        goto failed;
+
+    o = libxl__json_map_get("status", response, JSON_STRING);
+    if (!o) {
+        LOGD(ERROR, ev->domid,
+             "Missing 'status' in response to 'query-status'");
+        LOGD(DEBUG, ev->domid, ".. instead, got: %s", JSON(response));
+        rc = ERROR_QEMU_API;
+        goto failed;
+    }
+    status = libxl__json_object_get_string(o);
+    if (strcmp(status, "running")) {
+        LOGD(ERROR, ev->domid, "Unexpected QEMU status: %s", status);
+        rc = ERROR_NOT_READY;
+        goto failed;
+    }
+
+    libxl__spawn_initiate_detach(gc, &dmss->spawn);
+    return;
+
+failed:
+    LOGD(ERROR, ev->domid, "QEMU did not start properly, rc=%d", rc);
+    libxl__spawn_initiate_failure(egc, &dmss->spawn, rc);
 }
 
 static void device_model_spawn_outcome(libxl__egc *egc,

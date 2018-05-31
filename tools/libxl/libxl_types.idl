@@ -75,6 +75,7 @@ libxl_error = Enumeration("error", [
     (-29, "QMP_COMMAND_NOT_FOUND"), # the requested command has not been found
     (-30, "QMP_DEVICE_NOT_ACTIVE"), # a device has failed to be become active
     (-31, "QMP_DEVICE_NOT_FOUND"), # the requested device has not been found
+    (-32, "QEMU_API"), # QEMU's replies don't contains expected members
     ], value_namespace = "")
 
 libxl_domain_type = Enumeration("domain_type", [

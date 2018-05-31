@@ -3933,6 +3933,7 @@ typedef void libxl__dm_spawn_cb(libxl__egc *egc, libxl__dm_spawn_state*,
 struct libxl__dm_spawn_state {
     /* mixed - spawn.ao must be initialised by user; rest is private: */
     libxl__spawn_state spawn;
+    libxl__ev_qmp qmp;
     /* filled in by user, must remain valid: */
     uint32_t guest_domid; /* domain being served */
     libxl_domain_config *guest_config;
