@@ -252,13 +252,11 @@ let string_of_access_type = function
 	*)
 
 let sanitize_data data =
-	let data = Bytes.copy data in
-	for i = 0 to Bytes.length data - 1
-	do
-		if Bytes.get data i = '\000' then
-			Bytes.set data i ' '
-	done;
-	String.escaped (Bytes.unsafe_to_string data)
+	let data = String.init
+		(String.length data)
+		(fun i -> let c = data.[i] in if c = '\000' then ' ' else c)
+	in
+	String.escaped data
 
 let activate_access_log = ref true
 let access_log_destination = ref (File (Paths.xen_log_dir ^ "/xenstored-access.log"))
@@ -291,9 +289,7 @@ let access_logging ~con ~tid ?(data="") ~level access_type =
 				let date = string_of_date() in
 				let tid = string_of_tid ~con tid in
 				let access_type = string_of_access_type access_type in
-				(* we can use unsafe_of_string here as the sanitize_data function
-				   immediately makes a copy of the data and operates on that. *)
-				let data = sanitize_data (Bytes.unsafe_of_string data) in
+				let data = sanitize_data data in
 				let prefix = prefix !access_log_destination date in
 				let msg = Printf.sprintf "%s %s %s %s" prefix tid access_type data in
 				logger.write ~level msg)

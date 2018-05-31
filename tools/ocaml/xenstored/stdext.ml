@@ -122,7 +122,7 @@ let pidfile_write filename =
 		let pid = Unix.getpid () in
 		let buf = string_of_int pid ^ "\n" in
 		let len = String.length buf in
-		if Unix.write fd (Bytes.unsafe_of_string buf) 0 len <> len
+		if Unix.write_substring fd buf 0 len <> len
 		then failwith "pidfile_write failed";
 	)
 	(fun () -> Unix.close fd)
