@@ -2123,9 +2123,6 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( value & DR_GENERAL_DETECT )
             return -EPERM;
 
-        /* Zero the IO shadow before recalculating the real %dr7 */
-        v->arch.debugreg[5] = 0;
-
         /* DR7.{G,L}E = 0 => debugging disabled for this domain. */
         if ( value & DR7_ACTIVE_MASK )
         {
@@ -2154,6 +2151,10 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
                  !(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
                 activate_debugregs(v);
         }
+        else
+            /* Zero the emulated controls if %dr7 isn't active. */
+            v->arch.debugreg[5] = 0;
+
         if ( v == curr )
             write_debugreg(7, value);
         break;
