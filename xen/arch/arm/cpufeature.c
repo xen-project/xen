@@ -69,6 +69,35 @@ void __init enable_cpu_capabilities(const struct arm_cpu_capabilities *caps)
 }
 
 /*
+ * Run through the enabled capabilities and enable() them on the calling CPU.
+ * If enabling of any capability fails the error is returned. After enabling a
+ * capability fails the error will be remembered into 'rc' and the remaining
+ * capabilities will be enabled. If enabling multiple capabilities fail the
+ * error returned by this function represents the error code of the last
+ * failure.
+ */
+int enable_nonboot_cpu_caps(const struct arm_cpu_capabilities *caps)
+{
+    int rc = 0;
+
+    for ( ; caps->matches; caps++ )
+    {
+        if ( !cpus_have_cap(caps->capability) )
+            continue;
+
+        if ( caps->enable )
+        {
+            int ret = caps->enable((void *)caps);
+
+            if ( ret )
+                rc = ret;
+        }
+    }
+
+    return rc;
+}
+
+/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"

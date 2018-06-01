@@ -88,6 +88,7 @@ void update_cpu_capabilities(const struct arm_cpu_capabilities *caps,
                              const char *info);
 
 void enable_cpu_capabilities(const struct arm_cpu_capabilities *caps);
+int enable_nonboot_cpu_caps(const struct arm_cpu_capabilities *caps);
 
 #endif /* __ASSEMBLY__ */
 

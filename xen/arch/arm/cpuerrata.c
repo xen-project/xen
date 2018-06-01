@@ -1,3 +1,4 @@
+#include <xen/cpu.h>
 #include <xen/cpumask.h>
 #include <xen/mm.h>
 #include <xen/sizes.h>
@@ -5,6 +6,7 @@
 #include <xen/spinlock.h>
 #include <xen/vmap.h>
 #include <xen/warning.h>
+#include <xen/notifier.h>
 #include <asm/cpufeature.h>
 #include <asm/cpuerrata.h>
 #include <asm/psci.h>
@@ -348,6 +350,53 @@ void __init enable_errata_workarounds(void)
 {
     enable_cpu_capabilities(arm_errata);
 }
+
+static int cpu_errata_callback(struct notifier_block *nfb,
+                               unsigned long action,
+                               void *hcpu)
+{
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_STARTING:
+        /*
+         * At CPU_STARTING phase no notifier shall return an error, because the
+         * system is designed with the assumption that starting a CPU cannot
+         * fail at this point. If an error happens here it will cause Xen to hit
+         * the BUG_ON() in notify_cpu_starting(). In future, either this
+         * notifier/enabling capabilities should be fixed to always return
+         * success/void or notify_cpu_starting() and other common code should be
+         * fixed to expect an error at CPU_STARTING phase.
+         */
+        ASSERT(system_state != SYS_STATE_boot);
+        rc = enable_nonboot_cpu_caps(arm_errata);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_errata_nfb = {
+    .notifier_call = cpu_errata_callback,
+};
+
+static int __init cpu_errata_notifier_init(void)
+{
+    register_cpu_notifier(&cpu_errata_nfb);
+
+    return 0;
+}
+/*
+ * Initialization has to be done at init rather than presmp_init phase because
+ * the callback should execute only after the secondary CPUs are initially
+ * booted (in hotplug scenarios when the system state is not boot). On boot,
+ * the enabling of errata workarounds will be triggered by the boot CPU from
+ * start_xen().
+ */
+__initcall(cpu_errata_notifier_init);
 
 /*
  * Local variables:
