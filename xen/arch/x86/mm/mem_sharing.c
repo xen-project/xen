@@ -500,7 +500,7 @@ static int audit(void)
                 continue;
             }
             o_mfn = get_gfn_query_unlocked(d, g->gfn, &t); 
-            if ( mfn_x(o_mfn) != mfn_x(mfn) )
+            if ( !mfn_eq(o_mfn, mfn) )
             {
                 MEM_SHARING_DEBUG("Incorrect P2M for d=%hu, PFN=%lx."
                                   "Expecting MFN=%lx, got %lx\n",
@@ -904,7 +904,7 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
 
     /* This tricky business is to avoid two callers deadlocking if 
      * grabbing pages in opposite client/source order */
-    if( mfn_x(smfn) == mfn_x(cmfn) )
+    if ( mfn_eq(smfn, cmfn) )
     {
         /* The pages are already the same.  We could return some
          * kind of error here, but no matter how you look at it,

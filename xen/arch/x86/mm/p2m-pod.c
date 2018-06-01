@@ -75,7 +75,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
     {
         struct domain * od;
 
-        p = mfn_to_page(_mfn(mfn_x(mfn) + i));
+        p = mfn_to_page(mfn_add(mfn, i));
         od = page_get_owner(p);
         if ( od != d )
         {

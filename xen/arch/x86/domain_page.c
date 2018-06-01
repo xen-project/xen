@@ -101,7 +101,7 @@ void *map_domain_page(mfn_t mfn)
         ASSERT(idx < dcache->entries);
         hashent->refcnt++;
         ASSERT(hashent->refcnt);
-        ASSERT(l1e_get_pfn(MAPCACHE_L1ENT(idx)) == mfn_x(mfn));
+        ASSERT(mfn_eq(l1e_get_mfn(MAPCACHE_L1ENT(idx)), mfn));
         goto out;
     }
 

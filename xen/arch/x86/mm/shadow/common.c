@@ -318,10 +318,10 @@ void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn)
     {
         oos = v->arch.paging.shadow.oos;
         idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+        if ( !mfn_eq(oos[idx], gmfn) )
             idx = (idx + 1) % SHADOW_OOS_PAGES;
 
-        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+        if ( mfn_eq(oos[idx], gmfn) )
             return;
     }
 
@@ -389,15 +389,15 @@ void oos_fixup_add(struct domain *d, mfn_t gmfn,
         oos = v->arch.paging.shadow.oos;
         oos_fixup = v->arch.paging.shadow.oos_fixup;
         idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+        if ( !mfn_eq(oos[idx], gmfn) )
             idx = (idx + 1) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+        if ( mfn_eq(oos[idx], gmfn) )
         {
             int i;
             for ( i = 0; i < SHADOW_OOS_FIXUPS; i++ )
             {
                 if ( mfn_valid(oos_fixup[idx].smfn[i])
-                     && (mfn_x(oos_fixup[idx].smfn[i]) == mfn_x(smfn))
+                     && mfn_eq(oos_fixup[idx].smfn[i], smfn)
                      && (oos_fixup[idx].off[i] == off) )
                     return;
             }
@@ -570,9 +570,9 @@ static void oos_hash_remove(struct domain *d, mfn_t gmfn)
     {
         oos = v->arch.paging.shadow.oos;
         idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+        if ( !mfn_eq(oos[idx], gmfn) )
             idx = (idx + 1) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+        if ( mfn_eq(oos[idx], gmfn) )
         {
             oos[idx] = INVALID_MFN;
             return;
@@ -595,9 +595,9 @@ mfn_t oos_snapshot_lookup(struct domain *d, mfn_t gmfn)
         oos = v->arch.paging.shadow.oos;
         oos_snapshot = v->arch.paging.shadow.oos_snapshot;
         idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+        if ( !mfn_eq(oos[idx], gmfn) )
             idx = (idx + 1) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+        if ( mfn_eq(oos[idx], gmfn) )
         {
             return oos_snapshot[idx];
         }
@@ -622,10 +622,10 @@ void sh_resync(struct domain *d, mfn_t gmfn)
         oos_fixup = v->arch.paging.shadow.oos_fixup;
         oos_snapshot = v->arch.paging.shadow.oos_snapshot;
         idx = mfn_x(gmfn) % SHADOW_OOS_PAGES;
-        if ( mfn_x(oos[idx]) != mfn_x(gmfn) )
+        if ( !mfn_eq(oos[idx], gmfn) )
             idx = (idx + 1) % SHADOW_OOS_PAGES;
 
-        if ( mfn_x(oos[idx]) == mfn_x(gmfn) )
+        if ( mfn_eq(oos[idx], gmfn) )
         {
             _sh_resync(v, gmfn, &oos_fixup[idx], oos_snapshot[idx]);
             oos[idx] = INVALID_MFN;
@@ -2231,7 +2231,7 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
 {
     struct page_info *sp = mfn_to_page(smfn);
     mfn_t pmfn;
-    void *vaddr;
+    l1_pgentry_t *vaddr;
     int rc;
 
     ASSERT(sp->u.sh.type > 0);
@@ -2241,10 +2241,8 @@ static int sh_remove_shadow_via_pointer(struct domain *d, mfn_t smfn)
     if (sp->up == 0) return 0;
     pmfn = maddr_to_mfn(sp->up);
     ASSERT(mfn_valid(pmfn));
-    vaddr = map_domain_page(pmfn);
-    ASSERT(vaddr);
-    vaddr += sp->up & (PAGE_SIZE-1);
-    ASSERT(l1e_get_pfn(*(l1_pgentry_t *)vaddr) == mfn_x(smfn));
+    vaddr = map_domain_page(pmfn) + (sp->up & (PAGE_SIZE - 1));
+    ASSERT(mfn_eq(l1e_get_mfn(*vaddr), smfn));
 
     /* Is this the only reference to this shadow? */
     rc = (sp->u.sh.count == 1) ? 1 : 0;
@@ -3128,7 +3126,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
             {
                 if ( !npte
                      || !p2m_is_ram(p2m_flags_to_type(l1e_get_flags(npte[i])))
-                     || l1e_get_pfn(npte[i]) != mfn_x(omfn) )
+                     || !mfn_eq(l1e_get_mfn(npte[i]), omfn) )
                 {
                     /* This GFN->MFN mapping has gone away */
                     sh_remove_all_shadows_and_parents(d, omfn);
@@ -3136,7 +3134,7 @@ static void sh_unshadow_for_p2m_change(struct domain *d, unsigned long gfn,
                                                 _gfn(gfn + (i << PAGE_SHIFT))) )
                         cpumask_or(&flushmask, &flushmask, d->dirty_cpumask);
                 }
-                omfn = _mfn(mfn_x(omfn) + 1);
+                omfn = mfn_add(omfn, 1);
             }
             flush_tlb_mask(&flushmask);
 

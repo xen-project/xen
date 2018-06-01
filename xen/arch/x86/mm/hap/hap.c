@@ -729,7 +729,8 @@ hap_write_p2m_entry(struct domain *d, unsigned long gfn, l1_pgentry_t *p,
          * unless the only change is an increase in access rights. */
         mfn_t omfn = l1e_get_mfn(*p);
         mfn_t nmfn = l1e_get_mfn(new);
-        flush_nestedp2m = !( mfn_x(omfn) == mfn_x(nmfn)
+
+        flush_nestedp2m = !(mfn_eq(omfn, nmfn)
             && perms_strictly_increased(old_flags, l1e_get_flags(new)) );
     }
 

@@ -1104,7 +1104,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
 
         for ( i = 0; i < (1UL << order); ++i )
         {
-            ASSERT(mfn_valid(_mfn(mfn_x(omfn) + i)));
+            ASSERT(mfn_valid(mfn_add(omfn, i)));
             set_gpfn_from_mfn(mfn_x(omfn) + i, INVALID_M2P_ENTRY);
         }
     }
@@ -1222,7 +1222,7 @@ int clear_mmio_p2m_entry(struct domain *d, unsigned long gfn_l, mfn_t mfn,
                  "gfn_to_mfn failed! gfn=%08lx type:%d\n", gfn_l, t);
         goto out;
     }
-    if ( mfn_x(mfn) != mfn_x(actual_mfn) )
+    if ( !mfn_eq(mfn, actual_mfn) )
         gdprintk(XENLOG_WARNING,
                  "no mapping between mfn %08lx and gfn %08lx\n",
                  mfn_x(mfn), gfn_l);
