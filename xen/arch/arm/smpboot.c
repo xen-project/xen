@@ -395,6 +395,8 @@ void stop_cpu(void)
     /* Make sure the write happens before we sleep forever */
     dsb(sy);
     isb();
+    call_psci_cpu_off();
+
     while ( 1 )
         wfi();
 }
