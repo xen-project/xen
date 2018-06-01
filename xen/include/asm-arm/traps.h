@@ -27,6 +27,10 @@ void handle_wo_wi(struct cpu_user_regs *regs, int regidx, bool read,
 void handle_ro_raz(struct cpu_user_regs *regs, int regidx, bool read,
                    const union hsr hsr, int min_el);
 
+/* Read only as value provided with 'val' argument */
+void handle_ro_read_val(struct cpu_user_regs *regs, int regidx, bool read,
+                        const union hsr hsr, int min_el, register_t val);
+
 /* Co-processor registers emulation (see arch/arm/vcpreg.c). */
 void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr);
 void do_cp15_64(struct cpu_user_regs *regs, const union hsr hsr);

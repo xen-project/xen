@@ -1739,12 +1739,13 @@ void handle_wo_wi(struct cpu_user_regs *regs,
     advance_pc(regs, hsr);
 }
 
-/* Read only as read as zero */
-void handle_ro_raz(struct cpu_user_regs *regs,
-                   int regidx,
-                   bool read,
-                   const union hsr hsr,
-                   int min_el)
+/* Read only as value provided with 'val' argument of this function */
+void handle_ro_read_val(struct cpu_user_regs *regs,
+                        int regidx,
+                        bool read,
+                        const union hsr hsr,
+                        int min_el,
+                        register_t val)
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
@@ -1753,11 +1754,20 @@ void handle_ro_raz(struct cpu_user_regs *regs,
 
     if ( !read )
         return inject_undef_exception(regs, hsr);
-    /* else: raz */
 
-    set_user_reg(regs, regidx, 0);
+    set_user_reg(regs, regidx, val);
 
     advance_pc(regs, hsr);
+}
+
+/* Read only as read as zero */
+inline void handle_ro_raz(struct cpu_user_regs *regs,
+                          int regidx,
+                          bool read,
+                          const union hsr hsr,
+                          int min_el)
+{
+    handle_ro_read_val(regs, regidx, read, hsr, min_el, 0);
 }
 
 void dump_guest_s1_walk(struct domain *d, vaddr_t addr)

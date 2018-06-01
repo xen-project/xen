@@ -57,13 +57,15 @@ void do_sysreg(struct cpu_user_regs *regs,
      * ARMv8 (DDI 0487A.d): D1-1509 Table D1-58
      *
      * Unhandled:
-     *    OSLSR_EL1
      *    DBGPRCR_EL1
      */
     case HSR_SYSREG_OSLAR_EL1:
         return handle_wo_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
     case HSR_SYSREG_OSDLR_EL1:
         return handle_raz_wi(regs, regidx, hsr.sysreg.read, hsr, 1);
+    case HSR_SYSREG_OSLSR_EL1:
+        return handle_ro_read_val(regs, regidx, hsr.sysreg.read, hsr, 1,
+                                  1 << 3);
 
     /*
      * MDCR_EL2.TDA
