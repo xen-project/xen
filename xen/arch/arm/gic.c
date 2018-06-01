@@ -27,6 +27,8 @@
 #include <xen/list.h>
 #include <xen/device_tree.h>
 #include <xen/acpi.h>
+#include <xen/cpu.h>
+#include <xen/notifier.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
 #include <asm/platform.h>
@@ -461,6 +463,35 @@ int gic_iomem_deny_access(const struct domain *d)
 {
     return gic_hw_ops->iomem_deny_access(d);
 }
+
+static int cpu_gic_callback(struct notifier_block *nfb,
+                            unsigned long action,
+                            void *hcpu)
+{
+    switch ( action )
+    {
+    case CPU_DYING:
+        /* This is reverting the work done in init_maintenance_interrupt */
+        release_irq(gic_hw_ops->info->maintenance_irq, NULL);
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_gic_nfb = {
+    .notifier_call = cpu_gic_callback,
+};
+
+static int __init cpu_gic_notifier_init(void)
+{
+    register_cpu_notifier(&cpu_gic_nfb);
+
+    return 0;
+}
+__initcall(cpu_gic_notifier_init);
 
 /*
  * Local variables:
