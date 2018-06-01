@@ -52,8 +52,8 @@ nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 static unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
        __attribute__((__aligned__(STACK_SIZE)));
 
-/* Initial boot cpu data */
-struct init_info __initdata init_data =
+/* Boot cpu data */
+struct init_info init_data =
 {
     .stack = cpu0_boot_stack,
 };
