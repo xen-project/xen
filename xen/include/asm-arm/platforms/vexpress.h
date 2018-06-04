@@ -26,12 +26,6 @@
 /* Board-specific: base address of system controller */
 #define SP810_ADDRESS 0x1C020000
 
-#ifndef __ASSEMBLY__
-#include <xen/inttypes.h>
-
-int vexpress_syscfg(int write, int function, int device, uint32_t *data);
-#endif
-
 #endif /* __ASM_ARM_PLATFORMS_VEXPRESS_H */
 /*
  * Local variables:
