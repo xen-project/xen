@@ -420,7 +420,7 @@ sub ismailinglist ($) {
 sub getmaintainers ($$$) {
     my ($file, $rto, $rcc) = @_;
     my $fh;
-    open($fh, "-|", $get_maintainer, @get_maintainer_args, '-f', $file)
+    open($fh, "-|", $get_maintainer, @get_maintainer_args, $file)
         or die "Failed to open '$get_maintainer'\n";
     while(my $line = <$fh>) {
         chomp $line;
