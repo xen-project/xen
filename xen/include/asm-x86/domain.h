@@ -563,6 +563,9 @@ struct arch_vcpu
      * and thus should be saved/restored. */
     bool_t nonlazy_xstate_used;
 
+    /* Restore all FPU state (lazy and non-lazy state) on context switch? */
+    bool fully_eager_fpu;
+
     struct vmce vmce;
 
     struct paging_vcpu paging;
