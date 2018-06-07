@@ -215,8 +215,25 @@ void vcpu_restore_fpu_eager(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
     
+    if ( v->arch.fully_eager_fpu )
+    {
+        /* Avoid recursion */
+        clts();
+
+        if ( cpu_has_xsave )
+            fpu_xrstor(v, XSTATE_ALL);
+        else
+            fpu_fxrstor(v);
+
+        v->fpu_initialised = 1;
+        v->fpu_dirtied = 1;
+
+        /* Xen doesn't need TS set, but the guest might. */
+        if ( is_pv_vcpu(v) && (v->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS) )
+            stts();
+    }
     /* save the nonlazy extended state which is not tracked by CR0.TS bit */
-    if ( v->arch.nonlazy_xstate_used )
+    else if ( v->arch.nonlazy_xstate_used )
     {
         /* Avoid recursion */
         clts();        
@@ -237,6 +254,8 @@ void vcpu_restore_fpu_lazy(struct vcpu *v)
 
     if ( v->fpu_dirtied )
         return;
+
+    ASSERT(!v->arch.fully_eager_fpu);
 
     if ( cpu_has_xsave )
         fpu_xrstor(v, XSTATE_LAZY);

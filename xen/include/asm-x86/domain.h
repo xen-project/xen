@@ -574,6 +574,9 @@ struct arch_vcpu
      * and thus should be saved/restored. */
     bool_t nonlazy_xstate_used;
 
+    /* Restore all FPU state (lazy and non-lazy state) on context switch? */
+    bool_t fully_eager_fpu;
+
     /*
      * The SMAP check policy when updating runstate_guest(v) and the
      * secondary system time.
