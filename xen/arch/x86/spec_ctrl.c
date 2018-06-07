@@ -44,6 +44,7 @@ static enum ind_thunk {
 static int8_t __initdata opt_ibrs = -1;
 bool_t __read_mostly opt_ibpb = 1;
 bool_t __read_mostly opt_ssbd = 0;
+int8_t __read_mostly opt_eager_fpu = -1;
 
 bool_t __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -114,6 +115,7 @@ static int __init parse_spec_ctrl(char *s)
             opt_thunk = THUNK_JMP;
             opt_ibrs = 0;
             opt_ibpb = 0;
+            opt_eager_fpu = 0;
         }
         else if ( val > 0 )
             rc = -EINVAL;
@@ -167,6 +169,8 @@ static int __init parse_spec_ctrl(char *s)
             opt_ibpb = val;
         else if ( (val = parse_boolean("ssbd", s, ss)) >= 0 )
             opt_ssbd = val;
+        else if ( (val = parse_boolean("eager-fpu", s, ss)) >= 0 )
+            opt_eager_fpu = val;
         else
             rc = -EINVAL;
 
@@ -223,15 +227,19 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
      * Alternatives blocks for protecting against and/or virtualising
      * mitigation support for guests.
      */
-    printk("  Support for VMs: PV:%s%s%s, HVM:%s%s%s\n",
+    printk("  Support for VMs: PV:%s%s%s%s, HVM:%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
-            boot_cpu_has(X86_FEATURE_SC_RSB_PV))     ? ""               : " None",
+            boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
+            opt_eager_fpu)                           ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
            boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
+           opt_eager_fpu                             ? " EAGER_FPU"     : "",
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
-            boot_cpu_has(X86_FEATURE_SC_RSB_HVM))    ? ""               : " None",
+            boot_cpu_has(X86_FEATURE_SC_RSB_HVM) ||
+            opt_eager_fpu)                           ? ""               : " None",
            boot_cpu_has(X86_FEATURE_SC_MSR_HVM)      ? " MSR_SPEC_CTRL" : "",
-           boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "");
+           boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "",
+           opt_eager_fpu                             ? " EAGER_FPU"     : "");
 
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s\n",
            opt_xpti & OPT_XPTI_DOM0 ? "enabled" : "disabled",
@@ -318,6 +326,82 @@ static bool_t __init retpoline_safe(uint64_t caps)
         printk("Unrecognised CPU model %#x - assuming not reptpoline safe\n",
                boot_cpu_data.x86_model);
         return 0;
+    }
+}
+
+/* Calculate whether this CPU speculates past #NM */
+static bool_t __init should_use_eager_fpu(void)
+{
+    /*
+     * Assume all unrecognised processors are ok.  This is only known to
+     * affect Intel Family 6 processors.
+     */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return 0;
+
+    switch ( boot_cpu_data.x86_model )
+    {
+        /*
+         * Core processors since at least Nehalem are vulnerable.
+         */
+    case 0x1e: /* Nehalem */
+    case 0x1f: /* Auburndale / Havendale */
+    case 0x1a: /* Nehalem EP */
+    case 0x2e: /* Nehalem EX */
+    case 0x25: /* Westmere */
+    case 0x2c: /* Westmere EP */
+    case 0x2f: /* Westmere EX */
+    case 0x2a: /* SandyBridge */
+    case 0x2d: /* SandyBridge EP/EX */
+    case 0x3a: /* IvyBridge */
+    case 0x3e: /* IvyBridge EP/EX */
+    case 0x3c: /* Haswell */
+    case 0x3f: /* Haswell EX/EP */
+    case 0x45: /* Haswell D */
+    case 0x46: /* Haswell H */
+    case 0x3d: /* Broadwell */
+    case 0x47: /* Broadwell H */
+    case 0x4f: /* Broadwell EP/EX */
+    case 0x56: /* Broadwell D */
+    case 0x4e: /* Skylake M */
+    case 0x55: /* Skylake X */
+    case 0x5e: /* Skylake D */
+    case 0x66: /* Cannonlake */
+    case 0x67: /* Cannonlake? */
+    case 0x8e: /* Kabylake M */
+    case 0x9e: /* Kabylake D */
+        return 1;
+
+        /*
+         * Atom processors are not vulnerable.
+         */
+    case 0x1c: /* Pineview */
+    case 0x26: /* Lincroft */
+    case 0x27: /* Penwell */
+    case 0x35: /* Cloverview */
+    case 0x36: /* Cedarview */
+    case 0x37: /* Baytrail / Valleyview (Silvermont) */
+    case 0x4d: /* Avaton / Rangely (Silvermont) */
+    case 0x4c: /* Cherrytrail / Brasswell */
+    case 0x4a: /* Merrifield */
+    case 0x5a: /* Moorefield */
+    case 0x5c: /* Goldmont */
+    case 0x5f: /* Denverton */
+    case 0x7a: /* Gemini Lake */
+        return 0;
+
+        /*
+         * Knights processors are not vulnerable.
+         */
+    case 0x57: /* Knights Landing */
+    case 0x85: /* Knights Mill */
+        return 0;
+
+    default:
+        printk("Unrecognised CPU model %#x - assuming vulnerable to LazyFPU\n",
+               boot_cpu_data.x86_model);
+        return 1;
     }
 }
 
@@ -518,6 +602,10 @@ void __init init_speculation_mitigations(void)
     /* Check we have hardware IBPB support before using it... */
     if ( !boot_cpu_has(X86_FEATURE_IBRSB) && !boot_cpu_has(X86_FEATURE_IBPB) )
         opt_ibpb = 0;
+
+    /* Check whether Eager FPU should be enabled by default. */
+    if ( opt_eager_fpu == -1 )
+        opt_eager_fpu = should_use_eager_fpu();
 
     /* (Re)init BSP state now that default_spec_ctrl_flags has been calculated. */
     init_shadow_spec_ctrl_state();

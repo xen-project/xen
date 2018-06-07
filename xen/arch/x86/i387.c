@@ -16,6 +16,7 @@
 #include <asm/i387.h>
 #include <asm/xstate.h>
 #include <asm/asm_defns.h>
+#include <asm/spec_ctrl.h>
 
 /*******************************/
 /*     FPU Restore Functions   */
@@ -308,6 +309,8 @@ int vcpu_init_fpu(struct vcpu *v)
 {
     int rc;
     
+    v->arch.fully_eager_fpu = opt_eager_fpu;
+
     if ( (rc = xstate_alloc_save_area(v)) != 0 )
         return rc;
 
