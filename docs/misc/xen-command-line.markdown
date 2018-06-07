@@ -1544,7 +1544,7 @@ false disable the quirk workaround, which is also the default.
 
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb}=<bool>,
->              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd}=<bool> ]`
+>              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,eager-fpu}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -1593,6 +1593,11 @@ option can be used to force or prevent Xen using the feature itself.  On AMD
 hardware, this is a global option applied at boot, and not virtualised for
 guest use.  On Intel hardware, the feature is virtualised for guests,
 independently of Xen's choice of setting.
+
+On all hardware, the `eager-fpu=` option can be used to force or prevent Xen
+from using fully eager FPU context switches.  This is currently implemented as
+a global control.  By default, Xen will choose to use fully eager context
+switches on hardware believed to speculate past #NM exceptions.
 
 ### sync\_console
 > `= <boolean>`
