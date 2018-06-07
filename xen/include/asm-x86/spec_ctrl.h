@@ -28,6 +28,7 @@ void init_speculation_mitigations(void);
 
 extern bool_t opt_ibpb;
 extern bool_t opt_ssbd;
+extern int8_t opt_eager_fpu;
 
 extern bool_t bsp_delay_spec_ctrl;
 extern uint8_t default_xen_spec_ctrl;
