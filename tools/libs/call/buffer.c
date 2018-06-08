@@ -151,6 +151,7 @@ void xencall_free_buffer_pages(xencall_handle *xcall, void *p, size_t nr_pages)
 
 struct allocation_header {
     int nr_pages;
+    int pad[3];
 };
 
 void *xencall_alloc_buffer(xencall_handle *xcall, size_t size)
