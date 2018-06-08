@@ -96,6 +96,25 @@
  *      Maximum Y coordinate (height) to be used by the frontend
  *      while reporting input events, pixels, [0; UINT32_MAX].
  *
+ *----------------------- Multi-touch Device Parameters ----------------------
+ *
+ * multi-touch-num-contacts
+ *      Values:         <uint>
+ *
+ *      Number of simultaneous touches reported.
+ *
+ * multi-touch-width
+ *      Values:         <uint>
+ *
+ *      Width of the touch area to be used by the frontend
+ *      while reporting input events, pixels, [0; UINT32_MAX].
+ *
+ * multi-touch-height
+ *      Values:         <uint>
+ *
+ *      Height of the touch area to be used by the frontend
+ *      while reporting input events, pixels, [0; UINT32_MAX].
+ *
  *****************************************************************************
  *                            Frontend XenBus Nodes
  *****************************************************************************
@@ -143,25 +162,6 @@
  *
  *      OBSOLETE, not recommended for use.
  *      PFN of the shared page.
- *
- *----------------------- Multi-touch Device Parameters -----------------------
- *
- * multi-touch-num-contacts
- *      Values:         <uint>
- *
- *      Number of simultaneous touches reported.
- *
- * multi-touch-width
- *      Values:         <uint>
- *
- *      Width of the touch area to be used by the frontend
- *      while reporting input events, pixels, [0; UINT32_MAX].
- *
- * multi-touch-height
- *      Values:         <uint>
- *
- *      Height of the touch area to be used by the frontend
- *      while reporting input events, pixels, [0; UINT32_MAX].
  */
 
 /*
