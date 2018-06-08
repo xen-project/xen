@@ -82,6 +82,15 @@
  *      for pointer devices should set this to 1. Raw (unscaled) values have
  *      a range of [0, 0x7fff].
  *
+ *-----------------------  Device Instance Parameters ------------------------
+ *
+ * unique-id
+ *      Values:         <string>
+ *
+ *      After device instance initialization it is assigned a unique ID,
+ *      so every instance of the frontend can be identified by the backend
+ *      by this ID. This can be UUID or such.
+ *
  *------------------------- Pointer Device Parameters ------------------------
  *
  * width
@@ -204,6 +213,7 @@
 #define XENKBD_FIELD_MT_WIDTH          "multi-touch-width"
 #define XENKBD_FIELD_MT_HEIGHT         "multi-touch-height"
 #define XENKBD_FIELD_MT_NUM_CONTACTS   "multi-touch-num-contacts"
+#define XENKBD_FIELD_UNIQUE_ID         "unique-id"
 
 /* OBSOLETE, not recommended for use */
 #define XENKBD_FIELD_RING_REF          "page-ref"
