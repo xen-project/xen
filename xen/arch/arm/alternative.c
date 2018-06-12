@@ -97,12 +97,16 @@ static u32 get_alt_insn(const struct alt_instr *alt,
 /*
  * The region patched should be read-write to allow __apply_alternatives
  * to replacing the instructions when necessary.
+ *
+ * @update_offset: Offset between the region patched and the writable
+ * region for the update. 0 if the patched region is writable.
  */
-static int __apply_alternatives(const struct alt_region *region)
+static int __apply_alternatives(const struct alt_region *region,
+                                paddr_t update_offset)
 {
     const struct alt_instr *alt;
-    const u32 *replptr;
-    u32 *origptr;
+    const u32 *replptr, *origptr;
+    u32 *updptr;
 
     printk(XENLOG_INFO "alternatives: Patching with alt table %p -> %p\n",
            region->begin, region->end);
@@ -118,6 +122,7 @@ static int __apply_alternatives(const struct alt_region *region)
         BUG_ON(alt->alt_len != alt->orig_len);
 
         origptr = ALT_ORIG_PTR(alt);
+        updptr = (void *)origptr + update_offset;
         replptr = ALT_REPL_PTR(alt);
 
         nr_inst = alt->alt_len / sizeof(insn);
@@ -125,7 +130,7 @@ static int __apply_alternatives(const struct alt_region *region)
         for ( i = 0; i < nr_inst; i++ )
         {
             insn = get_alt_insn(alt, origptr + i, replptr + i);
-            *(origptr + i) = cpu_to_le32(insn);
+            *(updptr + i) = cpu_to_le32(insn);
         }
 
         /* Ensure the new instructions reached the memory and nuke */
@@ -162,9 +167,6 @@ static int __apply_alternatives_multi_stop(void *unused)
         paddr_t xen_size = _end - _start;
         unsigned int xen_order = get_order_from_bytes(xen_size);
         void *xenmap;
-        struct virtual_region patch_region = {
-            .list = LIST_HEAD_INIT(patch_region.list),
-        };
 
         BUG_ON(patched);
 
@@ -177,30 +179,12 @@ static int __apply_alternatives_multi_stop(void *unused)
         /* Re-mapping Xen is not expected to fail during boot. */
         BUG_ON(!xenmap);
 
-        /*
-         * If we generate a new branch instruction, the target will be
-         * calculated in this re-mapped Xen region. So we have to register
-         * this re-mapped Xen region as a virtual region temporarily.
-         */
-        patch_region.start = xenmap;
-        patch_region.end = xenmap + xen_size;
-        register_virtual_region(&patch_region);
+        region.begin = __alt_instructions;
+        region.end = __alt_instructions_end;
 
-        /*
-         * Find the virtual address of the alternative region in the new
-         * mapping.
-         * alt_instr contains relative offset, so the function
-         * __apply_alternatives will patch in the re-mapped version of
-         * Xen.
-         */
-        region.begin = (void *)__alt_instructions - (void *)_start + xenmap;
-        region.end = (void *)__alt_instructions_end - (void *)_start + xenmap;
-
-        ret = __apply_alternatives(&region);
+        ret = __apply_alternatives(&region, xenmap - (void *)_start);
         /* The patching is not expected to fail during boot. */
         BUG_ON(ret != 0);
-
-        unregister_virtual_region(&patch_region);
 
         vunmap(xenmap);
 
@@ -235,7 +219,7 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
         .end = end,
     };
 
-    return __apply_alternatives(&region);
+    return __apply_alternatives(&region, 0);
 }
 
 /*
