@@ -2034,8 +2034,10 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
 {
     if ( guest_mode(regs) )
     {
+        struct vcpu *v = current;
+
         /* If the guest has disabled the workaround, bring it back on. */
-        if ( needs_ssbd_flip(current) )
+        if ( needs_ssbd_flip(v) )
             arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
 
         /*
@@ -2044,8 +2046,8 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
          * but the crucial bit is "On taking a vSError interrupt, HCR_EL2.VSE
          * (alias of HCR.VA) is cleared to 0."
          */
-        if ( current->arch.hcr_el2 & HCR_VA )
-            current->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
+        if ( v->arch.hcr_el2 & HCR_VA )
+            v->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
 
 #ifdef CONFIG_NEW_VGIC
         /*
@@ -2055,11 +2057,11 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
          * TODO: Investigate whether this is necessary to do on every
          * trap and how it can be optimised.
          */
-        vtimer_update_irqs(current);
-        vcpu_update_evtchn_irq(current);
+        vtimer_update_irqs(v);
+        vcpu_update_evtchn_irq(v);
 #endif
 
-        vgic_sync_from_lrs(current);
+        vgic_sync_from_lrs(v);
     }
 }
 
