@@ -30,6 +30,8 @@
 #include <asm/byteorder.h>
 #include <asm/cpufeature.h>
 #include <asm/insn.h>
+/* XXX: Move ARCH_PATCH_INSN_SIZE out of livepatch.h */
+#include <asm/livepatch.h>
 #include <asm/page.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
@@ -94,6 +96,23 @@ static u32 get_alt_insn(const struct alt_instr *alt,
     return insn;
 }
 
+static void patch_alternative(const struct alt_instr *alt,
+                              const uint32_t *origptr,
+                              uint32_t *updptr, int nr_inst)
+{
+    const uint32_t *replptr;
+    unsigned int i;
+
+    replptr = ALT_REPL_PTR(alt);
+    for ( i = 0; i < nr_inst; i++ )
+    {
+        uint32_t insn;
+
+        insn = get_alt_insn(alt, origptr + i, replptr + i);
+        updptr[i] = cpu_to_le32(insn);
+    }
+}
+
 /*
  * The region patched should be read-write to allow __apply_alternatives
  * to replacing the instructions when necessary.
@@ -105,33 +124,38 @@ static int __apply_alternatives(const struct alt_region *region,
                                 paddr_t update_offset)
 {
     const struct alt_instr *alt;
-    const u32 *replptr, *origptr;
+    const u32 *origptr;
     u32 *updptr;
+    alternative_cb_t alt_cb;
 
     printk(XENLOG_INFO "alternatives: Patching with alt table %p -> %p\n",
            region->begin, region->end);
 
     for ( alt = region->begin; alt < region->end; alt++ )
     {
-        u32 insn;
-        int i, nr_inst;
+        int nr_inst;
 
-        if ( !cpus_have_cap(alt->cpufeature) )
+        /* Use ARM_CB_PATCH as an unconditional patch */
+        if ( alt->cpufeature < ARM_CB_PATCH &&
+             !cpus_have_cap(alt->cpufeature) )
             continue;
 
-        BUG_ON(alt->alt_len != alt->orig_len);
+        if ( alt->cpufeature == ARM_CB_PATCH )
+            BUG_ON(alt->alt_len != 0);
+        else
+            BUG_ON(alt->alt_len != alt->orig_len);
 
         origptr = ALT_ORIG_PTR(alt);
         updptr = (void *)origptr + update_offset;
-        replptr = ALT_REPL_PTR(alt);
 
-        nr_inst = alt->alt_len / sizeof(insn);
+        nr_inst = alt->orig_len / ARCH_PATCH_INSN_SIZE;
 
-        for ( i = 0; i < nr_inst; i++ )
-        {
-            insn = get_alt_insn(alt, origptr + i, replptr + i);
-            *(updptr + i) = cpu_to_le32(insn);
-        }
+        if ( alt->cpufeature < ARM_CB_PATCH )
+            alt_cb = patch_alternative;
+        else
+            alt_cb = ALT_REPL_PTR(alt);
+
+        alt_cb(alt, origptr, updptr, nr_inst);
 
         /* Ensure the new instructions reached the memory and nuke */
         clean_and_invalidate_dcache_va_range(origptr,

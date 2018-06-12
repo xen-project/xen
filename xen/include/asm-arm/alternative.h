@@ -3,6 +3,8 @@
 
 #include <asm/cpufeature.h>
 
+#define ARM_CB_PATCH ARM_NCAPS
+
 #ifndef __ASSEMBLY__
 
 #include <xen/init.h>
@@ -18,16 +20,24 @@ struct alt_instr {
 };
 
 /* Xen: helpers used by common code. */
-#define __ALT_PTR(a,f)		((u32 *)((void *)&(a)->f + (a)->f))
+#define __ALT_PTR(a,f)		((void *)&(a)->f + (a)->f)
 #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
 #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+
+typedef void (*alternative_cb_t)(const struct alt_instr *alt,
+				 const uint32_t *origptr, uint32_t *updptr,
+				 int nr_inst);
 
 void __init apply_alternatives_all(void);
 int apply_alternatives(const struct alt_instr *start, const struct alt_instr *end);
 
-#define ALTINSTR_ENTRY(feature)						      \
+#define ALTINSTR_ENTRY(feature, cb)					      \
 	" .word 661b - .\n"				/* label           */ \
+	" .if " __stringify(cb) " == 0\n"				      \
 	" .word 663f - .\n"				/* new instruction */ \
+	" .else\n"							      \
+	" .word " __stringify(cb) "- .\n"		/* callback */	      \
+	" .endif\n"							      \
 	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
 	" .byte 662b-661b\n"				/* source len      */ \
 	" .byte 664f-663f\n"				/* replacement len */
@@ -45,15 +55,18 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
  * but most assemblers die if insn1 or insn2 have a .inst. This should
  * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
  * containing commit 4e4d08cf7399b606 or c1baaddf8861).
+ *
+ * Alternatives with callbacks do not generate replacement instructions.
  */
-#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled)	\
+#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled, cb)	\
 	".if "__stringify(cfg_enabled)" == 1\n"				\
 	"661:\n\t"							\
 	oldinstr "\n"							\
 	"662:\n"							\
 	".pushsection .altinstructions,\"a\"\n"				\
-	ALTINSTR_ENTRY(feature)						\
+	ALTINSTR_ENTRY(feature,cb)					\
 	".popsection\n"							\
+	" .if " __stringify(cb) " == 0\n"				\
 	".pushsection .altinstr_replacement, \"a\"\n"			\
 	"663:\n\t"							\
 	newinstr "\n"							\
@@ -61,11 +74,17 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
 	".popsection\n\t"						\
 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
 	".org	. - (662b-661b) + (664b-663b)\n"			\
+	".else\n\t"							\
+	"663:\n\t"							\
+	"664:\n\t"							\
+	".endif\n"							\
 	".endif\n"
 
 #define _ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg, ...)	\
-	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg))
+	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg), 0)
 
+#define ALTERNATIVE_CB(oldinstr, cb) \
+	__ALTERNATIVE_CFG(oldinstr, "NOT_AN_INSTRUCTION", ARM_CB_PATCH, 1, cb)
 #else
 
 #include <asm/asm_defns.h>
@@ -126,6 +145,14 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
 663:
 .endm
 
+.macro alternative_cb cb
+	.set .Lasm_alt_mode, 0
+	.pushsection .altinstructions, "a"
+	altinstruction_entry 661f, \cb, ARM_CB_PATCH, 662f-661f, 0
+	.popsection
+661:
+.endm
+
 /*
  * Complete an alternative code sequence.
  */
@@ -133,6 +160,13 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
 664:	.popsection
 	.org	. - (664b-663b) + (662b-661b)
 	.org	. - (662b-661b) + (664b-663b)
+.endm
+
+/*
+ * Callback-based alternative epilogue
+ */
+.macro alternative_cb_end
+662:
 .endm
 
 #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
