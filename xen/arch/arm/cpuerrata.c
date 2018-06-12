@@ -9,6 +9,7 @@
 #include <xen/notifier.h>
 #include <asm/cpufeature.h>
 #include <asm/cpuerrata.h>
+#include <asm/insn.h>
 #include <asm/psci.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
@@ -273,6 +274,23 @@ static int __init parse_spec_ctrl(const char *s)
     return rc;
 }
 custom_param("spec-ctrl", parse_spec_ctrl);
+
+/* Arm64 only for now as for Arm32 the workaround is currently handled in C. */
+#ifdef CONFIG_ARM_64
+void __init arm_enable_wa2_handling(const struct alt_instr *alt,
+                                    const uint32_t *origptr,
+                                    uint32_t *updptr, int nr_inst)
+{
+    BUG_ON(nr_inst != 1);
+
+    /*
+     * Only allow mitigation on guest ARCH_WORKAROUND_2 if the SSBD
+     * state allow it to be flipped.
+     */
+    if ( get_ssbd_state() == ARM_SSBD_RUNTIME )
+        *updptr = aarch64_insn_gen_nop();
+}
+#endif
 
 /*
  * Assembly code may use the variable directly, so we need to make sure

@@ -22,6 +22,7 @@
 void __dummy__(void)
 {
    OFFSET(UREGS_X0, struct cpu_user_regs, x0);
+   OFFSET(UREGS_X1, struct cpu_user_regs, x1);
    OFFSET(UREGS_LR, struct cpu_user_regs, lr);
 
    OFFSET(UREGS_SP, struct cpu_user_regs, sp);
@@ -45,6 +46,7 @@ void __dummy__(void)
    BLANK();
 
    DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
+   OFFSET(CPUINFO_flags, struct cpu_info, flags);
 
    OFFSET(VCPU_arch_saved_context, struct vcpu, arch.saved_context);
 
