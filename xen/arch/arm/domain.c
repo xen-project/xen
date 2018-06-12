@@ -21,6 +21,7 @@
 #include <xen/wait.h>
 
 #include <asm/alternative.h>
+#include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
 #include <asm/current.h>
 #include <asm/event.h>
@@ -571,6 +572,13 @@ int vcpu_initialise(struct vcpu *v)
 
     if ( (rc = vcpu_vtimer_init(v)) != 0 )
         goto fail;
+
+    /*
+     * The workaround 2 (i.e SSBD mitigation) is enabled by default if
+     * supported.
+     */
+    if ( get_ssbd_state() == ARM_SSBD_RUNTIME )
+        v->arch.cpu_info->flags |= CPUINFO_WORKAROUND_2_FLAG;
 
     return rc;
 

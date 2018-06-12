@@ -2021,10 +2021,23 @@ inject_abt:
         inject_iabt_exception(regs, gva, hsr.len);
 }
 
+static inline bool needs_ssbd_flip(struct vcpu *v)
+{
+    if ( !check_workaround_ssbd() )
+        return false;
+
+    return !(v->arch.cpu_info->flags & CPUINFO_WORKAROUND_2_FLAG) &&
+             cpu_require_ssbd_mitigation();
+}
+
 static void enter_hypervisor_head(struct cpu_user_regs *regs)
 {
     if ( guest_mode(regs) )
     {
+        /* If the guest has disabled the workaround, bring it back on. */
+        if ( needs_ssbd_flip(current) )
+            arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+
         /*
          * If we pended a virtual abort, preserve it until it gets cleared.
          * See ARM ARM DDI 0487A.j D1.14.3 (Virtual Interrupts) for details,
@@ -2269,6 +2282,13 @@ void leave_hypervisor_tail(void)
              * to skip synchronizing SErrors for other SErrors handle options.
              */
             SYNCHRONIZE_SERROR(SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT);
+
+            /*
+             * The hypervisor runs with the workaround always present.
+             * If the guest wants it disabled, so be it...
+             */
+            if ( needs_ssbd_flip(current) )
+                arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
 
             return;
         }
