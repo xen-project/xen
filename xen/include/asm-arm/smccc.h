@@ -254,9 +254,9 @@ struct arm_smccc_res {
 
 #define ARM_SMCCC_ARCH_WORKAROUND_1_FID             \
     ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
-                      ARM_SMCCC_CONV_32,            \
-                      ARM_SMCCC_OWNER_ARCH,         \
-                      0x8000)
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_ARCH,        \
+                       0x8000)
 
 #define ARM_SMCCC_ARCH_WORKAROUND_2_FID             \
     ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
