@@ -171,8 +171,6 @@ static void __init processor_id(void)
     }
 
     processor_setup();
-
-    check_local_cpu_errata();
 }
 
 void dt_unreserved_regions(paddr_t s, paddr_t e,
@@ -778,6 +776,12 @@ void __init start_xen(unsigned long boot_phys_offset,
     cpus = smp_get_max_cpus();
     printk(XENLOG_INFO "SMP: Allowing %u CPUs\n", cpus);
     nr_cpu_ids = cpus;
+
+    /*
+     * Some errata relies on SMCCC version which is detected by psci_init()
+     * (called from smp_init_cpus()).
+     */
+    check_local_cpu_errata();
 
     init_xen_time();
 
