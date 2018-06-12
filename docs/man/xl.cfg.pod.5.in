@@ -1288,7 +1288,7 @@ Specifies virtual connectors for the device in following format
 
 =item C<id>
 
-String connector ID. Space, comma symbols are not allowed.
+String connector unique id. Space, comma symbols are not allowed.
 
 =item C<W>
 

@@ -809,7 +809,7 @@ libxl_device_channel = Struct("device_channel", [
 ])
 
 libxl_connector_param = Struct("connector_param", [
-    ("id", string),
+    ("unique_id", string),
     ("width", uint32),
     ("height", uint32)
     ])
@@ -935,7 +935,7 @@ libxl_physinfo = Struct("physinfo", [
     ], dir=DIR_OUT)
 
 libxl_connectorinfo = Struct("connectorinfo", [
-    ("id", string),
+    ("unique_id", string),
     ("width", uint32),
     ("height", uint32),
     ("req_evtch", integer),

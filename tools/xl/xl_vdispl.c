@@ -104,7 +104,7 @@ int main_vdispllist(int argc, char **argv)
                    printf("\tConnector: %d, id: %s, width: %d, height: %d, "
                           "req-rref: %d, req-evtch: %d, "
                           "evt-rref: %d, evt-evtch: %d\n",
-                          j, vdisplinfo.connectors[j].id,
+                          j, vdisplinfo.connectors[j].unique_id,
                           vdisplinfo.connectors[j].width,
                           vdisplinfo.connectors[j].height,
                           vdisplinfo.connectors[j].req_rref,

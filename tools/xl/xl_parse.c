@@ -827,7 +827,7 @@ int parse_vdispl_config(libxl_device_vdispl *vdispl, char *token)
             char *resolution;
 
             rc = split_string_into_pair(connectors[i], ":",
-                                        &vdispl->connectors[i].id,
+                                        &vdispl->connectors[i].unique_id,
                                         &resolution);
 
             rc= sscanf(resolution, "%ux%u", &vdispl->connectors[i].width,
