@@ -226,11 +226,11 @@ guest_sync:
         mrs     x1, esr_el2
         lsr     x1, x1, #HSR_EC_SHIFT           /* x1 = ESR_EL2.EC */
         cmp     x1, #HSR_EC_HVC64
-        b.ne    1f                              /* Not a HVC skip fastpath. */
+        b.ne    guest_sync_slowpath             /* Not a HVC skip fastpath. */
 
         mrs     x1, esr_el2
         and     x1, x1, #0xffff                 /* Check the immediate [0:16] */
-        cbnz    x1, 1f                          /* should be 0 for HVC #0 */
+        cbnz    x1, guest_sync_slowpath         /* should be 0 for HVC #0 */
 
         /*
          * Fastest path possible for ARM_SMCCC_ARCH_WORKAROUND_1.
@@ -241,7 +241,7 @@ guest_sync:
          * be encoded as an immediate for cmp.
          */
         eor     w0, w0, #ARM_SMCCC_ARCH_WORKAROUND_1_FID
-        cbnz    w0, 1f
+        cbnz    w0, guest_sync_slowpath
 
         /*
          * Clobber both x0 and x1 to prevent leakage. Note that thanks
@@ -250,7 +250,7 @@ guest_sync:
         mov     x1, xzr
         eret
 
-1:
+guest_sync_slowpath:
         /*
          * x0/x1 may have been scratch by the fast path above, so avoid
          * to save them.
