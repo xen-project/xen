@@ -1756,6 +1756,24 @@ enforces the maximum theoretically necessary timeout of 670ms. Any number
 is being interpreted as a custom timeout in milliseconds. Zero or boolean
 false disable the quirk workaround, which is also the default.
 
+### spec-ctrl (Arm)
+> `= List of [ ssbd=force-disable|runtime|force-enable ]`
+
+Controls for speculative execution sidechannel mitigations.
+
+The option `ssbd=` is used to control the state of Speculative Store
+Bypass Disable (SSBD) mitigation.
+
+* `ssbd=force-disable` will keep the mitigation permanently off. The guest
+will not be able to control the state of the mitigation.
+* `ssbd=runtime` will always turn on the mitigation when running in the
+hypervisor context. The guest will be to turn on/off the mitigation for
+itself by using the firmware interface ARCH\_WORKAROUND\_2.
+* `ssbd=force-enable` will keep the mitigation permanently on. The guest will
+not be able to control the state of the mitigation.
+
+By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
+
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd}=<bool> ]`

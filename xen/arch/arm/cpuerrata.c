@@ -239,6 +239,41 @@ static int enable_ic_inv_hardening(void *data)
 
 #ifdef CONFIG_ARM_SSBD
 
+enum ssbd_state ssbd_state = ARM_SSBD_RUNTIME;
+
+static int __init parse_spec_ctrl(const char *s)
+{
+    const char *ss;
+    int rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        if ( !strncmp(s, "ssbd=", 5) )
+        {
+            s += 5;
+
+            if ( !strncmp(s, "force-disable", ss - s) )
+                ssbd_state = ARM_SSBD_FORCE_DISABLE;
+            else if ( !strncmp(s, "runtime", ss - s) )
+                ssbd_state = ARM_SSBD_RUNTIME;
+            else if ( !strncmp(s, "force-enable", ss - s) )
+                ssbd_state = ARM_SSBD_FORCE_ENABLE;
+            else
+                rc = -EINVAL;
+        }
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("spec-ctrl", parse_spec_ctrl);
+
 /*
  * Assembly code may use the variable directly, so we need to make sure
  * it fits in a register.
@@ -253,20 +288,17 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
     if ( smccc_ver < SMCCC_VERSION(1, 1) )
         return false;
 
-    /*
-     * The probe function return value is either negative (unsupported
-     * or mitigated), positive (unaffected), or zero (requires
-     * mitigation). We only need to do anything in the last case.
-     */
     arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
                       ARM_SMCCC_ARCH_WORKAROUND_2_FID, &res);
 
     switch ( (int)res.a0 )
     {
     case ARM_SMCCC_NOT_SUPPORTED:
+        ssbd_state = ARM_SSBD_UNKNOWN;
         return false;
 
     case ARM_SMCCC_NOT_REQUIRED:
+        ssbd_state = ARM_SSBD_MITIGATED;
         return false;
 
     case ARM_SMCCC_SUCCESS:
@@ -282,8 +314,49 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
         return false;
     }
 
-    if ( required )
-        this_cpu(ssbd_callback_required) = 1;
+    switch ( ssbd_state )
+    {
+    case ARM_SSBD_FORCE_DISABLE:
+    {
+        static bool once = true;
+
+        if ( once )
+            printk("%s disabled from command-line\n", entry->desc);
+        once = false;
+
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
+        required = false;
+
+        break;
+    }
+
+    case ARM_SSBD_RUNTIME:
+        if ( required )
+        {
+            this_cpu(ssbd_callback_required) = 1;
+            arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+        }
+
+        break;
+
+    case ARM_SSBD_FORCE_ENABLE:
+    {
+        static bool once = true;
+
+        if ( once )
+            printk("%s forced from command-line\n", entry->desc);
+        once = false;
+
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+        required = true;
+
+        break;
+    }
+
+    default:
+        ASSERT_UNREACHABLE();
+        return false;
+    }
 
     return required;
 }
@@ -392,6 +465,7 @@ static const struct arm_cpu_capabilities arm_errata[] = {
 #endif
 #ifdef CONFIG_ARM_SSBD
     {
+        .desc = "Speculative Store Bypass Disabled",
         .capability = ARM_SSBD,
         .matches = has_ssbd_mitigation,
     },
