@@ -258,7 +258,14 @@ struct arm_smccc_res {
                       ARM_SMCCC_OWNER_ARCH,         \
                       0x8000)
 
+#define ARM_SMCCC_ARCH_WORKAROUND_2_FID             \
+    ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,         \
+                       ARM_SMCCC_CONV_32,           \
+                       ARM_SMCCC_OWNER_ARCH,        \
+                       0x7FFF)
+
 /* SMCCC error codes */
+#define ARM_SMCCC_NOT_REQUIRED          (-2)
 #define ARM_SMCCC_ERR_UNKNOWN_FUNCTION  (-1)
 #define ARM_SMCCC_NOT_SUPPORTED         (-1)
 #define ARM_SMCCC_SUCCESS               (0)

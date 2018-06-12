@@ -27,8 +27,29 @@ static inline bool check_workaround_##erratum(void)             \
 
 CHECK_WORKAROUND_HELPER(766422, ARM32_WORKAROUND_766422, CONFIG_ARM_32)
 CHECK_WORKAROUND_HELPER(834220, ARM64_WORKAROUND_834220, CONFIG_ARM_64)
+CHECK_WORKAROUND_HELPER(ssbd, ARM_SSBD, CONFIG_ARM_SSBD)
 
 #undef CHECK_WORKAROUND_HELPER
+
+#ifdef CONFIG_ARM_SSBD
+
+#include <asm/current.h>
+
+DECLARE_PER_CPU(register_t, ssbd_callback_required);
+
+static inline bool cpu_require_ssbd_mitigation(void)
+{
+    return this_cpu(ssbd_callback_required);
+}
+
+#else
+
+static inline bool cpu_require_ssbd_mitigation(void)
+{
+    return false;
+}
+
+#endif
 
 #endif /* __ARM_CPUERRATA_H__ */
 /*

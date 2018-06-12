@@ -43,8 +43,9 @@
 #define SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT 5
 #define SKIP_CTXT_SWITCH_SERROR_SYNC 6
 #define ARM_HARDEN_BRANCH_PREDICTOR 7
+#define ARM_SSBD 8
 
-#define ARM_NCAPS           8
+#define ARM_NCAPS           9
 
 #ifndef __ASSEMBLY__
 

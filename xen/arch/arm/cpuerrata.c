@@ -237,6 +237,58 @@ static int enable_ic_inv_hardening(void *data)
 
 #endif
 
+#ifdef CONFIG_ARM_SSBD
+
+/*
+ * Assembly code may use the variable directly, so we need to make sure
+ * it fits in a register.
+ */
+DEFINE_PER_CPU_READ_MOSTLY(register_t, ssbd_callback_required);
+
+static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
+{
+    struct arm_smccc_res res;
+    bool required;
+
+    if ( smccc_ver < SMCCC_VERSION(1, 1) )
+        return false;
+
+    /*
+     * The probe function return value is either negative (unsupported
+     * or mitigated), positive (unaffected), or zero (requires
+     * mitigation). We only need to do anything in the last case.
+     */
+    arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
+                      ARM_SMCCC_ARCH_WORKAROUND_2_FID, &res);
+
+    switch ( (int)res.a0 )
+    {
+    case ARM_SMCCC_NOT_SUPPORTED:
+        return false;
+
+    case ARM_SMCCC_NOT_REQUIRED:
+        return false;
+
+    case ARM_SMCCC_SUCCESS:
+        required = true;
+        break;
+
+    case 1: /* Mitigation not required on this CPU. */
+        required = false;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return false;
+    }
+
+    if ( required )
+        this_cpu(ssbd_callback_required) = 1;
+
+    return required;
+}
+#endif
+
 #define MIDR_RANGE(model, min, max)     \
     .matches = is_affected_midr_range,  \
     .midr_model = model,                \
@@ -336,6 +388,12 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         .capability = ARM_HARDEN_BRANCH_PREDICTOR,
         MIDR_ALL_VERSIONS(MIDR_CORTEX_A15),
         .enable = enable_ic_inv_hardening,
+    },
+#endif
+#ifdef CONFIG_ARM_SSBD
+    {
+        .capability = ARM_SSBD,
+        .matches = has_ssbd_mitigation,
     },
 #endif
     {},

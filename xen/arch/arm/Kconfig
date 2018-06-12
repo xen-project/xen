@@ -71,6 +71,16 @@ config SBSA_VUART_CONSOLE
 	  Allows a guest to use SBSA Generic UART as a console. The
 	  SBSA Generic UART implements a subset of ARM PL011 UART.
 
+config ARM_SSBD
+	bool "Speculative Store Bypass Disable" if EXPERT = "y"
+	depends on HAS_ALTERNATIVE
+	default y
+	help
+	  This enables mitigation of bypassing of previous stores by speculative
+	  loads.
+
+	  If unsure, say Y.
+
 endmenu
 
 menu "ARM errata workaround via the alternative framework"
