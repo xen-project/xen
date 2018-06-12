@@ -285,6 +285,12 @@ int gnttab_init(void);
 #define UNPLUG_AUX_IDE_DISKS 4
 #define UNPLUG_ALL 7
 
+static short unplug_value;
+static void unplug_devices(void)
+{
+	outw(unplug_value, XEN_IOPORT_UNPLUG);
+}
+
 static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 {
 	short magic, unplug = 0;
@@ -312,6 +318,7 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 			dev_warn(dev, "unrecognised option '%s' "
 				 "in module parameter 'dev_unplug'\n", p);
 	}
+	unplug_value = unplug;
 
 	if (iolen < 0x16) {
 		err = "backend too old";
@@ -339,7 +346,7 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 		}
 		/* Fall through */
 	case 0:
-		outw(unplug, XEN_IOPORT_UNPLUG);
+		unplug_devices();
 		break;
 	default:
 		err = "unknown I/O protocol version";
@@ -498,6 +505,8 @@ void platform_pci_resume(void)
 
 	if (set_callback_via(callback_via))
 		printk("platform_pci_resume failure!\n");
+
+	unplug_devices();
 }
 
 static int __init platform_pci_module_init(void)
