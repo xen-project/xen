@@ -798,7 +798,8 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
                                          int colo_mode, const char **id_ptr)
 {
     char *drive = NULL;
-    char *common = GCSPRINTF("if=none,cache=writeback");
+    char *common = GCSPRINTF("if=none,readonly=%s,cache=writeback",
+                             disk->readwrite ? "off" : "on");
     const char *exportname = disk->colo_export;
     const char *active_disk = disk->active_disk;
     const char *hidden_disk = disk->hidden_disk;
@@ -851,6 +852,8 @@ static char *qemu_disk_ide_drive_string(libxl__gc *gc, const char *target_path,
     const char *exportname = disk->colo_export;
     const char *active_disk = disk->active_disk;
     const char *hidden_disk = disk->hidden_disk;
+
+    assert(disk->readwrite); /* should have been checked earlier */
 
     switch (colo_mode) {
     case LIBXL__COLO_NONE:
@@ -1574,8 +1577,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     const char *drive_id;
                     if (colo_mode == LIBXL__COLO_SECONDARY) {
                         drive = libxl__sprintf
-                            (gc, "if=none,driver=%s,file=%s,id=%s",
-                             format, target_path, disks[i].colo_export);
+                            (gc, "if=none,driver=%s,file=%s,id=%s,readonly=%s",
+                             format, target_path, disks[i].colo_export,
+                             disks[i].readwrite ? "off" : "on");
 
                         flexarray_append(dm_args, "-drive");
                         flexarray_append(dm_args, drive);
