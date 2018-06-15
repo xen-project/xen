@@ -822,6 +822,69 @@ libxl_device_vdispl = Struct("device_vdispl", [
     ("connectors", Array(libxl_connector_param, "num_connectors"))
     ])
 
+libxl_vsnd_pcm_format = Enumeration("vsnd_pcm_format", [
+    (1,  "S8"),
+    (2,  "U8"),
+    (3,  "S16_LE"),
+    (4,  "S16_BE"),
+    (5,  "U16_LE"),
+    (6,  "U16_BE"),
+    (7,  "S24_LE"),
+    (8,  "S24_BE"),
+    (9,  "U24_LE"),
+    (10, "U24_BE"),
+    (11, "S32_LE"),
+    (12, "S32_BE"),
+    (13, "U32_LE"),
+    (14, "U32_BE"),
+    (15, "F32_LE"),
+    (16, "F32_BE"),
+    (17, "F64_LE"),
+    (18, "F64_BE"),
+    (19, "IEC958_SUBFRAME_LE"),
+    (20, "IEC958_SUBFRAME_BE"),
+    (21, "MU_LAW"),
+    (22, "A_LAW"),
+    (23, "IMA_ADPCM"),
+    (24, "MPEG"),
+    (25, "GSM")
+    ])
+
+libxl_vsnd_params = Struct("vsnd_params", [
+    ("sample_rates", Array(uint32, "num_sample_rates")),
+    ("sample_formats", Array(libxl_vsnd_pcm_format, "num_sample_formats")),
+    ("channels_min", uint32),
+    ("channels_max", uint32),
+    ("buffer_size", uint32)
+    ])
+
+libxl_vsnd_stream_type = Enumeration("vsnd_stream_type", [
+    (1, "P"),
+    (2, "C")
+    ])
+
+libxl_vsnd_stream = Struct("vsnd_stream", [
+    ("unique_id", string),
+    ("type", libxl_vsnd_stream_type),
+    ("params", libxl_vsnd_params)
+    ])
+
+libxl_vsnd_pcm = Struct("vsnd_pcm", [
+    ("name", string),
+    ("params", libxl_vsnd_params),
+    ("streams", Array(libxl_vsnd_stream, "num_vsnd_streams"))
+    ])
+
+libxl_device_vsnd = Struct("device_vsnd", [
+    ("backend_domid", libxl_domid),
+    ("backend_domname", string),
+    ("devid", libxl_devid),
+    ("short_name", string),
+    ("long_name", string),
+    ("params", libxl_vsnd_params),
+    ("pcms", Array(libxl_vsnd_pcm, "num_vsnd_pcms"))
+    ])
+
 libxl_domain_config = Struct("domain_config", [
     ("c_info", libxl_domain_create_info),
     ("b_info", libxl_domain_build_info),
@@ -837,6 +900,7 @@ libxl_domain_config = Struct("domain_config", [
     ("p9s", Array(libxl_device_p9, "num_p9s")),
     ("pvcallsifs", Array(libxl_device_pvcallsif, "num_pvcallsifs")),
     ("vdispls", Array(libxl_device_vdispl, "num_vdispls")),
+    ("vsnds", Array(libxl_device_vsnd, "num_vsnds")),
     # a channel manifests as a console with a name,
     # see docs/misc/channels.txt
     ("channels", Array(libxl_device_channel, "num_channels")),
