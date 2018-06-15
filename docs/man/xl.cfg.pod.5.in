@@ -1414,6 +1414,155 @@ we may break backward compatibility.
 
 =back
 
+=item B<vsnd=[ VCARD_SPEC, VCARD_SPEC, ... ]>
+
+Specifies the virtual sound cards to be provided to the guest.
+Each B<VCARD_SPEC> is a list, which has a form of
+"[VSND_ITEM_SPEC, VSND_ITEM_SPEC, ... ]" (without the quotes).
+The virtual sound card has hierarchical structure.
+Every card has a set of PCM devices and streams, each could be individually
+configured.
+
+B<VSND_ITEM_SPEC> describes individual item parameters.
+B<VSND_ITEM_SPEC> is a string of comma separated item parameters
+headed by item identifier. Each item parameter is C<KEY=VALUE> pair:
+
+=over 4
+
+"identifier, param = value, ...".
+
+=back
+
+Identifier shall be one of following values: "CARD", "PCM", "STREAM".
+The child item treated as belonging to the previously defined parent item.
+
+All parameters are optional.
+
+There are group of parameters which are common for all items.
+This group can be defined at higher level of the hierarchy and be fully or
+partially re-used by the underlying layers. These parameters are:
+
+=over 4
+
+* number of channels (min/max)
+
+* supported sample rates
+
+* supported sample formats
+
+=back
+
+E.g. one can define these values for the whole card, device or stream.
+Every underlying layer in turn can re-define some or all of them to better
+fit its needs. For example, card may define number of channels to be
+in [1; 8] range, and some particular stream may be limited to [1; 2] only.
+The rule is that the underlying layer must be a subset of the upper layer
+range.
+
+I<COMMON parameters:>
+
+=over 4
+
+=over 4
+
+=item B<sample-rates=RATES>
+
+List of integer values separated by semicolon: sample-rates=8000;22050;44100
+
+=item B<sample-formats=FORMATS>
+
+List of string values separated by semicolon: sample-formats=s16_le;s8;u32_be
+
+Supported formats: s8, u8, s16_le, s16_be, u16_le, u16_be, s24_le, s24_be,
+u24_le, u24_be, s32_le, s32_be, u32_le, u32_be, float_le, float_be,
+float64_le, float64_be, iec958_subframe_le, iec958_subframe_be,
+mu_law, a_law, ima_adpcm, mpeg, gsm
+
+=item B<channels-min=NUMBER>
+
+The minimum amount of channels.
+
+=item B<channels-max=NUMBER>
+
+The maximum amount of channels.
+
+=item B<buffer-size=NUMBER>
+
+The maximum size in octets of the buffer to allocate per stream.
+
+=back
+
+=back
+
+I<CARD specification:>
+
+=over 4
+
+=over 4
+
+=item B<backend=domain-id>
+
+Specify the backend domain name or id, defaults to dom0.
+
+=item B<short-name=STRING>
+
+Short name of the virtual sound card.
+
+=item B<long-name=STRING>
+
+Long name of the virtual sound card.
+
+=back
+
+=back
+
+I<PCM specification:>
+
+=over 4
+
+=over 4
+
+=item B<name=STRING>
+
+Name of the PCM sound device within the virtual sound card.
+
+=back
+
+=back
+
+I<STREAM specification:>
+
+=over 4
+
+=over 4
+
+=item B<unique-id=STRING>
+
+Unique stream identifier.
+
+=item B<type=TYPE>
+
+Stream type: "p" - playback stream, "c" - capture stream.
+
+=back
+
+=back
+
+I<EXAMPLE:>
+
+    vsnd = [
+        ['CARD, short-name=Main, sample-formats=s16_le;s8;u32_be',
+            'PCM, name=Main',
+                'STREAM, id=0, type=p',
+                'STREAM, id=1, type=c, channels-max=2'
+        ],
+        ['CARD, short-name=Second',
+            'PCM, name=Second, buffer-size=1024',
+                'STREAM, id=2, type=p',
+                'STREAM, id=3, type=c'
+        ]
+    ]
+
 =back
 
 =head2 Paravirtualised (PV) Guest Specific Options

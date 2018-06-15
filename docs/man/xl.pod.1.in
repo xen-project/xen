@@ -1492,6 +1492,36 @@ List virtual displays for a domain.
 
 =back
 
+=head2 VSND DEVICES
+
+=over 4
+
+=item B<vsnd-attach> I<domain-id> I<vsnd-item> I<vsnd-item> ...
+
+Creates a new vsnd device in the domain specified by I<domain-id>.
+I<vsnd-item>'s describe the vsnd device to attach, using the same format as the
+B<VSND_ITEM_SPEC> string in the domain config file. See L<xl.cfg> for
+more information.
+
+B<EXAMPLE>
+
+=over 4
+
+xl vsnd-attach DomU 'CARD, short-name=Main, sample-formats=s16_le;s8;u32_be'
+'PCM, name=Main' 'STREAM, id=0, type=p' 'STREAM, id=1, type=c, channels-max=2'
+
+=back
+
+=item B<vsnd-detach> I<domain-id> I<dev-id>
+
+Removes the vsnd device specified by I<dev-id> from the domain specified by I<domain-id>.
+
+=item B<vsnd-list> I<domain-id>
+
+List vsnd devices for a domain.
+
+=back
+
 =head1 PCI PASS-THROUGH
 
 =over 4
