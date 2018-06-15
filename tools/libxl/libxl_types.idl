@@ -1019,6 +1019,25 @@ libxl_vdisplinfo = Struct("vdisplinfo", [
     ("connectors", Array(libxl_connectorinfo, "num_connectors"))
     ], dir=DIR_OUT)
 
+libxl_streaminfo = Struct("streaminfo", [
+    ("req_evtch", integer),
+    ("req_rref", integer)
+    ])
+
+libxl_pcminfo = Struct("pcminfo", [
+    ("streams", Array(libxl_streaminfo, "num_vsnd_streams"))
+    ])
+
+libxl_vsndinfo = Struct("vsndinfo", [
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("devid", libxl_devid),
+    ("state", integer),
+    ("pcms", Array(libxl_pcminfo, "num_vsnd_pcms"))
+    ])
+
 # NUMA node characteristics: size and free are how much memory it has, and how
 # much of it is free, respectively. dists is an array of distances from this
 # node to each other node.
