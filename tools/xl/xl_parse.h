@@ -34,6 +34,7 @@ int parse_usbdev_config(libxl_device_usbdev *usbdev, char *token);
 int parse_cpurange(const char *cpu, libxl_bitmap *cpumap);
 int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token);
 int parse_vdispl_config(libxl_device_vdispl *vdispl, char *token);
+int parse_vsnd_item(libxl_device_vsnd *vsnd, const char *spec);
 
 int match_option_size(const char *prefix, size_t len,
                       char *arg, char **argopt);
