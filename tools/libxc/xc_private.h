@@ -254,9 +254,13 @@ out1:
     return ret;
 }
 
-static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
+static inline int do_domctl_maybe_retry_efault(xc_interface *xch,
+                                               struct xen_domctl *domctl,
+                                               unsigned int retries)
 {
     int ret = -1;
+    unsigned int retry_cnt = 0;
+
     DECLARE_HYPERCALL_BOUNCE(domctl, sizeof(*domctl), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
 
     domctl->interface_version = XEN_DOMCTL_INTERFACE_VERSION;
@@ -267,8 +271,11 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
         goto out1;
     }
 
-    ret = xencall1(xch->xcall, __HYPERVISOR_domctl,
-                   HYPERCALL_BUFFER_AS_ARG(domctl));
+    do {
+        ret = xencall1(xch->xcall, __HYPERVISOR_domctl,
+                       HYPERCALL_BUFFER_AS_ARG(domctl));
+    } while ( ret < 0 && errno == EFAULT && retry_cnt++ < retries );
+
     if ( ret < 0 )
     {
         if ( errno == EACCES )
@@ -279,6 +286,18 @@ static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
     xc_hypercall_bounce_post(xch, domctl);
  out1:
     return ret;
+}
+
+static inline int do_domctl(xc_interface *xch, struct xen_domctl *domctl)
+{
+    return do_domctl_maybe_retry_efault(xch, domctl, 0);
+}
+
+static inline int do_domctl_retry_efault(xc_interface *xch, struct xen_domctl *domctl)
+{
+    unsigned int retries = xencall_buffers_never_fault(xch->xcall) ? 0 : 2;
+
+    return do_domctl_maybe_retry_efault(xch, domctl, retries);
 }
 
 static inline int do_sysctl(xc_interface *xch, struct xen_sysctl *sysctl)

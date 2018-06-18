@@ -224,7 +224,7 @@ int xc_get_pfn_type_batch(xc_interface *xch, uint32_t dom,
     domctl.domain = dom;
     domctl.u.getpageframeinfo3.num = num;
     set_xen_guest_handle(domctl.u.getpageframeinfo3.array, arr);
-    rc = do_domctl(xch, &domctl);
+    rc = do_domctl_retry_efault(xch, &domctl);
     xc_hypercall_bounce_post(xch, arr);
     return rc;
 }
