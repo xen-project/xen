@@ -2984,6 +2984,8 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     switch ( msr )
     {
+        uint64_t rsvd;
+
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
         break;
@@ -2998,16 +3000,27 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         __vmwrite(GUEST_SYSENTER_EIP, msr_content);
         break;
     case MSR_IA32_DEBUGCTLMSR: {
-        uint64_t supported = IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF;
+        uint32_t ebx, ecx = 0;
 
-        if ( boot_cpu_has(X86_FEATURE_RTM) )
-            supported |= IA32_DEBUGCTLMSR_RTM;
-        if ( msr_content & ~supported )
+        rsvd = ~(IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF);
+
+        /* TODO: Wire vPMU settings properly through the CPUID policy */
+        if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_BTS) )
         {
-            /* Perhaps some other bits are supported in vpmu. */
-            if ( vpmu_do_wrmsr(msr, msr_content, supported) )
-                break;
+            rsvd &= ~(IA32_DEBUGCTLMSR_TR | IA32_DEBUGCTLMSR_BTS |
+                      IA32_DEBUGCTLMSR_BTINT);
+
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
+                rsvd &= ~(IA32_DEBUGCTLMSR_BTS_OFF_OS |
+                          IA32_DEBUGCTLMSR_BTS_OFF_USR);
         }
+
+        hvm_cpuid(7, NULL, &ebx, &ecx, NULL);
+        if ( ebx & cpufeat_mask(X86_FEATURE_RTM) )
+            rsvd &= ~IA32_DEBUGCTLMSR_RTM;
+
+        if ( msr_content & rsvd )
+            goto gp_fault;
 
         /*
          * When a guest first enables LBR, arrange to save and restore the LBR
