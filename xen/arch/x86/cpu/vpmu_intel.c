@@ -557,27 +557,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content,
     uint64_t *enabled_cntrs;
 
     if ( !core2_vpmu_msr_common_check(msr, &type, &index) )
-    {
-        /* Special handling for BTS */
-        if ( msr == MSR_IA32_DEBUGCTLMSR )
-        {
-            supported |= IA32_DEBUGCTLMSR_TR | IA32_DEBUGCTLMSR_BTS |
-                         IA32_DEBUGCTLMSR_BTINT;
-
-            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
-                supported |= IA32_DEBUGCTLMSR_BTS_OFF_OS |
-                             IA32_DEBUGCTLMSR_BTS_OFF_USR;
-            if ( !(msr_content & ~supported) &&
-                 vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
-                return 0;
-            if ( (msr_content & supported) &&
-                 !vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
-                printk(XENLOG_G_WARNING
-                       "%pv: Debug Store unsupported on this CPU\n",
-                       current);
-        }
         return -EINVAL;
-    }
 
     ASSERT(!supported);
 
