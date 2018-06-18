@@ -19,7 +19,16 @@
 
 static int all_restrict_cb(Xentoolcore__Active_Handle *ah, domid_t domid) {
     xencall_handle *xcall = CONTAINER_OF(ah, *xcall, tc_ah);
-    return xentoolcore__restrict_by_dup2_null(xcall->fd);
+    int rc;
+
+    rc = xentoolcore__restrict_by_dup2_null(xcall->buf_fd);
+    if ( rc )
+        goto out;
+
+    rc = xentoolcore__restrict_by_dup2_null(xcall->fd);
+
+out:
+    return rc;
 }
 
 xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
@@ -30,6 +39,7 @@ xencall_handle *xencall_open(xentoollog_logger *logger, unsigned open_flags)
     if (!xcall) return NULL;
 
     xcall->fd = -1;
+    xcall->buf_fd = -1;
     xcall->tc_ah.restrict_callback = all_restrict_cb;
     xentoolcore__register_active_handle(&xcall->tc_ah);
 
