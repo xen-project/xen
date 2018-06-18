@@ -115,6 +115,13 @@ void xencall_free_buffer_pages(xencall_handle *xcall, void *p, size_t nr_pages);
 void *xencall_alloc_buffer(xencall_handle *xcall, size_t size);
 void xencall_free_buffer(xencall_handle *xcall, void *p);
 
+/*
+ * Are allocated hypercall buffers safe to be accessed by the hypervisor all
+ * the time?
+ * Returns 0 if EFAULT might be possible.
+ */
+int xencall_buffers_never_fault(xencall_handle *xcall);
+
 #endif
 
 /*

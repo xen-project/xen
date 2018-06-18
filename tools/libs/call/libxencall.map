@@ -17,3 +17,8 @@ VERS_1.0 {
 		xencall_free_buffer_pages;
 	local: *; /* Do not expose anything by default */
 };
+
+VERS_1.1 {
+	global:
+		xencall_buffers_never_fault;
+} VERS_1.0;

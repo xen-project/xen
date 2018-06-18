@@ -70,6 +70,11 @@ void osdep_free_pages(xencall_handle *xcall, void *ptr, size_t npages)
     free(ptr);
 }
 
+int xencall_buffers_never_fault(xencall_handle *xcall)
+{
+    return 1;
+}
+
 /*
  * Local variables:
  * mode: C
