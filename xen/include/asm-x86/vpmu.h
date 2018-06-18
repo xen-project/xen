@@ -77,6 +77,10 @@ struct vpmu_struct {
 /* PV(H) guests: VPMU registers are accessed by guest from shared page */
 #define VPMU_CACHED                         0x40
 
+/* Intel-specific VPMU features */
+#define VPMU_CPU_HAS_DS                     0x100 /* Has Debug Store */
+#define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
+
 static inline void vpmu_set(struct vpmu_struct *vpmu, const u32 mask)
 {
     vpmu->flags |= mask;
