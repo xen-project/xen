@@ -18,16 +18,10 @@
 static unsigned long saved_lstar, saved_cstar;
 static unsigned long saved_sysenter_esp, saved_sysenter_eip;
 static unsigned long saved_fs_base, saved_gs_base, saved_kernel_gs_base;
-static uint16_t saved_segs[4];
 static uint64_t saved_xcr0;
 
 void save_rest_processor_state(void)
 {
-    vcpu_save_fpu(current);
-
-    asm volatile (
-        "movw %%ds,(%0); movw %%es,2(%0); movw %%fs,4(%0); movw %%gs,6(%0)"
-        : : "r" (saved_segs) : "memory" );
     saved_fs_base = rdfsbase();
     saved_gs_base = rdgsbase();
     rdmsrl(MSR_SHADOW_GS_BASE, saved_kernel_gs_base);
@@ -46,8 +40,6 @@ void save_rest_processor_state(void)
 
 void restore_rest_processor_state(void)
 {
-    struct vcpu *curr = current;
-
     load_TR();
 
     /* Recover syscall MSRs */
@@ -69,31 +61,8 @@ void restore_rest_processor_state(void)
         wrmsr(MSR_IA32_SYSENTER_CS, __HYPERVISOR_CS, 0);
     }
 
-    if ( !is_idle_vcpu(curr) )
-    {
-        asm volatile (
-            "movw (%0),%%ds; movw 2(%0),%%es; movw 4(%0),%%fs"
-            : : "r" (saved_segs) : "memory" );
-        do_set_segment_base(SEGBASE_GS_USER_SEL, saved_segs[3]);
-    }
-
     if ( cpu_has_xsave && !set_xcr0(saved_xcr0) )
         BUG();
-
-    /* Maybe load the debug registers. */
-    BUG_ON(!is_pv_vcpu(curr));
-    if ( !is_idle_vcpu(curr) && curr->arch.debugreg[7] )
-    {
-        write_debugreg(0, curr->arch.debugreg[0]);
-        write_debugreg(1, curr->arch.debugreg[1]);
-        write_debugreg(2, curr->arch.debugreg[2]);
-        write_debugreg(3, curr->arch.debugreg[3]);
-        write_debugreg(6, curr->arch.debugreg[6]);
-        write_debugreg(7, curr->arch.debugreg[7]);
-    }
-
-    /* Reload FPU state on next FPU use. */
-    stts();
 
     wrmsrl(MSR_IA32_CR_PAT, XEN_MSR_PAT);
 
