@@ -47,6 +47,73 @@ int x86_msr_copy_to_buffer(const struct msr_policy *p,
     return 0;
 }
 
+int x86_msr_copy_from_buffer(struct msr_policy *p,
+                             const msr_entry_buffer_t msrs, uint32_t nr_entries,
+                             uint32_t *err_msr)
+{
+    unsigned int i;
+    xen_msr_entry_t data;
+    int rc;
+
+    /*
+     * A well formed caller is expected to pass an array with entries in
+     * order, and without any repetitions.  However, due to per-vendor
+     * differences, and in the case of upgrade or levelled scenarios, we
+     * typically expect fewer than MAX entries to be passed.
+     *
+     * Detecting repeated entries is prohibitively complicated, so we don't
+     * bother.  That said, one way or another if more than MAX entries are
+     * passed, something is wrong.
+     */
+    if ( nr_entries > MSR_MAX_SERIALISED_ENTRIES )
+        return -E2BIG;
+
+    for ( i = 0; i < nr_entries; i++ )
+    {
+        if ( copy_from_buffer_offset(&data, msrs, i, 1) )
+            return -EFAULT;
+
+        if ( data.flags ) /* .flags MBZ */
+        {
+            rc = -EINVAL;
+            goto err;
+        }
+
+        switch ( data.idx )
+        {
+            /*
+             * Assign data.val to p->field, checking for truncation if the
+             * backing storage for field is smaller than uint64_t
+             */
+#define ASSIGN(field)                             \
+({                                                \
+    if ( (typeof(p->field))data.val != data.val ) \
+    {                                             \
+        rc = -EOVERFLOW;                          \
+        goto err;                                 \
+    }                                             \
+    p->field = data.val;                          \
+})
+
+        case MSR_INTEL_PLATFORM_INFO: ASSIGN(plaform_info.raw); break;
+
+#undef ASSIGN
+
+        default:
+            rc = -ERANGE;
+            goto err;
+        }
+    }
+
+    return 0;
+
+ err:
+    if ( err_msr )
+        *err_msr = data.idx;
+
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C
