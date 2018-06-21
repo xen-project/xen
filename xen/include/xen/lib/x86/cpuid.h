@@ -30,6 +30,19 @@ struct cpuid_leaf
 #define CPUID_GUEST_NR_EXTD       MAX(CPUID_GUEST_NR_EXTD_INTEL, \
                                       CPUID_GUEST_NR_EXTD_AMD)
 
+/*
+ * Maximum number of leaves a struct cpuid_policy turns into when serialised
+ * for interaction with the toolstack.  (Sum of all leaves in each union, less
+ * the entries in basic which sub-unions hang off of.)
+ */
+#define CPUID_MAX_SERIALISED_LEAVES                     \
+    (CPUID_GUEST_NR_BASIC +                             \
+     CPUID_GUEST_NR_FEAT   - !!CPUID_GUEST_NR_FEAT +    \
+     CPUID_GUEST_NR_CACHE  - !!CPUID_GUEST_NR_CACHE +   \
+     CPUID_GUEST_NR_TOPO   - !!CPUID_GUEST_NR_TOPO +    \
+     CPUID_GUEST_NR_XSTATE - !!CPUID_GUEST_NR_XSTATE +  \
+     CPUID_GUEST_NR_EXTD + 2 /* hv_limit and hv2_limit */ )
+
 struct cpuid_policy
 {
 #define DECL_BITFIELD(word) _DECL_BITFIELD(FEATURESET_ ## word)
@@ -229,6 +242,29 @@ static inline void cpuid_featureset_to_policy(
 }
 
 const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
+
+#ifdef __XEN__
+#include <public/arch-x86/xen.h>
+typedef XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_leaf_buffer_t;
+#else
+#include <xen/arch-x86/xen.h>
+typedef xen_cpuid_leaf_t cpuid_leaf_buffer_t[];
+#endif
+
+/**
+ * Serialise a cpuid_policy object into an array of cpuid leaves.
+ *
+ * @param policy     The cpuid_policy to serialise.
+ * @param leaves     The array of leaves to serialise into.
+ * @param nr_entries The number of entries in 'leaves'.
+ * @returns -errno
+ *
+ * Writes at most CPUID_MAX_SERIALISED_LEAVES.  May fail with -ENOBUFS if the
+ * leaves array is too short.  On success, nr_entries is updated with the
+ * actual number of leaves written.
+ */
+int x86_cpuid_copy_to_buffer(const struct cpuid_policy *policy,
+                             cpuid_leaf_buffer_t leaves, uint32_t *nr_entries);
 
 #endif /* !XEN_LIB_X86_CPUID_H */
 
