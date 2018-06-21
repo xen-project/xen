@@ -2538,6 +2538,9 @@ int xc_get_cpu_policy_size(xc_interface *xch, uint32_t *nr_leaves,
 int xc_get_system_cpu_policy(xc_interface *xch, uint32_t index,
                              uint32_t *nr_leaves, xen_cpuid_leaf_t *leaves,
                              uint32_t *nr_msrs, xen_msr_entry_t *msrs);
+int xc_get_domain_cpu_policy(xc_interface *xch, uint32_t domid,
+                             uint32_t *nr_leaves, xen_cpuid_leaf_t *leaves,
+                             uint32_t *nr_msrs, xen_msr_entry_t *msrs);
 
 uint32_t xc_get_cpu_featureset_size(void);
 

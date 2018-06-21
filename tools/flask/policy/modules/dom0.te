@@ -39,7 +39,7 @@ allow dom0_t dom0_t:domain {
 };
 allow dom0_t dom0_t:domain2 {
 	set_cpuid gettsc settsc setscheduler set_vnumainfo
-	get_vnumainfo psr_cmt_op psr_alloc
+	get_vnumainfo psr_cmt_op psr_alloc get_cpu_policy
 };
 allow dom0_t dom0_t:resource { add remove };
 

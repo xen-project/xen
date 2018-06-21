@@ -3,6 +3,8 @@
 #include <err.h>
 #include <getopt.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 
 #include <xenctrl.h>
 
@@ -309,11 +311,13 @@ int main(int argc, char **argv)
 {
     enum { MODE_UNKNOWN, MODE_INFO, MODE_DETAIL, MODE_INTERPRET, MODE_POLICY }
     mode = MODE_UNKNOWN;
+    int domid = -1;
 
     nr_features = xc_get_cpu_featureset_size();
 
     for ( ;; )
     {
+        const char *tmp_optarg;
         int option_index = 0, c;
         static struct option long_options[] =
         {
@@ -321,11 +325,11 @@ int main(int argc, char **argv)
             { "info", no_argument, NULL, 'i' },
             { "detail", no_argument, NULL, 'd' },
             { "verbose", no_argument, NULL, 'v' },
-            { "policy", no_argument, NULL, 'p' },
+            { "policy", optional_argument, NULL, 'p' },
             { NULL, 0, NULL, 0 },
         };
 
-        c = getopt_long(argc, argv, "hidvp", long_options, &option_index);
+        c = getopt_long(argc, argv, "hidvp::", long_options, &option_index);
 
         if ( c == -1 )
             break;
@@ -345,6 +349,24 @@ int main(int argc, char **argv)
 
         case 'p':
             mode = MODE_POLICY;
+
+            tmp_optarg = optarg;
+
+            /* Make "--policy $DOMID" and "-p $DOMID" work. */
+            if ( !optarg && optind < argc &&
+                 argv[optind] != NULL && argv[optind][0] != '\0' &&
+                 argv[optind][0] != '-' )
+                tmp_optarg = argv[optind++];
+
+            if ( tmp_optarg )
+            {
+                char *endptr;
+
+                errno = 0;
+                domid = strtol(tmp_optarg, &endptr, 0);
+                if ( errno || endptr == tmp_optarg )
+                    err(1, "strtol(%s,,)", tmp_optarg);
+            }
             break;
 
         case 'd':
@@ -398,8 +420,9 @@ int main(int argc, char **argv)
 
         if ( xc_get_cpu_policy_size(xch, &max_leaves, &max_msrs) )
             err(1, "xc_get_cpu_policy_size(...)");
-        printf("Xen reports there are maximum %u leaves and %u MSRs\n",
-               max_leaves, max_msrs);
+        if ( domid == -1 )
+            printf("Xen reports there are maximum %u leaves and %u MSRs\n",
+                   max_leaves, max_msrs);
 
         leaves = calloc(max_leaves, sizeof(xen_cpuid_leaf_t));
         if ( !leaves )
@@ -408,16 +431,35 @@ int main(int argc, char **argv)
         if ( !msrs )
             err(1, "calloc(max_msrs)");
 
-        for ( i = 0; i < ARRAY_SIZE(sys_policies); ++i )
+        if ( domid != -1 )
         {
+            char name[20];
             uint32_t nr_leaves = max_leaves;
             uint32_t nr_msrs = max_msrs;
 
-            if ( xc_get_system_cpu_policy(xch, i, &nr_leaves, leaves,
+            if ( xc_get_domain_cpu_policy(xch, domid, &nr_leaves, leaves,
                                           &nr_msrs, msrs) )
-                err(1, "xc_get_system_cpu_policy(, %s,,)", sys_policies[i]);
+                err(1, "xc_get_domain_cpu_policy(, %d, %d,, %d,)",
+                    domid, nr_leaves, nr_msrs);
 
-            print_policy(sys_policies[i], leaves, nr_leaves, msrs, nr_msrs);
+            snprintf(name, sizeof(name), "Domain %d", domid);
+            print_policy(name, leaves, nr_leaves, msrs, nr_msrs);
+        }
+        else
+        {
+            /* Get system policies */
+            for ( i = 0; i < ARRAY_SIZE(sys_policies); ++i )
+            {
+                uint32_t nr_leaves = max_leaves;
+                uint32_t nr_msrs = max_msrs;
+
+                if ( xc_get_system_cpu_policy(xch, i, &nr_leaves, leaves,
+                                              &nr_msrs, msrs) )
+                    err(1, "xc_get_system_cpu_policy(, %s,,)", sys_policies[i]);
+
+                print_policy(sys_policies[i], leaves, nr_leaves,
+                             msrs, nr_msrs);
+            }
         }
 
         free(leaves);

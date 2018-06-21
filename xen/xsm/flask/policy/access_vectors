@@ -248,6 +248,8 @@ class domain2
     psr_alloc
 # XENMEM_resource_map
     resource_map
+# XEN_DOMCTL_get_cpu_policy
+    get_cpu_policy
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

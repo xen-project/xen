@@ -652,6 +652,22 @@ struct xen_domctl_cpuid {
   uint32_t ecx;
   uint32_t edx;
 };
+
+/*
+ * XEN_DOMCTL_get_cpu_policy (x86 specific)
+ *
+ * Query the CPUID and MSR policies for a specific domain.
+ */
+struct xen_domctl_cpu_policy {
+    uint32_t nr_leaves; /* IN/OUT: Number of leaves in/written to
+                         * 'cpuid_policy'. */
+    uint32_t nr_msrs;   /* IN/OUT: Number of MSRs in/written to
+                         * 'msr_domain_policy' */
+    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_policy; /* OUT */
+    XEN_GUEST_HANDLE_64(xen_msr_entry_t) msr_policy;    /* OUT */
+};
+typedef struct xen_domctl_cpu_policy xen_domctl_cpu_policy_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_cpu_policy_t);
 #endif
 
 /*
@@ -1177,6 +1193,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_soft_reset                    79
 /* #define XEN_DOMCTL_set_gnttab_limits          80 - Moved into XEN_DOMCTL_createdomain */
 #define XEN_DOMCTL_vuart_op                      81
+#define XEN_DOMCTL_get_cpu_policy                82
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -1221,6 +1238,7 @@ struct xen_domctl {
         struct xen_domctl_mem_sharing_op    mem_sharing_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
+        struct xen_domctl_cpu_policy        cpu_policy;
         struct xen_domctl_vcpuextstate      vcpuextstate;
         struct xen_domctl_vcpu_msrs         vcpu_msrs;
 #endif
