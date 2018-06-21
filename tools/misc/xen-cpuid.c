@@ -277,9 +277,37 @@ static void dump_info(xc_interface *xch, bool detail)
         free(featuresets[i].fs);
 }
 
+static void print_policy(const char *name,
+                         xen_cpuid_leaf_t *leaves, uint32_t nr_leaves,
+                         xen_msr_entry_t *msrs, uint32_t nr_msrs)
+{
+    unsigned int l;
+
+    printf("%s policy: %u leaves, %u MSRs\n", name, nr_leaves, nr_msrs);
+    printf(" CPUID:\n");
+    printf("  %-8s %-8s -> %-8s %-8s %-8s %-8s\n",
+           "leaf", "subleaf", "eax", "ebx", "ecx", "edx");
+    for ( l = 0; l < nr_leaves; ++l )
+    {
+        /* Skip empty leaves. */
+        if ( !leaves[l].a && !leaves[l].b && !leaves[l].c && !leaves[l].d )
+            continue;
+
+        printf("  %08x:%08x -> %08x:%08x:%08x:%08x\n",
+               leaves[l].leaf, leaves[l].subleaf,
+               leaves[l].a, leaves[l].b, leaves[l].c, leaves[l].d);
+    }
+
+    printf(" MSRs:\n");
+    printf("  %-8s -> %-16s\n", "index", "value");
+    for ( l = 0; l < nr_msrs; ++l )
+        printf("  %08x -> %016lx\n",
+               msrs[l].idx, msrs[l].val);
+}
+
 int main(int argc, char **argv)
 {
-    enum { MODE_UNKNOWN, MODE_INFO, MODE_DETAIL, MODE_INTERPRET }
+    enum { MODE_UNKNOWN, MODE_INFO, MODE_DETAIL, MODE_INTERPRET, MODE_POLICY }
     mode = MODE_UNKNOWN;
 
     nr_features = xc_get_cpu_featureset_size();
@@ -293,10 +321,11 @@ int main(int argc, char **argv)
             { "info", no_argument, NULL, 'i' },
             { "detail", no_argument, NULL, 'd' },
             { "verbose", no_argument, NULL, 'v' },
+            { "policy", no_argument, NULL, 'p' },
             { NULL, 0, NULL, 0 },
         };
 
-        c = getopt_long(argc, argv, "hidv", long_options, &option_index);
+        c = getopt_long(argc, argv, "hidvp", long_options, &option_index);
 
         if ( c == -1 )
             break;
@@ -312,6 +341,10 @@ int main(int argc, char **argv)
 
         case 'i':
             mode = MODE_INFO;
+            break;
+
+        case 'p':
+            mode = MODE_POLICY;
             break;
 
         case 'd':
@@ -344,7 +377,54 @@ int main(int argc, char **argv)
             mode = MODE_INTERPRET;
     }
 
-    if ( mode == MODE_INFO || mode == MODE_DETAIL )
+    if ( mode == MODE_POLICY )
+    {
+        static const char *const sys_policies[] = {
+            [ XEN_SYSCTL_cpu_policy_raw ]          = "Raw",
+            [ XEN_SYSCTL_cpu_policy_host ]         = "Host",
+            [ XEN_SYSCTL_cpu_policy_pv_max ]       = "PV Max",
+            [ XEN_SYSCTL_cpu_policy_hvm_max ]      = "HVM Max",
+            [ XEN_SYSCTL_cpu_policy_pv_default ]   = "PV Default",
+            [ XEN_SYSCTL_cpu_policy_hvm_default ]  = "HVM Default",
+        };
+        xen_cpuid_leaf_t *leaves;
+        xen_msr_entry_t *msrs;
+        uint32_t i, max_leaves, max_msrs;
+
+        xc_interface *xch = xc_interface_open(0, 0, 0);
+
+        if ( !xch )
+            err(1, "xc_interface_open");
+
+        if ( xc_get_cpu_policy_size(xch, &max_leaves, &max_msrs) )
+            err(1, "xc_get_cpu_policy_size(...)");
+        printf("Xen reports there are maximum %u leaves and %u MSRs\n",
+               max_leaves, max_msrs);
+
+        leaves = calloc(max_leaves, sizeof(xen_cpuid_leaf_t));
+        if ( !leaves )
+            err(1, "calloc(max_leaves)");
+        msrs = calloc(max_msrs, sizeof(xen_msr_entry_t));
+        if ( !msrs )
+            err(1, "calloc(max_msrs)");
+
+        for ( i = 0; i < ARRAY_SIZE(sys_policies); ++i )
+        {
+            uint32_t nr_leaves = max_leaves;
+            uint32_t nr_msrs = max_msrs;
+
+            if ( xc_get_system_cpu_policy(xch, i, &nr_leaves, leaves,
+                                          &nr_msrs, msrs) )
+                err(1, "xc_get_system_cpu_policy(, %s,,)", sys_policies[i]);
+
+            print_policy(sys_policies[i], leaves, nr_leaves, msrs, nr_msrs);
+        }
+
+        free(leaves);
+        free(msrs);
+        xc_interface_close(xch);
+    }
+    else if ( mode == MODE_INFO || mode == MODE_DETAIL )
     {
         xc_interface *xch = xc_interface_open(0, 0, 0);
 

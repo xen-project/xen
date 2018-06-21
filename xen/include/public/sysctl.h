@@ -1075,12 +1075,26 @@ struct xen_sysctl_set_parameter {
  *  - Default_*: Default set of features a PV or HVM guest can use.  This is
  *               the security supported set.
  */
+struct xen_sysctl_cpu_policy {
 #define XEN_SYSCTL_cpu_policy_raw          0
 #define XEN_SYSCTL_cpu_policy_host         1
 #define XEN_SYSCTL_cpu_policy_pv_max       2
 #define XEN_SYSCTL_cpu_policy_hvm_max      3
 #define XEN_SYSCTL_cpu_policy_pv_default   4
 #define XEN_SYSCTL_cpu_policy_hvm_default  5
+    uint32_t index;       /* IN: Which policy to query? */
+    uint32_t nr_leaves;   /* IN/OUT: Number of leaves in/written to
+                           * 'cpuid_policy', or the maximum number of leaves
+                           * if the guest handle is NULL. */
+    uint32_t nr_msrs;     /* IN/OUT: Number of MSRs in/written to
+                           * 'msr_policy', or the maximum number of MSRs if
+                           * the guest handle is NULL. */
+    uint32_t _rsvd;       /* Must be zero. */
+    XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_policy; /* OUT */
+    XEN_GUEST_HANDLE_64(xen_msr_entry_t) msr_policy;    /* OUT */
+};
+typedef struct xen_sysctl_cpu_policy xen_sysctl_cpu_policy_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_policy_t);
 #endif
 
 struct xen_sysctl {
@@ -1112,6 +1126,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_get_cpu_featureset            26
 #define XEN_SYSCTL_livepatch_op                  27
 #define XEN_SYSCTL_set_parameter                 28
+#define XEN_SYSCTL_get_cpu_policy                29
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -1141,6 +1156,9 @@ struct xen_sysctl {
         struct xen_sysctl_cpu_featureset    cpu_featureset;
         struct xen_sysctl_livepatch_op      livepatch;
         struct xen_sysctl_set_parameter     set_parameter;
+#if defined(__i386__) || defined(__x86_64__)
+        struct xen_sysctl_cpu_policy        cpu_policy;
+#endif
         uint8_t                             pad[128];
     } u;
 };

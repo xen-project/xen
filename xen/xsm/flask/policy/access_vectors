@@ -28,7 +28,7 @@ class xen
 # XENPF_microcode_update
     microcode
 # XEN_SYSCTL_physinfo, XEN_SYSCTL_cputopoinfo, XEN_SYSCTL_numainfo
-# XEN_SYSCTL_pcitopoinfo
+# XEN_SYSCTL_pcitopoinfo, XEN_SYSCTL_get_cpu_policy
     physinfo
 # XENPF_platform_quirk
     quirk

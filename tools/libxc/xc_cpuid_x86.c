@@ -132,6 +132,63 @@ const uint32_t *xc_get_static_cpu_featuremask(
     }
 }
 
+int xc_get_cpu_policy_size(xc_interface *xch, uint32_t *nr_leaves,
+                           uint32_t *nr_msrs)
+{
+    struct xen_sysctl sysctl = {};
+    int ret;
+
+    sysctl.cmd = XEN_SYSCTL_get_cpu_policy;
+
+    ret = do_sysctl(xch, &sysctl);
+
+    if ( !ret )
+    {
+        *nr_leaves = sysctl.u.cpu_policy.nr_leaves;
+        *nr_msrs = sysctl.u.cpu_policy.nr_msrs;
+    }
+
+    return ret;
+}
+
+int xc_get_system_cpu_policy(xc_interface *xch, uint32_t index,
+                             uint32_t *nr_leaves, xen_cpuid_leaf_t *leaves,
+                             uint32_t *nr_msrs, xen_msr_entry_t *msrs)
+{
+    struct xen_sysctl sysctl = {};
+    DECLARE_HYPERCALL_BOUNCE(leaves,
+                             *nr_leaves * sizeof(*leaves),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(msrs,
+                             *nr_msrs * sizeof(*msrs),
+                             XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    int ret;
+
+    if ( xc_hypercall_bounce_pre(xch, leaves) ||
+         xc_hypercall_bounce_pre(xch, msrs) )
+        return -1;
+
+    sysctl.cmd = XEN_SYSCTL_get_cpu_policy;
+    sysctl.u.cpu_policy.index = index;
+    sysctl.u.cpu_policy.nr_leaves = *nr_leaves;
+    set_xen_guest_handle(sysctl.u.cpu_policy.cpuid_policy, leaves);
+    sysctl.u.cpu_policy.nr_msrs = *nr_msrs;
+    set_xen_guest_handle(sysctl.u.cpu_policy.msr_policy, msrs);
+
+    ret = do_sysctl(xch, &sysctl);
+
+    xc_hypercall_bounce_post(xch, leaves);
+    xc_hypercall_bounce_post(xch, msrs);
+
+    if ( !ret )
+    {
+        *nr_leaves = sysctl.u.cpu_policy.nr_leaves;
+        *nr_msrs = sysctl.u.cpu_policy.nr_msrs;
+    }
+
+    return ret;
+}
+
 struct cpuid_domain_info
 {
     enum
