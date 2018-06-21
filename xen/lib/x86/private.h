@@ -9,6 +9,7 @@
 #include <xen/types.h>
 
 #include <asm/guest_access.h>
+#include <asm/msr-index.h>
 
 #define copy_to_buffer_offset copy_to_guest_offset
 
@@ -18,6 +19,8 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
+
+#include <xen/asm/msr-index.h>
 
 #include <xen-tools/libs.h>
 
