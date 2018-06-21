@@ -37,8 +37,6 @@
 /* DEFAULT_BUFFER_SIZE should be large enough for each errno string. */
 #define DEFAULT_BUFFER_SIZE 16
 
-#define MIN(a, b) (((a) < (b))? (a) : (b))
-
 typedef int32_t wrl_creditt;
 #define WRL_CREDIT_MAX (1000*1000*1000)
 /* ^ satisfies non-overflow condition for wrl_xfer_credit */
