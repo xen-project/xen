@@ -2,6 +2,8 @@
 #ifndef XEN_LIB_X86_CPUID_H
 #define XEN_LIB_X86_CPUID_H
 
+#include <xen/lib/x86/cpuid-autogen.h>
+
 struct cpuid_leaf
 {
     uint32_t a, b, c, d;

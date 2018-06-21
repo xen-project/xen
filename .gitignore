@@ -311,7 +311,6 @@ xen/arch/*/efi/runtime.c
 xen/include/headers*.chk
 xen/include/asm
 xen/include/asm-*/asm-offsets.h
-xen/include/asm-x86/cpuid-autogen.h
 xen/include/compat/*
 xen/include/config/
 xen/include/generated/
@@ -319,6 +318,7 @@ xen/include/public/public
 xen/include/xen/*.new
 xen/include/xen/acm_policy.h
 xen/include/xen/compile.h
+xen/include/xen/lib/x86/cpuid-autogen.h
 xen/test/livepatch/config.h
 xen/test/livepatch/xen_bye_world.livepatch
 xen/test/livepatch/xen_hello_world.livepatch

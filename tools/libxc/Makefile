@@ -147,15 +147,6 @@ $(eval $(genpath-target))
 
 xc_private.h: _paths.h
 
-ifeq ($(CONFIG_X86),y)
-
-_xc_cpuid_autogen.h: $(XEN_ROOT)/xen/include/public/arch-x86/cpufeatureset.h $(XEN_ROOT)/xen/tools/gen-cpuid.py
-	$(PYTHON) $(XEN_ROOT)/xen/tools/gen-cpuid.py -i $^ -o $@.new
-	$(call move-if-changed,$@.new,$@)
-
-build: _xc_cpuid_autogen.h
-endif
-
 $(CTRL_LIB_OBJS) $(GUEST_LIB_OBJS) \
 $(CTRL_PIC_OBJS) $(GUEST_PIC_OBJS): xc_private.h
 

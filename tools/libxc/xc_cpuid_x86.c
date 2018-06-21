@@ -31,7 +31,6 @@ enum {
 #define XEN_CPUFEATURE(name, value) X86_FEATURE_##name = value,
 #include <xen/arch-x86/cpufeatureset.h>
 };
-#include "_xc_cpuid_autogen.h"
 
 #include <xen/lib/x86/cpuid.h>
 

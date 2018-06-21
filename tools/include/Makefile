@@ -23,8 +23,11 @@ xen/.dir:
 	ln -sf $(XEN_ROOT)/xen/include/acpi acpi
 ifeq ($(CONFIG_X86),y)
 	ln -sf $(XEN_ROOT)/xen/include/asm-x86 xen/asm
-	mkdir -p xen/lib
-	ln -sf $(XEN_ROOT)/xen/include/xen/lib/x86 xen/lib/x86
+	mkdir -p xen/lib/x86
+	for f in $(filter-out %autogen.h,$(patsubst $(XEN_ROOT)/xen/include/xen/lib/x86/%,%,Makefile $(wildcard $(XEN_ROOT)/xen/include/xen/lib/x86/*.h))); do \
+		ln -sf $(XEN_ROOT)/xen/include/xen/lib/x86/$$f xen/lib/x86/$$f; \
+	done
+	$(MAKE) -C xen/lib/x86 all XEN_ROOT=$(XEN_ROOT)
 endif
 	touch $@
 

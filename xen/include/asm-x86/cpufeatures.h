@@ -2,7 +2,7 @@
  * Explicitly intended for multiple inclusion.
  */
 
-#include <asm/cpuid-autogen.h>
+#include <xen/lib/x86/cpuid-autogen.h>
 
 #define FSCAPINTS FEATURESET_NR_ENTRIES
 
