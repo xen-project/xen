@@ -319,6 +319,27 @@ typedef xen_cpuid_leaf_t cpuid_leaf_buffer_t[];
 int x86_cpuid_copy_to_buffer(const struct cpuid_policy *policy,
                              cpuid_leaf_buffer_t leaves, uint32_t *nr_entries);
 
+/**
+ * Unserialise a cpuid_policy object from an array of cpuid leaves.
+ *
+ * @param policy      The cpuid_policy to unserialise into.
+ * @param leaves      The array of leaves to unserialise from.
+ * @param nr_entries  The number of entries in 'leaves'.
+ * @param err_leaf    Optional hint filled on error.
+ * @param err_subleaf Optional hint filled on error.
+ * @returns -errno
+ *
+ * Reads at most CPUID_MAX_SERIALISED_LEAVES.  May return -ERANGE if an
+ * incoming leaf is out of range of cpuid_policy, in which case the optional
+ * err_* pointers are filled to aid diagnostics.
+ *
+ * No content validation of in-range leaves is performed.
+ */
+int x86_cpuid_copy_from_buffer(struct cpuid_policy *policy,
+                               const cpuid_leaf_buffer_t leaves,
+                               uint32_t nr_entries, uint32_t *err_leaf,
+                               uint32_t *err_subleaf);
+
 #endif /* !XEN_LIB_X86_CPUID_H */
 
 /*

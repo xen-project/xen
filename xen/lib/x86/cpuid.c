@@ -233,6 +233,115 @@ int x86_cpuid_copy_to_buffer(const struct cpuid_policy *p,
     return 0;
 }
 
+int x86_cpuid_copy_from_buffer(struct cpuid_policy *p,
+                               const cpuid_leaf_buffer_t leaves,
+                               uint32_t nr_entries, uint32_t *err_leaf,
+                               uint32_t *err_subleaf)
+{
+    unsigned int i;
+    xen_cpuid_leaf_t data;
+
+    /*
+     * A well formed caller is expected to pass an array with leaves in order,
+     * and without any repetitions.  However, due to per-vendor differences,
+     * and in the case of upgrade or levelled scenarios, we typically expect
+     * fewer than MAX leaves to be passed.
+     *
+     * Detecting repeated entries is prohibitively complicated, so we don't
+     * bother.  That said, one way or another if more than MAX leaves are
+     * passed, something is wrong.
+     */
+    if ( nr_entries > CPUID_MAX_SERIALISED_LEAVES )
+        return -E2BIG;
+
+    for ( i = 0; i < nr_entries; ++i )
+    {
+        struct cpuid_leaf l;
+
+        if ( copy_from_buffer_offset(&data, leaves, i, 1) )
+            return -EFAULT;
+
+        l = (struct cpuid_leaf){ data.a, data.b, data.c, data.d };
+
+        switch ( data.leaf )
+        {
+        case 0 ... ARRAY_SIZE(p->basic.raw) - 1:
+            switch ( data.leaf )
+            {
+            case 0x4:
+                if ( data.subleaf >= ARRAY_SIZE(p->cache.raw) )
+                    goto out_of_range;
+
+                array_access_nospec(p->cache.raw, data.subleaf) = l;
+                break;
+
+            case 0x7:
+                if ( data.subleaf >= ARRAY_SIZE(p->feat.raw) )
+                    goto out_of_range;
+
+                array_access_nospec(p->feat.raw, data.subleaf) = l;
+                break;
+
+            case 0xb:
+                if ( data.subleaf >= ARRAY_SIZE(p->topo.raw) )
+                    goto out_of_range;
+
+                array_access_nospec(p->topo.raw, data.subleaf) = l;
+                break;
+
+            case 0xd:
+                if ( data.subleaf >= ARRAY_SIZE(p->xstate.raw) )
+                    goto out_of_range;
+
+                array_access_nospec(p->xstate.raw, data.subleaf) = l;
+                break;
+
+            default:
+                if ( data.subleaf != XEN_CPUID_NO_SUBLEAF )
+                    goto out_of_range;
+
+                array_access_nospec(p->basic.raw, data.leaf) = l;
+                break;
+            }
+            break;
+
+        case 0x40000000:
+            if ( data.subleaf != XEN_CPUID_NO_SUBLEAF )
+                goto out_of_range;
+
+            p->hv_limit = l.a;
+            break;
+
+        case 0x40000100:
+            if ( data.subleaf != XEN_CPUID_NO_SUBLEAF )
+                goto out_of_range;
+
+            p->hv2_limit = l.a;
+            break;
+
+        case 0x80000000 ... 0x80000000 + ARRAY_SIZE(p->extd.raw) - 1:
+            if ( data.subleaf != XEN_CPUID_NO_SUBLEAF )
+                goto out_of_range;
+
+            array_access_nospec(p->extd.raw, data.leaf & 0xffff) = l;
+            break;
+
+        default:
+            goto out_of_range;
+        }
+    }
+
+    return 0;
+
+ out_of_range:
+    if ( err_leaf )
+        *err_leaf = data.leaf;
+    if ( err_subleaf )
+        *err_subleaf = data.subleaf;
+
+    return -ERANGE;
+}
+
 /*
  * Local variables:
  * mode: C
