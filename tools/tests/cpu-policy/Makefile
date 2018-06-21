@@ -39,7 +39,7 @@ CFLAGS += $(APPEND_CFLAGS)
 
 vpath %.c ../../../xen/lib/x86
 
-test-cpu-policy: test-cpu-policy.o msr.o cpuid.o
+test-cpu-policy: test-cpu-policy.o msr.o cpuid.o policy.o
 	$(CC) $(CFLAGS) $^ -o $@
 
 -include $(DEPS_INCLUDE)

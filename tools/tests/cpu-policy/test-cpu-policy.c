@@ -9,8 +9,7 @@
 
 #include <xen-tools/libs.h>
 #include <xen/asm/x86-vendors.h>
-#include <xen/lib/x86/cpuid.h>
-#include <xen/lib/x86/msr.h>
+#include <xen/lib/x86/cpu-policy.h>
 #include <xen/domctl.h>
 
 static unsigned int nr_failures;
@@ -503,6 +502,111 @@ static void test_cpuid_out_of_range_clearing(void)
     }
 }
 
+static void test_is_compatible_success(void)
+{
+    static struct test {
+        const char *name;
+        struct cpuid_policy host_cpuid;
+        struct cpuid_policy guest_cpuid;
+        struct msr_policy host_msr;
+        struct msr_policy guest_msr;
+    } tests[] = {
+        {
+            .name = "Host CPUID faulting, Guest not",
+            .host_msr = {
+                .platform_info.cpuid_faulting = true,
+            },
+        },
+        {
+            .name = "Host CPUID faulting, Guest wanted",
+            .host_msr = {
+                .platform_info.cpuid_faulting = true,
+            },
+            .guest_msr = {
+                .platform_info.cpuid_faulting = true,
+            },
+        },
+    };
+    struct cpu_policy_errors no_errors = INIT_CPU_POLICY_ERRORS;
+
+    printf("Testing policy compatibility success:\n");
+
+    for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
+    {
+        struct test *t = &tests[i];
+        struct cpu_policy sys = {
+            &t->host_cpuid,
+            &t->host_msr,
+        }, new = {
+            &t->guest_cpuid,
+            &t->guest_msr,
+        };
+        struct cpu_policy_errors e;
+        int res = x86_cpu_policies_are_compatible(&sys, &new, &e);
+
+        /* Check the expected error output. */
+        if ( res != 0 || memcmp(&no_errors, &e, sizeof(no_errors)) )
+            fail("  Test '%s' expected no errors\n"
+                 "    got res %d { leaf %08x, subleaf %08x, msr %08x }\n",
+                 t->name, res, e.leaf, e.subleaf, e.msr);
+    }
+}
+
+static void test_is_compatible_failure(void)
+{
+    static struct test {
+        const char *name;
+        struct cpuid_policy host_cpuid;
+        struct cpuid_policy guest_cpuid;
+        struct msr_policy host_msr;
+        struct msr_policy guest_msr;
+        struct cpu_policy_errors e;
+    } tests[] = {
+        {
+            .name = "Host basic.max_leaf out of range",
+            .guest_cpuid.basic.max_leaf = 1,
+            .e = { 0, -1, -1 },
+        },
+        {
+            .name = "Host extd.max_leaf out of range",
+            .guest_cpuid.extd.max_leaf = 1,
+            .e = { 0x80000008, -1, -1 },
+        },
+        {
+            .name = "Host no CPUID faulting, Guest wanted",
+            .guest_msr = {
+                .platform_info.cpuid_faulting = true,
+            },
+            .e = { -1, -1, 0xce },
+        },
+    };
+
+    printf("Testing policy compatibility failure:\n");
+
+    for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
+    {
+        struct test *t = &tests[i];
+        struct cpu_policy sys = {
+            &t->host_cpuid,
+            &t->host_msr,
+        }, new = {
+            &t->guest_cpuid,
+            &t->guest_msr,
+        };
+        struct cpu_policy_errors e;
+        int res = x86_cpu_policies_are_compatible(&sys, &new, &e);
+
+        /* Check the expected error output. */
+        if ( res == 0 || memcmp(&t->e, &e, sizeof(t->e)) )
+            fail("  Test '%s' res %d\n"
+                 "    expected { leaf %08x, subleaf %08x, msr %08x }\n"
+                 "    got      { leaf %08x, subleaf %08x, msr %08x }\n",
+                 t->name, res,
+                 t->e.leaf, t->e.subleaf, t->e.msr,
+                 e.leaf, e.subleaf, e.msr);
+    }
+}
+
 int main(int argc, char **argv)
 {
     printf("CPU Policy unit tests\n");
@@ -515,6 +619,9 @@ int main(int argc, char **argv)
 
     test_msr_serialise_success();
     test_msr_deserialise_failure();
+
+    test_is_compatible_success();
+    test_is_compatible_failure();
 
     if ( nr_failures )
         printf("Done: %u failures\n", nr_failures);
