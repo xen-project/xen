@@ -17,8 +17,6 @@ extern const uint32_t special_features[FSCAPINTS];
 
 void init_guest_cpuid(void);
 
-const uint32_t *lookup_deep_deps(uint32_t feature);
-
 /*
  * Expected levelling capabilities (given cpuid vendor/family information),
  * and levelling capabilities actually available (given MSR probing).

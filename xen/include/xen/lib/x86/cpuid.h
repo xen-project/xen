@@ -228,6 +228,8 @@ static inline void cpuid_featureset_to_policy(
     p->feat._7d0  = fs[FEATURESET_7d0];
 }
 
+const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
+
 #endif /* !XEN_LIB_X86_CPUID_H */
 
 /*

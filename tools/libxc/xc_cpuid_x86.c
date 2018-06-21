@@ -131,33 +131,6 @@ const uint32_t *xc_get_static_cpu_featuremask(
     }
 }
 
-const uint32_t *xc_get_feature_deep_deps(uint32_t feature)
-{
-    static const struct {
-        uint32_t feature;
-        uint32_t fs[FEATURESET_NR_ENTRIES];
-    } deep_deps[] = INIT_DEEP_DEPS;
-
-    unsigned int start = 0, end = ARRAY_SIZE(deep_deps);
-
-    BUILD_BUG_ON(ARRAY_SIZE(deep_deps) != NR_DEEP_DEPS);
-
-    /* deep_deps[] is sorted.  Perform a binary search. */
-    while ( start < end )
-    {
-        unsigned int mid = start + ((end - start) / 2);
-
-        if ( deep_deps[mid].feature > feature )
-            end = mid;
-        else if ( deep_deps[mid].feature < feature )
-            start = mid + 1;
-        else
-            return deep_deps[mid].fs;
-    }
-
-    return NULL;
-}
-
 struct cpuid_domain_info
 {
     enum
@@ -677,7 +650,7 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
         const uint32_t *dfs;
 
         if ( !test_bit(b, disabled_features) ||
-             !(dfs = xc_get_feature_deep_deps(b)) )
+             !(dfs = x86_cpuid_lookup_deep_deps(b)) )
              continue;
 
         for ( i = 0; i < ARRAY_SIZE(disabled_features); ++i )

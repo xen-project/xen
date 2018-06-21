@@ -97,7 +97,7 @@ static void sanitise_featureset(uint32_t *fs)
     for_each_set_bit(i, (void *)disabled_features,
                      sizeof(disabled_features) * 8)
     {
-        const uint32_t *dfs = lookup_deep_deps(i);
+        const uint32_t *dfs = x86_cpuid_lookup_deep_deps(i);
         unsigned int j;
 
         ASSERT(dfs); /* deep_features[] should guarentee this. */
@@ -546,36 +546,6 @@ bool recheck_cpu_features(unsigned int cpu)
     }
 
     return okay;
-}
-
-const uint32_t *lookup_deep_deps(uint32_t feature)
-{
-    static const struct {
-        uint32_t feature;
-        uint32_t fs[FSCAPINTS];
-    } deep_deps[] = INIT_DEEP_DEPS;
-    unsigned int start = 0, end = ARRAY_SIZE(deep_deps);
-
-    BUILD_BUG_ON(ARRAY_SIZE(deep_deps) != NR_DEEP_DEPS);
-
-    /* Fast early exit. */
-    if ( !test_bit(feature, deep_features) )
-        return NULL;
-
-    /* deep_deps[] is sorted.  Perform a binary search. */
-    while ( start < end )
-    {
-        unsigned int mid = start + ((end - start) / 2);
-
-        if ( deep_deps[mid].feature > feature )
-            end = mid;
-        else if ( deep_deps[mid].feature < feature )
-            start = mid + 1;
-        else
-            return deep_deps[mid].fs;
-    }
-
-    return NULL;
 }
 
 void recalculate_cpuid_policy(struct domain *d)

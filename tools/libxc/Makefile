@@ -80,6 +80,12 @@ GUEST_SRCS-y += $(ELF_SRCS-y)
 $(patsubst %.c,%.o,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
 $(patsubst %.c,%.opic,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
 
+ifeq ($(CONFIG_X86),y) # Add libx86 to the build
+vpath %.c ../../xen/lib/x86
+
+GUEST_SRCS-y                 += cpuid.c
+endif
+
 # new domain builder
 GUEST_SRCS-y                 += xc_dom_core.c xc_dom_boot.c
 GUEST_SRCS-y                 += xc_dom_elfloader.c

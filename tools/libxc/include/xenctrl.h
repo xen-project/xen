@@ -2564,7 +2564,6 @@ enum xc_static_cpu_featuremask {
     XC_FEATUREMASK_DEEP_FEATURES,
 };
 const uint32_t *xc_get_static_cpu_featuremask(enum xc_static_cpu_featuremask);
-const uint32_t *xc_get_feature_deep_deps(uint32_t feature);
 
 #endif
 
