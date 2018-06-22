@@ -754,7 +754,7 @@ static int _vmx_cpu_up(bool bsp)
         eax |= IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX;
         if ( test_bit(X86_FEATURE_SMX, &boot_cpu_data.x86_capability) )
             eax |= IA32_FEATURE_CONTROL_ENABLE_VMXON_INSIDE_SMX;
-        wrmsr(MSR_IA32_FEATURE_CONTROL, eax, 0);
+        wrmsrns(MSR_IA32_FEATURE_CONTROL, eax);
     }
 
     if ( (rc = vmx_init_vmcs_config(bsp)) != 0 )

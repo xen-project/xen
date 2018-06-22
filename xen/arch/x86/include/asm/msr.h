@@ -15,13 +15,17 @@
  *   uint64_t foo = rdmsr(MSR_BAR);
  *   wrmsrns(MSR_BAR, foo);
  *
+ * and, if architectural serialisaition is necessary, or there are other
+ * reasons that WRMSRNS is inapplicable, then:
+ *
+ *   wrmsr(MSR_BAR, foo);
+ *
  * In addition, *_safe() wrappers exist to cope gracefully with a #GP.
  *
  *
  * All legacy forms are to be phased out:
  *
  *  rdmsrl(MSR_FOO, val);
- *  wrmsr(MSR_FOO, lo, hi);
  *  wrmsrl(MSR_FOO, val);
  */
 
@@ -43,17 +47,13 @@ static always_inline uint64_t rdmsr(unsigned int msr)
        val = a__ | ((u64)b__<<32); \
 } while(0)
 
-#define wrmsr(msr,val1,val2) \
-     __asm__ __volatile__("wrmsr" \
-			  : /* no outputs */ \
-			  : "c" (msr), "a" (val1), "d" (val2))
-
-static inline void wrmsrl(unsigned int msr, uint64_t val)
+static inline void wrmsr(unsigned int msr, uint64_t val)
 {
-        uint32_t lo = val, hi = val >> 32;
+    uint32_t lo = val, hi = val >> 32;
 
-        wrmsr(msr, lo, hi);
+    asm volatile ( "wrmsr" :: "a" (lo), "d" (hi), "c" (msr) );
 }
+#define wrmsrl(msr, val) wrmsr(msr, val)
 
 /* Non-serialising WRMSR, when available.  Falls back to a serialising WRMSR. */
 static inline void wrmsrns(uint32_t msr, uint64_t val)
@@ -150,7 +150,7 @@ static inline void wrmsr_tsc_aux(uint32_t val)
 
     if ( *this_tsc_aux != val )
     {
-        wrmsr(MSR_TSC_AUX, val, 0);
+        wrmsrns(MSR_TSC_AUX, val);
         *this_tsc_aux = val;
     }
 }

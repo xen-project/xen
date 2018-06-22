@@ -34,7 +34,7 @@
 #define MAX_COUNTERS FAM15H_NUM_COUNTERS
 
 #define CTR_READ(msr_content,msrs,c) do {rdmsrl(msrs->counters[(c)].addr, (msr_content));} while (0)
-#define CTR_WRITE(l,msrs,c) do {wrmsr(msrs->counters[(c)].addr, -(unsigned int)(l), -1);} while (0)
+#define CTR_WRITE(l,msrs,c) wrmsr(msrs->counters[(c)].addr, -(l))
 #define CTR_OVERFLOWED(n) (!((n) & (1ULL<<31)))
 
 #define CTRL_READ(msr_content,msrs,c) do {rdmsrl(msrs->controls[(c)].addr, (msr_content));} while (0)
