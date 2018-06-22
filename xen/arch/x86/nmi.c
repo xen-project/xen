@@ -218,16 +218,16 @@ void disable_lapic_nmi_watchdog(void)
         return;
     switch (boot_cpu_data.x86_vendor) {
     case X86_VENDOR_AMD:
-        wrmsr(MSR_K7_EVNTSEL0, 0, 0);
+        wrmsrns(MSR_K7_EVNTSEL0, 0);
         break;
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
-            wrmsr(MSR_P6_EVNTSEL(0), 0, 0);
+            wrmsrns(MSR_P6_EVNTSEL(0), 0);
             break;
         case 15:
-            wrmsr(MSR_P4_IQ_CCCR0, 0, 0);
-            wrmsr(MSR_P4_CRU_ESCR0, 0, 0);
+            wrmsr(MSR_P4_IQ_CCCR0, 0);
+            wrmsr(MSR_P4_CRU_ESCR0, 0);
             break;
         }
         break;
@@ -282,7 +282,7 @@ static void clear_msr_range(unsigned int base, unsigned int n)
     unsigned int i;
 
     for (i = 0; i < n; i++)
-        wrmsr(base+i, 0, 0);
+        wrmsrns(base + i, 0);
 }
 
 static inline void write_watchdog_counter(const char *descr)
@@ -308,11 +308,11 @@ static void setup_k7_watchdog(void)
         | K7_EVNTSEL_USR
         | K7_NMI_EVENT;
 
-    wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
+    wrmsrns(MSR_K7_EVNTSEL0, evntsel);
     write_watchdog_counter("K7_PERFCTR0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     evntsel |= K7_EVNTSEL_ENABLE;
-    wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
+    wrmsrns(MSR_K7_EVNTSEL0, evntsel);
 }
 
 static void setup_p6_watchdog(unsigned counter)
@@ -338,11 +338,11 @@ static void setup_p6_watchdog(unsigned counter)
         | P6_EVNTSEL_USR
         | counter;
 
-    wrmsr(MSR_P6_EVNTSEL(0), evntsel, 0);
+    wrmsrns(MSR_P6_EVNTSEL(0), evntsel);
     write_watchdog_counter("P6_PERFCTR0");
     apic_write(APIC_LVTPC, APIC_DM_NMI);
     evntsel |= P6_EVNTSEL0_ENABLE;
-    wrmsr(MSR_P6_EVNTSEL(0), evntsel, 0);
+    wrmsrns(MSR_P6_EVNTSEL(0), evntsel);
 }
 
 static void setup_p4_watchdog(void)
