@@ -9,10 +9,32 @@
 #include <asm/asm_defns.h>
 #include <asm/msr-index.h>
 
-#define rdmsr(msr,val1,val2) \
-     __asm__ __volatile__("rdmsr" \
-			  : "=a" (val1), "=d" (val2) \
-			  : "c" (msr))
+/*
+ * MSR APIs.  Most logic is expected to use:
+ *
+ *   uint64_t foo = rdmsr(MSR_BAR);
+ *   wrmsrns(MSR_BAR, foo);
+ *
+ * In addition, *_safe() wrappers exist to cope gracefully with a #GP.
+ *
+ *
+ * All legacy forms are to be phased out:
+ *
+ *  rdmsrl(MSR_FOO, val);
+ *  wrmsr(MSR_FOO, lo, hi);
+ *  wrmsrl(MSR_FOO, val);
+ */
+
+static always_inline uint64_t rdmsr(unsigned int msr)
+{
+    unsigned long lo, hi;
+
+    asm volatile ( "rdmsr"
+                   : "=a" (lo), "=d" (hi)
+                   : "c" (msr) );
+
+    return (hi << 32) | lo;
+}
 
 #define rdmsrl(msr,val) do { unsigned long a__,b__; \
        __asm__ __volatile__("rdmsr" \

@@ -23,17 +23,17 @@ static uint32_t __ro_after_init mcu_opt_ctrl_val;
 
 void update_mcu_opt_ctrl(void)
 {
-    uint32_t mask = mcu_opt_ctrl_mask, lo, hi;
+    uint64_t mask = mcu_opt_ctrl_mask, val;
 
     if ( !mask )
         return;
 
-    rdmsr(MSR_MCU_OPT_CTRL, lo, hi);
+    val = rdmsr(MSR_MCU_OPT_CTRL);
 
-    lo &= ~mask;
-    lo |= mcu_opt_ctrl_val;
+    val &= ~mask;
+    val |= mcu_opt_ctrl_val;
 
-    wrmsr(MSR_MCU_OPT_CTRL, lo, hi);
+    wrmsrns(MSR_MCU_OPT_CTRL, val);
 }
 
 void __init set_in_mcu_opt_ctrl(uint32_t mask, uint32_t val)
@@ -51,17 +51,17 @@ static uint32_t __ro_after_init pb_opt_ctrl_val;
 
 void update_pb_opt_ctrl(void)
 {
-    uint32_t mask = pb_opt_ctrl_mask, lo, hi;
+    uint64_t mask = pb_opt_ctrl_mask, val;
 
     if ( !mask )
         return;
 
-    rdmsr(MSR_PB_OPT_CTRL, lo, hi);
+    val = rdmsr(MSR_PB_OPT_CTRL);
 
-    lo &= ~mask;
-    lo |= pb_opt_ctrl_val;
+    val &= ~mask;
+    val |= pb_opt_ctrl_val;
 
-    wrmsr(MSR_PB_OPT_CTRL, lo, hi);
+    wrmsrns(MSR_PB_OPT_CTRL, val);
 }
 
 void __init set_in_pb_opt_ctrl(uint32_t mask, uint32_t val)
@@ -456,15 +456,15 @@ static void __init probe_mwait_errata(void)
  */
 static void Intel_errata_workarounds(struct cpuinfo_x86 *c)
 {
-	unsigned long lo, hi;
+	uint64_t val;
 
 	if ((c->x86 == 15) && (c->x86_model == 1) && (c->x86_mask == 1)) {
-		rdmsr (MSR_IA32_MISC_ENABLE, lo, hi);
-		if ((lo & (1<<9)) == 0) {
+		val = rdmsr(MSR_IA32_MISC_ENABLE);
+		if ((val & (1 << 9)) == 0) {
 			printk (KERN_INFO "CPU: C0 stepping P4 Xeon detected.\n");
 			printk (KERN_INFO "CPU: Disabling hardware prefetching (Errata 037)\n");
-			lo |= (1<<9);	/* Disable hw prefetching */
-			wrmsr (MSR_IA32_MISC_ENABLE, lo, hi);
+			val |= (1 << 9); /* Disable hw prefetching */
+			wrmsrns(MSR_IA32_MISC_ENABLE, val);
 		}
 	}
 

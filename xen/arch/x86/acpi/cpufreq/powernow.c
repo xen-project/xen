@@ -140,23 +140,25 @@ static int cf_check powernow_cpufreq_target(
 
 static void amd_fixup_frequency(struct xen_processor_px *px)
 {
-    u32 hi, lo, fid, did;
+    uint64_t val;
+    uint32_t fid, did;
     int index = px->control & 0x00000007;
     const struct cpuinfo_x86 *c = &current_cpu_data;
 
     if ((c->x86 != 0x10 || c->x86_model >= 10) && c->x86 != 0x11)
         return;
 
-    rdmsr(MSR_PSTATE_DEF_BASE + index, lo, hi);
+    val = rdmsr(MSR_PSTATE_DEF_BASE + index);
+
     /*
      * MSR C001_0064+:
      * Bit 63: PstateEn. Read-write. If set, the P-state is valid.
      */
-    if (!(hi & (1U << 31)))
+    if (!(val & (1UL << 63)))
         return;
 
-    fid = lo & 0x3f;
-    did = (lo >> 6) & 7;
+    fid = val & 0x3f;
+    did = (val >> 6) & 7;
     if (c->x86 == 0x10)
         px->core_frequency = (100 * (fid + 16)) >> did;
     else
