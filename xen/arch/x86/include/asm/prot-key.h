@@ -52,11 +52,7 @@ DECLARE_PER_CPU(uint32_t, pkrs);
 
 static inline uint32_t rdpkrs(void)
 {
-    uint32_t pkrs, tmp;
-
-    rdmsr(MSR_PKRS, pkrs, tmp);
-
-    return pkrs;
+    return rdmsr(MSR_PKRS);
 }
 
 static inline uint32_t rdpkrs_and_cache(void)

@@ -268,14 +268,11 @@ const struct genapic *__init apic_x2apic_probe(void)
 
 void __init check_x2apic_preenabled(void)
 {
-    u32 lo, hi;
-
     if ( !cpu_has_x2apic )
         return;
 
     /* Check whether x2apic mode was already enabled by the BIOS. */
-    rdmsr(MSR_APIC_BASE, lo, hi);
-    if ( lo & APIC_BASE_EXTD )
+    if ( rdmsr(MSR_APIC_BASE) & APIC_BASE_EXTD )
     {
         printk("x2APIC mode is already enabled by BIOS.\n");
         x2apic_enabled = 1;

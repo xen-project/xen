@@ -329,6 +329,7 @@ static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
 void __init early_cpu_init(bool verbose)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
+	uint64_t val;
 	u32 eax, ebx, ecx, edx;
 
 	c->x86_cache_alignment = 32;
@@ -412,10 +413,11 @@ void __init early_cpu_init(bool verbose)
 			    &c->x86_capability[FEATURESET_7c0],
 			    &c->x86_capability[FEATURESET_7d0]);
 
-		if (test_bit(X86_FEATURE_ARCH_CAPS, c->x86_capability))
-			rdmsr(MSR_ARCH_CAPABILITIES,
-			      c->x86_capability[FEATURESET_m10Al],
-			      c->x86_capability[FEATURESET_m10Ah]);
+		if (test_bit(X86_FEATURE_ARCH_CAPS, c->x86_capability)) {
+			val = rdmsr(MSR_ARCH_CAPABILITIES);
+			c->x86_capability[FEATURESET_m10Al] = val;
+			c->x86_capability[FEATURESET_m10Ah] = val >> 32;
+		}
 
 		if (max_subleaf >= 1)
 			cpuid_count(7, 1, &eax, &ebx, &ecx,
@@ -467,6 +469,7 @@ void reset_cpuinfo(struct cpuinfo_x86 *c, bool keep_basic)
 
 static void generic_identify(struct cpuinfo_x86 *c)
 {
+	uint64_t val;
 	u32 eax, ebx, ecx, edx, tmp;
 
 	/* Get vendor name */
@@ -566,10 +569,11 @@ static void generic_identify(struct cpuinfo_x86 *c)
 			    &c->x86_capability[FEATURESET_Da1],
 			    &tmp, &tmp, &tmp);
 
-	if (test_bit(X86_FEATURE_ARCH_CAPS, c->x86_capability))
-		rdmsr(MSR_ARCH_CAPABILITIES,
-		      c->x86_capability[FEATURESET_m10Al],
-		      c->x86_capability[FEATURESET_m10Ah]);
+	if (test_bit(X86_FEATURE_ARCH_CAPS, c->x86_capability)) {
+		val = rdmsr(MSR_ARCH_CAPABILITIES);
+		c->x86_capability[FEATURESET_m10Al] = val;
+		c->x86_capability[FEATURESET_m10Ah] = val >> 32;
+	}
 }
 
 /*

@@ -1369,9 +1369,9 @@ static void cf_check init_amd(struct cpuinfo_x86 *c)
 	}
 
 	if (cpu_has(c, X86_FEATURE_EFRO)) {
-		rdmsr(MSR_K8_HWCR, l, h);
-		l |= (1 << 27); /* Enable read-only APERF/MPERF bit */
-		wrmsr(MSR_K8_HWCR, l, h);
+		/* Enable read-only APERF/MPERF bit */
+		wrmsrns(MSR_K8_HWCR,
+			rdmsr(MSR_K8_HWCR) | (1 << 27));
 	}
 
 	/* Prevent TSC drift in non single-processor, single-core platforms. */

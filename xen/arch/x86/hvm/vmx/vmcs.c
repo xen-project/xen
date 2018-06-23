@@ -207,9 +207,13 @@ static void __init vmx_display_features(void)
 static u32 adjust_vmx_controls(
     const char *name, u32 ctl_min, u32 ctl_opt, u32 msr, bool *mismatch)
 {
+    uint64_t val;
     u32 vmx_msr_low, vmx_msr_high, ctl = ctl_min | ctl_opt;
 
-    rdmsr(msr, vmx_msr_low, vmx_msr_high);
+    val = rdmsr(msr);
+
+    vmx_msr_low = val;
+    vmx_msr_high = val >> 32;
 
     ctl &= vmx_msr_high; /* bit == 0 in high word ==> must be zero */
     ctl |= vmx_msr_low;  /* bit == 1 in low word  ==> must be one  */
@@ -258,10 +262,13 @@ static int vmx_init_vmcs_config(bool bsp)
 {
     u32 vmx_basic_msr_low, vmx_basic_msr_high, min, opt;
     struct vmx_caps caps = {};
-    u64 _vmx_misc_cap = 0;
+    uint64_t _vmx_misc_cap = 0, val;
     bool mismatch = false;
 
-    rdmsr(MSR_IA32_VMX_BASIC, vmx_basic_msr_low, vmx_basic_msr_high);
+    val = rdmsr(MSR_IA32_VMX_BASIC);
+
+    vmx_basic_msr_low = val;
+    vmx_basic_msr_high = val >> 32;
 
     min = (PIN_BASED_EXT_INTR_MASK |
            PIN_BASED_NMI_EXITING);
@@ -366,7 +373,10 @@ static int vmx_init_vmcs_config(bool bsp)
     if ( caps.secondary_exec_control & (SECONDARY_EXEC_ENABLE_EPT |
                                         SECONDARY_EXEC_ENABLE_VPID) )
     {
-        rdmsr(MSR_IA32_VMX_EPT_VPID_CAP, caps.ept, caps.vpid);
+        val = rdmsr(MSR_IA32_VMX_EPT_VPID_CAP);
+
+        caps.ept = val;
+        caps.vpid = val >> 32;
 
         if ( !opt_ept_ad )
             caps.ept &= ~VMX_EPT_AD_BIT;
@@ -408,9 +418,15 @@ static int vmx_init_vmcs_config(bool bsp)
          * We check VMX_BASIC_MSR[55] to correctly handle default controls.
          */
         uint32_t must_be_one, must_be_zero, msr = MSR_IA32_VMX_PROCBASED_CTLS;
+
         if ( vmx_basic_msr_high & (VMX_BASIC_DEFAULT1_ZERO >> 32) )
             msr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS;
-        rdmsr(msr, must_be_one, must_be_zero);
+
+        val = rdmsr(msr);
+
+        must_be_one = val;
+        must_be_zero = val >> 32;
+
         if ( must_be_one & (CPU_BASED_INVLPG_EXITING |
                             CPU_BASED_CR3_LOAD_EXITING |
                             CPU_BASED_CR3_STORE_EXITING) )
@@ -699,7 +715,7 @@ void cf_check vmx_cpu_dead(unsigned int cpu)
 
 static int _vmx_cpu_up(bool bsp)
 {
-    u32 eax, edx;
+    uint32_t eax;
     int rc, bios_locked, cpu = smp_processor_id();
     u64 cr0, vmx_cr0_fixed0, vmx_cr0_fixed1;
 
@@ -719,7 +735,7 @@ static int _vmx_cpu_up(bool bsp)
         return -EINVAL;
     }
 
-    rdmsr(MSR_IA32_FEATURE_CONTROL, eax, edx);
+    eax = rdmsr(MSR_IA32_FEATURE_CONTROL);
 
     bios_locked = !!(eax & IA32_FEATURE_CONTROL_LOCK);
     if ( bios_locked )

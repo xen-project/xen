@@ -42,6 +42,8 @@ void tsx_init(void)
 {
     static bool __read_mostly once;
 
+    uint64_t val;
+
     /*
      * This function is first called between microcode being loaded, and
      * CPUID being scanned generally. early_cpu_init() has already prepared
@@ -62,8 +64,6 @@ void tsx_init(void)
              * On a TAA-vulnerable or later part with at least the May 2020
              * microcode mitigating SRBDS.
              */
-            uint64_t val;
-
             rdmsrl(MSR_MCU_OPT_CTRL, val);
 
             /*
@@ -118,8 +118,6 @@ void tsx_init(void)
 
         if ( cpu_has_tsx_force_abort )
         {
-            uint64_t val;
-
             /*
              * On an early TSX-enabled Skylake part subject to the memory
              * ordering erratum, with at least the March 2019 microcode.
@@ -250,18 +248,17 @@ void tsx_init(void)
          *    controlled, we have or will set MSR_MCU_OPT_CTRL.RTM_ALLOW to
          *    let TSX_CTRL.RTM_DISABLE be usable.
          */
-        uint32_t hi, lo;
 
-        rdmsr(MSR_TSX_CTRL, lo, hi);
+        val = rdmsr(MSR_TSX_CTRL);
 
         /* Check bottom bit only.  Higher bits are various sentinels. */
         rtm_disabled = !(opt_tsx & 1);
 
-        lo &= ~(TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR);
+        val &= ~(TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR);
         if ( rtm_disabled )
-            lo |= TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR;
+            val |= TSX_CTRL_RTM_DISABLE | TSX_CTRL_CPUID_CLEAR;
 
-        wrmsr(MSR_TSX_CTRL, lo, hi);
+        wrmsrns(MSR_TSX_CTRL, val);
     }
     else if ( cpu_has_tsx_force_abort )
     {
@@ -269,14 +266,12 @@ void tsx_init(void)
          * On an early TSX-enable Skylake part subject to the memory ordering
          * erratum, with at least the March 2019 microcode.
          */
-        uint32_t hi, lo;
-
-        rdmsr(MSR_TSX_FORCE_ABORT, lo, hi);
+        val = rdmsr(MSR_TSX_FORCE_ABORT);
 
         /* Check bottom bit only.  Higher bits are various sentinels. */
         rtm_disabled = !(opt_tsx & 1);
 
-        lo &= ~(TSX_FORCE_ABORT_RTM | TSX_CPUID_CLEAR | TSX_ENABLE_RTM);
+        val &= ~(TSX_FORCE_ABORT_RTM | TSX_CPUID_CLEAR | TSX_ENABLE_RTM);
 
         if ( cpu_has_rtm_always_abort )
         {
@@ -291,7 +286,7 @@ void tsx_init(void)
              *  - TSX_FORCE_ABORT.ENABLE_RTM may be used to opt in to
              *    re-enabling RTM, at the users own risk.
              */
-            lo |= rtm_disabled ? TSX_CPUID_CLEAR : TSX_ENABLE_RTM;
+            val |= rtm_disabled ? TSX_CPUID_CLEAR : TSX_ENABLE_RTM;
         }
         else
         {
@@ -304,10 +299,10 @@ void tsx_init(void)
              *    setting TSX_FORCE_ABORT.FORCE_ABORT_RTM.
              */
             if ( rtm_disabled )
-                lo |= TSX_FORCE_ABORT_RTM;
+                val |= TSX_FORCE_ABORT_RTM;
         }
 
-        wrmsr(MSR_TSX_FORCE_ABORT, lo, hi);
+        wrmsrns(MSR_TSX_FORCE_ABORT, val);
     }
     else if ( opt_tsx >= 0 )
         printk_once(XENLOG_WARNING
