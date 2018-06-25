@@ -44,10 +44,6 @@ ov=4.0
         git add -p
 	git commit -m "Branch for $v"
 
-### * make symlink on mariner for qemu
-###        cd /var/www/git/
-###        ln -s /usr/groups/xencore/HG/qemu-xen-$v-testing.git .
-
 * make branches etc. in osstest
         ssh osstest@osstest.test-lab
 	cd testing.git
@@ -79,13 +75,6 @@ ov=4.0
 	git add versions
 	git commit -m "Branch for $v"
 
-#* update xenbits web page
-        ssh root@xenbits.xen.org
-        cd /var/xenbits-www/html
-        emacs index.html
-	# - search for previous version number, and update in each place found
-	# - in general, drop one old release in favour of the new one
-
 Ensure references to qemu trees in xen.git's Config.mk are updated.
 Check this with
         grep unstable Config.mk 
@@ -96,8 +85,4 @@ README etc.
 
 Update new stable tree's MAINTAINERS to contain correct info for this stable branch
 
-###* fix new trees' vcs descriptions
-#* make old trees' descriptions "historical"
-#	cd ~/git
-#	perl -i~ -pe "s/unstable/4.6-testing/" qemu-upstream-$v-testing.git/description
 
