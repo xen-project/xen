@@ -138,10 +138,10 @@ config XSM_FLASK_AVC_STATS
 
 	  If unsure, say Y.
 
-config XSM_POLICY
-	bool "Compile Xen with a built-in security policy"
+config XSM_FLASK_POLICY
+	bool "Compile Xen with a built-in FLASK security policy"
 	default y if HAS_CHECKPOLICY = "y"
-	depends on XSM
+	depends on XSM_FLASK
 	---help---
 	  This includes a default XSM policy in the hypervisor so that the
 	  bootloader does not need to load a policy to get sane behavior from an

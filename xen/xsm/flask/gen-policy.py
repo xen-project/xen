@@ -8,7 +8,7 @@ sys.stdout.write("""
 #include <xen/init.h>
 #include <xsm/xsm.h>
 
-const unsigned char xsm_init_policy[] __initconst = {
+const unsigned char xsm_flask_init_policy[] __initconst = {
 """)
 
 for char in sys.stdin.read():
@@ -19,5 +19,5 @@ for char in sys.stdin.read():
 
 sys.stdout.write("""
 };
-const unsigned int __initconst xsm_init_policy_size = %d;
+const unsigned int __initconst xsm_flask_init_policy_size = %d;
 """ % policy_size)

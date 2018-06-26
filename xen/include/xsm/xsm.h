@@ -728,9 +728,9 @@ static inline void flask_init(const void *policy_buffer, size_t policy_size)
 }
 #endif
 
-#ifdef CONFIG_XSM_POLICY
-extern const unsigned char xsm_init_policy[];
-extern const unsigned int xsm_init_policy_size;
+#ifdef CONFIG_XSM_FLASK_POLICY
+extern const unsigned char xsm_flask_init_policy[];
+extern const unsigned int xsm_flask_init_policy_size;
 #endif
 
 #else /* CONFIG_XSM */

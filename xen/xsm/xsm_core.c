@@ -42,11 +42,11 @@ static inline int verify(struct xsm_operations *ops)
 
 static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
 {
-#ifdef CONFIG_XSM_POLICY
+#ifdef CONFIG_XSM_FLASK_POLICY
     if ( policy_size == 0 )
     {
-        policy_buffer = xsm_init_policy;
-        policy_size = xsm_init_policy_size;
+        policy_buffer = xsm_flask_init_policy;
+        policy_size = xsm_flask_init_policy_size;
     }
 #endif
 
