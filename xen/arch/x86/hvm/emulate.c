@@ -2053,6 +2053,7 @@ static int hvmemul_get_fpu(
          * masking of all exceptions by FNSTENV.)
          */
         save_fpu_enable();
+        curr->fpu_initialised = true;
         curr->fpu_dirtied = true;
         if ( (fpu_ctxt->fcw & 0x3f) != 0x3f )
         {
