@@ -114,7 +114,7 @@ config XSM
 
 	  If unsure, say N.
 
-config FLASK
+config XSM_FLASK
 	def_bool y
 	prompt "FLux Advanced Security Kernel support" if EXPERT = "y"
 	depends on XSM
@@ -127,10 +127,10 @@ config FLASK
 
 	  If unsure, say Y.
 
-config FLASK_AVC_STATS
+config XSM_FLASK_AVC_STATS
 	def_bool y
 	prompt "Maintain statistics on the FLASK access vector cache" if EXPERT = "y"
-	depends on FLASK
+	depends on XSM_FLASK
 	---help---
 	  Maintain counters on the access vector cache that can be viewed using
 	  the FLASK_AVC_CACHESTATS sub-op of the xsm_op hypercall.  Disabling

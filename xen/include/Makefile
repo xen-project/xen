@@ -30,7 +30,7 @@ headers-$(CONFIG_X86)     += compat/hvm/dm_op.h
 headers-$(CONFIG_X86)     += compat/hvm/hvm_op.h
 headers-$(CONFIG_X86)     += compat/hvm/hvm_vcpu.h
 headers-y                 += compat/arch-$(compat-arch-y).h compat/pmu.h compat/xlat.h
-headers-$(CONFIG_FLASK)   += compat/xsm/flask_op.h
+headers-$(CONFIG_XSM_FLASK) += compat/xsm/flask_op.h
 
 cppflags-y                := -include public/xen-compat.h -DXEN_GENERATING_COMPAT_HEADERS
 cppflags-$(CONFIG_X86)    += -m32

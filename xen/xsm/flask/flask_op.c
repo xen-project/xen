@@ -425,7 +425,7 @@ static int flask_security_make_bools(void)
     return ret;
 }
 
-#ifdef CONFIG_FLASK_AVC_STATS
+#ifdef CONFIG_XSM_FLASK_AVC_STATS
 
 static int flask_security_avc_cachestats(struct xen_flask_cache_stats *arg)
 {
@@ -713,7 +713,7 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op)
         rv = avc_get_hash_stats(&op.u.hash_stats);
         break;
 
-#ifdef CONFIG_FLASK_AVC_STATS
+#ifdef CONFIG_XSM_FLASK_AVC_STATS
     case FLASK_AVC_CACHESTATS:
         rv = flask_security_avc_cachestats(&op.u.cache_stats);
         break;

@@ -95,7 +95,7 @@ struct xen_flask_hash_stats;
 int avc_get_hash_stats(struct xen_flask_hash_stats *arg);
 extern unsigned int avc_cache_threshold;
 
-#ifdef CONFIG_FLASK_AVC_STATS
+#ifdef CONFIG_XSM_FLASK_AVC_STATS
 DECLARE_PER_CPU(struct avc_cache_stats, avc_cache_stats);
 #endif
 

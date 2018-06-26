@@ -24,7 +24,7 @@ DEFINE_XEN_GUEST_HANDLE(xsm_op_t);
 /* policy magic number (defined by XSM_MAGIC) */
 typedef u32 xsm_magic_t;
 
-#ifdef CONFIG_FLASK
+#ifdef CONFIG_XSM_FLASK
 #define XSM_MAGIC 0xf97cff8c
 #else
 #define XSM_MAGIC 0x0
@@ -720,7 +720,7 @@ extern int register_xsm(struct xsm_operations *ops);
 extern struct xsm_operations dummy_xsm_ops;
 extern void xsm_fixup_ops(struct xsm_operations *ops);
 
-#ifdef CONFIG_FLASK
+#ifdef CONFIG_XSM_FLASK
 extern void flask_init(const void *policy_buffer, size_t policy_size);
 #else
 static inline void flask_init(const void *policy_buffer, size_t policy_size)
