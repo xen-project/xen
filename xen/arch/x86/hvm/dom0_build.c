@@ -314,8 +314,10 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
 
     /*
      * Craft the e820 memory map for Dom0 based on the hardware e820 map.
+     * Add an extra entry in case we have to split a RAM entry into a RAM and a
+     * UNUSABLE one in order to truncate it.
      */
-    d->arch.e820 = xzalloc_array(struct e820entry, e820.nr_map);
+    d->arch.e820 = xzalloc_array(struct e820entry, e820.nr_map + 1);
     if ( !d->arch.e820 )
         panic("Unable to allocate memory for Dom0 e820 map");
     entry_guest = d->arch.e820;
@@ -323,19 +325,20 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
     /* Clamp e820 memory map to match the memory assigned to Dom0 */
     for ( i = 0, entry = e820.map; i < e820.nr_map; i++, entry++ )
     {
+        *entry_guest = *entry;
+
         if ( entry->type != E820_RAM )
-        {
-            *entry_guest = *entry;
             goto next;
-        }
 
         if ( nr_pages == cur_pages )
         {
             /*
-             * We already have all the assigned memory,
-             * skip this entry
+             * We already have all the requested memory, turn this RAM region
+             * into a UNUSABLE region in order to prevent Dom0 from placing
+             * BARs in this area.
              */
-            continue;
+            entry_guest->type = E820_UNUSABLE;
+            goto next;
         }
 
         /*
@@ -358,6 +361,12 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
         {
             /* Truncate region */
             entry_guest->size = (nr_pages - cur_pages) << PAGE_SHIFT;
+            /* Add the remaining of the RAM region as UNUSABLE. */
+            entry_guest++;
+            d->arch.nr_e820++;
+            entry_guest->type = E820_UNUSABLE;
+            entry_guest->addr = start + ((nr_pages - cur_pages) << PAGE_SHIFT);
+            entry_guest->size = end - entry_guest->addr;
             cur_pages = nr_pages;
         }
         else
@@ -367,9 +376,9 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
  next:
         d->arch.nr_e820++;
         entry_guest++;
+        ASSERT(d->arch.nr_e820 <= e820.nr_map + 1);
     }
     ASSERT(cur_pages == nr_pages);
-    ASSERT(d->arch.nr_e820 <= e820.nr_map);
 }
 
 static int __init pvh_setup_p2m(struct domain *d)
