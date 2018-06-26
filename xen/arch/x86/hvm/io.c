@@ -89,7 +89,7 @@ bool hvm_emulate_one_insn(hvm_emulate_validate_t *validate, const char *descr)
 
     rc = hvm_emulate_one(&ctxt);
 
-    if ( hvm_vcpu_io_need_completion(vio) )
+    if ( hvm_ioreq_needs_completion(&vio->io_req) )
         vio->io_completion = HVMIO_mmio_completion;
     else
         vio->mmio_access = (struct npfec){};
@@ -142,7 +142,7 @@ bool handle_pio(uint16_t port, unsigned int size, int dir)
 
     rc = hvmemul_do_pio_buffer(port, size, dir, &data);
 
-    if ( hvm_vcpu_io_need_completion(vio) )
+    if ( hvm_ioreq_needs_completion(&vio->io_req) )
         vio->io_completion = HVMIO_pio_completion;
 
     switch ( rc )

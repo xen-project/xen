@@ -282,11 +282,7 @@ static int hvmemul_do_io(
             rc = hvm_send_ioreq(s, &p, 0);
             if ( rc != X86EMUL_RETRY || currd->is_shutting_down )
                 vio->io_req.state = STATE_IOREQ_NONE;
-            /*
-             * This effectively is !hvm_vcpu_io_need_completion(vio), slightly
-             * optimized and using local variables we have available.
-             */
-            else if ( data_is_addr || (!is_mmio && dir == IOREQ_WRITE) )
+            else if ( !hvm_ioreq_needs_completion(&vio->io_req) )
                 rc = X86EMUL_OKAY;
         }
         break;
@@ -2278,7 +2274,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     if ( rc == X86EMUL_OKAY && vio->mmio_retry )
         rc = X86EMUL_RETRY;
 
-    if ( !hvm_vcpu_io_need_completion(vio) )
+    if ( !hvm_ioreq_needs_completion(&vio->io_req) )
     {
         vio->mmio_cache_count = 0;
         vio->mmio_insn_bytes = 0;

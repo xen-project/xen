@@ -91,12 +91,11 @@ struct hvm_vcpu_io {
     const struct g2m_ioport *g2m_ioport;
 };
 
-static inline bool hvm_vcpu_io_need_completion(const struct hvm_vcpu_io *vio)
+static inline bool hvm_ioreq_needs_completion(const ioreq_t *ioreq)
 {
-    return (vio->io_req.state == STATE_IOREQ_READY) &&
-           !vio->io_req.data_is_ptr &&
-           (vio->io_req.type != IOREQ_TYPE_PIO ||
-            vio->io_req.dir != IOREQ_WRITE);
+    return ioreq->state == STATE_IOREQ_READY &&
+           !ioreq->data_is_ptr &&
+           (ioreq->type != IOREQ_TYPE_PIO || ioreq->dir != IOREQ_WRITE);
 }
 
 struct nestedvcpu {

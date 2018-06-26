@@ -110,15 +110,15 @@ bool hvm_io_pending(struct vcpu *v)
 static void hvm_io_assist(struct hvm_ioreq_vcpu *sv, uint64_t data)
 {
     struct vcpu *v = sv->vcpu;
-    struct hvm_vcpu_io *vio = &v->arch.hvm_vcpu.hvm_io;
+    ioreq_t *ioreq = &v->arch.hvm_vcpu.hvm_io.io_req;
 
-    if ( hvm_vcpu_io_need_completion(vio) )
+    if ( hvm_ioreq_needs_completion(ioreq) )
     {
-        vio->io_req.state = STATE_IORESP_READY;
-        vio->io_req.data = data;
+        ioreq->state = STATE_IORESP_READY;
+        ioreq->data = data;
     }
     else
-        vio->io_req.state = STATE_IOREQ_NONE;
+        ioreq->state = STATE_IOREQ_NONE;
 
     msix_write_completion(v);
     vcpu_end_shutdown_deferral(v);
