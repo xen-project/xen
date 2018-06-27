@@ -54,35 +54,21 @@ static void __init calculate_host_policy(void)
 static void __init calculate_hvm_max_policy(void)
 {
     struct msr_domain_policy *dp = &hvm_max_msr_domain_policy;
-    struct msr_vcpu_policy *vp = &hvm_max_msr_vcpu_policy;
 
     if ( !hvm_enabled )
         return;
 
     *dp = host_msr_domain_policy;
 
-    /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* It's always possible to emulate CPUID faulting for HVM guests */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
-         boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-    {
-        dp->plaform_info.available = true;
-        dp->plaform_info.cpuid_faulting = true;
-    }
-
-    /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
-    vp->misc_features_enables.available = dp->plaform_info.cpuid_faulting;
+    dp->plaform_info.cpuid_faulting = true;
 }
 
 static void __init calculate_pv_max_policy(void)
 {
     struct msr_domain_policy *dp = &pv_max_msr_domain_policy;
-    struct msr_vcpu_policy *vp = &pv_max_msr_vcpu_policy;
 
     *dp = host_msr_domain_policy;
-
-    /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
-    vp->misc_features_enables.available = dp->plaform_info.cpuid_faulting;
 }
 
 void __init init_guest_msr_policy(void)
@@ -107,10 +93,7 @@ int init_domain_msr_policy(struct domain *d)
 
     /* See comment in intel_ctxt_switch_levelling() */
     if ( is_control_domain(d) )
-    {
-        dp->plaform_info.available = false;
         dp->plaform_info.cpuid_faulting = false;
-    }
 
     d->arch.msr = dp;
 
@@ -129,10 +112,6 @@ int init_vcpu_msr_policy(struct vcpu *v)
 
     *vp = is_pv_domain(d) ? pv_max_msr_vcpu_policy :
                             hvm_max_msr_vcpu_policy;
-
-    /* See comment in intel_ctxt_switch_levelling() */
-    if ( is_control_domain(d) )
-        vp->misc_features_enables.available = false;
 
     v->arch.msr = vp;
 
@@ -160,8 +139,6 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
     case MSR_INTEL_PLATFORM_INFO:
-        if ( !dp->plaform_info.available )
-            goto gp_fault;
         *val = (uint64_t)dp->plaform_info.cpuid_faulting <<
                _MSR_PLATFORM_INFO_CPUID_FAULTING;
         break;
@@ -171,8 +148,6 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         goto gp_fault;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
-        if ( !vp->misc_features_enables.available )
-            goto gp_fault;
         *val = (uint64_t)vp->misc_features_enables.cpuid_faulting <<
                _MSR_MISC_FEATURES_CPUID_FAULTING;
         break;
@@ -257,9 +232,6 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_INTEL_MISC_FEATURES_ENABLES:
     {
         bool old_cpuid_faulting = vp->misc_features_enables.cpuid_faulting;
-
-        if ( !vp->misc_features_enables.available )
-            goto gp_fault;
 
         rsvd = ~0ull;
         if ( dp->plaform_info.cpuid_faulting )

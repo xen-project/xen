@@ -115,13 +115,8 @@ bool __init probe_cpuid_faulting(void)
 	int rc;
 
 	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val)) == 0)
-	{
-		struct msr_domain_policy *dp = &raw_msr_domain_policy;
-
-		dp->plaform_info.available = true;
-		if (val & MSR_PLATFORM_INFO_CPUID_FAULTING)
-			dp->plaform_info.cpuid_faulting = true;
-	}
+		raw_msr_domain_policy.plaform_info.cpuid_faulting =
+			val & MSR_PLATFORM_INFO_CPUID_FAULTING;
 
 	if (rc ||
 	    !(val & MSR_PLATFORM_INFO_CPUID_FAULTING) ||

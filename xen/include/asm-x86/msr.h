@@ -260,9 +260,15 @@ static inline void wrmsr_tsc_aux(uint32_t val)
 /* MSR policy object for shared per-domain MSRs */
 struct msr_domain_policy
 {
-    /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
+    /*
+     * 0x000000ce - MSR_INTEL_PLATFORM_INFO
+     *
+     * This MSR is non-architectural, but for simplicy we allow it to be read
+     * unconditionally.  CPUID Faulting support can be fully emulated for HVM
+     * guests so can be offered unconditionally, while support for PV guests
+     * is dependent on real hardware support.
+     */
     struct {
-        bool available; /* This MSR is non-architectural */
         bool cpuid_faulting;
     } plaform_info;
 };
@@ -288,9 +294,14 @@ struct msr_vcpu_policy
         uint32_t raw;
     } spec_ctrl;
 
-    /* 0x00000140  MSR_INTEL_MISC_FEATURES_ENABLES */
+    /*
+     * 0x00000140 - MSR_INTEL_MISC_FEATURES_ENABLES
+     *
+     * This MSR is non-architectural, but for simplicy we allow it to be read
+     * unconditionally.  The CPUID Faulting bit is the only writeable bit, and
+     * only if enumerated by MSR_PLATFORM_INFO.
+     */
     struct {
-        bool available; /* This MSR is non-architectural */
         bool cpuid_faulting;
     } misc_features_enables;
 };
