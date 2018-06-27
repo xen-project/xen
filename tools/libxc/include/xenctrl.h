@@ -1828,8 +1828,6 @@ int xc_cpuid_apply_policy(xc_interface *xch,
                           uint32_t domid,
                           uint32_t *featureset,
                           unsigned int nr_features);
-void xc_cpuid_to_str(const unsigned int *regs,
-                     char **strs); /* some strs[] may be NULL if ENOMEM */
 int xc_mca_op(xc_interface *xch, struct xen_mc *mc);
 int xc_mca_op_inject_v2(xc_interface *xch, unsigned int flags,
                         xc_cpumap_t cpumap, unsigned int nr_cpus);

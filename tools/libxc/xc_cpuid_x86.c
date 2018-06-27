@@ -627,29 +627,6 @@ static int xc_cpuid_do_domctl(
     return do_domctl(xch, &domctl);
 }
 
-static char *alloc_str(void)
-{
-    char *s = malloc(33);
-    if ( s == NULL )
-        return s;
-    memset(s, 0, 33);
-    return s;
-}
-
-void xc_cpuid_to_str(const unsigned int *regs, char **strs)
-{
-    int i, j;
-
-    for ( i = 0; i < 4; i++ )
-    {
-        strs[i] = alloc_str();
-        if ( strs[i] == NULL )
-            continue;
-        for ( j = 0; j < 32; j++ )
-            strs[i][j] = !!((regs[i] & (1U << (31 - j)))) ? '1' : '0';
-    }
-}
-
 static void sanitise_featureset(struct cpuid_domain_info *info)
 {
     const uint32_t fs_size = xc_get_cpu_featureset_size();
@@ -823,7 +800,7 @@ int xc_cpuid_set(
             continue;
         }
         
-        config_transformed[i] = alloc_str();
+        config_transformed[i] = calloc(33, 1); /* 32 bits, NUL terminator. */
         if ( config_transformed[i] == NULL )
         {
             rc = -ENOMEM;
