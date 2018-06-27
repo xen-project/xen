@@ -139,8 +139,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
     case MSR_INTEL_PLATFORM_INFO:
-        *val = (uint64_t)dp->plaform_info.cpuid_faulting <<
-               _MSR_PLATFORM_INFO_CPUID_FAULTING;
+        *val = dp->plaform_info.raw;
         break;
 
     case MSR_ARCH_CAPABILITIES:
@@ -148,8 +147,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         goto gp_fault;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
-        *val = (uint64_t)vp->misc_features_enables.cpuid_faulting <<
-               _MSR_MISC_FEATURES_CPUID_FAULTING;
+        *val = vp->misc_features_enables.raw;
         break;
 
     default:
@@ -240,8 +238,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( val & rsvd )
             goto gp_fault;
 
-        vp->misc_features_enables.cpuid_faulting =
-            val & MSR_MISC_FEATURES_CPUID_FAULTING;
+        vp->misc_features_enables.raw = val;
 
         if ( v == curr && is_hvm_domain(d) && cpu_has_cpuid_faulting &&
              (old_cpuid_faulting ^ vp->misc_features_enables.cpuid_faulting) )

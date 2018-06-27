@@ -268,8 +268,12 @@ struct msr_domain_policy
      * guests so can be offered unconditionally, while support for PV guests
      * is dependent on real hardware support.
      */
-    struct {
-        bool cpuid_faulting;
+    union {
+        uint32_t raw;
+        struct {
+            uint32_t :31;
+            bool cpuid_faulting:1;
+        };
     } plaform_info;
 };
 
@@ -301,8 +305,11 @@ struct msr_vcpu_policy
      * unconditionally.  The CPUID Faulting bit is the only writeable bit, and
      * only if enumerated by MSR_PLATFORM_INFO.
      */
-    struct {
-        bool cpuid_faulting;
+    union {
+        uint32_t raw;
+        struct {
+            bool cpuid_faulting:1;
+        };
     } misc_features_enables;
 };
 
