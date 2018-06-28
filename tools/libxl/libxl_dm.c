@@ -798,6 +798,7 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
                                          int colo_mode, const char **id_ptr)
 {
     char *drive = NULL;
+    char *common = GCSPRINTF("if=none,cache=writeback");
     const char *exportname = disk->colo_export;
     const char *active_disk = disk->active_disk;
     const char *hidden_disk = disk->hidden_disk;
@@ -806,25 +807,23 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
     switch (colo_mode) {
     case LIBXL__COLO_NONE:
         id = GCSPRINTF("scsi0-hd%d", unit);
-        drive = GCSPRINTF("file=%s,if=none,id=%s,format=%s,cache=writeback",
-                          target_path, id, format);
+        drive = GCSPRINTF("file=%s,id=%s,format=%s,%s",
+                          target_path, id, format, common);
         break;
     case LIBXL__COLO_PRIMARY:
         id = exportname;
         drive = GCSPRINTF(
-            "if=none,cache=writeback,driver=quorum,"
-            "id=%s,"
+            "%s,id=%s,driver=quorum,"
             "children.0.file.filename=%s,"
             "children.0.driver=%s,"
             "read-pattern=fifo,"
             "vote-threshold=1",
-            id, target_path, format);
+            common, id, target_path, format);
         break;
     case LIBXL__COLO_SECONDARY:
         id = "top-colo";
         drive = GCSPRINTF(
-            "if=none,id=%s,cache=writeback,"
-            "driver=replication,"
+            "%s,id=%s,driver=replication,"
             "mode=secondary,"
             "top-id=top-colo,"
             "file.driver=qcow2,"
@@ -832,7 +831,7 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
             "file.backing.driver=qcow2,"
             "file.backing.file.filename=%s,"
             "file.backing.backing=%s",
-            id, active_disk, hidden_disk, exportname);
+            common, id, active_disk, hidden_disk, exportname);
         break;
     default:
         abort();
