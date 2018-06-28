@@ -1749,7 +1749,21 @@ void do_device_not_available(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
 
-    BUG_ON(!guest_mode(regs));
+    if ( !guest_mode(regs) )
+    {
+        unsigned long fixup = search_exception_table(regs);
+
+        gprintk(XENLOG_ERR, "#NM: %p [%ps] -> %p\n",
+                _p(regs->rip), _p(regs->rip), _p(fixup));
+        /*
+         * We shouldn't be able to reach here, but for release builds have
+         * the recovery logic in place nevertheless.
+         */
+        ASSERT_UNREACHABLE();
+        BUG_ON(!fixup);
+        regs->rip = fixup;
+        return;
+    }
 
     vcpu_restore_fpu_lazy(curr);
 
