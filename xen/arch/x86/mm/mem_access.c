@@ -474,6 +474,26 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access)
     return _p2m_get_mem_access(p2m, gfn, access);
 }
 
+void arch_p2m_set_access_required(struct domain *d, bool access_required)
+{
+    unsigned int i;
+
+    ASSERT(atomic_read(&d->pause_count));
+
+    p2m_get_hostp2m(d)->access_required = access_required;
+
+    if ( !altp2m_active(d) )
+        return;
+
+    for ( i = 0; i < MAX_ALTP2M; i++ )
+    {
+        struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
+
+        if ( p2m )
+            p2m->access_required = access_required;
+    }
+}
+
 /*
  * Local variables:
  * mode: C

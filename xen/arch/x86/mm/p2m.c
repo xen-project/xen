@@ -199,6 +199,7 @@ static int p2m_init_altp2m(struct domain *d)
 {
     unsigned int i;
     struct p2m_domain *p2m;
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
 
     mm_lock_init(&d->arch.altp2m_list_lock);
     for ( i = 0; i < MAX_ALTP2M; i++ )
@@ -210,7 +211,7 @@ static int p2m_init_altp2m(struct domain *d)
             return -ENOMEM;
         }
         p2m->p2m_class = p2m_alternate;
-        p2m->access_required = 1;
+        p2m->access_required = hostp2m->access_required;
         _atomic_set(&p2m->active_vcpus, 0);
     }
 

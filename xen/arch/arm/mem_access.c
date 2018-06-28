@@ -453,6 +453,12 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn,
     return ret;
 }
 
+void arch_p2m_set_access_required(struct domain *d, bool access_required)
+{
+    ASSERT(atomic_read(&d->pause_count));
+    p2m_get_hostp2m(d)->access_required = access_required;
+}
+
 /*
  * Local variables:
  * mode: C

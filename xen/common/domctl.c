@@ -1092,8 +1092,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         else
         {
             domain_pause(d);
-            p2m_get_hostp2m(d)->access_required =
-                op->u.access_required.access_required;
+            arch_p2m_set_access_required(d,
+                op->u.access_required.access_required);
             domain_unpause(d);
         }
         break;
