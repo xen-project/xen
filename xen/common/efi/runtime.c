@@ -111,14 +111,16 @@ struct efi_rs_state efi_rs_enter(void)
 
 void efi_rs_leave(struct efi_rs_state *state)
 {
+    struct vcpu *curr = current;
+
     if ( !state->cr3 )
         return;
     switch_cr3_cr4(state->cr3, read_cr4());
-    if ( is_pv_vcpu(current) && !is_idle_vcpu(current) )
+    if ( is_pv_vcpu(curr) && !is_idle_vcpu(curr) )
     {
         struct desc_ptr gdt_desc = {
             .limit = LAST_RESERVED_GDT_BYTE,
-            .base  = GDT_VIRT_START(current)
+            .base  = GDT_VIRT_START(curr)
         };
 
         asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
@@ -126,7 +128,7 @@ void efi_rs_leave(struct efi_rs_state *state)
     irq_exit();
     efi_rs_on_cpu = NR_CPUS;
     spin_unlock(&efi_rs_lock);
-    stts();
+    vcpu_restore_fpu_eager(curr);
 }
 
 bool_t efi_rs_using_pgtables(void)
