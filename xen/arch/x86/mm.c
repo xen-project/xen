@@ -2661,7 +2661,7 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                 nx = x & ~(PGT_validated|PGT_partial);
                 if ( unlikely((y = cmpxchg(&page->u.inuse.type_info,
                                            x, nx)) != x) )
-                    continue;
+                    goto maybe_preempt;
                 /* We cleared the 'valid bit' so we do the clean up. */
                 rc = _put_final_page_type(page, x, preemptible, ptpg);
                 ptpg = NULL;
@@ -2697,12 +2697,13 @@ static int _put_page_type(struct page_info *page, bool preemptible,
              */
             cpu_relax();
             y = page->u.inuse.type_info;
-            continue;
+            goto maybe_preempt;
         }
 
         if ( likely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) == x) )
             break;
 
+    maybe_preempt:
         if ( preemptible && hypercall_preempt_check() )
             return -EINTR;
     }
@@ -2806,12 +2807,11 @@ static int __get_page_type(struct page_info *page, unsigned long type,
             if ( !(x & PGT_partial) )
             {
                 /* Someone else is updating validation of this page. Wait... */
-                while ( (y = page->u.inuse.type_info) == x )
-                {
+                do {
                     if ( preemptible && hypercall_preempt_check() )
                         return -EINTR;
                     cpu_relax();
-                }
+                } while ( (y = page->u.inuse.type_info) == x );
                 continue;
             }
             /* Type ref count was left at 1 when PGT_partial got set. */
