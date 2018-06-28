@@ -1065,7 +1065,8 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
         vmx_vmcs_reload(v);
     }
 
-    vmx_fpu_leave(v);
+    if ( !v->arch.fully_eager_fpu )
+        vmx_fpu_leave(v);
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
@@ -1633,7 +1634,10 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
         {
             if ( v != current )
-                hw_cr0_mask |= X86_CR0_TS;
+            {
+                if ( !v->arch.fully_eager_fpu )
+                    hw_cr0_mask |= X86_CR0_TS;
+            }
             else if ( v->arch.hvm_vcpu.hw_cr[0] & X86_CR0_TS )
                 vmx_fpu_enter(v);
         }
