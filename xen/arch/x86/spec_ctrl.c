@@ -183,8 +183,6 @@ custom_param("spec-ctrl", parse_spec_ctrl);
 
 static void __init print_details(enum ind_thunk thunk, uint64_t caps)
 {
-    bool use_spec_ctrl = (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
-                          boot_cpu_has(X86_FEATURE_SC_MSR_HVM));
     unsigned int _7d0 = 0, e8b = 0, tmp;
 
     /* Collect diagnostics about available mitigations. */
@@ -216,10 +214,9 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
            thunk == THUNK_JMP       ? "JMP" : "?",
-           !use_spec_ctrl                            ?  "No" :
-           (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ?  "IBRS+" :  "IBRS-",
-           !use_spec_ctrl || !boot_cpu_has(X86_FEATURE_SSBD)
-                                                     ? "" :
+           !boot_cpu_has(X86_FEATURE_IBRSB)          ? "No" :
+           (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ? "IBRS+" :  "IBRS-",
+           !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            opt_ibpb                                  ? " IBPB"  : "");
 
@@ -561,16 +558,14 @@ void __init init_speculation_mitigations(void)
         }
 
         if ( use_spec_ctrl )
-        {
-            if ( ibrs )
-                default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
-
             default_spec_ctrl_flags |= SCF_ist_wrmsr;
-        }
+
+        if ( ibrs )
+            default_xen_spec_ctrl |= SPEC_CTRL_IBRS;
     }
 
     /* If we have SSBD available, see whether we should use it. */
-    if ( boot_cpu_has(X86_FEATURE_SSBD) && use_spec_ctrl && opt_ssbd )
+    if ( boot_cpu_has(X86_FEATURE_SSBD) && opt_ssbd )
         default_xen_spec_ctrl |= SPEC_CTRL_SSBD;
 
     /*
