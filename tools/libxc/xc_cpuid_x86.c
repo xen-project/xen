@@ -592,9 +592,9 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
     }
 }
 
-static int xc_cpuid_policy(xc_interface *xch,
-                           const struct cpuid_domain_info *info,
-                           const unsigned int *input, unsigned int *regs)
+static void xc_cpuid_policy(xc_interface *xch,
+                            const struct cpuid_domain_info *info,
+                            const unsigned int *input, unsigned int *regs)
 {
     /*
      * For hypervisor leaves (0x4000XXXX) only 0x4000xx00.EAX[7:0] bits (max
@@ -604,15 +604,13 @@ static int xc_cpuid_policy(xc_interface *xch,
     if ( (input[0] & 0xffff0000) == 0x40000000 )
     {
         regs[0] = regs[1] = regs[2] = regs[3] = 0;
-        return 0;
+        return;
     }
 
     if ( info->hvm )
         xc_cpuid_hvm_policy(xch, info, input, regs);
     else
         xc_cpuid_pv_policy(xch, info, input, regs);
-
-    return 0;
 }
 
 static int xc_cpuid_do_domctl(
