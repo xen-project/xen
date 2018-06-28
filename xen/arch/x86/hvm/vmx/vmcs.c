@@ -1144,7 +1144,9 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_TR_SELECTOR, TSS_ENTRY << 3);
 
     /* Host control registers. */
-    v->arch.hvm_vmx.host_cr0 = read_cr0() | X86_CR0_TS;
+    v->arch.hvm_vmx.host_cr0 = read_cr0() & ~X86_CR0_TS;
+    if ( !v->arch.fully_eager_fpu )
+        v->arch.hvm_vmx.host_cr0 |= X86_CR0_TS;
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
     __vmwrite(HOST_CR4, mmu_cr4_features);
 
@@ -1223,7 +1225,7 @@ static int construct_vmcs(struct vcpu *v)
 
     v->arch.hvm_vmx.exception_bitmap = HVM_TRAP_MASK
               | (paging_mode_hap(d) ? 0 : (1U << TRAP_page_fault))
-              | (1U << TRAP_no_device);
+              | (v->arch.fully_eager_fpu ? 0 : (1U << TRAP_no_device));
     vmx_update_exception_bitmap(v);
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
