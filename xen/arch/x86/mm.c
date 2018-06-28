@@ -2551,7 +2551,7 @@ static int _put_page_type(struct page_info *page, bool preemptible,
                 nx = x & ~(PGT_validated|PGT_partial);
                 if ( unlikely((y = cmpxchg(&page->u.inuse.type_info,
                                            x, nx)) != x) )
-                    continue;
+                    break;
                 /* We cleared the 'valid bit' so we do the clean up. */
                 rc = _put_final_page_type(page, x, preemptible, ptpg);
                 if ( x & PGT_partial )
@@ -2574,7 +2574,18 @@ static int _put_page_type(struct page_info *page, bool preemptible,
             else
                 BUG_ON(!IS_ENABLED(CONFIG_PV_LINEAR_PT));
 
-            break;
+            /* fall through */
+        default:
+            if ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) )
+                break;
+
+            if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
+            {
+                dec_linear_uses(page);
+                dec_linear_entries(ptpg);
+            }
+
+            return 0;
 
         case PGT_locked:
             ASSERT_UNREACHABLE();
@@ -2587,23 +2598,12 @@ static int _put_page_type(struct page_info *page, bool preemptible,
              */
             cpu_relax();
             y = page->u.inuse.type_info;
-            continue;
-        }
-
-        if ( likely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) == x) )
             break;
+        }
 
         if ( preemptible && hypercall_preempt_check() )
             return -EINTR;
     }
-
-    if ( ptpg && PGT_type_equal(x, ptpg->u.inuse.type_info) )
-    {
-        dec_linear_uses(page);
-        dec_linear_entries(ptpg);
-    }
-
-    return 0;
 }
 
 
@@ -2704,12 +2704,11 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             if ( !(x & PGT_partial) )
             {
                 /* Someone else is updating validation of this page. Wait... */
-                while ( (y = page->u.inuse.type_info) == x )
-                {
+                do {
                     if ( preemptible && hypercall_preempt_check() )
                         return -EINTR;
                     cpu_relax();
-                }
+                } while ( (y = page->u.inuse.type_info) == x );
                 continue;
             }
             /* Type ref count was left at 1 when PGT_partial got set. */
