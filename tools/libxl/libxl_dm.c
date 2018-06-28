@@ -773,6 +773,7 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
                                          int colo_mode)
 {
     char *drive = NULL;
+    char *common = GCSPRINTF("cache=writeback");
     const char *exportname = disk->colo_export;
     const char *active_disk = disk->active_disk;
     const char *hidden_disk = disk->hidden_disk;
@@ -780,8 +781,8 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
     switch (colo_mode) {
     case LIBXL__COLO_NONE:
         drive = libxl__sprintf
-            (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
-             target_path, unit, format);
+            (gc, "%s,file=%s,if=scsi,bus=0,unit=%d,format=%s",
+             common, target_path, unit, format);
         break;
     case LIBXL__COLO_PRIMARY:
         /*
@@ -794,13 +795,13 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
          *  vote-threshold=1
          */
         drive = GCSPRINTF(
-            "if=scsi,bus=0,unit=%d,cache=writeback,driver=quorum,"
+            "%s,if=scsi,bus=0,unit=%d,,driver=quorum,"
             "id=%s,"
             "children.0.file.filename=%s,"
             "children.0.driver=%s,"
             "read-pattern=fifo,"
             "vote-threshold=1",
-            unit, exportname, target_path, format);
+            common, unit, exportname, target_path, format);
         break;
     case LIBXL__COLO_SECONDARY:
         /*
@@ -814,7 +815,7 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
          *  file.backing.backing=exportname,
          */
         drive = GCSPRINTF(
-            "if=scsi,id=top-colo,bus=0,unit=%d,cache=writeback,"
+            "%s,if=scsi,id=top-colo,bus=0,unit=%d,"
             "driver=replication,"
             "mode=secondary,"
             "top-id=top-colo,"
@@ -823,7 +824,7 @@ static char *qemu_disk_scsi_drive_string(libxl__gc *gc, const char *target_path,
             "file.backing.driver=qcow2,"
             "file.backing.file.filename=%s,"
             "file.backing.backing=%s",
-            unit, active_disk, hidden_disk, exportname);
+            common, unit, active_disk, hidden_disk, exportname);
         break;
     default:
         abort();
