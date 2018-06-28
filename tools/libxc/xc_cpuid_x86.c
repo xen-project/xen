@@ -308,8 +308,7 @@ static void free_cpuid_domain_info(struct cpuid_domain_info *info)
     free(info->featureset);
 }
 
-static void amd_xc_cpuid_policy(xc_interface *xch,
-                                const struct cpuid_domain_info *info,
+static void amd_xc_cpuid_policy(const struct cpuid_domain_info *info,
                                 const unsigned int *input, unsigned int *regs)
 {
     switch ( input[0] )
@@ -365,8 +364,7 @@ static void amd_xc_cpuid_policy(xc_interface *xch,
     }
 }
 
-static void intel_xc_cpuid_policy(xc_interface *xch,
-                                  const struct cpuid_domain_info *info,
+static void intel_xc_cpuid_policy(const struct cpuid_domain_info *info,
                                   const unsigned int *input, unsigned int *regs)
 {
     switch ( input[0] )
@@ -397,8 +395,7 @@ static void intel_xc_cpuid_policy(xc_interface *xch,
     }
 }
 
-static void xc_cpuid_hvm_policy(xc_interface *xch,
-                                const struct cpuid_domain_info *info,
+static void xc_cpuid_hvm_policy(const struct cpuid_domain_info *info,
                                 const unsigned int *input, unsigned int *regs)
 {
     switch ( input[0] )
@@ -490,13 +487,12 @@ static void xc_cpuid_hvm_policy(xc_interface *xch,
     }
 
     if ( info->vendor == VENDOR_AMD )
-        amd_xc_cpuid_policy(xch, info, input, regs);
+        amd_xc_cpuid_policy(info, input, regs);
     else
-        intel_xc_cpuid_policy(xch, info, input, regs);
+        intel_xc_cpuid_policy(info, input, regs);
 }
 
-static void xc_cpuid_pv_policy(xc_interface *xch,
-                               const struct cpuid_domain_info *info,
+static void xc_cpuid_pv_policy(const struct cpuid_domain_info *info,
                                const unsigned int *input, unsigned int *regs)
 {
     switch ( input[0] )
@@ -592,8 +588,7 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
     }
 }
 
-static void xc_cpuid_policy(xc_interface *xch,
-                            const struct cpuid_domain_info *info,
+static void xc_cpuid_policy(const struct cpuid_domain_info *info,
                             const unsigned int *input, unsigned int *regs)
 {
     /*
@@ -608,9 +603,9 @@ static void xc_cpuid_policy(xc_interface *xch,
     }
 
     if ( info->hvm )
-        xc_cpuid_hvm_policy(xch, info, input, regs);
+        xc_cpuid_hvm_policy(info, input, regs);
     else
-        xc_cpuid_pv_policy(xch, info, input, regs);
+        xc_cpuid_pv_policy(info, input, regs);
 }
 
 static int xc_cpuid_do_domctl(
@@ -745,7 +740,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
     for ( ; ; )
     {
         cpuid(input, regs);
-        xc_cpuid_policy(xch, &info, input, regs);
+        xc_cpuid_policy(&info, input, regs);
 
         if ( regs[0] || regs[1] || regs[2] || regs[3] )
         {
@@ -818,7 +813,7 @@ int xc_cpuid_set(
     cpuid(input, regs);
 
     memcpy(polregs, regs, sizeof(regs));
-    xc_cpuid_policy(xch, &info, input, polregs);
+    xc_cpuid_policy(&info, input, polregs);
 
     for ( i = 0; i < 4; i++ )
     {
