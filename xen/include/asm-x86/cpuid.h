@@ -18,7 +18,9 @@
 #ifndef __ASSEMBLY__
 #include <xen/types.h>
 #include <xen/kernel.h>
-#include <asm/x86_emulate.h>
+
+#include <xen/lib/x86/cpuid.h>
+
 #include <public/sysctl.h>
 
 extern const uint32_t known_features[FSCAPINTS];

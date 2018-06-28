@@ -23,6 +23,8 @@ xen/.dir:
 	ln -sf $(XEN_ROOT)/xen/include/acpi acpi
 ifeq ($(CONFIG_X86),y)
 	ln -sf $(XEN_ROOT)/xen/include/asm-x86 xen/asm
+	mkdir -p xen/lib
+	ln -sf $(XEN_ROOT)/xen/include/xen/lib/x86 xen/lib/x86
 endif
 	touch $@
 

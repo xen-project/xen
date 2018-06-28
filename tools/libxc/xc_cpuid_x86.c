@@ -33,6 +33,8 @@ enum {
 };
 #include "_xc_cpuid_autogen.h"
 
+#include <xen/lib/x86/cpuid.h>
+
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define featureword_of(idx) ((idx) >> 5)
 #define clear_feature(idx, dst) ((dst) &= ~bitmaskof(idx))
