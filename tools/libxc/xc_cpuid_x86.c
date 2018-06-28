@@ -672,6 +672,12 @@ static void xc_cpuid_pv_policy(xc_interface *xch,
         break;
     }
 
+    case 0x80000008:
+        regs[0] &= 0x0000ffffu;
+        regs[1] = info->featureset[featureword_of(X86_FEATURE_CLZERO)];
+        regs[2] = regs[3] = 0;
+        break;
+
     case 0x00000005: /* MONITOR/MWAIT */
     case 0x0000000a: /* Architectural Performance Monitor Features */
     case 0x0000000b: /* Extended Topology Enumeration */
