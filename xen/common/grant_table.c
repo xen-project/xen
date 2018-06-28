@@ -1764,9 +1764,10 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
         req_nr_frames = INITIAL_NR_GRANT_FRAMES;
     ASSERT(req_nr_frames <= gt->max_grant_frames);
 
-    gdprintk(XENLOG_INFO,
-            "Expanding d%d grant table from %u to %u frames\n",
-            d->domain_id, nr_grant_frames(gt), req_nr_frames);
+    if ( req_nr_frames > INITIAL_NR_GRANT_FRAMES )
+        gdprintk(XENLOG_INFO,
+                 "Expanding d%d grant table from %u to %u frames\n",
+                 d->domain_id, nr_grant_frames(gt), req_nr_frames);
 
     /* Active */
     for ( i = nr_active_grant_frames(gt);
