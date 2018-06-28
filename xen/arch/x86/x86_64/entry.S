@@ -266,7 +266,8 @@ ENTRY(lstar_enter)
         jz    .Llstar_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         mov   %rcx, %cr3
-        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Llstar_cr3_okay:
         sti
 
@@ -302,7 +303,8 @@ GLOBAL(sysenter_eflags_saved)
         jz    .Lsyse_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         mov   %rcx, %cr3
-        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lsyse_cr3_okay:
         sti
 
@@ -351,7 +353,8 @@ ENTRY(int80_direct_trap)
         jz    .Lint80_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         mov   %rcx, %cr3
-        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lint80_cr3_okay:
         sti
 
@@ -566,11 +569,11 @@ ENTRY(common_interrupt)
         jz    .Lintr_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
-        xor   %ecx, %ecx
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3, UREGS_cs(%rsp)
-        cmovnz %rcx, %r15
-        cmovnz %rcx, %rbx
+        cmovnz %r12, %r15
+        cmovnz %r12d, %ebx
 .Lintr_cr3_okay:
 
         CR4_PV32_RESTORE
@@ -598,11 +601,11 @@ GLOBAL(handle_exception)
         jz    .Lxcpt_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
-        xor   %ecx, %ecx
-        mov   %rcx, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
         testb $3, UREGS_cs(%rsp)
-        cmovnz %rcx, %r15
-        cmovnz %rcx, %r13
+        cmovnz %r12, %r15
+        cmovnz %r12d, %r13d
 .Lxcpt_cr3_okay:
 
 handle_exception_saved:
@@ -775,7 +778,8 @@ ENTRY(double_fault)
         jz    .Ldblf_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rbx, %cr3
-        movq $0, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .Ldblf_cr3_okay:
 
         movq  %rsp,%rdi
@@ -809,7 +813,8 @@ handle_ist_exception:
         jz    .List_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%r14)
         mov   %rcx, %cr3
-        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
 .List_cr3_okay:
 
         CR4_PV32_RESTORE

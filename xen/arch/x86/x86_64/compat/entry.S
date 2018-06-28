@@ -220,7 +220,8 @@ ENTRY(cstar_enter)
         jz    .Lcstar_cr3_okay
         movb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
         mov   %rcx, %cr3
-        movq  $0, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
+        /* %r12 is still zero at this point. */
+        mov   %r12, STACK_CPUINFO_FIELD(xen_cr3)(%rbx)
 .Lcstar_cr3_okay:
         sti
 
@@ -244,7 +245,8 @@ UNLIKELY_START(z, compat_syscall_gpf)
         movq  VCPU_trap_ctxt(%rbx),%rdi
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         subl  $2,UREGS_rip(%rsp)
-        movl  $0,TRAPBOUNCE_error_code(%rdx)
+        /* %r12 is still zero at this point. */
+        mov   %r12d, TRAPBOUNCE_error_code(%rdx)
         movl  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rdi),%eax
         movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rdi),%esi
         testb $4,TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_flags(%rdi)
