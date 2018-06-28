@@ -666,7 +666,7 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
 
     if ( info->hvm )
     {
-        /* HVM Guest */
+        /* HVM or PVH Guest */
 
         if ( !info->pae )
             clear_bit(X86_FEATURE_PAE, info->featureset);
@@ -679,7 +679,7 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
     }
     else
     {
-        /* PV or PVH Guest */
+        /* PV Guest */
 
         if ( !info->pv64 )
         {
