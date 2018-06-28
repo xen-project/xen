@@ -1703,7 +1703,7 @@ static void __context_switch(void)
             if ( xcr0 != get_xcr0() && !set_xcr0(xcr0) )
                 BUG();
         }
-        vcpu_restore_fpu_eager(n);
+        vcpu_restore_fpu_nonlazy(n, 0);
         n->arch.ctxt_switch_to(n);
     }
 

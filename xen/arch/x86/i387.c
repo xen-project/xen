@@ -212,7 +212,7 @@ static inline void fpu_fsave(struct vcpu *v)
 /*       VCPU FPU Functions    */
 /*******************************/
 /* Restore FPU state whenever VCPU is schduled in. */
-void vcpu_restore_fpu_eager(struct vcpu *v)
+void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool_t need_stts)
 {
     if ( v->arch.fully_eager_fpu )
     {
@@ -230,8 +230,7 @@ void vcpu_restore_fpu_eager(struct vcpu *v)
         v->fpu_dirtied = 1;
 
         /* Xen doesn't need TS set, but the guest might. */
-        if ( is_pv_vcpu(v) && (v->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS) )
-            stts();
+        need_stts = is_pv_vcpu(v) && (v->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS);
     }
     /* save the nonlazy extended state which is not tracked by CR0.TS bit */
     else if ( v->arch.nonlazy_xstate_used )
@@ -241,8 +240,11 @@ void vcpu_restore_fpu_eager(struct vcpu *v)
         /* Avoid recursion */
         clts();        
         fpu_xrstor(v, XSTATE_NONLAZY);
-        stts();
+        need_stts = 1;
     }
+
+    if ( need_stts )
+        stts();
 }
 
 /* 
