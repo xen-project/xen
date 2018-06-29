@@ -261,7 +261,8 @@ static int __init parse_extra_guest_irqs(const char *s)
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
 struct domain *domain_create(domid_t domid,
-                             struct xen_domctl_createdomain *config)
+                             struct xen_domctl_createdomain *config,
+                             bool is_priv)
 {
     struct domain *d, **pd, *old_hwdom = NULL;
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
@@ -272,6 +273,7 @@ struct domain *domain_create(domid_t domid,
         return ERR_PTR(-ENOMEM);
 
     d->domain_id = domid;
+    d->is_privileged = is_priv;
 
     /* Debug sanity. */
     ASSERT(is_system_domain(d) ? config == NULL : config != NULL);

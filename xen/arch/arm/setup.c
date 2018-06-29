@@ -843,12 +843,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     dom0_cfg.arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE;
     dom0_cfg.arch.nr_spis = gic_number_lines() - 32;
 
-    dom0 = domain_create(0, &dom0_cfg);
+    dom0 = domain_create(0, &dom0_cfg, true);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
             panic("Error creating domain 0");
-
-    dom0->is_privileged = 1;
-    dom0->target = NULL;
 
     if ( construct_dom0(dom0) != 0)
             panic("Could not set up DOM0 guest OS");

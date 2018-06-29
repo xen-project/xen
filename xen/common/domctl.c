@@ -532,7 +532,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             rover = dom;
         }
 
-        d = domain_create(dom, &op->u.createdomain);
+        d = domain_create(dom, &op->u.createdomain, false);
         if ( IS_ERR(d) )
         {
             ret = PTR_ERR(d);

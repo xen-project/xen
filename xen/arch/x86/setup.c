@@ -1660,13 +1660,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     /* Create initial domain 0. */
-    dom0 = domain_create(get_initial_domain_id(), &dom0_cfg);
+    dom0 = domain_create(get_initial_domain_id(), &dom0_cfg, !pv_shim);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0");
-
-    if ( !pv_shim )
-        dom0->is_privileged = 1;
-    dom0->target = NULL;
 
     /* Grab the DOM0 command line. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);

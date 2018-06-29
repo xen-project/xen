@@ -546,7 +546,8 @@ void domain_update_node_affinity(struct domain *d);
  * (domid < DOMID_FIRST_RESERVED).
  */
 struct domain *domain_create(domid_t domid,
-                             struct xen_domctl_createdomain *config);
+                             struct xen_domctl_createdomain *config,
+                             bool is_priv);
 
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
