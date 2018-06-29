@@ -33,6 +33,7 @@ enum {
 };
 
 #include <xen/lib/x86/cpuid.h>
+#include <xen/lib/x86/msr.h>
 
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define featureword_of(idx) ((idx) >> 5)

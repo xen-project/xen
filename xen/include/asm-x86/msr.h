@@ -8,6 +8,9 @@
 #include <xen/types.h>
 #include <xen/percpu.h>
 #include <xen/errno.h>
+
+#include <xen/lib/x86/msr.h>
+
 #include <asm/asm_defns.h>
 #include <asm/cpufeature.h>
 
@@ -256,26 +259,6 @@ static inline void wrmsr_tsc_aux(uint32_t val)
         *this_tsc_aux = val;
     }
 }
-
-/* MSR policy object for shared per-domain MSRs */
-struct msr_policy
-{
-    /*
-     * 0x000000ce - MSR_INTEL_PLATFORM_INFO
-     *
-     * This MSR is non-architectural, but for simplicy we allow it to be read
-     * unconditionally.  CPUID Faulting support can be fully emulated for HVM
-     * guests so can be offered unconditionally, while support for PV guests
-     * is dependent on real hardware support.
-     */
-    union {
-        uint32_t raw;
-        struct {
-            uint32_t :31;
-            bool cpuid_faulting:1;
-        };
-    } plaform_info;
-};
 
 extern struct msr_policy     raw_msr_policy,
                             host_msr_policy,
