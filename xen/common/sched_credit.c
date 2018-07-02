@@ -2156,6 +2156,36 @@ csched_dump(const struct scheduler *ops)
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 
+static int __init
+csched_global_init(void)
+{
+    if ( sched_credit_tslice_ms > XEN_SYSCTL_CSCHED_TSLICE_MAX ||
+         sched_credit_tslice_ms < XEN_SYSCTL_CSCHED_TSLICE_MIN )
+    {
+        printk("WARNING: sched_credit_tslice_ms outside of valid range [%d,%d].\n"
+               " Resetting to default %u\n",
+               XEN_SYSCTL_CSCHED_TSLICE_MIN,
+               XEN_SYSCTL_CSCHED_TSLICE_MAX,
+               CSCHED_DEFAULT_TSLICE_MS);
+        sched_credit_tslice_ms = CSCHED_DEFAULT_TSLICE_MS;
+    }
+
+    if ( MICROSECS(sched_ratelimit_us) > MILLISECS(sched_credit_tslice_ms) )
+        printk("WARNING: sched_ratelimit_us >"
+               "sched_credit_tslice_ms is undefined\n"
+               "Setting ratelimit to tslice\n");
+
+    if ( vcpu_migration_delay_us > XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US )
+    {
+        vcpu_migration_delay_us = 0;
+        printk("WARNING: vcpu_migration_delay outside of valid range [0,%d]us.\n"
+               "Resetting to default: %u\n",
+               XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US, vcpu_migration_delay_us);
+    }
+
+    return 0;
+}
+
 static int
 csched_init(struct scheduler *ops)
 {
@@ -2186,36 +2216,13 @@ csched_init(struct scheduler *ops)
     INIT_LIST_HEAD(&prv->active_sdom);
     prv->master = UINT_MAX;
 
-    if ( sched_credit_tslice_ms > XEN_SYSCTL_CSCHED_TSLICE_MAX
-         || sched_credit_tslice_ms < XEN_SYSCTL_CSCHED_TSLICE_MIN )
-    {
-        printk("WARNING: sched_credit_tslice_ms outside of valid range [%d,%d].\n"
-               " Resetting to default %u\n",
-               XEN_SYSCTL_CSCHED_TSLICE_MIN,
-               XEN_SYSCTL_CSCHED_TSLICE_MAX,
-               CSCHED_DEFAULT_TSLICE_MS);
-        sched_credit_tslice_ms = CSCHED_DEFAULT_TSLICE_MS;
-    }
-
     __csched_set_tslice(prv, sched_credit_tslice_ms);
 
     if ( MICROSECS(sched_ratelimit_us) > MILLISECS(sched_credit_tslice_ms) )
-    {
-        printk("WARNING: sched_ratelimit_us >" 
-               "sched_credit_tslice_ms is undefined\n"
-               "Setting ratelimit to tslice\n");
         prv->ratelimit = prv->tslice;
-    }
     else
         prv->ratelimit = MICROSECS(sched_ratelimit_us);
 
-    if ( vcpu_migration_delay_us > XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US )
-    {
-        vcpu_migration_delay_us = 0;
-        printk("WARNING: vcpu_migration_delay outside of valid range [0,%d]us.\n"
-               "Resetting to default: %u\n",
-               XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US, vcpu_migration_delay_us);
-    }
     prv->vcpu_migr_delay = MICROSECS(vcpu_migration_delay_us);
 
     return 0;
@@ -2265,6 +2272,8 @@ static const struct scheduler sched_credit_def = {
     .opt_name       = "credit",
     .sched_id       = XEN_SCHEDULER_CREDIT,
     .sched_data     = NULL,
+
+    .global_init    = csched_global_init,
 
     .insert_vcpu    = csched_vcpu_insert,
     .remove_vcpu    = csched_vcpu_remove,

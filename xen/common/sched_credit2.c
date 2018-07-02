@@ -448,7 +448,7 @@ static const char *const opt_runqueue_str[] = {
 };
 static int __read_mostly opt_runqueue = OPT_RUNQUEUE_SOCKET;
 
-static int parse_credit2_runqueue(const char *s)
+static int __init parse_credit2_runqueue(const char *s)
 {
     unsigned int i;
 
@@ -3937,6 +3937,33 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     return;
 }
 
+static int __init
+csched2_global_init(void)
+{
+    if ( opt_load_precision_shift < LOADAVG_PRECISION_SHIFT_MIN )
+    {
+        printk("WARNING: %s: opt_load_precision_shift %u below min %d, resetting\n",
+               __func__, opt_load_precision_shift, LOADAVG_PRECISION_SHIFT_MIN);
+        opt_load_precision_shift = LOADAVG_PRECISION_SHIFT_MIN;
+    }
+
+    if ( opt_load_window_shift <= LOADAVG_GRANULARITY_SHIFT )
+    {
+        printk("WARNING: %s: opt_load_window_shift %u too short, resetting\n",
+               __func__, opt_load_window_shift);
+        opt_load_window_shift = LOADAVG_WINDOW_SHIFT;
+    }
+
+    if ( CSCHED2_BDGT_REPL_PERIOD < CSCHED2_MIN_TIMER )
+    {
+        printk("WARNING: %s: opt_cap_period %u too small, resetting\n",
+               __func__, opt_cap_period);
+        opt_cap_period = 10; /* ms */
+    }
+
+    return 0;
+}
+
 static int
 csched2_init(struct scheduler *ops)
 {
@@ -3958,28 +3985,8 @@ csched2_init(struct scheduler *ops)
            opt_runqueue_str[opt_runqueue],
            opt_cap_period);
 
-    if ( opt_load_precision_shift < LOADAVG_PRECISION_SHIFT_MIN )
-    {
-        printk("WARNING: %s: opt_load_precision_shift %d below min %d, resetting\n",
-               __func__, opt_load_precision_shift, LOADAVG_PRECISION_SHIFT_MIN);
-        opt_load_precision_shift = LOADAVG_PRECISION_SHIFT_MIN;
-    }
-
-    if ( opt_load_window_shift <= LOADAVG_GRANULARITY_SHIFT )
-    {
-        printk("WARNING: %s: opt_load_window_shift %d too short, resetting\n",
-               __func__, opt_load_window_shift);
-        opt_load_window_shift = LOADAVG_WINDOW_SHIFT;
-    }
     printk(XENLOG_INFO "load tracking window length %llu ns\n",
            1ULL << opt_load_window_shift);
-
-    if ( CSCHED2_BDGT_REPL_PERIOD < CSCHED2_MIN_TIMER )
-    {
-        printk("WARNING: %s: opt_cap_period %d too small, resetting\n",
-               __func__, opt_cap_period);
-        opt_cap_period = 10; /* ms */
-    }
 
     /*
      * Basically no CPU information is available at this point; just
@@ -4030,6 +4037,8 @@ static const struct scheduler sched_credit2_def = {
     .opt_name       = "credit2",
     .sched_id       = XEN_SCHEDULER_CREDIT2,
     .sched_data     = NULL,
+
+    .global_init    = csched2_global_init,
 
     .insert_vcpu    = csched2_vcpu_insert,
     .remove_vcpu    = csched2_vcpu_remove,
