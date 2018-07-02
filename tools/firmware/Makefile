@@ -19,7 +19,8 @@ SUBDIRS-$(CONFIG_ROMBIOS) += etherboot
 SUBDIRS-$(CONFIG_PV_SHIM) += xen-dir
 SUBDIRS-y += hvmloader
 
-LD32BIT-$(CONFIG_FreeBSD) := LD32BIT_FLAG=-melf_i386_fbsd
+SEABIOSCC ?= $(CC)
+SEABIOSLD ?= $(LD)
 
 ovmf-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(OVMF_UPSTREAM_URL) $(OVMF_UPSTREAM_REVISION) ovmf-dir
@@ -28,7 +29,7 @@ ovmf-dir:
 seabios-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(SEABIOS_UPSTREAM_URL) $(SEABIOS_UPSTREAM_REVISION) seabios-dir
 	cp seabios-config seabios-dir/.config;
-	$(MAKE) -C seabios-dir olddefconfig
+	$(MAKE) -C seabios-dir olddefconfig CC=$(SEABIOSCC) LD=$(SEABIOSLD)
 
 .PHONY: all
 all: $(SUBDIRS-y)
@@ -41,8 +42,7 @@ ifeq ($(CONFIG_ROMBIOS),y)
 	false ; \
 	fi
 endif
-	$(MAKE) $(LD32BIT-y) CC=$(CC) PYTHON=$(PYTHON) subdirs-$@
-
+	$(MAKE) CC=$(CC) PYTHON=$(PYTHON) subdirs-$@
 
 .PHONY: install
 install: all
@@ -114,7 +114,7 @@ seabios-dir-force-update: seabios-dir
 
 subdir-clean-seabios-dir:
 	set -e; if test -d seabios-dir/.; then \
-		$(MAKE) -C seabios-dir clean; \
+		$(MAKE) -C seabios-dir CC=$(SEABIOSCC) LD=$(SEABIOSLD) clean; \
 	fi
 
 subtree-force-update:
@@ -128,3 +128,6 @@ endif
 subtree-force-update-all:
 	$(MAKE) seabios-dir-force-update
 	$(MAKE) ovmf-dir-force-update
+
+subdir-all-seabios-dir: seabios-dir
+	$(MAKE) -C $< CC=$(SEABIOSCC) LD=$(SEABIOSLD) PYTHON=$(PYTHON) all;
