@@ -148,6 +148,7 @@ svm_msrbit(unsigned long *msr_bitmap, uint32_t msr)
 void svm_intercept_msr(struct vcpu *v, uint32_t msr, int flags)
 {
     unsigned long *msr_bit;
+    const struct domain *d = v->domain;
 
     msr_bit = svm_msrbit(v->arch.hvm_svm.msrpm, msr);
     BUG_ON(msr_bit == NULL);
@@ -155,12 +156,12 @@ void svm_intercept_msr(struct vcpu *v, uint32_t msr, int flags)
 
     if ( flags & MSR_INTERCEPT_READ )
          __set_bit(msr * 2, msr_bit);
-    else
+    else if ( !monitored_msr(d, msr) )
          __clear_bit(msr * 2, msr_bit);
 
     if ( flags & MSR_INTERCEPT_WRITE )
         __set_bit(msr * 2 + 1, msr_bit);
-    else
+    else if ( !monitored_msr(d, msr) )
         __clear_bit(msr * 2 + 1, msr_bit);
 }
 
