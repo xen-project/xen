@@ -10,7 +10,6 @@
 #include <asm/mpspec.h>
 #include <asm/apic.h>
 #include <mach_apic.h>
-#include <asm/setup.h>
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
 #include "cpu.h"

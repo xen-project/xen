@@ -8,7 +8,6 @@
 #include <asm/processor.h>
 #include <asm/amd.h>
 #include <asm/hvm/support.h>
-#include <asm/setup.h> /* amd_init_cpu */
 #include <asm/spec_ctrl.h>
 #include <asm/acpi.h>
 #include <asm/apic.h>

@@ -11,7 +11,6 @@
 #include <asm/i387.h>
 #include <mach_apic.h>
 #include <asm/hvm/support.h>
-#include <asm/setup.h>
 
 #include "cpu.h"
 

@@ -17,13 +17,6 @@ extern unsigned long xenheap_initial_phys_start;
 void early_cpu_init(void);
 void early_time_init(void);
 
-int intel_cpu_init(void);
-int amd_init_cpu(void);
-int cyrix_init_cpu(void);
-int nsc_init_cpu(void);
-int centaur_init_cpu(void);
-int transmeta_init_cpu(void);
-
 void set_nr_cpu_ids(unsigned int max_cpus);
 
 void numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn);
