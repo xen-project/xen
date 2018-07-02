@@ -187,12 +187,7 @@ again:
     /* find all expired events */
     for_each_cpu(cpu, ch->cpumask)
     {
-        s_time_t deadline;
-
-        if ( !cpumask_test_cpu(cpu, ch->cpumask) )
-            continue;
-
-        deadline = ACCESS_ONCE(per_cpu(timer_deadline, cpu));
+        s_time_t deadline = ACCESS_ONCE(per_cpu(timer_deadline, cpu));
 
         if ( deadline <= now )
             __cpumask_set_cpu(cpu, &mask);
