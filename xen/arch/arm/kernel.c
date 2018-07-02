@@ -46,7 +46,7 @@ struct minimal_dtb_header {
  * @paddr: source physical address
  * @len: length to copy
  */
-void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
+void __init copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 {
     void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
 
@@ -68,8 +68,8 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
     clear_fixmap(FIXMAP_MISC);
 }
 
-static void place_modules(struct kernel_info *info,
-                          paddr_t kernbase, paddr_t kernend)
+static void __init place_modules(struct kernel_info *info,
+                                 paddr_t kernbase, paddr_t kernend)
 {
     /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
     const struct bootmodule *mod = info->initrd_bootmodule;
@@ -122,7 +122,7 @@ static void place_modules(struct kernel_info *info,
     info->initrd_paddr = info->dtb_paddr + dtb_len;
 }
 
-static paddr_t kernel_zimage_place(struct kernel_info *info)
+static paddr_t __init kernel_zimage_place(struct kernel_info *info)
 {
     paddr_t load_addr;
 
@@ -154,7 +154,7 @@ static paddr_t kernel_zimage_place(struct kernel_info *info)
     return load_addr;
 }
 
-static void kernel_zimage_load(struct kernel_info *info)
+static void __init kernel_zimage_load(struct kernel_info *info)
 {
     paddr_t load_addr = kernel_zimage_place(info);
     paddr_t paddr = info->zimage.kernel_addr;
@@ -190,8 +190,8 @@ static void kernel_zimage_load(struct kernel_info *info)
 /*
  * Check if the image is a uImage and setup kernel_info
  */
-static int kernel_uimage_probe(struct kernel_info *info,
-                                 paddr_t addr, paddr_t size)
+static int __init kernel_uimage_probe(struct kernel_info *info,
+                                      paddr_t addr, paddr_t size)
 {
     struct {
         __be32 magic;   /* Image Header Magic Number */
@@ -318,8 +318,8 @@ static __init int kernel_decompress(struct bootmodule *mod)
 /*
  * Check if the image is a 64-bit Image.
  */
-static int kernel_zimage64_probe(struct kernel_info *info,
-                                 paddr_t addr, paddr_t size)
+static int __init kernel_zimage64_probe(struct kernel_info *info,
+                                        paddr_t addr, paddr_t size)
 {
     /* linux/Documentation/arm64/booting.txt */
     struct {
@@ -372,8 +372,8 @@ static int kernel_zimage64_probe(struct kernel_info *info,
 /*
  * Check if the image is a 32-bit zImage and setup kernel_info
  */
-static int kernel_zimage32_probe(struct kernel_info *info,
-                                 paddr_t addr, paddr_t size)
+static int __init kernel_zimage32_probe(struct kernel_info *info,
+                                        paddr_t addr, paddr_t size)
 {
     uint32_t zimage[ZIMAGE32_HEADER_LEN/4];
     uint32_t start, end;
@@ -421,7 +421,7 @@ static int kernel_zimage32_probe(struct kernel_info *info,
     return 0;
 }
 
-static void kernel_elf_load(struct kernel_info *info)
+static void __init kernel_elf_load(struct kernel_info *info)
 {
     /*
      * TODO: can the ELF header be used to find the physical address
@@ -444,8 +444,8 @@ static void kernel_elf_load(struct kernel_info *info)
     free_xenheap_pages(info->elf.kernel_img, info->elf.kernel_order);
 }
 
-static int kernel_elf_probe(struct kernel_info *info,
-                            paddr_t addr, paddr_t size)
+static int __init kernel_elf_probe(struct kernel_info *info,
+                                   paddr_t addr, paddr_t size)
 {
     int rc;
 
@@ -496,7 +496,7 @@ err:
     return rc;
 }
 
-int kernel_probe(struct kernel_info *info)
+int __init kernel_probe(struct kernel_info *info)
 {
     struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
     int rc;
@@ -534,7 +534,7 @@ int kernel_probe(struct kernel_info *info)
     return rc;
 }
 
-void kernel_load(struct kernel_info *info)
+void __init kernel_load(struct kernel_info *info)
 {
     info->load(info);
 }
