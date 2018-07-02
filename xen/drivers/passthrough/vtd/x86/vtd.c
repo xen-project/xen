@@ -110,30 +110,34 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 
 void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
 {
-    unsigned long i, j, tmp, top;
+    unsigned long i, j, tmp, top, max_pfn;
 
     BUG_ON(!is_hardware_domain(d));
 
-    top = max(max_pdx, pfn_to_pdx(0xffffffffUL >> PAGE_SHIFT) + 1);
+    max_pfn = (GB(4) >> PAGE_SHIFT) - 1;
+    top = max(max_pdx, pfn_to_pdx(max_pfn) + 1);
 
     for ( i = 0; i < top; i++ )
     {
+        unsigned long pfn = pdx_to_pfn(i);
+        bool map;
         int rc = 0;
 
         /*
-         * Set up 1:1 mapping for dom0. Default to use only conventional RAM
-         * areas and let RMRRs include needed reserved regions. When set, the
-         * inclusive mapping maps in everything below 4GB except unusable
-         * ranges.
+         * Set up 1:1 mapping for dom0. Default to include only
+         * conventional RAM areas and let RMRRs include needed reserved
+         * regions. When set, the inclusive mapping additionally maps in
+         * every pfn up to 4GB except those that fall in unusable ranges.
          */
-        unsigned long pfn = pdx_to_pfn(i);
+        if ( pfn > max_pfn && !mfn_valid(_mfn(pfn)) )
+            continue;
 
-        if ( pfn > (0xffffffffUL >> PAGE_SHIFT) ?
-             (!mfn_valid(_mfn(pfn)) ||
-              !page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL)) :
-             iommu_inclusive_mapping ?
-             page_is_ram_type(pfn, RAM_TYPE_UNUSABLE) :
-             !page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL) )
+        if ( iommu_inclusive_mapping && pfn <= max_pfn )
+            map = !page_is_ram_type(pfn, RAM_TYPE_UNUSABLE);
+        else
+            map = page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL);
+
+        if ( !map )
             continue;
 
         /* Exclude Xen bits */
@@ -151,8 +155,8 @@ void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
         }
 
         if ( rc )
-           printk(XENLOG_WARNING VTDPREFIX " d%d: IOMMU mapping failed: %d\n",
-                  d->domain_id, rc);
+            printk(XENLOG_WARNING VTDPREFIX " d%d: IOMMU mapping failed: %d\n",
+                   d->domain_id, rc);
 
         if (!(i & (0xfffff >> (PAGE_SHIFT - PAGE_SHIFT_4K))))
             process_pending_softirqs();
