@@ -24,6 +24,7 @@ config X86
 	select HAS_PDX
 	select HAS_UBSAN
 	select HAS_VPCI if !PV_SHIM_EXCLUSIVE
+	select NEEDS_LIBELF
 	select NUMA
 
 config ARCH_DEFCONFIG

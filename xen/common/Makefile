@@ -78,5 +78,5 @@ obj-$(CONFIG_TMEM) += $(tmem-y)
 subdir-$(CONFIG_COVERAGE) += coverage
 subdir-$(CONFIG_UBSAN) += ubsan
 
-subdir-y += libelf
+subdir-$(CONFIG_NEEDS_LIBELF) += libelf
 subdir-$(CONFIG_HAS_DEVICE_TREE) += libfdt
