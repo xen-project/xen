@@ -1213,7 +1213,9 @@ wait descriptor timed out', try increasing this value.
 Use this to work around firmware issues providing incorrect RMRR entries.
 Rather than only mapping RAM pages for IOMMU accesses for Dom0, with this
 option all pages up to 4GB, not marked as unusable in the E820 table, will
-get a mapping established.
+get a mapping established. Note that this option is only applicable to a
+PV dom0. Also note that if `dom0-strict` mode is enabled then conventional
+RAM pages not assigned to dom0 will not be mapped.
 
 ### irq\_ratelimit (x86)
 > `= <integer>`

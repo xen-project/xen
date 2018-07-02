@@ -1304,7 +1304,7 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
 {
     struct acpi_drhd_unit *drhd;
 
-    if ( !iommu_passthrough && !need_iommu(d) )
+    if ( !iommu_passthrough && is_pv_domain(d) )
     {
         /* Set up 1:1 page table for hardware domain. */
         vtd_set_hwdom_mapping(d);

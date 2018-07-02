@@ -144,6 +144,14 @@ void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
         if ( xen_in_range(pfn) )
             continue;
 
+        /*
+         * If dom0-strict mode is enabled then exclude conventional RAM
+         * and let the common code map dom0's pages.
+         */
+        if ( iommu_dom0_strict &&
+             page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL) )
+            continue;
+
         tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
         for ( j = 0; j < tmp; j++ )
         {

@@ -29,7 +29,7 @@
 #include <asm/iommu.h>
 
 extern bool_t iommu_enable, iommu_enabled;
-extern bool_t force_iommu, iommu_verbose;
+extern bool_t force_iommu, iommu_dom0_strict, iommu_verbose;
 extern bool_t iommu_workaround_bios_bug, iommu_igfx, iommu_passthrough;
 extern bool_t iommu_snoop, iommu_qinval, iommu_intremap, iommu_intpost;
 extern bool_t iommu_hap_pt_share;
