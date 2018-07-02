@@ -421,81 +421,6 @@ static int __init kernel_zimage32_probe(struct kernel_info *info,
     return 0;
 }
 
-static void __init kernel_elf_load(struct kernel_info *info)
-{
-    /*
-     * TODO: can the ELF header be used to find the physical address
-     * to load the image to?  Instead of assuming virt == phys.
-     */
-    info->entry = info->elf.parms.virt_entry;
-
-    place_modules(info,
-                  info->elf.parms.virt_kstart,
-                  info->elf.parms.virt_kend);
-
-    printk("Loading ELF image into guest memory\n");
-    info->elf.elf.dest_base = (void*)(unsigned long)info->elf.parms.virt_kstart;
-    info->elf.elf.dest_size =
-         info->elf.parms.virt_kend - info->elf.parms.virt_kstart;
-
-    elf_load_binary(&info->elf.elf);
-
-    printk("Free temporary kernel buffer\n");
-    free_xenheap_pages(info->elf.kernel_img, info->elf.kernel_order);
-}
-
-static int __init kernel_elf_probe(struct kernel_info *info,
-                                   paddr_t addr, paddr_t size)
-{
-    int rc;
-
-    memset(&info->elf.elf, 0, sizeof(info->elf.elf));
-
-    info->elf.kernel_order = get_order_from_bytes(size);
-    info->elf.kernel_img = alloc_xenheap_pages(info->elf.kernel_order, 0);
-    if ( info->elf.kernel_img == NULL )
-        panic("Cannot allocate temporary buffer for kernel");
-
-    copy_from_paddr(info->elf.kernel_img, addr, size);
-
-    if ( (rc = elf_init(&info->elf.elf, info->elf.kernel_img, size )) != 0 )
-        goto err;
-#ifdef CONFIG_VERBOSE_DEBUG
-    elf_set_verbose(&info->elf.elf);
-#endif
-    elf_parse_binary(&info->elf.elf);
-    if ( (rc = elf_xen_parse(&info->elf.elf, &info->elf.parms)) != 0 )
-        goto err;
-
-#ifdef CONFIG_ARM_64
-    if ( elf_32bit(&info->elf.elf) )
-        info->type = DOMAIN_32BIT;
-    else if ( elf_64bit(&info->elf.elf) )
-        info->type = DOMAIN_64BIT;
-    else
-    {
-        printk("Unknown ELF class\n");
-        rc = -EINVAL;
-        goto err;
-    }
-#endif
-
-    info->load = kernel_elf_load;
-
-    if ( elf_check_broken(&info->elf.elf) )
-        printk("Xen: warning: ELF kernel broken: %s\n",
-               elf_check_broken(&info->elf.elf));
-
-    return 0;
-err:
-    if ( elf_check_broken(&info->elf.elf) )
-        printk("Xen: ELF kernel broken: %s\n",
-               elf_check_broken(&info->elf.elf));
-
-    free_xenheap_pages(info->elf.kernel_img, info->elf.kernel_order);
-    return rc;
-}
-
 int __init kernel_probe(struct kernel_info *info)
 {
     struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
@@ -528,8 +453,6 @@ int __init kernel_probe(struct kernel_info *info)
         rc = kernel_uimage_probe(info, mod->start, mod->size);
     if (rc < 0)
         rc = kernel_zimage32_probe(info, mod->start, mod->size);
-    if (rc < 0)
-        rc = kernel_elf_probe(info, mod->start, mod->size);
 
     return rc;
 }

@@ -6,7 +6,6 @@
 #ifndef __ARCH_ARM_KERNEL_H__
 #define __ARCH_ARM_KERNEL_H__
 
-#include <xen/libelf.h>
 #include <xen/device_tree.h>
 #include <asm/setup.h>
 
@@ -45,13 +44,6 @@ struct kernel_info {
 #endif
             paddr_t start; /* 32-bit zImage only */
         } zimage;
-
-        struct {
-            struct elf_binary elf;
-            struct elf_dom_parms parms;
-            unsigned kernel_order;
-            void *kernel_img;
-        } elf;
     };
 };
 
@@ -60,7 +52,7 @@ struct kernel_info {
  *
  * Sets in info:
  *  ->type
- *  ->load hook, and sets loader specific variables ->{zimage,elf}
+ *  ->load hook, and sets loader specific variables ->zimage
  */
 int kernel_probe(struct kernel_info *info);
 
