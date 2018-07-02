@@ -77,7 +77,7 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
     return alloc_vcpu(dom0, 0, 0);
 }
 
-static unsigned int get_11_allocation_size(paddr_t size)
+static unsigned int __init get_11_allocation_size(paddr_t size)
 {
     /*
      * get_order_from_bytes returns the order greater than or equal to
@@ -95,10 +95,10 @@ static unsigned int get_11_allocation_size(paddr_t size)
  * Returns false if the memory would be below bank 0 or we have run
  * out of banks. In this case it will free the pages.
  */
-static bool insert_11_bank(struct domain *d,
-                           struct kernel_info *kinfo,
-                           struct page_info *pg,
-                           unsigned int order)
+static bool __init insert_11_bank(struct domain *d,
+                                  struct kernel_info *kinfo,
+                                  struct page_info *pg,
+                                  unsigned int order)
 {
     int res, i;
     mfn_t smfn;
@@ -243,7 +243,7 @@ fail:
  * (as described above) we allow higher allocations and continue until
  * that runs out (or we have allocated sufficient dom0 memory).
  */
-static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
+static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
 {
     const unsigned int min_low_order =
         get_order_from_bytes(min_t(paddr_t, dom0_mem, MB(128)));
@@ -367,8 +367,8 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
     }
 }
 
-static int write_properties(struct domain *d, struct kernel_info *kinfo,
-                            const struct dt_device_node *node)
+static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
+                                   const struct dt_device_node *node)
 {
     const char *bootargs = NULL;
     const struct dt_property *prop, *status = NULL;
@@ -494,8 +494,10 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
 
 typedef __be32 gic_interrupt_t[3];
 
-static void set_interrupt_ppi(gic_interrupt_t interrupt, unsigned int irq,
-                              unsigned int cpumask, unsigned int level)
+static void __init set_interrupt_ppi(gic_interrupt_t interrupt,
+                                     unsigned int irq,
+                                     unsigned int cpumask,
+                                     unsigned int level)
 {
     __be32 *cells = interrupt;
 
@@ -514,8 +516,8 @@ static void set_interrupt_ppi(gic_interrupt_t interrupt, unsigned int irq,
  *  "interrupts": contains the list of interrupts
  *  "interrupt-parent": link to the GIC
  */
-static int fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
-                                   unsigned num_irq)
+static int __init fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
+                                          unsigned num_irq)
 {
     int res;
 
@@ -529,10 +531,10 @@ static int fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
     return res;
 }
 
-static int make_memory_node(const struct domain *d,
-                            void *fdt,
-                            const struct dt_device_node *parent,
-                            const struct kernel_info *kinfo)
+static int __init make_memory_node(const struct domain *d,
+                                   void *fdt,
+                                   const struct dt_device_node *parent,
+                                   const struct kernel_info *kinfo)
 {
     int res, i;
     int reg_size = dt_child_n_addr_cells(parent) + dt_child_n_size_cells(parent);
@@ -575,9 +577,9 @@ static int make_memory_node(const struct domain *d,
 
 static void evtchn_allocate(struct domain *d);
 
-static int make_hypervisor_node(struct domain *d,
-                                const struct kernel_info *kinfo,
-                                const struct dt_device_node *parent)
+static int __init make_hypervisor_node(struct domain *d,
+                                       const struct kernel_info *kinfo,
+                                       const struct dt_device_node *parent)
 {
     const char compat[] =
         "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
@@ -641,7 +643,8 @@ static int make_hypervisor_node(struct domain *d,
     return res;
 }
 
-static int make_psci_node(void *fdt, const struct dt_device_node *parent)
+static int __init make_psci_node(void *fdt,
+                                 const struct dt_device_node *parent)
 {
     int res;
     const char compat[] =
@@ -677,8 +680,8 @@ static int make_psci_node(void *fdt, const struct dt_device_node *parent)
     return res;
 }
 
-static int make_cpus_node(const struct domain *d, void *fdt,
-                          const struct dt_device_node *parent)
+static int __init make_cpus_node(const struct domain *d, void *fdt,
+                                 const struct dt_device_node *parent)
 {
     int res;
     const struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
@@ -791,8 +794,8 @@ static int make_cpus_node(const struct domain *d, void *fdt,
     return res;
 }
 
-static int make_gic_node(const struct domain *d, void *fdt,
-                         const struct dt_device_node *node)
+static int __init make_gic_node(const struct domain *d, void *fdt,
+                                const struct dt_device_node *node)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
     int res = 0;
@@ -860,8 +863,8 @@ static int make_gic_node(const struct domain *d, void *fdt,
     return res;
 }
 
-static int make_timer_node(const struct domain *d, void *fdt,
-                           const struct dt_device_node *node)
+static int __init make_timer_node(const struct domain *d, void *fdt,
+                                  const struct dt_device_node *node)
 {
     static const struct dt_device_match timer_ids[] __initconst =
     {
@@ -935,9 +938,8 @@ static int make_timer_node(const struct domain *d, void *fdt,
     return res;
 }
 
-static int map_irq_to_domain(struct domain *d, unsigned int irq,
-                             bool need_mapping, const char *devname)
-
+static int __init map_irq_to_domain(struct domain *d, unsigned int irq,
+                                    bool need_mapping, const char *devname)
 {
     int res;
 
@@ -971,9 +973,9 @@ static int map_irq_to_domain(struct domain *d, unsigned int irq,
     return 0;
 }
 
-static int map_dt_irq_to_domain(const struct dt_device_node *dev,
-                                const struct dt_irq *dt_irq,
-                                void *data)
+static int __init map_dt_irq_to_domain(const struct dt_device_node *dev,
+                                       const struct dt_irq *dt_irq,
+                                       void *data)
 {
     struct domain *d = data;
     unsigned int irq = dt_irq->irq;
@@ -1002,9 +1004,9 @@ static int map_dt_irq_to_domain(const struct dt_device_node *dev,
     return 0;
 }
 
-static int map_range_to_domain(const struct dt_device_node *dev,
-                               u64 addr, u64 len,
-                               void *data)
+static int __init map_range_to_domain(const struct dt_device_node *dev,
+                                      u64 addr, u64 len,
+                                      void *data)
 {
     struct map_range_data *mr_data = data;
     struct domain *d = mr_data->d;
@@ -1051,9 +1053,9 @@ static int map_range_to_domain(const struct dt_device_node *dev,
  * then we may need to perform additional mappings in order to make
  * the child resources available to domain 0.
  */
-static int map_device_children(struct domain *d,
-                               const struct dt_device_node *dev,
-                               p2m_type_t p2mt)
+static int __init map_device_children(struct domain *d,
+                                      const struct dt_device_node *dev,
+                                      p2m_type_t p2mt)
 {
     struct map_range_data mr_data = { .d = d, .p2mt = p2mt };
     int ret;
@@ -1083,8 +1085,8 @@ static int map_device_children(struct domain *d,
  *  - Assign the device to the guest if it's protected by an IOMMU
  *  - Map the IRQs and iomem regions to DOM0
  */
-static int handle_device(struct domain *d, struct dt_device_node *dev,
-                         p2m_type_t p2mt)
+static int __init handle_device(struct domain *d, struct dt_device_node *dev,
+                                p2m_type_t p2mt)
 {
     unsigned int nirq;
     unsigned int naddr;
@@ -1171,9 +1173,9 @@ static int handle_device(struct domain *d, struct dt_device_node *dev,
     return 0;
 }
 
-static int handle_node(struct domain *d, struct kernel_info *kinfo,
-                       struct dt_device_node *node,
-                       p2m_type_t p2mt)
+static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
+                              struct dt_device_node *node,
+                              p2m_type_t p2mt)
 {
     static const struct dt_device_match skip_matches[] __initconst =
     {
@@ -1317,7 +1319,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     return res;
 }
 
-static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+static int __init prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 {
     const p2m_type_t default_p2mt = p2m_mmio_direct_c;
     const void *fdt;
@@ -1358,7 +1360,7 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 #ifdef CONFIG_ACPI
 #define ACPI_DOM0_FDT_MIN_SIZE 4096
 
-static int acpi_iomem_deny_access(struct domain *d)
+static int __init acpi_iomem_deny_access(struct domain *d)
 {
     acpi_status status;
     struct acpi_table_spcr *spcr = NULL;
@@ -1390,7 +1392,7 @@ static int acpi_iomem_deny_access(struct domain *d)
     return gic_iomem_deny_access(d);
 }
 
-static int acpi_route_spis(struct domain *d)
+static int __init acpi_route_spis(struct domain *d)
 {
     int i, res;
     struct irq_desc *desc;
@@ -1418,7 +1420,7 @@ static int acpi_route_spis(struct domain *d)
     return 0;
 }
 
-static int acpi_make_chosen_node(const struct kernel_info *kinfo)
+static int __init acpi_make_chosen_node(const struct kernel_info *kinfo)
 {
     int res;
     const char *bootargs = NULL;
@@ -1459,8 +1461,8 @@ static int acpi_make_chosen_node(const struct kernel_info *kinfo)
     return res;
 }
 
-static int acpi_make_hypervisor_node(const struct kernel_info *kinfo,
-                                     struct membank tbl_add[])
+static int __init acpi_make_hypervisor_node(const struct kernel_info *kinfo,
+                                            struct membank tbl_add[])
 {
     const char compat[] =
         "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
@@ -1494,7 +1496,8 @@ static int acpi_make_hypervisor_node(const struct kernel_info *kinfo,
  * Prepare a minimal DTB for Dom0 which contains bootargs, initrd, memory
  * information, EFI table.
  */
-static int create_acpi_dtb(struct kernel_info *kinfo, struct membank tbl_add[])
+static int __init create_acpi_dtb(struct kernel_info *kinfo,
+                                  struct membank tbl_add[])
 {
     int new_size;
     int ret;
@@ -1554,7 +1557,7 @@ static int create_acpi_dtb(struct kernel_info *kinfo, struct membank tbl_add[])
     return -EINVAL;
 }
 
-static void acpi_map_other_tables(struct domain *d)
+static void __init acpi_map_other_tables(struct domain *d)
 {
     int i;
     unsigned long res;
@@ -1579,7 +1582,7 @@ static void acpi_map_other_tables(struct domain *d)
     }
 }
 
-static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
+static int __init acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
 {
 
     struct acpi_table_rsdp *rsdp = NULL;
@@ -1613,8 +1616,9 @@ static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
     return 0;
 }
 
-static void acpi_xsdt_modify_entry(u64 entry[], unsigned long entry_count,
-                                   char *signature, u64 addr)
+static void __init acpi_xsdt_modify_entry(u64 entry[],
+                                          unsigned long entry_count,
+                                          char *signature, u64 addr)
 {
     int i;
     struct acpi_table_header *table;
@@ -1633,7 +1637,7 @@ static void acpi_xsdt_modify_entry(u64 entry[], unsigned long entry_count,
     }
 }
 
-static int acpi_create_xsdt(struct domain *d, struct membank tbl_add[])
+static int __init acpi_create_xsdt(struct domain *d, struct membank tbl_add[])
 {
     struct acpi_table_header *table = NULL;
     struct acpi_table_rsdp *rsdp_tbl;
@@ -1681,7 +1685,7 @@ static int acpi_create_xsdt(struct domain *d, struct membank tbl_add[])
     return 0;
 }
 
-static int acpi_create_stao(struct domain *d, struct membank tbl_add[])
+static int __init acpi_create_stao(struct domain *d, struct membank tbl_add[])
 {
     struct acpi_table_header *table = NULL;
     struct acpi_table_stao *stao = NULL;
@@ -1718,7 +1722,7 @@ static int acpi_create_stao(struct domain *d, struct membank tbl_add[])
     return 0;
 }
 
-static int acpi_create_madt(struct domain *d, struct membank tbl_add[])
+static int __init acpi_create_madt(struct domain *d, struct membank tbl_add[])
 {
     struct acpi_table_header *table = NULL;
     struct acpi_table_madt *madt = NULL;
@@ -1775,7 +1779,7 @@ static int acpi_create_madt(struct domain *d, struct membank tbl_add[])
     return 0;
 }
 
-static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
+static int __init acpi_create_fadt(struct domain *d, struct membank tbl_add[])
 {
     struct acpi_table_header *table = NULL;
     struct acpi_table_fadt *fadt = NULL;
@@ -1812,7 +1816,8 @@ static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
     return 0;
 }
 
-static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
+static int __init estimate_acpi_efi_size(struct domain *d,
+                                         struct kernel_info *kinfo)
 {
     size_t efi_size, acpi_size, madt_size;
     u64 addr;
@@ -1861,7 +1866,7 @@ static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
     return 0;
 }
 
-static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+static int __init prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 {
     int rc = 0;
     int order;
@@ -1960,14 +1965,14 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
     return 0;
 }
 #else
-static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+static int __init prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 {
     /* Only booting with ACPI will hit here */
     BUG();
     return -EINVAL;
 }
 #endif
-static void dtb_load(struct kernel_info *kinfo)
+static void __init dtb_load(struct kernel_info *kinfo)
 {
     unsigned long left;
 
@@ -1983,7 +1988,7 @@ static void dtb_load(struct kernel_info *kinfo)
     xfree(kinfo->fdt);
 }
 
-static void initrd_load(struct kernel_info *kinfo)
+static void __init initrd_load(struct kernel_info *kinfo)
 {
     const struct bootmodule *mod = kinfo->initrd_bootmodule;
     paddr_t load_addr = kinfo->initrd_paddr;
@@ -2039,7 +2044,7 @@ static void initrd_load(struct kernel_info *kinfo)
  * Note that this should only be called once all PPIs used by the
  * hardware domain have been registered.
  */
-static void evtchn_allocate(struct domain *d)
+static void __init evtchn_allocate(struct domain *d)
 {
     int res;
     u64 val;
