@@ -87,8 +87,7 @@ static void update_msi(const struct pci_dev *pdev, struct vpci_msi *msi)
     if ( !msi->enabled )
         return;
 
-    vpci_msi_arch_disable(msi, pdev);
-    if ( vpci_msi_arch_enable(msi, pdev, msi->vectors) )
+    if ( vpci_msi_arch_update(msi, pdev) )
         msi->enabled = false;
 }
 

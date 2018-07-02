@@ -159,6 +159,8 @@ int __must_check vpci_msi_arch_enable(struct vpci_msi *msi,
                                       const struct pci_dev *pdev,
                                       unsigned int vectors);
 void vpci_msi_arch_disable(struct vpci_msi *msi, const struct pci_dev *pdev);
+int __must_check vpci_msi_arch_update(struct vpci_msi *msi,
+                                      const struct pci_dev *pdev);
 void vpci_msi_arch_init(struct vpci_msi *msi);
 void vpci_msi_arch_print(const struct vpci_msi *msi);
 

@@ -699,6 +699,29 @@ static int vpci_msi_update(const struct pci_dev *pdev, uint32_t data,
     return 0;
 }
 
+int vpci_msi_arch_update(struct vpci_msi *msi, const struct pci_dev *pdev)
+{
+    int rc;
+
+    ASSERT(msi->arch.pirq != INVALID_PIRQ);
+
+    pcidevs_lock();
+    rc = vpci_msi_update(pdev, msi->data, msi->address, msi->vectors,
+                         msi->arch.pirq, msi->mask);
+    if ( rc )
+    {
+        spin_lock(&pdev->domain->event_lock);
+        unmap_domain_pirq(pdev->domain, msi->arch.pirq);
+        spin_unlock(&pdev->domain->event_lock);
+        pcidevs_unlock();
+        msi->arch.pirq = INVALID_PIRQ;
+        return rc;
+    }
+    pcidevs_unlock();
+
+    return 0;
+}
+
 static int vpci_msi_enable(const struct pci_dev *pdev, uint32_t data,
                            uint64_t address, unsigned int nr,
                            paddr_t table_base, uint32_t mask)
