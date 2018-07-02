@@ -1585,14 +1585,12 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
 
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
 
-        if ( !paging_mode_hap(v->domain) )
-            /*
-             * Shadow path has not been optimized because it requires
-             * unconditionally trapping more CR4 bits, at which point the
-             * performance benefit of doing this is quite dubious.
-             */
-            v->arch.hvm_vmx.cr4_host_mask = ~0UL;
-        else
+        /*
+         * Shadow path has not been optimized because it requires
+         * unconditionally trapping more CR4 bits, at which point the
+         * performance benefit of doing this is quite dubious.
+         */
+        if ( paging_mode_hap(v->domain) )
         {
             /*
              * Update CR4 host mask to only trap when the guest tries to set
@@ -1617,8 +1615,9 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
                 /* Add the nested host mask to get the more restrictive one. */
                 v->arch.hvm_vmx.cr4_host_mask |= get_vvmcs(v,
                                                            CR4_GUEST_HOST_MASK);
+
+            __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm_vmx.cr4_host_mask);
         }
-        __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm_vmx.cr4_host_mask);
 
         break;
 
