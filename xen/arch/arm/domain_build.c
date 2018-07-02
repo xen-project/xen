@@ -28,8 +28,6 @@
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
-int dom0_11_mapping = 1;
-
 static u64 __initdata dom0_mem;
 
 static int __init parse_dom0_mem(const char *s)
@@ -261,7 +259,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
      * TODO: Implement memory bank allocation when DOM0 is not direct
      * mapped
      */
-    BUG_ON(!dom0_11_mapping);
+    BUG_ON(!is_domain_direct_mapped(d));
 
     printk("Allocating 1:1 mappings totalling %ldMB for dom0:\n",
            /* Don't want format this as PRIpaddr (16 digit hex) */

@@ -31,8 +31,8 @@ enum domain_type {
 #define is_64bit_domain(d) (0)
 #endif
 
-extern int dom0_11_mapping;
-#define is_domain_direct_mapped(d) ((d) == hardware_domain && dom0_11_mapping)
+/* The hardware domain has always its memory direct mapped. */
+#define is_domain_direct_mapped(d) ((d) == hardware_domain)
 
 struct vtimer {
         struct vcpu *v;
