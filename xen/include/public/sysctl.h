@@ -1063,6 +1063,26 @@ struct xen_sysctl_set_parameter {
     uint16_t pad[3];                        /* IN: MUST be zero. */
 };
 
+#if defined(__i386__) || defined(__x86_64__)
+/*
+ * XEN_SYSCTL_get_cpu_policy (x86 specific)
+ *
+ * Return information about CPUID and MSR policies available on this host.
+ *  -       Raw: The real H/W values.
+ *  -      Host: The values Xen is using, (after command line overrides, etc).
+ *  -     Max_*: Maximum set of features a PV or HVM guest can use.  Includes
+ *               experimental features outside of security support.
+ *  - Default_*: Default set of features a PV or HVM guest can use.  This is
+ *               the security supported set.
+ */
+#define XEN_SYSCTL_cpu_policy_raw          0
+#define XEN_SYSCTL_cpu_policy_host         1
+#define XEN_SYSCTL_cpu_policy_pv_max       2
+#define XEN_SYSCTL_cpu_policy_hvm_max      3
+#define XEN_SYSCTL_cpu_policy_pv_default   4
+#define XEN_SYSCTL_cpu_policy_hvm_default  5
+#endif
+
 struct xen_sysctl {
     uint32_t cmd;
 #define XEN_SYSCTL_readconsole                    1

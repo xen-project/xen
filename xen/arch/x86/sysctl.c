@@ -32,6 +32,33 @@
 #include <asm/psr.h>
 #include <asm/cpuid.h>
 
+const struct cpu_policy system_policies[] = {
+    [ XEN_SYSCTL_cpu_policy_raw ] = {
+        &raw_cpuid_policy,
+        &raw_msr_policy,
+    },
+    [ XEN_SYSCTL_cpu_policy_host ] = {
+        &host_cpuid_policy,
+        &host_msr_policy,
+    },
+    [ XEN_SYSCTL_cpu_policy_pv_max ] = {
+        &pv_max_cpuid_policy,
+        &pv_max_msr_policy,
+    },
+    [ XEN_SYSCTL_cpu_policy_hvm_max ] = {
+        &hvm_max_cpuid_policy,
+        &hvm_max_msr_policy,
+    },
+    [ XEN_SYSCTL_cpu_policy_pv_default ] = {
+        &pv_max_cpuid_policy,
+        &pv_max_msr_policy,
+    },
+    [ XEN_SYSCTL_cpu_policy_hvm_default ] = {
+        &hvm_max_cpuid_policy,
+        &hvm_max_msr_policy,
+    },
+};
+
 struct l3_cache_info {
     int ret;
     unsigned long size;

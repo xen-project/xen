@@ -8,6 +8,7 @@
 #include <xen/types.h>
 #include <xen/kernel.h>
 
+#include <xen/lib/x86/cpu-policy.h>
 #include <xen/lib/x86/cpuid.h>
 
 #include <public/sysctl.h>
@@ -49,6 +50,8 @@ extern struct cpuidmasks cpuidmask_defaults;
 
 extern struct cpuid_policy raw_cpuid_policy, host_cpuid_policy,
     pv_max_cpuid_policy, hvm_max_cpuid_policy;
+
+extern const struct cpu_policy system_policies[];
 
 /* Check that all previously present features are still available. */
 bool recheck_cpu_features(unsigned int cpu);
