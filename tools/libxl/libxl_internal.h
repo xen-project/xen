@@ -192,6 +192,8 @@ typedef struct libxl__ao libxl__ao;
 typedef struct libxl__aop_occurred libxl__aop_occurred;
 typedef struct libxl__osevent_hook_nexus libxl__osevent_hook_nexus;
 typedef struct libxl__osevent_hook_nexi libxl__osevent_hook_nexi;
+typedef struct libxl__json_object libxl__json_object;
+typedef struct libxl__carefd libxl__carefd;
 
 typedef struct libxl__domain_create_state libxl__domain_create_state;
 typedef void libxl__domain_create_cb(struct libxl__egc *egc,
@@ -353,6 +355,76 @@ struct libxl__ev_child {
     libxl__ev_child_callback *callback;
     /* remainder is private for libxl__ev_... */
     LIBXL_LIST_ENTRY(struct libxl__ev_child) entry;
+};
+
+/*
+ * QMP asynchronous calls
+ *
+ * This facility allows a command to be sent to QEMU, and the response
+ * to be handed to a callback function.
+ *
+ * Commands can be submited one after an other with the same
+ * connection (e.g. the result from the "add-fd" command need to be
+ * use in a follow-up command before disconnecting from QMP). A
+ * libxl__ev_qmp can be reused when the callback is been called in
+ * order to use the same connection.
+ *
+ * Only one connection at a time can be made to one QEMU, so avoid
+ * keeping a libxl__ev_qmp Connected for to long and call
+ * libxl__ev_qmp_dispose as soon as it is not needed anymore.
+ *
+ * Possible states of a libxl__ev_qmp:
+ *  Undefined
+ *    Might contain anything.
+ *  Idle
+ *    Struct contents are defined enough to pass to any
+ *    libxl__ev_qmp_* function.
+ *    The struct does not contain references to any allocated private
+ *    resources so can be thrown away.
+ *  Active
+ *    Currently waiting for the callback to be called.
+ *    _dispose must be called to reclaim resources.
+ *  Connected
+ *    Struct contain allocated ressources.
+ *    Calling _send() with this same ev will use the same QMP connection.
+ *    _dispose() must be called to reclaim resources.
+ *
+ * libxl__ev_qmp_init: Undefined/Idle -> Idle
+ *
+ * libxl__ev_qmp_send: Idle/Connected -> Active (on error: Idle)
+ *    Sends a command to QEMU.
+ *    callback will be called when a response is received or when an
+ *    error as occured.
+ *    callback isn't called synchronously.
+ *
+ * libxl__ev_qmp_dispose: Connected/Active/Idle -> Idle
+ *
+ * callback: When called: Active -> Connected (on error: Idle/Connected)
+ *    When called, ev is Connected and can be reused or disposed of.
+ *    On error, the callback is called with response == NULL and the
+ *    error code in rc. The new state of ev depending on the value of rc:
+ *    - rc == ERROR_QMP_*: This is an error associated with the cmd to
+ *      run, ev is Connected.
+ *    - otherwise: An other error happend, ev is now Idle.
+ *    The callback is only called once.
+ */
+typedef struct libxl__ev_qmp libxl__ev_qmp;
+typedef void libxl__ev_qmp_callback(libxl__egc *egc, libxl__ev_qmp *ev,
+                                    const libxl__json_object *response,
+                                    int rc);
+
+_hidden void libxl__ev_qmp_init(libxl__ev_qmp *ev);
+_hidden int libxl__ev_qmp_send(libxl__gc *gc, libxl__ev_qmp *ev,
+                               const char *cmd, libxl__json_object *args);
+_hidden void libxl__ev_qmp_dispose(libxl__gc *gc, libxl__ev_qmp *ev);
+
+struct libxl__ev_qmp {
+    /* caller should include this in their own struct */
+    /* caller must fill these in, and they must all remain valid */
+    libxl__ao *ao;
+    libxl_domid domid;
+    libxl__ev_qmp_callback *callback;
+    int payload_fd; /* set to send a fd with the command, -1 otherwise */
 };
 
 
@@ -1909,7 +1981,7 @@ typedef enum {
     JSON_ANY     = 255 /* this is a mask of all values above, adjust as needed */
 } libxl__json_node_type;
 
-typedef struct libxl__json_object {
+struct libxl__json_object {
     libxl__json_node_type type;
     union {
         bool b;
@@ -1922,7 +1994,7 @@ typedef struct libxl__json_object {
         flexarray_t *map;
     } u;
     struct libxl__json_object *parent;
-} libxl__json_object;
+};
 
 typedef int (*libxl__json_parse_callback)(libxl__gc *gc,
                                           libxl__json_object *o,
@@ -2347,7 +2419,6 @@ _hidden void libxl__nested_ao_free(libxl__ao *child);
  * In general nothing should be done before _unlock that could be done
  * afterwards.
  */
-typedef struct libxl__carefd libxl__carefd;
 
 _hidden void libxl__carefd_begin(void);
 _hidden void libxl__carefd_unlock(void);
