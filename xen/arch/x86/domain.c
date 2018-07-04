@@ -1635,7 +1635,7 @@ static void __context_switch(void)
             if ( cpu_has_xsaves && is_hvm_vcpu(n) )
                 set_msr_xss(n->arch.hvm_vcpu.msr_xss);
         }
-        vcpu_restore_fpu_eager(n);
+        vcpu_restore_fpu_nonlazy(n, false);
         nd->arch.ctxt_switch->to(n);
     }
 
