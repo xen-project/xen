@@ -1,3 +1,4 @@
+#include <xen/cpu.h>
 #include <xen/cpumask.h>
 #include <xen/mm.h>
 #include <xen/sizes.h>
@@ -5,8 +6,10 @@
 #include <xen/spinlock.h>
 #include <xen/vmap.h>
 #include <xen/warning.h>
+#include <xen/notifier.h>
 #include <asm/cpufeature.h>
 #include <asm/cpuerrata.h>
+#include <asm/insn.h>
 #include <asm/psci.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
@@ -235,6 +238,148 @@ static int enable_ic_inv_hardening(void *data)
 
 #endif
 
+#ifdef CONFIG_ARM_SSBD
+
+enum ssbd_state ssbd_state = ARM_SSBD_RUNTIME;
+
+static int __init parse_spec_ctrl(const char *s)
+{
+    const char *ss;
+    int rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        if ( !strncmp(s, "ssbd=", 5) )
+        {
+            s += 5;
+
+            if ( !strncmp(s, "force-disable", ss - s) )
+                ssbd_state = ARM_SSBD_FORCE_DISABLE;
+            else if ( !strncmp(s, "runtime", ss - s) )
+                ssbd_state = ARM_SSBD_RUNTIME;
+            else if ( !strncmp(s, "force-enable", ss - s) )
+                ssbd_state = ARM_SSBD_FORCE_ENABLE;
+            else
+                rc = -EINVAL;
+        }
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
+}
+custom_param("spec-ctrl", parse_spec_ctrl);
+
+/* Arm64 only for now as for Arm32 the workaround is currently handled in C. */
+#ifdef CONFIG_ARM_64
+void __init arm_enable_wa2_handling(const struct alt_instr *alt,
+                                    const uint32_t *origptr,
+                                    uint32_t *updptr, int nr_inst)
+{
+    BUG_ON(nr_inst != 1);
+
+    /*
+     * Only allow mitigation on guest ARCH_WORKAROUND_2 if the SSBD
+     * state allow it to be flipped.
+     */
+    if ( get_ssbd_state() == ARM_SSBD_RUNTIME )
+        *updptr = aarch64_insn_gen_nop();
+}
+#endif
+
+/*
+ * Assembly code may use the variable directly, so we need to make sure
+ * it fits in a register.
+ */
+DEFINE_PER_CPU_READ_MOSTLY(register_t, ssbd_callback_required);
+
+static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
+{
+    struct arm_smccc_res res;
+    bool required;
+
+    if ( smccc_ver < SMCCC_VERSION(1, 1) )
+        return false;
+
+    arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FID,
+                      ARM_SMCCC_ARCH_WORKAROUND_2_FID, &res);
+
+    switch ( (int)res.a0 )
+    {
+    case ARM_SMCCC_NOT_SUPPORTED:
+        ssbd_state = ARM_SSBD_UNKNOWN;
+        return false;
+
+    case ARM_SMCCC_NOT_REQUIRED:
+        ssbd_state = ARM_SSBD_MITIGATED;
+        return false;
+
+    case ARM_SMCCC_SUCCESS:
+        required = true;
+        break;
+
+    case 1: /* Mitigation not required on this CPU. */
+        required = false;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        return false;
+    }
+
+    switch ( ssbd_state )
+    {
+    case ARM_SSBD_FORCE_DISABLE:
+    {
+        static bool once = true;
+
+        if ( once )
+            printk("%s disabled from command-line\n", entry->desc);
+        once = false;
+
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
+        required = false;
+
+        break;
+    }
+
+    case ARM_SSBD_RUNTIME:
+        if ( required )
+        {
+            this_cpu(ssbd_callback_required) = 1;
+            arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+        }
+
+        break;
+
+    case ARM_SSBD_FORCE_ENABLE:
+    {
+        static bool once = true;
+
+        if ( once )
+            printk("%s forced from command-line\n", entry->desc);
+        once = false;
+
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+        required = true;
+
+        break;
+    }
+
+    default:
+        ASSERT_UNREACHABLE();
+        return false;
+    }
+
+    return required;
+}
+#endif
+
 #define MIDR_RANGE(model, min, max)     \
     .matches = is_affected_midr_range,  \
     .midr_model = model,                \
@@ -336,6 +481,13 @@ static const struct arm_cpu_capabilities arm_errata[] = {
         .enable = enable_ic_inv_hardening,
     },
 #endif
+#ifdef CONFIG_ARM_SSBD
+    {
+        .desc = "Speculative Store Bypass Disabled",
+        .capability = ARM_SSBD,
+        .matches = has_ssbd_mitigation,
+    },
+#endif
     {},
 };
 
@@ -348,6 +500,53 @@ void __init enable_errata_workarounds(void)
 {
     enable_cpu_capabilities(arm_errata);
 }
+
+static int cpu_errata_callback(struct notifier_block *nfb,
+                               unsigned long action,
+                               void *hcpu)
+{
+    int rc = 0;
+
+    switch ( action )
+    {
+    case CPU_STARTING:
+        /*
+         * At CPU_STARTING phase no notifier shall return an error, because the
+         * system is designed with the assumption that starting a CPU cannot
+         * fail at this point. If an error happens here it will cause Xen to hit
+         * the BUG_ON() in notify_cpu_starting(). In future, either this
+         * notifier/enabling capabilities should be fixed to always return
+         * success/void or notify_cpu_starting() and other common code should be
+         * fixed to expect an error at CPU_STARTING phase.
+         */
+        ASSERT(system_state != SYS_STATE_boot);
+        rc = enable_nonboot_cpu_caps(arm_errata);
+        break;
+    default:
+        break;
+    }
+
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
+}
+
+static struct notifier_block cpu_errata_nfb = {
+    .notifier_call = cpu_errata_callback,
+};
+
+static int __init cpu_errata_notifier_init(void)
+{
+    register_cpu_notifier(&cpu_errata_nfb);
+
+    return 0;
+}
+/*
+ * Initialization has to be done at init rather than presmp_init phase because
+ * the callback should execute only after the secondary CPUs are initially
+ * booted (in hotplug scenarios when the system state is not boot). On boot,
+ * the enabling of errata workarounds will be triggered by the boot CPU from
+ * start_xen().
+ */
+__initcall(cpu_errata_notifier_init);
 
 /*
  * Local variables:

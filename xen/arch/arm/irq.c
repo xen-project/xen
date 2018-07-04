@@ -65,7 +65,7 @@ irq_desc_t *__irq_to_desc(int irq)
     return &irq_desc[irq-NR_LOCAL_IRQS];
 }
 
-int __init arch_init_one_irq_desc(struct irq_desc *desc)
+int arch_init_one_irq_desc(struct irq_desc *desc)
 {
     desc->arch.type = IRQ_TYPE_INVALID;
     return 0;

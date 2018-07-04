@@ -52,8 +52,8 @@ nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 static unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
        __attribute__((__aligned__(STACK_SIZE)));
 
-/* Initial boot cpu data */
-struct init_info __initdata init_data =
+/* Boot cpu data */
+struct init_info init_data =
 {
     .stack = cpu0_boot_stack,
 };
@@ -87,6 +87,12 @@ static void setup_cpu_sibling_map(int cpu)
     /* A CPU is a sibling with itself and is always on its own core. */
     cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
     cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
+}
+
+static void remove_cpu_sibling_map(int cpu)
+{
+    free_cpumask_var(per_cpu(cpu_sibling_mask, cpu));
+    free_cpumask_var(per_cpu(cpu_core_mask, cpu));
 }
 
 void __init
@@ -395,6 +401,8 @@ void stop_cpu(void)
     /* Make sure the write happens before we sleep forever */
     dsb(sy);
     isb();
+    call_psci_cpu_off();
+
     while ( 1 )
         wfi();
 }
@@ -496,6 +504,36 @@ void __cpu_die(unsigned int cpu)
     cpu_is_dead = false;
     smp_mb();
 }
+
+static int cpu_smpboot_callback(struct notifier_block *nfb,
+                                unsigned long action,
+                                void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_DEAD:
+        remove_cpu_sibling_map(cpu);
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_smpboot_nfb = {
+    .notifier_call = cpu_smpboot_callback,
+};
+
+static int __init cpu_smpboot_notifier_init(void)
+{
+    register_cpu_notifier(&cpu_smpboot_nfb);
+
+    return 0;
+}
+presmp_initcall(cpu_smpboot_notifier_init);
 
 /*
  * Local variables:

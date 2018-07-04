@@ -8,6 +8,8 @@
 #include <xen/iocap.h>
 #include <xen/mem_access.h>
 #include <xen/xmalloc.h>
+#include <xen/cpu.h>
+#include <xen/notifier.h>
 #include <public/vm_event.h>
 #include <asm/flushtlb.h>
 #include <asm/event.h>
@@ -1451,10 +1453,12 @@ err:
     return page;
 }
 
-static void __init setup_virt_paging_one(void *data)
+/* VTCR value to be configured by all CPUs. Set only once by the boot CPU */
+static uint32_t __read_mostly vtcr;
+
+static void setup_virt_paging_one(void *data)
 {
-    unsigned long val = (unsigned long)data;
-    WRITE_SYSREG32(val, VTCR_EL2);
+    WRITE_SYSREG32(vtcr, VTCR_EL2);
     isb();
 }
 
@@ -1538,9 +1542,48 @@ void __init setup_virt_paging(void)
 
     /* It is not allowed to concatenate a level zero root */
     BUG_ON( P2M_ROOT_LEVEL == 0 && P2M_ROOT_ORDER > 0 );
-    setup_virt_paging_one((void *)val);
-    smp_call_function(setup_virt_paging_one, (void *)val, 1);
+    vtcr = val;
+    setup_virt_paging_one(NULL);
+    smp_call_function(setup_virt_paging_one, NULL, 1);
 }
+
+static int cpu_virt_paging_callback(struct notifier_block *nfb,
+                                    unsigned long action,
+                                    void *hcpu)
+{
+    switch ( action )
+    {
+    case CPU_STARTING:
+        ASSERT(system_state != SYS_STATE_boot);
+        setup_virt_paging_one(NULL);
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_virt_paging_nfb = {
+    .notifier_call = cpu_virt_paging_callback,
+};
+
+static int __init cpu_virt_paging_init(void)
+{
+    register_cpu_notifier(&cpu_virt_paging_nfb);
+
+    return 0;
+}
+/*
+ * Initialization of the notifier has to be done at init rather than presmp_init
+ * phase because: the registered notifier is used to setup virtual paging for
+ * non-boot CPUs after the initial virtual paging for all CPUs is already setup,
+ * i.e. when a non-boot CPU is hotplugged after the system has booted. In other
+ * words, the notifier should be registered after the virtual paging is
+ * initially setup (setup_virt_paging() is called from start_xen()). This is
+ * required because vtcr config value has to be set before a notifier can fire.
+ */
+__initcall(cpu_virt_paging_init);
 
 /*
  * Local variables:

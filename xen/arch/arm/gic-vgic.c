@@ -362,7 +362,7 @@ int vgic_vcpu_pending_irq(struct vcpu *v)
     ASSERT(v == current);
 
     mask_priority = gic_hw_ops->read_vmcr_priority();
-    active_priority = find_next_bit(&apr, 32, 0);
+    active_priority = find_first_bit(&apr, 32);
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 

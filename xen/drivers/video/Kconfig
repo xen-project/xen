@@ -11,6 +11,3 @@ config VGA
 	  Enable VGA output for the Xen hypervisor.
 
 	  If unsure, say Y.
-
-config HAS_ARM_HDLCD
-	bool

@@ -59,41 +59,6 @@ static inline int vexpress_ctrl_start(uint32_t *syscfg, int write,
     return 0;
 }
 
-int vexpress_syscfg(int write, int function, int device, uint32_t *data)
-{
-    uint32_t *syscfg = (uint32_t *) FIXMAP_ADDR(FIXMAP_MISC);
-    int ret = -1;
-
-    set_fixmap(FIXMAP_MISC, maddr_to_mfn(V2M_SYS_MMIO_BASE),
-               PAGE_HYPERVISOR_NOCACHE);
-
-    if ( syscfg[V2M_SYS_CFGCTRL/4] & V2M_SYS_CFG_START )
-        goto out;
-
-    /* clear the complete bit in the V2M_SYS_CFGSTAT status register */
-    syscfg[V2M_SYS_CFGSTAT/4] = 0;
-
-    if ( write )
-    {
-        /* write data */
-        syscfg[V2M_SYS_CFGDATA/4] = *data;
-
-        if ( vexpress_ctrl_start(syscfg, write, function, device) < 0 )
-            goto out;
-    } else {
-        if ( vexpress_ctrl_start(syscfg, write, function, device) < 0 )
-            goto out;
-        else
-            /* read data */
-            *data = syscfg[V2M_SYS_CFGDATA/4];
-    }
-
-    ret = 0;
-out:
-    clear_fixmap(FIXMAP_MISC);
-    return ret;
-}
-
 /*
  * TODO: Get base address from the device tree
  * See arm,vexpress-reset node

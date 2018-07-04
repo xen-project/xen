@@ -35,9 +35,9 @@ struct proc_info_list {
     struct processor    *processor;
 };
 
-const __init struct proc_info_list *lookup_processor_type(void);
+const struct proc_info_list *lookup_processor_type(void);
 
-void __init processor_setup(void);
+void processor_setup(void);
 void processor_vcpu_initialise(struct vcpu *v);
 
 #endif

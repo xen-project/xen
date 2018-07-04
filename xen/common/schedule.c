@@ -737,6 +737,7 @@ void restore_vcpu_affinity(struct domain *d)
     for_each_vcpu ( d, v )
     {
         spinlock_t *lock;
+        unsigned int old_cpu = v->processor;
 
         ASSERT(!vcpu_runnable(v));
 
@@ -769,6 +770,9 @@ void restore_vcpu_affinity(struct domain *d)
         lock = vcpu_schedule_lock_irq(v);
         v->processor = SCHED_OP(vcpu_scheduler(v), pick_cpu, v);
         spin_unlock_irq(lock);
+
+        if ( old_cpu != v->processor )
+            sched_move_irqs(v);
     }
 
     domain_update_node_affinity(d);

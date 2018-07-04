@@ -18,6 +18,7 @@
 #include <xen/lib.h>
 #include <xen/types.h>
 #include <public/arch-arm/smccc.h>
+#include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
 #include <asm/monitor.h>
 #include <asm/regs.h>
@@ -104,6 +105,23 @@ static bool handle_arch(struct cpu_user_regs *regs)
             if ( cpus_have_cap(ARM_HARDEN_BRANCH_PREDICTOR) )
                 ret = 0;
             break;
+        case ARM_SMCCC_ARCH_WORKAROUND_2_FID:
+            switch ( get_ssbd_state() )
+            {
+            case ARM_SSBD_UNKNOWN:
+            case ARM_SSBD_FORCE_DISABLE:
+                break;
+
+            case ARM_SSBD_RUNTIME:
+                ret = ARM_SMCCC_SUCCESS;
+                break;
+
+            case ARM_SSBD_FORCE_ENABLE:
+            case ARM_SSBD_MITIGATED:
+                ret = ARM_SMCCC_NOT_REQUIRED;
+                break;
+            }
+            break;
         }
 
         set_user_reg(regs, 0, ret);
@@ -114,6 +132,25 @@ static bool handle_arch(struct cpu_user_regs *regs)
     case ARM_SMCCC_ARCH_WORKAROUND_1_FID:
         /* No return value */
         return true;
+
+    case ARM_SMCCC_ARCH_WORKAROUND_2_FID:
+    {
+        bool enable = (uint32_t)get_user_reg(regs, 1);
+
+        /*
+         * ARM_WORKAROUND_2_FID should only be called when mitigation
+         * state can be changed at runtime.
+         */
+        if ( unlikely(get_ssbd_state() != ARM_SSBD_RUNTIME) )
+            return true;
+
+        if ( enable )
+            get_cpu_info()->flags |= CPUINFO_WORKAROUND_2_FLAG;
+        else
+            get_cpu_info()->flags &= ~CPUINFO_WORKAROUND_2_FLAG;
+
+        return true;
+    }
     }
 
     return false;

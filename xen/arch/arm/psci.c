@@ -46,6 +46,19 @@ int call_psci_cpu_on(int cpu)
     return call_smc(psci_cpu_on_nr, cpu_logical_map(cpu), __pa(init_secondary), 0);
 }
 
+void call_psci_cpu_off(void)
+{
+    if ( psci_ver > PSCI_VERSION(0, 1) )
+    {
+        int errno;
+
+        /* If successfull the PSCI cpu_off call doesn't return */
+        errno = call_smc(PSCI_0_2_FN32_CPU_OFF, 0, 0, 0);
+        panic("PSCI cpu off failed for CPU%d err=%d\n", smp_processor_id(),
+              errno);
+    }
+}
+
 void call_psci_system_off(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )

@@ -17,12 +17,10 @@ config ARM_64
 config ARM
 	def_bool y
 	select HAS_ALTERNATIVE
-	select HAS_ARM_HDLCD
 	select HAS_DEVICE_TREE
 	select HAS_MEM_ACCESS
 	select HAS_PASSTHROUGH
 	select HAS_PDX
-	select VIDEO
 
 config ARCH_DEFCONFIG
 	string
@@ -72,6 +70,33 @@ config SBSA_VUART_CONSOLE
 	---help---
 	  Allows a guest to use SBSA Generic UART as a console. The
 	  SBSA Generic UART implements a subset of ARM PL011 UART.
+
+config ARM_SSBD
+	bool "Speculative Store Bypass Disable" if EXPERT = "y"
+	depends on HAS_ALTERNATIVE
+	default y
+	help
+	  This enables mitigation of bypassing of previous stores by speculative
+	  loads.
+
+	  If unsure, say Y.
+
+config HARDEN_BRANCH_PREDICTOR
+	bool "Harden the branch predictor against aliasing attacks" if EXPERT = "y"
+	default y
+	help
+	  Speculation attacks against some high-performance processors rely on
+	  being able to manipulate the branch predictor for a victim context by
+	  executing aliasing branches in the attacker context.  Such attacks
+	  can be partially mitigated against by clearing internal branch
+	  predictor state and limiting the prediction logic in some situations.
+
+	  This config option will take CPU-specific actions to harden the
+	  branch predictor against aliasing attacks and may rely on specific
+	  instruction sequences or control bits being set by the system
+	  firmware.
+
+	  If unsure, say Y.
 
 endmenu
 
@@ -186,23 +211,6 @@ config ARM64_ERRATUM_834220
 	  If unsure, say Y.
 
 endmenu
-
-config HARDEN_BRANCH_PREDICTOR
-	bool "Harden the branch predictor against aliasing attacks" if EXPERT
-	default y
-	help
-	  Speculation attacks against some high-performance processors rely on
-	  being able to manipulate the branch predictor for a victim context by
-	  executing aliasing branches in the attacker context.  Such attacks
-	  can be partially mitigated against by clearing internal branch
-	  predictor state and limiting the prediction logic in some situations.
-
-	  This config option will take CPU-specific actions to harden the
-	  branch predictor against aliasing attacks and may rely on specific
-	  instruction sequences or control bits being set by the system
-	  firmware.
-
-	  If unsure, say Y.
 
 config ARM64_HARDEN_BRANCH_PREDICTOR
     def_bool y if ARM_64 && HARDEN_BRANCH_PREDICTOR

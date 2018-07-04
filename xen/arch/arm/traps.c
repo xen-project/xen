@@ -1739,12 +1739,13 @@ void handle_wo_wi(struct cpu_user_regs *regs,
     advance_pc(regs, hsr);
 }
 
-/* Read only as read as zero */
-void handle_ro_raz(struct cpu_user_regs *regs,
-                   int regidx,
-                   bool read,
-                   const union hsr hsr,
-                   int min_el)
+/* Read only as value provided with 'val' argument of this function */
+void handle_ro_read_val(struct cpu_user_regs *regs,
+                        int regidx,
+                        bool read,
+                        const union hsr hsr,
+                        int min_el,
+                        register_t val)
 {
     ASSERT((min_el == 0) || (min_el == 1));
 
@@ -1753,11 +1754,20 @@ void handle_ro_raz(struct cpu_user_regs *regs,
 
     if ( !read )
         return inject_undef_exception(regs, hsr);
-    /* else: raz */
 
-    set_user_reg(regs, regidx, 0);
+    set_user_reg(regs, regidx, val);
 
     advance_pc(regs, hsr);
+}
+
+/* Read only as read as zero */
+inline void handle_ro_raz(struct cpu_user_regs *regs,
+                          int regidx,
+                          bool read,
+                          const union hsr hsr,
+                          int min_el)
+{
+    handle_ro_read_val(regs, regidx, read, hsr, min_el, 0);
 }
 
 void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
@@ -2011,18 +2021,33 @@ inject_abt:
         inject_iabt_exception(regs, gva, hsr.len);
 }
 
+static inline bool needs_ssbd_flip(struct vcpu *v)
+{
+    if ( !check_workaround_ssbd() )
+        return false;
+
+    return !(v->arch.cpu_info->flags & CPUINFO_WORKAROUND_2_FLAG) &&
+             cpu_require_ssbd_mitigation();
+}
+
 static void enter_hypervisor_head(struct cpu_user_regs *regs)
 {
     if ( guest_mode(regs) )
     {
+        struct vcpu *v = current;
+
+        /* If the guest has disabled the workaround, bring it back on. */
+        if ( needs_ssbd_flip(v) )
+            arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+
         /*
          * If we pended a virtual abort, preserve it until it gets cleared.
          * See ARM ARM DDI 0487A.j D1.14.3 (Virtual Interrupts) for details,
          * but the crucial bit is "On taking a vSError interrupt, HCR_EL2.VSE
          * (alias of HCR.VA) is cleared to 0."
          */
-        if ( current->arch.hcr_el2 & HCR_VA )
-            current->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
+        if ( v->arch.hcr_el2 & HCR_VA )
+            v->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
 
 #ifdef CONFIG_NEW_VGIC
         /*
@@ -2032,11 +2057,11 @@ static void enter_hypervisor_head(struct cpu_user_regs *regs)
          * TODO: Investigate whether this is necessary to do on every
          * trap and how it can be optimised.
          */
-        vtimer_update_irqs(current);
-        vcpu_update_evtchn_irq(current);
+        vtimer_update_irqs(v);
+        vcpu_update_evtchn_irq(v);
 #endif
 
-        vgic_sync_from_lrs(current);
+        vgic_sync_from_lrs(v);
     }
 }
 
@@ -2259,6 +2284,13 @@ void leave_hypervisor_tail(void)
              * to skip synchronizing SErrors for other SErrors handle options.
              */
             SYNCHRONIZE_SERROR(SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT);
+
+            /*
+             * The hypervisor runs with the workaround always present.
+             * If the guest wants it disabled, so be it...
+             */
+            if ( needs_ssbd_flip(current) )
+                arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
 
             return;
         }

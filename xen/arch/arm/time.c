@@ -29,6 +29,8 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/acpi.h>
+#include <xen/cpu.h>
+#include <xen/notifier.h>
 #include <asm/system.h>
 #include <asm/time.h>
 #include <asm/vgic.h>
@@ -312,6 +314,21 @@ void init_timer_interrupt(void)
     check_timer_irq_cfg(timer_irq[TIMER_PHYS_NONSECURE_PPI], "NS-physical");
 }
 
+/*
+ * Revert actions done in init_timer_interrupt that are required to properly
+ * disable this CPU.
+ */
+static void deinit_timer_interrupt(void)
+{
+    WRITE_SYSREG32(0, CNTP_CTL_EL0);    /* Disable physical timer */
+    WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Disable hypervisor's timer */
+    isb();
+
+    release_irq(timer_irq[TIMER_HYP_PPI], NULL);
+    release_irq(timer_irq[TIMER_VIRT_PPI], NULL);
+    release_irq(timer_irq[TIMER_PHYS_NONSECURE_PPI], NULL);
+}
+
 /* Wait a set number of microseconds */
 void udelay(unsigned long usecs)
 {
@@ -339,6 +356,34 @@ void domain_set_time_offset(struct domain *d, int64_t time_offset_seconds)
     d->time_offset_seconds = time_offset_seconds;
     /* XXX update guest visible wallclock time */
 }
+
+static int cpu_time_callback(struct notifier_block *nfb,
+                             unsigned long action,
+                             void *hcpu)
+{
+    switch ( action )
+    {
+    case CPU_DYING:
+        deinit_timer_interrupt();
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_time_nfb = {
+    .notifier_call = cpu_time_callback,
+};
+
+static int __init cpu_time_notifier_init(void)
+{
+    register_cpu_notifier(&cpu_time_nfb);
+
+    return 0;
+}
+__initcall(cpu_time_notifier_init);
 
 /*
  * Local variables:

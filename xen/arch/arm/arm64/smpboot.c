@@ -104,7 +104,7 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
         return smp_psci_init(cpu);
 }
 
-int __init arch_cpu_up(int cpu)
+int arch_cpu_up(int cpu)
 {
     if ( !smp_enable_ops[cpu].prepare_cpu )
         return -ENODEV;

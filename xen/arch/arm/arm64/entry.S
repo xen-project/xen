@@ -1,4 +1,6 @@
 #include <asm/asm_defns.h>
+#include <asm/current.h>
+#include <asm/macros.h>
 #include <asm/regs.h>
 #include <asm/alternative.h>
 #include <asm/smccc.h>
@@ -226,11 +228,11 @@ guest_sync:
         mrs     x1, esr_el2
         lsr     x1, x1, #HSR_EC_SHIFT           /* x1 = ESR_EL2.EC */
         cmp     x1, #HSR_EC_HVC64
-        b.ne    1f                              /* Not a HVC skip fastpath. */
+        b.ne    guest_sync_slowpath             /* Not a HVC skip fastpath. */
 
         mrs     x1, esr_el2
         and     x1, x1, #0xffff                 /* Check the immediate [0:16] */
-        cbnz    x1, 1f                          /* should be 0 for HVC #0 */
+        cbnz    x1, guest_sync_slowpath         /* should be 0 for HVC #0 */
 
         /*
          * Fastest path possible for ARM_SMCCC_ARCH_WORKAROUND_1.
@@ -241,7 +243,7 @@ guest_sync:
          * be encoded as an immediate for cmp.
          */
         eor     w0, w0, #ARM_SMCCC_ARCH_WORKAROUND_1_FID
-        cbnz    w0, 1f
+        cbnz    w0, check_wa2
 
         /*
          * Clobber both x0 and x1 to prevent leakage. Note that thanks
@@ -250,7 +252,45 @@ guest_sync:
         mov     x1, xzr
         eret
 
-1:
+check_wa2:
+        /* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
+        eor     w0, w0, #(ARM_SMCCC_ARCH_WORKAROUND_1_FID ^ ARM_SMCCC_ARCH_WORKAROUND_2_FID)
+        cbnz    w0, guest_sync_slowpath
+#ifdef CONFIG_ARM_SSBD
+alternative_cb arm_enable_wa2_handling
+        b       wa2_end
+alternative_cb_end
+        /* Sanitize the argument */
+        mov     x0, #-(UREGS_kernel_sizeof - UREGS_X1)  /* x0 := offset of guest's x1 on the stack */
+        ldr     x1, [sp, x0]                            /* Load guest's x1 */
+        cmp     w1, wzr
+        cset    x1, ne
+
+        /*
+         * Update the guest flag. At this stage sp point after the field
+         * guest_cpu_user_regs in cpu_info.
+         */
+        adr_cpu_info x2
+        ldr     x0, [x2, #CPUINFO_flags]
+        bfi     x0, x1, #CPUINFO_WORKAROUND_2_FLAG_SHIFT, #1
+        str     x0, [x2, #CPUINFO_flags]
+
+        /* Check that we actually need to perform the call */
+        ldr_this_cpu x0, ssbd_callback_required, x2
+        cbz     x0, wa2_end
+
+        mov     w0, #ARM_SMCCC_ARCH_WORKAROUND_2_FID
+        smc     #0
+
+wa2_end:
+        /* Don't leak data from the SMC call */
+        mov     x1, xzr
+        mov     x2, xzr
+        mov     x3, xzr
+#endif /* !CONFIG_ARM_SSBD */
+        mov     x0, xzr
+        eret
+guest_sync_slowpath:
         /*
          * x0/x1 may have been scratch by the fast path above, so avoid
          * to save them.
