@@ -208,11 +208,11 @@ static inline void fpu_fxsave(struct vcpu *v)
 /* Restore FPU state whenever VCPU is schduled in. */
 void vcpu_restore_fpu_eager(struct vcpu *v)
 {
-    ASSERT(!is_idle_vcpu(v));
-    
     /* Restore nonlazy extended state (i.e. parts not tracked by CR0.TS). */
     if ( !v->arch.fully_eager_fpu && !v->arch.nonlazy_xstate_used )
         return;
+
+    ASSERT(!is_idle_vcpu(v));
 
     /* Avoid recursion */
     clts();
