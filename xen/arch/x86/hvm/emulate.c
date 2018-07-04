@@ -1841,7 +1841,7 @@ static void hvmemul_put_fpu(
          *   by hvmemul_get_fpu().
          */
         if ( curr->arch.fully_eager_fpu )
-            vcpu_restore_fpu_eager(curr);
+            vcpu_restore_fpu_nonlazy(curr, false);
         else
         {
             curr->fpu_dirtied = false;
