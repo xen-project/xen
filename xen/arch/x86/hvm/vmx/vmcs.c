@@ -1808,10 +1808,7 @@ void vmcs_dump_vcpu(struct vcpu *v)
     vmentry_ctl = vmr32(VM_ENTRY_CONTROLS),
     vmexit_ctl = vmr32(VM_EXIT_CONTROLS);
     cr4 = vmr(GUEST_CR4);
-
-    /* EFER.LMA is read as zero, and is loaded from vmentry_ctl on entry. */
-    BUILD_BUG_ON(VM_ENTRY_IA32E_MODE << 1 != EFER_LMA);
-    efer = vmr(GUEST_EFER) | ((vmentry_ctl & VM_ENTRY_IA32E_MODE) << 1);
+    efer = vmr(GUEST_EFER);
 
     printk("*** Guest State ***\n");
     printk("CR0: actual=0x%016lx, shadow=0x%016lx, gh_mask=%016lx\n",
@@ -1821,7 +1818,7 @@ void vmcs_dump_vcpu(struct vcpu *v)
     printk("CR3 = 0x%016lx\n", vmr(GUEST_CR3));
     if ( (v->arch.hvm_vmx.secondary_exec_control &
           SECONDARY_EXEC_ENABLE_EPT) &&
-         (cr4 & X86_CR4_PAE) && !(efer & EFER_LMA) )
+         (cr4 & X86_CR4_PAE) && !(vmentry_ctl & VM_ENTRY_IA32E_MODE) )
     {
         printk("PDPTE0 = 0x%016lx  PDPTE1 = 0x%016lx\n",
                vmr(GUEST_PDPTE(0)), vmr(GUEST_PDPTE(1)));
