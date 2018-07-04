@@ -22,7 +22,7 @@
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#include <xen-tools/libs.h>
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC

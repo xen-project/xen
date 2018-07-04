@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <xen-tools/libs.h>
+
 /* Is A == B ? */
 #define streq(a,b) (strcmp((a),(b)) == 0)
 
@@ -18,10 +20,6 @@ static inline bool strends(const char *a, const char *b)
 
 	return streq(a + strlen(a) - strlen(b), b);
 }
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#endif
 
 void barf(const char *fmt, ...) __attribute__((noreturn));
 void barf_perror(const char *fmt, ...) __attribute__((noreturn));

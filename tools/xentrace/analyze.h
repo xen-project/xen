@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+#include <xen-tools/libs.h>
 
 #define TRC_GEN_MAIN     0
 #define TRC_SCHED_MAIN   1

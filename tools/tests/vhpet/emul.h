@@ -24,6 +24,8 @@
 
 #include "hpet.h"
 
+#include <xen-tools/libs.h>
+
 #define NR_CPUS 8
 
 typedef int64_t s_time_t;
@@ -60,10 +62,6 @@ struct msi_msg
     u32     data;           /* 16 bits of msi message data */
     u32     dest32;         /* used when Interrupt Remapping with EIM is enabled */
 };
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#endif
 
 #define X86EMUL_OKAY 100
 #define EINVAL 101

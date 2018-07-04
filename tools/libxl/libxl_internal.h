@@ -57,6 +57,8 @@
 #include <xenguest.h>
 #include <xc_dom.h>
 
+#include <xen-tools/libs.h>
+
 #include "xentoollog.h"
 
 #include <xen/io/xenbus.h>
@@ -126,8 +128,6 @@
 #define _AC(X,Y)    __AC(X,Y)
 #define MB(_mb)     (_AC(_mb, ULL) << 20)
 #define GB(_gb)     (_AC(_gb, ULL) << 30)
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
 #define ROUNDUP(_val, _order)                                           \
     (((unsigned long)(_val)+(1UL<<(_order))-1) & ~((1UL<<(_order))-1))

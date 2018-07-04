@@ -30,8 +30,9 @@
 #include <time.h>
 #include <xenstore.h>
 
+#include <xen-tools/libs.h>
+
 #define TEST_PATH "xenstore-test"
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 #define WRITE_BUFFERS_N    10
 #define WRITE_BUFFERS_SIZE 4000
 #define MAX_TA_LOOPS       100

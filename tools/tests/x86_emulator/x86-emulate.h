@@ -15,21 +15,11 @@
 #include <asm/x86-defns.h>
 #include <asm/x86-vendors.h>
 
+#include <xen-tools/libs.h>
+
 #define BUG() abort()
 #define ASSERT assert
 #define ASSERT_UNREACHABLE() assert(!__LINE__)
-
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof(*(a)))
-
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-/* Force a compilation error if condition is true */
-#define BUILD_BUG_ON(cond) ({ _Static_assert(!(cond), "!(" #cond ")"); })
-#define BUILD_BUG_ON_ZERO(cond) \
-    sizeof(struct { _Static_assert(!(cond), "!(" #cond ")"); })
-#else
-#define BUILD_BUG_ON_ZERO(cond) sizeof(struct { int:-!!(cond); })
-#define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
-#endif
 
 #define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
 #define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))

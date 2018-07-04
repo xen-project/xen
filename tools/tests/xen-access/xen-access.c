@@ -42,6 +42,8 @@
 #include <xenevtchn.h>
 #include <xen/vm_event.h>
 
+#include <xen-tools/libs.h>
+
 #if defined(__arm__) || defined(__aarch64__)
 #include <xen/arch-arm.h>
 #define START_PFN (GUEST_RAM0_BASE >> 12)
@@ -59,10 +61,6 @@
 
 /* From xen/include/asm-x86/x86-defns.h */
 #define X86_CR4_PGE        0x00000080 /* enable global pages */
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-#endif
 
 typedef struct vm_event {
     domid_t domain_id;

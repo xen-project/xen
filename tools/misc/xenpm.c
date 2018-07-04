@@ -28,10 +28,10 @@
 #include <inttypes.h>
 #include <sys/time.h>
 
+#include <xen-tools/libs.h>
+
 #define MAX_PKG_RESIDENCIES 12
 #define MAX_CORE_RESIDENCIES 8
-
-#define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
 static xc_interface *xc_handle;
 static unsigned int max_cpu_nr;

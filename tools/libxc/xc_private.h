@@ -40,6 +40,8 @@
 
 #include <xen/sys/privcmd.h>
 
+#include <xen-tools/libs.h>
+
 #if defined(HAVE_VALGRIND_MEMCHECK_H) && !defined(NDEBUG) && !defined(__MINIOS__)
 /* Compile in Valgrind client requests? */
 #include <valgrind/memcheck.h>
@@ -72,11 +74,6 @@ struct iovec {
 #define PAGE_SHIFT              XC_PAGE_SHIFT
 #define PAGE_SIZE               XC_PAGE_SIZE
 #define PAGE_MASK               XC_PAGE_MASK
-
-#ifndef ARRAY_SIZE /* MiniOS leaks ARRAY_SIZE into our namespace as part of a
-                    * stubdom build.  It shouldn't... */
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
-#endif
 
 /*
 ** Define max dirty page cache to permit during save/restore -- need to balance 

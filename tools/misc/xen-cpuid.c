@@ -6,7 +6,8 @@
 
 #include <xenctrl.h>
 
-#define ARRAY_SIZE(a) (sizeof a / sizeof *a)
+#include <xen-tools/libs.h>
+
 static uint32_t nr_features;
 
 static const char *str_1d[32] =
