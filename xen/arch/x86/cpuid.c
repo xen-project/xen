@@ -620,14 +620,6 @@ void recalculate_cpuid_policy(struct domain *d)
     recalculate_xstate(p);
     recalculate_misc(p);
 
-    /*
-     * Override STIBP to match IBRS.  Guests can safely use STIBP
-     * functionality on non-HT hardware, but can't necesserily protect
-     * themselves from SP2/Spectre/Branch Target Injection if STIBP is hidden
-     * on HT-capable hardware.
-     */
-    p->feat.stibp = p->feat.ibrsb;
-
     for ( i = 0; i < ARRAY_SIZE(p->cache.raw); ++i )
     {
         if ( p->cache.subleaf[i].type >= 1 &&
