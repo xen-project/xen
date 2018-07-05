@@ -133,7 +133,7 @@
     rdmsr
 
     /* Stash the value from hardware. */
-    mov VCPU_arch_msr(%rbx), %rdx
+    mov VCPU_arch_msrs(%rbx), %rdx
     mov %eax, VCPUMSR_spec_ctrl_raw(%rdx)
     xor %edx, %edx
 

@@ -64,7 +64,7 @@ __UNLIKELY_END(nsvm_hap)
         mov  %rsp, %rdi
         call svm_vmenter_helper
 
-        mov VCPU_arch_msr(%rbx), %rax
+        mov VCPU_arch_msrs(%rbx), %rax
         mov VCPUMSR_spec_ctrl_raw(%rax), %eax
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */

@@ -154,7 +154,7 @@ ENTRY(compat_restore_all_guest)
         or    $X86_EFLAGS_IF,%r11
         mov   %r11d,UREGS_eflags(%rsp)
 
-        mov VCPU_arch_msr(%rbx), %rax
+        mov VCPU_arch_msrs(%rbx), %rax
         mov VCPUMSR_spec_ctrl_raw(%rax), %eax
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */

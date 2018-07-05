@@ -71,7 +71,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     char sig[5], instr[2];
     unsigned long eip, rc;
     struct cpuid_leaf res;
-    const struct msr_vcpu_policy *vp = current->arch.msr;
+    const struct vcpu_msrs *msrs = current->arch.msrs;
 
     eip = regs->rip;
 
@@ -95,7 +95,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
         return 0;
 
     /* If cpuid faulting is enabled and CPL>0 inject a #GP in place of #UD. */
-    if ( vp->misc_features_enables.cpuid_faulting &&
+    if ( msrs->misc_features_enables.cpuid_faulting &&
          !guest_kernel_mode(current, regs) )
     {
         regs->rip = eip;

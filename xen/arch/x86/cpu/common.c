@@ -115,7 +115,7 @@ bool __init probe_cpuid_faulting(void)
 	int rc;
 
 	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val)) == 0)
-		raw_msr_domain_policy.plaform_info.cpuid_faulting =
+		raw_msr_policy.plaform_info.cpuid_faulting =
 			val & MSR_PLATFORM_INFO_CPUID_FAULTING;
 
 	if (rc ||
@@ -177,7 +177,7 @@ void ctxt_switch_levelling(const struct vcpu *next)
 		 */
 		set_cpuid_faulting(nextd && !is_control_domain(nextd) &&
 				   (is_pv_domain(nextd) ||
-				    next->arch.msr->
+				    next->arch.msrs->
 				    misc_features_enables.cpuid_faulting));
 		return;
 	}

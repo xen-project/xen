@@ -26,13 +26,13 @@
 
 DEFINE_PER_CPU(uint32_t, tsc_aux);
 
-struct msr_domain_policy __read_mostly     raw_msr_domain_policy,
-                         __read_mostly    host_msr_domain_policy,
-                         __read_mostly hvm_max_msr_domain_policy,
-                         __read_mostly  pv_max_msr_domain_policy;
+struct msr_policy __read_mostly     raw_msr_policy,
+                  __read_mostly    host_msr_policy,
+                  __read_mostly hvm_max_msr_policy,
+                  __read_mostly  pv_max_msr_policy;
 
-struct msr_vcpu_policy __read_mostly hvm_max_msr_vcpu_policy,
-                       __read_mostly  pv_max_msr_vcpu_policy;
+struct vcpu_msrs __read_mostly hvm_max_vcpu_msrs,
+                 __read_mostly  pv_max_vcpu_msrs;
 
 static void __init calculate_raw_policy(void)
 {
@@ -42,33 +42,33 @@ static void __init calculate_raw_policy(void)
 
 static void __init calculate_host_policy(void)
 {
-    struct msr_domain_policy *dp = &host_msr_domain_policy;
+    struct msr_policy *mp = &host_msr_policy;
 
-    *dp = raw_msr_domain_policy;
+    *mp = raw_msr_policy;
 
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* probe_cpuid_faulting() sanity checks presence of MISC_FEATURES_ENABLES */
-    dp->plaform_info.cpuid_faulting = cpu_has_cpuid_faulting;
+    mp->plaform_info.cpuid_faulting = cpu_has_cpuid_faulting;
 }
 
 static void __init calculate_hvm_max_policy(void)
 {
-    struct msr_domain_policy *dp = &hvm_max_msr_domain_policy;
+    struct msr_policy *mp = &hvm_max_msr_policy;
 
     if ( !hvm_enabled )
         return;
 
-    *dp = host_msr_domain_policy;
+    *mp = host_msr_policy;
 
     /* It's always possible to emulate CPUID faulting for HVM guests */
-    dp->plaform_info.cpuid_faulting = true;
+    mp->plaform_info.cpuid_faulting = true;
 }
 
 static void __init calculate_pv_max_policy(void)
 {
-    struct msr_domain_policy *dp = &pv_max_msr_domain_policy;
+    struct msr_policy *mp = &pv_max_msr_policy;
 
-    *dp = host_msr_domain_policy;
+    *mp = host_msr_policy;
 }
 
 void __init init_guest_msr_policy(void)
@@ -81,18 +81,18 @@ void __init init_guest_msr_policy(void)
 
 int init_domain_msr_policy(struct domain *d)
 {
-    struct msr_domain_policy *dp =
-        xmemdup(is_pv_domain(d) ?  &pv_max_msr_domain_policy
-                                : &hvm_max_msr_domain_policy);
+    struct msr_policy *mp =
+        xmemdup(is_pv_domain(d) ?  &pv_max_msr_policy
+                                : &hvm_max_msr_policy);
 
-    if ( !dp )
+    if ( !mp )
         return -ENOMEM;
 
     /* See comment in intel_ctxt_switch_levelling() */
     if ( is_control_domain(d) )
-        dp->plaform_info.cpuid_faulting = false;
+        mp->plaform_info.cpuid_faulting = false;
 
-    d->arch.msr = dp;
+    d->arch.msr = mp;
 
     return 0;
 }
@@ -100,14 +100,14 @@ int init_domain_msr_policy(struct domain *d)
 int init_vcpu_msr_policy(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct msr_vcpu_policy *vp =
-        xmemdup(is_pv_domain(d) ?  &pv_max_msr_vcpu_policy
-                                : &hvm_max_msr_vcpu_policy);
+    struct vcpu_msrs *msrs =
+        xmemdup(is_pv_domain(d) ?  &pv_max_vcpu_msrs
+                                : &hvm_max_vcpu_msrs);
 
-    if ( !vp )
+    if ( !msrs )
         return -ENOMEM;
 
-    v->arch.msr = vp;
+    v->arch.msrs = msrs;
 
     return 0;
 }
@@ -115,8 +115,8 @@ int init_vcpu_msr_policy(struct vcpu *v)
 int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
     const struct cpuid_policy *cp = v->domain->arch.cpuid;
-    const struct msr_domain_policy *dp = v->domain->arch.msr;
-    const struct msr_vcpu_policy *vp = v->arch.msr;
+    const struct msr_policy *mp = v->domain->arch.msr;
+    const struct vcpu_msrs *msrs = v->arch.msrs;
 
     switch ( msr )
     {
@@ -129,11 +129,11 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_SPEC_CTRL:
         if ( !cp->feat.ibrsb )
             goto gp_fault;
-        *val = vp->spec_ctrl.raw;
+        *val = msrs->spec_ctrl.raw;
         break;
 
     case MSR_INTEL_PLATFORM_INFO:
-        *val = dp->plaform_info.raw;
+        *val = mp->plaform_info.raw;
         break;
 
     case MSR_ARCH_CAPABILITIES:
@@ -141,7 +141,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         goto gp_fault;
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
-        *val = vp->misc_features_enables.raw;
+        *val = msrs->misc_features_enables.raw;
         break;
 
     default:
@@ -159,8 +159,8 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     const struct vcpu *curr = current;
     struct domain *d = v->domain;
     const struct cpuid_policy *cp = d->arch.cpuid;
-    struct msr_domain_policy *dp = d->arch.msr;
-    struct msr_vcpu_policy *vp = v->arch.msr;
+    const struct msr_policy *mp = d->arch.msr;
+    struct vcpu_msrs *msrs = v->arch.msrs;
 
     switch ( msr )
     {
@@ -207,7 +207,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( val & rsvd )
             goto gp_fault; /* Rsvd bit set? */
 
-        vp->spec_ctrl.raw = val;
+        msrs->spec_ctrl.raw = val;
         break;
 
     case MSR_PRED_CMD:
@@ -223,19 +223,19 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
     case MSR_INTEL_MISC_FEATURES_ENABLES:
     {
-        bool old_cpuid_faulting = vp->misc_features_enables.cpuid_faulting;
+        bool old_cpuid_faulting = msrs->misc_features_enables.cpuid_faulting;
 
         rsvd = ~0ull;
-        if ( dp->plaform_info.cpuid_faulting )
+        if ( mp->plaform_info.cpuid_faulting )
             rsvd &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
 
         if ( val & rsvd )
             goto gp_fault;
 
-        vp->misc_features_enables.raw = val;
+        msrs->misc_features_enables.raw = val;
 
         if ( v == curr && is_hvm_domain(d) && cpu_has_cpuid_faulting &&
-             (old_cpuid_faulting ^ vp->misc_features_enables.cpuid_faulting) )
+             (old_cpuid_faulting ^ msrs->misc_features_enables.cpuid_faulting) )
             ctxt_switch_levelling(v);
         break;
     }

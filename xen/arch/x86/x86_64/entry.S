@@ -137,7 +137,7 @@ restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
 
         /* Stash guest SPEC_CTRL value while we can read struct vcpu. */
-        mov VCPU_arch_msr(%rbx), %rdx
+        mov VCPU_arch_msrs(%rbx), %rdx
         mov VCPUMSR_spec_ctrl_raw(%rdx), %r15d
 
         /* Copy guest mappings and switch to per-CPU root page table. */

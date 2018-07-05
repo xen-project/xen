@@ -356,7 +356,7 @@ int vcpu_initialise(struct vcpu *v)
         /* Idle domain */
         v->arch.cr3 = __pa(idle_pg_table);
         rc = 0;
-        v->arch.msr = ZERO_BLOCK_PTR; /* Catch stray misuses */
+        v->arch.msrs = ZERO_BLOCK_PTR; /* Catch stray misuses */
     }
 
     if ( rc )
@@ -376,8 +376,8 @@ int vcpu_initialise(struct vcpu *v)
 
  fail:
     vcpu_destroy_fpu(v);
-    xfree(v->arch.msr);
-    v->arch.msr = NULL;
+    xfree(v->arch.msrs);
+    v->arch.msrs = NULL;
 
     return rc;
 }
@@ -389,8 +389,8 @@ void vcpu_destroy(struct vcpu *v)
 
     vcpu_destroy_fpu(v);
 
-    xfree(v->arch.msr);
-    v->arch.msr = NULL;
+    xfree(v->arch.msrs);
+    v->arch.msrs = NULL;
 
     if ( !is_idle_domain(v->domain) )
         vpmu_destroy(v);

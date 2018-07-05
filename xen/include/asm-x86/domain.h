@@ -367,7 +367,7 @@ struct arch_domain
 
     /* CPUID and MSR policy objects. */
     struct cpuid_policy *cpuid;
-    struct msr_domain_policy *msr;
+    struct msr_policy *msr;
 
     struct PITState vpit;
 
@@ -582,7 +582,7 @@ struct arch_vcpu
 
     struct arch_vm_event *vm_event;
 
-    struct msr_vcpu_policy *msr;
+    struct vcpu_msrs *msrs;
 
     struct {
         bool next_interrupt_enabled;

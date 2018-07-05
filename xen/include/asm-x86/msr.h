@@ -258,7 +258,7 @@ static inline void wrmsr_tsc_aux(uint32_t val)
 }
 
 /* MSR policy object for shared per-domain MSRs */
-struct msr_domain_policy
+struct msr_policy
 {
     /*
      * 0x000000ce - MSR_INTEL_PLATFORM_INFO
@@ -277,16 +277,13 @@ struct msr_domain_policy
     } plaform_info;
 };
 
-/* RAW msr domain policy: contains the actual values from H/W MSRs */
-extern struct msr_domain_policy raw_msr_domain_policy;
-/*
- * HOST msr domain policy: features that Xen actually decided to use,
- * a subset of RAW policy.
- */
-extern struct msr_domain_policy host_msr_domain_policy;
+extern struct msr_policy     raw_msr_policy,
+                            host_msr_policy,
+                         hvm_max_msr_policy,
+                          pv_max_msr_policy;
 
-/* MSR policy object for per-vCPU MSRs */
-struct msr_vcpu_policy
+/* Container object for per-vCPU MSRs */
+struct vcpu_msrs
 {
     /* 0x00000048 - MSR_SPEC_CTRL */
     struct {

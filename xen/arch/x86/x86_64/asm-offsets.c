@@ -76,7 +76,7 @@ void __dummy__(void)
     OFFSET(VCPU_iopl, struct vcpu, arch.pv_vcpu.iopl);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.vgc_flags);
     OFFSET(VCPU_cr3, struct vcpu, arch.cr3);
-    OFFSET(VCPU_arch_msr, struct vcpu, arch.msr);
+    OFFSET(VCPU_arch_msrs, struct vcpu, arch.msrs);
     OFFSET(VCPU_nmi_pending, struct vcpu, nmi_pending);
     OFFSET(VCPU_mce_pending, struct vcpu, mce_pending);
     OFFSET(VCPU_nmi_old_mask, struct vcpu, nmi_state.old_mask);
@@ -139,7 +139,7 @@ void __dummy__(void)
     OFFSET(TRAPBOUNCE_eip, struct trap_bounce, eip);
     BLANK();
 
-    OFFSET(VCPUMSR_spec_ctrl_raw, struct msr_vcpu_policy, spec_ctrl.raw);
+    OFFSET(VCPUMSR_spec_ctrl_raw, struct vcpu_msrs, spec_ctrl.raw);
     BLANK();
 
 #ifdef CONFIG_PERF_COUNTERS
