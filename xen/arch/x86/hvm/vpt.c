@@ -445,8 +445,8 @@ void create_periodic_time(
     uint64_t period, uint8_t irq, time_cb *cb, void *data)
 {
     if ( !pt->source ||
-         (pt->irq >= NR_ISAIRQS && pt->source == PTSRC_isa) ||
-         (pt->irq >= hvm_domain_irq(v->domain)->nr_gsis &&
+         (irq >= NR_ISAIRQS && pt->source == PTSRC_isa) ||
+         (irq >= hvm_domain_irq(v->domain)->nr_gsis &&
           pt->source == PTSRC_ioapic) )
     {
         ASSERT_UNREACHABLE();
