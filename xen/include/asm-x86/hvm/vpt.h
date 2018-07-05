@@ -37,11 +37,11 @@ typedef void time_cb(struct vcpu *v, void *opaque);
 
 struct periodic_time {
     struct list_head list;
-    bool_t on_list;
-    bool_t one_shot;
-    bool_t do_not_freeze;
-    bool_t irq_issued;
-    bool_t warned_timeout_too_short;
+    bool on_list;
+    bool one_shot;
+    bool do_not_freeze;
+    bool irq_issued;
+    bool warned_timeout_too_short;
 #define PTSRC_isa    1 /* ISA time source */
 #define PTSRC_lapic  2 /* LAPIC time source */
 #define PTSRC_ioapic 3 /* IOAPIC time source */
