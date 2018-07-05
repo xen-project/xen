@@ -60,6 +60,8 @@
 #define ATM_LNC_C6_AUTO_DEMOTE		(1UL << 25)
 
 #define MSR_MTRRcap			0x000000fe
+#define MTRRcap_VCNT			0x000000ff
+
 #define MSR_IA32_BBL_CR_CTL		0x00000119
 
 #define MSR_IA32_SYSENTER_CS		0x00000174

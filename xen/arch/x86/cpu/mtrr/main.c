@@ -95,7 +95,7 @@ static void __init set_num_var_ranges(void)
 		config = 2;
 	else if (is_cpu(CENTAUR))
 		config = 8;
-	num_var_ranges = config & 0xff;
+	num_var_ranges = MASK_EXTR(config, MTRRcap_VCNT);
 }
 
 static void __init init_table(void)

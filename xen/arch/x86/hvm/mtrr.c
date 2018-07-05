@@ -78,7 +78,7 @@ static uint8_t __read_mostly pat_entry_tbl[PAT_TYPE_NUMS] =
 bool_t is_var_mtrr_overlapped(const struct mtrr_state *m)
 {
     unsigned int seg, i;
-    unsigned int num_var_ranges = (uint8_t)m->mtrr_cap;
+    unsigned int num_var_ranges = MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT);
 
     for ( i = 0; i < num_var_ranges; i++ )
     {
@@ -193,7 +193,7 @@ static int get_mtrr_type(const struct mtrr_state *m,
    uint8_t     overlap_mtrr = 0;
    uint8_t     overlap_mtrr_pos = 0;
    uint64_t    mask = -(uint64_t)PAGE_SIZE << order;
-   unsigned int seg, num_var_ranges = m->mtrr_cap & 0xff;
+   unsigned int seg, num_var_ranges = MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT);
 
    if ( unlikely(!(m->enabled & 0x2)) )
        return MTRR_TYPE_UNCACHABLE;
@@ -483,7 +483,7 @@ bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs)
 
     if ( md->enabled & 2 )
     {
-        unsigned int num_var_ranges = (uint8_t)md->mtrr_cap;
+        unsigned int num_var_ranges = MASK_EXTR(md->mtrr_cap, MTRRcap_VCNT);
 
         /* Test default type MSR. */
         if ( md->def_type != ms->def_type )
@@ -499,7 +499,7 @@ bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs)
             return true;
 
         /* Test variable ranges. */
-        if ( num_var_ranges != (uint8_t)ms->mtrr_cap ||
+        if ( num_var_ranges != MASK_EXTR(ms->mtrr_cap, MTRRcap_VCNT) ||
              memcmp(md->var_ranges, ms->var_ranges,
                     num_var_ranges * sizeof(*md->var_ranges)) )
             return true;
