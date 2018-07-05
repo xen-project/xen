@@ -998,6 +998,8 @@ struct xen_domctl_psr_cmt_op {
 #define XEN_DOMCTL_MONITOR_EVENT_INTERRUPT             8
 #define XEN_DOMCTL_MONITOR_EVENT_DESC_ACCESS           9
 #define XEN_DOMCTL_MONITOR_EVENT_EMUL_UNIMPLEMENTED    10
+/* Enabled by default */
+#define XEN_DOMCTL_MONITOR_EVENT_INGUEST_PAGEFAULT     11
 
 struct xen_domctl_monitor_op {
     uint32_t op; /* XEN_DOMCTL_MONITOR_OP_* */

@@ -242,6 +242,19 @@ int arch_monitor_domctl_event(struct domain *d,
         break;
     }
 
+    case XEN_DOMCTL_MONITOR_EVENT_INGUEST_PAGEFAULT:
+    {
+        bool old_status = ad->monitor.inguest_pagefault_disabled;
+
+        if ( unlikely(old_status == requested_status) )
+            return -EEXIST;
+
+        domain_pause(d);
+        ad->monitor.inguest_pagefault_disabled = requested_status;
+        domain_unpause(d);
+        break;
+    }
+
     case XEN_DOMCTL_MONITOR_EVENT_DESC_ACCESS:
     {
         bool old_status = ad->monitor.descriptor_access_enabled;

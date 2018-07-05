@@ -163,6 +163,20 @@ int xc_monitor_guest_request(xc_interface *xch, uint32_t domain_id, bool enable,
     return do_domctl(xch, &domctl);
 }
 
+int xc_monitor_inguest_pagefault(xc_interface *xch, uint32_t domain_id,
+                                bool disable)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_monitor_op;
+    domctl.domain = domain_id;
+    domctl.u.monitor_op.op = disable ? XEN_DOMCTL_MONITOR_OP_ENABLE
+                                    : XEN_DOMCTL_MONITOR_OP_DISABLE;
+    domctl.u.monitor_op.event = XEN_DOMCTL_MONITOR_EVENT_INGUEST_PAGEFAULT;
+
+    return do_domctl(xch, &domctl);
+}
+
 int xc_monitor_emulate_each_rep(xc_interface *xch, uint32_t domain_id,
                                 bool enable)
 {

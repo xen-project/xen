@@ -2047,6 +2047,13 @@ int xc_monitor_descriptor_access(xc_interface *xch, uint32_t domain_id,
                                  bool enable);
 int xc_monitor_guest_request(xc_interface *xch, uint32_t domain_id,
                              bool enable, bool sync, bool allow_userspace);
+/*
+ * Disables page-walk mem_access events by emulating. If the
+ * emulation can not be performed then a VM_EVENT_REASON_EMUL_UNIMPLEMENTED
+ * event will be issued.
+ */
+int xc_monitor_inguest_pagefault(xc_interface *xch, uint32_t domain_id,
+                                 bool disable);
 int xc_monitor_debug_exceptions(xc_interface *xch, uint32_t domain_id,
                                 bool enable, bool sync);
 int xc_monitor_cpuid(xc_interface *xch, uint32_t domain_id, bool enable);

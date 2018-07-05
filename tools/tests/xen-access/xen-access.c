@@ -360,7 +360,7 @@ void usage(char* progname)
 {
     fprintf(stderr, "Usage: %s [-m] <domain_id> write|exec", progname);
 #if defined(__i386__) || defined(__x86_64__)
-            fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec|debug|cpuid|desc_access|write_ctrlreg_cr4");
+            fprintf(stderr, "|breakpoint|altp2m_write|altp2m_exec|debug|cpuid|desc_access|write_ctrlreg_cr4|altp2m_write_no_gpt");
 #elif defined(__arm__) || defined(__aarch64__)
             fprintf(stderr, "|privcall");
 #endif
@@ -393,6 +393,7 @@ int main(int argc, char *argv[])
     int cpuid = 0;
     int desc_access = 0;
     int write_ctrlreg_cr4 = 0;
+    int altp2m_write_no_gpt = 0;
     uint16_t altp2m_view_id = 0;
 
     char* progname = argv[0];
@@ -450,6 +451,13 @@ int main(int argc, char *argv[])
         default_access = XENMEM_access_rw;
         altp2m = 1;
         memaccess = 1;
+    }
+    else if ( !strcmp(argv[0], "altp2m_write_no_gpt") )
+    {
+        default_access = XENMEM_access_rw;
+        altp2m_write_no_gpt = 1;
+        memaccess = 1;
+        altp2m = 1;
     }
     else if ( !strcmp(argv[0], "debug") )
     {
@@ -510,6 +518,22 @@ int main(int argc, char *argv[])
     {
         xen_pfn_t gfn = 0;
         unsigned long perm_set = 0;
+
+        if( altp2m_write_no_gpt )
+        {
+            rc = xc_monitor_inguest_pagefault(xch, domain_id, 1);
+            if ( rc < 0 )
+            {
+                ERROR("Error %d setting inguest pagefault\n", rc);
+                goto exit;
+            }
+            rc = xc_monitor_emul_unimplemented(xch, domain_id, 1);
+            if ( rc < 0 )
+            {
+                ERROR("Error %d failed to enable emul unimplemented\n", rc);
+                goto exit;
+            }
+        }
 
         rc = xc_altp2m_set_domain_state( xch, domain_id, 1 );
         if ( rc < 0 )
@@ -856,6 +880,16 @@ int main(int argc, char *argv[])
                        get_x86_ctrl_reg_name(req.u.write_ctrlreg.index),
                        req.u.write_ctrlreg.old_value,
                        req.u.write_ctrlreg.new_value);
+                break;
+            case VM_EVENT_REASON_EMUL_UNIMPLEMENTED:
+                if ( altp2m_write_no_gpt && req.flags & VM_EVENT_FLAG_ALTERNATE_P2M )
+                {
+                    DPRINTF("\tSwitching back to default view!\n");
+
+                    rsp.flags |= (VM_EVENT_FLAG_ALTERNATE_P2M |
+                                  VM_EVENT_FLAG_TOGGLE_SINGLESTEP);
+                    rsp.altp2m_idx = 0;
+                }
                 break;
             default:
                 fprintf(stderr, "UNKNOWN REASON CODE %d\n", req.reason);

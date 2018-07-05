@@ -417,6 +417,11 @@ struct arch_domain
         unsigned int descriptor_access_enabled                             : 1;
         unsigned int guest_request_userspace_enabled                       : 1;
         unsigned int emul_unimplemented_enabled                            : 1;
+        /*
+         * By default all events are sent.
+         * This is used to filter out pagefaults.
+         */
+        unsigned int inguest_pagefault_disabled                            : 1;
         struct monitor_msr_bitmap *msr_bitmap;
         uint64_t write_ctrlreg_mask[4];
     } monitor;
