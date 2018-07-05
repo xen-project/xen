@@ -265,6 +265,41 @@ static void pt_timer_fn(void *data)
     pt_unlock(pt);
 }
 
+static void pt_irq_fired(struct vcpu *v, struct periodic_time *pt)
+{
+    pt->irq_issued = false;
+
+    if ( pt->one_shot )
+    {
+        if ( pt->on_list )
+            list_del(&pt->list);
+        pt->on_list = false;
+        pt->pending_intr_nr = 0;
+    }
+    else if ( mode_is(v->domain, one_missed_tick_pending) ||
+              mode_is(v->domain, no_missed_ticks_pending) )
+    {
+        pt->last_plt_gtime = hvm_get_guest_time(v);
+        pt_process_missed_ticks(pt);
+        pt->pending_intr_nr = 0; /* 'collapse' all missed ticks */
+        set_timer(&pt->timer, pt->scheduled);
+    }
+    else
+    {
+        pt->last_plt_gtime += pt->period;
+        if ( --pt->pending_intr_nr == 0 )
+        {
+            pt_process_missed_ticks(pt);
+            if ( pt->pending_intr_nr == 0 )
+                set_timer(&pt->timer, pt->scheduled);
+        }
+    }
+
+    if ( mode_is(v->domain, delay_for_missed_ticks) &&
+         (hvm_get_guest_time(v) < pt->last_plt_gtime) )
+        hvm_set_guest_time(v, pt->last_plt_gtime);
+}
+
 int pt_update_irq(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
@@ -386,37 +421,7 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
         return;
     }
 
-    pt->irq_issued = 0;
-
-    if ( pt->one_shot )
-    {
-        if ( pt->on_list )
-            list_del(&pt->list);
-        pt->on_list = 0;
-        pt->pending_intr_nr = 0;
-    }
-    else if ( mode_is(v->domain, one_missed_tick_pending) ||
-              mode_is(v->domain, no_missed_ticks_pending) )
-    {
-        pt->last_plt_gtime = hvm_get_guest_time(v);
-        pt_process_missed_ticks(pt);
-        pt->pending_intr_nr = 0; /* 'collapse' all missed ticks */
-        set_timer(&pt->timer, pt->scheduled);
-    }
-    else
-    {
-        pt->last_plt_gtime += pt->period;
-        if ( --pt->pending_intr_nr == 0 )
-        {
-            pt_process_missed_ticks(pt);
-            if ( pt->pending_intr_nr == 0 )
-                set_timer(&pt->timer, pt->scheduled);
-        }
-    }
-
-    if ( mode_is(v->domain, delay_for_missed_ticks) &&
-         (hvm_get_guest_time(v) < pt->last_plt_gtime) )
-        hvm_set_guest_time(v, pt->last_plt_gtime);
+    pt_irq_fired(v, pt);
 
     cb = pt->cb;
     cb_priv = pt->priv;
