@@ -73,6 +73,9 @@
     ((timer_config(h, n) & HPET_TN_INT_ROUTE_CAP_MASK) \
         >> HPET_TN_INT_ROUTE_CAP_SHIFT)
 
+#define timer_int_route_valid(h, n) \
+    ((1u << timer_int_route(h, n)) & timer_int_route_cap(h, n))
+
 static inline uint64_t hpet_read_maincounter(HPETState *h, uint64_t guest_time)
 {
     ASSERT(rw_is_locked(&h->lock));
@@ -244,6 +247,12 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
     if ( !timer_enabled(h, tn) )
         return;
 
+    if ( !timer_int_route_valid(h, tn) )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
     tn_cmp   = hpet_get_comparator(h, tn, guest_time);
     cur_tick = hpet_read_maincounter(h, guest_time);
     if ( timer_is_32bit(h, tn) )
@@ -302,6 +311,24 @@ static inline uint64_t hpet_fixup_reg(
     new &= mask;
     new |= old & ~mask;
     return new;
+}
+
+static void timer_sanitize_int_route(HPETState *h, unsigned int tn)
+{
+    if ( timer_int_route_valid(h, tn) )
+        return;
+
+    timer_config(h, tn) &= ~HPET_TN_ROUTE;
+    if ( !timer_enabled(h, tn) )
+        return;
+
+    /*
+     * If the requested interrupt is not valid and the timer is
+     * enabled pick the first irq.
+     */
+    timer_config(h, tn) |=
+        MASK_INSR(find_first_set_bit(timer_int_route_cap(h, tn)),
+                  HPET_TN_ROUTE);
 }
 
 static int hpet_write(
@@ -385,6 +412,8 @@ static int hpet_write(
         tn = HPET_TN(CFG, addr);
 
         h->hpet.timers[tn].config = hpet_fixup_reg(new_val, old_val, 0x3f4e);
+
+        timer_sanitize_int_route(h, tn);
 
         if ( timer_level(h, tn) )
         {
@@ -621,6 +650,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
         if ( timer_is_32bit(hp, i) )
             cmp = (uint32_t)cmp;
         hp->hpet.timers[i].cmp = cmp;
+        timer_sanitize_int_route(hp, i);
     }
 #undef C
 
