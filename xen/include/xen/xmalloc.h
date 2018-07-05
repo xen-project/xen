@@ -13,6 +13,22 @@
 #define xmalloc(_type) ((_type *)_xmalloc(sizeof(_type), __alignof__(_type)))
 #define xzalloc(_type) ((_type *)_xzalloc(sizeof(_type), __alignof__(_type)))
 
+/*
+ * Allocate space for a typed object and copy an existing instance.
+ *
+ * Note: Due to const propagating in the typeof(), ptr needs to be mutable.
+ * This can be fixed by changing n_ to being void *, but then we lose type
+ * safety on the return value.
+ */
+#define xmemdup(ptr)                                         \
+({                                                           \
+    typeof(*(ptr)) *p_ = (ptr), *n_ = xmalloc(typeof(*p_));  \
+                                                             \
+    if ( n_ )                                                \
+        memcpy(n_, p_, sizeof(*n_));                         \
+    n_;                                                      \
+})
+
 /* Allocate space for array of typed objects. */
 #define xmalloc_array(_type, _num) \
     ((_type *)_xmalloc_array(sizeof(_type), __alignof__(_type), _num))

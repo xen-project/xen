@@ -703,16 +703,17 @@ void recalculate_cpuid_policy(struct domain *d)
 
 int init_domain_cpuid_policy(struct domain *d)
 {
-    d->arch.cpuid = xmalloc(struct cpuid_policy);
+    struct cpuid_policy *p =
+        xmemdup(is_pv_domain(d) ?  &pv_max_cpuid_policy
+                                : &hvm_max_cpuid_policy);
 
-    if ( !d->arch.cpuid )
+    if ( !p )
         return -ENOMEM;
 
-    *d->arch.cpuid = is_pv_domain(d)
-        ? pv_max_cpuid_policy : hvm_max_cpuid_policy;
-
     if ( d->disable_migrate )
-        d->arch.cpuid->extd.itsc = cpu_has_itsc;
+        p->extd.itsc = cpu_has_itsc;
+
+    d->arch.cpuid = p;
 
     recalculate_cpuid_policy(d);
 

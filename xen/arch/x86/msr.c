@@ -81,15 +81,12 @@ void __init init_guest_msr_policy(void)
 
 int init_domain_msr_policy(struct domain *d)
 {
-    struct msr_domain_policy *dp;
-
-    dp = xmalloc(struct msr_domain_policy);
+    struct msr_domain_policy *dp =
+        xmemdup(is_pv_domain(d) ?  &pv_max_msr_domain_policy
+                                : &hvm_max_msr_domain_policy);
 
     if ( !dp )
         return -ENOMEM;
-
-    *dp = is_pv_domain(d) ? pv_max_msr_domain_policy :
-                            hvm_max_msr_domain_policy;
 
     /* See comment in intel_ctxt_switch_levelling() */
     if ( is_control_domain(d) )
@@ -103,15 +100,12 @@ int init_domain_msr_policy(struct domain *d)
 int init_vcpu_msr_policy(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct msr_vcpu_policy *vp;
-
-    vp = xmalloc(struct msr_vcpu_policy);
+    struct msr_vcpu_policy *vp =
+        xmemdup(is_pv_domain(d) ?  &pv_max_msr_vcpu_policy
+                                : &hvm_max_msr_vcpu_policy);
 
     if ( !vp )
         return -ENOMEM;
-
-    *vp = is_pv_domain(d) ? pv_max_msr_vcpu_policy :
-                            hvm_max_msr_vcpu_policy;
 
     v->arch.msr = vp;
 
