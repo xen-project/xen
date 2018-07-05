@@ -7,4 +7,5 @@ obj-y += common.o
 obj-y += intel.o
 obj-y += intel_cacheinfo.o
 obj-y += mwait-idle.o
+obj-y += shanghai.o
 obj-y += vpmu.o vpmu_amd.o vpmu_intel.o

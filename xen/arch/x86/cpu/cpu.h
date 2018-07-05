@@ -20,3 +20,4 @@ extern void display_cacheinfo(struct cpuinfo_x86 *c);
 int intel_cpu_init(void);
 int amd_init_cpu(void);
 int centaur_init_cpu(void);
+int shanghai_init_cpu(void);

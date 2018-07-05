@@ -700,6 +700,7 @@ void __init early_cpu_init(void)
 	intel_cpu_init();
 	amd_init_cpu();
 	centaur_init_cpu();
+	shanghai_init_cpu();
 	early_cpu_detect();
 }
 
