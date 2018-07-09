@@ -9,10 +9,10 @@ for the definitions of the support status levels etc.
 
 # Release Support
 
-    Xen-Version: 4.11-unstable
-    Initial-Release: n/a
+    Xen-Version: 4.11
+    Initial-Release: 2018-07-10
     Supported-Until: TBD
-    Security-Support-Until: Unreleased - not yet security-supported
+    Security-Support-Until: TBD
 
 # Feature Support
 
