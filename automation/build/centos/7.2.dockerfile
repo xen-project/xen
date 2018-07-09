@@ -6,6 +6,10 @@ LABEL maintainer.name="The Xen Project" \
 # the version we want
 COPY CentOS-7.2.repo /etc/yum.repos.d/CentOS-Base.repo
 
+# install EPEL for dev86, xz-devel and possibly other packages
+RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm && \
+        yum clean all
+
 RUN mkdir /build
 WORKDIR /build
 
@@ -39,4 +43,7 @@ RUN rpm --rebuilddb && \
         python-markdown \
         patch \
         checkpolicy \
+        dev86 \
+        xz-devel \
+        bzip2 \
     && yum clean all
