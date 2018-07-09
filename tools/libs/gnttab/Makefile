@@ -2,7 +2,7 @@ XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR    = 1
-MINOR    = 1
+MINOR    = 2
 SHLIB_LDFLAGS += -Wl,--version-script=libxengnttab.map
 
 CFLAGS   += -Werror -Wmissing-prototypes
