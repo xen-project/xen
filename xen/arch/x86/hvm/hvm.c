@@ -981,7 +981,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
     const char *errstr;
-    struct xsave_struct *xsave_area;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -1114,22 +1113,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     hvm_set_segment_register(v, x86_seg_ldtr, &seg);
 
     /* Cover xsave-absent save file restoration on xsave-capable host. */
-    xsave_area = xsave_enabled(v) ? NULL : v->arch.xsave_area;
-
-    v->fpu_initialised = !!(ctxt.flags & XEN_X86_FPU_INITIALISED);
-    if ( v->fpu_initialised )
-    {
-        memcpy(v->arch.fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
-        if ( xsave_area )
-            xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-    }
-    else if ( xsave_area )
-    {
-        xsave_area->xsave_hdr.xstate_bv = 0;
-        xsave_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
-    }
-    if ( xsave_area )
-        xsave_area->xsave_hdr.xcomp_bv = 0;
+    vcpu_setup_fpu(v, xsave_enabled(v) ? NULL : v->arch.xsave_area,
+                   ctxt.flags & XEN_X86_FPU_INITIALISED ? ctxt.fpu_regs : NULL,
+                   FCW_RESET);
 
     v->arch.user_regs.rax = ctxt.rax;
     v->arch.user_regs.rbx = ctxt.rbx;
@@ -3878,7 +3864,6 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 {
     struct domain *d = v->domain;
     struct segment_register reg;
-    typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
 
     domain_lock(d);
 
@@ -3892,14 +3877,9 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
         v->arch.guest_table = pagetable_null();
     }
 
-    memset(fpu_ctxt, 0, sizeof(*fpu_ctxt));
-    fpu_ctxt->fcw = FCW_RESET;
-    fpu_ctxt->mxcsr = MXCSR_DEFAULT;
     if ( v->arch.xsave_area )
-    {
-        v->arch.xsave_area->xsave_hdr.xstate_bv = X86_XCR0_FP;
-        v->arch.xsave_area->xsave_hdr.xcomp_bv = 0;
-    }
+        v->arch.xsave_area->xsave_hdr.xstate_bv = 0;
+    vcpu_setup_fpu(v, v->arch.xsave_area, NULL, FCW_RESET);
 
     v->arch.vgc_flags = VGCF_online;
     memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));

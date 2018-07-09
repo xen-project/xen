@@ -834,35 +834,15 @@ int arch_set_info_guest(
             return -EINVAL;
     }
 
-    v->fpu_initialised = !!(flags & VGCF_I387_VALID);
-
     v->arch.flags &= ~TF_kernel_mode;
     if ( (flags & VGCF_in_kernel) || is_hvm_domain(d)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
     v->arch.vgc_flags = flags;
 
-    if ( flags & VGCF_I387_VALID )
-    {
-        memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
-        if ( v->arch.xsave_area )
-            v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-    }
-    else if ( v->arch.xsave_area )
-    {
-        v->arch.xsave_area->xsave_hdr.xstate_bv = 0;
-        v->arch.xsave_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
-    }
-    else
-    {
-        typeof(v->arch.xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
-
-        memset(fpu_sse, 0, sizeof(*fpu_sse));
-        fpu_sse->fcw = FCW_DEFAULT;
-        fpu_sse->mxcsr = MXCSR_DEFAULT;
-    }
-    if ( v->arch.xsave_area )
-        v->arch.xsave_area->xsave_hdr.xcomp_bv = 0;
+    vcpu_setup_fpu(v, v->arch.xsave_area,
+                   flags & VGCF_I387_VALID ? &c.nat->fpu_ctxt : NULL,
+                   FCW_DEFAULT);
 
     if ( !compat )
     {

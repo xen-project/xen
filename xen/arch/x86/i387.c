@@ -337,6 +337,49 @@ int vcpu_init_fpu(struct vcpu *v)
     return rc;
 }
 
+void vcpu_setup_fpu(struct vcpu *v, struct xsave_struct *xsave_area,
+                    const void *data, unsigned int fcw_default)
+{
+    /*
+     * For the entire function please note that vcpu_init_fpu() (above) points
+     * v->arch.fpu_ctxt into v->arch.xsave_area when XSAVE is available. Hence
+     * accesses through both pointers alias one another, and the shorter form
+     * is used here.
+     */
+    typeof(xsave_area->fpu_sse) *fpu_sse = v->arch.fpu_ctxt;
+
+    ASSERT(!xsave_area || xsave_area == v->arch.xsave_area);
+
+    v->fpu_initialised = !!data;
+
+    if ( data )
+    {
+        memcpy(fpu_sse, data, sizeof(*fpu_sse));
+        if ( xsave_area )
+            xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
+    }
+    else if ( xsave_area && fcw_default == FCW_DEFAULT )
+    {
+        xsave_area->xsave_hdr.xstate_bv = 0;
+        fpu_sse->mxcsr = MXCSR_DEFAULT;
+    }
+    else
+    {
+        memset(fpu_sse, 0, sizeof(*fpu_sse));
+        fpu_sse->fcw = fcw_default;
+        fpu_sse->mxcsr = MXCSR_DEFAULT;
+        if ( v->arch.xsave_area )
+        {
+            v->arch.xsave_area->xsave_hdr.xstate_bv &= ~XSTATE_FP_SSE;
+            if ( fcw_default != FCW_DEFAULT )
+                v->arch.xsave_area->xsave_hdr.xstate_bv |= X86_XCR0_FP;
+        }
+    }
+
+    if ( xsave_area )
+        xsave_area->xsave_hdr.xcomp_bv = 0;
+}
+
 /* Free FPU's context save area */
 void vcpu_destroy_fpu(struct vcpu *v)
 {
