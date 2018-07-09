@@ -76,7 +76,13 @@ static void post_flush(u32 t)
 
 static void do_tlb_flush(void)
 {
-    u32 t = pre_flush();
+    unsigned long flags;
+    u32 t;
+
+    /* This non-reentrant function is sometimes called in interrupt context. */
+    local_irq_save(flags);
+
+    t = pre_flush();
 
     if ( use_invpcid )
         invpcid_flush_all();
@@ -89,6 +95,8 @@ static void do_tlb_flush(void)
     }
 
     post_flush(t);
+
+    local_irq_restore(flags);
 }
 
 void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
@@ -147,10 +155,6 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
 unsigned int flush_area_local(const void *va, unsigned int flags)
 {
     unsigned int order = (flags - 1) & FLUSH_ORDER_MASK;
-    unsigned long irqfl;
-
-    /* This non-reentrant function is sometimes called in interrupt context. */
-    local_irq_save(irqfl);
 
     if ( flags & (FLUSH_TLB|FLUSH_TLB_GLOBAL) )
     {
@@ -217,8 +221,6 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
             wbinvd();
         }
     }
-
-    local_irq_restore(irqfl);
 
     if ( flags & FLUSH_ROOT_PGTBL )
         get_cpu_info()->root_pgt_changed = true;
