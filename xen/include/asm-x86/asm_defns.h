@@ -18,12 +18,11 @@
 #ifndef CONFIG_INDIRECT_THUNK
 .equ CONFIG_INDIRECT_THUNK, 0
 #endif
-# include <asm/indirect_thunk_asm.h>
 #else
 asm ( "\t.equ CONFIG_INDIRECT_THUNK, "
       __stringify(IS_ENABLED(CONFIG_INDIRECT_THUNK)) );
-asm ( "\t.include \"asm/indirect_thunk_asm.h\"" );
 #endif
+#include <asm/indirect_thunk_asm.h>
 
 #ifndef __ASSEMBLY__
 void ret_from_intr(void);

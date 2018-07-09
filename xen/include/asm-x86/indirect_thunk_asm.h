@@ -1,7 +1,17 @@
 /*
- * Warning!  This file is included at an assembler level for .c files, causing
- * usual #ifdef'ary to turn into comments.
+ * Trickery to allow this header to be included at the C level, to permit
+ * proper dependency tracking in .*.o.d files, while still having it contain
+ * assembler only macros.
  */
+#ifndef __ASSEMBLY__
+# if 0
+  .if 0
+# endif
+asm ( "\t.include \"asm/indirect_thunk_asm.h\"" );
+# if 0
+  .endif
+# endif
+#else
 
 .macro INDIRECT_BRANCH insn:req arg:req
 /*
@@ -39,3 +49,5 @@
 .macro INDIRECT_JMP arg:req
     INDIRECT_BRANCH jmp \arg
 .endm
+
+#endif
