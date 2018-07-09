@@ -58,7 +58,6 @@ void __dummy__(void)
    OFFSET(UREGS_R12_fiq, struct cpu_user_regs, r12_fiq);
 
    OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, cpsr);
-   DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
    BLANK();
 
    DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));

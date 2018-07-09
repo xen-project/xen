@@ -41,22 +41,14 @@ void __dummy__(void)
     OFFSET(UREGS_rdi, struct cpu_user_regs, rdi);
     OFFSET(UREGS_error_code, struct cpu_user_regs, error_code);
     OFFSET(UREGS_entry_vector, struct cpu_user_regs, entry_vector);
-    OFFSET(UREGS_saved_upcall_mask, struct cpu_user_regs, saved_upcall_mask);
     OFFSET(UREGS_rip, struct cpu_user_regs, rip);
     OFFSET(UREGS_cs, struct cpu_user_regs, cs);
     OFFSET(UREGS_eflags, struct cpu_user_regs, rflags);
     OFFSET(UREGS_rsp, struct cpu_user_regs, rsp);
     OFFSET(UREGS_ss, struct cpu_user_regs, ss);
-    OFFSET(UREGS_ds, struct cpu_user_regs, ds);
-    OFFSET(UREGS_es, struct cpu_user_regs, es);
-    OFFSET(UREGS_fs, struct cpu_user_regs, fs);
-    OFFSET(UREGS_gs, struct cpu_user_regs, gs);
     OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, es);
-    DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
     BLANK();
 
-    OFFSET(irq_caps_offset, struct domain, irq_caps);
-    OFFSET(next_in_list_offset, struct domain, next_in_list);
     OFFSET(VCPU_processor, struct vcpu, processor);
     OFFSET(VCPU_domain, struct vcpu, domain);
     OFFSET(VCPU_vcpu_info, struct vcpu, vcpu_info);
@@ -64,10 +56,6 @@ void __dummy__(void)
     OFFSET(VCPU_thread_flags, struct vcpu, arch.flags);
     OFFSET(VCPU_event_addr, struct vcpu, arch.pv_vcpu.event_callback_eip);
     OFFSET(VCPU_event_sel, struct vcpu, arch.pv_vcpu.event_callback_cs);
-    OFFSET(VCPU_failsafe_addr, struct vcpu,
-           arch.pv_vcpu.failsafe_callback_eip);
-    OFFSET(VCPU_failsafe_sel, struct vcpu,
-           arch.pv_vcpu.failsafe_callback_cs);
     OFFSET(VCPU_syscall_addr, struct vcpu,
            arch.pv_vcpu.syscall_callback_eip);
     OFFSET(VCPU_syscall32_addr, struct vcpu,
@@ -96,7 +84,6 @@ void __dummy__(void)
     OFFSET(VCPU_async_exception_mask, struct vcpu, async_exception_mask);
     DEFINE(VCPU_TRAP_NMI, VCPU_TRAP_NMI);
     DEFINE(VCPU_TRAP_MCE, VCPU_TRAP_MCE);
-    DEFINE(_VGCF_failsafe_disables_events, _VGCF_failsafe_disables_events);
     DEFINE(_VGCF_syscall_disables_events,  _VGCF_syscall_disables_events);
     BLANK();
 
@@ -128,7 +115,6 @@ void __dummy__(void)
     BLANK();
 
     OFFSET(CPUINFO_guest_cpu_user_regs, struct cpu_info, guest_cpu_user_regs);
-    OFFSET(CPUINFO_processor_id, struct cpu_info, processor_id);
     OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
     OFFSET(CPUINFO_cr4, struct cpu_info, cr4);
     OFFSET(CPUINFO_xen_cr3, struct cpu_info, xen_cr3);
