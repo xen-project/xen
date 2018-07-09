@@ -1,0 +1,13 @@
+--- a/etc/Makefile.in	2007-03-27 13:09:32.000000000 -0500
++++ b/etc/Makefile.in	2018-07-09 11:08:50.294183081 -0500
+@@ -63,8 +63,8 @@
+ PDFFILES = standards.pdf configure.pdf
+ HTMLFILES = standards.html configure.html
+ 
+-all: info
+-install: install-info
++all:
++install:
+ 
+ uninstall:
+ 
