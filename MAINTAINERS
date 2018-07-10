@@ -407,12 +407,6 @@ S:	Obsolete
 L:	xen-devel@lists.xenproject.org
 F:	unmodified_drivers/linux-2.6/
 
-USB PV DRIVERS
-M:	Noboru Iwamatsu <n_iwamatsu@jp.fujitsu.com>
-S:	Supported
-T:	hg https://xenbits.xenproject.org/hg/linux-2.6.18-xen.hg
-F:	drivers/xen/usb*/
-
 VM EVENT, MEM ACCESS and MONITOR
 M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
 M:	Tamas K Lengyel <tamas@tklengyel.com>
