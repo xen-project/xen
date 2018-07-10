@@ -820,8 +820,8 @@ int parse_vdispl_config(libxl_device_vdispl *vdispl, char *token)
         split_string_into_string_list(oparg, ";", &connectors);
 
         vdispl->num_connectors = libxl_string_list_length(&connectors);
-        vdispl->connectors = calloc(vdispl->num_connectors,
-                                    sizeof(*vdispl->connectors));
+        vdispl->connectors = xcalloc(vdispl->num_connectors,
+                                     sizeof(*vdispl->connectors));
 
         for(i = 0; i < vdispl->num_connectors; i++)
         {
@@ -863,8 +863,8 @@ static int parse_vsnd_params(libxl_vsnd_params *params, char *token)
         split_string_into_string_list(oparg, ";", &rates);
 
         params->num_sample_rates = libxl_string_list_length(&rates);
-        params->sample_rates = calloc(params->num_sample_rates,
-                                      sizeof(*params->sample_rates));
+        params->sample_rates = xcalloc(params->num_sample_rates,
+                                       sizeof(*params->sample_rates));
 
         for (i = 0; i < params->num_sample_rates; i++) {
             params->sample_rates[i] = strtoul(rates[i], NULL, 0);
@@ -877,8 +877,8 @@ static int parse_vsnd_params(libxl_vsnd_params *params, char *token)
         split_string_into_string_list(oparg, ";", &formats);
 
         params->num_sample_formats = libxl_string_list_length(&formats);
-        params->sample_formats = calloc(params->num_sample_formats,
-                                        sizeof(*params->sample_formats));
+        params->sample_formats = xcalloc(params->num_sample_formats,
+                                         sizeof(*params->sample_formats));
 
         for (i = 0; i < params->num_sample_formats; i++) {
             libxl_vsnd_pcm_format format;
