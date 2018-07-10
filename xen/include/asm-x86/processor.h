@@ -579,13 +579,6 @@ int early_microcode_init(void);
 int microcode_init_intel(void);
 int microcode_init_amd(void);
 
-enum get_cpu_vendor {
-    gcv_host,
-    gcv_guest,
-};
-
-int get_cpu_vendor(uint32_t b, uint32_t c, uint32_t d, enum get_cpu_vendor mode);
-
 static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
                                      uint8_t *stepping)
 {

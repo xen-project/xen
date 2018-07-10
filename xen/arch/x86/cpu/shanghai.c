@@ -17,7 +17,6 @@ static void init_shanghai(struct cpuinfo_x86 *c)
 
 static const struct cpu_dev shanghai_cpu_dev = {
     .c_vendor   = "  Shang",
-    .c_ident    = {"  Shanghai  "},
     .c_init     = init_shanghai,
 };
 

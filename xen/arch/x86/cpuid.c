@@ -459,8 +459,8 @@ void recalculate_cpuid_policy(struct domain *d)
     uint32_t fs[FSCAPINTS], max_fs[FSCAPINTS];
     unsigned int i;
 
-    p->x86_vendor = get_cpu_vendor(p->basic.vendor_ebx, p->basic.vendor_ecx,
-                                   p->basic.vendor_edx, gcv_guest);
+    p->x86_vendor = x86_cpuid_lookup_vendor(
+        p->basic.vendor_ebx, p->basic.vendor_ecx, p->basic.vendor_edx);
 
     p->basic.max_leaf   = min(p->basic.max_leaf,   max->basic.max_leaf);
     p->feat.max_subleaf = min(p->feat.max_subleaf, max->feat.max_subleaf);

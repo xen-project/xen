@@ -247,36 +247,6 @@ void display_cacheinfo(struct cpuinfo_x86 *c)
 		       l2size, ecx & 0xFF);
 }
 
-int get_cpu_vendor(uint32_t b, uint32_t c, uint32_t d, enum get_cpu_vendor mode)
-{
-	int i;
-	static int printed;
-
-	for (i = 0; i < X86_VENDOR_NUM; i++) {
-		if (cpu_devs[i]) {
-			struct {
-				uint32_t b, d, c;
-			} *ptr = (void *)cpu_devs[i]->c_ident;
-
-			if (ptr->b == b && ptr->c == c && ptr->d == d) {
-				if (mode == gcv_host)
-					this_cpu = cpu_devs[i];
-				return i;
-			}
-		}
-	}
-	if (mode == gcv_guest)
-		return X86_VENDOR_UNKNOWN;
-	if (!printed) {
-		printed++;
-		printk(KERN_ERR "CPU: Vendor unknown, using generic init.\n");
-		printk(KERN_ERR "CPU: Your system may be unstable.\n");
-	}
-	this_cpu = &default_cpu;
-
-	return X86_VENDOR_UNKNOWN;
-}
-
 static inline u32 _phys_pkg_id(u32 cpuid_apic, int index_msb)
 {
 	return cpuid_apic >> index_msb;
@@ -313,7 +283,13 @@ static void __init early_cpu_detect(void)
 	*(u32 *)&c->x86_vendor_id[8] = ecx;
 	*(u32 *)&c->x86_vendor_id[4] = edx;
 
-	c->x86_vendor = get_cpu_vendor(ebx, ecx, edx, gcv_host);
+	c->x86_vendor = x86_cpuid_lookup_vendor(ebx, ecx, edx);
+	if (c->x86_vendor < ARRAY_SIZE(cpu_devs) && cpu_devs[c->x86_vendor])
+		this_cpu = cpu_devs[c->x86_vendor];
+	else
+		printk(XENLOG_ERR
+		       "Unrecognised or unsupported CPU vendor '%.12s'\n",
+		       c->x86_vendor_id);
 
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
 	c->x86 = get_cpu_family(eax, &c->x86_model, &c->x86_mask);
@@ -361,7 +337,12 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	*(u32 *)&c->x86_vendor_id[8] = ecx;
 	*(u32 *)&c->x86_vendor_id[4] = edx;
 
-	c->x86_vendor = get_cpu_vendor(ebx, ecx, edx, gcv_host);
+	c->x86_vendor = x86_cpuid_lookup_vendor(ebx, ecx, edx);
+	if (boot_cpu_data.x86_vendor != c->x86_vendor)
+		printk(XENLOG_ERR "CPU%u vendor %u mismatch against BSP %u\n",
+		       smp_processor_id(), c->x86_vendor,
+		       boot_cpu_data.x86_vendor);
+
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
 
