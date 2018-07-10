@@ -24,7 +24,7 @@ config XEN_FULLVERSION
 config DEFCONFIG_LIST
 	string
 	option defconfig_list
-	default "$ARCH_DEFCONFIG"
+	default ARCH_DEFCONFIG
 
 config EXPERT
 	string
