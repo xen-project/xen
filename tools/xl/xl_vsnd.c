@@ -46,6 +46,7 @@ int main_vsndattach(int argc, char **argv)
     if (dryrun_only) {
         char *json = libxl_device_vsnd_to_json(ctx, &vsnd);
         printf("vsnd: %s\n", json);
+        rc = 0;
         free(json);
         goto out;
     }
