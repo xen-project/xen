@@ -1058,7 +1058,7 @@ static int __init pvh_setup_acpi(struct domain *d, paddr_t start_info)
                                 d->vcpu[0]);
     if ( rc )
     {
-        printk("Unable to copy RSDP into guest memory\n");
+        printk("Unable to copy RSDP address to start info\n");
         return rc;
     }
 
