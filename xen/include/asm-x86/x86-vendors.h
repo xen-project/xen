@@ -4,11 +4,11 @@
 /*
  * CPU vendor IDs
  */
-#define X86_VENDOR_INTEL 0
-#define X86_VENDOR_AMD 1
-#define X86_VENDOR_CENTAUR 2
-#define X86_VENDOR_SHANGHAI 3
-#define X86_VENDOR_NUM 4
-#define X86_VENDOR_UNKNOWN 0xff
+#define X86_VENDOR_UNKNOWN 0
+#define X86_VENDOR_INTEL 1
+#define X86_VENDOR_AMD 2
+#define X86_VENDOR_CENTAUR 3
+#define X86_VENDOR_SHANGHAI 4
+#define X86_VENDOR_NUM 5
 
 #endif	/* __XEN_X86_VENDORS_H__ */
