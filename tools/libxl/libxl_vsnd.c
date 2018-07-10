@@ -192,6 +192,7 @@ static int libxl__pcm_from_xenstore(libxl__gc *gc, const char *path,
                         GCSPRINTF("%s/"XENSND_FIELD_DEVICE_NAME, path), NULL);
 
     rc = libxl__params_from_xenstore(gc, path, &pcm->params);
+    if (rc) goto out;
 
     pcm->streams = NULL;
     pcm->num_vsnd_streams = 0;
@@ -253,6 +254,7 @@ static int libxl__vsnd_from_xenstore(libxl__gc *gc, const char *libxl_path,
                               fe_path), NULL);
 
     rc = libxl__params_from_xenstore(gc, fe_path, &vsnd->params);
+    if (rc) goto out;
 
     vsnd->pcms = NULL;
     vsnd->num_vsnd_pcms = 0;
