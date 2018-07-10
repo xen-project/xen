@@ -287,11 +287,6 @@ struct vcpu_msrs
 {
     /* 0x00000048 - MSR_SPEC_CTRL */
     struct {
-        /*
-         * Only the bottom two bits are defined, so no need to waste space
-         * with uint64_t at the moment, but use uint32_t for the convenience
-         * of the assembly code.
-         */
         uint32_t raw;
     } spec_ctrl;
 
