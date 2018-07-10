@@ -160,6 +160,11 @@ Contributors to gather a list of features for the release. Discuss the
 support status of new features with stakeholders. Help prepare the press
 release, write a blog post for the release.
 
+Make sure the key people for doing the release (especially Community Manager,
+Release Manager and Release Technician) will be either available around the
+planned release date or have named a substitute being capable to perform the
+required tasks.
+
 1. Collate a list of major changes: this should be done in collaboration
 between Release Manager, PR Personnel and key contributors. This should *not*
 be done on a public mailing list, to minimize the risk of release related
@@ -198,12 +203,14 @@ releases typically done mid-week (Tuesday - Thursday).
 
 4. Select the release date.
 
-5. Check with relevant stake-holders (typically community manager) whether
+5. Specify the dates regarding support and security support in SUPPORT.md.
+
+6. Check with relevant stake-holders (typically community manager) whether
 wiki documentation and PR is in good shape (for an example see
 https://wiki.xenproject.org/wiki/Category:Xen_4.9
 <https://wiki.xenproject.org/wiki/Category:Xen_4.9>)
 
-6. Obtain a formal go-ahead from
+7. Obtain a formal go-ahead from
 
     * the Community Manager
     * the Release Technician
@@ -211,12 +218,12 @@ https://wiki.xenproject.org/wiki/Category:Xen_4.9
     Ask them to dry-run their checklist and confirm everything is OK. If not,
     arrange another RC and restart this checklist.
 
-7. Do not commit to a release date until
+8. Do not commit to a release date until
 
     * The exact xen.git commit id to be released is known.
     * That commit id has been satisfactorily tested.
 
-8. Give PR Personnel final go-ahead, and instruct Release Technician to make
+9. Give PR Personnel final go-ahead, and instruct Release Technician to make
 release deliverables (tags and tarballs - will usually be in place the day
 before the release). At this point, PR collateral will be sent to reporters
 (typically 2-3 working days before the release date) and we cannot undo
@@ -224,7 +231,7 @@ publications without questions being asked and risk of negative PR. It is
 acceptable to make a xen-devel@ announcement *before* the PR release date
 (blog, xen-announce@, press release).
 
-9. Make the announcement on various mailing list, publish the blog post.
+10. Make the announcement on various mailing list, publish the blog post.
 
 Allow for contingencies. It is not uncommon that some last minute (security or
 not) bugs are discovered. To provide a fix takes time, the test of the fix
@@ -239,9 +246,15 @@ following things happen for the new Release Manager.
 
 1. A JIRA (xenproject.atlassian.net) is created and proper permissions granted.
 2. Access to community test infrastructure is granted.
+   In the common case the public pages at logs.test-lab.xenproject.org will
+   suffice.
 3. Access to mailing list moderation panel is granted.
 4. An account for blog.xenproject.org is created.
+   The account can be created by the new Release Manager, it might be necessary
+   to adjust the access rights.
 5. An account for wiki.xenproject.org is created.
+   The account can be created by the new Release Manager, it might be necessary
+   to adjust the access rights.
 
 # Email templates and scripts
 
