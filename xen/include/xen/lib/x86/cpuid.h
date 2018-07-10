@@ -297,8 +297,9 @@ const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
 /**
  * Fill a CPUID policy using the native CPUID instruction.
  *
- * No sanitisation is performed.  Values may be influenced by a hypervisor or
- * from masking/faulting configuration.
+ * No sanitisation is performed, but synthesised values are calculated.
+ * Values may be influenced by a hypervisor or from masking/faulting
+ * configuration.
  */
 void x86_cpuid_policy_fill_native(struct cpuid_policy *p);
 
@@ -339,7 +340,8 @@ int x86_cpuid_copy_to_buffer(const struct cpuid_policy *policy,
  * incoming leaf is out of range of cpuid_policy, in which case the optional
  * err_* pointers are filled to aid diagnostics.
  *
- * No content validation of in-range leaves is performed.
+ * No content validation of in-range leaves is performed.  Synthesised data is
+ * recalculated.
  */
 int x86_cpuid_copy_from_buffer(struct cpuid_policy *policy,
                                const cpuid_leaf_buffer_t leaves,

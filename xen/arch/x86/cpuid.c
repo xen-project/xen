@@ -272,7 +272,8 @@ static void __init calculate_raw_policy(void)
 
     x86_cpuid_policy_fill_native(p);
 
-    p->x86_vendor = boot_cpu_data.x86_vendor;
+    /* Nothing good will come from Xen and libx86 disagreeing on vendor. */
+    ASSERT(p->x86_vendor == boot_cpu_data.x86_vendor);
 }
 
 static void __init calculate_host_policy(void)
