@@ -296,7 +296,7 @@ MINI-OS
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
 L:	minios-devel@lists.xenproject.org
-T:	git git://xenbits.xenproject.org/mini-os.git
+T:	git https://xenbits.xenproject.org/git-http/mini-os.git
 F:	config/MiniOS.mk
 
 OCAML TOOLS
@@ -309,7 +309,7 @@ OVMF UPSTREAM
 M:	Anthony PERARD <anthony.perard@citrix.com>
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
-T:	git git://xenbits.xenproject.org/ovmf.git
+T:	git https://xenbits.xenproject.org/git-http/ovmf.git
 
 POWER MANAGEMENT
 M:	Jan Beulich <jbeulich@suse.com>
@@ -333,13 +333,13 @@ F:	tools/python
 QEMU-DM
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 S:	Supported
-T:	git git://xenbits.xenproject.org/qemu-xen-traditional.git
+T:	git https://xenbits.xenproject.org/git-http/qemu-xen-traditional.git
 
 QEMU UPSTREAM
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Anthony Perard <anthony.perard@citrix.com>
 S:	Supported
-T:	git git://xenbits.xenproject.org/qemu-xen.git
+T:	git https://xenbits.xenproject.org/git-http/qemu-xen.git
 
 REMUS
 M:	Shriram Rajagopalan <rshriram@cs.ubc.ca>
@@ -367,7 +367,7 @@ F:	xen/common/sched*
 SEABIOS UPSTREAM
 M:	Wei Liu <wei.liu2@citrix.com>
 S:	Supported
-T:	git git://xenbits.xenproject.org/seabios.git
+T:	git https://xenbits.xenproject.org/git-http/seabios.git
 
 STUB DOMAINS
 M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
