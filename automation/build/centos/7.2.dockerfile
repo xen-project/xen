@@ -46,4 +46,5 @@ RUN rpm --rebuilddb && \
         dev86 \
         xz-devel \
         bzip2 \
+        nasm \
     && yum clean all

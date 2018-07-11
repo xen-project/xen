@@ -41,6 +41,7 @@ RUN apt-get update && \
         checkpolicy \
         wget \
         git \
+        nasm \
         && \
         apt-get autoremove -y && \
         apt-get clean && \
