@@ -11,9 +11,9 @@
 
 #include <xen/xen.h>
 
-#include <asm/msr-index.h>
-#include <asm/x86-defns.h>
-#include <asm/x86-vendors.h>
+#include <xen/asm/msr-index.h>
+#include <xen/asm/x86-defns.h>
+#include <xen/asm/x86-vendors.h>
 
 #include <xen-tools/libs.h>
 

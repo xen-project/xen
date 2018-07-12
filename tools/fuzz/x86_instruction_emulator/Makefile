@@ -13,11 +13,6 @@ x86_emulate:
 
 x86_emulate/%: x86_emulate ;
 
-asm:
-	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/include/asm-x86 $@
-
-asm/%: asm ;
-
 x86-emulate.c x86-emulate.h wrappers.c: %:
 	[ -L $* ] || ln -sf $(XEN_ROOT)/tools/tests/x86_emulator/$*
 
@@ -27,7 +22,8 @@ GCOV_FLAGS := --coverage
 %-cov.o: %.c
 	$(CC) -c $(CFLAGS) $(GCOV_FLAGS) $< -o $@
 
-x86.h := asm/x86-vendors.h asm/x86-defns.h asm/msr-index.h
+x86.h := $(addprefix $(XEN_ROOT)/tools/include/xen/asm/,\
+                     x86-vendors.h x86-defns.h msr-index.h)
 x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
 # x86-emulate.c will be implicit for both
@@ -50,7 +46,7 @@ all: x86-insn-fuzz-all
 
 .PHONY: distclean
 distclean: clean
-	rm -f x86_emulate x86-emulate.c x86-emulate.h asm
+	rm -f x86_emulate x86-emulate.c x86-emulate.h
 
 .PHONY: clean
 clean:

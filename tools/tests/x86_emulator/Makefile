@@ -118,7 +118,7 @@ $(TARGET): x86-emulate.o test_x86_emulator.o wrappers.o
 
 .PHONY: clean
 clean:
-	rm -rf $(TARGET) *.o *~ core $(addsuffix .h,$(TESTCASES)) *.bin x86_emulate asm
+	rm -rf $(TARGET) *.o *~ core $(addsuffix .h,$(TESTCASES)) *.bin x86_emulate
 
 .PHONY: distclean
 distclean: clean
@@ -131,16 +131,12 @@ x86_emulate:
 
 x86_emulate/%: x86_emulate ;
 
-asm:
-	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/include/asm-x86 $@
-
-asm/%: asm ;
-
 HOSTCFLAGS-x86_64 := -fno-PIE
 $(call cc-option-add,HOSTCFLAGS-x86_64,HOSTCC,-no-pie)
 HOSTCFLAGS += $(CFLAGS_xeninclude) -I. $(HOSTCFLAGS-$(XEN_COMPILE_ARCH))
 
-x86.h := asm/x86-vendors.h asm/x86-defns.h asm/msr-index.h
+x86.h := $(addprefix $(XEN_ROOT)/tools/include/xen/asm/,\
+                     x86-vendors.h x86-defns.h msr-index.h)
 x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
 x86-emulate.o test_x86_emulator.o wrappers.o: %.o: %.c $(x86_emulate.h)

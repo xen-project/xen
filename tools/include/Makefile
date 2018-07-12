@@ -21,6 +21,9 @@ xen/.dir:
 	ln -sf $(addprefix $(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
 	ln -s ../xen-foreign xen/foreign
 	ln -sf $(XEN_ROOT)/xen/include/acpi acpi
+ifeq ($(CONFIG_X86),y)
+	ln -sf $(XEN_ROOT)/xen/include/asm-x86 xen/asm
+endif
 	touch $@
 
 # Not xen/xsm as that clashes with link to
