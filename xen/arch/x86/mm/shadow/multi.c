@@ -2817,6 +2817,7 @@ static int sh_page_fault(struct vcpu *v,
     uint32_t rc, error_code;
     bool walk_ok;
     int version;
+    unsigned int cpl;
     const struct npfec access = {
          .read_access = 1,
          .write_access = !!(regs->error_code & PFEC_write_access),
@@ -2967,6 +2968,8 @@ static int sh_page_fault(struct vcpu *v,
         return 0;
     }
 
+    cpl = is_pv_vcpu(v) ? (regs->ss & 3) : hvm_get_cpl(v);
+
  rewalk:
 
     error_code = regs->error_code;
@@ -3023,8 +3026,7 @@ static int sh_page_fault(struct vcpu *v,
      * If this corner case comes about accidentally, then a security-relevant
      * bug has been tickled.
      */
-    if ( !(error_code & (PFEC_insn_fetch|PFEC_user_mode)) &&
-         (is_pv_vcpu(v) ? (regs->ss & 3) : hvm_get_cpl(v)) == 3 )
+    if ( !(error_code & (PFEC_insn_fetch|PFEC_user_mode)) && cpl == 3 )
         error_code |= PFEC_implicit;
 
     /* The walk is done in a lock-free style, with some sanity check
