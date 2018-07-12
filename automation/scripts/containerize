@@ -1,0 +1,93 @@
+#!/bin/bash
+
+einfo() {
+	echo "$*" >&2
+}
+
+die() {
+    echo "$*" >&2
+    exit 1
+}
+
+#
+# The caller is expected to override the CONTAINER environment
+# variable with the container they wish to launch.
+#
+BASE="registry.gitlab.com/xen-project/xen"
+case "_${CONTAINER}" in
+    _centos72) CONTAINER="${BASE}/centos:7.2" ;;
+    _trusty) CONTAINER="${BASE}/ubuntu:trusty" ;;
+    _xenial) CONTAINER="${BASE}/ubuntu:xenial" ;;
+    _jessie) CONTAINER="${BASE}/debian:jessie" ;;
+    _stretch|_) CONTAINER="${BASE}/debian:stretch" ;;
+esac
+
+# get our container name and version
+containid=${CONTAINER%:*}
+containver=${CONTAINER#*:}
+
+# Save the commands for future use
+cmd=$@
+
+# If no command was specified, just drop us into a shell if we're interactive
+[ $# -eq 0 ] && tty -s && cmd="/bin/bash"
+
+# Are we in an interactive terminal?
+tty -s && termint=t
+
+#
+# Fetch the latest version of the container in hub.docker.com,
+# unless it's a newly created local copy.
+#
+einfo "*** Ensuring ${CONTAINER} is up to date"
+docker pull ${CONTAINER} > /dev/null ||     \
+    die "Failed to update docker container"
+
+if hash greadlink > /dev/null 2>&1; then
+    READLINK=greadlink
+elif [[ $(uname -s) == "Darwin" ]]; then
+    echo "Unable to forward SSH agent without coreutils installed"
+    unset SSH_AUTH_SOCK
+else
+    READLINK=readlink
+fi
+
+# Ensure we've got what we need for SSH_AUTH_SOCK
+if [[ -n ${SSH_AUTH_SOCK} ]]; then
+	fullpath_sock=$(${READLINK} -f ${SSH_AUTH_SOCK} 2> /dev/null)
+	if [ $? -ne 0 ]; then
+        echo "Invalid SSH_AUTH_SOCK: ${SSH_AUTH_SOCK}"
+        unset SSH_AUTH_SOCK
+    else
+        SSH_AUTH_DIR=$(dirname ${fullpath_sock})
+        SSH_AUTH_NAME=$(basename ${fullpath_sock})
+    fi
+fi
+
+# if we got the CONTAINER_NAME env variable then use that for our name
+if [[ -n ${CONTAINER_NAME} ]]; then
+    name="--name ${CONTAINER_NAME}"
+fi
+
+# Figure out the base of what we want as our sources
+# by using the top of the git repo
+if [[ -n ${WORKDIR} ]]; then
+    WORKDIR="${WORKDIR}"
+else
+    WORKDIR=$(git rev-parse --show-toplevel)
+fi
+
+# Kick off Docker
+einfo "*** Launching container ..."
+exec docker run \
+    ${DOCKER_ARGS} \
+    ${SSH_AUTH_SOCK:+-e SSH_AUTH_SOCK="/tmp/ssh-agent/${SSH_AUTH_NAME}"} \
+    -v "${WORKDIR}":/build:rw \
+    -v "${HOME}/.ssh":/root/.ssh:ro \
+    ${SSH_AUTH_DIR:+-v "${SSH_AUTH_DIR}":/tmp/ssh-agent} \
+    ${XEN_CONFIG_EXPERT:+-e XEN_CONFIG_EXPERT=${XEN_CONFIG_EXPERT}} \
+    ${EXTRA_CONTAINER_ARGS} ${name} \
+    -${termint}i --rm -- \
+    ${CONTAINER} \
+    ${cmd}
+

@@ -5,9 +5,12 @@ These Docker containers should make it possible to build Xen in
 any of the available environments on any system that supports
 running Docker. They are organized by distro and tagged with
 the version of that distro. They are available from the GitLab
-Container Registry under the Xen project at:
+Container Registry under the Xen project at the [registry] and
+can be pulled with Docker from the following path:
 
-registry.gitlab.com/xen-project/xen/DISTRO:VERSION
+```
+docker pull registry.gitlab.com/xen-project/xen/DISTRO:VERSION
+```
 
 To see the list of available containers run `make` in this
 directory. You will have to replace the `/` with a `:` to use
@@ -19,16 +22,50 @@ Building Xen
 From the top level of the source tree it should be possible to
 run the following:
 
-docker run --rm -it -v $(PWD):/build -u $(id -u) -e CC=gcc $(CONTAINER) make
+```
+./automation/scripts/containerize make
+```
 
-There are other modifications that can be made but this will run
-the `make` command inside the specified container. It will use your
-currently checked out source tree to build with, ensure that file
-permissions remain consistent and clean up after itself.
+Which will cause the top level `make` to execute within the default
+container, which is currently defined as Debian Stretch. Any arguments
+specified to the script will be executed within the container from
+the default shell.
+
+There are several environment variables which the containerize script
+understands.
+
+- CONTAINER: This overrides the container to use. For CentOS 7.2, use:
+
+  ```
+  CONTAINER=centos72 ./automation/scripts/containerize make
+  ```
+
+- WORKDIR: This overrides the path that will be available under the
+  `/build` directory in the container, which is the default path.
+
+  ```
+  WORKDIR=/some/other/path ./automation/scripts/containerize ls
+  ```
+
+- XEN_CONFIG_EXPERT: If this is defined in your shell it will be
+  automatically passed through to the container.
+
+- CONTAINER_NAME: By default the container name is set based on the
+  container itself so that its easy to attach other terminals to your
+  container. This however prevents you from running multiple containers
+  of the same version. Override the name value to cause it to name
+  the container differently on start.
+
+- EXTRA_CONTAINER_ARGS: Allows you to pass extra arguments to Docker
+  when starting the container.
 
 Building a container
 --------------------
 
 There is a makefile to make this process easier. You should be
 able to run `make DISTRO/VERSION` to have Docker build the container
-for you.
+for you. If you define the `PUSH` environment variable when running the
+former `make` command, it will push the container to the [registry] if
+you have access to do so.
+
+[registry]: https://gitlab.com/xen-project/xen/container_registry
