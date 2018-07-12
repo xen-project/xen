@@ -1495,6 +1495,15 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( smp_found_config )
         get_smp_config();
 
+    /*
+     * In the shim case, the number of CPUs should be solely controlled by the
+     * guest configuration file.
+     */
+    if ( pv_shim )
+    {
+        opt_nosmp = false;
+        max_cpus = 0;
+    }
     if ( opt_nosmp )
     {
         max_cpus = 0;

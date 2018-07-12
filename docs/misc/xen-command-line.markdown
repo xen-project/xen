@@ -1288,6 +1288,10 @@ free memory is getting low.  Specifying `0` will disable this notification.
 ### maxcpus (x86)
 > `= <integer>`
 
+Specify the maximum number of CPUs that should be brought up.
+
+This option is ignored in **pv-shim** mode.
+
 ### max\_cstate (x86)
 > `= <integer>`
 
@@ -1434,6 +1438,8 @@ seconds.
 
 Disable SMP support.  No secondary processors will be booted.
 Defaults to booting secondary processors.
+
+This option is ignored in **pv-shim** mode.
 
 ### nr\_irqs (x86)
 > `= <integer>`
