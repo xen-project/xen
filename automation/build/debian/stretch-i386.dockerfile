@@ -8,7 +8,7 @@ ENV USER root
 RUN mkdir /build
 WORKDIR /build
 
-ENTRYPOINT ["/usr/bin/setarch", "i686", "/bin/bash"]
+ENTRYPOINT ["linux32"]
 
 # build depends
 RUN apt-get update && \
