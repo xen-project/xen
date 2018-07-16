@@ -3453,8 +3453,10 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_MTRRdefType:
         if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
-        *msr_content = v->arch.hvm_vcpu.mtrr.def_type
-                        | (v->arch.hvm_vcpu.mtrr.enabled << 10);
+        *msr_content = v->arch.hvm_vcpu.mtrr.def_type |
+                       MASK_INSR(v->arch.hvm_vcpu.mtrr.enabled, MTRRdefType_E) |
+                       MASK_INSR(v->arch.hvm_vcpu.mtrr.fixed_enabled,
+                                 MTRRdefType_FE);
         break;
     case MSR_MTRRfix64K_00000:
         if ( !d->arch.cpuid->basic.mtrr )

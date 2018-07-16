@@ -195,11 +195,11 @@ static int get_mtrr_type(const struct mtrr_state *m,
    uint64_t    mask = -(uint64_t)PAGE_SIZE << order;
    unsigned int seg, num_var_ranges = MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT);
 
-   if ( unlikely(!(m->enabled & 0x2)) )
+   if ( unlikely(!m->enabled) )
        return MTRR_TYPE_UNCACHABLE;
 
    pa &= mask;
-   if ( (pa < 0x100000) && (m->enabled & 1) )
+   if ( (pa < 0x100000) && m->fixed_enabled )
    {
        /* Fixed range MTRR takes effect. */
        uint32_t addr = (uint32_t)pa, index;
@@ -391,7 +391,8 @@ bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
                              uint64_t msr_content)
 {
     uint8_t def_type = msr_content & 0xff;
-    uint8_t enabled = (msr_content >> 10) & 0x3;
+    bool fixed_enabled = MASK_EXTR(msr_content, MTRRdefType_FE);
+    bool enabled = MASK_EXTR(msr_content, MTRRdefType_E);
 
     if ( unlikely(!valid_mtrr_type(def_type)) )
     {
@@ -406,10 +407,12 @@ bool_t mtrr_def_type_msr_set(struct domain *d, struct mtrr_state *m,
          return 0;
     }
 
-    if ( m->enabled != enabled || m->def_type != def_type )
+    if ( m->enabled != enabled || m->fixed_enabled != fixed_enabled ||
+         m->def_type != def_type )
     {
         m->enabled = enabled;
         m->def_type = def_type;
+        m->fixed_enabled = fixed_enabled;
         memory_type_changed(d);
     }
 
@@ -478,10 +481,10 @@ bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs)
     const struct mtrr_state *md = &vd->arch.hvm_vcpu.mtrr;
     const struct mtrr_state *ms = &vs->arch.hvm_vcpu.mtrr;
 
-    if ( (md->enabled ^ ms->enabled) & 2 )
+    if ( md->enabled != ms->enabled )
         return true;
 
-    if ( md->enabled & 2 )
+    if ( md->enabled )
     {
         unsigned int num_var_ranges = MASK_EXTR(md->mtrr_cap, MTRRcap_VCNT);
 
@@ -490,10 +493,10 @@ bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs)
             return true;
 
         /* Test fixed ranges. */
-        if ( (md->enabled ^ ms->enabled) & 1 )
+        if ( md->fixed_enabled != ms->fixed_enabled )
             return true;
 
-        if ( (md->enabled & 1) &&
+        if ( md->fixed_enabled &&
              memcmp(md->fixed_ranges, ms->fixed_ranges,
                     sizeof(md->fixed_ranges)) )
             return true;
@@ -681,7 +684,9 @@ static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
         const struct mtrr_state *mtrr_state = &v->arch.hvm_vcpu.mtrr;
         struct hvm_hw_mtrr hw_mtrr = {
             .msr_mtrr_def_type = mtrr_state->def_type |
-                                 (mtrr_state->enabled << 10),
+                                 MASK_INSR(mtrr_state->fixed_enabled,
+                                           MTRRdefType_FE) |
+                                 MASK_INSR(mtrr_state->enabled, MTRRdefType_E),
             .msr_mtrr_cap      = mtrr_state->mtrr_cap,
         };
         unsigned int i;

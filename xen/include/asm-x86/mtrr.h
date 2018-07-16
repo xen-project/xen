@@ -50,8 +50,9 @@ struct mtrr_var_range {
 struct mtrr_state {
 	struct mtrr_var_range *var_ranges;
 	mtrr_type fixed_ranges[NUM_FIXED_RANGES];
-	unsigned char enabled;
-	unsigned char have_fixed;
+	bool enabled;
+	bool fixed_enabled;
+	bool have_fixed;
 	mtrr_type def_type;
 
 	u64       mtrr_cap;

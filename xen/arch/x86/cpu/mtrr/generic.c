@@ -80,7 +80,8 @@ void __init get_mtrr_state(void)
 
 	rdmsrl(MSR_MTRRdefType, msr_content);
 	mtrr_state.def_type = (msr_content & 0xff);
-	mtrr_state.enabled = (msr_content & 0xc00) >> 10;
+	mtrr_state.enabled = MASK_EXTR(msr_content, MTRRdefType_E);
+	mtrr_state.fixed_enabled = MASK_EXTR(msr_content, MTRRdefType_FE);
 
 	/* Store mtrr_cap for HVM MTRR virtualisation. */
 	rdmsrl(MSR_MTRRcap, mtrr_state.mtrr_cap);
@@ -159,7 +160,7 @@ static void __init print_mtrr_state(const char *level)
 		unsigned int base = 0, step = 0x10000;
 
 		printk("%sMTRR fixed ranges %sabled:\n", level,
-		       mtrr_state.enabled & 1 ? "en" : "dis");
+		       mtrr_state.fixed_enabled ? "en" : "dis");
 		for (; block->ranges; ++block, step >>= 2) {
 			for (i = 0; i < block->ranges; ++i, fr += 8) {
 				print_fixed(base, step, fr, level);
@@ -169,7 +170,7 @@ static void __init print_mtrr_state(const char *level)
 		print_fixed_last(level);
 	}
 	printk("%sMTRR variable ranges %sabled:\n", level,
-	       mtrr_state.enabled & 2 ? "en" : "dis");
+	       mtrr_state.enabled ? "en" : "dis");
 	width = (paddr_bits - PAGE_SHIFT + 3) / 4;
 
 	for (i = 0; i < num_var_ranges; ++i) {
@@ -383,8 +384,11 @@ static unsigned long set_mtrr_state(void)
 	/*  Set_mtrr_restore restores the old value of MTRRdefType,
 	   so to set it we fiddle with the saved value  */
 	if ((deftype & 0xff) != mtrr_state.def_type
-	    || ((deftype & 0xc00) >> 10) != mtrr_state.enabled) {
-		deftype = (deftype & ~0xcff) | mtrr_state.def_type | (mtrr_state.enabled << 10);
+	    || MASK_EXTR(deftype, MTRRdefType_E) != mtrr_state.enabled
+	    || MASK_EXTR(deftype, MTRRdefType_FE) != mtrr_state.fixed_enabled) {
+		deftype = (deftype & ~0xcff) | mtrr_state.def_type |
+		          MASK_INSR(mtrr_state.enabled, MTRRdefType_E) |
+		          MASK_INSR(mtrr_state.fixed_enabled, MTRRdefType_FE);
 		change_mask |= MTRR_CHANGE_MASK_DEFTYPE;
 	}
 

@@ -98,6 +98,8 @@
 #define MSR_MTRRfix4K_F0000		0x0000026e
 #define MSR_MTRRfix4K_F8000		0x0000026f
 #define MSR_MTRRdefType			0x000002ff
+#define MTRRdefType_FE			(1u << 10)
+#define MTRRdefType_E			(1u << 11)
 
 #define MSR_IA32_DEBUGCTLMSR		0x000001d9
 #define IA32_DEBUGCTLMSR_LBR		(1<<0) /* Last Branch Record */
