@@ -1893,7 +1893,6 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
     vaddr_t gva;
     paddr_t gpa;
     uint8_t fsc = xabt.fsc & ~FSC_LL_MASK;
-    mfn_t mfn;
     bool is_data = (hsr.ec == HSR_EC_DATA_ABORT_LOWER_EL);
 
     /*
@@ -1972,12 +1971,11 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
         }
 
         /*
-         * The PT walk may have failed because someone was playing
-         * with the Stage-2 page table. Walk the Stage-2 PT to check
-         * if the entry exists. If it's the case, return to the guest
+         * First check if the translation fault can be resolved by the
+         * P2M subsystem. If that's the case nothing else to do.
          */
-        mfn = gfn_to_mfn(current->domain, gaddr_to_gfn(gpa));
-        if ( !mfn_eq(mfn, INVALID_MFN) )
+        if ( p2m_resolve_translation_fault(current->domain,
+                                           gaddr_to_gfn(gpa)) )
             return;
 
         if ( is_data && try_map_mmio(gaddr_to_gfn(gpa)) )

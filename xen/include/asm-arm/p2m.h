@@ -226,6 +226,8 @@ int p2m_set_entry(struct p2m_domain *p2m,
                   p2m_type_t t,
                   p2m_access_t a);
 
+bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn);
+
 /* Clean & invalidate caches corresponding to a region of guest address space */
 int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr);
 

@@ -1035,6 +1035,148 @@ int p2m_set_entry(struct p2m_domain *p2m,
     return rc;
 }
 
+/* Invalidate all entries in the table. The p2m should be write locked. */
+static void p2m_invalidate_table(struct p2m_domain *p2m, mfn_t mfn)
+{
+    lpae_t *table;
+    unsigned int i;
+
+    ASSERT(p2m_is_write_locked(p2m));
+
+    table = map_domain_page(mfn);
+
+    for ( i = 0; i < LPAE_ENTRIES; i++ )
+    {
+        lpae_t pte = table[i];
+
+        /*
+         * Writing an entry can be expensive because it may involve
+         * cleaning the cache. So avoid updating the entry if the valid
+         * bit is already cleared.
+         */
+        if ( !pte.p2m.valid )
+            continue;
+
+        pte.p2m.valid = 0;
+
+        p2m_write_pte(&table[i], pte, p2m->clean_pte);
+    }
+
+    unmap_domain_page(table);
+
+    p2m->need_flush = true;
+}
+
+/*
+ * Resolve any translation fault due to change in the p2m. This
+ * includes break-before-make and valid bit cleared.
+ */
+bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned int level = 0;
+    bool resolved = false;
+    lpae_t entry, *table;
+    paddr_t addr = gfn_to_gaddr(gfn);
+
+    /* Convenience aliases */
+    const unsigned int offsets[4] = {
+        zeroeth_table_offset(addr),
+        first_table_offset(addr),
+        second_table_offset(addr),
+        third_table_offset(addr)
+    };
+
+    p2m_write_lock(p2m);
+
+    /* This gfn is higher than the highest the p2m map currently holds */
+    if ( gfn_x(gfn) > gfn_x(p2m->max_mapped_gfn) )
+        goto out;
+
+    table = p2m_get_root_pointer(p2m, gfn);
+    /*
+     * The table should always be non-NULL because the gfn is below
+     * p2m->max_mapped_gfn and the root table pages are always present.
+     */
+    BUG_ON(table == NULL);
+
+    /*
+     * Go down the page-tables until an entry has the valid bit unset or
+     * a block/page entry has been hit.
+     */
+    for ( level = P2M_ROOT_LEVEL; level <= 3; level++ )
+    {
+        int rc;
+
+        entry = table[offsets[level]];
+
+        if ( level == 3 )
+            break;
+
+        /* Stop as soon as we hit an entry with the valid bit unset. */
+        if ( !lpae_is_valid(entry) )
+            break;
+
+        rc = p2m_next_level(p2m, true, level, &table, offsets[level]);
+        if ( rc == GUEST_TABLE_MAP_FAILED )
+            goto out_unmap;
+        else if ( rc != GUEST_TABLE_NORMAL_PAGE )
+            break;
+    }
+
+    /*
+     * If the valid bit of the entry is set, it means someone was playing with
+     * the Stage-2 page table. Nothing to do and mark the fault as resolved.
+     */
+    if ( lpae_is_valid(entry) )
+    {
+        resolved = true;
+        goto out_unmap;
+    }
+
+    /*
+     * The valid bit is unset. If the entry is still not valid then the fault
+     * cannot be resolved, exit and report it.
+     */
+    if ( !p2m_is_valid(entry) )
+        goto out_unmap;
+
+    /*
+     * Now we have an entry with valid bit unset, but still valid from
+     * the P2M point of view.
+     *
+     * If an entry is pointing to a table, each entry of the table will
+     * have there valid bit cleared. This allows a function to clear the
+     * full p2m with just a couple of write. The valid bit will then be
+     * propagated on the fault.
+     * If an entry is pointing to a block/page, no work to do for now.
+     */
+    if ( lpae_is_table(entry, level) )
+        p2m_invalidate_table(p2m, lpae_get_mfn(entry));
+
+    /*
+     * Now that the work on the entry is done, set the valid bit to prevent
+     * another fault on that entry.
+     */
+    resolved = true;
+    entry.p2m.valid = 1;
+
+    p2m_write_pte(table + offsets[level], entry, p2m->clean_pte);
+
+    /*
+     * No need to flush the TLBs as the modified entry had the valid bit
+     * unset.
+     */
+
+out_unmap:
+    unmap_domain_page(table);
+
+out:
+    p2m_write_unlock(p2m);
+
+    return resolved;
+}
+
 static inline int p2m_insert_mapping(struct domain *d,
                                      gfn_t start_gfn,
                                      unsigned long nr,
