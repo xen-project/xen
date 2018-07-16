@@ -413,7 +413,7 @@ only available when used together with `pv-in-pvh`.
 makes sense on its own.
 
 ### console\_timestamps
-> `= none | date | datems | boot`
+> `= none | date | datems | boot | raw`
 
 > Default: `none`
 
@@ -428,6 +428,8 @@ Specify which timestamp format Xen should use for each console line.
     * `[YYYY-MM-DD HH:MM:SS.mmm]`
 * `boot`: Seconds and microseconds since boot
     * `[SSSSSS.uuuuuu]`
++ `raw`: Raw platform ticks, architecture and implementation dependent
+    * `[XXXXXXXXXXXXXXXX]`
 
 For compatibility with the older boolean parameter, specifying
 `console_timestamps` alone will enable the `date` option.

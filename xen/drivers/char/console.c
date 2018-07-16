@@ -68,7 +68,8 @@ enum con_timestamp_mode
     TSM_NONE,          /* No timestamps */
     TSM_DATE,          /* [YYYY-MM-DD HH:MM:SS] */
     TSM_DATE_MS,       /* [YYYY-MM-DD HH:MM:SS.mmm] */
-    TSM_BOOT           /* [SSSSSS.uuuuuu] */
+    TSM_BOOT,          /* [SSSSSS.uuuuuu] */
+    TSM_RAW,           /* [XXXXXXXXXXXXXXXX] */
 };
 
 static enum con_timestamp_mode __read_mostly opt_con_timestamp_mode = TSM_NONE;
@@ -676,6 +677,8 @@ static int parse_console_timestamps(const char *s)
         opt_con_timestamp_mode = TSM_DATE_MS;
     else if ( !strcmp(s, "boot") )
         opt_con_timestamp_mode = TSM_BOOT;
+    else if ( !strcmp(s, "raw") )
+        opt_con_timestamp_mode = TSM_RAW;
     else if ( !strcmp(s, "none") )
         opt_con_timestamp_mode = TSM_NONE;
     else
@@ -699,25 +702,36 @@ static void printk_start_of_line(const char *prefix)
         tm = wallclock_time(&nsec);
 
         if ( tm.tm_mday == 0 )
-            return;
-
-        if ( opt_con_timestamp_mode == TSM_DATE )
+            /* nothing */;
+        else if ( opt_con_timestamp_mode == TSM_DATE )
+        {
             snprintf(tstr, sizeof(tstr), "[%04u-%02u-%02u %02u:%02u:%02u] ",
                      1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
                      tm.tm_hour, tm.tm_min, tm.tm_sec);
+            break;
+        }
         else
+        {
             snprintf(tstr, sizeof(tstr),
                      "[%04u-%02u-%02u %02u:%02u:%02u.%03"PRIu64"] ",
                      1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
                      tm.tm_hour, tm.tm_min, tm.tm_sec, nsec / 1000000);
-        break;
-
+            break;
+        }
+        /* fall through */
     case TSM_BOOT:
         sec = NOW();
         nsec = do_div(sec, 1000000000);
 
-        snprintf(tstr, sizeof(tstr), "[%5"PRIu64".%06"PRIu64"] ",
-                 sec, nsec / 1000);
+        if ( sec | nsec )
+        {
+            snprintf(tstr, sizeof(tstr), "[%5"PRIu64".%06"PRIu64"] ",
+                     sec, nsec / 1000);
+            break;
+        }
+        /* fall through */
+    case TSM_RAW:
+        snprintf(tstr, sizeof(tstr), "[%016"PRIx64"] ", get_cycles());
         break;
 
     case TSM_NONE:

@@ -5,11 +5,11 @@
     DT_MATCH_COMPATIBLE("arm,armv7-timer"), \
     DT_MATCH_COMPATIBLE("arm,armv8-timer")
 
-typedef unsigned long cycles_t;
+typedef uint64_t cycles_t;
 
 static inline cycles_t get_cycles (void)
 {
-        return 0;
+        return READ_SYSREG64(CNTPCT_EL0);
 }
 
 /* List of timer's IRQ */
