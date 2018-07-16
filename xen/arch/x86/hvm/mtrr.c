@@ -673,22 +673,22 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
 
 static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 {
-    int i;
     struct vcpu *v;
-    struct hvm_hw_mtrr hw_mtrr;
-    struct mtrr_state *mtrr_state;
+
     /* save mtrr&pat */
     for_each_vcpu(d, v)
     {
-        mtrr_state = &v->arch.hvm_vcpu.mtrr;
+        const struct mtrr_state *mtrr_state = &v->arch.hvm_vcpu.mtrr;
+        struct hvm_hw_mtrr hw_mtrr = {
+            .msr_mtrr_def_type = mtrr_state->def_type |
+                                 (mtrr_state->enabled << 10),
+            .msr_mtrr_cap      = mtrr_state->mtrr_cap,
+        };
+        unsigned int i;
 
         hvm_get_guest_pat(v, &hw_mtrr.msr_pat_cr);
 
-        hw_mtrr.msr_mtrr_def_type = mtrr_state->def_type
-                                | (mtrr_state->enabled << 10);
-        hw_mtrr.msr_mtrr_cap = mtrr_state->mtrr_cap;
-
-        for ( i = 0; i < MTRR_VCNT; i++ )
+        for ( i = 0; i < MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT); i++ )
         {
             /* save physbase */
             hw_mtrr.msr_mtrr_var[i*2] =
@@ -726,6 +726,14 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(MTRR, h, &hw_mtrr) != 0 )
         return -EINVAL;
 
+    if ( MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT) > MTRR_VCNT )
+    {
+        dprintk(XENLOG_G_ERR,
+                "HVM restore: %pv: too many (%lu) variable range MTRRs\n",
+                v, MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT));
+        return -EINVAL;
+    }
+
     mtrr_state = &v->arch.hvm_vcpu.mtrr;
 
     hvm_set_guest_pat(v, hw_mtrr.msr_pat_cr);
@@ -735,7 +743,7 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     for ( i = 0; i < NUM_FIXED_MSR; i++ )
         mtrr_fix_range_msr_set(d, mtrr_state, i, hw_mtrr.msr_mtrr_fixed[i]);
 
-    for ( i = 0; i < MTRR_VCNT; i++ )
+    for ( i = 0; i < MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT); i++ )
     {
         mtrr_var_range_msr_set(d, mtrr_state,
                                MSR_IA32_MTRR_PHYSBASE(i),
