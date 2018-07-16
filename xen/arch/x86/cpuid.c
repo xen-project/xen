@@ -389,6 +389,10 @@ static void __init calculate_host_policy(void)
     recalculate_xstate(p);
     recalculate_misc(p);
 
+    /* When vPMU is disabled, drop it from the host policy. */
+    if ( vpmu_mode == XENPMU_MODE_OFF )
+        p->basic.raw[0xa] = EMPTY_LEAF;
+
     if ( p->extd.svm )
     {
         /* Clamp to implemented features which require hardware support. */
@@ -688,6 +692,10 @@ void recalculate_cpuid_policy(struct domain *d)
             break;
         }
     }
+
+    if ( vpmu_mode == XENPMU_MODE_OFF ||
+         ((vpmu_mode & XENPMU_MODE_ALL) && !is_hardware_domain(d)) )
+        p->basic.raw[0xa] = EMPTY_LEAF;
 
     if ( !p->extd.svm )
         p->extd.raw[0xa] = EMPTY_LEAF;
