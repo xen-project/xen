@@ -84,6 +84,7 @@ AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
+AX_ARG_DEFAULT_ENABLE([ipxe], [Disable IPXE])
 
 AC_ARG_WITH([linux-backend-modules],
     AS_HELP_STRING([--with-linux-backend-modules="mod1 mod2"],
@@ -239,6 +240,28 @@ AS_IF([test "x$ovmf" = "xy" -o -n "$ovmf_path" ], [
     AC_DEFINE_UNQUOTED([OVMF_PATH],
                        ["${ovmf_path:-$XENFIRMWAREDIR/ovmf.bin}"],
                        [OVMF path])
+])
+
+AC_ARG_WITH([system-ipxe],
+    AS_HELP_STRING([--with-system-ipxe@<:@=PATH@:>@],
+       [Use system supplied IPXE PATH instead of building and installing
+        our own version]),[
+    # Disable compilation of IPXE.
+    ipxe=n
+    case $withval in
+        no) ipxe_path= ;;
+        *)  ipxe_path=$withval ;;
+    esac
+
+    # IPXE depends on Rombios
+    if test "x$enable_rombios" = "xno"; then
+        AC_MSG_ERROR([Rombios is required for using IPXE])
+    fi
+],[])
+AS_IF([test "x$ipxe" = "xy" -o -n "$ipxe_path" ], [
+    AC_DEFINE_UNQUOTED([IPXE_PATH],
+                       ["${ipxe_path:-$XENFIRMWAREDIR/ipxe.bin}"],
+                       [IPXE path])
 ])
 
 AC_ARG_WITH([extra-qemuu-configure-args],

@@ -96,6 +96,9 @@
 /* libutil header file name */
 #undef INCLUDE_LIBUTIL_H
 
+/* IPXE path */
+#undef IPXE_PATH
+
 /* OVMF path */
 #undef OVMF_PATH
 

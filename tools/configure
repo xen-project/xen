@@ -703,6 +703,7 @@ AS86
 qemu_traditional
 blktap2
 LINUX_BACKEND_MODULES
+ipxe
 seabios
 ovmf
 xsmpolicy
@@ -805,6 +806,7 @@ enable_ocamltools
 enable_xsmpolicy
 enable_ovmf
 enable_seabios
+enable_ipxe
 with_linux_backend_modules
 enable_blktap2
 enable_qemu_traditional
@@ -812,6 +814,7 @@ enable_rombios
 with_system_qemu
 with_system_seabios
 with_system_ovmf
+with_system_ipxe
 with_extra_qemuu_configure_args
 with_xenstored
 enable_systemd
@@ -1488,6 +1491,7 @@ Optional Features:
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
+  --disable-ipxe          Disable IPXE (default is ENABLED)
   --enable-blktap2        Enable blktap2, (DEFAULT is off)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
@@ -1526,6 +1530,9 @@ Optional Packages:
                           and installing our own version
   --with-system-ovmf[=PATH]
                           Use system supplied OVMF PATH instead of building
+                          and installing our own version
+  --with-system-ipxe[=PATH]
+                          Use system supplied IPXE PATH instead of building
                           and installing our own version
   --with-extra-qemuu-configure-args[="--ARG1 ..."]
                           List of additional configure options for upstream
@@ -4184,6 +4191,29 @@ seabios=$ax_cv_seabios
 
 
 
+# Check whether --enable-ipxe was given.
+if test "${enable_ipxe+set}" = set; then :
+  enableval=$enable_ipxe;
+fi
+
+
+if test "x$enable_ipxe" = "xno"; then :
+
+    ax_cv_ipxe="n"
+
+elif test "x$enable_ipxe" = "xyes"; then :
+
+    ax_cv_ipxe="y"
+
+elif test -z $ax_cv_ipxe; then :
+
+    ax_cv_ipxe="y"
+
+fi
+ipxe=$ax_cv_ipxe
+
+
+
 
 # Check whether --with-linux-backend-modules was given.
 if test "${with_linux_backend_modules+set}" = set; then :
@@ -4567,6 +4597,34 @@ if test "x$ovmf" = "xy" -o -n "$ovmf_path" ; then :
 
 cat >>confdefs.h <<_ACEOF
 #define OVMF_PATH "${ovmf_path:-$XENFIRMWAREDIR/ovmf.bin}"
+_ACEOF
+
+
+fi
+
+
+# Check whether --with-system-ipxe was given.
+if test "${with_system_ipxe+set}" = set; then :
+  withval=$with_system_ipxe;
+    # Disable compilation of IPXE.
+    ipxe=n
+    case $withval in
+        no) ipxe_path= ;;
+        *)  ipxe_path=$withval ;;
+    esac
+
+    # IPXE depends on Rombios
+    if test "x$enable_rombios" = "xno"; then
+        as_fn_error $? "Rombios is required for using IPXE" "$LINENO" 5
+    fi
+
+fi
+
+if test "x$ipxe" = "xy" -o -n "$ipxe_path" ; then :
+
+
+cat >>confdefs.h <<_ACEOF
+#define IPXE_PATH "${ipxe_path:-$XENFIRMWAREDIR/ipxe.bin}"
 _ACEOF
 
 

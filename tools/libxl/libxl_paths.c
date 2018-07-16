@@ -55,7 +55,11 @@ const char *libxl__ovmf_path(void)
 
 const char *libxl__ipxe_path(void)
 {
-    return XENFIRMWAREDIR "/ipxe.bin";
+#ifdef IPXE_PATH
+    return IPXE_PATH;
+#else
+    return NULL;
+#endif
 }
 
 /*
