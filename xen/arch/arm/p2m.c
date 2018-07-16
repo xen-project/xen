@@ -369,14 +369,14 @@ out:
 
 mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
 {
-    mfn_t ret;
+    mfn_t mfn;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     p2m_read_lock(p2m);
-    ret = p2m_get_entry(p2m, gfn, t, NULL, NULL);
+    mfn = p2m_get_entry(p2m, gfn, t, NULL, NULL);
     p2m_read_unlock(p2m);
 
-    return ret;
+    return mfn;
 }
 
 int guest_physmap_mark_populate_on_demand(struct domain *d,
