@@ -3476,10 +3476,13 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         index = msr - MSR_MTRRfix4K_C0000;
         *msr_content = fixed_range_base[index + 3];
         break;
-    case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT-1):
+    case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT_MAX - 1):
         if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_IA32_MTRR_PHYSBASE(0);
+        if ( (index / 2) >=
+             MASK_EXTR(v->arch.hvm_vcpu.mtrr.mtrr_cap, MTRRcap_VCNT) )
+            goto gp_fault;
         *msr_content = var_range_base[index];
         break;
 
@@ -3637,10 +3640,13 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
                                      index, msr_content) )
             goto gp_fault;
         break;
-    case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT-1):
+    case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT_MAX - 1):
         if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
-        if ( !mtrr_var_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
+        index = msr - MSR_IA32_MTRR_PHYSBASE(0);
+        if ( ((index / 2) >=
+              MASK_EXTR(v->arch.hvm_vcpu.mtrr.mtrr_cap, MTRRcap_VCNT)) ||
+             !mtrr_var_range_msr_set(v->domain, &v->arch.hvm_vcpu.mtrr,
                                      msr, msr_content) )
             goto gp_fault;
         break;

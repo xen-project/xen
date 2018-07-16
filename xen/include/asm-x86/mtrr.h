@@ -39,6 +39,9 @@ typedef u8 mtrr_type;
 #define MTRR_PHYSBASE_SHIFT      12
 /* Number of variable range MSR pairs we emulate for HVM guests: */
 #define MTRR_VCNT                8
+/* Maximum number of variable range MSR pairs if FE is supported. */
+#define MTRR_VCNT_MAX            ((MSR_MTRRfix64K_00000 - \
+                                   MSR_IA32_MTRR_PHYSBASE(0)) / 2)
 
 struct mtrr_var_range {
 	uint64_t base;

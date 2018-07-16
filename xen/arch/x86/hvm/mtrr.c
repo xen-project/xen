@@ -154,14 +154,26 @@ uint8_t pat_type_2_pte_flags(uint8_t pat_type)
 int hvm_vcpu_cacheattr_init(struct vcpu *v)
 {
     struct mtrr_state *m = &v->arch.hvm_vcpu.mtrr;
+    unsigned int num_var_ranges =
+        is_hardware_domain(v->domain) ? MASK_EXTR(mtrr_state.mtrr_cap,
+                                                  MTRRcap_VCNT)
+                                      : MTRR_VCNT;
+
+    if ( num_var_ranges > MTRR_VCNT_MAX )
+    {
+        ASSERT(is_hardware_domain(v->domain));
+        printk("WARNING: limited Dom%u variable range MTRRs from %u to %u\n",
+               v->domain->domain_id, num_var_ranges, MTRR_VCNT_MAX);
+        num_var_ranges = MTRR_VCNT_MAX;
+    }
 
     memset(m, 0, sizeof(*m));
 
-    m->var_ranges = xzalloc_array(struct mtrr_var_range, MTRR_VCNT);
+    m->var_ranges = xzalloc_array(struct mtrr_var_range, num_var_ranges);
     if ( m->var_ranges == NULL )
         return -ENOMEM;
 
-    m->mtrr_cap = (1u << 10) | (1u << 8) | MTRR_VCNT;
+    m->mtrr_cap = (1u << 10) | (1u << 8) | num_var_ranges;
 
     v->arch.hvm_vcpu.pat_cr =
         ((uint64_t)PAT_TYPE_WRBACK) |               /* PAT0: WB */
@@ -448,6 +460,12 @@ bool_t mtrr_var_range_msr_set(
     uint64_t *var_range_base = (uint64_t*)m->var_ranges;
 
     index = msr - MSR_IA32_MTRR_PHYSBASE(0);
+    if ( (index / 2) >= MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT) )
+    {
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
     if ( var_range_base[index] == msr_content )
         return 1;
 
@@ -690,6 +708,15 @@ static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
             .msr_mtrr_cap      = mtrr_state->mtrr_cap,
         };
         unsigned int i;
+
+        if ( MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT) >
+             (ARRAY_SIZE(hw_mtrr.msr_mtrr_var) / 2) )
+        {
+            dprintk(XENLOG_G_ERR,
+                    "HVM save: %pv: too many (%lu) variable range MTRRs\n",
+                    v, MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT));
+            return -EINVAL;
+        }
 
         hvm_get_guest_pat(v, &hw_mtrr.msr_pat_cr);
 
