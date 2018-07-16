@@ -185,6 +185,32 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v)
         ((uint64_t)PAT_TYPE_UC_MINUS << 48) |       /* PAT6: UC- */
         ((uint64_t)PAT_TYPE_UNCACHABLE << 56);      /* PAT7: UC */
 
+    if ( is_hardware_domain(v->domain) )
+    {
+        /* Copy values from the host. */
+        struct domain *d = v->domain;
+        unsigned int i;
+
+        if ( mtrr_state.have_fixed )
+            for ( i = 0; i < NUM_FIXED_MSR; i++ )
+                mtrr_fix_range_msr_set(d, m, i,
+                                      ((uint64_t *)mtrr_state.fixed_ranges)[i]);
+
+        for ( i = 0; i < num_var_ranges; i++ )
+        {
+            mtrr_var_range_msr_set(d, m, MSR_IA32_MTRR_PHYSBASE(i),
+                                   mtrr_state.var_ranges[i].base);
+            mtrr_var_range_msr_set(d, m, MSR_IA32_MTRR_PHYSMASK(i),
+                                   mtrr_state.var_ranges[i].mask);
+        }
+
+        mtrr_def_type_msr_set(d, m,
+                              mtrr_state.def_type |
+                              MASK_INSR(mtrr_state.fixed_enabled,
+                                        MTRRdefType_FE) |
+                              MASK_INSR(mtrr_state.enabled, MTRRdefType_E));
+    }
+
     return 0;
 }
 
