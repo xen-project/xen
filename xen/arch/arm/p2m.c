@@ -1425,17 +1425,24 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
 
     if ( par )
     {
+        /*
+         * When memaccess is enabled, the translation GVA to MADDR may
+         * have failed because of a permission fault.
+         */
+        if ( p2m->mem_access_enabled )
+            return p2m_mem_access_check_and_get_page(va, flags, v);
+
         dprintk(XENLOG_G_DEBUG,
                 "%pv: gvirt_to_maddr failed va=%#"PRIvaddr" flags=0x%lx par=%#"PRIx64"\n",
                 v, va, flags, par);
-        goto err;
+        return NULL;
     }
 
     if ( !mfn_valid(maddr_to_mfn(maddr)) )
     {
         dprintk(XENLOG_G_DEBUG, "%pv: Invalid MFN %#"PRI_mfn"\n",
                 v, mfn_x(maddr_to_mfn(maddr)));
-        goto err;
+        return NULL;
     }
 
     page = mfn_to_page(maddr_to_mfn(maddr));
@@ -1445,12 +1452,8 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     {
         dprintk(XENLOG_G_DEBUG, "%pv: Failing to acquire the MFN %#"PRI_mfn"\n",
                 v, mfn_x(maddr_to_mfn(maddr)));
-        page = NULL;
+        return NULL;
     }
-
-err:
-    if ( !page && p2m->mem_access_enabled )
-        page = p2m_mem_access_check_and_get_page(va, flags, v);
 
     return page;
 }
