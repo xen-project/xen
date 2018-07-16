@@ -1415,9 +1415,13 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     if ( v != current )
         return NULL;
 
+    /*
+     * The lock is here to protect us against the break-before-make
+     * sequence used when updating the entry.
+     */
     p2m_read_lock(p2m);
-
     par = gvirt_to_maddr(va, &maddr, flags);
+    p2m_read_unlock(p2m);
 
     if ( par )
     {
@@ -1445,8 +1449,6 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     }
 
 err:
-    p2m_read_unlock(p2m);
-
     if ( !page && p2m->mem_access_enabled )
         page = p2m_mem_access_check_and_get_page(va, flags, v);
 
