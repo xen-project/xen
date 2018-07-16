@@ -778,6 +778,8 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
     unsigned int target = 3 - (page_order / LPAE_SHIFT);
     lpae_t *entry, *table, orig_pte;
     int rc;
+    /* A mapping is removed if the MFN is invalid. */
+    bool removing_mapping = mfn_eq(smfn, INVALID_MFN);
 
     /* Convenience aliases */
     const unsigned int offsets[4] = {
@@ -803,9 +805,9 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
     {
         /*
          * Don't try to allocate intermediate page table if the mapping
-         * is about to be removed (i.e mfn == INVALID_MFN).
+         * is about to be removed.
          */
-        rc = p2m_next_level(p2m, mfn_eq(smfn, INVALID_MFN),
+        rc = p2m_next_level(p2m, removing_mapping,
                             level, &table, offsets[level]);
         if ( rc == GUEST_TABLE_MAP_FAILED )
         {
@@ -816,7 +818,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
              * when removing a mapping as it may not exist in the
              * page table. In this case, just ignore it.
              */
-            rc = mfn_eq(smfn, INVALID_MFN) ? 0 : -ENOENT;
+            rc = removing_mapping ?  0 : -ENOENT;
             goto out;
         }
         else if ( rc != GUEST_TABLE_NORMAL_PAGE )
@@ -911,7 +913,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
     if ( lpae_is_valid(orig_pte) )
         p2m_remove_pte(entry, p2m->clean_pte);
 
-    if ( mfn_eq(smfn, INVALID_MFN) )
+    if ( removing_mapping )
         /* Flush can be deferred if the entry is removed */
         p2m->need_flush |= !!lpae_is_valid(orig_pte);
     else
