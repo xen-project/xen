@@ -871,3 +871,13 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     return MTRR_TYPE_UNCACHABLE;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
