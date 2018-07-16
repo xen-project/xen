@@ -1005,7 +1005,7 @@ static int create_xen_entries(enum xenmap_operation op,
             }
         }
 
-        BUG_ON(!lpae_valid(*entry));
+        BUG_ON(!lpae_is_valid(*entry));
 
         third = __mfn_to_virt(entry->pt.base);
         entry = &third[third_table_offset(addr)];
@@ -1013,7 +1013,7 @@ static int create_xen_entries(enum xenmap_operation op,
         switch ( op ) {
             case INSERT:
             case RESERVE:
-                if ( lpae_valid(*entry) )
+                if ( lpae_is_valid(*entry) )
                 {
                     printk("%s: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
                            __func__, addr, mfn_x(mfn));
@@ -1030,7 +1030,7 @@ static int create_xen_entries(enum xenmap_operation op,
                 break;
             case MODIFY:
             case REMOVE:
-                if ( !lpae_valid(*entry) )
+                if ( !lpae_is_valid(*entry) )
                 {
                     printk("%s: trying to %s a non-existing mapping addr=%lx\n",
                            __func__, op == REMOVE ? "remove" : "modify", addr);

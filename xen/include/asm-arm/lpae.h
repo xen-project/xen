@@ -128,19 +128,19 @@ typedef union {
     lpae_walk_t walk;
 } lpae_t;
 
-static inline bool lpae_valid(lpae_t pte)
+static inline bool lpae_is_valid(lpae_t pte)
 {
     return pte.walk.valid;
 }
 
 static inline bool lpae_is_table(lpae_t pte, unsigned int level)
 {
-    return (level < 3) && lpae_valid(pte) && pte.walk.table;
+    return (level < 3) && lpae_is_valid(pte) && pte.walk.table;
 }
 
 static inline bool lpae_is_mapping(lpae_t pte, unsigned int level)
 {
-    if ( !lpae_valid(pte) )
+    if ( !lpae_is_valid(pte) )
         return false;
     else if ( level == 3 )
         return pte.walk.table;
@@ -155,7 +155,7 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 
 static inline bool lpae_is_page(lpae_t pte, unsigned int level)
 {
-    return (level == 3) && lpae_valid(pte) && pte.walk.table;
+    return (level == 3) && lpae_is_valid(pte) && pte.walk.table;
 }
 
 /*

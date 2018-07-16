@@ -546,7 +546,7 @@ static int guest_walk_ld(const struct vcpu *v,
          * - The PTE is not valid.
          * - If (level < 3) and the PTE is valid, we found a block descriptor.
          */
-        if ( level == 3 || !lpae_valid(pte) || lpae_is_superpage(pte, level) )
+        if ( level == 3 || !lpae_is_valid(pte) || lpae_is_superpage(pte, level) )
             break;
 
         /*

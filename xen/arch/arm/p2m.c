@@ -250,7 +250,7 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
 
     entry = *table + offset;
 
-    if ( !lpae_valid(*entry) )
+    if ( !lpae_is_valid(*entry) )
     {
         if ( read_only )
             return GUEST_TABLE_MAP_FAILED;
@@ -342,7 +342,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
 
     entry = table[offsets[level]];
 
-    if ( lpae_valid(entry) )
+    if ( lpae_is_valid(entry) )
     {
         *t = entry.p2m.type;
 
@@ -546,7 +546,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
     lpae_t *p;
     lpae_t pte;
 
-    ASSERT(!lpae_valid(*entry));
+    ASSERT(!lpae_is_valid(*entry));
 
     page = alloc_domheap_page(NULL, 0);
     if ( page == NULL )
@@ -610,7 +610,7 @@ static int p2m_mem_access_radix_set(struct p2m_domain *p2m, gfn_t gfn,
  */
 static void p2m_put_l3_page(const lpae_t pte)
 {
-    ASSERT(lpae_valid(pte));
+    ASSERT(lpae_is_valid(pte));
 
     /*
      * TODO: Handle other p2m types
@@ -638,7 +638,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
     struct page_info *pg;
 
     /* Nothing to do if the entry is invalid. */
-    if ( !lpae_valid(entry) )
+    if ( !lpae_is_valid(entry) )
         return;
 
     /* Nothing to do but updating the stats if the entry is a super-page. */
@@ -908,12 +908,12 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
      * sequence when updating the translation table (D4.7.1 in ARM DDI
      * 0487A.j).
      */
-    if ( lpae_valid(orig_pte) )
+    if ( lpae_is_valid(orig_pte) )
         p2m_remove_pte(entry, p2m->clean_pte);
 
     if ( mfn_eq(smfn, INVALID_MFN) )
         /* Flush can be deferred if the entry is removed */
-        p2m->need_flush |= !!lpae_valid(orig_pte);
+        p2m->need_flush |= !!lpae_is_valid(orig_pte);
     else
     {
         lpae_t pte = mfn_to_p2m_entry(smfn, t, a);
@@ -928,7 +928,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
          * Although, it could be defered when only the permissions are
          * changed (e.g in case of memaccess).
          */
-        if ( lpae_valid(orig_pte) )
+        if ( lpae_is_valid(orig_pte) )
         {
             if ( likely(!p2m->mem_access_enabled) ||
                  P2M_CLEAR_PERM(pte) != P2M_CLEAR_PERM(orig_pte) )
@@ -950,11 +950,11 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
      * Free the entry only if the original pte was valid and the base
      * is different (to avoid freeing when permission is changed).
      */
-    if ( lpae_valid(orig_pte) && entry->p2m.base != orig_pte.p2m.base )
+    if ( lpae_is_valid(orig_pte) && entry->p2m.base != orig_pte.p2m.base )
         p2m_free_entry(p2m, orig_pte, level);
 
     if ( need_iommu(p2m->domain) &&
-         (lpae_valid(orig_pte) || lpae_valid(*entry)) )
+         (lpae_is_valid(orig_pte) || lpae_is_valid(*entry)) )
         rc = iommu_iotlb_flush(p2m->domain, gfn_x(sgfn), 1UL << page_order);
     else
         rc = 0;
