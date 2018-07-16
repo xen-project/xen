@@ -134,7 +134,7 @@ static inline bool lpae_valid(lpae_t pte)
 }
 
 /*
- * These two can only be used on L0..L2 ptes because L3 mappings set
+ * This one can only be used on L0..L2 ptes because L3 mappings set
  * the table bit and therefore these would return the opposite to what
  * you would expect.
  */
@@ -143,14 +143,19 @@ static inline bool lpae_table(lpae_t pte)
     return lpae_valid(pte) && pte.walk.table;
 }
 
-static inline bool lpae_mapping(lpae_t pte)
+static inline bool lpae_is_mapping(lpae_t pte, unsigned int level)
 {
-    return lpae_valid(pte) && !pte.walk.table;
+    if ( !lpae_valid(pte) )
+        return false;
+    else if ( level == 3 )
+        return pte.walk.table;
+    else
+        return !pte.walk.table;
 }
 
 static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
 {
-    return (level < 3) && lpae_mapping(pte);
+    return (level < 3) && lpae_is_mapping(pte, level);
 }
 
 static inline bool lpae_is_page(lpae_t pte, unsigned int level)

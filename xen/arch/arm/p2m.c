@@ -241,7 +241,8 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry);
  *  GUEST_TABLE_SUPER_PAGE: The next entry points to a superpage.
  */
 static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
-                          lpae_t **table, unsigned int offset)
+                          unsigned int level, lpae_t **table,
+                          unsigned int offset)
 {
     lpae_t *entry;
     int ret;
@@ -260,7 +261,8 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
     }
 
     /* The function p2m_next_level is never called at the 3rd level */
-    if ( lpae_mapping(*entry) )
+    ASSERT(level < 3);
+    if ( lpae_is_mapping(*entry, level) )
         return GUEST_TABLE_SUPER_PAGE;
 
     mfn = _mfn(entry->p2m.base);
@@ -331,7 +333,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
 
     for ( level = P2M_ROOT_LEVEL; level < 3; level++ )
     {
-        rc = p2m_next_level(p2m, true, &table, offsets[level]);
+        rc = p2m_next_level(p2m, true, level, &table, offsets[level]);
         if ( rc == GUEST_TABLE_MAP_FAILED )
             goto out_unmap;
         else if ( rc != GUEST_TABLE_NORMAL_PAGE )
@@ -804,7 +806,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
          * is about to be removed (i.e mfn == INVALID_MFN).
          */
         rc = p2m_next_level(p2m, mfn_eq(smfn, INVALID_MFN),
-                            &table, offsets[level]);
+                            level, &table, offsets[level]);
         if ( rc == GUEST_TABLE_MAP_FAILED )
         {
             /*
@@ -861,7 +863,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         /* then move to the level we want to make real changes */
         for ( ; level < target; level++ )
         {
-            rc = p2m_next_level(p2m, true, &table, offsets[level]);
+            rc = p2m_next_level(p2m, true, level, &table, offsets[level]);
 
             /*
              * The entry should be found and either be a table
