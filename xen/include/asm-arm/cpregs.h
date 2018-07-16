@@ -47,8 +47,8 @@
     ((__HSR_CPREG_##op1) << HSR_CP64_OP1_SHIFT)
 
 /* Encode a register as per HSR ISS pattern */
-#define HSR_CPREG32(X) _HSR_CPREG32(X)
-#define HSR_CPREG64(X) _HSR_CPREG64(X)
+#define HSR_CPREG32(X...) _HSR_CPREG32(X)
+#define HSR_CPREG64(X...) _HSR_CPREG64(X)
 
 /*
  * Order registers by Coprocessor-> CRn-> Opcode 1-> CRm-> Opcode 2
