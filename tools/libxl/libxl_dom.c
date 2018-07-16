@@ -1129,6 +1129,19 @@ static int libxl__domain_firmware(libxl__gc *gc,
     }
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM &&
+        info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS &&
+        libxl__ipxe_path()) {
+        const char *fp = libxl__ipxe_path();
+        rc = xc_dom_module_file(dom, fp, "ipxe");
+
+        if (rc) {
+            LOGE(ERROR, "failed to load IPXE %s (%d)", fp, rc);
+            rc = ERROR_FAIL;
+            goto out;
+        }
+    }
+
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM &&
         info->u.hvm.smbios_firmware) {
         data = NULL;
         e = libxl_read_file_contents(ctx, info->u.hvm.smbios_firmware,

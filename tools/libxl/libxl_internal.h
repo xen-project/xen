@@ -2362,6 +2362,7 @@ _hidden const char *libxl__lock_dir_path(void);
 _hidden const char *libxl__run_dir_path(void);
 _hidden const char *libxl__seabios_path(void);
 _hidden const char *libxl__ovmf_path(void);
+_hidden const char *libxl__ipxe_path(void);
 
 /*----- subprocess execution with timeout -----*/
 

@@ -363,12 +363,18 @@ int main(void)
     {
         uint32_t paddr = bios_module->paddr;
 
-        bios->bios_load(bios, (void*)paddr, bios_module->size);
+        bios->bios_load(bios, (void *)paddr, bios_module->size, NULL);
     }
 #ifdef ENABLE_ROMBIOS
     else if ( bios == &rombios_config )
     {
-        bios->bios_load(bios, NULL, 0);
+        const struct hvm_modlist_entry *ipxe;
+        uint32_t paddr = 0;
+
+        ipxe = get_module_entry(hvm_start_info, "ipxe");
+        if ( ipxe )
+            paddr = ipxe->paddr;
+        bios->bios_load(bios, NULL, 0, (void *)paddr);
     }
 #endif
     else

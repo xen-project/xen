@@ -51,7 +51,6 @@ CIRRUSVGA_ROM := ../vgabios/VGABIOS-lgpl-latest.cirrus.debug.bin
 else
 CIRRUSVGA_ROM := ../vgabios/VGABIOS-lgpl-latest.cirrus.bin
 endif
-ETHERBOOT_ROM := ../etherboot/ipxe/src/bin/ipxe.bin
 endif
 
 ROMS := 
@@ -60,7 +59,7 @@ ifeq ($(CONFIG_ROMBIOS),y)
 OBJS += optionroms.o 32bitbios_support.o rombios.o
 CFLAGS += -DENABLE_ROMBIOS
 ROMBIOS_ROM := $(ROMBIOS_DIR)/BIOS-bochs-latest
-ROMS += $(ROMBIOS_ROM) $(STDVGA_ROM) $(CIRRUSVGA_ROM) $(ETHERBOOT_ROM)
+ROMS += $(ROMBIOS_ROM) $(STDVGA_ROM) $(CIRRUSVGA_ROM)
 endif
 
 .PHONY: all
@@ -105,12 +104,6 @@ ifneq ($(CIRRUSVGA_ROM),)
 	sh ../../misc/mkhex vgabios_cirrusvga $(CIRRUSVGA_ROM) >> $@.new
 	echo "#endif" >> $@.new
 endif
-ifneq ($(ETHERBOOT_ROM),)
-	echo "#ifdef ROM_INCLUDE_ETHERBOOT" >> $@.new
-	sh ../../misc/mkhex etherboot $(ETHERBOOT_ROM) >> $@.new
-	echo "#endif" >> $@.new
-endif
-
 	mv $@.new $@
 
 .PHONY: clean

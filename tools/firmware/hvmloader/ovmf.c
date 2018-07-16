@@ -85,7 +85,8 @@ static void ovmf_finish_bios_info(void)
 }
 
 static void ovmf_load(const struct bios_config *config,
-                      void *bios_addr, uint32_t bios_length)
+                      void *bios_addr, uint32_t bios_length,
+                      void *unused_addr)
 {
     xen_pfn_t mfn;
     uint64_t addr = OVMF_END

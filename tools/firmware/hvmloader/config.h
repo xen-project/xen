@@ -22,7 +22,8 @@ struct bios_config {
     /* ROMS */
     void (*load_roms)(void);
 
-    void (*bios_load)(const struct bios_config *config, void *addr, uint32_t size);
+    void (*bios_load)(const struct bios_config *config, void *addr,
+                      uint32_t size, void *extra_addr);
 
     void (*bios_info_setup)(void);
     void (*bios_info_finish)(void);
