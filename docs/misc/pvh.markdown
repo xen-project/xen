@@ -92,3 +92,21 @@ event channels. Delivery of those interrupts can be configured in the same way
 as HVM guests, check xen/include/public/hvm/params.h and
 xen/include/public/hvm/hvm\_op.h for more information about available delivery
 methods.
+
+## MTRR ##
+
+### Unprivileged guests ###
+
+PVH guests are currently booted with the default MTRR type set to write-back
+and MTRR enabled. This allows DomUs to start with a sane MTRR state. Note that
+this will have to be revisited when pci-passthrough is added to PVH in order to
+set MMIO regions as UC.
+
+Xen guarantees that RAM regions will always have the WB cache type set in the
+initial MTRR state, either set by the default MTRR type or by other means.
+
+### Hardware domain ###
+
+A PVH hardware domain is booted with the same MTRR state as the one found on
+the host. This is done because the hardware domain memory map is already a
+modified copy of the host memory map, so the same MTRR setup should work.
