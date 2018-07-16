@@ -4564,7 +4564,8 @@ if test "${with_system_seabios+set}" = set; then :
     seabios=n
     case $withval in
         no) seabios_path= ;;
-        *)  seabios_path=$withval ;;
+        /*)  seabios_path=$withval ;;
+        *) as_fn_error $? "Seabios specified, but is not an absolute path" "$LINENO" 5 ;;
     esac
 
 fi
@@ -4587,7 +4588,8 @@ if test "${with_system_ovmf+set}" = set; then :
     ovmf=n
     case $withval in
         no) ovmf_path= ;;
-        *)  ovmf_path=$withval ;;
+        /*)  ovmf_path=$withval ;;
+        *) as_fn_error $? "OVMF specified, but is not an absolute path" "$LINENO" 5 ;;
     esac
 
 fi
@@ -4610,7 +4612,8 @@ if test "${with_system_ipxe+set}" = set; then :
     ipxe=n
     case $withval in
         no) ipxe_path= ;;
-        *)  ipxe_path=$withval ;;
+        /*)  ipxe_path=$withval ;;
+        *) as_fn_error $? "IPXE specified, but is not an absolute path" "$LINENO" 5 ;;
     esac
 
     # IPXE depends on Rombios

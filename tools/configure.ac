@@ -216,7 +216,8 @@ AC_ARG_WITH([system-seabios],
     seabios=n
     case $withval in
         no) seabios_path= ;;
-        *)  seabios_path=$withval ;;
+        /*)  seabios_path=$withval ;;
+        *) AC_MSG_ERROR([Seabios specified, but is not an absolute path]) ;;
     esac
 ],[])
 AS_IF([test "x$seabios" = "xy" -o -n "$seabios_path" ], [
@@ -233,7 +234,8 @@ AC_ARG_WITH([system-ovmf],
     ovmf=n
     case $withval in
         no) ovmf_path= ;;
-        *)  ovmf_path=$withval ;;
+        /*)  ovmf_path=$withval ;;
+        *) AC_MSG_ERROR([OVMF specified, but is not an absolute path]) ;;
     esac
 ],[])
 AS_IF([test "x$ovmf" = "xy" -o -n "$ovmf_path" ], [
@@ -250,7 +252,8 @@ AC_ARG_WITH([system-ipxe],
     ipxe=n
     case $withval in
         no) ipxe_path= ;;
-        *)  ipxe_path=$withval ;;
+        /*)  ipxe_path=$withval ;;
+        *) AC_MSG_ERROR([IPXE specified, but is not an absolute path]) ;;
     esac
 
     # IPXE depends on Rombios
