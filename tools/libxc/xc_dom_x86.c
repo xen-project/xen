@@ -1742,26 +1742,30 @@ static int bootlate_hvm(struct xc_dom_image *dom)
                                 ((uintptr_t)cmdline - (uintptr_t)start_info);
         }
 
-        for ( i = 0; i < dom->num_modules; i++ )
-        {
-            struct xc_hvm_firmware_module mod;
-
-            DOMPRINTF("Adding module %u", i);
-            mod.guest_addr_out =
-                dom->modules[i].seg.vstart - dom->parms.virt_base;
-            mod.length =
-                dom->modules[i].seg.vend - dom->modules[i].seg.vstart;
-
-            add_module_to_list(dom, &mod, dom->modules[i].cmdline,
-                               modlist, start_info);
-        }
-
         /* ACPI module 0 is the RSDP */
         start_info->rsdp_paddr = dom->acpi_modules[0].guest_addr_out ? : 0;
     }
     else
     {
         add_module_to_list(dom, &dom->system_firmware_module, "firmware",
+                           modlist, start_info);
+    }
+
+    for ( i = 0; i < dom->num_modules; i++ )
+    {
+        struct xc_hvm_firmware_module mod;
+        uint64_t base = dom->parms.virt_base != UNSET_ADDR ?
+            dom->parms.virt_base : 0;
+
+        mod.guest_addr_out =
+            dom->modules[i].seg.vstart - base;
+        mod.length =
+            dom->modules[i].seg.vend - dom->modules[i].seg.vstart;
+
+        DOMPRINTF("Adding module %u guest_addr %"PRIx64" len %u",
+                  i, mod.guest_addr_out, mod.length);
+
+        add_module_to_list(dom, &mod, dom->modules[i].cmdline,
                            modlist, start_info);
     }
 
