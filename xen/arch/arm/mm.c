@@ -996,7 +996,7 @@ static int create_xen_entries(enum xenmap_operation op,
     for(; addr < addr_end; addr += PAGE_SIZE, mfn = mfn_add(mfn, 1))
     {
         entry = &xen_second[second_linear_offset(addr)];
-        if ( !lpae_table(*entry) )
+        if ( !lpae_is_table(*entry, 2) )
         {
             rc = create_xen_table(entry);
             if ( rc < 0 ) {
