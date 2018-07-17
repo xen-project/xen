@@ -2037,6 +2037,16 @@ int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid,
                              const libxl_asyncop_how *ao_how)
                             LIBXL_EXTERNAL_CALLERS_ONLY;
 
+libxl_device_vkb *libxl_device_vkb_list(libxl_ctx *ctx,
+                                        uint32_t domid, int *num)
+                                        LIBXL_EXTERNAL_CALLERS_ONLY;
+void libxl_device_vkb_list_free(libxl_device_vkb* list, int num)
+                                LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_device_vkb_getinfo(libxl_ctx *ctx, uint32_t domid,
+                             libxl_device_vkb *vkb,
+                             libxl_vkbinfo *vkbinfo)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
+
 /* Framebuffer */
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
                          const libxl_asyncop_how *ao_how)

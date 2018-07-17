@@ -1046,6 +1046,17 @@ libxl_vsndinfo = Struct("vsndinfo", [
     ("pcms", Array(libxl_pcminfo, "num_vsnd_pcms"))
     ])
 
+libxl_vkbinfo = Struct("vkbinfo", [
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("devid", libxl_devid),
+    ("state", integer),
+    ("evtch", integer),
+    ("rref", integer)
+    ], dir=DIR_OUT)
+
 # NUMA node characteristics: size and free are how much memory it has, and how
 # much of it is free, respectively. dists is an array of distances from this
 # node to each other node.
