@@ -1563,6 +1563,30 @@ I<EXAMPLE:>
         ]
     ]
 
+=item B<vkb=[ "VKB_SPEC_STRING", "VKB_SPEC_STRING", ...]>
+
+Specifies the virtual keyboard device to be provided to the guest.
+
+Each B<VKB_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
+settings from the following list:
+
+=over 4
+
+=item B<unique-id=STRING>
+
+Specifies the unique input device id.
+
+=item B<backend=domain-id>
+
+Specifies the backend domain name or id.
+
+=item B<backend-type=type>
+
+Specifies the backend type: qemu - for QEMU backend or linux - for Linux PV
+domain.
+
+=back
+
 =back
 
 =head2 Paravirtualised (PV) Guest Specific Options

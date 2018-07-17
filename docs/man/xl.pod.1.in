@@ -1522,6 +1522,28 @@ List vsnd devices for a domain.
 
 =back
 
+=head2 KEYBOARD DEVICES
+
+=over 4
+
+=item B<vkb-attach> I<domain-id> I<vkb-device>
+
+Creates a new keyboard device in the domain specified by I<domain-id>.
+I<vkb-device> describes the device to attach, using the same format as the
+B<VKB_SPEC_STRING> string in the domain config file. See L<xl.cfg(5)>
+for more informations.
+
+=item B<vkb-detach> I<domain-id> I<devid>
+
+Removes the keyboard device from the domain specified by I<domain-id>.
+I<devid> is the virtual interface device number within the domain
+
+=item B<vkb-list> I<domain-id>
+
+List virtual network interfaces for a domain.
+
+=back
+
 =head1 PCI PASS-THROUGH
 
 =over 4
