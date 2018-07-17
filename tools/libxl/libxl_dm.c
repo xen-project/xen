@@ -1790,6 +1790,7 @@ static int libxl__vfb_and_vkb_from_hvm_guest_config(libxl__gc *gc,
 
     vkb->backend_domid = 0;
     vkb->devid = 0;
+
     return 0;
 }
 

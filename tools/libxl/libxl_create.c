@@ -1421,6 +1421,9 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         for (i = 0; i < d_config->num_vfbs; i++) {
             libxl__device_add(gc, domid, &libxl__vfb_devtype,
                               &d_config->vfbs[i]);
+        }
+
+        for (i = 0; i < d_config->num_vkbs; i++) {
             libxl__device_add(gc, domid, &libxl__vkb_devtype,
                               &d_config->vkbs[i]);
         }
