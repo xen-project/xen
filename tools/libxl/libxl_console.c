@@ -638,45 +638,6 @@ int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-static int libxl__device_vkb_setdefault(libxl__gc *gc, uint32_t domid,
-                                        libxl_device_vkb *vkb, bool hotplug)
-{
-    return libxl__resolve_domid(gc, vkb->backend_domname, &vkb->backend_domid);
-}
-
-static int libxl__device_from_vkb(libxl__gc *gc, uint32_t domid,
-                                  libxl_device_vkb *vkb,
-                                  libxl__device *device)
-{
-    device->backend_devid = vkb->devid;
-    device->backend_domid = vkb->backend_domid;
-    device->backend_kind = LIBXL__DEVICE_KIND_VKBD;
-    device->devid = vkb->devid;
-    device->domid = domid;
-    device->kind = LIBXL__DEVICE_KIND_VKBD;
-
-    return 0;
-}
-
-int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb,
-                         const libxl_asyncop_how *ao_how)
-{
-    AO_CREATE(ctx, domid, ao_how);
-    int rc;
-
-    rc = libxl__device_add(gc, domid, &libxl__vkb_devtype, vkb);
-    if (rc) {
-        LOGD(ERROR, domid, "Unable to add vkb device");
-        goto out;
-    }
-
-out:
-    libxl__ao_complete(egc, ao, rc);
-    return AO_INPROGRESS;
-}
-
-static LIBXL_DEFINE_UPDATE_DEVID(vkb)
-
 static int libxl__device_vfb_setdefault(libxl__gc *gc, uint32_t domid,
                                         libxl_device_vfb *vfb, bool hotplug)
 {
@@ -746,8 +707,6 @@ static int libxl__set_xenstore_vfb(libxl__gc *gc, uint32_t domid,
 }
 
 /* The following functions are defined:
- * libxl_device_vkb_remove
- * libxl_device_vkb_destroy
  * libxl_device_vfb_remove
  * libxl_device_vfb_destroy
  */
@@ -755,18 +714,6 @@ static int libxl__set_xenstore_vfb(libxl__gc *gc, uint32_t domid,
 /* channel/console hotunplug is not implemented. There are 2 possibilities:
  * 1. add support for secondary consoles to xenconsoled
  * 2. dynamically add/remove qemu chardevs via qmp messages. */
-
-/* vkb */
-
-#define libxl__add_vkbs NULL
-#define libxl_device_vkb_list NULL
-#define libxl_device_vkb_compare NULL
-
-LIBXL_DEFINE_DEVICE_REMOVE(vkb)
-
-DEFINE_DEVICE_TYPE_STRUCT(vkb, VKBD,
-    .skip_attach = 1
-);
 
 #define libxl__add_vfbs NULL
 #define libxl_device_vfb_list NULL
