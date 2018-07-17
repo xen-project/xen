@@ -163,14 +163,6 @@ static void recalculate_xstate(struct cpuid_policy *p)
                           xstate_sizes[X86_XCR0_PKRU_POS]);
     }
 
-    if ( p->extd.lwp )
-    {
-        xstates |= X86_XCR0_LWP;
-        xstate_size = max(xstate_size,
-                          xstate_offsets[X86_XCR0_LWP_POS] +
-                          xstate_sizes[X86_XCR0_LWP_POS]);
-    }
-
     p->xstate.max_size  =  xstate_size;
     p->xstate.xcr0_low  =  xstates & ~XSTATE_XSAVES_ONLY;
     p->xstate.xcr0_high = (xstates & ~XSTATE_XSAVES_ONLY) >> 32;
@@ -265,8 +257,7 @@ static void recalculate_misc(struct cpuid_policy *p)
         zero_leaves(p->extd.raw, 0xb, 0x18);
 
         p->extd.raw[0x1b] = EMPTY_LEAF; /* IBS - not supported. */
-
-        p->extd.raw[0x1c].a = 0; /* LWP.a entirely dynamic. */
+        p->extd.raw[0x1c] = EMPTY_LEAF; /* LWP - not supported. */
         break;
     }
 }
@@ -581,11 +572,6 @@ void recalculate_cpuid_policy(struct domain *d)
 
     if ( !p->extd.page1gb )
         p->extd.raw[0x19] = EMPTY_LEAF;
-
-    if ( p->extd.lwp )
-        p->extd.raw[0x1c].d &= max->extd.raw[0x1c].d;
-    else
-        p->extd.raw[0x1c] = EMPTY_LEAF;
 }
 
 int init_domain_cpuid_policy(struct domain *d)
@@ -971,12 +957,6 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  guest_kernel_mode(v, guest_cpu_user_regs()) )
                 res->d |= cpufeat_mask(X86_FEATURE_MTRR);
         }
-        break;
-
-    case 0x8000001c:
-        if ( (v->arch.xcr0 & X86_XCR0_LWP) && cpu_has_svm )
-            /* Turn on available bit and other features specified in lwp_cfg. */
-            res->a = (res->d & v->arch.hvm.svm.guest_lwp_cfg) | 1;
         break;
     }
 }

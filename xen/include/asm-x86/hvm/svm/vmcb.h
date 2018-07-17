@@ -534,10 +534,6 @@ struct svm_vcpu {
     uint64_t guest_sysenter_cs;
     uint64_t guest_sysenter_esp;
     uint64_t guest_sysenter_eip;
-
-    /* AMD lightweight profiling MSR */
-    uint64_t guest_lwp_cfg;      /* guest version */
-    uint64_t cpu_lwp_cfg;        /* CPU version */
 };
 
 struct vmcb_struct *alloc_vmcb(void);

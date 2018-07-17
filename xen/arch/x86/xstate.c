@@ -725,8 +725,7 @@ int handle_xsetbv(u32 index, u64 new_bv)
     curr->arch.xcr0 = new_bv;
     curr->arch.xcr0_accum |= new_bv;
 
-    /* LWP sets nonlazy_xstate_used independently. */
-    if ( new_bv & (XSTATE_NONLAZY & ~X86_XCR0_LWP) )
+    if ( new_bv & XSTATE_NONLAZY )
         curr->arch.nonlazy_xstate_used = 1;
 
     mask &= curr->fpu_dirtied ? ~XSTATE_FP_SSE : XSTATE_NONLAZY;

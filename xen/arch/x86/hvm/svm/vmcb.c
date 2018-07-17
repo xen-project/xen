@@ -100,11 +100,6 @@ static int construct_vmcb(struct vcpu *v)
     svm_disable_intercept_for_msr(v, MSR_STAR);
     svm_disable_intercept_for_msr(v, MSR_SYSCALL_MASK);
 
-    /* LWP_CBADDR MSR is saved and restored by FPU code. So SVM doesn't need to
-     * intercept it. */
-    if ( cpu_has_lwp )
-        svm_disable_intercept_for_msr(v, MSR_AMD64_LWP_CBADDR);
-
     vmcb->_msrpm_base_pa = virt_to_maddr(svm->msrpm);
     vmcb->_iopm_base_pa = __pa(v->domain->arch.hvm.io_bitmap);
 
