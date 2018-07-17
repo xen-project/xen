@@ -355,6 +355,22 @@
 #define LIBXL_HAVE_BUILDINFO_BOOTLOADER_ARGS 1
 
 /*
+ * LIBXL_HAVE_EXTENDED_VKB indicates that libxl_device_vkb has extended fields:
+ *  - unique_id;
+ *  - feature_disable_keyboard;
+ *  - feature_disable_pointer;
+ *  - feature_abs_pointer;
+ *  - feature_raw_pointer;
+ *  - feature_multi_touch;
+ *  - width;
+ *  - height;
+ *  - multi_touch_width;
+ *  - multi_touch_height;
+ *  - multi_touch_num_contacts.
+ */
+#define LIBXL_HAVE_EXTENDED_VKB 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
