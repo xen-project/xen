@@ -43,6 +43,47 @@ static int libxl__set_xenstore_vkb(libxl__gc *gc, uint32_t domid,
         flexarray_append_pair(back, XENKBD_FIELD_UNIQUE_ID, vkb->unique_id);
     }
 
+    if (vkb->feature_disable_keyboard) {
+        flexarray_append_pair(back, XENKBD_FIELD_FEAT_DSBL_KEYBRD,
+                              GCSPRINTF("%u", vkb->feature_disable_keyboard));
+    }
+
+    if (vkb->feature_disable_pointer) {
+        flexarray_append_pair(back, XENKBD_FIELD_FEAT_DSBL_POINTER,
+                              GCSPRINTF("%u", vkb->feature_disable_pointer));
+    }
+
+    if (vkb->feature_abs_pointer) {
+        flexarray_append_pair(back, XENKBD_FIELD_FEAT_ABS_POINTER,
+                              GCSPRINTF("%u", vkb->feature_abs_pointer));
+    }
+
+    if (vkb->feature_raw_pointer) {
+        flexarray_append_pair(back, XENKBD_FIELD_FEAT_RAW_POINTER,
+                              GCSPRINTF("%u", vkb->feature_raw_pointer));
+    }
+
+    if (vkb->feature_multi_touch) {
+        flexarray_append_pair(back, XENKBD_FIELD_FEAT_MTOUCH,
+                              GCSPRINTF("%u", vkb->feature_multi_touch));
+        flexarray_append_pair(back, XENKBD_FIELD_MT_WIDTH,
+                              GCSPRINTF("%u", vkb->multi_touch_width));
+        flexarray_append_pair(back, XENKBD_FIELD_MT_HEIGHT,
+                              GCSPRINTF("%u", vkb->multi_touch_height));
+        flexarray_append_pair(back, XENKBD_FIELD_MT_NUM_CONTACTS,
+                              GCSPRINTF("%u", vkb->multi_touch_num_contacts));
+    }
+
+    if (vkb->width) {
+        flexarray_append_pair(back, XENKBD_FIELD_WIDTH,
+                              GCSPRINTF("%u", vkb->width));
+    }
+
+    if (vkb->height) {
+        flexarray_append_pair(back, XENKBD_FIELD_HEIGHT,
+                              GCSPRINTF("%u", vkb->height));
+    }
+
     return 0;
 }
 
@@ -50,7 +91,7 @@ static int libxl__vkb_from_xenstore(libxl__gc *gc, const char *libxl_path,
                                     libxl_devid devid,
                                     libxl_device_vkb *vkb)
 {
-    const char *be_path, *be_type, *fe_path;
+    const char *be_path, *be_type, *fe_path, *tmp;
     int rc;
 
     vkb->devid = devid;
@@ -77,6 +118,96 @@ static int libxl__vkb_from_xenstore(libxl__gc *gc, const char *libxl_path,
     if (rc) goto out;
 
     vkb->unique_id = xs_read(CTX->xsh, XBT_NULL, GCSPRINTF("%s/"XENKBD_FIELD_UNIQUE_ID, be_path), NULL);
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_FEAT_DSBL_KEYBRD,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->feature_disable_keyboard = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_FEAT_DSBL_POINTER,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->feature_disable_pointer = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_FEAT_ABS_POINTER,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->feature_abs_pointer = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_FEAT_RAW_POINTER,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->feature_raw_pointer = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_FEAT_MTOUCH,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->feature_multi_touch = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_MT_WIDTH,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->multi_touch_width = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_MT_HEIGHT,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->multi_touch_height = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_MT_NUM_CONTACTS,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->multi_touch_num_contacts = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_WIDTH,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->width = strtoul(tmp, NULL, 0);
+    }
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/"XENKBD_FIELD_HEIGHT,
+                                be_path), &tmp);
+    if (rc) goto out;
+
+    if (tmp) {
+        vkb->height = strtoul(tmp, NULL, 0);
+    }
 
     rc = 0;
 

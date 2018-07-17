@@ -1585,6 +1585,46 @@ Specifies the backend domain name or id.
 Specifies the backend type: qemu - for QEMU backend or linux - for Linux PV
 domain.
 
+=item B<feature-disable-keyboard=BOOLEAN>
+
+Indicates if keyboard device is disabled.
+
+=item B<feature-disable-pointer=BOOLEAN>
+
+Indicates if pointer device is disabled.
+
+=item B<feature-abs-pointer=BOOLEAN>
+
+Indicates if pointer device can return absolute coordinates.
+
+=item B<feature-raw-pointer=BOOLEAN>
+
+Indicates if pointer device can return raw (unscaled) absolute coordinates.
+
+=item B<feature-multi-touch=BOOLEAN>
+
+Indicates if input device supports multi touch.
+
+=item B<multi-touch-width=MULTI_TOUCH_WIDTH>
+
+Set maximum width for multi touch device.
+
+=item B<multi-touch-height=MULTI_TOUCH_HEIGHT>
+
+Set maximum height for multi touch device.
+
+=item B<multi-touch-num-contacts=MULTI_TOUCH_NUM_CONTACTS>
+
+Set maximum contacts number for multi touch device.
+
+=item B<width=WIDTH>
+
+Set maximum width for pointer device.
+
+=item B<height=HEIGHT>
+
+Set maximum height for pointer device.
+
 =back
 
 =back

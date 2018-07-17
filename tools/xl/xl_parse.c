@@ -1112,6 +1112,26 @@ int parse_vkb_config(libxl_device_vkb *vkb, char *token)
         vkb->backend_type = backend_type;
     } else if (MATCH_OPTION(XENKBD_FIELD_UNIQUE_ID, token, oparg)) {
         vkb->unique_id = strdup(oparg);
+    } else if (MATCH_OPTION(XENKBD_FIELD_FEAT_DSBL_KEYBRD, token, oparg)) {
+        vkb->feature_disable_keyboard = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_FEAT_DSBL_POINTER, token, oparg)) {
+        vkb->feature_disable_pointer = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_FEAT_ABS_POINTER, token, oparg)) {
+        vkb->feature_abs_pointer = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_FEAT_RAW_POINTER, token, oparg)) {
+        vkb->feature_raw_pointer = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_FEAT_MTOUCH, token, oparg)) {
+        vkb->feature_multi_touch = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_MT_WIDTH, token, oparg)) {
+        vkb->multi_touch_width = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_MT_HEIGHT, token, oparg)) {
+        vkb->multi_touch_height = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_MT_NUM_CONTACTS, token, oparg)) {
+        vkb->multi_touch_num_contacts = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_WIDTH, token, oparg)) {
+        vkb->width = strtoul(oparg, NULL, 0);
+    } else if (MATCH_OPTION(XENKBD_FIELD_HEIGHT, token, oparg)) {
+        vkb->height = strtoul(oparg, NULL, 0);
     } else {
         fprintf(stderr, "Unknown string \"%s\" in vkb spec\n", token);
         return -1;
@@ -1153,7 +1173,20 @@ static void parse_vkb_list(const XLU_Config *config,
 
             if (vkb->backend_type == LIBXL_VKB_BACKEND_UNKNOWN) {
                 fprintf(stderr, "backend-type should be set in vkb spec\n");
-                rc = -1; goto out;
+                rc = ERROR_FAIL; goto out;
+            }
+
+            if (vkb->multi_touch_height || vkb->multi_touch_width ||
+                vkb->multi_touch_num_contacts) {
+                vkb->feature_multi_touch = true;
+            }
+
+            if (vkb->feature_multi_touch && !(vkb->multi_touch_height ||
+                vkb->multi_touch_width || vkb->multi_touch_num_contacts)) {
+                fprintf(stderr, XENKBD_FIELD_MT_WIDTH", "XENKBD_FIELD_MT_HEIGHT", "
+                                XENKBD_FIELD_MT_NUM_CONTACTS" should be set for "
+                                "multi touch in vkb spec\n");
+                rc = ERROR_FAIL; goto out;
             }
 
             entry++;
