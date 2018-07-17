@@ -35,6 +35,7 @@ int parse_cpurange(const char *cpu, libxl_bitmap *cpumap);
 int parse_nic_config(libxl_device_nic *nic, XLU_Config **config, char *token);
 int parse_vdispl_config(libxl_device_vdispl *vdispl, char *token);
 int parse_vsnd_item(libxl_device_vsnd *vsnd, const char *spec);
+int parse_vkb_config(libxl_device_vkb *vkb, char *token);
 
 int match_option_size(const char *prefix, size_t len,
                       char *arg, char **argopt);
