@@ -768,7 +768,7 @@ static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 
 static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 {
-    int vcpuid, i;
+    unsigned int vcpuid, i;
     struct vcpu *v;
     struct mtrr_state *mtrr_state;
     struct hvm_hw_mtrr hw_mtrr;

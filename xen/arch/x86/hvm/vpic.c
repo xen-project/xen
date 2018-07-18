@@ -393,13 +393,12 @@ static int vpic_save(struct domain *d, hvm_domain_context_t *h)
 static int vpic_load(struct domain *d, hvm_domain_context_t *h)
 {
     struct hvm_hw_vpic *s;
-    uint16_t inst;
+    unsigned int inst = hvm_load_instance(h);
 
     if ( !has_vpic(d) )
         return -ENODEV;
 
     /* Which PIC is this? */
-    inst = hvm_load_instance(h);
     if ( inst > 1 )
         return -EINVAL;
     s = &d->arch.hvm_domain.vpic[inst];

@@ -1048,11 +1048,10 @@ static int viridian_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
 static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    int vcpuid;
+    unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
     struct hvm_viridian_vcpu_context ctxt;
 
-    vcpuid = hvm_load_instance(h);
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
     {
         dprintk(XENLOG_G_ERR, "HVM restore: dom%d has no vcpu%u\n",

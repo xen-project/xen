@@ -1507,7 +1507,7 @@ static void lapic_load_fixup(struct vlapic *vlapic)
 
 static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
 {
-    uint16_t vcpuid;
+    unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
     struct vlapic *s;
 
@@ -1515,7 +1515,6 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
         return -ENODEV;
 
     /* Which vlapic to load? */
-    vcpuid = hvm_load_instance(h); 
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
     {
         dprintk(XENLOG_G_ERR, "HVM restore: dom%d has no apic%u\n",
@@ -1542,7 +1541,7 @@ static int lapic_load_hidden(struct domain *d, hvm_domain_context_t *h)
 
 static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
 {
-    uint16_t vcpuid;
+    unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
     struct vlapic *s;
 
@@ -1550,7 +1549,6 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
         return -ENODEV;
 
     /* Which vlapic to load? */
-    vcpuid = hvm_load_instance(h); 
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
     {
         dprintk(XENLOG_G_ERR, "HVM restore: dom%d has no apic%u\n",

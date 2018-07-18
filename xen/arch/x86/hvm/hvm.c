@@ -976,14 +976,13 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore)
 
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
-    int vcpuid;
+    unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
     struct segment_register seg;
     const char *errstr;
 
     /* Which vcpu is this? */
-    vcpuid = hvm_load_instance(h);
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
     {
         dprintk(XENLOG_G_ERR, "HVM restore: dom%u has no vcpu%u\n",
