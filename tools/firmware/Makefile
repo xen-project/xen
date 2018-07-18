@@ -21,6 +21,7 @@ SUBDIRS-y += hvmloader
 
 SEABIOSCC ?= $(CC)
 SEABIOSLD ?= $(LD)
+SEABIOS_EXTRAVERSION ?= "-Xen"
 
 ovmf-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(OVMF_UPSTREAM_URL) $(OVMF_UPSTREAM_REVISION) ovmf-dir
@@ -30,6 +31,8 @@ seabios-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(SEABIOS_UPSTREAM_URL) $(SEABIOS_UPSTREAM_REVISION) seabios-dir
 	cp seabios-config seabios-dir/.config;
 	$(MAKE) -C seabios-dir olddefconfig CC=$(SEABIOSCC) LD=$(SEABIOSLD)
+	rm -f seabios-dir/.version
+	echo '$(SEABIOS_UPSTREAM_REVISION)' > seabios-dir/.version
 
 .PHONY: all
 all: $(SUBDIRS-y)
@@ -136,4 +139,4 @@ subtree-force-update-all:
 	$(MAKE) ovmf-dir-force-update
 
 subdir-all-seabios-dir: seabios-dir
-	$(MAKE) -C $< CC=$(SEABIOSCC) LD=$(SEABIOSLD) PYTHON=$(PYTHON) all;
+	$(MAKE) -C $< CC=$(SEABIOSCC) LD=$(SEABIOSLD) PYTHON=$(PYTHON) EXTRAVERSION=$(SEABIOS_EXTRAVERSION) all;
