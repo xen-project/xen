@@ -42,8 +42,6 @@
     (hvm_get_guest_time(vhpet_vcpu(hpet)) / STIME_PER_HPET_TICK)
 
 #define HPET_TN_INT_ROUTE_CAP_SHIFT 32
-#define HPET_TN_CFG_BITS_READONLY_OR_RESERVED (HPET_TN_RESERVED | \
-    HPET_TN_PERIODIC_CAP | HPET_TN_64BIT_CAP | HPET_TN_FSB_CAP)
 
 /* can be routed to IOAPIC.redirect_table[23..20] */
 #define HPET_TN_INT_ROUTE_CAP      (0x00f00000ULL \
@@ -368,7 +366,8 @@ static int hpet_write(
     switch ( addr & ~7 )
     {
     case HPET_CFG:
-        h->hpet.config = hpet_fixup_reg(new_val, old_val, 0x3);
+        h->hpet.config = hpet_fixup_reg(new_val, old_val,
+                                        HPET_CFG_ENABLE | HPET_CFG_LEGACY);
 
         if ( !(old_val & HPET_CFG_ENABLE) && (new_val & HPET_CFG_ENABLE) )
         {
@@ -411,7 +410,11 @@ static int hpet_write(
     case HPET_Tn_CFG(2):
         tn = HPET_TN(CFG, addr);
 
-        h->hpet.timers[tn].config = hpet_fixup_reg(new_val, old_val, 0x3f4e);
+        h->hpet.timers[tn].config =
+            hpet_fixup_reg(new_val, old_val,
+                           (HPET_TN_LEVEL | HPET_TN_ENABLE |
+                            HPET_TN_PERIODIC | HPET_TN_SETVAL |
+                            HPET_TN_32BIT | HPET_TN_ROUTE));
 
         timer_sanitize_int_route(h, tn);
 
