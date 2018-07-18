@@ -41,14 +41,8 @@
 #define guest_time_hpet(hpet) \
     (hvm_get_guest_time(vhpet_vcpu(hpet)) / STIME_PER_HPET_TICK)
 
-#define HPET_TN_INT_ROUTE_CAP_SHIFT 32
-
 /* can be routed to IOAPIC.redirect_table[23..20] */
-#define HPET_TN_INT_ROUTE_CAP      (0x00f00000ULL \
-                    << HPET_TN_INT_ROUTE_CAP_SHIFT)
-
-#define HPET_TN_INT_ROUTE_CAP_MASK (0xffffffffULL \
-                    << HPET_TN_INT_ROUTE_CAP_SHIFT)
+#define HPET_TN_INT_ROUTE_CAP_VAL MASK_INSR(0x00f00000, HPET_TN_INT_ROUTE_CAP)
 
 #define HPET_TN(reg, addr) (((addr) - HPET_Tn_##reg(0)) / \
                             (HPET_Tn_##reg(1) - HPET_Tn_##reg(0)))
@@ -64,12 +58,10 @@
 #define hpet_enabled(h)          (h->hpet.config & HPET_CFG_ENABLE)
 #define timer_level(h, n)        (timer_config(h, n) & HPET_TN_LEVEL)
 
-#define timer_int_route(h, n)   \
-    ((timer_config(h, n) & HPET_TN_ROUTE) >> HPET_TN_ROUTE_SHIFT)
+#define timer_int_route(h, n)    MASK_EXTR(timer_config(h, n), HPET_TN_ROUTE)
 
-#define timer_int_route_cap(h, n)   \
-    ((timer_config(h, n) & HPET_TN_INT_ROUTE_CAP_MASK) \
-        >> HPET_TN_INT_ROUTE_CAP_SHIFT)
+#define timer_int_route_cap(h, n) \
+    MASK_EXTR(timer_config(h, n), HPET_TN_INT_ROUTE_CAP)
 
 #define timer_int_route_valid(h, n) \
     ((1u << timer_int_route(h, n)) & timer_int_route_cap(h, n))
@@ -699,7 +691,7 @@ static void hpet_set(HPETState *h)
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
     {
         h->hpet.timers[i].config =
-            HPET_TN_INT_ROUTE_CAP | HPET_TN_64BIT_CAP | HPET_TN_PERIODIC_CAP;
+            HPET_TN_INT_ROUTE_CAP_VAL | HPET_TN_64BIT_CAP | HPET_TN_PERIODIC_CAP;
         h->hpet.timers[i].cmp = ~0ULL;
         h->hpet.comparator64[i] = ~0ULL;
         h->pt[i].source = PTSRC_isa;
