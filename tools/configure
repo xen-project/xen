@@ -693,6 +693,7 @@ APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
 EXTRA_QEMUU_CONFIGURE_ARGS
+ipxe
 qemu_xen_systemd
 qemu_xen_path
 qemu_xen
@@ -703,7 +704,6 @@ AS86
 qemu_traditional
 blktap2
 LINUX_BACKEND_MODULES
-ipxe
 seabios
 ovmf
 xsmpolicy
@@ -806,7 +806,6 @@ enable_ocamltools
 enable_xsmpolicy
 enable_ovmf
 enable_seabios
-enable_ipxe
 with_linux_backend_modules
 enable_blktap2
 enable_qemu_traditional
@@ -814,6 +813,7 @@ enable_rombios
 with_system_qemu
 with_system_seabios
 with_system_ovmf
+enable_ipxe
 with_system_ipxe
 with_extra_qemuu_configure_args
 with_xenstored
@@ -1491,13 +1491,14 @@ Optional Features:
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
-  --disable-ipxe          Disable IPXE (default is ENABLED)
   --enable-blktap2        Enable blktap2, (DEFAULT is off)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for Linux or NetBSD x86, otherwise off)
   --enable-rombios        Enable ROMBIOS, (DEFAULT is on if qemu-traditional
                           is enabled, otherwise off)
+  --disable-ipxe          Enable in-tree IPXE, (DEFAULT is on if rombios is
+                          enabled, otherwise off, see also --with-system-ipxe)
   --enable-systemd        Enable systemd support (default is DISABLED)
 
 Optional Packages:
@@ -1533,7 +1534,10 @@ Optional Packages:
                           and installing our own version
   --with-system-ipxe[=PATH]
                           Use system supplied IPXE PATH instead of building
-                          and installing our own version
+                          and installing our own version, it takes precedence
+                          over --{en,dis}able-ipxe and is bound by the
+                          presence of rombios, --without-system-ipxe is an
+                          error
   --with-extra-qemuu-configure-args[="--ARG1 ..."]
                           List of additional configure options for upstream
                           qemu
@@ -4191,29 +4195,6 @@ seabios=$ax_cv_seabios
 
 
 
-# Check whether --enable-ipxe was given.
-if test "${enable_ipxe+set}" = set; then :
-  enableval=$enable_ipxe;
-fi
-
-
-if test "x$enable_ipxe" = "xno"; then :
-
-    ax_cv_ipxe="n"
-
-elif test "x$enable_ipxe" = "xyes"; then :
-
-    ax_cv_ipxe="y"
-
-elif test -z $ax_cv_ipxe; then :
-
-    ax_cv_ipxe="y"
-
-fi
-ipxe=$ax_cv_ipxe
-
-
-
 
 # Check whether --with-linux-backend-modules was given.
 if test "${with_linux_backend_modules+set}" = set; then :
@@ -4604,26 +4585,45 @@ _ACEOF
 
 fi
 
+# Check whether --enable-ipxe was given.
+if test "${enable_ipxe+set}" = set; then :
+  enableval=$enable_ipxe;
+     if test "x$enable_ipxe" = "xno"; then :
+  ipxe=n
+else
+  ipxe=y
+fi
+
+else
+
+    if test "x$enable_rombios" = "xno"; then :
+  ipxe=n
+else
+  ipxe=y
+fi
+
+fi
+
 
 # Check whether --with-system-ipxe was given.
 if test "${with_system_ipxe+set}" = set; then :
   withval=$with_system_ipxe;
-    # Disable compilation of IPXE.
-    ipxe=n
     case $withval in
-        no) ipxe_path= ;;
-        /*)  ipxe_path=$withval ;;
+        no) as_fn_error $? "--without-system-ipxe has no effect" "$LINENO" 5 ;;
+        /*)  ipxe_path=$withval; ipxe=n ;;
         *) as_fn_error $? "IPXE specified, but is not an absolute path" "$LINENO" 5 ;;
     esac
-
-    # IPXE depends on Rombios
-    if test "x$enable_rombios" = "xno"; then
-        as_fn_error $? "Rombios is required for using IPXE" "$LINENO" 5
-    fi
 
 fi
 
 if test "x$ipxe" = "xy" -o -n "$ipxe_path" ; then :
+
+
+    if test "x$enable_rombios" = "xno"; then :
+
+        as_fn_error $? "Rombios is required to use IPXE" "$LINENO" 5
+
+fi
 
 
 cat >>confdefs.h <<_ACEOF
@@ -4632,6 +4632,7 @@ _ACEOF
 
 
 fi
+
 
 
 # Check whether --with-extra-qemuu-configure-args was given.
