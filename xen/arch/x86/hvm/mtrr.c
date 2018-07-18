@@ -472,7 +472,9 @@ bool_t mtrr_fix_range_msr_set(struct domain *d, struct mtrr_state *m,
                 return 0;
 
         fixed_range_base[row] = msr_content;
-        memory_type_changed(d);
+
+        if ( m->enabled && m->fixed_enabled )
+            memory_type_changed(d);
     }
 
     return 1;
@@ -515,7 +517,8 @@ bool_t mtrr_var_range_msr_set(
 
     m->overlapped = is_var_mtrr_overlapped(m);
 
-    memory_type_changed(d);
+    if ( m->enabled )
+        memory_type_changed(d);
 
     return 1;
 }
