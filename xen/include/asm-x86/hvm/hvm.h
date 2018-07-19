@@ -347,6 +347,12 @@ static inline void hvm_cpuid_policy_changed(struct vcpu *v)
     hvm_funcs.cpuid_policy_changed(v);
 }
 
+static inline void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset,
+                                      uint64_t at_tsc)
+{
+    hvm_funcs.set_tsc_offset(v, offset, at_tsc);
+}
+
 /*
  * Called to ensure than all guest-specific mappings in a tagged TLB are 
  * flushed; does *not* flush Xen's TLB entries, and on processors without a 

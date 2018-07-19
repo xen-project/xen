@@ -2198,9 +2198,9 @@ void tsc_set_info(struct domain *d,
              * will sync their TSC to BSP's sync_tsc.
              */
             d->arch.hvm_domain.sync_tsc = rdtsc();
-            hvm_funcs.set_tsc_offset(d->vcpu[0],
-                                     d->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset,
-                                     d->arch.hvm_domain.sync_tsc);
+            hvm_set_tsc_offset(d->vcpu[0],
+                               d->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset,
+                               d->arch.hvm_domain.sync_tsc);
         }
     }
 
