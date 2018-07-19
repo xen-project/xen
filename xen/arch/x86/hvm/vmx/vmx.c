@@ -1282,7 +1282,7 @@ static void vmx_handle_cd(struct vcpu *v, unsigned long value)
 
 static void vmx_setup_tsc_scaling(struct vcpu *v)
 {
-    if ( !hvm_tsc_scaling_supported || v->domain->arch.vtsc )
+    if ( v->domain->arch.vtsc )
         return;
 
     vmx_vmcs_enter(v);
@@ -2345,7 +2345,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .altp2m_vcpu_emulate_vmfunc = vmx_vcpu_emulate_vmfunc,
     .tsc_scaling = {
         .max_ratio = VMX_TSC_MULTIPLIER_MAX,
-        .setup     = vmx_setup_tsc_scaling,
     },
 };
 
@@ -2485,7 +2484,10 @@ const struct hvm_function_table * __init start_vmx(void)
     }
 
     if ( cpu_has_vmx_tsc_scaling )
+    {
         vmx_function_table.tsc_scaling.ratio_frac_bits = 48;
+        vmx_function_table.tsc_scaling.setup = vmx_setup_tsc_scaling;
+    }
 
     if ( cpu_has_mpx && cpu_has_vmx_mpx )
     {
