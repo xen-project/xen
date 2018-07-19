@@ -7,3 +7,9 @@ obj-y += nested_ept.o
 
 guest_walk_%level.o: guest_walk.c Makefile
 	$(CC) $(CFLAGS) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
+
+guest_walk_%level.i: guest_walk.c Makefile
+	$(CPP) $(filter-out -Wa$(comma)%,$(CFLAGS)) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
+
+guest_walk_%level.s: guest_walk.c Makefile
+	$(CC) $(filter-out -Wa$(comma)%,$(CFLAGS)) -DGUEST_PAGING_LEVELS=$* -S $< -o $@

@@ -6,3 +6,9 @@ endif
 
 guest_%.o: multi.c Makefile
 	$(CC) $(CFLAGS) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
+
+guest_%.i: multi.c Makefile
+	$(CPP) $(filter-out -Wa$(comma)%,$(CFLAGS)) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
+
+guest_%.s: multi.c Makefile
+	$(CC) $(filter-out -Wa$(comma)%,$(CFLAGS)) -DGUEST_PAGING_LEVELS=$* -S $< -o $@

@@ -13,3 +13,9 @@ obj-y += mem_access.o
 
 guest_walk_%.o: guest_walk.c Makefile
 	$(CC) $(CFLAGS) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
+
+guest_walk_%.i: guest_walk.c Makefile
+	$(CPP) $(filter-out -Wa$(comma)%,$(CFLAGS)) -DGUEST_PAGING_LEVELS=$* -c $< -o $@
+
+guest_walk_%.s: guest_walk.c Makefile
+	$(CC) $(filter-out -Wa$(comma)%,$(CFLAGS)) -DGUEST_PAGING_LEVELS=$* -S $< -o $@
