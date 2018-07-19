@@ -1335,7 +1335,8 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
 {
     const struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry *start = NULL, *ent, *end;
-    unsigned int substart, subend, total;
+    unsigned int substart = 0, subend = vmx->msr_save_count;
+    unsigned int total = vmx->msr_load_count;
 
     ASSERT(v == current || !vcpu_runnable(v));
 
@@ -1343,23 +1344,18 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
     {
     case VMX_MSR_HOST:
         start    = vmx->host_msr_area;
-        substart = 0;
         subend   = vmx->host_msr_count;
         total    = subend;
         break;
 
     case VMX_MSR_GUEST:
         start    = vmx->msr_area;
-        substart = 0;
-        subend   = vmx->msr_save_count;
-        total    = vmx->msr_load_count;
         break;
 
     case VMX_MSR_GUEST_LOADONLY:
         start    = vmx->msr_area;
-        substart = vmx->msr_save_count;
-        subend   = vmx->msr_load_count;
-        total    = subend;
+        substart = subend;
+        subend   = total;
         break;
 
     default:
