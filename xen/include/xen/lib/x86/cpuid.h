@@ -20,6 +20,21 @@ struct cpuid_leaf
     uint32_t a, b, c, d;
 };
 
+static inline void cpuid_leaf(uint32_t leaf, struct cpuid_leaf *l)
+{
+    asm ( "cpuid"
+          : "=a" (l->a), "=b" (l->b), "=c" (l->c), "=d" (l->d)
+          : "a" (leaf) );
+}
+
+static inline void cpuid_count_leaf(
+    uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *l)
+{
+    asm ( "cpuid"
+          : "=a" (l->a), "=b" (l->b), "=c" (l->c), "=d" (l->d)
+          : "a" (leaf), "c" (subleaf) );
+}
+
 #define CPUID_GUEST_NR_BASIC      (0xdu + 1)
 #define CPUID_GUEST_NR_FEAT       (0u + 1)
 #define CPUID_GUEST_NR_CACHE      (5u + 1)
@@ -242,6 +257,14 @@ static inline void cpuid_featureset_to_policy(
 }
 
 const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
+
+/**
+ * Fill a CPUID policy using the native CPUID instruction.
+ *
+ * No sanitisation is performed.  Values may be influenced by a hypervisor or
+ * from masking/faulting configuration.
+ */
+void x86_cpuid_policy_fill_native(struct cpuid_policy *p);
 
 #ifdef __XEN__
 #include <public/arch-x86/xen.h>

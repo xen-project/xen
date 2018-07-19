@@ -2,6 +2,114 @@
 
 #include <xen/lib/x86/cpuid.h>
 
+void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
+{
+    unsigned int i;
+
+    cpuid_leaf(0, &p->basic.raw[0]);
+    for ( i = 1; i < min(ARRAY_SIZE(p->basic.raw),
+                         p->basic.max_leaf + 1ul); ++i )
+    {
+        switch ( i )
+        {
+        case 0x4: case 0x7: case 0xb: case 0xd:
+            /* Multi-invocation leaves.  Deferred. */
+            continue;
+        }
+
+        cpuid_leaf(i, &p->basic.raw[i]);
+    }
+
+    if ( p->basic.max_leaf >= 4 )
+    {
+        for ( i = 0; i < ARRAY_SIZE(p->cache.raw); ++i )
+        {
+            union {
+                struct cpuid_leaf l;
+                struct cpuid_cache_leaf c;
+            } u;
+
+            cpuid_count_leaf(4, i, &u.l);
+
+            if ( u.c.type == 0 )
+                break;
+
+            p->cache.subleaf[i] = u.c;
+        }
+
+        /*
+         * The choice of CPUID_GUEST_NR_CACHE is arbitrary.  It is expected
+         * that it will eventually need increasing for future hardware.
+         */
+#ifdef __XEN__
+        if ( i == ARRAY_SIZE(p->cache.raw) )
+            printk(XENLOG_WARNING
+                   "CPUID: Insufficient Leaf 4 space for this hardware\n");
+#endif
+    }
+
+    if ( p->basic.max_leaf >= 7 )
+    {
+        cpuid_count_leaf(7, 0, &p->feat.raw[0]);
+
+        for ( i = 1; i < min(ARRAY_SIZE(p->feat.raw),
+                             p->feat.max_subleaf + 1ul); ++i )
+            cpuid_count_leaf(7, i, &p->feat.raw[i]);
+    }
+
+    if ( p->basic.max_leaf >= 0xb )
+    {
+        union {
+            struct cpuid_leaf l;
+            struct cpuid_topo_leaf t;
+        } u;
+
+        for ( i = 0; i < ARRAY_SIZE(p->topo.raw); ++i )
+        {
+            cpuid_count_leaf(0xb, i, &u.l);
+
+            if ( u.t.type == 0 )
+                break;
+
+            p->topo.subleaf[i] = u.t;
+        }
+
+        /*
+         * The choice of CPUID_GUEST_NR_TOPO is per the manual.  It may need
+         * to grow for future hardware.
+         */
+#ifdef __XEN__
+        if ( i == ARRAY_SIZE(p->topo.raw) &&
+             (cpuid_count_leaf(0xb, i, &u.l), u.t.type != 0) )
+            printk(XENLOG_WARNING
+                   "CPUID: Insufficient Leaf 0xb space for this hardware\n");
+#endif
+    }
+
+    if ( p->basic.max_leaf >= 0xd )
+    {
+        uint64_t xstates;
+
+        cpuid_count_leaf(0xd, 0, &p->xstate.raw[0]);
+        cpuid_count_leaf(0xd, 1, &p->xstate.raw[1]);
+
+        xstates  = ((uint64_t)(p->xstate.xcr0_high | p->xstate.xss_high) << 32);
+        xstates |=            (p->xstate.xcr0_low  | p->xstate.xss_low);
+
+        for ( i = 2; i < min(63ul, ARRAY_SIZE(p->xstate.raw)); ++i )
+        {
+            if ( xstates & (1ul << i) )
+                cpuid_count_leaf(0xd, i, &p->xstate.raw[i]);
+        }
+    }
+
+    /* Extended leaves. */
+    cpuid_leaf(0x80000000, &p->extd.raw[0]);
+    for ( i = 1; i < min(ARRAY_SIZE(p->extd.raw),
+                         p->extd.max_leaf + 1 - 0x80000000ul); ++i )
+        cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
+}
+
 const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature)
 {
     static const uint32_t deep_features[] = INIT_DEEP_FEATURES;

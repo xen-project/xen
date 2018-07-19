@@ -263,12 +263,6 @@ static always_inline unsigned int cpuid_count_ebx(
     return ebx;
 }
 
-static always_inline void cpuid_count_leaf(uint32_t leaf, uint32_t subleaf,
-                                           struct cpuid_leaf *data)
-{
-    cpuid_count(leaf, subleaf, &data->a, &data->b, &data->c, &data->d);
-}
-
 static inline unsigned long read_cr0(void)
 {
     unsigned long cr0;
