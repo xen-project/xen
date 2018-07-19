@@ -1122,14 +1122,6 @@ static int _wbinvd(struct x86_emulate_ctxt *ctxt)
     return X86EMUL_OKAY;
 }
 
-int pv_emul_cpuid(uint32_t leaf, uint32_t subleaf,
-                  struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt)
-{
-    guest_cpuid(current, leaf, subleaf, res);
-
-    return X86EMUL_OKAY;
-}
-
 static int validate(const struct x86_emulate_state *state,
                     struct x86_emulate_ctxt *ctxt)
 {
@@ -1233,7 +1225,7 @@ static const struct x86_emulate_ops priv_op_ops = {
     .write_xcr           = x86emul_write_xcr,
     .read_msr            = read_msr,
     .write_msr           = write_msr,
-    .cpuid               = pv_emul_cpuid,
+    .cpuid               = x86emul_cpuid,
     .wbinvd              = _wbinvd,
 };
 

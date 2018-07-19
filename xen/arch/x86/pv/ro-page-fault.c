@@ -259,7 +259,6 @@ static const struct x86_emulate_ops ptwr_emulate_ops = {
     .write      = ptwr_emulated_write,
     .cmpxchg    = ptwr_emulated_cmpxchg,
     .validate   = pv_emul_is_mem_write,
-    .cpuid      = pv_emul_cpuid,
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
@@ -308,7 +307,6 @@ static const struct x86_emulate_ops mmio_ro_emulate_ops = {
     .insn_fetch = ptwr_emulated_read,
     .write      = mmio_ro_emulated_write,
     .validate   = pv_emul_is_mem_write,
-    .cpuid      = pv_emul_cpuid,
 };
 
 static const struct x86_emulate_ops mmcfg_intercept_ops = {
@@ -316,7 +314,6 @@ static const struct x86_emulate_ops mmcfg_intercept_ops = {
     .insn_fetch = ptwr_emulated_read,
     .write      = mmcfg_intercept_write,
     .validate   = pv_emul_is_mem_write,
-    .cpuid      = pv_emul_cpuid,
 };
 
 /* Check if guest is trying to modify a r/o MMIO page. */

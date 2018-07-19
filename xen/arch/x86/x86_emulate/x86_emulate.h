@@ -725,6 +725,8 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
                     struct x86_emulate_ctxt *ctxt);
 int x86emul_write_dr(unsigned int reg, unsigned long val,
                      struct x86_emulate_ctxt *ctxt);
+int x86emul_cpuid(uint32_t leaf, uint32_t subleaf,
+                  struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt);
 
 #endif
 

@@ -2156,13 +2156,6 @@ static int hvmemul_wbinvd(
     return X86EMUL_OKAY;
 }
 
-int hvmemul_cpuid(uint32_t leaf, uint32_t subleaf,
-                  struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt)
-{
-    guest_cpuid(current, leaf, subleaf, res);
-    return X86EMUL_OKAY;
-}
-
 static int hvmemul_get_fpu(
     enum x86_emulate_fpu_type type,
     struct x86_emulate_ctxt *ctxt)
@@ -2361,7 +2354,7 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr,
     .wbinvd        = hvmemul_wbinvd,
-    .cpuid         = hvmemul_cpuid,
+    .cpuid         = x86emul_cpuid,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
     .invlpg        = hvmemul_invlpg,
@@ -2388,7 +2381,7 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr_discard,
     .wbinvd        = hvmemul_wbinvd_discard,
-    .cpuid         = hvmemul_cpuid,
+    .cpuid         = x86emul_cpuid,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
     .invlpg        = hvmemul_invlpg,
@@ -2474,13 +2467,11 @@ int hvm_emulate_one_mmio(unsigned long mfn, unsigned long gla)
         .read       = x86emul_unhandleable_rw,
         .insn_fetch = hvmemul_insn_fetch,
         .write      = mmcfg_intercept_write,
-        .cpuid      = hvmemul_cpuid,
     };
     static const struct x86_emulate_ops hvm_ro_emulate_ops_mmio = {
         .read       = x86emul_unhandleable_rw,
         .insn_fetch = hvmemul_insn_fetch,
         .write      = mmio_ro_emulated_write,
-        .cpuid      = hvmemul_cpuid,
     };
     struct mmio_ro_emulate_ctxt mmio_ro_ctxt = { .cr2 = gla };
     struct hvm_emulate_ctxt ctxt;

@@ -76,8 +76,6 @@ void hvm_emulate_init_per_insn(
     unsigned int insn_bytes);
 void hvm_emulate_writeback(
     struct hvm_emulate_ctxt *hvmemul_ctxt);
-int hvmemul_cpuid(uint32_t leaf, uint32_t subleaf,
-                  struct cpuid_leaf *res, struct x86_emulate_ctxt *ctxt);
 struct segment_register *hvmemul_get_seg_reg(
     enum x86_segment seg,
     struct hvm_emulate_ctxt *hvmemul_ctxt);

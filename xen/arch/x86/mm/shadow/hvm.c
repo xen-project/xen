@@ -297,7 +297,6 @@ const struct x86_emulate_ops hvm_shadow_emulator_ops = {
     .insn_fetch = hvm_emulate_insn_fetch,
     .write      = hvm_emulate_write,
     .cmpxchg    = hvm_emulate_cmpxchg,
-    .cpuid      = hvmemul_cpuid,
 };
 
 /**************************************************************************/
