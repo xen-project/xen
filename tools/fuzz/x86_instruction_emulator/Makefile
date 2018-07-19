@@ -8,6 +8,9 @@ else
 x86-insn-fuzz-all:
 endif
 
+# Add libx86 to the build
+vpath %.c $(XEN_ROOT)/xen/lib/x86
+
 x86_emulate:
 	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/arch/x86/$@
 
@@ -31,13 +34,13 @@ x86-emulate.o x86-emulate-cov.o: x86_emulate/x86_emulate.c $(x86_emulate.h)
 
 fuzz-emul.o fuzz-emulate-cov.o wrappers.o: $(x86_emulate.h)
 
-x86-insn-fuzzer.a: fuzz-emul.o x86-emulate.o
+x86-insn-fuzzer.a: fuzz-emul.o x86-emulate.o cpuid.o
 	$(AR) rc $@ $^
 
-afl-harness: afl-harness.o fuzz-emul.o x86-emulate.o wrappers.o
+afl-harness: afl-harness.o fuzz-emul.o x86-emulate.o cpuid.o wrappers.o
 	$(CC) $(CFLAGS) $^ -o $@
 
-afl-harness-cov: afl-harness-cov.o fuzz-emul-cov.o x86-emulate-cov.o wrappers.o
+afl-harness-cov: afl-harness-cov.o fuzz-emul-cov.o x86-emulate-cov.o cpuid.o wrappers.o
 	$(CC) $(CFLAGS) $(GCOV_FLAGS) $^ -o $@
 
 # Common targets

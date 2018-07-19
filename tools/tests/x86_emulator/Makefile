@@ -11,6 +11,11 @@ all: $(TARGET)
 run: $(TARGET)
 	./$(TARGET)
 
+# Add libx86 to the build
+vpath %.c $(XEN_ROOT)/xen/lib/x86
+
+CFLAGS += $(CFLAGS_xeninclude)
+
 SIMD := 3dnow sse sse2 sse4 avx avx2 xop
 FMA := fma4 fma
 SG := avx2-sg
@@ -139,7 +144,7 @@ $(addsuffix .h,$(SIMD) $(FMA) $(SG)): simd.h
 
 xop.h: simd-fma.c
 
-$(TARGET): x86-emulate.o test_x86_emulator.o wrappers.o
+$(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o wrappers.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
 .PHONY: clean

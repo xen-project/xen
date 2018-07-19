@@ -62,6 +62,7 @@
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
 extern uint32_t mxcsr_mask;
+extern struct cpuid_policy cp;
 
 #define MMAP_SZ 16384
 bool emul_test_init(void);
@@ -104,191 +105,41 @@ static inline uint64_t xgetbv(uint32_t xcr)
     return ((uint64_t)hi << 32) | lo;
 }
 
-#define cache_line_size() ({		     \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    res.d & (1U << 19) ? (res.b >> 5) & 0x7f8 : 0; \
-})
+/* Intentionally checking OSXSAVE here. */
+#define cpu_has_xsave     (cp.basic.raw[1].c & (1u << 27))
 
-#define cpu_has_mmx ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.d & (1U << 23)) != 0; \
-})
+static inline bool xcr0_mask(uint64_t mask)
+{
+    return cpu_has_xsave && ((xgetbv(0) & mask) == mask);
+}
 
-#define cpu_has_fxsr ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.d & (1U << 24)) != 0; \
-})
+#define cache_line_size() (cp.basic.clflush_size * 8)
+#define cpu_has_mmx        cp.basic.mmx
+#define cpu_has_fxsr       cp.basic.fxsr
+#define cpu_has_sse        cp.basic.sse
+#define cpu_has_sse2       cp.basic.sse2
+#define cpu_has_sse3       cp.basic.sse3
+#define cpu_has_fma       (cp.basic.fma && xcr0_mask(6))
+#define cpu_has_sse4_1     cp.basic.sse4_1
+#define cpu_has_sse4_2     cp.basic.sse4_2
+#define cpu_has_popcnt     cp.basic.popcnt
+#define cpu_has_avx       (cp.basic.avx  && xcr0_mask(6))
+#define cpu_has_f16c      (cp.basic.f16c && xcr0_mask(6))
 
-#define cpu_has_sse ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.d & (1U << 25)) != 0; \
-})
+#define cpu_has_avx2      (cp.feat.avx2 && xcr0_mask(6))
+#define cpu_has_bmi1       cp.feat.bmi1
+#define cpu_has_bmi2       cp.feat.bmi2
+#define cpu_has_avx512f   (cp.feat.avx512f  && xcr0_mask(0xe6))
+#define cpu_has_avx512dq  (cp.feat.avx512dq && xcr0_mask(0xe6))
+#define cpu_has_avx512bw  (cp.feat.avx512bw && xcr0_mask(0xe6))
 
-#define cpu_has_sse2 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.d & (1U << 26)) != 0; \
-})
+#define cpu_has_xgetbv1   (cpu_has_xsave && cp.xstate.xgetbv1)
 
-#define cpu_has_sse3 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.c & (1U << 0)) != 0; \
-})
-
-#define cpu_has_fma ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        res.c = 0; \
-    (res.c & (1U << 12)) != 0; \
-})
-
-#define cpu_has_sse4_1 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.c & (1U << 19)) != 0; \
-})
-
-#define cpu_has_sse4_2 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.c & (1U << 20)) != 0; \
-})
-
-#define cpu_has_popcnt ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    (res.c & (1U << 23)) != 0; \
-})
-
-#define cpu_has_xsave ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    /* Intentionally checking OSXSAVE here. */ \
-    (res.c & (1U << 27)) != 0; \
-})
-
-#define cpu_has_avx ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        res.c = 0; \
-    (res.c & (1U << 28)) != 0; \
-})
-
-#define cpu_has_f16c ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        res.c = 0; \
-    (res.c & (1U << 29)) != 0; \
-})
-
-#define cpu_has_avx2 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        res.b = 0; \
-    else { \
-        emul_test_cpuid(7, 0, &res, NULL); \
-    } \
-    (res.b & (1U << 5)) != 0; \
-})
-
-#define cpu_has_xgetbv1 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) ) \
-        res.a = 0; \
-    else \
-        emul_test_cpuid(0xd, 1, &res, NULL); \
-    (res.a & (1U << 2)) != 0; \
-})
-
-#define cpu_has_bmi1 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(7, 0, &res, NULL); \
-    (res.b & (1U << 3)) != 0; \
-})
-
-#define cpu_has_bmi2 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(7, 0, &res, NULL); \
-    (res.b & (1U << 8)) != 0; \
-})
-
-#define cpu_has_3dnow_ext ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(0x80000001, 0, &res, NULL); \
-    (res.d & (1U << 30)) != 0; \
-})
-
-#define cpu_has_sse4a ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(0x80000001, 0, &res, NULL); \
-    (res.c & (1U << 6)) != 0; \
-})
-
-#define cpu_has_xop ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        res.c = 0; \
-    else \
-        emul_test_cpuid(0x80000001, 0, &res, NULL); \
-    (res.c & (1U << 11)) != 0; \
-})
-
-#define cpu_has_fma4 ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 6) != 6) ) \
-        res.c = 0; \
-    else \
-        emul_test_cpuid(0x80000001, 0, &res, NULL); \
-    (res.c & (1U << 16)) != 0; \
-})
-
-#define cpu_has_tbm ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(0x80000001, 0, &res, NULL); \
-    (res.c & (1U << 21)) != 0; \
-})
-
-#define cpu_has_avx512f ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 0xe6) != 0xe6) ) \
-        res.b = 0; \
-    else \
-        emul_test_cpuid(7, 0, &res, NULL); \
-    (res.b & (1U << 16)) != 0; \
-})
-
-#define cpu_has_avx512dq ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 0xe6) != 0xe6) ) \
-        res.b = 0; \
-    else \
-        emul_test_cpuid(7, 0, &res, NULL); \
-    (res.b & (1U << 17)) != 0; \
-})
-
-#define cpu_has_avx512bw ({ \
-    struct cpuid_leaf res; \
-    emul_test_cpuid(1, 0, &res, NULL); \
-    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 0xe6) != 0xe6) ) \
-        res.b = 0; \
-    else \
-        emul_test_cpuid(7, 0, &res, NULL); \
-    (res.b & (1U << 30)) != 0; \
-})
+#define cpu_has_3dnow_ext  cp.extd._3dnowext
+#define cpu_has_sse4a      cp.extd.sse4a
+#define cpu_has_xop       (cp.extd.xop  && xcr0_mask(6))
+#define cpu_has_fma4      (cp.extd.fma4 && xcr0_mask(6))
+#define cpu_has_tbm        cp.extd.tbm
 
 int emul_test_cpuid(
     uint32_t leaf,
