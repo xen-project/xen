@@ -351,7 +351,7 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     unsigned int addr_size = is_pv_32bit_domain(currd) ? 32 : BITS_PER_LONG;
     struct x86_emulate_ctxt ctxt = {
         .regs      = regs,
-        .vendor    = currd->arch.cpuid->x86_vendor,
+        .cpuid     = currd->arch.cpuid,
         .addr_size = addr_size,
         .sp_size   = addr_size,
         .lma       = addr_size > 32,

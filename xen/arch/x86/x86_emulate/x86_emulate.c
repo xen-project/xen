@@ -1930,6 +1930,7 @@ protmode_load_seg(
     struct x86_emulate_ctxt *ctxt,
     const struct x86_emulate_ops *ops)
 {
+    const struct cpuid_policy *cp = ctxt->cpuid;
     enum x86_segment sel_seg = (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr;
     struct { uint32_t a, b; } desc, desc_hi = {};
     uint8_t dpl, rpl;
@@ -1954,7 +1955,7 @@ protmode_load_seg(
         case x86_seg_tr:
             goto raise_exn;
         }
-        if ( ctxt->vendor != X86_VENDOR_AMD || !ops->read_segment ||
+        if ( cp->x86_vendor != X86_VENDOR_AMD || !ops->read_segment ||
              ops->read_segment(seg, sreg, ctxt) != X86EMUL_OKAY )
             memset(sreg, 0, sizeof(*sreg));
         else
@@ -2081,7 +2082,7 @@ protmode_load_seg(
          */
         bool wide = desc.b & 0x1000
                     ? false : (desc.b & 0xf00) != 0xc00 &&
-                               ctxt->vendor != X86_VENDOR_AMD
+                               cp->x86_vendor != X86_VENDOR_AMD
                                ? mode_64bit() : ctxt->lma;
 
         if ( wide )
@@ -2099,7 +2100,7 @@ protmode_load_seg(
             default:
                 return rc;
             }
-            if ( !mode_64bit() && ctxt->vendor == X86_VENDOR_AMD &&
+            if ( !mode_64bit() && cp->x86_vendor == X86_VENDOR_AMD &&
                  (desc.b & 0xf00) != 0xc00 )
                 desc_hi.b = desc_hi.a = 0;
             if ( (desc_hi.b & 0x00001f00) ||

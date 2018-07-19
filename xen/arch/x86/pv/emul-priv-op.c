@@ -1243,7 +1243,7 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
     struct domain *currd = curr->domain;
     struct priv_op_ctxt ctxt = {
         .ctxt.regs = regs,
-        .ctxt.vendor = currd->arch.cpuid->x86_vendor,
+        .ctxt.cpuid = currd->arch.cpuid,
         .ctxt.lma = !is_pv_32bit_domain(currd),
     };
     int rc;

@@ -140,7 +140,7 @@ const struct x86_emulate_ops *shadow_init_emulation(
     memset(sh_ctxt, 0, sizeof(*sh_ctxt));
 
     sh_ctxt->ctxt.regs = regs;
-    sh_ctxt->ctxt.vendor = v->domain->arch.cpuid->x86_vendor;
+    sh_ctxt->ctxt.cpuid = v->domain->arch.cpuid;
     sh_ctxt->ctxt.lma = hvm_long_mode_active(v);
 
     /* Segment cache initialisation. Primed with CS. */

@@ -502,8 +502,8 @@ struct x86_emulate_ctxt
      * Input-only state:
      */
 
-    /* CPU vendor (X86_VENDOR_UNKNOWN for "don't care") */
-    unsigned char vendor;
+    /* CPUID Policy for the domain. */
+    const struct cpuid_policy *cpuid;
 
     /* Set this if writes may have side effects. */
     bool force_writeback;
