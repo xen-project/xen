@@ -76,7 +76,6 @@ static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg(struct vcpu *v, unsigned long vaddr);
-static int vmx_vmfunc_intercept(struct cpu_user_regs *regs);
 
 struct vmx_pi_blocking_vcpu {
     struct list_head     list;
@@ -2311,7 +2310,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
-    .vmfunc_intercept     = vmx_vmfunc_intercept,
     .handle_cd            = vmx_handle_cd,
     .set_info_guest       = vmx_set_info_guest,
     .set_rdtsc_exiting    = vmx_set_rdtsc_exiting,
