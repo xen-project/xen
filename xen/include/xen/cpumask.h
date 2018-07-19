@@ -345,9 +345,9 @@ static inline int cpulist_scnprintf(char *buf, int len,
 
 typedef cpumask_t *cpumask_var_t;
 
-static inline bool_t alloc_cpumask_var(cpumask_var_t *mask)
+static inline bool alloc_cpumask_var(cpumask_var_t *mask)
 {
-	*(void **)mask = _xmalloc(nr_cpumask_bits / 8, sizeof(long));
+	*mask = _xmalloc(nr_cpumask_bits / 8, sizeof(long));
 	return *mask != NULL;
 }
 
@@ -358,9 +358,9 @@ static inline bool cond_alloc_cpumask_var(cpumask_var_t *mask)
 	return *mask != NULL;
 }
 
-static inline bool_t zalloc_cpumask_var(cpumask_var_t *mask)
+static inline bool zalloc_cpumask_var(cpumask_var_t *mask)
 {
-	*(void **)mask = _xzalloc(nr_cpumask_bits / 8, sizeof(long));
+	*mask = _xzalloc(nr_cpumask_bits / 8, sizeof(long));
 	return *mask != NULL;
 }
 
@@ -383,16 +383,16 @@ static inline void free_cpumask_var(cpumask_var_t mask)
 #else
 typedef cpumask_t cpumask_var_t[1];
 
-static inline bool_t alloc_cpumask_var(cpumask_var_t *mask)
+static inline bool alloc_cpumask_var(cpumask_var_t *mask)
 {
-	return 1;
+	return true;
 }
 #define cond_alloc_cpumask_var alloc_cpumask_var
 
-static inline bool_t zalloc_cpumask_var(cpumask_var_t *mask)
+static inline bool zalloc_cpumask_var(cpumask_var_t *mask)
 {
 	cpumask_clear(*mask);
-	return 1;
+	return true;
 }
 #define cond_zalloc_cpumask_var zalloc_cpumask_var
 
