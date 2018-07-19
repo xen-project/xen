@@ -1778,92 +1778,58 @@ in_protmode(
     return !(in_realmode(ctxt, ops) || (ctxt->regs->eflags & X86_EFLAGS_VM));
 }
 
-#define EAX 0
-#define ECX 1
-#define EDX 2
-#define EBX 3
+#define vcpu_has_fpu()         (ctxt->cpuid->basic.fpu)
+#define vcpu_has_sep()         (ctxt->cpuid->basic.sep)
+#define vcpu_has_cx8()         (ctxt->cpuid->basic.cx8)
+#define vcpu_has_cmov()        (ctxt->cpuid->basic.cmov)
+#define vcpu_has_clflush()     (ctxt->cpuid->basic.clflush)
+#define vcpu_has_mmx()         (ctxt->cpuid->basic.mmx)
+#define vcpu_has_sse()         (ctxt->cpuid->basic.sse)
+#define vcpu_has_sse2()        (ctxt->cpuid->basic.sse2)
+#define vcpu_has_sse3()        (ctxt->cpuid->basic.sse3)
+#define vcpu_has_pclmulqdq()   (ctxt->cpuid->basic.pclmulqdq)
+#define vcpu_has_ssse3()       (ctxt->cpuid->basic.ssse3)
+#define vcpu_has_fma()         (ctxt->cpuid->basic.fma)
+#define vcpu_has_cx16()        (ctxt->cpuid->basic.cx16)
+#define vcpu_has_sse4_1()      (ctxt->cpuid->basic.sse4_1)
+#define vcpu_has_sse4_2()      (ctxt->cpuid->basic.sse4_2)
+#define vcpu_has_movbe()       (ctxt->cpuid->basic.movbe)
+#define vcpu_has_popcnt()      (ctxt->cpuid->basic.popcnt)
+#define vcpu_has_aesni()       (ctxt->cpuid->basic.aesni)
+#define vcpu_has_avx()         (ctxt->cpuid->basic.avx)
+#define vcpu_has_f16c()        (ctxt->cpuid->basic.f16c)
+#define vcpu_has_rdrand()      (ctxt->cpuid->basic.rdrand)
 
-static bool vcpu_has(
-    unsigned int eax,
-    unsigned int reg,
-    unsigned int bit,
-    struct x86_emulate_ctxt *ctxt,
-    const struct x86_emulate_ops *ops)
-{
-    struct cpuid_leaf res;
-    int rc = X86EMUL_OKAY;
+#define vcpu_has_mmxext()      (ctxt->cpuid->extd.mmxext || vcpu_has_sse())
+#define vcpu_has_3dnow_ext()   (ctxt->cpuid->extd._3dnowext)
+#define vcpu_has_3dnow()       (ctxt->cpuid->extd._3dnow)
+#define vcpu_has_lahf_lm()     (ctxt->cpuid->extd.lahf_lm)
+#define vcpu_has_cr8_legacy()  (ctxt->cpuid->extd.cr8_legacy)
+#define vcpu_has_lzcnt()       (ctxt->cpuid->extd.abm)
+#define vcpu_has_sse4a()       (ctxt->cpuid->extd.sse4a)
+#define vcpu_has_misalignsse() (ctxt->cpuid->extd.misalignsse)
+#define vcpu_has_xop()         (ctxt->cpuid->extd.xop)
+#define vcpu_has_fma4()        (ctxt->cpuid->extd.fma4)
+#define vcpu_has_tbm()         (ctxt->cpuid->extd.tbm)
+#define vcpu_has_clzero()      (ctxt->cpuid->extd.clzero)
 
-    fail_if(!ops->cpuid);
-    rc = ops->cpuid(eax, 0, &res, ctxt);
-    if ( rc == X86EMUL_OKAY )
-    {
-        switch ( reg )
-        {
-        case EAX: reg = res.a; break;
-        case EBX: reg = res.b; break;
-        case ECX: reg = res.c; break;
-        case EDX: reg = res.d; break;
-        default: BUG();
-        }
-        if ( !(reg & (1U << bit)) )
-            rc = ~X86EMUL_OKAY;
-    }
-
- done:
-    return rc == X86EMUL_OKAY;
-}
-
-#define vcpu_has_fpu()         vcpu_has(         1, EDX,  0, ctxt, ops)
-#define vcpu_has_sep()         vcpu_has(         1, EDX, 11, ctxt, ops)
-#define vcpu_has_cx8()         vcpu_has(         1, EDX,  8, ctxt, ops)
-#define vcpu_has_cmov()        vcpu_has(         1, EDX, 15, ctxt, ops)
-#define vcpu_has_clflush()     vcpu_has(         1, EDX, 19, ctxt, ops)
-#define vcpu_has_mmx()         vcpu_has(         1, EDX, 23, ctxt, ops)
-#define vcpu_has_sse()         vcpu_has(         1, EDX, 25, ctxt, ops)
-#define vcpu_has_sse2()        vcpu_has(         1, EDX, 26, ctxt, ops)
-#define vcpu_has_sse3()        vcpu_has(         1, ECX,  0, ctxt, ops)
-#define vcpu_has_pclmulqdq()   vcpu_has(         1, ECX,  1, ctxt, ops)
-#define vcpu_has_ssse3()       vcpu_has(         1, ECX,  9, ctxt, ops)
-#define vcpu_has_fma()         vcpu_has(         1, ECX, 12, ctxt, ops)
-#define vcpu_has_cx16()        vcpu_has(         1, ECX, 13, ctxt, ops)
-#define vcpu_has_sse4_1()      vcpu_has(         1, ECX, 19, ctxt, ops)
-#define vcpu_has_sse4_2()      vcpu_has(         1, ECX, 20, ctxt, ops)
-#define vcpu_has_movbe()       vcpu_has(         1, ECX, 22, ctxt, ops)
-#define vcpu_has_popcnt()      vcpu_has(         1, ECX, 23, ctxt, ops)
-#define vcpu_has_aesni()       vcpu_has(         1, ECX, 25, ctxt, ops)
-#define vcpu_has_avx()         vcpu_has(         1, ECX, 28, ctxt, ops)
-#define vcpu_has_f16c()        vcpu_has(         1, ECX, 29, ctxt, ops)
-#define vcpu_has_rdrand()      vcpu_has(         1, ECX, 30, ctxt, ops)
-#define vcpu_has_mmxext()     (vcpu_has(0x80000001, EDX, 22, ctxt, ops) || \
-                               vcpu_has_sse())
-#define vcpu_has_3dnow_ext()   vcpu_has(0x80000001, EDX, 30, ctxt, ops)
-#define vcpu_has_3dnow()       vcpu_has(0x80000001, EDX, 31, ctxt, ops)
-#define vcpu_has_lahf_lm()     vcpu_has(0x80000001, ECX,  0, ctxt, ops)
-#define vcpu_has_cr8_legacy()  vcpu_has(0x80000001, ECX,  4, ctxt, ops)
-#define vcpu_has_lzcnt()       vcpu_has(0x80000001, ECX,  5, ctxt, ops)
-#define vcpu_has_sse4a()       vcpu_has(0x80000001, ECX,  6, ctxt, ops)
-#define vcpu_has_misalignsse() vcpu_has(0x80000001, ECX,  7, ctxt, ops)
-#define vcpu_has_xop()         vcpu_has(0x80000001, ECX, 12, ctxt, ops)
-#define vcpu_has_fma4()        vcpu_has(0x80000001, ECX, 16, ctxt, ops)
-#define vcpu_has_tbm()         vcpu_has(0x80000001, ECX, 21, ctxt, ops)
-#define vcpu_has_bmi1()        vcpu_has(         7, EBX,  3, ctxt, ops)
-#define vcpu_has_hle()         vcpu_has(         7, EBX,  4, ctxt, ops)
-#define vcpu_has_avx2()        vcpu_has(         7, EBX,  5, ctxt, ops)
-#define vcpu_has_bmi2()        vcpu_has(         7, EBX,  8, ctxt, ops)
-#define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
-#define vcpu_has_mpx()         vcpu_has(         7, EBX, 14, ctxt, ops)
-#define vcpu_has_avx512f()     vcpu_has(         7, EBX, 16, ctxt, ops)
-#define vcpu_has_avx512dq()    vcpu_has(         7, EBX, 17, ctxt, ops)
-#define vcpu_has_rdseed()      vcpu_has(         7, EBX, 18, ctxt, ops)
-#define vcpu_has_adx()         vcpu_has(         7, EBX, 19, ctxt, ops)
-#define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
-#define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
-#define vcpu_has_clwb()        vcpu_has(         7, EBX, 24, ctxt, ops)
-#define vcpu_has_sha()         vcpu_has(         7, EBX, 29, ctxt, ops)
-#define vcpu_has_avx512bw()    vcpu_has(         7, EBX, 30, ctxt, ops)
-#define vcpu_has_avx512vl()    vcpu_has(         7, EBX, 31, ctxt, ops)
-#define vcpu_has_rdpid()       vcpu_has(         7, ECX, 22, ctxt, ops)
-#define vcpu_has_clzero()      vcpu_has(0x80000008, EBX,  0, ctxt, ops)
+#define vcpu_has_bmi1()        (ctxt->cpuid->feat.bmi1)
+#define vcpu_has_hle()         (ctxt->cpuid->feat.hle)
+#define vcpu_has_avx2()        (ctxt->cpuid->feat.avx2)
+#define vcpu_has_bmi2()        (ctxt->cpuid->feat.bmi2)
+#define vcpu_has_rtm()         (ctxt->cpuid->feat.rtm)
+#define vcpu_has_mpx()         (ctxt->cpuid->feat.mpx)
+#define vcpu_has_avx512f()     (ctxt->cpuid->feat.avx512f)
+#define vcpu_has_avx512dq()    (ctxt->cpuid->feat.avx512dq)
+#define vcpu_has_rdseed()      (ctxt->cpuid->feat.rdseed)
+#define vcpu_has_adx()         (ctxt->cpuid->feat.adx)
+#define vcpu_has_smap()        (ctxt->cpuid->feat.smap)
+#define vcpu_has_clflushopt()  (ctxt->cpuid->feat.clflushopt)
+#define vcpu_has_clwb()        (ctxt->cpuid->feat.clwb)
+#define vcpu_has_sha()         (ctxt->cpuid->feat.sha)
+#define vcpu_has_avx512bw()    (ctxt->cpuid->feat.avx512bw)
+#define vcpu_has_avx512vl()    (ctxt->cpuid->feat.avx512vl)
+#define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
 
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), EXC_UD)
@@ -5519,10 +5485,7 @@ x86_emulate(
 
             base = ad_bytes == 8 ? _regs.r(ax) :
                    ad_bytes == 4 ? _regs.eax : _regs.ax;
-            limit = 0;
-            if ( vcpu_has_clflush() &&
-                 ops->cpuid(1, 0, &cpuid_leaf, ctxt) == X86EMUL_OKAY )
-                limit = ((cpuid_leaf.b >> 8) & 0xff) * 8;
+            limit = ctxt->cpuid->basic.clflush_size * 8;
             generate_exception_if(limit < sizeof(long) ||
                                   (limit & (limit - 1)), EXC_UD);
             base &= ~(limit - 1);
