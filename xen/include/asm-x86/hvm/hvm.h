@@ -97,6 +97,9 @@ struct hvm_function_table {
     /* Necessary hardware support for alternate p2m's? */
     bool altp2m_supported;
 
+    /* Hardware virtual interrupt delivery enable? */
+    bool virtual_intr_delivery_enabled;
+
     /* Indicate HAP capabilities. */
     unsigned int hap_capabilities;
 
@@ -195,7 +198,6 @@ struct hvm_function_table {
 
     /* Virtual interrupt delivery */
     void (*update_eoi_exit_bitmap)(struct vcpu *v, u8 vector, u8 trig);
-    int (*virtual_intr_delivery_enabled)(void);
     void (*process_isr)(int isr, struct vcpu *v);
     void (*deliver_posted_intr)(struct vcpu *v, u8 vector);
     void (*sync_pir_to_irr)(struct vcpu *v);

@@ -1947,11 +1947,6 @@ static void vmx_update_eoi_exit_bitmap(struct vcpu *v, u8 vector, u8 trig)
         vmx_clear_eoi_exit_bitmap(v, vector);
 }
 
-static int vmx_virtual_intr_delivery_enabled(void)
-{
-    return cpu_has_vmx_virtual_intr_delivery;
-}
-
 static void vmx_process_isr(int isr, struct vcpu *v)
 {
     unsigned long status;
@@ -2330,7 +2325,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .nhvm_intr_blocked    = nvmx_intr_blocked,
     .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources,
     .update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap,
-    .virtual_intr_delivery_enabled = vmx_virtual_intr_delivery_enabled,
     .process_isr          = vmx_process_isr,
     .deliver_posted_intr  = vmx_deliver_posted_intr,
     .sync_pir_to_irr      = vmx_sync_pir_to_irr,
@@ -2469,6 +2463,8 @@ const struct hvm_function_table * __init start_vmx(void)
         vmx_function_table.process_isr = NULL;
         vmx_function_table.handle_eoi = NULL;
     }
+    else
+        vmx_function_table.virtual_intr_delivery_enabled = true;
 
     if ( cpu_has_vmx_posted_intr_processing )
     {

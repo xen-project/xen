@@ -1258,14 +1258,6 @@ void vlapic_adjust_i8259_target(struct domain *d)
     pt_adjust_global_vcpu_target(v);
 }
 
-int vlapic_virtual_intr_delivery_enabled(void)
-{
-    if ( hvm_funcs.virtual_intr_delivery_enabled )
-        return hvm_funcs.virtual_intr_delivery_enabled();
-    else
-        return 0;
-}
-
 int vlapic_has_pending_irq(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -1278,7 +1270,7 @@ int vlapic_has_pending_irq(struct vcpu *v)
     if ( irr == -1 )
         return -1;
 
-    if ( vlapic_virtual_intr_delivery_enabled() &&
+    if ( hvm_funcs.virtual_intr_delivery_enabled &&
          !nestedhvm_vcpu_in_guestmode(v) )
         return irr;
 
@@ -1316,7 +1308,7 @@ int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack)
     int isr;
 
     if ( !force_ack &&
-         vlapic_virtual_intr_delivery_enabled() )
+         hvm_funcs.virtual_intr_delivery_enabled )
         return 1;
 
     /* If there's no chance of using APIC assist then bail now. */
