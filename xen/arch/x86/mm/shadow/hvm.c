@@ -695,12 +695,12 @@ static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
 /* VRAM dirty tracking support */
 int shadow_track_dirty_vram(struct domain *d,
                             unsigned long begin_pfn,
-                            unsigned long nr,
+                            unsigned int nr_frames,
                             XEN_GUEST_HANDLE(void) guest_dirty_bitmap)
 {
     int rc = 0;
-    unsigned long end_pfn = begin_pfn + nr;
-    unsigned long dirty_size = (nr + 7) / 8;
+    unsigned long end_pfn = begin_pfn + nr_frames;
+    unsigned int dirty_size = DIV_ROUND_UP(nr_frames, BITS_PER_BYTE);
     int flush_tlb = 0;
     unsigned long i;
     p2m_type_t t;
@@ -717,7 +717,7 @@ int shadow_track_dirty_vram(struct domain *d,
 
     dirty_vram = d->arch.hvm.dirty_vram;
 
-    if ( dirty_vram && (!nr ||
+    if ( dirty_vram && (!nr_frames ||
              ( begin_pfn != dirty_vram->begin_pfn
             || end_pfn   != dirty_vram->end_pfn )) )
     {
@@ -729,7 +729,7 @@ int shadow_track_dirty_vram(struct domain *d,
         dirty_vram = d->arch.hvm.dirty_vram = NULL;
     }
 
-    if ( !nr )
+    if ( !nr_frames )
         goto out;
 
     dirty_bitmap = vzalloc(dirty_size);
@@ -759,9 +759,9 @@ int shadow_track_dirty_vram(struct domain *d,
         dirty_vram->end_pfn = end_pfn;
         d->arch.hvm.dirty_vram = dirty_vram;
 
-        if ( (dirty_vram->sl1ma = xmalloc_array(paddr_t, nr)) == NULL )
+        if ( (dirty_vram->sl1ma = xmalloc_array(paddr_t, nr_frames)) == NULL )
             goto out_dirty_vram;
-        memset(dirty_vram->sl1ma, ~0, sizeof(paddr_t) * nr);
+        memset(dirty_vram->sl1ma, ~0, sizeof(paddr_t) * nr_frames);
 
         if ( (dirty_vram->dirty_bitmap = xzalloc_array(uint8_t, dirty_size)) == NULL )
             goto out_sl1ma;
@@ -780,7 +780,7 @@ int shadow_track_dirty_vram(struct domain *d,
         void *map_sl1p = NULL;
 
         /* Iterate over VRAM to track dirty bits. */
-        for ( i = 0; i < nr; i++ )
+        for ( i = 0; i < nr_frames; i++ )
         {
             mfn_t mfn = get_gfn_query_unlocked(d, begin_pfn + i, &t);
             struct page_info *page;

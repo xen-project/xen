@@ -62,9 +62,10 @@ static bool _raw_copy_from_guest_buf_offset(void *dst,
                                     sizeof(dst))
 
 static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
-                            unsigned int nr, const struct xen_dm_op_buf *buf)
+                            unsigned int nr_frames,
+                            const struct xen_dm_op_buf *buf)
 {
-    if ( nr > (GB(1) >> PAGE_SHIFT) )
+    if ( nr_frames > (GB(1) >> PAGE_SHIFT) )
         return -EINVAL;
 
     if ( d->is_dying )
@@ -73,12 +74,12 @@ static int track_dirty_vram(struct domain *d, xen_pfn_t first_pfn,
     if ( !d->max_vcpus || !d->vcpu[0] )
         return -EINVAL;
 
-    if ( ((nr + 7) / 8) > buf->size )
+    if ( DIV_ROUND_UP(nr_frames, BITS_PER_BYTE) > buf->size )
         return -EINVAL;
 
-    return shadow_mode_enabled(d) ?
-        shadow_track_dirty_vram(d, first_pfn, nr, buf->h) :
-        hap_track_dirty_vram(d, first_pfn, nr, buf->h);
+    return shadow_mode_enabled(d)
+        ? shadow_track_dirty_vram(d, first_pfn, nr_frames, buf->h)
+        :    hap_track_dirty_vram(d, first_pfn, nr_frames, buf->h);
 }
 
 static int set_pci_intx_level(struct domain *d, uint16_t domain,

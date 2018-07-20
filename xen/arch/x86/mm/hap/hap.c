@@ -58,16 +58,16 @@
 
 int hap_track_dirty_vram(struct domain *d,
                          unsigned long begin_pfn,
-                         unsigned long nr,
+                         unsigned int nr_frames,
                          XEN_GUEST_HANDLE(void) guest_dirty_bitmap)
 {
     long rc = 0;
     struct sh_dirty_vram *dirty_vram;
     uint8_t *dirty_bitmap = NULL;
 
-    if ( nr )
+    if ( nr_frames )
     {
-        int size = (nr + BITS_PER_BYTE - 1) / BITS_PER_BYTE;
+        unsigned int size = DIV_ROUND_UP(nr_frames, BITS_PER_BYTE);
 
         if ( !paging_mode_log_dirty(d) )
         {
@@ -97,13 +97,13 @@ int hap_track_dirty_vram(struct domain *d,
         }
 
         if ( begin_pfn != dirty_vram->begin_pfn ||
-             begin_pfn + nr != dirty_vram->end_pfn )
+             begin_pfn + nr_frames != dirty_vram->end_pfn )
         {
             unsigned long ostart = dirty_vram->begin_pfn;
             unsigned long oend = dirty_vram->end_pfn;
 
             dirty_vram->begin_pfn = begin_pfn;
-            dirty_vram->end_pfn = begin_pfn + nr;
+            dirty_vram->end_pfn = begin_pfn + nr_frames;
 
             paging_unlock(d);
 
@@ -115,7 +115,7 @@ int hap_track_dirty_vram(struct domain *d,
              * Switch vram to log dirty mode, either by setting l1e entries of
              * P2M table to be read-only, or via hardware-assisted log-dirty.
              */
-            p2m_change_type_range(d, begin_pfn, begin_pfn + nr,
+            p2m_change_type_range(d, begin_pfn, begin_pfn + nr_frames,
                                   p2m_ram_rw, p2m_ram_logdirty);
 
             guest_flush_tlb_mask(d, d->dirty_cpumask);
@@ -132,7 +132,7 @@ int hap_track_dirty_vram(struct domain *d,
             p2m_flush_hardware_cached_dirty(d);
 
             /* get the bitmap */
-            paging_log_dirty_range(d, begin_pfn, nr, dirty_bitmap);
+            paging_log_dirty_range(d, begin_pfn, nr_frames, dirty_bitmap);
 
             domain_unpause(d);
         }
@@ -153,14 +153,15 @@ int hap_track_dirty_vram(struct domain *d,
              * then stop tracking
              */
             begin_pfn = dirty_vram->begin_pfn;
-            nr = dirty_vram->end_pfn - dirty_vram->begin_pfn;
+            nr_frames = dirty_vram->end_pfn - dirty_vram->begin_pfn;
             xfree(dirty_vram);
             d->arch.hvm.dirty_vram = NULL;
         }
 
         paging_unlock(d);
-        if ( nr )
-            p2m_change_type_range(d, begin_pfn, begin_pfn + nr,
+
+        if ( nr_frames )
+            p2m_change_type_range(d, begin_pfn, begin_pfn + nr_frames,
                                   p2m_ram_logdirty, p2m_ram_rw);
     }
 out:

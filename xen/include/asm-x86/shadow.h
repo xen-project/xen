@@ -64,7 +64,7 @@ int shadow_enable(struct domain *d, u32 mode);
 /* Enable VRAM dirty bit tracking. */
 int shadow_track_dirty_vram(struct domain *d,
                             unsigned long first_pfn,
-                            unsigned long nr,
+                            unsigned int nr_frames,
                             XEN_GUEST_HANDLE(void) dirty_bitmap);
 
 /* Handler for shadow control ops: operations from user-space to enable
