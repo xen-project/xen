@@ -317,12 +317,11 @@ static inline int sh_l1e_is_gnp(shadow_l1e_t sl1e)
 #define SH_L1E_MMIO_MAGIC       0xffffffff00000001ULL
 #define SH_L1E_MMIO_MAGIC_MASK  0xffffffff00000009ULL
 #define SH_L1E_MMIO_GFN_MASK    0x00000000fffffff0ULL
-#define SH_L1E_MMIO_GFN_SHIFT   4
 
 static inline shadow_l1e_t sh_l1e_mmio(gfn_t gfn, u32 gflags)
 {
     return (shadow_l1e_t) { (SH_L1E_MMIO_MAGIC
-                             | (gfn_x(gfn) << SH_L1E_MMIO_GFN_SHIFT)
+                             | MASK_INSR(gfn_x(gfn), SH_L1E_MMIO_GFN_MASK)
                              | (gflags & (_PAGE_USER|_PAGE_RW))) };
 }
 
@@ -333,7 +332,7 @@ static inline int sh_l1e_is_mmio(shadow_l1e_t sl1e)
 
 static inline gfn_t sh_l1e_mmio_get_gfn(shadow_l1e_t sl1e)
 {
-    return _gfn((sl1e.l1 & SH_L1E_MMIO_GFN_MASK) >> SH_L1E_MMIO_GFN_SHIFT);
+    return _gfn(MASK_EXTR(sl1e.l1, SH_L1E_MMIO_GFN_MASK));
 }
 
 static inline u32 sh_l1e_mmio_get_flags(shadow_l1e_t sl1e)
