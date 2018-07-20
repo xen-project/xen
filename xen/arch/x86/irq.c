@@ -2690,8 +2690,6 @@ int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
                     d->domain_id);
             return -EINVAL;
         }
-
-        msi->irq = irq;
         break;
 
     default:
