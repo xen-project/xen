@@ -30,8 +30,6 @@
 
 #include "decompress.h"
 
-#define	MIN(a, b) (((a) < (b)) ? (a) : (b))
-
 static long long INIT read_int(unsigned char *ptr, int size)
 {
 	int i;
@@ -55,6 +53,7 @@ static long long INIT read_int(unsigned char *ptr, int size)
 
 #ifdef __XEN__
 #include <xen/compiler.h>
+#include <xen/kernel.h>
 #endif
 
 #define LZMA_IOBUF_SIZE	0x10000
