@@ -628,7 +628,7 @@ _sh_propagate(struct vcpu *v,
                     sflags |= get_pat_flags(v,
                             gflags,
                             gfn_to_paddr(target_gfn),
-                            pfn_to_paddr(mfn_x(target_mfn)),
+                            mfn_to_maddr(target_mfn),
                             MTRR_TYPE_UNCACHABLE);
                 else if ( iommu_snoop )
                     sflags |= pat_type_2_pte_flags(PAT_TYPE_WRBACK);
@@ -636,7 +636,7 @@ _sh_propagate(struct vcpu *v,
                     sflags |= get_pat_flags(v,
                             gflags,
                             gfn_to_paddr(target_gfn),
-                            pfn_to_paddr(mfn_x(target_mfn)),
+                            mfn_to_maddr(target_mfn),
                             NO_HARDCODE_MEM_TYPE);
             }
     }
@@ -1131,7 +1131,7 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
 
         if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
             /* Initial guest reference, record it */
-            dirty_vram->sl1ma[i] = pfn_to_paddr(mfn_x(sl1mfn))
+            dirty_vram->sl1ma[i] = mfn_to_maddr(sl1mfn)
                 | ((unsigned long)sl1e & ~PAGE_MASK);
     }
 }
@@ -1160,7 +1160,7 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
         unsigned long i = gfn - dirty_vram->begin_pfn;
         struct page_info *page = mfn_to_page(mfn);
         int dirty = 0;
-        paddr_t sl1ma = pfn_to_paddr(mfn_x(sl1mfn))
+        paddr_t sl1ma = mfn_to_maddr(sl1mfn)
             | ((unsigned long)sl1e & ~PAGE_MASK);
 
         if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
@@ -2931,8 +2931,7 @@ static int sh_page_fault(struct vcpu *v,
             /* Magic MMIO marker: extract gfn for MMIO address */
             ASSERT(sh_l1e_is_mmio(sl1e));
             ASSERT(is_hvm_vcpu(v));
-            gpa = (((paddr_t)(gfn_x(sh_l1e_mmio_get_gfn(sl1e))))
-                   << PAGE_SHIFT) | (va & ~PAGE_MASK);
+            gpa = gfn_to_gaddr(sh_l1e_mmio_get_gfn(sl1e)) | (va & ~PAGE_MASK);
             perfc_incr(shadow_fault_fast_mmio);
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
             sh_reset_early_unshadow(v);
