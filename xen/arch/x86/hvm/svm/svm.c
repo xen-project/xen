@@ -67,9 +67,6 @@ void svm_asm_do_resume(void);
 
 u32 svm_feature_flags;
 
-/* Indicates whether guests may use EFER.LMSLE. */
-bool_t cpu_has_lmsl;
-
 static void svm_update_guest_efer(struct vcpu *);
 
 static struct hvm_function_table svm_function_table;
@@ -1675,26 +1672,6 @@ static int _svm_cpu_up(bool bsp)
 
     /* Initialize core's ASID handling. */
     svm_asid_init(c);
-
-    /*
-     * Check whether EFER.LMSLE can be written.
-     * Unfortunately there's no feature bit defined for this.
-     */
-    msr_content = read_efer();
-    if ( wrmsr_safe(MSR_EFER, msr_content | EFER_LMSLE) == 0 )
-        rdmsrl(MSR_EFER, msr_content);
-    if ( msr_content & EFER_LMSLE )
-    {
-        if ( 0 && /* FIXME: Migration! */ bsp )
-            cpu_has_lmsl = 1;
-        wrmsrl(MSR_EFER, msr_content ^ EFER_LMSLE);
-    }
-    else
-    {
-        if ( cpu_has_lmsl )
-            printk(XENLOG_WARNING "Inconsistent LMSLE support across CPUs!\n");
-        cpu_has_lmsl = 0;
-    }
 
     /* Initialize OSVW bits to be used by guests */
     svm_host_osvw_init();

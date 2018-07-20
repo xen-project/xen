@@ -874,7 +874,7 @@ static int read_msr(unsigned int reg, uint64_t *val,
          * vendor-dependent behaviour.
          */
         if ( is_pv_32bit_domain(currd) )
-            *val &= ~(EFER_LME | EFER_LMA | EFER_LMSLE |
+            *val &= ~(EFER_LME | EFER_LMA |
                       (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL
                        ? EFER_SCE : 0));
         return X86EMUL_OKAY;

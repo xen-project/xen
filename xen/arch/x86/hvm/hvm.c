@@ -925,9 +925,6 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
     if ( (value & EFER_SVME) && (!p->extd.svm || !nestedhvm_enabled(d)) )
         return "SVME without nested virt";
 
-    if ( (value & EFER_LMSLE) && !cpu_has_lmsl )
-        return "LMSLE without support";
-
     if ( (value & EFER_FFXSE) && !p->extd.ffxsr )
         return "FFXSE without feature";
 

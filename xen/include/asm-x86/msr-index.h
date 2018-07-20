@@ -20,7 +20,6 @@
 #define _EFER_LMA		10 /* Long mode active (read-only) */
 #define _EFER_NX		11 /* No execute enable */
 #define _EFER_SVME		12 /* AMD: SVM enable */
-#define _EFER_LMSLE		13 /* AMD: Long-mode segment limit enable */
 #define _EFER_FFXSE		14 /* AMD: Fast FXSAVE/FXRSTOR enable */
 
 #define EFER_SCE		(1<<_EFER_SCE)
@@ -28,11 +27,10 @@
 #define EFER_LMA		(1<<_EFER_LMA)
 #define EFER_NX			(1<<_EFER_NX)
 #define EFER_SVME		(1<<_EFER_SVME)
-#define EFER_LMSLE		(1<<_EFER_LMSLE)
 #define EFER_FFXSE		(1<<_EFER_FFXSE)
 
 #define EFER_KNOWN_MASK		(EFER_SCE | EFER_LME | EFER_LMA | EFER_NX | \
-				 EFER_SVME | EFER_LMSLE | EFER_FFXSE)
+				 EFER_SVME | EFER_FFXSE)
 
 /* Speculation Controls. */
 #define MSR_SPEC_CTRL			0x00000048
