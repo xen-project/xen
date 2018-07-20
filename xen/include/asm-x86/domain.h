@@ -113,7 +113,7 @@ struct shadow_domain {
     bool_t hash_walking;  /* Some function is walking the hash table */
 
     /* Fast MMIO path heuristic */
-    bool_t has_fast_mmio_entries;
+    bool has_fast_mmio_entries;
 
     /* OOS */
     bool_t oos_active;

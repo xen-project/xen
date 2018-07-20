@@ -563,8 +563,7 @@ _sh_propagate(struct vcpu *v,
     {
         /* Guest l1e maps emulated MMIO space */
         *sp = sh_l1e_mmio(target_gfn, gflags);
-        if ( !d->arch.paging.shadow.has_fast_mmio_entries )
-            d->arch.paging.shadow.has_fast_mmio_entries = 1;
+        d->arch.paging.shadow.has_fast_mmio_entries = true;
         goto done;
     }
 

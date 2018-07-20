@@ -3169,7 +3169,7 @@ shadow_write_p2m_entry(struct domain *d, unsigned long gfn,
     if ( d->arch.paging.shadow.has_fast_mmio_entries )
     {
         shadow_blow_tables(d);
-        d->arch.paging.shadow.has_fast_mmio_entries = 0;
+        d->arch.paging.shadow.has_fast_mmio_entries = false;
     }
 #endif
 
