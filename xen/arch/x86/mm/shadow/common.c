@@ -3316,7 +3316,7 @@ int shadow_track_dirty_vram(struct domain *d,
         memcpy(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size);
     else
     {
-        unsigned long map_mfn = mfn_x(INVALID_MFN);
+        mfn_t map_mfn = INVALID_MFN;
         void *map_sl1p = NULL;
 
         /* Iterate over VRAM to track dirty bits. */
@@ -3354,13 +3354,13 @@ int shadow_track_dirty_vram(struct domain *d,
                         /* Hopefully the most common case: only one mapping,
                          * whose dirty bit we can use. */
                         l1_pgentry_t *sl1e;
-                        unsigned long sl1mfn = paddr_to_pfn(sl1ma);
+                        mfn_t sl1mfn = maddr_to_mfn(sl1ma);
 
-                        if ( sl1mfn != map_mfn )
+                        if ( !mfn_eq(sl1mfn, map_mfn) )
                         {
                             if ( map_sl1p )
                                 unmap_domain_page(map_sl1p);
-                            map_sl1p = map_domain_page(_mfn(sl1mfn));
+                            map_sl1p = map_domain_page(sl1mfn);
                             map_mfn = sl1mfn;
                         }
                         sl1e = map_sl1p + (sl1ma & ~PAGE_MASK);
