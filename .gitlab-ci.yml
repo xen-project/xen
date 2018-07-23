@@ -103,6 +103,38 @@ debian-stretch-gcc-debug:
     debug: y
     XEN_TARGET_ARCH: x86_64
 
+debian-stretch-32-clang:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: debian:stretch-i386
+    debug: n
+    XEN_TARGET_ARCH: x86_32
+
+debian-stretch-32-clang-debug:
+  <<: *build
+  variables:
+    <<: *clang
+    CONTAINER: debian:stretch-i386
+    debug: y
+    XEN_TARGET_ARCH: x86_32
+
+debian-stretch-32-gcc:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:stretch-i386
+    debug: n
+    XEN_TARGET_ARCH: x86_32
+
+debian-stretch-32-gcc-debug:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:stretch-i386
+    debug: y
+    XEN_TARGET_ARCH: x86_32
+
 # Ubuntu Trusty's Clang is 3.4 while Xen requires 3.5
 
 ubuntu-trusty-gcc:
