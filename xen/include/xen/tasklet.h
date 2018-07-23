@@ -40,6 +40,11 @@ DECLARE_PER_CPU(unsigned long, tasklet_work_to_do);
 #define TASKLET_enqueued   (1ul << _TASKLET_enqueued)
 #define TASKLET_scheduled  (1ul << _TASKLET_scheduled)
 
+static inline bool tasklet_is_scheduled(const struct tasklet *t)
+{
+    return t->scheduled_on != -1;
+}
+
 void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
 void do_tasklet(void);

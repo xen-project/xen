@@ -114,7 +114,101 @@ static inline int shadow_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
  * What we can do is force a PV guest which writes a vulnerable PTE into
  * shadow mode, so Xen controls the pagetables which are reachable by the CPU
  * pagewalk.
+ *
+ * The core of the L1TF vulnerability is that the address bits of the PTE
+ * (accounting for PSE and factoring in the level-relevant part of the linear
+ * access) are sent for an L1D lookup (to retrieve the next-level PTE, or
+ * eventual memory address) before the Present or reserved bits (which would
+ * cause a terminal fault) are accounted for.  If an L1D hit occurs, the
+ * resulting data is available for potentially dependent instructions.
+ *
+ * For Present PTEs, the PV type-count safety logic ensures that the address
+ * bits always point at a guest-accessible frame, which is safe WRT L1TF from
+ * Xen's point of view.  In practice, a PV guest should be unable to set any
+ * reserved bits, so should be unable to create any present L1TF-vulnerable
+ * PTEs at all.
+ *
+ * Therefore, these safety checks apply to Not-Present PTEs only, where
+ * traditionally, Xen would have let the guest write any value it chose.
+ *
+ * The all-zero PTE potentially leaks mfn 0.  All software on the system is
+ * expected to cooperate and not put any secrets there.  In a Xen system,
+ * neither Xen nor dom0 are expected to touch mfn 0, as it typically contains
+ * the real mode IVT and Bios Data Area.  Therefore, mfn 0 is considered safe.
+ *
+ * Any PTE whose address is higher than the maximum cacheable address is safe,
+ * as it won't get an L1D hit.
+ *
+ * Speculative superpages also need accounting for, as PSE is considered
+ * irrespective of Present.  We disallow PSE being set, as it allows an
+ * attacker to leak 2M or 1G of data starting from mfn 0.  Also, because of
+ * recursive/linear pagetables, we must consider PSE even at L4, as hardware
+ * will interpret an L4e as an L3e during a recursive walk.
  */
+
+static inline bool is_l1tf_safe_maddr(intpte_t pte)
+{
+    paddr_t maddr = pte & l1tf_addr_mask;
+
+    return maddr == 0 || maddr >= l1tf_safe_maddr;
+}
+
+static inline bool pv_l1tf_check_pte(struct domain *d, unsigned int level,
+                                     intpte_t pte)
+{
+    ASSERT(is_pv_domain(d));
+    ASSERT(!(pte & _PAGE_PRESENT));
+
+    if ( d->arch.pv_domain.check_l1tf && !paging_mode_sh_forced(d) &&
+         (((level > 1) && (pte & _PAGE_PSE)) || !is_l1tf_safe_maddr(pte)) )
+    {
+#ifdef CONFIG_SHADOW_PAGING
+        struct tasklet *t = &d->arch.paging.shadow.pv_l1tf_tasklet;
+
+        printk(XENLOG_G_WARNING
+               "d%d L1TF-vulnerable L%ue %016"PRIx64" - Shadowing\n",
+               d->domain_id, level, pte);
+        /*
+         * Safety consideration for accessing tasklet.scheduled_on without the
+         * tasklet lock.  This is a singleshot tasklet with the side effect of
+         * setting PG_SH_forced (checked just above).  Multiple vcpus can race
+         * to schedule the tasklet, but if we observe it scheduled anywhere,
+         * that is good enough.
+         */
+        smp_rmb();
+        if ( !tasklet_is_scheduled(t) )
+            tasklet_schedule(t);
+#else
+        printk(XENLOG_G_ERR
+               "d%d L1TF-vulnerable L%ue %016"PRIx64" - Crashing\n",
+               d->domain_id, level, pte);
+        domain_crash(d);
+#endif
+        return true;
+    }
+
+    return false;
+}
+
+static inline bool pv_l1tf_check_l1e(struct domain *d, l1_pgentry_t l1e)
+{
+    return pv_l1tf_check_pte(d, 1, l1e.l1);
+}
+
+static inline bool pv_l1tf_check_l2e(struct domain *d, l2_pgentry_t l2e)
+{
+    return pv_l1tf_check_pte(d, 2, l2e.l2);
+}
+
+static inline bool pv_l1tf_check_l3e(struct domain *d, l3_pgentry_t l3e)
+{
+    return pv_l1tf_check_pte(d, 3, l3e.l3);
+}
+
+static inline bool pv_l1tf_check_l4e(struct domain *d, l4_pgentry_t l4e)
+{
+    return pv_l1tf_check_pte(d, 4, l4e.l4);
+}
 
 void pv_l1tf_tasklet(unsigned long data);
 
