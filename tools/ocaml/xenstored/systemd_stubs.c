@@ -32,13 +32,10 @@
 CAMLprim value ocaml_sd_notify_ready(value ignore)
 {
 	CAMLparam1(ignore);
-	CAMLlocal1(ret);
-
-	ret = Val_int(0);
 
 	sd_notify(1, "READY=1");
 
-	CAMLreturn(ret);
+	CAMLreturn(Val_unit);
 }
 
 #else
@@ -46,10 +43,7 @@ CAMLprim value ocaml_sd_notify_ready(value ignore)
 CAMLprim value ocaml_sd_notify_ready(value ignore)
 {
 	CAMLparam1(ignore);
-	CAMLlocal1(ret);
 
-	ret = Val_int(-1U);
-
-	CAMLreturn(ret);
+	CAMLreturn(Val_unit);
 }
 #endif
