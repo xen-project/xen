@@ -29,6 +29,7 @@
 #include <asm/mm.h>
 #include <asm/pci.h>
 #include <asm/pv/mm.h>
+#include <asm/shadow.h>
 
 #include "emulate.h"
 #include "mm.h"
@@ -127,6 +128,10 @@ static int ptwr_emulated_update(unsigned long addr, paddr_t old, paddr_t val,
 
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
+
+    if ( !(l1e_get_flags(nl1e) & _PAGE_PRESENT) && pv_l1tf_check_l1e(d, nl1e) )
+        return X86EMUL_RETRY;
+
     switch ( ret = get_page_from_l1e(nl1e, d, d) )
     {
     default:

@@ -50,6 +50,11 @@ static inline bool tasklet_work_to_do(unsigned int cpu)
                                                 TASKLET_scheduled);
 }
 
+static inline bool tasklet_is_scheduled(const struct tasklet *t)
+{
+    return t->scheduled_on != -1;
+}
+
 void tasklet_schedule_on_cpu(struct tasklet *t, unsigned int cpu);
 void tasklet_schedule(struct tasklet *t);
 void do_tasklet(void);
