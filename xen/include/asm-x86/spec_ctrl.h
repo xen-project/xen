@@ -38,6 +38,10 @@ extern int8_t opt_xpti;
 #define OPT_XPTI_DOM0  0x01
 #define OPT_XPTI_DOMU  0x02
 
+extern int8_t opt_pv_l1tf;
+#define OPT_PV_L1TF_DOM0  0x01
+#define OPT_PV_L1TF_DOMU  0x02
+
 /*
  * The L1D address mask, which might be wider than reported in CPUID, and the
  * system physical address above which there are believed to be no cacheable
