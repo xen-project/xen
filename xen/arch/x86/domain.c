@@ -66,6 +66,7 @@
 #include <compat/vcpu.h>
 #include <asm/psr.h>
 #include <asm/spec_ctrl.h>
+#include <asm/shadow.h>
 
 static __read_mostly enum {
     PCID_OFF,
@@ -672,6 +673,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         rc = 0;
     else
     {
+        pv_l1tf_domain_init(d);
+
         d->arch.pv_domain.gdt_ldt_l1tab =
             alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
         if ( !d->arch.pv_domain.gdt_ldt_l1tab )
@@ -777,7 +780,11 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         paging_final_teardown(d);
     free_perdomain_mappings(d);
     if ( is_pv_domain(d) )
+    {
+        pv_l1tf_domain_destroy(d);
+
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
+    }
     return rc;
 }
 
@@ -800,7 +807,11 @@ void arch_domain_destroy(struct domain *d)
 
     free_perdomain_mappings(d);
     if ( is_pv_domain(d) )
+    {
+        pv_l1tf_domain_destroy(d);
+
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
+    }
 
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);
