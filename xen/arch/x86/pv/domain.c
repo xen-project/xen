@@ -13,6 +13,7 @@
 #include <asm/invpcid.h>
 #include <asm/spec_ctrl.h>
 #include <asm/pv/domain.h>
+#include <asm/shadow.h>
 
 static __read_mostly enum {
     PCID_OFF,
@@ -215,6 +216,8 @@ int pv_vcpu_initialise(struct vcpu *v)
 
 void pv_domain_destroy(struct domain *d)
 {
+    pv_l1tf_domain_destroy(d);
+
     destroy_perdomain_mapping(d, GDT_LDT_VIRT_START,
                               GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
 
@@ -235,6 +238,8 @@ int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
         .tail = continue_nonidle_domain,
     };
     int rc = -ENOMEM;
+
+    pv_l1tf_domain_init(d);
 
     d->arch.pv_domain.gdt_ldt_l1tab =
         alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));

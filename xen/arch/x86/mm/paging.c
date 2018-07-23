@@ -879,6 +879,8 @@ void paging_dump_domain_info(struct domain *d)
         printk("    paging assistance: ");
         if ( paging_mode_shadow(d) )
             printk("shadow ");
+        if ( paging_mode_sh_forced(d) )
+            printk("forced ");
         if ( paging_mode_hap(d) )
             printk("hap ");
         if ( paging_mode_refcounts(d) )

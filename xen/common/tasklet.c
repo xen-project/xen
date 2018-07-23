@@ -156,6 +156,10 @@ void tasklet_kill(struct tasklet *t)
 
     spin_lock_irqsave(&tasklet_lock, flags);
 
+    /* Cope with uninitialised tasklets. */
+    if ( list_head_is_null(&t->list) )
+        goto unlock;
+
     if ( !list_empty(&t->list) )
     {
         BUG_ON(t->is_dead || t->is_running || (t->scheduled_on < 0));
@@ -172,6 +176,7 @@ void tasklet_kill(struct tasklet *t)
         spin_lock_irqsave(&tasklet_lock, flags);
     }
 
+ unlock:
     spin_unlock_irqrestore(&tasklet_lock, flags);
 }
 
