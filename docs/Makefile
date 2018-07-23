@@ -8,10 +8,10 @@ DATE		:= $(shell date +%Y-%m-%d)
 DOC_ARCHES      := arm x86_32 x86_64
 
 # Documentation sources to build
-MAN1SRC-y := $(sort $(shell find man/ -regex '.*\.\(pod\|markdown\)\.1' -print))
-MAN5SRC-y := $(sort $(shell find man/ -regex '.*\.\(pod\|markdown\)\.5' -print))
-MAN7SRC-y := $(sort $(shell find man/ -regex '.*\.\(pod\|markdown\)\.7' -print))
-MAN8SRC-y := $(sort $(shell find man/ -regex '.*\.\(pod\|markdown\)\.8' -print))
+MAN1SRC-y := $(sort $(wildcard man/*.pod.1 man/*.markdown.1))
+MAN5SRC-y := $(sort $(wildcard man/*.pod.5 man/*.markdown.5))
+MAN7SRC-y := $(sort $(wildcard man/*.pod.7 man/*.markdown.7))
+MAN8SRC-y := $(sort $(wildcard man/*.pod.8 man/*.markdown.8))
 
 MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
 
