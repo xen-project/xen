@@ -674,6 +674,8 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
     return 1;
 }
 
+static int __get_page_type(struct page_info *page, unsigned long type,
+                           int preemptible);
 
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
                                          unsigned long type,
@@ -688,9 +690,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
          unlikely(!get_page_from_pagenr(page_nr, d)) )
         return -EINVAL;
 
-    rc = (preemptible ?
-          get_page_type_preemptible(page, type) :
-          (get_page_type(page, type) ? 0 : -EINVAL));
+    rc = __get_page_type(page, type, preemptible);
 
     if ( unlikely(rc) && partial >= 0 &&
          (!preemptible || page != current->arch.old_guest_table) )
@@ -1514,8 +1514,7 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
     return 1;
 }
 
-static int alloc_l2_table(struct page_info *page, unsigned long type,
-                          int preemptible)
+static int alloc_l2_table(struct page_info *page, unsigned long type)
 {
     struct domain *d = page_get_owner(page);
     unsigned long  pfn = page_to_mfn(page);
@@ -1527,8 +1526,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
 
     for ( i = page->nr_validated_ptes; i < L2_PAGETABLE_ENTRIES; i++ )
     {
-        if ( preemptible && i > page->nr_validated_ptes
-             && hypercall_preempt_check() )
+        if ( i > page->nr_validated_ptes && hypercall_preempt_check() )
         {
             page->nr_validated_ptes = i;
             rc = -ERESTART;
@@ -1538,6 +1536,12 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
         if ( !is_guest_l2_slot(d, type, i) ||
              (rc = get_page_from_l2e(pl2e[i], pfn, d)) > 0 )
             continue;
+
+        if ( unlikely(rc == -ERESTART) )
+        {
+            page->nr_validated_ptes = i;
+            break;
+        }
 
         if ( rc < 0 )
         {
@@ -1763,7 +1767,7 @@ static void free_l1_table(struct page_info *page)
 }
 
 
-static int free_l2_table(struct page_info *page, int preemptible)
+static int free_l2_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     unsigned long pfn = page_to_mfn(page);
@@ -1777,7 +1781,7 @@ static int free_l2_table(struct page_info *page, int preemptible)
     do {
         if ( is_guest_l2_slot(d, page->u.inuse.type_info, i) &&
              put_page_from_l2e(pl2e[i], pfn) == 0 &&
-             preemptible && i && hypercall_preempt_check() )
+             i && hypercall_preempt_check() )
         {
            page->nr_validated_ptes = i;
            err = -ERESTART;
@@ -2363,7 +2367,8 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
         rc = alloc_l1_table(page);
         break;
     case PGT_l2_page_table:
-        rc = alloc_l2_table(page, type, preemptible);
+        ASSERT(preemptible);
+        rc = alloc_l2_table(page, type);
         break;
     case PGT_l3_page_table:
         ASSERT(preemptible);
@@ -2454,7 +2459,8 @@ int free_page_type(struct page_info *page, unsigned long type,
         rc = 0;
         break;
     case PGT_l2_page_table:
-        rc = free_l2_table(page, preemptible);
+        ASSERT(preemptible);
+        rc = free_l2_table(page);
         break;
     case PGT_l3_page_table:
         ASSERT(preemptible);
@@ -3723,12 +3729,9 @@ long do_mmuext_op(
     }
 
     if ( rc == -ERESTART )
-    {
-        ASSERT(i < count);
         rc = hypercall_create_continuation(
             __HYPERVISOR_mmuext_op, "hihi",
             uops, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
-    }
     else if ( curr->arch.old_guest_table )
     {
         XEN_GUEST_HANDLE_PARAM(void) null;
@@ -4041,12 +4044,9 @@ long do_mmu_update(
     }
 
     if ( rc == -ERESTART )
-    {
-        ASSERT(i < count);
         rc = hypercall_create_continuation(
             __HYPERVISOR_mmu_update, "hihi",
             ureqs, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
-    }
     else if ( curr->arch.old_guest_table )
     {
         XEN_GUEST_HANDLE_PARAM(void) null;
@@ -4756,7 +4756,13 @@ static int __do_update_va_mapping(
 long do_update_va_mapping(unsigned long va, u64 val64,
                           unsigned long flags)
 {
-    return __do_update_va_mapping(va, val64, flags, current->domain);
+    int rc = __do_update_va_mapping(va, val64, flags, current->domain);
+
+    if ( rc == -ERESTART )
+        rc = hypercall_create_continuation(
+            __HYPERVISOR_update_va_mapping, "lll", va, val64, flags);
+
+    return rc;
 }
 
 long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
@@ -4773,10 +4779,48 @@ long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
 
     put_pg_owner(pg_owner);
 
+    if ( rc == -ERESTART )
+        rc = hypercall_create_continuation(
+            __HYPERVISOR_update_va_mapping_otherdomain,
+            "llli", va, val64, flags, domid);
+
     return rc;
 }
 
+int compat_update_va_mapping(unsigned int va, uint32_t lo, uint32_t hi,
+                             unsigned int flags)
+{
+    int rc = __do_update_va_mapping(va, ((uint64_t)hi << 32) | lo,
+                                    flags, current->domain);
 
+    if ( rc == -ERESTART )
+        rc = hypercall_create_continuation(
+            __HYPERVISOR_update_va_mapping, "iiii", va, lo, hi, flags);
+
+    return rc;
+}
+
+int compat_update_va_mapping_otherdomain(unsigned int va,
+                                         uint32_t lo, uint32_t hi,
+                                         unsigned int flags, domid_t domid)
+{
+    struct domain *pg_owner;
+    int rc;
+
+    if ( (pg_owner = get_pg_owner(domid)) == NULL )
+        return -ESRCH;
+
+    rc = __do_update_va_mapping(va, ((uint64_t)hi << 32) | lo, flags, pg_owner);
+
+    put_pg_owner(pg_owner);
+
+    if ( rc == -ERESTART )
+        rc = hypercall_create_continuation(
+            __HYPERVISOR_update_va_mapping_otherdomain,
+            "iiiii", va, lo, hi, flags, domid);
+
+    return rc;
+}
 
 /*************************
  * Descriptor Tables
