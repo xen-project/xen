@@ -4424,6 +4424,10 @@ static inline bool libxl__string_is_default(char **s)
 
 _hidden int libxl__prepare_sockaddr_un(libxl__gc *gc, struct sockaddr_un *un,
                                        const char *path, const char *what);
+static inline const char *libxl__qemu_qmp_path(libxl__gc *gc, int domid)
+{
+    return GCSPRINTF("%s/qmp-libxl-%d", libxl__run_dir_path(), domid);
+}
 #endif
 
 /*

@@ -946,8 +946,8 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, "-chardev");
     flexarray_append(dm_args,
                      GCSPRINTF("socket,id=libxl-cmd,"
-                                    "path=%s/qmp-libxl-%d,server,nowait",
-                                    libxl__run_dir_path(), guest_domid));
+                               "path=%s,server,nowait",
+                               libxl__qemu_qmp_path(gc, guest_domid)));
 
     flexarray_append(dm_args, "-no-shutdown");
     flexarray_append(dm_args, "-mon");
