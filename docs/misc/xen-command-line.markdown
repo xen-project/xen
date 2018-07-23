@@ -1528,6 +1528,30 @@ do; there may be other custom operating systems which do.  If you're
 certain you don't plan on having PV guests which use this feature,
 turning it off can reduce the attack surface.
 
+### pv-l1tf (x86)
+> `= List of [ <bool>, dom0=<bool>, domu=<bool> ]`
+
+> Default: `false` on believed-unaffected hardware, or in pv-shim mode.
+>          `domu`  on believed-affected hardware.
+
+Mitigations for L1TF / XSA-273 / CVE-2018-3620 for PV guests.
+
+For backwards compatibility, we may not alter an architecturally-legitimate
+pagetable entry a PV guest chooses to write.  We can however force such a
+guest into shadow mode so that Xen controls the PTEs which are reachable by
+the CPU pagewalk.
+
+Shadowing is performed at the point where a PV guest first tries to write an
+L1TF-vulnerable PTE.  Therefore, a PV guest kernel which has been updated with
+its own L1TF mitigations will not trigger shadow mode if it is well behaved.
+
+If CONFIG\_SHADOW\_PAGING is not compiled in, this mitigation instead crashes
+the guest when an L1TF-vulnerable PTE is written, which still allows updated,
+well-behaved PV guests to run, despite Shadow being compiled out.
+
+In the pv-shim case, Shadow is expected to be compiled out, and a malicious
+guest kernel can only leak data from the shim Xen, rather than the host Xen.
+
 ### pv-shim (x86)
 > `= <boolean>`
 

@@ -71,6 +71,7 @@ config SHADOW_PAGING
             * Running HVM guests on hardware lacking hardware paging support
               (First-generation Intel VT-x or AMD SVM).
             * Live migration of PV guests.
+            * L1TF sidechannel mitigation for PV guests.
 
           Under a small number of specific workloads, shadow paging may be
           deliberately used as a performance optimisation.
