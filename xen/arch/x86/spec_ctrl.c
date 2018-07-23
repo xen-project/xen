@@ -187,6 +187,55 @@ static int __init parse_spec_ctrl(char *s)
 }
 custom_param("spec-ctrl", parse_spec_ctrl);
 
+int8_t __read_mostly opt_pv_l1tf = -1;
+
+static __init int parse_pv_l1tf(char *s)
+{
+    char *ss;
+    int val, rc = 0;
+
+    /* Inhibit the defaults as an explicit choice has been given. */
+    if ( opt_pv_l1tf == -1 )
+        opt_pv_l1tf = 0;
+
+    /* Interpret 'pv-l1tf' alone in its positive boolean form. */
+    if ( *s == '\0' )
+        opt_xpti = OPT_PV_L1TF_DOM0 | OPT_PV_L1TF_DOMU;
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        switch ( parse_bool(s) )
+        {
+        case 0:
+            opt_pv_l1tf = 0;
+            break;
+
+        case 1:
+            opt_pv_l1tf = OPT_PV_L1TF_DOM0 | OPT_PV_L1TF_DOMU;
+            break;
+
+        default:
+            if ( (val = parse_boolean("dom0", s, ss)) >= 0 )
+                opt_pv_l1tf = ((opt_pv_l1tf & ~OPT_PV_L1TF_DOM0) |
+                               (val ? OPT_PV_L1TF_DOM0 : 0));
+            else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
+                opt_pv_l1tf = ((opt_pv_l1tf & ~OPT_PV_L1TF_DOMU) |
+                               (val ? OPT_PV_L1TF_DOMU : 0));
+            else
+                rc = -EINVAL;
+            break;
+        }
+
+        s = ss + 1;
+    } while ( ss );
+
+    return rc;
+}
+custom_param("pv-l1tf", parse_pv_l1tf);
+
 static void __init print_details(enum ind_thunk thunk, uint64_t caps)
 {
     unsigned int _7d0 = 0, e8b = 0, tmp;
@@ -210,9 +259,16 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "",
            (caps & ARCH_CAPS_SSB_NO)                ? " SSB_NO"    : "");
 
-    /* Compiled-in support which pertains to BTI mitigations. */
-    if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) )
-        printk("  Compiled-in support: INDIRECT_THUNK\n");
+    /* Compiled-in support which pertains to mitigations. */
+    if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) )
+        printk("  Compiled-in support:"
+#ifdef CONFIG_INDIRECT_THUNK
+               " INDIRECT_THUNK"
+#endif
+#ifdef CONFIG_SHADOW_PAGING
+               " SHADOW_PAGING"
+#endif
+               "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
     printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s\n",
@@ -225,6 +281,13 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            opt_ibpb                                  ? " IBPB"  : "");
+
+    /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
+    if ( cpu_has_bug_l1tf || opt_pv_l1tf )
+        printk("  L1TF: believed%s vulnerable, maxphysaddr L1D %u, CPUID %u"
+               ", Safe address %"PRIx64"\n",
+               cpu_has_bug_l1tf ? "" : " not",
+               l1d_maxphysaddr, paddr_bits, l1tf_safe_maddr);
 
     /*
      * Alternatives blocks for protecting against and/or virtualising
@@ -247,6 +310,10 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s\n",
            opt_xpti & OPT_XPTI_DOM0 ? "enabled" : "disabled",
            opt_xpti & OPT_XPTI_DOMU ? "enabled" : "disabled");
+
+    printk("  PV L1TF shadowing: Dom0 %s, DomU %s\n",
+           opt_pv_l1tf & OPT_PV_L1TF_DOM0  ? "enabled"  : "disabled",
+           opt_pv_l1tf & OPT_PV_L1TF_DOMU  ? "enabled"  : "disabled");
 }
 
 /* Calculate whether Retpoline is known-safe on this CPU. */
@@ -769,6 +836,18 @@ void __init init_speculation_mitigations(void)
         setup_clear_cpu_cap(X86_FEATURE_NO_XPTI);
 
     l1tf_calculations(caps);
+
+    /*
+     * By default, enable PV domU L1TF mitigations on all L1TF-vulnerable
+     * hardware.
+     */
+    if ( opt_pv_l1tf == -1 )
+    {
+        if ( !cpu_has_bug_l1tf )
+            opt_pv_l1tf = 0;
+        else
+            opt_pv_l1tf = OPT_PV_L1TF_DOMU;
+    }
 
     print_details(thunk, caps);
 
