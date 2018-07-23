@@ -121,6 +121,11 @@ struct shadow_domain {
 
     /* Has this domain ever used HVMOP_pagetable_dying? */
     bool_t pagetable_dying_op;
+
+#ifdef CONFIG_PV
+    /* PV L1 Terminal Fault mitigation. */
+    struct tasklet pv_l1tf_tasklet;
+#endif /* CONFIG_PV */
 #endif
 };
 
@@ -257,6 +262,8 @@ struct pv_domain
     bool xpti;
     /* Use PCID feature? */
     bool pcid;
+    /* Mitigate L1TF with shadow/crashing? */
+    bool check_l1tf;
 
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
