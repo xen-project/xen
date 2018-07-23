@@ -3135,6 +3135,15 @@ static void sh_new_mode(struct domain *d, u32 new_mode)
     ASSERT(paging_locked_by_me(d));
     ASSERT(d != current->domain);
 
+    /*
+     * If PG_SH_forced has previously been activated because of writing an
+     * L1TF-vulnerable PTE, it must remain active for the remaining lifetime
+     * of the domain, even if the logdirty mode needs to be controlled for
+     * migration purposes.
+     */
+    if ( paging_mode_sh_forced(d) )
+        new_mode |= PG_SH_forced | PG_SH_enable;
+
     d->arch.paging.mode = new_mode;
     for_each_vcpu(d, v)
         sh_update_paging_modes(v);
@@ -4017,6 +4026,29 @@ void shadow_audit_tables(struct vcpu *v)
 }
 
 #endif /* Shadow audit */
+
+void pv_l1tf_tasklet(unsigned long data)
+{
+    struct domain *d = (void *)data;
+
+    domain_pause(d);
+    paging_lock(d);
+
+    if ( !paging_mode_sh_forced(d) && !d->is_dying )
+    {
+        int ret = shadow_one_bit_enable(d, PG_SH_forced);
+
+        if ( ret )
+        {
+            printk(XENLOG_G_ERR "d%d Failed to enable PG_SH_forced: %d\n",
+                   d->domain_id, ret);
+            domain_crash(d);
+        }
+    }
+
+    paging_unlock(d);
+    domain_unpause(d);
+}
 
 /*
  * Local variables:
