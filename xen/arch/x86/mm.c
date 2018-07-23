@@ -1116,7 +1116,7 @@ get_page_from_l2e(
     int rc;
 
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-        return 1;
+        return pv_l1tf_check_l2e(d, l2e) ? -ERESTART : 1;
 
     if ( unlikely((l2e_get_flags(l2e) & L2_DISALLOW_MASK)) )
     {
@@ -1147,7 +1147,7 @@ get_page_from_l3e(
     int rc;
 
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        return 1;
+        return pv_l1tf_check_l3e(d, l3e) ? -ERESTART : 1;
 
     if ( unlikely((l3e_get_flags(l3e) & l3_disallow_mask(d))) )
     {
@@ -1180,7 +1180,7 @@ get_page_from_l4e(
     int rc;
 
     if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
-        return 1;
+        return pv_l1tf_check_l4e(d, l4e) ? -ERESTART : 1;
 
     if ( unlikely((l4e_get_flags(l4e) & L4_DISALLOW_MASK)) )
     {
@@ -1390,6 +1390,13 @@ static int alloc_l1_table(struct page_info *page)
 
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
+        if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
+        {
+            ret = pv_l1tf_check_l1e(d, pl1e[i]) ? -ERESTART : 0;
+            if ( ret )
+                goto out;
+        }
+
         switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
         {
         default:
@@ -1410,6 +1417,7 @@ static int alloc_l1_table(struct page_info *page)
 
  fail:
     gdprintk(XENLOG_WARNING, "Failure in alloc_l1_table: slot %#x\n", i);
+ out:
     while ( i-- > 0 )
         put_page_from_l1e(pl1e[i], d);
 
@@ -2060,6 +2068,8 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             rc = -EBUSY;
         }
     }
+    else if ( pv_l1tf_check_l1e(pt_dom, nl1e) )
+        return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                                      preserve_ad)) )
     {
@@ -2123,6 +2133,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             rc = -EBUSY;
         }
     }
+    else if ( pv_l1tf_check_l2e(d, nl2e) )
+        return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l2, pl2e, ol2e, nl2e, pfn, vcpu,
                                      preserve_ad)) )
     {
@@ -2184,6 +2196,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
             rc = -EFAULT;
         }
     }
+    else if ( pv_l1tf_check_l3e(d, nl3e) )
+        return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l3, pl3e, ol3e, nl3e, pfn, vcpu,
                                      preserve_ad)) )
     {
@@ -2249,6 +2263,8 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
             rc = -EFAULT;
         }
     }
+    else if ( pv_l1tf_check_l4e(d, nl4e) )
+        return -ERESTART;
     else if ( unlikely(!UPDATE_ENTRY(l4, pl4e, ol4e, nl4e, pfn, vcpu,
                                      preserve_ad)) )
     {
