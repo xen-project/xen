@@ -200,19 +200,6 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
-int compat_update_va_mapping(unsigned int va, u32 lo, u32 hi,
-                             unsigned int flags)
-{
-    return do_update_va_mapping(va, lo | ((u64)hi << 32), flags);
-}
-
-int compat_update_va_mapping_otherdomain(unsigned long va, u32 lo, u32 hi,
-                                         unsigned long flags,
-                                         domid_t domid)
-{
-    return do_update_va_mapping_otherdomain(va, lo | ((u64)hi << 32), flags, domid);
-}
-
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_compat_t);
 
 int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) arg,

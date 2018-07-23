@@ -158,7 +158,7 @@ extern int compat_update_va_mapping(
     unsigned int va, u32 lo, u32 hi, unsigned int flags);
 
 extern int compat_update_va_mapping_otherdomain(
-    unsigned long va, u32 lo, u32 hi, unsigned long flags, domid_t domid);
+    unsigned int va, u32 lo, u32 hi, unsigned int flags, domid_t domid);
 
 DEFINE_XEN_GUEST_HANDLE(trap_info_compat_t);
 extern int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps);
