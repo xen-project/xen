@@ -29,6 +29,7 @@
 #include <asm/flushtlb.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
+#include <asm/spec_ctrl.h>
 
 /*****************************************************************************
  * Macros to tell which shadow paging mode a domain is in*/
@@ -113,6 +114,37 @@ static inline int shadow_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 }
 
 #endif /* CONFIG_SHADOW_PAGING */
+
+/*
+ * Mitigations for L1TF / CVE-2018-3620 for PV guests.
+ *
+ * We cannot alter an architecturally-legitimate PTE which a PV guest has
+ * chosen to write, as traditional paged-out metadata is L1TF-vulnerable.
+ * What we can do is force a PV guest which writes a vulnerable PTE into
+ * shadow mode, so Xen controls the pagetables which are reachable by the CPU
+ * pagewalk.
+ */
+
+void pv_l1tf_tasklet(unsigned long data);
+
+static inline void pv_l1tf_domain_init(struct domain *d)
+{
+    d->arch.pv_domain.check_l1tf =
+        opt_pv_l1tf & (is_hardware_domain(d)
+                       ? OPT_PV_L1TF_DOM0 : OPT_PV_L1TF_DOMU);
+
+#ifdef CONFIG_SHADOW_PAGING
+    tasklet_init(&d->arch.paging.shadow.pv_l1tf_tasklet,
+                 pv_l1tf_tasklet, (unsigned long)d);
+#endif
+}
+
+static inline void pv_l1tf_domain_destroy(struct domain *d)
+{
+#ifdef CONFIG_SHADOW_PAGING
+    tasklet_kill(&d->arch.paging.shadow.pv_l1tf_tasklet);
+#endif
+}
 
 /* Remove all shadows of the guest mfn. */
 static inline void shadow_remove_all_shadows(struct domain *d, mfn_t gmfn)

@@ -51,6 +51,11 @@ static inline void INIT_LIST_HEAD(struct list_head *list)
     list->prev = list;
 }
 
+static inline bool list_head_is_null(const struct list_head *list)
+{
+    return !list->next && !list->prev;
+}
+
 /*
  * Insert a new entry between two known consecutive entries. 
  *
