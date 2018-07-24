@@ -428,6 +428,7 @@ static libxl__qmp_handler *qmp_init_handler(libxl__gc *gc, uint32_t domid)
 static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
                     int timeout)
 {
+    GC_INIT(qmp->ctx);
     int ret = -1;
     int i = 0;
     struct sockaddr_un addr;
@@ -447,13 +448,9 @@ static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
         goto out;
     }
 
-    if (sizeof(addr.sun_path) <= strlen(qmp_socket_path)) {
-        ret = -1;
+    ret = libxl__prepare_sockaddr_un(gc, &addr, qmp_socket_path, "QMP socket");
+    if (ret)
         goto out;
-    }
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, qmp_socket_path, sizeof(addr.sun_path));
 
     do {
         ret = connect(qmp->qmp_fd, (struct sockaddr *) &addr, sizeof(addr));
@@ -471,6 +468,7 @@ static int qmp_open(libxl__qmp_handler *qmp, const char *qmp_socket_path,
 out:
     if (ret == -1 && qmp->qmp_fd > -1) close(qmp->qmp_fd);
 
+    GC_FREE;
     return ret;
 }
 

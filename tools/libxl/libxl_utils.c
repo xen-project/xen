@@ -1234,6 +1234,21 @@ int libxl__random_bytes(libxl__gc *gc, uint8_t *buf, size_t len)
     return ret;
 }
 
+int libxl__prepare_sockaddr_un(libxl__gc *gc,
+                               struct sockaddr_un *un, const char *path,
+                               const char *what)
+{
+    if (sizeof(un->sun_path) <= strlen(path)) {
+        LOG(ERROR, "UNIX socket path '%s' is too long for %s", path, what);
+        LOG(DEBUG, "Path must be less than %zu bytes", sizeof(un->sun_path));
+        return ERROR_INVAL;
+    }
+    memset(un, 0, sizeof(struct sockaddr_un));
+    un->sun_family = AF_UNIX;
+    strncpy(un->sun_path, path, sizeof(un->sun_path));
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

@@ -47,6 +47,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
 
@@ -4420,6 +4421,9 @@ static inline bool libxl__string_is_default(char **s)
 {
     return *s == NULL;
 }
+
+_hidden int libxl__prepare_sockaddr_un(libxl__gc *gc, struct sockaddr_un *un,
+                                       const char *path, const char *what);
 #endif
 
 /*
