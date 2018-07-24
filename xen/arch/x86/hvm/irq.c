@@ -61,6 +61,21 @@ int hvm_ioapic_assert(struct domain *d, unsigned int gsi, bool level)
     return vector;
 }
 
+void hvm_ioapic_deassert(struct domain *d, unsigned int gsi)
+{
+    struct hvm_irq *hvm_irq = hvm_domain_irq(d);
+
+    if ( gsi >= hvm_irq->nr_gsis )
+    {
+        ASSERT_UNREACHABLE();
+        return;
+    }
+
+    spin_lock(&d->arch.hvm_domain.irq_lock);
+    hvm_irq->gsi_assert_count[gsi]--;
+    spin_unlock(&d->arch.hvm_domain.irq_lock);
+}
+
 static void assert_irq(struct domain *d, unsigned ioapic_gsi, unsigned pic_irq)
 {
     assert_gsi(d, ioapic_gsi);

@@ -213,6 +213,17 @@ static void hpet_stop_timer(HPETState *h, unsigned int tn,
     hpet_get_comparator(h, tn, guest_time);
 }
 
+static void hpet_timer_fired(struct vcpu *v, void *data)
+{
+    unsigned int tn = (unsigned long)data;
+    HPETState *h = vcpu_vhpet(v);
+
+    write_lock(&h->lock);
+    if ( __test_and_set_bit(tn, &h->hpet.isr) )
+        ASSERT_UNREACHABLE();
+    write_unlock(&h->lock);
+}
+
 /* the number of HPET tick that stands for
  * 1/(2^10) second, namely, 0.9765625 milliseconds */
 #define  HPET_TINY_TIME_SPAN  ((h->stime_freq >> 10) / STIME_PER_HPET_TICK)
@@ -234,7 +245,8 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
         pit_stop_channel0_irq(&vhpet_domain(h)->arch.vpit);
     }
 
-    if ( !timer_enabled(h, tn) )
+    if ( !timer_enabled(h, tn) ||
+         (timer_level(h, tn) && test_bit(tn, &h->hpet.isr)) )
         return;
 
     if ( !timer_int_route_valid(h, tn) )
@@ -283,8 +295,12 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
      * timer we also need the period which may be different because time may
      * have elapsed between the time the comparator was written and the timer
      * being enabled (now).
+     *
+     * NB: set periodic timers as oneshot if interrupt type is set to level
+     * because the user must ack the interrupt (by writing 1 to the interrupt
+     * status register) before another interrupt can be delivered.
      */
-    oneshot = !timer_is_periodic(h, tn);
+    oneshot = !timer_is_periodic(h, tn) || timer_level(h, tn);
     TRACE_2_LONG_4D(TRC_HVM_EMUL_HPET_START_TIMER, tn, irq,
                     TRC_PAR_LONG(hpet_tick_to_ns(h, diff)),
                     TRC_PAR_LONG(oneshot ? 0LL :
@@ -292,7 +308,8 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
     create_periodic_time(vhpet_vcpu(h), &h->pt[tn],
                          hpet_tick_to_ns(h, diff),
                          oneshot ? 0 : hpet_tick_to_ns(h, h->hpet.period[tn]),
-                         irq, NULL, NULL, false);
+                         irq, timer_level(h, tn) ? hpet_timer_fired : NULL,
+                         (void *)(unsigned long)tn, timer_level(h, tn));
 }
 
 static inline uint64_t hpet_fixup_reg(
@@ -328,7 +345,7 @@ static int hpet_write(
     HPETState *h = vcpu_vhpet(v);
     uint64_t old_val, new_val;
     uint64_t guest_time;
-    int tn, i;
+    unsigned int tn, i;
 
     /* Acculumate a bit mask of timers whos state is changed by this write. */
     unsigned long start_timers = 0;
@@ -385,6 +402,27 @@ static int hpet_write(
         }
         break;
 
+    case HPET_STATUS:
+        /* write 1 to clear. */
+        while ( new_val )
+        {
+            bool active;
+
+            i = find_first_set_bit(new_val);
+            if ( i >= HPET_TIMER_NUM )
+                break;
+            __clear_bit(i, &new_val);
+            active = __test_and_clear_bit(i, &h->hpet.isr);
+            if ( active )
+            {
+                hvm_ioapic_deassert(v->domain, timer_int_route(h, i));
+                if ( hpet_enabled(h) && timer_enabled(h, i) &&
+                     timer_level(h, i) && timer_is_periodic(h, i) )
+                    set_start_timer(i);
+            }
+        }
+        break;
+
     case HPET_COUNTER:
         h->hpet.mc64 = new_val;
         if ( hpet_enabled(h) )
@@ -409,14 +447,6 @@ static int hpet_write(
                             HPET_TN_32BIT | HPET_TN_ROUTE));
 
         timer_sanitize_int_route(h, tn);
-
-        if ( timer_level(h, tn) )
-        {
-            gdprintk(XENLOG_ERR,
-                     "HPET: level triggered interrupt not supported now\n");
-            domain_crash(current->domain);
-            break;
-        }
 
         if ( new_val & HPET_TN_32BIT )
         {
