@@ -42,6 +42,7 @@ struct periodic_time {
     bool do_not_freeze;
     bool irq_issued;
     bool warned_timeout_too_short;
+    bool level;
 #define PTSRC_isa    1 /* ISA time source */
 #define PTSRC_lapic  2 /* LAPIC time source */
 #define PTSRC_ioapic 3 /* IOAPIC time source */
@@ -169,7 +170,7 @@ void pt_may_unmask_irq(struct domain *d, struct periodic_time *vlapic_pt);
  */
 void create_periodic_time(
     struct vcpu *v, struct periodic_time *pt, uint64_t delta,
-    uint64_t period, uint8_t irq, time_cb *cb, void *data);
+    uint64_t period, uint8_t irq, time_cb *cb, void *data, bool level);
 void destroy_periodic_time(struct periodic_time *pt);
 
 int pv_pit_handler(int port, int data, int write);

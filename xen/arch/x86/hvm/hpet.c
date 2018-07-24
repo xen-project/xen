@@ -292,7 +292,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
     create_periodic_time(vhpet_vcpu(h), &h->pt[tn],
                          hpet_tick_to_ns(h, diff),
                          oneshot ? 0 : hpet_tick_to_ns(h, h->hpet.period[tn]),
-                         irq, NULL, NULL);
+                         irq, NULL, NULL, false);
 }
 
 static inline uint64_t hpet_fixup_reg(

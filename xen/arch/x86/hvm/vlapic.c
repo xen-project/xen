@@ -762,7 +762,7 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
         create_periodic_time(current, &vlapic->pt, delta,
                              is_periodic ? period : 0, vlapic->pt.irq,
                              is_periodic ? vlapic_pt_cb : NULL,
-                             &vlapic->timer_last_update);
+                             &vlapic->timer_last_update, false);
 
         vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
         if ( !tmict_updated )
@@ -1166,7 +1166,7 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
                         TRC_PAR_LONG(0LL), vlapic->pt.irq);
         create_periodic_time(v, &vlapic->pt, delta, 0,
                              vlapic->pt.irq, vlapic_tdt_pt_cb,
-                             &vlapic->timer_last_update);
+                             &vlapic->timer_last_update, false);
         vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
     }
     else
@@ -1180,7 +1180,7 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
                             TRC_PAR_LONG(0LL), vlapic->pt.irq);
             create_periodic_time(v, &vlapic->pt, 0, 0,
                                  vlapic->pt.irq, vlapic_tdt_pt_cb,
-                                 &vlapic->timer_last_update);
+                                 &vlapic->timer_last_update, false);
             vlapic->timer_last_update = vlapic->pt.last_plt_gtime;
         }
         else
@@ -1423,7 +1423,7 @@ static void lapic_rearm(struct vlapic *s)
                          vlapic_lvtt_period(s) ? period : 0,
                          s->pt.irq,
                          vlapic_lvtt_period(s) ? vlapic_pt_cb : NULL,
-                         &s->timer_last_update);
+                         &s->timer_last_update, false);
     s->timer_last_update = s->pt.last_plt_gtime;
 }
 

@@ -191,14 +191,14 @@ static void pit_load_count(PITState *pit, int channel, int val)
         /* Periodic timer. */
         TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, period);
         create_periodic_time(v, &pit->pt0, period, period, 0, pit_time_fired, 
-                             &pit->count_load_time[channel]);
+                             &pit->count_load_time[channel], false);
         break;
     case 1:
     case 4:
         /* One-shot timer. */
         TRACE_2D(TRC_HVM_EMUL_PIT_START_TIMER, period, 0);
         create_periodic_time(v, &pit->pt0, period, 0, 0, pit_time_fired,
-                             &pit->count_load_time[channel]);
+                             &pit->count_load_time[channel], false);
         break;
     default:
         TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);

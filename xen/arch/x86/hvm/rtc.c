@@ -156,7 +156,7 @@ static void rtc_timer_update(RTCState *s)
                 {
                     TRACE_2D(TRC_HVM_EMUL_RTC_START_TIMER, delta, period);
                     create_periodic_time(v, &s->pt, delta, period,
-                                         RTC_IRQ, rtc_pf_callback, s);
+                                         RTC_IRQ, rtc_pf_callback, s, false);
                 }
                 else
                     s->check_ticks_since = now;
