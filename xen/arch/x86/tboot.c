@@ -391,7 +391,12 @@ void tboot_shutdown(uint32_t shutdown_type)
         tboot_gen_xenheap_integrity(g_tboot_shared->s3_key, &xenheap_mac);
     }
 
-    write_ptbase(idle_vcpu[0]);
+    /*
+     * During early boot, we can be called by panic before idle_vcpu[0] is
+     * setup, but in that case we don't need to change page tables.
+     */
+    if ( idle_vcpu[0] != INVALID_VCPU )
+        write_ptbase(idle_vcpu[0]);
 
     ((void(*)(void))(unsigned long)g_tboot_shared->shutdown_entry)();
 
