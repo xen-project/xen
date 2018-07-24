@@ -1093,14 +1093,14 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
 
     printk(XENLOG_INFO "*** Building a PVH Dom%d ***\n", d->domain_id);
 
-    iommu_hwdom_init(d);
-
     rc = pvh_setup_p2m(d);
     if ( rc )
     {
         printk("Failed to setup Dom0 physical memory map\n");
         return rc;
     }
+
+    iommu_hwdom_init(d);
 
     rc = pvh_load_kernel(d, image, image_headroom, initrd, bootstrap_map(image),
                          cmdline, &entry, &start_info);
