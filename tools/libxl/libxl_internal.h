@@ -439,6 +439,14 @@ struct libxl__ev_qmp {
     libxl__ev_qmp_callback *callback;
     int payload_fd; /* set to send a fd with the command, -1 otherwise */
 
+    /* read-only when Connected
+     * and not to be accessed by the caller otherwise */
+    struct {
+        int major;
+        int minor;
+        int micro;
+    } qemu_version;
+
     /*
      * remaining fields are private to libxl_ev_qmp_*
      */

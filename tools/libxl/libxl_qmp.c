@@ -1829,6 +1829,27 @@ static int qmp_ev_handle_message(libxl__egc *egc,
             return ERROR_PROTOCOL_ERROR_QMP;
         }
 
+        /*
+         * Store advertised QEMU version
+         * { "QMP": { "version": {
+         *     "qemu": { "major": int, "minor": int, "micro": int } } } }
+         */
+        o = libxl__json_map_get("QMP", resp, JSON_MAP);
+        o = libxl__json_map_get("version", o, JSON_MAP);
+        o = libxl__json_map_get("qemu", o, JSON_MAP);
+#define GRAB_VERSION(level) do { \
+        ev->qemu_version.level = libxl__json_object_get_integer( \
+            libxl__json_map_get(#level, o, JSON_INTEGER)); \
+        } while (0)
+        GRAB_VERSION(major);
+        GRAB_VERSION(minor);
+        GRAB_VERSION(micro);
+#undef GRAB_VERSION
+        LOGD(DEBUG, ev->domid, "QEMU version: %d.%d.%d",
+             ev->qemu_version.major,
+             ev->qemu_version.minor,
+             ev->qemu_version.micro);
+
         /* Prepare next message to send */
         assert(!ev->tx_buf);
         ev->id = ev->next_id++;
@@ -1991,6 +2012,10 @@ void libxl__ev_qmp_init(libxl__ev_qmp *ev)
 
     ev->msg = NULL;
     ev->msg_id = 0;
+
+    ev->qemu_version.major = -1;
+    ev->qemu_version.minor = -1;
+    ev->qemu_version.micro = -1;
 }
 
 int libxl__ev_qmp_send(libxl__gc *unused_gc, libxl__ev_qmp *ev,
