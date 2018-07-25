@@ -1774,6 +1774,9 @@ error:
     domcreate_complete(egc, &cdcs->dcs, rc);
 }
 
+static void soft_reset_dm_suspended(libxl__egc *egc,
+                                    libxl__domain_suspend_state *dsps,
+                                    int rc);
 static int do_domain_soft_reset(libxl_ctx *ctx,
                                 libxl_domain_config *d_config,
                                 uint32_t domid_soft_reset,
@@ -1856,11 +1859,24 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
         goto out;
     }
 
-    rc = libxl__domain_suspend_device_model(gc, &dss->dsps);
-    if (rc) {
-        LOGD(ERROR, domid_soft_reset, "failed to suspend device model.");
-        goto out;
-    }
+    dss->dsps.ao = ao;
+    dss->dsps.callback_device_model_done = soft_reset_dm_suspended;
+    libxl__domain_suspend_device_model(egc, &dss->dsps); /* must be last */
+
+    return AO_INPROGRESS;
+
+ out:
+    return AO_CREATE_FAIL(rc);
+}
+
+static void soft_reset_dm_suspended(libxl__egc *egc,
+                                    libxl__domain_suspend_state *dsps,
+                                    int rc)
+{
+    STATE_AO_GC(dsps->ao);
+    libxl__domain_soft_reset_state *srs =
+        CONTAINER_OF(dsps, *srs, dss.dsps);
+    libxl__app_domain_create_state *cdcs = &srs->cdcs;
 
     /*
      * Ask all backends to disconnect by removing the domain from
@@ -1868,18 +1884,13 @@ static int do_domain_soft_reset(libxl_ctx *ctx,
      * xenstore again with probably different store/console/...
      * channels.
      */
-    xs_release_domain(ctx->xsh, cdcs->dcs.domid_soft_reset);
+    xs_release_domain(CTX->xsh, cdcs->dcs.domid_soft_reset);
 
     srs->dds.ao = ao;
-    srs->dds.domid = domid_soft_reset;
+    srs->dds.domid = cdcs->dcs.domid_soft_reset;
     srs->dds.callback = domain_soft_reset_cb;
     srs->dds.soft_reset = true;
     libxl__domain_destroy(egc, &srs->dds);
-
-    return AO_INPROGRESS;
-
- out:
-    return AO_CREATE_FAIL(rc);
 }
 
 static void domain_create_cb(libxl__egc *egc,

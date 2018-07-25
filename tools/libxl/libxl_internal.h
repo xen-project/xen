@@ -3434,6 +3434,8 @@ struct libxl__domain_suspend_state {
     libxl__ev_time guest_timeout;
 
     const char *dm_savefile;
+    void (*callback_device_model_done)(libxl__egc*,
+                              struct libxl__domain_suspend_state*, int rc);
     void (*callback_common_done)(libxl__egc*,
                                  struct libxl__domain_suspend_state*, int ok);
 };
@@ -4075,8 +4077,9 @@ static inline bool libxl__save_helper_inuse(const libxl__save_helper_state *shs)
     return libxl__ev_child_inuse(&shs->child);
 }
 
-/* Each time the dm needs to be saved, we must call suspend and then save */
-_hidden int libxl__domain_suspend_device_model(libxl__gc *gc,
+/* Each time the dm needs to be saved, we must call suspend and then save
+ * calls dsps->callback_device_model_done when done */
+_hidden void libxl__domain_suspend_device_model(libxl__egc *egc,
                                            libxl__domain_suspend_state *dsps);
 
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
