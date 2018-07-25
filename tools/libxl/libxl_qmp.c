@@ -405,12 +405,12 @@ static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
  *   = 0  if qemu's version == asked version
  *   > 0  if qemu's version >  asked version
  */
-static int qmp_qemu_compare_version(libxl__qmp_handler *qmp, int major,
-                                    int minor, int micro)
+static int qmp_ev_qemu_compare_version(libxl__ev_qmp *ev, int major,
+                                       int minor, int micro)
 {
 #define CHECK_VERSION(level) do { \
-    if (qmp->version.level > (level)) return +1; \
-    if (qmp->version.level < (level)) return -1; \
+    if (ev->qemu_version.level > (level)) return +1; \
+    if (ev->qemu_version.level < (level)) return -1; \
 } while (0)
 
     CHECK_VERSION(major);
@@ -1019,29 +1019,6 @@ int libxl__qmp_system_wakeup(libxl__gc *gc, int domid)
     return qmp_run_command(gc, domid, "system_wakeup", NULL, NULL, NULL);
 }
 
-int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename, bool live)
-{
-    libxl__json_object *args = NULL;
-    libxl__qmp_handler *qmp = NULL;
-    int rc;
-
-    qmp = libxl__qmp_initialize(gc, domid);
-    if (!qmp)
-        return ERROR_FAIL;
-
-    qmp_parameters_add_string(gc, &args, "filename", (char *)filename);
-
-    /* live parameter was added to QEMU 2.11. It signal QEMU that the save
-     * operation is for a live migration rather that for taking a snapshot. */
-    if (qmp_qemu_compare_version(qmp, 2, 11, 0) >= 0)
-        qmp_parameters_add_bool(gc, &args, "live", live);
-
-    rc = qmp_synchronous_send(qmp, "xen-save-devices-state", args,
-                              NULL, NULL, qmp->timeout);
-    libxl__qmp_close(qmp);
-    return rc;
-}
-
 int libxl__qmp_restore(libxl__gc *gc, int domid, const char *state_file)
 {
     libxl__json_object *args = NULL;
@@ -1068,11 +1045,6 @@ static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
                               NULL, NULL, qmp->timeout);
 
     return rc;
-}
-
-int libxl__qmp_stop(libxl__gc *gc, int domid)
-{
-    return qmp_run_command(gc, domid, "stop", NULL, NULL, NULL);
 }
 
 int libxl__qmp_resume(libxl__gc *gc, int domid)
@@ -1313,6 +1285,130 @@ int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
     libxl__qmp_close(qmp);
     return ret;
 }
+
+
+/*
+ * Functions using libxl__ev_qmp
+ */
+
+static void dm_stopped(libxl__egc *egc, libxl__ev_qmp *ev,
+                       const libxl__json_object *response, int rc);
+static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
+                              const libxl__json_object *response, int rc);
+static void dm_state_saved(libxl__egc *egc, libxl__ev_qmp *ev,
+                           const libxl__json_object *response, int rc);
+
+/* calls dsps->callback_device_model_done when done */
+void libxl__qmp_suspend_save(libxl__egc *egc,
+                             libxl__domain_suspend_state *dsps)
+{
+    EGC_GC;
+    int rc;
+    libxl__ev_qmp *ev = &dsps->qmp;
+
+    ev->ao = dsps->ao;
+    ev->domid = dsps->domid;
+    ev->callback = dm_stopped;
+    ev->payload_fd = -1;
+
+    rc = libxl__ev_qmp_send(gc, ev, "stop", NULL);
+    if (rc)
+        goto error;
+
+    return;
+
+error:
+    dsps->callback_device_model_done(egc, dsps, rc);
+}
+
+static void dm_stopped(libxl__egc *egc, libxl__ev_qmp *ev,
+                       const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    libxl__domain_suspend_state *dsps = CONTAINER_OF(ev, *dsps, qmp);
+    const char *const filename = dsps->dm_savefile;
+
+    if (rc)
+        goto error;
+
+    ev->payload_fd = open(filename, O_WRONLY | O_CREAT, 0600);
+    if (ev->payload_fd < 0) {
+        LOGED(ERROR, ev->domid,
+              "Failed to open file %s for QEMU", filename);
+        rc = ERROR_FAIL;
+        goto error;
+    }
+
+    ev->callback = dm_state_fd_ready;
+    rc = libxl__ev_qmp_send(gc, ev, "add-fd", NULL);
+    if (rc)
+        goto error;
+
+    return;
+
+error:
+    if (ev->payload_fd >= 0) {
+        close(ev->payload_fd);
+        libxl__remove_file(gc, filename);
+        ev->payload_fd = -1;
+    }
+    dsps->callback_device_model_done(egc, dsps, rc);
+}
+
+static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
+                              const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    int fdset;
+    const libxl__json_object *o;
+    libxl__json_object *args = NULL;
+    libxl__domain_suspend_state *dsps = CONTAINER_OF(ev, *dsps, qmp);
+
+    close(ev->payload_fd);
+    ev->payload_fd = -1;
+
+    if (rc)
+        goto error;
+
+    o = libxl__json_map_get("fdset-id", response, JSON_INTEGER);
+    if (!o) {
+        rc = ERROR_QEMU_API;
+        goto error;
+    }
+    fdset = libxl__json_object_get_integer(o);
+
+    ev->callback = dm_state_saved;
+
+    /* The `live` parameter was added to QEMU 2.11. It signals QEMU that
+     * the save operation is for a live migration rather than for taking a
+     * snapshot. */
+    if (qmp_ev_qemu_compare_version(ev, 2, 11, 0) >= 0)
+        qmp_parameters_add_bool(gc, &args, "live", dsps->live);
+    QMP_PARAMETERS_SPRINTF(&args, "filename", "/dev/fdset/%d", fdset);
+    rc = libxl__ev_qmp_send(gc, ev, "xen-save-devices-state", args);
+    if (rc)
+        goto error;
+
+    return;
+
+error:
+    assert(rc);
+    libxl__remove_file(gc, dsps->dm_savefile);
+    dsps->callback_device_model_done(egc, dsps, rc);
+}
+
+static void dm_state_saved(libxl__egc *egc, libxl__ev_qmp *ev,
+                           const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    libxl__domain_suspend_state *dsps = CONTAINER_OF(ev, *dsps, qmp);
+
+    if (rc)
+        libxl__remove_file(gc, dsps->dm_savefile);
+
+    dsps->callback_device_model_done(egc, dsps, rc);
+}
+
 
 /* ------------ Implementation of libxl__ev_qmp ---------------- */
 

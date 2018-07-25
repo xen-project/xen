@@ -1963,13 +1963,8 @@ _hidden int libxl__qmp_pci_del(libxl__gc *gc, int domid,
                                libxl_device_pci *pcidev);
 /* Resume hvm domain */
 _hidden int libxl__qmp_system_wakeup(libxl__gc *gc, int domid);
-/* Suspend QEMU. */
-_hidden int libxl__qmp_stop(libxl__gc *gc, int domid);
 /* Resume QEMU. */
 _hidden int libxl__qmp_resume(libxl__gc *gc, int domid);
-/* Save current QEMU state into fd. */
-_hidden int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename,
-                            bool live);
 /* Load current QEMU state from file. */
 _hidden int libxl__qmp_restore(libxl__gc *gc, int domid, const char *filename);
 /* Set dirty bitmap logging status */
@@ -3432,6 +3427,7 @@ struct libxl__domain_suspend_state {
     libxl__xswait_state pvcontrol;
     libxl__ev_xswatch guest_watch;
     libxl__ev_time guest_timeout;
+    libxl__ev_qmp qmp;
 
     const char *dm_savefile;
     void (*callback_device_model_done)(libxl__egc*,
@@ -3442,6 +3438,11 @@ struct libxl__domain_suspend_state {
 int libxl__domain_suspend_init(libxl__egc *egc,
                                libxl__domain_suspend_state *dsps,
                                libxl_domain_type type);
+
+/* calls dsps->callback_device_model_done when done
+ * may synchronously calls this callback */
+_hidden void libxl__qmp_suspend_save(libxl__egc *egc,
+                                     libxl__domain_suspend_state *dsps);
 
 struct libxl__domain_save_state {
     /* set by caller of libxl__domain_save */
