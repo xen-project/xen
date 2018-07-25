@@ -864,6 +864,18 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = raw_max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
 
+    if ( !efi_enabled )
+    {
+        /*
+         * Supplement the heuristics in l1tf_calculations() by assuming that
+         * anything referenced in the E820 may be cacheable.
+         */
+        l1tf_safe_maddr =
+            max(l1tf_safe_maddr,
+                ROUNDUP(e820_raw[e820_raw_nr - 1].addr +
+                        e820_raw[e820_raw_nr - 1].size, PAGE_SIZE));
+    }
+
     /* Create a temporary copy of the E820 map. */
     memcpy(&boot_e820, &e820, sizeof(e820));
 

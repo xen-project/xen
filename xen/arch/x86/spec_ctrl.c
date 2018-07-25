@@ -50,6 +50,10 @@ bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
 uint8_t __read_mostly default_spec_ctrl_flags;
 
+paddr_t __read_mostly l1tf_addr_mask, __read_mostly l1tf_safe_maddr;
+static bool __initdata cpu_has_bug_l1tf;
+static unsigned int __initdata l1d_maxphysaddr;
+
 static int __init parse_bti(const char *s)
 {
     const char *ss;
@@ -404,6 +408,153 @@ static bool __init should_use_eager_fpu(void)
     }
 }
 
+/* Calculate whether this CPU is vulnerable to L1TF. */
+static __init void l1tf_calculations(uint64_t caps)
+{
+    bool hit_default = false;
+
+    l1d_maxphysaddr = paddr_bits;
+
+    /* L1TF is only known to affect Intel Family 6 processors at this time. */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+         boot_cpu_data.x86 == 6 )
+    {
+        switch ( boot_cpu_data.x86_model )
+        {
+            /*
+             * Core processors since at least Penryn are vulnerable.
+             */
+        case 0x17: /* Penryn */
+        case 0x1d: /* Dunnington */
+            cpu_has_bug_l1tf = true;
+            break;
+
+        case 0x1f: /* Auburndale / Havendale */
+        case 0x1e: /* Nehalem */
+        case 0x1a: /* Nehalem EP */
+        case 0x2e: /* Nehalem EX */
+        case 0x25: /* Westmere */
+        case 0x2c: /* Westmere EP */
+        case 0x2f: /* Westmere EX */
+            cpu_has_bug_l1tf = true;
+            l1d_maxphysaddr = 44;
+            break;
+
+        case 0x2a: /* SandyBridge */
+        case 0x2d: /* SandyBridge EP/EX */
+        case 0x3a: /* IvyBridge */
+        case 0x3e: /* IvyBridge EP/EX */
+        case 0x3c: /* Haswell */
+        case 0x3f: /* Haswell EX/EP */
+        case 0x45: /* Haswell D */
+        case 0x46: /* Haswell H */
+        case 0x3d: /* Broadwell */
+        case 0x47: /* Broadwell H */
+        case 0x4f: /* Broadwell EP/EX */
+        case 0x56: /* Broadwell D */
+        case 0x4e: /* Skylake M */
+        case 0x55: /* Skylake X */
+        case 0x5e: /* Skylake D */
+        case 0x66: /* Cannonlake */
+        case 0x67: /* Cannonlake? */
+        case 0x8e: /* Kabylake M */
+        case 0x9e: /* Kabylake D */
+            cpu_has_bug_l1tf = true;
+            l1d_maxphysaddr = 46;
+            break;
+
+            /*
+             * Atom processors are not vulnerable.
+             */
+        case 0x1c: /* Pineview */
+        case 0x26: /* Lincroft */
+        case 0x27: /* Penwell */
+        case 0x35: /* Cloverview */
+        case 0x36: /* Cedarview */
+        case 0x37: /* Baytrail / Valleyview (Silvermont) */
+        case 0x4d: /* Avaton / Rangely (Silvermont) */
+        case 0x4c: /* Cherrytrail / Brasswell */
+        case 0x4a: /* Merrifield */
+        case 0x5a: /* Moorefield */
+        case 0x5c: /* Goldmont */
+        case 0x5f: /* Denverton */
+        case 0x7a: /* Gemini Lake */
+            break;
+
+            /*
+             * Knights processors are not vulnerable.
+             */
+        case 0x57: /* Knights Landing */
+        case 0x85: /* Knights Mill */
+            break;
+
+        default:
+            /* Defer printk() until we've accounted for RDCL_NO. */
+            hit_default = true;
+            cpu_has_bug_l1tf = true;
+            break;
+        }
+    }
+
+    /* Any processor advertising RDCL_NO should be not vulnerable to L1TF. */
+    if ( caps & ARCH_CAPABILITIES_RDCL_NO )
+        cpu_has_bug_l1tf = false;
+
+    if ( cpu_has_bug_l1tf && hit_default )
+        printk("Unrecognised CPU model %#x - assuming vulnerable to L1TF\n",
+               boot_cpu_data.x86_model);
+
+    /*
+     * L1TF safe address heuristics.  These apply to the real hardware we are
+     * running on, and are best-effort-only if Xen is virtualised.
+     *
+     * The address mask which the L1D cache uses, which might be wider than
+     * the CPUID-reported maxphysaddr.
+     */
+    l1tf_addr_mask = ((1ul << l1d_maxphysaddr) - 1) & PAGE_MASK;
+
+    /*
+     * To be safe, l1tf_safe_maddr must be above the highest cacheable entity
+     * in system physical address space.  However, to preserve space for
+     * paged-out metadata, it should be as low as possible above the highest
+     * cacheable address, so as to require fewer high-order bits being set.
+     *
+     * These heuristics are based on some guesswork to improve the likelihood
+     * of safety in the common case, including Linux's L1TF mitigation of
+     * inverting all address bits in a non-present PTE.
+     *
+     * - If L1D is wider than CPUID (Nehalem and later mobile/desktop/low end
+     *   server), setting any address bit beyond CPUID maxphysaddr guarantees
+     *   to make the PTE safe.  This case doesn't require all the high-order
+     *   bits being set, and doesn't require any other source of information
+     *   for safety.
+     *
+     * - If L1D is the same as CPUID (Pre-Nehalem, or high end server), we
+     *   must sacrifice high order bits from the real address space for
+     *   safety.  Therefore, make a blind guess that there is nothing
+     *   cacheable in the top quarter of physical address space.
+     *
+     *   It is exceedingly unlikely for machines to be populated with this
+     *   much RAM (likely 512G on pre-Nehalem, 16T on Nehalem/Westmere, 64T on
+     *   Sandybridge and later) due to the sheer volume of DIMMs this would
+     *   actually take.
+     *
+     *   However, it is possible to find machines this large, so the "top
+     *   quarter" guess is supplemented to push the limit higher if references
+     *   to cacheable mappings (E820/SRAT/EFI/etc) are found above the top
+     *   quarter boundary.
+     *
+     *   Finally, this top quarter guess gives us a good chance of being safe
+     *   when running virtualised (and the CPUID maxphysaddr hasn't been
+     *   levelled for heterogeneous migration safety), where the safety
+     *   consideration is still in terms of host details, but all E820/etc
+     *   information is in terms of guest physical layout.
+     */
+    l1tf_safe_maddr = max(l1tf_safe_maddr, ((l1d_maxphysaddr > paddr_bits)
+                                            ? (1ul << paddr_bits)
+                                            : (3ul << (paddr_bits - 2))));
+}
+
 int8_t __read_mostly opt_xpti = -1;
 
 static __init void xpti_init_default(uint64_t caps)
@@ -616,6 +767,8 @@ void __init init_speculation_mitigations(void)
         setup_force_cpu_cap(X86_FEATURE_NO_XPTI);
     else
         setup_clear_cpu_cap(X86_FEATURE_NO_XPTI);
+
+    l1tf_calculations(caps);
 
     print_details(thunk, caps);
 
