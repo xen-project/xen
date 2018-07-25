@@ -20,6 +20,7 @@
 #include <xen/pfn.h>
 #include <asm/e820.h>
 #include <asm/page.h>
+#include <asm/spec_ctrl.h>
 
 static struct acpi_table_slit *__read_mostly acpi_slit;
 
@@ -284,6 +285,11 @@ acpi_numa_memory_affinity_init(const struct acpi_srat_mem_affinity *ma)
 	if (!(ma->flags & ACPI_SRAT_MEM_ENABLED))
 		return;
 
+	start = ma->base_address;
+	end = start + ma->length;
+	/* Supplement the heuristics in l1tf_calculations(). */
+	l1tf_safe_maddr = max(l1tf_safe_maddr, ROUNDUP(end, PAGE_SIZE));
+
 	if (num_node_memblks >= NR_NODE_MEMBLKS)
 	{
 		dprintk(XENLOG_WARNING,
@@ -292,8 +298,6 @@ acpi_numa_memory_affinity_init(const struct acpi_srat_mem_affinity *ma)
 		return;
 	}
 
-	start = ma->base_address;
-	end = start + ma->length;
 	pxm = ma->proximity_domain;
 	if (srat_rev < 2)
 		pxm &= 0xff;
