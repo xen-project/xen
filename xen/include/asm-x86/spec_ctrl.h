@@ -38,6 +38,13 @@ extern int8_t opt_xpti;
 #define OPT_XPTI_DOM0  0x01
 #define OPT_XPTI_DOMU  0x02
 
+/*
+ * The L1D address mask, which might be wider than reported in CPUID, and the
+ * system physical address above which there are believed to be no cacheable
+ * memory regions, thus unable to leak data via the L1TF vulnerability.
+ */
+extern paddr_t l1tf_addr_mask, l1tf_safe_maddr;
+
 static inline void init_shadow_spec_ctrl_state(void)
 {
     struct cpu_info *info = get_cpu_info();
