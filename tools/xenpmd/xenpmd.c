@@ -40,6 +40,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <xenstore.h>
+#include <assert.h>
 
 /* #define RUN_STANDALONE */
 #define RUN_IN_SIMULATE_MODE
@@ -345,18 +346,17 @@ void write_ulong_lsb_first(char *temp_val, unsigned long val)
 void write_battery_info_to_xenstore(struct battery_info *info)
 {
     char val[1024], string_info[256];
+    unsigned int len;
 
     xs_mkdir(xs, XBT_NULL, "/pm");
    
     memset(val, 0, 1024);
     memset(string_info, 0, 256);
     /* write 9 dwords (so 9*4) + length of 4 strings + 4 null terminators */
-    snprintf(val, 3, "%02x", 
-             (unsigned int)(9*4 +
-                            strlen(info->model_number) +
-                            strlen(info->serial_number) +
-                            strlen(info->battery_type) +
-                            strlen(info->oem_info) + 4));
+    len = 9 * 4 + strlen(info->model_number) + strlen(info->serial_number) +
+          strlen(info->battery_type) + strlen(info->oem_info) + 4;
+    assert(len < 255);
+    snprintf(val, 3, "%02x", len);
     write_ulong_lsb_first(val+2, info->present);
     write_ulong_lsb_first(val+10, info->design_capacity);
     write_ulong_lsb_first(val+18, info->last_full_capacity);
