@@ -373,13 +373,22 @@ void libxl__spawn_initiate_detach(libxl__gc *gc, libxl__spawn_state *ss)
     spawn_detach(gc, ss);
 }
 
+void libxl__spawn_initiate_failure(libxl__egc *egc, libxl__spawn_state *ss,
+                                   int rc)
+/* The spawn state must be Attached on entry and will be Attached Failed
+ * on return.  */
+{
+    spawn_fail(egc, ss, rc);
+}
+
 static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss, int rc)
 /* Caller must have logged.  Must be last thing in calling function,
  * as it may make the callback.  Precondition: Attached or Detaching. */
 {
     EGC_GC;
     assert(rc);
-    ss->rc = rc;
+    if (!ss->rc)
+        ss->rc = rc;
     spawn_detach(gc, ss);
 }
 

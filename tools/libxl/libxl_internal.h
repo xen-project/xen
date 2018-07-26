@@ -1567,7 +1567,8 @@ _hidden void libxl__spawn_init(libxl__spawn_state*);
  *
  * The inner child must soon exit or exec.  It must also soon exit or
  * notify the parent of its successful startup by writing to the
- * xenstore path xspath.
+ * xenstore path xspath OR via other means that the parent will have
+ * to set up.
  *
  * The user (in the parent) will be called back (confirm_cb) every
  * time that xenstore path is modified.
@@ -1622,6 +1623,26 @@ _hidden int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *spawn);
  * on return.
  */
 _hidden void libxl__spawn_initiate_detach(libxl__gc *gc, libxl__spawn_state*);
+
+/*
+ * libxl__spawn_initiate_failure - Propagate failure from the caller to the
+ * callee.
+ *
+ * Works by killing the intermediate process from spawn_spawn.
+ * After this function returns, a failure will be reported.
+ *
+ * This is not synchronous: there will be a further callback when
+ * the detach is complete.
+ *
+ * Caller must have logged a failure reason.
+ *
+ * The spawn state must be Attached on entry and will remain Attached. It
+ * is possible for a spawn to fail for multiple reasons, for example
+ * call(s) to libxl__spawn_initiate_failure and also for some other reason.
+ * In that case the first rc value from any source will take precedence.
+ */
+_hidden void libxl__spawn_initiate_failure(libxl__egc *egc,
+                                           libxl__spawn_state *ss, int rc);
 
 /*
  * If successful, this should return 0.
