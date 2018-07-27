@@ -248,6 +248,7 @@ void libxl__ev_fd_deregister(libxl__gc *gc, libxl__ev_fd *ev)
 short libxl__fd_poll_recheck(libxl__egc *egc, int fd, short events) {
     struct pollfd check;
     int r;
+    EGC_GC;
 
     for (;;) {
         check.fd = fd;
@@ -336,7 +337,7 @@ static void time_done_debug(libxl__gc *gc, const char *func,
                             libxl__ev_time *ev, int rc)
 {
 #ifdef DEBUG
-    libxl__log(CTX, XTL_DEBUG, -1,__FILE__,0,func,
+    libxl__log(CTX, XTL_DEBUG, -1, __FILE__, 0, func, INVALID_DOMID,
                "ev_time=%p done rc=%d .func=%p infinite=%d abs=%lu.%06lu",
                ev, rc, ev->func, ev->infinite,
                (unsigned long)ev->abs.tv_sec, (unsigned long)ev->abs.tv_usec);
@@ -445,6 +446,8 @@ void libxl__ev_time_deregister(libxl__gc *gc, libxl__ev_time *ev)
 
 static void time_occurs(libxl__egc *egc, libxl__ev_time *etime, int rc)
 {
+    EGC_GC;
+
     DBG("ev_time=%p occurs abs=%lu.%06lu",
         etime, (unsigned long)etime->abs.tv_sec,
         (unsigned long)etime->abs.tv_usec);
@@ -1192,6 +1195,7 @@ static int afterpoll_check_fd(libxl__poller *poller,
 static void fd_occurs(libxl__egc *egc, libxl__ev_fd *efd, short revents_ign)
 {
     short revents_current = libxl__fd_poll_recheck(egc, efd->fd, efd->events);
+    EGC_GC;
 
     DBG("ev_fd=%p occurs fd=%d events=%x revents_ign=%x revents_current=%x",
         efd, efd->fd, efd->events, revents_ign, revents_current);
@@ -2117,6 +2121,8 @@ int libxl_ao_abort(libxl_ctx *ctx, const libxl_asyncop_how *how)
 int libxl__ao_aborting(libxl__ao *ao)
 {
     libxl__ao *root = ao_nested_root(ao);
+    AO_GC;
+
     if (root->aborting) {
         DBG("ao=%p: aborting at explicit check (root=%p)", ao, root);
         return ERROR_ABORTED;
