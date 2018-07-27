@@ -16,6 +16,9 @@
 /*
  * This file implement a client for QMP (QEMU Monitor Protocol). For the
  * Specification, see in the QEMU repository.
+ *
+ * WARNING - Do not trust QEMU when writing codes for new commands or when
+ *           improving the client code.
  */
 
 /*
