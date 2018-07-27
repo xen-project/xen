@@ -18,6 +18,42 @@
  * Specification, see in the QEMU repository.
  */
 
+/*
+ * Logic used to send command to QEMU
+ *
+ * qmp_open():
+ *  Will open a socket and connect to QEMU.
+ *
+ * qmp_next():
+ *  Will read data sent by QEMU and then call qmp_handle_response() once a
+ *  complete QMP message is received.
+ *  The function return on timeout/error or once every data received as been
+ *  processed.
+ *
+ * qmp_handle_response()
+ *  This process json messages received from QEMU and update different list and
+ *  may call callback function.
+ *  `libxl__qmp_handler.wait_for_id` is reset once a message with this ID is
+ *    processed.
+ *  `libxl__qmp_handler.callback_list`: list with ID of command sent and
+ *    optional assotiated callback function. The return value of a callback is
+ *    set in context.
+ *
+ * qmp_send():
+ *  Simply prepare a QMP command and send it to QEMU.
+ *  It also add a `struct callback_id_pair` on the
+ *  `libxl__qmp_handler.callback_list` via qmp_send_prepare().
+ *
+ * qmp_synchronous_send():
+ *  This function calls qmp_send(), then wait for QEMU to reply to the command.
+ *  The wait is done by calling qmp_next() over and over again until either
+ *  there is a response for the command or there is an error.
+ *
+ *  An ID can be set for each QMP command, this is set into
+ *  `libxl__qmp_handler.wait_for_id`. qmp_next will check every response's ID
+ *  again this field and change the value of the field once the ID is found.
+ */
+
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include <sys/un.h>
@@ -43,6 +79,12 @@
 #define QMP_RECEIVE_BUFFER_SIZE 4096
 #define PCI_PT_QDEV_ID "pci-pt-%02x_%02x.%01x"
 
+/*
+ * qmp_callback_t is call whenever a message from QMP contain the "id"
+ * associated with the callback.
+ * "tree" contain the JSON tree that is in "return" of a QMP message. If QMP
+ * sent an error message, "tree" will be NULL.
+ */
 typedef int (*qmp_callback_t)(libxl__qmp_handler *qmp,
                               const libxl__json_object *tree,
                               void *opaque);
