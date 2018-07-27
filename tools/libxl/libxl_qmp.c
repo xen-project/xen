@@ -530,23 +530,24 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 
         DEBUG_REPORT_RECEIVED(qmp->domid, qmp->buffer, (int)rd);
 
+        if (incomplete) {
+            size_t current_pos = s - incomplete;
+            incomplete = libxl__realloc(gc, incomplete,
+                                        incomplete_size + rd + 1);
+            strncat(incomplete + incomplete_size, qmp->buffer, rd);
+            s = incomplete + current_pos;
+            incomplete_size += rd;
+            s_end = incomplete + incomplete_size;
+        } else {
+            incomplete = libxl__strndup(gc, qmp->buffer, rd);
+            incomplete_size = rd;
+            s = incomplete;
+            s_end = s + rd;
+            rd = 0;
+        }
+
         do {
             char *end = NULL;
-            if (incomplete) {
-                size_t current_pos = s - incomplete;
-                incomplete = libxl__realloc(gc, incomplete,
-                                            incomplete_size + rd + 1);
-                strncat(incomplete + incomplete_size, qmp->buffer, rd);
-                s = incomplete + current_pos;
-                incomplete_size += rd;
-                s_end = incomplete + incomplete_size;
-            } else {
-                incomplete = libxl__strndup(gc, qmp->buffer, rd);
-                incomplete_size = rd;
-                s = incomplete;
-                s_end = s + rd;
-                rd = 0;
-            }
 
             end = strstr(s, "\r\n");
             if (end) {
