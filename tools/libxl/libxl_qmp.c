@@ -528,7 +528,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
         }
         qmp->buffer[rd] = '\0';
 
-        DEBUG_REPORT_RECEIVED(qmp->domid, qmp->buffer, rd);
+        DEBUG_REPORT_RECEIVED(qmp->domid, qmp->buffer, (int)rd);
 
         do {
             char *end = NULL;
