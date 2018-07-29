@@ -39,6 +39,22 @@ centos-7-2-gcc-debug:
     debug: y
     XEN_TARGET_ARCH: x86_64
 
+centos-7-gcc:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: centos:7
+    debug: n
+    XEN_TARGET_ARCH: x86_64
+
+centos-7-gcc-debug:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: centos:7
+    debug: y
+    XEN_TARGET_ARCH: x86_64
+
 debian-jessie-clang:
   <<: *build
   variables:
