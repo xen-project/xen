@@ -1424,7 +1424,7 @@ static void free_heap_pages(
 
             page_list_del(predecessor, &heap(node, zone, order));
 
-            /* Keep predecessor's first_dirty if it is already set. */
+            /* Update predecessor's first_dirty if necessary. */
             if ( predecessor->u.free.first_dirty == INVALID_DIRTY_IDX &&
                  pg->u.free.first_dirty != INVALID_DIRTY_IDX )
                 predecessor->u.free.first_dirty = (1U << order) +
@@ -1444,6 +1444,12 @@ static void free_heap_pages(
                 break;
 
             check_and_stop_scrub(successor);
+
+            /* Update pg's first_dirty if necessary. */
+            if ( pg->u.free.first_dirty == INVALID_DIRTY_IDX &&
+                 successor->u.free.first_dirty != INVALID_DIRTY_IDX )
+                pg->u.free.first_dirty = (1U << order) +
+                                         successor->u.free.first_dirty;
 
             page_list_del(successor, &heap(node, zone, order));
         }
