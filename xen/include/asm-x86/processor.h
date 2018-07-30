@@ -390,12 +390,6 @@ static always_inline void set_in_cr4 (unsigned long mask)
     write_cr4(read_cr4() | mask);
 }
 
-static always_inline void clear_in_cr4 (unsigned long mask)
-{
-    mmu_cr4_features &= ~mask;
-    write_cr4(read_cr4() & ~mask);
-}
-
 /*
  *      NSC/Cyrix CPU configuration register indexes
  */

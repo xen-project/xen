@@ -69,19 +69,26 @@ physid_mask_t phys_cpu_present_map;
 
 void __init set_nr_cpu_ids(unsigned int max_cpus)
 {
+	unsigned int tot_cpus = num_processors + disabled_cpus;
+
 	if (!max_cpus)
-		max_cpus = num_processors + disabled_cpus;
+		max_cpus = tot_cpus;
 	if (max_cpus > NR_CPUS)
 		max_cpus = NR_CPUS;
 	else if (!max_cpus)
 		max_cpus = 1;
 	printk(XENLOG_INFO "SMP: Allowing %u CPUs (%d hotplug CPUs)\n",
 	       max_cpus, max_t(int, max_cpus - num_processors, 0));
-	nr_cpu_ids = max_cpus;
+
+	if (!park_offline_cpus)
+		tot_cpus = max_cpus;
+	nr_cpu_ids = min(tot_cpus, NR_CPUS + 0u);
+	if (park_offline_cpus && nr_cpu_ids < num_processors)
+		printk(XENLOG_WARNING "SMP: Cannot bring up %u further CPUs\n",
+		       num_processors - nr_cpu_ids);
 
 #ifndef nr_cpumask_bits
-	nr_cpumask_bits = (max_cpus + (BITS_PER_LONG - 1)) &
-			  ~(BITS_PER_LONG - 1);
+	nr_cpumask_bits = ROUNDUP(nr_cpu_ids, BITS_PER_LONG);
 	printk(XENLOG_DEBUG "NR_CPUS:%u nr_cpumask_bits:%u\n",
 	       NR_CPUS, nr_cpumask_bits);
 #endif

@@ -15,6 +15,7 @@
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
 #include "cpu.h"
+#include "mcheck/x86_mca.h"
 
 static bool_t __cpuinitdata use_xsave = 1;
 boolean_param("xsave", use_xsave);
@@ -208,6 +209,9 @@ static void __init early_cpu_detect(void)
 	/* Leaf 0x1 capabilities filled in early for Xen. */
 	c->x86_capability[0] = cap0;
 	c->x86_capability[4] = cap4;
+
+	if (c->x86_vendor != X86_VENDOR_AMD)
+		park_offline_cpus = !mce_disabled;
 
 	initialize_cpu_data(0);
 }
