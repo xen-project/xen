@@ -182,7 +182,7 @@ int nmi_reserve_counters(void)
 	if (!allocate_msrs())
 		return -ENOMEM;
 
-	/* We walk a thin line between law and rape here.
+	/*
 	 * We need to be careful to install our NMI handler
 	 * without actually triggering any NMIs as this will
 	 * break the core code horrifically.
