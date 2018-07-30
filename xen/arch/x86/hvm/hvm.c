@@ -889,6 +889,9 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
     else
         p = &host_policy;
 
+    if ( value & ~EFER_KNOWN_MASK )
+        return "Unknown bits set";
+
     if ( (value & EFER_SCE) && !p->extd.syscall )
         return "SCE without feature";
 
