@@ -639,7 +639,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;
     char *cmdline, *kextra, *loader;
-    unsigned int initrdidx, domcr_flags = DOMCRF_s3_integrity;
+    unsigned int initrdidx, num_parked = 0, domcr_flags = DOMCRF_s3_integrity;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
@@ -1440,7 +1440,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     else
     {
         set_nr_cpu_ids(max_cpus);
-        max_cpus = nr_cpu_ids;
+        if ( !max_cpus )
+            max_cpus = nr_cpu_ids;
     }
 
     /* Low mappings were only needed for some BIOS table parsing. */
@@ -1553,15 +1554,26 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         /* Set up node_to_cpumask based on cpu_to_node[]. */
         numa_add_cpu(i);        
 
-        if ( (num_online_cpus() < max_cpus) && !cpu_online(i) )
+        if ( (park_offline_cpus || num_online_cpus() < max_cpus) &&
+             !cpu_online(i) )
         {
             int ret = cpu_up(i);
             if ( ret != 0 )
                 printk("Failed to bring up CPU %u (error %d)\n", i, ret);
+            else if ( num_online_cpus() > max_cpus )
+            {
+                ret = cpu_down(i);
+                if ( !ret )
+                    ++num_parked;
+                else
+                    printk("Could not re-offline CPU%u (%d)\n", i, ret);
+            }
         }
     }
 
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
+    if ( num_parked )
+        printk(XENLOG_INFO "Parked %u CPUs\n", num_parked);
     smp_cpus_done();
 
     do_initcalls();
