@@ -1717,6 +1717,13 @@ Use `smap=hvm` to allow SMAP use by HVM guests only.
 Flag to enable Supervisor Mode Execution Protection
 Use `smep=hvm` to allow SMEP use by HVM guests only.
 
+### smt (x86)
+> `= <boolean>`
+
+Default: `true`
+
+Control bring up of multiple hyper-threads per CPU core.
+
 ### snb\_igd\_quirk
 > `= <boolean> | cap | <integer>`
 
