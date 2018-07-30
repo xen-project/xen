@@ -191,10 +191,11 @@ int parse_boolean(const char *name, const char *s, const char *e)
         char buf[8];
 
         s += nlen + 1;
-        if ( e <= s || e - s >= ARRAY_SIZE(buf) )
+        slen -= nlen + 1;
+        if ( slen >= ARRAY_SIZE(buf) )
             return -1;
-        memcpy(buf, s, e - s);
-        buf[e - s] = 0;
+        memcpy(buf, s, slen);
+        buf[slen] = 0;
         return parse_bool(buf);
     }
 
