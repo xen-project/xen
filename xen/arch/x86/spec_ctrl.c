@@ -408,12 +408,12 @@ static bool_t __init should_use_eager_fpu(void)
 #define OPT_XPTI_DEFAULT  0xff
 uint8_t __read_mostly opt_xpti = OPT_XPTI_DEFAULT;
 
-static __init void xpti_init_default(bool_t force)
+static __init void xpti_init_default(uint64_t caps)
 {
-    if ( !force && (opt_xpti != OPT_XPTI_DEFAULT) )
-        return;
-
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        caps = ARCH_CAPABILITIES_RDCL_NO;
+
+    if ( caps & ARCH_CAPABILITIES_RDCL_NO )
         opt_xpti = 0;
     else
         opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
@@ -423,8 +423,6 @@ static __init int parse_xpti(char *s)
 {
     char *ss;
     int val, rc = 0;
-
-    xpti_init_default(0);
 
     do {
         ss = strchr(s, ',');
@@ -443,7 +441,7 @@ static __init int parse_xpti(char *s)
 
         default:
             if ( !strcmp(s, "default") )
-                xpti_init_default(1);
+                opt_xpti = OPT_XPTI_DEFAULT;
             else if ( (val = parse_boolean("dom0", s, ss)) >= 0 )
                 opt_xpti = (opt_xpti & ~OPT_XPTI_DOM0) |
                            (val ? OPT_XPTI_DOM0 : 0);
@@ -608,7 +606,9 @@ void __init init_speculation_mitigations(void)
     if ( default_xen_spec_ctrl )
         __set_bit(X86_FEATURE_SC_MSR_IDLE, boot_cpu_data.x86_capability);
 
-    xpti_init_default(0);
+    if ( opt_xpti == OPT_XPTI_DEFAULT )
+        xpti_init_default(caps);
+
     if ( opt_xpti == 0 )
         __set_bit(X86_FEATURE_NO_XPTI, boot_cpu_data.x86_capability);
     else
