@@ -108,6 +108,8 @@ static int __init parse_spec_ctrl(char *s)
             opt_msr_sc_pv = 0;
             opt_msr_sc_hvm = 0;
 
+            opt_eager_fpu = 0;
+
         disable_common:
             opt_rsb_pv = 0;
             opt_rsb_hvm = 0;
@@ -115,7 +117,7 @@ static int __init parse_spec_ctrl(char *s)
             opt_thunk = THUNK_JMP;
             opt_ibrs = 0;
             opt_ibpb = 0;
-            opt_eager_fpu = 0;
+            opt_ssbd = 0;
         }
         else if ( val > 0 )
             rc = -EINVAL;
