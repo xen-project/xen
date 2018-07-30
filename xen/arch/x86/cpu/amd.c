@@ -502,17 +502,23 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
                 u32 eax, ebx, ecx, edx;
 
                 cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
-                c->compute_unit_id = ebx & 0xFF;
                 c->x86_num_siblings = ((ebx >> 8) & 0x3) + 1;
+
+                if (c->x86 < 0x17)
+                        c->compute_unit_id = ebx & 0xFF;
+                else {
+                        c->cpu_core_id = ebx & 0xFF;
+                        c->x86_max_cores /= c->x86_num_siblings;
+                }
         }
         
         if (opt_cpu_info)
                 printk("CPU %d(%d) -> Processor %d, %s %d\n",
                        cpu, c->x86_max_cores, c->phys_proc_id,
-                       cpu_has(c, X86_FEATURE_TOPOEXT) ? "Compute Unit" : 
-                                                         "Core",
-                       cpu_has(c, X86_FEATURE_TOPOEXT) ? c->compute_unit_id :
-                                                         c->cpu_core_id);
+                       c->compute_unit_id != INVALID_CUID ? "Compute Unit"
+                                                          : "Core",
+                       c->compute_unit_id != INVALID_CUID ? c->compute_unit_id
+                                                          : c->cpu_core_id);
 }
 
 static void early_init_amd(struct cpuinfo_x86 *c)
