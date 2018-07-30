@@ -707,12 +707,32 @@ int handle_xsetbv(u32 index, u64 new_bv)
     if ( index != XCR_XFEATURE_ENABLED_MASK )
         return -EOPNOTSUPP;
 
-    if ( (new_bv & ~xcr0_max) ||
-         (new_bv & ~xfeature_mask) || !valid_xcr0(new_bv) )
+    /*
+     * The CPUID logic shouldn't be able to hand out an XCR0 exceeding Xen's
+     * maximum features, but keep the check for robustness.
+     */
+    if ( unlikely(xcr0_max & ~xfeature_mask) )
+    {
+        gprintk(XENLOG_ERR,
+                "xcr0_max %016" PRIx64 " exceeds hardware max %016" PRIx64 "\n",
+                xcr0_max, xfeature_mask);
+        domain_crash(curr->domain);
+
+        return -EINVAL;
+    }
+
+    if ( (new_bv & ~xcr0_max) || !valid_xcr0(new_bv) )
         return -EINVAL;
 
-    if ( !set_xcr0(new_bv) )
+    /* By this point, new_bv really should be accepted by hardware. */
+    if ( unlikely(!set_xcr0(new_bv)) )
+    {
+        gprintk(XENLOG_ERR, "new_bv %016" PRIx64 " rejected by hardware\n",
+                new_bv);
+        domain_crash(curr->domain);
+
         return -EFAULT;
+    }
 
     mask = new_bv & ~curr->arch.xcr0_accum;
     curr->arch.xcr0 = new_bv;
