@@ -652,12 +652,47 @@ static bool_t valid_xcr0(u64 xcr0)
     return !(xcr0 & XSTATE_BNDREGS) == !(xcr0 & XSTATE_BNDCSR);
 }
 
-int validate_xstate(u64 xcr0, u64 xcr0_accum, const struct xsave_hdr *hdr)
+static uint64_t guest_xcr0_max(const struct domain *d)
 {
+    if ( has_hvm_container_domain(d) )
+    {
+        uint32_t eax, ecx = 0, edx;
+
+        hvm_cpuid(XSTATE_CPUID, &eax, NULL, &ecx, &edx);
+
+        return ((uint64_t)edx << 32) | eax;
+    }
+    else
+    {
+        struct cpu_user_regs regs = { };
+
+        regs._eax = XSTATE_CPUID;
+        regs._ecx = 0;
+        pv_cpuid(&regs);
+
+        return (regs.rdx << 32) | regs._eax;
+    }
+}
+
+int validate_xstate(const struct domain *d, uint64_t xcr0, uint64_t xcr0_accum,
+                    const struct xsave_hdr *hdr)
+{
+    uint64_t xcr0_max;
     unsigned int i;
+
+    if ( d == current->domain )
+        xcr0_max = guest_xcr0_max(d);
+    else
+    {
+        xcr0_max = xfeature_mask;
+        if ( !has_hvm_container_domain(d) )
+            xcr0_max &= ~(XSTATE_BNDREGS | XSTATE_BNDCSR |
+                          XSTATE_PKRU | XSTATE_LWP);
+    }
 
     if ( (hdr->xstate_bv & ~xcr0_accum) ||
          (xcr0 & ~xcr0_accum) ||
+         (xcr0_accum & ~xcr0_max) ||
          !valid_xcr0(xcr0) ||
          !valid_xcr0(xcr0_accum) )
         return -EINVAL;
@@ -676,17 +711,15 @@ int validate_xstate(u64 xcr0, u64 xcr0_accum, const struct xsave_hdr *hdr)
 int handle_xsetbv(u32 index, u64 new_bv)
 {
     struct vcpu *curr = current;
+    uint64_t xcr0_max = guest_xcr0_max(curr->domain);
     u64 mask;
 
     if ( index != XCR_XFEATURE_ENABLED_MASK )
         return -EOPNOTSUPP;
 
-    if ( (new_bv & ~xfeature_mask) || !valid_xcr0(new_bv) )
+    if ( (new_bv & ~xcr0_max) ||
+         (new_bv & ~xfeature_mask) || !valid_xcr0(new_bv) )
         return -EINVAL;
-
-    /* XCR0.PKRU is disabled on PV mode. */
-    if ( is_pv_vcpu(curr) && (new_bv & XSTATE_PKRU) )
-        return -EOPNOTSUPP;
 
     if ( !set_xcr0(new_bv) )
         return -EFAULT;
