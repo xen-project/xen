@@ -490,7 +490,7 @@ static int cpupool_cpu_add(unsigned int cpu)
     cpumask_clear_cpu(cpu, &cpupool_locked_cpus);
     cpumask_set_cpu(cpu, &cpupool_free_cpus);
 
-    if ( system_state == SYS_STATE_resume )
+    if ( system_state == SYS_STATE_suspend || system_state == SYS_STATE_resume )
     {
         struct cpupool **c;
 
@@ -522,6 +522,7 @@ static int cpupool_cpu_add(unsigned int cpu)
          * (or unplugging would have failed) and that is the default behavior
          * anyway.
          */
+        per_cpu(cpupool, cpu) = NULL;
         ret = cpupool_assign_cpu_locked(cpupool0, cpu);
     }
  out:
