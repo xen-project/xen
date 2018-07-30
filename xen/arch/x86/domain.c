@@ -107,10 +107,11 @@ static void play_dead(void)
     local_irq_disable();
 
     /*
-     * NOTE: After cpu_exit_clear, per-cpu variables are no longer accessible,
-     * as they may be freed at any time. In this case, heap corruption or
-     * #PF can occur (when heap debugging is enabled). For example, even
-     * printk() can involve tasklet scheduling, which touches per-cpu vars.
+     * NOTE: After cpu_exit_clear, per-cpu variables may no longer accessible,
+     * as they may be freed at any time if offline CPUs don't get parked. In
+     * this case, heap corruption or #PF can occur (when heap debugging is
+     * enabled). For example, even printk() can involve tasklet scheduling,
+     * which touches per-cpu vars.
      * 
      * Consider very carefully when adding code to *dead_idle. Most hypervisor
      * subsystems are unsafe to call.
