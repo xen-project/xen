@@ -14,6 +14,7 @@
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
 #include "cpu.h"
+#include "mcheck/x86_mca.h"
 
 bool_t opt_arat = 1;
 boolean_param("arat", opt_arat);
@@ -344,6 +345,9 @@ static void __init early_cpu_detect(void)
 		if (hap_paddr_bits > PADDR_BITS)
 			hap_paddr_bits = PADDR_BITS;
 	}
+
+	if (c->x86_vendor != X86_VENDOR_AMD)
+		park_offline_cpus = opt_mce;
 
 	initialize_cpu_data(0);
 }

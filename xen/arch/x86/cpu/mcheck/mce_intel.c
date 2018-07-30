@@ -636,8 +636,6 @@ static void clear_cmci(void)
 
 static void cpu_mcheck_disable(void)
 {
-    clear_in_cr4(X86_CR4_MCE);
-
     if ( cmci_support && opt_mce )
         clear_cmci();
 }
