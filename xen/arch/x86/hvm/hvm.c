@@ -935,6 +935,9 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
 {
     unsigned int ext1_ecx = 0, ext1_edx = 0;
 
+    if ( value & ~EFER_KNOWN_MASK )
+        return "Unknown bits set";
+
     if ( cr0_pg < 0 && !is_hardware_domain(v->domain) )
     {
         unsigned int level;
