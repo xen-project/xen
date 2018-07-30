@@ -1432,24 +1432,18 @@ static void svm_inject_event(const struct x86_event *event)
      * Xen must emulate enough of the event injection to be sure that a
      * further fault shouldn't occur during delivery.  This covers the fact
      * that hardware doesn't perform DPL checking on injection.
-     *
-     * Also, it accounts for proper positioning of %rip for an event with trap
-     * semantics (where %rip should point after the instruction) which suffers
-     * a fault during injection (at which point %rip should point at the
-     * instruction).
      */
     if ( event->type == X86_EVENTTYPE_PRI_SW_EXCEPTION ||
-         (!cpu_has_svm_nrips && (event->type == X86_EVENTTYPE_SW_INTERRUPT ||
-                                 event->type == X86_EVENTTYPE_SW_EXCEPTION)) )
+         (!cpu_has_svm_nrips && (event->type >= X86_EVENTTYPE_SW_INTERRUPT)) )
         svm_emul_swint_injection(&_event);
 
-    switch ( _event.vector )
+    switch ( _event.vector | -(_event.type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
     case TRAP_debug:
         if ( regs->eflags & X86_EFLAGS_TF )
         {
             __restore_debug_registers(vmcb, curr);
-            vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | 0x4000);
+            vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | DR_STEP);
         }
         /* fall through */
     case TRAP_int3:
@@ -1459,6 +1453,13 @@ static void svm_inject_event(const struct x86_event *event)
             domain_pause_for_debugger();
             return;
         }
+        break;
+
+    case TRAP_page_fault:
+        ASSERT(_event.type == X86_EVENTTYPE_HW_EXCEPTION);
+        curr->arch.hvm_vcpu.guest_cr[2] = _event.cr2;
+        vmcb_set_cr2(vmcb, _event.cr2);
+        break;
     }
 
     if ( unlikely(eventinj.fields.v) &&
@@ -1481,13 +1482,9 @@ static void svm_inject_event(const struct x86_event *event)
      * icebp, software events with trap semantics need emulating, so %rip in
      * the trap frame points after the instruction.
      *
-     * The x86 emulator (if requested by the x86_swint_emulate_* choice) will
-     * have performed checks such as presence/dpl/etc and believes that the
-     * event injection will succeed without faulting.
-     *
-     * The x86 emulator will always provide fault semantics for software
-     * events, with _trap.insn_len set appropriately.  If the injection
-     * requires emulation, move %rip forwards at this point.
+     * svm_emul_swint_injection() has already confirmed that events with trap
+     * semantics won't fault on injection.  Position %rip/NextRIP suitably,
+     * and restrict the event type to what hardware will tolerate.
      */
     switch ( _event.type )
     {
@@ -1544,16 +1541,12 @@ static void svm_inject_event(const struct x86_event *event)
            eventinj.fields.errorcode == (uint16_t)eventinj.fields.errorcode);
     vmcb->eventinj = eventinj;
 
-    if ( _event.vector == TRAP_page_fault )
-    {
-        curr->arch.hvm_vcpu.guest_cr[2] = _event.cr2;
-        vmcb_set_cr2(vmcb, _event.cr2);
-        HVMTRACE_LONG_2D(PF_INJECT, _event.error_code, TRC_PAR_LONG(_event.cr2));
-    }
+    if ( _event.vector == TRAP_page_fault &&
+         _event.type == X86_EVENTTYPE_HW_EXCEPTION )
+        HVMTRACE_LONG_2D(PF_INJECT, _event.error_code,
+                         TRC_PAR_LONG(_event.cr2));
     else
-    {
         HVMTRACE_2D(INJ_EXC, _event.vector, _event.error_code);
-    }
 }
 
 static int svm_event_pending(struct vcpu *v)
