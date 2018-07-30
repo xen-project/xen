@@ -68,12 +68,17 @@ void __init register_cpu_notifier(struct notifier_block *nb)
     spin_unlock(&cpu_add_remove_lock);
 }
 
-static int take_cpu_down(void *unused)
+static void _take_cpu_down(void *unused)
 {
     void *hcpu = (void *)(long)smp_processor_id();
     int notifier_rc = notifier_call_chain(&cpu_chain, CPU_DYING, hcpu, NULL);
     BUG_ON(notifier_rc != NOTIFY_DONE);
     __cpu_disable();
+}
+
+static int take_cpu_down(void *arg)
+{
+    _take_cpu_down(arg);
     return 0;
 }
 
@@ -99,7 +104,9 @@ int cpu_down(unsigned int cpu)
         goto fail;
     }
 
-    if ( (err = stop_machine_run(take_cpu_down, NULL, cpu)) < 0 )
+    if ( unlikely(system_state < SYS_STATE_active) )
+        on_selected_cpus(cpumask_of(cpu), _take_cpu_down, NULL, true);
+    else if ( (err = stop_machine_run(take_cpu_down, NULL, cpu)) < 0 )
         goto fail;
 
     __cpu_die(cpu);
