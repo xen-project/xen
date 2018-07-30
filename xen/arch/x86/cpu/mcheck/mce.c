@@ -695,12 +695,15 @@ static void cpu_bank_free(unsigned int cpu)
 
     mcabanks_free(poll);
     mcabanks_free(clr);
+
+    per_cpu(poll_bankmask, cpu) = NULL;
+    per_cpu(mce_clear_banks, cpu) = NULL;
 }
 
 static int cpu_bank_alloc(unsigned int cpu)
 {
-    struct mca_banks *poll = mcabanks_alloc();
-    struct mca_banks *clr = mcabanks_alloc();
+    struct mca_banks *poll = per_cpu(poll_bankmask, cpu) ?: mcabanks_alloc();
+    struct mca_banks *clr = per_cpu(mce_clear_banks, cpu) ?: mcabanks_alloc();
 
     if ( !poll || !clr )
     {
@@ -728,7 +731,13 @@ static int cpu_callback(
 
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        cpu_bank_free(cpu);
+        if ( !park_offline_cpus )
+            cpu_bank_free(cpu);
+        break;
+
+    case CPU_REMOVE:
+        if ( park_offline_cpus )
+            cpu_bank_free(cpu);
         break;
     }
 
