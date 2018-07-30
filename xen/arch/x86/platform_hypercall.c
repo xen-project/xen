@@ -54,10 +54,6 @@ static long cpu_frequency_change_helper(void *data)
     return cpu_frequency_change(this_cpu(freq));
 }
 
-/* from sysctl.c */
-long cpu_up_helper(void *data);
-long cpu_down_helper(void *data);
-
 /* from core_parking.c */
 long core_parking_helper(void *data);
 uint32_t get_cur_idle_nums(void);

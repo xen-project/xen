@@ -60,6 +60,9 @@ int hard_smp_processor_id(void);
 
 void __stop_this_cpu(void);
 
+long cpu_up_helper(void *data);
+long cpu_down_helper(void *data);
+
 /*
  * The value may be greater than the actual socket number in the system and
  * is required not to change from the initial startup.
