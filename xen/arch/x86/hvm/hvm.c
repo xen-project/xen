@@ -1251,7 +1251,7 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     ctxt = (struct hvm_hw_cpu_xsave *)&h->data[h->cur];
     h->cur += desc->length;
 
-    err = validate_xstate(ctxt->xcr0, ctxt->xcr0_accum,
+    err = validate_xstate(d, ctxt->xcr0, ctxt->xcr0_accum,
                           (const void *)&ctxt->save_area.xsave_hdr);
     if ( err )
     {
