@@ -48,6 +48,24 @@ static inline int local_fiq_is_enabled(void)
     return !(flags & PSR_FIQ_MASK);
 }
 
+#define CSDB    ".inst  0xe320f014"
+
+static inline unsigned long array_index_mask_nospec(unsigned long idx,
+                                                    unsigned long sz)
+{
+    unsigned long mask;
+
+    asm volatile( "cmp    %1, %2\n"
+                  "sbc    %0, %1, %1\n"
+                  CSDB
+                  : "=r" (mask)
+                  : "r" (idx), "Ir" (sz)
+                  : "cc" );
+
+    return mask;
+}
+#define array_index_mask_nospec array_index_mask_nospec
+
 #endif
 /*
  * Local variables:

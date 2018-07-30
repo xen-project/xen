@@ -80,6 +80,9 @@
 #pragma GCC visibility push(hidden)
 #endif
 
+/* Make the optimizer believe the variable can be manipulated arbitrarily. */
+#define OPTIMIZER_HIDE_VAR(var) __asm__ ( "" : "+g" (var) )
+
 /* This macro obfuscates arithmetic on a variable address so that gcc
    shouldn't recognize the original var, and make assumptions about it */
 /*
