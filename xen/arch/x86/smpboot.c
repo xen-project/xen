@@ -228,32 +228,40 @@ static void link_thread_siblings(int cpu1, int cpu2)
     cpumask_set_cpu(cpu2, per_cpu(cpu_core_mask, cpu1));
 }
 
-static void set_cpu_sibling_map(int cpu)
+static void set_cpu_sibling_map(unsigned int cpu)
 {
-    int i;
+    unsigned int i;
     struct cpuinfo_x86 *c = cpu_data;
 
     cpumask_set_cpu(cpu, &cpu_sibling_setup_map);
 
     cpumask_set_cpu(cpu, socket_cpumask[cpu_to_socket(cpu)]);
+    cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
+    cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
 
     if ( c[cpu].x86_num_siblings > 1 )
     {
         for_each_cpu ( i, &cpu_sibling_setup_map )
         {
-            if ( cpu_has(c, X86_FEATURE_TOPOEXT) ) {
-                if ( (c[cpu].phys_proc_id == c[i].phys_proc_id) &&
-                     (c[cpu].compute_unit_id == c[i].compute_unit_id) )
+            if ( cpu == i || c[cpu].phys_proc_id != c[i].phys_proc_id )
+                continue;
+            if ( c[cpu].compute_unit_id != INVALID_CUID &&
+                 c[i].compute_unit_id != INVALID_CUID )
+            {
+                if ( c[cpu].compute_unit_id == c[i].compute_unit_id )
                     link_thread_siblings(cpu, i);
-            } else if ( (c[cpu].phys_proc_id == c[i].phys_proc_id) &&
-                        (c[cpu].cpu_core_id == c[i].cpu_core_id) ) {
-                link_thread_siblings(cpu, i);
             }
+            else if ( c[cpu].cpu_core_id != XEN_INVALID_CORE_ID &&
+                      c[i].cpu_core_id != XEN_INVALID_CORE_ID )
+            {
+                if ( c[cpu].cpu_core_id == c[i].cpu_core_id )
+                    link_thread_siblings(cpu, i);
+            }
+            else
+                printk(XENLOG_WARNING
+                       "CPU%u: unclear relationship with CPU%u\n",
+                       cpu, i);
         }
-    }
-    else
-    {
-        cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
     }
 
     if ( c[cpu].x86_max_cores == 1 )
