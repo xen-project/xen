@@ -202,18 +202,21 @@ static int update_clusterinfo(
         if ( !cluster_cpus_spare )
             cluster_cpus_spare = xzalloc(cpumask_t);
         if ( !cluster_cpus_spare ||
-             !alloc_cpumask_var(&per_cpu(scratch_mask, cpu)) )
+             !cond_alloc_cpumask_var(&per_cpu(scratch_mask, cpu)) )
             err = -ENOMEM;
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
+    case CPU_REMOVE:
+        if ( park_offline_cpus == (action != CPU_REMOVE) )
+            break;
         if ( per_cpu(cluster_cpus, cpu) )
         {
             cpumask_clear_cpu(cpu, per_cpu(cluster_cpus, cpu));
             if ( cpumask_empty(per_cpu(cluster_cpus, cpu)) )
-                xfree(per_cpu(cluster_cpus, cpu));
+                XFREE(per_cpu(cluster_cpus, cpu));
         }
-        free_cpumask_var(per_cpu(scratch_mask, cpu));
+        FREE_CPUMASK_VAR(per_cpu(scratch_mask, cpu));
         break;
     }
 

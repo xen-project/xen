@@ -27,7 +27,7 @@ static int init_percpu_area(unsigned int cpu)
 {
     char *p;
     if ( __per_cpu_offset[cpu] != INVALID_PERCPU_AREA )
-        return -EBUSY;
+        return 0;
     if ( (p = alloc_xenheap_pages(PERCPU_ORDER, 0)) == NULL )
         return -ENOMEM;
     memset(p, 0, __per_cpu_data_end - __per_cpu_start);
@@ -70,9 +70,12 @@ static int cpu_percpu_callback(
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        free_percpu_area(cpu);
+        if ( !park_offline_cpus )
+            free_percpu_area(cpu);
         break;
-    default:
+    case CPU_REMOVE:
+        if ( park_offline_cpus )
+            free_percpu_area(cpu);
         break;
     }
 
