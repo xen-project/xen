@@ -70,6 +70,9 @@ boolean_param("smep", opt_smep);
 static bool_t __initdata opt_smap = 1;
 boolean_param("smap", opt_smap);
 
+int8_t __read_mostly opt_smt = -1;
+boolean_param("smt", opt_smt);
+
 /* opt_invpcid: If false, don't use INVPCID instruction even if available. */
 static bool_t __initdata opt_invpcid = 1;
 boolean_param("invpcid", opt_invpcid);
@@ -1495,7 +1498,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             int ret = cpu_up(i);
             if ( ret != 0 )
                 printk("Failed to bring up CPU %u (error %d)\n", i, ret);
-            else if ( num_online_cpus() > max_cpus )
+            else if ( num_online_cpus() > max_cpus ||
+                      (!opt_smt &&
+                       cpu_data[i].compute_unit_id == INVALID_CUID &&
+                       cpumask_weight(per_cpu(cpu_sibling_mask, i)) > 1) )
             {
                 ret = cpu_down(i);
                 if ( !ret )
