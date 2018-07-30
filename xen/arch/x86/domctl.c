@@ -1251,8 +1251,7 @@ long arch_do_domctl(
                 vcpu_pause(v);
                 v->arch.xcr0 = _xcr0;
                 v->arch.xcr0_accum = _xcr0_accum;
-                if ( _xcr0_accum & XSTATE_NONLAZY )
-                    v->arch.nonlazy_xstate_used = 1;
+                v->arch.nonlazy_xstate_used = _xcr0_accum & XSTATE_NONLAZY;
                 compress_xsave_states(v, _xsave_area,
                                       evc->size - PV_XSAVE_HDR_SIZE);
                 vcpu_unpause(v);
