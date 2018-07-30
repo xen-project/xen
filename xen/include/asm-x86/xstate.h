@@ -116,8 +116,9 @@ void xsave(struct vcpu *v, uint64_t mask);
 void xrstor(struct vcpu *v, uint64_t mask);
 void xstate_set_init(uint64_t mask);
 bool xsave_enabled(const struct vcpu *v);
-int __must_check validate_xstate(u64 xcr0, u64 xcr0_accum,
-                                 const struct xsave_hdr *);
+int __must_check validate_xstate(const struct domain *d,
+                                 uint64_t xcr0, uint64_t xcr0_accum,
+                                 const struct xsave_hdr *hdr);
 int __must_check handle_xsetbv(u32 index, u64 new_bv);
 void expand_xsave_states(struct vcpu *v, void *dest, unsigned int size);
 void compress_xsave_states(struct vcpu *v, const void *src, unsigned int size);
