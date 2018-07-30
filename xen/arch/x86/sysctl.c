@@ -24,6 +24,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/processor.h>
+#include <asm/setup.h>
 #include <asm/smp.h>
 #include <asm/numa.h>
 #include <xen/nodemask.h>
@@ -49,14 +50,27 @@ static void l3_cache_get(void *arg)
 
 long cpu_up_helper(void *data)
 {
-    int cpu = (unsigned long)data;
+    unsigned int cpu = (unsigned long)data;
     int ret = cpu_up(cpu);
+
     if ( ret == -EBUSY )
     {
         /* On EBUSY, flush RCU work and have one more go. */
         rcu_barrier();
         ret = cpu_up(cpu);
     }
+
+    if ( !ret && !opt_smt &&
+         cpu_data[cpu].compute_unit_id == INVALID_CUID &&
+         cpumask_weight(per_cpu(cpu_sibling_mask, cpu)) > 1 )
+    {
+        ret = cpu_down_helper(data);
+        if ( ret )
+            printk("Could not re-offline CPU%u (%d)\n", cpu, ret);
+        else
+            ret = -EPERM;
+    }
+
     return ret;
 }
 

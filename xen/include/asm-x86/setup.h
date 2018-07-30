@@ -57,4 +57,6 @@ extern uint8_t kbd_shift_flags;
 extern unsigned long highmem_start;
 #endif
 
+extern int8_t opt_smt;
+
 #endif
