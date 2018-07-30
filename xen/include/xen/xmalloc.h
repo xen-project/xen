@@ -26,6 +26,12 @@
 /* Free any of the above. */
 extern void xfree(void *);
 
+/* Free an allocation, and zero the pointer to it. */
+#define XFREE(p) do { \
+    xfree(p);         \
+    (p) = NULL;       \
+} while ( false )
+
 /* Underlying functions */
 extern void *_xmalloc(unsigned long size, unsigned long align);
 extern void *_xzalloc(unsigned long size, unsigned long align);

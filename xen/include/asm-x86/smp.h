@@ -26,6 +26,8 @@
 DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 
+extern bool park_offline_cpus;
+
 void smp_send_nmi_allbutself(void);
 
 void send_IPI_mask(const cpumask_t *, int vector);

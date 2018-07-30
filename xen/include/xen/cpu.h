@@ -47,6 +47,8 @@ void register_cpu_notifier(struct notifier_block *nb);
 #define CPU_DYING        (0x0007 | NOTIFY_REVERSE)
 /* CPU_DEAD: CPU is dead. */
 #define CPU_DEAD         (0x0008 | NOTIFY_REVERSE)
+/* CPU_REMOVE: CPU was removed. */
+#define CPU_REMOVE       (0x0009 | NOTIFY_REVERSE)
 
 /* Perform CPU hotplug. May return -EAGAIN. */
 int cpu_down(unsigned int cpu);

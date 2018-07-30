@@ -140,6 +140,14 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags);
 void free_xenheap_pages(void *v, unsigned int order);
 #define alloc_xenheap_page() (alloc_xenheap_pages(0,0))
 #define free_xenheap_page(v) (free_xenheap_pages(v,0))
+
+/* Free an allocation, and zero the pointer to it. */
+#define FREE_XENHEAP_PAGES(p, o) do { \
+    free_xenheap_pages(p, o);         \
+    (p) = NULL;                       \
+} while ( false )
+#define FREE_XENHEAP_PAGE(p) FREE_XENHEAP_PAGES(p, 0)
+
 /* Map machine page range in Xen virtual address space. */
 int map_pages_to_xen(
     unsigned long virt,

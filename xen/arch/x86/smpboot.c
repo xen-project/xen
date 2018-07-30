@@ -60,6 +60,8 @@ DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
 cpumask_t cpu_online_map __read_mostly;
 EXPORT_SYMBOL(cpu_online_map);
 
+bool __read_mostly park_offline_cpus;
+
 unsigned int __read_mostly nr_sockets;
 cpumask_t **__read_mostly socket_cpumask;
 static cpumask_t *secondary_socket_cpumask;
@@ -885,7 +887,14 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
     }
 }
 
-static void cpu_smpboot_free(unsigned int cpu)
+/*
+ * The 'remove' boolean controls whether a CPU is just getting offlined (and
+ * parked), or outright removed / offlined without parking. Parked CPUs need
+ * things like their stack, GDT, IDT, TSS, and per-CPU data still available.
+ * A few other items, in particular CPU masks, are also retained, as it's
+ * difficult to prove that they're entirely unreferenced from parked CPUs.
+ */
+static void cpu_smpboot_free(unsigned int cpu, bool remove)
 {
     unsigned int order, socket = cpu_to_socket(cpu);
     struct cpuinfo_x86 *c = cpu_data;
@@ -896,13 +905,17 @@ static void cpu_smpboot_free(unsigned int cpu)
         socket_cpumask[socket] = NULL;
     }
 
-    c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
-    c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
-    c[cpu].compute_unit_id = INVALID_CUID;
     cpumask_clear_cpu(cpu, &cpu_sibling_setup_map);
 
-    free_cpumask_var(per_cpu(cpu_sibling_mask, cpu));
-    free_cpumask_var(per_cpu(cpu_core_mask, cpu));
+    if ( remove )
+    {
+        c[cpu].phys_proc_id = XEN_INVALID_SOCKET_ID;
+        c[cpu].cpu_core_id = XEN_INVALID_CORE_ID;
+        c[cpu].compute_unit_id = INVALID_CUID;
+
+        FREE_CPUMASK_VAR(per_cpu(cpu_sibling_mask, cpu));
+        FREE_CPUMASK_VAR(per_cpu(cpu_core_mask, cpu));
+    }
 
     cleanup_cpu_root_pgt(cpu);
 
@@ -924,19 +937,21 @@ static void cpu_smpboot_free(unsigned int cpu)
     }
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
-    free_xenheap_pages(per_cpu(gdt_table, cpu), order);
+    if ( remove )
+        FREE_XENHEAP_PAGES(per_cpu(gdt_table, cpu), order);
 
     free_xenheap_pages(per_cpu(compat_gdt_table, cpu), order);
 
-    order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
-    free_xenheap_pages(idt_tables[cpu], order);
-    idt_tables[cpu] = NULL;
-
-    if ( stack_base[cpu] != NULL )
+    if ( remove )
     {
-        memguard_unguard_stack(stack_base[cpu]);
-        free_xenheap_pages(stack_base[cpu], STACK_ORDER);
-        stack_base[cpu] = NULL;
+        order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
+        FREE_XENHEAP_PAGES(idt_tables[cpu], order);
+
+        if ( stack_base[cpu] )
+        {
+            memguard_unguard_stack(stack_base[cpu]);
+            FREE_XENHEAP_PAGES(stack_base[cpu], STACK_ORDER);
+        }
     }
 }
 
@@ -950,15 +965,17 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
 
-    stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
+    if ( stack_base[cpu] == NULL )
+        stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
     if ( stack_base[cpu] == NULL )
         goto oom;
     memguard_guard_stack(stack_base[cpu]);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
-    per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
+    gdt = per_cpu(gdt_table, cpu) ?: alloc_xenheap_pages(order, memflags);
     if ( gdt == NULL )
         goto oom;
+    per_cpu(gdt_table, cpu) = gdt;
     memcpy(gdt, boot_cpu_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     BUILD_BUG_ON(NR_CPUS > 0x10000);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
@@ -970,7 +987,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
     order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
-    idt_tables[cpu] = alloc_xenheap_pages(order, memflags);
+    if ( idt_tables[cpu] == NULL )
+        idt_tables[cpu] = alloc_xenheap_pages(order, memflags);
     if ( idt_tables[cpu] == NULL )
         goto oom;
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
@@ -999,12 +1017,12 @@ static int cpu_smpboot_alloc(unsigned int cpu)
          (secondary_socket_cpumask = xzalloc(cpumask_t)) == NULL )
         goto oom;
 
-    if ( zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
-         zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
+    if ( cond_zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) &&
+         cond_zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
         return 0;
 
  oom:
-    cpu_smpboot_free(cpu);
+    cpu_smpboot_free(cpu, true);
     return -ENOMEM;
 }
 
@@ -1021,9 +1039,10 @@ static int cpu_smpboot_callback(
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        cpu_smpboot_free(cpu);
+        cpu_smpboot_free(cpu, !park_offline_cpus);
         break;
-    default:
+    case CPU_REMOVE:
+        cpu_smpboot_free(cpu, true);
         break;
     }
 
