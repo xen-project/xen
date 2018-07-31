@@ -61,7 +61,7 @@ struct xg_gdb_regs32 {
     uint32_t  gs;
 };  
 
-/* this from: regformats/reg-x86-64.dat in gdbserver */
+/* based on gdb/features/i386/64bit-core.xml in gdb */
 struct xg_gdb_regs64 {
     uint64_t  rax;
     uint64_t  rbx;
@@ -80,14 +80,14 @@ struct xg_gdb_regs64 {
     uint64_t  r14;
     uint64_t  r15;
     uint64_t  rip;
-    uint64_t  rflags;
-    uint64_t  cs;
-    uint64_t  ss;
-    uint64_t  ds;
-    uint64_t  es;
-    uint64_t  fs;
-    uint64_t  gs;
-};
+    uint32_t  eflags;
+    uint32_t  cs;
+    uint32_t  ss;
+    uint32_t  ds;
+    uint32_t  es;
+    uint32_t  fs;
+    uint32_t  gs;
+} __attribute__((__packed__));
 
 union xg_gdb_regs {
     struct xg_gdb_regs32 gregs_32;

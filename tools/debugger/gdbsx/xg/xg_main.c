@@ -580,14 +580,14 @@ _cp_64ctxt_to_64gdb(struct cpu_user_regs_x86_64 *cp, struct xg_gdb_regs64 *rp)
     rp->rax = cp->rax;
     rp->rip = cp->rip;         
     rp->rsp = cp->rsp;      
-    rp->rflags = cp->rflags;
+    rp->eflags = cp->rflags;
 
-    rp->cs = (uint64_t)cp->cs;            
-    rp->ss = (uint64_t)cp->ss;
-    rp->es = (uint64_t)cp->es;            
-    rp->ds = (uint64_t)cp->ds;
-    rp->fs = (uint64_t)cp->fs;            
-    rp->gs = (uint64_t)cp->gs;
+    rp->cs = cp->cs;
+    rp->ss = cp->ss;
+    rp->es = cp->es;
+    rp->ds = cp->ds;
+    rp->fs = cp->fs;
+    rp->gs = cp->gs;
 #if 0
     printf("cp:%llx bp:%llx rip:%llx\n", rp->rsp, rp->rbp, rp->rip);
     printf("rax:%llx rbx:%llx\n", rp->rax, rp->rbx);
@@ -635,7 +635,7 @@ _cp_32gdb_to_64ctxt(struct xg_gdb_regs32 *rp, struct cpu_user_regs_x86_64 *cp)
     cp->ds = rp->ds;       
     cp->fs = rp->fs;       
     cp->gs = rp->gs;
-    cp->rflags = rp->eflags;
+    cp->eflags = rp->eflags;
 }
 
 static void
@@ -658,7 +658,7 @@ _cp_64gdb_to_64ctxt(struct xg_gdb_regs64 *rp, struct cpu_user_regs_x86_64 *cp)
     cp->rax = rp->rax;
     cp->rip = rp->rip;
     cp->rsp = rp->rsp;
-    cp->rflags = rp->rflags;
+    cp->rflags = rp->eflags;
 
     cp->cs = (uint16_t)rp->cs;
     cp->ss = (uint16_t)rp->ss;

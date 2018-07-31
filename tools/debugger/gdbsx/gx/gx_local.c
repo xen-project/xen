@@ -45,8 +45,8 @@ prnt_32regs(struct xg_gdb_regs32 *r32p)
 static void
 prnt_64regs(struct xg_gdb_regs64 *r64p)
 {
-    printf("rip:"XGF64" rsp:"XGF64" flags:"XGF64"\n", r64p->rip, r64p->rsp,
-           r64p->rflags);
+    printf("rip:"XGF64" rsp:"XGF64" flags:%08x\n", r64p->rip, r64p->rsp,
+           r64p->eflags);
     printf("rax:"XGF64" rbx:"XGF64" rcx:"XGF64"\n", r64p->rax, r64p->rbx,
            r64p->rcx);
     printf("rdx:"XGF64" rsi:"XGF64" rdi:"XGF64"\n", r64p->rdx, r64p->rsi,
@@ -57,7 +57,7 @@ prnt_64regs(struct xg_gdb_regs64 *r64p)
            r64p->r13);
     printf("r14:"XGF64" r15:"XGF64" rbp:"XGF64"\n", r64p->r14, r64p->r15,
            r64p->rbp);
-    printf("cs:"XGF64" ds:"XGF64" fs:"XGF64" gs:"XGF64"\n", r64p->cs, 
+    printf("cs:%08x ds:%08x fs:%08x gs:%08x\n", r64p->cs,
            r64p->ds, r64p->fs, r64p->gs);
     printf("\n");
 }
