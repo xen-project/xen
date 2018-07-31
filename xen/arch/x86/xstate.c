@@ -715,7 +715,7 @@ int handle_xsetbv(u32 index, u64 new_bv)
     {
         gprintk(XENLOG_ERR,
                 "xcr0_max %016" PRIx64 " exceeds hardware max %016" PRIx64 "\n",
-                new_bv, xfeature_mask);
+                xcr0_max, xfeature_mask);
         domain_crash(curr->domain);
 
         return -EINVAL;
