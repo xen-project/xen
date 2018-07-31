@@ -39,7 +39,7 @@ config ACPI
 	  Advanced Configuration and Power Interface (ACPI) support for Xen is
 	  an alternative to device tree on ARM64.
 
-config HAS_GICV3
+config GICV3
 	bool "GICv3 driver"
 	depends on ARM_64
 	default y
@@ -51,7 +51,7 @@ config HAS_GICV3
 config HAS_ITS
         bool
         prompt "GICv3 ITS MSI controller support" if EXPERT = "y"
-        depends on HAS_GICV3 && !NEW_VGIC
+        depends on GICV3 && !NEW_VGIC
 
 config NEW_VGIC
 	bool

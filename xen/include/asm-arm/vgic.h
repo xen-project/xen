@@ -156,7 +156,7 @@ struct vgic_dist {
     struct pending_irq *pending_irqs;
     /* Base address for guest GIC */
     paddr_t dbase; /* Distributor base address */
-#ifdef CONFIG_HAS_GICV3
+#ifdef CONFIG_GICV3
     /* GIC V3 addressing */
     /* List of contiguous occupied by the redistributors */
     struct vgic_rdist_region {
@@ -359,7 +359,7 @@ unsigned int vgic_max_vcpus(const struct domain *d);
 void vgic_v2_setup_hw(paddr_t dbase, paddr_t cbase, paddr_t csize,
                       paddr_t vbase, uint32_t aliased_offset);
 
-#ifdef CONFIG_HAS_GICV3
+#ifdef CONFIG_GICV3
 struct rdist_region;
 void vgic_v3_setup_hw(paddr_t dbase,
                       unsigned int nr_rdist_regions,

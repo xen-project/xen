@@ -166,7 +166,7 @@
 
 #define DT_MATCH_GIC_V3 DT_MATCH_COMPATIBLE("arm,gic-v3")
 
-#ifdef CONFIG_HAS_GICV3
+#ifdef CONFIG_GICV3
 /*
  * GICv3 registers that needs to be saved/restored
  */
@@ -194,7 +194,7 @@ struct gic_v2 {
  */
 union gic_state_data {
     struct gic_v2 v2;
-#ifdef CONFIG_HAS_GICV3
+#ifdef CONFIG_GICV3
     struct gic_v3 v3;
 #endif
 };

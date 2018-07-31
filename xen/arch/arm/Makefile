@@ -17,7 +17,7 @@ obj-y += domctl.o
 obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += gic.o
 obj-y += gic-v2.o
-obj-$(CONFIG_HAS_GICV3) += gic-v3.o
+obj-$(CONFIG_GICV3) += gic-v3.o
 obj-$(CONFIG_HAS_ITS) += gic-v3-its.o
 obj-$(CONFIG_HAS_ITS) += gic-v3-lpi.o
 obj-y += guestcopy.o
@@ -51,7 +51,7 @@ ifneq ($(CONFIG_NEW_VGIC),y)
 obj-y += gic-vgic.o
 obj-y += vgic.o
 obj-y += vgic-v2.o
-obj-$(CONFIG_HAS_GICV3) += vgic-v3.o
+obj-$(CONFIG_GICV3) += vgic-v3.o
 obj-$(CONFIG_HAS_ITS) += vgic-v3-its.o
 endif
 obj-y += vm_event.o
