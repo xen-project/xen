@@ -18,6 +18,8 @@
 
 #define __packed      __attribute__((__packed__))
 
+#define __weak        __attribute__((__weak__))
+
 #if (!defined(__clang__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 5))
 #define unreachable() do {} while (1)
 #else

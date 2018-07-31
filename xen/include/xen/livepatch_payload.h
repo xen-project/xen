@@ -24,7 +24,7 @@ typedef void livepatch_unloadcall_t(void);
  * executed in series by the livepatch infrastructure at patch load time.
  */
 #define LIVEPATCH_LOAD_HOOK(_fn) \
-    livepatch_loadcall_t *__attribute__((weak)) \
+    livepatch_loadcall_t *__weak \
         const livepatch_load_data_##_fn __section(".livepatch.hooks.load") = _fn;
 
 /*
@@ -33,7 +33,7 @@ typedef void livepatch_unloadcall_t(void);
  * Same as LOAD hook with s/load/unload/
  */
 #define LIVEPATCH_UNLOAD_HOOK(_fn) \
-     livepatch_unloadcall_t *__attribute__((weak)) \
+     livepatch_unloadcall_t *__weak \
         const livepatch_unload_data_##_fn __section(".livepatch.hooks.unload") = _fn;
 
 #endif /* __XEN_LIVEPATCH_PAYLOAD_H__ */
