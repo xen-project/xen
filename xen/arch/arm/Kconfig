@@ -12,7 +12,6 @@ config ARM_32
 config ARM_64
 	def_bool y
 	depends on 64BIT
-	select HAS_GICV3
 
 config ARM
 	def_bool y
@@ -41,7 +40,13 @@ config ACPI
 	  an alternative to device tree on ARM64.
 
 config HAS_GICV3
-	bool
+	bool "GICv3 driver"
+	depends on ARM_64
+	default y
+	---help---
+
+	  Driver for the ARM Generic Interrupt Controller v3.
+	  If unsure, say Y
 
 config HAS_ITS
         bool
