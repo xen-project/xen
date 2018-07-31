@@ -1,3 +1,15 @@
 
 config HAS_PASSTHROUGH
 	bool
+
+if ARM
+config ARM_SMMU
+	bool "ARM SMMUv1 and v2 driver"
+	default y
+	---help---
+	  Support for implementations of the ARM System MMU architecture
+	  versions 1 and 2.
+
+	  Say Y here if your SoC includes an IOMMU device implementing the
+	  ARM SMMU architecture.
+endif
