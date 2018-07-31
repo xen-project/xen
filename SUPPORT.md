@@ -16,6 +16,12 @@ for the definitions of the support status levels etc.
 
 # Feature Support
 
+## Kconfig
+
+EXPERT and DEBUG Kconfig options are not security supported. Other
+Kconfig options are supported, if the related features are marked as
+supported in this document.
+
 ## Host Architecture
 
 ### x86-64
