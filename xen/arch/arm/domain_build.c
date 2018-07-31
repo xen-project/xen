@@ -932,6 +932,54 @@ static int __init make_timer_node(const struct domain *d, void *fdt,
     return res;
 }
 
+#ifdef CONFIG_ACPI
+/*
+ * This function is used as part of the device tree generation for Dom0
+ * on ACPI systems, and DomUs started directly from Xen based on device
+ * tree information.
+ */
+static int __init make_chosen_node(const struct kernel_info *kinfo)
+{
+    int res;
+    const char *bootargs = NULL;
+    const struct bootmodule *mod = kinfo->kernel_bootmodule;
+    void *fdt = kinfo->fdt;
+
+    dt_dprintk("Create chosen node\n");
+    res = fdt_begin_node(fdt, "chosen");
+    if ( res )
+        return res;
+
+    if ( mod && mod->cmdline[0] )
+    {
+        bootargs = &mod->cmdline[0];
+        res = fdt_property(fdt, "bootargs", bootargs, strlen(bootargs) + 1);
+        if ( res )
+           return res;
+    }
+
+    /*
+     * If the bootloader provides an initrd, we must create a placeholder
+     * for the initrd properties. The values will be replaced later.
+     */
+    if ( mod && mod->size )
+    {
+        u64 a = 0;
+        res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
+        if ( res )
+            return res;
+
+        res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
+        if ( res )
+            return res;
+    }
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+#endif
+
 static int __init map_irq_to_domain(struct domain *d, unsigned int irq,
                                     bool need_mapping, const char *devname)
 {
@@ -1423,47 +1471,6 @@ static int __init acpi_route_spis(struct domain *d)
     return 0;
 }
 
-static int __init acpi_make_chosen_node(const struct kernel_info *kinfo)
-{
-    int res;
-    const char *bootargs = NULL;
-    const struct bootmodule *mod = kinfo->kernel_bootmodule;
-    void *fdt = kinfo->fdt;
-
-    dt_dprintk("Create chosen node\n");
-    res = fdt_begin_node(fdt, "chosen");
-    if ( res )
-        return res;
-
-    if ( mod && mod->cmdline[0] )
-    {
-        bootargs = &mod->cmdline[0];
-        res = fdt_property(fdt, "bootargs", bootargs, strlen(bootargs) + 1);
-        if ( res )
-           return res;
-    }
-
-    /*
-     * If the bootloader provides an initrd, we must create a placeholder
-     * for the initrd properties. The values will be replaced later.
-     */
-    if ( mod && mod->size )
-    {
-        u64 a = 0;
-        res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
-        if ( res )
-            return res;
-
-        res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
-        if ( res )
-            return res;
-    }
-
-    res = fdt_end_node(fdt);
-
-    return res;
-}
-
 static int __init acpi_make_hypervisor_node(const struct kernel_info *kinfo,
                                             struct membank tbl_add[])
 {
@@ -1536,7 +1543,7 @@ static int __init create_acpi_dtb(struct kernel_info *kinfo,
         return ret;
 
     /* Create a chosen node for DOM0 */
-    ret = acpi_make_chosen_node(kinfo);
+    ret = make_chosen_node(kinfo);
     if ( ret )
         goto err;
 
