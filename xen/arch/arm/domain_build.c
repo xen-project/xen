@@ -631,7 +631,7 @@ static int __init make_hypervisor_node(struct domain *d,
      *  - All CPUs
      *  TODO: Handle properly the cpumask;
      */
-    set_interrupt_ppi(intr, d->arch.evtchn_irq, 0xf, IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intr, d->arch.evtchn_irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
     res = fdt_property_interrupts(fdt, &intr, 1);
     if ( res )
         return res;
@@ -908,15 +908,15 @@ static int __init make_timer_node(const struct domain *d, void *fdt,
 
     irq = timer_get_irq(TIMER_PHYS_SECURE_PPI);
     dt_dprintk("  Secure interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[0], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[0], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_PHYS_NONSECURE_PPI);
     dt_dprintk("  Non secure interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[1], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[1], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_VIRT_PPI);
     dt_dprintk("  Virt interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[2], irq, 0xf, IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[2], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(fdt, intrs, 3);
     if ( res )

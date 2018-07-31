@@ -7,23 +7,7 @@
 #include <stdbool.h>
 #include <libfdt.h>
 #include <assert.h>
-
-/**
- * IRQ line type.
- * DT_IRQ_TYPE_NONE            - default, unspecified type
- * DT_IRQ_TYPE_EDGE_RISING     - rising edge triggered
- * DT_IRQ_TYPE_EDGE_FALLING    - falling edge triggered
- * DT_IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
- * DT_IRQ_TYPE_LEVEL_HIGH      - high level triggered
- * DT_IRQ_TYPE_LEVEL_LOW       - low level triggered
- */
-#define DT_IRQ_TYPE_NONE           0x00000000
-#define DT_IRQ_TYPE_EDGE_RISING    0x00000001
-#define DT_IRQ_TYPE_EDGE_FALLING   0x00000002
-#define DT_IRQ_TYPE_EDGE_BOTH                           \
-    (DT_IRQ_TYPE_EDGE_FALLING | DT_IRQ_TYPE_EDGE_RISING)
-#define DT_IRQ_TYPE_LEVEL_HIGH     0x00000004
-#define DT_IRQ_TYPE_LEVEL_LOW      0x00000008
+#include <xen/device_tree_defs.h>
 
 static const char *gicv_to_string(libxl_gic_version gic_version)
 {
@@ -165,17 +149,8 @@ static struct arch_info {
     {"xen-3.0-aarch64", "arm,armv8-timer", "arm,armv8" },
 };
 
-/*
- * The device tree compiler (DTC) is allocating the phandle from 1 to
- * onwards. Reserve a high value for the GIC phandle.
- */
-#define PHANDLE_GIC (65000)
-
 typedef uint32_t be32;
 typedef be32 gic_interrupt[3];
-
-#define ROOT_ADDRESS_CELLS 2
-#define ROOT_SIZE_CELLS 2
 
 #define PROP_INITRD_START "linux,initrd-start"
 #define PROP_INITRD_END "linux,initrd-end"
@@ -252,7 +227,7 @@ static int fdt_property_interrupts(libxl__gc *gc, void *fdt,
     res = fdt_property(fdt, "interrupts", intr, sizeof (intr[0]) * num_irq);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "interrupt-parent", PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "interrupt-parent", GUEST_PHANDLE_GIC);
     if (res) return res;
 
     return 0;
@@ -298,13 +273,13 @@ static int make_root_properties(libxl__gc *gc,
                               "xen,xenvm");
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "interrupt-parent", PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "interrupt-parent", GUEST_PHANDLE_GIC);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "#address-cells", ROOT_ADDRESS_CELLS);
+    res = fdt_property_cell(fdt, "#address-cells", GUEST_ROOT_ADDRESS_CELLS);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "#size-cells", ROOT_SIZE_CELLS);
+    res = fdt_property_cell(fdt, "#size-cells", GUEST_ROOT_SIZE_CELLS);
     if (res) return res;
 
     return 0;
@@ -346,7 +321,7 @@ static int make_chosen_node(libxl__gc *gc, void *fdt, bool ramdisk,
                                   "multiboot,module");
         if (res) return res;
 
-        res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+        res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
                                 1, 0, 0);
         if (res) return res;
 
@@ -450,7 +425,7 @@ static int make_memory_nodes(libxl__gc *gc, void *fdt,
         res = fdt_property_string(fdt, "device_type", "memory");
         if (res) return res;
 
-        res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+        res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
                                 1, 0, 0);
         if (res) return res;
 
@@ -486,16 +461,16 @@ static int make_gicv2_node(libxl__gc *gc, void *fdt,
     res = fdt_property(fdt, "interrupt-controller", NULL, 0);
     if (res) return res;
 
-    res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+    res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
                             2,
                             gicd_base, gicd_size,
                             gicc_base, gicc_size);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "linux,phandle", PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "linux,phandle", GUEST_PHANDLE_GIC);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "phandle", PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "phandle", GUEST_PHANDLE_GIC);
     if (res) return res;
 
     res = fdt_end_node(fdt);
@@ -528,16 +503,16 @@ static int make_gicv3_node(libxl__gc *gc, void *fdt)
     res = fdt_property(fdt, "interrupt-controller", NULL, 0);
     if (res) return res;
 
-    res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+    res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
                             2,
                             gicd_base, gicd_size,
                             gicr0_base, gicr0_size);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "linux,phandle", PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "linux,phandle", GUEST_PHANDLE_GIC);
     if (res) return res;
 
-    res = fdt_property_cell(fdt, "phandle", PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "phandle", GUEST_PHANDLE_GIC);
     if (res) return res;
 
     res = fdt_end_node(fdt);
@@ -593,7 +568,7 @@ static int make_hypervisor_node(libxl__gc *gc, void *fdt,
     if (res) return res;
 
     /* reg 0 is grant table space */
-    res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+    res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
                             1,GUEST_GNTTAB_BASE, GUEST_GNTTAB_SIZE);
     if (res) return res;
 
@@ -626,7 +601,7 @@ static int make_vpl011_uart_node(libxl__gc *gc, void *fdt,
     res = fdt_property_compat(gc, fdt, 1, "arm,sbsa-uart");
     if (res) return res;
 
-    res = fdt_property_regs(gc, fdt, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS,
+    res = fdt_property_regs(gc, fdt, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
                             1,
                             GUEST_PL011_BASE, GUEST_PL011_SIZE);
     if (res) return res;
@@ -1027,12 +1002,12 @@ static void finalise_one_node(libxl__gc *gc, void *fdt, const char *uname,
         LOG(DEBUG, "Nopping out placeholder node %s", name);
         fdt_nop_node(fdt, node);
     } else {
-        uint32_t regs[ROOT_ADDRESS_CELLS+ROOT_SIZE_CELLS];
+        uint32_t regs[GUEST_ROOT_ADDRESS_CELLS+GUEST_ROOT_SIZE_CELLS];
         be32 *cells = &regs[0];
 
         LOG(DEBUG, "Populating placeholder node %s", name);
 
-        set_range(&cells, ROOT_ADDRESS_CELLS, ROOT_SIZE_CELLS, base, size);
+        set_range(&cells, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS, base, size);
 
         res = fdt_setprop_inplace(fdt, node, "reg", regs, sizeof(regs));
         assert(!res);
