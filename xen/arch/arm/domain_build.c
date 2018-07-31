@@ -619,11 +619,7 @@ static int __init make_hypervisor_node(struct domain *d,
     if ( res )
         return res;
 
-    /*
-     * It is safe to allocate the event channel here because all the
-     * PPIs used by the hardware domain have been registered.
-     */
-    evtchn_allocate(d);
+    BUG_ON(d->arch.evtchn_irq == 0);
 
     /*
      * Interrupt event channel upcall:
@@ -1292,6 +1288,12 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     {
         int addrcells = dt_child_n_addr_cells(node);
         int sizecells = dt_child_n_size_cells(node);
+
+        /*
+         * It is safe to allocate the event channel here because all the
+         * PPIs used by the hardware domain have been registered.
+         */
+        evtchn_allocate(d);
 
         /*
          * The hypervisor node should always be created after all nodes
