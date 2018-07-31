@@ -1,11 +1,11 @@
 config HAS_NS16550
-	bool
+	bool "NS16550 UART driver" if ARM
 	default y
 	help
 	  This selects the 16550-series UART support. For most systems, say Y.
 
 config HAS_CADENCE_UART
-	bool
+	bool "Xilinx Cadence UART driver"
 	default y
 	depends on ARM_64
 	help
@@ -13,7 +13,7 @@ config HAS_CADENCE_UART
 	  based board, say Y.
 
 config HAS_MVEBU
-	bool
+	bool "Marvell MVEBU UART driver"
 	default y
 	depends on ARM_64
 	help
@@ -21,7 +21,7 @@ config HAS_MVEBU
 	  based board, say Y.
 
 config HAS_PL011
-	bool
+	bool "ARM PL011 UART driver"
 	default y
 	depends on ARM
 	help
@@ -29,7 +29,7 @@ config HAS_PL011
 	  an Integrator/PP2, Integrator/CP or Versatile platform, say Y.
 
 config HAS_EXYNOS4210
-	bool
+	bool "Samsung Exynos 4210 UART driver"
 	default y
 	depends on ARM_32
 	help
@@ -37,7 +37,7 @@ config HAS_EXYNOS4210
 	  Exynos based board, say Y.
 
 config HAS_OMAP
-	bool
+	bool "Texas Instruments OMAP UART driver"
 	default y
 	depends on ARM_32
 	help
@@ -45,7 +45,7 @@ config HAS_OMAP
 	  Instruments based CPU, say Y.
 
 config HAS_SCIF
-	bool
+	bool "SuperH SCI(F) UART driver"
 	default y
 	depends on ARM
 	help
@@ -54,6 +54,7 @@ config HAS_SCIF
 
 config HAS_EHCI
 	bool
+	depends on X86
 	help
 	  This selects the USB based EHCI debug port to be used as a UART. If
 	  you have an x86 based system with USB, say Y.
