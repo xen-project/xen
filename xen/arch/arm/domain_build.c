@@ -533,11 +533,11 @@ static int __init fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
 
 static int __init make_memory_node(const struct domain *d,
                                    void *fdt,
-                                   const struct dt_device_node *parent,
+                                   int addrcells, int sizecells,
                                    const struct kernel_info *kinfo)
 {
     int res, i;
-    int reg_size = dt_child_n_addr_cells(parent) + dt_child_n_size_cells(parent);
+    int reg_size = addrcells + sizecells;
     int nr_cells = reg_size*kinfo->mem.nr_banks;
     __be32 reg[nr_cells];
     __be32 *cells;
@@ -563,7 +563,7 @@ static int __init make_memory_node(const struct domain *d,
         dt_dprintk("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
                    i, start, start + size);
 
-        dt_child_set_range(&cells, parent, start, size);
+        dt_child_set_range(&cells, addrcells, sizecells, start, size);
     }
 
     res = fdt_property(fdt, "reg", reg, sizeof(reg));
@@ -579,7 +579,7 @@ static void evtchn_allocate(struct domain *d);
 
 static int __init make_hypervisor_node(struct domain *d,
                                        const struct kernel_info *kinfo,
-                                       const struct dt_device_node *parent)
+                                       int addrcells, int sizecells)
 {
     const char compat[] =
         "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
@@ -588,9 +588,6 @@ static int __init make_hypervisor_node(struct domain *d,
     gic_interrupt_t intr;
     __be32 *cells;
     int res;
-    /* Convenience alias */
-    int addrcells = dt_child_n_addr_cells(parent);
-    int sizecells = dt_child_n_size_cells(parent);
     void *fdt = kinfo->fdt;
 
     dt_dprintk("Create hypervisor node\n");
@@ -615,7 +612,8 @@ static int __init make_hypervisor_node(struct domain *d,
 
     /* reg 0 is grant table space */
     cells = &reg[0];
-    dt_child_set_range(&cells, parent, kinfo->gnttab_start, kinfo->gnttab_size);
+    dt_child_set_range(&cells, addrcells, sizecells,
+                       kinfo->gnttab_start, kinfo->gnttab_size);
     res = fdt_property(fdt, "reg", reg,
                        dt_cells_to_size(addrcells + sizecells));
     if ( res )
@@ -1292,11 +1290,14 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
 
     if ( node == dt_host )
     {
+        int addrcells = dt_child_n_addr_cells(node);
+        int sizecells = dt_child_n_size_cells(node);
+
         /*
          * The hypervisor node should always be created after all nodes
          * from the host DT have been parsed.
          */
-        res = make_hypervisor_node(d, kinfo, node);
+        res = make_hypervisor_node(d, kinfo, addrcells, sizecells);
         if ( res )
             return res;
 
@@ -1308,7 +1309,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_memory_node(d, kinfo->fdt, node, kinfo);
+        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells, kinfo);
         if ( res )
             return res;
 

@@ -699,7 +699,7 @@ void dt_set_range(__be32 **cellp, const struct dt_device_node *np,
  * Write a range into a series of cells and update cellp to point to the
  * cell just after.
  */
-void dt_child_set_range(__be32 **cellp, const struct dt_device_node *parent,
+void dt_child_set_range(__be32 **cellp, int addrcells, int sizecells,
                         u64 address, u64 size);
 
 /**

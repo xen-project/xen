@@ -112,11 +112,11 @@ void dt_set_range(__be32 **cellp, const struct dt_device_node *np,
     dt_set_cell(cellp, dt_n_size_cells(np), size);
 }
 
-void dt_child_set_range(__be32 **cellp, const struct dt_device_node *parent,
+void dt_child_set_range(__be32 **cellp, int addrcells, int sizecells,
                         u64 address, u64 size)
 {
-    dt_set_cell(cellp, dt_child_n_addr_cells(parent), address);
-    dt_set_cell(cellp, dt_child_n_size_cells(parent), size);
+    dt_set_cell(cellp, addrcells, address);
+    dt_set_cell(cellp, sizecells, size);
 }
 
 static void __init *unflatten_dt_alloc(unsigned long *mem, unsigned long size,
