@@ -239,6 +239,11 @@
  *  mixed: allow access to all altp2m ops for both in-guest and external tools
  *  external: allow access to external privileged tools only
  *  limited: guest only has limited access (ie. control VMFUNC and #VE)
+ *
+ * Note that 'mixed' mode has not been evaluated for safety from a
+ * security perspective.  Before using this mode in a
+ * security-critical environment, each subop should be evaluated for
+ * safety, with unsafe subops blacklisted in xsm_hvm_altp2mhvm_op().
  */
 #define HVM_PARAM_ALTP2M       35
 #define XEN_ALTP2M_disabled      0
