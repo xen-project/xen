@@ -40,6 +40,7 @@ int log_time_hv = 0;
 int log_time_guest = 0;
 char *log_dir = NULL;
 int discard_overflowed_data = 1;
+int replace_escape = 0;
 
 static void handle_hup(int sig)
 {
@@ -48,7 +49,8 @@ static void handle_hup(int sig)
 
 static void usage(char *name)
 {
-	printf("Usage: %s [-h] [-V] [-v] [-i] [--log=none|guest|hv|all] [--log-dir=DIR] [--pid-file=PATH] [-t, --timestamp=none|guest|hv|all] [-o, --overflow-data=discard|keep]\n", name);
+	printf("Usage: %s [-h] [-V] [-v] [-i] [--log=none|guest|hv|all] [--log-dir=DIR] [--pid-file=PATH] [-t, --timestamp=none|guest|hv|all] [-o, --overflow-data=discard|keep] [--replace-escape]\n", name);
+	printf("  --replace-escape  - replace ESC character with dot when writing console log\n");
 }
 
 static void version(char *name)
@@ -104,6 +106,7 @@ int main(int argc, char **argv)
 		{ "pid-file", 1, 0, 'p' },
 		{ "timestamp", 1, 0, 't' },
 		{ "overflow-data", 1, 0, 'o'},
+		{ "replace-escape", 0, 0, 'e'},
 		{ 0 },
 	};
 	bool is_interactive = false;
@@ -167,6 +170,9 @@ int main(int argc, char **argv)
 			} else if (!strcmp(optarg, "discard")) {
 				discard_overflowed_data = 1;
 			}
+			break;
+		case 'e':
+			replace_escape = 1;
 			break;
 		case '?':
 			fprintf(stderr,

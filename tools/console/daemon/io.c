@@ -68,6 +68,7 @@ extern int log_time_hv;
 extern int log_time_guest;
 extern char *log_dir;
 extern int discard_overflowed_data;
+extern int replace_escape;
 
 static int log_time_hv_needts = 1;
 static int log_time_guest_needts = 1;
@@ -227,10 +228,34 @@ static inline int console_iter_int_arg3(struct domain *d,
 	return ret;
 }
 
+static void do_replace_escape(const char *src, char *dest, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) {
+		if (src[i] == '\033')
+			dest[i] = '.';
+		else
+			dest[i] = src[i];
+	}
+}
+
 static int write_all(int fd, const char* buf, size_t len)
 {
 	while (len) {
-		ssize_t ret = write(fd, buf, len);
+		ssize_t ret;
+		if (replace_escape) {
+			char buf_replaced[1024];
+			size_t this_round;
+
+			if (len > sizeof(buf_replaced))
+				this_round = sizeof(buf_replaced);
+			else
+				this_round = len;
+			do_replace_escape(buf, buf_replaced, this_round);
+			ret = write(fd, buf_replaced, this_round);
+		} else
+			ret = write(fd, buf, len);
 		if (ret == -1 && errno == EINTR)
 			continue;
 		if (ret <= 0)
