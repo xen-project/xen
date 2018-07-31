@@ -207,7 +207,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
                    d->domain_id, rc);
     }
 
-    return hd->platform_ops->hwdom_init(d);
+    hd->platform_ops->hwdom_init(d);
 }
 
 void iommu_teardown(struct domain *d)
