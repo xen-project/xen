@@ -15,7 +15,7 @@ config X86
 	select HAS_GDBSX
 	select HAS_IOPORTS
 	select HAS_KEXEC
-	select HAS_MEM_ACCESS
+	select MEM_ACCESS_ALWAYS_ON
 	select HAS_MEM_PAGING
 	select HAS_MEM_SHARING
 	select HAS_NS16550

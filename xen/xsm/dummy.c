@@ -127,7 +127,7 @@ void __init xsm_fixup_ops (struct xsm_operations *ops)
 
     set_to_dummy_if_null(ops, vm_event_control);
 
-#ifdef CONFIG_HAS_MEM_ACCESS
+#ifdef CONFIG_MEM_ACCESS
     set_to_dummy_if_null(ops, mem_access);
 #endif
 

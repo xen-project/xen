@@ -17,7 +17,6 @@ config ARM
 	def_bool y
 	select HAS_ALTERNATIVE
 	select HAS_DEVICE_TREE
-	select HAS_MEM_ACCESS
 	select HAS_PASSTHROUGH
 	select HAS_PDX
 

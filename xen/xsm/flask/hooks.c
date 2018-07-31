@@ -1256,7 +1256,7 @@ static int flask_vm_event_control(struct domain *d, int mode, int op)
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__VM_EVENT);
 }
 
-#ifdef CONFIG_HAS_MEM_ACCESS
+#ifdef CONFIG_MEM_ACCESS
 static int flask_mem_access(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__MEM_ACCESS);
@@ -1803,7 +1803,7 @@ static struct xsm_operations flask_ops = {
 
     .vm_event_control = flask_vm_event_control,
 
-#ifdef CONFIG_HAS_MEM_ACCESS
+#ifdef CONFIG_MEM_ACCESS
     .mem_access = flask_mem_access,
 #endif
 

@@ -143,7 +143,7 @@ struct xsm_operations {
 
     int (*vm_event_control) (struct domain *d, int mode, int op);
 
-#ifdef CONFIG_HAS_MEM_ACCESS
+#ifdef CONFIG_MEM_ACCESS
     int (*mem_access) (struct domain *d);
 #endif
 
@@ -582,7 +582,7 @@ static inline int xsm_vm_event_control (xsm_default_t def, struct domain *d, int
     return xsm_ops->vm_event_control(d, mode, op);
 }
 
-#ifdef CONFIG_HAS_MEM_ACCESS
+#ifdef CONFIG_MEM_ACCESS
 static inline int xsm_mem_access (xsm_default_t def, struct domain *d)
 {
     return xsm_ops->mem_access(d);

@@ -20,8 +20,16 @@ config HAS_DEVICE_TREE
 config HAS_EX_TABLE
 	bool
 
-config HAS_MEM_ACCESS
+config MEM_ACCESS_ALWAYS_ON
 	bool
+
+config MEM_ACCESS
+	def_bool MEM_ACCESS_ALWAYS_ON
+	prompt "Memory Access and VM events" if !MEM_ACCESS_ALWAYS_ON
+	---help---
+
+	  Framework to configure memory access types for guests and receive
+	  related events in userspace.
 
 config HAS_MEM_PAGING
 	bool
