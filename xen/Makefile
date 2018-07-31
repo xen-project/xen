@@ -278,3 +278,15 @@ $(KCONFIG_CONFIG):
 include/config/auto.conf.cmd: ;
 
 -include $(BASEDIR)/include/config/auto.conf.cmd
+
+.PHONY: cloc
+cloc:
+	$(eval tmpfile := $(shell mktemp))
+	$(foreach f, $(shell find $(BASEDIR) -name *.o.d), \
+		$(eval path := $(dir $(f))) \
+		$(eval names := $(shell grep -o "[a-zA-Z0-9_/-]*\.[cS]" $(f))) \
+		$(foreach sf, $(names), \
+			$(shell if test -f $(path)/$(sf) ; then echo $(path)/$(sf) >> $(tmpfile); fi;)))
+	cloc --list-file=$(tmpfile)
+	rm $(tmpfile)
+
