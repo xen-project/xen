@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <inttypes.h>
 #include <errno.h>
 
 #include "gx.h"
@@ -45,17 +46,17 @@ prnt_32regs(struct xg_gdb_regs32 *r32p)
 static void
 prnt_64regs(struct xg_gdb_regs64 *r64p)
 {
-    printf("rip:"XGF64" rsp:"XGF64" flags:%08x\n", r64p->rip, r64p->rsp,
+    printf("rip:%016"PRIx64" rsp:%016"PRIx64" flags:%08x\n", r64p->rip, r64p->rsp,
            r64p->eflags);
-    printf("rax:"XGF64" rbx:"XGF64" rcx:"XGF64"\n", r64p->rax, r64p->rbx,
+    printf("rax:%016"PRIx64" rbx:%016"PRIx64" rcx:%016"PRIx64"\n", r64p->rax, r64p->rbx,
            r64p->rcx);
-    printf("rdx:"XGF64" rsi:"XGF64" rdi:"XGF64"\n", r64p->rdx, r64p->rsi,
+    printf("rdx:%016"PRIx64" rsi:%016"PRIx64" rdi:%016"PRIx64"\n", r64p->rdx, r64p->rsi,
            r64p->rdi);
-    printf("r08:"XGF64" r09:"XGF64" r10:"XGF64"\n", r64p->r8, r64p->r9,
+    printf("r08:%016"PRIx64" r09:%016"PRIx64" r10:%016"PRIx64"\n", r64p->r8, r64p->r9,
            r64p->r10);
-    printf("r11:"XGF64" r12:"XGF64" r13:"XGF64"\n", r64p->r11, r64p->r12,
+    printf("r11:%016"PRIx64" r12:%016"PRIx64" r13:%016"PRIx64"\n", r64p->r11, r64p->r12,
            r64p->r13);
-    printf("r14:"XGF64" r15:"XGF64" rbp:"XGF64"\n", r64p->r14, r64p->r15,
+    printf("r14:%016"PRIx64" r15:%016"PRIx64" rbp:%016"PRIx64"\n", r64p->r14, r64p->r15,
            r64p->rbp);
     printf("cs:%08x ds:%08x fs:%08x gs:%08x\n", r64p->cs,
            r64p->ds, r64p->fs, r64p->gs);
@@ -92,13 +93,13 @@ prnt_call_trace64(uint64_t ip, uint64_t sp)
     uint64_t loopmax=0, val;
 
     printf("Call Trace:\n");
-    printf("   ["XGF64"]\n", ip);
+    printf("   [%016"PRIx64"]\n", ip);
 
     while(stack_max > 0) {
         if (xg_read_mem(sp, (char *)&val, sizeof(val),0) != 0)
             return;
         if (val > 0xffffffff80000000UL) {    /* kernel addr */
-            printf("   ["XGF64"]\n", val);
+            printf("   [%016"PRIx64"]\n", val);
             --stack_max;
         }
         sp += sizeof(sp);

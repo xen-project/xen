@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -114,9 +115,9 @@ _do_qRcmd_req(char *remote_buf)
         XGTRC("buf+5:%s pgd3val:0x%llx\n", buf+5, pgd3val);
 
         if (*endp == '\0' && pgd3val > 0) {
-            sprintf(buf1, "pgd3val set to: "XGF64"\n", pgd3val);
+            sprintf(buf1, "pgd3val set to: %016"PRIx64"\n", pgd3val);
         } else {
-            sprintf(buf1, "Invalid  pgd3val "XGF64"\n", pgd3val);
+            sprintf(buf1, "Invalid  pgd3val %016"PRIx64"\n", pgd3val);
             pgd3val = 0;
         }
     } else {

@@ -21,14 +21,6 @@
 #define XGTRC1(...)  \
            do {(xgtrc_on==2) ? (xgtrc(__FUNCTION__,__VA_ARGS__)):0;} while (0)
 
-#if defined(__x86_64__)
-    #define  XGFM64  "%lx"
-    #define  XGF64   "%016lx"
-#else
-    #define  XGFM64  "%llx"
-    #define  XGF64   "%016llx"
-#endif
-
 
 typedef enum {
     XG_GPRS=1,          /* general purpose user regs */
