@@ -8,4 +8,4 @@ obj-$(CONFIG_ARM_64) += seattle.o
 obj-y += sunxi.o
 obj-$(CONFIG_ARM_64) += thunderx.o
 obj-$(CONFIG_ARM_64) += xgene-storm.o
-obj-$(CONFIG_ARM_64) += xilinx-zynqmp.o
+obj-$(CONFIG_MPSOC_PLATFORM)  += xilinx-zynqmp.o
