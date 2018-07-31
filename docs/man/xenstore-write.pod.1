@@ -1,0 +1,25 @@
+=head1 NAME
+
+xenstore-write - write Xenstore values
+
+=head1 SYNOPSIS
+
+B<xenstore-read> [I<OPTION>]... I<PATH> I<VALUE>...
+
+=head1 DESCRIPTION
+
+Write I<VALUE>s to Xenstore I<PATH>s. Multiple pairs I<PATH> I<VALUE> can be
+provided to write them at once - in one Xenstore transaction.
+
+=over
+
+=item B<-s>
+
+Connect to the Xenstore daemon using a local socket only.
+
+=back
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xen.org, see
+http://wiki.xen.org/xenwiki/ReportingBugs on how to send bug reports.
