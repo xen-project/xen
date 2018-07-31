@@ -387,7 +387,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         put_page(page);
 
     put_page(page);
- out_put_gfn: __maybe_unused
+ out_put_gfn: __maybe_unused;
     put_gfn(d, gmfn);
 
     /*
