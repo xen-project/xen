@@ -4468,16 +4468,16 @@ static int hvmop_get_param(
 }
 
 /*
- * altp2m operations are envisioned as being used in several different 
+ * altp2m operations are envisioned as being used in several different
  * modes:
- * 
+ *
  * - external: All control and decisions are made by an external agent
  *   running domain 0.
  *
  * - internal: altp2m operations are used exclusively by an in-guest
  *   agent to protect itself from the guest kernel and in-guest
  *   attackers.
- * 
+ *
  * - coordinated: An in-guest agent handles #VE and VMFUNCs locally,
  *   but makes requests of an agent running outside the domain for
  *   bigger changes (such as modifying altp2m entires).
@@ -4491,7 +4491,7 @@ static int hvmop_get_param(
  * to properly enable the 'internal' use case, as well as to avoid
  * fragmentation, all altp2m subops should come under this single
  * HVMOP.
- * 
+ *
  * Note that 'internal' mode (HVM_PARAM_ALTP2M == XEN_ALTP2M_mixed)
  * has not been evaluated for safety from a security perspective.
  * Before using this mode in a security-critical environment, each

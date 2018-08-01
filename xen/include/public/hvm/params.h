@@ -243,7 +243,7 @@
  * Note that 'mixed' mode has not been evaluated for safety from a
  * security perspective.  Before using this mode in a
  * security-critical environment, each subop should be evaluated for
- * safety, with unsafe subops blacklisted in xsm_hvm_altp2mhvm_op().
+ * safety, with unsafe subops blacklisted in XSM.
  */
 #define HVM_PARAM_ALTP2M       35
 #define XEN_ALTP2M_disabled      0
