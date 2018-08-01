@@ -2695,11 +2695,11 @@ static void hvm_unmap_entry(void *p)
     hvm_unmap_guest_frame(p, 0);
 }
 
-static int hvm_load_segment_selector(
+static int task_switch_load_seg(
     enum x86_segment seg, uint16_t sel, unsigned int cpl, unsigned int eflags)
 {
     struct segment_register desctab, segr;
-    struct desc_struct *pdesc, desc;
+    struct desc_struct *pdesc = NULL, desc;
     u8 dpl, rpl;
     bool_t writable;
     int fault_type = TRAP_invalid_tss;
@@ -2719,7 +2719,7 @@ static int hvm_load_segment_selector(
     if ( (sel & 0xfffc) == 0 )
     {
         if ( (seg == x86_seg_cs) || (seg == x86_seg_ss) )
-            goto fail;
+            goto fault;
         memset(&segr, 0, sizeof(segr));
         segr.sel = sel;
         hvm_set_segment_register(v, seg, &segr);
@@ -2728,29 +2728,29 @@ static int hvm_load_segment_selector(
 
     /* LDT descriptor must be in the GDT. */
     if ( (seg == x86_seg_ldtr) && (sel & 4) )
-        goto fail;
+        goto fault;
 
     hvm_get_segment_register(
         v, (sel & 4) ? x86_seg_ldtr : x86_seg_gdtr, &desctab);
 
     /* Segment not valid for use (cooked meaning of .p)? */
     if ( !desctab.p )
-        goto fail;
+        goto fault;
 
     /* Check against descriptor table limit. */
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
-        goto fail;
+        goto fault;
 
     pdesc = hvm_map_entry(desctab.base + (sel & 0xfff8), &writable);
     if ( pdesc == NULL )
-        goto hvm_map_fail;
+        goto fault;
 
     do {
         desc = *pdesc;
 
         /* LDT descriptor is a system segment. All others are code/data. */
         if ( (desc.b & (1u<<12)) == ((seg == x86_seg_ldtr) << 12) )
-            goto unmap_and_fail;
+            goto fault;
 
         dpl = (desc.b >> 13) & 3;
         rpl = sel & 3;
@@ -2760,27 +2760,27 @@ static int hvm_load_segment_selector(
         case x86_seg_cs:
             /* Code segment? */
             if ( !(desc.b & _SEGMENT_CODE) )
-                goto unmap_and_fail;
+                goto fault;
             /* Non-conforming segment: check DPL against RPL. */
             if ( !(desc.b & _SEGMENT_EC) && (dpl != rpl) )
-                goto unmap_and_fail;
+                goto fault;
             break;
         case x86_seg_ss:
             /* Writable data segment? */
             if ( (desc.b & (_SEGMENT_CODE|_SEGMENT_WR)) != _SEGMENT_WR )
-                goto unmap_and_fail;
+                goto fault;
             if ( (dpl != cpl) || (dpl != rpl) )
-                goto unmap_and_fail;
+                goto fault;
             break;
         case x86_seg_ldtr:
             /* LDT system segment? */
             if ( (desc.b & _SEGMENT_TYPE) != (2u<<8) )
-                goto unmap_and_fail;
+                goto fault;
             goto skip_accessed_flag;
         default:
             /* Readable code or data segment? */
             if ( (desc.b & (_SEGMENT_CODE|_SEGMENT_WR)) == _SEGMENT_CODE )
-                goto unmap_and_fail;
+                goto fault;
             /*
              * Data or non-conforming code segment:
              * check DPL against RPL and CPL.
@@ -2788,7 +2788,7 @@ static int hvm_load_segment_selector(
             if ( ((desc.b & (_SEGMENT_EC|_SEGMENT_CODE)) !=
                   (_SEGMENT_EC|_SEGMENT_CODE))
                  && ((dpl < cpl) || (dpl < rpl)) )
-                goto unmap_and_fail;
+                goto fault;
             break;
         }
 
@@ -2797,7 +2797,7 @@ static int hvm_load_segment_selector(
         {
             fault_type = (seg != x86_seg_ss) ? TRAP_no_segment
                                              : TRAP_stack_error;
-            goto unmap_and_fail;
+            goto fault;
         }
     } while ( !(desc.b & 0x100) && /* Ensure Accessed flag is set */
               writable && /* except if we are to discard writes */
@@ -2822,11 +2822,10 @@ static int hvm_load_segment_selector(
 
     return 0;
 
- unmap_and_fail:
+ fault:
     hvm_unmap_entry(pdesc);
- fail:
     hvm_inject_hw_exception(fault_type, sel & 0xfffc);
- hvm_map_fail:
+
     return 1;
 }
 
@@ -2999,7 +2998,7 @@ void hvm_task_switch(
 
     new_cpl = tss.eflags & X86_EFLAGS_VM ? 3 : tss.cs & 3;
 
-    if ( hvm_load_segment_selector(x86_seg_ldtr, tss.ldt, new_cpl, 0) )
+    if ( task_switch_load_seg(x86_seg_ldtr, tss.ldt, new_cpl, 0) )
         goto out;
 
     rc = hvm_set_cr3(tss.cr3, 1);
@@ -3020,12 +3019,12 @@ void hvm_task_switch(
     regs->rdi    = tss.edi;
 
     exn_raised = 0;
-    if ( hvm_load_segment_selector(x86_seg_es, tss.es, new_cpl, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_cs, tss.cs, new_cpl, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_ss, tss.ss, new_cpl, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_ds, tss.ds, new_cpl, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_fs, tss.fs, new_cpl, tss.eflags) ||
-         hvm_load_segment_selector(x86_seg_gs, tss.gs, new_cpl, tss.eflags) )
+    if ( task_switch_load_seg(x86_seg_es, tss.es, new_cpl, tss.eflags) ||
+         task_switch_load_seg(x86_seg_cs, tss.cs, new_cpl, tss.eflags) ||
+         task_switch_load_seg(x86_seg_ss, tss.ss, new_cpl, tss.eflags) ||
+         task_switch_load_seg(x86_seg_ds, tss.ds, new_cpl, tss.eflags) ||
+         task_switch_load_seg(x86_seg_fs, tss.fs, new_cpl, tss.eflags) ||
+         task_switch_load_seg(x86_seg_gs, tss.gs, new_cpl, tss.eflags) )
         exn_raised = 1;
 
     if ( taskswitch_reason == TSW_call_or_int )
