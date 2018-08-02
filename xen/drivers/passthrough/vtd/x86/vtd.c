@@ -110,7 +110,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
 
 void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
 {
-    unsigned long i, j, tmp, top, max_pfn;
+    unsigned long i, top, max_pfn;
 
     BUG_ON(!is_hardware_domain(d));
 
@@ -121,7 +121,7 @@ void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
     {
         unsigned long pfn = pdx_to_pfn(i);
         bool map;
-        int rc = 0;
+        int rc;
 
         /*
          * Set up 1:1 mapping for dom0. Default to include only
@@ -152,21 +152,12 @@ void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
              page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL) )
             continue;
 
-        tmp = 1 << (PAGE_SHIFT - PAGE_SHIFT_4K);
-        for ( j = 0; j < tmp; j++ )
-        {
-            int ret = iommu_map_page(d, pfn * tmp + j, pfn * tmp + j,
-                                     IOMMUF_readable|IOMMUF_writable);
-
-            if ( !rc )
-               rc = ret;
-        }
-
+        rc = iommu_map_page(d, pfn, pfn, IOMMUF_readable|IOMMUF_writable);
         if ( rc )
             printk(XENLOG_WARNING VTDPREFIX " d%d: IOMMU mapping failed: %d\n",
                    d->domain_id, rc);
 
-        if (!(i & (0xfffff >> (PAGE_SHIFT - PAGE_SHIFT_4K))))
+        if (!(i & 0xfffff))
             process_pending_softirqs();
     }
 }
