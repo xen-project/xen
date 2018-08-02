@@ -759,11 +759,11 @@ void acpi_dead_idle(void)
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;
 
-    if ( (power = processor_powers[smp_processor_id()]) == NULL )
+    if ( (power = processor_powers[smp_processor_id()]) == NULL ||
+         power->count < 2 )
         goto default_halt;
 
-    if ( (cx = &power->states[power->count-1]) == NULL )
-        goto default_halt;
+    cx = &power->states[power->count - 1];
 
     if ( cx->entry_method == ACPI_CSTATE_EM_FFH )
     {
