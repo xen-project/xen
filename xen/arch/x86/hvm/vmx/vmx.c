@@ -2191,7 +2191,14 @@ static void vmx_vcpu_update_vmfunc_ve(struct vcpu *v)
             mfn = get_gfn_query_unlocked(d, gfn_x(vcpu_altp2m(v).veinfo_gfn), &t);
 
             if ( !mfn_eq(mfn, INVALID_MFN) )
+            {
                 __vmwrite(VIRT_EXCEPTION_INFO, mfn_x(mfn) << PAGE_SHIFT);
+                /*
+                 * Make sure we have an up-to-date EPTP_INDEX when
+                 * setting SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS.
+                 */
+                __vmwrite(EPTP_INDEX, vcpu_altp2m(v).p2midx);
+            }
             else
                 v->arch.hvm_vmx.secondary_exec_control &=
                     ~SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS;
