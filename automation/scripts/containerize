@@ -23,10 +23,6 @@ case "_${CONTAINER}" in
     _stretch|_) CONTAINER="${BASE}/debian:stretch" ;;
 esac
 
-# get our container name and version
-containid=${CONTAINER%:*}
-containver=${CONTAINER#*:}
-
 # Save the commands for future use
 cmd=$@
 
@@ -74,7 +70,6 @@ fi
 # Kick off Docker
 einfo "*** Launching container ..."
 exec docker run \
-    ${DOCKER_ARGS} \
     ${SSH_AUTH_SOCK:+-e SSH_AUTH_SOCK="/tmp/ssh-agent/${SSH_AUTH_NAME}"} \
     -v "${CONTAINER_PATH}":/build:rw \
     -v "${HOME}/.ssh":/root/.ssh:ro \
