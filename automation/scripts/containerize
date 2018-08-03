@@ -65,11 +65,6 @@ if [[ -n ${SSH_AUTH_SOCK} ]]; then
     fi
 fi
 
-# if we got the CONTAINER_NAME env variable then use that for our name
-if [[ -n ${CONTAINER_NAME} ]]; then
-    name="--name ${CONTAINER_NAME}"
-fi
-
 # Figure out the base of what we want as our sources
 # by using the top of the git repo
 if [[ -z ${CONTAINER_PATH} ]]; then
@@ -85,7 +80,7 @@ exec docker run \
     -v "${HOME}/.ssh":/root/.ssh:ro \
     ${SSH_AUTH_DIR:+-v "${SSH_AUTH_DIR}":/tmp/ssh-agent} \
     ${XEN_CONFIG_EXPERT:+-e XEN_CONFIG_EXPERT=${XEN_CONFIG_EXPERT}} \
-    ${CONTAINER_ARGS} ${name} \
+    ${CONTAINER_ARGS} \
     -${termint}i --rm -- \
     ${CONTAINER} \
     ${cmd}

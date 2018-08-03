@@ -53,11 +53,6 @@ understands.
 - XEN_CONFIG_EXPERT: If this is defined in your shell it will be
   automatically passed through to the container.
 
-- CONTAINER_NAME: By default the container name is set based on the
-  container itself so that its easy to attach other terminals to your
-  container. This however prevents you from running multiple containers
-  of the same version. Override the name value to cause it to name
-  the container differently on start.
 
 Building a container
 --------------------
