@@ -89,7 +89,7 @@ static struct {
     const char *name;
     size_t size;
     int kind;
-} hvm_sr_handlers[HVM_SAVE_CODE_MAX + 1] = { {NULL, NULL, "<?>"}, };
+} hvm_sr_handlers[HVM_SAVE_CODE_MAX + 1];
 
 /* Init-time function to add entries to that list */
 void __init hvm_register_savevm(uint16_t typecode,
