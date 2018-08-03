@@ -40,12 +40,15 @@ understands.
   CONTAINER=centos72 ./automation/scripts/containerize make
   ```
 
-- WORKDIR: This overrides the path that will be available under the
+- CONTAINER_PATH: This overrides the path that will be available under the
   `/build` directory in the container, which is the default path.
 
   ```
-  WORKDIR=/some/other/path ./automation/scripts/containerize ls
+  CONTAINER_PATH=/some/other/path ./automation/scripts/containerize ls
   ```
+
+- CONTAINER_ARGS: Allows you to pass extra arguments to Docker
+  when starting the container.
 
 - XEN_CONFIG_EXPERT: If this is defined in your shell it will be
   automatically passed through to the container.
@@ -55,9 +58,6 @@ understands.
   container. This however prevents you from running multiple containers
   of the same version. Override the name value to cause it to name
   the container differently on start.
-
-- EXTRA_CONTAINER_ARGS: Allows you to pass extra arguments to Docker
-  when starting the container.
 
 Building a container
 --------------------

@@ -72,10 +72,8 @@ fi
 
 # Figure out the base of what we want as our sources
 # by using the top of the git repo
-if [[ -n ${WORKDIR} ]]; then
-    WORKDIR="${WORKDIR}"
-else
-    WORKDIR=$(git rev-parse --show-toplevel)
+if [[ -z ${CONTAINER_PATH} ]]; then
+    CONTAINER_PATH=$(git rev-parse --show-toplevel)
 fi
 
 # Kick off Docker
@@ -83,11 +81,11 @@ einfo "*** Launching container ..."
 exec docker run \
     ${DOCKER_ARGS} \
     ${SSH_AUTH_SOCK:+-e SSH_AUTH_SOCK="/tmp/ssh-agent/${SSH_AUTH_NAME}"} \
-    -v "${WORKDIR}":/build:rw \
+    -v "${CONTAINER_PATH}":/build:rw \
     -v "${HOME}/.ssh":/root/.ssh:ro \
     ${SSH_AUTH_DIR:+-v "${SSH_AUTH_DIR}":/tmp/ssh-agent} \
     ${XEN_CONFIG_EXPERT:+-e XEN_CONFIG_EXPERT=${XEN_CONFIG_EXPERT}} \
-    ${EXTRA_CONTAINER_ARGS} ${name} \
+    ${CONTAINER_ARGS} ${name} \
     -${termint}i --rm -- \
     ${CONTAINER} \
     ${cmd}
