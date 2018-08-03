@@ -98,9 +98,6 @@ extern void acpi_restore_state_mem(void);
 
 extern unsigned long acpi_wakeup_address;
 
-/* early initialization routine */
-extern void acpi_reserve_bootmem(void);
-
 #define ARCH_HAS_POWER_INIT	1
 
 extern s8 acpi_numa;

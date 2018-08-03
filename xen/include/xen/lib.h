@@ -66,8 +66,6 @@
 
 #define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 
-#define reserve_bootmem(_p,_l) ((void)0)
-
 struct domain;
 
 void cmdline_parse(const char *cmdline);
