@@ -213,7 +213,8 @@ mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t);
  */
 mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
                     p2m_type_t *t, p2m_access_t *a,
-                    unsigned int *page_order);
+                    unsigned int *page_order,
+                    bool *valid);
 
 /*
  * Direct set a p2m entry: only for use by the P2M code.

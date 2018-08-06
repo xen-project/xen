@@ -71,7 +71,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
          * No setting was found in the Radix tree. Check if the
          * entry exists in the page-tables.
          */
-        mfn_t mfn = p2m_get_entry(p2m, gfn, NULL, NULL, NULL);
+        mfn_t mfn = p2m_get_entry(p2m, gfn, NULL, NULL, NULL, NULL);
 
         if ( mfn_eq(mfn, INVALID_MFN) )
             return -ESRCH;
@@ -200,7 +200,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
      * We had a mem_access permission limiting the access, but the page type
      * could also be limiting, so we need to check that as well.
      */
-    mfn = p2m_get_entry(p2m, gfn, &t, NULL, NULL);
+    mfn = p2m_get_entry(p2m, gfn, &t, NULL, NULL, NULL);
     if ( mfn_eq(mfn, INVALID_MFN) )
         goto err;
 
@@ -406,7 +406,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
           gfn = gfn_next_boundary(gfn, order) )
     {
         p2m_type_t t;
-        mfn_t mfn = p2m_get_entry(p2m, gfn, &t, NULL, &order);
+        mfn_t mfn = p2m_get_entry(p2m, gfn, &t, NULL, &order, NULL);
 
 
         if ( !mfn_eq(mfn, INVALID_MFN) )

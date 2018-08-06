@@ -298,10 +298,14 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
  *
  * If the entry is not present, INVALID_MFN will be returned and the
  * page_order will be set according to the order of the invalid range.
+ *
+ * valid will contain the value of bit[0] (e.g valid bit) of the
+ * entry.
  */
 mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
                     p2m_type_t *t, p2m_access_t *a,
-                    unsigned int *page_order)
+                    unsigned int *page_order,
+                    bool *valid)
 {
     paddr_t addr = gfn_to_gaddr(gfn);
     unsigned int level = 0;
@@ -325,6 +329,9 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
     t = t ?: &_t;
 
     *t = p2m_invalid;
+
+    if ( valid )
+        *valid = false;
 
     /* XXX: Check if the mapping is lower than the mapped gfn */
 
@@ -371,6 +378,9 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
          * to the GFN.
          */
         mfn = mfn_add(mfn, gfn_x(gfn) & ((1UL << level_orders[level]) - 1));
+
+        if ( valid )
+            *valid = lpae_is_valid(entry);
     }
 
 out_unmap:
@@ -389,7 +399,7 @@ mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     p2m_read_lock(p2m);
-    mfn = p2m_get_entry(p2m, gfn, t, NULL, NULL);
+    mfn = p2m_get_entry(p2m, gfn, t, NULL, NULL, NULL);
     p2m_read_unlock(p2m);
 
     return mfn;
@@ -1471,7 +1481,7 @@ int relinquish_p2m_mapping(struct domain *d)
     for ( ; gfn_x(start) < gfn_x(end);
           start = gfn_next_boundary(start, order) )
     {
-        mfn_t mfn = p2m_get_entry(p2m, start, &t, NULL, &order);
+        mfn_t mfn = p2m_get_entry(p2m, start, &t, NULL, &order, NULL);
 
         count++;
         /*
@@ -1534,7 +1544,7 @@ int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
 
     for ( ; gfn_x(start) < gfn_x(end); start = next_gfn )
     {
-        mfn_t mfn = p2m_get_entry(p2m, start, &t, NULL, &order);
+        mfn_t mfn = p2m_get_entry(p2m, start, &t, NULL, &order, NULL);
 
         next_gfn = gfn_next_boundary(start, order);
 
