@@ -687,11 +687,10 @@ static void kdd_handle_read_ctrl(kdd_state *s)
         }
     } else {
         /* 32-bit control-register space starts at 0x[2]cc, for 84 bytes */
-        uint32_t offset = addr;
-        if (offset > 0x200)
-            offset -= 0x200;
-        offset -= 0xcc;
-        if (offset > sizeof ctrl.c32 || offset + len > sizeof ctrl.c32) {
+        uint32_t offset = addr - 0xcc;
+        if (offset > sizeof ctrl.c32)
+            offset -= 0x2cc;
+        if (offset > sizeof ctrl.c32 || len > sizeof ctrl.c32 - offset) {
             KDD_LOG(s, "Request outside of known control space\n");
             len = 0;
         } else {
