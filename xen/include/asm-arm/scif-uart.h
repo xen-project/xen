@@ -47,17 +47,6 @@
 #define SCSCR_CKE1    (1 << 1)    /* Clock Enable 1 */
 #define SCSCR_CKE0    (1 << 0)    /* Clock Enable 0 */
 
-#define SCSCR_CKE00    (0)
-#define SCSCR_CKE01    (SCSCR_CKE0)
-#define SCSCR_CKE10    (SCSCR_CKE1)
-#define SCSCR_CKE11    (SCSCR_CKE1 | SCSCR_CKE0)
-
-/* Serial Mode Register (SCSMR) */
-#define SCSMR_CHR     (1 << 6)    /* 7-bit Character Length */
-#define SCSMR_PE      (1 << 5)    /* Parity Enable */
-#define SCSMR_ODD     (1 << 4)    /* Odd Parity */
-#define SCSMR_STOP    (1 << 3)    /* Stop Bit Length */
-
 /* Serial Status Register (SCFSR) */
 #define SCFSR_ER      (1 << 7)    /* Receive Error */
 #define SCFSR_TEND    (1 << 6)    /* Transmission End */

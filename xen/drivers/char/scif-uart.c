@@ -29,10 +29,6 @@
 #include <asm/scif-uart.h>
 #include <asm/io.h>
 
-#define PARITY_NONE    0
-#define PARITY_EVEN    1
-#define PARITY_ODD     2
-
 #define scif_readb(uart, off)          readb((uart)->regs + (off))
 #define scif_writeb(uart, off, val)    writeb((val), (uart)->regs + (off))
 
