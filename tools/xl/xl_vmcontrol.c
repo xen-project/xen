@@ -804,6 +804,36 @@ int create_domain(struct domain_create *dom_info)
         parse_config_data(config_source, config_data, config_len, &d_config);
     }
 
+    if (!dom_info->ignore_global_affinity_masks) {
+        libxl_domain_build_info *b_info = &d_config.b_info;
+
+        /* It is possible that no hard affinity is specified in config file.
+         * Generate hard affinity maps now if we care about those.
+         */
+        if (b_info->num_vcpu_hard_affinity == 0 &&
+              (!libxl_bitmap_is_full(&global_vm_affinity_mask) ||
+                 (b_info->type == LIBXL_DOMAIN_TYPE_PV &&
+                  !libxl_bitmap_is_full(&global_pv_affinity_mask)) ||
+                 (b_info->type != LIBXL_DOMAIN_TYPE_PV &&
+                  !libxl_bitmap_is_full(&global_hvm_affinity_mask))
+               )) {
+            b_info->num_vcpu_hard_affinity = b_info->max_vcpus;
+            b_info->vcpu_hard_affinity =
+                xmalloc(b_info->max_vcpus * sizeof(libxl_bitmap));
+
+            for (i = 0; i < b_info->num_vcpu_hard_affinity; i++) {
+                libxl_bitmap *m = &b_info->vcpu_hard_affinity[i];
+                libxl_bitmap_init(m);
+                libxl_cpu_bitmap_alloc(ctx, m, 0);
+                libxl_bitmap_set_any(m);
+            }
+        }
+
+        apply_global_affinity_masks(b_info->type,
+                                    b_info->vcpu_hard_affinity,
+                                    b_info->num_vcpu_hard_affinity);
+    }
+
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
             /* when we receive a domain we get its name from the config
@@ -1124,7 +1154,7 @@ int main_create(int argc, char **argv)
     const char *filename = NULL;
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
-        quiet = 0, monitor = 1, vnc = 0, vncautopass = 0;
+        quiet = 0, monitor = 1, vnc = 0, vncautopass = 0, ignore_masks = 0;
     int opt, rc;
     static struct option opts[] = {
         {"dryrun", 0, 0, 'n'},
@@ -1132,6 +1162,7 @@ int main_create(int argc, char **argv)
         {"defconfig", 1, 0, 'f'},
         {"vncviewer", 0, 0, 'V'},
         {"vncviewer-autopass", 0, 0, 'A'},
+        {"ignore-global-affinity-masks", 0, 0, 'i'},
         COMMON_LONG_OPTS
     };
 
@@ -1142,7 +1173,7 @@ int main_create(int argc, char **argv)
         argc--; argv++;
     }
 
-    SWITCH_FOREACH_OPT(opt, "Fnqf:pcdeVA", opts, "create", 0) {
+    SWITCH_FOREACH_OPT(opt, "Fnqf:pcdeVAi", opts, "create", 0) {
     case 'f':
         filename = optarg;
         break;
@@ -1174,6 +1205,9 @@ int main_create(int argc, char **argv)
     case 'A':
         vnc = vncautopass = 1;
         break;
+    case 'i':
+        ignore_masks = 1;
+        break;
     }
 
     memset(&dom_info, 0, sizeof(dom_info));
@@ -1203,6 +1237,7 @@ int main_create(int argc, char **argv)
     dom_info.vnc = vnc;
     dom_info.vncautopass = vncautopass;
     dom_info.console_autoconnect = console_autoconnect;
+    dom_info.ignore_global_affinity_masks = ignore_masks;
 
     rc = create_domain(&dom_info);
     if (rc < 0) {

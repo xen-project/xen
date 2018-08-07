@@ -185,6 +185,28 @@ massively huge guests).
 
 =back
 
+=item B<vm.cpumask>="CPULIST"
+
+=item B<vm.hvm.cpumask>="CPULIST"
+
+=item B<vm.pv.cpumask>="CPULIST"
+
+Global masks that are applied when creating guests and pinning vcpus
+to indicate which cpus they are allowed to run on.  Specifically,
+C<vm.cpumask> applies to all guest types, C<vm.hvm.cpumask> applies to
+both HVM and PVH guests and C<vm.pv.cpumask> applies to PV guests.
+
+The hard affinity of guest's vcpus are logical-AND'ed with respective
+masks. If the resulting affinity mask is empty, operation will fail.
+
+Use --ignore-global-affinity-masks to skip applying global masks.
+
+The default value for these masks are all 1's, i.e. all cpus are allowed.
+
+Due to bug(s), these options may not interact well with other options
+concerning CPU affinity. One example is CPU pools. Users should always double
+check that the required affinity has taken effect.
+
 =back
 
 =head1 SEE ALSO
