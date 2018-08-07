@@ -68,6 +68,61 @@ static void print_domain_vcpuinfo(uint32_t domid, uint32_t nr_cpus)
     libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
 }
 
+void apply_global_affinity_masks(libxl_domain_type type,
+                                 libxl_bitmap *vcpu_affinity_array,
+                                 unsigned int size)
+{
+    libxl_bitmap *mask = &global_vm_affinity_mask;
+    libxl_bitmap *type_mask;
+    unsigned int i;
+
+    switch (type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+    case LIBXL_DOMAIN_TYPE_PVH:
+        type_mask = &global_hvm_affinity_mask;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+        type_mask = &global_pv_affinity_mask;
+        break;
+    default:
+        fprintf(stderr, "Unknown guest type\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (i = 0; i < size; i++) {
+        int rc;
+        libxl_bitmap *t = &vcpu_affinity_array[i];
+        libxl_bitmap b1, b2;
+
+        libxl_bitmap_init(&b1);
+        libxl_bitmap_init(&b2);
+
+        rc = libxl_bitmap_and(ctx, &b1, t, mask);
+        if (rc) {
+            fprintf(stderr, "libxl_bitmap_and errored\n");
+            exit(EXIT_FAILURE);
+        }
+        rc = libxl_bitmap_and(ctx, &b2, &b1, type_mask);
+        if (rc) {
+            fprintf(stderr, "libxl_bitmap_and errored\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (libxl_bitmap_is_empty(&b2)) {
+            fprintf(stderr, "vcpu hard affinity map is empty\n");
+            exit(EXIT_FAILURE);
+        }
+
+        /* Replace target bitmap with the result */
+        libxl_bitmap_dispose(t);
+        libxl_bitmap_init(t);
+        libxl_bitmap_copy_alloc(ctx, t, &b2);
+
+        libxl_bitmap_dispose(&b1);
+        libxl_bitmap_dispose(&b2);
+    }
+}
+
 static void vcpulist(int argc, char **argv)
 {
     libxl_dominfo *dominfo;
@@ -118,6 +173,7 @@ int main_vcpupin(int argc, char **argv)
 {
     static struct option opts[] = {
         {"force", 0, 0, 'f'},
+        {"ignore-global-affinity-masks", 0, 0, 'i'},
         COMMON_LONG_OPTS
     };
     libxl_vcpuinfo *vcpuinfo;
@@ -132,14 +188,17 @@ int main_vcpupin(int argc, char **argv)
     const char *vcpu, *hard_str, *soft_str;
     char *endptr;
     int opt, nb_cpu, nb_vcpu, rc = EXIT_FAILURE;
-    bool force = false;
+    bool force = false, ignore_masks = false;
 
     libxl_bitmap_init(&cpumap_hard);
     libxl_bitmap_init(&cpumap_soft);
 
-    SWITCH_FOREACH_OPT(opt, "f", opts, "vcpu-pin", 3) {
+    SWITCH_FOREACH_OPT(opt, "fi", opts, "vcpu-pin", 3) {
     case 'f':
         force = true;
+        break;
+    case 'i':
+        ignore_masks = true;
         break;
     default:
         break;
@@ -220,6 +279,23 @@ int main_vcpupin(int argc, char **argv)
 
         rc = EXIT_SUCCESS;
         goto out;
+    }
+
+    /* Only hard affinity matters here */
+    if (!ignore_masks) {
+        libxl_domain_config d_config;
+
+        libxl_domain_config_init(&d_config);
+        rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+        if (rc) {
+            fprintf(stderr, "Could not retrieve domain configuration\n");
+            libxl_domain_config_dispose(&d_config);
+            goto out;
+        }
+
+        apply_global_affinity_masks(d_config.b_info.type, hard, 1);
+
+        libxl_domain_config_dispose(&d_config);
     }
 
     if (force) {
