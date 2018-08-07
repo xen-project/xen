@@ -2732,3 +2732,9 @@ int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
 
     return ret;
 }
+
+void arch_evtchn_inject(struct vcpu *v)
+{
+    if ( is_hvm_vcpu(v) )
+        hvm_assert_evtchn_irq(v);
+}
