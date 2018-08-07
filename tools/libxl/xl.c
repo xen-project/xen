@@ -45,6 +45,9 @@ char *default_bridge = NULL;
 char *default_gatewaydev = NULL;
 char *default_vifbackend = NULL;
 char *default_remus_netbufscript = NULL;
+libxl_bitmap global_vm_affinity_mask;
+libxl_bitmap global_hvm_affinity_mask;
+libxl_bitmap global_pv_affinity_mask;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
 bool progress_use_cr = 0;
@@ -179,6 +182,26 @@ static void parse_global_config(const char *configfile,
 
     xlu_cfg_replace_string (config, "remus.default.netbufscript",
         &default_remus_netbufscript, 0);
+
+    libxl_bitmap_init(&global_vm_affinity_mask);
+    libxl_cpu_bitmap_alloc(ctx, &global_vm_affinity_mask, 0);
+    libxl_bitmap_init(&global_hvm_affinity_mask);
+    libxl_cpu_bitmap_alloc(ctx, &global_hvm_affinity_mask, 0);
+    libxl_bitmap_init(&global_pv_affinity_mask);
+    libxl_cpu_bitmap_alloc(ctx, &global_pv_affinity_mask, 0);
+
+    if (!xlu_cfg_get_string (config, "vm.cpumask", &buf, 0))
+        cpurange_parse(buf, &global_vm_affinity_mask);
+    else
+        libxl_bitmap_set_any(&global_vm_affinity_mask);
+    if (!xlu_cfg_get_string (config, "vm.hvm.cpumask", &buf, 0))
+        cpurange_parse(buf, &global_hvm_affinity_mask);
+    else
+       libxl_bitmap_set_any(&global_hvm_affinity_mask);
+    if (!xlu_cfg_get_string (config, "vm.pv.cpumask", &buf, 0))
+        cpurange_parse(buf, &global_pv_affinity_mask);
+    else
+        libxl_bitmap_set_any(&global_pv_affinity_mask);
 
     xlu_cfg_destroy(config);
 }

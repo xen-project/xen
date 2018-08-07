@@ -153,6 +153,7 @@ struct domain_create {
     int vncautopass;
     int console_autoconnect;
     int checkpointed_stream;
+    int ignore_global_affinity_masks;
     const char *config_file;
     char *extra_config; /* extra config string */
     const char *restore_file;
@@ -836,7 +837,7 @@ static int update_cpumap_range(const char *str, libxl_bitmap *cpumap)
  * single cpus or as eintire NUMA nodes) and turns it into the
  * corresponding libxl_bitmap (in cpumap).
  */
-static int cpurange_parse(const char *cpu, libxl_bitmap *cpumap)
+int cpurange_parse(const char *cpu, libxl_bitmap *cpumap)
 {
     char *ptr, *saveptr = NULL, *buf = strdup(cpu);
     int rc = 0;
@@ -2790,6 +2791,36 @@ static uint32_t create_domain(struct domain_create *dom_info)
                                       (const char *)config_data);
     } else {
         parse_config_data(config_source, config_data, config_len, &d_config);
+    }
+
+    if (!dom_info->ignore_global_affinity_masks) {
+        libxl_domain_build_info *b_info = &d_config.b_info;
+
+        /* It is possible that no hard affinity is specified in config file.
+         * Generate hard affinity maps now if we care about those.
+         */
+        if (b_info->num_vcpu_hard_affinity == 0 &&
+              (!libxl_bitmap_is_full(&global_vm_affinity_mask) ||
+                 (b_info->type == LIBXL_DOMAIN_TYPE_PV &&
+                  !libxl_bitmap_is_full(&global_pv_affinity_mask)) ||
+                 (b_info->type != LIBXL_DOMAIN_TYPE_PV &&
+                  !libxl_bitmap_is_full(&global_hvm_affinity_mask))
+               )) {
+            b_info->num_vcpu_hard_affinity = b_info->max_vcpus;
+            b_info->vcpu_hard_affinity =
+                xmalloc(b_info->max_vcpus * sizeof(libxl_bitmap));
+
+            for (i = 0; i < b_info->num_vcpu_hard_affinity; i++) {
+                libxl_bitmap *m = &b_info->vcpu_hard_affinity[i];
+                libxl_bitmap_init(m);
+                libxl_cpu_bitmap_alloc(ctx, m, 0);
+                libxl_bitmap_set_any(m);
+            }
+        }
+
+        apply_global_affinity_masks(b_info->type,
+                                    b_info->vcpu_hard_affinity,
+                                    b_info->num_vcpu_hard_affinity);
     }
 
     if (migrate_fd >= 0) {
@@ -4963,7 +4994,7 @@ int main_create(int argc, char **argv)
     const char *filename = NULL;
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
-        quiet = 0, monitor = 1, vnc = 0, vncautopass = 0;
+        quiet = 0, monitor = 1, vnc = 0, vncautopass = 0, ignore_masks = 0;
     int opt, rc;
     static struct option opts[] = {
         {"dryrun", 0, 0, 'n'},
@@ -4971,6 +5002,7 @@ int main_create(int argc, char **argv)
         {"defconfig", 1, 0, 'f'},
         {"vncviewer", 0, 0, 'V'},
         {"vncviewer-autopass", 0, 0, 'A'},
+        {"ignore-global-affinity-masks", 0, 0, 'i'},
         COMMON_LONG_OPTS
     };
 
@@ -4981,7 +5013,7 @@ int main_create(int argc, char **argv)
         argc--; argv++;
     }
 
-    SWITCH_FOREACH_OPT(opt, "Fnqf:pcdeVA", opts, "create", 0) {
+    SWITCH_FOREACH_OPT(opt, "Fnqf:pcdeVAi", opts, "create", 0) {
     case 'f':
         filename = optarg;
         break;
@@ -5013,6 +5045,9 @@ int main_create(int argc, char **argv)
     case 'A':
         vnc = vncautopass = 1;
         break;
+    case 'i':
+        ignore_masks = 1;
+        break;
     }
 
     memset(&dom_info, 0, sizeof(dom_info));
@@ -5041,6 +5076,7 @@ int main_create(int argc, char **argv)
     dom_info.vnc = vnc;
     dom_info.vncautopass = vncautopass;
     dom_info.console_autoconnect = console_autoconnect;
+    dom_info.ignore_global_affinity_masks = ignore_masks;
 
     rc = create_domain(&dom_info);
     if (rc < 0) {
@@ -5235,6 +5271,60 @@ static void print_domain_vcpuinfo(uint32_t domid, uint32_t nr_cpus)
     libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
 }
 
+void apply_global_affinity_masks(libxl_domain_type type,
+                                 libxl_bitmap *vcpu_affinity_array,
+                                 unsigned int size)
+{
+    libxl_bitmap *mask = &global_vm_affinity_mask;
+    libxl_bitmap *type_mask;
+    unsigned int i;
+
+    switch (type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        type_mask = &global_hvm_affinity_mask;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+        type_mask = &global_pv_affinity_mask;
+        break;
+    default:
+        fprintf(stderr, "Unknown guest type\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (i = 0; i < size; i++) {
+        int rc;
+        libxl_bitmap *t = &vcpu_affinity_array[i];
+        libxl_bitmap b1, b2;
+
+        libxl_bitmap_init(&b1);
+        libxl_bitmap_init(&b2);
+
+        rc = libxl_bitmap_and(ctx, &b1, t, mask);
+        if (rc) {
+            fprintf(stderr, "libxl_bitmap_and errored\n");
+            exit(EXIT_FAILURE);
+        }
+        rc = libxl_bitmap_and(ctx, &b2, &b1, type_mask);
+        if (rc) {
+            fprintf(stderr, "libxl_bitmap_and errored\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (libxl_bitmap_is_empty(&b2)) {
+            fprintf(stderr, "vcpu hard affinity map is empty\n");
+            exit(EXIT_FAILURE);
+        }
+
+        /* Replace target bitmap with the result */
+        libxl_bitmap_dispose(t);
+        libxl_bitmap_init(t);
+        libxl_bitmap_copy_alloc(ctx, t, &b2);
+
+        libxl_bitmap_dispose(&b1);
+        libxl_bitmap_dispose(&b2);
+    }
+}
+
 static void vcpulist(int argc, char **argv)
 {
     libxl_dominfo *dominfo;
@@ -5283,6 +5373,10 @@ int main_vcpulist(int argc, char **argv)
 
 int main_vcpupin(int argc, char **argv)
 {
+    static struct option opts[] = {
+        {"ignore-global-affinity-masks", 0, 0, 'i'},
+        COMMON_LONG_OPTS
+    };
     libxl_vcpuinfo *vcpuinfo;
     libxl_bitmap cpumap_hard, cpumap_soft;;
     libxl_bitmap *soft = &cpumap_soft, *hard = &cpumap_hard;
@@ -5295,12 +5389,17 @@ int main_vcpupin(int argc, char **argv)
     const char *vcpu, *hard_str, *soft_str;
     char *endptr;
     int opt, nb_cpu, nb_vcpu, rc = -1;
+    bool ignore_masks = false;
 
     libxl_bitmap_init(&cpumap_hard);
     libxl_bitmap_init(&cpumap_soft);
 
-    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-pin", 3) {
-        /* No options */
+    SWITCH_FOREACH_OPT(opt, "i", opts, "vcpu-pin", 3) {
+    case 'i':
+        ignore_masks = true;
+        break;
+    default:
+        break;
     }
 
     domid = find_domain(argv[optind]);
@@ -5374,6 +5473,23 @@ int main_vcpupin(int argc, char **argv)
 
         rc = 0;
         goto out;
+    }
+
+    /* Only hard affinity matters here */
+    if (!ignore_masks) {
+        libxl_domain_config d_config;
+
+        libxl_domain_config_init(&d_config);
+        rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+        if (rc) {
+            fprintf(stderr, "Could not retrieve domain configuration\n");
+            libxl_domain_config_dispose(&d_config);
+            goto out;
+        }
+
+        apply_global_affinity_masks(d_config.b_info.type, hard, 1);
+
+        libxl_domain_config_dispose(&d_config);
     }
 
     if (vcpuid != -1) {
