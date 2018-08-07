@@ -28,6 +28,9 @@
 #include <libxl_utils.h>
 #include <libxlutil.h>
 #include "xl.h"
+#include "xl_parse.h"
+
+#include "xl_utils.h"
 
 xentoollog_logger_stdiostream *logger;
 int dryrun_only;
@@ -42,6 +45,9 @@ char *default_gatewaydev = NULL;
 char *default_vifbackend = NULL;
 char *default_remus_netbufscript = NULL;
 char *default_colo_proxy_script = NULL;
+libxl_bitmap global_vm_affinity_mask;
+libxl_bitmap global_hvm_affinity_mask;
+libxl_bitmap global_pv_affinity_mask;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
 bool progress_use_cr = 0;
@@ -187,6 +193,26 @@ static void parse_global_config(const char *configfile,
         &default_remus_netbufscript, 0);
     xlu_cfg_replace_string (config, "colo.default.proxyscript",
         &default_colo_proxy_script, 0);
+
+    libxl_bitmap_init(&global_vm_affinity_mask);
+    libxl_cpu_bitmap_alloc(ctx, &global_vm_affinity_mask, 0);
+    libxl_bitmap_init(&global_hvm_affinity_mask);
+    libxl_cpu_bitmap_alloc(ctx, &global_hvm_affinity_mask, 0);
+    libxl_bitmap_init(&global_pv_affinity_mask);
+    libxl_cpu_bitmap_alloc(ctx, &global_pv_affinity_mask, 0);
+
+    if (!xlu_cfg_get_string (config, "vm.cpumask", &buf, 0))
+        parse_cpurange(buf, &global_vm_affinity_mask);
+    else
+        libxl_bitmap_set_any(&global_vm_affinity_mask);
+    if (!xlu_cfg_get_string (config, "vm.hvm.cpumask", &buf, 0))
+        parse_cpurange(buf, &global_hvm_affinity_mask);
+    else
+       libxl_bitmap_set_any(&global_hvm_affinity_mask);
+    if (!xlu_cfg_get_string (config, "vm.pv.cpumask", &buf, 0))
+        parse_cpurange(buf, &global_pv_affinity_mask);
+    else
+        libxl_bitmap_set_any(&global_pv_affinity_mask);
 
     xlu_cfg_destroy(config);
 }

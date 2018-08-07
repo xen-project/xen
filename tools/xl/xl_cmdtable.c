@@ -34,7 +34,8 @@ struct cmd_spec cmd_table[] = {
       "-e                      Do not wait in the background for the death of the domain.\n"
       "-V, --vncviewer         Connect to the VNC display after the domain is created.\n"
       "-A, --vncviewer-autopass\n"
-      "                        Pass VNC password to viewer via stdin."
+      "                        Pass VNC password to viewer via stdin.\n"
+      "--ignore-global-affinity-masks Ignore global masks in xl.conf."
     },
     { "config-update",
       &main_config_update, 1, 1,
@@ -224,7 +225,8 @@ struct cmd_spec cmd_table[] = {
       &main_vcpupin, 1, 1,
       "Set which CPUs a VCPU can use",
       "[option] <Domain> <VCPU|all> <Hard affinity|-|all> <Soft affinity|-|all>",
-      "-f, --force        undo an override pinning done by the kernel",
+      "-f, --force        undo an override pinning done by the kernel\n"
+      "--ignore-global-affinity-masks Ignore global masks in xl.conf",
     },
     { "vcpu-set",
       &main_vcpuset, 0, 1,
