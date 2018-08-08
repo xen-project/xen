@@ -50,8 +50,8 @@ struct grant_table {
     /* Lock protecting the maptrack limit */
     spinlock_t            maptrack_lock;
     /*
-     * The defined versions are 1 and 2.  Set to 0 if we don't know
-     * what version to use yet.
+     * Defaults to v1.  May be changed with GNTTABOP_set_version.  All other
+     * values are invalid.
      */
     unsigned int          gt_version;
     /* Resource limits of the domain. */
@@ -222,7 +222,6 @@ nr_maptrack_frames(struct grant_table *t)
 static grant_entry_header_t *
 shared_entry_header(struct grant_table *t, grant_ref_t ref)
 {
-    ASSERT(t->gt_version != 0);
     if ( t->gt_version == 1 )
         return (grant_entry_header_t*)&shared_entry_v1(t, ref);
     else
@@ -1302,20 +1301,6 @@ unmap_common(
 
     grant_read_lock(rgt);
 
-    if ( rgt->gt_version == 0 )
-    {
-        /*
-         * This ought to be impossible, as such a mapping should not have
-         * been established (see the nr_grant_entries(rgt) bounds check in
-         * gnttab_map_grant_ref()). Doing this check only in
-         * gnttab_unmap_common_complete() - as it used to be done - would,
-         * however, be too late.
-         */
-        rc = GNTST_bad_gntref;
-        flags = 0;
-        goto unlock_out;
-    }
-
     op->rd = rd;
     op->ref = map->ref;
 
@@ -1931,9 +1916,6 @@ gnttab_setup_table(
         op.status = GNTST_general_error;
         goto unlock;
     }
-
-    if ( gt->gt_version == 0 )
-        gt->gt_version = 1;
 
     if ( (op.nr_frames > nr_grant_frames(gt) ||
           ((gt->gt_version > 1) &&
@@ -2991,15 +2973,11 @@ gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
 
     switch ( gt->gt_version )
     {
-    case 0:
-        if ( op.version == 2 )
-        {
     case 1:
-            /* XXX: We could maybe shrink the active grant table here. */
-            res = gnttab_populate_status_frames(currd, gt, nr_grant_frames(gt));
-            if ( res < 0)
-                goto out_unlock;
-        }
+        /* XXX: We could maybe shrink the active grant table here. */
+        res = gnttab_populate_status_frames(currd, gt, nr_grant_frames(gt));
+        if ( res < 0)
+            goto out_unlock;
         break;
     case 2:
         for ( i = 0; i < GNTTAB_NR_RESERVED_ENTRIES; i++ )
@@ -3594,6 +3572,8 @@ grant_table_create(
     percpu_rwlock_resource_init(&t->lock, grant_rwlock);
     spin_lock_init(&t->maptrack_lock);
 
+    t->gt_version = 1;
+
     /* Okay, install the structure. */
     t->domain = d;
     d->grant_table = t;
@@ -3868,9 +3848,6 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
     bool status = false;
 
     grant_write_lock(gt);
-
-    if ( gt->gt_version == 0 )
-        gt->gt_version = 1;
 
     if ( gt->gt_version == 2 &&
          (idx & XENMAPIDX_grant_table_status) )
