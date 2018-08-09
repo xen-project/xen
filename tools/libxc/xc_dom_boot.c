@@ -256,71 +256,81 @@ static xen_pfn_t xc_dom_gnttab_setup(xc_interface *xch, uint32_t domid)
     return gmfn;
 }
 
-int xc_dom_gnttab_seed(xc_interface *xch, uint32_t domid,
-                       xen_pfn_t console_gmfn,
-                       xen_pfn_t xenstore_gmfn,
-                       uint32_t console_domid,
-                       uint32_t xenstore_domid)
+static void xc_dom_set_gnttab_entry(xc_interface *xch,
+                                    grant_entry_v1_t *gnttab,
+                                    unsigned int idx,
+                                    uint32_t guest_domid,
+                                    uint32_t backend_domid,
+                                    xen_pfn_t guest_gfn)
+{
+    if ( guest_domid == backend_domid || guest_gfn == -1 )
+        return;
+
+    xc_dom_printf(xch, "%s: d%d gnt[%u] -> d%d 0x%"PRI_xen_pfn,
+                  __func__, guest_domid, idx, backend_domid, guest_gfn);
+
+    gnttab[idx].flags = GTF_permit_access;
+    gnttab[idx].domid = backend_domid;
+    gnttab[idx].frame = guest_gfn;
+}
+
+static int compat_gnttab_seed(xc_interface *xch, uint32_t domid,
+                              xen_pfn_t console_gfn,
+                              xen_pfn_t xenstore_gfn,
+                              uint32_t console_domid,
+                              uint32_t xenstore_domid)
 {
 
-    xen_pfn_t gnttab_gmfn;
+    xen_pfn_t gnttab_gfn;
     grant_entry_v1_t *gnttab;
 
-    gnttab_gmfn = xc_dom_gnttab_setup(xch, domid);
-    if ( gnttab_gmfn == -1 )
+    gnttab_gfn = xc_dom_gnttab_setup(xch, domid);
+    if ( gnttab_gfn == -1 )
         return -1;
 
     gnttab = xc_map_foreign_range(xch,
                                   domid,
                                   PAGE_SIZE,
                                   PROT_READ|PROT_WRITE,
-                                  gnttab_gmfn);
+                                  gnttab_gfn);
     if ( gnttab == NULL )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: failed to map domU grant table "
+                     "%s: failed to map d%d grant table "
                      "[errno=%d]\n",
-                     __FUNCTION__, errno);
+                     __func__, domid, errno);
         return -1;
     }
 
-    if ( domid != console_domid  && console_gmfn != -1)
-    {
-        gnttab[GNTTAB_RESERVED_CONSOLE].flags = GTF_permit_access;
-        gnttab[GNTTAB_RESERVED_CONSOLE].domid = console_domid;
-        gnttab[GNTTAB_RESERVED_CONSOLE].frame = console_gmfn;
-    }
-    if ( domid != xenstore_domid && xenstore_gmfn != -1)
-    {
-        gnttab[GNTTAB_RESERVED_XENSTORE].flags = GTF_permit_access;
-        gnttab[GNTTAB_RESERVED_XENSTORE].domid = xenstore_domid;
-        gnttab[GNTTAB_RESERVED_XENSTORE].frame = xenstore_gmfn;
-    }
+    xc_dom_set_gnttab_entry(xch, gnttab, GNTTAB_RESERVED_CONSOLE,
+                            domid, console_domid, console_gfn);
+    xc_dom_set_gnttab_entry(xch, gnttab, GNTTAB_RESERVED_XENSTORE,
+                            domid, xenstore_domid, xenstore_gfn);
 
     if ( munmap(gnttab, PAGE_SIZE) == -1 )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: failed to unmap domU grant table "
+                     "%s: failed to unmap d%d grant table "
                      "[errno=%d]\n",
-                     __FUNCTION__, errno);
+                     __func__, domid, errno);
         return -1;
     }
 
     /* Guest shouldn't really touch its grant table until it has
      * enabled its caches. But lets be nice. */
-    xc_domain_cacheflush(xch, domid, gnttab_gmfn, 1);
+    xc_domain_cacheflush(xch, domid, gnttab_gfn, 1);
 
     return 0;
 }
 
-int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
-                           xen_pfn_t console_gpfn,
-                           xen_pfn_t xenstore_gpfn,
-                           uint32_t console_domid,
-                           uint32_t xenstore_domid)
+static int compat_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
+                                  xen_pfn_t console_gfn,
+                                  xen_pfn_t xenstore_gfn,
+                                  uint32_t console_domid,
+                                  uint32_t xenstore_domid)
 {
     int rc;
-    xen_pfn_t scratch_gpfn;
+    xen_pfn_t scratch_gfn;
     struct xen_add_to_physmap xatp = {
         .domid = domid,
         .space = XENMAPSPACE_grant_table,
@@ -330,41 +340,41 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
         .domid = domid,
     };
 
-    rc = xc_core_arch_get_scratch_gpfn(xch, domid, &scratch_gpfn);
+    rc = xc_core_arch_get_scratch_gpfn(xch, domid, &scratch_gfn);
     if ( rc < 0 )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: failed to get a scratch gfn "
+                     "%s: failed to get a scratch gfn from d%d"
                      "[errno=%d]\n",
-                     __FUNCTION__, errno);
+                     __func__, domid, errno);
         return -1;
     }
-    xatp.gpfn = scratch_gpfn;
-    xrfp.gpfn = scratch_gpfn;
+    xatp.gpfn = scratch_gfn;
+    xrfp.gpfn = scratch_gfn;
 
-    xc_dom_printf(xch, "%s: called, pfn=0x%"PRI_xen_pfn, __FUNCTION__,
-                  scratch_gpfn);
-
+    xc_dom_printf(xch, "%s: d%d: pfn=0x%"PRI_xen_pfn, __func__,
+                  domid, scratch_gfn);
 
     rc = do_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
     if ( rc != 0 )
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: failed to add gnttab to physmap "
+                     "%s: failed to add gnttab to d%d physmap "
                      "[errno=%d]\n",
-                     __FUNCTION__, errno);
+                     __func__, domid, errno);
         return -1;
     }
 
-    rc = xc_dom_gnttab_seed(xch, domid,
-                            console_gpfn, xenstore_gpfn,
+    rc = compat_gnttab_seed(xch, domid,
+                            console_gfn, xenstore_gfn,
                             console_domid, xenstore_domid);
     if (rc != 0)
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: failed to seed gnttab entries\n",
-                     __FUNCTION__);
-        (void) do_memory_op(xch, XENMEM_remove_from_physmap, &xrfp, sizeof(xrfp));
+                     "%s: failed to seed gnttab entries for d%d\n",
+                     __func__, domid);
+        (void) do_memory_op(xch, XENMEM_remove_from_physmap, &xrfp,
+                            sizeof(xrfp));
         return -1;
     }
 
@@ -372,27 +382,64 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
     if (rc != 0)
     {
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
-                     "%s: failed to remove gnttab from physmap "
+                     "%s: failed to remove gnttab from d%d physmap "
                      "[errno=%d]\n",
-                     __FUNCTION__, errno);
+                     __func__, domid, errno);
         return -1;
     }
 
     return 0;
 }
 
+int xc_dom_gnttab_seed(xc_interface *xch, uint32_t guest_domid,
+                       bool is_hvm, xen_pfn_t console_gfn,
+                       xen_pfn_t xenstore_gfn, uint32_t console_domid,
+                       uint32_t xenstore_domid)
+{
+    xenforeignmemory_handle* fmem = xch->fmem;
+    xenforeignmemory_resource_handle *fres;
+    void *addr = NULL;
+
+    fres = xenforeignmemory_map_resource(
+        fmem, guest_domid, XENMEM_resource_grant_table,
+        XENMEM_resource_grant_table_id_shared, 0, 1, &addr,
+        PROT_READ | PROT_WRITE, 0);
+    if ( !fres )
+    {
+        if ( errno == EOPNOTSUPP )
+            return is_hvm ?
+                compat_gnttab_hvm_seed(xch, guest_domid,
+                                       console_gfn, xenstore_gfn,
+                                       console_domid, xenstore_domid) :
+                compat_gnttab_seed(xch, guest_domid,
+                                   console_gfn, xenstore_gfn,
+                                   console_domid, xenstore_domid);
+
+        xc_dom_panic(xch, XC_INTERNAL_ERROR,
+                     "%s: failed to acquire d%d grant table [errno=%d]\n",
+                     __func__, guest_domid, errno);
+        return -1;
+    }
+
+    xc_dom_set_gnttab_entry(xch, addr, GNTTAB_RESERVED_CONSOLE,
+                            guest_domid, console_domid, console_gfn);
+    xc_dom_set_gnttab_entry(xch, addr, GNTTAB_RESERVED_XENSTORE,
+                            guest_domid, xenstore_domid, xenstore_gfn);
+
+    xenforeignmemory_unmap_resource(fmem, fres);
+
+    return 0;
+}
+
 int xc_dom_gnttab_init(struct xc_dom_image *dom)
 {
-    if ( xc_dom_translated(dom) ) {
-        return xc_dom_gnttab_hvm_seed(dom->xch, dom->guest_domid,
-                                      dom->console_pfn, dom->xenstore_pfn,
-                                      dom->console_domid, dom->xenstore_domid);
-    } else {
-        return xc_dom_gnttab_seed(dom->xch, dom->guest_domid,
-                                  xc_dom_p2m(dom, dom->console_pfn),
-                                  xc_dom_p2m(dom, dom->xenstore_pfn),
-                                  dom->console_domid, dom->xenstore_domid);
-    }
+    bool is_hvm = xc_dom_translated(dom);
+    xen_pfn_t console_gfn = xc_dom_p2m(dom, dom->console_pfn);
+    xen_pfn_t xenstore_gfn = xc_dom_p2m(dom, dom->xenstore_pfn);
+
+    return xc_dom_gnttab_seed(dom->xch, dom->guest_domid, is_hvm,
+                              console_gfn, xenstore_gfn,
+                              dom->console_domid, dom->xenstore_domid);
 }
 
 /*

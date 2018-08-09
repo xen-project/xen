@@ -1105,7 +1105,7 @@ static int x86_pv_stream_complete(struct xc_sr_context *ctx)
     if ( rc )
         return rc;
 
-    rc = xc_dom_gnttab_seed(xch, ctx->domid,
+    rc = xc_dom_gnttab_seed(xch, ctx->domid, false,
                             ctx->restore.console_gfn,
                             ctx->restore.xenstore_gfn,
                             ctx->restore.console_domid,

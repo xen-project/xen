@@ -905,7 +905,6 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     *store_mfn = str_mfn;
     *console_mfn = cons_mfn;
 
-    xc_dom_gnttab_hvm_seed(handle, domid, *console_mfn, *store_mfn, console_domid, store_domid);
     return 0;
 }
 

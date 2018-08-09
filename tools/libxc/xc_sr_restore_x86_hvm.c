@@ -216,11 +216,11 @@ static int x86_hvm_stream_complete(struct xc_sr_context *ctx)
         return rc;
     }
 
-    rc = xc_dom_gnttab_hvm_seed(xch, ctx->domid,
-                                ctx->restore.console_gfn,
-                                ctx->restore.xenstore_gfn,
-                                ctx->restore.console_domid,
-                                ctx->restore.xenstore_domid);
+    rc = xc_dom_gnttab_seed(xch, ctx->domid, true,
+                            ctx->restore.console_gfn,
+                            ctx->restore.xenstore_gfn,
+                            ctx->restore.console_domid,
+                            ctx->restore.xenstore_domid);
     if ( rc )
     {
         PERROR("Failed to seed grant table");

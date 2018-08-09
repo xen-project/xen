@@ -337,14 +337,10 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
 int xc_dom_boot_image(struct xc_dom_image *dom);
 int xc_dom_compat_check(struct xc_dom_image *dom);
 int xc_dom_gnttab_init(struct xc_dom_image *dom);
-int xc_dom_gnttab_hvm_seed(xc_interface *xch, uint32_t domid,
-                           xen_pfn_t console_gmfn,
-                           xen_pfn_t xenstore_gmfn,
-                           uint32_t console_domid,
-                           uint32_t xenstore_domid);
-int xc_dom_gnttab_seed(xc_interface *xch, uint32_t domid,
-                       xen_pfn_t console_gmfn,
-                       xen_pfn_t xenstore_gmfn,
+int xc_dom_gnttab_seed(xc_interface *xch, uint32_t guest_domid,
+                       bool is_hvm,
+                       xen_pfn_t console_gfn,
+                       xen_pfn_t xenstore_gfn,
                        uint32_t console_domid,
                        uint32_t xenstore_domid);
 bool xc_dom_translated(const struct xc_dom_image *dom);

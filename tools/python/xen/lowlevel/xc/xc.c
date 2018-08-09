@@ -800,9 +800,9 @@ static PyObject *pyxc_gnttab_hvm_seed(XcObject *self,
 				      &console_domid, &xenstore_domid) )
         return NULL;
 
-    if ( xc_dom_gnttab_hvm_seed(self->xc_handle, dom,
-				console_gmfn, xenstore_gmfn,
-				console_domid, xenstore_domid) != 0 )
+    if ( xc_dom_gnttab_seed(self->xc_handle, dom, true,
+                            console_gmfn, xenstore_gmfn,
+                            console_domid, xenstore_domid) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     return Py_None;
