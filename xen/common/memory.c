@@ -23,6 +23,7 @@
 #include <xen/numa.h>
 #include <xen/mem_access.h>
 #include <xen/trace.h>
+#include <xen/grant_table.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <asm/p2m.h>
@@ -982,6 +983,44 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
     return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
 }
 
+static int acquire_grant_table(struct domain *d, unsigned int id,
+                               unsigned long frame,
+                               unsigned int nr_frames,
+                               xen_pfn_t mfn_list[])
+{
+    unsigned int i = nr_frames;
+
+    /* Iterate backwards in case table needs to grow */
+    while ( i-- != 0 )
+    {
+        mfn_t mfn = INVALID_MFN;
+        int rc;
+
+        switch ( id )
+        {
+        case XENMEM_resource_grant_table_id_shared:
+            rc = gnttab_get_shared_frame(d, frame + i, &mfn);
+            break;
+
+        case XENMEM_resource_grant_table_id_status:
+            rc = gnttab_get_status_frame(d, frame + i, &mfn);
+            break;
+
+        default:
+            rc = -EINVAL;
+            break;
+        }
+
+        if ( rc )
+            return rc;
+
+        ASSERT(!mfn_eq(mfn, INVALID_MFN));
+        mfn_list[i] = mfn_x(mfn);
+    }
+
+    return 0;
+}
+
 static int acquire_resource(
     XEN_GUEST_HANDLE_PARAM(xen_mem_acquire_resource_t) arg)
 {
@@ -992,7 +1031,7 @@ static int acquire_resource(
      * moment since they are small, but if they need to grow in future
      * use-cases then per-CPU arrays or heap allocations may be required.
      */
-    xen_pfn_t mfn_list[2];
+    xen_pfn_t mfn_list[32];
     int rc;
 
     if ( copy_from_guest(&xmar, arg, 1) )
@@ -1027,6 +1066,11 @@ static int acquire_resource(
 
     switch ( xmar.type )
     {
+    case XENMEM_resource_grant_table:
+        rc = acquire_grant_table(d, xmar.id, xmar.frame, xmar.nr_frames,
+                                 mfn_list);
+        break;
+
     default:
         rc = arch_acquire_resource(d, xmar.type, xmar.id, xmar.frame,
                                    xmar.nr_frames, mfn_list, &xmar.flags);
@@ -1045,6 +1089,16 @@ static int acquire_resource(
     {
         xen_pfn_t gfn_list[ARRAY_SIZE(mfn_list)];
         unsigned int i;
+
+        /*
+         * FIXME: Until foreign pages inserted into the P2M are properly
+         *        reference counted, it is unsafe to allow mapping of
+         *        non-caller-owned resource pages unless the caller is
+         *        the hardware domain.
+         */
+        if ( !(xmar.flags & XENMEM_rsrc_acq_caller_owned) &&
+             !is_hardware_domain(currd) )
+            return -EACCES;
 
         if ( copy_from_guest(gfn_list, xmar.frame_list, xmar.nr_frames) )
             rc = -EFAULT;

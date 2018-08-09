@@ -351,10 +351,15 @@ static inline void active_entry_release(struct active_grant_entry *act)
 
 #define GRANT_STATUS_PER_PAGE (PAGE_SIZE / sizeof(grant_status_t))
 #define GRANT_PER_PAGE (PAGE_SIZE / sizeof(grant_entry_v2_t))
-/* Number of grant table status entries. Caller must hold d's gr. table lock.*/
+
 static inline unsigned int grant_to_status_frames(unsigned int grant_frames)
 {
     return DIV_ROUND_UP(grant_frames * GRANT_PER_PAGE, GRANT_STATUS_PER_PAGE);
+}
+
+static inline unsigned int status_to_grant_frames(unsigned int status_frames)
+{
+    return DIV_ROUND_UP(status_frames * GRANT_STATUS_PER_PAGE, GRANT_PER_PAGE);
 }
 
 /* Check if the page has been paged out, or needs unsharing.
@@ -3840,6 +3845,70 @@ int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
 }
 #endif
 
+/* caller must hold write lock */
+static int gnttab_get_status_frame_mfn(struct domain *d,
+                                       unsigned long idx, mfn_t *mfn)
+{
+    const struct grant_table *gt = d->grant_table;
+
+    ASSERT(gt->gt_version == 2);
+
+    if ( idx >= nr_status_frames(gt) )
+    {
+        unsigned long nr_status;
+        unsigned long nr_grant;
+
+        nr_status = idx + 1; /* sufficient frames to make idx valid */
+
+        if ( nr_status == 0 ) /* overflow? */
+            return -EINVAL;
+
+        nr_grant = status_to_grant_frames(nr_status);
+
+        if ( grant_to_status_frames(nr_grant) != nr_status ) /* overflow? */
+            return -EINVAL;
+
+        if ( nr_grant <= gt->max_grant_frames )
+            gnttab_grow_table(d, nr_grant);
+
+        /* check whether gnttab_grow_table() succeeded */
+        if ( idx >= nr_status_frames(gt) )
+            return -EINVAL;
+    }
+
+    *mfn = _mfn(virt_to_mfn(gt->status[idx]));
+    return 0;
+}
+
+/* caller must hold write lock */
+static int gnttab_get_shared_frame_mfn(struct domain *d,
+                                       unsigned long idx, mfn_t *mfn)
+{
+    const struct grant_table *gt = d->grant_table;
+
+    ASSERT(gt->gt_version != 0);
+
+    if ( idx >= nr_grant_frames(gt) )
+    {
+        unsigned long nr_grant;
+
+        nr_grant = idx + 1; /* sufficient frames to make idx valid */
+
+        if ( nr_grant == 0 ) /* overflow? */
+            return -EINVAL;
+
+        if ( nr_grant <= gt->max_grant_frames )
+            gnttab_grow_table(d, nr_grant);
+
+        /* check whether gnttab_grow_table() succeeded */
+        if ( idx >= nr_grant_frames(gt) )
+            return -EINVAL;
+    }
+
+    *mfn = _mfn(virt_to_mfn(gt->shared_raw[idx]));
+    return 0;
+}
+
 int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
                      mfn_t *mfn)
 {
@@ -3854,21 +3923,11 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
     {
         idx &= ~XENMAPIDX_grant_table_status;
         status = true;
-        if ( idx < nr_status_frames(gt) )
-            *mfn = _mfn(virt_to_mfn(gt->status[idx]));
-        else
-            rc = -EINVAL;
+
+        rc = gnttab_get_status_frame_mfn(d, idx, mfn);
     }
     else
-    {
-        if ( (idx >= nr_grant_frames(gt)) && (idx < gt->max_grant_frames) )
-            gnttab_grow_table(d, idx + 1);
-
-        if ( idx < nr_grant_frames(gt) )
-            *mfn = _mfn(virt_to_mfn(gt->shared_raw[idx]));
-        else
-            rc = -EINVAL;
-    }
+        rc = gnttab_get_shared_frame_mfn(d, idx, mfn);
 
     if ( !rc && paging_mode_translate(d) &&
          !gfn_eq(gnttab_get_frame_gfn(gt, status, idx), INVALID_GFN) )
@@ -3878,6 +3937,33 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
     if ( !rc )
         gnttab_set_frame_gfn(gt, status, idx, gfn);
 
+    grant_write_unlock(gt);
+
+    return rc;
+}
+
+int gnttab_get_shared_frame(struct domain *d, unsigned long idx,
+                            mfn_t *mfn)
+{
+    struct grant_table *gt = d->grant_table;
+    int rc;
+
+    grant_write_lock(gt);
+    rc = gnttab_get_shared_frame_mfn(d, idx, mfn);
+    grant_write_unlock(gt);
+
+    return rc;
+}
+
+int gnttab_get_status_frame(struct domain *d, unsigned long idx,
+                            mfn_t *mfn)
+{
+    struct grant_table *gt = d->grant_table;
+    int rc;
+
+    grant_write_lock(gt);
+    rc = (gt->gt_version == 2) ?
+        gnttab_get_status_frame_mfn(d, idx, mfn) : -EINVAL;
     grant_write_unlock(gt);
 
     return rc;

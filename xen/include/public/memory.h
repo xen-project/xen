@@ -611,14 +611,20 @@ struct xen_mem_acquire_resource {
     uint16_t type;
 
 #define XENMEM_resource_ioreq_server 0
+#define XENMEM_resource_grant_table 1
 
     /*
      * IN - a type-specific resource identifier, which must be zero
      *      unless stated otherwise.
      *
      * type == XENMEM_resource_ioreq_server -> id == ioreq server id
+     * type == XENMEM_resource_grant_table -> id defined below
      */
     uint32_t id;
+
+#define XENMEM_resource_grant_table_id_shared 0
+#define XENMEM_resource_grant_table_id_status 1
+
     /*
      * IN/OUT - As an IN parameter number of frames of the resource
      *          to be mapped. However, if the specified value is 0 and
