@@ -68,7 +68,7 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
                                 intpte_t val, unsigned int bytes,
                                 struct x86_emulate_ctxt *ctxt)
 {
-    unsigned long mfn;
+    mfn_t mfn;
     unsigned long unaligned_addr = addr;
     struct page_info *page;
     l1_pgentry_t pte, ol1e, nl1e, *pl1e;
@@ -94,7 +94,7 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
         intpte_t full;
         unsigned int rc;
 
-        offset = addr & (sizeof(full) - 1);
+        offset = (addr & (sizeof(full) - 1)) * 8;
 
         /* Align address; read full word. */
         addr &= ~(sizeof(full) - 1);
@@ -106,24 +106,24 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
             return X86EMUL_EXCEPTION;
         }
         /* Mask out bits provided by caller. */
-        full &= ~((((intpte_t)1 << (bytes * 8)) - 1) << (offset * 8));
+        full &= ~((((intpte_t)1 << (bytes * 8)) - 1) << offset);
         /* Shift the caller value and OR in the missing bits. */
         val  &= (((intpte_t)1 << (bytes * 8)) - 1);
-        val <<= (offset) * 8;
+        val <<= offset;
         val  |= full;
         /* Also fill in missing parts of the cmpxchg old value. */
         old  &= (((intpte_t)1 << (bytes * 8)) - 1);
-        old <<= (offset) * 8;
+        old <<= offset;
         old  |= full;
     }
 
     pte  = ptwr_ctxt->pte;
-    mfn  = l1e_get_pfn(pte);
-    page = mfn_to_page(_mfn(mfn));
+    mfn  = l1e_get_mfn(pte);
+    page = mfn_to_page(mfn);
 
     /* We are looking only for read-only mappings of p.t. pages. */
     ASSERT((l1e_get_flags(pte) & (_PAGE_RW|_PAGE_PRESENT)) == _PAGE_PRESENT);
-    ASSERT(mfn_valid(_mfn(mfn)));
+    ASSERT(mfn_valid(mfn));
     ASSERT((page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table);
     ASSERT((page->u.inuse.type_info & PGT_count_mask) != 0);
     ASSERT(page_get_owner(page) == d);
@@ -167,20 +167,18 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
     nl1e = adjust_guest_l1e(nl1e, d);
 
     /* Checked successfully: do the update (write or cmpxchg). */
-    pl1e = map_domain_page(_mfn(mfn));
-    pl1e = (l1_pgentry_t *)((unsigned long)pl1e + (addr & ~PAGE_MASK));
+    pl1e = map_domain_page(mfn) + (addr & ~PAGE_MASK);
     if ( p_old )
     {
-
         ol1e = l1e_from_intpte(old);
         if ( !paging_cmpxchg_guest_entry(v, &l1e_get_intpte(*pl1e),
-                                         &old, l1e_get_intpte(nl1e), _mfn(mfn)) )
+                                         &old, l1e_get_intpte(nl1e), mfn) )
             ret = X86EMUL_UNHANDLEABLE;
         else if ( l1e_get_intpte(ol1e) == old )
             ret = X86EMUL_OKAY;
         else
         {
-            *p_old = old >> (offset * 8);
+            *p_old = old >> offset;
             ret = X86EMUL_CMPXCHG_FAILED;
         }
 
@@ -194,7 +192,7 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
     else
     {
         ol1e = *pl1e;
-        if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn, v, 0) )
+        if ( !UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, mfn_x(mfn), v, 0) )
             BUG();
     }
 
