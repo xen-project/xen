@@ -645,6 +645,10 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
         if ( !ctl.u.CrashNotify )
             break;
 
+        spin_lock(&d->shutdown_lock);
+        d->shutdown_code = SHUTDOWN_crash;
+        spin_unlock(&d->shutdown_lock);
+
         gprintk(XENLOG_WARNING, "VIRIDIAN CRASH: %lx %lx %lx %lx %lx\n",
                 v->arch.hvm.viridian.crash_param[0],
                 v->arch.hvm.viridian.crash_param[1],
