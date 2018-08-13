@@ -262,7 +262,8 @@ let path_write store perm path value =
 		Node.check_perm store.root perm Perms.WRITE;
 		Node.set_value store.root value, false
 	) else
-		Path.apply_modify store.root path do_write, !node_created
+		let root = Path.apply_modify store.root path do_write in
+		root, !node_created
 
 let path_rm store perm path =
 	let do_rm node name =
