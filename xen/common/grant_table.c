@@ -88,7 +88,11 @@ integer_runtime_param("gnttab_max_frames", opt_max_grant_frames);
 unsigned int __read_mostly opt_max_maptrack_frames = 1024;
 integer_runtime_param("gnttab_max_maptrack_frames", opt_max_maptrack_frames);
 
-static unsigned int __read_mostly opt_gnttab_max_version = 2;
+#ifndef GNTTAB_MAX_VERSION
+#define GNTTAB_MAX_VERSION 2
+#endif
+
+static unsigned int __read_mostly opt_gnttab_max_version = GNTTAB_MAX_VERSION;
 static bool __read_mostly opt_transitive_grants = true;
 
 static int __init parse_gnttab(const char *s)
