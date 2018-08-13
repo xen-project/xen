@@ -7,6 +7,7 @@
 #include <xen/sched.h>
 
 #define INITIAL_NR_GRANT_FRAMES 1U
+#define GNTTAB_MAX_VERSION 1
 
 struct grant_table_arch {
     gfn_t *shared_gfn;
