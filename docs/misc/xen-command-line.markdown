@@ -1479,10 +1479,15 @@ extreme care.**
 
 An overall boolean value, `spec-ctrl=no`, can be specified to turn off all
 mitigations, including pieces of infrastructure used to virtualise certain
-mitigation features for guests.  Alternatively, a slightly more restricted
-`spec-ctrl=no-xen` can be used to turn off all of Xen's mitigations, while
-leaving the virtualisation support in place for guests to use.  Use of a
-positive boolean value for either of these options is invalid.
+mitigation features for guests.  This also includes settings which `xpti`,
+`smt`, `pv-l1tf` control, unless the respective option(s) have been
+specified earlier on the command line.
+
+Alternatively, a slightly more restricted `spec-ctrl=no-xen` can be used to
+turn off all of Xen's mitigations, while leaving the virtualisation support
+in place for guests to use.
+
+Use of a positive boolean value for either of these options is invalid.
 
 The booleans `pv=`, `hvm=`, `msr-sc=` and `rsb=` offer fine grained control
 over the alternative blocks used by Xen.  These impact Xen's ability to
