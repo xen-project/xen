@@ -307,7 +307,7 @@ int osdep_xenforeignmemory_map_resource(
     {
         int saved_errno;
 
-        if ( errno != ENOTTY )
+        if ( errno != ENOTTY && errno != EOPNOTSUPP )
             PERROR("ioctl failed");
         else
             errno = EOPNOTSUPP;
