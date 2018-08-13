@@ -117,6 +117,15 @@ static int __init parse_spec_ctrl(char *s)
 
             opt_eager_fpu = 0;
 
+            if ( opt_xpti < 0 )
+                opt_xpti = 0;
+
+            if ( opt_smt < 0 )
+                opt_smt = 1;
+
+            if ( opt_pv_l1tf < 0 )
+                opt_pv_l1tf = 0;
+
         disable_common:
             opt_rsb_pv = false;
             opt_rsb_hvm = false;
