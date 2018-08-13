@@ -1756,7 +1756,8 @@ p2m_flush_table_locked(struct p2m_domain *p2m)
     p2m->np2m_generation++;
 
     /* Make sure nobody else is using this p2m table */
-    nestedhvm_vmcx_flushtlb(p2m);
+    if ( nestedhvm_enabled(d) )
+        nestedhvm_vmcx_flushtlb(p2m);
 
     /* Zap the top level of the trie */
     mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));

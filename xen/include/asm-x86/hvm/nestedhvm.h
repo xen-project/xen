@@ -33,7 +33,11 @@ enum nestedhvm_vmexits {
 };
 
 /* Nested HVM on/off per domain */
-bool nestedhvm_enabled(const struct domain *d);
+static inline bool nestedhvm_enabled(const struct domain *d)
+{
+    return is_hvm_domain(d) && d->arch.hvm_domain.params &&
+        d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM];
+}
 
 /* Nested VCPU */
 int nestedhvm_vcpu_initialise(struct vcpu *v);
@@ -70,7 +74,15 @@ unsigned long *nestedhvm_vcpu_iomap_get(bool_t ioport_80, bool_t ioport_ed);
 
 void nestedhvm_vmcx_flushtlb(struct p2m_domain *p2m);
 
-bool_t nestedhvm_is_n2(struct vcpu *v);
+static inline bool nestedhvm_is_n2(struct vcpu *v)
+{
+    if ( !nestedhvm_enabled(v->domain) ||
+        nestedhvm_vmswitch_in_progress(v) ||
+        !nestedhvm_paging_mode_hap(v) )
+        return false;
+
+    return nestedhvm_vcpu_in_guestmode(v);
+}
 
 static inline void nestedhvm_set_cr(struct vcpu *v, unsigned int cr,
                                     unsigned long value)

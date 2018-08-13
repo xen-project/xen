@@ -26,13 +26,6 @@
 
 static unsigned long *shadow_io_bitmap[3];
 
-/* Nested HVM on/off per domain */
-bool nestedhvm_enabled(const struct domain *d)
-{
-    return is_hvm_domain(d) && d->arch.hvm_domain.params &&
-        d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM];
-}
-
 /* Nested VCPU */
 bool_t
 nestedhvm_vcpu_in_guestmode(struct vcpu *v)
@@ -118,20 +111,6 @@ nestedhvm_vmcx_flushtlb(struct p2m_domain *p2m)
     on_selected_cpus(p2m->dirty_cpumask, nestedhvm_flushtlb_ipi,
         p2m->domain, 1);
     cpumask_clear(p2m->dirty_cpumask);
-}
-
-bool_t
-nestedhvm_is_n2(struct vcpu *v)
-{
-    if (!nestedhvm_enabled(v->domain)
-      || nestedhvm_vmswitch_in_progress(v)
-      || !nestedhvm_paging_mode_hap(v))
-        return 0;
-
-    if (nestedhvm_vcpu_in_guestmode(v))
-        return 1;
-
-    return 0;
 }
 
 /* Common shadow IO Permission bitmap */
