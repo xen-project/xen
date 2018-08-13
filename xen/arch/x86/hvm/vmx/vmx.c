@@ -3038,11 +3038,14 @@ void vmx_vlapic_msr_changed(struct vcpu *v)
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
+    const struct cpuid_policy *cp = v->domain->arch.cpuid;
 
     HVM_DBG_LOG(DBG_LEVEL_MSR, "ecx=%#x, msr_value=%#"PRIx64, msr, msr_content);
 
     switch ( msr )
     {
+        uint64_t rsvd;
+
     case MSR_IA32_SYSENTER_CS:
         __vmwrite(GUEST_SYSENTER_CS, msr_content);
         break;
@@ -3095,17 +3098,25 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         wrmsrl(MSR_SYSCALL_MASK, msr_content);
         break;
 
-    case MSR_IA32_DEBUGCTLMSR: {
-        uint64_t supported = IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF;
+    case MSR_IA32_DEBUGCTLMSR:
+        rsvd = ~(IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF);
 
-        if ( boot_cpu_has(X86_FEATURE_RTM) )
-            supported |= IA32_DEBUGCTLMSR_RTM;
-        if ( msr_content & ~supported )
+        /* TODO: Wire vPMU settings properly through the CPUID policy */
+        if ( vpmu_is_set(vcpu_vpmu(v), VPMU_CPU_HAS_BTS) )
         {
-            /* Perhaps some other bits are supported in vpmu. */
-            if ( vpmu_do_wrmsr(msr, msr_content, supported) )
-                break;
+            rsvd &= ~(IA32_DEBUGCTLMSR_TR | IA32_DEBUGCTLMSR_BTS |
+                      IA32_DEBUGCTLMSR_BTINT);
+
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
+                rsvd &= ~(IA32_DEBUGCTLMSR_BTS_OFF_OS |
+                          IA32_DEBUGCTLMSR_BTS_OFF_USR);
         }
+
+        if ( cp->feat.rtm )
+            rsvd &= ~IA32_DEBUGCTLMSR_RTM;
+
+        if ( msr_content & rsvd )
+            goto gp_fault;
 
         /*
          * When a guest first enables LBR, arrange to save and restore the LBR
@@ -3165,7 +3176,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
         __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
         break;
-    }
+
     case MSR_IA32_FEATURE_CONTROL:
     case MSR_IA32_VMX_BASIC ... MSR_IA32_VMX_VMFUNC:
         /* None of these MSRs are writeable. */
