@@ -885,6 +885,8 @@ version are 1 and 2.
 use of grant table v2 without transitive grants is an ABI breakage from the
 guests point of view.
 
+The usage of gnttab v2 is not security supported on ARM platforms.
+
 ### gnttab\_max\_frames
 > `= <integer>`
 
