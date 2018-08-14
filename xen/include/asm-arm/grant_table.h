@@ -4,6 +4,7 @@
 #include <xen/grant_table.h>
 
 #define INITIAL_NR_GRANT_FRAMES 4
+#define GNTTAB_MAX_VERSION 1
 
 void gnttab_clear_flag(unsigned long nr, uint16_t *addr);
 int create_grant_host_mapping(unsigned long gpaddr,
