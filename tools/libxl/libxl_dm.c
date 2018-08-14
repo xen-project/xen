@@ -2591,7 +2591,7 @@ int libxl__need_xenpv_qemu(libxl__gc *gc, libxl_domain_config *d_config)
         goto out;
     }
 
-    if (d_config->num_vfbs > 0) {
+    if (d_config->num_vfbs > 0 || d_config->num_p9s > 0) {
         ret = 1;
         goto out;
     }
