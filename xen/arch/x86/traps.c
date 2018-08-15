@@ -882,6 +882,7 @@ void pv_cpuid(struct cpu_user_regs *regs)
                 if ( !boot_cpu_has(X86_FEATURE_SC_MSR_PV) )
                     d &= ~(cpufeat_mask(X86_FEATURE_IBRSB) |
                            cpufeat_mask(X86_FEATURE_SSBD));
+                d &= ~cpufeat_mask(X86_FEATURE_L1D_FLUSH);
 
                 /*
                  * Override STIBP to match IBRS.  Guests can safely use STIBP
