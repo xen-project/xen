@@ -17,7 +17,7 @@ fsimage = Extension("fsimage",
 pkgs = [ 'grub' ]
 
 setup(name='pygrub',
-      version='0.3',
+      version='0.6',
       description='Boot loader that looks a lot like grub for Xen',
       author='Jeremy Katz',
       author_email='katzj@redhat.com',
