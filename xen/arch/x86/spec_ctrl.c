@@ -216,7 +216,7 @@ static __init int parse_pv_l1tf(const char *s)
 
     /* Interpret 'pv-l1tf' alone in its positive boolean form. */
     if ( *s == '\0' )
-        opt_xpti = OPT_PV_L1TF_DOM0 | OPT_PV_L1TF_DOMU;
+        opt_pv_l1tf = OPT_PV_L1TF_DOM0 | OPT_PV_L1TF_DOMU;
 
     do {
         ss = strchr(s, ',');
