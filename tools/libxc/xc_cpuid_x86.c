@@ -369,7 +369,8 @@ static void xc_cpuid_hvm_policy(
                         bitmaskof(X86_FEATURE_SMAP) |
                         bitmaskof(X86_FEATURE_FSGSBASE));
             regs[3] &= (bitmaskof(X86_FEATURE_IBRSB) |
-                        bitmaskof(X86_FEATURE_STIBP));
+                        bitmaskof(X86_FEATURE_STIBP) |
+                        bitmaskof(X86_FEATURE_SSBD));
         } else
             regs[1] = regs[3] = 0;
         regs[0] = regs[2] = 0;
@@ -512,7 +513,8 @@ static void xc_cpuid_pv_policy(
                         bitmaskof(X86_FEATURE_ADX)  |
                         bitmaskof(X86_FEATURE_FSGSBASE));
             regs[3] &= (bitmaskof(X86_FEATURE_IBRSB) |
-                        bitmaskof(X86_FEATURE_STIBP));
+                        bitmaskof(X86_FEATURE_STIBP) |
+                        bitmaskof(X86_FEATURE_SSBD));
         }
         else
             regs[1] = regs[3] = 0;
