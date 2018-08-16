@@ -371,8 +371,6 @@ static bool_t __init pci_mmcfg_reject_broken(void)
         (pci_mmcfg_config[0].address == 0))
         return 0;
 
-    cfg = &pci_mmcfg_config[0];
-
     for (i = 0; i < pci_mmcfg_config_num; i++) {
         u64 addr, size;
 
