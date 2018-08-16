@@ -125,7 +125,7 @@ int libxl__arch_domain_save_config(libxl__gc *gc,
         return ERROR_FAIL;
     }
 
-    state->clock_frequency = xc_config->clock_frequency;
+    state->clock_frequency = config->arch.clock_frequency;
 
     return 0;
 }
