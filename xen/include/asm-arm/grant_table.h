@@ -21,7 +21,6 @@ int create_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
 int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                                unsigned long new_gpaddr, unsigned int flags);
 void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
-#define gnttab_create_status_page(d, t, i) do {} while (0)
 #define gnttab_release_host_mappings(domain) 1
 
 /*
@@ -78,6 +77,12 @@ static inline unsigned int gnttab_dom0_max(void)
     do {                                                                 \
         share_xen_page_with_guest(                                       \
             virt_to_page((char *)(t)->shared_raw[i]), d, SHARE_rw);      \
+    } while ( 0 )
+
+#define gnttab_create_status_page(d, t, i)                               \
+    do {                                                                 \
+        share_xen_page_with_guest(                                       \
+            virt_to_page((char *)(t)->status[i]), d, SHARE_rw);          \
     } while ( 0 )
 
 #define gnttab_shared_gmfn(d, t, i)                                      \
