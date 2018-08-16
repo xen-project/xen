@@ -48,9 +48,9 @@ extern const unsigned char dsdt_anycpu_arm[];
 _hidden
 extern const int dsdt_anycpu_arm_len;
 
-#define ACPI_OEM_ID "Xen"
-#define ACPI_OEM_TABLE_ID "ARM"
-#define ACPI_ASL_COMPILER_ID "XL"
+#define ACPI_OEM_ID "Xen\0\0"
+#define ACPI_OEM_TABLE_ID "ARM\0\0\0\0"
+#define ACPI_ASL_COMPILER_ID "XL\0"
 
 enum {
     RSDP,
@@ -190,6 +190,7 @@ static void make_acpi_rsdp(libxl__gc *gc, struct xc_dom_image *dom,
     struct acpi_table_rsdp *rsdp = (void *)dom->acpi_modules[0].data + offset;
 
     memcpy(rsdp->signature, "RSD PTR ", sizeof(rsdp->signature));
+    BUILD_BUG_ON(sizeof(ACPI_OEM_ID) != sizeof(rsdp->oem_id));
     memcpy(rsdp->oem_id, ACPI_OEM_ID, sizeof(rsdp->oem_id));
     rsdp->length = acpitables[RSDP].size;
     rsdp->revision = 0x02;
@@ -205,9 +206,12 @@ static void make_acpi_header(struct acpi_table_header *h, const char *sig,
     memcpy(h->signature, sig, 4);
     h->length = len;
     h->revision = rev;
+    BUILD_BUG_ON(sizeof(ACPI_OEM_ID) != sizeof(h->oem_id));
     memcpy(h->oem_id, ACPI_OEM_ID, sizeof(h->oem_id));
+    BUILD_BUG_ON(sizeof(ACPI_OEM_TABLE_ID) != sizeof(h->oem_table_id));
     memcpy(h->oem_table_id, ACPI_OEM_TABLE_ID, sizeof(h->oem_table_id));
     h->oem_revision = 0;
+    BUILD_BUG_ON(sizeof(ACPI_ASL_COMPILER_ID) != sizeof(h->asl_compiler_id));
     memcpy(h->asl_compiler_id, ACPI_ASL_COMPILER_ID,
            sizeof(h->asl_compiler_id));
     h->asl_compiler_revision = 0;
