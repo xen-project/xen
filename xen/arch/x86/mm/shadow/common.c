@@ -113,6 +113,7 @@ __initcall(shadow_audit_key_init);
 #endif /* SHADOW_AUDIT */
 
 
+#ifdef CONFIG_HVM
 /**************************************************************************/
 /* x86 emulator support for the shadow code
  */
@@ -380,11 +381,13 @@ static const struct x86_emulate_ops hvm_shadow_emulator_ops = {
     .cmpxchg    = hvm_emulate_cmpxchg,
     .cpuid      = hvmemul_cpuid,
 };
+#endif
 
 const struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
     unsigned int pte_size)
 {
+#ifdef CONFIG_HVM
     struct segment_register *creg, *sreg;
     struct vcpu *v = current;
     unsigned long addr;
@@ -423,6 +426,10 @@ const struct x86_emulate_ops *shadow_init_emulation(
         ? sizeof(sh_ctxt->insn_buf) : 0;
 
     return &hvm_shadow_emulator_ops;
+#else
+    BUG();
+    return NULL;
+#endif
 }
 
 /* Update an initialized emulation context to prepare for the next
@@ -430,6 +437,7 @@ const struct x86_emulate_ops *shadow_init_emulation(
 void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
                                struct cpu_user_regs *regs)
 {
+#ifdef CONFIG_HVM
     struct vcpu *v = current;
     unsigned long addr, diff;
 
@@ -452,6 +460,9 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
             ? sizeof(sh_ctxt->insn_buf) : 0;
         sh_ctxt->insn_buf_eip = regs->rip;
     }
+#else
+    BUG();
+#endif
 }
 
 
@@ -1686,6 +1697,7 @@ static unsigned int shadow_get_allocation(struct domain *d)
             + ((pg & ((1 << (20 - PAGE_SHIFT)) - 1)) ? 1 : 0));
 }
 
+#ifdef CONFIG_HVM
 /**************************************************************************/
 /* Handling guest writes to pagetables. */
 
@@ -1958,6 +1970,7 @@ static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
 
     atomic_inc(&v->domain->arch.paging.shadow.gtable_dirty_version);
 }
+#endif
 
 /**************************************************************************/
 /* Hash table for storing the guest->shadow mappings.
@@ -2724,12 +2737,13 @@ static int sh_remove_all_mappings(struct domain *d, mfn_t gmfn, gfn_t gfn)
                && (page->count_info & PGC_count_mask) <= 3
                && ((page->u.inuse.type_info & PGT_count_mask)
                    == (is_xen_heap_page(page) ||
-                       is_ioreq_server_page(d, page)))) )
+                       (is_hvm_domain(d) && is_ioreq_server_page(d, page))))) )
         {
             SHADOW_ERROR("can't find all mappings of mfn %lx (gfn %lx): "
                           "c=%lx t=%lx x=%d i=%d\n", mfn_x(gmfn), gfn_x(gfn),
                           page->count_info, page->u.inuse.type_info,
-                          !!is_xen_heap_page(page), is_ioreq_server_page(d, page));
+                          !!is_xen_heap_page(page),
+                          is_hvm_domain(d) && is_ioreq_server_page(d, page));
         }
     }
 

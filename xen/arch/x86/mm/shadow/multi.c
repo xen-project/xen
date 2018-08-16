@@ -2924,20 +2924,22 @@ static int sh_page_fault(struct vcpu *v,
                 trace_shadow_gen(TRC_SHADOW_FAST_PROPAGATE, va);
                 return 0;
             }
-            else
-            {
-                /* Magic MMIO marker: extract gfn for MMIO address */
-                ASSERT(sh_l1e_is_mmio(sl1e));
-                gpa = (((paddr_t)(gfn_x(sh_l1e_mmio_get_gfn(sl1e))))
-                       << PAGE_SHIFT)
-                    | (va & ~PAGE_MASK);
-            }
+#ifdef CONFIG_HVM
+            /* Magic MMIO marker: extract gfn for MMIO address */
+            ASSERT(sh_l1e_is_mmio(sl1e));
+            ASSERT(is_hvm_vcpu(v));
+            gpa = (((paddr_t)(gfn_x(sh_l1e_mmio_get_gfn(sl1e))))
+                   << PAGE_SHIFT) | (va & ~PAGE_MASK);
             perfc_incr(shadow_fault_fast_mmio);
             SHADOW_PRINTK("fast path mmio %#"PRIpaddr"\n", gpa);
             sh_reset_early_unshadow(v);
             trace_shadow_gen(TRC_SHADOW_FAST_MMIO, va);
-            return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
-                    ? EXCRET_fault_fixed : 0);
+            return handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
+                   ? EXCRET_fault_fixed : 0;
+#else
+            /* When HVM is not enabled, there shouldn't be MMIO marker */
+            BUG();
+#endif
         }
         else
         {
@@ -3381,8 +3383,10 @@ static int sh_page_fault(struct vcpu *v,
 
     r = x86_emulate(&emul_ctxt.ctxt, emul_ops);
 
+#ifdef CONFIG_HVM
     if ( r == X86EMUL_EXCEPTION )
     {
+        ASSERT(is_hvm_domain(d));
         /*
          * This emulation covers writes to shadow pagetables.  We tolerate #PF
          * (from accesses spanning pages, concurrent paging updated from
@@ -3404,6 +3408,7 @@ static int sh_page_fault(struct vcpu *v,
             r = X86EMUL_UNHANDLEABLE;
         }
     }
+#endif
 
     /*
      * NB. We do not unshadow on X86EMUL_EXCEPTION. It's not clear that it
@@ -3513,6 +3518,8 @@ static int sh_page_fault(struct vcpu *v,
  mmio:
     if ( !guest_mode(regs) )
         goto not_a_shadow_fault;
+#ifdef CONFIG_HVM
+    ASSERT(is_hvm_vcpu(v));
     perfc_incr(shadow_fault_mmio);
     sh_audit_gw(v, &gw);
     SHADOW_PRINTK("mmio %#"PRIpaddr"\n", gpa);
@@ -3523,6 +3530,9 @@ static int sh_page_fault(struct vcpu *v,
     trace_shadow_gen(TRC_SHADOW_MMIO, va);
     return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
             ? EXCRET_fault_fixed : 0);
+#else
+    BUG();
+#endif
 
  not_a_shadow_fault:
     sh_audit_gw(v, &gw);
