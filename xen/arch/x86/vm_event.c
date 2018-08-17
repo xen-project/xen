@@ -124,6 +124,7 @@ void vm_event_monitor_next_interrupt(struct vcpu *v)
 
 void vm_event_fill_regs(vm_event_request_t *req)
 {
+#ifdef CONFIG_HVM
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct segment_register seg;
     struct hvm_hw_cpu ctxt;
@@ -177,6 +178,7 @@ void vm_event_fill_regs(vm_event_request_t *req)
 
     hvm_get_segment_register(curr, x86_seg_cs, &seg);
     req->data.regs.x86.cs_arbytes = seg.attr;
+#endif
 }
 
 void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp)
