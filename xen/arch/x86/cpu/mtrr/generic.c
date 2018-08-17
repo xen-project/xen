@@ -51,6 +51,38 @@ get_fixed_ranges(mtrr_type * frs)
 	}
 }
 
+bool is_var_mtrr_overlapped(const struct mtrr_state *m)
+{
+    unsigned int seg, i;
+    unsigned int num_var_ranges = MASK_EXTR(m->mtrr_cap, MTRRcap_VCNT);
+
+    for ( i = 0; i < num_var_ranges; i++ )
+    {
+        uint64_t base1 = m->var_ranges[i].base >> PAGE_SHIFT;
+        uint64_t mask1 = m->var_ranges[i].mask >> PAGE_SHIFT;
+
+        if ( !(m->var_ranges[i].mask & MTRR_PHYSMASK_VALID) )
+            continue;
+
+        for ( seg = i + 1; seg < num_var_ranges; seg++ )
+        {
+            uint64_t base2 = m->var_ranges[seg].base >> PAGE_SHIFT;
+            uint64_t mask2 = m->var_ranges[seg].mask >> PAGE_SHIFT;
+
+            if ( !(m->var_ranges[seg].mask & MTRR_PHYSMASK_VALID) )
+                continue;
+
+            if ( (base1 & mask1 & mask2) == (base2 & mask2 & mask1) )
+            {
+                /* MTRRs overlap. */
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void mtrr_save_fixed_ranges(void *info)
 {
 	get_fixed_ranges(mtrr_state.fixed_ranges);
