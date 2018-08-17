@@ -5800,7 +5800,7 @@ void paging_invlpg(struct vcpu *v, unsigned long va)
     if ( is_pv_vcpu(v) )
         flush_tlb_one_local(va);
     else
-        hvm_funcs.invlpg(v, va);
+        hvm_invlpg(v, va);
 }
 
 /* Build a 32bit PSE page table using 4MB pages. */

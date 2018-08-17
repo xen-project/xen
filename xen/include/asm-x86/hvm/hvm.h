@@ -454,6 +454,11 @@ static inline int hvm_event_pending(struct vcpu *v)
     return hvm_funcs.event_pending(v);
 }
 
+static inline void hvm_invlpg(struct vcpu *v, unsigned long va)
+{
+    hvm_funcs.invlpg(v, va);
+}
+
 /* These bits in CR4 are owned by the host. */
 #define HVM_CR4_HOST_MASK (mmu_cr4_features & \
     (X86_CR4_VMXE | X86_CR4_PAE | X86_CR4_MCE))
