@@ -40,6 +40,7 @@ int xc_domain_create(xc_interface *xch, uint32_t *pdomid,
         return err;
 
     *pdomid = (uint16_t)domctl.domain;
+    *config = domctl.u.createdomain;
 
     return 0;
 }
