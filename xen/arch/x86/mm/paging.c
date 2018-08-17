@@ -919,6 +919,7 @@ const struct paging_mode *paging_get_mode(struct vcpu *v)
     return paging_get_nestedmode(v);
 }
 
+#ifdef CONFIG_HVM
 void paging_update_nestedmode(struct vcpu *v)
 {
     ASSERT(nestedhvm_enabled(v->domain));
@@ -930,6 +931,7 @@ void paging_update_nestedmode(struct vcpu *v)
         v->arch.paging.nestedmode = NULL;
     hvm_asid_flush_vcpu(v);
 }
+#endif
 
 void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
                             l1_pgentry_t *p, l1_pgentry_t new,
