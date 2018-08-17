@@ -126,7 +126,7 @@ static int pci_segments_iterate(
     return rc;
 }
 
-void __init pt_pci_init(void)
+void __init pci_segments_init(void)
 {
     radix_tree_init(&pci_segments);
     if ( !alloc_pseg(0) )

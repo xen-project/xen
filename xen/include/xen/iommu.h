@@ -92,8 +92,6 @@ struct domain_iommu {
 #define iommu_clear_feature(d, f) clear_bit(f, dom_iommu(d)->features)
 
 #ifdef CONFIG_HAS_PCI
-void pt_pci_init(void);
-
 struct pirq;
 int hvm_do_IRQ_dpci(struct domain *, struct pirq *);
 int pt_irq_create_bind(struct domain *, const struct xen_domctl_bind_pt_irq *);

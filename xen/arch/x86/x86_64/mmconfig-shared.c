@@ -400,6 +400,8 @@ void __init acpi_mmcfg_init(void)
 {
     bool_t valid = 1;
 
+    pci_segments_init();
+
     /* MMCONFIG disabled */
     if ((pci_probe & PCI_PROBE_MMCONF) == 0)
         return;

@@ -143,6 +143,7 @@ struct pci_dev *pci_lock_domain_pdev(
 void setup_hwdom_pci_devices(struct domain *,
                             int (*)(u8 devfn, struct pci_dev *));
 int pci_release_devices(struct domain *d);
+void pci_segments_init(void);
 int pci_add_segment(u16 seg);
 const unsigned long *pci_get_ro_map(u16 seg);
 int pci_add_device(u16 seg, u8 bus, u8 devfn,

@@ -1609,8 +1609,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     local_irq_enable();
 
-    pt_pci_init();
-
     vesa_mtrr_init();
 
     acpi_mmcfg_init();
