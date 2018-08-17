@@ -471,6 +471,7 @@ void _lock_profile_deregister_struct(
     spin_unlock(&lock_profile_lock);
 }
 
+#ifdef CONFIG_LOCK_PROFILE
 static int __init lock_prof_init(void)
 {
     struct lock_profile **q;
@@ -489,5 +490,6 @@ static int __init lock_prof_init(void)
     return 0;
 }
 __initcall(lock_prof_init);
+#endif
 
 #endif /* LOCK_PROFILE */
