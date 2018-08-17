@@ -550,7 +550,9 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
         xfree(mc_old);
 
   out:
+#if CONFIG_HVM
     svm_host_osvw_init();
+#endif
 
     /*
      * In some cases we may return an error even if processor's microcode has
@@ -609,6 +611,7 @@ err1:
 
 static int start_update(void)
 {
+#if CONFIG_HVM
     /*
      * We assume here that svm_host_osvw_init() will be called on each cpu (from
      * cpu_request_microcode()).
@@ -619,6 +622,7 @@ static int start_update(void)
      * supporting OSVW so we will not deal with this possibility.
      */
     svm_host_osvw_reset();
+#endif
 
     return 0;
 }
