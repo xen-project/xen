@@ -94,6 +94,7 @@ config BIGMEM
 config HVM_FEP
 	bool "HVM Forced Emulation Prefix support" if EXPERT = "y"
 	default DEBUG
+	depends on HVM
 	---help---
 
 	  Compiles in a feature that allows HVM guest to arbitrarily
