@@ -138,6 +138,7 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
     return violation;
 }
 
+#ifdef CONFIG_HVM
 bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
                           struct npfec npfec,
                           vm_event_request_t **req_ptr)
@@ -244,6 +245,7 @@ bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     /* Return whether vCPU pause is required (aka. sync event) */
     return (p2ma != p2m_access_n2rwx);
 }
+#endif
 
 int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
                               struct p2m_domain *ap2m, p2m_access_t a,
