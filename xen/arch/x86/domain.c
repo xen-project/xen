@@ -931,9 +931,13 @@ int arch_set_info_guest(
     if ( !compat )
     {
         v->arch.pv_vcpu.syscall_callback_eip = c.nat->syscall_callback_eip;
-        v->arch.pv_vcpu.fs_base = c.nat->fs_base;
+        /* non-nul selector kills fs_base */
+        v->arch.pv_vcpu.fs_base =
+            !(v->arch.user_regs.fs & ~3) ? c.nat->fs_base : 0;
         v->arch.pv_vcpu.gs_base_kernel = c.nat->gs_base_kernel;
-        v->arch.pv_vcpu.gs_base_user = c.nat->gs_base_user;
+        /* non-nul selector kills gs_base_user */
+        v->arch.pv_vcpu.gs_base_user =
+            !(v->arch.user_regs.gs & ~3) ? c.nat->gs_base_user : 0;
     }
     else
     {
