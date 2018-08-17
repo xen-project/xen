@@ -1100,6 +1100,13 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
         return rc;
     }
 
+    /*
+     * NB: MMCFG initialization needs to be performed before iommu
+     * initialization so the iommu code can fetch the MMCFG regions used by the
+     * domain.
+     */
+    pvh_setup_mmcfg(d);
+
     iommu_hwdom_init(d);
 
     rc = pvh_load_kernel(d, image, image_headroom, initrd, bootstrap_map(image),
@@ -1123,8 +1130,6 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
         printk("Failed to setup Dom0 ACPI tables: %d\n", rc);
         return rc;
     }
-
-    pvh_setup_mmcfg(d);
 
     printk("WARNING: PVH is an experimental mode with limited functionality\n");
     return 0;
