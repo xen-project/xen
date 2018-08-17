@@ -11,6 +11,7 @@
 #include <asm/asm_defns.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
+#include <asm/processor.h>
 #include <public/xen.h>
 #include <irq_vectors.h>
 

@@ -7,9 +7,8 @@
 #include <asm/asm-offsets.h>
 #endif
 #include <asm/bug.h>
-#include <asm/page.h>
-#include <asm/processor.h>
 #include <asm/percpu.h>
+#include <asm/x86-defns.h>
 #include <xen/stringify.h>
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>

@@ -13,6 +13,7 @@
 
 #include <asm/asm_defns.h>
 #include <asm/cpufeature.h>
+#include <asm/processor.h>
 
 #define rdmsr(msr,val1,val2) \
      __asm__ __volatile__("rdmsr" \

@@ -59,6 +59,7 @@ int init_domain_cpuid_policy(struct domain *d);
 /* Clamp the CPUID policy to reality. */
 void recalculate_cpuid_policy(struct domain *d);
 
+struct vcpu;
 void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                  uint32_t subleaf, struct cpuid_leaf *res);
 
