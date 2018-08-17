@@ -1107,7 +1107,7 @@ static void load_shadow_guest_state(struct vcpu *v)
     /* TODO: CR3 target control */
 }
 
-uint64_t get_shadow_eptp(struct vcpu *v)
+static uint64_t get_shadow_eptp(struct vcpu *v)
 {
     struct p2m_domain *p2m = p2m_get_nestedp2m(v);
     struct ept_data *ept = &p2m->ept;

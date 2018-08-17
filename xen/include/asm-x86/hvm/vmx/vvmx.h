@@ -188,8 +188,6 @@ enum vmx_insn_errno set_vvmcs_real_safe(const struct vcpu *, u32 encoding,
    set_vvmcs_real_safe(vcpu, encoding, val) : \
    set_vvmcs_virtual_safe(vcpu_nestedhvm(vcpu).nv_vvmcx, encoding, val))
 
-uint64_t get_shadow_eptp(struct vcpu *v);
-
 void nvmx_destroy_vmcs(struct vcpu *v);
 int nvmx_handle_vmptrld(struct cpu_user_regs *regs);
 int nvmx_handle_vmptrst(struct cpu_user_regs *regs);
