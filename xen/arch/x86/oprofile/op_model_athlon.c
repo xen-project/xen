@@ -319,8 +319,10 @@ static int athlon_check_ctrs(unsigned int const cpu,
 	unsigned long eip = regs->rip;
 	int mode = 0;
 	struct vcpu *v = current;
-	struct cpu_user_regs *guest_regs = guest_cpu_user_regs();
 	unsigned int const nr_ctrs = model->num_counters;
+
+#if CONFIG_HVM
+	struct cpu_user_regs *guest_regs = guest_cpu_user_regs();
 
 	if (!guest_mode(regs) &&
 	    (eip == (unsigned long)svm_stgi_label)) {
@@ -329,6 +331,7 @@ static int athlon_check_ctrs(unsigned int const cpu,
 		eip = guest_regs->rip;
 		mode = xenoprofile_get_mode(v, guest_regs);
 	} else
+#endif
 		mode = xenoprofile_get_mode(v, regs);
 
 	for (i = 0 ; i < nr_ctrs; ++i) {
