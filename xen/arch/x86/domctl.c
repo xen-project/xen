@@ -715,6 +715,10 @@ long arch_do_domctl(
         struct xen_domctl_bind_pt_irq *bind = &domctl->u.bind_pt_irq;
         int irq = domain_pirq_to_irq(d, bind->machine_irq);
 
+        ret = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            break;
+
         ret = -EPERM;
         if ( irq <= 0 || !irq_access_permitted(currd, irq) )
             break;
