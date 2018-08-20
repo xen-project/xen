@@ -123,8 +123,8 @@ clean:
 .PHONY: distclean
 distclean: clean
 
-.PHONY: install
-install:
+.PHONY: install uninstall
+install uninstall:
 
 x86_emulate:
 	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/arch/x86/$@
