@@ -66,7 +66,7 @@ static int call_test(struct test *tst, int iters, bool no_clock)
     char *stage = "?";
     struct timespec tp1, tp2;
     uint64_t nsec, nsec_min, nsec_max, nsec_sum;
-    int i, ret;
+    int i, ret = 0;
 
     nsec_min = -1;
     nsec_max = 0;
