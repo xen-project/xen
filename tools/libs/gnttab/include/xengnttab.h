@@ -18,6 +18,7 @@
  * A library for low-level access to the Xen control interfaces.
  *
  * Copyright (c) 2007-2008, D G Murray <Derek.Murray@cl.cam.ac.uk>
+ * Copyright (c) 2018, Oleksandr Andrushchenko, EPAM Systems Inc.
  */
 #ifndef XENGNTTAB_H
 #define XENGNTTAB_H
@@ -294,6 +295,66 @@ typedef struct xengnttab_grant_copy_segment xengnttab_grant_copy_segment_t;
 int xengnttab_grant_copy(xengnttab_handle *xgt,
                          uint32_t count,
                          xengnttab_grant_copy_segment_t *segs);
+
+/*
+ * Flags to be used while requesting memory mapping's backing storage
+ * to be allocated with DMA API.
+ */
+
+/*
+ * The buffer is backed with memory allocated with dma_alloc_wc.
+ */
+#define GNTDEV_DMA_FLAG_WC		(1 << 0)
+
+/*
+ * The buffer is backed with memory allocated with dma_alloc_coherent.
+ */
+#define GNTDEV_DMA_FLAG_COHERENT	(1 << 1)
+
+/**
+ * Create a dma-buf [1] from grant references @refs of count @count provided
+ * by the foreign domain @domid with flags @flags.
+ *
+ * By default dma-buf is backed by system memory pages, but by providing
+ * one of the GNTDEV_DMA_FLAG_XXX flags it can also be created as
+ * a DMA write-combine or coherent buffer.
+ *
+ * Returns 0 if dma-buf was successfully created and the corresponding
+ * dma-buf's file descriptor is returned in @fd.
+ *
+ * [1] https://elixir.bootlin.com/linux/latest/source/Documentation/driver-api/dma-buf.rst
+ */
+int xengnttab_dmabuf_exp_from_refs(xengnttab_handle *xgt, uint32_t domid,
+                                   uint32_t flags, uint32_t count,
+                                   const uint32_t *refs, uint32_t *fd);
+
+/*
+ * This will block until the dma-buf with the file descriptor @fd is
+ * released. This is only valid for buffers created with
+ * IOCTL_GNTDEV_DMABUF_EXP_FROM_REFS.
+ *
+ * If withing @wait_to_ms milliseconds the buffer is not released
+ * then -ETIMEDOUT error is returned.
+ * If the buffer with file descriptor @fd does not exist or has already
+ * been released, then -ENOENT is returned. For valid file descriptors
+ * this must not be treated as error.
+ */
+int xengnttab_dmabuf_exp_wait_released(xengnttab_handle *xgt, uint32_t fd,
+                                       uint32_t wait_to_ms);
+
+/*
+ * Import a dma-buf with file descriptor @fd and export granted references
+ * to the pages of that dma-buf into array @refs of size @count.
+ */
+int xengnttab_dmabuf_imp_to_refs(xengnttab_handle *xgt, uint32_t domid,
+                                 uint32_t fd, uint32_t count, uint32_t *refs);
+
+/*
+ * This will close all references to an imported buffer, so it can be
+ * released by the owner. This is only valid for buffers created with
+ * IOCTL_GNTDEV_DMABUF_IMP_TO_REFS.
+ */
+int xengnttab_dmabuf_imp_release(xengnttab_handle *xgt, uint32_t fd);
 
 /*
  * Grant Sharing Interface (allocating and granting pages to others)

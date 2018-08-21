@@ -35,6 +35,19 @@ int osdep_gnttab_grant_copy(xengnttab_handle *xgt,
                             uint32_t count,
                             xengnttab_grant_copy_segment_t *segs);
 
+int osdep_gnttab_dmabuf_exp_from_refs(xengnttab_handle *xgt, uint32_t domid,
+                                      uint32_t flags, uint32_t count,
+                                      const uint32_t *refs, uint32_t *fd);
+
+int osdep_gnttab_dmabuf_exp_wait_released(xengnttab_handle *xgt,
+                                          uint32_t fd, uint32_t wait_to_ms);
+
+int osdep_gnttab_dmabuf_imp_to_refs(xengnttab_handle *xgt, uint32_t domid,
+                                    uint32_t fd, uint32_t count,
+                                    uint32_t *refs);
+
+int osdep_gnttab_dmabuf_imp_release(xengnttab_handle *xgt, uint32_t fd);
+
 int osdep_gntshr_open(xengntshr_handle *xgs);
 int osdep_gntshr_close(xengntshr_handle *xgs);
 

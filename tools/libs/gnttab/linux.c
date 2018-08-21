@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2007-2008, D G Murray <Derek.Murray@cl.cam.ac.uk>
+ * Copyright (c) 2018, Oleksandr Andrushchenko, EPAM Systems Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -305,6 +306,122 @@ int osdep_gnttab_grant_copy(xengnttab_handle *xgt,
     rc = ioctl(fd, IOCTL_GNTDEV_GRANT_COPY, &copy);
     if (rc)
         GTERROR(xgt->logger, "ioctl GRANT COPY failed %d ", errno);
+
+    return rc;
+}
+
+int osdep_gnttab_dmabuf_exp_from_refs(xengnttab_handle *xgt, uint32_t domid,
+                                      uint32_t flags, uint32_t count,
+                                      const uint32_t *refs,
+                                      uint32_t *dmabuf_fd)
+{
+    struct ioctl_gntdev_dmabuf_exp_from_refs *from_refs = NULL;
+    int rc = -1;
+
+    if ( !count )
+    {
+        errno = EINVAL;
+        goto out;
+    }
+
+    from_refs = malloc(sizeof(*from_refs) +
+                       (count - 1) * sizeof(from_refs->refs[0]));
+    if ( !from_refs )
+    {
+        errno = ENOMEM;
+        goto out;
+    }
+
+    from_refs->flags = flags;
+    from_refs->count = count;
+    from_refs->domid = domid;
+
+    memcpy(from_refs->refs, refs, count * sizeof(from_refs->refs[0]));
+
+    if ( (rc = ioctl(xgt->fd, IOCTL_GNTDEV_DMABUF_EXP_FROM_REFS, from_refs)) )
+    {
+        GTERROR(xgt->logger, "ioctl DMABUF_EXP_FROM_REFS failed");
+        goto out;
+    }
+
+    *dmabuf_fd = from_refs->fd;
+    rc = 0;
+
+out:
+    free(from_refs);
+    return rc;
+}
+
+int osdep_gnttab_dmabuf_exp_wait_released(xengnttab_handle *xgt,
+                                          uint32_t fd, uint32_t wait_to_ms)
+{
+    struct ioctl_gntdev_dmabuf_exp_wait_released wait;
+    int rc;
+
+    wait.fd = fd;
+    wait.wait_to_ms = wait_to_ms;
+
+    if ( (rc = ioctl(xgt->fd, IOCTL_GNTDEV_DMABUF_EXP_WAIT_RELEASED, &wait)) )
+    {
+        if ( errno == ENOENT )
+        {
+            /* The buffer may have already been released. */
+            errno = 0;
+            rc = 0;
+        } else
+            GTERROR(xgt->logger, "ioctl DMABUF_EXP_WAIT_RELEASED failed");
+    }
+
+    return rc;
+}
+
+int osdep_gnttab_dmabuf_imp_to_refs(xengnttab_handle *xgt, uint32_t domid,
+                                    uint32_t fd, uint32_t count, uint32_t *refs)
+{
+    struct ioctl_gntdev_dmabuf_imp_to_refs *to_refs = NULL;
+    int rc = -1;
+
+    if ( !count )
+    {
+        errno = EINVAL;
+        goto out;
+    }
+
+    to_refs = malloc(sizeof(*to_refs) +
+                     (count - 1) * sizeof(to_refs->refs[0]));
+    if ( !to_refs )
+    {
+        errno = ENOMEM;
+        goto out;
+    }
+
+    to_refs->fd = fd;
+    to_refs->count = count;
+    to_refs->domid = domid;
+
+    if ( (rc = ioctl(xgt->fd, IOCTL_GNTDEV_DMABUF_IMP_TO_REFS, to_refs)) )
+    {
+        GTERROR(xgt->logger, "ioctl DMABUF_IMP_TO_REFS failed");
+        goto out;
+    }
+
+    memcpy(refs, to_refs->refs, count * sizeof(*refs));
+    rc = 0;
+
+out:
+    free(to_refs);
+    return rc;
+}
+
+int osdep_gnttab_dmabuf_imp_release(xengnttab_handle *xgt, uint32_t fd)
+{
+    struct ioctl_gntdev_dmabuf_imp_release release;
+    int rc;
+
+    release.fd = fd;
+
+    if ( (rc = ioctl(xgt->fd, IOCTL_GNTDEV_DMABUF_IMP_RELEASE, &release)) )
+        GTERROR(xgt->logger, "ioctl DMABUF_IMP_RELEASE failed");
 
     return rc;
 }

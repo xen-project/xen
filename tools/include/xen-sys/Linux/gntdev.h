@@ -4,6 +4,7 @@
  * Interface to /dev/xen/gntdev.
  * 
  * Copyright (c) 2007, D G Murray
+ * Copyright (c) 2018, Oleksandr Andrushchenko, EPAM Systems Inc.
  * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
@@ -166,6 +167,111 @@ _IOC(_IOC_NONE, 'G', 8, sizeof(struct ioctl_gntdev_grant_copy))
 struct ioctl_gntdev_grant_copy {
     unsigned int count;
     struct ioctl_gntdev_grant_copy_segment *segments;
+};
+
+/*
+ * Flags to be used while requesting memory mapping's backing storage
+ * to be allocated with DMA API.
+ */
+
+/*
+ * The buffer is backed with memory allocated with dma_alloc_wc.
+ */
+#define GNTDEV_DMA_FLAG_WC		(1 << 0)
+
+/*
+ * The buffer is backed with memory allocated with dma_alloc_coherent.
+ */
+#define GNTDEV_DMA_FLAG_COHERENT	(1 << 1)
+
+/*
+ * Create a dma-buf [1] from grant references @refs of count @count provided
+ * by the foreign domain @domid with flags @flags.
+ *
+ * By default dma-buf is backed by system memory pages, but by providing
+ * one of the GNTDEV_DMA_FLAG_XXX flags it can also be created as
+ * a DMA write-combine or coherent buffer, e.g. allocated with dma_alloc_wc/
+ * dma_alloc_coherent.
+ *
+ * Returns 0 if dma-buf was successfully created and the corresponding
+ * dma-buf's file descriptor is returned in @fd.
+ *
+ * [1] https://elixir.bootlin.com/linux/latest/source/Documentation/driver-api/dma-buf.rst
+ */
+
+#define IOCTL_GNTDEV_DMABUF_EXP_FROM_REFS \
+    _IOC(_IOC_NONE, 'G', 9, \
+         sizeof(struct ioctl_gntdev_dmabuf_exp_from_refs))
+struct ioctl_gntdev_dmabuf_exp_from_refs {
+    /* IN parameters. */
+    /* Specific options for this dma-buf: see GNTDEV_DMABUF_FLAG_XXX. */
+    uint32_t flags;
+    /* Number of grant references in @refs array. */
+    uint32_t count;
+    /* OUT parameters. */
+    /* File descriptor of the dma-buf. */
+    uint32_t fd;
+    /* The domain ID of the grant references to be mapped. */
+    uint32_t domid;
+    /* Variable IN parameter. */
+    /* Array of grant references of size @count. */
+    uint32_t refs[1];
+};
+
+/*
+ * This will block until the dma-buf with the file descriptor @fd is
+ * released. This is only valid for buffers created with
+ * IOCTL_GNTDEV_DMABUF_EXP_FROM_REFS.
+ *
+ * If withing @wait_to_ms milliseconds the buffer is not released
+ * then -ETIMEDOUT error is returned.
+ * If the buffer with file descriptor @fd does not exist or has already
+ * been released, then -ENOENT is returned. For valid file descriptors
+ * this must not be treated as error.
+ */
+#define IOCTL_GNTDEV_DMABUF_EXP_WAIT_RELEASED \
+    _IOC(_IOC_NONE, 'G', 10, \
+         sizeof(struct ioctl_gntdev_dmabuf_exp_wait_released))
+struct ioctl_gntdev_dmabuf_exp_wait_released {
+    /* IN parameters */
+    uint32_t fd;
+    uint32_t wait_to_ms;
+};
+
+/*
+ * Import a dma-buf with file descriptor @fd and export granted references
+ * to the pages of that dma-buf into array @refs of size @count.
+ */
+#define IOCTL_GNTDEV_DMABUF_IMP_TO_REFS \
+    _IOC(_IOC_NONE, 'G', 11, \
+         sizeof(struct ioctl_gntdev_dmabuf_imp_to_refs))
+struct ioctl_gntdev_dmabuf_imp_to_refs {
+    /* IN parameters. */
+    /* File descriptor of the dma-buf. */
+    uint32_t fd;
+    /* Number of grant references in @refs array. */
+    uint32_t count;
+    /* The domain ID for which references to be granted. */
+    uint32_t domid;
+    /* Reserved - must be zero. */
+    uint32_t reserved;
+    /* OUT parameters. */
+    /* Array of grant references of size @count. */
+    uint32_t refs[1];
+};
+
+/*
+ * This will close all references to an imported buffer, so it can be
+ * released by the owner. This is only valid for buffers created with
+ * IOCTL_GNTDEV_DMABUF_IMP_TO_REFS.
+ */
+#define IOCTL_GNTDEV_DMABUF_IMP_RELEASE \
+    _IOC(_IOC_NONE, 'G', 12, \
+         sizeof(struct ioctl_gntdev_dmabuf_imp_release))
+struct ioctl_gntdev_dmabuf_imp_release {
+    /* IN parameters */
+    uint32_t fd;
+    uint32_t reserved;
 };
 
 #endif /* __LINUX_PUBLIC_GNTDEV_H__ */
