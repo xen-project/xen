@@ -283,9 +283,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.11.1
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= c8ea0457495342c417c3dc033bba25148b279f60
-# Fri Sep 15 19:37:27 2017 +0100
-# qemu-xen-traditional: Link against xentoolcore
+QEMU_TRADITIONAL_REVISION ?= 9c0eed618f37dd5b4a57c8b3fbc48ef8913e3149
+# Wed Aug 15 17:38:18 2018 +0100
+# qemu-trad: stop using the default IOREQ server
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
