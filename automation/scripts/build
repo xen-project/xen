@@ -16,8 +16,8 @@ cfgargs+=("--enable-docs")
 if [[ "${CC}" == "clang" ]]; then
     # SeaBIOS cannot be built with clang
     cfgargs+=("--with-system-seabios=/usr/share/seabios/bios.bin")
-    # iPXE cannot be built with clang so we cannot build rombios
-    cfgargs+=("--disable-rombios")
+    # iPXE cannot be built with clang
+    cfgargs+=("--with-system-ipxe=/usr/lib/ipxe/ipxe.pxe")
     # newlib cannot be built with clang so we cannot build stubdoms
     cfgargs+=("--disable-stubdom")
 fi
