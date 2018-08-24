@@ -23,6 +23,7 @@ struct xenforeignmemory_handle {
     unsigned flags;
     int fd;
     Xentoolcore__Active_Handle tc_ah;
+    int unimpl_errno;
 };
 
 int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem);

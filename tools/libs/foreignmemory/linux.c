@@ -53,6 +53,23 @@ int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
         return -1;
     }
 
+    /*
+     * Older versions of privcmd return -EINVAL for unimplemented ioctls
+     * so we need to probe for the errno to use rather than just using
+     * the conventional ENOTTY.
+     */
+    if ( ioctl(fd, IOCTL_PRIVCMD_UNIMPLEMENTED, NULL) >= 0 )
+    {
+        xtl_log(fmem->logger, XTL_ERROR, -1, "xenforeignmemory",
+                "privcmd ioctl should not be implemented");
+        return -1;
+    }
+    else
+    {
+        fmem->unimpl_errno = errno;
+        errno = 0;
+    }
+
     fmem->fd = fd;
     return 0;
 }
@@ -307,7 +324,7 @@ int osdep_xenforeignmemory_map_resource(
     {
         int saved_errno;
 
-        if ( errno != ENOTTY && errno != EOPNOTSUPP )
+        if ( errno != fmem->unimpl_errno && errno != EOPNOTSUPP )
             PERROR("ioctl failed");
         else
             errno = EOPNOTSUPP;
