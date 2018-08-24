@@ -15,7 +15,7 @@ SUBDIRS-$(CONFIG_OVMF) += ovmf-dir
 SUBDIRS-$(CONFIG_SEABIOS) += seabios-dir
 SUBDIRS-$(CONFIG_ROMBIOS) += rombios
 SUBDIRS-$(CONFIG_ROMBIOS) += vgabios
-SUBDIRS-$(CONFIG_ROMBIOS) += etherboot
+SUBDIRS-$(CONFIG_IPXE) += etherboot
 SUBDIRS-$(CONFIG_PV_SHIM) += xen-dir
 SUBDIRS-y += hvmloader
 
