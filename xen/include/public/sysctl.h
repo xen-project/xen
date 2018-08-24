@@ -36,7 +36,7 @@
 #include "physdev.h"
 #include "tmem.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000011
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000012
 
 /*
  * Read console content from Xen buffer ring.
@@ -85,9 +85,9 @@ struct xen_sysctl_tbuf_op {
  /* (x86) The platform supports HVM guests. */
 #define _XEN_SYSCTL_PHYSCAP_hvm          0
 #define XEN_SYSCTL_PHYSCAP_hvm           (1u<<_XEN_SYSCTL_PHYSCAP_hvm)
- /* (x86) The platform supports HVM-guest direct access to I/O devices. */
-#define _XEN_SYSCTL_PHYSCAP_hvm_directio 1
-#define XEN_SYSCTL_PHYSCAP_hvm_directio  (1u<<_XEN_SYSCTL_PHYSCAP_hvm_directio)
+ /* (x86) The platform supports direct access to I/O devices with IOMMU. */
+#define _XEN_SYSCTL_PHYSCAP_directio 1
+#define XEN_SYSCTL_PHYSCAP_directio  (1u<<_XEN_SYSCTL_PHYSCAP_directio)
 struct xen_sysctl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;

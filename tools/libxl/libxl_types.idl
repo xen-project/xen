@@ -1014,6 +1014,7 @@ libxl_physinfo = Struct("physinfo", [
 
     ("cap_hvm", bool),
     ("cap_hvm_directio", bool),
+    ("cap_directio", bool),
     ], dir=DIR_OUT)
 
 libxl_connectorinfo = Struct("connectorinfo", [

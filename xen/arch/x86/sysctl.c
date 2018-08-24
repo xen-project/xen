@@ -93,7 +93,7 @@ void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
     if ( hvm_enabled )
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm;
     if ( iommu_enabled )
-        pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm_directio;
+        pi->capabilities |= XEN_SYSCTL_PHYSCAP_directio;
 }
 
 long arch_do_sysctl(

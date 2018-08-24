@@ -67,6 +67,12 @@
  * the same $(XEN_VERSION) (e.g. throughout a major release).
  */
 
+/* LIBXL_HAVE_PHYSINFO_CAP_DIRECTIO
+ *
+ * If this is defined, libxl_physinfo has a "cap_directio" field.
+ */
+#define LIBXL_HAVE_PHYSINFO_CAP_DIRECTIO 1
+
 /* LIBXL_HAVE_CONSOLE_NOTIFY_FD
  *
  * If this is defined, libxl_console_exec and
