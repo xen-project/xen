@@ -1690,7 +1690,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( dom0_pvh )
     {
         dom0_cfg.flags |= (XEN_DOMCTL_CDF_hvm_guest |
-                           ((hvm_funcs.hap_supported && !opt_dom0_shadow) ?
+                           ((hvm_hap_supported() && !opt_dom0_shadow) ?
                             XEN_DOMCTL_CDF_hap : 0));
 
         dom0_cfg.arch.emulation_flags |=

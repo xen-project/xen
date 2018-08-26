@@ -475,7 +475,7 @@ static void __init calculate_hvm_max_policy(void)
     *p = host_cpuid_policy;
     cpuid_policy_to_featureset(p, hvm_featureset);
 
-    hvm_featuremask = hvm_funcs.hap_supported ?
+    hvm_featuremask = hvm_hap_supported() ?
         hvm_hap_featuremask : hvm_shadow_featuremask;
 
     for ( i = 0; i < ARRAY_SIZE(hvm_featureset); ++i )

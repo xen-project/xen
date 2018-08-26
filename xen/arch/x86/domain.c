@@ -506,7 +506,7 @@ int arch_domain_create(struct domain *d,
     /* Need to determine if HAP is enabled before initialising paging */
     if ( is_hvm_domain(d) )
         d->arch.hvm_domain.hap_enabled =
-            hvm_funcs.hap_supported && (config->flags & XEN_DOMCTL_CDF_hap);
+            hvm_hap_supported() && (config->flags & XEN_DOMCTL_CDF_hap);
 
     if ( (rc = paging_domain_init(d, config->flags)) != 0 )
         goto fail;

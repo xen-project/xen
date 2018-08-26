@@ -621,6 +621,11 @@ static inline bool_t hvm_is_singlestep_supported(void)
             hvm_funcs.is_singlestep_supported());
 }
 
+static inline bool hvm_hap_supported(void)
+{
+    return hvm_funcs.hap_supported;
+}
+
 /* returns true if hardware supports alternate p2m's */
 static inline bool hvm_altp2m_supported(void)
 {
