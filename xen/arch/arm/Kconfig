@@ -52,6 +52,9 @@ config HAS_ITS
         prompt "GICv3 ITS MSI controller support" if EXPERT = "y"
         depends on GICV3 && !NEW_VGIC
 
+config HVM
+        def_bool y
+
 config NEW_VGIC
 	bool
 	prompt "Use new VGIC implementation"
