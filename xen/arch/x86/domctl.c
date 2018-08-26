@@ -975,6 +975,7 @@ long arch_do_domctl(
         d->arch.suppress_spurious_page_faults = 1;
         break;
 
+#ifdef CONFIG_HVM
     case XEN_DOMCTL_debug_op:
     {
         struct vcpu *v;
@@ -992,6 +993,7 @@ long arch_do_domctl(
         ret = hvm_debug_op(v, domctl->u.debug_op.op);
         break;
     }
+#endif
 
     case XEN_DOMCTL_gdbsx_guestmemio:
         domctl->u.gdbsx_guest_memio.remain = domctl->u.gdbsx_guest_memio.len;
