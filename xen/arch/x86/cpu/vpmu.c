@@ -196,8 +196,10 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     struct vcpu *sampled = current, *sampling;
     struct vpmu_struct *vpmu;
+#ifdef CONFIG_HVM
     struct vlapic *vlapic;
-    u32 vlapic_lvtpc;
+    uint32_t vlapic_lvtpc;
+#endif
 
     /*
      * dom0 will handle interrupt for special domains (e.g. idle domain) or,
@@ -324,6 +326,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         return;
     }
 
+#ifdef CONFIG_HVM
     /* HVM guests */
     vlapic = vcpu_vlapic(sampling);
 
@@ -345,6 +348,7 @@ void vpmu_do_interrupt(struct cpu_user_regs *regs)
         sampling->nmi_pending = 1;
         break;
     }
+#endif
 }
 
 static void vpmu_save_force(void *arg)
