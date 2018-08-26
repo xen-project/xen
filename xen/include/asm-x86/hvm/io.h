@@ -125,7 +125,12 @@ void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
                   const union vioapic_redir_entry *ent);
 void msix_write_completion(struct vcpu *);
+
+#ifdef CONFIG_HVM
 void msixtbl_init(struct domain *d);
+#else
+static inline void msixtbl_init(struct domain *d) {}
+#endif
 
 /* Arch-specific MSI data for vPCI. */
 struct vpci_arch_msi {
