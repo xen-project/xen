@@ -100,6 +100,7 @@ static void __init disable_all_dmar_units(void)
     {
         list_del(&drhd->list);
         scope_devices_free(&drhd->scope);
+        iommu_free(drhd);
         xfree(drhd);
     }
     list_for_each_entry_safe ( rmrr, _rmrr, &acpi_rmrr_units, list )
