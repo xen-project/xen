@@ -291,11 +291,6 @@ help:
 	@echo '  uninstall             - attempt to remove installed Xen tools'
 	@echo '                          (use with extreme care!)'
 	@echo
-	@echo 'Trusted Boot (tboot) targets:'
-	@echo '  build-tboot           - download and build the tboot module'
-	@echo '  install-tboot         - download, build, and install the tboot module'
-	@echo '  clean-tboot           - clean the tboot module if it exists'
-	@echo
 	@echo 'Package targets:'
 	@echo '  src-tarball-release   - make a source tarball with xen and qemu tagged with a release'
 	@echo '  src-tarball           - make a source tarball with xen and qemu tagged with git describe'
@@ -324,46 +319,7 @@ uninstall-docs:
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
 uninstall: uninstall-tools-public-headers $(TARGS_UNINSTALL)
-	rm -rf $(D)/boot/tboot*
 
 .PHONY: xenversion
 xenversion:
 	@$(MAKE) --no-print-directory -C xen xenversion
-
-#
-# tboot targets
-#
-
-TBOOT_TARFILE = tboot-20090330.tar.gz
-#TBOOT_BASE_URL = http://downloads.sourceforge.net/tboot
-TBOOT_BASE_URL = $(XEN_EXTFILES_URL)
-
-.PHONY: build-tboot
-build-tboot: download_tboot
-	$(MAKE) -C tboot build
-
-.PHONY: install-tboot
-install-tboot: download_tboot
-	$(MAKE) -C tboot install
-
-.PHONY: dist-tboot
-dist-tboot: download_tboot
-	$(MAKE) DESTDIR=$(DISTDIR)/install -C tboot dist
-
-.PHONY: clean-tboot
-clean-tboot:
-	[ ! -d tboot ] || $(MAKE) -C tboot clean
-
-.PHONY: distclean-tboot
-distclean-tboot:
-	[ ! -d tboot ] || $(MAKE) -C tboot distclean
-
-.PHONY: download_tboot
-download_tboot: tboot/Makefile
-
-tboot/Makefile: tboot/$(TBOOT_TARFILE)
-	[ -e tboot/Makefile ] || tar -xzf tboot/$(TBOOT_TARFILE) -C tboot/ --strip-components 1
-
-tboot/$(TBOOT_TARFILE):
-	mkdir -p tboot
-	wget -O tboot/$(TBOOT_TARFILE) $(TBOOT_BASE_URL)/$(TBOOT_TARFILE)
