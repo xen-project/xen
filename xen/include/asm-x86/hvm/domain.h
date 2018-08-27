@@ -97,7 +97,6 @@ struct hvm_pi_ops {
 };
 
 #define MAX_NR_IOREQ_SERVERS 8
-#define DEFAULT_IOSERVID 0
 
 struct hvm_domain {
     /* Guest page range used for non-default ioreq servers */
