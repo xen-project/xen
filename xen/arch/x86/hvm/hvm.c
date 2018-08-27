@@ -4093,16 +4093,12 @@ static int hvm_allow_set_param(struct domain *d,
     case HVM_PARAM_CONSOLE_EVTCHN:
     case HVM_PARAM_X87_FIP_WIDTH:
         break;
-    /* The following parameters are deprecated. */
-    case HVM_PARAM_DM_DOMAIN:
-    case HVM_PARAM_BUFIOREQ_EVTCHN:
-        rc = -EPERM;
-        break;
     /*
      * The following parameters must not be set by the guest
      * since the domain may need to be paused.
      */
     case HVM_PARAM_IDENT_PT:
+    case HVM_PARAM_DM_DOMAIN:
     case HVM_PARAM_ACPI_S_STATE:
     /* The remaining parameters should not be set by the guest. */
     default:
@@ -4267,6 +4263,9 @@ static int hvmop_set_param(
              d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
             rc = -EINVAL;
         break;
+    case HVM_PARAM_BUFIOREQ_EVTCHN:
+        rc = -EINVAL;
+        break;
     case HVM_PARAM_TRIPLE_FAULT_REASON:
         if ( a.value > SHUTDOWN_MAX )
             rc = -EINVAL;
@@ -4374,11 +4373,13 @@ static int hvm_allow_get_param(struct domain *d,
     case HVM_PARAM_ALTP2M:
     case HVM_PARAM_X87_FIP_WIDTH:
         break;
-    /* The following parameters are deprecated. */
-    case HVM_PARAM_DM_DOMAIN:
+    /*
+     * The following parameters must not be read by the guest
+     * since the domain may need to be paused.
+     */
+    case HVM_PARAM_IOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_PFN:
     case HVM_PARAM_BUFIOREQ_EVTCHN:
-        rc = -ENODATA;
-        break;
     /* The remaining parameters should not be read by the guest. */
     default:
         if ( d == current->domain )
@@ -4432,6 +4433,25 @@ static int hvmop_get_param(
     case HVM_PARAM_X87_FIP_WIDTH:
         a.value = d->arch.x87_fip_width;
         break;
+    case HVM_PARAM_IOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_EVTCHN:
+        /*
+         * It may be necessary to create a default ioreq server here,
+         * because legacy versions of QEMU are not aware of the new API for
+         * explicit ioreq server creation. However, if the domain is not
+         * under construction then it will not be QEMU querying the
+         * parameters and thus the query should not have that side-effect.
+         */
+        if ( !d->creation_finished )
+        {
+            rc = hvm_create_ioreq_server(d, true,
+                                         HVM_IOREQSRV_BUFIOREQ_LEGACY, NULL);
+            if ( rc != 0 && rc != -EEXIST )
+                goto out;
+        }
+
+    /*FALLTHRU*/
     default:
         a.value = d->arch.hvm_domain.params[a.index];
         break;

@@ -81,13 +81,9 @@
 #define HVM_PARAM_PAE_ENABLED  4
 
 #define HVM_PARAM_IOREQ_PFN    5
-#define HVM_PARAM_BUFIOREQ_PFN 6
 
-#ifdef __XEN__
-/* These parameters are deprecated and their meaning is undefined. */
-#define HVM_PARAM_DM_DOMAIN 13
+#define HVM_PARAM_BUFIOREQ_PFN 6
 #define HVM_PARAM_BUFIOREQ_EVTCHN 26
-#endif
 
 #if defined(__i386__) || defined(__x86_64__)
 
@@ -184,6 +180,9 @@
 
 /* Identity-map page directory used by Intel EPT when CR0.PG=0. */
 #define HVM_PARAM_IDENT_PT     12
+
+/* Device Model domain, defaults to 0. */
+#define HVM_PARAM_DM_DOMAIN    13
 
 /* ACPI S state: currently support S0 and S3 on x86. */
 #define HVM_PARAM_ACPI_S_STATE 14
