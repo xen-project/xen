@@ -57,6 +57,7 @@ type domain_create_flag =
   | CDF_OOS_OFF
   | CDF_XS_DOMAIN
   | CDF_IOMMU
+  | CDF_NESTED_VIRT
 
 type domain_create_iommu_opts =
   | IOMMU_NO_SHAREPT

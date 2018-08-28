@@ -630,6 +630,7 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
     bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
     bool hap = config->flags & XEN_DOMCTL_CDF_hap;
+    bool nested_virt = config->flags & XEN_DOMCTL_CDF_nested_virt;
     unsigned int max_vcpus;
 
     if ( hvm ? !hvm_enabled : !IS_ENABLED(CONFIG_PV) )
@@ -666,6 +667,12 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
          * for HVM guests.
          */
         config->flags |= XEN_DOMCTL_CDF_oos_off;
+
+    if ( nested_virt && !hap )
+    {
+        dprintk(XENLOG_INFO, "Nested virt not supported without HAP\n");
+        return -EINVAL;
+    }
 
     return 0;
 }

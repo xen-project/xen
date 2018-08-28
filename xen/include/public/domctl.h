@@ -68,9 +68,11 @@ struct xen_domctl_createdomain {
  /* Should this domain be permitted to use the IOMMU? */
 #define _XEN_DOMCTL_CDF_iommu         5
 #define XEN_DOMCTL_CDF_iommu          (1U<<_XEN_DOMCTL_CDF_iommu)
+#define _XEN_DOMCTL_CDF_nested_virt   6
+#define XEN_DOMCTL_CDF_nested_virt    (1U << _XEN_DOMCTL_CDF_nested_virt)
 
 /* Max XEN_DOMCTL_CDF_* constant.  Used for ABI checking. */
-#define XEN_DOMCTL_CDF_MAX XEN_DOMCTL_CDF_iommu
+#define XEN_DOMCTL_CDF_MAX XEN_DOMCTL_CDF_nested_virt
 
     uint32_t flags;
 

@@ -617,6 +617,9 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
 
             if ( !libxl_defbool_val(info->oos) )
                 create.flags |= XEN_DOMCTL_CDF_oos_off;
+
+            if ( libxl_defbool_val(b_info->nested_hvm) )
+                create.flags |= XEN_DOMCTL_CDF_nested_virt;
         }
 
         assert(info->passthrough != LIBXL_PASSTHROUGH_DEFAULT);
