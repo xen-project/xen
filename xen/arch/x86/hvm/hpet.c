@@ -581,7 +581,7 @@ static int hpet_save(struct domain *d, hvm_domain_context_t *h)
         return 0;
 
     write_lock(&hp->lock);
-    guest_time = (v->arch.hvm_vcpu.guest_time ?: hvm_get_guest_time(v)) /
+    guest_time = (v->arch.hvm.guest_time ?: hvm_get_guest_time(v)) /
                  STIME_PER_HPET_TICK;
 
     /* Write the proper value into the main counter */

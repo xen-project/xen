@@ -122,7 +122,7 @@ uint8_t pat_type_2_pte_flags(uint8_t pat_type)
 
 int hvm_vcpu_cacheattr_init(struct vcpu *v)
 {
-    struct mtrr_state *m = &v->arch.hvm_vcpu.mtrr;
+    struct mtrr_state *m = &v->arch.hvm.mtrr;
     unsigned int num_var_ranges =
         is_hardware_domain(v->domain) ? MASK_EXTR(mtrr_state.mtrr_cap,
                                                   MTRRcap_VCNT)
@@ -144,7 +144,7 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v)
 
     m->mtrr_cap = (1u << 10) | (1u << 8) | num_var_ranges;
 
-    v->arch.hvm_vcpu.pat_cr =
+    v->arch.hvm.pat_cr =
         ((uint64_t)PAT_TYPE_WRBACK) |               /* PAT0: WB */
         ((uint64_t)PAT_TYPE_WRTHROUGH << 8) |       /* PAT1: WT */
         ((uint64_t)PAT_TYPE_UC_MINUS << 16) |       /* PAT2: UC- */
@@ -185,7 +185,7 @@ int hvm_vcpu_cacheattr_init(struct vcpu *v)
 
 void hvm_vcpu_cacheattr_destroy(struct vcpu *v)
 {
-    xfree(v->arch.hvm_vcpu.mtrr.var_ranges);
+    xfree(v->arch.hvm.mtrr.var_ranges);
 }
 
 /*
@@ -343,8 +343,8 @@ uint32_t get_pat_flags(struct vcpu *v,
     uint8_t guest_eff_mm_type;
     uint8_t shadow_mtrr_type;
     uint8_t pat_entry_value;
-    uint64_t pat = v->arch.hvm_vcpu.pat_cr;
-    struct mtrr_state *g = &v->arch.hvm_vcpu.mtrr;
+    uint64_t pat = v->arch.hvm.pat_cr;
+    struct mtrr_state *g = &v->arch.hvm.mtrr;
 
     /* 1. Get the effective memory type of guest physical address,
      * with the pair of guest MTRR and PAT
@@ -494,8 +494,8 @@ bool_t mtrr_var_range_msr_set(
 
 bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs)
 {
-    const struct mtrr_state *md = &vd->arch.hvm_vcpu.mtrr;
-    const struct mtrr_state *ms = &vs->arch.hvm_vcpu.mtrr;
+    const struct mtrr_state *md = &vd->arch.hvm.mtrr;
+    const struct mtrr_state *ms = &vs->arch.hvm.mtrr;
 
     if ( md->enabled != ms->enabled )
         return true;
@@ -525,7 +525,7 @@ bool mtrr_pat_not_equal(const struct vcpu *vd, const struct vcpu *vs)
     }
 
     /* Test PAT. */
-    return vd->arch.hvm_vcpu.pat_cr != vs->arch.hvm_vcpu.pat_cr;
+    return vd->arch.hvm.pat_cr != vs->arch.hvm.pat_cr;
 }
 
 struct hvm_mem_pinned_cacheattr_range {
@@ -697,7 +697,7 @@ static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     /* save mtrr&pat */
     for_each_vcpu(d, v)
     {
-        const struct mtrr_state *mtrr_state = &v->arch.hvm_vcpu.mtrr;
+        const struct mtrr_state *mtrr_state = &v->arch.hvm.mtrr;
         struct hvm_hw_mtrr hw_mtrr = {
             .msr_mtrr_def_type = mtrr_state->def_type |
                                  MASK_INSR(mtrr_state->fixed_enabled,
@@ -764,7 +764,7 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
-    mtrr_state = &v->arch.hvm_vcpu.mtrr;
+    mtrr_state = &v->arch.hvm.mtrr;
 
     hvm_set_guest_pat(v, hw_mtrr.msr_pat_cr);
 
@@ -858,7 +858,7 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
         return -1;
 
     gmtrr_mtype = is_hvm_domain(d) && v ?
-                  get_mtrr_type(&v->arch.hvm_vcpu.mtrr,
+                  get_mtrr_type(&v->arch.hvm.mtrr,
                                 gfn << PAGE_SHIFT, order) :
                   MTRR_TYPE_WRBACK;
     hmtrr_mtype = get_mtrr_type(&mtrr_state, mfn_x(mfn) << PAGE_SHIFT, order);

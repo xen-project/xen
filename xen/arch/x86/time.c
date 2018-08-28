@@ -1041,7 +1041,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         {
             struct pl_time *pl = v->domain->arch.hvm.pl_time;
 
-            stime += pl->stime_offset + v->arch.hvm_vcpu.stime_offset;
+            stime += pl->stime_offset + v->arch.hvm.stime_offset;
             if ( stime >= 0 )
                 tsc_stamp = gtime_to_gtsc(d, stime);
             else
@@ -1081,7 +1081,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         _u.flags |= XEN_PVCLOCK_TSC_STABLE_BIT;
 
     if ( is_hvm_domain(d) )
-        _u.tsc_timestamp += v->arch.hvm_vcpu.cache_tsc_offset;
+        _u.tsc_timestamp += v->arch.hvm.cache_tsc_offset;
 
     /* Don't bother unless timestamp record has changed or we are forced. */
     _u.version = u->version; /* make versions match for memcmp test */
@@ -2199,7 +2199,7 @@ void tsc_set_info(struct domain *d,
              */
             d->arch.hvm.sync_tsc = rdtsc();
             hvm_set_tsc_offset(d->vcpu[0],
-                               d->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset,
+                               d->vcpu[0]->arch.hvm.cache_tsc_offset,
                                d->arch.hvm.sync_tsc);
         }
     }

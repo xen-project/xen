@@ -123,7 +123,7 @@ static int hvmemul_do_io(
 {
     struct vcpu *curr = current;
     struct domain *currd = curr->domain;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     ioreq_t p = {
         .type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO,
         .addr = addr,
@@ -437,7 +437,7 @@ static int hvmemul_do_io_addr(
     ASSERT(rc != X86EMUL_UNIMPLEMENTED);
 
     if ( rc == X86EMUL_OKAY )
-        v->arch.hvm_vcpu.hvm_io.mmio_retry = (count < *reps);
+        v->arch.hvm.hvm_io.mmio_retry = (count < *reps);
 
     *reps = count;
 
@@ -706,7 +706,7 @@ static int hvmemul_linear_to_phys(
     *reps = min_t(unsigned long, *reps, 4096);
 
     /* With no paging it's easy: linear == physical. */
-    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG) )
+    if ( !(curr->arch.hvm.guest_cr[0] & X86_CR0_PG) )
     {
         *paddr = addr;
         return X86EMUL_OKAY;
@@ -975,7 +975,7 @@ static int hvmemul_linear_mmio_access(
     unsigned long gla, unsigned int size, uint8_t dir, void *buffer,
     uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt, bool_t known_gpfn)
 {
-    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
     unsigned long offset = gla & ~PAGE_MASK;
     struct hvm_mmio_cache *cache = hvmemul_find_mmio_cache(vio, gla, dir);
     unsigned int chunk, buffer_offset = 0;
@@ -1053,7 +1053,7 @@ static int __hvmemul_read(
     pagefault_info_t pfinfo;
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     int rc;
 
     if ( is_x86_system_segment(seg) )
@@ -1174,7 +1174,7 @@ static int hvmemul_write(
     struct vcpu *curr = current;
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     int rc;
     void *mapping;
 
@@ -1218,7 +1218,7 @@ static int hvmemul_rmw(
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
-    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
     int rc;
     void *mapping;
 
@@ -1375,7 +1375,7 @@ static int hvmemul_cmpxchg(
     struct vcpu *curr = current;
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     int rc;
     void *mapping = NULL;
 
@@ -1593,7 +1593,7 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
     unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
@@ -1748,7 +1748,7 @@ static int hvmemul_rep_stos(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &current->arch.hvm.hvm_io;
     unsigned long addr, bytes;
     paddr_t gpa;
     p2m_type_t p2mt;
@@ -1931,7 +1931,7 @@ static int hvmemul_read_cr(
     case 2:
     case 3:
     case 4:
-        *val = current->arch.hvm_vcpu.guest_cr[reg];
+        *val = current->arch.hvm.guest_cr[reg];
         HVMTRACE_LONG_2D(CR_READ, reg, TRC_PAR_LONG(*val));
         return X86EMUL_OKAY;
     default:
@@ -1956,7 +1956,7 @@ static int hvmemul_write_cr(
         break;
 
     case 2:
-        current->arch.hvm_vcpu.guest_cr[2] = val;
+        current->arch.hvm.guest_cr[2] = val;
         rc = X86EMUL_OKAY;
         break;
 
@@ -2280,7 +2280,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     const struct cpu_user_regs *regs = hvmemul_ctxt->ctxt.regs;
     struct vcpu *curr = current;
     uint32_t new_intr_shadow;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     int rc;
 
     hvm_emulate_init_per_insn(hvmemul_ctxt, vio->mmio_insn,
@@ -2410,7 +2410,7 @@ void hvm_emulate_one_vm_event(enum emul_kind kind, unsigned int trapnr,
         break;
     case EMUL_KIND_SET_CONTEXT_INSN: {
         struct vcpu *curr = current;
-        struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+        struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
 
         BUILD_BUG_ON(sizeof(vio->mmio_insn) !=
                      sizeof(curr->arch.vm_event->emul.insn.data));

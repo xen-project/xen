@@ -232,7 +232,7 @@ void vmx_intr_assist(void)
     int pt_vector;
 
     /* Block event injection when single step with MTF. */
-    if ( unlikely(v->arch.hvm_vcpu.single_step) )
+    if ( unlikely(v->arch.hvm.single_step) )
     {
         v->arch.hvm_vmx.exec_control |= CPU_BASED_MONITOR_TRAP_FLAG;
         vmx_update_cpu_exec_control(v);

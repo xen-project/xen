@@ -125,7 +125,7 @@ static int construct_vmcb(struct vcpu *v)
     }
 
     /* Guest EFER. */
-    v->arch.hvm_vcpu.guest_efer = 0;
+    v->arch.hvm.guest_efer = 0;
     hvm_update_guest_efer(v);
 
     /* Guest segment limits. */
@@ -171,10 +171,10 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->tr.base = 0;
     vmcb->tr.limit = 0xff;
 
-    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
+    v->arch.hvm.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
     hvm_update_guest_cr(v, 0);
 
-    v->arch.hvm_vcpu.guest_cr[4] = 0;
+    v->arch.hvm.guest_cr[4] = 0;
     hvm_update_guest_cr(v, 4);
 
     paging_update_paging_modes(v);

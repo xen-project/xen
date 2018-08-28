@@ -265,7 +265,7 @@ static int acpi_save(struct domain *d, hvm_domain_context_t *h)
      * Update the counter to the guest's current time.  Make sure it only
      * goes forwards.
      */
-    x = (((s->vcpu->arch.hvm_vcpu.guest_time ?: hvm_get_guest_time(s->vcpu)) -
+    x = (((s->vcpu->arch.hvm.guest_time ?: hvm_get_guest_time(s->vcpu)) -
           s->last_gtime) * s->scale) >> 32;
     if ( x < 1UL<<31 )
         acpi->tmr_val += x;

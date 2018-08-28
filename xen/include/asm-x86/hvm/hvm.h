@@ -285,27 +285,27 @@ void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *);
 int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 
 #define hvm_paging_enabled(v) \
-    (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG))
+    (!!((v)->arch.hvm.guest_cr[0] & X86_CR0_PG))
 #define hvm_wp_enabled(v) \
-    (!!((v)->arch.hvm_vcpu.guest_cr[0] & X86_CR0_WP))
+    (!!((v)->arch.hvm.guest_cr[0] & X86_CR0_WP))
 #define hvm_pcid_enabled(v) \
-    (!!((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PCIDE))
+    (!!((v)->arch.hvm.guest_cr[4] & X86_CR4_PCIDE))
 #define hvm_pae_enabled(v) \
-    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE))
+    (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_PAE))
 #define hvm_smep_enabled(v) \
-    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMEP))
+    (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_SMEP))
 #define hvm_smap_enabled(v) \
-    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_SMAP))
+    (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_SMAP))
 #define hvm_nx_enabled(v) \
-    ((v)->arch.hvm_vcpu.guest_efer & EFER_NX)
+    ((v)->arch.hvm.guest_efer & EFER_NX)
 #define hvm_pku_enabled(v) \
-    (hvm_paging_enabled(v) && ((v)->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PKE))
+    (hvm_paging_enabled(v) && ((v)->arch.hvm.guest_cr[4] & X86_CR4_PKE))
 
 /* Can we use superpages in the HAP p2m table? */
 #define hap_has_1gb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB))
 #define hap_has_2mb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB))
 
-#define hvm_long_mode_active(v) (!!((v)->arch.hvm_vcpu.guest_efer & EFER_LMA))
+#define hvm_long_mode_active(v) (!!((v)->arch.hvm.guest_efer & EFER_LMA))
 
 enum hvm_intblk
 hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack);
@@ -548,7 +548,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 #define hvm_msr_tsc_aux(v) ({                                               \
     struct domain *__d = (v)->domain;                                       \
     (__d->arch.tsc_mode == TSC_MODE_PVRDTSCP)                               \
-        ? (u32)__d->arch.incarnation : (u32)(v)->arch.hvm_vcpu.msr_tsc_aux; \
+        ? (u32)__d->arch.incarnation : (u32)(v)->arch.hvm.msr_tsc_aux;      \
 })
 
 int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content);

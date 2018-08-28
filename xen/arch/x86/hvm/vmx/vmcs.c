@@ -1233,10 +1233,10 @@ static int construct_vmcs(struct vcpu *v)
               | (v->arch.fully_eager_fpu ? 0 : (1U << TRAP_no_device));
     vmx_update_exception_bitmap(v);
 
-    v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
+    v->arch.hvm.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
     hvm_update_guest_cr(v, 0);
 
-    v->arch.hvm_vcpu.guest_cr[4] = 0;
+    v->arch.hvm.guest_cr[4] = 0;
     hvm_update_guest_cr(v, 4);
 
     if ( cpu_has_vmx_tpr_shadow )
@@ -1838,9 +1838,9 @@ void vmx_do_resume(struct vcpu *v)
                   || v->domain->arch.monitor.software_breakpoint_enabled
                   || v->domain->arch.monitor.singlestep_enabled;
 
-    if ( unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
+    if ( unlikely(v->arch.hvm.debug_state_latch != debug_state) )
     {
-        v->arch.hvm_vcpu.debug_state_latch = debug_state;
+        v->arch.hvm.debug_state_latch = debug_state;
         vmx_update_debug_state(v);
     }
 

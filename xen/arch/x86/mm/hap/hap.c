@@ -664,7 +664,7 @@ static bool_t hap_invlpg(struct vcpu *v, unsigned long va)
 
 static void hap_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 {
-    v->arch.hvm_vcpu.hw_cr[3] = v->arch.hvm_vcpu.guest_cr[3];
+    v->arch.hvm.hw_cr[3] = v->arch.hvm.guest_cr[3];
     hvm_update_guest_cr3(v, noflush);
 }
 
@@ -680,7 +680,7 @@ hap_paging_get_mode(struct vcpu *v)
 static void hap_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    unsigned long cr3_gfn = v->arch.hvm_vcpu.guest_cr[3] >> PAGE_SHIFT;
+    unsigned long cr3_gfn = v->arch.hvm.guest_cr[3] >> PAGE_SHIFT;
     p2m_type_t t;
 
     /* We hold onto the cr3 as it may be modified later, and

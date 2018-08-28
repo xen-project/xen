@@ -306,13 +306,13 @@ void hvm_assert_evtchn_irq(struct vcpu *v)
 {
     if ( unlikely(in_irq() || !local_irq_is_enabled()) )
     {
-        tasklet_schedule(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
+        tasklet_schedule(&v->arch.hvm.assert_evtchn_irq_tasklet);
         return;
     }
 
-    if ( v->arch.hvm_vcpu.evtchn_upcall_vector != 0 )
+    if ( v->arch.hvm.evtchn_upcall_vector != 0 )
     {
-        uint8_t vector = v->arch.hvm_vcpu.evtchn_upcall_vector;
+        uint8_t vector = v->arch.hvm.evtchn_upcall_vector;
 
         vlapic_set_irq(vcpu_vlapic(v), vector, 0);
     }

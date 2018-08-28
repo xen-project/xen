@@ -104,10 +104,10 @@ void show_registers(const struct cpu_user_regs *regs)
     {
         struct segment_register sreg;
         context = CTXT_hvm_guest;
-        fault_crs[0] = v->arch.hvm_vcpu.guest_cr[0];
-        fault_crs[2] = v->arch.hvm_vcpu.guest_cr[2];
-        fault_crs[3] = v->arch.hvm_vcpu.guest_cr[3];
-        fault_crs[4] = v->arch.hvm_vcpu.guest_cr[4];
+        fault_crs[0] = v->arch.hvm.guest_cr[0];
+        fault_crs[2] = v->arch.hvm.guest_cr[2];
+        fault_crs[3] = v->arch.hvm.guest_cr[3];
+        fault_crs[4] = v->arch.hvm.guest_cr[4];
         hvm_get_segment_register(v, x86_seg_cs, &sreg);
         fault_regs.cs = sreg.sel;
         hvm_get_segment_register(v, x86_seg_ds, &sreg);

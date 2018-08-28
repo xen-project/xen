@@ -96,7 +96,7 @@ static void realmode_deliver_exception(
 void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     int rc;
 
     perfc_incr(realmode_emulations);
@@ -115,7 +115,7 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
     if ( rc == X86EMUL_UNRECOGNIZED )
     {
         gdprintk(XENLOG_ERR, "Unrecognized insn.\n");
-        if ( curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE )
+        if ( curr->arch.hvm.guest_cr[0] & X86_CR0_PE )
             goto fail;
 
         realmode_deliver_exception(TRAP_invalid_op, 0, hvmemul_ctxt);
@@ -129,7 +129,7 @@ void vmx_realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
         {
             domain_pause_for_debugger();
         }
-        else if ( curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE )
+        else if ( curr->arch.hvm.guest_cr[0] & X86_CR0_PE )
         {
             gdprintk(XENLOG_ERR, "Exception %02x in protected mode.\n",
                      hvmemul_ctxt->ctxt.event.vector);
@@ -156,7 +156,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     struct vcpu *curr = current;
     struct hvm_emulate_ctxt hvmemul_ctxt;
     struct segment_register *sreg;
-    struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
+    struct hvm_vcpu_io *vio = &curr->arch.hvm.hvm_io;
     unsigned long intr_info;
     unsigned int emulations = 0;
 
@@ -168,7 +168,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     hvm_emulate_init_once(&hvmemul_ctxt, NULL, regs);
 
     /* Only deliver interrupts into emulated real mode. */
-    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) &&
+    if ( !(curr->arch.hvm.guest_cr[0] & X86_CR0_PE) &&
          (intr_info & INTR_INFO_VALID_MASK) )
     {
         realmode_deliver_exception((uint8_t)intr_info, 0, &hvmemul_ctxt);

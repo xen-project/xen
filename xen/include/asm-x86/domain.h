@@ -543,7 +543,7 @@ struct arch_vcpu
     /* Virtual Machine Extensions */
     union {
         struct pv_vcpu pv;
-        struct hvm_vcpu hvm_vcpu;
+        struct hvm_vcpu hvm;
     };
 
     pagetable_t guest_table_user;       /* (MFN) x86/64 user-space pagetable */
@@ -607,8 +607,8 @@ void update_guest_memory_policy(struct vcpu *v,
                                 struct guest_memory_policy *policy);
 
 /* Shorthands to improve code legibility. */
-#define hvm_vmx         hvm_vcpu.u.vmx
-#define hvm_svm         hvm_vcpu.u.svm
+#define hvm_vmx         hvm.u.vmx
+#define hvm_svm         hvm.u.svm
 
 bool update_runstate_area(struct vcpu *);
 bool update_secondary_system_time(struct vcpu *,

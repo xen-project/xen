@@ -191,13 +191,13 @@ static void svm_set_icebp_interception(struct domain *d, bool enable)
 static void svm_save_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    unsigned int flag_dr_dirty = v->arch.hvm_vcpu.flag_dr_dirty;
+    unsigned int flag_dr_dirty = v->arch.hvm.flag_dr_dirty;
 
     if ( !flag_dr_dirty )
         return;
 
     /* Clear the DR dirty flag and re-enable intercepts for DR accesses. */
-    v->arch.hvm_vcpu.flag_dr_dirty = 0;
+    v->arch.hvm.flag_dr_dirty = 0;
     vmcb_set_dr_intercepts(vmcb, ~0u);
 
     if ( v->domain->arch.cpuid->extd.dbext )
@@ -223,10 +223,10 @@ static void svm_save_dr(struct vcpu *v)
 
 static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
 {
-    if ( v->arch.hvm_vcpu.flag_dr_dirty )
+    if ( v->arch.hvm.flag_dr_dirty )
         return;
 
-    v->arch.hvm_vcpu.flag_dr_dirty = 1;
+    v->arch.hvm.flag_dr_dirty = 1;
     vmcb_set_dr_intercepts(vmcb, 0);
 
     ASSERT(v == current);
@@ -269,10 +269,10 @@ static int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    c->cr0 = v->arch.hvm_vcpu.guest_cr[0];
-    c->cr2 = v->arch.hvm_vcpu.guest_cr[2];
-    c->cr3 = v->arch.hvm_vcpu.guest_cr[3];
-    c->cr4 = v->arch.hvm_vcpu.guest_cr[4];
+    c->cr0 = v->arch.hvm.guest_cr[0];
+    c->cr2 = v->arch.hvm.guest_cr[2];
+    c->cr3 = v->arch.hvm.guest_cr[3];
+    c->cr4 = v->arch.hvm.guest_cr[4];
 
     c->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs;
     c->sysenter_esp = v->arch.hvm_svm.guest_sysenter_esp;
@@ -330,17 +330,17 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
             }
         }
 
-        if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
+        if ( v->arch.hvm.guest_cr[0] & X86_CR0_PG )
             put_page(pagetable_get_page(v->arch.guest_table));
 
         v->arch.guest_table =
             page ? pagetable_from_page(page) : pagetable_null();
     }
 
-    v->arch.hvm_vcpu.guest_cr[0] = c->cr0 | X86_CR0_ET;
-    v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
-    v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
-    v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
+    v->arch.hvm.guest_cr[0] = c->cr0 | X86_CR0_ET;
+    v->arch.hvm.guest_cr[2] = c->cr2;
+    v->arch.hvm.guest_cr[3] = c->cr3;
+    v->arch.hvm.guest_cr[4] = c->cr4;
     svm_update_guest_cr(v, 0, 0);
     svm_update_guest_cr(v, 2, 0);
     svm_update_guest_cr(v, 4, 0);
@@ -384,7 +384,7 @@ static void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_star         = vmcb->star;
     data->msr_cstar        = vmcb->cstar;
     data->msr_syscall_mask = vmcb->sfmask;
-    data->msr_efer         = v->arch.hvm_vcpu.guest_efer;
+    data->msr_efer         = v->arch.hvm.guest_efer;
     data->msr_flags        = 0;
 }
 
@@ -398,7 +398,7 @@ static void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     vmcb->star       = data->msr_star;
     vmcb->cstar      = data->msr_cstar;
     vmcb->sfmask     = data->msr_syscall_mask;
-    v->arch.hvm_vcpu.guest_efer = data->msr_efer;
+    v->arch.hvm.guest_efer = data->msr_efer;
     svm_update_guest_efer(v);
 }
 
@@ -509,7 +509,7 @@ static void svm_fpu_leave(struct vcpu *v)
      * then this is not necessary: no FPU activity can occur until the guest 
      * clears CR0.TS, and we will initialise the FPU when that happens.
      */
-    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+    if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
     {
         vmcb_set_exception_intercepts(
             n1vmcb,
@@ -550,7 +550,7 @@ static int svm_guest_x86_mode(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
 
-    if ( unlikely(!(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE)) )
+    if ( unlikely(!(v->arch.hvm.guest_cr[0] & X86_CR0_PE)) )
         return 0;
     if ( unlikely(guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
         return 1;
@@ -569,7 +569,7 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr, unsigned int flags)
     case 0: {
         unsigned long hw_cr0_mask = 0;
 
-        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+        if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
         {
             if ( v != current )
             {
@@ -590,17 +590,17 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr, unsigned int flags)
                vmcb_set_cr_intercepts(vmcb, intercepts | CR_INTERCEPT_CR3_WRITE);
         }
 
-        value = v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
+        value = v->arch.hvm.guest_cr[0] | hw_cr0_mask;
         if ( !paging_mode_hap(v->domain) )
             value |= X86_CR0_PG | X86_CR0_WP;
         vmcb_set_cr0(vmcb, value);
         break;
     }
     case 2:
-        vmcb_set_cr2(vmcb, v->arch.hvm_vcpu.guest_cr[2]);
+        vmcb_set_cr2(vmcb, v->arch.hvm.guest_cr[2]);
         break;
     case 3:
-        vmcb_set_cr3(vmcb, v->arch.hvm_vcpu.hw_cr[3]);
+        vmcb_set_cr3(vmcb, v->arch.hvm.hw_cr[3]);
         if ( !nestedhvm_enabled(v->domain) )
         {
             if ( !(flags & HVM_UPDATE_GUEST_CR3_NOFLUSH) )
@@ -611,13 +611,13 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr, unsigned int flags)
         else if ( !(flags & HVM_UPDATE_GUEST_CR3_NOFLUSH) )
             hvm_asid_flush_vcpu_asid(
                 nestedhvm_vcpu_in_guestmode(v)
-                ? &vcpu_nestedhvm(v).nv_n2asid : &v->arch.hvm_vcpu.n1asid);
+                ? &vcpu_nestedhvm(v).nv_n2asid : &v->arch.hvm.n1asid);
         break;
     case 4:
         value = HVM_CR4_HOST_MASK;
         if ( paging_mode_hap(v->domain) )
             value &= ~X86_CR4_PAE;
-        value |= v->arch.hvm_vcpu.guest_cr[4];
+        value |= v->arch.hvm.guest_cr[4];
 
         if ( !hvm_paging_enabled(v) )
         {
@@ -646,16 +646,16 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr, unsigned int flags)
 static void svm_update_guest_efer(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-    bool_t lma = !!(v->arch.hvm_vcpu.guest_efer & EFER_LMA);
+    bool_t lma = !!(v->arch.hvm.guest_efer & EFER_LMA);
     uint64_t new_efer;
 
-    new_efer = (v->arch.hvm_vcpu.guest_efer | EFER_SVME) & ~EFER_LME;
+    new_efer = (v->arch.hvm.guest_efer | EFER_SVME) & ~EFER_LME;
     if ( lma )
         new_efer |= EFER_LME;
     vmcb_set_efer(vmcb, new_efer);
 
     ASSERT(nestedhvm_enabled(v->domain) ||
-           !(v->arch.hvm_vcpu.guest_efer & EFER_SVME));
+           !(v->arch.hvm.guest_efer & EFER_SVME));
 
     if ( nestedhvm_enabled(v->domain) )
         svm_nested_features_on_efer_update(v);
@@ -1140,11 +1140,11 @@ static void noreturn svm_do_resume(struct vcpu *v)
         vcpu_guestmode = 1;
 
     if ( !vcpu_guestmode &&
-        unlikely(v->arch.hvm_vcpu.debug_state_latch != debug_state) )
+        unlikely(v->arch.hvm.debug_state_latch != debug_state) )
     {
         uint32_t intercepts = vmcb_get_exception_intercepts(vmcb);
 
-        v->arch.hvm_vcpu.debug_state_latch = debug_state;
+        v->arch.hvm.debug_state_latch = debug_state;
         vmcb_set_exception_intercepts(
             vmcb, debug_state ? (intercepts | (1U << TRAP_int3))
                               : (intercepts & ~(1U << TRAP_int3)));
@@ -1458,7 +1458,7 @@ static void svm_inject_event(const struct x86_event *event)
 
     case TRAP_page_fault:
         ASSERT(_event.type == X86_EVENTTYPE_HW_EXCEPTION);
-        curr->arch.hvm_vcpu.guest_cr[2] = _event.cr2;
+        curr->arch.hvm.guest_cr[2] = _event.cr2;
         vmcb_set_cr2(vmcb, _event.cr2);
         break;
     }
@@ -1800,14 +1800,14 @@ static void svm_fpu_dirty_intercept(void)
     if ( vmcb != n1vmcb )
     {
        /* Check if l1 guest must make FPU ready for the l2 guest */
-       if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS )
+       if ( v->arch.hvm.guest_cr[0] & X86_CR0_TS )
            hvm_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
        else
            vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) & ~X86_CR0_TS);
        return;
     }
 
-    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
+    if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_TS) )
         vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
 }
 
@@ -2492,7 +2492,7 @@ static void svm_invlpga_intercept(
 {
     svm_invlpga(vaddr,
                 (asid == 0)
-                ? v->arch.hvm_vcpu.n1asid.asid
+                ? v->arch.hvm.n1asid.asid
                 : vcpu_nestedhvm(v).nv_n2asid.asid);
 }
 
@@ -2609,8 +2609,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     hvm_invalidate_regs_fields(regs);
 
     if ( paging_mode_hap(v->domain) )
-        v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] =
-            vmcb_get_cr3(vmcb);
+        v->arch.hvm.guest_cr[3] = v->arch.hvm.hw_cr[3] = vmcb_get_cr3(vmcb);
 
     if ( nestedhvm_enabled(v->domain) && nestedhvm_vcpu_in_guestmode(v) )
         vcpu_guestmode = 1;

@@ -311,7 +311,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     if ( !(val & PCI_MSIX_VECTOR_BITMASK) &&
          test_and_clear_bit(nr_entry, &entry->table_flags) )
     {
-        v->arch.hvm_vcpu.hvm_io.msix_unmask_address = address;
+        v->arch.hvm.hvm_io.msix_unmask_address = address;
         goto out;
     }
 
@@ -383,8 +383,8 @@ static bool_t msixtbl_range(const struct hvm_io_handler *handler,
                   PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) &&
                  !(data & PCI_MSIX_VECTOR_BITMASK) )
             {
-                curr->arch.hvm_vcpu.hvm_io.msix_snoop_address = addr;
-                curr->arch.hvm_vcpu.hvm_io.msix_snoop_gpa = 0;
+                curr->arch.hvm.hvm_io.msix_snoop_address = addr;
+                curr->arch.hvm.hvm_io.msix_snoop_gpa = 0;
             }
         }
         else if ( (size == 4 || size == 8) &&
@@ -401,9 +401,9 @@ static bool_t msixtbl_range(const struct hvm_io_handler *handler,
             BUILD_BUG_ON((PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET + 4) &
                          (PCI_MSIX_ENTRY_SIZE - 1));
 
-            curr->arch.hvm_vcpu.hvm_io.msix_snoop_address =
+            curr->arch.hvm.hvm_io.msix_snoop_address =
                 addr + size * r->count - 4;
-            curr->arch.hvm_vcpu.hvm_io.msix_snoop_gpa =
+            curr->arch.hvm.hvm_io.msix_snoop_gpa =
                 r->data + size * r->count - 4;
         }
     }
@@ -506,13 +506,13 @@ out:
         for_each_vcpu ( d, v )
         {
             if ( (v->pause_flags & VPF_blocked_in_xen) &&
-                 !v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa &&
-                 v->arch.hvm_vcpu.hvm_io.msix_snoop_address ==
+                 !v->arch.hvm.hvm_io.msix_snoop_gpa &&
+                 v->arch.hvm.hvm_io.msix_snoop_address ==
                  (gtable + msi_desc->msi_attrib.entry_nr *
                            PCI_MSIX_ENTRY_SIZE +
                   PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) )
-                v->arch.hvm_vcpu.hvm_io.msix_unmask_address =
-                    v->arch.hvm_vcpu.hvm_io.msix_snoop_address;
+                v->arch.hvm.hvm_io.msix_unmask_address =
+                    v->arch.hvm.hvm_io.msix_snoop_address;
         }
     }
 
@@ -592,13 +592,13 @@ void msixtbl_pt_cleanup(struct domain *d)
 
 void msix_write_completion(struct vcpu *v)
 {
-    unsigned long ctrl_address = v->arch.hvm_vcpu.hvm_io.msix_unmask_address;
-    unsigned long snoop_addr = v->arch.hvm_vcpu.hvm_io.msix_snoop_address;
+    unsigned long ctrl_address = v->arch.hvm.hvm_io.msix_unmask_address;
+    unsigned long snoop_addr = v->arch.hvm.hvm_io.msix_snoop_address;
 
-    v->arch.hvm_vcpu.hvm_io.msix_snoop_address = 0;
+    v->arch.hvm.hvm_io.msix_snoop_address = 0;
 
     if ( !ctrl_address && snoop_addr &&
-         v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa )
+         v->arch.hvm.hvm_io.msix_snoop_gpa )
     {
         const struct msi_desc *desc;
         uint32_t data;
@@ -610,7 +610,7 @@ void msix_write_completion(struct vcpu *v)
 
         if ( desc &&
              hvm_copy_from_guest_phys(&data,
-                                      v->arch.hvm_vcpu.hvm_io.msix_snoop_gpa,
+                                      v->arch.hvm.hvm_io.msix_snoop_gpa,
                                       sizeof(data)) == HVMTRANS_okay &&
              !(data & PCI_MSIX_VECTOR_BITMASK) )
             ctrl_address = snoop_addr;
@@ -619,7 +619,7 @@ void msix_write_completion(struct vcpu *v)
     if ( !ctrl_address )
         return;
 
-    v->arch.hvm_vcpu.hvm_io.msix_unmask_address = 0;
+    v->arch.hvm.hvm_io.msix_unmask_address = 0;
     if ( msixtbl_write(v, ctrl_address, 4, 0) != X86EMUL_OKAY )
         gdprintk(XENLOG_WARNING, "MSI-X write completion failure\n");
 }

@@ -829,7 +829,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         if ( is_hvm_domain(d) )
         {
             /* OSXSAVE clear in policy.  Fast-forward CR4 back in. */
-            if ( v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE )
+            if ( v->arch.hvm.guest_cr[4] & X86_CR4_OSXSAVE )
                 res->c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
         }
         else /* PV domain */
@@ -960,7 +960,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             /* OSPKE clear in policy.  Fast-forward CR4 back in. */
             if ( (is_pv_domain(d)
                   ? v->arch.pv.ctrlreg[4]
-                  : v->arch.hvm_vcpu.guest_cr[4]) & X86_CR4_PKE )
+                  : v->arch.hvm.guest_cr[4]) & X86_CR4_PKE )
                 res->c |= cpufeat_mask(X86_FEATURE_OSPKE);
             break;
         }

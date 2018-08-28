@@ -25,10 +25,10 @@
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpt.h>
 
-#define vcpu_vlapic(x)   (&(x)->arch.hvm_vcpu.vlapic)
-#define vlapic_vcpu(x)   (container_of((x), struct vcpu, arch.hvm_vcpu.vlapic))
+#define vcpu_vlapic(x)   (&(x)->arch.hvm.vlapic)
+#define vlapic_vcpu(x)   (container_of((x), struct vcpu, arch.hvm.vlapic))
 #define const_vlapic_vcpu(x) (container_of((x), const struct vcpu, \
-                              arch.hvm_vcpu.vlapic))
+                              arch.hvm.vlapic))
 #define vlapic_domain(x) (vlapic_vcpu(x)->domain)
 
 #define _VLAPIC_ID(vlapic, id) (vlapic_x2apic_mode(vlapic) \

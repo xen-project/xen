@@ -4071,7 +4071,7 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 
      ASSERT(shadow_mode_external(d));
      /* Find where in the page the l3 table is */
-     guest_idx = guest_index((void *)v->arch.hvm_vcpu.guest_cr[3]);
+     guest_idx = guest_index((void *)v->arch.hvm.guest_cr[3]);
 
      // Ignore the low 2 bits of guest_idx -- they are really just
      // cache control.
@@ -4209,19 +4209,17 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 
 
     ///
-    /// v->arch.hvm_vcpu.hw_cr[3]
+    /// v->arch.hvm.hw_cr[3]
     ///
     if ( shadow_mode_external(d) )
     {
         ASSERT(is_hvm_domain(d));
 #if SHADOW_PAGING_LEVELS == 3
         /* 2-on-3 or 3-on-3: Use the PAE shadow l3 table we just fabricated */
-        v->arch.hvm_vcpu.hw_cr[3] =
-            virt_to_maddr(&v->arch.paging.shadow.l3table);
+        v->arch.hvm.hw_cr[3] = virt_to_maddr(&v->arch.paging.shadow.l3table);
 #else
         /* 4-on-4: Just use the shadow top-level directly */
-        v->arch.hvm_vcpu.hw_cr[3] =
-            pagetable_get_paddr(v->arch.shadow_table[0]);
+        v->arch.hvm.hw_cr[3] = pagetable_get_paddr(v->arch.shadow_table[0]);
 #endif
         hvm_update_guest_cr3(v, noflush);
     }
@@ -4544,7 +4542,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     unsigned long l3gfn;
     mfn_t l3mfn;
 
-    gcr3 = (v->arch.hvm_vcpu.guest_cr[3]);
+    gcr3 = v->arch.hvm.guest_cr[3];
     /* fast path: the pagetable belongs to the current context */
     if ( gcr3 == gpa )
         fast_path = 1;

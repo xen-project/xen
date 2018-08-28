@@ -215,7 +215,7 @@ static inline bool guest_can_use_l2_superpages(const struct vcpu *v)
     return (is_pv_vcpu(v) ||
             GUEST_PAGING_LEVELS != 2 ||
             !hvm_paging_enabled(v) ||
-            (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PSE));
+            (v->arch.hvm.guest_cr[4] & X86_CR4_PSE));
 }
 
 static inline bool guest_can_use_l3_superpages(const struct domain *d)

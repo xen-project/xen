@@ -42,7 +42,7 @@ asm(".file \"" __OBJECT_FILE__ "\"");
 unsigned long hap_gva_to_gfn(GUEST_PAGING_LEVELS)(
     struct vcpu *v, struct p2m_domain *p2m, unsigned long gva, uint32_t *pfec)
 {
-    unsigned long cr3 = v->arch.hvm_vcpu.guest_cr[3];
+    unsigned long cr3 = v->arch.hvm.guest_cr[3];
     return hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(v, p2m, cr3, gva, pfec, NULL);
 }
 

@@ -135,14 +135,14 @@ struct nestedvcpu {
     unsigned long       guest_cr[5];
 };
 
-#define vcpu_nestedhvm(v) ((v)->arch.hvm_vcpu.nvcpu)
+#define vcpu_nestedhvm(v) ((v)->arch.hvm.nvcpu)
 
 struct altp2mvcpu {
     uint16_t    p2midx;         /* alternate p2m index */
     gfn_t       veinfo_gfn;     /* #VE information page gfn */
 };
 
-#define vcpu_altp2m(v) ((v)->arch.hvm_vcpu.avcpu)
+#define vcpu_altp2m(v) ((v)->arch.hvm.avcpu)
 
 struct hvm_vcpu {
     /* Guest control-register and EFER values, just as the guest sees them. */

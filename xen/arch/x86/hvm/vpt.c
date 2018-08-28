@@ -55,7 +55,7 @@ uint64_t hvm_get_guest_time_fixed(const struct vcpu *v, uint64_t at_tsc)
     }
     spin_unlock(&pl->pl_time_lock);
 
-    return now + v->arch.hvm_vcpu.stime_offset;
+    return now + v->arch.hvm.stime_offset;
 }
 
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time)
@@ -64,9 +64,9 @@ void hvm_set_guest_time(struct vcpu *v, u64 guest_time)
 
     if ( offset )
     {
-        v->arch.hvm_vcpu.stime_offset += offset;
+        v->arch.hvm.stime_offset += offset;
         /*
-         * If hvm_vcpu.stime_offset is updated make sure to
+         * If hvm.stime_offset is updated make sure to
          * also update vcpu time, since this value is used to
          * calculate the TSC.
          */
@@ -159,16 +159,16 @@ static void pt_lock(struct periodic_time *pt)
     for ( ; ; )
     {
         v = pt->vcpu;
-        spin_lock(&v->arch.hvm_vcpu.tm_lock);
+        spin_lock(&v->arch.hvm.tm_lock);
         if ( likely(pt->vcpu == v) )
             break;
-        spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+        spin_unlock(&v->arch.hvm.tm_lock);
     }
 }
 
 static void pt_unlock(struct periodic_time *pt)
 {
-    spin_unlock(&pt->vcpu->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&pt->vcpu->arch.hvm.tm_lock);
 }
 
 static void pt_process_missed_ticks(struct periodic_time *pt)
@@ -195,7 +195,7 @@ static void pt_freeze_time(struct vcpu *v)
     if ( !mode_is(v->domain, delay_for_missed_ticks) )
         return;
 
-    v->arch.hvm_vcpu.guest_time = hvm_get_guest_time(v);
+    v->arch.hvm.guest_time = hvm_get_guest_time(v);
 }
 
 static void pt_thaw_time(struct vcpu *v)
@@ -203,22 +203,22 @@ static void pt_thaw_time(struct vcpu *v)
     if ( !mode_is(v->domain, delay_for_missed_ticks) )
         return;
 
-    if ( v->arch.hvm_vcpu.guest_time == 0 )
+    if ( v->arch.hvm.guest_time == 0 )
         return;
 
-    hvm_set_guest_time(v, v->arch.hvm_vcpu.guest_time);
-    v->arch.hvm_vcpu.guest_time = 0;
+    hvm_set_guest_time(v, v->arch.hvm.guest_time);
+    v->arch.hvm.guest_time = 0;
 }
 
 void pt_save_timer(struct vcpu *v)
 {
-    struct list_head *head = &v->arch.hvm_vcpu.tm_list;
+    struct list_head *head = &v->arch.hvm.tm_list;
     struct periodic_time *pt;
 
     if ( v->pause_flags & VPF_blocked )
         return;
 
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    spin_lock(&v->arch.hvm.tm_lock);
 
     list_for_each_entry ( pt, head, list )
         if ( !pt->do_not_freeze )
@@ -226,15 +226,15 @@ void pt_save_timer(struct vcpu *v)
 
     pt_freeze_time(v);
 
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&v->arch.hvm.tm_lock);
 }
 
 void pt_restore_timer(struct vcpu *v)
 {
-    struct list_head *head = &v->arch.hvm_vcpu.tm_list;
+    struct list_head *head = &v->arch.hvm.tm_list;
     struct periodic_time *pt;
 
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    spin_lock(&v->arch.hvm.tm_lock);
 
     list_for_each_entry ( pt, head, list )
     {
@@ -247,7 +247,7 @@ void pt_restore_timer(struct vcpu *v)
 
     pt_thaw_time(v);
 
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&v->arch.hvm.tm_lock);
 }
 
 static void pt_timer_fn(void *data)
@@ -302,13 +302,13 @@ static void pt_irq_fired(struct vcpu *v, struct periodic_time *pt)
 
 int pt_update_irq(struct vcpu *v)
 {
-    struct list_head *head = &v->arch.hvm_vcpu.tm_list;
+    struct list_head *head = &v->arch.hvm.tm_list;
     struct periodic_time *pt, *temp, *earliest_pt;
     uint64_t max_lag;
     int irq, pt_vector = -1;
     bool level;
 
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    spin_lock(&v->arch.hvm.tm_lock);
 
     earliest_pt = NULL;
     max_lag = -1ULL;
@@ -338,7 +338,7 @@ int pt_update_irq(struct vcpu *v)
 
     if ( earliest_pt == NULL )
     {
-        spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+        spin_unlock(&v->arch.hvm.tm_lock);
         return -1;
     }
 
@@ -346,7 +346,7 @@ int pt_update_irq(struct vcpu *v)
     irq = earliest_pt->irq;
     level = earliest_pt->level;
 
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&v->arch.hvm.tm_lock);
 
     switch ( earliest_pt->source )
     {
@@ -393,9 +393,9 @@ int pt_update_irq(struct vcpu *v)
                 time_cb *cb = NULL;
                 void *cb_priv;
 
-                spin_lock(&v->arch.hvm_vcpu.tm_lock);
+                spin_lock(&v->arch.hvm.tm_lock);
                 /* Make sure the timer is still on the list. */
-                list_for_each_entry ( pt, &v->arch.hvm_vcpu.tm_list, list )
+                list_for_each_entry ( pt, &v->arch.hvm.tm_list, list )
                     if ( pt == earliest_pt )
                     {
                         pt_irq_fired(v, pt);
@@ -403,7 +403,7 @@ int pt_update_irq(struct vcpu *v)
                         cb_priv = pt->priv;
                         break;
                     }
-                spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+                spin_unlock(&v->arch.hvm.tm_lock);
 
                 if ( cb != NULL )
                     cb(v, cb_priv);
@@ -418,7 +418,7 @@ int pt_update_irq(struct vcpu *v)
 static struct periodic_time *is_pt_irq(
     struct vcpu *v, struct hvm_intack intack)
 {
-    struct list_head *head = &v->arch.hvm_vcpu.tm_list;
+    struct list_head *head = &v->arch.hvm.tm_list;
     struct periodic_time *pt;
 
     list_for_each_entry ( pt, head, list )
@@ -440,12 +440,12 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     if ( intack.source == hvm_intsrc_vector )
         return;
 
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    spin_lock(&v->arch.hvm.tm_lock);
 
     pt = is_pt_irq(v, intack);
     if ( pt == NULL )
     {
-        spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+        spin_unlock(&v->arch.hvm.tm_lock);
         return;
     }
 
@@ -454,7 +454,7 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
     cb = pt->cb;
     cb_priv = pt->priv;
 
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&v->arch.hvm.tm_lock);
 
     if ( cb != NULL )
         cb(v, cb_priv);
@@ -462,15 +462,15 @@ void pt_intr_post(struct vcpu *v, struct hvm_intack intack)
 
 void pt_migrate(struct vcpu *v)
 {
-    struct list_head *head = &v->arch.hvm_vcpu.tm_list;
+    struct list_head *head = &v->arch.hvm.tm_list;
     struct periodic_time *pt;
 
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    spin_lock(&v->arch.hvm.tm_lock);
 
     list_for_each_entry ( pt, head, list )
         migrate_timer(&pt->timer, v->processor);
 
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&v->arch.hvm.tm_lock);
 }
 
 void create_periodic_time(
@@ -489,7 +489,7 @@ void create_periodic_time(
 
     destroy_periodic_time(pt);
 
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    spin_lock(&v->arch.hvm.tm_lock);
 
     pt->pending_intr_nr = 0;
     pt->do_not_freeze = 0;
@@ -534,12 +534,12 @@ void create_periodic_time(
     pt->priv = data;
 
     pt->on_list = 1;
-    list_add(&pt->list, &v->arch.hvm_vcpu.tm_list);
+    list_add(&pt->list, &v->arch.hvm.tm_list);
 
     init_timer(&pt->timer, pt_timer_fn, pt, v->processor);
     set_timer(&pt->timer, pt->scheduled);
 
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&v->arch.hvm.tm_lock);
 }
 
 void destroy_periodic_time(struct periodic_time *pt)
@@ -578,16 +578,16 @@ static void pt_adjust_vcpu(struct periodic_time *pt, struct vcpu *v)
     pt->on_list = 0;
     pt_unlock(pt);
 
-    spin_lock(&v->arch.hvm_vcpu.tm_lock);
+    spin_lock(&v->arch.hvm.tm_lock);
     pt->vcpu = v;
     if ( on_list )
     {
         pt->on_list = 1;
-        list_add(&pt->list, &v->arch.hvm_vcpu.tm_list);
+        list_add(&pt->list, &v->arch.hvm.tm_list);
 
         migrate_timer(&pt->timer, v->processor);
     }
-    spin_unlock(&v->arch.hvm_vcpu.tm_lock);
+    spin_unlock(&v->arch.hvm.tm_lock);
 }
 
 void pt_adjust_global_vcpu_target(struct vcpu *v)
@@ -627,7 +627,7 @@ static void pt_resume(struct periodic_time *pt)
     if ( pt->pending_intr_nr && !pt->on_list )
     {
         pt->on_list = 1;
-        list_add(&pt->list, &pt->vcpu->arch.hvm_vcpu.tm_list);
+        list_add(&pt->list, &pt->vcpu->arch.hvm.tm_list);
         vcpu_kick(pt->vcpu);
     }
     pt_unlock(pt);

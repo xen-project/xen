@@ -90,12 +90,12 @@ void __dummy__(void)
     OFFSET(VCPU_vmx_realmode, struct vcpu, arch.hvm_vmx.vmx_realmode);
     OFFSET(VCPU_vmx_emulate, struct vcpu, arch.hvm_vmx.vmx_emulate);
     OFFSET(VCPU_vm86_seg_mask, struct vcpu, arch.hvm_vmx.vm86_segment_mask);
-    OFFSET(VCPU_hvm_guest_cr2, struct vcpu, arch.hvm_vcpu.guest_cr[2]);
+    OFFSET(VCPU_hvm_guest_cr2, struct vcpu, arch.hvm.guest_cr[2]);
     BLANK();
 
-    OFFSET(VCPU_nhvm_guestmode, struct vcpu, arch.hvm_vcpu.nvcpu.nv_guestmode);
-    OFFSET(VCPU_nhvm_p2m, struct vcpu, arch.hvm_vcpu.nvcpu.nv_p2m);
-    OFFSET(VCPU_nsvm_hap_enabled, struct vcpu, arch.hvm_vcpu.nvcpu.u.nsvm.ns_hap_enabled);
+    OFFSET(VCPU_nhvm_guestmode, struct vcpu, arch.hvm.nvcpu.nv_guestmode);
+    OFFSET(VCPU_nhvm_p2m, struct vcpu, arch.hvm.nvcpu.nv_p2m);
+    OFFSET(VCPU_nsvm_hap_enabled, struct vcpu, arch.hvm.nvcpu.u.nsvm.ns_hap_enabled);
     BLANK();
 
     OFFSET(DOMAIN_is_32bit_pv, struct domain, arch.is_32bit_pv);

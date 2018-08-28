@@ -1619,7 +1619,7 @@ static void __context_switch(void)
                 BUG();
 
             if ( cpu_has_xsaves && is_hvm_vcpu(n) )
-                set_msr_xss(n->arch.hvm_vcpu.msr_xss);
+                set_msr_xss(n->arch.hvm.msr_xss);
         }
         vcpu_restore_fpu_nonlazy(n, false);
         nd->arch.ctxt_switch->to(n);
@@ -1692,7 +1692,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         np2m_schedule(NP2M_SCHEDLE_OUT);
     }
 
-    if ( is_hvm_domain(prevd) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
+    if ( is_hvm_domain(prevd) && !list_empty(&prev->arch.hvm.tm_list) )
         pt_save_timer(prev);
 
     local_irq_disable();

@@ -1585,10 +1585,10 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     {
         struct segment_register sreg;
 
-        c.nat->ctrlreg[0] = v->arch.hvm_vcpu.guest_cr[0];
-        c.nat->ctrlreg[2] = v->arch.hvm_vcpu.guest_cr[2];
-        c.nat->ctrlreg[3] = v->arch.hvm_vcpu.guest_cr[3];
-        c.nat->ctrlreg[4] = v->arch.hvm_vcpu.guest_cr[4];
+        c.nat->ctrlreg[0] = v->arch.hvm.guest_cr[0];
+        c.nat->ctrlreg[2] = v->arch.hvm.guest_cr[2];
+        c.nat->ctrlreg[3] = v->arch.hvm.guest_cr[3];
+        c.nat->ctrlreg[4] = v->arch.hvm.guest_cr[4];
         hvm_get_segment_register(v, x86_seg_cs, &sreg);
         c.nat->user_regs.cs = sreg.sel;
         hvm_get_segment_register(v, x86_seg_ss, &sreg);

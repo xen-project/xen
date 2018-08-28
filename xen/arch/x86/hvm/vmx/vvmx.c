@@ -383,8 +383,8 @@ static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
 
     if ( vmxop_check )
     {
-        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) ||
-             !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_VMXE) )
+        if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_PE) ||
+             !(v->arch.hvm.guest_cr[4] & X86_CR4_VMXE) )
             goto invalid_op;
     }
     else if ( !nvmx_vcpu_in_vmx(v) )
@@ -1082,7 +1082,7 @@ static void load_shadow_guest_state(struct vcpu *v)
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
     }
 
-    hvm_set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
+    hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
 
     vvmcs_to_shadow_bulk(v, ARRAY_SIZE(vmentry_fields), vmentry_fields);
 
@@ -1170,7 +1170,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
      * hvm_set_efer won't work if CR0.PG = 1, so we change the value
      * directly to make hvm_long_mode_active(v) work in L2.
      * An additional update_paging_modes is also needed if
-     * there is 32/64 switch. v->arch.hvm_vcpu.guest_efer doesn't
+     * there is 32/64 switch. v->arch.hvm.guest_efer doesn't
      * need to be saved, since its value on vmexit is determined by
      * L1 exit_controls
      */
@@ -1178,9 +1178,9 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     lm_l2 = !!(get_vvmcs(v, VM_ENTRY_CONTROLS) & VM_ENTRY_IA32E_MODE);
 
     if ( lm_l2 )
-        v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
+        v->arch.hvm.guest_efer |= EFER_LMA | EFER_LME;
     else
-        v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
+        v->arch.hvm.guest_efer &= ~(EFER_LMA | EFER_LME);
 
     load_shadow_control(v);
     load_shadow_guest_state(v);
@@ -1189,7 +1189,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
         paging_update_paging_modes(v);
 
     if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
-         !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
+         !(v->arch.hvm.guest_efer & EFER_LMA) )
         vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
     regs->rip = get_vvmcs(v, GUEST_RIP);
@@ -1236,7 +1236,7 @@ static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
 
     if ( v->arch.hvm_vmx.cr4_host_mask != ~0UL )
         /* Only need to update nested GUEST_CR4 if not all bits are trapped. */
-        set_vvmcs(v, GUEST_CR4, v->arch.hvm_vcpu.guest_cr[4]);
+        set_vvmcs(v, GUEST_CR4, v->arch.hvm.guest_cr[4]);
 }
 
 static void sync_vvmcs_ro(struct vcpu *v)
@@ -1288,7 +1288,7 @@ static void load_vvmcs_host_state(struct vcpu *v)
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
     }
 
-    hvm_set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
+    hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
 
     set_vvmcs(v, VM_ENTRY_INTR_INFO, 0);
 }
@@ -1369,7 +1369,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     sync_exception_state(v);
 
     if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
-         !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
+         !(v->arch.hvm.guest_efer & EFER_LMA) )
         shadow_to_vvmcs_bulk(v, ARRAY_SIZE(gpdpte_fields), gpdpte_fields);
 
     /* This will clear current pCPU bit in p2m->dirty_cpumask */
@@ -1385,9 +1385,9 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     lm_l1 = !!(get_vvmcs(v, VM_EXIT_CONTROLS) & VM_EXIT_IA32E_MODE);
 
     if ( lm_l1 )
-        v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
+        v->arch.hvm.guest_efer |= EFER_LMA | EFER_LME;
     else
-        v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
+        v->arch.hvm.guest_efer &= ~(EFER_LMA | EFER_LME);
 
     vmx_update_cpu_exec_control(v);
     vmx_update_secondary_exec_control(v);
@@ -2438,7 +2438,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_DR_ACCESS:
         ctrl = __n2_exec_control(v);
         if ( (ctrl & CPU_BASED_MOV_DR_EXITING) &&
-            v->arch.hvm_vcpu.flag_dr_dirty )
+            v->arch.hvm.flag_dr_dirty )
             nvcpu->nv_vmexit_pending = 1;
         break;
     case EXIT_REASON_INVLPG:
@@ -2620,13 +2620,13 @@ void nvmx_set_cr_read_shadow(struct vcpu *v, unsigned int cr)
          * hardware. It consists of the L2-owned bits from the new
          * value combined with the L1-owned bits from L1's guest cr.
          */
-        v->arch.hvm_vcpu.guest_cr[cr] &= ~virtual_cr_mask;
-        v->arch.hvm_vcpu.guest_cr[cr] |= virtual_cr_mask &
+        v->arch.hvm.guest_cr[cr] &= ~virtual_cr_mask;
+        v->arch.hvm.guest_cr[cr] |= virtual_cr_mask &
             get_vvmcs(v, cr_field);
     }
 
     /* nvcpu.guest_cr is what L2 write to cr actually. */
-    __vmwrite(read_shadow_field, v->arch.hvm_vcpu.nvcpu.guest_cr[cr]);
+    __vmwrite(read_shadow_field, v->arch.hvm.nvcpu.guest_cr[cr]);
 }
 
 /*

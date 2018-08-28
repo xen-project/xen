@@ -243,10 +243,10 @@ static int nsvm_vcpu_hostsave(struct vcpu *v, unsigned int inst_len)
 
     /* Save shadowed values. This ensures that the l1 guest
      * cannot override them to break out. */
-    n1vmcb->_efer = v->arch.hvm_vcpu.guest_efer;
-    n1vmcb->_cr0 = v->arch.hvm_vcpu.guest_cr[0];
-    n1vmcb->_cr2 = v->arch.hvm_vcpu.guest_cr[2];
-    n1vmcb->_cr4 = v->arch.hvm_vcpu.guest_cr[4];
+    n1vmcb->_efer = v->arch.hvm.guest_efer;
+    n1vmcb->_cr0 = v->arch.hvm.guest_cr[0];
+    n1vmcb->_cr2 = v->arch.hvm.guest_cr[2];
+    n1vmcb->_cr4 = v->arch.hvm.guest_cr[4];
 
     /* Remember the host interrupt flag */
     svm->ns_hostflags.fields.rflagsif =
@@ -276,7 +276,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     v->arch.hvm_svm.vmcb_pa = nv->nv_n1vmcx_pa;
 
     /* EFER */
-    v->arch.hvm_vcpu.guest_efer = n1vmcb->_efer;
+    v->arch.hvm.guest_efer = n1vmcb->_efer;
     rc = hvm_set_efer(n1vmcb->_efer);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -284,7 +284,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_efer failed, rc: %u\n", rc);
 
     /* CR4 */
-    v->arch.hvm_vcpu.guest_cr[4] = n1vmcb->_cr4;
+    v->arch.hvm.guest_cr[4] = n1vmcb->_cr4;
     rc = hvm_set_cr4(n1vmcb->_cr4, 1);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -293,28 +293,28 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 
     /* CR0 */
     nestedsvm_fpu_vmexit(n1vmcb, n2vmcb,
-        svm->ns_cr0, v->arch.hvm_vcpu.guest_cr[0]);
-    v->arch.hvm_vcpu.guest_cr[0] = n1vmcb->_cr0 | X86_CR0_PE;
+        svm->ns_cr0, v->arch.hvm.guest_cr[0]);
+    v->arch.hvm.guest_cr[0] = n1vmcb->_cr0 | X86_CR0_PE;
     n1vmcb->rflags &= ~X86_EFLAGS_VM;
     rc = hvm_set_cr0(n1vmcb->_cr0 | X86_CR0_PE, 1);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
     if (rc != X86EMUL_OKAY)
         gdprintk(XENLOG_ERR, "hvm_set_cr0 failed, rc: %u\n", rc);
-    svm->ns_cr0 = v->arch.hvm_vcpu.guest_cr[0];
+    svm->ns_cr0 = v->arch.hvm.guest_cr[0];
 
     /* CR2 */
-    v->arch.hvm_vcpu.guest_cr[2] = n1vmcb->_cr2;
+    v->arch.hvm.guest_cr[2] = n1vmcb->_cr2;
     hvm_update_guest_cr(v, 2);
 
     /* CR3 */
     /* Nested paging mode */
     if (nestedhvm_paging_mode_hap(v)) {
         /* host nested paging + guest nested paging. */
-        /* hvm_set_cr3() below sets v->arch.hvm_vcpu.guest_cr[3] for us. */
+        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
     } else if (paging_mode_hap(v->domain)) {
         /* host nested paging + guest shadow paging. */
-        /* hvm_set_cr3() below sets v->arch.hvm_vcpu.guest_cr[3] for us. */
+        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
     } else {
         /* host shadow paging + guest shadow paging. */
 
@@ -322,7 +322,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
         if (!pagetable_is_null(v->arch.guest_table))
             put_page(pagetable_get_page(v->arch.guest_table));
         v->arch.guest_table = pagetable_null();
-        /* hvm_set_cr3() below sets v->arch.hvm_vcpu.guest_cr[3] for us. */
+        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
     }
     rc = hvm_set_cr3(n1vmcb->_cr3, 1);
     if ( rc == X86EMUL_EXCEPTION )
@@ -549,7 +549,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     }
 
     /* EFER */
-    v->arch.hvm_vcpu.guest_efer = ns_vmcb->_efer;
+    v->arch.hvm.guest_efer = ns_vmcb->_efer;
     rc = hvm_set_efer(ns_vmcb->_efer);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -557,7 +557,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_efer failed, rc: %u\n", rc);
 
     /* CR4 */
-    v->arch.hvm_vcpu.guest_cr[4] = ns_vmcb->_cr4;
+    v->arch.hvm.guest_cr[4] = ns_vmcb->_cr4;
     rc = hvm_set_cr4(ns_vmcb->_cr4, 1);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -565,9 +565,9 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_cr4 failed, rc: %u\n", rc);
 
     /* CR0 */
-    svm->ns_cr0 = v->arch.hvm_vcpu.guest_cr[0];
+    svm->ns_cr0 = v->arch.hvm.guest_cr[0];
     cr0 = nestedsvm_fpu_vmentry(svm->ns_cr0, ns_vmcb, n1vmcb, n2vmcb);
-    v->arch.hvm_vcpu.guest_cr[0] = ns_vmcb->_cr0;
+    v->arch.hvm.guest_cr[0] = ns_vmcb->_cr0;
     rc = hvm_set_cr0(cr0, 1);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -575,7 +575,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         gdprintk(XENLOG_ERR, "hvm_set_cr0 failed, rc: %u\n", rc);
 
     /* CR2 */
-    v->arch.hvm_vcpu.guest_cr[2] = ns_vmcb->_cr2;
+    v->arch.hvm.guest_cr[2] = ns_vmcb->_cr2;
     hvm_update_guest_cr(v, 2);
 
     /* Nested paging mode */
@@ -585,7 +585,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
 
         nestedsvm_vmcb_set_nestedp2m(v, ns_vmcb, n2vmcb);
 
-        /* hvm_set_cr3() below sets v->arch.hvm_vcpu.guest_cr[3] for us. */
+        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
         rc = hvm_set_cr3(ns_vmcb->_cr3, 1);
         if ( rc == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -599,7 +599,7 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         /* When l1 guest does shadow paging
          * we assume it intercepts page faults.
          */
-        /* hvm_set_cr3() below sets v->arch.hvm_vcpu.guest_cr[3] for us. */
+        /* hvm_set_cr3() below sets v->arch.hvm.guest_cr[3] for us. */
         rc = hvm_set_cr3(ns_vmcb->_cr3, 1);
         if ( rc == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
@@ -1259,7 +1259,7 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
          * Delay the injection because this would result in delivering
          * an interrupt *within* the execution of an instruction.
          */
-        if ( v->arch.hvm_vcpu.hvm_io.io_req.state != STATE_IOREQ_NONE )
+        if ( v->arch.hvm.hvm_io.io_req.state != STATE_IOREQ_NONE )
             return hvm_intblk_shadow;
 
         if ( !nv->nv_vmexit_pending && n2vmcb->exitintinfo.bytes != 0 ) {
@@ -1681,7 +1681,7 @@ void svm_nested_features_on_efer_update(struct vcpu *v)
      * Need state for transfering the nested gif status so only write on
      * the hvm_vcpu EFER.SVME changing.
      */
-    if ( v->arch.hvm_vcpu.guest_efer & EFER_SVME )
+    if ( v->arch.hvm.guest_efer & EFER_SVME )
     {
         if ( !vmcb->virt_ext.fields.vloadsave_enable &&
              paging_mode_hap(v->domain) &&
