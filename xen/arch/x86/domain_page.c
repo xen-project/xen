@@ -86,7 +86,7 @@ void *map_domain_page(mfn_t mfn)
         return mfn_to_virt(mfn_x(mfn));
 
     dcache = &v->domain->arch.pv.mapcache;
-    vcache = &v->arch.pv_vcpu.mapcache;
+    vcache = &v->arch.pv.mapcache;
     if ( !dcache->inuse )
         return mfn_to_virt(mfn_x(mfn));
 
@@ -194,7 +194,7 @@ void unmap_domain_page(const void *ptr)
 
     idx = PFN_DOWN(va - MAPCACHE_VIRT_START);
     mfn = l1e_get_pfn(MAPCACHE_L1ENT(idx));
-    hashent = &v->arch.pv_vcpu.mapcache.hash[MAPHASH_HASHFN(mfn)];
+    hashent = &v->arch.pv.mapcache.hash[MAPHASH_HASHFN(mfn)];
 
     local_irq_save(flags);
 
@@ -293,7 +293,7 @@ int mapcache_vcpu_init(struct vcpu *v)
     BUILD_BUG_ON(MAPHASHENT_NOTINUSE < MAPCACHE_ENTRIES);
     for ( i = 0; i < MAPHASH_ENTRIES; i++ )
     {
-        struct vcpu_maphash_entry *hashent = &v->arch.pv_vcpu.mapcache.hash[i];
+        struct vcpu_maphash_entry *hashent = &v->arch.pv.mapcache.hash[i];
 
         hashent->mfn = ~0UL; /* never valid to map */
         hashent->idx = MAPHASHENT_NOTINUSE;

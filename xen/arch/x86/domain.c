@@ -849,7 +849,7 @@ int arch_set_info_guest(
     {
         memcpy(&v->arch.user_regs, &c.nat->user_regs, sizeof(c.nat->user_regs));
         if ( is_pv_domain(d) )
-            memcpy(v->arch.pv_vcpu.trap_ctxt, c.nat->trap_ctxt,
+            memcpy(v->arch.pv.trap_ctxt, c.nat->trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
     else
@@ -858,7 +858,7 @@ int arch_set_info_guest(
         if ( is_pv_domain(d) )
         {
             for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
-                XLAT_trap_info(v->arch.pv_vcpu.trap_ctxt + i,
+                XLAT_trap_info(v->arch.pv.trap_ctxt + i,
                                c.cmp->trap_ctxt + i);
         }
     }
@@ -873,7 +873,7 @@ int arch_set_info_guest(
     }
 
     /* IOPL privileges are virtualised. */
-    v->arch.pv_vcpu.iopl = v->arch.user_regs.eflags & X86_EFLAGS_IOPL;
+    v->arch.pv.iopl = v->arch.user_regs.eflags & X86_EFLAGS_IOPL;
     v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
 
     /* Ensure real hardware interrupts are enabled. */
@@ -884,8 +884,8 @@ int arch_set_info_guest(
         if ( !compat && !(flags & VGCF_in_kernel) && !c.nat->ctrlreg[1] )
             return -EINVAL;
 
-        v->arch.pv_vcpu.ldt_base = c(ldt_base);
-        v->arch.pv_vcpu.ldt_ents = c(ldt_ents);
+        v->arch.pv.ldt_base = c(ldt_base);
+        v->arch.pv.ldt_ents = c(ldt_ents);
     }
     else
     {
@@ -910,47 +910,47 @@ int arch_set_info_guest(
             fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
         }
 
-        for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
-            fail |= v->arch.pv_vcpu.gdt_frames[i] != c(gdt_frames[i]);
-        fail |= v->arch.pv_vcpu.gdt_ents != c(gdt_ents);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.pv.gdt_frames); ++i )
+            fail |= v->arch.pv.gdt_frames[i] != c(gdt_frames[i]);
+        fail |= v->arch.pv.gdt_ents != c(gdt_ents);
 
-        fail |= v->arch.pv_vcpu.ldt_base != c(ldt_base);
-        fail |= v->arch.pv_vcpu.ldt_ents != c(ldt_ents);
+        fail |= v->arch.pv.ldt_base != c(ldt_base);
+        fail |= v->arch.pv.ldt_ents != c(ldt_ents);
 
         if ( fail )
            return -EOPNOTSUPP;
     }
 
-    v->arch.pv_vcpu.kernel_ss = c(kernel_ss);
-    v->arch.pv_vcpu.kernel_sp = c(kernel_sp);
-    for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.ctrlreg); ++i )
-        v->arch.pv_vcpu.ctrlreg[i] = c(ctrlreg[i]);
+    v->arch.pv.kernel_ss = c(kernel_ss);
+    v->arch.pv.kernel_sp = c(kernel_sp);
+    for ( i = 0; i < ARRAY_SIZE(v->arch.pv.ctrlreg); ++i )
+        v->arch.pv.ctrlreg[i] = c(ctrlreg[i]);
 
-    v->arch.pv_vcpu.event_callback_eip = c(event_callback_eip);
-    v->arch.pv_vcpu.failsafe_callback_eip = c(failsafe_callback_eip);
+    v->arch.pv.event_callback_eip = c(event_callback_eip);
+    v->arch.pv.failsafe_callback_eip = c(failsafe_callback_eip);
     if ( !compat )
     {
-        v->arch.pv_vcpu.syscall_callback_eip = c.nat->syscall_callback_eip;
+        v->arch.pv.syscall_callback_eip = c.nat->syscall_callback_eip;
         /* non-nul selector kills fs_base */
-        v->arch.pv_vcpu.fs_base =
+        v->arch.pv.fs_base =
             !(v->arch.user_regs.fs & ~3) ? c.nat->fs_base : 0;
-        v->arch.pv_vcpu.gs_base_kernel = c.nat->gs_base_kernel;
+        v->arch.pv.gs_base_kernel = c.nat->gs_base_kernel;
         /* non-nul selector kills gs_base_user */
-        v->arch.pv_vcpu.gs_base_user =
+        v->arch.pv.gs_base_user =
             !(v->arch.user_regs.gs & ~3) ? c.nat->gs_base_user : 0;
     }
     else
     {
-        v->arch.pv_vcpu.event_callback_cs = c(event_callback_cs);
-        v->arch.pv_vcpu.failsafe_callback_cs = c(failsafe_callback_cs);
+        v->arch.pv.event_callback_cs = c(event_callback_cs);
+        v->arch.pv.failsafe_callback_cs = c(failsafe_callback_cs);
     }
 
     /* Only CR0.TS is modifiable by guest or admin. */
-    v->arch.pv_vcpu.ctrlreg[0] &= X86_CR0_TS;
-    v->arch.pv_vcpu.ctrlreg[0] |= read_cr0() & ~X86_CR0_TS;
+    v->arch.pv.ctrlreg[0] &= X86_CR0_TS;
+    v->arch.pv.ctrlreg[0] |= read_cr0() & ~X86_CR0_TS;
 
-    cr4 = v->arch.pv_vcpu.ctrlreg[4];
-    v->arch.pv_vcpu.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(v, cr4) :
+    cr4 = v->arch.pv.ctrlreg[4];
+    v->arch.pv.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(v, cr4) :
         real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
     memset(v->arch.debugreg, 0, sizeof(v->arch.debugreg));
@@ -1012,10 +1012,10 @@ int arch_set_info_guest(
         rc = (int)pv_set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
     else
     {
-        unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames)];
+        unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv.gdt_frames)];
         unsigned int nr_frames = DIV_ROUND_UP(c.cmp->gdt_ents, 512);
 
-        if ( nr_frames > ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames) )
+        if ( nr_frames > ARRAY_SIZE(v->arch.pv.gdt_frames) )
             return -EINVAL;
 
         for ( i = 0; i < nr_frames; ++i )
@@ -1319,20 +1319,20 @@ static void load_segments(struct vcpu *n)
     if ( !is_pv_32bit_vcpu(n) )
     {
         /* This can only be non-zero if selector is NULL. */
-        if ( n->arch.pv_vcpu.fs_base | (dirty_segment_mask & DIRTY_FS_BASE) )
-            wrfsbase(n->arch.pv_vcpu.fs_base);
+        if ( n->arch.pv.fs_base | (dirty_segment_mask & DIRTY_FS_BASE) )
+            wrfsbase(n->arch.pv.fs_base);
 
         /*
          * Most kernels have non-zero GS base, so don't bother testing.
          * (For old AMD hardware this is also a serialising instruction,
          * avoiding erratum #88.)
          */
-        wrgsshadow(n->arch.pv_vcpu.gs_base_kernel);
+        wrgsshadow(n->arch.pv.gs_base_kernel);
 
         /* This can only be non-zero if selector is NULL. */
-        if ( n->arch.pv_vcpu.gs_base_user |
+        if ( n->arch.pv.gs_base_user |
              (dirty_segment_mask & DIRTY_GS_BASE) )
-            wrgsbase(n->arch.pv_vcpu.gs_base_user);
+            wrgsbase(n->arch.pv.gs_base_user);
 
         /* If in kernel mode then switch the GS bases around. */
         if ( (n->arch.flags & TF_kernel_mode) )
@@ -1341,7 +1341,7 @@ static void load_segments(struct vcpu *n)
 
     if ( unlikely(!all_segs_okay) )
     {
-        struct pv_vcpu *pv = &n->arch.pv_vcpu;
+        struct pv_vcpu *pv = &n->arch.pv;
         struct cpu_user_regs *regs = guest_cpu_user_regs();
         unsigned long *rsp =
             (unsigned long *)(((n->arch.flags & TF_kernel_mode)
@@ -1352,7 +1352,7 @@ static void load_segments(struct vcpu *n)
         rflags  = regs->rflags & ~(X86_EFLAGS_IF|X86_EFLAGS_IOPL);
         rflags |= !vcpu_info(n, evtchn_upcall_mask) << 9;
         if ( VM_ASSIST(n->domain, architectural_iopl) )
-            rflags |= n->arch.pv_vcpu.iopl;
+            rflags |= n->arch.pv.iopl;
 
         if ( is_pv_32bit_vcpu(n) )
         {
@@ -1450,11 +1450,11 @@ static void save_segments(struct vcpu *v)
 
     if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
     {
-        v->arch.pv_vcpu.fs_base = __rdfsbase();
+        v->arch.pv.fs_base = __rdfsbase();
         if ( v->arch.flags & TF_kernel_mode )
-            v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
+            v->arch.pv.gs_base_kernel = __rdgsbase();
         else
-            v->arch.pv_vcpu.gs_base_user = __rdgsbase();
+            v->arch.pv.gs_base_user = __rdgsbase();
     }
 
     if ( regs->ds )
@@ -1468,9 +1468,9 @@ static void save_segments(struct vcpu *v)
         dirty_segment_mask |= DIRTY_FS;
         /* non-nul selector kills fs_base */
         if ( regs->fs & ~3 )
-            v->arch.pv_vcpu.fs_base = 0;
+            v->arch.pv.fs_base = 0;
     }
-    if ( v->arch.pv_vcpu.fs_base )
+    if ( v->arch.pv.fs_base )
         dirty_segment_mask |= DIRTY_FS_BASE;
 
     if ( regs->gs || is_pv_32bit_vcpu(v) )
@@ -1478,10 +1478,10 @@ static void save_segments(struct vcpu *v)
         dirty_segment_mask |= DIRTY_GS;
         /* non-nul selector kills gs_base_user */
         if ( regs->gs & ~3 )
-            v->arch.pv_vcpu.gs_base_user = 0;
+            v->arch.pv.gs_base_user = 0;
     }
-    if ( v->arch.flags & TF_kernel_mode ? v->arch.pv_vcpu.gs_base_kernel
-                                        : v->arch.pv_vcpu.gs_base_user )
+    if ( v->arch.flags & TF_kernel_mode ? v->arch.pv.gs_base_kernel
+                                        : v->arch.pv.gs_base_user )
         dirty_segment_mask |= DIRTY_GS_BASE;
 
     this_cpu(dirty_segment_mask) = dirty_segment_mask;
@@ -1571,7 +1571,7 @@ static void _update_runstate_area(struct vcpu *v)
 {
     if ( !update_runstate_area(v) && is_pv_vcpu(v) &&
          !(v->arch.flags & TF_kernel_mode) )
-        v->arch.pv_vcpu.need_update_runstate_area = 1;
+        v->arch.pv.need_update_runstate_area = 1;
 }
 
 static inline bool need_full_gdt(const struct domain *d)

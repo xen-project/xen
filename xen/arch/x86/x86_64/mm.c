@@ -1007,8 +1007,8 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     fixup_guest_stack_selector(current->domain, ss);
-    current->arch.pv_vcpu.kernel_ss = ss;
-    current->arch.pv_vcpu.kernel_sp = esp;
+    current->arch.pv.kernel_ss = ss;
+    current->arch.pv.kernel_sp = esp;
     return 0;
 }
 
@@ -1026,7 +1026,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         if ( is_canonical_address(base) )
         {
             wrfsbase(base);
-            v->arch.pv_vcpu.fs_base = base;
+            v->arch.pv.fs_base = base;
         }
         else
             ret = -EINVAL;
@@ -1036,7 +1036,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         if ( is_canonical_address(base) )
         {
             wrgsshadow(base);
-            v->arch.pv_vcpu.gs_base_user = base;
+            v->arch.pv.gs_base_user = base;
         }
         else
             ret = -EINVAL;
@@ -1046,7 +1046,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         if ( is_canonical_address(base) )
         {
             wrgsbase(base);
-            v->arch.pv_vcpu.gs_base_kernel = base;
+            v->arch.pv.gs_base_kernel = base;
         }
         else
             ret = -EINVAL;

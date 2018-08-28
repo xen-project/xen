@@ -111,7 +111,7 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
         break;
 
     case 4 ... 5:
-        if ( !(curr->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) )
+        if ( !(curr->arch.pv.ctrlreg[4] & X86_CR4_DE) )
         {
             *val = curr->arch.debugreg[reg + 2];
             break;

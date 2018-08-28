@@ -37,7 +37,7 @@ bool pv_emulate_invalid_op(struct cpu_user_regs *regs);
 static inline bool pv_trap_callback_registered(const struct vcpu *v,
                                                uint8_t vector)
 {
-    return v->arch.pv_vcpu.trap_ctxt[vector].address;
+    return v->arch.pv.trap_ctxt[vector].address;
 }
 
 #else  /* !CONFIG_PV */

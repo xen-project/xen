@@ -412,7 +412,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( set_iopl.iopl > 3 )
             break;
         ret = 0;
-        curr->arch.pv_vcpu.iopl = MASK_INSR(set_iopl.iopl, X86_EFLAGS_IOPL);
+        curr->arch.pv.iopl = MASK_INSR(set_iopl.iopl, X86_EFLAGS_IOPL);
         break;
     }
 
@@ -429,12 +429,11 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             break;
         ret = 0;
 #ifndef COMPAT
-        curr->arch.pv_vcpu.iobmp = set_iobitmap.bitmap;
+        curr->arch.pv.iobmp = set_iobitmap.bitmap;
 #else
-        guest_from_compat_handle(curr->arch.pv_vcpu.iobmp,
-                                 set_iobitmap.bitmap);
+        guest_from_compat_handle(curr->arch.pv.iobmp, set_iobitmap.bitmap);
 #endif
-        curr->arch.pv_vcpu.iobmp_limit = set_iobitmap.nr_ports;
+        curr->arch.pv.iobmp_limit = set_iobitmap.nr_ports;
         break;
     }
 

@@ -37,9 +37,9 @@ bool pv_destroy_ldt(struct vcpu *v)
 
     ASSERT(!in_irq());
 
-    spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
+    spin_lock(&v->arch.pv.shadow_ldt_lock);
 
-    if ( v->arch.pv_vcpu.shadow_ldt_mapcnt == 0 )
+    if ( v->arch.pv.shadow_ldt_mapcnt == 0 )
         goto out;
 
     pl1e = pv_ldt_ptes(v);
@@ -58,11 +58,11 @@ bool pv_destroy_ldt(struct vcpu *v)
         put_page_and_type(page);
     }
 
-    ASSERT(v->arch.pv_vcpu.shadow_ldt_mapcnt == mappings_dropped);
-    v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
+    ASSERT(v->arch.pv.shadow_ldt_mapcnt == mappings_dropped);
+    v->arch.pv.shadow_ldt_mapcnt = 0;
 
  out:
-    spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
+    spin_unlock(&v->arch.pv.shadow_ldt_lock);
 
     return mappings_dropped;
 }
@@ -74,7 +74,7 @@ void pv_destroy_gdt(struct vcpu *v)
     l1_pgentry_t zero_l1e = l1e_from_mfn(zero_mfn, __PAGE_HYPERVISOR_RO);
     unsigned int i;
 
-    v->arch.pv_vcpu.gdt_ents = 0;
+    v->arch.pv.gdt_ents = 0;
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
         mfn_t mfn = l1e_get_mfn(pl1e[i]);
@@ -84,7 +84,7 @@ void pv_destroy_gdt(struct vcpu *v)
             put_page_and_type(mfn_to_page(mfn));
 
         l1e_write(&pl1e[i], zero_l1e);
-        v->arch.pv_vcpu.gdt_frames[i] = 0;
+        v->arch.pv.gdt_frames[i] = 0;
     }
 }
 
@@ -117,11 +117,11 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
     pv_destroy_gdt(v);
 
     /* Install the new GDT. */
-    v->arch.pv_vcpu.gdt_ents = entries;
+    v->arch.pv.gdt_ents = entries;
     pl1e = pv_gdt_ptes(v);
     for ( i = 0; i < nr_frames; i++ )
     {
-        v->arch.pv_vcpu.gdt_frames[i] = frames[i];
+        v->arch.pv.gdt_frames[i] = frames[i];
         l1e_write(&pl1e[i], l1e_from_pfn(frames[i], __PAGE_HYPERVISOR_RW));
     }
 

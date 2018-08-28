@@ -1144,8 +1144,7 @@ static int handle_ldt_mapping_fault(unsigned int offset,
             return 0;
 
         /* Access would have become non-canonical? Pass #GP[sel] back. */
-        if ( unlikely(!is_canonical_address(
-                          curr->arch.pv_vcpu.ldt_base + offset)) )
+        if ( unlikely(!is_canonical_address(curr->arch.pv.ldt_base + offset)) )
         {
             uint16_t ec = (offset & ~(X86_XEC_EXT | X86_XEC_IDT)) | X86_XEC_TI;
 
@@ -1154,7 +1153,7 @@ static int handle_ldt_mapping_fault(unsigned int offset,
         else
             /* else pass the #PF back, with adjusted %cr2. */
             pv_inject_page_fault(regs->error_code,
-                                 curr->arch.pv_vcpu.ldt_base + offset);
+                                 curr->arch.pv.ldt_base + offset);
     }
 
     return EXCRET_fault_fixed;
@@ -1536,7 +1535,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         /* This fault must be due to <INT n> instruction. */
         const struct trap_info *ti;
         unsigned char vector = regs->error_code >> 3;
-        ti = &v->arch.pv_vcpu.trap_ctxt[vector];
+        ti = &v->arch.pv.trap_ctxt[vector];
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             regs->rip += 2;
@@ -1768,10 +1767,10 @@ void do_device_not_available(struct cpu_user_regs *regs)
 
     vcpu_restore_fpu_lazy(curr);
 
-    if ( curr->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS )
+    if ( curr->arch.pv.ctrlreg[0] & X86_CR0_TS )
     {
         pv_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
-        curr->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
+        curr->arch.pv.ctrlreg[0] &= ~X86_CR0_TS;
     }
     else
         TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
@@ -2073,10 +2072,10 @@ void activate_debugregs(const struct vcpu *curr)
 
     if ( boot_cpu_has(X86_FEATURE_DBEXT) )
     {
-        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, curr->arch.pv_vcpu.dr_mask[0]);
-        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, curr->arch.pv_vcpu.dr_mask[1]);
-        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, curr->arch.pv_vcpu.dr_mask[2]);
-        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, curr->arch.pv_vcpu.dr_mask[3]);
+        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, curr->arch.pv.dr_mask[0]);
+        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, curr->arch.pv.dr_mask[1]);
+        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, curr->arch.pv.dr_mask[2]);
+        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, curr->arch.pv.dr_mask[3]);
     }
 }
 
@@ -2109,7 +2108,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         break;
 
     case 4:
-        if ( v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE )
+        if ( v->arch.pv.ctrlreg[4] & X86_CR4_DE )
             return -ENODEV;
 
         /* Fallthrough */
@@ -2129,7 +2128,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         break;
 
     case 5:
-        if ( v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE )
+        if ( v->arch.pv.ctrlreg[4] & X86_CR4_DE )
             return -ENODEV;
 
         /* Fallthrough */
@@ -2160,7 +2159,7 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
             {
                 if ( ((value >> i) & 3) == DR_IO )
                 {
-                    if ( !(v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) )
+                    if ( !(v->arch.pv.ctrlreg[4] & X86_CR4_DE) )
                         return -EPERM;
                     io_enable |= value & (3 << ((i - 16) >> 1));
                 }

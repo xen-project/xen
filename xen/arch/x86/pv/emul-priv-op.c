@@ -111,9 +111,9 @@ static bool iopl_ok(const struct vcpu *v, const struct cpu_user_regs *regs)
     unsigned int cpl = guest_kernel_mode(v, regs) ?
         (VM_ASSIST(v->domain, architectural_iopl) ? 0 : 1) : 3;
 
-    ASSERT((v->arch.pv_vcpu.iopl & ~X86_EFLAGS_IOPL) == 0);
+    ASSERT((v->arch.pv.iopl & ~X86_EFLAGS_IOPL) == 0);
 
-    return IOPL(cpl) <= v->arch.pv_vcpu.iopl;
+    return IOPL(cpl) <= v->arch.pv.iopl;
 }
 
 /* Has the guest requested sufficient permission for this I/O access? */
@@ -126,7 +126,7 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
     if ( iopl_ok(v, regs) )
         return true;
 
-    if ( (port + bytes) <= v->arch.pv_vcpu.iobmp_limit )
+    if ( (port + bytes) <= v->arch.pv.iobmp_limit )
     {
         union { uint8_t bytes[2]; uint16_t mask; } x;
 
@@ -137,7 +137,7 @@ static bool guest_io_okay(unsigned int port, unsigned int bytes,
         if ( user_mode )
             toggle_guest_pt(v);
 
-        switch ( __copy_from_guest_offset(x.bytes, v->arch.pv_vcpu.iobmp,
+        switch ( __copy_from_guest_offset(x.bytes, v->arch.pv.iobmp,
                                           port>>3, 2) )
         {
         default: x.bytes[0] = ~0;
@@ -286,8 +286,7 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
     unsigned int width, i, match = 0;
     unsigned long start;
 
-    if ( !(v->arch.debugreg[5]) ||
-         !(v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_DE) )
+    if ( !(v->arch.debugreg[5]) || !(v->arch.pv.ctrlreg[4] & X86_CR4_DE) )
         return 0;
 
     for ( i = 0; i < 4; i++ )
@@ -701,12 +700,12 @@ static int read_cr(unsigned int reg, unsigned long *val,
     switch ( reg )
     {
     case 0: /* Read CR0 */
-        *val = (read_cr0() & ~X86_CR0_TS) | curr->arch.pv_vcpu.ctrlreg[0];
+        *val = (read_cr0() & ~X86_CR0_TS) | curr->arch.pv.ctrlreg[0];
         return X86EMUL_OKAY;
 
     case 2: /* Read CR2 */
     case 4: /* Read CR4 */
-        *val = curr->arch.pv_vcpu.ctrlreg[reg];
+        *val = curr->arch.pv.ctrlreg[reg];
         return X86EMUL_OKAY;
 
     case 3: /* Read CR3 */
@@ -755,7 +754,7 @@ static int write_cr(unsigned int reg, unsigned long val,
         return X86EMUL_OKAY;
 
     case 2: /* Write CR2 */
-        curr->arch.pv_vcpu.ctrlreg[2] = val;
+        curr->arch.pv.ctrlreg[2] = val;
         arch_set_cr2(curr, val);
         return X86EMUL_OKAY;
 
@@ -785,7 +784,7 @@ static int write_cr(unsigned int reg, unsigned long val,
     }
 
     case 4: /* Write CR4 */
-        curr->arch.pv_vcpu.ctrlreg[4] = pv_guest_cr4_fixup(curr, val);
+        curr->arch.pv.ctrlreg[4] = pv_guest_cr4_fixup(curr, val);
         write_cr4(pv_guest_cr4_to_real_cr4(curr));
         ctxt_switch_levelling(curr);
         return X86EMUL_OKAY;
@@ -834,20 +833,20 @@ static int read_msr(unsigned int reg, uint64_t *val,
     case MSR_FS_BASE:
         if ( is_pv_32bit_domain(currd) )
             break;
-        *val = cpu_has_fsgsbase ? __rdfsbase() : curr->arch.pv_vcpu.fs_base;
+        *val = cpu_has_fsgsbase ? __rdfsbase() : curr->arch.pv.fs_base;
         return X86EMUL_OKAY;
 
     case MSR_GS_BASE:
         if ( is_pv_32bit_domain(currd) )
             break;
         *val = cpu_has_fsgsbase ? __rdgsbase()
-                                : curr->arch.pv_vcpu.gs_base_kernel;
+                                : curr->arch.pv.gs_base_kernel;
         return X86EMUL_OKAY;
 
     case MSR_SHADOW_GS_BASE:
         if ( is_pv_32bit_domain(currd) )
             break;
-        *val = curr->arch.pv_vcpu.gs_base_user;
+        *val = curr->arch.pv.gs_base_user;
         return X86EMUL_OKAY;
 
     /*
@@ -918,13 +917,13 @@ static int read_msr(unsigned int reg, uint64_t *val,
     case MSR_AMD64_DR0_ADDRESS_MASK:
         if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
             break;
-        *val = curr->arch.pv_vcpu.dr_mask[0];
+        *val = curr->arch.pv.dr_mask[0];
         return X86EMUL_OKAY;
 
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
         if ( !boot_cpu_has(X86_FEATURE_DBEXT) )
             break;
-        *val = curr->arch.pv_vcpu.dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1];
+        *val = curr->arch.pv.dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1];
         return X86EMUL_OKAY;
 
     case MSR_IA32_PERF_CAPABILITIES:
@@ -996,21 +995,21 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
         wrfsbase(val);
-        curr->arch.pv_vcpu.fs_base = val;
+        curr->arch.pv.fs_base = val;
         return X86EMUL_OKAY;
 
     case MSR_GS_BASE:
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
         wrgsbase(val);
-        curr->arch.pv_vcpu.gs_base_kernel = val;
+        curr->arch.pv.gs_base_kernel = val;
         return X86EMUL_OKAY;
 
     case MSR_SHADOW_GS_BASE:
         if ( is_pv_32bit_domain(currd) || !is_canonical_address(val) )
             break;
         wrgsshadow(val);
-        curr->arch.pv_vcpu.gs_base_user = val;
+        curr->arch.pv.gs_base_user = val;
         return X86EMUL_OKAY;
 
     case MSR_K7_FID_VID_STATUS:
@@ -1115,7 +1114,7 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_AMD64_DR0_ADDRESS_MASK:
         if ( !boot_cpu_has(X86_FEATURE_DBEXT) || (val >> 32) )
             break;
-        curr->arch.pv_vcpu.dr_mask[0] = val;
+        curr->arch.pv.dr_mask[0] = val;
         if ( curr->arch.debugreg[7] & DR7_ACTIVE_MASK )
             wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, val);
         return X86EMUL_OKAY;
@@ -1123,7 +1122,7 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
         if ( !boot_cpu_has(X86_FEATURE_DBEXT) || (val >> 32) )
             break;
-        curr->arch.pv_vcpu.dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1] = val;
+        curr->arch.pv.dr_mask[reg - MSR_AMD64_DR1_ADDRESS_MASK + 1] = val;
         if ( curr->arch.debugreg[7] & DR7_ACTIVE_MASK )
             wrmsrl(reg, val);
         return X86EMUL_OKAY;
@@ -1327,7 +1326,7 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
     else
         regs->eflags |= X86_EFLAGS_IF;
     ASSERT(!(regs->eflags & X86_EFLAGS_IOPL));
-    regs->eflags |= curr->arch.pv_vcpu.iopl;
+    regs->eflags |= curr->arch.pv.iopl;
     eflags = regs->eflags;
 
     ctxt.ctxt.addr_size = ar & _SEGMENT_L ? 64 : ar & _SEGMENT_DB ? 32 : 16;
@@ -1369,7 +1368,7 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
         if ( ctxt.bpmatch )
         {
             curr->arch.debugreg[6] |= ctxt.bpmatch | DR_STATUS_RESERVED_ONE;
-            if ( !(curr->arch.pv_vcpu.trap_bounce.flags & TBF_EXCEPTION) )
+            if ( !(curr->arch.pv.trap_bounce.flags & TBF_EXCEPTION) )
                 pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
         }
         /* fall through */

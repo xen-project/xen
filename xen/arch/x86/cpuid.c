@@ -841,7 +841,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
              *
              * Architecturally, the correct code here is simply:
              *
-             *   if ( v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE )
+             *   if ( v->arch.pv.ctrlreg[4] & X86_CR4_OSXSAVE )
              *       c |= cpufeat_mask(X86_FEATURE_OSXSAVE);
              *
              * However because of bugs in Xen (before c/s bd19080b, Nov 2010,
@@ -887,7 +887,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
              *    #UD or #GP is currently being serviced.
              */
             /* OSXSAVE clear in policy.  Fast-forward CR4 back in. */
-            if ( (v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE) ||
+            if ( (v->arch.pv.ctrlreg[4] & X86_CR4_OSXSAVE) ||
                  (regs->entry_vector == TRAP_invalid_op &&
                   guest_kernel_mode(v, regs) &&
                   (read_cr4() & X86_CR4_OSXSAVE)) )
@@ -959,7 +959,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         case 0:
             /* OSPKE clear in policy.  Fast-forward CR4 back in. */
             if ( (is_pv_domain(d)
-                  ? v->arch.pv_vcpu.ctrlreg[4]
+                  ? v->arch.pv.ctrlreg[4]
                   : v->arch.hvm_vcpu.guest_cr[4]) & X86_CR4_PKE )
                 res->c |= cpufeat_mask(X86_FEATURE_OSPKE);
             break;

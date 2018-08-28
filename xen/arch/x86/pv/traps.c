@@ -63,8 +63,8 @@ void pv_inject_event(const struct x86_event *event)
     else
         ASSERT(error_code == X86_EVENT_NO_EC);
 
-    tb = &curr->arch.pv_vcpu.trap_bounce;
-    ti = &curr->arch.pv_vcpu.trap_ctxt[vector];
+    tb = &curr->arch.pv.trap_bounce;
+    ti = &curr->arch.pv.trap_ctxt[vector];
 
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -73,7 +73,7 @@ void pv_inject_event(const struct x86_event *event)
     if ( event->type == X86_EVENTTYPE_HW_EXCEPTION &&
          vector == TRAP_page_fault )
     {
-        curr->arch.pv_vcpu.ctrlreg[2] = event->cr2;
+        curr->arch.pv.ctrlreg[2] = event->cr2;
         arch_set_cr2(curr, event->cr2);
 
         /* Re-set error_code.user flag appropriately for the guest. */
@@ -113,7 +113,7 @@ void pv_inject_event(const struct x86_event *event)
 bool set_guest_machinecheck_trapbounce(void)
 {
     struct vcpu *curr = current;
-    struct trap_bounce *tb = &curr->arch.pv_vcpu.trap_bounce;
+    struct trap_bounce *tb = &curr->arch.pv.trap_bounce;
 
     pv_inject_hw_exception(TRAP_machine_check, X86_EVENT_NO_EC);
     tb->flags &= ~TBF_EXCEPTION; /* not needed for MCE delivery path */
@@ -128,7 +128,7 @@ bool set_guest_machinecheck_trapbounce(void)
 bool set_guest_nmi_trapbounce(void)
 {
     struct vcpu *curr = current;
-    struct trap_bounce *tb = &curr->arch.pv_vcpu.trap_bounce;
+    struct trap_bounce *tb = &curr->arch.pv.trap_bounce;
 
     pv_inject_hw_exception(TRAP_nmi, X86_EVENT_NO_EC);
     tb->flags &= ~TBF_EXCEPTION; /* not needed for NMI delivery path */

@@ -42,12 +42,12 @@ long do_fpu_taskswitch(int set)
 
     if ( set )
     {
-        v->arch.pv_vcpu.ctrlreg[0] |= X86_CR0_TS;
+        v->arch.pv.ctrlreg[0] |= X86_CR0_TS;
         stts();
     }
     else
     {
-        v->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
+        v->arch.pv.ctrlreg[0] &= ~X86_CR0_TS;
         if ( v->fpu_dirtied )
             clts();
     }

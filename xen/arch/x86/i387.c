@@ -233,7 +233,7 @@ void vcpu_restore_fpu_nonlazy(struct vcpu *v, bool need_stts)
         v->fpu_dirtied = 1;
 
         /* Xen doesn't need TS set, but the guest might. */
-        need_stts = is_pv_vcpu(v) && (v->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS);
+        need_stts = is_pv_vcpu(v) && (v->arch.pv.ctrlreg[0] & X86_CR0_TS);
     }
     else
     {

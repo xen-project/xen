@@ -169,15 +169,15 @@ void vcpu_show_registers(const struct vcpu *v)
     if ( !is_pv_vcpu(v) )
         return;
 
-    crs[0] = v->arch.pv_vcpu.ctrlreg[0];
+    crs[0] = v->arch.pv.ctrlreg[0];
     crs[2] = arch_get_cr2(v);
     crs[3] = pagetable_get_paddr(kernel ?
                                  v->arch.guest_table :
                                  v->arch.guest_table_user);
-    crs[4] = v->arch.pv_vcpu.ctrlreg[4];
-    crs[5] = v->arch.pv_vcpu.fs_base;
-    crs[6 + !kernel] = v->arch.pv_vcpu.gs_base_kernel;
-    crs[7 - !kernel] = v->arch.pv_vcpu.gs_base_user;
+    crs[4] = v->arch.pv.ctrlreg[4];
+    crs[5] = v->arch.pv.fs_base;
+    crs[6 + !kernel] = v->arch.pv.gs_base_kernel;
+    crs[7 - !kernel] = v->arch.pv.gs_base_user;
 
     _show_registers(regs, crs, CTXT_pv_guest, v);
 }

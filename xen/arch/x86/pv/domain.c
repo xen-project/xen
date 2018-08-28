@@ -161,8 +161,7 @@ void pv_vcpu_destroy(struct vcpu *v)
     }
 
     pv_destroy_gdt_ldt_l1tab(v);
-    xfree(v->arch.pv_vcpu.trap_ctxt);
-    v->arch.pv_vcpu.trap_ctxt = NULL;
+    XFREE(v->arch.pv.trap_ctxt);
 }
 
 int pv_vcpu_initialise(struct vcpu *v)
@@ -172,17 +171,16 @@ int pv_vcpu_initialise(struct vcpu *v)
 
     ASSERT(!is_idle_domain(d));
 
-    spin_lock_init(&v->arch.pv_vcpu.shadow_ldt_lock);
+    spin_lock_init(&v->arch.pv.shadow_ldt_lock);
 
     rc = pv_create_gdt_ldt_l1tab(v);
     if ( rc )
         return rc;
 
-    BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) >
+    BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv.trap_ctxt) >
                  PAGE_SIZE);
-    v->arch.pv_vcpu.trap_ctxt = xzalloc_array(struct trap_info,
-                                              NR_VECTORS);
-    if ( !v->arch.pv_vcpu.trap_ctxt )
+    v->arch.pv.trap_ctxt = xzalloc_array(struct trap_info, NR_VECTORS);
+    if ( !v->arch.pv.trap_ctxt )
     {
         rc = -ENOMEM;
         goto done;
@@ -191,7 +189,7 @@ int pv_vcpu_initialise(struct vcpu *v)
     /* PV guests by default have a 100Hz ticker. */
     v->periodic_period = MILLISECS(10);
 
-    v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
+    v->arch.pv.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
     if ( is_pv_32bit_domain(d) )
     {
@@ -314,14 +312,12 @@ static void _toggle_guest_pt(struct vcpu *v)
     if ( !(v->arch.flags & TF_kernel_mode) )
         return;
 
-    if ( v->arch.pv_vcpu.need_update_runstate_area &&
-         update_runstate_area(v) )
-        v->arch.pv_vcpu.need_update_runstate_area = 0;
+    if ( v->arch.pv.need_update_runstate_area && update_runstate_area(v) )
+        v->arch.pv.need_update_runstate_area = 0;
 
-    if ( v->arch.pv_vcpu.pending_system_time.version &&
-         update_secondary_system_time(v,
-                                      &v->arch.pv_vcpu.pending_system_time) )
-        v->arch.pv_vcpu.pending_system_time.version = 0;
+    if ( v->arch.pv.pending_system_time.version &&
+         update_secondary_system_time(v, &v->arch.pv.pending_system_time) )
+        v->arch.pv.pending_system_time.version = 0;
 }
 
 void toggle_guest_mode(struct vcpu *v)
@@ -331,9 +327,9 @@ void toggle_guest_mode(struct vcpu *v)
     if ( cpu_has_fsgsbase )
     {
         if ( v->arch.flags & TF_kernel_mode )
-            v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
+            v->arch.pv.gs_base_kernel = __rdgsbase();
         else
-            v->arch.pv_vcpu.gs_base_user = __rdgsbase();
+            v->arch.pv.gs_base_user = __rdgsbase();
     }
     asm volatile ( "swapgs" );
 

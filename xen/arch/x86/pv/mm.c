@@ -87,7 +87,7 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     struct domain *currd = curr->domain;
     struct page_info *page;
     l1_pgentry_t gl1e, *pl1e;
-    unsigned long linear = curr->arch.pv_vcpu.ldt_base + offset;
+    unsigned long linear = curr->arch.pv.ldt_base + offset;
 
     BUG_ON(unlikely(in_irq()));
 
@@ -97,7 +97,7 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
      * current vcpu, and vcpu_reset() will block until this vcpu has been
      * descheduled before continuing.
      */
-    ASSERT((offset >> 3) <= curr->arch.pv_vcpu.ldt_ents);
+    ASSERT((offset >> 3) <= curr->arch.pv.ldt_ents);
 
     if ( is_pv_32bit_domain(currd) )
         linear = (uint32_t)linear;
@@ -119,10 +119,10 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     pl1e = &pv_ldt_ptes(curr)[offset >> PAGE_SHIFT];
     l1e_add_flags(gl1e, _PAGE_RW);
 
-    spin_lock(&curr->arch.pv_vcpu.shadow_ldt_lock);
+    spin_lock(&curr->arch.pv.shadow_ldt_lock);
     l1e_write(pl1e, gl1e);
-    curr->arch.pv_vcpu.shadow_ldt_mapcnt++;
-    spin_unlock(&curr->arch.pv_vcpu.shadow_ldt_lock);
+    curr->arch.pv.shadow_ldt_mapcnt++;
+    spin_unlock(&curr->arch.pv.shadow_ldt_lock);
 
     return true;
 }

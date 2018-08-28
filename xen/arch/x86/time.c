@@ -1099,7 +1099,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 
     if ( !update_secondary_system_time(v, &_u) && is_pv_domain(d) &&
          !is_pv_32bit_domain(d) && !(v->arch.flags & TF_kernel_mode) )
-        v->arch.pv_vcpu.pending_system_time = _u;
+        v->arch.pv.pending_system_time = _u;
 }
 
 bool update_secondary_system_time(struct vcpu *v,

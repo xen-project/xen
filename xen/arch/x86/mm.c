@@ -510,7 +510,7 @@ unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v)
     const struct domain *d = v->domain;
     unsigned long cr4;
 
-    cr4 = v->arch.pv_vcpu.ctrlreg[4] & ~X86_CR4_DE;
+    cr4 = v->arch.pv.ctrlreg[4] & ~X86_CR4_DE;
     cr4 |= mmu_cr4_features & (X86_CR4_PSE | X86_CR4_SMEP | X86_CR4_SMAP |
                                X86_CR4_OSXSAVE | X86_CR4_FSGSBASE);
 
@@ -3471,14 +3471,14 @@ long do_mmuext_op(
                          "Bad args to SET_LDT: ptr=%lx, ents=%x\n", ptr, ents);
                 rc = -EINVAL;
             }
-            else if ( (curr->arch.pv_vcpu.ldt_ents != ents) ||
-                      (curr->arch.pv_vcpu.ldt_base != ptr) )
+            else if ( (curr->arch.pv.ldt_ents != ents) ||
+                      (curr->arch.pv.ldt_base != ptr) )
             {
                 if ( pv_destroy_ldt(curr) )
                     flush_tlb_local();
 
-                curr->arch.pv_vcpu.ldt_base = ptr;
-                curr->arch.pv_vcpu.ldt_ents = ents;
+                curr->arch.pv.ldt_base = ptr;
+                curr->arch.pv.ldt_ents = ents;
                 load_LDT(curr);
             }
             break;

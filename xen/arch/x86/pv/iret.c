@@ -51,7 +51,7 @@ unsigned long do_iret(void)
     }
 
     if ( VM_ASSIST(v->domain, architectural_iopl) )
-        v->arch.pv_vcpu.iopl = iret_saved.rflags & X86_EFLAGS_IOPL;
+        v->arch.pv.iopl = iret_saved.rflags & X86_EFLAGS_IOPL;
 
     regs->rip    = iret_saved.rip;
     regs->cs     = iret_saved.cs | 3; /* force guest privilege */
@@ -115,7 +115,7 @@ unsigned int compat_iret(void)
     }
 
     if ( VM_ASSIST(v->domain, architectural_iopl) )
-        v->arch.pv_vcpu.iopl = eflags & X86_EFLAGS_IOPL;
+        v->arch.pv.iopl = eflags & X86_EFLAGS_IOPL;
 
     regs->eflags = (eflags & ~X86_EFLAGS_IOPL) | X86_EFLAGS_IF;
 
@@ -130,7 +130,7 @@ unsigned int compat_iret(void)
          * mode frames).
          */
         const struct trap_info *ti;
-        u32 x, ksp = v->arch.pv_vcpu.kernel_sp - 40;
+        u32 x, ksp = v->arch.pv.kernel_sp - 40;
         unsigned int i;
         int rc = 0;
 
@@ -158,9 +158,9 @@ unsigned int compat_iret(void)
             return 0;
         }
         regs->esp = ksp;
-        regs->ss = v->arch.pv_vcpu.kernel_ss;
+        regs->ss = v->arch.pv.kernel_ss;
 
-        ti = &v->arch.pv_vcpu.trap_ctxt[TRAP_gp_fault];
+        ti = &v->arch.pv.trap_ctxt[TRAP_gp_fault];
         if ( TI_GET_IF(ti) )
             eflags &= ~X86_EFLAGS_IF;
         regs->eflags &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|

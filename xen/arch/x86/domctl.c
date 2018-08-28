@@ -856,17 +856,17 @@ long arch_do_domctl(
             if ( is_pv_domain(d) )
             {
                 evc->sysenter_callback_cs      =
-                    v->arch.pv_vcpu.sysenter_callback_cs;
+                    v->arch.pv.sysenter_callback_cs;
                 evc->sysenter_callback_eip     =
-                    v->arch.pv_vcpu.sysenter_callback_eip;
+                    v->arch.pv.sysenter_callback_eip;
                 evc->sysenter_disables_events  =
-                    v->arch.pv_vcpu.sysenter_disables_events;
+                    v->arch.pv.sysenter_disables_events;
                 evc->syscall32_callback_cs     =
-                    v->arch.pv_vcpu.syscall32_callback_cs;
+                    v->arch.pv.syscall32_callback_cs;
                 evc->syscall32_callback_eip    =
-                    v->arch.pv_vcpu.syscall32_callback_eip;
+                    v->arch.pv.syscall32_callback_eip;
                 evc->syscall32_disables_events =
-                    v->arch.pv_vcpu.syscall32_disables_events;
+                    v->arch.pv.syscall32_disables_events;
             }
             else
             {
@@ -900,18 +900,18 @@ long arch_do_domctl(
                     break;
                 domain_pause(d);
                 fixup_guest_code_selector(d, evc->sysenter_callback_cs);
-                v->arch.pv_vcpu.sysenter_callback_cs      =
+                v->arch.pv.sysenter_callback_cs =
                     evc->sysenter_callback_cs;
-                v->arch.pv_vcpu.sysenter_callback_eip     =
+                v->arch.pv.sysenter_callback_eip =
                     evc->sysenter_callback_eip;
-                v->arch.pv_vcpu.sysenter_disables_events  =
+                v->arch.pv.sysenter_disables_events =
                     evc->sysenter_disables_events;
                 fixup_guest_code_selector(d, evc->syscall32_callback_cs);
-                v->arch.pv_vcpu.syscall32_callback_cs     =
+                v->arch.pv.syscall32_callback_cs =
                     evc->syscall32_callback_cs;
-                v->arch.pv_vcpu.syscall32_callback_eip    =
+                v->arch.pv.syscall32_callback_eip =
                     evc->syscall32_callback_eip;
-                v->arch.pv_vcpu.syscall32_disables_events =
+                v->arch.pv.syscall32_disables_events =
                     evc->syscall32_disables_events;
             }
             else if ( (evc->sysenter_callback_cs & ~3) ||
@@ -1330,12 +1330,12 @@ long arch_do_domctl(
 
                 if ( boot_cpu_has(X86_FEATURE_DBEXT) )
                 {
-                    if ( v->arch.pv_vcpu.dr_mask[0] )
+                    if ( v->arch.pv.dr_mask[0] )
                     {
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
-                            msr.value = v->arch.pv_vcpu.dr_mask[0];
+                            msr.value = v->arch.pv.dr_mask[0];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
                         }
@@ -1344,12 +1344,12 @@ long arch_do_domctl(
 
                     for ( j = 0; j < 3; ++j )
                     {
-                        if ( !v->arch.pv_vcpu.dr_mask[1 + j] )
+                        if ( !v->arch.pv.dr_mask[1 + j] )
                             continue;
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
-                            msr.value = v->arch.pv_vcpu.dr_mask[1 + j];
+                            msr.value = v->arch.pv.dr_mask[1 + j];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
                         }
@@ -1394,7 +1394,7 @@ long arch_do_domctl(
                     if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
                          (msr.value >> 32) )
                         break;
-                    v->arch.pv_vcpu.dr_mask[0] = msr.value;
+                    v->arch.pv.dr_mask[0] = msr.value;
                     continue;
 
                 case MSR_AMD64_DR1_ADDRESS_MASK ...
@@ -1403,7 +1403,7 @@ long arch_do_domctl(
                          (msr.value >> 32) )
                         break;
                     msr.index -= MSR_AMD64_DR1_ADDRESS_MASK - 1;
-                    v->arch.pv_vcpu.dr_mask[msr.index] = msr.value;
+                    v->arch.pv.dr_mask[msr.index] = msr.value;
                     continue;
                 }
                 break;
@@ -1564,7 +1564,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     {
         memcpy(&c.nat->user_regs, &v->arch.user_regs, sizeof(c.nat->user_regs));
         if ( is_pv_domain(d) )
-            memcpy(c.nat->trap_ctxt, v->arch.pv_vcpu.trap_ctxt,
+            memcpy(c.nat->trap_ctxt, v->arch.pv.trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
     else
@@ -1574,7 +1574,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         {
             for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); ++i )
                 XLAT_trap_info(c.cmp->trap_ctxt + i,
-                               v->arch.pv_vcpu.trap_ctxt + i);
+                               v->arch.pv.trap_ctxt + i);
         }
     }
 
@@ -1615,37 +1615,37 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     }
     else
     {
-        c(ldt_base = v->arch.pv_vcpu.ldt_base);
-        c(ldt_ents = v->arch.pv_vcpu.ldt_ents);
-        for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
-            c(gdt_frames[i] = v->arch.pv_vcpu.gdt_frames[i]);
+        c(ldt_base = v->arch.pv.ldt_base);
+        c(ldt_ents = v->arch.pv.ldt_ents);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.pv.gdt_frames); ++i )
+            c(gdt_frames[i] = v->arch.pv.gdt_frames[i]);
         BUILD_BUG_ON(ARRAY_SIZE(c.nat->gdt_frames) !=
                      ARRAY_SIZE(c.cmp->gdt_frames));
         for ( ; i < ARRAY_SIZE(c.nat->gdt_frames); ++i )
             c(gdt_frames[i] = 0);
-        c(gdt_ents = v->arch.pv_vcpu.gdt_ents);
-        c(kernel_ss = v->arch.pv_vcpu.kernel_ss);
-        c(kernel_sp = v->arch.pv_vcpu.kernel_sp);
-        for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.ctrlreg); ++i )
-            c(ctrlreg[i] = v->arch.pv_vcpu.ctrlreg[i]);
-        c(event_callback_eip = v->arch.pv_vcpu.event_callback_eip);
-        c(failsafe_callback_eip = v->arch.pv_vcpu.failsafe_callback_eip);
+        c(gdt_ents = v->arch.pv.gdt_ents);
+        c(kernel_ss = v->arch.pv.kernel_ss);
+        c(kernel_sp = v->arch.pv.kernel_sp);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.pv.ctrlreg); ++i )
+            c(ctrlreg[i] = v->arch.pv.ctrlreg[i]);
+        c(event_callback_eip = v->arch.pv.event_callback_eip);
+        c(failsafe_callback_eip = v->arch.pv.failsafe_callback_eip);
         if ( !compat )
         {
-            c.nat->syscall_callback_eip = v->arch.pv_vcpu.syscall_callback_eip;
-            c.nat->fs_base = v->arch.pv_vcpu.fs_base;
-            c.nat->gs_base_kernel = v->arch.pv_vcpu.gs_base_kernel;
-            c.nat->gs_base_user = v->arch.pv_vcpu.gs_base_user;
+            c.nat->syscall_callback_eip = v->arch.pv.syscall_callback_eip;
+            c.nat->fs_base = v->arch.pv.fs_base;
+            c.nat->gs_base_kernel = v->arch.pv.gs_base_kernel;
+            c.nat->gs_base_user = v->arch.pv.gs_base_user;
         }
         else
         {
-            c(event_callback_cs = v->arch.pv_vcpu.event_callback_cs);
-            c(failsafe_callback_cs = v->arch.pv_vcpu.failsafe_callback_cs);
+            c(event_callback_cs = v->arch.pv.event_callback_cs);
+            c(failsafe_callback_cs = v->arch.pv.failsafe_callback_cs);
         }
 
         /* IOPL privileges are virtualised: merge back into returned eflags. */
         BUG_ON((c(user_regs.eflags) & X86_EFLAGS_IOPL) != 0);
-        c(user_regs.eflags |= v->arch.pv_vcpu.iopl);
+        c(user_regs.eflags |= v->arch.pv.iopl);
 
         if ( !compat )
         {

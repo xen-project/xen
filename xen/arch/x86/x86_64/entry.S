@@ -371,7 +371,7 @@ UNLIKELY_END(msi_check)
         mov   VCPU_domain(%rbx), %rax
 
         /*
-         * if ( null_trap_info(v, &v->arch.pv_vcpu.trap_ctxt[0x80]) )
+         * if ( null_trap_info(v, &v->arch.pv.trap_ctxt[0x80]) )
          *    goto int80_slow_path;
          */
         mov    0x80 * TRAPINFO_sizeof + TRAPINFO_eip(%rsi), %rdi

@@ -540,7 +540,7 @@ struct arch_vcpu
 
     /* Virtual Machine Extensions */
     union {
-        struct pv_vcpu pv_vcpu;
+        struct pv_vcpu pv;
         struct hvm_vcpu hvm_vcpu;
     };
 

@@ -324,8 +324,8 @@ void pv_emulate_gate_op(struct cpu_user_regs *regs)
                 pv_inject_hw_exception(TRAP_gp_fault, regs->error_code);
                 return;
             }
-            esp = v->arch.pv_vcpu.kernel_sp;
-            ss = v->arch.pv_vcpu.kernel_ss;
+            esp = v->arch.pv.kernel_sp;
+            ss = v->arch.pv.kernel_ss;
             if ( (ss & 3) != (sel & 3) ||
                  !pv_emul_read_descriptor(ss, v, &base, &limit, &ar, 0) ||
                  ((ar >> 13) & 3) != (sel & 3) ||

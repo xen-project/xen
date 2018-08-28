@@ -131,7 +131,7 @@ static void intel_ctxt_switch_masking(const struct vcpu *next)
 		 * kernel.
 		 */
 		if (next && is_pv_vcpu(next) && !is_idle_vcpu(next) &&
-		    !(next->arch.pv_vcpu.ctrlreg[4] & X86_CR4_OSXSAVE))
+		    !(next->arch.pv.ctrlreg[4] & X86_CR4_OSXSAVE))
 			val &= ~(uint64_t)cpufeat_mask(X86_FEATURE_OSXSAVE);
 
 		if (unlikely(these_masks->_1cd != val)) {
