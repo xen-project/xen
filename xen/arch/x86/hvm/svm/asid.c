@@ -40,7 +40,7 @@ void svm_asid_init(const struct cpuinfo_x86 *c)
 void svm_asid_handle_vmrun(void)
 {
     struct vcpu *curr = current;
-    struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = curr->arch.hvm.svm.vmcb;
     struct hvm_vcpu_asid *p_asid =
         nestedhvm_vcpu_in_guestmode(curr)
         ? &vcpu_nestedhvm(curr).nv_n2asid : &curr->arch.hvm.n1asid;

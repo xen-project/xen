@@ -178,7 +178,7 @@ struct hvm_vcpu {
     union {
         struct vmx_vcpu vmx;
         struct svm_vcpu svm;
-    } u;
+    };
 
     struct tasklet      assert_evtchn_irq_tasklet;
 

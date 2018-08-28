@@ -175,8 +175,8 @@ void vmx_realmode(struct cpu_user_regs *regs)
         intr_info = 0;
     }
 
-    curr->arch.hvm_vmx.vmx_emulate = 1;
-    while ( curr->arch.hvm_vmx.vmx_emulate &&
+    curr->arch.hvm.vmx.vmx_emulate = 1;
+    while ( curr->arch.hvm.vmx.vmx_emulate &&
             !softirq_pending(smp_processor_id()) )
     {
         /*
@@ -185,7 +185,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
          * in real mode, because we don't emulate protected-mode IDT vectoring.
          */
         if ( unlikely(!(++emulations & 15)) &&
-             curr->arch.hvm_vmx.vmx_realmode && 
+             curr->arch.hvm.vmx.vmx_realmode &&
              hvm_local_events_need_delivery(curr) )
             break;
 
@@ -195,20 +195,20 @@ void vmx_realmode(struct cpu_user_regs *regs)
             break;
 
         /* Stop emulating unless our segment state is not safe */
-        if ( curr->arch.hvm_vmx.vmx_realmode )
-            curr->arch.hvm_vmx.vmx_emulate = 
-                (curr->arch.hvm_vmx.vm86_segment_mask != 0);
+        if ( curr->arch.hvm.vmx.vmx_realmode )
+            curr->arch.hvm.vmx.vmx_emulate =
+                (curr->arch.hvm.vmx.vm86_segment_mask != 0);
         else
-            curr->arch.hvm_vmx.vmx_emulate = 
+            curr->arch.hvm.vmx.vmx_emulate =
                  ((hvmemul_ctxt.seg_reg[x86_seg_cs].sel & 3)
                   || (hvmemul_ctxt.seg_reg[x86_seg_ss].sel & 3));
     }
 
     /* Need to emulate next time if we've started an IO operation */
     if ( vio->io_req.state != STATE_IOREQ_NONE )
-        curr->arch.hvm_vmx.vmx_emulate = 1;
+        curr->arch.hvm.vmx.vmx_emulate = 1;
 
-    if ( !curr->arch.hvm_vmx.vmx_emulate && !curr->arch.hvm_vmx.vmx_realmode )
+    if ( !curr->arch.hvm.vmx.vmx_emulate && !curr->arch.hvm.vmx.vmx_realmode )
     {
         /*
          * Cannot enter protected mode with bogus selector RPLs and DPLs.

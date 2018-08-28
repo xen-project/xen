@@ -439,7 +439,7 @@ int pt_irq_create_bind(
 
         /* Use interrupt posting if it is supported. */
         if ( iommu_intpost )
-            pi_update_irte(vcpu ? &vcpu->arch.hvm_vmx.pi_desc : NULL,
+            pi_update_irte(vcpu ? &vcpu->arch.hvm.vmx.pi_desc : NULL,
                            info, pirq_dpci->gmsi.gvec);
 
         if ( pt_irq_bind->u.msi.gflags & XEN_DOMCTL_VMSI_X86_UNMASKED )

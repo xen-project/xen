@@ -82,7 +82,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
             gdprintk(XENLOG_ERR, "nest: allocation for vmread bitmap failed\n");
             return -ENOMEM;
         }
-        v->arch.hvm_vmx.vmread_bitmap = vmread_bitmap;
+        v->arch.hvm.vmx.vmread_bitmap = vmread_bitmap;
 
         clear_domain_page(page_to_mfn(vmread_bitmap));
 
@@ -92,7 +92,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
             gdprintk(XENLOG_ERR, "nest: allocation for vmwrite bitmap failed\n");
             return -ENOMEM;
         }
-        v->arch.hvm_vmx.vmwrite_bitmap = vmwrite_bitmap;
+        v->arch.hvm.vmx.vmwrite_bitmap = vmwrite_bitmap;
 
         vw = __map_domain_page(vmwrite_bitmap);
         clear_page(vw);
@@ -138,7 +138,7 @@ void nvmx_vcpu_destroy(struct vcpu *v)
      * leak of L1 VMCS page.
      */
     if ( nvcpu->nv_n1vmcx_pa )
-        v->arch.hvm_vmx.vmcs_pa = nvcpu->nv_n1vmcx_pa;
+        v->arch.hvm.vmx.vmcs_pa = nvcpu->nv_n1vmcx_pa;
 
     if ( nvcpu->nv_n2vmcx_pa )
     {
@@ -155,15 +155,15 @@ void nvmx_vcpu_destroy(struct vcpu *v)
             xfree(item);
         }
 
-    if ( v->arch.hvm_vmx.vmread_bitmap )
+    if ( v->arch.hvm.vmx.vmread_bitmap )
     {
-        free_domheap_page(v->arch.hvm_vmx.vmread_bitmap);
-        v->arch.hvm_vmx.vmread_bitmap = NULL;
+        free_domheap_page(v->arch.hvm.vmx.vmread_bitmap);
+        v->arch.hvm.vmx.vmread_bitmap = NULL;
     }
-    if ( v->arch.hvm_vmx.vmwrite_bitmap )
+    if ( v->arch.hvm.vmx.vmwrite_bitmap )
     {
-        free_domheap_page(v->arch.hvm_vmx.vmwrite_bitmap);
-        v->arch.hvm_vmx.vmwrite_bitmap = NULL;
+        free_domheap_page(v->arch.hvm.vmx.vmwrite_bitmap);
+        v->arch.hvm.vmx.vmwrite_bitmap = NULL;
     }
 }
  
@@ -809,7 +809,7 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
         hvm_unmap_guest_frame(nvcpu->nv_vvmcx, 1);
     nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = INVALID_PADDR;
-    v->arch.hvm_vmx.vmcs_shadow_maddr = 0;
+    v->arch.hvm.vmx.vmcs_shadow_maddr = 0;
     for (i=0; i<2; i++) {
         if ( nvmx->iobitmap[i] ) {
             hvm_unmap_guest_frame(nvmx->iobitmap[i], 1);
@@ -1101,8 +1101,8 @@ static void load_shadow_guest_state(struct vcpu *v)
                      (get_vvmcs(v, CR4_READ_SHADOW) & cr_gh_mask);
     __vmwrite(CR4_READ_SHADOW, cr_read_shadow);
     /* Add the nested host mask to the one set by vmx_update_guest_cr. */
-    v->arch.hvm_vmx.cr4_host_mask |= cr_gh_mask;
-    __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm_vmx.cr4_host_mask);
+    v->arch.hvm.vmx.cr4_host_mask |= cr_gh_mask;
+    __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm.vmx.cr4_host_mask);
 
     /* TODO: CR3 target control */
 }
@@ -1133,18 +1133,18 @@ static bool_t nvmx_vpid_enabled(const struct vcpu *v)
 
 static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 {
-    paddr_t vvmcs_maddr = v->arch.hvm_vmx.vmcs_shadow_maddr;
+    paddr_t vvmcs_maddr = v->arch.hvm.vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
     vvmcs->vmcs_revision_id |= VMCS_RID_TYPE_MASK;
     __vmwrite(VMCS_LINK_POINTER, vvmcs_maddr);
-    __vmwrite(VMREAD_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmread_bitmap));
-    __vmwrite(VMWRITE_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmwrite_bitmap));
+    __vmwrite(VMREAD_BITMAP, page_to_maddr(v->arch.hvm.vmx.vmread_bitmap));
+    __vmwrite(VMWRITE_BITMAP, page_to_maddr(v->arch.hvm.vmx.vmwrite_bitmap));
 }
 
 static void nvmx_clear_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 {
-    paddr_t vvmcs_maddr = v->arch.hvm_vmx.vmcs_shadow_maddr;
+    paddr_t vvmcs_maddr = v->arch.hvm.vmx.vmcs_shadow_maddr;
 
     __vmpclear(vvmcs_maddr);
     vvmcs->vmcs_revision_id &= ~VMCS_RID_TYPE_MASK;
@@ -1159,7 +1159,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     unsigned long lm_l1, lm_l2;
 
-    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs_pa, nvcpu->nv_n2vmcx_pa);
+    vmx_vmcs_switch(v->arch.hvm.vmx.vmcs_pa, nvcpu->nv_n2vmcx_pa);
 
     nestedhvm_vcpu_enter_guestmode(v);
     nvcpu->nv_vmentry_pending = 0;
@@ -1197,7 +1197,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     regs->rflags = get_vvmcs(v, GUEST_RFLAGS);
 
     /* updating host cr0 to sync TS bit */
-    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
+    __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
 
     /* Setup virtual ETP for L2 guest*/
     if ( nestedhvm_paging_mode_hap(v) )
@@ -1234,7 +1234,7 @@ static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
     if ( !(__n2_exec_control(v) & CPU_BASED_CR3_LOAD_EXITING) )
         shadow_to_vvmcs(v, GUEST_CR3);
 
-    if ( v->arch.hvm_vmx.cr4_host_mask != ~0UL )
+    if ( v->arch.hvm.vmx.cr4_host_mask != ~0UL )
         /* Only need to update nested GUEST_CR4 if not all bits are trapped. */
         set_vvmcs(v, GUEST_CR4, v->arch.hvm.guest_cr[4]);
 }
@@ -1375,7 +1375,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     /* This will clear current pCPU bit in p2m->dirty_cpumask */
     np2m_schedule(NP2M_SCHEDLE_OUT);
 
-    vmx_vmcs_switch(v->arch.hvm_vmx.vmcs_pa, nvcpu->nv_n1vmcx_pa);
+    vmx_vmcs_switch(v->arch.hvm.vmx.vmcs_pa, nvcpu->nv_n1vmcx_pa);
 
     nestedhvm_vcpu_exit_guestmode(v);
     nvcpu->nv_vmexit_pending = 0;
@@ -1404,7 +1404,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     regs->rflags = X86_EFLAGS_MBS;
 
     /* updating host cr0 to sync TS bit */
-    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
+    __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
 
     if ( cpu_has_vmx_virtual_intr_delivery )
         nvmx_update_apicv(v);
@@ -1511,12 +1511,12 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
      * `fork' the host vmcs to shadow_vmcs
      * vmcs_lock is not needed since we are on current
      */
-    nvcpu->nv_n1vmcx_pa = v->arch.hvm_vmx.vmcs_pa;
-    __vmpclear(v->arch.hvm_vmx.vmcs_pa);
+    nvcpu->nv_n1vmcx_pa = v->arch.hvm.vmx.vmcs_pa;
+    __vmpclear(v->arch.hvm.vmx.vmcs_pa);
     copy_domain_page(_mfn(PFN_DOWN(nvcpu->nv_n2vmcx_pa)),
-                     _mfn(PFN_DOWN(v->arch.hvm_vmx.vmcs_pa)));
-    __vmptrld(v->arch.hvm_vmx.vmcs_pa);
-    v->arch.hvm_vmx.launched = 0;
+                     _mfn(PFN_DOWN(v->arch.hvm.vmx.vmcs_pa)));
+    __vmptrld(v->arch.hvm.vmx.vmcs_pa);
+    v->arch.hvm.vmx.launched = 0;
     vmsucceed(regs);
 
     return X86EMUL_OKAY;
@@ -1636,7 +1636,7 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     }
 
     launched = vvmcs_launched(&nvmx->launched_list,
-                              PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
+                              PFN_DOWN(v->arch.hvm.vmx.vmcs_shadow_maddr));
     if ( !launched )
     {
         vmfail_valid(regs, VMX_INSN_VMRESUME_NONLAUNCHED_VMCS);
@@ -1670,7 +1670,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     }
 
     launched = vvmcs_launched(&nvmx->launched_list,
-                              PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
+                              PFN_DOWN(v->arch.hvm.vmx.vmcs_shadow_maddr));
     if ( launched )
     {
         vmfail_valid(regs, VMX_INSN_VMLAUNCH_NONCLEAR_VMCS);
@@ -1681,7 +1681,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
         if ( rc == X86EMUL_OKAY )
         {
             if ( set_vvmcs_launched(&nvmx->launched_list,
-                                    PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr)) < 0 )
+                                    PFN_DOWN(v->arch.hvm.vmx.vmcs_shadow_maddr)) < 0 )
                 return X86EMUL_UNHANDLEABLE;
         }
     }
@@ -1732,7 +1732,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
                 }
                 nvcpu->nv_vvmcx = vvmcx;
                 nvcpu->nv_vvmcxaddr = gpa;
-                v->arch.hvm_vmx.vmcs_shadow_maddr =
+                v->arch.hvm.vmx.vmcs_shadow_maddr =
                     mfn_to_maddr(domain_page_map_to_mfn(vvmcx));
             }
             else
@@ -1806,7 +1806,7 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         if ( cpu_has_vmx_vmcs_shadowing )
             nvmx_clear_vmcs_pointer(v, nvcpu->nv_vvmcx);
         clear_vvmcs_launched(&nvmx->launched_list,
-                             PFN_DOWN(v->arch.hvm_vmx.vmcs_shadow_maddr));
+                             PFN_DOWN(v->arch.hvm.vmx.vmcs_shadow_maddr));
         nvmx_purge_vvmcs(v);
     }
     else 
@@ -2041,7 +2041,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     case MSR_IA32_VMX_BASIC:
     {
         const struct vmcs_struct *vmcs =
-            map_domain_page(_mfn(PFN_DOWN(v->arch.hvm_vmx.vmcs_pa)));
+            map_domain_page(_mfn(PFN_DOWN(v->arch.hvm.vmx.vmcs_pa)));
 
         data = (host_data & (~0ul << 32)) |
                (vmcs->vmcs_revision_id & 0x7fffffff);

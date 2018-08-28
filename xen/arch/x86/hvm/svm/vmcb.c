@@ -53,7 +53,7 @@ void free_vmcb(struct vmcb_struct *vmcb)
 /* This function can directly access fields which are covered by clean bits. */
 static int construct_vmcb(struct vcpu *v)
 {
-    struct svm_vcpu *svm = &v->arch.hvm_svm;
+    struct svm_vcpu *svm = &v->arch.hvm.svm;
     struct vmcb_struct *vmcb = svm->vmcb;
 
     /* Build-time check of the size of VMCB AMD structure. */
@@ -225,7 +225,7 @@ static int construct_vmcb(struct vcpu *v)
 int svm_create_vmcb(struct vcpu *v)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-    struct svm_vcpu *svm = &v->arch.hvm_svm;
+    struct svm_vcpu *svm = &v->arch.hvm.svm;
     int rc;
 
     if ( (nv->nv_n1vmcx == NULL) &&
@@ -252,7 +252,7 @@ int svm_create_vmcb(struct vcpu *v)
 void svm_destroy_vmcb(struct vcpu *v)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
-    struct svm_vcpu *svm = &v->arch.hvm_svm;
+    struct svm_vcpu *svm = &v->arch.hvm.svm;
 
     if ( nv->nv_n1vmcx != NULL )
         free_vmcb(nv->nv_n1vmcx);
@@ -286,7 +286,7 @@ static void vmcb_dump(unsigned char ch)
         for_each_vcpu ( d, v )
         {
             printk("\tVCPU %d\n", v->vcpu_id);
-            svm_vmcb_dump("key_handler", v->arch.hvm_svm.vmcb);
+            svm_vmcb_dump("key_handler", v->arch.hvm.svm.vmcb);
         }
     }
 

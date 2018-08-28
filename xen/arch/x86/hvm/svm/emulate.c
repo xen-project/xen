@@ -28,7 +28,7 @@
 
 static unsigned long svm_nextrip_insn_length(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( !cpu_has_svm_nrips )
         return 0;
@@ -86,7 +86,7 @@ static const struct {
 int __get_instruction_length_from_list(struct vcpu *v,
         const enum instruction_index *list, unsigned int list_count)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct hvm_emulate_ctxt ctxt;
     struct x86_emulate_state *state;
     unsigned long inst_len, j;

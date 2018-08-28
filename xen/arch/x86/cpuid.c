@@ -1072,7 +1072,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
     case 0x8000001c:
         if ( (v->arch.xcr0 & X86_XCR0_LWP) && cpu_has_svm )
             /* Turn on available bit and other features specified in lwp_cfg. */
-            res->a = (res->d & v->arch.hvm_svm.guest_lwp_cfg) | 1;
+            res->a = (res->d & v->arch.hvm.svm.guest_lwp_cfg) | 1;
         break;
     }
 }

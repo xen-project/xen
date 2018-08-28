@@ -82,14 +82,14 @@ void __dummy__(void)
     DEFINE(_VGCF_syscall_disables_events,  _VGCF_syscall_disables_events);
     BLANK();
 
-    OFFSET(VCPU_svm_vmcb_pa, struct vcpu, arch.hvm_svm.vmcb_pa);
-    OFFSET(VCPU_svm_vmcb, struct vcpu, arch.hvm_svm.vmcb);
+    OFFSET(VCPU_svm_vmcb_pa, struct vcpu, arch.hvm.svm.vmcb_pa);
+    OFFSET(VCPU_svm_vmcb, struct vcpu, arch.hvm.svm.vmcb);
     BLANK();
 
-    OFFSET(VCPU_vmx_launched, struct vcpu, arch.hvm_vmx.launched);
-    OFFSET(VCPU_vmx_realmode, struct vcpu, arch.hvm_vmx.vmx_realmode);
-    OFFSET(VCPU_vmx_emulate, struct vcpu, arch.hvm_vmx.vmx_emulate);
-    OFFSET(VCPU_vm86_seg_mask, struct vcpu, arch.hvm_vmx.vm86_segment_mask);
+    OFFSET(VCPU_vmx_launched, struct vcpu, arch.hvm.vmx.launched);
+    OFFSET(VCPU_vmx_realmode, struct vcpu, arch.hvm.vmx.vmx_realmode);
+    OFFSET(VCPU_vmx_emulate, struct vcpu, arch.hvm.vmx.vmx_emulate);
+    OFFSET(VCPU_vm86_seg_mask, struct vcpu, arch.hvm.vmx.vm86_segment_mask);
     OFFSET(VCPU_hvm_guest_cr2, struct vcpu, arch.hvm.guest_cr[2]);
     BLANK();
 

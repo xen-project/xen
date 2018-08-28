@@ -40,7 +40,7 @@
 
 static void svm_inject_nmi(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     eventinj_t event;
 
@@ -62,7 +62,7 @@ static void svm_inject_nmi(struct vcpu *v)
 
 static void svm_inject_extint(struct vcpu *v, int vector)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     eventinj_t event;
 
     event.bytes = 0;
@@ -76,7 +76,7 @@ static void svm_inject_extint(struct vcpu *v, int vector)
 
 static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vintr_t intr;
 
@@ -133,7 +133,7 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 void svm_intr_assist(void) 
 {
     struct vcpu *v = current;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct hvm_intack intack;
     enum hvm_intblk intblk;
 

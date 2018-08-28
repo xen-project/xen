@@ -643,7 +643,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
         struct vcpu *v;
 
         for_each_vcpu ( p2m->domain, v )
-            v->arch.hvm_vmx.ept_spurious_misconfig = 1;
+            v->arch.hvm.vmx.ept_spurious_misconfig = 1;
     }
 
     return rc;
@@ -658,9 +658,9 @@ bool_t ept_handle_misconfig(uint64_t gpa)
 
     p2m_lock(p2m);
 
-    spurious = curr->arch.hvm_vmx.ept_spurious_misconfig;
+    spurious = curr->arch.hvm.vmx.ept_spurious_misconfig;
     rc = resolve_misconfig(p2m, PFN_DOWN(gpa));
-    curr->arch.hvm_vmx.ept_spurious_misconfig = 0;
+    curr->arch.hvm.vmx.ept_spurious_misconfig = 0;
 
     p2m_unlock(p2m);
 

@@ -137,7 +137,7 @@ void nsvm_vcpu_destroy(struct vcpu *v)
      * of l1 vmcb page.
      */
     if (nv->nv_n1vmcx)
-        v->arch.hvm_svm.vmcb = nv->nv_n1vmcx;
+        v->arch.hvm.svm.vmcb = nv->nv_n1vmcx;
 
     if (svm->ns_cached_msrpm) {
         free_xenheap_pages(svm->ns_cached_msrpm,
@@ -272,8 +272,8 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
      */
 
     /* switch vmcb to l1 guest's vmcb */
-    v->arch.hvm_svm.vmcb = n1vmcb;
-    v->arch.hvm_svm.vmcb_pa = nv->nv_n1vmcx_pa;
+    v->arch.hvm.svm.vmcb = n1vmcb;
+    v->arch.hvm.svm.vmcb_pa = nv->nv_n1vmcx_pa;
 
     /* EFER */
     v->arch.hvm.guest_efer = n1vmcb->_efer;
@@ -350,7 +350,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 
 static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
 {
-    struct svm_vcpu *arch_svm = &v->arch.hvm_svm;
+    struct svm_vcpu *arch_svm = &v->arch.hvm.svm;
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;
@@ -390,9 +390,7 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
     nv->nv_ioport80 = ioport_80;
     nv->nv_ioportED = ioport_ed;
 
-    /* v->arch.hvm_svm.msrpm has type unsigned long, thus
-     * BYTES_PER_LONG.
-     */
+    /* v->arch.hvm.svm.msrpm has type unsigned long, thus BYTES_PER_LONG. */
     for (i = 0; i < MSRPM_SIZE / BYTES_PER_LONG; i++)
         svm->ns_merged_msrpm[i] = arch_svm->msrpm[i] | ns_msrpm_ptr[i];
 
@@ -730,8 +728,8 @@ nsvm_vcpu_vmentry(struct vcpu *v, struct cpu_user_regs *regs,
     }
 
     /* switch vmcb to shadow vmcb */
-    v->arch.hvm_svm.vmcb = nv->nv_n2vmcx;
-    v->arch.hvm_svm.vmcb_pa = nv->nv_n2vmcx_pa;
+    v->arch.hvm.svm.vmcb = nv->nv_n2vmcx;
+    v->arch.hvm.svm.vmcb_pa = nv->nv_n2vmcx_pa;
 
     ret = nsvm_vmcb_prepare4vmrun(v, regs);
     if (ret) {
@@ -800,7 +798,7 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct vmcb_struct *ns_vmcb;
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( vmcb->_vintr.fields.vgif_enable )
         ASSERT(vmcb->_vintr.fields.vgif == 0);
@@ -1348,7 +1346,7 @@ nestedsvm_vmexit_defer(struct vcpu *v,
     uint64_t exitcode, uint64_t exitinfo1, uint64_t exitinfo2)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
     if ( vmcb->_vintr.fields.vgif_enable )
         vmcb->_vintr.fields.vgif = 0;
@@ -1522,7 +1520,7 @@ void nsvm_vcpu_switch(struct cpu_user_regs *regs)
 
     nv = &vcpu_nestedhvm(v);
     svm = &vcpu_nestedsvm(v);
-    ASSERT(v->arch.hvm_svm.vmcb != NULL);
+    ASSERT(v->arch.hvm.svm.vmcb != NULL);
     ASSERT(nv->nv_n1vmcx != NULL);
     ASSERT(nv->nv_n2vmcx != NULL);
     ASSERT(nv->nv_n1vmcx_pa != INVALID_PADDR);
@@ -1607,7 +1605,7 @@ bool_t
 nestedsvm_gif_isset(struct vcpu *v)
 {
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
     /* get the vmcb gif value if using vgif */
     if ( vmcb->_vintr.fields.vgif_enable )
@@ -1640,7 +1638,7 @@ void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
 
 void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     unsigned int inst_len;
     uint32_t general1_intercepts = vmcb_get_general1_intercepts(vmcb);
     vintr_t intr;
@@ -1672,7 +1670,7 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
  */
 void svm_nested_features_on_efer_update(struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     u32 general2_intercepts;
     vintr_t vintr;

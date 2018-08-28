@@ -606,10 +606,6 @@ struct guest_memory_policy
 void update_guest_memory_policy(struct vcpu *v,
                                 struct guest_memory_policy *policy);
 
-/* Shorthands to improve code legibility. */
-#define hvm_vmx         hvm.u.vmx
-#define hvm_svm         hvm.u.svm
-
 bool update_runstate_area(struct vcpu *);
 bool update_secondary_system_time(struct vcpu *,
                                   struct vcpu_time_info *);

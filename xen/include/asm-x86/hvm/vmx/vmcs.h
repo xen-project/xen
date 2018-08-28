@@ -311,7 +311,7 @@ extern u64 vmx_ept_vpid_cap;
 #define cpu_has_vmx_unrestricted_guest \
     (vmx_secondary_exec_control & SECONDARY_EXEC_UNRESTRICTED_GUEST)
 #define vmx_unrestricted_guest(v)               \
-    ((v)->arch.hvm_vmx.secondary_exec_control & \
+    ((v)->arch.hvm.vmx.secondary_exec_control & \
      SECONDARY_EXEC_UNRESTRICTED_GUEST)
 #define cpu_has_vmx_ple \
     (vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING)
