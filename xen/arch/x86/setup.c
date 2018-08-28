@@ -1506,6 +1506,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     generic_apic_probe();
 
+    mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
+                                  RANGESETF_prettyprint_hex);
+
     acpi_boot_init();
 
     if ( smp_found_config )
@@ -1537,9 +1540,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     /* Low mappings were only needed for some BIOS table parsing. */
     zap_low_mappings();
-
-    mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
-                                  RANGESETF_prettyprint_hex);
 
     init_apic_mappings();
 
@@ -1610,8 +1610,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     local_irq_enable();
 
     vesa_mtrr_init();
-
-    acpi_mmcfg_init();
 
     early_msi_init();
 

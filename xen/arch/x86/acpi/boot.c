@@ -724,6 +724,8 @@ int __init acpi_boot_init(void)
 
 	acpi_table_parse(ACPI_SIG_HPET, acpi_parse_hpet);
 
+	acpi_mmcfg_init();
+
 	acpi_dmar_init();
 
 	erst_init();
