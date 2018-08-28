@@ -350,7 +350,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 
 static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
 {
-    struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
+    struct svm_vcpu *arch_svm = &v->arch.hvm_svm;
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;

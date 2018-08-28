@@ -663,8 +663,8 @@ static void svm_update_guest_efer(struct vcpu *v)
 
 static void svm_cpuid_policy_changed(struct vcpu *v)
 {
-    struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
-    struct vmcb_struct *vmcb = arch_svm->vmcb;
+    struct svm_vcpu *svm = &v->arch.hvm_svm;
+    struct vmcb_struct *vmcb = svm->vmcb;
     const struct cpuid_policy *cp = v->domain->arch.cpuid;
     u32 bitmap = vmcb_get_exception_intercepts(vmcb);
 
@@ -683,22 +683,22 @@ static void svm_cpuid_policy_changed(struct vcpu *v)
 
 static void svm_sync_vmcb(struct vcpu *v, enum vmcb_sync_state new_state)
 {
-    struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
+    struct svm_vcpu *svm = &v->arch.hvm_svm;
 
     if ( new_state == vmcb_needs_vmsave )
     {
-        if ( arch_svm->vmcb_sync_state == vmcb_needs_vmload )
-            svm_vmload(arch_svm->vmcb);
+        if ( svm->vmcb_sync_state == vmcb_needs_vmload )
+            svm_vmload(svm->vmcb);
 
-        arch_svm->vmcb_sync_state = new_state;
+        svm->vmcb_sync_state = new_state;
     }
     else
     {
-        if ( arch_svm->vmcb_sync_state == vmcb_needs_vmsave )
-            svm_vmsave(arch_svm->vmcb);
+        if ( svm->vmcb_sync_state == vmcb_needs_vmsave )
+            svm_vmsave(svm->vmcb);
 
-        if ( arch_svm->vmcb_sync_state != vmcb_needs_vmload )
-            arch_svm->vmcb_sync_state = new_state;
+        if ( svm->vmcb_sync_state != vmcb_needs_vmload )
+            svm->vmcb_sync_state = new_state;
     }
 }
 

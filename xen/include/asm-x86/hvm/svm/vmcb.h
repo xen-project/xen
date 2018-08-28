@@ -518,7 +518,7 @@ enum vmcb_sync_state {
     vmcb_needs_vmload     /* VMCB dirty (VMLOAD needed)? */
 };
 
-struct arch_svm_struct {
+struct svm_vcpu {
     struct vmcb_struct *vmcb;
     u64    vmcb_pa;
     unsigned long *msrpm;
