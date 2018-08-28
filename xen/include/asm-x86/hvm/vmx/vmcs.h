@@ -586,7 +586,10 @@ static inline int vmx_read_guest_msr(const struct vcpu *v, uint32_t msr,
     const struct vmx_msr_entry *ent = vmx_find_msr(v, msr, VMX_MSR_GUEST);
 
     if ( !ent )
+    {
+        *val = 0;
         return -ESRCH;
+    }
 
     *val = ent->data;
 
@@ -600,7 +603,10 @@ static inline int vmx_read_guest_loadonly_msr(
         vmx_find_msr(v, msr, VMX_MSR_GUEST_LOADONLY);
 
     if ( !ent )
+    {
+        *val = 0;
         return -ESRCH;
+    }
 
     *val = ent->data;
 
