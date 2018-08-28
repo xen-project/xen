@@ -240,7 +240,7 @@ static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
         if ( hvm_copy_to_guest_phys(gaddr, NULL, HVM_VM86_TSS_SIZE, v) !=
              HVMTRANS_okay )
             printk("Unable to zero VM86 TSS area\n");
-        d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED] =
+        d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED] =
             VM86_TSS_UPDATED | ((uint64_t)HVM_VM86_TSS_SIZE << 32) | gaddr;
         if ( pvh_add_mem_range(d, gaddr, gaddr + HVM_VM86_TSS_SIZE,
                                E820_RESERVED) )
@@ -271,7 +271,7 @@ static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
     write_32bit_pse_identmap(ident_pt);
     unmap_domain_page(ident_pt);
     put_page(mfn_to_page(mfn));
-    d->arch.hvm_domain.params[HVM_PARAM_IDENT_PT] = gaddr;
+    d->arch.hvm.params[HVM_PARAM_IDENT_PT] = gaddr;
     if ( pvh_add_mem_range(d, gaddr, gaddr + PAGE_SIZE, E820_RESERVED) )
             printk("Unable to set identity page tables as reserved in the memory map\n");
 

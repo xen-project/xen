@@ -2075,7 +2075,7 @@ static void __init evtchn_allocate(struct domain *d)
     val |= MASK_INSR(HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_LOW_LEVEL,
                      HVM_PARAM_CALLBACK_TYPE_PPI_FLAG_MASK);
     val |= d->arch.evtchn_irq;
-    d->arch.hvm_domain.params[HVM_PARAM_CALLBACK_IRQ] = val;
+    d->arch.hvm.params[HVM_PARAM_CALLBACK_IRQ] = val;
 }
 
 static void __init find_gnttab_region(struct domain *d,

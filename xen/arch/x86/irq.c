@@ -1293,7 +1293,7 @@ int init_domain_irq_mapping(struct domain *d)
 
     radix_tree_init(&d->arch.irq_pirq);
     if ( is_hvm_domain(d) )
-        radix_tree_init(&d->arch.hvm_domain.emuirq_pirq);
+        radix_tree_init(&d->arch.hvm.emuirq_pirq);
 
     for ( i = 1; platform_legacy_irq(i); ++i )
     {
@@ -1319,7 +1319,7 @@ void cleanup_domain_irq_mapping(struct domain *d)
 {
     radix_tree_destroy(&d->arch.irq_pirq, NULL);
     if ( is_hvm_domain(d) )
-        radix_tree_destroy(&d->arch.hvm_domain.emuirq_pirq, NULL);
+        radix_tree_destroy(&d->arch.hvm.emuirq_pirq, NULL);
 }
 
 struct pirq *alloc_pirq_struct(struct domain *d)
@@ -2490,7 +2490,7 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
     /* do not store emuirq mappings for pt devices */
     if ( emuirq != IRQ_PT )
     {
-        int err = radix_tree_insert(&d->arch.hvm_domain.emuirq_pirq, emuirq,
+        int err = radix_tree_insert(&d->arch.hvm.emuirq_pirq, emuirq,
                                     radix_tree_int_to_ptr(pirq));
 
         switch ( err )
@@ -2500,7 +2500,7 @@ int map_domain_emuirq_pirq(struct domain *d, int pirq, int emuirq)
         case -EEXIST:
             radix_tree_replace_slot(
                 radix_tree_lookup_slot(
-                    &d->arch.hvm_domain.emuirq_pirq, emuirq),
+                    &d->arch.hvm.emuirq_pirq, emuirq),
                 radix_tree_int_to_ptr(pirq));
             break;
         default:
@@ -2542,7 +2542,7 @@ int unmap_domain_pirq_emuirq(struct domain *d, int pirq)
         pirq_cleanup_check(info, d);
     }
     if ( emuirq != IRQ_PT )
-        radix_tree_delete(&d->arch.hvm_domain.emuirq_pirq, emuirq);
+        radix_tree_delete(&d->arch.hvm.emuirq_pirq, emuirq);
 
  done:
     return ret;

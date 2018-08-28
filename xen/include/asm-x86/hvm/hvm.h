@@ -266,7 +266,7 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
     (1ULL << hvm_funcs.tsc_scaling.ratio_frac_bits)
 
 #define hvm_tsc_scaling_ratio(d) \
-    ((d)->arch.hvm_domain.tsc_scaling_ratio)
+    ((d)->arch.hvm.tsc_scaling_ratio)
 
 u64 hvm_scale_tsc(const struct domain *d, u64 tsc);
 u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz);
@@ -391,10 +391,10 @@ static inline bool hvm_get_guest_bndcfgs(struct vcpu *v, u64 *val)
 bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val);
 
 #define has_hvm_params(d) \
-    ((d)->arch.hvm_domain.params != NULL)
+    ((d)->arch.hvm.params != NULL)
 
 #define viridian_feature_mask(d) \
-    (has_hvm_params(d) ? (d)->arch.hvm_domain.params[HVM_PARAM_VIRIDIAN] : 0)
+    (has_hvm_params(d) ? (d)->arch.hvm.params[HVM_PARAM_VIRIDIAN] : 0)
 
 #define is_viridian_domain(d) \
     (is_hvm_domain(d) && (viridian_feature_mask(d) & HVMPV_base_freq))
@@ -670,9 +670,8 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
 #define arch_vcpu_block(v) ({                                   \
     struct vcpu *v_ = (v);                                      \
     struct domain *d_ = v_->domain;                             \
-    if ( is_hvm_domain(d_) &&                               \
-         (d_->arch.hvm_domain.pi_ops.vcpu_block) )          \
-        d_->arch.hvm_domain.pi_ops.vcpu_block(v_);          \
+    if ( is_hvm_domain(d_) && d_->arch.hvm.pi_ops.vcpu_block )  \
+        d_->arch.hvm.pi_ops.vcpu_block(v_);                     \
 })
 
 #endif /* __ASM_X86_HVM_HVM_H__ */

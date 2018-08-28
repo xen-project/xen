@@ -527,7 +527,7 @@ _sh_propagate(struct vcpu *v,
     guest_l1e_t guest_entry = { guest_intpte };
     shadow_l1e_t *sp = shadow_entry_ptr;
     struct domain *d = v->domain;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
     gfn_t target_gfn = guest_l1e_get_gfn(guest_entry);
     u32 pass_thru_flags;
     u32 gflags, sflags;
@@ -618,7 +618,7 @@ _sh_propagate(struct vcpu *v,
         if ( !mmio_mfn &&
              (type = hvm_get_mem_pinned_cacheattr(d, target_gfn, 0)) >= 0 )
             sflags |= pat_type_2_pte_flags(type);
-        else if ( d->arch.hvm_domain.is_in_uc_mode )
+        else if ( d->arch.hvm.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);
         else
             if ( iomem_access_permitted(d, mfn_x(target_mfn), mfn_x(target_mfn)) )
@@ -1112,7 +1112,7 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
     mfn_t mfn = shadow_l1e_get_mfn(new_sl1e);
     int flags = shadow_l1e_get_flags(new_sl1e);
     unsigned long gfn;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
 
     if ( !dirty_vram         /* tracking disabled? */
          || !(flags & _PAGE_RW) /* read-only mapping? */
@@ -1143,7 +1143,7 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
     mfn_t mfn = shadow_l1e_get_mfn(old_sl1e);
     int flags = shadow_l1e_get_flags(old_sl1e);
     unsigned long gfn;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
+    struct sh_dirty_vram *dirty_vram = d->arch.hvm.dirty_vram;
 
     if ( !dirty_vram         /* tracking disabled? */
          || !(flags & _PAGE_RW) /* read-only mapping? */

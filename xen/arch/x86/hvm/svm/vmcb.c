@@ -106,7 +106,7 @@ static int construct_vmcb(struct vcpu *v)
         svm_disable_intercept_for_msr(v, MSR_AMD64_LWP_CBADDR);
 
     vmcb->_msrpm_base_pa = (u64)virt_to_maddr(arch_svm->msrpm);
-    vmcb->_iopm_base_pa = __pa(v->domain->arch.hvm_domain.io_bitmap);
+    vmcb->_iopm_base_pa = __pa(v->domain->arch.hvm.io_bitmap);
 
     /* Virtualise EFLAGS.IF and LAPIC TPR (CR8). */
     vmcb->_vintr.fields.intr_masking = 1;

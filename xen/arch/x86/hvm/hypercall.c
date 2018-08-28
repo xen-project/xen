@@ -41,7 +41,7 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = compat_memory_op(cmd, arg);
 
     if ( (cmd & MEMOP_CMD_MASK) == XENMEM_decrease_reservation )
-        curr->domain->arch.hvm_domain.qemu_mapcache_invalidate = true;
+        curr->domain->arch.hvm.qemu_mapcache_invalidate = true;
 
     return rc;
 }
@@ -286,8 +286,8 @@ int hvm_hypercall(struct cpu_user_regs *regs)
     if ( curr->hcall_preempted )
         return HVM_HCALL_preempted;
 
-    if ( unlikely(currd->arch.hvm_domain.qemu_mapcache_invalidate) &&
-         test_and_clear_bool(currd->arch.hvm_domain.qemu_mapcache_invalidate) )
+    if ( unlikely(currd->arch.hvm.qemu_mapcache_invalidate) &&
+         test_and_clear_bool(currd->arch.hvm.qemu_mapcache_invalidate) )
         send_invalidate_req();
 
     return HVM_HCALL_completed;

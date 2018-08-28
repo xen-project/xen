@@ -1197,7 +1197,7 @@ void svm_vmenter_helper(const struct cpu_user_regs *regs)
 
 static void svm_guest_osvw_init(struct domain *d)
 {
-    struct svm_domain *svm = &d->arch.hvm_domain.svm;
+    struct svm_domain *svm = &d->arch.hvm.svm;
 
     spin_lock(&osvw_lock);
 
@@ -2006,8 +2006,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_AMD_OSVW_STATUS:
         if ( !d->arch.cpuid->extd.osvw )
             goto gpf;
-        *msr_content =
-            d->arch.hvm_domain.svm.osvw.raw[msr - MSR_AMD_OSVW_ID_LENGTH];
+        *msr_content = d->arch.hvm.svm.osvw.raw[msr - MSR_AMD_OSVW_ID_LENGTH];
         break;
 
     default:

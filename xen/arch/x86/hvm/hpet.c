@@ -26,7 +26,7 @@
 #include <xen/event.h>
 #include <xen/trace.h>
 
-#define domain_vhpet(x) (&(x)->arch.hvm_domain.pl_time->vhpet)
+#define domain_vhpet(x) (&(x)->arch.hvm.pl_time->vhpet)
 #define vcpu_vhpet(x)   (domain_vhpet((x)->domain))
 #define vhpet_domain(x) (container_of(x, struct pl_time, vhpet)->domain)
 #define vhpet_vcpu(x)   (pt_global_vcpu_target(vhpet_domain(x)))
@@ -164,7 +164,7 @@ static int hpet_read(
     unsigned long result;
     uint64_t val;
 
-    if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] )
+    if ( !v->domain->arch.hvm.params[HVM_PARAM_HPET_ENABLED] )
     {
         result = ~0ul;
         goto out;
@@ -354,7 +354,7 @@ static int hpet_write(
 #define set_start_timer(n)   (__set_bit((n), &start_timers))
 #define set_restart_timer(n) (set_stop_timer(n),set_start_timer(n))
 
-    if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] )
+    if ( !v->domain->arch.hvm.params[HVM_PARAM_HPET_ENABLED] )
         goto out;
 
     addr &= HPET_MMAP_SIZE-1;
@@ -735,7 +735,7 @@ void hpet_init(struct domain *d)
 
     hpet_set(domain_vhpet(d));
     register_mmio_handler(d, &hpet_mmio_ops);
-    d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
+    d->arch.hvm.params[HVM_PARAM_HPET_ENABLED] = 1;
 }
 
 void hpet_deinit(struct domain *d)

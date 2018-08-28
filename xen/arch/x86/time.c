@@ -1039,7 +1039,7 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 
         if ( is_hvm_domain(d) )
         {
-            struct pl_time *pl = v->domain->arch.hvm_domain.pl_time;
+            struct pl_time *pl = v->domain->arch.hvm.pl_time;
 
             stime += pl->stime_offset + v->arch.hvm_vcpu.stime_offset;
             if ( stime >= 0 )
@@ -2183,7 +2183,7 @@ void tsc_set_info(struct domain *d,
     if ( is_hvm_domain(d) )
     {
         if ( hvm_tsc_scaling_supported && !d->arch.vtsc )
-            d->arch.hvm_domain.tsc_scaling_ratio =
+            d->arch.hvm.tsc_scaling_ratio =
                 hvm_get_tsc_scaling_ratio(d->arch.tsc_khz);
 
         hvm_set_rdtsc_exiting(d, d->arch.vtsc);
@@ -2197,10 +2197,10 @@ void tsc_set_info(struct domain *d,
              * call set_tsc_offset() later from hvm_vcpu_reset_state() and they
              * will sync their TSC to BSP's sync_tsc.
              */
-            d->arch.hvm_domain.sync_tsc = rdtsc();
+            d->arch.hvm.sync_tsc = rdtsc();
             hvm_set_tsc_offset(d->vcpu[0],
                                d->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset,
-                               d->arch.hvm_domain.sync_tsc);
+                               d->arch.hvm.sync_tsc);
         }
     }
 

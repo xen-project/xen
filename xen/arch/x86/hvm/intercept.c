@@ -219,10 +219,10 @@ static const struct hvm_io_handler *hvm_find_io_handler(const ioreq_t *p)
     BUG_ON((p->type != IOREQ_TYPE_PIO) &&
            (p->type != IOREQ_TYPE_COPY));
 
-    for ( i = 0; i < curr_d->arch.hvm_domain.io_handler_count; i++ )
+    for ( i = 0; i < curr_d->arch.hvm.io_handler_count; i++ )
     {
         const struct hvm_io_handler *handler =
-            &curr_d->arch.hvm_domain.io_handler[i];
+            &curr_d->arch.hvm.io_handler[i];
         const struct hvm_io_ops *ops = handler->ops;
 
         if ( handler->type != p->type )
@@ -257,9 +257,9 @@ int hvm_io_intercept(ioreq_t *p)
 
 struct hvm_io_handler *hvm_next_io_handler(struct domain *d)
 {
-    unsigned int i = d->arch.hvm_domain.io_handler_count++;
+    unsigned int i = d->arch.hvm.io_handler_count++;
 
-    ASSERT(d->arch.hvm_domain.io_handler);
+    ASSERT(d->arch.hvm.io_handler);
 
     if ( i == NR_IO_HANDLERS )
     {
@@ -267,7 +267,7 @@ struct hvm_io_handler *hvm_next_io_handler(struct domain *d)
         return NULL;
     }
 
-    return &d->arch.hvm_domain.io_handler[i];
+    return &d->arch.hvm.io_handler[i];
 }
 
 void register_mmio_handler(struct domain *d,
@@ -303,10 +303,10 @@ void relocate_portio_handler(struct domain *d, unsigned int old_port,
 {
     unsigned int i;
 
-    for ( i = 0; i < d->arch.hvm_domain.io_handler_count; i++ )
+    for ( i = 0; i < d->arch.hvm.io_handler_count; i++ )
     {
         struct hvm_io_handler *handler =
-            &d->arch.hvm_domain.io_handler[i];
+            &d->arch.hvm.io_handler[i];
 
         if ( handler->type != IOREQ_TYPE_PIO )
             continue;

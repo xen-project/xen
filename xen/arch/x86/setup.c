@@ -1874,7 +1874,7 @@ static int __hwdom_init io_bitmap_cb(unsigned long s, unsigned long e,
 
     ASSERT(e <= INT_MAX);
     for ( i = s; i <= e; i++ )
-        __clear_bit(i, d->arch.hvm_domain.io_bitmap);
+        __clear_bit(i, d->arch.hvm.io_bitmap);
 
     return 0;
 }
@@ -1885,7 +1885,7 @@ void __hwdom_init setup_io_bitmap(struct domain *d)
 
     if ( is_hvm_domain(d) )
     {
-        bitmap_fill(d->arch.hvm_domain.io_bitmap, 0x10000);
+        bitmap_fill(d->arch.hvm.io_bitmap, 0x10000);
         rc = rangeset_report_ranges(d->arch.ioport_caps, 0, 0x10000,
                                     io_bitmap_cb, d);
         BUG_ON(rc);
@@ -1896,9 +1896,9 @@ void __hwdom_init setup_io_bitmap(struct domain *d)
          * Access to 1 byte RTC ports also needs to be trapped in order
          * to keep consistency with PV.
          */
-        __set_bit(0xcf8, d->arch.hvm_domain.io_bitmap);
-        __set_bit(RTC_PORT(0), d->arch.hvm_domain.io_bitmap);
-        __set_bit(RTC_PORT(1), d->arch.hvm_domain.io_bitmap);
+        __set_bit(0xcf8, d->arch.hvm.io_bitmap);
+        __set_bit(RTC_PORT(0), d->arch.hvm.io_bitmap);
+        __set_bit(RTC_PORT(1), d->arch.hvm.io_bitmap);
     }
 }
 

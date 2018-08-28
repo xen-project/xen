@@ -51,7 +51,7 @@ struct arch_domain
     /* Virtual MMU */
     struct p2m_domain p2m;
 
-    struct hvm_domain hvm_domain;
+    struct hvm_domain hvm;
 
     struct vmmio vmmio;
 

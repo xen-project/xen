@@ -98,7 +98,7 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
     {
         /*
          * Only makes sense for vector-based callback, else HVM-IRQ logic
-         * calls back into itself and deadlocks on hvm_domain.irq_lock.
+         * calls back into itself and deadlocks on hvm.irq_lock.
          */
         if ( !is_hvm_pv_evtchn_domain(d) )
             return -EINVAL;

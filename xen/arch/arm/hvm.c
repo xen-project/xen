@@ -59,11 +59,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         if ( op == HVMOP_set_param )
         {
-            d->arch.hvm_domain.params[a.index] = a.value;
+            d->arch.hvm.params[a.index] = a.value;
         }
         else
         {
-            a.value = d->arch.hvm_domain.params[a.index];
+            a.value = d->arch.hvm.params[a.index];
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 

@@ -152,7 +152,7 @@ static struct vpci_msix *msix_find(const struct domain *d, unsigned long addr)
 {
     struct vpci_msix *msix;
 
-    list_for_each_entry ( msix, &d->arch.hvm_domain.msix_tables, next )
+    list_for_each_entry ( msix, &d->arch.hvm.msix_tables, next )
     {
         const struct vpci_bar *bars = msix->pdev->vpci->header.bars;
         unsigned int i;
@@ -438,10 +438,10 @@ static int init_msix(struct pci_dev *pdev)
     if ( rc )
         return rc;
 
-    if ( list_empty(&d->arch.hvm_domain.msix_tables) )
+    if ( list_empty(&d->arch.hvm.msix_tables) )
         register_mmio_handler(d, &vpci_msix_table_ops);
 
-    list_add(&pdev->vpci->msix->next, &d->arch.hvm_domain.msix_tables);
+    list_add(&pdev->vpci->msix->next, &d->arch.hvm.msix_tables);
 
     return 0;
 }

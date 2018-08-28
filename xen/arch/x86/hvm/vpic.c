@@ -35,7 +35,7 @@
 #include <asm/hvm/support.h>
 
 #define vpic_domain(v) (container_of((v), struct domain, \
-                        arch.hvm_domain.vpic[!vpic->is_master]))
+                        arch.hvm.vpic[!vpic->is_master]))
 #define __vpic_lock(v) &container_of((v), struct hvm_domain, \
                                         vpic[!(v)->is_master])->irq_lock
 #define vpic_lock(v)   spin_lock(__vpic_lock(v))
@@ -112,7 +112,8 @@ static void vpic_update_int_output(struct hvm_hw_vpic *vpic)
         if ( vpic->is_master )
         {
             /* Master INT line is connected in Virtual Wire Mode. */
-            struct vcpu *v = vpic_domain(vpic)->arch.hvm_domain.i8259_target;
+            struct vcpu *v = vpic_domain(vpic)->arch.hvm.i8259_target;
+
             if ( v != NULL )
             {
                 TRACE_1D(TRC_HVM_EMUL_PIC_KICK, irq);
@@ -334,7 +335,7 @@ static int vpic_intercept_pic_io(
         return X86EMUL_OKAY;
     }
 
-    vpic = &current->domain->arch.hvm_domain.vpic[port >> 7];
+    vpic = &current->domain->arch.hvm.vpic[port >> 7];
 
     if ( dir == IOREQ_WRITE )
         vpic_ioport_write(vpic, port, (uint8_t)*val);
@@ -352,7 +353,7 @@ static int vpic_intercept_elcr_io(
 
     BUG_ON(bytes != 1);
 
-    vpic = &current->domain->arch.hvm_domain.vpic[port & 1];
+    vpic = &current->domain->arch.hvm.vpic[port & 1];
 
     if ( dir == IOREQ_WRITE )
     {
@@ -382,7 +383,7 @@ static int vpic_save(struct domain *d, hvm_domain_context_t *h)
     /* Save the state of both PICs */
     for ( i = 0; i < 2 ; i++ )
     {
-        s = &d->arch.hvm_domain.vpic[i];
+        s = &d->arch.hvm.vpic[i];
         if ( hvm_save_entry(PIC, i, h, s) )
             return 1;
     }
@@ -401,7 +402,7 @@ static int vpic_load(struct domain *d, hvm_domain_context_t *h)
     /* Which PIC is this? */
     if ( inst > 1 )
         return -EINVAL;
-    s = &d->arch.hvm_domain.vpic[inst];
+    s = &d->arch.hvm.vpic[inst];
 
     /* Load the state */
     if ( hvm_load_entry(PIC, h, s) != 0 )
@@ -420,7 +421,7 @@ void vpic_reset(struct domain *d)
         return;
 
     /* Master PIC. */
-    vpic = &d->arch.hvm_domain.vpic[0];
+    vpic = &d->arch.hvm.vpic[0];
     memset(vpic, 0, sizeof(*vpic));
     vpic->is_master = 1;
     vpic->elcr      = 1 << 2;
@@ -446,7 +447,7 @@ void vpic_init(struct domain *d)
 
 void vpic_irq_positive_edge(struct domain *d, int irq)
 {
-    struct hvm_hw_vpic *vpic = &d->arch.hvm_domain.vpic[irq >> 3];
+    struct hvm_hw_vpic *vpic = &d->arch.hvm.vpic[irq >> 3];
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(has_vpic(d));
@@ -464,7 +465,7 @@ void vpic_irq_positive_edge(struct domain *d, int irq)
 
 void vpic_irq_negative_edge(struct domain *d, int irq)
 {
-    struct hvm_hw_vpic *vpic = &d->arch.hvm_domain.vpic[irq >> 3];
+    struct hvm_hw_vpic *vpic = &d->arch.hvm.vpic[irq >> 3];
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(has_vpic(d));
@@ -483,7 +484,7 @@ void vpic_irq_negative_edge(struct domain *d, int irq)
 int vpic_ack_pending_irq(struct vcpu *v)
 {
     int irq, vector;
-    struct hvm_hw_vpic *vpic = &v->domain->arch.hvm_domain.vpic[0];
+    struct hvm_hw_vpic *vpic = &v->domain->arch.hvm.vpic[0];
 
     ASSERT(has_vpic(v->domain));
 

@@ -319,7 +319,7 @@ int arch_set_info_hvm_guest(struct vcpu *v, const vcpu_hvm_context_t *ctx)
     v->arch.hvm_vcpu.cache_tsc_offset =
         d->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
     hvm_set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset,
-                       d->arch.hvm_domain.sync_tsc);
+                       d->arch.hvm.sync_tsc);
 
     paging_update_paging_modes(v);
 

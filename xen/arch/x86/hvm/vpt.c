@@ -24,11 +24,11 @@
 #include <asm/mc146818rtc.h>
 
 #define mode_is(d, name) \
-    ((d)->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)
+    ((d)->arch.hvm.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)
 
 void hvm_init_guest_time(struct domain *d)
 {
-    struct pl_time *pl = d->arch.hvm_domain.pl_time;
+    struct pl_time *pl = d->arch.hvm.pl_time;
 
     spin_lock_init(&pl->pl_time_lock);
     pl->stime_offset = -(u64)get_s_time();
@@ -37,7 +37,7 @@ void hvm_init_guest_time(struct domain *d)
 
 uint64_t hvm_get_guest_time_fixed(const struct vcpu *v, uint64_t at_tsc)
 {
-    struct pl_time *pl = v->domain->arch.hvm_domain.pl_time;
+    struct pl_time *pl = v->domain->arch.hvm.pl_time;
     u64 now;
 
     /* Called from device models shared with PV guests. Be careful. */
@@ -88,7 +88,7 @@ static int pt_irq_vector(struct periodic_time *pt, enum hvm_intsrc src)
     gsi = hvm_isa_irq_to_gsi(isa_irq);
 
     if ( src == hvm_intsrc_pic )
-        return (v->domain->arch.hvm_domain.vpic[isa_irq >> 3].irq_base
+        return (v->domain->arch.hvm.vpic[isa_irq >> 3].irq_base
                 + (isa_irq & 7));
 
     ASSERT(src == hvm_intsrc_lapic);
@@ -121,7 +121,7 @@ static int pt_irq_masked(struct periodic_time *pt)
 
     case PTSRC_isa:
     {
-        uint8_t pic_imr = v->domain->arch.hvm_domain.vpic[pt->irq >> 3].imr;
+        uint8_t pic_imr = v->domain->arch.hvm.vpic[pt->irq >> 3].imr;
 
         /* Check if the interrupt is unmasked in the PIC. */
         if ( !(pic_imr & (1 << (pt->irq & 7))) && vlapic_accept_pic_intr(v) )
@@ -363,7 +363,7 @@ int pt_update_irq(struct vcpu *v)
     case PTSRC_isa:
         hvm_isa_irq_deassert(v->domain, irq);
         if ( platform_legacy_irq(irq) && vlapic_accept_pic_intr(v) &&
-             v->domain->arch.hvm_domain.vpic[irq >> 3].int_output )
+             v->domain->arch.hvm.vpic[irq >> 3].int_output )
             hvm_isa_irq_assert(v->domain, irq, NULL);
         else
         {
@@ -514,7 +514,7 @@ void create_periodic_time(
 
     if ( !pt->one_shot )
     {
-        if ( v->domain->arch.hvm_domain.params[HVM_PARAM_VPT_ALIGN] )
+        if ( v->domain->arch.hvm.params[HVM_PARAM_VPT_ALIGN] )
         {
             pt->scheduled = align_timer(pt->scheduled, pt->period);
         }
@@ -605,7 +605,7 @@ void pt_adjust_global_vcpu_target(struct vcpu *v)
     pt_adjust_vcpu(&vpit->pt0, v);
     spin_unlock(&vpit->lock);
 
-    pl_time = v->domain->arch.hvm_domain.pl_time;
+    pl_time = v->domain->arch.hvm.pl_time;
 
     spin_lock(&pl_time->vrtc.lock);
     pt_adjust_vcpu(&pl_time->vrtc.pt, v);
@@ -640,9 +640,9 @@ void pt_may_unmask_irq(struct domain *d, struct periodic_time *vlapic_pt)
     if ( d )
     {
         pt_resume(&d->arch.vpit.pt0);
-        pt_resume(&d->arch.hvm_domain.pl_time->vrtc.pt);
+        pt_resume(&d->arch.hvm.pl_time->vrtc.pt);
         for ( i = 0; i < HPET_TIMER_NUM; i++ )
-            pt_resume(&d->arch.hvm_domain.pl_time->vhpet.pt[i]);
+            pt_resume(&d->arch.hvm.pl_time->vhpet.pt[i]);
     }
 
     if ( vlapic_pt )

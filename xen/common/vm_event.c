@@ -48,7 +48,7 @@ static int vm_event_enable(
     xen_event_channel_notification_t notification_fn)
 {
     int rc;
-    unsigned long ring_gfn = d->arch.hvm_domain.params[param];
+    unsigned long ring_gfn = d->arch.hvm.params[param];
 
     if ( !*ved )
         *ved = xzalloc(struct vm_event_domain);

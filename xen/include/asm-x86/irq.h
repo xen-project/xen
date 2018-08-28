@@ -188,8 +188,7 @@ void cleanup_domain_irq_mapping(struct domain *);
 #define domain_pirq_to_emuirq(d, pirq) pirq_field(d, pirq,              \
     arch.hvm.emuirq, IRQ_UNBOUND)
 #define domain_emuirq_to_pirq(d, emuirq) ({                             \
-    void *__ret = radix_tree_lookup(&(d)->arch.hvm_domain.emuirq_pirq,  \
-                                    emuirq);                            \
+    void *__ret = radix_tree_lookup(&(d)->arch.hvm.emuirq_pirq, emuirq);\
     __ret ? radix_tree_ptr_to_int(__ret) : IRQ_UNBOUND;                 \
 })
 #define IRQ_UNBOUND -1

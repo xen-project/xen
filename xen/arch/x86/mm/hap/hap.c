@@ -83,7 +83,7 @@ int hap_track_dirty_vram(struct domain *d,
 
         paging_lock(d);
 
-        dirty_vram = d->arch.hvm_domain.dirty_vram;
+        dirty_vram = d->arch.hvm.dirty_vram;
         if ( !dirty_vram )
         {
             rc = -ENOMEM;
@@ -93,7 +93,7 @@ int hap_track_dirty_vram(struct domain *d,
                 goto out;
             }
 
-            d->arch.hvm_domain.dirty_vram = dirty_vram;
+            d->arch.hvm.dirty_vram = dirty_vram;
         }
 
         if ( begin_pfn != dirty_vram->begin_pfn ||
@@ -145,7 +145,7 @@ int hap_track_dirty_vram(struct domain *d,
     {
         paging_lock(d);
 
-        dirty_vram = d->arch.hvm_domain.dirty_vram;
+        dirty_vram = d->arch.hvm.dirty_vram;
         if ( dirty_vram )
         {
             /*
@@ -155,7 +155,7 @@ int hap_track_dirty_vram(struct domain *d,
             begin_pfn = dirty_vram->begin_pfn;
             nr = dirty_vram->end_pfn - dirty_vram->begin_pfn;
             xfree(dirty_vram);
-            d->arch.hvm_domain.dirty_vram = NULL;
+            d->arch.hvm.dirty_vram = NULL;
         }
 
         paging_unlock(d);
@@ -579,8 +579,7 @@ void hap_teardown(struct domain *d, bool *preempted)
 
     d->arch.paging.mode &= ~PG_log_dirty;
 
-    xfree(d->arch.hvm_domain.dirty_vram);
-    d->arch.hvm_domain.dirty_vram = NULL;
+    XFREE(d->arch.hvm.dirty_vram);
 
 out:
     paging_unlock(d);

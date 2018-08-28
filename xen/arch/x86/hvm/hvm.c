@@ -382,7 +382,7 @@ u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz)
 
 u64 hvm_scale_tsc(const struct domain *d, u64 tsc)
 {
-    u64 ratio = d->arch.hvm_domain.tsc_scaling_ratio;
+    u64 ratio = d->arch.hvm.tsc_scaling_ratio;
     u64 dummy;
 
     if ( ratio == hvm_default_tsc_scaling_ratio )
@@ -583,14 +583,14 @@ int hvm_domain_initialise(struct domain *d)
         return -EINVAL;
     }
 
-    spin_lock_init(&d->arch.hvm_domain.irq_lock);
-    spin_lock_init(&d->arch.hvm_domain.uc_lock);
-    spin_lock_init(&d->arch.hvm_domain.write_map.lock);
-    rwlock_init(&d->arch.hvm_domain.mmcfg_lock);
-    INIT_LIST_HEAD(&d->arch.hvm_domain.write_map.list);
-    INIT_LIST_HEAD(&d->arch.hvm_domain.g2m_ioport_list);
-    INIT_LIST_HEAD(&d->arch.hvm_domain.mmcfg_regions);
-    INIT_LIST_HEAD(&d->arch.hvm_domain.msix_tables);
+    spin_lock_init(&d->arch.hvm.irq_lock);
+    spin_lock_init(&d->arch.hvm.uc_lock);
+    spin_lock_init(&d->arch.hvm.write_map.lock);
+    rwlock_init(&d->arch.hvm.mmcfg_lock);
+    INIT_LIST_HEAD(&d->arch.hvm.write_map.list);
+    INIT_LIST_HEAD(&d->arch.hvm.g2m_ioport_list);
+    INIT_LIST_HEAD(&d->arch.hvm.mmcfg_regions);
+    INIT_LIST_HEAD(&d->arch.hvm.msix_tables);
 
     rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
     if ( rc )
@@ -603,15 +603,15 @@ int hvm_domain_initialise(struct domain *d)
         goto fail0;
 
     nr_gsis = is_hardware_domain(d) ? nr_irqs_gsi : NR_HVM_DOMU_IRQS;
-    d->arch.hvm_domain.pl_time = xzalloc(struct pl_time);
-    d->arch.hvm_domain.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
-    d->arch.hvm_domain.io_handler = xzalloc_array(struct hvm_io_handler,
-                                                  NR_IO_HANDLERS);
-    d->arch.hvm_domain.irq = xzalloc_bytes(hvm_irq_size(nr_gsis));
+    d->arch.hvm.pl_time = xzalloc(struct pl_time);
+    d->arch.hvm.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
+    d->arch.hvm.io_handler = xzalloc_array(struct hvm_io_handler,
+                                           NR_IO_HANDLERS);
+    d->arch.hvm.irq = xzalloc_bytes(hvm_irq_size(nr_gsis));
 
     rc = -ENOMEM;
-    if ( !d->arch.hvm_domain.pl_time || !d->arch.hvm_domain.irq ||
-         !d->arch.hvm_domain.params  || !d->arch.hvm_domain.io_handler )
+    if ( !d->arch.hvm.pl_time || !d->arch.hvm.irq ||
+         !d->arch.hvm.params  || !d->arch.hvm.io_handler )
         goto fail1;
 
     /* Set the number of GSIs */
@@ -621,21 +621,21 @@ int hvm_domain_initialise(struct domain *d)
     ASSERT(hvm_domain_irq(d)->nr_gsis >= NR_ISAIRQS);
 
     /* need link to containing domain */
-    d->arch.hvm_domain.pl_time->domain = d;
+    d->arch.hvm.pl_time->domain = d;
 
     /* Set the default IO Bitmap. */
     if ( is_hardware_domain(d) )
     {
-        d->arch.hvm_domain.io_bitmap = _xmalloc(HVM_IOBITMAP_SIZE, PAGE_SIZE);
-        if ( d->arch.hvm_domain.io_bitmap == NULL )
+        d->arch.hvm.io_bitmap = _xmalloc(HVM_IOBITMAP_SIZE, PAGE_SIZE);
+        if ( d->arch.hvm.io_bitmap == NULL )
         {
             rc = -ENOMEM;
             goto fail1;
         }
-        memset(d->arch.hvm_domain.io_bitmap, ~0, HVM_IOBITMAP_SIZE);
+        memset(d->arch.hvm.io_bitmap, ~0, HVM_IOBITMAP_SIZE);
     }
     else
-        d->arch.hvm_domain.io_bitmap = hvm_io_bitmap;
+        d->arch.hvm.io_bitmap = hvm_io_bitmap;
 
     register_g2m_portio_handler(d);
     register_vpci_portio_handler(d);
@@ -644,7 +644,7 @@ int hvm_domain_initialise(struct domain *d)
 
     hvm_init_guest_time(d);
 
-    d->arch.hvm_domain.params[HVM_PARAM_TRIPLE_FAULT_REASON] = SHUTDOWN_reboot;
+    d->arch.hvm.params[HVM_PARAM_TRIPLE_FAULT_REASON] = SHUTDOWN_reboot;
 
     vpic_init(d);
 
@@ -659,7 +659,7 @@ int hvm_domain_initialise(struct domain *d)
     register_portio_handler(d, 0xe9, 1, hvm_print_line);
 
     if ( hvm_tsc_scaling_supported )
-        d->arch.hvm_domain.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;
+        d->arch.hvm.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;
 
     rc = hvm_funcs.domain_initialise(d);
     if ( rc != 0 )
@@ -673,11 +673,11 @@ int hvm_domain_initialise(struct domain *d)
     vioapic_deinit(d);
  fail1:
     if ( is_hardware_domain(d) )
-        xfree(d->arch.hvm_domain.io_bitmap);
-    xfree(d->arch.hvm_domain.io_handler);
-    xfree(d->arch.hvm_domain.params);
-    xfree(d->arch.hvm_domain.pl_time);
-    xfree(d->arch.hvm_domain.irq);
+        xfree(d->arch.hvm.io_bitmap);
+    xfree(d->arch.hvm.io_handler);
+    xfree(d->arch.hvm.params);
+    xfree(d->arch.hvm.pl_time);
+    xfree(d->arch.hvm.irq);
  fail0:
     hvm_destroy_cacheattr_region_list(d);
     destroy_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0);
@@ -710,11 +710,8 @@ void hvm_domain_destroy(struct domain *d)
     struct list_head *ioport_list, *tmp;
     struct g2m_ioport *ioport;
 
-    xfree(d->arch.hvm_domain.io_handler);
-    d->arch.hvm_domain.io_handler = NULL;
-
-    xfree(d->arch.hvm_domain.params);
-    d->arch.hvm_domain.params = NULL;
+    XFREE(d->arch.hvm.io_handler);
+    XFREE(d->arch.hvm.params);
 
     hvm_destroy_cacheattr_region_list(d);
 
@@ -723,14 +720,10 @@ void hvm_domain_destroy(struct domain *d)
     stdvga_deinit(d);
     vioapic_deinit(d);
 
-    xfree(d->arch.hvm_domain.pl_time);
-    d->arch.hvm_domain.pl_time = NULL;
+    XFREE(d->arch.hvm.pl_time);
+    XFREE(d->arch.hvm.irq);
 
-    xfree(d->arch.hvm_domain.irq);
-    d->arch.hvm_domain.irq = NULL;
-
-    list_for_each_safe ( ioport_list, tmp,
-                         &d->arch.hvm_domain.g2m_ioport_list )
+    list_for_each_safe ( ioport_list, tmp, &d->arch.hvm.g2m_ioport_list )
     {
         ioport = list_entry(ioport_list, struct g2m_ioport, list);
         list_del(&ioport->list);
@@ -798,7 +791,7 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         /* Architecture-specific vmcs/vmcb bits */
         hvm_funcs.save_cpu_ctxt(v, &ctxt);
 
-        ctxt.tsc = hvm_get_guest_tsc_fixed(v, d->arch.hvm_domain.sync_tsc);
+        ctxt.tsc = hvm_get_guest_tsc_fixed(v, d->arch.hvm.sync_tsc);
 
         ctxt.msr_tsc_aux = hvm_msr_tsc_aux(v);
 
@@ -1053,7 +1046,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
     v->arch.hvm_vcpu.msr_tsc_aux = ctxt.msr_tsc_aux;
 
-    hvm_set_guest_tsc_fixed(v, ctxt.tsc, d->arch.hvm_domain.sync_tsc);
+    hvm_set_guest_tsc_fixed(v, ctxt.tsc, d->arch.hvm.sync_tsc);
 
     seg.limit = ctxt.idtr_limit;
     seg.base = ctxt.idtr_base;
@@ -1637,7 +1630,7 @@ void hvm_triple_fault(void)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    u8 reason = d->arch.hvm_domain.params[HVM_PARAM_TRIPLE_FAULT_REASON];
+    u8 reason = d->arch.hvm.params[HVM_PARAM_TRIPLE_FAULT_REASON];
 
     gprintk(XENLOG_INFO,
             "Triple fault - invoking HVM shutdown action %d\n",
@@ -2046,7 +2039,7 @@ static bool_t domain_exit_uc_mode(struct vcpu *v)
 
 static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
 {
-    v->domain->arch.hvm_domain.is_in_uc_mode = is_in_uc_mode;
+    v->domain->arch.hvm.is_in_uc_mode = is_in_uc_mode;
     shadow_blow_tables_per_domain(v->domain);
 }
 
@@ -2130,10 +2123,10 @@ void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value)
     if ( value & X86_CR0_CD )
     {
         /* Entering no fill cache mode. */
-        spin_lock(&v->domain->arch.hvm_domain.uc_lock);
+        spin_lock(&v->domain->arch.hvm.uc_lock);
         v->arch.hvm_vcpu.cache_mode = NO_FILL_CACHE_MODE;
 
-        if ( !v->domain->arch.hvm_domain.is_in_uc_mode )
+        if ( !v->domain->arch.hvm.is_in_uc_mode )
         {
             domain_pause_nosync(v->domain);
 
@@ -2143,19 +2136,19 @@ void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value)
 
             domain_unpause(v->domain);
         }
-        spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
+        spin_unlock(&v->domain->arch.hvm.uc_lock);
     }
     else if ( !(value & X86_CR0_CD) &&
               (v->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
     {
         /* Exit from no fill cache mode. */
-        spin_lock(&v->domain->arch.hvm_domain.uc_lock);
+        spin_lock(&v->domain->arch.hvm.uc_lock);
         v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
 
         if ( domain_exit_uc_mode(v) )
             hvm_set_uc_mode(v, 0);
 
-        spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
+        spin_unlock(&v->domain->arch.hvm.uc_lock);
     }
 }
 
@@ -2597,9 +2590,9 @@ static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
             return NULL;
         }
         track->page = page;
-        spin_lock(&d->arch.hvm_domain.write_map.lock);
-        list_add_tail(&track->list, &d->arch.hvm_domain.write_map.list);
-        spin_unlock(&d->arch.hvm_domain.write_map.lock);
+        spin_lock(&d->arch.hvm.write_map.lock);
+        list_add_tail(&track->list, &d->arch.hvm.write_map.list);
+        spin_unlock(&d->arch.hvm.write_map.lock);
     }
 
     map = __map_domain_page_global(page);
@@ -2640,8 +2633,8 @@ void hvm_unmap_guest_frame(void *p, bool_t permanent)
         struct hvm_write_map *track;
 
         unmap_domain_page_global(p);
-        spin_lock(&d->arch.hvm_domain.write_map.lock);
-        list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
+        spin_lock(&d->arch.hvm.write_map.lock);
+        list_for_each_entry(track, &d->arch.hvm.write_map.list, list)
             if ( track->page == page )
             {
                 paging_mark_dirty(d, mfn);
@@ -2649,7 +2642,7 @@ void hvm_unmap_guest_frame(void *p, bool_t permanent)
                 xfree(track);
                 break;
             }
-        spin_unlock(&d->arch.hvm_domain.write_map.lock);
+        spin_unlock(&d->arch.hvm.write_map.lock);
     }
 
     put_page(page);
@@ -2659,10 +2652,10 @@ void hvm_mapped_guest_frames_mark_dirty(struct domain *d)
 {
     struct hvm_write_map *track;
 
-    spin_lock(&d->arch.hvm_domain.write_map.lock);
-    list_for_each_entry(track, &d->arch.hvm_domain.write_map.list, list)
+    spin_lock(&d->arch.hvm.write_map.lock);
+    list_for_each_entry(track, &d->arch.hvm.write_map.list, list)
         paging_mark_dirty(d, page_to_mfn(track->page));
-    spin_unlock(&d->arch.hvm_domain.write_map.lock);
+    spin_unlock(&d->arch.hvm.write_map.lock);
 }
 
 static void *hvm_map_entry(unsigned long va, bool_t *writable)
@@ -3942,7 +3935,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     v->arch.hvm_vcpu.cache_tsc_offset =
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
     hvm_set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset,
-                       d->arch.hvm_domain.sync_tsc);
+                       d->arch.hvm.sync_tsc);
 
     v->arch.hvm_vcpu.msr_tsc_adjust = 0;
 
@@ -3964,7 +3957,7 @@ static void hvm_s3_suspend(struct domain *d)
     domain_lock(d);
 
     if ( d->is_dying || (d->vcpu == NULL) || (d->vcpu[0] == NULL) ||
-         test_and_set_bool(d->arch.hvm_domain.is_s3_suspended) )
+         test_and_set_bool(d->arch.hvm.is_s3_suspended) )
     {
         domain_unlock(d);
         domain_unpause(d);
@@ -3994,7 +3987,7 @@ static void hvm_s3_suspend(struct domain *d)
 
 static void hvm_s3_resume(struct domain *d)
 {
-    if ( test_and_clear_bool(d->arch.hvm_domain.is_s3_suspended) )
+    if ( test_and_clear_bool(d->arch.hvm.is_s3_suspended) )
     {
         struct vcpu *v;
 
@@ -4074,7 +4067,7 @@ static int hvmop_set_evtchn_upcall_vector(
 static int hvm_allow_set_param(struct domain *d,
                                const struct xen_hvm_param *a)
 {
-    uint64_t value = d->arch.hvm_domain.params[a->index];
+    uint64_t value = d->arch.hvm.params[a->index];
     int rc;
 
     rc = xsm_hvm_param(XSM_TARGET, d, HVMOP_set_param);
@@ -4177,7 +4170,7 @@ static int hvmop_set_param(
          */
         if ( !paging_mode_hap(d) || !cpu_has_vmx )
         {
-            d->arch.hvm_domain.params[a.index] = a.value;
+            d->arch.hvm.params[a.index] = a.value;
             break;
         }
 
@@ -4192,7 +4185,7 @@ static int hvmop_set_param(
 
         rc = 0;
         domain_pause(d);
-        d->arch.hvm_domain.params[a.index] = a.value;
+        d->arch.hvm.params[a.index] = a.value;
         for_each_vcpu ( d, v )
             paging_update_cr3(v, false);
         domain_unpause(d);
@@ -4241,11 +4234,11 @@ static int hvmop_set_param(
         if ( !paging_mode_hap(d) && a.value )
             rc = -EINVAL;
         if ( a.value &&
-             d->arch.hvm_domain.params[HVM_PARAM_ALTP2M] )
+             d->arch.hvm.params[HVM_PARAM_ALTP2M] )
             rc = -EINVAL;
         /* Set up NHVM state for any vcpus that are already up. */
         if ( a.value &&
-             !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
+             !d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
             for_each_vcpu(d, v)
                 if ( rc == 0 )
                     rc = nestedhvm_vcpu_initialise(v);
@@ -4260,7 +4253,7 @@ static int hvmop_set_param(
         if ( a.value > XEN_ALTP2M_limited )
             rc = -EINVAL;
         if ( a.value &&
-             d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
+             d->arch.hvm.params[HVM_PARAM_NESTEDHVM] )
             rc = -EINVAL;
         break;
     case HVM_PARAM_BUFIOREQ_EVTCHN:
@@ -4271,20 +4264,20 @@ static int hvmop_set_param(
             rc = -EINVAL;
         break;
     case HVM_PARAM_IOREQ_SERVER_PFN:
-        d->arch.hvm_domain.ioreq_gfn.base = a.value;
+        d->arch.hvm.ioreq_gfn.base = a.value;
         break;
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
     {
         unsigned int i;
 
         if ( a.value == 0 ||
-             a.value > sizeof(d->arch.hvm_domain.ioreq_gfn.mask) * 8 )
+             a.value > sizeof(d->arch.hvm.ioreq_gfn.mask) * 8 )
         {
             rc = -EINVAL;
             break;
         }
         for ( i = 0; i < a.value; i++ )
-            set_bit(i, &d->arch.hvm_domain.ioreq_gfn.mask);
+            set_bit(i, &d->arch.hvm.ioreq_gfn.mask);
 
         break;
     }
@@ -4339,7 +4332,7 @@ static int hvmop_set_param(
     if ( rc != 0 )
         goto out;
 
-    d->arch.hvm_domain.params[a.index] = a.value;
+    d->arch.hvm.params[a.index] = a.value;
 
     HVM_DBG_LOG(DBG_LEVEL_HCALL, "set param %u = %"PRIx64,
                 a.index, a.value);
@@ -4418,15 +4411,15 @@ static int hvmop_get_param(
     switch ( a.index )
     {
     case HVM_PARAM_ACPI_S_STATE:
-        a.value = d->arch.hvm_domain.is_s3_suspended ? 3 : 0;
+        a.value = d->arch.hvm.is_s3_suspended ? 3 : 0;
         break;
 
     case HVM_PARAM_VM86_TSS:
-        a.value = (uint32_t)d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED];
+        a.value = (uint32_t)d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED];
         break;
 
     case HVM_PARAM_VM86_TSS_SIZED:
-        a.value = d->arch.hvm_domain.params[HVM_PARAM_VM86_TSS_SIZED] &
+        a.value = d->arch.hvm.params[HVM_PARAM_VM86_TSS_SIZED] &
                   ~VM86_TSS_UPDATED;
         break;
 
@@ -4453,7 +4446,7 @@ static int hvmop_get_param(
 
     /*FALLTHRU*/
     default:
-        a.value = d->arch.hvm_domain.params[a.index];
+        a.value = d->arch.hvm.params[a.index];
         break;
     }
 
@@ -4553,7 +4546,7 @@ static int do_altp2m_op(
         goto out;
     }
 
-    mode = d->arch.hvm_domain.params[HVM_PARAM_ALTP2M];
+    mode = d->arch.hvm.params[HVM_PARAM_ALTP2M];
 
     if ( XEN_ALTP2M_disabled == mode )
     {

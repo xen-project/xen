@@ -38,7 +38,7 @@
 #define MIN_PER_HOUR    60
 #define HOUR_PER_DAY    24
 
-#define domain_vrtc(x) (&(x)->arch.hvm_domain.pl_time->vrtc)
+#define domain_vrtc(x) (&(x)->arch.hvm.pl_time->vrtc)
 #define vcpu_vrtc(x)   (domain_vrtc((x)->domain))
 #define vrtc_domain(x) (container_of(x, struct pl_time, vrtc)->domain)
 #define vrtc_vcpu(x)   (pt_global_vcpu_target(vrtc_domain(x)))
@@ -148,7 +148,7 @@ static void rtc_timer_update(RTCState *s)
                 s_time_t now = NOW();
 
                 s->period = period;
-                if ( v->domain->arch.hvm_domain.params[HVM_PARAM_VPT_ALIGN] )
+                if ( v->domain->arch.hvm.params[HVM_PARAM_VPT_ALIGN] )
                     delta = 0;
                 else
                     delta = period - ((now - s->start_time) % period);

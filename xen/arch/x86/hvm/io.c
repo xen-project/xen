@@ -179,12 +179,12 @@ static bool_t g2m_portio_accept(const struct hvm_io_handler *handler,
                                 const ioreq_t *p)
 {
     struct vcpu *curr = current;
-    const struct hvm_domain *hvm_domain = &curr->domain->arch.hvm_domain;
+    const struct hvm_domain *hvm = &curr->domain->arch.hvm;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     struct g2m_ioport *g2m_ioport;
     unsigned int start, end;
 
-    list_for_each_entry( g2m_ioport, &hvm_domain->g2m_ioport_list, list )
+    list_for_each_entry( g2m_ioport, &hvm->g2m_ioport_list, list )
     {
         start = g2m_ioport->gport;
         end = start + g2m_ioport->np;
@@ -313,12 +313,12 @@ static int vpci_portio_read(const struct hvm_io_handler *handler,
     if ( addr == 0xcf8 )
     {
         ASSERT(size == 4);
-        *data = d->arch.hvm_domain.pci_cf8;
+        *data = d->arch.hvm.pci_cf8;
         return X86EMUL_OKAY;
     }
 
     ASSERT((addr & ~3) == 0xcfc);
-    cf8 = ACCESS_ONCE(d->arch.hvm_domain.pci_cf8);
+    cf8 = ACCESS_ONCE(d->arch.hvm.pci_cf8);
     if ( !CF8_ENABLED(cf8) )
         return X86EMUL_UNHANDLEABLE;
 
@@ -343,12 +343,12 @@ static int vpci_portio_write(const struct hvm_io_handler *handler,
     if ( addr == 0xcf8 )
     {
         ASSERT(size == 4);
-        d->arch.hvm_domain.pci_cf8 = data;
+        d->arch.hvm.pci_cf8 = data;
         return X86EMUL_OKAY;
     }
 
     ASSERT((addr & ~3) == 0xcfc);
-    cf8 = ACCESS_ONCE(d->arch.hvm_domain.pci_cf8);
+    cf8 = ACCESS_ONCE(d->arch.hvm.pci_cf8);
     if ( !CF8_ENABLED(cf8) )
         return X86EMUL_UNHANDLEABLE;
 
@@ -397,7 +397,7 @@ static const struct hvm_mmcfg *vpci_mmcfg_find(const struct domain *d,
 {
     const struct hvm_mmcfg *mmcfg;
 
-    list_for_each_entry ( mmcfg, &d->arch.hvm_domain.mmcfg_regions, next )
+    list_for_each_entry ( mmcfg, &d->arch.hvm.mmcfg_regions, next )
         if ( addr >= mmcfg->addr && addr < mmcfg->addr + mmcfg->size )
             return mmcfg;
 
@@ -420,9 +420,9 @@ static int vpci_mmcfg_accept(struct vcpu *v, unsigned long addr)
     struct domain *d = v->domain;
     bool found;
 
-    read_lock(&d->arch.hvm_domain.mmcfg_lock);
+    read_lock(&d->arch.hvm.mmcfg_lock);
     found = vpci_mmcfg_find(d, addr);
-    read_unlock(&d->arch.hvm_domain.mmcfg_lock);
+    read_unlock(&d->arch.hvm.mmcfg_lock);
 
     return found;
 }
@@ -437,16 +437,16 @@ static int vpci_mmcfg_read(struct vcpu *v, unsigned long addr,
 
     *data = ~0ul;
 
-    read_lock(&d->arch.hvm_domain.mmcfg_lock);
+    read_lock(&d->arch.hvm.mmcfg_lock);
     mmcfg = vpci_mmcfg_find(d, addr);
     if ( !mmcfg )
     {
-        read_unlock(&d->arch.hvm_domain.mmcfg_lock);
+        read_unlock(&d->arch.hvm.mmcfg_lock);
         return X86EMUL_RETRY;
     }
 
     reg = vpci_mmcfg_decode_addr(mmcfg, addr, &sbdf);
-    read_unlock(&d->arch.hvm_domain.mmcfg_lock);
+    read_unlock(&d->arch.hvm.mmcfg_lock);
 
     if ( !vpci_access_allowed(reg, len) ||
          (reg + len) > PCI_CFG_SPACE_EXP_SIZE )
@@ -479,16 +479,16 @@ static int vpci_mmcfg_write(struct vcpu *v, unsigned long addr,
     unsigned int reg;
     pci_sbdf_t sbdf;
 
-    read_lock(&d->arch.hvm_domain.mmcfg_lock);
+    read_lock(&d->arch.hvm.mmcfg_lock);
     mmcfg = vpci_mmcfg_find(d, addr);
     if ( !mmcfg )
     {
-        read_unlock(&d->arch.hvm_domain.mmcfg_lock);
+        read_unlock(&d->arch.hvm.mmcfg_lock);
         return X86EMUL_RETRY;
     }
 
     reg = vpci_mmcfg_decode_addr(mmcfg, addr, &sbdf);
-    read_unlock(&d->arch.hvm_domain.mmcfg_lock);
+    read_unlock(&d->arch.hvm.mmcfg_lock);
 
     if ( !vpci_access_allowed(reg, len) ||
          (reg + len) > PCI_CFG_SPACE_EXP_SIZE )
@@ -527,8 +527,8 @@ int register_vpci_mmcfg_handler(struct domain *d, paddr_t addr,
     new->segment = seg;
     new->size = (end_bus - start_bus + 1) << 20;
 
-    write_lock(&d->arch.hvm_domain.mmcfg_lock);
-    list_for_each_entry ( mmcfg, &d->arch.hvm_domain.mmcfg_regions, next )
+    write_lock(&d->arch.hvm.mmcfg_lock);
+    list_for_each_entry ( mmcfg, &d->arch.hvm.mmcfg_regions, next )
         if ( new->addr < mmcfg->addr + mmcfg->size &&
              mmcfg->addr < new->addr + new->size )
         {
@@ -539,25 +539,25 @@ int register_vpci_mmcfg_handler(struct domain *d, paddr_t addr,
                  new->segment == mmcfg->segment &&
                  new->size == mmcfg->size )
                 ret = 0;
-            write_unlock(&d->arch.hvm_domain.mmcfg_lock);
+            write_unlock(&d->arch.hvm.mmcfg_lock);
             xfree(new);
             return ret;
         }
 
-    if ( list_empty(&d->arch.hvm_domain.mmcfg_regions) )
+    if ( list_empty(&d->arch.hvm.mmcfg_regions) )
         register_mmio_handler(d, &vpci_mmcfg_ops);
 
-    list_add(&new->next, &d->arch.hvm_domain.mmcfg_regions);
-    write_unlock(&d->arch.hvm_domain.mmcfg_lock);
+    list_add(&new->next, &d->arch.hvm.mmcfg_regions);
+    write_unlock(&d->arch.hvm.mmcfg_lock);
 
     return 0;
 }
 
 void destroy_vpci_mmcfg(struct domain *d)
 {
-    struct list_head *mmcfg_regions = &d->arch.hvm_domain.mmcfg_regions;
+    struct list_head *mmcfg_regions = &d->arch.hvm.mmcfg_regions;
 
-    write_lock(&d->arch.hvm_domain.mmcfg_lock);
+    write_lock(&d->arch.hvm.mmcfg_lock);
     while ( !list_empty(mmcfg_regions) )
     {
         struct hvm_mmcfg *mmcfg = list_first_entry(mmcfg_regions,
@@ -566,7 +566,7 @@ void destroy_vpci_mmcfg(struct domain *d)
         list_del(&mmcfg->next);
         xfree(mmcfg);
     }
-    write_unlock(&d->arch.hvm_domain.mmcfg_lock);
+    write_unlock(&d->arch.hvm.mmcfg_lock);
 }
 
 /*

@@ -1203,10 +1203,10 @@ int vlapic_accept_pic_intr(struct vcpu *v)
         return 0;
 
     TRACE_2D(TRC_HVM_EMUL_LAPIC_PIC_INTR,
-             (v == v->domain->arch.hvm_domain.i8259_target),
+             (v == v->domain->arch.hvm.i8259_target),
              v ? __vlapic_accept_pic_intr(v) : -1);
 
-    return ((v == v->domain->arch.hvm_domain.i8259_target) &&
+    return ((v == v->domain->arch.hvm.i8259_target) &&
             __vlapic_accept_pic_intr(v));
 }
 
@@ -1224,9 +1224,9 @@ void vlapic_adjust_i8259_target(struct domain *d)
     v = d->vcpu ? d->vcpu[0] : NULL;
 
  found:
-    if ( d->arch.hvm_domain.i8259_target == v )
+    if ( d->arch.hvm.i8259_target == v )
         return;
-    d->arch.hvm_domain.i8259_target = v;
+    d->arch.hvm.i8259_target = v;
     pt_adjust_global_vcpu_target(v);
 }
 

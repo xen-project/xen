@@ -539,12 +539,12 @@ static DEFINE_RCU_READ_LOCK(pinned_cacheattr_rcu_lock);
 
 void hvm_init_cacheattr_region_list(struct domain *d)
 {
-    INIT_LIST_HEAD(&d->arch.hvm_domain.pinned_cacheattr_ranges);
+    INIT_LIST_HEAD(&d->arch.hvm.pinned_cacheattr_ranges);
 }
 
 void hvm_destroy_cacheattr_region_list(struct domain *d)
 {
-    struct list_head *head = &d->arch.hvm_domain.pinned_cacheattr_ranges;
+    struct list_head *head = &d->arch.hvm.pinned_cacheattr_ranges;
     struct hvm_mem_pinned_cacheattr_range *range;
 
     while ( !list_empty(head) )
@@ -568,7 +568,7 @@ int hvm_get_mem_pinned_cacheattr(struct domain *d, gfn_t gfn,
 
     rcu_read_lock(&pinned_cacheattr_rcu_lock);
     list_for_each_entry_rcu ( range,
-                              &d->arch.hvm_domain.pinned_cacheattr_ranges,
+                              &d->arch.hvm.pinned_cacheattr_ranges,
                               list )
     {
         if ( ((gfn_x(gfn) & mask) >= range->start) &&
@@ -612,7 +612,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
         /* Remove the requested range. */
         rcu_read_lock(&pinned_cacheattr_rcu_lock);
         list_for_each_entry_rcu ( range,
-                                  &d->arch.hvm_domain.pinned_cacheattr_ranges,
+                                  &d->arch.hvm.pinned_cacheattr_ranges,
                                   list )
             if ( range->start == gfn_start && range->end == gfn_end )
             {
@@ -655,7 +655,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
 
     rcu_read_lock(&pinned_cacheattr_rcu_lock);
     list_for_each_entry_rcu ( range,
-                              &d->arch.hvm_domain.pinned_cacheattr_ranges,
+                              &d->arch.hvm.pinned_cacheattr_ranges,
                               list )
     {
         if ( range->start == gfn_start && range->end == gfn_end )
@@ -682,7 +682,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
     range->end = gfn_end;
     range->type = type;
 
-    list_add_rcu(&range->list, &d->arch.hvm_domain.pinned_cacheattr_ranges);
+    list_add_rcu(&range->list, &d->arch.hvm.pinned_cacheattr_ranges);
     p2m_memory_type_changed(d);
     if ( type != PAT_TYPE_WRBACK )
         flush_all(FLUSH_CACHE);
@@ -827,7 +827,7 @@ int epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
 
     if ( direct_mmio )
     {
-        if ( (mfn_x(mfn) ^ d->arch.hvm_domain.vmx.apic_access_mfn) >> order )
+        if ( (mfn_x(mfn) ^ d->arch.hvm.vmx.apic_access_mfn) >> order )
             return MTRR_TYPE_UNCACHABLE;
         if ( order )
             return -1;

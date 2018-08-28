@@ -150,7 +150,7 @@ static inline shr_handle_t get_next_handle(void)
 }
 
 #define mem_sharing_enabled(d) \
-    (is_hvm_domain(d) && (d)->arch.hvm_domain.mem_sharing_enabled)
+    (is_hvm_domain(d) && (d)->arch.hvm.mem_sharing_enabled)
 
 static atomic_t nr_saved_mfns   = ATOMIC_INIT(0); 
 static atomic_t nr_shared_mfns  = ATOMIC_INIT(0);
@@ -1333,7 +1333,7 @@ int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg)
 
     /* Only HAP is supported */
     rc = -ENODEV;
-    if ( !hap_enabled(d) || !d->arch.hvm_domain.mem_sharing_enabled )
+    if ( !hap_enabled(d) || !d->arch.hvm.mem_sharing_enabled )
         goto out;
 
     switch ( mso.op )
@@ -1613,7 +1613,7 @@ int mem_sharing_domctl(struct domain *d, struct xen_domctl_mem_sharing_op *mec)
             if ( unlikely(need_iommu(d) && mec->u.enable) )
                 rc = -EXDEV;
             else
-                d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
+                d->arch.hvm.mem_sharing_enabled = mec->u.enable;
         }
         break;
 

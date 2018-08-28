@@ -173,7 +173,7 @@ static DEFINE_RCU_READ_LOCK(msixtbl_rcu_lock);
  */
 static bool msixtbl_initialised(const struct domain *d)
 {
-    return !!d->arch.hvm_domain.msixtbl_list.next;
+    return d->arch.hvm.msixtbl_list.next;
 }
 
 static struct msixtbl_entry *msixtbl_find_entry(
@@ -182,7 +182,7 @@ static struct msixtbl_entry *msixtbl_find_entry(
     struct msixtbl_entry *entry;
     struct domain *d = v->domain;
 
-    list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
+    list_for_each_entry( entry, &d->arch.hvm.msixtbl_list, list )
         if ( addr >= entry->gtable &&
              addr < entry->gtable + entry->table_len )
             return entry;
@@ -430,7 +430,7 @@ static void add_msixtbl_entry(struct domain *d,
     entry->pdev = pdev;
     entry->gtable = (unsigned long) gtable;
 
-    list_add_rcu(&entry->list, &d->arch.hvm_domain.msixtbl_list);
+    list_add_rcu(&entry->list, &d->arch.hvm.msixtbl_list);
 }
 
 static void free_msixtbl_entry(struct rcu_head *rcu)
@@ -483,7 +483,7 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
 
     pdev = msi_desc->dev;
 
-    list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
+    list_for_each_entry( entry, &d->arch.hvm.msixtbl_list, list )
         if ( pdev == entry->pdev )
             goto found;
 
@@ -542,7 +542,7 @@ void msixtbl_pt_unregister(struct domain *d, struct pirq *pirq)
 
     pdev = msi_desc->dev;
 
-    list_for_each_entry( entry, &d->arch.hvm_domain.msixtbl_list, list )
+    list_for_each_entry( entry, &d->arch.hvm.msixtbl_list, list )
         if ( pdev == entry->pdev )
             goto found;
 
@@ -564,7 +564,7 @@ void msixtbl_init(struct domain *d)
     if ( !is_hvm_domain(d) || !has_vlapic(d) || msixtbl_initialised(d) )
         return;
 
-    INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
+    INIT_LIST_HEAD(&d->arch.hvm.msixtbl_list);
 
     handler = hvm_next_io_handler(d);
     if ( handler )
@@ -584,7 +584,7 @@ void msixtbl_pt_cleanup(struct domain *d)
     spin_lock(&d->event_lock);
 
     list_for_each_entry_safe( entry, temp,
-                              &d->arch.hvm_domain.msixtbl_list, list )
+                              &d->arch.hvm.msixtbl_list, list )
         del_msixtbl_entry(entry);
 
     spin_unlock(&d->event_lock);

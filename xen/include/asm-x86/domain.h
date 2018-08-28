@@ -17,7 +17,7 @@
 #define is_pv_32bit_vcpu(v)    (is_pv_32bit_domain((v)->domain))
 
 #define is_hvm_pv_evtchn_domain(d) (is_hvm_domain(d) && \
-        (d)->arch.hvm_domain.irq->callback_via_type == HVMIRQ_callback_vector)
+        (d)->arch.hvm.irq->callback_via_type == HVMIRQ_callback_vector)
 #define is_hvm_pv_evtchn_vcpu(v) (is_hvm_pv_evtchn_domain(v->domain))
 #define is_domain_direct_mapped(d) ((void)(d), 0)
 
@@ -306,7 +306,7 @@ struct arch_domain
 
     union {
         struct pv_domain pv;
-        struct hvm_domain hvm_domain;
+        struct hvm_domain hvm;
     };
 
     struct paging_domain paging;

@@ -1108,8 +1108,8 @@ static int construct_vmcs(struct vcpu *v)
     }
 
     /* I/O access bitmap. */
-    __vmwrite(IO_BITMAP_A, __pa(d->arch.hvm_domain.io_bitmap));
-    __vmwrite(IO_BITMAP_B, __pa(d->arch.hvm_domain.io_bitmap) + PAGE_SIZE);
+    __vmwrite(IO_BITMAP_A, __pa(d->arch.hvm.io_bitmap));
+    __vmwrite(IO_BITMAP_B, __pa(d->arch.hvm.io_bitmap) + PAGE_SIZE);
 
     if ( cpu_has_vmx_virtual_intr_delivery )
     {
@@ -1263,7 +1263,7 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(XSS_EXIT_BITMAP, 0);
 
     if ( cpu_has_vmx_tsc_scaling )
-        __vmwrite(TSC_MULTIPLIER, d->arch.hvm_domain.tsc_scaling_ratio);
+        __vmwrite(TSC_MULTIPLIER, d->arch.hvm.tsc_scaling_ratio);
 
     /* will update HOST & GUEST_CR3 as reqd */
     paging_update_paging_modes(v);
@@ -1643,7 +1643,7 @@ void vmx_vcpu_flush_pml_buffer(struct vcpu *v)
 
 bool_t vmx_domain_pml_enabled(const struct domain *d)
 {
-    return !!(d->arch.hvm_domain.vmx.status & VMX_DOMAIN_PML_ENABLED);
+    return d->arch.hvm.vmx.status & VMX_DOMAIN_PML_ENABLED;
 }
 
 /*
@@ -1668,7 +1668,7 @@ int vmx_domain_enable_pml(struct domain *d)
         if ( (rc = vmx_vcpu_enable_pml(v)) != 0 )
             goto error;
 
-    d->arch.hvm_domain.vmx.status |= VMX_DOMAIN_PML_ENABLED;
+    d->arch.hvm.vmx.status |= VMX_DOMAIN_PML_ENABLED;
 
     return 0;
 
@@ -1697,7 +1697,7 @@ void vmx_domain_disable_pml(struct domain *d)
     for_each_vcpu ( d, v )
         vmx_vcpu_disable_pml(v);
 
-    d->arch.hvm_domain.vmx.status &= ~VMX_DOMAIN_PML_ENABLED;
+    d->arch.hvm.vmx.status &= ~VMX_DOMAIN_PML_ENABLED;
 }
 
 /*
