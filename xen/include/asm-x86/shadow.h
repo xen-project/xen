@@ -169,7 +169,7 @@ static inline bool pv_l1tf_check_pte(struct domain *d, unsigned int level,
     ASSERT(is_pv_domain(d));
     ASSERT(!(pte & _PAGE_PRESENT));
 
-    if ( d->arch.pv_domain.check_l1tf && !paging_mode_sh_forced(d) &&
+    if ( d->arch.pv.check_l1tf && !paging_mode_sh_forced(d) &&
          (((level > 1) && (pte & _PAGE_PSE)) || !is_l1tf_safe_maddr(pte)) )
     {
 #ifdef CONFIG_SHADOW_PAGING
@@ -224,7 +224,7 @@ void pv_l1tf_tasklet(unsigned long data);
 
 static inline void pv_l1tf_domain_init(struct domain *d)
 {
-    d->arch.pv_domain.check_l1tf =
+    d->arch.pv.check_l1tf =
         opt_pv_l1tf & (is_hardware_domain(d)
                        ? OPT_PV_L1TF_DOM0 : OPT_PV_L1TF_DOMU);
 

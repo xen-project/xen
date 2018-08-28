@@ -970,7 +970,7 @@ int arch_set_info_guest(
         if ( d != current->domain && !VM_ASSIST(d, m2p_strict) &&
              is_pv_domain(d) && !is_pv_32bit_domain(d) &&
              test_bit(VMASST_TYPE_m2p_strict, &c.nat->vm_assist) &&
-             atomic_read(&d->arch.pv_domain.nr_l4_pages) )
+             atomic_read(&d->arch.pv.nr_l4_pages) )
         {
             bool done = false;
 

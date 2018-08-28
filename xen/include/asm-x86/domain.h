@@ -305,7 +305,7 @@ struct arch_domain
     struct list_head pdev_list;
 
     union {
-        struct pv_domain pv_domain;
+        struct pv_domain pv;
         struct hvm_domain hvm_domain;
     };
 
@@ -458,7 +458,7 @@ struct arch_domain
 #define gdt_ldt_pt_idx(v) \
       ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))
 #define pv_gdt_ptes(v) \
-    ((v)->domain->arch.pv_domain.gdt_ldt_l1tab[gdt_ldt_pt_idx(v)] + \
+    ((v)->domain->arch.pv.gdt_ldt_l1tab[gdt_ldt_pt_idx(v)] + \
      (((v)->vcpu_id << GDT_LDT_VCPU_SHIFT) & (L1_PAGETABLE_ENTRIES - 1)))
 #define pv_ldt_ptes(v) (pv_gdt_ptes(v) + 16)
 

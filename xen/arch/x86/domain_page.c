@@ -85,7 +85,7 @@ void *map_domain_page(mfn_t mfn)
     if ( !v || !is_pv_vcpu(v) )
         return mfn_to_virt(mfn_x(mfn));
 
-    dcache = &v->domain->arch.pv_domain.mapcache;
+    dcache = &v->domain->arch.pv.mapcache;
     vcache = &v->arch.pv_vcpu.mapcache;
     if ( !dcache->inuse )
         return mfn_to_virt(mfn_x(mfn));
@@ -189,7 +189,7 @@ void unmap_domain_page(const void *ptr)
     v = mapcache_current_vcpu();
     ASSERT(v && is_pv_vcpu(v));
 
-    dcache = &v->domain->arch.pv_domain.mapcache;
+    dcache = &v->domain->arch.pv.mapcache;
     ASSERT(dcache->inuse);
 
     idx = PFN_DOWN(va - MAPCACHE_VIRT_START);
@@ -233,7 +233,7 @@ void unmap_domain_page(const void *ptr)
 
 int mapcache_domain_init(struct domain *d)
 {
-    struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;
+    struct mapcache_domain *dcache = &d->arch.pv.mapcache;
     unsigned int bitmap_pages;
 
     ASSERT(is_pv_domain(d));
@@ -261,7 +261,7 @@ int mapcache_domain_init(struct domain *d)
 int mapcache_vcpu_init(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;
+    struct mapcache_domain *dcache = &d->arch.pv.mapcache;
     unsigned long i;
     unsigned int ents = d->max_vcpus * MAPCACHE_VCPU_ENTRIES;
     unsigned int nr = PFN_UP(BITS_TO_LONGS(ents) * sizeof(long));

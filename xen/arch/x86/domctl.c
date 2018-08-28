@@ -194,7 +194,7 @@ static int update_domain_cpuid_info(struct domain *d,
                 break;
             }
 
-            d->arch.pv_domain.cpuidmasks->_1cd = mask;
+            d->arch.pv.cpuidmasks->_1cd = mask;
         }
         break;
 
@@ -206,7 +206,7 @@ static int update_domain_cpuid_info(struct domain *d,
             if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
                 mask &= (~0ULL << 32) | ctl->ecx;
 
-            d->arch.pv_domain.cpuidmasks->_6c = mask;
+            d->arch.pv.cpuidmasks->_6c = mask;
         }
         break;
 
@@ -223,7 +223,7 @@ static int update_domain_cpuid_info(struct domain *d,
             if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
                 mask &= ((uint64_t)eax << 32) | ebx;
 
-            d->arch.pv_domain.cpuidmasks->_7ab0 = mask;
+            d->arch.pv.cpuidmasks->_7ab0 = mask;
         }
 
         /*
@@ -262,7 +262,7 @@ static int update_domain_cpuid_info(struct domain *d,
             if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
                 mask &= (~0ULL << 32) | eax;
 
-            d->arch.pv_domain.cpuidmasks->Da1 = mask;
+            d->arch.pv.cpuidmasks->Da1 = mask;
         }
         break;
 
@@ -305,7 +305,7 @@ static int update_domain_cpuid_info(struct domain *d,
                 break;
             }
 
-            d->arch.pv_domain.cpuidmasks->e1cd = mask;
+            d->arch.pv.cpuidmasks->e1cd = mask;
         }
         break;
 

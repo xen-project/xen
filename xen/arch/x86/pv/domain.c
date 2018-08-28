@@ -122,8 +122,8 @@ int switch_compat(struct domain *d)
 
     d->arch.x87_fip_width = 4;
 
-    d->arch.pv_domain.xpti = false;
-    d->arch.pv_domain.pcid = false;
+    d->arch.pv.xpti = false;
+    d->arch.pv.pcid = false;
 
     return 0;
 
@@ -142,7 +142,7 @@ static int pv_create_gdt_ldt_l1tab(struct vcpu *v)
 {
     return create_perdomain_mapping(v->domain, GDT_VIRT_START(v),
                                     1U << GDT_LDT_VCPU_SHIFT,
-                                    v->domain->arch.pv_domain.gdt_ldt_l1tab,
+                                    v->domain->arch.pv.gdt_ldt_l1tab,
                                     NULL);
 }
 
@@ -215,11 +215,9 @@ void pv_domain_destroy(struct domain *d)
     destroy_perdomain_mapping(d, GDT_LDT_VIRT_START,
                               GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
 
-    xfree(d->arch.pv_domain.cpuidmasks);
-    d->arch.pv_domain.cpuidmasks = NULL;
+    XFREE(d->arch.pv.cpuidmasks);
 
-    free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
-    d->arch.pv_domain.gdt_ldt_l1tab = NULL;
+    FREE_XENHEAP_PAGE(d->arch.pv.gdt_ldt_l1tab);
 }
 
 
@@ -234,14 +232,14 @@ int pv_domain_initialise(struct domain *d)
 
     pv_l1tf_domain_init(d);
 
-    d->arch.pv_domain.gdt_ldt_l1tab =
+    d->arch.pv.gdt_ldt_l1tab =
         alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
-    if ( !d->arch.pv_domain.gdt_ldt_l1tab )
+    if ( !d->arch.pv.gdt_ldt_l1tab )
         goto fail;
-    clear_page(d->arch.pv_domain.gdt_ldt_l1tab);
+    clear_page(d->arch.pv.gdt_ldt_l1tab);
 
     if ( levelling_caps & ~LCAP_faulting &&
-         (d->arch.pv_domain.cpuidmasks = xmemdup(&cpuidmask_defaults)) == NULL )
+         (d->arch.pv.cpuidmasks = xmemdup(&cpuidmask_defaults)) == NULL )
         goto fail;
 
     rc = create_perdomain_mapping(d, GDT_LDT_VIRT_START,
@@ -255,8 +253,8 @@ int pv_domain_initialise(struct domain *d)
     /* 64-bit PV guest by default. */
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
-    d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
-                                         ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
+    d->arch.pv.xpti = opt_xpti & (is_hardware_domain(d)
+                                  ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
 
     if ( !is_pv_32bit_domain(d) && use_invpcid && cpu_has_pcid )
         switch ( opt_pcid )
@@ -265,15 +263,15 @@ int pv_domain_initialise(struct domain *d)
             break;
 
         case PCID_ALL:
-            d->arch.pv_domain.pcid = true;
+            d->arch.pv.pcid = true;
             break;
 
         case PCID_XPTI:
-            d->arch.pv_domain.pcid = d->arch.pv_domain.xpti;
+            d->arch.pv.pcid = d->arch.pv.xpti;
             break;
 
         case PCID_NOXPTI:
-            d->arch.pv_domain.pcid = !d->arch.pv_domain.xpti;
+            d->arch.pv.pcid = !d->arch.pv.xpti;
             break;
 
         default:
@@ -301,14 +299,13 @@ static void _toggle_guest_pt(struct vcpu *v)
 
     v->arch.flags ^= TF_kernel_mode;
     update_cr3(v);
-    if ( d->arch.pv_domain.xpti )
+    if ( d->arch.pv.xpti )
     {
         struct cpu_info *cpu_info = get_cpu_info();
 
         cpu_info->root_pgt_changed = true;
         cpu_info->pv_cr3 = __pa(this_cpu(root_pgt)) |
-                           (d->arch.pv_domain.pcid
-                            ? get_pcid_bits(v, true) : 0);
+                           (d->arch.pv.pcid ? get_pcid_bits(v, true) : 0);
     }
 
     /* Don't flush user global mappings from the TLB. Don't tick TLB clock. */

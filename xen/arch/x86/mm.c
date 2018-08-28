@@ -501,7 +501,7 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
     struct domain *d = v->domain;
 
     v->arch.cr3 = mfn_x(mfn) << PAGE_SHIFT;
-    if ( is_pv_domain(d) && d->arch.pv_domain.pcid )
+    if ( is_pv_domain(d) && d->arch.pv.pcid )
         v->arch.cr3 |= get_pcid_bits(v, false);
 }
 
@@ -514,9 +514,9 @@ unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v)
     cr4 |= mmu_cr4_features & (X86_CR4_PSE | X86_CR4_SMEP | X86_CR4_SMAP |
                                X86_CR4_OSXSAVE | X86_CR4_FSGSBASE);
 
-    if ( d->arch.pv_domain.pcid )
+    if ( d->arch.pv.pcid )
         cr4 |= X86_CR4_PCIDE;
-    else if ( !d->arch.pv_domain.xpti )
+    else if ( !d->arch.pv.xpti )
         cr4 |= X86_CR4_PGE;
 
     cr4 |= d->arch.vtsc ? X86_CR4_TSD : 0;
@@ -533,7 +533,7 @@ void write_ptbase(struct vcpu *v)
               ? pv_guest_cr4_to_real_cr4(v)
               : ((read_cr4() & ~(X86_CR4_PCIDE | X86_CR4_TSD)) | X86_CR4_PGE);
 
-    if ( is_pv_vcpu(v) && v->domain->arch.pv_domain.xpti )
+    if ( is_pv_vcpu(v) && v->domain->arch.pv.xpti )
     {
         cpu_info->root_pgt_changed = true;
         cpu_info->pv_cr3 = __pa(this_cpu(root_pgt));
@@ -1757,7 +1757,7 @@ static int alloc_l4_table(struct page_info *page)
     {
         init_xen_l4_slots(pl4e, _mfn(pfn),
                           d, INVALID_MFN, VM_ASSIST(d, m2p_strict));
-        atomic_inc(&d->arch.pv_domain.nr_l4_pages);
+        atomic_inc(&d->arch.pv.nr_l4_pages);
     }
     unmap_domain_page(pl4e);
 
@@ -1876,7 +1876,7 @@ static int free_l4_table(struct page_info *page)
 
     if ( rc >= 0 )
     {
-        atomic_dec(&d->arch.pv_domain.nr_l4_pages);
+        atomic_dec(&d->arch.pv.nr_l4_pages);
         rc = 0;
     }
 
@@ -3787,7 +3787,7 @@ long do_mmu_update(
                         break;
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    if ( !rc && pt_owner->arch.pv_domain.xpti )
+                    if ( !rc && pt_owner->arch.pv.xpti )
                     {
                         bool local_in_use = false;
 

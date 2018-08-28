@@ -387,8 +387,8 @@ int __init dom0_construct_pv(struct domain *d,
     if ( compat32 )
     {
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
-        d->arch.pv_domain.xpti = false;
-        d->arch.pv_domain.pcid = false;
+        d->arch.pv.xpti = false;
+        d->arch.pv.pcid = false;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
         if ( setup_compat_arg_xlat(v) != 0 )
             BUG();

@@ -119,8 +119,8 @@ static void intel_ctxt_switch_masking(const struct vcpu *next)
 	struct cpuidmasks *these_masks = &this_cpu(cpuidmasks);
 	const struct domain *nextd = next ? next->domain : NULL;
 	const struct cpuidmasks *masks =
-		(nextd && is_pv_domain(nextd) && nextd->arch.pv_domain.cpuidmasks)
-		? nextd->arch.pv_domain.cpuidmasks : &cpuidmask_defaults;
+		(nextd && is_pv_domain(nextd) && nextd->arch.pv.cpuidmasks)
+		? nextd->arch.pv.cpuidmasks : &cpuidmask_defaults;
 
         if (msr_basic) {
 		uint64_t val = masks->_1cd;
