@@ -52,7 +52,7 @@ typedef struct {
     Bit16u filler4;
     } r8;
   } u;
-} __attribute__((packed)) pushad_regs_t;
+} pushad_regs_t;
 
 
 
