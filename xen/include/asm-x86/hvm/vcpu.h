@@ -176,7 +176,7 @@ struct hvm_vcpu {
     u64                 msr_xss;
 
     union {
-        struct arch_vmx_struct vmx;
+        struct vmx_vcpu vmx;
         struct arch_svm_struct svm;
     } u;
 

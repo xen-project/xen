@@ -205,7 +205,7 @@ void vmx_pi_desc_fixup(unsigned int cpu)
 {
     unsigned int new_cpu, dest;
     unsigned long flags;
-    struct arch_vmx_struct *vmx, *tmp;
+    struct vmx_vcpu *vmx, *tmp;
     spinlock_t *new_lock, *old_lock = &per_cpu(vmx_pi_blocking, cpu).lock;
     struct list_head *blocked_vcpus = &per_cpu(vmx_pi_blocking, cpu).list;
 
@@ -2357,7 +2357,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
 /* Handle VT-d posted-interrupt when VCPU is blocked. */
 static void pi_wakeup_interrupt(struct cpu_user_regs *regs)
 {
-    struct arch_vmx_struct *vmx, *tmp;
+    struct vmx_vcpu *vmx, *tmp;
     spinlock_t *lock = &per_cpu(vmx_pi_blocking, smp_processor_id()).lock;
     struct list_head *blocked_vcpus =
 		&per_cpu(vmx_pi_blocking, smp_processor_id()).list;

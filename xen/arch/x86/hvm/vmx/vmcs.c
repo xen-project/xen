@@ -518,23 +518,23 @@ static void vmx_free_vmcs(paddr_t pa)
 static void __vmx_clear_vmcs(void *info)
 {
     struct vcpu *v = info;
-    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+    struct vmx_vcpu *vmx = &v->arch.hvm_vmx;
 
     /* Otherwise we can nest (vmx_cpu_down() vs. vmx_clear_vmcs()). */
     ASSERT(!local_irq_is_enabled());
 
-    if ( arch_vmx->active_cpu == smp_processor_id() )
+    if ( vmx->active_cpu == smp_processor_id() )
     {
-        __vmpclear(arch_vmx->vmcs_pa);
-        if ( arch_vmx->vmcs_shadow_maddr )
-            __vmpclear(arch_vmx->vmcs_shadow_maddr);
+        __vmpclear(vmx->vmcs_pa);
+        if ( vmx->vmcs_shadow_maddr )
+            __vmpclear(vmx->vmcs_shadow_maddr);
 
-        arch_vmx->active_cpu = -1;
-        arch_vmx->launched   = 0;
+        vmx->active_cpu = -1;
+        vmx->launched   = 0;
 
-        list_del(&arch_vmx->active_list);
+        list_del(&vmx->active_list);
 
-        if ( arch_vmx->vmcs_pa == this_cpu(current_vmcs) )
+        if ( vmx->vmcs_pa == this_cpu(current_vmcs) )
             this_cpu(current_vmcs) = 0;
     }
 }
@@ -901,7 +901,7 @@ bool vmx_msr_is_intercepted(struct vmx_msr_bitmap *msr_bitmap,
  */
 void vmx_vmcs_switch(paddr_t from, paddr_t to)
 {
-    struct arch_vmx_struct *vmx = &current->arch.hvm_vmx;
+    struct vmx_vcpu *vmx = &current->arch.hvm_vmx;
     spin_lock(&vmx->vmcs_lock);
 
     __vmpclear(from);
@@ -1308,7 +1308,7 @@ static struct vmx_msr_entry *locate_msr_entry(
 struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
                                    enum vmx_msr_list_type type)
 {
-    const struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
+    const struct vmx_vcpu *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry *start = NULL, *ent, *end;
     unsigned int substart = 0, subend = vmx->msr_save_count;
     unsigned int total = vmx->msr_load_count;
@@ -1349,7 +1349,7 @@ struct vmx_msr_entry *vmx_find_msr(const struct vcpu *v, uint32_t msr,
 int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
                 enum vmx_msr_list_type type)
 {
-    struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
+    struct vmx_vcpu *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry **ptr, *start = NULL, *ent, *end;
     unsigned int substart, subend, total;
     int rc;
@@ -1460,7 +1460,7 @@ int vmx_add_msr(struct vcpu *v, uint32_t msr, uint64_t val,
 
 int vmx_del_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type)
 {
-    struct arch_vmx_struct *vmx = &v->arch.hvm_vmx;
+    struct vmx_vcpu *vmx = &v->arch.hvm_vmx;
     struct vmx_msr_entry *start = NULL, *ent, *end;
     unsigned int substart = 0, subend = vmx->msr_save_count;
     unsigned int total = vmx->msr_load_count;
@@ -1743,20 +1743,20 @@ void vmx_domain_update_eptp(struct domain *d)
 
 int vmx_create_vmcs(struct vcpu *v)
 {
-    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+    struct vmx_vcpu *vmx = &v->arch.hvm_vmx;
     int rc;
 
-    if ( (arch_vmx->vmcs_pa = vmx_alloc_vmcs()) == 0 )
+    if ( (vmx->vmcs_pa = vmx_alloc_vmcs()) == 0 )
         return -ENOMEM;
 
-    INIT_LIST_HEAD(&arch_vmx->active_list);
-    __vmpclear(arch_vmx->vmcs_pa);
-    arch_vmx->active_cpu = -1;
-    arch_vmx->launched   = 0;
+    INIT_LIST_HEAD(&vmx->active_list);
+    __vmpclear(vmx->vmcs_pa);
+    vmx->active_cpu = -1;
+    vmx->launched   = 0;
 
     if ( (rc = construct_vmcs(v)) != 0 )
     {
-        vmx_free_vmcs(arch_vmx->vmcs_pa);
+        vmx_free_vmcs(vmx->vmcs_pa);
         return rc;
     }
 
@@ -1765,11 +1765,11 @@ int vmx_create_vmcs(struct vcpu *v)
 
 void vmx_destroy_vmcs(struct vcpu *v)
 {
-    struct arch_vmx_struct *arch_vmx = &v->arch.hvm_vmx;
+    struct vmx_vcpu *vmx = &v->arch.hvm_vmx;
 
     vmx_clear_vmcs(v);
 
-    vmx_free_vmcs(arch_vmx->vmcs_pa);
+    vmx_free_vmcs(vmx->vmcs_pa);
 
     free_xenheap_page(v->arch.hvm_vmx.host_msr_area);
     free_xenheap_page(v->arch.hvm_vmx.msr_area);

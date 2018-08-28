@@ -100,7 +100,7 @@ struct pi_blocking_vcpu {
     spinlock_t           *lock;
 };
 
-struct arch_vmx_struct {
+struct vmx_vcpu {
     /* Physical address of VMCS. */
     paddr_t              vmcs_pa;
     /* VMCS shadow machine address. */
