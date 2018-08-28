@@ -62,6 +62,7 @@ int osdep_xenforeignmemory_open(xenforeignmemory_handle *fmem)
     {
         xtl_log(fmem->logger, XTL_ERROR, -1, "xenforeignmemory",
                 "privcmd ioctl should not be implemented");
+        close(fd);
         return -1;
     }
     else
