@@ -329,13 +329,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
      * Alternatives blocks for protecting against and/or virtualising
      * mitigation support for guests.
      */
-    printk("  Support for VMs: PV:%s%s%s%s, HVM:%s%s%s%s\n",
-           (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
-            boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
-            opt_eager_fpu)                           ? ""               : " None",
-           boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
-           boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
-           opt_eager_fpu                             ? " EAGER_FPU"     : "",
+#ifdef CONFIG_HVM
+    printk("  Support for HVM VMs:%s%s%s%s\n",
            (boot_cpu_has(X86_FEATURE_SC_MSR_HVM) ||
             boot_cpu_has(X86_FEATURE_SC_RSB_HVM) ||
             opt_eager_fpu)                           ? ""               : " None",
@@ -343,7 +338,16 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "");
 
+#endif
 #ifdef CONFIG_PV
+    printk("  Support for PV VMs:%s%s%s%s\n",
+           (boot_cpu_has(X86_FEATURE_SC_MSR_PV) ||
+            boot_cpu_has(X86_FEATURE_SC_RSB_PV) ||
+            opt_eager_fpu)                           ? ""               : " None",
+           boot_cpu_has(X86_FEATURE_SC_MSR_PV)       ? " MSR_SPEC_CTRL" : "",
+           boot_cpu_has(X86_FEATURE_SC_RSB_PV)       ? " RSB"           : "",
+           opt_eager_fpu                             ? " EAGER_FPU"     : "");
+
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s (with%s PCID)\n",
            opt_xpti & OPT_XPTI_DOM0 ? "enabled" : "disabled",
            opt_xpti & OPT_XPTI_DOMU ? "enabled" : "disabled",
