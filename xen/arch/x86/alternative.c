@@ -91,7 +91,7 @@ asm ( ".pushsection .init.rodata, \"a\", @progbits\n\t"
       "toolchain_nops: .nops " __stringify(ASM_NOP_MAX) "\n\t"
       ".popsection\n\t");
 extern char toolchain_nops[ASM_NOP_MAX];
-static bool __read_mostly toolchain_nops_are_ideal;
+static bool init_or_livepatch_read_mostly toolchain_nops_are_ideal;
 
 #else
 # define toolchain_nops_are_ideal false
