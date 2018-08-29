@@ -20,6 +20,13 @@
 #ifndef __X86_SPEC_CTRL_H__
 #define __X86_SPEC_CTRL_H__
 
+/* Encoding of cpuinfo.spec_ctrl_flags */
+#define SCF_use_shadow (1 << 0)
+#define SCF_ist_wrmsr  (1 << 1)
+#define SCF_ist_rsb    (1 << 2)
+
+#ifndef __ASSEMBLY__
+
 #include <asm/alternative.h>
 #include <asm/current.h>
 #include <asm/msr-index.h>
@@ -91,6 +98,7 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
                    :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0) : "memory" );
 }
 
+#endif /* __ASSEMBLY__ */
 #endif /* !__X86_SPEC_CTRL_H__ */
 
 /*

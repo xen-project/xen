@@ -326,6 +326,8 @@ static always_inline void stac(void)
         "call cr4_pv32_restore", X86_FEATURE_XEN_SMEP, \
         "call cr4_pv32_restore", X86_FEATURE_XEN_SMAP
 
+#include <asm/spec_ctrl_asm.h>
+
 #endif
 
 #ifdef CONFIG_PERF_COUNTERS
@@ -367,7 +369,5 @@ static always_inline void stac(void)
 3:  desc                /* desc   */      ; \
 4:  .p2align 2                            ; \
     .popsection
-
-#include <asm/spec_ctrl_asm.h>
 
 #endif /* __X86_ASM_DEFNS_H__ */
