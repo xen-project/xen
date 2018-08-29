@@ -189,25 +189,32 @@ void ret_from_intr(void);
 #endif
 
 /* "Raw" instruction opcodes */
-#define __ASM_CLAC      .byte 0x0f,0x01,0xca
-#define __ASM_STAC      .byte 0x0f,0x01,0xcb
+#define __ASM_CLAC      ".byte 0x0f,0x01,0xca"
+#define __ASM_STAC      ".byte 0x0f,0x01,0xcb"
 
 #ifdef __ASSEMBLY__
-#define ASM_STAC ALTERNATIVE "", __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP
-#define ASM_CLAC ALTERNATIVE "", __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP
+.macro ASM_STAC
+    ALTERNATIVE "", __ASM_STAC, X86_FEATURE_XEN_SMAP
+.endm
+.macro ASM_CLAC
+    ALTERNATIVE "", __ASM_CLAC, X86_FEATURE_XEN_SMAP
+.endm
 #else
 static always_inline void clac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative("", __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP);
+    alternative("", __ASM_CLAC, X86_FEATURE_XEN_SMAP);
 }
 
 static always_inline void stac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative("", __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP);
+    alternative("", __ASM_STAC, X86_FEATURE_XEN_SMAP);
 }
 #endif
+
+#undef __ASM_STAC
+#undef __ASM_CLAC
 
 #ifdef __ASSEMBLY__
 .macro SAVE_ALL op, compat=0
