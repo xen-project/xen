@@ -94,8 +94,8 @@ void gic_raise_inflight_irq(struct vcpu *v, unsigned int virtual_irq)
     }
 #ifdef GIC_DEBUG
     else
-        gdprintk(XENLOG_DEBUG, "trying to inject irq=%u into d%dv%d, when it is still lr_pending\n",
-                 virtual_irq, v->domain->domain_id, v->vcpu_id);
+        gdprintk(XENLOG_DEBUG, "trying to inject irq=%u into %pv, when it is still lr_pending\n",
+                 virtual_irq, v);
 #endif
 }
 
@@ -201,8 +201,8 @@ static void gic_update_one_lr(struct vcpu *v, int i)
                 gic_hw_ops->write_lr(i, &lr_val);
             }
             else
-                gdprintk(XENLOG_WARNING, "unable to inject hw irq=%d into d%dv%d: already active in LR%d\n",
-                         irq, v->domain->domain_id, v->vcpu_id, i);
+                gdprintk(XENLOG_WARNING, "unable to inject hw irq=%d into %pv: already active in LR%d\n",
+                         irq, v, i);
         }
     }
     else if ( lr_val.pending )
@@ -210,8 +210,8 @@ static void gic_update_one_lr(struct vcpu *v, int i)
         int q __attribute__ ((unused)) = test_and_clear_bit(GIC_IRQ_GUEST_QUEUED, &p->status);
 #ifdef GIC_DEBUG
         if ( q )
-            gdprintk(XENLOG_DEBUG, "trying to inject irq=%d into d%dv%d, when it is already pending in LR%d\n",
-                    irq, v->domain->domain_id, v->vcpu_id, i);
+            gdprintk(XENLOG_DEBUG, "trying to inject irq=%d into %pv, when it is already pending in LR%d\n",
+                    irq, v, i);
 #endif
     }
     else
