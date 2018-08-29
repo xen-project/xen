@@ -28,5 +28,15 @@ Symbol/Function pointers:
 
 Domain and vCPU information:
 
-       %pv     Domain and vCPU ID from a 'struct vcpu *' (printed as
-               "d<domid>v<vcpuid>")
+       %pd     Domain from a 'struct domain *'
+
+               Regular domains are printed with their ID in decimal.  System
+               domains are printed with their name.
+                 e.g.  d0
+                       d[IDLE]
+
+       %pv     Domain and vCPU ID from a 'struct vcpu *'
+
+               The domain part as above, with the vcpu_id printed in decimal.
+                 e.g.  d0v1
+                       d[IDLE]v0
