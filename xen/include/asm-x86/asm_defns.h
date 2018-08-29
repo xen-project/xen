@@ -193,30 +193,19 @@ void ret_from_intr(void);
 #define __ASM_STAC      .byte 0x0f,0x01,0xcb
 
 #ifdef __ASSEMBLY__
-#define ASM_STAC                                        \
-    ALTERNATIVE __stringify(ASM_NOP3),                  \
-        __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP
-
-#define ASM_CLAC                                        \
-    ALTERNATIVE __stringify(ASM_NOP3),                  \
-        __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP
-
-#define CR4_PV32_RESTORE                                \
-    ALTERNATIVE_2 __stringify(ASM_NOP5),                \
-        "call cr4_pv32_restore", X86_FEATURE_XEN_SMEP,  \
-        "call cr4_pv32_restore", X86_FEATURE_XEN_SMAP
-
+#define ASM_STAC ALTERNATIVE "", __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP
+#define ASM_CLAC ALTERNATIVE "", __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP
 #else
 static always_inline void clac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative(ASM_NOP3, __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP);
+    alternative("", __stringify(__ASM_CLAC), X86_FEATURE_XEN_SMAP);
 }
 
 static always_inline void stac(void)
 {
     /* Note: a barrier is implicit in alternative() */
-    alternative(ASM_NOP3, __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP);
+    alternative("", __stringify(__ASM_STAC), X86_FEATURE_XEN_SMAP);
 }
 #endif
 
@@ -324,6 +313,11 @@ static always_inline void stac(void)
         LOAD_ONE_REG(di, \compat)
         subq  $-(UREGS_error_code-UREGS_r15+\adj), %rsp
 .endm
+
+#define CR4_PV32_RESTORE                               \
+    ALTERNATIVE_2 "",                                  \
+        "call cr4_pv32_restore", X86_FEATURE_XEN_SMEP, \
+        "call cr4_pv32_restore", X86_FEATURE_XEN_SMAP
 
 #endif
 

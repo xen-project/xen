@@ -24,6 +24,7 @@
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/nmi.h>
+#include <asm/nops.h>
 #include <xen/livepatch.h>
 
 #define MAX_PATCH_LEN (255-1)

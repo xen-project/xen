@@ -12,6 +12,7 @@
 #include <xen/softirq.h>
 #include <asm/flushtlb.h>
 #include <asm/invpcid.h>
+#include <asm/nops.h>
 #include <asm/page.h>
 #include <asm/pv/domain.h>
 #include <asm/spec_ctrl.h>
@@ -208,7 +209,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
              c->x86_clflush_size && c->x86_cache_size && sz &&
              ((sz >> 10) < c->x86_cache_size) )
         {
-            alternative(ASM_NOP3, "sfence", X86_FEATURE_CLFLUSHOPT);
+            alternative("", "sfence", X86_FEATURE_CLFLUSHOPT);
             for ( i = 0; i < sz; i += c->x86_clflush_size )
                 alternative_input(".byte " __stringify(NOP_DS_PREFIX) ";"
                                   " clflush %0",
