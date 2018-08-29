@@ -14,6 +14,7 @@
 #include <asm/invpcid.h>
 #include <asm/page.h>
 #include <asm/pv/domain.h>
+#include <asm/spec_ctrl.h>
 
 /* Debug builds: Wrap frequently to stress-test the wrap logic. */
 #ifdef NDEBUG
@@ -180,7 +181,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
                  */
                 invpcid_flush_one(PCID_PV_PRIV, addr);
                 invpcid_flush_one(PCID_PV_USER, addr);
-                if ( !cpu_has_no_xpti )
+                if ( opt_xpti )
                 {
                     invpcid_flush_one(PCID_PV_PRIV | PCID_PV_XPTI, addr);
                     invpcid_flush_one(PCID_PV_USER | PCID_PV_XPTI, addr);

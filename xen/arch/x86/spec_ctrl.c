@@ -873,11 +873,6 @@ void __init init_speculation_mitigations(void)
     if ( opt_xpti == -1 )
         xpti_init_default(caps);
 
-    if ( opt_xpti == 0 )
-        setup_force_cpu_cap(X86_FEATURE_NO_XPTI);
-    else
-        setup_clear_cpu_cap(X86_FEATURE_NO_XPTI);
-
     l1tf_calculations(caps);
 
     /*
