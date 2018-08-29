@@ -289,6 +289,12 @@ int pv_domain_initialise(struct domain *d)
     return rc;
 }
 
+bool __init xpti_pcid_enabled(void)
+{
+    return use_invpcid && cpu_has_pcid &&
+           (opt_pcid == PCID_ALL || opt_pcid == PCID_XPTI);
+}
+
 static void _toggle_guest_pt(struct vcpu *v)
 {
     const struct domain *d = v->domain;

@@ -21,6 +21,8 @@
 #ifndef __X86_PV_DOMAIN_H__
 #define __X86_PV_DOMAIN_H__
 
+#include <xen/sched.h>
+
 /*
  * PCID values for the address spaces of 64-bit pv domains:
  *
@@ -58,6 +60,8 @@ void pv_vcpu_destroy(struct vcpu *v);
 int pv_vcpu_initialise(struct vcpu *v);
 void pv_domain_destroy(struct domain *d);
 int pv_domain_initialise(struct domain *d);
+
+bool xpti_pcid_enabled(void);
 
 #else  /* !CONFIG_PV */
 

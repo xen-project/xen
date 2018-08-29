@@ -24,6 +24,7 @@
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
+#include <asm/pv/domain.h>
 #include <asm/pv/shim.h>
 #include <asm/setup.h>
 #include <asm/spec_ctrl.h>
@@ -342,13 +343,16 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            boot_cpu_has(X86_FEATURE_SC_RSB_HVM)      ? " RSB"           : "",
            opt_eager_fpu                             ? " EAGER_FPU"     : "");
 
-    printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s\n",
+#ifdef CONFIG_PV
+    printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s (with%s PCID)\n",
            opt_xpti & OPT_XPTI_DOM0 ? "enabled" : "disabled",
-           opt_xpti & OPT_XPTI_DOMU ? "enabled" : "disabled");
+           opt_xpti & OPT_XPTI_DOMU ? "enabled" : "disabled",
+           xpti_pcid_enabled() ? "" : "out");
 
     printk("  PV L1TF shadowing: Dom0 %s, DomU %s\n",
            opt_pv_l1tf & OPT_PV_L1TF_DOM0  ? "enabled"  : "disabled",
            opt_pv_l1tf & OPT_PV_L1TF_DOMU  ? "enabled"  : "disabled");
+#endif
 }
 
 /* Calculate whether Retpoline is known-safe on this CPU. */
