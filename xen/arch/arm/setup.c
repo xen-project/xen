@@ -425,7 +425,7 @@ static paddr_t __init get_xen_paddr(void)
     }
 
     if ( !paddr )
-        panic("Not enough memory to relocate Xen");
+        panic("Not enough memory to relocate Xen\n");
 
     printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            paddr, paddr + min_size);
@@ -483,7 +483,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     void *fdt;
 
     if ( !bootinfo.mem.nr_banks )
-        panic("No memory bank");
+        panic("No memory bank\n");
 
     init_pdx();
 
@@ -538,7 +538,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     } while ( !opt_xenheap_megabytes && xenheap_pages > 32<<(20-PAGE_SHIFT) );
 
     if ( ! e )
-        panic("Not not enough space for xenheap");
+        panic("Not not enough space for xenheap\n");
 
     domheap_pages = heap_pages - xenheap_pages;
 
@@ -716,7 +716,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     if ( !device_tree_flattened )
         panic("Invalid device tree blob at physical address %#lx.\n"
               "The DTB must be 8-byte aligned and must not exceed 2 MB in size.\n\n"
-              "Please check your bootloader.",
+              "Please check your bootloader.\n",
               fdt_paddr);
 
     fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
@@ -855,10 +855,10 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     dom0 = domain_create(0, &dom0_cfg, true);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
-            panic("Error creating domain 0");
+        panic("Error creating domain 0\n");
 
     if ( construct_dom0(dom0) != 0)
-            panic("Could not set up DOM0 guest OS");
+        panic("Could not set up DOM0 guest OS\n");
 
     heap_init_late();
 

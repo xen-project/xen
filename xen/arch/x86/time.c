@@ -798,7 +798,7 @@ static u64 __init init_platform_timer(void)
     }
 
     if ( rc <= 0 )
-        panic("Unable to find usable platform timer");
+        panic("Unable to find usable platform timer\n");
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
@@ -914,7 +914,7 @@ static unsigned long get_cmos_time(void)
         cmos_rtc_probe = false;
     else if ( system_state < SYS_STATE_smp_boot && !cmos_rtc_probe )
         panic("System with no CMOS RTC advertised must be booted from EFI"
-              " (or with command line option \"cmos-rtc-probe\")");
+              " (or with command line option \"cmos-rtc-probe\")\n");
 
     for ( ; ; )
     {
@@ -959,7 +959,7 @@ static unsigned long get_cmos_time(void)
     }
 
     if ( unlikely(cmos_rtc_probe) )
-        panic("No CMOS RTC found - system must be booted from EFI");
+        panic("No CMOS RTC found - system must be booted from EFI\n");
 
     return mktime(rtc.year, rtc.mon, rtc.day, rtc.hour, rtc.min, rtc.sec);
 }

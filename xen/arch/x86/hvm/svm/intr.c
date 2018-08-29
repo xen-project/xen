@@ -173,7 +173,7 @@ void svm_intr_assist(void)
                 /* Guest already enabled an interrupt window. */
                 return;
             default:
-                panic("%s: nestedsvm_vcpu_interrupt can't handle value %#x",
+                panic("%s: nestedsvm_vcpu_interrupt can't handle value %#x\n",
                     __func__, rc);
             }
         }

@@ -972,7 +972,7 @@ void vgic_v3_setup_hw(paddr_t dbase,
                       const struct rdist_region *regions,
                       unsigned int intid_bits)
 {
-    panic("New VGIC implementation does not yet support GICv3.");
+    panic("New VGIC implementation does not yet support GICv3\n");
 }
 #endif
 

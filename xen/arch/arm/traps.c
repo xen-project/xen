@@ -399,7 +399,7 @@ void panic_PAR(uint64_t par)
            second_in_first ? " during second stage lookup" : "",
            fsc_level_str(level));
 
-    panic("Error during Hypervisor-to-physical address translation");
+    panic("Error during Hypervisor-to-physical address translation\n");
 }
 
 static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
@@ -1312,7 +1312,7 @@ int do_bug_frame(struct cpu_user_regs *regs, vaddr_t pc)
             return 0;
 
         show_execution_state(regs);
-        panic("Xen BUG at %s%s:%d", prefix, filename, lineno);
+        panic("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
 
     case BUGFRAME_assert:
         /* ASSERT: decode the predicate string pointer. */
@@ -1325,7 +1325,7 @@ int do_bug_frame(struct cpu_user_regs *regs, vaddr_t pc)
         if ( debugger_trap_fatal(TRAP_invalid_op, regs) )
             return 0;
         show_execution_state(regs);
-        panic("Assertion '%s' failed at %s%s:%d",
+        panic("Assertion '%s' failed at %s%s:%d\n",
               predicate, prefix, filename, lineno);
     }
 
@@ -1446,7 +1446,7 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
         show_execution_state(regs);
         break;
     default:
-        panic("DOM%d: Unhandled debug trap %#x", domid, code);
+        panic("DOM%d: Unhandled debug trap %#x\n", domid, code);
         break;
     }
 }

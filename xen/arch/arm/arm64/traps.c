@@ -40,7 +40,7 @@ void do_bad_mode(struct cpu_user_regs *regs, int reason)
 
     local_irq_disable();
     show_execution_state(regs);
-    panic("bad mode");
+    panic("bad mode\n");
 }
 
 /*

@@ -308,7 +308,7 @@ struct domain *domain_create(domid_t domid,
     if ( domid == 0 || domid == hardware_domid )
     {
         if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
-            panic("The value of hardware_dom must be a valid domain ID");
+            panic("The value of hardware_dom must be a valid domain ID\n");
 
         d->is_pinned = opt_dom0_vcpus_pin;
         d->disable_migrate = 1;

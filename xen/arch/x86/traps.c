@@ -712,7 +712,7 @@ void fatal_trap(const struct cpu_user_regs *regs, bool show_remote)
     }
 
     panic("FATAL TRAP: vector = %d (%s)\n"
-          "[error_code=%04x] %s",
+          "[error_code=%04x] %s\n",
           trapnr, trapstr(trapnr), regs->error_code,
           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
 }
@@ -725,7 +725,7 @@ static void do_reserved_trap(struct cpu_user_regs *regs)
         return;
 
     show_execution_state(regs);
-    panic("FATAL RESERVED TRAP %#x: %s", trapnr, trapstr(trapnr));
+    panic("FATAL RESERVED TRAP %#x: %s\n", trapnr, trapstr(trapnr));
 }
 
 static void do_trap(struct cpu_user_regs *regs)
@@ -764,7 +764,7 @@ static void do_trap(struct cpu_user_regs *regs)
 
     show_execution_state(regs);
     panic("FATAL TRAP: vector = %d (%s)\n"
-          "[error_code=%04x]",
+          "[error_code=%04x]\n",
           trapnr, trapstr(trapnr), regs->error_code);
 }
 
@@ -1047,7 +1047,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
             return;
 
         show_execution_state(regs);
-        panic("Xen BUG at %s%s:%d", prefix, filename, lineno);
+        panic("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
 
     case BUGFRAME_assert:
         /* ASSERT: decode the predicate string pointer. */
@@ -1062,7 +1062,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
             return;
 
         show_execution_state(regs);
-        panic("Assertion '%s' failed at %s%s:%d",
+        panic("Assertion '%s' failed at %s%s:%d\n",
               predicate, prefix, filename, lineno);
     }
 
@@ -1078,7 +1078,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
         return;
 
     show_execution_state(regs);
-    panic("FATAL TRAP: vector = %d (invalid opcode)", TRAP_invalid_op);
+    panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);
 }
 
 void do_int3(struct cpu_user_regs *regs)
@@ -1439,7 +1439,7 @@ void do_page_fault(struct cpu_user_regs *regs)
         show_page_walk(addr);
         panic("FATAL PAGE FAULT\n"
               "[error_code=%04x]\n"
-              "Faulting linear address: %p",
+              "Faulting linear address: %p\n",
               error_code, _p(addr));
     }
 
@@ -1577,7 +1577,7 @@ void do_general_protection(struct cpu_user_regs *regs)
         return;
 
     show_execution_state(regs);
-    panic("GENERAL PROTECTION FAULT\n[error_code=%04x]", regs->error_code);
+    panic("GENERAL PROTECTION FAULT\n[error_code=%04x]\n", regs->error_code);
 }
 
 static void pci_serr_softirq(void)

@@ -1799,7 +1799,7 @@ void __init scheduler_init(void)
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
     if ( SCHED_OP(&ops, init) )
-        panic("scheduler returned error on init");
+        panic("scheduler returned error on init\n");
 
     if ( sched_ratelimit_us &&
          (sched_ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX

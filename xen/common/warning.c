@@ -11,7 +11,7 @@ static const char *__initdata warnings[WARNING_ARRAY_SIZE];
 void __init warning_add(const char *warning)
 {
     if ( nr_warnings >= WARNING_ARRAY_SIZE )
-        panic("Too many pieces of warning text.");
+        panic("Too many pieces of warning text\n");
 
     warnings[nr_warnings] = warning;
     nr_warnings++;

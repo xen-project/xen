@@ -1164,7 +1164,7 @@ static void p2m_vmid_allocator_init(void)
     vmid_mask = xzalloc_array(unsigned long, BITS_TO_LONGS(MAX_VMID));
 
     if ( !vmid_mask )
-        panic("Could not allocate VMID bitmap space");
+        panic("Could not allocate VMID bitmap space\n");
 
     set_bit(INVALID_VMID, vmid_mask);
 }

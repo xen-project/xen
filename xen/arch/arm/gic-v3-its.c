@@ -992,7 +992,7 @@ static void add_to_host_its_list(paddr_t addr, paddr_t size,
 
     its_data = xzalloc(struct host_its);
     if ( !its_data )
-        panic("GICv3: Cannot allocate memory for ITS frame");
+        panic("GICv3: Cannot allocate memory for ITS frame\n");
 
     its_data->addr = addr;
     its_data->size = size;
@@ -1020,7 +1020,7 @@ static void gicv3_its_dt_init(const struct dt_device_node *node)
             continue;
 
         if ( dt_device_get_address(its, 0, &addr, &size) )
-            panic("GICv3: Cannot find a valid ITS frame address");
+            panic("GICv3: Cannot find a valid ITS frame address\n");
 
         add_to_host_its_list(addr, size, its);
     }

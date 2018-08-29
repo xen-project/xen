@@ -256,7 +256,7 @@ static int enter_state(u32 state)
     microcode_resume_cpu(0);
 
     if ( !recheck_cpu_features(0) )
-        panic("Missing previously available feature(s).");
+        panic("Missing previously available feature(s)\n");
 
     /* Re-enabled default NMI/#MC use of MSR_SPEC_CTRL. */
     ci->spec_ctrl_flags |= (default_spec_ctrl_flags & SCF_ist_wrmsr);

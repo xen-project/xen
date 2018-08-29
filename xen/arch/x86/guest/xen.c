@@ -99,12 +99,12 @@ static void map_shared_info(void)
     unsigned long rc;
 
     if ( hypervisor_alloc_unused_page(&mfn) )
-        panic("unable to reserve shared info memory page");
+        panic("unable to reserve shared info memory page\n");
 
     xatp.gpfn = mfn_x(mfn);
     rc = xen_hypercall_memory_op(XENMEM_add_to_physmap, &xatp);
     if ( rc )
-        panic("failed to map shared_info page: %ld", rc);
+        panic("failed to map shared_info page: %ld\n", rc);
 
     set_fixmap(FIX_XEN_SHARED_INFO, mfn_x(mfn) << PAGE_SHIFT);
 
@@ -168,7 +168,7 @@ static void __init init_memmap(void)
 
     mem = rangeset_new(NULL, "host memory map", 0);
     if ( !mem )
-        panic("failed to allocate PFN usage rangeset");
+        panic("failed to allocate PFN usage rangeset\n");
 
     /*
      * Mark up to the last memory page (or 4GiB) as RAM. This is done because
@@ -178,7 +178,7 @@ static void __init init_memmap(void)
      */
     if ( rangeset_add_range(mem, 0, max_t(unsigned long, max_page - 1,
                                           PFN_DOWN(GB(4) - 1))) )
-        panic("unable to add RAM to in-use PFN rangeset");
+        panic("unable to add RAM to in-use PFN rangeset\n");
 
     for ( i = 0; i < e820.nr_map; i++ )
     {
@@ -186,7 +186,7 @@ static void __init init_memmap(void)
 
         if ( rangeset_add_range(mem, PFN_DOWN(e->addr),
                                 PFN_UP(e->addr + e->size - 1)) )
-            panic("unable to add range [%#lx, %#lx] to in-use PFN rangeset",
+            panic("unable to add range [%#lx, %#lx] to in-use PFN rangeset\n",
                   PFN_DOWN(e->addr), PFN_UP(e->addr + e->size - 1));
     }
 }
@@ -236,7 +236,7 @@ static void init_evtchn(void)
     rc = xen_hypercall_set_evtchn_upcall_vector(this_cpu(vcpu_id),
                                                 evtchn_upcall_vector);
     if ( rc )
-        panic("Unable to set evtchn upcall vector: %d", rc);
+        panic("Unable to set evtchn upcall vector: %d\n", rc);
 
     /* Trick toolstack to think we are enlightened */
     {
@@ -309,7 +309,7 @@ static void __init mark_pfn_as_ram(struct e820map *e820, uint64_t pfn)
         if ( !e820_change_range_type(e820, pfn << PAGE_SHIFT,
                                      (pfn << PAGE_SHIFT) + PAGE_SIZE,
                                      E820_RESERVED, E820_RAM) )
-            panic("Unable to add/change memory type of pfn %#lx to RAM", pfn);
+            panic("Unable to add/change memory type of pfn %#lx to RAM\n", pfn);
 }
 
 void __init hypervisor_fixup_e820(struct e820map *e820)
@@ -323,7 +323,7 @@ void __init hypervisor_fixup_e820(struct e820map *e820)
 #define MARK_PARAM_RAM(p) ({                    \
     rc = xen_hypercall_hvm_get_param(p, &pfn);  \
     if ( rc )                                   \
-        panic("Unable to get " #p);             \
+        panic("Unable to get " #p "\n");        \
     mark_pfn_as_ram(e820, pfn);                 \
     ASSERT(i < ARRAY_SIZE(reserved_pages));     \
     reserved_pages[i++] = pfn << PAGE_SHIFT;    \
@@ -367,7 +367,7 @@ void hypervisor_resume(void)
      */
     bitmap_zero(vcpu_info_mapped, NR_CPUS);
     if ( map_vcpuinfo() && nr_cpu_ids > XEN_LEGACY_MAX_VCPUS )
-        panic("unable to remap vCPU info and vCPUs > legacy limit");
+        panic("unable to remap vCPU info and vCPUs > legacy limit\n");
 
     /* Setup event channel upcall vector. */
     init_evtchn();

@@ -48,11 +48,11 @@ static void __init xgene_check_pirq_eoi(void)
 
     node = dt_find_interrupt_controller(xgene_dt_int_ctrl_match);
     if ( !node )
-        panic("%s: Can not find interrupt controller node", __func__);
+        panic("%s: Can not find interrupt controller node\n", __func__);
 
     res = dt_device_get_address(node, 0, &dbase, NULL);
     if ( !dbase )
-        panic("%s: Cannot find a valid address for the distributor", __func__);
+        panic("%s: Cannot find a valid address for the distributor\n", __func__);
 
     /*
      * In old X-Gene Storm firmware and DT, secure mode addresses have
@@ -62,7 +62,7 @@ static void __init xgene_check_pirq_eoi(void)
      */
     if ( dbase == XGENE_SEC_GICV2_DIST_ADDR )
         panic("OLD X-Gene Firmware is not supported by Xen.\n"
-              "Please upgrade your firmware to the latest version");
+              "Please upgrade your firmware to the latest version\n");
 }
 
 static uint32_t xgene_storm_quirks(void)

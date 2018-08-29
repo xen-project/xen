@@ -123,7 +123,7 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
 
     if (entry->pin != -1) {
         if (irq_2_pin_free_entry >= PIN_MAP_SIZE)
-            panic("io_apic.c: whoops");
+            panic("io_apic.c: whoops\n");
         entry->next = irq_2_pin_free_entry;
         entry = irq_2_pin + entry->next;
         irq_2_pin_free_entry = entry->next;
@@ -1425,7 +1425,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
                 if (!physid_isset(i, phys_id_present_map))
                     break;
             if (i >= get_physical_broadcast())
-                panic("Max APIC ID exceeded");
+                panic("Max APIC ID exceeded\n");
             printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
                    i);
             mp_ioapics[apic].mpc_apicid = i;
@@ -1993,7 +1993,7 @@ static void __init check_timer(void)
     }
     printk(" failed :(.\n");
     panic("IO-APIC + timer doesn't work!  Boot with apic_verbosity=debug "
-          "and send a report.  Then try booting with the 'noapic' option");
+          "and send a report.  Then try booting with the 'noapic' option\n");
 }
 
 /*
@@ -2137,7 +2137,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
         }
 
         if (i == get_physical_broadcast())
-            panic("Max apic_id exceeded");
+            panic("Max apic_id exceeded\n");
 
         printk(KERN_WARNING "IOAPIC[%d]: apic_id %d already used, "
                "trying %d\n", ioapic, apic_id, i);

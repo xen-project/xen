@@ -319,7 +319,7 @@ static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
      */
     d->arch.e820 = xzalloc_array(struct e820entry, e820.nr_map + 1);
     if ( !d->arch.e820 )
-        panic("Unable to allocate memory for Dom0 e820 map");
+        panic("Unable to allocate memory for Dom0 e820 map\n");
     entry_guest = d->arch.e820;
 
     /* Clamp e820 memory map to match the memory assigned to Dom0 */

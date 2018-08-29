@@ -237,7 +237,7 @@ static void __init MP_ioapic_info (struct mpc_config_ioapic *m)
 	if (nr_ioapics >= MAX_IO_APICS) {
 		printk(KERN_CRIT "Max # of I/O APICs (%d) exceeded (found %d).\n",
 			MAX_IO_APICS, nr_ioapics);
-		panic("Recompile kernel with bigger MAX_IO_APICS");
+		panic("Recompile kernel with bigger MAX_IO_APICS\n");
 	}
 	if (!m->mpc_apicaddr) {
 		printk(KERN_ERR "WARNING: bogus zero I/O APIC address"
@@ -257,7 +257,7 @@ static void __init MP_intsrc_info (struct mpc_config_intsrc *m)
 			(m->mpc_irqflag >> 2) & 3, m->mpc_srcbus,
 			m->mpc_srcbusirq, m->mpc_dstapic, m->mpc_dstirq);
 	if (++mp_irq_entries == MAX_IRQ_SOURCES)
-		panic("Max # of irq sources exceeded");
+		panic("Max # of irq sources exceeded\n");
 }
 
 static void __init MP_lintsrc_info (struct mpc_config_lintsrc *m)
@@ -862,7 +862,7 @@ void __init mp_register_ioapic (
 	if (nr_ioapics >= MAX_IO_APICS) {
 		printk(KERN_ERR "ERROR: Max # of I/O APICs (%d) exceeded "
 			"(found %d)\n", MAX_IO_APICS, nr_ioapics);
-		panic("Recompile kernel with bigger MAX_IO_APICS");
+		panic("Recompile kernel with bigger MAX_IO_APICS\n");
 	}
 	if (!address) {
 		printk(KERN_ERR "WARNING: Bogus (zero) I/O APIC address"
@@ -961,7 +961,7 @@ void __init mp_override_legacy_irq (
 
 	mp_irqs[mp_irq_entries] = intsrc;
 	if (++mp_irq_entries == MAX_IRQ_SOURCES)
-		panic("Max # of irq sources exceeded");
+		panic("Max # of irq sources exceeded\n");
 
 	return;
 }
@@ -1027,7 +1027,7 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 		mp_irqs[mp_irq_entries] = intsrc;
 		if (++mp_irq_entries == MAX_IRQ_SOURCES)
-			panic("Max # of irq sources exceeded");
+			panic("Max # of irq sources exceeded\n");
 	}
 }
 

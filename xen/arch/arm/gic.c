@@ -246,7 +246,7 @@ static void __init gic_dt_preinit(void)
         }
     }
     if ( !num_gics )
-        panic("Unable to find compatible GIC in the device tree");
+        panic("Unable to find compatible GIC in the device tree\n");
 
     /* Set the GIC as the primary interrupt controller */
     dt_interrupt_controller = node;
@@ -261,12 +261,12 @@ static void __init gic_acpi_preinit(void)
 
     header = acpi_table_get_entry_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
     if ( !header )
-        panic("No valid GICD entries exists");
+        panic("No valid GICD entries exists\n");
 
     dist = container_of(header, struct acpi_madt_generic_distributor, header);
 
     if ( acpi_device_init(DEVICE_GIC, NULL, dist->version) )
-        panic("Unable to find compatible GIC in the ACPI table");
+        panic("Unable to find compatible GIC in the ACPI table\n");
 }
 #else
 static void __init gic_acpi_preinit(void) { }
@@ -287,7 +287,7 @@ void __init gic_preinit(void)
 void __init gic_init(void)
 {
     if ( gic_hw_ops->init() )
-        panic("Failed to initialize the GIC drivers");
+        panic("Failed to initialize the GIC drivers\n");
     /* Clear LR mask for cpu0 */
     clear_cpu_lr_mask();
 }
@@ -364,7 +364,7 @@ static void do_sgi(struct cpu_user_regs *regs, enum gic_sgi sgi)
         smp_call_function_interrupt();
         break;
     default:
-        panic("Unhandled SGI %d on CPU%d", sgi, smp_processor_id());
+        panic("Unhandled SGI %d on CPU%d\n", sgi, smp_processor_id());
         break;
     }
 

@@ -325,7 +325,7 @@ void __init alternative_instructions(void)
         mdelay(1);
 
     if ( !ACCESS_ONCE(alt_done) )
-        panic("Timed out waiting for alternatives self-NMI to hit");
+        panic("Timed out waiting for alternatives self-NMI to hit\n");
 
     set_nmi_callback(saved_nmi_callback);
 }

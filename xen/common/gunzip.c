@@ -57,7 +57,7 @@ static void flush_window(void);
 
 static __init void error(char *x)
 {
-    panic("%s", x);
+    panic("%s\n", x);
 }
 
 static __init int fill_inbuf(void)

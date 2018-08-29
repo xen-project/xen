@@ -478,7 +478,7 @@ __ubsan_handle_builtin_unreachable(struct unreachable_data *data)
 	ubsan_prologue(&data->location, &flags);
 	pr_err("calling __builtin_unreachable()\n");
 	ubsan_epilogue(&flags);
-	panic("can't return from __builtin_unreachable()");
+	panic("can't return from __builtin_unreachable()\n");
 }
 EXPORT_SYMBOL(__ubsan_handle_builtin_unreachable);
 

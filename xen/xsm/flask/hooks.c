@@ -1875,13 +1875,13 @@ void __init flask_init(const void *policy_buffer, size_t policy_size)
     avc_init();
 
     if ( register_xsm(&flask_ops) )
-        panic("Flask: Unable to register with XSM");
+        panic("Flask: Unable to register with XSM\n");
 
     if ( policy_size && flask_bootparam != FLASK_BOOTPARAM_LATELOAD )
         ret = security_load_policy(policy_buffer, policy_size);
 
     if ( ret && flask_bootparam == FLASK_BOOTPARAM_ENFORCING )
-        panic("Unable to load FLASK policy");
+        panic("Unable to load FLASK policy\n");
 
     if ( ret )
         printk(XENLOG_INFO "Flask:  Access controls disabled until policy is loaded.\n");

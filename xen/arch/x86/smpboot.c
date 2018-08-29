@@ -1107,11 +1107,11 @@ void __init smp_prepare_cpus(void)
     socket_cpumask = xzalloc_array(cpumask_t *, nr_sockets);
     if ( socket_cpumask == NULL ||
          (socket_cpumask[cpu_to_socket(0)] = xzalloc(cpumask_t)) == NULL )
-        panic("No memory for socket CPU siblings map");
+        panic("No memory for socket CPU siblings map\n");
 
     if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, 0)) ||
          !zalloc_cpumask_var(&per_cpu(cpu_core_mask, 0)) )
-        panic("No memory for boot CPU sibling/core maps");
+        panic("No memory for boot CPU sibling/core maps\n");
 
     set_cpu_sibling_map(0);
 

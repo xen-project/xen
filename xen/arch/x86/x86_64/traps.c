@@ -264,7 +264,7 @@ void do_double_fault(struct cpu_user_regs *regs)
     show_code(regs);
     show_stack_overflow(cpu, regs);
 
-    panic("DOUBLE FAULT -- system shutdown");
+    panic("DOUBLE FAULT -- system shutdown\n");
 }
 
 static unsigned int write_stub_trampoline(

@@ -357,7 +357,7 @@ unsigned int __init arch_get_dma_bitsize(void)
              !(node_start_pfn(node) >> (32 - PAGE_SHIFT)) )
             break;
     if ( node >= MAX_NUMNODES )
-        panic("No node with memory below 4Gb");
+        panic("No node with memory below 4Gb\n");
 
     /*
      * Try to not reserve the whole node's memory for DMA, but dividing

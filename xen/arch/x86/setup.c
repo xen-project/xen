@@ -820,7 +820,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
-        panic("dom0 kernel not specified. Check bootloader configuration.");
+        panic("dom0 kernel not specified. Check bootloader configuration\n");
 
     if ( pvh_boot )
     {
@@ -911,7 +911,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         e820_raw.nr_map = 2;
     }
     else
-        panic("Bootloader provided no memory information.");
+        panic("Bootloader provided no memory information\n");
 
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = raw_max_page = init_e820(memmap_type, &e820_raw);
@@ -958,7 +958,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     for ( i = 0; !efi_enabled(EFI_LOADER) && i < mbi->mods_count; i++ )
     {
         if ( mod[i].mod_start & (PAGE_SIZE - 1) )
-            panic("Bootloader didn't honor module alignment request.");
+            panic("Bootloader didn't honor module alignment request\n");
         mod[i].mod_end -= mod[i].mod_start;
         mod[i].mod_start >>= PAGE_SHIFT;
         mod[i].reserved = 0;
@@ -1215,7 +1215,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     if ( modules_headroom && !mod->reserved )
-        panic("Not enough memory to relocate the dom0 kernel image.");
+        panic("Not enough memory to relocate the dom0 kernel image\n");
     for ( i = 0; i < mbi->mods_count; ++i )
     {
         uint64_t s = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
@@ -1224,7 +1224,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
 
     if ( !xen_phys_start )
-        panic("Not enough memory to relocate Xen.");
+        panic("Not enough memory to relocate Xen\n");
 
     /* This needs to remain in sync with xen_in_range(). */
     reserve_e820_ram(&boot_e820, __pa(_stext), __pa(__2M_rwdata_end));
@@ -1683,7 +1683,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         watchdog_setup();
 
     if ( !tboot_protect_mem_regions() )
-        panic("Could not protect TXT memory regions");
+        panic("Could not protect TXT memory regions\n");
 
     init_guest_cpuid();
     init_guest_msr_policy();
@@ -1702,7 +1702,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /* Create initial domain 0. */
     dom0 = domain_create(get_initial_domain_id(), &dom0_cfg, !pv_shim);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
-        panic("Error creating domain 0");
+        panic("Error creating domain 0\n");
 
     /* Grab the DOM0 command line. */
     cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
@@ -1765,7 +1765,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     if ( construct_dom0(dom0, mod, modules_headroom,
                         (initrdidx > 0) && (initrdidx < mbi->mods_count)
                         ? mod + initrdidx : NULL, cmdline) != 0)
-        panic("Could not set up DOM0 guest OS");
+        panic("Could not set up DOM0 guest OS\n");
 
     if ( cpu_has_smap )
     {

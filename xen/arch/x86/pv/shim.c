@@ -102,7 +102,7 @@ uint64_t pv_shim_mem(uint64_t avail)
     }
 
     if ( total_pages - avail > shim_nrpages )
-        panic("pages used by shim > shim_nrpages (%#lx > %#lx)",
+        panic("pages used by shim > shim_nrpages (%#lx > %#lx)\n",
               total_pages - avail, shim_nrpages);
 
     shim_nrpages -= total_pages - avail;

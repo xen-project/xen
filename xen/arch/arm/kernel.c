@@ -87,7 +87,7 @@ static void __init place_modules(struct kernel_info *info,
     paddr_t modbase;
 
     if ( modsize + kernsize > ramsize )
-        panic("Not enough memory in the first bank for the kernel+dtb+initrd");
+        panic("Not enough memory in the first bank for the kernel+dtb+initrd\n");
 
     /*
      * DTB must be loaded such that it does not conflict with the
@@ -114,7 +114,7 @@ static void __init place_modules(struct kernel_info *info,
         modbase = kernbase - modsize;
     else
     {
-        panic("Unable to find suitable location for dtb+initrd");
+        panic("Unable to find suitable location for dtb+initrd\n");
         return;
     }
 
@@ -171,12 +171,12 @@ static void __init kernel_zimage_load(struct kernel_info *info)
 
     kernel = ioremap_wc(paddr, len);
     if ( !kernel )
-        panic("Unable to map the hwdom kernel");
+        panic("Unable to map the hwdom kernel\n");
 
     rc = copy_to_guest_phys_flush_dcache(info->d, load_addr,
                                          kernel, len);
     if ( rc != 0 )
-        panic("Unable to copy the kernel in the hwdom memory");
+        panic("Unable to copy the kernel in the hwdom memory\n");
 
     iounmap(kernel);
 }

@@ -159,8 +159,7 @@ static void __hwdom_init check_hwdom_reqs(struct domain *d)
     arch_iommu_check_autotranslated_hwdom(d);
 
     if ( iommu_passthrough )
-        panic("Dom0 uses paging translated mode, dom0-passthrough must not be "
-              "enabled\n");
+        panic("Dom0 uses paging translated mode, dom0-passthrough must not be enabled\n");
 
     iommu_dom0_strict = 1;
 }
@@ -384,7 +383,7 @@ int __init iommu_setup(void)
 
     if ( (force_iommu && !iommu_enabled) ||
          (force_intremap && !iommu_intremap) )
-        panic("Couldn't enable %s and iommu=required/force",
+        panic("Couldn't enable %s and iommu=required/force\n",
               !iommu_enabled ? "IOMMU" : "Interrupt Remapping");
 
     if ( !iommu_intremap )

@@ -830,7 +830,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     }
 
     if ( base_mfn < mfn_x(xenheap_mfn_start) )
-        panic("cannot add xenheap mapping at %lx below heap start %lx",
+        panic("cannot add xenheap mapping at %lx below heap start %lx\n",
               base_mfn, mfn_x(xenheap_mfn_start));
 
     end_mfn = base_mfn + nr_mfns;

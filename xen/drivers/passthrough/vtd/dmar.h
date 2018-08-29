@@ -119,7 +119,7 @@ do {                                                \
             if ( !kexecing )                                    \
             {                                                   \
                 dump_execution_state();                         \
-                panic("DMAR hardware malfunction");             \
+                panic("DMAR hardware malfunction\n");           \
             }                                                   \
             break;                                              \
         }                                                       \

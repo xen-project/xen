@@ -759,7 +759,7 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
         if ( !is_igd_vt_enabled_quirk() )
         {
             if ( force_iommu )
-                panic("BIOS did not enable IGD for VT properly, crash Xen for security purpose");
+                panic("BIOS did not enable IGD for VT properly, crash Xen for security purpose\n");
 
             printk(XENLOG_WARNING VTDPREFIX
                    "BIOS did not enable IGD for VT properly.  Disabling IGD VT-d engine.\n");
@@ -2571,7 +2571,7 @@ static void vtd_resume(void)
         return;
 
     if ( init_vtd_hw() != 0  && force_iommu )
-         panic("IOMMU setup failed, crash Xen for security purpose");
+         panic("IOMMU setup failed, crash Xen for security purpose\n");
 
     for_each_drhd_unit ( drhd )
     {

@@ -71,7 +71,7 @@ void __init platform_init(void)
         res = platform->init();
 
     if ( res )
-        panic("Unable to initialize the platform");
+        panic("Unable to initialize the platform\n");
 }
 
 int __init platform_init_time(void)

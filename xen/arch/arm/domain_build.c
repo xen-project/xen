@@ -125,7 +125,7 @@ static bool __init insert_11_bank(struct domain *d,
 
     res = guest_physmap_add_page(d, _gfn(mfn_x(smfn)), smfn, order);
     if ( res )
-        panic("Failed map pages to DOM0: %d", res);
+        panic("Failed map pages to DOM0: %d\n", res);
 
     kinfo->unassigned_mem -= size;
 
@@ -289,7 +289,7 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
 
     /* Failed to allocate bank0 under 4GB */
     if ( is_32bit_domain(d) )
-        panic("Unable to allocate first memory bank.");
+        panic("Unable to allocate first memory bank\n");
 
     /* Try to allocate memory from above 4GB */
     printk(XENLOG_INFO "No bank has been allocated below 4GB.\n");
@@ -598,7 +598,7 @@ static int __init make_hypervisor_node(struct domain *d,
      */
     if ((addrcells != 1 && addrcells != 2) ||
         (sizecells != 1 && sizecells != 2))
-        panic("Cannot cope with this size");
+        panic("Cannot cope with this size\n");
 
     /* See linux Documentation/devicetree/bindings/arm/xen.txt */
     res = fdt_begin_node(fdt, "hypervisor");
@@ -1586,7 +1586,7 @@ static void __init acpi_map_other_tables(struct domain *d)
         if ( res )
         {
              panic(XENLOG_ERR "Unable to map ACPI region 0x%"PRIx64
-                   " - 0x%"PRIx64" in domain \n",
+                   " - 0x%"PRIx64" in domain\n",
                    addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
         }
     }
@@ -1994,7 +1994,7 @@ static void __init dtb_load(struct kernel_info *kinfo)
                                            fdt_totalsize(kinfo->fdt));
 
     if ( left != 0 )
-        panic("Unable to copy the DTB to dom0 memory (left = %lu bytes)", left);
+        panic("Unable to copy the DTB to dom0 memory (left = %lu bytes)\n", left);
     xfree(kinfo->fdt);
 }
 
@@ -2021,30 +2021,30 @@ static void __init initrd_load(struct kernel_info *kinfo)
     /* Fix up linux,initrd-start and linux,initrd-end in /chosen */
     node = fdt_path_offset(kinfo->fdt, "/chosen");
     if ( node < 0 )
-        panic("Cannot find the /chosen node");
+        panic("Cannot find the /chosen node\n");
 
     cellp = (__be32 *)val;
     dt_set_cell(&cellp, ARRAY_SIZE(val), load_addr);
     res = fdt_setprop_inplace(kinfo->fdt, node, "linux,initrd-start",
                               val, sizeof(val));
     if ( res )
-        panic("Cannot fix up \"linux,initrd-start\" property");
+        panic("Cannot fix up \"linux,initrd-start\" property\n");
 
     cellp = (__be32 *)val;
     dt_set_cell(&cellp, ARRAY_SIZE(val), load_addr + len);
     res = fdt_setprop_inplace(kinfo->fdt, node, "linux,initrd-end",
                               val, sizeof(val));
     if ( res )
-        panic("Cannot fix up \"linux,initrd-end\" property");
+        panic("Cannot fix up \"linux,initrd-end\" property\n");
 
     initrd = ioremap_wc(paddr, len);
     if ( !initrd )
-        panic("Unable to map the hwdom initrd");
+        panic("Unable to map the hwdom initrd\n");
 
     res = copy_to_guest_phys_flush_dcache(kinfo->d, load_addr,
                                           initrd, len);
     if ( res != 0 )
-        panic("Unable to copy the initrd in the hwdom memory");
+        panic("Unable to copy the initrd in the hwdom memory\n");
 }
 
 /*
