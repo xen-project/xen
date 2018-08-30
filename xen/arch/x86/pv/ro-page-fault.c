@@ -131,10 +131,12 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
     /* Check the new PTE. */
     nl1e = l1e_from_intpte(val);
 
-    if ( !(l1e_get_flags(nl1e) & _PAGE_PRESENT) && pv_l1tf_check_l1e(d, nl1e) )
-        return X86EMUL_RETRY;
-
-    switch ( ret = get_page_from_l1e(nl1e, d, d) )
+    if ( !(l1e_get_flags(nl1e) & _PAGE_PRESENT) )
+    {
+        if ( pv_l1tf_check_l1e(d, nl1e) )
+            return X86EMUL_RETRY;
+    }
+    else switch ( ret = get_page_from_l1e(nl1e, d, d) )
     {
     default:
         if ( is_pv_32bit_domain(d) && (bytes == 4) && (unaligned_addr & 4) &&

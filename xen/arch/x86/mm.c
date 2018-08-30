@@ -900,8 +900,11 @@ get_page_from_l1e(
     struct domain *real_pg_owner;
     bool write;
 
-    if ( !(l1f & _PAGE_PRESENT) )
+    if ( unlikely(!(l1f & _PAGE_PRESENT)) )
+    {
+        ASSERT_UNREACHABLE();
         return 0;
+    }
 
     if ( unlikely(l1f & l1_disallow_mask(l1e_owner)) )
     {
@@ -1099,14 +1102,6 @@ get_page_from_l1e(
     return -EBUSY;
 }
 
-
-/* NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'. */
-/*
- * get_page_from_l2e returns:
- *   1 => page not present
- *   0 => success
- *  <0 => error code
- */
 define_get_linear_pagetable(l2);
 static int
 get_page_from_l2e(
@@ -1114,9 +1109,6 @@ get_page_from_l2e(
 {
     unsigned long mfn = l2e_get_pfn(l2e);
     int rc;
-
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-        return pv_l1tf_check_l2e(d, l2e) ? -ERESTART : 1;
 
     if ( unlikely((l2e_get_flags(l2e) & L2_DISALLOW_MASK)) )
     {
@@ -1132,22 +1124,12 @@ get_page_from_l2e(
     return rc;
 }
 
-
-/*
- * get_page_from_l3e returns:
- *   1 => page not present
- *   0 => success
- *  <0 => error code
- */
 define_get_linear_pagetable(l3);
 static int
 get_page_from_l3e(
     l3_pgentry_t l3e, unsigned long pfn, struct domain *d, int partial)
 {
     int rc;
-
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        return pv_l1tf_check_l3e(d, l3e) ? -ERESTART : 1;
 
     if ( unlikely((l3e_get_flags(l3e) & l3_disallow_mask(d))) )
     {
@@ -1166,21 +1148,12 @@ get_page_from_l3e(
     return rc;
 }
 
-/*
- * get_page_from_l4e returns:
- *   1 => page not present
- *   0 => success
- *  <0 => error code
- */
 define_get_linear_pagetable(l4);
 static int
 get_page_from_l4e(
     l4_pgentry_t l4e, unsigned long pfn, struct domain *d, int partial)
 {
     int rc;
-
-    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
-        return pv_l1tf_check_l4e(d, l4e) ? -ERESTART : 1;
 
     if ( unlikely((l4e_get_flags(l4e) & L4_DISALLOW_MASK)) )
     {
@@ -1396,8 +1369,7 @@ static int alloc_l1_table(struct page_info *page)
             if ( ret )
                 goto out;
         }
-
-        switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
+        else switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
         {
         default:
             goto fail;
@@ -1477,6 +1449,8 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
 
     for ( i = page->nr_validated_ptes; i < L2_PAGETABLE_ENTRIES; i++ )
     {
+        l2_pgentry_t l2e;
+
         if ( i > page->nr_validated_ptes && hypercall_preempt_check() )
         {
             page->nr_validated_ptes = i;
@@ -1484,9 +1458,19 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
             break;
         }
 
-        if ( !is_guest_l2_slot(d, type, i) ||
-             (rc = get_page_from_l2e(pl2e[i], pfn, d)) > 0 )
+        if ( !is_guest_l2_slot(d, type, i) )
             continue;
+
+        l2e = pl2e[i];
+
+        if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+        {
+            if ( !pv_l1tf_check_l2e(d, l2e) )
+                continue;
+            rc = -ERESTART;
+        }
+        else
+            rc = get_page_from_l2e(l2e, pfn, d);
 
         if ( unlikely(rc == -ERESTART) )
         {
@@ -1503,14 +1487,14 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
             break;
         }
 
-        pl2e[i] = adjust_guest_l2e(pl2e[i], d);
+        pl2e[i] = adjust_guest_l2e(l2e, d);
     }
 
-    if ( rc >= 0 && (type & PGT_pae_xen_l2) )
+    if ( !rc && (type & PGT_pae_xen_l2) )
         init_xen_pae_l2_slots(pl2e, d);
 
     unmap_domain_page(pl2e);
-    return rc > 0 ? 0 : rc;
+    return rc;
 }
 
 static int alloc_l3_table(struct page_info *page)
@@ -1536,18 +1520,26 @@ static int alloc_l3_table(struct page_info *page)
     for ( i = page->nr_validated_ptes; i < L3_PAGETABLE_ENTRIES;
           i++, partial = 0 )
     {
+        l3_pgentry_t l3e = pl3e[i];
+
         if ( is_pv_32bit_domain(d) && (i == 3) )
         {
-            if ( !(l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) ||
-                 (l3e_get_flags(pl3e[i]) & l3_disallow_mask(d)) )
+            if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
+                 (l3e_get_flags(l3e) & l3_disallow_mask(d)) )
                 rc = -EINVAL;
             else
                 rc = get_page_and_type_from_mfn(
-                    l3e_get_mfn(pl3e[i]),
+                    l3e_get_mfn(l3e),
                     PGT_l2_page_table | PGT_pae_xen_l2, d, partial, 1);
         }
-        else if ( (rc = get_page_from_l3e(pl3e[i], pfn, d, partial)) > 0 )
-            continue;
+        else if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        {
+            if ( !pv_l1tf_check_l3e(d, l3e) )
+                continue;
+            rc = -ERESTART;
+        }
+        else
+            rc = get_page_from_l3e(l3e, pfn, d, partial);
 
         if ( rc == -ERESTART )
         {
@@ -1563,10 +1555,10 @@ static int alloc_l3_table(struct page_info *page)
         if ( rc < 0 )
             break;
 
-        pl3e[i] = adjust_guest_l3e(pl3e[i], d);
+        pl3e[i] = adjust_guest_l3e(l3e, d);
     }
 
-    if ( rc >= 0 && !create_pae_xen_mappings(d, pl3e) )
+    if ( !rc && !create_pae_xen_mappings(d, pl3e) )
         rc = -EINVAL;
     if ( rc < 0 && rc != -ERESTART && rc != -EINTR )
     {
@@ -1583,7 +1575,7 @@ static int alloc_l3_table(struct page_info *page)
     }
 
     unmap_domain_page(pl3e);
-    return rc > 0 ? 0 : rc;
+    return rc;
 }
 
 void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
@@ -1711,9 +1703,21 @@ static int alloc_l4_table(struct page_info *page)
     for ( i = page->nr_validated_ptes; i < L4_PAGETABLE_ENTRIES;
           i++, partial = 0 )
     {
-        if ( !is_guest_l4_slot(d, i) ||
-             (rc = get_page_from_l4e(pl4e[i], pfn, d, partial)) > 0 )
+        l4_pgentry_t l4e;
+
+        if ( !is_guest_l4_slot(d, i) )
             continue;
+
+        l4e = pl4e[i];
+
+        if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
+        {
+            if ( !pv_l1tf_check_l4e(d, l4e) )
+                continue;
+            rc = -ERESTART;
+        }
+        else
+            rc = get_page_from_l4e(l4e, pfn, d, partial);
 
         if ( rc == -ERESTART )
         {
@@ -1746,15 +1750,14 @@ static int alloc_l4_table(struct page_info *page)
             return rc;
         }
 
-        pl4e[i] = adjust_guest_l4e(pl4e[i], d);
+        pl4e[i] = adjust_guest_l4e(l4e, d);
     }
 
-    if ( rc >= 0 )
+    if ( !rc )
     {
         init_xen_l4_slots(pl4e, _mfn(pfn),
                           d, INVALID_MFN, VM_ASSIST(d, m2p_strict));
         atomic_inc(&d->arch.pv_domain.nr_l4_pages);
-        rc = 0;
     }
     unmap_domain_page(pl4e);
 
