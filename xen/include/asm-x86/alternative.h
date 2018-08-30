@@ -1,11 +1,12 @@
 #ifndef __X86_ALTERNATIVE_H__
 #define __X86_ALTERNATIVE_H__
 
+#ifdef __ASSEMBLY__
 #include <asm/alternative-asm.h>
-
-#ifndef __ASSEMBLY__
+#else
 #include <xen/stringify.h>
 #include <xen/types.h>
+#include <asm/asm-macros.h>
 
 struct __packed alt_instr {
     int32_t  orig_offset;   /* original instruction */
@@ -25,14 +26,6 @@ extern void add_nops(void *insns, unsigned int len);
 /* Similar to alternative_instructions except it can be run with IRQs enabled. */
 extern void apply_alternatives(struct alt_instr *start, struct alt_instr *end);
 extern void alternative_instructions(void);
-
-asm ( ".macro mknops nr_bytes\n\t"
-#ifdef HAVE_AS_NOPS_DIRECTIVE
-      ".nops \\nr_bytes, " __stringify(ASM_NOP_MAX) "\n\t"
-#else
-      ".skip \\nr_bytes, 0x90\n\t"
-#endif
-      ".endm\n\t" );
 
 #define alt_orig_len       "(.LXEN%=_orig_e - .LXEN%=_orig_s)"
 #define alt_pad_len        "(.LXEN%=_orig_p - .LXEN%=_orig_e)"

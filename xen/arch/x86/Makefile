@@ -215,8 +215,21 @@ $(TARGET).efi: prelink-efi.o $(note_file) efi.lds efi/relocs-dummy.o $(BASEDIR)/
 efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o: $(BASEDIR)/arch/x86/efi/built_in.o
 efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o: ;
 
-asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
+asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c $(BASEDIR)/include/asm-x86/asm-macros.h
 	$(CC) $(filter-out -Wa$(comma)% -flto,$(CFLAGS)) -S -o $@ $<
+
+asm-macros.i: CFLAGS += -D__ASSEMBLY__ -P
+
+$(BASEDIR)/include/asm-x86/asm-macros.h: asm-macros.i Makefile
+	echo '#if 0' >$@.new
+	echo '.if 0' >>$@.new
+	echo '#endif' >>$@.new
+	echo 'asm ( ".include \"$@\"" );' >>$@.new
+	echo '#if 0' >>$@.new
+	echo '.endif' >>$@.new
+	cat $< >>$@.new
+	echo '#endif' >>$@.new
+	$(call move-if-changed,$@.new,$@)
 
 xen.lds: xen.lds.S
 	$(CC) -P -E -Ui386 $(filter-out -Wa$(comma)%,$(AFLAGS)) -o $@ $<
@@ -237,6 +250,7 @@ efi/mkreloc: efi/mkreloc.c
 .PHONY: clean
 clean::
 	rm -f asm-offsets.s *.lds boot/*.o boot/*~ boot/core boot/mkelf32
+	rm -f asm-macros.i $(BASEDIR)/include/asm-x86/asm-macros.*
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
 	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.efi efi/mkreloc
 	rm -f boot/cmdline.S boot/reloc.S boot/*.lnk boot/*.bin
