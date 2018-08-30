@@ -80,20 +80,13 @@ struct hvm_ioreq_server {
  *     and actually has a physical device assigned .
  */
 struct hvm_pi_ops {
-    /* Hook into ctx_switch_from. */
-    void (*switch_from)(struct vcpu *v);
-
-    /* Hook into ctx_switch_to. */
-    void (*switch_to)(struct vcpu *v);
+    unsigned int flags;
 
     /*
      * Hook into arch_vcpu_block(), which is called
      * from vcpu_block() and vcpu_do_poll().
      */
     void (*vcpu_block)(struct vcpu *);
-
-    /* Hook into the vmentry path. */
-    void (*do_resume)(struct vcpu *v);
 };
 
 #define MAX_NR_IOREQ_SERVERS 8

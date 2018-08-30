@@ -77,6 +77,10 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg(struct vcpu *v, unsigned long vaddr);
 
+/* Values for domain's ->arch.hvm_domain.pi_ops.flags. */
+#define PI_CSW_FROM (1u << 0)
+#define PI_CSW_TO   (1u << 1)
+
 struct vmx_pi_blocking_vcpu {
     struct list_head     list;
     spinlock_t           lock;
@@ -329,8 +333,7 @@ void vmx_pi_hooks_assign(struct domain *d)
      * This can make sure the PI (especially the NDST feild) is
      * in proper state when we call vmx_vcpu_block().
      */
-    d->arch.hvm_domain.pi_ops.switch_from = vmx_pi_switch_from;
-    d->arch.hvm_domain.pi_ops.switch_to = vmx_pi_switch_to;
+    d->arch.hvm_domain.pi_ops.flags = PI_CSW_FROM | PI_CSW_TO;
 
     for_each_vcpu ( d, v )
     {
@@ -346,7 +349,6 @@ void vmx_pi_hooks_assign(struct domain *d)
     }
 
     d->arch.hvm_domain.pi_ops.vcpu_block = vmx_vcpu_block;
-    d->arch.hvm_domain.pi_ops.do_resume = vmx_pi_do_resume;
 }
 
 /* This function is called when pcidevs_lock is held */
@@ -383,8 +385,7 @@ void vmx_pi_hooks_deassign(struct domain *d)
      * 'switch_to' hook function.
      */
     d->arch.hvm_domain.pi_ops.vcpu_block = NULL;
-    d->arch.hvm_domain.pi_ops.switch_from = NULL;
-    d->arch.hvm_domain.pi_ops.do_resume = NULL;
+    d->arch.hvm_domain.pi_ops.flags = PI_CSW_TO;
 
     for_each_vcpu ( d, v )
         vmx_pi_unblock_vcpu(v);
@@ -934,8 +935,8 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
     vmx_restore_host_msrs();
     vmx_save_dr(v);
 
-    if ( v->domain->arch.hvm_domain.pi_ops.switch_from )
-        v->domain->arch.hvm_domain.pi_ops.switch_from(v);
+    if ( v->domain->arch.hvm_domain.pi_ops.flags & PI_CSW_FROM )
+        vmx_pi_switch_from(v);
 }
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
@@ -943,8 +944,8 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
 
-    if ( v->domain->arch.hvm_domain.pi_ops.switch_to )
-        v->domain->arch.hvm_domain.pi_ops.switch_to(v);
+    if ( v->domain->arch.hvm_domain.pi_ops.flags & PI_CSW_TO )
+        vmx_pi_switch_to(v);
 }
 
 
@@ -4330,8 +4331,8 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
      if ( nestedhvm_vcpu_in_guestmode(curr) && vcpu_nestedhvm(curr).stale_np2m )
          return false;
 
-    if ( curr->domain->arch.hvm_domain.pi_ops.do_resume )
-        curr->domain->arch.hvm_domain.pi_ops.do_resume(curr);
+    if ( curr->domain->arch.hvm_domain.pi_ops.vcpu_block )
+        vmx_pi_do_resume(curr);
 
     if ( !cpu_has_vmx_vpid )
         goto out;
