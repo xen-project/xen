@@ -12,7 +12,7 @@
 /* The following are dependent on APIC delivery mode (logical vs. physical). */
 #define INT_DELIVERY_MODE (genapic->int_delivery_mode)
 #define INT_DEST_MODE (genapic->int_dest_mode)
-#define TARGET_CPUS	  (genapic->target_cpus())
+#define TARGET_CPUS ((const typeof(cpu_online_map) *)&cpu_online_map)
 #define init_apic_ldr (genapic->init_apic_ldr)
 #define clustered_apic_check (genapic->clustered_apic_check) 
 #define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)

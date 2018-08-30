@@ -5,12 +5,6 @@
 #include <asm/hardirq.h>
 #include <mach_apic.h>
 
-
-const cpumask_t *target_cpus_all(void)
-{
-	return &cpu_online_map;
-}
-
 /*
  * LOGICAL FLAT DELIVERY MODE (multicast via bitmask to <= 8 logical APIC IDs).
  */
