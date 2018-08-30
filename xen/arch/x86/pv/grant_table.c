@@ -167,15 +167,15 @@ static bool steal_linear_address(unsigned long linear, l1_pgentry_t *out)
     ol1e = *pl1e;
     okay = UPDATE_ENTRY(l1, pl1e, ol1e, l1e_empty(), mfn_x(gl1mfn), curr, 0);
 
+    if ( okay )
+        *out = ol1e;
+
  out_unlock:
     page_unlock(page);
  out_put:
     put_page(page);
  out_unmap:
     unmap_domain_page(pl1e);
-
-    if ( okay )
-        *out = ol1e;
 
  out:
     return okay;
