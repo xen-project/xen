@@ -330,6 +330,9 @@ static void check_appendonly(void) {
 #include <sys/socket.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
+#ifndef TUNGETIFF
+#define TUNGETIFF _IOR('T', 210, unsigned int)
+#endif
 
 /* linux tun */
 
