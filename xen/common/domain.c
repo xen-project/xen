@@ -273,7 +273,21 @@ struct domain *domain_create(domid_t domid,
         return ERR_PTR(-ENOMEM);
 
     d->domain_id = domid;
+
+    /* Sort out our idea of is_control_domain(). */
     d->is_privileged = is_priv;
+
+    /* Sort out our idea of is_hardware_domain(). */
+    if ( domid == 0 || domid == hardware_domid )
+    {
+        if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
+            panic("The value of hardware_dom must be a valid domain ID");
+
+        d->is_pinned = opt_dom0_vcpus_pin;
+        d->disable_migrate = 1;
+        old_hwdom = hardware_domain;
+        hardware_domain = d;
+    }
 
     /* Debug sanity. */
     ASSERT(is_system_domain(d) ? config == NULL : config != NULL);
@@ -353,16 +367,6 @@ struct domain *domain_create(domid_t domid,
 
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
-
-        if ( domid == 0 || domid == hardware_domid )
-        {
-            if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
-                panic("The value of hardware_dom must be a valid domain ID");
-            d->is_pinned = opt_dom0_vcpus_pin;
-            d->disable_migrate = 1;
-            old_hwdom = hardware_domain;
-            hardware_domain = d;
-        }
 
         if ( config->flags & XEN_DOMCTL_CDF_xs_domain )
         {
