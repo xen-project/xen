@@ -349,7 +349,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         unsigned int i, num_cpus;
         struct xen_sysctl_cputopoinfo *ti = &op->u.cputopoinfo;
 
-        num_cpus = cpumask_last(&cpu_online_map) + 1;
+        num_cpus = cpumask_last(&cpu_present_map) + 1;
         if ( !guest_handle_is_null(ti->cputopo) )
         {
             struct xen_sysctl_cputopo cputopo = { };
