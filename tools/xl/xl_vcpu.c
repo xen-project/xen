@@ -144,13 +144,13 @@ static void vcpulist(int argc, char **argv)
         }
 
         for (i = 0; i<nb_domain; i++)
-            print_domain_vcpuinfo(dominfo[i].domid, physinfo.nr_cpus);
+            print_domain_vcpuinfo(dominfo[i].domid, physinfo.max_cpu_id + 1);
 
         libxl_dominfo_list_free(dominfo, nb_domain);
     } else {
         for (; argc > 0; ++argv, --argc) {
             uint32_t domid = find_domain(*argv);
-            print_domain_vcpuinfo(domid, physinfo.nr_cpus);
+            print_domain_vcpuinfo(domid, physinfo.max_cpu_id + 1);
         }
     }
   vcpulist_out:
