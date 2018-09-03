@@ -272,7 +272,11 @@ struct domain *domain_create(domid_t domid,
     if ( (d = alloc_domain_struct()) == NULL )
         return ERR_PTR(-ENOMEM);
 
+    /* Sort out our idea of is_system_domain(). */
     d->domain_id = domid;
+
+    /* Debug sanity. */
+    ASSERT(is_system_domain(d) ? config == NULL : config != NULL);
 
     /* Sort out our idea of is_control_domain(). */
     d->is_privileged = is_priv;
@@ -289,8 +293,11 @@ struct domain *domain_create(domid_t domid,
         hardware_domain = d;
     }
 
-    /* Debug sanity. */
-    ASSERT(is_system_domain(d) ? config == NULL : config != NULL);
+    /* Sort out our idea of is_{pv,hvm}_domain(). */
+    if ( config && (config->flags & XEN_DOMCTL_CDF_hvm_guest) )
+        d->guest_type = guest_type_hvm;
+    else
+        d->guest_type = guest_type_pv;
 
     TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
 
@@ -331,11 +338,6 @@ struct domain *domain_create(domid_t domid,
 
     if ( !is_idle_domain(d) )
     {
-        if ( config->flags & XEN_DOMCTL_CDF_hvm_guest )
-            d->guest_type = guest_type_hvm;
-        else
-            d->guest_type = guest_type_pv;
-
         if ( !is_hardware_domain(d) )
             d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
         else
