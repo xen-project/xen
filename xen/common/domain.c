@@ -274,6 +274,8 @@ static void _domain_destroy(struct domain *d)
 
     free_cpumask_var(d->dirty_cpumask);
 
+    lock_profile_deregister_struct(LOCKPROF_TYPE_PERDOM, d);
+
     free_domain_struct(d);
 }
 
