@@ -1369,6 +1369,12 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
     }
 
     maxcpus = libxl_bitmap_count_set(cpumap);
+    if (maxcpus == 0)
+    {
+        LOGED(ERROR, domid, "Requested 0 VCPUs!");
+        rc = ERROR_FAIL;
+        goto out;
+    }
     if (maxcpus > info.vcpu_max_id + 1)
     {
         LOGED(ERROR, domid, "Requested %d VCPUs, however maxcpus is %d!",
