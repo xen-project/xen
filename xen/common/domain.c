@@ -260,6 +260,23 @@ static int __init parse_extra_guest_irqs(const char *s)
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
+/*
+ * Destroy a domain once all references to it have been dropped.  Used either
+ * from the RCU path, or from the domain_create() error path before the domain
+ * is inserted into the domlist.
+ */
+static void _domain_destroy(struct domain *d)
+{
+    BUG_ON(!d->is_dying);
+    BUG_ON(atomic_read(&d->refcnt) != DOMAIN_DESTROYED);
+
+    xfree(d->pbuf);
+
+    free_cpumask_var(d->dirty_cpumask);
+
+    free_domain_struct(d);
+}
+
 struct domain *domain_create(domid_t domid,
                              struct xen_domctl_createdomain *config,
                              bool is_priv)
@@ -437,7 +454,6 @@ struct domain *domain_create(domid_t domid,
     if ( hardware_domain == d )
         hardware_domain = old_hwdom;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
-    xfree(d->pbuf);
 
     sched_destroy_domain(d);
 
@@ -462,8 +478,9 @@ struct domain *domain_create(domid_t domid,
         watchdog_domain_destroy(d);
     if ( init_status & INIT_xsm )
         xsm_free_security_domain(d);
-    free_cpumask_var(d->dirty_cpumask);
-    free_domain_struct(d);
+
+    _domain_destroy(d);
+
     return ERR_PTR(err);
 }
 
@@ -881,8 +898,6 @@ static void complete_domain_destroy(struct rcu_head *head)
     xfree(d->vm_event_share);
 #endif
 
-    xfree(d->pbuf);
-
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
         if ( (v = d->vcpu[i]) != NULL )
         {
@@ -901,9 +916,9 @@ static void complete_domain_destroy(struct rcu_head *head)
     radix_tree_destroy(&d->pirq_tree, free_pirq_struct);
 
     xsm_free_security_domain(d);
-    free_cpumask_var(d->dirty_cpumask);
     xfree(d->vcpu);
-    free_domain_struct(d);
+
+    _domain_destroy(d);
 
     send_global_virq(VIRQ_DOM_EXC);
 }
