@@ -482,6 +482,9 @@ void rangeset_domain_destroy(
 {
     struct rangeset *r;
 
+    if ( list_head_is_null(&d->rangesets) )
+        return;
+
     while ( !list_empty(&d->rangesets) )
     {
         r = list_entry(d->rangesets.next, struct rangeset, rangeset_list);

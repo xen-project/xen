@@ -272,6 +272,8 @@ static void _domain_destroy(struct domain *d)
 
     xfree(d->pbuf);
 
+    rangeset_domain_destroy(d);
+
     free_cpumask_var(d->dirty_cpumask);
 
     xsm_free_security_domain(d);
@@ -286,7 +288,7 @@ struct domain *domain_create(domid_t domid,
                              bool is_priv)
 {
     struct domain *d, **pd, *old_hwdom = NULL;
-    enum { INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
+    enum { INIT_watchdog = 1u<<1,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
     int err, init_status = 0;
 
@@ -350,7 +352,6 @@ struct domain *domain_create(domid_t domid,
         goto fail;
 
     rangeset_domain_initialise(d);
-    init_status |= INIT_rangeset;
 
     /* DOMID_{XEN,IO,etc} (other than IDLE) are sufficiently constructed. */
     if ( is_system_domain(d) && !is_idle_domain(d) )
@@ -475,8 +476,6 @@ struct domain *domain_create(domid_t domid,
         evtchn_destroy_final(d);
         radix_tree_destroy(&d->pirq_tree, free_pirq_struct);
     }
-    if ( init_status & INIT_rangeset )
-        rangeset_domain_destroy(d);
     if ( init_status & INIT_watchdog )
         watchdog_domain_destroy(d);
 
@@ -881,8 +880,6 @@ static void complete_domain_destroy(struct rcu_head *head)
     arch_domain_destroy(d);
 
     watchdog_domain_destroy(d);
-
-    rangeset_domain_destroy(d);
 
     sched_destroy_domain(d);
 
