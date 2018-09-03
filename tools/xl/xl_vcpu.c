@@ -255,9 +255,9 @@ int main_vcpupin(int argc, char **argv)
         goto out;
 
     if (dryrun_only) {
-        nb_cpu = libxl_get_online_cpus(ctx);
+        nb_cpu = libxl_get_max_cpus(ctx);
         if (nb_cpu < 0) {
-            fprintf(stderr, "libxl_get_online_cpus failed.\n");
+            fprintf(stderr, "libxl_get_max_cpus failed.\n");
             goto out;
         }
 
