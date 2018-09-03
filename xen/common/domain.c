@@ -274,6 +274,8 @@ static void _domain_destroy(struct domain *d)
 
     free_cpumask_var(d->dirty_cpumask);
 
+    xsm_free_security_domain(d);
+
     lock_profile_deregister_struct(LOCKPROF_TYPE_PERDOM, d);
 
     free_domain_struct(d);
@@ -284,7 +286,7 @@ struct domain *domain_create(domid_t domid,
                              bool is_priv)
 {
     struct domain *d, **pd, *old_hwdom = NULL;
-    enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
+    enum { INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
     int err, init_status = 0;
 
@@ -324,7 +326,6 @@ struct domain *domain_create(domid_t domid,
 
     if ( (err = xsm_alloc_security_domain(d)) != 0 )
         goto fail;
-    init_status |= INIT_xsm;
 
     atomic_set(&d->refcnt, 1);
     spin_lock_init_prof(d, domain_lock);
@@ -478,8 +479,6 @@ struct domain *domain_create(domid_t domid,
         rangeset_domain_destroy(d);
     if ( init_status & INIT_watchdog )
         watchdog_domain_destroy(d);
-    if ( init_status & INIT_xsm )
-        xsm_free_security_domain(d);
 
     _domain_destroy(d);
 
@@ -917,7 +916,6 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     radix_tree_destroy(&d->pirq_tree, free_pirq_struct);
 
-    xsm_free_security_domain(d);
     xfree(d->vcpu);
 
     _domain_destroy(d);
