@@ -83,21 +83,26 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_madt_local_x2apic *processor =
 		container_of(header, struct acpi_madt_local_x2apic, header);
-	bool enabled = false;
+	bool enabled = false, log = false;
 
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
+	if ((processor->lapic_flags & ACPI_MADT_ENABLED) ||
+	    processor->local_apic_id != 0xffffffff || opt_cpu_info) {
+		acpi_table_print_madt_entry(header);
+		log = true;
+	}
 
 	/* Record local apic id only when enabled and fitting. */
 	if (processor->local_apic_id >= MAX_APICS ||
 	    processor->uid >= MAX_MADT_ENTRIES) {
-		printk("%sAPIC ID %#x and/or ACPI ID %#x beyond limit"
-		       " - processor ignored\n",
-		       processor->lapic_flags & ACPI_MADT_ENABLED ?
-				KERN_WARNING "WARNING: " : KERN_INFO,
-		       processor->local_apic_id, processor->uid);
+		if (log)
+			printk("%sAPIC ID %#x and/or ACPI ID %#x beyond limit"
+			       " - processor ignored\n",
+			       processor->lapic_flags & ACPI_MADT_ENABLED
+			       ? KERN_WARNING "WARNING: " : KERN_INFO,
+			       processor->local_apic_id, processor->uid);
 		/*
 		 * Must not return an error here, to prevent
 		 * acpi_table_parse_entries() from terminating early.
@@ -132,7 +137,9 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 	if (BAD_MADT_ENTRY(processor, end))
 		return -EINVAL;
 
-	acpi_table_print_madt_entry(header);
+	if ((processor->lapic_flags & ACPI_MADT_ENABLED) ||
+	    processor->id != 0xff || opt_cpu_info)
+		acpi_table_print_madt_entry(header);
 
 	/* Record local apic id only when enabled */
 	if (processor->lapic_flags & ACPI_MADT_ENABLED) {
