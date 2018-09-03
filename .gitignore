@@ -311,6 +311,7 @@ xen/arch/*/efi/runtime.c
 xen/include/headers*.chk
 xen/include/asm
 xen/include/asm-*/asm-offsets.h
+xen/include/asm-x86/asm-macros.h
 xen/include/compat/*
 xen/include/config/
 xen/include/generated/
