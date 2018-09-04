@@ -403,19 +403,22 @@ void vcpu_destroy(struct vcpu *v)
 
 static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
 {
+#ifdef CONFIG_HVM
+    /* This doesn't catch !CONFIG_HVM case but it is better than nothing */
+    BUILD_BUG_ON(X86_EMU_ALL != XEN_X86_EMU_ALL);
+#endif
 
     if ( is_hvm_domain(d) )
     {
         if ( is_hardware_domain(d) &&
-             emflags != (XEN_X86_EMU_VPCI | XEN_X86_EMU_LAPIC |
-                         XEN_X86_EMU_IOAPIC) )
+             emflags != (X86_EMU_VPCI | X86_EMU_LAPIC | X86_EMU_IOAPIC) )
             return false;
         if ( !is_hardware_domain(d) &&
-             emflags != (XEN_X86_EMU_ALL & ~XEN_X86_EMU_VPCI) &&
-             emflags != XEN_X86_EMU_LAPIC )
+             emflags != (X86_EMU_ALL & ~X86_EMU_VPCI) &&
+             emflags != X86_EMU_LAPIC )
             return false;
     }
-    else if ( emflags != 0 && emflags != XEN_X86_EMU_PIT )
+    else if ( emflags != 0 && emflags != X86_EMU_PIT )
     {
         /* PV or classic PVH. */
         return false;

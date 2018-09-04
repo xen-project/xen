@@ -440,18 +440,51 @@ struct arch_domain
     uint32_t emulation_flags;
 } __cacheline_aligned;
 
-#define has_vlapic(d)      (!!((d)->arch.emulation_flags & XEN_X86_EMU_LAPIC))
-#define has_vhpet(d)       (!!((d)->arch.emulation_flags & XEN_X86_EMU_HPET))
-#define has_vpm(d)         (!!((d)->arch.emulation_flags & XEN_X86_EMU_PM))
-#define has_vrtc(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_RTC))
-#define has_vioapic(d)     (!!((d)->arch.emulation_flags & XEN_X86_EMU_IOAPIC))
-#define has_vpic(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_PIC))
-#define has_vvga(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_VGA))
-#define has_viommu(d)      (!!((d)->arch.emulation_flags & XEN_X86_EMU_IOMMU))
-#define has_vpit(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_PIT))
-#define has_pirq(d)        (!!((d)->arch.emulation_flags & \
-                            XEN_X86_EMU_USE_PIRQ))
-#define has_vpci(d)        (!!((d)->arch.emulation_flags & XEN_X86_EMU_VPCI))
+#ifdef CONFIG_HVM
+#define X86_EMU_LAPIC    XEN_X86_EMU_LAPIC
+#define X86_EMU_HPET     XEN_X86_EMU_HPET
+#define X86_EMU_PM       XEN_X86_EMU_PM
+#define X86_EMU_RTC      XEN_X86_EMU_RTC
+#define X86_EMU_IOAPIC   XEN_X86_EMU_IOAPIC
+#define X86_EMU_PIC      XEN_X86_EMU_PIC
+#define X86_EMU_VGA      XEN_X86_EMU_VGA
+#define X86_EMU_IOMMU    XEN_X86_EMU_IOMMU
+#define X86_EMU_USE_PIRQ XEN_X86_EMU_USE_PIRQ
+#define X86_EMU_VPCI     XEN_X86_EMU_VPCI
+#else
+#define X86_EMU_LAPIC    0
+#define X86_EMU_HPET     0
+#define X86_EMU_PM       0
+#define X86_EMU_RTC      0
+#define X86_EMU_IOAPIC   0
+#define X86_EMU_PIC      0
+#define X86_EMU_VGA      0
+#define X86_EMU_IOMMU    0
+#define X86_EMU_USE_PIRQ 0
+#define X86_EMU_VPCI     0
+#endif
+
+#define X86_EMU_PIT     XEN_X86_EMU_PIT
+
+/* This must match XEN_X86_EMU_ALL in xen.h */
+#define X86_EMU_ALL             (X86_EMU_LAPIC | X86_EMU_HPET |         \
+                                 X86_EMU_PM | X86_EMU_RTC |             \
+                                 X86_EMU_IOAPIC | X86_EMU_PIC |         \
+                                 X86_EMU_VGA | X86_EMU_IOMMU |          \
+                                 X86_EMU_PIT | X86_EMU_USE_PIRQ |       \
+                                 X86_EMU_VPCI)
+
+#define has_vlapic(d)      (!!((d)->arch.emulation_flags & X86_EMU_LAPIC))
+#define has_vhpet(d)       (!!((d)->arch.emulation_flags & X86_EMU_HPET))
+#define has_vpm(d)         (!!((d)->arch.emulation_flags & X86_EMU_PM))
+#define has_vrtc(d)        (!!((d)->arch.emulation_flags & X86_EMU_RTC))
+#define has_vioapic(d)     (!!((d)->arch.emulation_flags & X86_EMU_IOAPIC))
+#define has_vpic(d)        (!!((d)->arch.emulation_flags & X86_EMU_PIC))
+#define has_vvga(d)        (!!((d)->arch.emulation_flags & X86_EMU_VGA))
+#define has_viommu(d)      (!!((d)->arch.emulation_flags & X86_EMU_IOMMU))
+#define has_vpit(d)        (!!((d)->arch.emulation_flags & X86_EMU_PIT))
+#define has_pirq(d)        (!!((d)->arch.emulation_flags & X86_EMU_USE_PIRQ))
+#define has_vpci(d)        (!!((d)->arch.emulation_flags & X86_EMU_VPCI))
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 
