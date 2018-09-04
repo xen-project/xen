@@ -2626,7 +2626,7 @@ int main(int argc, char **argv)
         printf("skipped\n");
 #endif
 
-    printf("%-40s", "Testing maskmovq (zero mask)...");
+    printf("%-40s", "Testing maskmovq %mm4,%mm4...");
     if ( stack_exec && cpu_has_sse )
     {
         decl_insn(maskmovq);
@@ -2639,12 +2639,25 @@ int main(int argc, char **argv)
         rc = x86_emulate(&ctxt, &emulops);
         if ( rc != X86EMUL_OKAY || !check_eip(maskmovq) )
             goto fail;
+
+        asm volatile ( "pcmpeqb %mm3, %mm3\n\t"
+                       "punpcklbw %mm3, %mm4\n" );
+        memset(res, 0x55, 24);
+
+        set_insn(maskmovq);
+        regs.edi = (unsigned long)(res + 2);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(maskmovq) ||
+             memcmp(res, res + 4, 8) ||
+             res[2] != 0xff55ff55 || res[3] != 0xff55ff55 )
+            goto fail;
+
         printf("okay\n");
     }
     else
         printf("skipped\n");
 
-    printf("%-40s", "Testing maskmovdqu (zero mask)...");
+    printf("%-40s", "Testing maskmovdqu %xmm3,%xmm3...");
     if ( stack_exec && cpu_has_sse2 )
     {
         decl_insn(maskmovdqu);
@@ -2653,9 +2666,24 @@ int main(int argc, char **argv)
                        put_insn(maskmovdqu, "maskmovdqu %xmm3, %xmm3") );
 
         set_insn(maskmovdqu);
+        regs.edi = 0;
         rc = x86_emulate(&ctxt, &emulops);
         if ( rc != X86EMUL_OKAY || !check_eip(maskmovdqu) )
             goto fail;
+
+        asm volatile ( "pcmpeqb %xmm4, %xmm4\n\t"
+                       "punpcklbw %xmm4, %xmm3\n" );
+        memset(res, 0x55, 48);
+
+        set_insn(maskmovdqu);
+        regs.edi = (unsigned long)(res + 4);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(maskmovdqu) ||
+             memcmp(res, res + 8, 16) ||
+             res[4] != 0xff55ff55 || res[5] != 0xff55ff55 ||
+             res[6] != 0xff55ff55 || res[7] != 0xff55ff55 )
+            goto fail;
+
         printf("okay\n");
     }
     else
