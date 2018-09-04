@@ -10,7 +10,6 @@ obj-y += grant_table.o
 obj-y += hpet.o
 obj-y += hvm.o
 obj-y += hypercall.o
-obj-y += i8254.o
 obj-y += intercept.o
 obj-y += io.o
 obj-y += ioreq.o

@@ -379,6 +379,7 @@ static uint32_t pit_ioport_read(struct PITState *pit, uint32_t addr)
     return ret;
 }
 
+#ifdef CONFIG_HVM
 void pit_stop_channel0_irq(PITState *pit)
 {
     if ( !has_vpit(current->domain) )
@@ -438,6 +439,7 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
 }
 
 HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load, 1, HVMSR_PER_DOM);
+#endif
 
 void pit_reset(struct domain *d)
 {
@@ -448,9 +450,12 @@ void pit_reset(struct domain *d)
     if ( !has_vpit(d) )
         return;
 
-    TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
-    destroy_periodic_time(&pit->pt0);
-    pit->pt0.source = PTSRC_isa;
+    if ( is_hvm_domain(d) )
+    {
+        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
+        destroy_periodic_time(&pit->pt0);
+        pit->pt0.source = PTSRC_isa;
+    }
 
     spin_lock(&pit->lock);
 
@@ -490,8 +495,11 @@ void pit_deinit(struct domain *d)
     if ( !has_vpit(d) )
         return;
 
-    TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
-    destroy_periodic_time(&pit->pt0);
+    if ( is_hvm_domain(d) )
+    {
+        TRACE_0D(TRC_HVM_EMUL_PIT_STOP_TIMER);
+        destroy_periodic_time(&pit->pt0);
+    }
 }
 
 /* the intercept action for PIT DM retval:0--not handled; 1--handled */  
