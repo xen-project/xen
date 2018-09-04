@@ -224,7 +224,13 @@ enum simd_opsize {
      * - 32 bits with low opcode bit clear (scalar single)
      * - 64 bits with low opcode bit set (scalar double)
      */
-    simd_scalar_fp,
+    simd_scalar_opc,
+
+    /*
+     * Scalar floating point:
+     * - 32/64 bits depending on VEX.W
+     */
+    simd_scalar_vexw,
 
     /*
      * 128 bits of integer or floating point data, with no further
@@ -407,7 +413,7 @@ static const struct ext0f38_table {
     [0x13] = { .simd_size = simd_other, .two_op = 1 },
     [0x14 ... 0x16] = { .simd_size = simd_packed_fp },
     [0x17] = { .simd_size = simd_packed_int, .two_op = 1 },
-    [0x18 ... 0x19] = { .simd_size = simd_scalar_fp, .two_op = 1 },
+    [0x18 ... 0x19] = { .simd_size = simd_scalar_opc, .two_op = 1 },
     [0x1a] = { .simd_size = simd_128, .two_op = 1 },
     [0x1c ... 0x1e] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x20 ... 0x25] = { .simd_size = simd_other, .two_op = 1 },
@@ -427,9 +433,30 @@ static const struct ext0f38_table {
     [0x8c] = { .simd_size = simd_other },
     [0x8e] = { .simd_size = simd_other, .to_mem = 1 },
     [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1 },
-    [0x96 ... 0x9f] = { .simd_size = simd_packed_fp },
-    [0xa6 ... 0xaf] = { .simd_size = simd_packed_fp },
-    [0xb6 ... 0xbf] = { .simd_size = simd_packed_fp },
+    [0x96 ... 0x98] = { .simd_size = simd_packed_fp },
+    [0x99] = { .simd_size = simd_scalar_vexw },
+    [0x9a] = { .simd_size = simd_packed_fp },
+    [0x9b] = { .simd_size = simd_scalar_vexw },
+    [0x9c] = { .simd_size = simd_packed_fp },
+    [0x9d] = { .simd_size = simd_scalar_vexw },
+    [0x9e] = { .simd_size = simd_packed_fp },
+    [0x9f] = { .simd_size = simd_scalar_vexw },
+    [0xa6 ... 0xa8] = { .simd_size = simd_packed_fp },
+    [0xa9] = { .simd_size = simd_scalar_vexw },
+    [0xaa] = { .simd_size = simd_packed_fp },
+    [0xab] = { .simd_size = simd_scalar_vexw },
+    [0xac] = { .simd_size = simd_packed_fp },
+    [0xad] = { .simd_size = simd_scalar_vexw },
+    [0xae] = { .simd_size = simd_packed_fp },
+    [0xaf] = { .simd_size = simd_scalar_vexw },
+    [0xb6 ... 0xb8] = { .simd_size = simd_packed_fp },
+    [0xb9] = { .simd_size = simd_scalar_vexw },
+    [0xba] = { .simd_size = simd_packed_fp },
+    [0xbb] = { .simd_size = simd_scalar_vexw },
+    [0xbc] = { .simd_size = simd_packed_fp },
+    [0xbd] = { .simd_size = simd_scalar_vexw },
+    [0xbe] = { .simd_size = simd_packed_fp },
+    [0xbf] = { .simd_size = simd_scalar_vexw },
     [0xc8 ... 0xcd] = { .simd_size = simd_other },
     [0xdb] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xdc ... 0xdf] = { .simd_size = simd_packed_int },
@@ -454,7 +481,7 @@ static const struct ext0f3a_table {
     [0x04 ... 0x05] = { .simd_size = simd_packed_fp, .two_op = 1 },
     [0x06] = { .simd_size = simd_packed_fp },
     [0x08 ... 0x09] = { .simd_size = simd_packed_fp, .two_op = 1 },
-    [0x0a ... 0x0b] = { .simd_size = simd_scalar_fp },
+    [0x0a ... 0x0b] = { .simd_size = simd_scalar_opc },
     [0x0c ... 0x0d] = { .simd_size = simd_packed_fp },
     [0x0e ... 0x0f] = { .simd_size = simd_packed_int },
     [0x14 ... 0x17] = { .simd_size = simd_none, .to_mem = 1, .two_op = 1 },
@@ -476,13 +503,13 @@ static const struct ext0f3a_table {
     [0x5c ... 0x5f] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x60 ... 0x63] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x68 ... 0x69] = { .simd_size = simd_packed_fp, .four_op = 1 },
-    [0x6a ... 0x6b] = { .simd_size = simd_scalar_fp, .four_op = 1 },
+    [0x6a ... 0x6b] = { .simd_size = simd_scalar_opc, .four_op = 1 },
     [0x6c ... 0x6d] = { .simd_size = simd_packed_fp, .four_op = 1 },
-    [0x6e ... 0x6f] = { .simd_size = simd_scalar_fp, .four_op = 1 },
+    [0x6e ... 0x6f] = { .simd_size = simd_scalar_opc, .four_op = 1 },
     [0x78 ... 0x79] = { .simd_size = simd_packed_fp, .four_op = 1 },
-    [0x7a ... 0x7b] = { .simd_size = simd_scalar_fp, .four_op = 1 },
+    [0x7a ... 0x7b] = { .simd_size = simd_scalar_opc, .four_op = 1 },
     [0x7c ... 0x7d] = { .simd_size = simd_packed_fp, .four_op = 1 },
-    [0x7e ... 0x7f] = { .simd_size = simd_scalar_fp, .four_op = 1 },
+    [0x7e ... 0x7f] = { .simd_size = simd_scalar_opc, .four_op = 1 },
     [0xcc] = { .simd_size = simd_other },
     [0xdf] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xf0] = {},
@@ -518,7 +545,7 @@ static const struct ext8f09_table {
 } ext8f09_table[256] = {
     [0x01 ... 0x02] = { .two_op = 1 },
     [0x80 ... 0x81] = { .simd_size = simd_packed_fp, .two_op = 1 },
-    [0x82 ... 0x83] = { .simd_size = simd_scalar_fp, .two_op = 1 },
+    [0x82 ... 0x83] = { .simd_size = simd_scalar_opc, .two_op = 1 },
     [0x90 ... 0x9b] = { .simd_size = simd_packed_int },
     [0xc1 ... 0xc3] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xc6 ... 0xc7] = { .simd_size = simd_packed_int, .two_op = 1 },
@@ -3132,8 +3159,12 @@ x86_decode(
         }
         break;
 
-    case simd_scalar_fp:
+    case simd_scalar_opc:
         op_bytes = 4 << (ctxt->opcode & 1);
+        break;
+
+    case simd_scalar_vexw:
+        op_bytes = 4 << vex.w;
         break;
 
     case simd_128:
@@ -7747,33 +7778,33 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x96): /* vfmaddsub132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x97): /* vfmsubadd132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x98): /* vfmadd132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0x99): /* vfmadd132s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x99): /* vfmadd132s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x9a): /* vfmsub132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0x9b): /* vfmsub132s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x9b): /* vfmsub132s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x9c): /* vfnmadd132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0x9d): /* vfnmadd132s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x9d): /* vfnmadd132s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x9e): /* vfnmsub132p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0x9f): /* vfnmsub132s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0x9f): /* vfnmsub132s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xa6): /* vfmaddsub213p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xa7): /* vfmsubadd213p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xa8): /* vfmadd213p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xa9): /* vfmadd213s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xa9): /* vfmadd213s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xaa): /* vfmsub213p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xab): /* vfmsub213s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xab): /* vfmsub213s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xac): /* vfnmadd213p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xad): /* vfnmadd213s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xad): /* vfnmadd213s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xae): /* vfnmsub213p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xaf): /* vfnmsub213s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xaf): /* vfnmsub213s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xb6): /* vfmaddsub231p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xb7): /* vfmsubadd231p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xb8): /* vfmadd231p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xb9): /* vfmadd231s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xb9): /* vfmadd231s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xba): /* vfmsub231p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xbb): /* vfmsub231s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xbb): /* vfmsub231s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xbc): /* vfnmadd231p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xbd): /* vfnmadd231s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xbd): /* vfnmadd231s{s,d} xmm/mem,xmm,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0xbe): /* vfnmsub231p{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
-    case X86EMUL_OPC_VEX_66(0x0f38, 0xbf): /* vfnmsub231s{s,d} {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    case X86EMUL_OPC_VEX_66(0x0f38, 0xbf): /* vfnmsub231s{s,d} xmm/mem,xmm,xmm */
         host_and_vcpu_must_have(fma);
         goto simd_0f_ymm;
 
