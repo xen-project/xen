@@ -4480,8 +4480,7 @@ static int do_altp2m_op(
         return -EOPNOTSUPP;
     }
 
-    d = ( a.cmd != HVMOP_altp2m_vcpu_enable_notify ) ?
-        rcu_lock_domain_by_any_id(a.domain) : rcu_lock_current_domain();
+    d = rcu_lock_domain_by_any_id(a.domain);
 
     if ( d == NULL )
         return -ESRCH;
@@ -4552,26 +4551,28 @@ static int do_altp2m_op(
 
     case HVMOP_altp2m_vcpu_enable_notify:
     {
-        struct vcpu *curr = current;
+        struct vcpu *v;
         p2m_type_t p2mt;
 
-        if ( a.u.enable_notify.pad || a.domain != DOMID_SELF ||
-             a.u.enable_notify.vcpu_id != curr->vcpu_id )
+        if ( a.u.enable_notify.pad ||
+             a.u.enable_notify.vcpu_id >= d->max_vcpus )
         {
             rc = -EINVAL;
             break;
         }
 
-        if ( !gfn_eq(vcpu_altp2m(curr).veinfo_gfn, INVALID_GFN) ||
-             mfn_eq(get_gfn_query_unlocked(curr->domain,
+        v = d->vcpu[a.u.enable_notify.vcpu_id];
+
+        if ( !gfn_eq(vcpu_altp2m(v).veinfo_gfn, INVALID_GFN) ||
+             mfn_eq(get_gfn_query_unlocked(v->domain,
                     a.u.enable_notify.gfn, &p2mt), INVALID_MFN) )
         {
             rc = -EINVAL;
             break;
         }
 
-        vcpu_altp2m(curr).veinfo_gfn = _gfn(a.u.enable_notify.gfn);
-        altp2m_vcpu_update_vmfunc_ve(curr);
+        vcpu_altp2m(v).veinfo_gfn = _gfn(a.u.enable_notify.gfn);
+        altp2m_vcpu_update_vmfunc_ve(v);
         break;
     }
 

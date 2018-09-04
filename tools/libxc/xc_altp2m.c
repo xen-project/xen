@@ -68,7 +68,6 @@ int xc_altp2m_set_domain_state(xc_interface *handle, uint32_t dom, bool state)
     return rc;
 }
 
-/* This is a bit odd to me that it acts on current.. */
 int xc_altp2m_set_vcpu_enable_notify(xc_interface *handle, uint32_t domid,
                                      uint32_t vcpuid, xen_pfn_t gfn)
 {
