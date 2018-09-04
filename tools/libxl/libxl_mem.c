@@ -298,16 +298,18 @@ retry_transaction:
         }
     }
 
-    r = xc_domain_set_pod_target(ctx->xch, domid,
-            (new_target_memkb + size) / 4, NULL, NULL, NULL);
-    if (r != 0) {
-        LOGED(ERROR, domid,
-              "xc_domain_set_pod_target memkb=%"PRIu64" failed rc=%d\n",
-              (new_target_memkb + size) / 4,
-              r);
-        abort_transaction = 1;
-        rc = ERROR_FAIL;
-        goto out;
+    if (d_config.c_info.type != LIBXL_DOMAIN_TYPE_PV) {
+        r = xc_domain_set_pod_target(ctx->xch, domid,
+                (new_target_memkb + size) / 4, NULL, NULL, NULL);
+        if (r != 0) {
+            LOGED(ERROR, domid,
+                  "xc_domain_set_pod_target memkb=%"PRIu64" failed rc=%d\n",
+                  (new_target_memkb + size) / 4,
+                  r);
+            abort_transaction = 1;
+            rc = ERROR_FAIL;
+            goto out;
+        }
     }
 
     libxl__xs_printf(gc, t, GCSPRINTF("%s/memory/target", dompath),
