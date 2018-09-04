@@ -110,7 +110,8 @@ struct shadow_paging_mode {
 struct paging_mode {
     int           (*page_fault            )(struct vcpu *v, unsigned long va,
                                             struct cpu_user_regs *regs);
-    bool          (*invlpg                )(struct vcpu *v, unsigned long va);
+    bool          (*invlpg                )(struct vcpu *v,
+                                            unsigned long linear);
     unsigned long (*gva_to_gfn            )(struct vcpu *v,
                                             struct p2m_domain *p2m,
                                             unsigned long va,

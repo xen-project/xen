@@ -160,7 +160,7 @@ struct hvm_function_table {
 
     int  (*event_pending)(struct vcpu *v);
     bool (*get_pending_event)(struct vcpu *v, struct x86_event *info);
-    void (*invlpg)(struct vcpu *v, unsigned long vaddr);
+    void (*invlpg)(struct vcpu *v, unsigned long linear);
 
     int  (*cpu_up_prepare)(unsigned int cpu);
     void (*cpu_dead)(unsigned int cpu);
@@ -454,9 +454,9 @@ static inline int hvm_event_pending(struct vcpu *v)
     return hvm_funcs.event_pending(v);
 }
 
-static inline void hvm_invlpg(struct vcpu *v, unsigned long va)
+static inline void hvm_invlpg(struct vcpu *v, unsigned long linear)
 {
-    hvm_funcs.invlpg(v, va);
+    hvm_funcs.invlpg(v, linear);
 }
 
 /* These bits in CR4 are owned by the host. */

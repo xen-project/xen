@@ -75,7 +75,7 @@ static void vmx_wbinvd_intercept(void);
 static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
-static void vmx_invlpg(struct vcpu *v, unsigned long vaddr);
+static void vmx_invlpg(struct vcpu *v, unsigned long linear);
 
 /* Values for domain's ->arch.hvm_domain.pi_ops.flags. */
 #define PI_CSW_FROM (1u << 0)
@@ -2595,16 +2595,16 @@ static void vmx_dr_access(unsigned long exit_qualification,
     vmx_update_cpu_exec_control(v);
 }
 
-static void vmx_invlpg_intercept(unsigned long vaddr)
+static void vmx_invlpg_intercept(unsigned long linear)
 {
-    HVMTRACE_LONG_2D(INVLPG, /*invlpga=*/ 0, TRC_PAR_LONG(vaddr));
-    paging_invlpg(current, vaddr);
+    HVMTRACE_LONG_2D(INVLPG, /*invlpga=*/ 0, TRC_PAR_LONG(linear));
+    paging_invlpg(current, linear);
 }
 
-static void vmx_invlpg(struct vcpu *v, unsigned long vaddr)
+static void vmx_invlpg(struct vcpu *v, unsigned long linear)
 {
     if ( cpu_has_vmx_vpid )
-        vpid_sync_vcpu_gva(v, vaddr);
+        vpid_sync_vcpu_gva(v, linear);
 }
 
 static int vmx_vmfunc_intercept(struct cpu_user_regs *regs)

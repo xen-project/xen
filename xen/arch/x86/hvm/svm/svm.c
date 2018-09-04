@@ -2488,18 +2488,18 @@ static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
 }
 
 static void svm_invlpga_intercept(
-    struct vcpu *v, unsigned long vaddr, uint32_t asid)
+    struct vcpu *v, unsigned long linear, uint32_t asid)
 {
-    svm_invlpga(vaddr,
+    svm_invlpga(linear,
                 (asid == 0)
                 ? v->arch.hvm.n1asid.asid
                 : vcpu_nestedhvm(v).nv_n2asid.asid);
 }
 
-static void svm_invlpg_intercept(unsigned long vaddr)
+static void svm_invlpg_intercept(unsigned long linear)
 {
-    HVMTRACE_LONG_2D(INVLPG, 0, TRC_PAR_LONG(vaddr));
-    paging_invlpg(current, vaddr);
+    HVMTRACE_LONG_2D(INVLPG, 0, TRC_PAR_LONG(linear));
+    paging_invlpg(current, linear);
 }
 
 static bool is_invlpg(const struct x86_emulate_state *state,
@@ -2512,9 +2512,9 @@ static bool is_invlpg(const struct x86_emulate_state *state,
            (ext & 7) == 7;
 }
 
-static void svm_invlpg(struct vcpu *v, unsigned long vaddr)
+static void svm_invlpg(struct vcpu *v, unsigned long linear)
 {
-    svm_asid_g_invlpg(v, vaddr);
+    svm_asid_g_invlpg(v, linear);
 }
 
 static bool svm_get_pending_event(struct vcpu *v, struct x86_event *info)

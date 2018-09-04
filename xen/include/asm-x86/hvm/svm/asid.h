@@ -25,11 +25,11 @@
 void svm_asid_init(const struct cpuinfo_x86 *c);
 void svm_asid_handle_vmrun(void);
 
-static inline void svm_asid_g_invlpg(struct vcpu *v, unsigned long g_vaddr)
+static inline void svm_asid_g_invlpg(struct vcpu *v, unsigned long g_linear)
 {
 #if 0
     /* Optimization? */
-    svm_invlpga(g_vaddr, v->arch.hvm.svm.vmcb->guest_asid);
+    svm_invlpga(g_linear, v->arch.hvm.svm.vmcb->guest_asid);
 #endif
 
     /* Safe fallback. Take a new ASID. */

@@ -5793,19 +5793,19 @@ const unsigned long *__init get_platform_badpages(unsigned int *array_size)
     return bad_pages;
 }
 
-void paging_invlpg(struct vcpu *v, unsigned long va)
+void paging_invlpg(struct vcpu *v, unsigned long linear)
 {
-    if ( !is_canonical_address(va) )
+    if ( !is_canonical_address(linear) )
         return;
 
     if ( paging_mode_enabled(v->domain) &&
-         !paging_get_hostmode(v)->invlpg(v, va) )
+         !paging_get_hostmode(v)->invlpg(v, linear) )
         return;
 
     if ( is_pv_vcpu(v) )
-        flush_tlb_one_local(va);
+        flush_tlb_one_local(linear);
     else
-        hvm_invlpg(v, va);
+        hvm_invlpg(v, linear);
 }
 
 /* Build a 32bit PSE page table using 4MB pages. */

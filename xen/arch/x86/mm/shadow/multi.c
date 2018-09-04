@@ -3549,7 +3549,7 @@ propagate:
  * instruction should be issued on the hardware, or false if it's safe not
  * to do so.
  */
-static bool sh_invlpg(struct vcpu *v, unsigned long va)
+static bool sh_invlpg(struct vcpu *v, unsigned long linear)
 {
     mfn_t sl1mfn;
     shadow_l2e_t sl2e;
@@ -3572,14 +3572,14 @@ static bool sh_invlpg(struct vcpu *v, unsigned long va)
     {
         shadow_l3e_t sl3e;
         if ( !(shadow_l4e_get_flags(
-                   sh_linear_l4_table(v)[shadow_l4_linear_offset(va)])
+                   sh_linear_l4_table(v)[shadow_l4_linear_offset(linear)])
                & _PAGE_PRESENT) )
             return false;
         /* This must still be a copy-from-user because we don't have the
          * paging lock, and the higher-level shadows might disappear
          * under our feet. */
         if ( __copy_from_user(&sl3e, (sh_linear_l3_table(v)
-                                      + shadow_l3_linear_offset(va)),
+                                      + shadow_l3_linear_offset(linear)),
                               sizeof (sl3e)) != 0 )
         {
             perfc_incr(shadow_invlpg_fault);
@@ -3589,7 +3589,7 @@ static bool sh_invlpg(struct vcpu *v, unsigned long va)
             return false;
     }
 #else /* SHADOW_PAGING_LEVELS == 3 */
-    if ( !(l3e_get_flags(v->arch.paging.shadow.l3table[shadow_l3_linear_offset(va)])
+    if ( !(l3e_get_flags(v->arch.paging.shadow.l3table[shadow_l3_linear_offset(linear)])
            & _PAGE_PRESENT) )
         // no need to flush anything if there's no SL2...
         return false;
@@ -3598,7 +3598,7 @@ static bool sh_invlpg(struct vcpu *v, unsigned long va)
     /* This must still be a copy-from-user because we don't have the shadow
      * lock, and the higher-level shadows might disappear under our feet. */
     if ( __copy_from_user(&sl2e,
-                          sh_linear_l2_table(v) + shadow_l2_linear_offset(va),
+                          sh_linear_l2_table(v) + shadow_l2_linear_offset(linear),
                           sizeof (sl2e)) != 0 )
     {
         perfc_incr(shadow_invlpg_fault);
@@ -3642,7 +3642,7 @@ static bool sh_invlpg(struct vcpu *v, unsigned long va)
              * feet. */
             if ( __copy_from_user(&sl2e,
                                   sh_linear_l2_table(v)
-                                  + shadow_l2_linear_offset(va),
+                                  + shadow_l2_linear_offset(linear),
                                   sizeof (sl2e)) != 0 )
             {
                 perfc_incr(shadow_invlpg_fault);
@@ -3664,7 +3664,7 @@ static bool sh_invlpg(struct vcpu *v, unsigned long va)
                         && page_is_out_of_sync(pg) ) )
             {
                 shadow_l1e_t *sl1;
-                sl1 = sh_linear_l1_table(v) + shadow_l1_linear_offset(va);
+                sl1 = sh_linear_l1_table(v) + shadow_l1_linear_offset(linear);
                 /* Remove the shadow entry that maps this VA */
                 (void) shadow_set_l1e(d, sl1, shadow_l1e_empty(),
                                       p2m_invalid, sl1mfn);

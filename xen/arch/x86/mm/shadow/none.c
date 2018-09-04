@@ -37,7 +37,7 @@ static int _page_fault(struct vcpu *v, unsigned long va,
     return 0;
 }
 
-static bool _invlpg(struct vcpu *v, unsigned long va)
+static bool _invlpg(struct vcpu *v, unsigned long linear)
 {
     ASSERT_UNREACHABLE();
     return true;
