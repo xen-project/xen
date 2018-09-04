@@ -257,6 +257,89 @@ void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
 int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
 
 u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
+
+u64 hvm_scale_tsc(const struct domain *d, u64 tsc);
+u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz);
+
+void hvm_init_guest_time(struct domain *d);
+void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
+uint64_t hvm_get_guest_time_fixed(const struct vcpu *v, uint64_t at_tsc);
+
+int vmsi_deliver(
+    struct domain *d, int vector,
+    uint8_t dest, uint8_t dest_mode,
+    uint8_t delivery_mode, uint8_t trig_mode);
+struct hvm_pirq_dpci;
+void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *);
+int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
+
+enum hvm_intblk
+hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack);
+
+void hvm_hypercall_page_initialise(struct domain *d, void *hypercall_page);
+
+void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
+                              struct segment_register *reg);
+void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
+                              struct segment_register *reg);
+
+bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val);
+
+bool hvm_check_cpuid_faulting(struct vcpu *v);
+void hvm_migrate_timers(struct vcpu *v);
+void hvm_do_resume(struct vcpu *v);
+void hvm_migrate_pirqs(struct vcpu *v);
+
+void hvm_inject_event(const struct x86_event *event);
+
+int hvm_event_needs_reinjection(uint8_t type, uint8_t vector);
+
+uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2);
+
+void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable);
+
+enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };
+void hvm_task_switch(
+    uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
+    int32_t errcode);
+
+enum hvm_access_type {
+    hvm_access_insn_fetch,
+    hvm_access_none,
+    hvm_access_read,
+    hvm_access_write
+};
+bool_t hvm_virtual_to_linear_addr(
+    enum x86_segment seg,
+    const struct segment_register *reg,
+    unsigned long offset,
+    unsigned int bytes,
+    enum hvm_access_type access_type,
+    const struct segment_register *active_cs,
+    unsigned long *linear_addr);
+
+void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
+                             bool_t *writable);
+void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent);
+void hvm_unmap_guest_frame(void *p, bool_t permanent);
+void hvm_mapped_guest_frames_mark_dirty(struct domain *);
+
+int hvm_debug_op(struct vcpu *v, int32_t op);
+
+/* Caller should pause vcpu before calling this function */
+void hvm_toggle_singlestep(struct vcpu *v);
+
+int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
+                              struct npfec npfec);
+
+int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content);
+int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content);
+
+/* Check CR4/EFER values */
+const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
+                           signed int cr0_pg);
+unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
+
 #define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)
 
 #define hvm_tsc_scaling_supported \
@@ -268,21 +351,7 @@ u64 hvm_get_guest_tsc_fixed(struct vcpu *v, u64 at_tsc);
 #define hvm_tsc_scaling_ratio(d) \
     ((d)->arch.hvm.tsc_scaling_ratio)
 
-u64 hvm_scale_tsc(const struct domain *d, u64 tsc);
-u64 hvm_get_tsc_scaling_ratio(u32 gtsc_khz);
-
-void hvm_init_guest_time(struct domain *d);
-void hvm_set_guest_time(struct vcpu *v, u64 guest_time);
-uint64_t hvm_get_guest_time_fixed(const struct vcpu *v, uint64_t at_tsc);
 #define hvm_get_guest_time(v) hvm_get_guest_time_fixed(v, 0)
-
-int vmsi_deliver(
-    struct domain *d, int vector,
-    uint8_t dest, uint8_t dest_mode,
-    uint8_t delivery_mode, uint8_t trig_mode);
-struct hvm_pirq_dpci;
-void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *);
-int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 
 #define hvm_paging_enabled(v) \
     (!!((v)->arch.hvm.guest_cr[0] & X86_CR0_PG))
@@ -306,9 +375,6 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 #define hap_has_2mb (!!(hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB))
 
 #define hvm_long_mode_active(v) (!!((v)->arch.hvm.guest_efer & EFER_LMA))
-
-enum hvm_intblk
-hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack);
 
 static inline int
 hvm_guest_x86_mode(struct vcpu *v)
@@ -363,19 +429,11 @@ static inline void hvm_flush_guest_tlbs(void)
         hvm_asid_flush_core();
 }
 
-void hvm_hypercall_page_initialise(struct domain *d,
-                                   void *hypercall_page);
-
 static inline unsigned int
 hvm_get_cpl(struct vcpu *v)
 {
     return hvm_funcs.get_cpl(v);
 }
-
-void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
-                              struct segment_register *reg);
-void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
-                              struct segment_register *reg);
 
 static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
 {
@@ -387,8 +445,6 @@ static inline bool hvm_get_guest_bndcfgs(struct vcpu *v, u64 *val)
     return hvm_funcs.get_guest_bndcfgs &&
            hvm_funcs.get_guest_bndcfgs(v, val);
 }
-
-bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val);
 
 #define has_hvm_params(d) \
     ((d)->arch.hvm.params != NULL)
@@ -404,13 +460,6 @@ bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val);
 
 #define has_viridian_apic_assist(d) \
     (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_apic_assist))
-
-bool hvm_check_cpuid_faulting(struct vcpu *v);
-void hvm_migrate_timers(struct vcpu *v);
-void hvm_do_resume(struct vcpu *v);
-void hvm_migrate_pirqs(struct vcpu *v);
-
-void hvm_inject_event(const struct x86_event *event);
 
 static inline void hvm_inject_exception(
     unsigned int vector, unsigned int type,
@@ -468,12 +517,6 @@ static inline void hvm_invlpg(struct vcpu *v, unsigned long linear)
                        (1U << TRAP_alignment_check) | \
                        (1U << TRAP_machine_check))
 
-int hvm_event_needs_reinjection(uint8_t type, uint8_t vector);
-
-uint8_t hvm_combine_hw_exceptions(uint8_t vec1, uint8_t vec2);
-
-void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable);
-
 static inline int hvm_cpu_up(void)
 {
     return (hvm_funcs.cpu_up ? hvm_funcs.cpu_up() : 0);
@@ -490,42 +533,11 @@ static inline unsigned int hvm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
     return (hvm_funcs.get_insn_bytes ? hvm_funcs.get_insn_bytes(v, buf) : 0);
 }
 
-enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };
-void hvm_task_switch(
-    uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
-    int32_t errcode);
-
-enum hvm_access_type {
-    hvm_access_insn_fetch,
-    hvm_access_none,
-    hvm_access_read,
-    hvm_access_write
-};
-bool_t hvm_virtual_to_linear_addr(
-    enum x86_segment seg,
-    const struct segment_register *reg,
-    unsigned long offset,
-    unsigned int bytes,
-    enum hvm_access_type access_type,
-    const struct segment_register *active_cs,
-    unsigned long *linear_addr);
-
-void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent,
-                             bool_t *writable);
-void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent);
-void hvm_unmap_guest_frame(void *p, bool_t permanent);
-void hvm_mapped_guest_frames_mark_dirty(struct domain *);
-
 static inline void hvm_set_info_guest(struct vcpu *v)
 {
     if ( hvm_funcs.set_info_guest )
         return hvm_funcs.set_info_guest(v);
 }
-
-int hvm_debug_op(struct vcpu *v, int32_t op);
-
-/* Caller should pause vcpu before calling this function */
-void hvm_toggle_singlestep(struct vcpu *v);
 
 static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
 {
@@ -542,17 +554,11 @@ static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
 #endif
 }
 
-int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
-                              struct npfec npfec);
-
 #define hvm_msr_tsc_aux(v) ({                                               \
     struct domain *__d = (v)->domain;                                       \
     (__d->arch.tsc_mode == TSC_MODE_PVRDTSCP)                               \
         ? (u32)__d->arch.incarnation : (u32)(v)->arch.hvm.msr_tsc_aux;      \
 })
-
-int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content);
-int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content);
 
 /*
  * Nested HVM
@@ -656,11 +662,6 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
     }
     return false;
 }
-
-/* Check CR4/EFER values */
-const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
-                           signed int cr0_pg);
-unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
 
 /*
  * This must be defined as a macro instead of an inline function,
