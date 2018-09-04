@@ -99,9 +99,22 @@ static inline uint32_t arch_monitor_get_capabilities(struct domain *d)
 int arch_monitor_domctl_event(struct domain *d,
                               struct xen_domctl_monitor_op *mop);
 
+#ifdef CONFIG_HVM
+
 int arch_monitor_init_domain(struct domain *d);
 
 void arch_monitor_cleanup_domain(struct domain *d);
+
+#else
+
+static inline int arch_monitor_init_domain(struct domain *d)
+{
+    return -EOPNOTSUPP;
+}
+
+static inline void arch_monitor_cleanup_domain(struct domain *d) {}
+
+#endif
 
 bool monitored_msr(const struct domain *d, u32 msr);
 bool monitored_msr_onchangeonly(const struct domain *d, u32 msr);
