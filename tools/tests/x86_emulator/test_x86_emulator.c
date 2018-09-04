@@ -2046,11 +2046,6 @@ int main(int argc, char **argv)
         rc = x86_emulate(&ctxt, &emulops);
         if ( rc != X86EMUL_OKAY || !check_eip(vmovdqu_from_mem) )
             goto fail;
-#if 0 /* Don't use AVX2 instructions for now */
-        asm ( "vpcmpeqb %%ymm2, %%ymm2, %%ymm2\n\t"
-              "vpcmpeqb %%ymm4, %%ymm2, %%ymm0\n\t"
-              "vpmovmskb %%ymm0, %0" : "=r" (rc) );
-#else
         asm ( "vextractf128 $1, %%ymm4, %%xmm3\n\t"
               "vpcmpeqb %%xmm2, %%xmm2, %%xmm2\n\t"
               "vpcmpeqb %%xmm4, %%xmm2, %%xmm0\n\t"
@@ -2058,7 +2053,6 @@ int main(int argc, char **argv)
               "vpmovmskb %%xmm0, %0\n\t"
               "vpmovmskb %%xmm1, %1" : "=r" (rc), "=r" (i) );
         rc |= i << 16;
-#endif
         if ( rc != 0xffffffff )
             goto fail;
         printf("okay\n");
@@ -2730,11 +2724,6 @@ int main(int argc, char **argv)
         rc = x86_emulate(&ctxt, &emulops);
         if ( rc != X86EMUL_OKAY || !check_eip(vlddqu) )
             goto fail;
-#if 0 /* Don't use AVX2 instructions for now */
-        asm ( "vpcmpeqb %%ymm2, %%ymm2, %%ymm2\n\t"
-              "vpcmpeqb %%ymm4, %%ymm2, %%ymm0\n\t"
-              "vpmovmskb %%ymm0, %0" : "=r" (rc) );
-#else
         asm ( "vextractf128 $1, %%ymm4, %%xmm3\n\t"
               "vpcmpeqb %%xmm2, %%xmm2, %%xmm2\n\t"
               "vpcmpeqb %%xmm4, %%xmm2, %%xmm0\n\t"
@@ -2742,7 +2731,6 @@ int main(int argc, char **argv)
               "vpmovmskb %%xmm0, %0\n\t"
               "vpmovmskb %%xmm1, %1" : "=r" (rc), "=r" (i) );
         rc |= i << 16;
-#endif
         if ( ~rc )
             goto fail;
         printf("okay\n");
@@ -2781,15 +2769,9 @@ int main(int argc, char **argv)
     {
         decl_insn(vmovntdqa);
 
-#if 0 /* Don't use AVX2 instructions for now */
         asm volatile ( "vpxor %%ymm4, %%ymm4, %%ymm4\n"
                        put_insn(vmovntdqa, "vmovntdqa (%0), %%ymm4")
                        :: "c" (NULL) );
-#else
-        asm volatile ( "vpxor %xmm4, %xmm4, %xmm4\n"
-                       put_insn(vmovntdqa,
-                                ".byte 0xc4, 0xe2, 0x7d, 0x2a, 0x21") );
-#endif
 
         set_insn(vmovntdqa);
         memset(res, 0x55, 96);
@@ -2798,19 +2780,9 @@ int main(int argc, char **argv)
         rc = x86_emulate(&ctxt, &emulops);
         if ( rc != X86EMUL_OKAY || !check_eip(vmovntdqa) )
             goto fail;
-#if 0 /* Don't use AVX2 instructions for now */
         asm ( "vpcmpeqb %%ymm2, %%ymm2, %%ymm2\n\t"
               "vpcmpeqb %%ymm4, %%ymm2, %%ymm0\n\t"
               "vpmovmskb %%ymm0, %0" : "=r" (rc) );
-#else
-        asm ( "vextractf128 $1, %%ymm4, %%xmm3\n\t"
-              "vpcmpeqb %%xmm2, %%xmm2, %%xmm2\n\t"
-              "vpcmpeqb %%xmm4, %%xmm2, %%xmm0\n\t"
-              "vpcmpeqb %%xmm3, %%xmm2, %%xmm1\n\t"
-              "vpmovmskb %%xmm0, %0\n\t"
-              "vpmovmskb %%xmm1, %1" : "=r" (rc), "=r" (i) );
-        rc |= i << 16;
-#endif
         if ( ~rc )
             goto fail;
         printf("okay\n");
@@ -3136,12 +3108,7 @@ int main(int argc, char **argv)
 
         asm volatile ( "vpxor %%xmm1, %%xmm1, %%xmm1\n\t"
                        "vpinsrd $0b00, %1, %%xmm1, %%xmm2\n\t"
-#if 0 /* Don't use AVX2 instructions for now */
                        put_insn(vpmaskmovd, "vpmaskmovd %%xmm1, %%xmm2, (%0)")
-#else
-                       put_insn(vpmaskmovd,
-                                ".byte 0xc4, 0xe2, 0x69, 0x8e, 0x0a")
-#endif
                        :: "d" (NULL), "r" (~0) );
 
         memset(res + MMAP_SZ / sizeof(*res) - 8, 0xdb, 32);
@@ -3175,14 +3142,8 @@ int main(int argc, char **argv)
 
         asm volatile ( "vpxor %%xmm1, %%xmm1, %%xmm1\n\t"
                        "vpcmpeqd %%xmm0, %%xmm0, %%xmm0\n\t"
-#if 0 /* Don't use AVX2 instructions for now */
                        "vpblendd $0b0011, %%xmm0, %%xmm1, %%xmm2\n\t"
                        put_insn(vpmaskmovq, "vpmaskmovq %%xmm1, %%xmm2, (%0)")
-#else
-                       ".byte 0xc4, 0xe3, 0x71, 0x02, 0xd0, 0b0011\n\t"
-                       put_insn(vpmaskmovq,
-                                ".byte 0xc4, 0xe2, 0xe9, 0x8e, 0x0a")
-#endif
                        :: "d" (NULL) );
 
         memset(res + MMAP_SZ / sizeof(*res) - 8, 0xdb, 32);
@@ -3196,11 +3157,7 @@ int main(int argc, char **argv)
                     res + MMAP_SZ / sizeof(*res) - 4, 8) )
             goto fail;
 
-#if 0 /* Don't use AVX2 instructions for now */
         asm volatile ( "vpermq $0b00000001, %ymm2, %ymm2" );
-#else
-        asm volatile ( ".byte 0xc4, 0xe3, 0xfd, 0x00, 0xd2, 0b00000001" );
-#endif
         memset(res, 0xdb, 32);
         set_insn(vpmaskmovq);
         regs.edx = (unsigned long)(res - 2);
