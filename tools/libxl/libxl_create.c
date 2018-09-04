@@ -696,6 +696,9 @@ retry_transaction:
                         rwperm, ARRAY_SIZE(rwperm));
     }
     libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/control/sysrq", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/device/suspend/event-channel", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
     libxl__xs_mknod(gc, t,
