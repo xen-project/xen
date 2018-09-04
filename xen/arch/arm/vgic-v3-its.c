@@ -1548,6 +1548,10 @@ void vgic_v3_its_free_domain(struct domain *d)
 {
     struct virt_its *pos, *temp;
 
+    /* Cope with unitialized vITS */
+    if ( list_head_is_null(&d->arch.vgic.vits_list) )
+        return;
+
     list_for_each_entry_safe( pos, temp, &d->arch.vgic.vits_list, vits_list )
     {
         list_del(&pos->vits_list);
