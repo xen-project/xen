@@ -123,6 +123,16 @@ static void vcpu_info_reset(struct vcpu *v)
     v->vcpu_info_mfn = INVALID_MFN;
 }
 
+static void vcpu_destroy(struct vcpu *v)
+{
+    free_cpumask_var(v->cpu_hard_affinity);
+    free_cpumask_var(v->cpu_hard_affinity_tmp);
+    free_cpumask_var(v->cpu_hard_affinity_saved);
+    free_cpumask_var(v->cpu_soft_affinity);
+
+    free_vcpu_struct(v);
+}
+
 struct vcpu *vcpu_create(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
 {
@@ -147,7 +157,7 @@ struct vcpu *vcpu_create(
          !zalloc_cpumask_var(&v->cpu_hard_affinity_tmp) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||
          !zalloc_cpumask_var(&v->cpu_soft_affinity) )
-        goto fail_free;
+        goto fail;
 
     if ( is_idle_domain(d) )
     {
@@ -166,18 +176,7 @@ struct vcpu *vcpu_create(
         goto fail_wq;
 
     if ( arch_vcpu_create(v) != 0 )
-    {
-        sched_destroy_vcpu(v);
- fail_wq:
-        destroy_waitqueue_vcpu(v);
- fail_free:
-        free_cpumask_var(v->cpu_hard_affinity);
-        free_cpumask_var(v->cpu_hard_affinity_tmp);
-        free_cpumask_var(v->cpu_hard_affinity_saved);
-        free_cpumask_var(v->cpu_soft_affinity);
-        free_vcpu_struct(v);
-        return NULL;
-    }
+        goto fail_sched;
 
     d->vcpu[vcpu_id] = v;
     if ( vcpu_id != 0 )
@@ -194,6 +193,15 @@ struct vcpu *vcpu_create(
     vcpu_check_shutdown(v);
 
     return v;
+
+ fail_sched:
+    sched_destroy_vcpu(v);
+ fail_wq:
+    destroy_waitqueue_vcpu(v);
+ fail:
+    vcpu_destroy(v);
+
+    return NULL;
 }
 
 static int late_hwdom_init(struct domain *d)
@@ -902,13 +910,7 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
         if ( (v = d->vcpu[i]) != NULL )
-        {
-            free_cpumask_var(v->cpu_hard_affinity);
-            free_cpumask_var(v->cpu_hard_affinity_tmp);
-            free_cpumask_var(v->cpu_hard_affinity_saved);
-            free_cpumask_var(v->cpu_soft_affinity);
-            free_vcpu_struct(v);
-        }
+            vcpu_destroy(v);
 
     if ( d->target != NULL )
         put_domain(d->target);
