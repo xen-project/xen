@@ -410,6 +410,14 @@ by udev ("0") or will be run by the toolstack directly ("1").
 
 ### Platform Feature and Control Paths
 
+#### ~/control/sysrq = (""|COMMAND) [w]
+
+This is the PV SysRq control node. A toolstack can write a single character
+representing a magic SysRq key understood by the Linux kernel.  The guest
+acknowledges a request by writing the empty string back to the command node.
+
+This protocol is Linux only.
+
 #### ~/control/shutdown = (""|COMMAND) [w]
 
 This is the PV shutdown control node. A toolstack can write various
