@@ -13,7 +13,7 @@ typedef union {
     struct compat_vcpu_guest_context *cmp;
 } vcpu_guest_context_u __attribute__((__transparent_union__));
 
-struct vcpu *alloc_vcpu(
+struct vcpu *vcpu_create(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
 
 unsigned int dom0_max_vcpus(void);
@@ -47,13 +47,14 @@ void free_pirq_struct(void *);
 
 /*
  * Initialise/destroy arch-specific details of a VCPU.
- *  - vcpu_initialise() is called after the basic generic fields of the
+ *  - arch_vcpu_create() is called after the basic generic fields of the
  *    VCPU structure are initialised. Many operations can be applied to the
  *    VCPU at this point (e.g., vcpu_pause()).
- *  - vcpu_destroy() is called only if vcpu_initialise() previously succeeded.
+ *  - arch_vcpu_destroy() is called only if arch_vcpu_create() previously
+ *    succeeded.
  */
-int  vcpu_initialise(struct vcpu *v);
-void vcpu_destroy(struct vcpu *v);
+int  arch_vcpu_create(struct vcpu *v);
+void arch_vcpu_destroy(struct vcpu *v);
 
 int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset);
 void unmap_vcpu_info(struct vcpu *v);

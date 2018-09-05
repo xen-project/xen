@@ -538,7 +538,7 @@ void free_vcpu_struct(struct vcpu *v)
     free_xenheap_pages(v, get_order_from_bytes(sizeof(*v)));
 }
 
-int vcpu_initialise(struct vcpu *v)
+int arch_vcpu_create(struct vcpu *v)
 {
     int rc = 0;
 
@@ -583,11 +583,11 @@ int vcpu_initialise(struct vcpu *v)
     return rc;
 
 fail:
-    vcpu_destroy(v);
+    arch_vcpu_destroy(v);
     return rc;
 }
 
-void vcpu_destroy(struct vcpu *v)
+void arch_vcpu_destroy(struct vcpu *v)
 {
     vcpu_timer_destroy(v);
     vcpu_vgic_free(v);

@@ -123,7 +123,7 @@ static void vcpu_info_reset(struct vcpu *v)
     v->vcpu_info_mfn = INVALID_MFN;
 }
 
-struct vcpu *alloc_vcpu(
+struct vcpu *vcpu_create(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
 {
     struct vcpu *v;
@@ -165,7 +165,7 @@ struct vcpu *alloc_vcpu(
     if ( sched_init_vcpu(v, cpu_id) != 0 )
         goto fail_wq;
 
-    if ( vcpu_initialise(v) != 0 )
+    if ( arch_vcpu_create(v) != 0 )
     {
         sched_destroy_vcpu(v);
  fail_wq:
@@ -874,7 +874,7 @@ static void complete_domain_destroy(struct rcu_head *head)
         if ( (v = d->vcpu[i]) == NULL )
             continue;
         tasklet_kill(&v->continue_hypercall_tasklet);
-        vcpu_destroy(v);
+        arch_vcpu_destroy(v);
         sched_destroy_vcpu(v);
         destroy_waitqueue_vcpu(v);
     }

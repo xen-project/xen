@@ -134,7 +134,7 @@ struct vcpu *__init dom0_setup_vcpu(struct domain *d,
                                     unsigned int prev_cpu)
 {
     unsigned int cpu = cpumask_cycle(prev_cpu, &dom0_cpus);
-    struct vcpu *v = alloc_vcpu(d, vcpu_id, cpu);
+    struct vcpu *v = vcpu_create(d, vcpu_id, cpu);
 
     if ( v )
     {

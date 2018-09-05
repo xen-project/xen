@@ -74,7 +74,7 @@ unsigned int __init dom0_max_vcpus(void)
 
 struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 {
-    return alloc_vcpu(dom0, 0, 0);
+    return vcpu_create(dom0, 0, 0);
 }
 
 static unsigned int __init get_11_allocation_size(paddr_t size)
@@ -2232,7 +2232,7 @@ int __init construct_dom0(struct domain *d)
     for ( i = 1, cpu = 0; i < d->max_vcpus; i++ )
     {
         cpu = cpumask_cycle(cpu, &cpu_online_map);
-        if ( alloc_vcpu(d, i, cpu) == NULL )
+        if ( vcpu_create(d, i, cpu) == NULL )
         {
             printk("Failed to allocate dom0 vcpu %d on pcpu %d\n", i, cpu);
             break;

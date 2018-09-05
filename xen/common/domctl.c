@@ -571,7 +571,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                 cpumask_any(online) :
                 cpumask_cycle(d->vcpu[i-1]->processor, online);
 
-            if ( alloc_vcpu(d, i, cpu) == NULL )
+            if ( vcpu_create(d, i, cpu) == NULL )
                 goto maxvcpu_out;
         }
 

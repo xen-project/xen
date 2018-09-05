@@ -322,7 +322,7 @@ void free_vcpu_struct(struct vcpu *v)
     free_xenheap_page(v);
 }
 
-int vcpu_initialise(struct vcpu *v)
+int arch_vcpu_create(struct vcpu *v)
 {
     struct domain *d = v->domain;
     int rc;
@@ -382,7 +382,7 @@ int vcpu_initialise(struct vcpu *v)
     return rc;
 }
 
-void vcpu_destroy(struct vcpu *v)
+void arch_vcpu_destroy(struct vcpu *v)
 {
     xfree(v->arch.vm_event);
     v->arch.vm_event = NULL;

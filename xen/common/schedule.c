@@ -1645,7 +1645,7 @@ static int cpu_schedule_up(unsigned int cpu)
         return 0;
 
     if ( idle_vcpu[cpu] == NULL )
-        alloc_vcpu(idle_vcpu[0]->domain, cpu, cpu);
+        vcpu_create(idle_vcpu[0]->domain, cpu, cpu);
     else
     {
         struct vcpu *idle = idle_vcpu[cpu];
@@ -1817,7 +1817,7 @@ void __init scheduler_init(void)
     BUG_ON(IS_ERR(idle_domain));
     idle_domain->vcpu = idle_vcpu;
     idle_domain->max_vcpus = nr_cpu_ids;
-    if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
+    if ( vcpu_create(idle_domain, 0, 0) == NULL )
         BUG();
     this_cpu(schedule_data).sched_priv = SCHED_OP(&ops, alloc_pdata, 0);
     BUG_ON(IS_ERR(this_cpu(schedule_data).sched_priv));
