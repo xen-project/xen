@@ -48,7 +48,4 @@ void register_irq_keyhandler(unsigned char key,
 /* Inject a keypress into the key-handling subsystem. */
 extern void handle_keypress(unsigned char key, struct cpu_user_regs *regs);
 
-/* Scratch space is available for use of any keyhandler. */
-extern char keyhandler_scratch[1024];
-
 #endif /* __XEN_KEYHANDLER_H__ */

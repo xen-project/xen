@@ -487,6 +487,7 @@ static EFI_FILE_HANDLE __init get_parent_handle(EFI_LOADED_IMAGE *loaded_image,
                                                 CHAR16 **leaf)
 {
     static EFI_GUID __initdata fs_protocol = SIMPLE_FILE_SYSTEM_PROTOCOL;
+    static CHAR16 __initdata buffer[512];
     EFI_FILE_HANDLE dir_handle;
     EFI_DEVICE_PATH *dp;
     CHAR16 *pathend, *ptr;
@@ -506,8 +507,7 @@ static EFI_FILE_HANDLE __init get_parent_handle(EFI_LOADED_IMAGE *loaded_image,
     if ( ret != EFI_SUCCESS )
         PrintErrMesg(L"OpenVolume failure", ret);
 
-#define buffer ((CHAR16 *)keyhandler_scratch)
-#define BUFFERSIZE sizeof(keyhandler_scratch)
+#define BUFFERSIZE sizeof(buffer)
     for ( dp = loaded_image->FilePath, *buffer = 0;
           DevicePathType(dp) != END_DEVICE_PATH_TYPE;
           dp = (void *)dp + DevicePathNodeLength(dp) )

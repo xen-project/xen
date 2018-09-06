@@ -372,7 +372,6 @@ static void dump_numa(unsigned char key)
 {
     s_time_t now = NOW();
     unsigned int i, j, n;
-    int err;
     struct domain *d;
     struct page_info *page;
     unsigned int page_num_node[MAX_NUMNODES];
@@ -454,12 +453,10 @@ static void dump_numa(unsigned char key)
         {
             unsigned int start_cpu = ~0U;
 
-            err = snprintf(keyhandler_scratch, 12, "%3u",
-                    vnuma->vnode_to_pnode[i]);
-            if ( err < 0 || vnuma->vnode_to_pnode[i] == NUMA_NO_NODE )
-                strlcpy(keyhandler_scratch, "???", sizeof(keyhandler_scratch));
-
-            printk("       %3u: pnode %s,", i, keyhandler_scratch);
+            if ( vnuma->vnode_to_pnode[i] == NUMA_NO_NODE )
+                printk("       %3u: pnode ???,", i);
+            else
+                printk("       %3u: pnode %3u,", i, vnuma->vnode_to_pnode[i]);
 
             printk(" vcpus ");
 

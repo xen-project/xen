@@ -29,8 +29,6 @@ static keyhandler_fn_t show_handlers, dump_hwdom_registers,
 static irq_keyhandler_fn_t do_toggle_alt_key, dump_registers,
     reboot_machine, run_all_keyhandlers, do_debug_key;
 
-char keyhandler_scratch[1024];
-
 static struct keyhandler {
     union {
         keyhandler_fn_t *fn;
@@ -250,25 +248,11 @@ static void reboot_machine(unsigned char key, struct cpu_user_regs *regs)
     machine_restart(0);
 }
 
-static void periodic_timer_print(char *str, int size, uint64_t period)
-{
-    if ( period == 0 )
-    {
-        strlcpy(str, "No periodic timer", size);
-        return;
-    }
-
-    snprintf(str, size,
-             "%u Hz periodic timer (period %u ms)",
-             1000000000/(int)period, (int)period/1000000);
-}
-
 static void dump_domains(unsigned char key)
 {
     struct domain *d;
     struct vcpu   *v;
     s_time_t       now = NOW();
-#define tmpstr keyhandler_scratch
 
     printk("'%c' pressed -> dumping domain info (now = %"PRI_stime")\n",
            key, now);
@@ -333,8 +317,13 @@ static void dump_domains(unsigned char key)
             printk("    pause_count=%d pause_flags=%lx\n",
                    atomic_read(&v->pause_count), v->pause_flags);
             arch_dump_vcpu_info(v);
-            periodic_timer_print(tmpstr, sizeof(tmpstr), v->periodic_period);
-            printk("    %s\n", tmpstr);
+
+            if ( v->periodic_period == 0 )
+                printk("No periodic timer\n");
+            else
+                printk("%"PRI_stime" Hz periodic timer (period %"PRI_stime" ms)\n",
+                       1000000000 / v->periodic_period,
+                       v->periodic_period / 1000000);
         }
     }
 
@@ -355,7 +344,6 @@ static void dump_domains(unsigned char key)
     arch_dump_shared_mem_info();
 
     rcu_read_unlock(&domlist_read_lock);
-#undef tmpstr
 }
 
 static cpumask_t read_clocks_cpumask;
