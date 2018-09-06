@@ -4381,12 +4381,16 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
 
     switch ( type )
     {
+#ifdef CONFIG_HVM
     case XENMEM_resource_ioreq_server:
     {
         ioservid_t ioservid = id;
         unsigned int i;
 
         rc = -EINVAL;
+        if ( !is_hvm_domain(d) )
+            break;
+
         if ( id != (unsigned int)ioservid )
             break;
 
@@ -4409,6 +4413,7 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
         *flags |= XENMEM_rsrc_acq_caller_owned;
         break;
     }
+#endif
 
     default:
         rc = -EOPNOTSUPP;

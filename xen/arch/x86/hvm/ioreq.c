@@ -898,8 +898,7 @@ int hvm_get_ioreq_server_frame(struct domain *d, ioservid_t id,
     struct hvm_ioreq_server *s;
     int rc;
 
-    if ( !is_hvm_domain(d) )
-        return -EINVAL;
+    ASSERT(is_hvm_domain(d));
 
     spin_lock_recursive(&d->arch.hvm.ioreq_server.lock);
 
