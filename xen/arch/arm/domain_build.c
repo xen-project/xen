@@ -2242,6 +2242,8 @@ int __init construct_dom0(struct domain *d)
             vcpu_switch_to_aarch64_mode(d->vcpu[i]);
     }
 
+    domain_update_node_affinity(d);
+
     v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);
 

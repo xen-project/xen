@@ -709,6 +709,7 @@ int __init dom0_construct_pv(struct domain *d,
             cpu = p->processor;
     }
 
+    domain_update_node_affinity(d);
     d->arch.paging.mode = 0;
 
     /* Set up CR3 value for write_ptbase */

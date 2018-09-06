@@ -600,6 +600,8 @@ static int __init pvh_setup_cpus(struct domain *d, paddr_t entry,
             cpu = p->processor;
     }
 
+    domain_update_node_affinity(d);
+
     rc = arch_set_info_hvm_guest(v, &cpu_ctx);
     if ( rc )
     {

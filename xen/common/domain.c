@@ -193,9 +193,6 @@ struct vcpu *alloc_vcpu(
     /* Must be called after making new vcpu visible to for_each_vcpu(). */
     vcpu_check_shutdown(v);
 
-    if ( !is_idle_domain(d) )
-        domain_update_node_affinity(d);
-
     return v;
 }
 

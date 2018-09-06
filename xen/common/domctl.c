@@ -575,6 +575,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                 goto maxvcpu_out;
         }
 
+        domain_update_node_affinity(d);
         ret = 0;
 
     maxvcpu_out:
