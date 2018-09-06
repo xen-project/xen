@@ -416,7 +416,7 @@ static int dm_op(const struct dmop_args *op_args)
         if ( data->pad[0] || data->pad[1] || data->pad[2] )
             break;
 
-        rc = hvm_create_ioreq_server(d, false, data->handle_bufioreq,
+        rc = hvm_create_ioreq_server(d, data->handle_bufioreq,
                                      &data->id);
         break;
     }
