@@ -250,22 +250,6 @@ static void reboot_machine(unsigned char key, struct cpu_user_regs *regs)
     machine_restart(0);
 }
 
-static void cpuset_print(char *set, int size, const cpumask_t *mask)
-{
-    *set++ = '{';
-    set += cpulist_scnprintf(set, size-2, mask);
-    *set++ = '}';
-    *set++ = '\0';
-}
-
-static void nodeset_print(char *set, int size, const nodemask_t *mask)
-{
-    *set++ = '[';
-    set += nodelist_scnprintf(set, size-2, mask);
-    *set++ = ']';
-    *set++ = '\0';
-}
-
 static void periodic_timer_print(char *str, int size, uint64_t period)
 {
     if ( period == 0 )
@@ -298,14 +282,14 @@ static void dump_domains(unsigned char key)
         process_pending_softirqs();
 
         printk("General information for domain %u:\n", d->domain_id);
-        cpuset_print(tmpstr, sizeof(tmpstr), d->dirty_cpumask);
         printk("    refcnt=%d dying=%d pause_count=%d\n",
                atomic_read(&d->refcnt), d->is_dying,
                atomic_read(&d->pause_count));
         printk("    nr_pages=%d xenheap_pages=%d shared_pages=%u paged_pages=%u "
-               "dirty_cpus=%s max_pages=%u\n", d->tot_pages, d->xenheap_pages,
-                atomic_read(&d->shr_pages), atomic_read(&d->paged_pages),
-                tmpstr, d->max_pages);
+               "dirty_cpus={%*pbl} max_pages=%u\n",
+               d->tot_pages, d->xenheap_pages, atomic_read(&d->shr_pages),
+               atomic_read(&d->paged_pages), nr_cpu_ids,
+               cpumask_bits(d->dirty_cpumask), d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
@@ -324,8 +308,8 @@ static void dump_domains(unsigned char key)
 
         dump_pageframe_info(d);
 
-        nodeset_print(tmpstr, sizeof(tmpstr), &d->node_affinity);
-        printk("NODE affinity for domain %d: %s\n", d->domain_id, tmpstr);
+        printk("NODE affinity for domain %d: [%*pbl]\n",
+               d->domain_id, MAX_NUMNODES, d->node_affinity.bits);
 
         printk("VCPU information and callbacks for domain %u:\n",
                d->domain_id);
@@ -343,10 +327,9 @@ static void dump_domains(unsigned char key)
             if ( vcpu_cpu_dirty(v) )
                 printk("dirty_cpu=%u", v->dirty_cpu);
             printk("\n");
-            cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_hard_affinity);
-            printk("    cpu_hard_affinity=%s ", tmpstr);
-            cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_soft_affinity);
-            printk("cpu_soft_affinity=%s\n", tmpstr);
+            printk("    cpu_hard_affinity={%*pbl} cpu_soft_affinity={%*pbl}\n",
+                   nr_cpu_ids, cpumask_bits(v->cpu_hard_affinity),
+                   nr_cpu_ids, cpumask_bits(v->cpu_soft_affinity));
             printk("    pause_count=%d pause_flags=%lx\n",
                    atomic_read(&v->pause_count), v->pause_flags);
             arch_dump_vcpu_info(v);

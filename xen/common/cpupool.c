@@ -732,12 +732,6 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     return ret;
 }
 
-static void print_cpumap(const char *str, const cpumask_t *map)
-{
-    cpulist_scnprintf(keyhandler_scratch, sizeof(keyhandler_scratch), map);
-    printk("%s: %s\n", str, keyhandler_scratch);
-}
-
 void dump_runq(unsigned char key)
 {
     unsigned long    flags;
@@ -751,17 +745,18 @@ void dump_runq(unsigned char key)
             sched_smt_power_savings? "enabled":"disabled");
     printk("NOW=%"PRI_stime"\n", now);
 
-    print_cpumap("Online Cpus", &cpu_online_map);
+    printk("Online Cpus: %*pbl\n", nr_cpu_ids, cpumask_bits(&cpu_online_map));
     if ( !cpumask_empty(&cpupool_free_cpus) )
     {
-        print_cpumap("Free Cpus", &cpupool_free_cpus);
+        printk("Free Cpus: %*pbl\n",
+               nr_cpu_ids, cpumask_bits(&cpupool_free_cpus));
         schedule_dump(NULL);
     }
 
     for_each_cpupool(c)
     {
         printk("Cpupool %d:\n", (*c)->cpupool_id);
-        print_cpumap("Cpus", (*c)->cpu_valid);
+        printk("Cpus: %*pbl\n", nr_cpu_ids, cpumask_bits((*c)->cpu_valid));
         schedule_dump(*c);
     }
 
