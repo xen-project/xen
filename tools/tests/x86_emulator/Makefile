@@ -109,9 +109,9 @@ $(addsuffix .c,$(FMA)):
 $(addsuffix .c,$(SG)):
 	ln -sf simd-sg.c $@
 
-$(addsuffix .o,$(SIMD) $(FMA) $(SG)): simd.h
+$(addsuffix .h,$(SIMD) $(FMA) $(SG)): simd.h
 
-xop.o: simd-fma.c
+xop.h: simd-fma.c
 
 $(TARGET): x86-emulate.o test_x86_emulator.o wrappers.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
