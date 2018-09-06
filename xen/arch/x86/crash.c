@@ -159,11 +159,8 @@ static void nmi_shootdown_cpus(void)
     if ( cpumask_empty(&waiting_to_crash) )
         printk("Shot down all CPUs\n");
     else
-    {
-        cpulist_scnprintf(keyhandler_scratch, sizeof keyhandler_scratch,
-                          &waiting_to_crash);
-        printk("Failed to shoot down CPUs {%s}\n", keyhandler_scratch);
-    }
+        printk("Failed to shoot down CPUs {%*pbl}\n",
+               nr_cpu_ids, cpumask_bits(&waiting_to_crash));
 
     /* Crash shutdown any IOMMU functionality as the crashdump kernel is not
      * happy when booting if interrupt/dma remapping is still enabled */

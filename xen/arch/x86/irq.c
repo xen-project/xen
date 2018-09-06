@@ -2302,11 +2302,8 @@ static void dump_irqs(unsigned char key)
 
         spin_lock_irqsave(&desc->lock, flags);
 
-        cpumask_scnprintf(keyhandler_scratch, sizeof(keyhandler_scratch),
-                          desc->affinity);
-        printk("   IRQ:%4d affinity:%s vec:%02x type=%-15s"
-               " status=%08x ",
-               irq, keyhandler_scratch, desc->arch.vector,
+        printk("   IRQ:%4d affinity:%*pb vec:%02x type=%-15s status=%08x ",
+               irq, nr_cpu_ids, cpumask_bits(desc->affinity), desc->arch.vector,
                desc->handler->typename, desc->status);
 
         if ( ssid )
