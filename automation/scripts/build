@@ -30,4 +30,4 @@ fi
 
 ./configure "${cfgargs[@]}"
 
-make dist
+make -j$(nproc) dist
