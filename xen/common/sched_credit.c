@@ -2044,7 +2044,6 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
     spinlock_t *lock;
     unsigned long flags;
     int loop;
-#define cpustr keyhandler_scratch
 
     /*
      * We need both locks:
@@ -2059,11 +2058,10 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
-    printk("CPU[%02d] nr_run=%d, sort=%d, sibling=%s, ",
-           cpu, spc->nr_runnable, spc->runq_sort_last, cpustr);
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
-    printk("core=%s\n", cpustr);
+    printk("CPU[%02d] nr_run=%d, sort=%d, sibling=%*pb, core=%*pb\n",
+           cpu, spc->nr_runnable, spc->runq_sort_last,
+           nr_cpu_ids, cpumask_bits(per_cpu(cpu_sibling_mask, cpu)),
+           nr_cpu_ids, cpumask_bits(per_cpu(cpu_core_mask, cpu)));
 
     /* current VCPU (nothing to say if that's the idle vcpu). */
     svc = CSCHED_VCPU(curr_on_cpu(cpu));
@@ -2086,7 +2084,6 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
 
     pcpu_schedule_unlock(lock, cpu);
     spin_unlock_irqrestore(&prv->lock, flags);
-#undef cpustr
 }
 
 static void
@@ -2098,8 +2095,6 @@ csched_dump(const struct scheduler *ops)
     unsigned long flags;
 
     spin_lock_irqsave(&prv->lock, flags);
-
-#define idlers_buf keyhandler_scratch
 
     printk("info:\n"
            "\tncpus              = %u\n"
@@ -2127,8 +2122,7 @@ csched_dump(const struct scheduler *ops)
            prv->ticks_per_tslice,
            prv->vcpu_migr_delay/ MICROSECS(1));
 
-    cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), prv->idlers);
-    printk("idlers: %s\n", idlers_buf);
+    printk("idlers: %*pb\n", nr_cpu_ids, cpumask_bits(prv->idlers));
 
     printk("active vcpus:\n");
     loop = 0;
@@ -2151,7 +2145,6 @@ csched_dump(const struct scheduler *ops)
             vcpu_schedule_unlock(lock, svc->vcpu);
         }
     }
-#undef idlers_buf
 
     spin_unlock_irqrestore(&prv->lock, flags);
 }

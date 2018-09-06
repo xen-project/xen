@@ -793,14 +793,13 @@ static void null_dump_pcpu(const struct scheduler *ops, int cpu)
     struct null_vcpu *nvc;
     spinlock_t *lock;
     unsigned long flags;
-#define cpustr keyhandler_scratch
 
     lock = pcpu_schedule_lock_irqsave(cpu, &flags);
 
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_sibling_mask, cpu));
-    printk("CPU[%02d] sibling=%s, ", cpu, cpustr);
-    cpumask_scnprintf(cpustr, sizeof(cpustr), per_cpu(cpu_core_mask, cpu));
-    printk("core=%s", cpustr);
+    printk("CPU[%02d] sibling=%*pb, core=%*pb",
+           cpu,
+           nr_cpu_ids, cpumask_bits(per_cpu(cpu_sibling_mask, cpu)),
+           nr_cpu_ids, cpumask_bits(per_cpu(cpu_core_mask, cpu)));
     if ( per_cpu(npc, cpu).vcpu != NULL )
         printk(", vcpu=%pv", per_cpu(npc, cpu).vcpu);
     printk("\n");
@@ -815,7 +814,6 @@ static void null_dump_pcpu(const struct scheduler *ops, int cpu)
     }
 
     pcpu_schedule_unlock_irqrestore(lock, flags, cpu);
-#undef cpustr
 }
 
 static void null_dump(const struct scheduler *ops)
@@ -824,12 +822,10 @@ static void null_dump(const struct scheduler *ops)
     struct list_head *iter;
     unsigned long flags;
     unsigned int loop;
-#define cpustr keyhandler_scratch
 
     spin_lock_irqsave(&prv->lock, flags);
 
-    cpulist_scnprintf(cpustr, sizeof(cpustr), &prv->cpus_free);
-    printk("\tcpus_free = %s\n", cpustr);
+    printk("\tcpus_free = %*pbl\n", nr_cpu_ids, cpumask_bits(&prv->cpus_free));
 
     printk("Domain info:\n");
     loop = 0;
@@ -873,7 +869,6 @@ static void null_dump(const struct scheduler *ops)
     spin_unlock(&prv->waitq_lock);
 
     spin_unlock_irqrestore(&prv->lock, flags);
-#undef cpustr
 }
 
 const struct scheduler sched_null_def = {
