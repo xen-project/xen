@@ -264,6 +264,88 @@ static char *string(char *str, char *end, const char *s,
     return str;
 }
 
+/* Print a bitmap as '0-3,6-15' */
+static char *print_bitmap_list(
+    char *str, char *end, const unsigned long *bitmap, unsigned int nr_bits)
+{
+    /* current bit is 'cur', most recently seen range is [rbot, rtop] */
+    unsigned int cur, rbot, rtop;
+    bool first = true;
+
+    rbot = cur = find_first_bit(bitmap, nr_bits);
+    while ( cur < nr_bits )
+    {
+        rtop = cur;
+        cur = find_next_bit(bitmap, nr_bits, cur + 1);
+
+        if ( cur < nr_bits && cur <= rtop + 1 )
+            continue;
+
+        if ( !first )
+        {
+            if ( str < end )
+                *str = ',';
+            str++;
+        }
+        first = false;
+
+        str = number(str, end, rbot, 10, -1, -1, 0);
+        if ( rbot < rtop )
+        {
+            if ( str < end )
+                *str = '-';
+            str++;
+
+            str = number(str, end, rtop, 10, -1, -1, 0);
+        }
+
+        rbot = cur;
+    }
+
+    return str;
+}
+
+/* Print a bitmap as a comma separated hex string. */
+static char *print_bitmap_string(
+    char *str, char *end, const unsigned long *bitmap, unsigned int nr_bits)
+{
+    const unsigned int CHUNKSZ = 32;
+    unsigned int chunksz;
+    int i;
+    bool first = true;
+
+    chunksz = nr_bits & (CHUNKSZ - 1);
+    if ( chunksz == 0 )
+        chunksz = CHUNKSZ;
+
+    /*
+     * First iteration copes with the trailing partial word if nr_bits isn't a
+     * round multiple of CHUNKSZ.  All subsequent iterations work on a
+     * complete CHUNKSZ block.
+     */
+    for ( i = ROUNDUP(nr_bits, CHUNKSZ) - CHUNKSZ; i >= 0; i -= CHUNKSZ )
+    {
+        unsigned int chunkmask = (1ull << chunksz) - 1;
+        unsigned int word      = i / BITS_PER_LONG;
+        unsigned int offset    = i % BITS_PER_LONG;
+        unsigned long val      = (bitmap[word] >> offset) & chunkmask;
+
+        if ( !first )
+        {
+            if ( str < end )
+                *str = ',';
+            str++;
+        }
+        first = false;
+
+        str = number(str, end, val, 16, DIV_ROUND_UP(chunksz, 4), -1, ZEROPAD);
+
+        chunksz = CHUNKSZ;
+    }
+
+    return str;
+}
+
 /* Print a domain id, using names for system domains.  (e.g. d0 or d[IDLE]) */
 static char *print_domain(char *str, char *end, const struct domain *d)
 {
@@ -319,6 +401,21 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
     /* Custom %p suffixes. See XEN_ROOT/docs/misc/printk-formats.txt */
     switch ( fmt[1] )
     {
+    case 'b': /* Bitmap as hex, or list */
+        ++*fmt_ptr;
+
+        if ( field_width < 0 )
+            return str;
+
+        if ( fmt[2] == 'l' )
+        {
+            ++*fmt_ptr;
+
+            return print_bitmap_list(str, end, arg, field_width);
+        }
+
+        return print_bitmap_string(str, end, arg, field_width);
+
     case 'd': /* Domain ID from a struct domain *. */
         ++*fmt_ptr;
         return print_domain(str, end, arg);

@@ -13,6 +13,14 @@ Raw buffer as hex string:
        Up to 64 characters.  Buffer length expected via the field_width
        paramter. i.e. printk("%*ph", 8, buffer);
 
+Bitmaps (e.g. cpumask/nodemask):
+
+       %*pb    4321
+       %*pbl   0,5,8-9,14
+
+       Print a bitmap as either a hex string, or a range list.  Bitmap length
+       (in bits) expected via the field_width parameter.
+
 Symbol/Function pointers:
 
        %ps     Symbol name with condition offset and size (iff offset != 0)
