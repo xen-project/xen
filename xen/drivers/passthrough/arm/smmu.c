@@ -2732,6 +2732,10 @@ static void __hwdom_init arm_smmu_iommu_hwdom_init(struct domain *d)
 		printk(XENLOG_WARNING
 		"map-inclusive dom0-iommu option is not supported on ARM\n");
 	iommu_hwdom_inclusive = 0;
+	if ( iommu_hwdom_reserved == 1 )
+		printk(XENLOG_WARNING
+		"map-reserved dom0-iommu option is not supported on ARM\n");
+	iommu_hwdom_reserved = 0;
 }
 
 static void arm_smmu_iommu_domain_teardown(struct domain *d)

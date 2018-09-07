@@ -1307,6 +1307,9 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
     /* Inclusive mappings are enabled by default on Intel hardware for PV. */
     if ( iommu_hwdom_inclusive == -1 )
         iommu_hwdom_inclusive = is_pv_domain(d);
+    /* Reserved IOMMU mappings are enabled by default on Intel hardware. */
+    if ( iommu_hwdom_reserved == -1 )
+        iommu_hwdom_reserved = 1;
 
     setup_hwdom_pci_devices(d, setup_hwdom_device);
     setup_hwdom_rmrr(d);

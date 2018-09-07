@@ -704,6 +704,15 @@ This list of booleans controls the iommu usage by Dom0:
   option is only applicable to a PV Dom0 and is enabled by default on Intel
   hardware.
 
+* `map-reserved`: sets up DMA remapping for all the reserved regions in the
+  memory map for Dom0. Use this to work around firmware issues providing
+  incorrect RMRR/IVMD entries. Rather than only mapping RAM pages for IOMMU
+  accesses for Dom0, all memory regions marked as reserved in the memory map
+  that don't overlap with any MMIO region from emulated devices will be
+  identity mapped. This option maps a subset of the memory that would be
+  mapped when using the `map-inclusive` option. This option is available to all
+  Dom0 modes and is enabled by default on Intel hardware.
+
 ### dom0\_ioports\_disable (x86)
 > `= List of <hex>-<hex>`
 

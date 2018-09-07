@@ -256,6 +256,9 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
     /* Inclusive IOMMU mappings are disabled by default on AMD hardware. */
     if ( iommu_hwdom_inclusive == -1 )
         iommu_hwdom_inclusive = 0;
+    /* Reserved IOMMU mappings are disabled by default on AMD hardware. */
+    if ( iommu_hwdom_reserved == -1 )
+        iommu_hwdom_reserved = 0;
 
     if ( allocate_domain_resources(dom_iommu(d)) )
         BUG();

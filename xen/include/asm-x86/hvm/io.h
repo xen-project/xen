@@ -185,6 +185,9 @@ int register_vpci_mmcfg_handler(struct domain *d, paddr_t addr,
 /* Destroy tracked MMCFG areas. */
 void destroy_vpci_mmcfg(struct domain *d);
 
+/* Check if an address is between a MMCFG region for a domain. */
+bool vpci_is_mmcfg_address(const struct domain *d, paddr_t addr);
+
 #endif /* __ASM_X86_HVM_IO_H__ */
 
 

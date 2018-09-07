@@ -62,6 +62,7 @@ bool_t __read_mostly iommu_intremap = 1;
 bool __hwdom_initdata iommu_hwdom_strict;
 bool __read_mostly iommu_hwdom_passthrough;
 int8_t __hwdom_initdata iommu_hwdom_inclusive = -1;
+int8_t __hwdom_initdata iommu_hwdom_reserved = -1;
 
 /*
  * In the current implementation of VT-d posted interrupts, in some extreme
@@ -155,6 +156,8 @@ static int __init parse_dom0_iommu_param(const char *s)
             iommu_hwdom_strict = val;
         else if ( (val = parse_boolean("map-inclusive", s, ss)) >= 0 )
             iommu_hwdom_inclusive = val;
+        else if ( (val = parse_boolean("map-reserved", s, ss)) >= 0 )
+            iommu_hwdom_inclusive = val;
         else
             rc = -EINVAL;
 
@@ -236,7 +239,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
 
     hd->platform_ops->hwdom_init(d);
 
-    ASSERT(iommu_hwdom_inclusive != -1);
+    ASSERT(iommu_hwdom_inclusive != -1 && iommu_hwdom_inclusive != -1);
     if ( iommu_hwdom_inclusive && !is_pv_domain(d) )
     {
         printk(XENLOG_WARNING

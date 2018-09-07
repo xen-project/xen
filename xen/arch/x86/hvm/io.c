@@ -404,6 +404,11 @@ static const struct hvm_mmcfg *vpci_mmcfg_find(const struct domain *d,
     return NULL;
 }
 
+bool vpci_is_mmcfg_address(const struct domain *d, paddr_t addr)
+{
+    return vpci_mmcfg_find(d, addr);
+}
+
 static unsigned int vpci_mmcfg_decode_addr(const struct hvm_mmcfg *mmcfg,
                                            paddr_t addr, pci_sbdf_t *sbdf)
 {
