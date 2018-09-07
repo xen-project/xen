@@ -40,6 +40,9 @@ clean:
 .PHONY: distclean
 distclean: clean
 
+depriv-fd-checker: depriv-fd-checker.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS) $(APPEND_LDFLAGS)
+
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBEXEC_BIN)
 	$(INSTALL_PROG) $(INSTALL_PRIVBIN) $(DESTDIR)$(LIBEXEC_BIN)
