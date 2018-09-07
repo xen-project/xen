@@ -134,6 +134,39 @@ void arch_iommu_domain_destroy(struct domain *d)
 {
 }
 
+static bool __hwdom_init hwdom_iommu_map(const struct domain *d,
+                                         unsigned long pfn,
+                                         unsigned long max_pfn)
+{
+    mfn_t mfn = _mfn(pfn);
+
+    /*
+     * Set up 1:1 mapping for dom0. Default to include only conventional RAM
+     * areas and let RMRRs include needed reserved regions. When set, the
+     * inclusive mapping additionally maps in every pfn up to 4GB except those
+     * that fall in unusable ranges.
+     */
+    if ( (pfn > max_pfn && !mfn_valid(mfn)) || xen_in_range(pfn) )
+        return false;
+
+    switch ( page_get_ram_type(mfn) )
+    {
+    case RAM_TYPE_UNUSABLE:
+        return false;
+
+    case RAM_TYPE_CONVENTIONAL:
+        if ( iommu_hwdom_strict )
+            return false;
+        break;
+
+    default:
+        if ( !iommu_hwdom_inclusive || pfn > max_pfn )
+            return false;
+    }
+
+    return true;
+}
+
 void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 {
     unsigned long i, top, max_pfn;
@@ -149,36 +182,9 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
     for ( i = 0; i < top; i++ )
     {
         unsigned long pfn = pdx_to_pfn(i);
-        bool map;
         int rc;
 
-        /*
-         * Set up 1:1 mapping for dom0. Default to include only
-         * conventional RAM areas and let RMRRs include needed reserved
-         * regions. When set, the inclusive mapping additionally maps in
-         * every pfn up to 4GB except those that fall in unusable ranges.
-         */
-        if ( pfn > max_pfn && !mfn_valid(_mfn(pfn)) )
-            continue;
-
-        if ( iommu_hwdom_inclusive && pfn <= max_pfn )
-            map = !page_is_ram_type(pfn, RAM_TYPE_UNUSABLE);
-        else
-            map = page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL);
-
-        if ( !map )
-            continue;
-
-        /* Exclude Xen bits */
-        if ( xen_in_range(pfn) )
-            continue;
-
-        /*
-         * If dom0-strict mode is enabled then exclude conventional RAM
-         * and let the common code map dom0's pages.
-         */
-        if ( iommu_hwdom_strict &&
-             page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL) )
+        if ( !hwdom_iommu_map(d, pfn, max_pfn) )
             continue;
 
         rc = iommu_map_page(d, pfn, pfn, IOMMUF_readable|IOMMUF_writable);
