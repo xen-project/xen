@@ -121,7 +121,7 @@ static void amd_iommu_setup_domain_device(
     BUG_ON( !hd->arch.root_table || !hd->arch.paging_mode ||
             !iommu->dev_table.buffer );
 
-    if ( iommu_passthrough && is_hardware_domain(domain) )
+    if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
         valid = 0;
 
     if ( ats_enabled )
@@ -256,7 +256,7 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
     if ( allocate_domain_resources(dom_iommu(d)) )
         BUG();
 
-    if ( !iommu_passthrough && !need_iommu(d) )
+    if ( !iommu_hwdom_passthrough && !need_iommu(d) )
     {
         int rc = 0;
 

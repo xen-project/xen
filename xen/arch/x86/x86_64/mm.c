@@ -1426,7 +1426,8 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     if ( ret )
         goto destroy_m2p;
 
-    if ( iommu_enabled && !iommu_passthrough && !need_iommu(hardware_domain) )
+    if ( iommu_enabled && !iommu_hwdom_passthrough &&
+         !need_iommu(hardware_domain) )
     {
         for ( i = spfn; i < epfn; i++ )
             if ( iommu_map_page(hardware_domain, i, i, IOMMUF_readable|IOMMUF_writable) )

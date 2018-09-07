@@ -52,14 +52,15 @@ custom_param("iommu", parse_iommu_param);
 bool_t __initdata iommu_enable = 1;
 bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
-bool_t __hwdom_initdata iommu_dom0_strict;
 bool_t __read_mostly iommu_verbose;
 bool_t __read_mostly iommu_workaround_bios_bug;
 bool_t __read_mostly iommu_igfx = 1;
-bool_t __read_mostly iommu_passthrough;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
+
+bool __hwdom_initdata iommu_hwdom_strict;
+bool __read_mostly iommu_hwdom_passthrough;
 
 /*
  * In the current implementation of VT-d posted interrupts, in some extreme
@@ -121,9 +122,9 @@ static int __init parse_iommu_param(const char *s)
         else if ( !strncmp(s, "amd-iommu-perdev-intremap", ss - s) )
             amd_iommu_perdev_intremap = val;
         else if ( !strncmp(s, "dom0-passthrough", ss - s) )
-            iommu_passthrough = val;
+            iommu_hwdom_passthrough = val;
         else if ( !strncmp(s, "dom0-strict", ss - s) )
-            iommu_dom0_strict = val;
+            iommu_hwdom_strict = val;
         else if ( !strncmp(s, "sharept", ss - s) )
             iommu_hap_pt_share = val;
         else
@@ -158,10 +159,10 @@ static void __hwdom_init check_hwdom_reqs(struct domain *d)
 
     arch_iommu_check_autotranslated_hwdom(d);
 
-    if ( iommu_passthrough )
+    if ( iommu_hwdom_passthrough )
         panic("Dom0 uses paging translated mode, dom0-passthrough must not be enabled\n");
 
-    iommu_dom0_strict = 1;
+    iommu_hwdom_strict = true;
 }
 
 void __hwdom_init iommu_hwdom_init(struct domain *d)
@@ -174,7 +175,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
         return;
 
     register_keyhandler('o', &iommu_dump_p2m_table, "dump iommu p2m table", 0);
-    d->need_iommu = !!iommu_dom0_strict;
+    d->need_iommu = iommu_hwdom_strict;
     if ( need_iommu(d) && !iommu_use_hap_pt(d) )
     {
         struct page_info *page;
@@ -370,8 +371,8 @@ int __init iommu_setup(void)
     int rc = -ENODEV;
     bool_t force_intremap = force_iommu && iommu_intremap;
 
-    if ( iommu_dom0_strict )
-        iommu_passthrough = 0;
+    if ( iommu_hwdom_strict )
+        iommu_hwdom_passthrough = false;
 
     if ( iommu_enable )
     {
@@ -392,15 +393,15 @@ int __init iommu_setup(void)
     if ( !iommu_enabled )
     {
         iommu_snoop = 0;
-        iommu_passthrough = 0;
-        iommu_dom0_strict = 0;
+        iommu_hwdom_passthrough = false;
+        iommu_hwdom_strict = false;
     }
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( iommu_enabled )
     {
         printk(" - Dom0 mode: %s\n",
-               iommu_passthrough ? "Passthrough" :
-               iommu_dom0_strict ? "Strict" : "Relaxed");
+               iommu_hwdom_passthrough ? "Passthrough" :
+               iommu_hwdom_strict ? "Strict" : "Relaxed");
         printk("Interrupt remapping %sabled\n", iommu_intremap ? "en" : "dis");
         tasklet_init(&iommu_pt_cleanup_tasklet, iommu_free_pagetables, 0);
     }

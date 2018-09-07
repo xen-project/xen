@@ -1062,7 +1062,7 @@ static void __init amd_iommu_init_cleanup(void)
     radix_tree_destroy(&ivrs_maps, xfree);
 
     iommu_enabled = 0;
-    iommu_passthrough = 0;
+    iommu_hwdom_passthrough = false;
     iommu_intremap = 0;
     iommuv2_enabled = 0;
 }

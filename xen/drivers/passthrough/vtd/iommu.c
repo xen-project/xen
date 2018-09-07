@@ -1304,7 +1304,7 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
 {
     struct acpi_drhd_unit *drhd;
 
-    if ( !iommu_passthrough && is_pv_domain(d) )
+    if ( !iommu_hwdom_passthrough && is_pv_domain(d) )
     {
         /* Set up 1:1 page table for hardware domain. */
         vtd_set_hwdom_mapping(d);
@@ -1391,7 +1391,7 @@ int domain_context_mapping_one(
         return res;
     }
 
-    if ( iommu_passthrough && is_hardware_domain(domain) )
+    if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
     {
         context_set_translation_type(*context, CONTEXT_TT_PASS_THRU);
         agaw = level_to_agaw(iommu->nr_pt_levels);
@@ -1781,7 +1781,7 @@ static int __must_check intel_iommu_map_page(struct domain *d,
         return 0;
 
     /* Do nothing if hardware domain and iommu supports pass thru. */
-    if ( iommu_passthrough && is_hardware_domain(d) )
+    if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
 
     spin_lock(&hd->arch.mapping_lock);
@@ -1826,7 +1826,7 @@ static int __must_check intel_iommu_unmap_page(struct domain *d,
                                                unsigned long gfn)
 {
     /* Do nothing if hardware domain and iommu supports pass thru. */
-    if ( iommu_passthrough && is_hardware_domain(d) )
+    if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
 
     return dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
@@ -2269,8 +2269,8 @@ int __init intel_vtd_setup(void)
         if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
             iommu_snoop = 0;
 
-        if ( iommu_passthrough && !ecap_pass_thru(iommu->ecap) )
-            iommu_passthrough = 0;
+        if ( iommu_hwdom_passthrough && !ecap_pass_thru(iommu->ecap) )
+            iommu_hwdom_passthrough = false;
 
         if ( iommu_qinval && !ecap_queued_inval(iommu->ecap) )
             iommu_qinval = 0;
@@ -2308,7 +2308,7 @@ int __init intel_vtd_setup(void)
 
 #define P(p,s) printk("Intel VT-d %s %senabled.\n", s, (p)? "" : "not ")
     P(iommu_snoop, "Snoop Control");
-    P(iommu_passthrough, "Dom0 DMA Passthrough");
+    P(iommu_hwdom_passthrough, "Dom0 DMA Passthrough");
     P(iommu_qinval, "Queued Invalidation");
     P(iommu_intremap, "Interrupt Remapping");
     P(iommu_intpost, "Posted Interrupt");
@@ -2330,7 +2330,7 @@ int __init intel_vtd_setup(void)
  error:
     iommu_enabled = 0;
     iommu_snoop = 0;
-    iommu_passthrough = 0;
+    iommu_hwdom_passthrough = false;
     iommu_qinval = 0;
     iommu_intremap = 0;
     iommu_intpost = 0;
