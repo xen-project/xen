@@ -41,9 +41,8 @@ linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 $(D): linkfarm.stamp
 	$(MAKE) -C $(D)/xen distclean
 
-$(D)/xen/.config: shim.config $(D)
-	cp $< $@
-	$(MAKE) -C $(@D) olddefconfig XEN_CONFIG_EXPERT=y
+$(D)/xen/.config: $(D)
+	$(MAKE) -C $(@D) KBUILD_DEFCONFIG=pvshim_defconfig XEN_CONFIG_EXPERT=y defconfig
 
 xen-shim: $(D)/xen/.config
 	$(MAKE) -C $(<D) build XEN_CONFIG_EXPERT=y

@@ -1,0 +1,23 @@
+# Enable PV shim mode
+CONFIG_PV=y
+CONFIG_XEN_GUEST=y
+CONFIG_PVH_GUEST=y
+CONFIG_PV_SHIM=y
+CONFIG_PV_SHIM_EXCLUSIVE=y
+CONFIG_NR_CPUS=32
+# Disable features not used by the PV shim
+# CONFIG_SHADOW_PAGING is not set
+# CONFIG_BIGMEM is not set
+# CONFIG_HVM_FEP is not set
+# CONFIG_TBOOT is not set
+# CONFIG_KEXEC is not set
+# CONFIG_TMEM is not set
+# CONFIG_XENOPROF is not set
+# CONFIG_XSM is not set
+# CONFIG_SCHED_CREDIT2 is not set
+# CONFIG_SCHED_RTDS is not set
+# CONFIG_SCHED_ARINC653 is not set
+# CONFIG_SCHED_NULL is not set
+# CONFIG_LIVEPATCH is not set
+# CONFIG_SUPPRESS_DUPLICATE_SYMBOL_WARNINGS is not set
+# CONFIG_DEBUG is not set
