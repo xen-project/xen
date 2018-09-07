@@ -25,7 +25,6 @@
 #include <xen/irq.h>
 #include <xen/numa.h>
 #include <asm/fixmap.h>
-#include <asm/setup.h>
 #include "../iommu.h"
 #include "../dmar.h"
 #include "../vtd.h"
@@ -35,8 +34,7 @@
  * iommu_inclusive_mapping: when set, all memory below 4GB is included in dom0
  * 1:1 iommu mappings except xen and unusable regions.
  */
-static bool_t __hwdom_initdata iommu_inclusive_mapping = 1;
-boolean_param("iommu_inclusive_mapping", iommu_inclusive_mapping);
+boolean_param("iommu_inclusive_mapping", iommu_hwdom_inclusive);
 
 void *map_vtd_domain_page(u64 maddr)
 {
@@ -61,59 +59,5 @@ void cacheline_flush(char * addr)
 void flush_all_cache()
 {
     wbinvd();
-}
-
-void __hwdom_init vtd_set_hwdom_mapping(struct domain *d)
-{
-    unsigned long i, top, max_pfn;
-
-    BUG_ON(!is_hardware_domain(d));
-
-    max_pfn = (GB(4) >> PAGE_SHIFT) - 1;
-    top = max(max_pdx, pfn_to_pdx(max_pfn) + 1);
-
-    for ( i = 0; i < top; i++ )
-    {
-        unsigned long pfn = pdx_to_pfn(i);
-        bool map;
-        int rc;
-
-        /*
-         * Set up 1:1 mapping for dom0. Default to include only
-         * conventional RAM areas and let RMRRs include needed reserved
-         * regions. When set, the inclusive mapping additionally maps in
-         * every pfn up to 4GB except those that fall in unusable ranges.
-         */
-        if ( pfn > max_pfn && !mfn_valid(_mfn(pfn)) )
-            continue;
-
-        if ( iommu_inclusive_mapping && pfn <= max_pfn )
-            map = !page_is_ram_type(pfn, RAM_TYPE_UNUSABLE);
-        else
-            map = page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL);
-
-        if ( !map )
-            continue;
-
-        /* Exclude Xen bits */
-        if ( xen_in_range(pfn) )
-            continue;
-
-        /*
-         * If dom0-strict mode is enabled then exclude conventional RAM
-         * and let the common code map dom0's pages.
-         */
-        if ( iommu_hwdom_strict &&
-             page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL) )
-            continue;
-
-        rc = iommu_map_page(d, pfn, pfn, IOMMUF_readable|IOMMUF_writable);
-        if ( rc )
-            printk(XENLOG_WARNING VTDPREFIX " d%d: IOMMU mapping failed: %d\n",
-                   d->domain_id, rc);
-
-        if (!(i & 0xfffff))
-            process_pending_softirqs();
-    }
 }
 

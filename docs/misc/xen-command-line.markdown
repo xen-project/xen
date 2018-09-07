@@ -682,7 +682,7 @@ Flag that makes a dom0 use shadow paging. Only works when "pvh" is
 enabled.
 
 ### dom0-iommu
-> `= List of [ passthrough | strict ]`
+> `= List of [ passthrough | strict | map-inclusive ]`
 
 This list of booleans controls the iommu usage by Dom0:
 
@@ -695,6 +695,14 @@ This list of booleans controls the iommu usage by Dom0:
   RAM except regions in use by Xen. Note that this option is hard coded to
   `true` for a PVH Dom0 and any attempt to overwrite it from the command line
   is ignored.
+
+* `map-inclusive`: sets up DMA remapping for all the non-RAM regions below 4GB
+  except for unusable ranges. Use this to work around firmware issues providing
+  incorrect RMRR/IVMD entries. Rather than only mapping RAM pages for IOMMU
+  accesses for Dom0, with this option all pages up to 4GB, not marked as
+  unusable in the E820 table, will get a mapping established. Note that this
+  option is only applicable to a PV Dom0 and is enabled by default on Intel
+  hardware.
 
 ### dom0\_ioports\_disable (x86)
 > `= List of <hex>-<hex>`
@@ -1232,6 +1240,9 @@ wait descriptor timed out', try increasing this value.
 
 ### iommu\_inclusive\_mapping (VT-d)
 > `= <boolean>`
+
+**WARNING: This command line option is deprecated, and superseded by
+_dom0-iommu=map-inclusive_ - using both options in combination is undefined.**
 
 > Default: `true`
 
