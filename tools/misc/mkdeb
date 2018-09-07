@@ -59,7 +59,7 @@ find deb/etc -type f -printf /etc/%P\\n >deb/DEBIAN/conffiles
 
 # Package it up
 chown -R root:root deb
-dpkg --build deb xen-upstream-$version.deb
+dpkg-deb --build -z0 deb xen-upstream-$version.deb
 
 # Tidy up after ourselves
 rm -rf deb
