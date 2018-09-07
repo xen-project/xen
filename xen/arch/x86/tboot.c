@@ -461,8 +461,6 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
     if ( txt_heap_base == 0 )
         return 1;
 
-    /* map TXT heap into Xen addr space */
-
     /* walk heap to SinitMleData */
     pa = txt_heap_base;
     /* skip BiosData */
@@ -489,10 +487,6 @@ int __init tboot_parse_dmar_table(acpi_table_handler dmar_handler)
 
     rc = dmar_handler(dmar_table);
     xfree(dmar_table);
-
-    /* acpi_parse_dmar() zaps APCI DMAR signature in TXT heap table */
-    /* but dom0 will read real table, so must zap it there too */
-    acpi_dmar_zap();
 
     return rc;
 }
