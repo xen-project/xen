@@ -731,16 +731,23 @@ void hvm_domain_destroy(struct domain *d)
     destroy_vpci_mmcfg(d);
 }
 
+static int hvm_save_tsc_adjust_one(struct vcpu *v, hvm_domain_context_t *h)
+{
+    struct hvm_tsc_adjust ctxt = {
+        .tsc_adjust = v->arch.hvm.msr_tsc_adjust,
+    };
+
+    return hvm_save_entry(TSC_ADJUST, v->vcpu_id, h, &ctxt);
+}
+
 static int hvm_save_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
-    struct hvm_tsc_adjust ctxt;
     int err = 0;
 
     for_each_vcpu ( d, v )
     {
-        ctxt.tsc_adjust = v->arch.hvm.msr_tsc_adjust;
-        err = hvm_save_entry(TSC_ADJUST, v->vcpu_id, h, &ctxt);
+        err = hvm_save_tsc_adjust_one(v, h);
         if ( err )
             break;
     }
