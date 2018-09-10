@@ -639,8 +639,9 @@ static int __init dump_irq_info_key_init(void)
 }
 __initcall(dump_irq_info_key_init);
 
-static int irq_save_pci(struct domain *d, hvm_domain_context_t *h)
+static int irq_save_pci(struct vcpu *v, hvm_domain_context_t *h)
 {
+    struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     unsigned int asserted, pdev, pintx;
     int rc;
@@ -671,16 +672,18 @@ static int irq_save_pci(struct domain *d, hvm_domain_context_t *h)
     return rc;
 }
 
-static int irq_save_isa(struct domain *d, hvm_domain_context_t *h)
+static int irq_save_isa(struct vcpu *v, hvm_domain_context_t *h)
 {
+    const struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
 
     /* Save ISA IRQ lines */
     return ( hvm_save_entry(ISA_IRQ, 0, h, &hvm_irq->isa_irq) );
 }
 
-static int irq_save_link(struct domain *d, hvm_domain_context_t *h)
+static int irq_save_link(struct vcpu *v, hvm_domain_context_t *h)
 {
+    const struct domain *d = v->domain;
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
 
     /* Save PCI-ISA link state */
@@ -773,9 +776,9 @@ static int irq_load_link(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(PCI_IRQ, irq_save_pci, NULL, irq_load_pci,
+HVM_REGISTER_SAVE_RESTORE(PCI_IRQ, irq_save_pci, irq_load_pci,
                           1, HVMSR_PER_DOM);
-HVM_REGISTER_SAVE_RESTORE(ISA_IRQ, irq_save_isa, NULL, irq_load_isa,
+HVM_REGISTER_SAVE_RESTORE(ISA_IRQ, irq_save_isa, irq_load_isa,
                           1, HVMSR_PER_DOM);
-HVM_REGISTER_SAVE_RESTORE(PCI_LINK, irq_save_link, NULL, irq_load_link,
+HVM_REGISTER_SAVE_RESTORE(PCI_LINK, irq_save_link, irq_load_link,
                           1, HVMSR_PER_DOM);

@@ -569,8 +569,9 @@ int vioapic_get_trigger_mode(const struct domain *d, unsigned int gsi)
     return vioapic->redirtbl[pin].fields.trig_mode;
 }
 
-static int ioapic_save(struct domain *d, hvm_domain_context_t *h)
+static int ioapic_save(struct vcpu *v, hvm_domain_context_t *h)
 {
+    const struct domain *d = v->domain;
     struct hvm_vioapic *s;
 
     if ( !has_vioapic(d) )
@@ -601,7 +602,7 @@ static int ioapic_load(struct domain *d, hvm_domain_context_t *h)
     return hvm_load_entry(IOAPIC, h, &s->domU);
 }
 
-HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, NULL, ioapic_load, 1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(IOAPIC, ioapic_save, ioapic_load, 1, HVMSR_PER_DOM);
 
 void vioapic_reset(struct domain *d)
 {

@@ -570,16 +570,17 @@ static const struct hvm_mmio_ops hpet_mmio_ops = {
 };
 
 
-static int hpet_save(struct domain *d, hvm_domain_context_t *h)
+static int hpet_save(struct vcpu *v, hvm_domain_context_t *h)
 {
+    const struct domain *d = v->domain;
     HPETState *hp = domain_vhpet(d);
-    struct vcpu *v = pt_global_vcpu_target(d);
     int rc;
     uint64_t guest_time;
 
     if ( !has_vhpet(d) )
         return 0;
 
+    v = pt_global_vcpu_target(d);
     write_lock(&hp->lock);
     guest_time = (v->arch.hvm.guest_time ?: hvm_get_guest_time(v)) /
                  STIME_PER_HPET_TICK;
@@ -695,7 +696,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, NULL, hpet_load, 1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(HPET, hpet_save, hpet_load, 1, HVMSR_PER_DOM);
 
 static void hpet_set(HPETState *h)
 {

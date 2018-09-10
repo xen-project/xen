@@ -391,8 +391,9 @@ void pit_stop_channel0_irq(PITState *pit)
     spin_unlock(&pit->lock);
 }
 
-static int pit_save(struct domain *d, hvm_domain_context_t *h)
+static int pit_save(struct vcpu *v, hvm_domain_context_t *h)
 {
+    struct domain *d = v->domain;
     PITState *pit = domain_vpit(d);
     int rc;
 
@@ -438,7 +439,7 @@ static int pit_load(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, NULL, pit_load, 1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(PIT, pit_save, pit_load, 1, HVMSR_PER_DOM);
 #endif
 
 void pit_reset(struct domain *d)

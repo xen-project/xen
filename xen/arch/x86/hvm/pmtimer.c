@@ -249,8 +249,9 @@ static int handle_pmt_io(
     return X86EMUL_OKAY;
 }
 
-static int acpi_save(struct domain *d, hvm_domain_context_t *h)
+static int acpi_save(struct vcpu *v, hvm_domain_context_t *h)
 {
+    struct domain *d = v->domain;
     struct hvm_hw_acpi *acpi = &d->arch.hvm.acpi;
     PMTState *s = &d->arch.hvm.pl_time->vpmt;
     uint32_t x, msb = acpi->tmr_val & TMR_VAL_MSB;
@@ -309,7 +310,7 @@ static int acpi_load(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(PMTIMER, acpi_save, NULL, acpi_load,
+HVM_REGISTER_SAVE_RESTORE(PMTIMER, acpi_save, acpi_load,
                           1, HVMSR_PER_DOM);
 
 int pmtimer_change_ioport(struct domain *d, unsigned int version)

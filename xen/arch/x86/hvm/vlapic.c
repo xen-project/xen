@@ -1399,7 +1399,7 @@ static void lapic_rearm(struct vlapic *s)
     s->timer_last_update = s->pt.last_plt_gtime;
 }
 
-static int lapic_save_hidden_one(struct vcpu *v, hvm_domain_context_t *h)
+static int lapic_save_hidden(struct vcpu *v, hvm_domain_context_t *h)
 {
     if ( !has_vlapic(v->domain) )
         return 0;
@@ -1407,22 +1407,7 @@ static int lapic_save_hidden_one(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(LAPIC, v->vcpu_id, h, &vcpu_vlapic(v)->hw);
 }
 
-static int lapic_save_hidden(struct domain *d, hvm_domain_context_t *h)
-{
-    struct vcpu *v;
-    int err = 0;
-
-    for_each_vcpu ( d, v )
-    {
-        err = lapic_save_hidden_one(v, h);
-        if ( err )
-            break;
-    }
-
-    return err;
-}
-
-static int lapic_save_regs_one(struct vcpu *v, hvm_domain_context_t *h)
+static int lapic_save_regs(struct vcpu *v, hvm_domain_context_t *h)
 {
     if ( !has_vlapic(v->domain) )
         return 0;
@@ -1431,21 +1416,6 @@ static int lapic_save_regs_one(struct vcpu *v, hvm_domain_context_t *h)
         hvm_funcs.sync_pir_to_irr(v);
 
     return hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, vcpu_vlapic(v)->regs);
-}
-
-static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
-{
-    struct vcpu *v;
-    int err = 0;
-
-    for_each_vcpu ( d, v )
-    {
-        err = lapic_save_regs_one(v, h);
-        if ( err )
-            break;
-    }
-
-    return err;
 }
 
 /*
@@ -1546,9 +1516,9 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(LAPIC, lapic_save_hidden, lapic_save_hidden_one,
+HVM_REGISTER_SAVE_RESTORE(LAPIC, lapic_save_hidden,
                           lapic_load_hidden, 1, HVMSR_PER_VCPU);
-HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs, lapic_save_regs_one,
+HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs,
                           lapic_load_regs, 1, HVMSR_PER_VCPU);
 
 int vlapic_init(struct vcpu *v)

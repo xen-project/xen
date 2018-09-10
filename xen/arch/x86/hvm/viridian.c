@@ -994,8 +994,9 @@ out:
     return HVM_HCALL_completed;
 }
 
-static int viridian_save_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
+static int viridian_save_domain_ctxt(struct vcpu *v, hvm_domain_context_t *h)
 {
+    const struct domain *d = v->domain;
     struct hvm_viridian_domain_context ctxt = {
         .time_ref_count = d->arch.hvm.viridian.time_ref_count.val,
         .hypercall_gpa  = d->arch.hvm.viridian.hypercall_gpa.raw,
@@ -1027,10 +1028,10 @@ static int viridian_load_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_DOMAIN, viridian_save_domain_ctxt, NULL,
+HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_DOMAIN, viridian_save_domain_ctxt,
                           viridian_load_domain_ctxt, 1, HVMSR_PER_DOM);
 
-static int viridian_save_vcpu_ctxt_one(struct vcpu *v, hvm_domain_context_t *h)
+static int viridian_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
 {
     struct hvm_viridian_vcpu_context ctxt = {
         .vp_assist_msr = v->arch.hvm.viridian.vp_assist.msr.raw,
@@ -1041,21 +1042,6 @@ static int viridian_save_vcpu_ctxt_one(struct vcpu *v, hvm_domain_context_t *h)
         return 0;
 
     return hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt);
-}
-
-static int viridian_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
-{
-    struct vcpu *v;
-    int err = 0;
-
-    for_each_vcpu ( d, v )
-    {
-        err = viridian_save_vcpu_ctxt_one(v, h);
-        if ( err )
-            break;
-    }
-
-    return err;
 }
 
 static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
@@ -1088,7 +1074,6 @@ static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 }
 
 HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_VCPU, viridian_save_vcpu_ctxt,
-                          viridian_save_vcpu_ctxt_one,
                           viridian_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
 
 static int __init parse_viridian_version(const char *arg)

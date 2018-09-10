@@ -85,7 +85,6 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
 /* List of handlers for various HVM save and restore types */
 static struct {
     hvm_save_handler save;
-    hvm_save_vcpu_handler save_one;
     hvm_load_handler load;
     const char *name;
     size_t size;
@@ -96,7 +95,6 @@ static struct {
 void __init hvm_register_savevm(uint16_t typecode,
                                 const char *name,
                                 hvm_save_handler save_state,
-                                hvm_save_vcpu_handler save_one,
                                 hvm_load_handler load_state,
                                 size_t size, int kind)
 {
@@ -104,7 +102,6 @@ void __init hvm_register_savevm(uint16_t typecode,
     ASSERT(hvm_sr_handlers[typecode].save == NULL);
     ASSERT(hvm_sr_handlers[typecode].load == NULL);
     hvm_sr_handlers[typecode].save = save_state;
-    hvm_sr_handlers[typecode].save_one = save_one;
     hvm_sr_handlers[typecode].load = load_state;
     hvm_sr_handlers[typecode].name = name;
     hvm_sr_handlers[typecode].size = size;
@@ -141,6 +138,7 @@ int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
     int rv;
     hvm_domain_context_t ctxt = { };
     const struct hvm_save_descriptor *desc;
+    struct vcpu *v;
 
     if ( d->is_dying ||
          typecode > HVM_SAVE_CODE_MAX ||
@@ -148,14 +146,18 @@ int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
          !hvm_sr_handlers[typecode].save )
         return -EINVAL;
 
+    if ( hvm_sr_handlers[typecode].kind != HVMSR_PER_VCPU )
+        v = d->vcpu[0];
+    else if ( instance >= d->max_vcpus || !d->vcpu[instance] )
+        return -ENOENT;
+    else
+        v = d->vcpu[instance];
     ctxt.size = hvm_sr_handlers[typecode].size;
-    if ( hvm_sr_handlers[typecode].kind == HVMSR_PER_VCPU )
-        ctxt.size *= d->max_vcpus;
     ctxt.data = xmalloc_bytes(ctxt.size);
     if ( !ctxt.data )
         return -ENOMEM;
 
-    if ( (rv = hvm_sr_handlers[typecode].save(d, &ctxt)) != 0 )
+    if ( (rv = hvm_sr_handlers[typecode].save(v, &ctxt)) != 0 )
         printk(XENLOG_G_ERR "HVM%d save: failed to save type %"PRIu16" (%d)\n",
                d->domain_id, typecode, rv);
     else if ( rv = -ENOENT, ctxt.cur >= sizeof(*desc) )
@@ -222,10 +224,12 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     /* Save all available kinds of state */
     for ( i = 0; i <= HVM_SAVE_CODE_MAX; i++ )
     {
-        hvm_save_vcpu_handler save_one_handler = hvm_sr_handlers[i].save_one;
         hvm_save_handler handler = hvm_sr_handlers[i].save;
 
-        if ( save_one_handler )
+        if ( !handler )
+            continue;
+
+        if ( hvm_sr_handlers[i].kind == HVMSR_PER_VCPU )
         {
             struct vcpu *v;
 
@@ -233,7 +237,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
             {
                 printk(XENLOG_G_INFO "HVM %pv save: %s\n",
                        v, hvm_sr_handlers[i].name);
-                if ( save_one_handler(v, h) != 0 )
+                if ( handler(v, h) != 0 )
                 {
                     printk(XENLOG_G_ERR
                            "HVM %pv save: failed to save type %"PRIu16"\n",
@@ -242,14 +246,14 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
                 }
             }
         }
-        else if ( handler )
+        else
         {
-            printk(XENLOG_G_INFO "HVM%d save: %s\n",
+            printk(XENLOG_G_INFO "HVM d%d save: %s\n",
                    d->domain_id, hvm_sr_handlers[i].name);
-            if ( handler(d, h) != 0 )
+            if ( handler(d->vcpu[0], h) != 0 )
             {
                 printk(XENLOG_G_ERR
-                       "HVM%d save: failed to save type %"PRIu16"\n",
+                       "HVM d%d save: failed to save type %"PRIu16"\n",
                        d->domain_id, i);
                 return -ENODATA;
             }

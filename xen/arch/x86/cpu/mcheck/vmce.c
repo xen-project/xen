@@ -350,7 +350,7 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
 }
 
 #if CONFIG_HVM
-static int vmce_save_vcpu_ctxt_one(struct vcpu *v, hvm_domain_context_t *h)
+static int vmce_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
 {
     struct hvm_vmce_vcpu ctxt = {
         .caps = v->arch.vmce.mcg_cap,
@@ -360,21 +360,6 @@ static int vmce_save_vcpu_ctxt_one(struct vcpu *v, hvm_domain_context_t *h)
     };
 
     return hvm_save_entry(VMCE_VCPU, v->vcpu_id, h, &ctxt);
-}
-
-static int vmce_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
-{
-    struct vcpu *v;
-    int err = 0;
-
-    for_each_vcpu ( d, v )
-    {
-        err = vmce_save_vcpu_ctxt_one(v, h);
-        if ( err )
-            break;
-    }
-
-    return err;
 }
 
 static int vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
@@ -397,7 +382,6 @@ static int vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 }
 
 HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt,
-                          vmce_save_vcpu_ctxt_one,
                           vmce_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
 #endif
 

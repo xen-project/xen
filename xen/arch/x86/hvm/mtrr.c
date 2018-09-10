@@ -690,7 +690,7 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
     return 0;
 }
 
-static int hvm_save_mtrr_msr_one(struct vcpu *v, hvm_domain_context_t *h)
+static int hvm_save_mtrr_msr(struct vcpu *v, hvm_domain_context_t *h)
 {
     const struct mtrr_state *mtrr_state = &v->arch.hvm.mtrr;
     struct hvm_hw_mtrr hw_mtrr = {
@@ -726,22 +726,6 @@ static int hvm_save_mtrr_msr_one(struct vcpu *v, hvm_domain_context_t *h)
            sizeof(hw_mtrr.msr_mtrr_fixed));
 
     return hvm_save_entry(MTRR, v->vcpu_id, h, &hw_mtrr);
-}
-
-static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
-{
-    struct vcpu *v;
-    int err = 0;
-
-    /* save mtrr&pat */
-    for_each_vcpu(d, v)
-    {
-       err = hvm_save_mtrr_msr_one(v, h);
-       if ( err )
-           break;
-    }
-
-    return err;
 }
 
 static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
@@ -794,8 +778,8 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_save_mtrr_msr_one,
-                          hvm_load_mtrr_msr, 1, HVMSR_PER_VCPU);
+HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr, 1,
+                          HVMSR_PER_VCPU);
 
 void memory_type_changed(struct domain *d)
 {

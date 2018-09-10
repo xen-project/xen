@@ -737,8 +737,9 @@ void rtc_migrate_timers(struct vcpu *v)
 }
 
 /* Save RTC hardware state */
-static int rtc_save(struct domain *d, hvm_domain_context_t *h)
+static int rtc_save(struct vcpu *v, hvm_domain_context_t *h)
 {
+    const struct domain *d = v->domain;
     RTCState *s = domain_vrtc(d);
     int rc;
 
@@ -783,7 +784,7 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(RTC, rtc_save, NULL, rtc_load, 1, HVMSR_PER_DOM);
+HVM_REGISTER_SAVE_RESTORE(RTC, rtc_save, rtc_load, 1, HVMSR_PER_DOM);
 
 void rtc_reset(struct domain *d)
 {
