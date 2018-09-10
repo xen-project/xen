@@ -1399,23 +1399,27 @@ static void lapic_rearm(struct vlapic *s)
     s->timer_last_update = s->pt.last_plt_gtime;
 }
 
+static int lapic_save_hidden_one(struct vcpu *v, hvm_domain_context_t *h)
+{
+    if ( !has_vlapic(v->domain) )
+        return 0;
+
+    return hvm_save_entry(LAPIC, v->vcpu_id, h, &vcpu_vlapic(v)->hw);
+}
+
 static int lapic_save_hidden(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
-    struct vlapic *s;
-    int rc = 0;
-
-    if ( !has_vlapic(d) )
-        return 0;
+    int err = 0;
 
     for_each_vcpu ( d, v )
     {
-        s = vcpu_vlapic(v);
-        if ( (rc = hvm_save_entry(LAPIC, v->vcpu_id, h, &s->hw)) != 0 )
+        err = lapic_save_hidden_one(v, h);
+        if ( err )
             break;
     }
 
-    return rc;
+    return err;
 }
 
 static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
