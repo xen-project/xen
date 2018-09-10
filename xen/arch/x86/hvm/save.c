@@ -195,7 +195,6 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     char *c;
     struct hvm_save_header hdr;
     struct hvm_save_end end;
-    hvm_save_handler handler;
     unsigned int i;
 
     if ( d->is_dying )
@@ -223,8 +222,27 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     /* Save all available kinds of state */
     for ( i = 0; i <= HVM_SAVE_CODE_MAX; i++ )
     {
-        handler = hvm_sr_handlers[i].save;
-        if ( handler != NULL )
+        hvm_save_vcpu_handler save_one_handler = hvm_sr_handlers[i].save_one;
+        hvm_save_handler handler = hvm_sr_handlers[i].save;
+
+        if ( save_one_handler )
+        {
+            struct vcpu *v;
+
+            for_each_vcpu ( d, v )
+            {
+                printk(XENLOG_G_INFO "HVM %pv save: %s\n",
+                       v, hvm_sr_handlers[i].name);
+                if ( save_one_handler(v, h) != 0 )
+                {
+                    printk(XENLOG_G_ERR
+                           "HVM %pv save: failed to save type %"PRIu16"\n",
+                           v, i);
+                    return -ENODATA;
+                }
+            }
+        }
+        else if ( handler )
         {
             printk(XENLOG_G_INFO "HVM%d save: %s\n",
                    d->domain_id, hvm_sr_handlers[i].name);
@@ -233,7 +251,7 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
                 printk(XENLOG_G_ERR
                        "HVM%d save: failed to save type %"PRIu16"\n",
                        d->domain_id, i);
-                return -EFAULT;
+                return -ENODATA;
             }
         }
     }
