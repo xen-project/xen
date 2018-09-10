@@ -794,8 +794,8 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_load_mtrr_msr,
-                          1, HVMSR_PER_VCPU);
+HVM_REGISTER_SAVE_RESTORE(MTRR, hvm_save_mtrr_msr, hvm_save_mtrr_msr_one,
+                          hvm_load_mtrr_msr, 1, HVMSR_PER_VCPU);
 
 void memory_type_changed(struct domain *d)
 {

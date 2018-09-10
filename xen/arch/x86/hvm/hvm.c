@@ -776,6 +776,7 @@ static int hvm_load_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
 }
 
 HVM_REGISTER_SAVE_RESTORE(TSC_ADJUST, hvm_save_tsc_adjust,
+                          hvm_save_tsc_adjust_one,
                           hvm_load_tsc_adjust, 1, HVMSR_PER_VCPU);
 
 static int hvm_save_cpu_ctxt_one(struct vcpu *v, hvm_domain_context_t *h)
@@ -1156,8 +1157,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt,
-                          1, HVMSR_PER_VCPU);
+HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_save_cpu_ctxt_one,
+                          hvm_load_cpu_ctxt, 1, HVMSR_PER_VCPU);
 
 #define HVM_CPU_XSAVE_SIZE(xcr0) (offsetof(struct hvm_hw_cpu_xsave, \
                                            save_area) + \
@@ -1508,6 +1509,7 @@ static int __init hvm_register_CPU_save_and_restore(void)
     hvm_register_savevm(CPU_XSAVE_CODE,
                         "CPU_XSAVE",
                         hvm_save_cpu_xsave_states,
+                        hvm_save_cpu_xsave_states_one,
                         hvm_load_cpu_xsave_states,
                         HVM_CPU_XSAVE_SIZE(xfeature_mask) +
                             sizeof(struct hvm_save_descriptor),
@@ -1520,6 +1522,7 @@ static int __init hvm_register_CPU_save_and_restore(void)
         hvm_register_savevm(CPU_MSR_CODE,
                             "CPU_MSR",
                             hvm_save_cpu_msrs,
+                            hvm_save_cpu_msrs_one,
                             hvm_load_cpu_msrs,
                             HVM_CPU_MSR_SIZE(msr_count_max) +
                                 sizeof(struct hvm_save_descriptor),

@@ -1546,10 +1546,10 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
     return 0;
 }
 
-HVM_REGISTER_SAVE_RESTORE(LAPIC, lapic_save_hidden, lapic_load_hidden,
-                          1, HVMSR_PER_VCPU);
-HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs, lapic_load_regs,
-                          1, HVMSR_PER_VCPU);
+HVM_REGISTER_SAVE_RESTORE(LAPIC, lapic_save_hidden, lapic_save_hidden_one,
+                          lapic_load_hidden, 1, HVMSR_PER_VCPU);
+HVM_REGISTER_SAVE_RESTORE(LAPIC_REGS, lapic_save_regs, lapic_save_regs_one,
+                          lapic_load_regs, 1, HVMSR_PER_VCPU);
 
 int vlapic_init(struct vcpu *v)
 {

@@ -397,6 +397,7 @@ static int vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 }
 
 HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt,
+                          vmce_save_vcpu_ctxt_one,
                           vmce_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
 #endif
 

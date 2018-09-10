@@ -85,6 +85,7 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
 /* List of handlers for various HVM save and restore types */
 static struct {
     hvm_save_handler save;
+    hvm_save_vcpu_handler save_one;
     hvm_load_handler load;
     const char *name;
     size_t size;
@@ -95,6 +96,7 @@ static struct {
 void __init hvm_register_savevm(uint16_t typecode,
                                 const char *name,
                                 hvm_save_handler save_state,
+                                hvm_save_vcpu_handler save_one,
                                 hvm_load_handler load_state,
                                 size_t size, int kind)
 {
@@ -102,6 +104,7 @@ void __init hvm_register_savevm(uint16_t typecode,
     ASSERT(hvm_sr_handlers[typecode].save == NULL);
     ASSERT(hvm_sr_handlers[typecode].load == NULL);
     hvm_sr_handlers[typecode].save = save_state;
+    hvm_sr_handlers[typecode].save_one = save_one;
     hvm_sr_handlers[typecode].load = load_state;
     hvm_sr_handlers[typecode].name = name;
     hvm_sr_handlers[typecode].size = size;
