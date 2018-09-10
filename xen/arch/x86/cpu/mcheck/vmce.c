@@ -350,6 +350,18 @@ int vmce_wrmsr(uint32_t msr, uint64_t val)
 }
 
 #if CONFIG_HVM
+static int vmce_save_vcpu_ctxt_one(struct vcpu *v, hvm_domain_context_t *h)
+{
+    struct hvm_vmce_vcpu ctxt = {
+        .caps = v->arch.vmce.mcg_cap,
+        .mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2,
+        .mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2,
+        .mcg_ext_ctl = v->arch.vmce.mcg_ext_ctl,
+    };
+
+    return hvm_save_entry(VMCE_VCPU, v->vcpu_id, h, &ctxt);
+}
+
 static int vmce_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
@@ -357,14 +369,7 @@ static int vmce_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu ( d, v )
     {
-        struct hvm_vmce_vcpu ctxt = {
-            .caps = v->arch.vmce.mcg_cap,
-            .mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2,
-            .mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2,
-            .mcg_ext_ctl = v->arch.vmce.mcg_ext_ctl,
-        };
-
-        err = hvm_save_entry(VMCE_VCPU, v->vcpu_id, h, &ctxt);
+        err = vmce_save_vcpu_ctxt_one(v, h);
         if ( err )
             break;
     }
