@@ -1163,33 +1163,44 @@ HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt,
                                            save_area) + \
                                   xstate_ctxt_size(xcr0))
 
+static int hvm_save_cpu_xsave_states_one(struct vcpu *v, hvm_domain_context_t *h)
+{
+    struct hvm_hw_cpu_xsave *ctxt;
+    unsigned int size = HVM_CPU_XSAVE_SIZE(v->arch.xcr0_accum);
+    int err;
+
+    if ( !cpu_has_xsave || !xsave_enabled(v) )
+        return 0;   /* do nothing */
+
+    err = _hvm_init_entry(h, CPU_XSAVE_CODE, v->vcpu_id, size);
+    if ( err )
+        return err;
+
+    ctxt = (struct hvm_hw_cpu_xsave *)&h->data[h->cur];
+    h->cur += size;
+    ctxt->xfeature_mask = xfeature_mask;
+    ctxt->xcr0 = v->arch.xcr0;
+    ctxt->xcr0_accum = v->arch.xcr0_accum;
+
+    expand_xsave_states(v, &ctxt->save_area,
+                        size - offsetof(typeof(*ctxt), save_area));
+
+    return 0;
+}
+
 static int hvm_save_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
-    struct hvm_hw_cpu_xsave *ctxt;
-
-    if ( !cpu_has_xsave )
-        return 0;   /* do nothing */
+    int err = 0;
 
     for_each_vcpu ( d, v )
     {
-        unsigned int size = HVM_CPU_XSAVE_SIZE(v->arch.xcr0_accum);
-
-        if ( !xsave_enabled(v) )
-            continue;
-        if ( _hvm_init_entry(h, CPU_XSAVE_CODE, v->vcpu_id, size) )
-            return 1;
-        ctxt = (struct hvm_hw_cpu_xsave *)&h->data[h->cur];
-        h->cur += size;
-
-        ctxt->xfeature_mask = xfeature_mask;
-        ctxt->xcr0 = v->arch.xcr0;
-        ctxt->xcr0_accum = v->arch.xcr0_accum;
-        expand_xsave_states(v, &ctxt->save_area,
-                            size - offsetof(typeof(*ctxt), save_area));
+        err = hvm_save_cpu_xsave_states_one(v, h);
+        if ( err )
+            break;
     }
 
-    return 0;
+    return err;
 }
 
 /*
