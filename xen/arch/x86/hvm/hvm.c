@@ -1339,69 +1339,81 @@ static const uint32_t msrs_to_send[] = {
 };
 static unsigned int __read_mostly msr_count_max = ARRAY_SIZE(msrs_to_send);
 
+static int hvm_save_cpu_msrs_one(struct vcpu *v, hvm_domain_context_t *h)
+{
+    struct hvm_save_descriptor *desc = _p(&h->data[h->cur]);
+    struct hvm_msr *ctxt;
+    unsigned int i;
+    int err;
+
+    err = _hvm_init_entry(h, CPU_MSR_CODE, v->vcpu_id,
+                             HVM_CPU_MSR_SIZE(msr_count_max));
+    if ( err )
+        return err;
+    ctxt = (struct hvm_msr *)&h->data[h->cur];
+    ctxt->count = 0;
+
+    for ( i = 0; i < ARRAY_SIZE(msrs_to_send); ++i )
+    {
+        uint64_t val;
+        int rc = guest_rdmsr(v, msrs_to_send[i], &val);
+
+        /*
+         * It is the programmers responsibility to ensure that
+         * msrs_to_send[] contain generally-read/write MSRs.
+         * X86EMUL_EXCEPTION here implies a missing feature, and that the
+         * guest doesn't have access to the MSR.
+         */
+        if ( rc == X86EMUL_EXCEPTION )
+            continue;
+
+        if ( rc != X86EMUL_OKAY )
+        {
+            ASSERT_UNREACHABLE();
+            return -ENXIO;
+        }
+
+        if ( !val )
+            continue; /* Skip empty MSRs. */
+
+        ctxt->msr[ctxt->count].index = msrs_to_send[i];
+        ctxt->msr[ctxt->count++].val = val;
+    }
+
+    if ( hvm_funcs.save_msr )
+        hvm_funcs.save_msr(v, ctxt);
+
+    ASSERT(ctxt->count <= msr_count_max);
+
+    for ( i = 0; i < ctxt->count; ++i )
+        ctxt->msr[i]._rsvd = 0;
+
+    if ( ctxt->count )
+    {
+        /* Rewrite length to indicate how much space we actually used. */
+        desc->length = HVM_CPU_MSR_SIZE(ctxt->count);
+        h->cur += HVM_CPU_MSR_SIZE(ctxt->count);
+    }
+    else
+        /* or rewind and remove the descriptor from the stream. */
+        h->cur -= sizeof(struct hvm_save_descriptor);
+
+    return 0;
+}
+
 static int hvm_save_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
+    int err = 0;
 
     for_each_vcpu ( d, v )
     {
-        struct hvm_save_descriptor *desc = _p(&h->data[h->cur]);
-        struct hvm_msr *ctxt;
-        unsigned int i;
-
-        if ( _hvm_init_entry(h, CPU_MSR_CODE, v->vcpu_id,
-                             HVM_CPU_MSR_SIZE(msr_count_max)) )
-            return 1;
-        ctxt = (struct hvm_msr *)&h->data[h->cur];
-        ctxt->count = 0;
-
-        for ( i = 0; i < ARRAY_SIZE(msrs_to_send); ++i )
-        {
-            uint64_t val;
-            int rc = guest_rdmsr(v, msrs_to_send[i], &val);
-
-            /*
-             * It is the programmers responsibility to ensure that
-             * msrs_to_send[] contain generally-read/write MSRs.
-             * X86EMUL_EXCEPTION here implies a missing feature, and that the
-             * guest doesn't have access to the MSR.
-             */
-            if ( rc == X86EMUL_EXCEPTION )
-                continue;
-
-            if ( rc != X86EMUL_OKAY )
-            {
-                ASSERT_UNREACHABLE();
-                return -ENXIO;
-            }
-
-            if ( !val )
-                continue; /* Skip empty MSRs. */
-
-            ctxt->msr[ctxt->count].index = msrs_to_send[i];
-            ctxt->msr[ctxt->count++].val = val;
-        }
-
-        if ( hvm_funcs.save_msr )
-            hvm_funcs.save_msr(v, ctxt);
-
-        ASSERT(ctxt->count <= msr_count_max);
-
-        for ( i = 0; i < ctxt->count; ++i )
-            ctxt->msr[i]._rsvd = 0;
-
-        if ( ctxt->count )
-        {
-            /* Rewrite length to indicate how much space we actually used. */
-            desc->length = HVM_CPU_MSR_SIZE(ctxt->count);
-            h->cur += HVM_CPU_MSR_SIZE(ctxt->count);
-        }
-        else
-            /* or rewind and remove the descriptor from the stream. */
-            h->cur -= sizeof(struct hvm_save_descriptor);
+        err = hvm_save_cpu_msrs_one(v, h);
+        if ( err )
+            break;
     }
 
-    return 0;
+    return err;
 }
 
 static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
