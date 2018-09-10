@@ -157,6 +157,11 @@ int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
     if ( !ctxt.data )
         return -ENOMEM;
 
+    if ( hvm_sr_handlers[typecode].kind == HVMSR_PER_VCPU )
+        vcpu_pause(v);
+    else
+        domain_pause(d);
+
     if ( (rv = hvm_sr_handlers[typecode].save(v, &ctxt)) != 0 )
         printk(XENLOG_G_ERR "HVM%d save: failed to save type %"PRIu16" (%d)\n",
                d->domain_id, typecode, rv);
@@ -187,6 +192,11 @@ int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
             }
         }
     }
+
+    if ( hvm_sr_handlers[typecode].kind == HVMSR_PER_VCPU )
+        vcpu_unpause(v);
+    else
+        domain_unpause(d);
 
     xfree(ctxt.data);
     return rv;

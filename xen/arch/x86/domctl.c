@@ -599,12 +599,10 @@ long arch_do_domctl(
              !is_hvm_domain(d) )
             break;
 
-        domain_pause(d);
         ret = hvm_save_one(d, domctl->u.hvmcontext_partial.type,
                            domctl->u.hvmcontext_partial.instance,
                            domctl->u.hvmcontext_partial.buffer,
                            &domctl->u.hvmcontext_partial.bufsz);
-        domain_unpause(d);
 
         if ( !ret )
             copyback = true;
