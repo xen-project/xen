@@ -690,52 +690,58 @@ int hvm_set_mem_pinned_cacheattr(struct domain *d, uint64_t gfn_start,
     return 0;
 }
 
+static int hvm_save_mtrr_msr_one(struct vcpu *v, hvm_domain_context_t *h)
+{
+    const struct mtrr_state *mtrr_state = &v->arch.hvm.mtrr;
+    struct hvm_hw_mtrr hw_mtrr = {
+        .msr_mtrr_def_type = mtrr_state->def_type |
+                             MASK_INSR(mtrr_state->fixed_enabled,
+                                       MTRRdefType_FE) |
+                            MASK_INSR(mtrr_state->enabled, MTRRdefType_E),
+        .msr_mtrr_cap      = mtrr_state->mtrr_cap,
+    };
+    unsigned int i;
+
+    if ( MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT) >
+         (ARRAY_SIZE(hw_mtrr.msr_mtrr_var) / 2) )
+    {
+        dprintk(XENLOG_G_ERR,
+                "HVM save: %pv: too many (%lu) variable range MTRRs\n",
+                v, MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT));
+        return -EINVAL;
+    }
+
+    hvm_get_guest_pat(v, &hw_mtrr.msr_pat_cr);
+
+    for ( i = 0; i < MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT); i++ )
+    {
+        hw_mtrr.msr_mtrr_var[i * 2] = mtrr_state->var_ranges->base;
+        hw_mtrr.msr_mtrr_var[i * 2 + 1] = mtrr_state->var_ranges->mask;
+    }
+
+    BUILD_BUG_ON(sizeof(hw_mtrr.msr_mtrr_fixed) !=
+                 sizeof(mtrr_state->fixed_ranges));
+
+    memcpy(hw_mtrr.msr_mtrr_fixed, mtrr_state->fixed_ranges,
+           sizeof(hw_mtrr.msr_mtrr_fixed));
+
+    return hvm_save_entry(MTRR, v->vcpu_id, h, &hw_mtrr);
+}
+
 static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
+    int err = 0;
 
     /* save mtrr&pat */
     for_each_vcpu(d, v)
     {
-        const struct mtrr_state *mtrr_state = &v->arch.hvm.mtrr;
-        struct hvm_hw_mtrr hw_mtrr = {
-            .msr_mtrr_def_type = mtrr_state->def_type |
-                                 MASK_INSR(mtrr_state->fixed_enabled,
-                                           MTRRdefType_FE) |
-                                 MASK_INSR(mtrr_state->enabled, MTRRdefType_E),
-            .msr_mtrr_cap      = mtrr_state->mtrr_cap,
-        };
-        unsigned int i;
-
-        if ( MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT) >
-             (ARRAY_SIZE(hw_mtrr.msr_mtrr_var) / 2) )
-        {
-            dprintk(XENLOG_G_ERR,
-                    "HVM save: %pv: too many (%lu) variable range MTRRs\n",
-                    v, MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT));
-            return -EINVAL;
-        }
-
-        hvm_get_guest_pat(v, &hw_mtrr.msr_pat_cr);
-
-        for ( i = 0; i < MASK_EXTR(hw_mtrr.msr_mtrr_cap, MTRRcap_VCNT); i++ )
-        {
-            /* save physbase */
-            hw_mtrr.msr_mtrr_var[i*2] =
-                ((uint64_t*)mtrr_state->var_ranges)[i*2];
-            /* save physmask */
-            hw_mtrr.msr_mtrr_var[i*2+1] =
-                ((uint64_t*)mtrr_state->var_ranges)[i*2+1];
-        }
-
-        for ( i = 0; i < NUM_FIXED_MSR; i++ )
-            hw_mtrr.msr_mtrr_fixed[i] =
-                ((uint64_t*)mtrr_state->fixed_ranges)[i];
-
-        if ( hvm_save_entry(MTRR, v->vcpu_id, h, &hw_mtrr) != 0 )
-            return 1;
+       err = hvm_save_mtrr_msr_one(v, h);
+       if ( err )
+           break;
     }
-    return 0;
+
+    return err;
 }
 
 static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
