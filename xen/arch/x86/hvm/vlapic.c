@@ -1422,26 +1422,30 @@ static int lapic_save_hidden(struct domain *d, hvm_domain_context_t *h)
     return err;
 }
 
+static int lapic_save_regs_one(struct vcpu *v, hvm_domain_context_t *h)
+{
+    if ( !has_vlapic(v->domain) )
+        return 0;
+
+    if ( hvm_funcs.sync_pir_to_irr )
+        hvm_funcs.sync_pir_to_irr(v);
+
+    return hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, vcpu_vlapic(v)->regs);
+}
+
 static int lapic_save_regs(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;
-    struct vlapic *s;
-    int rc = 0;
-
-    if ( !has_vlapic(d) )
-        return 0;
+    int err = 0;
 
     for_each_vcpu ( d, v )
     {
-        if ( hvm_funcs.sync_pir_to_irr )
-            hvm_funcs.sync_pir_to_irr(v);
-
-        s = vcpu_vlapic(v);
-        if ( (rc = hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, s->regs)) != 0 )
+        err = lapic_save_regs_one(v, h);
+        if ( err )
             break;
     }
 
-    return rc;
+    return err;
 }
 
 /*
