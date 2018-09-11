@@ -1061,7 +1061,91 @@ static bool known_gla(unsigned long addr, unsigned int bytes, uint32_t pfec)
     else if ( !vio->mmio_access.read_access )
             return false;
 
-    return vio->mmio_gla == (addr & PAGE_MASK);
+    return (vio->mmio_gla == (addr & PAGE_MASK) &&
+            (addr & ~PAGE_MASK) + bytes <= PAGE_SIZE);
+}
+
+static int linear_read(unsigned long addr, unsigned int bytes, void *p_data,
+                       uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt)
+{
+    pagefault_info_t pfinfo;
+    int rc = hvm_copy_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo);
+
+    switch ( rc )
+    {
+        unsigned int offset, part1;
+
+    case HVMTRANS_okay:
+        return X86EMUL_OKAY;
+
+    case HVMTRANS_bad_linear_to_gfn:
+        x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &hvmemul_ctxt->ctxt);
+        return X86EMUL_EXCEPTION;
+
+    case HVMTRANS_bad_gfn_to_mfn:
+        if ( pfec & PFEC_insn_fetch )
+            return X86EMUL_UNHANDLEABLE;
+
+        offset = addr & ~PAGE_MASK;
+        if ( offset + bytes <= PAGE_SIZE )
+            return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec,
+                                            hvmemul_ctxt,
+                                            known_gla(addr, bytes, pfec));
+
+        /* Split the access at the page boundary. */
+        part1 = PAGE_SIZE - offset;
+        rc = linear_read(addr, part1, p_data, pfec, hvmemul_ctxt);
+        if ( rc == X86EMUL_OKAY )
+            rc = linear_read(addr + part1, bytes - part1, p_data + part1,
+                             pfec, hvmemul_ctxt);
+        return rc;
+
+    case HVMTRANS_gfn_paged_out:
+    case HVMTRANS_gfn_shared:
+        return X86EMUL_RETRY;
+    }
+
+    return X86EMUL_UNHANDLEABLE;
+}
+
+static int linear_write(unsigned long addr, unsigned int bytes, void *p_data,
+                        uint32_t pfec, struct hvm_emulate_ctxt *hvmemul_ctxt)
+{
+    pagefault_info_t pfinfo;
+    int rc = hvm_copy_to_guest_linear(addr, p_data, bytes, pfec, &pfinfo);
+
+    switch ( rc )
+    {
+        unsigned int offset, part1;
+
+    case HVMTRANS_okay:
+        return X86EMUL_OKAY;
+
+    case HVMTRANS_bad_linear_to_gfn:
+        x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &hvmemul_ctxt->ctxt);
+        return X86EMUL_EXCEPTION;
+
+    case HVMTRANS_bad_gfn_to_mfn:
+        offset = addr & ~PAGE_MASK;
+        if ( offset + bytes <= PAGE_SIZE )
+            return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec,
+                                             hvmemul_ctxt,
+                                             known_gla(addr, bytes, pfec));
+
+        /* Split the access at the page boundary. */
+        part1 = PAGE_SIZE - offset;
+        rc = linear_write(addr, part1, p_data, pfec, hvmemul_ctxt);
+        if ( rc == X86EMUL_OKAY )
+            rc = linear_write(addr + part1, bytes - part1, p_data + part1,
+                              pfec, hvmemul_ctxt);
+        return rc;
+
+    case HVMTRANS_gfn_paged_out:
+    case HVMTRANS_gfn_shared:
+        return X86EMUL_RETRY;
+    }
+
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static int __hvmemul_read(
@@ -1072,7 +1156,6 @@ static int __hvmemul_read(
     enum hvm_access_type access_type,
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
-    pagefault_info_t pfinfo;
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present;
     int rc;
@@ -1088,31 +1171,8 @@ static int __hvmemul_read(
         seg, offset, bytes, &reps, access_type, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY || !bytes )
         return rc;
-    if ( known_gla(addr, bytes, pfec) )
-        return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec, hvmemul_ctxt, 1);
 
-    rc = hvm_copy_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo);
-
-    switch ( rc )
-    {
-    case HVMTRANS_okay:
-        break;
-    case HVMTRANS_bad_linear_to_gfn:
-        x86_emul_pagefault(pfinfo.ec, pfinfo.linear, &hvmemul_ctxt->ctxt);
-        return X86EMUL_EXCEPTION;
-    case HVMTRANS_bad_gfn_to_mfn:
-        if ( access_type == hvm_access_insn_fetch )
-            return X86EMUL_UNHANDLEABLE;
-
-        return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec, hvmemul_ctxt, 0);
-    case HVMTRANS_gfn_paged_out:
-    case HVMTRANS_gfn_shared:
-        return X86EMUL_RETRY;
-    default:
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    return X86EMUL_OKAY;
+    return linear_read(addr, bytes, p_data, pfec, hvmemul_ctxt);
 }
 
 static int hvmemul_read(
@@ -1192,7 +1252,7 @@ static int hvmemul_write(
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
     int rc;
-    void *mapping;
+    void *mapping = NULL;
 
     if ( is_x86_system_segment(seg) )
         pfec |= PFEC_implicit;
@@ -1204,15 +1264,15 @@ static int hvmemul_write(
     if ( rc != X86EMUL_OKAY || !bytes )
         return rc;
 
-    if ( known_gla(addr, bytes, pfec) )
-        return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec, hvmemul_ctxt, 1);
-
-    mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
-    if ( IS_ERR(mapping) )
-        return ~PTR_ERR(mapping);
+    if ( !known_gla(addr, bytes, pfec) )
+    {
+        mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
+        if ( IS_ERR(mapping) )
+             return ~PTR_ERR(mapping);
+    }
 
     if ( !mapping )
-        return hvmemul_linear_mmio_write(addr, bytes, p_data, pfec, hvmemul_ctxt, 0);
+        return linear_write(addr, bytes, p_data, pfec, hvmemul_ctxt);
 
     memcpy(mapping, p_data, bytes);
 
@@ -1234,7 +1294,7 @@ static int hvmemul_rmw(
     unsigned long addr, reps = 1;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
     int rc;
-    void *mapping;
+    void *mapping = NULL;
 
     rc = hvmemul_virtual_to_linear(
         seg, offset, bytes, &reps, hvm_access_write, hvmemul_ctxt, &addr);
@@ -1246,9 +1306,12 @@ static int hvmemul_rmw(
     else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
         pfec |= PFEC_user_mode;
 
-    mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
-    if ( IS_ERR(mapping) )
-        return ~PTR_ERR(mapping);
+    if ( !known_gla(addr, bytes, pfec) )
+    {
+        mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
+        if ( IS_ERR(mapping) )
+            return ~PTR_ERR(mapping);
+    }
 
     if ( mapping )
     {
@@ -1258,17 +1321,14 @@ static int hvmemul_rmw(
     else
     {
         unsigned long data = 0;
-        bool known_gpfn = known_gla(addr, bytes, pfec);
 
         if ( bytes > sizeof(data) )
             return X86EMUL_UNHANDLEABLE;
-        rc = hvmemul_linear_mmio_read(addr, bytes, &data, pfec, hvmemul_ctxt,
-                                      known_gpfn);
+        rc = linear_read(addr, bytes, &data, pfec, hvmemul_ctxt);
         if ( rc == X86EMUL_OKAY )
             rc = x86_emul_rmw(&data, bytes, eflags, state, ctxt);
         if ( rc == X86EMUL_OKAY )
-            rc = hvmemul_linear_mmio_write(addr, bytes, &data, pfec,
-                                           hvmemul_ctxt, known_gpfn);
+            rc = linear_write(addr, bytes, &data, pfec, hvmemul_ctxt);
     }
 
     return rc;
