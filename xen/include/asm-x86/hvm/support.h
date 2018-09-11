@@ -100,9 +100,6 @@ enum hvm_translation_result hvm_copy_to_guest_linear(
 enum hvm_translation_result hvm_copy_from_guest_linear(
     void *buf, unsigned long addr, int size, uint32_t pfec,
     pagefault_info_t *pfinfo);
-enum hvm_translation_result hvm_fetch_from_guest_linear(
-    void *buf, unsigned long addr, int size, uint32_t pfec,
-    pagefault_info_t *pfinfo);
 
 /*
  * Get a reference on the page under an HVM physical or linear address.  If

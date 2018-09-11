@@ -3286,15 +3286,6 @@ enum hvm_translation_result hvm_copy_from_guest_linear(
                       PFEC_page_present | pfec, pfinfo);
 }
 
-enum hvm_translation_result hvm_fetch_from_guest_linear(
-    void *buf, unsigned long addr, int size, uint32_t pfec,
-    pagefault_info_t *pfinfo)
-{
-    return __hvm_copy(buf, addr, size, current,
-                      HVMCOPY_from_guest | HVMCOPY_linear,
-                      PFEC_page_present | PFEC_insn_fetch | pfec, pfinfo);
-}
-
 unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
@@ -3740,16 +3731,16 @@ void hvm_ud_intercept(struct cpu_user_regs *regs)
     if ( opt_hvm_fep )
     {
         const struct segment_register *cs = &ctxt.seg_reg[x86_seg_cs];
-        uint32_t walk = (ctxt.seg_reg[x86_seg_ss].dpl == 3)
-            ? PFEC_user_mode : 0;
+        uint32_t walk = ((ctxt.seg_reg[x86_seg_ss].dpl == 3)
+                         ? PFEC_user_mode : 0) | PFEC_insn_fetch;
         unsigned long addr;
         char sig[5]; /* ud2; .ascii "xen" */
 
         if ( hvm_virtual_to_linear_addr(x86_seg_cs, cs, regs->rip,
                                         sizeof(sig), hvm_access_insn_fetch,
                                         cs, &addr) &&
-             (hvm_fetch_from_guest_linear(sig, addr, sizeof(sig),
-                                          walk, NULL) == HVMTRANS_okay) &&
+             (hvm_copy_from_guest_linear(sig, addr, sizeof(sig),
+                                         walk, NULL) == HVMTRANS_okay) &&
              (memcmp(sig, "\xf\xbxen", sizeof(sig)) == 0) )
         {
             regs->rip += sizeof(sig);

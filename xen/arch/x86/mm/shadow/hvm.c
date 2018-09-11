@@ -122,10 +122,10 @@ hvm_read(enum x86_segment seg,
     if ( rc || !bytes )
         return rc;
 
-    if ( access_type == hvm_access_insn_fetch )
-        rc = hvm_fetch_from_guest_linear(p_data, addr, bytes, 0, &pfinfo);
-    else
-        rc = hvm_copy_from_guest_linear(p_data, addr, bytes, 0, &pfinfo);
+    rc = hvm_copy_from_guest_linear(p_data, addr, bytes,
+                                    (access_type == hvm_access_insn_fetch
+                                     ? PFEC_insn_fetch : 0),
+                                    &pfinfo);
 
     switch ( rc )
     {

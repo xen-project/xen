@@ -1063,6 +1063,8 @@ static int __hvmemul_read(
         pfec |= PFEC_implicit;
     else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
         pfec |= PFEC_user_mode;
+    if ( access_type == hvm_access_insn_fetch )
+        pfec |= PFEC_insn_fetch;
 
     rc = hvmemul_virtual_to_linear(
         seg, offset, bytes, &reps, access_type, hvmemul_ctxt, &addr);
@@ -1074,9 +1076,7 @@ static int __hvmemul_read(
          (vio->mmio_gla == (addr & PAGE_MASK)) )
         return hvmemul_linear_mmio_read(addr, bytes, p_data, pfec, hvmemul_ctxt, 1);
 
-    rc = ((access_type == hvm_access_insn_fetch) ?
-          hvm_fetch_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo) :
-          hvm_copy_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo));
+    rc = hvm_copy_from_guest_linear(p_data, addr, bytes, pfec, &pfinfo);
 
     switch ( rc )
     {
@@ -2515,9 +2515,10 @@ void hvm_emulate_init_per_insn(
                                         hvm_access_insn_fetch,
                                         &hvmemul_ctxt->seg_reg[x86_seg_cs],
                                         &addr) &&
-             hvm_fetch_from_guest_linear(hvmemul_ctxt->insn_buf, addr,
-                                         sizeof(hvmemul_ctxt->insn_buf),
-                                         pfec, NULL) == HVMTRANS_okay) ?
+             hvm_copy_from_guest_linear(hvmemul_ctxt->insn_buf, addr,
+                                        sizeof(hvmemul_ctxt->insn_buf),
+                                        pfec | PFEC_insn_fetch,
+                                        NULL) == HVMTRANS_okay) ?
             sizeof(hvmemul_ctxt->insn_buf) : 0;
     }
     else
