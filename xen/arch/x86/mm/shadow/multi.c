@@ -3991,9 +3991,8 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     struct domain *d = v->domain;
     mfn_t gmfn;
 #if GUEST_PAGING_LEVELS == 3
-    guest_l3e_t *gl3e;
-    u32 guest_idx=0;
-    int i;
+    const guest_l3e_t *gl3e;
+    unsigned int i, guest_idx;
 #endif
 
     /* Don't do anything on an uninitialised vcpu */
@@ -4059,23 +4058,24 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     else
         v->arch.paging.shadow.guest_vtable = __linear_l4_table;
 #elif GUEST_PAGING_LEVELS == 3
-     /* On PAE guests we don't use a mapping of the guest's own top-level
-      * table.  We cache the current state of that table and shadow that,
-      * until the next CR3 write makes us refresh our cache. */
-     ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
+    /*
+     * On PAE guests we don't use a mapping of the guest's own top-level
+     * table.  We cache the current state of that table and shadow that,
+     * until the next CR3 write makes us refresh our cache.
+     */
+    ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
+    ASSERT(shadow_mode_external(d));
 
-     ASSERT(shadow_mode_external(d));
-     /* Find where in the page the l3 table is */
-     guest_idx = guest_index((void *)v->arch.hvm.guest_cr[3]);
+    /*
+     * Find where in the page the l3 table is, but ignore the low 2 bits of
+     * guest_idx -- they are really just cache control.
+     */
+    guest_idx = guest_index((void *)v->arch.hvm.guest_cr[3]) & ~3;
 
-     // Ignore the low 2 bits of guest_idx -- they are really just
-     // cache control.
-     guest_idx &= ~3;
-
-     gl3e = ((guest_l3e_t *)map_domain_page(gmfn)) + guest_idx;
-     for ( i = 0; i < 4 ; i++ )
-         v->arch.paging.shadow.gl3e[i] = gl3e[i];
-     unmap_domain_page(gl3e);
+    gl3e = ((guest_l3e_t *)map_domain_page(gmfn)) + guest_idx;
+    for ( i = 0; i < 4 ; i++ )
+        v->arch.paging.shadow.gl3e[i] = gl3e[i];
+    unmap_domain_page(gl3e);
 #elif GUEST_PAGING_LEVELS == 2
     ASSERT(shadow_mode_external(d));
     if ( v->arch.paging.shadow.guest_vtable )
@@ -4108,7 +4108,8 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
         gfn_t gl2gfn;
         mfn_t gl2mfn;
         p2m_type_t p2mt;
-        guest_l3e_t *gl3e = (guest_l3e_t*)&v->arch.paging.shadow.gl3e;
+        const guest_l3e_t *gl3e = v->arch.paging.shadow.gl3e;
+
         /* First, make all four entries read-only. */
         for ( i = 0; i < 4; i++ )
         {
