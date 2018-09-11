@@ -486,5 +486,12 @@ AS_IF([test "x$systemd" = "xy"], [
     ])
 ])
 
-AC_OUTPUT()
+AC_ARG_ENABLE([9pfs],
+    AS_HELP_STRING([--enable-9pfs],
+                   [Explicitly enable 9pfs support in QEMU build (default is to defer to QEMU configure default)]),
+    [AS_IF([test "x$enable_9pfs" = "xyes"], [ninepfs=y], [ninepfs=n])],[
+])
 
+AC_SUBST(ninepfs)
+
+AC_OUTPUT()
