@@ -32,6 +32,13 @@
 #define PT_DEV    0xe71 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=0 P=1 */
 #define PT_DEV_L3 0xe73 /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=100 T=1 P=1 */
 
+#define __HEAD_FLAG_PAGE_SIZE   ((PAGE_SHIFT - 10) / 2)
+
+#define __HEAD_FLAG_PHYS_BASE   1
+
+#define __HEAD_FLAGS            ((__HEAD_FLAG_PAGE_SIZE << 1) | \
+                                 (__HEAD_FLAG_PHYS_BASE << 3))
+
 #if (defined (CONFIG_EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
 #include EARLY_PRINTK_INC
 #endif
@@ -120,8 +127,8 @@ efi_head:
         add     x13, x18, #0x16
         b       real_start           /* branch to kernel start */
         .quad   0                    /* Image load offset from start of RAM */
-        .quad   0                    /* reserved */
-        .quad   0                    /* reserved */
+        .quad   _end - start         /* Effective size of kernel image, little-endian */
+        .quad   __HEAD_FLAGS         /* Informative flags, little-endian */
         .quad   0                    /* reserved */
         .quad   0                    /* reserved */
         .quad   0                    /* reserved */
