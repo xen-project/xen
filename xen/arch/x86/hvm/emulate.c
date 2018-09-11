@@ -30,7 +30,7 @@
 static void hvmtrace_io_assist(const ioreq_t *p)
 {
     unsigned int size, event;
-    unsigned char buffer[12];
+    unsigned char buffer[16];
 
     if ( likely(!tb_init_done) )
         return;
@@ -47,8 +47,11 @@ static void hvmtrace_io_assist(const ioreq_t *p)
 
     if ( !p->data_is_ptr )
     {
-        *(uint32_t *)&buffer[size] = p->data;
-        size += 4;
+        if ( size == 4 )
+            *(uint32_t *)&buffer[size] = p->data;
+        else
+            *(uint64_t *)&buffer[size] = p->data;
+        size *= 2;
     }
 
     trace_var(event, 0/*!cycles*/, size, buffer);
