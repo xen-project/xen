@@ -2439,16 +2439,21 @@ bool_t hvm_virtual_to_linear_addr(
      */
     ASSERT(seg < x86_seg_none);
 
-    if ( !(curr->arch.hvm.guest_cr[0] & X86_CR0_PE) ||
-         (guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) )
+    if ( !(curr->arch.hvm.guest_cr[0] & X86_CR0_PE) )
     {
         /*
-         * REAL/VM86 MODE: Don't bother with segment access checks.
+         * REAL MODE: Don't bother with segment access checks.
          * Certain of them are not done in native real mode anyway.
          */
         addr = (uint32_t)(addr + reg->base);
-        last_byte = (uint32_t)addr + bytes - !!bytes;
-        if ( last_byte < addr )
+    }
+    else if ( (guest_cpu_user_regs()->eflags & X86_EFLAGS_VM) &&
+              is_x86_user_segment(seg) )
+    {
+        /* VM86 MODE: Fixed 64k limits on all user segments. */
+        addr = (uint32_t)(addr + reg->base);
+        last_byte = (uint32_t)offset + bytes - !!bytes;
+        if ( max(offset, last_byte) >> 16 )
             goto out;
     }
     else if ( hvm_long_mode_active(curr) &&
@@ -2470,8 +2475,7 @@ bool_t hvm_virtual_to_linear_addr(
             addr += reg->base;
 
         last_byte = addr + bytes - !!bytes;
-        if ( !is_canonical_address(addr) || last_byte < addr ||
-             !is_canonical_address(last_byte) )
+        if ( !is_canonical_address((long)addr < 0 ? addr : last_byte) )
             goto out;
     }
     else
@@ -2521,8 +2525,11 @@ bool_t hvm_virtual_to_linear_addr(
             if ( (offset <= reg->limit) || (last_byte < offset) )
                 goto out;
         }
-        else if ( (last_byte > reg->limit) || (last_byte < offset) )
-            goto out; /* last byte is beyond limit or wraps 0xFFFFFFFF */
+        else if ( last_byte > reg->limit )
+            goto out; /* last byte is beyond limit */
+        else if ( last_byte < offset &&
+                  curr->domain->arch.cpuid->x86_vendor == X86_VENDOR_AMD )
+            goto out; /* access wraps */
     }
 
     /* All checks ok. */
