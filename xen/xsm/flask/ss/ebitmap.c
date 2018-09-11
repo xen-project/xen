@@ -241,7 +241,7 @@ int ebitmap_read(struct ebitmap *e, void *fp)
     if ( mapunit != sizeof(u64) * 8 )
     {
         printk(KERN_ERR "Flask: ebitmap: map size %u does not "
-               "match my size %Zd (high bit was %d)\n", mapunit,
+               "match my size %zd (high bit was %d)\n", mapunit,
                sizeof(u64) * 8, e->highbit);
         goto bad;
     }
