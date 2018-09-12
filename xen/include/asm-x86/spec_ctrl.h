@@ -69,6 +69,8 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
     uint32_t val = 0;
 
     /*
+     * Branch Target Injection:
+     *
      * Latch the new shadow value, then enable shadowing, then update the MSR.
      * There are no SMP issues here; only local processor ordering concerns.
      */
@@ -76,8 +78,9 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
     barrier();
     info->spec_ctrl_flags |= SCF_use_shadow;
     barrier();
-    asm volatile ( ALTERNATIVE("", "wrmsr", X86_FEATURE_SC_MSR_IDLE)
-                   :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0) : "memory" );
+    alternative_input("", "wrmsr", X86_FEATURE_SC_MSR_IDLE,
+                      "a" (val), "c" (MSR_SPEC_CTRL), "d" (0));
+    barrier();
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe before this call. */
@@ -86,13 +89,16 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
     uint32_t val = info->xen_spec_ctrl;
 
     /*
+     * Branch Target Injection:
+     *
      * Disable shadowing before updating the MSR.  There are no SMP issues
      * here; only local processor ordering concerns.
      */
     info->spec_ctrl_flags &= ~SCF_use_shadow;
     barrier();
-    asm volatile ( ALTERNATIVE("", "wrmsr", X86_FEATURE_SC_MSR_IDLE)
-                   :: "a" (val), "c" (MSR_SPEC_CTRL), "d" (0) : "memory" );
+    alternative_input("", "wrmsr", X86_FEATURE_SC_MSR_IDLE,
+                      "a" (val), "c" (MSR_SPEC_CTRL), "d" (0));
+    barrier();
 }
 
 #endif /* __ASSEMBLY__ */
