@@ -285,8 +285,11 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
         }
     }
 
-    return ap2m->set_entry(ap2m, gfn, mfn, PAGE_ORDER_4K, t, a,
-                           current->domain != d);
+    /*
+     * Inherit the old suppress #VE bit value if it is already set, or set it
+     * to 1 otherwise
+     */
+    return ap2m->set_entry(ap2m, gfn, mfn, PAGE_ORDER_4K, t, a, -1);
 }
 
 static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
