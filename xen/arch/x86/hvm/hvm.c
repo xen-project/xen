@@ -4469,6 +4469,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_create_p2m:
     case HVMOP_altp2m_destroy_p2m:
     case HVMOP_altp2m_switch_p2m:
+    case HVMOP_altp2m_set_suppress_ve:
     case HVMOP_altp2m_set_mem_access:
     case HVMOP_altp2m_set_mem_access_multi:
     case HVMOP_altp2m_change_gfn:
@@ -4584,6 +4585,19 @@ static int do_altp2m_op(
 
     case HVMOP_altp2m_switch_p2m:
         rc = p2m_switch_domain_altp2m_by_id(d, a.u.view.view);
+        break;
+
+    case HVMOP_altp2m_set_suppress_ve:
+        if ( a.u.suppress_ve.pad1 || a.u.suppress_ve.pad2 )
+            rc = -EINVAL;
+        else
+        {
+            gfn_t gfn = _gfn(a.u.set_mem_access.gfn);
+            unsigned int altp2m_idx = a.u.set_mem_access.view;
+            bool suppress_ve = a.u.suppress_ve.suppress_ve;
+
+            rc = p2m_set_suppress_ve(d, gfn, suppress_ve, altp2m_idx);
+        }
         break;
 
     case HVMOP_altp2m_set_mem_access:

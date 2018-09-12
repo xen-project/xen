@@ -38,6 +38,14 @@ struct xen_hvm_param {
 typedef struct xen_hvm_param xen_hvm_param_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_param_t);
 
+struct xen_hvm_altp2m_suppress_ve {
+    uint16_t view;
+    uint8_t suppress_ve; /* Boolean type. */
+    uint8_t pad1;
+    uint32_t pad2;
+    uint64_t gfn;
+};
+
 #if __XEN_INTERFACE_VERSION__ < 0x00040900
 
 /* Set the logical level of one of a domain's PCI INTx wires. */
@@ -296,6 +304,8 @@ struct xen_hvm_altp2m_op {
 #define HVMOP_altp2m_change_gfn           8
 /* Set access for an array of pages */
 #define HVMOP_altp2m_set_mem_access_multi 9
+/* Set the "Suppress #VE" bit on a page */
+#define HVMOP_altp2m_set_suppress_ve      10
     domid_t domain;
     uint16_t pad1;
     uint32_t pad2;
@@ -306,6 +316,7 @@ struct xen_hvm_altp2m_op {
         struct xen_hvm_altp2m_set_mem_access       set_mem_access;
         struct xen_hvm_altp2m_change_gfn           change_gfn;
         struct xen_hvm_altp2m_set_mem_access_multi set_mem_access_multi;
+        struct xen_hvm_altp2m_suppress_ve          suppress_ve;
         uint8_t pad[64];
     } u;
 };
