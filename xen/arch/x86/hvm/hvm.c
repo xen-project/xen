@@ -4470,6 +4470,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_destroy_p2m:
     case HVMOP_altp2m_switch_p2m:
     case HVMOP_altp2m_set_suppress_ve:
+    case HVMOP_altp2m_get_suppress_ve:
     case HVMOP_altp2m_set_mem_access:
     case HVMOP_altp2m_set_mem_access_multi:
     case HVMOP_altp2m_change_gfn:
@@ -4597,6 +4598,24 @@ static int do_altp2m_op(
             bool suppress_ve = a.u.suppress_ve.suppress_ve;
 
             rc = p2m_set_suppress_ve(d, gfn, suppress_ve, altp2m_idx);
+        }
+        break;
+
+    case HVMOP_altp2m_get_suppress_ve:
+        if ( a.u.suppress_ve.pad1 || a.u.suppress_ve.pad2 )
+            rc = -EINVAL;
+        else
+        {
+            gfn_t gfn = _gfn(a.u.suppress_ve.gfn);
+            unsigned int altp2m_idx = a.u.suppress_ve.view;
+            bool suppress_ve;
+
+            rc = p2m_get_suppress_ve(d, gfn, &suppress_ve, altp2m_idx);
+            if ( !rc )
+            {
+                a.u.suppress_ve.suppress_ve = suppress_ve;
+                rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+            }
         }
         break;
 

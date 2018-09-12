@@ -306,6 +306,8 @@ struct xen_hvm_altp2m_op {
 #define HVMOP_altp2m_set_mem_access_multi 9
 /* Set the "Suppress #VE" bit on a page */
 #define HVMOP_altp2m_set_suppress_ve      10
+/* Get the "Suppress #VE" bit of a page */
+#define HVMOP_altp2m_get_suppress_ve      11
     domid_t domain;
     uint16_t pad1;
     uint32_t pad2;
