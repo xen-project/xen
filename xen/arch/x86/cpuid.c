@@ -27,7 +27,12 @@ static int __init parse_xen_cpuid(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
+        if ( (val = parse_boolean("md-clear", s, ss)) >= 0 )
+        {
+            if ( !val )
+                setup_clear_cpu_cap(X86_FEATURE_MD_CLEAR);
+        }
+        else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
         {
             if ( !val )
                 setup_clear_cpu_cap(X86_FEATURE_IBPB);

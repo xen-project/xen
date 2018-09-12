@@ -149,8 +149,9 @@ static const char *str_e8b[32] =
 
 static const char *str_7d0[32] =
 {
-    [0 ... 11] = "REZ",
+    [0 ... 9] = "REZ",
 
+    [10] = "md-clear",      [11] = "REZ",
     [12] = "REZ",           [13] = "tsx-force-abort",
 
     [14 ... 25] = "REZ",

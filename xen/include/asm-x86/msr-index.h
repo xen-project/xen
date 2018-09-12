@@ -50,6 +50,7 @@
 #define ARCH_CAPS_RSBA			(_AC(1, ULL) << 2)
 #define ARCH_CAPS_SKIP_L1DFL		(_AC(1, ULL) << 3)
 #define ARCH_CAPS_SSB_NO		(_AC(1, ULL) << 4)
+#define ARCH_CAPS_MDS_NO		(_AC(1, ULL) << 5)
 
 #define MSR_FLUSH_CMD			0x0000010b
 #define FLUSH_CMD_L1D			(_AC(1, ULL) << 0)

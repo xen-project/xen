@@ -442,7 +442,7 @@ accounting for hardware capabilities as enumerated via CPUID.
 
 Currently accepted:
 
-The Speculation Control hardware features `ibrsb`, `stibp`, `ibpb`,
+The Speculation Control hardware features `md-clear`, `ibrsb`, `stibp`, `ibpb`,
 `l1d-flush` and `ssbd` are used by default if available and applicable.  They can
 be ignored, e.g. `no-ibrsb`, at which point Xen won't use them itself, and
 won't offer them to guests.
