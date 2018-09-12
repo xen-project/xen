@@ -201,6 +201,68 @@ static int __init parse_spec_ctrl(char *s)
 }
 custom_param("spec-ctrl", parse_spec_ctrl);
 
+int8_t __read_mostly opt_xpti = -1;
+
+static __init void xpti_init_default(uint64_t caps)
+{
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        caps = ARCH_CAPABILITIES_RDCL_NO;
+
+    if ( caps & ARCH_CAPABILITIES_RDCL_NO )
+        opt_xpti = 0;
+    else
+        opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+}
+
+static __init int parse_xpti(char *s)
+{
+    char *ss;
+    int val, rc = 0;
+
+    /* Inhibit the defaults as an explicit choice has been given. */
+    if ( opt_xpti == -1 )
+        opt_xpti = 0;
+
+    /* Interpret 'xpti' alone in its positive boolean form. */
+    if ( *s == '\0' )
+        opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        switch ( parse_bool(s) )
+        {
+        case 0:
+            opt_xpti = 0;
+            break;
+
+        case 1:
+            opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+            break;
+
+        default:
+            if ( !strcmp(s, "default") )
+                opt_xpti = -1;
+            else if ( (val = parse_boolean("dom0", s, ss)) >= 0 )
+                opt_xpti = (opt_xpti & ~OPT_XPTI_DOM0) |
+                           (val ? OPT_XPTI_DOM0 : 0);
+            else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
+                opt_xpti = (opt_xpti & ~OPT_XPTI_DOMU) |
+                           (val ? OPT_XPTI_DOMU : 0);
+            else
+                rc = -EINVAL;
+            break;
+        }
+
+        s = ss + 1;
+    } while ( ss );
+
+    return rc;
+}
+custom_param("xpti", parse_xpti);
+
 int8_t __read_mostly opt_pv_l1tf = -1;
 
 static __init int parse_pv_l1tf(char *s)
@@ -638,68 +700,6 @@ static __init void l1tf_calculations(uint64_t caps)
                                             ? (1ul << paddr_bits)
                                             : (3ul << (paddr_bits - 2))));
 }
-
-int8_t __read_mostly opt_xpti = -1;
-
-static __init void xpti_init_default(uint64_t caps)
-{
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        caps = ARCH_CAPABILITIES_RDCL_NO;
-
-    if ( caps & ARCH_CAPABILITIES_RDCL_NO )
-        opt_xpti = 0;
-    else
-        opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
-}
-
-static __init int parse_xpti(char *s)
-{
-    char *ss;
-    int val, rc = 0;
-
-    /* Inhibit the defaults as an explicit choice has been given. */
-    if ( opt_xpti == -1 )
-        opt_xpti = 0;
-
-    /* Interpret 'xpti' alone in its positive boolean form. */
-    if ( *s == '\0' )
-        opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
-
-    do {
-        ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
-
-        switch ( parse_bool(s) )
-        {
-        case 0:
-            opt_xpti = 0;
-            break;
-
-        case 1:
-            opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
-            break;
-
-        default:
-            if ( !strcmp(s, "default") )
-                opt_xpti = -1;
-            else if ( (val = parse_boolean("dom0", s, ss)) >= 0 )
-                opt_xpti = (opt_xpti & ~OPT_XPTI_DOM0) |
-                           (val ? OPT_XPTI_DOM0 : 0);
-            else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
-                opt_xpti = (opt_xpti & ~OPT_XPTI_DOMU) |
-                           (val ? OPT_XPTI_DOMU : 0);
-            else
-                rc = -EINVAL;
-            break;
-        }
-
-        s = ss + 1;
-    } while ( ss );
-
-    return rc;
-}
-custom_param("xpti", parse_xpti);
 
 void __init init_speculation_mitigations(void)
 {
