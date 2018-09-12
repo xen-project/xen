@@ -378,8 +378,8 @@ static void dump_numa(unsigned char key)
     unsigned int page_num_node[MAX_NUMNODES];
     const struct vnuma_info *vnuma;
 
-    printk("'%c' pressed -> dumping numa info (now-0x%X:%08X)\n", key,
-           (u32)(now>>32), (u32)now);
+    printk("'%c' pressed -> dumping numa info (now = %"PRI_stime")\n", key,
+           now);
 
     for_each_online_node ( i )
     {

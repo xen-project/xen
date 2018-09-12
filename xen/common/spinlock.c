@@ -359,9 +359,8 @@ void spinlock_profile_printall(unsigned char key)
     s_time_t diff;
 
     diff = now - lock_profile_start;
-    printk("Xen lock profile info SHOW  (now = %08X:%08X, "
-        "total = %08X:%08X)\n", (u32)(now>>32), (u32)now,
-        (u32)(diff>>32), (u32)diff);
+    printk("Xen lock profile info SHOW  (now = %"PRI_stime" total = "
+           "%"PRI_stime")\n", now, diff);
     spinlock_profile_iterate(spinlock_profile_print_elem, NULL);
 }
 
@@ -379,8 +378,7 @@ void spinlock_profile_reset(unsigned char key)
     s_time_t now = NOW();
 
     if ( key != '\0' )
-        printk("Xen lock profile info RESET (now = %08X:%08X)\n",
-            (u32)(now>>32), (u32)now);
+        printk("Xen lock profile info RESET (now = %"PRI_stime")\n", now);
     lock_profile_start = now;
     spinlock_profile_iterate(spinlock_profile_reset_elem, NULL);
 }

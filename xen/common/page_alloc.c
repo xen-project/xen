@@ -2420,8 +2420,8 @@ static void dump_heap(unsigned char key)
     s_time_t      now = NOW();
     int           i, j;
 
-    printk("'%c' pressed -> dumping heap info (now-0x%X:%08X)\n", key,
-           (u32)(now>>32), (u32)now);
+    printk("'%c' pressed -> dumping heap info (now = %"PRI_stime")\n", key,
+           now);
 
     for ( i = 0; i < MAX_NUMNODES; i++ )
     {
