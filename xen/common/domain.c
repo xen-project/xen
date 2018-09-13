@@ -315,7 +315,14 @@ struct domain *domain_create(domid_t domid,
 
     /* Sort out our idea of is_{pv,hvm}_domain(). */
     if ( config && (config->flags & XEN_DOMCTL_CDF_hvm_guest) )
+    {
+#ifdef CONFIG_HVM
         d->guest_type = guest_type_hvm;
+#else
+        err = -EINVAL;
+        goto fail;
+#endif
+    }
     else
         d->guest_type = guest_type_pv;
 
