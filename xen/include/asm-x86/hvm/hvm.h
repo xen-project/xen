@@ -340,6 +340,9 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg);
 unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
 
+
+#ifdef CONFIG_HVM
+
 #define hvm_get_guest_tsc(v) hvm_get_guest_tsc_fixed(v, 0)
 
 #define hvm_tsc_scaling_supported \
@@ -674,6 +677,107 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
     if ( is_hvm_domain(d_) && d_->arch.hvm.pi_ops.vcpu_block )  \
         d_->arch.hvm.pi_ops.vcpu_block(v_);                     \
 })
+
+#else  /* CONFIG_HVM */
+
+#define hvm_enabled false
+
+/*
+ * List of inline functions above, of which only declarations are
+ * needed because DCE will kick in.
+ */
+int hvm_guest_x86_mode(struct vcpu *v);
+unsigned long hvm_get_shadow_gs_base(struct vcpu *v);
+void hvm_set_info_guest(struct vcpu *v);
+void hvm_cpuid_policy_changed(struct vcpu *v);
+void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset, uint64_t at_tsc);
+
+/* End of prototype list */
+
+/* Called by code in other header  */
+static inline bool hvm_is_singlestep_supported(void)
+{
+    return false;
+}
+
+static inline bool hvm_hap_supported(void)
+{
+    return false;
+}
+
+static inline bool nhvm_vmcx_hap_enabled(const struct vcpu *v)
+{
+    ASSERT_UNREACHABLE();
+    return false;
+}
+
+
+/* Called by common code */
+static inline int hvm_cpu_up(void)
+{
+    return 0;
+}
+
+static inline void hvm_cpu_down(void) {}
+
+static inline void hvm_flush_guest_tlbs(void) {}
+
+static inline void hvm_invlpg(const struct vcpu *v, unsigned long linear)
+{
+    ASSERT_UNREACHABLE();
+}
+
+/*
+ * Shadow code needs further cleanup to eliminate some HVM-only paths. For
+ * now provide the stubs here but assert they will never be reached.
+ */
+static inline void hvm_update_host_cr3(const struct vcpu *v)
+{
+    ASSERT_UNREACHABLE();
+}
+
+static inline void hvm_update_guest_cr3(const struct vcpu *v, bool noflush)
+{
+    ASSERT_UNREACHABLE();
+}
+
+static inline unsigned int hvm_get_cpl(const struct vcpu *v)
+{
+    ASSERT_UNREACHABLE();
+    return -1;
+}
+
+static inline bool hvm_event_pending(const struct vcpu *v)
+{
+    return false;
+}
+
+static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
+{
+    ASSERT_UNREACHABLE();
+}
+
+#define is_viridian_domain(d) ((void)(d), false)
+#define has_viridian_time_ref_count(d) ((void)(d), false)
+#define hvm_long_mode_active(v) ((void)(v), false)
+#define hvm_get_guest_time(v) ((void)(v), 0)
+
+#define hvm_tsc_scaling_supported false
+#define hap_has_1gb false
+#define hap_has_2mb false
+
+#define hvm_paging_enabled(v) ((void)(v), false)
+#define hvm_wp_enabled(v) ((void)(v), false)
+#define hvm_pcid_enabled(v) ((void)(v), false)
+#define hvm_pae_enabled(v) ((void)(v), false)
+#define hvm_smep_enabled(v) ((void)(v), false)
+#define hvm_smap_enabled(v) ((void)(v), false)
+#define hvm_nx_enabled(v) ((void)(v), false)
+#define hvm_pku_enabled(v) ((void)(v), false)
+
+#define arch_vcpu_block(v) ((void)(v))
+
+#endif  /* CONFIG_HVM */
 
 #endif /* __ASM_X86_HVM_HVM_H__ */
 
