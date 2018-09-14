@@ -1198,20 +1198,25 @@ struct hvm_ioreq_server *hvm_select_ioreq_server(struct domain *d,
 
         switch ( type )
         {
-            unsigned long end;
+            unsigned long start, end;
 
         case HVMOP_IO_RANGE_PORT:
-            end = addr + p->size - 1;
-            if ( rangeset_contains_range(r, addr, end) )
+            start = addr;
+            end = start + p->size - 1;
+            if ( rangeset_contains_range(r, start, end) )
                 return s;
 
             break;
+
         case HVMOP_IO_RANGE_MEMORY:
-            end = addr + (p->size * p->count) - 1;
-            if ( rangeset_contains_range(r, addr, end) )
+            start = hvm_mmio_first_byte(p);
+            end = hvm_mmio_last_byte(p);
+
+            if ( rangeset_contains_range(r, start, end) )
                 return s;
 
             break;
+
         case HVMOP_IO_RANGE_PCI:
             if ( rangeset_contains_singleton(r, addr >> 32) )
             {
