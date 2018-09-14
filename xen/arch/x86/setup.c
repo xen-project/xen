@@ -912,7 +912,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /* Sanitise the raw E820 map to produce a final clean version. */
     max_page = raw_max_page = init_e820(memmap_type, &e820_raw);
 
-    if ( !efi_enabled(EFI_BOOT) )
+    if ( !efi_enabled(EFI_BOOT) && e820_raw.nr_map >= 1 )
     {
         /*
          * Supplement the heuristics in l1tf_calculations() by assuming that
