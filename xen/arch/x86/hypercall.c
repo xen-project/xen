@@ -19,6 +19,7 @@
 
 #include <xen/compiler.h>
 #include <xen/hypercall.h>
+#include <xen/nospec.h>
 #include <xen/trace.h>
 
 #define ARGS(x, n)                              \
@@ -151,8 +152,15 @@ void pv_hypercall(struct cpu_user_regs *regs)
     BUILD_BUG_ON(ARRAY_SIZE(pv_hypercall_table) >
                  ARRAY_SIZE(hypercall_args_table));
 
-    if ( (eax >= ARRAY_SIZE(pv_hypercall_table)) ||
-         !pv_hypercall_table[eax].native )
+    if ( eax >= ARRAY_SIZE(pv_hypercall_table) )
+    {
+        regs->eax = -ENOSYS;
+        return;
+    }
+
+    eax = array_index_nospec(eax, ARRAY_SIZE(pv_hypercall_table));
+
+    if ( !pv_hypercall_table[eax].native )
     {
         regs->eax = -ENOSYS;
         return;
