@@ -23,6 +23,7 @@
 
 #include <xen/guest_access.h> /* copy_from_guest() */
 #include <xen/mem_access.h>
+#include <xen/nospec.h>
 #include <xen/vm_event.h>
 #include <xen/event.h>
 #include <public/vm_event.h>
@@ -325,6 +326,7 @@ static bool xenmem_access_to_p2m_access(struct p2m_domain *p2m,
     switch ( xaccess )
     {
     case 0 ... ARRAY_SIZE(memaccess) - 1:
+        xaccess = array_index_nospec(xaccess, ARRAY_SIZE(memaccess));
         *paccess = memaccess[xaccess];
         break;
     case XENMEM_access_default:

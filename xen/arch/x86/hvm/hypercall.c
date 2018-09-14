@@ -20,6 +20,7 @@
  */
 #include <xen/lib.h>
 #include <xen/hypercall.h>
+#include <xen/nospec.h>
 
 #include <asm/hvm/support.h>
 
@@ -176,8 +177,15 @@ int hvm_hypercall(struct cpu_user_regs *regs)
     BUILD_BUG_ON(ARRAY_SIZE(hvm_hypercall_table) >
                  ARRAY_SIZE(hypercall_args_table));
 
-    if ( (eax >= ARRAY_SIZE(hvm_hypercall_table)) ||
-         !hvm_hypercall_table[eax].native )
+    if ( eax >= ARRAY_SIZE(hvm_hypercall_table) )
+    {
+        regs->rax = -ENOSYS;
+        return HVM_HCALL_completed;
+    }
+
+    eax = array_index_nospec(eax, ARRAY_SIZE(hvm_hypercall_table));
+
+    if ( !hvm_hypercall_table[eax].native )
     {
         regs->rax = -ENOSYS;
         return HVM_HCALL_completed;
