@@ -3534,6 +3534,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             {
                 gdprintk(XENLOG_ERR, "EPTP not found in alternate p2m list\n");
                 domain_crash(v->domain);
+
+                return;
             }
         }
 
