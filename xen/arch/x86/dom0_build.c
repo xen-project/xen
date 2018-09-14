@@ -588,14 +588,6 @@ int __init construct_dom0(struct domain *d, const module_t *image,
 
     process_pending_softirqs();
 
-#ifdef CONFIG_SHADOW_PAGING
-    if ( opt_dom0_shadow && !dom0_pvh )
-    {
-        opt_dom0_shadow = false;
-        printk(XENLOG_WARNING "Shadow Dom0 requires PVH. Option ignored.\n");
-    }
-#endif
-
     if ( is_hvm_domain(d) )
         rc = dom0_construct_pvh(d, image, image_headroom, initrd, cmdline);
     else if ( is_pv_domain(d) )

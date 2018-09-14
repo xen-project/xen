@@ -906,6 +906,15 @@ int __init dom0_construct_pv(struct domain *d,
     if ( d->domain_id == hardware_domid )
         iommu_hwdom_init(d);
 
+    /* Activate shadow mode, if requested.  Reuse the pv_l1tf tasklet. */
+#ifdef CONFIG_SHADOW_PAGING
+    if ( opt_dom0_shadow )
+    {
+        printk("Switching dom0 to using shadow paging\n");
+        tasklet_schedule(&d->arch.paging.shadow.pv_l1tf_tasklet);
+    }
+#endif
+
     v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);
 

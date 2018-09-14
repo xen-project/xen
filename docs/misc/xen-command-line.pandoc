@@ -675,12 +675,16 @@ Controls for how dom0 is constructed on x86 systems.
         selected mode.
     *   For a PVH dom0, the hardware must have VT-x/SVM extensions available.
 
-*   The `shadow` boolean is only applicable when dom0 is constructed as a PVH
-    guest, and controls whether dom0 uses hardware assisted paging, or shadow
-    paging.  The default is HAP when available, and shadow otherwise.
+*   The `shadow` boolean allows dom0 to be explicitly constructed using shadow
+    paging.  This option is unavailable when `CONFIG_SHADOW_PAGING` is
+    disabled.
 
-    This option is unavailable when `CONFIG_SHADOW_PAGING` is disabled.  Such
-    builds of Xen require HAP-capable hardware to use a PVH dom0.
+    For PVH, dom0 defaults to using HAP on capable hardware, and falls back to
+    shadow paging otherwise.  A PVH dom0 cannot be used if Xen is compiled
+    without shadow paging support, and the hardware lacks HAP support.
+
+    For PV, the use of dom0 shadow mode is only for development purposes.  PV
+    guests do no require any paging support by default.
 
 *   The `verbose` boolean is intended for diagnostics, and prints out extra
     information during the dom0 build.  It defaults to false.
