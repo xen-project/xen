@@ -588,55 +588,36 @@ static uint32_t vlapic_read_aligned(struct vlapic *vlapic, unsigned int offset)
     return 0;
 }
 
-static int vlapic_read(
-    struct vcpu *v, unsigned long address,
-    unsigned int len, unsigned long *pval)
+static int vlapic_mmio_read(struct vcpu *v, unsigned long address,
+                            unsigned int len, unsigned long *pval)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic_base_address(vlapic);
-    unsigned int alignment = offset & 3, tmp, result = 0;
+    unsigned int alignment = offset & 0xf, result = 0;
 
-    if ( offset > (APIC_TDCR + 0x3) )
-        goto out;
-
-    tmp = vlapic_read_aligned(vlapic, offset & ~3);
-
-    switch ( len )
+    /*
+     * APIC registers are 32-bit values, aligned on 128-bit boundaries, and
+     * should be accessed with 32-bit wide loads.
+     *
+     * Some processors support smaller accesses, so we allow any access which
+     * fully fits within the 32-bit register.
+     */
+    if ( (alignment + len) <= 4 && offset <= (APIC_TDCR + 3) )
     {
-    case 1:
-        result = *((unsigned char *)&tmp + alignment);
-        break;
+        uint32_t reg = vlapic_read_aligned(vlapic, offset & ~0xf);
 
-    case 2:
-        if ( alignment == 3 )
-            goto unaligned_exit_and_crash;
-        result = *(unsigned short *)((unsigned char *)&tmp + alignment);
-        break;
+        switch ( len )
+        {
+        case 1: result = (uint8_t) (reg >> (alignment * 8)); break;
+        case 2: result = (uint16_t)(reg >> (alignment * 8)); break;
+        case 4: result = reg;                                break;
+        }
 
-    case 4:
-        if ( alignment != 0 )
-            goto unaligned_exit_and_crash;
-        result = *(unsigned int *)((unsigned char *)&tmp + alignment);
-        break;
-
-    default:
-        gdprintk(XENLOG_ERR, "Local APIC read with len=%#x, "
-                 "should be 4 instead.\n", len);
-        goto exit_and_crash;
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset %#x with length %#x, "
+                    "and the result is %#x", offset, len, result);
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset %#x with length %#x, "
-                "and the result is %#x", offset, len, result);
-
- out:
     *pval = result;
-    return X86EMUL_OKAY;
-
- unaligned_exit_and_crash:
-    gdprintk(XENLOG_ERR, "Unaligned LAPIC read len=%#x at offset=%#x.\n",
-             len, offset);
- exit_and_crash:
-    domain_crash(v->domain);
     return X86EMUL_OKAY;
 }
 
@@ -880,12 +861,14 @@ static void vlapic_reg_write(struct vcpu *v,
     }
 }
 
-static int vlapic_write(struct vcpu *v, unsigned long address,
-                        unsigned int len, unsigned long val)
+static int vlapic_mmio_write(struct vcpu *v, unsigned long address,
+                             unsigned int len, unsigned long val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     unsigned int offset = address - vlapic_base_address(vlapic);
-    int rc = X86EMUL_OKAY;
+    unsigned int alignment = offset & 0xf;
+
+    offset &= ~0xf;
 
     if ( offset != APIC_EOI )
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
@@ -893,49 +876,38 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
                     offset, len, val);
 
     /*
-     * According to the IA32 Manual, all accesses should be 32 bits.
-     * Some OSes do 8- or 16-byte accesses, however.
+     * APIC registers are 32-bit values, aligned on 128-bit boundaries, and
+     * should be accessed with 32-bit wide stores.
+     *
+     * Some processors support smaller accesses, so we allow any access which
+     * fully fits within the 32-bit register.
      */
-    if ( unlikely(len != 4) )
+    if ( (alignment + len) <= 4 && offset <= APIC_TDCR )
     {
-        unsigned int tmp = vlapic_read_aligned(vlapic, offset & ~3);
-        unsigned char alignment = (offset & 3) * 8;
-
-        switch ( len )
+        if ( unlikely(len < 4) )
         {
-        case 1:
-            val = ((tmp & ~(0xffU << alignment)) |
-                   ((val & 0xff) << alignment));
-            break;
+            uint32_t reg = vlapic_read_aligned(vlapic, offset);
 
-        case 2:
-            if ( alignment & 1 )
-                goto unaligned_exit_and_crash;
-            val = ((tmp & ~(0xffffU << alignment)) |
-                   ((val & 0xffff) << alignment));
-            break;
+            alignment *= 8;
 
-        default:
-            gprintk(XENLOG_ERR, "LAPIC write with len %u\n", len);
-            goto exit_and_crash;
+            switch ( len )
+            {
+            case 1:
+                val = ((reg & ~(0xffU << alignment)) |
+                       ((val &  0xff) << alignment));
+                break;
+
+            case 2:
+                val = ((reg & ~(0xffffU << alignment)) |
+                       ((val &  0xffff) << alignment));
+                break;
+            }
         }
 
-        gdprintk(XENLOG_INFO, "Notice: LAPIC write with len %u\n", len);
-        offset &= ~3;
+        vlapic_reg_write(v, offset, val);
     }
-    else if ( unlikely(offset & 3) )
-        goto unaligned_exit_and_crash;
-
-    vlapic_reg_write(v, offset, val);
 
     return X86EMUL_OKAY;
-
- unaligned_exit_and_crash:
-    gprintk(XENLOG_ERR, "Unaligned LAPIC write: len=%u offset=%#x.\n",
-            len, offset);
- exit_and_crash:
-    domain_crash(v->domain);
-    return rc;
 }
 
 int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
@@ -1049,8 +1021,8 @@ static int vlapic_range(struct vcpu *v, unsigned long addr)
 
 static const struct hvm_mmio_ops vlapic_mmio_ops = {
     .check = vlapic_range,
-    .read = vlapic_read,
-    .write = vlapic_write
+    .read = vlapic_mmio_read,
+    .write = vlapic_mmio_write,
 };
 
 static void set_x2apic_id(struct vlapic *vlapic)
