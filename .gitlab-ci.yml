@@ -11,6 +11,11 @@ stages:
       - xen/.config
       - '*.log'
     when: always
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
 
 .gcc-tmpl:
   variabes: &gcc
