@@ -863,15 +863,14 @@ out:
 }
 
 static void
-p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, int count)
+p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, unsigned int count)
 {
     mfn_t mfns[count];
     p2m_type_t types[count];
     unsigned long *map[count];
     struct domain *d = p2m->domain;
+    unsigned int i, j, max_ref = 1;
 
-    int i, j;
-    int max_ref = 1;
 
     /* Allow an extra refcount for one shadow pt mapping in shadowed domains */
     if ( paging_mode_shadow(d) )
@@ -911,14 +910,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, const gfn_t *gfns, int count)
         /* Quick zero-check */
         for ( j = 0; j < 16; j++ )
             if ( *(map[i] + j) != 0 )
-                break;
-
-        if ( j < 16 )
-        {
-            unmap_domain_page(map[i]);
-            map[i] = NULL;
-            continue;
-        }
+                goto skip;
 
         /* Try to remove the page, restoring old mapping if it fails. */
         if ( p2m_set_entry(p2m, gfns[i], INVALID_MFN, PAGE_ORDER_4K,
