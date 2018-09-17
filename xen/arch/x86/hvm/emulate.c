@@ -1859,7 +1859,7 @@ static int hvmemul_rep_stos(
     switch ( p2mt )
     {
         unsigned long bytes;
-        void *buf;
+        char *buf;
 
     default:
         /* Allocate temporary buffer. */
@@ -1882,10 +1882,10 @@ static int hvmemul_rep_stos(
 #define CASE(bits, suffix)                                     \
             case (bits) / 8:                                   \
                 asm ( "rep stos" #suffix                       \
-                      : "=m" (*(char (*)[bytes])buf),          \
+                      : "=m" (*buf),                           \
                         "=D" (dummy), "=c" (dummy)             \
                       : "a" (*(const uint##bits##_t *)p_data), \
-                         "1" (buf), "2" (*reps) );             \
+                        "1" (buf), "2" (*reps) : "memory" );   \
                 break
             CASE(8, b);
             CASE(16, w);
