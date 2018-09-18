@@ -27,17 +27,6 @@ diff -up grub-upstream.wip/configure.ac.btrfs grub-upstream.wip/configure.ac
  AC_ARG_ENABLE(vstafs,
    [  --disable-vstafs        disable VSTa FS support in Stage 2])
  
-diff -up grub-upstream.wip/docs/grub.texi.btrfs grub-upstream.wip/docs/grub.texi
---- grub-upstream.wip/docs/grub.texi.btrfs	2012-03-20 05:06:49.000000000 +0000
-+++ grub-upstream.wip/docs/grub.texi	2012-03-20 05:07:09.000000000 +0000
-@@ -1761,6 +1761,7 @@ itself. Usually, this is put in a filesy
- @itemx jfs_stage1_5
- @itemx minix_stage1_5
- @itemx reiserfs_stage1_5
-+@itemx btrfs_stage1_5
- @itemx vstafs_stage1_5
- @itemx xfs_stage1_5
- 
 diff -up grub-upstream.wip/grub/Makefile.am.btrfs grub-upstream.wip/grub/Makefile.am
 --- grub-upstream.wip/grub/Makefile.am.btrfs	2005-02-02 20:38:19.000000000 +0000
 +++ grub-upstream.wip/grub/Makefile.am	2012-03-20 05:07:09.000000000 +0000
