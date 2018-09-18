@@ -13,34 +13,6 @@ Debian Status Following:
    Added by: Otavio Salvador
        Date: 2006-01-05
 
-diff -Nur grub-0.97-bkp/docs/grub.texi grub-0.97/docs/grub.texi
---- grub-0.97-bkp/docs/grub.texi	2006-01-05 10:59:05.564347912 -0200
-+++ grub-0.97/docs/grub.texi	2006-01-05 11:18:59.033912960 -0200
-@@ -2685,6 +2685,7 @@
- * module::                      Load a module
- * modulenounzip::               Load a module without decompression
- * pause::                       Wait for a key press
-+* print::                       Print a message
- * quit::                        Exit from the grub shell
- * reboot::                      Reboot your computer
- * read::                        Read data from memory
-@@ -3091,6 +3092,16 @@
- @end deffn
- 
- 
-+@node print
-+@subsection print
-+
-+@deffn Command print message @dots{}
-+Print the @var{message}. Note that placing @key{^G} (ASCII code 7) in the
-+message will cause the speaker to emit the standard beep sound, which is
-+useful for visually impaired people.
-+@end deffn
-+
-+
- @node quit
- @subsection quit
- 
 diff -Nur grub-0.97-bkp/stage2/builtins.c grub-0.97/stage2/builtins.c
 --- grub-0.97-bkp/stage2/builtins.c	2006-01-05 10:59:05.550350040 -0200
 +++ grub-0.97/stage2/builtins.c	2006-01-05 11:19:28.422445224 -0200
