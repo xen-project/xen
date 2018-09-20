@@ -341,34 +341,28 @@ static inline unsigned long region_to_pages(unsigned long addr, unsigned long si
     return (PAGE_ALIGN(addr + size) - (addr & PAGE_MASK)) >> PAGE_SHIFT;
 }
 
-static inline struct page_info* alloc_amd_iommu_pgtable(void)
+static inline struct page_info *alloc_amd_iommu_pgtable(void)
 {
-    struct page_info *pg;
-    void *vaddr;
+    struct page_info *pg = alloc_domheap_page(NULL, 0);
 
-    pg = alloc_domheap_page(NULL, 0);
-    if ( pg == NULL )
-        return 0;
-    vaddr = __map_domain_page(pg);
-    memset(vaddr, 0, PAGE_SIZE);
-    unmap_domain_page(vaddr);
+    if ( pg )
+        clear_domain_page(page_to_mfn(pg));
+
     return pg;
 }
 
 static inline void free_amd_iommu_pgtable(struct page_info *pg)
 {
-    if ( pg != 0 )
+    if ( pg )
         free_domheap_page(pg);
 }
 
-static inline void* __alloc_amd_iommu_tables(int order)
+static inline void *__alloc_amd_iommu_tables(unsigned int order)
 {
-    void *buf;
-    buf = alloc_xenheap_pages(order, 0);
-    return buf;
+    return alloc_xenheap_pages(order, 0);
 }
 
-static inline void __free_amd_iommu_tables(void *table, int order)
+static inline void __free_amd_iommu_tables(void *table, unsigned int order)
 {
     free_xenheap_pages(table, order);
 }
