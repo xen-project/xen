@@ -300,7 +300,7 @@ static int iommu_read_log(struct amd_iommu *iommu,
                           unsigned int entry_size,
                           void (*parse_func)(struct amd_iommu *, u32 *))
 {
-    u32 tail, *entry, tail_offest, head_offset;
+    unsigned int tail, tail_offest, head_offset;
 
     BUG_ON(!iommu || ((log != &iommu->event_log) && (log != &iommu->ppr_log)));
     
@@ -319,10 +319,35 @@ static int iommu_read_log(struct amd_iommu *iommu,
 
     while ( tail != log->head )
     {
-        /* read event log entry */
-        entry = log->buffer + log->head;
+        uint32_t *entry = log->buffer + log->head;
+        unsigned int count = 0;
+
+        /* Event and PPR logs have their code field in the same position. */
+        unsigned int code = MASK_EXTR(entry[1], IOMMU_EVENT_CODE_MASK);
+
+        /*
+         * Workaround for errata #732, #733:
+         *
+         * It can happen that the tail pointer is updated before the actual
+         * entry got written.  We initialise the buffer to all zeros and clear
+         * the code field after processing entries.
+         */
+        while ( unlikely(code == 0) )
+        {
+            if ( unlikely(++count == IOMMU_LOG_ENTRY_TIMEOUT) )
+            {
+                AMD_IOMMU_DEBUG("AMD-Vi: No entry written to %s Log\n",
+                                log == &iommu->event_log ? "Event" : "PPR");
+                return 0;
+            }
+            udelay(1);
+            code = MASK_EXTR(ACCESS_ONCE(entry[1]), IOMMU_EVENT_CODE_MASK);
+        }
 
         parse_func(iommu, entry);
+
+        /* Clear 'code' to be able to spot the erratum when the ring wraps. */
+        ACCESS_ONCE(entry[1]) = 0;
 
         log->head += entry_size;
         if ( log->head == log->size )
@@ -503,7 +528,6 @@ static hw_irq_controller iommu_x2apic_type = {
 static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
     u32 code;
-    int count = 0;
     static const char *const event_str[] = {
 #define EVENT_STR(name) [IOMMU_EVENT_##name - 1] = #name
         EVENT_STR(ILLEGAL_DEV_TABLE_ENTRY),
@@ -520,25 +544,6 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 
     code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
                                             IOMMU_EVENT_CODE_SHIFT);
-
-    /*
-     * Workaround for erratum 732:
-     * It can happen that the tail pointer is updated before the actual entry
-     * got written. As suggested by RevGuide, we initialize the event log
-     * buffer to all zeros and clear event log entries after processing them.
-     */
-    while ( code == 0 )
-    {
-        if ( unlikely(++count == IOMMU_LOG_ENTRY_TIMEOUT) )
-        {
-            AMD_IOMMU_DEBUG("AMD-Vi: No event written to log\n");
-            return;
-        }
-        udelay(1);
-        barrier(); /* Prevent hoisting of the entry[] read. */
-        code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
-                                      IOMMU_EVENT_CODE_SHIFT);
-    }
 
     /* Look up the symbolic name for code. */
     if ( code <= ARRAY_SIZE(event_str) )
@@ -575,8 +580,6 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
     else
         printk(XENLOG_ERR "%s %08x %08x %08x %08x\n",
                code_str, entry[0], entry[1], entry[2], entry[3]);
-
-    memset(entry, 0, IOMMU_EVENT_LOG_ENTRY_SIZE);
 }
 
 static void iommu_check_event_log(struct amd_iommu *iommu)
@@ -627,31 +630,8 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
 
     u16 device_id;
-    u8 bus, devfn, code;
+    u8 bus, devfn;
     struct pci_dev *pdev;
-    int count = 0;
-
-    code = get_field_from_reg_u32(entry[1], IOMMU_PPR_LOG_CODE_MASK,
-                                  IOMMU_PPR_LOG_CODE_SHIFT);
-
-    /*
-     * Workaround for erratum 733:
-     * It can happen that the tail pointer is updated before the actual entry
-     * got written. As suggested by RevGuide, we initialize the event log
-     * buffer to all zeros and clear ppr log entries after processing them.
-     */
-    while ( code == 0 )
-    {
-        if ( unlikely(++count == IOMMU_LOG_ENTRY_TIMEOUT) )
-        {
-            AMD_IOMMU_DEBUG("AMD-Vi: No ppr written to log\n");
-            return;
-        }
-        udelay(1);
-        barrier(); /* Prevent hoisting of the entry[] read. */
-        code = get_field_from_reg_u32(entry[1], IOMMU_PPR_LOG_CODE_MASK,
-                                      IOMMU_PPR_LOG_CODE_SHIFT);
-    }
 
     /* here device_id is physical value */
     device_id = iommu_get_devid_from_cmd(entry[0]);
@@ -664,8 +644,6 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
 
     if ( pdev )
         guest_iommu_add_ppr_log(pdev->domain, entry);
-
-    memset(entry, 0, IOMMU_PPR_LOG_ENTRY_SIZE);
 }
 
 static void iommu_check_ppr_log(struct amd_iommu *iommu)
