@@ -1549,8 +1549,7 @@ int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid,
 
 static void libxl__device_pci_from_xs_be(libxl__gc *gc,
                                          const char *be_path,
-                                         libxl_device_pci *pci,
-                                         int nr)
+                                         int nr, libxl_device_pci *pci)
 {
     char *s;
     unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
@@ -1604,7 +1603,7 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num
     pcidevs = calloc(n, sizeof(libxl_device_pci));
 
     for (i = 0; i < n; i++)
-        libxl__device_pci_from_xs_be(gc, be_path, pcidevs + i, i);
+        libxl__device_pci_from_xs_be(gc, be_path, i, pcidevs + i);
 
     *num = n;
 out:
@@ -1688,7 +1687,9 @@ static int libxl_device_pci_compare(libxl_device_pci *d1,
 
 #define libxl__device_pci_update_devid NULL
 
-DEFINE_DEVICE_TYPE_STRUCT_X(pcidev, pci, PCI);
+DEFINE_DEVICE_TYPE_STRUCT_X(pcidev, pci, PCI,
+    .from_xenstore = (device_from_xenstore_fn_t)libxl__device_pci_from_xs_be,
+);
 
 /*
  * Local variables:
