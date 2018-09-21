@@ -333,9 +333,11 @@ struct arch_domain
         void (*tail)(struct vcpu *);
     } *ctxt_switch;
 
+#ifdef CONFIG_HVM
     /* nestedhvm: translate l2 guest physical to host physical */
     struct p2m_domain *nested_p2m[MAX_NESTEDP2M];
     mm_lock_t nested_p2m_lock;
+#endif
 
     /* altp2m: allow multiple copies of host p2m */
     bool_t altp2m_active;

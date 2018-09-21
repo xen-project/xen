@@ -49,23 +49,30 @@ boolean_param("hap_2mb", opt_hap_2mb);
 
 DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
 
+static void p2m_nestedp2m_init(struct p2m_domain *p2m)
+{
+#ifdef CONFIG_HVM
+    INIT_LIST_HEAD(&p2m->np2m_list);
+
+    p2m->np2m_base = P2M_BASE_EADDR;
+    p2m->np2m_generation = 0;
+#endif
+}
+
 /* Init the datastructures for later use by the p2m code */
 static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
     int ret = 0;
 
     mm_rwlock_init(&p2m->lock);
-    INIT_LIST_HEAD(&p2m->np2m_list);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
 
     p2m->domain = d;
     p2m->default_access = p2m_access_rwx;
     p2m->p2m_class = p2m_host;
 
-    p2m->np2m_base = P2M_BASE_EADDR;
-    p2m->np2m_generation = 0;
-
     p2m_pod_init(p2m);
+    p2m_nestedp2m_init(p2m);
 
     if ( hap_enabled(d) && cpu_has_vmx )
         ret = ept_p2m_init(p2m);
@@ -137,6 +144,7 @@ static void p2m_teardown_hostp2m(struct domain *d)
     }
 }
 
+#ifdef CONFIG_HVM
 static void p2m_teardown_nestedp2m(struct domain *d)
 {
     unsigned int i;
@@ -174,6 +182,7 @@ static int p2m_init_nestedp2m(struct domain *d)
 
     return 0;
 }
+#endif
 
 static void p2m_teardown_altp2m(struct domain *d)
 {
@@ -221,6 +230,7 @@ int p2m_init(struct domain *d)
     if ( rc )
         return rc;
 
+#ifdef CONFIG_HVM
     /* Must initialise nestedp2m unconditionally
      * since nestedhvm_enabled(d) returns false here.
      * (p2m_init runs too early for HVM_PARAM_* options) */
@@ -230,12 +240,15 @@ int p2m_init(struct domain *d)
         p2m_teardown_hostp2m(d);
         return rc;
     }
+#endif
 
     rc = p2m_init_altp2m(d);
     if ( rc )
     {
         p2m_teardown_hostp2m(d);
+#ifdef CONFIG_HVM
         p2m_teardown_nestedp2m(d);
+#endif
     }
 
     return rc;
@@ -687,7 +700,9 @@ void p2m_final_teardown(struct domain *d)
      * we initialise them unconditionally.
      */
     p2m_teardown_altp2m(d);
+#ifdef CONFIG_HVM
     p2m_teardown_nestedp2m(d);
+#endif
 
     /* Iterate over all p2m tables per domain */
     p2m_teardown_hostp2m(d);
@@ -1713,6 +1728,7 @@ void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
         p2m_switch_vcpu_altp2m_by_id(v, idx);
 }
 
+#ifdef CONFIG_HVM
 static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
 {
@@ -1970,6 +1986,7 @@ void np2m_schedule(int dir)
         p2m_unlock(p2m);
     }
 }
+#endif
 
 unsigned long paging_gva_to_gfn(struct vcpu *v,
                                 unsigned long va,

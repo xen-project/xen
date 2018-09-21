@@ -204,6 +204,7 @@ struct p2m_domain {
 
     p2m_class_t       p2m_class; /* host/nested/alternate */
 
+#ifdef CONFIG_HVM
     /* Nested p2ms only: nested p2m base value that this p2m shadows.
      * This can be cleared to P2M_BASE_EADDR under the per-p2m lock but
      * needs both the per-p2m lock and the per-domain nestedp2m lock
@@ -216,6 +217,7 @@ struct p2m_domain {
      * The host p2m hasolds the head of the list and the np2ms are 
      * threaded on in LRU order. */
     struct list_head   np2m_list;
+#endif
 
     /* Host p2m: Log-dirty ranges registered for the domain. */
     struct rangeset   *logdirty_ranges;
@@ -379,7 +381,11 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
 #define NP2M_SCHEDLE_IN  0
 #define NP2M_SCHEDLE_OUT 1
 
+#ifdef CONFIG_HVM
 void np2m_schedule(int dir);
+#else
+static inline void np2m_schedule(int dir) {}
+#endif
 
 static inline bool_t p2m_is_hostp2m(const struct p2m_domain *p2m)
 {
