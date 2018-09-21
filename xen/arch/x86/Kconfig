@@ -59,7 +59,17 @@ config PV_LINEAR_PT
          If unsure, say Y.
 
 config HVM
-	def_bool y
+	def_bool !PV_SHIM_EXCLUSIVE
+	prompt "HVM support"
+	---help---
+	  Interfaces to support HVM guests which require hardware
+	  support like Intel's VT-x or AMD's SVM. Note the hypervisor
+	  doesn't distinguish HVM or PVH guest types. PVH guest type
+	  is only a concept for end users.
+
+	  This option is needed if you want to run HVM or PVH guests.
+
+	  If unsure, say Y.
 
 config SHADOW_PAGING
         bool "Shadow Paging"
