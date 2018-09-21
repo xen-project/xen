@@ -501,6 +501,7 @@ void arch_p2m_set_access_required(struct domain *d, bool access_required)
     }
 }
 
+#ifdef CONFIG_HVM
 /*
  * Set/clear the #VE suppress bit for a page.  Only available on VMX.
  */
@@ -600,6 +601,7 @@ int p2m_get_suppress_ve(struct domain *d, gfn_t gfn, bool *suppress_ve,
 
     return 0;
 }
+#endif
 
 /*
  * Local variables:
