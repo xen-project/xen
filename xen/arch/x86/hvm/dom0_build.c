@@ -278,33 +278,6 @@ static int __init pvh_setup_vmx_realmode_helpers(struct domain *d)
     return 0;
 }
 
-/* Assign the low 1MB to Dom0. */
-static void __init pvh_steal_low_ram(struct domain *d, unsigned long start,
-                                     unsigned long nr_pages)
-{
-    unsigned long mfn;
-
-    ASSERT(start + nr_pages <= PFN_DOWN(MB(1)));
-
-    for ( mfn = start; mfn < start + nr_pages; mfn++ )
-    {
-        struct page_info *pg = mfn_to_page(_mfn(mfn));
-        int rc;
-
-        rc = unshare_xen_page_with_guest(pg, dom_io);
-        if ( rc )
-        {
-            printk("Unable to unshare Xen mfn %#lx: %d\n", mfn, rc);
-            continue;
-        }
-
-        share_xen_page_with_guest(pg, d, SHARE_rw);
-        rc = guest_physmap_add_entry(d, _gfn(mfn), _mfn(mfn), 0, p2m_ram_rw);
-        if ( rc )
-            printk("Unable to add mfn %#lx to p2m: %d\n", mfn, rc);
-    }
-}
-
 static __init void pvh_setup_e820(struct domain *d, unsigned long nr_pages)
 {
     struct e820entry *entry, *entry_guest;
@@ -399,8 +372,8 @@ static int __init pvh_setup_p2m(struct domain *d)
     } while ( preempted );
 
     /*
-     * Memory below 1MB is identity mapped.
-     * NB: this only makes sense when booted from legacy BIOS.
+     * Memory below 1MB is identity mapped initially. RAM regions are
+     * populated and copied below, replacing the respective mappings.
      */
     rc = modify_identity_mmio(d, 0, MB1_PAGES, true);
     if ( rc )
@@ -420,16 +393,24 @@ static int __init pvh_setup_p2m(struct domain *d)
         addr = PFN_DOWN(d->arch.e820[i].addr);
         size = PFN_DOWN(d->arch.e820[i].size);
 
-        if ( addr >= MB1_PAGES )
-            rc = pvh_populate_memory_range(d, addr, size);
-        else
-        {
-            ASSERT(addr + size < MB1_PAGES);
-            pvh_steal_low_ram(d, addr, size);
-        }
-
+        rc = pvh_populate_memory_range(d, addr, size);
         if ( rc )
             return rc;
+
+        if ( addr < MB1_PAGES )
+        {
+            uint64_t end = min_t(uint64_t, MB(1),
+                                 d->arch.e820[i].addr + d->arch.e820[i].size);
+            enum hvm_translation_result res =
+                 hvm_copy_to_guest_phys(mfn_to_maddr(_mfn(addr)),
+                                        mfn_to_virt(addr),
+                                        d->arch.e820[i].addr - end,
+                                        v);
+
+            if ( res != HVMTRANS_okay )
+                printk("Failed to copy [%#lx, %#lx): %d\n",
+                       addr, addr + size, res);
+        }
     }
 
     if ( cpu_has_vmx && paging_mode_hap(d) && !vmx_unrestricted_guest(v) )

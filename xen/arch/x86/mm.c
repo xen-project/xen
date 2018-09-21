@@ -511,22 +511,6 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
     spin_unlock(&d->page_alloc_lock);
 }
 
-int __init unshare_xen_page_with_guest(struct page_info *page,
-                                       struct domain *d)
-{
-    if ( page_get_owner(page) != d || !is_xen_heap_page(page) )
-        return -EINVAL;
-
-    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-        put_page(page);
-
-    /* Remove the owner and clear the flags. */
-    page->u.inuse.type_info = 0;
-    page_set_owner(page, NULL);
-
-    return 0;
-}
-
 void free_shared_domheap_page(struct page_info *page)
 {
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )

@@ -645,7 +645,6 @@ enum XENSHARE_flags {
 };
 void share_xen_page_with_guest(struct page_info *page, struct domain *d,
                                enum XENSHARE_flags flags);
-int unshare_xen_page_with_guest(struct page_info *page, struct domain *d);
 
 static inline void share_xen_page_with_privileged_guests(
     struct page_info *page, enum XENSHARE_flags flags)
