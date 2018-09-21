@@ -1413,16 +1413,21 @@ static int alloc_l1_table(struct page_info *page)
             if ( ret )
                 goto out;
         }
-        else switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
+        else
         {
-        default:
-            goto fail;
-        case 0:
-            break;
-        case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
-            ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
-            l1e_flip_flags(pl1e[i], ret);
-            break;
+            switch ( ret = get_page_from_l1e(pl1e[i], d, d) )
+            {
+            default:
+                goto fail;
+
+            case 0:
+                break;
+
+            case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
+                ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
+                l1e_flip_flags(pl1e[i], ret);
+                break;
+            }
         }
 
         pl1e[i] = adjust_guest_l1e(pl1e[i], d);

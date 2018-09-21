@@ -136,12 +136,18 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
         if ( pv_l1tf_check_l1e(d, nl1e) )
             return X86EMUL_RETRY;
     }
-    else switch ( ret = get_page_from_l1e(nl1e, d, d) )
+    else
     {
-    default:
-        if ( is_pv_32bit_domain(d) && (bytes == 4) && (unaligned_addr & 4) &&
-             !p_old && (l1e_get_flags(nl1e) & _PAGE_PRESENT) )
+        switch ( ret = get_page_from_l1e(nl1e, d, d) )
         {
+        default:
+            if ( !is_pv_32bit_domain(d) || (bytes != 4) ||
+                 !(unaligned_addr & 4) || p_old ||
+                 !(l1e_get_flags(nl1e) & _PAGE_PRESENT) )
+            {
+                gdprintk(XENLOG_WARNING, "could not get_page_from_l1e()\n");
+                return X86EMUL_UNHANDLEABLE;
+            }
             /*
              * If this is an upper-half write to a PAE PTE then we assume that
              * the guest has simply got the two writes the wrong way round. We
@@ -151,19 +157,16 @@ static int ptwr_emulated_update(unsigned long addr, intpte_t *p_old,
             gdprintk(XENLOG_DEBUG, "ptwr_emulate: fixing up invalid PAE PTE %"
                      PRIpte"\n", l1e_get_intpte(nl1e));
             l1e_remove_flags(nl1e, _PAGE_PRESENT);
+            break;
+
+        case 0:
+            break;
+
+        case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
+            ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
+            l1e_flip_flags(nl1e, ret);
+            break;
         }
-        else
-        {
-            gdprintk(XENLOG_WARNING, "could not get_page_from_l1e()\n");
-            return X86EMUL_UNHANDLEABLE;
-        }
-        break;
-    case 0:
-        break;
-    case _PAGE_RW ... _PAGE_RW | PAGE_CACHE_ATTRS:
-        ASSERT(!(ret & ~(_PAGE_RW | PAGE_CACHE_ATTRS)));
-        l1e_flip_flags(nl1e, ret);
-        break;
     }
 
     nl1e = adjust_guest_l1e(nl1e, d);
