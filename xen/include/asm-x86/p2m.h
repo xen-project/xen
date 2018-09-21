@@ -231,8 +231,10 @@ struct p2m_domain {
      * host p2m's lock. */
     int                defer_nested_flush;
 
+#ifdef CONFIG_HVM
     /* Alternate p2m: count of vcpu's currently using this p2m. */
     atomic_t           active_vcpus;
+#endif
 
     /* Pages used to construct the p2m */
     struct page_list_head pages;
@@ -841,7 +843,7 @@ void nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 /*
  * Alternate p2m: shadow p2m tables used for alternate memory views
  */
-
+#ifdef CONFIG_HVM
 /* get current alternate p2m table */
 static inline struct p2m_domain *p2m_get_altp2m(struct vcpu *v)
 {
@@ -888,6 +890,10 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
 int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
                                 mfn_t mfn, unsigned int page_order,
                                 p2m_type_t p2mt, p2m_access_t p2ma);
+#else
+struct p2m_domain *p2m_get_altp2m(struct vcpu *v);
+static inline void p2m_altp2m_check(struct vcpu *v, uint16_t idx) {}
+#endif
 
 /*
  * p2m type to IOMMU flags

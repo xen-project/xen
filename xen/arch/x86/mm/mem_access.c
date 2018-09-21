@@ -246,7 +246,6 @@ bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
     /* Return whether vCPU pause is required (aka. sync event) */
     return (p2ma != p2m_access_n2rwx);
 }
-#endif
 
 int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
                               struct p2m_domain *ap2m, p2m_access_t a,
@@ -291,6 +290,7 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
      */
     return ap2m->set_entry(ap2m, gfn, mfn, PAGE_ORDER_4K, t, a, -1);
 }
+#endif
 
 static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
                           struct p2m_domain *ap2m, p2m_access_t a,
@@ -298,6 +298,7 @@ static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
 {
     int rc = 0;
 
+#ifdef CONFIG_HVM
     if ( ap2m )
     {
         rc = p2m_set_altp2m_mem_access(d, p2m, ap2m, a, gfn);
@@ -306,6 +307,9 @@ static int set_mem_access(struct domain *d, struct p2m_domain *p2m,
             rc = 0;
     }
     else
+#else
+    ASSERT(!ap2m);
+#endif
     {
         mfn_t mfn;
         p2m_access_t _a;
@@ -367,6 +371,7 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
     long rc = 0;
 
     /* altp2m view 0 is treated as the hostp2m */
+#ifdef CONFIG_HVM
     if ( altp2m_idx )
     {
         if ( altp2m_idx >= MAX_ALTP2M ||
@@ -375,6 +380,9 @@ long p2m_set_mem_access(struct domain *d, gfn_t gfn, uint32_t nr,
 
         ap2m = d->arch.altp2m_p2m[altp2m_idx];
     }
+#else
+    ASSERT(!altp2m_idx);
+#endif
 
     if ( !xenmem_access_to_p2m_access(p2m, access, &a) )
         return -EINVAL;
@@ -422,6 +430,7 @@ long p2m_set_mem_access_multi(struct domain *d,
     long rc = 0;
 
     /* altp2m view 0 is treated as the hostp2m */
+#ifdef CONFIG_HVM
     if ( altp2m_idx )
     {
         if ( altp2m_idx >= MAX_ALTP2M ||
@@ -430,6 +439,9 @@ long p2m_set_mem_access_multi(struct domain *d,
 
         ap2m = d->arch.altp2m_p2m[altp2m_idx];
     }
+#else
+    ASSERT(!altp2m_idx);
+#endif
 
     p2m_lock(p2m);
     if ( ap2m )
@@ -483,22 +495,23 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access)
 
 void arch_p2m_set_access_required(struct domain *d, bool access_required)
 {
-    unsigned int i;
-
     ASSERT(atomic_read(&d->pause_count));
 
     p2m_get_hostp2m(d)->access_required = access_required;
 
-    if ( !altp2m_active(d) )
-        return;
-
-    for ( i = 0; i < MAX_ALTP2M; i++ )
+#ifdef CONFIG_HVM
+    if ( altp2m_active(d) )
     {
-        struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
+        unsigned int i;
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+        {
+            struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
 
-        if ( p2m )
-            p2m->access_required = access_required;
+            if ( p2m )
+                p2m->access_required = access_required;
+        }
     }
+#endif
 }
 
 #ifdef CONFIG_HVM

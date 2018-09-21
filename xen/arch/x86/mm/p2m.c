@@ -182,7 +182,6 @@ static int p2m_init_nestedp2m(struct domain *d)
 
     return 0;
 }
-#endif
 
 static void p2m_teardown_altp2m(struct domain *d)
 {
@@ -221,6 +220,7 @@ static int p2m_init_altp2m(struct domain *d)
 
     return 0;
 }
+#endif
 
 int p2m_init(struct domain *d)
 {
@@ -240,16 +240,14 @@ int p2m_init(struct domain *d)
         p2m_teardown_hostp2m(d);
         return rc;
     }
-#endif
 
     rc = p2m_init_altp2m(d);
     if ( rc )
     {
         p2m_teardown_hostp2m(d);
-#ifdef CONFIG_HVM
         p2m_teardown_nestedp2m(d);
-#endif
     }
+#endif
 
     return rc;
 }
@@ -695,12 +693,12 @@ void p2m_teardown(struct p2m_domain *p2m)
 
 void p2m_final_teardown(struct domain *d)
 {
+#ifdef CONFIG_HVM
     /*
      * We must teardown both of them unconditionally because
      * we initialise them unconditionally.
      */
     p2m_teardown_altp2m(d);
-#ifdef CONFIG_HVM
     p2m_teardown_nestedp2m(d);
 #endif
 
@@ -1722,12 +1720,6 @@ void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp)
     }
 }
 
-void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
-{
-    if ( altp2m_active(v->domain) )
-        p2m_switch_vcpu_altp2m_by_id(v, idx);
-}
-
 #ifdef CONFIG_HVM
 static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
@@ -2177,6 +2169,14 @@ int unmap_mmio_regions(struct domain *d,
     return i == nr ? 0 : i ?: ret;
 }
 
+#ifdef CONFIG_HVM
+
+void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
+{
+    if ( altp2m_active(v->domain) )
+        p2m_switch_vcpu_altp2m_by_id(v, idx);
+}
+
 bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
 {
     struct domain *d = v->domain;
@@ -2554,6 +2554,7 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 
     return ret;
 }
+#endif /* CONFIG_HVM */
 
 /*** Audit ***/
 

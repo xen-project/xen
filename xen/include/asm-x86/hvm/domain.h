@@ -194,7 +194,11 @@ struct hvm_domain {
     };
 };
 
+#ifdef CONFIG_HVM
 #define hap_enabled(d)  ((d)->arch.hvm.hap_enabled)
+#else
+#define hap_enabled(d)  ({(void)(d); false;})
+#endif
 
 #endif /* __ASM_X86_HVM_DOMAIN_H__ */
 

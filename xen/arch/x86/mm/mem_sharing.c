@@ -802,6 +802,7 @@ static int nominate_page(struct domain *d, gfn_t gfn,
     if ( !p2m_is_sharable(p2mt) )
         goto out;
 
+#ifdef CONFIG_HVM
     /* Check if there are mem_access/remapped altp2m entries for this page */
     if ( altp2m_active(d) )
     {
@@ -829,6 +830,7 @@ static int nominate_page(struct domain *d, gfn_t gfn,
 
         altp2m_list_unlock(d);
     }
+#endif
 
     /* Try to convert the mfn to the sharable type */
     page = mfn_to_page(mfn);
