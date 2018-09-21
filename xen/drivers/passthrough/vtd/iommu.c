@@ -1313,6 +1313,8 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
 
     setup_hwdom_pci_devices(d, setup_hwdom_device);
     setup_hwdom_rmrr(d);
+    /* Make sure workarounds are applied before enabling the IOMMU(s). */
+    arch_iommu_hwdom_init(d);
 
     if ( iommu_flush_all() )
         printk(XENLOG_WARNING VTDPREFIX

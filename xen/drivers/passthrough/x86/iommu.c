@@ -210,6 +210,14 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 
     BUG_ON(!is_hardware_domain(d));
 
+    ASSERT(iommu_hwdom_inclusive != -1 && iommu_hwdom_inclusive != -1);
+    if ( iommu_hwdom_inclusive && !is_pv_domain(d) )
+    {
+        printk(XENLOG_WARNING
+               "IOMMU inclusive mappings are only supported on PV Dom0\n");
+        iommu_hwdom_inclusive = 0;
+    }
+
     if ( iommu_hwdom_passthrough )
         return;
 

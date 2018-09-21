@@ -300,6 +300,8 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
                                         IOMMU_MMIO_REGION_LENGTH - 1)) )
             BUG();
 
+    /* Make sure workarounds are applied (if needed) before adding devices. */
+    arch_iommu_hwdom_init(d);
     setup_hwdom_pci_devices(d, amd_iommu_add_device);
 }
 
