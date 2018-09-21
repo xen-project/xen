@@ -306,6 +306,7 @@ struct p2m_domain {
      * to resume the search */
     unsigned long next_shared_gfn_to_relinquish;
 
+#ifdef CONFIG_HVM
     /* Populate-on-demand variables
      * All variables are protected with the pod lock. We cannot rely on
      * the p2m lock if it's turned into a fine-grained lock.
@@ -337,6 +338,8 @@ struct p2m_domain {
         mm_lock_t        lock;         /* Locking of private pod structs,   *
                                         * not relying on the p2m lock.      */
     } pod;
+#endif
+
     union {
         struct ept_data ept;
         /* NPT-equivalent structure could be added here. */
@@ -646,6 +649,12 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
 /* Dump PoD information about the domain */
 void p2m_pod_dump_data(struct domain *d);
 
+#ifdef CONFIG_HVM
+
+/* Called by p2m code when demand-populating a PoD page */
+bool
+p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn, unsigned int order);
+
 /* Move all pages from the populate-on-demand cache to the domain page_list
  * (usually in preparation for domain destruction) */
 int p2m_pod_empty_cache(struct domain *d);
@@ -661,6 +670,45 @@ p2m_pod_offline_or_broken_hit(struct page_info *p);
 /* Replace pod cache when offline/broken page triggered */
 void
 p2m_pod_offline_or_broken_replace(struct page_info *p);
+
+static inline long p2m_pod_entry_count(const struct p2m_domain *p2m)
+{
+    return p2m->pod.entry_count;
+}
+
+void p2m_pod_init(struct p2m_domain *p2m);
+
+#else
+
+static inline bool
+p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn, unsigned int order)
+{
+    return false;
+}
+
+static inline int p2m_pod_empty_cache(struct domain *d)
+{
+    return 0;
+}
+
+static inline int p2m_pod_offline_or_broken_hit(struct page_info *p)
+{
+    return 0;
+}
+
+static inline void p2m_pod_offline_or_broken_replace(struct page_info *p)
+{
+    ASSERT_UNREACHABLE();
+}
+
+static inline long p2m_pod_entry_count(const struct p2m_domain *p2m)
+{
+    return 0;
+}
+
+static inline void p2m_pod_init(struct p2m_domain *p2m) {}
+
+#endif
 
 
 /*
@@ -729,10 +777,6 @@ extern void audit_p2m(struct domain *d,
 #else
 #define P2M_DEBUG(f, a...) do { (void)(f); } while(0)
 #endif
-
-/* Called by p2m code when demand-populating a PoD page */
-bool
-p2m_pod_demand_populate(struct p2m_domain *p2m, gfn_t gfn, unsigned int order);
 
 /*
  * Functions specific to the p2m-pt implementation

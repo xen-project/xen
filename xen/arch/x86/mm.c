@@ -4619,6 +4619,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return 0;
     }
 
+#ifdef CONFIG_HVM
     case XENMEM_set_pod_target:
     case XENMEM_get_pod_target:
     {
@@ -4675,6 +4676,7 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         rcu_unlock_domain(d);
         return rc;
     }
+#endif
 
     default:
         return subarch_memory_op(cmd, arg);

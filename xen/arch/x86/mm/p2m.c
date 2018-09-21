@@ -52,15 +52,11 @@ DEFINE_PERCPU_RWLOCK_GLOBAL(p2m_percpu_rwlock);
 /* Init the datastructures for later use by the p2m code */
 static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
-    unsigned int i;
     int ret = 0;
 
     mm_rwlock_init(&p2m->lock);
-    mm_lock_init(&p2m->pod.lock);
     INIT_LIST_HEAD(&p2m->np2m_list);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
-    INIT_PAGE_LIST_HEAD(&p2m->pod.super);
-    INIT_PAGE_LIST_HEAD(&p2m->pod.single);
 
     p2m->domain = d;
     p2m->default_access = p2m_access_rwx;
@@ -69,8 +65,7 @@ static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->np2m_base = P2M_BASE_EADDR;
     p2m->np2m_generation = 0;
 
-    for ( i = 0; i < ARRAY_SIZE(p2m->pod.mrp.list); ++i )
-        p2m->pod.mrp.list[i] = gfn_x(INVALID_GFN);
+    p2m_pod_init(p2m);
 
     if ( hap_enabled(d) && cpu_has_vmx )
         ret = ept_p2m_init(p2m);
@@ -917,6 +912,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                  gfn_x(gfn), mfn_x(mfn));
         rc = p2m_set_entry(p2m, gfn, INVALID_MFN, page_order,
                            p2m_invalid, p2m->default_access);
+#ifdef CONFIG_HVM
         if ( rc == 0 )
         {
             pod_lock(p2m);
@@ -924,6 +920,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
             BUG_ON(p2m->pod.entry_count < 0);
             pod_unlock(p2m);
         }
+#endif
     }
 
 out:
@@ -1114,6 +1111,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
     if ( rc )
         gdprintk(XENLOG_ERR, "p2m_set_entry: %#lx:%u -> %d (0x%"PRI_mfn")\n",
                  gfn_l, order, rc, mfn_x(mfn));
+#ifdef CONFIG_HVM
     else if ( p2m_is_pod(ot) )
     {
         pod_lock(p2m);
@@ -1121,6 +1119,7 @@ static int set_typed_p2m_entry(struct domain *d, unsigned long gfn_l,
         BUG_ON(p2m->pod.entry_count < 0);
         pod_unlock(p2m);
     }
+#endif
     gfn_unlock(p2m, gfn, order);
 
     return rc;
@@ -1743,9 +1742,11 @@ p2m_flush_table_locked(struct p2m_domain *p2m)
      * when discarding them.
      */
     ASSERT(!p2m_is_hostp2m(p2m));
+#ifdef CONFIG_HVM
     /* Nested p2m's do not do pod, hence the asserts (and no pod lock)*/
     ASSERT(page_list_empty(&p2m->pod.super));
     ASSERT(page_list_empty(&p2m->pod.single));
+#endif
 
     /* No need to flush if it's already empty */
     if ( p2m_is_nestedp2m(p2m) && p2m->np2m_base == P2M_BASE_EADDR )
@@ -2539,7 +2540,7 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 
 /*** Audit ***/
 
-#if P2M_AUDIT
+#if P2M_AUDIT && defined(CONFIG_HVM)
 void audit_p2m(struct domain *d,
                uint64_t *orphans,
                 uint64_t *m2p_bad,

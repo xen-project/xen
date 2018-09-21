@@ -967,7 +967,7 @@ static int p2m_pt_change_entry_type_range(struct p2m_domain *p2m,
     return err;
 }
 
-#if P2M_AUDIT
+#if P2M_AUDIT && defined(CONFIG_HVM)
 long p2m_pt_audit_p2m(struct p2m_domain *p2m)
 {
     unsigned long entry_count = 0, pmbad = 0;
@@ -1116,6 +1116,8 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
 
     return pmbad;
 }
+#else
+# define p2m_pt_audit_p2m NULL
 #endif /* P2M_AUDIT */
 
 /* Set up the p2m function pointers for pagetable format */

@@ -1221,7 +1221,7 @@ long arch_do_domctl(
         ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
         break;
 
-#if P2M_AUDIT
+#if P2M_AUDIT && defined(CONFIG_HVM)
     case XEN_DOMCTL_audit_p2m:
         if ( d == currd )
             ret = -EPERM;

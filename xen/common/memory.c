@@ -210,7 +210,8 @@ static void populate_physmap(struct memop_args *a)
             if ( d == curr_d )
                 goto out;
 
-            if ( guest_physmap_mark_populate_on_demand(d, gpfn,
+            if ( is_hvm_domain(d) &&
+                 guest_physmap_mark_populate_on_demand(d, gpfn,
                                                        a->extent_order) < 0 )
                 goto out;
         }

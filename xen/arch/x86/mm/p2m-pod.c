@@ -1333,3 +1333,14 @@ out:
     return rc;
 }
 
+void p2m_pod_init(struct p2m_domain *p2m)
+{
+    unsigned int i;
+
+    mm_lock_init(&p2m->pod.lock);
+    INIT_PAGE_LIST_HEAD(&p2m->pod.super);
+    INIT_PAGE_LIST_HEAD(&p2m->pod.single);
+
+    for ( i = 0; i < ARRAY_SIZE(p2m->pod.mrp.list); ++i )
+        p2m->pod.mrp.list[i] = gfn_x(INVALID_GFN);
+}
