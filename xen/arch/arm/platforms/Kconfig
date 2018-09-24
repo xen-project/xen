@@ -36,6 +36,11 @@ config MPSOC
 	---help---
 	Enable all the required drivers for Xilinx Ultrascale+ MPSoC
 
+config NO_PLAT
+	bool "No Platforms"
+	---help---
+	Do not enable specific support for any platform.
+
 endchoice
 
 config ALL64_PLAT
