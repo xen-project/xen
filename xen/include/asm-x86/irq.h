@@ -145,7 +145,6 @@ int get_free_pirqs(struct domain *, unsigned int nr);
 void free_domain_pirqs(struct domain *d);
 int map_domain_emuirq_pirq(struct domain *d, int pirq, int irq);
 int unmap_domain_pirq_emuirq(struct domain *d, int pirq);
-bool hvm_domain_use_pirq(const struct domain *, const struct pirq *);
 
 /* Reset irq affinities to match the given CPU mask. */
 void fixup_irqs(const cpumask_t *mask, bool verbose);

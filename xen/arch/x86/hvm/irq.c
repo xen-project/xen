@@ -27,6 +27,11 @@
 #include <asm/hvm/support.h>
 #include <asm/msi.h>
 
+bool hvm_domain_use_pirq(const struct domain *d, const struct pirq *pirq)
+{
+    return is_hvm_domain(d) && pirq && pirq->arch.hvm.emuirq != IRQ_UNBOUND;
+}
+
 /* Must be called with hvm_domain->irq_lock hold */
 static void assert_gsi(struct domain *d, unsigned ioapic_gsi)
 {
