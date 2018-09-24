@@ -539,8 +539,10 @@ static int __init make_memory_node(const struct domain *d,
     int res, i;
     int reg_size = addrcells + sizecells;
     int nr_cells = reg_size*kinfo->mem.nr_banks;
-    __be32 reg[nr_cells];
+    __be32 reg[NR_MEM_BANKS * 4 /* Worst case addrcells + sizecells */];
     __be32 *cells;
+
+    BUG_ON(nr_cells >= ARRAY_SIZE(reg));
 
     dt_dprintk("Create memory node (reg size %d, nr cells %d)\n",
                reg_size, nr_cells);
