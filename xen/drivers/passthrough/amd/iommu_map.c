@@ -220,7 +220,7 @@ void __init iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev)
     dte[7] = dte[6] = dte[4] = dte[2] = dte[1] = dte[0] = 0;
 
     flags = ivrs_dev->device_flags;
-    sys_mgt = get_field_from_byte(flags, ACPI_IVHD_SYSTEM_MGMT);
+    sys_mgt = MASK_EXTR(flags, ACPI_IVHD_SYSTEM_MGMT);
     dev_ex = ivrs_dev->dte_allow_exclusion;
 
     flags &= mask;

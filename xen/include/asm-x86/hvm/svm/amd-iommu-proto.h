@@ -155,11 +155,6 @@ static inline u32 set_field_in_reg_u32(u32 field, u32 reg_value,
     return reg_value;
 }
 
-static inline u8 get_field_from_byte(u8 value, u8 mask)
-{
-    return (value & mask) / (mask & -mask);
-}
-
 static inline unsigned long region_to_pages(unsigned long addr, unsigned long size)
 {
     return (PAGE_ALIGN(addr + size) - (addr & PAGE_MASK)) >> PAGE_SHIFT;
