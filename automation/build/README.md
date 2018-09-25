@@ -50,6 +50,8 @@ understands.
 - CONTAINER_ARGS: Allows you to pass extra arguments to Docker
   when starting the container.
 
+- CONTAINER_UID0: This specifies whether root is used inside the container.
+
 - XEN_CONFIG_EXPERT: If this is defined in your shell it will be
   automatically passed through to the container.
 

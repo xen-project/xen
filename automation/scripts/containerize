@@ -23,6 +23,12 @@ case "_${CONTAINER}" in
     _stretch|_) CONTAINER="${BASE}/debian:stretch" ;;
 esac
 
+# Use this variable to control whehter root should be used
+case "_${CONTAINER_UID0}" in
+    _1)   userarg= ;;
+    _0|_) userarg="-u $(id -u)" ;;
+esac
+
 # Save the commands for future use
 cmd=$@
 
@@ -70,7 +76,7 @@ fi
 # Kick off Docker
 einfo "*** Launching container ..."
 exec docker run \
-    -u $(id -u) \
+    ${userarg} \
     ${SSH_AUTH_SOCK:+-e SSH_AUTH_SOCK="/tmp/ssh-agent/${SSH_AUTH_NAME}"} \
     -v "${CONTAINER_PATH}":/build:rw \
     -v "${HOME}/.ssh":/root/.ssh:ro \
