@@ -1,5 +1,4 @@
 #include <stdarg.h>
-#include <stdio.h>
 
 #define WRAP(x) typeof(x) emul_##x
 #include "x86-emulate.h"

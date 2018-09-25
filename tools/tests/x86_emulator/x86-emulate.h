@@ -3,10 +3,34 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+/*
+ * Use of sse registers must be disabled prior to the definition of
+ * always_inline functions that would use them (memcpy, memset, etc),
+ * so do this as early as possible, aiming to be before any always_inline
+ * functions that are used are declared.
+ * Unfortunately, this cannot be done prior to inclusion of <stdlib.h>
+ * due to functions such as 'atof' that have SSE register return declared,
+ * so do so here, immediately after that.
+ */
+#if __GNUC__ >= 6
+# pragma GCC target("no-sse")
+#endif
+ /*
+ * Attempt detection of unwanted prior inclusion of some headers known to use
+ * always_inline with SSE registers in some library / compiler / optimization
+ * combinations.
+ */
+#ifdef _STRING_H
+# error "Must not include <string.h> before x86-emulate.h"
+#endif
 #include <string.h>
 
-#if __GNUC__ >= 6
-#pragma GCC target("no-sse")
+/* EOF is a standard macro defined in <stdio.h> so use it for detection */
+#ifdef EOF
+# error "Must not include <stdio.h> before x86-emulate.h"
+#endif
+#ifdef WRAP
+# include <stdio.h>
 #endif
 
 #include <xen/xen.h>

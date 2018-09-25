@@ -6,9 +6,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -16,6 +14,14 @@
 #include <xen/xen.h>
 
 #include "x86-emulate.h"
+/*
+ * include "x86-emulate.h" prior to <stdio.h> and <string.h>:
+ * x86-emulate.h disables use of SSE registers, while <stdio.h> and <string.h>
+ * declare functions that may be always_inline and use those registers
+ * unless they have been disabled earlier, which can fail to compile.
+ */
+#include <stdio.h>
+#include <string.h>
 #include "fuzz-emul.h"
 
 #define MSR_INDEX_MAX 16
