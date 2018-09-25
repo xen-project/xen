@@ -165,7 +165,8 @@ int hvm_save_one(struct domain *d, unsigned int typecode, unsigned int instance,
     if ( (rv = hvm_sr_handlers[typecode].save(v, &ctxt)) != 0 )
         printk(XENLOG_G_ERR "HVM%d save: failed to save type %"PRIu16" (%d)\n",
                d->domain_id, typecode, rv);
-    else if ( rv = -ENOENT, ctxt.cur >= sizeof(*desc) )
+    else if ( (rv = hvm_sr_handlers[typecode].kind == HVMSR_PER_VCPU ?
+               -ENODATA : -ENOENT), ctxt.cur >= sizeof(*desc) )
     {
         uint32_t off;
 
