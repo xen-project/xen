@@ -568,7 +568,7 @@ static int __init make_memory_node(const struct domain *d,
         dt_child_set_range(&cells, addrcells, sizecells, start, size);
     }
 
-    res = fdt_property(fdt, "reg", reg, sizeof(reg));
+    res = fdt_property(fdt, "reg", reg, nr_cells * sizeof(*reg));
     if ( res )
         return res;
 
