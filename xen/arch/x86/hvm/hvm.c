@@ -4561,6 +4561,12 @@ static int do_altp2m_op(
             break;
         }
 
+        if ( !cpu_has_vmx_virt_exceptions )
+        {
+            rc = -EOPNOTSUPP;
+            break;
+        }
+
         v = d->vcpu[a.u.enable_notify.vcpu_id];
 
         if ( !gfn_eq(vcpu_altp2m(v).veinfo_gfn, INVALID_GFN) ||
