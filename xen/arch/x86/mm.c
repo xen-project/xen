@@ -465,7 +465,8 @@ unsigned int page_get_ram_type(mfn_t mfn)
             break;
 
         default:
-            ASSERT_UNREACHABLE();
+            type |= RAM_TYPE_UNKNOWN;
+            break;
         }
     }
 
