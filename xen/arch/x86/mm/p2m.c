@@ -2764,6 +2764,96 @@ out:
         rcu_unlock_domain(fdom);
     return rc;
 }
+
+#ifdef CONFIG_HVM
+/*
+ * Set/clear the #VE suppress bit for a page.  Only available on VMX.
+ */
+int p2m_set_suppress_ve(struct domain *d, gfn_t gfn, bool suppress_ve,
+                        unsigned int altp2m_idx)
+{
+    struct p2m_domain *host_p2m = p2m_get_hostp2m(d);
+    struct p2m_domain *ap2m = NULL;
+    struct p2m_domain *p2m;
+    mfn_t mfn;
+    p2m_access_t a;
+    p2m_type_t t;
+    int rc;
+
+    if ( altp2m_idx > 0 )
+    {
+        if ( altp2m_idx >= MAX_ALTP2M ||
+             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+            return -EINVAL;
+
+        p2m = ap2m = d->arch.altp2m_p2m[altp2m_idx];
+    }
+    else
+        p2m = host_p2m;
+
+    gfn_lock(host_p2m, gfn, 0);
+
+    if ( ap2m )
+        p2m_lock(ap2m);
+
+    mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL, NULL);
+    if ( !mfn_valid(mfn) )
+    {
+        rc = -ESRCH;
+        goto out;
+    }
+
+    rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, t, a, suppress_ve);
+
+out:
+    if ( ap2m )
+        p2m_unlock(ap2m);
+
+    gfn_unlock(host_p2m, gfn, 0);
+
+    return rc;
+}
+
+int p2m_get_suppress_ve(struct domain *d, gfn_t gfn, bool *suppress_ve,
+                        unsigned int altp2m_idx)
+{
+    struct p2m_domain *host_p2m = p2m_get_hostp2m(d);
+    struct p2m_domain *ap2m = NULL;
+    struct p2m_domain *p2m;
+    mfn_t mfn;
+    p2m_access_t a;
+    p2m_type_t t;
+    int rc = 0;
+
+    if ( altp2m_idx > 0 )
+    {
+        if ( altp2m_idx >= MAX_ALTP2M ||
+             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+            return -EINVAL;
+
+        p2m = ap2m = d->arch.altp2m_p2m[altp2m_idx];
+    }
+    else
+        p2m = host_p2m;
+
+    gfn_lock(host_p2m, gfn, 0);
+
+    if ( ap2m )
+        p2m_lock(ap2m);
+
+    mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL, suppress_ve);
+    if ( !mfn_valid(mfn) )
+        rc = -ESRCH;
+
+    if ( ap2m )
+        p2m_unlock(ap2m);
+
+    gfn_unlock(host_p2m, gfn, 0);
+
+    return rc;
+}
+#endif
+
 /*
  * Local variables:
  * mode: C

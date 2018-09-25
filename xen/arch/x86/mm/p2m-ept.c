@@ -697,6 +697,17 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     struct domain *d = p2m->domain;
 
     ASSERT(ept);
+
+    if ( !sve )
+    {
+        if ( !cpu_has_vmx_virt_exceptions )
+            return -EOPNOTSUPP;
+
+        /* #VE should be enabled for this vcpu. */
+        if ( gfn_eq(vcpu_altp2m(current).veinfo_gfn, INVALID_GFN) )
+            return -ENXIO;
+    }
+
     /*
      * the caller must make sure:
      * 1. passing valid gfn and mfn at order boundary.

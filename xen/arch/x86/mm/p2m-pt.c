@@ -501,7 +501,8 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     unsigned int flags, iommu_old_flags = 0;
     unsigned long old_mfn = mfn_x(INVALID_MFN);
 
-    ASSERT(sve != 0);
+    if ( !sve )
+        return -EOPNOTSUPP;
 
     if ( tb_init_done )
     {
