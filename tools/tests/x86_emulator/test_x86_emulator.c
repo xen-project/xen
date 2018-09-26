@@ -1,9 +1,9 @@
+#include "x86-emulate.h"
+
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <sys/mman.h>
-
-#include "x86-emulate.h"
 
 asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 
