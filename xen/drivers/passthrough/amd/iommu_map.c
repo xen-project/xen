@@ -285,19 +285,18 @@ void iommu_dte_set_guest_cr3(u32 *dte, u16 dom_id, u64 gcr3,
     dte[1] = entry;
 }
 
-u64 amd_iommu_get_next_table_from_pte(u32 *entry)
+uint64_t amd_iommu_get_address_from_pte(void *pte)
 {
-    u64 addr_lo, addr_hi, ptr;
+    uint32_t *entry = pte;
+    uint64_t addr_lo, addr_hi, ptr;
 
-    addr_lo = get_field_from_reg_u32(
-        entry[0],
-        IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_MASK,
-        IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT);
+    addr_lo = get_field_from_reg_u32(entry[0],
+                                     IOMMU_PTE_ADDR_LOW_MASK,
+                                     IOMMU_PTE_ADDR_LOW_SHIFT);
 
-    addr_hi = get_field_from_reg_u32(
-        entry[1],
-        IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_MASK,
-        IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_SHIFT);
+    addr_hi = get_field_from_reg_u32(entry[1],
+                                     IOMMU_PTE_ADDR_HIGH_MASK,
+                                     IOMMU_PTE_ADDR_HIGH_SHIFT);
 
     ptr = (addr_hi << 32) | (addr_lo << PAGE_SHIFT);
     return ptr;
@@ -350,11 +349,11 @@ static int iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
     pde = table + pfn_to_pde_idx(dfn, merge_level);
 
     /* get page table of next level */
-    ntable_maddr = amd_iommu_get_next_table_from_pte((u32*)pde);
+    ntable_maddr = amd_iommu_get_address_from_pte(pde);
     ntable = map_domain_page(_mfn(paddr_to_pfn(ntable_maddr)));
 
     /* get the first mfn of next level */
-    first_mfn = amd_iommu_get_next_table_from_pte((u32*)ntable) >> PAGE_SHIFT;
+    first_mfn = amd_iommu_get_address_from_pte(ntable) >> PAGE_SHIFT;
 
     if ( first_mfn == 0 )
         goto out;
@@ -401,7 +400,7 @@ static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
     pde = table + pfn_to_pde_idx(dfn, merge_level);
 
     /* get first mfn */
-    ntable_mfn = amd_iommu_get_next_table_from_pte((u32*)pde) >> PAGE_SHIFT;
+    ntable_mfn = amd_iommu_get_address_from_pte(pde) >> PAGE_SHIFT;
 
     if ( ntable_mfn == 0 )
     {
@@ -410,7 +409,7 @@ static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
     }
 
     ntable = map_domain_page(_mfn(ntable_mfn));
-    first_mfn = amd_iommu_get_next_table_from_pte((u32*)ntable) >> PAGE_SHIFT;
+    first_mfn = amd_iommu_get_address_from_pte(ntable) >> PAGE_SHIFT;
 
     if ( first_mfn == 0 )
     {
@@ -468,8 +467,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         pde = next_table_vaddr + pfn_to_pde_idx(dfn, level);
 
         /* Here might be a super page frame */
-        next_table_mfn = amd_iommu_get_next_table_from_pte((uint32_t*)pde) 
-                         >> PAGE_SHIFT;
+        next_table_mfn = amd_iommu_get_address_from_pte(pde) >> PAGE_SHIFT;
 
         /* Split super page frame into smaller pieces.*/
         if ( iommu_is_pte_present((u32*)pde) &&
@@ -823,3 +821,13 @@ void amd_iommu_share_p2m(struct domain *d)
                         mfn_x(pgd_mfn));
     }
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

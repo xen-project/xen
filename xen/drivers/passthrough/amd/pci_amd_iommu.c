@@ -391,11 +391,11 @@ static void deallocate_page_table(struct page_info *pg)
     for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {
         pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
-        next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
-        next_level = iommu_next_level((u32*)pde);
+        next_table_maddr = amd_iommu_get_address_from_pte(pde);
+        next_level = iommu_next_level(pde);
 
         if ( (next_table_maddr != 0) && (next_level != 0) &&
-             iommu_is_pte_present((u32*)pde) )
+             iommu_is_pte_present(pde) )
         {
             /* We do not support skip levels yet */
             ASSERT(next_level == level - 1);
@@ -520,8 +520,8 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
             process_pending_softirqs();
 
         pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
-        next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
-        entry = (u32*)pde;
+        next_table_maddr = amd_iommu_get_address_from_pte(pde);
+        entry = pde;
 
         present = get_field_from_reg_u32(entry[0],
                                          IOMMU_PDE_PRESENT_MASK,

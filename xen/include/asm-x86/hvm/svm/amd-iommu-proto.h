@@ -55,7 +55,7 @@ int amd_iommu_update_ivrs_mapping_acpi(void);
 int __must_check amd_iommu_map_page(struct domain *d, dfn_t dfn,
                                     mfn_t mfn, unsigned int flags);
 int __must_check amd_iommu_unmap_page(struct domain *d, dfn_t dfn);
-u64 amd_iommu_get_next_table_from_pte(u32 *entry);
+uint64_t amd_iommu_get_address_from_pte(void *entry);
 int __must_check amd_iommu_alloc_root(struct domain_iommu *hd);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
                                        u64 phys_addr, unsigned long size,
