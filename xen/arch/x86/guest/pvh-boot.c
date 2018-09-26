@@ -42,7 +42,17 @@ static void __init convert_pvh_info(void)
     module_t *mod;
     unsigned int i;
 
-    ASSERT(pvh_info->magic == XEN_HVM_START_MAGIC_VALUE);
+    if ( pvh_info->magic != XEN_HVM_START_MAGIC_VALUE )
+        panic("Magic value is wrong: %x\n", pvh_info->magic);
+
+    /*
+     * Temporary module array needs to be at least one element bigger than
+     * required. The extra element is used to aid relocation. See
+     * arch/x86/setup.c:__start_xen().
+     */
+    if ( ARRAY_SIZE(pvh_mbi_mods) <= pvh_info->nr_modules )
+        panic("The module array is too small, size %zu, requested %u\n",
+              ARRAY_SIZE(pvh_mbi_mods), pvh_info->nr_modules);
 
     /*
      * Turn hvm_start_info into mbi. Luckily all modules are placed under 4GB
