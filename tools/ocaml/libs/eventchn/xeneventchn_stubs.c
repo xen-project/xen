@@ -90,15 +90,15 @@ CAMLprim value stub_eventchn_bind_interdomain(value xce, value domid,
 	CAMLreturn(port);
 }
 
-CAMLprim value stub_eventchn_bind_dom_exc_virq(value xce)
+CAMLprim value stub_eventchn_bind_virq(value xce, value virq_type)
 {
-	CAMLparam1(xce);
+	CAMLparam2(xce, virq_type);
 	CAMLlocal1(port);
 	xenevtchn_port_or_error_t rc;
 
-	rc = xenevtchn_bind_virq(_H(xce), VIRQ_DOM_EXC);
+	rc = xenevtchn_bind_virq(_H(xce), Int_val(virq_type));
 	if (rc == -1)
-		caml_failwith("evtchn bind_dom_exc_virq failed");
+		caml_failwith("evtchn bind_virq failed");
 	port = Val_int(rc);
 
 	CAMLreturn(port);

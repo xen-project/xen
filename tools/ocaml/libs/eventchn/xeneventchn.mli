@@ -22,6 +22,23 @@ type handle
 type t
 (** A local event channel. *)
 
+type virq_t =
+  | Timer        (* #define VIRQ_TIMER      0 *)
+  | Debug        (* #define VIRQ_DEBUG      1 *)
+  | Console      (* #define VIRQ_CONSOLE    2 *)
+  | Dom_exc      (* #define VIRQ_DOM_EXC    3 *)
+  | Tbuf         (* #define VIRQ_TBUF       4 *)
+  | Reserved_5   (* Do not use this value as it's not defined *)
+  | Debugger     (* #define VIRQ_DEBUGGER   6 *)
+  | Xenoprof     (* #define VIRQ_XENOPROF   7 *)
+  | Con_ring     (* #define VIRQ_CON_RING   8 *)
+  | Pcpu_state   (* #define VIRQ_PCPU_STATE 9 *)
+  | Mem_event    (* #define VIRQ_MEM_EVENT  10 *)
+  | Xc_reserved  (* #define VIRQ_XC_RESERVED 11 *)
+  | Enomem       (* #define VIRQ_ENOMEM     12 *)
+  | Xenpmu       (* #define VIRQ_XENPMU     13 *)
+
+
 val to_int: t -> int
 
 val of_int: int -> t
@@ -48,6 +65,10 @@ val bind_dom_exc_virq : handle -> t
 (** Binds a local event channel to the VIRQ_DOM_EXC
     (domain exception VIRQ). On error it will throw a Failure
     exception. *)
+
+val bind_virq: handle -> virq_t -> t
+(** Binds a local event channel to the specific VIRQ type.
+    On error it will throw a Failure exception. *)
 
 val unbind : handle -> t -> unit
 (** Unbinds the given event channel. On error it will throw a
