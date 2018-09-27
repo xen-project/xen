@@ -82,7 +82,8 @@ int p2m_get_suppress_ve(struct domain *d, gfn_t gfn, bool *suppress_ve,
  * Get access type for a gfn.
  * If gfn == INVALID_GFN, gets the default access type.
  */
-int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access);
+int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access,
+                       unsigned int altp2m_idx);
 
 #ifdef CONFIG_MEM_ACCESS
 int mem_access_memop(unsigned long cmd,

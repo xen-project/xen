@@ -236,7 +236,7 @@ bool p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     if ( !p2m->mem_access_enabled )
         return true;
 
-    rc = p2m_get_mem_access(v->domain, gaddr_to_gfn(gpa), &xma);
+    rc = p2m_get_mem_access(v->domain, gaddr_to_gfn(gpa), &xma, 0);
     if ( rc )
         return true;
 
@@ -441,10 +441,13 @@ long p2m_set_mem_access_multi(struct domain *d,
 }
 
 int p2m_get_mem_access(struct domain *d, gfn_t gfn,
-                       xenmem_access_t *access)
+                       xenmem_access_t *access, unsigned int altp2m_idx)
 {
     int ret;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    /* altp2m is not yet implemented on Arm. The altp2m_idx should be 0. */
+    ASSERT(altp2m_idx == 0);
 
     p2m_read_lock(p2m);
     ret = __p2m_get_mem_access(d, gfn, access);

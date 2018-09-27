@@ -4469,6 +4469,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_get_suppress_ve:
     case HVMOP_altp2m_set_mem_access:
     case HVMOP_altp2m_set_mem_access_multi:
+    case HVMOP_altp2m_get_mem_access:
     case HVMOP_altp2m_change_gfn:
         break;
 
@@ -4596,8 +4597,8 @@ static int do_altp2m_op(
             rc = -EINVAL;
         else
         {
-            gfn_t gfn = _gfn(a.u.set_mem_access.gfn);
-            unsigned int altp2m_idx = a.u.set_mem_access.view;
+            gfn_t gfn = _gfn(a.u.mem_access.gfn);
+            unsigned int altp2m_idx = a.u.mem_access.view;
             bool suppress_ve = a.u.suppress_ve.suppress_ve;
 
             rc = p2m_set_suppress_ve(d, gfn, suppress_ve, altp2m_idx);
@@ -4623,12 +4624,12 @@ static int do_altp2m_op(
         break;
 
     case HVMOP_altp2m_set_mem_access:
-        if ( a.u.set_mem_access.pad )
+        if ( a.u.mem_access.pad )
             rc = -EINVAL;
         else
-            rc = p2m_set_mem_access(d, _gfn(a.u.set_mem_access.gfn), 1, 0, 0,
-                                    a.u.set_mem_access.hvmmem_access,
-                                    a.u.set_mem_access.view);
+            rc = p2m_set_mem_access(d, _gfn(a.u.mem_access.gfn), 1, 0, 0,
+                                    a.u.mem_access.access,
+                                    a.u.mem_access.view);
         break;
 
     case HVMOP_altp2m_set_mem_access_multi:
@@ -4661,6 +4662,23 @@ static int do_altp2m_op(
             else
                 rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",
                                                    HVMOP_altp2m, arg);
+        }
+        break;
+
+    case HVMOP_altp2m_get_mem_access:
+        if ( a.u.mem_access.pad )
+            rc = -EINVAL;
+        else
+        {
+            xenmem_access_t access;
+
+            rc = p2m_get_mem_access(d, _gfn(a.u.mem_access.gfn), &access,
+                                    a.u.mem_access.view);
+            if ( !rc )
+            {
+                a.u.mem_access.access = access;
+                rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+            }
         }
         break;
 

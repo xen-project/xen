@@ -99,7 +99,7 @@ int mem_access_memop(unsigned long cmd,
         if ( (mao.pfn > domain_get_maximum_gpfn(d)) && mao.pfn != ~0ull )
             break;
 
-        rc = p2m_get_mem_access(d, _gfn(mao.pfn), &access);
+        rc = p2m_get_mem_access(d, _gfn(mao.pfn), &access, 0);
         if ( rc != 0 )
             break;
 

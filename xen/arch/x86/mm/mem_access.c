@@ -486,9 +486,28 @@ long p2m_set_mem_access_multi(struct domain *d,
     return rc;
 }
 
-int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access)
+int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access,
+                       unsigned int altp2m_idx)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+#ifdef CONFIG_HVM
+    if ( !altp2m_active(d) )
+    {
+        if ( altp2m_idx )
+            return -EINVAL;
+    }
+    else
+    {
+        if ( altp2m_idx >= MAX_ALTP2M ||
+             d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
+            return -EINVAL;
+
+        p2m = d->arch.altp2m_p2m[altp2m_idx];
+    }
+#else
+    ASSERT(!altp2m_idx);
+#endif
 
     return _p2m_get_mem_access(p2m, gfn, access);
 }

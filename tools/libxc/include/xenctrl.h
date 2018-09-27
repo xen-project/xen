@@ -1949,6 +1949,9 @@ int xc_altp2m_set_mem_access(xc_interface *handle, uint32_t domid,
 int xc_altp2m_set_mem_access_multi(xc_interface *handle, uint32_t domid,
                                    uint16_t view_id, uint8_t *access,
                                    uint64_t *gfns, uint32_t nr);
+int xc_altp2m_get_mem_access(xc_interface *handle, uint32_t domid,
+                             uint16_t view_id, xen_pfn_t gfn,
+                             xenmem_access_t *access);
 int xc_altp2m_change_gfn(xc_interface *handle, uint32_t domid,
                          uint16_t view_id, xen_pfn_t old_gfn,
                          xen_pfn_t new_gfn);
