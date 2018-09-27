@@ -177,7 +177,12 @@ static multiboot_info_t *mbi2_reloc(u32 mbi_in)
     if ( mbi_out->mods_count )
     {
         mbi_out->flags |= MBI_MODULES;
-        mbi_out->mods_addr = alloc_mem(mbi_out->mods_count * sizeof(*mbi_out_mods));
+        /*
+         * We have to allocate one more module slot here. At some point
+         * __start_xen() may put Xen image placement into it.
+         */
+        mbi_out->mods_addr = alloc_mem((mbi_out->mods_count + 1) *
+                                       sizeof(*mbi_out_mods));
         mbi_out_mods = _p(mbi_out->mods_addr);
     }
 
