@@ -195,7 +195,7 @@ struct hvm_domain {
 };
 
 #ifdef CONFIG_HVM
-#define hap_enabled(d)  ((d)->arch.hvm.hap_enabled)
+#define hap_enabled(d)  (is_hvm_domain(d) && (d)->arch.hvm.hap_enabled)
 #else
 #define hap_enabled(d)  ({(void)(d); false;})
 #endif
