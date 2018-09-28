@@ -69,7 +69,6 @@ LINUX_BACKEND_MODULES := @LINUX_BACKEND_MODULES@
 #System options
 ZLIB                := @zlib@
 CONFIG_LIBICONV     := @libiconv@
-CONFIG_GCRYPT       := @libgcrypt@
 EXTFS_LIBS          := @EXTFS_LIBS@
 CURSES_LIBS         := @CURSES_LIBS@
 TINFO_LIBS          := @TINFO_LIBS@

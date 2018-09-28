@@ -407,8 +407,6 @@ AC_CHECK_LIB([aio], [io_setup], [], [AC_MSG_ERROR([Could not find libaio])])
 ])
 AC_SUBST(system_aio)
 AX_CHECK_EXTFS
-AC_CHECK_LIB([gcrypt], [gcry_md_hash_buffer], [libgcrypt="y"], [libgcrypt="n"])
-AC_SUBST(libgcrypt)
 AX_CHECK_PTHREAD
 AX_CHECK_PTYFUNCS
 AC_CHECK_LIB([yajl], [yajl_alloc], [],
