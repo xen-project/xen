@@ -24,8 +24,8 @@ distclean: clean
 .PHONY: install
 install: all
 	[ -d $(DESTDIR)$(sbindir) ] || $(INSTALL_DIR) $(DESTDIR)$(sbindir)
-	$(INSTALL_PROG) kdd $(DESTDIR)$(sbindir)/kdd
+	$(INSTALL_PROG) kdd $(DESTDIR)$(sbindir)/xen-kdd
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(DESTDIR)$(sbindir)/kdd
+	rm -f $(DESTDIR)$(sbindir)/xen-kdd
