@@ -416,6 +416,8 @@ static void *__init move_memory(
     return NULL;
 }
 
+#undef BOOTSTRAP_MAP_LIMIT
+
 static uint64_t __init consider_modules(
     uint64_t s, uint64_t e, uint32_t size, const module_t *mod,
     unsigned int nr_mods, unsigned int this_mod)
