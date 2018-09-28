@@ -43,4 +43,6 @@ void console_giveback(int id);
 int console_suspend(void);
 int console_resume(void);
 
+extern int8_t opt_console_xen;
+
 #endif /* __CONSOLE_H__ */

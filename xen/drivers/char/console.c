@@ -91,7 +91,8 @@ static uint32_t conringc, conringp;
 static int __read_mostly sercon_handle = -1;
 
 #ifdef CONFIG_X86
-static bool __read_mostly opt_console_xen; /* console=xen */
+/* Tristate: 0 disabled, 1 user enabled, -1 default enabled */
+int8_t __read_mostly opt_console_xen; /* console=xen */
 #endif
 
 static DEFINE_SPINLOCK(console_lock);
@@ -832,7 +833,7 @@ void __init console_init_preirq(void)
             pv_console_init();
 #ifdef CONFIG_X86
         else if ( !strncmp(p, "xen", 3) )
-            opt_console_xen = true;
+            opt_console_xen = 1;
 #endif
         else if ( !strncmp(p, "none", 4) )
             continue;
@@ -851,6 +852,11 @@ void __init console_init_preirq(void)
                 *q = ',';
         }
     }
+
+#ifdef CONFIG_X86
+    if ( opt_console_xen == -1 )
+        opt_console_xen = 0;
+#endif
 
     serial_set_rx_handler(sercon_handle, serial_rx);
     pv_console_set_rx_handler(serial_rx);

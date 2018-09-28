@@ -710,6 +710,11 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     if ( pvh_boot )
     {
+        /*
+         * Force xen console to be enabled. We will reset it later in console
+         * initialisation code.
+         */
+        opt_console_xen = -1;
         ASSERT(mbi_p == 0);
         mbi = pvh_init();
     }
