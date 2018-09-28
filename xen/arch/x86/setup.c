@@ -942,19 +942,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     initial_images = mod;
     nr_initial_images = mbi->mods_count;
 
-    /*
-     * Iterate backwards over all superpage-aligned RAM regions.
-     * 
-     * We require superpage alignment because the boot allocator is not yet
-     * initialised. Hence we can only map superpages in the address range
-     * 0 to BOOTSTRAP_DIRECTMAP_END, as this is guaranteed not to require
-     * dynamic allocation of pagetables.
-     * 
-     * As well as mapping superpages in that range, in preparation for
-     * initialising the boot allocator, we also look for a region to which
-     * we can relocate the dom0 kernel and other multiboot modules. Also, on
-     * x86/64, we relocate Xen to higher memory.
-     */
     for ( i = 0; !efi_enabled(EFI_LOADER) && i < mbi->mods_count; i++ )
     {
         if ( mod[i].mod_start & (PAGE_SIZE - 1) )
@@ -987,6 +974,19 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         highmem_start &= ~((1UL << L3_PAGETABLE_SHIFT) - 1);
 #endif
 
+    /*
+     * Iterate backwards over all superpage-aligned RAM regions.
+     *
+     * We require superpage alignment because the boot allocator is
+     * not yet initialised. Hence we can only map superpages in the
+     * address range BOOTSTRAP_MAP_BASE to 4GB, as this is guaranteed
+     * not to require dynamic allocation of pagetables.
+     *
+     * As well as mapping superpages in that range, in preparation for
+     * initialising the boot allocator, we also look for a region to which
+     * we can relocate the dom0 kernel and other multiboot modules. Also, on
+     * x86/64, we relocate Xen to higher memory.
+     */
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
