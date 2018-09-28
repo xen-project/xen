@@ -32,13 +32,13 @@ install: build
 	$(INSTALL_DIR) $(DESTDIR)$(sbindir)
 	$(INSTALL_PROG) xenbaked $(DESTDIR)$(sbindir)/xenbaked
 	$(INSTALL_PROG) xentrace_setmask  $(DESTDIR)$(sbindir)/xentrace_setmask
-	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(sbindir)/xenmon.py
+	$(INSTALL_PROG) xenmon.py  $(DESTDIR)$(sbindir)/xenmon
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(DESTDIR)$(sbindir)/xenbaked
 	rm -f $(DESTDIR)$(sbindir)/xentrace_setmask
-	rm -f $(DESTDIR)$(sbindir)/xenmon.py
+	rm -f $(DESTDIR)$(sbindir)/xenmon
 
 .PHONY: clean
 clean:
