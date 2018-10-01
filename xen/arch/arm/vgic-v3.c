@@ -1380,9 +1380,11 @@ static const struct mmio_handler_ops vgic_distr_mmio_handler = {
     .write = vgic_v3_distr_mmio_write,
 };
 
+static int vgic_v3_real_domain_init(struct domain *d);
+
 static int vgic_v3_vcpu_init(struct vcpu *v)
 {
-    int i;
+    int i, rc;
     paddr_t rdist_base;
     struct vgic_rdist_region *region;
     unsigned int last_cpu;
@@ -1390,6 +1392,19 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
     /* Convenient alias */
     struct domain *d = v->domain;
     uint32_t rdist_stride = d->arch.vgic.rdist_stride;
+
+    /*
+     * This is the earliest place where the number of vCPUs is
+     * known. This is required to initialize correctly the vGIC v3
+     * domain structure. We only to do that when vCPU 0 is
+     * initilialized.
+     */
+    if ( v->vcpu_id == 0 )
+    {
+        rc = vgic_v3_real_domain_init(d);
+        if ( rc )
+            return rc;
+    }
 
     /*
      * Find the region where the re-distributor lives. For this purpose,
@@ -1439,7 +1454,7 @@ static inline unsigned int vgic_v3_rdist_count(struct domain *d)
                GUEST_GICV3_RDIST_REGIONS;
 }
 
-static int vgic_v3_domain_init(struct domain *d)
+static int vgic_v3_real_domain_init(struct domain *d)
 {
     struct vgic_rdist_region *rdist_regions;
     int rdist_count, i, ret;
@@ -1525,6 +1540,16 @@ static int vgic_v3_domain_init(struct domain *d)
 
     d->arch.vgic.ctlr = VGICD_CTLR_DEFAULT;
 
+    return 0;
+}
+
+static int vgic_v3_domain_init(struct domain *d)
+{
+    /*
+     * The domain initialization for vGIC v3 is delayed until the first vCPU
+     * is created. This because the initialization may require to know the
+     * number of vCPUs that is not known when creating the domain.
+     */
     return 0;
 }
 
