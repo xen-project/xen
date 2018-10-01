@@ -44,8 +44,9 @@
 #define SKIP_CTXT_SWITCH_SERROR_SYNC 6
 #define ARM_HARDEN_BRANCH_PREDICTOR 7
 #define ARM_SSBD 8
+#define ARM_SMCCC_1_1 9
 
-#define ARM_NCAPS           9
+#define ARM_NCAPS           10
 
 #ifndef __ASSEMBLY__
 

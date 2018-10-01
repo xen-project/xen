@@ -21,6 +21,7 @@
 #include <xen/types.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
+#include <asm/cpufeature.h>
 #include <asm/psci.h>
 #include <asm/acpi.h>
 
@@ -117,6 +118,9 @@ static void __init psci_init_smccc(void)
         if ( ret != ARM_SMCCC_NOT_SUPPORTED )
             smccc_ver = ret;
     }
+
+    if ( smccc_ver >= SMCCC_VERSION(1, 1) )
+        cpus_set_cap(ARM_SMCCC_1_1);
 
     printk(XENLOG_INFO "Using SMC Calling Convention v%u.%u\n",
            SMCCC_VERSION_MAJOR(smccc_ver), SMCCC_VERSION_MINOR(smccc_ver));

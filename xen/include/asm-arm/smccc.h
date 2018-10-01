@@ -16,6 +16,9 @@
 #ifndef __ASM_ARM_SMCCC_H__
 #define __ASM_ARM_SMCCC_H__
 
+#include <asm/alternative.h>
+#include <asm/cpufeature.h>
+
 #define SMCCC_VERSION_MAJOR_SHIFT            16
 #define SMCCC_VERSION_MINOR_MASK             \
         ((1U << SMCCC_VERSION_MAJOR_SHIFT) - 1)
@@ -213,6 +216,7 @@ struct arm_smccc_res {
  */
 #ifdef CONFIG_ARM_32
 #define arm_smccc_1_0_smc(...) arm_smccc_1_1_smc(__VA_ARGS__)
+#define arm_smccc_smc(...) arm_smccc_1_1_smc(__VA_ARGS__)
 #else
 
 void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
@@ -254,6 +258,13 @@ void __arm_smccc_1_0_smc(register_t a0, register_t a1, register_t a2,
 #define arm_smccc_1_0_smc(...)                                              \
         __arm_smccc_1_0_smc_count(__count_args(__VA_ARGS__), __VA_ARGS__)
 
+#define arm_smccc_smc(...)                                      \
+    do {                                                        \
+        if ( cpus_have_const_cap(ARM_SMCCC_1_1) )               \
+            arm_smccc_1_1_smc(__VA_ARGS__);                     \
+        else                                                    \
+            arm_smccc_1_0_smc(__VA_ARGS__);                     \
+    } while ( 0 )
 #endif /* CONFIG_ARM_64 */
 
 #endif /* __ASSEMBLY__ */
