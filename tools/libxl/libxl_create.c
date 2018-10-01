@@ -368,25 +368,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             b_info->shadow_memkb = 0;
         if (b_info->u.pv.slack_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->u.pv.slack_memkb = 0;
-
-        /* For compatibility, fill in b_info->kernel|ramdisk|cmdline
-         * with the value in u.pv, later processing will use
-         * b_info->kernel|ramdisk|cmdline only.
-         * User with old APIs that passes u.pv.kernel|ramdisk|cmdline
-         * is not affected.
-         */
-        if (!b_info->kernel && b_info->u.pv.kernel) {
-            b_info->kernel = b_info->u.pv.kernel;
-            b_info->u.pv.kernel = NULL;
-        }
-        if (!b_info->ramdisk && b_info->u.pv.ramdisk) {
-            b_info->ramdisk = b_info->u.pv.ramdisk;
-            b_info->u.pv.ramdisk = NULL;
-        }
-        if (!b_info->cmdline && b_info->u.pv.cmdline) {
-            b_info->cmdline = b_info->u.pv.cmdline;
-            b_info->u.pv.cmdline = NULL;
-        }
         break;
     case LIBXL_DOMAIN_TYPE_PVH:
         libxl_defbool_setdefault(&b_info->u.pvh.pvshim, false);
