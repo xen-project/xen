@@ -953,7 +953,11 @@ int libxl__arch_domain_init_hw_description(libxl__gc *gc,
     int rc;
     uint64_t val;
 
-    assert(info->type == LIBXL_DOMAIN_TYPE_PV);
+    if (info->type != LIBXL_DOMAIN_TYPE_PVH) {
+        LOG(ERROR, "Unsupported Arm guest type %s",
+            libxl_domain_type_to_string(info->type));
+        return ERROR_INVAL;
+    }
 
     /* Set the value of domain param HVM_PARAM_CALLBACK_IRQ. */
     val = MASK_INSR(HVM_PARAM_CALLBACK_TYPE_PPI,
@@ -1110,10 +1114,28 @@ int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
     return xc_domain_bind_pt_spi_irq(CTX->xch, domid, irq, irq);
 }
 
-void libxl__arch_domain_build_info_setdefault(libxl_domain_build_info *b_info)
+void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
+                                              libxl_domain_build_info *b_info)
 {
     /* ACPI is disabled by default */
     libxl_defbool_setdefault(&b_info->acpi, false);
+
+    /*
+     * Arm guest are now considered as PVH by the toolstack. To allow
+     * compatibility with previous toolstack, PV guest are automatically
+     * converted to PVH.
+     */
+    if (b_info->type != LIBXL_DOMAIN_TYPE_PV)
+        return;
+
+    LOG(WARN, "Converting PV guest to PVH.");
+    LOG(WARN, "Arm guest are now PVH.");
+    LOG(WARN, "Please fix your configuration file/toolstack.");
+
+    /* Re-initialize type to PVH and all associated fields to defaults. */
+    memset(&b_info->u, '\0', sizeof(b_info->u));
+    b_info->type = LIBXL_DOMAIN_TYPE_INVALID;
+    libxl_domain_build_info_init_type(b_info, LIBXL_DOMAIN_TYPE_PVH);
 }
 
 /*

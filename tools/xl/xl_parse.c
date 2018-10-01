@@ -1286,7 +1286,11 @@ void parse_config_data(const char *config_source,
     }
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_INVALID)
+#if defined(__arm__) || defined(__aarch64__)
+        c_info->type = LIBXL_DOMAIN_TYPE_PVH;
+#else
         c_info->type = LIBXL_DOMAIN_TYPE_PV;
+#endif
 
     xlu_cfg_get_defbool(config, "hap", &c_info->hap, 0);
 

@@ -80,13 +80,14 @@ single host must be unique.
 =item B<type="pv">
 
 Specifies that this is to be a PV domain, suitable for hosting Xen-aware
-guest operating systems. This is the default.
+guest operating systems. This is the default on x86.
 
 =item B<type="pvh">
 
 Specifies that this is to be an PVH domain. That is a lightweight HVM-like
 guest without a device model and without many of the emulated devices
-available to HVM guests. Note that this mode requires a PVH aware kernel.
+available to HVM guests. Note that this mode requires a PVH aware kernel on
+x86. This is the default on Arm.
 
 =item B<type="hvm">
 

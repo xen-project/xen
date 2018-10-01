@@ -65,7 +65,8 @@ _hidden
 int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq);
 
 _hidden
-void libxl__arch_domain_build_info_setdefault(libxl_domain_build_info *b_info);
+void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
+                                              libxl_domain_build_info *b_info);
 
 _hidden
 int libxl__arch_extra_memory(libxl__gc *gc,
