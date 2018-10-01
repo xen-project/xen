@@ -63,6 +63,18 @@ static inline bool cpus_have_cap(unsigned int num)
     return test_bit(num, cpu_hwcaps);
 }
 
+/* System capability check for constant cap */
+#define cpus_have_const_cap(num) ({                 \
+        bool __ret;                                 \
+                                                    \
+        asm volatile (ALTERNATIVE("mov %0, #0",     \
+                                  "mov %0, #1",     \
+                                  num)              \
+                      : "=r" (__ret));              \
+                                                    \
+        unlikely(__ret);                            \
+        })
+
 static inline void cpus_set_cap(unsigned int num)
 {
     if (num >= ARM_NCAPS)
