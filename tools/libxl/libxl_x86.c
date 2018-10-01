@@ -613,8 +613,7 @@ int libxl__arch_domain_finalise_hw_description(libxl__gc *gc,
     return rc;
 }
 
-void libxl__arch_domain_build_info_acpi_setdefault(
-                                        libxl_domain_build_info *b_info)
+void libxl__arch_domain_build_info_setdefault(libxl_domain_build_info *b_info)
 {
     libxl_defbool_setdefault(&b_info->acpi, true);
 }

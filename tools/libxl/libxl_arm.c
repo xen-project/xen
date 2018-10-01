@@ -1110,9 +1110,9 @@ int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
     return xc_domain_bind_pt_spi_irq(CTX->xch, domid, irq, irq);
 }
 
-void libxl__arch_domain_build_info_acpi_setdefault(
-                                        libxl_domain_build_info *b_info)
+void libxl__arch_domain_build_info_setdefault(libxl_domain_build_info *b_info)
 {
+    /* ACPI is disabled by default */
     libxl_defbool_setdefault(&b_info->acpi, false);
 }
 
