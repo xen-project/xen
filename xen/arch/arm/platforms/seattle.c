@@ -33,12 +33,12 @@ static const char * const seattle_dt_compat[] __initconst =
  */
 static void seattle_system_reset(void)
 {
-    call_smc(PSCI_0_2_FN32_SYSTEM_RESET, 0, 0, 0);
+    arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_RESET, NULL);
 }
 
 static void seattle_system_off(void)
 {
-    call_smc(PSCI_0_2_FN32_SYSTEM_OFF, 0, 0, 0);
+    arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_OFF, NULL);
 }
 
 PLATFORM_START(seattle, "SEATTLE")

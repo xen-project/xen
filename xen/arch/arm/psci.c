@@ -42,42 +42,53 @@ uint32_t smccc_ver;
 
 static uint32_t psci_cpu_on_nr;
 
+#define PSCI_RET(res)   ((int32_t)(res).a0)
+
 int call_psci_cpu_on(int cpu)
 {
-    return call_smc(psci_cpu_on_nr, cpu_logical_map(cpu), __pa(init_secondary), 0);
+    struct arm_smccc_res res;
+
+    arm_smccc_smc(psci_cpu_on_nr, cpu_logical_map(cpu), __pa(init_secondary),
+                  &res);
+
+    return PSCI_RET(res);
 }
 
 void call_psci_cpu_off(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
     {
-        int errno;
+        struct arm_smccc_res res;
 
         /* If successfull the PSCI cpu_off call doesn't return */
-        errno = call_smc(PSCI_0_2_FN32_CPU_OFF, 0, 0, 0);
+        arm_smccc_smc(PSCI_0_2_FN32_CPU_OFF, &res);
         panic("PSCI cpu off failed for CPU%d err=%d\n", smp_processor_id(),
-              errno);
+              PSCI_RET(res));
     }
 }
 
 void call_psci_system_off(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
-        call_smc(PSCI_0_2_FN32_SYSTEM_OFF, 0, 0, 0);
+        arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_OFF, NULL);
 }
 
 void call_psci_system_reset(void)
 {
     if ( psci_ver > PSCI_VERSION(0, 1) )
-        call_smc(PSCI_0_2_FN32_SYSTEM_RESET, 0, 0, 0);
+        arm_smccc_smc(PSCI_0_2_FN32_SYSTEM_RESET, NULL);
 }
 
 static int __init psci_features(uint32_t psci_func_id)
 {
+    struct arm_smccc_res res;
+
     if ( psci_ver < PSCI_VERSION(1, 0) )
         return PSCI_NOT_SUPPORTED;
 
-    return call_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id, 0, 0);
+    arm_smccc_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id, NULL);
+
+    return PSCI_RET(res);
 }
 
 static int __init psci_is_smc_method(const struct dt_device_node *psci)
@@ -112,11 +123,11 @@ static void __init psci_init_smccc(void)
 
     if ( psci_features(ARM_SMCCC_VERSION_FID) != PSCI_NOT_SUPPORTED )
     {
-        uint32_t ret;
+        struct arm_smccc_res res;
 
-        ret = call_smc(ARM_SMCCC_VERSION_FID, 0, 0, 0);
-        if ( ret != ARM_SMCCC_NOT_SUPPORTED )
-            smccc_ver = ret;
+        arm_smccc_smc(ARM_SMCCC_VERSION_FID, &res);
+        if ( PSCI_RET(res) != ARM_SMCCC_NOT_SUPPORTED )
+            smccc_ver = PSCI_RET(res);
     }
 
     if ( smccc_ver >= SMCCC_VERSION(1, 1) )
@@ -165,6 +176,7 @@ static int __init psci_init_0_2(void)
         { /* sentinel */ },
     };
     int ret;
+    struct arm_smccc_res res;
 
     if ( acpi_disabled )
     {
@@ -186,7 +198,8 @@ static int __init psci_init_0_2(void)
         }
     }
 
-    psci_ver = call_smc(PSCI_0_2_FN32_PSCI_VERSION, 0, 0, 0);
+    arm_smccc_smc(PSCI_0_2_FN32_PSCI_VERSION, &res);
+    psci_ver = PSCI_RET(res);
 
     /* For the moment, we only support PSCI 0.2 and PSCI 1.x */
     if ( psci_ver != PSCI_VERSION(0, 2) && PSCI_VERSION_MAJOR(psci_ver) != 1 )

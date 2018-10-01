@@ -39,7 +39,6 @@ obj-y += processor.o
 obj-y += psci.o
 obj-y += setup.o
 obj-y += shutdown.o
-obj-y += smc.o
 obj-y += smp.o
 obj-y += smpboot.o
 obj-y += sysctl.o
