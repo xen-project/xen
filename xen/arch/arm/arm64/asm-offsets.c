@@ -10,6 +10,7 @@
 #include <xen/bitops.h>
 #include <public/xen.h>
 #include <asm/current.h>
+#include <asm/smccc.h>
 
 #define DEFINE(_sym, _val)                                                 \
     asm volatile ("\n.ascii\"==>#define " #_sym " %0 /* " #_val " */<==\"" \
@@ -51,6 +52,10 @@ void __dummy__(void)
 
    BLANK();
    OFFSET(INITINFO_stack, struct init_info, stack);
+
+   BLANK();
+   OFFSET(SMCCC_RES_a0, struct arm_smccc_res, a0);
+   OFFSET(SMCCC_RES_a2, struct arm_smccc_res, a2);
 }
 
 /*
