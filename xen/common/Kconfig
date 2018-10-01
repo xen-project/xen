@@ -215,7 +215,7 @@ config SCHED_NULL
 
 choice
 	prompt "Default Scheduler?"
-	default SCHED_CREDIT2_DEFAULT
+	default SCHED_CREDIT_DEFAULT
 
 	config SCHED_CREDIT_DEFAULT
 		bool "Credit Scheduler" if SCHED_CREDIT
@@ -236,7 +236,7 @@ config SCHED_DEFAULT
 	default "rtds" if SCHED_RTDS_DEFAULT
 	default "arinc653" if SCHED_ARINC653_DEFAULT
 	default "null" if SCHED_NULL_DEFAULT
-	default "credit2"
+	default "credit"
 
 endmenu
 
