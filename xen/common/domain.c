@@ -288,6 +288,21 @@ static void _domain_destroy(struct domain *d)
     free_domain_struct(d);
 }
 
+static int sanitise_domain_config(struct xen_domctl_createdomain *config)
+{
+    if ( config->flags & ~(XEN_DOMCTL_CDF_hvm_guest |
+                           XEN_DOMCTL_CDF_hap |
+                           XEN_DOMCTL_CDF_s3_integrity |
+                           XEN_DOMCTL_CDF_oos_off |
+                           XEN_DOMCTL_CDF_xs_domain) )
+    {
+        dprintk(XENLOG_INFO, "Unknown CDF flags %#x\n", config->flags);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 struct domain *domain_create(domid_t domid,
                              struct xen_domctl_createdomain *config,
                              bool is_priv)
@@ -296,6 +311,9 @@ struct domain *domain_create(domid_t domid,
     enum { INIT_watchdog = 1u<<1,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
     int err, init_status = 0;
+
+    if ( config && (err = sanitise_domain_config(config)) )
+        return ERR_PTR(err);
 
     if ( (d = alloc_domain_struct()) == NULL )
         return ERR_PTR(-ENOMEM);

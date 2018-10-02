@@ -498,15 +498,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         domid_t        dom;
         static domid_t rover = 0;
 
-        ret = -EINVAL;
-        if ( (op->u.createdomain.flags &
-             ~(XEN_DOMCTL_CDF_hvm_guest
-               | XEN_DOMCTL_CDF_hap
-               | XEN_DOMCTL_CDF_s3_integrity
-               | XEN_DOMCTL_CDF_oos_off
-               | XEN_DOMCTL_CDF_xs_domain)) )
-            break;
-
         dom = op->domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
         {
