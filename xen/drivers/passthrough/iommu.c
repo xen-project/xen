@@ -157,7 +157,7 @@ static int __init parse_dom0_iommu_param(const char *s)
         else if ( (val = parse_boolean("map-inclusive", s, ss)) >= 0 )
             iommu_hwdom_inclusive = val;
         else if ( (val = parse_boolean("map-reserved", s, ss)) >= 0 )
-            iommu_hwdom_inclusive = val;
+            iommu_hwdom_reserved = val;
         else
             rc = -EINVAL;
 

@@ -210,7 +210,7 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 
     BUG_ON(!is_hardware_domain(d));
 
-    ASSERT(iommu_hwdom_inclusive != -1 && iommu_hwdom_inclusive != -1);
+    ASSERT(iommu_hwdom_inclusive != -1 && iommu_hwdom_reserved != -1);
     if ( iommu_hwdom_inclusive && !is_pv_domain(d) )
     {
         printk(XENLOG_WARNING
