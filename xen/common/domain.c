@@ -300,7 +300,7 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    return 0;
+    return arch_sanitise_domain_config(config);
 }
 
 struct domain *domain_create(domid_t domid,

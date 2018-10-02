@@ -599,6 +599,30 @@ void vcpu_switch_to_aarch64_mode(struct vcpu *v)
     v->arch.hcr_el2 |= HCR_RW;
 }
 
+int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
+{
+    /* Fill in the native GIC version, passed back to the toolstack. */
+    if ( config->arch.gic_version == XEN_DOMCTL_CONFIG_GIC_NATIVE )
+    {
+        switch ( gic_hw_version() )
+        {
+        case GIC_V2:
+            config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
+            break;
+
+        case GIC_V3:
+            config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            return -EINVAL;
+        }
+    }
+
+    return 0;
+}
+
 int arch_domain_create(struct domain *d,
                        struct xen_domctl_createdomain *config)
 {
@@ -629,24 +653,6 @@ int arch_domain_create(struct domain *d,
 
     switch ( config->arch.gic_version )
     {
-    case XEN_DOMCTL_CONFIG_GIC_NATIVE:
-        switch ( gic_hw_version () )
-        {
-        case GIC_V2:
-            config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V2;
-            d->arch.vgic.version = GIC_V2;
-            break;
-
-        case GIC_V3:
-            config->arch.gic_version = XEN_DOMCTL_CONFIG_GIC_V3;
-            d->arch.vgic.version = GIC_V3;
-            break;
-
-        default:
-            BUG();
-        }
-        break;
-
     case XEN_DOMCTL_CONFIG_GIC_V2:
         d->arch.vgic.version = GIC_V2;
         break;
@@ -656,8 +662,7 @@ int arch_domain_create(struct domain *d,
         break;
 
     default:
-        rc = -EOPNOTSUPP;
-        goto fail;
+        BUG();
     }
 
     if ( (rc = domain_vgic_register(d, &count)) != 0 )

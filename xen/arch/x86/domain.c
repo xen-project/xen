@@ -418,6 +418,11 @@ void arch_vcpu_destroy(struct vcpu *v)
         pv_vcpu_destroy(v);
 }
 
+int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
+{
+    return 0;
+}
+
 static bool emulation_flags_ok(const struct domain *d, uint32_t emflags)
 {
 #ifdef CONFIG_HVM
