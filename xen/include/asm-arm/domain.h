@@ -208,12 +208,6 @@ void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 void vcpu_switch_to_aarch64_mode(struct vcpu *);
 
-/* On ARM, the number of VCPUs is limited by the type of GIC emulated. */
-static inline unsigned int domain_max_vcpus(const struct domain *d)
-{
-    return vgic_max_vcpus(d);
-}
-
 /*
  * Due to the restriction of GICv3, the number of vCPUs in AFF0 is
  * limited to 16, thus only the first 4 bits of AFF0 are legal. We will

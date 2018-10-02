@@ -112,9 +112,6 @@ int domain_vgic_register(struct domain *d, int *mmio_count)
         BUG();
     }
 
-    if ( d->max_vcpus > domain_max_vcpus(d) )
-        return -E2BIG;
-
     d->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
     d->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
     d->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;

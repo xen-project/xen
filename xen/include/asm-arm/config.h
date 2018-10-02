@@ -41,9 +41,9 @@
 #define OPT_CONSOLE_STR "dtuart"
 
 #ifdef CONFIG_ARM_64
-#define MAX_VIRT_CPUS 128
+#define MAX_VIRT_CPUS 128u
 #else
-#define MAX_VIRT_CPUS 8
+#define MAX_VIRT_CPUS 8u
 #endif
 
 #define INVALID_VCPU_ID MAX_VIRT_CPUS

@@ -725,7 +725,6 @@ static const struct vgic_ops vgic_v2_ops = {
     .domain_free = vgic_v2_domain_free,
     .lpi_to_pending = vgic_v2_lpi_to_pending,
     .lpi_get_priority = vgic_v2_lpi_get_priority,
-    .max_vcpus = 8,
 };
 
 int vgic_v2_init(struct domain *d, int *mmio_count)

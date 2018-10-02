@@ -664,8 +664,6 @@ unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v);
              X86_CR4_OSXSAVE | X86_CR4_SMEP |               \
              X86_CR4_FSGSBASE | X86_CR4_SMAP | X86_CR4_PCIDE))
 
-#define domain_max_vcpus(d) (is_hvm_domain(d) ? HVM_MAX_VCPUS : MAX_VIRT_CPUS)
-
 static inline struct vcpu_guest_context *alloc_vcpu_guest_context(void)
 {
     return vmalloc(sizeof(struct vcpu_guest_context));

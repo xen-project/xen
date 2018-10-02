@@ -667,9 +667,21 @@ void vgic_free_virq(struct domain *d, unsigned int virq)
     clear_bit(virq, d->arch.vgic.allocated_irqs);
 }
 
-unsigned int vgic_max_vcpus(const struct domain *d)
+unsigned int vgic_max_vcpus(unsigned int domctl_vgic_version)
 {
-    return min_t(unsigned int, MAX_VIRT_CPUS, d->arch.vgic.handler->max_vcpus);
+    switch ( domctl_vgic_version )
+    {
+    case XEN_DOMCTL_CONFIG_GIC_V2:
+        return 8;
+
+#ifdef CONFIG_GICV3
+    case XEN_DOMCTL_CONFIG_GIC_V3:
+        return 4096;
+#endif
+
+    default:
+        return 0;
+    }
 }
 
 /*

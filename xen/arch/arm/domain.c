@@ -601,6 +601,8 @@ void vcpu_switch_to_aarch64_mode(struct vcpu *v)
 
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
+    unsigned int max_vcpus;
+
     if ( config->flags != (XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap) )
     {
         dprintk(XENLOG_INFO, "Unsupported configuration %#x\n", config->flags);
@@ -624,6 +626,22 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
             ASSERT_UNREACHABLE();
             return -EINVAL;
         }
+    }
+
+    /* max_vcpus depends on the GIC version, and Xen's compiled limit. */
+    max_vcpus = min(vgic_max_vcpus(config->arch.gic_version), MAX_VIRT_CPUS);
+
+    if ( max_vcpus == 0 )
+    {
+        dprintk(XENLOG_INFO, "Unsupported GIC version\n");
+        return -EINVAL;
+    }
+
+    if ( config->max_vcpus > max_vcpus )
+    {
+        dprintk(XENLOG_INFO, "Requested vCPUs (%u) exceeds max (%u)\n",
+                config->max_vcpus, max_vcpus);
+        return -EINVAL;
     }
 
     return 0;

@@ -949,20 +949,16 @@ void vgic_sync_hardware_irq(struct domain *d,
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-unsigned int vgic_max_vcpus(const struct domain *d)
+unsigned int vgic_max_vcpus(unsigned int domctl_vgic_version)
 {
-    unsigned int vgic_vcpu_limit;
-
-    switch ( d->arch.vgic.version )
+    switch ( domctl_vgic_version )
     {
-    case GIC_V2:
-        vgic_vcpu_limit = VGIC_V2_MAX_CPUS;
-        break;
-    default:
-        BUG();
-    }
+    case XEN_DOMCTL_CONFIG_GIC_V2:
+        return VGIC_V2_MAX_CPUS;
 
-    return min_t(unsigned int, MAX_VIRT_CPUS, vgic_vcpu_limit);
+    default:
+        return 0;
+    }
 }
 
 #ifdef CONFIG_GICV3

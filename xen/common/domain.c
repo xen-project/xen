@@ -300,6 +300,12 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( config->max_vcpus < 1 )
+    {
+        dprintk(XENLOG_INFO, "No vCPUS\n");
+        return -EINVAL;
+    }
+
     return arch_sanitise_domain_config(config);
 }
 
@@ -344,6 +350,20 @@ struct domain *domain_create(domid_t domid,
                      ? guest_type_hvm : guest_type_pv);
 
     TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
+
+    /*
+     * Allocate d->vcpu[] and set ->max_vcpus up early.  Various per-domain
+     * resources want to be sized based on max_vcpus.
+     */
+    if ( !is_system_domain(d) )
+    {
+        err = -ENOMEM;
+        d->vcpu = xzalloc_array(struct vcpu *, config->max_vcpus);
+        if ( !d->vcpu )
+            goto fail;
+
+        d->max_vcpus = config->max_vcpus;
+    }
 
     lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid, "Domain");
 
@@ -396,19 +416,6 @@ struct domain *domain_create(domid_t domid,
 
     if ( !is_idle_domain(d) )
     {
-        /* Check d->max_vcpus and allocate d->vcpu[]. */
-        err = -EINVAL;
-        if ( config->max_vcpus < 1 ||
-             config->max_vcpus > domain_max_vcpus(d) )
-            goto fail;
-
-        err = -ENOMEM;
-        d->vcpu = xzalloc_array(struct vcpu *, config->max_vcpus);
-        if ( !d->vcpu )
-            goto fail;
-
-        d->max_vcpus = config->max_vcpus;
-
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
 
