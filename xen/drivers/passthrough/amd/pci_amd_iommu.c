@@ -250,49 +250,10 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev);
 
 static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
 {
-    unsigned long i; 
     const struct amd_iommu *iommu;
-
-    /* Inclusive IOMMU mappings are disabled by default on AMD hardware. */
-    if ( iommu_hwdom_inclusive == -1 )
-        iommu_hwdom_inclusive = 0;
-    /* Reserved IOMMU mappings are disabled by default on AMD hardware. */
-    if ( iommu_hwdom_reserved == -1 )
-        iommu_hwdom_reserved = 0;
 
     if ( allocate_domain_resources(dom_iommu(d)) )
         BUG();
-
-    if ( !iommu_hwdom_passthrough && !need_iommu(d) )
-    {
-        int rc = 0;
-
-        /* Set up 1:1 page table for dom0 */
-        for ( i = 0; i < max_pdx; i++ )
-        {
-            unsigned long pfn = pdx_to_pfn(i);
-
-            /*
-             * XXX Should we really map all non-RAM (above 4G)? Minimally
-             * a pfn_valid() check would seem desirable here.
-             */
-            if ( mfn_valid(_mfn(pfn)) )
-            {
-                int ret = amd_iommu_map_page(d, pfn, pfn,
-                                             IOMMUF_readable|IOMMUF_writable);
-
-                if ( !rc )
-                    rc = ret;
-            }
-
-            if ( !(i & 0xfffff) )
-                process_pending_softirqs();
-        }
-
-        if ( rc )
-            AMD_IOMMU_DEBUG("d%d: IOMMU mapping failed: %d\n",
-                            d->domain_id, rc);
-    }
 
     for_each_amd_iommu ( iommu )
         if ( iomem_deny_access(d, PFN_DOWN(iommu->mmio_base_phys),
