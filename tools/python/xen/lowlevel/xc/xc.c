@@ -2178,7 +2178,7 @@ static PyMethodDef pyxc_methods[] = {
       " xenstore_gmfn [int]: \n"
       " console_domid [int]: \n"
       " xenstore_domid [int]: \n"
-      "Returns: None on sucess. Raises exception on error.\n" },
+      "Returns: None on success. Raises exception on error.\n" },
 
     { "hvm_get_param", 
       (PyCFunction)pyxc_hvm_param_get,
