@@ -2385,7 +2385,7 @@ static PyMethodDef pyxc_methods[] = {
     { "domain_set_memmap_limit", 
       (PyCFunction)pyxc_domain_set_memmap_limit, 
       METH_VARARGS, "\n"
-      "Set a domain's physical memory mappping limit\n"
+      "Set a domain's physical memory mapping limit\n"
       " dom [int]: Identifier of domain.\n"
       " map_limitkb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },

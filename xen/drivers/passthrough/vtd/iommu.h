@@ -513,7 +513,7 @@ struct qi_ctrl {
 struct ir_ctrl {
     u64 iremap_maddr;            /* interrupt remap table machine address */
     int iremap_num;              /* total num of used interrupt remap entry */
-    spinlock_t iremap_lock;      /* lock for irq remappping table */
+    spinlock_t iremap_lock;      /* lock for irq remapping table */
 };
 
 struct iommu_flush {
