@@ -9224,7 +9224,7 @@ void process_cpu_change(struct pcpu_info *p) {
 
     /* File sanity check */
     if(p->file_offset != p->next_cpu_change_offset) {
-        fprintf(warn, "Strange, pcpu %d expected offet %llx, actual %llx!\n",
+        fprintf(warn, "Strange, pcpu %d expected offset %llx, actual %llx!\n",
                 p->pid, (unsigned long long)p->next_cpu_change_offset,
                 (unsigned long long)p->file_offset);
     }
@@ -9673,7 +9673,7 @@ ssize_t read_record(struct pcpu_info * p) {
 }
 
 /*
- * This funciton gets called for every record when doing dump.  Try to
+ * This function gets called for every record when doing dump.  Try to
  * make it efficient by changing the minimum amount from the last
  * call.  Do this by:
  * - Keeping track of the last pcpu called, so we can just set that to -
@@ -10629,7 +10629,7 @@ const struct argp_option cmd_opts[] =  {
       .key = OPT_SCATTERPLOT_EXTINT_CYCLES,
       .arg = "vector",
       .group = OPT_GROUP_EXTRA,
-      .doc = "Output a scatterplot of vmexit cycles for external interrupts of the given vector as a funciton of time.", },
+      .doc = "Output a scatterplot of vmexit cycles for external interrupts of the given vector as a function of time.", },
 
     { .name = "scatterplot-unpin-promote",
       .key = OPT_SCATTERPLOT_UNPIN_PROMOTE,
@@ -10756,7 +10756,7 @@ const struct argp_option cmd_opts[] =  {
       .key = OPT_MMIO_ENUMERATION_SKIP_VGA,
       .arg = "[0|1]",
       .group = OPT_GROUP_SUMMARY,
-      .doc = "Control whether we enumerate MMIO accesses to the VGA area, which can be extremly high during boot.  Default: 0", },
+      .doc = "Control whether we enumerate MMIO accesses to the VGA area, which can be extremely high during boot.  Default: 0", },
 
     { .name = "sample-size",
       .key = OPT_SAMPLE_SIZE,
