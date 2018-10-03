@@ -87,7 +87,7 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
         return "xen-3.0-x86_64";
     default:
         xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
-                     "%s: unkown image type %"PRIu64,
+                     "%s: unknown image type %"PRIu64,
                      __FUNCTION__, machine);
         return NULL;
     }

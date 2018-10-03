@@ -238,7 +238,7 @@ static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,
     port = libxl__json_object_get_string(obj);
 
     if (!addr || !port) {
-        LOGD(ERROR, qmp->domid, "Failed to retreive VNC connect information.");
+        LOGD(ERROR, qmp->domid, "Failed to retrieve VNC connect information.");
         goto out;
     }
 

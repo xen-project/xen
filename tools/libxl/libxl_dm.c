@@ -992,7 +992,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
 
     /*
      * Do not use any of the user-provided config files in sysconfdir,
-     * avoiding unkown and uncontrolled configuration.
+     * avoiding unknown and uncontrolled configuration.
      */
     flexarray_append(dm_args, "-no-user-config");
 

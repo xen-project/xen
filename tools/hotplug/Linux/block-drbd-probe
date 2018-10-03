@@ -20,7 +20,7 @@
 # Return value:
 #     0: the device is drbd device
 #     1: the device is not drbd device
-#     2: unkown error
+#     2: unknown error
 #     3: the drbd device does not use protocol D
 #     4: the drbd device is not ready
 
