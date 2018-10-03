@@ -680,7 +680,7 @@ CAMLprim value stub_xc_pcpu_info(value xch, value nr_cpus)
 
 	if (Int_val(nr_cpus) < 1)
 		caml_invalid_argument("nr_cpus");
-	
+
 	info = calloc(Int_val(nr_cpus) + 1, sizeof(*info));
 	if (!info)
 		caml_raise_out_of_memory();

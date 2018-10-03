@@ -69,8 +69,8 @@ let perms_of_string s =
 		           | 'w' -> PERM_WRITE | 'b' -> PERM_RDWR
 		           | c -> invalid_arg (Printf.sprintf "unknown permission type: %c" c) in
 	let perm_of_string s =
-		if String.length s < 2 
-		then invalid_arg (Printf.sprintf "perm of string: length = %d; contents=\"%s\"" (String.length s) s) 
+		if String.length s < 2
+		then invalid_arg (Printf.sprintf "perm of string: length = %d; contents=\"%s\"" (String.length s) s)
 		else
 		begin
 			int_of_string (String.sub s 1 (String.length s - 1)),

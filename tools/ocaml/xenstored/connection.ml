@@ -62,16 +62,16 @@ let reconnect con =
 let get_path con =
 Printf.sprintf "/local/domain/%i/" (match con.dom with None -> 0 | Some d -> Domain.get_id d)
 
-let watch_create ~con ~path ~token = { 
-	con = con; 
-	token = token; 
-	path = path; 
-	base = get_path con; 
+let watch_create ~con ~path ~token = {
+	con = con;
+	token = token;
+	path = path;
+	base = get_path con;
 	is_relative = path.[0] <> '/' && path.[0] <> '@'
 }
 
 let get_con w = w.con
- 
+
 let number_of_transactions con =
 	Hashtbl.length con.transactions
 
@@ -85,20 +85,20 @@ let get_domstr con =
 	| Some dom -> "D" ^ (string_of_int (Domain.get_id dom))
 
 let make_perm dom =
-	let domid = 
+	let domid =
 		match dom with
 		| None   -> 0
 		| Some d -> Domain.get_id d
-	in 
+	in
 	Perms.Connection.create ~perms:[Perms.READ; Perms.WRITE] domid
 
 let create xbcon dom =
 	let id =
 		match dom with
 		| None -> let old = !anon_id_next in incr anon_id_next; old
-		| Some _ -> 0  
+		| Some _ -> 0
 		in
-	let con = 
+	let con =
 	{
 	xb = xbcon;
 	dom = dom;
@@ -110,7 +110,7 @@ let create xbcon dom =
 	stat_nb_ops = 0;
 	perm = make_perm dom;
 	}
-	in 
+	in
 	Logging.new_connection ~tid:Transaction.none ~con:(get_domstr con);
 	con
 
@@ -191,7 +191,7 @@ let del_transactions con =
   Hashtbl.clear con.transactions
 
 let list_watches con =
-	let ll = Hashtbl.fold 
+	let ll = Hashtbl.fold
 		(fun _ watches acc -> List.map (fun watch -> watch.path, watch.token) watches :: acc)
 		con.watches [] in
 	List.concat ll
@@ -279,7 +279,7 @@ let stats con =
 
 let dump con chan =
 	match con.dom with
-	| Some dom -> 
+	| Some dom ->
 		let domid = Domain.get_id dom in
 		(* dump domain *)
 		Domain.dump dom chan;

@@ -188,7 +188,7 @@ let from_channel store cons doms chan =
 			in
 		Connections.add_domain cons ndom;
 		in
-	let watch_f domid path token = 
+	let watch_f domid path token =
 		let con = Connections.find_domain cons domid in
 		ignore (Connections.add_watch cons con path token)
 		in
@@ -238,7 +238,7 @@ let _ =
 			default_pidfile
 		in
 
-	(try 
+	(try
 		Unixext.mkdir_rec (Filename.dirname pidfile) 0o755
 	with _ ->
 		()
@@ -251,11 +251,11 @@ let _ =
 			Some (Unix.handle_unix_error Utils.create_unix_socket Define.xs_daemon_socket),
 			Some (Unix.handle_unix_error Utils.create_unix_socket Define.xs_daemon_socket_ro)
 		in
-	
+
 	if cf.daemonize then
 		Unixext.daemonize ()
 	else
-		printf "Xen Storage Daemon, version %d.%d\n%!" 
+		printf "Xen Storage Daemon, version %d.%d\n%!"
 			Define.xenstored_major Define.xenstored_minor;
 
 	(try Unixext.pidfile_write pidfile with _ -> ());

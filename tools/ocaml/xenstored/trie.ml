@@ -34,7 +34,7 @@ struct
 	}
 
 	let get_key node = node.key
-	let get_value node = 
+	let get_value node =
 		match node.value with
 		| None       -> raise Not_found
 		| Some value -> value
@@ -46,7 +46,7 @@ struct
 	let set_children node children =
 		{ node with children = children }
 
-	let add_child node child = 
+	let add_child node child =
 		{ node with children = child :: node.children }
 end
 
@@ -65,7 +65,7 @@ let replace_node nodes key node =
 		| h :: tl                       -> h :: aux tl
 	in
 	aux nodes
-			
+
 let remove_node nodes key =
 	let rec aux = function
 		| []                            -> raise Not_found
@@ -76,16 +76,16 @@ let remove_node nodes key =
 
 let create () = []
 
-let rec iter f tree = 
+let rec iter f tree =
 	let rec aux node =
-		f node.Node.key node.Node.value; 
+		f node.Node.key node.Node.value;
 		iter f node.Node.children
 	in
 	List.iter aux tree
 
 let rec map f tree =
 	let rec aux node =
-		let value = 
+		let value =
 			match node.Node.value with
 			| None       -> None
 			| Some value -> f value
@@ -98,12 +98,12 @@ let rec fold f tree acc =
 	let rec aux accu node =
 		fold f node.Node.children (f node.Node.key node.Node.value accu)
 	in
-	List.fold_left aux acc tree 
+	List.fold_left aux acc tree
 
 (* return a sub-trie *)
 let rec sub_node tree = function
 	| []   -> raise Not_found
-	| h::t -> 
+	| h::t ->
 		  if mem_node tree h
 		  then begin
 			  let node = find_node tree h in
@@ -113,19 +113,19 @@ let rec sub_node tree = function
 		  end else
 			  raise Not_found
 
-let sub tree path = 
+let sub tree path =
 	try (sub_node tree path).Node.children
 	with Not_found -> []
 
-let find tree path = 
+let find tree path =
 	Node.get_value (sub_node tree path)
 
 (* return false if the node doesn't exists or if it is not associated to any value *)
 let rec mem tree = function
 	| []   -> false
-	| h::t -> 
+	| h::t ->
 		  mem_node tree h
-		  && (let node = find_node tree h in 
+		  && (let node = find_node tree h in
 			  if t = []
 			  then node.Node.value <> None
 			  else mem node.Node.children t)
@@ -133,7 +133,7 @@ let rec mem tree = function
 (* Iterate over the longest valid prefix *)
 let rec iter_path f tree = function
 	| []   -> ()
-	| h::l -> 
+	| h::l ->
 		  if mem_node tree h
 		  then begin
 			  let node = find_node tree h in
@@ -142,7 +142,7 @@ let rec iter_path f tree = function
 		  end
 
 let rec set_node node path value =
-	if path = [] 
+	if path = []
 	then Node.set_value node value
 	else begin
 		let children = set node.Node.children path value in
@@ -152,7 +152,7 @@ let rec set_node node path value =
 and set tree path value =
 	match path with
 		| []   -> raise Not_found
-		| h::t -> 
+		| h::t ->
 			  if mem_node tree h
 			  then begin
 				  let node = find_node tree h in
@@ -164,7 +164,7 @@ and set tree path value =
 
 let rec unset tree = function
 	| []   -> tree
-	| h::t -> 
+	| h::t ->
 		  if mem_node tree h
 		  then begin
 			  let node = find_node tree h in

@@ -13,7 +13,7 @@ builtins = {
     "libxl_devid":          ("devid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "libxl_defbool":        ("bool option",            "%(c)s = Defbool_val(%(o)s)",        "Val_defbool(%(c)s)" ),
     "libxl_uuid":           ("int array",              "Uuid_val(&%(c)s, %(o)s)",   "Val_uuid(&%(c)s)"),
-    "libxl_bitmap":         ("bool array",             "Bitmap_val(ctx, &%(c)s, %(o)s)",   "Val_bitmap(&%(c)s)"),    
+    "libxl_bitmap":         ("bool array",             "Bitmap_val(ctx, &%(c)s, %(o)s)",   "Val_bitmap(&%(c)s)"),
     "libxl_key_value_list": ("(string * string) list", "libxl_key_value_list_val(&%(c)s, %(o)s)", "Val_key_value_list(&%(c)s)"),
     "libxl_string_list":    ("string list",            "libxl_string_list_val(&%(c)s, %(o)s)", "Val_string_list(&%(c)s)"),
     "libxl_mac":            ("int array",              "Mac_val(&%(c)s, %(o)s)",    "Val_mac(&%(c)s)"),
@@ -59,7 +59,7 @@ functions = { # ( name , [type1,type2,....] )
 }
 def stub_fn_name(ty, name):
     return "stub_xl_%s_%s" % (ty.rawname,name)
-    
+
 def ocaml_type_of(ty):
     if ty.rawname in ["domid","devid"]:
         return ty.rawname
@@ -127,7 +127,7 @@ def gen_struct(ty, indent):
 def gen_ocaml_keyedunions(ty, interface, indent, parent = None):
     s = ""
     union_type = ""
-    
+
     if ty.rawname is not None:
         # Non-anonymous types need no special handling
         pass
@@ -162,7 +162,7 @@ def gen_ocaml_keyedunions(ty, interface, indent, parent = None):
                     u.append("%s" % (f.name.capitalize()))
             else:
                 raise NotImplementedError("Cannot handle KeyedUnion fields which are not Structs")
-            
+
         s += " | ".join(u) + "\n"
         ty.union_name = name
 
@@ -195,7 +195,7 @@ def gen_ocaml_ml(ty, interface, indent=""):
         s = ("""(* %s interface *)\n""" % ty.typename)
     else:
         s = ("""(* %s implementation *)\n""" % ty.typename)
-        
+
     if isinstance(ty, idl.Enumeration):
         s += "type %s = \n" % ty.rawname
         for v in ty.values:
@@ -210,7 +210,7 @@ def gen_ocaml_ml(ty, interface, indent=""):
 
     elif isinstance(ty, idl.Aggregate):
         s += ""
-        
+
         if ty.typename is None:
             raise NotImplementedError("%s has no typename" % type(ty))
         else:
@@ -221,7 +221,7 @@ def gen_ocaml_ml(ty, interface, indent=""):
                 s += "module %s : sig\n" % module_name
             else:
                 s += "module %s = struct\n" % module_name
-                
+
         # Handle KeyedUnions...
         union_types = []
         for f in ty.fields:
@@ -256,7 +256,7 @@ def gen_ocaml_ml(ty, interface, indent=""):
                 s += "\texternal %s : " % name
                 s += " -> ".join(args)
                 s += " = \"%s\"\n" % stub_fn_name(ty,name)
-        
+
         s += "end\n"
 
     else:
@@ -312,7 +312,7 @@ def c_val(ty, c, o, indent="", parent = None):
                                                     parent + ty.keyvar.name,
                                                     f.enumname)
                 n += 1
-        s += "\t\t    default: failwith_xl(ERROR_FAIL, \"variant handling bug %s%s (long)\"); break;\n" % (parent, ty.keyvar.name)        
+        s += "\t\t    default: failwith_xl(ERROR_FAIL, \"variant handling bug %s%s (long)\"); break;\n" % (parent, ty.keyvar.name)
         s += "\t\t}\n"
         s += "\t} else {\n"
         s += "\t\t/* Is block... */\n"
@@ -342,24 +342,24 @@ def c_val(ty, c, o, indent="", parent = None):
             n = n + 1
     else:
         s += "%s_val(ctx, %s, %s);" % (ty.rawname, ty.pass_arg(c, parent is None, passby=idl.PASS_BY_REFERENCE), o)
-    
+
     return s.replace("\n", "\n%s" % indent)
 
 def gen_c_val(ty, indent=""):
     s = "/* Convert caml value to %s */\n" % ty.rawname
-    
+
     s += "static int %s_val (libxl_ctx *ctx, %s, value v)\n" % (ty.rawname, ty.make_arg("c_val", passby=idl.PASS_BY_REFERENCE))
     s += "{\n"
     s += "\tCAMLparam1(v);\n"
     s += "\n"
 
     s += c_val(ty, "c_val", "v", indent="\t") + "\n"
-    
+
     s += "\tCAMLreturn(0);\n"
     s += "}\n"
-    
+
     return s.replace("\n", "\n%s" % indent)
-    
+
 def ocaml_Val(ty, o, c, indent="", parent = None):
     s = indent
     if isinstance(ty,idl.UInt):
@@ -437,7 +437,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         s += "\tCAMLlocal1(%s);\n" % fn
         s += "\n"
         s += "\t%s = caml_alloc_tuple(%d);\n" % (o, len(ty.fields))
-        
+
         n = 0
         for f in ty.fields:
             if f.type.private:
@@ -452,7 +452,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         s += "}"
     else:
         s += "%s = Val_%s(%s);" % (o, ty.rawname, ty.pass_arg(c, parent is None))
-    
+
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
 def gen_Val_ocaml(ty, indent=""):
@@ -464,14 +464,14 @@ def gen_Val_ocaml(ty, indent=""):
     s += "\tCAMLlocal1(%s_ocaml);\n" % ty.rawname
 
     s += ocaml_Val(ty, "%s_ocaml" % ty.rawname, "%s_c" % ty.rawname, indent="\t") + "\n"
-    
+
     s += "\tCAMLreturn(%s_ocaml);\n" % ty.rawname
     s += "}\n"
     return s.replace("\n", "\n%s" % indent)
 
 def gen_c_stub_prototype(ty, fns):
     s = "/* Stubs for %s */\n" % ty.rawname
-    for name,args in fns:        
+    for name,args in fns:
         # For N args we return one value and take N-1 values as parameters
         s += "value %s(" % stub_fn_name(ty, name)
         s += ", ".join(["value v%d" % v for v in range(1,len(args))])
@@ -536,7 +536,7 @@ if __name__ == '__main__':
             print "unknown type %s in blacklist" % t
 
     types = [ty for ty in types if not ty.rawname in blacklist]
-    
+
     _ml = sys.argv[3]
     ml = open(_ml, 'w')
     ml.write(autogen_header("(*", "*)"))
@@ -544,7 +544,7 @@ if __name__ == '__main__':
     _mli = sys.argv[2]
     mli = open(_mli, 'w')
     mli.write(autogen_header("(*", "*)"))
-    
+
     _cinc = sys.argv[4]
     cinc = open(_cinc, 'w')
     cinc.write(autogen_header("/*", "*/"))
@@ -558,7 +558,7 @@ if __name__ == '__main__':
 
         mli.write(gen_ocaml_ml(ty, True))
         mli.write("\n")
-        
+
         if ty.marshal_in():
             cinc.write(gen_c_val(ty))
             cinc.write("\n")
@@ -571,7 +571,7 @@ if __name__ == '__main__':
             cinc.write(gen_c_defaults(ty))
             cinc.write("\n")
         #sys.stdout.write("\n")
-    
+
     ml.write("(* END OF AUTO-GENERATED CODE *)\n")
     ml.close()
     mli.write("(* END OF AUTO-GENERATED CODE *)\n")

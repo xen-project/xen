@@ -24,7 +24,7 @@ val create : unit -> ('a,'b) t
 (** Creates an empty trie. *)
 
 val mem : ('a,'b) t -> 'a list -> bool
-(** [mem t k] returns true if a value is associated with the key [k] in the trie [t]. 
+(** [mem t k] returns true if a value is associated with the key [k] in the trie [t].
 	Otherwise, it returns false. *)
 
 val find : ('a, 'b) t -> 'a list -> 'b
@@ -35,20 +35,20 @@ val set : ('a, 'b) t -> 'a list -> 'b -> ('a, 'b) t
 (** [set t k v] associates the value [v] with the key [k] in the trie [t]. *)
 
 val unset : ('a, 'b) t -> 'a list -> ('a, 'b) t
-(** [unset k v] removes the association of value [v] with the key [k] in the trie [t]. 
-	Moreover, it automatically clean the trie, ie. it removes recursively 
+(** [unset k v] removes the association of value [v] with the key [k] in the trie [t].
+	Moreover, it automatically clean the trie, ie. it removes recursively
 	every nodes of [t] containing no values and having no chil. *)
 
 val iter : ('a -> 'b option -> unit) -> ('a, 'b) t -> unit
-(** [iter f t] applies the function [f] to every node of the trie [t]. 
+(** [iter f t] applies the function [f] to every node of the trie [t].
 	As nodes of the trie [t] do not necessary contains a value, the second argument of
 	[f] is an option type. *)
 
 val iter_path : ('a -> 'b option -> unit) -> ('a, 'b) t -> 'a list -> unit
-(** [iter_path f t p] iterates [f] over nodes associated with the path [p] in the trie [t]. 
+(** [iter_path f t p] iterates [f] over nodes associated with the path [p] in the trie [t].
 	If [p] is not a valid path of [t], it iterates on the longest valid prefix of [p]. *)
 
-val fold : ('a -> 'b option -> 'c -> 'c) -> ('a, 'b) t -> 'c -> 'c 
+val fold : ('a -> 'b option -> 'c -> 'c) -> ('a, 'b) t -> 'c -> 'c
 (** [fold f t x] fold [f] over every nodes of [t], with [x] as initial value. *)
 
 val map : ('b -> 'c option) -> ('a,'b) t -> ('a,'c) t

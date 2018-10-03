@@ -20,7 +20,7 @@ type ('a, 'b) either = Right of 'a | Left of 'b
 (** apply the clean_f function after fct function has been called.
  * Even if fct raises an exception, clean_f is applied
  *)
-let exnhook = ref None 
+let exnhook = ref None
 
 let finally fct clean_f =
 	let result = try
@@ -36,7 +36,7 @@ let finally fct clean_f =
 let may f v =
 	match v with Some x -> Some (f x) | None -> None
 
-(** default value to d if v is none. *) 
+(** default value to d if v is none. *)
 let default d v =
 	match v with Some x -> x | None -> d
 
@@ -85,7 +85,7 @@ let mkdir_safe dir perm =
 let mkdir_rec dir perm =
 	let rec p_mkdir dir =
 		let p_name = Filename.dirname dir in
-		if p_name <> "/" && p_name <> "." 
+		if p_name <> "/" && p_name <> "."
 		then p_mkdir p_name;
 		mkdir_safe dir perm in
 	p_mkdir dir

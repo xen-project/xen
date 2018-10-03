@@ -352,7 +352,7 @@ let transaction_replay c t doms cons =
 		)
 
 let do_watch con t domains cons data =
-	let (node, token) = 
+	let (node, token) =
 		match (split None '\000' data) with
 		| [node; token; ""]   -> node, token
 		| _                   -> raise Invalid_Cmd_Args
@@ -431,7 +431,7 @@ let do_release con t domains cons data =
 	let fire_spec_watches = Domains.exist domains domid in
 	Domains.del domains domid;
 	Connections.del_domain cons domid;
-	if fire_spec_watches 
+	if fire_spec_watches
 	then Connections.fire_spec_watches cons "@releaseDomain"
 	else raise Invalid_Cmd_Args
 
@@ -558,7 +558,7 @@ let do_input store cons doms con =
 		let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
 		let req = {Packet.tid=tid; Packet.rid=rid; Packet.ty=ty; Packet.data=data} in
 
-		(* As we don't log IO, do not call an unnecessary sanitize_data 
+		(* As we don't log IO, do not call an unnecessary sanitize_data
 		   info "[%s] -> [%d] %s \"%s\""
 		         (Connection.get_domstr con) tid
 		         (Xenbus.Xb.Op.to_string ty) (sanitize_data data); *)
@@ -572,7 +572,7 @@ let do_output store cons doms con =
 		if Connection.has_new_output con then (
 			let packet = Connection.peek_output con in
 			let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
-			(* As we don't log IO, do not call an unnecessary sanitize_data 
+			(* As we don't log IO, do not call an unnecessary sanitize_data
 			   info "[%s] <- %s \"%s\""
 			         (Connection.get_domstr con)
 			         (Xenbus.Xb.Op.to_string ty) (sanitize_data data);*)

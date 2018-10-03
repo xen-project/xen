@@ -57,7 +57,7 @@ type logger =
 		  rotate: unit -> unit;
 		  write: ?level:level -> string -> unit }
 
-let truncate_line nb_chars line = 
+let truncate_line nb_chars line =
 	if String.length line > nb_chars - 1 then
 		let len = max (nb_chars - 1) 2 in
 		let dst_line = Bytes.create len in
@@ -174,7 +174,7 @@ let init_xenstored_log () = match !xenstored_log_destination with
 	| File file ->
 		if !xenstored_log_level <> Null && !xenstored_log_nb_files > 0 then
 			let logger =
-				make_file_logger 
+				make_file_logger
 					file !xenstored_log_nb_files !xenstored_log_nb_lines
 					!xenstored_log_nb_chars ignore in
 			set_xenstored_logger logger
@@ -236,7 +236,7 @@ let string_of_access_type = function
 	| Xenbus.Xb.Op.Getdomainpath     -> "getdomain"
 	| Xenbus.Xb.Op.Isintroduced      -> "is introduced"
 	| Xenbus.Xb.Op.Resume            -> "resume   "
- 
+
 	| Xenbus.Xb.Op.Write             -> "write    "
 	| Xenbus.Xb.Op.Mkdir             -> "mkdir    "
 	| Xenbus.Xb.Op.Rm                -> "rm       "
@@ -315,11 +315,11 @@ let xb_op ~tid ~con ~ty data =
 		| _ -> true in
 	if print then access_logging ~tid ~con ~data (XbOp ty) ~level:Info
 
-let start_transaction ~tid ~con = 
+let start_transaction ~tid ~con =
 	if !access_log_transaction_ops && tid <> 0
 	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_start) ~level:Debug
 
-let end_transaction ~tid ~con = 
+let end_transaction ~tid ~con =
 	if !access_log_transaction_ops && tid <> 0
 	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end) ~level:Debug
 

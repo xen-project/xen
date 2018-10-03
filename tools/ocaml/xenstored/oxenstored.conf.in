@@ -28,14 +28,14 @@ conflict-max-history-seconds = 0.05
 # tick one point of conflict-credit is given to just one domain: the
 # one at the front of the queue. If false, then after each tick each
 # domain gets a point of conflict-credit.
-# 
+#
 # In environments where it is known that every transaction will
 # involve a set of nodes that is writable by at most one other domain,
 # then it is safe to set this aggregate-limit flag to false for better
 # performance. (This can be determined by considering the layout of
 # the xenstore tree and permissions, together with the content of the
 # transactions that require protection.)
-# 
+#
 # A transaction which involves a set of nodes which can be modified by
 # multiple other domains can suffer conflicts caused by any of those
 # domains, so the flag must be set to true.

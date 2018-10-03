@@ -87,7 +87,7 @@ let read_watchevent_timeout xsh timeout callback =
 	let left = ref timeout in
 
 	(* Returns true if a watch event in the queue satisfied us *)
-	let process_queued_events () = 
+	let process_queued_events () =
 		let success = ref false in
 		while Xsraw.has_watchevents xsh.con && not(!success)
 		do
@@ -95,7 +95,7 @@ let read_watchevent_timeout xsh timeout callback =
 		done;
 		!success in
 	(* Returns true if a watch event read from the socket satisfied us *)
-	let process_incoming_event () = 
+	let process_incoming_event () =
 		let fd = get_fd xsh in
 		let r, _, _ = Unix.select [ fd ] [] [] (min max_blocking_time !left) in
 

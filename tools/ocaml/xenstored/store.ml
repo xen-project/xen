@@ -34,7 +34,7 @@ let get_value node = node.value
 let get_perms node = node.perms
 let get_name node = Symbol.to_string node.name
 
-let set_value node nvalue = 
+let set_value node nvalue =
 	if node.value = nvalue
 	then node
 	else { node with value = nvalue }
@@ -189,7 +189,7 @@ let get_node rnode path =
 let rec get_deepest_existing_node node = function
 	| [] -> node, true
 	| h :: t ->
-		try get_deepest_existing_node (Node.find node h) t 
+		try get_deepest_existing_node (Node.find node h) t
 		with Not_found -> node, false
 
 let set_node rnode path nnode =

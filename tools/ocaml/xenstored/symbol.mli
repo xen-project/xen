@@ -16,8 +16,8 @@
 
 (** Node names *)
 
-(** Xenstore nodes names are often the same, ie. "local", "domain", "device", ... so it is worth to 
-    manipulate them through the use of small identifiers that we call symbols. These symbols can be 
+(** Xenstore nodes names are often the same, ie. "local", "domain", "device", ... so it is worth to
+    manipulate them through the use of small identifiers that we call symbols. These symbols can be
     compared in constant time (as opposite to strings) and should help the ocaml GC. *)
 
 type t

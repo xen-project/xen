@@ -65,7 +65,7 @@ let find_domain_by_port cons port =
 let del_watches_of_con con watches =
 	match List.filter (fun w -> Connection.get_con w != con) watches with
 	| [] -> None
-	| ws -> Some ws 
+	| ws -> Some ws
 
 let del_anonymous cons con =
 	try
@@ -144,7 +144,7 @@ let fire_watches cons path recurse =
 	in
 	let fire_rec x = function
 		| None         -> ()
-		| Some watches -> 
+		| Some watches ->
 			  List.iter (fun w -> Connection.fire_single_watch w) watches
 	in
 	Trie.iter_path fire_watch cons.watches key;
@@ -161,14 +161,14 @@ let set_target cons domain target_domain =
 
 let number_of_transactions cons =
 	let res = ref 0 in
-	let aux con = 
+	let aux con =
 		res := Connection.number_of_transactions con + !res
 	in
 	iter cons aux;
 	!res
 
 let stats cons =
-	let nb_ops_anon = ref 0 
+	let nb_ops_anon = ref 0
 	and nb_watchs_anon = ref 0
 	and nb_ops_dom = ref 0
 	and nb_watchs_dom = ref 0 in

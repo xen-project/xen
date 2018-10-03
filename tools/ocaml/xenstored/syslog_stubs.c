@@ -42,7 +42,7 @@ value stub_syslog(value facility, value level, value msg)
 	caml_enter_blocking_section();
 	syslog(c_facility, "%s", c_msg);
 	caml_leave_blocking_section();
-	
+
 	free((void*)c_msg);
 	CAMLreturn(Val_unit);
 }
