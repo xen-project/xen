@@ -177,12 +177,11 @@ let from_channel_f chan domain_f watch_f store_f =
 let from_channel store cons doms chan =
 	(* don't let the permission get on our way, full perm ! *)
 	let op = Store.get_ops store Perms.Connection.full_rights in
-	let xc = Xenctrl.interface_open () in
 
 	let domain_f domid mfn port =
 		let ndom =
 			if domid > 0 then
-				Domains.create xc doms domid mfn port
+				Domains.create doms domid mfn port
 			else
 				Domains.create0 doms
 			in
@@ -196,8 +195,7 @@ let from_channel store cons doms chan =
 		op.Store.write path value;
 		op.Store.setperms path perms
 		in
-	finally (fun () -> from_channel_f chan domain_f watch_f store_f)
-	        (fun () -> Xenctrl.interface_close xc)
+	from_channel_f chan domain_f watch_f store_f
 
 let from_file store cons doms file =
 	let channel = open_in file in
@@ -328,8 +326,6 @@ let _ =
 		(if cf.domain_init then [ Event.fd eventchn ] else [])
 		in
 
-	let xc = Xenctrl.interface_open () in
-
 	let process_special_fds rset =
 		let accept_connection can_write fd =
 			let (cfd, addr) = Unix.accept fd in
@@ -340,7 +336,7 @@ let _ =
 			debug "pending port %d" (Xeneventchn.to_int port);
 			finally (fun () ->
 				if Some port = eventchn.Event.virq_port then (
-					let (notify, deaddom) = Domains.cleanup xc domains in
+					let (notify, deaddom) = Domains.cleanup domains in
 					List.iter (Connections.del_domain cons) deaddom;
 					if deaddom <> [] || notify then
 						Connections.fire_spec_watches cons "@releaseDomain"
