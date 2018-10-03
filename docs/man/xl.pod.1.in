@@ -1398,7 +1398,7 @@ Creates a new network device in the domain specified by I<domain-id>.
 I<network-device> describes the device to attach, using the same format as the
 B<vif> string in the domain config file. See L<xl.cfg(5)> and
 L<xl-network-configuration(5)>
-for more informations.
+for more information.
 
 Note that only attaching PV network interfaces is supported.
 
