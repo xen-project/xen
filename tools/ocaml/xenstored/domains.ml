@@ -18,6 +18,8 @@ let debug fmt = Logging.debug "domains" fmt
 let error fmt = Logging.error "domains" fmt
 let warn fmt  = Logging.warn  "domains" fmt
 
+let xc = Xenctrl.interface_open ()
+
 type domains = {
 	eventchn: Event.t;
 	table: (Xenctrl.domid, Domain.t) Hashtbl.t;
@@ -86,7 +88,7 @@ let remove_from_queue dom queue =
 		| None -> ()
 		| Some x -> if x=dom then d := None) queue
 
-let cleanup xc doms =
+let cleanup doms =
 	let notify = ref false in
 	let dead_dom = ref [] in
 
@@ -120,7 +122,7 @@ let cleanup xc doms =
 let resume doms domid =
 	()
 
-let create xc doms domid mfn port =
+let create doms domid mfn port =
 	let interface = Xenctrl.map_foreign_range xc domid (Xenmmap.getpagesize()) mfn in
 	let dom = Domain.make domid mfn port interface doms.eventchn in
 	Hashtbl.add doms.table domid dom;
