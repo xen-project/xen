@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     {
         if ( xc_lockprof_reset(xc_handle) != 0 )
         {
-            fprintf(stderr, "Error reseting profile data: %d (%s)\n",
+            fprintf(stderr, "Error resetting profile data: %d (%s)\n",
                     errno, strerror(errno));
             return 1;
         }

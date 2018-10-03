@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     {
         if ( xc_perfc_reset(xc_handle) != 0 )
         {
-            fprintf(stderr, "Error reseting performance counters: %d (%s)\n",
+            fprintf(stderr, "Error resetting performance counters: %d (%s)\n",
                     errno, strerror(errno));
             return 1;
         }
