@@ -1696,7 +1696,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         case NESTEDHVM_PAGEFAULT_RETRY:
             return 1;
         case NESTEDHVM_PAGEFAULT_L1_ERROR:
-            /* An error occured while translating gpa from
+            /* An error occurred while translating gpa from
              * l2 guest address to l1 guest address. */
             return 0;
         case NESTEDHVM_PAGEFAULT_INJECT:

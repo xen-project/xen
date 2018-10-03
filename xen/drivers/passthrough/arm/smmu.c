@@ -2278,7 +2278,7 @@ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
 
 /*
  * Xen: We don't have refcount for allocated memory so manually free memory
- * when an error occured.
+ * when an error occurred.
  */
 static int arm_smmu_device_dt_probe(struct platform_device *pdev)
 {

@@ -159,7 +159,7 @@ void svm_intr_assist(void)
             int rc;
 
             /* l2 guest was running when an interrupt for
-             * the l1 guest occured.
+             * the l1 guest occurred.
              */
             rc = nestedsvm_vcpu_interrupt(v, intack);
             switch (rc) {

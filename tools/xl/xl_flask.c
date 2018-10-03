@@ -75,7 +75,7 @@ int main_setenforce(int argc, char **argv)
             fprintf(stderr, "Flask XSM disabled\n");
         }
         else
-            fprintf(stderr, "error occured while setting enforcing mode (%i)\n", ret);
+            fprintf(stderr, "error occurred while setting enforcing mode (%i)\n", ret);
     }
 
     return ret;
