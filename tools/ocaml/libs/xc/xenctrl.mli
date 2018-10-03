@@ -108,7 +108,7 @@ exception Error of string
 type handle
 external interface_open : unit -> handle = "stub_xc_interface_open"
 external interface_close : handle -> unit = "stub_xc_interface_close"
-val with_intf : (handle -> 'a) -> 'a
+
 external domain_create : handle -> domctl_create_config -> domid
   = "stub_xc_domain_create"
 external domain_sethandle : handle -> domid -> string -> unit = "stub_xc_domain_sethandle"
