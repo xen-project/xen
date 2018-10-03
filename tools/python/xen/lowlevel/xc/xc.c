@@ -2200,7 +2200,7 @@ static PyMethodDef pyxc_methods[] = {
     { "get_device_group",
       (PyCFunction)pyxc_get_device_group,
       METH_VARARGS, "\n"
-      "get sibling devices infomation.\n"
+      "get sibling devices information.\n"
       " dom     [int]:      Domain to assign device to.\n"
       " seg     [int]:      PCI segment.\n"
       " bus     [int]:      PCI bus.\n"

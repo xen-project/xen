@@ -508,7 +508,7 @@ struct xen_domctl_assign_device {
     } u;
 };
 
-/* Retrieve sibling devices infomation of machine_sbdf */
+/* Retrieve sibling devices information of machine_sbdf */
 /* XEN_DOMCTL_get_device_group */
 struct xen_domctl_get_device_group {
     uint32_t  machine_sbdf;     /* IN */

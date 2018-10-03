@@ -2604,7 +2604,7 @@ struct libxl__multidev {
  * Once finished, aodev->callback will be executed.
  */
 /*
- * As of Xen 4.5 we maintain various infomation, including hotplug
+ * As of Xen 4.5 we maintain various information, including hotplug
  * device information, in JSON files, so that we can use this JSON
  * file as a template to reconstruct domain configuration.
  *

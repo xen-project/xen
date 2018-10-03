@@ -203,7 +203,7 @@ struct rt_vcpu {
     s_time_t period;
     s_time_t budget;
 
-    /* VCPU current infomation in nanosecond */
+    /* VCPU current information in nanosecond */
     s_time_t cur_budget;         /* current budget */
     s_time_t last_start;         /* last start time */
     s_time_t cur_deadline;       /* current deadline for EDF */
