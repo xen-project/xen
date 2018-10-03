@@ -410,8 +410,7 @@ let do_introduce con t domains cons data =
 		if Domains.exist domains domid then
 			Domains.find domains domid
 		else try
-			let ndom = Xenctrl.with_intf (fun xc ->
-				Domains.create xc domains domid mfn port) in
+			let ndom = Domains.create domains domid mfn port in
 			Connections.add_domain cons ndom;
 			Connections.fire_spec_watches cons "@introduceDomain";
 			ndom
