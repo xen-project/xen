@@ -344,19 +344,17 @@ static void dump_pmtimer(void)
 static void dump_mtrr(void)
 {
     HVM_SAVE_TYPE(MTRR) p;
-    int i;
+    unsigned int i;
+
     READ(p);
-    printf("    MTRR: PAT 0x%llx, cap 0x%llx, default 0x%llx\n", 
-           (unsigned long long) p.msr_pat_cr,
-           (unsigned long long) p.msr_mtrr_cap,
-           (unsigned long long) p.msr_mtrr_def_type);
+    printf("    MTRR: PAT %#" PRIx64 ", cap %#" PRIx64 ", default %#" PRIx64 "\n",
+           p.msr_pat_cr, p.msr_mtrr_cap, p.msr_mtrr_def_type);
     for ( i = 0 ; i < MTRR_VCNT ; i++ )
-        printf("          var %i 0x%16.16llx 0x%16.16llx\n", i,
-               (unsigned long long) p.msr_mtrr_var[2 * i], 
-               (unsigned long long) p.msr_mtrr_var[2 * i + 1]);
+        printf("          var %u %#18.13" PRIx64 " %#18.13" PRIx64 "\n", i,
+               p.msr_mtrr_var[2 * i], p.msr_mtrr_var[2 * i + 1]);
     for ( i = 0 ; i < NUM_FIXED_MSR ; i++ )
-        printf("          fixed %.2i 0x%16.16llx\n", i,
-               (unsigned long long) p.msr_mtrr_fixed[i]);
+        printf("          fixed %02x %#18.16" PRIx64 "\n",
+               i, p.msr_mtrr_fixed[i]);
 }
 
 static void dump_viridian_domain(void)
