@@ -600,7 +600,7 @@ static unsigned int get_num_cpus(void)
         exit(EXIT_FAILURE);
     }
 
-    return physinfo.nr_cpus;
+    return physinfo.max_cpu_id + 1;
 }
 
 /**
