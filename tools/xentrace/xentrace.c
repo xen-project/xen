@@ -489,7 +489,11 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
         exit(EXIT_FAILURE);
     }
 
-    /* Map per-cpu buffers */
+    /* 
+     * Map per-cpu buffers.  NB that if a cpu is offline, it may have
+     * no trace buffers.  In this case, the respective mfn_offset will
+     * be 0, and the index should be ignored.
+     */
     tbufs.meta = (struct t_buf **)calloc(num, sizeof(struct t_buf *));
     tbufs.data = (unsigned char **)calloc(num, sizeof(unsigned char *));
     if ( tbufs.meta == NULL || tbufs.data == NULL )
@@ -500,12 +504,14 @@ static struct t_struct *map_tbufs(unsigned long tbufs_mfn, unsigned int num,
 
     for(i=0; i<num; i++)
     {
-        
-        const uint32_t *mfn_list = (const uint32_t *)tbufs.t_info
-                                   + tbufs.t_info->mfn_offset[i];
+        const uint32_t *mfn_list;
         int j;
         xen_pfn_t pfn_list[tbufs.t_info->tbuf_size];
 
+        if ( !tbufs.t_info->mfn_offset[i] )
+            continue;
+
+        mfn_list = (const uint32_t *)tbufs.t_info + tbufs.t_info->mfn_offset[i];
         for ( j=0; j<tbufs.t_info->tbuf_size; j++)
             pfn_list[j] = (xen_pfn_t)mfn_list[j];
 
@@ -702,7 +708,8 @@ static int monitor_tbufs(void)
 
     if ( opts.discard )
         for ( i = 0; i < num; i++ )
-            meta[i]->cons = meta[i]->prod;
+            if ( meta[i] )
+                meta[i]->cons = meta[i]->prod;
 
     /* now, scan buffers for events */
     while ( 1 )
@@ -710,7 +717,10 @@ static int monitor_tbufs(void)
         for ( i = 0; i < num; i++ )
         {
             unsigned long start_offset, end_offset, window_size, cons, prod;
-                
+
+            if ( !meta[i] )
+                continue;
+
             /* Read window information only once. */
             cons = meta[i]->cons;
             prod = meta[i]->prod;
