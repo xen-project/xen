@@ -250,9 +250,9 @@ static void dump_lapic_regs(void)
     printf("    LAPIC registers:\n");
     for ( i = 0 ; i < 0x400 ; i += 32 )
     {
-        printf("          0x%4.4x: 0x%16.16llx   0x%4.4x: 0x%16.16llx\n",
-               i, *(unsigned long long *)&r.data[i], 
-               i + 16, *(unsigned long long *)&r.data[i + 16]);        
+        printf("          0x%03x: 0x%08" PRIx32 "   0x%03x: 0x%08" PRIx32 "\n",
+               i, *(uint32_t *)&r.data[i],
+               i + 16, *(uint32_t *)&r.data[i + 16]);
     }
 }
 
