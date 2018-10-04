@@ -163,6 +163,8 @@ static inline bool is_l1tf_safe_maddr(intpte_t pte)
     return maddr == 0 || maddr >= l1tf_safe_maddr;
 }
 
+#ifdef CONFIG_PV
+
 static inline bool pv_l1tf_check_pte(struct domain *d, unsigned int level,
                                      intpte_t pte)
 {
@@ -239,6 +241,8 @@ static inline void pv_l1tf_domain_destroy(struct domain *d)
     tasklet_kill(&d->arch.paging.shadow.pv_l1tf_tasklet);
 #endif
 }
+
+#endif /* CONFIG_PV */
 
 /* Remove all shadows of the guest mfn. */
 static inline void shadow_remove_all_shadows(struct domain *d, mfn_t gmfn)
