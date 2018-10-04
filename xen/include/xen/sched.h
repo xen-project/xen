@@ -873,8 +873,27 @@ void watchdog_domain_destroy(struct domain *d);
 
 #define VM_ASSIST(d, t) (test_bit(VMASST_TYPE_ ## t, &(d)->vm_assist))
 
-#define is_pv_domain(d) ((d)->guest_type == guest_type_pv)
-#define is_pv_vcpu(v)   (is_pv_domain((v)->domain))
+static inline bool is_pv_domain(const struct domain *d)
+{
+    return IS_ENABLED(CONFIG_PV) ? d->guest_type == guest_type_pv : false;
+}
+
+static inline bool is_pv_vcpu(const struct vcpu *v)
+{
+    return is_pv_domain(v->domain);
+}
+
+#ifdef CONFIG_COMPAT
+static inline bool is_pv_32bit_domain(const struct domain *d)
+{
+    return is_pv_domain(d) && d->arch.is_32bit_pv;
+}
+
+static inline bool is_pv_32bit_vcpu(const struct vcpu *v)
+{
+    return is_pv_32bit_domain(v->domain);
+}
+#endif
 
 static inline bool is_hvm_domain(const struct domain *d)
 {

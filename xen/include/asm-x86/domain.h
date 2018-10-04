@@ -13,8 +13,6 @@
 #include <public/hvm/hvm_info_table.h>
 
 #define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
-#define is_pv_32bit_domain(d)  ((d)->arch.is_32bit_pv)
-#define is_pv_32bit_vcpu(v)    (is_pv_32bit_domain((v)->domain))
 
 #define is_hvm_pv_evtchn_domain(d) (is_hvm_domain(d) && \
         (d)->arch.hvm.irq->callback_via_type == HVMIRQ_callback_vector)
