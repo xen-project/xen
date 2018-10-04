@@ -354,10 +354,12 @@ void hypercall_page_initialise(struct domain *d, void *hypercall_page)
     memset(hypercall_page, 0xCC, PAGE_SIZE);
     if ( is_hvm_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
-    else if ( !is_pv_32bit_domain(d) )
+    else if ( is_pv_64bit_domain(d) )
         hypercall_page_initialise_ring3_kernel(hypercall_page);
-    else
+    else if ( is_pv_32bit_domain(d) )
         hypercall_page_initialise_ring1_kernel(hypercall_page);
+    else
+        ASSERT_UNREACHABLE();
 }
 
 /*

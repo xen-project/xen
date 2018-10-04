@@ -28,9 +28,10 @@ extern const hypercall_args_t hypercall_args_table[NR_hypercalls];
 #ifdef CONFIG_PV
 extern const hypercall_table_t pv_hypercall_table[];
 void pv_hypercall(struct cpu_user_regs *regs);
+#endif
+
 void hypercall_page_initialise_ring3_kernel(void *hypercall_page);
 void hypercall_page_initialise_ring1_kernel(void *hypercall_page);
-#endif
 
 /*
  * Both do_mmuext_op() and do_mmu_update():
