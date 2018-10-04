@@ -135,8 +135,10 @@ static int __init parse_spec_ctrl(const char *s)
 
             opt_eager_fpu = 0;
 
-            if ( opt_xpti < 0 )
-                opt_xpti = 0;
+            if ( opt_xpti_hwdom < 0 )
+                opt_xpti_hwdom = 0;
+            if ( opt_xpti_domu < 0 )
+                opt_xpti_domu = 0;
 
             if ( opt_smt < 0 )
                 opt_smt = 1;
@@ -349,8 +351,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            opt_eager_fpu                             ? " EAGER_FPU"     : "");
 
     printk("  XPTI (64-bit PV only): Dom0 %s, DomU %s (with%s PCID)\n",
-           opt_xpti & OPT_XPTI_DOM0 ? "enabled" : "disabled",
-           opt_xpti & OPT_XPTI_DOMU ? "enabled" : "disabled",
+           opt_xpti_hwdom ? "enabled" : "disabled",
+           opt_xpti_domu  ? "enabled" : "disabled",
            xpti_pcid_enabled() ? "" : "out");
 
     printk("  PV L1TF shadowing: Dom0 %s, DomU %s\n",
@@ -665,7 +667,8 @@ static __init void l1tf_calculations(uint64_t caps)
                                             : (3ul << (paddr_bits - 2))));
 }
 
-int8_t __read_mostly opt_xpti = -1;
+int8_t __read_mostly opt_xpti_hwdom = -1;
+int8_t __read_mostly opt_xpti_domu = -1;
 
 static __init void xpti_init_default(uint64_t caps)
 {
@@ -673,9 +676,19 @@ static __init void xpti_init_default(uint64_t caps)
         caps = ARCH_CAPABILITIES_RDCL_NO;
 
     if ( caps & ARCH_CAPABILITIES_RDCL_NO )
-        opt_xpti = 0;
+    {
+        if ( opt_xpti_hwdom < 0 )
+            opt_xpti_hwdom = 0;
+        if ( opt_xpti_domu < 0 )
+            opt_xpti_domu = 0;
+    }
     else
-        opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+    {
+        if ( opt_xpti_hwdom < 0 )
+            opt_xpti_hwdom = 1;
+        if ( opt_xpti_domu < 0 )
+            opt_xpti_domu = 1;
+    }
 }
 
 static __init int parse_xpti(const char *s)
@@ -684,12 +697,14 @@ static __init int parse_xpti(const char *s)
     int val, rc = 0;
 
     /* Inhibit the defaults as an explicit choice has been given. */
-    if ( opt_xpti == -1 )
-        opt_xpti = 0;
+    if ( opt_xpti_hwdom == -1 )
+        opt_xpti_hwdom = 0;
+    if ( opt_xpti_domu == -1 )
+        opt_xpti_domu = 0;
 
     /* Interpret 'xpti' alone in its positive boolean form. */
     if ( *s == '\0' )
-        opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+        opt_xpti_hwdom = opt_xpti_domu = 1;
 
     do {
         ss = strchr(s, ',');
@@ -699,22 +714,20 @@ static __init int parse_xpti(const char *s)
         switch ( parse_bool(s, ss) )
         {
         case 0:
-            opt_xpti = 0;
+            opt_xpti_hwdom = opt_xpti_domu = 0;
             break;
 
         case 1:
-            opt_xpti = OPT_XPTI_DOM0 | OPT_XPTI_DOMU;
+            opt_xpti_hwdom = opt_xpti_domu = 1;
             break;
 
         default:
             if ( !strcmp(s, "default") )
-                opt_xpti = -1;
+                opt_xpti_hwdom = opt_xpti_domu = -1;
             else if ( (val = parse_boolean("dom0", s, ss)) >= 0 )
-                opt_xpti = (opt_xpti & ~OPT_XPTI_DOM0) |
-                           (val ? OPT_XPTI_DOM0 : 0);
+                opt_xpti_hwdom = val;
             else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
-                opt_xpti = (opt_xpti & ~OPT_XPTI_DOMU) |
-                           (val ? OPT_XPTI_DOMU : 0);
+                opt_xpti_domu = val;
             else if ( *s )
                 rc = -EINVAL;
             break;
@@ -870,8 +883,7 @@ void __init init_speculation_mitigations(void)
     if ( default_xen_spec_ctrl )
         setup_force_cpu_cap(X86_FEATURE_SC_MSR_IDLE);
 
-    if ( opt_xpti == -1 )
-        xpti_init_default(caps);
+    xpti_init_default(caps);
 
     l1tf_calculations(caps);
 

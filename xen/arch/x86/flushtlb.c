@@ -182,7 +182,7 @@ unsigned int flush_area_local(const void *va, unsigned int flags)
                  */
                 invpcid_flush_one(PCID_PV_PRIV, addr);
                 invpcid_flush_one(PCID_PV_USER, addr);
-                if ( opt_xpti )
+                if ( opt_xpti_hwdom || opt_xpti_domu )
                 {
                     invpcid_flush_one(PCID_PV_PRIV | PCID_PV_XPTI, addr);
                     invpcid_flush_one(PCID_PV_USER | PCID_PV_XPTI, addr);

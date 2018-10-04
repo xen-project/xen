@@ -789,7 +789,7 @@ static int setup_cpu_root_pgt(unsigned int cpu)
     unsigned int off;
     int rc;
 
-    if ( !opt_xpti )
+    if ( !opt_xpti_hwdom && !opt_xpti_domu )
         return 0;
 
     rpt = alloc_xen_pagetable();
