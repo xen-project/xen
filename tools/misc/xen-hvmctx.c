@@ -316,23 +316,20 @@ static void dump_rtc(void)
 
 static void dump_hpet(void)
 {
-    int i;
     HVM_SAVE_TYPE(HPET) h;
+    unsigned int i;
+
     READ(h);
-    printf("    HPET: capability %#llx config %#llx\n",
-           (unsigned long long) h.capability,
-           (unsigned long long) h.config);
-    printf("          isr %#llx counter %#llx\n",
-           (unsigned long long) h.isr,
-           (unsigned long long) h.mc64);
+    printf("    HPET: capability %#" PRIx64 " config %#" PRIx64 "\n",
+           h.capability, h.config);
+    printf("          isr %#" PRIx64 " counter %#" PRIx64 "\n",
+           h.isr, h.mc64);
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
     {
-        printf("          timer%i config %#llx cmp %#llx\n", i,
-               (unsigned long long) h.timers[i].config,
-               (unsigned long long) h.timers[i].cmp);
-        printf("          timer%i period %#llx fsb %#llx\n", i, 
-               (unsigned long long) h.period[i],
-               (unsigned long long) h.timers[i].fsb);
+        printf("          timer%u config %#18.16" PRIx64 " cmp %#18.8" PRIx64 "\n",
+               i, h.timers[i].config, h.timers[i].cmp);
+        printf("          timer%u period %#18.8" PRIx64 " fsb %#18.8" PRIx64 "\n",
+               i, h.period[i], h.timers[i].fsb);
     }
 }
 
