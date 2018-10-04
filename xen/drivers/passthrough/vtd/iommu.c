@@ -1768,7 +1768,7 @@ static int __must_check intel_iommu_map_page(struct domain *d,
                                              unsigned int flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
-    struct dma_pte *page = NULL, *pte = NULL, old, new = { 0 };
+    struct dma_pte *page, *pte, old, new = {};
     u64 pg_maddr;
     int rc = 0;
 
@@ -1783,14 +1783,16 @@ static int __must_check intel_iommu_map_page(struct domain *d,
     spin_lock(&hd->arch.mapping_lock);
 
     pg_maddr = addr_to_dma_page_maddr(d, __dfn_to_daddr(dfn), 1);
-    if ( pg_maddr == 0 )
+    if ( !pg_maddr )
     {
         spin_unlock(&hd->arch.mapping_lock);
         return -ENOMEM;
     }
+
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
-    pte = page + (dfn & LEVEL_MASK);
+    pte = &page[dfn & LEVEL_MASK];
     old = *pte;
+
     dma_set_pte_addr(new, (paddr_t)mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(new,
                      ((flags & IOMMUF_readable) ? DMA_PTE_READ  : 0) |
@@ -1806,6 +1808,7 @@ static int __must_check intel_iommu_map_page(struct domain *d,
         unmap_vtd_domain_page(page);
         return 0;
     }
+
     *pte = new;
 
     iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
@@ -1821,6 +1824,10 @@ static int __must_check intel_iommu_map_page(struct domain *d,
 static int __must_check intel_iommu_unmap_page(struct domain *d,
                                                unsigned long dfn)
 {
+    /* Do nothing if VT-d shares EPT page table */
+    if ( iommu_use_hap_pt(d) )
+        return 0;
+
     /* Do nothing if hardware domain and iommu supports pass thru. */
     if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
