@@ -248,6 +248,14 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
     return rc;
 }
 
+#ifndef CONFIG_PV
+/* Stub for arch_do_multicall_call */
+enum mc_disposition arch_do_multicall_call(struct mc_state *mc)
+{
+    return mc_exit;
+}
+#endif
+
 /*
  * Local variables:
  * mode: C
