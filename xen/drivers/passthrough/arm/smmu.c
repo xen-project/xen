@@ -2551,7 +2551,7 @@ static int __must_check arm_smmu_iotlb_flush_all(struct domain *d)
 }
 
 static int __must_check arm_smmu_iotlb_flush(struct domain *d,
-                                             unsigned long gfn,
+                                             unsigned long dfn,
                                              unsigned int page_count)
 {
 	/* ARM SMMU v1 doesn't have flush by VMA and VMID */
@@ -2748,7 +2748,7 @@ static void arm_smmu_iommu_domain_teardown(struct domain *d)
 	xfree(xen_domain);
 }
 
-static int __must_check arm_smmu_map_page(struct domain *d, unsigned long gfn,
+static int __must_check arm_smmu_map_page(struct domain *d, unsigned long dfn,
 			unsigned long mfn, unsigned int flags)
 {
 	p2m_type_t t;
@@ -2759,10 +2759,10 @@ static int __must_check arm_smmu_map_page(struct domain *d, unsigned long gfn,
 	 * protected by an IOMMU, Xen needs to add a 1:1 mapping in the domain
 	 * p2m to allow DMA request to work.
 	 * This is only valid when the domain is directed mapped. Hence this
-	 * function should only be used by gnttab code with gfn == mfn.
+	 * function should only be used by gnttab code with gfn == mfn == dfn.
 	 */
 	BUG_ON(!is_domain_direct_mapped(d));
-	BUG_ON(mfn != gfn);
+	BUG_ON(mfn != dfn);
 
 	/* We only support readable and writable flags */
 	if (!(flags & (IOMMUF_readable | IOMMUF_writable)))
@@ -2774,19 +2774,19 @@ static int __must_check arm_smmu_map_page(struct domain *d, unsigned long gfn,
 	 * The function guest_physmap_add_entry replaces the current mapping
 	 * if there is already one...
 	 */
-	return guest_physmap_add_entry(d, _gfn(gfn), _mfn(mfn), 0, t);
+	return guest_physmap_add_entry(d, _gfn(dfn), _mfn(dfn), 0, t);
 }
 
-static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long gfn)
+static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long dfn)
 {
 	/*
 	 * This function should only be used by gnttab code when the domain
-	 * is direct mapped
+	 * is direct mapped (i.e. gfn == mfn == dfn).
 	 */
 	if ( !is_domain_direct_mapped(d) )
 		return -EINVAL;
 
-	return guest_physmap_remove_page(d, _gfn(gfn), _mfn(gfn), 0);
+	return guest_physmap_remove_page(d, _gfn(dfn), _mfn(dfn), 0);
 }
 
 static const struct iommu_ops arm_smmu_iommu_ops = {

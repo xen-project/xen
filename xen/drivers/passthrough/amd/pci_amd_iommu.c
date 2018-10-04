@@ -548,7 +548,7 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
                 maddr_to_page(next_table_maddr), next_level,
                 address, indent + 1);
         else
-            printk("%*sgfn: %08lx  mfn: %08lx\n",
+            printk("%*sdfn: %08lx  mfn: %08lx\n",
                    indent, "",
                    (unsigned long)PFN_DOWN(address),
                    (unsigned long)PFN_DOWN(next_table_maddr));

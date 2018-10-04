@@ -35,12 +35,12 @@ static unsigned int pfn_to_pde_idx(unsigned long pfn, unsigned int level)
     return idx;
 }
 
-void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long gfn)
+void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long dfn)
 {
     u64 *table, *pte;
 
     table = map_domain_page(_mfn(l1_mfn));
-    pte = table + pfn_to_pde_idx(gfn, IOMMU_PAGING_MODE_LEVEL_1);
+    pte = table + pfn_to_pde_idx(dfn, IOMMU_PAGING_MODE_LEVEL_1);
     *pte = 0;
     unmap_domain_page(table);
 }
@@ -104,7 +104,7 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
     return need_flush;
 }
 
-static bool_t set_iommu_pte_present(unsigned long pt_mfn, unsigned long gfn, 
+static bool_t set_iommu_pte_present(unsigned long pt_mfn, unsigned long dfn,
                                     unsigned long next_mfn, int pde_level, 
                                     bool_t iw, bool_t ir)
 {
@@ -114,7 +114,7 @@ static bool_t set_iommu_pte_present(unsigned long pt_mfn, unsigned long gfn,
 
     table = map_domain_page(_mfn(pt_mfn));
 
-    pde = (u32*)(table + pfn_to_pde_idx(gfn, pde_level));
+    pde = (u32*)(table + pfn_to_pde_idx(dfn, pde_level));
 
     need_flush = set_iommu_pde_present(pde, next_mfn, 
                                        IOMMU_PAGING_MODE_LEVEL_0, iw, ir);
@@ -331,7 +331,7 @@ static void set_pde_count(u64 *pde, unsigned int count)
  * otherwise increase pde count if mfn is contigous with mfn - 1
  */
 static int iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
-                                  unsigned long gfn, unsigned long mfn,
+                                  unsigned long dfn, unsigned long mfn,
                                   unsigned int merge_level)
 {
     unsigned int pde_count, next_level;
@@ -347,7 +347,7 @@ static int iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
 
     /* get pde at merge level */
     table = map_domain_page(_mfn(pt_mfn));
-    pde = table + pfn_to_pde_idx(gfn, merge_level);
+    pde = table + pfn_to_pde_idx(dfn, merge_level);
 
     /* get page table of next level */
     ntable_maddr = amd_iommu_get_next_table_from_pte((u32*)pde);
@@ -362,7 +362,7 @@ static int iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
     mask = (1ULL<< (PTE_PER_TABLE_SHIFT * next_level)) - 1;
 
     if ( ((first_mfn & mask) == 0) &&
-         (((gfn & mask) | first_mfn) == mfn) )
+         (((dfn & mask) | first_mfn) == mfn) )
     {
         pde_count = get_pde_count(*pde);
 
@@ -387,7 +387,7 @@ out:
 }
 
 static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
-                             unsigned long gfn, unsigned int flags,
+                             unsigned long dfn, unsigned int flags,
                              unsigned int merge_level)
 {
     u64 *table, *pde, *ntable;
@@ -398,7 +398,7 @@ static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
     ASSERT( spin_is_locked(&hd->arch.mapping_lock) && pt_mfn );
 
     table = map_domain_page(_mfn(pt_mfn));
-    pde = table + pfn_to_pde_idx(gfn, merge_level);
+    pde = table + pfn_to_pde_idx(dfn, merge_level);
 
     /* get first mfn */
     ntable_mfn = amd_iommu_get_next_table_from_pte((u32*)pde) >> PAGE_SHIFT;
@@ -436,7 +436,7 @@ static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
  * {Re, un}mapping super page frames causes re-allocation of io
  * page tables.
  */
-static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn, 
+static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
                               unsigned long pt_mfn[])
 {
     u64 *pde, *next_table_vaddr;
@@ -465,7 +465,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
         pt_mfn[level] = next_table_mfn;
 
         next_table_vaddr = map_domain_page(_mfn(next_table_mfn));
-        pde = next_table_vaddr + pfn_to_pde_idx(pfn, level);
+        pde = next_table_vaddr + pfn_to_pde_idx(dfn, level);
 
         /* Here might be a super page frame */
         next_table_mfn = amd_iommu_get_next_table_from_pte((uint32_t*)pde) 
@@ -477,11 +477,11 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
              next_table_mfn != 0 )
         {
             int i;
-            unsigned long mfn, gfn;
+            unsigned long mfn, pfn;
             unsigned int page_sz;
 
             page_sz = 1 << (PTE_PER_TABLE_SHIFT * (next_level - 1));
-            gfn =  pfn & ~((1 << (PTE_PER_TABLE_SHIFT * next_level)) - 1);
+            pfn =  dfn & ~((1 << (PTE_PER_TABLE_SHIFT * next_level)) - 1);
             mfn = next_table_mfn;
 
             /* allocate lower level page table */
@@ -499,10 +499,10 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
 
             for ( i = 0; i < PTE_PER_TABLE_SIZE; i++ )
             {
-                set_iommu_pte_present(next_table_mfn, gfn, mfn, next_level,
+                set_iommu_pte_present(next_table_mfn, pfn, mfn, next_level,
                                       !!IOMMUF_writable, !!IOMMUF_readable);
                 mfn += page_sz;
-                gfn += page_sz;
+                pfn += page_sz;
              }
 
             amd_iommu_flush_all_pages(d);
@@ -540,7 +540,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
     return 0;
 }
 
-static int update_paging_mode(struct domain *d, unsigned long gfn)
+static int update_paging_mode(struct domain *d, unsigned long dfn)
 {
     u16 bdf;
     void *device_entry;
@@ -554,13 +554,13 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
     unsigned long old_root_mfn;
     struct domain_iommu *hd = dom_iommu(d);
 
-    if ( gfn == gfn_x(INVALID_GFN) )
+    if ( dfn == dfn_x(INVALID_DFN) )
         return -EADDRNOTAVAIL;
-    ASSERT(!(gfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
+    ASSERT(!(dfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
 
     level = hd->arch.paging_mode;
     old_root = hd->arch.root_table;
-    offset = gfn >> (PTE_PER_TABLE_SHIFT * (level - 1));
+    offset = dfn >> (PTE_PER_TABLE_SHIFT * (level - 1));
 
     ASSERT(spin_is_locked(&hd->arch.mapping_lock) && is_hvm_domain(d));
 
@@ -631,7 +631,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
     return 0;
 }
 
-int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
+int amd_iommu_map_page(struct domain *d, unsigned long dfn, unsigned long mfn,
                        unsigned int flags)
 {
     bool_t need_flush = 0;
@@ -651,34 +651,34 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
     if ( rc )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        AMD_IOMMU_DEBUG("Root table alloc failed, gfn = %lx\n", gfn);
+        AMD_IOMMU_DEBUG("Root table alloc failed, dfn = %lx\n", dfn);
         domain_crash(d);
         return rc;
     }
 
     /* Since HVM domain is initialized with 2 level IO page table,
-     * we might need a deeper page table for lager gfn now */
+     * we might need a deeper page table for wider dfn now */
     if ( is_hvm_domain(d) )
     {
-        if ( update_paging_mode(d, gfn) )
+        if ( update_paging_mode(d, dfn) )
         {
             spin_unlock(&hd->arch.mapping_lock);
-            AMD_IOMMU_DEBUG("Update page mode failed gfn = %lx\n", gfn);
+            AMD_IOMMU_DEBUG("Update page mode failed dfn = %lx\n", dfn);
             domain_crash(d);
             return -EFAULT;
         }
     }
 
-    if ( iommu_pde_from_gfn(d, gfn, pt_mfn) || (pt_mfn[1] == 0) )
+    if ( iommu_pde_from_dfn(d, dfn, pt_mfn) || (pt_mfn[1] == 0) )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        AMD_IOMMU_DEBUG("Invalid IO pagetable entry gfn = %lx\n", gfn);
+        AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %lx\n", dfn);
         domain_crash(d);
         return -EFAULT;
     }
 
     /* Install 4k mapping first */
-    need_flush = set_iommu_pte_present(pt_mfn[1], gfn, mfn, 
+    need_flush = set_iommu_pte_present(pt_mfn[1], dfn, mfn,
                                        IOMMU_PAGING_MODE_LEVEL_1,
                                        !!(flags & IOMMUF_writable),
                                        !!(flags & IOMMUF_readable));
@@ -690,7 +690,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
     /* 4K mapping for PV guests never changes, 
      * no need to flush if we trust non-present bits */
     if ( is_hvm_domain(d) )
-        amd_iommu_flush_pages(d, gfn, 0);
+        amd_iommu_flush_pages(d, dfn, 0);
 
     for ( merge_level = IOMMU_PAGING_MODE_LEVEL_2;
           merge_level <= hd->arch.paging_mode; merge_level++ )
@@ -698,15 +698,15 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
         if ( pt_mfn[merge_level] == 0 )
             break;
         if ( !iommu_update_pde_count(d, pt_mfn[merge_level],
-                                     gfn, mfn, merge_level) )
+                                     dfn, mfn, merge_level) )
             break;
 
-        if ( iommu_merge_pages(d, pt_mfn[merge_level], gfn, 
+        if ( iommu_merge_pages(d, pt_mfn[merge_level], dfn,
                                flags, merge_level) )
         {
             spin_unlock(&hd->arch.mapping_lock);
             AMD_IOMMU_DEBUG("Merge iommu page failed at level %d, "
-                            "gfn = %lx mfn = %lx\n", merge_level, gfn, mfn);
+                            "dfn = %lx mfn = %lx\n", merge_level, dfn, mfn);
             domain_crash(d);
             return -EFAULT;
         }
@@ -720,7 +720,7 @@ out:
     return 0;
 }
 
-int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
+int amd_iommu_unmap_page(struct domain *d, unsigned long dfn)
 {
     unsigned long pt_mfn[7];
     struct domain_iommu *hd = dom_iommu(d);
@@ -739,34 +739,34 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
     }
 
     /* Since HVM domain is initialized with 2 level IO page table,
-     * we might need a deeper page table for lager gfn now */
+     * we might need a deeper page table for lager dfn now */
     if ( is_hvm_domain(d) )
     {
-        int rc = update_paging_mode(d, gfn);
+        int rc = update_paging_mode(d, dfn);
 
         if ( rc )
         {
             spin_unlock(&hd->arch.mapping_lock);
-            AMD_IOMMU_DEBUG("Update page mode failed gfn = %lx\n", gfn);
+            AMD_IOMMU_DEBUG("Update page mode failed dfn = %lx\n", dfn);
             if ( rc != -EADDRNOTAVAIL )
                 domain_crash(d);
             return rc;
         }
     }
 
-    if ( iommu_pde_from_gfn(d, gfn, pt_mfn) || (pt_mfn[1] == 0) )
+    if ( iommu_pde_from_dfn(d, dfn, pt_mfn) || (pt_mfn[1] == 0) )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        AMD_IOMMU_DEBUG("Invalid IO pagetable entry gfn = %lx\n", gfn);
+        AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %lx\n", dfn);
         domain_crash(d);
         return -EFAULT;
     }
 
     /* mark PTE as 'page not present' */
-    clear_iommu_pte_present(pt_mfn[1], gfn);
+    clear_iommu_pte_present(pt_mfn[1], dfn);
     spin_unlock(&hd->arch.mapping_lock);
 
-    amd_iommu_flush_pages(d, gfn, 0);
+    amd_iommu_flush_pages(d, dfn, 0);
 
     return 0;
 }

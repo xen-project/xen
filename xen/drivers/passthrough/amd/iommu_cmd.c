@@ -284,7 +284,7 @@ void invalidate_iommu_all(struct amd_iommu *iommu)
 }
 
 void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
-                           uint64_t gaddr, unsigned int order)
+                           daddr_t daddr, unsigned int order)
 {
     unsigned long flags;
     struct amd_iommu *iommu;
@@ -315,12 +315,12 @@ void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
 
     /* send INVALIDATE_IOTLB_PAGES command */
     spin_lock_irqsave(&iommu->lock, flags);
-    invalidate_iotlb_pages(iommu, maxpend, 0, queueid, gaddr, req_id, order);
+    invalidate_iotlb_pages(iommu, maxpend, 0, queueid, daddr, req_id, order);
     flush_command_buffer(iommu);
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void amd_iommu_flush_all_iotlbs(struct domain *d, uint64_t gaddr,
+static void amd_iommu_flush_all_iotlbs(struct domain *d, daddr_t daddr,
                                        unsigned int order)
 {
     struct pci_dev *pdev;
@@ -333,7 +333,7 @@ static void amd_iommu_flush_all_iotlbs(struct domain *d, uint64_t gaddr,
         u8 devfn = pdev->devfn;
 
         do {
-            amd_iommu_flush_iotlb(devfn, pdev, gaddr, order);
+            amd_iommu_flush_iotlb(devfn, pdev, daddr, order);
             devfn += pdev->phantom_stride;
         } while ( devfn != pdev->devfn &&
                   PCI_SLOT(devfn) == PCI_SLOT(pdev->devfn) );
@@ -342,7 +342,7 @@ static void amd_iommu_flush_all_iotlbs(struct domain *d, uint64_t gaddr,
 
 /* Flush iommu cache after p2m changes. */
 static void _amd_iommu_flush_pages(struct domain *d,
-                                   uint64_t gaddr, unsigned int order)
+                                   daddr_t daddr, unsigned int order)
 {
     unsigned long flags;
     struct amd_iommu *iommu;
@@ -352,13 +352,13 @@ static void _amd_iommu_flush_pages(struct domain *d,
     for_each_amd_iommu ( iommu )
     {
         spin_lock_irqsave(&iommu->lock, flags);
-        invalidate_iommu_pages(iommu, gaddr, dom_id, order);
+        invalidate_iommu_pages(iommu, daddr, dom_id, order);
         flush_command_buffer(iommu);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 
     if ( ats_enabled )
-        amd_iommu_flush_all_iotlbs(d, gaddr, order);
+        amd_iommu_flush_all_iotlbs(d, daddr, order);
 }
 
 void amd_iommu_flush_all_pages(struct domain *d)
@@ -367,9 +367,9 @@ void amd_iommu_flush_all_pages(struct domain *d)
 }
 
 void amd_iommu_flush_pages(struct domain *d,
-                           unsigned long gfn, unsigned int order)
+                           unsigned long dfn, unsigned int order)
 {
-    _amd_iommu_flush_pages(d, (uint64_t) gfn << PAGE_SHIFT, order);
+    _amd_iommu_flush_pages(d, __dfn_to_daddr(dfn), order);
 }
 
 void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf)

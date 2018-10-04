@@ -585,7 +585,7 @@ static int __must_check iommu_flush_all(void)
 }
 
 static int __must_check iommu_flush_iotlb(struct domain *d,
-                                          unsigned long gfn,
+                                          unsigned long dfn,
                                           bool_t dma_old_pte_present,
                                           unsigned int page_count)
 {
@@ -612,12 +612,12 @@ static int __must_check iommu_flush_iotlb(struct domain *d,
         if ( iommu_domid == -1 )
             continue;
 
-        if ( page_count != 1 || gfn == gfn_x(INVALID_GFN) )
+        if ( page_count != 1 || dfn == dfn_x(INVALID_DFN) )
             rc = iommu_flush_iotlb_dsi(iommu, iommu_domid,
                                        0, flush_dev_iotlb);
         else
             rc = iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                       (paddr_t)gfn << PAGE_SHIFT_4K,
+                                       __dfn_to_daddr(dfn),
                                        PAGE_ORDER_4K,
                                        !dma_old_pte_present,
                                        flush_dev_iotlb);
@@ -633,15 +633,15 @@ static int __must_check iommu_flush_iotlb(struct domain *d,
 }
 
 static int __must_check iommu_flush_iotlb_pages(struct domain *d,
-                                                unsigned long gfn,
+                                                unsigned long dfn,
                                                 unsigned int page_count)
 {
-    return iommu_flush_iotlb(d, gfn, 1, page_count);
+    return iommu_flush_iotlb(d, dfn, 1, page_count);
 }
 
 static int __must_check iommu_flush_iotlb_all(struct domain *d)
 {
-    return iommu_flush_iotlb(d, gfn_x(INVALID_GFN), 0, 0);
+    return iommu_flush_iotlb(d, dfn_x(INVALID_DFN), 0, 0);
 }
 
 /* clear one page's page table */
@@ -1763,7 +1763,7 @@ static void iommu_domain_teardown(struct domain *d)
 }
 
 static int __must_check intel_iommu_map_page(struct domain *d,
-                                             unsigned long gfn,
+                                             unsigned long dfn,
                                              unsigned long mfn,
                                              unsigned int flags)
 {
@@ -1782,14 +1782,14 @@ static int __must_check intel_iommu_map_page(struct domain *d,
 
     spin_lock(&hd->arch.mapping_lock);
 
-    pg_maddr = addr_to_dma_page_maddr(d, (paddr_t)gfn << PAGE_SHIFT_4K, 1);
+    pg_maddr = addr_to_dma_page_maddr(d, __dfn_to_daddr(dfn), 1);
     if ( pg_maddr == 0 )
     {
         spin_unlock(&hd->arch.mapping_lock);
         return -ENOMEM;
     }
     page = (struct dma_pte *)map_vtd_domain_page(pg_maddr);
-    pte = page + (gfn & LEVEL_MASK);
+    pte = page + (dfn & LEVEL_MASK);
     old = *pte;
     dma_set_pte_addr(new, (paddr_t)mfn << PAGE_SHIFT_4K);
     dma_set_pte_prot(new,
@@ -1813,22 +1813,22 @@ static int __must_check intel_iommu_map_page(struct domain *d,
     unmap_vtd_domain_page(page);
 
     if ( !this_cpu(iommu_dont_flush_iotlb) )
-        rc = iommu_flush_iotlb(d, gfn, dma_pte_present(old), 1);
+        rc = iommu_flush_iotlb(d, dfn, dma_pte_present(old), 1);
 
     return rc;
 }
 
 static int __must_check intel_iommu_unmap_page(struct domain *d,
-                                               unsigned long gfn)
+                                               unsigned long dfn)
 {
     /* Do nothing if hardware domain and iommu supports pass thru. */
     if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
 
-    return dma_pte_clear_one(d, (paddr_t)gfn << PAGE_SHIFT_4K);
+    return dma_pte_clear_one(d, __dfn_to_daddr(dfn));
 }
 
-int iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
+int iommu_pte_flush(struct domain *d, uint64_t dfn, uint64_t *pte,
                     int order, int present)
 {
     struct acpi_drhd_unit *drhd;
@@ -1852,7 +1852,7 @@ int iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
             continue;
 
         rc = iommu_flush_iotlb_psi(iommu, iommu_domid,
-                                   (paddr_t)gfn << PAGE_SHIFT_4K,
+                                   __dfn_to_daddr(dfn),
                                    order, !present, flush_dev_iotlb);
         if ( rc > 0 )
         {
@@ -2622,7 +2622,7 @@ static void vtd_dump_p2m_table_level(paddr_t pt_maddr, int level, paddr_t gpa,
             vtd_dump_p2m_table_level(dma_pte_addr(*pte), next_level, 
                                      address, indent + 1);
         else
-            printk("%*sgfn: %08lx mfn: %08lx\n",
+            printk("%*sdfn: %08lx mfn: %08lx\n",
                    indent, "",
                    (unsigned long)(address >> PAGE_SHIFT_4K),
                    (unsigned long)(dma_pte_addr(*pte) >> PAGE_SHIFT_4K));

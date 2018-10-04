@@ -23,10 +23,24 @@
 #include <xen/page-defs.h>
 #include <xen/spinlock.h>
 #include <xen/pci.h>
+#include <xen/typesafe.h>
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 #include <asm/device.h>
 #include <asm/iommu.h>
+
+TYPE_SAFE(uint64_t, dfn);
+#define PRI_dfn     PRIx64
+#define INVALID_DFN _dfn(~0ULL)
+
+#ifndef dfn_t
+#define dfn_t /* Grep fodder: dfn_t, _dfn() and dfn_x() are defined above */
+#define _dfn
+#define dfn_x
+#undef dfn_t
+#undef _dfn
+#undef dfn_x
+#endif
 
 extern bool_t iommu_enable, iommu_enabled;
 extern bool_t force_iommu, iommu_verbose;
@@ -64,9 +78,9 @@ void iommu_teardown(struct domain *d);
 #define IOMMUF_readable  (1u<<_IOMMUF_readable)
 #define _IOMMUF_writable 1
 #define IOMMUF_writable  (1u<<_IOMMUF_writable)
-int __must_check iommu_map_page(struct domain *d, unsigned long gfn,
+int __must_check iommu_map_page(struct domain *d, unsigned long dfn,
                                 unsigned long mfn, unsigned int flags);
-int __must_check iommu_unmap_page(struct domain *d, unsigned long gfn);
+int __must_check iommu_unmap_page(struct domain *d, unsigned long dfn);
 
 enum iommu_feature
 {
@@ -154,9 +168,9 @@ struct iommu_ops {
 #endif /* HAS_PCI */
 
     void (*teardown)(struct domain *d);
-    int __must_check (*map_page)(struct domain *d, unsigned long gfn,
+    int __must_check (*map_page)(struct domain *d, unsigned long dfn,
                                  unsigned long mfn, unsigned int flags);
-    int __must_check (*unmap_page)(struct domain *d, unsigned long gfn);
+    int __must_check (*unmap_page)(struct domain *d, unsigned long dfn);
     void (*free_page_table)(struct page_info *);
 #ifdef CONFIG_X86
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
@@ -167,7 +181,7 @@ struct iommu_ops {
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);
     void (*crash_shutdown)(void);
-    int __must_check (*iotlb_flush)(struct domain *d, unsigned long gfn,
+    int __must_check (*iotlb_flush)(struct domain *d, unsigned long dfn,
                                     unsigned int page_count);
     int __must_check (*iotlb_flush_all)(struct domain *d);
     int (*get_reserved_device_memory)(iommu_grdm_t *, void *);
@@ -189,7 +203,7 @@ int iommu_do_pci_domctl(struct xen_domctl *, struct domain *d,
 int iommu_do_domctl(struct xen_domctl *, struct domain *d,
                     XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 
-int __must_check iommu_iotlb_flush(struct domain *d, unsigned long gfn,
+int __must_check iommu_iotlb_flush(struct domain *d, unsigned long dfn,
                                    unsigned int page_count);
 int __must_check iommu_iotlb_flush_all(struct domain *d);
 

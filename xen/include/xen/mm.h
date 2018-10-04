@@ -26,6 +26,11 @@
  *   A linear idea of a guest physical address space. For an auto-translated
  *   guest, pfn == gfn while for a non-translated guest, pfn != gfn.
  *
+ * dfn: Device DMA Frame Number (definitions in include/xen/iommu.h)
+ *   The linear frame numbers of device DMA address space. All initiators for
+ *   (i.e. all devices assigned to) a guest share a single DMA address space
+ *   and, by default, Xen will ensure dfn == pfn.
+ *
  * WARNING: Some of these terms have changed over time while others have been
  * used inconsistently, meaning that a lot of existing code does not match the
  * definitions above.  New code should use these terms as described here, and
