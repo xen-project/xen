@@ -379,6 +379,11 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
 
 #define hvm_long_mode_active(v) (!!((v)->arch.hvm.guest_efer & EFER_LMA))
 
+static inline bool hvm_has_set_descriptor_access_exiting(void)
+{
+    return hvm_funcs.set_descriptor_access_exiting;
+}
+
 static inline int
 hvm_guest_x86_mode(struct vcpu *v)
 {
@@ -755,6 +760,11 @@ static inline bool hvm_event_pending(const struct vcpu *v)
 static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
 {
     ASSERT_UNREACHABLE();
+}
+
+static inline bool hvm_has_set_descriptor_access_exiting(void)
+{
+    return false;
 }
 
 #define is_viridian_domain(d) ((void)(d), false)
