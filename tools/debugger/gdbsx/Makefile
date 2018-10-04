@@ -26,7 +26,7 @@ uninstall:
 	rm -f $(DESTDIR)$(sbindir)/gdbsx
 
 gdbsx: gx/gx_all.a xg/xg_all.a 
-	$(CC) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^
 
 xg/xg_all.a:
 	$(MAKE) -C xg
