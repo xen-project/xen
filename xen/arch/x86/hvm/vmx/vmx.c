@@ -1654,6 +1654,12 @@ static void vmx_update_guest_efer(struct vcpu *v)
          * not tolerate the LME and LMA settings being different.  As writes
          * to CR0 are intercepted, it is safe to leave LME clear at this
          * point, and fix up both LME and LMA when CR0.PG is set.
+         *
+         * Furthermore, when using shadow pagetables (subsumed by the
+         * Unrestricted Guest check), CR0.PG is a Xen-owned bit, and remains
+         * set even when the guest has logically disabled paging.  LMA was
+         * calculated using the guest CR0.PG setting, but LME needs clearing
+         * to avoid interacting with Xen's CR0.PG setting.
          */
         if ( !(guest_efer & EFER_LMA) )
             guest_efer &= ~EFER_LME;

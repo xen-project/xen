@@ -638,13 +638,32 @@ void svm_update_guest_cr(struct vcpu *v, unsigned int cr, unsigned int flags)
 static void svm_update_guest_efer(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    bool lma = v->arch.hvm.guest_efer & EFER_LMA;
-    uint64_t new_efer;
+    unsigned long guest_efer = v->arch.hvm.guest_efer,
+        xen_efer = read_efer();
 
-    new_efer = (v->arch.hvm.guest_efer | EFER_SVME) & ~EFER_LME;
-    if ( lma )
-        new_efer |= EFER_LME;
-    vmcb_set_efer(vmcb, new_efer);
+    if ( paging_mode_shadow(v->domain) )
+    {
+        /* EFER.NX is a Xen-owned bit and is not under guest control. */
+        guest_efer &= ~EFER_NX;
+        guest_efer |= xen_efer & EFER_NX;
+
+        /*
+         * CR0.PG is a Xen-owned bit, and remains set even when the guest has
+         * logically disabled paging.
+         *
+         * LMA was calculated using the guest CR0.PG setting, but LME needs
+         * clearing to avoid interacting with Xen's CR0.PG setting.  As writes
+         * to CR0 are intercepted, it is safe to leave LME clear at this
+         * point, and fix up both LME and LMA when CR0.PG is set.
+         */
+        if ( !(guest_efer & EFER_LMA) )
+            guest_efer &= ~EFER_LME;
+    }
+
+    /* SVME must remain set in non-root mode. */
+    guest_efer |= EFER_SVME;
+
+    vmcb_set_efer(vmcb, guest_efer);
 
     ASSERT(nestedhvm_enabled(v->domain) ||
            !(v->arch.hvm.guest_efer & EFER_SVME));
