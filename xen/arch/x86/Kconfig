@@ -37,6 +37,14 @@ source "arch/Kconfig"
 
 config PV
 	def_bool y
+	prompt "PV support"
+	---help---
+	  Interfaces to support PV domains. These require guest kernel support
+	  to run as a PV guest, but don't require any specific hardware support.
+
+	  This option is needed if you want to run PV domains.
+
+	  If unsure, say Y.
 
 config PV_LINEAR_PT
        bool "Support for PV linear pagetables"
