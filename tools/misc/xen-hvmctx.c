@@ -148,21 +148,20 @@ static void dump_cpu(void)
            "            dr0 0x%16.16llx     dr1 0x%16.16llx\n"
            "            dr2 0x%16.16llx     dr3 0x%16.16llx\n"
            "            dr6 0x%16.16llx     dr7 0x%16.16llx\n"
-           "             cs 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "             ds 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "             es 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "             fs 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "             gs 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "             ss 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "             tr 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "           ldtr 0x%8.8x (0x%16.16llx + 0x%8.8x / 0x%5.5x)\n"
-           "           idtr            (0x%16.16llx + 0x%8.8x)\n"
-           "           gdtr            (0x%16.16llx + 0x%8.8x)\n"
+           "             cs %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "             es %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "             ds %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "             fs %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "             gs %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "             ss %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.8" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "             tr %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.4" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "           ldtr %#6.4" PRIx32 " (%#18.8" PRIx64 " + %#10.4" PRIx32 " / %#7.4" PRIx32 ")\n"
+           "           idtr        (%#18.8" PRIx64 " + %#10.4" PRIx32 ")\n"
+           "           gdtr        (%#18.8" PRIx64 " + %#10.4" PRIx32 ")\n"
            "    sysenter cs 0x%8.8llx  eip 0x%16.16llx  esp 0x%16.16llx\n"
-           "      shadow gs 0x%16.16llx\n"
-           "      MSR flags 0x%16.16llx  lstar 0x%16.16llx\n"
-           "           star 0x%16.16llx  cstar 0x%16.16llx\n"
-           "         sfmask 0x%16.16llx   efer 0x%16.16llx\n"
+           "      shadow gs %#18.16" PRIx64 "   efer %#18.8" PRIx64 "\n"
+           "          lstar %#18.16" PRIx64 "  cstar %#18.16" PRIx64 "\n"
+           "           star %#18.16" PRIx64 " sfmask %#18.8" PRIx64 "\n"
            "            tsc 0x%16.16llx\n"
            "          event 0x%8.8lx error 0x%8.8lx\n",
            (unsigned long long) c.rax, (unsigned long long) c.rbx,
@@ -179,30 +178,27 @@ static void dump_cpu(void)
            (unsigned long long) c.dr0, (unsigned long long) c.dr1,
            (unsigned long long) c.dr2, (unsigned long long) c.dr3,
            (unsigned long long) c.dr6, (unsigned long long) c.dr7,
-           c.cs_sel, (unsigned long long) c.cs_base, c.cs_limit, c.cs_arbytes,
-           c.ds_sel, (unsigned long long) c.ds_base, c.ds_limit, c.ds_arbytes,
-           c.es_sel, (unsigned long long) c.es_base, c.es_limit, c.es_arbytes,
-           c.fs_sel, (unsigned long long) c.fs_base, c.fs_limit, c.fs_arbytes,
-           c.gs_sel, (unsigned long long) c.gs_base, c.gs_limit, c.gs_arbytes,
-           c.ss_sel, (unsigned long long) c.ss_base, c.ss_limit, c.ss_arbytes,
-           c.tr_sel, (unsigned long long) c.tr_base, c.tr_limit, c.tr_arbytes,
-           c.ldtr_sel, (unsigned long long) c.ldtr_base,
-           c.ldtr_limit, c.ldtr_arbytes,
-           (unsigned long long) c.idtr_base, c.idtr_limit, 
-           (unsigned long long) c.gdtr_base, c.gdtr_limit, 
+           c.cs_sel, c.cs_base, c.cs_limit, c.cs_arbytes,
+           c.ds_sel, c.ds_base, c.ds_limit, c.ds_arbytes,
+           c.es_sel, c.es_base, c.es_limit, c.es_arbytes,
+           c.fs_sel, c.fs_base, c.fs_limit, c.fs_arbytes,
+           c.gs_sel, c.gs_base, c.gs_limit, c.gs_arbytes,
+           c.ss_sel, c.ss_base, c.ss_limit, c.ss_arbytes,
+           c.tr_sel, c.tr_base, c.tr_limit, c.tr_arbytes,
+           c.ldtr_sel, c.ldtr_base, c.ldtr_limit, c.ldtr_arbytes,
+           c.idtr_base, c.idtr_limit,
+           c.gdtr_base, c.gdtr_limit,
            (unsigned long long) c.sysenter_cs, 
            (unsigned long long) c.sysenter_eip, 
            (unsigned long long) c.sysenter_esp,
-           (unsigned long long) c.shadow_gs,
-           (unsigned long long) c.msr_flags,
-           (unsigned long long) c.msr_lstar,
-           (unsigned long long) c.msr_star,
-           (unsigned long long) c.msr_cstar,
-           (unsigned long long) c.msr_syscall_mask,
-           (unsigned long long) c.msr_efer,
+           c.shadow_gs, c.msr_efer,
+           c.msr_lstar, c.msr_cstar,
+           c.msr_star, c.msr_syscall_mask,
            (unsigned long long) c.tsc,
            (unsigned long) c.pending_event, (unsigned long) c.error_code);
-    dump_fpu(&c.fpu_regs);
+
+    if ( c.flags & XEN_X86_FPU_INITIALISED )
+        dump_fpu(&c.fpu_regs);
 }
 
 
