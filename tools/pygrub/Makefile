@@ -10,7 +10,7 @@ INSTALL_LOG = build/installed_files.txt
 all: build
 .PHONY: build
 build:
-	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" $(PYTHON) setup.py build
+	CC="$(CC)" CFLAGS="$(PY_CFLAGS)" LDFLAGS="$(PY_LDFLAGS)" $(PYTHON) setup.py build
 
 .PHONY: install
 install: all
