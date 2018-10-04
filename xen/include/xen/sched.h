@@ -893,8 +893,17 @@ static inline bool is_pv_32bit_vcpu(const struct vcpu *v)
 {
     return is_pv_32bit_domain(v->domain);
 }
-#endif
 
+static inline bool is_pv_64bit_domain(const struct domain *d)
+{
+    return is_pv_domain(d) && !d->arch.is_32bit_pv;
+}
+
+static inline bool is_pv_64bit_vcpu(const struct vcpu *v)
+{
+    return is_pv_64bit_domain(v->domain);
+}
+#endif
 static inline bool is_hvm_domain(const struct domain *d)
 {
     return IS_ENABLED(CONFIG_HVM) ? d->guest_type == guest_type_hvm : false;
