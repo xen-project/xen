@@ -636,12 +636,6 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
      * sysenter_eip. These are handled via VMSAVE/VMLOAD emulation.
      */
 
-    /* Page tables */
-    n2vmcb->pdpe0 = ns_vmcb->pdpe0;
-    n2vmcb->pdpe1 = ns_vmcb->pdpe1;
-    n2vmcb->pdpe2 = ns_vmcb->pdpe2;
-    n2vmcb->pdpe3 = ns_vmcb->pdpe3;
-
     /* PAT */
     if (!vcleanbit_set(np)) {
         n2vmcb->_g_pat = ns_vmcb->_g_pat;
@@ -1176,12 +1170,6 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
 
     /* CR2 */
     ns_vmcb->_cr2 = n2vmcb->_cr2;
-
-    /* Page tables */
-    ns_vmcb->pdpe0 = n2vmcb->pdpe0;
-    ns_vmcb->pdpe1 = n2vmcb->pdpe1;
-    ns_vmcb->pdpe2 = n2vmcb->pdpe2;
-    ns_vmcb->pdpe3 = n2vmcb->pdpe3;
 
     /* PAT */
     ns_vmcb->_g_pat = n2vmcb->_g_pat;

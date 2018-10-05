@@ -479,17 +479,14 @@ struct vmcb_struct {
     u64 sysenter_esp;
     u64 sysenter_eip;
     u64 _cr2;                   /* cleanbit 9 */
-    u64 pdpe0;
-    u64 pdpe1;
-    u64 pdpe2;
-    u64 pdpe3;
+    u64 res16[4];
     u64 _g_pat;                 /* cleanbit 4 */
     u64 _debugctlmsr;           /* cleanbit 10 */
     u64 _lastbranchfromip;      /* cleanbit 10 */
     u64 _lastbranchtoip;        /* cleanbit 10 */
     u64 _lastintfromip;         /* cleanbit 10 */
     u64 _lastinttoip;           /* cleanbit 10 */
-    u64 res16[301];
+    u64 res17[301];
 };
 
 struct svm_domain {
