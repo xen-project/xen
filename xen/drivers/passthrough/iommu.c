@@ -224,7 +224,8 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
                   == PGT_writable_page) )
                 mapping |= IOMMUF_writable;
 
-            ret = hd->platform_ops->map_page(d, dfn, mfn, mapping);
+            ret = hd->platform_ops->map_page(d, _dfn(dfn), _mfn(mfn),
+                                             mapping);
             if ( !rc )
                 rc = ret;
 
@@ -294,7 +295,7 @@ int iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    rc = hd->platform_ops->map_page(d, dfn_x(dfn), mfn_x(mfn), flags);
+    rc = hd->platform_ops->map_page(d, dfn, mfn, flags);
     if ( unlikely(rc) )
     {
         if ( !d->is_shutting_down && printk_ratelimit() )
@@ -317,7 +318,7 @@ int iommu_unmap_page(struct domain *d, dfn_t dfn)
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    rc = hd->platform_ops->unmap_page(d, dfn_x(dfn));
+    rc = hd->platform_ops->unmap_page(d, dfn);
     if ( unlikely(rc) )
     {
         if ( !d->is_shutting_down && printk_ratelimit() )
@@ -357,7 +358,7 @@ int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count)
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush )
         return 0;
 
-    rc = hd->platform_ops->iotlb_flush(d, dfn_x(dfn), page_count);
+    rc = hd->platform_ops->iotlb_flush(d, dfn, page_count);
     if ( unlikely(rc) )
     {
         if ( !d->is_shutting_down && printk_ratelimit() )

@@ -48,6 +48,11 @@ static inline dfn_t dfn_add(dfn_t dfn, unsigned long i)
     return _dfn(dfn_x(dfn) + i);
 }
 
+static inline bool_t dfn_eq(dfn_t x, dfn_t y)
+{
+    return dfn_x(x) == dfn_x(y);
+}
+
 extern bool_t iommu_enable, iommu_enabled;
 extern bool_t force_iommu, iommu_verbose;
 extern bool_t iommu_workaround_bios_bug, iommu_igfx;
@@ -174,9 +179,9 @@ struct iommu_ops {
 #endif /* HAS_PCI */
 
     void (*teardown)(struct domain *d);
-    int __must_check (*map_page)(struct domain *d, unsigned long dfn,
-                                 unsigned long mfn, unsigned int flags);
-    int __must_check (*unmap_page)(struct domain *d, unsigned long dfn);
+    int __must_check (*map_page)(struct domain *d, dfn_t dfn, mfn_t mfn,
+                                 unsigned int flags);
+    int __must_check (*unmap_page)(struct domain *d, dfn_t dfn);
     void (*free_page_table)(struct page_info *);
 #ifdef CONFIG_X86
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
@@ -187,7 +192,7 @@ struct iommu_ops {
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);
     void (*crash_shutdown)(void);
-    int __must_check (*iotlb_flush)(struct domain *d, unsigned long dfn,
+    int __must_check (*iotlb_flush)(struct domain *d, dfn_t dfn,
                                     unsigned int page_count);
     int __must_check (*iotlb_flush_all)(struct domain *d);
     int (*get_reserved_device_memory)(iommu_grdm_t *, void *);

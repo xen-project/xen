@@ -2550,8 +2550,7 @@ static int __must_check arm_smmu_iotlb_flush_all(struct domain *d)
 	return 0;
 }
 
-static int __must_check arm_smmu_iotlb_flush(struct domain *d,
-                                             unsigned long dfn,
+static int __must_check arm_smmu_iotlb_flush(struct domain *d, dfn_t dfn,
                                              unsigned int page_count)
 {
 	/* ARM SMMU v1 doesn't have flush by VMA and VMID */
@@ -2748,8 +2747,8 @@ static void arm_smmu_iommu_domain_teardown(struct domain *d)
 	xfree(xen_domain);
 }
 
-static int __must_check arm_smmu_map_page(struct domain *d, unsigned long dfn,
-			unsigned long mfn, unsigned int flags)
+static int __must_check arm_smmu_map_page(struct domain *d, dfn_t dfn,
+					  mfn_t mfn, unsigned int flags)
 {
 	p2m_type_t t;
 
@@ -2762,7 +2761,7 @@ static int __must_check arm_smmu_map_page(struct domain *d, unsigned long dfn,
 	 * function should only be used by gnttab code with gfn == mfn == dfn.
 	 */
 	BUG_ON(!is_domain_direct_mapped(d));
-	BUG_ON(mfn != dfn);
+	BUG_ON(mfn_x(mfn) != dfn_x(dfn));
 
 	/* We only support readable and writable flags */
 	if (!(flags & (IOMMUF_readable | IOMMUF_writable)))
@@ -2774,10 +2773,11 @@ static int __must_check arm_smmu_map_page(struct domain *d, unsigned long dfn,
 	 * The function guest_physmap_add_entry replaces the current mapping
 	 * if there is already one...
 	 */
-	return guest_physmap_add_entry(d, _gfn(dfn), _mfn(dfn), 0, t);
+	return guest_physmap_add_entry(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)),
+				       0, t);
 }
 
-static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long dfn)
+static int __must_check arm_smmu_unmap_page(struct domain *d, dfn_t dfn)
 {
 	/*
 	 * This function should only be used by gnttab code when the domain
@@ -2786,7 +2786,7 @@ static int __must_check arm_smmu_unmap_page(struct domain *d, unsigned long dfn)
 	if ( !is_domain_direct_mapped(d) )
 		return -EINVAL;
 
-	return guest_physmap_remove_page(d, _gfn(dfn), _mfn(dfn), 0);
+	return guest_physmap_remove_page(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)), 0);
 }
 
 static const struct iommu_ops arm_smmu_iommu_ops = {
