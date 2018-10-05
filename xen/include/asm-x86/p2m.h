@@ -52,7 +52,7 @@ extern bool_t opt_hap_1gb, opt_hap_2mb;
  * cannot be non-zero, otherwise, hardware generates io page faults when 
  * device access those pages. Therefore, p2m_ram_rw has to be defined as 0.
  */
-typedef enum {
+enum p2m_type {
     p2m_ram_rw = 0,             /* Normal read/write guest RAM */
     p2m_invalid = 1,            /* Nothing mapped here */
     p2m_ram_logdirty = 2,       /* Temporarily read-only for log-dirty */
@@ -72,7 +72,7 @@ typedef enum {
     p2m_ram_broken = 13,          /* Broken page, access cause domain crash */
     p2m_map_foreign  = 14,        /* ram pages from foreign domain */
     p2m_ioreq_server = 15,
-} p2m_type_t;
+};
 
 /* Modifiers to the query */
 typedef unsigned int p2m_query_t;
@@ -502,7 +502,6 @@ static inline struct page_info *get_page_from_gfn(
     page = mfn_to_page(_mfn(gfn));
     return mfn_valid(_mfn(gfn)) && get_page(page, d) ? page : NULL;
 }
-
 
 /* General conversion function from mfn to gfn */
 static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)

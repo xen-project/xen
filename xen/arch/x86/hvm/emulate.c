@@ -356,22 +356,21 @@ static int hvmemul_acquire_page(unsigned long gmfn, struct page_info **page)
     struct domain *curr_d = current->domain;
     p2m_type_t p2mt;
 
-    *page = get_page_from_gfn(curr_d, gmfn, &p2mt, P2M_UNSHARE);
+    switch ( check_get_page_from_gfn(curr_d, _gfn(gmfn), false, &p2mt,
+                                     page) )
+    {
+    case 0:
+        break;
 
-    if ( *page == NULL )
+    case -EAGAIN:
+        return X86EMUL_RETRY;
+
+    default:
+        ASSERT_UNREACHABLE();
+        /* Fallthrough */
+
+    case -EINVAL:
         return X86EMUL_UNHANDLEABLE;
-
-    if ( p2m_is_paging(p2mt) )
-    {
-        put_page(*page);
-        p2m_mem_paging_populate(curr_d, gmfn);
-        return X86EMUL_RETRY;
-    }
-
-    if ( p2m_is_shared(p2mt) )
-    {
-        put_page(*page);
-        return X86EMUL_RETRY;
     }
 
     /* This code should not be reached if the gmfn is not RAM */

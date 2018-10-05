@@ -2536,20 +2536,8 @@ static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
     struct page_info *page;
     struct domain *d = current->domain;
 
-    page = get_page_from_gfn(d, gfn, &p2mt,
-                             writable ? P2M_UNSHARE : P2M_ALLOC);
-    if ( (p2m_is_shared(p2mt) && writable) || !page )
-    {
-        if ( page )
-            put_page(page);
+    if ( check_get_page_from_gfn(d, _gfn(gfn), !writable, &p2mt, &page) )
         return NULL;
-    }
-    if ( p2m_is_paging(p2mt) )
-    {
-        put_page(page);
-        p2m_mem_paging_populate(d, gfn);
-        return NULL;
-    }
 
     if ( writable )
     {

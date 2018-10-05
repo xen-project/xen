@@ -1623,36 +1623,65 @@ void destroy_ring_for_helper(
     }
 }
 
-int prepare_ring_for_helper(
-    struct domain *d, unsigned long gmfn, struct page_info **_page,
-    void **_va)
+/*
+ * Acquire a pointer to struct page_info for a specified doman and GFN,
+ * checking whether the page has been paged out, or needs unsharing.
+ * If the function succeeds then zero is returned, page_p is written
+ * with a pointer to the struct page_info with a reference taken, and
+ * p2mt_p it is written with the P2M type of the page. The caller is
+ * responsible for dropping the reference.
+ * If the function fails then an appropriate errno is returned and the
+ * values referenced by page_p and p2mt_p are undefined.
+ */
+int check_get_page_from_gfn(struct domain *d, gfn_t gfn, bool readonly,
+                            p2m_type_t *p2mt_p, struct page_info **page_p)
 {
-    struct page_info *page;
+    p2m_query_t q = readonly ? P2M_ALLOC : P2M_UNSHARE;
     p2m_type_t p2mt;
-    void *va;
+    struct page_info *page;
 
-    page = get_page_from_gfn(d, gmfn, &p2mt, P2M_UNSHARE);
+    page = get_page_from_gfn(d, gfn_x(gfn), &p2mt, q);
 
 #ifdef CONFIG_HAS_MEM_PAGING
     if ( p2m_is_paging(p2mt) )
     {
         if ( page )
             put_page(page);
-        p2m_mem_paging_populate(d, gmfn);
-        return -ENOENT;
+
+        p2m_mem_paging_populate(d, gfn_x(gfn));
+        return -EAGAIN;
     }
 #endif
 #ifdef CONFIG_HAS_MEM_SHARING
-    if ( p2m_is_shared(p2mt) )
+    if ( (q & P2M_UNSHARE) && p2m_is_shared(p2mt) )
     {
         if ( page )
             put_page(page);
-        return -ENOENT;
+
+        return -EAGAIN;
     }
 #endif
 
     if ( !page )
         return -EINVAL;
+
+    *p2mt_p = p2mt;
+    *page_p = page;
+    return 0;
+}
+
+int prepare_ring_for_helper(
+    struct domain *d, unsigned long gmfn, struct page_info **_page,
+    void **_va)
+{
+    p2m_type_t p2mt;
+    struct page_info *page;
+    void *va;
+    int rc;
+
+    rc = check_get_page_from_gfn(d, _gfn(gmfn), false, &p2mt, &page);
+    if ( rc )
+        return (rc == -EAGAIN) ? -ENOENT : rc;
 
     if ( !get_page_type(page, PGT_writable_page) )
     {
