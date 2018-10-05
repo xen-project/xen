@@ -1416,10 +1416,9 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
 
     /* Prevent device assign if mem paging or mem sharing have been 
      * enabled for this domain */
-    if ( unlikely(!need_iommu(d) &&
-            (d->arch.hvm.mem_sharing_enabled ||
-             vm_event_check_ring(d->vm_event_paging) ||
-             p2m_get_hostp2m(d)->global_logdirty)) )
+    if ( unlikely(d->arch.hvm.mem_sharing_enabled ||
+                  vm_event_check_ring(d->vm_event_paging) ||
+                  p2m_get_hostp2m(d)->global_logdirty) )
         return -EXDEV;
 
     if ( !pcidevs_trylock() )
@@ -1460,7 +1459,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     }
 
  done:
-    if ( !has_arch_pdevs(d) && need_iommu(d) )
+    if ( !has_arch_pdevs(d) && has_iommu_pt(d) )
         iommu_teardown(d);
     pcidevs_unlock();
 
@@ -1510,7 +1509,7 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 
     pdev->fault.count = 0;
 
-    if ( !has_arch_pdevs(d) && need_iommu(d) )
+    if ( !has_arch_pdevs(d) && has_iommu_pt(d) )
         iommu_teardown(d);
 
     return ret;

@@ -1426,8 +1426,14 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     if ( ret )
         goto destroy_m2p;
 
-    if ( iommu_enabled && !iommu_hwdom_passthrough &&
-         !need_iommu(hardware_domain) )
+    /*
+     * If hardware domain has IOMMU mappings but page tables are not
+     * shared or being kept in sync then newly added memory needs to be
+     * mapped here.
+     */
+    if ( has_iommu_pt(hardware_domain) &&
+         !iommu_use_hap_pt(hardware_domain) &&
+         !need_iommu_pt_sync(hardware_domain) )
     {
         for ( i = spfn; i < epfn; i++ )
             if ( iommu_map_page(hardware_domain, _dfn(i), _mfn(i),

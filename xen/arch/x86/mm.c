@@ -2787,7 +2787,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
     {
         /* Special pages should not be accessible from devices. */
         struct domain *d = page_get_owner(page);
-        if ( d && is_pv_domain(d) && unlikely(need_iommu(d)) )
+        if ( d && is_pv_domain(d) && unlikely(need_iommu_pt_sync(d)) )
         {
             mfn_t mfn = page_to_mfn(page);
 

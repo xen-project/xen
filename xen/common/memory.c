@@ -805,10 +805,8 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
     xatp->gpfn += start;
     xatp->size -= start;
 
-#ifdef CONFIG_HAS_PASSTHROUGH
-    if ( need_iommu(d) )
-        this_cpu(iommu_dont_flush_iotlb) = 1;
-#endif
+    if ( has_iommu_pt(d) )
+       this_cpu(iommu_dont_flush_iotlb) = 1;
 
     while ( xatp->size > done )
     {
@@ -828,8 +826,7 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
         }
     }
 
-#ifdef CONFIG_HAS_PASSTHROUGH
-    if ( need_iommu(d) )
+    if ( has_iommu_pt(d) )
     {
         int ret;
 
@@ -843,7 +840,6 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
         if ( unlikely(ret) && rc >= 0 )
             rc = ret;
     }
-#endif
 
     return rc;
 }

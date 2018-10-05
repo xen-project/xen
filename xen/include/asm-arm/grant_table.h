@@ -90,7 +90,7 @@ void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
     gfn_x(((i) >= nr_status_frames(t)) ? INVALID_GFN : (t)->arch.status_gfn[i])
 
 #define gnttab_need_iommu_mapping(d)                    \
-    (is_domain_direct_mapped(d) && need_iommu(d))
+    (is_domain_direct_mapped(d) && need_iommu_pt_sync(d))
 
 #endif /* __ASM_GRANT_TABLE_H__ */
 /*

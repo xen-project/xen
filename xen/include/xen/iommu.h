@@ -103,6 +103,13 @@ enum iommu_feature
 
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature);
 
+enum iommu_status
+{
+    IOMMU_STATUS_disabled,
+    IOMMU_STATUS_initializing,
+    IOMMU_STATUS_initialized
+};
+
 struct domain_iommu {
     struct arch_iommu arch;
 
@@ -116,6 +123,16 @@ struct domain_iommu {
 
     /* Features supported by the IOMMU */
     DECLARE_BITMAP(features, IOMMU_FEAT_count);
+
+    /* Status of guest IOMMU mappings */
+    enum iommu_status status;
+
+    /*
+     * Does the guest reqire mappings to be synchonized, to maintain
+     * the default dfn == pfn map. (See comment on dfn at the top of
+     * include/xen/mm.h).
+     */
+    bool need_sync;
 };
 
 #define dom_iommu(d)              (&(d)->iommu)

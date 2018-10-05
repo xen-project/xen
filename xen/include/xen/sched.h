@@ -371,9 +371,6 @@ struct domain
 
 #ifdef CONFIG_HAS_PASSTHROUGH
     struct domain_iommu iommu;
-
-    /* Does this guest need iommu mappings (-1 meaning "being set up")? */
-    s8               need_iommu;
 #endif
     /* is node-affinity automatically computed? */
     bool             auto_node_affinity;
@@ -893,9 +890,11 @@ static inline bool is_hvm_vcpu(const struct vcpu *v)
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
                            cpumask_weight((v)->cpu_hard_affinity) == 1)
 #ifdef CONFIG_HAS_PASSTHROUGH
-#define need_iommu(d)    ((d)->need_iommu)
+#define has_iommu_pt(d) (dom_iommu(d)->status != IOMMU_STATUS_disabled)
+#define need_iommu_pt_sync(d) (dom_iommu(d)->need_sync)
 #else
-#define need_iommu(d)    (0)
+#define has_iommu_pt(d) false
+#define need_iommu_pt_sync(d) false
 #endif
 
 static inline bool is_vcpu_online(const struct vcpu *v)

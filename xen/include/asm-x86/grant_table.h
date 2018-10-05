@@ -94,6 +94,6 @@ static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
 #define gnttab_release_host_mappings(domain) ( paging_mode_external(domain) )
 
 #define gnttab_need_iommu_mapping(d)                \
-    (!paging_mode_translate(d) && need_iommu(d))
+    (!paging_mode_translate(d) && need_iommu_pt_sync(d))
 
 #endif /* __ASM_GRANT_TABLE_H__ */

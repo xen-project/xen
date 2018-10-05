@@ -642,7 +642,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
 
             /* No paging if iommu is used */
             rc = -EMLINK;
-            if ( unlikely(need_iommu(d)) )
+            if ( unlikely(has_iommu_pt(d)) )
                 break;
 
             rc = -EXDEV;

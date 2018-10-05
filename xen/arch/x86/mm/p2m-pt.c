@@ -688,7 +688,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
             if ( iommu_old_flags )
                 amd_iommu_flush_pages(p2m->domain, gfn, page_order);
         }
-        else if ( need_iommu(p2m->domain) )
+        else if ( need_iommu_pt_sync(p2m->domain) )
         {
             dfn_t dfn = _dfn(gfn);
 

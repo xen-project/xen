@@ -48,8 +48,6 @@ int arch_iommu_populate_page_table(struct domain *d)
     struct page_info *page;
     int rc = 0, n = 0;
 
-    d->need_iommu = -1;
-
     this_cpu(iommu_dont_flush_iotlb) = 1;
     spin_lock(&d->page_alloc_lock);
 

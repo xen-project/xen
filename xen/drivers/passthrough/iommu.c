@@ -197,7 +197,7 @@ static void __hwdom_init check_hwdom_reqs(struct domain *d)
 
 void __hwdom_init iommu_hwdom_init(struct domain *d)
 {
-    const struct domain_iommu *hd = dom_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
     check_hwdom_reqs(d);
 
@@ -205,8 +205,10 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
         return;
 
     register_keyhandler('o', &iommu_dump_p2m_table, "dump iommu p2m table", 0);
-    d->need_iommu = iommu_hwdom_strict;
-    if ( need_iommu(d) && !iommu_use_hap_pt(d) )
+
+    hd->status = IOMMU_STATUS_initializing;
+    hd->need_sync = iommu_hwdom_strict && !iommu_use_hap_pt(d);
+    if ( need_iommu_pt_sync(d) )
     {
         struct page_info *page;
         unsigned int i = 0;
@@ -239,35 +241,51 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
     }
 
     hd->platform_ops->hwdom_init(d);
+
+    hd->status = IOMMU_STATUS_initialized;
 }
 
 void iommu_teardown(struct domain *d)
 {
-    const struct domain_iommu *hd = dom_iommu(d);
+    struct domain_iommu *hd = dom_iommu(d);
 
-    d->need_iommu = 0;
+    hd->status = IOMMU_STATUS_disabled;
     hd->platform_ops->teardown(d);
     tasklet_schedule(&iommu_pt_cleanup_tasklet);
 }
 
 int iommu_construct(struct domain *d)
 {
-    if ( need_iommu(d) > 0 )
+    struct domain_iommu *hd = dom_iommu(d);
+
+    if ( hd->status == IOMMU_STATUS_initialized )
         return 0;
 
     if ( !iommu_use_hap_pt(d) )
     {
         int rc;
 
+        hd->status = IOMMU_STATUS_initializing;
+        hd->need_sync = true;
+
         rc = arch_iommu_populate_page_table(d);
         if ( rc )
+        {
+            if ( rc != -ERESTART )
+            {
+                hd->need_sync = false;
+                hd->status = IOMMU_STATUS_disabled;
+            }
+
             return rc;
+        }
     }
 
-    d->need_iommu = 1;
+    hd->status = IOMMU_STATUS_initialized;
+
     /*
      * There may be dirty cache lines when a device is assigned
-     * and before need_iommu(d) becoming true, this will cause
+     * and before has_iommu_pt(d) becoming true, this will cause
      * memory_type_changed lose effect if memory type changes.
      * Call memory_type_changed here to amend this.
      */
@@ -534,7 +552,8 @@ static void iommu_dump_p2m_table(unsigned char key)
     ops = iommu_get_ops();
     for_each_domain(d)
     {
-        if ( is_hardware_domain(d) || need_iommu(d) <= 0 )
+        if ( is_hardware_domain(d) ||
+             dom_iommu(d)->status < IOMMU_STATUS_initialized )
             continue;
 
         if ( iommu_use_hap_pt(d) )
