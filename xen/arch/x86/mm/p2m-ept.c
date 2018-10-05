@@ -874,12 +874,12 @@ out:
         ept_sync_domain(p2m);
 
     /* For host p2m, may need to change VT-d page table.*/
-    if ( rc == 0 && p2m_is_hostp2m(p2m) && need_iommu(d) &&
+    if ( rc == 0 && p2m_is_hostp2m(p2m) &&
          need_modify_vtd_table )
     {
-        if ( iommu_hap_pt_share )
+        if ( iommu_use_hap_pt(d) )
             rc = iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
-        else
+        else if ( need_iommu(d) )
         {
             dfn_t dfn = _dfn(gfn);
 

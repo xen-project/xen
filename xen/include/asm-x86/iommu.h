@@ -89,8 +89,9 @@ static inline int iommu_hardware_setup(void)
     return -ENODEV;
 }
 
-/* Does this domain have a P2M table we can use as its IOMMU pagetable? */
-#define iommu_use_hap_pt(d) (hap_enabled(d) && iommu_hap_pt_share)
+/* Are we using the domain P2M table as its IOMMU pagetable? */
+#define iommu_use_hap_pt(d) \
+    (hap_enabled(d) && need_iommu(d) && iommu_hap_pt_share)
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);

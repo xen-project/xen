@@ -487,7 +487,7 @@ int iommu_do_domctl(
 
 void iommu_share_p2m_table(struct domain* d)
 {
-    if ( iommu_enabled && iommu_use_hap_pt(d) )
+    if ( iommu_use_hap_pt(d) )
         iommu_get_ops()->share_p2m(d);
 }
 

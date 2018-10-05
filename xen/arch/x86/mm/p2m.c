@@ -2087,7 +2087,7 @@ static unsigned int mmio_order(const struct domain *d,
      * - exclude PV guests, should execution reach this code for such.
      * So be careful when altering this.
      */
-    if ( !need_iommu(d) || !iommu_use_hap_pt(d) ||
+    if ( !iommu_use_hap_pt(d) ||
          (start_fn & ((1UL << PAGE_ORDER_2M) - 1)) || !(nr >> PAGE_ORDER_2M) )
         return PAGE_ORDER_4K;
 

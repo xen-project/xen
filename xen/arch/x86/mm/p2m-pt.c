@@ -678,8 +678,8 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
          && (gfn + (1UL << page_order) - 1 > p2m->max_mapped_pfn) )
         p2m->max_mapped_pfn = gfn + (1UL << page_order) - 1;
 
-    if ( iommu_enabled && need_iommu(p2m->domain) &&
-         (iommu_old_flags != iommu_pte_flags || old_mfn != mfn_x(mfn)) )
+    if ( iommu_enabled && (iommu_old_flags != iommu_pte_flags ||
+                           old_mfn != mfn_x(mfn)) )
     {
         ASSERT(rc == 0);
 
@@ -688,7 +688,7 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
             if ( iommu_old_flags )
                 amd_iommu_flush_pages(p2m->domain, gfn, page_order);
         }
-        else
+        else if ( need_iommu(p2m->domain) )
         {
             dfn_t dfn = _dfn(gfn);
 
