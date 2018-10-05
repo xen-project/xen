@@ -957,7 +957,8 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
 
     if ( need_iommu(p2m->domain) &&
          (lpae_is_valid(orig_pte) || lpae_is_valid(*entry)) )
-        rc = iommu_iotlb_flush(p2m->domain, gfn_x(sgfn), 1UL << page_order);
+        rc = iommu_iotlb_flush(p2m->domain, _dfn(gfn_x(sgfn)),
+                               1UL << page_order);
     else
         rc = 0;
 

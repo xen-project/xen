@@ -60,4 +60,3 @@ void flush_all_cache()
 {
     wbinvd();
 }
-

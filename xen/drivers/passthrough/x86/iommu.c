@@ -241,7 +241,8 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
         if ( paging_mode_translate(d) )
             rc = set_identity_p2m_entry(d, pfn, p2m_access_rw, 0);
         else
-            rc = iommu_map_page(d, pfn, pfn, IOMMUF_readable|IOMMUF_writable);
+            rc = iommu_map_page(d, _dfn(pfn), _mfn(pfn),
+                                IOMMUF_readable | IOMMUF_writable);
         if ( rc )
             printk(XENLOG_WARNING " d%d: IOMMU mapping failed: %d\n",
                    d->domain_id, rc);

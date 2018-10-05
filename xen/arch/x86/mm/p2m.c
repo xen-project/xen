@@ -723,9 +723,11 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
 
         if ( need_iommu(p2m->domain) )
         {
+            dfn_t dfn = _dfn(mfn);
+
             for ( i = 0; i < (1 << page_order); i++ )
             {
-                int ret = iommu_unmap_page(p2m->domain, mfn + i);
+                int ret = iommu_unmap_page(p2m->domain, dfn_add(dfn, i));
 
                 if ( !rc )
                     rc = ret;
@@ -782,16 +784,17 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     {
         if ( need_iommu(d) && t == p2m_ram_rw )
         {
+            dfn_t dfn = _dfn(mfn_x(mfn));
+
             for ( i = 0; i < (1 << page_order); i++ )
             {
-                rc = iommu_map_page(d, mfn_x(mfn_add(mfn, i)),
-                                    mfn_x(mfn_add(mfn, i)),
+                rc = iommu_map_page(d, dfn_add(dfn, i), mfn_add(mfn, i),
                                     IOMMUF_readable|IOMMUF_writable);
                 if ( rc != 0 )
                 {
                     while ( i-- > 0 )
                         /* If statement to satisfy __must_check. */
-                        if ( iommu_unmap_page(d, mfn_x(mfn_add(mfn, i))) )
+                        if ( iommu_unmap_page(d, dfn_add(dfn, i)) )
                             continue;
 
                     return rc;
@@ -1170,7 +1173,8 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
     {
         if ( !need_iommu(d) )
             return 0;
-        return iommu_map_page(d, gfn_l, gfn_l, IOMMUF_readable|IOMMUF_writable);
+        return iommu_map_page(d, _dfn(gfn_l), _mfn(gfn_l),
+                              IOMMUF_readable | IOMMUF_writable);
     }
 
     gfn_lock(p2m, gfn, 0);
@@ -1260,7 +1264,7 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
     {
         if ( !need_iommu(d) )
             return 0;
-        return iommu_unmap_page(d, gfn_l);
+        return iommu_unmap_page(d, _dfn(gfn_l));
     }
 
     gfn_lock(p2m, gfn, 0);

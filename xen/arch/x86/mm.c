@@ -2789,14 +2789,14 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         struct domain *d = page_get_owner(page);
         if ( d && is_pv_domain(d) && unlikely(need_iommu(d)) )
         {
-            gfn_t gfn = _gfn(mfn_to_gmfn(d, mfn_x(page_to_mfn(page))));
+            mfn_t mfn = page_to_mfn(page);
 
             if ( (x & PGT_type_mask) == PGT_writable_page )
-                iommu_ret = iommu_unmap_page(d, gfn_x(gfn));
+                iommu_ret = iommu_unmap_page(d, _dfn(mfn_x(mfn)));
             else if ( type == PGT_writable_page )
-                iommu_ret = iommu_map_page(d, gfn_x(gfn),
-                                           mfn_x(page_to_mfn(page)),
-                                           IOMMUF_readable|IOMMUF_writable);
+                iommu_ret = iommu_map_page(d, _dfn(mfn_x(mfn)), mfn,
+                                           IOMMUF_readable |
+                                           IOMMUF_writable);
         }
     }
 

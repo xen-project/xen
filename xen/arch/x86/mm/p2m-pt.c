@@ -688,29 +688,36 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
             if ( iommu_old_flags )
                 amd_iommu_flush_pages(p2m->domain, gfn, page_order);
         }
-        else if ( iommu_pte_flags )
-            for ( i = 0; i < (1UL << page_order); i++ )
-            {
-                rc = iommu_map_page(p2m->domain, gfn + i, mfn_x(mfn) + i,
-                                    iommu_pte_flags);
-                if ( unlikely(rc) )
-                {
-                    while ( i-- )
-                        /* If statement to satisfy __must_check. */
-                        if ( iommu_unmap_page(p2m->domain, gfn + i) )
-                            continue;
-
-                    break;
-                }
-            }
         else
-            for ( i = 0; i < (1UL << page_order); i++ )
-            {
-                int ret = iommu_unmap_page(p2m->domain, gfn + i);
+        {
+            dfn_t dfn = _dfn(gfn);
 
-                if ( !rc )
-                    rc = ret;
-            }
+            if ( iommu_pte_flags )
+                for ( i = 0; i < (1UL << page_order); i++ )
+                {
+                    rc = iommu_map_page(p2m->domain, dfn_add(dfn, i),
+                                        mfn_add(mfn, i), iommu_pte_flags);
+                    if ( unlikely(rc) )
+                    {
+                        while ( i-- )
+                            /* If statement to satisfy __must_check. */
+                            if ( iommu_unmap_page(p2m->domain,
+                                                  dfn_add(dfn, i)) )
+                                continue;
+
+                        break;
+                    }
+                }
+            else
+                for ( i = 0; i < (1UL << page_order); i++ )
+                {
+                    int ret = iommu_unmap_page(p2m->domain,
+                                               dfn_add(dfn, i));
+
+                    if ( !rc )
+                        rc = ret;
+                }
+        }
     }
 
     /*

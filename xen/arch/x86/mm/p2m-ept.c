@@ -881,15 +881,19 @@ out:
             rc = iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
         else
         {
+            dfn_t dfn = _dfn(gfn);
+
             if ( iommu_flags )
                 for ( i = 0; i < (1 << order); i++ )
                 {
-                    rc = iommu_map_page(d, gfn + i, mfn_x(mfn) + i, iommu_flags);
+                    rc = iommu_map_page(d, dfn_add(dfn, i),
+                                        mfn_add(mfn, i), iommu_flags);
                     if ( unlikely(rc) )
                     {
                         while ( i-- )
                             /* If statement to satisfy __must_check. */
-                            if ( iommu_unmap_page(p2m->domain, gfn + i) )
+                            if ( iommu_unmap_page(p2m->domain,
+                                                  dfn_add(dfn, i)) )
                                 continue;
 
                         break;
@@ -898,7 +902,7 @@ out:
             else
                 for ( i = 0; i < (1 << order); i++ )
                 {
-                    ret = iommu_unmap_page(d, gfn + i);
+                    ret = iommu_unmap_page(d, dfn_add(dfn, i));
                     if ( !rc )
                         rc = ret;
                 }
