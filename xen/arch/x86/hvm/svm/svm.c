@@ -78,6 +78,9 @@ static struct hvm_function_table svm_function_table;
  */
 static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, hsa);
 static DEFINE_PER_CPU_READ_MOSTLY(paddr_t, host_vmcb);
+#ifdef CONFIG_PV
+static DEFINE_PER_CPU(struct vmcb_struct *, host_vmcb_va);
+#endif
 
 static bool_t amd_erratum383_found __read_mostly;
 
@@ -1567,6 +1570,14 @@ static void svm_cpu_dead(unsigned int cpu)
         *this_hsa = 0;
     }
 
+#ifdef CONFIG_PV
+    if ( per_cpu(host_vmcb_va, cpu) )
+    {
+        unmap_domain_page_global(per_cpu(host_vmcb_va, cpu));
+        per_cpu(host_vmcb_va, cpu) = NULL;
+    }
+#endif
+
     if ( *this_vmcb )
     {
         free_domheap_page(maddr_to_page(*this_vmcb));
@@ -1601,6 +1612,11 @@ static int svm_cpu_up_prepare(unsigned int cpu)
         if ( !pg )
             goto err;
 
+#ifdef CONFIG_PV
+        if ( !cpu_has_fsgsbase )
+            per_cpu(host_vmcb_va, cpu) = __map_domain_page_global(pg);
+#endif
+
         clear_domain_page(page_to_mfn(pg));
         *this_vmcb = page_to_maddr(pg);
     }
@@ -1629,6 +1645,66 @@ static void svm_init_erratum_383(const struct cpuinfo_x86 *c)
         printk("Failed to enable erratum 383\n");
     }
 }
+
+#ifdef CONFIG_PV
+bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
+                   unsigned int fs_sel, unsigned long fs_base,
+                   unsigned int gs_sel, unsigned long gs_base,
+                   unsigned long gs_shadow)
+{
+    unsigned int cpu = smp_processor_id();
+    struct vmcb_struct *vmcb = per_cpu(host_vmcb_va, cpu);
+
+    if ( unlikely(!vmcb) )
+        return false;
+
+    if ( !ldt_base )
+    {
+        /*
+         * The actual structure field used here was arbitrarily chosen.
+         * Empirically it doesn't seem to matter much which element is used,
+         * and a clear explanation of the otherwise poor performance has not
+         * been found/provided so far.
+         */
+        prefetchw(&vmcb->ldtr);
+        return true;
+    }
+
+    if ( likely(!ldt_ents) )
+        memset(&vmcb->ldtr, 0, sizeof(vmcb->ldtr));
+    else
+    {
+        /* Keep GDT in sync. */
+        struct desc_struct *desc = this_cpu(gdt_table) + LDT_ENTRY -
+                                   FIRST_RESERVED_GDT_ENTRY;
+
+        _set_tssldt_desc(desc, ldt_base, ldt_ents * 8 - 1, SYS_DESC_ldt);
+
+        vmcb->ldtr.sel = LDT_ENTRY << 3;
+        vmcb->ldtr.attr = SYS_DESC_ldt | (_SEGMENT_P >> 8);
+        vmcb->ldtr.limit = ldt_ents * 8 - 1;
+        vmcb->ldtr.base = ldt_base;
+    }
+
+    ASSERT(!(fs_sel & ~3));
+    vmcb->fs.sel = fs_sel;
+    vmcb->fs.attr = 0;
+    vmcb->fs.limit = 0;
+    vmcb->fs.base = fs_base;
+
+    ASSERT(!(gs_sel & ~3));
+    vmcb->gs.sel = gs_sel;
+    vmcb->gs.attr = 0;
+    vmcb->gs.limit = 0;
+    vmcb->gs.base = gs_base;
+
+    vmcb->kerngsbase = gs_shadow;
+
+    svm_vmload_pa(per_cpu(host_vmcb, cpu));
+
+    return true;
+}
+#endif
 
 static int _svm_cpu_up(bool bsp)
 {
@@ -1661,6 +1737,8 @@ static int _svm_cpu_up(bool bsp)
 
     /* Initialize OSVW bits to be used by guests */
     svm_host_osvw_init();
+
+    svm_vmsave_pa(per_cpu(host_vmcb, cpu));
 
     return 0;
 }

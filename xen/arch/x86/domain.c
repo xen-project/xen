@@ -52,6 +52,7 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/svm/svm.h>
 #include <asm/hvm/viridian.h>
 #include <asm/debugreg.h>
 #include <asm/msr.h>
@@ -1281,10 +1282,33 @@ static void load_segments(struct vcpu *n)
     struct cpu_user_regs *uregs = &n->arch.user_regs;
     int all_segs_okay = 1;
     unsigned int dirty_segment_mask, cpu = smp_processor_id();
+    bool fs_gs_done = false;
 
     /* Load and clear the dirty segment mask. */
     dirty_segment_mask = per_cpu(dirty_segment_mask, cpu);
     per_cpu(dirty_segment_mask, cpu) = 0;
+
+#ifdef CONFIG_HVM
+    if ( !is_pv_32bit_vcpu(n) && !cpu_has_fsgsbase && cpu_has_svm &&
+         !((uregs->fs | uregs->gs) & ~3) &&
+         /*
+          * The remaining part is just for optimization: If only shadow GS
+          * needs loading, there's nothing to be gained here.
+          */
+         (n->arch.pv.fs_base | n->arch.pv.gs_base_user | n->arch.pv.ldt_ents) )
+    {
+        unsigned long gsb = n->arch.flags & TF_kernel_mode
+            ? n->arch.pv.gs_base_kernel : n->arch.pv.gs_base_user;
+        unsigned long gss = n->arch.flags & TF_kernel_mode
+            ? n->arch.pv.gs_base_user : n->arch.pv.gs_base_kernel;
+
+        fs_gs_done = svm_load_segs(n->arch.pv.ldt_ents, LDT_VIRT_START(n),
+                                   uregs->fs, n->arch.pv.fs_base,
+                                   uregs->gs, gsb, gss);
+    }
+#endif
+    if ( !fs_gs_done )
+        load_LDT(n);
 
     /* Either selector != 0 ==> reload. */
     if ( unlikely((dirty_segment_mask & DIRTY_DS) | uregs->ds) )
@@ -1301,7 +1325,7 @@ static void load_segments(struct vcpu *n)
     }
 
     /* Either selector != 0 ==> reload. */
-    if ( unlikely((dirty_segment_mask & DIRTY_FS) | uregs->fs) )
+    if ( unlikely((dirty_segment_mask & DIRTY_FS) | uregs->fs) && !fs_gs_done )
     {
         all_segs_okay &= loadsegment(fs, uregs->fs);
         /* non-nul selector updates fs_base */
@@ -1310,7 +1334,7 @@ static void load_segments(struct vcpu *n)
     }
 
     /* Either selector != 0 ==> reload. */
-    if ( unlikely((dirty_segment_mask & DIRTY_GS) | uregs->gs) )
+    if ( unlikely((dirty_segment_mask & DIRTY_GS) | uregs->gs) && !fs_gs_done )
     {
         all_segs_okay &= loadsegment(gs, uregs->gs);
         /* non-nul selector updates gs_base_user */
@@ -1318,7 +1342,7 @@ static void load_segments(struct vcpu *n)
             dirty_segment_mask &= ~DIRTY_GS_BASE;
     }
 
-    if ( !is_pv_32bit_vcpu(n) )
+    if ( !fs_gs_done && !is_pv_32bit_vcpu(n) )
     {
         /* This can only be non-zero if selector is NULL. */
         if ( n->arch.pv.fs_base | (dirty_segment_mask & DIRTY_FS_BASE) )
@@ -1653,6 +1677,13 @@ static void __context_switch(void)
 
     write_ptbase(n);
 
+#if defined(CONFIG_PV) && defined(CONFIG_HVM)
+    /* Prefetch the VMCB if we expect to use it later in the context switch */
+    if ( is_pv_domain(nd) && !is_pv_32bit_domain(nd) && !is_idle_domain(nd) &&
+         !cpu_has_fsgsbase && cpu_has_svm )
+        svm_load_segs(0, 0, 0, 0, 0, 0, 0);
+#endif
+
     if ( need_full_gdt(nd) &&
          ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(pd)) )
     {
@@ -1714,10 +1745,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         local_irq_enable();
 
         if ( is_pv_domain(nextd) )
-        {
-            load_LDT(next);
             load_segments(next);
-        }
 
         ctxt_switch_levelling(next);
 
