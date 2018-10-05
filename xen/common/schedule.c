@@ -1014,7 +1014,7 @@ static long do_poll(struct sched_poll *sched_poll)
 {
     struct vcpu   *v = current;
     struct domain *d = v->domain;
-    evtchn_port_t  port;
+    evtchn_port_t  port = 0;
     long           rc;
     unsigned int   i;
 
