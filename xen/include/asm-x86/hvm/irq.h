@@ -180,7 +180,15 @@ int pt_pirq_iterate(struct domain *d,
                               struct hvm_pirq_dpci *, void *arg),
                     void *arg);
 
+#ifdef CONFIG_HVM
 bool pt_pirq_softirq_active(struct hvm_pirq_dpci *);
+#else
+static inline bool pt_pirq_softirq_active(struct hvm_pirq_dpci *dpci)
+{
+    return false;
+}
+#endif
+
 /* Modify state of a PCI INTx wire. */
 void hvm_pci_intx_assert(struct domain *d, unsigned int device,
                          unsigned int intx);
