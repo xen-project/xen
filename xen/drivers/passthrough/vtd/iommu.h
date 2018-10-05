@@ -272,6 +272,9 @@ struct dma_pte {
 #define dma_set_pte_prot(p, prot) do { \
         (p).val = ((p).val & ~DMA_PTE_PROT) | ((prot) & DMA_PTE_PROT); \
     } while (0)
+#define dma_pte_prot(p) ((p).val & DMA_PTE_PROT)
+#define dma_pte_read(p) (dma_pte_prot(p) & DMA_PTE_READ)
+#define dma_pte_write(p) (dma_pte_prot(p) & DMA_PTE_WRITE)
 #define dma_pte_addr(p) ((p).val & PADDR_MASK & PAGE_MASK_4K)
 #define dma_set_pte_addr(p, addr) do {\
             (p).val |= ((addr) & PAGE_MASK_4K); } while (0)

@@ -1833,6 +1833,46 @@ static int __must_check intel_iommu_unmap_page(struct domain *d,
     return dma_pte_clear_one(d, dfn_to_daddr(dfn));
 }
 
+static int intel_iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
+                                   unsigned int *flags)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+    struct dma_pte *page, val;
+    u64 pg_maddr;
+
+    /*
+     * If VT-d shares EPT page table or if the domain is the hardware
+     * domain and iommu_passthrough is set then pass back the dfn.
+     */
+    if ( iommu_use_hap_pt(d) ||
+         (iommu_hwdom_passthrough && is_hardware_domain(d)) )
+        return -EOPNOTSUPP;
+
+    spin_lock(&hd->arch.mapping_lock);
+
+    pg_maddr = addr_to_dma_page_maddr(d, dfn_to_daddr(dfn), 0);
+    if ( !pg_maddr )
+    {
+        spin_unlock(&hd->arch.mapping_lock);
+        return -ENOMEM;
+    }
+
+    page = map_vtd_domain_page(pg_maddr);
+    val = page[dfn_x(dfn) & LEVEL_MASK];
+
+    unmap_vtd_domain_page(page);
+    spin_unlock(&hd->arch.mapping_lock);
+
+    if ( !dma_pte_present(val) )
+        return -ENOENT;
+
+    *mfn = maddr_to_mfn(dma_pte_addr(val));
+    *flags = dma_pte_read(val) ? IOMMUF_readable : 0;
+    *flags |= dma_pte_write(val) ? IOMMUF_writable : 0;
+
+    return 0;
+}
+
 int iommu_pte_flush(struct domain *d, uint64_t dfn, uint64_t *pte,
                     int order, int present)
 {
@@ -2658,6 +2698,7 @@ const struct iommu_ops intel_iommu_ops = {
     .teardown = iommu_domain_teardown,
     .map_page = intel_iommu_map_page,
     .unmap_page = intel_iommu_unmap_page,
+    .lookup_page = intel_iommu_lookup_page,
     .free_page_table = iommu_free_page_table,
     .reassign_device = reassign_device_ownership,
     .get_device_group_id = intel_iommu_group_id,

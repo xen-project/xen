@@ -333,6 +333,17 @@ int iommu_unmap_page(struct domain *d, dfn_t dfn)
     return rc;
 }
 
+int iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
+                      unsigned int *flags)
+{
+    const struct domain_iommu *hd = dom_iommu(d);
+
+    if ( !iommu_enabled || !hd->platform_ops )
+        return -EOPNOTSUPP;
+
+    return hd->platform_ops->lookup_page(d, dfn, mfn, flags);
+}
+
 static void iommu_free_pagetables(unsigned long unused)
 {
     do {

@@ -92,6 +92,8 @@ void iommu_teardown(struct domain *d);
 int __must_check iommu_map_page(struct domain *d, dfn_t dfn,
                                 mfn_t mfn, unsigned int flags);
 int __must_check iommu_unmap_page(struct domain *d, dfn_t dfn);
+int __must_check iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
+                                   unsigned int *flags);
 
 enum iommu_feature
 {
@@ -183,9 +185,17 @@ struct iommu_ops {
 #endif /* HAS_PCI */
 
     void (*teardown)(struct domain *d);
+
+    /*
+     * This block of operations must be appropriately locked against each
+     * other by the caller in order to have meaningful results.
+     */
     int __must_check (*map_page)(struct domain *d, dfn_t dfn, mfn_t mfn,
                                  unsigned int flags);
     int __must_check (*unmap_page)(struct domain *d, dfn_t dfn);
+    int __must_check (*lookup_page)(struct domain *d, dfn_t dfn, mfn_t *mfn,
+                                    unsigned int *flags);
+
     void (*free_page_table)(struct page_info *);
 #ifdef CONFIG_X86
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
