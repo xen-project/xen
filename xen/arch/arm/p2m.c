@@ -219,6 +219,20 @@ static p2m_access_t p2m_mem_access_radix_get(struct p2m_domain *p2m, gfn_t gfn)
         return radix_tree_ptr_to_int(ptr);
 }
 
+/*
+ * lpae_is_* helpers don't check whether the valid bit is set in the
+ * PTE. Provide our own overlay to check the valid bit.
+ */
+static inline bool p2m_is_mapping(lpae_t pte, unsigned int level)
+{
+    return lpae_is_valid(pte) && lpae_is_mapping(pte, level);
+}
+
+static inline bool p2m_is_superpage(lpae_t pte, unsigned int level)
+{
+    return lpae_is_valid(pte) && lpae_is_superpage(pte, level);
+}
+
 #define GUEST_TABLE_MAP_FAILED 0
 #define GUEST_TABLE_SUPER_PAGE 1
 #define GUEST_TABLE_NORMAL_PAGE 2
@@ -262,7 +276,7 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
 
     /* The function p2m_next_level is never called at the 3rd level */
     ASSERT(level < 3);
-    if ( lpae_is_mapping(*entry, level) )
+    if ( p2m_is_mapping(*entry, level) )
         return GUEST_TABLE_SUPER_PAGE;
 
     mfn = lpae_get_mfn(*entry);
@@ -642,7 +656,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
         return;
 
     /* Nothing to do but updating the stats if the entry is a super-page. */
-    if ( lpae_is_superpage(entry, level) )
+    if ( p2m_is_superpage(entry, level) )
     {
         p2m->stats.mappings[level]--;
         return;
@@ -697,7 +711,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
      * a superpage.
      */
     ASSERT(level < target);
-    ASSERT(lpae_is_superpage(*entry, level));
+    ASSERT(p2m_is_superpage(*entry, level));
 
     page = alloc_domheap_page(NULL, 0);
     if ( !page )
@@ -836,7 +850,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         /* We need to split the original page. */
         lpae_t split_pte = *entry;
 
-        ASSERT(lpae_is_superpage(*entry, level));
+        ASSERT(p2m_is_superpage(*entry, level));
 
         if ( !p2m_split_superpage(p2m, &split_pte, level, target, offsets) )
         {

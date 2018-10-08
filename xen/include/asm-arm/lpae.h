@@ -133,16 +133,19 @@ static inline bool lpae_is_valid(lpae_t pte)
     return pte.walk.valid;
 }
 
+/*
+ * lpae_is_* don't check the valid bit. This gives an opportunity for the
+ * callers to operate on the entry even if they are not valid. For
+ * instance to store information in advance.
+ */
 static inline bool lpae_is_table(lpae_t pte, unsigned int level)
 {
-    return (level < 3) && lpae_is_valid(pte) && pte.walk.table;
+    return (level < 3) && pte.walk.table;
 }
 
 static inline bool lpae_is_mapping(lpae_t pte, unsigned int level)
 {
-    if ( !lpae_is_valid(pte) )
-        return false;
-    else if ( level == 3 )
+    if ( level == 3 )
         return pte.walk.table;
     else
         return !pte.walk.table;
