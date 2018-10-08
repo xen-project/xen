@@ -511,6 +511,15 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
             DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6520"),
         },
     },
+    {    /* Handle problems with rebooting on Dell PowerEdge R540. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_ACPI,
+        .ident = "Dell PowerEdge R540",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge R540"),
+        },
+    },
     {    /* Handle problems with rebooting on Dell PowerEdge R740. */
         .callback = override_reboot,
         .driver_data = (void *)(long)BOOT_ACPI,
