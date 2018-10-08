@@ -159,10 +159,15 @@ EFI_LDFLAGS += --minor-image-version=$(XEN_SUBVERSION)
 EFI_LDFLAGS += --major-os-version=2 --minor-os-version=0
 EFI_LDFLAGS += --major-subsystem-version=2 --minor-subsystem-version=0
 
+# Check if the build system supports PE.
+XEN_BUILD_PE := $(shell $(CC) $(filter-out $(CFLAGS-y) .%.d,$(CFLAGS)) -c efi/check.c -o efi/check.o 2>/dev/null && echo y)
+export XEN_BUILD_PE := $(if $(XEN_BUILD_PE),$(shell $(LD) -mi386pep --subsystem=10 -o efi/check.efi efi/check.o 2>/dev/null && echo y))
+CFLAGS-$(XEN_BUILD_PE) += -DXEN_BUILD_PE
+
 $(TARGET).efi: VIRT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A VIRT_START$$,,p')
 $(TARGET).efi: ALT_BASE = 0x$(shell $(NM) efi/relocs-dummy.o | sed -n 's, A ALT_START$$,,p')
 # Don't use $(wildcard ...) here - at least make 3.80 expands this too early!
-$(TARGET).efi: guard = $(if $(shell echo efi/dis* | grep disabled),:)
+$(TARGET).efi: guard = $(if $(filter y,$(XEN_BUILD_PE)),,:)
 
 ifneq ($(build_id_linker),)
 ifeq ($(call ld-ver-build-id,$(LD) $(filter -m%,$(EFI_LDFLAGS))),y)
@@ -224,6 +229,6 @@ efi/mkreloc: efi/mkreloc.c
 clean::
 	rm -f asm-offsets.s *.lds boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
-	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.efi efi/disabled efi/mkreloc
+	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.efi efi/mkreloc
 	rm -f boot/cmdline.S boot/reloc.S boot/*.lnk boot/*.bin
 	rm -f note.o
