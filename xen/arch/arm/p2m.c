@@ -538,6 +538,16 @@ static lpae_t mfn_to_p2m_entry(mfn_t mfn, p2m_type_t t, p2m_access_t a)
     return e;
 }
 
+/* Generate table entry with correct attributes. */
+static lpae_t page_to_p2m_table(struct page_info *page)
+{
+    /*
+     * The access value does not matter because the hardware will ignore
+     * the permission fields for table entry.
+     */
+    return mfn_to_p2m_entry(page_to_mfn(page), p2m_invalid, p2m_access_rwx);
+}
+
 static inline void p2m_write_pte(lpae_t *p, lpae_t pte, bool clean_pte)
 {
     write_pte(p, pte);
@@ -558,7 +568,6 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
 {
     struct page_info *page;
     lpae_t *p;
-    lpae_t pte;
 
     ASSERT(!lpae_is_valid(*entry));
 
@@ -576,14 +585,7 @@ static int p2m_create_table(struct p2m_domain *p2m, lpae_t *entry)
 
     unmap_domain_page(p);
 
-    /*
-     * The access value does not matter because the hardware will ignore
-     * the permission fields for table entry.
-     */
-    pte = mfn_to_p2m_entry(page_to_mfn(page), p2m_invalid,
-                           p2m->default_access);
-
-    p2m_write_pte(entry, pte, p2m->clean_pte);
+    p2m_write_pte(entry, page_to_p2m_table(page), p2m->clean_pte);
 
     return 0;
 }
@@ -764,14 +766,11 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
 
     unmap_domain_page(table);
 
-    pte = mfn_to_p2m_entry(page_to_mfn(page), p2m_invalid,
-                           p2m->default_access);
-
     /*
      * Even if we failed, we should install the newly allocated LPAE
      * entry. The caller will be in charge to free the sub-tree.
      */
-    p2m_write_pte(entry, pte, p2m->clean_pte);
+    p2m_write_pte(entry, page_to_p2m_table(page), p2m->clean_pte);
 
     return rv;
 }
