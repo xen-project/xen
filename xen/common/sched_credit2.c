@@ -502,11 +502,10 @@ struct csched2_private {
 
 /*
  * Physical CPU
- *
- * The only per-pCPU information we need to maintain is of which runqueue
- * each CPU is part of.
  */
-static DEFINE_PER_CPU(int, runq_map);
+struct csched2_pcpu {
+    int runq_id;
+};
 
 /*
  * Virtual CPU
@@ -565,6 +564,11 @@ static inline struct csched2_private *csched2_priv(const struct scheduler *ops)
     return ops->sched_data;
 }
 
+static inline struct csched2_pcpu *csched2_pcpu(unsigned int cpu)
+{
+    return per_cpu(schedule_data, cpu).sched_priv;
+}
+
 static inline struct csched2_vcpu *csched2_vcpu(const struct vcpu *v)
 {
     return v->sched_priv;
@@ -578,7 +582,7 @@ static inline struct csched2_dom *csched2_dom(const struct domain *d)
 /* CPU to runq_id macro */
 static inline int c2r(unsigned int cpu)
 {
-    return per_cpu(runq_map, cpu);
+    return csched2_pcpu(cpu)->runq_id;
 }
 
 /* CPU to runqueue struct macro */
@@ -3769,30 +3773,44 @@ csched2_dump(const struct scheduler *ops)
 #undef cpustr
 }
 
+static void *
+csched2_alloc_pdata(const struct scheduler *ops, int cpu)
+{
+    struct csched2_pcpu *spc;
+
+    spc = xzalloc(struct csched2_pcpu);
+    if ( spc == NULL )
+        return ERR_PTR(-ENOMEM);
+
+    /* Not in any runqueue yet */
+    spc->runq_id = -1;
+
+    return spc;
+}
+
 /* Returns the ID of the runqueue the cpu is assigned to. */
 static unsigned
-init_pdata(struct csched2_private *prv, unsigned int cpu)
+init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
+           unsigned int cpu)
 {
-    unsigned rqi;
     struct csched2_runqueue_data *rqd;
 
     ASSERT(rw_is_write_locked(&prv->lock));
     ASSERT(!cpumask_test_cpu(cpu, &prv->initialized));
+    /* CPU data needs to be allocated, but still uninitialized. */
+    ASSERT(spc && spc->runq_id == -1);
 
     /* Figure out which runqueue to put it in */
-    rqi = cpu_to_runqueue(prv, cpu);
+    spc->runq_id = cpu_to_runqueue(prv, cpu);
 
-    rqd = prv->rqd + rqi;
+    rqd = prv->rqd + spc->runq_id;
 
-    printk(XENLOG_INFO "Adding cpu %d to runqueue %d\n", cpu, rqi);
-    if ( ! cpumask_test_cpu(rqi, &prv->active_queues) )
+    printk(XENLOG_INFO "Adding cpu %d to runqueue %d\n", cpu, spc->runq_id);
+    if ( ! cpumask_test_cpu(spc->runq_id, &prv->active_queues) )
     {
         printk(XENLOG_INFO " First cpu on runqueue, activating\n");
-        activate_runqueue(prv, rqi);
+        activate_runqueue(prv, spc->runq_id);
     }
-    
-    /* Set the runqueue map */
-    per_cpu(runq_map, cpu) = rqi;
     
     __cpumask_set_cpu(cpu, &rqd->idle);
     __cpumask_set_cpu(cpu, &rqd->active);
@@ -3802,7 +3820,7 @@ init_pdata(struct csched2_private *prv, unsigned int cpu)
     if ( cpumask_weight(&rqd->active) == 1 )
         rqd->pick_bias = cpu;
 
-    return rqi;
+    return spc->runq_id;
 }
 
 static void
@@ -3813,16 +3831,10 @@ csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
     unsigned long flags;
     unsigned rqi;
 
-    /*
-     * pdata contains what alloc_pdata returned. But since we don't (need to)
-     * implement alloc_pdata, either that's NULL, or something is very wrong!
-     */
-    ASSERT(!pdata);
-
     write_lock_irqsave(&prv->lock, flags);
     old_lock = pcpu_schedule_lock(cpu);
 
-    rqi = init_pdata(prv, cpu);
+    rqi = init_pdata(prv, pdata, cpu);
     /* Move the scheduler lock to the new runq lock. */
     per_cpu(schedule_data, cpu).schedule_lock = &prv->rqd[rqi].lock;
 
@@ -3840,7 +3852,7 @@ csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     struct csched2_vcpu *svc = vdata;
     unsigned rqi;
 
-    ASSERT(!pdata && svc && is_idle_vcpu(svc->vcpu));
+    ASSERT(pdata && svc && is_idle_vcpu(svc->vcpu));
 
     /*
      * We own one runqueue lock already (from schedule_cpu_switch()). This
@@ -3855,7 +3867,7 @@ csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
 
     idle_vcpu[cpu]->sched_priv = vdata;
 
-    rqi = init_pdata(prv, cpu);
+    rqi = init_pdata(prv, pdata, cpu);
 
     /*
      * Now that we know what runqueue we'll go in, double check what's said
@@ -3866,7 +3878,7 @@ csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     ASSERT(per_cpu(schedule_data, cpu).schedule_lock != &prv->rqd[rqi].lock);
 
     per_cpu(scheduler, cpu) = new_ops;
-    per_cpu(schedule_data, cpu).sched_priv = NULL; /* no pdata */
+    per_cpu(schedule_data, cpu).sched_priv = pdata;
 
     /*
      * (Re?)route the lock to the per pCPU lock as /last/ thing. In fact,
@@ -3885,7 +3897,7 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     unsigned long flags;
     struct csched2_private *prv = csched2_priv(ops);
     struct csched2_runqueue_data *rqd;
-    int rqi;
+    struct csched2_pcpu *spc = pcpu;
 
     write_lock_irqsave(&prv->lock, flags);
 
@@ -3893,17 +3905,24 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
      * alloc_pdata is not implemented, so pcpu must be NULL. On the other
      * hand, init_pdata must have been called for this pCPU.
      */
-    ASSERT(!pcpu && cpumask_test_cpu(cpu, &prv->initialized));
+    /*
+     * Scheduler specific data for this pCPU must still be there and and be
+     * valid. In fact, if we are here:
+     *  1. alloc_pdata must have been called for this cpu, and free_pdata
+     *     must not have been called on it before us,
+     *  2. init_pdata must have been called on this cpu, and deinit_pdata
+     *     (us!) must not have been called on it already.
+     */
+    ASSERT(spc && spc->runq_id != -1);
+    ASSERT(cpumask_test_cpu(cpu, &prv->initialized));
     
     /* Find the old runqueue and remove this cpu from it */
-    rqi = per_cpu(runq_map, cpu);
-
-    rqd = prv->rqd + rqi;
+    rqd = prv->rqd + spc->runq_id;
 
     /* No need to save IRQs here, they're already disabled */
     spin_lock(&rqd->lock);
 
-    printk(XENLOG_INFO "Removing cpu %d from runqueue %d\n", cpu, rqi);
+    printk(XENLOG_INFO "Removing cpu %d from runqueue %d\n", cpu, spc->runq_id);
 
     __cpumask_clear_cpu(cpu, &rqd->idle);
     __cpumask_clear_cpu(cpu, &rqd->smt_idle);
@@ -3912,12 +3931,12 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     if ( cpumask_empty(&rqd->active) )
     {
         printk(XENLOG_INFO " No cpus left on runqueue, disabling\n");
-        deactivate_runqueue(prv, rqi);
+        deactivate_runqueue(prv, spc->runq_id);
     }
     else if ( rqd->pick_bias == cpu )
         rqd->pick_bias = cpumask_first(&rqd->active);
 
-    per_cpu(runq_map, cpu) = -1;
+    spc->runq_id = -1;
 
     spin_unlock(&rqd->lock);
 
@@ -3926,6 +3945,24 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     write_unlock_irqrestore(&prv->lock, flags);
 
     return;
+}
+
+static void
+csched2_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
+{
+    struct csched2_pcpu *spc = pcpu;
+
+    /*
+     * pcpu either points to a valid struct csched2_pcpu, or is NULL (if
+     * CPU bringup failed, and we're beeing called from CPU_UP_CANCELLED).
+     * xfree() does not really mind, but we want to be sure that either
+     * init_pdata has never been called, or deinit_pdata has been called
+     * already.
+     */
+    ASSERT(!pcpu || spc->runq_id == -1);
+    ASSERT(!cpumask_test_cpu(cpu, &csched2_priv(ops)->initialized));
+
+    xfree(pcpu);
 }
 
 static int
@@ -4045,8 +4082,10 @@ static const struct scheduler sched_credit2_def = {
     .deinit         = csched2_deinit,
     .alloc_vdata    = csched2_alloc_vdata,
     .free_vdata     = csched2_free_vdata,
+    .alloc_pdata    = csched2_alloc_pdata,
     .init_pdata     = csched2_init_pdata,
     .deinit_pdata   = csched2_deinit_pdata,
+    .free_pdata     = csched2_free_pdata,
     .switch_sched   = csched2_switch_sched,
     .alloc_domdata  = csched2_alloc_domdata,
     .free_domdata   = csched2_free_domdata,
