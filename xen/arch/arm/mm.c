@@ -238,7 +238,7 @@ void dump_pt_walk(paddr_t ttbr, paddr_t addr,
 
         /* For next iteration */
         unmap_domain_page(mapping);
-        mapping = map_domain_page(_mfn(pte.walk.base));
+        mapping = map_domain_page(lpae_get_mfn(pte));
     }
 
     unmap_domain_page(mapping);
@@ -323,7 +323,7 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
 
     ASSERT(!(mfn_to_maddr(mfn) & ~PADDR_MASK));
 
-    e.pt.base = mfn_x(mfn);
+    lpae_set_mfn(e, mfn);
 
     return e;
 }
@@ -490,7 +490,7 @@ mfn_t domain_page_map_to_mfn(const void *ptr)
     ASSERT(slot >= 0 && slot < DOMHEAP_ENTRIES);
     ASSERT(map[slot].pt.avail != 0);
 
-    return _mfn(map[slot].pt.base + offset);
+    return mfn_add(lpae_get_mfn(map[slot]), offset);
 }
 #endif
 
@@ -851,7 +851,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
             /* mfn_to_virt is not valid on the 1st 1st mfn, since it
              * is not within the xenheap. */
             first = slot == xenheap_first_first_slot ?
-                xenheap_first_first : __mfn_to_virt(p->pt.base);
+                xenheap_first_first : mfn_to_virt(lpae_get_mfn(*p));
         }
         else if ( xenheap_first_first_slot == -1)
         {
@@ -1007,7 +1007,7 @@ static int create_xen_entries(enum xenmap_operation op,
 
         BUG_ON(!lpae_is_valid(*entry));
 
-        third = __mfn_to_virt(entry->pt.base);
+        third = mfn_to_virt(lpae_get_mfn(*entry));
         entry = &third[third_table_offset(addr)];
 
         switch ( op ) {

@@ -153,6 +153,9 @@ static inline bool lpae_is_superpage(lpae_t pte, unsigned int level)
     return (level < 3) && lpae_is_mapping(pte, level);
 }
 
+#define lpae_get_mfn(pte)    (_mfn((pte).walk.base))
+#define lpae_set_mfn(pte, mfn)  ((pte).walk.base = mfn_x(mfn))
+
 /*
  * AArch64 supports pages with different sizes (4K, 16K, and 64K). To enable
  * page table walks for various configurations, the following helpers enable

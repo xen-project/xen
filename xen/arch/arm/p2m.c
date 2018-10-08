@@ -265,7 +265,7 @@ static int p2m_next_level(struct p2m_domain *p2m, bool read_only,
     if ( lpae_is_mapping(*entry, level) )
         return GUEST_TABLE_SUPER_PAGE;
 
-    mfn = _mfn(entry->p2m.base);
+    mfn = lpae_get_mfn(*entry);
 
     unmap_domain_page(*table);
     *table = map_domain_page(mfn);
@@ -349,7 +349,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
         if ( a )
             *a = p2m_mem_access_radix_get(p2m, gfn);
 
-        mfn = _mfn(entry.p2m.base);
+        mfn = lpae_get_mfn(entry);
         /*
          * The entry may point to a superpage. Find the MFN associated
          * to the GFN.
@@ -519,7 +519,7 @@ static lpae_t mfn_to_p2m_entry(mfn_t mfn, p2m_type_t t, p2m_access_t a)
 
     ASSERT(!(mfn_to_maddr(mfn) & ~PADDR_MASK));
 
-    e.p2m.base = mfn_x(mfn);
+    lpae_set_mfn(e, mfn);
 
     return e;
 }
@@ -621,7 +621,7 @@ static void p2m_put_l3_page(const lpae_t pte)
      */
     if ( p2m_is_foreign(pte.p2m.type) )
     {
-        mfn_t mfn = _mfn(pte.p2m.base);
+        mfn_t mfn = lpae_get_mfn(pte);
 
         ASSERT(mfn_valid(mfn));
         put_page(mfn_to_page(mfn));
@@ -655,7 +655,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
         return;
     }
 
-    table = map_domain_page(_mfn(entry.p2m.base));
+    table = map_domain_page(lpae_get_mfn(entry));
     for ( i = 0; i < LPAE_ENTRIES; i++ )
         p2m_free_entry(p2m, *(table + i), level + 1);
 
@@ -669,7 +669,7 @@ static void p2m_free_entry(struct p2m_domain *p2m,
      */
     p2m_tlb_flush_sync(p2m);
 
-    mfn = _mfn(entry.p2m.base);
+    mfn = lpae_get_mfn(entry);
     ASSERT(mfn_valid(mfn));
 
     pg = mfn_to_page(mfn);
@@ -688,7 +688,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
     bool rv = true;
 
     /* Convenience aliases */
-    mfn_t mfn = _mfn(entry->p2m.base);
+    mfn_t mfn = lpae_get_mfn(*entry);
     unsigned int next_level = level + 1;
     unsigned int level_order = level_orders[next_level];
 
@@ -719,7 +719,7 @@ static bool p2m_split_superpage(struct p2m_domain *p2m, lpae_t *entry,
          * the necessary fields. So the correct permission are kept.
          */
         pte = *entry;
-        pte.p2m.base = mfn_x(mfn_add(mfn, i << level_order));
+        lpae_set_mfn(pte, mfn_add(mfn, i << level_order));
 
         /*
          * First and second level pages set p2m.table = 0, but third
@@ -952,7 +952,8 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
      * Free the entry only if the original pte was valid and the base
      * is different (to avoid freeing when permission is changed).
      */
-    if ( lpae_is_valid(orig_pte) && entry->p2m.base != orig_pte.p2m.base )
+    if ( lpae_is_valid(orig_pte) &&
+         !mfn_eq(lpae_get_mfn(*entry), lpae_get_mfn(orig_pte)) )
         p2m_free_entry(p2m, orig_pte, level);
 
     if ( need_iommu_pt_sync(p2m->domain) &&
