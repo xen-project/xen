@@ -28,9 +28,9 @@
  * page table on a different vCPU, the following registers would need to be
  * loaded: TCR_EL1, TTBR0_EL1, TTBR1_EL1, and SCTLR_EL1.
  */
-static int guest_walk_sd(const struct vcpu *v,
-                         vaddr_t gva, paddr_t *ipa,
-                         unsigned int *perms)
+static bool guest_walk_sd(const struct vcpu *v,
+                          vaddr_t gva, paddr_t *ipa,
+                          unsigned int *perms)
 {
     int ret;
     bool disabled = true;
@@ -79,7 +79,7 @@ static int guest_walk_sd(const struct vcpu *v,
     }
 
     if ( disabled )
-        return -EFAULT;
+        return false;
 
     /*
      * The address of the L1 descriptor for the initial lookup has the
@@ -97,12 +97,12 @@ static int guest_walk_sd(const struct vcpu *v,
     /* Access the guest's memory to read only one PTE. */
     ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(short_desc_t), false);
     if ( ret )
-        return -EINVAL;
+        return false;
 
     switch ( pte.walk.dt )
     {
     case L1DESC_INVALID:
-        return -EFAULT;
+        return false;
 
     case L1DESC_PAGE_TABLE:
         /*
@@ -122,10 +122,10 @@ static int guest_walk_sd(const struct vcpu *v,
         /* Access the guest's memory to read only one PTE. */
         ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(short_desc_t), false);
         if ( ret )
-            return -EINVAL;
+            return false;
 
         if ( pte.walk.dt == L2DESC_INVALID )
-            return -EFAULT;
+            return false;
 
         if ( pte.pg.page ) /* Small page. */
         {
@@ -175,7 +175,7 @@ static int guest_walk_sd(const struct vcpu *v,
             *perms |= GV2M_EXEC;
     }
 
-    return 0;
+    return true;
 }
 
 /*
@@ -355,9 +355,9 @@ static bool check_base_size(unsigned int output_size, uint64_t base)
  * page table on a different vCPU, the following registers would need to be
  * loaded: TCR_EL1, TTBR0_EL1, TTBR1_EL1, and SCTLR_EL1.
  */
-static int guest_walk_ld(const struct vcpu *v,
-                         vaddr_t gva, paddr_t *ipa,
-                         unsigned int *perms)
+static bool guest_walk_ld(const struct vcpu *v,
+                          vaddr_t gva, paddr_t *ipa,
+                          unsigned int *perms)
 {
     int ret;
     bool disabled = true;
@@ -442,7 +442,7 @@ static int guest_walk_ld(const struct vcpu *v,
          */
         if ( (input_size > TCR_EL1_IPS_48_BIT_VAL) ||
              (input_size < TCR_EL1_IPS_MIN_VAL) )
-            return -EFAULT;
+            return false;
     }
     else
     {
@@ -487,7 +487,7 @@ static int guest_walk_ld(const struct vcpu *v,
     }
 
     if ( disabled )
-        return -EFAULT;
+        return false;
 
     /*
      * The starting level is the number of strides (grainsizes[gran] - 3)
@@ -498,12 +498,12 @@ static int guest_walk_ld(const struct vcpu *v,
     /* Get the IPA output_size. */
     ret = get_ipa_output_size(d, tcr, &output_size);
     if ( ret )
-        return -EFAULT;
+        return false;
 
     /* Make sure the base address does not exceed its configured size. */
     ret = check_base_size(output_size, ttbr);
     if ( !ret )
-        return -EFAULT;
+        return false;
 
     /*
      * Compute the base address of the first level translation table that is
@@ -523,12 +523,12 @@ static int guest_walk_ld(const struct vcpu *v,
         /* Access the guest's memory to read only one PTE. */
         ret = access_guest_memory_by_ipa(d, paddr, &pte, sizeof(lpae_t), false);
         if ( ret )
-            return -EFAULT;
+            return false;
 
         /* Make sure the base address does not exceed its configured size. */
         ret = check_base_size(output_size, pfn_to_paddr(pte.walk.base));
         if ( !ret )
-            return -EFAULT;
+            return false;
 
         /*
          * If page granularity is 64K, make sure the address is aligned
@@ -537,7 +537,7 @@ static int guest_walk_ld(const struct vcpu *v,
         if ( (output_size < TCR_EL1_IPS_52_BIT_VAL) &&
              (gran == GRANULE_SIZE_INDEX_64K) &&
              (pte.walk.base & 0xf) )
-            return -EFAULT;
+            return false;
 
         /*
          * Break if one of the following conditions is true:
@@ -567,7 +567,7 @@ static int guest_walk_ld(const struct vcpu *v,
      * maps a memory block at level 3 (PTE<1:0> == 01).
      */
     if ( !lpae_is_valid(pte) || !lpae_is_mapping(pte, level) )
-        return -EFAULT;
+        return false;
 
     /* Make sure that the lower bits of the PTE's base address are zero. */
     mask = GENMASK_ULL(47, grainsizes[gran]);
@@ -583,11 +583,11 @@ static int guest_walk_ld(const struct vcpu *v,
     if ( !pte.pt.xn && !xn_table )
         *perms |= GV2M_EXEC;
 
-    return 0;
+    return true;
 }
 
-int guest_walk_tables(const struct vcpu *v, vaddr_t gva,
-                      paddr_t *ipa, unsigned int *perms)
+bool guest_walk_tables(const struct vcpu *v, vaddr_t gva,
+                       paddr_t *ipa, unsigned int *perms)
 {
     uint32_t sctlr = READ_SYSREG(SCTLR_EL1);
     register_t tcr = READ_SYSREG(TCR_EL1);
@@ -595,7 +595,7 @@ int guest_walk_tables(const struct vcpu *v, vaddr_t gva,
 
     /* We assume that the domain is running on the currently active domain. */
     if ( v != current )
-        return -EFAULT;
+        return false;
 
     /* Allow perms to be NULL. */
     perms = perms ?: &_perms;
@@ -619,7 +619,7 @@ int guest_walk_tables(const struct vcpu *v, vaddr_t gva,
         /* Memory can be accessed without any restrictions. */
         *perms = GV2M_READ|GV2M_WRITE|GV2M_EXEC;
 
-        return 0;
+        return true;
     }
 
     if ( is_32bit_domain(v->domain) && !(tcr & TTBCR_EAE) )

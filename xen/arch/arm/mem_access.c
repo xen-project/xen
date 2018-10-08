@@ -126,7 +126,7 @@ p2m_mem_access_check_and_get_page(vaddr_t gva, unsigned long flag,
          * The software gva to ipa translation can still fail, e.g., if the gva
          * is not mapped.
          */
-        if ( guest_walk_tables(v, gva, &ipa, &perms) < 0 )
+        if ( !guest_walk_tables(v, gva, &ipa, &perms) )
             return NULL;
 
         /*
