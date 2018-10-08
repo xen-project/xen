@@ -620,7 +620,6 @@ void __domain_crash(struct domain *d);
  */
 void noreturn asm_domain_crash_synchronous(unsigned long addr);
 
-#define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 int  sched_init_vcpu(struct vcpu *v, unsigned int processor);
 void sched_destroy_vcpu(struct vcpu *v);
