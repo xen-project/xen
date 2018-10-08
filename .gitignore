@@ -301,7 +301,6 @@ xen/arch/x86/boot/*.bin
 xen/arch/x86/boot/*.lnk
 xen/arch/x86/efi.lds
 xen/arch/x86/efi/check.efi
-xen/arch/x86/efi/disabled
 xen/arch/x86/efi/mkreloc
 xen/arch/*/efi/boot.c
 xen/arch/*/efi/compat.c
