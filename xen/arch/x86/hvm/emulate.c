@@ -183,6 +183,24 @@ static int hvmemul_do_io(
         hvmtrace_io_assist(&p);
     }
 
+    /*
+     * Make sure that we truncate rep MMIO at any GFN boundary. This is
+     * necessary to ensure that the correct device model is targetted
+     * or that we correctly handle a rep op spanning MMIO and RAM.
+     */
+    if ( unlikely(p.count > 1) && p.type == IOREQ_TYPE_COPY )
+    {
+        unsigned int off = p.addr & ~PAGE_MASK;
+        unsigned int tail = PAGE_SIZE - off;
+
+        if ( tail < p.size ) /* single rep spans GFN */
+            p.count = 1;
+        else
+            p.count = min(p.count,
+                          (p.df ? (off + p.size) : tail) / p.size);
+    }
+    ASSERT(p.count);
+
     vio->io_req = p;
 
     rc = hvm_io_intercept(&p);
