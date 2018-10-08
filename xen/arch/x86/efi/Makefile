@@ -6,6 +6,6 @@ CFLAGS += -fshort-wchar
 boot.init.o: buildid.o
 
 obj-y := stub.o
-obj-$(XEN_BUILD_PE) := boot.init.o compat.o relocs-dummy.o runtime.o
-extra-$(XEN_BUILD_PE) += buildid.o
-nocov-$(XEN_BUILD_PE) += stub.o
+obj-$(XEN_BUILD_EFI) := boot.init.o compat.o relocs-dummy.o runtime.o
+extra-$(XEN_BUILD_EFI) += buildid.o
+nocov-$(XEN_BUILD_EFI) += stub.o
