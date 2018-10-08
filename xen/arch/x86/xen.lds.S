@@ -281,7 +281,7 @@ SECTIONS
   } :text
 #endif
 
-#ifndef XEN_BUILD_PE
+#ifndef XEN_BUILD_EFI
   efi = .;
 #endif
 
