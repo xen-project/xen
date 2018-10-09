@@ -23,8 +23,8 @@
 
 #define XBT_NULL 0
 
-#define XS_OPEN_READONLY	1UL<<0
-#define XS_OPEN_SOCKETONLY      1UL<<1
+#define XS_OPEN_READONLY	(1UL<<0)
+#define XS_OPEN_SOCKETONLY      (1UL<<1)
 
 /*
  * Setting XS_UNWATCH_FILTER arranges that after xs_unwatch, no
@@ -45,7 +45,7 @@
  *                                  xs_unwatch for the first watch
  *                                  has returned.
  */
-#define XS_UNWATCH_FILTER     1UL<<2
+#define XS_UNWATCH_FILTER     (1UL<<2)
 
 struct xs_handle;
 typedef uint32_t xs_transaction_t;
