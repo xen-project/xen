@@ -27,7 +27,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <string.h>
-#include <fsimage_grub.h>
+#include <xenfsimage_grub.h>
 
 
 /*** START FROM shared.h ****/

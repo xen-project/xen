@@ -17,7 +17,7 @@
  *  along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <fsimage_grub.h>
+#include <xenfsimage_grub.h>
 #include "xfs.h"
 
 #define MAX_LINK_COUNT	8

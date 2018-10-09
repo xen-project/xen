@@ -30,7 +30,7 @@ extern C {
 
 #include <sys/types.h>
 
-#include "fsimage.h"
+#include "xenfsimage.h"
 
 #define	FSIMAGE_PLUGIN_VERSION 1
 

@@ -29,7 +29,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 
-#include "fsimage_plugin.h"
+#include "xenfsimage_plugin.h"
 #include "fsimage_priv.h"
 
 static fsi_plugin_t *plugins;

@@ -21,7 +21,7 @@
  * Use is subject to license terms.
  */
 
-#include <fsimage_plugin.h>
+#include <xenfsimage_plugin.h>
 #include INCLUDE_EXTFS_H
 #include <errno.h>
 #include <inttypes.h>

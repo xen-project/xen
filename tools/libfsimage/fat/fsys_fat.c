@@ -17,7 +17,7 @@
  */
 
 #include <limits.h>
-#include <fsimage_grub.h>
+#include <xenfsimage_grub.h>
 #include "fat.h"
 
 struct fat_superblock 

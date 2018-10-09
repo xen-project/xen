@@ -30,8 +30,8 @@ extern C {
 
 #include <sys/types.h>
 
-#include "fsimage.h"
-#include "fsimage_plugin.h"
+#include "xenfsimage.h"
+#include "xenfsimage_plugin.h"
 
 struct fsi_plugin {
 	const char *fp_name;

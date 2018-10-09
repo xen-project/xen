@@ -28,7 +28,7 @@
  *	Leonid Lisovskiy   <lly@pisem.net>	2003
  */
 
-#include <fsimage_grub.h>
+#include <xenfsimage_grub.h>
 #include <limits.h>
 
 #include "iso9660.h"

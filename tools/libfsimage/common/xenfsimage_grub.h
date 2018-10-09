@@ -33,8 +33,8 @@ extern C {
 #include <stdlib.h>
 #include <ctype.h>
 
-#include "fsimage.h"
-#include "fsimage_plugin.h"
+#include "xenfsimage.h"
+#include "xenfsimage_plugin.h"
 
 typedef struct fsig_plugin_ops {
 	int fpo_version;

@@ -11,7 +11,7 @@ fsimage = Extension("fsimage",
     extra_compile_args = extra_compile_args,
     include_dirs = [ XEN_ROOT + "/tools/libfsimage/common/" ],
     library_dirs = [ XEN_ROOT + "/tools/libfsimage/common/" ],
-    libraries = ["fsimage"],
+    libraries = ["xenfsimage"],
     sources = ["src/fsimage/fsimage.c"])
 
 pkgs = [ 'grub' ]

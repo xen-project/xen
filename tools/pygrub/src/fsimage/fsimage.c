@@ -23,7 +23,7 @@
 
 #include <Python.h>
 
-#include <fsimage.h>
+#include <xenfsimage.h>
 #include <stdlib.h>
 
 #if (PYTHON_API_VERSION >= 1011)

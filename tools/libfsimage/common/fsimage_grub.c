@@ -28,7 +28,7 @@
 #include <strings.h>
 #include <errno.h>
 
-#include "fsimage_grub.h"
+#include "xenfsimage_grub.h"
 #include "fsimage_priv.h"
 
 static char *disk_read_junk;
