@@ -1737,7 +1737,7 @@ int policydb_read(struct policydb *p, void *fp)
 {
     struct role_allow *ra, *lra;
     struct role_trans *tr, *ltr;
-    struct ocontext *l, *c /*, *newc*/;
+    struct ocontext *l, *c, **pn;
     int i, j, rc;
     __le32 buf[8];
     u32 len, /*len2,*/ config, nprim, nel /*, nel2*/;
@@ -1994,6 +1994,7 @@ int policydb_read(struct policydb *p, void *fp)
         if ( rc < 0 )
             goto bad;
         nel = le32_to_cpu(buf[0]);
+        pn = &p->ocontexts[i];
         l = NULL;
         for ( j = 0; j < nel; j++ )
         {
@@ -2003,11 +2004,6 @@ int policydb_read(struct policydb *p, void *fp)
                 rc = -ENOMEM;
                 goto bad;
             }
-            if ( l )
-                l->next = c;
-            else
-                p->ocontexts[i] = c;
-            l = c;
             rc = -EINVAL;
             switch ( i )
             {
@@ -2050,6 +2046,18 @@ int policydb_read(struct policydb *p, void *fp)
                 rc = context_read_and_validate(&c->context, p, fp);
                 if ( rc )
                     goto bad;
+
+                if ( *pn || ( l && l->u.ioport.high_ioport >= c->u.ioport.low_ioport ) )
+                {
+                    pn = &p->ocontexts[i];
+                    l = *pn;
+                    while ( l && l->u.ioport.high_ioport < c->u.ioport.low_ioport ) {
+                        pn = &l->next;
+                        l = *pn;
+                    }
+                    c->next = l;
+                }
+                l = c;
                 break;
             case OCON_IOMEM:
                 if ( p->target_type != TARGET_XEN )
@@ -2078,6 +2086,18 @@ int policydb_read(struct policydb *p, void *fp)
                 rc = context_read_and_validate(&c->context, p, fp);
                 if ( rc )
                     goto bad;
+
+                if ( *pn || ( l && l->u.iomem.high_iomem >= c->u.iomem.low_iomem ) )
+                {
+                    pn = &p->ocontexts[i];
+                    l = *pn;
+                    while ( l && l->u.iomem.high_iomem < c->u.iomem.low_iomem ) {
+                        pn = &l->next;
+                        l = *pn;
+                    }
+                    c->next = l;
+                }
+                l = c;
                 break;
             case OCON_DEVICE:
                 if ( p->target_type != TARGET_XEN )
@@ -2123,6 +2143,9 @@ int policydb_read(struct policydb *p, void *fp)
                 rc = -EINVAL;
                 goto bad;
             }
+
+            *pn = c;
+            pn = &c->next;
         }
     }
 
