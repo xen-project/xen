@@ -11,7 +11,6 @@
  */
 
 #define XSM_NO_WRAPPERS
-#define XSM_INLINE /* */
 #include <xsm/dummy.h>
 
 struct xsm_operations dummy_xsm_ops;
