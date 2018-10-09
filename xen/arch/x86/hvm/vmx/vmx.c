@@ -646,19 +646,10 @@ static void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 
     vmx_vmcs_enter(v);
 
-    c->cr0 = v->arch.hvm.guest_cr[0];
-    c->cr2 = v->arch.hvm.guest_cr[2];
-    c->cr3 = v->arch.hvm.guest_cr[3];
-    c->cr4 = v->arch.hvm.guest_cr[4];
-
-    c->msr_efer = v->arch.hvm.guest_efer;
-
     __vmread(GUEST_SYSENTER_CS, &c->sysenter_cs);
     __vmread(GUEST_SYSENTER_ESP, &c->sysenter_esp);
     __vmread(GUEST_SYSENTER_EIP, &c->sysenter_eip);
 
-    c->pending_event = 0;
-    c->error_code = 0;
     __vmread(VM_ENTRY_INTR_INFO, &ev);
     if ( (ev & INTR_INFO_VALID_MASK) &&
          hvm_event_needs_reinjection(MASK_EXTR(ev, INTR_INFO_INTR_TYPE_MASK),
@@ -732,10 +723,8 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     vmx_vmcs_enter(v);
 
-    v->arch.hvm.guest_cr[2] = c->cr2;
     v->arch.hvm.guest_cr[4] = c->cr4;
     vmx_update_guest_cr(v, 0, 0);
-    vmx_update_guest_cr(v, 2, 0);
     vmx_update_guest_cr(v, 4, 0);
 
     v->arch.hvm.guest_efer = c->msr_efer;
@@ -770,7 +759,6 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
     data->shadow_gs        = v->arch.hvm.vmx.shadow_gs;
-    data->msr_flags        = 0;
     data->msr_lstar        = v->arch.hvm.vmx.lstar;
     data->msr_star         = v->arch.hvm.vmx.star;
     data->msr_cstar        = v->arch.hvm.vmx.cstar;

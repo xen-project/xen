@@ -272,17 +272,10 @@ static int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
-    c->cr0 = v->arch.hvm.guest_cr[0];
-    c->cr2 = v->arch.hvm.guest_cr[2];
-    c->cr3 = v->arch.hvm.guest_cr[3];
-    c->cr4 = v->arch.hvm.guest_cr[4];
-
     c->sysenter_cs = v->arch.hvm.svm.guest_sysenter_cs;
     c->sysenter_esp = v->arch.hvm.svm.guest_sysenter_esp;
     c->sysenter_eip = v->arch.hvm.svm.guest_sysenter_eip;
 
-    c->pending_event = 0;
-    c->error_code = 0;
     if ( vmcb->eventinj.fields.v &&
          hvm_event_needs_reinjection(vmcb->eventinj.fields.type,
                                      vmcb->eventinj.fields.vector) )
@@ -341,11 +334,9 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     }
 
     v->arch.hvm.guest_cr[0] = c->cr0 | X86_CR0_ET;
-    v->arch.hvm.guest_cr[2] = c->cr2;
     v->arch.hvm.guest_cr[3] = c->cr3;
     v->arch.hvm.guest_cr[4] = c->cr4;
     svm_update_guest_cr(v, 0, 0);
-    svm_update_guest_cr(v, 2, 0);
     svm_update_guest_cr(v, 4, 0);
 
     /* Load sysenter MSRs into both VMCB save area and VCPU fields. */
@@ -387,8 +378,6 @@ static void svm_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_star         = vmcb->star;
     data->msr_cstar        = vmcb->cstar;
     data->msr_syscall_mask = vmcb->sfmask;
-    data->msr_efer         = v->arch.hvm.guest_efer;
-    data->msr_flags        = 0;
 }
 
 

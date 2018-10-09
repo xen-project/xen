@@ -787,12 +787,17 @@ static int hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
         .r13 = v->arch.user_regs.r13,
         .r14 = v->arch.user_regs.r14,
         .r15 = v->arch.user_regs.r15,
+        .cr0 = v->arch.hvm.guest_cr[0],
+        .cr2 = v->arch.hvm.guest_cr[2],
+        .cr3 = v->arch.hvm.guest_cr[3],
+        .cr4 = v->arch.hvm.guest_cr[4],
         .dr0 = v->arch.debugreg[0],
         .dr1 = v->arch.debugreg[1],
         .dr2 = v->arch.debugreg[2],
         .dr3 = v->arch.debugreg[3],
         .dr6 = v->arch.debugreg[6],
         .dr7 = v->arch.debugreg[7],
+        .msr_efer = v->arch.hvm.guest_efer,
     };
 
     /*
@@ -1022,6 +1027,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     /* Architecture-specific vmcs/vmcb bits */
     if ( hvm_funcs.load_cpu_ctxt(v, &ctxt) < 0 )
         return -EINVAL;
+
+    v->arch.hvm.guest_cr[2] = ctxt.cr2;
+    hvm_update_guest_cr(v, 2);
 
     if ( hvm_funcs.tsc_scaling.setup )
         hvm_funcs.tsc_scaling.setup(v);

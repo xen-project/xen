@@ -127,7 +127,7 @@ void vm_event_fill_regs(vm_event_request_t *req)
 #ifdef CONFIG_HVM
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct segment_register seg;
-    struct hvm_hw_cpu ctxt;
+    struct hvm_hw_cpu ctxt = {};
     struct vcpu *curr = current;
 
     ASSERT(is_hvm_vcpu(curr));
@@ -157,16 +157,16 @@ void vm_event_fill_regs(vm_event_request_t *req)
     req->data.regs.x86.rip    = regs->rip;
 
     req->data.regs.x86.dr7 = curr->arch.debugreg[7];
-    req->data.regs.x86.cr0 = ctxt.cr0;
-    req->data.regs.x86.cr2 = ctxt.cr2;
-    req->data.regs.x86.cr3 = ctxt.cr3;
-    req->data.regs.x86.cr4 = ctxt.cr4;
+    req->data.regs.x86.cr0 = curr->arch.hvm.guest_cr[0];
+    req->data.regs.x86.cr2 = curr->arch.hvm.guest_cr[2];
+    req->data.regs.x86.cr3 = curr->arch.hvm.guest_cr[3];
+    req->data.regs.x86.cr4 = curr->arch.hvm.guest_cr[4];
 
     req->data.regs.x86.sysenter_cs = ctxt.sysenter_cs;
     req->data.regs.x86.sysenter_esp = ctxt.sysenter_esp;
     req->data.regs.x86.sysenter_eip = ctxt.sysenter_eip;
 
-    req->data.regs.x86.msr_efer = ctxt.msr_efer;
+    req->data.regs.x86.msr_efer = curr->arch.hvm.guest_efer;
     req->data.regs.x86.msr_star = ctxt.msr_star;
     req->data.regs.x86.msr_lstar = ctxt.msr_lstar;
 
