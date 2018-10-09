@@ -95,7 +95,8 @@ struct hvm_domain {
     /* Guest page range used for non-default ioreq servers */
     struct {
         unsigned long base;
-        unsigned long mask;
+        unsigned long mask; /* indexed by GFN minus base */
+        unsigned long legacy_mask; /* indexed by HVM param number */
     } ioreq_gfn;
 
     /* Lock protects all other values in the sub-struct and the default */

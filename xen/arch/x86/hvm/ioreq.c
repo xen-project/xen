@@ -237,6 +237,22 @@ bool handle_hvm_io_completion(struct vcpu *v)
     return true;
 }
 
+static gfn_t hvm_alloc_legacy_ioreq_gfn(struct hvm_ioreq_server *s)
+{
+    struct domain *d = s->target;
+    unsigned int i;
+
+    BUILD_BUG_ON(HVM_PARAM_BUFIOREQ_PFN != HVM_PARAM_IOREQ_PFN + 1);
+
+    for ( i = HVM_PARAM_IOREQ_PFN; i <= HVM_PARAM_BUFIOREQ_PFN; i++ )
+    {
+        if ( !test_and_clear_bit(i, &d->arch.hvm.ioreq_gfn.legacy_mask) )
+            return _gfn(d->arch.hvm.params[i]);
+    }
+
+    return INVALID_GFN;
+}
+
 static gfn_t hvm_alloc_ioreq_gfn(struct hvm_ioreq_server *s)
 {
     struct domain *d = s->target;
@@ -248,7 +264,29 @@ static gfn_t hvm_alloc_ioreq_gfn(struct hvm_ioreq_server *s)
             return _gfn(d->arch.hvm.ioreq_gfn.base + i);
     }
 
-    return INVALID_GFN;
+    /*
+     * If we are out of 'normal' GFNs then we may still have a 'legacy'
+     * GFN available.
+     */
+    return hvm_alloc_legacy_ioreq_gfn(s);
+}
+
+static bool hvm_free_legacy_ioreq_gfn(struct hvm_ioreq_server *s,
+                                      gfn_t gfn)
+{
+    struct domain *d = s->target;
+    unsigned int i;
+
+    for ( i = HVM_PARAM_IOREQ_PFN; i <= HVM_PARAM_BUFIOREQ_PFN; i++ )
+    {
+        if ( gfn_eq(gfn, _gfn(d->arch.hvm.params[i])) )
+             break;
+    }
+    if ( i > HVM_PARAM_BUFIOREQ_PFN )
+        return false;
+
+    set_bit(i, &d->arch.hvm.ioreq_gfn.legacy_mask);
+    return true;
 }
 
 static void hvm_free_ioreq_gfn(struct hvm_ioreq_server *s, gfn_t gfn)
@@ -258,7 +296,11 @@ static void hvm_free_ioreq_gfn(struct hvm_ioreq_server *s, gfn_t gfn)
 
     ASSERT(!gfn_eq(gfn, INVALID_GFN));
 
-    set_bit(i, &d->arch.hvm.ioreq_gfn.mask);
+    if ( !hvm_free_legacy_ioreq_gfn(s, gfn) )
+    {
+        ASSERT(i < sizeof(d->arch.hvm.ioreq_gfn.mask) * 8);
+        set_bit(i, &d->arch.hvm.ioreq_gfn.mask);
+    }
 }
 
 static void hvm_unmap_ioreq_gfn(struct hvm_ioreq_server *s, bool buf)

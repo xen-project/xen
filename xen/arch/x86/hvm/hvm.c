@@ -4079,6 +4079,8 @@ static int hvm_allow_set_param(struct domain *d,
     {
     /* The following parameters should only be changed once. */
     case HVM_PARAM_VIRIDIAN:
+    case HVM_PARAM_IOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_PFN:
     case HVM_PARAM_IOREQ_SERVER_PFN:
     case HVM_PARAM_NR_IOREQ_SERVER_PAGES:
     case HVM_PARAM_ALTP2M:
@@ -4250,6 +4252,17 @@ static int hvmop_set_param(
 
         break;
     }
+
+    case HVM_PARAM_IOREQ_PFN:
+    case HVM_PARAM_BUFIOREQ_PFN:
+        BUILD_BUG_ON(HVM_PARAM_IOREQ_PFN >
+                     sizeof(d->arch.hvm.ioreq_gfn.legacy_mask) * 8);
+        BUILD_BUG_ON(HVM_PARAM_BUFIOREQ_PFN >
+                     sizeof(d->arch.hvm.ioreq_gfn.legacy_mask) * 8);
+        if ( a.value )
+            set_bit(a.index, &d->arch.hvm.ioreq_gfn.legacy_mask);
+        break;
+
     case HVM_PARAM_X87_FIP_WIDTH:
         if ( a.value != 0 && a.value != 4 && a.value != 8 )
         {
