@@ -505,7 +505,12 @@ int iommu_do_domctl(
 
 void iommu_share_p2m_table(struct domain* d)
 {
-    if ( iommu_use_hap_pt(d) )
+    ASSERT(hap_enabled(d));
+    /*
+     * iommu_use_hap_pt(d) cannot be used here because during domain
+     * construction need_iommu(d) will always return false here.
+     */
+    if ( iommu_enabled && iommu_hap_pt_share )
         iommu_get_ops()->share_p2m(d);
 }
 
