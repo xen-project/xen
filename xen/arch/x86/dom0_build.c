@@ -225,16 +225,17 @@ static int __init parse_dom0_param(const char *s)
     int rc = 0;
 
     do {
+        int val;
 
         ss = strchr(s, ',');
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !strncmp(s, "pvh", ss - s) )
-            dom0_pvh = true;
+        if ( (val = parse_boolean("pvh", s, ss)) >= 0 )
+            dom0_pvh = val;
 #ifdef CONFIG_SHADOW_PAGING
-        else if ( !strncmp(s, "shadow", ss - s) )
-            opt_dom0_shadow = true;
+        else if ( (val = parse_boolean("shadow", s, ss)) >= 0 )
+            opt_dom0_shadow = val;
 #endif
         else
             rc = -EINVAL;
