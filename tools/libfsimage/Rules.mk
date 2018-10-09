@@ -6,7 +6,7 @@ LDFLAGS += -L../common/
 
 PIC_OBJS := $(patsubst %.c,%.opic,$(LIB_SRCS-y))
 
-FSDIR = $(libdir)/fs
+FSDIR = $(libdir)/xenfsimage
 
 FSLIB = fsimage.so
 
