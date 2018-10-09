@@ -1,8 +1,8 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/libfsimage/Rules.mk
 
-MAJOR = 1.0
-MINOR = 0
+MAJOR = 0
+MINOR = 4.12
 
 LDFLAGS-$(CONFIG_SunOS) = -Wl,-M -Wl,mapfile-SunOS
 LDFLAGS-$(CONFIG_Linux) = -Wl,mapfile-GNU

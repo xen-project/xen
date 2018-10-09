@@ -31,7 +31,7 @@
 #include <errno.h>
 #include <pthread.h>
 
-#include "fsimage_plugin.h"
+#include "xenfsimage_plugin.h"
 #include "fsimage_priv.h"
 
 static pthread_mutex_t fsi_lock = PTHREAD_MUTEX_INITIALIZER;
