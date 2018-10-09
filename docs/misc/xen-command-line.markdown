@@ -900,7 +900,7 @@ Note that specifying zero as domU value means zero, while for dom0 it means
 to use the default.
 
 ### xsm
-> `= dummy | flask`
+> `= dummy | flask | silo`
 
 > Default: `dummy`
 
@@ -911,6 +911,9 @@ the hypervisor was compiled with XSM support.
   (the dummy module) will be applied.  It's also used when XSM is compiled out.
 * `flask`: this is the policy based access control.  To choose this, the
   separated option in kconfig must also be enabled.
+* `silo`: this will deny any unmediated communication channels between
+  unprivileged VMs.  To choose this, the separated option in kconfig must also
+  be enabled.
 
 ### flask
 > `= permissive | enforcing | late | disabled`

@@ -733,6 +733,12 @@ extern const unsigned char xsm_flask_init_policy[];
 extern const unsigned int xsm_flask_init_policy_size;
 #endif
 
+#ifdef CONFIG_XSM_SILO
+extern void silo_init(void);
+#else
+static inline void silo_init(void) {}
+#endif
+
 #else /* CONFIG_XSM */
 
 #include <xsm/dummy.h>

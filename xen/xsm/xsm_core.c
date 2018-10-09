@@ -34,11 +34,14 @@ struct xsm_operations *xsm_ops;
 enum xsm_bootparam {
     XSM_BOOTPARAM_DUMMY,
     XSM_BOOTPARAM_FLASK,
+    XSM_BOOTPARAM_SILO,
 };
 
 static enum xsm_bootparam __initdata xsm_bootparam =
 #ifdef CONFIG_XSM_FLASK_DEFAULT
     XSM_BOOTPARAM_FLASK;
+#elif CONFIG_XSM_SILO_DEFAULT
+    XSM_BOOTPARAM_SILO;
 #else
     XSM_BOOTPARAM_DUMMY;
 #endif
@@ -52,6 +55,10 @@ static int __init parse_xsm_param(const char *s)
 #ifdef CONFIG_XSM_FLASK
     else if ( !strcmp(s, "flask") )
         xsm_bootparam = XSM_BOOTPARAM_FLASK;
+#endif
+#ifdef CONFIG_XSM_SILO
+    else if ( !strcmp(s, "silo") )
+        xsm_bootparam = XSM_BOOTPARAM_SILO;
 #endif
     else
         rc = -EINVAL;
@@ -94,6 +101,10 @@ static int __init xsm_core_init(const void *policy_buffer, size_t policy_size)
 
     case XSM_BOOTPARAM_FLASK:
         flask_init(policy_buffer, policy_size);
+        break;
+
+    case XSM_BOOTPARAM_SILO:
+        silo_init();
         break;
 
     default:

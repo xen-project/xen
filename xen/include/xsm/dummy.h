@@ -48,7 +48,8 @@ void __xsm_action_mismatch_detected(void);
  * There is no xsm_default_t argument available, so the value from the assertion
  * is used to initialize the variable.
  */
-#define XSM_INLINE /* */
+#define XSM_INLINE __maybe_unused
+
 #define XSM_DEFAULT_ARG /* */
 #define XSM_DEFAULT_VOID void
 #define XSM_ASSERT_ACTION(def) xsm_default_t action = def; (void)action

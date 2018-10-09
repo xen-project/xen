@@ -154,15 +154,30 @@ config XSM_FLASK_POLICY
 
 	  If unsure, say Y.
 
+config XSM_SILO
+	def_bool y
+	prompt "SILO support"
+	depends on XSM
+	---help---
+	  Enables SILO as the access control mechanism used by the XSM framework.
+	  This is not the default module, add boot parameter xsm=silo to choose
+	  it. This will deny any unmediated communication channels (grant tables
+	  and event channels) between unprivileged VMs.
+
+	  If unsure, say Y.
+
 choice
 	prompt "Default XSM implementation"
 	depends on XSM
 	default XSM_FLASK_DEFAULT if XSM_FLASK
+	default XSM_SILO_DEFAULT if XSM_SILO
 	default XSM_DUMMY_DEFAULT
 	config XSM_DUMMY_DEFAULT
 		bool "Match non-XSM behavior"
 	config XSM_FLASK_DEFAULT
 		bool "FLux Advanced Security Kernel" if XSM_FLASK
+	config XSM_SILO_DEFAULT
+		bool "SILO" if XSM_SILO
 endchoice
 
 config LATE_HWDOM
