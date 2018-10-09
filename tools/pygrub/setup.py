@@ -7,7 +7,7 @@ extra_compile_args  = [ "-fno-strict-aliasing", "-Werror" ]
 
 XEN_ROOT = "../.."
 
-fsimage = Extension("fsimage",
+xenfsimage = Extension("xenfsimage",
     extra_compile_args = extra_compile_args,
     include_dirs = [ XEN_ROOT + "/tools/libfsimage/common/" ],
     library_dirs = [ XEN_ROOT + "/tools/libfsimage/common/" ],
@@ -25,5 +25,5 @@ setup(name='pygrub',
       package_dir={'grub': 'src', 'fsimage': 'src'},
       scripts = ["src/pygrub"],
       packages=pkgs,
-      ext_modules = [ fsimage ]
+      ext_modules = [ xenfsimage ]
       )

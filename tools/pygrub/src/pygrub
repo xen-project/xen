@@ -21,7 +21,7 @@ import xen.lowlevel.xc
 import curses, _curses, curses.wrapper, curses.textpad, curses.ascii
 import getopt
 
-import fsimage
+import xenfsimage
 import grub.GrubConf
 import grub.LiloConf
 import grub.ExtLinuxConf
@@ -897,7 +897,7 @@ if __name__ == "__main__":
 
     for offset in part_offs:
         try:
-            fs = fsimage.open(file, offset, bootfsoptions)
+            fs = xenfsimage.open(file, offset, bootfsoptions)
 
             chosencfg = sniff_solaris(fs, incfg)
 
@@ -945,7 +945,7 @@ if __name__ == "__main__":
 
     args = None
     if chosencfg["args"]:
-        zfsinfo = fsimage.getbootstring(fs)
+        zfsinfo = xenfsimage.getbootstring(fs)
         if zfsinfo is not None:
             e = re.compile("zfs-bootfs=[\w\-\.\:@/]+" )
             (chosencfg["args"],count) = e.subn(zfsinfo, chosencfg["args"])

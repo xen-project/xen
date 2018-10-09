@@ -132,7 +132,7 @@ static char fsimage_file_type__doc__[] = "Filesystem image file";
 PyTypeObject fsimage_file_type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
-	"fsimage.file",				/* tp_name */
+	"xenfsimage.file",			/* tp_name */
 	sizeof(fsimage_file_t),			/* tp_size */
 	0,					/* tp_itemsize */
 	(destructor) fsimage_file_dealloc, 	/* tp_dealloc */
@@ -234,7 +234,7 @@ PyDoc_STRVAR(fsimage_fs_type__doc__, "Filesystem image");
 PyTypeObject fsimage_fs_type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
-	"fsimage.fs",				/* tp_name */
+	"xenfsimage.fs",			/* tp_name */
 	sizeof(fsimage_fs_t),			/* tp_size */
 	0,					/* tp_itemsize */
 	(destructor) fsimage_fs_dealloc, 	/* tp_dealloc */
@@ -317,7 +317,7 @@ static struct PyMethodDef fsimage_module_methods[] = {
 };
 
 PyMODINIT_FUNC
-initfsimage(void)
+initxenfsimage(void)
 {
-	Py_InitModule("fsimage", fsimage_module_methods);
+	Py_InitModule("xenfsimage", fsimage_module_methods);
 }
