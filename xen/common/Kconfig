@@ -116,7 +116,7 @@ config XSM
 
 config XSM_FLASK
 	def_bool y
-	prompt "FLux Advanced Security Kernel support" if EXPERT = "y"
+	prompt "FLux Advanced Security Kernel support"
 	depends on XSM
 	---help---
 	  Enables FLASK (FLux Advanced Security Kernel) as the access control
@@ -153,6 +153,17 @@ config XSM_FLASK_POLICY
 	  available when compiling the hypervisor.
 
 	  If unsure, say Y.
+
+choice
+	prompt "Default XSM implementation"
+	depends on XSM
+	default XSM_FLASK_DEFAULT if XSM_FLASK
+	default XSM_DUMMY_DEFAULT
+	config XSM_DUMMY_DEFAULT
+		bool "Match non-XSM behavior"
+	config XSM_FLASK_DEFAULT
+		bool "FLux Advanced Security Kernel" if XSM_FLASK
+endchoice
 
 config LATE_HWDOM
 	bool "Dedicated hardware domain"

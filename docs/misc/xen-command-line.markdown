@@ -899,6 +899,19 @@ hardware domain is architecture dependent.
 Note that specifying zero as domU value means zero, while for dom0 it means
 to use the default.
 
+### xsm
+> `= dummy | flask`
+
+> Default: `dummy`
+
+Specify which XSM module should be enabled.  This option is only available if
+the hypervisor was compiled with XSM support.
+
+* `dummy`: this is the default choice.  Basic restriction for common deployment
+  (the dummy module) will be applied.  It's also used when XSM is compiled out.
+* `flask`: this is the policy based access control.  To choose this, the
+  separated option in kconfig must also be enabled.
+
 ### flask
 > `= permissive | enforcing | late | disabled`
 
