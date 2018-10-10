@@ -803,6 +803,7 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     dom->xenstore_evtchn = state->store_port;
     dom->xenstore_domid = state->store_domid;
     dom->claim_enabled = libxl_defbool_val(info->claim_mode);
+    dom->max_vcpus = info->max_vcpus;
 
     if (info->num_vnuma_nodes != 0) {
         unsigned int i;
@@ -1256,6 +1257,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     dom->mmio_start = mmio_start;
     dom->vga_hole_size = device_model ? LIBXL_VGA_HOLE_SIZE : 0;
     dom->device_model = device_model;
+    dom->max_vcpus = info->max_vcpus;
 
     rc = libxl__domain_device_construct_rdm(gc, d_config,
                                             info->u.hvm.rdm_mem_boundary_memkb*1024,

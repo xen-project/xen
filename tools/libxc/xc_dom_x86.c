@@ -955,16 +955,15 @@ static int vcpu_hvm(struct xc_dom_image *dom)
         HVM_SAVE_TYPE(HEADER) header;
         struct hvm_save_descriptor cpu_d;
         HVM_SAVE_TYPE(CPU) cpu;
-        struct hvm_save_descriptor mtrr_d;
-        HVM_SAVE_TYPE(MTRR) mtrr;
         struct hvm_save_descriptor end_d;
         HVM_SAVE_TYPE(END) end;
     } bsp_ctx;
-    const HVM_SAVE_TYPE(MTRR) *mtrr_record;
     uint8_t *full_ctx = NULL;
     int rc;
 
     DOMPRINTF_CALLED(dom->xch);
+
+    assert(dom->max_vcpus);
 
     /*
      * Get the full HVM context in order to have the header, it is not
@@ -1034,35 +1033,63 @@ static int vcpu_hvm(struct xc_dom_image *dom)
     if ( dom->start_info_seg.pfn )
         bsp_ctx.cpu.rbx = dom->start_info_seg.pfn << PAGE_SHIFT;
 
-    /* Set the MTRR. */
-    bsp_ctx.mtrr_d.typecode = HVM_SAVE_CODE(MTRR);
-    bsp_ctx.mtrr_d.instance = 0;
-    bsp_ctx.mtrr_d.length = HVM_SAVE_LENGTH(MTRR);
-
-    mtrr_record = hvm_get_save_record(full_ctx, HVM_SAVE_CODE(MTRR), 0);
-    if ( !mtrr_record )
-    {
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: unable to get MTRR save record", __func__);
-        goto out;
-    }
-
-    memcpy(&bsp_ctx.mtrr, mtrr_record, sizeof(bsp_ctx.mtrr));
-
-    /* TODO: maybe this should be a firmware option instead? */
-    if ( !dom->device_model )
-        /*
-         * Enable MTRR, set default type to WB.
-         * TODO: add MMIO areas as UC when passthrough is supported.
-         */
-        bsp_ctx.mtrr.msr_mtrr_def_type = MTRR_TYPE_WRBACK |
-                                         MTRR_DEF_TYPE_ENABLE;
-
     /* Set the end descriptor. */
     bsp_ctx.end_d.typecode = HVM_SAVE_CODE(END);
     bsp_ctx.end_d.instance = 0;
     bsp_ctx.end_d.length = HVM_SAVE_LENGTH(END);
 
+    /* TODO: maybe this should be a firmware option instead? */
+    if ( !dom->device_model )
+    {
+        struct {
+            struct hvm_save_descriptor header_d;
+            HVM_SAVE_TYPE(HEADER) header;
+            struct hvm_save_descriptor mtrr_d;
+            HVM_SAVE_TYPE(MTRR) mtrr;
+            struct hvm_save_descriptor end_d;
+            HVM_SAVE_TYPE(END) end;
+        } mtrr = {
+            .header_d = bsp_ctx.header_d,
+            .header = bsp_ctx.header,
+            .mtrr_d.typecode = HVM_SAVE_CODE(MTRR),
+            .mtrr_d.length = HVM_SAVE_LENGTH(MTRR),
+            .end_d = bsp_ctx.end_d,
+            .end = bsp_ctx.end,
+        };
+        const HVM_SAVE_TYPE(MTRR) *mtrr_record =
+            hvm_get_save_record(full_ctx, HVM_SAVE_CODE(MTRR), 0);
+        unsigned int i;
+
+        if ( !mtrr_record )
+        {
+            xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                         "%s: unable to get MTRR save record", __func__);
+            goto out;
+        }
+
+        memcpy(&mtrr.mtrr, mtrr_record, sizeof(mtrr.mtrr));
+
+        /*
+         * Enable MTRR, set default type to WB.
+         * TODO: add MMIO areas as UC when passthrough is supported.
+         */
+        mtrr.mtrr.msr_mtrr_def_type = MTRR_TYPE_WRBACK | MTRR_DEF_TYPE_ENABLE;
+
+        for ( i = 0; i < dom->max_vcpus; i++ )
+        {
+            mtrr.mtrr_d.instance = i;
+            rc = xc_domain_hvm_setcontext(dom->xch, dom->guest_domid,
+                                          (uint8_t *)&mtrr, sizeof(mtrr));
+            if ( rc != 0 )
+                xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                             "%s: SETHVMCONTEXT failed (rc=%d)", __func__, rc);
+        }
+    }
+
+    /*
+     * Loading the BSP context should be done in the last call to setcontext,
+     * since each setcontext call will put all vCPUs down.
+     */
     rc = xc_domain_hvm_setcontext(dom->xch, dom->guest_domid,
                                   (uint8_t *)&bsp_ctx, sizeof(bsp_ctx));
     if ( rc != 0 )

@@ -230,6 +230,9 @@ struct xc_dom_image {
 #endif
 
     xen_pfn_t vuart_gfn;
+
+    /* Number of vCPUs */
+    unsigned int max_vcpus;
 };
 
 /* --- pluggable kernel loader ------------------------------------- */
