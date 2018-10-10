@@ -3982,57 +3982,17 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_VMXOFF:
-        if ( nvmx_handle_vmxoff(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_VMXON:
-        if ( nvmx_handle_vmxon(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_VMCLEAR:
-        if ( nvmx_handle_vmclear(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
- 
     case EXIT_REASON_VMPTRLD:
-        if ( nvmx_handle_vmptrld(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_VMPTRST:
-        if ( nvmx_handle_vmptrst(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_VMREAD:
-        if ( nvmx_handle_vmread(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
- 
     case EXIT_REASON_VMWRITE:
-        if ( nvmx_handle_vmwrite(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_VMLAUNCH:
-        if ( nvmx_handle_vmlaunch(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_VMRESUME:
-        if ( nvmx_handle_vmresume(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_INVEPT:
-        if ( nvmx_handle_invept(regs) == X86EMUL_OKAY )
-            update_guest_eip();
-        break;
-
     case EXIT_REASON_INVVPID:
-        if ( nvmx_handle_invvpid(regs) == X86EMUL_OKAY )
+        if ( nvmx_handle_vmx_insn(regs, exit_reason) == X86EMUL_OKAY )
             update_guest_eip();
         break;
 

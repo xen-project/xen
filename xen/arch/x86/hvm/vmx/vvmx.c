@@ -1470,7 +1470,7 @@ void nvmx_switch_guest(void)
  * VMX instructions handling
  */
 
-int nvmx_handle_vmxon(struct cpu_user_regs *regs)
+static int nvmx_handle_vmxon(struct cpu_user_regs *regs)
 {
     struct vcpu *v=current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -1522,7 +1522,7 @@ int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
+static int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
 {
     struct vcpu *v=current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -1611,7 +1611,7 @@ static int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_vmresume(struct cpu_user_regs *regs)
+static int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 {
     bool_t launched;
     struct vcpu *v = current;
@@ -1645,7 +1645,7 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     return nvmx_vmresume(v,regs);
 }
 
-int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
+static int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
 {
     bool_t launched;
     struct vcpu *v = current;
@@ -1688,7 +1688,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     return rc;
 }
 
-int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
+static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
@@ -1759,7 +1759,7 @@ out:
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
+static int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
@@ -1784,7 +1784,7 @@ int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_vmclear(struct cpu_user_regs *regs)
+static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
@@ -1836,7 +1836,7 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_vmread(struct cpu_user_regs *regs)
+static int nvmx_handle_vmread(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
@@ -1878,7 +1878,7 @@ int nvmx_handle_vmread(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
+static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
@@ -1926,7 +1926,7 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_invept(struct cpu_user_regs *regs)
+static int nvmx_handle_invept(struct cpu_user_regs *regs)
 {
     struct vmx_inst_decoded decode;
     unsigned long eptp;
@@ -1954,7 +1954,7 @@ int nvmx_handle_invept(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
-int nvmx_handle_invvpid(struct cpu_user_regs *regs)
+static int nvmx_handle_invvpid(struct cpu_user_regs *regs)
 {
     struct vmx_inst_decoded decode;
     unsigned long vpid;
@@ -1978,6 +1978,81 @@ int nvmx_handle_invvpid(struct cpu_user_regs *regs)
 
     vmsucceed(regs);
     return X86EMUL_OKAY;
+}
+
+int nvmx_handle_vmx_insn(struct cpu_user_regs *regs, unsigned int exit_reason)
+{
+    struct vcpu *curr = current;
+    int ret;
+
+    if ( !(curr->arch.hvm_vcpu.guest_cr[4] & X86_CR4_VMXE) ||
+         !nestedhvm_enabled(curr->domain) ||
+         (vmx_guest_x86_mode(curr) < (hvm_long_mode_active(curr) ? 8 : 2)) )
+    {
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+        return X86EMUL_EXCEPTION;
+    }
+
+    if ( vmx_get_cpl() > 0 )
+    {
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        return X86EMUL_EXCEPTION;
+    }
+
+    switch ( exit_reason )
+    {
+    case EXIT_REASON_VMXOFF:
+        ret = nvmx_handle_vmxoff(regs);
+        break;
+
+    case EXIT_REASON_VMXON:
+        ret = nvmx_handle_vmxon(regs);
+        break;
+
+    case EXIT_REASON_VMCLEAR:
+        ret = nvmx_handle_vmclear(regs);
+        break;
+
+    case EXIT_REASON_VMPTRLD:
+        ret = nvmx_handle_vmptrld(regs);
+        break;
+
+    case EXIT_REASON_VMPTRST:
+        ret = nvmx_handle_vmptrst(regs);
+        break;
+
+    case EXIT_REASON_VMREAD:
+        ret = nvmx_handle_vmread(regs);
+        break;
+
+    case EXIT_REASON_VMWRITE:
+        ret = nvmx_handle_vmwrite(regs);
+        break;
+
+    case EXIT_REASON_VMLAUNCH:
+        ret = nvmx_handle_vmlaunch(regs);
+        break;
+
+    case EXIT_REASON_VMRESUME:
+        ret = nvmx_handle_vmresume(regs);
+        break;
+
+    case EXIT_REASON_INVEPT:
+        ret = nvmx_handle_invept(regs);
+        break;
+
+    case EXIT_REASON_INVVPID:
+        ret = nvmx_handle_invvpid(regs);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        domain_crash(curr->domain);
+        ret = X86EMUL_UNHANDLEABLE;
+        break;
+    }
+
+    return ret;
 }
 
 #define __emul_value(enable1, default1) \

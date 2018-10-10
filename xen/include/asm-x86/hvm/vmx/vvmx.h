@@ -94,9 +94,6 @@ void nvmx_domain_relinquish_resources(struct domain *d);
 
 bool_t nvmx_ept_enabled(struct vcpu *v);
 
-int nvmx_handle_vmxon(struct cpu_user_regs *regs);
-int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
-
 #define EPT_TRANSLATE_SUCCEED       0
 #define EPT_TRANSLATE_VIOLATION     1
 #define EPT_TRANSLATE_MISCONFIG     2
@@ -191,15 +188,7 @@ enum vmx_insn_errno set_vvmcs_real_safe(const struct vcpu *, u32 encoding,
 uint64_t get_shadow_eptp(struct vcpu *v);
 
 void nvmx_destroy_vmcs(struct vcpu *v);
-int nvmx_handle_vmptrld(struct cpu_user_regs *regs);
-int nvmx_handle_vmptrst(struct cpu_user_regs *regs);
-int nvmx_handle_vmclear(struct cpu_user_regs *regs);
-int nvmx_handle_vmread(struct cpu_user_regs *regs);
-int nvmx_handle_vmwrite(struct cpu_user_regs *regs);
-int nvmx_handle_vmresume(struct cpu_user_regs *regs);
-int nvmx_handle_vmlaunch(struct cpu_user_regs *regs);
-int nvmx_handle_invept(struct cpu_user_regs *regs);
-int nvmx_handle_invvpid(struct cpu_user_regs *regs);
+int nvmx_handle_vmx_insn(struct cpu_user_regs *regs, unsigned int exit_reason);
 int nvmx_msr_read_intercept(unsigned int msr,
                                 u64 *msr_content);
 
