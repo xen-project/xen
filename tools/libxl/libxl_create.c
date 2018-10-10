@@ -1218,6 +1218,15 @@ static void domcreate_stream_done(libxl__egc *egc,
         ret = ERROR_INVAL;
         goto out;
     }
+
+    /*
+     * The scheduler on the sending domain may be different than the
+     * scheduler running here.  Setting the scheduler to UNKNOWN will
+     * cause the code to take to take whatever parameters are
+     * available in that scheduler, while discarding the rest.
+     */
+    info->sched_params.sched = LIBXL_SCHEDULER_UNKNOWN;
+
     ret = libxl__build_post(gc, domid, info, state, vments, localents);
     if (ret)
         goto out;
