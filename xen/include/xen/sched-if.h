@@ -9,6 +9,7 @@
 #define __XEN_SCHED_IF_H__
 
 #include <xen/percpu.h>
+#include <xen/err.h>
 
 /* A global pointer to the initial cpupool (POOL0). */
 extern struct cpupool *cpupool0;
