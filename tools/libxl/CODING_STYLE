@@ -220,12 +220,14 @@ Do not leave whitespace dangling off the ends of lines.
 
 2. Line width
 
-Lines are limited to 75-80 characters.
+Lines are limited to 75 characters.
 
 Rationale:
  - Some people like to tile their 24" screens with a 6x4 matrix of 80x24
    xterms and use vi in all of them.  The best way to punish them is to
    let them keep doing it.
+ - In an 80 column terminal, some room needs to be left for > quoting
+   characters, +/- diff characters, and so on, in emails.
  - Code and especially patches is much more readable if limited to a sane
    line length.  Eighty is traditional.
  - It is the libxenlight coding style.
