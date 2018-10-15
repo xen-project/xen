@@ -93,7 +93,8 @@ static void *alloc_pages_bufdev(xencall_handle *xcall, size_t npages)
              xcall->buf_fd, 0);
     if ( p == MAP_FAILED )
     {
-        PERROR("alloc_pages: mmap failed");
+        PERROR("alloc_pages: mmap (,%zu*%lu,...) [bufdev] failed",
+               npages, (unsigned long)PAGE_SIZE);
         p = NULL;
     }
 
@@ -110,7 +111,7 @@ static void *alloc_pages_nobufdev(xencall_handle *xcall, size_t npages)
     p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
     if ( p == MAP_FAILED )
     {
-        PERROR("alloc_pages: mmap failed");
+        PERROR("alloc_pages: mmap(,%zu,...) [nobufdev] failed", size);
         return NULL;
     }
 
@@ -119,7 +120,8 @@ static void *alloc_pages_nobufdev(xencall_handle *xcall, size_t npages)
     rc = madvise(p, npages * PAGE_SIZE, MADV_DONTFORK);
     if ( rc < 0 )
     {
-        PERROR("alloc_pages: madvise failed");
+        PERROR("alloc_pages: madvise (,%zu*%lu,) [nobufdev] failed",
+               npages, (unsigned long)PAGE_SIZE);
         goto out;
     }
 
