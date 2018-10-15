@@ -232,6 +232,14 @@ typedef void libxl__ev_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
    * It is not permitted to listen for the same or overlapping events
    * on the same fd using multiple different libxl__ev_fd's.
    *
+   * Note that (depending on the underlying event loop implementation)
+   * it is possible that a the fd callback system is `level triggered'
+   * or `event triggered'.  That is, the callback may be called only
+   * once for each transition from not ready to ready.  So the
+   * callback must generally contain a loop which exhausts the fd,
+   * rather than relying on being called again if the fd is still
+   * ready.
+   *
    * (Spurious wakeups, and spurious bits set in revents, are
    * suppressed by the libxl event core.)
    */
