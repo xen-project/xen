@@ -239,6 +239,11 @@ def crunch_numbers(state):
         # absence of any enabled xstate.
         AVX: [FMA, FMA4, F16C, AVX2, XOP],
 
+        # This dependency exists solely for the shadow pagetable code.  If the
+        # host doesn't have NX support, the shadow pagetable code can't handle
+        # SMAP correctly for guests.
+        NX: [SMAP],
+
         # CX16 is only encodable in Long Mode.  LAHF_LM indicates that the
         # SAHF/LAHF instructions are reintroduced in Long Mode.  1GB
         # superpages, PCID and PKU are only available in 4 level paging.
