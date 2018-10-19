@@ -1328,12 +1328,12 @@ long arch_do_domctl(
 
                 if ( boot_cpu_has(X86_FEATURE_DBEXT) )
                 {
-                    if ( v->arch.pv.dr_mask[0] )
+                    if ( v->arch.msrs->dr_mask[0] )
                     {
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR0_ADDRESS_MASK;
-                            msr.value = v->arch.pv.dr_mask[0];
+                            msr.value = v->arch.msrs->dr_mask[0];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
                         }
@@ -1342,12 +1342,12 @@ long arch_do_domctl(
 
                     for ( j = 0; j < 3; ++j )
                     {
-                        if ( !v->arch.pv.dr_mask[1 + j] )
+                        if ( !v->arch.msrs->dr_mask[1 + j] )
                             continue;
                         if ( i < vmsrs->msr_count && !ret )
                         {
                             msr.index = MSR_AMD64_DR1_ADDRESS_MASK + j;
-                            msr.value = v->arch.pv.dr_mask[1 + j];
+                            msr.value = v->arch.msrs->dr_mask[1 + j];
                             if ( copy_to_guest_offset(vmsrs->msrs, i, &msr, 1) )
                                 ret = -EFAULT;
                         }
@@ -1392,7 +1392,7 @@ long arch_do_domctl(
                     if ( !boot_cpu_has(X86_FEATURE_DBEXT) ||
                          (msr.value >> 32) )
                         break;
-                    v->arch.pv.dr_mask[0] = msr.value;
+                    v->arch.msrs->dr_mask[0] = msr.value;
                     continue;
 
                 case MSR_AMD64_DR1_ADDRESS_MASK ...
@@ -1401,7 +1401,7 @@ long arch_do_domctl(
                          (msr.value >> 32) )
                         break;
                     msr.index -= MSR_AMD64_DR1_ADDRESS_MASK - 1;
-                    v->arch.pv.dr_mask[msr.index] = msr.value;
+                    v->arch.msrs->dr_mask[msr.index] = msr.value;
                     continue;
                 }
                 break;

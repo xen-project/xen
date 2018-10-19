@@ -538,9 +538,6 @@ struct svm_vcpu {
     /* AMD lightweight profiling MSR */
     uint64_t guest_lwp_cfg;      /* guest version */
     uint64_t cpu_lwp_cfg;        /* CPU version */
-
-    /* data breakpoint extension MSRs */
-    uint32_t dr_mask[4];
 };
 
 struct vmcb_struct *alloc_vmcb(void);

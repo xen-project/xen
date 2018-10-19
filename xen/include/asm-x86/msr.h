@@ -287,6 +287,12 @@ struct vcpu_msrs
             bool cpuid_faulting:1;
         };
     } misc_features_enables;
+
+    /*
+     * 0xc00110{27,19-1b} MSR_AMD64_DR{0-3}_ADDRESS_MASK
+     * TODO: Not yet handled by guest_{rd,wr}msr() infrastructure.
+     */
+    uint32_t dr_mask[4];
 };
 
 void init_guest_msr_policy(void);

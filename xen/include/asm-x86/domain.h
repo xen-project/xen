@@ -553,9 +553,6 @@ struct pv_vcpu
      */
     uint32_t dr7_emul;
 
-    /* data breakpoint extension MSRs */
-    uint32_t dr_mask[4];
-
     /* Deferred VA-based update state. */
     bool_t need_update_runstate_area;
     struct vcpu_time_info pending_system_time;

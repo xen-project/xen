@@ -2071,10 +2071,10 @@ void activate_debugregs(const struct vcpu *curr)
 
     if ( boot_cpu_has(X86_FEATURE_DBEXT) )
     {
-        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, curr->arch.pv.dr_mask[0]);
-        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, curr->arch.pv.dr_mask[1]);
-        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, curr->arch.pv.dr_mask[2]);
-        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, curr->arch.pv.dr_mask[3]);
+        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, curr->arch.msrs->dr_mask[0]);
+        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, curr->arch.msrs->dr_mask[1]);
+        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, curr->arch.msrs->dr_mask[2]);
+        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, curr->arch.msrs->dr_mask[3]);
     }
 }
 

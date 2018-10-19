@@ -210,10 +210,10 @@ static void svm_save_dr(struct vcpu *v)
         svm_intercept_msr(v, MSR_AMD64_DR2_ADDRESS_MASK, MSR_INTERCEPT_RW);
         svm_intercept_msr(v, MSR_AMD64_DR3_ADDRESS_MASK, MSR_INTERCEPT_RW);
 
-        rdmsrl(MSR_AMD64_DR0_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[0]);
-        rdmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[1]);
-        rdmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[2]);
-        rdmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[3]);
+        rdmsrl(MSR_AMD64_DR0_ADDRESS_MASK, v->arch.msrs->dr_mask[0]);
+        rdmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.msrs->dr_mask[1]);
+        rdmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.msrs->dr_mask[2]);
+        rdmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.msrs->dr_mask[3]);
     }
 
     v->arch.dr[0] = read_debugreg(0);
@@ -241,10 +241,10 @@ static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
         svm_intercept_msr(v, MSR_AMD64_DR2_ADDRESS_MASK, MSR_INTERCEPT_NONE);
         svm_intercept_msr(v, MSR_AMD64_DR3_ADDRESS_MASK, MSR_INTERCEPT_NONE);
 
-        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[0]);
-        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[1]);
-        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[2]);
-        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.hvm.svm.dr_mask[3]);
+        wrmsrl(MSR_AMD64_DR0_ADDRESS_MASK, v->arch.msrs->dr_mask[0]);
+        wrmsrl(MSR_AMD64_DR1_ADDRESS_MASK, v->arch.msrs->dr_mask[1]);
+        wrmsrl(MSR_AMD64_DR2_ADDRESS_MASK, v->arch.msrs->dr_mask[2]);
+        wrmsrl(MSR_AMD64_DR3_ADDRESS_MASK, v->arch.msrs->dr_mask[3]);
     }
 
     write_debugreg(0, v->arch.dr[0]);
@@ -422,19 +422,19 @@ static void svm_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
 {
     if ( boot_cpu_has(X86_FEATURE_DBEXT) )
     {
-        ctxt->msr[ctxt->count].val = v->arch.hvm.svm.dr_mask[0];
+        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[0];
         if ( ctxt->msr[ctxt->count].val )
             ctxt->msr[ctxt->count++].index = MSR_AMD64_DR0_ADDRESS_MASK;
 
-        ctxt->msr[ctxt->count].val = v->arch.hvm.svm.dr_mask[1];
+        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[1];
         if ( ctxt->msr[ctxt->count].val )
             ctxt->msr[ctxt->count++].index = MSR_AMD64_DR1_ADDRESS_MASK;
 
-        ctxt->msr[ctxt->count].val = v->arch.hvm.svm.dr_mask[2];
+        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[2];
         if ( ctxt->msr[ctxt->count].val )
             ctxt->msr[ctxt->count++].index = MSR_AMD64_DR2_ADDRESS_MASK;
 
-        ctxt->msr[ctxt->count].val = v->arch.hvm.svm.dr_mask[3];
+        ctxt->msr[ctxt->count].val = v->arch.msrs->dr_mask[3];
         if ( ctxt->msr[ctxt->count].val )
             ctxt->msr[ctxt->count++].index = MSR_AMD64_DR3_ADDRESS_MASK;
     }
@@ -455,7 +455,7 @@ static int svm_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
             else if ( ctxt->msr[i].val >> 32 )
                 err = -EDOM;
             else
-                v->arch.hvm.svm.dr_mask[0] = ctxt->msr[i].val;
+                v->arch.msrs->dr_mask[0] = ctxt->msr[i].val;
             break;
 
         case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
@@ -464,7 +464,7 @@ static int svm_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
             else if ( ctxt->msr[i].val >> 32 )
                 err = -EDOM;
             else
-                v->arch.hvm.svm.dr_mask[idx - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
+                v->arch.msrs->dr_mask[idx - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
                     ctxt->msr[i].val;
             break;
 
@@ -2079,14 +2079,14 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_AMD64_DR0_ADDRESS_MASK:
         if ( !v->domain->arch.cpuid->extd.dbext )
             goto gpf;
-        *msr_content = v->arch.hvm.svm.dr_mask[0];
+        *msr_content = v->arch.msrs->dr_mask[0];
         break;
 
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
         if ( !v->domain->arch.cpuid->extd.dbext )
             goto gpf;
         *msr_content =
-            v->arch.hvm.svm.dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1];
+            v->arch.msrs->dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1];
         break;
 
     case MSR_AMD_OSVW_ID_LENGTH:
@@ -2277,13 +2277,13 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     case MSR_AMD64_DR0_ADDRESS_MASK:
         if ( !v->domain->arch.cpuid->extd.dbext || (msr_content >> 32) )
             goto gpf;
-        v->arch.hvm.svm.dr_mask[0] = msr_content;
+        v->arch.msrs->dr_mask[0] = msr_content;
         break;
 
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
         if ( !v->domain->arch.cpuid->extd.dbext || (msr_content >> 32) )
             goto gpf;
-        v->arch.hvm.svm.dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
+        v->arch.msrs->dr_mask[msr - MSR_AMD64_DR1_ADDRESS_MASK + 1] =
             msr_content;
         break;
 
