@@ -510,8 +510,13 @@ int __init construct_dom0(struct domain *d, const module_t *image,
     }
 #endif
 
-    rc = (is_hvm_domain(d) ? dom0_construct_pvh : dom0_construct_pv)
-         (d, image, image_headroom, initrd, cmdline);
+    if ( is_hvm_domain(d) )
+        rc = dom0_construct_pvh(d, image, image_headroom, initrd, cmdline);
+    else if ( is_pv_domain(d) )
+        rc = dom0_construct_pv(d, image, image_headroom, initrd, cmdline);
+    else
+        panic("Cannot construct Dom0. No guest interface available\n");
+
     if ( rc )
         return rc;
 
