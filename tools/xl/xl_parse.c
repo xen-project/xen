@@ -356,7 +356,7 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
             j++;
         }
 
-        /* We have a list of cpumaps, disable automatic placement */
+        /* When we have a list of cpumaps, always disable automatic placement */
         libxl_defbool_set(&b_info->numa_placement, false);
     } else {
         int i;
@@ -380,7 +380,9 @@ static void parse_vcpu_affinity(libxl_domain_build_info *b_info,
                               &vcpu_affinity_array[0]);
         }
 
-        libxl_defbool_set(&b_info->numa_placement, false);
+        /* We have soft affinity already, disable automatic placement */
+        if (!is_hard)
+            libxl_defbool_set(&b_info->numa_placement, false);
     }
 }
 

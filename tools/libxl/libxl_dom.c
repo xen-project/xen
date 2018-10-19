@@ -27,6 +27,8 @@
 
 #include "_paths.h"
 
+//#define DEBUG 1
+
 libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -142,12 +144,13 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
 {
     int found;
     libxl__numa_candidate candidate;
-    libxl_bitmap cpupool_nodemap;
+    libxl_bitmap cpumap, cpupool_nodemap, *map;
     libxl_cpupoolinfo cpupool_info;
     int i, cpupool, rc = 0;
     uint64_t memkb;
 
     libxl__numa_candidate_init(&candidate);
+    libxl_bitmap_init(&cpumap);
     libxl_bitmap_init(&cpupool_nodemap);
     libxl_cpupoolinfo_init(&cpupool_info);
 
@@ -162,6 +165,35 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     rc = libxl_cpupool_info(CTX, &cpupool_info, cpupool);
     if (rc)
         goto out;
+    map = &cpupool_info.cpumap;
+
+    /*
+     * If there's a well defined hard affinity mask (i.e., the same one for all
+     * the vcpus), we can try to run the placement considering only the pcpus
+     * within such mask.
+     */
+    if (info->num_vcpu_hard_affinity)
+    {
+#ifdef DEBUG
+        int j;
+
+        for (j = 0; j < info->num_vcpu_hard_affinity; j++)
+            assert(libxl_bitmap_equal(&info->vcpu_hard_affinity[0],
+                                      &info->vcpu_hard_affinity[j], 0));
+#endif /* DEBUG */
+
+        rc = libxl_bitmap_and(CTX, &cpumap, &info->vcpu_hard_affinity[0],
+                              &cpupool_info.cpumap);
+        if (rc)
+            goto out;
+
+        /* Hard affinity must contain at least one cpu of our cpupool */
+        if (libxl_bitmap_is_empty(&cpumap)) {
+            LOG(ERROR, "Hard affinity completely outside of domain's cpupool!");
+            rc = ERROR_INVAL;
+            goto out;
+        }
+    }
 
     rc = libxl_domain_need_memory(CTX, info, &memkb);
     if (rc)
@@ -174,8 +206,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     /* Find the best candidate with enough free memory and at least
      * as much pcpus as the domain has vcpus.  */
     rc = libxl__get_numa_candidate(gc, memkb, info->max_vcpus,
-                                   0, 0, &cpupool_info.cpumap,
-                                   numa_cmpf, &candidate, &found);
+                                   0, 0, map, numa_cmpf, &candidate, &found);
     if (rc)
         goto out;
 
@@ -206,6 +237,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
  out:
     libxl__numa_candidate_dispose(&candidate);
     libxl_bitmap_dispose(&cpupool_nodemap);
+    libxl_bitmap_dispose(&cpumap);
     libxl_cpupoolinfo_dispose(&cpupool_info);
     return rc;
 }
@@ -373,9 +405,8 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
      * reflect the placement result if that is the case
      */
     if (libxl_defbool_val(info->numa_placement)) {
-        if (info->cpumap.size || info->num_vcpu_hard_affinity ||
-            info->num_vcpu_soft_affinity)
-            LOG(WARN, "Can't run NUMA placement, as an (hard or soft) "
+        if (info->cpumap.size || info->num_vcpu_soft_affinity)
+            LOG(WARN, "Can't run NUMA placement, as a soft "
                       "affinity has been specified explicitly");
         else if (info->nodemap.size)
             LOG(WARN, "Can't run NUMA placement, as the domain has "
