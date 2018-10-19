@@ -214,8 +214,8 @@ static bool pci_cfg_ok(struct domain *currd, unsigned int start,
            pci_conf_write_intercept(0, machine_bdf, start, size, write) >= 0;
 }
 
-uint32_t guest_io_read(unsigned int port, unsigned int bytes,
-                       struct domain *currd)
+static uint32_t guest_io_read(unsigned int port, unsigned int bytes,
+                              struct domain *currd)
 {
     uint32_t data = 0;
     unsigned int shift = 0;
@@ -343,8 +343,8 @@ static int read_io(unsigned int port, unsigned int bytes,
     return X86EMUL_OKAY;
 }
 
-void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
-                    struct domain *currd)
+static void guest_io_write(unsigned int port, unsigned int bytes,
+                           uint32_t data, struct domain *currd)
 {
     if ( admin_io_okay(port, bytes, currd) )
     {
