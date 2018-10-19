@@ -1822,6 +1822,7 @@ void do_debug(struct cpu_user_regs *regs)
 
         if ( regs->eflags & X86_EFLAGS_TF )
         {
+#ifdef CONFIG_PV
             /* In SYSENTER entry path we can't zap TF until EFLAGS is saved. */
             if ( (regs->rip >= (unsigned long)sysenter_entry) &&
                  (regs->rip <= (unsigned long)sysenter_eflags_saved) )
@@ -1830,6 +1831,7 @@ void do_debug(struct cpu_user_regs *regs)
                     regs->eflags &= ~X86_EFLAGS_TF;
                 return;
             }
+#endif
             if ( !debugger_trap_fatal(TRAP_debug, regs) )
             {
                 WARN();
