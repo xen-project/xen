@@ -321,10 +321,14 @@ static always_inline void stac(void)
         subq  $-(UREGS_error_code-UREGS_r15+\adj), %rsp
 .endm
 
+#ifdef CONFIG_PV
 #define CR4_PV32_RESTORE                               \
     ALTERNATIVE_2 "",                                  \
         "call cr4_pv32_restore", X86_FEATURE_XEN_SMEP, \
         "call cr4_pv32_restore", X86_FEATURE_XEN_SMAP
+#else
+#define CR4_PV32_RESTORE
+#endif
 
 #include <asm/spec_ctrl_asm.h>
 
