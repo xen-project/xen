@@ -40,7 +40,7 @@ config ACPI
 
 config GICV3
 	bool "GICv3 driver"
-	depends on ARM_64
+	depends on ARM_64 && !NEW_VGIC
 	default y
 	---help---
 
