@@ -1094,12 +1094,14 @@ void __init smp_prepare_cpus(void)
     {
         get_cpu_info()->pv_cr3 = 0;
 
+#ifdef CONFIG_PV
         /*
          * All entry points which may need to switch page tables have to start
          * with interrupts off. Re-write what pv_trap_init() has put there.
          */
         _set_gate(idt_table + LEGACY_SYSCALL_VECTOR, SYS_DESC_irq_gate, 3,
                   &int80_direct_trap);
+#endif
     }
 
     set_nr_sockets();
