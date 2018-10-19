@@ -12,7 +12,7 @@ config ARM_32
 config ARM_64
 	def_bool y
 	depends on 64BIT
-	select HAS_GICV3
+	select HAS_GICV3 if !NEW_VGIC
 
 config ARM
 	def_bool y
