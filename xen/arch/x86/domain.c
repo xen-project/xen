@@ -791,11 +791,15 @@ int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
+    unsigned int i;
+    unsigned long flags;
+    bool compat;
+#ifdef CONFIG_PV
     unsigned long cr3_gfn;
     struct page_info *cr3_page;
-    unsigned long flags, cr4;
-    unsigned int i;
-    int rc = 0, compat;
+    unsigned long cr4;
+    int rc = 0;
+#endif
 
     /* The context is a compat-mode one if the target domain is compat-mode;
      * we expect the tools to DTRT even in compat-mode callers. */
@@ -889,6 +893,7 @@ int arch_set_info_guest(
         goto out;
     }
 
+#ifdef CONFIG_PV
     /* IOPL privileges are virtualised. */
     v->arch.pv.iopl = v->arch.user_regs.eflags & X86_EFLAGS_IOPL;
     v->arch.user_regs.eflags &= ~X86_EFLAGS_IOPL;
@@ -1154,6 +1159,7 @@ int arch_set_info_guest(
         paging_update_paging_modes(v);
 
     update_cr3(v);
+#endif /* CONFIG_PV */
 
  out:
     if ( flags & VGCF_online )
