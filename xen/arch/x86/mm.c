@@ -625,6 +625,7 @@ const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
     zero_page[PAGE_SIZE];
 
 
+#ifdef CONFIG_PV
 static int alloc_segdesc_page(struct page_info *page)
 {
     const struct domain *owner = page_get_owner(page);
@@ -639,37 +640,10 @@ static int alloc_segdesc_page(struct page_info *page)
 
     return i == 512 ? 0 : -EINVAL;
 }
+#endif
 
 static int _get_page_type(struct page_info *page, unsigned long type,
                           bool preemptible);
-
-static int get_page_and_type_from_mfn(
-    mfn_t mfn, unsigned long type, struct domain *d,
-    int partial, int preemptible)
-{
-    struct page_info *page = mfn_to_page(mfn);
-    int rc;
-
-    if ( likely(partial >= 0) &&
-         unlikely(!get_page_from_mfn(mfn, d)) )
-        return -EINVAL;
-
-    rc = _get_page_type(page, type, preemptible);
-
-    if ( unlikely(rc) && partial >= 0 &&
-         (!preemptible || page != current->arch.old_guest_table) )
-        put_page(page);
-
-    return rc;
-}
-
-static void put_data_page(struct page_info *page, bool writeable)
-{
-    if ( writeable )
-        put_page_and_type(page);
-    else
-        put_page(page);
-}
 
 #ifdef CONFIG_PV_LINEAR_PT
 
@@ -1128,6 +1102,27 @@ get_page_from_l1e(
     return -EBUSY;
 }
 
+#ifdef CONFIG_PV
+static int get_page_and_type_from_mfn(
+    mfn_t mfn, unsigned long type, struct domain *d,
+    int partial, int preemptible)
+{
+    struct page_info *page = mfn_to_page(mfn);
+    int rc;
+
+    if ( likely(partial >= 0) &&
+         unlikely(!get_page_from_mfn(mfn, d)) )
+        return -EINVAL;
+
+    rc = _get_page_type(page, type, preemptible);
+
+    if ( unlikely(rc) && partial >= 0 &&
+         (!preemptible || page != current->arch.old_guest_table) )
+        put_page(page);
+
+    return rc;
+}
+
 define_get_linear_pagetable(l2);
 static int
 get_page_from_l2e(
@@ -1195,6 +1190,7 @@ get_page_from_l4e(
 
     return rc;
 }
+#endif /* CONFIG_PV */
 
 static int _put_page_type(struct page_info *page, bool preemptible,
                           struct page_info *ptpg);
@@ -1275,6 +1271,14 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
     }
 }
 
+#ifdef CONFIG_PV
+static void put_data_page(struct page_info *page, bool writeable)
+{
+    if ( writeable )
+        put_page_and_type(page);
+    else
+        put_page(page);
+}
 
 /*
  * NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'.
@@ -1621,6 +1625,7 @@ void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
                l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
            COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2t));
 }
+#endif /* CONFIG_PV */
 
 /*
  * Fill an L4 with Xen entries.
@@ -1728,6 +1733,7 @@ void zap_ro_mpt(mfn_t mfn)
     unmap_domain_page(l4tab);
 }
 
+#ifdef CONFIG_PV
 static int alloc_l4_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
@@ -1918,6 +1924,7 @@ static int free_l4_table(struct page_info *page)
 
     return rc;
 }
+#endif /* CONFIG_PV */
 
 #ifndef NDEBUG
 /*
@@ -2002,6 +2009,7 @@ void page_unlock(struct page_info *page)
     current_locked_page_set(NULL);
 }
 
+#ifdef CONFIG_PV
 /*
  * PTE flags that a guest may change without re-validating the PTE.
  * All other bits affect translation, caching, or Xen's safety.
@@ -2313,6 +2321,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     put_page_from_l4e(ol4e, pfn, 0, 1);
     return rc;
 }
+#endif /* CONFIG_PV */
 
 static int cleanup_page_cacheattr(struct page_info *page)
 {
@@ -2420,6 +2429,7 @@ static void get_page_light(struct page_info *page)
 static int alloc_page_type(struct page_info *page, unsigned long type,
                            int preemptible)
 {
+#ifdef CONFIG_PV
     struct domain *owner = page_get_owner(page);
     int rc;
 
@@ -2489,12 +2499,17 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
     }
 
     return rc;
+#else
+    ASSERT_UNREACHABLE();
+    return -EINVAL;
+#endif
 }
 
 
 int free_page_type(struct page_info *page, unsigned long type,
                    int preemptible)
 {
+#ifdef CONFIG_PV
     struct domain *owner = page_get_owner(page);
     unsigned long gmfn;
     int rc;
@@ -2543,6 +2558,10 @@ int free_page_type(struct page_info *page, unsigned long type,
     }
 
     return rc;
+#else
+    ASSERT_UNREACHABLE();
+    return -EINVAL;
+#endif
 }
 
 
@@ -2933,6 +2952,7 @@ int vcpu_destroy_pagetables(struct vcpu *v)
 
 int new_guest_cr3(mfn_t mfn)
 {
+#ifdef CONFIG_PV
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     int rc;
@@ -3031,48 +3051,10 @@ int new_guest_cr3(mfn_t mfn)
     }
 
     return rc;
-}
-
-static struct domain *get_pg_owner(domid_t domid)
-{
-    struct domain *pg_owner = NULL, *curr = current->domain;
-
-    if ( likely(domid == DOMID_SELF) )
-    {
-        pg_owner = rcu_lock_current_domain();
-        goto out;
-    }
-
-    if ( unlikely(domid == curr->domain_id) )
-    {
-        gdprintk(XENLOG_WARNING, "Cannot specify itself as foreign domain\n");
-        goto out;
-    }
-
-    switch ( domid )
-    {
-    case DOMID_IO:
-        pg_owner = rcu_lock_domain(dom_io);
-        break;
-    case DOMID_XEN:
-        pg_owner = rcu_lock_domain(dom_xen);
-        break;
-    default:
-        if ( (pg_owner = rcu_lock_domain_by_id(domid)) == NULL )
-        {
-            gdprintk(XENLOG_WARNING, "Unknown domain d%d\n", domid);
-            break;
-        }
-        break;
-    }
-
- out:
-    return pg_owner;
-}
-
-static void put_pg_owner(struct domain *pg_owner)
-{
-    rcu_unlock_domain(pg_owner);
+#else
+    ASSERT_UNREACHABLE();
+    return -EINVAL;
+#endif
 }
 
 static inline int vcpumask_to_pcpumask(
@@ -3115,6 +3097,49 @@ static inline int vcpumask_to_pcpumask(
                 __cpumask_set_cpu(cpu, pmask);
         }
     }
+}
+
+#ifdef CONFIG_PV
+static struct domain *get_pg_owner(domid_t domid)
+{
+    struct domain *pg_owner = NULL, *curr = current->domain;
+
+    if ( likely(domid == DOMID_SELF) )
+    {
+        pg_owner = rcu_lock_current_domain();
+        goto out;
+    }
+
+    if ( unlikely(domid == curr->domain_id) )
+    {
+        gdprintk(XENLOG_WARNING, "Cannot specify itself as foreign domain\n");
+        goto out;
+    }
+
+    switch ( domid )
+    {
+    case DOMID_IO:
+        pg_owner = rcu_lock_domain(dom_io);
+        break;
+    case DOMID_XEN:
+        pg_owner = rcu_lock_domain(dom_xen);
+        break;
+    default:
+        if ( (pg_owner = rcu_lock_domain_by_id(domid)) == NULL )
+        {
+            gdprintk(XENLOG_WARNING, "Unknown domain d%d\n", domid);
+            break;
+        }
+        break;
+    }
+
+ out:
+    return pg_owner;
+}
+
+static void put_pg_owner(struct domain *pg_owner)
+{
+    rcu_unlock_domain(pg_owner);
 }
 
 long do_mmuext_op(
@@ -3973,6 +3998,7 @@ long do_mmu_update(
 
     return rc;
 }
+#endif /* CONFIG_PV */
 
 int donate_page(
     struct domain *d, struct page_info *page, unsigned int memflags)
@@ -4080,6 +4106,7 @@ int steal_page(
     return -EINVAL;
 }
 
+#ifdef CONFIG_PV
 static int __do_update_va_mapping(
     unsigned long va, u64 val64, unsigned long flags, struct domain *pg_owner)
 {
@@ -4242,6 +4269,7 @@ int compat_update_va_mapping_otherdomain(unsigned int va,
 
     return rc;
 }
+#endif /* CONFIG_PV */
 
 typedef struct e820entry e820entry_t;
 DEFINE_XEN_GUEST_HANDLE(e820entry_t);

@@ -163,6 +163,7 @@ int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
+#ifdef CONFIG_PV
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_compat_t);
 
 int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) arg,
@@ -313,6 +314,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(void) arg,
 
     return rc;
 }
+#endif /* CONFIG_PV */
 
 /*
  * Local variables:

@@ -135,7 +135,9 @@ static const hypercall_table_t hvm_hypercall_table[] = {
     HYPERCALL(tmem_op),
 #endif
     COMPAT_CALL(platform_op),
+#ifdef CONFIG_PV
     COMPAT_CALL(mmuext_op),
+#endif
     HYPERCALL(xenpmu_op),
     COMPAT_CALL(dm_op),
     HYPERCALL(arch_1)
