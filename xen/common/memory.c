@@ -358,7 +358,9 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 #endif
     if ( unlikely(!mfn_valid(mfn)) )
     {
+#ifdef CONFIG_X86
         put_gfn(d, gmfn);
+#endif
         gdprintk(XENLOG_INFO, "Domain %u page number %lx invalid\n",
                 d->domain_id, gmfn);
 
@@ -388,7 +390,9 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     page = mfn_to_page(mfn);
     if ( unlikely(!get_page(page, d)) )
     {
+#ifdef CONFIG_X86
         put_gfn(d, gmfn);
+#endif
         gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
 
         return -ENXIO;
@@ -409,8 +413,11 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         put_page(page);
 
     put_page(page);
- out_put_gfn: __maybe_unused;
+
+#ifdef CONFIG_X86
+ out_put_gfn:
     put_gfn(d, gmfn);
+#endif
 
     /*
      * Filter out -ENOENT return values that aren't a result of an empty p2m
@@ -656,7 +663,9 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
 #endif
                 if ( unlikely(!mfn_valid(mfn)) )
                 {
+#ifdef CONFIG_X86
                     put_gfn(d, gmfn + k);
+#endif
                     rc = -EINVAL;
                     goto fail;
                 }
@@ -666,12 +675,16 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                 rc = steal_page(d, page, MEMF_no_refcount);
                 if ( unlikely(rc) )
                 {
+#ifdef CONFIG_X86
                     put_gfn(d, gmfn + k);
+#endif
                     goto fail;
                 }
 
                 page_list_add(page, &in_chunk_list);
+#ifdef CONFIG_X86
                 put_gfn(d, gmfn + k);
+#endif
             }
         }
 

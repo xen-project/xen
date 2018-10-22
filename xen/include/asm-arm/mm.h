@@ -313,8 +313,6 @@ static inline void *page_to_virt(const struct page_info *pg)
 struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
                                     unsigned long flags);
 
-static inline void put_gfn(struct domain *d, unsigned long gfn) {}
-
 /*
  * Arm does not have an M2P, but common code expects a handful of
  * M2P-related defines and functions. Provide dummy versions of these.

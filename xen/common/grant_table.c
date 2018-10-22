@@ -2110,7 +2110,9 @@ gnttab_transfer(
         /* Check the passed page frame for basic validity. */
         if ( unlikely(!mfn_valid(mfn)) )
         {
+#ifdef CONFIG_X86
             put_gfn(d, gop.mfn);
+#endif
             gdprintk(XENLOG_INFO, "out-of-range %lx\n", (unsigned long)gop.mfn);
             gop.status = GNTST_bad_page;
             goto copyback;
@@ -2119,7 +2121,9 @@ gnttab_transfer(
         page = mfn_to_page(mfn);
         if ( (rc = steal_page(d, page, 0)) < 0 )
         {
+#ifdef CONFIG_X86
             put_gfn(d, gop.mfn);
+#endif
             gop.status = rc == -EINVAL ? GNTST_bad_page : GNTST_general_error;
             goto copyback;
         }
@@ -2149,7 +2153,9 @@ gnttab_transfer(
         unlock_and_copyback:
             rcu_unlock_domain(e);
         put_gfn_and_copyback:
+#ifdef CONFIG_X86
             put_gfn(d, gop.mfn);
+#endif
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
             goto copyback;
@@ -2236,7 +2242,9 @@ gnttab_transfer(
         page_set_owner(page, e);
 
         spin_unlock(&e->page_alloc_lock);
+#ifdef CONFIG_X86
         put_gfn(d, gop.mfn);
+#endif
 
         TRACE_1D(TRC_MEM_PAGE_GRANT_TRANSFER, e->domain_id);
 
