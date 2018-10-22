@@ -901,9 +901,8 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
     struct two_gfns tg;
     struct rmap_iterator ri;
 
-    get_two_gfns(sd, gfn_x(sgfn), &smfn_type, NULL, &smfn,
-                 cd, gfn_x(cgfn), &cmfn_type, NULL, &cmfn,
-                 0, &tg);
+    get_two_gfns(sd, sgfn, &smfn_type, NULL, &smfn,
+                 cd, cgfn, &cmfn_type, NULL, &cmfn, 0, &tg);
 
     /* This tricky business is to avoid two callers deadlocking if 
      * grabbing pages in opposite client/source order */
@@ -1027,9 +1026,8 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
     p2m_access_t a;
     struct two_gfns tg;
 
-    get_two_gfns(sd, sgfn, &smfn_type, NULL, &smfn,
-                 cd, cgfn, &cmfn_type, &a, &cmfn,
-                 0, &tg);
+    get_two_gfns(sd, _gfn(sgfn), &smfn_type, NULL, &smfn,
+                 cd, _gfn(cgfn), &cmfn_type, &a, &cmfn, 0, &tg);
 
     /* Get the source shared page, check and lock */
     ret = XENMEM_SHARING_OP_S_HANDLE_INVALID;
