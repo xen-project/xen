@@ -252,7 +252,8 @@ void p2m_flush_hardware_cached_dirty(struct domain *d)
  */
 void p2m_tlb_flush_sync(struct p2m_domain *p2m)
 {
-    if ( p2m->need_flush ) {
+    if ( p2m->need_flush )
+    {
         p2m->need_flush = 0;
         p2m->tlb_flush(p2m);
     }
@@ -263,7 +264,8 @@ void p2m_tlb_flush_sync(struct p2m_domain *p2m)
  */
 void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m)
 {
-    if ( p2m->need_flush ) {
+    if ( p2m->need_flush )
+    {
         p2m->need_flush = 0;
         mm_write_unlock(&p2m->lock);
         p2m->tlb_flush(p2m);
@@ -304,7 +306,7 @@ mfn_t p2m_get_gfn_type_access(struct p2m_domain *p2m, gfn_t gfn,
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
     }
 
-    if (unlikely((p2m_is_broken(*t))))
+    if ( unlikely(p2m_is_broken(*t)) )
     {
         /* Return invalid_mfn to avoid caller's access */
         mfn = INVALID_MFN;
@@ -655,6 +657,7 @@ p2m_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
                    mfn_x(omfn), ot, a,
                    mfn_x(mfn) + i, t, p2m->default_access);
             domain_crash(d);
+
             return -EPERM;
         }
         else if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
@@ -774,7 +777,7 @@ out:
  * Resets the access permissions.
  */
 int p2m_change_type_one(struct domain *d, unsigned long gfn_l,
-                       p2m_type_t ot, p2m_type_t nt)
+                        p2m_type_t ot, p2m_type_t nt)
 {
     p2m_access_t a;
     p2m_type_t pt;
@@ -907,6 +910,7 @@ void p2m_change_type_range(struct domain *d,
         unsigned int i;
 
         for ( i = 0; i < MAX_ALTP2M; i++ )
+        {
             if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
             {
                 struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
@@ -915,6 +919,7 @@ void p2m_change_type_range(struct domain *d,
                 change_type_range(altp2m, start, end, ot, nt);
                 p2m_unlock(altp2m);
             }
+        }
     }
     hostp2m->defer_nested_flush = false;
     if ( nestedhvm_enabled(d) )
@@ -978,6 +983,7 @@ int p2m_finish_type_change(struct domain *d,
         unsigned int i;
 
         for ( i = 0; i < MAX_ALTP2M; i++ )
+        {
             if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
             {
                 struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
@@ -989,6 +995,7 @@ int p2m_finish_type_change(struct domain *d,
                 if ( rc < 0 )
                     goto out;
             }
+        }
     }
 
  out:
@@ -1311,7 +1318,7 @@ static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
 {
     struct list_head *lru_list = &p2m_get_hostp2m(d)->np2m_list;
-    
+
     ASSERT(!list_empty(lru_list));
 
     if ( p2m == NULL )
@@ -1458,13 +1465,12 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
     /* Mask out low bits; this avoids collisions with P2M_BASE_EADDR */
     np2m_base &= ~(0xfffULL);
 
-    if (nv->nv_flushp2m && nv->nv_p2m) {
+    if ( nv->nv_flushp2m && nv->nv_p2m )
         nv->nv_p2m = NULL;
-    }
 
     nestedp2m_lock(d);
     p2m = nv->nv_p2m;
-    if ( p2m ) 
+    if ( p2m )
     {
         p2m_lock(p2m);
         if ( p2m->np2m_base == np2m_base )
@@ -1522,7 +1528,7 @@ struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v)
 struct p2m_domain *
 p2m_get_p2m(struct vcpu *v)
 {
-    if (!nestedhvm_is_n2(v))
+    if ( !nestedhvm_is_n2(v) )
         return p2m_get_hostp2m(v->domain);
 
     return p2m_get_nestedp2m(v);
@@ -2203,8 +2209,8 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
 #if P2M_AUDIT
 void audit_p2m(struct domain *d,
                uint64_t *orphans,
-                uint64_t *m2p_bad,
-                uint64_t *p2m_bad)
+               uint64_t *m2p_bad,
+               uint64_t *p2m_bad)
 {
     struct page_info *page;
     struct domain *od;
@@ -2223,7 +2229,7 @@ void audit_p2m(struct domain *d,
     p2m_lock(p2m);
     pod_lock(p2m);
 
-    if (p2m->audit_p2m)
+    if ( p2m->audit_p2m )
         pmbad = p2m->audit_p2m(p2m);
 
     /* Audit part two: walk the domain's page allocation list, checking
@@ -2249,14 +2255,14 @@ void audit_p2m(struct domain *d,
         {
             orphans_count++;
             P2M_PRINTK("orphaned guest page: mfn=%#lx has invalid gfn\n",
-                           mfn);
+                       mfn);
             continue;
         }
 
         if ( SHARED_M2P(gfn) )
         {
             P2M_PRINTK("shared mfn (%lx) on domain page list!\n",
-                    mfn);
+                       mfn);
             continue;
         }
 
@@ -2278,13 +2284,13 @@ void audit_p2m(struct domain *d,
         p2m_put_gfn(p2m, _gfn(gfn));
 
         P2M_PRINTK("OK: mfn=%#lx, gfn=%#lx, p2mfn=%#lx\n",
-                       mfn, gfn, mfn_x(p2mfn));
+                   mfn, gfn, mfn_x(p2mfn));
     }
     spin_unlock(&d->page_alloc_lock);
 
     pod_unlock(p2m);
     p2m_unlock(p2m);
- 
+
     P2M_PRINTK("p2m audit complete\n");
     if ( orphans_count | mpbad | pmbad )
         P2M_PRINTK("p2m audit found %lu orphans\n", orphans_count);
