@@ -245,7 +245,7 @@ can allow more efficient aggregate use of memory across VMs.
 
 ### Alternative p2m
 
-Allows external monitoring of hypervisor memory
+Alternative p2m (altp2m) allows external monitoring of guest memory
 by maintaining multiple physical to machine (p2m) memory mappings.
 
     Status, x86 HVM: Tech Preview
