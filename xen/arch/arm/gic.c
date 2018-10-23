@@ -359,7 +359,6 @@ void gic_disable_cpu(void)
 
 static void do_sgi(struct cpu_user_regs *regs, enum gic_sgi sgi)
 {
-    /* Lower the priority */
     struct irq_desc *desc = irq_to_desc(sgi);
 
     perfc_incr(ipis);
