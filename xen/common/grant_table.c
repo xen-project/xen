@@ -3869,8 +3869,7 @@ static int gnttab_get_shared_frame_mfn(struct domain *d,
     return 0;
 }
 
-int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
-                     mfn_t *mfn)
+int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
 {
     int rc = 0;
     struct grant_table *gt = d->grant_table;
@@ -3878,8 +3877,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
 
     grant_write_lock(gt);
 
-    if ( gt->gt_version == 2 &&
-         (idx & XENMAPIDX_grant_table_status) )
+    if ( gt->gt_version == 2 && (idx & XENMAPIDX_grant_table_status) )
     {
         idx &= ~XENMAPIDX_grant_table_status;
         status = true;
@@ -3889,10 +3887,13 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn,
     else
         rc = gnttab_get_shared_frame_mfn(d, idx, mfn);
 
-    if ( !rc && paging_mode_translate(d) &&
-         !gfn_eq(gnttab_get_frame_gfn(gt, status, idx), INVALID_GFN) )
-        rc = guest_physmap_remove_page(d, gnttab_get_frame_gfn(gt, status, idx),
-                                       *mfn, 0);
+    if ( !rc && paging_mode_translate(d) )
+    {
+        gfn_t gfn = gnttab_get_frame_gfn(gt, status, idx);
+
+        if ( !gfn_eq(gfn, INVALID_GFN) )
+            rc = guest_physmap_remove_page(d, gfn, *mfn, 0);
+    }
 
     if ( !rc )
         gnttab_set_frame_gfn(gt, status, idx, gfn);
