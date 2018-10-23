@@ -1691,7 +1691,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     int rc, fall_through = 0, paged = 0;
     int sharing_enomem = 0;
     vm_event_request_t *req_ptr = NULL;
-    bool_t ap2m_active, sync = 0;
+    bool sync = false;
     unsigned int page_order;
 
     /* On Nested Virtualization, walk the guest page table.
@@ -1750,8 +1750,6 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         goto out;
     }
 
-    ap2m_active = altp2m_active(currd);
-
     /*
      * Take a lock on the host p2m speculatively, to avoid potential
      * locking order problems later and to handle unshare etc.
@@ -1761,7 +1759,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                               P2M_ALLOC | (npfec.write_access ? P2M_UNSHARE : 0),
                               &page_order);
 
-    if ( ap2m_active )
+    if ( altp2m_active(currd) )
     {
         p2m = p2m_get_altp2m(curr);
 
@@ -1888,13 +1886,14 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         {
             paging_mark_pfn_dirty(currd, _pfn(gfn));
             /*
-             * If p2m is really an altp2m, unlock here to avoid lock ordering
-             * violation when the change below is propagated from host p2m.
+             * If p2m is really an altp2m, unlock it before changing the type,
+             * as p2m_altp2m_propagate_change() needs to acquire the
+             * altp2m_list lock.
              */
-            if ( ap2m_active )
+            if ( p2m != hostp2m )
                 __put_gfn(p2m, gfn);
             p2m_change_type_one(currd, gfn, p2m_ram_logdirty, p2m_ram_rw);
-            __put_gfn(ap2m_active ? hostp2m : p2m, gfn);
+            __put_gfn(hostp2m, gfn);
 
             goto out;
         }
@@ -1915,9 +1914,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     rc = fall_through;
 
  out_put_gfn:
-    __put_gfn(p2m, gfn);
-    if ( ap2m_active )
-        __put_gfn(hostp2m, gfn);
+    if ( p2m != hostp2m )
+        __put_gfn(p2m, gfn);
+    __put_gfn(hostp2m, gfn);
  out:
     /* All of these are delayed until we exit, since we might 
      * sleep on event ring wait queues, and we must not hold
