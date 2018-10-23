@@ -984,6 +984,12 @@ static void gicv3_send_sgi_list(enum gic_sgi sgi, const cpumask_t *cpumask)
 static void gicv3_send_sgi(enum gic_sgi sgi, enum gic_sgi_mode mode,
                            const cpumask_t *cpumask)
 {
+    /*
+     * Ensure that stores to Normal memory are visible to the other CPUs
+     * before issuing the IPI.
+     */
+    dsb(st);
+
     switch ( mode )
     {
     case SGI_TARGET_OTHERS:
