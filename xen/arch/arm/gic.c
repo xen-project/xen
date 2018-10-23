@@ -294,6 +294,11 @@ void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)
 {
     ASSERT(sgi < 16); /* There are only 16 SGIs */
 
+   /*
+    * Ensure that stores to Normal memory are visible to the other CPUs
+    * before issuing the IPI.
+    * Matches the read barrier in do_sgi.
+    */
     dsb(sy);
     gic_hw_ops->send_SGI(sgi, SGI_TARGET_LIST, cpumask);
 }
@@ -307,6 +312,11 @@ void send_SGI_self(enum gic_sgi sgi)
 {
     ASSERT(sgi < 16); /* There are only 16 SGIs */
 
+   /*
+    * Ensure that stores to Normal memory are visible to the other CPUs
+    * before issuing the IPI.
+    * Matches the read barrier in do_sgi.
+    */
     dsb(sy);
     gic_hw_ops->send_SGI(sgi, SGI_TARGET_SELF, NULL);
 }
@@ -315,6 +325,11 @@ void send_SGI_allbutself(enum gic_sgi sgi)
 {
    ASSERT(sgi < 16); /* There are only 16 SGIs */
 
+   /*
+    * Ensure that stores to Normal memory are visible to the other CPUs
+    * before issuing the IPI.
+    * Matches the read barrier in do_sgi.
+    */
    dsb(sy);
    gic_hw_ops->send_SGI(sgi, SGI_TARGET_OTHERS, NULL);
 }
@@ -349,6 +364,13 @@ static void do_sgi(struct cpu_user_regs *regs, enum gic_sgi sgi)
 
     /* Lower the priority */
     gic_hw_ops->eoi_irq(desc);
+
+    /*
+     * Ensure any shared data written by the CPU sending
+     * the IPI is read after we've read the ACK register on the GIC.
+     * Matches the write barrier in send_SGI_* helpers.
+     */
+    smp_rmb();
 
     switch (sgi)
     {
