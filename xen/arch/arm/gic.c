@@ -706,6 +706,7 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
         if ( likely(irq >= 16 && irq < 1020) )
         {
             local_irq_enable();
+            isb();
             do_IRQ(regs, irq, is_fiq);
             local_irq_disable();
         }
