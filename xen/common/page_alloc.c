@@ -146,6 +146,7 @@
 #include <asm/guest.h>
 #include <asm/p2m.h>
 #include <asm/setup.h> /* for highmem_start only */
+#include <asm/paging.h>
 #else
 #define p2m_pod_offline_or_broken_hit(pg) 0
 #define p2m_pod_offline_or_broken_replace(pg) BUG_ON(pg != NULL)
@@ -2508,6 +2509,42 @@ static __init int register_heap_trigger(void)
     return 0;
 }
 __initcall(register_heap_trigger);
+
+struct domain *get_pg_owner(domid_t domid)
+{
+    struct domain *pg_owner = NULL, *curr = current->domain;
+
+    if ( likely(domid == DOMID_SELF) )
+    {
+        pg_owner = rcu_lock_current_domain();
+        goto out;
+    }
+
+    if ( unlikely(domid == curr->domain_id) )
+    {
+        gdprintk(XENLOG_WARNING, "Cannot specify itself as foreign domain\n");
+        goto out;
+    }
+
+    switch ( domid )
+    {
+    case DOMID_IO:
+        pg_owner = rcu_lock_domain(dom_io);
+        break;
+
+    case DOMID_XEN:
+        pg_owner = rcu_lock_domain(dom_xen);
+        break;
+
+    default:
+        if ( (pg_owner = rcu_lock_domain_by_id(domid)) == NULL )
+            gdprintk(XENLOG_WARNING, "Unknown domain d%d\n", domid);
+        break;
+    }
+
+ out:
+    return pg_owner;
+}
 
 /*
  * Local variables:

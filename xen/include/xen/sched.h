@@ -599,6 +599,14 @@ static inline struct domain *rcu_lock_current_domain(void)
 }
 
 struct domain *get_domain_by_id(domid_t dom);
+
+struct domain *get_pg_owner(domid_t domid);
+
+static inline void put_pg_owner(struct domain *pg_owner)
+{
+    rcu_unlock_domain(pg_owner);
+}
+
 void domain_destroy(struct domain *d);
 int domain_kill(struct domain *d);
 int domain_shutdown(struct domain *d, u8 reason);
