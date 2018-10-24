@@ -17,10 +17,6 @@
 struct grant_table_arch {
 };
 
-/*
- * Caller must own caller's BIGLOCK, is responsible for flushing the TLB, and
- * must hold a reference to the page.
- */
 static inline int create_grant_host_mapping(uint64_t addr, mfn_t frame,
                                             unsigned int flags,
                                             unsigned int cache_flags)
@@ -62,7 +58,7 @@ static inline int replace_grant_host_mapping(uint64_t addr, mfn_t frame,
 #define gnttab_status_gmfn(d, t, i)                     \
     (mfn_to_gmfn(d, gnttab_status_mfn(t, i)))
 
-#define gnttab_mark_dirty(d, f) paging_mark_dirty((d), f)
+#define gnttab_mark_dirty(d, f) paging_mark_dirty(d, f)
 
 static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
 {
@@ -70,10 +66,10 @@ static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
      * Note that this cannot be clear_bit(), as the access must be
      * confined to the specified 2 bytes.
      */
-    asm volatile ("lock btrw %w1,%0" : "=m" (*st) : "Ir" (nr), "m" (*st));
+    asm volatile ("lock btrw %w1,%0" : "+m" (*st) : "Ir" (nr));
 }
 
-/* Foreign mappings of HHVM-guest pages do not modify the type count. */
+/* Foreign mappings of HVM-guest pages do not modify the type count. */
 #define gnttab_host_mapping_get_page_type(ro, ld, rd)   \
     (!(ro) && (((ld) == (rd)) || !paging_mode_external(rd)))
 

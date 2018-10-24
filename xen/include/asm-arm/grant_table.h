@@ -54,10 +54,8 @@ void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
 
 #define gnttab_destroy_arch(gt)                                          \
     do {                                                                 \
-        xfree((gt)->arch.shared_gfn);                                    \
-        (gt)->arch.shared_gfn = NULL;                                    \
-        xfree((gt)->arch.status_gfn);                                    \
-        (gt)->arch.status_gfn = NULL;                                    \
+        XFREE((gt)->arch.shared_gfn);                                    \
+        XFREE((gt)->arch.status_gfn);                                    \
     } while ( 0 )
 
 #define gnttab_set_frame_gfn(gt, st, idx, gfn)                           \
