@@ -71,18 +71,6 @@ void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
              : gnttab_shared_gmfn(NULL, gt, idx));                       \
 })
 
-#define gnttab_create_shared_page(d, t, i)                               \
-    do {                                                                 \
-        share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->shared_raw[i]), d, SHARE_rw);      \
-    } while ( 0 )
-
-#define gnttab_create_status_page(d, t, i)                               \
-    do {                                                                 \
-        share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->status[i]), d, SHARE_rw);          \
-    } while ( 0 )
-
 #define gnttab_shared_gmfn(d, t, i)                                      \
     gfn_x(((i) >= nr_grant_frames(t)) ? INVALID_GFN : (t)->arch.shared_gfn[i])
 

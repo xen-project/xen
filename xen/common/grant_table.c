@@ -1635,7 +1635,7 @@ gnttab_populate_status_frames(struct domain *d, struct grant_table *gt,
     }
     /* Share the new status frames with the recipient domain */
     for ( i = nr_status_frames(gt); i < req_status_frames; i++ )
-        gnttab_create_status_page(d, gt, i);
+        share_xen_page_with_guest(virt_to_page(gt->status[i]), d, SHARE_rw);
 
     gt->nr_status_frames = req_status_frames;
 
@@ -1702,7 +1702,8 @@ gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
                 if ( get_page(pg, d) )
                     set_bit(_PGC_allocated, &pg->count_info);
                 while ( i-- )
-                    gnttab_create_status_page(d, gt, i);
+                    share_xen_page_with_guest(virt_to_page(gt->status[i]),
+                                              d, SHARE_rw);
             }
             return -EBUSY;
         }
@@ -1773,7 +1774,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
 
     /* Share the new shared frames with the recipient domain */
     for ( i = nr_grant_frames(gt); i < req_nr_frames; i++ )
-        gnttab_create_shared_page(d, gt, i);
+        share_xen_page_with_guest(virt_to_page(gt->shared_raw[i]), d, SHARE_rw);
     gt->nr_grant_frames = req_nr_frames;
 
     return 0;

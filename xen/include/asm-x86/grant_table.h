@@ -49,19 +49,6 @@ static inline int replace_grant_host_mapping(uint64_t addr, mfn_t frame,
     VALID_M2P(gpfn_) ? _gfn(gpfn_) : INVALID_GFN;                        \
 })
 
-#define gnttab_create_shared_page(d, t, i)                               \
-    do {                                                                 \
-        share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->shared_raw[i]), d, SHARE_rw);      \
-    } while ( 0 )
-
-#define gnttab_create_status_page(d, t, i)                               \
-    do {                                                                 \
-        share_xen_page_with_guest(                                       \
-            virt_to_page((char *)(t)->status[i]), d, SHARE_rw);          \
-    } while ( 0 )
-
-
 #define gnttab_shared_mfn(t, i)                         \
     ((virt_to_maddr((t)->shared_raw[i]) >> PAGE_SHIFT))
 
