@@ -283,9 +283,9 @@ SEABIOS_UPSTREAM_REVISION ?= rel-1.11.1
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= 9c0eed618f37dd5b4a57c8b3fbc48ef8913e3149
-# Wed Aug 15 17:38:18 2018 +0100
-# qemu-trad: stop using the default IOREQ server
+QEMU_TRADITIONAL_REVISION ?= d0d8ad39ecb51cd7497cd524484fe09f50876798
+# Wed Oct 10 18:52:54 2018 +0000
+# xen/pt: allow QEMU to request MSI unmasking at bind time
 
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
