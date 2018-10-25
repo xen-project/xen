@@ -429,6 +429,8 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     INIT_LIST_HEAD(&v->arch.hvm.vmx.pi_blocking.list);
 
+    vcpu_2_nvmx(v).vmxon_region_pa = INVALID_PADDR;
+
     if ( (rc = vmx_create_vmcs(v)) != 0 )
     {
         dprintk(XENLOG_WARNING,

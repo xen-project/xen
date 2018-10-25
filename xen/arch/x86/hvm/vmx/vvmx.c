@@ -1987,7 +1987,8 @@ int nvmx_handle_vmx_insn(struct cpu_user_regs *regs, unsigned int exit_reason)
 
     if ( !(curr->arch.hvm.guest_cr[4] & X86_CR4_VMXE) ||
          !nestedhvm_enabled(curr->domain) ||
-         (vmx_guest_x86_mode(curr) < (hvm_long_mode_active(curr) ? 8 : 2)) )
+         (vmx_guest_x86_mode(curr) < (hvm_long_mode_active(curr) ? 8 : 2)) ||
+         (exit_reason != EXIT_REASON_VMXON && !nvmx_vcpu_in_vmx(curr)) )
     {
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return X86EMUL_EXCEPTION;
@@ -1997,6 +1998,14 @@ int nvmx_handle_vmx_insn(struct cpu_user_regs *regs, unsigned int exit_reason)
     {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
+    }
+
+    if ( nestedhvm_vcpu_in_guestmode(curr) )
+    {
+        /* Should have been handled by nvmx_n2_vmexit_handler()... */
+        ASSERT_UNREACHABLE();
+        domain_crash(curr->domain);
+        return X86EMUL_UNHANDLEABLE;
     }
 
     switch ( exit_reason )
