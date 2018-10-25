@@ -2383,6 +2383,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_TRIPLE_FAULT:
     case EXIT_REASON_TASK_SWITCH:
     case EXIT_REASON_CPUID:
+    case EXIT_REASON_GETSEC:
+    case EXIT_REASON_INVD:
     case EXIT_REASON_VMCALL:
     case EXIT_REASON_VMCLEAR:
     case EXIT_REASON_VMLAUNCH:
@@ -2395,6 +2397,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_VMXON:
     case EXIT_REASON_INVEPT:
     case EXIT_REASON_XSETBV:
+    case EXIT_REASON_INVVPID:
         /* inject to L1 */
         nvcpu->nv_vmexit_pending = 1;
         break;
