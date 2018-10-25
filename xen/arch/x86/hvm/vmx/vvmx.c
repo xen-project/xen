@@ -377,57 +377,15 @@ static inline u32 __n2_secondary_exec_control(struct vcpu *v)
     return second_ctrl;
 }
 
-static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
-{
-    struct vcpu *v = current;
-
-    if ( vmxop_check )
-    {
-        if ( !(v->arch.hvm.guest_cr[0] & X86_CR0_PE) ||
-             !(v->arch.hvm.guest_cr[4] & X86_CR4_VMXE) )
-            goto invalid_op;
-    }
-    else if ( !nvmx_vcpu_in_vmx(v) )
-        goto invalid_op;
-
-    if ( vmx_guest_x86_mode(v) < (hvm_long_mode_active(v) ? 8 : 2) )
-        goto invalid_op;
-    else if ( nestedhvm_vcpu_in_guestmode(v) )
-        goto vmexit;
-
-    if ( vmx_get_cpl() > 0 )
-        goto gp_fault;
-
-    return X86EMUL_OKAY;
-
-vmexit:
-    gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: vmexit\n");
-    vcpu_nestedhvm(v).nv_vmexit_pending = 1;
-    return X86EMUL_EXCEPTION;
-    
-invalid_op:
-    gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: invalid_op\n");
-    hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
-    return X86EMUL_EXCEPTION;
-
-gp_fault:
-    gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: gp_fault\n");
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
-    return X86EMUL_EXCEPTION;
-}
-
 static int decode_vmx_inst(struct cpu_user_regs *regs,
                            struct vmx_inst_decoded *decode,
-                           unsigned long *poperandS, int vmxon_check)
+                           unsigned long *poperandS)
 {
     struct vcpu *v = current;
     union vmx_inst_info info;
     struct segment_register seg;
     unsigned long base, index, seg_base, disp, offset;
     int scale, size;
-
-    if ( vmx_inst_check_privilege(regs, vmxon_check) != X86EMUL_OKAY )
-        return X86EMUL_EXCEPTION;
 
     __vmread(VMX_INSTRUCTION_INFO, &offset);
     info.word = offset;
@@ -1480,7 +1438,7 @@ static int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     uint32_t nvmcs_revid;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa, 1);
+    rc = decode_vmx_inst(regs, &decode, &gpa);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1526,11 +1484,6 @@ static int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
 {
     struct vcpu *v=current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
-    int rc;
-
-    rc = vmx_inst_check_privilege(regs, 0);
-    if ( rc != X86EMUL_OKAY )
-        return rc;
 
     nvmx_purge_vvmcs(v);
     nvmx->vmxon_region_pa = INVALID_PADDR;
@@ -1617,10 +1570,6 @@ static int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long intr_shadow;
-    int rc = vmx_inst_check_privilege(regs, 0);
-
-    if ( rc != X86EMUL_OKAY )
-        return rc;
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
     {
@@ -1651,10 +1600,7 @@ static int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long intr_shadow;
-    int rc = vmx_inst_check_privilege(regs, 0);
-
-    if ( rc != X86EMUL_OKAY )
-        return rc;
+    int rc;
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
     {
@@ -1696,7 +1642,7 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
     unsigned long gpa = 0;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa, 0);
+    rc = decode_vmx_inst(regs, &decode, &gpa);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1768,7 +1714,7 @@ static int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     unsigned long gpa = 0;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa, 0);
+    rc = decode_vmx_inst(regs, &decode, &gpa);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1794,7 +1740,7 @@ static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     void *vvmcs;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa, 0);
+    rc = decode_vmx_inst(regs, &decode, &gpa);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1844,7 +1790,7 @@ static int nvmx_handle_vmread(struct cpu_user_regs *regs)
     u64 value = 0;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, NULL, 0);
+    rc = decode_vmx_inst(regs, &decode, NULL);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1887,8 +1833,7 @@ static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     bool_t okay = 1;
     enum vmx_insn_errno err;
 
-    if ( decode_vmx_inst(regs, &decode, &operand, 0)
-             != X86EMUL_OKAY )
+    if ( decode_vmx_inst(regs, &decode, &operand) != X86EMUL_OKAY )
         return X86EMUL_EXCEPTION;
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == INVALID_PADDR )
@@ -1932,7 +1877,7 @@ static int nvmx_handle_invept(struct cpu_user_regs *regs)
     unsigned long eptp;
     int ret;
 
-    if ( (ret = decode_vmx_inst(regs, &decode, &eptp, 0)) != X86EMUL_OKAY )
+    if ( (ret = decode_vmx_inst(regs, &decode, &eptp)) != X86EMUL_OKAY )
         return ret;
 
     switch ( reg_read(regs, decode.reg2) )
@@ -1960,7 +1905,7 @@ static int nvmx_handle_invvpid(struct cpu_user_regs *regs)
     unsigned long vpid;
     int ret;
 
-    if ( (ret = decode_vmx_inst(regs, &decode, &vpid, 0)) != X86EMUL_OKAY )
+    if ( (ret = decode_vmx_inst(regs, &decode, &vpid)) != X86EMUL_OKAY )
         return ret;
 
     switch ( reg_read(regs, decode.reg2) )
