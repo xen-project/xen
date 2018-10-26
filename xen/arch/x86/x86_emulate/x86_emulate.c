@@ -650,7 +650,7 @@ union evex {
         uint8_t w:1;
         uint8_t opmsk:3;
         uint8_t RX:1;
-        uint8_t bcst:1;
+        uint8_t br:1;
         uint8_t lr:2;
         uint8_t z:1;
     };
@@ -2760,13 +2760,11 @@ x86_decode(
                         evex.raw[1] = vex.raw[1];
                         evex.raw[2] = insn_fetch_type(uint8_t);
 
-                        generate_exception_if(evex.mbs || !evex.mbz, EXC_UD);
+                        generate_exception_if(!evex.mbs || evex.mbz, EXC_UD);
+                        generate_exception_if(!evex.opmsk && evex.z, EXC_UD);
 
                         if ( !mode_64bit() )
-                        {
-                            generate_exception_if(!evex.RX, EXC_UD);
                             evex.R = 1;
-                        }
 
                         vex.opcx = evex.opcx;
                         break;
@@ -3404,6 +3402,7 @@ x86_emulate(
         d = (d & ~DstMask) | DstMem;
         /* Becomes a normal DstMem operation from here on. */
     case DstMem:
+        generate_exception_if(ea.type == OP_MEM && evex.z, EXC_UD);
         if ( state->simd_size )
         {
             generate_exception_if(lock_prefix, EXC_UD);
