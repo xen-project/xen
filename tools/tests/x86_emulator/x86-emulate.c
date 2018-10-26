@@ -209,6 +209,9 @@ int emul_test_get_fpu(
     case X86EMUL_FPU_ymm:
         if ( cpu_has_avx )
             break;
+    case X86EMUL_FPU_opmask:
+        if ( cpu_has_avx512f )
+            break;
     default:
         return X86EMUL_UNHANDLEABLE;
     }

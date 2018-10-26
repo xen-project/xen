@@ -491,6 +491,7 @@ static const struct ext0f3a_table {
     [0x20] = { .simd_size = simd_none },
     [0x21] = { .simd_size = simd_other },
     [0x22] = { .simd_size = simd_none },
+    [0x30 ... 0x33] = { .simd_size = simd_other, .two_op = 1 },
     [0x38] = { .simd_size = simd_128 },
     [0x39] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
@@ -1187,6 +1188,11 @@ static int _get_fpu(
             return X86EMUL_UNHANDLEABLE;
         break;
 
+    case X86EMUL_FPU_opmask:
+        if ( !(xcr0 & X86_XCR0_SSE) || !(xcr0 & X86_XCR0_OPMASK) )
+            return X86EMUL_UNHANDLEABLE;
+        break;
+
     default:
         break;
     }
@@ -1762,12 +1768,15 @@ static bool vcpu_has(
 #define vcpu_has_bmi2()        vcpu_has(         7, EBX,  8, ctxt, ops)
 #define vcpu_has_rtm()         vcpu_has(         7, EBX, 11, ctxt, ops)
 #define vcpu_has_mpx()         vcpu_has(         7, EBX, 14, ctxt, ops)
+#define vcpu_has_avx512f()     vcpu_has(         7, EBX, 16, ctxt, ops)
+#define vcpu_has_avx512dq()    vcpu_has(         7, EBX, 17, ctxt, ops)
 #define vcpu_has_rdseed()      vcpu_has(         7, EBX, 18, ctxt, ops)
 #define vcpu_has_adx()         vcpu_has(         7, EBX, 19, ctxt, ops)
 #define vcpu_has_smap()        vcpu_has(         7, EBX, 20, ctxt, ops)
 #define vcpu_has_clflushopt()  vcpu_has(         7, EBX, 23, ctxt, ops)
 #define vcpu_has_clwb()        vcpu_has(         7, EBX, 24, ctxt, ops)
 #define vcpu_has_sha()         vcpu_has(         7, EBX, 29, ctxt, ops)
+#define vcpu_has_avx512bw()    vcpu_has(         7, EBX, 30, ctxt, ops)
 #define vcpu_has_rdpid()       vcpu_has(         7, ECX, 22, ctxt, ops)
 #define vcpu_has_clzero()      vcpu_has(0x80000008, EBX,  0, ctxt, ops)
 
@@ -2394,6 +2403,18 @@ x86_decode_twobyte(
             /* Avoid the state->desc clobbering of TwoOp below. */
             return X86EMUL_OKAY;
         }
+        break;
+
+    case X86EMUL_OPC_VEX(0, 0x90):    /* kmov{w,q} */
+    case X86EMUL_OPC_VEX_66(0, 0x90): /* kmov{b,d} */
+        state->desc = DstReg | SrcMem | Mov;
+        state->simd_size = simd_other;
+        break;
+
+    case X86EMUL_OPC_VEX(0, 0x91):    /* kmov{w,q} */
+    case X86EMUL_OPC_VEX_66(0, 0x91): /* kmov{b,d} */
+        state->desc = DstMem | SrcReg | Mov;
+        state->simd_size = simd_other;
         break;
 
     case 0xae:
@@ -6002,6 +6023,60 @@ x86_emulate(
             dst.val = src.val;
         break;
 
+    case X86EMUL_OPC_VEX(0x0f, 0x4a):    /* kadd{w,q} k,k,k */
+        if ( !vex.w )
+            host_and_vcpu_must_have(avx512dq);
+        /* fall through */
+    case X86EMUL_OPC_VEX(0x0f, 0x41):    /* kand{w,q} k,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x41): /* kand{b,d} k,k,k */
+    case X86EMUL_OPC_VEX(0x0f, 0x42):    /* kandn{w,q} k,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x42): /* kandn{b,d} k,k,k */
+    case X86EMUL_OPC_VEX(0x0f, 0x45):    /* kor{w,q} k,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x45): /* kor{b,d} k,k,k */
+    case X86EMUL_OPC_VEX(0x0f, 0x46):    /* kxnor{w,q} k,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x46): /* kxnor{b,d} k,k,k */
+    case X86EMUL_OPC_VEX(0x0f, 0x47):    /* kxor{w,q} k,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x47): /* kxor{b,d} k,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x4a): /* kadd{b,d} k,k,k */
+        generate_exception_if(!vex.l, EXC_UD);
+    opmask_basic:
+        if ( vex.w )
+            host_and_vcpu_must_have(avx512bw);
+        else if ( vex.pfx )
+            host_and_vcpu_must_have(avx512dq);
+    opmask_common:
+        host_and_vcpu_must_have(avx512f);
+        generate_exception_if(!vex.r || (mode_64bit() && !(vex.reg & 8)) ||
+                              ea.type != OP_REG, EXC_UD);
+
+        vex.reg |= 8;
+        d &= ~TwoOp;
+
+        get_fpu(X86EMUL_FPU_opmask);
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        insn_bytes = PFX_BYTES + 2;
+
+        state->simd_size = simd_other;
+        op_bytes = 1; /* Any non-zero value will do. */
+        break;
+
+    case X86EMUL_OPC_VEX(0x0f, 0x44):    /* knot{w,q} k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x44): /* knot{b,d} k,k */
+        generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
+        goto opmask_basic;
+
+    case X86EMUL_OPC_VEX(0x0f, 0x4b):    /* kunpck{w,d}{d,q} k,k,k */
+        generate_exception_if(!vex.l, EXC_UD);
+        host_and_vcpu_must_have(avx512bw);
+        goto opmask_common;
+
+    case X86EMUL_OPC_VEX_66(0x0f, 0x4b): /* kunpckbw k,k,k */
+        generate_exception_if(!vex.l || vex.w, EXC_UD);
+        goto opmask_common;
+
     CASE_SIMD_PACKED_FP(, 0x0f, 0x50):     /* movmskp{s,d} xmm,reg */
     CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x50): /* vmovmskp{s,d} {x,y}mm,reg */
     CASE_SIMD_PACKED_INT(0x0f, 0xd7):      /* pmovmskb {,x}mm,reg */
@@ -6550,6 +6625,154 @@ x86_emulate(
 
     case X86EMUL_OPC(0x0f, 0x90) ... X86EMUL_OPC(0x0f, 0x9f): /* setcc */
         dst.val = test_cc(b, _regs.eflags);
+        break;
+
+    case X86EMUL_OPC_VEX(0x0f, 0x91):    /* kmov{w,q} k,mem */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x91): /* kmov{b,d} k,mem */
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_VEX(0x0f, 0x90):    /* kmov{w,q} k/mem,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x90): /* kmov{b,d} k/mem,k */
+        generate_exception_if(vex.l || !vex.r, EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        if ( vex.w )
+        {
+            host_and_vcpu_must_have(avx512bw);
+            op_bytes = 4 << !vex.pfx;
+        }
+        else if ( vex.pfx )
+        {
+            host_and_vcpu_must_have(avx512dq);
+            op_bytes = 1;
+        }
+        else
+            op_bytes = 2;
+
+        get_fpu(X86EMUL_FPU_opmask);
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        if ( ea.type == OP_MEM )
+        {
+            /* convert memory operand to (%rAX) */
+            vex.b = 1;
+            opc[1] &= 0x38;
+        }
+        insn_bytes = PFX_BYTES + 2;
+        break;
+
+    case X86EMUL_OPC_VEX(0x0f, 0x92):    /* kmovw r32,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x92): /* kmovb r32,k */
+    case X86EMUL_OPC_VEX_F2(0x0f, 0x92): /* kmov{d,q} reg,k */
+        generate_exception_if(vex.l || !vex.r || vex.reg != 0xf ||
+                              ea.type != OP_REG, EXC_UD);
+
+        host_and_vcpu_must_have(avx512f);
+        if ( vex.pfx == vex_f2 )
+            host_and_vcpu_must_have(avx512bw);
+        else
+        {
+            generate_exception_if(vex.w, EXC_UD);
+            if ( vex.pfx )
+                host_and_vcpu_must_have(avx512dq);
+        }
+
+        get_fpu(X86EMUL_FPU_opmask);
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        /* Convert GPR source to %rAX. */
+        vex.b = 1;
+        if ( !mode_64bit() )
+            vex.w = 0;
+        opc[1] = modrm & 0xf8;
+        opc[2] = 0xc3;
+
+        copy_VEX(opc, vex);
+        ea.reg = decode_gpr(&_regs, modrm_rm);
+        invoke_stub("", "", "=m" (dummy) : "a" (*ea.reg));
+
+        put_stub(stub);
+
+        ASSERT(!state->simd_size);
+        dst.type = OP_NONE;
+        break;
+
+    case X86EMUL_OPC_VEX(0x0f, 0x93):    /* kmovw k,r32 */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x93): /* kmovb k,r32 */
+    case X86EMUL_OPC_VEX_F2(0x0f, 0x93): /* kmov{d,q} k,reg */
+        generate_exception_if(vex.l || vex.reg != 0xf || ea.type != OP_REG,
+                              EXC_UD);
+        dst = ea;
+        dst.reg = decode_gpr(&_regs, modrm_reg);
+
+        host_and_vcpu_must_have(avx512f);
+        if ( vex.pfx == vex_f2 )
+        {
+            host_and_vcpu_must_have(avx512bw);
+            dst.bytes = 4 << (mode_64bit() && vex.w);
+        }
+        else
+        {
+            generate_exception_if(vex.w, EXC_UD);
+            dst.bytes = 4;
+            if ( vex.pfx )
+                host_and_vcpu_must_have(avx512dq);
+        }
+
+        get_fpu(X86EMUL_FPU_opmask);
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        /* Convert GPR destination to %rAX. */
+        vex.r = 1;
+        if ( !mode_64bit() )
+            vex.w = 0;
+        opc[1] = modrm & 0xc7;
+        opc[2] = 0xc3;
+
+        copy_VEX(opc, vex);
+        invoke_stub("", "", "=a" (dst.val) : [dummy] "i" (0));
+
+        put_stub(stub);
+
+        ASSERT(!state->simd_size);
+        break;
+
+    case X86EMUL_OPC_VEX(0x0f, 0x99):    /* ktest{w,q} k,k */
+        if ( !vex.w )
+            host_and_vcpu_must_have(avx512dq);
+        /* fall through */
+    case X86EMUL_OPC_VEX(0x0f, 0x98):    /* kortest{w,q} k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x98): /* kortest{b,d} k,k */
+    case X86EMUL_OPC_VEX_66(0x0f, 0x99): /* ktest{b,d} k,k */
+        generate_exception_if(vex.l || !vex.r || vex.reg != 0xf ||
+                              ea.type != OP_REG, EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        if ( vex.w )
+            host_and_vcpu_must_have(avx512bw);
+        else if ( vex.pfx )
+            host_and_vcpu_must_have(avx512dq);
+
+        get_fpu(X86EMUL_FPU_opmask);
+
+        opc = init_prefixes(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        opc[2] = 0xc3;
+
+        copy_VEX(opc, vex);
+        invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),
+                    _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),
+                    [eflags] "+g" (_regs.eflags),
+                    "=a" (dst.val), [tmp] "=&r" (dummy)
+                    : [mask] "i" (EFLAGS_MASK));
+
+        put_stub(stub);
+
+        ASSERT(!state->simd_size);
+        dst.type = OP_NONE;
         break;
 
     case X86EMUL_OPC(0x0f, 0xa2): /* cpuid */
@@ -8169,6 +8392,23 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x41): /* vdppd $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
         generate_exception_if(vex.l, EXC_UD);
         goto simd_0f_imm8_avx;
+
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x30): /* kshiftr{b,w} $imm8,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x32): /* kshiftl{b,w} $imm8,k,k */
+        if ( !vex.w )
+            host_and_vcpu_must_have(avx512dq);
+    opmask_shift_imm:
+        generate_exception_if(vex.l || !vex.r || vex.reg != 0xf ||
+                              ea.type != OP_REG, EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        get_fpu(X86EMUL_FPU_opmask);
+        op_bytes = 1; /* Any non-zero value will do. */
+        goto simd_0f_imm8;
+
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x31): /* kshiftr{d,q} $imm8,k,k */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x33): /* kshiftl{d,q} $imm8,k,k */
+        host_and_vcpu_must_have(avx512bw);
+        goto opmask_shift_imm;
 
     case X86EMUL_OPC_66(0x0f3a, 0x44):     /* pclmulqdq $imm8,xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x44): /* vpclmulqdq $imm8,xmm/m128,xmm,xmm */

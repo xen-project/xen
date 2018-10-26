@@ -18,6 +18,9 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx2.h"
 #include "avx2-sg.h"
 #include "xop.h"
+#include "avx512f-opmask.h"
+#include "avx512dq-opmask.h"
+#include "avx512bw-opmask.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -77,6 +80,24 @@ static bool simd_check_xop(void)
 {
     return cpu_has_xop;
 }
+
+static bool simd_check_avx512f(void)
+{
+    return cpu_has_avx512f;
+}
+#define simd_check_avx512f_opmask simd_check_avx512f
+
+static bool simd_check_avx512dq(void)
+{
+    return cpu_has_avx512dq;
+}
+#define simd_check_avx512dq_opmask simd_check_avx512dq
+
+static bool simd_check_avx512bw(void)
+{
+    return cpu_has_avx512bw;
+}
+#define simd_check_avx512bw_opmask simd_check_avx512bw
 
 static void simd_set_regs(struct cpu_user_regs *regs)
 {
@@ -223,6 +244,10 @@ static const struct {
     SIMD(XOP i16x16,              xop,      32i2),
     SIMD(XOP i32x8,               xop,      32i4),
     SIMD(XOP i64x4,               xop,      32i8),
+    SIMD(OPMASK/w,     avx512f_opmask,         2),
+    SIMD(OPMASK/b,    avx512dq_opmask,         1),
+    SIMD(OPMASK/d,    avx512bw_opmask,         4),
+    SIMD(OPMASK/q,    avx512bw_opmask,         8),
 #undef SIMD_
 #undef SIMD
 };
@@ -3426,8 +3451,8 @@ int main(int argc, char **argv)
             rc = x86_emulate(&ctxt, &emulops);
             if ( rc != X86EMUL_OKAY )
             {
-                printf("failed at %%eip == %08lx (opcode %08x)\n",
-                       (unsigned long)regs.eip, ctxt.opcode);
+                printf("failed (%d) at %%eip == %08lx (opcode %08x)\n",
+                       rc, (unsigned long)regs.eip, ctxt.opcode);
                 return 1;
             }
         }

@@ -260,6 +260,36 @@ static inline uint64_t xgetbv(uint32_t xcr)
     (res.c & (1U << 21)) != 0; \
 })
 
+#define cpu_has_avx512f ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(1, 0, &res, NULL); \
+    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 0xe6) != 0xe6) ) \
+        res.b = 0; \
+    else \
+        emul_test_cpuid(7, 0, &res, NULL); \
+    (res.b & (1U << 16)) != 0; \
+})
+
+#define cpu_has_avx512dq ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(1, 0, &res, NULL); \
+    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 0xe6) != 0xe6) ) \
+        res.b = 0; \
+    else \
+        emul_test_cpuid(7, 0, &res, NULL); \
+    (res.b & (1U << 17)) != 0; \
+})
+
+#define cpu_has_avx512bw ({ \
+    struct cpuid_leaf res; \
+    emul_test_cpuid(1, 0, &res, NULL); \
+    if ( !(res.c & (1U << 27)) || ((xgetbv(0) & 0xe6) != 0xe6) ) \
+        res.b = 0; \
+    else \
+        emul_test_cpuid(7, 0, &res, NULL); \
+    (res.b & (1U << 30)) != 0; \
+})
+
 int emul_test_cpuid(
     uint32_t leaf,
     uint32_t subleaf,
