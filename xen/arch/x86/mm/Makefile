@@ -2,9 +2,8 @@ subdir-y += shadow
 subdir-$(CONFIG_HVM) += hap
 
 obj-$(CONFIG_HVM) += altp2m.o
-obj-y += guest_walk_2.o
-obj-y += guest_walk_3.o
-obj-y += guest_walk_4.o
+obj-$(CONFIG_HVM) += guest_walk_2.o guest_walk_3.o guest_walk_4.o
+obj-$(CONFIG_SHADOW_PAGING) += guest_walk_2.o guest_walk_3.o guest_walk_4.o
 obj-$(CONFIG_MEM_ACCESS) += mem_access.o
 obj-y += mem_paging.o
 obj-y += mem_sharing.o
