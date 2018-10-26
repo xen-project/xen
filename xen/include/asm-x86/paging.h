@@ -95,7 +95,7 @@ struct shadow_paging_mode {
     void          (*destroy_monitor_table )(struct vcpu *v, mfn_t mmfn);
     int           (*guess_wrmap           )(struct vcpu *v, 
                                             unsigned long vaddr, mfn_t gmfn);
-    void          (*pagetable_dying       )(struct vcpu *v, paddr_t gpa);
+    void          (*pagetable_dying       )(paddr_t gpa);
     void          (*trace_emul_write_val  )(const void *ptr, unsigned long vaddr,
                                             const void *src, unsigned int bytes);
 #endif
@@ -343,9 +343,11 @@ void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
                             l1_pgentry_t *p, l1_pgentry_t new,
                             unsigned int level);
 
-/* Called from the guest to indicate that the a process is being
- * torn down and its pagetables will soon be discarded */
-void pagetable_dying(struct domain *d, paddr_t gpa);
+/*
+ * Called from the guest to indicate that the a process is being
+ * torn down and its pagetables will soon be discarded.
+ */
+void pagetable_dying(paddr_t gpa);
 
 /* Print paging-assistance info to the console */
 void paging_dump_domain_info(struct domain *d);

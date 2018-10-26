@@ -851,15 +851,14 @@ int paging_enable(struct domain *d, u32 mode)
 
 /* Called from the guest to indicate that a process is being torn down
  * and therefore its pagetables will soon be discarded */
-void pagetable_dying(struct domain *d, paddr_t gpa)
+void pagetable_dying(paddr_t gpa)
 {
 #ifdef CONFIG_SHADOW_PAGING
-    struct vcpu *v;
+    struct vcpu *curr = current;
 
-    ASSERT(paging_mode_shadow(d));
+    ASSERT(paging_mode_shadow(curr->domain));
 
-    v = d->vcpu[0];
-    v->arch.paging.mode->shadow.pagetable_dying(v, gpa);
+    curr->arch.paging.mode->shadow.pagetable_dying(gpa);
 #else
     BUG();
 #endif

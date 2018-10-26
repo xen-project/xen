@@ -4920,10 +4920,12 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -ESRCH;
 
         rc = -EINVAL;
-        if ( is_hvm_domain(d) && paging_mode_shadow(d) )
+        if ( unlikely(d != current->domain) )
+            rc = -EOPNOTSUPP;
+        else if ( is_hvm_domain(d) && paging_mode_shadow(d) )
             rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( !rc )
-            pagetable_dying(d, a.gpa);
+            pagetable_dying(a.gpa);
 
         rcu_unlock_domain(d);
         break;

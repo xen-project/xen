@@ -4525,8 +4525,9 @@ int sh_remove_l3_shadow(struct domain *d, mfn_t sl4mfn, mfn_t sl3mfn)
  * and in the meantime we unhook its top-level user-mode entries. */
 
 #if GUEST_PAGING_LEVELS == 3
-static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
+static void sh_pagetable_dying(paddr_t gpa)
 {
+    struct vcpu *v = current;
     struct domain *d = v->domain;
     int i = 0;
     int flush = 0;
@@ -4604,8 +4605,9 @@ out_put_gfn:
     put_gfn(d, l3gfn);
 }
 #else
-static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
+static void sh_pagetable_dying(paddr_t gpa)
 {
+    struct vcpu *v = current;
     struct domain *d = v->domain;
     mfn_t smfn, gmfn;
     p2m_type_t p2mt;
