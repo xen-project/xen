@@ -46,6 +46,10 @@ static inline bool _to_bool(byte_vec_t bv)
 # define to_bool(cmp) _to_bool((byte_vec_t)(cmp))
 #endif
 
+#ifndef eq
+# define eq(x, y) to_bool((x) == (y))
+#endif
+
 #if VEC_SIZE == FLOAT_SIZE
 # define to_int(x) ((vec_t){ (int)(x)[0] })
 #elif VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW__)
@@ -605,18 +609,18 @@ int simd_test(void)
     touch(src);
     x = src;
     touch(x);
-    if ( !to_bool(x == src) ) return __LINE__;
+    if ( !eq(x, src) ) return __LINE__;
 
     touch(src);
     y = x + src;
     touch(src);
     touch(y);
-    if ( !to_bool(y == 2 * src) ) return __LINE__;
+    if ( !eq(y, 2 * src) ) return __LINE__;
 
     touch(src);
     z = y -= src;
     touch(z);
-    if ( !to_bool(x == z) ) return __LINE__;
+    if ( !eq(x, z) ) return __LINE__;
 
 #if defined(UINT_SIZE)
 
@@ -628,7 +632,7 @@ int simd_test(void)
     z ^= inv;
     touch(inv);
     touch(x);
-    if ( !to_bool((x & ~y) == z) ) return __LINE__;
+    if ( !eq(x & ~y, z) ) return __LINE__;
 
 #elif ELEM_SIZE > 1 || VEC_SIZE <= 8
 
@@ -639,7 +643,7 @@ int simd_test(void)
     z = src + inv;
     touch(inv);
     z *= (src - inv);
-    if ( !to_bool(x - y == z) ) return __LINE__;
+    if ( !eq(x - y, z) ) return __LINE__;
 
 #endif
 
@@ -648,10 +652,10 @@ int simd_test(void)
     x = src * alt;
     touch(alt);
     y = src / alt;
-    if ( !to_bool(x == y) ) return __LINE__;
+    if ( !eq(x, y) ) return __LINE__;
     touch(alt);
     touch(src);
-    if ( !to_bool(x * -alt == -src) ) return __LINE__;
+    if ( !eq(x * -alt, -src) ) return __LINE__;
 
 # if defined(recip) && defined(to_int)
 
@@ -659,16 +663,16 @@ int simd_test(void)
     x = recip(src);
     touch(src);
     touch(x);
-    if ( !to_bool(to_int(recip(x)) == src) ) return __LINE__;
+    if ( !eq(to_int(recip(x)), src) ) return __LINE__;
 
 #  ifdef rsqrt
     x = src * src;
     touch(x);
     y = rsqrt(x);
     touch(y);
-    if ( !to_bool(to_int(recip(y)) == src) ) return __LINE__;
+    if ( !eq(to_int(recip(y)), src) ) return __LINE__;
     touch(src);
-    if ( !to_bool(to_int(y) == to_int(recip(src))) ) return __LINE__;
+    if ( !eq(to_int(y), to_int(recip(src))) ) return __LINE__;
 #  endif
 
 # endif
@@ -676,7 +680,7 @@ int simd_test(void)
 # ifdef sqrt
     x = src * src;
     touch(x);
-    if ( !to_bool(sqrt(x) == src) ) return __LINE__;
+    if ( !eq(sqrt(x), src) ) return __LINE__;
 # endif
 
 # ifdef trunc
@@ -684,20 +688,20 @@ int simd_test(void)
     y = (vec_t){ 1 };
     touch(x);
     z = trunc(x);
-    if ( !to_bool(y == z) ) return __LINE__;
+    if ( !eq(y, z) ) return __LINE__;
 # endif
 
 # ifdef frac
     touch(src);
     x = frac(src);
     touch(src);
-    if ( !to_bool(x == 0) ) return __LINE__;
+    if ( !eq(x, (vec_t){}) ) return __LINE__;
 
     x = 1 / (src + 1);
     touch(x);
     y = frac(x);
     touch(x);
-    if ( !to_bool(x == y) ) return __LINE__;
+    if ( !eq(x, y) ) return __LINE__;
 # endif
 
 # if defined(trunc) && defined(frac)
@@ -707,7 +711,7 @@ int simd_test(void)
     touch(x);
     z = frac(x);
     touch(x);
-    if ( !to_bool(x == y + z) ) return __LINE__;
+    if ( !eq(x, y + z) ) return __LINE__;
 # endif
 
 #else
@@ -720,16 +724,16 @@ int simd_test(void)
     y[ELEM_COUNT - 1] = y[0] = j = ELEM_COUNT;
     for ( i = 1; i < ELEM_COUNT / 2; ++i )
         y[ELEM_COUNT - i - 1] = y[i] = y[i - 1] + (j -= 2);
-    if ( !to_bool(x == y) ) return __LINE__;
+    if ( !eq(x, y) ) return __LINE__;
 
 #  ifdef mul_hi
     touch(alt);
     x = mul_hi(src, alt);
     touch(alt);
 #   ifdef INT_SIZE
-    if ( !to_bool(x == (alt < 0)) ) return __LINE__;
+    if ( !eq(x, alt < 0) ) return __LINE__;
 #   else
-    if ( !to_bool(x == (src & alt) + alt) ) return __LINE__;
+    if ( !eq(x, (src & alt) + alt) ) return __LINE__;
 #   endif
 #  endif
 
@@ -745,7 +749,7 @@ int simd_test(void)
         z[i] = res;
         z[i + 1] = res >> (ELEM_SIZE << 3);
     }
-    if ( !to_bool(y == z) ) return __LINE__;
+    if ( !eq(y, z) ) return __LINE__;
 #  endif
 
     z = src;
@@ -757,12 +761,12 @@ int simd_test(void)
     touch(z);
     y = z << 2;
     touch(z);
-    if ( !to_bool(x == y + y) ) return __LINE__;
+    if ( !eq(x, y + y) ) return __LINE__;
 
     touch(x);
     z = x >> 2;
     touch(x);
-    if ( !to_bool(y == z + z) ) return __LINE__;
+    if ( !eq(y, z + z) ) return __LINE__;
 
     z = src;
 #  ifdef INT_SIZE
@@ -781,11 +785,11 @@ int simd_test(void)
     touch(j);
     y = z << j;
     touch(j);
-    if ( !to_bool(x == y + y) ) return __LINE__;
+    if ( !eq(x, y + y) ) return __LINE__;
 
     z = x >> j;
     touch(j);
-    if ( !to_bool(y == z + z) ) return __LINE__;
+    if ( !eq(y, z + z) ) return __LINE__;
 
 # endif
 
@@ -809,12 +813,12 @@ int simd_test(void)
     --sh;
     touch(sh);
     y = z << sh;
-    if ( !to_bool(x == y + y) ) return __LINE__;
+    if ( !eq(x, y + y) ) return __LINE__;
 
 #  if (defined(__AVX2__) && ELEM_SIZE >= 4) || defined(__XOP__)
     touch(sh);
     x = y >> sh;
-    if ( !to_bool(x == z) ) return __LINE__;
+    if ( !eq(x, z) ) return __LINE__;
 #  endif
 
 # endif
@@ -828,7 +832,7 @@ int simd_test(void)
     touch(inv);
     y = max(src, inv);
     touch(inv);
-    if ( !to_bool(x + y == src + inv) ) return __LINE__;
+    if ( !eq(x + y, src + inv) ) return __LINE__;
 # else
     x = src * alt;
     y = inv * alt;
@@ -837,33 +841,33 @@ int simd_test(void)
     touch(y);
     y = min(x, y);
     touch(y);
-    if ( !to_bool((y + z) * alt == src + inv) ) return __LINE__;
+    if ( !eq((y + z) * alt, src + inv) ) return __LINE__;
 # endif
 #endif
 
 #ifdef abs
     x = src * alt;
     touch(x);
-    if ( !to_bool(abs(x) == src) ) return __LINE__;
+    if ( !eq(abs(x), src) ) return __LINE__;
 #endif
 
 #ifdef copysignz
     touch(alt);
-    if ( !to_bool(copysignz((vec_t){} + 1, alt) == alt) ) return __LINE__;
+    if ( !eq(copysignz((vec_t){} + 1, alt), alt) ) return __LINE__;
 #endif
 
 #ifdef swap
     touch(src);
-    if ( !to_bool(swap(src) == inv) ) return __LINE__;
+    if ( !eq(swap(src), inv) ) return __LINE__;
 #endif
 
 #ifdef swap2
     touch(src);
-    if ( !to_bool(swap2(src) == inv) ) return __LINE__;
+    if ( !eq(swap2(src), inv) ) return __LINE__;
 #endif
 
 #if defined(broadcast)
-    if ( !to_bool(broadcast(ELEM_COUNT + 1) == src + inv) ) return __LINE__;
+    if ( !eq(broadcast(ELEM_COUNT + 1), src + inv) ) return __LINE__;
 #endif
 
 #if defined(interleave_lo) && defined(interleave_hi)
@@ -877,7 +881,11 @@ int simd_test(void)
 # else
     z = (x - y) * alt;
 # endif
-    if ( !to_bool(z == ELEM_COUNT / 2) ) return __LINE__;
+# ifdef broadcast
+    if ( !eq(z, broadcast(ELEM_COUNT / 2)) ) return __LINE__;
+# else
+    if ( !eq(z, ELEM_COUNT / 2) ) return __LINE__;
+# endif
 #endif
 
 #if defined(INT_SIZE) && defined(widen1) && defined(interleave_lo)
@@ -887,7 +895,7 @@ int simd_test(void)
     touch(x);
     z = widen1(x);
     touch(x);
-    if ( !to_bool(z == y) ) return __LINE__;
+    if ( !eq(z, y) ) return __LINE__;
 
 # ifdef widen2
     y = interleave_lo(alt < 0, alt < 0);
@@ -895,7 +903,7 @@ int simd_test(void)
     touch(x);
     z = widen2(x);
     touch(x);
-    if ( !to_bool(z == y) ) return __LINE__;
+    if ( !eq(z, y) ) return __LINE__;
 
 #  ifdef widen3
     y = interleave_lo(alt < 0, alt < 0);
@@ -904,7 +912,7 @@ int simd_test(void)
     touch(x);
     z = widen3(x);
     touch(x);
-    if ( !to_bool(z == y) ) return __LINE__;
+    if ( !eq(z, y) ) return __LINE__;
 #  endif
 # endif
 
@@ -919,21 +927,21 @@ int simd_test(void)
     touch(src);
     x = widen1(src);
     touch(src);
-    if ( !to_bool(x == y) ) return __LINE__;
+    if ( !eq(x, y) ) return __LINE__;
 # endif
 
 # ifdef widen2
     touch(src);
     x = widen2(src);
     touch(src);
-    if ( !to_bool(x == z) ) return __LINE__;
+    if ( !eq(x, z) ) return __LINE__;
 # endif
 
 # ifdef widen3
     touch(src);
     x = widen3(src);
     touch(src);
-    if ( !to_bool(x == interleave_lo(z, (vec_t){})) ) return __LINE__;
+    if ( !eq(x, interleave_lo(z, (vec_t){})) ) return __LINE__;
 # endif
 
 #endif
@@ -942,14 +950,14 @@ int simd_test(void)
     touch(src);
     x = dup_lo(src);
     touch(src);
-    if ( !to_bool(x - src == (alt - 1) / 2) ) return __LINE__;
+    if ( !eq(x - src, (alt - 1) / 2) ) return __LINE__;
 #endif
 
 #ifdef dup_hi
     touch(src);
     x = dup_hi(src);
     touch(src);
-    if ( !to_bool(x - src == (alt + 1) / 2) ) return __LINE__;
+    if ( !eq(x - src, (alt + 1) / 2) ) return __LINE__;
 #endif
 
     for ( i = 0; i < ELEM_COUNT; ++i )
@@ -961,7 +969,7 @@ int simd_test(void)
 # else
     select(&z, src, inv, alt > 0);
 # endif
-    if ( !to_bool(z == y) ) return __LINE__;
+    if ( !eq(z, y) ) return __LINE__;
 #endif
 
 #ifdef select2
@@ -970,14 +978,14 @@ int simd_test(void)
 # else
     select2(&z, src, inv, alt > 0);
 # endif
-    if ( !to_bool(z == y) ) return __LINE__;
+    if ( !eq(z, y) ) return __LINE__;
 #endif
 
 #ifdef mix
     touch(src);
     touch(inv);
     x = mix(src, inv);
-    if ( !to_bool(x == y) ) return __LINE__;
+    if ( !eq(x, y) ) return __LINE__;
 
 # ifdef addsub
     touch(src);
@@ -986,22 +994,22 @@ int simd_test(void)
     touch(src);
     touch(inv);
     y = mix(src - inv, src + inv);
-    if ( !to_bool(x == y) ) return __LINE__;
+    if ( !eq(x, y) ) return __LINE__;
 # endif
 #endif
 
 #ifdef rotr
     x = rotr(src, 1);
     y = (src & (ELEM_COUNT - 1)) + 1;
-    if ( !to_bool(x == y) ) return __LINE__;
+    if ( !eq(x, y) ) return __LINE__;
 #endif
 
 #ifdef dot_product
     touch(src);
     touch(inv);
     x = dot_product(src, inv);
-    if ( !to_bool(x == (vec_t){ (ELEM_COUNT * (ELEM_COUNT + 1) *
-                                 (ELEM_COUNT + 2)) / 6 }) ) return __LINE__;
+    if ( !eq(x, (vec_t){ (ELEM_COUNT * (ELEM_COUNT + 1) *
+                          (ELEM_COUNT + 2)) / 6 }) ) return __LINE__;
 #endif
 
 #ifdef hadd
@@ -1022,7 +1030,7 @@ int simd_test(void)
     x = hsub(src, inv);
     for ( i = ELEM_COUNT; i >>= 1; )
         x = hadd(x, (vec_t){});
-    if ( !to_bool(x == 0) ) return __LINE__;
+    if ( !eq(x, (vec_t){}) ) return __LINE__;
 # endif
 #endif
 

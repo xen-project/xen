@@ -20,6 +20,10 @@ ENTRY(fma_test);
 # endif
 #endif
 
+#ifndef eq
+# define eq(x, y) to_bool((x) == (y))
+#endif
+
 #if VEC_SIZE == 16
 # if FLOAT_SIZE == 4
 #  define addsub(x, y) __builtin_ia32_addsubps(x, y)
@@ -62,38 +66,38 @@ int fma_test(void)
     y = (src - one) * inv;
     touch(src);
     z = inv * src + inv;
-    if ( !to_bool(x == z) ) return __LINE__;
+    if ( !eq(x, z) ) return __LINE__;
 
     touch(src);
     z = -inv * src - inv;
-    if ( !to_bool(-x == z) ) return __LINE__;
+    if ( !eq(-x, z) ) return __LINE__;
 
     touch(src);
     z = inv * src - inv;
-    if ( !to_bool(y == z) ) return __LINE__;
+    if ( !eq(y, z) ) return __LINE__;
 
     touch(src);
     z = -inv * src + inv;
-    if ( !to_bool(-y == z) ) return __LINE__;
+    if ( !eq(-y, z) ) return __LINE__;
     touch(src);
 
     x = src + inv;
     y = src - inv;
     touch(inv);
     z = src * one + inv;
-    if ( !to_bool(x == z) ) return __LINE__;
+    if ( !eq(x, z) ) return __LINE__;
 
     touch(inv);
     z = -src * one - inv;
-    if ( !to_bool(-x == z) ) return __LINE__;
+    if ( !eq(-x, z) ) return __LINE__;
 
     touch(inv);
     z = src * one - inv;
-    if ( !to_bool(y == z) ) return __LINE__;
+    if ( !eq(y, z) ) return __LINE__;
 
     touch(inv);
     z = -src * one + inv;
-    if ( !to_bool(-y == z) ) return __LINE__;
+    if ( !eq(-y, z) ) return __LINE__;
     touch(inv);
 
 #if defined(addsub) && defined(fmaddsub)
@@ -101,21 +105,21 @@ int fma_test(void)
     y = addsub(src * inv, -one);
     touch(one);
     z = fmaddsub(src, inv, one);
-    if ( !to_bool(x == z) ) return __LINE__;
+    if ( !eq(x, z) ) return __LINE__;
 
     touch(one);
     z = fmaddsub(src, inv, -one);
-    if ( !to_bool(y == z) ) return __LINE__;
+    if ( !eq(y, z) ) return __LINE__;
     touch(one);
 
     x = addsub(src * inv, one);
     touch(inv);
     z = fmaddsub(src, inv, one);
-    if ( !to_bool(x == z) ) return __LINE__;
+    if ( !eq(x, z) ) return __LINE__;
 
     touch(inv);
     z = fmaddsub(src, inv, -one);
-    if ( !to_bool(y == z) ) return __LINE__;
+    if ( !eq(y, z) ) return __LINE__;
     touch(inv);
 #endif
 
