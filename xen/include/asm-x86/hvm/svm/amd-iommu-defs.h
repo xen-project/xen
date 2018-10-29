@@ -38,8 +38,7 @@
 	PAGE_SIZE * (PTE_PER_TABLE_ALIGN(entries) >> PTE_PER_TABLE_SHIFT)
 
 #define amd_offset_level_address(offset, level) \
-      	((u64)(offset) << (12 + (PTE_PER_TABLE_SHIFT * \
-                                (level - IOMMU_PAGING_MODE_LEVEL_1))))
+        ((uint64_t)(offset) << (12 + (PTE_PER_TABLE_SHIFT * ((level) - 1))))
 
 #define PCI_MIN_CAP_OFFSET	0x40
 #define PCI_MAX_CAP_BLOCKS	48
@@ -449,14 +448,6 @@
 
 /* Paging modes */
 #define IOMMU_PAGING_MODE_DISABLED	0x0
-#define IOMMU_PAGING_MODE_LEVEL_0	0x0
-#define IOMMU_PAGING_MODE_LEVEL_1	0x1
-#define IOMMU_PAGING_MODE_LEVEL_2	0x2
-#define IOMMU_PAGING_MODE_LEVEL_3	0x3
-#define IOMMU_PAGING_MODE_LEVEL_4	0x4
-#define IOMMU_PAGING_MODE_LEVEL_5	0x5
-#define IOMMU_PAGING_MODE_LEVEL_6	0x6
-#define IOMMU_PAGING_MODE_LEVEL_7	0x7
 
 /* Flags */
 #define IOMMU_CONTROL_DISABLED	0
@@ -497,3 +488,13 @@
 #define IOMMU_REG_BASE_ADDR_HIGH_SHIFT              0
 
 #endif /* _ASM_X86_64_AMD_IOMMU_DEFS_H */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

@@ -240,9 +240,7 @@ static int amd_iommu_domain_init(struct domain *d)
 
     /* For pv and dom0, stick with get_paging_mode(max_page)
      * For HVM dom0, use 2 level page table at first */
-    hd->arch.paging_mode = is_hvm_domain(d) ?
-                      IOMMU_PAGING_MODE_LEVEL_2 :
-                      get_paging_mode(max_page);
+    hd->arch.paging_mode = is_hvm_domain(d) ? 2 : get_paging_mode(max_page);
     return 0;
 }
 

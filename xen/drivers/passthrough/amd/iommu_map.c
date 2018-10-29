@@ -40,7 +40,7 @@ void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long dfn)
     u64 *table, *pte;
 
     table = map_domain_page(_mfn(l1_mfn));
-    pte = table + pfn_to_pde_idx(dfn, IOMMU_PAGING_MODE_LEVEL_1);
+    pte = table + pfn_to_pde_idx(dfn, 1);
     *pte = 0;
     unmap_domain_page(table);
 }
@@ -84,7 +84,7 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
     /* FC bit should be enabled in PTE, this helps to solve potential
      * issues with ATS devices
      */
-    if ( next_level == IOMMU_PAGING_MODE_LEVEL_0 )
+    if ( next_level == 0 )
         set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
                              IOMMU_PTE_FC_MASK, IOMMU_PTE_FC_SHIFT, &entry);
     pde[1] = entry;
@@ -116,8 +116,7 @@ static bool_t set_iommu_pte_present(unsigned long pt_mfn, unsigned long dfn,
 
     pde = (u32*)(table + pfn_to_pde_idx(dfn, pde_level));
 
-    need_flush = set_iommu_pde_present(pde, next_mfn, 
-                                       IOMMU_PAGING_MODE_LEVEL_0, iw, ir);
+    need_flush = set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
     unmap_domain_page(table);
     return need_flush;
 }
@@ -419,8 +418,7 @@ static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
     }
 
     /* setup super page mapping, next level = 0 */
-    set_iommu_pde_present((u32*)pde, first_mfn,
-                          IOMMU_PAGING_MODE_LEVEL_0,
+    set_iommu_pde_present((u32*)pde, first_mfn, 0,
                           !!(flags & IOMMUF_writable),
                           !!(flags & IOMMUF_readable));
 
@@ -447,18 +445,17 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     table = hd->arch.root_table;
     level = hd->arch.paging_mode;
 
-    BUG_ON( table == NULL || level < IOMMU_PAGING_MODE_LEVEL_1 || 
-            level > IOMMU_PAGING_MODE_LEVEL_6 );
+    BUG_ON( table == NULL || level < 1 || level > 6 );
 
     next_table_mfn = mfn_x(page_to_mfn(table));
 
-    if ( level == IOMMU_PAGING_MODE_LEVEL_1 )
+    if ( level == 1 )
     {
         pt_mfn[level] = next_table_mfn;
         return 0;
     }
 
-    while ( level > IOMMU_PAGING_MODE_LEVEL_1 )
+    while ( level > 1 )
     {
         unsigned int next_level = level - 1;
         pt_mfn[level] = next_table_mfn;
@@ -679,8 +676,7 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     }
 
     /* Install 4k mapping first */
-    need_flush = set_iommu_pte_present(pt_mfn[1], dfn_x(dfn), mfn_x(mfn),
-                                       IOMMU_PAGING_MODE_LEVEL_1,
+    need_flush = set_iommu_pte_present(pt_mfn[1], dfn_x(dfn), mfn_x(mfn), 1,
                                        !!(flags & IOMMUF_writable),
                                        !!(flags & IOMMUF_readable));
 
@@ -693,8 +689,8 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     if ( is_hvm_domain(d) )
         amd_iommu_flush_pages(d, dfn_x(dfn), 0);
 
-    for ( merge_level = IOMMU_PAGING_MODE_LEVEL_2;
-          merge_level <= hd->arch.paging_mode; merge_level++ )
+    for ( merge_level = 2; merge_level <= hd->arch.paging_mode;
+          merge_level++ )
     {
         if ( pt_mfn[merge_level] == 0 )
             break;
@@ -816,7 +812,7 @@ void amd_iommu_share_p2m(struct domain *d)
         hd->arch.root_table = p2m_table;
 
         /* When sharing p2m with iommu, paging mode = 4 */
-        hd->arch.paging_mode = IOMMU_PAGING_MODE_LEVEL_4;
+        hd->arch.paging_mode = 4;
         AMD_IOMMU_DEBUG("Share p2m table with iommu: p2m table = %#lx\n",
                         mfn_x(pgd_mfn));
     }
