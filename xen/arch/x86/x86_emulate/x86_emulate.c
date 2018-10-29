@@ -191,14 +191,14 @@ enum simd_opsize {
      * Ordinary packed integers:
      * - 64 bits without prefix 66 (MMX)
      * - 128 bits with prefix 66 (SSEn)
-     * - 128/256 bits depending on VEX.L (AVX)
+     * - 128/256/512 bits depending on VEX.L/EVEX.LR (AVX+)
      */
     simd_packed_int,
 
     /*
      * Ordinary packed/scalar floating point:
      * - 128 bits without prefix or with prefix 66 (SSEn)
-     * - 128/256 bits depending on VEX.L (AVX)
+     * - 128/256/512 bits depending on VEX.L/EVEX.LR (AVX+)
      * - 32 bits with prefix F3 (scalar single)
      * - 64 bits with prefix F2 (scalar doubgle)
      */
@@ -207,14 +207,14 @@ enum simd_opsize {
     /*
      * Packed floating point:
      * - 128 bits without prefix or with prefix 66 (SSEn)
-     * - 128/256 bits depending on VEX.L (AVX)
+     * - 128/256/512 bits depending on VEX.L/EVEX.LR (AVX+)
      */
     simd_packed_fp,
 
     /*
      * Single precision packed/scalar floating point:
      * - 128 bits without prefix (SSEn)
-     * - 128/256 bits depending on VEX.L, no prefix (AVX)
+     * - 128/256/512 bits depending on VEX.L/EVEX.LR (AVX+)
      * - 32 bits with prefix F3 (scalar)
      */
     simd_single_fp,
@@ -228,7 +228,7 @@ enum simd_opsize {
 
     /*
      * Scalar floating point:
-     * - 32/64 bits depending on VEX.W
+     * - 32/64 bits depending on VEX.W/EVEX.W
      */
     simd_scalar_vexw,
 
@@ -2249,6 +2249,7 @@ int x86emul_unhandleable_rw(
 #define lock_prefix (state->lock_prefix)
 #define vex (state->vex)
 #define evex (state->evex)
+#define evex_encoded() (evex.mbs)
 #define ea (state->ea)
 
 static int
@@ -2818,6 +2819,9 @@ x86_decode(
 
                 opcode |= b | MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
 
+                if ( !evex_encoded() )
+                    evex.lr = vex.l;
+
                 if ( !(d & ModRM) )
                     break;
 
@@ -3148,7 +3152,7 @@ x86_decode(
             }
             /* fall through */
         case vex_66:
-            op_bytes = 16 << vex.l;
+            op_bytes = 16 << evex.lr;
             break;
         default:
             op_bytes = 0;
@@ -3172,9 +3176,17 @@ x86_decode(
     case simd_any_fp:
         switch ( vex.pfx )
         {
-        default:     op_bytes = 16 << vex.l; break;
-        case vex_f3: op_bytes = 4;           break;
-        case vex_f2: op_bytes = 8;           break;
+        default:
+            op_bytes = 16 << evex.lr;
+            break;
+        case vex_f3:
+            generate_exception_if(evex_encoded() && evex.w, EXC_UD);
+            op_bytes = 4;
+            break;
+        case vex_f2:
+            generate_exception_if(evex_encoded() && !evex.w, EXC_UD);
+            op_bytes = 8;
+            break;
         }
         break;
 
