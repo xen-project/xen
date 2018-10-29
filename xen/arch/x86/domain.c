@@ -326,9 +326,8 @@ void free_vcpu_struct(struct vcpu *v)
 /* Initialise various registers to their architectural INIT/RESET state. */
 void arch_vcpu_regs_init(struct vcpu *v)
 {
-    v->arch.user_regs = (typeof(v->arch.user_regs)){
-        .rflags = X86_EFLAGS_MBS,
-    };
+    memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
+    v->arch.user_regs.eflags = X86_EFLAGS_MBS;
 
     memset(v->arch.debugreg, 0, sizeof(v->arch.debugreg));
     v->arch.debugreg[6] = X86_DR6_DEFAULT;
