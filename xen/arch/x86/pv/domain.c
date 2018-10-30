@@ -22,7 +22,7 @@ static __read_mostly enum {
     PCID_NOXPTI
 } opt_pcid = PCID_XPTI;
 
-static __init int parse_pcid(const char *s)
+static int parse_pcid(const char *s)
 {
     int rc = 0;
 
