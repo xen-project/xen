@@ -348,7 +348,7 @@ let transaction_replay c t doms cons =
 				false
 			)
 		(fun () ->
-			Connection.end_transaction c tid None
+			ignore @@ Connection.end_transaction c tid None
 		)
 
 let do_watch con t domains cons data =
@@ -366,7 +366,7 @@ let do_unwatch con t domains cons data =
 		| [node; token; ""]   -> node, token
 		| _                   -> raise Invalid_Cmd_Args
 		in
-	Connections.del_watch cons con node token
+	ignore @@ Connections.del_watch cons con node token
 
 let do_transaction_start con t domains cons data =
 	if Transaction.get_id t <> Transaction.none then

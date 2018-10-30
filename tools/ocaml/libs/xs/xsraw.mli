@@ -33,7 +33,7 @@ val has_watchevents : con -> bool
 val get_watchevent : con -> string * string
 val read_watchevent : con -> string * string
 val sync_recv : Xenbus.Xb.Op.operation -> con -> string
-val sync : (Xenbus.Xb.t -> 'a) -> con -> string
+val sync : (Xenbus.Xb.t -> unit) -> con -> string
 val ack : string -> unit
 val validate_path : string -> unit
 val validate_watch_path : string -> unit
