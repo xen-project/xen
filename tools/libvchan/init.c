@@ -250,6 +250,7 @@ static int init_xs_srv(struct libxenvchan *ctrl, int domain, const char* xs_base
 	char buf[64];
 	char ref[16];
 	char* domid_str = NULL;
+	xs_transaction_t xs_trans = NULL;
 	xs = xs_domain_open();
 	if (!xs)
 		goto fail;
@@ -265,21 +266,31 @@ static int init_xs_srv(struct libxenvchan *ctrl, int domain, const char* xs_base
 	perms[1].id = domain;
 	perms[1].perms = XS_PERM_READ;
 
+retry_transaction:
+	xs_trans = xs_transaction_start(xs);
+	if (!xs_trans)
+		goto fail_xs_open;
+
 	snprintf(ref, sizeof ref, "%d", ring_ref);
 	snprintf(buf, sizeof buf, "%s/ring-ref", xs_base);
-	if (!xs_write(xs, 0, buf, ref, strlen(ref)))
+	if (!xs_write(xs, xs_trans, buf, ref, strlen(ref)))
 		goto fail_xs_open;
-	if (!xs_set_permissions(xs, 0, buf, perms, 2))
+	if (!xs_set_permissions(xs, xs_trans, buf, perms, 2))
 		goto fail_xs_open;
 
 	snprintf(ref, sizeof ref, "%d", ctrl->event_port);
 	snprintf(buf, sizeof buf, "%s/event-channel", xs_base);
-	if (!xs_write(xs, 0, buf, ref, strlen(ref)))
+	if (!xs_write(xs, xs_trans, buf, ref, strlen(ref)))
 		goto fail_xs_open;
-	if (!xs_set_permissions(xs, 0, buf, perms, 2))
+	if (!xs_set_permissions(xs, xs_trans, buf, perms, 2))
 		goto fail_xs_open;
 
-	ret = 0;
+	if (!xs_transaction_end(xs, xs_trans, 0)) {
+		if (errno == EAGAIN)
+			goto retry_transaction;
+	} else {
+		ret = 0;
+	}
  fail_xs_open:
 	free(domid_str);
 	xs_daemon_close(xs);
