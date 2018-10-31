@@ -42,12 +42,10 @@
 #include <asm/cpufeature.h>
 #include <asm/debugger.h>
 #include <asm/event.h>
-#include <asm/flushtlb.h>
 #include <asm/hsr.h>
 #include <asm/mmio.h>
-#include <asm/monitor.h>
-#include <asm/psci.h>
 #include <asm/regs.h>
+#include <asm/smccc.h>
 #include <asm/traps.h>
 #include <asm/vgic.h>
 #include <asm/vtimer.h>
