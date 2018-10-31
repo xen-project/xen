@@ -249,9 +249,7 @@ extern int gic_route_irq_to_guest(struct domain *, unsigned int virq,
 int gic_remove_irq_from_guest(struct domain *d, unsigned int virq,
                               struct irq_desc *desc);
 
-extern void vgic_sync_to_lrs(void);
 extern void gic_clear_pending_irqs(struct vcpu *v);
-extern int vgic_vcpu_pending_irq(struct vcpu *v);
 
 extern void init_maintenance_interrupt(void);
 extern void gic_raise_guest_irq(struct vcpu *v, unsigned int irq,
@@ -306,7 +304,6 @@ extern unsigned int gic_number_lines(void);
 /* IRQ translation function for the device tree */
 int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
                   unsigned int *out_hwirq, unsigned int *out_type);
-void vgic_sync_from_lrs(struct vcpu *v);
 
 struct gic_info {
     /* GIC version */

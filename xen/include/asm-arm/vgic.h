@@ -363,6 +363,11 @@ void vgic_v3_setup_hw(paddr_t dbase,
                       unsigned int intid_bits);
 #endif
 
+void vgic_sync_to_lrs(void);
+void vgic_sync_from_lrs(struct vcpu *v);
+
+int vgic_vcpu_pending_irq(struct vcpu *v);
+
 #endif /* __ASM_ARM_VGIC_H__ */
 
 /*

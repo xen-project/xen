@@ -1,7 +1,6 @@
 #ifndef __ASM_EVENT_H__
 #define __ASM_EVENT_H__
 
-#include <asm/gic.h>
 #include <asm/domain.h>
 
 void vcpu_kick(struct vcpu *v);
