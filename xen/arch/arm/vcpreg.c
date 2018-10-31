@@ -18,6 +18,7 @@
 
 #include <xen/sched.h>
 
+#include <asm/cpufeature.h>
 #include <asm/cpregs.h>
 #include <asm/current.h>
 #include <asm/regs.h>
