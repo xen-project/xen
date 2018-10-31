@@ -787,8 +787,8 @@ static const char *mode_string(uint32_t cpsr)
     return mode_strings[mode] ? : "Unknown";
 }
 
-static void show_registers_32(struct cpu_user_regs *regs,
-                              struct reg_ctxt *ctxt,
+static void show_registers_32(const struct cpu_user_regs *regs,
+                              const struct reg_ctxt *ctxt,
                               int guest_mode,
                               const struct vcpu *v)
 {
@@ -864,8 +864,8 @@ static void show_registers_32(struct cpu_user_regs *regs,
 }
 
 #ifdef CONFIG_ARM_64
-static void show_registers_64(struct cpu_user_regs *regs,
-                              struct reg_ctxt *ctxt,
+static void show_registers_64(const struct cpu_user_regs *regs,
+                              const struct reg_ctxt *ctxt,
                               int guest_mode,
                               const struct vcpu *v)
 {
@@ -925,8 +925,8 @@ static void show_registers_64(struct cpu_user_regs *regs,
 }
 #endif
 
-static void _show_registers(struct cpu_user_regs *regs,
-                            struct reg_ctxt *ctxt,
+static void _show_registers(const struct cpu_user_regs *regs,
+                            const struct reg_ctxt *ctxt,
                             int guest_mode,
                             const struct vcpu *v)
 {
@@ -981,7 +981,7 @@ static void _show_registers(struct cpu_user_regs *regs,
     printk("\n");
 }
 
-void show_registers(struct cpu_user_regs *regs)
+void show_registers(const struct cpu_user_regs *regs)
 {
     struct reg_ctxt ctxt;
     ctxt.sctlr_el1 = READ_SYSREG(SCTLR_EL1);
@@ -1027,7 +1027,7 @@ void vcpu_show_registers(const struct vcpu *v)
     _show_registers(&v->arch.cpu_info->guest_cpu_user_regs, &ctxt, 1, v);
 }
 
-static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
+static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 {
     int i;
     vaddr_t sp;
@@ -1161,7 +1161,7 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
  */
 #define STACK_FRAME_BASE(fp)       ((register_t*)(fp))
 #endif
-static void show_trace(struct cpu_user_regs *regs)
+static void show_trace(const struct cpu_user_regs *regs)
 {
     register_t *frame, next, addr, low, high;
 
@@ -1196,7 +1196,7 @@ static void show_trace(struct cpu_user_regs *regs)
     printk("\n");
 }
 
-void show_stack(struct cpu_user_regs *regs)
+void show_stack(const struct cpu_user_regs *regs)
 {
     register_t *stack = STACK_BEFORE_EXCEPTION(regs), addr;
     int i;
@@ -1223,7 +1223,7 @@ void show_stack(struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
-void show_execution_state(struct cpu_user_regs *regs)
+void show_execution_state(const struct cpu_user_regs *regs)
 {
     show_registers(regs);
     show_stack(regs);
@@ -1249,14 +1249,14 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_unpause(v);
 }
 
-void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
+void do_unexpected_trap(const char *msg, const struct cpu_user_regs *regs)
 {
     printk("CPU%d: Unexpected Trap: %s\n", smp_processor_id(), msg);
     show_execution_state(regs);
     panic("CPU%d: Unexpected Trap: %s\n", smp_processor_id(), msg);
 }
 
-int do_bug_frame(struct cpu_user_regs *regs, vaddr_t pc)
+int do_bug_frame(const struct cpu_user_regs *regs, vaddr_t pc)
 {
     const struct bug_frame *bug = NULL;
     const char *prefix = "", *filename, *predicate;

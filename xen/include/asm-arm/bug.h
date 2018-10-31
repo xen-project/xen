@@ -77,7 +77,7 @@ extern const struct bug_frame __start_bug_frames[],
                               __stop_bug_frames_1[],
                               __stop_bug_frames_2[];
 
-int do_bug_frame(struct cpu_user_regs *regs, vaddr_t pc);
+int do_bug_frame(const struct cpu_user_regs *regs, vaddr_t pc);
 
 #endif /* __ARM_BUG_H__ */
 /*
