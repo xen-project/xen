@@ -18,6 +18,7 @@
 
 #include <xen/lib.h>
 
+#include <asm/hsr.h>
 #include <asm/system.h>
 #include <asm/processor.h>
 

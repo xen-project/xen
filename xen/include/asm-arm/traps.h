@@ -1,6 +1,7 @@
 #ifndef __ASM_ARM_TRAPS__
 #define __ASM_ARM_TRAPS__
 
+#include <asm/hsr.h>
 #include <asm/processor.h>
 
 #if defined(CONFIG_ARM_32)

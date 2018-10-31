@@ -43,6 +43,7 @@
 #include <asm/debugger.h>
 #include <asm/event.h>
 #include <asm/flushtlb.h>
+#include <asm/hsr.h>
 #include <asm/mmio.h>
 #include <asm/monitor.h>
 #include <asm/psci.h>
