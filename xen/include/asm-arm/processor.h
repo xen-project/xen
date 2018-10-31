@@ -684,16 +684,6 @@ void do_trap_guest_serror(struct cpu_user_regs *regs);
 
 register_t get_default_hcr_flags(void);
 
-/* Functions for pending virtual abort checking window. */
-void abort_guest_exit_start(void);
-void abort_guest_exit_end(void);
-
-#define VABORT_GEN_BY_GUEST(r)  \
-( \
-    ( (unsigned long)abort_guest_exit_start == (r)->pc ) || \
-    ( (unsigned long)abort_guest_exit_end == (r)->pc ) \
-)
-
 /*
  * Synchronize SError unless the feature is selected.
  * This is relying on the SErrors are currently unmasked.

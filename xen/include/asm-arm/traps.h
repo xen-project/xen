@@ -45,6 +45,16 @@ void do_trap_hvc_smccc(struct cpu_user_regs *regs);
 
 int do_bug_frame(const struct cpu_user_regs *regs, vaddr_t pc);
 
+/* Functions for pending virtual abort checking window. */
+void abort_guest_exit_start(void);
+void abort_guest_exit_end(void);
+
+static inline bool VABORT_GEN_BY_GUEST(const struct cpu_user_regs *regs)
+{
+    return ((unsigned long)abort_guest_exit_start == regs->pc) ||
+        (unsigned long)abort_guest_exit_end == regs->pc;
+}
+
 #endif /* __ASM_ARM_TRAPS__ */
 /*
  * Local variables:
