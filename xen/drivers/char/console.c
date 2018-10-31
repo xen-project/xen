@@ -630,16 +630,16 @@ static void __putstr(const char *str)
 static int printk_prefix_check(char *p, char **pp)
 {
     int loglvl = -1;
-    int upper_thresh = xenlog_upper_thresh;
-    int lower_thresh = xenlog_lower_thresh;
+    int upper_thresh = ACCESS_ONCE(xenlog_upper_thresh);
+    int lower_thresh = ACCESS_ONCE(xenlog_lower_thresh);
 
     while ( (p[0] == '<') && (p[1] != '\0') && (p[2] == '>') )
     {
         switch ( p[1] )
         {
         case 'G':
-            upper_thresh = xenlog_guest_upper_thresh;
-            lower_thresh = xenlog_guest_lower_thresh;
+            upper_thresh = ACCESS_ONCE(xenlog_guest_upper_thresh);
+            lower_thresh = ACCESS_ONCE(xenlog_guest_lower_thresh);
             if ( loglvl == -1 )
                 loglvl = XENLOG_GUEST_DEFAULT;
             break;
@@ -690,13 +690,14 @@ static int parse_console_timestamps(const char *s)
 
 static void printk_start_of_line(const char *prefix)
 {
+    enum con_timestamp_mode mode = ACCESS_ONCE(opt_con_timestamp_mode);
     struct tm tm;
     char tstr[32];
     uint64_t sec, nsec;
 
     __putstr(prefix);
 
-    switch ( opt_con_timestamp_mode )
+    switch ( mode )
     {
     case TSM_DATE:
     case TSM_DATE_MS:
@@ -704,7 +705,7 @@ static void printk_start_of_line(const char *prefix)
 
         if ( tm.tm_mday == 0 )
             /* nothing */;
-        else if ( opt_con_timestamp_mode == TSM_DATE )
+        else if ( mode == TSM_DATE )
         {
             snprintf(tstr, sizeof(tstr), "[%04u-%02u-%02u %02u:%02u:%02u] ",
                      1900 + tm.tm_year, tm.tm_mon + 1, tm.tm_mday,

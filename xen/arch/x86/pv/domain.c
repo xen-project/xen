@@ -256,7 +256,7 @@ int pv_domain_initialise(struct domain *d)
     d->arch.pv.xpti = is_hardware_domain(d) ? opt_xpti_hwdom : opt_xpti_domu;
 
     if ( !is_pv_32bit_domain(d) && use_invpcid && cpu_has_pcid )
-        switch ( opt_pcid )
+        switch ( ACCESS_ONCE(opt_pcid) )
         {
         case PCID_OFF:
             break;
