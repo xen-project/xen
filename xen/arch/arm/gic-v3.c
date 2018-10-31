@@ -21,25 +21,27 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/lib.h>
-#include <xen/init.h>
-#include <xen/mm.h>
-#include <xen/irq.h>
-#include <xen/iocap.h>
-#include <xen/sched.h>
-#include <xen/errno.h>
+#include <xen/acpi.h>
 #include <xen/delay.h>
 #include <xen/device_tree.h>
-#include <xen/sizes.h>
+#include <xen/errno.h>
+#include <xen/init.h>
+#include <xen/iocap.h>
+#include <xen/irq.h>
+#include <xen/lib.h>
 #include <xen/libfdt/libfdt.h>
-#include <xen/acpi.h>
+#include <xen/mm.h>
+#include <xen/sched.h>
+#include <xen/sizes.h>
+
 #include <acpi/actables.h>
-#include <asm/io.h>
+
+#include <asm/cpufeature.h>
 #include <asm/device.h>
 #include <asm/gic.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>
-#include <asm/cpufeature.h>
+#include <asm/io.h>
 
 /* Global state */
 static struct {
