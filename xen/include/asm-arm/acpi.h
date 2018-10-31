@@ -23,7 +23,6 @@
 #ifndef _ASM_ARM_ACPI_H
 #define _ASM_ARM_ACPI_H
 
-#include <asm/page.h>
 #include <asm/setup.h>
 
 #define COMPILER_DEPENDENT_INT64   long long
