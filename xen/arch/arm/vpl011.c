@@ -33,6 +33,7 @@
 #include <asm/pl011-uart.h>
 #include <asm/vgic-emul.h>
 #include <asm/vpl011.h>
+#include <asm/vreg.h>
 
 /*
  * Since pl011 registers are 32-bit registers, all registers

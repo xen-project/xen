@@ -31,6 +31,7 @@
 #include <asm/platform.h>
 #include <asm/vgic.h>
 #include <asm/vgic-emul.h>
+#include <asm/vreg.h>
 
 static struct {
     bool enabled;

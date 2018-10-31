@@ -45,6 +45,7 @@
 #include <asm/gic_v3_its.h>
 #include <asm/vgic.h>
 #include <asm/vgic-emul.h>
+#include <asm/vreg.h>
 
 /*
  * Data structure to describe a virtual ITS.

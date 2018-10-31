@@ -21,7 +21,6 @@
 
 #include <public/domctl.h>
 #include <public/io/ring.h>
-#include <asm/vreg.h>
 #include <xen/mm.h>
 
 /* helper macros */

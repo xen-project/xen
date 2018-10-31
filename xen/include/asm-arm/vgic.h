@@ -27,7 +27,6 @@
 #include <xen/rbtree.h>
 #include <asm/gic.h>
 #include <asm/mmio.h>
-#include <asm/vreg.h>
 
 struct pending_irq
 {
