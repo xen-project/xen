@@ -17,7 +17,6 @@
  * GNU General Public License for more details.
  */
 
-#include <asm/p2m.h>
 #include <xen/device_tree.h>
 #include <xen/domain_page.h>
 #include <xen/mm.h>
