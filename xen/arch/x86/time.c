@@ -2125,7 +2125,7 @@ void tsc_set_info(struct domain *d,
 {
     ASSERT(!is_system_domain(d));
 
-    if ( is_hardware_domain(d) )
+    if ( is_pv_domain(d) && is_hardware_domain(d) )
     {
         d->arch.vtsc = 0;
         return;
