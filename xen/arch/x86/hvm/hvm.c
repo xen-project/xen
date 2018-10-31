@@ -545,7 +545,7 @@ static int hvm_print_line(
     struct domain *cd = current->domain;
     char c = *val;
 
-    ASSERT(bytes == 1 && port == 0xe9);
+    ASSERT(bytes == 1 && port == XEN_HVM_DEBUGCONS_IOPORT);
 
     /* Deny any input requests. */
     if ( dir != IOREQ_WRITE )
@@ -654,7 +654,7 @@ int hvm_domain_initialise(struct domain *d)
 
     rtc_init(d);
 
-    register_portio_handler(d, 0xe9, 1, hvm_print_line);
+    register_portio_handler(d, XEN_HVM_DEBUGCONS_IOPORT, 1, hvm_print_line);
 
     if ( hvm_tsc_scaling_supported )
         d->arch.hvm.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;

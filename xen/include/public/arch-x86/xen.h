@@ -346,6 +346,13 @@ struct xen_arch_domainconfig {
 #define XEN_CPUID          XEN_EMULATE_PREFIX "cpuid"
 #endif
 
+/*
+ * Debug console IO port, also called "port E9 hack". Each character written
+ * to this IO port will be printed on the hypervisor console, subject to log
+ * level restrictions.
+ */
+#define XEN_HVM_DEBUGCONS_IOPORT 0xe9
+
 #endif /* __XEN_PUBLIC_ARCH_X86_XEN_H__ */
 
 /*

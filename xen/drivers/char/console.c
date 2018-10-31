@@ -458,7 +458,7 @@ static inline void xen_console_write_debug_port(const char *buf, size_t len)
     unsigned long tmp;
     asm volatile ( "rep outsb;"
                    : "=&S" (tmp), "=&c" (tmp)
-                   : "0" (buf), "1" (len), "d" (0xe9) );
+                   : "0" (buf), "1" (len), "d" (XEN_HVM_DEBUGCONS_IOPORT) );
 }
 #endif
 
