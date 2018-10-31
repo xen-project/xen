@@ -789,7 +789,7 @@ static const char *mode_string(uint32_t cpsr)
 
 static void show_registers_32(const struct cpu_user_regs *regs,
                               const struct reg_ctxt *ctxt,
-                              int guest_mode,
+                              bool guest_mode,
                               const struct vcpu *v)
 {
 
@@ -866,7 +866,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 #ifdef CONFIG_ARM_64
 static void show_registers_64(const struct cpu_user_regs *regs,
                               const struct reg_ctxt *ctxt,
-                              int guest_mode,
+                              bool guest_mode,
                               const struct vcpu *v)
 {
 
@@ -927,7 +927,7 @@ static void show_registers_64(const struct cpu_user_regs *regs,
 
 static void _show_registers(const struct cpu_user_regs *regs,
                             const struct reg_ctxt *ctxt,
-                            int guest_mode,
+                            bool guest_mode,
                             const struct vcpu *v)
 {
     print_xen_info();

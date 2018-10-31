@@ -5,8 +5,10 @@
 
 #ifndef __ASSEMBLY__
 
+#include <xen/lib.h>
 #include <xen/types.h>
 #include <public/xen.h>
+#include <asm/current.h>
 #include <asm/processor.h>
 
 #define psr_mode(psr,m) (((psr) & PSR_MODE_MASK) == m)
@@ -37,16 +39,16 @@
     (psr_mode((r)->cpsr,PSR_MODE_EL0t) || usr_mode(r))
 #endif
 
-#define guest_mode(r)                                                         \
-({                                                                            \
-    unsigned long diff = (char *)guest_cpu_user_regs() - (char *)(r);         \
-    /* Frame pointer must point into current CPU stack. */                    \
-    ASSERT(diff < STACK_SIZE);                                                \
-    /* If not a guest frame, it must be a hypervisor frame. */                \
-    ASSERT((diff == 0) || hyp_mode(r));                                       \
-    /* Return TRUE if it's a guest frame. */                                  \
-    (diff == 0);                                                              \
-})
+static inline bool guest_mode(const struct cpu_user_regs *r)
+{
+    unsigned long diff = (char *)guest_cpu_user_regs() - (char *)(r);
+    /* Frame pointer must point into current CPU stack. */
+    ASSERT(diff < STACK_SIZE);
+    /* If not a guest frame, it must be a hypervisor frame. */
+    ASSERT((diff == 0) || hyp_mode(r));
+    /* Return TRUE if it's a guest frame. */
+    return (diff == 0);
+}
 
 #define return_reg(v) ((v)->arch.cpu_info->guest_cpu_user_regs.r0)
 
