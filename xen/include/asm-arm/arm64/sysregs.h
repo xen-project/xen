@@ -57,6 +57,29 @@
 #define ICH_AP1R2_EL2             __AP1Rx_EL2(2)
 #define ICH_AP1R3_EL2             __AP1Rx_EL2(3)
 
+/* Access to system registers */
+
+#define READ_SYSREG32(name) ({                          \
+    uint32_t _r;                                        \
+    asm volatile("mrs  %0, "__stringify(name) : "=r" (_r));         \
+    _r; })
+#define WRITE_SYSREG32(v, name) do {                    \
+    uint32_t _r = v;                                    \
+    asm volatile("msr "__stringify(name)", %0" : : "r" (_r));       \
+} while (0)
+
+#define WRITE_SYSREG64(v, name) do {                    \
+    uint64_t _r = v;                                    \
+    asm volatile("msr "__stringify(name)", %0" : : "r" (_r));       \
+} while (0)
+#define READ_SYSREG64(name) ({                          \
+    uint64_t _r;                                        \
+    asm volatile("mrs  %0, "__stringify(name) : "=r" (_r));         \
+    _r; })
+
+#define READ_SYSREG(name)     READ_SYSREG64(name)
+#define WRITE_SYSREG(v, name) WRITE_SYSREG64(v, name)
+
 #endif /* _ASM_ARM_ARM64_SYSREGS_H */
 
 /*

@@ -1,4 +1,5 @@
 #include <asm/asm_defns.h>
+#include <asm/sysregs.h>
 #include <asm/regs.h>
 #include <asm/alternative.h>
 #include <public/xen.h>

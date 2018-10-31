@@ -1,7 +1,7 @@
 #ifndef __ARM_TIME_H__
 #define __ARM_TIME_H__
 
-#include <asm/processor.h>
+#include <asm/sysregs.h>
 
 #define DT_MATCH_TIMER                      \
     DT_MATCH_COMPATIBLE("arm,armv7-timer"), \

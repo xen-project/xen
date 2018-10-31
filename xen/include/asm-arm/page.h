@@ -4,6 +4,7 @@
 #include <public/xen.h>
 #include <asm/processor.h>
 #include <asm/lpae.h>
+#include <asm/sysregs.h>
 
 #ifdef CONFIG_ARM_64
 #define PADDR_BITS              48

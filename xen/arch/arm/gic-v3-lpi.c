@@ -30,6 +30,7 @@
 #include <asm/gic_v3_its.h>
 #include <asm/io.h>
 #include <asm/page.h>
+#include <asm/sysregs.h>
 
 /*
  * There could be a lot of LPIs on the host side, and they always go to

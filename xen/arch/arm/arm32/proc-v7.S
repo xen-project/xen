@@ -19,6 +19,7 @@
 
 #include <asm/asm_defns.h>
 #include <asm/arm32/processor.h>
+#include <asm/sysregs.h>
 
 ca15mp_init:
 ca7mp_init:
