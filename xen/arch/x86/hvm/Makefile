@@ -1,5 +1,6 @@
 subdir-y += svm
 subdir-y += vmx
+subdir-y += viridian
 
 obj-y += asid.o
 obj-y += dm.o
@@ -23,7 +24,6 @@ obj-y += rtc.o
 obj-y += save.o
 obj-y += stdvga.o
 obj-y += vioapic.o
-obj-y += viridian.o
 obj-y += vlapic.o
 obj-y += vm_event.o
 obj-y += vmsi.o

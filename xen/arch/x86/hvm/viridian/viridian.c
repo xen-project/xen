@@ -4,7 +4,7 @@
  * An implementation of some Viridian enlightenments. See Microsoft's
  * Hypervisor Top Level Functional Specification (v5.0a) at:
  *
- * https://github.com/Microsoft/Virtualization-Documentation/raw/master/tlfs/Hypervisor%20Top%20Level%20Functional%20Specification%20v5.0.pdf 
+ * https://github.com/Microsoft/Virtualization-Documentation/raw/master/tlfs/Hypervisor%20Top%20Level%20Functional%20Specification%20v5.0.pdf
  *
  * for more information.
  */
@@ -334,7 +334,7 @@ static void dump_reference_tsc(const struct domain *d)
     const union viridian_reference_tsc *rt;
 
     rt = &d->arch.hvm.viridian.reference_tsc;
-    
+
     printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: enabled: %x pfn: %lx\n",
            d->domain_id,
            rt->fields.enabled, (unsigned long)rt->fields.pfn);
