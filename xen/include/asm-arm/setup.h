@@ -74,14 +74,14 @@ void discard_initial_modules(void);
 void dt_unreserved_regions(paddr_t s, paddr_t e,
                            void (*cb)(paddr_t, paddr_t), int first);
 
-size_t __init boot_fdt_info(const void *fdt, paddr_t paddr);
-const char __init *boot_fdt_cmdline(const void *fdt);
+size_t boot_fdt_info(const void *fdt, paddr_t paddr);
+const char *boot_fdt_cmdline(const void *fdt);
 
 struct bootmodule *add_boot_module(bootmodule_kind kind,
                                    paddr_t start, paddr_t size,
                                    const char *cmdline);
 struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
-const char * __init boot_module_kind_as_string(bootmodule_kind kind);
+const char *boot_module_kind_as_string(bootmodule_kind kind);
 
 #endif
 /*

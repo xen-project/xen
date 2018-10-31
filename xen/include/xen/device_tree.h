@@ -15,7 +15,6 @@
 #include <public/xen.h>
 #include <public/device_tree_defs.h>
 #include <xen/kernel.h>
-#include <xen/init.h>
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/list.h>
@@ -169,7 +168,7 @@ int device_tree_for_each_node(const void *fdt,
  * Create a hierarchical device tree for the host DTB to be able
  * to retrieve parents.
  */
-void __init dt_unflatten_host_device_tree(void);
+void dt_unflatten_host_device_tree(void);
 
 /**
  * IRQ translation callback
@@ -204,7 +203,7 @@ extern const struct dt_device_node *dt_interrupt_controller;
  *
  * If found, return the interrupt controller device node.
  */
-struct dt_device_node * __init
+struct dt_device_node *
 dt_find_interrupt_controller(const struct dt_device_match *matches);
 
 #define dt_prop_cmp(s1, s2) strcmp((s1), (s2))

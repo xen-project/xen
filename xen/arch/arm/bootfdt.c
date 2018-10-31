@@ -349,7 +349,7 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
     return fdt_totalsize(fdt);
 }
 
-const char *boot_fdt_cmdline(const void *fdt)
+const __init char *boot_fdt_cmdline(const void *fdt)
 {
     int node;
     const struct fdt_property *prop;

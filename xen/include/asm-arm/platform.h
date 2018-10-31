@@ -1,7 +1,6 @@
 #ifndef __ASM_ARM_PLATFORM_H
 #define __ASM_ARM_PLATFORM_H
 
-#include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
 #include <xen/device_tree.h>
@@ -46,9 +45,9 @@ struct platform_desc {
  */
 #define PLATFORM_QUIRK_GIC_64K_STRIDE (1 << 0)
 
-void __init platform_init(void);
-int __init platform_init_time(void);
-int __init platform_specific_mapping(struct domain *d);
+void platform_init(void);
+int platform_init_time(void);
+int platform_specific_mapping(struct domain *d);
 #ifdef CONFIG_ARM_32
 int platform_smp_init(void);
 int platform_cpu_up(int cpu);

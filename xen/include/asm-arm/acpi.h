@@ -23,7 +23,6 @@
 #ifndef _ASM_ARM_ACPI_H
 #define _ASM_ARM_ACPI_H
 
-#include <xen/init.h>
 #include <asm/page.h>
 #include <asm/setup.h>
 
@@ -43,9 +42,9 @@ typedef enum {
     TBL_MMAX,
 } EFI_MEM_RES;
 
-bool __init acpi_psci_present(void);
-bool __init acpi_psci_hvc_present(void);
-void __init acpi_smp_init_cpus(void);
+bool acpi_psci_present(void);
+bool acpi_psci_hvc_present(void);
+void acpi_smp_init_cpus(void);
 
 /*
  * This function returns the offset of a given ACPI/EFI table in the allocated

@@ -24,9 +24,9 @@ struct arch_iommu
 #define iommu_use_hap_pt(d) (has_iommu_pt(d))
 
 const struct iommu_ops *iommu_get_ops(void);
-void __init iommu_set_ops(const struct iommu_ops *ops);
+void iommu_set_ops(const struct iommu_ops *ops);
 
-int __init iommu_hardware_setup(void);
+int iommu_hardware_setup(void);
 
 #endif /* __ARCH_ARM_IOMMU_H__ */
 

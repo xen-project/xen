@@ -1,8 +1,6 @@
 #ifndef __ASM_ARM_DEVICE_H
 #define __ASM_ARM_DEVICE_H
 
-#include <xen/init.h>
-
 enum device_type
 {
     DEV_DT,
@@ -68,8 +66,8 @@ struct acpi_device_desc {
  *
  *  Return 0 on success.
  */
-int __init acpi_device_init(enum device_class class,
-                            const void *data, int class_type);
+int acpi_device_init(enum device_class class,
+                     const void *data, int class_type);
 
 /**
  *  device_init - Initialize a device
@@ -79,8 +77,8 @@ int __init acpi_device_init(enum device_class class,
  *
  *  Return 0 on success.
  */
-int __init device_init(struct dt_device_node *dev, enum device_class class,
-                       const void *data);
+int device_init(struct dt_device_node *dev, enum device_class class,
+                const void *data);
 
 /**
  * device_get_type - Get the type of the device

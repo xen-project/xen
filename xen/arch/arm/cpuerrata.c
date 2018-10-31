@@ -1,5 +1,6 @@
 #include <xen/cpu.h>
 #include <xen/cpumask.h>
+#include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/sizes.h>
 #include <xen/smp.h>

@@ -19,6 +19,7 @@
 
 #include <asm/device.h>
 #include <xen/errno.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 
 extern const struct device_desc _sdevice[], _edevice[];

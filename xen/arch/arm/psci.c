@@ -19,6 +19,7 @@
 
 
 #include <xen/types.h>
+#include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
 #include <asm/cpufeature.h>

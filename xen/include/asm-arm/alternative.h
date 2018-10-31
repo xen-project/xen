@@ -7,7 +7,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <xen/init.h>
 #include <xen/types.h>
 #include <xen/stringify.h>
 
@@ -28,7 +27,7 @@ typedef void (*alternative_cb_t)(const struct alt_instr *alt,
 				 const uint32_t *origptr, uint32_t *updptr,
 				 int nr_inst);
 
-void __init apply_alternatives_all(void);
+void apply_alternatives_all(void);
 int apply_alternatives(const struct alt_instr *start, const struct alt_instr *end);
 
 #define ALTINSTR_ENTRY(feature, cb)					      \
