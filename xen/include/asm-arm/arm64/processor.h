@@ -1,8 +1,6 @@
 #ifndef __ASM_ARM_ARM64_PROCESSOR_H
 #define __ASM_ARM_ARM64_PROCESSOR_H
 
-#include <xen/stringify.h>
-
 #ifndef __ASSEMBLY__
 
 /* Anonymous union includes both 32- and 64-bit names (e.g., r0/x0). */

@@ -1,6 +1,7 @@
 #ifndef __ASM_ARM_ARM32_SYSREGS_H
 #define __ASM_ARM_ARM32_SYSREGS_H
 
+#include <xen/stringify.h>
 #include <asm/cpregs.h>
 
 /* Layout as used in assembly, with src/dest registers mixed in */

@@ -1,8 +1,6 @@
 #ifndef __ASM_ARM_CPREGS_H
 #define __ASM_ARM_CPREGS_H
 
-#include <xen/stringify.h>
-
 /*
  * AArch32 Co-processor registers.
  *
