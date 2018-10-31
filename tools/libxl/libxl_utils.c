@@ -1070,6 +1070,8 @@ int libxl__sendmsg_fds(libxl__gc *gc, int carrier,
     struct iovec iov;
     int r;
 
+    assert(datalen == 1);
+
     iov.iov_base = (void*)data;
     iov.iov_len  = datalen;
 
@@ -1088,11 +1090,24 @@ int libxl__sendmsg_fds(libxl__gc *gc, int carrier,
 
     msg.msg_controllen = cmsg->cmsg_len;
 
-    r = sendmsg(carrier, &msg, 0);
-    if (r < 0) {
-        LOGE(ERROR, "failed to send fd-carrying message (%s)", what);
-        return ERROR_FAIL;
-    }
+    while (1) {
+        r = sendmsg(carrier, &msg, 0);
+        if (r < 0) {
+            if (errno == EINTR)
+                continue;
+            if (errno == EWOULDBLOCK) {
+                return ERROR_NOT_READY;
+            }
+            LOGE(ERROR, "failed to send fd-carrying message (%s)", what);
+            return ERROR_FAIL;
+        }
+        if (r != datalen) {
+            LOG(ERROR, "sendmsg have written %d instead of %zu",
+                r, datalen);
+            return ERROR_FAIL;
+        }
+        break;
+    };
 
     return 0;
 }
