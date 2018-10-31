@@ -22,11 +22,8 @@
 #include <asm/new_vgic.h>
 #else
 
-#include <xen/bitops.h>
 #include <xen/radix-tree.h>
 #include <xen/rbtree.h>
-#include <asm/gic.h>
-#include <asm/mmio.h>
 
 struct pending_irq
 {
