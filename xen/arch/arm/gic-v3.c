@@ -23,7 +23,6 @@
 
 #include <xen/lib.h>
 #include <xen/init.h>
-#include <xen/cpu.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <xen/iocap.h>
@@ -33,18 +32,14 @@
 #include <xen/device_tree.h>
 #include <xen/sizes.h>
 #include <xen/libfdt/libfdt.h>
-#include <xen/sort.h>
 #include <xen/acpi.h>
 #include <acpi/actables.h>
-#include <asm/p2m.h>
-#include <asm/domain.h>
 #include <asm/io.h>
 #include <asm/device.h>
 #include <asm/gic.h>
 #include <asm/gic_v3_defs.h>
 #include <asm/gic_v3_its.h>
 #include <asm/cpufeature.h>
-#include <asm/acpi.h>
 
 /* Global state */
 static struct {
