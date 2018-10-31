@@ -2,9 +2,7 @@
 #define __ARM_CURRENT_H__
 
 #include <xen/percpu.h>
-#include <public/xen.h>
 
-#include <asm/percpu.h>
 #include <asm/processor.h>
 
 /* Tell whether the guest vCPU enabled Workaround 2 (i.e variant 4) */
