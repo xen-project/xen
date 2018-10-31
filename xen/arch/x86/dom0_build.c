@@ -433,6 +433,12 @@ int __init dom0_setup_permissions(struct domain *d)
         rc |= ioports_deny_access(d, pmtmr_ioport, pmtmr_ioport + 3);
     /* PCI configuration space (NB. 0xcf8 has special treatment). */
     rc |= ioports_deny_access(d, 0xcfc, 0xcff);
+#ifdef CONFIG_HVM
+    if ( is_hvm_domain(d) )
+        /* HVM debug console IO port. */
+        rc |= ioports_deny_access(d, XEN_HVM_DEBUGCONS_IOPORT,
+                                  XEN_HVM_DEBUGCONS_IOPORT);
+#endif
     /* Command-line I/O ranges. */
     process_dom0_ioports_disable(d);
 
