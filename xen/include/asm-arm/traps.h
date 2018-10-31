@@ -46,6 +46,9 @@ void do_trap_hvc_smccc(struct cpu_user_regs *regs);
 
 int do_bug_frame(const struct cpu_user_regs *regs, vaddr_t pc);
 
+void noreturn do_unexpected_trap(const char *msg,
+                                 const struct cpu_user_regs *regs);
+
 /* Functions for pending virtual abort checking window. */
 void abort_guest_exit_start(void);
 void abort_guest_exit_end(void);

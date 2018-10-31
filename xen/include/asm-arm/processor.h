@@ -453,10 +453,6 @@ extern register_t __cpu_logical_map[];
 #endif
 
 #ifndef __ASSEMBLY__
-extern uint32_t hyp_traps_vector[];
-
-void init_traps(void);
-
 void panic_PAR(uint64_t par);
 
 void show_execution_state(const struct cpu_user_regs *regs);
@@ -469,9 +465,6 @@ void show_registers(const struct cpu_user_regs *regs);
 /* All a bit UP for the moment */
 #define cpu_to_core(_cpu)   (0)
 #define cpu_to_socket(_cpu) (0)
-
-void noreturn do_unexpected_trap(const char *msg,
-                                 const struct cpu_user_regs *regs);
 
 struct vcpu;
 void vcpu_regs_hyp_to_user(const struct vcpu *vcpu,

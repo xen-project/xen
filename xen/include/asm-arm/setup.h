@@ -83,6 +83,9 @@ struct bootmodule *add_boot_module(bootmodule_kind kind,
 struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
 const char *boot_module_kind_as_string(bootmodule_kind kind);
 
+extern uint32_t hyp_traps_vector[];
+void init_traps(void);
+
 #endif
 /*
  * Local variables:
