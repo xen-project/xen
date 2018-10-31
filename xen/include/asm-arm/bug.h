@@ -1,8 +1,6 @@
 #ifndef __ARM_BUG_H__
 #define __ARM_BUG_H__
 
-#include <asm/processor.h>
-
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/bug.h>
 #elif defined(CONFIG_ARM_64)
@@ -76,8 +74,6 @@ extern const struct bug_frame __start_bug_frames[],
                               __stop_bug_frames_0[],
                               __stop_bug_frames_1[],
                               __stop_bug_frames_2[];
-
-int do_bug_frame(const struct cpu_user_regs *regs, vaddr_t pc);
 
 #endif /* __ARM_BUG_H__ */
 /*

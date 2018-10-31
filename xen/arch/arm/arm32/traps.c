@@ -22,6 +22,7 @@
 #include <public/xen.h>
 
 #include <asm/processor.h>
+#include <asm/traps.h>
 
 void do_trap_reset(struct cpu_user_regs *regs)
 {
