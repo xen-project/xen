@@ -1872,11 +1872,12 @@ static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     struct vmx_inst_decoded decode;
     unsigned long operand; 
     u64 vmcs_encoding;
-    bool_t okay = 1;
     enum vmx_insn_errno err;
+    int rc;
 
-    if ( decode_vmx_inst(regs, &decode, &operand) != X86EMUL_OKAY )
-        return X86EMUL_EXCEPTION;
+    rc = decode_vmx_inst(regs, &decode, &operand);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     if ( !vvmcx_valid(v) )
     {
@@ -1905,10 +1906,7 @@ static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
         break;
     }
 
-    if ( okay )
-        vmsucceed(regs);
-    else
-        vmfail_valid(regs, VMX_INSN_UNSUPPORTED_VMCS_COMPONENT);
+    vmsucceed(regs);
 
     return X86EMUL_OKAY;
 }
