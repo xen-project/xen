@@ -1371,7 +1371,6 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
         nvmx_update_apicv(v);
 
     nvcpu->nv_vmswitch_in_progress = 0;
-    vmsucceed(regs);
 }
 
 static void nvmx_eptp_update(void)
