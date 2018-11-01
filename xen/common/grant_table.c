@@ -890,13 +890,6 @@ static unsigned int mapkind(
     return kind;
 }
 
-/*
- * Returns 0 if TLB flush / invalidate required by caller.
- * va will indicate the address to be invalidated.
- *
- * addr is _either_ a host virtual address, or the address of the pte to
- * update, as indicated by the GNTMAP_contains_pte flag.
- */
 static void
 map_grant_ref(
     struct gnttab_map_grant_ref *op)
