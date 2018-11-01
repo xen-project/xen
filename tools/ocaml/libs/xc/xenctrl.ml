@@ -141,6 +141,28 @@ type handle
 external interface_open: unit -> handle = "stub_xc_interface_open"
 external interface_close: handle -> unit = "stub_xc_interface_close"
 
+let handle = ref None
+
+let get_handle () = !handle
+
+let close_handle () =
+	match !handle with
+	| Some h -> handle := None; interface_close h
+	| None -> ()
+
+let with_intf f =
+	match !handle with
+	| Some h -> f h
+	| None ->
+		let h =
+			try interface_open () with
+			| e ->
+				let msg = Printexc.to_string e in
+				failwith ("failed to open xenctrl: "^msg)
+		in
+		handle := Some h;
+		f h
+
 external domain_create: handle -> domctl_create_config -> domid
        = "stub_xc_domain_create"
 
