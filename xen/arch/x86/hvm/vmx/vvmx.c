@@ -1672,7 +1672,7 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( gpa & 0xfff )
+    if ( (gpa & ~PAGE_MASK) || !gfn_valid(v->domain, gaddr_to_gfn(gpa)) )
     {
         vmfail(regs, VMX_INSN_VMPTRLD_INVALID_PHYADDR);
         goto out;
@@ -1780,7 +1780,7 @@ static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         goto out;
     }
 
-    if ( gpa & 0xfff )
+    if ( (gpa & ~PAGE_MASK) || !gfn_valid(v->domain, gaddr_to_gfn(gpa)) )
     {
         vmfail(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
         goto out;
