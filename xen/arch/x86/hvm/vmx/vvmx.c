@@ -207,11 +207,6 @@ struct vmx_inst_decoded {
     unsigned int reg2;
 };
 
-#define CASE_SET_REG(REG, reg)      \
-    case VMX_REG_ ## REG: regs->reg = value; break
-#define CASE_GET_REG(REG, reg)      \
-    case VMX_REG_ ## REG: value = regs->reg; break
-
 static int vvmcs_offset(u32 width, u32 type, u32 index)
 {
     int offset;
