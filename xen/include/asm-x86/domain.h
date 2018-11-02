@@ -681,7 +681,14 @@ void arch_vcpu_regs_init(struct vcpu *v);
 struct vcpu_hvm_context;
 int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx);
 
+#ifdef CONFIG_PV
 void pv_inject_event(const struct x86_event *event);
+#else
+static inline void pv_inject_event(const struct x86_event *event)
+{
+    ASSERT_UNREACHABLE();
+}
+#endif
 
 static inline void pv_inject_hw_exception(unsigned int vector, int errcode)
 {
