@@ -140,7 +140,7 @@ struct vcpu *vcpu_create(
 
     BUG_ON((!is_idle_domain(d) || vcpu_id) && d->vcpu[vcpu_id]);
 
-    if ( (v = alloc_vcpu_struct()) == NULL )
+    if ( (v = alloc_vcpu_struct(d)) == NULL )
         return NULL;
 
     v->domain = d;

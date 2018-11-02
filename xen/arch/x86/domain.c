@@ -302,7 +302,7 @@ void free_domain_struct(struct domain *d)
     free_xenheap_page(d);
 }
 
-struct vcpu *alloc_vcpu_struct(void)
+struct vcpu *alloc_vcpu_struct(const struct domain *d)
 {
     struct vcpu *v;
     /*
@@ -311,8 +311,11 @@ struct vcpu *alloc_vcpu_struct(void)
      * may require that the shadow CR3 points below 4GB, and hence the whole
      * structure must satisfy this restriction. Thus we specify MEMF_bits(32).
      */
+    unsigned int memflags =
+        (is_hvm_domain(d) && paging_mode_shadow(d)) ? MEMF_bits(32) : 0;
+
     BUILD_BUG_ON(sizeof(*v) > PAGE_SIZE);
-    v = alloc_xenheap_pages(0, MEMF_bits(32));
+    v = alloc_xenheap_pages(0, memflags);
     if ( v != NULL )
         clear_page(v);
     return v;

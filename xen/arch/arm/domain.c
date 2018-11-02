@@ -516,7 +516,7 @@ void dump_pageframe_info(struct domain *d)
 #define MAX_PAGES_PER_VCPU  1
 #endif
 
-struct vcpu *alloc_vcpu_struct(void)
+struct vcpu *alloc_vcpu_struct(const struct domain *d)
 {
     struct vcpu *v;
 
