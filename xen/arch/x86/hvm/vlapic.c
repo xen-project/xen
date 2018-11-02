@@ -448,7 +448,7 @@ void vlapic_EOI_set(struct vlapic *vlapic)
     vlapic_clear_vector(vector, &vlapic->regs->data[APIC_ISR]);
 
     if ( hvm_funcs.handle_eoi )
-        hvm_funcs.handle_eoi(vector);
+        hvm_funcs.handle_eoi(vector, vlapic_find_highest_isr(vlapic));
 
     vlapic_handle_EOI(vlapic, vector);
 
