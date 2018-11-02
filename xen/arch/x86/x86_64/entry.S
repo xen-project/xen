@@ -121,16 +121,6 @@ process_trap:
         call create_bounce_frame
         jmp  test_all_events
 
-/* No special register assumptions. */
-ENTRY(ret_from_intr)
-        GET_CURRENT(bx)
-        testb $3, UREGS_cs(%rsp)
-        jz    restore_all_xen
-        movq  VCPU_domain(%rbx), %rax
-        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
-        je    test_all_events
-        jmp   compat_test_all_events
-
         .section .text.entry, "ax", @progbits
 
 /* %rbx: struct vcpu, interrupts disabled */
@@ -210,26 +200,6 @@ iret_exit_to_guest:
         addq  $8,%rsp
 .Lft0:  iretq
         _ASM_PRE_EXTABLE(.Lft0, handle_exception)
-
-        ALIGN
-/* No special register assumptions. */
-restore_all_xen:
-        /*
-         * Check whether we need to switch to the per-CPU page tables, in
-         * case we return to late PV exit code (from an NMI or #MC).
-         */
-        GET_STACK_END(bx)
-        cmpb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
-UNLIKELY_START(ne, exit_cr3)
-        mov   STACK_CPUINFO_FIELD(pv_cr3)(%rbx), %rax
-        mov   %rax, %cr3
-UNLIKELY_END(exit_cr3)
-
-        /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        SPEC_CTRL_EXIT_TO_XEN_IST /* Req: %rbx=end, Clob: acd */
-
-        RESTORE_ALL adj=8
-        iretq
 
 /*
  * When entering SYSCALL from kernel mode:
@@ -553,7 +523,41 @@ ENTRY(dom_crash_sync_extable)
         jmp   asm_domain_crash_synchronous /* Does not return */
         .popsection
 
+/* --- CODE BELOW THIS LINE (MOSTLY) NOT GUEST RELATED --- */
+
+        .text
+
+/* No special register assumptions. */
+ENTRY(ret_from_intr)
+        GET_CURRENT(bx)
+        testb $3, UREGS_cs(%rsp)
+        jz    restore_all_xen
+        movq  VCPU_domain(%rbx), %rax
+        cmpb  $0, DOMAIN_is_32bit_pv(%rax)
+        je    test_all_events
+        jmp   compat_test_all_events
+
         .section .text.entry, "ax", @progbits
+
+        ALIGN
+/* No special register assumptions. */
+restore_all_xen:
+        /*
+         * Check whether we need to switch to the per-CPU page tables, in
+         * case we return to late PV exit code (from an NMI or #MC).
+         */
+        GET_STACK_END(bx)
+        cmpb  $0, STACK_CPUINFO_FIELD(use_pv_cr3)(%rbx)
+UNLIKELY_START(ne, exit_cr3)
+        mov   STACK_CPUINFO_FIELD(pv_cr3)(%rbx), %rax
+        mov   %rax, %cr3
+UNLIKELY_END(exit_cr3)
+
+        /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
+        SPEC_CTRL_EXIT_TO_XEN_IST /* Req: %rbx=end, Clob: acd */
+
+        RESTORE_ALL adj=8
+        iretq
 
 ENTRY(common_interrupt)
         SAVE_ALL CLAC
