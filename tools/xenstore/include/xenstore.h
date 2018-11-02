@@ -77,7 +77,7 @@ typedef uint32_t xs_transaction_t;
 struct xs_handle *xs_open(unsigned long flags);
 
 /* Close the connection to the xs daemon. */
-void xs_close(struct xs_handle *xsh);
+void xs_close(struct xs_handle *xsh /* NULL ok */);
 
 /* Connect to the xs daemon.
  * Returns a handle or NULL.
