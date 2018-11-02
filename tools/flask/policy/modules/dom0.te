@@ -66,6 +66,9 @@ allow dom0_t security_t:security { load_policy setenforce setbool };
 # Audit policy change events even when they are allowed
 auditallow dom0_t security_t:security { load_policy setenforce setbool };
 
+# Allow dom0 to report platform configuration changes back to the hypervisor
+allow dom0_t xen_t:resource setup;
+
 admin_device(dom0_t, device_t)
 admin_device(dom0_t, irq_t)
 admin_device(dom0_t, ioport_t)
