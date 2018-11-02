@@ -1114,23 +1114,34 @@ int libxl__arch_domain_map_irq(libxl__gc *gc, uint32_t domid, int irq)
     return xc_domain_bind_pt_spi_irq(CTX->xch, domid, irq, irq);
 }
 
+void libxl__arch_domain_create_info_setdefault(libxl__gc *gc,
+                                               libxl_domain_create_info *c_info)
+{
+    /*
+     * Arm guest are now considered as PVH by the toolstack. To allow
+     * compatibility with previous toolstack, PV guest are automatically
+     * converted to PVH.
+     */
+    if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
+        LOG(WARN, "Converting PV guest to PVH.");
+        LOG(WARN, "Arm guest are now PVH.");
+        LOG(WARN, "Please fix your configuration file/toolstack.");
+
+        c_info->type = LIBXL_DOMAIN_TYPE_PVH;
+        /* All other fields can remain untouched */
+    }
+}
+
 void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
                                               libxl_domain_build_info *b_info)
 {
     /* ACPI is disabled by default */
     libxl_defbool_setdefault(&b_info->acpi, false);
 
-    /*
-     * Arm guest are now considered as PVH by the toolstack. To allow
-     * compatibility with previous toolstack, PV guest are automatically
-     * converted to PVH.
-     */
     if (b_info->type != LIBXL_DOMAIN_TYPE_PV)
         return;
 
-    LOG(WARN, "Converting PV guest to PVH.");
-    LOG(WARN, "Arm guest are now PVH.");
-    LOG(WARN, "Please fix your configuration file/toolstack.");
+    LOG(DEBUG, "Converting build_info to PVH");
 
     /* Re-initialize type to PVH and all associated fields to defaults. */
     memset(&b_info->u, '\0', sizeof(b_info->u));

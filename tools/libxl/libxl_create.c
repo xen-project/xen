@@ -35,6 +35,8 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
         return ERROR_INVAL;
     }
 
+    libxl__arch_domain_create_info_setdefault(gc, c_info);
+
     if (c_info->type != LIBXL_DOMAIN_TYPE_PV) {
         libxl_defbool_setdefault(&c_info->hap, true);
         libxl_defbool_setdefault(&c_info->oos, true);
