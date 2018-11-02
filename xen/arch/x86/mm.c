@@ -3057,7 +3057,8 @@ int new_guest_cr3(mfn_t mfn)
 #endif
 }
 
-static inline int vcpumask_to_pcpumask(
+#ifdef CONFIG_PV
+static int vcpumask_to_pcpumask(
     struct domain *d, XEN_GUEST_HANDLE_PARAM(const_void) bmap, cpumask_t *pmask)
 {
     unsigned int vcpu_id, vcpu_bias, offs;
@@ -3099,7 +3100,6 @@ static inline int vcpumask_to_pcpumask(
     }
 }
 
-#ifdef CONFIG_PV
 static struct domain *get_pg_owner(domid_t domid)
 {
     struct domain *pg_owner = NULL, *curr = current->domain;
