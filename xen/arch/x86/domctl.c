@@ -609,19 +609,33 @@ long arch_do_domctl(
         break;
 
     case XEN_DOMCTL_set_address_size:
-        if ( ((domctl->u.address_size.size == 64) && !d->arch.is_32bit_pv) ||
-             ((domctl->u.address_size.size == 32) && d->arch.is_32bit_pv) )
-            ret = 0;
-        else if ( domctl->u.address_size.size == 32 )
-            ret = switch_compat(d);
+        if ( is_hvm_domain(d) )
+            ret = -EOPNOTSUPP;
+        else if ( is_pv_domain(d) )
+        {
+            if ( ((domctl->u.address_size.size == 64) && !d->arch.is_32bit_pv) ||
+                 ((domctl->u.address_size.size == 32) && d->arch.is_32bit_pv) )
+                ret = 0;
+            else if ( domctl->u.address_size.size == 32 )
+                ret = switch_compat(d);
+            else
+                ret = -EINVAL;
+        }
         else
-            ret = -EINVAL;
+            ASSERT_UNREACHABLE();
         break;
 
     case XEN_DOMCTL_get_address_size:
-        domctl->u.address_size.size = is_pv_32bit_domain(d) ? 32 :
-                                                              BITS_PER_LONG;
-        copyback = true;
+        if ( is_hvm_domain(d) )
+            ret = -EOPNOTSUPP;
+        else if ( is_pv_domain(d) )
+        {
+            domctl->u.address_size.size =
+                is_pv_32bit_domain(d) ? 32 : BITS_PER_LONG;
+            copyback = true;
+        }
+        else
+            ASSERT_UNREACHABLE();
         break;
 
     case XEN_DOMCTL_set_machine_address_size:
