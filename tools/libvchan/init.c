@@ -250,7 +250,7 @@ static int init_xs_srv(struct libxenvchan *ctrl, int domain, const char* xs_base
 	char buf[64];
 	char ref[16];
 	char* domid_str = NULL;
-	xs_transaction_t xs_trans = NULL;
+	xs_transaction_t xs_trans = XBT_NULL;
 	xs = xs_domain_open();
 	if (!xs)
 		goto fail;
