@@ -2333,7 +2333,7 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
             msr_split(regs, msr_content);
     }
     else
-        rc = hvm_msr_write_intercept(regs->ecx, msr_fold(regs), 1);
+        rc = hvm_msr_write_intercept(regs->ecx, msr_fold(regs), true);
 
     if ( rc == X86EMUL_OKAY )
         __update_guest_eip(regs, inst_len);

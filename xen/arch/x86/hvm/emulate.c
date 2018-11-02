@@ -2024,7 +2024,7 @@ static int hvmemul_write_cr(
     switch ( reg )
     {
     case 0:
-        rc = hvm_set_cr0(val, 1);
+        rc = hvm_set_cr0(val, true);
         break;
 
     case 2:
@@ -2033,11 +2033,11 @@ static int hvmemul_write_cr(
         break;
 
     case 3:
-        rc = hvm_set_cr3(val, 1);
+        rc = hvm_set_cr3(val, true);
         break;
 
     case 4:
-        rc = hvm_set_cr4(val, 1);
+        rc = hvm_set_cr4(val, true);
         break;
 
     default:
@@ -2092,7 +2092,7 @@ static int hvmemul_write_msr(
     uint64_t val,
     struct x86_emulate_ctxt *ctxt)
 {
-    int rc = hvm_msr_write_intercept(reg, val, 1);
+    int rc = hvm_msr_write_intercept(reg, val, true);
 
     if ( rc == X86EMUL_EXCEPTION )
         x86_emul_hw_exception(TRAP_gp_fault, 0, ctxt);

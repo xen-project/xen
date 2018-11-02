@@ -2664,7 +2664,7 @@ static int vmx_cr_access(cr_access_qual_t qual)
                  (X86_CR0_PE|X86_CR0_MP|X86_CR0_EM|X86_CR0_TS));
         HVMTRACE_LONG_1D(LMSW, value);
 
-        if ( (rc = hvm_set_cr0(value, 1)) == X86EMUL_EXCEPTION )
+        if ( (rc = hvm_set_cr0(value, true)) == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
         return rc;
@@ -4000,7 +4000,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     case EXIT_REASON_MSR_WRITE:
-        switch ( hvm_msr_write_intercept(regs->ecx, msr_fold(regs), 1) )
+        switch ( hvm_msr_write_intercept(regs->ecx, msr_fold(regs), true) )
         {
         case X86EMUL_OKAY:
             update_guest_eip(); /* Safe: WRMSR */

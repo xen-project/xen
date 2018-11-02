@@ -1017,15 +1017,15 @@ static void load_shadow_guest_state(struct vcpu *v)
     nvcpu->guest_cr[0] = get_vvmcs(v, CR0_READ_SHADOW);
     nvcpu->guest_cr[4] = get_vvmcs(v, CR4_READ_SHADOW);
 
-    rc = hvm_set_cr0(get_vvmcs(v, GUEST_CR0), 1);
+    rc = hvm_set_cr0(get_vvmcs(v, GUEST_CR0), true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
-    rc = hvm_set_cr4(get_vvmcs(v, GUEST_CR4), 1);
+    rc = hvm_set_cr4(get_vvmcs(v, GUEST_CR4), true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
-    rc = hvm_set_cr3(get_vvmcs(v, GUEST_CR3), 1);
+    rc = hvm_set_cr3(get_vvmcs(v, GUEST_CR3), true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
@@ -1035,7 +1035,7 @@ static void load_shadow_guest_state(struct vcpu *v)
     if ( control & VM_ENTRY_LOAD_PERF_GLOBAL_CTRL )
     {
         rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
-                                     get_vvmcs(v, GUEST_PERF_GLOBAL_CTRL), 0);
+                                     get_vvmcs(v, GUEST_PERF_GLOBAL_CTRL), false);
         if ( rc == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
     }
@@ -1223,15 +1223,15 @@ static void load_vvmcs_host_state(struct vcpu *v)
         __vmwrite(vmcs_h2g_field[i].guest_field, r);
     }
 
-    rc = hvm_set_cr0(get_vvmcs(v, HOST_CR0), 1);
+    rc = hvm_set_cr0(get_vvmcs(v, HOST_CR0), true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
-    rc = hvm_set_cr4(get_vvmcs(v, HOST_CR4), 1);
+    rc = hvm_set_cr4(get_vvmcs(v, HOST_CR4), true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
-    rc = hvm_set_cr3(get_vvmcs(v, HOST_CR3), 1);
+    rc = hvm_set_cr3(get_vvmcs(v, HOST_CR3), true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
 
@@ -1241,7 +1241,7 @@ static void load_vvmcs_host_state(struct vcpu *v)
     if ( control & VM_EXIT_LOAD_PERF_GLOBAL_CTRL )
     {
         rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
-                                     get_vvmcs(v, HOST_PERF_GLOBAL_CTRL), 1);
+                                     get_vvmcs(v, HOST_PERF_GLOBAL_CTRL), true);
         if ( rc == X86EMUL_EXCEPTION )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
     }

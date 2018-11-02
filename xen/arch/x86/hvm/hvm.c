@@ -2038,15 +2038,15 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
     switch ( cr )
     {
     case 0:
-        rc = hvm_set_cr0(val, 1);
+        rc = hvm_set_cr0(val, true);
         break;
 
     case 3:
-        rc = hvm_set_cr3(val, 1);
+        rc = hvm_set_cr3(val, true);
         break;
 
     case 4:
-        rc = hvm_set_cr4(val, 1);
+        rc = hvm_set_cr4(val, true);
         break;
 
     case 8:
@@ -2142,7 +2142,7 @@ static void hvm_update_cr(struct vcpu *v, unsigned int cr, unsigned long value)
     hvm_update_guest_cr(v, cr);
 }
 
-int hvm_set_cr0(unsigned long value, bool_t may_defer)
+int hvm_set_cr0(unsigned long value, bool may_defer)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
@@ -2260,7 +2260,7 @@ int hvm_set_cr0(unsigned long value, bool_t may_defer)
     return X86EMUL_OKAY;
 }
 
-int hvm_set_cr3(unsigned long value, bool_t may_defer)
+int hvm_set_cr3(unsigned long value, bool may_defer)
 {
     struct vcpu *v = current;
     struct page_info *page;
@@ -2314,7 +2314,7 @@ int hvm_set_cr3(unsigned long value, bool_t may_defer)
     return X86EMUL_UNHANDLEABLE;
 }
 
-int hvm_set_cr4(unsigned long value, bool_t may_defer)
+int hvm_set_cr4(unsigned long value, bool may_defer)
 {
     struct vcpu *v = current;
     unsigned long old_cr;
@@ -2981,7 +2981,7 @@ void hvm_task_switch(
     if ( task_switch_load_seg(x86_seg_ldtr, tss.ldt, new_cpl, 0) )
         goto out;
 
-    rc = hvm_set_cr3(tss.cr3, 1);
+    rc = hvm_set_cr3(tss.cr3, true);
     if ( rc == X86EMUL_EXCEPTION )
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
     if ( rc != X86EMUL_OKAY )
