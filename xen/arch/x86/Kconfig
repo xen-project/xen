@@ -62,12 +62,11 @@ config HVM
 	def_bool !PV_SHIM_EXCLUSIVE
 	prompt "HVM support"
 	---help---
-	  Interfaces to support HVM guests which require hardware
-	  support like Intel's VT-x or AMD's SVM. Note the hypervisor
-	  doesn't distinguish HVM or PVH guest types. PVH guest type
-	  is only a concept for end users.
+	  Interfaces to support HVM domains.  HVM domains require hardware
+	  virtualisation extensions (e.g. Intel VT-x, AMD SVM), but can boot
+	  guests which have no specific Xen knowledge.
 
-	  This option is needed if you want to run HVM or PVH guests.
+	  This option is needed if you want to run HVM or PVH domains.
 
 	  If unsure, say Y.
 
