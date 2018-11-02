@@ -1160,8 +1160,9 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
 
     /* Host SYSENTER CS:RIP. */
-    __vmwrite(HOST_SYSENTER_CS, __HYPERVISOR_CS);
-    __vmwrite(HOST_SYSENTER_EIP, (unsigned long)sysenter_entry);
+    __vmwrite(HOST_SYSENTER_CS, IS_ENABLED(CONFIG_PV) ? __HYPERVISOR_CS : 0);
+    __vmwrite(HOST_SYSENTER_EIP,
+              IS_ENABLED(CONFIG_PV) ? (unsigned long)sysenter_entry : 0);
 
     /* MSR intercepts. */
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
