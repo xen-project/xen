@@ -89,6 +89,7 @@ int x86emul_write_xcr(unsigned int reg, uint64_t val,
     return X86EMUL_OKAY;
 }
 
+#ifdef CONFIG_PV
 /* Called with NULL ctxt in hypercall context. */
 int x86emul_read_dr(unsigned int reg, unsigned long *val,
                     struct x86_emulate_ctxt *ctxt)
@@ -155,6 +156,7 @@ int x86emul_write_dr(unsigned int reg, unsigned long val,
         return X86EMUL_EXCEPTION;
     }
 }
+#endif /* CONFIG_PV */
 
 /*
  * Local variables:
