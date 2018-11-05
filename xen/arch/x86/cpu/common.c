@@ -3,6 +3,7 @@
 #include <xen/delay.h>
 #include <xen/smp.h>
 #include <asm/current.h>
+#include <asm/debugreg.h>
 #include <asm/processor.h>
 #include <asm/xstate.h>
 #include <asm/msr.h>
@@ -827,10 +828,13 @@ void cpu_init(void)
 	/* Ensure FPU gets initialised for each domain. */
 	stts();
 
-	/* Clear all 6 debug registers: */
-#define CD(register) asm volatile ( "mov %0,%%db" #register : : "r"(0UL) );
-	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
-#undef CD
+	/* Reset debug registers: */
+	write_debugreg(0, 0);
+	write_debugreg(1, 0);
+	write_debugreg(2, 0);
+	write_debugreg(3, 0);
+	write_debugreg(6, X86_DR6_DEFAULT);
+	write_debugreg(7, X86_DR7_DEFAULT);
 
 	/* Enable NMIs.  Our loader (e.g. Tboot) may have left them disabled. */
 	enable_nmis();
