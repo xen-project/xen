@@ -11,7 +11,6 @@
 
 #include <xen/sched.h>
 #include <xen/version.h>
-#include <xen/perfc.h>
 #include <xen/hypercall.h>
 #include <xen/domain_page.h>
 #include <asm/guest_access.h>
@@ -560,13 +559,11 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
     switch ( idx )
     {
     case HV_X64_MSR_GUEST_OS_ID:
-        perfc_incr(mshv_wrmsr_osid);
         d->arch.hvm.viridian.guest_os_id.raw = val;
         dump_guest_os_id(d);
         break;
 
     case HV_X64_MSR_HYPERCALL:
-        perfc_incr(mshv_wrmsr_hc_page);
         d->arch.hvm.viridian.hypercall_gpa.raw = val;
         dump_hypercall(d);
         if ( d->arch.hvm.viridian.hypercall_gpa.fields.enabled )
@@ -574,18 +571,15 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
         break;
 
     case HV_X64_MSR_VP_INDEX:
-        perfc_incr(mshv_wrmsr_vp_index);
         break;
 
     case HV_X64_MSR_EOI:
-        perfc_incr(mshv_wrmsr_eoi);
         vlapic_EOI_set(vcpu_vlapic(v));
         break;
 
     case HV_X64_MSR_ICR: {
         u32 eax = (u32)val, edx = (u32)(val >> 32);
         struct vlapic *vlapic = vcpu_vlapic(v);
-        perfc_incr(mshv_wrmsr_icr);
         eax &= ~(1 << 12);
         edx &= 0xff000000;
         vlapic_set_reg(vlapic, APIC_ICR2, edx);
@@ -595,12 +589,10 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
     }
 
     case HV_X64_MSR_TPR:
-        perfc_incr(mshv_wrmsr_tpr);
         vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI, (uint8_t)val);
         break;
 
     case HV_X64_MSR_VP_ASSIST_PAGE:
-        perfc_incr(mshv_wrmsr_apic_msr);
         teardown_vp_assist(v); /* release any previous mapping */
         v->arch.hvm.viridian.vp_assist.msr.raw = val;
         dump_vp_assist(v);
@@ -612,7 +604,6 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        perfc_incr(mshv_wrmsr_tsc_msr);
         d->arch.hvm.viridian.reference_tsc.raw = val;
         dump_reference_tsc(d);
         if ( d->arch.hvm.viridian.reference_tsc.fields.enabled )
@@ -704,17 +695,14 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
     switch ( idx )
     {
     case HV_X64_MSR_GUEST_OS_ID:
-        perfc_incr(mshv_rdmsr_osid);
         *val = d->arch.hvm.viridian.guest_os_id.raw;
         break;
 
     case HV_X64_MSR_HYPERCALL:
-        perfc_incr(mshv_rdmsr_hc_page);
         *val = d->arch.hvm.viridian.hypercall_gpa.raw;
         break;
 
     case HV_X64_MSR_VP_INDEX:
-        perfc_incr(mshv_rdmsr_vp_index);
         *val = v->vcpu_id;
         break;
 
@@ -722,7 +710,6 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
         if ( viridian_feature_mask(d) & HVMPV_no_freq )
             return X86EMUL_EXCEPTION;
 
-        perfc_incr(mshv_rdmsr_tsc_frequency);
         *val = (uint64_t)d->arch.tsc_khz * 1000ull;
         break;
 
@@ -730,23 +717,19 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
         if ( viridian_feature_mask(d) & HVMPV_no_freq )
             return X86EMUL_EXCEPTION;
 
-        perfc_incr(mshv_rdmsr_apic_frequency);
         *val = 1000000000ull / APIC_BUS_CYCLE_NS;
         break;
 
     case HV_X64_MSR_ICR:
-        perfc_incr(mshv_rdmsr_icr);
         *val = (((uint64_t)vlapic_get_reg(vcpu_vlapic(v), APIC_ICR2) << 32) |
                 vlapic_get_reg(vcpu_vlapic(v), APIC_ICR));
         break;
 
     case HV_X64_MSR_TPR:
-        perfc_incr(mshv_rdmsr_tpr);
         *val = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI);
         break;
 
     case HV_X64_MSR_VP_ASSIST_PAGE:
-        perfc_incr(mshv_rdmsr_apic_msr);
         *val = v->arch.hvm.viridian.vp_assist.msr.raw;
         break;
 
@@ -754,7 +737,6 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        perfc_incr(mshv_rdmsr_tsc_msr);
         *val = d->arch.hvm.viridian.reference_tsc.raw;
         break;
 
@@ -771,7 +753,6 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
             printk(XENLOG_G_INFO "d%d: VIRIDIAN MSR_TIME_REF_COUNT: accessed\n",
                    d->domain_id);
 
-        perfc_incr(mshv_rdmsr_time_ref_count);
         *val = raw_trc_val(d) + trc->off;
         break;
     }
@@ -876,7 +857,6 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         /*
          * See section 14.5.1 of the specification.
          */
-        perfc_incr(mshv_call_long_wait);
         do_sched_op(SCHEDOP_yield, guest_handle_from_ptr(NULL, void));
         status = HV_STATUS_SUCCESS;
         break;
@@ -895,7 +875,6 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         /*
          * See sections 9.4.2 and 9.4.4 of the specification.
          */
-        perfc_incr(mshv_call_flush);
 
         /* These hypercalls should never use the fast-call convention. */
         status = HV_STATUS_INVALID_PARAMETER;
