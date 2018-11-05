@@ -753,6 +753,9 @@ void cpu_init(void)
 #define CD(register) asm volatile ( "mov %0,%%db" #register : : "r"(0UL) );
 	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 #undef CD
+
+	/* Enable NMIs.  Our loader (e.g. Tboot) may have left them disabled. */
+	enable_nmis();
 }
 
 void cpu_uninit(unsigned int cpu)

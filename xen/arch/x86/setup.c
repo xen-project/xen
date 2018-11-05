@@ -675,6 +675,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     /* Full exception support from here on in. */
 
+    /* Enable NMIs.  Our loader (e.g. Tboot) may have left them disabled. */
+    enable_nmis();
+
     loader = (mbi->flags & MBI_LOADERNAME)
         ? (char *)__va(mbi->boot_loader_name) : "unknown";
 
