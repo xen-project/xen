@@ -26,6 +26,7 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 #include <asm/mc146818rtc.h>
+#include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/atomic.h>
 #include <asm/mpspec.h>
@@ -1078,6 +1079,13 @@ static void __setup_APIC_LVTT(unsigned int clocks)
 
     apic_write(APIC_LVTT, lvtt_value);
 
+    /*
+     * See Intel SDM: TSC-Deadline Mode chapter. In xAPIC mode,
+     * writing to the APIC LVTT and TSC_DEADLINE MSR isn't serialized.
+     * According to Intel, MFENCE can do the serialization here.
+     */
+    asm volatile( "mfence" : : : "memory" );
+
     tmp_value = apic_read(APIC_TDCR);
     apic_write(APIC_TDCR, tmp_value | APIC_TDR_DIV_1);
 
@@ -1090,6 +1098,97 @@ static void setup_APIC_timer(void)
     local_irq_save(flags);
     __setup_APIC_LVTT(0);
     local_irq_restore(flags);
+}
+
+#define DEADLINE_MODEL_MATCH(m, fr) \
+    { .vendor = X86_VENDOR_INTEL, .family = 6, .model = (m), \
+      .feature = X86_FEATURE_TSC_DEADLINE, \
+      .driver_data = (void *)(unsigned long)(fr) }
+
+static unsigned int __init hsx_deadline_rev(void)
+{
+    switch ( boot_cpu_data.x86_mask )
+    {
+    case 0x02: return 0x3a; /* EP */
+    case 0x04: return 0x0f; /* EX */
+    }
+
+    return ~0U;
+}
+
+static unsigned int __init bdx_deadline_rev(void)
+{
+    switch ( boot_cpu_data.x86_mask )
+    {
+    case 0x02: return 0x00000011;
+    case 0x03: return 0x0700000e;
+    case 0x04: return 0x0f00000c;
+    case 0x05: return 0x0e000003;
+    }
+
+    return ~0U;
+}
+
+static unsigned int __init skx_deadline_rev(void)
+{
+    switch ( boot_cpu_data.x86_mask )
+    {
+    case 0x00 ... 0x02: return ~0U;
+    case 0x03: return 0x01000136;
+    case 0x04: return 0x02000014;
+    }
+
+    return 0;
+}
+
+static const struct x86_cpu_id __initconstrel deadline_match[] = {
+    DEADLINE_MODEL_MATCH(0x3c, 0x22),             /* Haswell */
+    DEADLINE_MODEL_MATCH(0x3f, hsx_deadline_rev), /* Haswell EP/EX */
+    DEADLINE_MODEL_MATCH(0x45, 0x20),             /* Haswell D */
+    DEADLINE_MODEL_MATCH(0x46, 0x17),             /* Haswell H */
+
+    DEADLINE_MODEL_MATCH(0x3d, 0x25),             /* Broadwell */
+    DEADLINE_MODEL_MATCH(0x47, 0x17),             /* Broadwell H */
+    DEADLINE_MODEL_MATCH(0x4f, 0x0b000020),       /* Broadwell EP/EX */
+    DEADLINE_MODEL_MATCH(0x56, bdx_deadline_rev), /* Broadwell D */
+
+    DEADLINE_MODEL_MATCH(0x4e, 0xb2),             /* Skylake M */
+    DEADLINE_MODEL_MATCH(0x55, skx_deadline_rev), /* Skylake X */
+    DEADLINE_MODEL_MATCH(0x5e, 0xb2),             /* Skylake D */
+
+    DEADLINE_MODEL_MATCH(0x8e, 0x52),             /* Kabylake M */
+    DEADLINE_MODEL_MATCH(0x9e, 0x52),             /* Kabylake D */
+
+    {}
+};
+
+static void __init check_deadline_errata(void)
+{
+    const struct x86_cpu_id *m;
+    unsigned int rev;
+
+    if ( boot_cpu_has(X86_FEATURE_HYPERVISOR) )
+        return;
+
+    m = x86_match_cpu(deadline_match);
+    if ( !m )
+        return;
+
+    /*
+     * Function pointers will have the MSB set due to address layout,
+     * immediate revisions will not.
+     */
+    if ( (long)m->driver_data < 0 )
+        rev = ((unsigned int (*)(void))(m->driver_data))();
+    else
+        rev = (unsigned long)m->driver_data;
+
+    if ( this_cpu(ucode_cpu_info).cpu_sig.rev >= rev )
+        return;
+
+    setup_clear_cpu_cap(X86_FEATURE_TSC_DEADLINE);
+    printk(XENLOG_WARNING "TSC_DEADLINE disabled due to Errata; "
+           "please update microcode to version %#x (or later)\n", rev);
 }
 
 static void wait_tick_pvh(void)
@@ -1200,6 +1299,8 @@ void __init setup_boot_APIC_clock(void)
     unsigned long flags;
     apic_printk(APIC_VERBOSE, "Using local APIC timer interrupts.\n");
     using_apic_timer = true;
+
+    check_deadline_errata();
 
     local_irq_save(flags);
 
