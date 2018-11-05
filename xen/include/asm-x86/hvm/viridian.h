@@ -77,10 +77,6 @@ union viridian_reference_tsc
     } fields;
 };
 
-/*
- * Type defintion as in Microsoft Hypervisor Top-Level Functional
- * Specification v4.0a, section 15.4.2.
- */
 typedef struct _HV_REFERENCE_TSC_PAGE
 {
     uint32_t TscSequence;

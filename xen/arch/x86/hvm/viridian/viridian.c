@@ -1,12 +1,8 @@
-/******************************************************************************
+/**************************************************************************
  * viridian.c
  *
  * An implementation of some Viridian enlightenments. See Microsoft's
- * Hypervisor Top Level Functional Specification (v5.0a) at:
- *
- * https://github.com/Microsoft/Virtualization-Documentation/raw/master/tlfs/Hypervisor%20Top%20Level%20Functional%20Specification%20v5.0.pdf
- *
- * for more information.
+ * Hypervisor Top Level Functional Specification for more information.
  */
 
 #include <xen/sched.h>
@@ -102,12 +98,7 @@
 /* Viridian Hypercall Flags. */
 #define HV_FLUSH_ALL_PROCESSORS 1
 
-/*
- * Viridian Partition Privilege Flags.
- *
- * This is taken from section 4.2.2 of the specification, and fixed for
- * style and correctness.
- */
+/* Viridian Partition Privilege Flags */
 typedef struct {
     /* Access to virtual MSRs */
     uint64_t AccessVpRunTimeReg:1;
@@ -168,7 +159,7 @@ typedef union _HV_CRASH_CTL_REG_CONTENTS
 #define CPUID4A_MSR_BASED_APIC         (1 << 3)
 #define CPUID4A_RELAX_TIMER_INT        (1 << 5)
 
-/* Viridian CPUID leaf 6: Implementation HW features detected and in use. */
+/* Viridian CPUID leaf 6: Implementation HW features detected and in use */
 #define CPUID6A_APIC_OVERLAY    (1 << 0)
 #define CPUID6A_MSR_BITMAPS     (1 << 1)
 #define CPUID6A_NESTED_PAGING   (1 << 3)
@@ -204,7 +195,6 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
     switch ( leaf )
     {
     case 0:
-        /* See section 2.4.1 of the specification */
         res->a = 0x40000006; /* Maximum leaf */
         memcpy(&res->b, "Micr", 4);
         memcpy(&res->c, "osof", 4);
@@ -212,13 +202,14 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
         break;
 
     case 1:
-        /* See section 2.4.2 of the specification */
         memcpy(&res->a, "Hv#1", 4);
         break;
 
     case 2:
-        /* Hypervisor information, but only if the guest has set its
-           own version number. */
+        /*
+         * Hypervisor information, but only if the guest has set its
+         * own version number.
+         */
         if ( d->arch.hvm.viridian.guest_os_id.raw == 0 )
             break;
         res->a = viridian_build;
@@ -230,9 +221,9 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
     case 3:
     {
         /*
-         * Section 2.4.4 details this leaf and states that EAX and EBX
-         * are defined to be the low and high parts of the partition
-         * privilege mask respectively.
+         * The specification states that EAX and EBX are defined to be
+         * the low and high parts of the partition privilege mask
+         * respectively.
          */
         HV_PARTITION_PRIVILEGE_MASK mask = {
             .AccessIntrCtrlRegs = 1,
@@ -382,11 +373,6 @@ static void initialize_vp_assist(struct vcpu *v)
 
     ASSERT(!v->arch.hvm.viridian.vp_assist.va);
 
-    /*
-     * See section 7.8.7 of the specification for details of this
-     * enlightenment.
-     */
-
     if ( !page )
         goto fail;
 
@@ -409,8 +395,8 @@ static void initialize_vp_assist(struct vcpu *v)
     return;
 
  fail:
-    gdprintk(XENLOG_WARNING, "Bad GMFN %#"PRI_gfn" (MFN %#"PRI_mfn")\n", gmfn,
-             mfn_x(page ? page_to_mfn(page) : INVALID_MFN));
+    gdprintk(XENLOG_WARNING, "Bad GMFN %#"PRI_gfn" (MFN %#"PRI_mfn")\n",
+             gmfn, mfn_x(page ? page_to_mfn(page) : INVALID_MFN));
 }
 
 static void teardown_vp_assist(struct vcpu *v)
@@ -498,14 +484,15 @@ static void update_reference_tsc(struct domain *d, bool_t initialize)
         clear_page(p);
 
     /*
-     * This enlightenment must be disabled is the host TSC is not invariant.
-     * However it is also disabled if vtsc is true (which means rdtsc is being
-     * emulated). This generally happens when guest TSC freq and host TSC freq
-     * don't match. The TscScale value could be adjusted to cope with this,
-     * allowing vtsc to be turned off, but support for this is not yet present
-     * in the hypervisor. Thus is it is possible that migrating a Windows VM
-     * between hosts of differing TSC frequencies may result in large
-     * differences in guest performance.
+     * This enlightenment must be disabled is the host TSC is not
+     * invariant. However it is also disabled if vtsc is true (which
+     * means rdtsc is being emulated). This generally happens when guest
+     * TSC freq and host TSC freq don't match. The TscScale value could be
+     * adjusted to cope with this, allowing vtsc to be turned off, but
+     * support for this is not yet present in the hypervisor. Thus is it
+     * is possible that migrating a Windows VM between hosts of differing
+     * TSC frequencies may result in large differences in guest
+     * performance.
      */
     if ( !host_tsc_is_safe() || d->arch.vtsc )
     {
@@ -515,10 +502,10 @@ static void update_reference_tsc(struct domain *d, bool_t initialize)
          * this mechanism is no longer a reliable source of time and that
          * the VM should fall back to a different source.
          *
-         * Server 2012 (6.2 kernel) and 2012 R2 (6.3 kernel) actually violate
-         * the spec. and rely on a value of 0 to indicate that this
-         * enlightenment should no longer be used. These two kernel
-         * versions are currently the only ones to make use of this
+         * Server 2012 (6.2 kernel) and 2012 R2 (6.3 kernel) actually
+         * violate the specification and rely on a value of 0 to indicate
+         * that this enlightenment should no longer be used. These two
+         * kernel versions are currently the only ones to make use of this
          * enlightenment, so just use 0 here.
          */
         p->TscSequence = 0;
@@ -646,7 +633,8 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
 
     default:
         gdprintk(XENLOG_INFO,
-                 "Write %016"PRIx64" to unimplemented MSR %#x\n", val, idx);
+                 "Write %016"PRIx64" to unimplemented MSR %#x\n", val,
+                 idx);
         return X86EMUL_EXCEPTION;
     }
 
@@ -872,10 +860,6 @@ int viridian_hypercall(struct cpu_user_regs *regs)
             uint64_t vcpu_mask;
         } input_params;
 
-        /*
-         * See sections 9.4.2 and 9.4.4 of the specification.
-         */
-
         /* These hypercalls should never use the fast-call convention. */
         status = HV_STATUS_INVALID_PARAMETER;
         if ( input.fast )
@@ -883,7 +867,8 @@ int viridian_hypercall(struct cpu_user_regs *regs)
 
         /* Get input parameters. */
         if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
-                                      sizeof(input_params)) != HVMTRANS_okay )
+                                      sizeof(input_params)) !=
+             HVMTRANS_okay )
             break;
 
         /*
@@ -961,7 +946,8 @@ out:
     return HVM_HCALL_completed;
 }
 
-static int viridian_save_domain_ctxt(struct vcpu *v, hvm_domain_context_t *h)
+static int viridian_save_domain_ctxt(struct vcpu *v,
+                                     hvm_domain_context_t *h)
 {
     const struct domain *d = v->domain;
     struct hvm_viridian_domain_context ctxt = {
@@ -977,7 +963,8 @@ static int viridian_save_domain_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     return (hvm_save_entry(VIRIDIAN_DOMAIN, 0, h, &ctxt) != 0);
 }
 
-static int viridian_load_domain_ctxt(struct domain *d, hvm_domain_context_t *h)
+static int viridian_load_domain_ctxt(struct domain *d,
+                                     hvm_domain_context_t *h)
 {
     struct hvm_viridian_domain_context ctxt;
 
@@ -1011,7 +998,8 @@ static int viridian_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     return hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt);
 }
 
-static int viridian_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+static int viridian_load_vcpu_ctxt(struct domain *d,
+                                   hvm_domain_context_t *h)
 {
     unsigned int vcpuid = hvm_load_instance(h);
     struct vcpu *v;
