@@ -381,6 +381,8 @@ void start_secondary(void *unused)
 
     smp_callin();
 
+    set_cpu_sibling_map(cpu);
+
     init_percpu_time();
 
     setup_secondary_APIC_clock();
@@ -393,7 +395,6 @@ void start_secondary(void *unused)
 
     /* This must be done before setting cpu_online_map */
     spin_debug_enable();
-    set_cpu_sibling_map(cpu);
     notify_cpu_starting(cpu);
 
     /*

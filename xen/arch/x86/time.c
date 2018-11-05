@@ -88,6 +88,9 @@ static bool __read_mostly using_pit;
 /* Boot timestamp, filled in head.S */
 u64 __initdata boot_tsc_stamp;
 
+/* Per-socket TSC_ADJUST values, for secondary cores/threads to sync to. */
+static uint64_t *__read_mostly tsc_adjust;
+
 /*
  * 32-bit division of integer dividend and integer divisor yielding
  * 32-bit fractional quotient.
@@ -1602,6 +1605,56 @@ void init_percpu_time(void)
     /* Initial estimate for TSC rate. */
     t->tsc_scale = per_cpu(cpu_time, 0).tsc_scale;
 
+    if ( tsc_adjust )
+    {
+        unsigned int socket = cpu_to_socket(smp_processor_id());
+        int64_t adj;
+
+        /* For now we don't want to come here for the BSP. */
+        ASSERT(system_state >= SYS_STATE_smp_boot);
+
+        rdmsrl(MSR_IA32_TSC_ADJUST, adj);
+
+        /*
+         * Check whether this CPU is the first in a package to come up. In
+         * this case do not check the boot value against another package
+         * because the new package might have been physically hotplugged,
+         * where TSC_ADJUST is expected to be different.
+         */
+        if ( cpumask_weight(socket_cpumask[socket]) == 1 )
+        {
+            /*
+             * On the boot CPU we just force the ADJUST value to 0 if it's non-
+             * zero (in early_time_init()). We don't do that on non-boot CPUs
+             * because physical hotplug should have set the ADJUST register to a
+             * value > 0, so the TSC is in sync with the already running CPUs.
+             *
+             * But we always force non-negative ADJUST values for now.
+             */
+            if ( adj < 0 )
+            {
+                printk(XENLOG_WARNING
+                       "TSC ADJUST set to -%lx on CPU%u - clearing\n",
+                       -adj, smp_processor_id());
+                wrmsrl(MSR_IA32_TSC_ADJUST, 0);
+                adj = 0;
+            }
+            tsc_adjust[socket] = adj;
+        }
+        else if ( adj != tsc_adjust[socket] )
+        {
+            static bool __read_mostly warned;
+
+            if ( !warned )
+            {
+                warned = true;
+                printk(XENLOG_WARNING
+                       "Differing TSC ADJUST values within socket(s) - fixing all\n");
+            }
+            wrmsrl(MSR_IA32_TSC_ADJUST, tsc_adjust[socket]);
+        }
+    }
+
     local_irq_save(flags);
     now = read_platform_stime(NULL);
     tsc = rdtsc_ordered();
@@ -1788,6 +1841,15 @@ int __init init_xen_time(void)
     /* Finish platform timer initialization. */
     try_platform_timer_tail(false);
 
+    /*
+     * Setup space to track per-socket TSC_ADJUST values. Don't fiddle with
+     * values if the TSC is not reported as invariant. Ignore allocation
+     * failure here - most systems won't need any adjustment anyway.
+     */
+    if ( boot_cpu_has(X86_FEATURE_TSC_ADJUST) &&
+         boot_cpu_has(X86_FEATURE_ITSC) )
+        tsc_adjust = xzalloc_array(uint64_t, nr_sockets);
+
     return 0;
 }
 
@@ -1797,6 +1859,19 @@ void __init early_time_init(void)
 {
     struct cpu_time *t = &this_cpu(cpu_time);
     u64 tmp;
+
+    if ( boot_cpu_has(X86_FEATURE_TSC_ADJUST) &&
+         boot_cpu_has(X86_FEATURE_ITSC) )
+    {
+        rdmsrl(MSR_IA32_TSC_ADJUST, tmp);
+        if ( tmp )
+        {
+            printk(XENLOG_WARNING
+                   "TSC ADJUST set to %lx on boot CPU - clearing\n", tmp);
+            wrmsrl(MSR_IA32_TSC_ADJUST, 0);
+            boot_tsc_stamp -= tmp;
+        }
+    }
 
     preinit_pit();
     tmp = init_platform_timer();
