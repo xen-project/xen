@@ -99,6 +99,16 @@
 #define X86_CR4_PKE        0x00400000 /* enable PKE */
 
 /*
+ * Debug status flags in DR6.
+ */
+#define X86_DR6_DEFAULT         0xffff0ff0  /* Default %dr6 value. */
+
+/*
+ * Debug control flags in DR7.
+ */
+#define X86_DR7_DEFAULT         0x00000400  /* Default %dr7 value. */
+
+/*
  * Trap/fault mnemonics.
  */
 #define TRAP_divide_error      0
