@@ -122,11 +122,66 @@ void vm_event_monitor_next_interrupt(struct vcpu *v)
     v->arch.monitor.next_interrupt_enabled = true;
 }
 
+static void vm_event_pack_segment_register(enum x86_segment segment,
+                                           struct vm_event_regs_x86 *reg)
+{
+    struct segment_register seg;
+
+    hvm_get_segment_register(current, segment, &seg);
+
+    switch ( segment )
+    {
+    case x86_seg_ss:
+        reg->ss_base = seg.base;
+        reg->ss.limit = seg.g ? seg.limit >> 12 : seg.limit;
+        reg->ss.ar = seg.attr;
+        reg->ss_sel = seg.sel;
+        break;
+
+    case x86_seg_fs:
+        reg->fs_base = seg.base;
+        reg->fs.limit = seg.g ? seg.limit >> 12 : seg.limit;
+        reg->fs.ar = seg.attr;
+        reg->fs_sel = seg.sel;
+        break;
+
+    case x86_seg_gs:
+        reg->gs_base = seg.base;
+        reg->gs.limit = seg.g ? seg.limit >> 12 : seg.limit;
+        reg->gs.ar = seg.attr;
+        reg->gs_sel = seg.sel;
+        break;
+
+    case x86_seg_cs:
+        reg->cs_base = seg.base;
+        reg->cs.limit = seg.g ? seg.limit >> 12 : seg.limit;
+        reg->cs.ar = seg.attr;
+        reg->cs_sel = seg.sel;
+        break;
+
+    case x86_seg_ds:
+        reg->ds_base = seg.base;
+        reg->ds.limit = seg.g ? seg.limit >> 12 : seg.limit;
+        reg->ds.ar = seg.attr;
+        reg->ds_sel = seg.sel;
+        break;
+
+    case x86_seg_es:
+        reg->es_base = seg.base;
+        reg->es.limit = seg.g ? seg.limit >> 12 : seg.limit;
+        reg->es.ar = seg.attr;
+        reg->es_sel = seg.sel;
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
+}
+
 void vm_event_fill_regs(vm_event_request_t *req)
 {
 #ifdef CONFIG_HVM
     const struct cpu_user_regs *regs = guest_cpu_user_regs();
-    struct segment_register seg;
     struct hvm_hw_cpu ctxt = {};
     struct vcpu *curr = current;
 
@@ -170,14 +225,15 @@ void vm_event_fill_regs(vm_event_request_t *req)
     req->data.regs.x86.msr_star = ctxt.msr_star;
     req->data.regs.x86.msr_lstar = ctxt.msr_lstar;
 
-    hvm_get_segment_register(curr, x86_seg_fs, &seg);
-    req->data.regs.x86.fs_base = seg.base;
+    vm_event_pack_segment_register(x86_seg_fs, &req->data.regs.x86);
+    vm_event_pack_segment_register(x86_seg_gs, &req->data.regs.x86);
+    vm_event_pack_segment_register(x86_seg_cs, &req->data.regs.x86);
+    vm_event_pack_segment_register(x86_seg_ss, &req->data.regs.x86);
+    vm_event_pack_segment_register(x86_seg_ds, &req->data.regs.x86);
+    vm_event_pack_segment_register(x86_seg_es, &req->data.regs.x86);
 
-    hvm_get_segment_register(curr, x86_seg_gs, &seg);
-    req->data.regs.x86.gs_base = seg.base;
-
-    hvm_get_segment_register(curr, x86_seg_cs, &seg);
-    req->data.regs.x86.cs_arbytes = seg.attr;
+    req->data.regs.x86.shadow_gs = ctxt.shadow_gs;
+    req->data.regs.x86.dr6 = ctxt.dr6;
 #endif
 }
 
