@@ -53,6 +53,9 @@
 #define X86_CR0_PE 0x01
 #define X86_CR0_ET 0x10
 
+#define X86_DR6_DEFAULT 0xffff0ff0u
+#define X86_DR7_DEFAULT 0x00000400u
+
 #define SPECIALPAGE_PAGING   0
 #define SPECIALPAGE_ACCESS   1
 #define SPECIALPAGE_SHARING  2
@@ -860,6 +863,9 @@ static int vcpu_x86_32(struct xc_dom_image *dom)
         dom->parms.virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
     ctxt->user_regs.eflags = 1 << 9; /* Interrupt Enable */
 
+    ctxt->debugreg[6] = X86_DR6_DEFAULT;
+    ctxt->debugreg[7] = X86_DR7_DEFAULT;
+
     ctxt->flags = VGCF_in_kernel_X86_32 | VGCF_online_X86_32;
     if ( dom->parms.pae == XEN_PAE_EXTCR3 ||
          dom->parms.pae == XEN_PAE_BIMODAL )
@@ -906,6 +912,9 @@ static int vcpu_x86_64(struct xc_dom_image *dom)
     ctxt->user_regs.rsi =
         dom->parms.virt_base + (dom->start_info_pfn) * PAGE_SIZE_X86;
     ctxt->user_regs.rflags = 1 << 9; /* Interrupt Enable */
+
+    ctxt->debugreg[6] = X86_DR6_DEFAULT;
+    ctxt->debugreg[7] = X86_DR7_DEFAULT;
 
     ctxt->flags = VGCF_in_kernel_X86_64 | VGCF_online_X86_64;
     cr3_pfn = xc_dom_p2m(dom, dom->pgtables_seg.pfn);
@@ -1010,6 +1019,9 @@ static int vcpu_hvm(struct xc_dom_image *dom)
 
     /* Set the IP. */
     bsp_ctx.cpu.rip = dom->parms.phys_entry;
+
+    bsp_ctx.cpu.dr6 = X86_DR6_DEFAULT;
+    bsp_ctx.cpu.dr7 = X86_DR7_DEFAULT;
 
     if ( dom->start_info_seg.pfn )
         bsp_ctx.cpu.rbx = dom->start_info_seg.pfn << PAGE_SHIFT;
