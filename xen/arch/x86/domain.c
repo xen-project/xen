@@ -731,8 +731,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
-        d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
-                                             ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
+        d->arch.pv_domain.xpti = is_hardware_domain(d) ? opt_xpti_hwdom
+                                                       : opt_xpti_domu;
 
         if ( !is_pv_32bit_domain(d) && use_invpcid && cpu_has_pcid )
             switch ( opt_pcid )
