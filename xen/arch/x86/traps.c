@@ -1537,9 +1537,9 @@ void do_general_protection(struct cpu_user_regs *regs)
     if ( regs->error_code & X86_XEC_IDT )
     {
         /* This fault must be due to <INT n> instruction. */
-        const struct trap_info *ti;
-        unsigned char vector = regs->error_code >> 3;
-        ti = &v->arch.pv.trap_ctxt[vector];
+        uint8_t vector = regs->error_code >> 3;
+        const struct trap_info *ti = &v->arch.pv.trap_ctxt[vector];
+
         if ( permit_softint(TI_GET_DPL(ti), v, regs) )
         {
             regs->rip += 2;
@@ -1785,8 +1785,6 @@ void do_device_not_available(struct cpu_user_regs *regs)
 #else
     ASSERT_UNREACHABLE();
 #endif
-
-    return;
 }
 
 void do_debug(struct cpu_user_regs *regs)
