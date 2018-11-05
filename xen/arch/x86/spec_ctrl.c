@@ -231,12 +231,6 @@ static __init int parse_pv_l1tf(const char *s)
     const char *ss;
     int val, rc = 0;
 
-    /* Inhibit the defaults as an explicit choice has been given. */
-    if ( opt_pv_l1tf_hwdom == -1 )
-        opt_pv_l1tf_hwdom = 0;
-    if ( opt_pv_l1tf_domu == -1 )
-        opt_pv_l1tf_domu = 0;
-
     /* Interpret 'pv-l1tf' alone in its positive boolean form. */
     if ( *s == '\0' )
         opt_pv_l1tf_hwdom = opt_pv_l1tf_domu = 1;
@@ -690,12 +684,6 @@ static __init int parse_xpti(const char *s)
 {
     const char *ss;
     int val, rc = 0;
-
-    /* Inhibit the defaults as an explicit choice has been given. */
-    if ( opt_xpti_hwdom == -1 )
-        opt_xpti_hwdom = 0;
-    if ( opt_xpti_domu == -1 )
-        opt_xpti_domu = 0;
 
     /* Interpret 'xpti' alone in its positive boolean form. */
     if ( *s == '\0' )
