@@ -33,7 +33,7 @@ $(ROM): $(ROMS)
 	$(MAKE) -C $D/src bin/$(*F).rom
 
 $T:
-	if ! $(FETCHER) _$T $(IPXE_TARBALL_URL); then \
+	set -e; if ! $(FETCHER) _$T $(IPXE_TARBALL_URL); then \
 		$(GIT) clone $(IPXE_GIT_URL) $D.git; \
 		(cd $D.git && $(GIT) archive --format=tar --prefix=$D/ \
 		$(IPXE_GIT_TAG) | gzip -n >../_$T); \
