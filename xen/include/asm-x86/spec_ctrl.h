@@ -37,9 +37,7 @@ extern uint8_t default_spec_ctrl_flags;
 
 extern int8_t opt_xpti_hwdom, opt_xpti_domu;
 
-extern int8_t opt_pv_l1tf;
-#define OPT_PV_L1TF_DOM0  0x01
-#define OPT_PV_L1TF_DOMU  0x02
+extern int8_t opt_pv_l1tf_hwdom, opt_pv_l1tf_domu;
 
 /*
  * The L1D address mask, which might be wider than reported in CPUID, and the

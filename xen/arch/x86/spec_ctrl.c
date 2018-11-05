@@ -125,8 +125,10 @@ static int __init parse_spec_ctrl(char *s)
             if ( opt_smt < 0 )
                 opt_smt = 1;
 
-            if ( opt_pv_l1tf < 0 )
-                opt_pv_l1tf = 0;
+            if ( opt_pv_l1tf_hwdom < 0 )
+                opt_pv_l1tf_hwdom = 0;
+            if ( opt_pv_l1tf_domu < 0 )
+                opt_pv_l1tf_domu = 0;
 
         disable_common:
             opt_rsb_pv = false;
@@ -204,7 +206,8 @@ static int __init parse_spec_ctrl(char *s)
 }
 custom_param("spec-ctrl", parse_spec_ctrl);
 
-int8_t __read_mostly opt_pv_l1tf = -1;
+int8_t __read_mostly opt_pv_l1tf_hwdom = -1;
+int8_t __read_mostly opt_pv_l1tf_domu = -1;
 
 static __init int parse_pv_l1tf(char *s)
 {
@@ -212,12 +215,14 @@ static __init int parse_pv_l1tf(char *s)
     int val, rc = 0;
 
     /* Inhibit the defaults as an explicit choice has been given. */
-    if ( opt_pv_l1tf == -1 )
-        opt_pv_l1tf = 0;
+    if ( opt_pv_l1tf_hwdom == -1 )
+        opt_pv_l1tf_hwdom = 0;
+    if ( opt_pv_l1tf_domu == -1 )
+        opt_pv_l1tf_domu = 0;
 
     /* Interpret 'pv-l1tf' alone in its positive boolean form. */
     if ( *s == '\0' )
-        opt_pv_l1tf = OPT_PV_L1TF_DOM0 | OPT_PV_L1TF_DOMU;
+        opt_pv_l1tf_hwdom = opt_pv_l1tf_domu = 1;
 
     do {
         ss = strchr(s, ',');
@@ -227,20 +232,18 @@ static __init int parse_pv_l1tf(char *s)
         switch ( parse_bool(s) )
         {
         case 0:
-            opt_pv_l1tf = 0;
+            opt_pv_l1tf_hwdom = opt_pv_l1tf_domu = 0;
             break;
 
         case 1:
-            opt_pv_l1tf = OPT_PV_L1TF_DOM0 | OPT_PV_L1TF_DOMU;
+            opt_pv_l1tf_hwdom = opt_pv_l1tf_domu = 1;
             break;
 
         default:
             if ( (val = parse_boolean("dom0", s, ss)) >= 0 )
-                opt_pv_l1tf = ((opt_pv_l1tf & ~OPT_PV_L1TF_DOM0) |
-                               (val ? OPT_PV_L1TF_DOM0 : 0));
+                opt_pv_l1tf_hwdom = val;
             else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
-                opt_pv_l1tf = ((opt_pv_l1tf & ~OPT_PV_L1TF_DOMU) |
-                               (val ? OPT_PV_L1TF_DOMU : 0));
+                opt_pv_l1tf_domu = val;
             else if ( *s )
                 rc = -EINVAL;
             break;
@@ -303,7 +306,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            opt_l1d_flush                             ? " L1D_FLUSH" : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
-    if ( cpu_has_bug_l1tf || opt_pv_l1tf )
+    if ( cpu_has_bug_l1tf || opt_pv_l1tf_hwdom || opt_pv_l1tf_domu )
         printk("  L1TF: believed%s vulnerable, maxphysaddr L1D %u, CPUID %u"
                ", Safe address %"PRIx64"\n",
                cpu_has_bug_l1tf ? "" : " not",
@@ -332,8 +335,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            opt_xpti_domu  ? "enabled" : "disabled");
 
     printk("  PV L1TF shadowing: Dom0 %s, DomU %s\n",
-           opt_pv_l1tf & OPT_PV_L1TF_DOM0  ? "enabled"  : "disabled",
-           opt_pv_l1tf & OPT_PV_L1TF_DOMU  ? "enabled"  : "disabled");
+           opt_pv_l1tf_hwdom ? "enabled"  : "disabled",
+           opt_pv_l1tf_domu  ? "enabled"  : "disabled");
 }
 
 /* Calculate whether Retpoline is known-safe on this CPU. */
@@ -871,13 +874,10 @@ void __init init_speculation_mitigations(void)
      * By default, enable PV domU L1TF mitigations on all L1TF-vulnerable
      * hardware.
      */
-    if ( opt_pv_l1tf == -1 )
-    {
-        if ( !cpu_has_bug_l1tf )
-            opt_pv_l1tf = 0;
-        else
-            opt_pv_l1tf = OPT_PV_L1TF_DOMU;
-    }
+    if ( opt_pv_l1tf_hwdom == -1 )
+        opt_pv_l1tf_hwdom = 0;
+    if ( opt_pv_l1tf_domu == -1 )
+        opt_pv_l1tf_domu = cpu_has_bug_l1tf;
 
     /*
      * By default, enable L1D_FLUSH on L1TF-vulnerable hardware, unless

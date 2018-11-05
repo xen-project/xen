@@ -214,9 +214,8 @@ void pv_l1tf_tasklet(unsigned long data);
 
 static inline void pv_l1tf_domain_init(struct domain *d)
 {
-    d->arch.pv_domain.check_l1tf =
-        opt_pv_l1tf & (is_hardware_domain(d)
-                       ? OPT_PV_L1TF_DOM0 : OPT_PV_L1TF_DOMU);
+    d->arch.pv_domain.check_l1tf = is_hardware_domain(d) ? opt_pv_l1tf_hwdom
+                                                         : opt_pv_l1tf_domu;
 
 #ifdef CONFIG_SHADOW_PAGING
     tasklet_init(&d->arch.paging.shadow.pv_l1tf_tasklet,
