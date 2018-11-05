@@ -386,8 +386,8 @@ static void set_domain_xpti(struct domain *d)
     }
     else
     {
-        d->arch.pv_domain.xpti = opt_xpti & (is_hardware_domain(d)
-                                             ? OPT_XPTI_DOM0 : OPT_XPTI_DOMU);
+        d->arch.pv_domain.xpti = is_hardware_domain(d) ? opt_xpti_hwdom
+                                                       : opt_xpti_domu;
 
         if ( use_invpcid && cpu_has_pcid )
             switch ( opt_pcid )
