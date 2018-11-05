@@ -239,7 +239,7 @@ static __init int parse_pv_l1tf(char *s)
             else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
                 opt_pv_l1tf = ((opt_pv_l1tf & ~OPT_PV_L1TF_DOMU) |
                                (val ? OPT_PV_L1TF_DOMU : 0));
-            else
+            else if ( *s )
                 rc = -EINVAL;
             break;
         }
@@ -690,7 +690,7 @@ static __init int parse_xpti(char *s)
             else if ( (val = parse_boolean("domu", s, ss)) >= 0 )
                 opt_xpti = (opt_xpti & ~OPT_XPTI_DOMU) |
                            (val ? OPT_XPTI_DOMU : 0);
-            else
+            else if ( *s )
                 rc = -EINVAL;
             break;
         }
