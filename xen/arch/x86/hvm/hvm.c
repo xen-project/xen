@@ -3893,11 +3893,9 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     }
 
     v->arch.vgc_flags = VGCF_online;
-    memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
-    v->arch.user_regs.rflags = X86_EFLAGS_MBS;
-    v->arch.user_regs.rdx = 0x00000f00;
+
+    arch_vcpu_regs_init(v);
     v->arch.user_regs.rip = ip;
-    memset(&v->arch.debugreg, 0, sizeof(v->arch.debugreg));
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
     hvm_update_guest_cr(v, 0);

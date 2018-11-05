@@ -646,6 +646,8 @@ static inline void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
     vfree(vgc);
 }
 
+void arch_vcpu_regs_init(struct vcpu *v);
+
 struct vcpu_hvm_context;
 int arch_set_info_hvm_guest(struct vcpu *v, const struct vcpu_hvm_context *ctx);
 

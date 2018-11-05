@@ -327,6 +327,17 @@ void free_vcpu_struct(struct vcpu *v)
     free_xenheap_page(v);
 }
 
+/* Initialise various registers to their architectural INIT/RESET state. */
+void arch_vcpu_regs_init(struct vcpu *v)
+{
+    memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
+    v->arch.user_regs.eflags = X86_EFLAGS_MBS;
+
+    memset(v->arch.debugreg, 0, sizeof(v->arch.debugreg));
+    v->arch.debugreg[6] = X86_DR6_DEFAULT;
+    v->arch.debugreg[7] = X86_DR7_DEFAULT;
+}
+
 int vcpu_initialise(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -346,6 +357,8 @@ int vcpu_initialise(struct vcpu *v)
             return rc;
 
         vmce_init_vcpu(v);
+
+        arch_vcpu_regs_init(v);
     }
     else if ( (rc = xstate_alloc_save_area(v)) != 0 )
         return rc;
