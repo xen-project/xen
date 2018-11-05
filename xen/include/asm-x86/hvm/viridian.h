@@ -9,8 +9,9 @@
 #ifndef __ASM_X86_HVM_VIRIDIAN_H__
 #define __ASM_X86_HVM_VIRIDIAN_H__
 
-union viridian_vp_assist
-{   uint64_t raw;
+union viridian_page_msr
+{
+    uint64_t raw;
     struct
     {
         uint64_t enabled:1;
@@ -22,14 +23,14 @@ union viridian_vp_assist
 struct viridian_vcpu
 {
     struct {
-        union viridian_vp_assist msr;
+        union viridian_page_msr msr;
         void *va;
         bool pending;
     } vp_assist;
     uint64_t crash_param[5];
 };
 
-union viridian_guest_os_id
+union viridian_guest_os_id_msr
 {
     uint64_t raw;
     struct
@@ -40,16 +41,6 @@ union viridian_guest_os_id
         uint64_t major:8;
         uint64_t os:8;
         uint64_t vendor:16;
-    } fields;
-};
-
-union viridian_hypercall_gpa
-{   uint64_t raw;
-    struct
-    {
-        uint64_t enabled:1;
-        uint64_t reserved_preserved:11;
-        uint64_t pfn:48;
     } fields;
 };
 
@@ -66,17 +57,6 @@ struct viridian_time_ref_count
     int64_t off;
 };
 
-union viridian_reference_tsc
-{
-    uint64_t raw;
-    struct
-    {
-        uint64_t enabled:1;
-        uint64_t reserved_preserved:11;
-        uint64_t pfn:48;
-    } fields;
-};
-
 typedef struct _HV_REFERENCE_TSC_PAGE
 {
     uint32_t TscSequence;
@@ -88,10 +68,10 @@ typedef struct _HV_REFERENCE_TSC_PAGE
 
 struct viridian_domain
 {
-    union viridian_guest_os_id guest_os_id;
-    union viridian_hypercall_gpa hypercall_gpa;
+    union viridian_guest_os_id_msr guest_os_id;
+    union viridian_page_msr hypercall_gpa;
     struct viridian_time_ref_count time_ref_count;
-    union viridian_reference_tsc reference_tsc;
+    union viridian_page_msr reference_tsc;
 };
 
 void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,

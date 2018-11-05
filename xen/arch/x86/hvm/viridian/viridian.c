@@ -286,7 +286,7 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
 
 static void dump_guest_os_id(const struct domain *d)
 {
-    const union viridian_guest_os_id *goi;
+    const union viridian_guest_os_id_msr *goi;
 
     goi = &d->arch.hvm.viridian.guest_os_id;
 
@@ -300,7 +300,7 @@ static void dump_guest_os_id(const struct domain *d)
 
 static void dump_hypercall(const struct domain *d)
 {
-    const union viridian_hypercall_gpa *hg;
+    const union viridian_page_msr *hg;
 
     hg = &d->arch.hvm.viridian.hypercall_gpa;
 
@@ -311,7 +311,7 @@ static void dump_hypercall(const struct domain *d)
 
 static void dump_vp_assist(const struct vcpu *v)
 {
-    const union viridian_vp_assist *va;
+    const union viridian_page_msr *va;
 
     va = &v->arch.hvm.viridian.vp_assist.msr;
 
@@ -321,7 +321,7 @@ static void dump_vp_assist(const struct vcpu *v)
 
 static void dump_reference_tsc(const struct domain *d)
 {
-    const union viridian_reference_tsc *rt;
+    const union viridian_page_msr *rt;
 
     rt = &d->arch.hvm.viridian.reference_tsc;
 
