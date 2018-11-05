@@ -3247,6 +3247,11 @@ x86_emulate(
 
     ASSERT(ops->read);
 
+    generate_exception_if((mode_vif() &&
+                           (_regs.eflags & X86_EFLAGS_VIF) &&
+                           (_regs.eflags & X86_EFLAGS_VIP)),
+                          EXC_GP, 0);
+
     rc = x86_decode(&state, ctxt, ops);
     if ( rc != X86EMUL_OKAY )
         return rc;
