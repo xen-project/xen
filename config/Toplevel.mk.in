@@ -1,2 +1,2 @@
 SUBSYSTEMS               := @SUBSYSTEMS@
-GIT_HTTP                 := @githttp@
+GIT_HTTP                 ?= @githttp@
