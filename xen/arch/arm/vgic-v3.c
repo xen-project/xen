@@ -1474,6 +1474,7 @@ static bool vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
     enum gic_sgi_mode sgi_mode;
     struct sgi_target target;
 
+    sgi_target_init(&target);
     irqmode = (sgir >> ICH_SGI_IRQMODE_SHIFT) & ICH_SGI_IRQMODE_MASK;
     virq = (sgir >> ICH_SGI_IRQ_SHIFT ) & ICH_SGI_IRQ_MASK;
 
@@ -1481,7 +1482,6 @@ static bool vgic_v3_to_sgi(struct vcpu *v, register_t sgir)
     switch ( irqmode )
     {
     case ICH_SGI_TARGET_LIST:
-        sgi_target_init(&target);
         /* We assume that only AFF1 is used in ICC_SGI1R_EL1. */
         target.aff1 = (sgir >> ICH_SGI_AFFINITY_LEVEL(1)) & ICH_SGI_AFFx_MASK;
         target.list = sgir & ICH_SGI_TARGETLIST_MASK;
