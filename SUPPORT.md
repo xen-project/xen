@@ -526,6 +526,26 @@ Vulnerabilities of a device model stub domain
 to a hostile driver domain (either compromised or untrusted)
 are excluded from security support.
 
+### Device Model Deprivileging
+
+    Status, Linux dom0: Tech Preview, with limited support
+
+This means adding extra restrictions to a device model in order to
+prevent a compromised device model from attacking the rest of the
+domain it's running in (normally dom0).
+
+"Tech preview with limited support" means we will not issue XSAs for
+the _additional_ functionality provided by the feature; but we will
+issue XSAs in the event that enabling this feature opens up a security
+hole that would not be present without the feature disabled.
+
+For example, while this is classified as tech preview, a bug in libxl
+which failed to change the user ID of QEMU would not receive an XSA,
+since without this feature the user ID wouldn't be changed. But a
+change which made it possible for a compromised guest to read
+arbitrary files on the host filesystem without compromising QEMU would
+be issued an XSA, since that does weaken security.
+
 ### KCONFIG Expert
 
     Status: Experimental
