@@ -2393,6 +2393,11 @@ retry_transaction:
         goto out_close;
     if (!rc) { /* inner child */
         setsid();
+        if (libxl_defbool_val(b_info->dm_restrict)) {
+            rc = libxl__local_dm_preexec_restrict(gc);
+            if (rc)
+                _exit(-1);
+        }
         libxl__exec(gc, null, logfile_w, logfile_w, dm, args, envs);
     }
 

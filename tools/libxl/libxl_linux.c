@@ -307,6 +307,20 @@ int libxl__pci_topology_init(libxl__gc *gc,
     return err;
 }
 
+int libxl__local_dm_preexec_restrict(libxl__gc *gc)
+{
+    int r;
+
+    /* Unshare mount and IPC namespaces.  These are unused by QEMU. */
+    r = unshare(CLONE_NEWNS | CLONE_NEWIPC);
+    if (r) {
+        LOGE(ERROR, "libxl: Mount and IPC namespace unfailed");
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

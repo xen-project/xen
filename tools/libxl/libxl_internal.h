@@ -3774,6 +3774,11 @@ struct libxl__dm_spawn_state {
 
 _hidden void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state*);
 
+/* 
+ * Called after forking but before executing the local devicemodel.
+ */
+_hidden int libxl__local_dm_preexec_restrict(libxl__gc *gc);
+
 /* Stubdom device models. */
 
 typedef struct {

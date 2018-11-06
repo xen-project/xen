@@ -76,12 +76,6 @@ Then adds the following to the qemu command-line:
 	
 '''Tested''': Not tested
 
-## Restrictions / improvements still to do
-
-This lists potential restrictions still to do.  It is meant to be
-listed in order of ease of implementation, with low-hanging fruit
-first.
-
 ## Namespaces for unused functionality (Linux only)
 
 '''Description''': QEMU doesn't use the functionality associated with
@@ -108,6 +102,12 @@ call:
 '''Tested''': Not tested
 
 [qemu-namespaces]: https://lists.gnu.org/archive/html/qemu-devel/2017-10/msg04723.html
+
+# Restrictions / improvements still to do
+
+This lists potential restrictions still to do.  It is meant to be
+listed in order of ease of implementation, with low-hanging fruit
+first.
 
 ### Basic RLIMITs
 

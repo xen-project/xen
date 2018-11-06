@@ -124,3 +124,8 @@ int libxl__pci_topology_init(libxl__gc *gc,
 {
     return ERROR_NI;
 }
+
+int libxl__local_dm_preexec_restrict(libxl__gc *gc)
+{
+    return 0;
+}
