@@ -13,6 +13,7 @@ for the definitions of the support status levels etc.
     Initial-Release: 2017-12-13
     Supported-Until: 2019-06-13
     Security-Support-Until: 2020-12-13
+    Release-Notes: <a href="https://wiki.xenproject.org/wiki/Xen_Project_4.10_Release_Notes">RN</a>
 
 # Feature Support
 
