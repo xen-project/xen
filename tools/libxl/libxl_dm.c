@@ -1410,8 +1410,47 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
     }
 
-    if (libxl_defbool_val(b_info->dm_restrict))
+    if (libxl_defbool_val(b_info->dm_restrict)) {
+        char *chroot_dir = GCSPRINTF("%s/qemu-root-%d",
+                                      libxl__run_dir_path(), guest_domid);
+        int r;
+        
         flexarray_append(dm_args, "-xen-domid-restrict");
+
+        /* 
+         * Run QEMU in a chroot at XEN_RUN_DIR/qemu-root-<domid>
+         *
+         * There is no library function to do the equivalent of `rm
+         * -rf`.  However deprivileged QEMU in theory shouldn't be
+         * able to write any files, as the chroot would be owned by
+         * root, but it would be running as an unprivileged process.
+         * So in theory, old chroots should always be empty.
+         * 
+         * rmdir the directory before attempting to create
+         * it; if it returns anything other than ENOENT, fail domain
+         * creation.
+         */
+        r = rmdir(chroot_dir);
+        if (r != 0 && errno != ENOENT) {
+            LOGED(ERROR, guest_domid,
+                  "failed to remove existing chroot dir %s", chroot_dir);
+            return ERROR_FAIL;
+        }
+        
+        for (;;) {
+            r = mkdir(chroot_dir, 0000);
+            if (!r)
+                break;
+            if (errno == EINTR) continue;
+            LOGED(ERROR, guest_domid,
+                  "failed to create chroot dir %s", chroot_dir);
+            return ERROR_FAIL;
+        }
+
+        /* Add "-chroot [dir]" to command-line */
+        flexarray_append(dm_args, "-chroot");
+        flexarray_append(dm_args, chroot_dir);
+    }
 
     if (state->saved_state) {
         /* This file descriptor is meant to be used by QEMU */

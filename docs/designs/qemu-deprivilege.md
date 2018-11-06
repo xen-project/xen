@@ -59,12 +59,6 @@ source tree.)
 
 '''Testing status''': Tested
 
-# Restrictions / improvements still to do
-
-This lists potential restrictions still to do.  It is meant to be
-listed in order of ease of implementation, with low-hanging fruit
-first.
-
 ## Chroot
 
 '''Description''': Qemu runs in its own chroot, such that even if it
@@ -81,6 +75,12 @@ Then adds the following to the qemu command-line:
 '''How to test''':  Check `/proc/<qpid>/root`
 	
 '''Tested''': Not tested
+
+## Restrictions / improvements still to do
+
+This lists potential restrictions still to do.  It is meant to be
+listed in order of ease of implementation, with low-hanging fruit
+first.
 
 ## Namespaces for unused functionality (Linux only)
 
