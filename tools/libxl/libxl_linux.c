@@ -12,11 +12,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Lesser General Public License for more details.
  */
- 
+
 #include "libxl_osdeps.h" /* must come before any other headers */
 
+#include <sys/resource.h>
 #include "libxl_internal.h"
- 
+
 int libxl__try_phy_backend(mode_t st_mode)
 {
     if (S_ISBLK(st_mode) || S_ISREG(st_mode)) {
@@ -307,15 +308,52 @@ int libxl__pci_topology_init(libxl__gc *gc,
     return err;
 }
 
+static struct {
+    int resource;
+    rlim_t limit;
+} rlimits[] = {
+#define RLIMIT_ENTRY(r, l) \
+    { .resource = r, .limit = l }
+    /* Big enough for log files, not big enough for a DoS */
+    RLIMIT_ENTRY(RLIMIT_FSIZE,    256*1024),
+
+    /* Shouldn't need any of these */
+    RLIMIT_ENTRY(RLIMIT_NPROC,    0),
+    RLIMIT_ENTRY(RLIMIT_CORE,     0),
+    RLIMIT_ENTRY(RLIMIT_MSGQUEUE, 0),
+    RLIMIT_ENTRY(RLIMIT_LOCKS,    0),
+    RLIMIT_ENTRY(RLIMIT_MEMLOCK,  0),
+
+    /* End-of-list marker */
+    RLIMIT_ENTRY(RLIMIT_NLIMITS,  0),
+#undef RLIMIT_ENTRY
+};
+
 int libxl__local_dm_preexec_restrict(libxl__gc *gc)
 {
     int r;
+    unsigned i;
 
     /* Unshare mount and IPC namespaces.  These are unused by QEMU. */
     r = unshare(CLONE_NEWNS | CLONE_NEWIPC);
     if (r) {
         LOGE(ERROR, "libxl: Mount and IPC namespace unfailed");
         return ERROR_FAIL;
+    }
+
+    /* Set various "easy" rlimits */
+    for (i = 0; rlimits[i].resource != RLIMIT_NLIMITS; i++) {
+        struct rlimit rlim;
+
+        rlim.rlim_cur = rlim.rlim_max = rlimits[i].limit;
+
+        r = setrlimit(rlimits[i].resource, &rlim);
+        if (r < 0) {
+            LOGE(ERROR, "Setting rlimit %d to %llu failed\n",
+                                  rlimits[i].resource,
+                                  (unsigned long long)rlimits[i].limit);
+            return ERROR_FAIL;
+        }
     }
 
     return 0;

@@ -103,12 +103,6 @@ call:
 
 [qemu-namespaces]: https://lists.gnu.org/archive/html/qemu-devel/2017-10/msg04723.html
 
-# Restrictions / improvements still to do
-
-This lists potential restrictions still to do.  It is meant to be
-listed in order of ease of implementation, with low-hanging fruit
-first.
-
 ### Basic RLIMITs
 
 '''Description''': A number of limits on the resources that a given
@@ -134,6 +128,12 @@ are specified; this does not apply to QEMU running as a Xen DM.
 '''How to test''': Check `/proc/<qpid>/limits`
 
 '''Tested''': Not tested
+
+# Restrictions / improvements still to do
+
+This lists potential restrictions still to do.  It is meant to be
+listed in order of ease of implementation, with low-hanging fruit
+first.
 
 ### Further RLIMITs
 
