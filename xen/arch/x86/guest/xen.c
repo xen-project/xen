@@ -40,7 +40,7 @@ bool __read_mostly xen_guest;
 static __read_mostly uint32_t xen_cpuid_base;
 extern char hypercall_page[];
 static struct rangeset *mem;
-static unsigned long __initdata reserved_pages[2];
+static struct platform_bad_page __initdata reserved_pages[2];
 
 DEFINE_PER_CPU(unsigned int, vcpu_id);
 
@@ -326,7 +326,7 @@ void __init hypervisor_fixup_e820(struct e820map *e820)
         panic("Unable to get " #p);             \
     mark_pfn_as_ram(e820, pfn);                 \
     ASSERT(i < ARRAY_SIZE(reserved_pages));     \
-    reserved_pages[i++] = pfn << PAGE_SHIFT;    \
+    reserved_pages[i++].mfn = pfn;              \
 })
     MARK_PARAM_RAM(HVM_PARAM_STORE_PFN);
     if ( !pv_console )
@@ -334,7 +334,7 @@ void __init hypervisor_fixup_e820(struct e820map *e820)
 #undef MARK_PARAM_RAM
 }
 
-const unsigned long *__init hypervisor_reserved_pages(unsigned int *size)
+const struct platform_bad_page *__init hypervisor_reserved_pages(unsigned int *size)
 {
     ASSERT(xen_guest);
 

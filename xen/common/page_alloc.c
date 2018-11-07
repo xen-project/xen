@@ -270,7 +270,7 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
     unsigned long bad_spfn, bad_epfn;
     const char *p;
 #ifdef CONFIG_X86
-    const unsigned long *badpage = NULL;
+    const struct platform_bad_page *badpage;
     unsigned int i, array_size;
 
     BUILD_BUG_ON(8 * sizeof(frame_table->u.free.first_dirty) <
@@ -299,8 +299,8 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
     {
         for ( i = 0; i < array_size; i++ )
         {
-            bootmem_region_zap(*badpage >> PAGE_SHIFT,
-                               (*badpage >> PAGE_SHIFT) + 1);
+            bootmem_region_zap(badpage->mfn,
+                               badpage->mfn + (1U << badpage->order));
             badpage++;
         }
     }
@@ -312,8 +312,8 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
         {
             for ( i = 0; i < array_size; i++ )
             {
-                bootmem_region_zap(*badpage >> PAGE_SHIFT,
-                                   (*badpage >> PAGE_SHIFT) + 1);
+                bootmem_region_zap(badpage->mfn,
+                                   badpage->mfn + (1U << badpage->order));
                 badpage++;
             }
         }
