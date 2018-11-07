@@ -22,12 +22,6 @@ if [[ "${CC}" == "clang" ]]; then
     cfgargs+=("--disable-stubdom")
 fi
 
-if [[ "${XEN_TARGET_ARCH}" == "arm64" || "${XEN_TARGET_ARCH}" == "arm32" ]]; then
-    cfgargs+=("--disable-tools") # we don't have the cross depends installed
-elif [[ "${CC}" != "clang" ]]; then
-    cfgargs+=("--enable-ovmf") # build ovmf with gcc on x86, arm doesn't use in-tree ovmf
-fi
-
 ./configure "${cfgargs[@]}"
 
 make -j$(nproc) dist
