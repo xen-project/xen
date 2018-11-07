@@ -5769,23 +5769,23 @@ void arch_dump_shared_mem_info(void)
             mem_sharing_get_nr_saved_mfns());
 }
 
-const unsigned long *__init get_platform_badpages(unsigned int *array_size)
+const struct platform_bad_page *__init get_platform_badpages(unsigned int *array_size)
 {
     u32 igd_id;
-    static unsigned long __initdata bad_pages[] = {
-        0x20050000,
-        0x20110000,
-        0x20130000,
-        0x20138000,
-        0x40004000,
+    static const struct platform_bad_page __initconst snb_bad_pages[] = {
+        { .mfn = 0x20050000 >> PAGE_SHIFT },
+        { .mfn = 0x20110000 >> PAGE_SHIFT },
+        { .mfn = 0x20130000 >> PAGE_SHIFT },
+        { .mfn = 0x20138000 >> PAGE_SHIFT },
+        { .mfn = 0x40004000 >> PAGE_SHIFT },
     };
 
-    *array_size = ARRAY_SIZE(bad_pages);
+    *array_size = ARRAY_SIZE(snb_bad_pages);
     igd_id = pci_conf_read32(0, 0, 2, 0, 0);
-    if ( !IS_SNB_GFX(igd_id) )
-        return NULL;
+    if ( IS_SNB_GFX(igd_id) )
+        return snb_bad_pages;
 
-    return bad_pages;
+    return NULL;
 }
 
 void paging_invlpg(struct vcpu *v, unsigned long va)
