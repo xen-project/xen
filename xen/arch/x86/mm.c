@@ -5690,6 +5690,22 @@ const struct platform_bad_page *__init get_platform_badpages(unsigned int *array
         { .mfn = 0x20138000 >> PAGE_SHIFT },
         { .mfn = 0x40004000 >> PAGE_SHIFT },
     };
+    static const struct platform_bad_page __initconst hle_bad_page = {
+        .mfn = 0x40000000 >> PAGE_SHIFT, .order = 10
+    };
+
+    switch ( cpuid_eax(1) & 0x000f3ff0 )
+    {
+    case 0x000406e0: /* erratum SKL167 */
+    case 0x00050650: /* erratum SKZ63 */
+    case 0x000506e0: /* errata SKL167 / SKW159 */
+    case 0x000806e0: /* erratum KBL??? */
+    case 0x000906e0: /* errata KBL??? / KBW114 / CFW103 */
+        *array_size = (cpuid_eax(0) >= 7 &&
+                       !(cpuid_ecx(1) & cpufeat_mask(X86_FEATURE_HYPERVISOR)) &&
+                       (cpuid_count_ebx(7, 0) & cpufeat_mask(X86_FEATURE_HLE)));
+        return &hle_bad_page;
+    }
 
     *array_size = ARRAY_SIZE(snb_bad_pages);
     igd_id = pci_conf_read32(0, 0, 2, 0, 0);
