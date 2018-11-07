@@ -27,7 +27,6 @@
 #define _XEN_ASM_X86_P2M_H
 
 #include <xen/paging.h>
-#include <xen/p2m-common.h>
 #include <xen/mem_access.h>
 #include <asm/mem_sharing.h>
 #include <asm/page.h>    /* for pagetable_t */
@@ -52,7 +51,7 @@ extern bool_t opt_hap_1gb, opt_hap_2mb;
  * cannot be non-zero, otherwise, hardware generates io page faults when 
  * device access those pages. Therefore, p2m_ram_rw has to be defined as 0.
  */
-enum p2m_type {
+typedef enum {
     p2m_ram_rw = 0,             /* Normal read/write guest RAM */
     p2m_invalid = 1,            /* Nothing mapped here */
     p2m_ram_logdirty = 2,       /* Temporarily read-only for log-dirty */
@@ -72,7 +71,7 @@ enum p2m_type {
     p2m_ram_broken = 13,          /* Broken page, access cause domain crash */
     p2m_map_foreign  = 14,        /* ram pages from foreign domain */
     p2m_ioreq_server = 15,
-};
+} p2m_type_t;
 
 /* Modifiers to the query */
 typedef unsigned int p2m_query_t;
@@ -367,6 +366,12 @@ struct p2m_domain {
 
 /* get host p2m table */
 #define p2m_get_hostp2m(d)      ((d)->arch.p2m)
+
+/* All common type definitions should live ahead of this inclusion. */
+#ifdef _XEN_P2M_COMMON_H
+# error "xen/p2m-common.h should not be included directly"
+#endif
+#include <xen/p2m-common.h>
 
 /*
  * Updates vCPU's n2pm to match its np2m_base in VMCx12 and returns that np2m.

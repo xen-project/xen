@@ -32,8 +32,6 @@ unsigned long
 p2m_pod_decrease_reservation(struct domain *d, gfn_t gfn,
                              unsigned int order);
 
-typedef enum p2m_type p2m_type_t;
-
 int __must_check check_get_page_from_gfn(struct domain *d, gfn_t gfn,
                                          bool readonly, p2m_type_t *p2mt_p,
                                          struct page_info **page_p);

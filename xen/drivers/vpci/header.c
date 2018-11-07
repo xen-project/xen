@@ -17,12 +17,12 @@
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <xen/p2m-common.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/vpci.h>
 
 #include <asm/event.h>
+#include <asm/p2m.h>
 
 #define MAPPABLE_BAR(x)                                                 \
     ((x)->type == VPCI_BAR_MEM32 || (x)->type == VPCI_BAR_MEM64_LO ||   \

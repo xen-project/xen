@@ -7,8 +7,6 @@
 #include <xen/mem_access.h>
 #include <public/vm_event.h> /* for vm_event_response_t */
 #include <public/memory.h>
-#include <xen/p2m-common.h>
-#include <public/memory.h>
 
 #define paddr_bits PADDR_BITS
 
@@ -110,7 +108,7 @@ struct p2m_domain {
  * future, it's possible to use higher value for pseudo-type and don't store
  * them in the p2m entry.
  */
-enum p2m_type {
+typedef enum {
     p2m_invalid = 0,    /* Nothing mapped here */
     p2m_ram_rw,         /* Normal read/write guest RAM */
     p2m_ram_ro,         /* Read-only; writes are silently dropped */
@@ -124,7 +122,7 @@ enum p2m_type {
     p2m_iommu_map_rw,   /* Read/write iommu mapping */
     p2m_iommu_map_ro,   /* Read-only iommu mapping */
     p2m_max_real_type,  /* Types after this won't be store in the p2m */
-};
+} p2m_type_t;
 
 /* We use bitmaps and mask to handle groups of types */
 #define p2m_to_mask(_t) (1UL << (_t))
@@ -143,6 +141,12 @@ enum p2m_type {
 #define p2m_is_any_ram(_t) (p2m_to_mask(_t) &                   \
                             (P2M_RAM_TYPES | P2M_GRANT_TYPES |  \
                              p2m_to_mask(p2m_map_foreign)))
+
+/* All common type definitions should live ahead of this inclusion. */
+#ifdef _XEN_P2M_COMMON_H
+# error "xen/p2m-common.h should not be included directly"
+#endif
+#include <xen/p2m-common.h>
 
 static inline
 void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
