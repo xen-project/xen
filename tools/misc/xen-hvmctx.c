@@ -371,8 +371,8 @@ static void dump_viridian_vcpu(void)
     HVM_SAVE_TYPE(VIRIDIAN_VCPU) p;
     READ(p);
     printf("    VIRIDIAN_VCPU: vp_assist_msr 0x%llx, vp_assist_pending %s\n",
-	   (unsigned long long) p.vp_assist_msr,
-	   p.vp_assist_pending ? "true" : "false");
+           (unsigned long long) p.vp_assist_msr,
+           p.vp_assist_pending ? "true" : "false");
 }
 
 static void dump_vmce_vcpu(void)
@@ -468,4 +468,14 @@ int main(int argc, char **argv)
     } while ( desc.typecode != HVM_SAVE_CODE(END) && off < len );
 
     return 0;
-} 
+}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
