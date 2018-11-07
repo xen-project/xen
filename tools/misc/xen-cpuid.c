@@ -5,6 +5,7 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
+#include <inttypes.h>
 
 #include <xenctrl.h>
 
@@ -303,7 +304,7 @@ static void print_policy(const char *name,
     printf(" MSRs:\n");
     printf("  %-8s -> %-16s\n", "index", "value");
     for ( l = 0; l < nr_msrs; ++l )
-        printf("  %08x -> %016lx\n",
+        printf("  %08x -> %016"PRIx64"\n",
                msrs[l].idx, msrs[l].val);
 }
 
