@@ -341,7 +341,13 @@ void zap_ro_mpt(mfn_t mfn);
 
 bool is_iomem_page(mfn_t mfn);
 
-const unsigned long *get_platform_badpages(unsigned int *array_size);
+struct platform_bad_page {
+    unsigned long mfn;
+    unsigned int order;
+};
+
+const struct platform_bad_page *get_platform_badpages(unsigned int *array_size);
+
 /* Per page locks:
  * page_lock() is used for two purposes: pte serialization, and memory sharing.
  *
