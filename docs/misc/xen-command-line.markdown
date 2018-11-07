@@ -227,13 +227,18 @@ that byte `0x12345678` is bad, you would place `badpage=0x12345` on
 Xen's command line.
 
 ### bootscrub
-> `= <boolean>`
+> `= idle | <boolean>`
 
-> Default: `true`
+> Default: `idle`
 
 Scrub free RAM during boot.  This is a safety feature to prevent
 accidentally leaking sensitive VM data into other VMs if Xen crashes
 and reboots.
+
+In `idle` mode, RAM is scrubbed in background on all CPUs during idle-loop
+with a guarantee that memory allocations always provide scrubbed pages.
+This option reduces boot time on machines with a large amount of RAM while
+still providing security benefits.
 
 ### bootscrub\_chunk
 > `= <size>`

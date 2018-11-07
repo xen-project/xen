@@ -161,8 +161,42 @@ string_param("badpage", opt_badpage);
 /*
  * no-bootscrub -> Free pages are not zeroed during boot.
  */
-static bool_t opt_bootscrub __initdata = 1;
-boolean_param("bootscrub", opt_bootscrub);
+enum bootscrub_mode {
+    BOOTSCRUB_OFF,
+    BOOTSCRUB_ON,
+    BOOTSCRUB_IDLE,
+};
+static enum bootscrub_mode __initdata opt_bootscrub = BOOTSCRUB_IDLE;
+static int __init parse_bootscrub_param(const char *s)
+{
+    /* Interpret 'bootscrub' alone in its positive boolean form */
+    if ( *s == '\0' )
+    {
+        opt_bootscrub = BOOTSCRUB_ON;
+        return 0;
+    }
+
+    switch ( parse_bool(s, NULL) )
+    {
+    case 0:
+        opt_bootscrub = BOOTSCRUB_OFF;
+        break;
+
+    case 1:
+        opt_bootscrub = BOOTSCRUB_ON;
+        break;
+
+    default:
+        if ( !strcmp(s, "idle") )
+            opt_bootscrub = BOOTSCRUB_IDLE;
+        else
+            return -EINVAL;
+        break;
+    }
+
+    return 0;
+}
+custom_param("bootscrub", parse_bootscrub_param);
 
 /*
  * bootscrub_chunk -> Amount of bytes to scrub lockstep on non-SMT CPUs
@@ -1726,6 +1760,7 @@ static void init_heap_pages(
     struct page_info *pg, unsigned long nr_pages)
 {
     unsigned long i;
+    bool idle_scrub = false;
 
     /*
      * Some pages may not go through the boot allocator (e.g reserved
@@ -1736,6 +1771,9 @@ static void init_heap_pages(
     spin_lock(&heap_lock);
     first_valid_mfn = mfn_min(page_to_mfn(pg), first_valid_mfn);
     spin_unlock(&heap_lock);
+
+    if ( system_state < SYS_STATE_active && opt_bootscrub == BOOTSCRUB_IDLE )
+        idle_scrub = true;
 
     for ( i = 0; i < nr_pages; i++ )
     {
@@ -1763,7 +1801,7 @@ static void init_heap_pages(
             nr_pages -= n;
         }
 
-        free_heap_pages(pg + i, 0, scrub_debug);
+        free_heap_pages(pg + i, 0, scrub_debug || idle_scrub);
     }
 }
 
@@ -2039,8 +2077,23 @@ void __init heap_init_late(void)
      */
     setup_low_mem_virq();
 
-    if ( opt_bootscrub )
+    switch ( opt_bootscrub )
+    {
+    default:
+        ASSERT_UNREACHABLE();
+        /* Fall through */
+
+    case BOOTSCRUB_IDLE:
+        printk("Scrubbing free RAM on in background\n");
+        break;
+
+    case BOOTSCRUB_ON:
         scrub_heap_pages();
+        break;
+
+    case BOOTSCRUB_OFF:
+        break;
+    }
 }
 
 
