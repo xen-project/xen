@@ -631,7 +631,9 @@ static void init_amd(struct cpuinfo_x86 *c)
 	case 0xf ... 0x17:
 		disable_c1e(NULL);
 		if (acpi_smi_cmd && (acpi_enable_value | acpi_disable_value)) {
+#ifdef CONFIG_PV
 			pv_post_outb_hook = amd_check_disable_c1e;
+#endif
 			amd_acpi_c1e_quirk = true;
 		}
 		break;
