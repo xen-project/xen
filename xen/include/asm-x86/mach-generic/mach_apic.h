@@ -10,13 +10,13 @@
 #define esr_disable (0)
 
 /* The following are dependent on APIC delivery mode (logical vs. physical). */
-#define INT_DELIVERY_MODE (genapic->int_delivery_mode)
-#define INT_DEST_MODE (genapic->int_dest_mode)
+#define INT_DELIVERY_MODE (genapic.int_delivery_mode)
+#define INT_DEST_MODE (genapic.int_dest_mode)
 #define TARGET_CPUS ((const typeof(cpu_online_map) *)&cpu_online_map)
-#define init_apic_ldr (genapic->init_apic_ldr)
-#define clustered_apic_check (genapic->clustered_apic_check) 
-#define cpu_mask_to_apicid (genapic->cpu_mask_to_apicid)
-#define vector_allocation_cpumask(cpu) (genapic->vector_allocation_cpumask(cpu))
+#define init_apic_ldr (genapic.init_apic_ldr)
+#define clustered_apic_check (genapic.clustered_apic_check)
+#define cpu_mask_to_apicid (genapic.cpu_mask_to_apicid)
+#define vector_allocation_cpumask(cpu) (genapic.vector_allocation_cpumask(cpu))
 
 static inline void enable_apic_mode(void)
 {

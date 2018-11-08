@@ -162,7 +162,8 @@ static int MP_processor_info_x(struct mpc_config_processor *m,
 		return -ENOSPC;
 	}
 
-	if (num_processors >= 8 && hotplug && genapic == &apic_default) {
+	if (num_processors >= 8 && hotplug
+	    && genapic.name == apic_default.name) {
 		printk(KERN_WARNING "WARNING: CPUs limit of 8 reached."
 			" Processor ignored.\n");
 		return -ENOSPC;

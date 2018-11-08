@@ -47,8 +47,9 @@ struct genapic {
 	APICFUNC(mps_oem_check), \
 	APICFUNC(acpi_madt_oem_check)
 
-extern const struct genapic *genapic;
+extern struct genapic genapic;
 extern const struct genapic apic_default;
+extern const struct genapic apic_bigsmp;
 
 void send_IPI_self_legacy(uint8_t vector);
 

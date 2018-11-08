@@ -29,12 +29,12 @@
 
 void send_IPI_mask(const cpumask_t *mask, int vector)
 {
-    genapic->send_IPI_mask(mask, vector);
+    genapic.send_IPI_mask(mask, vector);
 }
 
 void send_IPI_self(int vector)
 {
-    genapic->send_IPI_self(vector);
+    genapic.send_IPI_self(vector);
 }
 
 /*

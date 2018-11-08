@@ -163,7 +163,7 @@ static void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
     local_irq_restore(flags);
 }
 
-static const struct genapic apic_x2apic_phys = {
+static const struct genapic __initconstrel apic_x2apic_phys = {
     APIC_INIT("x2apic_phys", NULL),
     .int_delivery_mode = dest_Fixed,
     .int_dest_mode = 0 /* physical delivery */,
@@ -175,7 +175,7 @@ static const struct genapic apic_x2apic_phys = {
     .send_IPI_self = send_IPI_self_x2apic
 };
 
-static const struct genapic apic_x2apic_cluster = {
+static const struct genapic __initconstrel apic_x2apic_cluster = {
     APIC_INIT("x2apic_cluster", NULL),
     .int_delivery_mode = dest_LowestPrio,
     .int_dest_mode = 1 /* logical delivery */,
@@ -259,6 +259,6 @@ void __init check_x2apic_preenabled(void)
     {
         printk("x2APIC mode is already enabled by BIOS.\n");
         x2apic_enabled = 1;
-        genapic = apic_x2apic_probe();
+        genapic = *apic_x2apic_probe();
     }
 }
