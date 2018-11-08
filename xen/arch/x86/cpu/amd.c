@@ -44,6 +44,9 @@ integer_param("cpuid_mask_thermal_ecx", opt_cpuid_mask_thermal_ecx);
 s8 __read_mostly opt_allow_unsafe;
 boolean_param("allow_unsafe", opt_allow_unsafe);
 
+/* Signal whether the ACPI C1E quirk is required. */
+bool __read_mostly amd_acpi_c1e_quirk;
+
 static inline int rdmsr_amd_safe(unsigned int msr, unsigned int *lo,
 				 unsigned int *hi)
 {
@@ -443,7 +446,7 @@ static void disable_c1e(void *unused)
 		       smp_processor_id(), msr_content);
 }
 
-static void check_disable_c1e(unsigned int port, u8 value)
+void amd_check_disable_c1e(unsigned int port, u8 value)
 {
 	/* C1E is sometimes enabled during entry to ACPI mode. */
 	if ((port == acpi_smi_cmd) && (value == acpi_enable_value))
@@ -627,8 +630,10 @@ static void init_amd(struct cpuinfo_x86 *c)
 	{
 	case 0xf ... 0x17:
 		disable_c1e(NULL);
-		if (acpi_smi_cmd && (acpi_enable_value | acpi_disable_value))
-			pv_post_outb_hook = check_disable_c1e;
+		if (acpi_smi_cmd && (acpi_enable_value | acpi_disable_value)) {
+			pv_post_outb_hook = amd_check_disable_c1e;
+			amd_acpi_c1e_quirk = true;
+		}
 		break;
 	}
 

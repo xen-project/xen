@@ -1273,6 +1273,22 @@ void svm_host_osvw_init()
     spin_unlock(&osvw_lock);
 }
 
+static int acpi_c1e_quirk(int dir, unsigned int port, unsigned int bytes,
+                          uint32_t *val)
+{
+    ASSERT(bytes == 1 && port == acpi_smi_cmd);
+
+    if ( dir == IOREQ_READ )
+        *val = inb(port);
+    else
+    {
+        outb(*val, port);
+        amd_check_disable_c1e(port, *val);
+    }
+
+    return X86EMUL_OKAY;
+}
+
 static int svm_domain_initialise(struct domain *d)
 {
     static const struct arch_csw csw = {
@@ -1284,6 +1300,9 @@ static int svm_domain_initialise(struct domain *d)
     d->arch.ctxt_switch = &csw;
 
     svm_guest_osvw_init(d);
+
+    if ( is_hardware_domain(d) && amd_acpi_c1e_quirk )
+        register_portio_handler(d, acpi_smi_cmd, 1, acpi_c1e_quirk);
 
     return 0;
 }
