@@ -418,6 +418,19 @@ _hidden int libxl__ev_qmp_send(libxl__gc *gc, libxl__ev_qmp *ev,
                                const char *cmd, libxl__json_object *args);
 _hidden void libxl__ev_qmp_dispose(libxl__gc *gc, libxl__ev_qmp *ev);
 
+typedef enum {
+    /* initial state */
+    qmp_state_disconnected = 1,
+    /* connected to QMP socket, waiting for greeting message */
+    qmp_state_connecting,
+    /* qmp_capabilities command sent, waiting for reply */
+    qmp_state_capability_negotiation,
+    /* sending user's cmd and waiting for reply */
+    qmp_state_waiting_reply,
+    /* ready to send commands */
+    qmp_state_connected,
+} libxl__qmp_state;
+
 struct libxl__ev_qmp {
     /* caller should include this in their own struct */
     /* caller must fill these in, and they must all remain valid */
@@ -425,6 +438,27 @@ struct libxl__ev_qmp {
     libxl_domid domid;
     libxl__ev_qmp_callback *callback;
     int payload_fd; /* set to send a fd with the command, -1 otherwise */
+
+    /*
+     * remaining fields are private to libxl_ev_qmp_*
+     */
+
+    libxl__carefd *cfd;
+    libxl__ev_fd efd;
+    libxl__qmp_state state;
+    int id;
+    int next_id;        /* next id to use */
+    /* receive buffer */
+    char *rx_buf;
+    size_t rx_buf_size; /* current allocated size */
+    size_t rx_buf_used; /* actual data in the buffer */
+    /* sending buffer */
+    char *tx_buf;
+    size_t tx_buf_len;  /* tx_buf size */
+    size_t tx_buf_off;  /* already sent */
+    /* The message to send when ready */
+    char *msg;
+    int msg_id;
 };
 
 

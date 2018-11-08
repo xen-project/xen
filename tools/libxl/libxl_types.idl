@@ -69,6 +69,12 @@ libxl_error = Enumeration("error", [
     (-23, "NOTFOUND"),
     (-24, "DOMAIN_DESTROYED"), # Target domain ceased to exist during op
     (-25, "FEATURE_REMOVED"), # For functionality that has been removed
+    (-26, "PROTOCOL_ERROR_QMP"),
+    (-27, "UNKNOWN_QMP_ERROR"),
+    (-28, "QMP_GENERIC_ERROR"), # unspecified qmp error
+    (-29, "QMP_COMMAND_NOT_FOUND"), # the requested command has not been found
+    (-30, "QMP_DEVICE_NOT_ACTIVE"), # a device has failed to be become active
+    (-31, "QMP_DEVICE_NOT_FOUND"), # the requested device has not been found
     ], value_namespace = "")
 
 libxl_domain_type = Enumeration("domain_type", [
