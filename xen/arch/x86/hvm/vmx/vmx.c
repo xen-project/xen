@@ -1903,7 +1903,7 @@ static void vmx_inject_event(const struct x86_event *event)
         HVMTRACE_2D(INJ_EXC, _event.vector, _event.error_code);
 }
 
-static int vmx_event_pending(struct vcpu *v)
+static bool vmx_event_pending(const struct vcpu *v)
 {
     unsigned long intr_info;
 

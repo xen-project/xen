@@ -158,7 +158,7 @@ struct hvm_function_table {
 
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
-    int  (*event_pending)(struct vcpu *v);
+    bool (*event_pending)(const struct vcpu *v);
     bool (*get_pending_event)(struct vcpu *v, struct x86_event *info);
     void (*invlpg)(struct vcpu *v, unsigned long linear);
 
@@ -507,7 +507,7 @@ static inline void hvm_inject_page_fault(int errcode, unsigned long cr2)
     hvm_inject_event(&event);
 }
 
-static inline int hvm_event_pending(struct vcpu *v)
+static inline bool hvm_event_pending(const struct vcpu *v)
 {
     return hvm_funcs.event_pending(v);
 }

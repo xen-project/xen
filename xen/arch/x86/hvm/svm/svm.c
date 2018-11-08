@@ -1581,10 +1581,9 @@ static void svm_inject_event(const struct x86_event *event)
         HVMTRACE_2D(INJ_EXC, _event.vector, _event.error_code);
 }
 
-static int svm_event_pending(struct vcpu *v)
+static bool svm_event_pending(const struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    return vmcb->eventinj.fields.v;
+    return v->arch.hvm.svm.vmcb->eventinj.fields.v;
 }
 
 static void svm_cpu_dead(unsigned int cpu)
