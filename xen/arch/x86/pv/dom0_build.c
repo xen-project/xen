@@ -684,11 +684,8 @@ int __init dom0_construct_pv(struct domain *d,
             if ( i == 3 )
                 l3e_get_page(*l3tab)->u.inuse.type_info |= PGT_pae_xen_l2;
         }
-        /* Install read-only guest visible MPT mapping. */
-        l2tab = l3e_to_l2e(l3start[3]);
-        memcpy(&l2tab[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
-               &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-               COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*l2tab));
+
+        init_xen_pae_l2_slots(l3e_to_l2e(l3start[3]), d);
     }
 
     /* Pages that are part of page tables must be read only. */
