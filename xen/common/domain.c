@@ -339,37 +339,9 @@ struct domain *domain_create(domid_t domid,
         hardware_domain = d;
     }
 
-    /* Sort out our idea of is_{pv,hvm}_domain(). */
-    if ( config )
-    {
-        if ( config->flags & XEN_DOMCTL_CDF_hvm_guest )
-        {
-#ifdef CONFIG_HVM
-            d->guest_type = guest_type_hvm;
-#else
-            err = -EINVAL;
-            goto fail;
-#endif
-        }
-        else
-        {
-#ifdef CONFIG_PV
-            d->guest_type = guest_type_pv;
-#else
-            err = -EINVAL;
-            goto fail;
-#endif
-        }
-    }
-    else
-    {
-        /*
-         * At least the idle domain should be treated as PV domain
-         * because it uses PV context switch functions. To err on the
-         * safe side, leave all system domains to be guest_type_pv.
-         */
-        d->guest_type = guest_type_pv;
-    }
+    /* Sort out our idea of is_{pv,hvm}_domain().  All system domains are PV. */
+    d->guest_type = ((config && (config->flags & XEN_DOMCTL_CDF_hvm_guest))
+                     ? guest_type_hvm : guest_type_pv);
 
     TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
 

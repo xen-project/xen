@@ -601,6 +601,12 @@ void vcpu_switch_to_aarch64_mode(struct vcpu *v)
 
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
+    if ( config->flags != (XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap) )
+    {
+        dprintk(XENLOG_INFO, "Unsupported configuration %#x\n", config->flags);
+        return -EINVAL;
+    }
+
     /* Fill in the native GIC version, passed back to the toolstack. */
     if ( config->arch.gic_version == XEN_DOMCTL_CONFIG_GIC_NATIVE )
     {

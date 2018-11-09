@@ -420,6 +420,14 @@ void arch_vcpu_destroy(struct vcpu *v)
 
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
+    bool hvm = config->flags & XEN_DOMCTL_CDF_hvm_guest;
+
+    if ( hvm ? !hvm_enabled : !IS_ENABLED(CONFIG_PV) )
+    {
+        dprintk(XENLOG_INFO, "%s support not available\n", hvm ? "HVM" : "PV");
+        return -EINVAL;
+    }
+
     return 0;
 }
 
