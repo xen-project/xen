@@ -392,13 +392,27 @@ static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
     return 0;
 }
 
-static bool qmp_qemu_check_version(libxl__qmp_handler *qmp, int major,
-                                   int minor, int micro)
+/*
+ * return values:
+ *   < 0  if qemu's version <  asked version
+ *   = 0  if qemu's version == asked version
+ *   > 0  if qemu's version >  asked version
+ */
+static int qmp_qemu_compare_version(libxl__qmp_handler *qmp, int major,
+                                    int minor, int micro)
 {
-    return qmp->version.major > major ||
-        (qmp->version.major == major &&
-            (qmp->version.minor > minor ||
-             (qmp->version.minor == minor && qmp->version.micro >= micro)));
+#define CHECK_VERSION(level) do { \
+    if (qmp->version.level > (level)) return +1; \
+    if (qmp->version.level < (level)) return -1; \
+} while (0)
+
+    CHECK_VERSION(major);
+    CHECK_VERSION(minor);
+    CHECK_VERSION(micro);
+
+#undef CHECK_VERSION
+
+    return 0;
 }
 
 /*
@@ -1012,7 +1026,7 @@ int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename, bool live)
 
     /* live parameter was added to QEMU 2.11. It signal QEMU that the save
      * operation is for a live migration rather that for taking a snapshot. */
-    if (qmp_qemu_check_version(qmp, 2, 11, 0))
+    if (qmp_qemu_compare_version(qmp, 2, 11, 0) >= 0)
         qmp_parameters_add_bool(gc, &args, "live", live);
 
     rc = qmp_synchronous_send(qmp, "xen-save-devices-state", args,
