@@ -20,11 +20,13 @@ union viridian_page_msr
     } fields;
 };
 
+typedef union _HV_VP_ASSIST_PAGE HV_VP_ASSIST_PAGE;
+
 struct viridian_vcpu
 {
     struct {
         union viridian_page_msr msr;
-        void *va;
+        HV_VP_ASSIST_PAGE *ptr;
         bool pending;
     } vp_assist;
     uint64_t crash_param[5];

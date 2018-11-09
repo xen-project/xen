@@ -16,6 +16,18 @@
 
 #include "private.h"
 
+typedef struct _HV_VIRTUAL_APIC_ASSIST
+{
+    uint32_t no_eoi:1;
+    uint32_t reserved_zero:31;
+} HV_VIRTUAL_APIC_ASSIST;
+
+union _HV_VP_ASSIST_PAGE
+{
+    HV_VIRTUAL_APIC_ASSIST ApicAssist;
+    uint8_t ReservedZBytePadding[PAGE_SIZE];
+};
+
 static void dump_vp_assist(const struct vcpu *v)
 {
     const union viridian_page_msr *va = &v->arch.hvm.viridian.vp_assist.msr;
@@ -32,9 +44,9 @@ static void initialize_vp_assist(struct vcpu *v)
     struct domain *d = v->domain;
     unsigned long gmfn = v->arch.hvm.viridian.vp_assist.msr.fields.pfn;
     struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
-    void *va;
+    HV_VP_ASSIST_PAGE *ptr;
 
-    ASSERT(!v->arch.hvm.viridian.vp_assist.va);
+    ASSERT(!v->arch.hvm.viridian.vp_assist.ptr);
 
     if ( !page )
         goto fail;
@@ -45,16 +57,16 @@ static void initialize_vp_assist(struct vcpu *v)
         goto fail;
     }
 
-    va = __map_domain_page_global(page);
-    if ( !va )
+    ptr = __map_domain_page_global(page);
+    if ( !ptr )
     {
         put_page_and_type(page);
         goto fail;
     }
 
-    clear_page(va);
+    clear_page(ptr);
 
-    v->arch.hvm.viridian.vp_assist.va = va;
+    v->arch.hvm.viridian.vp_assist.ptr = ptr;
     return;
 
  fail:
@@ -64,25 +76,25 @@ static void initialize_vp_assist(struct vcpu *v)
 
 static void teardown_vp_assist(struct vcpu *v)
 {
-    void *va = v->arch.hvm.viridian.vp_assist.va;
+    HV_VP_ASSIST_PAGE *ptr = v->arch.hvm.viridian.vp_assist.ptr;
     struct page_info *page;
 
-    if ( !va )
+    if ( !ptr )
         return;
 
-    v->arch.hvm.viridian.vp_assist.va = NULL;
+    v->arch.hvm.viridian.vp_assist.ptr = NULL;
 
-    page = mfn_to_page(domain_page_map_to_mfn(va));
+    page = mfn_to_page(domain_page_map_to_mfn(ptr));
 
-    unmap_domain_page_global(va);
+    unmap_domain_page_global(ptr);
     put_page_and_type(page);
 }
 
 void viridian_apic_assist_set(struct vcpu *v)
 {
-    uint32_t *va = v->arch.hvm.viridian.vp_assist.va;
+    HV_VP_ASSIST_PAGE *ptr = v->arch.hvm.viridian.vp_assist.ptr;
 
-    if ( !va )
+    if ( !ptr )
         return;
 
     /*
@@ -94,18 +106,18 @@ void viridian_apic_assist_set(struct vcpu *v)
         domain_crash(v->domain);
 
     v->arch.hvm.viridian.vp_assist.pending = true;
-    *va |= 1u;
+    ptr->ApicAssist.no_eoi = 1;
 }
 
 bool viridian_apic_assist_completed(struct vcpu *v)
 {
-    uint32_t *va = v->arch.hvm.viridian.vp_assist.va;
+    HV_VP_ASSIST_PAGE *ptr = v->arch.hvm.viridian.vp_assist.ptr;
 
-    if ( !va )
+    if ( !ptr )
         return false;
 
     if ( v->arch.hvm.viridian.vp_assist.pending &&
-         !(*va & 1u) )
+         !ptr->ApicAssist.no_eoi )
     {
         /* An EOI has been avoided */
         v->arch.hvm.viridian.vp_assist.pending = false;
@@ -117,12 +129,12 @@ bool viridian_apic_assist_completed(struct vcpu *v)
 
 void viridian_apic_assist_clear(struct vcpu *v)
 {
-    uint32_t *va = v->arch.hvm.viridian.vp_assist.va;
+    HV_VP_ASSIST_PAGE *ptr = v->arch.hvm.viridian.vp_assist.ptr;
 
-    if ( !va )
+    if ( !ptr )
         return;
 
-    *va &= ~1u;
+    ptr->ApicAssist.no_eoi = 0;
     v->arch.hvm.viridian.vp_assist.pending = false;
 }
 
