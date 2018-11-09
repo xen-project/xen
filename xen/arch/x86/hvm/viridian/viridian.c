@@ -588,6 +588,63 @@ out:
     return HVM_HCALL_completed;
 }
 
+void viridian_dump_guest_page(const struct vcpu *v, const char *name,
+                              const struct viridian_page *vp)
+{
+    if ( !vp->msr.fields.enabled )
+        return;
+
+    printk(XENLOG_G_INFO "%pv: VIRIDIAN %s: pfn: %lx\n",
+           v, name, (unsigned long)vp->msr.fields.pfn);
+}
+
+void viridian_map_guest_page(struct vcpu *v, struct viridian_page *vp)
+{
+    struct domain *d = v->domain;
+    unsigned long gmfn = vp->msr.fields.pfn;
+    struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
+
+    ASSERT(!vp->ptr);
+
+    if ( !page )
+        goto fail;
+
+    if ( !get_page_type(page, PGT_writable_page) )
+    {
+        put_page(page);
+        goto fail;
+    }
+
+    vp->ptr = __map_domain_page_global(page);
+    if ( !vp->ptr )
+    {
+        put_page_and_type(page);
+        goto fail;
+    }
+
+    clear_page(vp->ptr);
+    return;
+
+ fail:
+    gdprintk(XENLOG_WARNING, "Bad GMFN %#"PRI_gfn" (MFN %#"PRI_mfn")\n",
+             gmfn, mfn_x(page ? page_to_mfn(page) : INVALID_MFN));
+}
+
+void viridian_unmap_guest_page(struct viridian_page *vp)
+{
+    struct page_info *page;
+
+    if ( !vp->ptr )
+        return;
+
+    page = mfn_to_page(domain_page_map_to_mfn(vp->ptr));
+
+    unmap_domain_page_global(vp->ptr);
+    vp->ptr = NULL;
+
+    put_page_and_type(page);
+}
+
 static int viridian_save_domain_ctxt(struct vcpu *v,
                                      hvm_domain_context_t *h)
 {

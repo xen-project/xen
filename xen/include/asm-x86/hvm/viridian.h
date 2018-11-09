@@ -20,15 +20,16 @@ union viridian_page_msr
     } fields;
 };
 
-typedef union _HV_VP_ASSIST_PAGE HV_VP_ASSIST_PAGE;
+struct viridian_page
+{
+    union viridian_page_msr msr;
+    void *ptr;
+};
 
 struct viridian_vcpu
 {
-    struct {
-        union viridian_page_msr msr;
-        HV_VP_ASSIST_PAGE *ptr;
-        bool pending;
-    } vp_assist;
+    struct viridian_page vp_assist;
+    bool apic_assist_pending;
     uint64_t crash_param[5];
 };
 
