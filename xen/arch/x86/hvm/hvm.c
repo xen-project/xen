@@ -462,10 +462,9 @@ void hvm_migrate_timers(struct vcpu *v)
     pt_migrate(v);
 }
 
-static int hvm_migrate_pirq(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
-                            void *arg)
+void hvm_migrate_pirq(struct hvm_pirq_dpci *pirq_dpci, const struct vcpu *v)
 {
-    struct vcpu *v = arg;
+    ASSERT(iommu_enabled && hvm_domain_irq(v->domain)->dpci);
 
     if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI) &&
          /* Needn't migrate pirq if this pirq is delivered to guest directly.*/
@@ -476,11 +475,17 @@ static int hvm_migrate_pirq(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
             pirq_spin_lock_irq_desc(dpci_pirq(pirq_dpci), NULL);
 
         if ( !desc )
-            return 0;
+            return;
         ASSERT(MSI_IRQ(desc - irq_desc));
         irq_set_affinity(desc, cpumask_of(v->processor));
         spin_unlock_irq(&desc->lock);
     }
+}
+
+static int migrate_pirq(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
+                        void *arg)
+{
+    hvm_migrate_pirq(pirq_dpci, arg);
 
     return 0;
 }
@@ -493,7 +498,7 @@ void hvm_migrate_pirqs(struct vcpu *v)
        return;
 
     spin_lock(&d->event_lock);
-    pt_pirq_iterate(d, hvm_migrate_pirq, v);
+    pt_pirq_iterate(d, migrate_pirq, v);
     spin_unlock(&d->event_lock);
 }
 

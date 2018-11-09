@@ -434,8 +434,8 @@ int pt_irq_create_bind(
             if ( vcpu )
                 pirq_dpci->gmsi.posted = true;
         }
-        if ( dest_vcpu_id >= 0 )
-            hvm_migrate_pirqs(d->vcpu[dest_vcpu_id]);
+        if ( vcpu && iommu_enabled )
+            hvm_migrate_pirq(pirq_dpci, vcpu);
 
         /* Use interrupt posting if it is supported. */
         if ( iommu_intpost )
