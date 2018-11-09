@@ -303,15 +303,12 @@ DEFINE_PER_CPU(struct stubs, stubs);
 void lstar_enter(void);
 void cstar_enter(void);
 #else
-static inline void lstar_enter(void)
+static void __cold star_enter(void)
 {
-    panic("%s called\n", __func__);
+    panic("lstar/cstar\n");
 }
-
-static inline void cstar_enter(void)
-{
-    panic("%s called\n", __func__);
-}
+#define lstar_enter star_enter
+#define cstar_enter star_enter
 #endif /* CONFIG_PV */
 
 void subarch_percpu_traps_init(void)

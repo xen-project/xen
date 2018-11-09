@@ -9,6 +9,7 @@
  */
 #define __init            __text_section(".init.text")
 #define __exit            __text_section(".exit.text")
+#define __cold            __text_section(".text.cold")
 #define __initdata        __section(".init.data")
 #define __initconst       __section(".init.rodata")
 #define __initconstrel    __section(".init.rodata.rel")
