@@ -334,7 +334,7 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
         for ( i = 0; i < array_size; i++ )
         {
             bootmem_region_zap(badpage->mfn,
-                               badpage->mfn + (1U << badpage->order));
+                               badpage->mfn + (1UL << badpage->order));
             badpage++;
         }
     }
@@ -347,7 +347,7 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
             for ( i = 0; i < array_size; i++ )
             {
                 bootmem_region_zap(badpage->mfn,
-                                   badpage->mfn + (1U << badpage->order));
+                                   badpage->mfn + (1UL << badpage->order));
                 badpage++;
             }
         }
