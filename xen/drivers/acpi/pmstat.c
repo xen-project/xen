@@ -64,7 +64,7 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
     case PMSTAT_PX:
         if ( !(xen_processor_pmbits & XEN_PROCESSOR_PM_PX) )
             return -ENODEV;
-        if ( !cpufreq_driver )
+        if ( !cpufreq_driver.init )
             return -ENODEV;
         if ( !pmpt || !(pmpt->perf.init & XEN_PX_INIT) )
             return -EINVAL;
@@ -255,16 +255,16 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
         return ret;
 
     op->u.get_para.cpuinfo_cur_freq =
-        cpufreq_driver->get ? cpufreq_driver->get(op->cpuid) : policy->cur;
+        cpufreq_driver.get ? cpufreq_driver.get(op->cpuid) : policy->cur;
     op->u.get_para.cpuinfo_max_freq = policy->cpuinfo.max_freq;
     op->u.get_para.cpuinfo_min_freq = policy->cpuinfo.min_freq;
     op->u.get_para.scaling_cur_freq = policy->cur;
     op->u.get_para.scaling_max_freq = policy->max;
     op->u.get_para.scaling_min_freq = policy->min;
 
-    if ( cpufreq_driver->name[0] )
+    if ( cpufreq_driver.name[0] )
         strlcpy(op->u.get_para.scaling_driver, 
-            cpufreq_driver->name, CPUFREQ_NAME_LEN);
+            cpufreq_driver.name, CPUFREQ_NAME_LEN);
     else
         strlcpy(op->u.get_para.scaling_driver, "Unknown", CPUFREQ_NAME_LEN);
 

@@ -31,7 +31,7 @@
 #include <acpi/cpufreq/cpufreq.h>
 #include <public/sysctl.h>
 
-struct cpufreq_driver   *cpufreq_driver;
+struct cpufreq_driver __read_mostly cpufreq_driver;
 struct processor_pminfo *__read_mostly processor_pminfo[NR_CPUS];
 DEFINE_PER_CPU_READ_MOSTLY(struct cpufreq_policy *, cpufreq_cpu_policy);
 
@@ -360,11 +360,11 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 {
     int retval = -EINVAL;
 
-    if (cpu_online(policy->cpu) && cpufreq_driver->target)
+    if (cpu_online(policy->cpu) && cpufreq_driver.target)
     {
         unsigned int prev_freq = policy->cur;
 
-        retval = cpufreq_driver->target(policy, target_freq, relation);
+        retval = cpufreq_driver.target(policy, target_freq, relation);
         if ( retval == 0 )
             TRACE_2D(TRC_PM_FREQ_CHANGE, prev_freq/1000, policy->cur/1000);
     }
@@ -380,9 +380,9 @@ int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag)
     if (!cpu_online(cpu) || !(policy = per_cpu(cpufreq_cpu_policy, cpu)))
         return 0;
 
-    if (cpufreq_driver->getavg)
+    if (cpufreq_driver.getavg)
     {
-        freq_avg = cpufreq_driver->getavg(cpu, flag);
+        freq_avg = cpufreq_driver.getavg(cpu, flag);
         if (freq_avg > 0)
             return freq_avg;
     }
@@ -412,9 +412,9 @@ int cpufreq_update_turbo(int cpuid, int new_state)
         return 0;
 
     policy->turbo = new_state;
-    if (cpufreq_driver->update)
+    if (cpufreq_driver.update)
     {
-        ret = cpufreq_driver->update(cpuid, policy);
+        ret = cpufreq_driver.update(cpuid, policy);
         if (ret)
             policy->turbo = curr_state;
     }
@@ -450,15 +450,15 @@ int __cpufreq_set_policy(struct cpufreq_policy *data,
         return -EINVAL;
 
     /* verify the cpu speed can be set within this limit */
-    ret = cpufreq_driver->verify(policy);
+    ret = cpufreq_driver.verify(policy);
     if (ret)
         return ret;
 
     data->min = policy->min;
     data->max = policy->max;
     data->limits = policy->limits;
-    if (cpufreq_driver->setpolicy)
-        return cpufreq_driver->setpolicy(data);
+    if (cpufreq_driver.setpolicy)
+        return cpufreq_driver.setpolicy(data);
 
     if (policy->governor != data->governor) {
         /* save old, working values */

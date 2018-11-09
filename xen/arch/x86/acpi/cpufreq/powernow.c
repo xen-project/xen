@@ -52,8 +52,6 @@
 
 #define ARCH_CPU_FLAG_RESUME	1
 
-static struct cpufreq_driver powernow_cpufreq_driver;
-
 static void transition_pstate(void *pstate)
 {
     wrmsrl(MSR_PSTATE_CTRL, *(unsigned int *)pstate);
@@ -215,7 +213,7 @@ static void feature_detect(void *info)
     if ( cpu_has_aperfmperf )
     {
         policy->aperf_mperf = 1;
-        powernow_cpufreq_driver.getavg = get_measured_perf;
+        cpufreq_driver.getavg = get_measured_perf;
     }
 
     edx = cpuid_edx(CPUID_FREQ_VOLT_CAPABILITIES);
@@ -347,7 +345,8 @@ static int powernow_cpufreq_cpu_exit(struct cpufreq_policy *policy)
     return 0;
 }
 
-static struct cpufreq_driver powernow_cpufreq_driver = {
+static const struct cpufreq_driver __initconstrel powernow_cpufreq_driver = {
+    .name   = "powernow",
     .verify = powernow_cpufreq_verify,
     .target = powernow_cpufreq_target,
     .init   = powernow_cpufreq_cpu_init,

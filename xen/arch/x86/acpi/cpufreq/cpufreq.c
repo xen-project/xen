@@ -53,8 +53,6 @@ enum {
 
 struct acpi_cpufreq_data *cpufreq_drv_data[NR_CPUS];
 
-static struct cpufreq_driver acpi_cpufreq_driver;
-
 static bool __read_mostly acpi_pstate_strict;
 boolean_param("acpi_pstate_strict", acpi_pstate_strict);
 
@@ -355,7 +353,7 @@ static void feature_detect(void *info)
     if ( cpu_has_aperfmperf )
     {
         policy->aperf_mperf = 1;
-        acpi_cpufreq_driver.getavg = get_measured_perf;
+        cpufreq_driver.getavg = get_measured_perf;
     }
 
     eax = cpuid_eax(6);
@@ -593,7 +591,7 @@ acpi_cpufreq_cpu_init(struct cpufreq_policy *policy)
         policy->cur = acpi_cpufreq_guess_freq(data, policy->cpu);
         break;
     case ACPI_ADR_SPACE_FIXED_HARDWARE:
-        acpi_cpufreq_driver.get = get_cur_freq_on_cpu;
+        cpufreq_driver.get = get_cur_freq_on_cpu;
         policy->cur = get_cur_freq_on_cpu(cpu);
         break;
     default:
@@ -635,7 +633,7 @@ static int acpi_cpufreq_cpu_exit(struct cpufreq_policy *policy)
     return 0;
 }
 
-static struct cpufreq_driver acpi_cpufreq_driver = {
+static const struct cpufreq_driver __initconstrel acpi_cpufreq_driver = {
     .name   = "acpi-cpufreq",
     .verify = acpi_cpufreq_verify,
     .target = acpi_cpufreq_target,
@@ -656,7 +654,7 @@ static int __init cpufreq_driver_init(void)
 
     return ret;
 }
-__initcall(cpufreq_driver_init);
+presmp_initcall(cpufreq_driver_init);
 
 int cpufreq_cpu_init(unsigned int cpuid)
 {

@@ -153,7 +153,7 @@ __cpufreq_governor(struct cpufreq_policy *policy, unsigned int event)
 #define CPUFREQ_RELATION_H 1  /* highest frequency below or at target */
 
 struct cpufreq_driver {
-    char   name[CPUFREQ_NAME_LEN];
+    const char *name;
     int    (*init)(struct cpufreq_policy *policy);
     int    (*verify)(struct cpufreq_policy *policy);
     int    (*setpolicy)(struct cpufreq_policy *policy);
@@ -166,9 +166,9 @@ struct cpufreq_driver {
     int    (*exit)(struct cpufreq_policy *policy);
 };
 
-extern struct cpufreq_driver *cpufreq_driver;
+extern struct cpufreq_driver cpufreq_driver;
 
-int cpufreq_register_driver(struct cpufreq_driver *);
+int cpufreq_register_driver(const struct cpufreq_driver *);
 
 static __inline__
 void cpufreq_verify_within_limits(struct cpufreq_policy *policy,
