@@ -29,7 +29,7 @@
 
 #include "xen.h"
 
-#define VM_EVENT_INTERFACE_VERSION 0x00000003
+#define VM_EVENT_INTERFACE_VERSION 0x00000004
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
@@ -157,6 +157,12 @@
 #define VM_EVENT_X86_CR4    2
 #define VM_EVENT_X86_XCR0   3
 
+/* The limit field is right-shifted by 12 bits if .ar.g is set. */
+struct vm_event_x86_selector_reg {
+    uint32_t limit  :    20;
+    uint32_t ar     :    12;
+};
+
 /*
  * Using custom vCPU structs (i.e. not hvm_hw_cpu) for both x86 and ARM
  * so as to not fill the vm_event ring buffer too quickly.
@@ -179,6 +185,7 @@ struct vm_event_regs_x86 {
     uint64_t r14;
     uint64_t r15;
     uint64_t rflags;
+    uint64_t dr6;
     uint64_t dr7;
     uint64_t rip;
     uint64_t cr0;
@@ -191,9 +198,25 @@ struct vm_event_regs_x86 {
     uint64_t msr_efer;
     uint64_t msr_star;
     uint64_t msr_lstar;
+    uint32_t cs_base;
+    uint32_t ss_base;
+    uint32_t ds_base;
+    uint32_t es_base;
     uint64_t fs_base;
     uint64_t gs_base;
-    uint32_t cs_arbytes;
+    struct vm_event_x86_selector_reg cs;
+    struct vm_event_x86_selector_reg ss;
+    struct vm_event_x86_selector_reg ds;
+    struct vm_event_x86_selector_reg es;
+    struct vm_event_x86_selector_reg fs;
+    struct vm_event_x86_selector_reg gs;
+    uint64_t shadow_gs;
+    uint16_t cs_sel;
+    uint16_t ss_sel;
+    uint16_t ds_sel;
+    uint16_t es_sel;
+    uint16_t fs_sel;
+    uint16_t gs_sel;
     uint32_t _pad;
 };
 
