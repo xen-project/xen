@@ -120,6 +120,8 @@ void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
            min(sizeof(pi->hw_cap), sizeof(boot_cpu_data.x86_capability)));
     if ( hvm_enabled )
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm;
+    if ( IS_ENABLED(CONFIG_PV) )
+        pi->capabilities |= XEN_SYSCTL_PHYSCAP_pv;
     if ( iommu_enabled )
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_directio;
 }

@@ -396,9 +396,9 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     memcpy(physinfo->hw_cap,xcphysinfo.hw_cap, sizeof(physinfo->hw_cap));
 
     physinfo->cap_hvm = !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_hvm);
-    physinfo->cap_directio =
+    physinfo->cap_pv = !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_pv);
+    physinfo->cap_hvm_directio =
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_directio);
-    physinfo->cap_hvm_directio = physinfo->cap_hvm && physinfo->cap_directio;
 
     GC_FREE;
     return 0;
