@@ -496,7 +496,7 @@ static int vm_event_wait_slot(struct vm_event_domain *ved)
     return rc;
 }
 
-bool_t vm_event_check_ring(struct vm_event_domain *ved)
+bool vm_event_check_ring(struct vm_event_domain *ved)
 {
     return (ved && ved->ring_page);
 }
@@ -514,7 +514,7 @@ bool_t vm_event_check_ring(struct vm_event_domain *ved)
  *
  */
 int __vm_event_claim_slot(struct domain *d, struct vm_event_domain *ved,
-                          bool_t allow_sleep)
+                          bool allow_sleep)
 {
     if ( !vm_event_check_ring(ved) )
         return -EOPNOTSUPP;

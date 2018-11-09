@@ -448,7 +448,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
         /* Try to unshare. If we fail, communicate ENOMEM without
          * sleeping. */
         if ( mem_sharing_unshare_page(p2m->domain, gfn_l, 0) < 0 )
-            (void)mem_sharing_notify_enomem(p2m->domain, gfn_l, 0);
+            mem_sharing_notify_enomem(p2m->domain, gfn_l, false);
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
     }
 
@@ -839,8 +839,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                  * Foreign domains are okay to place an event as they 
                  * won't go to sleep. */
                 (void)mem_sharing_notify_enomem(p2m->domain,
-                                                gfn_x(gfn_add(gfn, i)),
-                                                0);
+                                                gfn_x(gfn_add(gfn, i)), false);
                 return rc;
             }
             omfn = p2m->get_entry(p2m, gfn_add(gfn, i),

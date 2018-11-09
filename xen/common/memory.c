@@ -356,7 +356,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         rc = mem_sharing_unshare_page(d, gmfn, 0);
         if ( rc )
         {
-            (void)mem_sharing_notify_enomem(d, gmfn, 0);
+            mem_sharing_notify_enomem(d, gmfn, false);
             goto out_put_gfn;
         }
         /* Maybe the mfn changed */

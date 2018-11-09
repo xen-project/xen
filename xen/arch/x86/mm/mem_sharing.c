@@ -546,7 +546,7 @@ static int audit(void)
 }
 
 int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
-                                bool_t allow_sleep) 
+                              bool allow_sleep)
 {
     struct vcpu *v = current;
     int rc;

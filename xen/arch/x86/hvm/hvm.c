@@ -1910,7 +1910,8 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     if ( sharing_enomem )
     {
         int rv;
-        if ( (rv = mem_sharing_notify_enomem(currd, gfn, 1)) < 0 )
+
+        if ( (rv = mem_sharing_notify_enomem(currd, gfn, true)) < 0 )
         {
             gdprintk(XENLOG_ERR, "Domain %hu attempt to unshare "
                      "gfn %lx, ENOMEM and no helper (rc %d)\n",

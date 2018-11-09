@@ -30,7 +30,7 @@
 void vm_event_cleanup(struct domain *d);
 
 /* Returns whether a ring has been set up */
-bool_t vm_event_check_ring(struct vm_event_domain *ved);
+bool vm_event_check_ring(struct vm_event_domain *ved);
 
 /* Returns 0 on success, -ENOSYS if there is no ring, -EBUSY if there is no
  * available space and the caller is a foreign domain. If the guest itself
@@ -46,17 +46,17 @@ bool_t vm_event_check_ring(struct vm_event_domain *ved);
  * succeed.
  */
 int __vm_event_claim_slot(struct domain *d, struct vm_event_domain *ved,
-                          bool_t allow_sleep);
+                          bool allow_sleep);
 static inline int vm_event_claim_slot(struct domain *d,
                                       struct vm_event_domain *ved)
 {
-    return __vm_event_claim_slot(d, ved, 1);
+    return __vm_event_claim_slot(d, ved, true);
 }
 
 static inline int vm_event_claim_slot_nosleep(struct domain *d,
                                               struct vm_event_domain *ved)
 {
-    return __vm_event_claim_slot(d, ved, 0);
+    return __vm_event_claim_slot(d, ved, false);
 }
 
 void vm_event_cancel_slot(struct domain *d, struct vm_event_domain *ved);
