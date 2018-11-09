@@ -17,71 +17,7 @@
 #include <public/sched.h>
 #include <public/hvm/hvm_op.h>
 
-/* Viridian MSR numbers. */
-#define HV_X64_MSR_GUEST_OS_ID                   0x40000000
-#define HV_X64_MSR_HYPERCALL                     0x40000001
-#define HV_X64_MSR_VP_INDEX                      0x40000002
-#define HV_X64_MSR_RESET                         0x40000003
-#define HV_X64_MSR_VP_RUNTIME                    0x40000010
-#define HV_X64_MSR_TIME_REF_COUNT                0x40000020
-#define HV_X64_MSR_REFERENCE_TSC                 0x40000021
-#define HV_X64_MSR_TSC_FREQUENCY                 0x40000022
-#define HV_X64_MSR_APIC_FREQUENCY                0x40000023
-#define HV_X64_MSR_EOI                           0x40000070
-#define HV_X64_MSR_ICR                           0x40000071
-#define HV_X64_MSR_TPR                           0x40000072
-#define HV_X64_MSR_VP_ASSIST_PAGE                0x40000073
-#define HV_X64_MSR_SCONTROL                      0x40000080
-#define HV_X64_MSR_SVERSION                      0x40000081
-#define HV_X64_MSR_SIEFP                         0x40000082
-#define HV_X64_MSR_SIMP                          0x40000083
-#define HV_X64_MSR_EOM                           0x40000084
-#define HV_X64_MSR_SINT0                         0x40000090
-#define HV_X64_MSR_SINT1                         0x40000091
-#define HV_X64_MSR_SINT2                         0x40000092
-#define HV_X64_MSR_SINT3                         0x40000093
-#define HV_X64_MSR_SINT4                         0x40000094
-#define HV_X64_MSR_SINT5                         0x40000095
-#define HV_X64_MSR_SINT6                         0x40000096
-#define HV_X64_MSR_SINT7                         0x40000097
-#define HV_X64_MSR_SINT8                         0x40000098
-#define HV_X64_MSR_SINT9                         0x40000099
-#define HV_X64_MSR_SINT10                        0x4000009A
-#define HV_X64_MSR_SINT11                        0x4000009B
-#define HV_X64_MSR_SINT12                        0x4000009C
-#define HV_X64_MSR_SINT13                        0x4000009D
-#define HV_X64_MSR_SINT14                        0x4000009E
-#define HV_X64_MSR_SINT15                        0x4000009F
-#define HV_X64_MSR_STIMER0_CONFIG                0x400000B0
-#define HV_X64_MSR_STIMER0_COUNT                 0x400000B1
-#define HV_X64_MSR_STIMER1_CONFIG                0x400000B2
-#define HV_X64_MSR_STIMER1_COUNT                 0x400000B3
-#define HV_X64_MSR_STIMER2_CONFIG                0x400000B4
-#define HV_X64_MSR_STIMER2_COUNT                 0x400000B5
-#define HV_X64_MSR_STIMER3_CONFIG                0x400000B6
-#define HV_X64_MSR_STIMER3_COUNT                 0x400000B7
-#define HV_X64_MSR_POWER_STATE_TRIGGER_C1        0x400000C1
-#define HV_X64_MSR_POWER_STATE_TRIGGER_C2        0x400000C2
-#define HV_X64_MSR_POWER_STATE_TRIGGER_C3        0x400000C3
-#define HV_X64_MSR_POWER_STATE_CONFIG_C1         0x400000D1
-#define HV_X64_MSR_POWER_STATE_CONFIG_C2         0x400000D2
-#define HV_X64_MSR_POWER_STATE_CONFIG_C3         0x400000D3
-#define HV_X64_MSR_STATS_PARTITION_RETAIL_PAGE   0x400000E0
-#define HV_X64_MSR_STATS_PARTITION_INTERNAL_PAGE 0x400000E1
-#define HV_X64_MSR_STATS_VP_RETAIL_PAGE          0x400000E2
-#define HV_X64_MSR_STATS_VP_INTERNAL_PAGE        0x400000E3
-#define HV_X64_MSR_GUEST_IDLE                    0x400000F0
-#define HV_X64_MSR_SYNTH_DEBUG_CONTROL           0x400000F1
-#define HV_X64_MSR_SYNTH_DEBUG_STATUS            0x400000F2
-#define HV_X64_MSR_SYNTH_DEBUG_SEND_BUFFER       0x400000F3
-#define HV_X64_MSR_SYNTH_DEBUG_RECEIVE_BUFFER    0x400000F4
-#define HV_X64_MSR_SYNTH_DEBUG_PENDING_BUFFER    0x400000F5
-#define HV_X64_MSR_CRASH_P0                      0x40000100
-#define HV_X64_MSR_CRASH_P1                      0x40000101
-#define HV_X64_MSR_CRASH_P2                      0x40000102
-#define HV_X64_MSR_CRASH_P3                      0x40000103
-#define HV_X64_MSR_CRASH_P4                      0x40000104
-#define HV_X64_MSR_CRASH_CTL                     0x40000105
+#include "private.h"
 
 /* Viridian Hypercall Status Codes. */
 #define HV_STATUS_SUCCESS                       0x0000
@@ -309,16 +245,6 @@ static void dump_hypercall(const struct domain *d)
            hg->fields.enabled, (unsigned long)hg->fields.pfn);
 }
 
-static void dump_vp_assist(const struct vcpu *v)
-{
-    const union viridian_page_msr *va;
-
-    va = &v->arch.hvm.viridian.vp_assist.msr;
-
-    printk(XENLOG_G_INFO "%pv: VIRIDIAN VP_ASSIST_PAGE: enabled: %x pfn: %lx\n",
-           v, va->fields.enabled, (unsigned long)va->fields.pfn);
-}
-
 static void dump_reference_tsc(const struct domain *d)
 {
     const union viridian_page_msr *rt;
@@ -362,105 +288,6 @@ static void enable_hypercall_page(struct domain *d)
     unmap_domain_page(p);
 
     put_page_and_type(page);
-}
-
-static void initialize_vp_assist(struct vcpu *v)
-{
-    struct domain *d = v->domain;
-    unsigned long gmfn = v->arch.hvm.viridian.vp_assist.msr.fields.pfn;
-    struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
-    void *va;
-
-    ASSERT(!v->arch.hvm.viridian.vp_assist.va);
-
-    if ( !page )
-        goto fail;
-
-    if ( !get_page_type(page, PGT_writable_page) )
-    {
-        put_page(page);
-        goto fail;
-    }
-
-    va = __map_domain_page_global(page);
-    if ( !va )
-    {
-        put_page_and_type(page);
-        goto fail;
-    }
-
-    clear_page(va);
-
-    v->arch.hvm.viridian.vp_assist.va = va;
-    return;
-
- fail:
-    gdprintk(XENLOG_WARNING, "Bad GMFN %#"PRI_gfn" (MFN %#"PRI_mfn")\n",
-             gmfn, mfn_x(page ? page_to_mfn(page) : INVALID_MFN));
-}
-
-static void teardown_vp_assist(struct vcpu *v)
-{
-    void *va = v->arch.hvm.viridian.vp_assist.va;
-    struct page_info *page;
-
-    if ( !va )
-        return;
-
-    v->arch.hvm.viridian.vp_assist.va = NULL;
-
-    page = mfn_to_page(domain_page_map_to_mfn(va));
-
-    unmap_domain_page_global(va);
-    put_page_and_type(page);
-}
-
-void viridian_apic_assist_set(struct vcpu *v)
-{
-    uint32_t *va = v->arch.hvm.viridian.vp_assist.va;
-
-    if ( !va )
-        return;
-
-    /*
-     * If there is already an assist pending then something has gone
-     * wrong and the VM will most likely hang so force a crash now
-     * to make the problem clear.
-     */
-    if ( v->arch.hvm.viridian.vp_assist.pending )
-        domain_crash(v->domain);
-
-    v->arch.hvm.viridian.vp_assist.pending = true;
-    *va |= 1u;
-}
-
-bool viridian_apic_assist_completed(struct vcpu *v)
-{
-    uint32_t *va = v->arch.hvm.viridian.vp_assist.va;
-
-    if ( !va )
-        return false;
-
-    if ( v->arch.hvm.viridian.vp_assist.pending &&
-         !(*va & 1u) )
-    {
-        /* An EOI has been avoided */
-        v->arch.hvm.viridian.vp_assist.pending = false;
-        return true;
-    }
-
-    return false;
-}
-
-void viridian_apic_assist_clear(struct vcpu *v)
-{
-    uint32_t *va = v->arch.hvm.viridian.vp_assist.va;
-
-    if ( !va )
-        return;
-
-    *va &= ~1u;
-    v->arch.hvm.viridian.vp_assist.pending = false;
 }
 
 static void update_reference_tsc(struct domain *d, bool_t initialize)
@@ -561,31 +388,10 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
         break;
 
     case HV_X64_MSR_EOI:
-        vlapic_EOI_set(vcpu_vlapic(v));
-        break;
-
-    case HV_X64_MSR_ICR: {
-        u32 eax = (u32)val, edx = (u32)(val >> 32);
-        struct vlapic *vlapic = vcpu_vlapic(v);
-        eax &= ~(1 << 12);
-        edx &= 0xff000000;
-        vlapic_set_reg(vlapic, APIC_ICR2, edx);
-        vlapic_ipi(vlapic, eax, edx);
-        vlapic_set_reg(vlapic, APIC_ICR, eax);
-        break;
-    }
-
+    case HV_X64_MSR_ICR:
     case HV_X64_MSR_TPR:
-        vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI, (uint8_t)val);
-        break;
-
     case HV_X64_MSR_VP_ASSIST_PAGE:
-        teardown_vp_assist(v); /* release any previous mapping */
-        v->arch.hvm.viridian.vp_assist.msr.raw = val;
-        dump_vp_assist(v);
-        if ( v->arch.hvm.viridian.vp_assist.msr.fields.enabled )
-            initialize_vp_assist(v);
-        break;
+        return viridian_synic_wrmsr(v, idx, val);
 
     case HV_X64_MSR_REFERENCE_TSC:
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
@@ -708,18 +514,11 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
         *val = 1000000000ull / APIC_BUS_CYCLE_NS;
         break;
 
+    case HV_X64_MSR_EOI:
     case HV_X64_MSR_ICR:
-        *val = (((uint64_t)vlapic_get_reg(vcpu_vlapic(v), APIC_ICR2) << 32) |
-                vlapic_get_reg(vcpu_vlapic(v), APIC_ICR));
-        break;
-
     case HV_X64_MSR_TPR:
-        *val = vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI);
-        break;
-
     case HV_X64_MSR_VP_ASSIST_PAGE:
-        *val = v->arch.hvm.viridian.vp_assist.msr.raw;
-        break;
+        return viridian_synic_rdmsr(v, idx, val);
 
     case HV_X64_MSR_REFERENCE_TSC:
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
@@ -777,7 +576,7 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
 
 void viridian_vcpu_deinit(struct vcpu *v)
 {
-    teardown_vp_assist(v);
+    viridian_synic_wrmsr(v, HV_X64_MSR_VP_ASSIST_PAGE, 0);
 }
 
 void viridian_domain_deinit(struct domain *d)
@@ -785,7 +584,7 @@ void viridian_domain_deinit(struct domain *d)
     struct vcpu *v;
 
     for_each_vcpu ( d, v )
-        teardown_vp_assist(v);
+        viridian_vcpu_deinit(v);
 }
 
 static DEFINE_PER_CPU(cpumask_t, ipi_cpumask);
@@ -987,13 +786,12 @@ HVM_REGISTER_SAVE_RESTORE(VIRIDIAN_DOMAIN, viridian_save_domain_ctxt,
 
 static int viridian_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
 {
-    struct hvm_viridian_vcpu_context ctxt = {
-        .vp_assist_msr = v->arch.hvm.viridian.vp_assist.msr.raw,
-        .vp_assist_pending = v->arch.hvm.viridian.vp_assist.pending,
-    };
+    struct hvm_viridian_vcpu_context ctxt = {};
 
     if ( !is_viridian_domain(v->domain) )
         return 0;
+
+    viridian_synic_save_vcpu_ctxt(v, &ctxt);
 
     return hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt);
 }
@@ -1018,12 +816,7 @@ static int viridian_load_vcpu_ctxt(struct domain *d,
     if ( memcmp(&ctxt._pad, zero_page, sizeof(ctxt._pad)) )
         return -EINVAL;
 
-    v->arch.hvm.viridian.vp_assist.msr.raw = ctxt.vp_assist_msr;
-    if ( v->arch.hvm.viridian.vp_assist.msr.fields.enabled &&
-         !v->arch.hvm.viridian.vp_assist.va )
-        initialize_vp_assist(v);
-
-    v->arch.hvm.viridian.vp_assist.pending = !!ctxt.vp_assist_pending;
+    viridian_synic_load_vcpu_ctxt(v, &ctxt);
 
     return 0;
 }
