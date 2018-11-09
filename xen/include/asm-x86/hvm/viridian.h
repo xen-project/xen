@@ -57,15 +57,6 @@ struct viridian_time_ref_count
     int64_t off;
 };
 
-typedef struct _HV_REFERENCE_TSC_PAGE
-{
-    uint32_t TscSequence;
-    uint32_t Reserved1;
-    uint64_t TscScale;
-    int64_t  TscOffset;
-    uint64_t Reserved2[509];
-} HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
-
 struct viridian_domain
 {
     union viridian_guest_os_id_msr guest_os_id;
