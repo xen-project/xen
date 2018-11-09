@@ -5,8 +5,6 @@
 #include <xen/radix-tree.h>
 #include <xen/rwlock.h>
 #include <xen/mem_access.h>
-#include <public/vm_event.h> /* for vm_event_response_t */
-#include <public/memory.h>
 
 #define paddr_bits PADDR_BITS
 
