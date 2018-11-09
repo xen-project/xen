@@ -26,6 +26,7 @@
 #include <xen/spinlock.h>
 #include <xen/trace.h>
 
+#include <asm/amd.h>
 #include <asm/apic.h>
 #include <asm/debugreg.h>
 #include <asm/hpet.h>
@@ -58,8 +59,6 @@ struct priv_op_ctxt {
 /* I/O emulation support. Helper routines for, and type of, the stack stub. */
 void host_to_guest_gpr_switch(struct cpu_user_regs *);
 unsigned long guest_to_host_gpr_switch(unsigned long);
-
-void (*pv_post_outb_hook)(unsigned int port, u8 value);
 
 typedef void io_emul_stub_t(struct cpu_user_regs *);
 
@@ -351,8 +350,8 @@ static void guest_io_write(unsigned int port, unsigned int bytes,
         {
         case 1:
             outb((uint8_t)data, port);
-            if ( pv_post_outb_hook )
-                pv_post_outb_hook(port, (uint8_t)data);
+            if ( amd_acpi_c1e_quirk )
+                amd_check_disable_c1e(port, (uint8_t)data);
             break;
         case 2:
             outw((uint16_t)data, port);
@@ -432,8 +431,8 @@ static int write_io(unsigned int port, unsigned int bytes,
             io_emul_stub_setup(poc, ctxt->opcode, port, bytes);
 
         io_emul(ctxt->regs);
-        if ( (bytes == 1) && pv_post_outb_hook )
-            pv_post_outb_hook(port, val);
+        if ( (bytes == 1) && amd_acpi_c1e_quirk )
+            amd_check_disable_c1e(port, val);
         return X86EMUL_DONE;
     }
 

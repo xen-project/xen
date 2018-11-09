@@ -48,8 +48,6 @@ __OUT(b,"b",char)
 __OUT(w,"w",short)
 __OUT(l,,int)
 
-extern void (*pv_post_outb_hook)(unsigned int port, u8 value);
-
 /* Function pointer used to handle platform specific I/O port emulation. */
 #define IOEMUL_QUIRK_STUB_BYTES 10
 extern bool (*ioemul_handle_quirk)(
