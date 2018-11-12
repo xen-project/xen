@@ -35,11 +35,11 @@ static multiboot_info_t __initdata pvh_mbi;
 static module_t __initdata pvh_mbi_mods[8];
 static const char *__initdata pvh_loader = "PVH Directboot";
 
-static void __init convert_pvh_info(void)
+static void __init convert_pvh_info(multiboot_info_t **mbi,
+                                    module_t **mod)
 {
     const struct hvm_start_info *pvh_info = __va(pvh_start_info_pa);
     const struct hvm_modlist_entry *entry;
-    module_t *mod;
     unsigned int i;
 
     if ( pvh_info->magic != XEN_HVM_START_MAGIC_VALUE )
@@ -68,20 +68,22 @@ static void __init convert_pvh_info(void)
     pvh_mbi.mods_count = pvh_info->nr_modules;
     pvh_mbi.mods_addr = __pa(pvh_mbi_mods);
 
-    mod = pvh_mbi_mods;
     entry = __va(pvh_info->modlist_paddr);
     for ( i = 0; i < pvh_info->nr_modules; i++ )
     {
         BUG_ON(entry[i].paddr >> 32);
         BUG_ON(entry[i].cmdline_paddr >> 32);
 
-        mod[i].mod_start = entry[i].paddr;
-        mod[i].mod_end   = entry[i].paddr + entry[i].size;
-        mod[i].string    = entry[i].cmdline_paddr;
+        pvh_mbi_mods[i].mod_start = entry[i].paddr;
+        pvh_mbi_mods[i].mod_end   = entry[i].paddr + entry[i].size;
+        pvh_mbi_mods[i].string    = entry[i].cmdline_paddr;
     }
 
     BUG_ON(!pvh_info->rsdp_paddr);
     rsdp_hint = pvh_info->rsdp_paddr;
+
+    *mbi = &pvh_mbi;
+    *mod = pvh_mbi_mods;
 }
 
 static void __init get_memory_map(void)
@@ -98,16 +100,14 @@ static void __init get_memory_map(void)
     sanitize_e820_map(e820_raw.map, &e820_raw.nr_map);
 }
 
-multiboot_info_t *__init pvh_init(void)
+void __init pvh_init(multiboot_info_t **mbi, module_t **mod)
 {
-    convert_pvh_info();
+    convert_pvh_info(mbi, mod);
 
     probe_hypervisor();
     ASSERT(xen_guest);
 
     get_memory_map();
-
-    return &pvh_mbi;
 }
 
 void __init pvh_print_info(void)

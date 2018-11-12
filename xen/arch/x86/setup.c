@@ -719,12 +719,13 @@ void __init noreturn __start_xen(unsigned long mbi_p)
          */
         opt_console_xen = -1;
         ASSERT(mbi_p == 0);
-        mbi = pvh_init();
+        pvh_init(&mbi, &mod);
     }
     else
+    {
         mbi = __va(mbi_p);
-
-    mod = __va(mbi->mods_addr);
+        mod = __va(mbi->mods_addr);
+    }
 
     loader = (mbi->flags & MBI_LOADERNAME)
         ? (char *)__va(mbi->boot_loader_name) : "unknown";

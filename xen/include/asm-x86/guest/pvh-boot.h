@@ -25,17 +25,16 @@
 
 extern bool pvh_boot;
 
-multiboot_info_t *pvh_init(void);
+void pvh_init(multiboot_info_t **mbi, module_t **mod);
 void pvh_print_info(void);
 
 #else
 
 #define pvh_boot 0
 
-static inline multiboot_info_t *pvh_init(void)
+static inline void pvh_init(multiboot_info_t **mbi, module_t **mod)
 {
     ASSERT_UNREACHABLE();
-    return NULL;
 }
 
 static inline void pvh_print_info(void)
