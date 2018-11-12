@@ -318,7 +318,6 @@ static struct {
     RLIMIT_ENTRY(RLIMIT_FSIZE,    256*1024),
 
     /* Shouldn't need any of these */
-    RLIMIT_ENTRY(RLIMIT_NPROC,    0),
     RLIMIT_ENTRY(RLIMIT_CORE,     0),
     RLIMIT_ENTRY(RLIMIT_MSGQUEUE, 0),
     RLIMIT_ENTRY(RLIMIT_LOCKS,    0),

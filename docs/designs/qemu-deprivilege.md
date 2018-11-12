@@ -114,7 +114,6 @@ resources available to it.
 
 Limits that can be implemented immediately without much effort:
  - RLIMIT_FSIZE` (file size) to 256KiB.
- - RLIMIT_NPROC (after uid changes to a unique uid)
 
 Probably not necessary but why not:
  - RLIMIT_CORE: 0
@@ -141,6 +140,9 @@ RLIMIT_AS limits the total amount of memory; but this includes the
 virtual memory which QEMU uses as a mapcache.  xen-mapcache.c already
 fiddles with this; it would be straightforward to make it *set* the
 rlimit to what it thinks a sensible limit is.
+
+RLIMIT_NPROC limits total number of processes or threads.  QEMU uses
+threads for some devices, so this would require some thought.
 
 Other things that would take some cleverness / changes to QEMU to
 utilize due to ordering constrants:
