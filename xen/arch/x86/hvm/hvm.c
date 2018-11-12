@@ -464,7 +464,8 @@ void hvm_migrate_timers(struct vcpu *v)
 
 void hvm_migrate_pirq(struct hvm_pirq_dpci *pirq_dpci, const struct vcpu *v)
 {
-    ASSERT(iommu_enabled && hvm_domain_irq(v->domain)->dpci);
+    ASSERT(iommu_enabled &&
+           (is_hardware_domain(v->domain) || hvm_domain_irq(v->domain)->dpci));
 
     if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI) &&
          /* Needn't migrate pirq if this pirq is delivered to guest directly.*/
