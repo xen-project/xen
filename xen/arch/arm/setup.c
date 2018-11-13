@@ -66,6 +66,9 @@ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 
 static __used void init_done(void)
 {
+    /* Must be done past setting system_state. */
+    unregister_init_virtual_region();
+
     free_init_memory();
     startup_cpu_idle_loop();
 }
@@ -960,9 +963,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     serial_endboot();
 
     system_state = SYS_STATE_active;
-
-    /* Must be done past setting system_state. */
-    unregister_init_virtual_region();
 
     domain_unpause_by_systemcontroller(dom0);
 
