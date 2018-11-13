@@ -376,6 +376,8 @@ struct domain
     bool             auto_node_affinity;
     /* Is this guest fully privileged (aka dom0)? */
     bool             is_privileged;
+    /* Can this guest access the Xen console? */
+    bool             is_console;
     /* Is this a xenstore domain (not dom0)? */
     bool             is_xenstore;
     /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
