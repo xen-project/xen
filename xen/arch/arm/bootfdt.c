@@ -176,6 +176,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
     /* sizeof("/chosen/") + DT_MAX_NAME + '/' + DT_MAX_NAME + '/0' => 92 */
     char path[92];
     int parent_node, ret;
+    bool domU;
 
     parent_node = fdt_parent_offset(fdt, node);
     ASSERT(parent_node >= 0);
@@ -230,12 +231,14 @@ static void __init process_multiboot_node(const void *fdt, int node,
             kind = BOOTMOD_XSM;
     }
 
-    add_boot_module(kind, start, size);
+    domU = fdt_node_check_compatible(fdt, parent_node, "xen,domain") == 0;
+    add_boot_module(kind, start, size, domU);
 
     prop = fdt_get_property(fdt, node, "bootargs", &len);
     if ( !prop )
         return;
-    add_boot_cmdline(fdt_get_name(fdt, parent_node, &len), prop->data, kind);
+    add_boot_cmdline(fdt_get_name(fdt, parent_node, &len), prop->data,
+                     kind, domU);
 }
 
 static void __init process_chosen_node(const void *fdt, int node,
@@ -281,7 +284,7 @@ static void __init process_chosen_node(const void *fdt, int node,
 
     printk("Initrd %"PRIpaddr"-%"PRIpaddr"\n", start, end);
 
-    add_boot_module(BOOTMOD_RAMDISK, start, end-start);
+    add_boot_module(BOOTMOD_RAMDISK, start, end-start, false);
 }
 
 static int __init early_scan_node(const void *fdt,
@@ -352,7 +355,7 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
     if ( ret < 0 )
         panic("No valid device tree\n");
 
-    add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt));
+    add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt), false);
 
     device_tree_for_each_node((void *)fdt, early_scan_node, NULL);
     early_print_info();

@@ -30,9 +30,16 @@ struct meminfo {
     struct membank bank[NR_MEM_BANKS];
 };
 
+/*
+ * The domU flag is set for kernels and ramdisks of "xen,domain" nodes.
+ * The purpose of the domU flag is to avoid getting confused in
+ * kernel_probe, where we try to guess which is the dom0 kernel and
+ * initrd to be compatible with all versions of the multiboot spec. 
+ */
 #define BOOTMOD_MAX_CMDLINE 1024
 struct bootmodule {
     bootmodule_kind kind;
+    bool domU;
     paddr_t start;
     paddr_t size;
 };
@@ -41,6 +48,7 @@ struct bootmodule {
 #define DT_MAX_NAME 41
 struct bootcmdline {
     bootmodule_kind kind;
+    bool domU;
     char dt_name[DT_MAX_NAME];
     char cmdline[BOOTMOD_MAX_CMDLINE];
 };
@@ -91,10 +99,10 @@ size_t boot_fdt_info(const void *fdt, paddr_t paddr);
 const char *boot_fdt_cmdline(const void *fdt);
 
 struct bootmodule *add_boot_module(bootmodule_kind kind,
-                                   paddr_t start, paddr_t size);
+                                   paddr_t start, paddr_t size, bool domU);
 struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
 void add_boot_cmdline(const char *name, const char *cmdline,
-                      bootmodule_kind kind);
+                      bootmodule_kind kind, bool domU);
 struct bootcmdline *boot_cmdline_find_by_kind(bootmodule_kind kind);
 const char *boot_module_kind_as_string(bootmodule_kind kind);
 
