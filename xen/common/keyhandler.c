@@ -286,8 +286,8 @@ static void dump_domains(unsigned char key)
     s_time_t       now = NOW();
 #define tmpstr keyhandler_scratch
 
-    printk("'%c' pressed -> dumping domain info (now = %"PRI_stime"\n", key,
-           now);
+    printk("'%c' pressed -> dumping domain info (now = %"PRI_stime")\n",
+           key, now);
 
     rcu_read_lock(&domlist_read_lock);
 
