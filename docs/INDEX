@@ -25,3 +25,4 @@ misc/arm/early-printk		Enabling early printk on ARM
 misc/arm/passthrough		Passthrough a device described in the Device Tree to a guest
 misc/arm/device-tree/booting	Device tree bindings to boot Xen
 misc/arm/device-tree/passthrough	Device tree binding to passthrough a device
+features/dom0less.markdown	Boot multiple domains from Xen in parallel
