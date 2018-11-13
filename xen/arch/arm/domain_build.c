@@ -1472,7 +1472,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     return res;
 }
 
-static int __init prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+static int __init prepare_dtb_hwdom(struct domain *d, struct kernel_info *kinfo)
 {
     const p2m_type_t default_p2mt = p2m_mmio_direct_c;
     const void *fdt;
@@ -2207,72 +2207,28 @@ static void __init find_gnttab_region(struct domain *d,
            kinfo->gnttab_start, kinfo->gnttab_start + kinfo->gnttab_size);
 }
 
-int __init construct_dom0(struct domain *d)
+static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
 {
-    struct kernel_info kinfo = {};
     struct vcpu *saved_current;
-    int rc, i, cpu;
-
+    int i, cpu;
     struct vcpu *v = d->vcpu[0];
     struct cpu_user_regs *regs = &v->arch.cpu_info->guest_cpu_user_regs;
 
-    /* Sanity! */
-    BUG_ON(d->domain_id != 0);
     BUG_ON(d->vcpu[0] == NULL);
     BUG_ON(v->is_initialised);
 
-    printk("*** LOADING DOMAIN 0 ***\n");
-    if ( dom0_mem <= 0 )
-    {
-        warning_add("PLEASE SPECIFY dom0_mem PARAMETER - USING 512M FOR NOW\n");
-        dom0_mem = MB(512);
-    }
-
-
-    iommu_hwdom_init(d);
-
-    d->max_pages = ~0U;
-
-    kinfo.unassigned_mem = dom0_mem;
-    kinfo.d = d;
-
-    rc = kernel_probe(&kinfo, NULL);
-    if ( rc < 0 )
-        return rc;
-
 #ifdef CONFIG_ARM_64
     /* if aarch32 mode is not supported at EL1 do not allow 32-bit domain */
-    if ( !(cpu_has_el1_32) && kinfo.type == DOMAIN_32BIT )
+    if ( !(cpu_has_el1_32) && kinfo->type == DOMAIN_32BIT )
     {
         printk("Platform does not support 32-bit domain\n");
         return -EINVAL;
     }
-    d->arch.type = kinfo.type;
 
     if ( is_64bit_domain(d) )
         vcpu_switch_to_aarch64_mode(v);
 
 #endif
-
-    allocate_memory_11(d, &kinfo);
-    find_gnttab_region(d, &kinfo);
-
-    /* Map extra GIC MMIO, irqs and other hw stuffs to dom0. */
-    rc = gic_map_hwdom_extra_mappings(d);
-    if ( rc < 0 )
-        return rc;
-
-    rc = platform_specific_mapping(d);
-    if ( rc < 0 )
-        return rc;
-
-    if ( acpi_disabled )
-        rc = prepare_dtb(d, &kinfo);
-    else
-        rc = prepare_acpi(d, &kinfo);
-
-    if ( rc < 0 )
-        return rc;
 
     /*
      * The following loads use the domain's p2m and require current to
@@ -2286,20 +2242,18 @@ int __init construct_dom0(struct domain *d)
      * kernel_load will determine the placement of the kernel as well
      * as the initrd & fdt in RAM, so call it first.
      */
-    kernel_load(&kinfo);
+    kernel_load(kinfo);
     /* initrd_load will fix up the fdt, so call it before dtb_load */
-    initrd_load(&kinfo);
-    dtb_load(&kinfo);
+    initrd_load(kinfo);
+    dtb_load(kinfo);
 
     /* Now that we are done restore the original p2m and current. */
     set_current(saved_current);
     p2m_restore_state(saved_current);
 
-    discard_initial_modules();
-
     memset(regs, 0, sizeof(*regs));
 
-    regs->pc = (register_t)kinfo.entry;
+    regs->pc = (register_t)kinfo->entry;
 
     if ( is_32bit_domain(d) )
     {
@@ -2317,14 +2271,14 @@ int __init construct_dom0(struct domain *d)
          */
         regs->r0 = 0; /* SBZ */
         regs->r1 = 0xffffffff; /* We use DTB therefore no machine id */
-        regs->r2 = kinfo.dtb_paddr;
+        regs->r2 = kinfo->dtb_paddr;
     }
 #ifdef CONFIG_ARM_64
     else
     {
         regs->cpsr = PSR_GUEST64_INIT;
         /* From linux/Documentation/arm64/booting.txt */
-        regs->x0 = kinfo.dtb_paddr;
+        regs->x0 = kinfo->dtb_paddr;
         regs->x1 = 0; /* Reserved for future use */
         regs->x2 = 0; /* Reserved for future use */
         regs->x3 = 0; /* Reserved for future use */
@@ -2350,6 +2304,62 @@ int __init construct_dom0(struct domain *d)
     clear_bit(_VPF_down, &v->pause_flags);
 
     return 0;
+}
+
+int __init construct_dom0(struct domain *d)
+{
+    struct kernel_info kinfo = {};
+    int rc;
+
+    /* Sanity! */
+    BUG_ON(d->domain_id != 0);
+
+    printk("*** LOADING DOMAIN 0 ***\n");
+    if ( dom0_mem <= 0 )
+    {
+        warning_add("PLEASE SPECIFY dom0_mem PARAMETER - USING 512M FOR NOW\n");
+        dom0_mem = MB(512);
+    }
+
+    iommu_hwdom_init(d);
+
+    d->max_pages = ~0U;
+
+    kinfo.unassigned_mem = dom0_mem;
+    kinfo.d = d;
+
+    rc = kernel_probe(&kinfo, NULL);
+    if ( rc < 0 )
+        return rc;
+
+#ifdef CONFIG_ARM_64
+    /* type must be set before allocate_memory */
+    d->arch.type = kinfo.type;
+#endif
+    allocate_memory_11(d, &kinfo);
+    find_gnttab_region(d, &kinfo);
+
+    /* Map extra GIC MMIO, irqs and other hw stuffs to dom0. */
+    rc = gic_map_hwdom_extra_mappings(d);
+    if ( rc < 0 )
+        return rc;
+
+    rc = platform_specific_mapping(d);
+    if ( rc < 0 )
+        return rc;
+
+    if ( acpi_disabled )
+        rc = prepare_dtb_hwdom(d, &kinfo);
+    else
+        rc = prepare_acpi(d, &kinfo);
+
+    if ( rc < 0 )
+        return rc;
+
+    rc = construct_domain(d, &kinfo);
+    discard_initial_modules();
+
+    return rc;
 }
 
 /*
