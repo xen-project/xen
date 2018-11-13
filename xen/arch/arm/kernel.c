@@ -16,8 +16,7 @@
 #include <xen/vmap.h>
 
 #include <asm/guest_access.h>
-
-#include "kernel.h"
+#include <asm/kernel.h>
 
 #define UIMAGE_MAGIC          0x27051956
 #define UIMAGE_NMLEN          32

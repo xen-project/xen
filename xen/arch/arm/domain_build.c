@@ -17,6 +17,7 @@
 #include <xen/warning.h>
 #include <acpi/actables.h>
 #include <asm/device.h>
+#include <asm/kernel.h>
 #include <asm/setup.h>
 #include <asm/platform.h>
 #include <asm/psci.h>
@@ -25,7 +26,6 @@
 
 #include <xen/irq.h>
 #include <xen/grant_table.h>
-#include "kernel.h"
 
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
