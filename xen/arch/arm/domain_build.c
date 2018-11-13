@@ -1034,7 +1034,6 @@ static int __init make_timer_node(const struct domain *d, void *fdt,
     return res;
 }
 
-#ifdef CONFIG_ACPI
 /*
  * This function is used as part of the device tree generation for Dom0
  * on ACPI systems, and DomUs started directly from Xen based on device
@@ -1080,7 +1079,6 @@ static int __init make_chosen_node(const struct kernel_info *kinfo)
 
     return res;
 }
-#endif
 
 static int __init map_irq_to_domain(struct domain *d, unsigned int irq,
                                     bool need_mapping, const char *devname)
@@ -1470,6 +1468,235 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     res = fdt_end_node(kinfo->fdt);
 
     return res;
+}
+
+static int __init make_gicv2_domU_node(const struct domain *d, void *fdt)
+{
+    int res = 0;
+    __be32 reg[(GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS) * 2];
+    __be32 *cells;
+
+    res = fdt_begin_node(fdt, "interrupt-controller@"__stringify(GUEST_GICD_BASE));
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#address-cells", 0);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "compatible", "arm,gic-400");
+    if ( res )
+        return res;
+
+    cells = &reg[0];
+    dt_child_set_range(&cells, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
+                       GUEST_GICD_BASE, GUEST_GICD_SIZE);
+    dt_child_set_range(&cells, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
+                       GUEST_GICC_BASE, GUEST_GICC_SIZE);
+
+    res = fdt_property(fdt, "reg", reg, sizeof(reg));
+    if (res)
+        return res;
+
+    res = fdt_property_cell(fdt, "linux,phandle", GUEST_PHANDLE_GIC);
+    if (res)
+        return res;
+
+    res = fdt_property_cell(fdt, "phandle", GUEST_PHANDLE_GIC);
+    if (res)
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+static int __init make_gicv3_domU_node(const struct domain *d, void *fdt)
+{
+    int res = 0;
+    __be32 reg[(GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS) * 2];
+    __be32 *cells;
+
+    res = fdt_begin_node(fdt, "interrupt-controller@"__stringify(GUEST_GICV3_GICD_BASE));
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#address-cells", 0);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "compatible", "arm,gic-v3");
+    if ( res )
+        return res;
+
+    cells = &reg[0];
+    dt_child_set_range(&cells, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
+                       GUEST_GICV3_GICD_BASE, GUEST_GICV3_GICD_SIZE);
+    dt_child_set_range(&cells, GUEST_ROOT_ADDRESS_CELLS, GUEST_ROOT_SIZE_CELLS,
+                       GUEST_GICV3_GICR0_BASE, GUEST_GICV3_GICR0_SIZE);
+
+    res = fdt_property(fdt, "reg", reg, sizeof(reg));
+    if (res)
+        return res;
+
+    res = fdt_property_cell(fdt, "linux,phandle", GUEST_PHANDLE_GIC);
+    if (res)
+        return res;
+
+    res = fdt_property_cell(fdt, "phandle", GUEST_PHANDLE_GIC);
+    if (res)
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+static int __init make_gic_domU_node(const struct domain *d, void *fdt)
+{
+    switch ( d->arch.vgic.version )
+    {
+    case GIC_V3:
+        return make_gicv3_domU_node(d, fdt);
+    case GIC_V2:
+        return make_gicv2_domU_node(d, fdt);
+    default:
+        panic("Unsupported GIC version");
+    }
+}
+
+static int __init make_timer_domU_node(const struct domain *d, void *fdt)
+{
+    int res;
+    gic_interrupt_t intrs[3];
+
+    res = fdt_begin_node(fdt, "timer");
+    if ( res )
+        return res;
+
+    if ( !is_64bit_domain(d) )
+    {
+        res = fdt_property_string(fdt, "compatible", "arm,armv7-timer");
+        if ( res )
+            return res;
+    }
+    else
+    {
+        res = fdt_property_string(fdt, "compatible", "arm,armv8-timer");
+        if ( res )
+            return res;
+    }
+
+    set_interrupt_ppi(intrs[0], GUEST_TIMER_PHYS_S_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[1], GUEST_TIMER_PHYS_NS_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt_ppi(intrs[2], GUEST_TIMER_VIRT_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+
+    res = fdt_property(fdt, "interrupts", intrs, sizeof (intrs[0]) * 3);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "interrupt-parent",
+                            GUEST_PHANDLE_GIC);
+    if (res)
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
+/*
+ * The max size for DT is 2MB. However, the generated DT is small, 4KB
+ * are enough for now, but we might have to increase it in the future.
+ */
+#define DOMU_DTB_SIZE 4096
+static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
+{
+    int addrcells, sizecells;
+    int ret;
+
+    addrcells = GUEST_ROOT_ADDRESS_CELLS;
+    sizecells = GUEST_ROOT_SIZE_CELLS;
+
+    kinfo->fdt = xmalloc_bytes(DOMU_DTB_SIZE);
+    if ( kinfo->fdt == NULL )
+        return -ENOMEM;
+
+    ret = fdt_create(kinfo->fdt, DOMU_DTB_SIZE);
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_finish_reservemap(kinfo->fdt);
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_begin_node(kinfo->fdt, "/");
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_property_cell(kinfo->fdt, "#address-cells", addrcells);
+    if ( ret )
+        goto err;
+
+    ret = fdt_property_cell(kinfo->fdt, "#size-cells", sizecells);
+    if ( ret )
+        goto err;
+
+    ret = make_chosen_node(kinfo);
+    if ( ret )
+        goto err;
+
+    ret = make_psci_node(kinfo->fdt, NULL);
+    if ( ret )
+        goto err;
+
+    ret = make_cpus_node(d, kinfo->fdt, NULL);
+    if ( ret )
+        goto err;
+
+    ret = make_memory_node(d, kinfo->fdt, addrcells, sizecells, kinfo);
+    if ( ret )
+        goto err;
+
+    ret = make_gic_domU_node(d, kinfo->fdt);
+    if ( ret )
+        goto err;
+
+    ret = make_timer_domU_node(d, kinfo->fdt);
+    if ( ret )
+        goto err;
+
+    ret = fdt_end_node(kinfo->fdt);
+    if ( ret < 0 )
+        goto err;
+
+    ret = fdt_finish(kinfo->fdt);
+    if ( ret < 0 )
+        goto err;
+
+    return 0;
+
+  err:
+    printk("Device tree generation failed (%d).\n", ret);
+    xfree(kinfo->fdt);
+
+    return -EINVAL;
 }
 
 static int __init prepare_dtb_hwdom(struct domain *d, struct kernel_info *kinfo)
@@ -2338,6 +2565,10 @@ static int __init construct_domU(struct domain *d,
     d->arch.type = kinfo.type;
 #endif
     allocate_memory(d, &kinfo);
+
+    rc = prepare_dtb_domU(d, &kinfo);
+    if ( rc < 0 )
+        return rc;
 
     return construct_domain(d, &kinfo);
 }
