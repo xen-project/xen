@@ -4,6 +4,7 @@
 #include <xen/mm.h>
 #include <xen/domain_page.h>
 #include <xen/sched.h>
+#include <xen/sizes.h>
 #include <asm/irq.h>
 #include <asm/regs.h>
 #include <xen/errno.h>
@@ -369,7 +370,6 @@ static void __init allocate_memory_11(struct domain *d,
     }
 }
 
-#if 0
 static bool __init allocate_bank_memory(struct domain *d,
                                        struct kernel_info *kinfo,
                                        gfn_t sgfn,
@@ -468,7 +468,6 @@ fail:
           " %ldKB unallocated. Fix the VMs configurations.\n",
           (unsigned long)kinfo->unassigned_mem >> 10);
 }
-#endif
 
 static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
                                    const struct dt_device_node *node)
@@ -2310,7 +2309,37 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
 static int __init construct_domU(struct domain *d,
                                  const struct dt_device_node *node)
 {
-    return -ENOSYS;
+    struct kernel_info kinfo = {};
+    int rc;
+    u64 mem;
+
+    rc = dt_property_read_u64(node, "memory", &mem);
+    if ( !rc )
+    {
+        printk("Error building DomU: cannot read \"memory\" property\n");
+        return -EINVAL;
+    }
+    kinfo.unassigned_mem = (paddr_t)mem * SZ_1K;
+
+    printk("*** LOADING DOMU cpus=%u memory=%"PRIx64"KB ***\n", d->max_vcpus, mem);
+
+    if ( vcpu_create(d, 0, 0) == NULL )
+        return -ENOMEM;
+    d->max_pages = ~0U;
+
+    kinfo.d = d;
+
+    rc = kernel_probe(&kinfo, node);
+    if ( rc < 0 )
+        return rc;
+
+#ifdef CONFIG_ARM_64
+    /* type must be set before allocate memory */
+    d->arch.type = kinfo.type;
+#endif
+    allocate_memory(d, &kinfo);
+
+    return construct_domain(d, &kinfo);
 }
 
 void __init create_domUs(void)
