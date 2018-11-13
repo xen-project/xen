@@ -594,19 +594,20 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
 
 typedef __be32 gic_interrupt_t[3];
 
-static void __init set_interrupt_ppi(gic_interrupt_t interrupt,
-                                     unsigned int irq,
-                                     unsigned int cpumask,
-                                     unsigned int level)
+static void __init set_interrupt(gic_interrupt_t interrupt,
+                                 unsigned int irq,
+                                 unsigned int cpumask,
+                                 unsigned int level)
 {
     __be32 *cells = interrupt;
+    bool is_ppi = !!(irq < 32);
 
     BUG_ON(irq < 16);
-    BUG_ON(irq >= 32);
+    irq -= (is_ppi) ? 16: 32; /* PPIs start at 16, SPIs at 32 */
 
     /* See linux Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt */
-    dt_set_cell(&cells, 1, 1); /* is a PPI */
-    dt_set_cell(&cells, 1, irq - 16); /* PPIs start at 16 */
+    dt_set_cell(&cells, 1, is_ppi); /* is a PPI? */
+    dt_set_cell(&cells, 1, irq);
     dt_set_cell(&cells, 1, (cpumask << 8) | level);
 }
 
@@ -729,7 +730,7 @@ static int __init make_hypervisor_node(struct domain *d,
      *  - All CPUs
      *  TODO: Handle properly the cpumask;
      */
-    set_interrupt_ppi(intr, d->arch.evtchn_irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intr, d->arch.evtchn_irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
     res = fdt_property_interrupts(fdt, &intr, 1);
     if ( res )
         return res;
@@ -1006,15 +1007,15 @@ static int __init make_timer_node(const struct domain *d, void *fdt,
 
     irq = timer_get_irq(TIMER_PHYS_SECURE_PPI);
     dt_dprintk("  Secure interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[0], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intrs[0], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_PHYS_NONSECURE_PPI);
     dt_dprintk("  Non secure interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[1], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intrs[1], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     irq = timer_get_irq(TIMER_VIRT_PPI);
     dt_dprintk("  Virt interrupt %u\n", irq);
-    set_interrupt_ppi(intrs[2], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intrs[2], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(fdt, intrs, 3);
     if ( res )
@@ -1603,9 +1604,9 @@ static int __init make_timer_domU_node(const struct domain *d, void *fdt)
             return res;
     }
 
-    set_interrupt_ppi(intrs[0], GUEST_TIMER_PHYS_S_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-    set_interrupt_ppi(intrs[1], GUEST_TIMER_PHYS_NS_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-    set_interrupt_ppi(intrs[2], GUEST_TIMER_VIRT_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intrs[0], GUEST_TIMER_PHYS_S_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intrs[1], GUEST_TIMER_PHYS_NS_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    set_interrupt(intrs[2], GUEST_TIMER_VIRT_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property(fdt, "interrupts", intrs, sizeof (intrs[0]) * 3);
     if ( res )
