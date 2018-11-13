@@ -28,6 +28,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
+#include <xen/console.h>
 #include <public/domctl.h>
 #include <public/io/console.h>
 #include <asm/pl011-uart.h>
@@ -76,6 +77,121 @@ static void vpl011_update_interrupt_status(struct domain *d)
 #else
     vgic_inject_irq(d, NULL, GUEST_VPL011_SPI, uartmis);
 #endif
+}
+
+/*
+ * vpl011_write_data_xen writes chars from the vpl011 out buffer to the
+ * console. Only to be used when the backend is Xen.
+ */
+static void vpl011_write_data_xen(struct domain *d, uint8_t data)
+{
+    unsigned long flags;
+    struct vpl011 *vpl011 = &d->arch.vpl011;
+    struct vpl011_xen_backend *intf = vpl011->backend.xen;
+    struct domain *input = console_input_domain();
+
+    VPL011_LOCK(d, flags);
+
+    intf->out[intf->out_prod++] = data;
+    if ( d == input )
+    {
+        if ( intf->out_prod == 1 )
+        {
+            printk("%c", data);
+            intf->out_prod = 0;
+        }
+        else
+        {
+            if ( data != '\n' )
+                intf->out[intf->out_prod++] = '\n';
+            intf->out[intf->out_prod++] = '\0';
+            printk("%s", intf->out);
+            intf->out_prod = 0;
+        }
+    }
+    else
+    {
+        if ( intf->out_prod == SBSA_UART_OUT_BUF_SIZE - 2 ||
+             data == '\n' )
+        {
+            if ( data != '\n' )
+                intf->out[intf->out_prod++] = '\n';
+            intf->out[intf->out_prod++] = '\0';
+            printk("DOM%u: %s", d->domain_id, intf->out);
+            intf->out_prod = 0;
+        }
+    }
+
+    vpl011->uartris |= TXI;
+    vpl011->uartfr &= ~TXFE;
+    vpl011_update_interrupt_status(d);
+
+    VPL011_UNLOCK(d, flags);
+    if ( input != NULL )
+        rcu_unlock_domain(input);
+}
+
+/*
+ * vpl011_read_data_xen reads data when the backend is xen. Characters
+ * are added to the vpl011 receive buffer by vpl011_rx_char_xen.
+ */
+static uint8_t vpl011_read_data_xen(struct domain *d)
+{
+    unsigned long flags;
+    uint8_t data = 0;
+    struct vpl011 *vpl011 = &d->arch.vpl011;
+    struct vpl011_xen_backend *intf = vpl011->backend.xen;
+    XENCONS_RING_IDX in_cons, in_prod;
+
+    VPL011_LOCK(d, flags);
+
+    in_cons = intf->in_cons;
+    in_prod = intf->in_prod;
+
+    smp_rmb();
+
+    /*
+     * It is expected that there will be data in the ring buffer when this
+     * function is called since the guest is expected to read the data register
+     * only if the TXFE flag is not set.
+     * If the guest still does read when TXFE bit is set then 0 will be returned.
+     */
+    if ( xencons_queued(in_prod, in_cons, sizeof(intf->in)) > 0 )
+    {
+        unsigned int fifo_level;
+
+        data = intf->in[xencons_mask(in_cons, sizeof(intf->in))];
+        in_cons += 1;
+        smp_mb();
+        intf->in_cons = in_cons;
+
+        fifo_level = xencons_queued(in_prod, in_cons, sizeof(intf->in));
+
+        /* If the FIFO is now empty, we clear the receive timeout interrupt. */
+        if ( fifo_level == 0 )
+        {
+            vpl011->uartfr |= RXFE;
+            vpl011->uartris &= ~RTI;
+        }
+
+        /* If the FIFO is more than half empty, we clear the RX interrupt. */
+        if ( fifo_level < sizeof(intf->in) - SBSA_UART_FIFO_LEVEL )
+            vpl011->uartris &= ~RXI;
+
+        vpl011_update_interrupt_status(d);
+    }
+    else
+        gprintk(XENLOG_ERR, "vpl011: Unexpected IN ring buffer empty\n");
+
+    /*
+     * We have consumed a character or the FIFO was empty, so clear the
+     * "FIFO full" bit.
+     */
+    vpl011->uartfr &= ~RXFF;
+
+    VPL011_UNLOCK(d, flags);
+
+    return data;
 }
 
 static uint8_t vpl011_read_data(struct domain *d)
@@ -241,7 +357,10 @@ static int vpl011_mmio_read(struct vcpu *v,
     case DR:
         if ( !vpl011_reg32_check_access(dabt) ) goto bad_width;
 
-        *r = vreg_reg32_extract(vpl011_read_data(d), info);
+        if ( vpl011->backend_in_domain )
+            *r = vreg_reg32_extract(vpl011_read_data(d), info);
+        else
+            *r = vreg_reg32_extract(vpl011_read_data_xen(d), info);
         return 1;
 
     case RSR:
@@ -326,7 +445,10 @@ static int vpl011_mmio_write(struct vcpu *v,
 
         vreg_reg32_update(&data, r, info);
         data &= 0xFF;
-        vpl011_write_data(v->domain, data);
+        if ( vpl011->backend_in_domain )
+            vpl011_write_data(v->domain, data);
+        else
+            vpl011_write_data_xen(v->domain, data);
         return 1;
     }
 
@@ -431,6 +553,39 @@ static void vpl011_data_avail(struct domain *d,
         vpl011->uartfr |= TXFE;
 }
 
+/*
+ * vpl011_rx_char_xen adds a char to a domain's vpl011 receive buffer.
+ * It is only used when the vpl011 backend is in Xen.
+ */
+void vpl011_rx_char_xen(struct domain *d, char c)
+{
+    unsigned long flags;
+    struct vpl011 *vpl011 = &d->arch.vpl011;
+    struct vpl011_xen_backend *intf = vpl011->backend.xen;
+    XENCONS_RING_IDX in_cons, in_prod, in_fifo_level;
+
+    ASSERT(!vpl011->backend_in_domain);
+    VPL011_LOCK(d, flags);
+
+    in_cons = intf->in_cons;
+    in_prod = intf->in_prod;
+    if ( xencons_queued(in_prod, in_cons, sizeof(intf->in)) == sizeof(intf->in) )
+    {
+        VPL011_UNLOCK(d, flags);
+        return;
+    }
+
+    intf->in[xencons_mask(in_prod, sizeof(intf->in))] = c;
+    intf->in_prod = ++in_prod;
+
+    in_fifo_level = xencons_queued(in_prod,
+                                   in_cons,
+                                   sizeof(intf->in));
+
+    vpl011_data_avail(d, in_fifo_level, sizeof(intf->in), 0, SBSA_UART_FIFO_SIZE);
+    VPL011_UNLOCK(d, flags);
+}
+
 static void vpl011_notification(struct vcpu *v, unsigned int port)
 {
     unsigned long flags;
@@ -471,27 +626,47 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
     if ( vpl011->backend.dom.ring_buf )
         return -EINVAL;
 
-    /* Map the guest PFN to Xen address space. */
-    rc =  prepare_ring_for_helper(d,
-                                  gfn_x(info->gfn),
-                                  &vpl011->backend.dom.ring_page,
-                                  &vpl011->backend.dom.ring_buf);
-    if ( rc < 0 )
-        goto out;
+    /*
+     * info is NULL when the backend is in Xen.
+     * info is != NULL when the backend is in a domain.
+     */
+    if ( info != NULL )
+    {
+        vpl011->backend_in_domain = true;
+
+        /* Map the guest PFN to Xen address space. */
+        rc =  prepare_ring_for_helper(d,
+                                      gfn_x(info->gfn),
+                                      &vpl011->backend.dom.ring_page,
+                                      &vpl011->backend.dom.ring_buf);
+        if ( rc < 0 )
+            goto out;
+
+        rc = alloc_unbound_xen_event_channel(d, 0, info->console_domid,
+                                             vpl011_notification);
+        if ( rc < 0 )
+            goto out1;
+
+        vpl011->evtchn = info->evtchn = rc;
+    }
+    else
+    {
+        vpl011->backend_in_domain = false;
+
+        vpl011->backend.xen = xzalloc(struct vpl011_xen_backend);
+        if ( vpl011->backend.xen == NULL )
+        {
+            rc = -EINVAL;
+            goto out1;
+        }
+    }
 
     rc = vgic_reserve_virq(d, GUEST_VPL011_SPI);
     if ( !rc )
     {
         rc = -EINVAL;
-        goto out1;
-    }
-
-    rc = alloc_unbound_xen_event_channel(d, 0, info->console_domid,
-                                         vpl011_notification);
-    if ( rc < 0 )
         goto out2;
-
-    vpl011->evtchn = info->evtchn = rc;
+    }
 
     spin_lock_init(&vpl011->lock);
 
@@ -504,8 +679,11 @@ out2:
     vgic_free_virq(d, GUEST_VPL011_SPI);
 
 out1:
-    destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
-			                vpl011->backend.dom.ring_page);
+    if ( vpl011->backend_in_domain )
+        destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
+                                vpl011->backend.dom.ring_page);
+    else
+        xfree(vpl011->backend.xen);
 
 out:
     return rc;
@@ -515,12 +693,17 @@ void domain_vpl011_deinit(struct domain *d)
 {
     struct vpl011 *vpl011 = &d->arch.vpl011;
 
-    if ( !vpl011->backend.dom.ring_buf )
-        return;
+    if ( vpl011->backend_in_domain )
+    {
+        if ( !vpl011->backend.dom.ring_buf )
+            return;
 
-    free_xen_event_channel(d, vpl011->evtchn);
-    destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
-			                vpl011->backend.dom.ring_page);
+        free_xen_event_channel(d, vpl011->evtchn);
+        destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
+                                vpl011->backend.dom.ring_page);
+    }
+    else
+        xfree(vpl011->backend.xen);
 }
 
 /*

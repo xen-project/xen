@@ -2631,7 +2631,14 @@ static int __init construct_domU(struct domain *d,
     if ( rc < 0 )
         return rc;
 
-    return construct_domain(d, &kinfo);
+    rc = construct_domain(d, &kinfo);
+    if ( rc < 0 )
+        return rc;
+
+    if ( kinfo.vpl011 )
+        rc = domain_vpl011_init(d, NULL);
+
+    return rc;
 }
 
 void __init create_domUs(void)

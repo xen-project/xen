@@ -21,6 +21,7 @@
 
 #include <public/domctl.h>
 #include <public/io/ring.h>
+#include <public/io/console.h>
 #include <xen/mm.h>
 
 /* helper macros */
@@ -28,13 +29,23 @@
 #define VPL011_UNLOCK(d,flags) spin_unlock_irqrestore(&(d)->arch.vpl011.lock, flags)
 
 #define SBSA_UART_FIFO_SIZE 32
+/* Same size as VUART_BUF_SIZE, used in vuart.c */
+#define SBSA_UART_OUT_BUF_SIZE 128
+struct vpl011_xen_backend {
+    char in[SBSA_UART_FIFO_SIZE];
+    char out[SBSA_UART_OUT_BUF_SIZE];
+    XENCONS_RING_IDX in_cons, in_prod;
+    XENCONS_RING_IDX out_prod;
+};
 
 struct vpl011 {
+    bool backend_in_domain;
     union {
         struct {
             void *ring_buf;
             struct page_info *ring_page;
         } dom;
+        struct vpl011_xen_backend *xen;
     } backend;
     uint32_t    uartfr;         /* Flag register */
     uint32_t    uartcr;         /* Control register */
@@ -56,6 +67,7 @@ struct vpl011_init_info {
 int domain_vpl011_init(struct domain *d,
                        struct vpl011_init_info *info);
 void domain_vpl011_deinit(struct domain *d);
+void vpl011_rx_char_xen(struct domain *d, char c);
 #else
 static inline int domain_vpl011_init(struct domain *d,
                                      struct vpl011_init_info *info)

@@ -406,6 +406,14 @@ static void dump_console_ring_key(unsigned char key)
  */
 static unsigned int __read_mostly console_rx = 0;
 
+/* Make sure to rcu_unlock_domain after use */
+struct domain *console_input_domain(void)
+{
+    if ( console_rx == 0 )
+            return NULL;
+    return rcu_lock_domain_by_id(console_rx - 1);
+}
+
 static void switch_serial_input(void)
 {
     if ( console_rx == max_init_domid + 1 )
@@ -447,7 +455,7 @@ static void __serial_rx(char c, struct cpu_user_regs *regs)
         send_global_virq(VIRQ_CONSOLE);
         break;
 
-#if 0
+#ifdef CONFIG_SBSA_VUART_CONSOLE
     default:
     {
         struct domain *d = rcu_lock_domain_by_any_id(console_rx - 1);
