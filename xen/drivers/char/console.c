@@ -31,10 +31,13 @@
 #include <xen/early_printk.h>
 #include <xen/warning.h>
 #include <xen/pv_console.h>
+#include <asm/setup.h>
 
 #ifdef CONFIG_X86
 #include <xen/consoled.h>
 #include <asm/guest.h>
+#else
+#include <asm/vpl011.h>
 #endif
 
 /* console: comma-separated list of console outputs. */
@@ -391,31 +394,82 @@ static void dump_console_ring_key(unsigned char key)
     free_xenheap_pages(buf, order);
 }
 
-/* CTRL-<switch_char> switches input direction between Xen and DOM0. */
+/*
+ * CTRL-<switch_char> changes input direction, rotating among Xen, Dom0,
+ * and the DomUs started from Xen at boot.
+ */
 #define switch_code (opt_conswitch[0]-'a'+1)
-static int __read_mostly xen_rx = 1; /* FALSE => input passed to domain 0. */
+/*
+ * console_rx=0 => input to xen
+ * console_rx=1 => input to dom0
+ * console_rx=N => input to dom(N-1)
+ */
+static unsigned int __read_mostly console_rx = 0;
 
 static void switch_serial_input(void)
 {
-    static char *input_str[2] = { "DOM0", "Xen" };
-    xen_rx = !xen_rx;
-    printk("*** Serial input -> %s", input_str[xen_rx]);
+    if ( console_rx == max_init_domid + 1 )
+    {
+        console_rx = 0;
+        printk("*** Serial input to Xen");
+    }
+    else
+    {
+        console_rx++;
+        printk("*** Serial input to DOM%d", console_rx - 1);
+    }
+
     if ( switch_code )
-        printk(" (type 'CTRL-%c' three times to switch input to %s)",
-               opt_conswitch[0], input_str[!xen_rx]);
+        printk(" (type 'CTRL-%c' three times to switch input)",
+               opt_conswitch[0]);
     printk("\n");
 }
 
 static void __serial_rx(char c, struct cpu_user_regs *regs)
 {
-    if ( xen_rx )
+    switch ( console_rx )
+    {
+    case 0:
         return handle_keypress(c, regs);
 
-    /* Deliver input to guest buffer, unless it is already full. */
-    if ( (serial_rx_prod-serial_rx_cons) != SERIAL_RX_SIZE )
-        serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod++)] = c;
-    /* Always notify the guest: prevents receive path from getting stuck. */
-    send_global_virq(VIRQ_CONSOLE);
+    case 1:
+        /*
+         * Deliver input to the hardware domain buffer, unless it is
+         * already full.
+         */
+        if ( (serial_rx_prod - serial_rx_cons) != SERIAL_RX_SIZE )
+            serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod++)] = c;
+
+        /*
+         * Always notify the hardware domain: prevents receive path from
+         * getting stuck.
+         */
+        send_global_virq(VIRQ_CONSOLE);
+        break;
+
+#if 0
+    default:
+    {
+        struct domain *d = rcu_lock_domain_by_any_id(console_rx - 1);
+
+        /*
+         * If we have a properly initialized vpl011 console for the
+         * domain, without a full PV ring to Dom0 (in that case input
+         * comes from the PV ring), then send the character to it.
+         */
+        if ( d != NULL &&
+             !d->arch.vpl011.backend_in_domain &&
+             d->arch.vpl011.backend.xen != NULL )
+            vpl011_rx_char_xen(d, c);
+        else
+            printk("Cannot send chars to Dom%d: no UART available\n",
+                   console_rx - 1);
+
+        if ( d != NULL )
+            rcu_unlock_domain(d);
+    }
+#endif
+    }
 
 #ifdef CONFIG_X86
     if ( pv_shim && pv_console )
@@ -944,7 +998,7 @@ void __init console_endboot(void)
      * a useful 'how to switch' message.
      */
     if ( opt_conswitch[1] == 'x' )
-        xen_rx = !xen_rx;
+        console_rx = max_init_domid + 1;
 
     register_keyhandler('w', dump_console_ring_key,
                         "synchronously dump console ring buffer (dmesg)", 0);
