@@ -243,7 +243,8 @@ fail:
  * (as described above) we allow higher allocations and continue until
  * that runs out (or we have allocated sufficient dom0 memory).
  */
-static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
+static void __init allocate_memory_11(struct domain *d,
+                                      struct kernel_info *kinfo)
 {
     const unsigned int min_low_order =
         get_order_from_bytes(min_t(paddr_t, dom0_mem, MB(128)));
@@ -2152,7 +2153,7 @@ int __init construct_dom0(struct domain *d)
 
 #endif
 
-    allocate_memory(d, &kinfo);
+    allocate_memory_11(d, &kinfo);
     find_gnttab_region(d, &kinfo);
 
     /* Map extra GIC MMIO, irqs and other hw stuffs to dom0. */
