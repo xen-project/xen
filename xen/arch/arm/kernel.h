@@ -55,7 +55,7 @@ struct kernel_info {
  *  ->type
  *  ->load hook, and sets loader specific variables ->zimage
  */
-int kernel_probe(struct kernel_info *info);
+int kernel_probe(struct kernel_info *info, const struct dt_device_node *domain);
 
 /*
  * Loads the kernel into guest RAM.

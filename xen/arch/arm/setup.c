@@ -297,6 +297,37 @@ struct bootcmdline * __init boot_cmdline_find_by_kind(bootmodule_kind kind)
     return NULL;
 }
 
+struct bootcmdline * __init boot_cmdline_find_by_name(const char *name)
+{
+    struct bootcmdlines *mods = &bootinfo.cmdlines;
+    struct bootcmdline *mod;
+    unsigned int i;
+
+    for (i = 0 ; i < mods->nr_mods ; i++ )
+    {
+        mod = &mods->cmdline[i];
+        if ( strcmp(mod->dt_name, name) == 0 )
+            return mod;
+    }
+    return NULL;
+}
+
+struct bootmodule * __init boot_module_find_by_addr_and_kind(bootmodule_kind kind,
+                                                             paddr_t start)
+{
+    struct bootmodules *mods = &bootinfo.modules;
+    struct bootmodule *mod;
+    unsigned int i;
+
+    for (i = 0 ; i < mods->nr_mods ; i++ )
+    {
+        mod = &mods->module[i];
+        if ( mod->kind == kind && mod->start == start )
+            return mod;
+    }
+    return NULL;
+}
+
 const char * __init boot_module_kind_as_string(bootmodule_kind kind)
 {
     switch ( kind )

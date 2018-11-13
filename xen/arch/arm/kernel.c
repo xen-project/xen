@@ -421,22 +421,72 @@ static int __init kernel_zimage32_probe(struct kernel_info *info,
     return 0;
 }
 
-int __init kernel_probe(struct kernel_info *info)
+int __init kernel_probe(struct kernel_info *info,
+                        const struct dt_device_node *domain)
 {
-    struct bootmodule *mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
+    struct bootmodule *mod = NULL;
+    struct bootcmdline *cmd = NULL;
+    struct dt_device_node *node;
+    u64 kernel_addr, initrd_addr, size;
     int rc;
 
+    /* domain is NULL only for the hardware domain */
+    if ( domain == NULL )
+    {
+        ASSERT(is_hardware_domain(info->d));
+
+        mod = boot_module_find_by_kind(BOOTMOD_KERNEL);
+
+        info->kernel_bootmodule = mod;
+        info->initrd_bootmodule = boot_module_find_by_kind(BOOTMOD_RAMDISK);
+
+        cmd = boot_cmdline_find_by_kind(BOOTMOD_KERNEL);
+        if ( cmd )
+            info->cmdline = &cmd->cmdline[0];
+    }
+    else
+    {
+        const char *name = NULL;
+
+        dt_for_each_child_node(domain, node)
+        {
+            if ( dt_device_is_compatible(node, "multiboot,kernel") )
+            {
+                u32 len;
+                const __be32 *val;
+
+                val = dt_get_property(node, "reg", &len);
+                dt_get_range(&val, node, &kernel_addr, &size);
+                mod = boot_module_find_by_addr_and_kind(
+                        BOOTMOD_KERNEL, kernel_addr);
+                info->kernel_bootmodule = mod;
+            }
+            else if ( dt_device_is_compatible(node, "multiboot,ramdisk") )
+            {
+                u32 len;
+                const __be32 *val;
+
+                val = dt_get_property(node, "reg", &len);
+                dt_get_range(&val, node, &initrd_addr, &size);
+                info->initrd_bootmodule = boot_module_find_by_addr_and_kind(
+                        BOOTMOD_RAMDISK, initrd_addr);
+            }
+            else
+                continue;
+        }
+        name = dt_node_name(domain);
+        cmd = boot_cmdline_find_by_name(name);
+        if ( cmd )
+            info->cmdline = &cmd->cmdline[0];
+    }
     if ( !mod || !mod->size )
     {
         printk(XENLOG_ERR "Missing kernel boot module?\n");
         return -ENOENT;
     }
 
-    info->kernel_bootmodule = mod;
-
-    printk("Loading kernel from boot module @ %"PRIpaddr"\n", mod->start);
-
-    info->initrd_bootmodule = boot_module_find_by_kind(BOOTMOD_RAMDISK);
+    printk("Loading Dom%pd kernel from boot module @ %"PRIpaddr"\n",
+           info->d, info->kernel_bootmodule->start);
     if ( info->initrd_bootmodule )
         printk("Loading ramdisk from boot module @ %"PRIpaddr"\n",
                info->initrd_bootmodule->start);

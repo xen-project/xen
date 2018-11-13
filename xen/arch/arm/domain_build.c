@@ -2107,7 +2107,6 @@ static void __init find_gnttab_region(struct domain *d,
 
 int __init construct_dom0(struct domain *d)
 {
-    const struct bootcmdline *kernel = boot_cmdline_find_by_kind(BOOTMOD_KERNEL);
     struct kernel_info kinfo = {};
     struct vcpu *saved_current;
     int rc, i, cpu;
@@ -2135,7 +2134,7 @@ int __init construct_dom0(struct domain *d)
     kinfo.unassigned_mem = dom0_mem;
     kinfo.d = d;
 
-    rc = kernel_probe(&kinfo);
+    rc = kernel_probe(&kinfo, NULL);
     if ( rc < 0 )
         return rc;
 
@@ -2153,7 +2152,6 @@ int __init construct_dom0(struct domain *d)
 
 #endif
 
-    kinfo.cmdline = (kernel != NULL) ? &kernel->cmdline[0] : NULL;
     allocate_memory(d, &kinfo);
     find_gnttab_region(d, &kinfo);
 
