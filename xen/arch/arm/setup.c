@@ -254,7 +254,7 @@ struct bootmodule * __init boot_module_find_by_kind(bootmodule_kind kind)
 }
 
 void __init add_boot_cmdline(const char *name, const char *cmdline,
-                             bootmodule_kind kind, bool domU)
+                             bootmodule_kind kind, paddr_t start, bool domU)
 {
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
     struct bootcmdline *cmd;
@@ -268,6 +268,7 @@ void __init add_boot_cmdline(const char *name, const char *cmdline,
     cmd = &cmds->cmdline[cmds->nr_mods++];
     cmd->kind = kind;
     cmd->domU = domU;
+    cmd->start = start;
 
     ASSERT(strlen(name) <= DT_MAX_NAME);
     safe_strcpy(cmd->dt_name, name);

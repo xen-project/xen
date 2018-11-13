@@ -49,6 +49,7 @@ struct bootmodule {
 struct bootcmdline {
     bootmodule_kind kind;
     bool domU;
+    paddr_t start;
     char dt_name[DT_MAX_NAME];
     char cmdline[BOOTMOD_MAX_CMDLINE];
 };
@@ -104,7 +105,7 @@ struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
 struct bootmodule * boot_module_find_by_addr_and_kind(bootmodule_kind kind,
                                                              paddr_t start);
 void add_boot_cmdline(const char *name, const char *cmdline,
-                      bootmodule_kind kind, bool domU);
+                      bootmodule_kind kind, paddr_t start, bool domU);
 struct bootcmdline *boot_cmdline_find_by_kind(bootmodule_kind kind);
 struct bootcmdline * boot_cmdline_find_by_name(const char *name);
 const char *boot_module_kind_as_string(bootmodule_kind kind);
