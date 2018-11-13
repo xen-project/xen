@@ -301,3 +301,25 @@ ubuntu-bionic-gcc-debug:
     CONTAINER: ubuntu:bionic
     debug: y
     XEN_TARGET_ARCH: x86_64
+
+# Arm builds
+
+debian-unstable-gcc-arm64:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:unstable-arm64v8
+    debug: n
+    XEN_TARGET_ARCH: arm64
+  tags:
+    - arm64
+
+debian-unstable-gcc-debug-arm64:
+  <<: *build
+  variables:
+    <<: *gcc
+    CONTAINER: debian:unstable-arm64v8
+    debug: y
+    XEN_TARGET_ARCH: arm64
+  tags:
+    - arm64
