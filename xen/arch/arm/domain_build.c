@@ -77,7 +77,7 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
     return vcpu_create(dom0, 0, 0);
 }
 
-static unsigned int __init get_11_allocation_size(paddr_t size)
+static unsigned int __init get_allocation_size(paddr_t size)
 {
     /*
      * get_order_from_bytes returns the order greater than or equal to
@@ -249,7 +249,7 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
         get_order_from_bytes(min_t(paddr_t, dom0_mem, MB(128)));
     const unsigned int min_order = get_order_from_bytes(MB(4));
     struct page_info *pg;
-    unsigned int order = get_11_allocation_size(kinfo->unassigned_mem);
+    unsigned int order = get_allocation_size(kinfo->unassigned_mem);
     int i;
 
     bool lowmem = true;
@@ -301,7 +301,7 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
      * If we failed to allocate bank0 under 4GB, continue allocating
      * memory from above 4GB and fill in banks.
      */
-    order = get_11_allocation_size(kinfo->unassigned_mem);
+    order = get_allocation_size(kinfo->unassigned_mem);
     while ( kinfo->unassigned_mem && kinfo->mem.nr_banks < NR_MEM_BANKS )
     {
         pg = alloc_domheap_pages(d, order, lowmem ? MEMF_bits(32) : 0);
@@ -312,7 +312,7 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
             if ( lowmem && order < min_low_order)
             {
                 D11PRINT("Failed at min_low_order, allow high allocations\n");
-                order = get_11_allocation_size(kinfo->unassigned_mem);
+                order = get_allocation_size(kinfo->unassigned_mem);
                 lowmem = false;
                 continue;
             }
@@ -332,7 +332,7 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
             if ( lowmem )
             {
                 D11PRINT("Allocation below bank 0, allow high allocations\n");
-                order = get_11_allocation_size(kinfo->unassigned_mem);
+                order = get_allocation_size(kinfo->unassigned_mem);
                 lowmem = false;
                 continue;
             }
@@ -347,7 +347,7 @@ static void __init allocate_memory(struct domain *d, struct kernel_info *kinfo)
          * Success, next time around try again to get the largest order
          * allocation possible.
          */
-        order = get_11_allocation_size(kinfo->unassigned_mem);
+        order = get_allocation_size(kinfo->unassigned_mem);
     }
 
     if ( kinfo->unassigned_mem )
