@@ -33,6 +33,9 @@ struct kernel_info {
     paddr_t dtb_paddr;
     paddr_t initrd_paddr;
 
+    /* Enable pl011 emulation */
+    bool vpl011;
+
     /* loader to use for this kernel */
     void (*load)(struct kernel_info *info);
     /* loader specific state */

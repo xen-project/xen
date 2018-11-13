@@ -1622,6 +1622,54 @@ static int __init make_timer_domU_node(const struct domain *d, void *fdt)
     return res;
 }
 
+#ifdef CONFIG_SBSA_VUART_CONSOLE
+static int __init make_vpl011_uart_node(const struct domain *d, void *fdt)
+{
+    int res;
+    gic_interrupt_t intr;
+    __be32 reg[GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS];
+    __be32 *cells;
+
+    res = fdt_begin_node(fdt, "sbsa-uart@"__stringify(GUEST_PL011_BASE));
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "compatible", "arm,sbsa-uart");
+    if ( res )
+        return res;
+
+    cells = &reg[0];
+    dt_child_set_range(&cells, GUEST_ROOT_ADDRESS_CELLS,
+                       GUEST_ROOT_SIZE_CELLS, GUEST_PL011_BASE,
+                       GUEST_PL011_SIZE);
+    if ( res )
+        return res;
+    res = fdt_property(fdt, "reg", reg, sizeof(reg));
+    if ( res )
+        return res;
+
+    set_interrupt(intr, GUEST_VPL011_SPI, 0xf, DT_IRQ_TYPE_LEVEL_HIGH);
+
+    res = fdt_property(fdt, "interrupts", intr, sizeof (intr));
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "interrupt-parent",
+                            GUEST_PHANDLE_GIC);
+    if ( res )
+        return res;
+
+    /* Use a default baud rate of 115200. */
+    fdt_property_u32(fdt, "current-speed", 115200);
+
+    res = fdt_end_node(fdt);
+    if ( res )
+        return res;
+
+    return 0;
+}
+#endif
+
 /*
  * The max size for DT is 2MB. However, the generated DT is small, 4KB
  * are enough for now, but we might have to increase it in the future.
@@ -1682,6 +1730,16 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     ret = make_timer_domU_node(d, kinfo->fdt);
     if ( ret )
         goto err;
+
+    if ( kinfo->vpl011 )
+    {
+        ret = -EINVAL;
+#ifdef CONFIG_SBSA_VUART_CONSOLE
+        ret = make_vpl011_uart_node(d, kinfo->fdt);
+#endif
+        if ( ret )
+            goto err;
+    }
 
     ret = fdt_end_node(kinfo->fdt);
     if ( ret < 0 )
@@ -2550,6 +2608,8 @@ static int __init construct_domU(struct domain *d,
     kinfo.unassigned_mem = (paddr_t)mem * SZ_1K;
 
     printk("*** LOADING DOMU cpus=%u memory=%"PRIx64"KB ***\n", d->max_vcpus, mem);
+
+    kinfo.vpl011 = dt_property_read_bool(node, "vpl011");
 
     if ( vcpu_create(d, 0, 0) == NULL )
         return -ENOMEM;
