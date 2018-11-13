@@ -64,11 +64,14 @@ static unsigned long opt_xenheap_megabytes __initdata;
 integer_param("xenheap_megabytes", opt_xenheap_megabytes);
 #endif
 
+domid_t __read_mostly max_init_domid;
+
 static __used void init_done(void)
 {
     /* Must be done past setting system_state. */
     unregister_init_virtual_region();
 
+    discard_initial_modules();
     free_init_memory();
     startup_cpu_idle_loop();
 }
@@ -963,6 +966,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     serial_endboot();
 
     system_state = SYS_STATE_active;
+
+    create_domUs();
 
     domain_unpause_by_systemcontroller(dom0);
 

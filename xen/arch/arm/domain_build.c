@@ -7,6 +7,7 @@
 #include <asm/irq.h>
 #include <asm/regs.h>
 #include <xen/errno.h>
+#include <xen/err.h>
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/guest_access.h>
@@ -2306,6 +2307,51 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
     return 0;
 }
 
+static int __init construct_domU(struct domain *d,
+                                 const struct dt_device_node *node)
+{
+    return -ENOSYS;
+}
+
+void __init create_domUs(void)
+{
+    struct dt_device_node *node;
+    const struct dt_device_node *chosen = dt_find_node_by_path("/chosen");
+
+    BUG_ON(chosen == NULL);
+    dt_for_each_child_node(chosen, node)
+    {
+        struct domain *d;
+        struct xen_domctl_createdomain d_cfg = {
+            .arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE,
+            .arch.nr_spis = 0,
+            .flags = XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap,
+            .max_vcpus = 1,
+            .max_evtchn_port = -1,
+            .max_grant_frames = 64,
+            .max_maptrack_frames = 1024,
+        };
+
+        if ( !dt_device_is_compatible(node, "xen,domain") )
+            continue;
+
+        if ( dt_property_read_bool(node, "vpl011") )
+            d_cfg.arch.nr_spis = GUEST_VPL011_SPI - 32 + 1;
+        dt_property_read_u32(node, "cpus", &d_cfg.max_vcpus);
+
+        d = domain_create(++max_init_domid, &d_cfg, false);
+        if ( IS_ERR(d) )
+            panic("Error creating domain %s", dt_node_name(node));
+
+        d->is_console = true;
+
+        if ( construct_domU(d, node) != 0 )
+            panic("Could not set up domain %s", dt_node_name(node));
+
+        domain_unpause_by_systemcontroller(d);
+    }
+}
+
 int __init construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
@@ -2356,10 +2402,7 @@ int __init construct_dom0(struct domain *d)
     if ( rc < 0 )
         return rc;
 
-    rc = construct_domain(d, &kinfo);
-    discard_initial_modules();
-
-    return rc;
+    return construct_domain(d, &kinfo);
 }
 
 /*

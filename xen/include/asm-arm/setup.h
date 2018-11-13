@@ -75,6 +75,8 @@ struct bootinfo {
 
 extern struct bootinfo bootinfo;
 
+extern domid_t max_init_domid;
+
 void arch_init_memory(void);
 
 void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
@@ -91,6 +93,7 @@ void acpi_create_efi_mmap_table(struct domain *d,
 int acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);
 
 int construct_dom0(struct domain *d);
+void create_domUs(void);
 
 void discard_initial_modules(void);
 void dt_unreserved_regions(paddr_t s, paddr_t e,
