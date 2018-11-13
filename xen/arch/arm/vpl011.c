@@ -83,7 +83,7 @@ static uint8_t vpl011_read_data(struct domain *d)
     unsigned long flags;
     uint8_t data = 0;
     struct vpl011 *vpl011 = &d->arch.vpl011;
-    struct xencons_interface *intf = vpl011->ring_buf;
+    struct xencons_interface *intf = vpl011->backend.dom.ring_buf;
     XENCONS_RING_IDX in_cons, in_prod;
 
     VPL011_LOCK(d, flags);
@@ -146,7 +146,7 @@ static uint8_t vpl011_read_data(struct domain *d)
 static void vpl011_update_tx_fifo_status(struct vpl011 *vpl011,
                                          unsigned int fifo_level)
 {
-    struct xencons_interface *intf = vpl011->ring_buf;
+    struct xencons_interface *intf = vpl011->backend.dom.ring_buf;
     unsigned int fifo_threshold = sizeof(intf->out) - SBSA_UART_FIFO_LEVEL;
 
     BUILD_BUG_ON(sizeof(intf->out) < SBSA_UART_FIFO_SIZE);
@@ -165,7 +165,7 @@ static void vpl011_write_data(struct domain *d, uint8_t data)
 {
     unsigned long flags;
     struct vpl011 *vpl011 = &d->arch.vpl011;
-    struct xencons_interface *intf = vpl011->ring_buf;
+    struct xencons_interface *intf = vpl011->backend.dom.ring_buf;
     XENCONS_RING_IDX out_cons, out_prod;
 
     VPL011_LOCK(d, flags);
@@ -383,7 +383,7 @@ static void vpl011_data_avail(struct domain *d)
 {
     unsigned long flags;
     struct vpl011 *vpl011 = &d->arch.vpl011;
-    struct xencons_interface *intf = vpl011->ring_buf;
+    struct xencons_interface *intf = vpl011->backend.dom.ring_buf;
     XENCONS_RING_IDX in_cons, in_prod, out_cons, out_prod;
     XENCONS_RING_IDX in_fifo_level, out_fifo_level;
 
@@ -460,14 +460,14 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
     int rc;
     struct vpl011 *vpl011 = &d->arch.vpl011;
 
-    if ( vpl011->ring_buf )
+    if ( vpl011->backend.dom.ring_buf )
         return -EINVAL;
 
     /* Map the guest PFN to Xen address space. */
     rc =  prepare_ring_for_helper(d,
                                   gfn_x(info->gfn),
-                                  &vpl011->ring_page,
-                                  &vpl011->ring_buf);
+                                  &vpl011->backend.dom.ring_page,
+                                  &vpl011->backend.dom.ring_buf);
     if ( rc < 0 )
         goto out;
 
@@ -496,7 +496,8 @@ out2:
     vgic_free_virq(d, GUEST_VPL011_SPI);
 
 out1:
-    destroy_ring_for_helper(&vpl011->ring_buf, vpl011->ring_page);
+    destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
+			                vpl011->backend.dom.ring_page);
 
 out:
     return rc;
@@ -506,11 +507,12 @@ void domain_vpl011_deinit(struct domain *d)
 {
     struct vpl011 *vpl011 = &d->arch.vpl011;
 
-    if ( !vpl011->ring_buf )
+    if ( !vpl011->backend.dom.ring_buf )
         return;
 
     free_xen_event_channel(d, vpl011->evtchn);
-    destroy_ring_for_helper(&vpl011->ring_buf, vpl011->ring_page);
+    destroy_ring_for_helper(&vpl011->backend.dom.ring_buf,
+			                vpl011->backend.dom.ring_page);
 }
 
 /*

@@ -30,8 +30,12 @@
 #define SBSA_UART_FIFO_SIZE 32
 
 struct vpl011 {
-    void *ring_buf;
-    struct page_info *ring_page;
+    union {
+        struct {
+            void *ring_buf;
+            struct page_info *ring_page;
+        } dom;
+    } backend;
     uint32_t    uartfr;         /* Flag register */
     uint32_t    uartcr;         /* Control register */
     uint32_t    uartimsc;       /* Interrupt mask register*/
