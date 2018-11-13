@@ -379,9 +379,62 @@ static const struct mmio_handler_ops vpl011_mmio_handler = {
     .write = vpl011_mmio_write,
 };
 
-static void vpl011_data_avail(struct domain *d)
+static void vpl011_data_avail(struct domain *d,
+                              XENCONS_RING_IDX in_fifo_level,
+                              XENCONS_RING_IDX in_size,
+                              XENCONS_RING_IDX out_fifo_level,
+                              XENCONS_RING_IDX out_size)
+{
+    struct vpl011 *vpl011 = &d->arch.vpl011;
+
+    /**** Update the UART RX state ****/
+
+    /* Clear the FIFO_EMPTY bit if the FIFO holds at least one character. */
+    if ( in_fifo_level > 0 )
+        vpl011->uartfr &= ~RXFE;
+
+    /* Set the FIFO_FULL bit if the Xen buffer is full. */
+    if ( in_fifo_level == in_size )
+        vpl011->uartfr |= RXFF;
+
+    /* Assert the RX interrupt if the FIFO is more than half way filled. */
+    if ( in_fifo_level >= in_size - SBSA_UART_FIFO_LEVEL )
+        vpl011->uartris |= RXI;
+
+    /*
+     * If the input queue is not empty, we assert the receive timeout interrupt.
+     * As we don't emulate any timing here, so we ignore the actual timeout
+     * of 32 baud cycles.
+     */
+    if ( in_fifo_level > 0 )
+        vpl011->uartris |= RTI;
+
+    /**** Update the UART TX state ****/
+
+    if ( out_fifo_level != out_size )
+    {
+        vpl011->uartfr &= ~TXFF;
+
+        /*
+         * Clear the BUSY bit as soon as space becomes available
+         * so that the SBSA UART driver can start writing more data
+         * without any further delay.
+         */
+        vpl011->uartfr &= ~BUSY;
+
+        vpl011_update_tx_fifo_status(vpl011, out_fifo_level);
+    }
+
+    vpl011_update_interrupt_status(d);
+
+    if ( out_fifo_level == 0 )
+        vpl011->uartfr |= TXFE;
+}
+
+static void vpl011_notification(struct vcpu *v, unsigned int port)
 {
     unsigned long flags;
+    struct domain *d = v->domain;
     struct vpl011 *vpl011 = &d->arch.vpl011;
     struct xencons_interface *intf = vpl011->backend.dom.ring_buf;
     XENCONS_RING_IDX in_cons, in_prod, out_cons, out_prod;
@@ -404,55 +457,10 @@ static void vpl011_data_avail(struct domain *d)
                                     out_cons,
                                     sizeof(intf->out));
 
-    /**** Update the UART RX state ****/
-
-    /* Clear the FIFO_EMPTY bit if the FIFO holds at least one character. */
-    if ( in_fifo_level > 0 )
-        vpl011->uartfr &= ~RXFE;
-
-    /* Set the FIFO_FULL bit if the Xen buffer is full. */
-    if ( in_fifo_level == sizeof(intf->in) )
-        vpl011->uartfr |= RXFF;
-
-    /* Assert the RX interrupt if the FIFO is more than half way filled. */
-    if ( in_fifo_level >= sizeof(intf->in) - SBSA_UART_FIFO_LEVEL )
-        vpl011->uartris |= RXI;
-
-    /*
-     * If the input queue is not empty, we assert the receive timeout interrupt.
-     * As we don't emulate any timing here, so we ignore the actual timeout
-     * of 32 baud cycles.
-     */
-    if ( in_fifo_level > 0 )
-        vpl011->uartris |= RTI;
-
-    /**** Update the UART TX state ****/
-
-    if ( out_fifo_level != sizeof(intf->out) )
-    {
-        vpl011->uartfr &= ~TXFF;
-
-        /*
-         * Clear the BUSY bit as soon as space becomes available
-         * so that the SBSA UART driver can start writing more data
-         * without any further delay.
-         */
-        vpl011->uartfr &= ~BUSY;
-
-        vpl011_update_tx_fifo_status(vpl011, out_fifo_level);
-    }
-
-    vpl011_update_interrupt_status(d);
-
-    if ( out_fifo_level == 0 )
-        vpl011->uartfr |= TXFE;
+    vpl011_data_avail(v->domain, in_fifo_level, sizeof(intf->in),
+                      out_fifo_level, sizeof(intf->out));
 
     VPL011_UNLOCK(d, flags);
-}
-
-static void vpl011_notification(struct vcpu *v, unsigned int port)
-{
-    vpl011_data_avail(v->domain);
 }
 
 int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
