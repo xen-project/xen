@@ -35,6 +35,13 @@ struct bootmodule {
     bootmodule_kind kind;
     paddr_t start;
     paddr_t size;
+};
+
+/* DT_MAX_NAME is the node name max length according the DT spec */
+#define DT_MAX_NAME 41
+struct bootcmdline {
+    bootmodule_kind kind;
+    char dt_name[DT_MAX_NAME];
     char cmdline[BOOTMOD_MAX_CMDLINE];
 };
 
@@ -43,9 +50,15 @@ struct bootmodules {
     struct bootmodule module[MAX_MODULES];
 };
 
+struct bootcmdlines {
+    unsigned int nr_mods;
+    struct bootcmdline cmdline[MAX_MODULES];
+};
+
 struct bootinfo {
     struct meminfo mem;
     struct bootmodules modules;
+    struct bootcmdlines cmdlines;
 #ifdef CONFIG_ACPI
     struct meminfo acpi;
 #endif
@@ -78,9 +91,11 @@ size_t boot_fdt_info(const void *fdt, paddr_t paddr);
 const char *boot_fdt_cmdline(const void *fdt);
 
 struct bootmodule *add_boot_module(bootmodule_kind kind,
-                                   paddr_t start, paddr_t size,
-                                   const char *cmdline);
+                                   paddr_t start, paddr_t size);
 struct bootmodule *boot_module_find_by_kind(bootmodule_kind kind);
+void add_boot_cmdline(const char *name, const char *cmdline,
+                      bootmodule_kind kind);
+struct bootcmdline *boot_cmdline_find_by_kind(bootmodule_kind kind);
 const char *boot_module_kind_as_string(bootmodule_kind kind);
 
 extern uint32_t hyp_traps_vector[];

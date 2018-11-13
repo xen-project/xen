@@ -201,8 +201,7 @@ void __init dt_unreserved_regions(paddr_t s, paddr_t e,
 }
 
 struct bootmodule __init *add_boot_module(bootmodule_kind kind,
-                                          paddr_t start, paddr_t size,
-                                          const char *cmdline)
+                                          paddr_t start, paddr_t size)
 {
     struct bootmodules *mods = &bootinfo.modules;
     struct bootmodule *mod;
@@ -218,10 +217,6 @@ struct bootmodule __init *add_boot_module(bootmodule_kind kind,
     mod->kind = kind;
     mod->start = start;
     mod->size = size;
-    if ( cmdline )
-        safe_strcpy(mod->cmdline, cmdline);
-    else
-        mod->cmdline[0] = 0;
 
     return mod;
 }
@@ -236,6 +231,44 @@ struct bootmodule * __init boot_module_find_by_kind(bootmodule_kind kind)
         mod = &mods->module[i];
         if ( mod->kind == kind )
             return mod;
+    }
+    return NULL;
+}
+
+void __init add_boot_cmdline(const char *name, const char *cmdline,
+                             bootmodule_kind kind)
+{
+    struct bootcmdlines *cmds = &bootinfo.cmdlines;
+    struct bootcmdline *cmd;
+
+    if ( cmds->nr_mods == MAX_MODULES )
+    {
+        printk("Ignoring %s cmdline (too many)\n", name);
+        return;
+    }
+
+    cmd = &cmds->cmdline[cmds->nr_mods++];
+    cmd->kind = kind;
+
+    ASSERT(strlen(name) <= DT_MAX_NAME);
+    safe_strcpy(cmd->dt_name, name);
+
+    if ( strlen(cmdline) > BOOTMOD_MAX_CMDLINE )
+        panic("module %s command line too long\n", name);
+    safe_strcpy(cmd->cmdline, cmdline);
+}
+
+struct bootcmdline * __init boot_cmdline_find_by_kind(bootmodule_kind kind)
+{
+    struct bootcmdlines *cmds = &bootinfo.cmdlines;
+    struct bootcmdline *cmd;
+    int i;
+
+    for ( i = 0 ; i < cmds->nr_mods ; i++ )
+    {
+        cmd = &cmds->cmdline[i];
+        if ( cmd->kind == kind )
+            return cmd;
     }
     return NULL;
 }
@@ -729,7 +762,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     /* Register Xen's load address as a boot module. */
     xen_bootmodule = add_boot_module(BOOTMOD_XEN,
                              (paddr_t)(uintptr_t)(_start + boot_phys_offset),
-                             (paddr_t)(uintptr_t)(_end - _start + 1), NULL);
+                             (paddr_t)(uintptr_t)(_end - _start + 1));
     BUG_ON(!xen_bootmodule);
 
     xen_paddr = get_xen_paddr();
