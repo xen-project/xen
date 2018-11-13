@@ -8,7 +8,7 @@
 
 #define NR_MEM_BANKS 128
 
-#define MAX_MODULES 5 /* Current maximum useful modules */
+#define MAX_MODULES 32 /* Current maximum useful modules */
 
 typedef enum {
     BOOTMOD_XEN,
