@@ -119,3 +119,110 @@ For those you would hardcode the Xen commandline in the DTB under
 line by writing bootargs (as for native Linux).
 A Xen-aware bootloader would set xen,xen-bootargs for Xen, xen,dom0-bootargs
 for Dom0 and bootargs for native Linux.
+
+
+Creating Multiple Domains directly from Xen
+===========================================
+
+It is possible to have Xen create other domains, in addition to dom0,
+out of the information provided via device tree. A kernel and initrd
+(optional) need to be specified for each guest.
+
+For each domain to be created there needs to be one node under /chosen
+with the following properties:
+
+- compatible
+
+    For domUs: "xen,domain"
+
+- memory
+
+	A 64-bit integer specifying the amount of kilobytes of RAM to
+    allocate to the guest.
+
+- cpus
+
+    An integer specifying the number of vcpus to allocate to the guest.
+
+- vpl011
+
+    An empty property to enable/disable a virtual pl011 for the guest to use.
+
+- #address-cells and #size-cells
+
+    Both #address-cells and #size-cells need to be specified because
+    both sub-nodes (described shortly) have reg properties.
+
+Under the "xen,domain" compatible node, one or more sub-nodes are present
+for the DomU kernel and ramdisk.
+
+The kernel sub-node has the following properties:
+
+- compatible
+
+    "multiboot,kernel"
+
+- reg
+
+    Specifies the physical address of the kernel in RAM and its
+    length.
+
+- bootargs (optional)
+
+    Command line parameters for the guest kernel.
+
+The ramdisk sub-node has the following properties:
+
+- compatible
+
+    "multiboot,ramdisk"
+
+- reg
+
+    Specifies the physical address of the ramdisk in RAM and its
+    length.
+
+
+Example
+=======
+
+chosen {
+    domU1 {
+        compatible = "xen,domain";
+        #address-cells = <0x2>;
+        #size-cells = <0x1>;
+        memory = <0 131072>;
+        cpus = <2>;
+        vpl011;
+
+        module@0x4a000000 {
+            compatible = "multiboot,kernel";
+            reg = <0x0 0x4a000000 0xffffff>;
+            bootargs = "console=ttyAMA0 init=/bin/sh";
+        };
+
+        module@0x4b000000 {
+            compatible = "multiboot,ramdisk";
+            reg = <0x0 0x4b000000 0xffffff>;
+        };
+    };
+
+    domU2 {
+        compatible = "xen,domain";
+        #address-cells = <0x2>;
+        #size-cells = <0x1>;
+        memory = <0 65536>;
+        cpus = <1>;
+
+        module@0x4c000000 {
+            compatible = "multiboot,kernel";
+            reg = <0x0 0x4c000000 0xffffff>;
+            bootargs = "console=ttyAMA0 init=/bin/sh";
+        };
+
+        module@0x4d000000 {
+            compatible = "multiboot,ramdisk";
+            reg = <0x0 0x4d000000 0xffffff>;
+        };
+    };
+};
