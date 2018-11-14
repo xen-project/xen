@@ -1650,9 +1650,15 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    if ( gpa == vcpu_2_nvmx(v).vmxon_region_pa || gpa & 0xfff )
+    if ( gpa & 0xfff )
     {
-        vmfail_invalid(regs);
+        vmfail(regs, VMX_INSN_VMPTRLD_INVALID_PHYADDR);
+        goto out;
+    }
+
+    if ( gpa == vcpu_2_nvmx(v).vmxon_region_pa )
+    {
+        vmfail(regs, VMX_INSN_VMPTRLD_WITH_VMXON_PTR);
         goto out;
     }
 
