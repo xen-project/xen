@@ -463,13 +463,18 @@ static void vmfail_valid(struct cpu_user_regs *regs, enum vmx_insn_errno errno)
     struct vcpu *v = current;
     unsigned int eflags = regs->eflags;
 
+    ASSERT(vvmcx_valid(v));
+
     regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_ZF;
     set_vvmcs(v, VM_INSTRUCTION_ERROR, errno);
 }
 
 static void vmfail_invalid(struct cpu_user_regs *regs)
 {
+    struct vcpu *v = current;
     unsigned int eflags = regs->eflags;
+
+    ASSERT(!vvmcx_valid(v));
 
     regs->eflags = (eflags & ~X86_EFLAGS_ARITH_MASK) | X86_EFLAGS_CF;
 }
@@ -1690,7 +1695,7 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
              !map_io_bitmap_all(v) ||
              !_map_msr_bitmap(v) )
         {
-            vmfail_valid(regs, VMX_INSN_VMPTRLD_INVALID_PHYADDR);
+            vmfail(regs, VMX_INSN_VMPTRLD_INVALID_PHYADDR);
             goto out;
         }
     }
@@ -1774,7 +1779,7 @@ static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     if ( rc == VMSUCCEED )
         vmsucceed(regs);
     else if ( rc == VMFAIL_VALID )
-        vmfail_valid(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
+        vmfail(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
     else
         vmfail_invalid(regs);
 
