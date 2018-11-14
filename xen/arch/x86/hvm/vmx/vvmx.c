@@ -2091,6 +2091,14 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = (host_data & (~0ul << 32)) |
                (vmcs->vmcs_revision_id & 0x7fffffff);
         unmap_domain_page(vmcs);
+
+        if ( !cpu_has_vmx_vmcs_shadowing )
+        {
+            /* Report vmcs_region_size as 4096 */
+            data &= ~VMX_BASIC_VMCS_SIZE_MASK;
+            data |= 1ULL << 44;
+        }
+
         break;
     }
     case MSR_IA32_VMX_PINBASED_CTLS:
