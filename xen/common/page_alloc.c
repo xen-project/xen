@@ -2084,7 +2084,7 @@ void __init heap_init_late(void)
         /* Fall through */
 
     case BOOTSCRUB_IDLE:
-        printk("Scrubbing free RAM on in background\n");
+        printk("Scrubbing Free RAM in background\n");
         break;
 
     case BOOTSCRUB_ON:
