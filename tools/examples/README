@@ -7,35 +7,27 @@ incorporate code from them into your own scripts.
 
 If you write a useful script and would like to share it, please do
 send it (preferably with a little summary to go in this file) to
-<xen-devel@lists.sourceforge.net> so we can add it to this directory.
+<xen-devel@lists.xenproject.org> so we can add it to this directory.
 
-block               - called by xen-backend.agent to bind/unbind dev  
+block               - called by xen-backend.agent to bind/unbind dev
 block-common.sh     - sourced by block, block-*
 block-enbd          - binds/unbinds network block devices
 block-nbd           - binds/unbinds network block devices
-cpupool             - example configuration script for 'xm cpupool-create'
+cpupool             - example configuration script for 'xl cpupool-create'
 external-device-migrate - called by xend for migrating external devices
 locking.sh          - locking functions to prevent concurrent access to
                       critical sections inside script files
 logging.sh          - logging function to log output using syslog
 vif-bridge          - virtual network start/stop script in bridged mode
-vif-common.sh       - sourced by vif-bridge 
-vif-nat             - xen virtual network start/stop script in NAT mode 
+vif-common.sh       - sourced by vif-bridge
+vif-nat             - xen virtual network start/stop script in NAT mode
 vif-route           - xen virtual network start/stop script in routed mode
-xen-backend.agent   - calls block, vif-* scripts to add, remove, hotplug
-                      devices  
 xen-hotplug-common.sh - sourced by vif-common.sh
 xen-network-common.sh - sourced by vif-common.sh
 xen-script-common.sh  - sourced by xen-hotplug-common.sh
-xmexample1          - example configuration script for 'xm create'
-xmexample2          - a more complex configuration script for 'xm create'
-xmexample3          - an advanced configuration script for 'xm create' 
-                      that utilizes the vmid
-xmexample.nbd       - configuration script that uses NBD filesystems
-xmexample.hvm       - a configuration script for creating a hvm domain with
-                      'xm create'
-xmexample.hvm-stubdom - a configuration script for creating a hvm domain with
-                        'xm create' that utilizes a stubdomain for device model
-xmexample.pv-grub   - a configuration script for creating a domain with 'xm create'
-                      which boots PV-GRUB.
-xmexample.vti       - a configuration script for creating a domain on vti
+oxenstored.conf     - configuration file for oxenstored
+xl.conf             - configuration file for xl
+xlexample.hvm       - a configuration script for creating a hvm domain with
+                      'xl create'
+xlexample.pvlinux   - a configuration script for creating a pv domain with
+                      'xl create'
