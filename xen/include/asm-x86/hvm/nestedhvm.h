@@ -92,4 +92,9 @@ static inline void nestedhvm_set_cr(struct vcpu *v, unsigned int cr,
         v->arch.hvm.nvcpu.guest_cr[cr] = value;
 }
 
+static inline bool vvmcx_valid(const struct vcpu *v)
+{
+    return vcpu_nestedhvm(v).nv_vvmcxaddr != INVALID_PADDR;
+}
+
 #endif /* _HVM_NESTEDHVM_H */
