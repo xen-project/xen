@@ -1,6 +1,4 @@
-open Arg
 open Printf
-open Xenlight
 
 let send_keys ctx s =
   printf "Sending debug key %s\n" s;

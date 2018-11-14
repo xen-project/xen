@@ -1,6 +1,4 @@
 open Printf
-open Xentoollog
-open Xenlight
 
 let _ =
   try

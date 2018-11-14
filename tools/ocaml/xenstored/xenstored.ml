@@ -311,8 +311,8 @@ let _ =
 	Select.use_poll (not cf.use_select);
 
 	Sys.set_signal Sys.sighup (Sys.Signal_handle sighup_handler);
-	Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun i -> quit := true));
-	Sys.set_signal Sys.sigusr1 (Sys.Signal_handle (fun i -> sigusr1_handler store));
+	Sys.set_signal Sys.sigterm (Sys.Signal_handle (fun _ -> quit := true));
+	Sys.set_signal Sys.sigusr1 (Sys.Signal_handle (fun _ -> sigusr1_handler store));
 	Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
 
 	if cf.activate_access_log then begin
@@ -328,10 +328,10 @@ let _ =
 
 	let process_special_fds rset =
 		let accept_connection can_write fd =
-			let (cfd, addr) = Unix.accept fd in
+			let (cfd, _addr) = Unix.accept fd in
 			debug "new connection through socket";
 			Connections.add_anonymous cons cfd can_write
-		and handle_eventchn fd =
+		and handle_eventchn _fd =
 			let port = Event.pending eventchn in
 			debug "pending port %d" (Xeneventchn.to_int port);
 			finally (fun () ->

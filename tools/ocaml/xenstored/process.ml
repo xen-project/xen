@@ -83,7 +83,7 @@ let create_implicit_path t perm path =
 	)
 
 (* packets *)
-let do_debug con t domains cons data =
+let do_debug con t _domains cons data =
 	if not (Connection.is_dom0 con) && not !allow_debug
 	then None
 	else try match split None '\000' data with
@@ -104,7 +104,7 @@ let do_debug con t domains cons data =
 	| _ -> None
 	with _ -> None
 
-let do_directory con t domains cons data =
+let do_directory con t _domains _cons data =
 	let path = split_one_path data con in
 	let entries = Transaction.ls t (Connection.get_perm con) path in
 	if List.length entries > 0 then
@@ -112,16 +112,16 @@ let do_directory con t domains cons data =
 	else
 		""
 
-let do_read con t domains cons data =
+let do_read con t _domains _cons data =
 	let path = split_one_path data con in
 	Transaction.read t (Connection.get_perm con) path
 
-let do_getperms con t domains cons data =
+let do_getperms con t _domains _cons data =
 	let path = split_one_path data con in
 	let perms = Transaction.getperms t (Connection.get_perm con) path in
 	Perms.Node.to_string perms ^ "\000"
 
-let do_getdomainpath con t domains cons data =
+let do_getdomainpath _con _t _domains _cons data =
 	let domid =
 		match (split None '\000' data) with
 		| domid :: "" :: [] -> c_int_of_string domid
@@ -129,7 +129,7 @@ let do_getdomainpath con t domains cons data =
 		in
 	sprintf "/local/domain/%u\000" domid
 
-let do_write con t domains cons data =
+let do_write con t _domains _cons data =
 	let path, value =
 		match (split (Some 2) '\000' data) with
 		| path :: value :: [] -> Store.Path.create path (Connection.get_path con), value
@@ -138,7 +138,7 @@ let do_write con t domains cons data =
 	create_implicit_path t (Connection.get_perm con) path;
 	Transaction.write t (Connection.get_perm con) path value
 
-let do_mkdir con t domains cons data =
+let do_mkdir con t _domains _cons data =
 	let path = split_one_path data con in
 	create_implicit_path t (Connection.get_perm con) path;
 	try
@@ -146,14 +146,14 @@ let do_mkdir con t domains cons data =
 	with
 		Define.Already_exist -> ()
 
-let do_rm con t domains cons data =
+let do_rm con t _domains _cons data =
 	let path = split_one_path data con in
 	try
 		Transaction.rm t (Connection.get_perm con) path
 	with
 		Define.Doesnt_exist -> ()
 
-let do_setperms con t domains cons data =
+let do_setperms con t _domains _cons data =
 	let path, perms =
 		match (split (Some 2) '\000' data) with
 		| path :: perms :: _ ->
@@ -163,10 +163,10 @@ let do_setperms con t domains cons data =
 		in
 	Transaction.setperms t (Connection.get_perm con) path perms
 
-let do_error con t domains cons data =
+let do_error _con _t _domains _cons _data =
 	raise Define.Unknown_operation
 
-let do_isintroduced con t domains cons data =
+let do_isintroduced _con _t domains _cons data =
 	let domid =
 		match (split None '\000' data) with
 		| domid :: _ -> int_of_string domid
@@ -175,12 +175,12 @@ let do_isintroduced con t domains cons data =
 	if domid = Define.domid_self || Domains.exist domains domid then "T\000" else "F\000"
 
 (* only in xen >= 4.2 *)
-let do_reset_watches con t domains cons data =
+let do_reset_watches con _t _domains _cons _data =
   Connection.del_watches con;
   Connection.del_transactions con
 
 (* only in >= xen3.3                                                                                    *)
-let do_set_target con t domains cons data =
+let do_set_target con _t _domains cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
 	match split None '\000' data with
@@ -254,11 +254,11 @@ let input_handle_error ~cons ~doms ~fct ~con ~t ~req =
 	| Define.Invalid_path          -> reply_error "EINVAL"
 	| Define.Already_exist         -> reply_error "EEXIST"
 	| Define.Doesnt_exist          -> reply_error "ENOENT"
-	| Define.Lookup_Doesnt_exist s -> reply_error "ENOENT"
+	| Define.Lookup_Doesnt_exist _ -> reply_error "ENOENT"
 	| Define.Permission_denied     -> reply_error "EACCES"
 	| Not_found                    -> reply_error "ENOENT"
 	| Invalid_Cmd_Args             -> reply_error "EINVAL"
-	| Invalid_argument i           -> reply_error "EINVAL"
+	| Invalid_argument _           -> reply_error "EINVAL"
 	| Transaction_again            -> reply_error "EAGAIN"
 	| Transaction_nested           -> reply_error "EBUSY"
 	| Domain_not_match             -> reply_error "EINVAL"
@@ -293,7 +293,7 @@ let transaction_replay c t doms cons =
 	| Transaction.No ->
 		error "attempted to replay a non-full transaction";
 		false
-	| Transaction.Full(id, oldstore, cstore) ->
+	| Transaction.Full(id, _oldstore, cstore) ->
 		let tid = Connection.start_transaction c cstore in
 		let replay_t = Transaction.make ~internal:true tid cstore in
 		let con = sprintf "r(%d):%s" id (Connection.get_domstr c) in
@@ -351,7 +351,7 @@ let transaction_replay c t doms cons =
 			ignore @@ Connection.end_transaction c tid None
 		)
 
-let do_watch con t domains cons data =
+let do_watch con _t _domains cons data =
 	let (node, token) =
 		match (split None '\000' data) with
 		| [node; token; ""]   -> node, token
@@ -360,7 +360,7 @@ let do_watch con t domains cons data =
 	let watch = Connections.add_watch cons con node token in
 	Packet.Ack (fun () -> Connection.fire_single_watch watch)
 
-let do_unwatch con t domains cons data =
+let do_unwatch con _t _domains cons data =
 	let (node, token) =
 		match (split None '\000' data) with
 		| [node; token; ""]   -> node, token
@@ -368,7 +368,7 @@ let do_unwatch con t domains cons data =
 		in
 	ignore @@ Connections.del_watch cons con node token
 
-let do_transaction_start con t domains cons data =
+let do_transaction_start con t _domains _cons _data =
 	if Transaction.get_id t <> Transaction.none then
 		raise Transaction_nested;
 	let store = Transaction.get_store t in
@@ -397,7 +397,7 @@ let do_transaction_end con t domains cons data =
 			record_commit ~con ~tid:id ~before:oldstore ~after:cstore
 	end
 
-let do_introduce con t domains cons data =
+let do_introduce con _t domains cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
 	let (domid, mfn, port) =
@@ -419,7 +419,7 @@ let do_introduce con t domains cons data =
 	if (Domain.get_remote_port dom) <> port || (Domain.get_mfn dom) <> mfn then
 		raise Domain_not_match
 
-let do_release con t domains cons data =
+let do_release con _t domains cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
 	let domid =
@@ -434,7 +434,7 @@ let do_release con t domains cons data =
 	then Connections.fire_spec_watches cons "@releaseDomain"
 	else raise Invalid_Cmd_Args
 
-let do_resume con t domains cons data =
+let do_resume con _t domains _cons data =
 	if not (Connection.is_dom0 con)
 	then raise Define.Permission_denied;
 	let domid =
@@ -566,11 +566,11 @@ let do_input store cons doms con =
 		Connection.incr_ops con;
 	)
 
-let do_output store cons doms con =
+let do_output _store _cons _doms con =
 	if Connection.has_output con then (
 		if Connection.has_new_output con then (
 			let packet = Connection.peek_output con in
-			let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
+			let tid, _rid, ty, data = Xenbus.Xb.Packet.unpack packet in
 			(* As we don't log IO, do not call an unnecessary sanitize_data
 			   info "[%s] <- %s \"%s\""
 			         (Connection.get_domstr con)

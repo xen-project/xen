@@ -1,4 +1,3 @@
-open Printf
 
 let _ =
 	Xenlight.register_exceptions ();

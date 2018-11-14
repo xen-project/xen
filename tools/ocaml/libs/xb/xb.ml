@@ -69,13 +69,13 @@ let reconnect t = match t.backend with
 
 let queue con pkt = Queue.push pkt con.pkt_out
 
-let read_fd back con b len =
+let read_fd back _con b len =
 	let rd = Unix.read back.fd b 0 len in
 	if rd = 0 then
 		raise End_of_file;
 	rd
 
-let read_mmap back con b len =
+let read_mmap back _con b len =
 	let s = Bytes.make len '\000' in
 	let rd = Xs_ring.read back.mmap s len in
 	Bytes.blit s 0 b 0 rd;
@@ -89,10 +89,10 @@ let read con b len =
 	| Fd backfd     -> read_fd backfd con b len
 	| Xenmmap backmmap -> read_mmap backmmap con b len
 
-let write_fd back con b len =
+let write_fd back _con b len =
 	Unix.write_substring back.fd b 0 len
 
-let write_mmap back con s len =
+let write_mmap back _con s len =
 	let ws = Xs_ring.write_substring back.mmap s len in
 	if ws > 0 then
 		back.eventchn_notify ();
@@ -128,7 +128,7 @@ let input con =
 	let to_read =
 		match con.partial_in with
 		| HaveHdr partial_pkt -> Partial.to_complete partial_pkt
-		| NoHdr   (i, buf)    -> i in
+		| NoHdr   (i, _)    -> i in
 
 	(* try to get more data from input stream *)
 	let b = Bytes.make to_read '\000' in

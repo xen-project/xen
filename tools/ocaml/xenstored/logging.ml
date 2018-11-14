@@ -98,7 +98,7 @@ let make_file_logger log_file log_nb_files log_nb_lines log_nb_chars post_rotate
 		log_rotate channel log_file log_nb_files;
 		(post_rotate (): unit);
 		counter := 0 in
-	let write ?level s =
+	let write ?level:_ s =
 		let s = if log_nb_chars > 0 then truncate_line log_nb_chars s else s in
 		let s = s ^ "\n" in
 		output_string !channel s;

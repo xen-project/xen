@@ -119,7 +119,7 @@ let cleanup doms =
 	) !dead_dom;
 	!notify, !dead_dom
 
-let resume doms domid =
+let resume _doms _domid =
 	()
 
 let create doms domid mfn port =

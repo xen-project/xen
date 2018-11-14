@@ -21,7 +21,7 @@ struct
 		children: ('a,'b) t list;
 	}
 
-	let create key value = {
+	let _create key value = {
 		key = key;
 		value = Some value;
 		children = [];
@@ -33,20 +33,20 @@ struct
 		children = []
 	}
 
-	let get_key node = node.key
+	let _get_key node = node.key
 	let get_value node =
 		match node.value with
 		| None       -> raise Not_found
 		| Some value -> value
 
-	let get_children node = node.children
+	let _get_children node = node.children
 
 	let set_value node value =
 		{ node with value = Some value }
 	let set_children node children =
 		{ node with children = children }
 
-	let add_child node child =
+	let _add_child node child =
 		{ node with children = child :: node.children }
 end
 
@@ -77,14 +77,14 @@ let remove_node nodes key =
 let create () = []
 
 let rec iter f tree =
-	let rec aux node =
+	let aux node =
 		f node.Node.key node.Node.value;
 		iter f node.Node.children
 	in
 	List.iter aux tree
 
 let rec map f tree =
-	let rec aux node =
+	let aux node =
 		let value =
 			match node.Node.value with
 			| None       -> None
@@ -95,7 +95,7 @@ let rec map f tree =
 	List.filter (fun n -> n.Node.value <> None || n.Node.children <> []) (List.map aux tree)
 
 let rec fold f tree acc =
-	let rec aux accu node =
+	let aux accu node =
 		fold f node.Node.children (f node.Node.key node.Node.value accu)
 	in
 	List.fold_left aux acc tree

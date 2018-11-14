@@ -473,7 +473,7 @@ let incr_transaction_abort store =
 
 let stats store =
 	let nb_nodes = ref 0 in
-	traversal store.root (fun path node ->
+	traversal store.root (fun _path _node ->
 		incr nb_nodes
 	);
 	!nb_nodes, store.stat_transaction_abort, store.stat_transaction_coalesce

@@ -60,7 +60,7 @@ let test_coalesce oldroot currentroot optpath =
 			let pnode = Store.Path.get_node currentroot (Store.Path.get_parent path) in
 			match pnode with
 			| None       -> false (* ok it doesn't exists, just bail out. *)
-			| Some pnode -> true
+			| Some _     -> true
 			)
 		| _ ->
 			false
@@ -103,7 +103,7 @@ let oldest_short_running_transaction () =
 	let rec last = function
 		| [] -> None
 		| [x] -> Some x
-		| x :: xs -> last xs
+		| _ :: xs -> last xs
 	in last !short_running_txns
 
 let trim_short_running_transactions txn =
@@ -196,7 +196,7 @@ let commit ~con t =
 	let has_commited =
 	match t.ty with
 	| No                         -> true
-	| Full (id, oldstore, cstore) ->       (* "cstore" meaning current canonical store *)
+	| Full (_id, oldstore, cstore) ->       (* "cstore" meaning current canonical store *)
 		let commit_partial oldroot cstore store =
 			(* get the lowest path of the query and verify that it hasn't
 			   been modified by others transactions. *)

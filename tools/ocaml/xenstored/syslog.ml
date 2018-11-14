@@ -13,7 +13,6 @@
  *)
 
 type level = Emerg | Alert | Crit | Err | Warning | Notice | Info | Debug
-type options = Cons | Ndelay | Nowait | Odelay | Perror | Pid
 type facility = Auth | Authpriv | Cron | Daemon | Ftp | Kern
               | Local0 | Local1 | Local2 | Local3
 	      | Local4 | Local5 | Local6 | Local7

@@ -57,7 +57,7 @@ let do_argv =
 		  ("--use-select", Arg.Unit (fun () -> use_select := true), "Use select instead of poll"); (* for backward compatibility and testing *)
 		] in
 	let usage_msg = "usage : xenstored [--config-file <filename>] [--no-domain-init] [--help] [--no-fork] [--reraise-top-level] [--restart] [--disable-socket] [--use-select]" in
-	Arg.parse speclist (fun s -> ()) usage_msg;
+	Arg.parse speclist (fun _ -> ()) usage_msg;
 	{
 		domain_init = !domain_init;
 		activate_access_log = !activate_access_log;
