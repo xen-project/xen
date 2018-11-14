@@ -31,7 +31,7 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    rc = gen_stub_json_config(0);
+    rc = gen_stub_json_config(0, NULL);
     if (rc)
         goto out;
 

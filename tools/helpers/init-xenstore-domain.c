@@ -382,7 +382,7 @@ int main(int argc, char** argv)
     if ( rv )
         return 1;
 
-    rv = gen_stub_json_config(domid);
+    rv = gen_stub_json_config(domid, NULL);
     if ( rv )
         return 3;
 

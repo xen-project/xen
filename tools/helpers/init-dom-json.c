@@ -7,7 +7,7 @@
 #include <xenctrl.h>
 #include <libxl.h>
 
-int gen_stub_json_config(uint32_t domid)
+int gen_stub_json_config(uint32_t domid, libxl_uuid *uuid)
 {
     int rc = 1;
     xentoollog_logger_stdiostream *logger;
@@ -39,6 +39,9 @@ int gen_stub_json_config(uint32_t domid)
                              ? LIBXL_DOMAIN_TYPE_PVH : LIBXL_DOMAIN_TYPE_PV;
     libxl_domain_build_info_init_type(&dom_config.b_info,
                                       dom_config.c_info.type);
+
+    if (uuid && !libxl_uuid_is_nil(uuid))
+        libxl_uuid_copy(ctx, &dom_config.c_info.uuid, uuid);
 
     json = libxl_domain_config_to_json(ctx, &dom_config);
     /* libxl-json format requires the string ends with '\0'. Code
