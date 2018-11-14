@@ -1516,6 +1516,8 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( rc != 0 )
         goto fail4;
 
+    vcpu_nestedhvm(v).nv_vvmcxaddr = INVALID_PADDR;
+
     if ( nestedhvm_enabled(d)
          && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) /* teardown: nestedhvm_vcpu_destroy */
         goto fail5;
