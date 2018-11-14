@@ -707,6 +707,17 @@ static void __clear_current_vvmcs(struct vcpu *v)
         __vmpclear(nvcpu->nv_n2vmcx_pa);
 }
 
+static void unmap_msr_bitmap(struct vcpu *v)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+
+    if ( nvmx->msrbitmap )
+    {
+        hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
+        nvmx->msrbitmap = NULL;
+    }
+}
+
 /*
  * Refreshes the MSR bitmap mapping for the current nested vcpu.  Returns true
  * for a successful mapping, and returns false for MSR_BITMAP parameter errors
@@ -717,12 +728,7 @@ static bool __must_check _map_msr_bitmap(struct vcpu *v)
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     uint64_t gpa;
 
-    if ( nvmx->msrbitmap )
-    {
-        hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
-        nvmx->msrbitmap = NULL;
-    }
-
+    unmap_msr_bitmap(v);
     gpa = get_vvmcs(v, MSR_BITMAP);
 
     if ( !IS_ALIGNED(gpa, PAGE_SIZE) )
@@ -733,6 +739,17 @@ static bool __must_check _map_msr_bitmap(struct vcpu *v)
     return nvmx->msrbitmap != NULL;
 }
 
+static void unmap_io_bitmap(struct vcpu *v, unsigned int idx)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+
+    if ( nvmx->iobitmap[idx] )
+    {
+        hvm_unmap_guest_frame(nvmx->iobitmap[idx], 1);
+        nvmx->iobitmap[idx] = NULL;
+    }
+}
+
 static bool_t __must_check _map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -740,8 +757,7 @@ static bool_t __must_check _map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
     int index;
 
     index = vmcs_reg == IO_BITMAP_A ? 0 : 1;
-    if (nvmx->iobitmap[index])
-        hvm_unmap_guest_frame(nvmx->iobitmap[index], 1);
+    unmap_io_bitmap(v, index);
     gpa = get_vvmcs(v, vmcs_reg);
     nvmx->iobitmap[index] = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
 
@@ -756,7 +772,6 @@ static inline bool_t __must_check map_io_bitmap_all(struct vcpu *v)
 
 static void nvmx_purge_vvmcs(struct vcpu *v)
 {
-    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     int i;
 
@@ -766,16 +781,11 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
     nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = INVALID_PADDR;
     v->arch.hvm.vmx.vmcs_shadow_maddr = 0;
-    for (i=0; i<2; i++) {
-        if ( nvmx->iobitmap[i] ) {
-            hvm_unmap_guest_frame(nvmx->iobitmap[i], 1);
-            nvmx->iobitmap[i] = NULL;
-        }
-    }
-    if ( nvmx->msrbitmap ) {
-        hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
-        nvmx->msrbitmap = NULL;
-    }
+
+    for ( i = 0; i < 2; i++ )
+        unmap_io_bitmap(v, i);
+
+    unmap_msr_bitmap(v);
 }
 
 u64 nvmx_get_tsc_offset(struct vcpu *v)
@@ -1546,20 +1556,34 @@ static void clear_vvmcs_launched(struct list_head *launched_list,
     }
 }
 
-static int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
+static enum vmx_insn_errno nvmx_vmresume(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    unsigned int exec_ctrl;
 
-    /* check VMCS is valid and IO BITMAP is set */
-    if ( vvmcx_valid(v) &&
-            ((nvmx->iobitmap[0] && nvmx->iobitmap[1]) ||
-            !(__n2_exec_control(v) & CPU_BASED_ACTIVATE_IO_BITMAP) ) )
-        nvcpu->nv_vmentry_pending = 1;
-    else
-        vmfail_invalid(regs);
+    ASSERT(vvmcx_valid(v));
+    exec_ctrl = __n2_exec_control(v);
 
-    return X86EMUL_OKAY;
+    if ( exec_ctrl & CPU_BASED_ACTIVATE_IO_BITMAP )
+    {
+        if ( (nvmx->iobitmap[0] == NULL || nvmx->iobitmap[1] == NULL) &&
+             !map_io_bitmap_all(v) )
+            goto invalid_control_state;
+    }
+
+    if ( exec_ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP )
+    {
+        if ( nvmx->msrbitmap == NULL && !_map_msr_bitmap(v) )
+            goto invalid_control_state;
+    }
+
+    nvcpu->nv_vmentry_pending = 1;
+
+    return VMX_INSN_SUCCEED;
+
+invalid_control_state:
+    return VMX_INSN_INVALID_CONTROL_STATE;
 }
 
 static int nvmx_handle_vmresume(struct cpu_user_regs *regs)
@@ -1568,6 +1592,7 @@ static int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long intr_shadow;
+    int rc;
 
     if ( !vvmcx_valid(v) )
     {
@@ -1589,7 +1614,12 @@ static int nvmx_handle_vmresume(struct cpu_user_regs *regs)
         vmfail_valid(regs, VMX_INSN_VMRESUME_NONLAUNCHED_VMCS);
         return X86EMUL_OKAY;
     }
-    return nvmx_vmresume(v,regs);
+
+    rc = nvmx_vmresume(v);
+    if ( rc )
+        vmfail_valid(regs, rc);
+
+    return X86EMUL_OKAY;
 }
 
 static int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
@@ -1621,13 +1651,16 @@ static int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
         return X86EMUL_OKAY;
     }
     else {
-        rc = nvmx_vmresume(v,regs);
-        if ( rc == X86EMUL_OKAY )
+        rc = nvmx_vmresume(v);
+        if ( rc )
+            vmfail_valid(regs, rc);
+        else
         {
             if ( set_vvmcs_launched(&nvmx->launched_list,
                                     PFN_DOWN(v->arch.hvm.vmx.vmcs_shadow_maddr)) < 0 )
                 return X86EMUL_UNHANDLEABLE;
         }
+        rc = X86EMUL_OKAY;
     }
     return rc;
 }
@@ -1691,9 +1724,7 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
                 vvmcx = NULL;
             }
         }
-        if ( !vvmcx ||
-             !map_io_bitmap_all(v) ||
-             !_map_msr_bitmap(v) )
+        else
         {
             vmfail(regs, VMX_INSN_VMPTRLD_INVALID_PHYADDR);
             goto out;
@@ -1869,13 +1900,13 @@ static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     switch ( vmcs_encoding & ~VMCS_HIGH(0) )
     {
     case IO_BITMAP_A:
-        okay = _map_io_bitmap(v, IO_BITMAP_A);
+        unmap_io_bitmap(v, 0);
         break;
     case IO_BITMAP_B:
-        okay = _map_io_bitmap(v, IO_BITMAP_B);
+        unmap_io_bitmap(v, 1);
         break;
     case MSR_BITMAP:
-        okay = _map_msr_bitmap(v);
+        unmap_msr_bitmap(v);
         break;
     }
 
