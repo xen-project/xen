@@ -1891,7 +1891,7 @@ static int nvmx_handle_invept(struct cpu_user_regs *regs)
         __invept(INVEPT_ALL_CONTEXT, 0);
         break;
     default:
-        vmfail_invalid(regs);
+        vmfail(regs, VMX_INSN_INVEPT_INVVPID_INVALID_OP);
         return X86EMUL_OKAY;
     }
     vmsucceed(regs);
@@ -1916,7 +1916,7 @@ static int nvmx_handle_invvpid(struct cpu_user_regs *regs)
         hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(current).nv_n2asid);
         break;
     default:
-        vmfail_invalid(regs);
+        vmfail(regs, VMX_INSN_INVEPT_INVVPID_INVALID_OP);
         return X86EMUL_OKAY;
     }
 
