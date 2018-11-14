@@ -207,12 +207,6 @@ struct vmx_inst_decoded {
     unsigned int reg2;
 };
 
-enum vmx_ops_result {
-    VMSUCCEED,
-    VMFAIL_VALID,
-    VMFAIL_INVALID,
-};
-
 #define CASE_SET_REG(REG, reg)      \
     case VMX_REG_ ## REG: regs->reg = value; break
 #define CASE_GET_REG(REG, reg)      \
@@ -1754,16 +1748,26 @@ static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    BUILD_BUG_ON(X86EMUL_OKAY != VMSUCCEED); /* rc = VMSUCCEED; */
+    if ( gpa == vcpu_2_nvmx(v).vmxon_region_pa )
+    {
+        vmfail(regs, VMX_INSN_VMCLEAR_WITH_VMXON_PTR);
+        goto out;
+    }
+
     if ( gpa & 0xfff )
-        rc = VMFAIL_INVALID;
-    else if ( gpa == nvcpu->nv_vvmcxaddr )
+    {
+        vmfail(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
+        goto out;
+    }
+
+    if ( gpa == nvcpu->nv_vvmcxaddr )
     {
         if ( cpu_has_vmx_vmcs_shadowing )
             nvmx_clear_vmcs_pointer(v, nvcpu->nv_vvmcx);
         clear_vvmcs_launched(&nvmx->launched_list,
                              PFN_DOWN(v->arch.hvm.vmx.vmcs_shadow_maddr));
         nvmx_purge_vvmcs(v);
+        vmsucceed(regs);
     }
     else 
     {
@@ -1771,24 +1775,26 @@ static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         bool_t writable;
 
         vvmcs = hvm_map_guest_frame_rw(paddr_to_pfn(gpa), 0, &writable);
-        if ( vvmcs ) 
+
+        if ( !vvmcs )
         {
-            if ( writable )
-                clear_vvmcs_launched(&nvmx->launched_list,
-                                     mfn_x(domain_page_map_to_mfn(vvmcs)));
-            else
-                rc = VMFAIL_VALID;
-            hvm_unmap_guest_frame(vvmcs, 0);
+            vmfail(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
+            goto out;
         }
+
+        if ( writable )
+        {
+            clear_vvmcs_launched(&nvmx->launched_list,
+                                 mfn_x(domain_page_map_to_mfn(vvmcs)));
+            vmsucceed(regs);
+        }
+        else
+            vmfail(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
+
+        hvm_unmap_guest_frame(vvmcs, 0);
     }
 
-    if ( rc == VMSUCCEED )
-        vmsucceed(regs);
-    else if ( rc == VMFAIL_VALID )
-        vmfail(regs, VMX_INSN_VMCLEAR_INVALID_PHYADDR);
-    else
-        vmfail_invalid(regs);
-
+out:
     return X86EMUL_OKAY;
 }
 
