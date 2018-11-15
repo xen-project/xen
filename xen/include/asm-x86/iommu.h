@@ -56,24 +56,15 @@ struct arch_iommu
     struct guest_iommu *g_iommu;
 };
 
-extern const struct iommu_ops intel_iommu_ops;
-extern const struct iommu_ops amd_iommu_ops;
 int intel_vtd_setup(void);
 int amd_iov_detect(void);
 
+extern struct iommu_ops iommu_ops;
+
 static inline const struct iommu_ops *iommu_get_ops(void)
 {
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        return &intel_iommu_ops;
-    case X86_VENDOR_AMD:
-        return &amd_iommu_ops;
-    }
-
-    BUG();
-
-    return NULL;
+    BUG_ON(!iommu_ops.init);
+    return &iommu_ops;
 }
 
 static inline int iommu_hardware_setup(void)

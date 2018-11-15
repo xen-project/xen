@@ -2299,6 +2299,8 @@ int __init intel_vtd_setup(void)
         goto error;
     }
 
+    iommu_ops = intel_iommu_ops;
+
     /* We enable the following features only if they are supported by all VT-d
      * engines: Snoop Control, DMA passthrough, Queued Invalidation, Interrupt
      * Remapping, and Posted Interrupt
@@ -2698,7 +2700,7 @@ static void vtd_dump_p2m_table(struct domain *d)
     vtd_dump_p2m_table_level(hd->arch.pgd_maddr, agaw_to_level(hd->arch.agaw), 0, 0);
 }
 
-const struct iommu_ops intel_iommu_ops = {
+const struct iommu_ops __initconstrel intel_iommu_ops = {
     .init = intel_iommu_domain_init,
     .hwdom_init = intel_iommu_hwdom_init,
     .add_device = intel_iommu_add_device,

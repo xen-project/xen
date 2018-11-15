@@ -29,6 +29,8 @@
 
 static bool_t __read_mostly init_done;
 
+static const struct iommu_ops amd_iommu_ops;
+
 struct amd_iommu *find_iommu_for_device(int seg, int bdf)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
@@ -181,6 +183,8 @@ int __init amd_iov_detect(void)
         iommu_intremap = 0;
         return -ENODEV;
     }
+
+    iommu_ops = amd_iommu_ops;
 
     if ( amd_iommu_init() != 0 )
     {
@@ -566,7 +570,7 @@ static void amd_dump_p2m_table(struct domain *d)
     amd_dump_p2m_table_level(hd->arch.root_table, hd->arch.paging_mode, 0, 0);
 }
 
-const struct iommu_ops amd_iommu_ops = {
+static const struct iommu_ops __initconstrel amd_iommu_ops = {
     .init = amd_iommu_domain_init,
     .hwdom_init = amd_iommu_hwdom_init,
     .add_device = amd_iommu_add_device,

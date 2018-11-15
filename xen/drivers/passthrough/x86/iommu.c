@@ -23,6 +23,8 @@
 #include <asm/hvm/io.h>
 #include <asm/setup.h>
 
+struct iommu_ops iommu_ops;
+
 void iommu_update_ire_from_apic(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
