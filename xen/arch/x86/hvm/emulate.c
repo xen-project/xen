@@ -1472,9 +1472,12 @@ static int hvmemul_cmpxchg(
     else if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
         pfec |= PFEC_user_mode;
 
-    mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
-    if ( IS_ERR(mapping) )
-        return ~PTR_ERR(mapping);
+    if ( !known_gla(addr, bytes, pfec) )
+    {
+        mapping = hvmemul_map_linear_addr(addr, bytes, pfec, hvmemul_ctxt);
+        if ( IS_ERR(mapping) )
+            return ~PTR_ERR(mapping);
+    }
 
     if ( !mapping )
     {
