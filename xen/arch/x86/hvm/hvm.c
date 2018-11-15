@@ -2558,7 +2558,8 @@ static void *_hvm_map_guest_frame(unsigned long gfn, bool_t permanent,
 
     if ( writable )
     {
-        if ( unlikely(p2m_is_discard_write(p2mt)) )
+        if ( unlikely(p2m_is_discard_write(p2mt)) ||
+             unlikely(p2mt == p2m_ioreq_server) )
             *writable = 0;
         else if ( !permanent )
             paging_mark_pfn_dirty(d, _pfn(gfn));
