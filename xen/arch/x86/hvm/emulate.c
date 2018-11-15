@@ -613,10 +613,21 @@ static void *hvmemul_map_linear_addr(
 
         *mfn++ = page_to_mfn(page);
 
-        if ( p2m_is_discard_write(p2mt) )
+        if ( pfec & PFEC_write_access )
         {
-            err = ERR_PTR(~X86EMUL_OKAY);
-            goto out;
+            if ( p2m_is_discard_write(p2mt) )
+            {
+                err = ERR_PTR(~X86EMUL_OKAY);
+                goto out;
+            }
+
+            if ( p2mt == p2m_ioreq_server )
+            {
+                err = NULL;
+                goto out;
+            }
+
+            ASSERT(p2mt == p2m_ram_logdirty || !p2m_is_readonly(p2mt));
         }
     }
 
