@@ -28,7 +28,6 @@
 #include <public/hvm/ioreq.h>
 #include <public/domctl.h>
 #include <asm/device.h>
-#include <asm/iommu.h>
 
 TYPE_SAFE(uint64_t, dfn);
 #define PRI_dfn     PRIx64
@@ -102,42 +101,6 @@ enum iommu_feature
 };
 
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature);
-
-enum iommu_status
-{
-    IOMMU_STATUS_disabled,
-    IOMMU_STATUS_initializing,
-    IOMMU_STATUS_initialized
-};
-
-struct domain_iommu {
-    struct arch_iommu arch;
-
-    /* iommu_ops */
-    const struct iommu_ops *platform_ops;
-
-#ifdef CONFIG_HAS_DEVICE_TREE
-    /* List of DT devices assigned to this domain */
-    struct list_head dt_devices;
-#endif
-
-    /* Features supported by the IOMMU */
-    DECLARE_BITMAP(features, IOMMU_FEAT_count);
-
-    /* Status of guest IOMMU mappings */
-    enum iommu_status status;
-
-    /*
-     * Does the guest reqire mappings to be synchonized, to maintain
-     * the default dfn == pfn map. (See comment on dfn at the top of
-     * include/xen/mm.h).
-     */
-    bool need_sync;
-};
-
-#define dom_iommu(d)              (&(d)->iommu)
-#define iommu_set_feature(d, f)   set_bit(f, dom_iommu(d)->features)
-#define iommu_clear_feature(d, f) clear_bit(f, dom_iommu(d)->features)
 
 #ifdef CONFIG_HAS_PCI
 struct pirq;
@@ -229,6 +192,44 @@ struct iommu_ops {
     int (*get_reserved_device_memory)(iommu_grdm_t *, void *);
     void (*dump_p2m_table)(struct domain *d);
 };
+
+#include <asm/iommu.h>
+
+enum iommu_status
+{
+    IOMMU_STATUS_disabled,
+    IOMMU_STATUS_initializing,
+    IOMMU_STATUS_initialized
+};
+
+struct domain_iommu {
+    struct arch_iommu arch;
+
+    /* iommu_ops */
+    const struct iommu_ops *platform_ops;
+
+#ifdef CONFIG_HAS_DEVICE_TREE
+    /* List of DT devices assigned to this domain */
+    struct list_head dt_devices;
+#endif
+
+    /* Features supported by the IOMMU */
+    DECLARE_BITMAP(features, IOMMU_FEAT_count);
+
+    /* Status of guest IOMMU mappings */
+    enum iommu_status status;
+
+    /*
+     * Does the guest reqire mappings to be synchonized, to maintain
+     * the default dfn == pfn map. (See comment on dfn at the top of
+     * include/xen/mm.h).
+     */
+    bool need_sync;
+};
+
+#define dom_iommu(d)              (&(d)->iommu)
+#define iommu_set_feature(d, f)   set_bit(f, dom_iommu(d)->features)
+#define iommu_clear_feature(d, f) clear_bit(f, dom_iommu(d)->features)
 
 int __must_check iommu_suspend(void);
 void iommu_resume(void);
