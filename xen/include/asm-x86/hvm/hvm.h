@@ -560,12 +560,6 @@ static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
 #endif
 }
 
-#define hvm_msr_tsc_aux(v) ({                                               \
-    struct domain *__d = (v)->domain;                                       \
-    (__d->arch.tsc_mode == TSC_MODE_PVRDTSCP)                               \
-        ? (u32)__d->arch.incarnation : (u32)(v)->arch.hvm.msr_tsc_aux;      \
-})
-
 /*
  * Nested HVM
  */

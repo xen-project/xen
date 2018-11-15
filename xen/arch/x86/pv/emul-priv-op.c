@@ -847,10 +847,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
         *val = currd->arch.vtsc ? pv_soft_rdtsc(curr, ctxt->regs) : rdtsc();
         return X86EMUL_OKAY;
 
-    case MSR_TSC_AUX:
-        *val = 0;
-        return X86EMUL_OKAY;
-
     case MSR_EFER:
         /* Hide unknown bits, and unconditionally hide SVME from guests. */
         *val = read_efer() & EFER_KNOWN_MASK & ~EFER_SVME;

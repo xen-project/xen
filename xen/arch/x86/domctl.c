@@ -1274,6 +1274,7 @@ long arch_do_domctl(
         static const uint32_t msrs_to_send[] = {
             MSR_SPEC_CTRL,
             MSR_INTEL_MISC_FEATURES_ENABLES,
+            MSR_TSC_AUX,
             MSR_AMD64_DR0_ADDRESS_MASK,
             MSR_AMD64_DR1_ADDRESS_MASK,
             MSR_AMD64_DR2_ADDRESS_MASK,
@@ -1373,6 +1374,7 @@ long arch_do_domctl(
                 {
                 case MSR_SPEC_CTRL:
                 case MSR_INTEL_MISC_FEATURES_ENABLES:
+                case MSR_TSC_AUX:
                 case MSR_AMD64_DR0_ADDRESS_MASK:
                 case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
                     if ( guest_wrmsr(v, msr.index, msr.value) != X86EMUL_OKAY )

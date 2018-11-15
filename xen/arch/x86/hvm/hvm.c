@@ -774,7 +774,7 @@ static int hvm_save_cpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     struct segment_register seg;
     struct hvm_hw_cpu ctxt = {
         .tsc = hvm_get_guest_tsc_fixed(v, v->domain->arch.hvm.sync_tsc),
-        .msr_tsc_aux = hvm_msr_tsc_aux(v),
+        .msr_tsc_aux = v->arch.msrs->tsc_aux,
         .rax = v->arch.user_regs.rax,
         .rbx = v->arch.user_regs.rbx,
         .rcx = v->arch.user_regs.rcx,
@@ -1014,6 +1014,13 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         return -EINVAL;
     }
 
+    if ( ctxt.msr_tsc_aux != (uint32_t)ctxt.msr_tsc_aux )
+    {
+        printk(XENLOG_G_ERR "%pv: HVM restore: bad MSR_TSC_AUX %#"PRIx64"\n",
+               v, ctxt.msr_tsc_aux);
+        return -EINVAL;
+    }
+
     /* Older Xen versions used to save the segment arbytes directly 
      * from the VMCS on Intel hosts.  Detect this and rearrange them
      * into the struct segment_register format. */
@@ -1040,7 +1047,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_funcs.tsc_scaling.setup )
         hvm_funcs.tsc_scaling.setup(v);
 
-    v->arch.hvm.msr_tsc_aux = ctxt.msr_tsc_aux;
+    v->arch.msrs->tsc_aux = ctxt.msr_tsc_aux;
 
     hvm_set_guest_tsc_fixed(v, ctxt.tsc, d->arch.hvm.sync_tsc);
 
@@ -3406,10 +3413,6 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = v->arch.hvm.msr_tsc_adjust;
         break;
 
-    case MSR_TSC_AUX:
-        *msr_content = hvm_msr_tsc_aux(v);
-        break;
-
     case MSR_APIC_BASE:
         *msr_content = vcpu_vlapic(v)->hw.apic_base_msr;
         break;
@@ -3555,13 +3558,6 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
 
     case MSR_IA32_TSC_ADJUST:
         hvm_set_guest_tsc_adjust(v, msr_content);
-        break;
-
-    case MSR_TSC_AUX:
-        v->arch.hvm.msr_tsc_aux = (uint32_t)msr_content;
-        if ( cpu_has_rdtscp
-             && (v->domain->arch.tsc_mode != TSC_MODE_PVRDTSCP) )
-            wrmsr_tsc_aux(msr_content);
         break;
 
     case MSR_APIC_BASE:

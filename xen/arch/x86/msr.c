@@ -170,6 +170,13 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         ret = guest_rdmsr_xen(v, msr, val);
         break;
 
+    case MSR_TSC_AUX:
+        if ( !cp->extd.rdtscp && !cp->feat.rdpid )
+            goto gp_fault;
+
+        *val = msrs->tsc_aux;
+        break;
+
     case MSR_AMD64_DR0_ADDRESS_MASK:
     case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
         if ( !cp->extd.dbext )
@@ -322,6 +329,17 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         /* Fallthrough. */
     case 0x40000200 ... 0x400002ff:
         ret = guest_wrmsr_xen(v, msr, val);
+        break;
+
+    case MSR_TSC_AUX:
+        if ( !cp->extd.rdtscp && !cp->feat.rdpid )
+            goto gp_fault;
+        if ( val != (uint32_t)val )
+            goto gp_fault;
+
+        msrs->tsc_aux = val;
+        if ( v == curr )
+            wrmsr_tsc_aux(val);
         break;
 
     case MSR_AMD64_DR0_ADDRESS_MASK:

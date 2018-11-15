@@ -1069,8 +1069,8 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_lwp_load(v);
     svm_tsc_ratio_load(v);
 
-    if ( cpu_has_rdtscp )
-        wrmsr_tsc_aux(hvm_msr_tsc_aux(v));
+    if ( cpu_has_msr_tsc_aux )
+        wrmsr_tsc_aux(v->arch.msrs->tsc_aux);
 }
 
 static void noreturn svm_do_resume(struct vcpu *v)
@@ -2286,8 +2286,7 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs, bool rdtscp)
     enum instruction_index insn = rdtscp ? INSTR_RDTSCP : INSTR_RDTSC;
     unsigned int inst_len;
 
-    if ( rdtscp && !currd->arch.cpuid->extd.rdtscp &&
-         currd->arch.tsc_mode != TSC_MODE_PVRDTSCP )
+    if ( rdtscp && !currd->arch.cpuid->extd.rdtscp )
     {
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
@@ -2299,7 +2298,7 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs, bool rdtscp)
     __update_guest_eip(regs, inst_len);
 
     if ( rdtscp )
-        regs->rcx = hvm_msr_tsc_aux(curr);
+        regs->rcx = curr->arch.msrs->tsc_aux;
 
     hvm_rdtsc_intercept(regs);
 }

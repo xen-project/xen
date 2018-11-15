@@ -511,8 +511,8 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     wrmsrl(MSR_LSTAR,          v->arch.hvm.vmx.lstar);
     wrmsrl(MSR_SYSCALL_MASK,   v->arch.hvm.vmx.sfmask);
 
-    if ( cpu_has_rdtscp )
-        wrmsr_tsc_aux(hvm_msr_tsc_aux(v));
+    if ( cpu_has_msr_tsc_aux )
+        wrmsr_tsc_aux(v->arch.msrs->tsc_aux);
 }
 
 void vmx_update_cpu_exec_control(struct vcpu *v)
@@ -3957,14 +3957,13 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_invlpg_intercept(exit_qualification);
         break;
     case EXIT_REASON_RDTSCP:
-        if ( !currd->arch.cpuid->extd.rdtscp &&
-             currd->arch.tsc_mode != TSC_MODE_PVRDTSCP )
+        if ( !currd->arch.cpuid->extd.rdtscp )
         {
             hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
             break;
         }
 
-        regs->rcx = hvm_msr_tsc_aux(v);
+        regs->rcx = v->arch.msrs->tsc_aux;
         /* fall through */
     case EXIT_REASON_RDTSC:
         update_guest_eip(); /* Safe: RDTSC, RDTSCP */

@@ -289,6 +289,15 @@ struct vcpu_msrs
     } misc_features_enables;
 
     /*
+     * 0xc0000103 - MSR_TSC_AUX
+     *
+     * Value is guest chosen, and always loaded in vcpu context.  Guests have
+     * no direct MSR access, and the value is accessible to userspace with the
+     * RDTSCP and RDPID instructions.
+     */
+    uint32_t tsc_aux;
+
+    /*
      * 0xc00110{27,19-1b} MSR_AMD64_DR{0-3}_ADDRESS_MASK
      *
      * Loaded into hardware for guests which have active %dr7 settings.

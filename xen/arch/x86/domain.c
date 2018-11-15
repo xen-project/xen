@@ -1595,9 +1595,8 @@ void paravirt_ctxt_switch_to(struct vcpu *v)
     if ( unlikely(v->arch.dr7 & DR7_ACTIVE_MASK) )
         activate_debugregs(v);
 
-    if ( cpu_has_rdtscp )
-        wrmsr_tsc_aux(v->domain->arch.tsc_mode == TSC_MODE_PVRDTSCP
-                      ? v->domain->arch.incarnation : 0);
+    if ( cpu_has_msr_tsc_aux )
+        wrmsr_tsc_aux(v->arch.msrs->tsc_aux);
 }
 
 /* Update per-VCPU guest runstate shared memory area (if registered). */
