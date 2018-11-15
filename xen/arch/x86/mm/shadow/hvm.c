@@ -338,6 +338,11 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v, unsigned long vaddr,
     {
         return _mfn(BAD_GFN_TO_MFN);
     }
+    if ( p2mt == p2m_ioreq_server )
+    {
+        put_page(page);
+        return _mfn(BAD_GFN_TO_MFN);
+    }
     if ( p2m_is_discard_write(p2mt) )
     {
         put_page(page);
