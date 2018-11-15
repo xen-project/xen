@@ -360,11 +360,7 @@ void p2m_enable_hardware_log_dirty(struct domain *d)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( p2m->enable_hardware_log_dirty )
-    {
-        p2m_lock(p2m);
         p2m->enable_hardware_log_dirty(p2m);
-        p2m_unlock(p2m);
-    }
 }
 
 void p2m_disable_hardware_log_dirty(struct domain *d)
@@ -372,11 +368,7 @@ void p2m_disable_hardware_log_dirty(struct domain *d)
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     if ( p2m->disable_hardware_log_dirty )
-    {
-        p2m_lock(p2m);
         p2m->disable_hardware_log_dirty(p2m);
-        p2m_unlock(p2m);
-    }
 }
 
 void p2m_flush_hardware_cached_dirty(struct domain *d)

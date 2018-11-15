@@ -17,6 +17,7 @@
 
 #include <xen/domain_page.h>
 #include <xen/sched.h>
+#include <asm/altp2m.h>
 #include <asm/current.h>
 #include <asm/paging.h>
 #include <asm/types.h>
@@ -1222,6 +1223,34 @@ static void ept_tlb_flush(struct p2m_domain *p2m)
     ept_sync_domain_mask(p2m, p2m->domain->dirty_cpumask);
 }
 
+static void ept_set_ad_sync(struct domain *d, bool value)
+{
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
+
+    ASSERT(p2m_locked_by_me(hostp2m));
+
+    hostp2m->ept.ad = value;
+
+    if ( unlikely(altp2m_active(d)) )
+    {
+        unsigned int i;
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+        {
+            struct p2m_domain *p2m;
+
+            if ( d->arch.altp2m_eptp[i] == mfn_x(INVALID_MFN) )
+                continue;
+
+            p2m = d->arch.altp2m_p2m[i];
+
+            p2m_lock(p2m);
+            p2m->ept.ad = value;
+            p2m_unlock(p2m);
+        }
+    }
+}
+
 static void ept_enable_pml(struct p2m_domain *p2m)
 {
     /* Domain must have been paused */
@@ -1236,7 +1265,7 @@ static void ept_enable_pml(struct p2m_domain *p2m)
         return;
 
     /* Enable EPT A/D bit for PML */
-    p2m->ept.ad = 1;
+    ept_set_ad_sync(p2m->domain, true);
     vmx_domain_update_eptp(p2m->domain);
 }
 
@@ -1248,8 +1277,26 @@ static void ept_disable_pml(struct p2m_domain *p2m)
     vmx_domain_disable_pml(p2m->domain);
 
     /* Disable EPT A/D bit */
-    p2m->ept.ad = 0;
+    ept_set_ad_sync(p2m->domain, false);
     vmx_domain_update_eptp(p2m->domain);
+}
+
+static void ept_enable_hardware_log_dirty(struct p2m_domain *p2m)
+{
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(p2m->domain);
+
+    p2m_lock(hostp2m);
+    ept_enable_pml(hostp2m);
+    p2m_unlock(hostp2m);
+}
+
+static void ept_disable_hardware_log_dirty(struct p2m_domain *p2m)
+{
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(p2m->domain);
+
+    p2m_lock(hostp2m);
+    ept_disable_pml(hostp2m);
+    p2m_unlock(hostp2m);
 }
 
 static void ept_flush_pml_buffers(struct p2m_domain *p2m)
@@ -1281,8 +1328,8 @@ int ept_p2m_init(struct p2m_domain *p2m)
 
     if ( cpu_has_vmx_pml )
     {
-        p2m->enable_hardware_log_dirty = ept_enable_pml;
-        p2m->disable_hardware_log_dirty = ept_disable_pml;
+        p2m->enable_hardware_log_dirty = ept_enable_hardware_log_dirty;
+        p2m->disable_hardware_log_dirty = ept_disable_hardware_log_dirty;
         p2m->flush_hardware_cached_dirty = ept_flush_pml_buffers;
     }
 
@@ -1390,8 +1437,10 @@ void setup_ept_dump(void)
 void p2m_init_altp2m_ept(struct domain *d, unsigned int i)
 {
     struct p2m_domain *p2m = d->arch.altp2m_p2m[i];
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
     struct ept_data *ept;
 
+    p2m->ept.ad = hostp2m->ept.ad;
     p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
     p2m->max_remapped_gfn = 0;
     ept = &p2m->ept;
