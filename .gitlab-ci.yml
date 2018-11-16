@@ -28,330 +28,305 @@ stages:
     CXX: clang++
     clang: y
 
-centos-7-2-gcc:
+.x86-64-build-tmpl:
   <<: *build
   variables:
-    <<: *gcc
-    CONTAINER: centos:7.2
-    debug: n
     XEN_TARGET_ARCH: x86_64
+
+.x86-64-build:
+  extends: .x86-64-build-tmpl
+  variables:
+    debug: n
+
+.x86-64-build-debug:
+  extends: .x86-64-build-tmpl
+  variables:
+    debug: y
+
+.x86-32-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: x86_32
+
+.x86-32-build:
+  extends: .x86-32-build-tmpl
+  variables:
+    debug: n
+
+.x86-32-build-debug:
+  extends: .x86-32-build-tmpl
+  variables:
+    debug: y
+
+.gcc-x86-64-build:
+  extends: .x86-64-build
+  variables:
+    <<: *gcc
+
+.gcc-x86-64-build-debug:
+  extends: .x86-64-build-debug
+  variables:
+    <<: *gcc
+
+.gcc-x86-32-build:
+  extends: .x86-32-build
+  variables:
+    <<: *gcc
+
+.gcc-x86-32-build-debug:
+  extends: .x86-32-build-debug
+  variables:
+    <<: *gcc
+
+.clang-x86-64-build:
+  extends: .x86-64-build
+  variables:
+    <<: *clang
+
+.clang-x86-64-build-debug:
+  extends: .x86-64-build-debug
+  variables:
+    <<: *clang
+
+.clang-x86-32-build:
+  extends: .x86-32-build
+  variables:
+    <<: *clang
+
+.clang-x86-32-build-debug:
+  extends: .x86-32-build-debug
+  variables:
+    <<: *clang
+
+.arm64-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: arm64
+  tags:
+    - arm64
+
+.arm64-build:
+  extends: .arm64-build-tmpl
+  variables:
+    debug: n
+
+.arm64-build-debug:
+  extends: .arm64-build-tmpl
+  variables:
+    debug: y
+
+.gcc-arm64-build:
+  extends: .arm64-build
+  variables:
+    <<: *gcc
+
+.gcc-arm64-build-debug:
+  extends: .arm64-build-debug
+  variables:
+    <<: *gcc
+
+# Jobs below this line
+
+centos-7-2-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: centos:7.2
 
 centos-7-2-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: centos:7.2
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 centos-7-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: centos:7
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 centos-7-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: centos:7
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 debian-jessie-clang:
-  <<: *build
+  extends: .clang-x86-64-build
   variables:
-    <<: *clang
     CONTAINER: debian:jessie
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 debian-jessie-clang-debug:
-  <<: *build
+  extends: .clang-x86-64-build-debug
   variables:
-    <<: *clang
     CONTAINER: debian:jessie
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 debian-jessie-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: debian:jessie
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 debian-jessie-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: debian:jessie
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 debian-stretch-clang:
-  <<: *build
+  extends: .clang-x86-64-build
   variables:
-    <<: *clang
     CONTAINER: debian:stretch
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 debian-stretch-clang-debug:
-  <<: *build
+  extends: .clang-x86-64-build-debug
   variables:
-    <<: *clang
     CONTAINER: debian:stretch
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 debian-stretch-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: debian:stretch
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 debian-stretch-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: debian:stretch
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 debian-stretch-32-clang:
-  <<: *build
+  extends: .clang-x86-32-build
   variables:
-    <<: *clang
     CONTAINER: debian:stretch-i386
-    debug: n
-    XEN_TARGET_ARCH: x86_32
 
 debian-stretch-32-clang-debug:
-  <<: *build
+  extends: .clang-x86-32-build-debug
   variables:
-    <<: *clang
     CONTAINER: debian:stretch-i386
-    debug: y
-    XEN_TARGET_ARCH: x86_32
 
 debian-stretch-32-gcc:
-  <<: *build
+  extends: .gcc-x86-32-build
   variables:
-    <<: *gcc
     CONTAINER: debian:stretch-i386
-    debug: n
-    XEN_TARGET_ARCH: x86_32
 
 debian-stretch-32-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: debian:stretch-i386
-    debug: y
-    XEN_TARGET_ARCH: x86_32
 
 debian-unstable-clang:
-  <<: *build
+  extends: .clang-x86-64-build
   variables:
-    <<: *clang
     CONTAINER: debian:unstable
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 debian-unstable-clang-debug:
-  <<: *build
+  extends: .clang-x86-64-build-debug
   variables:
-    <<: *clang
     CONTAINER: debian:unstable
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 debian-unstable-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: debian:unstable
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 debian-unstable-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: debian:unstable
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 debian-unstable-32-clang:
-  <<: *build
+  extends: .clang-x86-32-build
   variables:
-    <<: *clang
     CONTAINER: debian:unstable-i386
-    debug: n
-    XEN_TARGET_ARCH: x86_32
 
 debian-unstable-32-clang-debug:
-  <<: *build
+  extends: .clang-x86-32-build-debug
   variables:
-    <<: *clang
     CONTAINER: debian:unstable-i386
-    debug: y
-    XEN_TARGET_ARCH: x86_32
 
 debian-unstable-32-gcc:
-  <<: *build
+  extends: .gcc-x86-32-build
   variables:
-    <<: *gcc
     CONTAINER: debian:unstable-i386
-    debug: n
-    XEN_TARGET_ARCH: x86_32
 
 debian-unstable-32-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: debian:unstable-i386
-    debug: y
-    XEN_TARGET_ARCH: x86_32
 
 # Ubuntu Trusty's Clang is 3.4 while Xen requires 3.5
 
 ubuntu-trusty-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: ubuntu:trusty
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-trusty-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: ubuntu:trusty
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-xenial-clang:
-  <<: *build
+  extends: .clang-x86-64-build
   variables:
-    <<: *clang
     CONTAINER: ubuntu:xenial
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-xenial-clang-debug:
-  <<: *build
+  extends: .clang-x86-64-build-debug
   variables:
-    <<: *clang
     CONTAINER: ubuntu:xenial
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-xenial-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: ubuntu:xenial
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-xenial-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: ubuntu:xenial
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-bionic-clang:
-  <<: *build
+  extends: .clang-x86-64-build
   variables:
-    <<: *clang
     CONTAINER: ubuntu:bionic
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-bionic-clang-debug:
-  <<: *build
+  extends: .clang-x86-64-build-debug
   variables:
-    <<: *clang
     CONTAINER: ubuntu:bionic
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-bionic-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: ubuntu:bionic
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 ubuntu-bionic-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: ubuntu:bionic
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 opensuse-leap-clang:
-  <<: *build
+  extends: .clang-x86-64-build
   variables:
-    <<: *clang
     CONTAINER: suse:opensuse-leap
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 opensuse-leap-clang-debug:
-  <<: *build
+  extends: .clang-x86-64-build-debug
   variables:
-    <<: *clang
     CONTAINER: suse:opensuse-leap
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 opensuse-leap-gcc:
-  <<: *build
+  extends: .gcc-x86-64-build
   variables:
-    <<: *gcc
     CONTAINER: suse:opensuse-leap
-    debug: n
-    XEN_TARGET_ARCH: x86_64
 
 opensuse-leap-gcc-debug:
-  <<: *build
+  extends: .gcc-x86-64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: suse:opensuse-leap
-    debug: y
-    XEN_TARGET_ARCH: x86_64
 
 # Arm builds
 
 debian-unstable-gcc-arm64:
-  <<: *build
+  extends: .gcc-arm64-build
   variables:
-    <<: *gcc
     CONTAINER: debian:unstable-arm64v8
-    debug: n
-    XEN_TARGET_ARCH: arm64
-  tags:
-    - arm64
 
 debian-unstable-gcc-debug-arm64:
-  <<: *build
+  extends: .gcc-arm64-build-debug
   variables:
-    <<: *gcc
     CONTAINER: debian:unstable-arm64v8
-    debug: y
-    XEN_TARGET_ARCH: arm64
-  tags:
-    - arm64
