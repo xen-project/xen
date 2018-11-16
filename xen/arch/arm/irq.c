@@ -224,7 +224,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
         /*
          * The irq cannot be a PPI, we only support delivery of SPIs to
          * guests.
-	 */
+         */
         vgic_inject_irq(info->d, NULL, info->virq, true);
         goto out_no_end;
     }
