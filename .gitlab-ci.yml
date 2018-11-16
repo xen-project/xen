@@ -32,6 +32,8 @@ stages:
   <<: *build
   variables:
     XEN_TARGET_ARCH: x86_64
+  tags:
+    - x86_64
 
 .x86-64-build:
   extends: .x86-64-build-tmpl
@@ -47,6 +49,8 @@ stages:
   <<: *build
   variables:
     XEN_TARGET_ARCH: x86_32
+  tags:
+    - x86_32
 
 .x86-32-build:
   extends: .x86-32-build-tmpl
