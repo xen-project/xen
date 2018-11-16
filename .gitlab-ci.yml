@@ -227,6 +227,18 @@ debian-unstable-gcc-debug:
   variables:
     CONTAINER: debian:unstable
 
+debian-unstable-gcc-randconfig:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+    RANDCONFIG: y
+
+debian-unstable-gcc-debug-randconfig:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: debian:unstable
+    RANDCONFIG: y
+
 debian-unstable-32-clang:
   extends: .clang-x86-32-build
   variables:
@@ -330,3 +342,15 @@ debian-unstable-gcc-debug-arm64:
   extends: .gcc-arm64-build-debug
   variables:
     CONTAINER: debian:unstable-arm64v8
+
+debian-unstable-gcc-arm64-randconfig:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+    RANDCONFIG: y
+
+debian-unstable-gcc-debug-arm64-randconfig:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+    RANDCONFIG: y
