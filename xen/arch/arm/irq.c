@@ -61,7 +61,9 @@ static DEFINE_PER_CPU(irq_desc_t[NR_LOCAL_IRQS], local_irq_desc);
 
 irq_desc_t *__irq_to_desc(int irq)
 {
-    if (irq < NR_LOCAL_IRQS) return &this_cpu(local_irq_desc)[irq];
+    if ( irq < NR_LOCAL_IRQS )
+        return &this_cpu(local_irq_desc)[irq];
+
     return &irq_desc[irq-NR_LOCAL_IRQS];
 }
 
@@ -76,7 +78,8 @@ static int __init init_irq_data(void)
 {
     int irq;
 
-    for (irq = NR_LOCAL_IRQS; irq < NR_IRQS; irq++) {
+    for ( irq = NR_LOCAL_IRQS; irq < NR_IRQS; irq++ )
+    {
         struct irq_desc *desc = irq_to_desc(irq);
         init_one_irq_desc(desc);
         desc->irq = irq;
@@ -92,7 +95,8 @@ static int init_local_irq_data(void)
 
     spin_lock(&local_irqs_type_lock);
 
-    for (irq = 0; irq < NR_LOCAL_IRQS; irq++) {
+    for ( irq = 0; irq < NR_LOCAL_IRQS; irq++ )
+    {
         struct irq_desc *desc = irq_to_desc(irq);
         init_one_irq_desc(desc);
         desc->irq = irq;
@@ -193,7 +197,7 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 
     ASSERT(irq >= 16); /* SGIs do not come down this path */
 
-    if (irq < 32)
+    if ( irq < 32 )
         perfc_incr(ppis);
     else
         perfc_incr(spis);
