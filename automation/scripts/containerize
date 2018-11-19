@@ -42,9 +42,11 @@ tty -s && termint=t
 # Fetch the latest version of the container in hub.docker.com,
 # unless it's a newly created local copy.
 #
-einfo "*** Ensuring ${CONTAINER} is up to date"
-docker pull ${CONTAINER} > /dev/null ||     \
-    die "Failed to update docker container"
+if [[ "_${CONTAINER_NO_PULL}" != "_1" ]]; then
+    einfo "*** Ensuring ${CONTAINER} is up to date"
+    docker pull ${CONTAINER} > /dev/null ||     \
+        die "Failed to update docker container"
+fi
 
 if hash greadlink > /dev/null 2>&1; then
     READLINK=greadlink

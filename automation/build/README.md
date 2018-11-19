@@ -52,6 +52,9 @@ understands.
 
 - CONTAINER_UID0: This specifies whether root is used inside the container.
 
+- CONTAINER_NO_PULL: If set to 1, the script will not pull from docker hub.
+  This is useful when testing container locally.
+
 - XEN_CONFIG_EXPERT: If this is defined in your shell it will be
   automatically passed through to the container.
 
