@@ -20,20 +20,50 @@ struct cpuid_leaf
     uint32_t a, b, c, d;
 };
 
+/*
+ * Versions of GCC before 5 unconditionally reserve %rBX as the PIC hard
+ * register, and are unable to cope with spilling it.  This results in a
+ * rather cryptic error:
+ *    error: inconsistent operand constraints in an ‘asm’
+ *
+ * In affected situations, work around the issue by using a separate register
+ * to hold the the %rBX output, and xchg twice to leave %rBX preserved around
+ * the asm() statement.
+ */
+#if defined(__PIC__) && __GNUC__ < 5 && !defined(__clang__) && defined(__i386__)
+# define XCHG_BX "xchg %%ebx, %[bx];"
+# define BX_CON [bx] "=&r"
+#elif defined(__PIC__) && __GNUC__ < 5 && !defined(__clang__) && \
+    defined(__x86_64__) && (defined(__code_model_medium__) || \
+                            defined(__code_model_large__))
+# define XCHG_BX "xchg %%rbx, %q[bx];"
+# define BX_CON [bx] "=&r"
+#else
+# define XCHG_BX ""
+# define BX_CON "=&b"
+#endif
+
 static inline void cpuid_leaf(uint32_t leaf, struct cpuid_leaf *l)
 {
-    asm ( "cpuid"
-          : "=a" (l->a), "=b" (l->b), "=c" (l->c), "=d" (l->d)
+    asm ( XCHG_BX
+          "cpuid;"
+          XCHG_BX
+          : "=a" (l->a), BX_CON (l->b), "=&c" (l->c), "=&d" (l->d)
           : "a" (leaf) );
 }
 
 static inline void cpuid_count_leaf(
     uint32_t leaf, uint32_t subleaf, struct cpuid_leaf *l)
 {
-    asm ( "cpuid"
-          : "=a" (l->a), "=b" (l->b), "=c" (l->c), "=d" (l->d)
+    asm ( XCHG_BX
+          "cpuid;"
+          XCHG_BX
+          : "=a" (l->a), BX_CON (l->b), "=c" (l->c), "=&d" (l->d)
           : "a" (leaf), "c" (subleaf) );
 }
+
+#undef BX_CON
+#undef XCHG
 
 #define CPUID_GUEST_NR_BASIC      (0xdu + 1)
 #define CPUID_GUEST_NR_FEAT       (0u + 1)
