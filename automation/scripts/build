@@ -26,6 +26,9 @@ fi
 
 make -j$(nproc) dist
 
+# Extract artifacts to avoid getting rewritten by customised builds
+cp xen/.config xen-config
+
 # Build all the configs we care about
 case ${XEN_TARGET_ARCH} in
     x86_64) arch=x86 ;;

@@ -8,7 +8,7 @@ stages:
     - ./automation/scripts/build 2>&1 | tee build.log
   artifacts:
     paths:
-      - xen/.config
+      - xen-config
       - '*.log'
     when: always
   except:
