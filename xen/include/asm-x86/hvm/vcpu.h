@@ -42,15 +42,14 @@ struct hvm_vcpu_asid {
 };
 
 /*
- * We may read or write up to m256 as a number of device-model
+ * We may read or write up to m512 as a number of device-model
  * transactions.
  */
 struct hvm_mmio_cache {
     unsigned long gla;
     unsigned int size;
     uint8_t dir;
-    uint8_t pad[3]; /* make buffer[] long-aligned */
-    uint8_t buffer[32];
+    uint8_t buffer[64] __aligned(sizeof(long));
 };
 
 struct hvm_vcpu_io {

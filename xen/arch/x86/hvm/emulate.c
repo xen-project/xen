@@ -876,7 +876,18 @@ static int hvmemul_phys_mmio_access(
     int rc = X86EMUL_OKAY;
 
     /* Accesses must fall within a page. */
-    BUG_ON((gpa & ~PAGE_MASK) + size > PAGE_SIZE);
+    if ( (gpa & ~PAGE_MASK) + size > PAGE_SIZE )
+    {
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    /* Accesses must not overflow the cache's buffer. */
+    if ( size > sizeof(cache->buffer) )
+    {
+        ASSERT_UNREACHABLE();
+        return X86EMUL_UNHANDLEABLE;
+    }
 
     /*
      * hvmemul_do_io() cannot handle non-power-of-2 accesses or
