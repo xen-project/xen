@@ -313,14 +313,14 @@ static const struct twobyte_table {
     [0x5a ... 0x5b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x5c ... 0x5f] = { DstImplicit|SrcMem|ModRM, simd_any_fp, d8s_vl },
     [0x60 ... 0x62] = { DstImplicit|SrcMem|ModRM, simd_other },
-    [0x63 ... 0x67] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
+    [0x63 ... 0x67] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0x68 ... 0x6a] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0x6b ... 0x6d] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0x6e] = { DstImplicit|SrcMem|ModRM|Mov, simd_none, d8s_dq64 },
     [0x6f] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_int, d8s_vl },
     [0x70] = { SrcImmByte|ModRM|TwoOp, simd_other },
     [0x71 ... 0x73] = { DstImplicit|SrcImmByte|ModRM },
-    [0x74 ... 0x76] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
+    [0x74 ... 0x76] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0x77] = { DstImplicit|SrcNone },
     [0x78] = { ImplicitOps|ModRM },
     [0x79] = { DstReg|SrcMem|ModRM, simd_packed_int },
@@ -444,13 +444,13 @@ static const struct ext0f38_table {
     [0x1b] = { .simd_size = simd_256, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x1c ... 0x1e] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x20 ... 0x25] = { .simd_size = simd_other, .two_op = 1 },
-    [0x28 ... 0x29] = { .simd_size = simd_packed_int },
+    [0x26 ... 0x29] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x2a] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x2b] = { .simd_size = simd_packed_int },
     [0x2c ... 0x2d] = { .simd_size = simd_packed_fp },
     [0x2e ... 0x2f] = { .simd_size = simd_packed_fp, .to_mem = 1 },
     [0x30 ... 0x35] = { .simd_size = simd_other, .two_op = 1 },
-    [0x36 ... 0x3f] = { .simd_size = simd_packed_int },
+    [0x36 ... 0x3f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x40] = { .simd_size = simd_packed_int },
     [0x41] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x45 ... 0x47] = { .simd_size = simd_packed_int },
@@ -516,6 +516,7 @@ static const struct ext0f3a_table {
     [0x18] = { .simd_size = simd_128 },
     [0x19] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
     [0x1d] = { .simd_size = simd_other, .to_mem = 1, .two_op = 1 },
+    [0x1e ... 0x1f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x20] = { .simd_size = simd_none },
     [0x21] = { .simd_size = simd_other },
     [0x22] = { .simd_size = simd_none },
@@ -523,6 +524,7 @@ static const struct ext0f3a_table {
     [0x30 ... 0x33] = { .simd_size = simd_other, .two_op = 1 },
     [0x38] = { .simd_size = simd_128 },
     [0x39] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
+    [0x3e ... 0x3f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
     [0x42] = { .simd_size = simd_packed_int },
     [0x44] = { .simd_size = simd_packed_int },
@@ -6583,6 +6585,32 @@ x86_emulate(
         get_fpu(X86EMUL_FPU_mmx);
         goto simd_0f_common;
 
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x26): /* vptestnm{b,w} [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x27): /* vptestnm{d,q} [xyz]mm/mem,[xyz]mm,k{k} */
+        op_bytes = 16 << evex.lr;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f,   0x64): /* vpcmpeqb [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f,   0x65): /* vpcmpeqw [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f,   0x66): /* vpcmpeqd [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f,   0x74): /* vpcmpgtb [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f,   0x75): /* vpcmpgtw [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f,   0x76): /* vpcmpgtd [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x26): /* vptestm{b,w} [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x27): /* vptestm{d,q} [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x29): /* vpcmpeqq [xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x37): /* vpcmpgtq [xyz]mm/mem,[xyz]mm,k{k} */
+        generate_exception_if(!evex.r || !evex.R || evex.z, EXC_UD);
+        if ( b & (ext == ext_0f38 ? 1 : 2) )
+        {
+            generate_exception_if(b != 0x27 && evex.w != (b & 1), EXC_UD);
+            goto avx512f_no_sae;
+        }
+        host_and_vcpu_must_have(avx512bw);
+        generate_exception_if(evex.br, EXC_UD);
+        elem_bytes = 1 << (ext == ext_0f ? b & 1 : evex.w);
+        avx512_vlen_check(false);
+        goto simd_zmm;
+
     CASE_SIMD_PACKED_INT(0x0f, 0x6e):    /* mov{d,q} r/m,{,x}mm */
     case X86EMUL_OPC_VEX_66(0x0f, 0x6e): /* vmov{d,q} r/m,xmm */
     CASE_SIMD_PACKED_INT(0x0f, 0x7e):    /* mov{d,q} {,x}mm,r/m */
@@ -7591,6 +7619,7 @@ x86_emulate(
                               EXC_UD);
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f3a, 0x25): /* vpternlog{d,q} $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    avx512f_imm8_no_sae:
         host_and_vcpu_must_have(avx512f);
         generate_exception_if(ea.type != OP_MEM && evex.br, EXC_UD);
         avx512_vlen_check(false);
@@ -8764,6 +8793,19 @@ x86_emulate(
         state->simd_size = simd_none;
         break;
     }
+
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x1e): /* vpcmpu{d,q} $imm8,[xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x1f): /* vpcmp{d,q} $imm8,[xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x3e): /* vpcmpu{b,w} $imm8,[xyz]mm/mem,[xyz]mm,k{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x3f): /* vpcmp{b,w} $imm8,[xyz]mm/mem,[xyz]mm,k{k} */
+        generate_exception_if(!evex.r || !evex.R || evex.z, EXC_UD);
+        if ( !(b & 0x20) )
+            goto avx512f_imm8_no_sae;
+        host_and_vcpu_must_have(avx512bw);
+        generate_exception_if(evex.br, EXC_UD);
+        elem_bytes = 1 << evex.w;
+        avx512_vlen_check(false);
+        goto simd_imm8_zmm;
 
     case X86EMUL_OPC_66(0x0f3a, 0x20): /* pinsrb $imm8,r32/m8,xmm */
     case X86EMUL_OPC_66(0x0f3a, 0x22): /* pinsr{d,q} $imm8,r/m,xmm */
