@@ -1026,10 +1026,14 @@ void shadow_promote(struct domain *d, mfn_t gmfn, unsigned int type)
 
     /* Is the page already shadowed? */
     if ( !test_and_set_bit(_PGC_page_table, &page->count_info) )
+    {
         page->shadow_flags = 0;
+        if ( is_hvm_domain(d) )
+            page->pagetable_dying = 0;
+    }
 
-    ASSERT(!test_bit(type, &page->shadow_flags));
-    set_bit(type, &page->shadow_flags);
+    ASSERT(!(page->shadow_flags & (1u << type)));
+    page->shadow_flags |= 1u << type;
     TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_PROMOTE);
 }
 
@@ -1038,9 +1042,9 @@ void shadow_demote(struct domain *d, mfn_t gmfn, u32 type)
     struct page_info *page = mfn_to_page(gmfn);
 
     ASSERT(test_bit(_PGC_page_table, &page->count_info));
-    ASSERT(test_bit(type, &page->shadow_flags));
+    ASSERT(page->shadow_flags & (1u << type));
 
-    clear_bit(type, &page->shadow_flags);
+    page->shadow_flags &= ~(1u << type);
 
     if ( (page->shadow_flags & SHF_page_type_mask) == 0 )
     {
@@ -2878,7 +2882,7 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     if ( !fast && all && (pg->count_info & PGC_page_table) )
     {
         SHADOW_ERROR("can't find all shadows of mfn %05lx "
-                     "(shadow_flags=%08x)\n",
+                     "(shadow_flags=%04x)\n",
                       mfn_x(gmfn), pg->shadow_flags);
         domain_crash(d);
     }
