@@ -352,7 +352,7 @@ static const struct twobyte_table {
     [0xbf] = { DstReg|SrcMem16|ModRM|Mov },
     [0xc0] = { ByteOp|DstMem|SrcReg|ModRM },
     [0xc1] = { DstMem|SrcReg|ModRM },
-    [0xc2] = { DstImplicit|SrcImmByte|ModRM, simd_any_fp },
+    [0xc2] = { DstImplicit|SrcImmByte|ModRM, simd_any_fp, d8s_vl },
     [0xc3] = { DstMem|SrcReg|ModRM|Mov },
     [0xc4] = { DstReg|SrcImmByte|ModRM, simd_packed_int },
     [0xc5] = { DstReg|SrcImmByte|ModRM|Mov },
@@ -7452,7 +7452,7 @@ x86_emulate(
         goto add;
 
     CASE_SIMD_ALL_FP(, 0x0f, 0xc2):        /* cmp{p,s}{s,d} $imm8,xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0xc2):    /* vcmp{p,s}{s,d} $imm8,{x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0xc2):    /* vcmp{p,s}{s,d} $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_PACKED_FP(, 0x0f, 0xc6):     /* shufp{s,d} $imm8,xmm/mem,xmm */
     CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0xc6): /* vshufp{s,d} $imm8,{x,y}mm/mem,{x,y}mm */
         d = (d & ~SrcMask) | SrcMem;
@@ -7465,6 +7465,30 @@ x86_emulate(
             goto simd_0f_imm8;
         }
         goto simd_0f_imm8_avx;
+
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0xc2): /* vcmp{p,s}{s,d} $imm8,[xyz]mm/mem,[xyz]mm,k{k} */
+        generate_exception_if((evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK) ||
+                               (ea.type == OP_MEM && evex.br &&
+                                (evex.pfx & VEX_PREFIX_SCALAR_MASK)) ||
+                               !evex.r || !evex.R || evex.z),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        if ( ea.type == OP_MEM || !evex.br )
+            avx512_vlen_check(evex.pfx & VEX_PREFIX_SCALAR_MASK);
+        d = (d & ~SrcMask) | SrcMem;
+        get_fpu(X86EMUL_FPU_zmm);
+        opc = init_evex(stub);
+        opc[0] = b;
+        opc[1] = modrm;
+        if ( ea.type == OP_MEM )
+        {
+            /* convert memory operand to (%rAX) */
+            evex.b = 1;
+            opc[1] &= 0x38;
+        }
+        opc[2] = imm1;
+        insn_bytes = EVEX_PFX_BYTES + 3;
+        break;
 
     case X86EMUL_OPC(0x0f, 0xc3): /* movnti */
         /* Ignore the non-temporal hint for now. */

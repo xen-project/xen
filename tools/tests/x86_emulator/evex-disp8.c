@@ -105,6 +105,7 @@ enum esz {
 
 static const struct test avx512f_all[] = {
     INSN_FP(add,             0f, 58),
+    INSN_FP(cmp,             0f, c2),
     INSN_FP(div,             0f, 5e),
     INSN_FP(max,             0f, 5f),
     INSN_FP(min,             0f, 5d),
