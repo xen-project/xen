@@ -2194,19 +2194,19 @@ void tsc_get_info(struct domain *d, uint32_t *tsc_mode,
  * only the last "sticks" and all are completed before the guest executes
  * an rdtsc instruction
  */
-void tsc_set_info(struct domain *d,
-                  uint32_t tsc_mode, uint64_t elapsed_nsec,
-                  uint32_t gtsc_khz, uint32_t incarnation)
+int tsc_set_info(struct domain *d,
+                 uint32_t tsc_mode, uint64_t elapsed_nsec,
+                 uint32_t gtsc_khz, uint32_t incarnation)
 {
     ASSERT(!is_system_domain(d));
 
     if ( is_pv_domain(d) && is_hardware_domain(d) )
     {
         d->arch.vtsc = 0;
-        return;
+        return 0;
     }
 
-    switch ( d->arch.tsc_mode = tsc_mode )
+    switch ( tsc_mode )
     {
         bool enable_tsc_scaling;
 
@@ -2253,7 +2253,13 @@ void tsc_set_info(struct domain *d,
                                   elapsed_nsec;
         }
         break;
+
+    default:
+        return -EINVAL;
     }
+
+    d->arch.tsc_mode = tsc_mode;
+
     d->arch.incarnation = incarnation + 1;
     if ( is_hvm_domain(d) )
     {
@@ -2280,6 +2286,8 @@ void tsc_set_info(struct domain *d,
     }
 
     recalculate_cpuid_policy(d);
+
+    return 0;
 }
 
 /* vtsc may incur measurable performance degradation, diagnose with this */

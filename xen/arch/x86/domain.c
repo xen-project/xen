@@ -599,8 +599,11 @@ int arch_domain_create(struct domain *d,
     else
         ASSERT_UNREACHABLE(); /* Not HVM and not PV? */
 
-    /* initialize default tsc behavior in case tools don't */
-    tsc_set_info(d, TSC_MODE_DEFAULT, 0UL, 0, 0);
+    if ( (rc = tsc_set_info(d, TSC_MODE_DEFAULT, 0, 0, 0)) != 0 )
+    {
+        ASSERT_UNREACHABLE();
+        goto fail;
+    }
 
     /* PV/PVH guests get an emulated PIT too for video BIOSes to use. */
     pit_init(d, cpu_khz);

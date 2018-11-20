@@ -975,10 +975,10 @@ long arch_do_domctl(
         else
         {
             domain_pause(d);
-            tsc_set_info(d, domctl->u.tsc_info.tsc_mode,
-                         domctl->u.tsc_info.elapsed_nsec,
-                         domctl->u.tsc_info.gtsc_khz,
-                         domctl->u.tsc_info.incarnation);
+            ret = tsc_set_info(d, domctl->u.tsc_info.tsc_mode,
+                               domctl->u.tsc_info.elapsed_nsec,
+                               domctl->u.tsc_info.gtsc_khz,
+                               domctl->u.tsc_info.incarnation);
             domain_unpause(d);
         }
         break;
