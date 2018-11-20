@@ -2762,15 +2762,8 @@ static int __get_page_type(struct page_info *page, unsigned long type,
         {
             struct domain *d = page_get_owner(page);
 
-            /* Normally we should never let a page go from type count 0
-             * to type count 1 when it is shadowed. One exception:
-             * out-of-sync shadowed pages are allowed to become
-             * writeable. */
-            if ( d && shadow_mode_enabled(d)
-                 && (page->count_info & PGC_page_table)
-                 && !((page->shadow_flags & (1u<<29))
-                      && type == PGT_writable_page) )
-               shadow_remove_all_shadows(d, _mfn(page_to_mfn(page)));
+            if ( d && shadow_mode_enabled(d) )
+               shadow_prepare_page_type_change(d, page, type);
 
             ASSERT(!(x & PGT_pae_xen_l2));
             if ( (x & PGT_type_mask) != type )
