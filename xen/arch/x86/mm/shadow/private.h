@@ -290,8 +290,6 @@ static inline void sh_terminate_list(struct page_list_head *tmp_list)
 
 #endif /* (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC) */
 
-#define SHF_pagetable_dying (1u<<31)
-
 static inline int sh_page_has_multiple_shadows(struct page_info *pg)
 {
     u32 shadows;
