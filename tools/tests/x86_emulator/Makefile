@@ -1,5 +1,5 @@
 
-XEN_ROOT=$(CURDIR)/../../..
+XEN_ROOT ?= $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 TARGET := test_x86_emulator
@@ -22,6 +22,12 @@ SG := avx2-sg
 TESTCASES := blowfish $(SIMD) $(FMA) $(SG)
 
 OPMASK := avx512f avx512dq avx512bw
+
+ifeq ($(origin XEN_COMPILE_ARCH),override)
+
+HOSTCFLAGS += -m32
+
+else
 
 blowfish-cflags := ""
 blowfish-cflags-x86_32 := "-mno-accumulate-outgoing-args -Dstatic="
@@ -144,6 +150,8 @@ $(addsuffix .h,$(SIMD) $(FMA) $(SG)): simd.h
 
 xop.h: simd-fma.c
 
+endif # 32-bit override
+
 $(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o wrappers.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
@@ -157,6 +165,16 @@ distclean: clean
 
 .PHONY: install uninstall
 install uninstall:
+
+.PHONY: run32 clean32
+ifeq ($(XEN_TARGET_ARCH),x86_64)
+run32: $(addsuffix .h,$(TESTCASES)) $(addsuffix -opmask.h,$(OPMASK))
+run32 clean32: %32:
+	$(MAKE) -C 32 $*
+clean: clean32
+else
+run32 clean32: %32: %
+endif
 
 x86_emulate:
 	[ -L $@ ] || ln -sf $(XEN_ROOT)/xen/arch/x86/$@

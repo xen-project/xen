@@ -240,6 +240,7 @@ tools/security/xensec_tool
 tools/tests/depriv/depriv-fd-checker
 tools/tests/x86_emulator/*.bin
 tools/tests/x86_emulator/*.tmp
+tools/tests/x86_emulator/32/x86_emulate
 tools/tests/x86_emulator/3dnow*.[ch]
 tools/tests/x86_emulator/asm
 tools/tests/x86_emulator/avx*.[ch]
