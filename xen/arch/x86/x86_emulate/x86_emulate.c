@@ -452,30 +452,30 @@ static const struct ext0f38_table {
     [0x8c] = { .simd_size = simd_packed_int },
     [0x8e] = { .simd_size = simd_packed_int, .to_mem = 1 },
     [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1 },
-    [0x96 ... 0x98] = { .simd_size = simd_packed_fp },
-    [0x99] = { .simd_size = simd_scalar_vexw },
-    [0x9a] = { .simd_size = simd_packed_fp },
-    [0x9b] = { .simd_size = simd_scalar_vexw },
-    [0x9c] = { .simd_size = simd_packed_fp },
-    [0x9d] = { .simd_size = simd_scalar_vexw },
-    [0x9e] = { .simd_size = simd_packed_fp },
-    [0x9f] = { .simd_size = simd_scalar_vexw },
-    [0xa6 ... 0xa8] = { .simd_size = simd_packed_fp },
-    [0xa9] = { .simd_size = simd_scalar_vexw },
-    [0xaa] = { .simd_size = simd_packed_fp },
-    [0xab] = { .simd_size = simd_scalar_vexw },
-    [0xac] = { .simd_size = simd_packed_fp },
-    [0xad] = { .simd_size = simd_scalar_vexw },
-    [0xae] = { .simd_size = simd_packed_fp },
-    [0xaf] = { .simd_size = simd_scalar_vexw },
-    [0xb6 ... 0xb8] = { .simd_size = simd_packed_fp },
-    [0xb9] = { .simd_size = simd_scalar_vexw },
-    [0xba] = { .simd_size = simd_packed_fp },
-    [0xbb] = { .simd_size = simd_scalar_vexw },
-    [0xbc] = { .simd_size = simd_packed_fp },
-    [0xbd] = { .simd_size = simd_scalar_vexw },
-    [0xbe] = { .simd_size = simd_packed_fp },
-    [0xbf] = { .simd_size = simd_scalar_vexw },
+    [0x96 ... 0x98] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0x99] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0x9a] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0x9b] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0x9c] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0x9d] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0x9e] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0x9f] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xa6 ... 0xa8] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xa9] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xaa] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xab] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xac] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xad] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xae] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xaf] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xb6 ... 0xb8] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xb9] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xba] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xbb] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xbc] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xbd] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xbe] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0xbf] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xc8 ... 0xcd] = { .simd_size = simd_other },
     [0xdb] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0xdc ... 0xdf] = { .simd_size = simd_packed_int },
@@ -8300,6 +8300,49 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0xbf): /* vfnmsub231s{s,d} xmm/mem,xmm,xmm */
         host_and_vcpu_must_have(fma);
         goto simd_0f_ymm;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x96): /* vfmaddsub132p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x97): /* vfmsubadd132p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x98): /* vfmadd132p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x9a): /* vfmsub132p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x9c): /* vfnmadd132p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x9e): /* vfnmsub132p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xa6): /* vfmaddsub213p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xa7): /* vfmsubadd213p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xa8): /* vfmadd213p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xaa): /* vfmsub213p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xac): /* vfnmadd213p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xae): /* vfnmsub213p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xb6): /* vfmaddsub231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xb7): /* vfmsubadd231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xb8): /* vfmadd231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xba): /* vfmsub231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xbc): /* vfnmadd231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xbe): /* vfnmsub231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512f);
+        if ( ea.type == OP_MEM || !evex.br )
+            avx512_vlen_check(false);
+        goto simd_zmm;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x99): /* vfmadd132s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x9b): /* vfmsub132s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x9d): /* vfnmadd132s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x9f): /* vfnmsub132s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xa9): /* vfmadd213s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xab): /* vfmsub213s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xad): /* vfnmadd213s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xaf): /* vfnmsub213s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xb9): /* vfmadd231s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xbb): /* vfmsub231s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xbd): /* vfnmadd231s{s,d} xmm/mem,xmm,xmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xbf): /* vfnmsub231s{s,d} xmm/mem,xmm,xmm{k} */
+        host_and_vcpu_must_have(avx512f);
+        if ( ea.type == OP_MEM )
+        {
+            generate_exception_if(evex.br, EXC_UD);
+            avx512_vlen_check(true);
+        }
+        goto simd_zmm;
 
     case X86EMUL_OPC(0x0f38, 0xc8):     /* sha1nexte xmm/m128,xmm */
     case X86EMUL_OPC(0x0f38, 0xc9):     /* sha1msg1 xmm/m128,xmm */
