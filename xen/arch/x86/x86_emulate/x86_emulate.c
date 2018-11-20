@@ -1017,6 +1017,15 @@ do {                                                    \
     if ( rc ) goto done;                                \
 } while (0)
 
+#define EXPECT(p)                                       \
+do {                                                    \
+    if ( unlikely(!(p)) )                               \
+    {                                                   \
+        ASSERT_UNREACHABLE();                           \
+        goto unhandleable;                              \
+    }                                                   \
+} while (0)
+
 static inline int mkec(uint8_t e, int32_t ec, ...)
 {
     return (e < 32 && ((1u << e) & EXC_HAS_EC)) ? ec : X86_EVENT_NO_EC;
@@ -8837,12 +8846,7 @@ x86_emulate(
                 dst.type = OP_NONE;
                 break;
             default:
-                if ( (d & DstMask) != DstMem )
-                {
-                    ASSERT_UNREACHABLE();
-                    rc = X86EMUL_UNHANDLEABLE;
-                    goto done;
-                }
+                EXPECT((d & DstMask) == DstMem);
                 break;
             }
             if ( (d & DstMask) == DstMem )
@@ -8974,9 +8978,11 @@ x86_emulate(
             stub.func);
     generate_exception_if(stub_exn.info.fields.trapnr == EXC_UD, EXC_UD);
     domain_crash(current->domain);
+#endif
+
+ unhandleable:
     rc = X86EMUL_UNHANDLEABLE;
     goto done;
-#endif
 }
 
 #undef op_bytes
