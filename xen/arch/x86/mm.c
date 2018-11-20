@@ -4464,12 +4464,6 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
 
             mfn_list[i] = mfn_x(mfn);
         }
-
-        /*
-         * The frames will have been assigned to the domain that created
-         * the ioreq server.
-         */
-        *flags |= XENMEM_rsrc_acq_caller_owned;
         break;
     }
 #endif
