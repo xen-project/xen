@@ -342,20 +342,12 @@ static int hvm_alloc_ioreq_mfn(struct hvm_ioreq_server *s, bool buf)
         return 0;
     }
 
-    /*
-     * Allocated IOREQ server pages are assigned to the emulating
-     * domain, not the target domain. This is safe because the emulating
-     * domain cannot be destroyed until the ioreq server is destroyed.
-     * Also we must use MEMF_no_refcount otherwise page allocation
-     * could fail if the emulating domain has already reached its
-     * maximum allocation.
-     */
-    page = alloc_domheap_page(s->emulator, MEMF_no_refcount);
+    page = alloc_domheap_page(s->target, 0);
 
     if ( !page )
         return -ENOMEM;
 
-    if ( !get_page_and_type(page, s->emulator, PGT_writable_page) )
+    if ( !get_page_and_type(page, s->target, PGT_writable_page) )
     {
         /*
          * The domain can't possibly know about this page yet, so failure
