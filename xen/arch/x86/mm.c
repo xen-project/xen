@@ -4835,6 +4835,14 @@ static int __do_update_va_mapping(
     if ( pl1e )
         guest_unmap_l1e(pl1e);
 
+    /*
+     * Any error at this point means that we haven't change the l1e.  Skip the
+     * flush, as it won't do anything useful.  Furthermore, va is guest
+     * controlled and not necesserily audited by this point.
+     */
+    if ( rc )
+        return rc;
+
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
     case UVMF_TLB_FLUSH:
