@@ -171,6 +171,7 @@ enum x86_emulate_fpu_type {
     X86EMUL_FPU_xmm, /* SSE instruction set (%xmm0-%xmm7/15) */
     X86EMUL_FPU_ymm, /* AVX/XOP instruction set (%ymm0-%ymm7/15) */
     X86EMUL_FPU_opmask, /* AVX512 opmask instruction set (%k0-%k7) */
+    X86EMUL_FPU_zmm, /* AVX512 instruction set (%zmm0-%zmm7/31) */
     /* This sentinel will never be passed to ->get_fpu(). */
     X86EMUL_FPU_none
 };

@@ -222,6 +222,7 @@ int emul_test_get_fpu(
         if ( cpu_has_avx )
             break;
     case X86EMUL_FPU_opmask:
+    case X86EMUL_FPU_zmm:
         if ( cpu_has_avx512f )
             break;
     default:
