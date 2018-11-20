@@ -105,6 +105,7 @@ enum esz {
 
 static const struct test avx512f_all[] = {
     INSN_FP(add,             0f, 58),
+    INSN(broadcastss,  66, 0f38, 18,    el,      d, el),
     INSN_FP(cmp,             0f, c2),
     INSN_FP(div,             0f, 5e),
     INSN(fmadd132,     66, 0f38, 98,    vl,     sd, vl),
@@ -176,6 +177,15 @@ static const struct test avx512f_128[] = {
     INSN(movq,      66,   0f, d6, el,    q, el),
 };
 
+static const struct test avx512f_no128[] = {
+    INSN(broadcastf32x4, 66, 0f38, 1a, el_4,  d, vl),
+    INSN(broadcastsd,    66, 0f38, 19, el,    q, el),
+};
+
+static const struct test avx512f_512[] = {
+    INSN(broadcastf64x4, 66, 0f38, 1b, el_4, q, vl),
+};
+
 static const struct test avx512bw_all[] = {
     INSN(movdqu8,     f2,   0f, 6f,    vl,    b, vl),
     INSN(movdqu8,     f2,   0f, 7f,    vl,    b, vl),
@@ -190,8 +200,19 @@ static const struct test avx512dq_all[] = {
     INSN_PFP(xor,              0f, 57),
 };
 
+static const struct test avx512dq_no128[] = {
+    INSN(broadcastf32x2, 66, 0f38, 19, el_2, d, vl),
+    INSN(broadcastf64x2, 66, 0f38, 1a, el_2, q, vl),
+};
+
+static const struct test avx512dq_512[] = {
+    INSN(broadcastf32x8, 66, 0f38, 1b, el_8, d, vl),
+};
+
 static const unsigned char vl_all[] = { VL_512, VL_128, VL_256 };
 static const unsigned char vl_128[] = { VL_128 };
+static const unsigned char vl_no128[] = { VL_512, VL_256 };
+static const unsigned char vl_512[] = { VL_512 };
 
 /*
  * This table, indicating the presence of an immediate (byte) for an opcode
@@ -520,6 +541,10 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
 
     RUN(avx512f, all);
     RUN(avx512f, 128);
+    RUN(avx512f, no128);
+    RUN(avx512f, 512);
     RUN(avx512bw, all);
     RUN(avx512dq, all);
+    RUN(avx512dq, no128);
+    RUN(avx512dq, 512);
 }
