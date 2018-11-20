@@ -4089,6 +4089,14 @@ static int __do_update_va_mapping(
     if ( pl1e )
         unmap_domain_page(pl1e);
 
+    /*
+     * Any error at this point means that we haven't change the L1e.  Skip the
+     * flush, as it won't do anything useful.  Furthermore, va is guest
+     * controlled and not necesserily audited by this point.
+     */
+    if ( rc )
+        return rc;
+
     switch ( flags & UVMF_FLUSHTYPE_MASK )
     {
     case UVMF_TLB_FLUSH:
