@@ -282,7 +282,7 @@ static const struct twobyte_table {
     [0x11] = { DstMem|SrcImplicit|ModRM|Mov, simd_any_fp, d8s_vl },
     [0x12] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x13] = { DstMem|SrcImplicit|ModRM|Mov, simd_other },
-    [0x14 ... 0x15] = { DstImplicit|SrcMem|ModRM, simd_packed_fp },
+    [0x14 ... 0x15] = { DstImplicit|SrcMem|ModRM, simd_packed_fp, d8s_vl },
     [0x16] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x17] = { DstMem|SrcImplicit|ModRM|Mov, simd_other },
     [0x18 ... 0x1f] = { ImplicitOps|ModRM },
@@ -356,7 +356,7 @@ static const struct twobyte_table {
     [0xc3] = { DstMem|SrcReg|ModRM|Mov },
     [0xc4] = { DstReg|SrcImmByte|ModRM, simd_packed_int },
     [0xc5] = { DstReg|SrcImmByte|ModRM|Mov },
-    [0xc6] = { DstImplicit|SrcImmByte|ModRM, simd_packed_fp },
+    [0xc6] = { DstImplicit|SrcImmByte|ModRM, simd_packed_fp, d8s_vl },
     [0xc7] = { ImplicitOps|ModRM },
     [0xc8 ... 0xcf] = { ImplicitOps },
     [0xd0] = { DstImplicit|SrcMem|ModRM, simd_other },
@@ -5946,6 +5946,17 @@ x86_emulate(
         host_and_vcpu_must_have(sse3);
         goto simd_0f_xmm;
 
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x14): /* vunpcklp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x15): /* vunpckhp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        generate_exception_if(evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK),
+                              EXC_UD);
+        fault_suppression = false;
+    avx512f_no_sae:
+        host_and_vcpu_must_have(avx512f);
+        generate_exception_if(ea.type != OP_MEM && evex.br, EXC_UD);
+        avx512_vlen_check(false);
+        goto simd_zmm;
+
     case X86EMUL_OPC(0x0f, 0x20): /* mov cr,reg */
     case X86EMUL_OPC(0x0f, 0x21): /* mov dr,reg */
     case X86EMUL_OPC(0x0f, 0x22): /* mov reg,cr */
@@ -6625,11 +6636,9 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_F3(0x0f, 0x7f): /* vmovdqu{32,64} [xyz]mm,[xyz]mm/mem{k} */
     vmovdqa:
         generate_exception_if(evex.br, EXC_UD);
-        host_and_vcpu_must_have(avx512f);
-        avx512_vlen_check(false);
         d |= TwoOp;
         op_bytes = 16 << evex.lr;
-        goto simd_zmm;
+        goto avx512f_no_sae;
 
     case X86EMUL_OPC_EVEX_F2(0x0f, 0x6f): /* vmovdqu{8,16} [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_F2(0x0f, 0x7f): /* vmovdqu{8,16} [xyz]mm,[xyz]mm/mem{k} */
@@ -7454,7 +7463,7 @@ x86_emulate(
     CASE_SIMD_ALL_FP(, 0x0f, 0xc2):        /* cmp{p,s}{s,d} $imm8,xmm/mem,xmm */
     CASE_SIMD_ALL_FP(_VEX, 0x0f, 0xc2):    /* vcmp{p,s}{s,d} $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_PACKED_FP(, 0x0f, 0xc6):     /* shufp{s,d} $imm8,xmm/mem,xmm */
-    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0xc6): /* vshufp{s,d} $imm8,{x,y}mm/mem,{x,y}mm */
+    CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0xc6): /* vshufp{s,d} $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
         d = (d & ~SrcMask) | SrcMem;
         if ( vex.opcx == vex_none )
         {
@@ -7475,7 +7484,9 @@ x86_emulate(
         host_and_vcpu_must_have(avx512f);
         if ( ea.type == OP_MEM || !evex.br )
             avx512_vlen_check(evex.pfx & VEX_PREFIX_SCALAR_MASK);
-        d = (d & ~SrcMask) | SrcMem;
+    simd_imm8_zmm:
+        if ( (d & SrcMask) == SrcImmByte )
+            d = (d & ~SrcMask) | SrcMem;
         get_fpu(X86EMUL_FPU_zmm);
         opc = init_evex(stub);
         opc[0] = b;
@@ -7518,6 +7529,15 @@ x86_emulate(
         opc[2] = imm1;
         insn_bytes = PFX_BYTES + 3;
         goto simd_0f_to_gpr;
+
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0xc6): /* vshufp{s,d} $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        fault_suppression = false;
+        generate_exception_if(evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        generate_exception_if(ea.type != OP_MEM && evex.br, EXC_UD);
+        avx512_vlen_check(false);
+        goto simd_imm8_zmm;
 
     case X86EMUL_OPC(0x0f, 0xc7): /* Grp9 */
     {
