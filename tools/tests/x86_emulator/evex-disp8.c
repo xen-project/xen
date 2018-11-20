@@ -104,6 +104,10 @@ enum esz {
     INSN_SFP(m, sp, o)
 
 static const struct test avx512f_all[] = {
+    INSN_FP(add,             0f, 58),
+    INSN_FP(div,             0f, 5e),
+    INSN_FP(max,             0f, 5f),
+    INSN_FP(min,             0f, 5d),
     INSN_SFP(mov,            0f, 10),
     INSN_SFP(mov,            0f, 11),
     INSN_PFP_NB(mova,        0f, 28),
@@ -121,6 +125,9 @@ static const struct test avx512f_all[] = {
     INSN_PFP_NB(movnt,       0f, 2b),
     INSN_PFP_NB(movu,        0f, 10),
     INSN_PFP_NB(movu,        0f, 11),
+    INSN_FP(mul,             0f, 59),
+    INSN_FP(sqrt,            0f, 51),
+    INSN_FP(sub,             0f, 5c),
 };
 
 static const struct test avx512f_128[] = {

@@ -300,12 +300,12 @@ static const struct twobyte_table {
     [0x3a] = { DstReg|SrcImmByte|ModRM },
     [0x40 ... 0x4f] = { DstReg|SrcMem|ModRM|Mov },
     [0x50] = { DstReg|SrcImplicit|ModRM|Mov },
-    [0x51] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_any_fp },
+    [0x51] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_any_fp, d8s_vl },
     [0x52 ... 0x53] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_single_fp },
     [0x54 ... 0x57] = { DstImplicit|SrcMem|ModRM, simd_packed_fp },
-    [0x58 ... 0x59] = { DstImplicit|SrcMem|ModRM, simd_any_fp },
+    [0x58 ... 0x59] = { DstImplicit|SrcMem|ModRM, simd_any_fp, d8s_vl },
     [0x5a ... 0x5b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
-    [0x5c ... 0x5f] = { DstImplicit|SrcMem|ModRM, simd_any_fp },
+    [0x5c ... 0x5f] = { DstImplicit|SrcMem|ModRM, simd_any_fp, d8s_vl },
     [0x60 ... 0x62] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0x63 ... 0x67] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0x68 ... 0x6a] = { DstImplicit|SrcMem|ModRM, simd_other },
@@ -5877,10 +5877,22 @@ x86_emulate(
         if ( (b & ~1) == 0x10 && ea.type == OP_MEM )
             d |= TwoOp;
         generate_exception_if(evex.br, EXC_UD);
-        generate_exception_if(evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK),
+        /* fall through */
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x51):    /* vsqrtp{s,d} [xyz]mm/mem,[xyz]mm{k} */
+                                            /* vsqrts{s,d} xmm/m32,xmm,xmm{k} */
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x58):    /* vadd{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x59):    /* vmul{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5c):    /* vsub{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5d):    /* vmin{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5e):    /* vdiv{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5f):    /* vmax{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        generate_exception_if((evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK) ||
+                               (ea.type == OP_MEM && evex.br &&
+                                (evex.pfx & VEX_PREFIX_SCALAR_MASK))),
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
-        avx512_vlen_check(evex.pfx & VEX_PREFIX_SCALAR_MASK);
+        if ( ea.type == OP_MEM || !evex.br )
+            avx512_vlen_check(evex.pfx & VEX_PREFIX_SCALAR_MASK);
     simd_zmm:
         get_fpu(X86EMUL_FPU_zmm);
         opc = init_evex(stub);
