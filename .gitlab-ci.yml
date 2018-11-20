@@ -227,7 +227,7 @@ debian-stretch-32-gcc:
     CONTAINER: debian:stretch-i386
 
 debian-stretch-32-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86-32-build-debug
   variables:
     CONTAINER: debian:stretch-i386
 
@@ -279,7 +279,7 @@ debian-unstable-32-gcc:
     CONTAINER: debian:unstable-i386
 
 debian-unstable-32-gcc-debug:
-  extends: .gcc-x86-64-build-debug
+  extends: .gcc-x86-32-build-debug
   variables:
     CONTAINER: debian:unstable-i386
 
