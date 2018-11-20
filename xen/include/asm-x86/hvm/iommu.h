@@ -59,6 +59,7 @@ struct arch_iommu
 
     /* amd iommu support */
     int paging_mode;
+    bool_t no_merge;
     struct page_info *root_table;
     struct guest_iommu *g_iommu;
 };

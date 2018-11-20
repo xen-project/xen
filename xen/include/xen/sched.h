@@ -387,6 +387,12 @@ struct domain
     bool_t           disable_migrate;
     /* Is this guest being debugged by dom0? */
     bool_t           debugger_attached;
+    /*
+     * Set to true at the very end of domain creation, when the domain is
+     * unpaused for the first time by the systemcontroller.
+     */
+    bool_t           creation_finished;
+
     /* Which guest this guest has privileges on */
     struct domain   *target;
 
