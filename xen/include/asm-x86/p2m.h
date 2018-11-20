@@ -432,10 +432,7 @@ static inline mfn_t __nonnull(3) get_gfn_type(
     return get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, q, NULL);
 }
 
-/* Syntactic sugar: most callers will use one of these. 
- * N.B. get_gfn_query() is the _only_ one guaranteed not to take the
- * p2m lock; none of the others can be called with the p2m or paging
- * lock held. */
+/* Syntactic sugar: most callers will use one of these. */
 #define get_gfn(d, g, t)         get_gfn_type((d), (g), (t), P2M_ALLOC)
 #define get_gfn_query(d, g, t)   get_gfn_type((d), (g), (t), 0)
 #define get_gfn_unshare(d, g, t) get_gfn_type((d), (g), (t), \

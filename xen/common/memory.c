@@ -303,7 +303,11 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 #ifdef CONFIG_X86
     mfn = get_gfn_query(d, gmfn, &p2mt);
     if ( unlikely(p2mt == p2m_invalid) || unlikely(p2mt == p2m_mmio_dm) )
+    {
+        put_gfn(d, gmfn);
+
         return -ENOENT;
+    }
 
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
