@@ -96,6 +96,9 @@ WRAP(puts);
 
 #include "x86_emulate/x86_emulate.h"
 
+void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
+                     const struct x86_emulate_ops *ops);
+
 static inline uint64_t xgetbv(uint32_t xcr)
 {
     uint32_t lo, hi;

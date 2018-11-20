@@ -3795,6 +3795,9 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    if ( stack_exec )
+        evex_disp8_test(instr, &ctxt, &emulops);
+
     for ( j = 0; j < ARRAY_SIZE(blobs); j++ )
     {
         if ( blobs[j].check_cpu && !blobs[j].check_cpu() )

@@ -144,7 +144,7 @@ $(addsuffix .h,$(SIMD) $(FMA) $(SG)): simd.h
 
 xop.h: simd-fma.c
 
-$(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o wrappers.o
+$(TARGET): x86-emulate.o cpuid.o test_x86_emulator.o evex-disp8.o wrappers.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $^
 
 .PHONY: clean
@@ -171,7 +171,7 @@ x86.h := $(addprefix $(XEN_ROOT)/tools/include/xen/asm/,\
                      x86-vendors.h x86-defns.h msr-index.h)
 x86_emulate.h := x86-emulate.h x86_emulate/x86_emulate.h $(x86.h)
 
-x86-emulate.o test_x86_emulator.o wrappers.o: %.o: %.c $(x86_emulate.h)
+x86-emulate.o test_x86_emulator.o evex-disp8.o wrappers.o: %.o: %.c $(x86_emulate.h)
 	$(HOSTCC) $(HOSTCFLAGS) -c -g -o $@ $<
 
 x86-emulate.o: x86_emulate/x86_emulate.c
