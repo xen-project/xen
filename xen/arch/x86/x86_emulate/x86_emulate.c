@@ -364,13 +364,13 @@ static const struct twobyte_table {
     [0xd4 ... 0xd5] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xd6] = { DstMem|SrcImplicit|ModRM|Mov, simd_other, 3 },
     [0xd7] = { DstReg|SrcImplicit|ModRM|Mov },
-    [0xd8 ... 0xdf] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
+    [0xd8 ... 0xdf] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0xe0] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xe1 ... 0xe2] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0xe3 ... 0xe5] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
     [0xe6] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0xe7] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_int, d8s_vl },
-    [0xe8 ... 0xef] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
+    [0xe8 ... 0xef] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0xf0] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0xf1 ... 0xf3] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0xf4 ... 0xf6] = { DstImplicit|SrcMem|ModRM, simd_packed_int },
@@ -493,6 +493,7 @@ static const struct ext0f3a_table {
     uint8_t to_mem:1;
     uint8_t two_op:1;
     uint8_t four_op:1;
+    disp8scale_t d8s:4;
 } ext0f3a_table[256] = {
     [0x00] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x01] = { .simd_size = simd_packed_fp, .two_op = 1 },
@@ -510,6 +511,7 @@ static const struct ext0f3a_table {
     [0x20] = { .simd_size = simd_none },
     [0x21] = { .simd_size = simd_other },
     [0x22] = { .simd_size = simd_none },
+    [0x25] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x30 ... 0x33] = { .simd_size = simd_other, .two_op = 1 },
     [0x38] = { .simd_size = simd_128 },
     [0x39] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
@@ -3025,20 +3027,33 @@ x86_decode(
                 disp8scale = decode_disp8scale(ext0f38_table[b].d8s, state);
             break;
 
+        case ext_0f3a:
+            /*
+             * Cannot update d here yet, as the immediate operand still
+             * needs fetching.
+             */
+            state->simd_size = ext0f3a_table[b].simd_size;
+            if ( evex_encoded() )
+                disp8scale = decode_disp8scale(ext0f3a_table[b].d8s, state);
+            break;
+
         case ext_8f09:
             if ( ext8f09_table[b].two_op )
                 d |= TwoOp;
             state->simd_size = ext8f09_table[b].simd_size;
             break;
 
-        case ext_0f3a:
         case ext_8f08:
+        case ext_8f0a:
             /*
              * Cannot update d here yet, as the immediate operand still
              * needs fetching.
              */
-        default:
             break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            return X86EMUL_UNIMPLEMENTED;
         }
 
         if ( modrm_mod == 3 )
@@ -3217,7 +3232,6 @@ x86_decode(
         else if ( ext0f3a_table[b].four_op && !mode_64bit() && vex.opcx )
             imm1 &= 0x7f;
         state->desc = d;
-        state->simd_size = ext0f3a_table[b].simd_size;
         rc = x86_decode_0f3a(state, ctxt, ops);
         break;
 
@@ -5951,6 +5965,11 @@ x86_emulate(
         generate_exception_if(evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK),
                               EXC_UD);
         fault_suppression = false;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0xdb): /* vpand{d,q} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0xdf): /* vpandn{d,q} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0xeb): /* vpor{d,q} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0xef): /* vpxor{d,q} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     avx512f_no_sae:
         host_and_vcpu_must_have(avx512f);
         generate_exception_if(ea.type != OP_MEM && evex.br, EXC_UD);
@@ -7534,6 +7553,8 @@ x86_emulate(
         fault_suppression = false;
         generate_exception_if(evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK),
                               EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x25): /* vpternlog{d,q} $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         host_and_vcpu_must_have(avx512f);
         generate_exception_if(ea.type != OP_MEM && evex.br, EXC_UD);
         avx512_vlen_check(false);
