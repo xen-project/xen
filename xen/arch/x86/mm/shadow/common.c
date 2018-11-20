@@ -749,6 +749,9 @@ int sh_unsync(struct vcpu *v, mfn_t gmfn)
          || !v->domain->arch.paging.shadow.oos_active )
         return 0;
 
+    BUILD_BUG_ON(!(typeof(pg->shadow_flags))SHF_out_of_sync);
+    BUILD_BUG_ON(!(typeof(pg->shadow_flags))SHF_oos_may_write);
+
     pg->shadow_flags |= SHF_out_of_sync|SHF_oos_may_write;
     oos_hash_add(v, gmfn);
     perfc_incr(shadow_unsync);
@@ -2411,6 +2414,26 @@ void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all)
     flush_tlb_mask(d->dirty_cpumask);
 
     paging_unlock(d);
+}
+
+void shadow_prepare_page_type_change(struct domain *d, struct page_info *page,
+                                     unsigned long new_type)
+{
+    if ( !(page->count_info & PGC_page_table) )
+        return;
+
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
+    /*
+     * Normally we should never let a page go from type count 0 to type
+     * count 1 when it is shadowed. One exception: out-of-sync shadowed
+     * pages are allowed to become writeable.
+     */
+    if ( (page->shadow_flags & SHF_oos_may_write) &&
+         new_type == PGT_writable_page )
+        return;
+#endif
+
+    shadow_remove_all_shadows(d, page_to_mfn(page));
 }
 
 static void

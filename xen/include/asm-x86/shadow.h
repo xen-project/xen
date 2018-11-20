@@ -81,6 +81,10 @@ void shadow_final_teardown(struct domain *d);
 
 void sh_remove_shadows(struct domain *d, mfn_t gmfn, int fast, int all);
 
+/* Adjust shadows ready for a guest page to change its type. */
+void shadow_prepare_page_type_change(struct domain *d, struct page_info *page,
+                                     unsigned long new_type);
+
 /* Discard _all_ mappings from the domain's shadows. */
 void shadow_blow_tables_per_domain(struct domain *d);
 
@@ -104,6 +108,10 @@ int shadow_set_allocation(struct domain *d, unsigned int pages,
 
 static inline void sh_remove_shadows(struct domain *d, mfn_t gmfn,
                                      int fast, int all) {}
+
+static inline void shadow_prepare_page_type_change(struct domain *d,
+                                                   struct page_info *page,
+                                                   unsigned long new_type) {}
 
 static inline void shadow_blow_tables_per_domain(struct domain *d) {}
 
