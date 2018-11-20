@@ -107,6 +107,8 @@ static const struct test avx512f_all[] = {
     INSN_FP(add,             0f, 58),
     INSN(broadcastss,  66, 0f38, 18,    el,      d, el),
     INSN_FP(cmp,             0f, c2),
+    INSN(comisd,       66,   0f, 2f,    el,      q, el),
+    INSN(comiss,         ,   0f, 2f,    el,      d, el),
     INSN_FP(div,             0f, 5e),
     INSN(fmadd132,     66, 0f38, 98,    vl,     sd, vl),
     INSN(fmadd132,     66, 0f38, 99,    el,     sd, el),
@@ -166,6 +168,8 @@ static const struct test avx512f_all[] = {
     INSN_PFP(shuf,           0f, c6),
     INSN_FP(sqrt,            0f, 51),
     INSN_FP(sub,             0f, 5c),
+    INSN(ucomisd,      66,   0f, 2e,    el,      q, el),
+    INSN(ucomiss,        ,   0f, 2e,    el,      d, el),
     INSN_PFP(unpckh,         0f, 15),
     INSN_PFP(unpckl,         0f, 14),
 };

@@ -299,7 +299,7 @@ static const struct twobyte_table {
     [0x2a] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x2b] = { DstMem|SrcImplicit|ModRM|Mov, simd_any_fp, d8s_vl },
     [0x2c ... 0x2d] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
-    [0x2e ... 0x2f] = { ImplicitOps|ModRM|TwoOp },
+    [0x2e ... 0x2f] = { ImplicitOps|ModRM|TwoOp, simd_none, d8s_dq },
     [0x30 ... 0x35] = { ImplicitOps },
     [0x37] = { ImplicitOps },
     [0x38] = { DstReg|SrcMem|ModRM },
@@ -6125,24 +6125,34 @@ x86_emulate(
         }
 
         opc = init_prefixes(stub);
+        op_bytes = 4 << vex.pfx;
+    vcomi:
         opc[0] = b;
         opc[1] = modrm;
         if ( ea.type == OP_MEM )
         {
-            rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp, vex.pfx ? 8 : 4,
-                           ctxt);
+            rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp, op_bytes, ctxt);
             if ( rc != X86EMUL_OKAY )
                 goto done;
 
             /* Convert memory operand to (%rAX). */
             rex_prefix &= ~REX_B;
             vex.b = 1;
+            evex.b = 1;
             opc[1] &= 0x38;
         }
-        insn_bytes = PFX_BYTES + 2;
+        if ( evex_encoded() )
+        {
+            insn_bytes = EVEX_PFX_BYTES + 2;
+            copy_EVEX(opc, evex);
+        }
+        else
+        {
+            insn_bytes = PFX_BYTES + 2;
+            copy_REX_VEX(opc, rex_prefix, vex);
+        }
         opc[2] = 0xc3;
 
-        copy_REX_VEX(opc, rex_prefix, vex);
         invoke_stub(_PRE_EFLAGS("[eflags]", "[mask]", "[tmp]"),
                     _POST_EFLAGS("[eflags]", "[mask]", "[tmp]"),
                     [eflags] "+g" (_regs.eflags),
@@ -6152,6 +6162,20 @@ x86_emulate(
         put_stub(stub);
         ASSERT(!state->simd_size);
         break;
+
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x2e): /* vucomis{s,d} xmm/mem,xmm */
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x2f): /* vcomis{s,d} xmm/mem,xmm */
+        generate_exception_if((evex.reg != 0xf || !evex.RX || evex.opmsk ||
+                               (ea.type != OP_REG && evex.br) ||
+                               evex.w != evex.pfx),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        avx512_vlen_check(true);
+        get_fpu(X86EMUL_FPU_zmm);
+
+        opc = init_evex(stub);
+        op_bytes = 4 << evex.w;
+        goto vcomi;
 
     case X86EMUL_OPC(0x0f, 0x30): /* wrmsr */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
