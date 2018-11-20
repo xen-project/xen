@@ -3309,8 +3309,8 @@ static int sh_page_fault(struct vcpu *v,
 
     /* Unshadow if we are writing to a toplevel pagetable that is
      * flagged as a dying process, and that is not currently used. */
-    if ( sh_mfn_is_a_page_table(gmfn)
-         && (mfn_to_page(gmfn)->shadow_flags & SHF_pagetable_dying) )
+    if ( sh_mfn_is_a_page_table(gmfn) && is_hvm_domain(d) &&
+         mfn_to_page(gmfn)->pagetable_dying )
     {
         int used = 0;
         struct vcpu *tmp;
@@ -4250,9 +4250,9 @@ int sh_rm_write_access_from_sl1p(struct domain *d, mfn_t gmfn,
     ASSERT(mfn_valid(smfn));
 
     /* Remember if we've been told that this process is being torn down */
-    if ( curr->domain == d )
+    if ( curr->domain == d && is_hvm_domain(d) )
         curr->arch.paging.shadow.pagetable_dying
-            = !!(mfn_to_page(gmfn)->shadow_flags & SHF_pagetable_dying);
+            = mfn_to_page(gmfn)->pagetable_dying;
 
     sp = mfn_to_page(smfn);
 
@@ -4568,10 +4568,10 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
                    : shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
         }
 
-        if ( mfn_valid(smfn) )
+        if ( mfn_valid(smfn) && is_hvm_domain(d) )
         {
             gmfn = _mfn(mfn_to_page(smfn)->v.sh.back);
-            mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
+            mfn_to_page(gmfn)->pagetable_dying = true;
             shadow_unhook_mappings(d, smfn, 1/* user pages only */);
             flush = 1;
         }
@@ -4608,9 +4608,9 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     smfn = shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l4_64_shadow);
 #endif
 
-    if ( mfn_valid(smfn) )
+    if ( mfn_valid(smfn) && is_hvm_domain(d) )
     {
-        mfn_to_page(gmfn)->shadow_flags |= SHF_pagetable_dying;
+        mfn_to_page(gmfn)->pagetable_dying = true;
         shadow_unhook_mappings(d, smfn, 1/* user pages only */);
         /* Now flush the TLB: we removed toplevel mappings. */
         flush_tlb_mask(d->domain_dirty_cpumask);
