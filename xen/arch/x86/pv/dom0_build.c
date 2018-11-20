@@ -148,7 +148,14 @@ static __init void setup_pv_physmap(struct domain *d, unsigned long pgtbl_pfn,
         pl3e += l3_table_offset(vphysmap_start);
         if ( !l3e_get_intpte(*pl3e) )
         {
-            if ( cpu_has_page1gb &&
+            /*
+             * 1G superpages aren't supported by the shadow code.  Avoid using
+             * them if we are liable to need to start shadowing dom0.  This
+             * assumes that there are no circumstances where we will activate
+             * logdirty mode on dom0.
+             */
+            if ( (!IS_ENABLED(CONFIG_SHADOW_PAGING) ||
+                  !d->arch.pv_domain.check_l1tf) && cpu_has_page1gb &&
                  !(vphysmap_start & ((1UL << L3_PAGETABLE_SHIFT) - 1)) &&
                  vphysmap_end >= vphysmap_start + (1UL << L3_PAGETABLE_SHIFT) &&
                  (page = alloc_domheap_pages(d,
