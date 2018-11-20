@@ -366,19 +366,19 @@ static const struct twobyte_table {
     [0xc7] = { ImplicitOps|ModRM },
     [0xc8 ... 0xcf] = { ImplicitOps },
     [0xd0] = { DstImplicit|SrcMem|ModRM, simd_other },
-    [0xd1 ... 0xd3] = { DstImplicit|SrcMem|ModRM, simd_other },
+    [0xd1 ... 0xd3] = { DstImplicit|SrcMem|ModRM, simd_128 },
     [0xd4 ... 0xd5] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0xd6] = { DstMem|SrcImplicit|ModRM|Mov, simd_other, 3 },
     [0xd7] = { DstReg|SrcImplicit|ModRM|Mov },
     [0xd8 ... 0xdf] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0xe0] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
-    [0xe1 ... 0xe2] = { DstImplicit|SrcMem|ModRM, simd_other },
+    [0xe1 ... 0xe2] = { DstImplicit|SrcMem|ModRM, simd_128 },
     [0xe3 ... 0xe5] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0xe6] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0xe7] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_int, d8s_vl },
     [0xe8 ... 0xef] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0xf0] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
-    [0xf1 ... 0xf3] = { DstImplicit|SrcMem|ModRM, simd_other },
+    [0xf1 ... 0xf3] = { DstImplicit|SrcMem|ModRM, simd_128 },
     [0xf4 ... 0xf6] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0xf7] = { DstMem|SrcMem|ModRM|Mov, simd_packed_int },
     [0xf8 ... 0xfe] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
@@ -3346,7 +3346,8 @@ x86_decode(
         break;
 
     case simd_128:
-        op_bytes = 16;
+        /* The special cases here are MMX shift insns. */
+        op_bytes = vex.opcx || vex.pfx ? 16 : 8;
         break;
 
     case simd_256:
@@ -6480,6 +6481,12 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f, 0x75): /* vpcmpeqw {x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_PACKED_INT(0x0f, 0x76):    /* pcmpeqd {,x}mm/mem,{,x}mm */
     case X86EMUL_OPC_VEX_66(0x0f, 0x76): /* vpcmpeqd {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xd1):    /* psrlw {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xd1): /* vpsrlw xmm/m128,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xd2):    /* psrld {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xd2): /* vpsrld xmm/m128,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xd3):    /* psrlq {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xd3): /* vpsrlq xmm/m128,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xd4):     /* paddq xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0xd4): /* vpaddq {x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_PACKED_INT(0x0f, 0xd5):    /* pmullw {,x}mm/mem,{,x}mm */
@@ -6502,6 +6509,10 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f, 0xdf): /* vpandn {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xe0):     /* pavgb xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0xe0): /* vpavgb {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xe1):    /* psraw {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xe1): /* vpsraw xmm/m128,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xe2):    /* psrad {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xe2): /* vpsrad xmm/m128,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xe3):     /* pavgw xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0xe3): /* vpavgw {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xe4):     /* pmulhuw xmm/m128,xmm */
@@ -6524,6 +6535,12 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f, 0xee): /* vpmaxsw {x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_PACKED_INT(0x0f, 0xef):    /* pxor {,x}mm/mem,{,x}mm */
     case X86EMUL_OPC_VEX_66(0x0f, 0xef): /* vpxor {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xf1):    /* psllw {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xf1): /* vpsllw xmm/m128,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xf2):    /* pslld {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xf2): /* vpslld xmm/m128,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xf3):    /* psllq {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xf3): /* vpsllq xmm/m128,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xf4):     /* pmuludq xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0xf4): /* vpmuludq {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xf6):     /* psadbw xmm/m128,xmm */
@@ -7849,25 +7866,6 @@ x86_emulate(
             break;
         }
         break;
-
-    CASE_SIMD_PACKED_INT(0x0f, 0xd1):    /* psrlw {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xd1): /* vpsrlw xmm/m128,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_INT(0x0f, 0xd2):    /* psrld {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xd2): /* vpsrld xmm/m128,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_INT(0x0f, 0xd3):    /* psrlq {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xd3): /* vpsrlq xmm/m128,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_INT(0x0f, 0xe1):    /* psraw {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xe1): /* vpsraw xmm/m128,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_INT(0x0f, 0xe2):    /* psrad {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xe2): /* vpsrad xmm/m128,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_INT(0x0f, 0xf1):    /* psllw {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xf1): /* vpsllw xmm/m128,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_INT(0x0f, 0xf2):    /* pslld {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xf2): /* vpslld xmm/m128,{x,y}mm,{x,y}mm */
-    CASE_SIMD_PACKED_INT(0x0f, 0xf3):    /* psllq {,x}mm/mem,{,x}mm */
-    case X86EMUL_OPC_VEX_66(0x0f, 0xf3): /* vpsllq xmm/m128,{x,y}mm,{x,y}mm */
-        op_bytes = vex.pfx ? 16 : 8;
-        goto simd_0f_int;
 
     case X86EMUL_OPC_EVEX_66(0x0f, 0xfa): /* vpsubd [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xfb): /* vpsubq [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
