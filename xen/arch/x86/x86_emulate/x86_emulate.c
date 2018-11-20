@@ -439,8 +439,8 @@ static const struct ext0f38_table {
     [0x28 ... 0x29] = { .simd_size = simd_packed_int },
     [0x2a] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x2b] = { .simd_size = simd_packed_int },
-    [0x2c ... 0x2d] = { .simd_size = simd_other },
-    [0x2e ... 0x2f] = { .simd_size = simd_other, .to_mem = 1 },
+    [0x2c ... 0x2d] = { .simd_size = simd_packed_fp },
+    [0x2e ... 0x2f] = { .simd_size = simd_packed_fp, .to_mem = 1 },
     [0x30 ... 0x35] = { .simd_size = simd_other, .two_op = 1 },
     [0x36 ... 0x3f] = { .simd_size = simd_packed_int },
     [0x40] = { .simd_size = simd_packed_int },
@@ -449,8 +449,8 @@ static const struct ext0f38_table {
     [0x58 ... 0x59] = { .simd_size = simd_other, .two_op = 1 },
     [0x5a] = { .simd_size = simd_128, .two_op = 1 },
     [0x78 ... 0x79] = { .simd_size = simd_other, .two_op = 1 },
-    [0x8c] = { .simd_size = simd_other },
-    [0x8e] = { .simd_size = simd_other, .to_mem = 1 },
+    [0x8c] = { .simd_size = simd_packed_int },
+    [0x8e] = { .simd_size = simd_packed_int, .to_mem = 1 },
     [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1 },
     [0x96 ... 0x98] = { .simd_size = simd_packed_fp },
     [0x99] = { .simd_size = simd_scalar_vexw },
@@ -7998,6 +7998,8 @@ x86_emulate(
 
         generate_exception_if(ea.type != OP_MEM || vex.w, EXC_UD);
         host_and_vcpu_must_have(avx);
+        elem_bytes = 4 << (b & 1);
+    vmaskmov:
         get_fpu(X86EMUL_FPU_ymm);
 
         /*
@@ -8012,7 +8014,7 @@ x86_emulate(
         opc = init_prefixes(stub);
         pvex = copy_VEX(opc, vex);
         pvex->opcx = vex_0f;
-        if ( !(b & 1) )
+        if ( elem_bytes == 4 )
             pvex->pfx = vex_none;
         opc[0] = 0x50; /* vmovmskp{s,d} */
         /* Use %rax as GPR destination and VEX.vvvv as source. */
@@ -8025,21 +8027,9 @@ x86_emulate(
         invoke_stub("", "", "=a" (ea.val) : [dummy] "i" (0));
         put_stub(stub);
 
-        if ( !ea.val )
-            goto complete_insn;
-
-        op_bytes = 4 << (b & 1);
-        first_byte = __builtin_ctz(ea.val);
-        ea.val >>= first_byte;
-        first_byte *= op_bytes;
-        op_bytes *= 32 - __builtin_clz(ea.val);
-
-        /*
-         * Even for the memory write variant a memory read is needed, unless
-         * all set mask bits are contiguous.
-         */
-        if ( ea.val & (ea.val + 1) )
-            d = (d & ~SrcMask) | SrcMem;
+        evex.opmsk = 1; /* fake */
+        op_mask = ea.val;
+        fault_suppression = true;
 
         opc = init_prefixes(stub);
         opc[0] = b;
@@ -8090,63 +8080,10 @@ x86_emulate(
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8c): /* vpmaskmov{d,q} mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8e): /* vpmaskmov{d,q} {x,y}mm,{x,y}mm,mem */
-    {
-        typeof(vex) *pvex;
-        unsigned int mask = vex.w ? 0x80808080U : 0x88888888U;
-
         generate_exception_if(ea.type != OP_MEM, EXC_UD);
         host_and_vcpu_must_have(avx2);
-        get_fpu(X86EMUL_FPU_ymm);
-
-        /*
-         * While we can't reasonably provide fully correct behavior here
-         * (in particular, for writes, avoiding the memory read in anticipation
-         * of all elements in the range eventually being written), we can (and
-         * should) still limit the memory access to the smallest possible range
-         * (suppressing it altogether if all mask bits are clear), to provide
-         * correct faulting behavior. Read the mask bits via vmovmskp{s,d}
-         * for that purpose.
-         */
-        opc = init_prefixes(stub);
-        pvex = copy_VEX(opc, vex);
-        pvex->opcx = vex_0f;
-        opc[0] = 0xd7; /* vpmovmskb */
-        /* Use %rax as GPR destination and VEX.vvvv as source. */
-        pvex->r = 1;
-        pvex->b = !mode_64bit() || (vex.reg >> 3);
-        opc[1] = 0xc0 | (~vex.reg & 7);
-        pvex->reg = 0xf;
-        opc[2] = 0xc3;
-
-        invoke_stub("", "", "=a" (ea.val) : [dummy] "i" (0));
-        put_stub(stub);
-
-        /* Convert byte granular result to dword/qword granularity. */
-        ea.val &= mask;
-        if ( !ea.val )
-            goto complete_insn;
-
-        first_byte = __builtin_ctz(ea.val) & ~((4 << vex.w) - 1);
-        ea.val >>= first_byte;
-        op_bytes = 32 - __builtin_clz(ea.val);
-
-        /*
-         * Even for the memory write variant a memory read is needed, unless
-         * all set mask bits are contiguous.
-         */
-        if ( ea.val & (ea.val + ~mask + 1) )
-            d = (d & ~SrcMask) | SrcMem;
-
-        opc = init_prefixes(stub);
-        opc[0] = b;
-        /* Convert memory operand to (%rAX). */
-        rex_prefix &= ~REX_B;
-        vex.b = 1;
-        opc[1] = modrm & 0x38;
-        insn_bytes = PFX_BYTES + 2;
-
-        break;
-    }
+        elem_bytes = 4 << vex.w;
+        goto vmaskmov;
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x90): /* vpgatherd{d,q} {x,y}mm,mem,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x91): /* vpgatherq{d,q} {x,y}mm,mem,{x,y}mm */
