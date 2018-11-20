@@ -35,7 +35,7 @@ static unsigned int pfn_to_pde_idx(unsigned long pfn, unsigned int level)
     return idx;
 }
 
-void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long gfn)
+static void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long gfn)
 {
     u64 *table, *pte;
 
@@ -49,23 +49,42 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
                                     unsigned int next_level,
                                     bool_t iw, bool_t ir)
 {
-    u64 addr_lo, addr_hi, maddr_old, maddr_next;
+    uint64_t addr_lo, addr_hi, maddr_next;
     u32 entry;
-    bool_t need_flush = 0;
+    bool need_flush = false, old_present;
 
     maddr_next = (u64)next_mfn << PAGE_SHIFT;
 
-    addr_hi = get_field_from_reg_u32(pde[1],
-                                     IOMMU_PTE_ADDR_HIGH_MASK,
-                                     IOMMU_PTE_ADDR_HIGH_SHIFT);
-    addr_lo = get_field_from_reg_u32(pde[0],
-                                     IOMMU_PTE_ADDR_LOW_MASK,
-                                     IOMMU_PTE_ADDR_LOW_SHIFT);
+    old_present = get_field_from_reg_u32(pde[0], IOMMU_PTE_PRESENT_MASK,
+                                         IOMMU_PTE_PRESENT_SHIFT);
+    if ( old_present )
+    {
+        bool old_r, old_w;
+        unsigned int old_level;
+        uint64_t maddr_old;
 
-    maddr_old = (addr_hi << 32) | (addr_lo << PAGE_SHIFT);
+        addr_hi = get_field_from_reg_u32(pde[1],
+                                         IOMMU_PTE_ADDR_HIGH_MASK,
+                                         IOMMU_PTE_ADDR_HIGH_SHIFT);
+        addr_lo = get_field_from_reg_u32(pde[0],
+                                         IOMMU_PTE_ADDR_LOW_MASK,
+                                         IOMMU_PTE_ADDR_LOW_SHIFT);
+        old_level = get_field_from_reg_u32(pde[0],
+                                           IOMMU_PDE_NEXT_LEVEL_MASK,
+                                           IOMMU_PDE_NEXT_LEVEL_SHIFT);
+        old_w = get_field_from_reg_u32(pde[1],
+                                       IOMMU_PTE_IO_WRITE_PERMISSION_MASK,
+                                       IOMMU_PTE_IO_WRITE_PERMISSION_SHIFT);
+        old_r = get_field_from_reg_u32(pde[1],
+                                       IOMMU_PTE_IO_READ_PERMISSION_MASK,
+                                       IOMMU_PTE_IO_READ_PERMISSION_SHIFT);
 
-    if ( maddr_old != maddr_next )
-        need_flush = 1;
+        maddr_old = (addr_hi << 32) | (addr_lo << PAGE_SHIFT);
+
+        if ( maddr_old != maddr_next || iw != old_w || ir != old_r ||
+             old_level != next_level )
+            need_flush = true;
+    }
 
     addr_lo = maddr_next & DMA_32BIT_MASK;
     addr_hi = maddr_next >> 32;
@@ -687,10 +706,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
     if ( !need_flush )
         goto out;
 
-    /* 4K mapping for PV guests never changes, 
-     * no need to flush if we trust non-present bits */
-    if ( is_hvm_domain(d) )
-        amd_iommu_flush_pages(d, gfn, 0);
+    amd_iommu_flush_pages(d, gfn, 0);
 
     for ( merge_level = IOMMU_PAGING_MODE_LEVEL_2;
           merge_level <= hd->arch.paging_mode; merge_level++ )
