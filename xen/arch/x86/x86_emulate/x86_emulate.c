@@ -302,7 +302,7 @@ static const struct twobyte_table {
     [0x50] = { DstReg|SrcImplicit|ModRM|Mov },
     [0x51] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_any_fp, d8s_vl },
     [0x52 ... 0x53] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_single_fp },
-    [0x54 ... 0x57] = { DstImplicit|SrcMem|ModRM, simd_packed_fp },
+    [0x54 ... 0x57] = { DstImplicit|SrcMem|ModRM, simd_packed_fp, d8s_vl },
     [0x58 ... 0x59] = { DstImplicit|SrcMem|ModRM, simd_any_fp, d8s_vl },
     [0x5a ... 0x5b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x5c ... 0x5f] = { DstImplicit|SrcMem|ModRM, simd_any_fp, d8s_vl },
@@ -6342,6 +6342,17 @@ x86_emulate(
         ASSERT(!state->simd_size);
         dst.bytes = 4;
         break;
+
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x54): /* vandp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x55): /* vandnp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x56): /* vorp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x57): /* vxorp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        generate_exception_if((evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK) ||
+                               (ea.type != OP_MEM && evex.br)),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512dq);
+        avx512_vlen_check(false);
+        goto simd_zmm;
 
     CASE_SIMD_ALL_FP(, 0x0f, 0x5a):        /* cvt{p,s}{s,d}2{p,s}{s,d} xmm/mem,xmm */
     CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5a):    /* vcvtp{s,d}2p{s,d} xmm/mem,xmm */
