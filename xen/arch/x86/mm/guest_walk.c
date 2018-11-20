@@ -324,9 +324,20 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
         rc |= _PAGE_PRESENT;
         goto out;
     }
+
+    /*
+     * In 2-level paging without CR0.PSE, there are no reserved bits, and the
+     * PAT/PSE bit is ignored.
+     */
+    if ( GUEST_PAGING_LEVELS == 2 && !guest_supports_superpages(v) )
+    {
+        gw->l2e.l2 &= ~_PAGE_PSE;
+        gflags &= ~_PAGE_PSE;
+    }
+
     rc |= ((gflags & mflags) ^ mflags);
 
-    pse2M = (gflags & _PAGE_PSE) && guest_supports_superpages(v); 
+    pse2M = !!(gflags & _PAGE_PSE);
 
     if ( pse2M )
     {
@@ -348,6 +359,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
             /* _PAGE_PSE_PAT not set: remove _PAGE_PAT from flags. */
             flags &= ~_PAGE_PAT;
 
+        if ( !guest_supports_superpages(v) )
+            rc |= _PAGE_PSE | _PAGE_INVALID_BIT;
         if ( gfn_x(start) & GUEST_L2_GFN_MASK & ~0x1 )
             rc |= _PAGE_INVALID_BITS;
 
