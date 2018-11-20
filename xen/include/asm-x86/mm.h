@@ -259,8 +259,15 @@ struct page_info
          * Guest pages with a shadow.  This does not conflict with
          * tlbflush_timestamp since page table pages are explicitly not
          * tracked for TLB-flush avoidance when a guest runs in shadow mode.
+         *
+         * pagetable_dying is used for HVM domains only. The layout here has
+         * to avoid re-use of the space used by linear_pt_count, which (only)
+         * PV guests use.
          */
-        u32 shadow_flags;
+        struct {
+            uint16_t shadow_flags;
+            bool pagetable_dying;
+        };
 
         /* When in use as a shadow, next shadow in this hash chain. */
         __pdx_t next_shadow;
