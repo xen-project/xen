@@ -1338,9 +1338,7 @@ void panic(const char *fmt, ...)
 
     debugger_trap_immediate();
 
-#ifdef CONFIG_KEXEC
     kexec_crash();
-#endif
 
     if ( opt_noreboot )
         machine_halt();
