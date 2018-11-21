@@ -16,10 +16,10 @@ struct grant_table_arch {
     gfn_t *status_gfn;
 };
 
-static inline void gnttab_clear_flag(struct domain *d,
-                                     unsigned long nr, uint16_t *addr)
+static inline void gnttab_clear_flags(struct domain *d,
+                                      unsigned int mask, uint16_t *addr)
 {
-    guest_clear_mask16(d, BIT(nr, UL), addr);
+    guest_clear_mask16(d, mask, addr);
 }
 
 static inline void gnttab_mark_dirty(struct domain *d, mfn_t mfn)
