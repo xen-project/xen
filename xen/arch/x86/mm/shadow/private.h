@@ -139,11 +139,7 @@ enum {
  * Auditing routines
  */
 
-#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL
 extern void shadow_audit_tables(struct vcpu *v);
-#else
-#define shadow_audit_tables(_v) do {} while(0)
-#endif
 
 /******************************************************************************
  * Macro for dealing with the naming of the internal names of the

@@ -258,11 +258,9 @@ void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
  * will be valid.
  */
 
-
-#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL
 static void sh_oos_audit(struct domain *d)
 {
-    int idx, expected_idx, expected_idx_alt;
+    unsigned int idx, expected_idx, expected_idx_alt;
     struct page_info *pg;
     struct vcpu *v;
 
@@ -278,7 +276,7 @@ static void sh_oos_audit(struct domain *d)
             expected_idx_alt = ((expected_idx + 1) % SHADOW_OOS_PAGES);
             if ( idx != expected_idx && idx != expected_idx_alt )
             {
-                printk("%s: idx %d contains gmfn %lx, expected at %d or %d.\n",
+                printk("%s: idx %x contains gmfn %lx, expected at %x or %x.\n",
                        __func__, idx, mfn_x(oos[idx]),
                        expected_idx, expected_idx_alt);
                 BUG();
@@ -286,26 +284,25 @@ static void sh_oos_audit(struct domain *d)
             pg = mfn_to_page(oos[idx]);
             if ( !(pg->count_info & PGC_page_table) )
             {
-                printk("%s: idx %x gmfn %lx not a pt (count %"PRIx32")\n",
+                printk("%s: idx %x gmfn %lx not a pt (count %lx)\n",
                        __func__, idx, mfn_x(oos[idx]), pg->count_info);
                 BUG();
             }
             if ( !(pg->shadow_flags & SHF_out_of_sync) )
             {
-                printk("%s: idx %x gmfn %lx not marked oos (flags %lx)\n",
+                printk("%s: idx %x gmfn %lx not marked oos (flags %x)\n",
                        __func__, idx, mfn_x(oos[idx]), pg->shadow_flags);
                 BUG();
             }
             if ( (pg->shadow_flags & SHF_page_type_mask & ~SHF_L1_ANY) )
             {
-                printk("%s: idx %x gmfn %lx shadowed as non-l1 (flags %lx)\n",
+                printk("%s: idx %x gmfn %lx shadowed as non-l1 (flags %x)\n",
                        __func__, idx, mfn_x(oos[idx]), pg->shadow_flags);
                 BUG();
             }
         }
     }
 }
-#endif
 
 #if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES
 void oos_audit_hash_is_present(struct domain *d, mfn_t gmfn)
@@ -1474,8 +1471,6 @@ static inline key_t sh_hash(unsigned long n, unsigned int t)
     return k % SHADOW_HASH_BUCKETS;
 }
 
-#if SHADOW_AUDIT & (SHADOW_AUDIT_HASH|SHADOW_AUDIT_HASH_FULL)
-
 /* Before we get to the mechanism, define a pair of audit functions
  * that sanity-check the contents of the hash table. */
 static void sh_hash_audit_bucket(struct domain *d, int bucket)
@@ -1483,7 +1478,8 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
 {
     struct page_info *sp, *x;
 
-    if ( !(SHADOW_AUDIT_ENABLE) )
+    if ( !(SHADOW_AUDIT & (SHADOW_AUDIT_HASH|SHADOW_AUDIT_HASH_FULL)) ||
+         !SHADOW_AUDIT_ENABLE )
         return;
 
     sp = d->arch.paging.shadow.hash_table[bucket];
@@ -1547,19 +1543,12 @@ static void sh_hash_audit_bucket(struct domain *d, int bucket)
     }
 }
 
-#else
-#define sh_hash_audit_bucket(_d, _b) do {} while(0)
-#endif /* Hashtable bucket audit */
-
-
-#if SHADOW_AUDIT & SHADOW_AUDIT_HASH_FULL
-
 static void sh_hash_audit(struct domain *d)
 /* Full audit: audit every bucket in the table */
 {
     int i;
 
-    if ( !(SHADOW_AUDIT_ENABLE) )
+    if ( !(SHADOW_AUDIT & SHADOW_AUDIT_HASH_FULL) || !SHADOW_AUDIT_ENABLE )
         return;
 
     for ( i = 0; i < SHADOW_HASH_BUCKETS; i++ )
@@ -1567,10 +1556,6 @@ static void sh_hash_audit(struct domain *d)
         sh_hash_audit_bucket(d, i);
     }
 }
-
-#else
-#define sh_hash_audit(_d) do {} while(0)
-#endif /* Hashtable bucket audit */
 
 /* Allocate and initialise the table itself.
  * Returns 0 for success, 1 for error. */
@@ -3525,13 +3510,12 @@ int shadow_domctl(struct domain *d,
 /**************************************************************************/
 /* Auditing shadow tables */
 
-#if SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL
-
 void shadow_audit_tables(struct vcpu *v)
 {
     /* Dispatch table for getting per-type functions */
     static const hash_vcpu_callback_t callbacks[SH_type_unused] = {
         NULL, /* none    */
+#if SHADOW_AUDIT & (SHADOW_AUDIT_ENTRIES | SHADOW_AUDIT_ENTRIES_FULL)
         SHADOW_INTERNAL_NAME(sh_audit_l1_table, 2),  /* l1_32   */
         SHADOW_INTERNAL_NAME(sh_audit_fl1_table, 2), /* fl1_32  */
         SHADOW_INTERNAL_NAME(sh_audit_l2_table, 2),  /* l2_32   */
@@ -3545,19 +3529,23 @@ void shadow_audit_tables(struct vcpu *v)
         SHADOW_INTERNAL_NAME(sh_audit_l2_table, 4),  /* l2h_64   */
         SHADOW_INTERNAL_NAME(sh_audit_l3_table, 4),  /* l3_64   */
         SHADOW_INTERNAL_NAME(sh_audit_l4_table, 4),  /* l4_64   */
+#endif
         NULL  /* All the rest */
     };
     unsigned int mask;
 
-    if ( !(SHADOW_AUDIT_ENABLE) )
+    if ( !(SHADOW_AUDIT & (SHADOW_AUDIT_ENTRIES | SHADOW_AUDIT_ENTRIES_FULL)) ||
+         !SHADOW_AUDIT_ENABLE )
         return;
 
+    if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL )
+    {
 #if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
-    sh_oos_audit(v->domain);
+        sh_oos_audit(v->domain);
 #endif
 
-    if ( SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES_FULL )
         mask = SHF_page_type_mask; /* Audit every table in the system */
+    }
     else 
     {
         /* Audit only the current mode's tables */
@@ -3574,8 +3562,6 @@ void shadow_audit_tables(struct vcpu *v)
 
     hash_vcpu_foreach(v, mask, callbacks, INVALID_MFN);
 }
-
-#endif /* Shadow audit */
 
 #ifdef CONFIG_PV
 
