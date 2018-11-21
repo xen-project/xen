@@ -1134,14 +1134,14 @@ map_grant_ref(
              !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
         {
             if ( !(kind & MAPKIND_WRITE) )
-                err = iommu_map_page(ld, _dfn(mfn_x(mfn)), mfn,
-                                     IOMMUF_readable | IOMMUF_writable);
+                err = iommu_map(ld, _dfn(mfn_x(mfn)), mfn, 0,
+                                IOMMUF_readable | IOMMUF_writable);
         }
         else if ( act_pin && !old_pin )
         {
             if ( !kind )
-                err = iommu_map_page(ld, _dfn(mfn_x(mfn)), mfn,
-                                     IOMMUF_readable);
+                err = iommu_map(ld, _dfn(mfn_x(mfn)), mfn, 0,
+                                IOMMUF_readable);
         }
         if ( err )
         {
@@ -1389,10 +1389,10 @@ unmap_common(
 
         kind = mapkind(lgt, rd, op->mfn);
         if ( !kind )
-            err = iommu_unmap_page(ld, _dfn(mfn_x(op->mfn)));
+            err = iommu_unmap(ld, _dfn(mfn_x(op->mfn)), 0);
         else if ( !(kind & MAPKIND_WRITE) )
-            err = iommu_map_page(ld, _dfn(mfn_x(op->mfn)), op->mfn,
-                                 IOMMUF_readable);
+            err = iommu_map(ld, _dfn(mfn_x(op->mfn)), op->mfn, 0,
+                            IOMMUF_readable);
 
         double_gt_unlock(lgt, rgt);
 

@@ -1436,14 +1436,15 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
          !need_iommu_pt_sync(hardware_domain) )
     {
         for ( i = spfn; i < epfn; i++ )
-            if ( iommu_map_page(hardware_domain, _dfn(i), _mfn(i),
-                                IOMMUF_readable | IOMMUF_writable) )
+            if ( iommu_map(hardware_domain, _dfn(i), _mfn(i),
+                           PAGE_ORDER_4K,
+                           IOMMUF_readable | IOMMUF_writable) )
                 break;
         if ( i != epfn )
         {
             while (i-- > old_max)
                 /* If statement to satisfy __must_check. */
-                if ( iommu_unmap_page(hardware_domain, _dfn(i)) )
+                if ( iommu_unmap(hardware_domain, _dfn(i), PAGE_ORDER_4K) )
                     continue;
 
             goto destroy_m2p;

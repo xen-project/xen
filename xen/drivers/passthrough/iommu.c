@@ -304,48 +304,78 @@ void iommu_domain_destroy(struct domain *d)
     arch_iommu_domain_destroy(d);
 }
 
-int iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
-                   unsigned int flags)
+int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
+              unsigned int page_order, unsigned int flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
-    int rc;
+    unsigned long i;
+    int rc = 0;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    rc = hd->platform_ops->map_page(d, dfn, mfn, flags);
-    if ( unlikely(rc) )
+    ASSERT(IS_ALIGNED(dfn_x(dfn), (1ul << page_order)));
+    ASSERT(IS_ALIGNED(mfn_x(mfn), (1ul << page_order)));
+
+    for ( i = 0; i < (1ul << page_order); i++ )
     {
+        rc = hd->platform_ops->map_page(d, dfn_add(dfn, i),
+                                        mfn_add(mfn, i), flags);
+
+        if ( likely(!rc) )
+            continue;
+
         if ( !d->is_shutting_down && printk_ratelimit() )
             printk(XENLOG_ERR
                    "d%d: IOMMU mapping dfn %"PRI_dfn" to mfn %"PRI_mfn" failed: %d\n",
-                   d->domain_id, dfn_x(dfn), mfn_x(mfn), rc);
+                   d->domain_id, dfn_x(dfn_add(dfn, i)),
+                   mfn_x(mfn_add(mfn, i)), rc);
+
+        while ( i-- )
+            /* if statement to satisfy __must_check */
+            if ( hd->platform_ops->unmap_page(d, dfn_add(dfn, i)) )
+                continue;
 
         if ( !is_hardware_domain(d) )
             domain_crash(d);
+
+        break;
     }
 
     return rc;
 }
 
-int iommu_unmap_page(struct domain *d, dfn_t dfn)
+int iommu_unmap(struct domain *d, dfn_t dfn, unsigned int page_order)
 {
     const struct domain_iommu *hd = dom_iommu(d);
-    int rc;
+    unsigned long i;
+    int rc = 0;
 
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    rc = hd->platform_ops->unmap_page(d, dfn);
-    if ( unlikely(rc) )
+    ASSERT(IS_ALIGNED(dfn_x(dfn), (1ul << page_order)));
+
+    for ( i = 0; i < (1ul << page_order); i++ )
     {
+        int err = hd->platform_ops->unmap_page(d, dfn_add(dfn, i));
+
+        if ( likely(!err) )
+            continue;
+
         if ( !d->is_shutting_down && printk_ratelimit() )
             printk(XENLOG_ERR
                    "d%d: IOMMU unmapping dfn %"PRI_dfn" failed: %d\n",
-                   d->domain_id, dfn_x(dfn), rc);
+                   d->domain_id, dfn_x(dfn_add(dfn, i)), err);
+
+        if ( !rc )
+            rc = err;
 
         if ( !is_hardware_domain(d) )
+        {
             domain_crash(d);
+            break;
+        }
     }
 
     return rc;

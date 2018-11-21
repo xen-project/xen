@@ -710,24 +710,8 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
     p2m_access_t a;
 
     if ( !paging_mode_translate(p2m->domain) )
-    {
-        int rc = 0;
-
-        if ( need_iommu_pt_sync(p2m->domain) )
-        {
-            dfn_t dfn = _dfn(mfn);
-
-            for ( i = 0; i < (1 << page_order); i++ )
-            {
-                int ret = iommu_unmap_page(p2m->domain, dfn_add(dfn, i));
-
-                if ( !rc )
-                    rc = ret;
-            }
-        }
-
-        return rc;
-    }
+        return need_iommu_pt_sync(p2m->domain) ?
+            iommu_unmap(p2m->domain, _dfn(mfn), page_order) : 0;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn_l, mfn);
@@ -773,28 +757,9 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     int rc = 0;
 
     if ( !paging_mode_translate(d) )
-    {
-        if ( need_iommu_pt_sync(d) && t == p2m_ram_rw )
-        {
-            dfn_t dfn = _dfn(mfn_x(mfn));
-
-            for ( i = 0; i < (1 << page_order); i++ )
-            {
-                rc = iommu_map_page(d, dfn_add(dfn, i), mfn_add(mfn, i),
-                                    IOMMUF_readable|IOMMUF_writable);
-                if ( rc != 0 )
-                {
-                    while ( i-- > 0 )
-                        /* If statement to satisfy __must_check. */
-                        if ( iommu_unmap_page(d, dfn_add(dfn, i)) )
-                            continue;
-
-                    return rc;
-                }
-            }
-        }
-        return 0;
-    }
+        return (need_iommu_pt_sync(d) && t == p2m_ram_rw) ?
+            iommu_map(d, _dfn(mfn_x(mfn)), mfn, page_order,
+                      IOMMUF_readable | IOMMUF_writable) : 0;
 
     /* foreign pages are added thru p2m_add_foreign */
     if ( p2m_is_foreign(t) )
@@ -1164,8 +1129,8 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
     {
         if ( !need_iommu_pt_sync(d) )
             return 0;
-        return iommu_map_page(d, _dfn(gfn_l), _mfn(gfn_l),
-                              IOMMUF_readable | IOMMUF_writable);
+        return iommu_map(d, _dfn(gfn_l), _mfn(gfn_l), PAGE_ORDER_4K,
+                         IOMMUF_readable | IOMMUF_writable);
     }
 
     gfn_lock(p2m, gfn, 0);
@@ -1255,7 +1220,7 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
     {
         if ( !need_iommu_pt_sync(d) )
             return 0;
-        return iommu_unmap_page(d, _dfn(gfn_l));
+        return iommu_unmap(d, _dfn(gfn_l), PAGE_ORDER_4K);
     }
 
     gfn_lock(p2m, gfn, 0);
