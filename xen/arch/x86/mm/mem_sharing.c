@@ -964,6 +964,15 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
         goto err_out;
     }
 
+    /* Acquire an extra reference, for the freeing below to be safe. */
+    if ( !get_page(cpage, cd) )
+    {
+        ret = -EOVERFLOW;
+        mem_sharing_page_unlock(secondpg);
+        mem_sharing_page_unlock(firstpg);
+        goto err_out;
+    }
+
     /* Merge the lists together */
     rmap_seed_iterator(cpage, &ri);
     while ( (gfn = rmap_iterate(cpage, &ri)) != NULL)
@@ -993,6 +1002,7 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
     /* Free the client page */
     if(test_and_clear_bit(_PGC_allocated, &cpage->count_info))
         put_page(cpage);
+    put_page(cpage);
 
     /* We managed to free a domain page. */
     atomic_dec(&nr_shared_mfns);
@@ -1066,9 +1076,16 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
             if ( mfn_valid(cmfn) )
             {
                 struct page_info *cpage = mfn_to_page(cmfn);
-                ASSERT(cpage != NULL);
+
+                if ( !get_page(cpage, cd) )
+                {
+                    domain_crash(cd);
+                    ret = -EOVERFLOW;
+                    goto err_unlock;
+                }
                 if ( test_and_clear_bit(_PGC_allocated, &cpage->count_info) )
                     put_page(cpage);
+                put_page(cpage);
             }
         }
     }
@@ -1153,9 +1170,18 @@ int __mem_sharing_unshare_page(struct domain *d,
             mem_sharing_gfn_destroy(page, d, gfn_info);
         put_page_and_type(page);
         mem_sharing_page_unlock(page);
-        if ( last_gfn && 
-            test_and_clear_bit(_PGC_allocated, &page->count_info) ) 
+        if ( last_gfn )
+        {
+            if ( !get_page(page, d) )
+            {
+                put_gfn(d, gfn);
+                domain_crash(d);
+                return -EOVERFLOW;
+            }
+            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+                put_page(page);
             put_page(page);
+        }
         put_gfn(d, gfn);
 
         return 0;

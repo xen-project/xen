@@ -313,20 +313,36 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
-        rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
-        if ( rc )
-            goto out_put_gfn;
-
-        put_gfn(d, gmfn);
-
-        /* If the page hasn't yet been paged out, there is an
-         * actual page that needs to be released. */
+        /*
+         * If the page hasn't yet been paged out, there is an
+         * actual page that needs to be released.
+         */
         if ( p2mt == p2m_ram_paging_out )
         {
             ASSERT(mfn_valid(mfn));
             page = mfn_to_page(mfn);
+            rc = -ENXIO;
+            if ( !get_page(page, d) )
+                goto out_put_gfn;
+        }
+        else
+            page = NULL;
+
+        rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
+        if ( rc )
+        {
+            if ( page )
+                put_page(page);
+            goto out_put_gfn;
+        }
+
+        put_gfn(d, gmfn);
+
+        if ( page )
+        {
             if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 put_page(page);
+            put_page(page);
         }
         p2m_mem_paging_drop_page(d, gmfn, p2mt);
 
