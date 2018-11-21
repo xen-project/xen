@@ -48,6 +48,7 @@ endif
 ifneq ($(call cc-option,$(CC),-mindirect-branch-register,n),n)
 CFLAGS += -mindirect-branch=thunk-extern -mindirect-branch-register
 CFLAGS += -DCONFIG_INDIRECT_THUNK
+CFLAGS += -fno-jump-tables
 export CONFIG_INDIRECT_THUNK=y
 endif
 
