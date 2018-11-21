@@ -144,11 +144,11 @@ custom_param("gnttab", parse_gnttab);
  * The following union allows that to happen in an endian-neutral fashion.
  */
 union grant_combo {
-    uint32_t word;
+    uint32_t raw;
     struct {
         uint16_t flags;
         domid_t  domid;
-    } shorts;
+    };
 };
 
 /* Used to share code between unmap_grant_ref and unmap_and_replace. */
@@ -680,7 +680,7 @@ static int _set_status_v1(const grant_entry_header_t *shah,
 {
     int rc = GNTST_okay;
     uint32_t *raw_shah = (uint32_t *)shah;
-    union grant_combo scombo, prev_scombo, new_scombo;
+    union grant_combo scombo;
     uint16_t mask = GTF_type_mask;
 
     /*
@@ -698,7 +698,7 @@ static int _set_status_v1(const grant_entry_header_t *shah,
     if ( mapflag )
         mask |= GTF_sub_page;
 
-    scombo.word = ACCESS_ONCE(*raw_shah);
+    scombo.raw = ACCESS_ONCE(*raw_shah);
 
     /*
      * This loop attempts to set the access (reading/writing) flags
@@ -708,37 +708,35 @@ static int _set_status_v1(const grant_entry_header_t *shah,
      */
     for ( ; ; )
     {
+        union grant_combo prev, new;
+
         /* If not already pinned, check the grant domid and type. */
-        if ( !act->pin &&
-             (((scombo.shorts.flags & mask) !=
-               GTF_permit_access) ||
-              (scombo.shorts.domid != ldomid)) )
+        if ( !act->pin && (((scombo.flags & mask) != GTF_permit_access) ||
+                           (scombo.domid != ldomid)) )
             PIN_FAIL(done, GNTST_general_error,
                      "Bad flags (%x) or dom (%d); expected d%d\n",
-                     scombo.shorts.flags, scombo.shorts.domid,
-                     ldomid);
+                     scombo.flags, scombo.domid, ldomid);
 
-        new_scombo = scombo;
-        new_scombo.shorts.flags |= GTF_reading;
+        new = scombo;
+        new.flags |= GTF_reading;
 
         if ( !readonly )
         {
-            new_scombo.shorts.flags |= GTF_writing;
-            if ( unlikely(scombo.shorts.flags & GTF_readonly) )
+            new.flags |= GTF_writing;
+            if ( unlikely(scombo.flags & GTF_readonly) )
                 PIN_FAIL(done, GNTST_general_error,
                          "Attempt to write-pin a r/o grant entry\n");
         }
 
-        prev_scombo.word = guest_cmpxchg(rd, raw_shah,
-                                         scombo.word, new_scombo.word);
-        if ( likely(prev_scombo.word == scombo.word) )
+        prev.raw = guest_cmpxchg(rd, raw_shah, scombo.raw, new.raw);
+        if ( likely(prev.raw == scombo.raw) )
             break;
 
         if ( retries++ == 4 )
             PIN_FAIL(done, GNTST_general_error,
                      "Shared grant entry is unstable\n");
 
-        scombo = prev_scombo;
+        scombo = prev;
     }
 
 done:
@@ -756,13 +754,9 @@ static int _set_status_v2(const grant_entry_header_t *shah,
     int      rc    = GNTST_okay;
     uint32_t *raw_shah = (uint32_t *)shah;
     union grant_combo scombo;
-    uint16_t flags = shah->flags;
-    domid_t  id    = shah->domid;
     uint16_t mask  = GTF_type_mask;
 
-    scombo.word = ACCESS_ONCE(*raw_shah);
-    flags = scombo.shorts.flags;
-    id = scombo.shorts.domid;
+    scombo.raw = ACCESS_ONCE(*raw_shah);
 
     /* if this is a grant mapping operation we should ensure GTF_sub_page
        is not set */
@@ -770,13 +764,12 @@ static int _set_status_v2(const grant_entry_header_t *shah,
         mask |= GTF_sub_page;
 
     /* If not already pinned, check the grant domid and type. */
-    if ( !act->pin &&
-         ( (((flags & mask) != GTF_permit_access) &&
-            ((flags & mask) != GTF_transitive)) ||
-          (id != ldomid)) )
+    if ( !act->pin && ((((scombo.flags & mask) != GTF_permit_access) &&
+                        ((scombo.flags & mask) != GTF_transitive)) ||
+                       (scombo.domid != ldomid)) )
         PIN_FAIL(done, GNTST_general_error,
                  "Bad flags (%x) or dom (%d); expected d%d, flags %x\n",
-                 flags, id, ldomid, mask);
+                 scombo.flags, scombo.domid, ldomid, mask);
 
     if ( readonly )
     {
@@ -784,7 +777,7 @@ static int _set_status_v2(const grant_entry_header_t *shah,
     }
     else
     {
-        if ( unlikely(flags & GTF_readonly) )
+        if ( unlikely(scombo.flags & GTF_readonly) )
             PIN_FAIL(done, GNTST_general_error,
                      "Attempt to write-pin a r/o grant entry\n");
         *status |= GTF_reading | GTF_writing;
@@ -794,27 +787,25 @@ static int _set_status_v2(const grant_entry_header_t *shah,
        still valid */
     smp_mb();
 
-    scombo.word = ACCESS_ONCE(*raw_shah);
-    flags = scombo.shorts.flags;
-    id = scombo.shorts.domid;
+    scombo.raw = ACCESS_ONCE(*raw_shah);
 
     if ( !act->pin )
     {
-        if ( (((flags & mask) != GTF_permit_access) &&
-              ((flags & mask) != GTF_transitive)) ||
-             (id != ldomid) ||
-             (!readonly && (flags & GTF_readonly)) )
+        if ( (((scombo.flags & mask) != GTF_permit_access) &&
+              ((scombo.flags & mask) != GTF_transitive)) ||
+             (scombo.domid != ldomid) ||
+             (!readonly && (scombo.flags & GTF_readonly)) )
         {
             gnttab_clear_flag(rd, _GTF_writing, status);
             gnttab_clear_flag(rd, _GTF_reading, status);
             PIN_FAIL(done, GNTST_general_error,
                      "Unstable flags (%x) or dom (%d); expected d%d (r/w: %d)\n",
-                     flags, id, ldomid, !readonly);
+                     scombo.flags, scombo.domid, ldomid, !readonly);
         }
     }
     else
     {
-        if ( unlikely(flags & GTF_readonly) )
+        if ( unlikely(scombo.flags & GTF_readonly) )
         {
             gnttab_clear_flag(rd, _GTF_writing, status);
             PIN_FAIL(done, GNTST_general_error,
@@ -2038,7 +2029,7 @@ gnttab_prepare_for_transfer(
 {
     struct grant_table *rgt = rd->grant_table;
     uint32_t *raw_shah;
-    union grant_combo   scombo, prev_scombo, new_scombo;
+    union grant_combo scombo;
     int                 retries = 0;
 
     grant_read_lock(rgt);
@@ -2052,26 +2043,26 @@ gnttab_prepare_for_transfer(
     }
 
     raw_shah = (uint32_t *)shared_entry_header(rgt, ref);
-    scombo.word = ACCESS_ONCE(*raw_shah);
+    scombo.raw = ACCESS_ONCE(*raw_shah);
 
     for ( ; ; )
     {
-        if ( unlikely(scombo.shorts.flags != GTF_accept_transfer) ||
-             unlikely(scombo.shorts.domid != ld->domain_id) )
+        union grant_combo prev, new;
+
+        if ( unlikely(scombo.flags != GTF_accept_transfer) ||
+             unlikely(scombo.domid != ld->domain_id) )
         {
             gdprintk(XENLOG_INFO,
                      "Bad flags (%x) or dom (%d); expected d%d\n",
-                     scombo.shorts.flags, scombo.shorts.domid,
-                     ld->domain_id);
+                     scombo.flags, scombo.domid, ld->domain_id);
             goto fail;
         }
 
-        new_scombo = scombo;
-        new_scombo.shorts.flags |= GTF_transfer_committed;
+        new = scombo;
+        new.flags |= GTF_transfer_committed;
 
-        prev_scombo.word = guest_cmpxchg(rd, raw_shah,
-                                         scombo.word, new_scombo.word);
-        if ( likely(prev_scombo.word == scombo.word) )
+        prev.raw = guest_cmpxchg(rd, raw_shah, scombo.raw, new.raw);
+        if ( likely(prev.raw == scombo.raw) )
             break;
 
         if ( retries++ == 4 )
@@ -2080,7 +2071,7 @@ gnttab_prepare_for_transfer(
             goto fail;
         }
 
-        scombo = prev_scombo;
+        scombo = prev;
     }
 
     grant_read_unlock(rgt);
