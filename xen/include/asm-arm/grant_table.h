@@ -6,6 +6,8 @@
 #include <xen/pfn.h>
 #include <xen/sched.h>
 
+#include <asm/guest_atomics.h>
+
 #define INITIAL_NR_GRANT_FRAMES 1U
 #define GNTTAB_MAX_VERSION 1
 
@@ -14,13 +16,24 @@ struct grant_table_arch {
     gfn_t *status_gfn;
 };
 
-void gnttab_clear_flag(struct domain *d, unsigned long nr, uint16_t *addr);
+static inline void gnttab_clear_flag(struct domain *d,
+                                     unsigned long nr, uint16_t *addr)
+{
+    guest_clear_mask16(d, BIT(nr, UL), addr);
+}
+
+static inline void gnttab_mark_dirty(struct domain *d, mfn_t mfn)
+{
+#ifndef NDEBUG
+    printk_once(XENLOG_G_WARNING "gnttab_mark_dirty not implemented yet\n");
+#endif
+}
+
 int create_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                               unsigned int flags, unsigned int cache_flags);
 #define gnttab_host_mapping_get_page_type(ro, ld, rd) (0)
 int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                                unsigned long new_gpaddr, unsigned int flags);
-void gnttab_mark_dirty(struct domain *d, mfn_t mfn);
 #define gnttab_release_host_mappings(domain) 1
 
 /*

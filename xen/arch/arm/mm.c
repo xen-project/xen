@@ -41,7 +41,6 @@
 #include <xen/sizes.h>
 #include <xen/libfdt/libfdt.h>
 
-#include <asm/guest_atomics.h>
 #include <asm/setup.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
@@ -1530,21 +1529,6 @@ int get_page_type(struct page_info *page, unsigned long type)
 void put_page_type(struct page_info *page)
 {
     return;
-}
-
-void gnttab_clear_flag(struct domain *d, unsigned long nr, uint16_t *addr)
-{
-    guest_clear_mask16(d, BIT(nr, UL), addr);
-}
-
-void gnttab_mark_dirty(struct domain *d, mfn_t mfn)
-{
-    /* XXX: mark dirty */
-    static int warning;
-    if (!warning) {
-        gdprintk(XENLOG_WARNING, "gnttab_mark_dirty not implemented yet\n");
-        warning = 1;
-    }
 }
 
 int create_grant_host_mapping(unsigned long addr, mfn_t frame,
