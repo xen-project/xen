@@ -2554,7 +2554,7 @@ static bool vcpu_is_migrateable(struct csched2_vcpu *svc,
 static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
 {
     struct csched2_private *prv = csched2_priv(ops);
-    int i, max_delta_rqi = -1;
+    int i, max_delta_rqi;
     struct list_head *push_iter, *pull_iter;
     bool inner_load_updated = 0;
 
@@ -2573,6 +2573,7 @@ static void balance_load(const struct scheduler *ops, int cpu, s_time_t now)
     update_runq_load(ops, st.lrqd, 0, now);
 
 retry:
+    max_delta_rqi = -1;
     if ( !read_trylock(&prv->lock) )
         return;
 
