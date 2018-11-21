@@ -541,6 +541,11 @@ void arch_p2m_set_access_required(struct domain *d, bool access_required)
 #endif
 }
 
+bool p2m_mem_access_sanity_check(struct domain *d)
+{
+    return is_hvm_domain(d) && cpu_has_vmx && hap_enabled(d);
+}
+
 /*
  * Local variables:
  * mode: C

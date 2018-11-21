@@ -44,10 +44,7 @@ bool p2m_mem_access_emulate_check(struct vcpu *v,
                                   const vm_event_response_t *rsp);
 
 /* Sanity check for mem_access hardware support */
-static inline bool p2m_mem_access_sanity_check(struct domain *d)
-{
-    return is_hvm_domain(d) && cpu_has_vmx && hap_enabled(d);
-}
+bool p2m_mem_access_sanity_check(struct domain *d);
 
 #endif /*__ASM_X86_MEM_ACCESS_H__ */
 
