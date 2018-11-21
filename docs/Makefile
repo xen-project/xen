@@ -37,6 +37,10 @@ all: build
 .PHONY: build
 build: html txt pdf man-pages figs
 
+.PHONY: sphinx-html
+sphinx-html:
+	sphinx-build -b html . sphinx/html
+
 .PHONY: html
 html: $(DOC_HTML) html/index.html
 
@@ -59,7 +63,7 @@ clean: clean-man-pages
 	$(MAKE) -C figs clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~
 	rm -rf *.ilg *.log *.ind *.toc *.bak *.tmp core
-	rm -rf html txt pdf
+	rm -rf html txt pdf sphinx/html
 
 .PHONY: distclean
 distclean: clean
