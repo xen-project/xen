@@ -679,6 +679,7 @@ static int _set_status_v1(const grant_entry_header_t *shah,
                           domid_t  ldomid)
 {
     int rc = GNTST_okay;
+    uint32_t *raw_shah = (uint32_t *)shah;
     union grant_combo scombo, prev_scombo, new_scombo;
     uint16_t mask = GTF_type_mask;
 
@@ -697,7 +698,7 @@ static int _set_status_v1(const grant_entry_header_t *shah,
     if ( mapflag )
         mask |= GTF_sub_page;
 
-    scombo.word = *(u32 *)shah;
+    scombo.word = ACCESS_ONCE(*raw_shah);
 
     /*
      * This loop attempts to set the access (reading/writing) flags
@@ -728,7 +729,7 @@ static int _set_status_v1(const grant_entry_header_t *shah,
                          "Attempt to write-pin a r/o grant entry\n");
         }
 
-        prev_scombo.word = guest_cmpxchg(rd, (u32 *)shah,
+        prev_scombo.word = guest_cmpxchg(rd, raw_shah,
                                          scombo.word, new_scombo.word);
         if ( likely(prev_scombo.word == scombo.word) )
             break;
@@ -753,17 +754,13 @@ static int _set_status_v2(const grant_entry_header_t *shah,
                           domid_t  ldomid)
 {
     int      rc    = GNTST_okay;
+    uint32_t *raw_shah = (uint32_t *)shah;
     union grant_combo scombo;
     uint16_t flags = shah->flags;
     domid_t  id    = shah->domid;
     uint16_t mask  = GTF_type_mask;
 
-    /* we read flags and domid in a single memory access.
-       this avoids the need for another memory barrier to
-       ensure access to these fields are not reordered */
-    scombo.word = *(u32 *)shah;
-    barrier(); /* but we still need to stop the compiler from turning
-                  it back into two reads */
+    scombo.word = ACCESS_ONCE(*raw_shah);
     flags = scombo.shorts.flags;
     id = scombo.shorts.domid;
 
@@ -797,8 +794,7 @@ static int _set_status_v2(const grant_entry_header_t *shah,
        still valid */
     smp_mb();
 
-    scombo.word = *(u32 *)shah;
-    barrier();
+    scombo.word = ACCESS_ONCE(*raw_shah);
     flags = scombo.shorts.flags;
     id = scombo.shorts.domid;
 
@@ -2041,7 +2037,7 @@ gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref)
 {
     struct grant_table *rgt = rd->grant_table;
-    grant_entry_header_t *sha;
+    uint32_t *raw_shah;
     union grant_combo   scombo, prev_scombo, new_scombo;
     int                 retries = 0;
 
@@ -2055,9 +2051,8 @@ gnttab_prepare_for_transfer(
         goto fail;
     }
 
-    sha = shared_entry_header(rgt, ref);
-
-    scombo.word = *(u32 *)&sha->flags;
+    raw_shah = (uint32_t *)shared_entry_header(rgt, ref);
+    scombo.word = ACCESS_ONCE(*raw_shah);
 
     for ( ; ; )
     {
@@ -2074,7 +2069,7 @@ gnttab_prepare_for_transfer(
         new_scombo = scombo;
         new_scombo.shorts.flags |= GTF_transfer_committed;
 
-        prev_scombo.word = guest_cmpxchg(rd, (u32 *)&sha->flags,
+        prev_scombo.word = guest_cmpxchg(rd, raw_shah,
                                          scombo.word, new_scombo.word);
         if ( likely(prev_scombo.word == scombo.word) )
             break;
