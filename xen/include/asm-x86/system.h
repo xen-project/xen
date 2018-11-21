@@ -24,9 +24,6 @@ static inline void clflush(const void *p)
 #define xchg(ptr,v) \
     ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
 
-struct __xchg_dummy { unsigned long a[100]; };
-#define __xg(x) ((volatile struct __xchg_dummy *)(x))
-
 #include <asm/x86_64/system.h>
 
 /*
@@ -40,28 +37,24 @@ static always_inline unsigned long __xchg(
     switch ( size )
     {
     case 1:
-        asm volatile ( "xchgb %b0,%1"
-                       : "=q" (x)
-                       : "m" (*__xg(ptr)), "0" (x)
-                       : "memory" );
+        asm volatile ( "xchg %b[x], %[ptr]"
+                       : [x] "+q" (x), [ptr] "+m" (*(volatile uint8_t *)ptr)
+                       :: "memory" );
         break;
     case 2:
-        asm volatile ( "xchgw %w0,%1"
-                       : "=r" (x)
-                       : "m" (*__xg(ptr)), "0" (x)
-                       : "memory" );
+        asm volatile ( "xchg %w[x], %[ptr]"
+                       : [x] "+r" (x), [ptr] "+m" (*(volatile uint16_t *)ptr)
+                       :: "memory" );
         break;
     case 4:
-        asm volatile ( "xchgl %k0,%1"
-                       : "=r" (x)
-                       : "m" (*__xg(ptr)), "0" (x)
-                       : "memory" );
+        asm volatile ( "xchg %k[x], %[ptr]"
+                       : [x] "+r" (x), [ptr] "+m" (*(volatile uint32_t *)ptr)
+                       :: "memory" );
         break;
     case 8:
-        asm volatile ( "xchgq %0,%1"
-                       : "=r" (x)
-                       : "m" (*__xg(ptr)), "0" (x)
-                       : "memory" );
+        asm volatile ( "xchg %q[x], %[ptr]"
+                       : [x] "+r" (x), [ptr] "+m" (*(volatile uint64_t *)ptr)
+                       :: "memory" );
         break;
     }
     return x;
@@ -80,31 +73,27 @@ static always_inline unsigned long __cmpxchg(
     switch ( size )
     {
     case 1:
-        asm volatile ( "lock; cmpxchgb %b1,%2"
-                       : "=a" (prev)
-                       : "q" (new), "m" (*__xg(ptr)),
-                       "0" (old)
+        asm volatile ( "lock cmpxchg %b[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(volatile uint8_t *)ptr)
+                       : [new] "q" (new), "a" (old)
                        : "memory" );
         return prev;
     case 2:
-        asm volatile ( "lock; cmpxchgw %w1,%2"
-                       : "=a" (prev)
-                       : "r" (new), "m" (*__xg(ptr)),
-                       "0" (old)
+        asm volatile ( "lock cmpxchg %w[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(volatile uint16_t *)ptr)
+                       : [new] "r" (new), "a" (old)
                        : "memory" );
         return prev;
     case 4:
-        asm volatile ( "lock; cmpxchgl %k1,%2"
-                       : "=a" (prev)
-                       : "r" (new), "m" (*__xg(ptr)),
-                       "0" (old)
+        asm volatile ( "lock cmpxchg %k[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(volatile uint32_t *)ptr)
+                       : [new] "r" (new), "a" (old)
                        : "memory" );
         return prev;
     case 8:
-        asm volatile ( "lock; cmpxchgq %1,%2"
-                       : "=a" (prev)
-                       : "r" (new), "m" (*__xg(ptr)),
-                       "0" (old)
+        asm volatile ( "lock cmpxchg %q[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(volatile uint64_t *)ptr)
+                       : [new] "r" (new), "a" (old)
                        : "memory" );
         return prev;
     }
@@ -119,24 +108,24 @@ static always_inline unsigned long cmpxchg_local_(
     switch ( size )
     {
     case 1:
-        asm volatile ( "cmpxchgb %b2, %1"
-                       : "=a" (prev), "+m" (*(uint8_t *)ptr)
-                       : "q" (new), "0" (old) );
+        asm volatile ( "cmpxchg %b[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(uint8_t *)ptr)
+                       : [new] "q" (new), "a" (old) );
         break;
     case 2:
-        asm volatile ( "cmpxchgw %w2, %1"
-                       : "=a" (prev), "+m" (*(uint16_t *)ptr)
-                       : "r" (new), "0" (old) );
+        asm volatile ( "cmpxchg %w[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(uint16_t *)ptr)
+                       : [new] "r" (new), "a" (old) );
         break;
     case 4:
-        asm volatile ( "cmpxchgl %k2, %1"
-                       : "=a" (prev), "+m" (*(uint32_t *)ptr)
-                       : "r" (new), "0" (old) );
+        asm volatile ( "cmpxchg %k[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(uint32_t *)ptr)
+                       : [new] "r" (new), "a" (old) );
         break;
     case 8:
-        asm volatile ( "cmpxchgq %2, %1"
-                       : "=a" (prev), "+m" (*(uint64_t *)ptr)
-                       : "r" (new), "0" (old) );
+        asm volatile ( "cmpxchg %q[new], %[ptr]"
+                       : "=a" (prev), [ptr] "+m" (*(uint64_t *)ptr)
+                       : [new] "r" (new), "a" (old) );
         break;
     }
 
@@ -162,23 +151,23 @@ static always_inline unsigned long __xadd(
     switch ( size )
     {
     case 1:
-        asm volatile ( "lock; xaddb %b0,%1"
-                       : "+r" (v), "+m" (*__xg(ptr))
+        asm volatile ( "lock xadd %b[v], %[ptr]"
+                       : [v] "+q" (v), [ptr] "+m" (*(volatile uint8_t *)ptr)
                        :: "memory");
         return v;
     case 2:
-        asm volatile ( "lock; xaddw %w0,%1"
-                       : "+r" (v), "+m" (*__xg(ptr))
+        asm volatile ( "lock xadd %w[v], %[ptr]"
+                       : [v] "+r" (v), [ptr] "+m" (*(volatile uint16_t *)ptr)
                        :: "memory");
         return v;
     case 4:
-        asm volatile ( "lock; xaddl %k0,%1"
-                       : "+r" (v), "+m" (*__xg(ptr))
+        asm volatile ( "lock xadd %k[v], %[ptr]"
+                       : [v] "+r" (v), [ptr] "+m" (*(volatile uint32_t *)ptr)
                        :: "memory");
         return v;
     case 8:
-        asm volatile ( "lock; xaddq %q0,%1"
-                       : "+r" (v), "+m" (*__xg(ptr))
+        asm volatile ( "lock xadd %q[v], %[ptr]"
+                       : [v] "+r" (v), [ptr] "+m" (*(volatile uint64_t *)ptr)
                        :: "memory");
 
         return v;
