@@ -2061,6 +2061,14 @@ retry_transaction:
     return 0;
 }
 
+static void dmss_init(libxl__dm_spawn_state *dmss)
+{
+}
+
+static void dmss_dispose(libxl__gc *gc, libxl__dm_spawn_state *dmss)
+{
+}
+
 static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
                                 libxl__dm_spawn_state *stubdom_dmss,
                                 int rc);
@@ -2099,6 +2107,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     libxl__domain_build_state *const stubdom_state = &sdss->dm_state;
 
     libxl__domain_build_state_init(stubdom_state);
+    dmss_init(&sdss->dm);
 
     if (guest_config->b_info.device_model_version !=
         LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
@@ -2430,6 +2439,7 @@ static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
  out:
     libxl__domain_build_state_dispose(&sdss->dm_state);
     libxl__xswait_stop(gc, xswait);
+    dmss_dispose(gc, &sdss->dm);
     sdss->callback(egc, &sdss->dm, rc);
 }
 
@@ -2470,6 +2480,8 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     char **pass_stuff;
     const char *dm;
     int dm_state_fd = -1;
+
+    dmss_init(dmss);
 
     if (libxl_defbool_val(b_info->device_model_stubdomain)) {
         abort();
@@ -2690,6 +2702,7 @@ static void device_model_spawn_outcome(libxl__egc *egc,
     }
 
  out:
+    dmss_dispose(gc, dmss);
     dmss->callback(egc, dmss, rc);
 }
 
@@ -2701,6 +2714,8 @@ void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     const char *dm;
     int logfile_w, null = -1, rc;
     uint32_t domid = dmss->guest_domid;
+
+    dmss_init(dmss);
 
     /* Always use qemu-xen as device model */
     dm = qemu_xen_path(gc);
@@ -2766,6 +2781,7 @@ void libxl__spawn_qdisk_backend(libxl__egc *egc, libxl__dm_spawn_state *dmss)
 
     rc = 0;
 out:
+    dmss_dispose(gc, dmss);
     if (logfile_w >= 0) close(logfile_w);
     if (null >= 0) close(null);
     /* callback on error only, success goes via dmss->spawn.*_cb */
