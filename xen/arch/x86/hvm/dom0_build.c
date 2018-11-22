@@ -101,7 +101,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
         unsigned int range_order = get_order_from_pages(nr_pages + 1);
 
         order = min(range_order ? range_order - 1 : 0, order);
-        page = alloc_domheap_pages(d, order, dom0_memflags);
+        page = alloc_domheap_pages(d, order, dom0_memflags | MEMF_no_scrub);
         if ( page == NULL )
         {
             if ( order == 0 && dom0_memflags )
