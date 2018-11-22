@@ -1,0 +1,379 @@
+.build-tmpl: &build
+  stage: build
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  script:
+    - ./automation/scripts/build 2>&1 | tee build.log
+  artifacts:
+    paths:
+      - binaries/
+      - xen-config
+      - '*.log'
+    when: always
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
+
+.gcc-tmpl:
+  variabes: &gcc
+    CC: gcc
+    CXX: g++
+
+.clang-tmpl:
+  variables: &clang
+    CC: clang
+    CXX: clang++
+    clang: y
+
+.x86-64-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: x86_64
+  tags:
+    - x86_64
+
+.x86-64-build:
+  extends: .x86-64-build-tmpl
+  variables:
+    debug: n
+
+.x86-64-build-debug:
+  extends: .x86-64-build-tmpl
+  variables:
+    debug: y
+
+.x86-32-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: x86_32
+  tags:
+    - x86_32
+
+.x86-32-build:
+  extends: .x86-32-build-tmpl
+  variables:
+    debug: n
+
+.x86-32-build-debug:
+  extends: .x86-32-build-tmpl
+  variables:
+    debug: y
+
+.gcc-x86-64-build:
+  extends: .x86-64-build
+  variables:
+    <<: *gcc
+
+.gcc-x86-64-build-debug:
+  extends: .x86-64-build-debug
+  variables:
+    <<: *gcc
+
+.gcc-x86-32-build:
+  extends: .x86-32-build
+  variables:
+    <<: *gcc
+
+.gcc-x86-32-build-debug:
+  extends: .x86-32-build-debug
+  variables:
+    <<: *gcc
+
+.clang-x86-64-build:
+  extends: .x86-64-build
+  variables:
+    <<: *clang
+
+.clang-x86-64-build-debug:
+  extends: .x86-64-build-debug
+  variables:
+    <<: *clang
+
+.clang-x86-32-build:
+  extends: .x86-32-build
+  variables:
+    <<: *clang
+
+.clang-x86-32-build-debug:
+  extends: .x86-32-build-debug
+  variables:
+    <<: *clang
+
+.arm64-build-tmpl:
+  <<: *build
+  variables:
+    XEN_TARGET_ARCH: arm64
+  tags:
+    - arm64
+
+.arm64-build:
+  extends: .arm64-build-tmpl
+  variables:
+    debug: n
+
+.arm64-build-debug:
+  extends: .arm64-build-tmpl
+  variables:
+    debug: y
+
+.gcc-arm64-build:
+  extends: .arm64-build
+  variables:
+    <<: *gcc
+
+.gcc-arm64-build-debug:
+  extends: .arm64-build-debug
+  variables:
+    <<: *gcc
+
+# Jobs below this line
+
+centos-7-2-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: centos:7.2
+
+centos-7-2-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: centos:7.2
+
+centos-7-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: centos:7
+
+centos-7-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: centos:7
+
+debian-jessie-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:jessie
+
+debian-jessie-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: debian:jessie
+
+debian-jessie-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:jessie
+
+debian-jessie-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: debian:jessie
+
+debian-jessie-32-clang:
+  extends: .clang-x86-32-build
+  variables:
+    CONTAINER: debian:jessie-i386
+
+debian-jessie-32-clang-debug:
+  extends: .clang-x86-32-build-debug
+  variables:
+    CONTAINER: debian:jessie-i386
+
+debian-jessie-32-gcc:
+  extends: .gcc-x86-32-build
+  variables:
+    CONTAINER: debian:jessie-i386
+
+debian-jessie-32-gcc-debug:
+  extends: .gcc-x86-32-build-debug
+  variables:
+    CONTAINER: debian:jessie-i386
+
+debian-stretch-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-32-clang:
+  extends: .clang-x86-32-build
+  variables:
+    CONTAINER: debian:stretch-i386
+
+debian-stretch-32-clang-debug:
+  extends: .clang-x86-32-build-debug
+  variables:
+    CONTAINER: debian:stretch-i386
+
+debian-stretch-32-gcc:
+  extends: .gcc-x86-32-build
+  variables:
+    CONTAINER: debian:stretch-i386
+
+debian-stretch-32-gcc-debug:
+  extends: .gcc-x86-32-build-debug
+  variables:
+    CONTAINER: debian:stretch-i386
+
+debian-unstable-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-gcc-randconfig:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+    RANDCONFIG: y
+
+debian-unstable-gcc-debug-randconfig:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: debian:unstable
+    RANDCONFIG: y
+
+debian-unstable-32-clang:
+  extends: .clang-x86-32-build
+  variables:
+    CONTAINER: debian:unstable-i386
+
+debian-unstable-32-clang-debug:
+  extends: .clang-x86-32-build-debug
+  variables:
+    CONTAINER: debian:unstable-i386
+
+debian-unstable-32-gcc:
+  extends: .gcc-x86-32-build
+  variables:
+    CONTAINER: debian:unstable-i386
+
+debian-unstable-32-gcc-debug:
+  extends: .gcc-x86-32-build-debug
+  variables:
+    CONTAINER: debian:unstable-i386
+
+# Ubuntu Trusty's Clang is 3.4 while Xen requires 3.5
+
+ubuntu-trusty-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:trusty
+
+ubuntu-trusty-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:trusty
+
+ubuntu-xenial-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-xenial-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-xenial-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-xenial-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:xenial
+
+ubuntu-bionic-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:bionic
+
+ubuntu-bionic-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:bionic
+
+ubuntu-bionic-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:bionic
+
+ubuntu-bionic-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:bionic
+
+opensuse-leap-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+opensuse-leap-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+opensuse-leap-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+opensuse-leap-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-leap
+
+# Arm builds
+
+debian-unstable-gcc-arm64:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+
+debian-unstable-gcc-debug-arm64:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+
+debian-unstable-gcc-arm64-randconfig:
+  extends: .gcc-arm64-build
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+    RANDCONFIG: y
+
+debian-unstable-gcc-debug-arm64-randconfig:
+  extends: .gcc-arm64-build-debug
+  variables:
+    CONTAINER: debian:unstable-arm64v8
+    RANDCONFIG: y
+

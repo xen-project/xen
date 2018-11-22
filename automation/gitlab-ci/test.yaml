@@ -1,0 +1,34 @@
+# Test jobs
+qemu-smoke-x86-64-gcc:
+  stage: test
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  variables:
+    CONTAINER: debian:stretch
+  script:
+    - ./automation/scripts/qemu-smoke-x86-64.sh 2>&1 | tee qemu-smoke-x86-64.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  dependencies:
+    - debian-stretch-gcc-debug
+  tags:
+    - x86_64
+
+qemu-smoke-x86-64-clang:
+  stage: test
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  variables:
+    CONTAINER: debian:stretch
+  script:
+    - ./automation/scripts/qemu-smoke-x86-64.sh 2>&1 | tee qemu-smoke-x86-64.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  dependencies:
+    - debian-unstable-clang-debug
+  tags:
+    - x86_64
