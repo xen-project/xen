@@ -5,7 +5,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 TARGET := test_x86_emulator
 
 .PHONY: all
-all: $(TARGET)
+all:
 
 .PHONY: run
 run: $(TARGET)
@@ -67,6 +67,24 @@ xop-flts := $(avx-flts)
 avx512f-opmask-vecs := 2
 avx512dq-opmask-vecs := 1
 avx512bw-opmask-vecs := 4 8
+
+# Suppress building by default of the harness if the compiler can't deal
+# with any of the extensions used.  Don't alter the "run" target dependencies
+# though, as this target needs to be specified manually, and things may work
+# partially even with older compilers.
+TARGET-y := $(TARGET)
+
+define simd-check-cc
+TARGET-$(shell echo 'int i;' | $(CC) -x c -c -o /dev/null -m$(1) - || echo y) :=
+endef
+
+$(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-check-cc,$(flavor))))
+
+ifeq ($(TARGET-y),)
+$(warning Test harness not built, use newer compiler than "$(CC)")
+endif
+
+all: $(TARGET-y)
 
 # For AVX and later, have the compiler avoid XMM0 to widen coverage of
 # the VEX.vvvv checks in the emulator.  For 3DNow!, however, force SSE
