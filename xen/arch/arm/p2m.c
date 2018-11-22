@@ -1,19 +1,11 @@
-#include <xen/sched.h>
-#include <xen/lib.h>
-#include <xen/errno.h>
-#include <xen/domain_page.h>
-#include <xen/bitops.h>
-#include <xen/vm_event.h>
-#include <xen/monitor.h>
-#include <xen/iocap.h>
-#include <xen/mem_access.h>
-#include <xen/xmalloc.h>
 #include <xen/cpu.h>
-#include <xen/notifier.h>
-#include <public/vm_event.h>
-#include <asm/flushtlb.h>
+#include <xen/domain_page.h>
+#include <xen/iocap.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
+
 #include <asm/event.h>
-#include <asm/hardirq.h>
+#include <asm/flushtlb.h>
 #include <asm/page.h>
 
 #define MAX_VMID_8_BIT  (1UL << 8)
