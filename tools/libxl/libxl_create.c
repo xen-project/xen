@@ -761,6 +761,16 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
                             libxl_device_model_version_to_string(b_info->device_model_version));
 }
 
+void libxl__domain_build_state_init(libxl__domain_build_state *state)
+{
+}
+
+void libxl__domain_build_state_dispose(libxl__domain_build_state *state)
+{
+    libxl__file_reference_unmap(&state->pv_kernel);
+    libxl__file_reference_unmap(&state->pv_ramdisk);
+}
+
 /*----- main domain creation -----*/
 
 /* We have a linear control flow; only one event callback is
@@ -823,6 +833,7 @@ static void initiate_domain_create(libxl__egc *egc,
     const int restore_fd = dcs->restore_fd;
 
     domid = dcs->domid_soft_reset;
+    libxl__domain_build_state_init(&dcs->build_state);
 
     if (d_config->c_info.ssid_label) {
         char *s = d_config->c_info.ssid_label;
@@ -1595,8 +1606,7 @@ static void domcreate_complete(libxl__egc *egc,
     libxl_domain_config *const d_config = dcs->guest_config;
     libxl_domain_config *d_config_saved = &dcs->guest_config_saved;
 
-    libxl__file_reference_unmap(&dcs->build_state.pv_kernel);
-    libxl__file_reference_unmap(&dcs->build_state.pv_ramdisk);
+    libxl__domain_build_state_dispose(&dcs->build_state);
 
     if (!rc && d_config->b_info.exec_ssidref)
         rc = xc_flask_relabel_domain(CTX->xch, dcs->guest_domid, d_config->b_info.exec_ssidref);

@@ -2045,6 +2045,8 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     libxl__domain_build_state *const d_state = sdss->dm.build_state;
     libxl__domain_build_state *const stubdom_state = &sdss->dm_state;
 
+    libxl__domain_build_state_init(stubdom_state);
+
     if (guest_config->b_info.device_model_version !=
         LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
         ret = ERROR_INVAL;
@@ -2373,6 +2375,7 @@ static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
     if (strcmp(p, "running"))
         return;
  out:
+    libxl__domain_build_state_dispose(&sdss->dm_state);
     libxl__xswait_stop(gc, xswait);
     sdss->callback(egc, &sdss->dm, rc);
 }

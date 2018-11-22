@@ -1265,6 +1265,9 @@ typedef struct {
     uint32_t clock_frequency;
 } libxl__domain_build_state;
 
+_hidden void libxl__domain_build_state_init(libxl__domain_build_state *s);
+_hidden void libxl__domain_build_state_dispose(libxl__domain_build_state *s);
+
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_config * const d_config,
               libxl__domain_build_state *state);
