@@ -3555,6 +3555,13 @@ csched2_schedule(
             __set_bit(__CSFLAG_scheduled, &snext->flags);
         }
 
+        /* Clear the idle mask if necessary */
+        if ( cpumask_test_cpu(cpu, &rqd->idle) )
+        {
+            __cpumask_clear_cpu(cpu, &rqd->idle);
+            smt_idle_mask_clear(cpu, &rqd->smt_idle);
+        }
+
         /*
          * The reset condition is "has a scheduler epoch come to an end?".
          * The way this is enforced is checking whether the vcpu at the top
@@ -3573,13 +3580,6 @@ csched2_schedule(
         {
             reset_credit(ops, cpu, now, snext);
             balance_load(ops, cpu, now);
-        }
-
-        /* Clear the idle mask if necessary */
-        if ( cpumask_test_cpu(cpu, &rqd->idle) )
-        {
-            __cpumask_clear_cpu(cpu, &rqd->idle);
-            smt_idle_mask_clear(cpu, &rqd->smt_idle);
         }
 
         snext->start_time = now;
