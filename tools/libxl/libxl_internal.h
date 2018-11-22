@@ -2046,6 +2046,9 @@ _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc_opt, const char *s);
 
 _hidden char *libxl__json_object_to_json(libxl__gc *gc,
                                          const libxl__json_object *args);
+/* Always return a valid string, but invalid json on error. */
+#define JSON(o) \
+    (libxl__json_object_to_json(gc, (o)) ? : "<invalid-json-object>")
 
   /* Based on /local/domain/$domid/dm-version xenstore key
    * default is qemu xen traditional */
