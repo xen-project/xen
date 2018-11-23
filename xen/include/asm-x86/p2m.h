@@ -222,7 +222,7 @@ struct p2m_domain {
     struct rangeset   *logdirty_ranges;
 
     /* Host p2m: Global log-dirty mode enabled for the domain. */
-    bool_t             global_logdirty;
+    bool               global_logdirty;
 
     /* Host p2m: when this flag is set, don't flush all the nested-p2m 
      * tables on every host-p2m change.  The setter of this flag 
