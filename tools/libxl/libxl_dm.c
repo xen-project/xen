@@ -2348,7 +2348,6 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
     }
 
     const char *dom_path = libxl__xs_get_dompath(gc, domid);
-    spawn->pidpath = GCSPRINTF("%s/%s", dom_path, "image/device-model-pid");
 
     if (vnc && vnc->passwd) {
         /* This xenstore key will only be used by qemu-xen-traditionnal.
