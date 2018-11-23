@@ -978,7 +978,8 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
              * ignored) when STIBP isn't enumerated in hardware.
              */
             else if ( ctxt->msr[i].val &
-                      ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP) )
+                      ~(SPEC_CTRL_IBRS | SPEC_CTRL_STIBP |
+                        (v->domain->arch.cpuid->feat.ssbd ? SPEC_CTRL_SSBD : 0)) )
                 err = -ENXIO;
             else
                 v->arch.spec_ctrl = ctxt->msr[i].val;
