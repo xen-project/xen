@@ -2303,6 +2303,11 @@ struct page_info *alloc_domheap_pages(
 
     if ( memflags & MEMF_no_owner )
         memflags |= MEMF_no_refcount;
+    else if ( (memflags & MEMF_no_refcount) && d )
+    {
+        ASSERT(!(memflags & MEMF_no_refcount));
+        return NULL;
+    }
 
     if ( dma_bitsize && ((dma_zone = bits_to_zone(dma_bitsize)) < zone_hi) )
         pg = alloc_heap_pages(dma_zone + 1, zone_hi, order, memflags, d);
