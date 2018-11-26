@@ -232,8 +232,10 @@ bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn);
 /*
  * Clean & invalidate caches corresponding to a region [start,end) of guest
  * address space.
+ *
+ * start will get updated if the function is preempted.
  */
-int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end);
+int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end);
 
 /*
  * Map a region in the guest p2m with a specific p2m type.

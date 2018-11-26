@@ -1524,13 +1524,17 @@ int relinquish_p2m_mapping(struct domain *d)
     return rc;
 }
 
-int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
+int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     gfn_t next_block_gfn;
+    gfn_t start = *pstart;
     mfn_t mfn = INVALID_MFN;
     p2m_type_t t;
     unsigned int order;
+    int rc = 0;
+    /* Counter for preemption */
+    unsigned short count = 0;
 
     /*
      * The operation cache flush will invalidate the RAM assigned to the
@@ -1547,6 +1551,25 @@ int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
 
     while ( gfn_x(start) < gfn_x(end) )
     {
+       /*
+         * Cleaning the cache for the P2M may take a long time. So we
+         * need to be able to preempt. We will arbitrarily preempt every
+         * time count reach 512 or above.
+         *
+         * The count will be incremented by:
+         *  - 1 on region skipped
+         *  - 10 for each page requiring a flush
+         */
+        if ( count >= 512 )
+        {
+            if ( softirq_pending(smp_processor_id()) )
+            {
+                rc = -ERESTART;
+                break;
+            }
+            count = 0;
+        }
+
         /*
          * We want to flush page by page as:
          *  - it may not be possible to map the full block (can be up to 1GB)
@@ -1568,10 +1591,13 @@ int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
 
             if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_any_ram(t) )
             {
+                count++;
                 start = next_block_gfn;
                 continue;
             }
         }
+
+        count += 10;
 
         flush_page_to_ram(mfn_x(mfn), false);
 
@@ -1579,11 +1605,14 @@ int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
         mfn = mfn_add(mfn, 1);
     }
 
-    invalidate_icache();
+    if ( rc != -ERESTART )
+        invalidate_icache();
 
     p2m_read_unlock(p2m);
 
-    return 0;
+    *pstart = start;
+
+    return rc;
 }
 
 mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)
