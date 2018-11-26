@@ -80,6 +80,10 @@ endef
 
 $(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-check-cc,$(flavor))))
 
+# Also explicitly check for {evex} pseudo-prefix support, which got introduced
+# only after AVX512F and some of its extensions.
+TARGET-$(shell echo 'asm("{evex} vzeroall");' | $(CC) -x c -c -o /dev/null - || echo y) :=
+
 ifeq ($(TARGET-y),)
 $(warning Test harness not built, use newer compiler than "$(CC)")
 endif
