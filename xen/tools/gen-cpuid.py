@@ -19,7 +19,8 @@ class State(object):
         self.output = open_file_or_fd(output, "w", 2)
 
         # State parsed from input
-        self.names = {} # Name => value mapping
+        self.names = {}  # Value => Name mapping
+        self.values = {} # Name => Value mapping
         self.raw_special = set()
         self.raw_pv = set()
         self.raw_hvm_shadow = set()
@@ -76,8 +77,9 @@ def parse_definitions(state):
             this_name = name
         setattr(this, this_name, val)
 
-        # Construct a reverse mapping of value to name
+        # Construct forward and reverse mappings between name and value
         state.names[val] = name
+        state.values[name.lower().replace("_", "-")] = val
 
         for a in attr:
 
@@ -399,6 +401,22 @@ def write_results(state):
             % (dep, state.names[dep],
                format_uint32s(state.deep_deps[dep], 8)
            ))
+
+    state.output.write(
+"""}
+
+#define INIT_FEATURE_NAMES { \\
+""")
+
+    try:
+        _tmp = state.values.iteritems()
+    except AttributeError:
+        _tmp = state.values.items()
+
+    for name, bit in sorted(_tmp):
+        state.output.write(
+            '    { "%s", %sU },\\\n' % (name, bit)
+            )
 
     state.output.write(
 """}

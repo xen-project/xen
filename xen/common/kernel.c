@@ -309,10 +309,10 @@ int cmdline_strcmp(const char *frag, const char *name)
         if ( res || n == '\0' )
         {
             /*
-             * NUL in 'name' matching a comma, colon or semicolon in 'frag'
-             * implies success.
+             * NUL in 'name' matching a comma, colon, semicolon or equals in
+             * 'frag' implies success.
              */
-            if ( n == '\0' && (f == ',' || f == ':' || f == ';') )
+            if ( n == '\0' && (f == ',' || f == ':' || f == ';' || f == '=') )
                 res = 0;
 
             return res;

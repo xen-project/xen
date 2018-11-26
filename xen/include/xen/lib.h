@@ -85,8 +85,8 @@ int parse_boolean(const char *name, const char *s, const char *e);
 
 /**
  * Very similar to strcmp(), but will declare a match if the NUL in 'name'
- * lines up with comma, colon or semicolon in 'frag'.  Designed for picking
- * exact string matches out of a delimited command line list.
+ * lines up with comma, colon, semicolon or equals in 'frag'.  Designed for
+ * picking exact string matches out of a delimited command line list.
  */
 int cmdline_strcmp(const char *frag, const char *name);
 

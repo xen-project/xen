@@ -25,41 +25,59 @@ static int __init parse_xen_cpuid(const char *s)
     int val, rc = 0;
 
     do {
+        static const struct feature {
+            const char *name;
+            unsigned int bit;
+        } features[] __initconstrel = INIT_FEATURE_NAMES;
+        const struct feature *lhs, *mid, *rhs;
+        const char *feat;
+
         ss = strchr(s, ',');
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( (val = parse_boolean("md-clear", s, ss)) >= 0 )
+        /* Skip the 'no-' prefix for name comparisons. */
+        feat = s;
+        if ( strncmp(s, "no-", 3) == 0 )
+            feat += 3;
+
+        /* (Re)initalise lhs and rhs for binary search. */
+        lhs = features;
+        rhs = features + ARRAY_SIZE(features);
+
+        while ( lhs < rhs )
         {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_MD_CLEAR);
+            int res;
+
+            mid = lhs + (rhs - lhs) / 2;
+            res = cmdline_strcmp(feat, mid->name);
+
+            if ( res < 0 )
+            {
+                rhs = mid;
+                continue;
+            }
+            if ( res > 0 )
+            {
+                lhs = mid + 1;
+                continue;
+            }
+
+            if ( (val = parse_boolean(mid->name, s, ss)) >= 0 )
+            {
+                if ( !val )
+                    setup_clear_cpu_cap(mid->bit);
+                mid = NULL;
+            }
+
+            break;
         }
-        else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_IBPB);
-        }
-        else if ( (val = parse_boolean("ibrsb", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_IBRSB);
-        }
-        else if ( (val = parse_boolean("stibp", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_STIBP);
-        }
-        else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_L1D_FLUSH);
-        }
-        else if ( (val = parse_boolean("ssbd", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_SSBD);
-        }
-        else
+
+        /*
+         * Mid being NULL means that the name and boolean were successfully
+         * identified.  Everything else is an error.
+         */
+        if ( mid )
             rc = -EINVAL;
 
         s = ss + 1;
