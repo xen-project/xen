@@ -479,9 +479,8 @@ if __name__ == "__main__":
         sys.exit(main())
     except Fail:
         e = sys.exc_info()[1]
-        sys.stderr.write("%s:" % (sys.argv[0],))
-        sys.stderr.write(e)
-        sys.stderr.write("\n")
+        sys.stderr.write("%s: Fail: %s\n" %
+                         (os.path.abspath(sys.argv[0]), str(e)))
         sys.exit(1)
     except SystemExit:
         e = sys.exc_info()[1]
