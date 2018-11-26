@@ -602,10 +602,12 @@ void viridian_map_guest_page(struct vcpu *v, struct viridian_page *vp)
 {
     struct domain *d = v->domain;
     unsigned long gmfn = vp->msr.fields.pfn;
-    struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
+    struct page_info *page;
 
-    ASSERT(!vp->ptr);
+    if ( vp->ptr )
+        return;
 
+    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
     if ( !page )
         goto fail;
 
