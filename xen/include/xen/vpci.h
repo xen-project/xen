@@ -152,6 +152,9 @@ struct vpci_vcpu {
 #ifdef __XEN__
 void vpci_dump_msi(void);
 
+/* Make sure there's a hole in the p2m for the MSIX mmio areas. */
+int vpci_make_msix_hole(const struct pci_dev *pdev);
+
 /* Arch-specific vPCI MSI helpers. */
 void vpci_msi_arch_mask(struct vpci_msi *msi, const struct pci_dev *pdev,
                         unsigned int entry, bool mask);

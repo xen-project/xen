@@ -89,6 +89,17 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
     bool map = cmd & PCI_COMMAND_MEMORY;
     unsigned int i;
 
+    /*
+     * Make sure there are no mappings in the MSIX MMIO areas, so that accesses
+     * can be trapped (and emulated) by Xen when the memory decoding bit is
+     * enabled.
+     *
+     * FIXME: punching holes after the p2m has been set up might be racy for
+     * DomU usage, needs to be revisited.
+     */
+    if ( map && !rom_only && vpci_make_msix_hole(pdev) )
+        return;
+
     for ( i = 0; i < ARRAY_SIZE(header->bars); i++ )
     {
         if ( !MAPPABLE_BAR(&header->bars[i]) )

@@ -21,6 +21,7 @@
 #include <xen/vpci.h>
 
 #include <asm/msi.h>
+#include <asm/p2m.h>
 
 #define VMSIX_SIZE(num) offsetof(struct vpci_msix, entries[num])
 
@@ -394,6 +395,54 @@ static const struct hvm_mmio_ops vpci_msix_table_ops = {
     .read = msix_read,
     .write = msix_write,
 };
+
+int vpci_make_msix_hole(const struct pci_dev *pdev)
+{
+    struct domain *d = pdev->domain;
+    unsigned int i;
+
+    if ( !pdev->vpci->msix )
+        return 0;
+
+    /* Make sure there's a hole for the MSIX table/PBA in the p2m. */
+    for ( i = 0; i < ARRAY_SIZE(pdev->vpci->msix->tables); i++ )
+    {
+        unsigned long start = PFN_DOWN(vmsix_table_addr(pdev->vpci, i));
+        unsigned long end = PFN_DOWN(vmsix_table_addr(pdev->vpci, i) +
+                                     vmsix_table_size(pdev->vpci, i) - 1);
+
+        for ( ; start <= end; start++ )
+        {
+            p2m_type_t t;
+            mfn_t mfn = get_gfn_query(d, start, &t);
+
+            switch ( t )
+            {
+            case p2m_mmio_dm:
+            case p2m_invalid:
+                break;
+            case p2m_mmio_direct:
+                if ( mfn_x(mfn) == start )
+                {
+                    clear_identity_p2m_entry(d, start);
+                    break;
+                }
+                /* fallthrough. */
+            default:
+                put_gfn(d, start);
+                gprintk(XENLOG_WARNING,
+                        "%04x:%02x:%02x.%u: existing mapping (mfn: %" PRI_mfn
+                        "type: %d) at %#lx clobbers MSIX MMIO area\n",
+                        pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
+                        PCI_FUNC(pdev->devfn), mfn_x(mfn), t, start);
+                return -EEXIST;
+            }
+            put_gfn(d, start);
+        }
+    }
+
+    return 0;
+}
 
 static int init_msix(struct pci_dev *pdev)
 {
