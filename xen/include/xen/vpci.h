@@ -145,7 +145,7 @@ struct vpci_vcpu {
     /* Per-vcpu structure to store state while {un}mapping of PCI BARs. */
     struct rangeset *mem;
     struct pci_dev *pdev;
-    bool map      : 1;
+    uint16_t cmd;
     bool rom_only : 1;
 };
 
