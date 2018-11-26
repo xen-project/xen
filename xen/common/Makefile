@@ -75,6 +75,8 @@ tmem-y := tmem.o tmem_xen.o tmem_control.o
 tmem-$(CONFIG_COMPAT) += compat/tmem_xen.o
 obj-$(CONFIG_TMEM) += $(tmem-y)
 
+extra-y := symbols-dummy.o
+
 subdir-$(CONFIG_COVERAGE) += coverage
 subdir-$(CONFIG_UBSAN) += ubsan
 

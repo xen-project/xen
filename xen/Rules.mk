@@ -110,7 +110,7 @@ define gendep
         DEPS += $(dir $(1)).$(notdir $(1)).d
     endif
 endef
-$(foreach o,$(filter-out %/,$(obj-y)),$(eval $(call gendep,$(o))))
+$(foreach o,$(filter-out %/,$(obj-y) $(obj-bin-y) $(extra-y)),$(eval $(call gendep,$(o))))
 
 # Ensure each subdirectory has exactly one trailing slash.
 subdir-n := $(patsubst %,%/,$(patsubst %/,%,$(subdir-n) $(subdir-)))
@@ -158,22 +158,22 @@ endif
 # Always build obj-bin files as binary even if they come from C source. 
 $(obj-bin-y): CFLAGS := $(filter-out -flto,$(CFLAGS))
 
-built_in.o: $(obj-y)
+built_in.o: $(obj-y) $(extra-y)
 ifeq ($(obj-y),)
 	$(CC) $(CFLAGS) -c -x c /dev/null -o $@
 else
 ifeq ($(CONFIG_LTO),y)
-	$(LD_LTO) -r -o $@ $^
+	$(LD_LTO) -r -o $@ $(filter-out $(extra-y),$^)
 else
-	$(LD) $(LDFLAGS) -r -o $@ $^
+	$(LD) $(LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
 endif
 endif
 
-built_in_bin.o: $(obj-bin-y)
+built_in_bin.o: $(obj-bin-y) $(extra-y)
 ifeq ($(obj-bin-y),)
 	$(CC) $(AFLAGS) -c -x assembler /dev/null -o $@
 else
-	$(LD) $(LDFLAGS) -r -o $@ $^
+	$(LD) $(LDFLAGS) -r -o $@ $(filter-out $(extra-y),$^)
 endif
 
 # Force execution of pattern rules (for which PHONY cannot be directly used).

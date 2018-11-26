@@ -100,10 +100,7 @@ prelink.o: $(ALL_OBJS)
 	$(LD) $(LDFLAGS) -r -o $@ $^
 endif
 
-$(BASEDIR)/common/symbols-dummy.o:
-	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(BASEDIR)/common symbols-dummy.o
-
-$(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
+$(TARGET)-syms: prelink.o xen.lds
 	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
 	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
 	$(NM) -pa --format=sysv $(@D)/.$(@F).0 \
