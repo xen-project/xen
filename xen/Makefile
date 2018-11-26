@@ -137,7 +137,9 @@ $(TARGET): delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk include/xen/compile.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
 	[ -e arch/$(TARGET_ARCH)/efi ] && for f in boot.c runtime.c compat.c efi.h;\
-		do ln -nsf ../../../common/efi/$$f arch/$(TARGET_ARCH)/efi/; done;\
+		do test -r arch/$(TARGET_ARCH)/efi/$$f || \
+		   ln -nsf ../../../common/efi/$$f arch/$(TARGET_ARCH)/efi/; \
+		done; \
 		true
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C include
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) asm-offsets.s
