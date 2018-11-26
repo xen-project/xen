@@ -185,7 +185,7 @@ distclean: clean
 install uninstall:
 
 .PHONY: run32 clean32
-ifeq ($(XEN_TARGET_ARCH),x86_64)
+ifeq ($(XEN_COMPILE_ARCH),x86_64)
 run32: $(addsuffix .h,$(TESTCASES)) $(addsuffix -opmask.h,$(OPMASK))
 run32 clean32: %32:
 	$(MAKE) -C 32 $*
