@@ -184,6 +184,12 @@ static void defer_map(struct domain *d, struct pci_dev *pdev,
     curr->vpci.mem = mem;
     curr->vpci.cmd = cmd;
     curr->vpci.rom_only = rom_only;
+    /*
+     * Raise a scheduler softirq in order to prevent the guest from resuming
+     * execution with pending mapping operations, to trigger the invocation
+     * of vpci_process_pending().
+     */
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
 static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
