@@ -166,7 +166,15 @@ enum bootscrub_mode {
     BOOTSCRUB_ON,
     BOOTSCRUB_IDLE,
 };
-static enum bootscrub_mode __initdata opt_bootscrub = BOOTSCRUB_IDLE;
+
+/*
+ * opt_bootscrub should live in the init section, since it's not accessed
+ * afterwards. However at least LLVM assumes there are no side effects of
+ * accessing the variable, and optimizes the condition in init_heap_pages() so
+ * opt_bootscrub is read regardless of the value of system_state:
+ * https://bugs.llvm.org/show_bug.cgi?id=39707
+ */
+static enum bootscrub_mode __read_mostly opt_bootscrub = BOOTSCRUB_IDLE;
 static int __init parse_bootscrub_param(const char *s)
 {
     /* Interpret 'bootscrub' alone in its positive boolean form */
