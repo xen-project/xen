@@ -157,7 +157,7 @@ void __init video_endboot(void)
                 {
                     printk(XENLOG_INFO "Boot video device %02x:%02x.%u\n",
                            bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-                    pci_hide_device(bus, devfn);
+                    pci_hide_device(0, bus, devfn);
                 }
             }
     }

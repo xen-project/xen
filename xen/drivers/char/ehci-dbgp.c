@@ -1362,7 +1362,7 @@ static void __init ehci_dbgp_init_postirq(struct serial_port *port)
 
     ehci_dbgp_setup_postirq(dbgp);
 
-    pci_hide_device(dbgp->bus, PCI_DEVFN(dbgp->slot, dbgp->func));
+    pci_hide_device(0, dbgp->bus, PCI_DEVFN(dbgp->slot, dbgp->func));
 }
 
 static int ehci_dbgp_check_release(struct ehci_dbgp *dbgp)

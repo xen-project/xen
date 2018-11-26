@@ -440,17 +440,23 @@ static void _pci_hide_device(struct pci_dev *pdev)
     list_add(&pdev->domain_list, &dom_xen->arch.pdev_list);
 }
 
-int __init pci_hide_device(int bus, int devfn)
+int __init pci_hide_device(unsigned int seg, unsigned int bus,
+                           unsigned int devfn)
 {
     struct pci_dev *pdev;
+    struct pci_seg *pseg;
     int rc = -ENOMEM;
 
     pcidevs_lock();
-    pdev = alloc_pdev(get_pseg(0), bus, devfn);
-    if ( pdev )
+    pseg = alloc_pseg(seg);
+    if ( pseg )
     {
-        _pci_hide_device(pdev);
-        rc = 0;
+        pdev = alloc_pdev(pseg, bus, devfn);
+        if ( pdev )
+        {
+            _pci_hide_device(pdev);
+            rc = 0;
+        }
     }
     pcidevs_unlock();
 
