@@ -2241,36 +2241,12 @@ void do_trap_fiq(struct cpu_user_regs *regs)
     gic_interrupt(regs, 1);
 }
 
-void leave_hypervisor_tail(void)
+static void check_for_pcpu_work(void)
 {
-    while (1)
+    ASSERT(!local_irq_is_enabled());
+
+    while ( softirq_pending(smp_processor_id()) )
     {
-        local_irq_disable();
-        if ( !softirq_pending(smp_processor_id()) )
-        {
-            vgic_sync_to_lrs();
-
-            /*
-             * If the SErrors handle option is "DIVERSE", we have to prevent
-             * slipping the hypervisor SError to guest. In this option, before
-             * returning from trap, we have to synchronize SErrors to guarantee
-             * that the pending SError would be caught in hypervisor.
-             *
-             * If option is NOT "DIVERSE", SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
-             * will be set to cpu_hwcaps. This means we can use the alternative
-             * to skip synchronizing SErrors for other SErrors handle options.
-             */
-            SYNCHRONIZE_SERROR(SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT);
-
-            /*
-             * The hypervisor runs with the workaround always present.
-             * If the guest wants it disabled, so be it...
-             */
-            if ( needs_ssbd_flip(current) )
-                arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
-
-            return;
-        }
         local_irq_enable();
         do_softirq();
         /*
@@ -2278,7 +2254,36 @@ void leave_hypervisor_tail(void)
          * and we want to patch the hypervisor with almost no stack.
          */
         check_for_livepatch_work();
+        local_irq_disable();
     }
+}
+
+void leave_hypervisor_tail(void)
+{
+    local_irq_disable();
+
+    check_for_pcpu_work();
+
+    vgic_sync_to_lrs();
+
+    /*
+     * If the SErrors handle option is "DIVERSE", we have to prevent
+     * slipping the hypervisor SError to guest. In this option, before
+     * returning from trap, we have to synchronize SErrors to guarantee
+     * that the pending SError would be caught in hypervisor.
+     *
+     * If option is NOT "DIVERSE", SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+     * will be set to cpu_hwcaps. This means we can use the alternative
+     * to skip synchronizing SErrors for other SErrors handle options.
+     */
+    SYNCHRONIZE_SERROR(SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT);
+
+    /*
+     * The hypervisor runs with the workaround always present.
+     * If the guest wants it disabled, so be it...
+     */
+    if ( needs_ssbd_flip(current) )
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
 }
 
 /*
