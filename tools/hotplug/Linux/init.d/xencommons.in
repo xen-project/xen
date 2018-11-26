@@ -63,7 +63,7 @@ do_start () {
 	@XEN_SCRIPT_DIR@/launch-xenstore || exit 1
 
 	echo Setting domain 0 name, domid and JSON config...
-	${LIBEXEC_BIN}/xen-init-dom0
+	${LIBEXEC_BIN}/xen-init-dom0 ${XEN_DOM0_UUID}
 
 	echo Starting xenconsoled...
 	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" --log=$XENCONSOLED_TRACE"
