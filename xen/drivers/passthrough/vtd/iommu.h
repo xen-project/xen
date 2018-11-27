@@ -505,18 +505,7 @@ extern struct list_head acpi_drhd_units;
 extern struct list_head acpi_rmrr_units;
 extern struct list_head acpi_ioapic_units;
 
-struct iommu_flush {
-    int __must_check (*context)(void *iommu, u16 did, u16 source_id,
-                                u8 function_mask, u64 type,
-                                bool_t non_present_entry_flush);
-    int __must_check (*iotlb)(void *iommu, u16 did, u64 addr,
-                              unsigned int size_order, u64 type,
-                              bool_t flush_non_present_entry,
-                              bool_t flush_dev_iotlb);
-};
-
 struct intel_iommu {
-    struct iommu_flush flush;
     struct acpi_drhd_unit *drhd;
 };
 
@@ -542,15 +531,20 @@ struct vtd_iommu {
         spinlock_t lock;  /* lock for irq remapping table */
     } intremap;
 
+    struct {
+        int __must_check (*context)(struct vtd_iommu *iommu, u16 did,
+                                    u16 source_id, u8 function_mask, u64 type,
+                                    bool non_present_entry_flush);
+        int __must_check (*iotlb)(struct vtd_iommu *iommu, u16 did, u64 addr,
+                                  unsigned int size_order, u64 type,
+                                  bool flush_non_present_entry,
+                                  bool flush_dev_iotlb);
+    } flush;
+
     struct list_head ats_devices;
     unsigned long *domid_bitmap;  /* domain id bitmap */
     u16 *domid_map;               /* domain id mapping array */
 };
-
-static inline struct iommu_flush *iommu_get_flush(struct vtd_iommu *iommu)
-{
-    return iommu ? &iommu->intel->flush : NULL;
-}
 
 #define INTEL_IOMMU_DEBUG(fmt, args...) \
     do  \

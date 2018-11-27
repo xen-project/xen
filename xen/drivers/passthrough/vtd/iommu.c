@@ -315,11 +315,11 @@ static void iommu_flush_write_buffer(struct vtd_iommu *iommu)
 }
 
 /* return value determine if we need a write buffer flush */
-static int __must_check flush_context_reg(void *_iommu, u16 did, u16 source_id,
-                                          u8 function_mask, u64 type,
-                                          bool_t flush_non_present_entry)
+static int __must_check flush_context_reg(struct vtd_iommu *iommu, u16 did,
+                                          u16 source_id, u8 function_mask,
+                                          u64 type,
+                                          bool flush_non_present_entry)
 {
-    struct vtd_iommu *iommu = _iommu;
     u64 val = 0;
     unsigned long flags;
 
@@ -368,31 +368,28 @@ static int __must_check flush_context_reg(void *_iommu, u16 did, u16 source_id,
 }
 
 static int __must_check iommu_flush_context_global(struct vtd_iommu *iommu,
-                                                   bool_t flush_non_present_entry)
+                                                   bool flush_non_present_entry)
 {
-    struct iommu_flush *flush = iommu_get_flush(iommu);
-    return flush->context(iommu, 0, 0, 0, DMA_CCMD_GLOBAL_INVL,
-                                 flush_non_present_entry);
+    return iommu->flush.context(iommu, 0, 0, 0, DMA_CCMD_GLOBAL_INVL,
+                                flush_non_present_entry);
 }
 
 static int __must_check iommu_flush_context_device(struct vtd_iommu *iommu,
                                                    u16 did, u16 source_id,
                                                    u8 function_mask,
-                                                   bool_t flush_non_present_entry)
+                                                   bool flush_non_present_entry)
 {
-    struct iommu_flush *flush = iommu_get_flush(iommu);
-    return flush->context(iommu, did, source_id, function_mask,
-                                 DMA_CCMD_DEVICE_INVL,
-                                 flush_non_present_entry);
+    return iommu->flush.context(iommu, did, source_id, function_mask,
+                                DMA_CCMD_DEVICE_INVL, flush_non_present_entry);
 }
 
 /* return value determine if we need a write buffer flush */
-static int __must_check flush_iotlb_reg(void *_iommu, u16 did, u64 addr,
+static int __must_check flush_iotlb_reg(struct vtd_iommu *iommu, u16 did,
+                                        u64 addr,
                                         unsigned int size_order, u64 type,
-                                        bool_t flush_non_present_entry,
-                                        bool_t flush_dev_iotlb)
+                                        bool flush_non_present_entry,
+                                        bool flush_dev_iotlb)
 {
-    struct vtd_iommu *iommu = _iommu;
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     u64 val = 0;
     unsigned long flags;
@@ -455,17 +452,16 @@ static int __must_check flush_iotlb_reg(void *_iommu, u16 did, u64 addr,
 }
 
 static int __must_check iommu_flush_iotlb_global(struct vtd_iommu *iommu,
-                                                 bool_t flush_non_present_entry,
-                                                 bool_t flush_dev_iotlb)
+                                                 bool flush_non_present_entry,
+                                                 bool flush_dev_iotlb)
 {
-    struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
 
     /* apply platform specific errata workarounds */
     vtd_ops_preamble_quirk(iommu);
 
-    status = flush->iotlb(iommu, 0, 0, 0, DMA_TLB_GLOBAL_FLUSH,
-                        flush_non_present_entry, flush_dev_iotlb);
+    status = iommu->flush.iotlb(iommu, 0, 0, 0, DMA_TLB_GLOBAL_FLUSH,
+                                flush_non_present_entry, flush_dev_iotlb);
 
     /* undo platform specific errata workarounds */
     vtd_ops_postamble_quirk(iommu);
@@ -477,14 +473,13 @@ static int __must_check iommu_flush_iotlb_dsi(struct vtd_iommu *iommu, u16 did,
                                               bool_t flush_non_present_entry,
                                               bool_t flush_dev_iotlb)
 {
-    struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
 
     /* apply platform specific errata workarounds */
     vtd_ops_preamble_quirk(iommu);
 
-    status =  flush->iotlb(iommu, did, 0, 0, DMA_TLB_DSI_FLUSH,
-                        flush_non_present_entry, flush_dev_iotlb);
+    status = iommu->flush.iotlb(iommu, did, 0, 0, DMA_TLB_DSI_FLUSH,
+                                flush_non_present_entry, flush_dev_iotlb);
 
     /* undo platform specific errata workarounds */
     vtd_ops_postamble_quirk(iommu);
@@ -497,18 +492,19 @@ static int __must_check iommu_flush_iotlb_psi(struct vtd_iommu *iommu, u16 did,
                                               bool_t flush_non_present_entry,
                                               bool_t flush_dev_iotlb)
 {
-    struct iommu_flush *flush = iommu_get_flush(iommu);
     int status;
 
     ASSERT(!(addr & (~PAGE_MASK_4K)));
 
     /* Fallback to domain selective flush if no PSI support */
     if ( !cap_pgsel_inv(iommu->cap) )
-        return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry, flush_dev_iotlb);
+        return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry,
+                                     flush_dev_iotlb);
 
     /* Fallback to domain selective flush if size is too big */
     if ( order > cap_max_amask_val(iommu->cap) )
-        return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry, flush_dev_iotlb);
+        return iommu_flush_iotlb_dsi(iommu, did, flush_non_present_entry,
+                                     flush_dev_iotlb);
 
     addr >>= PAGE_SHIFT_4K + order;
     addr <<= PAGE_SHIFT_4K + order;
@@ -516,8 +512,8 @@ static int __must_check iommu_flush_iotlb_psi(struct vtd_iommu *iommu, u16 did,
     /* apply platform specific errata workarounds */
     vtd_ops_preamble_quirk(iommu);
 
-    status = flush->iotlb(iommu, did, addr, order, DMA_TLB_PSI_FLUSH,
-                        flush_non_present_entry, flush_dev_iotlb);
+    status = iommu->flush.iotlb(iommu, did, addr, order, DMA_TLB_PSI_FLUSH,
+                                flush_non_present_entry, flush_dev_iotlb);
 
     /* undo platform specific errata workarounds */
     vtd_ops_postamble_quirk(iommu);
@@ -2154,7 +2150,6 @@ static int __must_check init_vtd_hw(void)
 {
     struct acpi_drhd_unit *drhd;
     struct vtd_iommu *iommu;
-    struct iommu_flush *flush = NULL;
     int ret;
     unsigned long flags;
     u32 sts;
@@ -2189,9 +2184,8 @@ static int __must_check init_vtd_hw(void)
          */
         if ( enable_qinval(iommu) != 0 )
         {
-            flush = iommu_get_flush(iommu);
-            flush->context = flush_context_reg;
-            flush->iotlb = flush_iotlb_reg;
+            iommu->flush.context = flush_context_reg;
+            iommu->flush.iotlb   = flush_iotlb_reg;
         }
     }
 

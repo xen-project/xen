@@ -318,12 +318,10 @@ int iommu_flush_iec_index(struct vtd_iommu *iommu, u8 im, u16 iidx)
     return queue_invalidate_iec_sync(iommu, IEC_INDEX_INVL, im, iidx);
 }
 
-static int __must_check flush_context_qi(void *_iommu, u16 did,
+static int __must_check flush_context_qi(struct vtd_iommu *iommu, u16 did,
                                          u16 sid, u8 fm, u64 type,
-                                         bool_t flush_non_present_entry)
+                                         bool flush_non_present_entry)
 {
-    struct vtd_iommu *iommu = _iommu;
-
     ASSERT(iommu->qinval_maddr);
 
     /*
@@ -344,14 +342,14 @@ static int __must_check flush_context_qi(void *_iommu, u16 did,
                                          type >> DMA_CCMD_INVL_GRANU_OFFSET);
 }
 
-static int __must_check flush_iotlb_qi(void *_iommu, u16 did, u64 addr,
+static int __must_check flush_iotlb_qi(struct vtd_iommu *iommu, u16 did,
+                                       u64 addr,
                                        unsigned int size_order, u64 type,
-                                       bool_t flush_non_present_entry,
-                                       bool_t flush_dev_iotlb)
+                                       bool flush_non_present_entry,
+                                       bool flush_dev_iotlb)
 {
     u8 dr = 0, dw = 0;
     int ret = 0, rc;
-    struct vtd_iommu *iommu = _iommu;
 
     ASSERT(iommu->qinval_maddr);
 
@@ -392,14 +390,11 @@ static int __must_check flush_iotlb_qi(void *_iommu, u16 did, u64 addr,
 
 int enable_qinval(struct vtd_iommu *iommu)
 {
-    struct iommu_flush *flush;
     u32 sts;
     unsigned long flags;
 
     if ( !ecap_queued_inval(iommu->ecap) || !iommu_qinval )
         return -ENOENT;
-
-    flush = iommu_get_flush(iommu);
 
     /* Return if already enabled by Xen */
     sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
@@ -418,8 +413,8 @@ int enable_qinval(struct vtd_iommu *iommu)
         }
     }
 
-    flush->context = flush_context_qi;
-    flush->iotlb = flush_iotlb_qi;
+    iommu->flush.context = flush_context_qi;
+    iommu->flush.iotlb   = flush_iotlb_qi;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
 
