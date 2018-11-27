@@ -298,7 +298,7 @@ int osdep_xenforeignmemory_restrict(xenforeignmemory_handle *fmem,
 int osdep_xenforeignmemory_unmap_resource(
     xenforeignmemory_handle *fmem, xenforeignmemory_resource_handle *fres)
 {
-    return munmap(fres->addr, fres->nr_frames << PAGE_SHIFT);
+    return fres ? munmap(fres->addr, fres->nr_frames << PAGE_SHIFT) : 0;
 }
 
 int osdep_xenforeignmemory_map_resource(
