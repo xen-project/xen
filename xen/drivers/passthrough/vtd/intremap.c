@@ -176,7 +176,7 @@ bool __init intel_iommu_supports_eim(void)
  * present an atomic update to VT-d hardware even when cmpxchg16b
  * instruction is not supported.
  */
-static void update_irte(struct iommu *iommu, struct iremap_entry *entry,
+static void update_irte(struct vtd_iommu *iommu, struct iremap_entry *entry,
                         const struct iremap_entry *new_ire, bool atomic)
 {
     ASSERT(spin_is_locked(&iommu_ir_ctrl(iommu)->iremap_lock));
@@ -217,7 +217,7 @@ static void update_irte(struct iommu *iommu, struct iremap_entry *entry,
 }
 
 /* Mark specified intr remap entry as free */
-static void free_remap_entry(struct iommu *iommu, int index)
+static void free_remap_entry(struct vtd_iommu *iommu, int index)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries, new_ire = { };
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
@@ -242,7 +242,7 @@ static void free_remap_entry(struct iommu *iommu, int index)
  * Look for a free intr remap entry (or a contiguous set thereof).
  * Need hold iremap_lock, and setup returned entry before releasing lock.
  */
-static unsigned int alloc_remap_entry(struct iommu *iommu, unsigned int nr)
+static unsigned int alloc_remap_entry(struct vtd_iommu *iommu, unsigned int nr)
 {
     struct iremap_entry *iremap_entries = NULL;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
@@ -280,7 +280,7 @@ static unsigned int alloc_remap_entry(struct iommu *iommu, unsigned int nr)
 }
 
 static int remap_entry_to_ioapic_rte(
-    struct iommu *iommu, int index, struct IO_xAPIC_route_entry *old_rte)
+    struct vtd_iommu *iommu, int index, struct IO_xAPIC_route_entry *old_rte)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     unsigned long flags;
@@ -327,7 +327,7 @@ static int remap_entry_to_ioapic_rte(
     return 0;
 }
 
-static int ioapic_rte_to_remap_entry(struct iommu *iommu,
+static int ioapic_rte_to_remap_entry(struct vtd_iommu *iommu,
     int apic, unsigned int ioapic_pin, struct IO_xAPIC_route_entry *old_rte,
     unsigned int rte_upper, unsigned int value)
 {
@@ -423,7 +423,7 @@ unsigned int io_apic_read_remap_rte(
     int index;
     struct IO_xAPIC_route_entry old_rte = { 0 };
     int rte_upper = (reg & 1) ? 1 : 0;
-    struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
+    struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
     if ( !ir_ctrl->iremap_num ||
@@ -448,7 +448,7 @@ void io_apic_write_remap_rte(
     struct IO_xAPIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_remap_entry *remap_rte;
     unsigned int rte_upper = (reg & 1) ? 1 : 0;
-    struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
+    struct vtd_iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     int saved_mask;
 
     old_rte = __ioapic_read_entry(apic, ioapic_pin, 1);
@@ -539,7 +539,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
 }
 
 static int remap_entry_to_msi_msg(
-    struct iommu *iommu, struct msi_msg *msg, unsigned int index)
+    struct vtd_iommu *iommu, struct msi_msg *msg, unsigned int index)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries;
     struct msi_msg_remap_entry *remap_rte;
@@ -602,7 +602,7 @@ static int remap_entry_to_msi_msg(
 }
 
 static int msi_msg_to_remap_entry(
-    struct iommu *iommu, struct pci_dev *pdev,
+    struct vtd_iommu *iommu, struct pci_dev *pdev,
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct iremap_entry *iremap_entry = NULL, *iremap_entries, new_ire = { };
@@ -735,7 +735,7 @@ int msi_msg_write_remap_rte(
 
 int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)
 {
-    struct iommu *iommu = hpet_to_iommu(msi_desc->hpet_id);
+    struct vtd_iommu *iommu = hpet_to_iommu(msi_desc->hpet_id);
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
     unsigned long flags;
     int rc = 0;
@@ -758,7 +758,7 @@ int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)
     return rc;
 }
 
-int enable_intremap(struct iommu *iommu, int eim)
+int enable_intremap(struct vtd_iommu *iommu, int eim)
 {
     struct ir_ctrl *ir_ctrl;
     u32 sts, gcmd;
@@ -840,7 +840,7 @@ int enable_intremap(struct iommu *iommu, int eim)
     return init_apic_pin_2_ir_idx();
 }
 
-void disable_intremap(struct iommu *iommu)
+void disable_intremap(struct vtd_iommu *iommu)
 {
     u32 sts;
     u64 irta;
@@ -889,7 +889,7 @@ out:
 int intel_iommu_enable_eim(void)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
 
     if ( system_state < SYS_STATE_active && !platform_supports_x2apic() )
         return -ENXIO;

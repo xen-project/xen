@@ -137,7 +137,7 @@ static void __init map_igd_reg(void)
 /*
  * force IGD to exit low power mode by accessing a IGD 3D regsiter.
  */
-static int cantiga_vtd_ops_preamble(struct iommu* iommu)
+static int cantiga_vtd_ops_preamble(struct vtd_iommu *iommu)
 {
     struct intel_iommu *intel = iommu->intel;
     struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
@@ -172,7 +172,7 @@ static int cantiga_vtd_ops_preamble(struct iommu* iommu)
  * parameter to a numerical value enables the quirk and
  * sets the timeout to that numerical number of msecs.
  */
-static void snb_vtd_ops_preamble(struct iommu* iommu)
+static void snb_vtd_ops_preamble(struct vtd_iommu *iommu)
 {
     struct intel_iommu *intel = iommu->intel;
     struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
@@ -202,7 +202,7 @@ static void snb_vtd_ops_preamble(struct iommu* iommu)
     *(volatile u32 *)(igd_reg_va + 0x2050) = 0x10001;
 }
 
-static void snb_vtd_ops_postamble(struct iommu* iommu)
+static void snb_vtd_ops_postamble(struct vtd_iommu *iommu)
 {
     struct intel_iommu *intel = iommu->intel;
     struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
@@ -221,7 +221,7 @@ static void snb_vtd_ops_postamble(struct iommu* iommu)
  * call before VT-d translation enable and IOTLB flush operations.
  */
 
-void vtd_ops_preamble_quirk(struct iommu* iommu)
+void vtd_ops_preamble_quirk(struct vtd_iommu *iommu)
 {
     cantiga_vtd_ops_preamble(iommu);
     if ( snb_igd_timeout != 0 )
@@ -236,7 +236,7 @@ void vtd_ops_preamble_quirk(struct iommu* iommu)
 /*
  * call after VT-d translation enable and IOTLB flush operations.
  */
-void vtd_ops_postamble_quirk(struct iommu* iommu)
+void vtd_ops_postamble_quirk(struct vtd_iommu *iommu)
 {
     if ( snb_igd_timeout != 0 )
     {

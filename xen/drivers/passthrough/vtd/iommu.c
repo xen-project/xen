@@ -58,7 +58,7 @@ static int setup_hwdom_device(u8 devfn, struct pci_dev *);
 static void setup_hwdom_rmrr(struct domain *d);
 
 static int domain_iommu_domid(struct domain *d,
-                              struct iommu *iommu)
+                              struct vtd_iommu *iommu)
 {
     unsigned long nr_dom, i;
 
@@ -82,7 +82,7 @@ static int domain_iommu_domid(struct domain *d,
 #define DID_HIGH_OFFSET 8
 static int context_set_domain_id(struct context_entry *context,
                                  struct domain *d,
-                                 struct iommu *iommu)
+                                 struct vtd_iommu *iommu)
 {
     unsigned long nr_dom, i;
     int found = 0;
@@ -118,7 +118,7 @@ static int context_set_domain_id(struct context_entry *context,
 }
 
 static int context_get_domain_id(struct context_entry *context,
-                                 struct iommu *iommu)
+                                 struct vtd_iommu *iommu)
 {
     unsigned long dom_index, nr_dom;
     int domid = -1;
@@ -216,7 +216,7 @@ void free_pgtable_maddr(u64 maddr)
 }
 
 /* context entry handling */
-static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
+static u64 bus_to_context_maddr(struct vtd_iommu *iommu, u8 bus)
 {
     struct root_entry *root, *root_entries;
     u64 maddr;
@@ -297,7 +297,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
     return pte_maddr;
 }
 
-static void iommu_flush_write_buffer(struct iommu *iommu)
+static void iommu_flush_write_buffer(struct vtd_iommu *iommu)
 {
     u32 val;
     unsigned long flags;
@@ -321,7 +321,7 @@ static int __must_check flush_context_reg(void *_iommu, u16 did, u16 source_id,
                                           u8 function_mask, u64 type,
                                           bool_t flush_non_present_entry)
 {
-    struct iommu *iommu = (struct iommu *) _iommu;
+    struct vtd_iommu *iommu = _iommu;
     u64 val = 0;
     unsigned long flags;
 
@@ -369,7 +369,7 @@ static int __must_check flush_context_reg(void *_iommu, u16 did, u16 source_id,
     return 0;
 }
 
-static int __must_check iommu_flush_context_global(struct iommu *iommu,
+static int __must_check iommu_flush_context_global(struct vtd_iommu *iommu,
                                                    bool_t flush_non_present_entry)
 {
     struct iommu_flush *flush = iommu_get_flush(iommu);
@@ -377,7 +377,7 @@ static int __must_check iommu_flush_context_global(struct iommu *iommu,
                                  flush_non_present_entry);
 }
 
-static int __must_check iommu_flush_context_device(struct iommu *iommu,
+static int __must_check iommu_flush_context_device(struct vtd_iommu *iommu,
                                                    u16 did, u16 source_id,
                                                    u8 function_mask,
                                                    bool_t flush_non_present_entry)
@@ -394,7 +394,7 @@ static int __must_check flush_iotlb_reg(void *_iommu, u16 did, u64 addr,
                                         bool_t flush_non_present_entry,
                                         bool_t flush_dev_iotlb)
 {
-    struct iommu *iommu = (struct iommu *) _iommu;
+    struct vtd_iommu *iommu = _iommu;
     int tlb_offset = ecap_iotlb_offset(iommu->ecap);
     u64 val = 0;
     unsigned long flags;
@@ -456,7 +456,7 @@ static int __must_check flush_iotlb_reg(void *_iommu, u16 did, u64 addr,
     return 0;
 }
 
-static int __must_check iommu_flush_iotlb_global(struct iommu *iommu,
+static int __must_check iommu_flush_iotlb_global(struct vtd_iommu *iommu,
                                                  bool_t flush_non_present_entry,
                                                  bool_t flush_dev_iotlb)
 {
@@ -475,7 +475,7 @@ static int __must_check iommu_flush_iotlb_global(struct iommu *iommu,
     return status;
 }
 
-static int __must_check iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
+static int __must_check iommu_flush_iotlb_dsi(struct vtd_iommu *iommu, u16 did,
                                               bool_t flush_non_present_entry,
                                               bool_t flush_dev_iotlb)
 {
@@ -494,7 +494,7 @@ static int __must_check iommu_flush_iotlb_dsi(struct iommu *iommu, u16 did,
     return status;
 }
 
-static int __must_check iommu_flush_iotlb_psi(struct iommu *iommu, u16 did,
+static int __must_check iommu_flush_iotlb_psi(struct vtd_iommu *iommu, u16 did,
                                               u64 addr, unsigned int order,
                                               bool_t flush_non_present_entry,
                                               bool_t flush_dev_iotlb)
@@ -530,7 +530,7 @@ static int __must_check iommu_flush_iotlb_psi(struct iommu *iommu, u16 did,
 static int __must_check iommu_flush_all(void)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     bool_t flush_dev_iotlb;
     int rc = 0;
 
@@ -571,7 +571,7 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     bool_t flush_dev_iotlb;
     int iommu_domid;
     int rc = 0;
@@ -707,7 +707,7 @@ static void iommu_free_page_table(struct page_info *pg)
     free_pgtable_maddr(pt_maddr);
 }
 
-static int iommu_set_root_entry(struct iommu *iommu)
+static int iommu_set_root_entry(struct vtd_iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
@@ -730,7 +730,7 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
 {
     u32 sts;
     unsigned long flags;
-    struct iommu *iommu = drhd->iommu;
+    struct vtd_iommu *iommu = drhd->iommu;
 
     if ( is_igd_drhd(drhd) )
     {
@@ -774,7 +774,7 @@ static void iommu_enable_translation(struct acpi_drhd_unit *drhd)
     disable_pmr(iommu);
 }
 
-static void iommu_disable_translation(struct iommu *iommu)
+static void iommu_disable_translation(struct vtd_iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
@@ -851,7 +851,7 @@ static const char *iommu_get_fault_reason(u8 fault_reason,
     }
 }
 
-static int iommu_page_fault_do_one(struct iommu *iommu, int type,
+static int iommu_page_fault_do_one(struct vtd_iommu *iommu, int type,
                                    u8 fault_reason, u16 source_id, u64 addr)
 {
     const char *reason, *kind;
@@ -917,7 +917,7 @@ static void iommu_fault_status(u32 fault_status)
 }
 
 #define PRIMARY_FAULT_REG_LEN (16)
-static void __do_iommu_page_fault(struct iommu *iommu)
+static void __do_iommu_page_fault(struct vtd_iommu *iommu)
 {
     int reg, fault_index;
     u32 fault_status;
@@ -1020,7 +1020,7 @@ static void iommu_page_fault(int irq, void *dev_id,
 
 static void dma_msi_unmask(struct irq_desc *desc)
 {
-    struct iommu *iommu = desc->action->dev_id;
+    struct vtd_iommu *iommu = desc->action->dev_id;
     unsigned long flags;
     u32 sts;
 
@@ -1036,7 +1036,7 @@ static void dma_msi_unmask(struct irq_desc *desc)
 static void dma_msi_mask(struct irq_desc *desc)
 {
     unsigned long flags;
-    struct iommu *iommu = desc->action->dev_id;
+    struct vtd_iommu *iommu = desc->action->dev_id;
     u32 sts;
 
     /* mask it */
@@ -1072,7 +1072,7 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     struct msi_msg msg;
     unsigned int dest;
     unsigned long flags;
-    struct iommu *iommu = desc->action->dev_id;
+    struct vtd_iommu *iommu = desc->action->dev_id;
 
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID){
@@ -1115,7 +1115,7 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
 {
     int irq, ret;
     struct acpi_rhsa_unit *rhsa = drhd_to_rhsa(drhd);
-    struct iommu *iommu = drhd->iommu;
+    struct vtd_iommu *iommu = drhd->iommu;
     struct irq_desc *desc;
 
     irq = create_irq(rhsa ? pxm_to_node(rhsa->proximity_domain)
@@ -1148,7 +1148,7 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
 
 int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 {
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     unsigned long sagaw, nr_dom;
     int agaw;
 
@@ -1159,7 +1159,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
     }
 
-    iommu = xzalloc(struct iommu);
+    iommu = xzalloc(struct vtd_iommu);
     if ( iommu == NULL )
         return -ENOMEM;
 
@@ -1244,7 +1244,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
 
 void __init iommu_free(struct acpi_drhd_unit *drhd)
 {
-    struct iommu *iommu = drhd->iommu;
+    struct vtd_iommu *iommu = drhd->iommu;
 
     if ( iommu == NULL )
         return;
@@ -1307,7 +1307,7 @@ static void __hwdom_init intel_iommu_hwdom_init(struct domain *d)
 
 int domain_context_mapping_one(
     struct domain *domain,
-    struct iommu *iommu,
+    struct vtd_iommu *iommu,
     u8 bus, u8 devfn, const struct pci_dev *pdev)
 {
     struct domain_iommu *hd = dom_iommu(domain);
@@ -1555,7 +1555,7 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
 
 int domain_context_unmap_one(
     struct domain *domain,
-    struct iommu *iommu,
+    struct vtd_iommu *iommu,
     u8 bus, u8 devfn)
 {
     struct context_entry *context, *context_entries;
@@ -1623,7 +1623,7 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
                                 struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     int ret = 0;
     u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
     int found = 0;
@@ -1883,7 +1883,7 @@ int iommu_pte_flush(struct domain *d, uint64_t dfn, uint64_t *pte,
                     int order, int present)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu = NULL;
+    struct vtd_iommu *iommu = NULL;
     struct domain_iommu *hd = dom_iommu(d);
     bool_t flush_dev_iotlb;
     int iommu_domid;
@@ -1926,7 +1926,7 @@ int iommu_pte_flush(struct domain *d, uint64_t dfn, uint64_t *pte,
     return rc;
 }
 
-static int __init vtd_ept_page_compatible(struct iommu *iommu)
+static int __init vtd_ept_page_compatible(struct vtd_iommu *iommu)
 {
     u64 ept_cap, vtd_cap = iommu->cap;
 
@@ -2106,7 +2106,7 @@ static int __hwdom_init setup_hwdom_device(u8 devfn, struct pci_dev *pdev)
     return domain_context_mapping(pdev->domain, devfn, pdev);
 }
 
-void clear_fault_bits(struct iommu *iommu)
+void clear_fault_bits(struct vtd_iommu *iommu)
 {
     u64 val;
     unsigned long flags;
@@ -2154,7 +2154,7 @@ __initcall(adjust_vtd_irq_affinities);
 static int __must_check init_vtd_hw(void)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     struct iommu_flush *flush = NULL;
     int ret;
     unsigned long flags;
@@ -2279,7 +2279,7 @@ static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
 static int __init vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     int ret;
 
     if ( list_empty(&acpi_drhd_units) )
@@ -2541,7 +2541,7 @@ static u32 iommu_state[MAX_IOMMUS][MAX_IOMMU_REGS];
 static int __must_check vtd_suspend(void)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     u32    i;
     int rc;
 
@@ -2591,7 +2591,7 @@ static int __must_check vtd_suspend(void)
 static void vtd_crash_shutdown(void)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
 
     if ( !iommu_enabled )
         return;
@@ -2612,7 +2612,7 @@ static void vtd_crash_shutdown(void)
 static void vtd_resume(void)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     u32 i;
     unsigned long flags;
 

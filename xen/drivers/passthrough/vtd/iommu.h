@@ -532,7 +532,7 @@ struct intel_iommu {
     struct acpi_drhd_unit *drhd;
 };
 
-struct iommu {
+struct vtd_iommu {
     struct list_head list;
     void __iomem *reg; /* Pointer to hardware regs, virtual addr */
     u32	index;         /* Sequence number of iommu */
@@ -550,17 +550,17 @@ struct iommu {
     u16 *domid_map;               /* domain id mapping array */
 };
 
-static inline struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu)
+static inline struct qi_ctrl *iommu_qi_ctrl(struct vtd_iommu *iommu)
 {
     return iommu ? &iommu->intel->qi_ctrl : NULL;
 }
 
-static inline struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu)
+static inline struct ir_ctrl *iommu_ir_ctrl(struct vtd_iommu *iommu)
 {
     return iommu ? &iommu->intel->ir_ctrl : NULL;
 }
 
-static inline struct iommu_flush *iommu_get_flush(struct iommu *iommu)
+static inline struct iommu_flush *iommu_get_flush(struct vtd_iommu *iommu)
 {
     return iommu ? &iommu->intel->flush : NULL;
 }

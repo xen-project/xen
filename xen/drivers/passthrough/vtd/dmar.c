@@ -137,7 +137,7 @@ struct acpi_drhd_unit *ioapic_to_drhd(unsigned int apic_id)
     return NULL;
 }
 
-struct iommu *ioapic_to_iommu(unsigned int apic_id)
+struct vtd_iommu *ioapic_to_iommu(unsigned int apic_id)
 {
     struct acpi_drhd_unit *drhd;
 
@@ -168,7 +168,7 @@ struct acpi_drhd_unit *hpet_to_drhd(unsigned int hpet_id)
     return NULL;
 }
 
-struct iommu *hpet_to_iommu(unsigned int hpet_id)
+struct vtd_iommu *hpet_to_iommu(unsigned int hpet_id)
 {
     struct acpi_drhd_unit *drhd = hpet_to_drhd(hpet_id);
 
@@ -982,7 +982,7 @@ int __init acpi_dmar_init(void)
     for_each_drhd_unit ( drhd )
     {
         const struct acpi_rhsa_unit *rhsa = drhd_to_rhsa(drhd);
-        struct iommu *iommu = drhd->iommu;
+        struct vtd_iommu *iommu = drhd->iommu;
 
         if ( ret )
             break;

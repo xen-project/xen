@@ -29,7 +29,7 @@
 #include <asm/io_apic.h>
 
 /* Disable vt-d protected memory registers. */
-void disable_pmr(struct iommu *iommu)
+void disable_pmr(struct vtd_iommu *iommu)
 {
     u32 val;
     unsigned long flags;
@@ -51,7 +51,7 @@ void disable_pmr(struct iommu *iommu)
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd)
 {
-    struct iommu *iommu = drhd->iommu;
+    struct vtd_iommu *iommu = drhd->iommu;
     u64 cap;
 
     printk("---- print_iommu_regs ----\n");
@@ -87,7 +87,7 @@ static u32 get_level_index(unsigned long gmfn, int level)
     return gmfn & LEVEL_MASK;
 }
 
-void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
+void print_vtd_entries(struct vtd_iommu *iommu, int bus, int devfn, u64 gmfn)
 {
     struct context_entry *ctxt_entry;
     struct root_entry *root_entry;
@@ -175,7 +175,7 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
 void vtd_dump_iommu_info(unsigned char key)
 {
     struct acpi_drhd_unit *drhd;
-    struct iommu *iommu;
+    struct vtd_iommu *iommu;
     int i;
 
     for_each_drhd_unit ( drhd )

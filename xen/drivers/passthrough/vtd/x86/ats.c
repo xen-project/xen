@@ -30,7 +30,7 @@
 
 static LIST_HEAD(ats_dev_drhd_units);
 
-struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu)
+struct acpi_drhd_unit *find_ats_dev_drhd(struct vtd_iommu *iommu)
 {
     struct acpi_drhd_unit *drhd;
     list_for_each_entry ( drhd, &ats_dev_drhd_units, list )
@@ -71,7 +71,7 @@ int ats_device(const struct pci_dev *pdev, const struct acpi_drhd_unit *drhd)
     return pos;
 }
 
-static bool device_in_domain(const struct iommu *iommu,
+static bool device_in_domain(const struct vtd_iommu *iommu,
                              const struct pci_dev *pdev, uint16_t did)
 {
     struct root_entry *root_entry;
@@ -108,7 +108,7 @@ out:
     return found;
 }
 
-int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
+int dev_invalidate_iotlb(struct vtd_iommu *iommu, u16 did,
     u64 addr, unsigned int size_order, u64 type)
 {
     struct pci_dev *pdev, *temp;

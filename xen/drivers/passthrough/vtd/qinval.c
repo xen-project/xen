@@ -31,9 +31,9 @@
 
 #define VTD_QI_TIMEOUT	1
 
-static int __must_check invalidate_sync(struct iommu *iommu);
+static int __must_check invalidate_sync(struct vtd_iommu *iommu);
 
-static void print_qi_regs(struct iommu *iommu)
+static void print_qi_regs(struct vtd_iommu *iommu)
 {
     u64 val;
 
@@ -47,7 +47,7 @@ static void print_qi_regs(struct iommu *iommu)
     printk("DMAR_IQT_REG = %"PRIx64"\n", val);
 }
 
-static unsigned int qinval_next_index(struct iommu *iommu)
+static unsigned int qinval_next_index(struct vtd_iommu *iommu)
 {
     u64 tail;
 
@@ -62,7 +62,7 @@ static unsigned int qinval_next_index(struct iommu *iommu)
     return tail;
 }
 
-static void qinval_update_qtail(struct iommu *iommu, unsigned int index)
+static void qinval_update_qtail(struct vtd_iommu *iommu, unsigned int index)
 {
     u64 val;
 
@@ -72,7 +72,7 @@ static void qinval_update_qtail(struct iommu *iommu, unsigned int index)
     dmar_writeq(iommu->reg, DMAR_IQT_REG, (val << QINVAL_INDEX_SHIFT));
 }
 
-static int __must_check queue_invalidate_context_sync(struct iommu *iommu,
+static int __must_check queue_invalidate_context_sync(struct vtd_iommu *iommu,
                                                       u16 did, u16 source_id,
                                                       u8 function_mask,
                                                       u8 granu)
@@ -106,7 +106,7 @@ static int __must_check queue_invalidate_context_sync(struct iommu *iommu,
     return invalidate_sync(iommu);
 }
 
-static int __must_check queue_invalidate_iotlb_sync(struct iommu *iommu,
+static int __must_check queue_invalidate_iotlb_sync(struct vtd_iommu *iommu,
                                                     u8 granu, u8 dr, u8 dw,
                                                     u16 did, u8 am, u8 ih,
                                                     u64 addr)
@@ -143,7 +143,7 @@ static int __must_check queue_invalidate_iotlb_sync(struct iommu *iommu,
     return invalidate_sync(iommu);
 }
 
-static int __must_check queue_invalidate_wait(struct iommu *iommu,
+static int __must_check queue_invalidate_wait(struct vtd_iommu *iommu,
                                               u8 iflag, u8 sw, u8 fn,
                                               bool_t flush_dev_iotlb)
 {
@@ -200,7 +200,7 @@ static int __must_check queue_invalidate_wait(struct iommu *iommu,
     return -EOPNOTSUPP;
 }
 
-static int __must_check invalidate_sync(struct iommu *iommu)
+static int __must_check invalidate_sync(struct vtd_iommu *iommu)
 {
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
@@ -209,7 +209,7 @@ static int __must_check invalidate_sync(struct iommu *iommu)
     return queue_invalidate_wait(iommu, 0, 1, 1, 0);
 }
 
-static int __must_check dev_invalidate_sync(struct iommu *iommu,
+static int __must_check dev_invalidate_sync(struct vtd_iommu *iommu,
                                             struct pci_dev *pdev, u16 did)
 {
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
@@ -238,7 +238,7 @@ static int __must_check dev_invalidate_sync(struct iommu *iommu,
     return rc;
 }
 
-int qinval_device_iotlb_sync(struct iommu *iommu, struct pci_dev *pdev,
+int qinval_device_iotlb_sync(struct vtd_iommu *iommu, struct pci_dev *pdev,
                              u16 did, u16 size, u64 addr)
 {
     unsigned long flags;
@@ -272,7 +272,7 @@ int qinval_device_iotlb_sync(struct iommu *iommu, struct pci_dev *pdev,
     return dev_invalidate_sync(iommu, pdev, did);
 }
 
-static int __must_check queue_invalidate_iec_sync(struct iommu *iommu,
+static int __must_check queue_invalidate_iec_sync(struct vtd_iommu *iommu,
                                                   u8 granu, u8 im, u16 iidx)
 {
     unsigned long flags;
@@ -311,12 +311,12 @@ static int __must_check queue_invalidate_iec_sync(struct iommu *iommu,
     return ret;
 }
 
-int iommu_flush_iec_global(struct iommu *iommu)
+int iommu_flush_iec_global(struct vtd_iommu *iommu)
 {
     return queue_invalidate_iec_sync(iommu, IEC_GLOBAL_INVL, 0, 0);
 }
 
-int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx)
+int iommu_flush_iec_index(struct vtd_iommu *iommu, u8 im, u16 iidx)
 {
     return queue_invalidate_iec_sync(iommu, IEC_INDEX_INVL, im, iidx);
 }
@@ -325,7 +325,7 @@ static int __must_check flush_context_qi(void *_iommu, u16 did,
                                          u16 sid, u8 fm, u64 type,
                                          bool_t flush_non_present_entry)
 {
-    struct iommu *iommu = (struct iommu *)_iommu;
+    struct vtd_iommu *iommu = _iommu;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     ASSERT(qi_ctrl->qinval_maddr);
@@ -355,7 +355,7 @@ static int __must_check flush_iotlb_qi(void *_iommu, u16 did, u64 addr,
 {
     u8 dr = 0, dw = 0;
     int ret = 0, rc;
-    struct iommu *iommu = (struct iommu *)_iommu;
+    struct vtd_iommu *iommu = _iommu;
     struct qi_ctrl *qi_ctrl = iommu_qi_ctrl(iommu);
 
     ASSERT(qi_ctrl->qinval_maddr);
@@ -395,7 +395,7 @@ static int __must_check flush_iotlb_qi(void *_iommu, u16 did, u64 addr,
     return ret;
 }
 
-int enable_qinval(struct iommu *iommu)
+int enable_qinval(struct vtd_iommu *iommu)
 {
     struct qi_ctrl *qi_ctrl;
     struct iommu_flush *flush;
@@ -454,7 +454,7 @@ int enable_qinval(struct iommu *iommu)
     return 0;
 }
 
-void disable_qinval(struct iommu *iommu)
+void disable_qinval(struct vtd_iommu *iommu)
 {
     u32 sts;
     unsigned long flags;
