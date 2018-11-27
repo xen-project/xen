@@ -2016,18 +2016,6 @@ pages) must also be specified via the tbuf_size parameter.
 ### timer_slop
 > `= <integer>`
 
-### tmem
-> `= <boolean>`
-
-This option (and its underlying code) is going to go away in a future
-Xen version.
-
-### tmem_compress
-> `= <boolean>`
-
-This option (and its underlying code) is going to go away in a future
-Xen version.
-
 ### tsc (x86)
 > `= unstable | skewed | stable:socket`
 

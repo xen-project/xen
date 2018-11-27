@@ -81,42 +81,6 @@ __HYPERVISOR_memory_op (xen/include/public/memory.h)
  * XENMEM_get_pod_target
  * XENMEM_claim_pages
 
-__HYPERVISOR_tmem_op (xen/include/public/tmem.h)
-
- The following tmem control ops, that is the sub-subops of
- TMEM_CONTROL, are covered by this statement. 
-
- Note that TMEM is also subject to a similar policy arising from
- XSA-15 http://lists.xen.org/archives/html/xen-announce/2012-09/msg00006.html.
- Due to this existing policy all TMEM Ops are already subject to
- reduced security support.
-
- * TMEMC_THAW
- * TMEMC_FREEZE
- * TMEMC_FLUSH
- * TMEMC_DESTROY
- * TMEMC_LIST
- * TMEMC_SET_WEIGHT
- * TMEMC_SET_CAP
- * TMEMC_SET_COMPRESS
- * TMEMC_QUERY_FREEABLE_MB
- * TMEMC_SAVE_BEGIN
- * TMEMC_SAVE_GET_VERSION
- * TMEMC_SAVE_GET_MAXPOOLS
- * TMEMC_SAVE_GET_CLIENT_WEIGHT
- * TMEMC_SAVE_GET_CLIENT_CAP
- * TMEMC_SAVE_GET_CLIENT_FLAGS
- * TMEMC_SAVE_GET_POOL_FLAGS
- * TMEMC_SAVE_GET_POOL_NPAGES
- * TMEMC_SAVE_GET_POOL_UUID
- * TMEMC_SAVE_GET_NEXT_PAGE
- * TMEMC_SAVE_GET_NEXT_INV
- * TMEMC_SAVE_END
- * TMEMC_RESTORE_BEGIN
- * TMEMC_RESTORE_PUT_PAGE
- * TMEMC_RESTORE_FLUSH_PAGE
-
-
 
 Setting up FLASK
 ----------------
