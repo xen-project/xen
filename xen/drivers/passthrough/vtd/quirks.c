@@ -139,8 +139,7 @@ static void __init map_igd_reg(void)
  */
 static int cantiga_vtd_ops_preamble(struct vtd_iommu *iommu)
 {
-    struct intel_iommu *intel = iommu->intel;
-    struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
+    struct acpi_drhd_unit *drhd = iommu->drhd;
 
     if ( !is_igd_drhd(drhd) || !is_cantiga_b3 )
         return 0;
@@ -174,8 +173,7 @@ static int cantiga_vtd_ops_preamble(struct vtd_iommu *iommu)
  */
 static void snb_vtd_ops_preamble(struct vtd_iommu *iommu)
 {
-    struct intel_iommu *intel = iommu->intel;
-    struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
+    struct acpi_drhd_unit *drhd = iommu->drhd;
     s_time_t start_time;
 
     if ( !is_igd_drhd(drhd) || !is_snb_gfx )
@@ -204,8 +202,7 @@ static void snb_vtd_ops_preamble(struct vtd_iommu *iommu)
 
 static void snb_vtd_ops_postamble(struct vtd_iommu *iommu)
 {
-    struct intel_iommu *intel = iommu->intel;
-    struct acpi_drhd_unit *drhd = intel ? intel->drhd : NULL;
+    struct acpi_drhd_unit *drhd = iommu->drhd;
 
     if ( !is_igd_drhd(drhd) || !is_snb_gfx )
         return;

@@ -505,10 +505,6 @@ extern struct list_head acpi_drhd_units;
 extern struct list_head acpi_rmrr_units;
 extern struct list_head acpi_ioapic_units;
 
-struct intel_iommu {
-    struct acpi_drhd_unit *drhd;
-};
-
 struct vtd_iommu {
     struct list_head list;
     void __iomem *reg; /* Pointer to hardware regs, virtual addr */
@@ -521,7 +517,7 @@ struct vtd_iommu {
     u64 root_maddr; /* root entry machine address */
     nodeid_t node;
     struct msi_desc msi;
-    struct intel_iommu *intel;
+    struct acpi_drhd_unit *drhd;
 
     uint64_t qinval_maddr;   /* queue invalidation page machine address */
 

@@ -139,22 +139,6 @@ static int context_get_domain_id(struct context_entry *context,
     return domid;
 }
 
-static struct intel_iommu *__init alloc_intel_iommu(void)
-{
-    struct intel_iommu *intel;
-
-    intel = xzalloc(struct intel_iommu);
-    if ( intel == NULL )
-        return NULL;
-
-    return intel;
-}
-
-static void __init free_intel_iommu(struct intel_iommu *intel)
-{
-    xfree(intel);
-}
-
 static int iommus_incoherent;
 static void __iommu_flush_cache(void *addr, unsigned int size)
 {
@@ -850,7 +834,7 @@ static int iommu_page_fault_do_one(struct vtd_iommu *iommu, int type,
 {
     const char *reason, *kind;
     enum faulttype fault_type;
-    u16 seg = iommu->intel->drhd->segment;
+    u16 seg = iommu->drhd->segment;
 
     reason = iommu_get_fault_reason(fault_reason, &fault_type);
     switch ( fault_type )
@@ -963,7 +947,7 @@ static void __do_iommu_page_fault(struct vtd_iommu *iommu)
         iommu_page_fault_do_one(iommu, type, fault_reason,
                                 source_id, guest_addr);
 
-        pci_check_disable_device(iommu->intel->drhd->segment,
+        pci_check_disable_device(iommu->drhd->segment,
                                  PCI_BUS(source_id), PCI_DEVFN2(source_id));
 
         fault_index++;
@@ -1162,13 +1146,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     INIT_LIST_HEAD(&iommu->ats_devices);
     spin_lock_init(&iommu->intremap.lock);
 
-    iommu->intel = alloc_intel_iommu();
-    if ( iommu->intel == NULL )
-    {
-        xfree(iommu);
-        return -ENOMEM;
-    }
-    iommu->intel->drhd = drhd;
+    iommu->drhd = drhd;
     drhd->iommu = iommu;
 
     iommu->reg = ioremap(drhd->address, PAGE_SIZE);
@@ -1258,7 +1236,6 @@ void __init iommu_free(struct acpi_drhd_unit *drhd)
     xfree(iommu->domid_bitmap);
     xfree(iommu->domid_map);
 
-    free_intel_iommu(iommu->intel);
     if ( iommu->msi.irq >= 0 )
         destroy_irq(iommu->msi.irq);
     xfree(iommu);
@@ -1308,7 +1285,7 @@ int domain_context_mapping_one(
     struct domain_iommu *hd = dom_iommu(domain);
     struct context_entry *context, *context_entries;
     u64 maddr, pgd_maddr;
-    u16 seg = iommu->intel->drhd->segment;
+    u16 seg = iommu->drhd->segment;
     int agaw, rc, ret;
     bool_t flush_dev_iotlb;
 
@@ -1608,7 +1585,7 @@ int domain_context_unmap_one(
     spin_unlock(&iommu->lock);
     unmap_vtd_domain_page(context_entries);
 
-    if ( !iommu->intel->drhd->segment && !rc )
+    if ( !iommu->drhd->segment && !rc )
         rc = me_wifi_quirk(domain, bus, devfn, UNMAP_ME_PHANTOM_FUNC);
 
     return rc;

@@ -96,7 +96,7 @@ void print_vtd_entries(struct vtd_iommu *iommu, int bus, int devfn, u64 gmfn)
     u32 l_index, level;
 
     printk("print_vtd_entries: iommu #%u dev %04x:%02x:%02x.%u gmfn %"PRI_gfn"\n",
-           iommu->index, iommu->intel->drhd->segment, bus,
+           iommu->index, iommu->drhd->segment, bus,
            PCI_SLOT(devfn), PCI_FUNC(devfn), gmfn);
 
     if ( iommu->root_maddr == 0 )
