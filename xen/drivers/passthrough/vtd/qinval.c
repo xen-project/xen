@@ -428,6 +428,8 @@ int enable_qinval(struct iommu *iommu)
     flush->context = flush_context_qi;
     flush->iotlb = flush_iotlb_qi;
 
+    spin_lock_irqsave(&iommu->register_lock, flags);
+
     /* Setup Invalidation Queue Address(IQA) register with the
      * address of the page we just allocated.  QS field at
      * bits[2:0] to indicate size of queue is one 4KB page.
@@ -435,10 +437,8 @@ int enable_qinval(struct iommu *iommu)
      * registers are automatically reset to 0 with write
      * to IQA register.
      */
-    qi_ctrl->qinval_maddr |= QINVAL_PAGE_ORDER;
-
-    spin_lock_irqsave(&iommu->register_lock, flags);
-    dmar_writeq(iommu->reg, DMAR_IQA_REG, qi_ctrl->qinval_maddr);
+    dmar_writeq(iommu->reg, DMAR_IQA_REG,
+                qi_ctrl->qinval_maddr | QINVAL_PAGE_ORDER);
 
     dmar_writeq(iommu->reg, DMAR_IQT_REG, 0);
 
