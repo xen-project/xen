@@ -505,10 +505,6 @@ extern struct list_head acpi_drhd_units;
 extern struct list_head acpi_rmrr_units;
 extern struct list_head acpi_ioapic_units;
 
-struct qi_ctrl {
-    u64 qinval_maddr;  /* queue invalidation page machine address */
-};
-
 struct ir_ctrl {
     u64 iremap_maddr;            /* interrupt remap table machine address */
     int iremap_num;              /* total num of used interrupt remap entry */
@@ -526,7 +522,6 @@ struct iommu_flush {
 };
 
 struct intel_iommu {
-    struct qi_ctrl qi_ctrl;
     struct ir_ctrl ir_ctrl;
     struct iommu_flush flush;
     struct acpi_drhd_unit *drhd;
@@ -545,15 +540,13 @@ struct vtd_iommu {
     nodeid_t node;
     struct msi_desc msi;
     struct intel_iommu *intel;
+
+    uint64_t qinval_maddr;   /* queue invalidation page machine address */
+
     struct list_head ats_devices;
     unsigned long *domid_bitmap;  /* domain id bitmap */
     u16 *domid_map;               /* domain id mapping array */
 };
-
-static inline struct qi_ctrl *iommu_qi_ctrl(struct vtd_iommu *iommu)
-{
-    return iommu ? &iommu->intel->qi_ctrl : NULL;
-}
 
 static inline struct ir_ctrl *iommu_ir_ctrl(struct vtd_iommu *iommu)
 {
