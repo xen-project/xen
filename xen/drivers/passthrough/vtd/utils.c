@@ -208,7 +208,7 @@ void vtd_dump_iommu_info(unsigned char key)
             uint64_t iremap_maddr = irta & PAGE_MASK;
             unsigned int nr_entry = 1 << ((irta & 0xF) + 1);
             struct iremap_entry *iremap_entries = NULL;
-            int print_cnt = 0;
+            unsigned int print_cnt = 0;
 
             printk("  Interrupt remapping table (nr_entry=%#x. "
                 "Only dump P=1 entries here):\n", nr_entry);
@@ -251,9 +251,9 @@ void vtd_dump_iommu_info(unsigned char key)
             }
             if ( iremap_entries )
                 unmap_vtd_domain_page(iremap_entries);
-            if ( iommu_ir_ctrl(iommu)->iremap_num != print_cnt )
-                printk("Warning: Print %d IRTE (actually have %d)!\n",
-                        print_cnt, iommu_ir_ctrl(iommu)->iremap_num);
+            if ( iommu->intremap.num != print_cnt )
+                printk("Warning: Print %u IRTE (actually have %u)!\n",
+                        print_cnt, iommu->intremap.num);
 
         }
     }
@@ -264,13 +264,12 @@ void vtd_dump_iommu_info(unsigned char key)
         int apic;
         union IO_APIC_reg_01 reg_01;
         struct IO_APIC_route_remap_entry *remap;
-        struct ir_ctrl *ir_ctrl;
 
         for ( apic = 0; apic < nr_ioapics; apic++ )
         {
             iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
-            ir_ctrl = iommu_ir_ctrl(iommu);
-            if ( !ir_ctrl || !ir_ctrl->iremap_maddr || !ir_ctrl->iremap_num )
+
+            if ( !iommu->intremap.maddr || !iommu->intremap.num )
                 continue;
 
             printk( "\nRedirection table of IOAPIC %x:\n", apic);

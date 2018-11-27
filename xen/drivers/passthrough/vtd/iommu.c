@@ -147,8 +147,6 @@ static struct intel_iommu *__init alloc_intel_iommu(void)
     if ( intel == NULL )
         return NULL;
 
-    spin_lock_init(&intel->ir_ctrl.iremap_lock);
-
     return intel;
 }
 
@@ -1166,6 +1164,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     iommu->msi.irq = -1; /* No irq assigned yet. */
     iommu->node = NUMA_NO_NODE;
     INIT_LIST_HEAD(&iommu->ats_devices);
+    spin_lock_init(&iommu->intremap.lock);
 
     iommu->intel = alloc_intel_iommu();
     if ( iommu->intel == NULL )

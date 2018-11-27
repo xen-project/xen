@@ -505,12 +505,6 @@ extern struct list_head acpi_drhd_units;
 extern struct list_head acpi_rmrr_units;
 extern struct list_head acpi_ioapic_units;
 
-struct ir_ctrl {
-    u64 iremap_maddr;            /* interrupt remap table machine address */
-    int iremap_num;              /* total num of used interrupt remap entry */
-    spinlock_t iremap_lock;      /* lock for irq remapping table */
-};
-
 struct iommu_flush {
     int __must_check (*context)(void *iommu, u16 did, u16 source_id,
                                 u8 function_mask, u64 type,
@@ -522,7 +516,6 @@ struct iommu_flush {
 };
 
 struct intel_iommu {
-    struct ir_ctrl ir_ctrl;
     struct iommu_flush flush;
     struct acpi_drhd_unit *drhd;
 };
@@ -543,15 +536,16 @@ struct vtd_iommu {
 
     uint64_t qinval_maddr;   /* queue invalidation page machine address */
 
+    struct {
+        uint64_t maddr;   /* interrupt remap table machine address */
+        unsigned int num; /* total num of used interrupt remap entry */
+        spinlock_t lock;  /* lock for irq remapping table */
+    } intremap;
+
     struct list_head ats_devices;
     unsigned long *domid_bitmap;  /* domain id bitmap */
     u16 *domid_map;               /* domain id mapping array */
 };
-
-static inline struct ir_ctrl *iommu_ir_ctrl(struct vtd_iommu *iommu)
-{
-    return iommu ? &iommu->intel->ir_ctrl : NULL;
-}
 
 static inline struct iommu_flush *iommu_get_flush(struct vtd_iommu *iommu)
 {
