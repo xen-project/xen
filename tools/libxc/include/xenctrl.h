@@ -44,7 +44,6 @@
 #include <xen/hvm/dm_op.h>
 #include <xen/hvm/params.h>
 #include <xen/xsm/flask_op.h>
-#include <xen/tmem.h>
 #include <xen/kexec.h>
 #include <xen/platform.h>
 
@@ -1909,22 +1908,6 @@ int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value);
 
 int xc_enable_turbo(xc_interface *xch, int cpuid);
 int xc_disable_turbo(xc_interface *xch, int cpuid);
-/**
- * tmem operations
- */
-
-int xc_tmem_control_oid(xc_interface *xch, int32_t pool_id, uint32_t subop,
-                        uint32_t cli_id, uint32_t len, uint32_t arg,
-                        struct xen_tmem_oid oid, void *buf);
-int xc_tmem_control(xc_interface *xch,
-                    int32_t pool_id, uint32_t subop, uint32_t cli_id,
-                    uint32_t len, uint32_t arg, void *buf);
-int xc_tmem_auth(xc_interface *xch, int cli_id, char *uuid_str, int enable);
-int xc_tmem_save(xc_interface *xch, uint32_t domid, int live, int fd, int field_marker);
-int xc_tmem_save_extra(xc_interface *xch, uint32_t domid, int fd, int field_marker);
-void xc_tmem_save_done(xc_interface *xch, uint32_t domid);
-int xc_tmem_restore(xc_interface *xch, uint32_t domid, int fd);
-int xc_tmem_restore_extra(xc_interface *xch, uint32_t domid, int fd);
 
 /**
  * altp2m operations

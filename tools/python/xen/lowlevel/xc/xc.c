@@ -17,7 +17,6 @@
 #include <arpa/inet.h>
 
 #include <xen/elfnote.h>
-#include <xen/tmem.h>
 #include "xc_dom.h"
 #include <xen/hvm/hvm_info_table.h>
 #include <xen/hvm/params.h>
@@ -1614,71 +1613,6 @@ static PyObject *dom_op(XcObject *self, PyObject *args,
     return zero;
 }
 
-static PyObject *pyxc_tmem_control(XcObject *self,
-                                   PyObject *args,
-                                   PyObject *kwds)
-{
-    int32_t pool_id;
-    uint32_t subop;
-    uint32_t cli_id;
-    uint32_t len;
-    uint32_t arg;
-    char *buf;
-    char _buffer[32768], *buffer = _buffer;
-    int rc;
-
-    static char *kwd_list[] = { "pool_id", "subop", "cli_id", "arg1", "arg2", "buf", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiis", kwd_list,
-                        &pool_id, &subop, &cli_id, &len, &arg, &buf) )
-        return NULL;
-
-    if ( (subop == XEN_SYSCTL_TMEM_OP_LIST) && (len > 32768) )
-        len = 32768;
-
-    if ( (rc = xc_tmem_control(self->xc_handle, pool_id, subop, cli_id, len, arg, buffer)) < 0 )
-        return Py_BuildValue("i", rc);
-
-    switch (subop) {
-        case XEN_SYSCTL_TMEM_OP_LIST:
-            return Py_BuildValue("s", buffer);
-        case XEN_SYSCTL_TMEM_OP_FLUSH:
-            return Py_BuildValue("i", rc);
-        case XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB:
-            return Py_BuildValue("i", rc);
-        case XEN_SYSCTL_TMEM_OP_THAW:
-        case XEN_SYSCTL_TMEM_OP_FREEZE:
-        case XEN_SYSCTL_TMEM_OP_DESTROY:
-        default:
-            break;
-    }
-
-    Py_INCREF(zero);
-    return zero;
-}
-
-static PyObject *pyxc_tmem_shared_auth(XcObject *self,
-                                   PyObject *args,
-                                   PyObject *kwds)
-{
-    uint32_t cli_id;
-    uint32_t arg1;
-    char *uuid_str;
-    int rc;
-
-    static char *kwd_list[] = { "cli_id", "uuid_str", "arg1", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "isi", kwd_list,
-                                   &cli_id, &uuid_str, &arg1) )
-        return NULL;
-
-    if ( (rc = xc_tmem_auth(self->xc_handle, cli_id, uuid_str, arg1)) < 0 )
-        return Py_BuildValue("i", rc);
-
-    Py_INCREF(zero);
-    return zero;
-}
-
 static PyObject *pyxc_dom_set_memshr(XcObject *self, PyObject *args)
 {
     uint32_t dom;
@@ -2496,27 +2430,6 @@ static PyMethodDef pyxc_methods[] = {
       "Do not propagate spurious page faults to this guest.\n"
       " dom [int]: Identifier of domain.\n" },
 #endif
-
-    { "tmem_control",
-      (PyCFunction)pyxc_tmem_control,
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Do various control on a tmem pool.\n"
-      " pool_id [int]: Identifier of the tmem pool (-1 == all).\n"
-      " subop [int]: Supplementary Operation.\n"
-      " cli_id [int]: Client identifier (-1 == all).\n"
-      " len [int]: Length of 'buf'.\n"
-      " arg [int]: Argument.\n"
-      " buf [str]: Buffer.\n\n"
-      "Returns: [int] 0 or [str] tmem info on success; exception on error.\n" },
-
-    { "tmem_shared_auth",
-      (PyCFunction)pyxc_tmem_shared_auth,
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "De/authenticate a shared tmem pool.\n"
-      " cli_id [int]: Client identifier (-1 == all).\n"
-      " uuid_str [str]: uuid.\n"
-      " auth [int]: 0|1 .\n"
-      "Returns: [int] 0 on success; exception on error.\n" },
 
     { "dom_set_memshr", 
       (PyCFunction)pyxc_dom_set_memshr,

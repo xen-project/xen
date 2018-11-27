@@ -30,7 +30,6 @@ CTRL_SRCS-y       += xc_tbuf.c
 CTRL_SRCS-y       += xc_pm.c
 CTRL_SRCS-y       += xc_cpu_hotplug.c
 CTRL_SRCS-y       += xc_resume.c
-CTRL_SRCS-y       += xc_tmem.c
 CTRL_SRCS-y       += xc_vm_event.c
 CTRL_SRCS-y       += xc_monitor.c
 CTRL_SRCS-y       += xc_mem_paging.c
