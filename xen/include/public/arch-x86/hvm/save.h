@@ -1,7 +1,7 @@
-/* 
+/*
  * Structure definitions for HVM state that is held by Xen and must
  * be saved along with the domain's memory and device-model state.
- * 
+ *
  * Copyright (c) 2007 XenSource Ltd.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,8 +26,8 @@
 #ifndef __XEN_PUBLIC_HVM_SAVE_X86_H__
 #define __XEN_PUBLIC_HVM_SAVE_X86_H__
 
-/* 
- * Save/restore header: general info about the save file. 
+/*
+ * Save/restore header: general info about the save file.
  */
 
 #define HVM_FILE_MAGIC   0x54381286
@@ -85,7 +85,7 @@ struct hvm_hw_cpu {
     uint64_t dr2;
     uint64_t dr3;
     uint64_t dr6;
-    uint64_t dr7;    
+    uint64_t dr7;
 
     uint32_t cs_sel;
     uint32_t ds_sel;
@@ -199,7 +199,7 @@ struct hvm_hw_cpu_compat {
     uint64_t dr2;
     uint64_t dr3;
     uint64_t dr6;
-    uint64_t dr7;    
+    uint64_t dr7;
 
     uint32_t cs_sel;
     uint32_t ds_sel;
@@ -463,7 +463,7 @@ struct hvm_hw_pci_link {
 
 DECLARE_HVM_SAVE_TYPE(PCI_LINK, 9, struct hvm_hw_pci_link);
 
-/* 
+/*
  *  PIT
  */
 
@@ -489,9 +489,9 @@ struct hvm_hw_pit {
 DECLARE_HVM_SAVE_TYPE(PIT, 10, struct hvm_hw_pit);
 
 
-/* 
+/*
  * RTC
- */ 
+ */
 
 #define RTC_CMOS_SIZE 14
 struct hvm_hw_rtc {
@@ -639,7 +639,7 @@ struct hvm_msr {
 
 #define CPU_MSR_CODE  20
 
-/* 
+/*
  * Largest type-code in use
  */
 #define HVM_SAVE_CODE_MAX 20

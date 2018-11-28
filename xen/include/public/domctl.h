@@ -1,8 +1,8 @@
 /******************************************************************************
  * domctl.h
- * 
+ *
  * Domain management operations. For use by node control stack.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -785,7 +785,7 @@ struct xen_domctl_gdbsx_domstatus {
 /*
  * Domain memory paging
  * Page memory in and out.
- * Domctl interface to set up and tear down the 
+ * Domctl interface to set up and tear down the
  * pager<->hypervisor interface. Use XENMEM_paging_op*
  * to perform per-page operations.
  *
@@ -837,7 +837,7 @@ struct xen_domctl_gdbsx_domstatus {
  */
 #define XEN_DOMCTL_VM_EVENT_OP_SHARING           3
 
-/* Use for teardown/setup of helper<->hypervisor interface for paging, 
+/* Use for teardown/setup of helper<->hypervisor interface for paging,
  * access and sharing.*/
 struct xen_domctl_vm_event_op {
     uint32_t       op;           /* XEN_VM_EVENT_* */

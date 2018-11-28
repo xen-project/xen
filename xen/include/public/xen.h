@@ -1,8 +1,8 @@
 /******************************************************************************
  * xen.h
- * 
+ *
  * Guest OS interface to Xen.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -157,11 +157,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define __HYPERVISOR_dom0_op __HYPERVISOR_platform_op
 #endif
 
-/* 
+/*
  * VIRTUAL INTERRUPTS
- * 
+ *
  * Virtual interrupts that a guest OS may receive from Xen.
- * 
+ *
  * In the side comments, 'V.' denotes a per-VCPU VIRQ while 'G.' denotes a
  * global VIRQ. The former can be bound once per VCPU and cannot be re-bound.
  * The latter can be allocated only once per guest: they must initially be
@@ -211,7 +211,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *                     (x) encodes the PFD as follows:
  *                     x == 0 => PFD == DOMID_SELF
  *                     x != 0 => PFD == x - 1
- * 
+ *
  * Sub-commands: ptr[1:0] specifies the appropriate MMU_* command.
  * -------------
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
@@ -257,13 +257,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  * To deallocate the pages, the operations are the reverse of the steps
  * mentioned above. The argument is MMUEXT_UNPIN_TABLE for all levels and the
  * pagetable MUST not be in use (meaning that the cr3 is not set to it).
- * 
+ *
  * ptr[1:0] == MMU_MACHPHYS_UPDATE:
  * Updates an entry in the machine->pseudo-physical mapping table.
  * ptr[:2]  -- Machine address within the frame whose mapping to modify.
  *             The frame must belong to the FD, if one is specified.
  * val      -- Value to write into the mapping entry.
- * 
+ *
  * ptr[1:0] == MMU_PT_UPDATE_PRESERVE_AD:
  * As MMU_NORMAL_PT_UPDATE above, but A/D bits currently in the PTE are ORed
  * with those in @val.
@@ -661,7 +661,7 @@ typedef struct vcpu_time_info vcpu_time_info_t;
 struct vcpu_info {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
-     * a pending notification for a particular VCPU. It is then cleared 
+     * a pending notification for a particular VCPU. It is then cleared
      * by the guest OS /before/ checking for pending work, thus avoiding
      * a set-and-check race. Note that the mask is only accessed by Xen
      * on the CPU that is currently hosting the VCPU. This means that the
@@ -724,7 +724,7 @@ struct shared_info {
      *  3. Virtual interrupts ('events'). A domain can bind an event-channel
      *     port to a virtual interrupt source, such as the virtual-timer
      *     device or the emergency console.
-     * 
+     *
      * Event channels are addressed by a "port index". Each channel is
      * associated with two bits of information:
      *  1. PENDING -- notifies the domain that there is a pending notification
@@ -735,7 +735,7 @@ struct shared_info {
      *     becomes pending while the channel is masked then the 'edge' is lost
      *     (i.e., when the channel is unmasked, the guest must manually handle
      *     pending notifications as no upcall will be scheduled by Xen).
-     * 
+     *
      * To expedite scanning of pending notifications, any 0->1 pending
      * transition on an unmasked channel causes a corresponding bit in a
      * per-vcpu selector word to be set. Each bit in the selector covers a

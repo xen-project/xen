@@ -1,7 +1,7 @@
 /*
  * ioreq.h: I/O request definitions for device models
  * Copyright (c) 2004, Intel Corporation.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -45,7 +45,7 @@
  *
  * For I/O type IOREQ_TYPE_PCI_CONFIG, the physical address is formatted
  * as follows:
- * 
+ *
  * 63....48|47..40|39..35|34..32|31........0
  * SEGMENT |BUS   |DEV   |FN    |OFFSET
  */
@@ -57,7 +57,7 @@ struct ioreq {
     uint32_t vp_eport;      /* evtchn for notifications to/from device model */
     uint16_t _pad0;
     uint8_t state:4;
-    uint8_t data_is_ptr:1;  /* if 1, data above is the guest paddr 
+    uint8_t data_is_ptr:1;  /* if 1, data above is the guest paddr
                              * of the real data to use. */
     uint8_t dir:1;          /* 1=read, 0=write */
     uint8_t df:1;
@@ -99,7 +99,7 @@ struct buffered_iopage {
 typedef struct buffered_iopage buffered_iopage_t;
 
 /*
- * ACPI Control/Event register locations. Location is controlled by a 
+ * ACPI Control/Event register locations. Location is controlled by a
  * version number in HVM_PARAM_ACPI_IOPORTS_LOCATION.
  */
 

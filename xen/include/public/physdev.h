@@ -148,7 +148,7 @@ struct physdev_irq {
 };
 typedef struct physdev_irq physdev_irq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
- 
+
 #define MAP_PIRQ_TYPE_MSI               0x0
 #define MAP_PIRQ_TYPE_GSI               0x1
 #define MAP_PIRQ_TYPE_UNKNOWN           0x2
@@ -192,7 +192,7 @@ struct physdev_manage_pci {
     /* IN */
     uint8_t bus;
     uint8_t devfn;
-}; 
+};
 
 typedef struct physdev_manage_pci physdev_manage_pci_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_t);
@@ -258,7 +258,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_setup_gsi_t);
  * the hypercall returns a free pirq */
 #define PHYSDEVOP_get_free_pirq    23
 struct physdev_get_free_pirq {
-    /* IN */ 
+    /* IN */
     int type;
     /* OUT */
     uint32_t pirq;

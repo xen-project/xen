@@ -1,6 +1,6 @@
 /******************************************************************************
  * kexec.h - Public portion
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -18,7 +18,7 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- * 
+ *
  * Xen port written by:
  * - Simon 'Horms' Horman <horms@verge.net.au>
  * - Magnus Damm <magnus@valinux.co.jp>
@@ -30,7 +30,7 @@
 
 /* This file describes the Kexec / Kdump hypercall interface for Xen.
  *
- * Kexec under vanilla Linux allows a user to reboot the physical machine 
+ * Kexec under vanilla Linux allows a user to reboot the physical machine
  * into a new user-specified kernel. The Xen port extends this idea
  * to allow rebooting of the machine from dom0. When kexec for dom0
  * is used to reboot,  both the hypervisor and the domains get replaced
@@ -41,8 +41,8 @@
  * types of hypercall operations:
  *
  * 1) Range information:
- *    This is used by the dom0 kernel to ask the hypervisor about various 
- *    address information. This information is needed to allow kexec-tools 
+ *    This is used by the dom0 kernel to ask the hypervisor about various
+ *    address information. This information is needed to allow kexec-tools
  *    to fill in the ELF headers for /proc/vmcore properly.
  *
  * 2) Load and unload of images:
@@ -65,7 +65,7 @@
 /*
  * Prototype for this hypercall is:
  *  int kexec_op(int cmd, void *args)
- * @cmd  == KEXEC_CMD_... 
+ * @cmd  == KEXEC_CMD_...
  *          KEXEC operation to perform
  * @args == Operation-specific extra arguments (NULL if none).
  */
@@ -92,7 +92,7 @@
  * is passed to the "code page" which is one page of code that performs
  * the final relocations before jumping to the new kernel.
  */
- 
+
 typedef struct xen_kexec_image {
 #if defined(__i386__) || defined(__x86_64__)
     unsigned long page_list[KEXEC_XEN_NO_PAGES];
