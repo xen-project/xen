@@ -8400,7 +8400,8 @@ x86_emulate(
                 signed long idx = b & 1 ? index.qw[i] : index.dw[i];
 
                 rc = ops->read(ea.mem.seg,
-                               ea.mem.off + (idx << state->sib_scale),
+                               truncate_ea(ea.mem.off +
+                                           (idx << state->sib_scale)),
                                (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
                 if ( rc != X86EMUL_OKAY )
                 {
