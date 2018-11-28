@@ -45,9 +45,9 @@ static void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long dfn)
     unmap_domain_page(table);
 }
 
-static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn, 
-                                    unsigned int next_level,
-                                    bool_t iw, bool_t ir)
+static bool set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
+                                  unsigned int next_level,
+                                  bool iw, bool ir)
 {
     uint64_t addr_lo, addr_hi, maddr_next;
     u32 entry;
@@ -123,13 +123,13 @@ static bool_t set_iommu_pde_present(u32 *pde, unsigned long next_mfn,
     return need_flush;
 }
 
-static bool_t set_iommu_pte_present(unsigned long pt_mfn, unsigned long dfn,
-                                    unsigned long next_mfn, int pde_level, 
-                                    bool_t iw, bool_t ir)
+static bool set_iommu_pte_present(unsigned long pt_mfn, unsigned long dfn,
+                                  unsigned long next_mfn, int pde_level,
+                                  bool iw, bool ir)
 {
     u64 *table;
     u32 *pde;
-    bool_t need_flush = 0;
+    bool need_flush;
 
     table = map_domain_page(_mfn(pt_mfn));
 
@@ -347,16 +347,16 @@ static void set_pde_count(u64 *pde, unsigned int count)
 /* Return 1, if pages are suitable for merging at merge_level.
  * otherwise increase pde count if mfn is contigous with mfn - 1
  */
-static int iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
-                                  unsigned long dfn, unsigned long mfn,
-                                  unsigned int merge_level)
+static bool iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
+                                   unsigned long dfn, unsigned long mfn,
+                                   unsigned int merge_level)
 {
     unsigned int pde_count, next_level;
     unsigned long first_mfn;
     u64 *table, *pde, *ntable;
     u64 ntable_maddr, mask;
     struct domain_iommu *hd = dom_iommu(d);
-    bool_t ok = 0;
+    bool ok = false;
 
     ASSERT( spin_is_locked(&hd->arch.mapping_lock) && pt_mfn );
 
@@ -384,7 +384,7 @@ static int iommu_update_pde_count(struct domain *d, unsigned long pt_mfn,
         pde_count = get_pde_count(*pde);
 
         if ( pde_count == (PTE_PER_TABLE_SIZE - 1) )
-            ok = 1;
+            ok = true;
         else if ( pde_count < (PTE_PER_TABLE_SIZE - 1))
         {
             pde_count++;
@@ -648,7 +648,7 @@ static int update_paging_mode(struct domain *d, unsigned long dfn)
 int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
                        unsigned int flags)
 {
-    bool_t need_flush = 0;
+    bool need_flush;
     struct domain_iommu *hd = dom_iommu(d);
     int rc;
     unsigned long pt_mfn[7];
