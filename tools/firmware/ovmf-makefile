@@ -16,6 +16,7 @@ all: build
 
 .PHONY: build
 build:
+	if test -e .git ; then $(GIT) submodule update --init --recursive ; fi
 	OvmfPkg/build.sh -a X64 -b $(TARGET) -n 4
 	cp Build/OvmfX64/$(TARGET)_GCC*/FV/OVMF.fd ovmf.bin
 
