@@ -209,11 +209,8 @@ static void parse_global_config(const char *configfile,
     if (!xlu_cfg_get_long (config, "max_maptrack_frames", &l, 0))
         max_maptrack_frames = l;
 
-    libxl_bitmap_init(&global_vm_affinity_mask);
     libxl_cpu_bitmap_alloc(ctx, &global_vm_affinity_mask, 0);
-    libxl_bitmap_init(&global_hvm_affinity_mask);
     libxl_cpu_bitmap_alloc(ctx, &global_hvm_affinity_mask, 0);
-    libxl_bitmap_init(&global_pv_affinity_mask);
     libxl_cpu_bitmap_alloc(ctx, &global_pv_affinity_mask, 0);
 
     if (!xlu_cfg_get_string (config, "vm.cpumask", &buf, 0))
@@ -323,11 +320,17 @@ void xl_ctx_alloc(void) {
         exit(1);
     }
 
+    libxl_bitmap_init(&global_vm_affinity_mask);
+    libxl_bitmap_init(&global_hvm_affinity_mask);
+    libxl_bitmap_init(&global_pv_affinity_mask);
     libxl_childproc_setmode(ctx, &childproc_hooks, 0);
 }
 
 static void xl_ctx_free(void)
 {
+    libxl_bitmap_dispose(&global_pv_affinity_mask);
+    libxl_bitmap_dispose(&global_hvm_affinity_mask);
+    libxl_bitmap_dispose(&global_vm_affinity_mask);
     if (ctx) {
         libxl_ctx_free(ctx);
         ctx = NULL;
@@ -383,9 +386,9 @@ int main(int argc, char **argv)
         (progress_use_cr ? XTL_STDIOSTREAM_PROGRESS_USE_CR : 0));
     if (!logger) exit(EXIT_FAILURE);
 
-    atexit(xl_ctx_free);
-
     xl_ctx_alloc();
+
+    atexit(xl_ctx_free);
 
     ret = libxl_read_file_contents(ctx, XL_GLOBAL_CONFIG,
             &config_data, &config_len);
