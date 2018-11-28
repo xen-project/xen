@@ -41,7 +41,6 @@
 #include <public/vcpu.h>
 #include <xsm/xsm.h>
 #include <xen/trace.h>
-#include <xen/tmem.h>
 #include <asm/setup.h>
 
 #ifdef CONFIG_X86
@@ -725,10 +724,8 @@ int domain_kill(struct domain *d)
         argo_destroy(d);
         evtchn_destroy(d);
         gnttab_release_mappings(d);
-        tmem_destroy(d->tmem_client);
         vnuma_destroy(d->vnuma);
         domain_set_outstanding_pages(d, 0);
-        d->tmem_client = NULL;
         /* fallthrough */
     case DOMDYING_dying:
         rc = domain_relinquish_resources(d);

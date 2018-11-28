@@ -454,9 +454,6 @@ struct domain
      */
     spinlock_t hypercall_deadlock_mutex;
 
-    /* transcendent memory, auto-allocated on first tmem op by each domain */
-    struct client *tmem_client;
-
     struct lock_profile_qhead profile_head;
 
     /* Various vm_events */

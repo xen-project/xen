@@ -34,7 +34,6 @@
 #include "xen.h"
 #include "domctl.h"
 #include "physdev.h"
-#include "tmem.h"
 
 #define XEN_SYSCTL_INTERFACE_VERSION 0x00000012
 
@@ -751,110 +750,6 @@ struct xen_sysctl_psr_alloc {
     } u;
 };
 
-#define XEN_SYSCTL_TMEM_OP_ALL_CLIENTS 0xFFFFU
-
-#define XEN_SYSCTL_TMEM_OP_THAW                   0
-#define XEN_SYSCTL_TMEM_OP_FREEZE                 1
-#define XEN_SYSCTL_TMEM_OP_FLUSH                  2
-#define XEN_SYSCTL_TMEM_OP_DESTROY                3
-#define XEN_SYSCTL_TMEM_OP_LIST                   4
-#define XEN_SYSCTL_TMEM_OP_GET_CLIENT_INFO        5
-#define XEN_SYSCTL_TMEM_OP_SET_CLIENT_INFO        6
-#define XEN_SYSCTL_TMEM_OP_GET_POOLS              7
-#define XEN_SYSCTL_TMEM_OP_QUERY_FREEABLE_MB      8
-#define XEN_SYSCTL_TMEM_OP_SET_POOLS              9
-#define XEN_SYSCTL_TMEM_OP_SAVE_BEGIN             10
-#define XEN_SYSCTL_TMEM_OP_SET_AUTH               11
-#define XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_PAGE     19
-#define XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_INV      20
-#define XEN_SYSCTL_TMEM_OP_SAVE_END               21
-#define XEN_SYSCTL_TMEM_OP_RESTORE_BEGIN          30
-#define XEN_SYSCTL_TMEM_OP_RESTORE_PUT_PAGE       32
-#define XEN_SYSCTL_TMEM_OP_RESTORE_FLUSH_PAGE     33
-
-/*
- * XEN_SYSCTL_TMEM_OP_SAVE_GET_NEXT_[PAGE|INV] override the 'buf' in
- * xen_sysctl_tmem_op with this structure - sometimes with an extra
- * page tackled on.
- */
-struct tmem_handle {
-    uint32_t pool_id;
-    uint32_t index;
-    xen_tmem_oid_t oid;
-};
-
-/*
- * XEN_SYSCTL_TMEM_OP_[GET,SAVE]_CLIENT uses the 'client' in
- * xen_tmem_op with this structure, which is mostly used during migration.
- */
-struct xen_tmem_client {
-    uint32_t version;   /* If mismatched we will get XEN_EOPNOTSUPP. */
-    uint32_t maxpools;  /* If greater than what hypervisor supports, will get
-                           XEN_ERANGE. */
-    uint32_t nr_pools;  /* Current amount of pools. Ignored on SET*/
-    union {             /* See TMEM_CLIENT_[COMPRESS,FROZEN] */
-        uint32_t raw;
-        struct {
-            uint8_t frozen:1,
-                    compress:1,
-                    migrating:1;
-        } u;
-    } flags;
-    uint32_t weight;
-};
-typedef struct xen_tmem_client xen_tmem_client_t;
-DEFINE_XEN_GUEST_HANDLE(xen_tmem_client_t);
-
-/*
- * XEN_SYSCTL_TMEM_OP_[GET|SET]_POOLS or XEN_SYSCTL_TMEM_OP_SET_AUTH
- * uses the 'pool' array in * xen_sysctl_tmem_op with this structure.
- * The XEN_SYSCTL_TMEM_OP_GET_POOLS hypercall will
- * return the number of entries in 'pool' or a negative value
- * if an error was encountered.
- * The XEN_SYSCTL_TMEM_OP_SET_[AUTH|POOLS] will return the number of
- * entries in 'pool' processed or a negative value if an error
- * was encountered.
- */
-struct xen_tmem_pool_info {
-    union {
-        uint32_t raw;
-        struct {
-            uint32_t persist:1,    /* See TMEM_POOL_PERSIST. */
-                     shared:1,     /* See TMEM_POOL_SHARED. */
-                     auth:1,       /* See TMEM_POOL_AUTH. */
-                     rsv1:1,
-                     pagebits:8,   /* TMEM_POOL_PAGESIZE_[SHIFT,MASK]. */
-                     rsv2:12,
-                     version:8;    /* TMEM_POOL_VERSION_[SHIFT,MASK]. */
-        } u;
-    } flags;
-    uint32_t id;                  /* Less than tmem_client.maxpools. */
-    uint64_t n_pages;             /* Zero on XEN_SYSCTL_TMEM_OP_SET_[AUTH|POOLS]. */
-    uint64_aligned_t uuid[2];
-};
-typedef struct xen_tmem_pool_info xen_tmem_pool_info_t;
-DEFINE_XEN_GUEST_HANDLE(xen_tmem_pool_info_t);
-
-struct xen_sysctl_tmem_op {
-    uint32_t cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */
-    int32_t pool_id;    /* IN: 0 by default unless _SAVE_*, RESTORE_* .*/
-    uint32_t cli_id;    /* IN: client id, 0 for XEN_SYSCTL_TMEM_QUERY_FREEABLE_MB
-                           for all others can be the domain id or
-                           XEN_SYSCTL_TMEM_OP_ALL_CLIENTS for all. */
-    uint32_t len;       /* IN: length of 'buf'. If not applicable to use 0. */
-    uint32_t arg;       /* IN: If not applicable to command use 0. */
-    uint32_t pad;       /* Padding so structure is the same under 32 and 64. */
-    xen_tmem_oid_t oid; /* IN: If not applicable to command use 0s. */
-    union {
-        XEN_GUEST_HANDLE_64(char) buf; /* IN/OUT: Buffer to save/restore */
-        XEN_GUEST_HANDLE_64(xen_tmem_client_t) client; /* IN/OUT for */
-                        /*  XEN_SYSCTL_TMEM_OP_[GET,SAVE]_CLIENT. */
-        XEN_GUEST_HANDLE_64(xen_tmem_pool_info_t) pool; /* OUT for */
-                        /* XEN_SYSCTL_TMEM_OP_GET_POOLS. Must have 'len' */
-                        /* of them. */
-    } u;
-};
-
 /*
  * XEN_SYSCTL_get_cpu_levelling_caps (x86 specific)
  *
@@ -1143,7 +1038,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_psr_cmt_op                    21
 #define XEN_SYSCTL_pcitopoinfo                   22
 #define XEN_SYSCTL_psr_alloc                     23
-#define XEN_SYSCTL_tmem_op                       24
+/* #define XEN_SYSCTL_tmem_op                       24 */
 #define XEN_SYSCTL_get_cpu_levelling_caps        25
 #define XEN_SYSCTL_get_cpu_featureset            26
 #define XEN_SYSCTL_livepatch_op                  27
@@ -1173,7 +1068,6 @@ struct xen_sysctl {
         struct xen_sysctl_coverage_op       coverage_op;
         struct xen_sysctl_psr_cmt_op        psr_cmt_op;
         struct xen_sysctl_psr_alloc         psr_alloc;
-        struct xen_sysctl_tmem_op           tmem_op;
         struct xen_sysctl_cpu_levelling_caps cpu_levelling_caps;
         struct xen_sysctl_cpu_featureset    cpu_featureset;
         struct xen_sysctl_livepatch_op      livepatch;

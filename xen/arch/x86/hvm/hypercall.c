@@ -135,9 +135,6 @@ static const hypercall_table_t hvm_hypercall_table[] = {
     HYPERCALL(hvm_op),
     HYPERCALL(sysctl),
     HYPERCALL(domctl),
-#ifdef CONFIG_TMEM
-    HYPERCALL(tmem_op),
-#endif
 #ifdef CONFIG_ARGO
     COMPAT_CALL(argo_op),
 #endif

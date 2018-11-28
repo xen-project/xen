@@ -88,21 +88,6 @@ config KEXEC
 
 	  If unsure, say Y.
 
-config TMEM
-	bool "Transcendent Memory Support (deprecated)" if EXPERT = "y"
-	---help---
-	  Transcendent memory allows PV-aware guests to collaborate on memory
-	  usage. Guests can 'swap' their memory to the hypervisor or have an
-	  collective pool of memory shared across guests. The end result is
-	  less memory usage by guests allowing higher guest density.
-
-	  You also have to enable it on the Xen commandline by using tmem=1.
-
-	  WARNING: This option (and its underlying code) is going to go away
-	  in a future Xen version.
-
-	  If unsure, say N.
-
 config XENOPROF
 	def_bool y
 	prompt "Xen Oprofile Support" if EXPERT = "y"

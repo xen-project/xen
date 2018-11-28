@@ -7,6 +7,7 @@
  * Copyright (c) 2003-2005, K A Fraser
  */
 
+#include <xen/domain_page.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
@@ -18,8 +19,6 @@
 #include <xen/guest_access.h>
 #include <xen/hypercall.h>
 #include <xen/errno.h>
-#include <xen/tmem.h>
-#include <xen/tmem_xen.h>
 #include <xen/numa.h>
 #include <xen/mem_access.h>
 #include <xen/trace.h>
@@ -250,11 +249,10 @@ static void populate_physmap(struct memop_args *a)
 
                 if ( unlikely(!page) )
                 {
-                    if ( !tmem_enabled() || a->extent_order )
-                        gdprintk(XENLOG_INFO,
-                                 "Could not allocate order=%u extent: id=%d memflags=%#x (%u of %u)\n",
-                                 a->extent_order, d->domain_id, a->memflags,
-                                 i, a->nr_extents);
+                    gdprintk(XENLOG_INFO,
+                             "Could not allocate order=%u extent: id=%d memflags=%#x (%u of %u)\n",
+                             a->extent_order, d->domain_id, a->memflags,
+                             i, a->nr_extents);
                     goto out;
                 }
 

@@ -65,7 +65,6 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     ARGS(sysctl, 1),
     ARGS(domctl, 1),
     ARGS(kexec_op, 2),
-    ARGS(tmem_op, 1),
 #ifdef CONFIG_ARGO
     ARGS(argo_op, 5),
 #endif

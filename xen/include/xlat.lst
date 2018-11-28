@@ -135,8 +135,6 @@
 ?	sched_pin_override		sched.h
 ?	sched_remote_shutdown		sched.h
 ?	sched_shutdown			sched.h
-?	tmem_oid			tmem.h
-!	tmem_op				tmem.h
 ?	t_buf				trace.h
 ?	vcpu_get_physid			vcpu.h
 ?	vcpu_register_vcpu_info		vcpu.h

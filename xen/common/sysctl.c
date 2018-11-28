@@ -13,7 +13,6 @@
 #include <xen/domain.h>
 #include <xen/event.h>
 #include <xen/domain_page.h>
-#include <xen/tmem.h>
 #include <xen/trace.h>
 #include <xen/console.h>
 #include <xen/iocap.h>
@@ -455,10 +454,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         break;
     }
 #endif
-
-    case XEN_SYSCTL_tmem_op:
-        ret = tmem_control(&op->u.tmem_op);
-        break;
 
     case XEN_SYSCTL_livepatch_op:
         ret = livepatch_op(&op->u.livepatch);

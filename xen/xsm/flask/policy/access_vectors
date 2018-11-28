@@ -67,10 +67,6 @@ class xen
     lockprof
 # XEN_SYSCTL_cpupool_op
     cpupool_op
-# tmem hypercall (any access)
-    tmem_op
-# XEN_SYSCTL_tmem_op command of tmem (part of sysctl)
-    tmem_control
 # XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo, XEN_SYSCTL_sched_id, XEN_DOMCTL_SCHEDOP_getvcpuinfo
     getscheduler
 # XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo, XEN_DOMCTL_SCHEDOP_putvcpuinfo

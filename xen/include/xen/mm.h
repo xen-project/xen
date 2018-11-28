@@ -209,7 +209,6 @@ unsigned long avail_node_heap_pages(unsigned int);
 unsigned int online_page(unsigned long mfn, uint32_t *status);
 int offline_page(unsigned long mfn, int broken, uint32_t *status);
 int query_page_offline(unsigned long mfn, uint32_t *status);
-unsigned long total_free_pages(void);
 
 void heap_init_late(void);
 
@@ -249,8 +248,6 @@ struct npfec {
 #define  MEMF_no_refcount (1U<<_MEMF_no_refcount)
 #define _MEMF_populate_on_demand 1
 #define  MEMF_populate_on_demand (1U<<_MEMF_populate_on_demand)
-#define _MEMF_tmem        2
-#define  MEMF_tmem        (1U<<_MEMF_tmem)
 #define _MEMF_no_dma      3
 #define  MEMF_no_dma      (1U<<_MEMF_no_dma)
 #define _MEMF_exact_node  4

@@ -12,7 +12,6 @@
 #include <public/sysctl.h>
 #include <public/platform.h>
 #include <public/event_channel.h>
-#include <public/tmem.h>
 #include <public/version.h>
 #include <public/pmu.h>
 #include <public/hvm/dm_op.h>
@@ -129,12 +128,6 @@ do_kexec_op(
 extern long
 do_xsm_op(
     XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_xsm_op);
-
-#ifdef CONFIG_TMEM
-extern long
-do_tmem_op(
-    XEN_GUEST_HANDLE_PARAM(tmem_op_t) uops);
-#endif
 
 #ifdef CONFIG_ARGO
 extern long do_argo_op(

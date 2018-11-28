@@ -402,14 +402,6 @@ F:	*/configure
 F:	*/*.ac
 F:	tools/
 
-TRANSCENDENT MEMORY (TMEM)
-M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-W:	https://oss.oracle.com/projects/tmem
-S:	Supported
-F:	xen/common/tmem*
-F:	xen/include/xen/tmem*
-F:	docs/misc/tmem*
-
 UNMODIFIED LINUX PV DRIVERS
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Obsolete

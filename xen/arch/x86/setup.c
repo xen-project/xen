@@ -25,7 +25,6 @@
 #include <xen/dmi.h>
 #include <xen/pfn.h>
 #include <xen/nodemask.h>
-#include <xen/tmem_xen.h>
 #include <xen/virtual_region.h>
 #include <xen/watchdog.h>
 #include <public/version.h>
@@ -1495,13 +1494,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             if ( PFN_DOWN(s) <= limit )
                 s = pfn_to_paddr(limit + 1);
             init_domheap_pages(s, e);
-        }
-
-        if ( tmem_enabled() )
-        {
-           printk(XENLOG_WARNING
-                  "TMEM physical RAM limit exceeded, disabling TMEM\n");
-           tmem_disable();
         }
     }
     else

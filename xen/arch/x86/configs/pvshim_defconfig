@@ -11,7 +11,6 @@ CONFIG_NR_CPUS=32
 # CONFIG_HVM_FEP is not set
 # CONFIG_TBOOT is not set
 # CONFIG_KEXEC is not set
-# CONFIG_TMEM is not set
 # CONFIG_XENOPROF is not set
 # CONFIG_XSM is not set
 # CONFIG_SCHED_CREDIT2 is not set

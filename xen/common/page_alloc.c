@@ -135,8 +135,6 @@
 #include <xen/numa.h>
 #include <xen/nodemask.h>
 #include <xen/event.h>
-#include <xen/tmem.h>
-#include <xen/tmem_xen.h>
 #include <public/sysctl.h>
 #include <public/sched.h>
 #include <asm/page.h>
@@ -455,10 +453,6 @@ static unsigned long node_need_scrub[MAX_NUMNODES];
 static unsigned long *avail[MAX_NUMNODES];
 static long total_avail_pages;
 
-/* TMEM: Reserve a fraction of memory for mid-size (0<order<9) allocations.*/
-static long midsize_alloc_zone_pages;
-#define MIDSIZE_ALLOC_FRAC 128
-
 static DEFINE_SPINLOCK(heap_lock);
 static long outstanding_claims; /* total outstanding claims by all domains */
 
@@ -534,16 +528,6 @@ int domain_set_outstanding_pages(struct domain *d, unsigned long pages)
     /* how much memory is available? */
     avail_pages = total_avail_pages;
 
-    /* Note: The usage of claim means that allocation from a guest *might*
-     * have to come from freeable memory. Using free memory is always better, if
-     * it is available, than using freeable memory.
-     *
-     * But that is OK as once the claim has been made, it still can take minutes
-     * before the claim is fully satisfied. Tmem can make use of the unclaimed
-     * pages during this time (to store ephemeral/freeable pages only,
-     * not persistent pages).
-     */
-    avail_pages += tmem_freeable_pages();
     avail_pages -= outstanding_claims;
 
     /*
@@ -715,8 +699,7 @@ static void __init setup_low_mem_virq(void)
 
 static void check_low_mem_virq(void)
 {
-    unsigned long avail_pages = total_avail_pages +
-        tmem_freeable_pages() - outstanding_claims;
+    unsigned long avail_pages = total_avail_pages - outstanding_claims;
 
     if ( unlikely(avail_pages <= low_mem_virq_th) )
     {
@@ -943,29 +926,12 @@ static struct page_info *alloc_heap_pages(
      * Claimed memory is considered unavailable unless the request
      * is made by a domain with sufficient unclaimed pages.
      */
-    if ( (outstanding_claims + request >
-          total_avail_pages + tmem_freeable_pages()) &&
+    if ( (outstanding_claims + request > total_avail_pages) &&
           ((memflags & MEMF_no_refcount) ||
            !d || d->outstanding_pages < request) )
     {
         spin_unlock(&heap_lock);
         return NULL;
-    }
-
-    /*
-     * TMEM: When available memory is scarce due to tmem absorbing it, allow
-     * only mid-size allocations to avoid worst of fragmentation issues.
-     * Others try tmem pools then fail.  This is a workaround until all
-     * post-dom0-creation-multi-page allocations can be eliminated.
-     */
-    if ( ((order == 0) || (order >= 9)) &&
-         (total_avail_pages <= midsize_alloc_zone_pages) &&
-         tmem_freeable_pages() )
-    {
-        /* Try to free memory from tmem. */
-        pg = tmem_relinquish_pages(order, memflags);
-        spin_unlock(&heap_lock);
-        return pg;
     }
 
     pg = get_free_buddy(zone_lo, zone_hi, order, memflags, d);
@@ -1456,10 +1422,6 @@ static void free_heap_pages(
     else
         pg->u.free.first_dirty = INVALID_DIRTY_IDX;
 
-    if ( tmem_enabled() )
-        midsize_alloc_zone_pages = max(
-            midsize_alloc_zone_pages, total_avail_pages / MIDSIZE_ALLOC_FRAC);
-
     /* Merge chunks as far as possible. */
     while ( order < MAX_ORDER )
     {
@@ -1844,11 +1806,6 @@ static unsigned long avail_heap_pages(
     }
 
     return free_pages;
-}
-
-unsigned long total_free_pages(void)
-{
-    return total_avail_pages - midsize_alloc_zone_pages;
 }
 
 void __init end_boot_allocator(void)
@@ -2277,10 +2234,9 @@ int assign_pages(
     {
         if ( unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
         {
-            if ( !tmem_enabled() || order != 0 || d->tot_pages != d->max_pages )
-                gprintk(XENLOG_INFO, "Over-allocation for domain %u: "
-                        "%u > %u\n", d->domain_id,
-                        d->tot_pages + (1 << order), d->max_pages);
+            gprintk(XENLOG_INFO, "Over-allocation for domain %u: "
+                    "%u > %u\n", d->domain_id,
+                    d->tot_pages + (1 << order), d->max_pages);
             rc = -E2BIG;
             goto out;
         }

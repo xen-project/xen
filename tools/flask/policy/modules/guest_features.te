@@ -1,6 +1,3 @@
-# Allow all domains to use (unprivileged parts of) the tmem hypercall
-allow domain_type xen_t:xen tmem_op;
-
 # Allow all domains to use PMU (but not to change its settings --- that's what
 # pmu_ctrl is for)
 allow domain_type xen_t:xen2 pmu_use;

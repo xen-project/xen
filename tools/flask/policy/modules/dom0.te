@@ -10,8 +10,8 @@ allow dom0_t xen_t:xen {
 	settime tbufcontrol readconsole clearconsole perfcontrol mtrr_add
 	mtrr_del mtrr_read microcode physinfo quirk writeconsole readapic
 	writeapic privprofile nonprivprofile kexec firmware sleep frequency
-	getidle debug getcpuinfo heap pm_op mca_op lockprof cpupool_op tmem_op
-	tmem_control getscheduler setscheduler
+	getidle debug getcpuinfo heap pm_op mca_op lockprof cpupool_op
+	getscheduler setscheduler
 };
 allow dom0_t xen_t:xen2 {
 	resource_op psr_cmt_op psr_alloc pmu_ctrl get_symbol
