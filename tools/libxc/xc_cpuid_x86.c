@@ -336,13 +336,22 @@ static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
             if ( featureset[i] != 0 )
                 return -EOPNOTSUPP;
     }
+    else
+    {
+        rc = xc_get_cpu_featureset(xch, (info->hvm
+                                         ? XEN_SYSCTL_cpu_featureset_hvm
+                                         : XEN_SYSCTL_cpu_featureset_pv),
+                                   &host_nr_features, info->featureset);
+        if ( rc )
+            return -errno;
+    }
 
     /* Get xstate information. */
     domctl.cmd = XEN_DOMCTL_getvcpuextstate;
     domctl.domain = domid;
     rc = do_domctl(xch, &domctl);
     if ( rc )
-        return rc;
+        return -errno;
 
     info->xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
 
@@ -352,23 +361,15 @@ static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
 
         rc = xc_hvm_param_get(xch, domid, HVM_PARAM_PAE_ENABLED, &val);
         if ( rc )
-            return rc;
+            return -errno;
 
         info->pae = !!val;
 
         rc = xc_hvm_param_get(xch, domid, HVM_PARAM_NESTEDHVM, &val);
         if ( rc )
-            return rc;
+            return -errno;
 
         info->nestedhvm = !!val;
-
-        if ( !featureset )
-        {
-            rc = xc_get_cpu_featureset(xch, XEN_SYSCTL_cpu_featureset_hvm,
-                                       &host_nr_features, info->featureset);
-            if ( rc )
-                return rc;
-        }
     }
     else
     {
@@ -376,17 +377,9 @@ static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
 
         rc = xc_domain_get_guest_width(xch, domid, &width);
         if ( rc )
-            return rc;
+            return -errno;
 
         info->pv64 = (width == 8);
-
-        if ( !featureset )
-        {
-            rc = xc_get_cpu_featureset(xch, XEN_SYSCTL_cpu_featureset_pv,
-                                       &host_nr_features, info->featureset);
-            if ( rc )
-                return rc;
-        }
     }
 
     return 0;
