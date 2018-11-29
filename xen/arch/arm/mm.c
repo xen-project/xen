@@ -649,11 +649,31 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     }
 #endif
 
+    /* Break up the Xen mapping into 4k pages and protect them separately. */
+    for ( i = 0; i < LPAE_ENTRIES; i++ )
+    {
+        mfn_t mfn = mfn_add(maddr_to_mfn(xen_paddr), i);
+        unsigned long va = XEN_VIRT_START + (i << PAGE_SHIFT);
+
+        if ( !is_kernel(va) )
+            break;
+        pte = mfn_to_xen_entry(mfn, MT_NORMAL);
+        pte.pt.table = 1; /* 4k mappings always have this bit set */
+        if ( is_kernel_text(va) || is_kernel_inittext(va) )
+        {
+            pte.pt.xn = 0;
+            pte.pt.ro = 1;
+        }
+        if ( is_kernel_rodata(va) )
+            pte.pt.ro = 1;
+        xen_xenmap[i] = pte;
+    }
+
     /* Initialise xen second level entries ... */
     /* ... Xen's text etc */
 
-    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), MT_NORMAL);
-    pte.pt.xn = 0;/* Contains our text mapping! */
+    pte = pte_of_xenaddr((vaddr_t)xen_xenmap);
+    pte.pt.table = 1;
     xen_second[second_table_offset(XEN_VIRT_START)] = pte;
 
     /* ... Fixmap */
@@ -692,31 +712,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 #endif
     clear_table(boot_second);
     clear_table(boot_third);
-
-    /* Break up the Xen mapping into 4k pages and protect them separately. */
-    for ( i = 0; i < LPAE_ENTRIES; i++ )
-    {
-        mfn_t mfn = mfn_add(maddr_to_mfn(xen_paddr), i);
-        unsigned long va = XEN_VIRT_START + (i << PAGE_SHIFT);
-        if ( !is_kernel(va) )
-            break;
-        pte = mfn_to_xen_entry(mfn, MT_NORMAL);
-        pte.pt.table = 1; /* 4k mappings always have this bit set */
-        if ( is_kernel_text(va) || is_kernel_inittext(va) )
-        {
-            pte.pt.xn = 0;
-            pte.pt.ro = 1;
-        }
-        if ( is_kernel_rodata(va) )
-            pte.pt.ro = 1;
-        write_pte(xen_xenmap + i, pte);
-        /* No flush required here as page table is not hooked in yet. */
-    }
-
-    pte = pte_of_xenaddr((vaddr_t)xen_xenmap);
-    pte.pt.table = 1;
-    write_pte(xen_second + second_linear_offset(XEN_VIRT_START), pte);
-    /* TLBFLUSH and ISB would be needed here, but wait until we set WXN */
 
     /* From now on, no mapping may be both writable and executable. */
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
