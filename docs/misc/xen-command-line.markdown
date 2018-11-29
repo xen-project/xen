@@ -250,40 +250,6 @@ and not running softirqs. Reduce this if softirqs are not being run frequently
 enough. Setting this to a high value may cause boot failure, particularly if
 the NMI watchdog is also enabled.
 
-### bti (x86)
-> `= List of [ <bool>, thunk=retpoline|lfence|jmp, ibrs=<bool>, ibpb=<bool>, rsb=<bool>, rsb_{vmexit,native}=<bool> ]`
-
-**WARNING: This command line option is deprecated, and superseded by
-_spec-ctrl=_ - using both options in combination is undefined.**
-
-Branch Target Injection controls.  By default, Xen will pick the most
-appropriate BTI mitigations based on compiled in support, loaded microcode,
-and hardware details.
-
-**WARNING: Any use of this option may interfere with heuristics.  Use with
-extreme care.**
-
-A (negative) boolean value can be specified to turn off all mitigations.
-(Use of a positive boolean value is invalid.)
-
-If Xen was compiled with INDIRECT\_THUNK support, `thunk=` can be used to
-select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
-locations.  The default thunk is `retpoline` (generally preferred for Intel
-hardware), with the alternatives being `jmp` (a `jmp *%reg` gadget, minimal
-overhead), and `lfence` (an `lfence; jmp *%reg` gadget, preferred for AMD).
-
-On hardware supporting IBRS, the `ibrs=` option can be used to force or
-prevent Xen using the feature itself.  If Xen is not using IBRS itself,
-functionality is still set up so IBRS can be virtualised for guests.
-
-On hardware supporting IBPB, the `ibpb=` option can be used to prevent Xen
-from issuing Branch Prediction Barriers on vcpu context switches.
-
-The `rsb=`, `rsb_vmexit=` and `rsb_native=` options can be used to control
-when the RSB gets overwritten.  The former control all RSB overwriting, while
-the latter two can be used to fine tune overwriting on from HVM context, and
-an entry from a native (PV or Xen) context.
-
 ### clocksource (x86)
 > `= pit | hpet | acpi | tsc`
 

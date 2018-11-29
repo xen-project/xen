@@ -59,63 +59,6 @@ paddr_t __read_mostly l1tf_addr_mask, __read_mostly l1tf_safe_maddr;
 static bool __initdata cpu_has_bug_l1tf;
 static unsigned int __initdata l1d_maxphysaddr;
 
-static int __init parse_bti(const char *s)
-{
-    const char *ss;
-    int val, rc = 0;
-
-    do {
-        ss = strchr(s, ',');
-        if ( !ss )
-            ss = strchr(s, '\0');
-
-        val = parse_bool(s, ss);
-        if ( !val )
-        {
-            opt_thunk = THUNK_JMP;
-            opt_ibrs = 0;
-            opt_ibpb = false;
-            opt_rsb_pv = false;
-            opt_rsb_hvm = false;
-        }
-        else if ( val > 0 )
-            rc = -EINVAL;
-        else if ( !strncmp(s, "thunk=", 6) )
-        {
-            s += 6;
-
-            if ( !strncmp(s, "retpoline", ss - s) )
-                opt_thunk = THUNK_RETPOLINE;
-            else if ( !strncmp(s, "lfence", ss - s) )
-                opt_thunk = THUNK_LFENCE;
-            else if ( !strncmp(s, "jmp", ss - s) )
-                opt_thunk = THUNK_JMP;
-            else
-                rc = -EINVAL;
-        }
-        else if ( (val = parse_boolean("ibrs", s, ss)) >= 0 )
-            opt_ibrs = val;
-        else if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
-            opt_ibpb = val;
-        else if ( (val = parse_boolean("rsb_native", s, ss)) >= 0 )
-            opt_rsb_pv = val;
-        else if ( (val = parse_boolean("rsb_vmexit", s, ss)) >= 0 )
-            opt_rsb_hvm = val;
-        else if ( (val = parse_boolean("rsb", s, ss)) >= 0 )
-        {
-            opt_rsb_pv = val;
-            opt_rsb_hvm = val;
-        }
-        else
-            rc = -EINVAL;
-
-        s = ss + 1;
-    } while ( *ss );
-
-    return rc;
-}
-custom_param("bti", parse_bti);
-
 static int __init parse_spec_ctrl(const char *s)
 {
     const char *ss;
