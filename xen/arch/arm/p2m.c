@@ -1527,7 +1527,8 @@ int relinquish_p2m_mapping(struct domain *d)
 int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    gfn_t next_gfn;
+    gfn_t next_block_gfn;
+    mfn_t mfn = INVALID_MFN;
     p2m_type_t t;
     unsigned int order;
 
@@ -1542,24 +1543,40 @@ int p2m_cache_flush_range(struct domain *d, gfn_t start, gfn_t end)
     start = gfn_max(start, p2m->lowest_mapped_gfn);
     end = gfn_min(end, p2m->max_mapped_gfn);
 
-    for ( ; gfn_x(start) < gfn_x(end); start = next_gfn )
+    next_block_gfn = start;
+
+    while ( gfn_x(start) < gfn_x(end) )
     {
-        mfn_t mfn = p2m_get_entry(p2m, start, &t, NULL, &order, NULL);
-
-        next_gfn = gfn_next_boundary(start, order);
-
-        /* Skip hole and non-RAM page */
-        if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_any_ram(t) )
-            continue;
-
-        /* XXX: Implement preemption */
-        while ( gfn_x(start) < gfn_x(next_gfn) )
+        /*
+         * We want to flush page by page as:
+         *  - it may not be possible to map the full block (can be up to 1GB)
+         *    in Xen memory
+         *  - we may want to do fine grain preemption as flushing multiple
+         *    page in one go may take a long time
+         *
+         * As p2m_get_entry is able to return the size of the mapping
+         * in the p2m, it is pointless to execute it for each page.
+         *
+         * We can optimize it by tracking the gfn of the next
+         * block. So we will only call p2m_get_entry for each block (can
+         * be up to 1GB).
+         */
+        if ( gfn_eq(start, next_block_gfn) )
         {
-            flush_page_to_ram(mfn_x(mfn), false);
+            mfn = p2m_get_entry(p2m, start, &t, NULL, &order, NULL);
+            next_block_gfn = gfn_next_boundary(start, order);
 
-            start = gfn_add(start, 1);
-            mfn = mfn_add(mfn, 1);
+            if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_any_ram(t) )
+            {
+                start = next_block_gfn;
+                continue;
+            }
         }
+
+        flush_page_to_ram(mfn_x(mfn), false);
+
+        start = gfn_add(start, 1);
+        mfn = mfn_add(mfn, 1);
     }
 
     invalidate_icache();
