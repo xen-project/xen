@@ -239,6 +239,18 @@ struct cpuid_domain_info
     bool hvm;
     uint64_t xfeature_mask;
 
+    /*
+     * Careful with featureset lengths.
+     *
+     * Code in this file requires featureset to have at least
+     * xc_get_cpu_featureset_size() entries.  This is a libxc compiletime
+     * constant.
+     *
+     * The featureset length used by the hypervisor may be different.  If the
+     * hypervisor version is longer, XEN_SYSCTL_get_cpu_featureset will fail
+     * with -ENOBUFS, and libxc really does need rebuilding.  If the
+     * hypervisor version is shorter, it is safe to zero-extend.
+     */
     uint32_t *featureset;
     unsigned int nr_features;
 
@@ -309,11 +321,18 @@ static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
 
     if ( featureset )
     {
+        /*
+         * The user supplied featureset may be shorter or longer than
+         * host_nr_features.  Shorter is fine, and we will zero-extend.
+         * Longer is fine, so long as it only padded with zeros.
+         */
+        unsigned int fslen = min(host_nr_features, nr_features);
+
         memcpy(info->featureset, featureset,
-               min(host_nr_features, nr_features) * sizeof(*info->featureset));
+               fslen * sizeof(*info->featureset));
 
         /* Check for truncated set bits. */
-        for ( i = nr_features; i < host_nr_features; ++i )
+        for ( i = fslen; i < nr_features; ++i )
             if ( featureset[i] != 0 )
                 return -EOPNOTSUPP;
     }
