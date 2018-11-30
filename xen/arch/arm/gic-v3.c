@@ -607,6 +607,10 @@ static void __init gicv3_dist_init(void)
     if ( type & GICD_TYPE_LPIS )
         gicv3_lpi_init_host_lpis(GICD_TYPE_ID_BITS(type));
 
+    /* Only 1020 interrupts are supported */
+    nr_lines = min(1020U, nr_lines);
+    gicv3_info.nr_lines = nr_lines;
+
     printk("GICv3: %d lines, (IID %8.8x).\n",
            nr_lines, readl_relaxed(GICD + GICD_IIDR));
 
@@ -646,9 +650,6 @@ static void __init gicv3_dist_init(void)
 
     for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i++ )
         writeq_relaxed(affinity, GICD + GICD_IROUTER + i * 8);
-
-    /* Only 1020 interrupts are supported */
-    gicv3_info.nr_lines = min(1020U, nr_lines);
 }
 
 static int gicv3_enable_redist(void)

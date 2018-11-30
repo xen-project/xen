@@ -353,6 +353,10 @@ static void __init gicv2_dist_init(void)
 
     type = readl_gicd(GICD_TYPER);
     nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
+    /* Only 1020 interrupts are supported */
+    nr_lines = min(1020U, nr_lines);
+    gicv2_info.nr_lines = nr_lines;
+
     gic_cpus = 1 + ((type & GICD_TYPE_CPUS) >> 5);
     printk("GICv2: %d lines, %d cpu%s%s (IID %8.8x).\n",
            nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
@@ -376,9 +380,6 @@ static void __init gicv2_dist_init(void)
     /* Disable all global interrupts */
     for ( i = 32; i < nr_lines; i += 32 )
         writel_gicd(~0x0, GICD_ICENABLER + (i / 32) * 4);
-
-    /* Only 1020 interrupts are supported */
-    gicv2_info.nr_lines = min(1020U, nr_lines);
 
     /* Turn on the distributor */
     writel_gicd(GICD_CTL_ENABLE, GICD_CTLR);
