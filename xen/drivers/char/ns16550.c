@@ -1037,16 +1037,16 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
                     }
                 }
 
-                if ( !param->bar0 )
-                {
-                    bar_idx = idx;
-                    port_idx = 0;
-                }
-
                 if ( port_idx >= param->max_ports )
                 {
                     idx -= param->max_ports;
                     continue;
+                }
+
+                if ( !param->bar0 )
+                {
+                    bar_idx = idx;
+                    port_idx = 0;
                 }
 
                 uart->io_base = 0;
