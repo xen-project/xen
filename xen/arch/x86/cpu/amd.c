@@ -681,6 +681,56 @@ void amd_init_lfence(struct cpuinfo_x86 *c)
 			  c->x86_capability);
 }
 
+/*
+ * Refer to the AMD Speculative Store Bypass whitepaper:
+ * https://developer.amd.com/wp-content/resources/124441_AMD64_SpeculativeStoreBypassDisable_Whitepaper_final.pdf
+ */
+void amd_init_ssbd(const struct cpuinfo_x86 *c)
+{
+	int bit = -1;
+
+	if (cpu_has_ssb_no)
+		return;
+
+	if (cpu_has_amd_ssbd) {
+		wrmsrl(MSR_SPEC_CTRL, opt_ssbd ? SPEC_CTRL_SSBD : 0);
+		return;
+	}
+
+	if (cpu_has_virt_ssbd) {
+		wrmsrl(MSR_VIRT_SPEC_CTRL, opt_ssbd ? SPEC_CTRL_SSBD : 0);
+		return;
+	}
+
+	switch (c->x86) {
+	case 0x15: bit = 54; break;
+	case 0x16: bit = 33; break;
+	case 0x17:
+	case 0x18: bit = 10; break;
+	}
+
+	if (bit >= 0) {
+		uint64_t val, mask = 1ull << bit;
+
+		if (rdmsr_safe(MSR_AMD64_LS_CFG, val) ||
+		    ({
+			    val &= ~mask;
+			    if (opt_ssbd)
+				    val |= mask;
+			    false;
+		    }) ||
+		    wrmsr_safe(MSR_AMD64_LS_CFG, val) ||
+		    ({
+			    rdmsrl(MSR_AMD64_LS_CFG, val);
+			    (val & mask) != (opt_ssbd * mask);
+		    }))
+			bit = -1;
+	}
+
+	if (bit < 0)
+		printk_once(XENLOG_ERR "No SSBD controls available\n");
+}
+
 void __init detect_zen2_null_seg_behaviour(void)
 {
 	uint64_t base;
@@ -744,29 +794,12 @@ static void init_amd(struct cpuinfo_x86 *c)
 	else /* Implicily "== 0x10 || >= 0x12" by being 64bit. */
 		amd_init_lfence(c);
 
+	amd_init_ssbd(c);
+
 	/* Probe for NSCB on Zen2 CPUs when not virtualised */
 	if (!cpu_has_hypervisor && !cpu_has_nscb && c == &boot_cpu_data &&
 	    c->x86 == 0x17)
 		detect_zen2_null_seg_behaviour();
-
-	/*
-	 * If the user has explicitly chosen to disable Memory Disambiguation
-	 * to mitigiate Speculative Store Bypass, poke the appropriate MSR.
-	 */
-	if (opt_ssbd) {
-		int bit = -1;
-
-		switch (c->x86) {
-		case 0x15: bit = 54; break;
-		case 0x16: bit = 33; break;
-		case 0x17: bit = 10; break;
-		}
-
-		if (bit >= 0 && !rdmsr_safe(MSR_AMD64_LS_CFG, value)) {
-			value |= 1ull << bit;
-			wrmsr_safe(MSR_AMD64_LS_CFG, value);
-		}
-	}
 
 	/* MFENCE stops RDTSC speculation */
 	if (!cpu_has_lfence_dispatch)
