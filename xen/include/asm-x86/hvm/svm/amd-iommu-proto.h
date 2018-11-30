@@ -58,7 +58,7 @@ int __must_check amd_iommu_unmap_page(struct domain *d, dfn_t dfn);
 uint64_t amd_iommu_get_address_from_pte(void *entry);
 int __must_check amd_iommu_alloc_root(struct domain_iommu *hd);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
-                                       u64 phys_addr, unsigned long size,
+                                       paddr_t phys_addr, unsigned long size,
                                        int iw, int ir);
 
 /* Share p2m table with iommu */
