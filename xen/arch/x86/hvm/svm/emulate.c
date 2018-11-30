@@ -64,7 +64,6 @@ static unsigned long svm_nextrip_insn_length(struct vcpu *v)
  */
 unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct hvm_emulate_ctxt ctxt;
     struct x86_emulate_state *state;
     unsigned long nrip_len, emul_len;
@@ -92,15 +91,6 @@ unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc)
     modrm_mod = x86_insn_modrm(state, &modrm_rm, &modrm_reg);
     x86_emulate_free_state(state);
 
-#ifndef NDEBUG
-    if ( nrip_len && nrip_len != emul_len )
-    {
-        gprintk(XENLOG_WARNING, "insn-len[%02x]=%lu (exp %lu)\n",
-                ctxt.ctxt.opcode, nrip_len, emul_len);
-        return nrip_len;
-    }
-#endif
-
     /* Extract components from instr_enc. */
     instr_modrm  = instr_enc & 0xff;
     instr_opcode = instr_enc >> 8;
@@ -116,9 +106,12 @@ unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc)
             return emul_len;
     }
 
-    gdprintk(XENLOG_WARNING,
-             "%s: Mismatch between expected and actual instruction: "
-             "eip = %lx\n",  __func__, (unsigned long)vmcb->rip);
+    printk(XENLOG_G_WARNING
+           "Insn mismatch: Expected opcode %#x, modrm %#x, got nrip_len %lu, emul_len %lu\n",
+           instr_opcode, instr_modrm, nrip_len, emul_len);
+    hvm_dump_emulation_state(XENLOG_G_WARNING, "SVM Insn len",
+                             &ctxt, X86EMUL_UNHANDLEABLE);
+
     hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return 0;
 }
