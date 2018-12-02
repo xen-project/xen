@@ -348,19 +348,19 @@ static inline lpae_t mfn_to_xen_entry(mfn_t mfn, unsigned attr)
 /* Map a 4k page in a fixmap entry */
 void set_fixmap(unsigned map, mfn_t mfn, unsigned int flags)
 {
-    lpae_t pte = mfn_to_xen_entry(mfn, PAGE_AI_MASK(flags));
-    pte.pt.table = 1; /* 4k mappings always have this bit set */
-    pte.pt.xn = 1;
-    write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
+    int res;
+
+    res = map_pages_to_xen(FIXMAP_ADDR(map), mfn, 1, flags);
+    BUG_ON(res != 0);
 }
 
 /* Remove a mapping from a fixmap entry */
 void clear_fixmap(unsigned map)
 {
-    lpae_t pte = {0};
-    write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
+    int res;
+
+    res = destroy_xen_mappings(FIXMAP_ADDR(map), FIXMAP_ADDR(map) + PAGE_SIZE);
+    BUG_ON(res != 0);
 }
 
 /* Create Xen's mappings of memory.
