@@ -118,8 +118,8 @@ sub ri_Header {
 sub ri_Para {
     return unless @insections;
     my $insection = $insections[$#insections];
-#    print STDERR "ri_Para $version_index $had_feature ".
-#        $insection->{HasCaveat}." $insection->{Key}\n";
+#    print DEBUG "ri_Para ",
+#        Dumper($version_index, $had_feature, $insection);
 
     if ($had_feature) {
         my $sectnode = find_current_sectnode();
