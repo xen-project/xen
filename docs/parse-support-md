@@ -137,6 +137,19 @@ sub parse_feature_entry ($) {
     $sectnode->{Status}[$version_index] = $value;
 }
 
+sub descr2key ($) {
+    my ($descr) = @_;
+
+    die unless @insections;
+    my $insection = $insections[$#insections];
+
+    my $key = lc $descr;
+    $key =~ y/ /-/;
+    $key =~ y/-0-9A-Za-z//cd;
+    $key = $insection->{Anchor}.'--'.$key;
+    return $key;
+}
+
 sub ri_CodeBlock {
     my ($c) = @_;
     my ($infos, $text) = @$c;
@@ -164,17 +177,10 @@ sub ri_CodeBlock {
                     ($toplevel and 'top').
                     "\n$l\n ?");
 
-        die unless @insections;
-        my $insection = $insections[$#insections];
-
         if (length $descr) {
-            my $key = lc $descr;
-            $key =~ y/ /-/;
-            $key =~ y/-0-9A-Za-z//cd;
-            $key = $insection->{Anchor}.'--'.$key;
             push @insections,
                 {
-                 Key => $key,
+                 Key => descr2key($descr),
                  Headline => [{ t => 'Str', c => $descr }],
                 };
         }
