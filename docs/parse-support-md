@@ -191,6 +191,33 @@ sub ri_CodeBlock {
     }
 }
 
+sub ri_DefinitionList {
+    my ($c) = @_;
+    foreach my $defent (@$c) {
+        my ($term, $defns) = @$defent;
+        my $descr =
+            join ' ',
+            map { $_->{c} }
+            grep { $_->{t} eq 'Str' }
+            @$term;
+        push @insections,
+            {
+             Key => descr2key($descr),
+             Headline => $term,
+            };
+        die "multiple definitions in definition list definition"
+            if @$defns > 1;
+        my $defn = $defns->[0];
+        die "multiple paras in definition list definition"
+            if @$defn > 1;
+        my $defnp = $defn->[0];
+        die "only understand plain definition not $defnp->{t} ?"
+            unless $defnp->{t} eq 'Plain';
+        parse_feature_entry $defnp->{c};
+        pop @insections;
+    }
+}
+
 sub process_unknown {
     my ($c, $e) = @_;
     $had_unknown = Dumper($e);
