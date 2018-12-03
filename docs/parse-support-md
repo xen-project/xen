@@ -30,7 +30,7 @@ our $toplevel_sectlist = new_sectlist();
 #   a tied hashref      something seen
 # (tied $sectlist)    is an object of type Tie::IxHash
 # $sectlist->{KEY} a $sectnode:
-# $sectlist->{KEY}{Status}[VI] = absent or markdown content
+# $sectlist->{KEY}{Status}[VI] = absent or string or markdown content
 # $sectlist->{KEY}{Children} = a further $sectlist
 # $sectlist->{KEY}{Key} = KEY
 # $sectlist->{KEY}{RealSectNode} = us, or our parent
@@ -341,7 +341,7 @@ sub count_rows_sectlist ($) {
 
 # After reprocess_sectlist,
 #    ->{Headline}   is in html
-#    ->{Status}     is in plain text
+#    ->{Status}     is (still) string or markdown content
 
 sub analyse_reprocess () {
     $maxdepth = 0;
@@ -430,7 +430,12 @@ sub write_output_row ($) {
             o(sprintf '<a href="%s">', $version_urls[$i]);
             $end_a = '</a>';
         }
-        o(escapeHTML($st));
+        if (ref $st) {
+            $st = pandoc2html_inline $st;
+        } else {
+            $st = escapeHTML($st);
+        }
+        o($st);
         o($end_a);
         o('</td>');
         o($nextcell);
