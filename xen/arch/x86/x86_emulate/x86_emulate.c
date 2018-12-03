@@ -4198,6 +4198,10 @@ x86_emulate(
         goto push;
 
     case 0x9d: /* popf */ {
+        /*
+         * Bits which may not be modified by this instruction. RF is handled
+         * uniformly during instruction retirement.
+         */
         uint32_t mask = X86_EFLAGS_VIP | X86_EFLAGS_VIF | X86_EFLAGS_VM;
 
         cr4 = 0;
@@ -4211,15 +4215,20 @@ x86_emulate(
                     if ( rc != X86EMUL_OKAY )
                         goto done;
                 }
+                /* All IOPL != 3 POPFs fail, except in vm86 mode. */
                 generate_exception_if(!(cr4 & X86_CR4_VME) &&
                                       MASK_EXTR(_regs.eflags, X86_EFLAGS_IOPL) != 3,
                                       EXC_GP, 0);
             }
+            /*
+             * IOPL cannot be modified outside of CPL 0.  IF cannot be
+             * modified if IOPL < CPL.
+             */
             mask |= X86_EFLAGS_IOPL;
             if ( !mode_iopl() )
                 mask |= X86_EFLAGS_IF;
         }
-        /* 64-bit mode: POP defaults to a 64-bit operand. */
+        /* 64-bit mode: POPF defaults to a 64-bit operand. */
         if ( mode_64bit() && (op_bytes == 4) )
             op_bytes = 8;
         if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
@@ -4227,7 +4236,9 @@ x86_emulate(
             goto done;
         if ( op_bytes == 2 )
         {
+            /* 16-bit POPF preserves the upper 16 bits of EFLAGS. */
             dst.val = (uint16_t)dst.val | (_regs.eflags & 0xffff0000u);
+            /* VME processing only applies at IOPL != 3. */
             if ( (cr4 & X86_CR4_VME) &&
                  MASK_EXTR(_regs.eflags, X86_EFLAGS_IOPL) != 3 )
             {
