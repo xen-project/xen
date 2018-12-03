@@ -247,10 +247,11 @@ sub pandoc2html_inline ($) {
     my ($content) = @_;
 
     my $json_fh = IO::File::new_tmpfile or die $!;
-    print $json_fh to_json([
-                            { unMeta => { } },
-                            [{ t => 'Para', c => $content }],
-                           ]) or die $!;
+    my $j = to_json([
+                     { unMeta => { } },
+                     [{ t => 'Para', c => $content }],
+                    ]) or die $!;
+    print $json_fh $j;
     flush $json_fh or die $!;
     seek $json_fh,0,0 or die $!;
 
@@ -270,7 +271,7 @@ sub pandoc2html_inline ($) {
             open STDIN, '<&', $json_fh or die $!;
             system 'json_pp';
         };
-        die "\n $? $!";
+        die "$j \n $? $!";
     }
 
     $html =~ s{^\<p\>}{} or die "$html ?";
