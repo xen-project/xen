@@ -5,10 +5,10 @@
 #
 # usage:
 #   pandoc -t json SUPPORT.md >j-unstable
-#   git-cat-file ... | pandoc -t json >j-4.10
+#   git cat-file blob origin/staging-4.11:SUPPORT.md | pandoc -t json >j-4.11
 #   docs/parse-support-md \
 #            j-unstable https://xenbits/unstable/SUPPORT.html
-#            j-4.10 https://xenbits/4.10/SUPPORT.html
+#            j-4.11 https://xenbits/4.11/SUPPORT.html
 # or equivalent
 
 use strict;
