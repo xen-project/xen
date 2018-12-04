@@ -4223,7 +4223,8 @@ x86_emulate(
         if ( op_bytes == 2 )
         {
             dst.val = (uint16_t)dst.val | (_regs.eflags & 0xffff0000u);
-            if ( cr4 & X86_CR4_VME )
+            if ( (cr4 & X86_CR4_VME) &&
+                 MASK_EXTR(_regs.eflags, X86_EFLAGS_IOPL) != 3 )
             {
                 if ( dst.val & X86_EFLAGS_IF )
                 {
