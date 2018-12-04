@@ -4226,6 +4226,7 @@ x86_emulate(
             if ( (cr4 & X86_CR4_VME) &&
                  MASK_EXTR(_regs.eflags, X86_EFLAGS_IOPL) != 3 )
             {
+                generate_exception_if(dst.val & X86_EFLAGS_TF, EXC_GP, 0);
                 if ( dst.val & X86_EFLAGS_IF )
                 {
                     generate_exception_if(_regs.eflags & X86_EFLAGS_VIP,
