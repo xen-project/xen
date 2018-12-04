@@ -1289,6 +1289,8 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     dom->vga_hole_size = device_model ? LIBXL_VGA_HOLE_SIZE : 0;
     dom->device_model = device_model;
     dom->max_vcpus = info->max_vcpus;
+    dom->console_domid = state->console_domid;
+    dom->xenstore_domid = state->store_domid;
 
     rc = libxl__domain_device_construct_rdm(gc, d_config,
                                             info->u.hvm.rdm_mem_boundary_memkb*1024,
