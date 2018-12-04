@@ -1320,7 +1320,7 @@ static int __init debugtrace_init(void)
 }
 __initcall(debugtrace_init);
 
-#endif /* !NDEBUG */
+#endif /* !CONFIG_DEBUG_TRACE */
 
 
 /*
