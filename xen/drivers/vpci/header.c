@@ -486,6 +486,9 @@ static int init_bars(struct pci_dev *pdev)
     if ( rc )
         return rc;
 
+    if ( pdev->ignore_bars )
+        return 0;
+
     /* Disable memory decoding before sizing. */
     cmd = pci_conf_read16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND);
     if ( cmd & PCI_COMMAND_MEMORY )

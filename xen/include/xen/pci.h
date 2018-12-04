@@ -88,6 +88,9 @@ struct pci_dev {
 
     nodeid_t node; /* NUMA node */
 
+    /* Device with errata, ignore the BARs. */
+    bool ignore_bars;
+
     enum pdev_type {
         DEV_TYPE_PCI_UNKNOWN,
         DEV_TYPE_PCIe_ENDPOINT,
