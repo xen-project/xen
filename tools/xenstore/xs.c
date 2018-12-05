@@ -680,6 +680,7 @@ char **xs_directory(struct xs_handle *h, xs_transaction_t t,
 /* Get the value of a single file, nul terminated.
  * Returns a malloced value: call free() on it after use.
  * len indicates length in bytes, not including the nul.
+ * Returns NULL on failure.
  */
 void *xs_read(struct xs_handle *h, xs_transaction_t t,
 	      const char *path, unsigned int *len)
