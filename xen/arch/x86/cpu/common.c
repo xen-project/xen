@@ -724,9 +724,9 @@ void load_system_tables(void)
 		stack_top = stack_bottom & ~(STACK_SIZE - 1);
 
 	struct tss_struct *tss = &this_cpu(init_tss);
-	struct desc_struct *gdt =
+	seg_desc_t *gdt =
 		this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY;
-	struct desc_struct *compat_gdt =
+	seg_desc_t *compat_gdt =
 		this_cpu(compat_gdt_table) - FIRST_RESERVED_GDT_ENTRY;
 
 	const struct desc_ptr gdtr = {

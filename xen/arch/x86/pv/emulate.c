@@ -29,7 +29,7 @@ int pv_emul_read_descriptor(unsigned int sel, const struct vcpu *v,
                             unsigned long *base, unsigned long *limit,
                             unsigned int *ar, bool insn_fetch)
 {
-    struct desc_struct desc;
+    seg_desc_t desc;
 
     if ( sel < 4)
         desc.b = desc.a = 0;

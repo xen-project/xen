@@ -438,7 +438,7 @@ static inline int get_page_and_type(struct page_info *page,
     ASSERT(((_p)->count_info & PGC_count_mask) != 0);          \
     ASSERT(page_get_owner(_p) == (_d))
 
-int check_descriptor(const struct domain *, struct desc_struct *d);
+int check_descriptor(const struct domain *d, seg_desc_t *desc);
 
 extern paddr_t mem_hotplug;
 

@@ -96,8 +96,8 @@ string_param("nmi", opt_nmi);
 DEFINE_PER_CPU(uint64_t, efer);
 static DEFINE_PER_CPU(unsigned long, last_extable_addr);
 
-DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table);
-DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, compat_gdt_table);
+DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, gdt_table);
+DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, compat_gdt_table);
 
 /* Master table, used by CPU0. */
 idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)

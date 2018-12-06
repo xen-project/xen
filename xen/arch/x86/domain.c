@@ -1665,7 +1665,7 @@ static void __context_switch(void)
     struct vcpu          *p = per_cpu(curr_vcpu, cpu);
     struct vcpu          *n = current;
     struct domain        *pd = p->domain, *nd = n->domain;
-    struct desc_struct   *gdt;
+    seg_desc_t           *gdt;
     struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);

@@ -1636,8 +1636,8 @@ bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
     else
     {
         /* Keep GDT in sync. */
-        struct desc_struct *desc = this_cpu(gdt_table) + LDT_ENTRY -
-                                   FIRST_RESERVED_GDT_ENTRY;
+        seg_desc_t *desc =
+            this_cpu(gdt_table) + LDT_ENTRY - FIRST_RESERVED_GDT_ENTRY;
 
         _set_tssldt_desc(desc, ldt_base, ldt_ents * 8 - 1, SYS_DESC_ldt);
 

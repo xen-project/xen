@@ -47,8 +47,8 @@ static int read_gate_descriptor(unsigned int gate_sel,
                                 unsigned long *off,
                                 unsigned int *ar)
 {
-    struct desc_struct desc;
-    const struct desc_struct *pdesc = gdt_ldt_desc_ptr(gate_sel);
+    seg_desc_t desc;
+    const seg_desc_t *pdesc = gdt_ldt_desc_ptr(gate_sel);
 
     if ( (gate_sel < 4) ||
          ((gate_sel >= FIRST_RESERVED_GDT_BYTE) && !(gate_sel & 4)) ||

@@ -18,10 +18,10 @@ static inline int pv_emul_is_mem_write(const struct x86_emulate_state *state,
 }
 
 /* Return a pointer to the GDT/LDT descriptor referenced by sel. */
-static inline const struct desc_struct *gdt_ldt_desc_ptr(unsigned int sel)
+static inline const seg_desc_t *gdt_ldt_desc_ptr(unsigned int sel)
 {
     const struct vcpu *curr = current;
-    const struct desc_struct *tbl = (void *)
+    const seg_desc_t *tbl = (void *)
         ((sel & X86_XEC_TI) ? LDT_VIRT_START(curr) : GDT_VIRT_START(curr));
 
     return &tbl[sel >> 3];

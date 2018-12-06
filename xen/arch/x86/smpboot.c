@@ -972,7 +972,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
 {
     unsigned int i, order, memflags = 0;
     nodeid_t node = cpu_to_node(cpu);
-    struct desc_struct *gdt;
+    seg_desc_t *gdt;
     unsigned long stub_page;
     int rc = -ENOMEM;
 

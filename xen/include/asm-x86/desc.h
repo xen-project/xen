@@ -102,9 +102,9 @@
 #define SYS_DESC_irq_gate     14
 #define SYS_DESC_trap_gate    15
 
-struct desc_struct {
-    u32 a, b;
-};
+typedef struct {
+    uint32_t a, b;
+} seg_desc_t;
 
 typedef union {
     struct {
@@ -201,10 +201,10 @@ struct __packed desc_ptr {
 	unsigned long base;
 };
 
-extern struct desc_struct boot_cpu_gdt_table[];
-DECLARE_PER_CPU(struct desc_struct *, gdt_table);
-extern struct desc_struct boot_cpu_compat_gdt_table[];
-DECLARE_PER_CPU(struct desc_struct *, compat_gdt_table);
+extern seg_desc_t boot_cpu_gdt_table[];
+DECLARE_PER_CPU(seg_desc_t *, gdt_table);
+extern seg_desc_t boot_cpu_compat_gdt_table[];
+DECLARE_PER_CPU(seg_desc_t *, compat_gdt_table);
 
 extern void load_TR(void);
 

@@ -626,7 +626,7 @@ const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
 static int alloc_segdesc_page(struct page_info *page)
 {
     const struct domain *owner = page_get_owner(page);
-    struct desc_struct *descs = __map_domain_page(page);
+    seg_desc_t *descs = __map_domain_page(page);
     unsigned i;
 
     for ( i = 0; i < 512; i++ )

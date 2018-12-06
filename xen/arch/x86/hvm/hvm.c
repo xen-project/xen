@@ -2695,7 +2695,7 @@ static int task_switch_load_seg(
     enum x86_segment seg, uint16_t sel, unsigned int cpl, unsigned int eflags)
 {
     struct segment_register desctab, segr;
-    struct desc_struct *pdesc = NULL, desc;
+    seg_desc_t *pdesc = NULL, desc;
     u8 dpl, rpl;
     bool_t writable;
     int fault_type = TRAP_invalid_tss;
@@ -2876,7 +2876,7 @@ void hvm_task_switch(
     struct vcpu *v = current;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     struct segment_register gdt, tr, prev_tr, segr;
-    struct desc_struct *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
+    seg_desc_t *optss_desc = NULL, *nptss_desc = NULL, tss_desc;
     bool_t otd_writable, ntd_writable;
     unsigned int eflags, new_cpl;
     pagefault_info_t pfinfo;

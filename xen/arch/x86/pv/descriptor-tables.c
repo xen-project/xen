@@ -212,16 +212,16 @@ long do_update_descriptor(uint64_t pa, uint64_t desc)
     unsigned long gmfn = pa >> PAGE_SHIFT;
     unsigned long mfn;
     unsigned int  offset;
-    struct desc_struct *gdt_pent, d;
+    seg_desc_t *gdt_pent, d;
     struct page_info *page;
     long ret = -EINVAL;
 
-    offset = ((unsigned int)pa & ~PAGE_MASK) / sizeof(struct desc_struct);
+    offset = ((unsigned int)pa & ~PAGE_MASK) / sizeof(seg_desc_t);
 
     *(uint64_t *)&d = desc;
 
     page = get_page_from_gfn(currd, gmfn, NULL, P2M_ALLOC);
-    if ( (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
+    if ( (((unsigned int)pa % sizeof(seg_desc_t)) != 0) ||
          !page ||
          !check_descriptor(currd, &d) )
     {
