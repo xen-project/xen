@@ -88,8 +88,7 @@ do_get_debugreg(
 
 extern long
 do_update_descriptor(
-    u64 pa,
-    u64 desc);
+    uint64_t gaddr, seg_desc_t desc);
 
 extern long
 do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc);

@@ -206,30 +206,24 @@ int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list,
     return ret;
 }
 
-long do_update_descriptor(uint64_t pa, uint64_t desc)
+long do_update_descriptor(uint64_t gaddr, seg_desc_t d)
 {
     struct domain *currd = current->domain;
-    unsigned long gmfn = pa >> PAGE_SHIFT;
-    unsigned long mfn;
-    unsigned int  offset;
-    seg_desc_t *gdt_pent, d;
+    gfn_t gfn = gaddr_to_gfn(gaddr);
+    mfn_t mfn;
+    seg_desc_t *entry;
     struct page_info *page;
     long ret = -EINVAL;
 
-    offset = ((unsigned int)pa & ~PAGE_MASK) / sizeof(seg_desc_t);
-
-    *(uint64_t *)&d = desc;
-
-    page = get_page_from_gfn(currd, gmfn, NULL, P2M_ALLOC);
-    if ( (((unsigned int)pa % sizeof(seg_desc_t)) != 0) ||
-         !page ||
-         !check_descriptor(currd, &d) )
-    {
-        if ( page )
-            put_page(page);
+    /* gaddr must be aligned, or it will corrupt adjacent descriptors. */
+    if ( !IS_ALIGNED(gaddr, sizeof(d)) || !check_descriptor(currd, &d) )
         return -EINVAL;
-    }
-    mfn = mfn_x(page_to_mfn(page));
+
+    page = get_page_from_gfn(currd, gfn_x(gfn), NULL, P2M_ALLOC);
+    if ( !page )
+        return -EINVAL;
+
+    mfn = page_to_mfn(page);
 
     /* Check if the given frame is in use in an unsafe context. */
     switch ( page->u.inuse.type_info & PGT_type_mask )
@@ -244,12 +238,12 @@ long do_update_descriptor(uint64_t pa, uint64_t desc)
         break;
     }
 
-    paging_mark_dirty(currd, _mfn(mfn));
+    paging_mark_dirty(currd, mfn);
 
     /* All is good so make the update. */
-    gdt_pent = map_domain_page(_mfn(mfn));
-    write_atomic((uint64_t *)&gdt_pent[offset], *(uint64_t *)&d);
-    unmap_domain_page(gdt_pent);
+    entry = map_domain_page(mfn) + (gaddr & ~PAGE_MASK);
+    ACCESS_ONCE(entry->raw) = d.raw;
+    unmap_domain_page(entry);
 
     put_page_type(page);
 
@@ -264,8 +258,11 @@ long do_update_descriptor(uint64_t pa, uint64_t desc)
 int compat_update_descriptor(uint32_t pa_lo, uint32_t pa_hi,
                              uint32_t desc_lo, uint32_t desc_hi)
 {
-    return do_update_descriptor(pa_lo | ((uint64_t)pa_hi << 32),
-                                desc_lo | ((uint64_t)desc_hi << 32));
+    seg_desc_t d;
+
+    d.raw = ((uint64_t)desc_hi << 32) | desc_lo;
+
+    return do_update_descriptor(pa_lo | ((uint64_t)pa_hi << 32), d);
 }
 
 /*

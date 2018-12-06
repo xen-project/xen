@@ -102,8 +102,11 @@
 #define SYS_DESC_irq_gate     14
 #define SYS_DESC_trap_gate    15
 
-typedef struct {
-    uint32_t a, b;
+typedef union {
+    struct {
+        uint32_t a, b;
+    };
+    uint64_t raw;
 } seg_desc_t;
 
 typedef union {
