@@ -92,6 +92,7 @@ static struct ns16550 {
     u32 bar64;
     u16 cr;
     u8 bar_idx;
+    bool msi;
     const struct ns16550_config_param *param; /* Points into .init.*! */
 #endif
 } ns16550_com[2] = { { 0 } };
@@ -712,6 +713,16 @@ static void __init ns16550_init_preirq(struct serial_port *port)
         uart->fifo_size = 16;
 }
 
+static void __init ns16550_init_irq(struct serial_port *port)
+{
+#ifdef CONFIG_HAS_PCI
+    struct ns16550 *uart = port->uart;
+
+    if ( uart->msi )
+        uart->irq = create_irq(0);
+#endif
+}
+
 static void ns16550_setup_postirq(struct ns16550 *uart)
 {
     if ( uart->irq > 0 )
@@ -746,17 +757,6 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     uart->timeout_ms = max_t(
         unsigned int, 1, (bits * uart->fifo_size * 1000) / uart->baud);
 
-    if ( uart->irq > 0 )
-    {
-        uart->irqaction.handler = ns16550_interrupt;
-        uart->irqaction.name    = "ns16550";
-        uart->irqaction.dev_id  = port;
-        if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate ns16550 IRQ %d\n", uart->irq);
-    }
-
-    ns16550_setup_postirq(uart);
-
 #ifdef CONFIG_HAS_PCI
     if ( uart->bar || uart->ps_bdf_enable )
     {
@@ -777,8 +777,65 @@ static void __init ns16550_init_postirq(struct serial_port *port)
                                     uart->ps_bdf[0], uart->ps_bdf[1],
                                     uart->ps_bdf[2]);
         }
+
+        if ( uart->msi )
+        {
+            struct msi_info msi = {
+                .bus = uart->ps_bdf[0],
+                .devfn = PCI_DEVFN(uart->ps_bdf[1], uart->ps_bdf[2]),
+                .irq = rc = uart->irq,
+                .entry_nr = 1
+            };
+
+            if ( rc > 0 )
+            {
+                struct msi_desc *msi_desc = NULL;
+
+                pcidevs_lock();
+
+                rc = pci_enable_msi(&msi, &msi_desc);
+                if ( !rc )
+                {
+                    struct irq_desc *desc = irq_to_desc(msi.irq);
+                    unsigned long flags;
+
+                    spin_lock_irqsave(&desc->lock, flags);
+                    rc = setup_msi_irq(desc, msi_desc);
+                    spin_unlock_irqrestore(&desc->lock, flags);
+                    if ( rc )
+                        pci_disable_msi(msi_desc);
+                }
+
+                pcidevs_unlock();
+
+                if ( rc )
+                {
+                    uart->irq = 0;
+                    if ( msi_desc )
+                        msi_free_irq(msi_desc);
+                    else
+                        destroy_irq(msi.irq);
+                }
+            }
+
+            if ( rc )
+                printk(XENLOG_WARNING
+                       "MSI setup failed (%d) for %02x:%02x.%o\n",
+                       rc, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2]);
+        }
     }
 #endif
+
+    if ( uart->irq > 0 )
+    {
+        uart->irqaction.handler = ns16550_interrupt;
+        uart->irqaction.name    = "ns16550";
+        uart->irqaction.dev_id  = port;
+        if ( (rc = setup_irq(uart->irq, 0, &uart->irqaction)) != 0 )
+            printk("ERROR: Failed to allocate ns16550 IRQ %d\n", uart->irq);
+    }
+
+    ns16550_setup_postirq(uart);
 }
 
 static void ns16550_suspend(struct serial_port *port)
@@ -908,6 +965,7 @@ static const struct vuart_info *ns16550_vuart_info(struct serial_port *port)
 
 static struct uart_driver __read_mostly ns16550_driver = {
     .init_preirq  = ns16550_init_preirq,
+    .init_irq     = ns16550_init_irq,
     .init_postirq = ns16550_init_postirq,
     .endboot      = ns16550_endboot,
     .suspend      = ns16550_suspend,
@@ -1261,7 +1319,18 @@ static bool __init parse_positional(struct ns16550 *uart, char **str)
     }
 
     if ( *conf == ',' && *++conf != ',' )
-        uart->irq = simple_strtol(conf, &conf, 10);
+    {
+#ifdef CONFIG_HAS_PCI
+        if ( strncmp(conf, "msi", 3) == 0 )
+        {
+            conf += 3;
+            uart->msi = true;
+            uart->irq = 0;
+        }
+        else
+#endif
+            uart->irq = simple_strtol(conf, &conf, 10);
+    }
 
 #ifdef CONFIG_HAS_PCI
     if ( *conf == ',' && *++conf != ',' )

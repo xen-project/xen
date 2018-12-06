@@ -278,7 +278,7 @@ Flag to indicate whether to probe for a CMOS Real Time Clock irrespective of
 ACPI indicating none to be there.
 
 ### com1,com2
-> `= <baud>[/<base-baud>][,[DPS][,[<io-base>|pci|amt][,[<irq>][,[<port-bdf>][,[<bridge-bdf>]]]]]]`
+> `= <baud>[/<base-baud>][,[DPS][,[<io-base>|pci|amt][,[<irq>|msi][,[<port-bdf>][,[<bridge-bdf>]]]]]]`
 
 Both option `com1` and `com2` follow the same format.
 
@@ -299,7 +299,7 @@ Both option `com1` and `com2` follow the same format.
 * `<io-base>` is an integer which specifies the IO base port for UART
   registers.
 * `<irq>` is the IRQ number to use, or `0` to use the UART in poll
-  mode only.
+  mode only, or `msi` to set up a Message Signaled Interrupt.
 * `<port-bdf>` is the PCI location of the UART, in
   `<bus>:<device>.<function>` notation.
 * `<bridge-bdf>` is the PCI bridge behind which is the UART, in

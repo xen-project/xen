@@ -742,6 +742,16 @@ static int msi_capability_init(struct pci_dev *dev,
 
     *desc = entry;
     /* Restore the original MSI enabled bits  */
+    if ( !hardware_domain )
+    {
+        /*
+         * ..., except for internal requests (before Dom0 starts), in which
+         * case we rather need to behave "normally", i.e. not follow the split
+         * brain model where Dom0 actually enables MSI (and disables INTx).
+         */
+        pci_intx(dev, false);
+        control |= PCI_MSI_FLAGS_ENABLE;
+    }
     pci_conf_write16(seg, bus, slot, func, msi_control_reg(pos), control);
 
     return 0;
@@ -1019,6 +1029,18 @@ static int msix_capability_init(struct pci_dev *dev,
     ++msix->used_entries;
 
     /* Restore MSI-X enabled bits */
+    if ( !hardware_domain )
+    {
+        /*
+         * ..., except for internal requests (before Dom0 starts), in which
+         * case we rather need to behave "normally", i.e. not follow the split
+         * brain model where Dom0 actually enables MSI (and disables INTx).
+         */
+        pci_intx(dev, false);
+        control |= PCI_MSIX_FLAGS_ENABLE;
+        control &= ~PCI_MSIX_FLAGS_MASKALL;
+        maskall = 0;
+    }
     msix->host_maskall = maskall;
     pci_conf_write16(seg, bus, slot, func, msix_control_reg(pos), control);
 
@@ -1073,6 +1095,8 @@ static void __pci_disable_msi(struct msi_desc *entry)
 
     dev = entry->dev;
     msi_set_enable(dev, 0);
+    if ( entry->irq > 0 && !(irq_to_desc(entry->irq)->status & IRQ_GUEST) )
+        pci_intx(dev, true);
 
     BUG_ON(list_empty(&dev->msi_list));
 }

@@ -200,6 +200,7 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
                               uint64_t *paddr, uint64_t *psize,
                               unsigned int flags);
 
+void pci_intx(const struct pci_dev *, bool enable);
 bool_t pcie_aer_get_firmware_first(const struct pci_dev *);
 
 struct pirq;
