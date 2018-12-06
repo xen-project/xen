@@ -972,6 +972,11 @@ void __init console_init_ring(void)
     printk("Allocated console ring of %u KiB.\n", opt_conring_size >> 10);
 }
 
+void __init console_init_irq(void)
+{
+    serial_init_irq();
+}
+
 void __init console_init_postirq(void)
 {
     serial_init_postirq();

@@ -64,6 +64,7 @@ struct serial_port {
 struct uart_driver {
     /* Driver initialisation (pre- and post-IRQ subsystem setup). */
     void (*init_preirq)(struct serial_port *);
+    void (*init_irq)(struct serial_port *);
     void (*init_postirq)(struct serial_port *);
     /* Hook to clean up after Xen bootstrap (before domain 0 runs). */
     void (*endboot)(struct serial_port *);
@@ -99,8 +100,9 @@ struct uart_driver {
 #define SERHND_LO       (1<<3) /* Ditto, except that the MSB is cleared.  */
 #define SERHND_COOKED   (1<<4) /* Newline/carriage-return translation?    */
 
-/* Two-stage initialisation (before/after IRQ-subsystem initialisation). */
+/* Three-stage initialisation (before/during/after IRQ-subsystem setup). */
 void serial_init_preirq(void);
+void serial_init_irq(void);
 void serial_init_postirq(void);
 
 /* Clean-up hook before domain 0 runs. */

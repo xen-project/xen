@@ -503,6 +503,15 @@ void __init serial_init_preirq(void)
             com[i].driver->init_preirq(&com[i]);
 }
 
+void __init serial_init_irq(void)
+{
+    unsigned int i;
+
+    for ( i = 0; i < ARRAY_SIZE(com); i++ )
+        if ( com[i].driver && com[i].driver->init_irq )
+            com[i].driver->init_irq(&com[i]);
+}
+
 void __init serial_init_postirq(void)
 {
     int i;

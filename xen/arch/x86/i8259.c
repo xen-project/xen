@@ -341,8 +341,6 @@ void __init init_IRQ(void)
 
     init_8259A(0);
 
-    BUG_ON(init_irq_data() < 0);
-
     for (irq = 0; platform_legacy_irq(irq); irq++) {
         struct irq_desc *desc = irq_to_desc(irq);
         

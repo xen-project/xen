@@ -15,6 +15,7 @@ long read_console_ring(struct xen_sysctl_readconsole *op);
 
 void console_init_preirq(void);
 void console_init_ring(void);
+void console_init_irq(void);
 void console_init_postirq(void);
 void console_endboot(void);
 int console_has(const char *device);

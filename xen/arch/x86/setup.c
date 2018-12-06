@@ -677,6 +677,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
     bool acpi_boot_table_init_done = false, relocated = false;
+    int ret;
     struct ns16550_defaults ns16550 = {
         .data_bits = 8,
         .parity    = 'n',
@@ -1563,6 +1564,12 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     x2apic_bsp_setup();
 
+    ret = init_irq_data();
+    if ( ret < 0 )
+        panic("Error %d setting up IRQ data\n", ret);
+
+    console_init_irq();
+
     init_IRQ();
 
     module_map = xmalloc_array(unsigned long, BITS_TO_LONGS(mbi->mods_count));
@@ -1665,7 +1672,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             if ( (park_offline_cpus || num_online_cpus() < max_cpus) &&
                  !cpu_online(i) )
             {
-                int ret = cpu_up(i);
+                ret = cpu_up(i);
                 if ( ret != 0 )
                     printk("Failed to bring up CPU %u (error %d)\n", i, ret);
                 else if ( num_online_cpus() > max_cpus ||
