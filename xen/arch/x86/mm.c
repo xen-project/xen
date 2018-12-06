@@ -4009,7 +4009,8 @@ int donate_page(
     {
         if ( d->tot_pages >= d->max_pages )
             goto fail;
-        domain_adjust_tot_pages(d, 1);
+        if ( unlikely(domain_adjust_tot_pages(d, 1) == 1) )
+            get_knownalive_domain(d);
     }
 
     page->count_info = PGC_allocated | 1;

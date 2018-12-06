@@ -190,7 +190,8 @@ int destroy_xen_mappings(unsigned long v, unsigned long e);
  */
 int populate_pt_range(unsigned long virt, unsigned long nr_mfns);
 /* Claim handling */
-unsigned long domain_adjust_tot_pages(struct domain *d, long pages);
+unsigned long __must_check domain_adjust_tot_pages(struct domain *d,
+    long pages);
 int domain_set_outstanding_pages(struct domain *d, unsigned long pages);
 void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages);
 

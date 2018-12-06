@@ -2273,10 +2273,8 @@ int assign_pages(
             goto out;
         }
 
-        if ( unlikely(d->tot_pages == 0) )
+        if ( unlikely(domain_adjust_tot_pages(d, 1 << order) == (1 << order)) )
             get_knownalive_domain(d);
-
-        domain_adjust_tot_pages(d, 1 << order);
     }
 
     for ( i = 0; i < (1 << order); i++ )
