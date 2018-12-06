@@ -320,30 +320,15 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         if ( p2mt == p2m_ram_paging_out )
         {
             ASSERT(mfn_valid(mfn));
-            page = mfn_to_page(mfn);
-            rc = -ENXIO;
-            if ( !get_page(page, d) )
-                goto out_put_gfn;
+            goto obtain_page;
         }
-        else
-            page = NULL;
 
         rc = guest_physmap_remove_page(d, _gfn(gmfn), mfn, 0);
         if ( rc )
-        {
-            if ( page )
-                put_page(page);
             goto out_put_gfn;
-        }
 
         put_gfn(d, gmfn);
 
-        if ( page )
-        {
-            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-                put_page(page);
-            put_page(page);
-        }
         p2m_mem_paging_drop_page(d, gmfn, p2mt);
 
         return 0;
@@ -387,13 +372,16 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     }
 #endif /* CONFIG_X86 */
 
+ obtain_page: __maybe_unused;
     page = mfn_to_page(mfn);
     if ( unlikely(!get_page(page, d)) )
     {
 #ifdef CONFIG_X86
         put_gfn(d, gmfn);
+        if ( !p2m_is_paging(p2mt) )
 #endif
-        gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
+            gdprintk(XENLOG_INFO, "Bad page free for Dom%u GFN %lx\n",
+                     d->domain_id, gmfn);
 
         return -ENXIO;
     }
