@@ -1098,6 +1098,10 @@ static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 
     __vmpclear(vvmcs_maddr);
     vvmcs->vmcs_revision_id |= VMCS_RID_TYPE_MASK;
+    v->arch.hvm.vmx.secondary_exec_control |=
+        SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
+    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+              v->arch.hvm.vmx.secondary_exec_control);
     __vmwrite(VMCS_LINK_POINTER, vvmcs_maddr);
     __vmwrite(VMREAD_BITMAP, page_to_maddr(v->arch.hvm.vmx.vmread_bitmap));
     __vmwrite(VMWRITE_BITMAP, page_to_maddr(v->arch.hvm.vmx.vmwrite_bitmap));
@@ -1109,6 +1113,10 @@ static void nvmx_clear_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
 
     __vmpclear(vvmcs_maddr);
     vvmcs->vmcs_revision_id &= ~VMCS_RID_TYPE_MASK;
+    v->arch.hvm.vmx.secondary_exec_control &=
+        ~SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
+    __vmwrite(SECONDARY_VM_EXEC_CONTROL,
+              v->arch.hvm.vmx.secondary_exec_control);
     __vmwrite(VMCS_LINK_POINTER, ~0ul);
     __vmwrite(VMREAD_BITMAP, 0);
     __vmwrite(VMWRITE_BITMAP, 0);
