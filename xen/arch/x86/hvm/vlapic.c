@@ -1257,18 +1257,15 @@ int vlapic_has_pending_irq(struct vcpu *v)
          !nestedhvm_vcpu_in_guestmode(v) )
         return irr;
 
-    isr = vlapic_find_highest_isr(vlapic);
-
     /*
      * If APIC assist was set then an EOI may have been avoided.
      * If so, we need to emulate the EOI here before comparing ISR
      * with IRR.
      */
     if ( viridian_apic_assist_completed(v) )
-    {
         vlapic_EOI_set(vlapic);
-        isr = vlapic_find_highest_isr(vlapic);
-    }
+
+    isr = vlapic_find_highest_isr(vlapic);
 
     /*
      * The specification says that if APIC assist is set and a
