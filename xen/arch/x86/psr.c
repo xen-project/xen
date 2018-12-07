@@ -591,13 +591,13 @@ static int __init parse_psr_param(const char *s)
         if ( val_delim > ss )
             val_delim = ss;
 
-        if ( *val_delim && !strncmp(s, "rmid_max", val_delim - s) )
+        if ( *val_delim && !cmdline_strcmp(s, "rmid_max") )
         {
             opt_rmid_max = simple_strtoul(val_delim + 1, &q, 0);
             if ( *q && *q != ',' )
                 rc = -EINVAL;
         }
-        else if ( *val_delim && !strncmp(s, "cos_max", val_delim - s) )
+        else if ( *val_delim && !cmdline_strcmp(s, "cos_max") )
         {
             opt_cos_max = simple_strtoul(val_delim + 1, &q, 0);
             if ( *q && *q != ',' )

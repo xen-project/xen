@@ -46,8 +46,8 @@ static int __init parse_mmcfg(const char *s)
         case 1:
             break;
         default:
-            if ( !strncmp(s, "amd_fam10", ss - s) ||
-                 !strncmp(s, "amd-fam10", ss - s) )
+            if ( !cmdline_strcmp(s, "amd_fam10") ||
+                 !cmdline_strcmp(s, "amd-fam10") )
                 pci_probe |= PCI_CHECK_ENABLE_AMD_MMCONF;
             else
                 rc = -EINVAL;
