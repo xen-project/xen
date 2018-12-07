@@ -66,6 +66,10 @@ SECTIONS
        *(.data.param)
        __param_end = .;
 
+       __proc_info_start = .;
+       *(.proc.info)
+       __proc_info_end = .;
+
 #if defined(CONFIG_HAS_VPCI) && defined(CONFIG_LATE_HWDOM)
        . = ALIGN(POINTER_ALIGN);
        __start_vpci_array = .;
@@ -150,10 +154,6 @@ SECTIONS
        __setup_start = .;
        *(.init.setup)
        __setup_end = .;
-
-       __proc_info_start = .;
-       *(.init.proc.info)
-       __proc_info_end = .;
 
        __initcall_start = .;
        *(.initcallpresmp.init)
