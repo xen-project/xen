@@ -283,12 +283,6 @@ bool __initdata opt_dom0_shadow;
 bool __initdata dom0_pvh;
 bool __initdata dom0_verbose;
 
-/*
- * List of parameters that affect Dom0 creation:
- *
- *  - pvh               Create a PVHv2 Dom0.
- *  - shadow            Use shadow paging for Dom0.
- */
 static int __init parse_dom0_param(const char *s)
 {
     const char *ss;

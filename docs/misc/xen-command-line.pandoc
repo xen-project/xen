@@ -636,61 +636,83 @@ trace feature is only enabled in debugging builds of Xen.
 
 Specify the bit width of the DMA heap.
 
-### dom0 (x86)
-> `= List of [ pvh | shadow | verbose ]`
+### dom0
+    = List of [ pvh=<bool>, shadow=<bool>, verbose=<bool> ]
 
-> Sub-options:
+    Applicability: x86
 
-> `pvh`
+Controls for how dom0 is constructed on x86 systems.
 
-> Default: `false`
+*   The `pvh` boolean controls whether dom0 is constructed as a PV or a PVH
+    guest.  The default is PV.  In addition, the following requirements must
+    be met:
 
-Flag that makes a dom0 boot in PVHv2 mode.
+    *   The dom0 kernel selected by the boot loader must be capable of the
+        selected mode.
+    *   For a PV dom0, Xen must have been compiled with `CONFIG_PV` enabled.
+    *   For a PVH dom0, Xen must have been compiled with `CONFIG_HVM` enabled,
+        and the hardware must have VT-x/SVM extensions available.
 
-> `shadow`
+*   The `shadow` boolean is only applicable when dom0 is constructed as a PVH
+    guest, and controls whether dom0 uses hardware assisted paging, or shadow
+    paging.  The default is HAP when available, and shadow otherwise.
 
-> Default: `false`
+    This option is unavailable when `CONFIG_SHADOW_PAGING` is disabled.  Such
+    builds of Xen require HAP-capable hardware to use a PVH dom0.
 
-Flag that makes a dom0 use shadow paging. Only works when "pvh" is
-enabled.
-
-> `verbose`
-
-> Default: `false`
-
-Print debug information during dom0 build.
+*   The `verbose` boolean is intended for diagnostics, and prints out extra
+    information during the dom0 build.  It defaults to false.
 
 ### dom0-iommu
-> `= List of [ passthrough | strict | map-inclusive ]`
+    = List of [ passthrough=<bool>, strict=<bool>, map-inclusive=<bool>,
+                map-reserved=<bool> ]
 
-This list of booleans controls the iommu usage by Dom0:
+Controls for the dom0 IOMMU setup.
 
-* `passthrough`: disables DMA remapping for Dom0. Default is `false`. Note that
-  this option is hard coded to `false` for a PVH Dom0 and any attempt to
-  overwrite it from the command line is ignored.
+*   The `passthrough` boolean controls whether IOMMU translation functionality
+    is disabled for devices in dom0 (`passthrough=1`) or whether the IOMMU is
+    used to ensure that dom0 can only DMA to its permitted areas of RAM
+    (`passthrough=0`).
 
-* `strict`: sets up DMA remapping only for the RAM Dom0 actually got assigned.
-  Default is `false` which means Dom0 will get mappings for all the host
-  RAM except regions in use by Xen. Note that this option is hard coded to
-  `true` for a PVH Dom0 and any attempt to overwrite it from the command line
-  is ignored.
+    This option is only applicable to x86 PV dom0's, and defaults to false.
 
-* `map-inclusive`: sets up DMA remapping for all the non-RAM regions below 4GB
-  except for unusable ranges. Use this to work around firmware issues providing
-  incorrect RMRR/IVMD entries. Rather than only mapping RAM pages for IOMMU
-  accesses for Dom0, with this option all pages up to 4GB, not marked as
-  unusable in the E820 table, will get a mapping established. Note that this
-  option is only applicable to a PV Dom0 and is enabled by default on Intel
-  hardware.
+    Some older Intel VT-d hardware isn't capable of disabling translation
+    functionality on a per-device basis, and will cause this option to be
+    ignored and assumed to be 0.  Similar behaviour on such systems is only
+    available by fully disabling all IOMMUs.
 
-* `map-reserved`: sets up DMA remapping for all the reserved regions in the
-  memory map for Dom0. Use this to work around firmware issues providing
-  incorrect RMRR/IVMD entries. Rather than only mapping RAM pages for IOMMU
-  accesses for Dom0, all memory regions marked as reserved in the memory map
-  that don't overlap with any MMIO region from emulated devices will be
-  identity mapped. This option maps a subset of the memory that would be
-  mapped when using the `map-inclusive` option. This option is available to all
-  Dom0 modes and is enabled by default on Intel hardware.
+    This option is hardwired to false for x86 PVH dom0's (where a non-identity
+    transform is required for dom0 to function), and is ignored for ARM.
+
+*   The `strict` boolean is applicable to x86 PV dom0's only and defaults to
+    false.  It controls whether dom0 can have IOMMU mappings for all domain
+    RAM in the system, or only for its allocated RAM (and grant mappings etc.)
+
+    This option is hardwired to true for x86 PVH dom0's (as RAM belonging to
+    other domains in the system don't live in a compatible address space), and
+    is ignored for ARM.
+
+*   The `map-inclusive` boolean is applicable to x86 PV dom0's, and sets up
+    identity IOMMU mappings for all non-RAM regions below 4GB except for
+    unusable ranges, and ranges belonging to Xen.
+
+    Typically, some devices in a system use bits of RAM for communication, and
+    these areas should be listed as reserved in the E820 table and identified
+    via RMRR or IVMD entries in the APCI tables, so Xen can ensure that they
+    are identity-mapped in the IOMMU.  However, some firmware makes mistakes,
+    and this option is a coarse-grain workaround for those errors.
+
+    Where possible, finer grain corrections should be made with the `rmrr=`,
+    `ivrs_hpet=` or `ivrs_ioapic=` command line options.
+
+    This option is enabled by default on x86 systems, and invalid on ARM
+    systems.
+
+*   The `map-reserved` functionality is very similar to `map-inclusive`.
+
+    The differences from `map-inclusive` are that `map-reserved` is applicable
+    to both x86 PV and PVH dom0's, and represents a subset of the correction
+    by only mapping reserved memory regions rather than all non-RAM regions.
 
 ### dom0_ioports_disable (x86)
 > `= List of <hex>-<hex>`
@@ -1181,19 +1203,10 @@ detection of systems known to misbehave upon accesses to that port.
 > **WARNING: This command line option is deprecated, and superseded by
 > _dom0-iommu=passthrough_ - using both options in combination is undefined.**
 
-> Default: `false`
-
->> Control whether to disable DMA remapping for Dom0.
-
 > `dom0-strict`
 
 > **WARNING: This command line option is deprecated, and superseded by
 > _dom0-iommu=strict_ - using both options in combination is undefined.**
-
-> Default: `false`
-
->> Control whether to set up DMA remapping only for the memory Dom0 actually
->> got assigned. Implies `no-dom0-passthrough`.
 
 > `amd-iommu-perdev-intremap`
 
@@ -1241,20 +1254,11 @@ Specify the timeout of the device IOTLB invalidation in milliseconds.
 By default, the timeout is 1000 ms. When you see error 'Queue invalidate
 wait descriptor timed out', try increasing this value.
 
-### iommu_inclusive_mapping (VT-d)
+### iommu_inclusive_mapping
 > `= <boolean>`
 
 **WARNING: This command line option is deprecated, and superseded by
 _dom0-iommu=map-inclusive_ - using both options in combination is undefined.**
-
-> Default: `true`
-
-Use this to work around firmware issues providing incorrect RMRR entries.
-Rather than only mapping RAM pages for IOMMU accesses for Dom0, with this
-option all pages up to 4GB, not marked as unusable in the E820 table, will
-get a mapping established. Note that this option is only applicable to a
-PV dom0. Also note that if `dom0-strict` mode is enabled then conventional
-RAM pages not assigned to dom0 will not be mapped.
 
 ### irq_ratelimit (x86)
 > `= <integer>`
