@@ -36,6 +36,7 @@ bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
 
+static bool __hwdom_initdata iommu_hwdom_none;
 bool __hwdom_initdata iommu_hwdom_strict;
 bool __read_mostly iommu_hwdom_passthrough;
 bool __hwdom_initdata iommu_hwdom_inclusive;
@@ -131,6 +132,8 @@ static int __init parse_dom0_iommu_param(const char *s)
             iommu_hwdom_inclusive = val;
         else if ( (val = parse_boolean("map-reserved", s, ss)) >= 0 )
             iommu_hwdom_reserved = val;
+        else if ( !cmdline_strcmp(s, "none") )
+            iommu_hwdom_none = true;
         else
             rc = -EINVAL;
 
@@ -159,7 +162,7 @@ int iommu_domain_init(struct domain *d)
 
 static void __hwdom_init check_hwdom_reqs(struct domain *d)
 {
-    if ( !paging_mode_translate(d) )
+    if ( iommu_hwdom_none || !paging_mode_translate(d) )
         return;
 
     arch_iommu_check_autotranslated_hwdom(d);

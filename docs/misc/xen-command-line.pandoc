@@ -667,7 +667,7 @@ Controls for how dom0 is constructed on x86 systems.
 
 ### dom0-iommu
     = List of [ passthrough=<bool>, strict=<bool>, map-inclusive=<bool>,
-                map-reserved=<bool> ]
+                map-reserved=<bool>, none ]
 
 Controls for the dom0 IOMMU setup.
 
@@ -717,6 +717,12 @@ Controls for the dom0 IOMMU setup.
     to both x86 PV and PVH dom0's, is enabled by default, and represents a
     subset of the correction by only mapping reserved memory regions rather
     than all non-RAM regions.
+
+*   The `none` option is intended for development purposes only, and skips
+    certain safety checks pertaining to the correct IOMMU configuration for
+    dom0 to boot.
+
+    Incorrect use of this option may result in a malfunctioning system.
 
 ### dom0_ioports_disable (x86)
 > `= List of <hex>-<hex>`
