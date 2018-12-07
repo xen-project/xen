@@ -348,8 +348,8 @@ The accepted name keywords for name=value pairs are:
 The following are examples of correct specifications:
 
     com1=115200,8n1,0x3f8,4
-    com1=115200,8n1,0x3f8,4,reg\_width=4,reg\_shift=2
-    com1=baud=115200,parity=n,stop\_bits=1,io\_base=0x3f8,reg\_width=4
+    com1=115200,8n1,0x3f8,4,reg_width=4,reg_shift=2
+    com1=baud=115200,parity=n,stop_bits=1,io_base=0x3f8,reg_width=4
 
 ### conring\_size
 > `= <size>`
@@ -1665,7 +1665,7 @@ Specify the host reboot method.
 when running nested Xen)
 
 ### rmrr
-> '= start<-end>=[s1]bdf1[,[s1]bdf2[,...]];start<-end>=[s2]bdf1[,[s2]bdf2[,...]]
+> `= start<-end>=[s1]bdf1[,[s1]bdf2[,...]];start<-end>=[s2]bdf1[,[s2]bdf2[,...]]`
 
 Define RMRR units that are missing from ACPI table along with device they
 belong to and use them for 1:1 mapping. End addresses can be omitted and one
@@ -2096,7 +2096,7 @@ As the virtualisation is not 100% safe, don't use the vpmu flag on
 production systems (see http://xenbits.xen.org/xsa/advisory-163.html)!
 
 ### vwfi (arm)
-> `= trap | native
+> `= trap | native`
 
 > Default: `trap`
 
