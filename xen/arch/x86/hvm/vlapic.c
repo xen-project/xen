@@ -775,14 +775,13 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
     }
 }
 
-static void vlapic_reg_write(struct vcpu *v,
-                             unsigned int offset, uint32_t val)
+void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
 
     memset(&vlapic->loaded, 0, sizeof(vlapic->loaded));
 
-    switch ( offset )
+    switch ( reg )
     {
     case APIC_ID:
         vlapic_set_reg(vlapic, APIC_ID, val);
@@ -857,16 +856,16 @@ static void vlapic_reg_write(struct vcpu *v,
     case APIC_LVTERR:       /* LVT Error Reg */
         if ( vlapic_sw_disabled(vlapic) )
             val |= APIC_LVT_MASKED;
-        val &= vlapic_lvt_mask[(offset - APIC_LVTT) >> 4];
-        vlapic_set_reg(vlapic, offset, val);
-        if ( offset == APIC_LVT0 )
+        val &= vlapic_lvt_mask[(reg - APIC_LVTT) >> 4];
+        vlapic_set_reg(vlapic, reg, val);
+        if ( reg == APIC_LVT0 )
         {
             vlapic_adjust_i8259_target(v->domain);
             pt_may_unmask_irq(v->domain, NULL);
         }
-        if ( (offset == APIC_LVTT) && !(val & APIC_LVT_MASKED) )
+        if ( (reg == APIC_LVTT) && !(val & APIC_LVT_MASKED) )
             pt_may_unmask_irq(NULL, &vlapic->pt);
-        if ( offset == APIC_LVTPC )
+        if ( reg == APIC_LVTPC )
             vpmu_lvtpc_update(val);
         break;
 

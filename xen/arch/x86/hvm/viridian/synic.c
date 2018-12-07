@@ -84,18 +84,13 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         vlapic_EOI_set(vcpu_vlapic(v));
         break;
 
-    case HV_X64_MSR_ICR: {
-        u32 eax = (u32)val, edx = (u32)(val >> 32);
-        struct vlapic *vlapic = vcpu_vlapic(v);
-        eax &= ~(1 << 12);
-        edx &= 0xff000000;
-        vlapic_set_reg(vlapic, APIC_ICR2, edx);
-        vlapic_ipi(vlapic, eax, edx);
-        vlapic_set_reg(vlapic, APIC_ICR, eax);
+    case HV_X64_MSR_ICR:
+        vlapic_reg_write(v, APIC_ICR2, val >> 32);
+        vlapic_reg_write(v, APIC_ICR, val);
         break;
-    }
+
     case HV_X64_MSR_TPR:
-        vlapic_set_reg(vcpu_vlapic(v), APIC_TASKPRI, (uint8_t)val);
+        vlapic_reg_write(v, APIC_TASKPRI, val);
         break;
 
     case HV_X64_MSR_VP_ASSIST_PAGE:
