@@ -637,21 +637,23 @@ trace feature is only enabled in debugging builds of Xen.
 Specify the bit width of the DMA heap.
 
 ### dom0
-    = List of [ pvh=<bool>, shadow=<bool>, verbose=<bool> ]
+    = List of [ pv | pvh, shadow=<bool>, verbose=<bool> ]
 
     Applicability: x86
 
 Controls for how dom0 is constructed on x86 systems.
 
-*   The `pvh` boolean controls whether dom0 is constructed as a PV or a PVH
-    guest.  The default is PV.  In addition, the following requirements must
-    be met:
+*   The `pv` and `pvh` options select the virtualisation mode of dom0.
+
+    The `pv` option is only available when `CONFIG_PV` is compiled in.  The
+    `pvh` option is only available when `CONFIG_HVM` is compiled in.  When
+    both options are compiled in, the default is PV.
+
+    In addition, the following requirements must be met:
 
     *   The dom0 kernel selected by the boot loader must be capable of the
         selected mode.
-    *   For a PV dom0, Xen must have been compiled with `CONFIG_PV` enabled.
-    *   For a PVH dom0, Xen must have been compiled with `CONFIG_HVM` enabled,
-        and the hardware must have VT-x/SVM extensions available.
+    *   For a PVH dom0, the hardware must have VT-x/SVM extensions available.
 
 *   The `shadow` boolean is only applicable when dom0 is constructed as a PVH
     guest, and controls whether dom0 uses hardware assisted paging, or shadow

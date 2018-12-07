@@ -280,7 +280,7 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 #ifdef CONFIG_SHADOW_PAGING
 bool __initdata opt_dom0_shadow;
 #endif
-bool __initdata dom0_pvh;
+bool __initdata dom0_pvh = !IS_ENABLED(CONFIG_PV);
 bool __initdata dom0_verbose;
 
 static int __init parse_dom0_param(const char *s)
@@ -295,8 +295,10 @@ static int __init parse_dom0_param(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( (val = parse_boolean("pvh", s, ss)) >= 0 )
-            dom0_pvh = val;
+        if ( IS_ENABLED(CONFIG_PV) && !cmdline_strcmp(s, "pv") )
+            dom0_pvh = false;
+        else if ( IS_ENABLED(CONFIG_HVM) && !cmdline_strcmp(s, "pvh") )
+            dom0_pvh = true;
 #ifdef CONFIG_SHADOW_PAGING
         else if ( (val = parse_boolean("shadow", s, ss)) >= 0 )
             opt_dom0_shadow = val;
