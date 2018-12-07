@@ -16,7 +16,7 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
     return 0;
 }
 
-int __init arch_cpu_up(int cpu)
+int arch_cpu_up(int cpu)
 {
     return platform_cpu_up(cpu);
 }

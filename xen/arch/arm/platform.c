@@ -95,7 +95,7 @@ int __init platform_specific_mapping(struct domain *d)
 }
 
 #ifdef CONFIG_ARM_32
-int __init platform_cpu_up(int cpu)
+int platform_cpu_up(int cpu)
 {
     if ( psci_ver )
         return call_psci_cpu_on(cpu);
