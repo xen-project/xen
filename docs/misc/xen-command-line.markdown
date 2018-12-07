@@ -277,7 +277,8 @@ Interrupts.  Specifying zero disables CMCI handling.
 Flag to indicate whether to probe for a CMOS Real Time Clock irrespective of
 ACPI indicating none to be there.
 
-### com1,com2
+### com1
+### com2
 > `= <baud>[/<base-baud>][,[DPS][,[<io-base>|pci|amt][,[<irq>|msi][,[<port-bdf>][,[<bridge-bdf>]]]]]]`
 
 Both option `com1` and `com2` follow the same format.
@@ -467,44 +468,45 @@ The Speculation Control hardware features `ibrsb`, `stibp`, `ibpb`,
 be ignored, e.g. `no-ibrsb`, at which point Xen won't use them itself, and
 won't offer them to guests.
 
-### cpuid\_mask\_cpu (AMD only)
-> `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
+### cpuid_mask_cpu
+> `= fam_0f_rev_[cdefg] | fam_10_rev_[bc] | fam_11_rev_b`
 
-If the other **cpuid\_mask\_{,ext\_,thermal\_,l7s0\_}e{a,b,c,d}x**
-options are fully set (unspecified on the command line), specify a
-pre-canned cpuid mask to mask the current processor down to appear as
-the specified processor. It is important to ensure that all hosts in a
-pool appear the same to guests to allow successful live migration.
+> Applicability: AMD
 
-### cpuid\_mask\_{{,ext\_}ecx,edx} (x86)
+If none of the other **cpuid\_mask\_\*** options are given, Xen has a set of
+pre-configured masks to make the current processor appear to be
+family/revision specified.
+
+See below for general information on masking.
+
+**Warning: This option is not fully effective on Family 15h processors or
+later.**
+
+### cpuid_mask_ecx
+### cpuid_mask_edx
+### cpuid_mask_ext_ecx
+### cpuid_mask_ext_edx
+### cpuid_mask_l7s0_eax
+### cpuid_mask_l7s0_ebx
+### cpuid_mask_thermal_ecx
+### cpuid_mask_xsave_eax
 > `= <integer>`
 
-> Default: `~0` (all bits set)
+> Applicability: x86.  Default: `~0` (all bits set)
 
-These four command line parameters are used to specify cpuid masks to
-help with cpuid levelling across a pool of hosts.  Setting a bit in
-the mask indicates that the feature should be enabled, while clearing
-a bit in the mask indicates that the feature should be disabled.  It
-is important to ensure that all hosts in a pool appear the same to
-guests to allow successful live migration.
+The availability of these options are model specific.  Some processors don't
+support any of them, and no processor supports all of them.  Xen will ignore
+options on processors which are lacking support.
 
-### cpuid\_mask\_xsave\_eax (Intel only)
-> `= <integer>`
+These options can be used to alter the features visible via the `CPUID`
+instruction.  Settings applied here take effect globally, including for Xen
+and all guests.
 
-> Default: `~0` (all bits set)
-
-This command line parameter is also used to specify a cpuid mask to
-help with cpuid levelling across a pool of hosts.  See the description
-of the other respective options above.
-
-### cpuid\_mask\_{l7s0\_{eax,ebx},thermal\_ecx} (AMD only)
-> `= <integer>`
-
-> Default: `~0` (all bits set)
-
-These three command line parameters are also used to specify cpuid
-masks to help with cpuid levelling across a pool of hosts.  See the
-description of the other respective options above.
+Note: Since Xen 4.7, it is no longer necessary to mask a host to create
+migration safety in heterogeneous scenarios.  All necessary CPUID settings
+should be provided in the VM configuration file.  Furthermore, it is
+recommended not to use this option, as doing so causes an unnecessary
+reduction of features at Xen's disposal to manage guests.
 
 ### cpuidle (x86)
 > `= <boolean>`
