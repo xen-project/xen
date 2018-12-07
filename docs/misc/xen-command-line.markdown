@@ -870,22 +870,6 @@ hardware domain is architecture dependent.
 Note that specifying zero as domU value means zero, while for dom0 it means
 to use the default.
 
-### xsm
-> `= dummy | flask | silo`
-
-> Default: `dummy`
-
-Specify which XSM module should be enabled.  This option is only available if
-the hypervisor was compiled with XSM support.
-
-* `dummy`: this is the default choice.  Basic restriction for common deployment
-  (the dummy module) will be applied.  It's also used when XSM is compiled out.
-* `flask`: this is the policy based access control.  To choose this, the
-  separated option in kconfig must also be enabled.
-* `silo`: this will deny any unmediated communication channels between
-  unprivileged VMs.  To choose this, the separated option in kconfig must also
-  be enabled.
-
 ### flask
 > `= permissive | enforcing | late | disabled`
 
@@ -2180,3 +2164,19 @@ for dom0 or guest domains only.
 > Default: `true`
 
 Permit use of the `xsave/xrstor` instructions.
+
+### xsm
+> `= dummy | flask | silo`
+
+> Default: selectable via Kconfig.  Depends on enabled XSM modules.
+
+Specify which XSM module should be enabled.  This option is only available if
+the hypervisor was compiled with CONFIG\_XSM enabled.
+
+* `dummy`: this is the default choice.  Basic restriction for common deployment
+  (the dummy module) will be applied.  It's also used when XSM is compiled out.
+* `flask`: this is the policy based access control.  To choose this, the
+  separated option in kconfig must also be enabled.
+* `silo`: this will deny any unmediated communication channels between
+  unprivileged VMs.  To choose this, the separated option in kconfig must also
+  be enabled.
