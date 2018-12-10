@@ -19,6 +19,19 @@ Most notably:
  - tools/xl           : LGPL v2.1
  - xen/include/public : MIT license
 
+The COMMON COPYRIGHT NOTICES section of this document contains
+sample copyright notices for the most common licenses used within
+this repository.
+
+When creating new components, new files, or importing code please follow
+the conventions outlined below. As a general rule, whenever code using a
+license other than GPLv2 is introduced, attention must be drawn to the
+difference, such that maintainers can make an informed decision about the
+deviation. Any new code must be GPLv2 compatible.
+
+New components
+--------------
+
 When creating new components and directories that contain a
 significant amount of files that are licensed under licenses other
 than GPLv2 or the license specified in the COPYING file, please
@@ -27,14 +40,20 @@ license text and a rationale for using a different license. This helps
 ensure that the license of this new component/directory is maintained
 consistently with the original intention.
 
+New files
+---------
+
+If specific files that differ from the license in a directory are introduced,
+exceptions should be highlighted and discussed in the commit message or cover
+letter introducing the file.
+
+Importing code
+--------------
+
 When importing code from other upstream projects into this repository,
 please create a README.source file in the directory the code is imported
 to, listing the original source of the code. An example can be found at
 m4/README.source
-
-The COMMON COPYRIGHT NOTICES section of this document contains
-sample copyright notices for the most common licenses used within
-this repository.
 
 Developer's Certificate of Origin
 ---------------------------------
