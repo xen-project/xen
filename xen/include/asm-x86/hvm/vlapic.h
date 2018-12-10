@@ -123,7 +123,10 @@ void vlapic_destroy(struct vcpu *v);
 
 void vlapic_reset(struct vlapic *vlapic);
 
-bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value);
+int guest_wrmsr_apic_base(struct vcpu *v, uint64_t val);
+int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val);
+int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t val);
+
 void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value);
 uint64_t vlapic_tdt_msr_get(struct vlapic *vlapic);
 

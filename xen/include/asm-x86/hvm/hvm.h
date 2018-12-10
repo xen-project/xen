@@ -333,9 +333,6 @@ void hvm_toggle_singlestep(struct vcpu *v);
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                               struct npfec npfec);
 
-int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val);
-int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t val);
-
 /* Check CR4/EFER values */
 const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg);

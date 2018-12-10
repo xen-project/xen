@@ -1072,15 +1072,68 @@ static void set_x2apic_id(struct vlapic *vlapic)
     vlapic_set_reg(vlapic, APIC_LDR, ldr);
 }
 
-bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
+int guest_wrmsr_apic_base(struct vcpu *v, uint64_t value)
 {
-    if ( !has_vlapic(vlapic_domain(vlapic)) )
-        return 0;
+    const struct cpuid_policy *cp = v->domain->arch.cpuid;
+    struct vlapic *vlapic = vcpu_vlapic(v);
+
+    if ( !has_vlapic(v->domain) )
+        return X86EMUL_EXCEPTION;
+
+    /* Attempting to set reserved bits? */
+    if ( value & ~(APIC_BASE_ADDR_MASK | APIC_BASE_ENABLE | APIC_BASE_BSP |
+                   (cp->basic.x2apic ? APIC_BASE_EXTD : 0)) )
+        return X86EMUL_EXCEPTION;
+
+    /*
+     * Architecturally speaking, we should allow a guest to move the xAPIC
+     * MMIO window (within reason - not even hardware allows arbitrary
+     * positions).  However, virtualising the behaviour for multi-vcpu guests
+     * is problematic.
+     *
+     * The ability to move the MMIO window was introduced with the Pentium Pro
+     * processor, to deconflict the window with other MMIO in the system.  The
+     * need to move the MMIO window was obsoleted by the Netburst architecture
+     * which reserved the space in physical address space for MSIs.
+     *
+     * As such, it appears to be a rarely used feature before the turn of the
+     * millennium, and entirely unused after.
+     *
+     * Xen uses a per-domain P2M, but MSR_APIC_BASE is per-vcpu.  In
+     * principle, we could emulate the MMIO windows being in different
+     * locations by ensuring that all windows are unmapped in the P2M and trap
+     * for emulation.  Xen has never had code to modify the P2M in response to
+     * APIC_BASE updates, so guests which actually try this are likely to end
+     * up without a working APIC.
+     *
+     * Things are more complicated with hardware APIC acceleration, where Xen
+     * has to map a sink-page into the P2M for APIC accesses to be recognised
+     * and accelerated by microcode.  Again, this could in principle be
+     * emulated, but the visible result in the guest would be multiple working
+     * APIC MMIO windows.  Moving the APIC window has never caused the
+     * sink-page to move in the P2M, meaning that on all modern hardware, the
+     * APIC definitely ceases working if the guest tries to move the window.
+     *
+     * As such, when the APIC is configured in xAPIC mode, require the MMIO
+     * window to be in its default location.  We don't expect any guests which
+     * currently run on Xen to be impacted by this restriction, and the #GP
+     * fault will be far more obvious to debug than a malfunctioning MMIO
+     * window.
+     */
+    if ( ((value & (APIC_BASE_EXTD | APIC_BASE_ENABLE)) == APIC_BASE_ENABLE) &&
+         ((value & APIC_BASE_ADDR_MASK) != APIC_DEFAULT_PHYS_BASE) )
+    {
+        printk(XENLOG_G_INFO
+               "%pv tried to move the APIC MMIO window: val 0x%08"PRIx64"\n",
+               v, value);
+        return X86EMUL_EXCEPTION;
+    }
 
     if ( (vlapic->hw.apic_base_msr ^ value) & APIC_BASE_ENABLE )
     {
         if ( unlikely(value & APIC_BASE_EXTD) )
-            return 0;
+            return X86EMUL_EXCEPTION;
+
         if ( value & APIC_BASE_ENABLE )
         {
             vlapic_reset(vlapic);
@@ -1095,7 +1148,7 @@ bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
     }
     else if ( ((vlapic->hw.apic_base_msr ^ value) & APIC_BASE_EXTD) &&
               unlikely(!vlapic_xapic_mode(vlapic)) )
-        return 0;
+        return X86EMUL_EXCEPTION;
 
     vlapic->hw.apic_base_msr = value;
     memset(&vlapic->loaded, 0, sizeof(vlapic->loaded));
@@ -1108,7 +1161,7 @@ bool_t vlapic_msr_set(struct vlapic *vlapic, uint64_t value)
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
                 "apic base msr is 0x%016"PRIx64, vlapic->hw.apic_base_msr);
 
-    return 1;
+    return X86EMUL_OKAY;
 }
 
 uint64_t  vlapic_tdt_msr_get(struct vlapic *vlapic)
