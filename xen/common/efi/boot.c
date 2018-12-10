@@ -1389,27 +1389,29 @@ static bool __initdata efi_map_uc;
 static int __init parse_efi_param(const char *s)
 {
     const char *ss;
-    int rc = 0;
+    int rc = 0, val;
 
     do {
-        bool val = strncmp(s, "no-", 3);
-
-        if ( !val )
-            s += 3;
-
         ss = strchr(s, ',');
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !cmdline_strcmp(s, "rs") )
+        if ( (val = parse_boolean("rs", s, ss)) >= 0 )
         {
             if ( val )
                 __set_bit(EFI_RS, &efi_flags);
             else
                 __clear_bit(EFI_RS, &efi_flags);
         }
-        else if ( !cmdline_strcmp(s, "attr=uc") )
-            efi_map_uc = val;
+        else if ( (ss - s) > 5 && !memcmp(s, "attr=", 5) )
+        {
+            if ( cmdline_strcmp(s + 5, "uc") )
+                efi_map_uc = true;
+            else if ( cmdline_strcmp(s + 5, "no") )
+                efi_map_uc = false;
+            else
+                rc = -EINVAL;
+        }
         else
             rc = -EINVAL;
 

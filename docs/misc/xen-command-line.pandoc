@@ -853,23 +853,18 @@ disable it (edid=no). This option should not normally be required
 except for debugging purposes.
 
 ### efi
-> `= List of [ rs | attr ]`
+    = List of [ rs=<bool>, attr=no|uc ]
 
-All options are of boolean kind and can be prefixed with `no-` to
-effect the inverse meaning.
+Controls for interacting with the system Extended Firmware Interface.
 
-> `rs`
+*   The `rs` boolean controls whether Runtime Services are used.  By default,
+    Xen uses Runtime Services itself, and proxies certain calls on behalf of
+    dom0.  Selecting `rs=0` prohibits all use of Runtime Services.
 
-> Default: `true`
-
->> Force or disable use of EFI runtime services.
-
-> `attr=uc`
-
-> Default: `off`
-
->> Allows mapping of RuntimeServices which have no cachability attribute
->> set as UC.
+*   The `attr=` string exists to specify what to do with memory regions of
+    unknown/unrecognised cacheability.  `attr=no` is the default and will
+    leave the memory regions unmapped, while `attr=uc` will map them as fully
+    uncacheable.
 
 ### ept
 > `= List of [ ad=<bool>, pml=<bool> ]`
