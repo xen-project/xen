@@ -15,6 +15,11 @@ qemu-smoke-x86-64-gcc:
     - debian-stretch-gcc-debug
   tags:
     - x86_64
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
 
 qemu-smoke-x86-64-clang:
   stage: test
@@ -32,3 +37,8 @@ qemu-smoke-x86-64-clang:
     - debian-unstable-clang-debug
   tags:
     - x86_64
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
