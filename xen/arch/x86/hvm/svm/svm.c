@@ -1788,10 +1788,10 @@ static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 
 static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    int ret;
     struct vcpu *v = current;
     const struct domain *d = v->domain;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    const struct nestedsvm *nsvm = &vcpu_nestedsvm(v);
 
     switch ( msr )
     {
@@ -1914,6 +1914,18 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto gpf;
         break;
 
+    case MSR_K8_VM_CR:
+        *msr_content = 0;
+        break;
+
+    case MSR_K8_VM_HSAVE_PA:
+        *msr_content = nsvm->ns_msr_hsavepa;
+        break;
+
+    case MSR_AMD64_TSC_RATIO:
+        *msr_content = nsvm->ns_tscratio;
+        break;
+
     case MSR_AMD_OSVW_ID_LENGTH:
     case MSR_AMD_OSVW_STATUS:
         if ( !d->arch.cpuid->extd.osvw )
@@ -1922,12 +1934,6 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     default:
-        ret = nsvm_rdmsr(v, msr, msr_content);
-        if ( ret < 0 )
-            goto gpf;
-        else if ( ret )
-            break;
-
         if ( rdmsr_safe(msr, *msr_content) == 0 )
             break;
 
@@ -1956,10 +1962,10 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
 static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
-    int ret, result = X86EMUL_OKAY;
     struct vcpu *v = current;
     struct domain *d = v->domain;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
+    struct nestedsvm *nsvm = &vcpu_nestedsvm(v);
 
     switch ( msr )
     {
@@ -2085,6 +2091,22 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             goto gpf;
         break;
 
+    case MSR_K8_VM_CR:
+        /* ignore write. handle all bits as read-only. */
+        break;
+
+    case MSR_K8_VM_HSAVE_PA:
+        if ( (msr_content & ~PAGE_MASK) || msr_content > 0xfd00000000ULL )
+            goto gpf;
+        nsvm->ns_msr_hsavepa = msr_content;
+        break;
+
+    case MSR_AMD64_TSC_RATIO:
+        if ( msr_content & TSC_RATIO_RSVD_BITS )
+            goto gpf;
+        nsvm->ns_tscratio = msr_content;
+        break;
+
     case MSR_IA32_MCx_MISC(4): /* Threshold register */
     case MSR_F10_MC4_MISC1 ... MSR_F10_MC4_MISC3:
         /*
@@ -2102,12 +2124,6 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     default:
-        ret = nsvm_wrmsr(v, msr, msr_content);
-        if ( ret < 0 )
-            goto gpf;
-        else if ( ret )
-            break;
-
         /* Match up with the RDMSR side; ultimately this should go away. */
         if ( rdmsr_safe(msr, msr_content) == 0 )
             break;
@@ -2115,7 +2131,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         goto gpf;
     }
 
-    return result;
+    return X86EMUL_OKAY;
 
  gpf:
     return X86EMUL_EXCEPTION;

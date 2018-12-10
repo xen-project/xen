@@ -47,22 +47,6 @@ nestedsvm_vcpu_stgi(struct vcpu *v)
     local_event_delivery_enable(); /* unmask events for PV drivers */
 }
 
-static int
-nestedsvm_vmcb_isvalid(struct vcpu *v, uint64_t vmcxaddr)
-{
-    /* Address must be 4k aligned */
-    if ( (vmcxaddr & ~PAGE_MASK) != 0 )
-        return 0;
-
-    /* Maximum valid physical address.
-     * See AMD BKDG for HSAVE_PA MSR.
-     */
-    if ( vmcxaddr > 0xfd00000000ULL )
-        return 0;
-
-    return 1;
-}
-
 int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
@@ -1261,67 +1245,6 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
     }
 
     return hvm_intblk_none;
-}
-
-/* MSR handling */
-int nsvm_rdmsr(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
-{
-    struct nestedsvm *svm = &vcpu_nestedsvm(v);
-    int ret = 1;
-
-    *msr_content = 0;
-
-    switch (msr) {
-    case MSR_K8_VM_CR:
-        break;
-    case MSR_K8_VM_HSAVE_PA:
-        *msr_content = svm->ns_msr_hsavepa;
-        break;
-    case MSR_AMD64_TSC_RATIO:
-        *msr_content = svm->ns_tscratio;
-        break;
-    default:
-        ret = 0;
-        break;
-    }
-
-    return ret;
-}
-
-int nsvm_wrmsr(struct vcpu *v, unsigned int msr, uint64_t msr_content)
-{
-    int ret = 1;
-    struct nestedsvm *svm = &vcpu_nestedsvm(v);
-
-    switch (msr) {
-    case MSR_K8_VM_CR:
-        /* ignore write. handle all bits as read-only. */
-        break;
-    case MSR_K8_VM_HSAVE_PA:
-        if (!nestedsvm_vmcb_isvalid(v, msr_content)) {
-            gdprintk(XENLOG_ERR,
-                "MSR_K8_VM_HSAVE_PA value invalid %#"PRIx64"\n", msr_content);
-            ret = -1; /* inject #GP */
-            break;
-        }
-        svm->ns_msr_hsavepa = msr_content;
-        break;
-    case MSR_AMD64_TSC_RATIO:
-        if ((msr_content & ~TSC_RATIO_RSVD_BITS) != msr_content) {
-            gdprintk(XENLOG_ERR,
-                "reserved bits set in MSR_AMD64_TSC_RATIO %#"PRIx64"\n",
-                msr_content);
-            ret = -1; /* inject #GP */
-            break;
-        }
-        svm->ns_tscratio = msr_content;
-        break;
-    default:
-        ret = 0;
-        break;
-    }
-
-    return ret;
 }
 
 /* VMEXIT emulation */

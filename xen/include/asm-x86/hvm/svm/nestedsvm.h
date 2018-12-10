@@ -118,10 +118,6 @@ bool_t nsvm_vmcb_guest_intercepts_event(
 bool_t nsvm_vmcb_hap_enabled(struct vcpu *v);
 enum hvm_intblk nsvm_intr_blocked(struct vcpu *v);
 
-/* MSRs */
-int nsvm_rdmsr(struct vcpu *v, unsigned int msr, uint64_t *msr_content);
-int nsvm_wrmsr(struct vcpu *v, unsigned int msr, uint64_t msr_content);
-
 /* Interrupts, vGIF */
 void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v);
 void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v);
