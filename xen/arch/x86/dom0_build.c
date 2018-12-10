@@ -29,6 +29,7 @@ struct memsize {
 static struct memsize __initdata dom0_size;
 static struct memsize __initdata dom0_min_size;
 static struct memsize __initdata dom0_max_size = { .nr_pages = LONG_MAX };
+static bool __initdata dom0_mem_set;
 
 static bool __init memsize_gt_zero(const struct memsize *sz)
 {
@@ -116,6 +117,8 @@ static int __init parse_amt(const char *s, const char **ps, struct memsize *sz)
 static int __init parse_dom0_mem(const char *s)
 {
     int ret;
+
+    dom0_mem_set = true;
 
     /* xen-shim uses shim_mem parameter instead of dom0_mem */
     if ( pv_shim )
@@ -338,6 +341,9 @@ unsigned long __init dom0_compute_nr_pages(
     nodeid_t node;
     unsigned long avail = 0, nr_pages, min_pages, max_pages;
     bool need_paging;
+
+    if ( !dom0_mem_set && CONFIG_DOM0_MEM[0] )
+        parse_dom0_mem(CONFIG_DOM0_MEM);
 
     for_each_node_mask ( node, dom0_nodes )
         avail += avail_domheap_pages_region(node, 0, 0) +

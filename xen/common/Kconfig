@@ -323,4 +323,17 @@ config CMDLINE_OVERRIDE
 
 	  This is used to work around broken bootloaders. This should
 	  be set to 'N' under normal conditions.
+
+config DOM0_MEM
+	string "Default value for dom0_mem boot parameter"
+	default ""
+	---help---
+	  Sets a default value for dom0_mem, e.g. "512M".
+	  The specified string will be used for the dom0_mem parameter in
+	  case it was not specified on the command line.
+
+	  See docs/misc/xen-command-line.markdown for the supported syntax.
+
+	  Leave empty if you are not sure what to specify.
+
 endmenu

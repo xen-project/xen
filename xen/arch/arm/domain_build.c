@@ -32,9 +32,12 @@ static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
 static u64 __initdata dom0_mem;
+static bool __initdata dom0_mem_set;
 
 static int __init parse_dom0_mem(const char *s)
 {
+    dom0_mem_set = true;
+
     dom0_mem = parse_size_and_unit(s, &s);
 
     return *s ? -EINVAL : 0;
@@ -2114,6 +2117,10 @@ int __init construct_dom0(struct domain *d)
     BUG_ON(d->domain_id != 0);
 
     printk("*** LOADING DOMAIN 0 ***\n");
+
+    if ( !dom0_mem_set && CONFIG_DOM0_MEM[0] )
+        parse_dom0_mem(CONFIG_DOM0_MEM);
+
     if ( dom0_mem <= 0 )
     {
         warning_add("PLEASE SPECIFY dom0_mem PARAMETER - USING 512M FOR NOW\n");
