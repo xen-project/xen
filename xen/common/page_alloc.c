@@ -1,21 +1,21 @@
 /******************************************************************************
  * page_alloc.c
- * 
+ *
  * Simple buddy heap allocator for Xen.
- * 
+ *
  * Copyright (c) 2002-2004 K A Fraser
  * Copyright (c) 2006 IBM Ryan Harper <ryanh@us.ibm.com>
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; If not, see <http://www.gnu.org/licenses/>.
  */
@@ -330,7 +330,7 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
     bootmem_region_add(ps >> PAGE_SHIFT, pe >> PAGE_SHIFT);
 
 #ifdef CONFIG_X86
-    /* 
+    /*
      * Here we put platform-specific memory range workarounds, i.e.
      * memory known to be corrupt or otherwise in need to be reserved on
      * specific platforms.
@@ -568,7 +568,7 @@ void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages)
     spin_unlock(&heap_lock);
 }
 
-static bool_t __read_mostly first_node_initialised;
+static bool __read_mostly first_node_initialised;
 #ifndef CONFIG_SEPARATE_XENHEAP
 static unsigned int __read_mostly xenheap_bits;
 #else
@@ -576,7 +576,7 @@ static unsigned int __read_mostly xenheap_bits;
 #endif
 
 static unsigned long init_node_heap(int node, unsigned long mfn,
-                                    unsigned long nr, bool_t *use_tail)
+                                    unsigned long nr, bool *use_tail)
 {
     /* First node to be discovered has its heap metadata statically alloced. */
     static heap_by_zone_and_order_t _heap_static;
@@ -590,7 +590,7 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     {
         _heap[node] = &_heap_static;
         avail[node] = avail_static;
-        first_node_initialised = 1;
+        first_node_initialised = true;
         needed = 0;
     }
     else if ( *use_tail && nr >= needed &&
@@ -610,7 +610,7 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
         _heap[node] = mfn_to_virt(mfn);
         avail[node] = mfn_to_virt(mfn + needed - 1) +
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
-        *use_tail = 0;
+        *use_tail = false;
     }
     else if ( get_order_from_bytes(sizeof(**_heap)) ==
               get_order_from_pages(needed) )
@@ -661,7 +661,7 @@ static void __init setup_low_mem_virq(void)
 {
     unsigned int order;
     paddr_t threshold;
-    bool_t halve;
+    bool halve;
 
     /* If the user specifies zero, then he/she doesn't want this virq
      * to ever trigger. */
@@ -849,8 +849,8 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
     first_node = node;
 
     /*
-     * Start with requested node, but exhaust all node memory in requested 
-     * zone before failing, only calc new node value if we fail to find memory 
+     * Start with requested node, but exhaust all node memory in requested
+     * zone before failing, only calc new node value if we fail to find memory
      * in target node, this avoids needless computation on fast-path.
      */
     for ( ; ; )
@@ -1268,11 +1268,11 @@ bool scrub_free_pages(void)
     bool preempt = false;
     nodeid_t node;
     unsigned int cnt = 0;
-  
+
     node = node_to_scrub(true);
     if ( node == NUMA_NO_NODE )
         return false;
- 
+
     spin_lock(&heap_lock);
 
     for ( zone = 0; zone < NR_ZONES; zone++ )
@@ -1319,7 +1319,7 @@ bool scrub_free_pages(void)
                         /* Someone wants this chunk. Drop everything. */
 
                         pg->u.free.first_dirty = (i == (1U << order) - 1) ?
-                            INVALID_DIRTY_IDX : i + 1; 
+                            INVALID_DIRTY_IDX : i + 1;
                         smp_wmb();
                         pg->u.free.scrub_state = BUDDY_NOT_SCRUBBING;
 
@@ -1791,9 +1791,9 @@ static void init_heap_pages(
         {
             unsigned long s = mfn_x(page_to_mfn(pg + i));
             unsigned long e = mfn_x(mfn_add(page_to_mfn(pg + nr_pages - 1), 1));
-            bool_t use_tail = (nid == phys_to_nid(pfn_to_paddr(e - 1))) &&
-                              !(s & ((1UL << MAX_ORDER) - 1)) &&
-                              (find_first_set_bit(e) <= find_first_set_bit(s));
+            bool use_tail = (nid == phys_to_nid(pfn_to_paddr(e - 1))) &&
+                            !(s & ((1UL << MAX_ORDER) - 1)) &&
+                            (find_first_set_bit(e) <= find_first_set_bit(s));
             unsigned long n;
 
             n = init_node_heap(nid, mfn_x(page_to_mfn(pg + i)), nr_pages - i,
@@ -2162,7 +2162,7 @@ void free_xenheap_pages(void *v, unsigned int order)
     free_heap_pages(virt_to_page(v), order, false);
 }
 
-#else
+#else  /* !CONFIG_SEPARATE_XENHEAP */
 
 void __init xenheap_max_mfn(unsigned long mfn)
 {
@@ -2218,7 +2218,7 @@ void free_xenheap_pages(void *v, unsigned int order)
     free_heap_pages(pg, order, true);
 }
 
-#endif
+#endif  /* CONFIG_SEPARATE_XENHEAP */
 
 
 
@@ -2330,7 +2330,7 @@ struct page_info *alloc_domheap_pages(
         free_heap_pages(pg, order, memflags & MEMF_no_scrub);
         return NULL;
     }
-    
+
     return pg;
 }
 
@@ -2338,7 +2338,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 {
     struct domain *d = page_get_owner(pg);
     unsigned int i;
-    bool_t drop_dom_ref;
+    bool drop_dom_ref;
 
     ASSERT(!in_irq());
 
@@ -2357,7 +2357,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
     }
     else
     {
-        bool_t scrub;
+        bool scrub;
 
         if ( likely(d) && likely(d != dom_cow) )
         {
@@ -2391,7 +2391,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
              * check here, don't check d != dom_cow for now.
              */
             ASSERT(!d || !order);
-            drop_dom_ref = 0;
+            drop_dom_ref = false;
             scrub = 1;
         }
 
