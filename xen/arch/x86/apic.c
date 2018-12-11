@@ -1408,15 +1408,13 @@ void spurious_interrupt(struct cpu_user_regs *regs)
         if (this_cpu(state_dump_pending)) {
             this_cpu(state_dump_pending) = false;
             dump_execstate(regs);
-            goto out;
+            return;
         }
     }
 
     /* see sw-dev-man vol 3, chapter 7.4.13.5 */
     printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should "
            "never happen.\n", smp_processor_id());
-
-out: ;
 }
 
 /*
