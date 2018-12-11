@@ -771,13 +771,12 @@ static void page_list_add_scrub(struct page_info *pg, unsigned int node,
 static void poison_one_page(struct page_info *pg)
 {
 #ifdef CONFIG_SCRUB_DEBUG
-    mfn_t mfn = page_to_mfn(pg);
     uint64_t *ptr;
 
     if ( !scrub_debug )
         return;
 
-    ptr = map_domain_page(mfn);
+    ptr = __map_domain_page(pg);
     *ptr = ~SCRUB_PATTERN;
     unmap_domain_page(ptr);
 #endif
@@ -786,14 +785,13 @@ static void poison_one_page(struct page_info *pg)
 static void check_one_page(struct page_info *pg)
 {
 #ifdef CONFIG_SCRUB_DEBUG
-    mfn_t mfn = page_to_mfn(pg);
     const uint64_t *ptr;
     unsigned int i;
 
     if ( !scrub_debug )
         return;
 
-    ptr = map_domain_page(mfn);
+    ptr = __map_domain_page(pg);
     for ( i = 0; i < PAGE_SIZE / sizeof (*ptr); i++ )
         BUG_ON(ptr[i] != SCRUB_PATTERN);
     unmap_domain_page(ptr);
