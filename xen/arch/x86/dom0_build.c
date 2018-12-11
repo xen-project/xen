@@ -20,17 +20,42 @@
 #include <asm/p2m.h>
 #include <asm/setup.h>
 
-static long __initdata dom0_nrpages;
-static long __initdata dom0_min_nrpages;
-static long __initdata dom0_max_nrpages = LONG_MAX;
+struct memsize {
+    long nr_pages;
+    unsigned int percent;
+    bool minus;
+};
+
+static struct memsize __initdata dom0_size;
+static struct memsize __initdata dom0_min_size;
+static struct memsize __initdata dom0_max_size = { .nr_pages = LONG_MAX };
+
+static bool __init memsize_gt_zero(const struct memsize *sz)
+{
+    return !sz->minus && sz->nr_pages;
+}
+
+static unsigned long __init get_memsize(const struct memsize *sz,
+                                        unsigned long avail)
+{
+    unsigned long pages;
+
+    pages = sz->nr_pages + sz->percent * avail / 100;
+    return sz->minus ? avail - pages : pages;
+}
 
 /*
  * dom0_mem=[min:<min_amt>,][max:<max_amt>,][<amt>]
- * 
+ *
  * <min_amt>: The minimum amount of memory which should be allocated for dom0.
  * <max_amt>: The maximum amount of memory which should be allocated for dom0.
  * <amt>:     The precise amount of memory to allocate for dom0.
- * 
+ *
+ * The format of <min_amt>, <max_amt> and <amt> is as follows:
+ * <size> | <frac>% | <size>+<frac>%
+ * <size> is a size value like 1G (1 GByte), <frac> is percentage of host
+ * memory (so 1G+10% means 10 percent of host memory + 1 GByte).
+ *
  * Notes:
  *  1. <amt> is clamped from below by <min_amt> and from above by available
  *     memory and <max_amt>
@@ -39,19 +64,59 @@ static long __initdata dom0_max_nrpages = LONG_MAX;
  *  4. If <amt> is not specified, it is calculated as follows:
  *     "All of memory is allocated to domain 0, minus 1/16th which is reserved
  *      for uses such as DMA buffers (the reservation is clamped to 128MB)."
- * 
+ *
  * Each value can be specified as positive or negative:
  *  If +ve: The specified amount is an absolute value.
  *  If -ve: The specified amount is subtracted from total available memory.
  */
-static long __init parse_amt(const char *s, const char **ps)
+static int __init parse_amt(const char *s, const char **ps, struct memsize *sz)
 {
-    long pages = parse_size_and_unit((*s == '-') ? s+1 : s, ps) >> PAGE_SHIFT;
-    return (*s == '-') ? -pages : pages;
+    unsigned long val;
+    struct memsize tmp = { };
+    unsigned int items = 0;
+
+    tmp.minus = (*s == '-');
+    if ( tmp.minus )
+        s++;
+
+    do
+    {
+        if ( !isdigit(*s) )
+            return -EINVAL;
+
+        val = parse_size_and_unit(s, ps);
+        s = *ps;
+        if ( *s == '%' )
+        {
+            if ( val >= 100 )
+                return -EINVAL;
+            tmp.percent = val;
+            s++;
+            items++; /* No other item allowed. */
+        }
+        else
+        {
+            /* <size> item must be first one. */
+            if ( items )
+                return -EINVAL;
+            tmp.nr_pages = val >> PAGE_SHIFT;
+        }
+        items++;
+    } while ( *s++ == '+' && items < 2 );
+
+    *ps = --s;
+    if ( *s && *s != ',' )
+        return -EINVAL;
+
+    *sz = tmp;
+
+    return 0;
 }
 
 static int __init parse_dom0_mem(const char *s)
 {
+    int ret;
+
     /* xen-shim uses shim_mem parameter instead of dom0_mem */
     if ( pv_shim )
     {
@@ -61,14 +126,14 @@ static int __init parse_dom0_mem(const char *s)
 
     do {
         if ( !strncmp(s, "min:", 4) )
-            dom0_min_nrpages = parse_amt(s+4, &s);
+            ret = parse_amt(s + 4, &s, &dom0_min_size);
         else if ( !strncmp(s, "max:", 4) )
-            dom0_max_nrpages = parse_amt(s+4, &s);
+            ret = parse_amt(s + 4, &s, &dom0_max_size);
         else
-            dom0_nrpages = parse_amt(s, &s);
-    } while ( *s++ == ',' );
+            ret = parse_amt(s, &s, &dom0_size);
+    } while ( *s++ == ',' && !ret );
 
-    return s[-1] ? -EINVAL : 0;
+    return s[-1] ? -EINVAL : ret;
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
@@ -298,9 +363,9 @@ unsigned long __init dom0_compute_nr_pages(
         (!iommu_hap_pt_share || !paging_mode_hap(d));
     for ( ; ; need_paging = false )
     {
-        nr_pages = dom0_nrpages;
-        min_pages = dom0_min_nrpages;
-        max_pages = dom0_max_nrpages;
+        nr_pages = get_memsize(&dom0_size, avail);
+        min_pages = get_memsize(&dom0_min_size, avail);
+        max_pages = get_memsize(&dom0_max_size, avail);
 
         /*
          * If allocation isn't specified, reserve 1/16th of available memory
@@ -308,13 +373,8 @@ unsigned long __init dom0_compute_nr_pages(
          * maximum of 128MB.
          */
         if ( !nr_pages )
-            nr_pages = -(pv_shim ? pv_shim_mem(avail)
+            nr_pages = avail - (pv_shim ? pv_shim_mem(avail)
                                  : min(avail / 16, 128UL << (20 - PAGE_SHIFT)));
-
-        /* Negative specification means "all memory - specified amount". */
-        if ( (long)nr_pages  < 0 ) nr_pages  += avail;
-        if ( (long)min_pages < 0 ) min_pages += avail;
-        if ( (long)max_pages < 0 ) max_pages += avail;
 
         /* Clamp according to min/max limits and available memory. */
         nr_pages = max(nr_pages, min_pages);
@@ -329,8 +389,8 @@ unsigned long __init dom0_compute_nr_pages(
     }
 
     if ( is_pv_domain(d) &&
-         (parms->p2m_base == UNSET_ADDR) && (dom0_nrpages <= 0) &&
-         ((dom0_min_nrpages <= 0) || (nr_pages > min_pages)) )
+         (parms->p2m_base == UNSET_ADDR) && !memsize_gt_zero(&dom0_size) &&
+         (!memsize_gt_zero(&dom0_min_size) || (nr_pages > min_pages)) )
     {
         /*
          * Legacy Linux kernels (i.e. such without a XEN_ELFNOTE_INIT_P2M
@@ -356,7 +416,7 @@ unsigned long __init dom0_compute_nr_pages(
         {
             end = sizeof_long >= sizeof(end) ? 0 : 1UL << (8 * sizeof_long);
             nr_pages = (end - vend) / (2 * sizeof_long);
-            if ( dom0_min_nrpages > 0 && nr_pages < min_pages )
+            if ( memsize_gt_zero(&dom0_min_size) && nr_pages < min_pages )
                 nr_pages = min_pages;
             printk("Dom0 memory clipped to %lu pages\n", nr_pages);
         }

@@ -727,17 +727,17 @@ Set the amount of memory for the initial domain (dom0). It must be
 greater than zero. This parameter is required.
 
 ### dom0\_mem (x86)
-> `= List of ( min:<size> | max:<size> | <size> )`
+> `= List of ( min:<sz> | max:<sz> | <sz> )`
 
 Set the amount of memory for the initial domain (dom0). If a size is
 positive, it represents an absolute value.  If a size is negative, it
 is subtracted from the total available memory.
 
-* `<size>` specifies the exact amount of memory.
-* `min:<size>` specifies the minimum amount of memory.
-* `max:<size>` specifies the maximum amount of memory.
+* `<sz>` specifies the exact amount of memory.
+* `min:<sz>` specifies the minimum amount of memory.
+* `max:<sz>` specifies the maximum amount of memory.
 
-If `<size>` is not specified, the default is all the available memory
+If `<sz>` is not specified, the default is all the available memory
 minus some reserve.  The reserve is 1/16 of the available memory or
 128 MB (whichever is smaller).
 
@@ -745,12 +745,19 @@ The amount of memory will be at least the minimum but never more than
 the maximum (i.e., `max` overrides the `min` option).  If there isn't
 enough memory then as much as possible is allocated.
 
-`max:<size>` also sets the maximum reservation (the maximum amount of
+`max:<sz>` also sets the maximum reservation (the maximum amount of
 memory dom0 can balloon up to).  If this is omitted then the maximum
 reservation is unlimited.
 
 For example, to set dom0's initial memory allocation to 512MB but
 allow it to balloon up as far as 1GB use `dom0_mem=512M,max:1G`
+
+> `<sz>` is: `<size> | [<size>+]<frac>%`
+> `<frac>` is an integer < 100
+
+* `<frac>` specifies a fraction of host memory size in percent.
+
+So `<sz>` being `1G+25%` on a 256 GB host would result in 65 GB.
 
 If you use this option then it is highly recommended that you disable
 any dom0 autoballooning feature present in your toolstack. See the
