@@ -771,28 +771,31 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
  */
 
 /* Event callbacks, in this order: */
-static void domcreate_devmodel_started(libxl__egc *egc,
-                                       libxl__dm_spawn_state *dmss,
-                                       int rc);
 static void domcreate_bootloader_console_available(libxl__egc *egc,
                                                    libxl__bootloader_state *bl);
-static void domcreate_bootloader_done(libxl__egc *egc,
-                                      libxl__bootloader_state *bl,
-                                      int rc);
-
-static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *aodevs,
-                                int ret);
-
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
 
+static void domcreate_bootloader_done(libxl__egc *egc,
+                                      libxl__bootloader_state *bl,
+                                      int rc);
+static void libxl__colo_restore_setup_done(libxl__egc *egc,
+                                           libxl__colo_restore_state *crs,
+                                           int rc);
 static void domcreate_stream_done(libxl__egc *egc,
                                   libxl__stream_read_state *srs,
                                   int ret);
-
 static void domcreate_rebuild_done(libxl__egc *egc,
                                    libxl__domain_create_state *dcs,
                                    int ret);
+static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *aodevs,
+                                int ret);
+static void domcreate_devmodel_started(libxl__egc *egc,
+                                       libxl__dm_spawn_state *dmss,
+                                       int rc);
+static void domcreate_attach_devices(libxl__egc *egc,
+                                     libxl__multidev *multidev,
+                                     int ret);
 
 /* Our own function to clean up and call the user's callback.
  * The final call in the sequence. */
@@ -1031,23 +1034,6 @@ static void domcreate_console_available(libxl__egc *egc,
                                         dcs->aop_console_how.for_event));
 }
 
-static void libxl__colo_restore_setup_done(libxl__egc *egc,
-                                           libxl__colo_restore_state *crs,
-                                           int rc)
-{
-    libxl__domain_create_state *dcs = CONTAINER_OF(crs, *dcs, crs);
-
-    EGC_GC;
-
-    if (rc) {
-        LOGD(ERROR, dcs->guest_domid, "colo restore setup fails: %d", rc);
-        domcreate_stream_done(egc, &dcs->srs, rc);
-        return;
-    }
-
-    libxl__stream_read_start(egc, &dcs->srs);
-}
-
 static void domcreate_bootloader_done(libxl__egc *egc,
                                       libxl__bootloader_state *bl,
                                       int rc)
@@ -1143,6 +1129,23 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 
  out:
     domcreate_stream_done(egc, &dcs->srs, rc);
+}
+
+static void libxl__colo_restore_setup_done(libxl__egc *egc,
+                                           libxl__colo_restore_state *crs,
+                                           int rc)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(crs, *dcs, crs);
+
+    EGC_GC;
+
+    if (rc) {
+        LOGD(ERROR, dcs->guest_domid, "colo restore setup fails: %d", rc);
+        domcreate_stream_done(egc, &dcs->srs, rc);
+        return;
+    }
+
+    libxl__stream_read_start(egc, &dcs->srs);
 }
 
 void libxl__srm_callout_callback_restore_results(xen_pfn_t store_mfn,
@@ -1509,6 +1512,38 @@ const struct libxl_device_type *device_type_tbl[] = {
     NULL
 };
 
+static void domcreate_devmodel_started(libxl__egc *egc,
+                                       libxl__dm_spawn_state *dmss,
+                                       int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(dmss, *dcs, sdss.dm);
+    STATE_AO_GC(dmss->spawn.ao);
+    int domid = dcs->guest_domid;
+
+    /* convenience aliases */
+    libxl_domain_config *const d_config = dcs->guest_config;
+
+    if (ret) {
+        LOGD(ERROR, domid, "device model did not start: %d", ret);
+        goto error_out;
+    }
+
+    if (dcs->sdss.dm.guest_domid) {
+        if (d_config->b_info.device_model_version
+            == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+            libxl__qmp_initializations(gc, domid, d_config);
+        }
+    }
+
+    dcs->device_type_idx = -1;
+    domcreate_attach_devices(egc, &dcs->multidev, 0);
+    return;
+
+error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
 static void domcreate_attach_devices(libxl__egc *egc,
                                      libxl__multidev *multidev,
                                      int ret)
@@ -1545,38 +1580,6 @@ static void domcreate_attach_devices(libxl__egc *egc,
 
     domcreate_complete(egc, dcs, 0);
 
-    return;
-
-error_out:
-    assert(ret);
-    domcreate_complete(egc, dcs, ret);
-}
-
-static void domcreate_devmodel_started(libxl__egc *egc,
-                                       libxl__dm_spawn_state *dmss,
-                                       int ret)
-{
-    libxl__domain_create_state *dcs = CONTAINER_OF(dmss, *dcs, sdss.dm);
-    STATE_AO_GC(dmss->spawn.ao);
-    int domid = dcs->guest_domid;
-
-    /* convenience aliases */
-    libxl_domain_config *const d_config = dcs->guest_config;
-
-    if (ret) {
-        LOGD(ERROR, domid, "device model did not start: %d", ret);
-        goto error_out;
-    }
-
-    if (dcs->sdss.dm.guest_domid) {
-        if (d_config->b_info.device_model_version
-            == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-            libxl__qmp_initializations(gc, domid, d_config);
-        }
-    }
-
-    dcs->device_type_idx = -1;
-    domcreate_attach_devices(egc, &dcs->multidev, 0);
     return;
 
 error_out:
