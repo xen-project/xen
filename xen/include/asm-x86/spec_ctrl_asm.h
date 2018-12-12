@@ -245,12 +245,16 @@
 /* Use when exiting to PV guest context. */
 #define SPEC_CTRL_EXIT_TO_PV                                            \
     ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV
+        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_PV;              \
+    ALTERNATIVE "", __stringify(verw CPUINFO_verw_sel(%rsp)),           \
+        X86_FEATURE_SC_VERW_PV
 
 /* Use when exiting to HVM guest context. */
 #define SPEC_CTRL_EXIT_TO_HVM                                           \
     ALTERNATIVE "",                                                     \
-        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_HVM
+        DO_SPEC_CTRL_EXIT_TO_GUEST, X86_FEATURE_SC_MSR_HVM;             \
+    ALTERNATIVE "", __stringify(verw CPUINFO_verw_sel(%rsp)),           \
+        X86_FEATURE_SC_VERW_HVM
 
 /*
  * Use in IST interrupt/exception context.  May interrupt Xen or PV context.
