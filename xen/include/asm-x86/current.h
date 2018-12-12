@@ -39,6 +39,7 @@ struct vcpu;
 struct cpu_info {
     struct cpu_user_regs guest_cpu_user_regs;
     unsigned int processor_id;
+    unsigned int verw_sel;
     struct vcpu *current_vcpu;
     unsigned long per_cpu_offset;
     unsigned long cr4;
