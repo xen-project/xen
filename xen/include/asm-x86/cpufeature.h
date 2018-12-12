@@ -36,6 +36,9 @@
 #define X86_FEATURE_SC_RSB_HVM		((FSCAPINTS+0)*32+ 17) /* RSB overwrite needed for HVM */
 #define X86_FEATURE_NO_XPTI		((FSCAPINTS+0)*32+ 18) /* XPTI mitigation not in use */
 #define X86_FEATURE_SC_MSR_IDLE		((FSCAPINTS+0)*32+ 19) /* (SC_MSR_PV || SC_MSR_HVM) && default_xen_spec_ctrl */
+#define X86_FEATURE_SC_VERW_PV		((FSCAPINTS+0)*32+ 20) /* VERW used by Xen for PV */
+#define X86_FEATURE_SC_VERW_HVM		((FSCAPINTS+0)*32+ 21) /* VERW used by Xen for HVM */
+#define X86_FEATURE_SC_VERW_IDLE	((FSCAPINTS+0)*32+ 22) /* VERW used by Xen for idle */
 
 #define cpufeat_word(idx)	((idx) / 32)
 #define cpufeat_bit(idx)	((idx) % 32)
