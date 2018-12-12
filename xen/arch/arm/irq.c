@@ -209,12 +209,14 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
     spin_lock(&desc->lock);
     desc->handler->ack(desc);
 
+#ifndef NDEBUG
     if ( !desc->action )
     {
         printk("Unknown %s %#3.3x\n",
                is_fiq ? "FIQ" : "IRQ", irq);
         goto out;
     }
+#endif
 
     if ( test_bit(_IRQ_GUEST, &desc->status) )
     {
