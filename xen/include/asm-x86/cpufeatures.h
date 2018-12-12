@@ -35,3 +35,6 @@ XEN_CPUFEATURE(SC_RSB_HVM,      (FSCAPINTS+0)*32+21) /* RSB overwrite needed for
 XEN_CPUFEATURE(NO_XPTI,         (FSCAPINTS+0)*32+22) /* XPTI mitigation not in use */
 XEN_CPUFEATURE(SC_MSR_IDLE,     (FSCAPINTS+0)*32+23) /* (SC_MSR_PV || SC_MSR_HVM) && default_xen_spec_ctrl */
 XEN_CPUFEATURE(XEN_LBR,         (FSCAPINTS+0)*32+24) /* Xen uses MSR_DEBUGCTL.LBR */
+XEN_CPUFEATURE(SC_VERW_PV,      (FSCAPINTS+0)*32+25) /* VERW used by Xen for PV */
+XEN_CPUFEATURE(SC_VERW_HVM,     (FSCAPINTS+0)*32+26) /* VERW used by Xen for HVM */
+XEN_CPUFEATURE(SC_VERW_IDLE,    (FSCAPINTS+0)*32+27) /* VERW used by Xen for idle */
