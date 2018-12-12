@@ -216,7 +216,9 @@ static void gic_update_one_lr(struct vcpu *v, int i)
     }
     else
     {
+#ifndef NDEBUG
         gic_hw_ops->clear_lr(i);
+#endif
         clear_bit(i, &this_cpu(lr_mask));
 
         if ( p->desc != NULL )
