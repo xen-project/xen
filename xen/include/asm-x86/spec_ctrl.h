@@ -61,6 +61,13 @@ static inline void init_shadow_spec_ctrl_state(void)
     info->shadow_spec_ctrl = 0;
     info->xen_spec_ctrl = default_xen_spec_ctrl;
     info->spec_ctrl_flags = default_spec_ctrl_flags;
+
+    /*
+     * For least latency, the VERW selector should be a writeable data
+     * descriptor resident in the cache.  __HYPERVISOR_DS32 shares a cache
+     * line with __HYPERVISOR_CS, so is expected to be very cache-hot.
+     */
+    info->verw_sel = __HYPERVISOR_DS32;
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe after this call. */
@@ -81,6 +88,22 @@ static always_inline void spec_ctrl_enter_idle(struct cpu_info *info)
     alternative_input("", "wrmsr", X86_FEATURE_SC_MSR_IDLE,
                       "a" (val), "c" (MSR_SPEC_CTRL), "d" (0));
     barrier();
+
+    /*
+     * Microarchitectural Store Buffer Data Sampling:
+     *
+     * On vulnerable systems, store buffer entries are statically partitioned
+     * between active threads.  When entering idle, our store buffer entries
+     * are re-partitioned to allow the other threads to use them.
+     *
+     * Flush the buffers to ensure that no sensitive data of ours can be
+     * leaked by a sibling after it gets our store buffer entries.
+     *
+     * Note: VERW must be encoded with a memory operand, as it is only that
+     * form which causes a flush.
+     */
+    alternative_input("", "verw %[sel]", X86_FEATURE_SC_VERW_IDLE,
+                      [sel] "m" (info->verw_sel));
 }
 
 /* WARNING! `ret`, `call *`, `jmp *` not safe before this call. */
@@ -99,6 +122,17 @@ static always_inline void spec_ctrl_exit_idle(struct cpu_info *info)
     alternative_input("", "wrmsr", X86_FEATURE_SC_MSR_IDLE,
                       "a" (val), "c" (MSR_SPEC_CTRL), "d" (0));
     barrier();
+
+    /*
+     * Microarchitectural Store Buffer Data Sampling:
+     *
+     * On vulnerable systems, store buffer entries are statically partitioned
+     * between active threads.  When exiting idle, the other threads store
+     * buffer entries are re-partitioned to give us some.
+     *
+     * We now have store buffer entries with stale data from sibling threads.
+     * A flush if necessary will be performed on the return to guest path.
+     */
 }
 
 #endif /* __ASSEMBLY__ */
