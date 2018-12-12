@@ -439,6 +439,15 @@ void identify_cpu(struct cpuinfo_x86 *c)
 		if (test_bit(X86_FEATURE_SC_MSR_IDLE,
 			     boot_cpu_data.x86_capability))
 			__set_bit(X86_FEATURE_SC_MSR_IDLE, c->x86_capability);
+		if (test_bit(X86_FEATURE_SC_VERW_PV,
+			     boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_SC_VERW_PV, c->x86_capability);
+		if (test_bit(X86_FEATURE_SC_VERW_HVM,
+			     boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_SC_VERW_HVM, c->x86_capability);
+		if (test_bit(X86_FEATURE_SC_VERW_IDLE,
+			     boot_cpu_data.x86_capability))
+			__set_bit(X86_FEATURE_SC_VERW_IDLE, c->x86_capability);
 
 		/* AND the already accumulated flags with these */
 		for ( i = 0 ; i < NCAPINTS ; i++ )

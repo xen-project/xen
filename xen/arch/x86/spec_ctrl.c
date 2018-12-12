@@ -32,6 +32,8 @@ static bool_t __initdata opt_msr_sc_pv = 1;
 static bool_t __initdata opt_msr_sc_hvm = 1;
 static bool_t __initdata opt_rsb_pv = 1;
 static bool_t __initdata opt_rsb_hvm = 1;
+static int8_t __initdata opt_md_clear_pv = -1;
+static int8_t __initdata opt_md_clear_hvm = -1;
 
 /* Cmdline controls for Xen's speculative settings. */
 static enum ind_thunk {
@@ -55,6 +57,9 @@ uint8_t __read_mostly default_spec_ctrl_flags;
 paddr_t __read_mostly l1tf_addr_mask, __read_mostly l1tf_safe_maddr;
 static bool_t __initdata cpu_has_bug_l1tf;
 static unsigned int __initdata l1d_maxphysaddr;
+
+static bool_t __initdata cpu_has_bug_msbds_only; /* => minimal HT impact. */
+static bool_t __initdata cpu_has_bug_mds; /* Any other M{LP,SB,FB}DS combination. */
 
 static int __init parse_bti(const char *s)
 {
@@ -128,6 +133,8 @@ static int __init parse_spec_ctrl(char *s)
         disable_common:
             opt_rsb_pv = 0;
             opt_rsb_hvm = 0;
+            opt_md_clear_pv = 0;
+            opt_md_clear_hvm = 0;
 
             opt_thunk = THUNK_JMP;
             opt_ibrs = 0;
@@ -150,11 +157,13 @@ static int __init parse_spec_ctrl(char *s)
         {
             opt_msr_sc_pv = val;
             opt_rsb_pv = val;
+            opt_md_clear_pv = val;
         }
         else if ( (val = parse_boolean("hvm", s, ss)) >= 0 )
         {
             opt_msr_sc_hvm = val;
             opt_rsb_hvm = val;
+            opt_md_clear_hvm = val;
         }
         else if ( (val = parse_boolean("msr-sc", s, ss)) >= 0 )
         {
@@ -165,6 +174,12 @@ static int __init parse_spec_ctrl(char *s)
         {
             opt_rsb_pv = val;
             opt_rsb_hvm = val;
+        }
+        else if ( (val = parse_boolean("md-clear", s, ss)) >= 0 ||
+                  (val = parse_boolean("mds", s, ss)) >= 0 )
+        {
+            opt_md_clear_pv = val;
+            opt_md_clear_hvm = val;
         }
 
         /* Xen's speculative sidechannel mitigation settings. */
@@ -351,7 +366,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -361,7 +376,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            opt_ibpb                                  ? " IBPB"  : "",
-           opt_l1d_flush                             ? " L1D_FLUSH" : "");
+           opt_l1d_flush                             ? " L1D_FLUSH" : "",
+           opt_md_clear_pv || opt_md_clear_hvm       ? " VERW"  : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
     if ( cpu_has_bug_l1tf || opt_pv_l1tf )
@@ -744,6 +760,107 @@ static __init void l1tf_calculations(uint64_t caps)
                                             : (3ul << (paddr_bits - 2))));
 }
 
+/* Calculate whether this CPU is vulnerable to MDS. */
+static __init void mds_calculations(uint64_t caps)
+{
+    /* MDS is only known to affect Intel Family 6 processors at this time. */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return;
+
+    /* Any processor advertising MDS_NO should be not vulnerable to MDS. */
+    if ( caps & ARCH_CAPS_MDS_NO )
+        return;
+
+    switch ( boot_cpu_data.x86_model )
+    {
+        /*
+         * Core processors since at least Nehalem are vulnerable.
+         */
+    case 0x1f: /* Auburndale / Havendale */
+    case 0x1e: /* Nehalem */
+    case 0x1a: /* Nehalem EP */
+    case 0x2e: /* Nehalem EX */
+    case 0x25: /* Westmere */
+    case 0x2c: /* Westmere EP */
+    case 0x2f: /* Westmere EX */
+    case 0x2a: /* SandyBridge */
+    case 0x2d: /* SandyBridge EP/EX */
+    case 0x3a: /* IvyBridge */
+    case 0x3e: /* IvyBridge EP/EX */
+    case 0x3c: /* Haswell */
+    case 0x3f: /* Haswell EX/EP */
+    case 0x45: /* Haswell D */
+    case 0x46: /* Haswell H */
+    case 0x3d: /* Broadwell */
+    case 0x47: /* Broadwell H */
+    case 0x4f: /* Broadwell EP/EX */
+    case 0x56: /* Broadwell D */
+    case 0x4e: /* Skylake M */
+    case 0x5e: /* Skylake D */
+        cpu_has_bug_mds = 1;
+        break;
+
+        /*
+         * Some Core processors have per-stepping vulnerability.
+         */
+    case 0x55: /* Skylake-X / Cascade Lake */
+        if ( boot_cpu_data.x86_mask <= 5 )
+            cpu_has_bug_mds = 1;
+        break;
+
+    case 0x8e: /* Kaby / Coffee / Whiskey Lake M */
+        if ( boot_cpu_data.x86_mask <= 0xb )
+            cpu_has_bug_mds = 1;
+        break;
+
+    case 0x9e: /* Kaby / Coffee / Whiskey Lake D */
+        if ( boot_cpu_data.x86_mask <= 0xc )
+            cpu_has_bug_mds = 1;
+        break;
+
+        /*
+         * Very old and very new Atom processors are not vulnerable.
+         */
+    case 0x1c: /* Pineview */
+    case 0x26: /* Lincroft */
+    case 0x27: /* Penwell */
+    case 0x35: /* Cloverview */
+    case 0x36: /* Cedarview */
+    case 0x7a: /* Goldmont */
+        break;
+
+        /*
+         * Middling Atom processors are vulnerable to just the Store Buffer
+         * aspect.
+         */
+    case 0x37: /* Baytrail / Valleyview (Silvermont) */
+    case 0x4a: /* Merrifield */
+    case 0x4c: /* Cherrytrail / Brasswell */
+    case 0x4d: /* Avaton / Rangely (Silvermont) */
+    case 0x5a: /* Moorefield */
+    case 0x5d:
+    case 0x65:
+    case 0x6e:
+    case 0x75:
+        /*
+         * Knights processors (which are based on the Silvermont/Airmont
+         * microarchitecture) are similarly only affected by the Store Buffer
+         * aspect.
+         */
+    case 0x57: /* Knights Landing */
+    case 0x85: /* Knights Mill */
+        cpu_has_bug_msbds_only = 1;
+        break;
+
+    default:
+        printk("Unrecognised CPU model %#x - assuming vulnerable to MDS\n",
+               boot_cpu_data.x86_model);
+        cpu_has_bug_mds = 1;
+        break;
+    }
+}
+
 void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
@@ -937,6 +1054,50 @@ void __init init_speculation_mitigations(void)
         printk("Booted on L1TF-vulnerable hardware with SMT/Hyperthreading\n");
         printk("enabled.  Please assess your configuration and choose an\n");
         printk("explicit 'smt=<bool>' setting.  See XSA-273.\n");
+        printk("******************************************************\n");
+    }
+
+    mds_calculations(caps);
+
+    /*
+     * By default, enable PV and HVM mitigations on MDS-vulnerable hardware.
+     * This will only be a token effort for MLPDS/MFBDS when HT is enabled,
+     * but it is somewhat better than nothing.
+     */
+    if ( opt_md_clear_pv == -1 )
+        opt_md_clear_pv = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
+                           boot_cpu_has(X86_FEATURE_MD_CLEAR));
+    if ( opt_md_clear_hvm == -1 )
+        opt_md_clear_hvm = ((cpu_has_bug_mds || cpu_has_bug_msbds_only) &&
+                            boot_cpu_has(X86_FEATURE_MD_CLEAR));
+
+    /*
+     * Enable MDS defences as applicable.  The PV blocks need using all the
+     * time, and the Idle blocks need using if either PV or HVM defences are
+     * used.
+     *
+     * HVM is more complicated.  The MD_CLEAR microcode extends L1D_FLUSH with
+     * equivelent semantics to avoid needing to perform both flushes on the
+     * HVM path.  The HVM blocks don't need activating if our hypervisor told
+     * us it was handling L1D_FLUSH, or we are using L1D_FLUSH ourselves.
+     */
+    if ( opt_md_clear_pv )
+        __set_bit(X86_FEATURE_SC_VERW_PV, boot_cpu_data.x86_capability);
+    if ( opt_md_clear_pv || opt_md_clear_hvm )
+        __set_bit(X86_FEATURE_SC_VERW_IDLE, boot_cpu_data.x86_capability);
+    if ( opt_md_clear_hvm && !(caps & ARCH_CAPS_SKIP_L1DFL) && !opt_l1d_flush )
+        __set_bit(X86_FEATURE_SC_VERW_HVM, boot_cpu_data.x86_capability);
+
+    /*
+     * Warn the user if they are on MLPDS/MFBDS-vulnerable hardware with HT
+     * active and no explicit SMT choice.
+     */
+    if ( opt_smt == -1 && cpu_has_bug_mds && hw_smt_enabled )
+    {
+        printk("******************************************************\n");
+        printk("Booted on MLPDS/MFBDS-vulnerable hardware with SMT/Hyperthreading\n");
+        printk("enabled.  Mitigations will not be fully effective.  Please\n");
+        printk("choose an explicit smt=<bool> setting.  See XSA-297.\n");
         printk("******************************************************\n");
     }
 

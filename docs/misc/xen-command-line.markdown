@@ -1514,7 +1514,7 @@ is being interpreted as a custom timeout in milliseconds. Zero or boolean
 false disable the quirk workaround, which is also the default.
 
 ### spec-ctrl (x86)
-> `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb}=<bool>,
+> `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb,md-clear}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,eager-fpu,
 >              l1d-flush}=<bool> ]`
 
@@ -1538,9 +1538,10 @@ in place for guests to use.
 
 Use of a positive boolean value for either of these options is invalid.
 
-The booleans `pv=`, `hvm=`, `msr-sc=` and `rsb=` offer fine grained control
-over the alternative blocks used by Xen.  These impact Xen's ability to
-protect itself, and Xen's ability to virtualise support for guests to use.
+The booleans `pv=`, `hvm=`, `msr-sc=`, `rsb=` and `md-clear=` offer fine
+grained control over the alternative blocks used by Xen.  These impact Xen's
+ability to protect itself, and Xen's ability to virtualise support for guests
+to use.
 
 * `pv=` and `hvm=` offer control over all suboptions for PV and HVM guests
   respectively.
@@ -1549,6 +1550,11 @@ protect itself, and Xen's ability to virtualise support for guests to use.
   guests and if disabled, guests will be unable to use IBRS/STIBP/SSBD/etc.
 * `rsb=` offers control over whether to overwrite the Return Stack Buffer /
   Return Address Stack on entry to Xen.
+* `md-clear=` offers control over whether to use VERW to flush
+  microarchitectural buffers on idle and exit from Xen.  *Note: For
+  compatibility with development versions of this fix, `mds=` is also accepted
+  on Xen 4.12 and earlier as an alias.  Consult vendor documentation in
+  preference to here.*
 
 If Xen was compiled with INDIRECT\_THUNK support, `bti-thunk=` can be used to
 select which of the thunks gets patched into the `__x86_indirect_thunk_%reg`
