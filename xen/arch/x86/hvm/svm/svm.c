@@ -2244,8 +2244,8 @@ static void svm_do_msr_access(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     bool rdmsr = curr->arch.hvm.svm.vmcb->exitinfo1 == 0;
-    int rc, inst_len = __get_instruction_length(
-        curr, rdmsr ? INSTR_RDMSR : INSTR_WRMSR);
+    int rc, inst_len = svm_get_insn_len(curr, rdmsr ? INSTR_RDMSR
+                                                    : INSTR_WRMSR);
 
     if ( inst_len == 0 )
         return;
@@ -2272,7 +2272,7 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
 {
     unsigned int inst_len;
 
-    if ( (inst_len = __get_instruction_length(current, INSTR_HLT)) == 0 )
+    if ( (inst_len = svm_get_insn_len(current, INSTR_HLT)) == 0 )
         return;
     __update_guest_eip(regs, inst_len);
 
@@ -2283,7 +2283,6 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs, bool rdtscp)
 {
     struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
-    enum instruction_index insn = rdtscp ? INSTR_RDTSCP : INSTR_RDTSC;
     unsigned int inst_len;
 
     if ( rdtscp && !currd->arch.cpuid->extd.rdtscp )
@@ -2292,7 +2291,8 @@ static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs, bool rdtscp)
         return;
     }
 
-    if ( (inst_len = __get_instruction_length(curr, insn)) == 0 )
+    if ( (inst_len = svm_get_insn_len(curr, rdtscp ? INSTR_RDTSCP
+                                                   : INSTR_RDTSC)) == 0 )
         return;
 
     __update_guest_eip(regs, inst_len);
@@ -2307,7 +2307,7 @@ static void svm_vmexit_do_pause(struct cpu_user_regs *regs)
 {
     unsigned int inst_len;
 
-    if ( (inst_len = __get_instruction_length(current, INSTR_PAUSE)) == 0 )
+    if ( (inst_len = svm_get_insn_len(current, INSTR_PAUSE)) == 0 )
         return;
     __update_guest_eip(regs, inst_len);
 
@@ -2374,7 +2374,7 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     unsigned int inst_len;
     struct page_info *page;
 
-    if ( (inst_len = __get_instruction_length(v, INSTR_VMLOAD)) == 0 )
+    if ( (inst_len = svm_get_insn_len(v, INSTR_VMLOAD)) == 0 )
         return;
 
     if ( !nsvm_efer_svm_enabled(v) ) 
@@ -2409,7 +2409,7 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     unsigned int inst_len;
     struct page_info *page;
 
-    if ( (inst_len = __get_instruction_length(v, INSTR_VMSAVE)) == 0 )
+    if ( (inst_len = svm_get_insn_len(v, INSTR_VMSAVE)) == 0 )
         return;
 
     if ( !nsvm_efer_svm_enabled(v) ) 
@@ -2477,13 +2477,12 @@ static void svm_wbinvd_intercept(void)
         flush_all(FLUSH_CACHE);
 }
 
-static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
+static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs,
+                                           bool invld)
 {
-    static const enum instruction_index list[] = { INSTR_INVD, INSTR_WBINVD };
-    int inst_len;
+    unsigned int inst_len = svm_get_insn_len(current, invld ? INSTR_INVD
+                                                            : INSTR_WBINVD);
 
-    inst_len = __get_instruction_length_from_list(
-        current, list, ARRAY_SIZE(list));
     if ( inst_len == 0 )
         return;
 
@@ -2758,7 +2757,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             else
             {
                 trap_type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
-                inst_len = __get_instruction_length(v, INSTR_ICEBP);
+                inst_len = svm_get_insn_len(v, INSTR_ICEBP);
             }
 
             rc = hvm_monitor_debug(regs->rip,
@@ -2775,7 +2774,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_EXCEPTION_BP:
-        inst_len = __get_instruction_length(v, INSTR_INT3);
+        inst_len = svm_get_insn_len(v, INSTR_INT3);
 
         if ( inst_len == 0 )
              break;
@@ -2866,7 +2865,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_INVD:
     case VMEXIT_WBINVD:
-        svm_vmexit_do_invalidate_cache(regs);
+        svm_vmexit_do_invalidate_cache(regs, exit_reason == VMEXIT_INVD);
         break;
 
     case VMEXIT_TASK_SWITCH: {
@@ -2895,7 +2894,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_CPUID:
     {
-        unsigned int inst_len = __get_instruction_length(v, INSTR_CPUID);
+        unsigned int inst_len = svm_get_insn_len(v, INSTR_CPUID);
         int rc = 0;
 
         if ( inst_len == 0 )
@@ -2951,14 +2950,14 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
             break;
         }
-        if ( (inst_len = __get_instruction_length(v, INSTR_INVLPGA)) == 0 )
+        if ( (inst_len = svm_get_insn_len(v, INSTR_INVLPGA)) == 0 )
             break;
         svm_invlpga_intercept(v, regs->rax, regs->ecx);
         __update_guest_eip(regs, inst_len);
         break;
 
     case VMEXIT_VMMCALL:
-        if ( (inst_len = __get_instruction_length(v, INSTR_VMCALL)) == 0 )
+        if ( (inst_len = svm_get_insn_len(v, INSTR_VMCALL)) == 0 )
             break;
         BUG_ON(vcpu_guestmode);
         HVMTRACE_1D(VMMCALL, regs->eax);
@@ -3012,7 +3011,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_XSETBV:
         if ( vmcb_get_cpl(vmcb) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
-        else if ( (inst_len = __get_instruction_length(v, INSTR_XSETBV)) &&
+        else if ( (inst_len = svm_get_insn_len(v, INSTR_XSETBV)) &&
                   hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == X86EMUL_OKAY )
             __update_guest_eip(regs, inst_len);
         break;

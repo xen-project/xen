@@ -84,28 +84,30 @@ static const struct {
     [INSTR_CPUID]   = { X86EMUL_OPC(0x0f, 0xa2) },
 };
 
-int __get_instruction_length_from_list(struct vcpu *v,
-        const enum instruction_index *list, unsigned int list_count)
+/*
+ * Early processors with SVM didn't have the NextRIP feature, meaning that
+ * when we take a fault-style VMExit, we have to decode the instruction stream
+ * to calculate how many bytes to move %rip forwards by.
+ *
+ * In debug builds, always compare the hardware reported instruction length
+ * (if available) with the result from x86_decode_insn().
+ */
+unsigned int svm_get_insn_len(struct vcpu *v, enum instruction_index insn)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct hvm_emulate_ctxt ctxt;
     struct x86_emulate_state *state;
-    unsigned long inst_len, j;
+    unsigned long nrip_len, emul_len;
     unsigned int modrm_rm, modrm_reg;
     int modrm_mod;
 
-    /*
-     * In debug builds, always use x86_decode_insn() and compare with
-     * hardware.
-     */
-#ifdef NDEBUG
-    if ( (inst_len = svm_nextrip_insn_length(v)) > MAX_INST_LEN )
-        gprintk(XENLOG_WARNING, "NRip reported inst_len %lu\n", inst_len);
-    else if ( inst_len != 0 )
-        return inst_len;
+    nrip_len = svm_nextrip_insn_length(v);
 
-    if ( vmcb->exitcode == VMEXIT_IOIO )
-        return vmcb->exitinfo2 - vmcb->rip;
+#ifdef NDEBUG
+    if ( nrip_len > MAX_INST_LEN )
+        gprintk(XENLOG_WARNING, "NRip reported inst_len %lu\n", nrip_len);
+    else if ( nrip_len != 0 )
+        return nrip_len;
 #endif
 
     ASSERT(v == current);
@@ -115,41 +117,34 @@ int __get_instruction_length_from_list(struct vcpu *v,
     if ( IS_ERR_OR_NULL(state) )
         return 0;
 
-    inst_len = x86_insn_length(state, &ctxt.ctxt);
+    emul_len = x86_insn_length(state, &ctxt.ctxt);
     modrm_mod = x86_insn_modrm(state, &modrm_rm, &modrm_reg);
     x86_emulate_free_state(state);
+
 #ifndef NDEBUG
-    if ( vmcb->exitcode == VMEXIT_IOIO )
-        j = vmcb->exitinfo2 - vmcb->rip;
-    else
-        j = svm_nextrip_insn_length(v);
-    if ( j && j != inst_len )
+    if ( nrip_len && nrip_len != emul_len )
     {
         gprintk(XENLOG_WARNING, "insn-len[%02x]=%lu (exp %lu)\n",
-                ctxt.ctxt.opcode, inst_len, j);
-        return j;
+                ctxt.ctxt.opcode, nrip_len, emul_len);
+        return nrip_len;
     }
 #endif
 
-    for ( j = 0; j < list_count; j++ )
+    if ( insn >= ARRAY_SIZE(opc_tab) )
     {
-        unsigned int instr = list[j];
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
 
-        if ( instr >= ARRAY_SIZE(opc_tab) )
-        {
-            ASSERT_UNREACHABLE();
-            break;
-        }
-        if ( opc_tab[instr].opcode == ctxt.ctxt.opcode )
-        {
-            if ( !opc_tab[instr].modrm.mod )
-                return inst_len;
+    if ( opc_tab[insn].opcode == ctxt.ctxt.opcode )
+    {
+        if ( !opc_tab[insn].modrm.mod )
+            return emul_len;
 
-            if ( modrm_mod == opc_tab[instr].modrm.mod &&
-                 (modrm_rm & 7) == opc_tab[instr].modrm.rm &&
-                 (modrm_reg & 7) == opc_tab[instr].modrm.reg )
-                return inst_len;
-        }
+        if ( modrm_mod == opc_tab[insn].modrm.mod &&
+             (modrm_rm & 7) == opc_tab[insn].modrm.rm &&
+             (modrm_reg & 7) == opc_tab[insn].modrm.reg )
+            return emul_len;
     }
 
     gdprintk(XENLOG_WARNING,

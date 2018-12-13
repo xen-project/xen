@@ -743,8 +743,9 @@ nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
 
-    inst_len = __get_instruction_length(v, INSTR_VMRUN);
-    if (inst_len == 0) {
+    inst_len = svm_get_insn_len(v, INSTR_VMRUN);
+    if ( inst_len == 0 )
+    {
         svm->ns_vmexit.exitcode = VMEXIT_SHUTDOWN;
         return -1;
     }
@@ -1616,7 +1617,7 @@ void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
         return;
     }
 
-    if ( (inst_len = __get_instruction_length(v, INSTR_STGI)) == 0 )
+    if ( (inst_len = svm_get_insn_len(v, INSTR_STGI)) == 0 )
         return;
 
     nestedsvm_vcpu_stgi(v);
@@ -1637,7 +1638,7 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
         return;
     }
 
-    if ( (inst_len = __get_instruction_length(v, INSTR_CLGI)) == 0 )
+    if ( (inst_len = svm_get_insn_len(v, INSTR_CLGI)) == 0 )
         return;
 
     nestedsvm_vcpu_clgi(v);
