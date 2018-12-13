@@ -2439,7 +2439,7 @@ static PyMethodDef pyxc_methods[] = {
       "Set a domain's TSC mode\n"
       " dom        [int]: Domain whose TSC mode is being set.\n"
       " tsc_mode   [int]: 0=default (monotonic, but native where possible)\n"
-      "                   1=always emulate 2=never emulate 3=pvrdtscp\n"
+      "                   1=always emulate 2=never emulate\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_disable_migrate",

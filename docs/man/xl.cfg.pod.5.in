@@ -2099,14 +2099,7 @@ by h/w, else executed natively.
 
 =item B<native_paravirt>
 
-Same as B<native>, except Xen manages the TSC_AUX register so the guest can
-determine when a restore/migration has occurred and assumes guest
-obtains/uses a pvclock-like mechanism to adjust for monotonicity and
-frequency changes.
-
-If a HVM container in B<native_paravirt> TSC mode can execute both guest
-rdtsc and guest rdtscp natively, then the guest TSC frequency will be
-determined in a similar way to that of B<default> TSC mode.
+This mode has been removed.
 
 =back
 

@@ -77,9 +77,7 @@ highest performance is required.
 
 =item * B<tsc_mode=3> (PVRDTSCP).
 
-High-TSC-frequency apps may be paravirtualized (modified) to
-obtain both correctness and highest performance; any unmodified
-apps must be TSC-resilient.
+This mode has been removed.
 
 =back
 
@@ -215,30 +213,6 @@ is emulated.  Note that, though emulated, the "apparent" TSC frequency
 will be the TSC frequency of the initial physical machine, even after
 migration.
 
-For environments where both TSC-safeness AND highest performance
-even across migration is a requirement, application code can be specially
-modified to use an algorithm explicitly designed into Xen for this purpose.
-This mode (tsc_mode==3) is called PVRDTSCP, because it requires
-app paravirtualization (awareness by the app that it may be running
-on top of Xen), and utilizes a variation of the rdtsc instruction
-called rdtscp that is available on most recent generation processors.
-(The rdtscp instruction differs from the rdtsc instruction in that it
-reads not only the TSC but an additional register set by system software.)
-When a pvrdtscp-modified app is running on a processor that is both TSC-safe
-and supports the rdtscp instruction, information can be obtained
-about migration and TSC frequency/offset adjustment to allow the
-vast majority of timestamps to be obtained at top performance; when
-running on a TSC-unsafe processor or a processor that doesn't support
-the rdtscp instruction, rdtscp is emulated.
-
-PVRDTSCP (tsc_mode==3) has two limitations.  First, it applies to
-all apps running in this virtual machine.  This means that all
-apps must either be TSC-resilient or pvrdtscp-modified.  Second,
-highest performance is only obtained on TSC-safe machines that
-support the rdtscp instruction; when running on older machines,
-rdtscp is emulated and thus slower.  For more information on PVRDTSCP,
-see below.
-
 Finally, tsc_mode==1 always enables TSC emulation, regardless of
 the underlying physical hardware. The "apparent" TSC frequency will
 be the TSC frequency of the initial physical machine, even after migration.
@@ -287,56 +261,7 @@ have been replaced by a paravirtualized equivalent of the cpuid instruction
 ("pvcpuid") and also trap to Xen.  But apps in a PV guest that use a
 cpuid instruction execute it directly, without a trap to Xen.  As a result,
 an app may directly examine the physical TSC Invariant cpuid bit and make
-decisions based on that bit.  This is still an unsolved problem, though
-a workaround exists as part of the PVRDTSCP tsc_mode for apps that
-can be modified.
-
-=head1 MORE ON PVRDTSCP
-
-Paravirtualized OS's use the "pvclock" algorithm to manage the passing
-of time.  This sophisticated algorithm obtains information from a memory
-page shared between Xen and the OS and selects information from this
-page based on the current virtual CPU (vcpu) in order to properly adapt to
-TSC-unsafe systems and changes that occur across migration.  Neither
-this shared page nor the vcpu information is available to a userland
-app so the pvclock algorithm cannot be directly used by an app, at least
-without performance degradation roughly equal to the cost of just
-emulating an rdtsc.
-
-As a result, as of 4.0, Xen provides capabilities for a userland app
-to obtain key time values similar to the information accessible
-to the PV OS pvclock algorithm.  The app uses the rdtscp instruction
-which is defined in recent processors to obtain both the TSC and an
-auxiliary value called TSC_AUX.  Xen is responsible for setting TSC_AUX
-to the same value on all vcpus running any domain with tsc_mode==3;
-further, Xen tools are responsible for monotonically incrementing TSC_AUX
-anytime the domain is restored/migrated (thus changing key time values);
-and, when the domain is running on a physical machine that either
-is not TSC-safe or does not support the rdtscp instruction, Xen
-is responsible for emulating the rdtscp instruction and for setting
-TSC_AUX to zero on all processors.
-
-Xen also provides pvclock information via a "pvcpuid" instruction.
-While this results in a slow trap, the information changes
-(and thus must be reobtained via pvcpuid) ONLY when TSC_AUX
-has changed, which should be very rare relative to a high
-frequency of rdtscp instructions.
-
-Finally, Xen provides additional time-related information via
-other pvcpuid instructions.  First, an app is capable of
-determining if it is currently running on Xen, next whether
-the tsc_mode setting of the domain in which it is running,
-and finally whether the underlying hardware is TSC-safe and
-supports the rdtscp instruction.
-
-As a result, a pvrdtscp-modified app has sufficient information
-to compute the pvclock "elapsed nanoseconds" which can
-be used as a timestamp.  And this can be done nearly as
-fast as a native rdtsc instruction, much faster than emulation,
-and also much faster than nearly all OS-provided time mechanisms.
-While pvrtscp is too complex for most apps, certain enterprise
-TSC-sensitive high-TSC-frequency apps may find it useful to
-obtain a significant performance gain.
+decisions based on that bit.
 
 =head1 HARDWARE TSC SCALING
 
@@ -344,20 +269,15 @@ Intel VMX TSC scaling and AMD SVM TSC ratio allow the guest TSC read
 by guest rdtsc/p increasing in a different frequency than the host
 TSC frequency.
 
-If a HVM container in default TSC mode (tsc_mode=0) or PVRDTSCP mode
-(tsc_mode=3) is created on a host that provides constant TSC, its
-guest TSC frequency will be the same as the host. If it is later
-migrated to another host that provides constant TSC and supports Intel
-VMX TSC scaling/AMD SVM TSC ratio, its guest TSC frequency will be the
-same before and after migration.
+If a HVM container in default TSC mode (tsc_mode=0) is created on a host
+that provides constant TSC, its guest TSC frequency will be the same as
+the host. If it is later migrated to another host that provides constant
+TSC and supports Intel VMX TSC scaling/AMD SVM TSC ratio, its guest TSC
+frequency will be the same before and after migration.
 
 For above HVM container in default TSC mode (tsc_mode=0), if above
 hosts support rdtscp, both guest rdtsc and rdtscp instructions will be
 executed natively before and after migration.
-
-For above HVM container in PVRDTSCP mode (tsc_mode=3), if the
-destination host does not support rdtscp, the guest rdtscp instruction
-will be emulated with the guest TSC frequency.
 
 =head1 AUTHORS
 

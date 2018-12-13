@@ -309,12 +309,19 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         tsc_mode = 2;
         break;
     case LIBXL_TSC_MODE_NATIVE_PARAVIRT:
-        tsc_mode = 3;
-        break;
+        LOGD(ERROR, domid, "TSC Mode native_paravirt (a.k.a PVRDTSCP) has been removed");
+        ret = ERROR_FEATURE_REMOVED;
+        goto out;
     default:
         abort();
     }
-    xc_domain_set_tsc_info(ctx->xch, domid, tsc_mode, 0, 0, 0);
+
+    if (xc_domain_set_tsc_info(ctx->xch, domid, tsc_mode, 0, 0, 0)) {
+        LOGE(ERROR, "xc_domain_set_tsc_info() failed");
+        ret = ERROR_FAIL;
+        goto out;
+    }
+
     if (libxl_defbool_val(d_config->b_info.disable_migrate))
         xc_domain_disable_migrate(ctx->xch, domid);
     rtc_timeoffset = d_config->b_info.rtc_timeoffset;
