@@ -54,36 +54,6 @@ static unsigned long svm_nextrip_insn_length(struct vcpu *v)
     return vmcb->nextrip - vmcb->rip;
 }
 
-static const struct {
-    unsigned int opcode;
-    struct {
-        unsigned int rm:3;
-        unsigned int reg:3;
-        unsigned int mod:2;
-#define MODRM(mod, reg, rm) { rm, reg, mod }
-    } modrm;
-} opc_tab[INSTR_MAX_COUNT] = {
-    [INSTR_PAUSE]   = { X86EMUL_OPC_F3(0, 0x90) },
-    [INSTR_INT3]    = { X86EMUL_OPC(   0, 0xcc) },
-    [INSTR_ICEBP]   = { X86EMUL_OPC(   0, 0xf1) },
-    [INSTR_HLT]     = { X86EMUL_OPC(   0, 0xf4) },
-    [INSTR_XSETBV]  = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 2, 1) },
-    [INSTR_VMRUN]   = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 0) },
-    [INSTR_VMCALL]  = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 1) },
-    [INSTR_VMLOAD]  = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 2) },
-    [INSTR_VMSAVE]  = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 3) },
-    [INSTR_STGI]    = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 4) },
-    [INSTR_CLGI]    = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 5) },
-    [INSTR_INVLPGA] = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 7) },
-    [INSTR_RDTSCP]  = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 7, 1) },
-    [INSTR_INVD]    = { X86EMUL_OPC(0x0f, 0x08) },
-    [INSTR_WBINVD]  = { X86EMUL_OPC(0x0f, 0x09) },
-    [INSTR_WRMSR]   = { X86EMUL_OPC(0x0f, 0x30) },
-    [INSTR_RDTSC]   = { X86EMUL_OPC(0x0f, 0x31) },
-    [INSTR_RDMSR]   = { X86EMUL_OPC(0x0f, 0x32) },
-    [INSTR_CPUID]   = { X86EMUL_OPC(0x0f, 0xa2) },
-};
-
 /*
  * Early processors with SVM didn't have the NextRIP feature, meaning that
  * when we take a fault-style VMExit, we have to decode the instruction stream
@@ -92,12 +62,13 @@ static const struct {
  * In debug builds, always compare the hardware reported instruction length
  * (if available) with the result from x86_decode_insn().
  */
-unsigned int svm_get_insn_len(struct vcpu *v, enum instruction_index insn)
+unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct hvm_emulate_ctxt ctxt;
     struct x86_emulate_state *state;
     unsigned long nrip_len, emul_len;
+    unsigned int instr_opcode, instr_modrm;
     unsigned int modrm_rm, modrm_reg;
     int modrm_mod;
 
@@ -130,20 +101,18 @@ unsigned int svm_get_insn_len(struct vcpu *v, enum instruction_index insn)
     }
 #endif
 
-    if ( insn >= ARRAY_SIZE(opc_tab) )
-    {
-        ASSERT_UNREACHABLE();
-        return 0;
-    }
+    /* Extract components from instr_enc. */
+    instr_modrm  = instr_enc & 0xff;
+    instr_opcode = instr_enc >> 8;
 
-    if ( opc_tab[insn].opcode == ctxt.ctxt.opcode )
+    if ( instr_opcode == ctxt.ctxt.opcode )
     {
-        if ( !opc_tab[insn].modrm.mod )
+        if ( !instr_modrm )
             return emul_len;
 
-        if ( modrm_mod == opc_tab[insn].modrm.mod &&
-             (modrm_rm & 7) == opc_tab[insn].modrm.rm &&
-             (modrm_reg & 7) == opc_tab[insn].modrm.reg )
+        if ( modrm_mod       == MASK_EXTR(instr_modrm, 0300) &&
+             (modrm_reg & 7) == MASK_EXTR(instr_modrm, 0070) &&
+             (modrm_rm  & 7) == MASK_EXTR(instr_modrm, 0007) )
             return emul_len;
     }
 

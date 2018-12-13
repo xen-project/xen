@@ -19,33 +19,38 @@
 #ifndef __ASM_X86_HVM_SVM_EMULATE_H__
 #define __ASM_X86_HVM_SVM_EMULATE_H__
 
-/* Enumerate some standard instructions that we support */
-enum instruction_index {
-    INSTR_INVD,
-    INSTR_WBINVD,
-    INSTR_CPUID,
-    INSTR_RDMSR,
-    INSTR_WRMSR,
-    INSTR_VMCALL,
-    INSTR_HLT,
-    INSTR_INT3,
-    INSTR_RDTSC,
-    INSTR_RDTSCP,
-    INSTR_PAUSE,
-    INSTR_XSETBV,
-    INSTR_VMRUN,
-    INSTR_VMLOAD,
-    INSTR_VMSAVE,
-    INSTR_STGI,
-    INSTR_CLGI,
-    INSTR_INVLPGA,
-    INSTR_ICEBP,
-    INSTR_MAX_COUNT /* Must be last - Number of instructions supported */
-};
+/*
+ * Encoding for svm_get_insn_len().  We take X86EMUL_OPC() for the main
+ * opcode, shifted left to make room for the ModRM byte.
+ *
+ * The Grp7 instructions have their ModRM byte expressed in octal for easier
+ * cross referencing with the opcode extension table.
+ */
+#define INSTR_ENC(opc, modrm) (((opc) << 8) | (modrm))
+
+#define INSTR_PAUSE       INSTR_ENC(X86EMUL_OPC_F3(0, 0x90), 0)
+#define INSTR_INT3        INSTR_ENC(X86EMUL_OPC(   0, 0xcc), 0)
+#define INSTR_ICEBP       INSTR_ENC(X86EMUL_OPC(   0, 0xf1), 0)
+#define INSTR_HLT         INSTR_ENC(X86EMUL_OPC(   0, 0xf4), 0)
+#define INSTR_XSETBV      INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0321)
+#define INSTR_VMRUN       INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0330)
+#define INSTR_VMCALL      INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0331)
+#define INSTR_VMLOAD      INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0332)
+#define INSTR_VMSAVE      INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0333)
+#define INSTR_STGI        INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0334)
+#define INSTR_CLGI        INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0335)
+#define INSTR_INVLPGA     INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0337)
+#define INSTR_RDTSCP      INSTR_ENC(X86EMUL_OPC(0x0f, 0x01), 0371)
+#define INSTR_INVD        INSTR_ENC(X86EMUL_OPC(0x0f, 0x08), 0)
+#define INSTR_WBINVD      INSTR_ENC(X86EMUL_OPC(0x0f, 0x09), 0)
+#define INSTR_WRMSR       INSTR_ENC(X86EMUL_OPC(0x0f, 0x30), 0)
+#define INSTR_RDTSC       INSTR_ENC(X86EMUL_OPC(0x0f, 0x31), 0)
+#define INSTR_RDMSR       INSTR_ENC(X86EMUL_OPC(0x0f, 0x32), 0)
+#define INSTR_CPUID       INSTR_ENC(X86EMUL_OPC(0x0f, 0xa2), 0)
 
 struct vcpu;
 
-unsigned int svm_get_insn_len(struct vcpu *v, enum instruction_index instr);
+unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc);
 
 #endif /* __ASM_X86_HVM_SVM_EMULATE_H__ */
 
