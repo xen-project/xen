@@ -652,12 +652,11 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < LPAE_ENTRIES; i++ )
     {
-        mfn_t mfn = mfn_add(maddr_to_mfn(xen_paddr), i);
-        unsigned long va = XEN_VIRT_START + (i << PAGE_SHIFT);
+        vaddr_t va = XEN_VIRT_START + (i << PAGE_SHIFT);
 
         if ( !is_kernel(va) )
             break;
-        pte = mfn_to_xen_entry(mfn, MT_NORMAL);
+        pte = pte_of_xenaddr(va);
         pte.pt.table = 1; /* 4k mappings always have this bit set */
         if ( is_kernel_text(va) || is_kernel_inittext(va) )
         {
