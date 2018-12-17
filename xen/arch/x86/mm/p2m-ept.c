@@ -885,8 +885,8 @@ out:
             rc = iommu_pte_flush(d, gfn, &ept_entry->epte, order, vtd_pte_present);
         else if ( need_iommu_pt_sync(d) )
             rc = iommu_flags ?
-                iommu_map(d, _dfn(gfn), mfn, order, iommu_flags) :
-                iommu_unmap(d, _dfn(gfn), order);
+                iommu_legacy_map(d, _dfn(gfn), mfn, order, iommu_flags) :
+                iommu_legacy_unmap(d, _dfn(gfn), order);
     }
 
     unmap_domain_page(table);

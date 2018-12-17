@@ -83,15 +83,21 @@ int iommu_construct(struct domain *d);
 /* Function used internally, use iommu_domain_destroy */
 void iommu_teardown(struct domain *d);
 
-/* iommu_map_page() takes flags to direct the mapping operation. */
+/*
+ * The following flags are passed to map operations and passed by lookup
+ * operations.
+ */
 #define _IOMMUF_readable 0
 #define IOMMUF_readable  (1u<<_IOMMUF_readable)
 #define _IOMMUF_writable 1
 #define IOMMUF_writable  (1u<<_IOMMUF_writable)
-int __must_check iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
-                           unsigned int page_order, unsigned int flags);
-int __must_check iommu_unmap(struct domain *d, dfn_t dfn,
-                             unsigned int page_order);
+
+int __must_check iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
+                                  unsigned int page_order,
+                                  unsigned int flags);
+int __must_check iommu_legacy_unmap(struct domain *d, dfn_t dfn,
+                                    unsigned int page_order);
+
 int __must_check iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
                                    unsigned int *flags);
 
