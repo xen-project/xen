@@ -2535,8 +2535,11 @@ static int __must_check arm_smmu_iotlb_flush_all(struct domain *d)
 }
 
 static int __must_check arm_smmu_iotlb_flush(struct domain *d, dfn_t dfn,
-                                             unsigned int page_count)
+					     unsigned int page_count,
+					     unsigned int flush_flags)
 {
+	ASSERT(flush_flags);
+
 	/* ARM SMMU v1 doesn't have flush by VMA and VMID */
 	return arm_smmu_iotlb_flush_all(d);
 }
@@ -2732,7 +2735,8 @@ static void arm_smmu_iommu_domain_teardown(struct domain *d)
 }
 
 static int __must_check arm_smmu_map_page(struct domain *d, dfn_t dfn,
-					  mfn_t mfn, unsigned int flags)
+					  mfn_t mfn, unsigned int flags,
+					  unsigned int *flush_flags)
 {
 	p2m_type_t t;
 
@@ -2761,7 +2765,8 @@ static int __must_check arm_smmu_map_page(struct domain *d, dfn_t dfn,
 				       0, t);
 }
 
-static int __must_check arm_smmu_unmap_page(struct domain *d, dfn_t dfn)
+static int __must_check arm_smmu_unmap_page(struct domain *d, dfn_t dfn,
+                                            unsigned int *flush_flags)
 {
 	/*
 	 * This function should only be used by gnttab code when the domain

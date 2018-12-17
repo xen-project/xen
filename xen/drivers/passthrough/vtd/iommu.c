@@ -633,11 +633,14 @@ static int __must_check iommu_flush_iotlb(struct domain *d, dfn_t dfn,
 
 static int __must_check iommu_flush_iotlb_pages(struct domain *d,
                                                 dfn_t dfn,
-                                                unsigned int page_count)
+                                                unsigned int page_count,
+                                                unsigned int flush_flags)
 {
     ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
+    ASSERT(flush_flags);
 
-    return iommu_flush_iotlb(d, dfn, 1, page_count);
+    return iommu_flush_iotlb(d, dfn, flush_flags & IOMMU_FLUSHF_modified,
+                             page_count);
 }
 
 static int __must_check iommu_flush_iotlb_all(struct domain *d)
@@ -646,7 +649,8 @@ static int __must_check iommu_flush_iotlb_all(struct domain *d)
 }
 
 /* clear one page's page table */
-static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr)
+static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr,
+                                          unsigned int *flush_flags)
 {
     struct domain_iommu *hd = dom_iommu(domain);
     struct dma_pte *page = NULL, *pte = NULL;
@@ -673,11 +677,10 @@ static int __must_check dma_pte_clear_one(struct domain *domain, u64 addr)
     }
 
     dma_clear_pte(*pte);
+    *flush_flags |= IOMMU_FLUSHF_modified;
+
     spin_unlock(&hd->arch.mapping_lock);
     iommu_flush_cache_entry(pte, sizeof(struct dma_pte));
-
-    if ( !this_cpu(iommu_dont_flush_iotlb) )
-        rc = iommu_flush_iotlb_pages(domain, daddr_to_dfn(addr), 1);
 
     unmap_vtd_domain_page(page);
 
@@ -1773,9 +1776,9 @@ static void iommu_domain_teardown(struct domain *d)
     spin_unlock(&hd->arch.mapping_lock);
 }
 
-static int __must_check intel_iommu_map_page(struct domain *d,
-                                             dfn_t dfn, mfn_t mfn,
-                                             unsigned int flags)
+static int __must_check intel_iommu_map_page(struct domain *d, dfn_t dfn,
+                                             mfn_t mfn, unsigned int flags,
+                                             unsigned int *flush_flags)
 {
     struct domain_iommu *hd = dom_iommu(d);
     struct dma_pte *page, *pte, old, new = {};
@@ -1825,14 +1828,15 @@ static int __must_check intel_iommu_map_page(struct domain *d,
     spin_unlock(&hd->arch.mapping_lock);
     unmap_vtd_domain_page(page);
 
-    if ( !this_cpu(iommu_dont_flush_iotlb) )
-        rc = iommu_flush_iotlb(d, dfn, dma_pte_present(old), 1);
+    *flush_flags |= IOMMU_FLUSHF_added;
+    if ( dma_pte_present(old) )
+        *flush_flags |= IOMMU_FLUSHF_modified;
 
     return rc;
 }
 
-static int __must_check intel_iommu_unmap_page(struct domain *d,
-                                               dfn_t dfn)
+static int __must_check intel_iommu_unmap_page(struct domain *d, dfn_t dfn,
+                                               unsigned int *flush_flags)
 {
     /* Do nothing if VT-d shares EPT page table */
     if ( iommu_use_hap_pt(d) )
@@ -1842,7 +1846,7 @@ static int __must_check intel_iommu_unmap_page(struct domain *d,
     if ( iommu_hwdom_passthrough && is_hardware_domain(d) )
         return 0;
 
-    return dma_pte_clear_one(d, dfn_to_daddr(dfn));
+    return dma_pte_clear_one(d, dfn_to_daddr(dfn), flush_flags);
 }
 
 static int intel_iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,

@@ -46,11 +46,9 @@ int __init iommu_setup_hpet_msi(struct msi_desc *msi)
 
 int arch_iommu_populate_page_table(struct domain *d)
 {
-    const struct domain_iommu *hd = dom_iommu(d);
     struct page_info *page;
     int rc = 0, n = 0;
 
-    this_cpu(iommu_dont_flush_iotlb) = 1;
     spin_lock(&d->page_alloc_lock);
 
     if ( unlikely(d->is_dying) )
@@ -63,14 +61,15 @@ int arch_iommu_populate_page_table(struct domain *d)
         {
             unsigned long mfn = mfn_x(page_to_mfn(page));
             unsigned long gfn = mfn_to_gmfn(d, mfn);
+            unsigned int flush_flags = 0;
 
             if ( gfn != gfn_x(INVALID_GFN) )
             {
                 ASSERT(!(gfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
                 BUG_ON(SHARED_M2P(gfn));
-                rc = hd->platform_ops->map_page(d, _dfn(gfn), _mfn(mfn),
-                                                IOMMUF_readable |
-                                                IOMMUF_writable);
+                rc = iommu_map(d, _dfn(gfn), _mfn(mfn), PAGE_ORDER_4K,
+                               IOMMUF_readable | IOMMUF_writable,
+                               &flush_flags);
             }
             if ( rc )
             {
@@ -104,10 +103,14 @@ int arch_iommu_populate_page_table(struct domain *d)
     }
 
     spin_unlock(&d->page_alloc_lock);
-    this_cpu(iommu_dont_flush_iotlb) = 0;
 
     if ( !rc )
-        rc = iommu_iotlb_flush_all(d);
+        /*
+         * flush_flags are not tracked across hypercall pre-emption so
+         * assume a full flush is necessary.
+         */
+        rc = iommu_iotlb_flush_all(
+            d, IOMMU_FLUSHF_added | IOMMU_FLUSHF_modified);
 
     if ( rc && rc != -ERESTART )
         iommu_teardown(d);
@@ -207,6 +210,7 @@ static bool __hwdom_init hwdom_iommu_map(const struct domain *d,
 void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 {
     unsigned long i, top, max_pfn;
+    unsigned int flush_flags = 0;
 
     BUG_ON(!is_hardware_domain(d));
 
@@ -241,8 +245,9 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
         if ( paging_mode_translate(d) )
             rc = set_identity_p2m_entry(d, pfn, p2m_access_rw, 0);
         else
-            rc = iommu_legacy_map(d, _dfn(pfn), _mfn(pfn), PAGE_ORDER_4K,
-                                  IOMMUF_readable | IOMMUF_writable);
+            rc = iommu_map(d, _dfn(pfn), _mfn(pfn), PAGE_ORDER_4K,
+                           IOMMUF_readable | IOMMUF_writable, &flush_flags);
+
         if ( rc )
             printk(XENLOG_WARNING " d%d: IOMMU mapping failed: %d\n",
                    d->domain_id, rc);
@@ -250,6 +255,10 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
         if (!(i & 0xfffff))
             process_pending_softirqs();
     }
+
+    /* Use if to avoid compiler warning */
+    if ( iommu_iotlb_flush_all(d, flush_flags) )
+        return;
 }
 
 /*

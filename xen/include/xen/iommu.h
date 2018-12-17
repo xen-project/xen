@@ -92,6 +92,31 @@ void iommu_teardown(struct domain *d);
 #define _IOMMUF_writable 1
 #define IOMMUF_writable  (1u<<_IOMMUF_writable)
 
+/*
+ * flush_flags:
+ *
+ * IOMMU_FLUSHF_added -> A new 'present' PTE has been inserted.
+ * IOMMU_FLUSHF_modified -> An existing 'present' PTE has been modified
+ *                          (whether the new PTE value is 'present' or not).
+ *
+ * These flags are passed back from map/unmap operations and passed into
+ * flush operations.
+ */
+enum
+{
+    _IOMMU_FLUSHF_added,
+    _IOMMU_FLUSHF_modified,
+};
+#define IOMMU_FLUSHF_added (1u << _IOMMU_FLUSHF_added)
+#define IOMMU_FLUSHF_modified (1u << _IOMMU_FLUSHF_modified)
+
+int __must_check iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
+                           unsigned int page_order, unsigned int flags,
+                           unsigned int *flush_flags);
+int __must_check iommu_unmap(struct domain *d, dfn_t dfn,
+                             unsigned int page_order,
+                             unsigned int *flush_flags);
+
 int __must_check iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
                                   unsigned int page_order,
                                   unsigned int flags);
@@ -100,6 +125,12 @@ int __must_check iommu_legacy_unmap(struct domain *d, dfn_t dfn,
 
 int __must_check iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
                                    unsigned int *flags);
+
+int __must_check iommu_iotlb_flush(struct domain *d, dfn_t dfn,
+                                   unsigned int page_count,
+                                   unsigned int flush_flags);
+int __must_check iommu_iotlb_flush_all(struct domain *d,
+                                       unsigned int flush_flags);
 
 enum iommu_feature
 {
@@ -178,8 +209,10 @@ struct iommu_ops {
      * other by the caller in order to have meaningful results.
      */
     int __must_check (*map_page)(struct domain *d, dfn_t dfn, mfn_t mfn,
-                                 unsigned int flags);
-    int __must_check (*unmap_page)(struct domain *d, dfn_t dfn);
+                                 unsigned int flags,
+                                 unsigned int *flush_flags);
+    int __must_check (*unmap_page)(struct domain *d, dfn_t dfn,
+                                   unsigned int *flush_flags);
     int __must_check (*lookup_page)(struct domain *d, dfn_t dfn, mfn_t *mfn,
                                     unsigned int *flags);
 
@@ -194,7 +227,8 @@ struct iommu_ops {
     void (*share_p2m)(struct domain *d);
     void (*crash_shutdown)(void);
     int __must_check (*iotlb_flush)(struct domain *d, dfn_t dfn,
-                                    unsigned int page_count);
+                                    unsigned int page_count,
+                                    unsigned int flush_flags);
     int __must_check (*iotlb_flush_all)(struct domain *d);
     int (*get_reserved_device_memory)(iommu_grdm_t *, void *);
     void (*dump_p2m_table)(struct domain *d);
@@ -252,10 +286,6 @@ int iommu_do_pci_domctl(struct xen_domctl *, struct domain *d,
 
 int iommu_do_domctl(struct xen_domctl *, struct domain *d,
                     XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
-
-int __must_check iommu_iotlb_flush(struct domain *d, dfn_t dfn,
-                                   unsigned int page_count);
-int __must_check iommu_iotlb_flush_all(struct domain *d);
 
 void iommu_dev_iotlb_flush_timeout(struct domain *d, struct pci_dev *pdev);
 

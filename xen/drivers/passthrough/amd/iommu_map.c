@@ -35,23 +35,37 @@ static unsigned int pfn_to_pde_idx(unsigned long pfn, unsigned int level)
     return idx;
 }
 
-static void clear_iommu_pte_present(unsigned long l1_mfn, unsigned long dfn)
+static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
+                                            unsigned long dfn)
 {
     uint64_t *table, *pte;
+    uint32_t entry;
+    unsigned int flush_flags;
 
     table = map_domain_page(_mfn(l1_mfn));
-    pte = table + pfn_to_pde_idx(dfn, 1);
+
+    pte = (table + pfn_to_pde_idx(dfn, 1));
+    entry = *pte >> 32;
+
+    flush_flags = get_field_from_reg_u32(entry, IOMMU_PTE_PRESENT_MASK,
+                                         IOMMU_PTE_PRESENT_SHIFT) ?
+                                         IOMMU_FLUSHF_modified : 0;
+
     *pte = 0;
     unmap_domain_page(table);
+
+    return flush_flags;
 }
 
-static bool set_iommu_pde_present(uint32_t *pde, unsigned long next_mfn,
-                                  unsigned int next_level,
-                                  bool iw, bool ir)
+static unsigned int set_iommu_pde_present(uint32_t *pde,
+                                          unsigned long next_mfn,
+                                          unsigned int next_level, bool iw,
+                                          bool ir)
 {
     uint64_t maddr_next;
     uint32_t addr_lo, addr_hi, entry;
-    bool need_flush = false, old_present;
+    bool old_present;
+    unsigned int flush_flags = IOMMU_FLUSHF_added;
 
     maddr_next = __pfn_to_paddr(next_mfn);
 
@@ -84,7 +98,7 @@ static bool set_iommu_pde_present(uint32_t *pde, unsigned long next_mfn,
 
         if ( maddr_old != maddr_next || iw != old_w || ir != old_r ||
              old_level != next_level )
-            need_flush = true;
+            flush_flags |= IOMMU_FLUSHF_modified;
     }
 
     addr_lo = maddr_next & DMA_32BIT_MASK;
@@ -121,24 +135,27 @@ static bool set_iommu_pde_present(uint32_t *pde, unsigned long next_mfn,
                          IOMMU_PDE_PRESENT_SHIFT, &entry);
     pde[0] = entry;
 
-    return need_flush;
+    return flush_flags;
 }
 
-static bool set_iommu_pte_present(unsigned long pt_mfn, unsigned long dfn,
-                                  unsigned long next_mfn, int pde_level,
-                                  bool iw, bool ir)
+static unsigned int set_iommu_pte_present(unsigned long pt_mfn,
+                                          unsigned long dfn,
+                                          unsigned long next_mfn,
+                                          int pde_level,
+                                          bool iw, bool ir)
 {
     uint64_t *table;
     uint32_t *pde;
-    bool need_flush;
+    unsigned int flush_flags;
 
     table = map_domain_page(_mfn(pt_mfn));
 
     pde = (uint32_t *)(table + pfn_to_pde_idx(dfn, pde_level));
 
-    need_flush = set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
+    flush_flags = set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
     unmap_domain_page(table);
-    return need_flush;
+
+    return flush_flags;
 }
 
 void amd_iommu_set_root_page_table(uint32_t *dte, uint64_t root_ptr,
@@ -525,9 +542,8 @@ static int update_paging_mode(struct domain *d, unsigned long dfn)
 }
 
 int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
-                       unsigned int flags)
+                       unsigned int flags, unsigned int *flush_flags)
 {
-    bool need_flush;
     struct domain_iommu *hd = dom_iommu(d);
     int rc;
     unsigned long pt_mfn[7];
@@ -573,18 +589,17 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     }
 
     /* Install 4k mapping */
-    need_flush = set_iommu_pte_present(pt_mfn[1], dfn_x(dfn), mfn_x(mfn), 1,
-                                       !!(flags & IOMMUF_writable),
-                                       !!(flags & IOMMUF_readable));
-
-    if ( need_flush )
-        amd_iommu_flush_pages(d, dfn_x(dfn), 0);
+    *flush_flags |= set_iommu_pte_present(pt_mfn[1], dfn_x(dfn), mfn_x(mfn),
+                                          1, (flags & IOMMUF_writable),
+                                          (flags & IOMMUF_readable));
 
     spin_unlock(&hd->arch.mapping_lock);
+
     return 0;
 }
 
-int amd_iommu_unmap_page(struct domain *d, dfn_t dfn)
+int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
+                         unsigned int *flush_flags)
 {
     unsigned long pt_mfn[7];
     struct domain_iommu *hd = dom_iommu(d);
@@ -629,11 +644,10 @@ int amd_iommu_unmap_page(struct domain *d, dfn_t dfn)
     }
 
     /* mark PTE as 'page not present' */
-    clear_iommu_pte_present(pt_mfn[1], dfn_x(dfn));
+    *flush_flags |= clear_iommu_pte_present(pt_mfn[1], dfn_x(dfn));
 
     spin_unlock(&hd->arch.mapping_lock);
 
-    amd_iommu_flush_pages(d, dfn_x(dfn), 0);
     return 0;
 }
 
@@ -648,11 +662,17 @@ static unsigned long flush_count(unsigned long dfn, unsigned int page_count,
 }
 
 int amd_iommu_flush_iotlb_pages(struct domain *d, dfn_t dfn,
-                                unsigned int page_count)
+                                unsigned int page_count,
+                                unsigned int flush_flags)
 {
     unsigned long dfn_l = dfn_x(dfn);
 
     ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
+    ASSERT(flush_flags);
+
+    /* Unless a PTE was modified, no flush is required */
+    if ( !(flush_flags & IOMMU_FLUSHF_modified) )
+        return 0;
 
     /* If the range wraps then just flush everything */
     if ( dfn_l + page_count < dfn_l )
@@ -695,6 +715,7 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
     unsigned long npages, i;
     unsigned long gfn;
     unsigned int flags = !!ir;
+    unsigned int flush_flags = 0;
     int rt = 0;
 
     if ( iw )
@@ -706,11 +727,19 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
     {
         unsigned long frame = gfn + i;
 
-        rt = amd_iommu_map_page(domain, _dfn(frame), _mfn(frame), flags);
+        rt = amd_iommu_map_page(domain, _dfn(frame), _mfn(frame), flags,
+                                &flush_flags);
         if ( rt != 0 )
-            return rt;
+            break;
     }
-    return 0;
+
+    /* Use while-break to avoid compiler warning */
+    while ( flush_flags &&
+            amd_iommu_flush_iotlb_pages(domain, _dfn(gfn),
+                                        npages, flush_flags) )
+        break;
+
+    return rt;
 }
 
 /* Share p2m table with iommu. */

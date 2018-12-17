@@ -211,7 +211,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
     if ( need_iommu_pt_sync(d) )
     {
         struct page_info *page;
-        unsigned int i = 0;
+        unsigned int i = 0, flush_flags = 0;
         int rc = 0;
 
         page_list_for_each ( page, &d->page_list )
@@ -226,14 +226,19 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
                   == PGT_writable_page) )
                 mapping |= IOMMUF_writable;
 
-            ret = hd->platform_ops->map_page(d, _dfn(dfn), _mfn(mfn),
-                                             mapping);
+            ret = iommu_map(d, _dfn(dfn), _mfn(mfn), mapping, 0,
+                            &flush_flags);
+
             if ( !rc )
                 rc = ret;
 
             if ( !(i++ & 0xfffff) )
                 process_pending_softirqs();
         }
+
+        /* Use while-break to avoid compiler warning */
+        while ( iommu_iotlb_flush_all(d, flush_flags) )
+            break;
 
         if ( rc )
             printk(XENLOG_WARNING "d%d: IOMMU mapping failed: %d\n",
@@ -304,8 +309,9 @@ void iommu_domain_destroy(struct domain *d)
     arch_iommu_domain_destroy(d);
 }
 
-int iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
-                     unsigned int page_order, unsigned int flags)
+int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
+              unsigned int page_order, unsigned int flags,
+              unsigned int *flush_flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
     unsigned long i;
@@ -319,8 +325,8 @@ int iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
 
     for ( i = 0; i < (1ul << page_order); i++ )
     {
-        rc = hd->platform_ops->map_page(d, dfn_add(dfn, i),
-                                        mfn_add(mfn, i), flags);
+        rc = hd->platform_ops->map_page(d, dfn_add(dfn, i), mfn_add(mfn, i),
+                                        flags, flush_flags);
 
         if ( likely(!rc) )
             continue;
@@ -333,7 +339,8 @@ int iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
 
         while ( i-- )
             /* if statement to satisfy __must_check */
-            if ( hd->platform_ops->unmap_page(d, dfn_add(dfn, i)) )
+            if ( hd->platform_ops->unmap_page(d, dfn_add(dfn, i),
+                                              flush_flags) )
                 continue;
 
         if ( !is_hardware_domain(d) )
@@ -345,7 +352,26 @@ int iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
     return rc;
 }
 
-int iommu_legacy_unmap(struct domain *d, dfn_t dfn, unsigned int page_order)
+int iommu_legacy_map(struct domain *d, dfn_t dfn, mfn_t mfn,
+                     unsigned int page_order, unsigned int flags)
+{
+    unsigned int flush_flags = 0;
+    int rc = iommu_map(d, dfn, mfn, page_order, flags, &flush_flags);
+
+    if ( !this_cpu(iommu_dont_flush_iotlb) )
+    {
+        int err = iommu_iotlb_flush(d, dfn, (1u << page_order),
+                                    flush_flags);
+
+        if ( !rc )
+            rc = err;
+    }
+
+    return rc;
+}
+
+int iommu_unmap(struct domain *d, dfn_t dfn, unsigned int page_order,
+                unsigned int *flush_flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
     unsigned long i;
@@ -358,7 +384,8 @@ int iommu_legacy_unmap(struct domain *d, dfn_t dfn, unsigned int page_order)
 
     for ( i = 0; i < (1ul << page_order); i++ )
     {
-        int err = hd->platform_ops->unmap_page(d, dfn_add(dfn, i));
+        int err = hd->platform_ops->unmap_page(d, dfn_add(dfn, i),
+                                               flush_flags);
 
         if ( likely(!err) )
             continue;
@@ -376,6 +403,23 @@ int iommu_legacy_unmap(struct domain *d, dfn_t dfn, unsigned int page_order)
             domain_crash(d);
             break;
         }
+    }
+
+    return rc;
+}
+
+int iommu_legacy_unmap(struct domain *d, dfn_t dfn, unsigned int page_order)
+{
+    unsigned int flush_flags = 0;
+    int rc = iommu_unmap(d, dfn, page_order, &flush_flags);
+
+    if ( !this_cpu(iommu_dont_flush_iotlb) )
+    {
+        int err = iommu_iotlb_flush(d, dfn, (1u << page_order),
+                                    flush_flags);
+
+        if ( !rc )
+            rc = err;
     }
 
     return rc;
@@ -409,25 +453,26 @@ static void iommu_free_pagetables(unsigned long unused)
                             cpumask_cycle(smp_processor_id(), &cpu_online_map));
 }
 
-int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count)
+int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count,
+                      unsigned int flush_flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
     int rc;
 
     if ( !iommu_enabled || !hd->platform_ops ||
-         !hd->platform_ops->iotlb_flush || !page_count )
+         !hd->platform_ops->iotlb_flush || !page_count || !flush_flags )
         return 0;
 
     if ( dfn_eq(dfn, INVALID_DFN) )
         return -EINVAL;
 
-    rc = hd->platform_ops->iotlb_flush(d, dfn, page_count);
+    rc = hd->platform_ops->iotlb_flush(d, dfn, page_count, flush_flags);
     if ( unlikely(rc) )
     {
         if ( !d->is_shutting_down && printk_ratelimit() )
             printk(XENLOG_ERR
-                   "d%d: IOMMU IOTLB flush failed: %d, dfn %"PRI_dfn", page count %u\n",
-                   d->domain_id, rc, dfn_x(dfn), page_count);
+                   "d%d: IOMMU IOTLB flush failed: %d, dfn %"PRI_dfn", page count %u flags %x\n",
+                   d->domain_id, rc, dfn_x(dfn), page_count, flush_flags);
 
         if ( !is_hardware_domain(d) )
             domain_crash(d);
@@ -436,14 +481,19 @@ int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count)
     return rc;
 }
 
-int iommu_iotlb_flush_all(struct domain *d)
+int iommu_iotlb_flush_all(struct domain *d, unsigned int flush_flags)
 {
     const struct domain_iommu *hd = dom_iommu(d);
     int rc;
 
-    if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->iotlb_flush_all )
+    if ( !iommu_enabled || !hd->platform_ops ||
+         !hd->platform_ops->iotlb_flush_all || !flush_flags )
         return 0;
 
+    /*
+     * The operation does a full flush so we don't need to pass the
+     * flush_flags in.
+     */
     rc = hd->platform_ops->iotlb_flush_all(d);
     if ( unlikely(rc) )
     {
