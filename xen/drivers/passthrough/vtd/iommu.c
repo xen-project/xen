@@ -635,6 +635,8 @@ static int __must_check iommu_flush_iotlb_pages(struct domain *d,
                                                 dfn_t dfn,
                                                 unsigned int page_count)
 {
+    ASSERT(page_count && !dfn_eq(dfn, INVALID_DFN));
+
     return iommu_flush_iotlb(d, dfn, 1, page_count);
 }
 
