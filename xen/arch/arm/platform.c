@@ -127,6 +127,14 @@ void platform_poweroff(void)
         platform->poweroff();
 }
 
+bool platform_smc(struct cpu_user_regs *regs)
+{
+    if ( likely(platform && platform->smc) )
+        return platform->smc(regs);
+
+    return false;
+}
+
 bool platform_has_quirk(uint32_t quirk)
 {
     uint32_t quirks = 0;

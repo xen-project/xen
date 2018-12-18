@@ -25,6 +25,7 @@
 #include <asm/smccc.h>
 #include <asm/traps.h>
 #include <asm/vpsci.h>
+#include <asm/platform.h>
 
 /* Number of functions currently supported by Hypervisor Service. */
 #define XEN_SMCCC_FUNCTION_COUNT 3
@@ -271,6 +272,9 @@ static bool vsmccc_handle_call(struct cpu_user_regs *regs)
             break;
         case ARM_SMCCC_OWNER_STANDARD:
             handled = handle_sssc(regs);
+            break;
+        case ARM_SMCCC_OWNER_SIP:
+            handled = platform_smc(regs);
             break;
         }
     }
