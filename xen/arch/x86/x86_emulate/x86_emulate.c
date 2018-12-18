@@ -8532,11 +8532,9 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbd): /* vfnmadd231s{s,d} xmm/mem,xmm,xmm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbf): /* vfnmsub231s{s,d} xmm/mem,xmm,xmm{k} */
         host_and_vcpu_must_have(avx512f);
-        if ( ea.type == OP_MEM )
-        {
-            generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(ea.type != OP_REG && evex.br, EXC_UD);
+        if ( !evex.br )
             avx512_vlen_check(true);
-        }
         goto simd_zmm;
 
     case X86EMUL_OPC(0x0f38, 0xc8):     /* sha1nexte xmm/m128,xmm */
