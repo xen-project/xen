@@ -25,6 +25,9 @@
  * EEMI firmware API:
  * https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
  *
+ * IPI firmware API:
+ * https://github.com/ARM-software/arm-trusted-firmware/blob/master/plat/xilinx/zynqmp/ipi_mailbox_service/ipi_mailbox_svc.h
+ *
  * Power domain node_ids identify the area of effect of the power
  * management operations. They are the first parameter passed to power
  * management EEMI calls.
@@ -152,6 +155,21 @@ bool zynqmp_eemi(struct cpu_user_regs *regs)
     case EEMI_FID(PM_SYSTEM_SHUTDOWN):
         ret = XST_PM_NO_ACCESS;
         goto done;
+
+    case IPI_MAILBOX_FID(IPI_MAILBOX_OPEN):
+    case IPI_MAILBOX_FID(IPI_MAILBOX_RELEASE):
+    case IPI_MAILBOX_FID(IPI_MAILBOX_STATUS_ENQUIRY):
+    case IPI_MAILBOX_FID(IPI_MAILBOX_NOTIFY):
+    case IPI_MAILBOX_FID(IPI_MAILBOX_ACK):
+    case IPI_MAILBOX_FID(IPI_MAILBOX_ENABLE_IRQ):
+    case IPI_MAILBOX_FID(IPI_MAILBOX_DISABLE_IRQ):
+        if ( !is_hardware_domain(current->domain) )
+        {
+            gprintk(XENLOG_WARNING, "IPI mailbox: fn=%u No access", pm_fn);
+            ret = XST_PM_NO_ACCESS;
+            goto done;
+        }
+        goto forward_to_fw;
 
     default:
         gprintk(XENLOG_WARNING, "zynqmp-pm: Unhandled PM Call: %u\n", fid);

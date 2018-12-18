@@ -99,6 +99,21 @@ enum pm_ret_status {
     XST_PM_ABORT_SUSPEND,
 };
 
+/* IPI SMC function numbers enum definition and fids */
+#define IPI_MAILBOX_FID(fid) ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, \
+                                                ARM_SMCCC_CONV_32,   \
+                                                ARM_SMCCC_OWNER_SIP, \
+                                                fid)
+enum ipi_api_id {
+    IPI_MAILBOX_OPEN = 0x1000,
+    IPI_MAILBOX_RELEASE,
+    IPI_MAILBOX_STATUS_ENQUIRY,
+    IPI_MAILBOX_NOTIFY,
+    IPI_MAILBOX_ACK,
+    IPI_MAILBOX_ENABLE_IRQ,
+    IPI_MAILBOX_DISABLE_IRQ,
+};
+
 extern bool zynqmp_eemi(struct cpu_user_regs *regs);
 
 #endif /* __ASM_ARM_PLATFORMS_ZYNQMP_H */
