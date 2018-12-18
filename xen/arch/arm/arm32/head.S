@@ -469,58 +469,12 @@ fail:   PRINT("- Boot failed -\r\n")
 GLOBAL(_end_boot)
 
 /*
- * Copy Xen to new location and switch TTBR
+ * Switch TTBR
  * r1:r0       ttbr
- * r2          source address
- * r3          destination address
- * [sp]=>r4    length
  *
- * Source and destination must be word aligned, length is rounded up
- * to a 16 byte boundary.
- *
- * MUST BE VERY CAREFUL when saving things to RAM over the copy
+ * TODO: This code does not comply with break-before-make.
  */
-ENTRY(relocate_xen)
-        push {r4,r5,r6,r7,r8,r9,r10,r11}
-
-        ldr   r4, [sp, #8*4]                /* Get 4th argument from stack */
-
-        /* Copy 16 bytes at a time using:
-         * r5:  counter
-         * r6:  data
-         * r7:  data
-         * r8:  data
-         * r9:  data
-         * r10: source
-         * r11: destination
-         */
-        mov   r5, r4
-        mov   r10, r2
-        mov   r11, r3
-1:      ldmia r10!, {r6, r7, r8, r9}
-        stmia r11!, {r6, r7, r8, r9}
-
-        subs  r5, r5, #16
-        bgt   1b
-
-        /* Flush destination from dcache using:
-         * r5: counter
-         * r6: step
-         * r7: vaddr
-         */
-        dsb        /* So the CPU issues all writes to the range */
-
-        mov   r5, r4
-        ldr   r6, =dcache_line_bytes /* r6 := step */
-        ldr   r6, [r6]
-        mov   r7, r3
-
-1:      mcr   CP32(r7, DCCMVAC)
-
-        add   r7, r7, r6
-        subs  r5, r5, r6
-        bgt   1b
-
+ENTRY(switch_ttbr)
         dsb                            /* Ensure the flushes happen before
                                         * continuing */
         isb                            /* Ensure synchronization with previous
@@ -542,8 +496,6 @@ ENTRY(relocate_xen)
         mcr   CP32(r0, BPIALL)         /* Flush branch predictor */
         dsb                            /* Ensure completion of TLB+BP flush */
         isb
-
-        pop {r4, r5,r6,r7,r8,r9,r10,r11}
 
         mov pc, lr
 

@@ -374,6 +374,7 @@ void __init discard_initial_modules(void)
     remove_early_mappings();
 }
 
+#ifdef CONFIG_ARM_32
 /*
  * Returns the end address of the highest region in the range s..e
  * with required size and alignment that does not conflict with the
@@ -440,6 +441,7 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
     }
     return e;
 }
+#endif
 
 /*
  * Return the end of the non-module region starting at s. In other
@@ -473,59 +475,6 @@ static paddr_t __init next_module(paddr_t s, paddr_t *end)
         *end = min(*end, mod_e);
     }
     return lowest;
-}
-
-
-/**
- * get_xen_paddr - get physical address to relocate Xen to
- *
- * Xen is relocated to as near to the top of RAM as possible and
- * aligned to a XEN_PADDR_ALIGN boundary.
- */
-static paddr_t __init get_xen_paddr(void)
-{
-    struct meminfo *mi = &bootinfo.mem;
-    paddr_t min_size;
-    paddr_t paddr = 0;
-    int i;
-
-    min_size = (_end - _start + (XEN_PADDR_ALIGN-1)) & ~(XEN_PADDR_ALIGN-1);
-
-    /* Find the highest bank with enough space. */
-    for ( i = 0; i < mi->nr_banks; i++ )
-    {
-        const struct membank *bank = &mi->bank[i];
-        paddr_t s, e;
-
-        if ( bank->size >= min_size )
-        {
-            e = consider_modules(bank->start, bank->start + bank->size,
-                                 min_size, XEN_PADDR_ALIGN, 0);
-            if ( !e )
-                continue;
-
-#ifdef CONFIG_ARM_32
-            /* Xen must be under 4GB */
-            if ( e > 0x100000000ULL )
-                e = 0x100000000ULL;
-            if ( e < bank->start )
-                continue;
-#endif
-
-            s = e - min_size;
-
-            if ( s > paddr )
-                paddr = s;
-        }
-    }
-
-    if ( !paddr )
-        panic("Not enough memory to relocate Xen\n");
-
-    printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
-           paddr, paddr + min_size);
-
-    return paddr;
 }
 
 static void __init init_pdx(void)
@@ -783,7 +732,6 @@ void __init start_xen(unsigned long boot_phys_offset,
 {
     size_t fdt_size;
     int cpus, i;
-    paddr_t xen_paddr;
     const char *cmdline;
     struct bootmodule *xen_bootmodule;
     struct domain *dom0;
@@ -827,14 +775,7 @@ void __init start_xen(unsigned long boot_phys_offset,
                              (paddr_t)(uintptr_t)(_end - _start + 1), false);
     BUG_ON(!xen_bootmodule);
 
-    xen_paddr = get_xen_paddr();
-    setup_pagetables(boot_phys_offset, xen_paddr);
-
-    /* Update Xen's address now that we have relocated. */
-    printk("Update BOOTMOD_XEN from %"PRIpaddr"-%"PRIpaddr" => %"PRIpaddr"-%"PRIpaddr"\n",
-           xen_bootmodule->start, xen_bootmodule->start + xen_bootmodule->size,
-           xen_paddr, xen_paddr + xen_bootmodule->size);
-    xen_bootmodule->start = xen_paddr;
+    setup_pagetables(boot_phys_offset);
 
     setup_mm(fdt_paddr, fdt_size);
 

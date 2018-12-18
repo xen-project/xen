@@ -609,52 +609,14 @@ fail:   PRINT("- Boot failed -\r\n")
 
 GLOBAL(_end_boot)
 
-/* Copy Xen to new location and switch TTBR
+/*
+ * Switch TTBR
+ *
  * x0    ttbr
- * x1    source address
- * x2    destination address
- * x3    length
  *
- * Source and destination must be word aligned, length is rounded up
- * to a 16 byte boundary.
- *
- * MUST BE VERY CAREFUL when saving things to RAM over the copy */
-ENTRY(relocate_xen)
-        /* Copy 16 bytes at a time using:
-         *   x9: counter
-         *   x10: data
-         *   x11: data
-         *   x12: source
-         *   x13: destination
-         */
-        mov     x9, x3
-        mov     x12, x1
-        mov     x13, x2
-
-1:      ldp     x10, x11, [x12], #16
-        stp     x10, x11, [x13], #16
-
-        subs    x9, x9, #16
-        bgt     1b
-
-        /* Flush destination from dcache using:
-         * x9: counter
-         * x10: step
-         * x11: vaddr
-         */
-        dsb   sy        /* So the CPU issues all writes to the range */
-
-        mov   x9, x3
-        ldr   x10, =dcache_line_bytes /* x10 := step */
-        ldr   x10, [x10]
-        mov   x11, x2
-
-1:      dc    cvac, x11
-
-        add   x11, x11, x10
-        subs  x9, x9, x10
-        bgt   1b
-
+ * TODO: This code does not comply with break-before-make.
+ */
+ENTRY(switch_ttbr)
         dsb   sy                     /* Ensure the flushes happen before
                                       * continuing */
         isb                          /* Ensure synchronization with previous

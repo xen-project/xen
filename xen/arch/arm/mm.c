@@ -601,7 +601,7 @@ void __init remove_early_mappings(void)
     flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, BOOT_FDT_SLOT_SIZE);
 }
 
-extern void relocate_xen(uint64_t ttbr, void *src, void *dst, size_t len);
+extern void switch_ttbr(uint64_t ttbr);
 
 /* Clear a translation table and clean & invalidate the cache */
 static void clear_table(void *table)
@@ -612,15 +612,13 @@ static void clear_table(void *table)
 
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
-void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
+void __init setup_pagetables(unsigned long boot_phys_offset)
 {
     uint64_t ttbr;
-    unsigned long dest_va;
     lpae_t pte, *p;
     int i;
 
-    /* Calculate virt-to-phys offset for the new location */
-    phys_offset = xen_paddr - (unsigned long) _start;
+    phys_offset = boot_phys_offset;
 
 #ifdef CONFIG_ARM_64
     p = (void *) xen_pgtable;
@@ -686,21 +684,13 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     pte = boot_second[second_table_offset(BOOT_FDT_VIRT_START + SZ_2M)];
     xen_second[second_table_offset(BOOT_FDT_VIRT_START + SZ_2M)] = pte;
 
-    /* ... Boot Misc area for xen relocation */
-    dest_va = BOOT_RELOC_VIRT_START;
-    pte = mfn_to_xen_entry(maddr_to_mfn(xen_paddr), MT_NORMAL);
-    /* Map the destination in xen_second. */
-    xen_second[second_table_offset(dest_va)] = pte;
-    /* Map the destination in boot_second. */
-    write_pte(boot_second + second_table_offset(dest_va), pte);
-    flush_xen_data_tlb_range_va_local(dest_va, SECOND_SIZE);
 #ifdef CONFIG_ARM_64
     ttbr = (uintptr_t) xen_pgtable + phys_offset;
 #else
     ttbr = (uintptr_t) cpu0_pgtable + phys_offset;
 #endif
 
-    relocate_xen(ttbr, _start, (void*)dest_va, _end - _start);
+    switch_ttbr(ttbr);
 
     /* Clear the copy of the boot pagetables. Each secondary CPU
      * rebuilds these itself (see head.S) */
