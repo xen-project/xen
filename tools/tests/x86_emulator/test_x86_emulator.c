@@ -3322,22 +3322,15 @@ int main(int argc, char **argv)
     {
         decl_insn(vpcmpestri);
 
+        asm volatile ( "movq %0, %%xmm2\n"
 #ifdef __x86_64__
-        /*
-         * gas up to at least 2.27 doesn't honor explict "rex.w" for
-         * VEX/EVEX encoded instructions, and also doesn't provide any
-         * other means to control VEX.W.
-         */
-        asm volatile ( "movq %0, %%xmm2\n"
                        put_insn(vpcmpestri,
-                                ".byte 0xC4, 0xE3, 0xF9, 0x61, 0x16, 0x7A")
-                       :: "m" (res[0]) );
+                                "vpcmpestriq $0b01111010, (%1), %%xmm2")
 #else
-        asm volatile ( "movq %0, %%xmm2\n"
                        put_insn(vpcmpestri,
                                 "vpcmpestri $0b01111010, (%1), %%xmm2")
-                       :: "m" (res[0]), "S" (NULL) );
 #endif
+                       :: "m" (res[0]), "S" (NULL) );
 
         set_insn(vpcmpestri);
 #ifdef __x86_64__
