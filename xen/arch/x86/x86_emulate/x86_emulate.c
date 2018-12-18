@@ -1866,6 +1866,13 @@ static bool vcpu_has(
 #define host_and_vcpu_must_have(feat) vcpu_must_have(feat)
 #endif
 
+/* Initialise output state in x86_emulate_ctxt */
+static void init_context(struct x86_emulate_ctxt *ctxt)
+{
+    ctxt->retire.raw = 0;
+    x86_emul_reset_event(ctxt);
+}
+
 static int
 realmode_load_seg(
     enum x86_segment seg,
@@ -2713,10 +2720,6 @@ x86_decode(
     state->regs = ctxt->regs;
     state->ip = ctxt->regs->r(ip);
 
-    /* Initialise output state in x86_emulate_ctxt */
-    ctxt->retire.raw = 0;
-    x86_emul_reset_event(ctxt);
-
     op_bytes = def_op_bytes = ad_bytes = def_ad_bytes = ctxt->addr_size/8;
     if ( op_bytes == 8 )
     {
@@ -3399,6 +3402,8 @@ x86_emulate(
 #endif
 
     ASSERT(ops->read);
+
+    init_context(ctxt);
 
     generate_exception_if((mode_vif() &&
                            (_regs.eflags & X86_EFLAGS_VIF) &&
@@ -9800,8 +9805,11 @@ x86_decode_insn(
         .insn_fetch = insn_fetch,
         .read       = x86emul_unhandleable_rw,
     };
-    int rc = x86_decode(state, ctxt, &ops);
+    int rc;
 
+    init_context(ctxt);
+
+    rc = x86_decode(state, ctxt, &ops);
     if ( unlikely(rc != X86EMUL_OKAY) )
         return ERR_PTR(-rc);
 
