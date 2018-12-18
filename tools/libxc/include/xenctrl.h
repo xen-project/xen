@@ -1932,6 +1932,8 @@ int xc_altp2m_get_domain_state(xc_interface *handle, uint32_t dom, bool *state);
 int xc_altp2m_set_domain_state(xc_interface *handle, uint32_t dom, bool state);
 int xc_altp2m_set_vcpu_enable_notify(xc_interface *handle, uint32_t domid,
                                      uint32_t vcpuid, xen_pfn_t gfn);
+int xc_altp2m_set_vcpu_disable_notify(xc_interface *handle, uint32_t domid,
+                                      uint32_t vcpuid);
 int xc_altp2m_create_view(xc_interface *handle, uint32_t domid,
                           xenmem_access_t default_access, uint16_t *view_id);
 int xc_altp2m_destroy_view(xc_interface *handle, uint32_t domid,

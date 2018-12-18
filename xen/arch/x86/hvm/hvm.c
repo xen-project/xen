@@ -4479,6 +4479,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_get_domain_state:
     case HVMOP_altp2m_set_domain_state:
     case HVMOP_altp2m_vcpu_enable_notify:
+    case HVMOP_altp2m_vcpu_disable_notify:
     case HVMOP_altp2m_create_p2m:
     case HVMOP_altp2m_destroy_p2m:
     case HVMOP_altp2m_switch_p2m:
@@ -4592,6 +4593,33 @@ static int do_altp2m_op(
         }
 
         vcpu_altp2m(v).veinfo_gfn = _gfn(a.u.enable_notify.gfn);
+        altp2m_vcpu_update_vmfunc_ve(v);
+        break;
+    }
+
+    case HVMOP_altp2m_vcpu_disable_notify:
+    {
+        struct vcpu *v;
+
+        if ( a.u.disable_notify.vcpu_id >= d->max_vcpus )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        if ( !cpu_has_vmx_virt_exceptions )
+        {
+            rc = -EOPNOTSUPP;
+            break;
+        }
+
+        v = d->vcpu[a.u.enable_notify.vcpu_id];
+
+        /* Already disabled, nothing to do. */
+        if ( gfn_eq(vcpu_altp2m(v).veinfo_gfn, INVALID_GFN) )
+            break;
+
+        vcpu_altp2m(v).veinfo_gfn = INVALID_GFN;
         altp2m_vcpu_update_vmfunc_ve(v);
         break;
     }
