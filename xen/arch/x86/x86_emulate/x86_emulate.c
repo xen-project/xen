@@ -6187,7 +6187,8 @@ x86_emulate(
                                evex.w != evex.pfx),
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
-        avx512_vlen_check(true);
+        if ( !evex.br )
+            avx512_vlen_check(true);
         get_fpu(X86EMUL_FPU_zmm);
 
         opc = init_evex(stub);
