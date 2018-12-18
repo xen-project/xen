@@ -6079,9 +6079,11 @@ x86_emulate(
         else
         {
             generate_exception_if(vex.reg != 0xf, EXC_UD);
-            vex.l = 0;
             host_and_vcpu_must_have(avx);
             get_fpu(X86EMUL_FPU_ymm);
+
+            /* Work around erratum BT230. */
+            vex.l = 0;
         }
 
         opc = init_prefixes(stub);
@@ -6983,6 +6985,9 @@ x86_emulate(
             host_and_vcpu_must_have(mmx);
             get_fpu(X86EMUL_FPU_mmx);
         }
+
+        /* Work around erratum BT36. */
+        vex.w = 0;
 
         opc = init_prefixes(stub);
         opc[0] = b;
@@ -8816,6 +8821,11 @@ x86_emulate(
         generate_exception_if(vex.l || vex.reg != 0xf, EXC_UD);
         host_and_vcpu_must_have(avx);
         get_fpu(X86EMUL_FPU_ymm);
+
+        /* Work around erratum BT41. */
+        if ( !mode_64bit() )
+            vex.w = 0;
+
         opc = init_prefixes(stub);
         goto pextr;
 
