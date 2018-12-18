@@ -1116,8 +1116,11 @@ int domain_unpause_by_systemcontroller(struct domain *d)
      * Creation is considered finished when the controller reference count
      * first drops to 0.
      */
-    if ( new == 0 )
+    if ( new == 0 && !d->creation_finished )
+    {
         d->creation_finished = true;
+        arch_domain_creation_finished(d);
+    }
 
     domain_unpause(d);
 

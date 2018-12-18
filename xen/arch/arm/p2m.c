@@ -1079,6 +1079,22 @@ static void p2m_invalidate_table(struct p2m_domain *p2m, mfn_t mfn)
 }
 
 /*
+ * Invalidate all entries in the root page-tables. This is
+ * useful to get fault on entry and do an action.
+ */
+void p2m_invalidate_root(struct p2m_domain *p2m)
+{
+    unsigned int i;
+
+    p2m_write_lock(p2m);
+
+    for ( i = 0; i < P2M_ROOT_LEVEL; i++ )
+        p2m_invalidate_table(p2m, page_to_mfn(p2m->root + i));
+
+    p2m_write_unlock(p2m);
+}
+
+/*
  * Resolve any translation fault due to change in the p2m. This
  * includes break-before-make and valid bit cleared.
  */
@@ -1587,10 +1603,12 @@ int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end)
          */
         if ( gfn_eq(start, next_block_gfn) )
         {
-            mfn = p2m_get_entry(p2m, start, &t, NULL, &order, NULL);
+            bool valid;
+
+            mfn = p2m_get_entry(p2m, start, &t, NULL, &order, &valid);
             next_block_gfn = gfn_next_boundary(start, order);
 
-            if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_any_ram(t) )
+            if ( mfn_eq(mfn, INVALID_MFN) || !p2m_is_any_ram(t) || !valid )
             {
                 count++;
                 start = next_block_gfn;
@@ -1624,6 +1642,7 @@ int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end)
  */
 void p2m_flush_vm(struct vcpu *v)
 {
+    struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
     int rc;
     gfn_t start = _gfn(0);
 
@@ -1642,6 +1661,12 @@ void p2m_flush_vm(struct vcpu *v)
         gprintk(XENLOG_WARNING,
                 "P2M has not been correctly cleaned (rc = %d)\n",
                 rc);
+
+    /*
+     * Invalidate the p2m to track which page was modified by the guest
+     * between call of p2m_flush_vm().
+     */
+    p2m_invalidate_root(p2m);
 
     v->arch.need_flush_to_ram = false;
 }

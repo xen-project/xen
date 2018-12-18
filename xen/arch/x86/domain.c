@@ -765,6 +765,10 @@ int arch_domain_soft_reset(struct domain *d)
     return ret;
 }
 
+void arch_domain_creation_finished(struct domain *d)
+{
+}
+
 /*
  * These are the masks of CR4 bits (subject to hardware availability) which a
  * PV guest may not legitimiately attempt to modify.
