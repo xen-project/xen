@@ -51,8 +51,13 @@
 #define TVM_REG(sz, func, reg...)                                           \
 static bool func(struct cpu_user_regs *regs, uint##sz##_t *r, bool read)    \
 {                                                                           \
+    struct vcpu *v = current;                                               \
+    bool cache_enabled = vcpu_has_cache_enabled(v);                         \
+                                                                            \
     GUEST_BUG_ON(read);                                                     \
     WRITE_SYSREG##sz(*r, reg);                                              \
+                                                                            \
+    p2m_toggle_cache(v, cache_enabled);                                     \
                                                                             \
     return true;                                                            \
 }
@@ -71,6 +76,8 @@ static bool func(struct cpu_user_regs *regs, uint##sz##_t *r, bool read)    \
 static bool vreg_emulate_##xreg(struct cpu_user_regs *regs, uint32_t *r,    \
                                 bool read, bool hi)                         \
 {                                                                           \
+    struct vcpu *v = current;                                               \
+    bool cache_enabled = vcpu_has_cache_enabled(v);                         \
     register_t reg = READ_SYSREG(xreg);                                     \
                                                                             \
     GUEST_BUG_ON(read);                                                     \
@@ -85,6 +92,8 @@ static bool vreg_emulate_##xreg(struct cpu_user_regs *regs, uint32_t *r,    \
         reg |= *r;                                                          \
     }                                                                       \
     WRITE_SYSREG(reg, xreg);                                                \
+                                                                            \
+    p2m_toggle_cache(v, cache_enabled);                                     \
                                                                             \
     return true;                                                            \
 }                                                                           \
@@ -183,6 +192,19 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
             return inject_undef_exception(regs, hsr);
         if ( cp32.read )
             set_user_reg(regs, regidx, v->arch.actlr);
+        break;
+
+    /*
+     * HCR_EL2.TSW
+     *
+     * ARMv7 (DDI 0406C.b): B1.14.6
+     * ARMv8 (DDI 0487B.b): Table D1-42
+     */
+    case HSR_CPREG32(DCISW):
+    case HSR_CPREG32(DCCSW):
+    case HSR_CPREG32(DCCISW):
+        if ( !cp32.read )
+            p2m_set_way_flush(current);
         break;
 
     /*

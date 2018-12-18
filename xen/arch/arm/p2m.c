@@ -3,6 +3,7 @@
 #include <xen/iocap.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
 
 #include <asm/event.h>
 #include <asm/flushtlb.h>
@@ -1613,6 +1614,95 @@ int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end)
     *pstart = start;
 
     return rc;
+}
+
+/*
+ * Clean & invalidate RAM associated to the guest vCPU.
+ *
+ * The function can only work with the current vCPU and should be called
+ * with IRQ enabled as the vCPU could get preempted.
+ */
+void p2m_flush_vm(struct vcpu *v)
+{
+    int rc;
+    gfn_t start = _gfn(0);
+
+    ASSERT(v == current);
+    ASSERT(local_irq_is_enabled());
+    ASSERT(v->arch.need_flush_to_ram);
+
+    do
+    {
+        rc = p2m_cache_flush_range(v->domain, &start, _gfn(ULONG_MAX));
+        if ( rc == -ERESTART )
+            do_softirq();
+    } while ( rc == -ERESTART );
+
+    if ( rc != 0 )
+        gprintk(XENLOG_WARNING,
+                "P2M has not been correctly cleaned (rc = %d)\n",
+                rc);
+
+    v->arch.need_flush_to_ram = false;
+}
+
+/*
+ * See note at ARMv7 ARM B1.14.4 (DDI 0406C.c) (TL;DR: S/W ops are not
+ * easily virtualized).
+ *
+ * Main problems:
+ *  - S/W ops are local to a CPU (not broadcast)
+ *  - We have line migration behind our back (speculation)
+ *  - System caches don't support S/W at all (damn!)
+ *
+ * In the face of the above, the best we can do is to try and convert
+ * S/W ops to VA ops. Because the guest is not allowed to infer the S/W
+ * to PA mapping, it can only use S/W to nuke the whole cache, which is
+ * rather a good thing for us.
+ *
+ * Also, it is only used when turning caches on/off ("The expected
+ * usage of the cache maintenance instructions that operate by set/way
+ * is associated with the powerdown and powerup of caches, if this is
+ * required by the implementation.").
+ *
+ * We use the following policy:
+ *  - If we trap a S/W operation, we enabled VM trapping to detect
+ *  caches being turned on/off, and do a full clean.
+ *
+ *  - We flush the caches on both caches being turned on and off.
+ *
+ *  - Once the caches are enabled, we stop trapping VM ops.
+ */
+void p2m_set_way_flush(struct vcpu *v)
+{
+    /* This function can only work with the current vCPU. */
+    ASSERT(v == current);
+
+    if ( !(v->arch.hcr_el2 & HCR_TVM) )
+    {
+        v->arch.need_flush_to_ram = true;
+        vcpu_hcr_set_flags(v, HCR_TVM);
+    }
+}
+
+void p2m_toggle_cache(struct vcpu *v, bool was_enabled)
+{
+    bool now_enabled = vcpu_has_cache_enabled(v);
+
+    /* This function can only work with the current vCPU. */
+    ASSERT(v == current);
+
+    /*
+     * If switching the MMU+caches on, need to invalidate the caches.
+     * If switching it off, need to clean the caches.
+     * Clean + invalidate does the trick always.
+     */
+    if ( was_enabled != now_enabled )
+        v->arch.need_flush_to_ram = true;
+
+    /* Caches are now on, stop trapping VM ops (until a S/W op) */
+    if ( now_enabled )
+        vcpu_hcr_clear_flags(v, HCR_TVM);
 }
 
 mfn_t gfn_to_mfn(struct domain *d, gfn_t gfn)

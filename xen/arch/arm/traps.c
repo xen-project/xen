@@ -97,7 +97,7 @@ register_t get_default_hcr_flags(void)
 {
     return  (HCR_PTW|HCR_BSU_INNER|HCR_AMO|HCR_IMO|HCR_FMO|HCR_VM|
              (vwfi != NATIVE ? (HCR_TWI|HCR_TWE) : 0) |
-             HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB);
+             HCR_TSC|HCR_TAC|HCR_SWIO|HCR_TIDCP|HCR_FB|HCR_TSW);
 }
 
 static enum {
@@ -2258,10 +2258,33 @@ static void check_for_pcpu_work(void)
     }
 }
 
+/*
+ * Process pending work for the vCPU. Any call should be fast or
+ * implement preemption.
+ */
+static void check_for_vcpu_work(void)
+{
+    struct vcpu *v = current;
+
+    if ( likely(!v->arch.need_flush_to_ram) )
+        return;
+
+    /*
+     * Give a chance for the pCPU to process work before handling the vCPU
+     * pending work.
+     */
+    check_for_pcpu_work();
+
+    local_irq_enable();
+    p2m_flush_vm(v);
+    local_irq_disable();
+}
+
 void leave_hypervisor_tail(void)
 {
     local_irq_disable();
 
+    check_for_vcpu_work();
     check_for_pcpu_work();
 
     vgic_sync_to_lrs();

@@ -34,8 +34,13 @@
 static bool vreg_emulate_##reg(struct cpu_user_regs *regs,          \
                                uint64_t *r, bool read)              \
 {                                                                   \
+    struct vcpu *v = current;                                       \
+    bool cache_enabled = vcpu_has_cache_enabled(v);                 \
+                                                                    \
     GUEST_BUG_ON(read);                                             \
     WRITE_SYSREG64(*r, reg);                                        \
+                                                                    \
+    p2m_toggle_cache(v, cache_enabled);                             \
                                                                     \
     return true;                                                    \
 }
@@ -82,6 +87,18 @@ void do_sysreg(struct cpu_user_regs *regs,
             return inject_undef_exception(regs, hsr);
         if ( hsr.sysreg.read )
             set_user_reg(regs, regidx, v->arch.actlr);
+        break;
+
+    /*
+     * HCR_EL2.TSW
+     *
+     * ARMv8 (DDI 0487B.b): Table D1-42
+     */
+    case HSR_SYSREG_DCISW:
+    case HSR_SYSREG_DCCSW:
+    case HSR_SYSREG_DCCISW:
+        if ( !hsr.sysreg.read )
+            p2m_set_way_flush(current);
         break;
 
     /*

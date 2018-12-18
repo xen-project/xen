@@ -6,6 +6,8 @@
 #include <xen/rwlock.h>
 #include <xen/mem_access.h>
 
+#include <asm/current.h>
+
 #define paddr_bits PADDR_BITS
 
 /* Holds the bit size of IPAs in p2m tables.  */
@@ -237,6 +239,12 @@ bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn);
  */
 int p2m_cache_flush_range(struct domain *d, gfn_t *pstart, gfn_t end);
 
+void p2m_set_way_flush(struct vcpu *v);
+
+void p2m_toggle_cache(struct vcpu *v, bool was_enabled);
+
+void p2m_flush_vm(struct vcpu *v);
+
 /*
  * Map a region in the guest p2m with a specific p2m type.
  * The memory attributes will be derived from the p2m type.
@@ -362,6 +370,18 @@ static inline int set_foreign_p2m_entry(struct domain *d, unsigned long gfn,
      *       foreign entries will need to be implemented.
      */
     return -EOPNOTSUPP;
+}
+
+/*
+ * A vCPU has cache enabled only when the MMU is enabled and data cache
+ * is enabled.
+ */
+static inline bool vcpu_has_cache_enabled(struct vcpu *v)
+{
+    /* Only works with the current vCPU */
+    ASSERT(current == v);
+
+    return (READ_SYSREG32(SCTLR_EL1) & (SCTLR_C|SCTLR_M)) == (SCTLR_C|SCTLR_M);
 }
 
 #endif /* _XEN_P2M_H */
