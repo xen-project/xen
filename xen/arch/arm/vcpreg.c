@@ -23,7 +23,128 @@
 #include <asm/current.h>
 #include <asm/regs.h>
 #include <asm/traps.h>
+#include <asm/vreg.h>
 #include <asm/vtimer.h>
+
+/*
+ * Macros to help generating helpers for registers trapped when
+ * HCR_EL2.TVM is set.
+ *
+ * Note that it only traps NS write access from EL1.
+ *
+ *  - TVM_REG() should not be used outside of the macros. It is there to
+ *    help defining TVM_REG32() and TVM_REG64()
+ *  - TVM_REG32(regname, xreg) and TVM_REG64(regname, xreg) are used to
+ *    resp. generate helper accessing 32-bit and 64-bit register. "regname"
+ *    is the Arm32 name and "xreg" the Arm64 name.
+ *  - TVM_REG32_COMBINED(lowreg, hireg, xreg) are used to generate a
+ *    pair of register sharing the same Arm64 register, but are 2 distinct
+ *    Arm32 registers. "lowreg" and "hireg" contains the name for on Arm32
+ *    registers, "xreg" contains the name for the combined register on Arm64.
+ *    The definition of "lowreg" and "higreg" match the Armv8 specification,
+ *    this means "lowreg" is an alias to xreg[31:0] and "high" is an alias to
+ *    xreg[63:32].
+ *
+ */
+
+/* The name is passed from the upper macro to workaround macro expansion. */
+#define TVM_REG(sz, func, reg...)                                           \
+static bool func(struct cpu_user_regs *regs, uint##sz##_t *r, bool read)    \
+{                                                                           \
+    GUEST_BUG_ON(read);                                                     \
+    WRITE_SYSREG##sz(*r, reg);                                              \
+                                                                            \
+    return true;                                                            \
+}
+
+#define TVM_REG32(regname, xreg) TVM_REG(32, vreg_emulate_##regname, xreg)
+#define TVM_REG64(regname, xreg) TVM_REG(64, vreg_emulate_##regname, xreg)
+
+#ifdef CONFIG_ARM_32
+#define TVM_REG32_COMBINED(lowreg, hireg, xreg)                     \
+    /* Use TVM_REG directly to workaround macro expansion. */       \
+    TVM_REG(32, vreg_emulate_##lowreg, lowreg)                      \
+    TVM_REG(32, vreg_emulate_##hireg, hireg)
+
+#else /* CONFIG_ARM_64 */
+#define TVM_REG32_COMBINED(lowreg, hireg, xreg)                             \
+static bool vreg_emulate_##xreg(struct cpu_user_regs *regs, uint32_t *r,    \
+                                bool read, bool hi)                         \
+{                                                                           \
+    register_t reg = READ_SYSREG(xreg);                                     \
+                                                                            \
+    GUEST_BUG_ON(read);                                                     \
+    if ( hi ) /* reg[63:32] is AArch32 register hireg */                    \
+    {                                                                       \
+        reg &= GENMASK(31, 0);                                              \
+        reg |= ((uint64_t)*r) << 32;                                        \
+    }                                                                       \
+    else /* reg[31:0] is AArch32 register lowreg. */                        \
+    {                                                                       \
+        reg &= GENMASK(63, 32);                                             \
+        reg |= *r;                                                          \
+    }                                                                       \
+    WRITE_SYSREG(reg, xreg);                                                \
+                                                                            \
+    return true;                                                            \
+}                                                                           \
+                                                                            \
+static bool vreg_emulate_##lowreg(struct cpu_user_regs *regs, uint32_t *r,  \
+                                  bool read)                                \
+{                                                                           \
+    return vreg_emulate_##xreg(regs, r, read, false);                       \
+}                                                                           \
+                                                                            \
+static bool vreg_emulate_##hireg(struct cpu_user_regs *regs, uint32_t *r,   \
+                                 bool read)                                 \
+{                                                                           \
+    return vreg_emulate_##xreg(regs, r, read, true);                        \
+}
+#endif
+
+/* Defining helpers for emulating co-processor registers. */
+TVM_REG32(SCTLR, SCTLR_EL1)
+/*
+ * AArch32 provides two way to access TTBR* depending on the access
+ * size, whilst AArch64 provides one way.
+ *
+ * When using AArch32, for simplicity, use the same access size as the
+ * guest.
+ */
+#ifdef CONFIG_ARM_32
+TVM_REG32(TTBR0_32, TTBR0_32)
+TVM_REG32(TTBR1_32, TTBR1_32)
+#else
+TVM_REG32(TTBR0_32, TTBR0_EL1)
+TVM_REG32(TTBR1_32, TTBR1_EL1)
+#endif
+TVM_REG64(TTBR0, TTBR0_EL1)
+TVM_REG64(TTBR1, TTBR1_EL1)
+/* AArch32 registers TTBCR and TTBCR2 share AArch64 register TCR_EL1. */
+TVM_REG32_COMBINED(TTBCR, TTBCR2, TCR_EL1)
+TVM_REG32(DACR, DACR32_EL2)
+TVM_REG32(DFSR, ESR_EL1)
+TVM_REG32(IFSR, IFSR32_EL2)
+/* AArch32 registers DFAR and IFAR shares AArch64 register FAR_EL1. */
+TVM_REG32_COMBINED(DFAR, IFAR, FAR_EL1)
+TVM_REG32(ADFSR, AFSR0_EL1)
+TVM_REG32(AIFSR, AFSR1_EL1)
+/* AArch32 registers MAIR0 and MAIR1 share AArch64 register MAIR_EL1. */
+TVM_REG32_COMBINED(MAIR0, MAIR1, MAIR_EL1)
+/* AArch32 registers AMAIR0 and AMAIR1 share AArch64 register AMAIR_EL1. */
+TVM_REG32_COMBINED(AMAIR0, AMAIR1, AMAIR_EL1)
+TVM_REG32(CONTEXTIDR, CONTEXTIDR_EL1)
+
+/* Macro to generate easily case for co-processor emulation. */
+#define GENERATE_CASE(reg, sz)                                      \
+    case HSR_CPREG##sz(reg):                                        \
+    {                                                               \
+        bool res;                                                   \
+                                                                    \
+        res = vreg_emulate_cp##sz(regs, hsr, vreg_emulate_##reg);   \
+        ASSERT(res);                                                \
+        break;                                                      \
+    }
 
 void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
 {
@@ -63,6 +184,31 @@ void do_cp15_32(struct cpu_user_regs *regs, const union hsr hsr)
         if ( cp32.read )
             set_user_reg(regs, regidx, v->arch.actlr);
         break;
+
+    /*
+     * HCR_EL2.TVM
+     *
+     * ARMv8 (DDI 0487D.a): Table D1-38
+     */
+    GENERATE_CASE(SCTLR, 32)
+    GENERATE_CASE(TTBR0_32, 32)
+    GENERATE_CASE(TTBR1_32, 32)
+    GENERATE_CASE(TTBCR, 32)
+    GENERATE_CASE(TTBCR2, 32)
+    GENERATE_CASE(DACR, 32)
+    GENERATE_CASE(DFSR, 32)
+    GENERATE_CASE(IFSR, 32)
+    GENERATE_CASE(DFAR, 32)
+    GENERATE_CASE(IFAR, 32)
+    GENERATE_CASE(ADFSR, 32)
+    GENERATE_CASE(AIFSR, 32)
+    /* AKA PRRR */
+    GENERATE_CASE(MAIR0, 32)
+    /* AKA NMRR */
+    GENERATE_CASE(MAIR1, 32)
+    GENERATE_CASE(AMAIR0, 32)
+    GENERATE_CASE(AMAIR1, 32)
+    GENERATE_CASE(CONTEXTIDR, 32)
 
     /*
      * MDCR_EL2.TPM
@@ -192,6 +338,9 @@ void do_cp15_64(struct cpu_user_regs *regs, const union hsr hsr)
         if ( !vgic_emulate(regs, hsr) )
             return inject_undef_exception(regs, hsr);
         break;
+
+    GENERATE_CASE(TTBR0, 64)
+    GENERATE_CASE(TTBR1, 64)
 
     /*
      * CPTR_EL2.T{0..9,12..13}
