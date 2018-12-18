@@ -9,3 +9,4 @@ obj-$(CONFIG_ALL_PLAT)   += sunxi.o
 obj-$(CONFIG_ALL64_PLAT) += thunderx.o
 obj-$(CONFIG_ALL64_PLAT) += xgene-storm.o
 obj-$(CONFIG_MPSOC_PLATFORM)  += xilinx-zynqmp.o
+obj-$(CONFIG_MPSOC_PLATFORM)  += xilinx-zynqmp-eemi.o

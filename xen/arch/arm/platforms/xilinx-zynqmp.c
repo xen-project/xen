@@ -18,6 +18,8 @@
  */
 
 #include <asm/platform.h>
+#include <asm/platforms/xilinx-zynqmp-eemi.h>
+#include <asm/smccc.h>
 
 static const char * const zynqmp_dt_compat[] __initconst =
 {
@@ -32,8 +34,30 @@ static const struct dt_device_match zynqmp_blacklist_dev[] __initconst =
     { /* sentinel */ },
 };
 
+static bool zynqmp_smc(struct cpu_user_regs *regs)
+{
+    /*
+     * ZynqMP firmware is based on SMCCC 1.1. If SMCCC 1.1 is not
+     * available something is wrong, don't try to handle it.
+     */
+    if ( !cpus_have_const_cap(ARM_SMCCC_1_1) )
+    {
+        static bool once = true;
+
+        if ( once )
+        {
+            printk(XENLOG_WARNING "ZynqMP firmware Error: no SMCCC 1.1 "
+                   "support. Disabling firmware calls.");
+            once = false;
+        }
+        return false;
+    }
+    return zynqmp_eemi(regs);
+}
+
 PLATFORM_START(xilinx_zynqmp, "Xilinx ZynqMP")
     .compatible = zynqmp_dt_compat,
+    .smc = zynqmp_smc,
     .blacklist_dev = zynqmp_blacklist_dev,
 PLATFORM_END
 
