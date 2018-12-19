@@ -647,7 +647,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
 {
     AO_CREATE(ctx, domid, ao_how);
     int num = 0, i;
-    libxl_device_disk *disks = NULL, disk_saved, disk_empty;
+    libxl_device_disk *disks = NULL, disk_saved;
     libxl_domain_config d_config;
     int rc, dm_ver;
     libxl__device device;
@@ -658,15 +658,8 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     flexarray_t *insert = NULL, *empty = NULL;
 
     libxl_domain_config_init(&d_config);
-    libxl_device_disk_init(&disk_empty);
     libxl_device_disk_init(&disk_saved);
     libxl_device_disk_copy(ctx, &disk_saved, disk);
-
-    disk_empty.format = LIBXL_DISK_FORMAT_EMPTY;
-    disk_empty.vdev = libxl__strdup(NOGC, disk->vdev);
-    disk_empty.pdev_path = libxl__strdup(NOGC, "");
-    disk_empty.is_cdrom = 1;
-    libxl__device_disk_setdefault(gc, domid, &disk_empty, false);
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
@@ -721,23 +714,6 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     be_path = libxl__device_backend_path(gc, &device);
     libxl_path = libxl__device_libxl_path(gc, &device);
 
-    insert = flexarray_make(gc, 4, 1);
-
-    flexarray_append_pair(insert, "type",
-                          libxl__device_disk_string_of_backend(disk->backend));
-    if (disk->format != LIBXL_DISK_FORMAT_EMPTY)
-        flexarray_append_pair(insert, "params",
-                        GCSPRINTF("%s:%s",
-                            libxl__device_disk_string_of_format(disk->format),
-                            disk->pdev_path));
-    else
-        flexarray_append_pair(insert, "params", "");
-
-    empty = flexarray_make(gc, 4, 1);
-    flexarray_append_pair(empty, "type",
-                          libxl__device_disk_string_of_backend(disk->backend));
-    flexarray_append_pair(empty, "params", "");
-
     /* Note: CTX lock is already held at this point so lock hierarchy
      * is maintained.
      */
@@ -750,10 +726,26 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     /* We need to eject the original image first. This is implemented
      * by inserting empty media. JSON is not updated.
      */
+
     if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+        libxl_device_disk disk_empty;
+
+        libxl_device_disk_init(&disk_empty);
+        disk_empty.format = LIBXL_DISK_FORMAT_EMPTY;
+        disk_empty.vdev = libxl__strdup(NOGC, disk->vdev);
+        disk_empty.pdev_path = libxl__strdup(NOGC, "");
+        disk_empty.is_cdrom = 1;
+        libxl__device_disk_setdefault(gc, domid, &disk_empty, false);
+
         rc = libxl__qmp_insert_cdrom(gc, domid, &disk_empty);
+        libxl_device_disk_dispose(&disk_empty);
         if (rc) goto out;
     }
+
+    empty = flexarray_make(gc, 4, 1);
+    flexarray_append_pair(empty, "type",
+                          libxl__device_disk_string_of_backend(disk->backend));
+    flexarray_append_pair(empty, "params", "");
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
@@ -781,6 +773,10 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         if (rc < 0) goto out;
     }
 
+    /*
+     * Now that the drive is empty, we can insert the new media.
+     */
+
     rc = libxl__get_domain_configuration(gc, domid, &d_config);
     if (rc) goto out;
 
@@ -793,6 +789,17 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         rc = libxl__qmp_insert_cdrom(gc, domid, disk);
         if (rc) goto out;
     }
+
+    insert = flexarray_make(gc, 4, 1);
+    flexarray_append_pair(insert, "type",
+                      libxl__device_disk_string_of_backend(disk->backend));
+    if (disk->format != LIBXL_DISK_FORMAT_EMPTY)
+        flexarray_append_pair(insert, "params",
+                    GCSPRINTF("%s:%s",
+                        libxl__device_disk_string_of_format(disk->format),
+                        disk->pdev_path));
+    else
+        flexarray_append_pair(insert, "params", "");
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
@@ -831,7 +838,6 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
 out:
     libxl__xs_transaction_abort(gc, &t);
     libxl__device_list_free(&libxl__disk_devtype, disks, num);
-    libxl_device_disk_dispose(&disk_empty);
     libxl_device_disk_dispose(&disk_saved);
     libxl_domain_config_dispose(&d_config);
 
