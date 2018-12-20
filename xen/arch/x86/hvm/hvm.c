@@ -1814,6 +1814,24 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             break;
         }
 
+        /*
+         * Workaround for XSA-304 / CVE-2018-12207.  If we take an execution
+         * fault against a non-executable superpage, shatter it to regain
+         * execute permissions.
+         */
+        if ( page_order > 0 && npfec.insn_fetch && npfec.present && !violation )
+        {
+            int res = p2m_set_entry(p2m, _gfn(gfn), mfn, PAGE_ORDER_4K,
+                                    p2mt, p2ma);
+
+            if ( res )
+                printk(XENLOG_ERR "Failed to shatter gfn %"PRI_gfn": %d\n",
+                       gfn, res);
+
+            rc = !res;
+            goto out_put_gfn;
+        }
+
         if ( violation )
         {
             /* Should #VE be emulated for this fault? */

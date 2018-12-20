@@ -895,7 +895,7 @@ Controls for interacting with the system Extended Firmware Interface.
     uncacheable.
 
 ### ept
-> `= List of [ ad=<bool>, pml=<bool> ]`
+> `= List of [ ad=<bool>, pml=<bool>, exec-sp=<bool> ]`
 
 > Applicability: Intel
 
@@ -925,6 +925,16 @@ introduced with the Nehalem architecture.
     functionally depends on A/D tracking, so choosing `ad=0` will implicitly
     disable PML.  `pml=0` can be used to prevent the use of PML on otherwise
     capable hardware.
+
+*   The `exec-sp` boolean controls whether EPT superpages with execute
+    permissions are permitted.  In general this is good for performance.
+
+    However, on processors vulnerable CVE-2018-12207, HVM guest kernels can
+    use executable superpages to crash the host.  By default, executable
+    superpages are disabled on affected hardware.
+
+    If HVM guest kernels are trusted not to mount a DoS against the system,
+    this option can enabled to regain performance.
 
 ### extra_guest_irqs
 > `= [<domU number>][,<dom0 number>]`
