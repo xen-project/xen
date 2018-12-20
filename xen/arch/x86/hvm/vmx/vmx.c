@@ -2496,6 +2496,102 @@ static void pi_notification_interrupt(struct cpu_user_regs *regs)
 static void __init lbr_tsx_fixup_check(void);
 static void __init bdw_erratum_bdf14_fixup_check(void);
 
+/*
+ * Calculate whether the CPU is vulnerable to Instruction Fetch page
+ * size-change MCEs.
+ */
+static bool __init has_if_pschange_mc(void)
+{
+    uint64_t caps = 0;
+
+    /*
+     * If we are virtualised, there is nothing we can do.  Our EPT tables are
+     * shadowed by our hypervisor, and not walked by hardware.
+     */
+    if ( cpu_has_hypervisor )
+        return false;
+
+    if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
+        rdmsrl(MSR_ARCH_CAPABILITIES, caps);
+
+    if ( caps & ARCH_CAPS_IF_PSCHANGE_MC_NO )
+        return false;
+
+    /*
+     * IF_PSCHANGE_MC is only known to affect Intel Family 6 processors at
+     * this time.
+     */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return false;
+
+    switch ( boot_cpu_data.x86_model )
+    {
+        /*
+         * Core processors since at least Nehalem are vulnerable.
+         */
+    case 0x1f: /* Auburndale / Havendale */
+    case 0x1e: /* Nehalem */
+    case 0x1a: /* Nehalem EP */
+    case 0x2e: /* Nehalem EX */
+    case 0x25: /* Westmere */
+    case 0x2c: /* Westmere EP */
+    case 0x2f: /* Westmere EX */
+    case 0x2a: /* SandyBridge */
+    case 0x2d: /* SandyBridge EP/EX */
+    case 0x3a: /* IvyBridge */
+    case 0x3e: /* IvyBridge EP/EX */
+    case 0x3c: /* Haswell */
+    case 0x3f: /* Haswell EX/EP */
+    case 0x45: /* Haswell D */
+    case 0x46: /* Haswell H */
+    case 0x3d: /* Broadwell */
+    case 0x47: /* Broadwell H */
+    case 0x4f: /* Broadwell EP/EX */
+    case 0x56: /* Broadwell D */
+    case 0x4e: /* Skylake M */
+    case 0x5e: /* Skylake D */
+    case 0x55: /* Skylake-X / Cascade Lake */
+    case 0x8e: /* Kaby / Coffee / Whiskey Lake M */
+    case 0x9e: /* Kaby / Coffee / Whiskey Lake D */
+        return true;
+
+        /*
+         * Atom processors are not vulnerable.
+         */
+    case 0x1c: /* Pineview */
+    case 0x26: /* Lincroft */
+    case 0x27: /* Penwell */
+    case 0x35: /* Cloverview */
+    case 0x36: /* Cedarview */
+    case 0x37: /* Baytrail / Valleyview (Silvermont) */
+    case 0x4d: /* Avaton / Rangely (Silvermont) */
+    case 0x4c: /* Cherrytrail / Brasswell */
+    case 0x4a: /* Merrifield */
+    case 0x5a: /* Moorefield */
+    case 0x5c: /* Goldmont */
+    case 0x5d: /* SoFIA 3G Granite/ES2.1 */
+    case 0x65: /* SoFIA LTE AOSP */
+    case 0x5f: /* Denverton */
+    case 0x6e: /* Cougar Mountain */
+    case 0x75: /* Lightning Mountain */
+    case 0x7a: /* Gemini Lake */
+    case 0x86: /* Jacobsville */
+
+        /*
+         * Knights processors are not vulnerable.
+         */
+    case 0x57: /* Knights Landing */
+    case 0x85: /* Knights Mill */
+        return false;
+
+    default:
+        printk("Unrecognised CPU model %#x - assuming vulnerable to IF_PSCHANGE_MC\n",
+               boot_cpu_data.x86_model);
+        return true;
+    }
+}
+
 const struct hvm_function_table * __init start_vmx(void)
 {
     set_in_cr4(X86_CR4_VMXE);
@@ -2516,6 +2612,17 @@ const struct hvm_function_table * __init start_vmx(void)
      */
     if ( cpu_has_vmx_ept && (cpu_has_vmx_pat || opt_force_ept) )
     {
+        bool cpu_has_bug_pschange_mc = has_if_pschange_mc();
+
+        if ( opt_ept_exec_sp == -1 )
+        {
+            /* Default to non-executable superpages on vulnerable hardware. */
+            opt_ept_exec_sp = !cpu_has_bug_pschange_mc;
+
+            if ( cpu_has_bug_pschange_mc )
+                printk("VMX: Disabling executable EPT superpages due to CVE-2018-12207\n");
+        }
+
         vmx_function_table.hap_supported = 1;
         vmx_function_table.altp2m_supported = 1;
 

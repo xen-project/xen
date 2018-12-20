@@ -1648,6 +1648,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     struct p2m_domain *p2m, *hostp2m;
     int rc, fall_through = 0, paged = 0;
     int sharing_enomem = 0;
+    unsigned int page_order = 0;
     vm_event_request_t *req_ptr = NULL;
     bool_t ap2m_active, sync = 0;
 
@@ -1718,7 +1719,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     hostp2m = p2m_get_hostp2m(currd);
     mfn = get_gfn_type_access(hostp2m, gfn, &p2mt, &p2ma,
                               P2M_ALLOC | (npfec.write_access ? P2M_UNSHARE : 0),
-                              NULL);
+                              &page_order);
 
     if ( ap2m_active )
     {
@@ -1730,7 +1731,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             goto out;
         }
 
-        mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 0, NULL);
+        mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 0, &page_order);
     }
     else
         p2m = hostp2m;
@@ -1770,6 +1771,23 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
         case p2m_access_rwx:
             violation = 0;
             break;
+        }
+
+        /*
+         * Workaround for XSA-304 / CVE-2018-12207.  If we take an execution
+         * fault against a non-executable superpage, shatter it to regain
+         * execute permissions.
+         */
+        if ( page_order > 0 && npfec.insn_fetch && npfec.present && !violation )
+        {
+            int res = p2m_set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2ma);
+
+            if ( res )
+                printk(XENLOG_ERR "Failed to shatter gfn %"PRI_gfn": %d\n",
+                       gfn, res);
+
+            rc = !res;
+            goto out_put_gfn;
         }
 
         if ( violation )
