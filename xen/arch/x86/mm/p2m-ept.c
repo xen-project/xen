@@ -210,6 +210,12 @@ static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,
             break;
     }
     
+    /*
+     * Don't create executable superpages if we need to shatter them to
+     * protect against CVE-2018-12207.
+     */
+    if ( !opt_ept_exec_sp && is_epte_superpage(entry) )
+        entry->x = 0;
 }
 
 #define GUEST_TABLE_MAP_FAILED  0
