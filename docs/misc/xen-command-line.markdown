@@ -841,29 +841,37 @@ effect the inverse meaning.
 >> Allows mapping of RuntimeServices which have no cachability attribute
 >> set as UC.
 
-### ept (Intel)
-> `= List of ( {no-}pml | {no-}ad )`
+### ept
+> `= List of [ ad=<bool>, pml=<bool> ]`
 
-Controls EPT related features.
+> Applicability: Intel
 
-> Sub-options:
+Extended Page Tables are a feature of Intel's VT-x technology, whereby
+hardware manages the virtualisation of HVM guest pagetables.  EPT was
+introduced with the Nehalem architecture.
 
-> `pml`
+*   The `ad` boolean controls hardware tracking of Access and Dirty bits in the
+    EPT pagetables, and was first introduced in Broadwell Server.
 
-> Default: `true`
+    By default, Xen will use A/D tracking when available in hardware, except
+    on Avoton processors affected by erratum AVR41.  Explicitly choosing
+    `ad=0` will disable the use of A/D tracking on capable hardware, whereas
+    choosing `ad=1` will cause tracking to be used even on AVR41-affected
+    hardware.
 
->> PML is a new hardware feature in Intel's Broadwell Server and further
->> platforms which reduces hypervisor overhead of log-dirty mechanism by
->> automatically recording GPAs (guest physical addresses) when guest memory
->> gets dirty, and therefore significantly reducing number of EPT violation
->> caused by write protection of guest memory, which is a necessity to
->> implement log-dirty mechanism before PML.
+*   The `pml` boolean controls the use of Page Modification Logging, which is
+    also introduced in Broadwell Server.
 
-> `ad`
+    PML is a feature whereby the processor generates a list of pages which
+    have been dirtied.  This is necessary information for operations such as
+    live migration, and having the processor maintain the list of dirtied
+    pages is more efficient than traditional software implementations where
+    all guest writes trap into Xen so the dirty bitmap can be maintained.
 
-> Default: Hardware dependent
-
->> Have hardware keep accessed/dirty (A/D) bits updated.
+    By default, Xen will use PML when it is available in hardware.  PML
+    functionally depends on A/D tracking, so choosing `ad=0` will implicitly
+    disable PML.  `pml=0` can be used to prevent the use of PML on otherwise
+    capable hardware.
 
 ### extra\_guest\_irqs
 > `= [<domU number>][,<dom0 number>]`

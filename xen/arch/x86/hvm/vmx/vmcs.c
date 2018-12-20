@@ -65,35 +65,23 @@ integer_param("ple_gap", ple_gap);
 static unsigned int __read_mostly ple_window = 4096;
 integer_param("ple_window", ple_window);
 
-static bool_t __read_mostly opt_pml_enabled = 1;
+static bool __read_mostly opt_ept_pml = true;
 static s8 __read_mostly opt_ept_ad = -1;
 
-/*
- * The 'ept' parameter controls functionalities that depend on, or impact the
- * EPT mechanism. Optional comma separated value may contain:
- *
- *  pml                 Enable PML
- *  ad                  Use A/D bits
- */
 static int __init parse_ept_param(const char *s)
 {
     const char *ss;
-    int rc = 0;
+    int val, rc = 0;
 
     do {
-        bool_t val = !!strncmp(s, "no-", 3);
-
-        if ( !val )
-            s += 3;
-
         ss = strchr(s, ',');
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !strncmp(s, "pml", ss - s) )
-            opt_pml_enabled = val;
-        else if ( !strncmp(s, "ad", ss - s) )
+        if ( (val = parse_boolean("ad", s, ss)) >= 0 )
             opt_ept_ad = val;
+        else if ( (val = parse_boolean("pml", s, ss)) >= 0 )
+            opt_ept_pml = val;
         else
             rc = -EINVAL;
 
@@ -247,7 +235,7 @@ static int vmx_init_vmcs_config(void)
             opt |= SECONDARY_EXEC_ENABLE_VPID;
         if ( opt_unrestricted_guest_enabled )
             opt |= SECONDARY_EXEC_UNRESTRICTED_GUEST;
-        if ( opt_pml_enabled )
+        if ( opt_ept_pml )
             opt |= SECONDARY_EXEC_ENABLE_PML;
 
         /*
@@ -330,9 +318,9 @@ static int vmx_init_vmcs_config(void)
     if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT) )
         _vmx_secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
 
-    /* Turn off opt_pml_enabled if PML feature is not present */
+    /* Turn off opt_ept_pml if PML feature is not present. */
     if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_PML) )
-        opt_pml_enabled = 0;
+        opt_ept_pml = false;
 
     if ( (_vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING) &&
           ple_gap == 0 )
