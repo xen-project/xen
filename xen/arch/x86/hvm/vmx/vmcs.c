@@ -67,6 +67,7 @@ integer_param("ple_window", ple_window);
 
 static bool __read_mostly opt_ept_pml = true;
 static s8 __read_mostly opt_ept_ad = -1;
+int8_t __read_mostly opt_ept_exec_sp = -1;
 
 static int __init parse_ept_param(const char *s)
 {
@@ -82,6 +83,8 @@ static int __init parse_ept_param(const char *s)
             opt_ept_ad = val;
         else if ( (val = parse_boolean("pml", s, ss)) >= 0 )
             opt_ept_pml = val;
+        else if ( (val = parse_boolean("exec-sp", s, ss)) >= 0 )
+            opt_ept_exec_sp = val;
         else
             rc = -EINVAL;
 
