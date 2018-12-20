@@ -67,6 +67,7 @@ integer_param("ple_window", ple_window);
 
 static bool_t __read_mostly opt_pml_enabled = 1;
 static s8 __read_mostly opt_ept_ad = -1;
+int8_t __read_mostly opt_ept_exec_sp = -1;
 
 /*
  * The 'ept' parameter controls functionalities that depend on, or impact the
@@ -94,6 +95,8 @@ static int __init parse_ept_param(const char *s)
             opt_pml_enabled = val;
         else if ( !cmdline_strcmp(s, "ad") )
             opt_ept_ad = val;
+        else if ( !cmdline_strcmp(s, "exec-sp") )
+            opt_ept_exec_sp = val;
         else
             rc = -EINVAL;
 

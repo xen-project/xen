@@ -828,7 +828,7 @@ effect the inverse meaning.
 >> set as UC.
 
 ### ept (Intel)
-> `= List of ( {no-}pml | {no-}ad )`
+> `= List of [ {no-}pml,  {no-}ad, {no-}exec-sp ]`
 
 Controls EPT related features.
 
@@ -850,6 +850,16 @@ Controls EPT related features.
 > Default: Hardware dependent
 
 >> Have hardware keep accessed/dirty (A/D) bits updated.
+
+*   The `exec-sp` boolean controls whether EPT superpages with execute
+    permissions are permitted.  In general this is good for performance.
+
+    However, on processors vulnerable CVE-2018-12207, HVM guest kernels can
+    use executable superpages to crash the host.  By default, executable
+    superpages are disabled on affected hardware.
+
+    If HVM guest kernels are trusted not to mount a DoS against the system,
+    this option can enabled to regain performance.
 
 ### extra\_guest\_irqs
 > `= [<domU number>][,<dom0 number>]`
