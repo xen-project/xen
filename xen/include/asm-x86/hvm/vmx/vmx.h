@@ -28,6 +28,8 @@
 #include <asm/hvm/trace.h>
 #include <asm/hvm/vmx/vmcs.h>
 
+extern int8_t opt_ept_exec_sp;
+
 typedef union {
     struct {
         u64 r       :   1,  /* bit 0 - Read permission */
