@@ -268,24 +268,37 @@ static int libxl__get_reaper_uid(libxl__gc *gc, uid_t *reaper_uid)
     struct passwd *user_base, user_pwbuf;
     int rc;
 
+    rc = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_REAPER,
+                                         &user_pwbuf, &user_base);
+    /* 
+     * Either there was an error, or we found a suitable user; stop
+     * looking
+     */
+    if (rc || user_base)
+        goto out;
+
     rc = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
                                          &user_pwbuf, &user_base);
-    if (rc)
-        return rc;
+    if (rc || user_base)
+        goto out;
 
-    if (!user_base) {
-        LOG(WARN, "Couldn't find uid for reaper process");
-        return ERROR_INVAL;
+    LOG(WARN, "Couldn't find uid for reaper process");
+    rc = ERROR_INVAL;
+
+ out:
+    /* First check to see if the discovered user maps to root */
+    if (!rc) {
+        if (user_base->pw_uid == 0) {
+            LOG(ERROR, "UID for reaper process maps to root!");
+            rc = ERROR_INVAL;
+        }
     }
-    
-    if (user_base->pw_uid == 0) {
-        LOG(ERROR, "UID for reaper process maps to root!");
-        return ERROR_INVAL;
-    }
 
-    *reaper_uid = user_base->pw_uid;
+    /* If everything is OK, set reaper_uid as appropriate */
+    if (!rc)
+        *reaper_uid = user_base->pw_uid;
 
-    return 0;
+    return rc;
 }
 
 const char *libxl__domain_device_model(libxl__gc *gc,
@@ -2908,9 +2921,6 @@ static int get_reaper_lock_and_uid(libxl__destroy_devicemodel_state *ddms,
 
     /*
      * Get reaper_uid.  If we can't find such a uid, return an error.
-     *
-     * FIXME: This means that domain destruction will fail if
-     * device_model_user is set but QEMU_USER_RANGE_BASE doesn't exist.
      */
     return libxl__get_reaper_uid(gc, reaper_uid);
 }

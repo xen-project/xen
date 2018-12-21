@@ -77,11 +77,20 @@ And then in your config file, the following line:
 
     device_model_user="xen-qemuuser-c6-01"
 
+If you use this method, you should also allocate one "reaper" user to
+be used for killing device models:
+
+    adduser --system --no-create-home --group xen-qemuuser-reaper
+
 NOTE: It is important when using `device_model_user` that EACH VM HAVE
 A SEPARATE UID, and that none of these UIDs map to root.  xl will
 throw an error a uid maps to zero, but not if multiple VMs have the
 same uid.  Multiple VMs with the same device model uid will cause
 problems.
+
+It is also important that `xen-qemuuser-reaper` not have any processes
+associated with it, as they will be destroyed when deprivileged qemu
+processes are destroyed.
 
 ## Domain config changes
 
