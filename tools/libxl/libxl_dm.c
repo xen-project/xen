@@ -129,6 +129,7 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     int rc;
     char *user;
     uid_t intended_uid = -1;
+    bool kill_by_uid;
 
     /* Only qemu-upstream can run as a different uid */
     if (b_info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN)
@@ -141,7 +142,8 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
      * - if rc is an error code, user and intended_uid are ignored.
      * - if rc is 0, user may be set or not set.
      * - if user is set, then intended_uid must be set to a UID matching
-     *   the username `user`.  This will be checked for root (0).
+     *   the username `user`, and kill_by_uid must be set to the appropriate
+     *   value.  intended_uid will be checked for root (0).
      */
     
     /*
@@ -162,6 +164,7 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         }
 
         intended_uid = user_base->pw_uid;
+        kill_by_uid = true;
         rc = 0;
         goto out;
     }
@@ -205,12 +208,15 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         LOGD(DEBUG, guest_domid, "using uid %ld", (long)intended_uid);
         user = GCSPRINTF("%ld:%ld", (long)intended_uid,
                          (long)user_base->pw_gid);
+        kill_by_uid = true;
         rc = 0;
         goto out;
     }
 
     /*
-     * We couldn't find QEMU_USER_BASE_RANGE; look for QEMU_USER_SHARED
+     * We couldn't find QEMU_USER_BASE_RANGE; look for
+     * QEMU_USER_SHARED.  NB for QEMU_USER_SHARED, all QEMU will run
+     * as the same UID, we can't kill by uid; therefore don't set uid.
      */
     user = LIBXL_QEMU_USER_SHARED;
     rc = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
@@ -220,6 +226,7 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         LOGD(WARN, guest_domid, "Could not find user %s, falling back to %s",
              LIBXL_QEMU_USER_RANGE_BASE, LIBXL_QEMU_USER_SHARED);
         intended_uid = user_base->pw_uid;
+        kill_by_uid = false;
         rc = 0;
         goto out;
     }
@@ -245,6 +252,8 @@ out:
     /* Then do the final set, if still appropriate */
     if (!rc && user) {
         state->dm_runas = user;
+        if (kill_by_uid)
+            state->dm_kill_uid = GCSPRINTF("%ld", (long)intended_uid);
     }
 
     return rc;
@@ -2427,6 +2436,15 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
 
     const char *dom_path = libxl__xs_get_dompath(gc, domid);
 
+    /*
+     * If we're starting the dm with a non-root UID, save the UID so
+     * that we can reliably kill it and any subprocesses
+     */
+    if (state->dm_kill_uid)
+        libxl__xs_printf(gc, XBT_NULL,
+                         GCSPRINTF("%s/image/device-model-kill-uid", dom_path),
+                         "%s", state->dm_kill_uid);
+
     if (vnc && vnc->passwd) {
         /* This xenstore key will only be used by qemu-xen-traditionnal.
          * The code to supply vncpasswd to qemu-xen is later. */
@@ -2696,24 +2714,202 @@ out:
     return rc;
 }
 
+/* Asynchronous device model destroy functions */
+
+static int kill_device_model_uid_child(libxl__destroy_devicemodel_state *ddms,
+                                       const char *dm_kill_uid_str);
+
+static void kill_device_model_uid_cb(libxl__egc *egc,
+                                     libxl__ev_child *destroyer,
+                                     pid_t pid, int status);
+
+/*
+ * If we have a uid, we shouldn't kill by pid.  This is because a
+ * hostile QEMU might have exited, in which case the pid we have may
+ * be that of another process.
+ *
+ * The running devicemodel has permission over a specific domain id;
+ * this means that ideally we wouldn't the domain in question (freeing
+ * up the domain id for reuse) until we're confident that we've killed
+ * the domain.
+ *
+ * In general, destroy as much as we can; but return an error if there
+ * are any errors, so that the domain destroy will be aborted, and the
+ * domain itself will remain, giving the admin an opportunity to fix
+ * any issues and re-try the domain destroy.
+ */
 void libxl__destroy_device_model(libxl__egc *egc,
                                  libxl__destroy_devicemodel_state *ddms)
 {
     STATE_AO_GC(ddms->ao);
     int rc;
     int domid = ddms->domid;
-    char *path = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
+    char *path;
+    const char *dm_kill_uid_str = NULL;
+    int reaper_pid;
 
-    if (!xs_rm(CTX->xsh, XBT_NULL, path))
+    ddms->rc = 0;
+
+    path = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
+    rc = libxl__xs_rm_checked(gc, XBT_NULL, path);
+    if (rc) {
+        ACCUMULATE_RC(ddms->rc);
         LOGD(ERROR, domid, "xs_rm failed for %s", path);
+    }
 
-    /* We should try to destroy the device model anyway. */
-    rc = kill_device_model(gc,
-              GCSPRINTF("/local/domain/%d/image/device-model-pid", domid));
+    /*
+     * See if we should try to kill by uid
+     */
+    path = GCSPRINTF("/local/domain/%d/image/device-model-kill-uid", domid);
+    rc = libxl__xs_read_checked(gc, XBT_NULL, path, &dm_kill_uid_str);
 
-    libxl__qmp_cleanup(gc, domid);
+    /*
+     * If there was an error here, accumulate the error and fall back
+     * to killing by pid.
+     */
+    if (rc) {
+        /* 
+         * Technically the state of the string passed to libxl__xs_read_checked() is
+         * "undefined" in the case rc == 0 (according to libxl_internal.h).  Set it to
+         * NULL to prevent undefined behavior.
+         */
+        dm_kill_uid_str = NULL;
+        ACCUMULATE_RC(ddms->rc);
+        LOGD(ERROR, domid, "Reading dm UID path failed for %s", path);
+    }
 
-    ddms->callback(egc, ddms, rc);
+    /* The DM has its own uid; Attempt to kill all processes with that UID */
+    if (dm_kill_uid_str) {
+        LOGD(DEBUG, domid, "Found DM uid %s, destroying by uid",
+             dm_kill_uid_str);
+
+        reaper_pid = libxl__ev_child_fork(gc, &ddms->destroyer,
+                                          kill_device_model_uid_cb);
+        if (reaper_pid < 0) {
+            rc = ERROR_FAIL;
+            ACCUMULATE_RC(ddms->rc);
+            /*
+             * Note that if this fails, we still don't kill by pid, to
+             * make sure that an untrusted DM has not "maliciously"
+             * exited (potentially causing us to kill an unrelated
+             * process which happened to get the same pid).
+             */
+            goto out;
+        }
+
+        if (!reaper_pid) {  /* child */
+            rc = kill_device_model_uid_child(ddms, dm_kill_uid_str);
+            assert(rc <= 0 && rc >= -125);
+            _exit(-rc);
+        }
+
+        /*
+         * Parent of successful fork; execution will pick up in
+         * kill_device_model_uid_cb when child exits
+         */
+        return;
+    }
+
+    /*
+     * No uid to kill; attept to kill by pid.
+     */
+    LOGD(DEBUG, domid, "Didn't find dm UID; destroying by pid");
+
+    path = GCSPRINTF("/local/domain/%d/image/device-model-pid", domid);
+    rc = kill_device_model(gc, path);
+
+    if (rc) {
+        ACCUMULATE_RC(ddms->rc);
+        LOGD(ERROR, domid, "Killing device model pid from path %s", path);
+    }
+
+out:
+    /*
+     * NB that we always pass '0' here for the "status of exited
+     * process"; since there is no process, it always "succeeds".
+     * Errors are accumulated in ddms->rc and will be handled
+     * correctly.
+     */
+    kill_device_model_uid_cb(egc, &ddms->destroyer, -1, 0);
+    return;
+}
+
+/*
+ * Destroy all processes of the given uid by setresuid to the
+ * specified uid and kill(-1).  NB this MUST BE CALLED FROM A SEPARATE
+ * PROCESS from the normal libxl process.  Returns a libxl-style error
+ * code that is guaranteed to be >= -125.
+ */
+static int kill_device_model_uid_child(libxl__destroy_devicemodel_state *ddms,
+                                       const char *dm_kill_uid_str) {
+    STATE_AO_GC(ddms->ao);
+    int domid = ddms->domid;
+    int r, rc;
+    uid_t dm_kill_uid = atoi(dm_kill_uid_str);
+
+    /*
+     * FIXME: the second uid needs to be distinct to avoid being
+     * killed by a potential rogue process
+     */
+
+    /*
+     * Should never happen; but if it does, better to have the
+     * toolstack crash with an error than nuking dom0.
+      */
+    assert(dm_kill_uid);
+
+    LOGD(DEBUG, domid, "DM reaper: calling setresuid(%d, %d, 0)",
+         dm_kill_uid, dm_kill_uid);
+    r = setresuid(dm_kill_uid, dm_kill_uid, 0);
+    if (r) {
+        LOGED(ERROR, domid, "setresuid to (%d, %d, 0)",
+              dm_kill_uid, dm_kill_uid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    /*
+     * And kill everyone but me.
+     *
+     * NB that it's not clear from either POSIX or the Linux man page
+     * that ESRCH would be returned with a pid value of -1, but it
+     * doesn't hurt to check.
+     */
+    r = kill(-1, 9);
+    if (r && errno != ESRCH) {
+        LOGED(ERROR, domid, "kill(-1,9)");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = 0;
+
+out:
+    return rc;
+}
+
+static void kill_device_model_uid_cb(libxl__egc *egc,
+                                    libxl__ev_child *destroyer,
+                                    pid_t pid, int status)
+{
+    libxl__destroy_devicemodel_state *ddms = CONTAINER_OF(destroyer, *ddms, destroyer);
+    STATE_AO_GC(ddms->ao);
+
+    if (status) {
+        int rc = ERROR_FAIL;
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) <= 125)
+            rc = -WEXITSTATUS(status);
+
+        ACCUMULATE_RC(ddms->rc);
+        libxl_report_child_exitstatus(CTX, XTL_ERROR,
+                                      "async domain destroy", pid, status);
+    }
+
+    /* Always try to clean up qmp, even if something went wrong */
+    libxl__qmp_cleanup(gc, ddms->domid);
+
+    ddms->callback(egc, ddms, ddms->rc);
 }
 
 /* Return 0 if no dm needed, 1 if needed and <0 if error. */

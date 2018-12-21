@@ -160,6 +160,12 @@
 #endif
   /* all of these macros preserve errno (saving and restoring) */
 
+/* 
+ * A macro to help retain the first failure in "do as much as you can"
+ * situations.  Note the hard-coded use of the variable name `rc`.
+ */
+#define ACCUMULATE_RC(rc_acc) ((rc_acc) = (rc_acc) ?: rc)
+
 /* Convert pfn to physical address space. */
 #define pfn_to_paddr(x) ((uint64_t)(x) << XC_PAGE_SHIFT)
 
@@ -1135,7 +1141,13 @@ typedef struct {
     const char *shim_cmdline;
     const char *pv_cmdline;
 
-    char *dm_runas;
+    /* 
+     * dm_runas: If set, pass qemu the `-runas` parameter with this
+     *  string as an argument
+     * dm_kill_uid: If set, the devicemodel should be killed by
+     *  destroying all processes with this uid.
+     */
+    char *dm_runas, *dm_kill_uid;
 
     xen_vmemrange_t *vmemranges;
     uint32_t num_vmemranges;
@@ -3706,6 +3718,8 @@ struct libxl__destroy_devicemodel_state {
     uint32_t domid;
     libxl__devicemodel_destroy_cb *callback; /* May be called re-entrantly */
     /* private to implementation */
+    libxl__ev_child destroyer;
+    int rc; /* Accumulated return value for the destroy operation */
 };
 
 struct libxl__destroy_domid_state {
