@@ -803,8 +803,8 @@ int arch_set_info_guest(
     unsigned long flags;
     bool compat;
 #ifdef CONFIG_PV
-    unsigned long cr3_gfn;
-    struct page_info *cr3_page;
+    mfn_t cr3_mfn;
+    struct page_info *cr3_page = NULL;
     int rc = 0;
 #endif
 
@@ -1070,10 +1070,10 @@ int arch_set_info_guest(
     set_bit(_VPF_in_reset, &v->pause_flags);
 
     if ( !compat )
-        cr3_gfn = xen_cr3_to_pfn(c.nat->ctrlreg[3]);
+        cr3_mfn = _mfn(xen_cr3_to_pfn(c.nat->ctrlreg[3]));
     else
-        cr3_gfn = compat_cr3_to_pfn(c.cmp->ctrlreg[3]);
-    cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
+        cr3_mfn = _mfn(compat_cr3_to_pfn(c.cmp->ctrlreg[3]));
+    cr3_page = get_page_from_mfn(cr3_mfn, d);
 
     if ( !cr3_page )
         rc = -EINVAL;
@@ -1101,7 +1101,7 @@ int arch_set_info_guest(
         case 0:
             if ( !compat && !VM_ASSIST(d, m2p_strict) &&
                  !paging_mode_refcounts(d) )
-                fill_ro_mpt(_mfn(cr3_gfn));
+                fill_ro_mpt(cr3_mfn);
             break;
         default:
             if ( cr3_page == current->arch.old_guest_table )
@@ -1116,8 +1116,8 @@ int arch_set_info_guest(
         v->arch.guest_table = pagetable_from_page(cr3_page);
         if ( c.nat->ctrlreg[1] )
         {
-            cr3_gfn = xen_cr3_to_pfn(c.nat->ctrlreg[1]);
-            cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
+            cr3_mfn = _mfn(xen_cr3_to_pfn(c.nat->ctrlreg[1]));
+            cr3_page = get_page_from_mfn(cr3_mfn, d);
 
             if ( !cr3_page )
                 rc = -EINVAL;
@@ -1141,7 +1141,7 @@ int arch_set_info_guest(
                     break;
                 case 0:
                     if ( VM_ASSIST(d, m2p_strict) )
-                        zap_ro_mpt(_mfn(cr3_gfn));
+                        zap_ro_mpt(cr3_mfn);
                     break;
                 }
             }
