@@ -128,26 +128,6 @@ are specified; this does not apply to QEMU running as a Xen DM.
 
 '''Tested''': Not tested
 
-# Restrictions / improvements still to do
-
-This lists potential restrictions still to do.  It is meant to be
-listed in order of ease of implementation, with low-hanging fruit
-first.
-
-### Further RLIMITs
-
-RLIMIT_AS limits the total amount of memory; but this includes the
-virtual memory which QEMU uses as a mapcache.  xen-mapcache.c already
-fiddles with this; it would be straightforward to make it *set* the
-rlimit to what it thinks a sensible limit is.
-
-RLIMIT_NPROC limits total number of processes or threads.  QEMU uses
-threads for some devices, so this would require some thought.
-
-Other things that would take some cleverness / changes to QEMU to
-utilize due to ordering constrants:
- - RLIMIT_NOFILES (after all necessary files are opened)
-
 ### libxl UID cleanup
 
 '''Description''': Domain IDs are reused, and thus restricted UIDs are
@@ -222,6 +202,26 @@ process vulnerable to the target process again.
 Since this will kill all other `reaper_uid` processes as well, we must
 either allocate a separate `reaper_uid` per domain, or use locking to
 ensure that only one killing process is active at a time.
+
+# Restrictions / improvements still to do
+
+This lists potential restrictions still to do.  It is meant to be
+listed in order of ease of implementation, with low-hanging fruit
+first.
+
+### Further RLIMITs
+
+RLIMIT_AS limits the total amount of memory; but this includes the
+virtual memory which QEMU uses as a mapcache.  xen-mapcache.c already
+fiddles with this; it would be straightforward to make it *set* the
+rlimit to what it thinks a sensible limit is.
+
+RLIMIT_NPROC limits total number of processes or threads.  QEMU uses
+threads for some devices, so this would require some thought.
+
+Other things that would take some cleverness / changes to QEMU to
+utilize due to ordering constrants:
+ - RLIMIT_NOFILES (after all necessary files are opened)
 
 ## libxl: Treat QMP connection as untrusted
 
