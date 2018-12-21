@@ -406,6 +406,39 @@ mfn_t p2m_lookup(struct domain *d, gfn_t gfn, p2m_type_t *t)
     return mfn;
 }
 
+struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
+                                        p2m_type_t *t)
+{
+    struct page_info *page;
+    p2m_type_t p2mt;
+    mfn_t mfn = p2m_lookup(d, gfn, &p2mt);
+
+    if ( t )
+        *t = p2mt;
+
+    if ( !p2m_is_any_ram(p2mt) )
+        return NULL;
+
+    if ( !mfn_valid(mfn) )
+        return NULL;
+
+    page = mfn_to_page(mfn);
+
+    /*
+     * get_page won't work on foreign mapping because the page doesn't
+     * belong to the current domain.
+     */
+    if ( p2m_is_foreign(p2mt) )
+    {
+        struct domain *fdom = page_get_owner_and_reference(page);
+        ASSERT(fdom != NULL);
+        ASSERT(fdom != d);
+        return page;
+    }
+
+    return get_page(page, d) ? page : NULL;
+}
+
 int guest_physmap_mark_populate_on_demand(struct domain *d,
                                           unsigned long gfn,
                                           unsigned int order)

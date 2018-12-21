@@ -289,38 +289,13 @@ typedef unsigned int p2m_query_t;
 #define P2M_ALLOC    (1u<<0)   /* Populate PoD and paged-out entries */
 #define P2M_UNSHARE  (1u<<1)   /* Break CoW sharing */
 
+struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
+                                        p2m_type_t *t);
+
 static inline struct page_info *get_page_from_gfn(
     struct domain *d, unsigned long gfn, p2m_type_t *t, p2m_query_t q)
 {
-    struct page_info *page;
-    p2m_type_t p2mt;
-    mfn_t mfn = p2m_lookup(d, _gfn(gfn), &p2mt);
-
-    if (t)
-        *t = p2mt;
-
-    if ( !p2m_is_any_ram(p2mt) )
-        return NULL;
-
-    if ( !mfn_valid(mfn) )
-        return NULL;
-    page = mfn_to_page(mfn);
-
-    /*
-     * get_page won't work on foreign mapping because the page doesn't
-     * belong to the current domain.
-     */
-    if ( p2m_is_foreign(p2mt) )
-    {
-        struct domain *fdom = page_get_owner_and_reference(page);
-        ASSERT(fdom != NULL);
-        ASSERT(fdom != d);
-        return page;
-    }
-
-    if ( !get_page(page, d) )
-        return NULL;
-    return page;
+    return p2m_get_page_from_gfn(d, _gfn(gfn), t);
 }
 
 int get_page_type(struct page_info *page, unsigned long type);
