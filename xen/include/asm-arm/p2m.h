@@ -115,7 +115,7 @@ typedef enum {
     p2m_mmio_direct_dev,/* Read/write mapping of genuine Device MMIO area */
     p2m_mmio_direct_nc, /* Read/write mapping of genuine MMIO area non-cacheable */
     p2m_mmio_direct_c,  /* Read/write mapping of genuine MMIO area cacheable */
-    p2m_map_foreign,    /* Ram pages from foreign domain */
+    p2m_map_foreign_rw, /* Read/write RAM pages from foreign domain */
     p2m_grant_map_rw,   /* Read/write grant mapping */
     p2m_grant_map_ro,   /* Read-only grant mapping */
     /* The types below are only used to decide the page attribute in the P2M */
@@ -137,10 +137,10 @@ typedef enum {
 
 /* Useful predicates */
 #define p2m_is_ram(_t) (p2m_to_mask(_t) & P2M_RAM_TYPES)
-#define p2m_is_foreign(_t) (p2m_to_mask(_t) & p2m_to_mask(p2m_map_foreign))
+#define p2m_is_foreign(_t) (p2m_to_mask(_t) & p2m_to_mask(p2m_map_foreign_rw))
 #define p2m_is_any_ram(_t) (p2m_to_mask(_t) &                   \
                             (P2M_RAM_TYPES | P2M_GRANT_TYPES |  \
-                             p2m_to_mask(p2m_map_foreign)))
+                             p2m_to_mask(p2m_map_foreign_rw)))
 
 /* All common type definitions should live ahead of this inclusion. */
 #ifdef _XEN_P2M_COMMON_H

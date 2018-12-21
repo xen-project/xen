@@ -1267,7 +1267,7 @@ int xenmem_add_to_physmap_one(
         }
 
         mfn = page_to_mfn(page);
-        t = p2m_map_foreign;
+        t = p2m_map_foreign_rw;
 
         rcu_unlock_domain(od);
         break;
