@@ -1069,8 +1069,6 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
     if (dm_present) {
         if (libxl__destroy_device_model(gc, domid) < 0)
             LOGD(ERROR, domid, "libxl__destroy_device_model failed");
-
-        libxl__qmp_cleanup(gc, domid);
     }
     dis->drs.ao = ao;
     dis->drs.domid = domid;
