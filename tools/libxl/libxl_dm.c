@@ -259,6 +259,35 @@ out:
     return rc;
 }
 
+/*
+ * Look up "reaper UID".  If present and non-root, returns 0 and sets
+ * reaper_uid.  Otherwise returns libxl-style error.
+ */
+static int libxl__get_reaper_uid(libxl__gc *gc, uid_t *reaper_uid)
+{
+    struct passwd *user_base, user_pwbuf;
+    int rc;
+
+    rc = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
+                                         &user_pwbuf, &user_base);
+    if (rc)
+        return rc;
+
+    if (!user_base) {
+        LOG(WARN, "Couldn't find uid for reaper process");
+        return ERROR_INVAL;
+    }
+    
+    if (user_base->pw_uid == 0) {
+        LOG(ERROR, "UID for reaper process maps to root!");
+        return ERROR_INVAL;
+    }
+
+    *reaper_uid = user_base->pw_uid;
+
+    return 0;
+}
+
 const char *libxl__domain_device_model(libxl__gc *gc,
                                        const libxl_domain_build_info *info)
 {
@@ -2834,37 +2863,110 @@ out:
     return;
 }
 
+/* 
+ * Note that this attempts to grab a file lock, so must be called from
+ * a sub-process.
+ */
+static int get_reaper_lock_and_uid(libxl__destroy_devicemodel_state *ddms,
+                                   uid_t *reaper_uid)
+{
+    STATE_AO_GC(ddms->ao);
+    int domid = ddms->domid;
+    int r;
+    const char * lockfile;
+    int fd;
+
+    /* Try to lock the "reaper uid" */
+    lockfile = GCSPRINTF("%s/dm-reaper-lock", libxl__run_dir_path());
+
+    /*
+     * NB that since we've just forked, we can't have any
+     * threads; so we don't need the libxl__carefd
+     * infrastructure here.
+     */
+    fd = open(lockfile, O_RDWR|O_CREAT, 0644);
+    if (fd < 0) {
+        LOGED(ERROR, domid,
+              "unexpected error while trying to open lockfile %s, errno=%d",
+              lockfile, errno);
+        return ERROR_FAIL;
+    }
+
+    /* Try to lock the file, retrying on EINTR */
+    for (;;) {
+        r = flock(fd, LOCK_EX);
+        if (!r)
+            break;
+        if (errno != EINTR) {
+            /* All other errno: EBADF, EINVAL, ENOLCK, EWOULDBLOCK */
+            LOGED(ERROR, domid,
+                  "unexpected error while trying to lock %s, fd=%d, errno=%d",
+                  lockfile, fd, errno);
+            return ERROR_FAIL;
+        }
+    }
+
+    /*
+     * Get reaper_uid.  If we can't find such a uid, return an error.
+     *
+     * FIXME: This means that domain destruction will fail if
+     * device_model_user is set but QEMU_USER_RANGE_BASE doesn't exist.
+     */
+    return libxl__get_reaper_uid(gc, reaper_uid);
+}
+
+
 /*
  * Destroy all processes of the given uid by setresuid to the
  * specified uid and kill(-1).  NB this MUST BE CALLED FROM A SEPARATE
- * PROCESS from the normal libxl process.  Returns a libxl-style error
- * code that is guaranteed to be >= -125.
+ * PROCESS from the normal libxl process, and should exit immediately
+ * after return.  Returns a libxl-style error code that is guaranteed
+ * to be >= -125.
  */
 static int kill_device_model_uid_child(libxl__destroy_devicemodel_state *ddms,
                                        const char *dm_kill_uid_str) {
     STATE_AO_GC(ddms->ao);
     int domid = ddms->domid;
-    int r, rc;
+    int r, rc = 0;
     uid_t dm_kill_uid = atoi(dm_kill_uid_str);
+    uid_t reaper_uid;
 
     /*
-     * FIXME: the second uid needs to be distinct to avoid being
-     * killed by a potential rogue process
+     * Try to kill the devicemodel by uid.  The safest way to do this
+     * is to set euid == dm_uid, but the ruid to something else.  If
+     * we can't get a separate ruid, carry on trying to kill the
+     * process anyway using dm_uid for the ruid.  This is racy (the dm
+     * may be able to kill(-1) us before we kill them), but worth
+     * trying.
+     *
+     * NB: Even if we don't have a separate reaper_uid, the parent can
+     * know whether we won the race by looking at the status variable;
+     * so we don't strictly need to return failure in this case.  But
+     * if there's a misconfiguration, it's better to alert the
+     * administator sooner rather than later; so if we fail to get a
+     * reaper uid, report an error even if the kill succeeds.
      */
+    rc = get_reaper_lock_and_uid(ddms, &reaper_uid);
+    if (rc) {
+        reaper_uid = dm_kill_uid;
+        LOGD(WARN, domid, "Couldn't get separate reaper uid;"
+            "carrying on with unsafe kill");
+    }
 
     /*
      * Should never happen; but if it does, better to have the
      * toolstack crash with an error than nuking dom0.
       */
+    assert(reaper_uid);
     assert(dm_kill_uid);
 
     LOGD(DEBUG, domid, "DM reaper: calling setresuid(%d, %d, 0)",
-         dm_kill_uid, dm_kill_uid);
-    r = setresuid(dm_kill_uid, dm_kill_uid, 0);
+         reaper_uid, dm_kill_uid);
+    r = setresuid(reaper_uid, dm_kill_uid, 0);
     if (r) {
         LOGED(ERROR, domid, "setresuid to (%d, %d, 0)",
-              dm_kill_uid, dm_kill_uid);
-        rc = ERROR_FAIL;
+              reaper_uid, dm_kill_uid);
+        rc = rc ?: ERROR_FAIL;
         goto out;
     }
 
@@ -2878,7 +2980,7 @@ static int kill_device_model_uid_child(libxl__destroy_devicemodel_state *ddms,
     r = kill(-1, 9);
     if (r && errno != ESRCH) {
         LOGED(ERROR, domid, "kill(-1,9)");
-        rc = ERROR_FAIL;
+        rc = rc ?: ERROR_FAIL;
         goto out;
     }
 
