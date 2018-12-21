@@ -177,6 +177,7 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         LOGD(DEBUG, guest_domid,
              "dm_restrict disabled, starting QEMU as root");
         user = NULL; /* Should already be null, but just in case */
+        rc = 0;
         goto out;
     }
 
