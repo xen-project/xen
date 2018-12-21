@@ -72,7 +72,13 @@ static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
  *  userlookup_helper_getpwuid(libxl__gc*, uid_t uid,
  *                             struct passwd **pwd_r);
  *
- *  returns 1 if the user was found, 0 if it was not, -1 on error
+ *  If the user is found, return 0 and set *pwd_r to the appropriat
+ *  value.
+ *
+ *  If the user is not found but there are no errors, return 0
+ *  and set *pwd_r to NULL.
+ *
+ *  On error, return a libxl-style error code.
  */
 #define DEFINE_USERLOOKUP_HELPER(NAME,SPEC_TYPE,STRUCTNAME,SYSCONF)     \
     static int userlookup_helper_##NAME(libxl__gc *gc,                  \
@@ -83,7 +89,7 @@ static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
         struct STRUCTNAME *resultp = NULL;                              \
         char *buf = NULL;                                               \
         long buf_size;                                                  \
-        int ret;                                                        \
+        int r;                                                          \
                                                                         \
         buf_size = sysconf(SYSCONF);                                    \
         if (buf_size < 0) {                                             \
@@ -95,17 +101,16 @@ static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
                                                                         \
         while (1) {                                                     \
             buf = libxl__realloc(gc, buf, buf_size);                    \
-            ret = NAME##_r(spec, resultbuf, buf, buf_size, &resultp);   \
-            if (ret == ERANGE) {                                        \
+            r = NAME##_r(spec, resultbuf, buf, buf_size, &resultp);     \
+            if (r == ERANGE) {                                          \
                 buf_size += 128;                                        \
                 continue;                                               \
             }                                                           \
-            if (ret != 0)                                               \
+            if (r != 0) {                                               \
+                LOGEV(ERROR, r, "Looking up username/uid with " #NAME); \
                 return ERROR_FAIL;                                      \
-            if (resultp != NULL) {                                      \
-                if (out) *out = resultp;                                \
-                return 1;                                               \
             }                                                           \
+            *out = resultp;                                             \
             return 0;                                                   \
         }                                                               \
     }
@@ -140,16 +145,16 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
 
     ret = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
                                          &user_pwbuf, &user_base);
-    if (ret < 0)
+    if (ret)
         return ret;
-    if (ret > 0) {
+    if (user_base) {
         struct passwd *user_clash, user_clash_pwbuf;
         uid_t intended_uid = user_base->pw_uid + guest_domid;
         ret = userlookup_helper_getpwuid(gc, intended_uid,
                                          &user_clash_pwbuf, &user_clash);
-        if (ret < 0)
+        if (ret)
             return ret;
-        if (ret > 0) {
+        if (user_clash) {
             LOGD(ERROR, guest_domid,
                  "wanted to use uid %ld (%s + %d) but that is user %s !",
                  (long)intended_uid, LIBXL_QEMU_USER_RANGE_BASE,
@@ -163,10 +168,10 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     }
 
     user = LIBXL_QEMU_USER_SHARED;
-    ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
-    if (ret < 0)
+    ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
+    if (ret)
         return ret;
-    if (ret > 0) {
+    if (user_base) {
         LOGD(WARN, guest_domid, "Could not find user %s, falling back to %s",
              LIBXL_QEMU_USER_RANGE_BASE, LIBXL_QEMU_USER_SHARED);
         goto end_search;
