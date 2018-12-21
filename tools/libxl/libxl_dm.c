@@ -138,13 +138,6 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         return 0;
     }
 
-    user = GCSPRINTF("%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
-    ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
-    if (ret < 0)
-        return ret;
-    if (ret > 0)
-        goto end_search;
-
     ret = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
                                          &user_pwbuf, &user_base);
     if (ret < 0)
@@ -174,15 +167,14 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     if (ret < 0)
         return ret;
     if (ret > 0) {
-        LOGD(WARN, guest_domid, "Could not find user %s%d, falling back to %s",
-             LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED);
+        LOGD(WARN, guest_domid, "Could not find user %s, falling back to %s",
+             LIBXL_QEMU_USER_RANGE_BASE, LIBXL_QEMU_USER_SHARED);
         goto end_search;
     }
 
     LOGD(ERROR, guest_domid,
-         "Could not find user %s%d or %s or range base pseudo-user %s, cannot restrict",
-         LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED,
-         LIBXL_QEMU_USER_RANGE_BASE);
+         "Could not find user %s or range base pseudo-user %s, cannot restrict",
+         LIBXL_QEMU_USER_SHARED, LIBXL_QEMU_USER_RANGE_BASE);
     return ERROR_INVAL;
 
 end_search:
