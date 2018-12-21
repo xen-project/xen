@@ -300,7 +300,38 @@ struct page_info *p2m_get_page_from_gfn(struct domain *d, gfn_t gfn,
 static inline struct page_info *get_page_from_gfn(
     struct domain *d, unsigned long gfn, p2m_type_t *t, p2m_query_t q)
 {
-    return p2m_get_page_from_gfn(d, _gfn(gfn), t);
+    mfn_t mfn;
+    p2m_type_t _t;
+    struct page_info *page;
+
+    /*
+     * Special case for DOMID_XEN as it is the only domain so far that is
+     * not auto-translated.
+     */
+    if ( likely(d != dom_xen) )
+        return p2m_get_page_from_gfn(d, _gfn(gfn), t);
+
+    if ( !t )
+        t = &_t;
+
+    *t = p2m_invalid;
+
+    /*
+     * DOMID_XEN sees 1-1 RAM. The p2m_type is based on the type of the
+     * page.
+     */
+    mfn = _mfn(gfn);
+    page = mfn_to_page(mfn);
+
+    if ( !mfn_valid(mfn) || !get_page(page, d) )
+        return NULL;
+
+    if ( page->u.inuse.type_info & PGT_writable_page )
+        *t = p2m_ram_rw;
+    else
+        *t = p2m_ram_ro;
+
+    return page;
 }
 
 int get_page_type(struct page_info *page, unsigned long type);
