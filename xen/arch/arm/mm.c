@@ -1233,20 +1233,20 @@ int xenmem_add_to_physmap_one(
         struct domain *od;
         p2m_type_t p2mt;
 
-        od = rcu_lock_domain_by_any_id(extra.foreign_domid);
+        od = get_pg_owner(extra.foreign_domid);
         if ( od == NULL )
             return -ESRCH;
 
         if ( od == d )
         {
-            rcu_unlock_domain(od);
+            put_pg_owner(od);
             return -EINVAL;
         }
 
         rc = xsm_map_gmfn_foreign(XSM_TARGET, d, od);
         if ( rc )
         {
-            rcu_unlock_domain(od);
+            put_pg_owner(od);
             return rc;
         }
 
@@ -1255,7 +1255,7 @@ int xenmem_add_to_physmap_one(
         page = get_page_from_gfn(od, idx, &p2mt, P2M_ALLOC);
         if ( !page )
         {
-            rcu_unlock_domain(od);
+            put_pg_owner(od);
             return -EINVAL;
         }
 
@@ -1264,13 +1264,13 @@ int xenmem_add_to_physmap_one(
         else
         {
             put_page(page);
-            rcu_unlock_domain(od);
+            put_pg_owner(od);
             return -EINVAL;
         }
 
         mfn = page_to_mfn(page);
 
-        rcu_unlock_domain(od);
+        put_pg_owner(od);
         break;
     }
     case XENMAPSPACE_dev_mmio:
