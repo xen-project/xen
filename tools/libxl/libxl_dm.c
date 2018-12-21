@@ -126,65 +126,128 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     const libxl_domain_build_info *b_info = &dmss->guest_config->b_info;
 
     struct passwd *user_base, user_pwbuf;
-    int ret;
+    int rc;
     char *user;
+    uid_t intended_uid = -1;
 
     /* Only qemu-upstream can run as a different uid */
     if (b_info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN)
         return 0;
 
+    /*
+     * From this point onward, all paths should go through the `out`
+     * label.  The invariants should be:
+     * - rc may be 0, or an error code.
+     * - if rc is an error code, user and intended_uid are ignored.
+     * - if rc is 0, user may be set or not set.
+     * - if user is set, then intended_uid must be set to a UID matching
+     *   the username `user`.  This will be checked for root (0).
+     */
+    
+    /*
+     * If device_model_user is present, set `-runas` even if
+     * dm_restrict isn't in use
+     */
     user = b_info->device_model_user;
-    if (user)
-        goto end_search;
+    if (user) {
+        rc = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
+        if (rc)
+            goto out;
 
+        if (!user_base) {
+            LOGD(ERROR, guest_domid, "Couldn't find device_model_user %s",
+                 user);
+            rc = ERROR_INVAL;
+            goto out;
+        }
+
+        intended_uid = user_base->pw_uid;
+        rc = 0;
+        goto out;
+    }
+
+    /*
+     * If dm_restrict isn't set, and we don't have a specified user, don't
+     * bother setting a `-runas` parameter.
+     */
     if (!libxl_defbool_val(b_info->dm_restrict)) {
         LOGD(DEBUG, guest_domid,
              "dm_restrict disabled, starting QEMU as root");
-        return 0;
+        user = NULL; /* Should already be null, but just in case */
+        goto out;
     }
 
-    ret = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
+    /*
+     * dm_restrict is set, but device_model_user isn't set; look for
+     * QEMU_USER_BASE_RANGE
+     */
+    rc = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
                                          &user_pwbuf, &user_base);
-    if (ret)
-        return ret;
+    if (rc)
+        goto out;
     if (user_base) {
         struct passwd *user_clash, user_clash_pwbuf;
-        uid_t intended_uid = user_base->pw_uid + guest_domid;
-        ret = userlookup_helper_getpwuid(gc, intended_uid,
+
+        intended_uid = user_base->pw_uid + guest_domid;
+        rc = userlookup_helper_getpwuid(gc, intended_uid,
                                          &user_clash_pwbuf, &user_clash);
-        if (ret)
-            return ret;
+        if (rc)
+            goto out;
         if (user_clash) {
             LOGD(ERROR, guest_domid,
                  "wanted to use uid %ld (%s + %d) but that is user %s !",
                  (long)intended_uid, LIBXL_QEMU_USER_RANGE_BASE,
                  guest_domid, user_clash->pw_name);
-            return ERROR_FAIL;
+            rc = ERROR_INVAL;
+            goto out;
         }
+
         LOGD(DEBUG, guest_domid, "using uid %ld", (long)intended_uid);
         user = GCSPRINTF("%ld:%ld", (long)intended_uid,
                          (long)user_base->pw_gid);
-        goto end_search;
+        rc = 0;
+        goto out;
     }
 
+    /*
+     * We couldn't find QEMU_USER_BASE_RANGE; look for QEMU_USER_SHARED
+     */
     user = LIBXL_QEMU_USER_SHARED;
-    ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
-    if (ret)
-        return ret;
+    rc = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
+    if (rc)
+        goto out;
     if (user_base) {
         LOGD(WARN, guest_domid, "Could not find user %s, falling back to %s",
              LIBXL_QEMU_USER_RANGE_BASE, LIBXL_QEMU_USER_SHARED);
-        goto end_search;
+        intended_uid = user_base->pw_uid;
+        rc = 0;
+        goto out;
     }
 
+    /*
+     * dm_depriv is set, but we can't find a non-root uid to run as;
+     * fail domain creation
+     */
     LOGD(ERROR, guest_domid,
          "Could not find user %s or range base pseudo-user %s, cannot restrict",
          LIBXL_QEMU_USER_SHARED, LIBXL_QEMU_USER_RANGE_BASE);
-    return ERROR_INVAL;
+    rc = ERROR_INVAL;
 
-end_search:
-    state->dm_runas = user;
-    return 0;
+out:
+    /* First, do a root check if appropriate */
+    if (!rc) {
+        if (user && intended_uid == 0) {
+            LOGD(ERROR, guest_domid, "intended_uid is 0 (root)!");
+            rc = ERROR_INVAL;
+        }
+    }
+
+    /* Then do the final set, if still appropriate */
+    if (!rc && user) {
+        state->dm_runas = user;
+    }
+
+    return rc;
 }
 
 const char *libxl__domain_device_model(libxl__gc *gc,
@@ -1757,7 +1820,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             break;
         }
 
-        if (state->dm_runas && strcmp(state->dm_runas, "root")) {
+        if (state->dm_runas) {
             flexarray_append(dm_args, "-runas");
             flexarray_append(dm_args, state->dm_runas);
         }
