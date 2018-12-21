@@ -495,7 +495,6 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("device_model",     string),
     ("device_model_ssidref", uint32),
     ("device_model_ssid_label", string),
-    # device_model_user is not ready for use yet
     ("device_model_user", string),
 
     # extra parameters pass directly to qemu, NULL terminated

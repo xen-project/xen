@@ -66,6 +66,23 @@ this, create a user named `xen-qemuuser-shared`; for example:
 
     adduser --no-create-home --system xen-qemuuser-shared
 
+A final way to set up a separate process for qemus is to allocate one
+UID per VM, and set the UID in the domain config file with the
+`device_model_user` argument.  For example, suppose you have a VM
+named `c6-01`.  You might do the following:
+
+    adduser --system --no-create-home --group xen-qemuuser-c6-01
+
+And then in your config file, the following line:
+
+    device_model_user="xen-qemuuser-c6-01"
+
+NOTE: It is important when using `device_model_user` that EACH VM HAVE
+A SEPARATE UID, and that none of these UIDs map to root.  xl will
+throw an error a uid maps to zero, but not if multiple VMs have the
+same uid.  Multiple VMs with the same device model uid will cause
+problems.
+
 ## Domain config changes
 
 The core domain config change is to add the following line to the
