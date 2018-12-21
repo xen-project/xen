@@ -615,15 +615,15 @@ static const uint8_t sse_prefix[] = { 0x66, 0xf3, 0xf2 };
 
 union vex {
     uint8_t raw[2];
-    struct {
-        uint8_t opcx:5;
-        uint8_t b:1;
-        uint8_t x:1;
-        uint8_t r:1;
-        uint8_t pfx:2;
-        uint8_t l:1;
-        uint8_t reg:4;
-        uint8_t w:1;
+    struct {             /* SDM names */
+        uint8_t opcx:5;  /* mmmmm */
+        uint8_t b:1;     /* B */
+        uint8_t x:1;     /* X */
+        uint8_t r:1;     /* R */
+        uint8_t pfx:2;   /* pp */
+        uint8_t l:1;     /* L */
+        uint8_t reg:4;   /* vvvv */
+        uint8_t w:1;     /* W */
     };
 };
 
@@ -668,22 +668,22 @@ union vex {
 
 union evex {
     uint8_t raw[3];
-    struct {
-        uint8_t opcx:2;
+    struct {             /* SDM names */
+        uint8_t opcx:2;  /* mm */
         uint8_t mbz:2;
-        uint8_t R:1;
-        uint8_t b:1;
-        uint8_t x:1;
-        uint8_t r:1;
-        uint8_t pfx:2;
+        uint8_t R:1;     /* R' */
+        uint8_t b:1;     /* B */
+        uint8_t x:1;     /* X */
+        uint8_t r:1;     /* R */
+        uint8_t pfx:2;   /* pp */
         uint8_t mbs:1;
-        uint8_t reg:4;
-        uint8_t w:1;
-        uint8_t opmsk:3;
-        uint8_t RX:1;
-        uint8_t br:1;
-        uint8_t lr:2;
-        uint8_t z:1;
+        uint8_t reg:4;   /* vvvv */
+        uint8_t w:1;     /* W */
+        uint8_t opmsk:3; /* aaa */
+        uint8_t RX:1;    /* V' */
+        uint8_t brs:1;   /* b */
+        uint8_t lr:2;    /* L'L */
+        uint8_t z:1;     /* z */
     };
 };
 
@@ -2231,7 +2231,7 @@ static unsigned int decode_disp8scale(enum disp8scale scale,
     default:
         if ( scale < d8s_vl )
             return scale;
-        if ( state->evex.br )
+        if ( state->evex.brs )
         {
     case d8s_dq:
             return 2 + state->evex.w;
@@ -5913,7 +5913,7 @@ x86_emulate(
         /* vmovs{s,d} to/from memory have only two operands. */
         if ( (b & ~1) == 0x10 && ea.type == OP_MEM )
             d |= TwoOp;
-        generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
         /* fall through */
     CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x51):    /* vsqrtp{s,d} [xyz]mm/mem,[xyz]mm{k} */
                                             /* vsqrts{s,d} xmm/m32,xmm,xmm{k} */
@@ -5924,11 +5924,11 @@ x86_emulate(
     CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5e):    /* vdiv{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5f):    /* vmax{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         generate_exception_if((evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK) ||
-                               (ea.type != OP_REG && evex.br &&
+                               (ea.type != OP_REG && evex.brs &&
                                 (evex.pfx & VEX_PREFIX_SCALAR_MASK))),
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
-        if ( ea.type != OP_REG || !evex.br )
+        if ( ea.type != OP_REG || !evex.brs )
             avx512_vlen_check(evex.pfx & VEX_PREFIX_SCALAR_MASK);
     simd_zmm:
         get_fpu(X86EMUL_FPU_zmm);
@@ -5999,7 +5999,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x3f): /* vpmaxu{d,q} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     avx512f_no_sae:
         host_and_vcpu_must_have(avx512f);
-        generate_exception_if(ea.type != OP_MEM && evex.br, EXC_UD);
+        generate_exception_if(ea.type != OP_MEM && evex.brs, EXC_UD);
         avx512_vlen_check(false);
         goto simd_zmm;
 
@@ -6183,11 +6183,11 @@ x86_emulate(
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x2e): /* vucomis{s,d} xmm/mem,xmm */
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x2f): /* vcomis{s,d} xmm/mem,xmm */
         generate_exception_if((evex.reg != 0xf || !evex.RX || evex.opmsk ||
-                               (ea.type != OP_REG && evex.br) ||
+                               (ea.type != OP_REG && evex.brs) ||
                                evex.w != evex.pfx),
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
-        if ( !evex.br )
+        if ( !evex.brs )
             avx512_vlen_check(true);
         get_fpu(X86EMUL_FPU_zmm);
 
@@ -6432,7 +6432,7 @@ x86_emulate(
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x56): /* vorp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x57): /* vxorp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         generate_exception_if((evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK) ||
-                               (ea.type != OP_MEM && evex.br)),
+                               (ea.type != OP_MEM && evex.brs)),
                               EXC_UD);
         host_and_vcpu_must_have(avx512dq);
         avx512_vlen_check(false);
@@ -6638,7 +6638,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f, 0xfc): /* vpaddb [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xfd): /* vpaddw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         host_and_vcpu_must_have(avx512bw);
-        generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
         elem_bytes = 1 << (b & 1);
         goto avx512f_no_sae;
 
@@ -6663,7 +6663,7 @@ x86_emulate(
             goto avx512f_no_sae;
         }
         host_and_vcpu_must_have(avx512bw);
-        generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
         elem_bytes = 1 << (ext == ext_0f ? b & 1 : evex.w);
         avx512_vlen_check(false);
         goto simd_zmm;
@@ -6717,7 +6717,7 @@ x86_emulate(
 
     case X86EMUL_OPC_EVEX_66(0x0f, 0x6e): /* vmov{d,q} r/m,xmm */
     case X86EMUL_OPC_EVEX_66(0x0f, 0x7e): /* vmov{d,q} xmm,r/m */
-        generate_exception_if((evex.lr || evex.opmsk || evex.br ||
+        generate_exception_if((evex.lr || evex.opmsk || evex.brs ||
                                evex.reg != 0xf || !evex.RX),
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
@@ -6743,7 +6743,7 @@ x86_emulate(
 
     case X86EMUL_OPC_EVEX_F3(0x0f, 0x7e): /* vmovq xmm/m64,xmm */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xd6): /* vmovq xmm,xmm/m64 */
-        generate_exception_if(evex.lr || !evex.w || evex.opmsk || evex.br,
+        generate_exception_if(evex.lr || !evex.w || evex.opmsk || evex.brs,
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
         d |= TwoOp;
@@ -6781,7 +6781,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f, 0x7f): /* vmovdqa{32,64} [xyz]mm,[xyz]mm/mem{k} */
     case X86EMUL_OPC_EVEX_F3(0x0f, 0x7f): /* vmovdqu{32,64} [xyz]mm,[xyz]mm/mem{k} */
     vmovdqa:
-        generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
         d |= TwoOp;
         op_bytes = 16 << evex.lr;
         goto avx512f_no_sae;
@@ -7626,12 +7626,12 @@ x86_emulate(
 
     CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0xc2): /* vcmp{p,s}{s,d} $imm8,[xyz]mm/mem,[xyz]mm,k{k} */
         generate_exception_if((evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK) ||
-                               (ea.type != OP_REG && evex.br &&
+                               (ea.type != OP_REG && evex.brs &&
                                 (evex.pfx & VEX_PREFIX_SCALAR_MASK)) ||
                                !evex.r || !evex.R || evex.z),
                               EXC_UD);
         host_and_vcpu_must_have(avx512f);
-        if ( ea.type != OP_REG || !evex.br )
+        if ( ea.type != OP_REG || !evex.brs )
             avx512_vlen_check(evex.pfx & VEX_PREFIX_SCALAR_MASK);
     simd_imm8_zmm:
         if ( (d & SrcMask) == SrcImmByte )
@@ -7687,7 +7687,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f3a, 0x25): /* vpternlog{d,q} $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     avx512f_imm8_no_sae:
         host_and_vcpu_must_have(avx512f);
-        generate_exception_if(ea.type != OP_MEM && evex.br, EXC_UD);
+        generate_exception_if(ea.type != OP_MEM && evex.brs, EXC_UD);
         avx512_vlen_check(false);
         goto simd_imm8_zmm;
 
@@ -7921,7 +7921,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f, 0xea): /* vpminsw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xee): /* vpmaxsw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         host_and_vcpu_must_have(avx512bw);
-        generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
         elem_bytes = b & 0x10 ? 1 : 2;
         goto avx512f_no_sae;
 
@@ -8122,7 +8122,7 @@ x86_emulate(
         break;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x18): /* vbroadcastss xmm/m32,[xyz]mm{k} */
-        generate_exception_if(evex.w || evex.br, EXC_UD);
+        generate_exception_if(evex.w || evex.brs, EXC_UD);
     avx512_broadcast:
         /*
          * For the respective code below the main switch() to work we need to
@@ -8145,14 +8145,14 @@ x86_emulate(
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x19): /* vbroadcastsd xmm/m64,{y,z}mm{k} */
                                             /* vbroadcastf32x2 xmm/m64,{y,z}mm{k} */
-        generate_exception_if(!evex.lr || evex.br, EXC_UD);
+        generate_exception_if(!evex.lr || evex.brs, EXC_UD);
         if ( !evex.w )
             host_and_vcpu_must_have(avx512dq);
         goto avx512_broadcast;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x1a): /* vbroadcastf32x4 m128,{y,z}mm{k} */
                                             /* vbroadcastf64x2 m128,{y,z}mm{k} */
-        generate_exception_if(ea.type != OP_MEM || !evex.lr || evex.br,
+        generate_exception_if(ea.type != OP_MEM || !evex.lr || evex.brs,
                               EXC_UD);
         if ( evex.w )
             host_and_vcpu_must_have(avx512dq);
@@ -8304,7 +8304,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x3c): /* vpmaxsb [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x3e): /* vpmaxuw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         host_and_vcpu_must_have(avx512bw);
-        generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
         elem_bytes = b & 2 ?: 1;
         goto avx512f_no_sae;
 
@@ -8521,7 +8521,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbc): /* vfnmadd231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbe): /* vfnmsub231p{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         host_and_vcpu_must_have(avx512f);
-        if ( ea.type != OP_REG || !evex.br )
+        if ( ea.type != OP_REG || !evex.brs )
             avx512_vlen_check(false);
         goto simd_zmm;
 
@@ -8538,8 +8538,8 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbd): /* vfnmadd231s{s,d} xmm/mem,xmm,xmm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xbf): /* vfnmsub231s{s,d} xmm/mem,xmm,xmm{k} */
         host_and_vcpu_must_have(avx512f);
-        generate_exception_if(ea.type != OP_REG && evex.br, EXC_UD);
-        if ( !evex.br )
+        generate_exception_if(ea.type != OP_REG && evex.brs, EXC_UD);
+        if ( !evex.brs )
             avx512_vlen_check(true);
         goto simd_zmm;
 
@@ -8883,7 +8883,7 @@ x86_emulate(
         if ( !(b & 0x20) )
             goto avx512f_imm8_no_sae;
         host_and_vcpu_must_have(avx512bw);
-        generate_exception_if(evex.br, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
         elem_bytes = 1 << evex.w;
         avx512_vlen_check(false);
         goto simd_imm8_zmm;
@@ -9350,7 +9350,7 @@ x86_emulate(
                                   EXC_GP, 0);
 
             EXPECT(elem_bytes > 0);
-            if ( evex.br )
+            if ( evex.brs )
             {
                 ASSERT((d & DstMask) != DstMem);
                 op_bytes = elem_bytes;
@@ -9365,7 +9365,7 @@ x86_emulate(
             {
                 if ( !op_mask )
                     goto simd_no_mem;
-                if ( !evex.br )
+                if ( !evex.brs )
                 {
                     first_byte = __builtin_ctzll(op_mask);
                     op_mask >>= first_byte;
