@@ -36,6 +36,7 @@
 #include <xen/pfn.h>
 #include <xen/virtual_region.h>
 #include <xen/vmap.h>
+#include <xen/trace.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/acpi.h>
 #include <asm/alternative.h>
@@ -898,6 +899,8 @@ void __init start_xen(unsigned long boot_phys_offset,
         panic("Could not set up DOM0 guest OS\n");
 
     heap_init_late();
+
+    init_trace_bufs();
 
     init_constructors();
 
