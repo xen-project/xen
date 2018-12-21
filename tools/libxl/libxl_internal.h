@@ -1705,8 +1705,6 @@ _hidden int libxl__wait_for_device_model_deprecated(libxl__gc *gc,
                                                       void *userdata),
                                 void *check_callback_userdata);
 
-_hidden int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid);
-
 _hidden const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *g_cfg);
 
 _hidden char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path);
@@ -3672,6 +3670,7 @@ extern const struct libxl_device_type *device_type_tbl[];
 
 typedef struct libxl__domain_destroy_state libxl__domain_destroy_state;
 typedef struct libxl__destroy_domid_state libxl__destroy_domid_state;
+typedef struct libxl__destroy_devicemodel_state libxl__destroy_devicemodel_state;
 typedef struct libxl__devices_remove_state libxl__devices_remove_state;
 
 typedef void libxl__domain_destroy_cb(libxl__egc *egc,
@@ -3680,6 +3679,10 @@ typedef void libxl__domain_destroy_cb(libxl__egc *egc,
 
 typedef void libxl__domid_destroy_cb(libxl__egc *egc,
                                      libxl__destroy_domid_state *dis,
+                                     int rc);
+
+typedef void libxl__devicemodel_destroy_cb(libxl__egc *egc,
+                                     libxl__destroy_devicemodel_state *ddms,
                                      int rc);
 
 typedef void libxl__devices_remove_callback(libxl__egc *egc,
@@ -3697,6 +3700,14 @@ struct libxl__devices_remove_state {
     int num_devices;
 };
 
+struct libxl__destroy_devicemodel_state {
+    /* filled in by user */
+    libxl__ao *ao;
+    uint32_t domid;
+    libxl__devicemodel_destroy_cb *callback; /* May be called re-entrantly */
+    /* private to implementation */
+};
+
 struct libxl__destroy_domid_state {
     /* filled in by user */
     libxl__ao *ao;
@@ -3704,6 +3715,7 @@ struct libxl__destroy_domid_state {
     libxl__domid_destroy_cb *callback;
     /* private to implementation */
     libxl__devices_remove_state drs;
+    libxl__destroy_devicemodel_state ddms;
     libxl__ev_child destroyer;
     bool soft_reset;
 };
@@ -3734,6 +3746,10 @@ _hidden void libxl__domain_destroy(libxl__egc *egc,
 /* Used to destroy a domain with the passed id (it doesn't check for stubs) */
 _hidden void libxl__destroy_domid(libxl__egc *egc,
                                   libxl__destroy_domid_state *dis);
+
+/* Used to detroy the device model */
+_hidden void libxl__destroy_device_model(libxl__egc *egc,
+                                         libxl__destroy_devicemodel_state *ddms);
 
 /* Entry point for devices destruction */
 _hidden void libxl__devices_destroy(libxl__egc *egc,

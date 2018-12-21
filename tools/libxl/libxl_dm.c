@@ -2696,19 +2696,24 @@ out:
     return rc;
 }
 
-int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
+void libxl__destroy_device_model(libxl__egc *egc,
+                                 libxl__destroy_devicemodel_state *ddms)
 {
+    STATE_AO_GC(ddms->ao);
     int rc;
+    int domid = ddms->domid;
     char *path = DEVICE_MODEL_XS_PATH(gc, LIBXL_TOOLSTACK_DOMID, domid, "");
+
     if (!xs_rm(CTX->xsh, XBT_NULL, path))
         LOGD(ERROR, domid, "xs_rm failed for %s", path);
+
     /* We should try to destroy the device model anyway. */
     rc = kill_device_model(gc,
               GCSPRINTF("/local/domain/%d/image/device-model-pid", domid));
-    
+
     libxl__qmp_cleanup(gc, domid);
 
-    return rc;
+    ddms->callback(egc, ddms, rc);
 }
 
 /* Return 0 if no dm needed, 1 if needed and <0 if error. */
