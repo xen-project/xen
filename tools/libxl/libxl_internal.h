@@ -332,7 +332,7 @@ struct libxl__ev_evtchn {
 typedef struct libxl__ev_watch_slot {
     LIBXL_SLIST_ENTRY(struct libxl__ev_watch_slot) empty;
 } libxl__ev_watch_slot;
-    
+
 _hidden libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc,
                                                       int slotnum);
 
@@ -484,7 +484,7 @@ struct libxl__ctx {
         death_list /* sorted by domid */,
         death_reported;
     libxl__ev_xswatch death_watch;
-    
+
     LIBXL_LIST_HEAD(, libxl_evgen_disk_eject) disk_eject_evgens;
 
     const libxl_childproc_hooks *childproc_hooks;
@@ -1131,9 +1131,11 @@ typedef struct {
 
     libxl__file_reference pv_kernel;
     libxl__file_reference pv_ramdisk;
-    const char * shim_path;
-    const char * shim_cmdline;
-    const char * pv_cmdline;
+    const char *shim_path;
+    const char *shim_cmdline;
+    const char *pv_cmdline;
+
+    char *dm_runas;
 
     xen_vmemrange_t *vmemranges;
     uint32_t num_vmemranges;
@@ -1471,7 +1473,7 @@ _hidden void libxl__spawn_init(libxl__spawn_state*);
  *
  * what: string describing the spawned process, used for logging
  *
- * Logs errors.  A copy of "what" is taken. 
+ * Logs errors.  A copy of "what" is taken.
  * Return values:
  *  < 0   error, *spawn is now Idle and need not be detached
  *   +1   caller is the parent, *spawn is Attached and must be detached
@@ -2750,10 +2752,10 @@ static inline void libxl__device_disk_local_init(libxl__disk_local_state *dls)
     dls->rc = 0;
 }
 
-/* 
+/*
  * See if we can find a way to access a disk locally
  */
-_hidden char * libxl__device_disk_find_local_path(libxl__gc *gc, 
+_hidden char * libxl__device_disk_find_local_path(libxl__gc *gc,
                                                   libxl_domid guest_domid,
                                                   const libxl_device_disk *disk,
                                                   bool qdisk_direct);
@@ -3774,7 +3776,7 @@ struct libxl__dm_spawn_state {
 
 _hidden void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state*);
 
-/* 
+/*
  * Called after forking but before executing the local devicemodel.
  */
 _hidden int libxl__local_dm_preexec_restrict(libxl__gc *gc);
@@ -3963,7 +3965,7 @@ _hidden void libxl__remus_restore_setup(libxl__egc *egc,
  */
 #define GCNEW_ARRAY(var, nmemb)                                 \
     ((var) = libxl__calloc((gc), (nmemb), sizeof(*(var))))
-    
+
 /*
  * Expression statement  <type> *GCREALLOC_ARRAY(<type> *var, size_t nmemb);
  * Uses                  libxl__gc *gc;

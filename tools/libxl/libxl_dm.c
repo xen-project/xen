@@ -65,6 +65,131 @@ static int libxl__create_qemu_logfile(libxl__gc *gc, char *name)
     return logfile_w;
 }
 
+/*
+ *  userlookup_helper_getpwnam(libxl__gc*, const char *user,
+ *                             struct passwd **pwd_r);
+ *
+ *  userlookup_helper_getpwuid(libxl__gc*, uid_t uid,
+ *                             struct passwd **pwd_r);
+ *
+ *  returns 1 if the user was found, 0 if it was not, -1 on error
+ */
+#define DEFINE_USERLOOKUP_HELPER(NAME,SPEC_TYPE,STRUCTNAME,SYSCONF)     \
+    static int userlookup_helper_##NAME(libxl__gc *gc,                  \
+                                        SPEC_TYPE spec,                 \
+                                        struct STRUCTNAME *resultbuf,   \
+                                        struct STRUCTNAME **out)        \
+    {                                                                   \
+        struct STRUCTNAME *resultp = NULL;                              \
+        char *buf = NULL;                                               \
+        long buf_size;                                                  \
+        int ret;                                                        \
+                                                                        \
+        buf_size = sysconf(SYSCONF);                                    \
+        if (buf_size < 0) {                                             \
+            buf_size = 2048;                                            \
+            LOG(DEBUG,                                                  \
+    "sysconf failed, setting the initial buffer size to %ld",           \
+                buf_size);                                              \
+        }                                                               \
+                                                                        \
+        while (1) {                                                     \
+            buf = libxl__realloc(gc, buf, buf_size);                    \
+            ret = NAME##_r(spec, resultbuf, buf, buf_size, &resultp);   \
+            if (ret == ERANGE) {                                        \
+                buf_size += 128;                                        \
+                continue;                                               \
+            }                                                           \
+            if (ret != 0)                                               \
+                return ERROR_FAIL;                                      \
+            if (resultp != NULL) {                                      \
+                if (out) *out = resultp;                                \
+                return 1;                                               \
+            }                                                           \
+            return 0;                                                   \
+        }                                                               \
+    }
+
+DEFINE_USERLOOKUP_HELPER(getpwnam, const char*, passwd, _SC_GETPW_R_SIZE_MAX);
+DEFINE_USERLOOKUP_HELPER(getpwuid, uid_t,       passwd, _SC_GETPW_R_SIZE_MAX);
+
+static int libxl__domain_get_device_model_uid(libxl__gc *gc,
+                                              libxl__dm_spawn_state *dmss)
+{
+    int guest_domid = dmss->guest_domid;
+    libxl__domain_build_state *const state = dmss->build_state;
+    const libxl_domain_build_info *b_info = &dmss->guest_config->b_info;
+
+    struct passwd *user_base, user_pwbuf;
+    int ret;
+    char *user;
+
+    /* Only qemu-upstream can run as a different uid */
+    if (b_info->device_model_version != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN)
+        return 0;
+
+    user = b_info->device_model_user;
+    if (user)
+        goto end_search;
+
+    if (!libxl_defbool_val(b_info->dm_restrict)) {
+        LOGD(DEBUG, guest_domid,
+             "dm_restrict disabled, starting QEMU as root");
+        return 0;
+    }
+
+    user = GCSPRINTF("%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
+    ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
+    if (ret < 0)
+        return ret;
+    if (ret > 0)
+        goto end_search;
+
+    ret = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
+                                         &user_pwbuf, &user_base);
+    if (ret < 0)
+        return ret;
+    if (ret > 0) {
+        struct passwd *user_clash, user_clash_pwbuf;
+        uid_t intended_uid = user_base->pw_uid + guest_domid;
+        ret = userlookup_helper_getpwuid(gc, intended_uid,
+                                         &user_clash_pwbuf, &user_clash);
+        if (ret < 0)
+            return ret;
+        if (ret > 0) {
+            LOGD(ERROR, guest_domid,
+                 "wanted to use uid %ld (%s + %d) but that is user %s !",
+                 (long)intended_uid, LIBXL_QEMU_USER_RANGE_BASE,
+                 guest_domid, user_clash->pw_name);
+            return ERROR_FAIL;
+        }
+        LOGD(DEBUG, guest_domid, "using uid %ld", (long)intended_uid);
+        user = GCSPRINTF("%ld:%ld", (long)intended_uid,
+                         (long)user_base->pw_gid);
+        goto end_search;
+    }
+
+    user = LIBXL_QEMU_USER_SHARED;
+    ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
+    if (ret < 0)
+        return ret;
+    if (ret > 0) {
+        LOGD(WARN, guest_domid, "Could not find user %s%d, falling back to %s",
+             LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED);
+        goto end_search;
+    }
+
+    LOGD(ERROR, guest_domid,
+         "Could not find user %s%d or %s or range base pseudo-user %s, cannot restrict",
+         LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED,
+         LIBXL_QEMU_USER_RANGE_BASE);
+    return ERROR_INVAL;
+
+end_search:
+    state->dm_runas = user;
+    return 0;
+}
+
 const char *libxl__domain_device_model(libxl__gc *gc,
                                        const libxl_domain_build_info *info)
 {
@@ -737,54 +862,6 @@ libxl__detect_gfx_passthru_kind(libxl__gc *gc,
     return LIBXL_GFX_PASSTHRU_KIND_DEFAULT;
 }
 
-/*
- *  userlookup_helper_getpwnam(libxl__gc*, const char *user,
- *                             struct passwd **pwd_r);
- *
- *  userlookup_helper_getpwuid(libxl__gc*, uid_t uid,
- *                             struct passwd **pwd_r);
- *
- *  returns 1 if the user was found, 0 if it was not, -1 on error
- */
-#define DEFINE_USERLOOKUP_HELPER(NAME,SPEC_TYPE,STRUCTNAME,SYSCONF)     \
-    static int userlookup_helper_##NAME(libxl__gc *gc,                  \
-                                        SPEC_TYPE spec,                 \
-                                        struct STRUCTNAME *resultbuf,   \
-                                        struct STRUCTNAME **out)        \
-    {                                                                   \
-        struct STRUCTNAME *resultp = NULL;                              \
-        char *buf = NULL;                                               \
-        long buf_size;                                                  \
-        int ret;                                                        \
-                                                                        \
-        buf_size = sysconf(SYSCONF);                                    \
-        if (buf_size < 0) {                                             \
-            buf_size = 2048;                                            \
-            LOG(DEBUG,                                                  \
-    "sysconf failed, setting the initial buffer size to %ld",           \
-                buf_size);                                              \
-        }                                                               \
-                                                                        \
-        while (1) {                                                     \
-            buf = libxl__realloc(gc, buf, buf_size);                    \
-            ret = NAME##_r(spec, resultbuf, buf, buf_size, &resultp);   \
-            if (ret == ERANGE) {                                        \
-                buf_size += 128;                                        \
-                continue;                                               \
-            }                                                           \
-            if (ret != 0)                                               \
-                return ERROR_FAIL;                                      \
-            if (resultp != NULL) {                                      \
-                if (out) *out = resultp;                                \
-                return 1;                                               \
-            }                                                           \
-            return 0;                                                   \
-        }                                                               \
-    }
-
-DEFINE_USERLOOKUP_HELPER(getpwnam, const char*, passwd, _SC_GETPW_R_SIZE_MAX);
-DEFINE_USERLOOKUP_HELPER(getpwuid, uid_t,       passwd, _SC_GETPW_R_SIZE_MAX);
-
 /* colo mode */
 enum {
     LIBXL__COLO_NONE = 0,
@@ -928,11 +1005,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
     const char *keymap = dm_keymap(guest_config);
     char *machinearg;
     flexarray_t *dm_args, *dm_envs;
-    int i, connection, devid, ret;
+    int i, connection, devid;
     uint64_t ram_size;
     const char *path, *chardev;
-    char *user = NULL;
-    struct passwd *user_base, user_pwbuf;
 
     dm_args = flexarray_make(gc, 16, 1);
     dm_envs = flexarray_make(gc, 16, 1);
@@ -1414,10 +1489,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         char *chroot_dir = GCSPRINTF("%s/qemu-root-%d",
                                       libxl__run_dir_path(), guest_domid);
         int r;
-        
+
         flexarray_append(dm_args, "-xen-domid-restrict");
 
-        /* 
+        /*
          * Run QEMU in a chroot at XEN_RUN_DIR/qemu-root-<domid>
          *
          * There is no library function to do the equivalent of `rm
@@ -1425,7 +1500,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
          * able to write any files, as the chroot would be owned by
          * root, but it would be running as an unprivileged process.
          * So in theory, old chroots should always be empty.
-         * 
+         *
          * rmdir the directory before attempting to create
          * it; if it returns anything other than ENOENT, fail domain
          * creation.
@@ -1436,7 +1511,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                   "failed to remove existing chroot dir %s", chroot_dir);
             return ERROR_FAIL;
         }
-        
+
         for (;;) {
             r = mkdir(chroot_dir, 0000);
             if (!r)
@@ -1538,7 +1613,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 continue;
             }
 
-            /* 
+            /*
              * If qemu isn't doing the interpreting, the parameter is
              * always raw
              */
@@ -1563,7 +1638,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     continue;
                 }
 
-                /* 
+                /*
                  * We can't call libxl__blktap_devpath from
                  * libxl__device_disk_find_local_path for now because
                  * the bootloader is called before the disks are set
@@ -1685,71 +1760,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             break;
         }
 
-        if (b_info->device_model_user) {
-            user = b_info->device_model_user;
-            goto end_search;
-        }
-
-        if (!libxl_defbool_val(b_info->dm_restrict)) {
-            LOGD(DEBUG, guest_domid,
-                 "dm_restrict disabled, starting QEMU as root");
-            goto end_search;
-        }
-
-        user = GCSPRINTF("%s%d", LIBXL_QEMU_USER_BASE, guest_domid);
-        ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
-        if (ret < 0)
-            return ret;
-        if (ret > 0)
-            goto end_search;
-
-        ret = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
-                                         &user_pwbuf, &user_base);
-        if (ret < 0)
-            return ret;
-        if (ret > 0) {
-            struct passwd *user_clash, user_clash_pwbuf;
-            uid_t intended_uid = user_base->pw_uid + guest_domid;
-            ret = userlookup_helper_getpwuid(gc, intended_uid,
-                                             &user_clash_pwbuf, &user_clash);
-            if (ret < 0)
-                return ret;
-            if (ret > 0) {
-                LOGD(ERROR, guest_domid,
-                     "wanted to use uid %ld (%s + %d) but that is user %s !",
-                     (long)intended_uid, LIBXL_QEMU_USER_RANGE_BASE,
-                     guest_domid, user_clash->pw_name);
-                return ERROR_FAIL;
-            }
-            LOGD(DEBUG, guest_domid, "using uid %ld", (long)intended_uid);
+        if (state->dm_runas && strcmp(state->dm_runas, "root")) {
             flexarray_append(dm_args, "-runas");
-            flexarray_append(dm_args,
-                             GCSPRINTF("%ld:%ld", (long)intended_uid,
-                                       (long)user_base->pw_gid));
-            user = NULL; /* we have taken care of it */
-            goto end_search;
-        }
-
-        user = LIBXL_QEMU_USER_SHARED;
-        ret = userlookup_helper_getpwnam(gc, user, &user_pwbuf, 0);
-        if (ret < 0)
-            return ret;
-        if (ret > 0) {
-            LOGD(WARN, guest_domid, "Could not find user %s%d, falling back to %s",
-                    LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED);
-            goto end_search;
-        }
-
-        LOGD(ERROR, guest_domid,
- "Could not find user %s%d or %s or range base pseudo-user %s, cannot restrict",
-             LIBXL_QEMU_USER_BASE, guest_domid, LIBXL_QEMU_USER_SHARED,
-             LIBXL_QEMU_USER_RANGE_BASE);
-        return ERROR_INVAL;
-
-end_search:
-        if (user != NULL && strcmp(user, "root")) {
-            flexarray_append(dm_args, "-runas");
-            flexarray_append(dm_args, user);
+            flexarray_append(dm_args, state->dm_runas);
         }
     }
     flexarray_append(dm_args, NULL);
@@ -2303,6 +2316,11 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         rc = ERROR_FAIL;
         goto out;
     }
+
+    rc = libxl__domain_get_device_model_uid(gc, dmss);
+    if (rc)
+        goto out;
+
     rc = libxl__build_device_model_args(gc, dm, domid, guest_config,
                                           &args, &envs, state,
                                           &dm_state_fd);
