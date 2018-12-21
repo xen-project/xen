@@ -478,6 +478,7 @@ static void p2m_set_permission(lpae_t *e, p2m_type_t t, p2m_access_t a)
         break;
 
     case p2m_iommu_map_ro:
+    case p2m_map_foreign_ro:
     case p2m_grant_map_ro:
     case p2m_invalid:
         e->p2m.xn = 1;

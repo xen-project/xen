@@ -1259,7 +1259,9 @@ int xenmem_add_to_physmap_one(
             return -EINVAL;
         }
 
-        if ( !p2m_is_ram(p2mt) )
+        if ( p2m_is_ram(p2mt) )
+            t = (p2mt == p2m_ram_rw) ? p2m_map_foreign_rw : p2m_map_foreign_ro;
+        else
         {
             put_page(page);
             rcu_unlock_domain(od);
@@ -1267,7 +1269,6 @@ int xenmem_add_to_physmap_one(
         }
 
         mfn = page_to_mfn(page);
-        t = p2m_map_foreign_rw;
 
         rcu_unlock_domain(od);
         break;
