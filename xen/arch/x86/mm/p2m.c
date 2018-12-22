@@ -1002,30 +1002,46 @@ int p2m_change_type_one(struct domain *d, unsigned long gfn_l,
     return rc;
 }
 
-/* Modify the p2m type of a range of gfns from ot to nt. */
+/* Modify the p2m type of [start, end_exclusive) from ot to nt. */
 static void change_type_range(struct p2m_domain *p2m,
-                              unsigned long start, unsigned long end,
+                              unsigned long start, unsigned long end_exclusive,
                               p2m_type_t ot, p2m_type_t nt)
 {
-    unsigned long gfn = start;
     struct domain *d = p2m->domain;
+    const unsigned long host_max_pfn = p2m_get_hostp2m(d)->max_mapped_pfn;
+    unsigned long end = end_exclusive - 1;
     int rc = 0;
 
-    if ( unlikely(end > p2m->max_mapped_pfn) )
+    /*
+     * Always clip the rangeset down to the host p2m. This is probably not
+     * the right behavior. This should be revisited later, but for now post a
+     * warning.
+     */
+    if ( unlikely(end > host_max_pfn) )
     {
-        if ( !gfn )
-        {
-            p2m->change_entry_type_global(p2m, ot, nt);
-            gfn = end;
-        }
-        end = p2m->max_mapped_pfn + 1;
+        printk(XENLOG_G_WARNING "Dom%d logdirty rangeset clipped to max_mapped_pfn\n",
+               d->domain_id);
+        end = host_max_pfn;
     }
-    if ( gfn < end )
-        rc = p2m->change_entry_type_range(p2m, ot, nt, gfn, end - 1);
+
+    /* If the requested range is out of scope, return doing nothing. */
+    if ( start > end )
+        return;
+
+    /*
+     * If all valid gfns are in the invalidation range, just do a
+     * global type change. Otherwise, invalidate only the range we
+     * need.
+     */
+    if ( !start && end >= p2m->max_mapped_pfn )
+        p2m->change_entry_type_global(p2m, ot, nt);
+    else
+        rc = p2m->change_entry_type_range(p2m, ot, nt, start, end);
+
     if ( rc )
     {
-        printk(XENLOG_G_ERR "Error %d changing Dom%d GFNs [%lx,%lx] from %d to %d\n",
-               rc, d->domain_id, start, end - 1, ot, nt);
+        printk(XENLOG_G_ERR "Error %d changing Dom%d GFNs [%lx,%lx) from %d to %d\n",
+               rc, d->domain_id, start, end_exclusive, ot, nt);
         domain_crash(d);
     }
 
@@ -1033,11 +1049,11 @@ static void change_type_range(struct p2m_domain *p2m,
     {
     case p2m_ram_rw:
         if ( ot == p2m_ram_logdirty )
-            rc = rangeset_remove_range(p2m->logdirty_ranges, start, end - 1);
+            rc = rangeset_remove_range(p2m->logdirty_ranges, start, end);
         break;
     case p2m_ram_logdirty:
         if ( ot == p2m_ram_rw )
-            rc = rangeset_add_range(p2m->logdirty_ranges, start, end - 1);
+            rc = rangeset_add_range(p2m->logdirty_ranges, start, end);
         break;
     default:
         break;
