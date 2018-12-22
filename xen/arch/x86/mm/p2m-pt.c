@@ -29,6 +29,7 @@
 #include <xen/event.h>
 #include <xen/trace.h>
 #include <public/vm_event.h>
+#include <asm/altp2m.h>
 #include <asm/domain.h>
 #include <asm/page.h>
 #include <asm/paging.h>
@@ -463,6 +464,13 @@ int p2m_pt_handle_deferred_changes(uint64_t gpa)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(current->domain);
     int rc;
+
+    /*
+     * Should altp2m ever be enabled for NPT / shadow use, this code
+     * should be updated to make use of the active altp2m, like
+     * ept_handle_misconfig().
+     */
+    ASSERT(!altp2m_active(current->domain));
 
     p2m_lock(p2m);
     rc = do_recalc(p2m, PFN_DOWN(gpa));

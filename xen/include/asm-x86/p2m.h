@@ -626,9 +626,6 @@ int p2m_finish_type_change(struct domain *d,
                            gfn_t first_gfn,
                            unsigned long max_nr);
 
-/* Report a change affecting memory types. */
-void p2m_memory_type_changed(struct domain *d);
-
 int p2m_is_logdirty_range(struct p2m_domain *, unsigned long start,
                           unsigned long end);
 
@@ -658,6 +655,9 @@ int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
 void p2m_pod_dump_data(struct domain *d);
 
 #ifdef CONFIG_HVM
+
+/* Report a change affecting memory types. */
+void p2m_memory_type_changed(struct domain *d);
 
 /* Called by p2m code when demand-populating a PoD page */
 bool

@@ -277,7 +277,6 @@ int p2m_init(struct domain *d)
 int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
                           unsigned long end)
 {
-    ASSERT(p2m_is_hostp2m(p2m));
     if ( p2m->global_logdirty ||
          rangeset_contains_range(p2m->logdirty_ranges, start, end) )
         return 1;
@@ -286,31 +285,79 @@ int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
     return 0;
 }
 
+static void change_entry_type_global(struct p2m_domain *p2m,
+                                     p2m_type_t ot, p2m_type_t nt)
+{
+    p2m->change_entry_type_global(p2m, ot, nt);
+    p2m->global_logdirty = (nt == p2m_ram_logdirty);
+}
+
 void p2m_change_entry_type_global(struct domain *d,
                                   p2m_type_t ot, p2m_type_t nt)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
 
     ASSERT(ot != nt);
     ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
 
-    p2m_lock(p2m);
-    p2m->change_entry_type_global(p2m, ot, nt);
-    p2m->global_logdirty = (nt == p2m_ram_logdirty);
-    p2m_unlock(p2m);
+    p2m_lock(hostp2m);
+
+    change_entry_type_global(hostp2m, ot, nt);
+
+#ifdef CONFIG_HVM
+    if ( unlikely(altp2m_active(d)) )
+    {
+        unsigned int i;
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+            if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
+            {
+                struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
+
+                p2m_lock(altp2m);
+                change_entry_type_global(altp2m, ot, nt);
+                p2m_unlock(altp2m);
+            }
+    }
+#endif
+
+    p2m_unlock(hostp2m);
+}
+
+#ifdef CONFIG_HVM
+/* There's already a memory_type_changed() in asm/mtrr.h. */
+static void _memory_type_changed(struct p2m_domain *p2m)
+{
+    if ( p2m->memory_type_changed )
+        p2m->memory_type_changed(p2m);
 }
 
 void p2m_memory_type_changed(struct domain *d)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
 
-    if ( p2m->memory_type_changed )
+    p2m_lock(hostp2m);
+
+    _memory_type_changed(hostp2m);
+
+    if ( unlikely(altp2m_active(d)) )
     {
-        p2m_lock(p2m);
-        p2m->memory_type_changed(p2m);
-        p2m_unlock(p2m);
+        unsigned int i;
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+            if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
+            {
+                struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
+
+                p2m_lock(altp2m);
+                _memory_type_changed(altp2m);
+                p2m_unlock(altp2m);
+            }
     }
+
+    p2m_unlock(hostp2m);
 }
+#endif
 
 int p2m_set_ioreq_server(struct domain *d,
                          unsigned int flags,
@@ -956,19 +1003,13 @@ int p2m_change_type_one(struct domain *d, unsigned long gfn_l,
 }
 
 /* Modify the p2m type of a range of gfns from ot to nt. */
-void p2m_change_type_range(struct domain *d, 
-                           unsigned long start, unsigned long end,
-                           p2m_type_t ot, p2m_type_t nt)
+static void change_type_range(struct p2m_domain *p2m,
+                              unsigned long start, unsigned long end,
+                              p2m_type_t ot, p2m_type_t nt)
 {
     unsigned long gfn = start;
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    struct domain *d = p2m->domain;
     int rc = 0;
-
-    ASSERT(ot != nt);
-    ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
-
-    p2m_lock(p2m);
-    p2m->defer_nested_flush = 1;
 
     if ( unlikely(end > p2m->max_mapped_pfn) )
     {
@@ -1007,26 +1048,57 @@ void p2m_change_type_range(struct domain *d,
                rc, d->domain_id);
         domain_crash(d);
     }
+}
 
-    p2m->defer_nested_flush = 0;
+void p2m_change_type_range(struct domain *d,
+                           unsigned long start, unsigned long end,
+                           p2m_type_t ot, p2m_type_t nt)
+{
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
+
+    ASSERT(ot != nt);
+    ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
+
+    p2m_lock(hostp2m);
+    hostp2m->defer_nested_flush = 1;
+
+    change_type_range(hostp2m, start, end, ot, nt);
+
+#ifdef CONFIG_HVM
+    if ( unlikely(altp2m_active(d)) )
+    {
+        unsigned int i;
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+            if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
+            {
+                struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
+
+                p2m_lock(altp2m);
+                change_type_range(altp2m, start, end, ot, nt);
+                p2m_unlock(altp2m);
+            }
+    }
+#endif
+    hostp2m->defer_nested_flush = 0;
     if ( nestedhvm_enabled(d) )
         p2m_flush_nestedp2m(d);
-    p2m_unlock(p2m);
+
+    p2m_unlock(hostp2m);
 }
 
 /*
  * Finish p2m type change for gfns which are marked as need_recalc in a range.
+ * Uses the current p2m's max_mapped_pfn to further clip the invalidation
+ * range for alternate p2ms.
  * Returns: 0/1 for success, negative for failure
  */
-int p2m_finish_type_change(struct domain *d,
-                           gfn_t first_gfn, unsigned long max_nr)
+static int finish_type_change(struct p2m_domain *p2m,
+                              gfn_t first_gfn, unsigned long max_nr)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     unsigned long gfn = gfn_x(first_gfn);
     unsigned long last_gfn = gfn + max_nr - 1;
     int rc = 0;
-
-    p2m_lock(p2m);
 
     last_gfn = min(last_gfn, p2m->max_mapped_pfn);
     while ( gfn <= last_gfn )
@@ -1042,14 +1114,51 @@ int p2m_finish_type_change(struct domain *d,
         else if ( rc < 0 )
         {
             gdprintk(XENLOG_ERR, "p2m->recalc failed! Dom%d gfn=%lx\n",
-                     d->domain_id, gfn);
+                     p2m->domain->domain_id, gfn);
             break;
         }
 
         gfn++;
     }
 
-    p2m_unlock(p2m);
+    return rc;
+}
+
+int p2m_finish_type_change(struct domain *d,
+                           gfn_t first_gfn, unsigned long max_nr)
+{
+    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
+    int rc;
+
+    p2m_lock(hostp2m);
+
+    rc = finish_type_change(hostp2m, first_gfn, max_nr);
+
+    if ( !rc )
+        goto out;
+
+#ifdef CONFIG_HVM
+    if ( unlikely(altp2m_active(d)) )
+    {
+        unsigned int i;
+
+        for ( i = 0; i < MAX_ALTP2M; i++ )
+            if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
+            {
+                struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
+
+                p2m_lock(altp2m);
+                rc = finish_type_change(altp2m, first_gfn, max_nr);
+                p2m_unlock(altp2m);
+
+                if ( !rc )
+                    goto out;
+            }
+    }
+#endif
+
+out:
+    p2m_unlock(hostp2m);
 
     return rc;
 }
