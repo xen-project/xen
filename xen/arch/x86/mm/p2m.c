@@ -2265,6 +2265,40 @@ void p2m_flush_altp2m(struct domain *d)
     altp2m_list_unlock(d);
 }
 
+static int p2m_activate_altp2m(struct domain *d, unsigned int idx)
+{
+    struct p2m_domain *hostp2m, *p2m;
+    int rc;
+
+    ASSERT(idx < MAX_ALTP2M);
+
+    p2m = d->arch.altp2m_p2m[idx];
+    hostp2m = p2m_get_hostp2m(d);
+
+    p2m_lock(p2m);
+
+    rc = p2m_init_logdirty(p2m);
+
+    if ( rc )
+        goto out;
+
+    /* The following is really just a rangeset copy. */
+    rc = rangeset_merge(p2m->logdirty_ranges, hostp2m->logdirty_ranges);
+
+    if ( rc )
+    {
+        p2m_free_logdirty(p2m);
+        goto out;
+    }
+
+    p2m_init_altp2m_ept(d, idx);
+
+ out:
+    p2m_unlock(p2m);
+
+    return rc;
+}
+
 int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx)
 {
     int rc = -EINVAL;
@@ -2275,10 +2309,7 @@ int p2m_init_altp2m_by_id(struct domain *d, unsigned int idx)
     altp2m_list_lock(d);
 
     if ( d->arch.altp2m_eptp[idx] == mfn_x(INVALID_MFN) )
-    {
-        p2m_init_altp2m_ept(d, idx);
-        rc = 0;
-    }
+        rc = p2m_activate_altp2m(d, idx);
 
     altp2m_list_unlock(d);
     return rc;
@@ -2296,9 +2327,10 @@ int p2m_init_next_altp2m(struct domain *d, uint16_t *idx)
         if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
             continue;
 
-        p2m_init_altp2m_ept(d, i);
-        *idx = i;
-        rc = 0;
+        rc = p2m_activate_altp2m(d, i);
+
+        if ( !rc )
+            *idx = i;
 
         break;
     }
