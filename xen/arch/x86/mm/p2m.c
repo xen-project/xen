@@ -2247,6 +2247,36 @@ bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
     return 1;
 }
 
+enum altp2m_reset_type {
+    ALTP2M_RESET,
+    ALTP2M_DEACTIVATE
+};
+
+static void p2m_reset_altp2m(struct domain *d, unsigned int idx,
+                             enum altp2m_reset_type reset_type)
+{
+    struct p2m_domain *p2m;
+
+    ASSERT(idx < MAX_ALTP2M);
+    p2m = d->arch.altp2m_p2m[idx];
+
+    p2m_lock(p2m);
+
+    p2m_flush_table_locked(p2m);
+
+    if ( reset_type == ALTP2M_DEACTIVATE )
+        p2m_free_logdirty(p2m);
+
+    /* Uninit and reinit ept to force TLB shootdown */
+    ept_p2m_uninit(p2m);
+    ept_p2m_init(p2m);
+
+    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
+    p2m->max_remapped_gfn = 0;
+
+    p2m_unlock(p2m);
+}
+
 void p2m_flush_altp2m(struct domain *d)
 {
     unsigned int i;
@@ -2255,10 +2285,7 @@ void p2m_flush_altp2m(struct domain *d)
 
     for ( i = 0; i < MAX_ALTP2M; i++ )
     {
-        p2m_flush_table(d->arch.altp2m_p2m[i]);
-        /* Uninit and reinit ept to force TLB shootdown */
-        ept_p2m_uninit(d->arch.altp2m_p2m[i]);
-        ept_p2m_init(d->arch.altp2m_p2m[i]);
+        p2m_reset_altp2m(d, i, ALTP2M_DEACTIVATE);
         d->arch.altp2m_eptp[i] = mfn_x(INVALID_MFN);
     }
 
@@ -2357,10 +2384,7 @@ int p2m_destroy_altp2m_by_id(struct domain *d, unsigned int idx)
 
         if ( !_atomic_read(p2m->active_vcpus) )
         {
-            p2m_flush_table(d->arch.altp2m_p2m[idx]);
-            /* Uninit and reinit ept to force TLB shootdown */
-            ept_p2m_uninit(d->arch.altp2m_p2m[idx]);
-            ept_p2m_init(d->arch.altp2m_p2m[idx]);
+            p2m_reset_altp2m(d, idx, ALTP2M_DEACTIVATE);
             d->arch.altp2m_eptp[idx] = mfn_x(INVALID_MFN);
             rc = 0;
         }
@@ -2485,16 +2509,6 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     return rc;
 }
 
-static void p2m_reset_altp2m(struct p2m_domain *p2m)
-{
-    p2m_flush_table(p2m);
-    /* Uninit and reinit ept to force TLB shootdown */
-    ept_p2m_uninit(p2m);
-    ept_p2m_init(p2m);
-    p2m->min_remapped_gfn = gfn_x(INVALID_GFN);
-    p2m->max_remapped_gfn = 0;
-}
-
 int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
                                 mfn_t mfn, unsigned int page_order,
                                 p2m_type_t p2mt, p2m_access_t p2ma)
@@ -2528,7 +2542,7 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
         {
             if ( !reset_count++ )
             {
-                p2m_reset_altp2m(p2m);
+                p2m_reset_altp2m(d, i, ALTP2M_RESET);
                 last_reset_idx = i;
             }
             else
@@ -2542,10 +2556,7 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
                          d->arch.altp2m_eptp[i] == mfn_x(INVALID_MFN) )
                         continue;
 
-                    p2m = d->arch.altp2m_p2m[i];
-                    p2m_lock(p2m);
-                    p2m_reset_altp2m(p2m);
-                    p2m_unlock(p2m);
+                    p2m_reset_altp2m(d, i, ALTP2M_RESET);
                 }
 
                 ret = 0;
