@@ -1007,42 +1007,68 @@ static void change_type_range(struct p2m_domain *p2m,
                               unsigned long start, unsigned long end_exclusive,
                               p2m_type_t ot, p2m_type_t nt)
 {
+    unsigned long invalidate_start, invalidate_end;
     struct domain *d = p2m->domain;
     const unsigned long host_max_pfn = p2m_get_hostp2m(d)->max_mapped_pfn;
     unsigned long end = end_exclusive - 1;
+    const unsigned long max_pfn = p2m->max_mapped_pfn;
     int rc = 0;
 
     /*
-     * Always clip the rangeset down to the host p2m. This is probably not
-     * the right behavior. This should be revisited later, but for now post a
-     * warning.
+     * If we have an altp2m, the logdirty rangeset range needs to
+     * match that of the hostp2m, but for efficiency, we want to clip
+     * down the the invalidation range according to the mapped values
+     * in the altp2m. Keep track of and clip the ranges separately.
+     */
+    invalidate_start = start;
+    invalidate_end   = end;
+
+    /*
+     * Clip down to the host p2m. This is probably not the right behavior.
+     * This should be revisited later, but for now post a warning.
      */
     if ( unlikely(end > host_max_pfn) )
     {
         printk(XENLOG_G_WARNING "Dom%d logdirty rangeset clipped to max_mapped_pfn\n",
                d->domain_id);
-        end = host_max_pfn;
+        end = invalidate_end = host_max_pfn;
     }
 
     /* If the requested range is out of scope, return doing nothing. */
     if ( start > end )
         return;
 
-    /*
-     * If all valid gfns are in the invalidation range, just do a
-     * global type change. Otherwise, invalidate only the range we
-     * need.
-     */
-    if ( !start && end >= p2m->max_mapped_pfn )
-        p2m->change_entry_type_global(p2m, ot, nt);
-    else
-        rc = p2m->change_entry_type_range(p2m, ot, nt, start, end);
+    if ( p2m_is_altp2m(p2m) )
+        invalidate_end = min(invalidate_end, max_pfn);
 
-    if ( rc )
+    /*
+     * If the p2m is empty, or the range is outside the currently
+     * mapped range, no need to do the invalidation; just update the
+     * rangeset.
+     */
+    if ( invalidate_start < invalidate_end )
     {
-        printk(XENLOG_G_ERR "Error %d changing Dom%d GFNs [%lx,%lx) from %d to %d\n",
-               rc, d->domain_id, start, end_exclusive, ot, nt);
-        domain_crash(d);
+        /*
+         * If all valid gfns are in the invalidation range, just do a
+         * global type change. Otherwise, invalidate only the range
+         * we need.
+         *
+         * NB that invalidate_end can't logically be >max_pfn at this
+         * point. If this changes, the == will need to be changed to
+         * >=.
+         */
+        ASSERT(invalidate_end <= max_pfn);
+        if ( !invalidate_start && invalidate_end == max_pfn)
+            p2m->change_entry_type_global(p2m, ot, nt);
+        else
+            rc = p2m->change_entry_type_range(p2m, ot, nt,
+                                              invalidate_start, invalidate_end);
+        if ( rc )
+        {
+            printk(XENLOG_G_ERR "Error %d changing Dom%d GFNs [%lx,%lx] from %d to %d\n",
+                   rc, d->domain_id, invalidate_start, invalidate_end, ot, nt);
+            domain_crash(d);
+        }
     }
 
     switch ( nt )
