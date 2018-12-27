@@ -124,7 +124,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
                                     order);
         if ( rc != 0 )
         {
-            printk("Failed to populate memory: [%#lx,%lx): %d\n",
+            printk("Failed to populate memory: [%#lx,%#lx): %d\n",
                    start, start + (1UL << order), rc);
             return -ENOMEM;
         }
