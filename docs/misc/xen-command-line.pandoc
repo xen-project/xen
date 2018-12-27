@@ -1500,13 +1500,12 @@ This option is ignored in **pv-shim** mode.
 > Default: `on`
 
 ### pci
-> `= {no-}serr | {no-}perr`
+    = List of [ serr=<bool>, perr=<bool> ]
 
-> Default: Signaling left as set by firmware.
+    Default: Signaling left as set by firmware.
 
-Disable signaling of SERR (system errors) and/or PERR (parity errors)
-on all PCI devices.
-
+Override the firmware settings, and explicitly enable or disable the
+signalling of PCI System and Parity errors.
 
 ### pci-phantom
 > `=[<seg>:]<bus>:<device>,<stride>`

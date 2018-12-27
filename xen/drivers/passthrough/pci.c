@@ -188,37 +188,25 @@ custom_param("pci-phantom", parse_phantom_dev);
 static u16 __read_mostly command_mask;
 static u16 __read_mostly bridge_ctl_mask;
 
-/*
- * The 'pci' parameter controls certain PCI device aspects.
- * Optional comma separated value may contain:
- *
- *   serr                       don't suppress system errors (default)
- *   no-serr                    suppress system errors
- *   perr                       don't suppress parity errors (default)
- *   no-perr                    suppress parity errors
- */
 static int __init parse_pci_param(const char *s)
 {
     const char *ss;
     int rc = 0;
 
     do {
-        bool_t on = !!strncmp(s, "no-", 3);
+        int val;
         u16 cmd_mask = 0, brctl_mask = 0;
-
-        if ( !on )
-            s += 3;
 
         ss = strchr(s, ',');
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !cmdline_strcmp(s, "serr") )
+        if ( (val = parse_boolean("serr", s, ss)) >= 0 )
         {
             cmd_mask = PCI_COMMAND_SERR;
             brctl_mask = PCI_BRIDGE_CTL_SERR | PCI_BRIDGE_CTL_DTMR_SERR;
         }
-        else if ( !cmdline_strcmp(s, "perr") )
+        else if ( (val = parse_boolean("perr", s, ss)) >= 0 )
         {
             cmd_mask = PCI_COMMAND_PARITY;
             brctl_mask = PCI_BRIDGE_CTL_PARITY;
@@ -226,7 +214,7 @@ static int __init parse_pci_param(const char *s)
         else
             rc = -EINVAL;
 
-        if ( on )
+        if ( val )
         {
             command_mask &= ~cmd_mask;
             bridge_ctl_mask &= ~brctl_mask;
