@@ -739,7 +739,7 @@ static int __init pvh_setup_acpi_madt(struct domain *d, paddr_t *addr)
     /* Place the new MADT in guest memory space. */
     if ( pvh_steal_ram(d, size, 0, GB(4), addr) )
     {
-        printk("Unable to find allocate guest RAM for MADT\n");
+        printk("Unable to steal guest RAM for MADT\n");
         rc = -ENOMEM;
         goto out;
     }
