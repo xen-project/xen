@@ -21,34 +21,11 @@
 #include <xen/keyhandler.h>
 #include <xsm/xsm.h>
 
-static int parse_iommu_param(const char *s);
 static void iommu_dump_p2m_table(unsigned char key);
 
 unsigned int __read_mostly iommu_dev_iotlb_timeout = 1000;
 integer_param("iommu_dev_iotlb_timeout", iommu_dev_iotlb_timeout);
 
-/*
- * The 'iommu' parameter enables the IOMMU.  Optional comma separated
- * value may contain:
- *
- *   off|no|false|disable       Disable IOMMU (default)
- *   force|required             Don't boot unless IOMMU is enabled
- *   no-intremap                Disable interrupt remapping
- *   intpost                    Enable VT-d Interrupt posting
- *   verbose                    Be more verbose
- *   debug                      Enable debugging messages and checks
- *   workaround_bios_bug        Workaround some bios issue to still enable
- *                              VT-d, don't guarantee security
- *   dom0-passthrough           No DMA translation at all for Dom0
- *   dom0-strict                No 1:1 memory mapping for Dom0
- *   no-sharept                 Don't share VT-d and EPT page tables
- *   no-snoop                   Disable VT-d Snoop Control
- *   no-qinval                  Disable VT-d Queued Invalidation
- *   no-igfx                    Disable VT-d for IGD devices (insecure)
- *   no-amd-iommu-perdev-intremap Don't use per-device interrupt remapping
- *                              tables (insecure)
- */
-custom_param("iommu", parse_iommu_param);
 bool_t __initdata iommu_enable = 1;
 bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
@@ -84,50 +61,45 @@ static struct tasklet iommu_pt_cleanup_tasklet;
 static int __init parse_iommu_param(const char *s)
 {
     const char *ss;
-    int val, b, rc = 0;
+    int val, rc = 0;
 
     do {
-        val = !!strncmp(s, "no-", 3);
-        if ( !val )
-            s += 3;
-
         ss = strchr(s, ',');
         if ( !ss )
             ss = strchr(s, '\0');
 
-        b = parse_bool(s, ss);
-        if ( b >= 0 )
-            iommu_enable = b;
-        else if ( !cmdline_strcmp(s, "force") ||
-                  !cmdline_strcmp(s, "required") )
+        if ( (val = parse_bool(s, ss)) >= 0 )
+            iommu_enable = val;
+        else if ( (val = parse_boolean("force", s, ss)) >= 0 ||
+                  (val = parse_boolean("required", s, ss)) >= 0 )
             force_iommu = val;
-        else if ( !cmdline_strcmp(s, "workaround_bios_bug") )
+        else if ( (val = parse_boolean("workaround_bios_bug", s, ss)) >= 0 )
             iommu_workaround_bios_bug = val;
-        else if ( !cmdline_strcmp(s, "igfx") )
+        else if ( (val = parse_boolean("igfx", s, ss)) >= 0 )
             iommu_igfx = val;
-        else if ( !cmdline_strcmp(s, "verbose") )
+        else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
             iommu_verbose = val;
-        else if ( !cmdline_strcmp(s, "snoop") )
+        else if ( (val = parse_boolean("snoop", s, ss)) >= 0 )
             iommu_snoop = val;
-        else if ( !cmdline_strcmp(s, "qinval") )
+        else if ( (val = parse_boolean("qinval", s, ss)) >= 0 )
             iommu_qinval = val;
-        else if ( !cmdline_strcmp(s, "intremap") )
+        else if ( (val = parse_boolean("intremap", s, ss)) >= 0 )
             iommu_intremap = val;
-        else if ( !cmdline_strcmp(s, "intpost") )
+        else if ( (val = parse_boolean("intpost", s, ss)) >= 0 )
             iommu_intpost = val;
-        else if ( !cmdline_strcmp(s, "debug") )
+        else if ( (val = parse_boolean("debug", s, ss)) >= 0 )
         {
             iommu_debug = val;
             if ( val )
                 iommu_verbose = 1;
         }
-        else if ( !cmdline_strcmp(s, "amd-iommu-perdev-intremap") )
+        else if ( (val = parse_boolean("amd-iommu-perdev-intremap", s, ss)) >= 0 )
             amd_iommu_perdev_intremap = val;
-        else if ( !cmdline_strcmp(s, "dom0-passthrough") )
+        else if ( (val = parse_boolean("dom0-passthrough", s, ss)) >= 0 )
             iommu_hwdom_passthrough = val;
-        else if ( !cmdline_strcmp(s, "dom0-strict") )
+        else if ( (val = parse_boolean("dom0-strict", s, ss)) >= 0 )
             iommu_hwdom_strict = val;
-        else if ( !cmdline_strcmp(s, "sharept") )
+        else if ( (val = parse_boolean("sharept", s, ss)) >= 0 )
             iommu_hap_pt_share = val;
         else
             rc = -EINVAL;
@@ -137,6 +109,7 @@ static int __init parse_iommu_param(const char *s)
 
     return rc;
 }
+custom_param("iommu", parse_iommu_param);
 
 static int __init parse_dom0_iommu_param(const char *s)
 {

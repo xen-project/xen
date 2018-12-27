@@ -1146,104 +1146,111 @@ detection of systems known to misbehave upon accesses to that port.
 > Default: `new` unless directed-EOI is supported
 
 ### iommu
-> `= List of [ <boolean> | force | required | intremap | intpost | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | igfx | verbose | debug ]`
+    = List of [ <bool>, verbose, debug, force, required,
+                sharept, intremap, intpost,
+                snoop, qinval, igfx, workaround_bios_bug,
+                amd-iommu-perdev-intremap,
+                dom0-{passthrough,strict} ]
 
-> Sub-options:
+    All sub-options are boolean in nature.
 
-> `<boolean>`
+I/O Memory Memory Units perform a function similar to the CPU MMU (hence the
+name), but typically exist as a discrete device, integrated as part of a PCI
+Root Complex.  The most common configuration is to have one IOMMU per package
+(for on-die PCIe devices and directly attached PCIe lanes), and one IOMMU
+covering the remaining I/O in the system.
 
-> Default: `on`
+The functionality in an IOMMU commonly falls into two orthogonal categories:
 
->> Control the use of IOMMU(s) in the system.
+1.  DMA remapping which uses a pagetable-like hierarchical structure and maps
+    I/O Virtual Addresses (DFNs - Device Frame Numbers in Xen's terminology)
+    to System Physical Addresses (MFNs - Machine Frame Numbers in Xen's
+    terminology).
 
-> All other sub-options are of boolean kind and can be prefixed with `no-` to
-> effect the inverse meaning.
+2.  Interrupt Remapping, which controls incoming Message Signalled Interrupt
+    requests, including their routing to specific CPUs.
 
-> `force` or `required`
+IOMMU functionality can be used to provide a translation which the hardware
+device driver isn't aware of (e.g. PCI Passthrough and a native driver inside
+the guest) and/or to enforce fine-grained control over the memory and
+interrupts which a device is attempting to access.
 
-> Default: `false`
+By default, IOMMUs are configured for use if they are available.  An overall
+boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
 
->> Don't continue booting unless IOMMU support is found and can be initialized
->> successfully.
+*   The `verbose` and `debug` booleans can be used to print additional
+    diagnostic information.  Neither are active by default.
 
-> `intremap`
+*   The `force` and `required` booleans are synonymous and, when requested,
+    will prevent Xen from booting if IOMMUs aren't discovered and enabled
+    successfully.
 
-> Default: `true`
+*   The `sharept` boolean controls whether the IOMMU pagetables are shared
+    with the CPU-side HAP pagetables, or allocated separately.  Sharing
+    reduces the memory overhead, but doesn't work in combination with CPU-side
+    pagefault-based features, e.g. dirty VRAM tracking when a PCI device is
+    assigned.
 
->> Control the use of interrupt remapping (DMA remapping will always be enabled
->> if IOMMU functionality is enabled).
+    Due to implementation choices, sharing pagetables doesn't work on AMD
+    hardware, and this option is ignored.  It is enabled by default on Intel
+    systems.
 
-> `intpost`
+    This option is ignored on ARM, and the pagetables are always shared.
 
-> Default: `false`
+*   The `intremap` boolean controls the Interrupt Remapping sub-feature, and
+    is active by default on compatible hardware.  On x86 systems, the first
+    generation of IOMMUs only supported DMA remapping, and Interrupt Remapping
+    appeared in the second generation.
 
->> Control the use of interrupt posting, which depends on the availability of
->> interrupt remapping.
+*   The `intpost` boolean controls the Posted Interrupt sub-feature.  In
+    combination with APIC acceleration (VT-x APICV, SVM AVIC), the IOMMU can
+    be configured to deliver interrupts from assigned PCI devices directly
+    into the guest, without trapping out into hypervisor context.
 
-> `qinval` (VT-d)
+    This option depends on `intremap`, and is disabled by default due to some
+    corner cases in the implementation which have yet to be resolved.
 
-> Default: `true`
+The following options are specific to Intel VT-d hardware:
 
->> Control the use of Queued Invalidation.
+*   The `snoop` boolean controls the Snoop Control sub-feature, and is active
+    by default on compatible hardware.
 
-> `snoop` (Intel)
+    An incoming DMA request may specify _Snooped_ (query the CPU caches for
+    the appropriate lines) or _Non-Snooped_ (don't query the CPU caches).
+    _Non-Snooped_ accesses incur less latency, but behind-the-scenes
+    hypervisor activity can invalidate the expectations of the device driver,
+    and Snoop Control allows the hypervisor to force DMA requests to be
+    _Snooped_ when they would otherwise not be.
 
-> Default: `true`
+*   The `qinval` boolean controls the Queued Invalidation sub-feature, and is
+    active by default on compatible hardware.  Queued Invalidation is a
+    feature in second-generation IOMMUs and is a functional prerequisite for
+    Interrupt Remapping.
 
->> Control the use of Snoop Control.
+*   The `igfx` boolean is active by default, and controls whether the IOMMU in
+    front of an Intel Graphics Device is enabled or not.
 
-> `sharept`
+    It is intended as a debugging mechanism for graphics issues, and to be
+    similar to Linux's `intel_iommu=igfx_off` option.  If specifying `no-igfx`
+    fixes anything, please report the problem.
 
-> Default: `true`
+*   The `workaround_bios_bug` boolean is disabled by default.  It can be used
+    to ignore errors when parsing the ACPI tables, and finding a listed PCI
+    device which doesn't appear to exist in the system.
 
->> Control whether CPU and IOMMU page tables should be shared.
+The following options are specific to AMD-Vi hardware:
 
-> `dom0-passthrough`
+*   The `amd-iommu-perdev-intremap` boolean controls whether the interrupt
+    remapping table is per device (the default), or a single global table for
+    the entire system.
 
-> **WARNING: This command line option is deprecated, and superseded by
-> _dom0-iommu=passthrough_ - using both options in combination is undefined.**
+    Using a global table is not security supported as it allows all devices to
+    impersonate each other as far as interrupts as concerned (see XSA-36), but
+    it is a workaround for SP5100 Erratum 28.
 
-> `dom0-strict`
-
-> **WARNING: This command line option is deprecated, and superseded by
-> _dom0-iommu=strict_ - using both options in combination is undefined.**
-
-> `amd-iommu-perdev-intremap`
-
-> Default: `true`
-
->> Control whether to set up interrupt remapping data structures per device
->> rather that once for the entire system. Turning this off is making PCI
->> device pass-through insecure and hence unsupported.
-
-> `workaround_bios_bug` (VT-d)
-
-> Default: `false`
-
->> Causes DRHD entries without any PCI discoverable devices under them to be
->> ignored (normally IOMMU setup fails if any of the devices listed by a DRHD
->> entry aren't PCI discoverable).
-
-> `igfx` (VT-d)
-
-> Default: `true`
-
->> Enable IOMMU for Intel graphics devices. The intended usage of this option
->> is `no-igfx`, which is similar to Linux `intel_iommu=igfx_off` option used
->> to workaround graphics issues. If adding `no-igfx` fixes anything, you
->> should file a bug reporting the problem.
-
-> `verbose`
-
-> Default: `false`
-
->> Increase IOMMU code's verbosity.
-
-> `debug`
-
-> Default: `false`
-
->> Enable IOMMU debugging code (implies `verbose`).
+**WARNING: The `dom0-passthrough` and `dom0-strict` booleans are both
+deprecated, and superseded by _dom0-iommu={passthrough,strict}_ respectively -
+using both the old and new command line options in combination is undefined.**
 
 ### iommu_dev_iotlb_timeout
 > `= <integer>`
