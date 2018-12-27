@@ -40,6 +40,13 @@ static void init_hygon(struct cpuinfo_x86 *c)
 	    c->x86 == 0x18)
 		detect_zen2_null_seg_behaviour();
 
+	/*
+	 * Hygon CPUs before Zen2 don't clear segment bases/limits when
+	 * loading a NULL selector.
+	 */
+	if (c == &boot_cpu_data && !cpu_has_nscb)
+		setup_force_cpu_cap(X86_BUG_NULL_SEG);
+
 	/* MFENCE stops RDTSC speculation */
 	if (!cpu_has_lfence_dispatch)
 		__set_bit(X86_FEATURE_MFENCE_RDTSC, c->x86_capability);

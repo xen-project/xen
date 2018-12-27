@@ -159,6 +159,7 @@
 
 /* Bugs. */
 #define cpu_bug_fpu_ptrs        boot_cpu_has(X86_BUG_FPU_PTRS)
+#define cpu_bug_null_seg        boot_cpu_has(X86_BUG_NULL_SEG)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,

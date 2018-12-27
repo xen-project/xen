@@ -227,8 +227,7 @@ long do_set_segment_base(unsigned int which, unsigned long base)
         if ( sel > 3 )
             /* Fix up RPL for non-NUL selectors. */
             sel |= 3;
-        else if ( boot_cpu_data.x86_vendor &
-                  (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+        else if ( cpu_bug_null_seg )
             /* Work around NUL segment behaviour on AMD hardware. */
             asm volatile ( "mov %[sel], %%gs"
                            :: [sel] "r" (FLAT_USER_DS32) );
