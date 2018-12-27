@@ -145,6 +145,7 @@ static const char *const str_e7d[32] =
 static const char *const str_e8b[32] =
 {
     [ 0] = "clzero",
+    [ 2] = "rstr-fp-err-ptrs",
 
     /* [ 8] */            [ 9] = "wbnoinvd",
 

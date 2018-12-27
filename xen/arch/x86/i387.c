@@ -43,20 +43,18 @@ static inline void fpu_fxrstor(struct vcpu *v)
     const typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
 
     /*
-     * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
+     * Some CPUs don't save/restore FDP/FIP/FOP unless an exception
      * is pending. Clear the x87 state here by setting it to fixed
      * values. The hypervisor data segment can be sometimes 0 and
      * sometimes new user value. Both should be ok. Use the FPU saved
      * data block as a safe address because it should be in L1.
      */
-    if ( !(fpu_ctxt->fsw & ~fpu_ctxt->fcw & 0x003f) &&
-         boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-    {
+    if ( cpu_bug_fpu_ptrs &&
+         !(fpu_ctxt->fsw & ~fpu_ctxt->fcw & 0x003f) )
         asm volatile ( "fnclex\n\t"
                        "ffree %%st(7)\n\t" /* clear stack tag */
                        "fildl %0"          /* load to clear state */
                        : : "m" (*fpu_ctxt) );
-    }
 
     /*
      * FXRSTOR can fault if passed a corrupted data block. We handle this
@@ -169,11 +167,11 @@ static inline void fpu_fxsave(struct vcpu *v)
                        : "=m" (*fpu_ctxt) : "R" (fpu_ctxt) );
 
         /*
-         * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
-         * is pending.
+         * Some CPUs don't save/restore FDP/FIP/FOP unless an exception is
+         * pending.  In this case, the restore side will arrange safe values,
+         * and there is no point trying to collect FCS/FDS in addition.
          */
-        if ( !(fpu_ctxt->fsw & 0x0080) &&
-             boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        if ( cpu_bug_fpu_ptrs && !(fpu_ctxt->fsw & 0x0080) )
             return;
 
         /*
