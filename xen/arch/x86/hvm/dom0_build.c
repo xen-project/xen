@@ -154,12 +154,13 @@ static int __init pvh_steal_ram(struct domain *d, unsigned long size,
     {
         struct e820entry *entry = &d->arch.e820[i];
 
-        if ( entry->type != E820_RAM || entry->addr + entry->size > limit ||
-             entry->addr < MB(1) )
+        if ( entry->type != E820_RAM || entry->addr + entry->size > limit )
             continue;
 
         *addr = (entry->addr + entry->size - size) & ~(align - 1);
-        if ( *addr < entry->addr )
+        if ( *addr < entry->addr ||
+             /* Don't steal from the low 1MB due to the copying done there. */
+             *addr < MB(1) )
             continue;
 
         entry->size = *addr - entry->addr;
