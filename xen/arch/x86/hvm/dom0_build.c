@@ -126,7 +126,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
         {
             printk("Failed to populate memory: [%#lx,%#lx): %d\n",
                    start, start + (1UL << order), rc);
-            return -ENOMEM;
+            return rc;
         }
         start += 1UL << order;
         nr_pages -= 1UL << order;
