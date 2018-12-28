@@ -91,16 +91,55 @@ static int __init pvh_populate_memory_range(struct domain *d,
                                             unsigned long start,
                                             unsigned long nr_pages)
 {
-    unsigned int order = MAX_ORDER, i = 0;
+    struct {
+        unsigned long align;
+        unsigned int order;
+    } static const __initconst orders[] = {
+        /* NB: must be sorted by decreasing size. */
+        { .align = PFN_DOWN(GB(1)), .order = PAGE_ORDER_1G },
+        { .align = PFN_DOWN(MB(2)), .order = PAGE_ORDER_2M },
+        { .align = PFN_DOWN(KB(4)), .order = PAGE_ORDER_4K },
+    };
+    unsigned int max_order = MAX_ORDER, i = 0;
     struct page_info *page;
     int rc;
 #define MAP_MAX_ITER 64
 
     while ( nr_pages != 0 )
     {
-        unsigned int range_order = get_order_from_pages(nr_pages + 1);
+        unsigned int order, j;
+        unsigned long end;
 
-        order = min(range_order ? range_order - 1 : 0, order);
+        /* Search for the largest page size which can fulfil this request. */
+        for ( j = 0; j < ARRAY_SIZE(orders); j++ )
+            if ( IS_ALIGNED(start, orders[j].align) &&
+                 nr_pages >= (1UL << orders[j].order) )
+                break;
+
+        switch ( j )
+        {
+        case ARRAY_SIZE(orders):
+            printk("Unable to find allocation order for [%#lx,%#lx)\n",
+                   start, start + nr_pages);
+            return -EINVAL;
+
+        case 0:
+            /* Highest order, aim to allocate until the end of the region. */
+            end = (start + nr_pages) & ~(orders[0].align - 1);
+            break;
+
+        default:
+            /*
+             * Aim to allocate until the higher next order alignment or the
+             * end of the region.
+             */
+            end = min(ROUNDUP(start + 1, orders[j - 1].align),
+                      start + nr_pages);
+            break;
+        }
+
+        order = get_order_from_pages(end - start + 1);
+        order = min(order ? order - 1 : 0, max_order);
         page = alloc_domheap_pages(d, order, dom0_memflags | MEMF_no_scrub);
         if ( page == NULL )
         {
@@ -108,7 +147,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
             {
                 /* Try again without any dom0_memflags. */
                 dom0_memflags = 0;
-                order = MAX_ORDER;
+                max_order = MAX_ORDER;
                 continue;
             }
             if ( order == 0 )
@@ -116,7 +155,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
                 printk("Unable to allocate memory with order 0!\n");
                 return -ENOMEM;
             }
-            order--;
+            max_order = order - 1;
             continue;
         }
 
