@@ -214,18 +214,21 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 
     BUG_ON(!is_hardware_domain(d));
 
-    /* Inclusive mappings are enabled by default for PV. */
-    if ( iommu_hwdom_inclusive == -1 )
-        iommu_hwdom_inclusive = is_pv_domain(d);
     /* Reserved IOMMU mappings are enabled by default. */
     if ( iommu_hwdom_reserved == -1 )
         iommu_hwdom_reserved = 1;
 
-    if ( iommu_hwdom_inclusive && !is_pv_domain(d) )
+    if ( iommu_hwdom_inclusive )
     {
         printk(XENLOG_WARNING
-               "IOMMU inclusive mappings are only supported on PV Dom0\n");
-        iommu_hwdom_inclusive = 0;
+               "IOMMU inclusive mappings are deprecated and will be removed in future versions\n");
+
+        if ( !is_pv_domain(d) )
+        {
+            printk(XENLOG_WARNING
+                   "IOMMU inclusive mappings are only supported on PV Dom0\n");
+            iommu_hwdom_inclusive = false;
+        }
     }
 
     if ( iommu_hwdom_passthrough )

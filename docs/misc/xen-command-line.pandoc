@@ -707,14 +707,16 @@ Controls for the dom0 IOMMU setup.
     Where possible, finer grain corrections should be made with the `rmrr=`,
     `ivrs_hpet=` or `ivrs_ioapic=` command line options.
 
-    This option is enabled by default on x86 systems, and invalid on ARM
-    systems.
+    This option is disabled by default, and deprecated and intended for
+    removal in future versions of Xen.  If specifying `map-inclusive` is the
+    only way to make your system boot, please report a bug.
 
 *   The `map-reserved` functionality is very similar to `map-inclusive`.
 
     The differences from `map-inclusive` are that `map-reserved` is applicable
-    to both x86 PV and PVH dom0's, and represents a subset of the correction
-    by only mapping reserved memory regions rather than all non-RAM regions.
+    to both x86 PV and PVH dom0's, is enabled by default, and represents a
+    subset of the correction by only mapping reserved memory regions rather
+    than all non-RAM regions.
 
 ### dom0_ioports_disable (x86)
 > `= List of <hex>-<hex>`

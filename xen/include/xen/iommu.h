@@ -60,8 +60,8 @@ extern bool_t iommu_hap_pt_share;
 extern bool_t iommu_debug;
 extern bool_t amd_iommu_perdev_intremap;
 
-extern bool iommu_hwdom_strict, iommu_hwdom_passthrough;
-extern int8_t iommu_hwdom_inclusive, iommu_hwdom_reserved;
+extern bool iommu_hwdom_strict, iommu_hwdom_passthrough, iommu_hwdom_inclusive;
+extern int8_t iommu_hwdom_reserved;
 
 extern unsigned int iommu_dev_iotlb_timeout;
 

@@ -38,7 +38,7 @@ bool_t __read_mostly iommu_intremap = 1;
 
 bool __hwdom_initdata iommu_hwdom_strict;
 bool __read_mostly iommu_hwdom_passthrough;
-int8_t __hwdom_initdata iommu_hwdom_inclusive = -1;
+bool __hwdom_initdata iommu_hwdom_inclusive;
 int8_t __hwdom_initdata iommu_hwdom_reserved = -1;
 
 /*
