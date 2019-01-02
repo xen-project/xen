@@ -38,7 +38,7 @@ int xc_altp2m_get_domain_state(xc_interface *handle, uint32_t dom, bool *state)
     arg->domain = dom;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     if ( !rc )
         *state = arg->u.domain_state.state;
@@ -62,7 +62,7 @@ int xc_altp2m_set_domain_state(xc_interface *handle, uint32_t dom, bool state)
     arg->u.domain_state.state = state;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_buffer_free(handle, arg);
     return rc;
@@ -85,7 +85,7 @@ int xc_altp2m_set_vcpu_enable_notify(xc_interface *handle, uint32_t domid,
     arg->u.enable_notify.gfn = gfn;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_buffer_free(handle, arg);
     return rc;
@@ -130,7 +130,7 @@ int xc_altp2m_create_view(xc_interface *handle, uint32_t domid,
     arg->u.view.hvmmem_default_access = default_access;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     if ( !rc )
         *view_id = arg->u.view.view;
@@ -155,7 +155,7 @@ int xc_altp2m_destroy_view(xc_interface *handle, uint32_t domid,
     arg->u.view.view = view_id;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_buffer_free(handle, arg);
     return rc;
@@ -178,7 +178,7 @@ int xc_altp2m_switch_to_view(xc_interface *handle, uint32_t domid,
     arg->u.view.view = view_id;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_buffer_free(handle, arg);
     return rc;
@@ -253,7 +253,7 @@ int xc_altp2m_set_mem_access(xc_interface *handle, uint32_t domid,
     arg->u.mem_access.gfn = gfn;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_buffer_free(handle, arg);
     return rc;
@@ -278,7 +278,7 @@ int xc_altp2m_change_gfn(xc_interface *handle, uint32_t domid,
     arg->u.change_gfn.new_gfn = new_gfn;
 
     rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
-		  HYPERCALL_BUFFER_AS_ARG(arg));
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     xc_hypercall_buffer_free(handle, arg);
     return rc;
