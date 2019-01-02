@@ -1061,18 +1061,17 @@ void libxl_vcpuinfo_list_free(libxl_vcpuinfo *list, int nr)
 }
 
 int libxl__sendmsg_fds(libxl__gc *gc, int carrier,
-                       const void *data, size_t datalen,
+                       const char data,
                        int nfds, const int fds[], const char *what) {
     struct msghdr msg = { 0 };
     struct cmsghdr *cmsg;
     size_t spaceneeded = nfds * sizeof(fds[0]);
     char control[CMSG_SPACE(spaceneeded)];
+    const size_t datalen = 1;
     struct iovec iov;
     int r;
 
-    assert(datalen == 1);
-
-    iov.iov_base = (void*)data;
+    iov.iov_base = (void*)&data;
     iov.iov_len  = datalen;
 
     /* compose the message */

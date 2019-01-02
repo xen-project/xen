@@ -477,7 +477,7 @@ int libxl__openptys(libxl__openpty_state *op,
             r = openpty(&ptyfds[i][0], &ptyfds[i][1], NULL, termp, winp);
             if (r) { LOGE(ERROR,"openpty failed"); _exit(-1); }
         }
-        rc = libxl__sendmsg_fds(gc, sockets[1], "",1,
+        rc = libxl__sendmsg_fds(gc, sockets[1], '\0',
                                 2*count, &ptyfds[0][0], "ptys");
         if (rc) { LOGE(ERROR,"sendmsg to parent failed"); _exit(-1); }
         _exit(0);

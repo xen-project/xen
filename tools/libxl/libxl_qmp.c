@@ -1725,7 +1725,7 @@ static int qmp_ev_callback_writable(libxl__gc *gc,
         ev->payload_fd >= 0 &&
         ev->tx_buf_off == 0) {
 
-        rc = libxl__sendmsg_fds(gc, fd, ev->tx_buf, 1,
+        rc = libxl__sendmsg_fds(gc, fd, ev->tx_buf[ev->tx_buf_off],
                                 1, &ev->payload_fd, "QMP socket");
         /* Check for EWOULDBLOCK, and return to try again later */
         if (rc == ERROR_NOT_READY)
