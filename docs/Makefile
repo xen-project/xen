@@ -6,12 +6,10 @@ VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
 DATE		:= $(shell date +%Y-%m-%d)
 
 DOC_ARCHES      := arm x86_32 x86_64
+MAN_SECTIONS    := 1 5 7 8
 
 # Documentation sources to build
-MAN1SRC-y := $(sort $(wildcard man/*.pod.1 man/*.markdown.1))
-MAN5SRC-y := $(sort $(wildcard man/*.pod.5 man/*.markdown.5))
-MAN7SRC-y := $(sort $(wildcard man/*.pod.7 man/*.markdown.7))
-MAN8SRC-y := $(sort $(wildcard man/*.pod.8 man/*.markdown.8))
+MAN-SRC-y := $(sort $(basename $(wildcard man/*.pod man/*.pandoc)))
 
 MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
 
@@ -20,38 +18,20 @@ TXTSRC-y := $(sort $(shell find misc -name '*.txt' -print))
 PANDOCSRC-y := $(sort $(shell find designs/ features/ misc/ process/ specs/ -name '*.pandoc' -print))
 
 # Documentation targets
-DOC_MAN1 := $(patsubst man/%.pod.1,man1/%.1,$(MAN1SRC-y)) \
-	        $(patsubst man/%.markdown.1,man1/%.1,$(MAN1SRC-y))
-DOC_MAN5 := $(patsubst man/%.pod.5,man5/%.5,$(MAN5SRC-y)) \
-	        $(patsubst man/%.markdown.5,man5/%.5,$(MAN5SRC-y))
-DOC_MAN7 := $(patsubst man/%.pod.7,man7/%.7,$(MAN7SRC-y)) \
-	        $(patsubst man/%.markdown.7,man7/%.7,$(MAN7SRC-y))
-DOC_MAN8 := $(patsubst man/%.pod.8,man8/%.8,$(MAN8SRC-y)) \
-	        $(patsubst man/%.markdown.8,man8/%.8,$(MAN8SRC-y))
+$(foreach i,$(MAN_SECTIONS), \
+  $(eval DOC_MAN$(i) := $(patsubst man/%.$(i),man$(i)/%.$(i), \
+                                   $(filter %.$(i),$(MAN-SRC-y)))))
+
 DOC_HTML := html/SUPPORT.html \
             $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,html/%.html,$(PANDOCSRC-y)) \
-            $(patsubst man/%.markdown.1,html/man/%.1.html,$(MAN1SRC-y)) \
-            $(patsubst man/%.markdown.5,html/man/%.5.html,$(MAN5SRC-y)) \
-            $(patsubst man/%.markdown.7,html/man/%.7.html,$(MAN7SRC-y)) \
-            $(patsubst man/%.markdown.8,html/man/%.8.html,$(MAN8SRC-y)) \
-            $(patsubst man/%.pod.1,html/man/%.1.html,$(MAN1SRC-y)) \
-            $(patsubst man/%.pod.5,html/man/%.5.html,$(MAN5SRC-y)) \
-            $(patsubst man/%.pod.7,html/man/%.7.html,$(MAN7SRC-y)) \
-            $(patsubst man/%.pod.8,html/man/%.8.html,$(MAN8SRC-y)) \
+            $(patsubst %,html/%.html,$(MAN-SRC-y)) \
             $(patsubst %.txt,html/%.txt,$(TXTSRC-y)) \
             $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
 DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
             $(patsubst %.markdown,txt/%.txt,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,txt/%.txt,$(PANDOCSRC-y)) \
-            $(patsubst man/%.markdown.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
-            $(patsubst man/%.markdown.5,txt/man/%.5.txt,$(MAN5SRC-y)) \
-            $(patsubst man/%.markdown.7,txt/man/%.7.txt,$(MAN7SRC-y)) \
-            $(patsubst man/%.markdown.8,txt/man/%.8.txt,$(MAN8SRC-y)) \
-            $(patsubst man/%.pod.1,txt/man/%.1.txt,$(MAN1SRC-y)) \
-            $(patsubst man/%.pod.5,txt/man/%.5.txt,$(MAN5SRC-y)) \
-            $(patsubst man/%.pod.7,txt/man/%.7.txt,$(MAN7SRC-y)) \
-            $(patsubst man/%.pod.8,txt/man/%.8.txt,$(MAN8SRC-y))
+            $(patsubst %,txt/%.txt,$(MAN-SRC-y))
 DOC_PDF  := $(patsubst %.markdown,pdf/%.pdf,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,pdf/%.pdf,$(PANDOCSRC-y))
 
@@ -99,7 +79,7 @@ distclean: clean
 define GENERATE_MANPAGE_RULES
 
 # Real manpages
-man$(1)/%.$(1): man/%.pod.$(1) Makefile
+man$(1)/%.$(1): man/%.$(1).pod Makefile
 ifneq ($(POD2MAN),)
 	@$(INSTALL_DIR) $$(@D)
 	$(POD2MAN) --release=$(VERSION) --name=$$* -s $(1) -c "Xen" $$< $$@
@@ -107,7 +87,7 @@ else
 	@echo "pod2man not installed; skipping $$@"
 endif
 
-man$(1)/%.$(1): man/%.markdown.$(1) Makefile
+man$(1)/%.$(1): man/%.$(1).pandoc Makefile
 ifneq ($(PANDOC),)
 	@$(INSTALL_DIR) $$(@D)
 	$(PANDOC) --standalone -V title=$$* -V section=$(1) \
@@ -118,7 +98,7 @@ else
 endif
 
 # HTML manpages
-html/man/%.$(1).html: man/%.pod.$(1) Makefile
+html/man/%.$(1).html: man/%.$(1).pod Makefile
 ifneq ($(POD2HTML),)
 	@$(INSTALL_DIR) $$(@D)
 	$(POD2HTML) --infile=$$< --outfile=$$@
@@ -126,7 +106,7 @@ else
 	@echo "pod2html not installed; skipping $$@"
 endif
 
-html/man/%.$(1).html: man/%.markdown.$(1) Makefile
+html/man/%.$(1).html: man/%.$(1).pandoc Makefile
 ifneq ($(PANDOC),)
 	@$(INSTALL_DIR) $$(@D)
 	$(PANDOC) --standalone $$< -t html --toc --output $$@
@@ -135,7 +115,7 @@ else
 endif
 
 # Text manpages
-txt/man/%.$(1).txt: man/%.pod.$(1) Makefile
+txt/man/%.$(1).txt: man/%.$(1).pod Makefile
 ifneq ($(POD2TEXT),)
 	@$(INSTALL_DIR) $$(@D)
 	$(POD2TEXT) $$< $$@
@@ -143,7 +123,7 @@ else
 	@echo "pod2text not installed; skipping $$@"
 endif
 
-txt/man/%.$(1).txt: man/%.markdown.$(1) Makefile
+txt/man/%.$(1).txt: man/%.$(1).pandoc Makefile
 ifneq ($(PANDOC),)
 	@$(INSTALL_DIR) $$(@D)
 	$(PANDOC) --standalone $$< -t plain --output $$@
@@ -169,7 +149,7 @@ clean-man$(1)-pages:
 # Uninstall
 .PHONY: uninstall-man$(1)-pages
 uninstall-man$(1)-pages:
-	rm -f $(addprefix $(DESTDIR)$(mandir)/man$(1)/, $(filter-out %.pod.$(1) %.markdown.$(1), $(notdir $(DOC_MAN$(1)))))
+	rm -f $(addprefix $(DESTDIR)$(mandir)/,$(DOC_MAN$(1)))
 
 # Link buld/install/clean to toplevel rules
 man-pages: man$(1)-pages
@@ -180,7 +160,7 @@ uninstall-man-pages: uninstall-man$(1)-pages
 endef
 
 # Generate manpage rules for each section
-$(foreach i,1 5 7 8,$(eval $(call GENERATE_MANPAGE_RULES,$(i))))
+$(foreach i,$(MAN_SECTIONS),$(eval $(call GENERATE_MANPAGE_RULES,$(i))))
 
 .PHONY: install-html
 install-html: html txt figs

@@ -7,8 +7,8 @@ AC_INIT([Xen Hypervisor Documentation], m4_esyscmd([../version.sh ../xen/Makefil
 AC_CONFIG_SRCDIR([misc/xen-command-line.markdown])
 AC_CONFIG_FILES([
 ../config/Docs.mk
-man/xl.cfg.pod.5
-man/xl.pod.1
+man/xl.cfg.5.pod
+man/xl.1.pod
 ])
 AC_CONFIG_AUX_DIR([../])
 
