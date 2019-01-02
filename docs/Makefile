@@ -11,8 +11,6 @@ MAN_SECTIONS    := 1 5 7 8
 # Documentation sources to build
 MAN-SRC-y := $(sort $(basename $(wildcard man/*.pod man/*.pandoc)))
 
-MARKDOWNSRC-y := $(sort $(shell find misc -name '*.markdown' -print))
-
 TXTSRC-y := $(sort $(shell find misc -name '*.txt' -print))
 
 PANDOCSRC-y := $(sort $(shell find designs/ features/ misc/ process/ specs/ -name '*.pandoc' -print))
@@ -23,17 +21,14 @@ $(foreach i,$(MAN_SECTIONS), \
                                    $(filter %.$(i),$(MAN-SRC-y)))))
 
 DOC_HTML := html/SUPPORT.html \
-            $(patsubst %.markdown,html/%.html,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,html/%.html,$(PANDOCSRC-y)) \
             $(patsubst %,html/%.html,$(MAN-SRC-y)) \
             $(patsubst %.txt,html/%.txt,$(TXTSRC-y)) \
             $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
 DOC_TXT  := $(patsubst %.txt,txt/%.txt,$(TXTSRC-y)) \
-            $(patsubst %.markdown,txt/%.txt,$(MARKDOWNSRC-y)) \
             $(patsubst %.pandoc,txt/%.txt,$(PANDOCSRC-y)) \
             $(patsubst %,txt/%.txt,$(MAN-SRC-y))
-DOC_PDF  := $(patsubst %.markdown,pdf/%.pdf,$(MARKDOWNSRC-y)) \
-            $(patsubst %.pandoc,pdf/%.pdf,$(PANDOCSRC-y))
+DOC_PDF  := $(patsubst %.pandoc,pdf/%.pdf,$(PANDOCSRC-y))
 
 # Top level build targets
 .PHONY: all
@@ -181,14 +176,6 @@ uninstall: uninstall-man-pages uninstall-html
 html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
 	$(PERL) -w -- $(CURDIR)/gen-html-index -i INDEX html $(DOC_HTML)
 
-html/%.html: %.markdown
-ifneq ($(MARKDOWN),)
-	@$(INSTALL_DIR) $(@D)
-	$(MARKDOWN) $< > $@
-else
-	@echo "markdown not installed; skipping $@"
-endif
-
 html/%.txt: %.txt
 	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
@@ -213,10 +200,6 @@ txt/%.txt: %.txt
 	@$(INSTALL_DIR) $(@D)
 	$(INSTALL_DATA) $< $@
 
-txt/%.txt: %.markdown
-	@$(INSTALL_DIR) $(@D)
-	$(INSTALL_DATA) $< $@
-
 # Metarule for generating pandoc rules.
 define GENERATE_PANDOC_RULE_RAW
 $(1): $(2)
@@ -234,9 +217,8 @@ endef
 $(eval $(call GENERATE_PANDOC_RULE,pdf,pandoc))   # pdf/%.pdf: %.pandoc
 $(eval $(call GENERATE_PANDOC_RULE,txt,pandoc))   # txt/%.txt: %.pandoc
 $(eval $(call GENERATE_PANDOC_RULE,html,pandoc))  # html/%.html: %.pandoc
-$(eval $(call GENERATE_PANDOC_RULE,pdf,markdown)) # pdf/%.pdf: %.markdown
 
-$(eval $(call GENERATE_PANDOC_RULE_RAW,html/SUPPORT.html,$(XEN_ROOT)/SUPPORT.md)) # pdf/%.pdf: %.markdown
+$(eval $(call GENERATE_PANDOC_RULE_RAW,html/SUPPORT.html,$(XEN_ROOT)/SUPPORT.md))
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Docs.mk:

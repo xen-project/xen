@@ -73,7 +73,8 @@ disabled at compile time:
       ocaml-findlib). Required to build ocaml components which
       includes the alternative ocaml xenstored.
     * cmake (if building vtpm stub domains)
-    * markdown
+    * pandoc, transfig, pod2{man,html,text} for rendering various pieces of
+      documentation into alternative formats
     * figlet (for generating the traditional Xen start of day banner)
     * systemd daemon development files
     * Development install of libnl3 (e.g., libnl-3-200,

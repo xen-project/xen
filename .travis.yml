@@ -62,7 +62,6 @@ addons:
             - libnl-3-dev
             - ocaml-nox
             - libfindlib-ocaml-dev
-            - markdown
             - transfig
             - pandoc
             - gcc-arm-linux-gnueabihf
