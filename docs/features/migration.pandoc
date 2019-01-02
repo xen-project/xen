@@ -65,7 +65,7 @@ legacy stream into a migration v2 stream.
 
 ## libxl
 
-With migration v2 support, LIBXL\_HAVE\_SRM\_V2 and LIBXL\_HAVE\_SRM\_V1
+With migration v2 support, LIBXL_HAVE_SRM_V2 and LIBXL_HAVE_SRM_V1
 are introduced to indicate support.  `domain_restore_params` gains a new
 parameter, `stream_version`, which is used to distinguish between legacy and
 v2 migration streams, and hence whether legacy conversion is required.

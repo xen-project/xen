@@ -182,8 +182,8 @@ in the stream.
 
 The end record contains no fields; its body_length is 0.
 
-LIBXC\_CONTEXT
---------------
+LIBXC_CONTEXT
+-------------
 
 A libxc context record is a marker, indicating that the stream should be
 handed to `xc_domain_restore()`.  `libxc` shall be responsible for reading its
@@ -199,8 +199,8 @@ The libxc context record contains no fields; its body_length is 0[^1].
 might write into the stream, especially for live migration where the quantity
 of data is partially proportional to the elapsed time.
 
-EMULATOR\_XENSTORE\_DATA
-------------------------
+EMULATOR_XENSTORE_DATA
+----------------------
 
 A set of xenstore key/value pairs for a specific emulator associated with the
 domain.
@@ -226,7 +226,7 @@ domain.  At the time of writing, keys are relative to the path
 although this path is free to change moving forward, thus should not be
 assumed.
 
-EMULATOR\_CONTEXT
+EMULATOR_CONTEXT
 ----------------
 
 A context blob for a specific emulator associated with the domain.
@@ -242,8 +242,8 @@ A context blob for a specific emulator associated with the domain.
 The *emulator_ctx* is a binary blob interpreted by the emulator identified by
 *emulator_id*.  Its format is unspecified.
 
-CHECKPOINT\_END
----------------
+CHECKPOINT_END
+--------------
 
 A checkpoint end record marks the end of a checkpoint in the image.
 
@@ -253,8 +253,8 @@ A checkpoint end record marks the end of a checkpoint in the image.
 The end record contains no fields; its body_length is 0.
 
 
-CHECKPOINT\_STATE
---------------
+CHECKPOINT_STATE
+----------------
 
 A checkpoint state record contains the control information for checkpoint. It
 is only used by COLO, more detail please reference README.colo.
@@ -282,26 +282,26 @@ In COLO, Primary is running in below loop:
 
 1. Suspend primary vm
     a. Suspend primary vm
-    b. Read _CHECKPOINT\_SVM\_SUSPENDED_ sent by secondary
+    b. Read *CHECKPOINT_SVM_SUSPENDED* sent by secondary
 2. Checkpoint
 3. Resume primary vm
-    a. Read _CHECKPOINT\_SVM\_READY_ from secondary
+    a. Read *CHECKPOINT_SVM_READY* from secondary
     b. Resume primary vm
-    c. Read _CHECKPOINT\_SVM\_RESUMED_ from secondary
+    c. Read *CHECKPOINT_SVM_RESUMED* from secondary
 4. Wait a new checkpoint
-    a. Send _CHECKPOINT\_NEW_ to secondary
+    a. Send *CHECKPOINT_NEW* to secondary
 
 While Secondary is running in below loop:
 
 1. Resume secondary vm
-    a. Send _CHECKPOINT\_SVM\_READY_ to primary
+    a. Send *CHECKPOINT_SVM_READY* to primary
     b. Resume secondary vm
-    c. Send _CHECKPOINT\_SVM\_RESUMED_ to primary
+    c. Send *CHECKPOINT_SVM_RESUMED* to primary
 2. Wait a new checkpoint
-    a. Read _CHECKPOINT\_NEW_ from primary
+    a. Read *CHECKPOINT_NEW* from primary
 3. Suspend secondary vm
     a. Suspend secondary vm
-    b. Send _CHECKPOINT\_SVM\_SUSPENDED_ to primary
+    b. Send *CHECKPOINT_SVM_SUSPENDED* to primary
 4. Checkpoint
 
 Future Extensions

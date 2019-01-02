@@ -57,7 +57,7 @@ is all contained in `xen/common/sched_credit2.c`.
 
 Global scheduling parameters, such as context switching rate
 limiting, is only available from Xen 4.8 onward. In libxl, the
-`LIBXL\_HAVE\_SCHED\_CREDIT2\_PARAMS` symbol is introduced to
+LIBXL_HAVE_SCHED_CREDIT2_PARAMS symbol is introduced to
 indicate their availability.
 
 # Testing
@@ -82,8 +82,8 @@ following:
 * vCPUs' reservations (similar to caps, but providing a vCPU with guarantees
   about some pCPU time it will always be able to execute for);
 * benchmarking for assessing the best combination of values for the various
-  parameters (`sched\_credit2\_migrate\_resist`, `credit2\_balance\_over`,
-  `credit2\_balance\_under`)
+  parameters (`sched_credit2_migrate_resist`, `credit2_balance_over`,
+  `credit2_balance_under`)
 
 # Known issues
 

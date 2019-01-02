@@ -127,19 +127,19 @@ time.
 ## Host boot
 
 As Xen boots, it will enumerate the features it can see.  This is stored as
-the _raw\_featureset_.
+the *raw_featureset*.
 
 Errata checks and command line arguments are then taken into account to reduce
-the _raw\_featureset_ into the _host\_featureset_, which is the set of
+the *raw_featureset* into the *host_featureset*, which is the set of
 features Xen uses.  On hardware with masking/override MSRs, the default MSR
-values are picked from the _host\_featureset_.
+values are picked from the *host_featureset*.
 
-The _host\_featureset_ is then used to calculate the _pv\_featureset_ and
-_hvm\_featureset_, which are the maximum featuresets Xen is willing to offer
+The *host_featureset* is then used to calculate the *pv_featureset* and
+*hvm_featureset*, which are the maximum featuresets Xen is willing to offer
 to PV and HVM guests respectively.
 
 In addition, Xen will calculate how much control it has over non-cooperative
-PV `CPUID` instructions, storing this information as _levelling\_caps_.
+PV `CPUID` instructions, storing this information as *levelling_caps*.
 
 ## Domain creation
 
@@ -163,7 +163,7 @@ features will be able to find some of them.  e.g. There is no way of forcibly
 preventing a guest from using 1GB superpages if the hardware supports it.
 
 Some information simply cannot be hidden from guests.  There is no way to
-control certain behaviour such as the hardware MXCSR\_MASK or x87 FPU exception
+control certain behaviour such as the hardware MXCSR_MASK or x87 FPU exception
 behaviour.
 
 
@@ -196,7 +196,7 @@ be at the head of the migration stream.
 
 MSRs are another source of features for guests.  There is no general provision
 for controlling the available MSRs.  E.g. 64bit versions of Windows notice
-changes in IA32\_MISC\_ENABLE, and suffer a BSOD 0x109 (Critical Structure
+changes in IA32_MISC_ENABLE, and suffer a BSOD 0x109 (Critical Structure
 Corruption)
 
 

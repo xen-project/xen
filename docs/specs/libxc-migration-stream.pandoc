@@ -298,14 +298,14 @@ count       Number of pages described in this record.
 
 pfn         An array of count PFNs and their types.
 
-            Bit 63-60: XEN\_DOMCTL\_PFINFO\_* type (from
+            Bit 63-60: XEN_DOMCTL_PFINFO_* type (from
             `public/domctl.h` but shifted by 32 bits)
 
             Bit 59-52: Reserved.
 
             Bit 51-0: PFN.
 
-page\_data  page\_size octets of uncompressed page contents for each
+page_data   page_size octets of uncompressed page contents for each
             page set as present in the pfn array.
 --------------------------------------------------------------------
 
@@ -342,7 +342,7 @@ XALLOC         0xE        Allocate only.
 XTAB           0xF        Invalid page.
 --------------------------------------------------------------------
 
-Table: XEN\_DOMCTL\_PFINFO\_* Page Types.
+Table: XEN_DOMCTL_PFINFO_* Page Types.
 
 PFNs with type `BROKEN`, `XALLOC`, or `XTAB` do not have any
 corresponding `page_data`.
@@ -429,13 +429,13 @@ context          Binary data for this VCPU.
 ---------------------------------------------------------------------
 Record type                  Accessor hypercalls
 -----------------------      ----------------------------------------
-X86\_PV\_VCPU\_BASIC         XEN\_DOMCTL\_{get,set}vcpucontext
+X86_PV_VCPU_BASIC            XEN_DOMCTL_{get,set}vcpucontext
 
-X86\_PV\_VCPU\_EXTENDED      XEN\_DOMCTL\_{get,set}\_ext\_vcpucontext
+X86_PV_VCPU_EXTENDED         XEN_DOMCTL_{get,set}\_ext_vcpucontext
 
-X86\_PV\_VCPU\_XSAVE         XEN\_DOMCTL\_{get,set}vcpuextstate
+X86_PV_VCPU_XSAVE            XEN_DOMCTL_{get,set}vcpuextstate
 
-X86\_PV\_VCPU\_MSRS          XEN\_DOMCTL\_{get,set}\_vcpu\_msrs
+X86_PV_VCPU_MSRS             XEN_DOMCTL_{get,set}\_vcpu_msrs
 ---------------------------------------------------------------------
 
 \clearpage
@@ -464,7 +464,7 @@ TSC_INFO
 --------
 
 Domain TSC information, as accessed by the
-XEN\_DOMCTL\_{get,set}tscinfo hypercall sub-ops.
+XEN_DOMCTL_{get,set}tscinfo hypercall sub-ops.
 
      0     1     2     3     4     5     6     7 octet
     +------------------------+------------------------+
@@ -478,7 +478,7 @@ XEN\_DOMCTL\_{get,set}tscinfo hypercall sub-ops.
 --------------------------------------------------------------------
 Field            Description
 -----------      ---------------------------------------------------
-mode             TSC mode, TSC\_MODE\_* constant.
+mode             TSC mode, TSC_MODE_* constant.
 
 khz              TSC frequency, in kHz.
 
@@ -493,7 +493,7 @@ HVM_CONTEXT
 -----------
 
 HVM Domain context, as accessed by the
-XEN\_DOMCTL\_{get,set}hvmcontext hypercall sub-ops.
+XEN_DOMCTL_{get,set}hvmcontext hypercall sub-ops.
 
      0     1     2     3     4     5     6     7 octet
     +-------------------------------------------------+
@@ -513,7 +513,7 @@ HVM_PARAMS
 ----------
 
 HVM Domain parameters, as accessed by the
-HVMOP\_{get,set}\_param hypercall sub-ops.
+HVMOP_{get,set}\_param hypercall sub-ops.
 
      0     1     2     3     4     5     6     7 octet
     +------------------------+------------------------+
@@ -643,25 +643,25 @@ A typical save record for an x86 PV guest image would look like:
 
 1. Image header
 2. Domain header
-3. X86\_PV\_INFO record
-4. X86\_PV\_P2M\_FRAMES record
-5. Many PAGE\_DATA records
-6. TSC\_INFO
-7. SHARED\_INFO record
+3. X86_PV_INFO record
+4. X86_PV_P2M_FRAMES record
+5. Many PAGE_DATA records
+6. TSC_INFO
+7. SHARED_INFO record
 8. VCPU context records for each online VCPU
-    a. X86\_PV\_VCPU\_BASIC record
-    b. X86\_PV\_VCPU\_EXTENDED record
-    c. X86\_PV\_VCPU\_XSAVE record
-    d. X86\_PV\_VCPU\_MSRS record
+    a. X86_PV_VCPU_BASIC record
+    b. X86_PV_VCPU_EXTENDED record
+    c. X86_PV_VCPU_XSAVE record
+    d. X86_PV_VCPU_MSRS record
 9. END record
 
 There are some strict ordering requirements.  The following records must
 be present in the following order as each of them depends on information
 present in the preceding ones.
 
-1. X86\_PV\_INFO record
-2. X86\_PV\_P2M\_FRAMES record
-3. PAGE\_DATA records
+1. X86_PV_INFO record
+2. X86_PV_P2M_FRAMES record
+3. PAGE_DATA records
 4. VCPU records
 
 x86 HVM Guest
@@ -671,12 +671,12 @@ A typical save record for an x86 HVM guest image would look like:
 
 1. Image header
 2. Domain header
-3. Many PAGE\_DATA records
-4. TSC\_INFO
-5. HVM\_PARAMS
-6. HVM\_CONTEXT
+3. Many PAGE_DATA records
+4. TSC_INFO
+5. HVM_PARAMS
+6. HVM_CONTEXT
 
-HVM\_PARAMS must precede HVM\_CONTEXT, as certain parameters can affect
+HVM_PARAMS must precede HVM_CONTEXT, as certain parameters can affect
 the validity of architectural state in the context.
 
 
@@ -731,5 +731,5 @@ Errata
 
 1. For compatibility with older code, the receving side of a stream should
    tolerate and ignore variable sized records with zero content.  Xen releases
-   between 4.6 and 4.8 could end up generating valid HVM\_PARAMS or
-   X86\_PV\_VCPU\_{EXTENDED,XSAVE,MSRS} records with zero-length content.
+   between 4.6 and 4.8 could end up generating valid HVM_PARAMS or
+   X86_PV_VCPU_{EXTENDED,XSAVE,MSRS} records with zero-length content.

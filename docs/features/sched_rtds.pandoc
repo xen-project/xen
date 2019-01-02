@@ -49,12 +49,12 @@ hook based, architecture for schedulers. Thanks to this, RTDS code
 is all contained in `xen/common/sched_rtds.c`.
 
 In libxl, the availability of the RTDS scheduler is advertised by
-the presence of the LIBXL\_HAVE\_SCHED\_RTDS symbol. The ability of
+the presence of the LIBXL_HAVE_SCHED_RTDS symbol. The ability of
 specifying different scheduling parameters for each vcpu has been
 introduced later, and is available if the following symbols are defined:
-    * `LIBXL\_HAVE\_VCPU\_SCHED\_PARAMS`,
-    * `LIBXL\_HAVE\_SCHED\_RTDS\_VCPU\_PARAMS`,
-    * `LIBXL\_HAVE\_SCHED\_RTDS\_VCPU\_EXTRA`.
+    * LIBXL_HAVE_VCPU_SCHED_PARAMS,
+    * LIBXL_HAVE_SCHED_RTDS_VCPU_PARAMS,
+    * LIBXL_HAVE_SCHED_RTDS_VCPU_EXTRA.
 
 # Limitations
 
