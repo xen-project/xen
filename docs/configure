@@ -584,7 +584,7 @@ PACKAGE_STRING='Xen Hypervisor Documentation 4.12'
 PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
 PACKAGE_URL='http://www.xen.org/'
 
-ac_unique_file="misc/xen-command-line.markdown"
+ac_unique_file="misc/xen-command-line.pandoc"
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 PERL

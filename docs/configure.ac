@@ -4,7 +4,7 @@
 AC_PREREQ([2.67])
 AC_INIT([Xen Hypervisor Documentation], m4_esyscmd([../version.sh ../xen/Makefile]),
     [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
-AC_CONFIG_SRCDIR([misc/xen-command-line.markdown])
+AC_CONFIG_SRCDIR([misc/xen-command-line.pandoc])
 AC_CONFIG_FILES([
 ../config/Docs.mk
 man/xl.cfg.5.pod
