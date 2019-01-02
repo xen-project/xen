@@ -1,4 +1,4 @@
-# Xen transport for 9pfs version 1 
+# Xen transport for 9pfs version 1
 
 ## Background
 
@@ -74,7 +74,7 @@ frontend:
 
     versions
          Values:         <string>
-    
+
          List of comma separated protocol versions supported by the backend.
          For example "1,2,3". Currently the value is just "1", as there is
          only one version. N.B.: this is the version of the Xen trasport
@@ -82,12 +82,12 @@ frontend:
 
     max-rings
          Values:         <uint32_t>
-    
+
          The maximum supported number of rings per frontend.
-    
+
     max-ring-page-order
          Values:         <uint32_t>
-    
+
          The maximum supported size of a memory allocation in units of
          log2n(machine pages), e.g. 1 = 2 pages, 2 == 4 pages, etc. It
          must be at least 1.
@@ -97,18 +97,18 @@ backend:
 
     path
          Values:         <string>
-    
+
          Host filesystem path to share.
-    
+
     tag
          Values:         <string>
-    
+
          Alphanumeric tag that identifies the 9pfs share. The client needs
          to know the tag to be able to mount it.
-    
+
     security-model
          Values:         "none"
-    
+
          *none*: files are stored using the same credentials as they are
                  created on the guest (no user ownership squash or remap)
          Only "none" is supported in this version of the protocol.
@@ -117,25 +117,25 @@ backend:
 
     version
          Values:         <string>
-    
+
          Protocol version, chosen among the ones supported by the backend
          (see **versions** under [Backend XenBus Nodes]). Currently the
          value must be "1".
 
     num-rings
          Values:         <uint32_t>
-    
+
          Number of rings. It needs to be lower or equal to max-rings.
-    
+
     event-channel-<num> (event-channel-0, event-channel-1, etc)
          Values:         <uint32_t>
-    
+
          The identifier of the Xen event channel used to signal activity
          in the ring buffer. One for each ring.
-    
+
     ring-ref<num> (ring-ref0, ring-ref1, etc)
          Values:         <uint32_t>
-    
+
          The Xen grant reference granting permission for the backend to
          map a page with information to setup a share ring. One for each
          ring.
@@ -263,7 +263,7 @@ The shared page has the following layout:
 
 The binary layout of `struct xen_9pfs_intf` follows:
 
-    0         4         8           64        68        72        76 
+    0         4         8           64        68        72        76
     +---------+---------+-----//-----+---------+---------+---------+
     | in_cons | in_prod |  padding   |out_cons |out_prod |ring_orde|
     +---------+---------+-----//-----+---------+---------+---------+
@@ -315,7 +315,7 @@ what [ring.h] does.
 ## Ring Usage
 
 The **in** and **out** arrays are used as circular buffers:
-    
+
     0                               sizeof(array) == ((1<<ring_order)<<PAGE_SHIFT)/2
     +-----------------------------------+
     |to consume|    free    |to consume |
@@ -349,7 +349,7 @@ The following functions are provided to read and write to an array:
     	}
     	*masked_cons = _MASK_XEN_9PFS_IDX(*masked_cons + len);
     }
-    
+
     static inline void xen_9pfs_write(char *buf,
     		XEN_9PFS_RING_IDX *masked_prod, XEN_9PFS_RING_IDX *masked_cons,
     		uint8_t *opaque, size_t len) {
@@ -358,9 +358,9 @@ The following functions are provided to read and write to an array:
     	} else {
     		if (len > XEN_9PFS_RING_SIZE - *masked_prod) {
     			memcpy(buf + *masked_prod, opaque, XEN_9PFS_RING_SIZE - *masked_prod);
-    			memcpy(buf, opaque + (XEN_9PFS_RING_SIZE - *masked_prod), len - (XEN_9PFS_RING_SIZE - *masked_prod)); 
+    			memcpy(buf, opaque + (XEN_9PFS_RING_SIZE - *masked_prod), len - (XEN_9PFS_RING_SIZE - *masked_prod));
     		} else {
-    			memcpy(buf + *masked_prod, opaque, len); 
+    			memcpy(buf + *masked_prod, opaque, len);
     		}
     	}
     	*masked_prod = _MASK_XEN_9PFS_IDX(*masked_prod + len);

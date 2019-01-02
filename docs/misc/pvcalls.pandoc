@@ -45,7 +45,7 @@ community. If you are a Xen contributor you can skip this section.
   virtio device emulators.
 
 * VMX and SVM
-  
+
   On Intel processors, VMX is the CPU flag for VT-x, hardware
   virtualization support. It corresponds to SVM on AMD processors.
 
@@ -228,7 +228,7 @@ requests are allocated on the ring using the `RING_GET_REQUEST` macro.
 The list of commands below is in calling order.
 
 The format is defined as follows:
-    
+
     #define PVCALLS_SOCKET         0
     #define PVCALLS_CONNECT        1
     #define PVCALLS_RELEASE        2
@@ -885,7 +885,7 @@ buffers for transferring data, and, together, they are the data ring.
                                                     |  @4099->8196: out |
                                                     |  ref[1]           |
                                                     +-------------------+
- 
+
 
 #### Indexes Page Structure
 
@@ -950,7 +950,7 @@ buffers for transferring data, and, together, they are the data ring.
 
 The binary layout of `struct pvcalls_data_intf` follows:
 
-    0         4         8         12           64        68        72        76 
+    0         4         8         12           64        68        72        76
     +---------+---------+---------+-----//-----+---------+---------+---------+
     | in_cons | in_prod |in_error |  padding   |out_cons |out_prod |out_error|
     +---------+---------+---------+-----//-----+---------+---------+---------+
@@ -1003,7 +1003,7 @@ what [ring.h] does.
 #### Workflow
 
 The **in** and **out** arrays are used as circular buffers:
-    
+
     0                               sizeof(array) == ((1<<ring_order)<<PAGE_SHIFT)/2
     +-----------------------------------+
     |to consume|    free    |to consume |
@@ -1028,16 +1028,16 @@ left unconsumed in an array:
     		PVCALLS_RING_IDX ring_size)
     {
     	PVCALLS_RING_IDX size;
-    
+
     	if (prod == cons)
     		return 0;
-    
+
     	prod = _MASK_PVCALLS_IDX(prod, ring_size);
     	cons = _MASK_PVCALLS_IDX(cons, ring_size);
-    
+
     	if (prod == cons)
     		return ring_size;
-    
+
     	if (prod > cons)
     		size = prod - cons;
     	else {

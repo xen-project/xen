@@ -31,9 +31,9 @@ filesystem as:
 
 Where `<ARCH>` is the first element of the GNU triplet e.g. one of:
 
- * i386 (nb only i386, not i686 etc), corresponding to the Xen
-   x86\_32(p) arch;
- * x86\_64, corresponding to the Xen x86\_64 arch;
+ * `i386` (nb only `i386`, not `i686` etc), corresponding to the Xen
+   `x86_32(p)` arch;
+ * `x86_64`, corresponding to the Xen `x86_64` arch;
 
 It is allowable for `/boot` to be a separate filesystem from `/` and
 therefore stage 1 bootloaders should search
@@ -44,6 +44,6 @@ and therefore it is not necessary to search for /pvboot-<ARCH>.elf.
 It is not in general possible under Xen for a bootloader to boot a
 kernel of a different width from itself, and this extends to
 chainloading from a stage one. Therefore it is permissible to have
-both `/boot/xen/pvboot-i386.elf` and `/boot/xen/pvboot-x86\_64.elf`
+both `/boot/xen/pvboot-i386.elf` and `/boot/xen/pvboot-x86_64.elf`
 present in a guest to be used by the appropriate stage 1 (e.g. for
 systems with 32-bit userspace and an optional 64-bit kernel).

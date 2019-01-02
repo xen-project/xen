@@ -47,7 +47,7 @@ thus look like this (`#` serving as comment character):
 
     [global]
     default=sle11sp2
-    
+
     [sle11sp2]
     options=console=vga,com1 com1=57600 loglvl=all noreboot
     kernel=vmlinuz-3.0.31-0.4-xen [domain 0 command line options]

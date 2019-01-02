@@ -100,13 +100,13 @@ while the new patched hypervisor would be:
     48 89 e0                  mov    %rsp,%rax
     48 25 00 80 ff ff         and    $0xffffffffffff8000,%rax
 
-This is inside the arch\_do\_domctl. This new change adds 21 extra
+This is inside the `arch_do_domctl`. This new change adds 21 extra
 bytes of code which alters all the offsets inside the function. To alter
 these offsets and add the extra 21 bytes of code we might not have enough
 space in .text to squeeze this in.
 
 As such we could simplify this problem by only patching the site
-which calls arch\_do\_domctl:
+which calls `arch_do_domctl`:
 
     do_domctl:
     e8 4b b1 05 00          callq  ffff82d08015fbb9 <arch_do_domctl>
@@ -154,7 +154,7 @@ CPU branching logic (I-cache, but it is just one unconditional jump).
 
 For this example we will assume that the hypervisor has not been compiled with
 XSA-125 (see
-[pre-fill structures for certain HYPERVISOR\_xen\_version sub-ops](http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=fe2e079f642effb3d24a6e1a7096ef26e691d93e))
+[pre-fill structures for certain HYPERVISOR_xen_version sub-ops](http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=fe2e079f642effb3d24a6e1a7096ef26e691d93e))
 which mem-sets an structure in `xen_version` hypercall. This function is not
 called **anywhere** in the hypervisor (it is called by the guest) but
 referenced in the `compat_hypercall_table` and `hypercall_table` (and
@@ -192,7 +192,7 @@ new replacement function which required:
  * Inserting trampoline with new offset in the old function to point to the
    new function.
  * Optionally we can insert in the old function a trampoline jump to an function
-   providing an BUG\_ON to catch errant code.
+   providing an BUG_ON to catch errant code.
 
 The disadvantage of this are that the unconditional jump will consume a small
 I-cache penalty. However the simplicity of the patching and higher chance
@@ -244,7 +244,7 @@ Note that every structure has padding. This is added so that the hypervisor
 can re-use those fields as it sees fit.
 
 Earlier design attempted to ineptly explain the relations of the ELF sections
-to each other without using proper ELF mechanism (sh\_info, sh\_link, data
+to each other without using proper ELF mechanism (sh_info, sh_link, data
 structures using Elf types, etc). This design will explain the structures
 and how they are used together and not dig in the ELF format - except mention
 that the section names should match the structure names.
@@ -269,14 +269,14 @@ like what the Linux kernel module loader does.
 
 The payload contains at least three sections:
 
- * `.livepatch.funcs` - which is an array of livepatch\_func structures.
+ * `.livepatch.funcs` - which is an array of livepatch_func structures.
  * `.livepatch.depends` - which is an ELF Note that describes what the payload
     depends on. **MUST** have one.
  *  `.note.gnu.build-id` - the build-id of this payload. **MUST** have one.
 
 ### .livepatch.funcs
 
-The `.livepatch.funcs` contains an array of livepatch\_func structures
+The `.livepatch.funcs` contains an array of livepatch_func structures
 which describe the functions to be patched:
 
     struct livepatch_func {
@@ -395,7 +395,7 @@ which follows the format of an ELF Note. The contents of this
 build the hypevisor and payload.
 
 If GNU linker is used then the name is `GNU` and the description
-is a NT\_GNU\_BUILD\_ID type ID. The description can be an SHA1
+is a NT_GNU_BUILD_ID type ID. The description can be an SHA1
 checksum, MD5 checksum or any unique value.
 
 The size of these structures varies with the `--build-id` linker option.
@@ -426,7 +426,7 @@ Furthermore it is possible to have multiple different payloads for the same
 function. As such an unique name per payload has to be visible to allow proper manipulation.
 
 The hypercall is part of the `xen_sysctl`. The top level structure contains
-one uint32\_t to determine the sub-operations and one padding field which
+one uint32_t to determine the sub-operations and one padding field which
 *MUST* always be zero.
 
     struct xen_sysctl_livepatch_op {
@@ -439,7 +439,7 @@ one uint32\_t to determine the sub-operations and one padding field which
 
 while the rest of hypercall specific structures are part of the this structure.
 
-### Basic type: struct xen\_livepatch\_name
+### Basic type: struct xen_livepatch_name
 
 Most of the hypercalls employ an shared structure called `struct xen_livepatch_name`
 which contains:
@@ -462,12 +462,12 @@ The structure is as follow:
         uint16_t pad[3];                        /* IN: MUST be zero. */
     };
 
-### XEN\_SYSCTL\_LIVEPATCH\_UPLOAD (0)
+### XEN_SYSCTL_LIVEPATCH_UPLOAD (0)
 
 Upload a payload to the hypervisor. The payload is verified
 against basic checks and if there are any issues the proper return code
 will be returned. The payload is not applied at this time - that is
-controlled by *XEN\_SYSCTL\_LIVEPATCH\_ACTION*.
+controlled by *XEN_SYSCTL_LIVEPATCH_ACTION*.
 
 The caller provides:
 
@@ -480,7 +480,7 @@ payload. It can be embedded into the ELF payload at creation time
 and extracted by tools.
 
 The return value is zero if the payload was succesfully uploaded.
-Otherwise an -XEN\_EXX return value is provided. Duplicate `name` are not supported.
+Otherwise an -XEN_EXX return value is provided. Duplicate `name` are not supported.
 
 The `payload` is the ELF payload as mentioned in the `Payload format` section.
 
@@ -492,7 +492,7 @@ The structure is as follow:
         XEN_GUEST_HANDLE_64(uint8) payload; /* IN: ELF file. */
     };
 
-### XEN\_SYSCTL\_LIVEPATCH\_GET (1)
+### XEN_SYSCTL_LIVEPATCH_GET (1)
 
 Retrieve an status of an specific payload. This caller provides:
 
@@ -503,25 +503,25 @@ Retrieve an status of an specific payload. This caller provides:
 Upon completion the `struct xen_livepatch_status` is updated.
 
  * `status` - indicates the current status of the payload:
-   * *LIVEPATCH\_STATUS\_CHECKED* (1) loaded and the ELF payload safety checks passed.
-   * *LIVEPATCH\_STATUS\_APPLIED* (2) loaded, checked, and applied.
+   * *LIVEPATCH_STATUS_CHECKED* (1) loaded and the ELF payload safety checks passed.
+   * *LIVEPATCH_STATUS_APPLIED* (2) loaded, checked, and applied.
    *  No other value is possible.
- * `rc` - -XEN\_EXX type errors encountered while performing the last
-   LIVEPATCH\_ACTION\_\* operation. The normal values can be zero or -XEN\_EAGAIN which
+ * `rc` - -XEN_EXX type errors encountered while performing the last
+   LIVEPATCH_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
    respectively mean: success or operation in progress. Other values
    imply an error occurred. If there is an error in `rc`, `status` will **NOT**
    have changed.
 
-The return value of the hypercall is zero on success and -XEN\_EXX on failure.
+The return value of the hypercall is zero on success and -XEN_EXX on failure.
 (Note that the `rc` value can be different from the return value, as in
-rc=-XEN\_EAGAIN and return value can be 0).
+rc = -XEN_EAGAIN and return value can be 0).
 
 For example, supposing there is an payload:
 
     status: LIVEPATCH_STATUS_CHECKED
     rc: 0
 
-We apply an action - LIVEPATCH\_ACTION\_REVERT - to revert it (which won't work
+We apply an action - LIVEPATCH_ACTION_REVERT - to revert it (which won't work
 as we have not even applied it. Afterwards we will have:
 
     status: LIVEPATCH_STATUS_CHECKED
@@ -545,7 +545,7 @@ The structure is as follow:
         xen_livepatch_status_t status;  /* IN/OUT: status of the payload. */
     };
 
-### XEN\_SYSCTL\_LIVEPATCH\_LIST (2)
+### XEN_SYSCTL_LIVEPATCH_LIST (2)
 
 Retrieve an array of abbreviated status and names of payloads that are loaded in the
 hypervisor.
@@ -566,11 +566,11 @@ The caller provides:
    structures. Caller *MUST* allocate up to `nr` of them.
  * `name` - Virtual address of where to write the unique name of the payload.
    Caller *MUST* allocate up to `nr` of them. Each *MUST* be of
-   **XEN\_LIVEPATCH\_NAME\_SIZE** size. Note that **XEN\_LIVEPATCH\_NAME\_SIZE** includes
+   **XEN_LIVEPATCH_NAME_SIZE** size. Note that **XEN_LIVEPATCH_NAME_SIZE** includes
    the NUL terminator.
  * `len` - Virtual address of where to write the length of each unique name
    of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST* be
-   of sizeof(uint32\_t) (4 bytes).
+   of sizeof(uint32_t) (4 bytes).
 
 If the hypercall returns an positive number, it is the number (upto `nr`
 provided to the hypercall) of the payloads returned, along with `nr` updated
@@ -579,7 +579,7 @@ across hypercalls - if it varies the data is stale and further calls could
 fail). The `status`, `name`, and `len` are updated at their designed index
 value (`idx`) with the returned value of data.
 
-If the hypercall returns -XEN\_E2BIG the `nr` is too big and should be
+If the hypercall returns -XEN_E2BIG the `nr` is too big and should be
 lowered.
 
 If the hypercall returns an zero value there are no more payloads.
@@ -594,11 +594,11 @@ data and start from scratch. It is OK for the toolstack to use the new
 The `struct xen_livepatch_status` structure contains an status of payload which includes:
 
  * `status` - indicates the current status of the payload:
-   * *LIVEPATCH\_STATUS\_CHECKED* (1) loaded and the ELF payload safety checks passed.
-   * *LIVEPATCH\_STATUS\_APPLIED* (2) loaded, checked, and applied.
+   * *LIVEPATCH_STATUS_CHECKED* (1) loaded and the ELF payload safety checks passed.
+   * *LIVEPATCH_STATUS_APPLIED* (2) loaded, checked, and applied.
    *  No other value is possible.
- * `rc` - -XEN\_EXX type errors encountered while performing the last
-   LIVEPATCH\_ACTION\_\* operation. The normal values can be zero or -XEN\_EAGAIN which
+ * `rc` - -XEN_EXX type errors encountered while performing the last
+   LIVEPATCH_ACTION_* operation. The normal values can be zero or -XEN_EAGAIN which
    respectively mean: success or operation in progress. Other values
    imply an error occurred. If there is an error in `rc`, `status` will **NOT**
    have changed.
@@ -624,29 +624,29 @@ The structure is as follow:
                                                    Must have nr of them. */
     };
 
-### XEN\_SYSCTL\_LIVEPATCH\_ACTION (3)
+### XEN_SYSCTL_LIVEPATCH_ACTION (3)
 
 Perform an operation on the payload structure referenced by the `name` field.
 The operation request is asynchronous and the status should be retrieved
-by using either **XEN\_SYSCTL\_LIVEPATCH\_GET** or **XEN\_SYSCTL\_LIVEPATCH\_LIST** hypercall.
+by using either **XEN_SYSCTL_LIVEPATCH_GET** or **XEN_SYSCTL_LIVEPATCH_LIST** hypercall.
 
 The caller provides:
 
  * A `struct xen_livepatch_name` `name` containing the unique name.
  * `cmd` The command requested:
-  * *LIVEPATCH\_ACTION\_UNLOAD* (1) Unload the payload.
+  * *LIVEPATCH_ACTION_UNLOAD* (1) Unload the payload.
    Any further hypercalls against the `name` will result in failure unless
-   **XEN\_SYSCTL\_LIVEPATCH\_UPLOAD** hypercall is perfomed with same `name`.
-  * *LIVEPATCH\_ACTION\_REVERT* (2) Revert the payload. If the operation takes
+   **XEN_SYSCTL_LIVEPATCH_UPLOAD** hypercall is perfomed with same `name`.
+  * *LIVEPATCH_ACTION_REVERT* (2) Revert the payload. If the operation takes
   more time than the upper bound of time the `rc` in `xen_livepatch_status`
-  retrieved via **XEN\_SYSCTL\_LIVEPATCH\_GET** will be -XEN\_EBUSY.
-  * *LIVEPATCH\_ACTION\_APPLY* (3) Apply the payload. If the operation takes
+  retrieved via **XEN_SYSCTL_LIVEPATCH_GET** will be -XEN_EBUSY.
+  * *LIVEPATCH_ACTION_APPLY* (3) Apply the payload. If the operation takes
   more time than the upper bound of time the `rc` in `xen_livepatch_status`
-  retrieved via **XEN\_SYSCTL\_LIVEPATCH\_GET** will be -XEN\_EBUSY.
-  * *LIVEPATCH\_ACTION\_REPLACE* (4) Revert all applied payloads and apply this
+  retrieved via **XEN_SYSCTL_LIVEPATCH_GET** will be -XEN_EBUSY.
+  * *LIVEPATCH_ACTION_REPLACE* (4) Revert all applied payloads and apply this
   payload. If the operation takes more time than the upper bound of time
-  the `rc` in `xen_livepatch_status` retrieved via **XEN\_SYSCTL\_LIVEPATCH\_GET**
-  will be -XEN\_EBUSY.
+  the `rc` in `xen_livepatch_status` retrieved via **XEN_SYSCTL_LIVEPATCH_GET**
+  will be -XEN_EBUSY.
  * `time` The upper bound of time (ns) the cmd should take. Zero means to use
    the hypervisor default. If within the time the operation does not succeed
    the operation would go in error state.
@@ -670,11 +670,11 @@ The structure is as follow:
     };
 
 
-## State diagrams of LIVEPATCH\_ACTION commands.
+## State diagrams of LIVEPATCH_ACTION commands.
 
 There is a strict ordering state of what the commands can be.
-The LIVEPATCH\_ACTION prefix has been dropped to easy reading and
-does not include the LIVEPATCH\_STATES:
+The LIVEPATCH_ACTION prefix has been dropped to easy reading and
+does not include the LIVEPATCH_STATES:
 
                  /->\
                  \  /
@@ -682,11 +682,11 @@ does not include the LIVEPATCH\_STATES:
                    \                                  |
                     \-------------------<-------------/
 
-## State transition table of LIVEPATCH\_ACTION commands and LIVEPATCH\_STATUS.
+## State transition table of LIVEPATCH_ACTION commands and LIVEPATCH_STATUS.
 
 Note that:
 
- - The CHECKED state is the starting one achieved with *XEN\_SYSCTL\_LIVEPATCH\_UPLOAD* hypercall.
+ - The CHECKED state is the starting one achieved with *XEN_SYSCTL_LIVEPATCH_UPLOAD* hypercall.
  - The REVERT operation on success will automatically move to the CHECKED state.
  - There are two STATES: CHECKED and APPLIED.
  - There are four actions (aka commands): APPLY, REPLACE, REVERT, and UNLOAD.
@@ -721,10 +721,10 @@ All the other state transitions are invalid.
 
 The normal sequence of events is to:
 
- 1. *XEN\_SYSCTL\_LIVEPATCH\_UPLOAD* to upload the payload. If there are errors *STOP* here.
- 2. *XEN\_SYSCTL\_LIVEPATCH\_GET* to check the `->rc`. If *-XEN\_EAGAIN* spin. If zero go to next step.
- 3. *XEN\_SYSCTL\_LIVEPATCH\_ACTION* with *LIVEPATCH\_ACTION\_APPLY* to apply the patch.
- 4. *XEN\_SYSCTL\_LIVEPATCH\_GET* to check the `->rc`. If in *-XEN\_EAGAIN* spin. If zero exit with success.
+ 1. *XEN_SYSCTL_LIVEPATCH_UPLOAD* to upload the payload. If there are errors *STOP* here.
+ 2. *XEN_SYSCTL_LIVEPATCH_GET* to check the `->rc`. If *-XEN_EAGAIN* spin. If zero go to next step.
+ 3. *XEN_SYSCTL_LIVEPATCH_ACTION* with *LIVEPATCH_ACTION_APPLY* to apply the patch.
+ 4. *XEN_SYSCTL_LIVEPATCH_GET* to check the `->rc`. If in *-XEN_EAGAIN* spin. If zero exit with success.
 
 
 ## Addendum
@@ -758,7 +758,7 @@ minimize the chance of the patch not being applied due to safety
 checks failing. Safety checks such as not patching code which
 is on the stack - which can lead to corruption.
 
-#### Rendezvous code instead of stop\_machine for patching
+#### Rendezvous code instead of stop_machine for patching
 
 The hypervisor's time rendezvous code runs synchronously across all CPUs
 every second. Using the `stop_machine` to patch can stall the time rendezvous
@@ -769,7 +769,7 @@ However the entrance point for that code is `do_softirq ->
 timer_softirq_action -> time_calibration` which ends up calling
 `on_selected_cpus` on remote CPUs.
 
-The remote CPUs receive CALL\_FUNCTION\_VECTOR IPI and execute the
+The remote CPUs receive CALL_FUNCTION_VECTOR IPI and execute the
 desired function.
 
 #### Before entering the guest code.
@@ -918,10 +918,10 @@ The implementation must also have a mechanism for (in no particular order):
    the stack, make sure the payload is built with same compiler as hypervisor).
    Specifically we want to make sure that live patching codepaths cannot be patched.
  * NOP out the code sequence if `new_size` is zero.
- * Deal with other relocation types:  R\_X86\_64\_[8,16,32,32S], R\_X86\_64\_PC[8,16,64]
+ * Deal with other relocation types:  `R_X86_64_[8,16,32,32S]`, `R_X86_64_PC[8,16,64]`
    in payload file.
 
-### Handle inlined \_\_LINE\_\_
+### Handle inlined \__LINE__
 
 This problem is related to hotpatch construction
 and potentially has influence on the design of the hotpatching
@@ -981,7 +981,7 @@ Options:
 For BUG(), WARN(), etc., the line number is embedded into the bug frame, not
 the function itself.
 
-Similar considerations are true to a lesser extent for \_\_FILE\_\_, but it
+Similar considerations are true to a lesser extent for \__FILE__, but it
 could be argued that file renaming should be done outside of hotpatches.
 
 ## Signature checking requirements.

@@ -467,11 +467,11 @@ the corresponding acpi_ feature flag is set in ~/platform.
 Indicates to the guest that this platform supports the multiprocessor
 suspend feature.
 
-#### ~/control/platform-feature-xs\_reset\_watches = (0|1) []
+#### ~/control/platform-feature-xs_reset_watches = (0|1) []
 
 Indicates to the guest that this platform supports the
 XS_RESET_WATCHES xenstore message. See
-[xen/include/public/io/xs\_wire.h][XSWIRE] for the XenStore wire
+[xen/include/public/io/xs_wire.h][XSWIRE] for the XenStore wire
 protocol definition.
 
 #### ~/control/laptop-slate-mode = (""|"laptop"|"slate") [w]
@@ -609,7 +609,7 @@ Path in xenstore to the backend, normally
 
 Trustworthy copy of /local/domain/$DOMID/backend/$KIND/$DEVID/$NODE.
 
-#### /libxl/$DOMID/dm-version ("qemu\_xen"|"qemu\_xen\_traditional") = [n,INTERNAL]
+#### /libxl/$DOMID/dm-version ("qemu_xen"|"qemu_xen_traditional") = [n,INTERNAL]
 
 The device model version for a domain.
 
