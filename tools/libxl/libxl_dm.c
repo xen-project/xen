@@ -3024,7 +3024,7 @@ static int get_reaper_lock_and_uid(libxl__destroy_devicemodel_state *ddms,
     int domid = ddms->domid;
     int r;
     const char * lockfile;
-    int fd;
+    int fd; /* "leaked" into the general process context (even on failure) */
 
     /* Try to lock the "reaper uid" */
     lockfile = GCSPRINTF("%s/dm-reaper-lock", libxl__run_dir_path());
