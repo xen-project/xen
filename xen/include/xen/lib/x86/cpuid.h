@@ -323,6 +323,11 @@ static inline uint64_t cpuid_policy_xstates(const struct cpuid_policy *p)
 const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
 
 /**
+ * Recalculate the content in a CPUID policy which is derived from raw data.
+ */
+void x86_cpuid_policy_recalc_synth(struct cpuid_policy *p);
+
+/**
  * Fill a CPUID policy using the native CPUID instruction.
  *
  * No sanitisation is performed, but synthesised values are calculated.

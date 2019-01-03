@@ -449,8 +449,10 @@ F:	xen/lib/x86
 F:	tools/firmware/hvmloader/
 F:	tools/firmware/rombios/
 F:	tools/firmware/vgabios/
-F:	tools/tests/x86_emulator/
+F:	tools/fuzz/cpu-policy/
 F:	tools/fuzz/x86_instruction_emulator/
+F:	tools/tests/cpu-policy/
+F:	tools/tests/x86_emulator/
 
 X86 I/O EMULATION
 M:	Paul Durrant <paul.durrant@citrix.com>

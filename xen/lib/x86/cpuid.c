@@ -53,8 +53,7 @@ const char *x86_cpuid_vendor_to_str(unsigned int vendor)
     }
 }
 
-/* Recalculate the content in a CPUID policy which is derived from raw data. */
-static void recalculate_synth(struct cpuid_policy *p)
+void x86_cpuid_policy_recalc_synth(struct cpuid_policy *p)
 {
     p->x86_vendor = x86_cpuid_lookup_vendor(
         p->basic.vendor_ebx, p->basic.vendor_ecx, p->basic.vendor_edx);
@@ -170,7 +169,7 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
                            p->extd.max_leaf + 1 - 0x80000000); ++i )
         cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
 
-    recalculate_synth(p);
+    x86_cpuid_policy_recalc_synth(p);
 }
 
 void x86_cpuid_policy_clear_out_of_range_leaves(struct cpuid_policy *p)
@@ -465,7 +464,7 @@ int x86_cpuid_copy_from_buffer(struct cpuid_policy *p,
         }
     }
 
-    recalculate_synth(p);
+    x86_cpuid_policy_recalc_synth(p);
 
     return 0;
 
