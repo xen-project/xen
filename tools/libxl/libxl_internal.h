@@ -2104,6 +2104,10 @@ static inline bool libxl__json_object_is_array(const libxl__json_object *o)
     return o != NULL && o->type == JSON_ARRAY;
 }
 
+/*
+ * `o` may be NULL for all libxl__json_object_get_* functions.
+ */
+
 static inline bool libxl__json_object_get_bool(const libxl__json_object *o)
 {
     if (libxl__json_object_is_bool(o))
@@ -2152,11 +2156,9 @@ static inline long long libxl__json_object_get_integer(const libxl__json_object 
 }
 
 /*
- * NOGC can be used with those json_object functions, but the
- * libxl__json_object* will need to be freed with libxl__json_object_free.
+ * `o` may be NULL for the following libxl__json_*_get functions.
  */
-_hidden libxl__json_object *libxl__json_object_alloc(libxl__gc *gc_opt,
-                                                     libxl__json_node_type type);
+
 _hidden libxl__json_object *libxl__json_array_get(const libxl__json_object *o,
                                                   int i);
 _hidden
@@ -2165,6 +2167,13 @@ libxl__json_map_node *libxl__json_map_node_get(const libxl__json_object *o,
 _hidden const libxl__json_object *libxl__json_map_get(const char *key,
                                           const libxl__json_object *o,
                                           libxl__json_node_type expected_type);
+
+/*
+ * NOGC can be used with those json_object functions, but the
+ * libxl__json_object* will need to be freed with libxl__json_object_free.
+ */
+_hidden libxl__json_object *libxl__json_object_alloc(libxl__gc *gc_opt,
+                                                     libxl__json_node_type type);
 _hidden yajl_status libxl__json_object_to_yajl_gen(libxl__gc *gc_opt,
                                                    yajl_gen hand,
                                                    const libxl__json_object *param);
@@ -2173,6 +2182,7 @@ _hidden void libxl__json_object_free(libxl__gc *gc_opt,
 
 _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc_opt, const char *s);
 
+/* `args` may be NULL */
 _hidden char *libxl__json_object_to_json(libxl__gc *gc,
                                          const libxl__json_object *args);
 /* Always return a valid string, but invalid json on error. */
