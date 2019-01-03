@@ -66,8 +66,8 @@ static inline void cpuid_count_leaf(
 #undef XCHG
 
 #define CPUID_GUEST_NR_BASIC      (0xdu + 1)
-#define CPUID_GUEST_NR_FEAT       (0u + 1)
 #define CPUID_GUEST_NR_CACHE      (5u + 1)
+#define CPUID_GUEST_NR_FEAT       (0u + 1)
 #define CPUID_GUEST_NR_TOPO       (1u + 1)
 #define CPUID_GUEST_NR_XSTATE     (62u + 1)
 #define CPUID_GUEST_NR_EXTD_INTEL (0x8u + 1)
