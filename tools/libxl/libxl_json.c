@@ -23,7 +23,7 @@
 
 /* #define DEBUG_ANSWER */
 
-struct libxl__yajl_ctx {
+typedef struct libxl__yajl_ctx {
     libxl__gc *gc;
     yajl_handle hand;
     libxl__json_object *head;
@@ -31,7 +31,7 @@ struct libxl__yajl_ctx {
 #ifdef DEBUG_ANSWER
     yajl_gen g;
 #endif
-};
+} libxl__yajl_ctx;
 
 #ifdef DEBUG_ANSWER
 #if YAJL_VERSION < 20000
@@ -463,8 +463,9 @@ libxl__json_object *libxl__json_object_alloc(libxl__gc *gc,
     return obj;
 }
 
-int libxl__json_object_append_to(libxl__gc *gc, libxl__json_object *obj,
-                                 libxl__yajl_ctx *ctx)
+static int libxl__json_object_append_to(libxl__gc *gc,
+                                        libxl__json_object *obj,
+                                        libxl__yajl_ctx *ctx)
 {
     libxl__json_object *dst = ctx->current;
 

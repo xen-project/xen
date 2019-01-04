@@ -2071,8 +2071,6 @@ typedef struct {
     libxl__json_object *obj;
 } libxl__json_map_node;
 
-typedef struct libxl__yajl_ctx libxl__yajl_ctx;
-
 static inline bool libxl__json_object_is_null(const libxl__json_object *o)
 {
     return o != NULL && o->type == JSON_NULL;
@@ -2159,9 +2157,6 @@ static inline long long libxl__json_object_get_integer(const libxl__json_object 
  */
 _hidden libxl__json_object *libxl__json_object_alloc(libxl__gc *gc_opt,
                                                      libxl__json_node_type type);
-_hidden int libxl__json_object_append_to(libxl__gc *gc_opt,
-                                         libxl__json_object *obj,
-                                         libxl__yajl_ctx *ctx);
 _hidden libxl__json_object *libxl__json_array_get(const libxl__json_object *o,
                                                   int i);
 _hidden
