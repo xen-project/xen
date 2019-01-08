@@ -60,6 +60,18 @@ static struct acpi_madt_interrupt_override __initdata *intsrcovr;
 static unsigned int __initdata acpi_nmi_sources;
 static struct acpi_madt_nmi_source __initdata *nmisrc;
 
+static unsigned int __initdata order_stats[MAX_ORDER + 1];
+
+static void __init print_order_stats(const struct domain *d)
+{
+    unsigned int i;
+
+    printk("Dom%u memory allocation stats:\n", d->domain_id);
+    for ( i = 0; i < ARRAY_SIZE(order_stats); i++ )
+        if ( order_stats[i] )
+            printk("order %2u allocations: %u\n", i, order_stats[i]);
+}
+
 static int __init modify_identity_mmio(struct domain *d, unsigned long pfn,
                                        unsigned long nr_pages, const bool map)
 {
@@ -169,6 +181,7 @@ static int __init pvh_populate_memory_range(struct domain *d,
         }
         start += 1UL << order;
         nr_pages -= 1UL << order;
+        order_stats[order]++;
         if ( (++i % MAP_MAX_ITER) == 0 )
             process_pending_softirqs();
     }
@@ -464,6 +477,9 @@ static int __init pvh_setup_p2m(struct domain *d)
         if ( rc )
             return rc;
     }
+
+    if ( dom0_verbose )
+        print_order_stats(d);
 
     return 0;
 #undef MB1_PAGES

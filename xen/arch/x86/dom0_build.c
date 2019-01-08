@@ -281,6 +281,7 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 bool __initdata opt_dom0_shadow;
 #endif
 bool __initdata dom0_pvh;
+bool __initdata dom0_verbose;
 
 /*
  * List of parameters that affect Dom0 creation:
@@ -306,6 +307,8 @@ static int __init parse_dom0_param(const char *s)
         else if ( (val = parse_boolean("shadow", s, ss)) >= 0 )
             opt_dom0_shadow = val;
 #endif
+        else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
+            dom0_verbose = val;
         else
             rc = -EINVAL;
 
