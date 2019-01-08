@@ -54,6 +54,8 @@ static DEFINE_SPINLOCK(grant_lock);
 static PAGE_LIST_HEAD(balloon);
 static DEFINE_SPINLOCK(balloon_lock);
 
+static struct platform_bad_page __initdata reserved_pages[2];
+
 static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 static long pv_shim_grant_table_op(unsigned int cmd,
                                    XEN_GUEST_HANDLE_PARAM(void) uop,
@@ -111,6 +113,47 @@ uint64_t pv_shim_mem(uint64_t avail)
            total_pages - avail, shim_nrpages);
 
     return shim_nrpages;
+}
+
+static void __init mark_pfn_as_ram(struct e820map *e820, uint64_t pfn)
+{
+    if ( !e820_add_range(e820, pfn << PAGE_SHIFT,
+                         (pfn << PAGE_SHIFT) + PAGE_SIZE, E820_RAM) &&
+         !e820_change_range_type(e820, pfn << PAGE_SHIFT,
+                                 (pfn << PAGE_SHIFT) + PAGE_SIZE,
+                                 E820_RESERVED, E820_RAM) )
+        panic("Unable to add/change memory type of pfn %#lx to RAM\n", pfn);
+}
+
+void __init pv_shim_fixup_e820(struct e820map *e820)
+{
+    uint64_t pfn = 0;
+    unsigned int i = 0;
+    long rc;
+
+    ASSERT(xen_guest);
+
+#define MARK_PARAM_RAM(p) ({                    \
+    rc = xen_hypercall_hvm_get_param(p, &pfn);  \
+    if ( rc )                                   \
+        panic("Unable to get " #p "\n");        \
+    mark_pfn_as_ram(e820, pfn);                 \
+    ASSERT(i < ARRAY_SIZE(reserved_pages));     \
+    reserved_pages[i++].mfn = pfn;              \
+})
+    MARK_PARAM_RAM(HVM_PARAM_STORE_PFN);
+    if ( !pv_console )
+        MARK_PARAM_RAM(HVM_PARAM_CONSOLE_PFN);
+#undef MARK_PARAM_RAM
+}
+
+const struct platform_bad_page *__init pv_shim_reserved_pages(unsigned int *size)
+{
+    ASSERT(xen_guest);
+
+    *size = ARRAY_SIZE(reserved_pages);
+
+    return reserved_pages;
 }
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER| \

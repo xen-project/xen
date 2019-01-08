@@ -348,9 +348,9 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
         }
     }
 
-    if ( xen_guest )
+    if ( pv_shim )
     {
-        badpage = hypervisor_reserved_pages(&array_size);
+        badpage = pv_shim_reserved_pages(&array_size);
         if ( badpage )
         {
             for ( i = 0; i < array_size; i++ )

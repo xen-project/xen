@@ -700,8 +700,8 @@ unsigned long __init init_e820(const char *str, struct e820map *raw)
 
     machine_specific_memory_setup(raw);
 
-    if ( xen_guest )
-        hypervisor_fixup_e820(&e820);
+    if ( pv_shim )
+        pv_shim_fixup_e820(&e820);
 
     printk("%s RAM map:\n", str);
     print_e820_memory_map(e820.map, e820.nr_map);

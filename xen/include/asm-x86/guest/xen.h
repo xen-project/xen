@@ -36,8 +36,6 @@ void hypervisor_setup(void);
 void hypervisor_ap_setup(void);
 int hypervisor_alloc_unused_page(mfn_t *mfn);
 int hypervisor_free_unused_page(mfn_t mfn);
-void hypervisor_fixup_e820(struct e820map *e820);
-const struct platform_bad_page *hypervisor_reserved_pages(unsigned int *size);
 uint32_t hypervisor_cpuid_base(void);
 void hypervisor_resume(void);
 
@@ -58,17 +56,6 @@ static inline void hypervisor_setup(void)
 static inline void hypervisor_ap_setup(void)
 {
     ASSERT_UNREACHABLE();
-}
-
-static inline void hypervisor_fixup_e820(struct e820map *e820)
-{
-    ASSERT_UNREACHABLE();
-}
-
-static inline const struct platform_bad_page *hypervisor_reserved_pages(unsigned int *size)
-{
-    ASSERT_UNREACHABLE();
-    return NULL;
 }
 
 #endif /* CONFIG_XEN_GUEST */
