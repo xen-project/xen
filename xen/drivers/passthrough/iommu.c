@@ -266,11 +266,12 @@ int iommu_construct(struct domain *d)
     if ( hd->status == IOMMU_STATUS_initialized )
         return 0;
 
+    hd->status = IOMMU_STATUS_initializing;
+
     if ( !iommu_use_hap_pt(d) )
     {
         int rc;
 
-        hd->status = IOMMU_STATUS_initializing;
         hd->need_sync = true;
 
         rc = arch_iommu_populate_page_table(d);
