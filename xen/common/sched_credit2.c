@@ -59,19 +59,13 @@
 #define TRC_CSCHED2_RUNQ_CAND_CHECK  TRC_SCHED_CLASS_EVT(CSCHED2, 23)
 
 /*
- * WARNING: This is still in an experimental phase.  Status and work can be found at the
- * credit2 wiki page:
- *  http://wiki.xen.org/wiki/Credit2_Scheduler_Development
- *
  * TODO:
  * + Hyperthreading
- *  - Look for non-busy core if possible
  *  - "Discount" time run on a thread with busy siblings
  * + Algorithm:
  *  - "Mixed work" problem: if a VM is playing audio (5%) but also burning cpu (e.g.,
  *    a flash animation in the background) can we schedule it with low enough latency
  *    so that audio doesn't skip?
- *  - Cap and reservation: How to implement with the current system?
  * + Optimizing
  *  - Profiling, making new algorithms, making math more efficient (no long division)
  */
