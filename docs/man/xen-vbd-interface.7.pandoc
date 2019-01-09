@@ -73,13 +73,13 @@ The information above is encoded in the concrete interface as an
 integer (in a canonical decimal format in xenstore), whose value
 encodes the information above as follows:
 
-    1 << 28 | disk << 8 | partition      xvd, disks or partitions 16 onwards
-   202 << 8 | disk << 4 | partition      xvd, disks and partitions up to 15
-     8 << 8 | disk << 4 | partition      sd, disks and partitions up to 15
-     3 << 8 | disk << 6 | partition      hd, disks 0..1, partitions 0..63
-    22 << 8 | (disk-2) << 6 | partition  hd, disks 2..3, partitions 0..63
-    2 << 28 onwards                      reserved for future use
-   other values less than 1 << 28        deprecated / reserved
+     1 << 28 | disk << 8 | partition      xvd, disks or partitions 16 onwards
+    202 << 8 | disk << 4 | partition      xvd, disks and partitions up to 15
+      8 << 8 | disk << 4 | partition      sd, disks and partitions up to 15
+      3 << 8 | disk << 6 | partition      hd, disks 0..1, partitions 0..63
+     22 << 8 | (disk-2) << 6 | partition  hd, disks 2..3, partitions 0..63
+     2 << 28 onwards                      reserved for future use
+    other values less than 1 << 28        deprecated / reserved
 
 The 1<<28 format handles disks up to (1<<20)-1 and partitions up to
 255.  It will be used only where the 202<<8 format does not have
