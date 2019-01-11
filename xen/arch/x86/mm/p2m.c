@@ -1176,7 +1176,7 @@ int p2m_finish_type_change(struct domain *d,
 
     rc = finish_type_change(hostp2m, first_gfn, max_nr);
 
-    if ( !rc )
+    if ( rc < 0 )
         goto out;
 
 #ifdef CONFIG_HVM
@@ -1188,18 +1188,24 @@ int p2m_finish_type_change(struct domain *d,
             if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
             {
                 struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
+                int rc1;
 
                 p2m_lock(altp2m);
-                rc = finish_type_change(altp2m, first_gfn, max_nr);
+                rc1 = finish_type_change(altp2m, first_gfn, max_nr);
                 p2m_unlock(altp2m);
 
-                if ( !rc )
+                if ( rc1 < 0 )
+                {
+                    rc = rc1;
                     goto out;
+                }
+
+                rc |= rc1;
             }
     }
 #endif
 
-out:
+ out:
     p2m_unlock(hostp2m);
 
     return rc;
