@@ -105,6 +105,8 @@
 #define get_unaligned_le16(_p) (*(u16 *)(_p))
 #define get_unaligned_le32(_p) (*(u32 *)(_p))
 
+#ifdef CONFIG_TMEM
+
 static noinline size_t
 lzo1x_1_do_compress(const unsigned char *in, size_t in_len,
                     unsigned char *out, size_t *out_len,
@@ -362,6 +364,11 @@ int lzo1x_1_compress(const unsigned char *in, size_t in_len,
     return LZO_E_OK;
 }
 
+# define INIT
+#else /* CONFIG_TMEM */
+# include "decompress.h"
+#endif /* CONFIG_TMEM */
+
 /*
  *  LZO1X Decompressor from LZO
  *
@@ -391,8 +398,8 @@ int lzo1x_1_compress(const unsigned char *in, size_t in_len,
  */
 #define MAX_255_COUNT      ((((size_t)~0) / 255) - 2)
 
-int lzo1x_decompress_safe(const unsigned char *in, size_t in_len,
-                          unsigned char *out, size_t *out_len)
+int INIT lzo1x_decompress_safe(const unsigned char *in, size_t in_len,
+                               unsigned char *out, size_t *out_len)
 {
     unsigned char *op;
     const unsigned char *ip;
