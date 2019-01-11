@@ -334,10 +334,22 @@ int libxl__local_dm_preexec_restrict(libxl__gc *gc)
     unsigned i;
 
     /* Unshare mount and IPC namespaces.  These are unused by QEMU. */
-    r = unshare(CLONE_NEWNS | CLONE_NEWIPC);
+    r = unshare(CLONE_NEWNS);
     if (r) {
-        LOGE(ERROR, "libxl: Mount and IPC namespace unfailed");
+        LOGE(ERROR, "libxl: Mount namespace unshare failed");
         return ERROR_FAIL;
+    }
+
+#ifndef CLONE_NEWIPC /* Available as of Linux 2.6.19 / glibc 2.8 */
+# define CLONE_NEWIPC 0x08000000
+#endif
+    r = unshare(CLONE_NEWIPC);
+    if (r) {
+        if (r && errno != EINVAL) {
+            LOGE(ERROR, "libxl: IPC namespace unshare failed");
+            return ERROR_FAIL;
+        }
+        LOG(WARN, "libxl: IPC namespace unshare unavailable");
     }
 
     /* Set various "easy" rlimits */
