@@ -18,6 +18,14 @@
 #include <sys/resource.h>
 #include "libxl_internal.h"
 
+
+/* Workarounds for Linux-specific lacks can go here: */
+
+#ifndef CLONE_NEWIPC /* Available as of Linux 2.6.19 / glibc 2.8 */
+# define CLONE_NEWIPC 0x08000000
+#endif
+
+
 int libxl__try_phy_backend(mode_t st_mode)
 {
     if (S_ISBLK(st_mode) || S_ISREG(st_mode)) {
