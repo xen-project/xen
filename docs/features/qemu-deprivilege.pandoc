@@ -112,6 +112,9 @@ The following features still need to be implemented:
  * Inserting a new cdrom while the guest is running (xl cdrom-insert)
  * Migration / save / restore
 
+dm_restrict is totally unsupported and may have unexpected security
+problems if used with a dom0 Linux kernel earlier than 2.6.18.
+
 Additionally, getting PCI passthrough to work securely would require a
 significant rework of how passthrough works at the moment.  It may be
 implemented at some point but is not a near-term priority.
