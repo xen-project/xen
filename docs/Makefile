@@ -96,7 +96,8 @@ endif
 html/man/%.$(1).html: man/%.$(1).pod Makefile
 ifneq ($(POD2HTML),)
 	@$(INSTALL_DIR) $$(@D)
-	$(POD2HTML) --infile=$$< --outfile=$$@
+	sed -r -e 's%L<([^>]+)\(([1-9])\)>%L<\1(\2)|\1.\2>%g' $$< | \
+		(cd man; $(POD2HTML) --podpath=. --htmlroot=. --outfile=../$$@)
 else
 	@echo "pod2html not installed; skipping $$@"
 endif
