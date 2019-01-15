@@ -905,7 +905,7 @@ claimed for domains.
 
 =item B<outstanding_claims>
 
-When a claim call is done (see L<xl.conf>) a reservation for a specific
+When a claim call is done (see L<xl.conf(5)>) a reservation for a specific
 amount of pages is set and also a global value is incremented. This
 global value (outstanding_claims) is then reduced as the domain's memory
 is populated and eventually reaches zero. Most of the time the value will
@@ -1458,7 +1458,7 @@ List virtual Trusted Platform Modules for a domain.
 
 Creates a new vdispl device in the domain specified by I<domain-id>.
 I<vdispl-device> describes the device to attach, using the same format as the
-B<vdispl> string in the domain config file. See L<xl.cfg> for
+B<vdispl> string in the domain config file. See L<xl.cfg(5)> for
 more information.
 
 B<NOTES>
@@ -1500,7 +1500,7 @@ List virtual displays for a domain.
 
 Creates a new vsnd device in the domain specified by I<domain-id>.
 I<vsnd-item>'s describe the vsnd device to attach, using the same format as the
-B<VSND_ITEM_SPEC> string in the domain config file. See L<xl.cfg> for
+B<VSND_ITEM_SPEC> string in the domain config file. See L<xl.cfg(5)> for
 more information.
 
 B<EXAMPLE>
@@ -1974,7 +1974,7 @@ Transcendent Memory.
 
 The following man pages:
 
-L<xl.cfg>(5), L<xlcpupool.cfg>(5), L<xentop>(1), L<xl-disk-configuration(5)>
+L<xl.cfg(5)>, L<xlcpupool.cfg(5)>, L<xentop(1)>, L<xl-disk-configuration(5)>
 L<xl-network-configuration(5)>
 
 And the following documents on the xen.org website:
