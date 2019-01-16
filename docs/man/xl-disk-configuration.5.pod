@@ -123,7 +123,7 @@ raw
 =item Description
 
 Virtual device as seen by the guest (also referred to as guest drive
-designation in some specifications).  L<xen-vbd-interface(7)>
+designation in some specifications).  See L<xen-vbd-interface(7)>.
 
 =item Supported values
 
