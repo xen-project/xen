@@ -96,8 +96,12 @@ endif
 html/man/%.$(1).html: man/%.$(1).pod Makefile
 ifneq ($(POD2HTML),)
 	@$(INSTALL_DIR) $$(@D)
-	sed -r -e 's%L<([^>]+)\(([1-9])\)>%L<\1(\2)|\1.\2>%g' $$< | \
-		(cd man; $(POD2HTML) --podpath=. --htmlroot=. --outfile=../$$@)
+	# Fix up links between man-pages
+	# 1) L<xl(1)> -> L<xl(1)|relative:xl.1.html>
+	# 2) <a href="relative:xl.1.html"> -> <a href="xl.1.html">
+	sed -r -e 's%L<([^>]+)\(([1-9])\)>%L<\1(\2)|relative:\1.\2.html>%g' $$< | \
+		$(POD2HTML) | \
+		sed -r -e 's%( href=")relative:%\1%g' > $$@
 else
 	@echo "pod2html not installed; skipping $$@"
 endif
