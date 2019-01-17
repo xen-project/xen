@@ -27,7 +27,6 @@ altp2m_vcpu_initialise(struct vcpu *v)
         vcpu_pause(v);
 
     vcpu_altp2m(v).p2midx = 0;
-    vcpu_altp2m(v).veinfo_gfn = INVALID_GFN;
     atomic_inc(&p2m_get_altp2m(v)->active_vcpus);
 
     altp2m_vcpu_update_p2m(v);
@@ -58,25 +57,69 @@ altp2m_vcpu_destroy(struct vcpu *v)
 
 int altp2m_vcpu_enable_ve(struct vcpu *v, gfn_t gfn)
 {
+    struct domain *d = v->domain;
+    struct altp2mvcpu *a = &vcpu_altp2m(v);
     p2m_type_t p2mt;
+    struct page_info *pg;
+    int rc;
 
-    if ( !gfn_eq(vcpu_altp2m(v).veinfo_gfn, INVALID_GFN) ||
-         mfn_eq(get_gfn_query_unlocked(v->domain, gfn_x(gfn), &p2mt),
-                INVALID_MFN) )
-        return -EINVAL;
+    /* Early exit path if #VE is already configured. */
+    if ( a->veinfo_pg )
+        return -EEXIST;
 
-    vcpu_altp2m(v).veinfo_gfn = gfn;
+    rc = check_get_page_from_gfn(d, gfn, false, &p2mt, &pg);
+    if ( rc )
+        return rc;
+
+    /*
+     * Looking for a plain piece of guest writeable RAM with isn't a magic
+     * frame such as a grant/ioreq/shared_info/etc mapping.  We (ab)use the
+     * pageable() predicate for this, due to it having the same properties
+     * that we want.
+     */
+    if ( !p2m_is_pageable(p2mt) || is_xen_heap_page(pg) )
+    {
+        rc = -EINVAL;
+        goto err;
+    }
+
+    /*
+     * Update veinfo_pg, making sure to be safe with concurrent hypercalls.
+     * The first caller to make veinfo_pg become non-NULL will program its MFN
+     * into the VMCS, so must not be clobbered.  Callers which lose the race
+     * back off with -EEXIST.
+     */
+    if ( cmpxchg(&a->veinfo_pg, NULL, pg) != NULL )
+    {
+        rc = -EEXIST;
+        goto err;
+    }
+
     altp2m_vcpu_update_vmfunc_ve(v);
 
     return 0;
+
+ err:
+    put_page(pg);
+
+    return rc;
 }
 
 void altp2m_vcpu_disable_ve(struct vcpu *v)
 {
-    if ( !gfn_eq(vcpu_altp2m(v).veinfo_gfn, INVALID_GFN) )
+    struct altp2mvcpu *a = &vcpu_altp2m(v);
+    struct page_info *pg;
+
+    /*
+     * Update veinfo_pg, making sure to be safe with concurrent hypercalls.
+     * The winner of this race is responsible to update the VMCS to no longer
+     * point at the page, then drop the associated ref.
+     */
+    if ( (pg = xchg(&a->veinfo_pg, NULL)) )
     {
-        vcpu_altp2m(v).veinfo_gfn = INVALID_GFN;
         altp2m_vcpu_update_vmfunc_ve(v);
+
+        put_page(pg);
     }
 }
 

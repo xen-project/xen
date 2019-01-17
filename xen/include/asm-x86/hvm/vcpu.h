@@ -137,8 +137,13 @@ struct nestedvcpu {
 #define vcpu_nestedhvm(v) ((v)->arch.hvm.nvcpu)
 
 struct altp2mvcpu {
+    /*
+     * #VE information page.  This pointer being non-NULL indicates that a
+     * VMCS's VIRT_EXCEPTION_INFO field is pointing to the page, and an extra
+     * page reference is held.
+     */
+    struct page_info *veinfo_pg;
     uint16_t    p2midx;         /* alternate p2m index */
-    gfn_t       veinfo_gfn;     /* #VE information page gfn */
 };
 
 #define vcpu_altp2m(v) ((v)->arch.hvm.avcpu)

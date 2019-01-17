@@ -38,6 +38,7 @@
 #include <xen/livepatch.h>
 #include <public/sysctl.h>
 #include <public/hvm/hvm_vcpu.h>
+#include <asm/altp2m.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -2069,6 +2070,12 @@ int domain_relinquish_resources(struct domain *d)
             ret = vcpu_destroy_pagetables(v);
             if ( ret )
                 return ret;
+        }
+
+        if ( altp2m_active(d) )
+        {
+            for_each_vcpu ( d, v )
+                altp2m_vcpu_disable_ve(v);
         }
 
         if ( is_pv_domain(d) )

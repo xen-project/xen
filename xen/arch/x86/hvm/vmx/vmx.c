@@ -2196,14 +2196,11 @@ static void vmx_vcpu_update_vmfunc_ve(struct vcpu *v)
 
         if ( cpu_has_vmx_virt_exceptions )
         {
-            p2m_type_t t;
-            mfn_t mfn;
+            const struct page_info *pg = vcpu_altp2m(v).veinfo_pg;
 
-            mfn = get_gfn_query_unlocked(d, gfn_x(vcpu_altp2m(v).veinfo_gfn), &t);
-
-            if ( !mfn_eq(mfn, INVALID_MFN) )
+            if ( pg )
             {
-                __vmwrite(VIRT_EXCEPTION_INFO, mfn_x(mfn) << PAGE_SHIFT);
+                __vmwrite(VIRT_EXCEPTION_INFO, page_to_maddr(pg));
                 /*
                  * Make sure we have an up-to-date EPTP_INDEX when
                  * setting SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS.
@@ -2237,21 +2234,19 @@ static int vmx_vcpu_emulate_vmfunc(const struct cpu_user_regs *regs)
 
 static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
 {
-    bool_t rc = 0, writable;
-    gfn_t gfn = vcpu_altp2m(v).veinfo_gfn;
+    const struct page_info *pg = vcpu_altp2m(v).veinfo_pg;
     ve_info_t *veinfo;
+    bool rc = false;
 
-    if ( gfn_eq(gfn, INVALID_GFN) )
-        return 0;
+    if ( !pg )
+        return rc;
 
-    veinfo = hvm_map_guest_frame_rw(gfn_x(gfn), 0, &writable);
-    if ( !veinfo )
-        return 0;
-    if ( !writable || veinfo->semaphore != 0 )
+    veinfo = __map_domain_page(pg);
+
+    if ( veinfo->semaphore != 0 )
         goto out;
 
-    rc = 1;
-
+    rc = true;
     veinfo->exit_reason = EXIT_REASON_EPT_VIOLATION;
     veinfo->semaphore = ~0;
     veinfo->eptp_index = vcpu_altp2m(v).p2midx;
@@ -2266,7 +2261,11 @@ static bool_t vmx_vcpu_emulate_ve(struct vcpu *v)
                             X86_EVENT_NO_EC);
 
  out:
-    hvm_unmap_guest_frame(veinfo, 0);
+    unmap_domain_page(veinfo);
+
+    if ( rc )
+        paging_mark_dirty(v->domain, page_to_mfn(pg));
+
     return rc;
 }
 
