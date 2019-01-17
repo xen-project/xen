@@ -21,22 +21,13 @@
 #include <asm/altp2m.h>
 
 void
-altp2m_vcpu_reset(struct vcpu *v)
-{
-    struct altp2mvcpu *av = &vcpu_altp2m(v);
-
-    av->p2midx = INVALID_ALTP2M;
-    av->veinfo_gfn = INVALID_GFN;
-}
-
-void
 altp2m_vcpu_initialise(struct vcpu *v)
 {
     if ( v != current )
         vcpu_pause(v);
 
-    altp2m_vcpu_reset(v);
     vcpu_altp2m(v).p2midx = 0;
+    vcpu_altp2m(v).veinfo_gfn = INVALID_GFN;
     atomic_inc(&p2m_get_altp2m(v)->active_vcpus);
 
     altp2m_vcpu_update_p2m(v);
@@ -56,13 +47,37 @@ altp2m_vcpu_destroy(struct vcpu *v)
     if ( (p2m = p2m_get_altp2m(v)) )
         atomic_dec(&p2m->active_vcpus);
 
-    altp2m_vcpu_reset(v);
+    altp2m_vcpu_disable_ve(v);
 
+    vcpu_altp2m(v).p2midx = INVALID_ALTP2M;
     altp2m_vcpu_update_p2m(v);
-    altp2m_vcpu_update_vmfunc_ve(v);
 
     if ( v != current )
         vcpu_unpause(v);
+}
+
+int altp2m_vcpu_enable_ve(struct vcpu *v, gfn_t gfn)
+{
+    p2m_type_t p2mt;
+
+    if ( !gfn_eq(vcpu_altp2m(v).veinfo_gfn, INVALID_GFN) ||
+         mfn_eq(get_gfn_query_unlocked(v->domain, gfn_x(gfn), &p2mt),
+                INVALID_MFN) )
+        return -EINVAL;
+
+    vcpu_altp2m(v).veinfo_gfn = gfn;
+    altp2m_vcpu_update_vmfunc_ve(v);
+
+    return 0;
+}
+
+void altp2m_vcpu_disable_ve(struct vcpu *v)
+{
+    if ( !gfn_eq(vcpu_altp2m(v).veinfo_gfn, INVALID_GFN) )
+    {
+        vcpu_altp2m(v).veinfo_gfn = INVALID_GFN;
+        altp2m_vcpu_update_vmfunc_ve(v);
+    }
 }
 
 /*

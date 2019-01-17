@@ -33,7 +33,9 @@ static inline bool altp2m_active(const struct domain *d)
 /* Alternate p2m VCPU */
 void altp2m_vcpu_initialise(struct vcpu *v);
 void altp2m_vcpu_destroy(struct vcpu *v);
-void altp2m_vcpu_reset(struct vcpu *v);
+
+int altp2m_vcpu_enable_ve(struct vcpu *v, gfn_t gfn);
+void altp2m_vcpu_disable_ve(struct vcpu *v);
 
 static inline uint16_t altp2m_vcpu_idx(const struct vcpu *v)
 {
