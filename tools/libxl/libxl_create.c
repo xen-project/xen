@@ -442,7 +442,7 @@ int libxl__domain_build(libxl__gc *gc,
     struct timeval start_time;
     int i, ret;
 
-    ret = libxl__build_pre(gc, domid, d_config, state);
+    ret = libxl__build_pre(gc, domid, d_config, state, false);
     if (ret)
         goto out;
 
@@ -1117,7 +1117,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
         goto out;
     }
 
-    rc = libxl__build_pre(gc, domid, d_config, state);
+    rc = libxl__build_pre(gc, domid, d_config, state,
+                          dcs->domid_soft_reset != INVALID_DOMID);
     if (rc)
         goto out;
 
