@@ -345,7 +345,8 @@ static void hvm_set_conf_params(xc_interface *handle, uint32_t domid,
 }
 
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
-              libxl_domain_config *d_config, libxl__domain_build_state *state)
+              libxl_domain_config *d_config, libxl__domain_build_state *state,
+              bool is_reset)
 {
     libxl_domain_build_info *const info = &d_config->b_info;
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -353,15 +354,17 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     int rc;
     uint64_t size;
 
-    if (xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus) != 0) {
-        LOG(ERROR, "Couldn't set max vcpu count");
-        return ERROR_FAIL;
-    }
+    if (!is_reset) {
+        if (xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus) != 0) {
+            LOG(ERROR, "Couldn't set max vcpu count");
+            return ERROR_FAIL;
+        }
 
-    if (xc_domain_set_gnttab_limits(ctx->xch, domid, info->max_grant_frames,
-                                    info->max_maptrack_frames) != 0) {
-        LOG(ERROR, "Couldn't set grant table limits");
-        return ERROR_FAIL;
+        if (xc_domain_set_gnttab_limits(ctx->xch, domid, info->max_grant_frames,
+                                        info->max_maptrack_frames) != 0) {
+            LOG(ERROR, "Couldn't set grant table limits");
+            return ERROR_FAIL;
+        }
     }
 
     /*
