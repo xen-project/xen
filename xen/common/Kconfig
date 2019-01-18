@@ -11,6 +11,17 @@ config COMPAT
 config CORE_PARKING
 	bool
 
+config GRANT_TABLE
+	bool "Grant table support" if EXPERT = "y"
+	default y
+	---help---
+	  Grant table provides a generic mechanism to memory sharing
+	  between domains. This shared memory interface underpins the
+	  split device drivers for block and network IO in a classic
+	  Xen setup.
+
+	  If unsure, say Y.
+
 config HAS_ALTERNATIVE
 	bool
 

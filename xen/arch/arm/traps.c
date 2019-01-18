@@ -1396,7 +1396,9 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL_DEPRECATED(physdev_op_compat, 1),
     HYPERCALL(sysctl, 2),
     HYPERCALL(hvm_op, 2),
+#ifdef CONFIG_GRANT_TABLE
     HYPERCALL(grant_table_op, 3),
+#endif
     HYPERCALL(multicall, 2),
     HYPERCALL(platform_op, 1),
     HYPERCALL_ARM(vcpu_op, 3),

@@ -47,6 +47,7 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     return rc;
 }
 
+#ifdef CONFIG_GRANT_TABLE
 static long hvm_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
 {
@@ -71,6 +72,7 @@ static long hvm_grant_table_op(
     else
         return compat_grant_table_op(cmd, uop, count);
 }
+#endif
 
 static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -119,7 +121,9 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 static const hypercall_table_t hvm_hypercall_table[] = {
     HVM_CALL(memory_op),
+#ifdef CONFIG_GRANT_TABLE
     HVM_CALL(grant_table_op),
+#endif
     COMPAT_CALL(vcpu_op),
     HVM_CALL(physdev_op),
     COMPAT_CALL(xen_version),

@@ -47,7 +47,9 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     ARGS(xen_version, 2),
     ARGS(console_io, 3),
     ARGS(physdev_op_compat, 1),
+#ifdef CONFIG_GRANT_TABLE
     ARGS(grant_table_op, 3),
+#endif
     ARGS(vm_assist, 2),
     COMP(update_va_mapping_otherdomain, 4, 5),
     ARGS(vcpu_op, 3),
