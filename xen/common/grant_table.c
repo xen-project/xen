@@ -2157,7 +2157,7 @@ gnttab_transfer(
 #ifdef CONFIG_X86
             put_gfn(d, gop.mfn);
 #endif
-            page->count_info &= ~(PGC_count_mask|PGC_allocated);
+            /* The count_info has already been cleaned */
             free_domheap_page(page);
             goto copyback;
         }
@@ -2180,10 +2180,9 @@ gnttab_transfer(
 
             copy_domain_page(page_to_mfn(new_page), mfn);
 
-            page->count_info &= ~(PGC_count_mask|PGC_allocated);
+            /* The count_info has already been cleared */
             free_domheap_page(page);
             page = new_page;
-            page->count_info = PGC_allocated | 1;
             mfn = page_to_mfn(page);
         }
 
@@ -2223,12 +2222,17 @@ gnttab_transfer(
          */
         spin_unlock(&e->page_alloc_lock);
         okay = gnttab_prepare_for_transfer(e, d, gop.ref);
-        spin_lock(&e->page_alloc_lock);
 
-        if ( unlikely(!okay) || unlikely(e->is_dying) )
+        if ( unlikely(!okay || assign_pages(e, page, 0, MEMF_no_refcount)) )
         {
-            bool_t drop_dom_ref = !domain_adjust_tot_pages(e, -1);
+            bool drop_dom_ref;
 
+            /*
+             * Need to grab this again to safely free our "reserved"
+             * page in the page total
+             */
+            spin_lock(&e->page_alloc_lock);
+            drop_dom_ref = !domain_adjust_tot_pages(e, -1);
             spin_unlock(&e->page_alloc_lock);
 
             if ( okay /* i.e. e->is_dying due to the surrounding if() */ )
@@ -2241,10 +2245,6 @@ gnttab_transfer(
             goto unlock_and_copyback;
         }
 
-        page_list_add_tail(page, &e->page_list);
-        page_set_owner(page, e);
-
-        spin_unlock(&e->page_alloc_lock);
 #ifdef CONFIG_X86
         put_gfn(d, gop.mfn);
 #endif
