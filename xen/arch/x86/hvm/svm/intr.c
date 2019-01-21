@@ -32,6 +32,7 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/intr.h>
 #include <asm/hvm/nestedhvm.h> /* for nestedhvm_vcpu_in_guestmode */
+#include <asm/vm_event.h>
 #include <xen/event.h>
 #include <xen/kernel.h>
 #include <public/hvm/ioreq.h>
@@ -136,6 +137,10 @@ void svm_intr_assist(void)
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     struct hvm_intack intack;
     enum hvm_intblk intblk;
+
+    /* Block event injection while handling a sync vm_event. */
+    if ( unlikely(v->arch.vm_event) && v->arch.vm_event->sync_event )
+        return;
 
     /* Crank the handle on interrupt state. */
     pt_update_irq(v);

@@ -34,6 +34,8 @@ struct arch_vm_event {
     struct monitor_write_data write_data;
     struct vm_event_regs_x86 gprs;
     bool set_gprs;
+    /* A sync vm_event has been sent and we're not done handling it. */
+    bool sync_event;
 };
 
 int vm_event_init_domain(struct domain *d);
@@ -46,5 +48,7 @@ void vm_event_toggle_singlestep(struct domain *d, struct vcpu *v,
 void vm_event_register_write_resume(struct vcpu *v, vm_event_response_t *rsp);
 
 void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp);
+
+void vm_event_sync_event(struct vcpu *v, bool value);
 
 #endif /* __ASM_X86_VM_EVENT_H__ */

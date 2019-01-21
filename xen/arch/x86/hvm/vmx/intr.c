@@ -37,6 +37,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/trace.h>
+#include <asm/vm_event.h>
 
 /*
  * A few notes on virtual NMI and INTR delivery, and interactions with
@@ -238,6 +239,10 @@ void vmx_intr_assist(void)
         vmx_update_cpu_exec_control(v);
         return;
     }
+
+    /* Block event injection while handling a sync vm_event. */
+    if ( unlikely(v->arch.vm_event) && v->arch.vm_event->sync_event )
+        return;
 
     /* Crank the handle on interrupt state. */
     pt_vector = pt_update_irq(v);

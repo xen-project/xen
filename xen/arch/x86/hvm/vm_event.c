@@ -124,6 +124,8 @@ void hvm_vm_event_do_resume(struct vcpu *v)
 
         w->do_write.msr = 0;
     }
+
+    vm_event_sync_event(v, false);
 }
 
 /*

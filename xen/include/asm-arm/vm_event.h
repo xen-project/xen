@@ -52,4 +52,10 @@ void vm_event_emulate_check(struct vcpu *v, vm_event_response_t *rsp)
     /* Not supported on ARM. */
 }
 
+static inline
+void vm_event_sync_event(struct vcpu *v, bool value)
+{
+    /* Not supported on ARM. */
+}
+
 #endif /* __ASM_ARM_VM_EVENT_H__ */

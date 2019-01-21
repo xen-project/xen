@@ -113,6 +113,7 @@ int monitor_traps(struct vcpu *v, bool sync, vm_event_request_t *req)
     if ( sync )
     {
         req->flags |= VM_EVENT_FLAG_VCPU_PAUSED;
+        vm_event_sync_event(v, true);
         vm_event_vcpu_pause(v);
         rc = 1;
     }

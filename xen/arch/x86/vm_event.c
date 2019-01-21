@@ -122,6 +122,11 @@ void vm_event_monitor_next_interrupt(struct vcpu *v)
     v->arch.monitor.next_interrupt_enabled = true;
 }
 
+void vm_event_sync_event(struct vcpu *v, bool value)
+{
+    v->arch.vm_event->sync_event = value;
+}
+
 #ifdef CONFIG_HVM
 static void vm_event_pack_segment_register(enum x86_segment segment,
                                            struct vm_event_regs_x86 *reg)
