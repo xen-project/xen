@@ -778,9 +778,9 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn_l, unsigned long mfn,
     p2m_type_t t;
     p2m_access_t a;
 
+    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
     if ( !paging_mode_translate(p2m->domain) )
-        return need_iommu_pt_sync(p2m->domain) ?
-            iommu_legacy_unmap(p2m->domain, _dfn(mfn), page_order) : 0;
+        return 0;
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn_l, mfn);
@@ -825,10 +825,35 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     int pod_count = 0;
     int rc = 0;
 
+    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
     if ( !paging_mode_translate(d) )
-        return (need_iommu_pt_sync(d) && t == p2m_ram_rw) ?
-            iommu_legacy_map(d, _dfn(mfn_x(mfn)), mfn, page_order,
-                             IOMMUF_readable | IOMMUF_writable) : 0;
+    {
+        struct page_info *page = mfn_to_page(mfn);
+
+        /*
+         * Our interface for PV guests wrt IOMMU entries hasn't been very
+         * clear; but historically, pages have started out with IOMMU mappings,
+         * and only lose them when changed to a different page type.
+         *
+         * Retain this property by grabbing a writable type ref and then
+         * dropping it immediately.  The result will be pages that have a
+         * writable type (and an IOMMU entry), but a count of 0 (such that
+         * any guest-requested type changes succeed and remove the IOMMU
+         * entry).
+         */
+        if ( !need_iommu_pt_sync(d) || t != p2m_ram_rw )
+            return 0;
+
+        for ( i = 0; i < (1UL << page_order); ++i, ++page )
+        {
+            if ( get_page_and_type(page, d, PGT_writable_page) )
+                put_page_and_type(page);
+            else
+                return -EINVAL;
+        }
+
+        return 0;
+    }
 
     /* foreign pages are added thru p2m_add_foreign */
     if ( p2m_is_foreign(t) )
