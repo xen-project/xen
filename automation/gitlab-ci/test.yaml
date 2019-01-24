@@ -5,7 +5,7 @@ qemu-smoke-x86-64-gcc:
   variables:
     CONTAINER: debian:stretch
   script:
-    - ./automation/scripts/qemu-smoke-x86-64.sh 2>&1 | tee qemu-smoke-x86-64.log
+    - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee qemu-smoke-x86-64.log
   artifacts:
     paths:
       - smoke.serial
@@ -27,7 +27,51 @@ qemu-smoke-x86-64-clang:
   variables:
     CONTAINER: debian:stretch
   script:
-    - ./automation/scripts/qemu-smoke-x86-64.sh 2>&1 | tee qemu-smoke-x86-64.log
+    - ./automation/scripts/qemu-smoke-x86-64.sh pv 2>&1 | tee qemu-smoke-x86-64.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  dependencies:
+    - debian-unstable-clang-debug
+  tags:
+    - x86_64
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
+
+qemu-smoke-x86-64-gcc-pvh:
+  stage: test
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  variables:
+    CONTAINER: debian:stretch
+  script:
+    - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee qemu-smoke-x86-64.log
+  artifacts:
+    paths:
+      - smoke.serial
+      - '*.log'
+    when: always
+  dependencies:
+    - debian-stretch-gcc-debug
+  tags:
+    - x86_64
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
+
+qemu-smoke-x86-64-clang-pvh:
+  stage: test
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  variables:
+    CONTAINER: debian:stretch
+  script:
+    - ./automation/scripts/qemu-smoke-x86-64.sh pvh 2>&1 | tee qemu-smoke-x86-64.log
   artifacts:
     paths:
       - smoke.serial
