@@ -202,7 +202,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
                   == PGT_writable_page) )
                 mapping |= IOMMUF_writable;
 
-            ret = iommu_map(d, _dfn(dfn), _mfn(mfn), mapping, 0,
+            ret = iommu_map(d, _dfn(dfn), _mfn(mfn), 0, mapping,
                             &flush_flags);
 
             if ( !rc )
