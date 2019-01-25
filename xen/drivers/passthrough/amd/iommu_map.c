@@ -39,15 +39,13 @@ static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
                                             unsigned long dfn)
 {
     uint64_t *table, *pte;
-    uint32_t entry;
     unsigned int flush_flags;
 
     table = map_domain_page(_mfn(l1_mfn));
 
     pte = (table + pfn_to_pde_idx(dfn, 1));
-    entry = *pte >> 32;
 
-    flush_flags = get_field_from_reg_u32(entry, IOMMU_PTE_PRESENT_MASK,
+    flush_flags = get_field_from_reg_u32(*pte, IOMMU_PTE_PRESENT_MASK,
                                          IOMMU_PTE_PRESENT_SHIFT) ?
                                          IOMMU_FLUSHF_modified : 0;
 
