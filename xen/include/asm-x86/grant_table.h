@@ -39,24 +39,19 @@ static inline int replace_grant_host_mapping(uint64_t addr, mfn_t frame,
 #define gnttab_destroy_arch(gt) do {} while ( 0 )
 #define gnttab_set_frame_gfn(gt, st, idx, gfn) do {} while ( 0 )
 #define gnttab_get_frame_gfn(gt, st, idx) ({                             \
-    unsigned long mfn_ = (st) ? gnttab_status_mfn(gt, idx)               \
-                              : gnttab_shared_mfn(gt, idx);              \
-    unsigned long gpfn_ = get_gpfn_from_mfn(mfn_);                       \
+    mfn_t mfn_ = (st) ? gnttab_status_mfn(gt, idx)                       \
+                      : gnttab_shared_mfn(gt, idx);                      \
+    unsigned long gpfn_ = get_gpfn_from_mfn(mfn_x(mfn_));                \
     VALID_M2P(gpfn_) ? _gfn(gpfn_) : INVALID_GFN;                        \
 })
 
-#define gnttab_shared_mfn(t, i)                         \
-    ((virt_to_maddr((t)->shared_raw[i]) >> PAGE_SHIFT))
+#define gnttab_shared_mfn(t, i) _mfn(__virt_to_mfn((t)->shared_raw[i]))
 
-#define gnttab_shared_gmfn(d, t, i)                     \
-    (mfn_to_gmfn(d, gnttab_shared_mfn(t, i)))
+#define gnttab_shared_gfn(d, t, i) mfn_to_gfn(d, gnttab_shared_mfn(t, i))
 
+#define gnttab_status_mfn(t, i) _mfn(__virt_to_mfn((t)->status[i]))
 
-#define gnttab_status_mfn(t, i)                         \
-    ((virt_to_maddr((t)->status[i]) >> PAGE_SHIFT))
-
-#define gnttab_status_gmfn(d, t, i)                     \
-    (mfn_to_gmfn(d, gnttab_status_mfn(t, i)))
+#define gnttab_status_gfn(d, t, i) mfn_to_gfn(d, gnttab_status_mfn(t, i))
 
 #define gnttab_mark_dirty(d, f) paging_mark_dirty(d, f)
 

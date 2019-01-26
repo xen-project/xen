@@ -78,15 +78,15 @@ int replace_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
     } while ( 0 )
 
 #define gnttab_get_frame_gfn(gt, st, idx) ({                             \
-   _gfn((st) ? gnttab_status_gmfn(NULL, gt, idx)                         \
-             : gnttab_shared_gmfn(NULL, gt, idx));                       \
+   (st) ? gnttab_status_gfn(NULL, gt, idx)                               \
+        : gnttab_shared_gfn(NULL, gt, idx);                              \
 })
 
-#define gnttab_shared_gmfn(d, t, i)                                      \
-    gfn_x(((i) >= nr_grant_frames(t)) ? INVALID_GFN : (t)->arch.shared_gfn[i])
+#define gnttab_shared_gfn(d, t, i)                                       \
+    (((i) >= nr_grant_frames(t)) ? INVALID_GFN : (t)->arch.shared_gfn[i])
 
-#define gnttab_status_gmfn(d, t, i)                                      \
-    gfn_x(((i) >= nr_status_frames(t)) ? INVALID_GFN : (t)->arch.status_gfn[i])
+#define gnttab_status_gfn(d, t, i)                                       \
+    (((i) >= nr_status_frames(t)) ? INVALID_GFN : (t)->arch.status_gfn[i])
 
 #define gnttab_need_iommu_mapping(d)                    \
     (is_domain_direct_mapped(d) && need_iommu_pt_sync(d))

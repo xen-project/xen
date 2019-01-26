@@ -1974,7 +1974,7 @@ gnttab_setup_table(
     op.status = GNTST_okay;
     for ( i = 0; i < op.nr_frames; i++ )
     {
-        xen_pfn_t gmfn = gnttab_shared_gmfn(d, gt, i);
+        xen_pfn_t gmfn = gfn_x(gnttab_shared_gfn(d, gt, i));
 
         /* Grant tables cannot be shared */
         BUG_ON(SHARED_M2P(gmfn));
@@ -3212,7 +3212,7 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
 
     for ( i = 0; i < op.nr_frames; i++ )
     {
-        gmfn = gnttab_status_gmfn(d, gt, i);
+        gmfn = gfn_x(gnttab_status_gfn(d, gt, i));
         if ( copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
             op.status = GNTST_bad_virt_addr;
     }
