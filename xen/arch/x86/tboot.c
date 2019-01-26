@@ -280,7 +280,7 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
 
         if ( !mfn_valid(_mfn(mfn)) )
             continue;
-        if ( is_xen_fixed_mfn(mfn) )
+        if ( is_xen_fixed_mfn(_mfn(mfn)) )
             continue; /* skip Xen */
         if ( (mfn >= PFN_DOWN(g_tboot_shared->tboot_base - 3 * PAGE_SIZE))
              && (mfn < PFN_UP(g_tboot_shared->tboot_base

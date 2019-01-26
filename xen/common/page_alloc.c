@@ -1585,7 +1585,7 @@ int offline_page(mfn_t mfn, int broken, uint32_t *status)
     *status = 0;
     pg = mfn_to_page(mfn);
 
-    if ( is_xen_fixed_mfn(mfn_x(mfn)) )
+    if ( is_xen_fixed_mfn(mfn) )
     {
         *status = PG_OFFLINE_XENPAGE | PG_OFFLINE_FAILED |
           (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);

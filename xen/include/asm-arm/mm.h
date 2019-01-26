@@ -152,8 +152,8 @@ extern unsigned long xenheap_base_pdx;
 #endif
 
 #define is_xen_fixed_mfn(mfn)                                   \
-    ((pfn_to_paddr(mfn) >= virt_to_maddr(&_start)) &&       \
-     (pfn_to_paddr(mfn) <= virt_to_maddr(&_end)))
+    ((mfn_to_maddr(mfn) >= virt_to_maddr(&_start)) &&           \
+     (mfn_to_maddr(mfn) <= virt_to_maddr(&_end)))
 
 #define page_get_owner(_p)    (_p)->v.inuse.domain
 #define page_set_owner(_p,_d) ((_p)->v.inuse.domain = (_d))
