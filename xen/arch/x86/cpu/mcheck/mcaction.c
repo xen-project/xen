@@ -6,7 +6,7 @@
 
 static struct mcinfo_recovery *
 mci_action_add_pageoffline(int bank, struct mc_info *mi,
-                           uint64_t mfn, uint32_t status)
+                           mfn_t mfn, uint32_t status)
 {
     struct mcinfo_recovery *rec;
 
@@ -22,7 +22,7 @@ mci_action_add_pageoffline(int bank, struct mc_info *mi,
 
     rec->mc_bank = bank;
     rec->action_types = MC_ACTION_PAGE_OFFLINE;
-    rec->action_info.page_retire.mfn = mfn;
+    rec->action_info.page_retire.mfn = mfn_x(mfn);
     rec->action_info.page_retire.status = status;
     return rec;
 }
@@ -42,7 +42,8 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
     struct mcinfo_bank *bank = binfo->mib;
     struct mcinfo_global *global = binfo->mig;
     struct domain *d;
-    unsigned long mfn, gfn;
+    mfn_t mfn;
+    unsigned long gfn;
     uint32_t status;
     int vmce_vcpuid;
     unsigned int mc_vcpuid;
@@ -54,11 +55,12 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
         return;
     }
 
-    mfn = bank->mc_addr >> PAGE_SHIFT;
+    mfn = maddr_to_mfn(bank->mc_addr);
     if ( offline_page(mfn, 1, &status) )
     {
         dprintk(XENLOG_WARNING,
-                "Failed to offline page %lx for MCE error\n", mfn);
+                "Failed to offline page %"PRI_mfn" for MCE error\n",
+                mfn_x(mfn));
         return;
     }
 
@@ -89,10 +91,10 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                 ASSERT(d);
                 gfn = get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
 
-                if ( unmmap_broken_page(d, _mfn(mfn), gfn) )
+                if ( unmmap_broken_page(d, mfn, gfn) )
                 {
-                    printk("Unmap broken memory %lx for DOM%d failed\n",
-                           mfn, d->domain_id);
+                    printk("Unmap broken memory %"PRI_mfn" for DOM%d failed\n",
+                           mfn_x(mfn), d->domain_id);
                     goto vmce_failed;
                 }
 

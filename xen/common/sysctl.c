@@ -185,7 +185,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     case XEN_SYSCTL_page_offline_op:
     {
         uint32_t *status, *ptr;
-        unsigned long pfn;
+        mfn_t mfn;
 
         ret = xsm_page_offline(XSM_HOOK, op->u.page_offline.cmd);
         if ( ret )
@@ -204,21 +204,21 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         memset(status, PG_OFFLINE_INVALID, sizeof(uint32_t) *
                       (op->u.page_offline.end - op->u.page_offline.start + 1));
 
-        for ( pfn = op->u.page_offline.start;
-              pfn <= op->u.page_offline.end;
-              pfn ++ )
+        for ( mfn = _mfn(op->u.page_offline.start);
+              mfn_x(mfn) <= op->u.page_offline.end;
+              mfn = mfn_add(mfn, 1) )
         {
             switch ( op->u.page_offline.cmd )
             {
                 /* Shall revert her if failed, or leave caller do it? */
                 case sysctl_page_offline:
-                    ret = offline_page(pfn, 0, ptr++);
+                    ret = offline_page(mfn, 0, ptr++);
                     break;
                 case sysctl_page_online:
-                    ret = online_page(pfn, ptr++);
+                    ret = online_page(mfn, ptr++);
                     break;
                 case sysctl_query_page_offline:
-                    ret = query_page_offline(pfn, ptr++);
+                    ret = query_page_offline(mfn, ptr++);
                     break;
                 default:
                     ret = -EINVAL;

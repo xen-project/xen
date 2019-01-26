@@ -1569,23 +1569,23 @@ static int reserve_heap_page(struct page_info *pg)
 
 }
 
-int offline_page(unsigned long mfn, int broken, uint32_t *status)
+int offline_page(mfn_t mfn, int broken, uint32_t *status)
 {
     unsigned long old_info = 0;
     struct domain *owner;
     struct page_info *pg;
 
-    if ( !mfn_valid(_mfn(mfn)) )
+    if ( !mfn_valid(mfn) )
     {
         dprintk(XENLOG_WARNING,
-                "try to offline page out of range %lx\n", mfn);
+                "try to offline out of range page %"PRI_mfn"\n", mfn_x(mfn));
         return -EINVAL;
     }
 
     *status = 0;
-    pg = mfn_to_page(_mfn(mfn));
+    pg = mfn_to_page(mfn);
 
-    if ( is_xen_fixed_mfn(mfn) )
+    if ( is_xen_fixed_mfn(mfn_x(mfn)) )
     {
         *status = PG_OFFLINE_XENPAGE | PG_OFFLINE_FAILED |
           (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);
@@ -1596,7 +1596,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
      * N.B. xen's txt in x86_64 is marked reserved and handled already.
      * Also kexec range is reserved.
      */
-    if ( !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
+    if ( !page_is_ram_type(mfn_x(mfn), RAM_TYPE_CONVENTIONAL) )
     {
         *status = PG_OFFLINE_FAILED | PG_OFFLINE_NOT_CONV_RAM;
         return -EINVAL;
@@ -1678,19 +1678,19 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
  *   The caller should make sure end_pfn <= max_page,
  *   if not, expand_pages() should be called prior to online_page().
  */
-unsigned int online_page(unsigned long mfn, uint32_t *status)
+unsigned int online_page(mfn_t mfn, uint32_t *status)
 {
     unsigned long x, nx, y;
     struct page_info *pg;
     int ret;
 
-    if ( !mfn_valid(_mfn(mfn)) )
+    if ( !mfn_valid(mfn) )
     {
         dprintk(XENLOG_WARNING, "call expand_pages() first\n");
         return -EINVAL;
     }
 
-    pg = mfn_to_page(_mfn(mfn));
+    pg = mfn_to_page(mfn);
 
     spin_lock(&heap_lock);
 
@@ -1731,11 +1731,11 @@ unsigned int online_page(unsigned long mfn, uint32_t *status)
     return ret;
 }
 
-int query_page_offline(unsigned long mfn, uint32_t *status)
+int query_page_offline(mfn_t mfn, uint32_t *status)
 {
     struct page_info *pg;
 
-    if ( !mfn_valid(_mfn(mfn)) || !page_is_ram_type(mfn, RAM_TYPE_CONVENTIONAL) )
+    if ( !mfn_valid(mfn) || !page_is_ram_type(mfn_x(mfn), RAM_TYPE_CONVENTIONAL) )
     {
         dprintk(XENLOG_WARNING, "call expand_pages() first\n");
         return -EINVAL;
@@ -1744,7 +1744,7 @@ int query_page_offline(unsigned long mfn, uint32_t *status)
     *status = 0;
     spin_lock(&heap_lock);
 
-    pg = mfn_to_page(_mfn(mfn));
+    pg = mfn_to_page(mfn);
 
     if ( page_state_is(pg, offlining) )
         *status |= PG_OFFLINE_STATUS_OFFLINE_PENDING;
