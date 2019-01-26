@@ -96,15 +96,17 @@ int arch_iommu_populate_page_table(struct domain *d)
         if ( is_hvm_domain(d) ||
             (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
         {
-            unsigned long mfn = mfn_x(page_to_mfn(page));
-            unsigned long gfn = mfn_to_gmfn(d, mfn);
+            mfn_t mfn = page_to_mfn(page);
+            gfn_t gfn = mfn_to_gfn(d, mfn);
             unsigned int flush_flags = 0;
 
-            if ( gfn != gfn_x(INVALID_GFN) )
+            if ( !gfn_eq(gfn, INVALID_GFN) )
             {
-                ASSERT(!(gfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
-                BUG_ON(SHARED_M2P(gfn));
-                rc = iommu_map(d, _dfn(gfn), _mfn(mfn), PAGE_ORDER_4K,
+                dfn_t dfn = _dfn(gfn_x(gfn));
+
+                ASSERT(!(gfn_x(gfn) >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
+                BUG_ON(SHARED_M2P(gfn_x(gfn)));
+                rc = iommu_map(d, dfn, mfn, PAGE_ORDER_4K,
                                IOMMUF_readable | IOMMUF_writable,
                                &flush_flags);
 
@@ -122,7 +124,7 @@ int arch_iommu_populate_page_table(struct domain *d)
                      ((page->u.inuse.type_info & PGT_type_mask) !=
                       PGT_writable_page) )
                 {
-                    rc = iommu_unmap(d, _dfn(gfn), PAGE_ORDER_4K, &flush_flags);
+                    rc = iommu_unmap(d, dfn, PAGE_ORDER_4K, &flush_flags);
                     /* If the type changed yet again, simply force a retry. */
                     if ( !rc && ((page->u.inuse.type_info & PGT_type_mask) ==
                                  PGT_writable_page) )

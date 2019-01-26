@@ -712,7 +712,7 @@ static int read_cr(unsigned int reg, unsigned long *val,
         if ( !is_pv_32bit_domain(currd) )
         {
             mfn = pagetable_get_mfn(curr->arch.guest_table);
-            *val = xen_pfn_to_cr3(mfn_to_gmfn(currd, mfn_x(mfn)));
+            *val = xen_pfn_to_cr3(gfn_x(mfn_to_gfn(currd, mfn)));
         }
         else
         {
@@ -721,7 +721,7 @@ static int read_cr(unsigned int reg, unsigned long *val,
 
             mfn = l4e_get_mfn(*pl4e);
             unmap_domain_page(pl4e);
-            *val = compat_pfn_to_cr3(mfn_to_gmfn(currd, mfn_x(mfn)));
+            *val = compat_pfn_to_cr3(gfn_x(mfn_to_gfn(currd, mfn)));
         }
 
         return X86EMUL_OKAY;
