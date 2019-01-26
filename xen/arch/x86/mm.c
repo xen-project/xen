@@ -4430,8 +4430,8 @@ int xenmem_add_to_physmap_one(
     gfn_t gpfn)
 {
     struct page_info *page = NULL;
-    unsigned long gfn = 0; /* gcc ... */
-    unsigned long prev_mfn, old_gpfn;
+    unsigned long gfn = 0 /* gcc ... */, old_gpfn;
+    mfn_t prev_mfn;
     int rc = 0;
     mfn_t mfn = INVALID_MFN;
     p2m_type_t p2mt;
@@ -4477,12 +4477,12 @@ int xenmem_add_to_physmap_one(
     }
 
     /* Remove previously mapped page if it was present. */
-    prev_mfn = mfn_x(get_gfn(d, gfn_x(gpfn), &p2mt));
-    if ( mfn_valid(_mfn(prev_mfn)) )
+    prev_mfn = get_gfn(d, gfn_x(gpfn), &p2mt);
+    if ( mfn_valid(prev_mfn) )
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot. */
-            rc = guest_physmap_remove_page(d, gpfn, _mfn(prev_mfn), PAGE_ORDER_4K);
+            rc = guest_physmap_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
             rc = guest_remove_page(d, gfn_x(gpfn));

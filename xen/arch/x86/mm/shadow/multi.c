@@ -559,7 +559,7 @@ _sh_propagate(struct vcpu *v,
      * caching attributes in the shadows to match what was asked for.
      */
     if ( (level == 1) && is_hvm_domain(d) &&
-         !is_xen_heap_mfn(mfn_x(target_mfn)) )
+         !is_xen_heap_mfn(target_mfn) )
     {
         int type;
 

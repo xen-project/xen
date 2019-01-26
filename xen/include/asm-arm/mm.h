@@ -139,16 +139,16 @@ extern unsigned long xenheap_base_pdx;
 #endif
 
 #ifdef CONFIG_ARM_32
-#define is_xen_heap_page(page) is_xen_heap_mfn(mfn_x(page_to_mfn(page)))
+#define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                                 \
-    unsigned long mfn_ = (mfn);                                 \
+    unsigned long mfn_ = mfn_x(mfn);                            \
     (mfn_ >= mfn_x(xenheap_mfn_start) &&                        \
      mfn_ < mfn_x(xenheap_mfn_end));                            \
 })
 #else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
-    (mfn_valid(_mfn(mfn)) && is_xen_heap_page(mfn_to_page(_mfn(mfn))))
+    (mfn_valid(mfn) && is_xen_heap_page(mfn_to_page(mfn)))
 #endif
 
 #define is_xen_fixed_mfn(mfn)                                   \
@@ -247,7 +247,7 @@ static inline paddr_t __virt_to_maddr(vaddr_t va)
 #ifdef CONFIG_ARM_32
 static inline void *maddr_to_virt(paddr_t ma)
 {
-    ASSERT(is_xen_heap_mfn(ma >> PAGE_SHIFT));
+    ASSERT(is_xen_heap_mfn(maddr_to_mfn(ma)));
     ma -= mfn_to_maddr(xenheap_mfn_start);
     return (void *)(unsigned long) ma + XENHEAP_VIRT_START;
 }
