@@ -1448,7 +1448,11 @@ static int vgic_v3_vcpu_init(struct vcpu *v)
     return 0;
 }
 
-static inline unsigned int vgic_v3_rdist_count(struct domain *d)
+/*
+ * Return the maximum number possible of re-distributor regions for
+ * a given domain.
+ */
+static inline unsigned int vgic_v3_max_rdist_count(struct domain *d)
 {
     return is_hardware_domain(d) ? vgic_v3_hw.nr_rdist_regions :
                GUEST_GICV3_RDIST_REGIONS;
@@ -1460,7 +1464,7 @@ static int vgic_v3_real_domain_init(struct domain *d)
     int rdist_count, i, ret;
 
     /* Allocate memory for Re-distributor regions */
-    rdist_count = vgic_v3_rdist_count(d);
+    rdist_count = vgic_v3_max_rdist_count(d);
 
     rdist_regions = xzalloc_array(struct vgic_rdist_region, rdist_count);
     if ( !rdist_regions )
@@ -1499,7 +1503,18 @@ static int vgic_v3_real_domain_init(struct domain *d)
             d->arch.vgic.rdist_regions[i].first_cpu = first_cpu;
 
             first_cpu += size / d->arch.vgic.rdist_stride;
+
+            if ( first_cpu >= d->max_vcpus )
+                break;
         }
+
+        /*
+         * The hardware domain may not use all the re-distributors
+         * regions (e.g when the number of vCPUs does not match the
+         * number of pCPUs). Update the number of regions to avoid
+         * exposing unused region as they will not get emulated.
+         */
+        d->arch.vgic.nr_regions = i + 1;
     }
     else
     {
@@ -1582,7 +1597,7 @@ int vgic_v3_init(struct domain *d, int *mmio_count)
     }
 
     /* GICD region + number of Redistributors */
-    *mmio_count = vgic_v3_rdist_count(d) + 1;
+    *mmio_count = vgic_v3_max_rdist_count(d) + 1;
 
     register_vgic_ops(d, &v3_ops);
 
