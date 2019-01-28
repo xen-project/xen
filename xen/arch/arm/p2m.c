@@ -106,15 +106,19 @@ void p2m_restore_state(struct vcpu *n)
         return;
 
     WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
-    isb();
-
     WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
-    isb();
-
     WRITE_SYSREG(n->arch.hcr_el2, HCR_EL2);
-    isb();
 
     last_vcpu_ran = &p2m->last_vcpu_ran[smp_processor_id()];
+
+    /*
+     * While we are restoring an out-of-context translation regime
+     * we still need to ensure:
+     *  - VTTBR_EL2 is synchronized before flushing the TLBs
+     *  - All registers for EL1 are synchronized before executing an AT
+     *  instructions targeting S1/S2.
+     */
+    isb();
 
     /*
      * Flush local TLB for the domain to prevent wrong TLB translation
@@ -147,6 +151,7 @@ static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
     {
         local_irq_save(flags);
         WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
+        /* Ensure VTTBR_EL2 is synchronized before flushing the TLBs */
         isb();
     }
 
@@ -155,6 +160,7 @@ static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
     if ( ovttbr != READ_SYSREG64(VTTBR_EL2) )
     {
         WRITE_SYSREG64(ovttbr, VTTBR_EL2);
+        /* Ensure VTTBR_EL2 is back in place before continuing. */
         isb();
         local_irq_restore(flags);
     }
@@ -1907,7 +1913,6 @@ static uint32_t __read_mostly vtcr;
 static void setup_virt_paging_one(void *data)
 {
     WRITE_SYSREG32(vtcr, VTCR_EL2);
-    isb();
 }
 
 void __init setup_virt_paging(void)
