@@ -1353,21 +1353,29 @@ int guest_physmap_remove_page(struct domain *d, gfn_t gfn, mfn_t mfn,
     return p2m_remove_mapping(d, gfn, (1 << page_order), mfn);
 }
 
-static int p2m_alloc_table(struct domain *d)
+static struct page_info *p2m_allocate_root(void)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
     struct page_info *page;
     unsigned int i;
 
     page = alloc_domheap_pages(NULL, P2M_ROOT_ORDER, 0);
     if ( page == NULL )
-        return -ENOMEM;
+        return NULL;
 
     /* Clear both first level pages */
     for ( i = 0; i < P2M_ROOT_PAGES; i++ )
         clear_and_clean_page(page + i);
 
-    p2m->root = page;
+    return page;
+}
+
+static int p2m_alloc_table(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    p2m->root = p2m_allocate_root();
+    if ( !p2m->root )
+        return -ENOMEM;
 
     p2m->vttbr = generate_vttbr(p2m->vmid, page_to_mfn(p2m->root));
 
