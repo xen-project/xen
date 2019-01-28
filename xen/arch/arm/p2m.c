@@ -41,6 +41,11 @@ static const paddr_t level_masks[] =
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
 
+static uint64_t generate_vttbr(uint16_t vmid, mfn_t root_mfn)
+{
+    return (mfn_to_maddr(root_mfn) | ((uint64_t)vmid << 48));
+}
+
 /* Unlock the flush and do a P2M TLB flush if necessary */
 void p2m_write_unlock(struct p2m_domain *p2m)
 {
@@ -1364,7 +1369,7 @@ static int p2m_alloc_table(struct domain *d)
 
     p2m->root = page;
 
-    p2m->vttbr = page_to_maddr(p2m->root) | ((uint64_t)p2m->vmid << 48);
+    p2m->vttbr = generate_vttbr(p2m->vmid, page_to_mfn(p2m->root));
 
     /*
      * Make sure that all TLBs corresponding to the new VMID are flushed
