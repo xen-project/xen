@@ -236,20 +236,6 @@ static void vioapic_write_redirent(
 
     *pent = ent;
 
-    if ( is_hardware_domain(d) && unmasked )
-    {
-        int ret;
-
-        ret = vioapic_hwdom_map_gsi(gsi, ent.fields.trig_mode,
-                                    ent.fields.polarity);
-        if ( ret )
-        {
-            /* Mask the entry again. */
-            pent->fields.mask = 1;
-            unmasked = 0;
-        }
-    }
-
     if ( gsi == 0 )
     {
         vlapic_adjust_i8259_target(d);
@@ -265,6 +251,24 @@ static void vioapic_write_redirent(
     }
 
     spin_unlock(&d->arch.hvm.irq_lock);
+
+    if ( is_hardware_domain(d) && unmasked )
+    {
+        /*
+         * NB: don't call vioapic_hwdom_map_gsi while holding hvm.irq_lock
+         * since it can cause deadlocks as event_lock is taken by
+         * allocate_and_map_gsi_pirq, and that will invert the locking order
+         * used by other parts of the code.
+         */
+        int ret = vioapic_hwdom_map_gsi(gsi, ent.fields.trig_mode,
+                                        ent.fields.polarity);
+        if ( ret )
+        {
+            gprintk(XENLOG_ERR,
+                    "unable to bind gsi %u to hardware domain: %d\n", gsi, ret);
+            unmasked = 0;
+        }
+    }
 
     if ( gsi == 0 || unmasked )
         pt_may_unmask_irq(d, NULL);
