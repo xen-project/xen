@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <xen/trace.h>
+#include <xen/nospec.h>
 
 #define domain_vhpet(x) (&(x)->arch.hvm.pl_time->vhpet)
 #define vcpu_vhpet(x)   (domain_vhpet((x)->domain))
@@ -124,15 +125,18 @@ static inline uint64_t hpet_read64(HPETState *h, unsigned long addr,
     case HPET_Tn_CFG(0):
     case HPET_Tn_CFG(1):
     case HPET_Tn_CFG(2):
-        return h->hpet.timers[HPET_TN(CFG, addr)].config;
+        return array_access_nospec(h->hpet.timers, HPET_TN(CFG, addr)).config;
     case HPET_Tn_CMP(0):
     case HPET_Tn_CMP(1):
     case HPET_Tn_CMP(2):
-        return hpet_get_comparator(h, HPET_TN(CMP, addr), guest_time);
+        return hpet_get_comparator(h,
+                                   array_index_nospec(HPET_TN(CMP, addr),
+                                                      ARRAY_SIZE(h->hpet.timers)),
+                                   guest_time);
     case HPET_Tn_ROUTE(0):
     case HPET_Tn_ROUTE(1):
     case HPET_Tn_ROUTE(2):
-        return h->hpet.timers[HPET_TN(ROUTE, addr)].fsb;
+        return array_access_nospec(h->hpet.timers, HPET_TN(ROUTE, addr)).fsb;
     }
 
     return 0;
@@ -438,7 +442,7 @@ static int hpet_write(
     case HPET_Tn_CFG(0):
     case HPET_Tn_CFG(1):
     case HPET_Tn_CFG(2):
-        tn = HPET_TN(CFG, addr);
+        tn = array_index_nospec(HPET_TN(CFG, addr), ARRAY_SIZE(h->hpet.timers));
 
         h->hpet.timers[tn].config =
             hpet_fixup_reg(new_val, old_val,
@@ -480,7 +484,7 @@ static int hpet_write(
     case HPET_Tn_CMP(0):
     case HPET_Tn_CMP(1):
     case HPET_Tn_CMP(2):
-        tn = HPET_TN(CMP, addr);
+        tn = array_index_nospec(HPET_TN(CMP, addr), ARRAY_SIZE(h->hpet.timers));
         if ( timer_is_periodic(h, tn) &&
              !(h->hpet.timers[tn].config & HPET_TN_SETVAL) )
         {
@@ -523,8 +527,7 @@ static int hpet_write(
     case HPET_Tn_ROUTE(0):
     case HPET_Tn_ROUTE(1):
     case HPET_Tn_ROUTE(2):
-        tn = HPET_TN(ROUTE, addr);
-        h->hpet.timers[tn].fsb = new_val;
+        array_access_nospec(h->hpet.timers, HPET_TN(ROUTE, addr)).fsb = new_val;
         break;
 
     default:

@@ -58,6 +58,12 @@ static inline unsigned long array_index_mask_nospec(unsigned long index,
     (typeof(_i)) (_i & _mask);                                          \
 })
 
+/*
+ * array_access_nospec - allow nospec access for static size arrays
+ */
+#define array_access_nospec(array, index)                               \
+    (array)[array_index_nospec(index, ARRAY_SIZE(array))]
+
 #endif /* XEN_NOSPEC_H */
 
 /*
