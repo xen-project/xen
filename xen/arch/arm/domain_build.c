@@ -1923,7 +1923,6 @@ static void __init find_gnttab_region(struct domain *d,
 
 static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
 {
-    struct vcpu *saved_current;
     int i, cpu;
     struct vcpu *v = d->vcpu[0];
     struct cpu_user_regs *regs = &v->arch.cpu_info->guest_cpu_user_regs;
@@ -1945,14 +1944,6 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
 #endif
 
     /*
-     * The following loads use the domain's p2m and require current to
-     * be a vcpu of the domain, temporarily switch
-     */
-    saved_current = current;
-    p2m_restore_state(v);
-    set_current(v);
-
-    /*
      * kernel_load will determine the placement of the kernel as well
      * as the initrd & fdt in RAM, so call it first.
      */
@@ -1960,10 +1951,6 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
     /* initrd_load will fix up the fdt, so call it before dtb_load */
     initrd_load(kinfo);
     dtb_load(kinfo);
-
-    /* Now that we are done restore the original p2m and current. */
-    set_current(saved_current);
-    p2m_restore_state(saved_current);
 
     memset(regs, 0, sizeof(*regs));
 
