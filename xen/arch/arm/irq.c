@@ -44,7 +44,14 @@ static void ack_none(struct irq_desc *irq)
     printk("unexpected IRQ trap at irq %02x\n", irq->irq);
 }
 
-static void end_none(struct irq_desc *irq) { }
+static void end_none(struct irq_desc *irq)
+{
+    /*
+     * Still allow a CPU to end an interrupt if we receive a spurious
+     * interrupt. This will prevent the CPU to lose interrupt forever.
+     */
+    gic_hw_ops->gic_host_irq_type->end(irq);
+}
 
 hw_irq_controller no_irq_type = {
     .typename = "none",
