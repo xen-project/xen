@@ -1178,6 +1178,8 @@ static int gicv3_make_hwdom_dt_node(const struct domain *d,
      * GIC has two memory regions: Distributor + rdist regions
      * CPU interface and virtual cpu interfaces accessesed as System registers
      * So cells are created only for Distributor and rdist regions
+     * The hardware domain may not use all the regions. So only copy
+     * what is necessary.
      */
     len = len * (d->arch.vgic.nr_regions + 1);
     new_cells = xzalloc_bytes(len);
@@ -1416,6 +1418,10 @@ static int gicv3_make_hwdom_madt(const struct domain *d, u32 offset)
 
     /* Add Generic Redistributor */
     size = sizeof(struct acpi_madt_generic_redistributor);
+    /*
+     * The hardware domain may not used all the regions. So only copy
+     * what is necessary.
+     */
     for ( i = 0; i < d->arch.vgic.nr_regions; i++ )
     {
         gicr = (struct acpi_madt_generic_redistributor *)(base_ptr + table_len);
