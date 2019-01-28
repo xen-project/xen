@@ -218,6 +218,12 @@ static int apply_microcode(unsigned int cpu)
 
     spin_unlock_irqrestore(&microcode_update_lock, flags);
 
+    /*
+     * Some processors leave the ucode blob mapping as UC after the update.
+     * Flush the mapping to regain normal cacheability.
+     */
+    flush_area_local(hdr, FLUSH_TLB_GLOBAL | FLUSH_ORDER(0));
+
     /* check current patch id and patch's id for match */
     if ( hw_err || (rev != hdr->patch_id) )
     {
