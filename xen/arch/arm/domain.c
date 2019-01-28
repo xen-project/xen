@@ -181,8 +181,6 @@ static void ctxt_switch_to(struct vcpu *n)
     if ( is_idle_vcpu(n) )
         return;
 
-    p2m_restore_state(n);
-
     vpidr = READ_SYSREG32(MIDR_EL1);
     WRITE_SYSREG32(vpidr, VPIDR_EL2);
     WRITE_SYSREG(n->arch.vmpidr, VMPIDR_EL2);
@@ -234,6 +232,12 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_SYSREG64(n->arch.amair, AMAIR_EL1);
 #endif
     isb();
+
+    /*
+     * ARM64_WORKAROUND_AT_SPECULATE: The P2M should be restored after
+     * the stage-1 MMU sysregs have been restored.
+     */
+    p2m_restore_state(n);
 
     /* Control Registers */
     WRITE_SYSREG(n->arch.cpacr, CPACR_EL1);

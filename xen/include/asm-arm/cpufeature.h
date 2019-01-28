@@ -45,8 +45,9 @@
 #define ARM_HARDEN_BRANCH_PREDICTOR 7
 #define ARM_SSBD 8
 #define ARM_SMCCC_1_1 9
+#define ARM64_WORKAROUND_AT_SPECULATE 10
 
-#define ARM_NCAPS           10
+#define ARM_NCAPS           11
 
 #ifndef __ASSEMBLY__
 

@@ -5,6 +5,7 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
+#include <asm/alternative.h>
 #include <asm/event.h>
 #include <asm/flushtlb.h>
 #include <asm/guest_walk.h>
@@ -40,6 +41,8 @@ static const paddr_t level_masks[] =
     { ZEROETH_MASK, FIRST_MASK, SECOND_MASK, THIRD_MASK };
 static const uint8_t level_orders[] =
     { ZEROETH_ORDER, FIRST_ORDER, SECOND_ORDER, THIRD_ORDER };
+
+static mfn_t __read_mostly empty_root_mfn;
 
 static uint64_t generate_vttbr(uint16_t vmid, mfn_t root_mfn)
 {
@@ -92,9 +95,25 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
                  P2M_ROOT_LEVEL, P2M_ROOT_PAGES);
 }
 
+/*
+ * p2m_save_state and p2m_restore_state work in pair to workaround
+ * ARM64_WORKAROUND_AT_SPECULATE. p2m_save_state will set-up VTTBR to
+ * point to the empty page-tables to stop allocating TLB entries.
+ */
 void p2m_save_state(struct vcpu *p)
 {
     p->arch.sctlr = READ_SYSREG(SCTLR_EL1);
+
+    if ( cpus_have_const_cap(ARM64_WORKAROUND_AT_SPECULATE) )
+    {
+        WRITE_SYSREG64(generate_vttbr(INVALID_VMID, empty_root_mfn), VTTBR_EL2);
+        /*
+         * Ensure VTTBR_EL2 is correctly synchronized so we can restore
+         * the next vCPU context without worrying about AT instruction
+         * speculation.
+         */
+        isb();
+    }
 }
 
 void p2m_restore_state(struct vcpu *n)
@@ -105,9 +124,16 @@ void p2m_restore_state(struct vcpu *n)
     if ( is_idle_vcpu(n) )
         return;
 
-    WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
     WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
     WRITE_SYSREG(n->arch.hcr_el2, HCR_EL2);
+
+    /*
+     * ARM64_WORKAROUND_AT_SPECULATE: VTTBR_EL2 should be restored after all
+     * registers associated to EL1/EL0 translations regime have been
+     * synchronized.
+     */
+    asm volatile(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_AT_SPECULATE));
+    WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
 
     last_vcpu_ran = &p2m->last_vcpu_ran[smp_processor_id()];
 
@@ -149,8 +175,23 @@ static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
     ovttbr = READ_SYSREG64(VTTBR_EL2);
     if ( ovttbr != p2m->vttbr )
     {
+        uint64_t vttbr;
+
         local_irq_save(flags);
-        WRITE_SYSREG64(p2m->vttbr, VTTBR_EL2);
+
+        /*
+         * ARM64_WORKAROUND_AT_SPECULATE: We need to stop AT to allocate
+         * TLBs entries because the context is partially modified. We
+         * only need the VMID for flushing the TLBs, so we can generate
+         * a new VTTBR with the VMID to flush and the empty root table.
+         */
+        if ( !cpus_have_const_cap(ARM64_WORKAROUND_AT_SPECULATE) )
+            vttbr = p2m->vttbr;
+        else
+            vttbr = generate_vttbr(p2m->vmid, empty_root_mfn);
+
+        WRITE_SYSREG64(vttbr, VTTBR_EL2);
+
         /* Ensure VTTBR_EL2 is synchronized before flushing the TLBs */
         isb();
     }
@@ -1913,6 +1954,23 @@ static uint32_t __read_mostly vtcr;
 static void setup_virt_paging_one(void *data)
 {
     WRITE_SYSREG32(vtcr, VTCR_EL2);
+
+    /*
+     * ARM64_WORKAROUND_AT_SPECULATE: We want to keep the TLBs free from
+     * entries related to EL1/EL0 translation regime until a guest vCPU
+     * is running. For that, we need to set-up VTTBR to point to an empty
+     * page-table and turn on stage-2 translation. The TLB entries
+     * associated with EL1/EL0 translation regime will also be flushed in case
+     * an AT instruction was speculated before hand.
+     */
+    if ( cpus_have_cap(ARM64_WORKAROUND_AT_SPECULATE) )
+    {
+        WRITE_SYSREG64(generate_vttbr(INVALID_VMID, empty_root_mfn), VTTBR_EL2);
+        WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_VM, HCR_EL2);
+        isb();
+
+        flush_tlb_all_local();
+    }
 }
 
 void __init setup_virt_paging(void)
@@ -1996,6 +2054,22 @@ void __init setup_virt_paging(void)
     /* It is not allowed to concatenate a level zero root */
     BUG_ON( P2M_ROOT_LEVEL == 0 && P2M_ROOT_ORDER > 0 );
     vtcr = val;
+
+    /*
+     * ARM64_WORKAROUND_AT_SPECULATE requires to allocate root table
+     * with all entries zeroed.
+     */
+    if ( cpus_have_cap(ARM64_WORKAROUND_AT_SPECULATE) )
+    {
+        struct page_info *root;
+
+        root = p2m_allocate_root();
+        if ( !root )
+            panic("Unable to allocate root table for ARM64_WORKAROUND_AT_SPECULATE\n");
+
+        empty_root_mfn = page_to_mfn(root);
+    }
+
     setup_virt_paging_one(NULL);
     smp_call_function(setup_virt_paging_one, NULL, 1);
 }
