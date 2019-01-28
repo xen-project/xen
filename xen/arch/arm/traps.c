@@ -157,8 +157,12 @@ void init_traps(void)
     WRITE_SYSREG((HCPTR_CP_MASK & ~(HCPTR_CP(10) | HCPTR_CP(11))) | HCPTR_TTA,
                  CPTR_EL2);
 
-    /* Setup hypervisor traps */
-    WRITE_SYSREG(get_default_hcr_flags(), HCR_EL2);
+    /*
+     * Configure HCR_EL2 with the bare minimum to run Xen until a guest
+     * is scheduled. {A,I,F}MO bits are set to allow EL2 receiving
+     * interrupts.
+     */
+    WRITE_SYSREG(HCR_AMO | HCR_FMO | HCR_IMO, HCR_EL2);
     isb();
 }
 
