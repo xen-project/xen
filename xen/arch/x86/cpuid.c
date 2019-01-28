@@ -1,6 +1,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
+#include <xen/nospec.h>
 #include <asm/cpuid.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/nestedhvm.h>
@@ -629,7 +630,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
             if ( subleaf >= ARRAY_SIZE(p->cache.raw) )
                 return;
 
-            *res = p->cache.raw[subleaf];
+            *res = array_access_nospec(p->cache.raw, subleaf);
             break;
 
         case 0x7:
@@ -638,25 +639,25 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                                  ARRAY_SIZE(p->feat.raw) - 1) )
                 return;
 
-            *res = p->feat.raw[subleaf];
+            *res = array_access_nospec(p->feat.raw, subleaf);
             break;
 
         case 0xb:
             if ( subleaf >= ARRAY_SIZE(p->topo.raw) )
                 return;
 
-            *res = p->topo.raw[subleaf];
+            *res = array_access_nospec(p->topo.raw, subleaf);
             break;
 
         case XSTATE_CPUID:
             if ( !p->basic.xsave || subleaf >= ARRAY_SIZE(p->xstate.raw) )
                 return;
 
-            *res = p->xstate.raw[subleaf];
+            *res = array_access_nospec(p->xstate.raw, subleaf);
             break;
 
         default:
-            *res = p->basic.raw[leaf];
+            *res = array_access_nospec(p->basic.raw, leaf);
             break;
         }
         break;
@@ -680,7 +681,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
                                      ARRAY_SIZE(p->extd.raw) - 1) )
             return;
 
-        *res = p->extd.raw[leaf & 0xffff];
+        *res = array_access_nospec(p->extd.raw, leaf & 0xffff);
         break;
 
     default:
@@ -847,7 +848,7 @@ void guest_cpuid(const struct vcpu *v, uint32_t leaf,
         if ( is_pv_domain(d) && is_hardware_domain(d) &&
              guest_kernel_mode(v, regs) && cpu_has_monitor &&
              regs->entry_vector == TRAP_gp_fault )
-            *res = raw_cpuid_policy.basic.raw[leaf];
+            *res = raw_cpuid_policy.basic.raw[5];
         break;
 
     case 0x7:
