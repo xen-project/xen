@@ -81,7 +81,8 @@ struct kernel_param {
         OPT_UINT,
         OPT_BOOL,
         OPT_SIZE,
-        OPT_CUSTOM
+        OPT_CUSTOM,
+        OPT_IGNORE,
     } type;
     unsigned int len;
     union {
@@ -136,6 +137,11 @@ extern const struct kernel_param __param_start[], __param_end[];
           .type = OPT_STR, \
           .len = sizeof(_var), \
           .par.var = &_var }
+#define ignore_param(_name)                 \
+    __setup_str setup_str_ign[] = _name;    \
+    __kparam setup_ign =                    \
+        { .name = setup_str_ign,            \
+          .type = OPT_IGNORE }
 
 #define __rtparam         __param(__dataparam)
 

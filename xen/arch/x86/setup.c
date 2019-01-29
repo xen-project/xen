@@ -639,6 +639,12 @@ static void __init noreturn reinit_bsp_stack(void)
     reset_stack_and_jump(init_done);
 }
 
+/*
+ * Some scripts add "placeholder" to work around a grub error where it ate the
+ * first parameter.
+ */
+ignore_param("placeholder");
+
 static bool __init loader_is_grub2(const char *loader_name)
 {
     /* GRUB1="GNU GRUB 0.xx"; GRUB2="GRUB 1.xx" */

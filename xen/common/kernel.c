@@ -162,6 +162,8 @@ static int parse_params(const char *cmdline, const struct kernel_param *start,
                 }
                 rctmp = param->par.func(optval);
                 break;
+            case OPT_IGNORE:
+                break;
             default:
                 BUG();
                 break;

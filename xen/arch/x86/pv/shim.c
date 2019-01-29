@@ -40,7 +40,10 @@
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
 
-#ifndef CONFIG_PV_SHIM_EXCLUSIVE
+#ifdef CONFIG_PV_SHIM_EXCLUSIVE
+/* Tolerate "pv-shim" being passed to a CONFIG_PV_SHIM_EXCLUSIVE hypervisor. */
+ignore_param("pv-shim");
+#else
 bool pv_shim;
 boolean_param("pv-shim", pv_shim);
 #endif
