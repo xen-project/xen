@@ -90,7 +90,7 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
         }
         free(domname);
     }
-    free(dominfo);
+    libxl_dominfo_list_free(dominfo, nb_domains);
     return ret;
 }
 
