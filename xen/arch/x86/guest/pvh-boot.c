@@ -79,7 +79,6 @@ static void __init convert_pvh_info(multiboot_info_t **mbi,
         pvh_mbi_mods[i].string    = entry[i].cmdline_paddr;
     }
 
-    BUG_ON(!pvh_info->rsdp_paddr);
     rsdp_hint = pvh_info->rsdp_paddr;
 
     *mbi = &pvh_mbi;
