@@ -1183,6 +1183,14 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_append(dm_args,
             GCSPRINTF("socket,id=libxl-cmd,fd=%d,server,nowait",
                       state->dm_monitor_fd));
+
+        /*
+         * Start QEMU with its "CPU" paused, it will not start any emulation
+         * until the QMP command "cont" is used. This also prevent QEMU from
+         * writing "running" to the "state" xenstore node so we only use this
+         * flag when we have the QMP based startup notification.
+         * */
+        flexarray_append(dm_args, "-S");
     } else {
         flexarray_append(dm_args,
                          GCSPRINTF("socket,id=libxl-cmd,"
@@ -2702,6 +2710,7 @@ static void device_model_qmp_cb(libxl__egc *egc, libxl__ev_qmp *ev,
     libxl__dm_spawn_state *dmss = CONTAINER_OF(ev, *dmss, qmp);
     const libxl__json_object *o;
     const char *status;
+    const char *expected_state;
 
     libxl__ev_qmp_dispose(gc, ev);
 
@@ -2717,7 +2726,11 @@ static void device_model_qmp_cb(libxl__egc *egc, libxl__ev_qmp *ev,
         goto failed;
     }
     status = libxl__json_object_get_string(o);
-    if (strcmp(status, "running")) {
+    if (!dmss->build_state->saved_state)
+        expected_state = "prelaunch";
+    else
+        expected_state = "paused";
+    if (strcmp(status, expected_state)) {
         LOGD(ERROR, ev->domid, "Unexpected QEMU status: %s", status);
         rc = ERROR_NOT_READY;
         goto failed;
