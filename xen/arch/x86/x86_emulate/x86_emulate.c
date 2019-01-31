@@ -6633,11 +6633,13 @@ x86_emulate(
         get_fpu(X86EMUL_FPU_mmx);
         goto simd_0f_common;
 
+    case X86EMUL_OPC_EVEX_66(0x0f, 0xf6): /* vpsadbw [xyz]mm/mem,[xyz]mm,[xyz]mm */
+        generate_exception_if(evex.opmsk, EXC_UD);
+        /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xd1): /* vpsrlw xmm/m128,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xe1): /* vpsraw xmm/m128,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xf1): /* vpsllw xmm/m128,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xf5): /* vpmaddwd [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
-    case X86EMUL_OPC_EVEX_66(0x0f, 0xf6): /* vpsadbw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         fault_suppression = false;
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xd5): /* vpmullw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
@@ -6998,8 +7000,9 @@ x86_emulate(
         case 6: /* vpsllq $imm8,[xyz]mm/mem,[xyz]mm{k} */
             generate_exception_if(!evex.w, EXC_UD);
             goto avx512f_shift_imm;
-        case 3: /* vpsrldq $imm8,{x,y}mm,{x,y}mm */
-        case 7: /* vpslldq $imm8,{x,y}mm,{x,y}mm */
+        case 3: /* vpsrldq $imm8,[xyz]mm/mem,[xyz]mm */
+        case 7: /* vpslldq $imm8,[xyz]mm/mem,[xyz]mm */
+            generate_exception_if(evex.opmsk, EXC_UD);
             goto avx512bw_shift_imm;
         }
         goto unrecognized_insn;
