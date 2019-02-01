@@ -900,12 +900,7 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg)
 {
     const struct domain *d = v->domain;
-    const struct cpuid_policy *p;
-
-    if ( cr0_pg < 0 && !is_hardware_domain(d) )
-        p = d->arch.cpuid;
-    else
-        p = &host_cpuid_policy;
+    const struct cpuid_policy *p = d->arch.cpuid;
 
     if ( value & ~EFER_KNOWN_MASK )
         return "Unknown bits set";
@@ -945,13 +940,8 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
 /* These bits in CR4 can be set by the guest. */
 unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore)
 {
-    const struct cpuid_policy *p;
+    const struct cpuid_policy *p = d->arch.cpuid;
     bool mce, vmxe;
-
-    if ( !restore && !is_hardware_domain(d) )
-        p = d->arch.cpuid;
-    else
-        p = &host_cpuid_policy;
 
     /* Logic broken out simply to aid readability below. */
     mce  = p->basic.mce || p->basic.mca;
@@ -967,13 +957,13 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore)
                                 X86_CR4_PCE                    |
             (p->basic.fxsr    ? X86_CR4_OSFXSR            : 0) |
             (p->basic.sse     ? X86_CR4_OSXMMEXCPT        : 0) |
+            (p->feat.umip     ? X86_CR4_UMIP              : 0) |
             (vmxe             ? X86_CR4_VMXE              : 0) |
             (p->feat.fsgsbase ? X86_CR4_FSGSBASE          : 0) |
             (p->basic.pcid    ? X86_CR4_PCIDE             : 0) |
             (p->basic.xsave   ? X86_CR4_OSXSAVE           : 0) |
             (p->feat.smep     ? X86_CR4_SMEP              : 0) |
             (p->feat.smap     ? X86_CR4_SMAP              : 0) |
-            (p->feat.umip     ? X86_CR4_UMIP              : 0) |
             (p->feat.pku      ? X86_CR4_PKE               : 0));
 }
 
