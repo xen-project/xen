@@ -75,6 +75,7 @@ static const struct {
     [INSTR_STGI]    = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 4) },
     [INSTR_CLGI]    = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 5) },
     [INSTR_INVLPGA] = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 3, 7) },
+    [INSTR_RDTSCP]  = { X86EMUL_OPC(0x0f, 0x01), MODRM(3, 7, 1) },
     [INSTR_INVD]    = { X86EMUL_OPC(0x0f, 0x08) },
     [INSTR_WBINVD]  = { X86EMUL_OPC(0x0f, 0x09) },
     [INSTR_WRMSR]   = { X86EMUL_OPC(0x0f, 0x30) },

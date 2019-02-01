@@ -2321,13 +2321,27 @@ static void svm_vmexit_do_hlt(struct vmcb_struct *vmcb,
     hvm_hlt(regs->eflags);
 }
 
-static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs)
+static void svm_vmexit_do_rdtsc(struct cpu_user_regs *regs, bool rdtscp)
 {
+    struct vcpu *curr = current;
+    const struct domain *currd = curr->domain;
+    enum instruction_index insn = rdtscp ? INSTR_RDTSCP : INSTR_RDTSC;
     unsigned int inst_len;
 
-    if ( (inst_len = __get_instruction_length(current, INSTR_RDTSC)) == 0 )
+    if ( rdtscp && !currd->arch.cpuid->extd.rdtscp &&
+         currd->arch.tsc_mode != TSC_MODE_PVRDTSCP )
+    {
+        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         return;
+    }
+
+    if ( (inst_len = __get_instruction_length(curr, insn)) == 0 )
+        return;
+
     __update_guest_eip(regs, inst_len);
+
+    if ( rdtscp )
+        regs->rcx = hvm_msr_tsc_aux(curr);
 
     hvm_rdtsc_intercept(regs);
 }
@@ -3014,10 +3028,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case VMEXIT_RDTSCP:
-        regs->rcx = hvm_msr_tsc_aux(v);
-        /* fall through */
     case VMEXIT_RDTSC:
-        svm_vmexit_do_rdtsc(regs);
+        svm_vmexit_do_rdtsc(regs, exit_reason == VMEXIT_RDTSCP);
         break;
 
     case VMEXIT_MONITOR:
