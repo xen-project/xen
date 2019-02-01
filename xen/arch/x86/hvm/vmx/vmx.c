@@ -3595,6 +3595,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     unsigned long exit_qualification, exit_reason, idtv_info, intr_info = 0;
     unsigned int vector = 0, mode;
     struct vcpu *v = current;
+    struct domain *currd = v->domain;
 
     __vmread(GUEST_RIP,    &regs->rip);
     __vmread(GUEST_RSP,    &regs->rsp);
@@ -3958,6 +3959,13 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_invlpg_intercept(exit_qualification);
         break;
     case EXIT_REASON_RDTSCP:
+        if ( !currd->arch.cpuid->extd.rdtscp &&
+             currd->arch.tsc_mode != TSC_MODE_PVRDTSCP )
+        {
+            hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
+            break;
+        }
+
         regs->rcx = hvm_msr_tsc_aux(v);
         /* fall through */
     case EXIT_REASON_RDTSC:
