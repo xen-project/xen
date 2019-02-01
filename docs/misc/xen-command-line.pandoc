@@ -2108,36 +2108,38 @@ Use Virtual Processor ID support if available.  This prevents the need for TLB
 flushes on VM entry and exit, increasing performance.
 
 ### vpmu (x86)
-> `= ( <boolean> | { bts | ipc | arch [, ...] } )`
+    = List of [ <bool>, bts, ipc, arch ]
 
-> Default: `off`
+    Applicability: x86.  Default: false
 
-Switch on the virtualized performance monitoring unit for HVM guests.
+Controls for Performance Monitoring Unit virtualisation.
 
-If the current cpu isn't supported a message like
-'VPMU: Initialization failed. ...'
-is printed on the hypervisor serial log.
+Performance monitoring facilities tend to be very hardware specific, and
+provide access to a wealth of low level processor information.
 
-For some Intel Nehalem processors a quirk handling exist for an unknown
-wrong behaviour (see `handle_pmc_quirk()`).
+*   An overall boolean can be used to enable or disable vPMU support.  vPMU is
+    disabled by default.
 
-If 'vpmu=bts' is specified the virtualisation of the Branch Trace Store (BTS)
-feature is switched on on Intel processors supporting this feature.
+    When enabled, guests have full access to all performance counter settings,
+    including model specific functionality.  This is a superset of the
+    functionality offered by `ipc` and/or `arch`, but a subset of the
+    functionality offered by `bts`.
 
-vpmu=ipc enables performance monitoring, but restricts the counters to the
-most minimum set possible: instructions, cycles, and reference cycles. These
-can be used to calculate instructions per cycle (IPC).
+    Xen's watchdog functionality is implemented using performance counters.
+    As a result, use of the **watchdog** option will override and disable
+    vPMU.
 
-vpmu=arch enables performance monitoring, but restricts the counters to the
-pre-defined architectural events only. These are exposed by cpuid, and listed
-in the Pre-Defined Architectural Performance Events table from the Intel 64
-and IA-32 Architectures Software Developer's Manual, Volume 3B, System
-Programming Guide, Part 2.
+*   The `bts` option enables performance monitoring, and permits additional
+    access to the Branch Trace Store controls.  BTS is an Intel feature where
+    the processor can write data into a buffer whenever a branch occurs.
+    However, as this feature isn't virtualised, a misconfiguration by the
+    guest can lock the entire system up.
 
-If a boolean is not used, combinations of flags are allowed, comma separated.
-For example, vpmu=arch,bts.
+*   The `ipc` option allows access to the most minimal set of counters
+    possible: instructions, cycles, and reference cycles.  These can be used
+    to calculate instructions per cycle (IPC).
 
-Note that if **watchdog** option is also specified vpmu will be turned off.
+*   The `arch` option allows access to the pre-defined architectural events.
 
 *Warning:*
 As the virtualisation is not 100% safe, don't use the vpmu flag on

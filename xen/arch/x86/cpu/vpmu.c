@@ -42,19 +42,9 @@ CHECK_pmu_cntr_pair;
 CHECK_pmu_data;
 CHECK_pmu_params;
 
-/*
- * "vpmu" :     vpmu generally enabled (all counters)
- * "vpmu=off"  : vpmu generally disabled
- * "vpmu=bts"  : vpmu enabled and Intel BTS feature switched on.
- * "vpmu=ipc"  : vpmu enabled for IPC counters only (most restrictive)
- * "vpmu=arch" : vpmu enabled for predef arch counters only (restrictive)
- * flag combinations are allowed, eg, "vpmu=ipc,bts".
- */
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
-static int parse_vpmu_params(const char *s);
-custom_param("vpmu", parse_vpmu_params);
 
 static DEFINE_SPINLOCK(vpmu_lock);
 static unsigned vpmu_count;
@@ -64,37 +54,41 @@ static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 static int __init parse_vpmu_params(const char *s)
 {
     const char *ss;
+    int rc = 0, val;
 
-    switch ( parse_bool(s, NULL) )
-    {
-    case 0:
-        break;
-    default:
-        do {
-            ss = strchr(s, ',');
-            if ( !ss )
-                ss = strchr(s, '\0');
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-            if ( !cmdline_strcmp(s, "bts") )
-                vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
-            else if ( !cmdline_strcmp(s, "ipc") )
-                vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
-            else if ( !cmdline_strcmp(s, "arch") )
-                vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
-            else
-                return -EINVAL;
+        if ( (val = parse_bool(s, ss)) >= 0 )
+        {
+            opt_vpmu_enabled = val;
+            if ( !val )
+                vpmu_features = 0;
+        }
+        else if ( !cmdline_strcmp(s, "bts") )
+            vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
+        else if ( !cmdline_strcmp(s, "ipc") )
+            vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
+        else if ( !cmdline_strcmp(s, "arch") )
+            vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
+        else
+            rc = -EINVAL;
 
-            s = ss + 1;
-        } while ( *ss );
-        /* fall through */
-    case 1:
-        /* Default VPMU mode */
+        s = ss + 1;
+    } while ( *ss );
+
+    /* Selecting bts/ipc/arch implies vpmu=1. */
+    if ( vpmu_features )
+        opt_vpmu_enabled = true;
+
+    if ( opt_vpmu_enabled )
         vpmu_mode = XENPMU_MODE_SELF;
-        opt_vpmu_enabled = 1;
-        break;
-    }
-    return 0;
+
+    return rc;
 }
+custom_param("vpmu", parse_vpmu_params);
 
 void vpmu_lvtpc_update(uint32_t val)
 {
