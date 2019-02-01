@@ -1323,14 +1323,14 @@ static int __init parse_efi_param(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !strncmp(s, "rs", ss - s) )
+        if ( !cmdline_strcmp(s, "rs") )
         {
             if ( val )
                 __set_bit(EFI_RS, &efi_flags);
             else
                 __clear_bit(EFI_RS, &efi_flags);
         }
-        else if ( !strncmp(s, "attr=uc", ss - s) )
+        else if ( !cmdline_strcmp(s, "attr=uc") )
             efi_map_uc = val;
         else
             rc = -EINVAL;

@@ -61,42 +61,31 @@ static unsigned vpmu_count;
 
 static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 
-static int parse_vpmu_param(const char *s, unsigned int len)
-{
-    if ( !*s || !len )
-        return 0;
-    if ( !strncmp(s, "bts", len) )
-        vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
-    else if ( !strncmp(s, "ipc", len) )
-        vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
-    else if ( !strncmp(s, "arch", len) )
-        vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
-    else
-        return 1;
-    return 0;
-}
-
 static int __init parse_vpmu_params(const char *s)
 {
-    const char *sep, *p = s;
+    const char *ss;
 
     switch ( parse_bool(s, NULL) )
     {
     case 0:
         break;
     default:
-        for ( ; ; )
-        {
-            sep = strchr(p, ',');
-            if ( sep == NULL )
-                sep = strchr(p, 0);
-            if ( parse_vpmu_param(p, sep - p) )
-                goto error;
-            if ( !*sep )
-                /* reached end of flags */
-                break;
-            p = sep + 1;
-        }
+        do {
+            ss = strchr(s, ',');
+            if ( !ss )
+                ss = strchr(s, '\0');
+
+            if ( !cmdline_strcmp(s, "bts") )
+                vpmu_features |= XENPMU_FEATURE_INTEL_BTS;
+            else if ( !cmdline_strcmp(s, "ipc") )
+                vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
+            else if ( !cmdline_strcmp(s, "arch") )
+                vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
+            else
+                return -EINVAL;
+
+            s = ss + 1;
+        } while ( *ss );
         /* fall through */
     case 1:
         /* Default VPMU mode */
@@ -105,10 +94,6 @@ static int __init parse_vpmu_params(const char *s)
         break;
     }
     return 0;
-
- error:
-    printk("VPMU: unknown flags: %s - vpmu disabled!\n", s);
-    return -EINVAL;
 }
 
 void vpmu_lvtpc_update(uint32_t val)

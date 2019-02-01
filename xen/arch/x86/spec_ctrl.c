@@ -83,11 +83,11 @@ static int __init parse_bti(const char *s)
         {
             s += 6;
 
-            if ( !strncmp(s, "retpoline", ss - s) )
+            if ( !cmdline_strcmp(s, "retpoline") )
                 opt_thunk = THUNK_RETPOLINE;
-            else if ( !strncmp(s, "lfence", ss - s) )
+            else if ( !cmdline_strcmp(s, "lfence") )
                 opt_thunk = THUNK_LFENCE;
-            else if ( !strncmp(s, "jmp", ss - s) )
+            else if ( !cmdline_strcmp(s, "jmp") )
                 opt_thunk = THUNK_JMP;
             else
                 rc = -EINVAL;
@@ -194,11 +194,11 @@ static int __init parse_spec_ctrl(const char *s)
         {
             s += 10;
 
-            if ( !strncmp(s, "retpoline", ss - s) )
+            if ( !cmdline_strcmp(s, "retpoline") )
                 opt_thunk = THUNK_RETPOLINE;
-            else if ( !strncmp(s, "lfence", ss - s) )
+            else if ( !cmdline_strcmp(s, "lfence") )
                 opt_thunk = THUNK_LFENCE;
-            else if ( !strncmp(s, "jmp", ss - s) )
+            else if ( !cmdline_strcmp(s, "jmp") )
                 opt_thunk = THUNK_JMP;
             else
                 rc = -EINVAL;

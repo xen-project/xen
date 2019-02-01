@@ -212,12 +212,12 @@ static int __init parse_pci_param(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !strncmp(s, "serr", ss - s) )
+        if ( !cmdline_strcmp(s, "serr") )
         {
             cmd_mask = PCI_COMMAND_SERR;
             brctl_mask = PCI_BRIDGE_CTL_SERR | PCI_BRIDGE_CTL_DTMR_SERR;
         }
-        else if ( !strncmp(s, "perr", ss - s) )
+        else if ( !cmdline_strcmp(s, "perr") )
         {
             cmd_mask = PCI_COMMAND_PARITY;
             brctl_mask = PCI_BRIDGE_CTL_PARITY;
