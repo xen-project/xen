@@ -865,6 +865,42 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing imull -4(%ecx)...");
+    instr[0] = 0xf7; instr[1] = 0x69; instr[2] = 0xfc;
+    regs.eflags = EFLAGS_ALWAYS_SET;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0x89abcdef;
+    res[0]      = 0x12345678;
+    regs.ecx    = (unsigned long)(res + 1);
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.eax != 0x89abcdef * 0x12345678) ||
+         (regs.edx != (uint64_t)((int64_t)(int32_t)0x89abcdef *
+                                 0x12345678) >> 32) ||
+         ((regs.eflags & (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF |
+                          X86_EFLAGS_OF)) !=
+          (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF | X86_EFLAGS_OF)) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing imul $3,-4(%edx),%ecx...");
+    instr[0] = 0x6b; instr[1] = 0x4a; instr[2] = 0xfc; instr[3] = 0x03;
+    regs.eflags = EFLAGS_ALWAYS_SET;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x12345678;
+    res[0]      = 0x89abcdef;
+    regs.edx    = (unsigned long)(res + 1);
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (regs.ecx != 0x89abcdef * 3) ||
+         ((regs.eflags & (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF |
+                          X86_EFLAGS_OF)) !=
+          (EFLAGS_ALWAYS_SET | X86_EFLAGS_CF | X86_EFLAGS_OF)) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
 #ifndef __x86_64__
     printf("%-40s", "Testing daa/das (all inputs)...");
     /* Bits 0-7: AL; Bit 8: EFLAGS.AF; Bit 9: EFLAGS.CF; Bit 10: DAA vs. DAS. */
