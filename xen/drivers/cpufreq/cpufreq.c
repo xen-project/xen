@@ -73,7 +73,7 @@ static int __init setup_cpufreq_option(const char *str)
         arg = strchr(str, '\0');
     choice = parse_bool(str, arg);
 
-    if ( choice < 0 && !strncmp(str, "dom0-kernel", arg - str) )
+    if ( choice < 0 && !cmdline_strcmp(str, "dom0-kernel") )
     {
         xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_dom0_kernel;
@@ -81,14 +81,14 @@ static int __init setup_cpufreq_option(const char *str)
         return 0;
     }
 
-    if ( choice == 0 || !strncmp(str, "none", arg - str) )
+    if ( choice == 0 || !cmdline_strcmp(str, "none") )
     {
         xen_processor_pmbits &= ~XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_none;
         return 0;
     }
 
-    if ( choice > 0 || !strncmp(str, "xen", arg - str) )
+    if ( choice > 0 || !cmdline_strcmp(str, "xen") )
     {
         xen_processor_pmbits |= XEN_PROCESSOR_PM_PX;
         cpufreq_controller = FREQCTL_xen;

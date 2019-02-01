@@ -221,25 +221,51 @@ void __init cmdline_parse(const char *cmdline)
 
 int parse_bool(const char *s, const char *e)
 {
-    unsigned int len;
+    size_t len = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
 
-    len = e ? ({ ASSERT(e >= s); e - s; }) : strlen(s);
-    if ( !len )
-        return -1;
+    switch ( len )
+    {
+    case 1:
+        if ( *s == '1' )
+            return 1;
+        if ( *s == '0' )
+            return 0;
+        break;
 
-    if ( !strncmp("no", s, len) ||
-         !strncmp("off", s, len) ||
-         !strncmp("false", s, len) ||
-         !strncmp("disable", s, len) ||
-         !strncmp("0", s, len) )
-        return 0;
+    case 2:
+        if ( !strncmp("on", s, 2) )
+            return 1;
+        if ( !strncmp("no", s, 2) )
+            return 0;
+        break;
 
-    if ( !strncmp("yes", s, len) ||
-         !strncmp("on", s, len) ||
-         !strncmp("true", s, len) ||
-         !strncmp("enable", s, len) ||
-         !strncmp("1", s, len) )
-        return 1;
+    case 3:
+        if ( !strncmp("yes", s, 3) )
+            return 1;
+        if ( !strncmp("off", s, 3) )
+            return 0;
+        break;
+
+    case 4:
+        if ( !strncmp("true", s, 4) )
+            return 1;
+        break;
+
+    case 5:
+        if ( !strncmp("false", s, 5) )
+            return 0;
+        break;
+
+    case 6:
+        if ( !strncmp("enable", s, 6) )
+            return 1;
+        break;
+
+    case 7:
+        if ( !strncmp("disable", s, 7) )
+            return 0;
+        break;
+    }
 
     return -1;
 }
@@ -269,6 +295,27 @@ int parse_boolean(const char *name, const char *s, const char *e)
 
     /* Unrecognised.  Give up. */
     return -1;
+}
+
+int cmdline_strcmp(const char *frag, const char *name)
+{
+    for ( ; ; frag++, name++ )
+    {
+        unsigned char f = *frag, n = *name;
+        int res = f - n;
+
+        if ( res || n == '\0' )
+        {
+            /*
+             * NUL in 'name' matching a comma, colon or semicolon in 'frag'
+             * implies success.
+             */
+            if ( n == '\0' && (f == ',' || f == ':' || f == ';') )
+                res = 0;
+
+            return res;
+        }
+    }
 }
 
 unsigned int tainted;
