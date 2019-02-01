@@ -200,7 +200,7 @@ struct hvm_function_table {
     void (*deliver_posted_intr)(struct vcpu *v, u8 vector);
     void (*sync_pir_to_irr)(struct vcpu *v);
     bool (*test_pir)(const struct vcpu *v, uint8_t vector);
-    void (*handle_eoi)(u8 vector);
+    void (*handle_eoi)(uint8_t vector, int isr);
 
     /*Walk nested p2m  */
     int (*nhvm_hap_walk_L1_p2m)(struct vcpu *v, paddr_t L2_gpa,
