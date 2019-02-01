@@ -3237,6 +3237,12 @@ static enum hvm_translation_result __hvm_copy(
         if ( res != HVMTRANS_okay )
             return res;
 
+        if ( (flags & HVMCOPY_to_guest) && p2mt == p2m_ioreq_server )
+        {
+            put_page(page);
+            return HVMTRANS_bad_gfn_to_mfn;
+        }
+
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
         if ( flags & HVMCOPY_to_guest )
