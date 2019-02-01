@@ -1981,17 +1981,14 @@ static int vmx_virtual_intr_delivery_enabled(void)
     return cpu_has_vmx_virtual_intr_delivery;
 }
 
-static void vmx_process_isr(int isr, struct vcpu *v)
+static u8 set_svi(int isr)
 {
     unsigned long status;
     u8 old;
-    unsigned int i;
-    const struct vlapic *vlapic = vcpu_vlapic(v);
 
     if ( isr < 0 )
         isr = 0;
 
-    vmx_vmcs_enter(v);
     __vmread(GUEST_INTR_STATUS, &status);
     old = status >> VMX_GUEST_INTR_STATUS_SVI_OFFSET;
     if ( isr != old )
@@ -2000,6 +1997,18 @@ static void vmx_process_isr(int isr, struct vcpu *v)
         status |= isr << VMX_GUEST_INTR_STATUS_SVI_OFFSET;
         __vmwrite(GUEST_INTR_STATUS, status);
     }
+
+    return old;
+}
+
+static void vmx_process_isr(int isr, struct vcpu *v)
+{
+    unsigned int i;
+    const struct vlapic *vlapic = vcpu_vlapic(v);
+
+    vmx_vmcs_enter(v);
+
+    set_svi(isr);
 
     /*
      * Theoretically, only level triggered interrupts can have their
@@ -2151,14 +2160,13 @@ static bool vmx_test_pir(const struct vcpu *v, uint8_t vec)
     return pi_test_pir(vec, &v->arch.hvm_vmx.pi_desc);
 }
 
-static void vmx_handle_eoi(u8 vector)
+static void vmx_handle_eoi(uint8_t vector, int isr)
 {
-    unsigned long status;
+    uint8_t old_svi = set_svi(isr);
+    static bool warned;
 
-    /* We need to clear the SVI field. */
-    __vmread(GUEST_INTR_STATUS, &status);
-    status &= VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
-    __vmwrite(GUEST_INTR_STATUS, status);
+    if ( vector != old_svi && !test_and_set_bool(warned) )
+        printk(XENLOG_WARNING "EOI for %02x but SVI=%02x\n", vector, old_svi);
 }
 
 static void vmx_enable_msr_interception(struct domain *d, uint32_t msr)
