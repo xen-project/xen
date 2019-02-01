@@ -30,6 +30,7 @@ enum instruction_index {
     INSTR_HLT,
     INSTR_INT3,
     INSTR_RDTSC,
+    INSTR_RDTSCP,
     INSTR_PAUSE,
     INSTR_XSETBV,
     INSTR_VMRUN,
