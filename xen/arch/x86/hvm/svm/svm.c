@@ -2760,6 +2760,9 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             {
                 trap_type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
                 inst_len = svm_get_insn_len(v, INSTR_ICEBP);
+
+                if ( !inst_len )
+                    break;
             }
 
             rc = hvm_monitor_debug(regs->rip,
