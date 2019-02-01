@@ -696,7 +696,7 @@ int arch_domain_soft_reset(struct domain *d)
         printk(XENLOG_G_ERR "Failed to get Dom%d's shared_info GFN (%lx)\n",
                d->domain_id, gfn);
         ret = -EINVAL;
-        goto exit_put_page;
+        goto exit_put_gfn;
     }
 
     new_page = alloc_domheap_page(d, 0);
