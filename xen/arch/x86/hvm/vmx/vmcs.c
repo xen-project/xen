@@ -1011,14 +1011,22 @@ static int construct_vmcs(struct vcpu *v)
     v->arch.hvm_vmx.secondary_exec_control = vmx_secondary_exec_control;
 
     /*
-     * Disable descriptor table exiting: It's controlled by the VM event
-     * monitor requesting it.
+     * Disable features which we don't want active by default:
+     *  - Descriptor table exiting only if wanted by introspection
+     *  - x2APIC - default is xAPIC mode
+     *  - VPID settings chosen at VMEntry time
+     *  - VMCS Shadowing only when in nested VMX mode
+     *  - PML only when logdirty is active
+     *  - VMFUNC/#VE only if wanted by altp2m
      */
     v->arch.hvm_vmx.secondary_exec_control &=
-        ~SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING;
-
-    /* Disable VPID for now: we decide when to enable it on VMENTER. */
-    v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_VPID;
+        ~(SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING |
+          SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
+          SECONDARY_EXEC_ENABLE_VPID |
+          SECONDARY_EXEC_ENABLE_VMCS_SHADOWING |
+          SECONDARY_EXEC_ENABLE_PML |
+          SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
+          SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
 
     if ( paging_mode_hap(d) )
     {
@@ -1037,17 +1045,8 @@ static int construct_vmcs(struct vcpu *v)
         vmentry_ctl &= ~VM_ENTRY_LOAD_GUEST_PAT;
     }
 
-    /* Disable Virtualize x2APIC mode by default. */
-    v->arch.hvm_vmx.secondary_exec_control &=
-        ~SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
-
     /* Do not enable Monitor Trap Flag unless start single step debug */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
-
-    /* Disable VMFUNC and #VE for now: they may be enabled later by altp2m. */
-    v->arch.hvm_vmx.secondary_exec_control &=
-        ~(SECONDARY_EXEC_ENABLE_VM_FUNCTIONS |
-          SECONDARY_EXEC_ENABLE_VIRT_EXCEPTIONS);
 
     if ( !has_vlapic(d) )
     {
@@ -1131,9 +1130,6 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(PI_DESC_ADDR, virt_to_maddr(&v->arch.hvm_vmx.pi_desc));
         __vmwrite(POSTED_INTR_NOTIFICATION_VECTOR, posted_intr_vector);
     }
-
-    /* Disable PML anyway here as it will only be enabled in log dirty mode */
-    v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
 
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
