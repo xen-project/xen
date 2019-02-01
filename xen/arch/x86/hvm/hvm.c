@@ -882,12 +882,7 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg)
 {
     const struct domain *d = v->domain;
-    const struct cpuid_policy *p;
-
-    if ( cr0_pg < 0 && !is_hardware_domain(d) )
-        p = d->arch.cpuid;
-    else
-        p = &host_policy;
+    const struct cpuid_policy *p = d->arch.cpuid;
 
     if ( value & ~EFER_KNOWN_MASK )
         return "Unknown bits set";
@@ -928,13 +923,8 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
 unsigned long hvm_cr4_guest_valid_bits(const struct vcpu *v, bool restore)
 {
     const struct domain *d = v->domain;
-    const struct cpuid_policy *p;
+    const struct cpuid_policy *p = d->arch.cpuid;
     bool mce, vmxe;
-
-    if ( !restore && !is_hardware_domain(d) )
-        p = d->arch.cpuid;
-    else
-        p = &host_policy;
 
     /* Logic broken out simply to aid readability below. */
     mce  = p->basic.mce || p->basic.mca;
