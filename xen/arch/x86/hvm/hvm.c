@@ -3165,6 +3165,12 @@ static enum hvm_copy_result __hvm_copy(
             return HVMCOPY_unhandleable;
         }
 
+        if ( (flags & HVMCOPY_to_guest) && p2mt == p2m_ioreq_server )
+        {
+            put_page(page);
+            return HVMCOPY_bad_gfn_to_mfn;
+        }
+
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
         if ( flags & HVMCOPY_to_guest )
