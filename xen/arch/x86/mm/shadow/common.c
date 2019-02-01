@@ -1219,7 +1219,7 @@ const u8 sh_type_to_size[] = {
  * allow for more than ninety allocated pages per vcpu.  We round that
  * up to 128 pages, or half a megabyte per vcpu, and add 1 more vcpu's
  * worth to make sure we never return zero. */
-static unsigned int shadow_min_acceptable_pages(struct domain *d)
+static unsigned int shadow_min_acceptable_pages(const struct domain *d)
 {
     return (d->max_vcpus + 1) * 128;
 }
@@ -1610,6 +1610,15 @@ shadow_free_p2m_page(struct domain *d, struct page_info *pg)
     paging_unlock(d);
 }
 
+static unsigned int sh_min_allocation(const struct domain *d)
+{
+    /*
+     * Don't allocate less than the minimum acceptable, plus one page per
+     * megabyte of RAM (for the p2m table).
+     */
+    return shadow_min_acceptable_pages(d) + (d->tot_pages / 256);
+}
+
 int shadow_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
 {
     struct page_info *sp;
@@ -1625,9 +1634,7 @@ int shadow_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
         else
             pages -= d->arch.paging.shadow.p2m_pages;
 
-        /* Don't allocate less than the minimum acceptable, plus one page per
-         * megabyte of RAM (for the p2m table) */
-        lower_bound = shadow_min_acceptable_pages(d) + (d->tot_pages / 256);
+        lower_bound = sh_min_allocation(d);
         if ( pages < lower_bound )
             pages = lower_bound;
     }
@@ -3243,7 +3250,7 @@ int shadow_enable(struct domain *d, u32 mode)
 
     /* Init the shadow memory allocation if the user hasn't done so */
     old_pages = d->arch.paging.shadow.total_pages;
-    if ( old_pages == 0 )
+    if ( old_pages < sh_min_allocation(d) + d->arch.paging.shadow.p2m_pages )
     {
         paging_lock(d);
         rv = shadow_set_allocation(d, 1024, NULL); /* Use at least 4MB */
