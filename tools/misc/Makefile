@@ -17,7 +17,6 @@ INSTALL_BIN                    += xencov_split
 INSTALL_BIN += $(INSTALL_BIN-y)
 
 # Everything to be installed in regular sbin/
-INSTALL_SBIN                   += xen-bugtool
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN-$(CONFIG_X86)     += xen-hvmcrash
 INSTALL_SBIN-$(CONFIG_X86)     += xen-hvmctx
@@ -41,7 +40,6 @@ INSTALL_PRIVBIN                += xenpvnetboot
 TARGETS_ALL := $(INSTALL_BIN) $(INSTALL_SBIN) $(INSTALL_PRIVBIN)
 
 # Everything which only needs copying to install
-TARGETS_COPY += xen-bugtool
 TARGETS_COPY += xen-ringwatch
 TARGETS_COPY += xencons
 TARGETS_COPY += xencov_split
