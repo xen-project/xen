@@ -296,6 +296,9 @@ static struct x86_emulate_ops emulops = {
     .put_fpu    = emul_test_put_fpu,
 };
 
+#define EFLAGS_ALWAYS_SET (X86_EFLAGS_IF | X86_EFLAGS_MBS)
+#define EFLAGS_MASK (X86_EFLAGS_ARITH_MASK | EFLAGS_ALWAYS_SET)
+
 int main(int argc, char **argv)
 {
     struct x86_emulate_ctxt ctxt;
