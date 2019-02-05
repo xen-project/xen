@@ -626,9 +626,12 @@ static void __init gicv3_dist_init(void)
         writel_relaxed(priority, GICD + GICD_IPRIORITYR + (i / 4) * 4);
     }
 
-    /* Disable all global interrupts */
+    /* Disable/deactivate all global interrupts */
     for ( i = NR_GIC_LOCAL_IRQS; i < nr_lines; i += 32 )
+    {
         writel_relaxed(0xffffffff, GICD + GICD_ICENABLER + (i / 32) * 4);
+        writel_relaxed(0xffffffff, GICD + GICD_ICACTIVER + (i / 32) * 4);
+    }
 
     /*
      * Configure SPIs as non-secure Group-1. This will only matter
@@ -834,6 +837,11 @@ static int gicv3_cpu_init(void)
         writel_relaxed(priority,
                 GICD_RDIST_SGI_BASE + GICR_IPRIORITYR0 + (i / 4) * 4);
 
+    /*
+     * The activate state is unknown at boot, so make sure all
+     * SGIs and PPIs are de-activated.
+     */
+    writel_relaxed(0xffffffff, GICD_RDIST_SGI_BASE + GICR_ICACTIVER0);
     /*
      * Disable all PPI interrupts, ensure all SGI interrupts are
      * enabled.
