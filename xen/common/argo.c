@@ -19,6 +19,15 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 
+/* Change this to #define ARGO_DEBUG here to enable more debug messages */
+#undef ARGO_DEBUG
+
+#ifdef ARGO_DEBUG
+#define argo_dprintk(format, args...) printk("argo: " format, ## args )
+#else
+#define argo_dprintk(format, ... ) ((void)0)
+#endif
+
 long
 do_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
            XEN_GUEST_HANDLE_PARAM(void) arg2, unsigned long raw_arg3,
