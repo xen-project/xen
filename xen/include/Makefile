@@ -5,6 +5,7 @@ ifneq ($(CONFIG_COMPAT),)
 compat-arch-$(CONFIG_X86) := x86_32
 
 headers-y := \
+    compat/argo.h \
     compat/callback.h \
     compat/elfnote.h \
     compat/event_channel.h \

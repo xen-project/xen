@@ -32,6 +32,7 @@
 #include <xen/grant_table.h>
 #include <xen/xenoprof.h>
 #include <xen/irq.h>
+#include <xen/argo.h>
 #include <asm/debugger.h>
 #include <asm/p2m.h>
 #include <asm/processor.h>
@@ -277,6 +278,8 @@ static void _domain_destroy(struct domain *d)
 
     xfree(d->pbuf);
 
+    argo_destroy(d);
+
     rangeset_domain_destroy(d);
 
     free_cpumask_var(d->dirty_cpumask);
@@ -444,6 +447,9 @@ struct domain *domain_create(domid_t domid,
                                      config->max_maptrack_frames)) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
+
+        if ( (err = argo_init(d)) != 0 )
+            goto fail;
 
         err = -ENOMEM;
 
@@ -717,6 +723,7 @@ int domain_kill(struct domain *d)
         if ( d->is_dying != DOMDYING_alive )
             return domain_kill(d);
         d->is_dying = DOMDYING_dying;
+        argo_destroy(d);
         evtchn_destroy(d);
         gnttab_release_mappings(d);
         tmem_destroy(d->tmem_client);
@@ -1174,6 +1181,8 @@ int domain_soft_reset(struct domain *d)
         return rc;
 
     grant_table_warn_active_grants(d);
+
+    argo_soft_reset(d);
 
     for_each_vcpu ( d, v )
     {

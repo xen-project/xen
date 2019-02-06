@@ -182,6 +182,19 @@ Permit Xen to use "Always Running APIC Timer" support on compatible hardware
 in combination with cpuidle.  This option is only expected to be useful for
 developers wishing Xen to fall back to older timing methods on newer hardware.
 
+### argo
+    = List of [ <bool> ]
+
+Controls for the Argo hypervisor-mediated interdomain communication service.
+
+The functionality that this option controls is only available when Xen has been
+compiled with the build setting for Argo enabled in the build configuration.
+
+Argo is a interdomain communication mechanism, where Xen acts as the central
+point of authority.  Guests may register memory rings to recieve messages,
+query the status of other domains, and send messages by hypercall, all subject
+to appropriate auditing by Xen.  Argo is disabled by default.
+
 ### asid (x86)
 > `= <boolean>`
 
