@@ -107,6 +107,42 @@ typedef struct xen_argo_unregister_ring
 /* Messages on the ring are padded to a multiple of this size. */
 #define XEN_ARGO_MSG_SLOT_SIZE 0x10
 
+/*
+ * Notify flags
+ */
+/* Ring exists */
+#define XEN_ARGO_RING_EXISTS            (1U << 0)
+/* Ring is shared, not unicast */
+#define XEN_ARGO_RING_SHARED            (1U << 1)
+/* Ring is empty */
+#define XEN_ARGO_RING_EMPTY             (1U << 2)
+/* Sufficient space to queue space_required bytes might exist */
+#define XEN_ARGO_RING_SUFFICIENT        (1U << 3)
+/* Insufficient ring size for space_required bytes */
+#define XEN_ARGO_RING_EMSGSIZE          (1U << 4)
+/* Too many domains waiting for available space signals for this ring */
+#define XEN_ARGO_RING_EBUSY             (1U << 5)
+
+typedef struct xen_argo_ring_data_ent
+{
+    struct xen_argo_addr ring;
+    uint16_t flags;
+    uint16_t pad;
+    uint32_t space_required;
+    uint32_t max_message_size;
+} xen_argo_ring_data_ent_t;
+
+typedef struct xen_argo_ring_data
+{
+    uint32_t nent;
+    uint32_t pad;
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+    struct xen_argo_ring_data_ent data[];
+#elif defined(__GNUC__)
+    struct xen_argo_ring_data_ent data[0];
+#endif
+} xen_argo_ring_data_t;
+
 struct xen_argo_ring_message_header
 {
     uint32_t len;
@@ -196,5 +232,36 @@ struct xen_argo_ring_message_header
  * arg4: unsigned long message type (32-bit value)
  */
 #define XEN_ARGO_OP_sendv               3
+
+/*
+ * XEN_ARGO_OP_notify
+ *
+ * Asks Xen for information about other rings in the system.
+ *
+ * ent->ring is the xen_argo_addr_t of the ring you want information on.
+ * Uses the same ring matching rules as XEN_ARGO_OP_sendv.
+ *
+ * ent->space_required : if this field is not null then Xen will check
+ * that there is space in the destination ring for this many bytes of payload.
+ * If the ring is too small for the requested space_required, it will set the
+ * XEN_ARGO_RING_EMSGSIZE flag on return.
+ * If sufficient space is available, it will set XEN_ARGO_RING_SUFFICIENT
+ * and CANCEL any pending notification for that ent->ring; otherwise it
+ * will schedule a notification event and the flag will not be set.
+ *
+ * These flags are set by Xen when notify replies:
+ * XEN_ARGO_RING_EXISTS     ring exists
+ * XEN_ARGO_RING_SHARED     ring is registered for wildcard partner
+ * XEN_ARGO_RING_EMPTY      ring is empty
+ * XEN_ARGO_RING_SUFFICIENT sufficient space for space_required is there
+ * XEN_ARGO_RING_EMSGSIZE   space_required is too large for the ring size
+ * XEN_ARGO_RING_EBUSY      too many domains waiting for available space signals
+ *
+ * arg1: XEN_GUEST_HANDLE(xen_argo_ring_data_t) ring_data (may be NULL)
+ * arg2: NULL
+ * arg3: 0 (ZERO)
+ * arg4: 0 (ZERO)
+ */
+#define XEN_ARGO_OP_notify              4
 
 #endif

@@ -34,6 +34,8 @@
 !	argo_iov			argo.h
 ?	argo_register_ring		argo.h
 ?	argo_ring			argo.h
+?	argo_ring_data			argo.h
+?	argo_ring_data_ent		argo.h
 ?	argo_ring_message_header	argo.h
 ?	argo_send_addr			argo.h
 ?	argo_unregister_ring		argo.h

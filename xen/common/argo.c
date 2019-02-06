@@ -36,12 +36,17 @@ CHECK_argo_addr;
 #define CHECK_argo_addr struct xen_argo_addr
 CHECK_argo_register_ring;
 CHECK_argo_ring;
+CHECK_argo_ring_data_ent;
+#undef CHECK_argo_ring_data_ent
+#define CHECK_argo_ring_data_ent struct xen_argo_ring_data_ent
+CHECK_argo_ring_data;
 CHECK_argo_ring_message_header;
 CHECK_argo_unregister_ring;
 CHECK_argo_send_addr;
 #endif
 
 #define MAX_RINGS_PER_DOMAIN            128U
+#define MAX_NOTIFY_COUNT                256U
 #define MAX_PENDING_PER_RING             32U
 
 /* All messages on the ring are padded to a multiple of the slot size. */
@@ -61,6 +66,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_argo_gfn_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_iov_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_register_ring_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_ring_t);
+DEFINE_XEN_GUEST_HANDLE(xen_argo_ring_data_t);
+DEFINE_XEN_GUEST_HANDLE(xen_argo_ring_data_ent_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_send_addr_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_unregister_ring_t);
 #ifdef CONFIG_COMPAT
@@ -434,6 +441,18 @@ signal_domain(struct domain *d)
 }
 
 static void
+signal_domid(domid_t domain_id)
+{
+    struct domain *d = get_domain_by_id(domain_id);
+
+    if ( !d )
+        return;
+
+    signal_domain(d);
+    put_domain(d);
+}
+
+static void
 ring_unmap(const struct domain *d, struct argo_ring_info *ring_info)
 {
     unsigned int i;
@@ -631,6 +650,66 @@ get_sanitized_ring(const struct domain *d, xen_argo_ring_t *ring,
     ring->rx_ptr = rx_ptr;
 
     return 0;
+}
+
+static unsigned int
+ringbuf_payload_space(const struct domain *d, struct argo_ring_info *ring_info)
+{
+    xen_argo_ring_t ring;
+    unsigned int len;
+    int ret;
+
+    ASSERT(LOCKING_L3(d, ring_info));
+
+    len = ring_info->len;
+    if ( !len )
+        return 0;
+
+    if ( get_sanitized_ring(d, &ring, ring_info) )
+        return 0;
+
+    argo_dprintk("sanitized ringbuf_payload_space: tx_ptr=%u rx_ptr=%u\n",
+                 ring.tx_ptr, ring.rx_ptr);
+
+    /*
+     * rx_ptr == tx_ptr means that the ring has been emptied.
+     * See message size checking logic in the entry to ringbuf_insert which
+     * ensures that there is always one message slot of size ROUNDUP_MESSAGE(1)
+     * left available, preventing a ring from being entirely filled.
+     * This ensures that matching ring indexes always indicate an empty ring
+     * and never a full one.
+     */
+    ret = ring.rx_ptr - ring.tx_ptr;
+    if ( ret <= 0 )
+        ret += len;
+
+    /*
+     * In a sanitized ring, we can rely on:
+     *              (rx_ptr < ring_info->len)           &&
+     *              (tx_ptr < ring_info->len)           &&
+     *      (ring_info->len <= XEN_ARGO_MAX_RING_SIZE)
+     *
+     * and since: XEN_ARGO_MAX_RING_SIZE < INT32_MAX
+     * therefore right here: ret < INT32_MAX
+     * and we are safe to return it as a unsigned value from this function.
+     * The subtractions below cannot increase its value.
+     */
+
+    /*
+     * The maximum size payload for a message that will be accepted is:
+     * (the available space between the ring indexes)
+     *    minus (space for a message header)
+     *    minus (space for one message slot)
+     * since ringbuf_insert requires that one message slot be left
+     * unfilled, to avoid filling the ring to capacity and confusing a full
+     * ring with an empty one.
+     * Since the ring indexes are sanitized, the value in ret is aligned, so
+     * the simple subtraction here works to return the aligned value needed:
+     */
+    ret -= sizeof(struct xen_argo_ring_message_header);
+    ret -= ROUNDUP_MESSAGE(1);
+
+    return (ret < 0) ? 0 : ret;
 }
 
 /*
@@ -966,6 +1045,64 @@ pending_remove_all(const struct domain *d, struct argo_ring_info *ring_info)
     ring_info->npending = 0;
 }
 
+static void
+pending_notify(struct list_head *to_notify)
+{
+    struct pending_ent *ent;
+
+    ASSERT(LOCKING_Read_L1);
+
+    /* Sending signals for all ents in this list, draining until it is empty. */
+    while ( (ent = list_first_entry_or_null(to_notify, struct pending_ent,
+                                            node)) )
+    {
+        list_del(&ent->node);
+        signal_domid(ent->domain_id);
+        xfree(ent);
+    }
+}
+
+static void
+pending_find(const struct domain *d, struct argo_ring_info *ring_info,
+             unsigned int payload_space, struct list_head *to_notify)
+{
+    struct pending_ent *ent, *next;
+
+    ASSERT(LOCKING_Read_rings_L2(d));
+
+    /*
+     * TODO: Current policy here is to signal _all_ of the waiting domains
+     *       interested in sending a message of size less than payload_space.
+     *
+     * This is likely to be suboptimal, since once one of them has added
+     * their message to the ring, there may well be insufficient room
+     * available for any of the others to transmit, meaning that they were
+     * woken in vain, which created extra work just to requeue their wait.
+     *
+     * Retain this simple policy for now since it at least avoids starving a
+     * domain of available space notifications because of a policy that only
+     * notified other domains instead. Improvement may be possible;
+     * investigation required.
+     */
+    spin_lock(&ring_info->L3_lock);
+
+    /* Remove matching ents from the ring list, and add them to "to_notify" */
+    list_for_each_entry_safe(ent, next, &ring_info->pending, node)
+    {
+        if ( payload_space >= ent->len )
+        {
+            if ( ring_info->id.partner_id == XEN_ARGO_DOMID_ANY )
+                wildcard_pending_list_remove(ent->domain_id, ent);
+
+            list_del(&ent->node);
+            ring_info->npending--;
+            list_add(&ent->node, to_notify);
+        }
+    }
+
+    spin_unlock(&ring_info->L3_lock);
+}
+
 static int
 pending_queue(const struct domain *d, struct argo_ring_info *ring_info,
               domid_t src_id, unsigned int len)
@@ -1024,6 +1161,29 @@ pending_requeue(const struct domain *d, struct argo_ring_info *ring_info,
     }
 
     return pending_queue(d, ring_info, src_id, len);
+}
+
+static void
+pending_cancel(const struct domain *d, struct argo_ring_info *ring_info,
+               domid_t src_id)
+{
+    struct pending_ent *ent, *next;
+
+    ASSERT(LOCKING_L3(d, ring_info));
+
+    /* Remove all ents where domain_id matches src_id from the ring's list. */
+    list_for_each_entry_safe(ent, next, &ring_info->pending, node)
+    {
+        if ( ent->domain_id == src_id )
+        {
+            /* For wildcard rings, remove each from their wildcard list too. */
+            if ( ring_info->id.partner_id == XEN_ARGO_DOMID_ANY )
+                wildcard_pending_list_remove(ent->domain_id, ent);
+            list_del(&ent->node);
+            xfree(ent);
+            ring_info->npending--;
+        }
+    }
 }
 
 static void
@@ -1155,6 +1315,99 @@ partner_rings_remove(struct domain *src_d)
             xfree(send_info);
         }
     }
+}
+
+static int
+fill_ring_data(const struct domain *currd,
+               XEN_GUEST_HANDLE(xen_argo_ring_data_ent_t) data_ent_hnd)
+{
+    xen_argo_ring_data_ent_t ent;
+    struct domain *dst_d;
+    struct argo_ring_info *ring_info;
+    int ret = 0;
+
+    ASSERT(currd == current->domain);
+    ASSERT(LOCKING_Read_L1);
+
+    if ( __copy_from_guest(&ent, data_ent_hnd, 1) )
+        return -EFAULT;
+
+    argo_dprintk("fill_ring_data: ent.ring.domain=%u,ent.ring.aport=%x\n",
+                 ent.ring.domain_id, ent.ring.aport);
+
+    ent.flags = 0;
+
+    dst_d = get_domain_by_id(ent.ring.domain_id);
+    if ( !dst_d || !dst_d->argo )
+        goto out;
+
+    read_lock(&dst_d->argo->rings_L2_rwlock);
+
+    ring_info = find_ring_info_by_match(dst_d, ent.ring.aport,
+                                        currd->domain_id);
+    if ( ring_info )
+    {
+        unsigned int space_avail;
+
+        ent.flags |= XEN_ARGO_RING_EXISTS;
+
+        spin_lock(&ring_info->L3_lock);
+
+        ent.max_message_size = ring_info->len -
+                                   sizeof(struct xen_argo_ring_message_header) -
+                                   ROUNDUP_MESSAGE(1);
+
+        if ( ring_info->id.partner_id == XEN_ARGO_DOMID_ANY )
+            ent.flags |= XEN_ARGO_RING_SHARED;
+
+        space_avail = ringbuf_payload_space(dst_d, ring_info);
+
+        argo_dprintk("fill_ring_data: aport=%x space_avail=%u"
+                     " space_wanted=%u\n",
+                     ring_info->id.aport, space_avail, ent.space_required);
+
+        /* Do not queue a notification for an unachievable size */
+        if ( ent.space_required > ent.max_message_size )
+            ent.flags |= XEN_ARGO_RING_EMSGSIZE;
+        else if ( space_avail >= ent.space_required )
+        {
+            pending_cancel(dst_d, ring_info, currd->domain_id);
+            ent.flags |= XEN_ARGO_RING_SUFFICIENT;
+        }
+        else
+        {
+            ret = pending_requeue(dst_d, ring_info, currd->domain_id,
+                                  ent.space_required);
+            if ( ret == -EBUSY )
+            {
+                /*
+                 * Too many other domains are already awaiting notification
+                 * about available space on this ring. Indicate this state via
+                 * flag. No need to return an error to the caller; allow the
+                 * processing of queries about other rings to continue.
+                 */
+                ent.flags |= XEN_ARGO_RING_EBUSY;
+                ret = 0;
+            }
+        }
+
+        spin_unlock(&ring_info->L3_lock);
+
+        if ( space_avail == ent.max_message_size )
+            ent.flags |= XEN_ARGO_RING_EMPTY;
+
+    }
+    read_unlock(&dst_d->argo->rings_L2_rwlock);
+
+ out:
+    if ( dst_d )
+        put_domain(dst_d);
+
+    if ( !ret && (__copy_field_to_guest(data_ent_hnd, &ent, flags) ||
+                  __copy_field_to_guest(data_ent_hnd, &ent, max_message_size)) )
+        return -EFAULT;
+
+    return ret;
 }
 
 static int
@@ -1593,6 +1846,109 @@ register_ring(struct domain *currd,
     return ret;
 }
 
+static void
+notify_ring(const struct domain *d, struct argo_ring_info *ring_info,
+            struct list_head *to_notify)
+{
+    unsigned int space;
+
+    ASSERT(LOCKING_Read_rings_L2(d));
+
+    spin_lock(&ring_info->L3_lock);
+
+    if ( ring_info->len )
+        space = ringbuf_payload_space(d, ring_info);
+    else
+        space = 0;
+
+    spin_unlock(&ring_info->L3_lock);
+
+    if ( space )
+        pending_find(d, ring_info, space, to_notify);
+}
+
+static void
+notify_check_pending(struct domain *d)
+{
+    unsigned int i;
+    LIST_HEAD(to_notify);
+
+    ASSERT(LOCKING_Read_L1);
+
+    read_lock(&d->argo->rings_L2_rwlock);
+
+    /* Walk all rings, call notify_ring on each to populate to_notify list */
+    for ( i = 0; i < ARGO_HASHTABLE_SIZE; i++ )
+    {
+        struct argo_ring_info *ring_info, *next;
+        struct list_head *bucket = &d->argo->ring_hash[i];
+
+        list_for_each_entry_safe(ring_info, next, bucket, node)
+            notify_ring(d, ring_info, &to_notify);
+    }
+
+    read_unlock(&d->argo->rings_L2_rwlock);
+
+    if ( !list_empty(&to_notify) )
+        pending_notify(&to_notify);
+}
+
+static long
+notify(struct domain *currd,
+       XEN_GUEST_HANDLE_PARAM(xen_argo_ring_data_t) ring_data_hnd)
+{
+    XEN_GUEST_HANDLE(xen_argo_ring_data_ent_t) ent_hnd;
+    xen_argo_ring_data_t ring_data;
+    int ret = 0;
+
+    ASSERT(currd == current->domain);
+
+    read_lock(&L1_global_argo_rwlock);
+
+    if ( !currd->argo )
+    {
+        argo_dprintk("!d->argo, ENODEV\n");
+        ret = -ENODEV;
+        goto out;
+    }
+
+    notify_check_pending(currd);
+
+    if ( guest_handle_is_null(ring_data_hnd) )
+        goto out;
+
+    ret = copy_from_guest(&ring_data, ring_data_hnd, 1) ? -EFAULT : 0;
+    if ( ret )
+        goto out;
+
+    if ( ring_data.nent > MAX_NOTIFY_COUNT )
+    {
+        gprintk(XENLOG_ERR, "argo: notify entry count(%u) exceeds max(%u)\n",
+                ring_data.nent, MAX_NOTIFY_COUNT);
+        ret = -EACCES;
+        goto out;
+    }
+
+    ent_hnd = guest_handle_for_field(ring_data_hnd,
+                                     xen_argo_ring_data_ent_t, data[0]);
+    if ( unlikely(!guest_handle_okay(ent_hnd, ring_data.nent)) )
+    {
+        ret = -EFAULT;
+        goto out;
+    }
+
+    while ( !ret && ring_data.nent-- )
+    {
+        ret = fill_ring_data(currd, ent_hnd);
+        guest_handle_add_offset(ent_hnd, 1);
+    }
+
+ out:
+    read_unlock(&L1_global_argo_rwlock);
+
+    return ret;
+}
+
 static long
 sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
       const xen_argo_addr_t *dst_addr, xen_argo_iov_t *iovs, unsigned int niov,
@@ -1790,6 +2146,21 @@ do_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
         }
 
         rc = sendv(currd, &send_addr.src, &send_addr.dst, iovs, niov, arg4);
+        break;
+    }
+
+    case XEN_ARGO_OP_notify:
+    {
+        XEN_GUEST_HANDLE_PARAM(xen_argo_ring_data_t) ring_data_hnd =
+                   guest_handle_cast(arg1, xen_argo_ring_data_t);
+
+        if ( unlikely((!guest_handle_is_null(arg2)) || arg3 || arg4) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        rc = notify(currd, ring_data_hnd);
         break;
     }
 
