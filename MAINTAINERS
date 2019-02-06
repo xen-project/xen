@@ -158,6 +158,13 @@ S:	Supported
 F:	xen/arch/x86/hvm/svm/
 F:	xen/arch/x86/cpu/vpmu_amd.c
 
+ARGO
+M:	Christopher Clark <christopher.w.clark@gmail.com>
+S:	Maintained
+F:	xen/include/public/argo.h
+F:	xen/include/xen/argo.h
+F:	xen/common/argo.c
+
 ARINC653 SCHEDULER
 M:	Josh Whitehead <josh.whitehead@dornerworks.com>
 M:	Robert VanVossen <robert.vanvossen@dornerworks.com>
