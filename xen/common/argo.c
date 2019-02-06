@@ -37,6 +37,7 @@ CHECK_argo_addr;
 CHECK_argo_register_ring;
 CHECK_argo_ring;
 CHECK_argo_ring_message_header;
+CHECK_argo_unregister_ring;
 #endif
 
 #define MAX_RINGS_PER_DOMAIN            128U
@@ -53,6 +54,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_argo_addr_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_gfn_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_register_ring_t);
 DEFINE_XEN_GUEST_HANDLE(xen_argo_ring_t);
+DEFINE_XEN_GUEST_HANDLE(xen_argo_unregister_ring_t);
 
 static bool __read_mostly opt_argo;
 static bool __read_mostly opt_argo_mac_permissive;
@@ -355,6 +357,36 @@ find_ring_info(const struct domain *d, const struct argo_ring_id *id)
         }
     }
     argo_dprintk("no ring_info for ring(%u:%x %u)\n",
+                 id->domain_id, id->aport, id->partner_id);
+
+    return NULL;
+}
+
+static struct argo_send_info *
+find_send_info(const struct domain *d, const struct argo_ring_id *id)
+{
+    struct argo_send_info *send_info;
+    const struct list_head *bucket;
+
+    ASSERT(LOCKING_send_L2(d));
+
+    /* List is not modified here. Search and return the match if found. */
+    bucket = &d->argo->send_hash[hash_index(id)];
+
+    list_for_each_entry(send_info, bucket, node)
+    {
+        const struct argo_ring_id *cmpid = &send_info->id;
+
+        if ( cmpid->aport == id->aport &&
+             cmpid->domain_id == id->domain_id &&
+             cmpid->partner_id == id->partner_id )
+        {
+            argo_dprintk("found send_info for ring(%u:%x %u)\n",
+                         id->domain_id, id->aport, id->partner_id);
+            return send_info;
+        }
+    }
+    argo_dprintk("no send_info for ring(%u:%x %u)\n",
                  id->domain_id, id->aport, id->partner_id);
 
     return NULL;
@@ -738,6 +770,85 @@ find_ring_mfns(struct domain *d, struct argo_ring_info *ring_info,
 }
 
 static long
+unregister_ring(struct domain *currd,
+                XEN_GUEST_HANDLE_PARAM(xen_argo_unregister_ring_t) unreg_hnd)
+{
+    xen_argo_unregister_ring_t unreg;
+    struct argo_ring_id ring_id;
+    struct argo_ring_info *ring_info = NULL;
+    struct argo_send_info *send_info = NULL;
+    struct domain *dst_d = NULL;
+
+    ASSERT(currd == current->domain);
+
+    if ( copy_from_guest(&unreg, unreg_hnd, 1) )
+        return -EFAULT;
+
+    if ( unreg.pad )
+        return -EINVAL;
+
+    ring_id.partner_id = unreg.partner_id;
+    ring_id.aport = unreg.aport;
+    ring_id.domain_id = currd->domain_id;
+
+    read_lock(&L1_global_argo_rwlock);
+
+    if ( unlikely(!currd->argo) )
+    {
+        read_unlock(&L1_global_argo_rwlock);
+        return -ENODEV;
+    }
+
+    write_lock(&currd->argo->rings_L2_rwlock);
+
+    ring_info = find_ring_info(currd, &ring_id);
+    if ( !ring_info )
+        goto out;
+
+    ring_remove_info(currd, ring_info);
+    currd->argo->ring_count--;
+
+    if ( ring_id.partner_id == XEN_ARGO_DOMID_ANY )
+        goto out;
+
+    dst_d = get_domain_by_id(ring_id.partner_id);
+    if ( !dst_d || !dst_d->argo )
+    {
+        ASSERT_UNREACHABLE();
+        goto out;
+    }
+
+    spin_lock(&dst_d->argo->send_L2_lock);
+
+    send_info = find_send_info(dst_d, &ring_id);
+    if ( send_info )
+        list_del(&send_info->node);
+    else
+        ASSERT_UNREACHABLE();
+
+    spin_unlock(&dst_d->argo->send_L2_lock);
+
+ out:
+    write_unlock(&currd->argo->rings_L2_rwlock);
+
+    read_unlock(&L1_global_argo_rwlock);
+
+    if ( dst_d )
+        put_domain(dst_d);
+
+    xfree(send_info);
+
+    if ( !ring_info )
+    {
+        argo_dprintk("unregister_ring: no ring_info found for ring(%u:%x %u)\n",
+                     ring_id.domain_id, ring_id.aport, ring_id.partner_id);
+        return -ENOENT;
+    }
+
+    return 0;
+}
+
+static long
 register_ring(struct domain *currd,
               XEN_GUEST_HANDLE_PARAM(xen_argo_register_ring_t) reg_hnd,
               XEN_GUEST_HANDLE_PARAM(xen_argo_gfn_t) gfn_hnd,
@@ -1026,6 +1137,21 @@ do_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
         }
 
         rc = register_ring(currd, reg_hnd, gfn_hnd, arg3, arg4);
+        break;
+    }
+
+    case XEN_ARGO_OP_unregister_ring:
+    {
+        XEN_GUEST_HANDLE_PARAM(xen_argo_unregister_ring_t) unreg_hnd =
+            guest_handle_cast(arg1, xen_argo_unregister_ring_t);
+
+        if ( unlikely((!guest_handle_is_null(arg2)) || arg3 || arg4) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        rc = unregister_ring(currd, unreg_hnd);
         break;
     }
 

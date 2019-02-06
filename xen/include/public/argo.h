@@ -75,6 +75,13 @@ typedef struct xen_argo_register_ring
     uint32_t len;
 } xen_argo_register_ring_t;
 
+typedef struct xen_argo_unregister_ring
+{
+    xen_argo_port_t aport;
+    domid_t partner_id;
+    uint16_t pad;
+} xen_argo_unregister_ring_t;
+
 /* Messages on the ring are padded to a multiple of this size. */
 #define XEN_ARGO_MSG_SLOT_SIZE 0x10
 
@@ -129,5 +136,17 @@ struct xen_argo_ring_message_header
 /* Mask for all defined flags. */
 #define XEN_ARGO_REGISTER_FLAG_MASK XEN_ARGO_REGISTER_FLAG_FAIL_EXIST
 #endif
+
+/*
+ * XEN_ARGO_OP_unregister_ring
+ *
+ * Unregister a previously-registered ring, ending communication.
+ *
+ * arg1: XEN_GUEST_HANDLE(xen_argo_unregister_ring_t)
+ * arg2: NULL
+ * arg3: 0 (ZERO)
+ * arg4: 0 (ZERO)
+ */
+#define XEN_ARGO_OP_unregister_ring     2
 
 #endif
