@@ -535,6 +535,9 @@ class version
 # Class argo is used to describe the Argo interdomain communication system.
 class argo
 {
+    # Enable initialization of a domain's argo subsystem and
+    # permission to access the argo hypercall operations.
+    enable
     # Domain requesting registration of a communication ring
     # to receive messages from a specific other domain.
     register_single_source

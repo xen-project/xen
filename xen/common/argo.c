@@ -2078,6 +2078,10 @@ do_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
     if ( unlikely(!opt_argo) )
         return -EOPNOTSUPP;
 
+    rc = xsm_argo_enable(currd);
+    if ( rc )
+        return rc;
+
     switch ( cmd )
     {
     case XEN_ARGO_OP_register_ring:
@@ -2216,6 +2220,10 @@ compat_argo_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg1,
     if ( unlikely(!opt_argo) )
         return -EOPNOTSUPP;
 
+    rc = xsm_argo_enable(currd);
+    if ( rc )
+        return rc;
+
     argo_dprintk("->compat_argo_op(%u,%p,%p,%lu,0x%lx)\n", cmd,
                  (void *)arg1.p, (void *)arg2.p, arg3, arg4);
 
@@ -2277,7 +2285,7 @@ argo_init(struct domain *d)
 {
     struct argo_domain *argo;
 
-    if ( !opt_argo )
+    if ( !opt_argo || xsm_argo_enable(d) )
     {
         argo_dprintk("argo disabled, domid: %u\n", d->domain_id);
         return 0;
@@ -2334,9 +2342,9 @@ argo_soft_reset(struct domain *d)
         wildcard_rings_pending_remove(d);
 
         /*
-         * Since opt_argo cannot change at runtime, if d->argo is true then
-         * opt_argo must be true, and we can assume that init is allowed to
-         * proceed again here.
+         * Since neither opt_argo or xsm_argo_enable(d) can change at runtime,
+         * if d->argo is true then both opt_argo and xsm_argo_enable(d) must be
+         * true, and we can assume that init is allowed to proceed again here.
          */
         argo_domain_init(d->argo);
     }
