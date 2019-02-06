@@ -1,0 +1,448 @@
+# Argo
+
+## Introduction
+
+Argo is an interdomain communication mechanism. It provides Xen hypervisor
+primitives to transmit data between VMs, by performing data copies into
+receive memory rings registered by domains. It does not require memory
+sharing between VMs and does not use the grant tables or Xenstore.
+
+Argo has requirements for performance isolation between domains, to prevent
+negative performance impact from malicious or disruptive activity of other
+domains, or even other VCPUs of the same domain operating other rings.
+
+## Hypervisor-Mediated data eXchange (HMX)
+
+This term references inter-VM communication protocols that have this
+key architectural point: The hypervisor is responsible for performing the
+write of data into the guest-accessible memory buffer, in the manner
+according to the agreed transfer protocol. This structure ensures that
+there is strength to the transport mechanism, because the transmitting side
+of the communication is the hypervisor, which can be trusted by the receiver,
+and the buffer is isolated from access by any other potential sources
+outside the receiver.
+
+The receiver can trust that the hypervisor will:
+
+- Provide a protocol implementation adhering to hardware synchronization
+requirements for concurrent access to system memory by communicating
+components
+- Deliver data only from an approved source, enforcing policy for Mandatory
+Access Control.
+- Indicate the correct sender of the data.
+- Transmit only the intended data, adhering to the access protocol of the data
+structure in the buffer. If the memory region is being used as a ring, then:
+    - Data writes will only occur within the ring region that is indicated as
+    available for incoming data by the ring indexes.
+    - The indicated length of data written will exactly match the length of
+    data actually written.
+    - The write for each piece of data will occur only once.
+    - Data will be written sequentially in the order that it is sent.
+- Issue notification of data delivered correctly.
+
+This structure allows for augmentation by the hypervisor to identify the
+sending entity within the source VM, and then provide the receiver with
+assured context information about the data source. This enables the receiver
+to make decisions based on fine-grained knowledge of the source of the data.
+
+This structure is also of strong interest for nested virtualization:
+transport via the hypervisor can enable construction of efficient
+communications between VMs at different levels of nesting.
+
+# Locking
+
+Since Argo operates a data path between domains, sections of this code are
+*hot* when the communication paths are in use. To encourage high performance, a
+goal is to limit mutual exclusion to only where required and enable significant
+concurrency.
+
+Avoidance of deadlock is essential and since state must frequently be updated
+that pertains to more than one domain, a locking protocol defines which locks
+are needed and the order of their acquistion.
+
+## Structure
+
+The granular locking structure of Argo enables:
+
+1. Performance isolation of guests
+2. Avoidance of DoS of rings by domains that are not authorized to send to them
+3. Deadlock-free teardown of state across multiple domains on domain destroy
+4. Performance of guests using Argo with concurrent operation of rings.
+
+Argo uses three per-domain locks to protect three separate data structures.
+Access to the ring_hash data structure is confined to domains that a
+ring-registering domain has authorized to send data via the ring.  The complete
+set of Argo locks is:
+
+* Global : `L1_global_argo_rwlock`
+* Per-domain: `rings_L2_rwlock`
+* Per-domain: `send_L2_lock`
+* Per-domain: `wildcard_L2_lock`
+* Per-ring: `L3_lock`
+
+## Protected State
+
+The data structures being protected by the locks are all per-domain. The only
+global Argo state is the `L1_global_argo_rwlock` used to coordinate access to
+data structures of other domains.
+
+### State: Rings registered and owned by a domain
+
+This includes the state to run that ring, such as memory frame numbers and
+established mappings. Per-ring state is protected by its own lock, so that
+multiple VCPUs of the same domain operating different rings do not inhibit the
+performance of each other.
+
+The per-domain ring state also includes the list of pending notifications for
+other domains that are waiting for ring space availability.
+
+### State: Partner rings for which this domain is the single allowed sender
+
+This state belonging to the permitted sender is written to when a ring is
+registered by another domain. The lock that protects this state is subject to
+locking at arbitrary frequency by those foreign domains when registering rings
+-- which do not need any permission granted by this domain in order to register
+a ring to communicate with it --  so it must not inhibit the domain's own
+ability to use its own rings, to protect them from DoS. For this reason, this
+state is protected by its own lock.
+
+### State: Pending notifications for wildcard rings registered by other domains
+
+This data structure is needed when a domain is destroyed, to cancel the
+outstanding space availability notifications about the wildcard rings of other
+domains that this domain has queried.
+
+Data is entered into this data structure by the domain that owns it, either by
+a space-inhibited sendv or a notify operation.
+
+Data is removed from this data structure in one of three cases: when space
+becomes available in the destination ring and the notification is sent, when
+the ring is torn down, or when the awaiting domain is destroyed.
+
+In the case where a notification is sent, access to the data structure is
+triggered by the ring owner domain, rather than the domain waiting for
+notification. This data structure is protected by its own lock since doing so
+entails less contention than the alternative of reusing an existing lock owned
+by the domain.
+
+## Hierarchical Locking Model and Protocol
+
+The locking discipline within the Argo code is heirarchical and utilizes
+reader/writer locks to enable increased concurrency when operations do not
+conflict. None of the Argo locks are reentrant.
+
+The hierarchy:
+
+* There is a global rwlock (`L1`) to protect access to all of the per-domain
+argo data structures.
+* There is a rwlock per-domain (`rings_L2`) to protect the hashtable of the
+per-ring data structures.
+* There is a lock per ring (`L3`) to protect the per-ring data structure,
+`struct argo_ring_info`.
+
+There are a two other per-domain L2 locks; their operation is similar and they
+are described later.
+
+The protocol to safely acquire write access to the per-ring data structure,
+`struct argo_ring_info`, is:
+
+1) Acquire a Read lock on L1.
+2) Acquire a Read lock on L2.
+3) Acquire L3.
+
+An alternative valid sequence is:
+
+1) Acquire a Read lock on L1.
+2) Acquire a Write lock on L2.
+
+This second sequence grants write access to _all_ of the `argo_ring_info`
+structs belonging to the domain, but at the expense of less concurrency: no
+other operation can access those structs while the locks are held, which will
+inhibit operations on those rings until the locks are released.
+
+Another alternative valid sequence is:
+
+1) Acquire a Write lock on L1.
+
+This grants write access to _all_ of the `argo_ring_info` structs belonging to
+_all domains_, but again at the expense of far less concurrency: no other
+operation can operate on Argo rings until the locks are released.
+
+## Lock Definitions
+
+The full set of locks that are directly operated upon by the Argo code are
+described in the following section.
+
+### The global singleton lock:
+
+* `L1_global_argo_rwlock`
+
+The rationale for having a global lock is to be able to enforce system-wide
+exclusion for a critical region and simplify the logic required to avoid
+deadlock, for teardown of state across multiple domains when a domain is
+destroyed.
+
+The majority of operations take a read-lock on this lock, allowing concurrent
+Argo operations by many domains.
+
+The pointer d->argo on every domain is protected by this lock. A set of more
+granular per-domain locks could be used to do that, but since domain start and
+stop is expected to be a far less frequent operation than the other argo
+operations, acquiring a single read lock to enable access to all the argo
+structs of all domains simplifies the protocol.
+
+Points of write-locking on this lock:
+
+* `argo_destroy`, where:
+  * All of the domain's own rings are destroyed.
+      * All of the notifications pending for other domains are cancelled.
+   * All of the unicast partner rings owned by other domains for this domain to
+send to, are destroyed.
+      * All of the notifications pending on those rings are cancelled.
+   * All of the notifications pending for this domain on wildcard rings owned
+by other domains are cancelled.
+* `argo_soft_reset`, for similar teardown operations as argo_destroy.
+* `argo_init`, where the `d->argo` pointer is first populated.
+  * Since the write lock is taken here, there is serialization all concurrent
+Argo operations around this single pointer write; this is the cost of using the
+simpler one global lock approach.
+
+Enforcing that the write_lock is acquired on `L1_global_argo_rwlock` before
+executing teardown, ensures that no teardown operations act concurrently and no
+other Argo operations happen concurrently with a teardown. The teardown logic
+is free to safely modify the Argo state across all domains without having to
+acquire per-domain locks and deadlock cannot occur.
+
+### Per-Domain: Ring hash lock
+
+`rings_L2_rwlock`
+
+Protects: the per-domain ring hash table of `argo_ring_info` structs.
+
+Holding a read lock on `rings_L2` protects the ring hash table and the elements
+in the hash table `d->argo->ring_hash`, and the `node` and `id` fields in
+struct `argo_ring_info` in the hash table.
+
+Holding a write lock on `rings_L2` protects all of the elements of all the
+struct `argo_ring_info` belonging to this domain.
+
+To take `rings_L2` you must already have `R(L1)`. `W(L1)` implies `W(rings_L2)`
+and `L3`.
+
+Prerequisites:
+
+* `R(L1_global_argo_rwlock)` must be acquired before taking either read or
+write on `rings_L2_rwlock`.
+* `W(L1_global_argo_rwlock)` implies `W(rings_L2_rwlock)`, so if
+`W(L1_global_argo_rwlock)` is held, then `rings_L2_rwlock` does not need to be
+acquired, and all the data structures that `rings_L2_rwlock` protects can be
+accessed as if `W(ring_L2_rwlock)` was held.
+
+Is accessed by the hypervisor on behalf of:
+
+* The domain that registered the ring.
+* Any domain that is allowed to send to the ring -- so that's the partner
+domain, for unicast rings, or any domain, for wildcard rings.
+
+### Send hash lock
+
+`send_L2_lock`
+
+Protects: the per-domain send hash table of `argo_send_info` structs.
+
+Is accessed by the hypervisor on behalf of:
+
+* Any domain that registers a ring that specifies the domain as the unicast
+sender.
+* The domain that has been allowed to send, as part of teardown when the domain
+is being destroyed.
+
+
+### Wildcard pending list lock
+
+`wildcard_L2_lock`
+
+Protects: the per-domain list of pending notifications to the domain from
+wildcard rings owned by other domains.
+
+Is accessed by the hypervisor on behalf of:
+
+* The domain that issued a query to another about space availability in one of
+its wildcard rings - this can be done by attempting a send operation when there
+is insufficient ring space available at the time.
+* Any domain that the domain has issued a query to about space availability in
+one of their wildcard rings.
+
+### Per-Ring locks:
+
+* `L3_lock`
+
+This lock protects the members of a `struct ring_info` which is the primary
+state for a domain's own registered ring.
+
+
+## Reasoning Model
+
+A common model for reasoning about concurrent code focusses on accesses to
+individual variables: if code touches this variable, see that it first acquires
+the corresponding lock and then drops it afterwards. A challenge with this
+model is in ensuring that the sequence of locks acquired within nested
+functions, when operating on data from multiple domains with concurrent
+operations, is safe from deadlock.
+
+An alternative method that is better suited to the Argo software is to consider
+the execution path, the full sequence of locks acquired, accesses performed,
+and locks released, from entering an operation, to the completion of the work.
+
+An example code path for an operation:
+
+`[entry] > -- [ take R(L1) ] -- [ take R(L2) ] -- loop [ take a L3 / drop L3 ]
+--  [ drop R(L2) ] -- [ drop R(L1)] -- > [exit]`
+
+If a function implements a section of the path, it is important to know not
+only what variables the function itself operates upon, but also the locking
+state that will already have been established at the point when the function is
+invoked, since this will affect what data the function can access. For this
+reason, comments in the code, or ASSERTs that explicitly check lock state,
+communicate what the locking state is expected and intended to be when that
+code is invoked. See the macros defined to support this for Argo later in this
+document.
+
+
+## Macros to Validate and Document Lock State
+
+These macros encode the logic to verify that the locking has adhered to the
+locking discipline.
+
+eg. On entry to logic that requires holding at least `R(rings_L2)`, this:
+
+`ASSERT(LOCKING_Read_rings_L2(d));`
+
+checks that the lock state is sufficient, validating that one of the following
+must be true when executed:
+
+`R(rings_L2) && R(L1)`
+or:  `W(rings_L2) && R(L1)`
+or:  `W(L1)`
+
+The macros are defined thus:
+
+```
+#define LOCKING_Write_L1 (rw_is_write_locked(&L1_global_argo_rwlock))
+/*
+ * While LOCKING_Read_L1 will return true even if the lock is write-locked,
+ * that's OK because everywhere that a Read lock is needed with these macros,
+ * holding a Write lock there instead is OK too: we're checking that _at least_
+ * the specified level of locks are held.
+ */
+#define LOCKING_Read_L1 (rw_is_locked(&L1_global_argo_rwlock))
+
+#define LOCKING_Write_rings_L2(d) \
+    ((LOCKING_Read_L1 && rw_is_write_locked(&(d)->argo->rings_L2_rwlock)) || \
+     LOCKING_Write_L1)
+/*
+ * Skip checking LOCKING_Write_rings_L2(d) within this LOCKING_Read_rings_L2
+ * definition because the first clause that is testing R(L1) && R(L2) will also
+ * return true if R(L1) && W(L2) is true, because of the way that rw_is_locked
+ * behaves. This results in a slightly shorter and faster implementation.
+ */
+#define LOCKING_Read_rings_L2(d) \
+    ((LOCKING_Read_L1 && rw_is_locked(&(d)->argo->rings_L2_rwlock)) || \
+     LOCKING_Write_L1)
+/*
+ * Skip checking LOCKING_Write_L1 within this LOCKING_L3 definition because
+ * LOCKING_Write_rings_L2(d) will return true for that condition.
+ */
+#define LOCKING_L3(d, r) \
+    ((LOCKING_Read_L1 && rw_is_locked(&(d)->argo->rings_L2_rwlock) \
+      && spin_is_locked(&(r)->L3_lock)) || LOCKING_Write_rings_L2(d))
+
+#define LOCKING_send_L2(d) \
+    ((LOCKING_Read_L1 && spin_is_locked(&(d)->argo->send_L2_lock)) || \
+     LOCKING_Write_L1)
+```
+
+Here is an example of a macro in use:
+
+```
+static void
+notify_ring(const struct domain *d, struct argo_ring_info *ring_info,
+          struct hlist_head *to_notify)
+{
+  uint32_t space;
+
+  ASSERT(LOCKING_Read_rings_L2(d));
+
+  spin_lock(&ring_info->L3_lock);
+
+  if ( ring_info->len )
+      space = ringbuf_payload_space(d, ring_info);
+  else
+      space = 0;
+
+  spin_unlock(&ring_info->L3_lock);
+
+  if ( space )
+      pending_find(d, ring_info, space, to_notify);
+}
+
+```
+
+In the above example, it can be seen that it is safe to acquire the `L3` lock
+because _at least_ `R(rings_L2)` is already held, as documented and verified by
+the macro.
+
+## FAQ / Other Considerations
+
+### Why not have a single per-domain lock?
+
+Due to performance isolation / DoS avoidance: if there is a single per-domain
+lock, acquiring this lock will stall operations on other active rings owned by
+the domain. A malicious domain can loop registering and unregistering rings,
+without any consent by the targetted domain, which would experience decreased
+throughput due to the contention on the single per-domain lock. The granular
+locking structure of Argo prevents this. It also allows concurrent operation of
+different rings by multiple VCPUs of the same domain without contention, to
+avoid negative application performance interaction.
+
+## Rationale for Using a Singleton Global Lock: L1
+
+### Teardown on domain destroy
+
+The single global lock enables exclusive access to the argo data structures
+across domains when a domain is destroyed. Every unicast ring that the dying
+domain is the authorized sender is torn down and any pending space-available
+notifications in other domain's wildcard rings are cancelled. This requires
+gaining safe access to the data structures on each of the domains involved.
+
+The 'send hashtable' data structure is needed in order to perform the teardown
+of rings when a domain is destroyed. To populate it, whenever a unicast ring is
+registered, the lock that protects that data structure must be taken
+exclusively.
+
+There are granular per-domain locks which protect the per-domain data
+structures. The global singleton L1 lock operates with-and-above the per-domain
+locks and is used to obtain exclusive access to multiple domain's argo data
+structures in the infrequent case where it is used -- for domain destroy --
+whilst otherwise allowing concurrent access, via acquiring it with 'read'
+access, for the majority of the time.
+
+To perform the required state teardown on domain destruction, which can require
+removing state from the data structures of multiple domains, a locking protocol
+to obtain mutual exclusion and safe access to the state is required, without
+deadlocking.
+
+Using the single global lock avoids the need for sequencing the acquisition of
+multiple individual per-domain locks (and lower level data structure locks) to
+prevent deadlock: taking W(L1) grants access to all and taking R(L1) ensures
+that teardown of any domain will not interfere with any Argo hypercall
+operation. It enables introducing granular locking without complex or
+error-prone lock acquisition logic.
+
+# Future Work
+
+- Performance measurement and optimization
+- Provide assurance of connection source context to destination
+- Policy controls for reducing the duration of hypervisor mappings of
+transmission rings, to improve resistance to data read attacks on
+hypervisor memory
