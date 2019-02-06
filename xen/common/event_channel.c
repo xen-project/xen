@@ -746,7 +746,7 @@ void send_guest_vcpu_virq(struct vcpu *v, uint32_t virq)
     spin_unlock_irqrestore(&v->virq_lock, flags);
 }
 
-static void send_guest_global_virq(struct domain *d, uint32_t virq)
+void send_guest_global_virq(struct domain *d, uint32_t virq)
 {
     unsigned long flags;
     int port;

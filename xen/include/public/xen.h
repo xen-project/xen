@@ -178,7 +178,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define VIRQ_CON_RING   8  /* G. (DOM0) Bytes received on console            */
 #define VIRQ_PCPU_STATE 9  /* G. (DOM0) PCPU state changed                   */
 #define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occurred          */
-#define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
+#define VIRQ_ARGO       11 /* G. Argo interdomain message notification       */
 #define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
 #define VIRQ_XENPMU     13 /* V.  PMC interrupt                              */
 
