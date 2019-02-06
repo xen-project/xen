@@ -191,7 +191,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 	  echo "#ifndef __ASM_OFFSETS_H__"; \
 	  echo "#define __ASM_OFFSETS_H__"; \
 	  echo ""; \
-	  sed -rne "/==>/{s:.*==>(.*)<==.*:\1:; s: [\$$#]: :; p;}"; \
+	  sed -rne "/^[^#].*==>/{s:.*==>(.*)<==.*:\1:; s: [\$$#]: :; p;}"; \
 	  echo ""; \
 	  echo "#endif") <$< >$@
 
