@@ -102,6 +102,7 @@ XEN_ERRNO(EILSEQ,	84)	/* Illegal byte sequence */
 XEN_ERRNO(ERESTART,	85)	/* Interrupted system call should be restarted */
 #endif
 XEN_ERRNO(ENOTSOCK,	88)	/* Socket operation on non-socket */
+XEN_ERRNO(EMSGSIZE,	90)	/* Message too large. */
 XEN_ERRNO(EOPNOTSUPP,	95)	/* Operation not supported on transport endpoint */
 XEN_ERRNO(EADDRINUSE,	98)	/* Address already in use */
 XEN_ERRNO(EADDRNOTAVAIL, 99)	/* Cannot assign requested address */
@@ -109,6 +110,7 @@ XEN_ERRNO(ENOBUFS,	105)	/* No buffer space available */
 XEN_ERRNO(EISCONN,	106)	/* Transport endpoint is already connected */
 XEN_ERRNO(ENOTCONN,	107)	/* Transport endpoint is not connected */
 XEN_ERRNO(ETIMEDOUT,	110)	/* Connection timed out */
+XEN_ERRNO(ECONNREFUSED,	111)	/* Connection refused */
 
 #undef XEN_ERRNO
 #endif /* XEN_ERRNO */
