@@ -63,6 +63,9 @@ int access_guest_memory_by_ipa(struct domain *d, paddr_t ipa, void *buf,
     _y;                                                     \
 })
 
+#define guest_handle_for_field(hnd, type, fld)          \
+    ((XEN_GUEST_HANDLE(type)) { &(hnd).p->fld })
+
 #define guest_handle_from_ptr(ptr, type)        \
     ((XEN_GUEST_HANDLE_PARAM(type)) { (type *)ptr })
 #define const_guest_handle_from_ptr(ptr, type)  \
