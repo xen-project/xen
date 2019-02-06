@@ -31,7 +31,9 @@
 !	mc_physcpuinfo			arch-x86/xen-mca.h
 ?	page_offline_action		arch-x86/xen-mca.h
 ?	argo_addr			argo.h
+?	argo_register_ring		argo.h
 ?	argo_ring			argo.h
+?	argo_ring_message_header	argo.h
 ?	evtchn_alloc_unbound		event_channel.h
 ?	evtchn_bind_interdomain		event_channel.h
 ?	evtchn_bind_ipi			event_channel.h

@@ -183,7 +183,7 @@ in combination with cpuidle.  This option is only expected to be useful for
 developers wishing Xen to fall back to older timing methods on newer hardware.
 
 ### argo
-    = List of [ <bool> ]
+    = List of [ <bool>, mac-permissive=<bool> ]
 
 Controls for the Argo hypervisor-mediated interdomain communication service.
 
@@ -194,6 +194,13 @@ Argo is a interdomain communication mechanism, where Xen acts as the central
 point of authority.  Guests may register memory rings to recieve messages,
 query the status of other domains, and send messages by hypercall, all subject
 to appropriate auditing by Xen.  Argo is disabled by default.
+
+*   The `mac-permissive` boolean controls whether wildcard receive rings may be
+    registered (`mac-permissive=1`) or may not be registered
+    (`mac-permissive=0`).
+
+    This option is disabled by default, to protect domains from a DoS by a
+    buggy or malicious other domain spamming the ring.
 
 ### asid (x86)
 > `= <boolean>`
