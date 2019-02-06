@@ -1732,6 +1732,12 @@ static int flask_argo_register_any_source(const struct domain *d)
     return avc_has_perm(domain_sid(d), SECINITSID_XEN, SECCLASS_ARGO,
                         ARGO__REGISTER_ANY_SOURCE, NULL);
 }
+
+static int flask_argo_send(const struct domain *d, const struct domain *t)
+{
+    return domain_has_perm(d, t, SECCLASS_ARGO, ARGO__SEND);
+}
+
 #endif
 
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
@@ -1871,6 +1877,7 @@ static struct xsm_operations flask_ops = {
 #ifdef CONFIG_ARGO
     .argo_register_single_source = flask_argo_register_single_source,
     .argo_register_any_source = flask_argo_register_any_source,
+    .argo_send = flask_argo_send,
 #endif
 };
 

@@ -185,6 +185,7 @@ struct xsm_operations {
     int (*argo_register_single_source) (const struct domain *d,
                                         const struct domain *t);
     int (*argo_register_any_source) (const struct domain *d);
+    int (*argo_send) (const struct domain *d, const struct domain *t);
 #endif
 };
 
@@ -713,6 +714,11 @@ static inline int xsm_argo_register_single_source(const struct domain *d,
 static inline int xsm_argo_register_any_source(const struct domain *d)
 {
     return xsm_ops->argo_register_any_source(d);
+}
+
+static inline int xsm_argo_send(const struct domain *d, const struct domain *t)
+{
+    return xsm_ops->argo_send(d, t);
 }
 
 #endif /* CONFIG_ARGO */

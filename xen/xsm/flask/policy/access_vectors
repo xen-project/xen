@@ -541,4 +541,6 @@ class argo
     # Domain requesting registration of a communication ring
     # to receive messages from any other domain.
     register_any_source
+    # Domain sending a message to another domain.
+    send
 }

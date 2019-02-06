@@ -732,6 +732,12 @@ static XSM_INLINE int xsm_argo_register_any_source(const struct domain *d)
     return 0;
 }
 
+static XSM_INLINE int xsm_argo_send(const struct domain *d,
+                                    const struct domain *t)
+{
+    return 0;
+}
+
 #endif /* CONFIG_ARGO */
 
 #include <public/version.h>

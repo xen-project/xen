@@ -1990,6 +1990,17 @@ sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
     if ( !dst_d )
         return -ESRCH;
 
+    ret = xsm_argo_send(src_d, dst_d);
+    if ( ret )
+    {
+        gprintk(XENLOG_ERR, "argo: XSM REJECTED %i -> %i\n",
+                src_d->domain_id, dst_d->domain_id);
+
+        put_domain(dst_d);
+
+        return ret;
+    }
+
     read_lock(&L1_global_argo_rwlock);
 
     if ( !src_d->argo )

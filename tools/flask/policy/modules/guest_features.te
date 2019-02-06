@@ -6,10 +6,11 @@ allow domain_type xen_t:xen tmem_op;
 allow domain_type xen_t:xen2 pmu_use;
 
 # Allow all domains:
-# to register single-sender (unicast) rings to partner with any domain; and
-# to register any-sender (wildcard) rings that can be sent to by any domain.
+# to register single-sender (unicast) rings to partner with any domain;
+# to register any-sender (wildcard) rings that can be sent to by any domain;
+# and send messages to rings.
 allow domain_type xen_t:argo { register_any_source };
-allow domain_type domain_type:argo { register_single_source };
+allow domain_type domain_type:argo { send register_single_source };
 
 # Allow guest console output to the serial console.  This is used by PV Linux
 # and stub domains for early boot output, so don't audit even when we deny it.
