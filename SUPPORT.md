@@ -617,6 +617,10 @@ Virtual Performance Management Unit for HVM guests
 Disabled by default (enable with hypervisor command line option).
 This feature is not security supported: see http://xenbits.xen.org/xsa/advisory-163.html
 
+### Argo: Inter-domain message delivery by hypercall
+
+    Status: Experimental
+
 ### x86/PCI Device Passthrough
 
     Status, x86 PV: Supported, with caveats
