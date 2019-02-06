@@ -64,6 +64,9 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
     ARGS(domctl, 1),
     ARGS(kexec_op, 2),
     ARGS(tmem_op, 1),
+#ifdef CONFIG_ARGO
+    ARGS(argo_op, 5),
+#endif
     ARGS(xenpmu_op, 2),
 #ifdef CONFIG_HVM
     ARGS(hvm_op, 2),

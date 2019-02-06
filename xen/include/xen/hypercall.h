@@ -136,6 +136,15 @@ do_tmem_op(
     XEN_GUEST_HANDLE_PARAM(tmem_op_t) uops);
 #endif
 
+#ifdef CONFIG_ARGO
+extern long do_argo_op(
+    unsigned int cmd,
+    XEN_GUEST_HANDLE_PARAM(void) arg1,
+    XEN_GUEST_HANDLE_PARAM(void) arg2,
+    unsigned long arg3,
+    unsigned long arg4);
+#endif
+
 extern long
 do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
@@ -196,6 +205,15 @@ DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
 extern int compat_multicall(
     XEN_GUEST_HANDLE_PARAM(multicall_entry_compat_t) call_list,
     uint32_t nr_calls);
+
+#ifdef CONFIG_ARGO
+extern long compat_argo_op(
+    unsigned int cmd,
+    XEN_GUEST_HANDLE_PARAM(void) arg1,
+    XEN_GUEST_HANDLE_PARAM(void) arg2,
+    unsigned long arg3,
+    unsigned long arg4);
+#endif
 
 #include <compat/hvm/dm_op.h>
 

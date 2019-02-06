@@ -1401,6 +1401,9 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(platform_op, 1),
     HYPERCALL_ARM(vcpu_op, 3),
     HYPERCALL(vm_assist, 2),
+#ifdef CONFIG_ARGO
+    HYPERCALL(argo_op, 5),
+#endif
 };
 
 #ifndef NDEBUG
