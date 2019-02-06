@@ -202,6 +202,25 @@ config LATE_HWDOM
 
 	  If unsure, say N.
 
+config ARGO
+	bool "Argo: hypervisor-mediated interdomain communication" if EXPERT = "y"
+	---help---
+	  Enables a hypercall for domains to ask the hypervisor to perform
+	  data transfer of messages between domains.
+
+	  This allows communication channels to be established that do not
+	  require any shared memory between domains; the hypervisor is the
+	  entity that each domain interacts with. The hypervisor is able to
+	  enforce Mandatory Access Control policy over the communication.
+
+	  If XSM_FLASK is enabled, XSM policy can govern which domains may
+	  communicate via the Argo system.
+
+	  This feature does nothing if the "argo" boot parameter is not present.
+	  Argo is disabled at runtime by default.
+
+	  If unsure, say N.
+
 menu "Schedulers"
 	visible if EXPERT = "y"
 
