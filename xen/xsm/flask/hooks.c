@@ -36,13 +36,14 @@
 #include <objsec.h>
 #include <conditional.h>
 
-static u32 domain_sid(struct domain *dom)
+static u32 domain_sid(const struct domain *dom)
 {
     struct domain_security_struct *dsec = dom->ssid;
     return dsec->sid;
 }
 
-static u32 domain_target_sid(struct domain *src, struct domain *dst)
+static u32 domain_target_sid(const struct domain *src,
+                             const struct domain *dst)
 {
     struct domain_security_struct *ssec = src->ssid;
     struct domain_security_struct *dsec = dst->ssid;
@@ -58,7 +59,8 @@ static u32 evtchn_sid(const struct evtchn *chn)
     return chn->ssid.flask_sid;
 }
 
-static int domain_has_perm(struct domain *dom1, struct domain *dom2, 
+static int domain_has_perm(const struct domain *dom1,
+                           const struct domain *dom2,
                            u16 class, u32 perms)
 {
     u32 ssid, tsid;
@@ -1717,6 +1719,21 @@ static int flask_domain_resource_map(struct domain *d)
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__RESOURCE_MAP);
 }
 
+#ifdef CONFIG_ARGO
+static int flask_argo_register_single_source(const struct domain *d,
+                                             const struct domain *t)
+{
+    return domain_has_perm(d, t, SECCLASS_ARGO,
+                           ARGO__REGISTER_SINGLE_SOURCE);
+}
+
+static int flask_argo_register_any_source(const struct domain *d)
+{
+    return avc_has_perm(domain_sid(d), SECINITSID_XEN, SECCLASS_ARGO,
+                        ARGO__REGISTER_ANY_SOURCE, NULL);
+}
+#endif
+
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 int compat_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 
@@ -1851,6 +1868,10 @@ static struct xsm_operations flask_ops = {
 #endif
     .xen_version = flask_xen_version,
     .domain_resource_map = flask_domain_resource_map,
+#ifdef CONFIG_ARGO
+    .argo_register_single_source = flask_argo_register_single_source,
+    .argo_register_any_source = flask_argo_register_any_source,
+#endif
 };
 
 void __init flask_init(const void *policy_buffer, size_t policy_size)

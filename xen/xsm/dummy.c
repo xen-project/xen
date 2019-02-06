@@ -152,4 +152,8 @@ void __init xsm_fixup_ops (struct xsm_operations *ops)
 #endif
     set_to_dummy_if_null(ops, xen_version);
     set_to_dummy_if_null(ops, domain_resource_map);
+#ifdef CONFIG_ARGO
+    set_to_dummy_if_null(ops, argo_register_single_source);
+    set_to_dummy_if_null(ops, argo_register_any_source);
+#endif
 }
