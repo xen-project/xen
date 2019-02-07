@@ -15,7 +15,7 @@
 # Default-Start:     2 3 5
 # Default-Stop:      0 1 6
 # Short-Description: Start/stop xenstored and xenconsoled
-# Description:       Starts and stops the daemons neeeded for xl/xend
+# Description:       Starts and stops the daemons needed for xl
 ### END INIT INFO
 
 BACKEND_MODULES="@LINUX_BACKEND_MODULES@"
