@@ -56,8 +56,8 @@ do_start () {
 
 	for mod in $BACKEND_MODULES ; do modprobe "$mod" &>/dev/null ; done
 
-	mkdir -p ${XEN_RUN_DIR}
-	mkdir -p ${XEN_LOCK_DIR}
+	mkdir -m700 -p ${XEN_RUN_DIR}
+	mkdir -m700 -p ${XEN_LOCK_DIR}
 	mkdir -p ${XEN_LOG_DIR}
 
 	@XEN_SCRIPT_DIR@/launch-xenstore || exit 1
