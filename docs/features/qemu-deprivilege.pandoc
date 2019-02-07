@@ -109,15 +109,17 @@ See docs/design/qemu-deprivilege.md for technical details.
 # Limitations
 
 The following features still need to be implemented:
- * Inserting a new cdrom while the guest is running (xl cdrom-insert)
- * Support for qdisk backends
+
+* Inserting a new cdrom while the guest is running (xl cdrom-insert)
+* Support for qdisk backends
 
 A number of restrictions still need to be implemented.  A compromised
 device model may be able to do the following:
- * Delay or exploit weaknesses in the toolstack
- * Launch "fork bombs" or other resource exhaustion attacks
- * Make network connections on the management network
- * Break out of the restrictions after migration
+
+* Delay or exploit weaknesses in the toolstack
+* Launch "fork bombs" or other resource exhaustion attacks
+* Make network connections on the management network
+* Break out of the restrictions after migration
 
 Additionally, getting PCI passthrough to work securely would require a
 significant rework of how passthrough works at the moment.  It may be
