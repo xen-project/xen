@@ -12,16 +12,18 @@
 
 # Overview
 
-Credit (also known as Credit1) is the default virtual CPU (vCPU) scheduler
+Credit (also known as Credit1) is the old virtual CPU (vCPU) scheduler
 of the Xen hypervisor.
 
 It is a general purpose, weighted fair-share scheduler.
 
 # User details
 
-Xen supports multiple schedulers. As said, Credit is the default, so it
-is used automatically, unless the `sched=$SCHED` (with `$SCHED` different
-than `credit`) parameter is passed to Xen via the bootloader.
+Xen supports multiple schedulers. Credit is no longer the default.  In
+order to use it as the Xen scheduler the following parameter should be
+passed to the hypervisor at boot:
+
+    `sched=credit`
 
 Once the system is live, for creating a cpupool with Credit as its
 scheduler, either compile a cpupool configuration file, as described
@@ -94,4 +96,5 @@ by also doing the following:
 Date       Revision Version  Notes
 ---------- -------- -------- -------------------------------------------
 2016-10-14 1        Xen 4.8  Document written
+2019-02-7  3        Xen 4.12 No longer default scheduler
 ---------- -------- -------- -------------------------------------------

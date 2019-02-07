@@ -12,21 +12,19 @@
 
 # Overview
 
-Credit2 is one of the virtual CPU (vCPU) scheduler available in the
+Credit2 is the default virtual CPU (vCPU) scheduler available in the
 Xen hypervisor.
 
 Credit2 was designed as a general purpose scheduler, with particular
 focus on improving handling of mixed workloads, scalability and
-support for low latency applications inside VMs, with respect to
-Credit1.
+support for low latency applications inside VMs.
 
 # User details
 
-Credit2 is not in use by default. In order to use it as the Xen
-scheduler the following parameter should be passed to the hypervisor
-at boot:
-
-    `sched=credit2`
+Xen supports multiple schedulers. As said, Credit2 is the default, so
+it is used automatically, unless the `sched=$SCHED` (with `$SCHED`
+different than `credit2`) parameter is passed to Xen via the
+bootloader.
 
 Other parameters are available for tuning the behavior of Credit2
 (see `docs/misc/xen-command-line.markdown` for a complete list and
@@ -106,4 +104,5 @@ Date       Revision Version  Notes
 ---------- -------- -------- -------------------------------------------
 2016-10-14 1        Xen 4.8  Document written
 2017-11-6  2        Xen 4.10 Soft-affinity and caps implemented
+2019-02-7  3        Xen 4.12 Made the default scheduler
 ---------- -------- -------- -------------------------------------------
