@@ -7,7 +7,7 @@
 # chkconfig: 2345 70 10
 # description: Starts and stops xenstored and xenconsoled
 ### BEGIN INIT INFO
-# Provides:          xenstored xenconsoled
+# Provides:          xenstored xenconsoled xen
 # Required-Start:    $syslog $remote_fs
 # Should-Start:
 # Required-Stop:     $syslog $remote_fs
