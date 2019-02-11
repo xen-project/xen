@@ -4273,6 +4273,7 @@ static void lbr_fixup(void)
 bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
+    struct domain *currd = curr->domain;
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
@@ -4319,17 +4320,42 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
 
     if ( paging_mode_hap(curr->domain) )
     {
-        struct ept_data *ept = &p2m_get_hostp2m(curr->domain)->ept;
+        struct ept_data *ept = &p2m_get_hostp2m(currd)->ept;
         unsigned int cpu = smp_processor_id();
+        unsigned int inv = 0; /* None => Single => All */
+        struct ept_data *single = NULL; /* Single eptp, iff inv == 1 */
 
         if ( cpumask_test_cpu(cpu, ept->invalidate) )
         {
             cpumask_clear_cpu(cpu, ept->invalidate);
-            if ( nestedhvm_enabled(curr->domain) )
-                __invept(INVEPT_ALL_CONTEXT, 0);
-            else
-                __invept(INVEPT_SINGLE_CONTEXT, ept->eptp);
+
+            /* Automatically invalidate all contexts if nested. */
+            inv += 1 + nestedhvm_enabled(currd);
+            single = ept;
         }
+
+        if ( altp2m_active(currd) )
+        {
+            unsigned int i;
+
+            for ( i = 0; i < MAX_ALTP2M; ++i )
+            {
+                if ( currd->arch.altp2m_eptp[i] == mfn_x(INVALID_MFN) )
+                    continue;
+
+                ept = &currd->arch.altp2m_p2m[i]->ept;
+                if ( cpumask_test_cpu(cpu, ept->invalidate) )
+                {
+                    cpumask_clear_cpu(cpu, ept->invalidate);
+                    inv++;
+                    single = ept;
+                }
+            }
+        }
+
+        if ( inv )
+            __invept(inv == 1 ? INVEPT_SINGLE_CONTEXT : INVEPT_ALL_CONTEXT,
+                     inv == 1 ? single->eptp          : 0);
     }
 
  out:
