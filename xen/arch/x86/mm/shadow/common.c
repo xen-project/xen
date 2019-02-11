@@ -966,7 +966,8 @@ const u8 sh_type_to_size[] = {
     1  /* SH_type_oos_snapshot   */
 };
 
-/* Figure out the least acceptable quantity of shadow memory.
+/*
+ * Figure out the least acceptable quantity of shadow memory.
  * The minimum memory requirement for always being able to free up a
  * chunk of memory is very small -- only three max-order chunks per
  * vcpu to hold the top level shadows and pages with Xen mappings in them.
@@ -975,11 +976,11 @@ const u8 sh_type_to_size[] = {
  * instruction, we must be able to map a large number (about thirty) VAs
  * at the same time, which means that to guarantee progress, we must
  * allow for more than ninety allocated pages per vcpu.  We round that
- * up to 128 pages, or half a megabyte per vcpu, and add 1 more vcpu's
- * worth to make sure we never return zero. */
+ * up to 128 pages, or half a megabyte per vcpu.
+ */
 static unsigned int shadow_min_acceptable_pages(const struct domain *d)
 {
-    return (d->max_vcpus + 1) * 128;
+    return d->max_vcpus * 128;
 }
 
 /* Dispatcher function: call the per-mode function that will unhook the
@@ -1322,8 +1323,11 @@ shadow_alloc_p2m_page(struct domain *d)
         if ( !d->arch.paging.p2m_alloc_failed )
         {
             d->arch.paging.p2m_alloc_failed = 1;
-            dprintk(XENLOG_ERR, "d%i failed to allocate from shadow pool\n",
-                    d->domain_id);
+            dprintk(XENLOG_ERR,
+                    "d%d failed to allocate from shadow pool (tot=%u p2m=%u min=%u)\n",
+                    d->domain_id, d->arch.paging.shadow.total_pages,
+                    d->arch.paging.shadow.p2m_pages,
+                    shadow_min_acceptable_pages(d));
         }
         paging_unlock(d);
         return NULL;
@@ -1373,9 +1377,13 @@ static unsigned int sh_min_allocation(const struct domain *d)
 {
     /*
      * Don't allocate less than the minimum acceptable, plus one page per
-     * megabyte of RAM (for the p2m table).
+     * megabyte of RAM (for the p2m table, minimally enough for HVM's setting
+     * up of slot zero and an LAPIC page), plus one for HVM's 1-to-1 pagetable.
      */
-    return shadow_min_acceptable_pages(d) + (d->tot_pages / 256);
+    return shadow_min_acceptable_pages(d) +
+           max(d->tot_pages / 256,
+               is_hvm_domain(d) ? CONFIG_PAGING_LEVELS + 2 : 0U) +
+           is_hvm_domain(d);
 }
 
 int shadow_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
