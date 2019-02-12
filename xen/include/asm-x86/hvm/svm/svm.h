@@ -21,7 +21,6 @@
 #define __ASM_X86_HVM_SVM_H__
 
 #include <xen/types.h>
-#include <xen/bitmap.h>
 
 #define svm_vmload(x)     svm_vmload_pa(__pa(x))
 #define svm_vmsave(x)     svm_vmsave_pa(__pa(x))
@@ -77,7 +76,7 @@ extern u32 svm_feature_flags;
 #define SVM_FEATURE_VLOADSAVE     15 /* virtual vmload/vmsave */
 #define SVM_FEATURE_VGIF          16 /* Virtual GIF */
 
-#define cpu_has_svm_feature(f) test_bit(f, &svm_feature_flags)
+#define cpu_has_svm_feature(f) (svm_feature_flags & (1u << (f)))
 #define cpu_has_svm_npt       cpu_has_svm_feature(SVM_FEATURE_NPT)
 #define cpu_has_svm_lbrv      cpu_has_svm_feature(SVM_FEATURE_LBRV)
 #define cpu_has_svm_svml      cpu_has_svm_feature(SVM_FEATURE_SVML)
