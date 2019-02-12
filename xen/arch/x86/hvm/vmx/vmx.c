@@ -2999,10 +2999,10 @@ static int vmx_alloc_vlapic_mapping(struct domain *d)
     clear_domain_page(mfn);
     share_xen_page_with_guest(pg, d, SHARE_rw);
     d->arch.hvm.vmx.apic_access_mfn = mfn_x(mfn);
-    set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), mfn,
-                       PAGE_ORDER_4K, p2m_get_hostp2m(d)->default_access);
 
-    return 0;
+    return set_mmio_p2m_entry(d, paddr_to_pfn(APIC_DEFAULT_PHYS_BASE), mfn,
+                              PAGE_ORDER_4K,
+                              p2m_get_hostp2m(d)->default_access);
 }
 
 static void vmx_free_vlapic_mapping(struct domain *d)
