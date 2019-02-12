@@ -893,11 +893,11 @@ int iommu_enable_x2apic_IR(void)
 
         if ( !platform_supports_x2apic() )
             return -ENXIO;
+
+        iommu_ops = intel_iommu_ops;
     }
     else if ( !x2apic_enabled )
         return -EOPNOTSUPP;
-
-    iommu_ops = intel_iommu_ops;
 
     for_each_drhd_unit ( drhd )
     {
