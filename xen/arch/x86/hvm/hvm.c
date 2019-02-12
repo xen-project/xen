@@ -37,6 +37,7 @@
 #include <xen/monitor.h>
 #include <xen/warning.h>
 #include <xen/vpci.h>
+#include <xen/nospec.h>
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
@@ -2092,7 +2093,7 @@ int hvm_mov_from_cr(unsigned int cr, unsigned int gpr)
     case 2:
     case 3:
     case 4:
-        val = curr->arch.hvm.guest_cr[cr];
+        val = array_access_nospec(curr->arch.hvm.guest_cr, cr);
         break;
     case 8:
         val = (vlapic_get_reg(vcpu_vlapic(curr), APIC_TASKPRI) & 0xf0) >> 4;
@@ -3438,13 +3439,15 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix16K_80000;
-        *msr_content = fixed_range_base[index + 1];
+        *msr_content = fixed_range_base[array_index_nospec(index + 1,
+                                   ARRAY_SIZE(v->arch.hvm.mtrr.fixed_ranges))];
         break;
     case MSR_MTRRfix4K_C0000...MSR_MTRRfix4K_F8000:
         if ( !d->arch.cpuid->basic.mtrr )
             goto gp_fault;
         index = msr - MSR_MTRRfix4K_C0000;
-        *msr_content = fixed_range_base[index + 3];
+        *msr_content = fixed_range_base[array_index_nospec(index + 3,
+                                   ARRAY_SIZE(v->arch.hvm.mtrr.fixed_ranges))];
         break;
     case MSR_IA32_MTRR_PHYSBASE(0)...MSR_IA32_MTRR_PHYSMASK(MTRR_VCNT_MAX - 1):
         if ( !d->arch.cpuid->basic.mtrr )
@@ -3453,7 +3456,9 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( (index / 2) >=
              MASK_EXTR(v->arch.hvm.mtrr.mtrr_cap, MTRRcap_VCNT) )
             goto gp_fault;
-        *msr_content = var_range_base[index];
+        *msr_content = var_range_base[array_index_nospec(index,
+                                      2 * MASK_EXTR(v->arch.hvm.mtrr.mtrr_cap,
+                                                    MTRRcap_VCNT))];
         break;
 
     case MSR_IA32_XSS:
@@ -4016,7 +4021,7 @@ static int hvmop_set_evtchn_upcall_vector(
     if ( op.vector < 0x10 )
         return -EINVAL;
 
-    if ( op.vcpu >= d->max_vcpus || (v = d->vcpu[op.vcpu]) == NULL )
+    if ( (v = domain_vcpu(d, op.vcpu)) == NULL )
         return -ENOENT;
 
     printk(XENLOG_G_INFO "%pv: upcall vector %02x\n", v, op.vector);
