@@ -302,6 +302,17 @@ enum VMEXIT_EXITCODE
     VMEXIT_INVALID          =  -1
 };
 
+enum
+{
+    /* Available on all SVM-capable hardware. */
+    TLB_CTRL_NO_FLUSH             = 0,
+    TLB_CTRL_FLUSH_ALL            = 1,
+
+    /* Available with the FlushByASID feature. */
+    TLB_CTRL_FLUSH_ASID           = 3,
+    TLB_CTRL_FLUSH_ASID_NONGLOBAL = 7,
+};
+
 typedef union
 {
     struct
@@ -419,7 +430,7 @@ struct vmcb_struct {
     u64 _msrpm_base_pa;         /* offset 0x48 - cleanbit 1 */
     u64 _tsc_offset;            /* offset 0x50 - cleanbit 0 */
     u32 _guest_asid;            /* offset 0x58 - cleanbit 2 */
-    u8  tlb_control;            /* offset 0x5C */
+    u8  tlb_control;            /* offset 0x5C - TLB_CTRL_* */
     u8  res07[3];
     vintr_t _vintr;             /* offset 0x60 - cleanbit 3 */
     intstat_t int_stat;         /* offset 0x68 */
