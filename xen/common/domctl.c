@@ -392,6 +392,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     switch ( op->cmd )
     {
     case XEN_DOMCTL_test_assign_device:
+    case XEN_DOMCTL_vm_event_op:
         if ( op->domain == DOMID_INVALID )
         {
     case XEN_DOMCTL_createdomain:

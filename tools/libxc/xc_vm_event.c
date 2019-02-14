@@ -35,7 +35,7 @@ int xc_vm_event_control(xc_interface *xch, uint32_t domain_id, unsigned int op,
 
     rc = do_domctl(xch, &domctl);
     if ( !rc && port )
-        *port = domctl.u.vm_event_op.port;
+        *port = domctl.u.vm_event_op.u.enable.port;
     return rc;
 }
 
@@ -154,6 +154,22 @@ void *xc_vm_event_enable(xc_interface *xch, uint32_t domain_id, int param,
     }
 
     return ring_page;
+}
+
+int xc_vm_event_get_version(xc_interface *xch)
+{
+    DECLARE_DOMCTL;
+    int rc;
+
+    domctl.cmd = XEN_DOMCTL_vm_event_op;
+    domctl.domain = DOMID_INVALID;
+    domctl.u.vm_event_op.op = XEN_VM_EVENT_GET_VERSION;
+    domctl.u.vm_event_op.mode = XEN_DOMCTL_VM_EVENT_OP_MONITOR;
+
+    rc = do_domctl(xch, &domctl);
+    if ( !rc )
+        rc = domctl.u.vm_event_op.u.version;
+    return rc;
 }
 
 /*

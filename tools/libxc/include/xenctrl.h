@@ -2003,6 +2003,11 @@ int xc_set_mem_access_multi(xc_interface *xch, uint32_t domain_id,
 int xc_get_mem_access(xc_interface *xch, uint32_t domain_id,
                       uint64_t pfn, xenmem_access_t *access);
 
+/*
+ * Returns the VM_EVENT_INTERFACE version.
+ */
+int xc_vm_event_get_version(xc_interface *xch);
+
 /***
  * Monitor control operations.
  *

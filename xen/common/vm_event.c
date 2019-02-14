@@ -88,7 +88,7 @@ static int vm_event_enable(
     if ( rc < 0 )
         goto err;
 
-    (*ved)->xen_port = vec->port = rc;
+    (*ved)->xen_port = vec->u.enable.port = rc;
 
     /* Prepare ring buffer */
     FRONT_RING_INIT(&(*ved)->front_ring,
@@ -591,6 +591,15 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
                     XEN_GUEST_HANDLE_PARAM(void) u_domctl)
 {
     int rc;
+
+    if ( vec->op == XEN_VM_EVENT_GET_VERSION )
+    {
+        vec->u.version = VM_EVENT_INTERFACE_VERSION;
+        return 0;
+    }
+
+    if ( unlikely(d == NULL) )
+        return -ESRCH;
 
     rc = xsm_vm_event_control(XSM_PRIV, d, vec->mode, vec->op);
     if ( rc )
