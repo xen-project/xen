@@ -70,7 +70,7 @@ static int setup_compat_l4(struct vcpu *v)
     l4_pgentry_t *l4tab;
     mfn_t mfn;
 
-    pg = alloc_domheap_page(v->domain, MEMF_no_owner);
+    pg = alloc_domheap_page(v->domain, MEMF_no_owner | MEMF_no_scrub);
     if ( pg == NULL )
         return -ENOMEM;
 
@@ -156,6 +156,8 @@ int switch_compat(struct domain *d)
 {
     struct vcpu *v;
     int rc;
+
+    BUILD_BUG_ON(offsetof(struct shared_info, vcpu_info) != 0);
 
     if ( is_hvm_domain(d) || d->tot_pages != 0 )
         return -EACCES;
