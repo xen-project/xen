@@ -33,3 +33,8 @@ VERS_1.2 {
 		xendevicemodel_relocate_memory;
 		xendevicemodel_pin_memory_cacheattr;
 } VERS_1.1;
+
+VERS_1.3 {
+	global:
+		xendevicemodel_modified_memory_bulk;
+} VERS_1.2;
