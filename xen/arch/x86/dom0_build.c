@@ -378,8 +378,18 @@ unsigned long __init dom0_compute_nr_pages(
          * maximum of 128MB.
          */
         if ( !nr_pages )
+        {
             nr_pages = avail - (pv_shim ? pv_shim_mem(avail)
                                  : min(avail / 16, 128UL << (20 - PAGE_SHIFT)));
+            if ( is_hvm_domain(d) && !need_paging )
+                /*
+                 * Temporary workaround message until internal (paging) memory
+                 * accounting required to build a pvh dom0 is improved.
+                 */
+                printk("WARNING: PVH dom0 without dom0_mem set is still unstable. "
+                       "If you get crashes during boot, try adding a dom0_mem parameter\n");
+        }
+
 
         /* Clamp according to min/max limits and available memory. */
         nr_pages = max(nr_pages, min_pages);
