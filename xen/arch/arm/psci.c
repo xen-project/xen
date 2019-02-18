@@ -87,7 +87,7 @@ static int __init psci_features(uint32_t psci_func_id)
     if ( psci_ver < PSCI_VERSION(1, 0) )
         return PSCI_NOT_SUPPORTED;
 
-    arm_smccc_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id, NULL);
+    arm_smccc_smc(PSCI_1_0_FN32_PSCI_FEATURES, psci_func_id, &res);
 
     return PSCI_RET(res);
 }
