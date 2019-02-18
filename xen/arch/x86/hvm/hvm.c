@@ -4538,6 +4538,10 @@ static int do_altp2m_op(
             break;
         }
 
+        rc = domain_pause_except_self(d);
+        if ( rc )
+            break;
+
         ostate = d->arch.altp2m_active;
         d->arch.altp2m_active = !!a.u.domain_state.state;
 
@@ -4556,6 +4560,8 @@ static int do_altp2m_op(
             if ( ostate )
                 p2m_flush_altp2m(d);
         }
+
+        domain_unpause_except_self(d);
         break;
     }
 
