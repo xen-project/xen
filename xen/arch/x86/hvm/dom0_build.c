@@ -152,6 +152,8 @@ static int __init pvh_populate_memory_range(struct domain *d,
 
         order = get_order_from_pages(end - start + 1);
         order = min(order ? order - 1 : 0, max_order);
+        /* The order allocated and populated must be aligned to the address. */
+        order = min(order, start ? find_first_set_bit(start) : MAX_ORDER);
         page = alloc_domheap_pages(d, order, dom0_memflags | MEMF_no_scrub);
         if ( page == NULL )
         {
