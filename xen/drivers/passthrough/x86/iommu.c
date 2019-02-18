@@ -151,12 +151,7 @@ static bool __hwdom_init hwdom_iommu_map(const struct domain *d,
      * inclusive mapping additionally maps in every pfn up to 4GB except those
      * that fall in unusable ranges for PV Dom0.
      */
-    if ( (pfn > max_pfn && !mfn_valid(mfn)) || xen_in_range(pfn) ||
-         /*
-          * Ignore any address below 1MB, that's already identity mapped by the
-          * Dom0 builder for HVM.
-          */
-         (!d->domain_id && is_hvm_domain(d) && pfn < PFN_DOWN(MB(1))) )
+    if ( (pfn > max_pfn && !mfn_valid(mfn)) || xen_in_range(pfn) )
         return false;
 
     switch ( type = page_get_ram_type(mfn) )
