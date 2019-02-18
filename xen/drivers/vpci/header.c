@@ -362,16 +362,6 @@ static void bar_write(const struct pci_dev *pdev, unsigned int reg,
     uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
     bool hi = false;
 
-    if ( pci_conf_read16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND) &
-         PCI_COMMAND_MEMORY )
-    {
-        gprintk(XENLOG_WARNING,
-                "%04x:%02x:%02x.%u: ignored BAR %lu write with memory decoding enabled\n",
-                pdev->seg, pdev->bus, slot, func,
-                bar - pdev->vpci->header.bars);
-        return;
-    }
-
     if ( bar->type == VPCI_BAR_MEM64_HI )
     {
         ASSERT(reg > PCI_BASE_ADDRESS_0);
@@ -380,6 +370,19 @@ static void bar_write(const struct pci_dev *pdev, unsigned int reg,
     }
     else
         val &= PCI_BASE_ADDRESS_MEM_MASK;
+
+    if ( pci_conf_read16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND) &
+         PCI_COMMAND_MEMORY )
+    {
+        /* If the value written is the current one avoid printing a warning. */
+        if ( val != (uint32_t)(bar->addr >> (hi ? 32 : 0)) )
+            gprintk(XENLOG_WARNING,
+                    "%04x:%02x:%02x.%u: ignored BAR %lu write with memory decoding enabled\n",
+                    pdev->seg, pdev->bus, slot, func,
+                    bar - pdev->vpci->header.bars + hi);
+        return;
+    }
+
 
     /*
      * Update the cached address, so that when memory decoding is enabled
