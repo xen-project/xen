@@ -1580,7 +1580,7 @@ static int __init make_gic_domU_node(const struct domain *d, void *fdt)
     case GIC_V2:
         return make_gicv2_domU_node(d, fdt);
     default:
-        panic("Unsupported GIC version");
+        panic("Unsupported GIC version\n");
     }
 }
 
@@ -2086,12 +2086,12 @@ void __init create_domUs(void)
 
         d = domain_create(++max_init_domid, &d_cfg, false);
         if ( IS_ERR(d) )
-            panic("Error creating domain %s", dt_node_name(node));
+            panic("Error creating domain %s\n", dt_node_name(node));
 
         d->is_console = true;
 
         if ( construct_domU(d, node) != 0 )
-            panic("Could not set up domain %s", dt_node_name(node));
+            panic("Could not set up domain %s\n", dt_node_name(node));
 
         domain_unpause_by_systemcontroller(d);
     }
