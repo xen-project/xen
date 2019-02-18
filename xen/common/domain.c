@@ -1134,18 +1134,24 @@ int domain_unpause_by_systemcontroller(struct domain *d)
     return 0;
 }
 
-void domain_pause_except_self(struct domain *d)
+int domain_pause_except_self(struct domain *d)
 {
     struct vcpu *v, *curr = current;
 
     if ( curr->domain == d )
     {
+        /* Avoid racing with other vcpus which may want to be pausing us */
+        if ( !spin_trylock(&d->hypercall_deadlock_mutex) )
+            return -ERESTART;
         for_each_vcpu( d, v )
             if ( likely(v != curr) )
                 vcpu_pause(v);
+        spin_unlock(&d->hypercall_deadlock_mutex);
     }
     else
         domain_pause(d);
+
+    return 0;
 }
 
 void domain_unpause_except_self(struct domain *d)

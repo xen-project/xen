@@ -839,7 +839,7 @@ static inline int domain_pause_by_systemcontroller_nosync(struct domain *d)
 }
 
 /* domain_pause() but safe against trying to pause current. */
-void domain_pause_except_self(struct domain *d);
+int __must_check domain_pause_except_self(struct domain *d);
 void domain_unpause_except_self(struct domain *d);
 
 /*
