@@ -308,6 +308,35 @@ int osdep_gntshr_unshare(xengntshr_handle *xgs,
 }
 
 /*
+ * The functions below are Linux-isms that will likely never be implemented
+ * on FreeBSD unless FreeBSD also implements something akin to Linux dmabuf.
+ */
+int osdep_gnttab_dmabuf_exp_from_refs(xengnttab_handle *xgt, uint32_t domid,
+                                      uint32_t flags, uint32_t count,
+                                      const uint32_t *refs,
+                                      uint32_t *dmabuf_fd)
+{
+    abort();
+}
+
+int osdep_gnttab_dmabuf_exp_wait_released(xengnttab_handle *xgt,
+                                          uint32_t fd, uint32_t wait_to_ms)
+{
+    abort();
+}
+
+int osdep_gnttab_dmabuf_imp_to_refs(xengnttab_handle *xgt, uint32_t domid,
+                                    uint32_t fd, uint32_t count, uint32_t *refs)
+{
+    abort();
+}
+
+int osdep_gnttab_dmabuf_imp_release(xengnttab_handle *xgt, uint32_t fd)
+{
+    abort();
+}
+
+/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"
