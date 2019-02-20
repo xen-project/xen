@@ -475,8 +475,6 @@ int arch_domain_create(struct domain *d,
     int rc;
 
     INIT_LIST_HEAD(&d->arch.pdev_list);
-
-    d->arch.relmem = RELMEM_not_started;
     INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
     spin_lock_init(&d->arch.e820_lock);
@@ -2020,17 +2018,50 @@ int domain_relinquish_resources(struct domain *d)
 
     BUG_ON(!cpumask_empty(d->dirty_cpumask));
 
-    switch ( d->arch.relmem )
+    /*
+     * This hypercall can take minutes of wallclock time to complete.  This
+     * logic implements a co-routine, stashing state in struct domain across
+     * hypercall continuation boundaries.
+     */
+    switch ( d->arch.rel_priv )
     {
-    case RELMEM_not_started:
+        /*
+         * Record the current progress.  Subsequent hypercall continuations
+         * will logically restart work from this point.
+         *
+         * PROGRESS() markers must not be in the middle of loops.  The loop
+         * variable isn't preserved across a continuation.
+         *
+         * To avoid redundant work, there should be a marker before each
+         * function which may return -ERESTART.
+         */
+#define PROGRESS(x)                                                     \
+        d->arch.rel_priv = PROG_ ## x; /* Fallthrough */ case PROG_ ## x
+
+        enum {
+            PROG_paging = 1,
+            PROG_vcpu_pagetables,
+            PROG_shared,
+            PROG_xen,
+            PROG_l4,
+            PROG_l3,
+            PROG_l2,
+            PROG_done,
+        };
+
+    case 0:
         ret = pci_release_devices(d);
         if ( ret )
             return ret;
+
+    PROGRESS(paging):
 
         /* Tear down paging-assistance stuff. */
         ret = paging_teardown(d);
         if ( ret )
             return ret;
+
+    PROGRESS(vcpu_pagetables):
 
         /* Drop the in-use references to page-table bases. */
         for_each_vcpu ( d, v )
@@ -2058,10 +2089,7 @@ int domain_relinquish_resources(struct domain *d)
             d->arch.auto_unmask = 0;
         }
 
-        d->arch.relmem = RELMEM_shared;
-        /* fallthrough */
-
-    case RELMEM_shared:
+    PROGRESS(shared):
 
         if ( is_hvm_domain(d) )
         {
@@ -2072,44 +2100,39 @@ int domain_relinquish_resources(struct domain *d)
                 return ret;
         }
 
-        d->arch.relmem = RELMEM_xen;
-
         spin_lock(&d->page_alloc_lock);
         page_list_splice(&d->arch.relmem_list, &d->page_list);
         INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
         spin_unlock(&d->page_alloc_lock);
 
-        /* Fallthrough. Relinquish every page of memory. */
-    case RELMEM_xen:
+    PROGRESS(xen):
+
         ret = relinquish_memory(d, &d->xenpage_list, ~0UL);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_l4;
-        /* fallthrough */
 
-    case RELMEM_l4:
+    PROGRESS(l4):
+
         ret = relinquish_memory(d, &d->page_list, PGT_l4_page_table);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_l3;
-        /* fallthrough */
 
-    case RELMEM_l3:
+    PROGRESS(l3):
+
         ret = relinquish_memory(d, &d->page_list, PGT_l3_page_table);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_l2;
-        /* fallthrough */
 
-    case RELMEM_l2:
+    PROGRESS(l2):
+
         ret = relinquish_memory(d, &d->page_list, PGT_l2_page_table);
         if ( ret )
             return ret;
-        d->arch.relmem = RELMEM_done;
-        /* fallthrough */
 
-    case RELMEM_done:
+    PROGRESS(done):
         break;
+
+#undef PROGRESS
 
     default:
         BUG();

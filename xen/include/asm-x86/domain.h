@@ -314,15 +314,7 @@ struct arch_domain
     int page_alloc_unlock_level;
 
     /* Continuable domain_relinquish_resources(). */
-    enum {
-        RELMEM_not_started,
-        RELMEM_shared,
-        RELMEM_xen,
-        RELMEM_l4,
-        RELMEM_l3,
-        RELMEM_l2,
-        RELMEM_done,
-    } relmem;
+    unsigned int rel_priv;
     struct page_list_head relmem_list;
 
     const struct arch_csw {
