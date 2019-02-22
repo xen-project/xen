@@ -729,6 +729,12 @@ unsigned long long xenstat_vbd_wr_sects(xenstat_vbd * vbd)
 	return vbd->wr_sects;
 }
 
+/* Returns error while getting stats (1 if error happened, 0 otherwise) */
+bool xenstat_vbd_error(xenstat_vbd * vbd)
+{
+	return vbd->error;
+}
+
 /*
  * Tmem functions
  */

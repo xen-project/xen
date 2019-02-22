@@ -98,6 +98,7 @@ struct xenstat_network {
 struct xenstat_vbd {
 	unsigned int back_type;
 	unsigned int dev;
+	unsigned int error;
 	unsigned long long oo_reqs;
 	unsigned long long rd_reqs;
 	unsigned long long wr_reqs;

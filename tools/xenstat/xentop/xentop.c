@@ -87,7 +87,7 @@ static int handle_key(int);
 static int compare(unsigned long long, unsigned long long);
 static int compare_domains(xenstat_domain **, xenstat_domain **);
 static unsigned long long tot_net_bytes( xenstat_domain *, int);
-static unsigned long long tot_vbd_reqs( xenstat_domain *, int);
+static bool tot_vbd_reqs(xenstat_domain *, int, unsigned long long *);
 
 /* Field functions */
 static int compare_state(xenstat_domain *domain1, xenstat_domain *domain2);
@@ -685,91 +685,164 @@ static void print_vbds(xenstat_domain *domain)
    returning -1,0,1 * for <,=,> */
 static int compare_vbd_oo(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-  return -compare(tot_vbd_reqs(domain1, FIELD_VBD_OO),
-		  tot_vbd_reqs(domain2, FIELD_VBD_OO));
+	unsigned long long dom1_vbd_oo = 0, dom2_vbd_oo = 0;
+
+	tot_vbd_reqs(domain1, FIELD_VBD_OO, &dom1_vbd_oo);
+	tot_vbd_reqs(domain1, FIELD_VBD_OO, &dom2_vbd_oo);
+
+	return -compare(dom1_vbd_oo, dom2_vbd_oo);
 }
 
 /* Prints number of total VBD OO requests statistic */
 static void print_vbd_oo(xenstat_domain *domain)
 {
-	print("%8llu", tot_vbd_reqs(domain, FIELD_VBD_OO));
+	unsigned long long vbd_oo;
+
+	if (tot_vbd_reqs(domain, FIELD_VBD_OO, &vbd_oo))
+	{
+		print("%8llu", vbd_oo);
+	}
+	else
+	{
+		print("%8c", '-');
+	}
 }
 
 /* Compares number of total VBD READ requests of two domains,
    returning -1,0,1 * for <,=,> */
 static int compare_vbd_rd(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_RD),
-			tot_vbd_reqs(domain2, FIELD_VBD_RD));
+	unsigned long long dom1_vbd_rd = 0, dom2_vbd_rd = 0;
+
+	tot_vbd_reqs(domain1, FIELD_VBD_RD, &dom1_vbd_rd);
+	tot_vbd_reqs(domain1, FIELD_VBD_RD, &dom2_vbd_rd);
+
+	return -compare(dom1_vbd_rd, dom1_vbd_rd);
 }
 
 /* Prints number of total VBD READ requests statistic */
 static void print_vbd_rd(xenstat_domain *domain)
 {
-	print("%*llu", fields[FIELD_VBD_RD-1].default_width, tot_vbd_reqs(domain, FIELD_VBD_RD));
+	unsigned long long vbd_rd;
+
+	if (tot_vbd_reqs(domain, FIELD_VBD_RD, &vbd_rd))
+	{
+		print("%*llu", fields[FIELD_VBD_RD-1].default_width, vbd_rd);
+	}
+	else
+	{
+		print("%*c", fields[FIELD_VBD_RD-1].default_width, '-');
+	}
 }
 
 /* Compares number of total VBD WRITE requests of two domains,
    returning -1,0,1 * for <,=,> */
 static int compare_vbd_wr(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_WR),
-			tot_vbd_reqs(domain2, FIELD_VBD_WR));
+	unsigned long long dom1_vbd_wr = 0, dom2_vbd_wr = 0;
+
+	tot_vbd_reqs(domain1, FIELD_VBD_WR, &dom1_vbd_wr);
+	tot_vbd_reqs(domain1, FIELD_VBD_WR, &dom2_vbd_wr);
+
+	return -compare(dom1_vbd_wr, dom2_vbd_wr);
 }
 
 /* Prints number of total VBD WRITE requests statistic */
 static void print_vbd_wr(xenstat_domain *domain)
 {
-	print("%*llu", fields[FIELD_VBD_WR-1].default_width, tot_vbd_reqs(domain, FIELD_VBD_WR));
+	unsigned long long vbd_wr;
+
+	if (tot_vbd_reqs(domain, FIELD_VBD_WR, &vbd_wr))
+	{
+		print("%*llu", fields[FIELD_VBD_WR-1].default_width, vbd_wr);
+	}
+	else
+	{
+		print("%*c", fields[FIELD_VBD_WR-1].default_width, '-');
+	}
 }
 
 /* Compares number of total VBD READ sectors of two domains,
    returning -1,0,1 * for <,=,> */
 static int compare_vbd_rsect(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_RSECT),
-			tot_vbd_reqs(domain2, FIELD_VBD_RSECT));
+	unsigned long long dom1_vbd_rsect = 0, dom2_vbd_rsect = 0;
+
+	tot_vbd_reqs(domain1, FIELD_VBD_RSECT, &dom1_vbd_rsect);
+	tot_vbd_reqs(domain1, FIELD_VBD_RSECT, &dom2_vbd_rsect);
+
+	return -compare(dom1_vbd_rsect, dom2_vbd_rsect);
 }
 
 /* Prints number of total VBD READ sectors statistic */
 static void print_vbd_rsect(xenstat_domain *domain)
 {
-	print("%*llu", fields[FIELD_VBD_RSECT-1].default_width, tot_vbd_reqs(domain, FIELD_VBD_RSECT));
+	unsigned long long vbd_rsect;
+
+	if (tot_vbd_reqs(domain, FIELD_VBD_RSECT, &vbd_rsect))
+	{
+		print("%*llu", fields[FIELD_VBD_RSECT-1].default_width, vbd_rsect);
+	}
+	else
+	{
+		print("%*c", fields[FIELD_VBD_RSECT-1].default_width, '-');
+	}
 }
 
 /* Compares number of total VBD WRITE sectors of two domains,
    returning -1,0,1 * for <,=,> */
 static int compare_vbd_wsect(xenstat_domain *domain1, xenstat_domain *domain2)
 {
-	return -compare(tot_vbd_reqs(domain1, FIELD_VBD_WSECT),
-			tot_vbd_reqs(domain2, FIELD_VBD_WSECT));
+	unsigned long long dom1_vbd_wsect = 0, dom2_vbd_wsect = 0;
+
+	tot_vbd_reqs(domain1, FIELD_VBD_WSECT, &dom1_vbd_wsect);
+	tot_vbd_reqs(domain2, FIELD_VBD_WSECT, &dom2_vbd_wsect);
+
+	return -compare(dom1_vbd_wsect, dom2_vbd_wsect);
 }
 
 /* Prints number of total VBD WRITE sectors statistic */
 static void print_vbd_wsect(xenstat_domain *domain)
 {
-	print("%*llu", fields[FIELD_VBD_WSECT-1].default_width, tot_vbd_reqs(domain, FIELD_VBD_WSECT));
+	unsigned long long vbd_wsect;
+
+	if (tot_vbd_reqs(domain, FIELD_VBD_WSECT, &vbd_wsect))
+	{
+		print("%*llu", fields[FIELD_VBD_WSECT-1].default_width, vbd_wsect);
+	}
+	else
+	{
+		print("%*c", fields[FIELD_VBD_WSECT-1].default_width, '-');
+	}
 }
 
 
-/* Gets number of total VBD requests statistic, 
+/* Gets number of total VBD requests statistic,
  *   if flag is FIELD_VBD_OO, then OO requests,
  *   if flag is FIELD_VBD_RD, then READ requests,
  *   if flag is FIELD_VBD_WR, then WRITE requests,
  *   if flag is FIELD_VBD_RSECT, then READ sectors,
  *   if flag is FIELD_VBD_WSECT, then WRITE sectors.
  */
-static unsigned long long tot_vbd_reqs(xenstat_domain *domain, int flag)
+static bool tot_vbd_reqs(xenstat_domain *domain, int flag, unsigned long long *res)
 {
 	int i = 0;
 	xenstat_vbd *vbd;
 	unsigned num_vbds = 0;
 	unsigned long long total = 0;
-	
+	bool show_stats = false;
+
 	num_vbds = xenstat_domain_num_vbds(domain);
-	
+	if (!num_vbds)
+		show_stats = true;
+
 	for ( i=0 ; i < num_vbds ; i++) {
 		vbd = xenstat_domain_vbd(domain,i);
+		if (xenstat_vbd_error(vbd))
+			continue;
+		else
+			show_stats = true;
+
 		switch(flag) {
 		case FIELD_VBD_OO:
 			total += xenstat_vbd_oo_reqs(vbd);
@@ -790,8 +863,10 @@ static unsigned long long tot_vbd_reqs(xenstat_domain *domain, int flag)
 			break;
 		}
 	}
-	
-	return total;
+
+	*res = total;
+
+	return show_stats;
 }
 
 /* Compares security id (ssid) of two domains, returning -1,0,1 for <,=,> */
@@ -822,6 +897,7 @@ void reset_field_widths(void)
 void adjust_field_widths(xenstat_domain *domain)
 {
 	unsigned int length;
+	unsigned long long vbd_rd, vbd_wr, vbd_rsect, vbd_wsect;
 
 	if (show_full_name) {
 		length = strlen(xenstat_domain_name(domain));
@@ -837,19 +913,23 @@ void adjust_field_widths(xenstat_domain *domain)
 	if (length > fields[FIELD_NET_RX-1].default_width)
 		fields[FIELD_NET_RX-1].default_width = length;
 
-	length = INT_FIELD_WIDTH((tot_vbd_reqs(domain, FIELD_VBD_RD)) + 1);
+	tot_vbd_reqs(domain, FIELD_VBD_RD, &vbd_rd);
+	length = INT_FIELD_WIDTH(vbd_rd + 1);
 	if (length > fields[FIELD_VBD_RD-1].default_width)
 		fields[FIELD_VBD_RD-1].default_width = length;
 
-	length = INT_FIELD_WIDTH((tot_vbd_reqs(domain, FIELD_VBD_WR)) + 1);
+	tot_vbd_reqs(domain, FIELD_VBD_WR, &vbd_wr);
+	length = INT_FIELD_WIDTH(vbd_wr + 1);
 	if (length > fields[FIELD_VBD_WR-1].default_width)
 		fields[FIELD_VBD_WR-1].default_width = length;
 
-	length = INT_FIELD_WIDTH((tot_vbd_reqs(domain, FIELD_VBD_RSECT)) + 1);
+	tot_vbd_reqs(domain, FIELD_VBD_RSECT, &vbd_rsect);
+	length = INT_FIELD_WIDTH(vbd_rsect + 1);
 	if (length > fields[FIELD_VBD_RSECT-1].default_width)
 		fields[FIELD_VBD_RSECT-1].default_width = length;
 
-	length = INT_FIELD_WIDTH((tot_vbd_reqs(domain, FIELD_VBD_WSECT)) + 1);
+	tot_vbd_reqs(domain, FIELD_VBD_WSECT, &vbd_wsect);
+	length = INT_FIELD_WIDTH(vbd_wsect + 1);
 	if (length > fields[FIELD_VBD_WSECT-1].default_width)
 		fields[FIELD_VBD_WSECT-1].default_width = length;
 }
@@ -1009,7 +1089,7 @@ void do_vcpu(xenstat_domain *domain)
 		if (xenstat_vcpu_online(vcpu) > 0) {
 			if (i != 0 && (i%5)==0)
 				print("\n        ");
-			print(" %2u: %10llus", i, 
+			print(" %2u: %10llus", i,
 					xenstat_vcpu_ns(vcpu)/1000000000);
 		}
 	}
@@ -1074,15 +1154,24 @@ void do_vbd(xenstat_domain *domain)
 			 MAJOR(xenstat_vbd_dev(vbd)),
 			 MINOR(xenstat_vbd_dev(vbd)));
 #endif
-
-		print("VBD %s %4d %s OO: %8llu   RD: %8llu   WR: %8llu   RSECT: %10llu   WSECT: %10llu\n",
-		      vbd_type[xenstat_vbd_type(vbd)],
-		      xenstat_vbd_dev(vbd), details,
-		      xenstat_vbd_oo_reqs(vbd),
-		      xenstat_vbd_rd_reqs(vbd),
-		      xenstat_vbd_wr_reqs(vbd),
-		      xenstat_vbd_rd_sects(vbd),
-		      xenstat_vbd_wr_sects(vbd));
+		if (xenstat_vbd_error(vbd))
+		{
+			print("VBD %s %4d %s OO: %8c   RD: %8c   WR: %8c   RSECT: %10c   WSECT: %10c\n",
+				vbd_type[xenstat_vbd_type(vbd)],
+				xenstat_vbd_dev(vbd), details,
+				'-', '-', '-', '-','-');
+		}
+		else
+		{
+			print("VBD %s %4d %s OO: %8llu   RD: %8llu   WR: %8llu   RSECT: %10llu   WSECT: %10llu\n",
+				vbd_type[xenstat_vbd_type(vbd)],
+				xenstat_vbd_dev(vbd), details,
+				xenstat_vbd_oo_reqs(vbd),
+				xenstat_vbd_rd_reqs(vbd),
+				xenstat_vbd_wr_reqs(vbd),
+				xenstat_vbd_rd_sects(vbd),
+				xenstat_vbd_wr_sects(vbd));
+		}
 	}
 }
 

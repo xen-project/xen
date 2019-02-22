@@ -20,6 +20,8 @@
 #ifndef XENSTAT_H
 #define XENSTAT_H
 
+#include <stdbool.h>
+
 /* Opaque handles */
 typedef struct xenstat_handle xenstat_handle;
 typedef struct xenstat_domain xenstat_domain;
@@ -192,6 +194,9 @@ unsigned long long xenstat_vbd_rd_reqs(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_wr_reqs(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_rd_sects(xenstat_vbd * vbd);
 unsigned long long xenstat_vbd_wr_sects(xenstat_vbd * vbd);
+
+/* Returns error while getting stats (1 if error happened, 0 otherwise) */
+bool xenstat_vbd_error(xenstat_vbd * vbd);
 
 /*
  * Tmem functions - extract tmem information
