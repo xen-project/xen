@@ -628,19 +628,6 @@ void xstate_init(struct cpuinfo_x86 *c)
         BUG_ON(xsave_cntxt_size != _xstate_ctxt_size(feature_mask));
     }
 
-    /* Check extended XSAVE features. */
-    cpuid_count(XSTATE_CPUID, 1, &eax, &ebx, &ecx, &edx);
-
-    /* Mask out features not currently understood by Xen. */
-    eax &= (cpufeat_mask(X86_FEATURE_XSAVEOPT) |
-            cpufeat_mask(X86_FEATURE_XSAVEC) |
-            cpufeat_mask(X86_FEATURE_XGETBV1) |
-            cpufeat_mask(X86_FEATURE_XSAVES));
-
-    c->x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)] = eax;
-
-    BUG_ON(eax != boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)]);
-
     if ( setup_xstate_features(bsp) && bsp )
         BUG();
 }
