@@ -30,6 +30,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/nospec.h>
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpic.h>
@@ -65,6 +66,12 @@ static struct hvm_vioapic *gsi_vioapic(const struct domain *d,
                                        unsigned int gsi, unsigned int *pin)
 {
     unsigned int i;
+
+    /*
+     * Make sure the compiler does not optimize away the initialization done by
+     * callers
+     */
+    OPTIMIZER_HIDE_VAR(*pin);
 
     for ( i = 0; i < d->arch.hvm.nr_vioapics; i++ )
     {
@@ -117,7 +124,8 @@ static uint32_t vioapic_read_indirect(const struct hvm_vioapic *vioapic)
             break;
         }
 
-        redir_content = vioapic->redirtbl[redir_index].bits;
+        redir_content = vioapic->redirtbl[array_index_nospec(redir_index,
+                                                       vioapic->nr_pins)].bits;
         result = (vioapic->ioregsel & 1) ? (redir_content >> 32)
                                          : redir_content;
         break;
@@ -212,7 +220,15 @@ static void vioapic_write_redirent(
     struct hvm_irq *hvm_irq = hvm_domain_irq(d);
     union vioapic_redir_entry *pent, ent;
     int unmasked = 0;
-    unsigned int gsi = vioapic->base_gsi + idx;
+    unsigned int gsi;
+
+    /* Callers of this function should make sure idx is bounded appropriately */
+    ASSERT(idx < vioapic->nr_pins);
+
+    /* Make sure no out-of-bounds value for idx can be used */
+    idx = array_index_nospec(idx, vioapic->nr_pins);
+
+    gsi = vioapic->base_gsi + idx;
 
     spin_lock(&d->arch.hvm.irq_lock);
 
@@ -467,7 +483,7 @@ static void vioapic_deliver(struct hvm_vioapic *vioapic, unsigned int pin)
 
 void vioapic_irq_positive_edge(struct domain *d, unsigned int irq)
 {
-    unsigned int pin;
+    unsigned int pin = 0; /* See gsi_vioapic */
     struct hvm_vioapic *vioapic = gsi_vioapic(d, irq, &pin);
     union vioapic_redir_entry *ent;
 
@@ -542,7 +558,7 @@ void vioapic_update_EOI(struct domain *d, u8 vector)
 
 int vioapic_get_mask(const struct domain *d, unsigned int gsi)
 {
-    unsigned int pin;
+    unsigned int pin = 0; /* See gsi_vioapic */
     const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);
 
     if ( !vioapic )
@@ -553,7 +569,7 @@ int vioapic_get_mask(const struct domain *d, unsigned int gsi)
 
 int vioapic_get_vector(const struct domain *d, unsigned int gsi)
 {
-    unsigned int pin;
+    unsigned int pin = 0; /* See gsi_vioapic */
     const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);
 
     if ( !vioapic )
@@ -564,7 +580,7 @@ int vioapic_get_vector(const struct domain *d, unsigned int gsi)
 
 int vioapic_get_trigger_mode(const struct domain *d, unsigned int gsi)
 {
-    unsigned int pin;
+    unsigned int pin = 0; /* See gsi_vioapic */
     const struct hvm_vioapic *vioapic = gsi_vioapic(d, gsi, &pin);
 
     if ( !vioapic )
