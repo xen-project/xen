@@ -326,9 +326,9 @@ long read_console_ring(struct xen_sysctl_readconsole *op)
 static char serial_rx_ring[SERIAL_RX_SIZE];
 static unsigned int serial_rx_cons, serial_rx_prod;
 
-static void (*serial_steal_fn)(const char *) = early_puts;
+static void (*serial_steal_fn)(const char *, size_t nr) = early_puts;
 
-int console_steal(int handle, void (*fn)(const char *))
+int console_steal(int handle, void (*fn)(const char *, size_t nr))
 {
     if ( (handle == -1) || (handle != sercon_handle) )
         return 0;
@@ -346,15 +346,15 @@ void console_giveback(int id)
         serial_steal_fn = NULL;
 }
 
-static void sercon_puts(const char *s)
+static void sercon_puts(const char *s, size_t nr)
 {
     if ( serial_steal_fn != NULL )
-        (*serial_steal_fn)(s);
+        serial_steal_fn(s, nr);
     else
-        serial_puts(sercon_handle, s);
+        serial_puts(sercon_handle, s, nr);
 
     /* Copy all serial output into PV console */
-    pv_console_puts(s);
+    pv_console_puts(s, nr);
 }
 
 static void dump_console_ring_key(unsigned char key)
@@ -387,10 +387,9 @@ static void dump_console_ring_key(unsigned char key)
         sofar += len;
         c += len;
     }
-    buf[sofar] = '\0';
 
-    sercon_puts(buf);
-    video_puts(buf);
+    sercon_puts(buf, sofar);
+    video_puts(buf, sofar);
 
     free_xenheap_pages(buf, order);
 }
@@ -528,7 +527,7 @@ static inline void xen_console_write_debug_port(const char *buf, size_t len)
 static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 {
     char kbuf[128];
-    int kcount = 0;
+    unsigned int kcount = 0;
     struct domain *cd = current->domain;
 
     while ( count > 0 )
@@ -541,25 +540,22 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
         kcount = min_t(int, count, sizeof(kbuf)-1);
         if ( copy_from_guest(kbuf, buffer, kcount) )
             return -EFAULT;
-        kbuf[kcount] = '\0';
 
         if ( is_hardware_domain(cd) )
         {
             /* Use direct console output as it could be interactive */
             spin_lock_irq(&console_lock);
 
-            sercon_puts(kbuf);
-            video_puts(kbuf);
+            sercon_puts(kbuf, kcount);
+            video_puts(kbuf, kcount);
 
 #ifdef CONFIG_X86
             if ( opt_console_xen )
             {
-                size_t len = strlen(kbuf);
-
                 if ( xen_guest )
-                    xen_hypercall_console_write(kbuf, len);
+                    xen_hypercall_console_write(kbuf, kcount);
                 else
-                    xen_console_write_debug_port(kbuf, len);
+                    xen_console_write_debug_port(kbuf, kcount);
             }
 #endif
 
@@ -576,19 +572,20 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
             char *kin = kbuf, *kout = kbuf, c;
 
             /* Strip non-printable characters */
-            for ( ; ; )
+            do
             {
                 c = *kin++;
-                if ( c == '\0' || c == '\n' )
+                if ( c == '\n' )
                     break;
                 if ( isprint(c) || c == '\t' )
                     *kout++ = c;
-            }
+            } while ( --kcount > 0 );
+
             *kout = '\0';
             spin_lock(&cd->pbuf_lock);
+            kcount = kin - kbuf;
             if ( c == '\n' )
             {
-                kcount = kin - kbuf;
                 cd->pbuf[cd->pbuf_idx] = '\0';
                 guest_printk(cd, XENLOG_G_DEBUG "%s%s\n", cd->pbuf, kbuf);
                 cd->pbuf_idx = 0;
@@ -667,16 +664,16 @@ static bool_t console_locks_busted;
 
 static void __putstr(const char *str)
 {
+    size_t len = strlen(str);
+
     ASSERT(spin_is_locked(&console_lock));
 
-    sercon_puts(str);
-    video_puts(str);
+    sercon_puts(str, len);
+    video_puts(str, len);
 
 #ifdef CONFIG_X86
     if ( opt_console_xen )
     {
-        size_t len = strlen(str);
-
         if ( xen_guest )
             xen_hypercall_console_write(str, len);
         else
@@ -1250,6 +1247,7 @@ void debugtrace_printk(const char *fmt, ...)
     char          cntbuf[24];
     va_list       args;
     unsigned long flags;
+    unsigned int nr;
 
     if ( debugtrace_bytes == 0 )
         return;
@@ -1261,14 +1259,15 @@ void debugtrace_printk(const char *fmt, ...)
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
 
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    nr = vscnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
     if ( debugtrace_send_to_console )
     {
-        snprintf(cntbuf, sizeof(cntbuf), "%u ", ++count);
-        serial_puts(sercon_handle, cntbuf);
-        serial_puts(sercon_handle, buf);
+        unsigned int n = scnprintf(cntbuf, sizeof(cntbuf), "%u ", ++count);
+
+        serial_puts(sercon_handle, cntbuf, n);
+        serial_puts(sercon_handle, buf, nr);
     }
     else
     {
@@ -1381,7 +1380,7 @@ void panic(const char *fmt, ...)
  * **************************************************************
  */
 
-static void suspend_steal_fn(const char *str) { }
+static void suspend_steal_fn(const char *str, size_t nr) { }
 static int suspend_steal_id;
 
 int console_suspend(void)

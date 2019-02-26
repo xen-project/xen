@@ -223,11 +223,10 @@ void serial_putc(int handle, char c)
     spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
-void serial_puts(int handle, const char *s)
+void serial_puts(int handle, const char *s, size_t nr)
 {
     struct serial_port *port;
     unsigned long flags;
-    char c;
 
     if ( handle == -1 )
         return;
@@ -238,8 +237,10 @@ void serial_puts(int handle, const char *s)
 
     spin_lock_irqsave(&port->tx_lock, flags);
 
-    while ( (c = *s++) != '\0' )
+    for ( ; nr > 0; nr--, s++ )
     {
+        char c = *s;
+
         if ( (c == '\n') && (handle & SERHND_COOKED) )
             __serial_putc(port, '\r' | ((handle & SERHND_HI) ? 0x80 : 0x00));
 

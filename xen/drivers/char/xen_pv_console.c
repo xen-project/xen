@@ -129,13 +129,13 @@ size_t pv_console_rx(struct cpu_user_regs *regs)
     return recv;
 }
 
-static size_t pv_ring_puts(const char *buf)
+static size_t pv_ring_puts(const char *buf, size_t nr)
 {
     XENCONS_RING_IDX cons, prod;
     size_t sent = 0, avail;
     bool put_r = false;
 
-    while ( buf[sent] != '\0' || put_r )
+    while ( sent < nr || put_r )
     {
         cons = ACCESS_ONCE(cons_ring->out_cons);
         prod = cons_ring->out_prod;
@@ -156,7 +156,7 @@ static size_t pv_ring_puts(const char *buf)
             continue;
         }
 
-        while ( avail && (buf[sent] != '\0' || put_r) )
+        while ( avail && (sent < nr || put_r) )
         {
             if ( put_r )
             {
@@ -185,7 +185,7 @@ static size_t pv_ring_puts(const char *buf)
     return sent;
 }
 
-void pv_console_puts(const char *buf)
+void pv_console_puts(const char *buf, size_t nr)
 {
     unsigned long flags;
 
@@ -193,7 +193,7 @@ void pv_console_puts(const char *buf)
         return;
 
     spin_lock_irqsave(&tx_lock, flags);
-    pv_ring_puts(buf);
+    pv_ring_puts(buf, nr);
     spin_unlock_irqrestore(&tx_lock, flags);
 }
 

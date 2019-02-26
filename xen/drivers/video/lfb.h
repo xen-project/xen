@@ -35,8 +35,8 @@ struct lfb_prop {
     unsigned int text_rows;
 };
 
-void lfb_redraw_puts(const char *s);
-void lfb_scroll_puts(const char *s);
+void lfb_redraw_puts(const char *s, size_t nr);
+void lfb_scroll_puts(const char *s, size_t nr);
 void lfb_carriage_return(void);
 void lfb_free(void);
 

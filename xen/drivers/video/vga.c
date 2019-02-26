@@ -18,9 +18,9 @@ static int vgacon_keep;
 static unsigned int xpos, ypos;
 static unsigned char *video;
 
-static void vga_text_puts(const char *s);
-static void vga_noop_puts(const char *s) {}
-void (*video_puts)(const char *) = vga_noop_puts;
+static void vga_text_puts(const char *s, size_t nr);
+static void vga_noop_puts(const char *s, size_t nr) {}
+void (*video_puts)(const char *, size_t nr) = vga_noop_puts;
 
 /*
  * 'vga=<mode-specifier>[,keep]' where <mode-specifier> is one of:
@@ -174,12 +174,12 @@ void __init video_endboot(void)
     }
 }
 
-static void vga_text_puts(const char *s)
+static void vga_text_puts(const char *s, size_t nr)
 {
-    char c;
-
-    while ( (c = *s++) != '\0' )
+    for ( ; nr > 0; nr--, s++ )
     {
+        char c = *s;
+
         if ( (c == '\n') || (xpos >= columns) )
         {
             if ( ++ypos >= lines )

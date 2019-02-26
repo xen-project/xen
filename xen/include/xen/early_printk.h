@@ -5,7 +5,7 @@
 #define __XEN_EARLY_PRINTK_H__
 
 #ifdef CONFIG_EARLY_PRINTK
-void early_puts(const char *s);
+void early_puts(const char *s, size_t nr);
 #else
 #define early_puts NULL
 #endif
