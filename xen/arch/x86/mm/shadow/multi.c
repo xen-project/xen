@@ -175,18 +175,22 @@ static inline bool
 sh_walk_guest_tables(struct vcpu *v, unsigned long va, walk_t *gw,
                      uint32_t pfec)
 {
-    return guest_walk_tables(v, p2m_get_hostp2m(v->domain), va, gw, pfec,
 #if GUEST_PAGING_LEVELS == 3 /* PAE */
-                             INVALID_MFN,
-                             v->arch.paging.shadow.gl3e
+    return guest_walk_tables(v, p2m_get_hostp2m(v->domain), va, gw, pfec,
+                             INVALID_MFN, v->arch.paging.shadow.gl3e);
 #else /* 32 or 64 */
-                             (((v->arch.flags & TF_kernel_mode) ||
-                               is_pv_32bit_vcpu(v))
-                              ? pagetable_get_mfn(v->arch.guest_table)
-                              : pagetable_get_mfn(v->arch.guest_table_user)),
-                             v->arch.paging.shadow.guest_vtable
+    const struct domain *d = v->domain;
+    mfn_t root_mfn = ((v->arch.flags & TF_kernel_mode) || is_pv_32bit_domain(d)
+                      ? pagetable_get_mfn(v->arch.guest_table)
+                      : pagetable_get_mfn(v->arch.guest_table_user));
+    void *root_map = map_domain_page(root_mfn);
+    bool ok = guest_walk_tables(v, p2m_get_hostp2m(d), va, gw, pfec,
+                                root_mfn, root_map);
+
+    unmap_domain_page(root_map);
+
+    return ok;
 #endif
-                             );
 }
 
 /* This validation is called with lock held, and after write permission
@@ -226,8 +230,9 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
     perfc_incr(shadow_check_gwalk);
 #if GUEST_PAGING_LEVELS >= 3 /* PAE or 64... */
 #if GUEST_PAGING_LEVELS >= 4 /* 64-bit only... */
-    l4p = (guest_l4e_t *)v->arch.paging.shadow.guest_vtable;
+    l4p = map_domain_page(gw->l4mfn);
     mismatch |= (gw->l4e.l4 != l4p[guest_l4_table_offset(va)].l4);
+    unmap_domain_page(l4p);
     l3p = map_domain_page(gw->l3mfn);
     mismatch |= (gw->l3e.l3 != l3p[guest_l3_table_offset(va)].l3);
     unmap_domain_page(l3p);
@@ -235,13 +240,11 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
     mismatch |= (gw->l3e.l3 !=
                  v->arch.paging.shadow.gl3e[guest_l3_table_offset(va)].l3);
 #endif
+#endif
     l2p = map_domain_page(gw->l2mfn);
     mismatch |= (gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2);
     unmap_domain_page(l2p);
-#else
-    l2p = (guest_l2e_t *)v->arch.paging.shadow.guest_vtable;
-    mismatch |= (gw->l2e.l2 != l2p[guest_l2_table_offset(va)].l2);
-#endif
+
     if ( !(guest_can_use_l2_superpages(v) &&
            (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)) )
     {
@@ -3862,7 +3865,8 @@ sh_update_linear_entries(struct vcpu *v)
 }
 
 
-/* Removes vcpu->arch.paging.shadow.guest_vtable and vcpu->arch.shadow_table[].
+/*
+ * Removes vcpu->arch.shadow_table[].
  * Does all appropriate management/bookkeeping/refcounting/etc...
  */
 static void
@@ -3871,23 +3875,6 @@ sh_detach_old_tables(struct vcpu *v)
     struct domain *d = v->domain;
     mfn_t smfn;
     int i = 0;
-
-    ////
-    //// vcpu->arch.paging.shadow.guest_vtable
-    ////
-
-#if GUEST_PAGING_LEVELS == 3
-    /* PAE guests don't have a mapping of the guest top-level table */
-    ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
-#else
-    if ( v->arch.paging.shadow.guest_vtable )
-    {
-        if ( shadow_mode_external(d) || shadow_mode_translate(d) )
-            unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
-        v->arch.paging.shadow.guest_vtable = NULL;
-    }
-#endif // !NDEBUG
-
 
     ////
     //// vcpu->arch.shadow_table[]
@@ -4044,29 +4031,12 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
 #endif
         gmfn = pagetable_get_mfn(v->arch.guest_table);
 
-
-    ////
-    //// vcpu->arch.paging.shadow.guest_vtable
-    ////
-#if GUEST_PAGING_LEVELS == 4
-    if ( shadow_mode_external(d) || shadow_mode_translate(d) )
-    {
-        if ( v->arch.paging.shadow.guest_vtable )
-            unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
-        v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
-        /* PAGING_LEVELS==4 implies 64-bit, which means that
-         * map_domain_page_global can't fail */
-        BUG_ON(v->arch.paging.shadow.guest_vtable == NULL);
-    }
-    else
-        v->arch.paging.shadow.guest_vtable = __linear_l4_table;
-#elif GUEST_PAGING_LEVELS == 3
+#if GUEST_PAGING_LEVELS == 3
     /*
      * On PAE guests we don't use a mapping of the guest's own top-level
      * table.  We cache the current state of that table and shadow that,
      * until the next CR3 write makes us refresh our cache.
      */
-    ASSERT(v->arch.paging.shadow.guest_vtable == NULL);
     ASSERT(shadow_mode_external(d));
 
     /*
@@ -4079,16 +4049,6 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
     for ( i = 0; i < 4 ; i++ )
         v->arch.paging.shadow.gl3e[i] = gl3e[i];
     unmap_domain_page(gl3e);
-#elif GUEST_PAGING_LEVELS == 2
-    ASSERT(shadow_mode_external(d));
-    if ( v->arch.paging.shadow.guest_vtable )
-        unmap_domain_page_global(v->arch.paging.shadow.guest_vtable);
-    v->arch.paging.shadow.guest_vtable = map_domain_page_global(gmfn);
-    /* Does this really need map_domain_page_global?  Handle the
-     * error properly if so. */
-    BUG_ON(v->arch.paging.shadow.guest_vtable == NULL); /* XXX */
-#else
-#error this should never happen
 #endif
 
 
