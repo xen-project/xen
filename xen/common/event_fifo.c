@@ -33,7 +33,8 @@ static inline event_word_t *evtchn_fifo_word_from_port(const struct domain *d,
      */
     smp_rmb();
 
-    p = port / EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
+    p = array_index_nospec(port / EVTCHN_FIFO_EVENT_WORDS_PER_PAGE,
+                           d->evtchn_fifo->num_evtchns);
     w = port % EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
 
     return d->evtchn_fifo->event_array[p] + w;
@@ -516,13 +517,19 @@ int evtchn_fifo_init_control(struct evtchn_init_control *init_control)
     gfn     = init_control->control_gfn;
     offset  = init_control->offset;
 
-    if ( vcpu_id >= d->max_vcpus || !d->vcpu[vcpu_id] )
+    if ( (v = domain_vcpu(d, vcpu_id)) == NULL )
         return -ENOENT;
-    v = d->vcpu[vcpu_id];
 
     /* Must not cross page boundary. */
     if ( offset > (PAGE_SIZE - sizeof(evtchn_fifo_control_block_t)) )
         return -EINVAL;
+
+    /*
+     * Make sure the guest controlled value offset is bounded even during
+     * speculative execution.
+     */
+    offset = array_index_nospec(offset,
+                           PAGE_SIZE - sizeof(evtchn_fifo_control_block_t) + 1);
 
     /* Must be 8-bytes aligned. */
     if ( offset & (8 - 1) )

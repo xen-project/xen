@@ -365,11 +365,16 @@ int evtchn_bind_virq(evtchn_bind_virq_t *bind, evtchn_port_t port)
     if ( (virq < 0) || (virq >= ARRAY_SIZE(v->virq_to_evtchn)) )
         return -EINVAL;
 
+   /*
+    * Make sure the guest controlled value virq is bounded even during
+    * speculative execution.
+    */
+    virq = array_index_nospec(virq, ARRAY_SIZE(v->virq_to_evtchn));
+
     if ( virq_is_global(virq) && (vcpu != 0) )
         return -EINVAL;
 
-    if ( (vcpu < 0) || (vcpu >= d->max_vcpus) ||
-         ((v = d->vcpu[vcpu]) == NULL) )
+    if ( (v = domain_vcpu(d, vcpu)) == NULL )
         return -ENOENT;
 
     spin_lock(&d->event_lock);
@@ -418,8 +423,7 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     int            port, vcpu = bind->vcpu;
     long           rc = 0;
 
-    if ( (vcpu < 0) || (vcpu >= d->max_vcpus) ||
-         (d->vcpu[vcpu] == NULL) )
+    if ( domain_vcpu(d, vcpu) == NULL )
         return -ENOENT;
 
     spin_lock(&d->event_lock);
@@ -930,8 +934,10 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     struct domain *d = current->domain;
     struct evtchn *chn;
     long           rc = 0;
+    struct vcpu   *v;
 
-    if ( (vcpu_id >= d->max_vcpus) || (d->vcpu[vcpu_id] == NULL) )
+    /* Use the vcpu info to prevent speculative out-of-bound accesses */
+    if ( (v = domain_vcpu(d, vcpu_id)) == NULL )
         return -ENOENT;
 
     spin_lock(&d->event_lock);
@@ -955,22 +961,22 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
     {
     case ECS_VIRQ:
         if ( virq_is_global(chn->u.virq) )
-            chn->notify_vcpu_id = vcpu_id;
+            chn->notify_vcpu_id = v->vcpu_id;
         else
             rc = -EINVAL;
         break;
     case ECS_UNBOUND:
     case ECS_INTERDOMAIN:
-        chn->notify_vcpu_id = vcpu_id;
+        chn->notify_vcpu_id = v->vcpu_id;
         break;
     case ECS_PIRQ:
-        if ( chn->notify_vcpu_id == vcpu_id )
+        if ( chn->notify_vcpu_id == v->vcpu_id )
             break;
         unlink_pirq_port(chn, d->vcpu[chn->notify_vcpu_id]);
-        chn->notify_vcpu_id = vcpu_id;
+        chn->notify_vcpu_id = v->vcpu_id;
         pirq_set_affinity(d, chn->u.pirq.irq,
-                          cpumask_of(d->vcpu[vcpu_id]->processor));
-        link_pirq_port(port, chn, d->vcpu[vcpu_id]);
+                          cpumask_of(v->processor));
+        link_pirq_port(port, chn, v);
         break;
     default:
         rc = -EINVAL;
