@@ -430,7 +430,16 @@ void viridian_domain_deinit(struct domain *d)
         viridian_vcpu_deinit(v);
 }
 
-static DEFINE_PER_CPU(cpumask_t, ipi_cpumask);
+/*
+ * Windows should not issue the hypercalls requiring this callback in the
+ * case where vcpu_id would exceed the size of the mask.
+ */
+static bool need_flush(void *ctxt, struct vcpu *v)
+{
+    uint64_t vcpu_mask = *(uint64_t *)ctxt;
+
+    return vcpu_mask & (1ul << v->vcpu_id);
+}
 
 int viridian_hypercall(struct cpu_user_regs *regs)
 {
@@ -494,8 +503,6 @@ int viridian_hypercall(struct cpu_user_regs *regs)
     case HvFlushVirtualAddressSpace:
     case HvFlushVirtualAddressList:
     {
-        cpumask_t *pcpu_mask;
-        struct vcpu *v;
         struct {
             uint64_t address_space;
             uint64_t flags;
@@ -521,36 +528,12 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         if ( input_params.flags & HV_FLUSH_ALL_PROCESSORS )
             input_params.vcpu_mask = ~0ul;
 
-        pcpu_mask = &this_cpu(ipi_cpumask);
-        cpumask_clear(pcpu_mask);
-
         /*
-         * For each specified virtual CPU flush all ASIDs to invalidate
-         * TLB entries the next time it is scheduled and then, if it
-         * is currently running, add its physical CPU to a mask of
-         * those which need to be interrupted to force a flush.
+         * A false return means that another vcpu is currently trying
+         * a similar operation, so back off.
          */
-        for_each_vcpu ( currd, v )
-        {
-            if ( v->vcpu_id >= (sizeof(input_params.vcpu_mask) * 8) )
-                break;
-
-            if ( !(input_params.vcpu_mask & (1ul << v->vcpu_id)) )
-                continue;
-
-            hvm_asid_flush_vcpu(v);
-            if ( v != curr && v->is_running )
-                __cpumask_set_cpu(v->processor, pcpu_mask);
-        }
-
-        /*
-         * Since ASIDs have now been flushed it just remains to
-         * force any CPUs currently running target vCPUs out of non-
-         * root mode. It's possible that re-scheduling has taken place
-         * so we may unnecessarily IPI some CPUs.
-         */
-        if ( !cpumask_empty(pcpu_mask) )
-            smp_send_event_check_mask(pcpu_mask);
+        if ( !hvm_flush_vcpu_tlb(need_flush, &input_params.vcpu_mask) )
+            return HVM_HCALL_preempted;
 
         output.rep_complete = input.rep_count;
 

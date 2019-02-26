@@ -338,6 +338,8 @@ const char *hvm_efer_valid(const struct vcpu *v, uint64_t value,
                            signed int cr0_pg);
 unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore);
 
+bool hvm_flush_vcpu_tlb(bool (*flush_vcpu)(void *ctxt, struct vcpu *v),
+                        void *ctxt);
 
 #ifdef CONFIG_HVM
 
