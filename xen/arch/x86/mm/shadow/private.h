@@ -372,7 +372,7 @@ extern int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
                                   unsigned long fault_addr);
 
 /* Functions that atomically write PT/P2M entries and update state */
-void shadow_write_p2m_entry(struct domain *d, unsigned long gfn,
+void shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
                             l1_pgentry_t *p, l1_pgentry_t new,
                             unsigned int level);
 

@@ -60,7 +60,7 @@ static void _update_paging_modes(struct vcpu *v)
     ASSERT_UNREACHABLE();
 }
 
-static void _write_p2m_entry(struct domain *d, unsigned long gfn,
+static void _write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
                              l1_pgentry_t *p, l1_pgentry_t new,
                              unsigned int level)
 {

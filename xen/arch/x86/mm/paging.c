@@ -941,7 +941,7 @@ void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     if ( v->domain != d )
         v = d->vcpu ? d->vcpu[0] : NULL;
     if ( likely(v && paging_mode_enabled(d) && paging_get_hostmode(v) != NULL) )
-        paging_get_hostmode(v)->write_p2m_entry(d, gfn, p, new, level);
+        paging_get_hostmode(v)->write_p2m_entry(p2m, gfn, p, new, level);
     else
         safe_write_pte(p, new);
 }
