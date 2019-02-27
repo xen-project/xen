@@ -372,9 +372,9 @@ extern int sh_remove_write_access(struct domain *d, mfn_t readonly_mfn,
                                   unsigned long fault_addr);
 
 /* Functions that atomically write PT/P2M entries and update state */
-void shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-                            l1_pgentry_t *p, l1_pgentry_t new,
-                            unsigned int level);
+int shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
+                           l1_pgentry_t *p, l1_pgentry_t new,
+                           unsigned int level);
 
 /* Update all the things that are derived from the guest's CR0/CR3/CR4.
  * Called to initialize paging structures if the paging mode

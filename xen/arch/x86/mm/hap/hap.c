@@ -708,7 +708,7 @@ static void hap_update_paging_modes(struct vcpu *v)
     put_gfn(d, cr3_gfn);
 }
 
-static void
+static int
 hap_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, l1_pgentry_t *p,
                     l1_pgentry_t new, unsigned int level)
 {
@@ -746,6 +746,8 @@ hap_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, l1_pgentry_t *p,
 
     if ( flush_nestedp2m )
         p2m_flush_nestedp2m(d);
+
+    return 0;
 }
 
 static unsigned long hap_gva_to_gfn_real_mode(

@@ -932,18 +932,22 @@ void paging_update_nestedmode(struct vcpu *v)
 }
 #endif
 
-void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
-                            l1_pgentry_t *p, l1_pgentry_t new,
-                            unsigned int level)
+int paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
+                           l1_pgentry_t *p, l1_pgentry_t new,
+                           unsigned int level)
 {
     struct domain *d = p2m->domain;
     struct vcpu *v = current;
+    int rc = 0;
+
     if ( v->domain != d )
         v = d->vcpu ? d->vcpu[0] : NULL;
     if ( likely(v && paging_mode_enabled(d) && paging_get_hostmode(v) != NULL) )
-        paging_get_hostmode(v)->write_p2m_entry(p2m, gfn, p, new, level);
+        rc = paging_get_hostmode(v)->write_p2m_entry(p2m, gfn, p, new, level);
     else
         safe_write_pte(p, new);
+
+    return rc;
 }
 
 int paging_set_allocation(struct domain *d, unsigned int pages, bool *preempted)

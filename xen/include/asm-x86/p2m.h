@@ -265,7 +265,7 @@ struct p2m_domain {
                                                   unsigned long last_gfn);
     void               (*memory_type_changed)(struct p2m_domain *p2m);
     
-    void               (*write_p2m_entry)(struct p2m_domain *p2m,
+    int                (*write_p2m_entry)(struct p2m_domain *p2m,
                                           unsigned long gfn, l1_pgentry_t *p,
                                           l1_pgentry_t new, unsigned int level);
     long               (*audit_p2m)(struct p2m_domain *p2m);
@@ -837,7 +837,7 @@ void p2m_flush_nestedp2m(struct domain *d);
 /* Flushes the np2m specified by np2m_base (if it exists) */
 void np2m_flush_base(struct vcpu *v, unsigned long np2m_base);
 
-void nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
+int nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     l1_pgentry_t *p, l1_pgentry_t new, unsigned int level);
 
 /*
