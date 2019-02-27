@@ -903,8 +903,8 @@ pod_retry_l1:
     *t = p2m_recalc_type(recalc || _needs_recalc(flags), l1t, p2m, gfn);
     unmap_domain_page(l1e);
 
-    ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t) || p2m_is_paging(*t));
-    return (p2m_is_valid(*t) || p2m_is_grant(*t)) ? mfn : INVALID_MFN;
+    ASSERT(mfn_valid(mfn) || !p2m_is_any_ram(*t) || p2m_is_paging(*t));
+    return (p2m_is_valid(*t) || p2m_is_any_ram(*t)) ? mfn : INVALID_MFN;
 }
 
 static void p2m_pt_change_entry_type_global(struct p2m_domain *p2m,
