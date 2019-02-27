@@ -100,9 +100,9 @@ let daemonize () =
 
 		begin match Unix.fork () with
 		| 0 ->
-			let nullfd = Unix.openfile "/dev/null" [ Unix.O_WRONLY ] 0 in
+			let nullfd = Unix.openfile "/dev/null" [ Unix.O_RDWR ] 0 in
 			begin try
-				Unix.close Unix.stdin;
+				Unix.dup2 nullfd Unix.stdin;
 				Unix.dup2 nullfd Unix.stdout;
 				Unix.dup2 nullfd Unix.stderr;
 			with exn -> Unix.close nullfd; raise exn
