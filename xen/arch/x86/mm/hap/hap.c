@@ -735,6 +735,9 @@ hap_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, l1_pgentry_t *p,
             && perms_strictly_increased(old_flags, l1e_get_flags(new)) );
     }
 
+    p2m_entry_modify(p2m, p2m_flags_to_type(l1e_get_flags(new)),
+                     p2m_flags_to_type(old_flags), level);
+
     safe_write_pte(p, new);
     if ( old_flags & _PAGE_PRESENT )
         flush_tlb_mask(d->dirty_cpumask);

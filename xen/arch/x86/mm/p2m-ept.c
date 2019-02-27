@@ -46,7 +46,8 @@ static inline bool_t is_epte_valid(ept_entry_t *e)
 }
 
 /* returns : 0 for success, -errno otherwise */
-static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
+static int atomic_write_ept_entry(struct p2m_domain *p2m,
+                                  ept_entry_t *entryptr, ept_entry_t new,
                                   int level)
 {
     int rc;
@@ -88,6 +89,8 @@ static int atomic_write_ept_entry(ept_entry_t *entryptr, ept_entry_t new,
 
     if ( unlikely(p2m_is_foreign(entryptr->sa_p2mt)) && check_foreign )
         oldmfn = entryptr->mfn;
+
+    p2m_entry_modify(p2m, new.sa_p2mt, entryptr->sa_p2mt, level);
 
     write_atomic(&entryptr->epte, new.epte);
 
@@ -390,7 +393,8 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
  * present entries in the given page table, optionally marking the entries
  * also for their subtrees needing P2M type re-calculation.
  */
-static bool_t ept_invalidate_emt(mfn_t mfn, bool_t recalc, int level)
+static bool_t ept_invalidate_emt(struct p2m_domain *p2m, mfn_t mfn,
+                                 bool_t recalc, int level)
 {
     int rc;
     ept_entry_t *epte = map_domain_page(mfn);
@@ -408,7 +412,7 @@ static bool_t ept_invalidate_emt(mfn_t mfn, bool_t recalc, int level)
         e.emt = MTRR_NUM_TYPES;
         if ( recalc )
             e.recalc = 1;
-        rc = atomic_write_ept_entry(&epte[i], e, level);
+        rc = atomic_write_ept_entry(p2m, &epte[i], e, level);
         ASSERT(rc == 0);
         changed = 1;
     }
@@ -459,7 +463,7 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
             rc = -ENOMEM;
             goto out;
         }
-        wrc = atomic_write_ept_entry(&table[index], split_ept_entry, i);
+        wrc = atomic_write_ept_entry(p2m, &table[index], split_ept_entry, i);
         ASSERT(wrc == 0);
 
         for ( ; i > target; --i )
@@ -479,7 +483,7 @@ static int ept_invalidate_emt_range(struct p2m_domain *p2m,
         {
             e.emt = MTRR_NUM_TYPES;
             e.recalc = 1;
-            wrc = atomic_write_ept_entry(&table[index], e, target);
+            wrc = atomic_write_ept_entry(p2m, &table[index], e, target);
             ASSERT(wrc == 0);
             rc = 1;
         }
@@ -549,17 +553,11 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                     nt = p2m_recalc_type(e.recalc, e.sa_p2mt, p2m, gfn + i);
                     if ( nt != e.sa_p2mt )
                     {
-                        if ( e.sa_p2mt == p2m_ioreq_server )
-                        {
-                            ASSERT(p2m->ioreq.entry_count > 0);
-                            p2m->ioreq.entry_count--;
-                        }
-
                         e.sa_p2mt = nt;
                         ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
                     }
                     e.recalc = 0;
-                    wrc = atomic_write_ept_entry(&epte[i], e, level);
+                    wrc = atomic_write_ept_entry(p2m, &epte[i], e, level);
                     ASSERT(wrc == 0);
                 }
             }
@@ -595,7 +593,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                 {
                     if ( ept_split_super_page(p2m, &e, level, level - 1) )
                     {
-                        wrc = atomic_write_ept_entry(&epte[i], e, level);
+                        wrc = atomic_write_ept_entry(p2m, &epte[i], e, level);
                         ASSERT(wrc == 0);
                         unmap_domain_page(epte);
                         mfn = e.mfn;
@@ -610,7 +608,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
                 e.recalc = 0;
                 if ( recalc && p2m_is_changeable(e.sa_p2mt) )
                     ept_p2m_type_to_flags(p2m, &e, e.sa_p2mt, e.access);
-                wrc = atomic_write_ept_entry(&epte[i], e, level);
+                wrc = atomic_write_ept_entry(p2m, &epte[i], e, level);
                 ASSERT(wrc == 0);
             }
 
@@ -621,11 +619,11 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
         if ( e.emt == MTRR_NUM_TYPES )
         {
             ASSERT(is_epte_present(&e));
-            ept_invalidate_emt(_mfn(e.mfn), e.recalc, level);
+            ept_invalidate_emt(p2m, _mfn(e.mfn), e.recalc, level);
             smp_wmb();
             e.emt = 0;
             e.recalc = 0;
-            wrc = atomic_write_ept_entry(&epte[i], e, level);
+            wrc = atomic_write_ept_entry(p2m, &epte[i], e, level);
             ASSERT(wrc == 0);
             unmap_domain_page(epte);
             rc = 1;
@@ -786,7 +784,7 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
 
         /* now install the newly split ept sub-tree */
         /* NB: please make sure domian is paused and no in-fly VT-d DMA. */
-        rc = atomic_write_ept_entry(ept_entry, split_ept_entry, i);
+        rc = atomic_write_ept_entry(p2m, ept_entry, split_ept_entry, i);
         ASSERT(rc == 0);
 
         /* then move to the level we want to make real changes */
@@ -833,24 +831,7 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         new_entry.suppress_ve = is_epte_valid(&old_entry) ?
                                     old_entry.suppress_ve : 1;
 
-    /*
-     * p2m_ioreq_server is only used for 4K pages, so the
-     * count is only done on ept page table entries.
-     */
-    if ( p2mt == p2m_ioreq_server )
-    {
-        ASSERT(i == 0);
-        p2m->ioreq.entry_count++;
-    }
-
-    if ( ept_entry->sa_p2mt == p2m_ioreq_server )
-    {
-        ASSERT(i == 0);
-        ASSERT(p2m->ioreq.entry_count > 0);
-        p2m->ioreq.entry_count--;
-    }
-
-    rc = atomic_write_ept_entry(ept_entry, new_entry, target);
+    rc = atomic_write_ept_entry(p2m, ept_entry, new_entry, target);
     if ( unlikely(rc) )
         old_entry.epte = 0;
     else
@@ -1070,7 +1051,7 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
     if ( !mfn )
         return;
 
-    if ( ept_invalidate_emt(_mfn(mfn), 1, p2m->ept.wl) )
+    if ( ept_invalidate_emt(p2m, _mfn(mfn), 1, p2m->ept.wl) )
         ept_sync_domain(p2m);
 }
 
@@ -1128,7 +1109,7 @@ static void ept_memory_type_changed(struct p2m_domain *p2m)
     if ( !mfn )
         return;
 
-    if ( ept_invalidate_emt(_mfn(mfn), 0, p2m->ept.wl) )
+    if ( ept_invalidate_emt(p2m, _mfn(mfn), 0, p2m->ept.wl) )
         ept_sync_domain(p2m);
 }
 

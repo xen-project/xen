@@ -932,6 +932,38 @@ int p2m_set_ioreq_server(struct domain *d, unsigned int flags,
 struct hvm_ioreq_server *p2m_get_ioreq_server(struct domain *d,
                                               unsigned int *flags);
 
+static inline void p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
+                                    p2m_type_t ot, unsigned int level)
+{
+    if ( level != 1 || nt == ot )
+        return;
+
+    switch ( nt )
+    {
+    case p2m_ioreq_server:
+        /*
+         * p2m_ioreq_server is only used for 4K pages, so
+         * the count is only done for level 1 entries.
+         */
+        p2m->ioreq.entry_count++;
+        break;
+
+    default:
+        break;
+    }
+
+    switch ( ot )
+    {
+    case p2m_ioreq_server:
+        ASSERT(p2m->ioreq.entry_count > 0);
+        p2m->ioreq.entry_count--;
+        break;
+
+    default:
+        break;
+    }
+}
+
 #endif /* _XEN_ASM_X86_P2M_H */
 
 /*
