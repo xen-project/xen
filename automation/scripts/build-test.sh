@@ -38,6 +38,7 @@ else
     ORIG=`git rev-parse HEAD`
 fi
 
+ret=1
 while read num rev; do
     echo "Testing $num $rev"
 
