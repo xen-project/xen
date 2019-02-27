@@ -50,60 +50,15 @@ static int atomic_write_ept_entry(struct p2m_domain *p2m,
                                   ept_entry_t *entryptr, ept_entry_t new,
                                   int level)
 {
-    int rc;
-    unsigned long oldmfn = mfn_x(INVALID_MFN);
-    bool_t check_foreign = (new.mfn != entryptr->mfn ||
-                            new.sa_p2mt != entryptr->sa_p2mt);
+    int rc = p2m_entry_modify(p2m, new.sa_p2mt, entryptr->sa_p2mt,
+                              _mfn(new.mfn), _mfn(entryptr->mfn), level);
 
-    if ( level )
-    {
-        ASSERT(!is_epte_superpage(&new) || !p2m_is_foreign(new.sa_p2mt));
-        write_atomic(&entryptr->epte, new.epte);
-        return 0;
-    }
-
-    if ( unlikely(p2m_is_foreign(new.sa_p2mt)) )
-    {
-        rc = -EINVAL;
-        if ( !is_epte_present(&new) )
-                goto out;
-
-        if ( check_foreign )
-        {
-            struct domain *fdom;
-
-            if ( !mfn_valid(_mfn(new.mfn)) )
-                goto out;
-
-            rc = -ESRCH;
-            fdom = page_get_owner(mfn_to_page(_mfn(new.mfn)));
-            if ( fdom == NULL )
-                goto out;
-
-            /* get refcount on the page */
-            rc = -EBUSY;
-            if ( !get_page(mfn_to_page(_mfn(new.mfn)), fdom) )
-                goto out;
-        }
-    }
-
-    if ( unlikely(p2m_is_foreign(entryptr->sa_p2mt)) && check_foreign )
-        oldmfn = entryptr->mfn;
-
-    p2m_entry_modify(p2m, new.sa_p2mt, entryptr->sa_p2mt, level);
+    if ( rc )
+        return rc;
 
     write_atomic(&entryptr->epte, new.epte);
 
-    if ( unlikely(oldmfn != mfn_x(INVALID_MFN)) )
-        put_page(mfn_to_page(_mfn(oldmfn)));
-
-    rc = 0;
-
- out:
-    if ( rc )
-        gdprintk(XENLOG_ERR, "epte o:%"PRIx64" n:%"PRIx64" rc:%d\n",
-                 entryptr->epte, new.epte, rc);
-    return rc;
+    return 0;
 }
 
 static void ept_p2m_type_to_flags(struct p2m_domain *p2m, ept_entry_t *entry,

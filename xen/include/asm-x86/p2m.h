@@ -932,11 +932,14 @@ int p2m_set_ioreq_server(struct domain *d, unsigned int flags,
 struct hvm_ioreq_server *p2m_get_ioreq_server(struct domain *d,
                                               unsigned int *flags);
 
-static inline void p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
-                                    p2m_type_t ot, unsigned int level)
+static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
+                                   p2m_type_t ot, mfn_t nfn, mfn_t ofn,
+                                   unsigned int level)
 {
-    if ( level != 1 || nt == ot )
-        return;
+    BUG_ON(level > 1 && (nt == p2m_ioreq_server || nt == p2m_map_foreign));
+
+    if ( level != 1 || (nt == ot && mfn_eq(nfn, ofn)) )
+        return 0;
 
     switch ( nt )
     {
@@ -946,6 +949,18 @@ static inline void p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
          * the count is only done for level 1 entries.
          */
         p2m->ioreq.entry_count++;
+        break;
+
+    case p2m_map_foreign:
+        if ( !mfn_valid(nfn) )
+        {
+            ASSERT_UNREACHABLE();
+            return -EINVAL;
+        }
+
+        if ( !page_get_owner_and_reference(mfn_to_page(nfn)) )
+            return -EBUSY;
+
         break;
 
     default:
@@ -959,9 +974,20 @@ static inline void p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
         p2m->ioreq.entry_count--;
         break;
 
+    case p2m_map_foreign:
+        if ( !mfn_valid(ofn) )
+        {
+            ASSERT_UNREACHABLE();
+            return -EINVAL;
+        }
+        put_page(mfn_to_page(ofn));
+        break;
+
     default:
         break;
     }
+
+    return 0;
 }
 
 #endif /* _XEN_ASM_X86_P2M_H */

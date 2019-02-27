@@ -3182,6 +3182,7 @@ shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
                        unsigned int level)
 {
     struct domain *d = p2m->domain;
+    int rc;
 
     paging_lock(d);
 
@@ -3190,8 +3191,14 @@ shadow_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     if ( likely(d->arch.paging.shadow.total_pages != 0) )
          sh_unshadow_for_p2m_change(d, gfn, p, new, level);
 
-    p2m_entry_modify(p2m, p2m_flags_to_type(l1e_get_flags(new)),
-                     p2m_flags_to_type(l1e_get_flags(*p)), level);
+    rc = p2m_entry_modify(p2m, p2m_flags_to_type(l1e_get_flags(new)),
+                          p2m_flags_to_type(l1e_get_flags(*p)),
+                          l1e_get_mfn(new), l1e_get_mfn(*p), level);
+    if ( rc )
+    {
+        paging_unlock(d);
+        return rc;
+    }
 
     /* Update the entry with new content */
     safe_write_pte(p, new);
