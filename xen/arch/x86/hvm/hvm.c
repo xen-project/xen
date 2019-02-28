@@ -1627,7 +1627,7 @@ void hvm_triple_fault(void)
     struct domain *d = v->domain;
     u8 reason = d->arch.hvm.params[HVM_PARAM_TRIPLE_FAULT_REASON];
 
-    gprintk(XENLOG_INFO,
+    gprintk(XENLOG_ERR,
             "Triple fault - invoking HVM shutdown action %d\n",
             reason);
     vcpu_show_execution_state(v);
