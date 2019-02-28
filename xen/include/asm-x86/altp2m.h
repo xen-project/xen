@@ -50,6 +50,7 @@ static inline bool altp2m_active(const struct domain *d)
 
 /* Only declaration is needed. DCE will optimise it out when linking. */
 uint16_t altp2m_vcpu_idx(const struct vcpu *v);
+void altp2m_vcpu_disable_ve(struct vcpu *v);
 
 #endif
 
