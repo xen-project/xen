@@ -1770,7 +1770,7 @@ int assign_pages(
     for ( i = 0; i < (1 << order); i++ )
     {
         ASSERT(page_get_owner(&pg[i]) == NULL);
-        ASSERT((pg[i].count_info & ~(PGC_allocated | 1)) == 0);
+        ASSERT(!pg[i].count_info);
         page_set_owner(&pg[i], d);
         smp_wmb(); /* Domain pointer must be visible before updating refcnt. */
         pg[i].count_info = PGC_allocated | 1;
