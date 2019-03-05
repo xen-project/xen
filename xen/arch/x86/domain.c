@@ -1433,7 +1433,8 @@ static void save_segments(struct vcpu *v)
     regs->fs = read_sreg(fs);
     regs->gs = read_sreg(gs);
 
-    if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
+    /* %fs/%gs bases can only be stale if WR{FS,GS}BASE are usable. */
+    if ( (read_cr4() & X86_CR4_FSGSBASE) && !is_pv_32bit_vcpu(v) )
     {
         v->arch.pv_vcpu.fs_base = __rdfsbase();
         if ( v->arch.flags & TF_kernel_mode )
