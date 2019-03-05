@@ -675,20 +675,22 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
          * Success! Beyond this point we cannot fail for this chunk.
          */
 
-        /* Destroy final reference to each input page. */
+        /*
+         * These pages have already had owner and reference cleared.
+         * Do the final two steps: Remove from the physmap, and free
+         * them.
+         */
         while ( (page = page_list_remove_head(&in_chunk_list)) )
         {
             unsigned long gfn;
 
-            if ( !test_and_clear_bit(_PGC_allocated, &page->count_info) )
-                BUG();
             mfn = page_to_mfn(page);
             gfn = mfn_to_gmfn(d, mfn_x(mfn));
             /* Pages were unshared above */
             BUG_ON(SHARED_M2P(gfn));
             if ( guest_physmap_remove_page(d, _gfn(gfn), mfn, 0) )
                 domain_crash(d);
-            put_page(page);
+            free_domheap_page(page);
         }
 
         /* Assign each output page to the domain. */
@@ -761,13 +763,16 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
      * chunks succeeded.
      */
  fail:
-    /* Reassign any input pages we managed to steal. */
+    /*
+     * Reassign any input pages we managed to steal.  NB that if the assign
+     * fails again, we're on the hook for freeing the page, since we've already
+     * cleared PGC_allocated.
+     */
     while ( (page = page_list_remove_head(&in_chunk_list)) )
         if ( assign_pages(d, page, 0, MEMF_no_refcount) )
         {
             BUG_ON(!d->is_dying);
-            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-                put_page(page);
+            free_domheap_page(page);
         }
 
  dying:
