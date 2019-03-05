@@ -2205,6 +2205,8 @@ gnttab_transfer(
             page->count_info &= ~(PGC_count_mask|PGC_allocated);
             free_domheap_page(page);
             page = new_page;
+            page->count_info = PGC_allocated | 1;
+            mfn = page_to_mfn(page);
         }
 
         spin_lock(&e->page_alloc_lock);
