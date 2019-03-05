@@ -2953,6 +2953,13 @@ static int _get_page_type(struct page_info *page, unsigned long type,
                                              PAGE_ORDER_4K,
                                              IOMMUF_readable |
                                              IOMMUF_writable);
+
+            if ( unlikely(iommu_ret) )
+            {
+                _put_page_type(page, false, NULL);
+                rc = iommu_ret;
+                goto out;
+            }
         }
     }
 
@@ -2967,11 +2974,9 @@ static int _get_page_type(struct page_info *page, unsigned long type,
         rc = alloc_page_type(page, type, preemptible);
     }
 
+ out:
     if ( (x & PGT_partial) && !(nx & PGT_partial) )
         put_page(page);
-
-    if ( !rc )
-        rc = iommu_ret;
 
     return rc;
 }
