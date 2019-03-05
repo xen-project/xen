@@ -663,7 +663,14 @@ enum get_cpu_vendor {
 };
 
 int get_cpu_vendor(const char vendor_id[], enum get_cpu_vendor);
-void pv_cpuid(struct cpu_user_regs *regs);
+void pv_cpuid(uint32_t leaf, uint32_t subleaf,
+              uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
+
+static inline void pv_cpuid_regs(struct cpu_user_regs *regs)
+{
+    pv_cpuid(regs->_eax, regs->_ecx,
+             &regs->_eax, &regs->_ebx, &regs->_ecx, &regs->_edx);
+}
 
 #endif /* !__ASSEMBLY__ */
 

@@ -3803,7 +3803,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
         if ( is_pvh_vcpu(v) )
         {
-            pv_cpuid(regs);
+            pv_cpuid_regs(regs);
             rc = 0;
         }
         else

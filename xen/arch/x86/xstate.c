@@ -654,24 +654,18 @@ static bool_t valid_xcr0(u64 xcr0)
 
 static uint64_t guest_xcr0_max(const struct domain *d)
 {
+    uint32_t eax, edx;
+
     if ( has_hvm_container_domain(d) )
     {
-        uint32_t eax, ecx = 0, edx;
+        uint32_t ecx = 0;
 
         hvm_cpuid(XSTATE_CPUID, &eax, NULL, &ecx, &edx);
-
-        return ((uint64_t)edx << 32) | eax;
     }
     else
-    {
-        struct cpu_user_regs regs = { };
+        pv_cpuid(XSTATE_CPUID, 0, &eax, NULL, NULL, &edx);
 
-        regs._eax = XSTATE_CPUID;
-        regs._ecx = 0;
-        pv_cpuid(&regs);
-
-        return (regs.rdx << 32) | regs._eax;
-    }
+    return ((uint64_t)edx << 32) | eax;
 }
 
 int validate_xstate(const struct domain *d, uint64_t xcr0, uint64_t xcr0_accum,
