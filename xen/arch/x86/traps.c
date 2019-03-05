@@ -918,7 +918,8 @@ static void _domain_cpuid(struct domain *currd,
                           unsigned int *eax, unsigned int *ebx,
                           unsigned int *ecx, unsigned int *edx)
 {
-    if ( !is_control_domain(currd) && !is_hardware_domain(currd) )
+    if ( !is_control_domain(currd) && !is_hardware_domain(currd) &&
+         !is_idle_domain(currd) )
         domain_cpuid(currd, leaf, subleaf, eax, ebx, ecx, edx);
     else
         cpuid_count(leaf, subleaf, eax, ebx, ecx, edx);
@@ -2721,8 +2722,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
 
         case 4: /* Write CR4 */
-            v->arch.pv_vcpu.ctrlreg[4] = pv_guest_cr4_fixup(v, *reg);
-            write_cr4(pv_guest_cr4_to_real_cr4(v));
+            v->arch.pv_vcpu.ctrlreg[4] = pv_fixup_guest_cr4(v, *reg);
+            write_cr4(pv_make_cr4(v));
             ctxt_switch_levelling(v);
             break;
 

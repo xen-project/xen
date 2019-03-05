@@ -377,6 +377,63 @@ static void release_compat_l4(struct vcpu *v)
     v->arch.guest_table_user = pagetable_null();
 }
 
+unsigned long pv_fixup_guest_cr4(const struct vcpu *v, unsigned long cr4)
+{
+    unsigned int leaf1_ecx = 0, leaf1_edx = 0;
+    unsigned int leaf7_0_ebx = 0, level = 0;
+
+    pv_cpuid(0, 0, &level, NULL, NULL, NULL);
+    if ( level >= 1 )
+        pv_cpuid(1, 0, NULL, NULL, &leaf1_ecx, &leaf1_edx);
+    if ( level >= 7 )
+        pv_cpuid(7, 0, NULL, &leaf7_0_ebx, NULL, NULL);
+
+    /* Discard attempts to set guest controllable bits outside of the policy. */
+    cr4 &= ~(((leaf1_edx & cpufeat_mask(X86_FEATURE_TSC))
+              ? 0 : X86_CR4_TSD) |
+             ((leaf1_edx & cpufeat_mask(X86_FEATURE_DE))
+              ? 0 : X86_CR4_DE) |
+             ((leaf7_0_ebx & cpufeat_mask(X86_FEATURE_FSGSBASE))
+              ? 0 : X86_CR4_FSGSBASE) |
+             ((leaf1_ecx & cpufeat_mask(X86_FEATURE_XSAVE))
+              ? 0 : X86_CR4_OSXSAVE));
+
+    /* Masks expected to be disjoint sets. */
+    BUILD_BUG_ON(PV_CR4_GUEST_MASK & PV_CR4_GUEST_VISIBLE_MASK);
+
+    /*
+     * A guest sees the policy subset of its own choice of guest controllable
+     * bits, and a subset of Xen's choice of certain hardware settings.
+     */
+    return ((cr4 & PV_CR4_GUEST_MASK) |
+            (mmu_cr4_features & PV_CR4_GUEST_VISIBLE_MASK));
+}
+
+unsigned long pv_make_cr4(const struct vcpu *v)
+{
+    const struct domain *d = v->domain;
+    unsigned long cr4 = mmu_cr4_features &
+        ~(X86_CR4_PCIDE | X86_CR4_PGE | X86_CR4_TSD);
+
+    /*
+     * PCIDE or PGE depends on the PCID/XPTI settings, but must not both be
+     * set, as it impacts the safety of TLB flushing.
+     */
+    if ( d->arch.pv_domain.pcid )
+        cr4 |= X86_CR4_PCIDE;
+    else if ( !d->arch.pv_domain.xpti )
+        cr4 |= X86_CR4_PGE;
+
+    /*
+     * TSD is needed if either the guest has elected to use it, or Xen is
+     * virtualising the TSC value the guest sees.
+     */
+    if ( d->arch.vtsc || (v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_TSD) )
+        cr4 |= X86_CR4_TSD;
+
+    return cr4;
+}
+
 static void set_domain_xpti(struct domain *d)
 {
     if ( is_pv_32bit_domain(d) )
@@ -551,6 +608,8 @@ int vcpu_initialise(struct vcpu *v)
 
         /* PV guests by default have a 100Hz ticker. */
         v->periodic_period = MILLISECS(10);
+
+        v->arch.pv_vcpu.ctrlreg[4] = pv_fixup_guest_cr4(v, 0);
     }
 
     v->arch.schedule_tail = continue_nonidle_domain;
@@ -562,8 +621,6 @@ int vcpu_initialise(struct vcpu *v)
         v->arch.schedule_tail = continue_idle_domain;
         v->arch.cr3           = __pa(idle_pg_table);
     }
-
-    v->arch.pv_vcpu.ctrlreg[4] = real_cr4_to_pv_guest_cr4(mmu_cr4_features);
 
     if ( is_pv_32bit_domain(d) )
     {
@@ -937,49 +994,6 @@ int arch_domain_soft_reset(struct domain *d)
     return ret;
 }
 
-/*
- * These are the masks of CR4 bits (subject to hardware availability) which a
- * PV guest may not legitimiately attempt to modify.
- */
-static unsigned long __read_mostly pv_cr4_mask, compat_pv_cr4_mask;
-
-static int __init init_pv_cr4_masks(void)
-{
-    unsigned long common_mask = ~X86_CR4_TSD;
-
-    /*
-     * All PV guests may attempt to modify TSD, DE and OSXSAVE.
-     */
-    if ( cpu_has_de )
-        common_mask &= ~X86_CR4_DE;
-    if ( cpu_has_xsave )
-        common_mask &= ~X86_CR4_OSXSAVE;
-
-    pv_cr4_mask = compat_pv_cr4_mask = common_mask;
-
-    /*
-     * 64bit PV guests may attempt to modify FSGSBASE.
-     */
-    if ( cpu_has_fsgsbase )
-        pv_cr4_mask &= ~X86_CR4_FSGSBASE;
-
-    return 0;
-}
-__initcall(init_pv_cr4_masks);
-
-unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
-{
-    unsigned long hv_cr4 = real_cr4_to_pv_guest_cr4(read_cr4());
-    unsigned long mask = is_pv_32bit_vcpu(v) ? compat_pv_cr4_mask : pv_cr4_mask;
-
-    if ( (guest_cr4 & mask) != (hv_cr4 & mask) )
-        printk(XENLOG_G_WARNING
-               "d%d attempted to change %pv's CR4 flags %08lx -> %08lx\n",
-               current->domain->domain_id, v, hv_cr4, guest_cr4);
-
-    return (hv_cr4 & mask) | (guest_cr4 & ~mask);
-}
-
 #define xen_vcpu_guest_context vcpu_guest_context
 #define fpu_ctxt fpu_ctxt.x
 CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
@@ -993,7 +1007,7 @@ int arch_set_info_guest(
     struct domain *d = v->domain;
     unsigned long cr3_gfn;
     struct page_info *cr3_page;
-    unsigned long flags, cr4;
+    unsigned long flags;
     unsigned int i;
     int rc = 0, compat;
 
@@ -1210,9 +1224,8 @@ int arch_set_info_guest(
     v->arch.pv_vcpu.ctrlreg[0] &= X86_CR0_TS;
     v->arch.pv_vcpu.ctrlreg[0] |= read_cr0() & ~X86_CR0_TS;
 
-    cr4 = v->arch.pv_vcpu.ctrlreg[4];
-    v->arch.pv_vcpu.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(v, cr4) :
-        real_cr4_to_pv_guest_cr4(mmu_cr4_features);
+    v->arch.pv_vcpu.ctrlreg[4] =
+        pv_fixup_guest_cr4(v, v->arch.pv_vcpu.ctrlreg[4]);
 
     memset(v->arch.debugreg, 0, sizeof(v->arch.debugreg));
     for ( i = 0; i < 8; i++ )
