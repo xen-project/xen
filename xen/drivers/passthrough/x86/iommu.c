@@ -70,6 +70,27 @@ int arch_iommu_populate_page_table(struct domain *d)
                 rc = iommu_map(d, _dfn(gfn), _mfn(mfn), PAGE_ORDER_4K,
                                IOMMUF_readable | IOMMUF_writable,
                                &flush_flags);
+
+                /*
+                 * We may be working behind the back of a running guest, which
+                 * may change the type of a page at any time.  We can't prevent
+                 * this (for instance, by bumping the type count while mapping
+                 * the page) without causing legitimate guest type-change
+                 * operations to fail.  So after adding the page to the IOMMU,
+                 * check again to make sure this is still valid.  NB that the
+                 * writable entry in the iommu is harmless until later, when
+                 * the actual device gets assigned.
+                 */
+                if ( !rc && !is_hvm_domain(d) &&
+                     ((page->u.inuse.type_info & PGT_type_mask) !=
+                      PGT_writable_page) )
+                {
+                    rc = iommu_unmap(d, _dfn(gfn), PAGE_ORDER_4K, &flush_flags);
+                    /* If the type changed yet again, simply force a retry. */
+                    if ( !rc && ((page->u.inuse.type_info & PGT_type_mask) ==
+                                 PGT_writable_page) )
+                        rc = -ERESTART;
+                }
             }
             if ( rc )
             {
