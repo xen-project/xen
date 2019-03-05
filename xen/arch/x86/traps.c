@@ -2722,6 +2722,17 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
 
         case 4: /* Write CR4 */
+            /*
+             * If this write will disable FSGSBASE, refresh Xen's idea of the
+             * guest bases now that they can no longer change.
+             */
+            if ( (v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_FSGSBASE) &&
+                 !(*reg & X86_CR4_FSGSBASE) )
+            {
+                v->arch.pv_vcpu.fs_base = __rdfsbase();
+                v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
+            }
+
             v->arch.pv_vcpu.ctrlreg[4] = pv_fixup_guest_cr4(v, *reg);
             write_cr4(pv_make_cr4(v));
             ctxt_switch_levelling(v);
@@ -2993,13 +3004,14 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_FS_BASE:
             if ( is_pv_32bit_domain(currd) )
                 goto fail;
-            val = cpu_has_fsgsbase ? __rdfsbase() : v->arch.pv_vcpu.fs_base;
+            val = (read_cr4() & X86_CR4_FSGSBASE) ? __rdfsbase()
+                                                  : v->arch.pv_vcpu.fs_base;
             goto rdmsr_writeback;
         case MSR_GS_BASE:
             if ( is_pv_32bit_domain(currd) )
                 goto fail;
-            val = cpu_has_fsgsbase ? __rdgsbase()
-                                   : v->arch.pv_vcpu.gs_base_kernel;
+            val = (read_cr4() & X86_CR4_FSGSBASE) ? __rdgsbase()
+                                                  : v->arch.pv_vcpu.gs_base_kernel;
             goto rdmsr_writeback;
         case MSR_SHADOW_GS_BASE:
             if ( is_pv_32bit_domain(currd) )
