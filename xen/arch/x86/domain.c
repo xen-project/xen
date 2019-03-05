@@ -733,49 +733,6 @@ int arch_domain_soft_reset(struct domain *d)
     return ret;
 }
 
-/*
- * These are the masks of CR4 bits (subject to hardware availability) which a
- * PV guest may not legitimiately attempt to modify.
- */
-static unsigned long __read_mostly pv_cr4_mask, compat_pv_cr4_mask;
-
-static int __init init_pv_cr4_masks(void)
-{
-    unsigned long common_mask = ~X86_CR4_TSD;
-
-    /*
-     * All PV guests may attempt to modify TSD, DE and OSXSAVE.
-     */
-    if ( cpu_has_de )
-        common_mask &= ~X86_CR4_DE;
-    if ( cpu_has_xsave )
-        common_mask &= ~X86_CR4_OSXSAVE;
-
-    pv_cr4_mask = compat_pv_cr4_mask = common_mask;
-
-    /*
-     * 64bit PV guests may attempt to modify FSGSBASE.
-     */
-    if ( cpu_has_fsgsbase )
-        pv_cr4_mask &= ~X86_CR4_FSGSBASE;
-
-    return 0;
-}
-__initcall(init_pv_cr4_masks);
-
-unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
-{
-    unsigned long hv_cr4 = real_cr4_to_pv_guest_cr4(read_cr4());
-    unsigned long mask = is_pv_32bit_vcpu(v) ? compat_pv_cr4_mask : pv_cr4_mask;
-
-    if ( (guest_cr4 & mask) != (hv_cr4 & mask) )
-        printk(XENLOG_G_WARNING
-               "d%d attempted to change %pv's CR4 flags %08lx -> %08lx\n",
-               current->domain->domain_id, v, hv_cr4, guest_cr4);
-
-    return (hv_cr4 & mask) | (guest_cr4 & ~mask);
-}
-
 #define xen_vcpu_guest_context vcpu_guest_context
 #define fpu_ctxt fpu_ctxt.x
 CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
@@ -789,7 +746,7 @@ int arch_set_info_guest(
     struct domain *d = v->domain;
     unsigned long cr3_gfn;
     struct page_info *cr3_page;
-    unsigned long flags, cr4;
+    unsigned long flags;
     unsigned int i;
     int rc = 0, compat;
 
@@ -978,9 +935,8 @@ int arch_set_info_guest(
     v->arch.pv_vcpu.ctrlreg[0] &= X86_CR0_TS;
     v->arch.pv_vcpu.ctrlreg[0] |= read_cr0() & ~X86_CR0_TS;
 
-    cr4 = v->arch.pv_vcpu.ctrlreg[4];
-    v->arch.pv_vcpu.ctrlreg[4] = cr4 ? pv_guest_cr4_fixup(v, cr4) :
-        real_cr4_to_pv_guest_cr4(mmu_cr4_features);
+    v->arch.pv_vcpu.ctrlreg[4] =
+        pv_fixup_guest_cr4(v, v->arch.pv_vcpu.ctrlreg[4]);
 
     memset(v->arch.debugreg, 0, sizeof(v->arch.debugreg));
     for ( i = 0; i < 8; i++ )
