@@ -121,7 +121,7 @@ fail:
 
 static int load_plugins(void)
 {
-	const char *fsdir = getenv("FSIMAGE_FSDIR");
+	const char *fsdir = getenv("XEN_FSIMAGE_FSDIR");
 	struct dirent *dp = NULL;
 	DIR *dir = NULL;
 	char *tmp = NULL;
