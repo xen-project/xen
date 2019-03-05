@@ -46,7 +46,7 @@ provided by your OS distributor:
         - GCC 4.8 or later
         - GNU Binutils 2.24 or later
     * Development install of zlib (e.g., zlib-dev)
-    * Development install of Python v2.4 or later (e.g., python-dev)
+    * Development install of Python 2, v2.4 or later (e.g., python-dev)
     * Development install of curses (e.g., libncurses-dev)
     * Development install of openssl (e.g., openssl-dev)
     * Development install of x11 (e.g. xorg-x11-dev)
@@ -177,9 +177,15 @@ Python Runtime Libraries
 
 Various tools, such as pygrub, have the following runtime dependencies:
 
-    * Python 2.3 or later.
+    * Python 2, v2.4 or later.
           URL:    http://www.python.org/
           Debian: python
+
+Note that the build system expects `python` to be python2.  If your system
+has `python` pointing to python3 (as in the case of Arch Linux or Anaconda),
+you'll need to specify a path to a python2 binary when running configure:
+
+    PYTHON=/usr/bin/python2 ./configure
 
 Intel(R) Trusted Execution Technology Support
 =============================================
