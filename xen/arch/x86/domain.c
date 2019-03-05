@@ -428,6 +428,16 @@ unsigned long pv_make_cr4(const struct vcpu *v)
     if ( d->arch.vtsc || (v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_TSD) )
         cr4 |= X86_CR4_TSD;
 
+    /*
+     * The {RD,WR}{FS,GS}BASE are only useable in 64bit code segments.  While
+     * we must not have CR4.FSGSBASE set behind the back of a 64bit PV kernel,
+     * we do leave it set in 32bit PV context to speed up Xen's context switch
+     * path.
+     */
+    if ( !is_pv_32bit_domain(d) &&
+         !(v->arch.pv_vcpu.ctrlreg[4] & X86_CR4_FSGSBASE) )
+        cr4 &= ~X86_CR4_FSGSBASE;
+
     return cr4;
 }
 
@@ -2022,7 +2032,8 @@ static void save_segments(struct vcpu *v)
     regs->fs = read_sreg(fs);
     regs->gs = read_sreg(gs);
 
-    if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
+    /* %fs/%gs bases can only be stale if WR{FS,GS}BASE are usable. */
+    if ( (read_cr4() & X86_CR4_FSGSBASE) && !is_pv_32bit_vcpu(v) )
     {
         v->arch.pv_vcpu.fs_base = __rdfsbase();
         if ( v->arch.flags & TF_kernel_mode )

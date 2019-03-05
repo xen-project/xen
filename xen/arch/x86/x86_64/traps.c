@@ -267,7 +267,9 @@ void toggle_guest_mode(struct vcpu *v)
 {
     if ( is_pv_32bit_vcpu(v) )
         return;
-    if ( cpu_has_fsgsbase )
+
+    /* %fs/%gs bases can only be stale if WR{FS,GS}BASE are usable. */
+    if ( read_cr4() & X86_CR4_FSGSBASE )
     {
         if ( v->arch.flags & TF_kernel_mode )
             v->arch.pv_vcpu.gs_base_kernel = __rdgsbase();
