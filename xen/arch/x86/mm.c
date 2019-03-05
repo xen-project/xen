@@ -530,33 +530,13 @@ void make_cr3(struct vcpu *v, unsigned long mfn)
         v->arch.cr3 |= get_pcid_bits(v, false);
 }
 
-unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v)
-{
-    const struct domain *d = v->domain;
-    unsigned long cr4;
-
-    cr4 = v->arch.pv_vcpu.ctrlreg[4] & ~X86_CR4_DE;
-    cr4 |= mmu_cr4_features & (X86_CR4_PSE | X86_CR4_SMEP | X86_CR4_SMAP |
-                               X86_CR4_OSXSAVE | X86_CR4_FSGSBASE);
-
-    if ( d->arch.pv_domain.pcid )
-        cr4 |= X86_CR4_PCIDE;
-    else if ( !d->arch.pv_domain.xpti )
-        cr4 |= X86_CR4_PGE;
-
-    cr4 |= d->arch.vtsc ? X86_CR4_TSD : 0;
-
-    return cr4;
-}
-
 void write_ptbase(struct vcpu *v)
 {
     struct cpu_info *cpu_info = get_cpu_info();
     unsigned long new_cr4;
 
     new_cr4 = (is_pv_vcpu(v) && !is_idle_vcpu(v))
-              ? pv_guest_cr4_to_real_cr4(v)
-              : ((read_cr4() & ~(X86_CR4_PCIDE | X86_CR4_TSD)) | X86_CR4_PGE);
+              ? pv_make_cr4(v) : mmu_cr4_features;
 
     if ( is_pv_vcpu(v) && v->domain->arch.pv_domain.xpti )
     {
@@ -575,8 +555,6 @@ void write_ptbase(struct vcpu *v)
         switch_cr3_cr4(v->arch.cr3, new_cr4);
         cpu_info->pv_cr3 = 0;
     }
-
-    ASSERT(is_pv_vcpu(v) || read_cr4() == mmu_cr4_features);
 }
 
 /*

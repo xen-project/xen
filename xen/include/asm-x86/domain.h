@@ -648,16 +648,22 @@ bool_t update_secondary_system_time(struct vcpu *,
 void vcpu_show_execution_state(struct vcpu *);
 void vcpu_show_registers(const struct vcpu *);
 
-/* Clean up CR4 bits that are not under guest control. */
-unsigned long pv_guest_cr4_fixup(const struct vcpu *, unsigned long guest_cr4);
+/*
+ * Bits which a PV guest can toggle in its view of cr4.  Some are loaded into
+ * hardware, while some are fully emulated.
+ */
+#define PV_CR4_GUEST_MASK \
+    (X86_CR4_TSD | X86_CR4_DE | X86_CR4_FSGSBASE | X86_CR4_OSXSAVE)
 
-/* Convert between guest-visible and real CR4 values. */
-unsigned long pv_guest_cr4_to_real_cr4(const struct vcpu *v);
+/* Bits which a PV guest may observe from the real hardware settings. */
+#define PV_CR4_GUEST_VISIBLE_MASK \
+    (X86_CR4_PAE | X86_CR4_MCE | X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT)
 
-#define real_cr4_to_pv_guest_cr4(c)                         \
-    ((c) & ~(X86_CR4_PGE | X86_CR4_PSE | X86_CR4_TSD |      \
-             X86_CR4_OSXSAVE | X86_CR4_SMEP |               \
-             X86_CR4_FSGSBASE | X86_CR4_SMAP | X86_CR4_PCIDE))
+/* Given a new cr4 value, construct the resulting guest-visible cr4 value. */
+unsigned long pv_fixup_guest_cr4(const struct vcpu *v, unsigned long cr4);
+
+/* Create a cr4 value to load into hardware, based on vcpu settings. */
+unsigned long pv_make_cr4(const struct vcpu *v);
 
 #define domain_max_vcpus(d) (is_hvm_domain(d) ? HVM_MAX_VCPUS : MAX_VIRT_CPUS)
 
