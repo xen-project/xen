@@ -3698,7 +3698,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
     }
     case EXIT_REASON_CPUID:
-        is_pvh_vcpu(v) ? pv_cpuid(regs) : vmx_do_cpuid(regs);
+        is_pvh_vcpu(v) ? pv_cpuid_regs(regs) : vmx_do_cpuid(regs);
         update_guest_eip(); /* Safe: CPUID */
         break;
     case EXIT_REASON_HLT:
