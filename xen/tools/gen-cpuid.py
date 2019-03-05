@@ -197,7 +197,7 @@ def crunch_numbers(state):
         # %XMM support, without specific inter-dependencies.  Additionally
         # AMD has a special mis-alignment sub-mode.
         SSE: [SSE2, SSE3, SSSE3, SSE4A, MISALIGNSSE,
-              AESNI, SHA],
+              AESNI, PCLMULQDQ, SHA],
 
         # SSE2 was re-specified as core instructions for 64bit.
         SSE2: [LM],
