@@ -1604,6 +1604,13 @@ static int alloc_l3_table(struct page_info *page)
     {
         l3_pgentry_t l3e = pl3e[i];
 
+        if ( i > page->nr_validated_ptes && hypercall_preempt_check() )
+        {
+            page->nr_validated_ptes = i;
+            rc = -ERESTART;
+            break;
+        }
+
         if ( is_pv_32bit_domain(d) && (i == 3) )
         {
             if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
@@ -1924,15 +1931,25 @@ static int free_l3_table(struct page_info *page)
 
     pl3e = map_domain_page(_mfn(pfn));
 
-    do {
+    for ( ; ; )
+    {
         rc = put_page_from_l3e(pl3e[i], pfn, partial, 0);
         if ( rc < 0 )
             break;
+
         partial = 0;
-        if ( rc > 0 )
-            continue;
-        pl3e[i] = unadjust_guest_l3e(pl3e[i], d);
-    } while ( i-- );
+        if ( rc == 0 )
+            pl3e[i] = unadjust_guest_l3e(pl3e[i], d);
+
+        if ( !i-- )
+            break;
+
+        if ( hypercall_preempt_check() )
+        {
+            rc = -EINTR;
+            break;
+        }
+    }
 
     unmap_domain_page(pl3e);
 
