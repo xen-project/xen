@@ -26,12 +26,6 @@
 #include <xenfsimage.h>
 #include <stdlib.h>
 
-#if (PYTHON_API_VERSION >= 1011)
-#define PY_PAD 0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L,0L
-#else
-#define PY_PAD 0L,0L,0L,0L
-#endif
-
 typedef struct fsimage_fs {
 	PyObject_HEAD
 	fsi_t *fs;
@@ -59,12 +53,24 @@ fsimage_file_read(fsimage_file_t *file, PyObject *args, PyObject *kwargs)
 
 	bufsize = size ? size : 4096;
 
-	if ((buffer = PyString_FromStringAndSize(NULL, bufsize)) == NULL)
+	buffer =
+#if PY_MAJOR_VERSION < 3
+		PyString_FromStringAndSize(NULL, bufsize);
+#else
+		PyBytes_FromStringAndSize(NULL, bufsize);
+#endif
+
+	if (buffer == NULL)
 		return (NULL);
  
 	while (1) {
 		int err;
-		void *buf = PyString_AS_STRING(buffer) + bytesread;
+		void *buf =
+#if PY_MAJOR_VERSION < 3
+			PyString_AS_STRING(buffer) + bytesread;
+#else
+			PyBytes_AS_STRING(buffer) + bytesread;
+#endif
 
 		err = fsi_pread_file(file->file, buf, bufsize,
 		    bytesread + offset);
@@ -84,12 +90,20 @@ fsimage_file_read(fsimage_file_t *file, PyObject *args, PyObject *kwargs)
 			if (bufsize == 0)
 				break;
 		} else {
+#if PY_MAJOR_VERSION < 3
 			if (_PyString_Resize(&buffer, bytesread + bufsize) < 0)
+#else
+			if (_PyBytes_Resize(&buffer, bytesread + bufsize) < 0)
+#endif
 				return (NULL);
 		}
 	}
 
+#if PY_MAJOR_VERSION < 3
 	_PyString_Resize(&buffer, bytesread);
+#else
+	_PyBytes_Resize(&buffer, bytesread);
+#endif
 	return (buffer);
 }
 
@@ -106,11 +120,13 @@ static struct PyMethodDef fsimage_file_methods[] = {
 	{ NULL, NULL, 0, NULL }	
 };
 
+#if PY_MAJOR_VERSION < 3
 static PyObject *
 fsimage_file_getattr(fsimage_file_t *file, char *name)
 {
 	return (Py_FindMethod(fsimage_file_methods, (PyObject *)file, name));
 }
+#endif
 
 static void
 fsimage_file_dealloc(fsimage_file_t *file)
@@ -123,29 +139,18 @@ fsimage_file_dealloc(fsimage_file_t *file)
 
 static char fsimage_file_type__doc__[] = "Filesystem image file";
 PyTypeObject fsimage_file_type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
-	"xenfsimage.file",			/* tp_name */
-	sizeof(fsimage_file_t),			/* tp_size */
-	0,					/* tp_itemsize */
-	(destructor) fsimage_file_dealloc, 	/* tp_dealloc */
-	0,					/* tp_print */
-	(getattrfunc) fsimage_file_getattr, 	/* tp_getattr */
-	0,					/* tp_setattr */
-	0,					/* tp_compare */
-	0,					/* tp_repr */
-	0,					/* tp_as_number */
-	0,	 				/* tp_as_sequence */
-	0,					/* tp_as_mapping */
-	0,	   				/* tp_hash */
-	0,					/* tp_call */
-	0,					/* tp_str */
-	0,					/* tp_getattro */
-	0,					/* tp_setattro */
-	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	fsimage_file_type__doc__,
-	PY_PAD
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
+	.tp_name = "xenfsimage.file",
+	.tp_basicsize = sizeof(fsimage_file_t),
+	.tp_dealloc = (destructor) fsimage_file_dealloc,
+#if PY_MAJOR_VERSION < 3
+	.tp_getattr = (getattrfunc) fsimage_file_getattr,
+#endif
+	.tp_flags = Py_TPFLAGS_DEFAULT,
+	.tp_doc = fsimage_file_type__doc__,
+#if PY_MAJOR_VERSION >= 3
+	.tp_methods = fsimage_file_methods,
+#endif
 };
 
 static PyObject *
@@ -208,11 +213,13 @@ static struct PyMethodDef fsimage_fs_methods[] = {
 	{ NULL, NULL, 0, NULL }	
 };
 
+#if PY_MAJOR_VERSION < 3
 static PyObject *
 fsimage_fs_getattr(fsimage_fs_t *fs, char *name)
 {
 	return (Py_FindMethod(fsimage_fs_methods, (PyObject *)fs, name));
 }
+#endif
 
 static void
 fsimage_fs_dealloc (fsimage_fs_t *fs)
@@ -225,29 +232,18 @@ fsimage_fs_dealloc (fsimage_fs_t *fs)
 PyDoc_STRVAR(fsimage_fs_type__doc__, "Filesystem image");
 
 PyTypeObject fsimage_fs_type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
-	"xenfsimage.fs",			/* tp_name */
-	sizeof(fsimage_fs_t),			/* tp_size */
-	0,					/* tp_itemsize */
-	(destructor) fsimage_fs_dealloc, 	/* tp_dealloc */
-	0,					/* tp_print */
-	(getattrfunc) fsimage_fs_getattr, 	/* tp_getattr */
-	0,					/* tp_setattr */
-	0,					/* tp_compare */
-	0,					/* tp_repr */
-	0,					/* tp_as_number */
-	0,	 				/* tp_as_sequence */
-	0,					/* tp_as_mapping */
-	0,	   				/* tp_hash */
-	0,					/* tp_call */
-	0,					/* tp_str */
-	0,					/* tp_getattro */
-	0,					/* tp_setattro */
-	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	fsimage_fs_type__doc__,
-	PY_PAD
+	PyVarObject_HEAD_INIT(&PyType_Type, 0)
+	.tp_name = "xenfsimage.fs",
+	.tp_basicsize = sizeof(fsimage_fs_t),
+	.tp_dealloc = (destructor) fsimage_fs_dealloc,
+#if PY_MAJOR_VERSION < 3
+	.tp_getattr = (getattrfunc) fsimage_fs_getattr,
+#endif
+	.tp_flags = Py_TPFLAGS_DEFAULT,
+	.tp_doc = fsimage_fs_type__doc__,
+#if PY_MAJOR_VERSION >= 3
+	.tp_methods = fsimage_fs_methods,
+#endif
 };
 
 static PyObject *
@@ -309,8 +305,27 @@ static struct PyMethodDef fsimage_module_methods[] = {
 	{ NULL, NULL, 0, NULL }
 };
 
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef fsimage_module_def = {
+	PyModuleDef_HEAD_INIT,
+	.m_name = "xenfsimage",
+	.m_size = -1,
+	.m_methods = fsimage_module_methods,
+};
+#endif
+
 PyMODINIT_FUNC
+#if PY_MAJOR_VERSION >= 3
+PyInit_xenfsimage(void)
+#else
 initxenfsimage(void)
+#endif
 {
+#if PY_MAJOR_VERSION < 3
 	Py_InitModule("xenfsimage", fsimage_module_methods);
+#else
+	if (PyType_Ready(&fsimage_fs_type) < 0 || PyType_Ready(&fsimage_file_type) < 0)
+		return NULL;
+	return PyModule_Create(&fsimage_module_def);
+#endif
 }
