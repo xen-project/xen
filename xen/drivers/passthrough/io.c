@@ -869,7 +869,8 @@ static int _hvm_dpci_msi_eoi(struct domain *d,
 
 void hvm_dpci_msi_eoi(struct domain *d, int vector)
 {
-    if ( !iommu_enabled || !hvm_domain_irq(d)->dpci )
+    if ( !iommu_enabled ||
+         (!hvm_domain_irq(d)->dpci && !is_hardware_domain(d)) )
        return;
 
     spin_lock(&d->event_lock);
