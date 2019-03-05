@@ -306,11 +306,31 @@ static inline unsigned long read_cr4(void)
 
 static inline void write_cr4(unsigned long val)
 {
+    struct cpu_info *info = get_cpu_info();
+
     /* No global pages in case of PCIDs enabled! */
     ASSERT(!(val & X86_CR4_PGE) || !(val & X86_CR4_PCIDE));
 
-    get_cpu_info()->cr4 = val;
-    asm volatile ( "mov %0,%%cr4" : : "r" (val) );
+    /*
+     * On hardware supporting FSGSBASE, the value in %cr4 is the kernel's
+     * choice for 64bit PV guests, which impacts whether Xen can use the
+     * instructions.
+     *
+     * The {rd,wr}{fs,gs}base() helpers use info->cr4 to work out whether it
+     * is safe to execute the {RD,WR}{FS,GS}BASE instruction, falling back to
+     * the MSR path if not.  Some users require interrupt safety.
+     *
+     * If FSGSBASE is currently or about to become clear, reflect this in
+     * info->cr4 before updating %cr4, so an interrupt which hits in the
+     * middle won't observe FSGSBASE set in info->cr4 but clear in %cr4.
+     */
+    info->cr4 = val & (info->cr4 | ~X86_CR4_FSGSBASE);
+
+    asm volatile ( "mov %[val], %%cr4"
+                   : "+m" (info->cr4) /* Force ordering without a barrier. */
+                   : [val] "r" (val) );
+
+    info->cr4 = val;
 }
 
 /* Clear and set 'TS' bit respectively */
