@@ -1610,7 +1610,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     cr4_pv32_mask = mmu_cr4_features & XEN_CR4_PV32_BITS;
 
-    if ( cpu_has_fsgsbase )
+    if ( boot_cpu_has(X86_FEATURE_FSGSBASE) )
         set_in_cr4(X86_CR4_FSGSBASE);
 
     if ( opt_invpcid && cpu_has_invpcid )

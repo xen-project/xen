@@ -1574,8 +1574,7 @@ static int svm_cpu_up_prepare(unsigned int cpu)
             goto err;
 
 #ifdef CONFIG_PV
-        if ( !cpu_has_fsgsbase )
-            per_cpu(host_vmcb_va, cpu) = __map_domain_page_global(pg);
+        per_cpu(host_vmcb_va, cpu) = __map_domain_page_global(pg);
 #endif
 
         clear_domain_page(page_to_mfn(pg));

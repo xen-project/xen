@@ -1302,13 +1302,8 @@ static void load_segments(struct vcpu *n)
     per_cpu(dirty_segment_mask, cpu) = 0;
 
 #ifdef CONFIG_HVM
-    if ( !is_pv_32bit_vcpu(n) && !cpu_has_fsgsbase && cpu_has_svm &&
-         !((uregs->fs | uregs->gs) & ~3) &&
-         /*
-          * The remaining part is just for optimization: If only shadow GS
-          * needs loading, there's nothing to be gained here.
-          */
-         (n->arch.pv.fs_base | n->arch.pv.gs_base_user | n->arch.pv.ldt_ents) )
+    if ( cpu_has_svm && !is_pv_32bit_vcpu(n) &&
+         !(read_cr4() & X86_CR4_FSGSBASE) && !((uregs->fs | uregs->gs) & ~3) )
     {
         unsigned long gsb = n->arch.flags & TF_kernel_mode
             ? n->arch.pv.gs_base_kernel : n->arch.pv.gs_base_user;
@@ -1487,7 +1482,8 @@ static void save_segments(struct vcpu *v)
     regs->fs = read_sreg(fs);
     regs->gs = read_sreg(gs);
 
-    if ( cpu_has_fsgsbase && !is_pv_32bit_vcpu(v) )
+    /* %fs/%gs bases can only be stale if WR{FS,GS}BASE are usable. */
+    if ( (read_cr4() & X86_CR4_FSGSBASE) && !is_pv_32bit_vcpu(v) )
     {
         v->arch.pv.fs_base = __rdfsbase();
         if ( v->arch.flags & TF_kernel_mode )
@@ -1691,8 +1687,8 @@ static void __context_switch(void)
 
 #if defined(CONFIG_PV) && defined(CONFIG_HVM)
     /* Prefetch the VMCB if we expect to use it later in the context switch */
-    if ( is_pv_domain(nd) && !is_pv_32bit_domain(nd) && !is_idle_domain(nd) &&
-         !cpu_has_fsgsbase && cpu_has_svm )
+    if ( cpu_has_svm && is_pv_domain(nd) && !is_pv_32bit_domain(nd) &&
+         !is_idle_domain(nd) && !(read_cr4() & X86_CR4_FSGSBASE) )
         svm_load_segs(0, 0, 0, 0, 0, 0, 0);
 #endif
 
