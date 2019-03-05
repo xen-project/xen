@@ -60,6 +60,23 @@ void pv_domain_destroy(struct domain *d);
 int pv_domain_initialise(struct domain *d, unsigned int domcr_flags,
                          struct xen_arch_domainconfig *config);
 
+/*
+ * Bits which a PV guest can toggle in its view of cr4.  Some are loaded into
+ * hardware, while some are fully emulated.
+ */
+#define PV_CR4_GUEST_MASK \
+    (X86_CR4_TSD | X86_CR4_DE | X86_CR4_FSGSBASE | X86_CR4_OSXSAVE)
+
+/* Bits which a PV guest may observe from the real hardware settings. */
+#define PV_CR4_GUEST_VISIBLE_MASK \
+    (X86_CR4_PAE | X86_CR4_MCE | X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT)
+
+/* Given a new cr4 value, construct the resulting guest-visible cr4 value. */
+unsigned long pv_fixup_guest_cr4(const struct vcpu *v, unsigned long cr4);
+
+/* Create a cr4 value to load into hardware, based on vcpu settings. */
+unsigned long pv_make_cr4(const struct vcpu *v);
+
 #else  /* !CONFIG_PV */
 
 #include <xen/errno.h>
@@ -73,6 +90,9 @@ static inline int pv_domain_initialise(struct domain *d,
 {
     return -EOPNOTSUPP;
 }
+
+static inline unsigned long pv_make_cr4(const struct vcpu *v) { return ~0ul; }
+
 #endif	/* CONFIG_PV */
 
 void paravirt_ctxt_switch_from(struct vcpu *v);
