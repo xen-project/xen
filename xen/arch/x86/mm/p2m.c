@@ -642,13 +642,9 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
     p2m_type_t t;
     p2m_access_t a;
 
+    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
     if ( !paging_mode_translate(p2m->domain) )
-    {
-        if ( need_iommu(p2m->domain) )
-            for ( i = 0; i < (1 << page_order); i++ )
-                iommu_unmap_page(p2m->domain, mfn + i);
         return 0;
-    }
 
     ASSERT(gfn_locked_by_me(p2m, gfn));
     P2M_DEBUG("removing gfn=%#lx mfn=%#lx\n", gfn, mfn);
@@ -692,22 +688,33 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     int pod_count = 0;
     int rc = 0;
 
+    /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
     if ( !paging_mode_translate(d) )
     {
-        if ( need_iommu(d) && t == p2m_ram_rw )
+        struct page_info *page = mfn_to_page(_mfn(mfn));
+
+        /*
+         * Our interface for PV guests wrt IOMMU entries hasn't been very
+         * clear; but historically, pages have started out with IOMMU mappings,
+         * and only lose them when changed to a different page type.
+         *
+         * Retain this property by grabbing a writable type ref and then
+         * dropping it immediately.  The result will be pages that have a
+         * writable type (and an IOMMU entry), but a count of 0 (such that
+         * any guest-requested type changes succeed and remove the IOMMU
+         * entry).
+         */
+        if ( !need_iommu(d) || t != p2m_ram_rw )
+            return 0;
+
+        for ( i = 0; i < (1UL << page_order); ++i, ++page )
         {
-            for ( i = 0; i < (1 << page_order); i++ )
-            {
-                rc = iommu_map_page(
-                    d, mfn + i, mfn + i, IOMMUF_readable|IOMMUF_writable);
-                if ( rc != 0 )
-                {
-                    while ( i-- > 0 )
-                        iommu_unmap_page(d, mfn + i);
-                    return rc;
-                }
-            }
+            if ( get_page_and_type(page, d, PGT_writable_page) )
+                put_page_and_type(page);
+            else
+                return -EINVAL;
         }
+
         return 0;
     }
 
