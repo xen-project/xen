@@ -81,6 +81,22 @@
  * OS's, which will generally use the WP bit to simplify copy-on-write
  * implementation (in that case, OS wants a fault when it writes to
  * an application-supplied buffer).
+ *
+ * PV domUs and IOMMUs:
+ * --------------------
+ * For a guest to be able to DMA into a page, that page must be in the
+ * domain's IOMMU.  However, we *must not* allow DMA into 'special'
+ * pages (such as page table pages, descriptor tables, &c); and we
+ * must also ensure that mappings are removed from the IOMMU when the
+ * page is freed.  Finally, it is inherently racy to make any changes
+ * based on a page with a non-zero type count.
+ *
+ * To that end, we put the page in the IOMMU only when a page gains
+ * the PGT_writeable type; and we remove the page when it loses the
+ * PGT_writeable type (not when the type count goes to zero).  This
+ * effectively protects the IOMMU status update with the type count we
+ * have just acquired.  We must also check for PGT_writable type when
+ * doing the final put_page(), and remove it from the iommu if so.
  */
 
 #include <xen/init.h>
@@ -2252,19 +2268,79 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     return rc;
 }
 
-static int cleanup_page_cacheattr(struct page_info *page)
+/*
+ * In the course of a page's use, it may have caused other secondary
+ * mappings to have changed:
+ * - Xen's mappings may have been changed to accomodate the requested
+ *   cache attibutes
+ * - A page may have been put into the IOMMU of a PV guest when it
+ *   gained a writable mapping.
+ *
+ * Now that the page is being freed, clean up these mappings if
+ * appropriate.  NB that at this point the page is still "allocated",
+ * but not "live" (i.e., its refcount is 0), so it's safe to read the
+ * count_info, owner, and type_info without synchronization.
+ */
+static int cleanup_page_mappings(struct page_info *page)
 {
     unsigned int cacheattr =
         (page->count_info & PGC_cacheattr_mask) >> PGC_cacheattr_base;
+    int rc = 0;
+    unsigned long mfn = mfn_x(page_to_mfn(page));
 
-    if ( likely(cacheattr == 0) )
-        return 0;
+    /*
+     * If we've modified xen mappings as a result of guest cache
+     * attributes, restore them to the "normal" state.
+     */
+    if ( unlikely(cacheattr) )
+    {
+        page->count_info &= ~PGC_cacheattr_mask;
 
-    page->count_info &= ~PGC_cacheattr_mask;
+        BUG_ON(is_xen_heap_page(page));
 
-    BUG_ON(is_xen_heap_page(page));
+        rc = update_xen_mappings(mfn, 0);
+    }
 
-    return update_xen_mappings(mfn_x(page_to_mfn(page)), 0);
+    /*
+     * If this may be in a PV domain's IOMMU, remove it.
+     *
+     * NB that writable xenheap pages have their type set and cleared by
+     * implementation-specific code, rather than by get_page_type().  As such:
+     * - They aren't expected to have an IOMMU mapping, and
+     * - We don't necessarily expect the type count to be zero when the final
+     * put_page happens.
+     *
+     * Go ahead and attemp to call iommu_unmap() on xenheap pages anyway, just
+     * in case; but only ASSERT() that the type count is zero and remove the
+     * PGT_writable type for non-xenheap pages.
+     */
+    if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
+    {
+        struct domain *d = page_get_owner(page);
+
+        if ( d && is_pv_domain(d) && unlikely(need_iommu(d)) )
+        {
+            int rc2 = iommu_unmap_page(d, mfn);
+
+            if ( !rc )
+                rc = rc2;
+        }
+
+        if ( likely(!is_xen_heap_page(page)) )
+        {
+            ASSERT((page->u.inuse.type_info &
+                    (PGT_type_mask | PGT_count_mask)) == PGT_writable_page);
+            /*
+             * Clear the type to record the fact that all writable mappings
+             * have been removed.  But if either operation failed, leave
+             * type_info alone.
+             */
+            if ( likely(!rc) )
+                page->u.inuse.type_info &= ~(PGT_type_mask | PGT_count_mask);
+        }
+    }
+
+    return rc;
 }
 
 void put_page(struct page_info *page)
@@ -2280,7 +2356,7 @@ void put_page(struct page_info *page)
 
     if ( unlikely((nx & PGC_count_mask) == 0) )
     {
-        if ( cleanup_page_cacheattr(page) == 0 )
+        if ( !cleanup_page_mappings(page) )
             free_domheap_page(page);
         else
             gdprintk(XENLOG_WARNING,
@@ -3978,9 +4054,10 @@ int steal_page(
      * NB this is safe even if the page ends up being given back to
      * the domain, because the count is zero: subsequent mappings will
      * cause the cache attributes to be re-instated inside
-     * get_page_from_l1e().
+     * get_page_from_l1e(), or the page to be added back to the IOMMU
+     * upon the type changing to PGT_writeable, as appropriate.
      */
-    if ( (rc = cleanup_page_cacheattr(page)) )
+    if ( (rc = cleanup_page_mappings(page)) )
     {
         /*
          * Couldn't fixup Xen's mappings; put things the way we found
