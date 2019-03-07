@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+from __future__ import print_function
+
 import sys
 import re
 
@@ -576,14 +578,14 @@ def libxl_C_enum_from_string(ty, str, e, indent = "    "):
 
 if __name__ == '__main__':
     if len(sys.argv) != 6:
-        print >>sys.stderr, "Usage: gentypes.py <idl> <header> <header-private> <header-json> <implementation>"
+        print("Usage: gentypes.py <idl> <header> <header-private> <header-json> <implementation>", file=sys.stderr)
         sys.exit(1)
 
     (_, idlname, header, header_private, header_json, impl) = sys.argv
 
     (builtins,types) = idl.parse(idlname)
 
-    print "outputting libxl type definitions to %s" % header
+    print("outputting libxl type definitions to %s" % header)
 
     f = open(header, "w")
 
@@ -633,7 +635,7 @@ if __name__ == '__main__':
     f.write("""#endif /* %s */\n""" % (header_define))
     f.close()
 
-    print "outputting libxl JSON definitions to %s" % header_json
+    print("outputting libxl JSON definitions to %s" % header_json)
 
     f = open(header_json, "w")
 
@@ -657,7 +659,7 @@ if __name__ == '__main__':
     f.write("""#endif /* %s */\n""" % header_json_define)
     f.close()
 
-    print "outputting libxl type internal definitions to %s" % header_private
+    print("outputting libxl type internal definitions to %s" % header_private)
 
     f = open(header_private, "w")
 
@@ -683,7 +685,7 @@ if __name__ == '__main__':
     f.write("""#endif /* %s */\n""" % header_json_define)
     f.close()
 
-    print "outputting libxl type implementations to %s" % impl
+    print("outputting libxl type implementations to %s" % impl)
 
     f = open(impl, "w")
     f.write("""
