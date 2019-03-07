@@ -10,9 +10,11 @@
 # along with this program; If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import print_function, absolute_import
+
 import sys, re, os
 import logging
-import GrubConf
+from . import GrubConf
 
 class ExtLinuxImage(object):
     def __init__(self, lines, path):
@@ -32,7 +34,8 @@ class ExtLinuxImage(object):
         self.lines = []
         self.path = path
         self.root = ""
-        map(self.set_from_line, lines)
+        for line in lines:
+            self.set_from_line(line)
 
     def set_from_line(self, line, replace = None):
         (com, arg) = GrubConf.grub_exact_split(line, 2)
@@ -67,7 +70,7 @@ class ExtLinuxImage(object):
                         setattr(self, "initrd", a.replace("initrd=", ""))
                         arg = arg.replace(a, "")
 
-        if com is not None and self.commands.has_key(com):
+        if com is not None and com in self.commands:
             if self.commands[com] is not None:
                 setattr(self, self.commands[com], re.sub('^"(.+)"$', r"\1", arg.strip()))
             else:
@@ -136,7 +139,7 @@ class ExtLinuxConfigFile(object):
     def parse(self, buf = None):
         if buf is None:
             if self.filename is None:
-                raise ValueError, "No config file defined to parse!"
+                raise ValueError("No config file defined to parse!")
 
             f = open(self.filename, 'r')
             lines = f.readlines()
@@ -167,7 +170,7 @@ class ExtLinuxConfigFile(object):
 
             (com, arg) = GrubConf.grub_exact_split(l, 2)
             com = com.lower()
-            if self.commands.has_key(com):
+            if com in self.commands:
                 if self.commands[com] is not None:
                     setattr(self, self.commands[com], arg.strip())
                 else:
@@ -207,8 +210,8 @@ class ExtLinuxConfigFile(object):
         
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        raise RuntimeError, "Need a configuration file to read"
+        raise RuntimeError("Need a configuration file to read")
     g = ExtLinuxConfigFile(sys.argv[1])
     for i in g.images:
-        print i
-    print g.default
+        print(i)
+    print(g.default)

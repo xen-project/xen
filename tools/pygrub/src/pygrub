@@ -12,13 +12,15 @@
 # along with this program; If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import print_function
+
 import os, sys, string, struct, tempfile, re, traceback, stat, errno
 import copy
 import logging
 import platform
 import xen.lowlevel.xc
 
-import curses, _curses, curses.wrapper, curses.textpad, curses.ascii
+import curses, _curses, curses.textpad, curses.ascii
 import getopt
 
 import xenfsimage
@@ -77,7 +79,7 @@ def get_solaris_slice(file, offset):
     buf = os.read(fd, 512)
     os.close(fd)
     if struct.unpack("<H", buf[508:510])[0] != DKL_MAGIC:
-        raise RuntimeError, "Invalid disklabel magic"
+        raise RuntimeError("Invalid disklabel magic")
 
     nslices = struct.unpack("<H", buf[30:32])[0]
 
@@ -88,7 +90,7 @@ def get_solaris_slice(file, offset):
         if slicetag == V_ROOT:
             return slicesect * SECTOR_SIZE
 
-    raise RuntimeError, "No root slice found"      
+    raise RuntimeError("No root slice found")
 
 def get_fs_offset_gpt(file):
     fd = os.open(file, os.O_RDONLY)
@@ -423,20 +425,17 @@ class Grub:
         we're being given a raw config file rather than a disk image."""
         
         if not os.access(fn, os.R_OK):
-            raise RuntimeError, "Unable to access %s" %(fn,)
+            raise RuntimeError("Unable to access %s" %(fn,))
 
-        cfg_list = map(lambda x: (x,grub.GrubConf.Grub2ConfigFile),
-                       ["/boot/grub/grub.cfg", "/grub/grub.cfg",
-                        "/boot/grub2/grub.cfg", "/grub2/grub.cfg"]) + \
-                   map(lambda x: (x,grub.ExtLinuxConf.ExtLinuxConfigFile),
-                       ["/boot/isolinux/isolinux.cfg",
+        cfg_list = [(x,grub.GrubConf.Grub2ConfigFile) for x in ["/boot/grub/grub.cfg", "/grub/grub.cfg",
+                        "/boot/grub2/grub.cfg", "/grub2/grub.cfg"]] + \
+                   [(x,grub.ExtLinuxConf.ExtLinuxConfigFile) for x in ["/boot/isolinux/isolinux.cfg",
                         "/boot/extlinux/extlinux.conf",
                         "/boot/extlinux.conf",
                         "/extlinux/extlinux.conf",
-                        "/extlinux.conf"]) + \
-                   map(lambda x: (x,grub.GrubConf.GrubConfigFile),
-                       ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
-                        "/grub/menu.lst", "/grub/grub.conf"])
+                        "/extlinux.conf"]] + \
+                   [(x,grub.GrubConf.GrubConfigFile) for x in ["/boot/grub/menu.lst", "/boot/grub/grub.conf",
+                        "/grub/menu.lst", "/grub/grub.conf"]]
 
         if not fs:
             # set the config file and parse it
@@ -448,12 +447,12 @@ class Grub:
 
         for f,parser in cfg_list:
             if fs.file_exists(f):
-                print >>sys.stderr, "Using %s to parse %s" % (parser,f)
+                print("Using %s to parse %s" % (parser,f), file=sys.stderr)
                 self.cf = parser()
                 self.cf.filename = f
                 break
         if self.__dict__.get('cf', None) is None:
-            raise RuntimeError, "couldn't find bootloader config file in the image provided."
+            raise RuntimeError("couldn't find bootloader config file in the image provided.")
         f = fs.open_file(self.cf.filename)
         # limit read size to avoid pathological cases
         buf = f.read(FS_READ_MAX)
@@ -628,11 +627,11 @@ def run_grub(file, entry, fs, cfg_args):
     if list_entries:
         for i in range(len(g.cf.images)):
             img = g.cf.images[i]
-            print "title: %s" % img.title
-            print "  root: %s" % img.root
-            print "  kernel: %s" % img.kernel[1]
-            print "  args: %s" % img.args
-            print "  initrd: %s" % img.initrd[1]
+            print("title: %s" % img.title)
+            print("  root: %s" % img.root)
+            print("  kernel: %s" % img.kernel[1])
+            print("  args: %s" % img.args)
+            print("  initrd: %s" % img.initrd[1])
 
     if interactive and not list_entries:
         curses.wrapper(run_main)
@@ -646,7 +645,7 @@ def run_grub(file, entry, fs, cfg_args):
            sel = idx
 
     if sel == -1:
-        print "No kernel image selected!"
+        print("No kernel image selected!")
         sys.exit(1)
 
     try:
@@ -731,7 +730,7 @@ def format_sxp(kernel, ramdisk, args):
 def format_simple(kernel, ramdisk, args, sep):
     for check in (kernel, ramdisk, args):
         if check is not None and sep in check:
-            raise RuntimeError, "simple format cannot represent delimiter-containing value"
+            raise RuntimeError("simple format cannot represent delimiter-containing value")
     s = ("kernel %s" % kernel) + sep
     if ramdisk:
         s += ("ramdisk %s" % ramdisk) + sep
@@ -744,7 +743,7 @@ if __name__ == "__main__":
     sel = None
     
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] [--offset=] <image>" %(sys.argv[0],)
+        print("Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] [--offset=] <image>" %(sys.argv[0],), file=sys.stderr)
 
     def copy_from_image(fs, file_to_read, file_type, output_directory,
                         not_really):
@@ -755,8 +754,8 @@ if __name__ == "__main__":
                 sys.exit("The requested %s file does not exist" % file_type)
         try:
             datafile = fs.open_file(file_to_read)
-        except Exception, e:
-            print >>sys.stderr, e
+        except Exception as e:
+            print(e, file=sys.stderr)
             sys.exit("Error opening %s in guest" % file_to_read)
         (tfd, ret) = tempfile.mkstemp(prefix="boot_"+file_type+".",
                                       dir=output_directory)
@@ -769,8 +768,8 @@ if __name__ == "__main__":
                 return ret
             try:
                 os.write(tfd, data)
-            except Exception, e:
-                print >>sys.stderr, e
+            except Exception as e:
+                print(e, file=sys.stderr)
                 os.close(tfd)
                 os.unlink(ret)
                 del datafile
@@ -834,7 +833,7 @@ if __name__ == "__main__":
             try:
                 part_offs = [ int(a) ]
             except ValueError:
-                print "offset value must be an integer"
+                print("offset value must be an integer")
                 usage()
                 sys.exit(1)
         elif o in ("--entry",):
@@ -847,13 +846,13 @@ if __name__ == "__main__":
             debug = True
         elif o in ("--output-format",):
             if a not in ["sxp", "simple", "simple0"]:
-                print "unknown output format %s" % a
+                print("unknown output format %s" % a)
                 usage()
                 sys.exit(1)
             output_format = a
         elif o in ("--output-directory",):
             if not os.path.isdir(a):
-                print "%s is not an existing directory" % a
+                print("%s is not an existing directory" % a)
                 sys.exit(1)
             output_directory = a
 
@@ -862,8 +861,8 @@ if __name__ == "__main__":
 
 
     try:
-        os.makedirs(output_directory, 0700)
-    except OSError,e:
+        os.makedirs(output_directory, 0o700)
+    except OSError as e:
         if (e.errno == errno.EEXIST) and os.path.isdir(output_directory):
             pass
         else:
@@ -877,10 +876,10 @@ if __name__ == "__main__":
     # debug
     if isconfig:
         chosencfg = run_grub(file, entry, fs, incfg["args"])
-        print "  kernel: %s" % chosencfg["kernel"]
+        print("  kernel: %s" % chosencfg["kernel"])
         if chosencfg["ramdisk"]:
-            print "  initrd: %s" % chosencfg["ramdisk"]
-        print "  args: %s" % chosencfg["args"]
+            print("  initrd: %s" % chosencfg["ramdisk"])
+        print("  args: %s" % chosencfg["args"])
         sys.exit(0)
 
     # if boot filesystem is set then pass to fsimage.open
@@ -926,7 +925,7 @@ if __name__ == "__main__":
 
     # Did looping through partitions find us a kernel?
     if fs is None:
-        raise RuntimeError, "Unable to find partition containing kernel"
+        raise RuntimeError("Unable to find partition containing kernel")
 
     bootcfg["kernel"] = copy_from_image(fs, chosencfg["kernel"], "kernel",
                                         output_directory, not_really)

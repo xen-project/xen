@@ -2,9 +2,11 @@
 #LiloConf.py
 #
 
+from __future__ import print_function, absolute_import
+
 import sys, re, os
 import logging
-import GrubConf
+from . import GrubConf
 
 class LiloImage(object):
     def __init__(self, lines, path):
@@ -24,12 +26,13 @@ class LiloImage(object):
         self.lines = []
         self.path = path
         self.root = ""
-        map(self.set_from_line, lines)
+        for line in lines:
+            self.set_from_line(line)
 
     def set_from_line(self, line, replace = None):
         (com, arg) = GrubConf.grub_exact_split(line, 2)
 
-        if self.commands.has_key(com):
+        if com in self.commands:
             if self.commands[com] is not None:
                 setattr(self, self.commands[com], re.sub('^"(.+)"$', r"\1", arg.strip()))
             else:
@@ -97,7 +100,7 @@ class LiloConfigFile(object):
     def parse(self, buf = None):
         if buf is None:
             if self.filename is None:
-                raise ValueError, "No config file defined to parse!"
+                raise ValueError("No config file defined to parse!")
 
             f = open(self.filename, 'r')
             lines = f.readlines()
@@ -127,7 +130,7 @@ class LiloConfigFile(object):
                 continue
 
             (com, arg) = GrubConf.grub_exact_split(l, 2)
-            if self.commands.has_key(com):
+            if com in self.commands:
                 if self.commands[com] is not None:
                     setattr(self, self.commands[com], arg.strip())
                 else:
@@ -170,8 +173,8 @@ class LiloConfigFile(object):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        raise RuntimeError, "Need a lilo.conf to read"
+        raise RuntimeError("Need a lilo.conf to read")
     g = LiloConfigFile(sys.argv[1])
     for i in g.images:
-        print i #, i.title, i.root, i.kernel, i.args, i.initrd
-    print g.default
+        print(i) #, i.title, i.root, i.kernel, i.args, i.initrd
+    print(g.default)
