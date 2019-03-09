@@ -1648,7 +1648,7 @@ void destroy_ring_for_helper(
 }
 
 /*
- * Acquire a pointer to struct page_info for a specified doman and GFN,
+ * Acquire a pointer to struct page_info for a specified domain and GFN,
  * checking whether the page has been paged out, or needs unsharing.
  * If the function succeeds then zero is returned, page_p is written
  * with a pointer to the struct page_info with a reference taken, and
