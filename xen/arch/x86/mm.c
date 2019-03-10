@@ -2002,8 +2002,7 @@ static int free_l4_table(struct page_info *page)
  * 1. No hypervisor paths ever lock two pages at once, and
  * 2. We never call _put_page_type() on a page while holding its page lock.
  *
- * Add a check to debug builds to catch any violations of these
- * assumpitons.
+ * Add a check to debug builds to catch any violations of these assumptions.
  *
  * NB that if we find valid, safe reasons to hold two page locks at
  * once, these checks will need to be adjusted.
