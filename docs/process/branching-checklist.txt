@@ -1,10 +1,6 @@
 v=4.1
 ov=4.0
 
-##* tag branchpoint
-##        hg tag $v.0-branched
-##        hg sign -k 'Xen tree' 4.1.0-branched
-
 * make branch in qemu-iwj.git
         git-branch $v-testing master
 
