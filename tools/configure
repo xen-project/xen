@@ -7002,15 +7002,15 @@ if test x"${PYTHONPATH}" = x"no"
 then
     as_fn_error $? "Unable to find $PYTHON, please install $PYTHON" "$LINENO" 5
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for python version >= 2.3 " >&5
-$as_echo_n "checking for python version >= 2.3 ... " >&6; }
-`$PYTHON -c 'import sys; sys.exit(eval("sys.version_info < (2, 3)"))'`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for python version >= 2.6 " >&5
+$as_echo_n "checking for python version >= 2.6 ... " >&6; }
+`$PYTHON -c 'import sys; sys.exit(eval("sys.version_info < (2, 6)"))'`
 if test "$?" != "0"
 then
     python_version=`$PYTHON -V 2>&1`
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-    as_fn_error $? "$python_version is too old, minimum required version is 2.3" "$LINENO" 5
+    as_fn_error $? "$python_version is too old, minimum required version is 2.6" "$LINENO" 5
 else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }

@@ -46,7 +46,7 @@ provided by your OS distributor:
         - GCC 4.8 or later
         - GNU Binutils 2.24 or later
     * Development install of zlib (e.g., zlib-dev)
-    * Development install of Python 2, v2.4 or later (e.g., python-dev)
+    * Development install of Python 2, v2.6 or later (e.g., python-dev)
     * Development install of curses (e.g., libncurses-dev)
     * Development install of openssl (e.g., openssl-dev)
     * Development install of x11 (e.g. xorg-x11-dev)
@@ -177,7 +177,7 @@ Python Runtime Libraries
 
 Various tools, such as pygrub, have the following runtime dependencies:
 
-    * Python 2, v2.4 or later.
+    * Python 2, v2.6 or later.
           URL:    http://www.python.org/
           Debian: python
 

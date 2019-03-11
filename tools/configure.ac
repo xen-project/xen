@@ -358,7 +358,7 @@ AS_IF([echo "$PYTHON" | grep -q "^/"], [
 ],[test -z "$PYTHON"], [PYTHON="python"],
 [AC_MSG_ERROR([PYTHON specified, but is not an absolute path])])
 AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
-AX_CHECK_PYTHON_VERSION([2], [3])
+AX_CHECK_PYTHON_VERSION([2], [6])
 
 AS_IF([test "$cross_compiling" != yes], [
     AX_CHECK_PYTHON_DEVEL()
