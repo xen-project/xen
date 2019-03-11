@@ -37,7 +37,14 @@
 struct microcode_header_intel {
     unsigned int hdrver;
     unsigned int rev;
-    unsigned int date;
+    union {
+        struct {
+            uint16_t year;
+            uint8_t day;
+            uint8_t month;
+        };
+        unsigned int date;
+    };
     unsigned int sig;
     unsigned int cksum;
     unsigned int ldrver;
@@ -316,9 +323,9 @@ static int apply_microcode(unsigned int cpu)
     printk(KERN_INFO "microcode: CPU%d updated from revision "
            "%#x to %#x, date = %04x-%02x-%02x \n",
            cpu_num, uci->cpu_sig.rev, val[1],
-           uci->mc.mc_intel->hdr.date & 0xffff,
-           uci->mc.mc_intel->hdr.date >> 24,
-           (uci->mc.mc_intel->hdr.date >> 16) & 0xff);
+           uci->mc.mc_intel->hdr.year,
+           uci->mc.mc_intel->hdr.month,
+           uci->mc.mc_intel->hdr.day);
     uci->cpu_sig.rev = val[1];
 
     return 0;
