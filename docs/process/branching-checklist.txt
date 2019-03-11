@@ -75,6 +75,7 @@ Ensure references to qemu trees in xen.git's Config.mk are updated.
 Check this with
         grep unstable Config.mk 
 which should produce no output.  Replace as necessary.
+(There may well be none.)
 
 Update newly diverging staging (unstable) according to
 release-technician-checklist.txt section re README etc.
