@@ -49,7 +49,10 @@ t=RELEASE-$r
 * consider bumping sonames of shlibs
 
 * change xen-unstable README (should say "Xen 4.5" in releases and on stable branches, "Xen 4.5-unstable" on unstable)
-* change xen-unstable Config.mk (QEMU_UPSTREAM_REVISION, QEMU_TRADITIONAL_REVISION, MINIOS_UPSTREAM_REVISION)
+* change xen-unstable Config.mk
+#   QEMU_UPSTREAM_REVISION,
+#   QEMU_TRADITIONAL_REVISION
+#   MINIOS_UPSTREAM_REVISION
 * change SUPPORT.md heading version number; -unstable or -rc tag
 *     (empty in stable branches after .0 release).
 *     insert correct version number in release-notes link
