@@ -858,7 +858,7 @@ if __name__ == "__main__":
             output_directory = a
 
     if debug:
-	logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(level=logging.DEBUG)
 
 
     try:
@@ -917,7 +917,7 @@ if __name__ == "__main__":
             # IOErrors raised by fsimage.open
             # RuntimeErrors raised by run_grub if no menu.lst present
             if debug:
-		traceback.print_exc()
+                traceback.print_exc()
             fs = None
             continue
 
