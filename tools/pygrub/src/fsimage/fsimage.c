@@ -43,13 +43,6 @@ typedef struct fsimage_file {
 	fsi_file_t *file;
 } fsimage_file_t;
 
-struct foo {
-	int ref;
-	int size;
-	long hash;
-	int state;
-};
-
 static PyObject *
 fsimage_file_read(fsimage_file_t *file, PyObject *args, PyObject *kwargs)
 {
