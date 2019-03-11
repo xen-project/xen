@@ -88,6 +88,8 @@ Update new stable tree's MAINTAINERS to contain correct info for this
 stable branch: usually, copy text from previous
 staging-$ov:MAINTAINERS section "Stable Release Maintenance"
 into new staging-$v, deleting what's there.
+  git cat-file blob origin/staging-$ov:MAINTAINERS >MAINTAINERS
+and review the changes, commiting ONLY THE RELEVANT ONES
 
 Set off a manual osstest run, since the osstest cr-for-branches change
 will take a while to take effect:
