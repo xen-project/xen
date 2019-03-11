@@ -59,7 +59,11 @@ t=RELEASE-$r
 * change xen-unstable xen/Makefile XEN_EXTRAVERSION
 # if main version number has changed (eg 4.7 -> 4.8) rerun ./autogen.sh
 * rerun ./autogen.sh to update version number in configure
-#    - XEN_EXTRAVERSION should be `.0-rc$(XEN_VENDORVERSION)'
+#    - XEN_EXTRAVERSION should be as follows
+#      `.0-rc$(XEN_VENDORVERSION)'       during freeze, first rc onwards (including staging, before branching)
+#      `-unstable$(XEN_VENDORVERSION)'   unstable aka unfrozen staging (or unstable branch, after branching)
+#      `.0$(XEN_VENDORVERSION)'          actual release of Xen X.Y.0 (aka first actual release of Xen X.Y)
+#      `.Z$(XEN_VENDORVERSION)'          actual release of Xen X.Y.Z (stable point realase)
 #
 #    - turn off debug on stable branches, if not already done
 #           - tools/Rules.mk
