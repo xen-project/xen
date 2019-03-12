@@ -9,7 +9,7 @@
 static inline type name(const volatile type *addr) \
 {                                                  \
     type ret;                                      \
-    asm volatile("ldr" size " %" width "0,%1"      \
+    asm volatile("ldr" size " %" width(0) ",%1"    \
                  : "=r" (ret)                      \
                  : "m" (*(volatile type *)addr));  \
     return ret;                                    \
@@ -18,7 +18,7 @@ static inline type name(const volatile type *addr) \
 #define build_atomic_write(name, size, width, type)    \
 static inline void name(volatile type *addr, type val) \
 {                                                      \
-    asm volatile("str" size " %"width"1,%0"            \
+    asm volatile("str" size " %" width(1) ",%0"        \
                  : "=m" (*(volatile type *)addr)       \
                  : "r" (val));                         \
 }
@@ -27,19 +27,20 @@ static inline void name(volatile type *addr, type val) \
 static inline void name(volatile type *addr, type val)                  \
 {                                                                       \
     type t;                                                             \
-    asm volatile("ldr" size " %"width"1,%0\n"                           \
-                 "add %"width"1,%"width"1,%"width"2\n"                  \
-                 "str" size " %"width"1,%0"                             \
+    asm volatile("ldr" size " %" width(1) ",%0\n"                       \
+                 "add %" width(1) ",%" width(1) ",%" width(2) "\n"      \
+                 "str" size " %" width(1) ",%0"                         \
                  : "+m" (*addr), "=&r" (t)                              \
                  : "ri" (val));                                         \
 }
 
 #if defined (CONFIG_ARM_32)
-#define BYTE ""
-#define WORD ""
+#define BYTE(n) #n
+#define WORD(n) #n
 #elif defined (CONFIG_ARM_64)
-#define BYTE "w"
-#define WORD "w"
+#define BYTE(n)  "w" #n
+#define WORD(n)  "w" #n
+#define DWORD(n) "" #n
 #endif
 
 build_atomic_read(read_u8_atomic,  "b", BYTE, uint8_t)
@@ -53,8 +54,8 @@ build_atomic_write(write_u32_atomic, "",  WORD, uint32_t)
 build_atomic_write(write_int_atomic, "",  WORD, int)
 
 #if defined (CONFIG_ARM_64)
-build_atomic_read(read_u64_atomic, "", "", uint64_t)
-build_atomic_write(write_u64_atomic, "", "", uint64_t)
+build_atomic_read(read_u64_atomic, "", DWORD, uint64_t)
+build_atomic_write(write_u64_atomic, "", DWORD, uint64_t)
 #elif defined (CONFIG_ARM_32)
 static inline uint64_t read_u64_atomic(const volatile uint64_t *addr)
 {
