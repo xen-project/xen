@@ -30,7 +30,7 @@ static inline void name(volatile type *addr, type val)                  \
     asm volatile("ldr" size " %"width"1,%0\n"                           \
                  "add %"width"1,%"width"1,%"width"2\n"                  \
                  "str" size " %"width"1,%0"                             \
-                 : "=m" (*(volatile type *)addr), "=r" (t)              \
+                 : "+m" (*addr), "=&r" (t)                              \
                  : reg (val));                                          \
 }
 
