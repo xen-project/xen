@@ -493,6 +493,34 @@ static inline void check_for_early_unshadow(struct vcpu *v, mfn_t gmfn)
 #endif
 }
 
+/* This is the entry point for emulated writes to pagetables in HVM guests */
+static void validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
+                                    void *entry, unsigned int size)
+{
+    struct domain *d = v->domain;
+    int rc;
+
+    ASSERT(paging_locked_by_me(v->domain));
+
+    rc = sh_validate_guest_entry(v, gmfn, entry, size);
+
+    if ( rc & SHADOW_SET_FLUSH )
+        /* Need to flush TLBs to pick up shadow PT changes */
+        flush_tlb_mask(d->dirty_cpumask);
+
+    if ( rc & SHADOW_SET_ERROR )
+    {
+        /*
+         * This page is probably not a pagetable any more: tear it out of the
+         * shadows, along with any tables that reference it.
+         * Since the validate call above will have made a "safe" (i.e. zero)
+         * shadow entry, we can let the domain live even if we can't fully
+         * unshadow the page.
+         */
+        sh_remove_shadows(d, gmfn, 0, 0);
+    }
+}
+
 /*
  * Tidy up after the emulated write: mark pages dirty, verify the new
  * contents, and undo the mapping.
@@ -558,9 +586,9 @@ static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
             ASSERT(b2 < bytes);
         }
         if ( likely(b1 > 0) )
-            sh_validate_guest_pt_write(v, sh_ctxt->mfn[0], addr, b1);
+            validate_guest_pt_write(v, sh_ctxt->mfn[0], addr, b1);
         if ( unlikely(b2 > 0) )
-            sh_validate_guest_pt_write(v, sh_ctxt->mfn[1], addr + b1, b2);
+            validate_guest_pt_write(v, sh_ctxt->mfn[1], addr + b1, b2);
     }
 
     paging_mark_dirty(v->domain, sh_ctxt->mfn[0]);

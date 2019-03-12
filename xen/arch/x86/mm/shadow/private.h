@@ -359,10 +359,6 @@ void sh_install_xen_entries_in_l4(struct domain *, mfn_t gl4mfn, mfn_t sl4mfn);
 /* Update the shadows in response to a pagetable write from Xen */
 int sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size);
 
-/* Update the shadows in response to a pagetable write from a HVM guest */
-void sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
-                                void *entry, u32 size);
-
 /* Remove all writeable mappings of a guest frame from the shadows.
  * Returns non-zero if we need to flush TLBs.
  * level and fault_addr desribe how we found this to be a pagetable;

@@ -886,33 +886,6 @@ sh_validate_guest_entry(struct vcpu *v, mfn_t gmfn, void *entry, u32 size)
 }
 
 
-void
-sh_validate_guest_pt_write(struct vcpu *v, mfn_t gmfn,
-                           void *entry, u32 size)
-/* This is the entry point for emulated writes to pagetables in HVM guests and
- * PV translated guests.
- */
-{
-    struct domain *d = v->domain;
-    int rc;
-
-    ASSERT(paging_locked_by_me(v->domain));
-    rc = sh_validate_guest_entry(v, gmfn, entry, size);
-    if ( rc & SHADOW_SET_FLUSH )
-        /* Need to flush TLBs to pick up shadow PT changes */
-        flush_tlb_mask(d->dirty_cpumask);
-    if ( rc & SHADOW_SET_ERROR )
-    {
-        /* This page is probably not a pagetable any more: tear it out of the
-         * shadows, along with any tables that reference it.
-         * Since the validate call above will have made a "safe" (i.e. zero)
-         * shadow entry, we can let the domain live even if we can't fully
-         * unshadow the page. */
-        sh_remove_shadows(d, gmfn, 0, 0);
-    }
-}
-
-
 /**************************************************************************/
 /* Memory management for shadow pages. */
 
