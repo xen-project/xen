@@ -173,7 +173,7 @@ static int __init parse_crashkernel(const char *str)
             kexec_crash_area_limit = parse_size_and_unit(cur = str + 1, &str);
         else if ( !strncmp(str, ",below=", 7) )
             kexec_crash_area_limit = parse_size_and_unit(cur = str + 7, &str);
-        else
+        else if ( *str )
         {
             printk(XENLOG_WARNING "crashkernel: '%s' ignored\n", str);
             rc = -EINVAL;
