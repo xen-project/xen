@@ -5,25 +5,25 @@
 #include <xen/prefetch.h>
 #include <asm/system.h>
 
-#define build_atomic_read(name, size, width, type, reg)\
+#define build_atomic_read(name, size, width, type) \
 static inline type name(const volatile type *addr) \
 {                                                  \
     type ret;                                      \
     asm volatile("ldr" size " %" width "0,%1"      \
-                 : reg (ret)                       \
+                 : "=r" (ret)                      \
                  : "m" (*(volatile type *)addr));  \
     return ret;                                    \
 }
 
-#define build_atomic_write(name, size, width, type, reg) \
+#define build_atomic_write(name, size, width, type)    \
 static inline void name(volatile type *addr, type val) \
 {                                                      \
     asm volatile("str" size " %"width"1,%0"            \
                  : "=m" (*(volatile type *)addr)       \
-                 : reg (val));                         \
+                 : "r" (val));                         \
 }
 
-#define build_add_sized(name, size, width, type, reg) \
+#define build_add_sized(name, size, width, type)                        \
 static inline void name(volatile type *addr, type val)                  \
 {                                                                       \
     type t;                                                             \
@@ -31,7 +31,7 @@ static inline void name(volatile type *addr, type val)                  \
                  "add %"width"1,%"width"1,%"width"2\n"                  \
                  "str" size " %"width"1,%0"                             \
                  : "+m" (*addr), "=&r" (t)                              \
-                 : reg (val));                                          \
+                 : "ri" (val));                                         \
 }
 
 #if defined (CONFIG_ARM_32)
@@ -42,19 +42,19 @@ static inline void name(volatile type *addr, type val)                  \
 #define WORD "w"
 #endif
 
-build_atomic_read(read_u8_atomic,  "b", BYTE, uint8_t, "=r")
-build_atomic_read(read_u16_atomic, "h", WORD, uint16_t, "=r")
-build_atomic_read(read_u32_atomic, "",  WORD, uint32_t, "=r")
-build_atomic_read(read_int_atomic, "",  WORD, int, "=r")
+build_atomic_read(read_u8_atomic,  "b", BYTE, uint8_t)
+build_atomic_read(read_u16_atomic, "h", WORD, uint16_t)
+build_atomic_read(read_u32_atomic, "",  WORD, uint32_t)
+build_atomic_read(read_int_atomic, "",  WORD, int)
 
-build_atomic_write(write_u8_atomic,  "b", BYTE, uint8_t, "r")
-build_atomic_write(write_u16_atomic, "h", WORD, uint16_t, "r")
-build_atomic_write(write_u32_atomic, "",  WORD, uint32_t, "r")
-build_atomic_write(write_int_atomic, "",  WORD, int, "r")
+build_atomic_write(write_u8_atomic,  "b", BYTE, uint8_t)
+build_atomic_write(write_u16_atomic, "h", WORD, uint16_t)
+build_atomic_write(write_u32_atomic, "",  WORD, uint32_t)
+build_atomic_write(write_int_atomic, "",  WORD, int)
 
 #if defined (CONFIG_ARM_64)
-build_atomic_read(read_u64_atomic, "", "", uint64_t, "=r")
-build_atomic_write(write_u64_atomic, "", "", uint64_t, "r")
+build_atomic_read(read_u64_atomic, "", "", uint64_t)
+build_atomic_write(write_u64_atomic, "", "", uint64_t)
 #elif defined (CONFIG_ARM_32)
 static inline uint64_t read_u64_atomic(const volatile uint64_t *addr)
 {
@@ -70,9 +70,9 @@ static inline void write_u64_atomic(volatile uint64_t *addr, uint64_t val)
 }
 #endif
 
-build_add_sized(add_u8_sized, "b", BYTE, uint8_t, "ri")
-build_add_sized(add_u16_sized, "h", WORD, uint16_t, "ri")
-build_add_sized(add_u32_sized, "", WORD, uint32_t, "ri")
+build_add_sized(add_u8_sized, "b", BYTE, uint8_t)
+build_add_sized(add_u16_sized, "h", WORD, uint16_t)
+build_add_sized(add_u32_sized, "", WORD, uint32_t)
 
 void __bad_atomic_size(void);
 
