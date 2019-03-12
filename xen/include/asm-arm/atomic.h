@@ -55,6 +55,19 @@ build_atomic_write(write_int_atomic, "",  WORD, int, "r")
 #if defined (CONFIG_ARM_64)
 build_atomic_read(read_u64_atomic, "", "", uint64_t, "=r")
 build_atomic_write(write_u64_atomic, "", "", uint64_t, "r")
+#elif defined (CONFIG_ARM_32)
+static inline uint64_t read_u64_atomic(const volatile uint64_t *addr)
+{
+    uint64_t val;
+
+    asm volatile ( "ldrd %0,%H0,%1" : "=r" (val) : "m" (*addr) );
+
+    return val;
+}
+static inline void write_u64_atomic(volatile uint64_t *addr, uint64_t val)
+{
+    asm volatile ( "strd %1,%H1,%0" : "=m" (*addr) : "r" (val) );
+}
 #endif
 
 build_add_sized(add_u8_sized, "b", BYTE, uint8_t, "ri")
@@ -69,6 +82,7 @@ void __bad_atomic_size(void);
     case 1: __x = (typeof(*p))read_u8_atomic((uint8_t *)p); break;      \
     case 2: __x = (typeof(*p))read_u16_atomic((uint16_t *)p); break;    \
     case 4: __x = (typeof(*p))read_u32_atomic((uint32_t *)p); break;    \
+    case 8: __x = (typeof(*p))read_u64_atomic((uint64_t *)p); break;    \
     default: __x = 0; __bad_atomic_size(); break;                       \
     }                                                                   \
     __x;                                                                \
@@ -80,6 +94,7 @@ void __bad_atomic_size(void);
     case 1: write_u8_atomic((uint8_t *)p, (uint8_t)__x); break;         \
     case 2: write_u16_atomic((uint16_t *)p, (uint16_t)__x); break;      \
     case 4: write_u32_atomic((uint32_t *)p, (uint32_t)__x); break;      \
+    case 8: write_u64_atomic((uint64_t *)p, (uint64_t)__x); break;      \
     default: __bad_atomic_size(); break;                                \
     }                                                                   \
     __x;                                                                \
