@@ -692,11 +692,6 @@ void vgic_kick_vcpus(struct domain *d)
     }
 }
 
-void arch_evtchn_inject(struct vcpu *v)
-{
-    vgic_inject_irq(v->domain, v, v->domain->arch.evtchn_irq, true);
-}
-
 bool vgic_evtchn_irq_pending(struct vcpu *v)
 {
     struct vgic_irq *irq;

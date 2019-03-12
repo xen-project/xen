@@ -597,11 +597,6 @@ out:
     return;
 }
 
-void arch_evtchn_inject(struct vcpu *v)
-{
-    vgic_inject_irq(v->domain, v, v->domain->arch.evtchn_irq, true);
-}
-
 bool vgic_evtchn_irq_pending(struct vcpu *v)
 {
     struct pending_irq *p;

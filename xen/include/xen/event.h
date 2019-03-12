@@ -91,9 +91,6 @@ int guest_enabled_event(struct vcpu *v, uint32_t virq);
 /* Notify remote end of a Xen-attached event channel.*/
 void notify_via_xen_event_channel(struct domain *ld, int lport);
 
-/* Inject an event channel notification into the guest */
-void arch_evtchn_inject(struct vcpu *v);
-
 /*
  * Internal event channel object storage.
  *
