@@ -1172,7 +1172,7 @@ detection of systems known to misbehave upon accesses to that port.
 
 ### iommu
     = List of [ <bool>, verbose, debug, force, required,
-                sharept, intremap, intpost,
+                sharept, intremap, intpost, crash-disable,
                 snoop, qinval, igfx, workaround_bios_bug,
                 amd-iommu-perdev-intremap,
                 dom0-{passthrough,strict} ]
@@ -1234,6 +1234,12 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
 
     This option depends on `intremap`, and is disabled by default due to some
     corner cases in the implementation which have yet to be resolved.
+
+*   The `crash-disable` boolean controls disabling IOMMU functionality (DMAR/IR/QI)
+    before switching to a crash kernel. This option is inactive by default and
+    is for compatibility with older kdump kernels only. Modern kernels copy
+    all the necessary tables from the previous one following kexec which makes
+    the transition transparent for them with IOMMU functions still on.
 
 The following options are specific to Intel VT-d hardware:
 
