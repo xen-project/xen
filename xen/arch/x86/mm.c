@@ -146,7 +146,9 @@
 #include <asm/pv/grant_table.h>
 #include <asm/pv/mm.h>
 
+#ifdef CONFIG_PV
 #include "pv/mm.h"
+#endif
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn

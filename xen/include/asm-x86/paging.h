@@ -86,11 +86,13 @@ struct sh_emulate_ctxt;
 struct shadow_paging_mode {
 #ifdef CONFIG_SHADOW_PAGING
     void          (*detach_old_tables     )(struct vcpu *v);
+#ifdef CONFIG_PV
     bool          (*write_guest_entry     )(struct vcpu *v, intpte_t *p,
                                             intpte_t new, mfn_t gmfn);
     bool          (*cmpxchg_guest_entry   )(struct vcpu *v, intpte_t *p,
                                             intpte_t *old, intpte_t new,
                                             mfn_t gmfn);
+#endif
     mfn_t         (*make_monitor_table    )(struct vcpu *v);
     void          (*destroy_monitor_table )(struct vcpu *v, mfn_t mmfn);
     int           (*guess_wrmap           )(struct vcpu *v, 
@@ -290,6 +292,7 @@ static inline void paging_update_paging_modes(struct vcpu *v)
     paging_get_hostmode(v)->update_paging_modes(v);
 }
 
+#ifdef CONFIG_PV
 
 /*
  * Write a new value into the guest pagetable, and update the
@@ -324,6 +327,8 @@ static inline bool paging_cmpxchg_guest_entry(
 #endif
     return !cmpxchg_user(p, *old, new);
 }
+
+#endif /* CONFIG_PV */
 
 /* Helper function that writes a pte in such a way that a concurrent read 
  * never sees a half-written entry that has _PAGE_PRESENT set */

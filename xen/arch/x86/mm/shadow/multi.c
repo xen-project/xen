@@ -372,55 +372,6 @@ static void sh_audit_gw(struct vcpu *v, const walk_t *gw)
 #endif /* SHADOW_AUDIT & SHADOW_AUDIT_ENTRIES */
 }
 
-/*
- * Write a new value into the guest pagetable, and update the shadows
- * appropriately.  Returns false if we page-faulted, true for success.
- */
-static bool
-sh_write_guest_entry(struct vcpu *v, intpte_t *p, intpte_t new, mfn_t gmfn)
-{
-#if CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
-    int failed;
-
-    paging_lock(v->domain);
-    failed = __copy_to_user(p, &new, sizeof(new));
-    if ( failed != sizeof(new) )
-        sh_validate_guest_entry(v, gmfn, p, sizeof(new));
-    paging_unlock(v->domain);
-
-    return !failed;
-#else
-    return false;
-#endif
-}
-
-/*
- * Cmpxchg a new value into the guest pagetable, and update the shadows
- * appropriately. Returns false if we page-faulted, true if not.
- * N.B. caller should check the value of "old" to see if the cmpxchg itself
- * was successful.
- */
-static bool
-sh_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p, intpte_t *old,
-                       intpte_t new, mfn_t gmfn)
-{
-#if CONFIG_PAGING_LEVELS == GUEST_PAGING_LEVELS
-    int failed;
-    guest_intpte_t t = *old;
-
-    paging_lock(v->domain);
-    failed = cmpxchg_user(p, t, new);
-    if ( t == *old )
-        sh_validate_guest_entry(v, gmfn, p, sizeof(new));
-    *old = t;
-    paging_unlock(v->domain);
-
-    return !failed;
-#else
-    return false;
-#endif
-}
-
 /**************************************************************************/
 /* Functions to compute the correct index into a shadow page, given an
  * index into the guest page (as returned by guest_get_index()).
@@ -4925,8 +4876,10 @@ const struct paging_mode sh_paging_mode = {
     .write_p2m_entry               = shadow_write_p2m_entry,
     .guest_levels                  = GUEST_PAGING_LEVELS,
     .shadow.detach_old_tables      = sh_detach_old_tables,
+#ifdef CONFIG_PV
     .shadow.write_guest_entry      = sh_write_guest_entry,
     .shadow.cmpxchg_guest_entry    = sh_cmpxchg_guest_entry,
+#endif
     .shadow.make_monitor_table     = sh_make_monitor_table,
     .shadow.destroy_monitor_table  = sh_destroy_monitor_table,
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
