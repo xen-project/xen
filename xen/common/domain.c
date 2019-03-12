@@ -1253,7 +1253,6 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     void *mapping;
     vcpu_info_t *new_info;
     struct page_info *page;
-    int i;
 
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
         return -EINVAL;
@@ -1306,8 +1305,12 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
      * Mark everything as being pending just to make sure nothing gets
      * lost.  The domain will get a spurious event, but it can cope.
      */
-    for ( i = 0; i < BITS_PER_EVTCHN_WORD(d); i++ )
-        set_bit(i, &vcpu_info(v, evtchn_pending_sel));
+#ifdef CONFIG_COMPAT
+    if ( !has_32bit_shinfo(d) )
+        write_atomic(&new_info->native.evtchn_pending_sel, ~0);
+    else
+#endif
+        write_atomic(&vcpu_info(v, evtchn_pending_sel), ~0);
     vcpu_mark_events_pending(v);
 
     return 0;
