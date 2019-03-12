@@ -1306,10 +1306,9 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
      * Mark everything as being pending just to make sure nothing gets
      * lost.  The domain will get a spurious event, but it can cope.
      */
-    vcpu_info(v, evtchn_upcall_pending) = 1;
     for ( i = 0; i < BITS_PER_EVTCHN_WORD(d); i++ )
         set_bit(i, &vcpu_info(v, evtchn_pending_sel));
-    arch_evtchn_inject(v);
+    vcpu_mark_events_pending(v);
 
     return 0;
 }
