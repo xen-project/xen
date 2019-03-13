@@ -174,12 +174,13 @@ char *(strchr)(const char *s, int c)
  */
 char *(strrchr)(const char *s, int c)
 {
-       const char *p = s + strlen(s);
-       do {
-           if (*p == (char)c)
-               return (char *)p;
-       } while (--p >= s);
-       return NULL;
+	const char *p = s + strlen(s);
+
+	for (; *p != (char)c; --p)
+		if (p == s)
+			return NULL;
+
+	return (char *)p;
 }
 #endif
 
