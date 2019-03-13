@@ -7418,6 +7418,7 @@ if test "$cross_compiling" != yes; then :
 
 ac_previous_cppflags=$CPPFLAGS
 ac_previous_ldflags=$LDFLAGS
+ac_previous_libs=$LIBS
 # Extract the first word of "$PYTHON-config", so it can be a program name with args.
 set dummy $PYTHON-config; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -7472,11 +7473,16 @@ if test x"$pyconfig" = x"no"; then :
         print(distutils.sysconfig.get_config_var("LINKFORSHARED"))'`"
     LDFLAGS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print(distutils.sysconfig.get_config_var("LDFLAGS"))'`"
+    LIBS="$LIBS `$PYTHON -c 'import distutils.sysconfig; \
+        print(distutils.sysconfig.get_config_var("LIBS"))'`"
+    LIBS="$LIBS `$PYTHON -c 'import distutils.sysconfig; \
+        print(distutils.sysconfig.get_config_var("SYSLIBS"))'`"
 
 else
 
         CPPFLAGS="$CFLAGS `$PYTHON-config --cflags`"
     LDFLAGS="$LDFLAGS `$PYTHON-config --ldflags`"
+    LIBS="$LIBS `$PYTHON-config --libs`"
 
 fi
 
@@ -7498,6 +7504,7 @@ fi
 
 CPPFLAGS=$ac_previous_cppflags
 LDFLAGS=$ac_previous_ldflags
+LIBS=$ac_previous_libs
 
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether Python setup.py brokenly enables -D_FORTIFY_SOURCE" >&5

@@ -1,6 +1,7 @@
 AC_DEFUN([AX_CHECK_PYTHON_DEVEL], [
 ac_previous_cppflags=$CPPFLAGS
 ac_previous_ldflags=$LDFLAGS
+ac_previous_libs=$LIBS
 AC_PATH_PROG([pyconfig], [$PYTHON-config], [no])
 AS_IF([test x"$pyconfig" = x"no"], [
     dnl For those that don't have python-config
@@ -15,10 +16,15 @@ AS_IF([test x"$pyconfig" = x"no"], [
         print(distutils.sysconfig.get_config_var("LINKFORSHARED"))'`"
     LDFLAGS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print(distutils.sysconfig.get_config_var("LDFLAGS"))'`"
+    LIBS="$LIBS `$PYTHON -c 'import distutils.sysconfig; \
+        print(distutils.sysconfig.get_config_var("LIBS"))'`"
+    LIBS="$LIBS `$PYTHON -c 'import distutils.sysconfig; \
+        print(distutils.sysconfig.get_config_var("SYSLIBS"))'`"
 ], [
     dnl If python-config is found use it
     CPPFLAGS="$CFLAGS `$PYTHON-config --cflags`"
     LDFLAGS="$LDFLAGS `$PYTHON-config --ldflags`"
+    LIBS="$LIBS `$PYTHON-config --libs`"
 ])
 
 AC_CHECK_HEADER([Python.h], [],
@@ -28,4 +34,5 @@ AC_CHECK_FUNC([PyArg_ParseTuple], [],
 
 CPPFLAGS=$ac_previous_cppflags
 LDFLAGS=$ac_previous_ldflags
+LIBS=$ac_previous_libs
 ])
