@@ -96,10 +96,6 @@ void *memmove(void *, const void *, size_t);
 #define memmove(d, s, n) __builtin_memmove(d, s, n)
 #endif
 
-#ifndef __HAVE_ARCH_MEMSCAN
-void *memscan(void *, int, size_t);
-#endif
-
 #ifndef __HAVE_ARCH_MEMCMP
 int memcmp(const void *, const void *, size_t);
 #define memcmp(s1, s2, n) __builtin_memcmp(s1, s2, n)
