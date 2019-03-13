@@ -953,7 +953,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
         }
         if ( page_get_owner(mfn_to_page(mfn_add(mfn, i))) != d )
             continue;
-        ogfn = _gfn(mfn_to_gfn(d, mfn_add(mfn, i)));
+        ogfn = mfn_to_gfn(d, mfn_add(mfn, i));
         if ( !gfn_eq(ogfn, _gfn(INVALID_M2P_ENTRY)) &&
              !gfn_eq(ogfn, gfn_add(gfn, i)) )
         {

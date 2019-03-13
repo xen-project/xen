@@ -1076,7 +1076,7 @@ static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
          || !mfn_valid(mfn) )   /* mfn can be invalid in mmio_direct */
         return;
 
-    gfn = mfn_to_gfn(d, mfn);
+    gfn = gfn_x(mfn_to_gfn(d, mfn));
     /* Page sharing not supported on shadow PTs */
     BUG_ON(SHARED_M2P(gfn));
 
@@ -1107,7 +1107,7 @@ static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
          || !mfn_valid(mfn) )   /* mfn can be invalid in mmio_direct */
         return;
 
-    gfn = mfn_to_gfn(d, mfn);
+    gfn = gfn_x(mfn_to_gfn(d, mfn));
     /* Page sharing not supported on shadow PTs */
     BUG_ON(SHARED_M2P(gfn));
 

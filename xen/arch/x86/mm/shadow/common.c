@@ -375,7 +375,8 @@ static inline void trace_resync(int event, mfn_t gmfn)
     if ( tb_init_done )
     {
         /* Convert gmfn to gfn */
-        unsigned long gfn = mfn_to_gfn(current->domain, gmfn);
+        gfn_t gfn = mfn_to_gfn(current->domain, gmfn);
+
         __trace_var(event, 0/*!tsc*/, sizeof(gfn), &gfn);
     }
 }
@@ -886,7 +887,8 @@ static inline void trace_shadow_prealloc_unpin(struct domain *d, mfn_t smfn)
     if ( tb_init_done )
     {
         /* Convert smfn to gfn */
-        unsigned long gfn;
+        gfn_t gfn;
+
         ASSERT(mfn_valid(smfn));
         gfn = mfn_to_gfn(d, backpointer(mfn_to_page(smfn)));
         __trace_var(TRC_SHADOW_PREALLOC_UNPIN, 0/*!tsc*/, sizeof(gfn), &gfn);
@@ -1762,7 +1764,8 @@ static inline void trace_shadow_wrmap_bf(mfn_t gmfn)
     if ( tb_init_done )
     {
         /* Convert gmfn to gfn */
-        unsigned long gfn = mfn_to_gfn(current->domain, gmfn);
+        gfn_t gfn = mfn_to_gfn(current->domain, gmfn);
+
         __trace_var(TRC_SHADOW_WRMAP_BF, 0/*!tsc*/, sizeof(gfn), &gfn);
     }
 }
@@ -1847,7 +1850,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC
     if ( curr->domain == d )
     {
-        unsigned long gfn;
+        gfn_t gfn;
         /* Heuristic: there is likely to be only one writeable mapping,
          * and that mapping is likely to be in the current pagetable,
          * in the guest's linear map (on non-HIGHPTE linux and windows)*/
@@ -1870,8 +1873,9 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
                 GUESS(0xC0000000UL + (fault_addr >> 10), 1);
 
             /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
-            if ((gfn = mfn_to_gfn(d, gmfn)) < 0x38000 )
-                GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
+            gfn = mfn_to_gfn(d, gmfn);
+            if ( gfn_x(gfn) < 0x38000 )
+                GUESS(0xC0000000UL + gfn_to_gaddr(gfn), 4);
 
             /* FreeBSD: Linear map at 0xBFC00000 */
             if ( level == 1 )
@@ -1888,8 +1892,9 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
             }
 
             /* Linux lowmem: first 896MB is mapped 1-to-1 above 0xC0000000 */
-            if ((gfn = mfn_to_gfn(d, gmfn)) < 0x38000 )
-                GUESS(0xC0000000UL + (gfn << PAGE_SHIFT), 4);
+            gfn = mfn_to_gfn(d, gmfn);
+            if ( gfn_x(gfn) < 0x38000 )
+                GUESS(0xC0000000UL + gfn_to_gaddr(gfn), 4);
 
             /* FreeBSD PAE: Linear map at 0xBF800000 */
             switch ( level )
@@ -1917,15 +1922,15 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
              * had it at 0xffff810000000000, and older kernels yet had it
              * at 0x0000010000000000UL */
             gfn = mfn_to_gfn(d, gmfn);
-            GUESS(0xffff880000000000UL + (gfn << PAGE_SHIFT), 4);
-            GUESS(0xffff810000000000UL + (gfn << PAGE_SHIFT), 4);
-            GUESS(0x0000010000000000UL + (gfn << PAGE_SHIFT), 4);
+            GUESS(0xffff880000000000UL + gfn_to_gaddr(gfn), 4);
+            GUESS(0xffff810000000000UL + gfn_to_gaddr(gfn), 4);
+            GUESS(0x0000010000000000UL + gfn_to_gaddr(gfn), 4);
 
             /*
              * 64bit Solaris kernel page map at
              * kpm_vbase; 0xfffffe0000000000UL
              */
-            GUESS(0xfffffe0000000000UL + (gfn << PAGE_SHIFT), 4);
+            GUESS(0xfffffe0000000000UL + gfn_to_gaddr(gfn), 4);
 
              /* FreeBSD 64bit: linear map 0xffff800000000000 */
              switch ( level )
@@ -1938,7 +1943,7 @@ int sh_remove_write_access(struct domain *d, mfn_t gmfn,
                            + ((fault_addr & VADDR_MASK) >> 27), 6); break;
              }
              /* FreeBSD 64bit: direct map at 0xffffff0000000000 */
-             GUESS(0xffffff0000000000 + (gfn << PAGE_SHIFT), 6);
+             GUESS(0xffffff0000000000 + gfn_to_gaddr(gfn), 6);
         }
 
 #undef GUESS
