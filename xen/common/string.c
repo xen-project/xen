@@ -290,6 +290,27 @@ char * strsep(char **s, const char *ct)
 }
 #endif
 
+#ifndef __HAVE_ARCH_STRSTR
+/**
+ * strstr - Find the first substring in a %NUL terminated string
+ * @s1: The string to be searched
+ * @s2: The string to search for
+ */
+char *(strstr)(const char *s1, const char *s2)
+{
+	size_t l1, l2 = strlen(s2);
+
+	if (!l2)
+		return (char *)s1;
+
+	for (l1 = strlen(s1); l1 >= l2; --l1, ++s1)
+		if (!memcmp(s1, s2, l2))
+			return (char *)s1;
+
+	return NULL;
+}
+#endif
+
 #ifndef __HAVE_ARCH_MEMSET
 /**
  * memset - Fill a region of memory with the given value
@@ -377,30 +398,6 @@ int (memcmp)(const void *cs, const void *ct, size_t count)
 		if ((res = *su1 - *su2) != 0)
 			break;
 	return res;
-}
-#endif
-
-#ifndef __HAVE_ARCH_STRSTR
-/**
- * strstr - Find the first substring in a %NUL terminated string
- * @s1: The string to be searched
- * @s2: The string to search for
- */
-char *(strstr)(const char *s1, const char *s2)
-{
-	int l1, l2;
-
-	l2 = strlen(s2);
-	if (!l2)
-		return (char *) s1;
-	l1 = strlen(s1);
-	while (l1 >= l2) {
-		l1--;
-		if (!memcmp(s1,s2,l2))
-			return (char *) s1;
-		s1++;
-	}
-	return NULL;
 }
 #endif
 
