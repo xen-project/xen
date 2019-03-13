@@ -329,6 +329,7 @@ F:	xen/include/acpi/cpufreq/
 
 PUBLIC I/O INTERFACES AND PV DRIVERS DESIGNS
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+M:	Juergen Gross <jgross@suse.com>
 S:	Supported
 F:	xen/include/public/io/
 
