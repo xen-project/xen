@@ -17,7 +17,7 @@ RUN apt-get update && \
         zlib1g-dev \
         libncurses5-dev \
         libssl-dev \
-        python2.7-dev \
+        python-dev \
         xorg-dev \
         uuid-dev \
         libyajl-dev \
