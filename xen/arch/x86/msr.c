@@ -191,6 +191,13 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 
         break;
 
+    case MSR_IA32_XSS:
+        if ( !cp->xstate.xsaves )
+            goto gp_fault;
+
+        *val = msrs->xss.raw;
+        break;
+
     case 0x40000000 ... 0x400001ff:
         if ( is_viridian_domain(d) )
         {
@@ -375,6 +382,17 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         if ( !hvm_set_guest_bndcfgs(v, val) )
             goto gp_fault;
 
+        break;
+
+    case MSR_IA32_XSS:
+        if ( !cp->xstate.xsaves )
+            goto gp_fault;
+
+        /* No XSS features currently supported for guests */
+        if ( val != 0 )
+            goto gp_fault;
+
+        msrs->xss.raw = val;
         break;
 
     case 0x40000000 ... 0x400001ff:

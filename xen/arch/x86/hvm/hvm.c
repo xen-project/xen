@@ -1309,6 +1309,7 @@ static const uint32_t msrs_to_send[] = {
     MSR_SPEC_CTRL,
     MSR_INTEL_MISC_FEATURES_ENABLES,
     MSR_IA32_BNDCFGS,
+    MSR_IA32_XSS,
     MSR_AMD64_DR0_ADDRESS_MASK,
     MSR_AMD64_DR1_ADDRESS_MASK,
     MSR_AMD64_DR2_ADDRESS_MASK,
@@ -1447,6 +1448,7 @@ static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
         case MSR_SPEC_CTRL:
         case MSR_INTEL_MISC_FEATURES_ENABLES:
         case MSR_IA32_BNDCFGS:
+        case MSR_IA32_XSS:
         case MSR_AMD64_DR0_ADDRESS_MASK:
         case MSR_AMD64_DR1_ADDRESS_MASK ... MSR_AMD64_DR3_ADDRESS_MASK:
             rc = guest_wrmsr(v, ctxt->msr[i].index, ctxt->msr[i].val);
@@ -3473,12 +3475,6 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
                                                     MTRRcap_VCNT))];
         break;
 
-    case MSR_IA32_XSS:
-        if ( !d->arch.cpuid->xstate.xsaves )
-            goto gp_fault;
-        *msr_content = v->arch.msrs->xss.raw;
-        break;
-
     case MSR_K8_ENABLE_C1E:
     case MSR_AMD64_NB_CFG:
          /*
@@ -3616,13 +3612,6 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
              !mtrr_var_range_msr_set(v->domain, &v->arch.hvm.mtrr,
                                      msr, msr_content) )
             goto gp_fault;
-        break;
-
-    case MSR_IA32_XSS:
-        /* No XSS features currently supported for guests. */
-        if ( !d->arch.cpuid->xstate.xsaves || msr_content != 0 )
-            goto gp_fault;
-        v->arch.msrs->xss.raw = msr_content;
         break;
 
     case MSR_AMD64_NB_CFG:

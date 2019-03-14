@@ -797,52 +797,6 @@ static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
     return 0;
 }
 
-static unsigned int __init vmx_init_msr(void)
-{
-    return (cpu_has_mpx && cpu_has_vmx_mpx) +
-           (cpu_has_xsaves && cpu_has_vmx_xsaves);
-}
-
-static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
-{
-    if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
-    {
-        ctxt->msr[ctxt->count].val = v->arch.msrs->xss.raw;
-        if ( ctxt->msr[ctxt->count].val )
-            ctxt->msr[ctxt->count++].index = MSR_IA32_XSS;
-    }
-}
-
-static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
-{
-    unsigned int i;
-    int err = 0;
-
-    vmx_vmcs_enter(v);
-
-    for ( i = 0; i < ctxt->count; ++i )
-    {
-        switch ( ctxt->msr[i].index )
-        {
-        case MSR_IA32_XSS:
-            if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
-                v->arch.msrs->xss.raw = ctxt->msr[i].val;
-            else
-                err = -ENXIO;
-            break;
-        default:
-            continue;
-        }
-        if ( err )
-            break;
-        ctxt->msr[i]._rsvd = 1;
-    }
-
-    vmx_vmcs_exit(v);
-
-    return err;
-}
-
 static void vmx_fpu_enter(struct vcpu *v)
 {
     vcpu_restore_fpu_lazy(v);
@@ -2282,9 +2236,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .vcpu_destroy         = vmx_vcpu_destroy,
     .save_cpu_ctxt        = vmx_save_vmcs_ctxt,
     .load_cpu_ctxt        = vmx_load_vmcs_ctxt,
-    .init_msr             = vmx_init_msr,
-    .save_msr             = vmx_save_msr,
-    .load_msr             = vmx_load_msr,
     .get_interrupt_shadow = vmx_get_interrupt_shadow,
     .set_interrupt_shadow = vmx_set_interrupt_shadow,
     .guest_x86_mode       = vmx_guest_x86_mode,
