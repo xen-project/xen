@@ -805,17 +805,6 @@ static unsigned int __init vmx_init_msr(void)
 
 static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
 {
-    vmx_vmcs_enter(v);
-
-    if ( cpu_has_mpx && cpu_has_vmx_mpx )
-    {
-        __vmread(GUEST_BNDCFGS, &ctxt->msr[ctxt->count].val);
-        if ( ctxt->msr[ctxt->count].val )
-            ctxt->msr[ctxt->count++].index = MSR_IA32_BNDCFGS;
-    }
-
-    vmx_vmcs_exit(v);
-
     if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
     {
         ctxt->msr[ctxt->count].val = v->arch.hvm.msr_xss;
@@ -835,14 +824,6 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
     {
         switch ( ctxt->msr[i].index )
         {
-        case MSR_IA32_BNDCFGS:
-            if ( cpu_has_mpx && cpu_has_vmx_mpx &&
-                 is_canonical_address(ctxt->msr[i].val) &&
-                 !(ctxt->msr[i].val & IA32_BNDCFGS_RESERVED) )
-                __vmwrite(GUEST_BNDCFGS, ctxt->msr[i].val);
-            else if ( ctxt->msr[i].val )
-                err = -ENXIO;
-            break;
         case MSR_IA32_XSS:
             if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
                 v->arch.hvm.msr_xss = ctxt->msr[i].val;
@@ -1215,8 +1196,11 @@ static bool vmx_set_guest_bndcfgs(struct vcpu *v, u64 val)
     return true;
 }
 
-static bool vmx_get_guest_bndcfgs(struct vcpu *v, u64 *val)
+static bool vmx_get_guest_bndcfgs(const struct vcpu *cv, u64 *val)
 {
+    /* Get a non-const pointer for vmx_vmcs_enter() */
+    struct vcpu *v = cv->domain->vcpu[cv->vcpu_id];
+
     ASSERT(cpu_has_mpx && cpu_has_vmx_mpx);
 
     vmx_vmcs_enter(v);

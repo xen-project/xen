@@ -181,6 +181,16 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         ret = guest_rdmsr_x2apic(v, msr, val);
         break;
 
+    case MSR_IA32_BNDCFGS:
+        if ( !cp->feat.mpx )
+            goto gp_fault;
+
+        ASSERT(is_hvm_domain(d));
+        if (!hvm_get_guest_bndcfgs(v, val) )
+            goto gp_fault;
+
+        break;
+
     case 0x40000000 ... 0x400001ff:
         if ( is_viridian_domain(d) )
         {
@@ -355,6 +365,16 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
             goto gp_fault;
 
         ret = guest_wrmsr_x2apic(v, msr, val);
+        break;
+
+    case MSR_IA32_BNDCFGS:
+        if ( !cp->feat.mpx )
+            goto gp_fault;
+
+        ASSERT(is_hvm_domain(d));
+        if ( !hvm_set_guest_bndcfgs(v, val) )
+            goto gp_fault;
+
         break;
 
     case 0x40000000 ... 0x400001ff:
