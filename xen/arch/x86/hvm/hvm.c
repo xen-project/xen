@@ -4145,6 +4145,9 @@ static int hvmop_set_param(
     if ( a.index >= HVM_NR_PARAMS )
         return -EINVAL;
 
+    /* Make sure the above bound check is not bypassed during speculation. */
+    block_speculation();
+
     d = rcu_lock_domain_by_any_id(a.domid);
     if ( d == NULL )
         return -ESRCH;
@@ -4410,6 +4413,9 @@ static int hvmop_get_param(
 
     if ( a.index >= HVM_NR_PARAMS )
         return -EINVAL;
+
+    /* Make sure the above bound check is not bypassed during speculation. */
+    block_speculation();
 
     d = rcu_lock_domain_by_any_id(a.domid);
     if ( d == NULL )
