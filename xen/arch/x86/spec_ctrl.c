@@ -21,6 +21,7 @@
 #include <xen/lib.h>
 #include <xen/warning.h>
 
+#include <asm/cpuid.h>
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
@@ -50,6 +51,7 @@ bool __read_mostly opt_ibpb = true;
 bool __read_mostly opt_ssbd = false;
 int8_t __read_mostly opt_eager_fpu = -1;
 int8_t __read_mostly opt_l1d_flush = -1;
+int8_t __read_mostly opt_l1tf_barrier = -1;
 
 bool __initdata bsp_delay_spec_ctrl;
 uint8_t __read_mostly default_xen_spec_ctrl;
@@ -90,6 +92,8 @@ static int __init parse_spec_ctrl(const char *s)
                 opt_pv_l1tf_hwdom = 0;
             if ( opt_pv_l1tf_domu < 0 )
                 opt_pv_l1tf_domu = 0;
+
+            opt_l1tf_barrier = 0;
 
         disable_common:
             opt_rsb_pv = false;
@@ -157,6 +161,8 @@ static int __init parse_spec_ctrl(const char *s)
             opt_eager_fpu = val;
         else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
             opt_l1d_flush = val;
+        else if ( (val = parse_boolean("l1tf-barrier", s, ss)) >= 0 )
+            opt_l1tf_barrier = val;
         else
             rc = -EINVAL;
 
@@ -248,7 +254,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -258,7 +264,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            opt_ibpb                                  ? " IBPB"  : "",
-           opt_l1d_flush                             ? " L1D_FLUSH" : "");
+           opt_l1d_flush                             ? " L1D_FLUSH" : "",
+           opt_l1tf_barrier                          ? " L1TF_BARRIER" : "");
 
     /* L1TF diagnostics, printed if vulnerable or PV shadowing is in use. */
     if ( cpu_has_bug_l1tf || opt_pv_l1tf_hwdom || opt_pv_l1tf_domu )
@@ -861,6 +868,12 @@ void __init init_speculation_mitigations(void)
         opt_l1d_flush = 0;
     else if ( opt_l1d_flush == -1 )
         opt_l1d_flush = cpu_has_bug_l1tf && !(caps & ARCH_CAPS_SKIP_L1DFL);
+
+    /* By default, enable L1TF_VULN on L1TF-vulnerable hardware */
+    if ( opt_l1tf_barrier == -1 )
+        opt_l1tf_barrier = cpu_has_bug_l1tf && (opt_smt || !opt_l1d_flush);
+    if ( opt_l1tf_barrier > 0 )
+        setup_force_cpu_cap(X86_FEATURE_SC_L1TF_VULN);
 
     /*
      * We do not disable HT by default on affected hardware.
