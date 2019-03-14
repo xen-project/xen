@@ -1315,7 +1315,6 @@ static const uint32_t msrs_to_send[] = {
     MSR_AMD64_DR2_ADDRESS_MASK,
     MSR_AMD64_DR3_ADDRESS_MASK,
 };
-static unsigned int __read_mostly msr_count_max = ARRAY_SIZE(msrs_to_send);
 
 static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
 {
@@ -1325,7 +1324,7 @@ static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
     int err;
 
     err = _hvm_init_entry(h, CPU_MSR_CODE, v->vcpu_id,
-                             HVM_CPU_MSR_SIZE(msr_count_max));
+                             HVM_CPU_MSR_SIZE(ARRAY_SIZE(msrs_to_send)));
     if ( err )
         return err;
     ctxt = (struct hvm_msr *)&h->data[h->cur];
@@ -1358,10 +1357,7 @@ static int hvm_save_cpu_msrs(struct vcpu *v, hvm_domain_context_t *h)
         ctxt->msr[ctxt->count++].val = val;
     }
 
-    if ( hvm_funcs.save_msr )
-        hvm_funcs.save_msr(v, ctxt);
-
-    ASSERT(ctxt->count <= msr_count_max);
+    ASSERT(ctxt->count <= ARRAY_SIZE(msrs_to_send));
 
     for ( i = 0; i < ctxt->count; ++i )
         ctxt->msr[i]._rsvd = 0;
@@ -1436,9 +1432,6 @@ static int hvm_load_cpu_msrs(struct domain *d, hvm_domain_context_t *h)
             return -EOPNOTSUPP;
     /* Checking finished */
 
-    if ( hvm_funcs.load_msr )
-        err = hvm_funcs.load_msr(v, ctxt);
-
     for ( i = 0; !err && i < ctxt->count; ++i )
     {
         switch ( ctxt->msr[i].index )
@@ -1480,17 +1473,13 @@ static int __init hvm_register_CPU_save_and_restore(void)
                             sizeof(struct hvm_save_descriptor),
                         HVMSR_PER_VCPU);
 
-    if ( hvm_funcs.init_msr )
-        msr_count_max += hvm_funcs.init_msr();
-
-    if ( msr_count_max )
-        hvm_register_savevm(CPU_MSR_CODE,
-                            "CPU_MSR",
-                            hvm_save_cpu_msrs,
-                            hvm_load_cpu_msrs,
-                            HVM_CPU_MSR_SIZE(msr_count_max) +
-                                sizeof(struct hvm_save_descriptor),
-                            HVMSR_PER_VCPU);
+    hvm_register_savevm(CPU_MSR_CODE,
+                        "CPU_MSR",
+                        hvm_save_cpu_msrs,
+                        hvm_load_cpu_msrs,
+                        HVM_CPU_MSR_SIZE(ARRAY_SIZE(msrs_to_send)) +
+                            sizeof(struct hvm_save_descriptor),
+                        HVMSR_PER_VCPU);
 
     return 0;
 }

@@ -115,10 +115,6 @@ struct hvm_function_table {
     void (*save_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
     int (*load_cpu_ctxt)(struct vcpu *v, struct hvm_hw_cpu *ctxt);
 
-    unsigned int (*init_msr)(void);
-    void (*save_msr)(struct vcpu *, struct hvm_msr *);
-    int (*load_msr)(struct vcpu *, struct hvm_msr *);
-
     /* Examine specifics of the guest state. */
     unsigned int (*get_interrupt_shadow)(struct vcpu *v);
     void (*set_interrupt_shadow)(struct vcpu *v, unsigned int intr_shadow);
