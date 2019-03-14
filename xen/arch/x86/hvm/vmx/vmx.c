@@ -807,7 +807,7 @@ static void vmx_save_msr(struct vcpu *v, struct hvm_msr *ctxt)
 {
     if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
     {
-        ctxt->msr[ctxt->count].val = v->arch.hvm.msr_xss;
+        ctxt->msr[ctxt->count].val = v->arch.msrs->xss.raw;
         if ( ctxt->msr[ctxt->count].val )
             ctxt->msr[ctxt->count++].index = MSR_IA32_XSS;
     }
@@ -826,7 +826,7 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
         {
         case MSR_IA32_XSS:
             if ( cpu_has_xsaves && cpu_has_vmx_xsaves )
-                v->arch.hvm.msr_xss = ctxt->msr[i].val;
+                v->arch.msrs->xss.raw = ctxt->msr[i].val;
             else
                 err = -ENXIO;
             break;

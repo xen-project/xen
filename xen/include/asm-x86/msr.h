@@ -313,6 +313,11 @@ struct vcpu_msrs
      * values here may be stale in current context.
      */
     uint32_t dr_mask[4];
+
+    /* 0x00000da0 - MSR_IA32_XSS */
+    struct {
+        uint64_t raw;
+    } xss;
 };
 
 void init_guest_msr_policy(void);

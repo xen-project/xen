@@ -3476,7 +3476,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_IA32_XSS:
         if ( !d->arch.cpuid->xstate.xsaves )
             goto gp_fault;
-        *msr_content = v->arch.hvm.msr_xss;
+        *msr_content = v->arch.msrs->xss.raw;
         break;
 
     case MSR_K8_ENABLE_C1E:
@@ -3622,7 +3622,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         /* No XSS features currently supported for guests. */
         if ( !d->arch.cpuid->xstate.xsaves || msr_content != 0 )
             goto gp_fault;
-        v->arch.hvm.msr_xss = msr_content;
+        v->arch.msrs->xss.raw = msr_content;
         break;
 
     case MSR_AMD64_NB_CFG:

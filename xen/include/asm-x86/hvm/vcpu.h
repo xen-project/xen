@@ -176,7 +176,6 @@ struct hvm_vcpu {
     struct hvm_vcpu_asid n1asid;
 
     u64                 msr_tsc_adjust;
-    u64                 msr_xss;
 
     union {
         struct vmx_vcpu vmx;
