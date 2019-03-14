@@ -911,10 +911,10 @@ void watchdog_domain_destroy(struct domain *d);
  *    (that is, this would not be suitable for a driver domain)
  *  - There is never a reason to deny the hardware domain access to this
  */
-#define is_hardware_domain(_d) ((_d) == hardware_domain)
+#define is_hardware_domain(_d) evaluate_nospec((_d) == hardware_domain)
 
 /* This check is for functionality specific to a control domain */
-#define is_control_domain(_d) ((_d)->is_privileged)
+#define is_control_domain(_d) evaluate_nospec((_d)->is_privileged)
 
 #define VM_ASSIST(d, t) (test_bit(VMASST_TYPE_ ## t, &(d)->vm_assist))
 
