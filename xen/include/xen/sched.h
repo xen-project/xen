@@ -920,7 +920,8 @@ void watchdog_domain_destroy(struct domain *d);
 
 static inline bool is_pv_domain(const struct domain *d)
 {
-    return IS_ENABLED(CONFIG_PV) ? d->guest_type == guest_type_pv : false;
+    return IS_ENABLED(CONFIG_PV)
+           ? evaluate_nospec(d->guest_type == guest_type_pv) : false;
 }
 
 static inline bool is_pv_vcpu(const struct vcpu *v)
@@ -951,7 +952,8 @@ static inline bool is_pv_64bit_vcpu(const struct vcpu *v)
 #endif
 static inline bool is_hvm_domain(const struct domain *d)
 {
-    return IS_ENABLED(CONFIG_HVM) ? d->guest_type == guest_type_hvm : false;
+    return IS_ENABLED(CONFIG_HVM)
+           ? evaluate_nospec(d->guest_type == guest_type_hvm) : false;
 }
 
 static inline bool is_hvm_vcpu(const struct vcpu *v)
