@@ -37,39 +37,26 @@ static inline void name(volatile type *addr, type val)                  \
 #if defined (CONFIG_ARM_32)
 #define BYTE(n) #n
 #define WORD(n) #n
+#define DWORD(n) "" #n ",%H" #n
+#define PAIR     "d"
 #elif defined (CONFIG_ARM_64)
 #define BYTE(n)  "w" #n
 #define WORD(n)  "w" #n
 #define DWORD(n) "" #n
+#define PAIR     ""
 #endif
 
 build_atomic_read(read_u8_atomic,  "b", BYTE, uint8_t)
 build_atomic_read(read_u16_atomic, "h", WORD, uint16_t)
 build_atomic_read(read_u32_atomic, "",  WORD, uint32_t)
+build_atomic_read(read_u64_atomic, PAIR, DWORD, uint64_t)
 build_atomic_read(read_int_atomic, "",  WORD, int)
 
 build_atomic_write(write_u8_atomic,  "b", BYTE, uint8_t)
 build_atomic_write(write_u16_atomic, "h", WORD, uint16_t)
 build_atomic_write(write_u32_atomic, "",  WORD, uint32_t)
+build_atomic_write(write_u64_atomic, PAIR, DWORD, uint64_t)
 build_atomic_write(write_int_atomic, "",  WORD, int)
-
-#if defined (CONFIG_ARM_64)
-build_atomic_read(read_u64_atomic, "", DWORD, uint64_t)
-build_atomic_write(write_u64_atomic, "", DWORD, uint64_t)
-#elif defined (CONFIG_ARM_32)
-static inline uint64_t read_u64_atomic(const volatile uint64_t *addr)
-{
-    uint64_t val;
-
-    asm volatile ( "ldrd %0,%H0,%1" : "=r" (val) : "m" (*addr) );
-
-    return val;
-}
-static inline void write_u64_atomic(volatile uint64_t *addr, uint64_t val)
-{
-    asm volatile ( "strd %1,%H1,%0" : "=m" (*addr) : "r" (val) );
-}
-#endif
 
 build_add_sized(add_u8_sized, "b", BYTE, uint8_t)
 build_add_sized(add_u16_sized, "h", WORD, uint16_t)
