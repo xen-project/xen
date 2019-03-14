@@ -18,6 +18,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/bitops.h>
+#include <xen/nospec.h>
 
 /* Parameters for PFN/MADDR compression. */
 unsigned long __read_mostly max_pdx;
@@ -33,8 +34,9 @@ unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
 
 bool __mfn_valid(unsigned long mfn)
 {
-    return likely(mfn < max_page) &&
-           likely(!(mfn & pfn_hole_mask)) &&
+    if ( unlikely(evaluate_nospec(mfn >= max_page)) )
+        return false;
+    return likely(!(mfn & pfn_hole_mask)) &&
            likely(test_bit(pfn_to_pdx(mfn) / PDX_GROUP_COUNT,
                            pdx_group_valid));
 }
