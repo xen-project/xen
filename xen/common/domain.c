@@ -1364,7 +1364,7 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
     struct vcpu *v;
     long rc = 0;
 
-    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
+    if ( (v = domain_vcpu(d, vcpuid)) == NULL )
         return -ENOENT;
 
     switch ( cmd )
