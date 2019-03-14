@@ -18,7 +18,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 LDCONFIG=ldconfig
 MAKE_LINK=ln -sf
 
-MAJOR=4.12
+MAJOR=4.13
 MINOR=0
 
 LIB=src/libxenstat.a

@@ -1,7 +1,7 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-MAJOR    = 4.12
+MAJOR    = 4.13
 MINOR    = 0
 
 ifeq ($(CONFIG_LIBXC_MINIOS),y)
