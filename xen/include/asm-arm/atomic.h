@@ -11,7 +11,7 @@ static inline type name(const volatile type *addr) \
     type ret;                                      \
     asm volatile("ldr" size " %" width(0) ",%1"    \
                  : "=r" (ret)                      \
-                 : "m" (*(volatile type *)addr));  \
+                 : "m" (*addr));                   \
     return ret;                                    \
 }
 
@@ -19,7 +19,7 @@ static inline type name(const volatile type *addr) \
 static inline void name(volatile type *addr, type val) \
 {                                                      \
     asm volatile("str" size " %" width(1) ",%0"        \
-                 : "=m" (*(volatile type *)addr)       \
+                 : "=m" (*addr)                        \
                  : "r" (val));                         \
 }
 
@@ -61,6 +61,15 @@ build_atomic_write(write_int_atomic, "",  WORD, int)
 build_add_sized(add_u8_sized, "b", BYTE, uint8_t)
 build_add_sized(add_u16_sized, "h", WORD, uint16_t)
 build_add_sized(add_u32_sized, "", WORD, uint32_t)
+
+#undef BYTE
+#undef WORD
+#undef DWORD
+#undef PAIR
+
+#undef build_atomic_read
+#undef build_atomic_write
+#undef build_add_sized
 
 void __bad_atomic_size(void);
 
