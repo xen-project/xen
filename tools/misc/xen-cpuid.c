@@ -104,8 +104,8 @@ static const char *str_7b0[32] =
     [14] = "mpx",      [15] = "pqe",
     [16] = "avx512f",  [17] = "avx512dq",
     [18] = "rdseed",   [19] = "adx",
-    [20] = "smap",     [21] = "avx512ifma",
-    [22] = "pcomit",   [23] = "clflushopt",
+    [20] = "smap",     [21] = "avx512-ifma",
+    [22] = "pcommit",  [23] = "clflushopt",
     [24] = "clwb",     [25] = "pt",
     [26] = "avx512pf", [27] = "avx512er",
     [28] = "avx512cd", [29] = "sha",
@@ -120,13 +120,20 @@ static const char *str_Da1[32] =
 
 static const char *str_7c0[32] =
 {
-    [ 0] = "prechwt1", [ 1] = "avx512vbmi",
-    [ 2] = "umip",     [ 3] = "pku",
-    [ 4] = "ospke",
-
+    [ 0] = "prefetchwt1",      [ 1] = "avx512_vbmi",
+    [ 2] = "umip",             [ 3] = "pku",
+    [ 4] = "ospke",            [ 5] = "waitpkg",
+    [ 6] = "avx512_vbmi2",
+    [ 8] = "gfni",             [ 9] = "vaes",
+    [10] = "vpclmulqdq",       [11] = "avx512_vnni",
+    [12] = "avx512_bitalg",
     [14] = "avx512_vpopcntdq",
 
     [22] = "rdpid",
+    /* 24 */                   [25] = "cldemote",
+    /* 26 */                   [27] = "movdiri",
+    [28] = "movdir64b",
+    [30] = "sgx_lc",
 };
 
 static const char *str_e7d[32] =
@@ -145,8 +152,11 @@ static const char *str_e8b[32] =
 static const char *str_7d0[32] =
 {
     [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
+    [ 4] = "fsrm",
 
     /* 12 */                [13] = "tsx-force-abort",
+
+    [18] = "pconfig",
 
     [26] = "ibrsb",         [27] = "stibp",
     [28] = "l1d_flush",     [29] = "arch_caps",
