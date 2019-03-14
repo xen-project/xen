@@ -256,9 +256,6 @@ static void sched_spin_unlock_double(spinlock_t *lock1, spinlock_t *lock2,
 int sched_init_vcpu(struct vcpu *v, unsigned int processor)
 {
     struct domain *d = v->domain;
-    cpumask_t allcpus;
-
-    cpumask_setall(&allcpus);
 
     v->processor = processor;
 
@@ -280,9 +277,9 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
      * domain-0 VCPUs, are pinned onto their respective physical CPUs.
      */
     if ( is_idle_domain(d) || d->is_pinned )
-        sched_set_affinity(v, cpumask_of(processor), &allcpus);
+        sched_set_affinity(v, cpumask_of(processor), &cpumask_all);
     else
-        sched_set_affinity(v, &allcpus, &allcpus);
+        sched_set_affinity(v, &cpumask_all, &cpumask_all);
 
     /* Idle VCPUs are scheduled immediately, so don't put them in runqueue. */
     if ( is_idle_domain(d) )
@@ -361,7 +358,6 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     for_each_vcpu ( d, v )
     {
         spinlock_t *lock;
-        cpumask_t allcpus;
 
         vcpudata = v->sched_priv;
 
@@ -369,11 +365,9 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         migrate_timer(&v->singleshot_timer, new_p);
         migrate_timer(&v->poll_timer, new_p);
 
-        cpumask_setall(&allcpus);
-
         lock = vcpu_schedule_lock_irq(v);
 
-        sched_set_affinity(v, &allcpus, &allcpus);
+        sched_set_affinity(v, &cpumask_all, &cpumask_all);
 
         v->processor = new_p;
         /*
@@ -812,8 +806,6 @@ int cpu_disable_scheduler(unsigned int cpu)
             if ( cpumask_empty(&online_affinity) &&
                  cpumask_test_cpu(cpu, v->cpu_hard_affinity) )
             {
-                cpumask_t allcpus;
-
                 if ( v->affinity_broken )
                 {
                     /* The vcpu is temporarily pinned, can't move it. */
@@ -831,8 +823,7 @@ int cpu_disable_scheduler(unsigned int cpu)
                 else
                     printk(XENLOG_DEBUG "Breaking affinity for %pv\n", v);
 
-                cpumask_setall(&allcpus);
-                sched_set_affinity(v, &allcpus, NULL);
+                sched_set_affinity(v, &cpumask_all, NULL);
             }
 
             if ( v->processor != cpu )

@@ -306,6 +306,8 @@ static inline const cpumask_t *cpumask_of(unsigned int cpu)
 
 #define cpumask_bits(maskp) ((maskp)->bits)
 
+extern const cpumask_t cpumask_all;
+
 /*
  * cpumask_var_t: struct cpumask for stack usage.
  *

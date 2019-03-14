@@ -11,6 +11,10 @@ unsigned int __read_mostly nr_cpumask_bits
     = BITS_TO_LONGS(NR_CPUS) * BITS_PER_LONG;
 #endif
 
+const cpumask_t cpumask_all = {
+    .bits[0 ... (BITS_TO_LONGS(NR_CPUS) - 1)] = ~0UL
+};
+
 /*
  * cpu_bit_bitmap[] is a special, "compressed" data structure that
  * represents all NR_CPUS bits binary values of 1<<nr.
