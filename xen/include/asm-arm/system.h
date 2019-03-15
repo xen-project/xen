@@ -5,9 +5,6 @@
 #include <xen/lib.h>
 #include <public/arch-arm.h>
 
-#define nop() \
-    asm volatile ( "nop" )
-
 #define sev()           asm volatile("sev" : : : "memory")
 #define wfe()           asm volatile("wfe" : : : "memory")
 #define wfi()           asm volatile("wfi" : : : "memory")

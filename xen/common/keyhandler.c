@@ -480,9 +480,9 @@ static void do_debug_key(unsigned char key, struct cpu_user_regs *regs)
 {
     printk("'%c' pressed -> trapping into debugger\n", key);
     (void)debugger_trap_fatal(0xf001, regs);
-    nop(); /* Prevent the compiler doing tail call
-                             optimisation, as that confuses xendbg a
-                             bit. */
+
+    /* Prevent tail call optimisation, which confuses xendbg. */
+    barrier();
 }
 
 static void do_toggle_alt_key(unsigned char key, struct cpu_user_regs *regs)

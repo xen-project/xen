@@ -17,9 +17,6 @@
 #define clflush(a) \
     asm volatile ( "clflush (%0)" : : "r"(a) )
 
-#define nop() \
-    asm volatile ( "nop" )
-
 #define xchg(ptr,v) \
     ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
 
