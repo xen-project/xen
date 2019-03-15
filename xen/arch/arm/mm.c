@@ -1255,52 +1255,6 @@ int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags)
     return xen_pt_update(s, INVALID_MFN, (e - s) >> PAGE_SHIFT, flags);
 }
 
-enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
-static void set_pte_flags_on_range(const char *p, unsigned long l, enum mg mg)
-{
-    lpae_t pte;
-    int i;
-
-    ASSERT(is_kernel(p) && is_kernel(p + l));
-
-    /* Can only guard in page granularity */
-    ASSERT(!((unsigned long) p & ~PAGE_MASK));
-    ASSERT(!(l & ~PAGE_MASK));
-
-    for ( i = (p - _start) / PAGE_SIZE; 
-          i < (p + l - _start) / PAGE_SIZE; 
-          i++ )
-    {
-        pte = xen_xenmap[i];
-        switch ( mg )
-        {
-        case mg_clear:
-            pte.pt.valid = 0;
-            break;
-        case mg_ro:
-            pte.pt.valid = 1;
-            pte.pt.pxn = 1;
-            pte.pt.xn = 1;
-            pte.pt.ro = 1;
-            break;
-        case mg_rw:
-            pte.pt.valid = 1;
-            pte.pt.pxn = 1;
-            pte.pt.xn = 1;
-            pte.pt.ro = 0;
-            break;
-        case mg_rx:
-            pte.pt.valid = 1;
-            pte.pt.pxn = 0;
-            pte.pt.xn = 0;
-            pte.pt.ro = 1;
-            break;
-        }
-        write_pte(xen_xenmap + i, pte);
-    }
-    flush_xen_tlb_local();
-}
-
 /* Release all __init and __initdata ranges to be reused */
 void free_init_memory(void)
 {
@@ -1309,8 +1263,12 @@ void free_init_memory(void)
     uint32_t insn;
     unsigned int i, nr = len / sizeof(insn);
     uint32_t *p;
+    int rc;
 
-    set_pte_flags_on_range(__init_begin, len, mg_rw);
+    rc = modify_xen_mappings((unsigned long)__init_begin,
+                             (unsigned long)__init_end, PAGE_HYPERVISOR_RW);
+    if ( rc )
+        panic("Unable to map RW the init section (rc = %d)\n", rc);
 
     /*
      * From now on, init will not be used for execution anymore,
@@ -1328,7 +1286,11 @@ void free_init_memory(void)
     for ( i = 0; i < nr; i++ )
         *(p + i) = insn;
 
-    set_pte_flags_on_range(__init_begin, len, mg_clear);
+    rc = destroy_xen_mappings((unsigned long)__init_begin,
+                              (unsigned long)__init_end);
+    if ( rc )
+        panic("Unable to remove the init section (rc = %d)\n", rc);
+
     init_domheap_pages(pa, pa + len);
     printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 }
