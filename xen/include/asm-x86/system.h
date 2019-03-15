@@ -11,11 +11,15 @@
     __sel;                                                      \
 })
 
-#define wbinvd() \
-    asm volatile ( "wbinvd" : : : "memory" )
+static inline void wbinvd(void)
+{
+    asm volatile ( "wbinvd" ::: "memory" );
+}
 
-#define clflush(a) \
-    asm volatile ( "clflush (%0)" : : "r"(a) )
+static inline void clflush(const void *p)
+{
+    asm volatile ( "clflush %0" :: "m" (*(const char *)p) );
+}
 
 #define xchg(ptr,v) \
     ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
