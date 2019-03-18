@@ -976,7 +976,7 @@ static int create_xen_entries(enum xenmap_operation op,
                               unsigned long nr_mfns,
                               unsigned int flags)
 {
-    int rc;
+    int rc = 0;
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
     lpae_t pte, *entry;
     lpae_t *third = NULL;
@@ -1005,7 +1005,8 @@ static int create_xen_entries(enum xenmap_operation op,
                 {
                     printk("%s: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
                            __func__, addr, mfn_x(mfn));
-                    return -EINVAL;
+                    rc = -EINVAL;
+                    goto out;
                 }
                 if ( op == RESERVE )
                     break;
@@ -1022,7 +1023,8 @@ static int create_xen_entries(enum xenmap_operation op,
                 {
                     printk("%s: trying to %s a non-existing mapping addr=%lx\n",
                            __func__, op == REMOVE ? "remove" : "modify", addr);
-                    return -EINVAL;
+                    rc = -EINVAL;
+                    goto out;
                 }
                 if ( op == REMOVE )
                     pte.bits = 0;
@@ -1035,7 +1037,8 @@ static int create_xen_entries(enum xenmap_operation op,
                     {
                         printk("%s: Incorrect combination for addr=%lx\n",
                                __func__, addr);
-                        return -EINVAL;
+                        rc = -EINVAL;
+                        goto out;
                     }
                 }
                 write_pte(entry, pte);
@@ -1044,11 +1047,14 @@ static int create_xen_entries(enum xenmap_operation op,
                 BUG();
         }
     }
+out:
+    /*
+     * Flush the TLBs even in case of failure because we may have
+     * partially modified the PT. This will prevent any unexpected
+     * behavior afterwards.
+     */
     flush_xen_data_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
 
-    rc = 0;
-
-out:
     return rc;
 }
 
