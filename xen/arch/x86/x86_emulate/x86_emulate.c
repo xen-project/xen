@@ -5911,7 +5911,6 @@ x86_emulate(
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x2b): /* vmovntp{s,d} [xyz]mm,mem */
         generate_exception_if(ea.type != OP_MEM || evex.opmsk, EXC_UD);
         sfence = true;
-        fault_suppression = false;
         /* fall through */
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x10): /* vmovup{s,d} [xyz]mm/mem,[xyz]mm{k} */
     CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x10): /* vmovs{s,d} mem,xmm{k} */
@@ -6795,7 +6794,6 @@ x86_emulate(
         generate_exception_if(ea.type != OP_MEM || evex.opmsk || evex.w,
                               EXC_UD);
         sfence = true;
-        fault_suppression = false;
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f, 0x6f): /* vmovdqa{32,64} [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_F3(0x0f, 0x6f): /* vmovdqu{32,64} [xyz]mm/mem,[xyz]mm{k} */
