@@ -941,6 +941,76 @@ enum xenmap_operation {
     RESERVE
 };
 
+static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
+                               mfn_t mfn, unsigned int flags)
+{
+    lpae_t pte, *entry;
+    lpae_t *third = NULL;
+
+    entry = &xen_second[second_linear_offset(addr)];
+    if ( !lpae_is_valid(*entry) || !lpae_is_table(*entry, 2) )
+    {
+        int rc = create_xen_table(entry);
+        if ( rc < 0 ) {
+            printk("%s: L2 failed\n", __func__);
+            return rc;
+        }
+    }
+
+    BUG_ON(!lpae_is_valid(*entry));
+
+    third = mfn_to_virt(lpae_get_mfn(*entry));
+    entry = &third[third_table_offset(addr)];
+
+    switch ( op ) {
+        case INSERT:
+        case RESERVE:
+            if ( lpae_is_valid(*entry) )
+            {
+                printk("%s: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
+                       __func__, addr, mfn_x(mfn));
+                return -EINVAL;
+            }
+            if ( op == RESERVE )
+                break;
+            pte = mfn_to_xen_entry(mfn, PAGE_AI_MASK(flags));
+            pte.pt.ro = PAGE_RO_MASK(flags);
+            pte.pt.xn = PAGE_XN_MASK(flags);
+            BUG_ON(!pte.pt.ro && !pte.pt.xn);
+            pte.pt.table = 1;
+            write_pte(entry, pte);
+            break;
+        case MODIFY:
+        case REMOVE:
+            if ( !lpae_is_valid(*entry) )
+            {
+                printk("%s: trying to %s a non-existing mapping addr=%lx\n",
+                       __func__, op == REMOVE ? "remove" : "modify", addr);
+                return -EINVAL;
+            }
+            if ( op == REMOVE )
+                pte.bits = 0;
+            else
+            {
+                pte = *entry;
+                pte.pt.ro = PAGE_RO_MASK(flags);
+                pte.pt.xn = PAGE_XN_MASK(flags);
+                if ( !pte.pt.ro && !pte.pt.xn )
+                {
+                    printk("%s: Incorrect combination for addr=%lx\n",
+                           __func__, addr);
+                    return -EINVAL;
+                }
+            }
+            write_pte(entry, pte);
+            break;
+        default:
+            BUG();
+    }
+
+    return 0;
+}
+
 static DEFINE_SPINLOCK(xen_pt_lock);
 
 static int xen_pt_update(enum xenmap_operation op,
@@ -951,78 +1021,16 @@ static int xen_pt_update(enum xenmap_operation op,
 {
     int rc = 0;
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
-    lpae_t pte, *entry;
-    lpae_t *third = NULL;
 
     spin_lock(&xen_pt_lock);
 
     for(; addr < addr_end; addr += PAGE_SIZE, mfn = mfn_add(mfn, 1))
     {
-        entry = &xen_second[second_linear_offset(addr)];
-        if ( !lpae_is_valid(*entry) || !lpae_is_table(*entry, 2) )
-        {
-            rc = create_xen_table(entry);
-            if ( rc < 0 ) {
-                printk("%s: L2 failed\n", __func__);
-                goto out;
-            }
-        }
-
-        BUG_ON(!lpae_is_valid(*entry));
-
-        third = mfn_to_virt(lpae_get_mfn(*entry));
-        entry = &third[third_table_offset(addr)];
-
-        switch ( op ) {
-            case INSERT:
-            case RESERVE:
-                if ( lpae_is_valid(*entry) )
-                {
-                    printk("%s: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
-                           __func__, addr, mfn_x(mfn));
-                    rc = -EINVAL;
-                    goto out;
-                }
-                if ( op == RESERVE )
-                    break;
-                pte = mfn_to_xen_entry(mfn, PAGE_AI_MASK(flags));
-                pte.pt.ro = PAGE_RO_MASK(flags);
-                pte.pt.xn = PAGE_XN_MASK(flags);
-                BUG_ON(!pte.pt.ro && !pte.pt.xn);
-                pte.pt.table = 1;
-                write_pte(entry, pte);
-                break;
-            case MODIFY:
-            case REMOVE:
-                if ( !lpae_is_valid(*entry) )
-                {
-                    printk("%s: trying to %s a non-existing mapping addr=%lx\n",
-                           __func__, op == REMOVE ? "remove" : "modify", addr);
-                    rc = -EINVAL;
-                    goto out;
-                }
-                if ( op == REMOVE )
-                    pte.bits = 0;
-                else
-                {
-                    pte = *entry;
-                    pte.pt.ro = PAGE_RO_MASK(flags);
-                    pte.pt.xn = PAGE_XN_MASK(flags);
-                    if ( !pte.pt.ro && !pte.pt.xn )
-                    {
-                        printk("%s: Incorrect combination for addr=%lx\n",
-                               __func__, addr);
-                        rc = -EINVAL;
-                        goto out;
-                    }
-                }
-                write_pte(entry, pte);
-                break;
-            default:
-                BUG();
-        }
+        rc = xen_pt_update_entry(op, addr, mfn, flags);
+        if ( rc )
+            break;
     }
-out:
+
     /*
      * Flush the TLBs even in case of failure because we may have
      * partially modified the PT. This will prevent any unexpected
