@@ -165,8 +165,11 @@ static void nmi_shootdown_cpus(void)
         printk("Failed to shoot down CPUs {%s}\n", keyhandler_scratch);
     }
 
-    /* Crash shutdown any IOMMU functionality as the crashdump kernel is not
-     * happy when booting if interrupt/dma remapping is still enabled */
+    /*
+     * Try to crash shutdown IOMMU functionality as some old crashdump
+     * kernels are not happy when booting if interrupt/dma remapping
+     * is still enabled.
+     */
     iommu_crash_shutdown();
 
     __stop_this_cpu();
