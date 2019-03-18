@@ -218,6 +218,15 @@ TABLE_OFFSET_HELPERS(64);
 #undef TABLE_OFFSET
 #undef TABLE_OFFSET_HELPERS
 
+/* Generate an array @var containing the offset for each level from @addr */
+#define DECLARE_OFFSETS(var, addr)          \
+    const unsigned int var[4] = {           \
+        zeroeth_table_offset(addr),         \
+        first_table_offset(addr),           \
+        second_table_offset(addr),          \
+        third_table_offset(addr)            \
+    }
+
 #endif /* __ASSEMBLY__ */
 
 /*

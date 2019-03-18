@@ -366,14 +366,7 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
     int rc;
     mfn_t mfn = INVALID_MFN;
     p2m_type_t _t;
-
-    /* Convenience aliases */
-    const unsigned int offsets[4] = {
-        zeroeth_table_offset(addr),
-        first_table_offset(addr),
-        second_table_offset(addr),
-        third_table_offset(addr)
-    };
+    DECLARE_OFFSETS(offsets, addr);
 
     ASSERT(p2m_is_locked(p2m));
     BUILD_BUG_ON(THIRD_MASK != PAGE_MASK);
@@ -888,21 +881,13 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
                            p2m_type_t t,
                            p2m_access_t a)
 {
-    paddr_t addr = gfn_to_gaddr(sgfn);
     unsigned int level = 0;
     unsigned int target = 3 - (page_order / LPAE_SHIFT);
     lpae_t *entry, *table, orig_pte;
     int rc;
     /* A mapping is removed if the MFN is invalid. */
     bool removing_mapping = mfn_eq(smfn, INVALID_MFN);
-
-    /* Convenience aliases */
-    const unsigned int offsets[4] = {
-        zeroeth_table_offset(addr),
-        first_table_offset(addr),
-        second_table_offset(addr),
-        third_table_offset(addr)
-    };
+    DECLARE_OFFSETS(offsets, gfn_to_gaddr(sgfn));
 
     ASSERT(p2m_is_write_locked(p2m));
 
@@ -1199,15 +1184,9 @@ bool p2m_resolve_translation_fault(struct domain *d, gfn_t gfn)
     unsigned int level = 0;
     bool resolved = false;
     lpae_t entry, *table;
-    paddr_t addr = gfn_to_gaddr(gfn);
 
     /* Convenience aliases */
-    const unsigned int offsets[4] = {
-        zeroeth_table_offset(addr),
-        first_table_offset(addr),
-        second_table_offset(addr),
-        third_table_offset(addr)
-    };
+    DECLARE_OFFSETS(offsets, gfn_to_gaddr(gfn));
 
     p2m_write_lock(p2m);
 
