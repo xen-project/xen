@@ -180,7 +180,10 @@ sh_walk_guest_tables(struct vcpu *v, unsigned long va, walk_t *gw,
                              INVALID_MFN,
                              v->arch.paging.shadow.gl3e
 #else /* 32 or 64 */
-                             pagetable_get_mfn(v->arch.guest_table),
+                             (((v->arch.flags & TF_kernel_mode) ||
+                               is_pv_32bit_vcpu(v))
+                              ? pagetable_get_mfn(v->arch.guest_table)
+                              : pagetable_get_mfn(v->arch.guest_table_user)),
                              v->arch.paging.shadow.guest_vtable
 #endif
                              );
