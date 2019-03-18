@@ -939,6 +939,8 @@ enum xenmap_operation {
     RESERVE
 };
 
+static DEFINE_SPINLOCK(xen_pt_lock);
+
 static int create_xen_entries(enum xenmap_operation op,
                               unsigned long virt,
                               mfn_t mfn,
@@ -949,6 +951,8 @@ static int create_xen_entries(enum xenmap_operation op,
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
     lpae_t pte, *entry;
     lpae_t *third = NULL;
+
+    spin_lock(&xen_pt_lock);
 
     for(; addr < addr_end; addr += PAGE_SIZE, mfn = mfn_add(mfn, 1))
     {
@@ -1023,6 +1027,8 @@ out:
      * behavior afterwards.
      */
     flush_xen_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
+
+    spin_unlock(&xen_pt_lock);
 
     return rc;
 }
