@@ -135,8 +135,6 @@ struct shadow_vcpu {
     l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
     /* PAE guests: per-vcpu cache of the top-level *guest* entries */
     l3_pgentry_t gl3e[4] __attribute__((__aligned__(32)));
-    /* Non-PAE guests: pointer to guest top-level pagetable */
-    void *guest_vtable;
     /* Last MFN that we emulated a write to as unshadow heuristics. */
     unsigned long last_emulated_mfn_for_unshadow;
     /* MFN of the last shadow that we shot a writeable mapping in */
