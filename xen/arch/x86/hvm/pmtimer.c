@@ -87,7 +87,7 @@ void hvm_acpi_sleep_button(struct domain *d)
         return;
 
     spin_lock(&s->lock);
-    d->arch.hvm_domain.acpi.pm1a_sts |= PWRBTN_STS;
+    d->arch.hvm_domain.acpi.pm1a_sts |= SLPBTN_STS;
     pmt_update_sci(s);
     spin_unlock(&s->lock);
 }
