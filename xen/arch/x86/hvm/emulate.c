@@ -946,12 +946,11 @@ static struct hvm_mmio_cache *hvmemul_find_mmio_cache(
             return cache;
     }
 
-    i = vio->mmio_cache_count++;
+    i = vio->mmio_cache_count;
     if( i == ARRAY_SIZE(vio->mmio_cache) )
-    {
-        domain_crash(current->domain);
         return NULL;
-    }
+
+    ++vio->mmio_cache_count;
 
     cache = &vio->mmio_cache[i];
     memset(cache, 0, sizeof (*cache));
