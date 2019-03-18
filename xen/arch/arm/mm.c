@@ -50,6 +50,19 @@
 #undef mfn_to_virt
 #define mfn_to_virt(mfn) __mfn_to_virt(mfn_x(mfn))
 
+#ifdef NDEBUG
+static inline void
+__attribute__ ((__format__ (__printf__, 1, 2)))
+mm_printk(const char *fmt, ...) {}
+#else
+#define mm_printk(fmt, args...)             \
+    do                                      \
+    {                                       \
+        dprintk(XENLOG_ERR, fmt, ## args);  \
+        WARN();                             \
+    } while (0);
+#endif
+
 #define DEFINE_PAGE_TABLES(name, nr)                    \
 lpae_t __aligned(PAGE_SIZE) name[LPAE_ENTRIES * (nr)]
 
@@ -941,11 +954,80 @@ enum xenmap_operation {
     RESERVE
 };
 
+/* Sanity check of the entry */
+static bool xen_pt_check_entry(lpae_t entry, mfn_t mfn, unsigned int flags)
+{
+    /* Sanity check when modifying a page. */
+    if ( (flags & _PAGE_PRESENT) && mfn_eq(mfn, INVALID_MFN) )
+    {
+        /* We don't allow modifying an invalid entry. */
+        if ( !lpae_is_valid(entry) )
+        {
+            mm_printk("Modifying invalid entry is not allowed.\n");
+            return false;
+        }
+
+        /* We don't allow changing memory attributes. */
+        if ( entry.pt.ai != PAGE_AI_MASK(flags) )
+        {
+            mm_printk("Modifying memory attributes is not allowed (0x%x -> 0x%x).\n",
+                      entry.pt.ai, PAGE_AI_MASK(flags));
+            return false;
+        }
+
+        /* We don't allow modifying entry with contiguous bit set. */
+        if ( entry.pt.contig )
+        {
+            mm_printk("Modifying entry with contiguous bit set is not allowed.\n");
+            return false;
+        }
+    }
+    /* Sanity check when inserting a page */
+    else if ( flags & _PAGE_PRESENT )
+    {
+        /* We should be here with a valid MFN. */
+        ASSERT(!mfn_eq(mfn, INVALID_MFN));
+
+        /* We don't allow replacing any valid entry. */
+        if ( lpae_is_valid(entry) )
+        {
+            mm_printk("Changing MFN for a valid entry is not allowed (%#"PRI_mfn" -> %#"PRI_mfn").\n",
+                      mfn_x(lpae_get_mfn(entry)), mfn_x(mfn));
+            return false;
+        }
+    }
+    /* Sanity check when removing a page. */
+    else if ( (flags & (_PAGE_PRESENT|_PAGE_POPULATE)) == 0 )
+    {
+        /* We should be here with an invalid MFN. */
+        ASSERT(mfn_eq(mfn, INVALID_MFN));
+
+        /* We don't allow removing page with contiguous bit set. */
+        if ( entry.pt.contig )
+        {
+            mm_printk("Removing entry with contiguous bit set is not allowed.\n");
+            return false;
+        }
+    }
+    /* Sanity check when populating the page-table. No check so far. */
+    else
+    {
+        ASSERT(flags & _PAGE_POPULATE);
+        /* We should be here with an invalid MFN */
+        ASSERT(mfn_eq(mfn, INVALID_MFN));
+    }
+
+    return true;
+}
+
 static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
                                mfn_t mfn, unsigned int flags)
 {
     lpae_t pte, *entry;
     lpae_t *third = NULL;
+
+    /* _PAGE_POPULATE and _PAGE_PRESENT should never be set together. */
+    ASSERT((flags & (_PAGE_POPULATE|_PAGE_PRESENT)) != (_PAGE_POPULATE|_PAGE_PRESENT));
 
     entry = &xen_second[second_linear_offset(addr)];
     if ( !lpae_is_valid(*entry) || !lpae_is_table(*entry, 2) )
@@ -962,15 +1044,12 @@ static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
     third = mfn_to_virt(lpae_get_mfn(*entry));
     entry = &third[third_table_offset(addr)];
 
+    if ( !xen_pt_check_entry(*entry, mfn, flags) )
+        return -EINVAL;
+
     switch ( op ) {
         case INSERT:
         case RESERVE:
-            if ( lpae_is_valid(*entry) )
-            {
-                printk("%s: trying to replace an existing mapping addr=%lx mfn=%"PRI_mfn"\n",
-                       __func__, addr, mfn_x(mfn));
-                return -EINVAL;
-            }
             if ( op == RESERVE )
                 break;
             pte = mfn_to_xen_entry(mfn, PAGE_AI_MASK(flags));
@@ -982,12 +1061,6 @@ static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
             break;
         case MODIFY:
         case REMOVE:
-            if ( !lpae_is_valid(*entry) )
-            {
-                printk("%s: trying to %s a non-existing mapping addr=%lx\n",
-                       __func__, op == REMOVE ? "remove" : "modify", addr);
-                return -EINVAL;
-            }
             if ( op == REMOVE )
                 pte.bits = 0;
             else
@@ -995,12 +1068,6 @@ static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
                 pte = *entry;
                 pte.pt.ro = PAGE_RO_MASK(flags);
                 pte.pt.xn = PAGE_XN_MASK(flags);
-                if ( !pte.pt.ro && !pte.pt.xn )
-                {
-                    printk("%s: Incorrect combination for addr=%lx\n",
-                           __func__, addr);
-                    return -EINVAL;
-                }
             }
             write_pte(entry, pte);
             break;
@@ -1021,6 +1088,25 @@ static int xen_pt_update(enum xenmap_operation op,
 {
     int rc = 0;
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
+
+    /*
+     * The hardware was configured to forbid mapping both writeable and
+     * executable.
+     * When modifying/creating mapping (i.e _PAGE_PRESENT is set),
+     * prevent any update if this happen.
+     */
+    if ( (flags & _PAGE_PRESENT) && !PAGE_RO_MASK(flags) &&
+         !PAGE_XN_MASK(flags) )
+    {
+        mm_printk("Mappings should not be both Writeable and Executable.\n");
+        return -EINVAL;
+    }
+
+    if ( !IS_ALIGNED(virt, PAGE_SIZE) )
+    {
+        mm_printk("The virtual address is not aligned to the page-size.\n");
+        return -EINVAL;
+    }
 
     spin_lock(&xen_pt_lock);
 
