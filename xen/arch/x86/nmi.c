@@ -37,6 +37,7 @@ unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
 static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 static unsigned int nmi_p4_cccr_val;
+static unsigned int nmi_p6_event_width;
 static DEFINE_PER_CPU(struct timer, nmi_timer);
 static DEFINE_PER_CPU(unsigned int, nmi_timer_ticks);
 
@@ -123,7 +124,9 @@ int nmi_active;
 #define P6_EVNTSEL_USR		(1 << 16)
 #define P6_EVENT_CPU_CLOCKS_NOT_HALTED	 0x79
 #define CORE_EVENT_CPU_CLOCKS_NOT_HALTED 0x3c
-#define P6_EVENT_WIDTH          32
+/* Bit width of IA32_PMCx MSRs is reported using CPUID.0AH:EAX[23:16]. */
+#define P6_EVENT_WIDTH_MASK	(((1 << 8) - 1) << 16)
+#define P6_EVENT_WIDTH_MIN	32
 
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
 #define P4_CCCR_OVF_PMI0	(1<<26)
@@ -323,6 +326,15 @@ static void setup_p6_watchdog(unsigned counter)
     unsigned int evntsel;
 
     nmi_perfctr_msr = MSR_P6_PERFCTR(0);
+
+    if ( !nmi_p6_event_width && current_cpu_data.cpuid_level >= 0xa )
+        nmi_p6_event_width = MASK_EXTR(cpuid_eax(0xa), P6_EVENT_WIDTH_MASK);
+    if ( !nmi_p6_event_width )
+        nmi_p6_event_width = P6_EVENT_WIDTH_MIN;
+
+    if ( nmi_p6_event_width < P6_EVENT_WIDTH_MIN ||
+         nmi_p6_event_width > BITS_PER_LONG )
+        return;
 
     clear_msr_range(MSR_P6_EVNTSEL(0), 2);
     clear_msr_range(MSR_P6_PERFCTR(0), 2);
@@ -529,7 +541,7 @@ bool nmi_watchdog_tick(const struct cpu_user_regs *regs)
         else if ( nmi_perfctr_msr == MSR_P6_PERFCTR(0) )
         {
             rdmsrl(MSR_P6_PERFCTR(0), msr_content);
-            if ( msr_content & (1ULL << P6_EVENT_WIDTH) )
+            if ( msr_content & (1ULL << (nmi_p6_event_width - 1)) )
                 watchdog_tick = false;
 
             /*
