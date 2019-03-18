@@ -112,6 +112,7 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
         write_cr4(old_cr4);
     }
     else if ( use_invpcid )
+    {
         /*
          * Flushing the TLB via INVPCID is necessary only in case PCIDs are
          * in use, which is true only with INVPCID being available.
@@ -121,6 +122,19 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
          * invpcid_flush_all(), so use that.
          */
         invpcid_flush_all_nonglobals();
+
+        /*
+         * CR4.PCIDE needs to be set before the CR3 write below. Otherwise
+         * - the CR3 write will fault when CR3.NOFLUSH is set (which is the
+         *   case normally),
+         * - the subsequent CR4 write will fault if CR3.PCID != 0.
+         */
+        if ( (old_cr4 & X86_CR4_PCIDE) < (cr4 & X86_CR4_PCIDE) )
+        {
+            write_cr4(cr4);
+            old_cr4 = cr4;
+        }
+    }
 
     /*
      * If we don't change PCIDs, the CR3 write below needs to flush this very
