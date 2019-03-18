@@ -86,8 +86,7 @@ int parse_boolean(const char *name, const char *s, const char *e);
  */
 int cmdline_strcmp(const char *frag, const char *name);
 
-/*#define DEBUG_TRACE_DUMP*/
-#ifdef DEBUG_TRACE_DUMP
+#ifdef CONFIG_DEBUG_TRACE
 extern void debugtrace_dump(void);
 extern void debugtrace_printk(const char *fmt, ...)
     __attribute__ ((format (printf, 1, 2)));

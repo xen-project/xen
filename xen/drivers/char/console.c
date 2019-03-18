@@ -1157,7 +1157,7 @@ int printk_ratelimit(void)
  * **************************************************************
  */
 
-#ifdef DEBUG_TRACE_DUMP
+#ifdef CONFIG_DEBUG_TRACE
 
 /* Send output direct to console, or buffer it? */
 static volatile int debugtrace_send_to_console;

@@ -98,6 +98,13 @@ config UBSAN
 
 	  If unsure, say N here.
 
+config DEBUG_TRACE
+	bool "Debug trace support"
+	---help---
+	  Debug trace enables to record debug trace messages which are printed
+	  either directly to the console or are printed to console in case of
+	  a system crash.
+
 endif # DEBUG || EXPERT
 
 endmenu
