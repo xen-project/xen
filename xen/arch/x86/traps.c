@@ -2517,6 +2517,8 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
     case MSR_PRED_CMD:
     case MSR_FLUSH_CMD:
         /* Write-only */
+    case MSR_TSX_FORCE_ABORT:
+        /* Not offered to guests. */
         break;
 
     case MSR_SPEC_CTRL:
@@ -2745,6 +2747,8 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
     case MSR_INTEL_PLATFORM_INFO:
     case MSR_ARCH_CAPABILITIES:
         /* The MSR is read-only. */
+    case MSR_TSX_FORCE_ABORT:
+        /* Not offered to guests. */
         break;
 
     case MSR_SPEC_CTRL:

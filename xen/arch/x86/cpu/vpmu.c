@@ -53,6 +53,7 @@ CHECK_pmu_params;
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
+bool __read_mostly opt_rtm_abort;
 static void parse_vpmu_params(char *s);
 custom_param("vpmu", parse_vpmu_params);
 
@@ -63,6 +64,8 @@ static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 
 static int parse_vpmu_param(char *s, unsigned int len)
 {
+    int val;
+
     if ( !*s || !len )
         return 0;
     if ( !strncmp(s, "bts", len) )
@@ -71,6 +74,8 @@ static int parse_vpmu_param(char *s, unsigned int len)
         vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
     else if ( !strncmp(s, "arch", len) )
         vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
+    else if ( (val = parse_boolean("rtm-abort", s, s + len)) >= 0 )
+        opt_rtm_abort = val;
     else
         return 1;
     return 0;
@@ -97,6 +102,10 @@ static void __init parse_vpmu_params(char *s)
                 break;
             p = sep + 1;
         }
+
+        if ( !vpmu_features ) /* rtm-abort doesn't imply vpmu=1 */
+            break;
+
         /* fall through */
     case 1:
         /* Default VPMU mode */
