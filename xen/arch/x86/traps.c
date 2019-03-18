@@ -2904,6 +2904,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_INTEL_PLATFORM_INFO:
         case MSR_ARCH_CAPABILITIES:
             /* The MSR is read-only. */
+        case MSR_TSX_FORCE_ABORT:
+            /* Not offered to guests. */
             goto fail;
 
         case MSR_SPEC_CTRL:
@@ -3075,6 +3077,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case MSR_PRED_CMD:
         case MSR_FLUSH_CMD:
             /* Write-only */
+        case MSR_TSX_FORCE_ABORT:
+            /* Not offered to guests. */
             goto fail;
 
         case MSR_SPEC_CTRL:

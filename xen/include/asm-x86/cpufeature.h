@@ -85,6 +85,7 @@
 #define cpu_has_avx             boot_cpu_has(X86_FEATURE_AVX)
 #define cpu_has_lwp             boot_cpu_has(X86_FEATURE_LWP)
 #define cpu_has_mpx             boot_cpu_has(X86_FEATURE_MPX)
+#define cpu_has_tsx_force_abort boot_cpu_has(X86_FEATURE_TSX_FORCE_ABORT)
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 #define cpu_has_rdtscp          boot_cpu_has(X86_FEATURE_RDTSCP)
 #define cpu_has_svm		boot_cpu_has(X86_FEATURE_SVM)
