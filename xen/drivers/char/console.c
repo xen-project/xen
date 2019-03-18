@@ -1225,13 +1225,26 @@ void debugtrace_dump(void)
     watchdog_enable();
 }
 
+static void debugtrace_add_to_buf(char *buf)
+{
+    char *p;
+
+    for ( p = buf; *p != '\0'; p++ )
+    {
+        debugtrace_buf[debugtrace_prd++] = *p;
+        /* Always leave a nul byte at the end of the buffer. */
+        if ( debugtrace_prd == (debugtrace_bytes - 1) )
+            debugtrace_prd = 0;
+    }
+}
+
 void debugtrace_printk(const char *fmt, ...)
 {
-    static char    buf[1024];
-    static u32 count;
+    static char buf[1024], last_buf[1024];
+    static unsigned int count, last_count, last_prd;
 
+    char          cntbuf[24];
     va_list       args;
-    char         *p;
     unsigned long flags;
 
     if ( debugtrace_bytes == 0 )
@@ -1243,25 +1256,32 @@ void debugtrace_printk(const char *fmt, ...)
 
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
 
-    snprintf(buf, sizeof(buf), "%u ", ++count);
-
     va_start(args, fmt);
-    (void)vsnprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), fmt, args);
+    vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
     if ( debugtrace_send_to_console )
     {
+        snprintf(cntbuf, sizeof(cntbuf), "%u ", ++count);
+        serial_puts(sercon_handle, cntbuf);
         serial_puts(sercon_handle, buf);
     }
     else
     {
-        for ( p = buf; *p != '\0'; p++ )
+        if ( strcmp(buf, last_buf) )
         {
-            debugtrace_buf[debugtrace_prd++] = *p;            
-            /* Always leave a nul byte at the end of the buffer. */
-            if ( debugtrace_prd == (debugtrace_bytes - 1) )
-                debugtrace_prd = 0;
+            last_prd = debugtrace_prd;
+            last_count = ++count;
+            safe_strcpy(last_buf, buf);
+            snprintf(cntbuf, sizeof(cntbuf), "%u ", count);
         }
+        else
+        {
+            debugtrace_prd = last_prd;
+            snprintf(cntbuf, sizeof(cntbuf), "%u-%u ", last_count, ++count);
+        }
+        debugtrace_add_to_buf(cntbuf);
+        debugtrace_add_to_buf(buf);
     }
 
     spin_unlock_irqrestore(&debugtrace_lock, flags);
