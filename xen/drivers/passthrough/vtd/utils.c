@@ -204,8 +204,9 @@ void vtd_dump_iommu_info(unsigned char key)
         if ( status & DMA_GSTS_IRES )
         {
             /* Dump interrupt remapping table. */
-            u64 iremap_maddr = dmar_readq(iommu->reg, DMAR_IRTA_REG);
-            int nr_entry = 1 << ((iremap_maddr & 0xF) + 1);
+            uint64_t irta = dmar_readq(iommu->reg, DMAR_IRTA_REG);
+            uint64_t iremap_maddr = irta & PAGE_MASK;
+            unsigned int nr_entry = 1 << ((irta & 0xF) + 1);
             struct iremap_entry *iremap_entries = NULL;
             int print_cnt = 0;
 
