@@ -1056,7 +1056,7 @@ int map_pages_to_xen(unsigned long virt,
 
 int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 {
-    return xen_pt_update(RESERVE, virt, INVALID_MFN, nr_mfns, 0);
+    return xen_pt_update(RESERVE, virt, INVALID_MFN, nr_mfns, _PAGE_POPULATE);
 }
 
 int destroy_xen_mappings(unsigned long v, unsigned long e)

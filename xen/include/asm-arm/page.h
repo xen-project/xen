@@ -76,6 +76,8 @@
  *
  * [0:2] Memory Attribute Index
  * [3:4] Permission flags
+ * [5]   Page present
+ * [6]   Only populate page tables
  */
 #define PAGE_AI_MASK(x) ((x) & 0x7U)
 
@@ -86,12 +88,15 @@
 #define PAGE_XN_MASK(x) (((x) >> _PAGE_XN_BIT) & 0x1U)
 #define PAGE_RO_MASK(x) (((x) >> _PAGE_RO_BIT) & 0x1U)
 
+#define _PAGE_PRESENT    (1U << 5)
+#define _PAGE_POPULATE   (1U << 6)
+
 /*
  * _PAGE_DEVICE and _PAGE_NORMAL are convenience defines. They are not
  * meant to be used outside of this header.
  */
-#define _PAGE_DEVICE    _PAGE_XN
-#define _PAGE_NORMAL    MT_NORMAL
+#define _PAGE_DEVICE    (_PAGE_XN|_PAGE_PRESENT)
+#define _PAGE_NORMAL    (MT_NORMAL|_PAGE_PRESENT)
 
 #define PAGE_HYPERVISOR_RO      (_PAGE_NORMAL|_PAGE_RO|_PAGE_XN)
 #define PAGE_HYPERVISOR_RX      (_PAGE_NORMAL|_PAGE_RO)
