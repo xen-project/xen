@@ -30,7 +30,8 @@ typedef union _HV_VP_ASSIST_PAGE
 
 void viridian_apic_assist_set(const struct vcpu *v)
 {
-    HV_VP_ASSIST_PAGE *ptr = v->arch.hvm.viridian->vp_assist.ptr;
+    struct viridian_vcpu *vv = v->arch.hvm.viridian;
+    HV_VP_ASSIST_PAGE *ptr = vv->vp_assist.ptr;
 
     if ( !ptr )
         return;
@@ -40,25 +41,25 @@ void viridian_apic_assist_set(const struct vcpu *v)
      * wrong and the VM will most likely hang so force a crash now
      * to make the problem clear.
      */
-    if ( v->arch.hvm.viridian->apic_assist_pending )
+    if ( vv->apic_assist_pending )
         domain_crash(v->domain);
 
-    v->arch.hvm.viridian->apic_assist_pending = true;
+    vv->apic_assist_pending = true;
     ptr->ApicAssist.no_eoi = 1;
 }
 
 bool viridian_apic_assist_completed(const struct vcpu *v)
 {
-    HV_VP_ASSIST_PAGE *ptr = v->arch.hvm.viridian->vp_assist.ptr;
+    struct viridian_vcpu *vv = v->arch.hvm.viridian;
+    HV_VP_ASSIST_PAGE *ptr = vv->vp_assist.ptr;
 
     if ( !ptr )
         return false;
 
-    if ( v->arch.hvm.viridian->apic_assist_pending &&
-         !ptr->ApicAssist.no_eoi )
+    if ( vv->apic_assist_pending && !ptr->ApicAssist.no_eoi )
     {
         /* An EOI has been avoided */
-        v->arch.hvm.viridian->apic_assist_pending = false;
+        vv->apic_assist_pending = false;
         return true;
     }
 
@@ -67,17 +68,20 @@ bool viridian_apic_assist_completed(const struct vcpu *v)
 
 void viridian_apic_assist_clear(const struct vcpu *v)
 {
-    HV_VP_ASSIST_PAGE *ptr = v->arch.hvm.viridian->vp_assist.ptr;
+    struct viridian_vcpu *vv = v->arch.hvm.viridian;
+    HV_VP_ASSIST_PAGE *ptr = vv->vp_assist.ptr;
 
     if ( !ptr )
         return;
 
     ptr->ApicAssist.no_eoi = 0;
-    v->arch.hvm.viridian->apic_assist_pending = false;
+    vv->apic_assist_pending = false;
 }
 
 int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 {
+    struct viridian_vcpu *vv = v->arch.hvm.viridian;
+
     switch ( idx )
     {
     case HV_X64_MSR_EOI:
@@ -95,12 +99,11 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 
     case HV_X64_MSR_VP_ASSIST_PAGE:
         /* release any previous mapping */
-        viridian_unmap_guest_page(&v->arch.hvm.viridian->vp_assist);
-        v->arch.hvm.viridian->vp_assist.msr.raw = val;
-        viridian_dump_guest_page(v, "VP_ASSIST",
-                                 &v->arch.hvm.viridian->vp_assist);
-        if ( v->arch.hvm.viridian->vp_assist.msr.fields.enabled )
-            viridian_map_guest_page(v, &v->arch.hvm.viridian->vp_assist);
+        viridian_unmap_guest_page(&vv->vp_assist);
+        vv->vp_assist.msr.raw = val;
+        viridian_dump_guest_page(v, "VP_ASSIST", &vv->vp_assist);
+        if ( vv->vp_assist.msr.fields.enabled )
+            viridian_map_guest_page(v, &vv->vp_assist);
         break;
 
     default:
@@ -146,18 +149,22 @@ int viridian_synic_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
 void viridian_synic_save_vcpu_ctxt(const struct vcpu *v,
                                    struct hvm_viridian_vcpu_context *ctxt)
 {
-    ctxt->apic_assist_pending = v->arch.hvm.viridian->apic_assist_pending;
-    ctxt->vp_assist_msr = v->arch.hvm.viridian->vp_assist.msr.raw;
+    const struct viridian_vcpu *vv = v->arch.hvm.viridian;
+
+    ctxt->apic_assist_pending = vv->apic_assist_pending;
+    ctxt->vp_assist_msr = vv->vp_assist.msr.raw;
 }
 
 void viridian_synic_load_vcpu_ctxt(
     struct vcpu *v, const struct hvm_viridian_vcpu_context *ctxt)
 {
-    v->arch.hvm.viridian->vp_assist.msr.raw = ctxt->vp_assist_msr;
-    if ( v->arch.hvm.viridian->vp_assist.msr.fields.enabled )
-        viridian_map_guest_page(v, &v->arch.hvm.viridian->vp_assist);
+    struct viridian_vcpu *vv = v->arch.hvm.viridian;
 
-    v->arch.hvm.viridian->apic_assist_pending = ctxt->apic_assist_pending;
+    vv->vp_assist.msr.raw = ctxt->vp_assist_msr;
+    if ( vv->vp_assist.msr.fields.enabled )
+        viridian_map_guest_page(v, &vv->vp_assist);
+
+    vv->apic_assist_pending = ctxt->apic_assist_pending;
 }
 
 /*

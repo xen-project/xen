@@ -141,6 +141,7 @@ void viridian_time_ref_count_thaw(const struct domain *d)
 int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 {
     struct domain *d = v->domain;
+    struct viridian_domain *vd = d->arch.hvm.viridian;
 
     switch ( idx )
     {
@@ -148,9 +149,9 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        d->arch.hvm.viridian->reference_tsc.raw = val;
+        vd->reference_tsc.raw = val;
         dump_reference_tsc(d);
-        if ( d->arch.hvm.viridian->reference_tsc.fields.enabled )
+        if ( vd->reference_tsc.fields.enabled )
             update_reference_tsc(d, true);
         break;
 
@@ -165,7 +166,8 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 
 int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
 {
-    struct domain *d = v->domain;
+    const struct domain *d = v->domain;
+    struct viridian_domain *vd = d->arch.hvm.viridian;
 
     switch ( idx )
     {
@@ -187,13 +189,12 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        *val = d->arch.hvm.viridian->reference_tsc.raw;
+        *val = vd->reference_tsc.raw;
         break;
 
     case HV_X64_MSR_TIME_REF_COUNT:
     {
-        struct viridian_time_ref_count *trc =
-            &d->arch.hvm.viridian->time_ref_count;
+        struct viridian_time_ref_count *trc = &vd->time_ref_count;
 
         if ( !(viridian_feature_mask(d) & HVMPV_time_ref_count) )
             return X86EMUL_EXCEPTION;
@@ -217,17 +218,21 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
 void viridian_time_save_domain_ctxt(
     const struct domain *d, struct hvm_viridian_domain_context *ctxt)
 {
-    ctxt->time_ref_count = d->arch.hvm.viridian->time_ref_count.val;
-    ctxt->reference_tsc = d->arch.hvm.viridian->reference_tsc.raw;
+    const struct viridian_domain *vd = d->arch.hvm.viridian;
+
+    ctxt->time_ref_count = vd->time_ref_count.val;
+    ctxt->reference_tsc = vd->reference_tsc.raw;
 }
 
 void viridian_time_load_domain_ctxt(
     struct domain *d, const struct hvm_viridian_domain_context *ctxt)
 {
-    d->arch.hvm.viridian->time_ref_count.val = ctxt->time_ref_count;
-    d->arch.hvm.viridian->reference_tsc.raw = ctxt->reference_tsc;
+    struct viridian_domain *vd = d->arch.hvm.viridian;
 
-    if ( d->arch.hvm.viridian->reference_tsc.fields.enabled )
+    vd->time_ref_count.val = ctxt->time_ref_count;
+    vd->reference_tsc.raw = ctxt->reference_tsc;
+
+    if ( vd->reference_tsc.fields.enabled )
         update_reference_tsc(d, false);
 }
 
