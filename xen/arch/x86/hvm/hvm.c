@@ -666,6 +666,10 @@ int hvm_domain_initialise(struct domain *d)
     if ( hvm_tsc_scaling_supported )
         d->arch.hvm.tsc_scaling_ratio = hvm_default_tsc_scaling_ratio;
 
+    rc = viridian_domain_init(d);
+    if ( rc )
+        goto fail2;
+
     rc = hvm_funcs.domain_initialise(d);
     if ( rc != 0 )
         goto fail2;
@@ -687,6 +691,7 @@ int hvm_domain_initialise(struct domain *d)
     hvm_destroy_cacheattr_region_list(d);
     destroy_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0);
  fail:
+    viridian_domain_deinit(d);
     return rc;
 }
 
@@ -1526,6 +1531,10 @@ int hvm_vcpu_initialise(struct vcpu *v)
          && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) /* teardown: nestedhvm_vcpu_destroy */
         goto fail5;
 
+    rc = viridian_vcpu_init(v);
+    if ( rc )
+        goto fail5;
+
     rc = hvm_all_ioreq_servers_add_vcpu(d, v);
     if ( rc != 0 )
         goto fail6;
@@ -1553,6 +1562,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
  fail2:
     hvm_vcpu_cacheattr_destroy(v);
  fail1:
+    viridian_vcpu_deinit(v);
     return rc;
 }
 

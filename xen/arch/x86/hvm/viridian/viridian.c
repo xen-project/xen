@@ -417,6 +417,16 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
     return X86EMUL_OKAY;
 }
 
+int viridian_vcpu_init(struct vcpu *v)
+{
+    return 0;
+}
+
+int viridian_domain_init(struct domain *d)
+{
+    return 0;
+}
+
 void viridian_vcpu_deinit(struct vcpu *v)
 {
     viridian_synic_wrmsr(v, HV_X64_MSR_VP_ASSIST_PAGE, 0);

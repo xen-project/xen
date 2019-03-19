@@ -80,6 +80,9 @@ viridian_hypercall(struct cpu_user_regs *regs);
 void viridian_time_ref_count_freeze(struct domain *d);
 void viridian_time_ref_count_thaw(struct domain *d);
 
+int viridian_vcpu_init(struct vcpu *v);
+int viridian_domain_init(struct domain *d);
+
 void viridian_vcpu_deinit(struct vcpu *v);
 void viridian_domain_deinit(struct domain *d);
 
