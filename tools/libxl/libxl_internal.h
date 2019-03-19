@@ -4477,6 +4477,12 @@ void libxl__unlock_domain_userdata(libxl__domain_userdata_lock *lock);
  * data store. The registry entry in libxl private data store
  * is "libxl-json".
  * Caller must hold user data lock.
+ *
+ * Other names used for this lock throughout the libxl code are json_lock,
+ * libxl__domain_userdata_lock, "libxl-json", data store lock.
+ *
+ * See the comment for libxl__ao_device, and "Algorithm for handling device
+ * removal", for information about using the libxl-json lock / json_lock.
  */
 int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_config *d_config);
