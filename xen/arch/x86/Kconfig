@@ -130,7 +130,6 @@ config HVM_FEP
 config TBOOT
 	def_bool y
 	prompt "Xen tboot support" if EXPERT = "y"
-	depends on X86
 	select CRYPTO
 	---help---
 	  Allows support for Trusted Boot using the Intel(R) Trusted Execution
