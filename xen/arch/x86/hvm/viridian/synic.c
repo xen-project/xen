@@ -186,6 +186,16 @@ void viridian_synic_load_vcpu_ctxt(
     vv->apic_assist_pending = ctxt->apic_assist_pending;
 }
 
+void viridian_synic_save_domain_ctxt(
+    const struct domain *d, struct hvm_viridian_domain_context *ctxt)
+{
+}
+
+void viridian_synic_load_domain_ctxt(
+    struct domain *d, const struct hvm_viridian_domain_context *ctxt)
+{
+}
+
 /*
  * Local variables:
  * mode: C

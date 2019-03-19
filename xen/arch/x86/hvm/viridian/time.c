@@ -233,6 +233,16 @@ void viridian_time_domain_deinit(const struct domain *d)
 {
 }
 
+void viridian_time_save_vcpu_ctxt(
+    const struct vcpu *v, struct hvm_viridian_vcpu_context *ctxt)
+{
+}
+
+void viridian_time_load_vcpu_ctxt(
+    struct vcpu *v, const struct hvm_viridian_vcpu_context *ctxt)
+{
+}
+
 void viridian_time_save_domain_ctxt(
     const struct domain *d, struct hvm_viridian_domain_context *ctxt)
 {

@@ -707,6 +707,7 @@ static int viridian_save_domain_ctxt(struct vcpu *v,
         return 0;
 
     viridian_time_save_domain_ctxt(d, &ctxt);
+    viridian_synic_save_domain_ctxt(d, &ctxt);
 
     return (hvm_save_entry(VIRIDIAN_DOMAIN, 0, h, &ctxt) != 0);
 }
@@ -723,6 +724,7 @@ static int viridian_load_domain_ctxt(struct domain *d,
     vd->hypercall_gpa.raw = ctxt.hypercall_gpa;
     vd->guest_os_id.raw = ctxt.guest_os_id;
 
+    viridian_synic_load_domain_ctxt(d, &ctxt);
     viridian_time_load_domain_ctxt(d, &ctxt);
 
     return 0;
@@ -738,6 +740,7 @@ static int viridian_save_vcpu_ctxt(struct vcpu *v, hvm_domain_context_t *h)
     if ( !is_viridian_vcpu(v) )
         return 0;
 
+    viridian_time_save_vcpu_ctxt(v, &ctxt);
     viridian_synic_save_vcpu_ctxt(v, &ctxt);
 
     return hvm_save_entry(VIRIDIAN_VCPU, v->vcpu_id, h, &ctxt);
@@ -764,6 +767,7 @@ static int viridian_load_vcpu_ctxt(struct domain *d,
         return -EINVAL;
 
     viridian_synic_load_vcpu_ctxt(v, &ctxt);
+    viridian_time_load_vcpu_ctxt(v, &ctxt);
 
     return 0;
 }
