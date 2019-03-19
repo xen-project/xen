@@ -484,7 +484,7 @@ int __init kernel_probe(struct kernel_info *info,
         return -ENOENT;
     }
 
-    printk("Loading Dom%pd kernel from boot module @ %"PRIpaddr"\n",
+    printk("Loading %pd kernel from boot module @ %"PRIpaddr"\n",
            info->d, info->kernel_bootmodule->start);
     if ( info->initrd_bootmodule )
         printk("Loading ramdisk from boot module @ %"PRIpaddr"\n",
