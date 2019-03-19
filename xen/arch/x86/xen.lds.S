@@ -12,7 +12,6 @@
 #define FORMAT "pei-x86-64"
 #undef __XEN_VIRT_START
 #define __XEN_VIRT_START __image_base__
-#define SECTION_ALIGN MB(2)
 #define DECL_SECTION(x) x :
 
 ENTRY(efi_start)
@@ -20,12 +19,17 @@ ENTRY(efi_start)
 #else /* !EFI */
 
 #define FORMAT "elf64-x86-64"
-#define SECTION_ALIGN PAGE_SIZE
 #define DECL_SECTION(x) x : AT(ADDR(x) - __XEN_VIRT_START)
 
 ENTRY(start_pa)
 
 #endif /* EFI */
+
+#if defined(CONFIG_XEN_ALIGN_2M) || defined(EFI)
+# define SECTION_ALIGN MB(2)
+#else
+# define SECTION_ALIGN PAGE_SIZE
+#endif
 
 OUTPUT_FORMAT(FORMAT, FORMAT, FORMAT)
 

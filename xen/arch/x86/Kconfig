@@ -137,6 +137,29 @@ config TBOOT
 
 	  If unsure, say Y.
 
+choice
+	prompt "Alignment of Xen image"
+	default XEN_ALIGN_2M if PV_SHIM_EXCLUSIVE
+	default XEN_ALIGN_DEFAULT
+	---help---
+	  Specify alignment for Xen image.
+
+	  If unsure, choose "default".
+
+config XEN_ALIGN_DEFAULT
+	bool "Default alignment"
+	---help---
+	  Pick alignment according to build variants.
+
+	  For EFI build the default alignment is 2M. For ELF build
+	  the default alignment is 4K due to syslinux failing to handle
+	  the increment of image size induced by 2M alignment.
+
+config XEN_ALIGN_2M
+	bool "2M alignment"
+
+endchoice
+
 config XEN_GUEST
 	def_bool n
 	prompt "Xen Guest"
