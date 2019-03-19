@@ -319,6 +319,12 @@
 #define LIBXL_HAVE_VIRIDIAN_CRASH_CTL 1
 
 /*
+ * LIBXL_HAVE_VIRIDIAN_SYNIC indicates that the 'synic' value
+ * is present in the viridian enlightenment enumeration.
+ */
+#define LIBXL_HAVE_VIRIDIAN_SYNIC 1
+
+/*
  * LIBXL_HAVE_BUILDINFO_HVM_ACPI_LAPTOP_SLATE indicates that
  * libxl_domain_build_info has the u.hvm.acpi_laptop_slate field.
  */

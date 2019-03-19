@@ -146,6 +146,10 @@
 #define _HVMPV_crash_ctl 6
 #define HVMPV_crash_ctl (1 << _HVMPV_crash_ctl)
 
+/* Enable SYNIC MSRs */
+#define _HVMPV_synic 7
+#define HVMPV_synic (1 << _HVMPV_synic)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
@@ -153,7 +157,8 @@
          HVMPV_reference_tsc | \
          HVMPV_hcall_remote_tlb_flush | \
          HVMPV_apic_assist | \
-         HVMPV_crash_ctl)
+         HVMPV_crash_ctl | \
+         HVMPV_synic)
 
 #endif
 

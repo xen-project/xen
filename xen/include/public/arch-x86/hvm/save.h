@@ -602,6 +602,8 @@ struct hvm_viridian_vcpu_context {
     uint64_t vp_assist_msr;
     uint8_t  apic_assist_pending;
     uint8_t  _pad[7];
+    uint64_t simp_msr;
+    uint64_t sint_msr[16];
 };
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_VCPU, 17, struct hvm_viridian_vcpu_context);

@@ -26,10 +26,31 @@ struct viridian_page
     void *ptr;
 };
 
+union viridian_sint_msr
+{
+    uint64_t raw;
+    struct
+    {
+        uint64_t vector:8;
+        uint64_t reserved_preserved1:8;
+        uint64_t mask:1;
+        uint64_t auto_eoi:1;
+        uint64_t polling:1;
+        uint64_t reserved_preserved2:45;
+    };
+};
+
 struct viridian_vcpu
 {
     struct viridian_page vp_assist;
     bool apic_assist_pending;
+    bool polled;
+    unsigned int msg_pending;
+    uint64_t scontrol;
+    uint64_t siefp;
+    struct viridian_page simp;
+    union viridian_sint_msr sint[16];
+    uint8_t vector_to_sintx[256];
     uint64_t crash_param[5];
 };
 
@@ -89,6 +110,11 @@ void viridian_domain_deinit(struct domain *d);
 void viridian_apic_assist_set(const struct vcpu *v);
 bool viridian_apic_assist_completed(const struct vcpu *v);
 void viridian_apic_assist_clear(const struct vcpu *v);
+
+void viridian_synic_poll(const struct vcpu *v);
+bool viridian_synic_is_auto_eoi_sint(const struct vcpu *v,
+                                     unsigned int vector);
+void viridian_synic_ack_sint(const struct vcpu *v, unsigned int vector);
 
 #endif /* __ASM_X86_HVM_VIRIDIAN_H__ */
 

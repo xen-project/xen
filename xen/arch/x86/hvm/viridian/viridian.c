@@ -89,6 +89,7 @@ typedef union _HV_CRASH_CTL_REG_CONTENTS
 
 /* Viridian CPUID leaf 3, Hypervisor Feature Indication */
 #define CPUID3D_CRASH_MSRS (1 << 10)
+#define CPUID3D_SINT_POLLING (1 << 17)
 
 /* Viridian CPUID leaf 4: Implementation Recommendations. */
 #define CPUID4A_HCALL_REMOTE_TLB_FLUSH (1 << 2)
@@ -178,6 +179,8 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
             mask.AccessPartitionReferenceCounter = 1;
         if ( viridian_feature_mask(d) & HVMPV_reference_tsc )
             mask.AccessPartitionReferenceTsc = 1;
+        if ( viridian_feature_mask(d) & HVMPV_synic )
+            mask.AccessSynicRegs = 1;
 
         u.mask = mask;
 
@@ -186,6 +189,8 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
 
         if ( viridian_feature_mask(d) & HVMPV_crash_ctl )
             res->d = CPUID3D_CRASH_MSRS;
+        if ( viridian_feature_mask(d) & HVMPV_synic )
+            res->d |= CPUID3D_SINT_POLLING;
 
         break;
     }
@@ -306,8 +311,16 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
     case HV_X64_MSR_ICR:
     case HV_X64_MSR_TPR:
     case HV_X64_MSR_VP_ASSIST_PAGE:
+    case HV_X64_MSR_SCONTROL:
+    case HV_X64_MSR_SVERSION:
+    case HV_X64_MSR_SIEFP:
+    case HV_X64_MSR_SIMP:
+    case HV_X64_MSR_EOM:
+    case HV_X64_MSR_SINT0 ... HV_X64_MSR_SINT15:
         return viridian_synic_wrmsr(v, idx, val);
 
+    case HV_X64_MSR_TSC_FREQUENCY:
+    case HV_X64_MSR_APIC_FREQUENCY:
     case HV_X64_MSR_REFERENCE_TSC:
         return viridian_time_wrmsr(v, idx, val);
 
@@ -378,6 +391,12 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
     case HV_X64_MSR_ICR:
     case HV_X64_MSR_TPR:
     case HV_X64_MSR_VP_ASSIST_PAGE:
+    case HV_X64_MSR_SCONTROL:
+    case HV_X64_MSR_SVERSION:
+    case HV_X64_MSR_SIEFP:
+    case HV_X64_MSR_SIMP:
+    case HV_X64_MSR_EOM:
+    case HV_X64_MSR_SINT0 ... HV_X64_MSR_SINT15:
         return viridian_synic_rdmsr(v, idx, val);
 
     case HV_X64_MSR_TSC_FREQUENCY:

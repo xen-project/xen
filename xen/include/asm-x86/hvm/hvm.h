@@ -472,6 +472,9 @@ static inline bool hvm_get_guest_bndcfgs(struct vcpu *v, u64 *val)
 #define has_viridian_apic_assist(d) \
     (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_apic_assist))
 
+#define has_viridian_synic(d) \
+    (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_synic))
+
 static inline void hvm_inject_exception(
     unsigned int vector, unsigned int type,
     unsigned int insn_len, int error_code)
