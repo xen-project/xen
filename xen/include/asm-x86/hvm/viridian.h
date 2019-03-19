@@ -65,7 +65,7 @@ struct viridian_domain
     union viridian_guest_os_id_msr guest_os_id;
     union viridian_page_msr hypercall_gpa;
     struct viridian_time_ref_count time_ref_count;
-    union viridian_page_msr reference_tsc;
+    struct viridian_page reference_tsc;
 };
 
 void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,

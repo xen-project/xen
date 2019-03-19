@@ -644,9 +644,8 @@ void viridian_dump_guest_page(const struct vcpu *v, const char *name,
            v, name, (unsigned long)vp->msr.pfn);
 }
 
-void viridian_map_guest_page(const struct vcpu *v, struct viridian_page *vp)
+void viridian_map_guest_page(struct domain *d, struct viridian_page *vp)
 {
-    struct domain *d = v->domain;
     unsigned long gmfn = vp->msr.pfn;
     struct page_info *page;
 

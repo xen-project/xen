@@ -111,7 +111,7 @@ void viridian_time_load_domain_ctxt(
 
 void viridian_dump_guest_page(const struct vcpu *v, const char *name,
                               const struct viridian_page *vp);
-void viridian_map_guest_page(const struct vcpu *v, struct viridian_page *vp);
+void viridian_map_guest_page(struct domain *d, struct viridian_page *vp);
 void viridian_unmap_guest_page(struct viridian_page *vp);
 
 #endif /* X86_HVM_VIRIDIAN_PRIVATE_H */

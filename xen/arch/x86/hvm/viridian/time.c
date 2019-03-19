@@ -25,33 +25,10 @@ typedef struct _HV_REFERENCE_TSC_PAGE
     uint64_t Reserved2[509];
 } HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
 
-static void dump_reference_tsc(const struct domain *d)
-{
-    const union viridian_page_msr *rt = &d->arch.hvm.viridian->reference_tsc;
-
-    if ( !rt->enabled )
-        return;
-
-    printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: pfn: %lx\n",
-           d->domain_id, (unsigned long)rt->pfn);
-}
-
 static void update_reference_tsc(struct domain *d, bool initialize)
 {
-    unsigned long gmfn = d->arch.hvm.viridian->reference_tsc.pfn;
-    struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
-    HV_REFERENCE_TSC_PAGE *p;
-
-    if ( !page || !get_page_type(page, PGT_writable_page) )
-    {
-        if ( page )
-            put_page(page);
-        gdprintk(XENLOG_WARNING, "Bad GMFN %#"PRI_gfn" (MFN %#"PRI_mfn")\n",
-                 gmfn, mfn_x(page ? page_to_mfn(page) : INVALID_MFN));
-        return;
-    }
-
-    p = __map_domain_page(page);
+    const struct viridian_page *rt = &d->arch.hvm.viridian->reference_tsc;
+    HV_REFERENCE_TSC_PAGE *p = rt->ptr;
 
     if ( initialize )
         clear_page(p);
@@ -82,7 +59,7 @@ static void update_reference_tsc(struct domain *d, bool initialize)
 
         printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: invalidated\n",
                d->domain_id);
-        goto out;
+        return;
     }
 
     /*
@@ -100,11 +77,6 @@ static void update_reference_tsc(struct domain *d, bool initialize)
     if ( p->TscSequence == 0xFFFFFFFF ||
          p->TscSequence == 0 ) /* Avoid both 'invalid' values */
         p->TscSequence = 1;
-
- out:
-    unmap_domain_page(p);
-
-    put_page_and_type(page);
 }
 
 static int64_t raw_trc_val(const struct domain *d)
@@ -149,10 +121,14 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        vd->reference_tsc.raw = val;
-        dump_reference_tsc(d);
-        if ( vd->reference_tsc.enabled )
+        viridian_unmap_guest_page(&vd->reference_tsc);
+        vd->reference_tsc.msr.raw = val;
+        viridian_dump_guest_page(v, "REFERENCE_TSC", &vd->reference_tsc);
+        if ( vd->reference_tsc.msr.enabled )
+        {
+            viridian_map_guest_page(d, &vd->reference_tsc);
             update_reference_tsc(d, true);
+        }
         break;
 
     default:
@@ -189,7 +165,7 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        *val = vd->reference_tsc.raw;
+        *val = vd->reference_tsc.msr.raw;
         break;
 
     case HV_X64_MSR_TIME_REF_COUNT:
@@ -231,6 +207,7 @@ void viridian_time_vcpu_deinit(const struct vcpu *v)
 
 void viridian_time_domain_deinit(const struct domain *d)
 {
+    viridian_unmap_guest_page(&d->arch.hvm.viridian->reference_tsc);
 }
 
 void viridian_time_save_vcpu_ctxt(
@@ -249,7 +226,7 @@ void viridian_time_save_domain_ctxt(
     const struct viridian_domain *vd = d->arch.hvm.viridian;
 
     ctxt->time_ref_count = vd->time_ref_count.val;
-    ctxt->reference_tsc = vd->reference_tsc.raw;
+    ctxt->reference_tsc = vd->reference_tsc.msr.raw;
 }
 
 void viridian_time_load_domain_ctxt(
@@ -258,10 +235,13 @@ void viridian_time_load_domain_ctxt(
     struct viridian_domain *vd = d->arch.hvm.viridian;
 
     vd->time_ref_count.val = ctxt->time_ref_count;
-    vd->reference_tsc.raw = ctxt->reference_tsc;
+    vd->reference_tsc.msr.raw = ctxt->reference_tsc;
 
-    if ( vd->reference_tsc.enabled )
+    if ( vd->reference_tsc.msr.enabled )
+    {
+        viridian_map_guest_page(d, &vd->reference_tsc);
         update_reference_tsc(d, false);
+    }
 }
 
 /*
