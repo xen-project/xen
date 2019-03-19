@@ -418,8 +418,7 @@ skip_bss:
 
         mov   x3, #PT_PT             /* x2 := table map of boot_first_id */
         orr   x2, x2, x3             /*       + rights for linear PT */
-        lsl   x1, x1, #3             /* x1 := Slot offset */
-        str   x2, [x4, x1]
+        str   x2, [x4, x1, lsl #3]
 
         load_paddr x4, boot_first_id
 
@@ -428,8 +427,7 @@ skip_bss:
         mov   x3, #PT_MEM            /* x2 := Section map */
         orr   x2, x2, x3
         and   x1, x1, #LPAE_ENTRY_MASK /* x1 := Slot offset */
-        lsl   x1, x1, #3
-        str   x2, [x4, x1]           /* Mapping of paddr(start) */
+        str   x2, [x4, x1, lsl #3]   /* Mapping of paddr(start) */
         mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_first: */
@@ -450,8 +448,7 @@ skip_bss:
         lsl   x2, x2, #FIRST_SHIFT   /* Base address for 1GB mapping */
         mov   x3, #PT_MEM            /* x2 := Section map */
         orr   x2, x2, x3
-        lsl   x1, x1, #3             /* x1 := Slot offset */
-        str   x2, [x4, x1]           /* Create mapping of paddr(start)*/
+        str   x2, [x4, x1, lsl #3]   /* Create mapping of paddr(start)*/
         mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_second: */
@@ -473,8 +470,7 @@ skip_bss:
         lsl   x2, x2, #SECOND_SHIFT  /* Base address for 2MB mapping */
         mov   x3, #PT_MEM            /* x2 := Section map */
         orr   x2, x2, x3
-        lsl   x1, x1, #3             /* x1 := Slot offset */
-        str   x2, [x4, x1]           /* Create mapping of paddr(start)*/
+        str   x2, [x4, x1, lsl #3]   /* Create mapping of paddr(start)*/
         mov   x25, #1                /* x25 := identity map now in place */
 
 1:      /* Setup boot_third: */
