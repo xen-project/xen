@@ -102,7 +102,7 @@ int viridian_synic_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         viridian_unmap_guest_page(&vv->vp_assist);
         vv->vp_assist.msr.raw = val;
         viridian_dump_guest_page(v, "VP_ASSIST", &vv->vp_assist);
-        if ( vv->vp_assist.msr.fields.enabled )
+        if ( vv->vp_assist.msr.enabled )
             viridian_map_guest_page(v, &vv->vp_assist);
         break;
 
@@ -161,7 +161,7 @@ void viridian_synic_load_vcpu_ctxt(
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
 
     vv->vp_assist.msr.raw = ctxt->vp_assist_msr;
-    if ( vv->vp_assist.msr.fields.enabled )
+    if ( vv->vp_assist.msr.enabled )
         viridian_map_guest_page(v, &vv->vp_assist);
 
     vv->apic_assist_pending = ctxt->apic_assist_pending;

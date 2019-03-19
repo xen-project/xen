@@ -17,7 +17,7 @@ union viridian_page_msr
         uint64_t enabled:1;
         uint64_t reserved_preserved:11;
         uint64_t pfn:48;
-    } fields;
+    };
 };
 
 struct viridian_page
@@ -44,7 +44,7 @@ union viridian_guest_os_id_msr
         uint64_t major:8;
         uint64_t os:8;
         uint64_t vendor:16;
-    } fields;
+    };
 };
 
 struct viridian_time_ref_count

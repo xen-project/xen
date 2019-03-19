@@ -29,16 +29,16 @@ static void dump_reference_tsc(const struct domain *d)
 {
     const union viridian_page_msr *rt = &d->arch.hvm.viridian->reference_tsc;
 
-    if ( !rt->fields.enabled )
+    if ( !rt->enabled )
         return;
 
     printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: pfn: %lx\n",
-           d->domain_id, (unsigned long)rt->fields.pfn);
+           d->domain_id, (unsigned long)rt->pfn);
 }
 
 static void update_reference_tsc(struct domain *d, bool initialize)
 {
-    unsigned long gmfn = d->arch.hvm.viridian->reference_tsc.fields.pfn;
+    unsigned long gmfn = d->arch.hvm.viridian->reference_tsc.pfn;
     struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
     HV_REFERENCE_TSC_PAGE *p;
 
@@ -151,7 +151,7 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
 
         vd->reference_tsc.raw = val;
         dump_reference_tsc(d);
-        if ( vd->reference_tsc.fields.enabled )
+        if ( vd->reference_tsc.enabled )
             update_reference_tsc(d, true);
         break;
 
@@ -232,7 +232,7 @@ void viridian_time_load_domain_ctxt(
     vd->time_ref_count.val = ctxt->time_ref_count;
     vd->reference_tsc.raw = ctxt->reference_tsc;
 
-    if ( vd->reference_tsc.fields.enabled )
+    if ( vd->reference_tsc.enabled )
         update_reference_tsc(d, false);
 }
 

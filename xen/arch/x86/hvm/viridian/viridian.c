@@ -192,7 +192,7 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
 
     case 4:
         /* Recommended hypercall usage. */
-        if ( vd->guest_os_id.raw == 0 || vd->guest_os_id.fields.os < 4 )
+        if ( vd->guest_os_id.raw == 0 || vd->guest_os_id.os < 4 )
             break;
         res->a = CPUID4A_RELAX_TIMER_INT;
         if ( viridian_feature_mask(d) & HVMPV_hcall_remote_tlb_flush )
@@ -228,10 +228,8 @@ static void dump_guest_os_id(const struct domain *d)
 
     printk(XENLOG_G_INFO
            "d%d: VIRIDIAN GUEST_OS_ID: vendor: %x os: %x major: %x minor: %x sp: %x build: %x\n",
-           d->domain_id,
-           goi->fields.vendor, goi->fields.os,
-           goi->fields.major, goi->fields.minor,
-           goi->fields.service_pack, goi->fields.build_number);
+           d->domain_id, goi->vendor, goi->os, goi->major, goi->minor,
+           goi->service_pack, goi->build_number);
 }
 
 static void dump_hypercall(const struct domain *d)
@@ -242,12 +240,12 @@ static void dump_hypercall(const struct domain *d)
 
     printk(XENLOG_G_INFO "d%d: VIRIDIAN HYPERCALL: enabled: %x pfn: %lx\n",
            d->domain_id,
-           hg->fields.enabled, (unsigned long)hg->fields.pfn);
+           hg->enabled, (unsigned long)hg->pfn);
 }
 
 static void enable_hypercall_page(struct domain *d)
 {
-    unsigned long gmfn = d->arch.hvm.viridian->hypercall_gpa.fields.pfn;
+    unsigned long gmfn = d->arch.hvm.viridian->hypercall_gpa.pfn;
     struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
     uint8_t *p;
 
@@ -297,7 +295,7 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
     case HV_X64_MSR_HYPERCALL:
         vd->hypercall_gpa.raw = val;
         dump_hypercall(d);
-        if ( vd->hypercall_gpa.fields.enabled )
+        if ( vd->hypercall_gpa.enabled )
             enable_hypercall_page(d);
         break;
 
@@ -606,17 +604,17 @@ out:
 void viridian_dump_guest_page(const struct vcpu *v, const char *name,
                               const struct viridian_page *vp)
 {
-    if ( !vp->msr.fields.enabled )
+    if ( !vp->msr.enabled )
         return;
 
     printk(XENLOG_G_INFO "%pv: VIRIDIAN %s: pfn: %lx\n",
-           v, name, (unsigned long)vp->msr.fields.pfn);
+           v, name, (unsigned long)vp->msr.pfn);
 }
 
 void viridian_map_guest_page(const struct vcpu *v, struct viridian_page *vp)
 {
     struct domain *d = v->domain;
-    unsigned long gmfn = vp->msr.fields.pfn;
+    unsigned long gmfn = vp->msr.pfn;
     struct page_info *page;
 
     if ( vp->ptr )
