@@ -27,7 +27,7 @@ typedef struct _HV_REFERENCE_TSC_PAGE
 
 static void dump_reference_tsc(const struct domain *d)
 {
-    const union viridian_page_msr *rt = &d->arch.hvm.viridian.reference_tsc;
+    const union viridian_page_msr *rt = &d->arch.hvm.viridian->reference_tsc;
 
     if ( !rt->fields.enabled )
         return;
@@ -38,7 +38,7 @@ static void dump_reference_tsc(const struct domain *d)
 
 static void update_reference_tsc(struct domain *d, bool initialize)
 {
-    unsigned long gmfn = d->arch.hvm.viridian.reference_tsc.fields.pfn;
+    unsigned long gmfn = d->arch.hvm.viridian->reference_tsc.fields.pfn;
     struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
     HV_REFERENCE_TSC_PAGE *p;
 
@@ -107,7 +107,7 @@ static void update_reference_tsc(struct domain *d, bool initialize)
     put_page_and_type(page);
 }
 
-static int64_t raw_trc_val(struct domain *d)
+static int64_t raw_trc_val(const struct domain *d)
 {
     uint64_t tsc;
     struct time_scale tsc_to_ns;
@@ -119,21 +119,19 @@ static int64_t raw_trc_val(struct domain *d)
     return scale_delta(tsc, &tsc_to_ns) / 100ul;
 }
 
-void viridian_time_ref_count_freeze(struct domain *d)
+void viridian_time_ref_count_freeze(const struct domain *d)
 {
-    struct viridian_time_ref_count *trc;
-
-    trc = &d->arch.hvm.viridian.time_ref_count;
+    struct viridian_time_ref_count *trc =
+        &d->arch.hvm.viridian->time_ref_count;
 
     if ( test_and_clear_bit(_TRC_running, &trc->flags) )
         trc->val = raw_trc_val(d) + trc->off;
 }
 
-void viridian_time_ref_count_thaw(struct domain *d)
+void viridian_time_ref_count_thaw(const struct domain *d)
 {
-    struct viridian_time_ref_count *trc;
-
-    trc = &d->arch.hvm.viridian.time_ref_count;
+    struct viridian_time_ref_count *trc =
+        &d->arch.hvm.viridian->time_ref_count;
 
     if ( !d->is_shutting_down &&
          !test_and_set_bit(_TRC_running, &trc->flags) )
@@ -150,9 +148,9 @@ int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        d->arch.hvm.viridian.reference_tsc.raw = val;
+        d->arch.hvm.viridian->reference_tsc.raw = val;
         dump_reference_tsc(d);
-        if ( d->arch.hvm.viridian.reference_tsc.fields.enabled )
+        if ( d->arch.hvm.viridian->reference_tsc.fields.enabled )
             update_reference_tsc(d, true);
         break;
 
@@ -189,13 +187,13 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
         if ( !(viridian_feature_mask(d) & HVMPV_reference_tsc) )
             return X86EMUL_EXCEPTION;
 
-        *val = d->arch.hvm.viridian.reference_tsc.raw;
+        *val = d->arch.hvm.viridian->reference_tsc.raw;
         break;
 
     case HV_X64_MSR_TIME_REF_COUNT:
     {
         struct viridian_time_ref_count *trc =
-            &d->arch.hvm.viridian.time_ref_count;
+            &d->arch.hvm.viridian->time_ref_count;
 
         if ( !(viridian_feature_mask(d) & HVMPV_time_ref_count) )
             return X86EMUL_EXCEPTION;
@@ -219,17 +217,17 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
 void viridian_time_save_domain_ctxt(
     const struct domain *d, struct hvm_viridian_domain_context *ctxt)
 {
-    ctxt->time_ref_count = d->arch.hvm.viridian.time_ref_count.val;
-    ctxt->reference_tsc = d->arch.hvm.viridian.reference_tsc.raw;
+    ctxt->time_ref_count = d->arch.hvm.viridian->time_ref_count.val;
+    ctxt->reference_tsc = d->arch.hvm.viridian->reference_tsc.raw;
 }
 
 void viridian_time_load_domain_ctxt(
     struct domain *d, const struct hvm_viridian_domain_context *ctxt)
 {
-    d->arch.hvm.viridian.time_ref_count.val = ctxt->time_ref_count;
-    d->arch.hvm.viridian.reference_tsc.raw = ctxt->reference_tsc;
+    d->arch.hvm.viridian->time_ref_count.val = ctxt->time_ref_count;
+    d->arch.hvm.viridian->reference_tsc.raw = ctxt->reference_tsc;
 
-    if ( d->arch.hvm.viridian.reference_tsc.fields.enabled )
+    if ( d->arch.hvm.viridian->reference_tsc.fields.enabled )
         update_reference_tsc(d, false);
 }
 

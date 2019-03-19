@@ -463,6 +463,9 @@ static inline bool hvm_get_guest_bndcfgs(struct vcpu *v, u64 *val)
 #define is_viridian_domain(d) \
     (is_hvm_domain(d) && (viridian_feature_mask(d) & HVMPV_base_freq))
 
+#define is_viridian_vcpu(v) \
+    is_viridian_domain((v)->domain)
+
 #define has_viridian_time_ref_count(d) \
     (is_viridian_domain(d) && (viridian_feature_mask(d) & HVMPV_time_ref_count))
 
@@ -762,6 +765,7 @@ static inline bool hvm_has_set_descriptor_access_exiting(void)
 }
 
 #define is_viridian_domain(d) ((void)(d), false)
+#define is_viridian_vcpu(v) ((void)(v), false)
 #define has_viridian_time_ref_count(d) ((void)(d), false)
 #define hvm_long_mode_active(v) ((void)(v), false)
 #define hvm_get_guest_time(v) ((void)(v), 0)

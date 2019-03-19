@@ -205,7 +205,7 @@ struct hvm_vcpu {
     /* Pending hw/sw interrupt (.vector = -1 means nothing pending). */
     struct x86_event     inject_event;
 
-    struct viridian_vcpu viridian;
+    struct viridian_vcpu *viridian;
 };
 
 #endif /* __ASM_X86_HVM_VCPU_H__ */
