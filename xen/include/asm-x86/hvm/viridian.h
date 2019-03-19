@@ -40,6 +40,32 @@ union viridian_sint_msr
     };
 };
 
+union viridian_stimer_config_msr
+{
+    uint64_t raw;
+    struct
+    {
+        uint64_t enabled:1;
+        uint64_t periodic:1;
+        uint64_t lazy:1;
+        uint64_t auto_enable:1;
+        uint64_t vector:8;
+        uint64_t direct_mode:1;
+        uint64_t reserved_zero1:3;
+        uint64_t sintx:4;
+        uint64_t reserved_zero2:44;
+    };
+};
+
+struct viridian_stimer {
+    struct vcpu *v;
+    struct timer timer;
+    union viridian_stimer_config_msr config;
+    uint64_t count;
+    uint64_t expiration;
+    bool started;
+};
+
 struct viridian_vcpu
 {
     struct viridian_page vp_assist;
@@ -51,6 +77,9 @@ struct viridian_vcpu
     struct viridian_page simp;
     union viridian_sint_msr sint[16];
     uint8_t vector_to_sintx[256];
+    struct viridian_stimer stimer[4];
+    unsigned int stimer_enabled;
+    unsigned int stimer_pending;
     uint64_t crash_param[5];
 };
 
@@ -87,6 +116,7 @@ struct viridian_domain
     union viridian_page_msr hypercall_gpa;
     struct viridian_time_ref_count time_ref_count;
     struct viridian_page reference_tsc;
+    bool reference_tsc_valid;
 };
 
 void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
@@ -111,7 +141,7 @@ void viridian_apic_assist_set(const struct vcpu *v);
 bool viridian_apic_assist_completed(const struct vcpu *v);
 void viridian_apic_assist_clear(const struct vcpu *v);
 
-void viridian_synic_poll(const struct vcpu *v);
+void viridian_synic_poll(struct vcpu *v);
 bool viridian_synic_is_auto_eoi_sint(const struct vcpu *v,
                                      unsigned int vector);
 void viridian_synic_ack_sint(const struct vcpu *v, unsigned int vector);

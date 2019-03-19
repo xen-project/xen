@@ -269,6 +269,7 @@ static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
         libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_TIME_REF_COUNT);
         libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_APIC_ASSIST);
         libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_CRASH_CTL);
+        libxl_bitmap_set(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_STIMER);
     }
 
     libxl_for_each_set_bit(v, info->u.hvm.viridian_enable) {
@@ -319,6 +320,9 @@ static int hvm_set_viridian_features(libxl__gc *gc, uint32_t domid,
 
     if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_SYNIC))
         mask |= HVMPV_synic;
+
+    if (libxl_bitmap_test(&enlightenments, LIBXL_VIRIDIAN_ENLIGHTENMENT_STIMER))
+        mask |= HVMPV_time_ref_count | HVMPV_synic | HVMPV_stimer;
 
     if (mask != 0 &&
         xc_hvm_param_set(CTX->xch,

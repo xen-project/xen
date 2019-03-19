@@ -150,6 +150,10 @@
 #define _HVMPV_synic 7
 #define HVMPV_synic (1 << _HVMPV_synic)
 
+/* Enable STIMER MSRs */
+#define _HVMPV_stimer 8
+#define HVMPV_stimer (1 << _HVMPV_stimer)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
@@ -158,7 +162,8 @@
          HVMPV_hcall_remote_tlb_flush | \
          HVMPV_apic_assist | \
          HVMPV_crash_ctl | \
-         HVMPV_synic)
+         HVMPV_synic | \
+         HVMPV_stimer)
 
 #endif
 

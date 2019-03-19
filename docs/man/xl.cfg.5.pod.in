@@ -2167,11 +2167,19 @@ This group incorporates the crash control MSRs. These enlightenments
 allow Windows to write crash information such that it can be logged
 by Xen.
 
+=item B<stimer>
+
+This set incorporates the SynIC and synthetic timer MSRs. Windows will
+use synthetic timers in preference to emulated HPET for a source of
+ticks and hence enabling this group will ensure that ticks will be
+consistent with use of an enlightened time source (B<time_ref_count> or
+B<reference_tsc>).
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which
-is currently the B<base>, B<freq>, B<time_ref_count>, B<apic_assist>
-and B<crash_ctl> groups.
+is currently the B<base>, B<freq>, B<time_ref_count>, B<apic_assist>,
+B<crash_ctl> and B<stimer> groups.
 
 =item B<all>
 

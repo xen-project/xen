@@ -604,6 +604,8 @@ struct hvm_viridian_vcpu_context {
     uint8_t  _pad[7];
     uint64_t simp_msr;
     uint64_t sint_msr[16];
+    uint64_t stimer_config_msr[4];
+    uint64_t stimer_count_msr[4];
 };
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_VCPU, 17, struct hvm_viridian_vcpu_context);

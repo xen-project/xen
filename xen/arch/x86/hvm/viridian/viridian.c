@@ -181,6 +181,8 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
             mask.AccessPartitionReferenceTsc = 1;
         if ( viridian_feature_mask(d) & HVMPV_synic )
             mask.AccessSynicRegs = 1;
+        if ( viridian_feature_mask(d) & HVMPV_stimer )
+            mask.AccessSyntheticTimerRegs = 1;
 
         u.mask = mask;
 
@@ -322,6 +324,8 @@ int guest_wrmsr_viridian(struct vcpu *v, uint32_t idx, uint64_t val)
     case HV_X64_MSR_TSC_FREQUENCY:
     case HV_X64_MSR_APIC_FREQUENCY:
     case HV_X64_MSR_REFERENCE_TSC:
+    case HV_X64_MSR_TIME_REF_COUNT:
+    case HV_X64_MSR_STIMER0_CONFIG ... HV_X64_MSR_STIMER3_COUNT:
         return viridian_time_wrmsr(v, idx, val);
 
     case HV_X64_MSR_CRASH_P0:
@@ -403,6 +407,7 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
     case HV_X64_MSR_APIC_FREQUENCY:
     case HV_X64_MSR_REFERENCE_TSC:
     case HV_X64_MSR_TIME_REF_COUNT:
+    case HV_X64_MSR_STIMER0_CONFIG ... HV_X64_MSR_STIMER3_COUNT:
         return viridian_time_rdmsr(v, idx, val);
 
     case HV_X64_MSR_CRASH_P0:
