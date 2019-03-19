@@ -154,6 +154,10 @@
 #define _HVMPV_stimer 8
 #define HVMPV_stimer (1 << _HVMPV_stimer)
 
+/* Use Synthetic Cluster IPI Hypercall */
+#define _HVMPV_hcall_ipi 9
+#define HVMPV_hcall_ipi (1 << _HVMPV_hcall_ipi)
+
 #define HVMPV_feature_mask \
         (HVMPV_base_freq | \
          HVMPV_no_freq | \
@@ -163,7 +167,8 @@
          HVMPV_apic_assist | \
          HVMPV_crash_ctl | \
          HVMPV_synic | \
-         HVMPV_stimer)
+         HVMPV_stimer | \
+         HVMPV_hcall_ipi)
 
 #endif
 

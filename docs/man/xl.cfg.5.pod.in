@@ -2175,6 +2175,12 @@ ticks and hence enabling this group will ensure that ticks will be
 consistent with use of an enlightened time source (B<time_ref_count> or
 B<reference_tsc>).
 
+=item B<hcall_ipi>
+
+This set incorporates use of a hypercall for interprocessor interrupts.
+This enlightenment may improve performance of Windows guests with multiple
+virtual CPUs.
+
 =item B<defaults>
 
 This is a special value that enables the default set of groups, which

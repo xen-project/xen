@@ -237,6 +237,7 @@ libxl_viridian_enlightenment = Enumeration("viridian_enlightenment", [
     (6, "crash_ctl"),
     (7, "synic"),
     (8, "stimer"),
+    (9, "hcall_ipi"),
     ])
 
 libxl_hdtype = Enumeration("hdtype", [

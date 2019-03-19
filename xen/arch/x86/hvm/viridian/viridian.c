@@ -28,6 +28,7 @@
 #define HvFlushVirtualAddressSpace 0x0002
 #define HvFlushVirtualAddressList  0x0003
 #define HvNotifyLongSpinWait       0x0008
+#define HvSendSyntheticClusterIpi  0x000b
 #define HvGetPartitionId           0x0046
 #define HvExtCallQueryCapabilities 0x8001
 
@@ -95,6 +96,7 @@ typedef union _HV_CRASH_CTL_REG_CONTENTS
 #define CPUID4A_HCALL_REMOTE_TLB_FLUSH (1 << 2)
 #define CPUID4A_MSR_BASED_APIC         (1 << 3)
 #define CPUID4A_RELAX_TIMER_INT        (1 << 5)
+#define CPUID4A_SYNTHETIC_CLUSTER_IPI  (1 << 10)
 
 /* Viridian CPUID leaf 6: Implementation HW features detected and in use */
 #define CPUID6A_APIC_OVERLAY    (1 << 0)
@@ -206,6 +208,8 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
             res->a |= CPUID4A_HCALL_REMOTE_TLB_FLUSH;
         if ( !cpu_has_vmx_apic_reg_virt )
             res->a |= CPUID4A_MSR_BASED_APIC;
+        if ( viridian_feature_mask(d) & HVMPV_hcall_ipi )
+            res->a |= CPUID4A_SYNTHETIC_CLUSTER_IPI;
 
         /*
          * This value is the recommended number of attempts to try to
@@ -623,6 +627,65 @@ int viridian_hypercall(struct cpu_user_regs *regs)
             return HVM_HCALL_preempted;
 
         output.rep_complete = input.rep_count;
+
+        status = HV_STATUS_SUCCESS;
+        break;
+    }
+
+    case HvSendSyntheticClusterIpi:
+    {
+        struct vcpu *v;
+        uint32_t vector;
+        uint64_t vcpu_mask;
+
+        status = HV_STATUS_INVALID_PARAMETER;
+
+        /* Get input parameters. */
+        if ( input.fast )
+        {
+            if ( input_params_gpa >> 32 )
+                break;
+
+            vector = input_params_gpa;
+            vcpu_mask = output_params_gpa;
+        }
+        else
+        {
+            struct {
+                uint32_t vector;
+                uint8_t target_vtl;
+                uint8_t reserved_zero[3];
+                uint64_t vcpu_mask;
+            } input_params;
+
+            if ( hvm_copy_from_guest_phys(&input_params, input_params_gpa,
+                                          sizeof(input_params)) !=
+                 HVMTRANS_okay )
+                break;
+
+            if ( input_params.target_vtl ||
+                 input_params.reserved_zero[0] ||
+                 input_params.reserved_zero[1] ||
+                 input_params.reserved_zero[2] )
+                break;
+
+            vector = input_params.vector;
+            vcpu_mask = input_params.vcpu_mask;
+        }
+
+        if ( vector < 0x10 || vector > 0xff )
+            break;
+
+        for_each_vcpu ( currd, v )
+        {
+            if ( v->vcpu_id >= (sizeof(vcpu_mask) * 8) )
+                break;
+
+            if ( !(vcpu_mask & (1ul << v->vcpu_id)) )
+                continue;
+
+            vlapic_set_irq(vcpu_vlapic(v), vector, 0);
+        }
 
         status = HV_STATUS_SUCCESS;
         break;

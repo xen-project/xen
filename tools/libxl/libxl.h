@@ -331,6 +331,12 @@
 #define LIBXL_HAVE_VIRIDIAN_STIMER 1
 
 /*
+ * LIBXL_HAVE_VIRIDIAN_HCALL_IPI indicates that the 'hcall_ipi' value
+ * is present in the viridian enlightenment enumeration.
+ */
+#define LIBXL_HAVE_VIRIDIAN_HCALL_IPI 1
+
+/*
  * LIBXL_HAVE_BUILDINFO_HVM_ACPI_LAPTOP_SLATE indicates that
  * libxl_domain_build_info has the u.hvm.acpi_laptop_slate field.
  */
