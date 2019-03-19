@@ -657,20 +657,20 @@ void arch_domain_destroy(struct domain *d)
 
 void arch_domain_shutdown(struct domain *d)
 {
-    if ( has_viridian_time_ref_count(d) )
-        viridian_time_ref_count_freeze(d);
+    if ( is_viridian_domain(d) )
+        viridian_time_domain_freeze(d);
 }
 
 void arch_domain_pause(struct domain *d)
 {
-    if ( has_viridian_time_ref_count(d) )
-        viridian_time_ref_count_freeze(d);
+    if ( is_viridian_domain(d) )
+        viridian_time_domain_freeze(d);
 }
 
 void arch_domain_unpause(struct domain *d)
 {
-    if ( has_viridian_time_ref_count(d) )
-        viridian_time_ref_count_thaw(d);
+    if ( is_viridian_domain(d) )
+        viridian_time_domain_thaw(d);
 }
 
 int arch_domain_soft_reset(struct domain *d)

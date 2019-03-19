@@ -91,7 +91,7 @@ static int64_t raw_trc_val(const struct domain *d)
     return scale_delta(tsc, &tsc_to_ns) / 100ul;
 }
 
-void viridian_time_ref_count_freeze(const struct domain *d)
+static void time_ref_count_freeze(const struct domain *d)
 {
     struct viridian_time_ref_count *trc =
         &d->arch.hvm.viridian->time_ref_count;
@@ -100,7 +100,7 @@ void viridian_time_ref_count_freeze(const struct domain *d)
         trc->val = raw_trc_val(d) + trc->off;
 }
 
-void viridian_time_ref_count_thaw(const struct domain *d)
+static void time_ref_count_thaw(const struct domain *d)
 {
     struct viridian_time_ref_count *trc =
         &d->arch.hvm.viridian->time_ref_count;
@@ -108,6 +108,24 @@ void viridian_time_ref_count_thaw(const struct domain *d)
     if ( !d->is_shutting_down &&
          !test_and_set_bit(_TRC_running, &trc->flags) )
         trc->off = (int64_t)trc->val - raw_trc_val(d);
+}
+
+static int64_t time_ref_count(const struct domain *d)
+{
+    struct viridian_time_ref_count *trc =
+        &d->arch.hvm.viridian->time_ref_count;
+
+    return raw_trc_val(d) + trc->off;
+}
+
+void viridian_time_domain_freeze(const struct domain *d)
+{
+    time_ref_count_freeze(d);
+}
+
+void viridian_time_domain_thaw(const struct domain *d)
+{
+    time_ref_count_thaw(d);
 }
 
 int viridian_time_wrmsr(struct vcpu *v, uint32_t idx, uint64_t val)
@@ -179,7 +197,7 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
             printk(XENLOG_G_INFO "d%d: VIRIDIAN MSR_TIME_REF_COUNT: accessed\n",
                    d->domain_id);
 
-        *val = raw_trc_val(d) + trc->off;
+        *val = time_ref_count(d);
         break;
     }
 

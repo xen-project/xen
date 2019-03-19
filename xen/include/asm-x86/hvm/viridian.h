@@ -77,8 +77,8 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val);
 int
 viridian_hypercall(struct cpu_user_regs *regs);
 
-void viridian_time_ref_count_freeze(const struct domain *d);
-void viridian_time_ref_count_thaw(const struct domain *d);
+void viridian_time_domain_freeze(const struct domain *d);
+void viridian_time_domain_thaw(const struct domain *d);
 
 int viridian_vcpu_init(struct vcpu *v);
 int viridian_domain_init(struct domain *d);
