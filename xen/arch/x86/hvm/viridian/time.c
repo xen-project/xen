@@ -215,6 +215,24 @@ int viridian_time_rdmsr(const struct vcpu *v, uint32_t idx, uint64_t *val)
     return X86EMUL_OKAY;
 }
 
+int viridian_time_vcpu_init(const struct vcpu *v)
+{
+    return 0;
+}
+
+int viridian_time_domain_init(const struct domain *d)
+{
+    return 0;
+}
+
+void viridian_time_vcpu_deinit(const struct vcpu *v)
+{
+}
+
+void viridian_time_domain_deinit(const struct domain *d)
+{
+}
+
 void viridian_time_save_domain_ctxt(
     const struct domain *d, struct hvm_viridian_domain_context *ctxt)
 {

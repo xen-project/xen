@@ -418,22 +418,52 @@ int guest_rdmsr_viridian(const struct vcpu *v, uint32_t idx, uint64_t *val)
 
 int viridian_vcpu_init(struct vcpu *v)
 {
+    int rc;
+
     ASSERT(!v->arch.hvm.viridian);
     v->arch.hvm.viridian = xzalloc(struct viridian_vcpu);
     if ( !v->arch.hvm.viridian )
         return -ENOMEM;
 
+    rc = viridian_synic_vcpu_init(v);
+    if ( rc )
+        goto fail;
+
+    rc = viridian_time_vcpu_init(v);
+    if ( rc )
+        goto fail;
+
     return 0;
+
+ fail:
+    viridian_vcpu_deinit(v);
+
+    return rc;
 }
 
 int viridian_domain_init(struct domain *d)
 {
+    int rc;
+
     ASSERT(!d->arch.hvm.viridian);
     d->arch.hvm.viridian = xzalloc(struct viridian_domain);
     if ( !d->arch.hvm.viridian )
         return -ENOMEM;
 
+    rc = viridian_synic_domain_init(d);
+    if ( rc )
+        goto fail;
+
+    rc = viridian_time_domain_init(d);
+    if ( rc )
+        goto fail;
+
     return 0;
+
+ fail:
+    viridian_domain_deinit(d);
+
+    return rc;
 }
 
 void viridian_vcpu_deinit(struct vcpu *v)
@@ -441,8 +471,8 @@ void viridian_vcpu_deinit(struct vcpu *v)
     if ( !v->arch.hvm.viridian )
         return;
 
-    if ( is_viridian_vcpu(v) )
-        viridian_synic_wrmsr(v, HV_X64_MSR_VP_ASSIST_PAGE, 0);
+    viridian_time_vcpu_deinit(v);
+    viridian_synic_vcpu_deinit(v);
 
     XFREE(v->arch.hvm.viridian);
 }
@@ -456,6 +486,9 @@ void viridian_domain_deinit(struct domain *d)
 
     if ( !d->arch.hvm.viridian )
         return;
+
+    viridian_time_domain_deinit(d);
+    viridian_synic_domain_deinit(d);
 
     XFREE(d->arch.hvm.viridian);
 }
