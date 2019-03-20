@@ -2,6 +2,38 @@
 
 #include <xen/lib/x86/cpuid.h>
 
+unsigned int x86_cpuid_lookup_vendor(uint32_t ebx, uint32_t ecx, uint32_t edx)
+{
+    switch ( ebx )
+    {
+    case X86_VENDOR_INTEL_EBX:
+        if ( ecx == X86_VENDOR_INTEL_ECX &&
+             edx == X86_VENDOR_INTEL_EDX )
+            return X86_VENDOR_INTEL;
+        break;
+
+    case X86_VENDOR_AMD_EBX:
+        if ( ecx == X86_VENDOR_AMD_ECX &&
+             edx == X86_VENDOR_AMD_EDX )
+            return X86_VENDOR_AMD;
+        break;
+
+    case X86_VENDOR_CENTAUR_EBX:
+        if ( ecx == X86_VENDOR_CENTAUR_ECX &&
+             edx == X86_VENDOR_CENTAUR_EDX )
+            return X86_VENDOR_CENTAUR;
+        break;
+
+    case X86_VENDOR_SHANGHAI_EBX:
+        if ( ecx == X86_VENDOR_SHANGHAI_ECX &&
+             edx == X86_VENDOR_SHANGHAI_EDX )
+            return X86_VENDOR_SHANGHAI;
+        break;
+    }
+
+    return X86_VENDOR_UNKNOWN;
+}
+
 void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
 {
     unsigned int i;

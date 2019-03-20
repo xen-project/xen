@@ -8,6 +8,7 @@
 #include <err.h>
 
 #include <xen-tools/libs.h>
+#include <xen/asm/x86-vendors.h>
 #include <xen/lib/x86/cpuid.h>
 #include <xen/lib/x86/msr.h>
 #include <xen/domctl.h>
@@ -18,6 +19,40 @@ static unsigned int nr_failures;
     nr_failures++;                              \
     printf(fmt, ##__VA_ARGS__);                 \
 })
+
+static void test_vendor_identification(void)
+{
+    static const struct test {
+        union {
+            char ident[12];
+            struct {
+                uint32_t b, d, c;
+            };
+        };
+        unsigned int vendor;
+    } tests[] = {
+        { { "GenuineIntel" }, X86_VENDOR_INTEL },
+        { { "AuthenticAMD" }, X86_VENDOR_AMD },
+        { { "CentaurHauls" }, X86_VENDOR_CENTAUR },
+        { { "  Shanghai  " }, X86_VENDOR_SHANGHAI },
+
+        { { ""             }, X86_VENDOR_UNKNOWN },
+        { { "            " }, X86_VENDOR_UNKNOWN },
+        { { "xxxxxxxxxxxx" }, X86_VENDOR_UNKNOWN },
+    };
+
+    printf("Testing CPU vendor identification:\n");
+
+    for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
+    {
+        const struct test *t = &tests[i];
+        unsigned int vendor = x86_cpuid_lookup_vendor(t->b, t->c, t->d);
+
+        if ( vendor != t->vendor )
+            fail("  Test '%.12s', expected vendor %u, got %u\n",
+                 t->ident, t->vendor, vendor);
+    }
+}
 
 static void test_cpuid_serialise_success(void)
 {
@@ -242,6 +277,8 @@ static void test_msr_deserialise_failure(void)
 int main(int argc, char **argv)
 {
     printf("CPU Policy unit tests\n");
+
+    test_vendor_identification();
 
     test_cpuid_serialise_success();
     test_msr_serialise_success();

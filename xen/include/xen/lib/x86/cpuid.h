@@ -65,6 +65,12 @@ static inline void cpuid_count_leaf(
 #undef BX_CON
 #undef XCHG
 
+/**
+ * Given the vendor id from CPUID leaf 0, look up Xen's internal integer
+ * vendor ID.  Returns X86_VENDOR_UNKNOWN for any unknown vendor.
+ */
+unsigned int x86_cpuid_lookup_vendor(uint32_t ebx, uint32_t ecx, uint32_t edx);
+
 #define CPUID_GUEST_NR_BASIC      (0xdu + 1)
 #define CPUID_GUEST_NR_CACHE      (5u + 1)
 #define CPUID_GUEST_NR_FEAT       (0u + 1)
