@@ -459,12 +459,6 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
     struct xc_core_section_headers *sheaders = NULL;
     Elf64_Shdr *shdr;
  
-    if ( xc_domain_get_guest_width(xch, domid, &dinfo->guest_width) != 0 )
-    {
-        PERROR("Could not get address size for domain");
-        return sts;
-    }
-
     xc_core_arch_context_init(&arch_ctxt);
     if ( (dump_mem_start = malloc(DUMP_INCREMENT*PAGE_SIZE)) == NULL )
     {
@@ -486,6 +480,40 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
         goto out;
     }
     auto_translated_physmap = xc_core_arch_auto_translated_physmap(&info);
+
+    if ( !auto_translated_physmap )
+
+    {
+        if ( xc_domain_get_guest_width(xch, domid, &dinfo->guest_width) != 0 )
+        {
+            PERROR("Could not get address size for domain");
+            goto out;
+        }
+    }
+    else
+    {
+        /*
+         * Autotranslated guest never sets guest width in the first
+         * place. Force guest_width to be sizeof(unsigned long) so
+         * code below functions properly.
+         *
+         * Here is why this is correct.
+         *
+         * 1. Before f969bc9fc, xc_domain_get_guest_width for HVM (x86
+         * and ARM) always returned hypervisor's idea of
+         * sizeof(unsigned long).
+         *
+         * 2. There has never been a situation in which hypervisor's
+         * word width is smaller than toolstack domain's (i.e. no
+         * 32bit hypervisor + 64bit toolstack).
+         *
+         * Predicates in code test guest_width against toolstack
+         * domain's sizeof(unsigned long), so setting guest_width to
+         * toolstack domain's idea of sizeof(unsigned long) matches
+         * the original behaviour for HVM guests.
+         */
+        dinfo->guest_width = sizeof(unsigned long);
+    }
 
     if ( domid != info.domid )
     {
