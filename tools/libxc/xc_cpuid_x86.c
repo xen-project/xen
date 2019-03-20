@@ -32,6 +32,8 @@ enum {
 #include <xen/arch-x86/cpufeatureset.h>
 };
 
+#include <xen/asm/x86-vendors.h>
+
 #include <xen/lib/x86/cpuid.h>
 #include <xen/lib/x86/msr.h>
 
@@ -229,12 +231,7 @@ int xc_get_domain_cpu_policy(xc_interface *xch, uint32_t domid,
 
 struct cpuid_domain_info
 {
-    enum
-    {
-        VENDOR_UNKNOWN,
-        VENDOR_INTEL,
-        VENDOR_AMD,
-    } vendor;
+    unsigned int vendor; /* X86_VENDOR_* */
 
     bool hvm;
     uint64_t xfeature_mask;
@@ -296,16 +293,7 @@ static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
     int rc;
 
     cpuid(in, regs);
-    if ( regs[1] == 0x756e6547U &&      /* "GenuineIntel" */
-         regs[2] == 0x6c65746eU &&
-         regs[3] == 0x49656e69U )
-        info->vendor = VENDOR_INTEL;
-    else if ( regs[1] == 0x68747541U && /* "AuthenticAMD" */
-              regs[2] == 0x444d4163U &&
-              regs[3] == 0x69746e65U )
-        info->vendor = VENDOR_AMD;
-    else
-        info->vendor = VENDOR_UNKNOWN;
+    info->vendor = x86_cpuid_lookup_vendor(regs[1], regs[2], regs[3]);
 
     if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
          di.domid != domid )
@@ -568,7 +556,7 @@ static void xc_cpuid_hvm_policy(const struct cpuid_domain_info *info,
         break;
     }
 
-    if ( info->vendor == VENDOR_AMD )
+    if ( info->vendor == X86_VENDOR_AMD )
         amd_xc_cpuid_policy(info, input, regs);
     else
         intel_xc_cpuid_policy(info, input, regs);
@@ -630,7 +618,7 @@ static void xc_cpuid_pv_policy(const struct cpuid_domain_info *info,
 
     case 0x80000000:
     {
-        unsigned int max = info->vendor == VENDOR_AMD
+        unsigned int max = info->vendor == X86_VENDOR_AMD
             ? DEF_MAX_AMDEXT : DEF_MAX_INTELEXT;
 
         if ( regs[0] > max )
@@ -736,7 +724,7 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
         if ( !info->pv64 )
         {
             clear_bit(X86_FEATURE_LM, info->featureset);
-            if ( info->vendor != VENDOR_AMD )
+            if ( info->vendor != X86_VENDOR_AMD )
                 clear_bit(X86_FEATURE_SYSCALL, info->featureset);
         }
 
@@ -787,7 +775,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
     input[0] = 0x80000000;
     cpuid(input, regs);
 
-    if ( info.vendor == VENDOR_AMD )
+    if ( info.vendor == X86_VENDOR_AMD )
         ext_max = (regs[0] <= DEF_MAX_AMDEXT) ? regs[0] : DEF_MAX_AMDEXT;
     else
         ext_max = (regs[0] <= DEF_MAX_INTELEXT) ? regs[0] : DEF_MAX_INTELEXT;
