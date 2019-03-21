@@ -1173,8 +1173,7 @@ detection of systems known to misbehave upon accesses to that port.
 ### iommu
     = List of [ <bool>, verbose, debug, force, required,
                 sharept, intremap, intpost, crash-disable,
-                snoop, qinval, igfx, workaround_bios_bug,
-                amd-iommu-perdev-intremap,
+                snoop, qinval, igfx, amd-iommu-perdev-intremap,
                 dom0-{passthrough,strict} ]
 
     All sub-options are boolean in nature.
@@ -1264,10 +1263,6 @@ The following options are specific to Intel VT-d hardware:
     It is intended as a debugging mechanism for graphics issues, and to be
     similar to Linux's `intel_iommu=igfx_off` option.  If specifying `no-igfx`
     fixes anything, please report the problem.
-
-*   The `workaround_bios_bug` boolean is disabled by default.  It can be used
-    to ignore errors when parsing the ACPI tables, and finding a listed PCI
-    device which doesn't appear to exist in the system.
 
 The following options are specific to AMD-Vi hardware:
 
