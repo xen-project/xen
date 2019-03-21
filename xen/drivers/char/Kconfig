@@ -20,6 +20,14 @@ config HAS_MVEBU
 	  This selects the Marvell MVEBU UART. If you have a ARMADA 3700
 	  based board, say Y.
 
+config HAS_MESON
+	bool "Amlogic MESON UART driver"
+	default y
+	depends on ARM_64
+	help
+	  This selects the Amlogic MESON UART. If you have a Amlogic based
+	  board, say Y.
+
 config HAS_PL011
 	bool "ARM PL011 UART driver"
 	default y
