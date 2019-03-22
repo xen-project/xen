@@ -1024,11 +1024,14 @@ static int xen_pt_update(enum xenmap_operation op,
 
     spin_lock(&xen_pt_lock);
 
-    for(; addr < addr_end; addr += PAGE_SIZE, mfn = mfn_add(mfn, 1))
+    for( ; addr < addr_end; addr += PAGE_SIZE )
     {
         rc = xen_pt_update_entry(op, addr, mfn, flags);
         if ( rc )
             break;
+
+        if ( !mfn_eq(mfn, INVALID_MFN) )
+            mfn = mfn_add(mfn, 1);
     }
 
     /*
