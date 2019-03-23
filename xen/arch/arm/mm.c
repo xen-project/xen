@@ -947,13 +947,6 @@ static int create_xen_table(lpae_t *entry)
     return 0;
 }
 
-enum xenmap_operation {
-    INSERT,
-    REMOVE,
-    MODIFY,
-    RESERVE
-};
-
 /* Sanity check of the entry */
 static bool xen_pt_check_entry(lpae_t entry, mfn_t mfn, unsigned int flags)
 {
@@ -1020,8 +1013,8 @@ static bool xen_pt_check_entry(lpae_t entry, mfn_t mfn, unsigned int flags)
     return true;
 }
 
-static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
-                               mfn_t mfn, unsigned int flags)
+static int xen_pt_update_entry(unsigned long addr, mfn_t mfn,
+                               unsigned int flags)
 {
     lpae_t pte, *entry;
     lpae_t *third = NULL;
@@ -1079,8 +1072,7 @@ static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
 
 static DEFINE_SPINLOCK(xen_pt_lock);
 
-static int xen_pt_update(enum xenmap_operation op,
-                         unsigned long virt,
+static int xen_pt_update(unsigned long virt,
                          mfn_t mfn,
                          unsigned long nr_mfns,
                          unsigned int flags)
@@ -1111,7 +1103,7 @@ static int xen_pt_update(enum xenmap_operation op,
 
     for( ; addr < addr_end; addr += PAGE_SIZE )
     {
-        rc = xen_pt_update_entry(op, addr, mfn, flags);
+        rc = xen_pt_update_entry(addr, mfn, flags);
         if ( rc )
             break;
 
@@ -1136,24 +1128,24 @@ int map_pages_to_xen(unsigned long virt,
                      unsigned long nr_mfns,
                      unsigned int flags)
 {
-    return xen_pt_update(INSERT, virt, mfn, nr_mfns, flags);
+    return xen_pt_update(virt, mfn, nr_mfns, flags);
 }
 
 int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 {
-    return xen_pt_update(RESERVE, virt, INVALID_MFN, nr_mfns, _PAGE_POPULATE);
+    return xen_pt_update(virt, INVALID_MFN, nr_mfns, _PAGE_POPULATE);
 }
 
 int destroy_xen_mappings(unsigned long v, unsigned long e)
 {
     ASSERT(v <= e);
-    return xen_pt_update(REMOVE, v, INVALID_MFN, (e - v) >> PAGE_SHIFT, 0);
+    return xen_pt_update(v, INVALID_MFN, (e - v) >> PAGE_SHIFT, 0);
 }
 
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags)
 {
     ASSERT(s <= e);
-    return xen_pt_update(MODIFY, s, INVALID_MFN, (e - s) >> PAGE_SHIFT, flags);
+    return xen_pt_update(s, INVALID_MFN, (e - s) >> PAGE_SHIFT, flags);
 }
 
 enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
