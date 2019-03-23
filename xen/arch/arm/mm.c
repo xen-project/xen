@@ -1047,33 +1047,32 @@ static int xen_pt_update_entry(enum xenmap_operation op, unsigned long addr,
     if ( !xen_pt_check_entry(*entry, mfn, flags) )
         return -EINVAL;
 
-    switch ( op ) {
-        case INSERT:
-        case RESERVE:
-            if ( op == RESERVE )
-                break;
+    /* If we are only populating page-table, then we are done. */
+    if ( flags & _PAGE_POPULATE )
+        return 0;
+
+    /* We are removing the page */
+    if ( !(flags & _PAGE_PRESENT) )
+        memset(&pte, 0x00, sizeof(pte));
+    else
+    {
+        /* We are inserting a mapping => Create new pte. */
+        if ( !mfn_eq(mfn, INVALID_MFN) )
+        {
             pte = mfn_to_xen_entry(mfn, PAGE_AI_MASK(flags));
-            pte.pt.ro = PAGE_RO_MASK(flags);
-            pte.pt.xn = PAGE_XN_MASK(flags);
-            BUG_ON(!pte.pt.ro && !pte.pt.xn);
+
+            /* Third level entries set pte.pt.table = 1 */
             pte.pt.table = 1;
-            write_pte(entry, pte);
-            break;
-        case MODIFY:
-        case REMOVE:
-            if ( op == REMOVE )
-                pte.bits = 0;
-            else
-            {
-                pte = *entry;
-                pte.pt.ro = PAGE_RO_MASK(flags);
-                pte.pt.xn = PAGE_XN_MASK(flags);
-            }
-            write_pte(entry, pte);
-            break;
-        default:
-            BUG();
+        }
+        else /* We are updating the permission => Copy the current pte. */
+            pte = *entry;
+
+        /* Set permission */
+        pte.pt.ro = PAGE_RO_MASK(flags);
+        pte.pt.xn = PAGE_XN_MASK(flags);
     }
+
+    write_pte(entry, pte);
 
     return 0;
 }
