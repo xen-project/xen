@@ -470,6 +470,21 @@ struct libxl__ev_qmp {
     int msg_id;
 };
 
+/* QMP parameters helpers */
+
+_hidden void libxl__qmp_param_add_string(libxl__gc *gc,
+                                         libxl__json_object **param,
+                                         const char *name, const char *s);
+_hidden void libxl__qmp_param_add_bool(libxl__gc *gc,
+                                       libxl__json_object **param,
+                                       const char *name, bool b);
+_hidden void libxl__qmp_param_add_integer(libxl__gc *gc,
+                                          libxl__json_object **param,
+                                          const char *name, const int i);
+#define QMP_PARAMETERS_SPRINTF(args, name, format, ...) \
+    libxl__qmp_param_add_string(gc, args, name, \
+                                GCSPRINTF(format, __VA_ARGS__))
+
 
 /*
  * evgen structures, which are the state we use for generating

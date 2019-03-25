@@ -752,9 +752,9 @@ static void qmp_parameters_common_add(libxl__gc *gc,
     flexarray_append((*param)->u.map, arg);
 }
 
-static void qmp_parameters_add_string(libxl__gc *gc,
-                                      libxl__json_object **param,
-                                      const char *name, const char *argument)
+void libxl__qmp_param_add_string(libxl__gc *gc,
+                                 libxl__json_object **param,
+                                 const char *name, const char *argument)
 {
     libxl__json_object *obj;
 
@@ -764,9 +764,9 @@ static void qmp_parameters_add_string(libxl__gc *gc,
     qmp_parameters_common_add(gc, param, name, obj);
 }
 
-static void qmp_parameters_add_bool(libxl__gc *gc,
-                                    libxl__json_object **param,
-                                    const char *name, bool b)
+void libxl__qmp_param_add_bool(libxl__gc *gc,
+                               libxl__json_object **param,
+                               const char *name, bool b)
 {
     libxl__json_object *obj;
 
@@ -775,9 +775,9 @@ static void qmp_parameters_add_bool(libxl__gc *gc,
     qmp_parameters_common_add(gc, param, name, obj);
 }
 
-static void qmp_parameters_add_integer(libxl__gc *gc,
-                                       libxl__json_object **param,
-                                       const char *name, const int i)
+void libxl__qmp_param_add_integer(libxl__gc *gc,
+                                  libxl__json_object **param,
+                                  const char *name, const int i)
 {
     libxl__json_object *obj;
 
@@ -786,9 +786,6 @@ static void qmp_parameters_add_integer(libxl__gc *gc,
 
     qmp_parameters_common_add(gc, param, name, obj);
 }
-
-#define QMP_PARAMETERS_SPRINTF(args, name, format, ...) \
-    qmp_parameters_add_string(gc, args, name, GCSPRINTF(format, __VA_ARGS__))
 
 /*
  * API
@@ -975,7 +972,7 @@ int libxl__qmp_run_command_flexarray(libxl__gc *gc, int domid,
     for (i = 0; i < array->count; i += 2) {
         flexarray_get(array, i, &name);
         flexarray_get(array, i + 1, &value);
-        qmp_parameters_add_string(gc, &args, (char *)name, (char *)value);
+        libxl__qmp_param_add_string(gc, &args, (char *)name, (char *)value);
     }
 
     return qmp_run_command(gc, domid, cmd, args, NULL, NULL);
@@ -997,10 +994,10 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
     if (!hostaddr)
         return -1;
 
-    qmp_parameters_add_string(gc, &args, "driver", "xen-pci-passthrough");
+    libxl__qmp_param_add_string(gc, &args, "driver", "xen-pci-passthrough");
     QMP_PARAMETERS_SPRINTF(&args, "id", PCI_PT_QDEV_ID,
                            pcidev->bus, pcidev->dev, pcidev->func);
-    qmp_parameters_add_string(gc, &args, "hostaddr", hostaddr);
+    libxl__qmp_param_add_string(gc, &args, "hostaddr", hostaddr);
     if (pcidev->vdevfn) {
         QMP_PARAMETERS_SPRINTF(&args, "addr", "%x.%x",
                                PCI_SLOT(pcidev->vdevfn), PCI_FUNC(pcidev->vdevfn));
@@ -1016,7 +1013,7 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
      * reason to set the flag so this is ok.
      */
     if (pcidev->permissive)
-        qmp_parameters_add_bool(gc, &args, "permissive", true);
+        libxl__qmp_param_add_bool(gc, &args, "permissive", true);
 
     rc = qmp_synchronous_send(qmp, "device_add", args,
                               NULL, NULL, qmp->timeout);
@@ -1039,7 +1036,7 @@ static int qmp_device_del(libxl__gc *gc, int domid, char *id)
     if (!qmp)
         return ERROR_FAIL;
 
-    qmp_parameters_add_string(gc, &args, "id", id);
+    libxl__qmp_param_add_string(gc, &args, "id", id);
     rc = qmp_synchronous_send(qmp, "device_del", args,
                               NULL, NULL, qmp->timeout);
     if (rc == 0) {
@@ -1082,7 +1079,7 @@ int libxl__qmp_restore(libxl__gc *gc, int domid, const char *state_file)
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_string(gc, &args, "filename", state_file);
+    libxl__qmp_param_add_string(gc, &args, "filename", state_file);
 
     return qmp_run_command(gc, domid, "xen-load-devices-state", args,
                            NULL, NULL);
@@ -1094,10 +1091,10 @@ static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
     libxl__json_object *args = NULL;
     int rc = 0;
 
-    qmp_parameters_add_string(gc, &args, "device", device);
-    qmp_parameters_add_string(gc, &args, "target", target);
+    libxl__qmp_param_add_string(gc, &args, "device", device);
+    libxl__qmp_param_add_string(gc, &args, "target", target);
     if (arg) {
-        qmp_parameters_add_string(gc, &args, "arg", arg);
+        libxl__qmp_param_add_string(gc, &args, "arg", arg);
     }
 
     rc = qmp_synchronous_send(qmp, "change", args,
@@ -1115,7 +1112,7 @@ int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enable)
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_bool(gc, &args, "enable", enable);
+    libxl__qmp_param_add_bool(gc, &args, "enable", enable);
 
     return qmp_run_command(gc, domid, "xen-set-global-dirty-log", args,
                            NULL, NULL);
@@ -1132,8 +1129,8 @@ int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid,
     if (disk->format == LIBXL_DISK_FORMAT_EMPTY) {
         return qmp_run_command(gc, domid, "eject", args, NULL, NULL);
     } else {
-        qmp_parameters_add_string(gc, &args, "target", disk->pdev_path);
-        qmp_parameters_add_string(gc, &args, "arg",
+        libxl__qmp_param_add_string(gc, &args, "target", disk->pdev_path);
+        libxl__qmp_param_add_string(gc, &args, "arg",
             libxl__qemu_disk_format_string(disk->format));
         return qmp_run_command(gc, domid, "change", args, NULL, NULL);
     }
@@ -1143,7 +1140,7 @@ int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_integer(gc, &args, "id", idx);
+    libxl__qmp_param_add_integer(gc, &args, "id", idx);
 
     return qmp_run_command(gc, domid, "cpu-add", args, NULL, NULL);
 }
@@ -1201,10 +1198,10 @@ int libxl__qmp_nbd_server_start(libxl__gc *gc, int domid,
      *   }
      * }
      */
-    qmp_parameters_add_string(gc, &data, "host", host);
-    qmp_parameters_add_string(gc, &data, "port", port);
+    libxl__qmp_param_add_string(gc, &data, "host", host);
+    libxl__qmp_param_add_string(gc, &data, "port", port);
 
-    qmp_parameters_add_string(gc, &addr, "type", "inet");
+    libxl__qmp_param_add_string(gc, &addr, "type", "inet");
     qmp_parameters_common_add(gc, &addr, "data", data);
 
     qmp_parameters_common_add(gc, &args, "addr", addr);
@@ -1216,8 +1213,8 @@ int libxl__qmp_nbd_server_add(libxl__gc *gc, int domid, const char *disk)
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_string(gc, &args, "device", disk);
-    qmp_parameters_add_bool(gc, &args, "writable", true);
+    libxl__qmp_param_add_string(gc, &args, "device", disk);
+    libxl__qmp_param_add_bool(gc, &args, "writable", true);
 
     return qmp_run_command(gc, domid, "nbd-server-add", args, NULL, NULL);
 }
@@ -1226,8 +1223,8 @@ int libxl__qmp_start_replication(libxl__gc *gc, int domid, bool primary)
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_bool(gc, &args, "enable", true);
-    qmp_parameters_add_bool(gc, &args, "primary", primary);
+    libxl__qmp_param_add_bool(gc, &args, "enable", true);
+    libxl__qmp_param_add_bool(gc, &args, "primary", primary);
 
     return qmp_run_command(gc, domid, "xen-set-replication", args, NULL, NULL);
 }
@@ -1248,8 +1245,8 @@ int libxl__qmp_stop_replication(libxl__gc *gc, int domid, bool primary)
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_bool(gc, &args, "enable", false);
-    qmp_parameters_add_bool(gc, &args, "primary", primary);
+    libxl__qmp_param_add_bool(gc, &args, "enable", false);
+    libxl__qmp_param_add_bool(gc, &args, "primary", primary);
 
     return qmp_run_command(gc, domid, "xen-set-replication", args, NULL, NULL);
 }
@@ -1264,11 +1261,11 @@ int libxl__qmp_x_blockdev_change(libxl__gc *gc, int domid, const char *parent,
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_string(gc, &args, "parent", parent);
+    libxl__qmp_param_add_string(gc, &args, "parent", parent);
     if (child)
-        qmp_parameters_add_string(gc, &args, "child", child);
+        libxl__qmp_param_add_string(gc, &args, "child", child);
     if (node)
-        qmp_parameters_add_string(gc, &args, "node", node);
+        libxl__qmp_param_add_string(gc, &args, "node", node);
 
     return qmp_run_command(gc, domid, "x-blockdev-change", args, NULL, NULL);
 }
@@ -1305,7 +1302,7 @@ int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line,
 {
     libxl__json_object *args = NULL;
 
-    qmp_parameters_add_string(gc, &args, "command-line", command_line);
+    libxl__qmp_param_add_string(gc, &args, "command-line", command_line);
 
     return qmp_run_command(gc, domid, "human-monitor-command", args,
                            hmp_callback, output);
@@ -1442,7 +1439,7 @@ static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
      * the save operation is for a live migration rather than for taking a
      * snapshot. */
     if (qmp_ev_qemu_compare_version(ev, 2, 11, 0) >= 0)
-        qmp_parameters_add_bool(gc, &args, "live", dsps->live);
+        libxl__qmp_param_add_bool(gc, &args, "live", dsps->live);
     QMP_PARAMETERS_SPRINTF(&args, "filename", "/dev/fdset/%d", fdset);
     rc = libxl__ev_qmp_send(gc, ev, "xen-save-devices-state", args);
     if (rc)
