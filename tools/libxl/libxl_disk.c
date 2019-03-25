@@ -650,14 +650,17 @@ typedef struct {
     libxl__ev_devlock qmp_lock;
     int dm_ver;
     libxl__ev_time time;
+    libxl__ev_qmp qmp;
 } libxl__cdrom_insert_state;
 
 static void cdrom_insert_lock_acquired(libxl__egc *, libxl__ev_devlock *,
                                        int rc);
-static void cdrom_insert_ejected(libxl__egc *egc,
-                                 libxl__cdrom_insert_state *cis);
-static void cdrom_insert_inserted(libxl__egc *egc,
-                                  libxl__cdrom_insert_state *cis);
+static void cdrom_insert_ejected(libxl__egc *egc, libxl__ev_qmp *,
+                                 const libxl__json_object *, int rc);
+static void cdrom_insert_addfd_cb(libxl__egc *egc, libxl__ev_qmp *,
+                                  const libxl__json_object *, int rc);
+static void cdrom_insert_inserted(libxl__egc *egc, libxl__ev_qmp *,
+                                  const libxl__json_object *, int rc);
 static void cdrom_insert_timout(libxl__egc *egc, libxl__ev_time *ev,
                                 const struct timeval *requested_abs,
                                 int rc);
@@ -684,6 +687,10 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     cis->qmp_lock.ao = ao;
     cis->qmp_lock.domid = domid;
     libxl__ev_time_init(&cis->time);
+    libxl__ev_qmp_init(&cis->qmp);
+    cis->qmp.ao = ao;
+    cis->qmp.domid = domid;
+    cis->qmp.payload_fd = -1;
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
@@ -757,26 +764,22 @@ static void cdrom_insert_lock_acquired(libxl__egc *egc,
                                      LIBXL_HOTPLUG_TIMEOUT * 1000);
     if (rc) goto out;
 
-    /* We need to eject the original image first. This is implemented
-     * by inserting empty media. JSON is not updated.
+    /* We need to eject the original image first.
+     * JSON is not updated.
      */
 
     if (cis->dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-        libxl_device_disk disk_empty;
+        libxl__json_object *args = NULL;
+        int devid = libxl__device_disk_dev_number(cis->disk->vdev,
+                                                  NULL, NULL);
 
-        libxl_device_disk_init(&disk_empty);
-        disk_empty.format = LIBXL_DISK_FORMAT_EMPTY;
-        disk_empty.vdev = libxl__strdup(NOGC, cis->disk->vdev);
-        disk_empty.pdev_path = libxl__strdup(NOGC, "");
-        disk_empty.is_cdrom = 1;
-        libxl__device_disk_setdefault(gc, cis->domid, &disk_empty, false);
-
-        rc = libxl__qmp_insert_cdrom(gc, cis->domid, &disk_empty);
-        libxl_device_disk_dispose(&disk_empty);
+        QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", devid);
+        cis->qmp.callback = cdrom_insert_ejected;
+        rc = libxl__ev_qmp_send(gc, &cis->qmp, "eject", args);
         if (rc) goto out;
+    } else {
+        cdrom_insert_ejected(egc, &cis->qmp, NULL, 0); /* must be last */
     }
-
-    cdrom_insert_ejected(egc, cis); /* must be last */
     return;
 
 out:
@@ -784,10 +787,12 @@ out:
 }
 
 static void cdrom_insert_ejected(libxl__egc *egc,
-                                 libxl__cdrom_insert_state *cis)
+                                 libxl__ev_qmp *qmp,
+                                 const libxl__json_object *response,
+                                 int rc)
 {
     EGC_GC;
-    int rc;
+    libxl__cdrom_insert_state *cis = CONTAINER_OF(qmp, *cis, qmp);
     libxl__domain_userdata_lock *data_lock = NULL;
     libxl__device device;
     const char *be_path, *libxl_path;
@@ -795,12 +800,15 @@ static void cdrom_insert_ejected(libxl__egc *egc,
     xs_transaction_t t = XBT_NULL;
     char *tmp;
     libxl_domain_config d_config;
+    bool has_callback = false;
 
     /* convenience aliases */
     libxl_domid domid = cis->domid;
     libxl_device_disk *disk = cis->disk;
 
     libxl_domain_config_init(&d_config);
+
+    if (rc) goto out;
 
     rc = libxl__device_from_disk(gc, domid, disk, &device);
     if (rc) goto out;
@@ -857,9 +865,29 @@ static void cdrom_insert_ejected(libxl__egc *egc,
     rc = libxl__dm_check_start(gc, &d_config, domid);
     if (rc) goto out;
 
-    if (cis->dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-        rc = libxl__qmp_insert_cdrom(gc, domid, disk);
+    if (cis->dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN &&
+        disk->format != LIBXL_DISK_FORMAT_EMPTY) {
+        libxl__json_object *args = NULL;
+
+        assert(qmp->payload_fd == -1);
+        qmp->payload_fd = open(disk->pdev_path, O_RDONLY);
+        if (qmp->payload_fd < 0) {
+            LOGED(ERROR, domid, "Failed to open cdrom file %s",
+                  disk->pdev_path);
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
+        /* This free form parameter is not use by QEMU or libxl. */
+        QMP_PARAMETERS_SPRINTF(&args, "opaque", "%s:%s",
+                               libxl_disk_format_to_string(disk->format),
+                               disk->pdev_path);
+        qmp->callback = cdrom_insert_addfd_cb;
+        rc = libxl__ev_qmp_send(gc, qmp, "add-fd", args);
         if (rc) goto out;
+        has_callback = true;
+    } else {
+        has_callback = false;
     }
 
     rc = 0;
@@ -870,16 +898,58 @@ out:
     if (data_lock) libxl__unlock_domain_userdata(data_lock);
     if (rc) {
         cdrom_insert_done(egc, cis, rc); /* must be last */
-    } else {
-        cdrom_insert_inserted(egc, cis); /* must be last */
+    } else if (!has_callback) {
+        /* Only called if no asynchronous callback are set. */
+        cdrom_insert_inserted(egc, qmp, NULL, 0); /* must be last */
     }
 }
 
-static void cdrom_insert_inserted(libxl__egc *egc,
-                                  libxl__cdrom_insert_state *cis)
+static void cdrom_insert_addfd_cb(libxl__egc *egc,
+                                  libxl__ev_qmp *qmp,
+                                  const libxl__json_object *response,
+                                  int rc)
 {
     EGC_GC;
-    int rc;
+    libxl__cdrom_insert_state *cis = CONTAINER_OF(qmp, *cis, qmp);
+    libxl__json_object *args = NULL;
+    const libxl__json_object *o;
+    int devid;
+    int fdset;
+
+    /* convenience aliases */
+    libxl_device_disk *disk = cis->disk;
+
+    close(qmp->payload_fd);
+    qmp->payload_fd = -1;
+
+    if (rc) goto out;
+
+    o = libxl__json_map_get("fdset-id", response, JSON_INTEGER);
+    if (!o) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    fdset = libxl__json_object_get_integer(o);
+
+    devid = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
+    QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", devid);
+    QMP_PARAMETERS_SPRINTF(&args, "target", "/dev/fdset/%d", fdset);
+    libxl__qmp_param_add_string(gc, &args, "arg",
+        libxl__qemu_disk_format_string(disk->format));
+    qmp->callback = cdrom_insert_inserted;
+    rc = libxl__ev_qmp_send(gc, qmp, "change", args);
+out:
+    if (rc)
+        cdrom_insert_done(egc, cis, rc); /* must be last */
+}
+
+static void cdrom_insert_inserted(libxl__egc *egc,
+                                  libxl__ev_qmp *qmp,
+                                  const libxl__json_object *response,
+                                  int rc)
+{
+    EGC_GC;
+    libxl__cdrom_insert_state *cis = CONTAINER_OF(qmp, *cis, qmp);
     libxl__domain_userdata_lock *data_lock = NULL;
     libxl_domain_config d_config;
     flexarray_t *insert = NULL;
@@ -893,6 +963,8 @@ static void cdrom_insert_inserted(libxl__egc *egc,
     libxl_device_disk *disk = cis->disk;
 
     libxl_domain_config_init(&d_config);
+
+    if (rc) goto out;
 
     rc = libxl__device_from_disk(gc, domid, disk, &device);
     if (rc) goto out;
@@ -977,6 +1049,8 @@ static void cdrom_insert_done(libxl__egc *egc,
     EGC_GC;
 
     libxl__ev_time_deregister(gc, &cis->time);
+    libxl__ev_qmp_dispose(gc, &cis->qmp);
+    if (cis->qmp.payload_fd >= 0) close(cis->qmp.payload_fd);
     libxl__ev_devlock_unlock(gc, &cis->qmp_lock);
     libxl_device_disk_dispose(&cis->disk_saved);
     libxl__ao_complete(egc, cis->ao, rc);

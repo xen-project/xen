@@ -1118,24 +1118,6 @@ int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enable)
                            NULL, NULL);
 }
 
-int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid,
-                            const libxl_device_disk *disk)
-{
-    libxl__json_object *args = NULL;
-    int dev_number = libxl__device_disk_dev_number(disk->vdev, NULL, NULL);
-
-    QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", dev_number);
-
-    if (disk->format == LIBXL_DISK_FORMAT_EMPTY) {
-        return qmp_run_command(gc, domid, "eject", args, NULL, NULL);
-    } else {
-        libxl__qmp_param_add_string(gc, &args, "target", disk->pdev_path);
-        libxl__qmp_param_add_string(gc, &args, "arg",
-            libxl__qemu_disk_format_string(disk->format));
-        return qmp_run_command(gc, domid, "change", args, NULL, NULL);
-    }
-}
-
 int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
 {
     libxl__json_object *args = NULL;
