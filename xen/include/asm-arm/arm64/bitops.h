@@ -24,12 +24,13 @@ static /*__*/always_inline unsigned long __ffs(unsigned long word)
 
 static inline int flsl(unsigned long x)
 {
-        int ret;
+        uint64_t ret;
 
         if (__builtin_constant_p(x))
                return generic_flsl(x);
 
         asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
+
         return BITS_PER_LONG - ret;
 }
 
