@@ -2,6 +2,12 @@
 
 $CC --version
 
+# Express the compiler version as an integer.  e.g. GCC 4.9.2 => 0x040902
+cc-ver()
+{
+    $CC -dumpversion | awk -F. '{ printf "0x%02x%02x%02x", $1, $2, $3 }'
+}
+
 # random config or default config
 if [[ "${RANDCONFIG}" == "y" ]]; then
     make -C xen KCONFIG_ALLCONFIG=tools/kconfig/allrandom.config randconfig
@@ -20,6 +26,16 @@ if [[ "${CC}" == "clang" ]]; then
     cfgargs+=("--with-system-ipxe=/usr/lib/ipxe/ipxe.pxe")
     # newlib cannot be built with clang so we cannot build stubdoms
     cfgargs+=("--disable-stubdom")
+fi
+
+# Qemu requires Python 2.7 or later
+if python -c "import sys; res = sys.version_info < (2, 7); exit(not(res))"; then
+    cfgargs+=("--with-system-qemu=/bin/false")
+fi
+
+# SeaBIOS requires GCC 4.6 or later
+if [[ "${CC}" == "gcc" && `cc-ver` -lt 0x040600 ]]; then
+    cfgargs+=("--with-system-seabios=/bin/false")
 fi
 
 ./configure "${cfgargs[@]}"

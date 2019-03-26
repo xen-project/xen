@@ -15,6 +15,7 @@ die() {
 #
 BASE="registry.gitlab.com/xen-project/xen"
 case "_${CONTAINER}" in
+    _centos6) CONTAINER="${BASE}/centos:6" ;;
     _centos7) CONTAINER="${BASE}/centos:7" ;;
     _centos72) CONTAINER="${BASE}/centos:7.2" ;;
     _trusty) CONTAINER="${BASE}/ubuntu:trusty" ;;
