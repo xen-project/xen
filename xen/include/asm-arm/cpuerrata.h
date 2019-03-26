@@ -14,7 +14,7 @@ static inline bool check_workaround_##erratum(void)             \
         return false;                                           \
     else                                                        \
     {                                                           \
-        bool ret;                                               \
+        register_t ret;                                         \
                                                                 \
         asm volatile (ALTERNATIVE("mov %0, #0",                 \
                                   "mov %0, #1",                 \
