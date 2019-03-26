@@ -67,7 +67,7 @@ static inline bool cpus_have_cap(unsigned int num)
 
 /* System capability check for constant cap */
 #define cpus_have_const_cap(num) ({                 \
-        bool __ret;                                 \
+        register_t __ret;                           \
                                                     \
         asm volatile (ALTERNATIVE("mov %0, #0",     \
                                   "mov %0, #1",     \
