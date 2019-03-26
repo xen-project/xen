@@ -54,7 +54,8 @@
  * that both the kernel half of struct cpu_user_regs (which is pushed in
  * entry.S) and struct cpu_info (which lives at the bottom of a Xen
  * stack) must be doubleword-aligned in size.  */
-static inline void check_stack_alignment_constraints(void) {
+static void __init __maybe_unused build_assertions(void)
+{
 #ifdef CONFIG_ARM_64
     BUILD_BUG_ON((sizeof (struct cpu_user_regs)) & 0xf);
     BUILD_BUG_ON((offsetof(struct cpu_user_regs, spsr_el1)) & 0xf);
