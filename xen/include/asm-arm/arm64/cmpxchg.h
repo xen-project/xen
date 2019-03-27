@@ -63,8 +63,9 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 
 extern void __bad_cmpxchg(volatile void *ptr, int size);
 
-static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
-				      unsigned long new, int size)
+static always_inline unsigned long __cmpxchg(volatile void *ptr,
+					     unsigned long old,
+					     unsigned long new, int size)
 {
 	unsigned long oldval = 0, res;
 
@@ -137,8 +138,9 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	return oldval;
 }
 
-static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
-					 unsigned long new, int size)
+static always_inline unsigned long __cmpxchg_mb(volatile void *ptr,
+						unsigned long old,
+						unsigned long new, int size)
 {
 	unsigned long ret;
 
