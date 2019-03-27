@@ -12,7 +12,7 @@
  */
 
 #ifndef __ASM_ARM_PLATFORMS_ZYNQMP_H
-#define __ASM_ASM_PLATFORMS_ZYNQMP_H
+#define __ASM_ARM_PLATFORMS_ZYNQMP_H
 
 #include <asm/processor.h>
 #include <asm/smccc.h>
