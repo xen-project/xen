@@ -325,7 +325,7 @@ static unsigned int get_top_bit(struct domain *d, vaddr_t gva, register_t tcr)
      */
     if ( is_32bit_domain(d) )
         topbit = 31;
-    else if ( is_64bit_domain(d) )
+    else
     {
         if ( ((gva & BIT_ULL(55)) && (tcr & TCR_EL1_TBI1)) ||
              (!(gva & BIT_ULL(55)) && (tcr & TCR_EL1_TBI0)) )
