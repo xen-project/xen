@@ -40,21 +40,25 @@ static bool nvmx_vcpu_in_vmx(const struct vcpu *v)
 
 int nvmx_cpu_up_prepare(unsigned int cpu)
 {
-    if ( per_cpu(vvmcs_buf, cpu) != NULL )
-        return 0;
+    uint64_t **vvmcs_buf;
 
-    per_cpu(vvmcs_buf, cpu) = xzalloc_array(u64, VMCS_BUF_SIZE);
+    if ( cpu_has_vmx_vmcs_shadowing &&
+         (vvmcs_buf = &per_cpu(vvmcs_buf, cpu)) == NULL )
+    {
+        void *ptr = xzalloc_array(uint64_t, VMCS_BUF_SIZE);
 
-    if ( per_cpu(vvmcs_buf, cpu) != NULL )
-        return 0;
+        if ( !ptr )
+            return -ENOMEM;
 
-    return -ENOMEM;
+        *vvmcs_buf = ptr;
+    }
+
+    return 0;
 }
 
 void nvmx_cpu_dead(unsigned int cpu)
 {
-    xfree(per_cpu(vvmcs_buf, cpu));
-    per_cpu(vvmcs_buf, cpu) = NULL;
+    XFREE(per_cpu(vvmcs_buf, cpu));
 }
 
 int nvmx_vcpu_initialise(struct vcpu *v)
