@@ -47,7 +47,7 @@ static int __p2m_get_mem_access(struct domain *d, gfn_t gfn,
     };
 
     ASSERT(p2m_is_locked(p2m));
-    *access = p2m->default_access;
+    *access = memaccess[p2m->default_access];
 
     /* If no setting was ever set, just return rwx. */
     if ( !p2m->mem_access_enabled )
