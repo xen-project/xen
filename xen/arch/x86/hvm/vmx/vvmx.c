@@ -920,8 +920,8 @@ static void vvmcs_to_shadow_bulk(struct vcpu *v, unsigned int n,
 
     if ( !value || n > VMCS_BUF_SIZE )
     {
-        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, \
-                 buffer: %p, buffer size: %d, fields number: %d.\n",
+        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, "
+                 "buffer: %p, buffer size: %d, fields number: %d.\n",
                  value, VMCS_BUF_SIZE, n);
         goto fallback;
     }
@@ -960,8 +960,8 @@ static void shadow_to_vvmcs_bulk(struct vcpu *v, unsigned int n,
 
     if ( !value || n > VMCS_BUF_SIZE )
     {
-        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, \
-                 buffer: %p, buffer size: %d, fields number: %d.\n",
+        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, "
+                 "buffer: %p, buffer size: %d, fields number: %d.\n",
                  value, VMCS_BUF_SIZE, n);
         goto fallback;
     }
