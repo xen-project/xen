@@ -114,6 +114,48 @@ long cpu_down_helper(void *data)
     return ret;
 }
 
+static long smt_up_down_helper(void *data)
+{
+    bool up = (bool)data;
+    unsigned int cpu, sibling_mask = boot_cpu_data.x86_num_siblings - 1;
+    int ret = 0;
+
+    opt_smt = up;
+
+    for_each_present_cpu ( cpu )
+    {
+        /* Skip primary siblings (those whose thread id is 0). */
+        if ( !(x86_cpu_to_apicid[cpu] & sibling_mask) )
+            continue;
+
+        ret = up ? cpu_up_helper(_p(cpu))
+                 : cpu_down_helper(_p(cpu));
+
+        if ( ret && ret != -EEXIST )
+            break;
+
+        /*
+         * Ensure forward progress by only considering preemption when we have
+         * changed the state of one or more cpus.
+         */
+        if ( ret != -EEXIST && general_preempt_check() )
+        {
+            /* In tasklet context - can't create a contination. */
+            ret = -EBUSY;
+            break;
+        }
+
+        ret = 0; /* Avoid exiting with -EEXIST in the success case. */
+    }
+
+    if ( !ret )
+        printk(XENLOG_INFO "SMT %s - online CPUs 0x%*pb\n",
+               up ? "enabled" : "disabled",
+               nr_cpu_ids, cpumask_bits(&cpu_online_map));
+
+    return ret;
+}
+
 void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
 {
     memcpy(pi->hw_cap, boot_cpu_data.x86_capability,
@@ -137,11 +179,12 @@ long arch_do_sysctl(
     case XEN_SYSCTL_cpu_hotplug:
     {
         unsigned int cpu = sysctl->u.cpu_hotplug.cpu;
+        unsigned int op  = sysctl->u.cpu_hotplug.op;
         bool plug;
         long (*fn)(void *);
         void *hcpu;
 
-        switch ( sysctl->u.cpu_hotplug.op )
+        switch ( op )
         {
         case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
             plug = true;
@@ -153,6 +196,18 @@ long arch_do_sysctl(
             plug = false;
             fn = cpu_down_helper;
             hcpu = _p(cpu);
+            break;
+
+        case XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE:
+        case XEN_SYSCTL_CPU_HOTPLUG_SMT_DISABLE:
+            if ( !cpu_has_htt || boot_cpu_data.x86_num_siblings < 2 )
+            {
+                ret = -EOPNOTSUPP;
+                break;
+            }
+            plug = op == XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE;
+            fn = smt_up_down_helper;
+            hcpu = _p(plug);
             break;
 
         default:

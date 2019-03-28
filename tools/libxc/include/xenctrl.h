@@ -1854,6 +1854,8 @@ int xc_pm_reset_cxstat(xc_interface *xch, int cpuid);
 
 int xc_cpu_online(xc_interface *xch, int cpu);
 int xc_cpu_offline(xc_interface *xch, int cpu);
+int xc_smt_enable(xc_interface *xch);
+int xc_smt_disable(xc_interface *xch);
 
 /* 
  * cpufreq para name of this structure named 

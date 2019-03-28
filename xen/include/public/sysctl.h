@@ -246,8 +246,27 @@ struct xen_sysctl_get_pmstat {
 struct xen_sysctl_cpu_hotplug {
     /* IN variables */
     uint32_t cpu;   /* Physical cpu. */
+
+    /* Single CPU enable/disable. */
 #define XEN_SYSCTL_CPU_HOTPLUG_ONLINE  0
 #define XEN_SYSCTL_CPU_HOTPLUG_OFFLINE 1
+
+    /*
+     * SMT enable/disable.
+     *
+     * These two ops loop over all present CPUs, and either online or offline
+     * every non-primary sibling thread (those with a thread id which is not
+     * 0).  This behaviour is chosen to simplify the implementation.
+     *
+     * They are intended as a shorthand for identifying and feeding the cpu
+     * numbers individually to HOTPLUG_{ON,OFF}LINE.
+     *
+     * These are not expected to be used in conjunction with debugging options
+     * such as `maxcpus=` or when other manual configuration of offline cpus
+     * is in use.
+     */
+#define XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE  2
+#define XEN_SYSCTL_CPU_HOTPLUG_SMT_DISABLE 3
     uint32_t op;    /* hotplug opcode */
 };
 

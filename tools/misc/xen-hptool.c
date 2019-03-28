@@ -19,6 +19,8 @@ void show_help(void)
             "  mem-online    <mfn>      online MEMORY <mfn>\n"
             "  mem-offline   <mfn>      offline MEMORY <mfn>\n"
             "  mem-status    <mfn>      query Memory status<mfn>\n"
+            "  smt-enable               onlines all SMT threads\n"
+            "  smt-disable              offlines all SMT threads\n"
            );
 }
 
@@ -304,6 +306,58 @@ static int hp_cpu_offline_func(int argc, char *argv[])
     return ret;
 }
 
+static int main_smt_enable(int argc, char *argv[])
+{
+    int ret;
+
+    if ( argc )
+    {
+        show_help();
+        return -1;
+    }
+
+    for ( ;; )
+    {
+        ret = xc_smt_enable(xch);
+        if ( (ret >= 0) || (errno != EBUSY) )
+            break;
+    }
+
+    if ( ret < 0 )
+        fprintf(stderr, "Unable to enable SMT: errno %d, %s\n",
+                errno, strerror(errno));
+    else
+        printf("Enabled SMT\n");
+
+    return ret;
+}
+
+static int main_smt_disable(int argc, char *argv[])
+{
+    int ret;
+
+    if ( argc )
+    {
+        show_help();
+        return -1;
+    }
+
+    for ( ;; )
+    {
+        ret = xc_smt_disable(xch);
+        if ( (ret >= 0) || (errno != EBUSY) )
+            break;
+    }
+
+    if ( ret < 0 )
+        fprintf(stderr, "Unable to disable SMT: errno %d, %s\n",
+                errno, strerror(errno));
+    else
+        printf("Disabled SMT\n");
+
+    return ret;
+}
+
 struct {
     const char *name;
     int (*function)(int argc, char *argv[]);
@@ -314,6 +368,8 @@ struct {
     { "mem-status", hp_mem_query_func},
     { "mem-online", hp_mem_online_func},
     { "mem-offline", hp_mem_offline_func},
+    { "smt-enable", main_smt_enable },
+    { "smt-disable", main_smt_disable },
 };
 
 

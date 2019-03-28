@@ -46,3 +46,29 @@ int xc_cpu_offline(xc_interface *xch, int cpu)
     return ret;
 }
 
+int xc_smt_enable(xc_interface *xch)
+{
+    DECLARE_SYSCTL;
+    int ret;
+
+    sysctl.cmd = XEN_SYSCTL_cpu_hotplug;
+    sysctl.u.cpu_hotplug.cpu = 0;
+    sysctl.u.cpu_hotplug.op = XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE;
+    ret = xc_sysctl(xch, &sysctl);
+
+    return ret;
+}
+
+int xc_smt_disable(xc_interface *xch)
+{
+    DECLARE_SYSCTL;
+    int ret;
+
+    sysctl.cmd = XEN_SYSCTL_cpu_hotplug;
+    sysctl.u.cpu_hotplug.cpu = 0;
+    sysctl.u.cpu_hotplug.op = XEN_SYSCTL_CPU_HOTPLUG_SMT_DISABLE;
+    ret = xc_sysctl(xch, &sysctl);
+
+    return ret;
+}
+
