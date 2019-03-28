@@ -739,8 +739,7 @@ int __init dom0_construct_pv(struct domain *d,
             rc = -EINVAL;
             goto out;
         }
-        hypercall_page_initialise(
-            d, (void *)(unsigned long)parms.virt_hypercall);
+        init_hypercall_page(d, _p(parms.virt_hypercall));
     }
 
     /* Free temporary buffers. */

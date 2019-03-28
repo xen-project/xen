@@ -3807,13 +3807,11 @@ static void hvm_latch_shinfo_size(struct domain *d)
     }
 }
 
-/* Initialise a hypercall transfer page for a VMX domain using
-   paravirtualised drivers. */
-void hvm_hypercall_page_initialise(struct domain *d,
-                                   void *hypercall_page)
+void hvm_init_hypercall_page(struct domain *d, void *ptr)
 {
     hvm_latch_shinfo_size(d);
-    alternative_vcall(hvm_funcs.init_hypercall_page, d, hypercall_page);
+
+    alternative_vcall(hvm_funcs.init_hypercall_page, ptr);
 }
 
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)

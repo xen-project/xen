@@ -30,8 +30,8 @@ extern const hypercall_table_t pv_hypercall_table[];
 void pv_hypercall(struct cpu_user_regs *regs);
 #endif
 
-void hypercall_page_initialise_ring3_kernel(void *hypercall_page);
-void hypercall_page_initialise_ring1_kernel(void *hypercall_page);
+void pv_ring1_init_hypercall_page(void *ptr);
+void pv_ring3_init_hypercall_page(void *ptr);
 
 /*
  * Both do_mmuext_op() and do_mmu_update():

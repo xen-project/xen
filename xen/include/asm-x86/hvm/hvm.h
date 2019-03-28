@@ -152,7 +152,7 @@ struct hvm_function_table {
 
     void (*inject_event)(const struct x86_event *event);
 
-    void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
+    void (*init_hypercall_page)(void *ptr);
 
     bool (*event_pending)(const struct vcpu *v);
     bool (*get_pending_event)(struct vcpu *v, struct x86_event *info);
@@ -272,7 +272,7 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 enum hvm_intblk
 hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack);
 
-void hvm_hypercall_page_initialise(struct domain *d, void *hypercall_page);
+void hvm_init_hypercall_page(struct domain *d, void *ptr);
 
 void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
                               struct segment_register *reg);

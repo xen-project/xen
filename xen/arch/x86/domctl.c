@@ -517,7 +517,7 @@ long arch_do_domctl(
         }
 
         hypercall_page = __map_domain_page(page);
-        hypercall_page_initialise(d, hypercall_page);
+        init_hypercall_page(d, hypercall_page);
         unmap_domain_page(hypercall_page);
 
         put_page_and_type(page);

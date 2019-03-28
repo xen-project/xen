@@ -175,6 +175,20 @@ static void noreturn continue_idle_domain(struct vcpu *v)
     reset_stack_and_jump(idle_loop);
 }
 
+void init_hypercall_page(struct domain *d, void *ptr)
+{
+    memset(ptr, 0xcc, PAGE_SIZE);
+
+    if ( is_hvm_domain(d) )
+        hvm_init_hypercall_page(d, ptr);
+    else if ( is_pv_64bit_domain(d) )
+        pv_ring3_init_hypercall_page(ptr);
+    else if ( is_pv_32bit_domain(d) )
+        pv_ring1_init_hypercall_page(ptr);
+    else
+        ASSERT_UNREACHABLE();
+}
+
 void dump_pageframe_info(struct domain *d)
 {
     struct page_info *page;

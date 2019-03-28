@@ -83,7 +83,7 @@ void cpuid_policy_updated(struct vcpu *v);
  * Initialise a hypercall-transfer page. The given pointer must be mapped
  * in Xen virtual address space (accesses are not validated or checked).
  */
-void hypercall_page_initialise(struct domain *d, void *);
+void init_hypercall_page(struct domain *d, void *);
 
 /************************************************/
 /*          shadow paging extension             */
