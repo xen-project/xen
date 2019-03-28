@@ -21,6 +21,19 @@ configure the system.
   admin-guide/index
 
 
+Guest documentation
+-------------------
+
+This documentation concerns the APIs and ABIs available to guests.  It is
+intended for OS developers trying to use a Xen feature, and for Xen developers
+to avoid breaking things.
+
+.. toctree::
+  :maxdepth: 3
+
+  guest-guide/index
+
+
 Hypervisor developer documentation
 ----------------------------------
 
