@@ -137,27 +137,35 @@ long arch_do_sysctl(
     case XEN_SYSCTL_cpu_hotplug:
     {
         unsigned int cpu = sysctl->u.cpu_hotplug.cpu;
+        bool plug;
+        long (*fn)(void *);
+        void *hcpu;
 
         switch ( sysctl->u.cpu_hotplug.op )
         {
         case XEN_SYSCTL_CPU_HOTPLUG_ONLINE:
-            ret = xsm_resource_plug_core(XSM_HOOK);
-            if ( ret )
-                break;
-            ret = continue_hypercall_on_cpu(
-                0, cpu_up_helper, (void *)(unsigned long)cpu);
+            plug = true;
+            fn = cpu_up_helper;
+            hcpu = _p(cpu);
             break;
+
         case XEN_SYSCTL_CPU_HOTPLUG_OFFLINE:
-            ret = xsm_resource_unplug_core(XSM_HOOK);
-            if ( ret )
-                break;
-            ret = continue_hypercall_on_cpu(
-                0, cpu_down_helper, (void *)(unsigned long)cpu);
+            plug = false;
+            fn = cpu_down_helper;
+            hcpu = _p(cpu);
             break;
+
         default:
-            ret = -EINVAL;
+            ret = -EOPNOTSUPP;
             break;
         }
+
+        if ( !ret )
+            ret = plug ? xsm_resource_plug_core(XSM_HOOK)
+                       : xsm_resource_unplug_core(XSM_HOOK);
+
+        if ( !ret )
+            ret = continue_hypercall_on_cpu(0, fn, hcpu);
     }
     break;
 
