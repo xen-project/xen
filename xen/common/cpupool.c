@@ -236,10 +236,8 @@ static struct cpupool *cpupool_create(
     {
         if ( (*q)->cpupool_id == poolid )
         {
-            spin_unlock(&cpupool_lock);
-            free_cpupool_struct(c);
             *perr = -EEXIST;
-            return NULL;
+            goto err;
         }
         c->next = *q;
     }
@@ -253,11 +251,7 @@ static struct cpupool *cpupool_create(
     {
         c->sched = scheduler_alloc(sched_id, perr);
         if ( c->sched == NULL )
-        {
-            spin_unlock(&cpupool_lock);
-            free_cpupool_struct(c);
-            return NULL;
-        }
+            goto err;
     }
     c->gran = opt_sched_granularity;
 
@@ -270,6 +264,11 @@ static struct cpupool *cpupool_create(
 
     *perr = 0;
     return c;
+
+ err:
+    spin_unlock(&cpupool_lock);
+    free_cpupool_struct(c);
+    return NULL;
 }
 /*
  * destroys the given cpupool
