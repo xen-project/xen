@@ -615,6 +615,22 @@ static void migrate_timers_from_cpu(unsigned int old_cpu)
  */
 static struct timer *dummy_heap[1];
 
+static void free_percpu_timers(unsigned int cpu)
+{
+    struct timers *ts = &per_cpu(timers, cpu);
+
+    migrate_timers_from_cpu(cpu);
+
+    ASSERT(heap_metadata(ts->heap)->size == 0);
+    if ( heap_metadata(ts->heap)->limit )
+    {
+        xfree(ts->heap);
+        ts->heap = dummy_heap;
+    }
+    else
+        ASSERT(ts->heap == dummy_heap);
+}
+
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -628,10 +644,19 @@ static int cpu_callback(
         spin_lock_init(&ts->lock);
         ts->heap = dummy_heap;
         break;
+
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        migrate_timers_from_cpu(cpu);
+    case CPU_RESUME_FAILED:
+        if ( !park_offline_cpus && system_state != SYS_STATE_suspend )
+            free_percpu_timers(cpu);
         break;
+
+    case CPU_REMOVE:
+        if ( park_offline_cpus )
+            free_percpu_timers(cpu);
+        break;
+
     default:
         break;
     }
