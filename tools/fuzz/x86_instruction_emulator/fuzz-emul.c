@@ -708,7 +708,6 @@ enum {
     HOOK_vmfunc,
     CANONICALIZE_rip,
     CANONICALIZE_rsp,
-    CANONICALIZE_rbp
 };
 
 /* Expects bitmap to be defined */
@@ -785,9 +784,13 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
     regs->error_code = 0;
     regs->entry_vector = 0;
 
+    /*
+     * For both RIP and RSP make sure we test with canonical values in at
+     * least a fair number of cases. As all other registers aren't tied to
+     * special addressing purposes, leave everything else alone.
+     */
     CANONICALIZE_MAYBE(rip);
     CANONICALIZE_MAYBE(rsp);
-    CANONICALIZE_MAYBE(rbp);
 
     /*
      * CR0.PG can't be set if CR0.PE isn't set.  Set is more interesting, so
