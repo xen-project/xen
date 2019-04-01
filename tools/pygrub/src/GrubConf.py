@@ -233,7 +233,11 @@ class _GrubConfigFile(object):
         if val == "saved":
             self._default = 0
         else:
-            self._default = val
+            try:
+                self._default = int(val)
+            except ValueError:
+                logging.warning("Invalid value %s, setting default to 0" %(val,))
+                self._default = 0
 
         if self._default < 0:
             raise ValueError("default must be non-negative number")
