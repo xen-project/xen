@@ -276,7 +276,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
      * Initialize affinity settings. The idler, and potentially
      * domain-0 VCPUs, are pinned onto their respective physical CPUs.
      */
-    if ( is_idle_domain(d) || d->is_pinned )
+    if ( is_idle_domain(d) || (is_hardware_domain(d) && opt_dom0_vcpus_pin) )
         sched_set_affinity(v, cpumask_of(processor), &cpumask_all);
     else
         sched_set_affinity(v, &cpumask_all, &cpumask_all);
@@ -957,9 +957,6 @@ int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity)
 {
     cpumask_t online_affinity;
     cpumask_t *online;
-
-    if ( v->domain->is_pinned )
-        return -EINVAL;
 
     online = VCPU2ONLINE(v);
     cpumask_and(&online_affinity, affinity, online);

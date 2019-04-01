@@ -1017,7 +1017,7 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
              boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
             break;
-        if ( !is_hardware_domain(currd) || !is_pinned_vcpu(curr) )
+        if ( !is_hwdom_pinned_vcpu(curr) )
             return X86EMUL_OKAY;
         if ( (rdmsr_safe(MSR_AMD64_NB_CFG, temp) != 0) ||
              ((val ^ temp) & ~(1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT)) )
@@ -1030,7 +1030,7 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
              boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
             break;
-        if ( !is_hardware_domain(currd) || !is_pinned_vcpu(curr) )
+        if ( !is_hwdom_pinned_vcpu(curr) )
             return X86EMUL_OKAY;
         if ( rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, temp) != 0 )
             break;
@@ -1050,7 +1050,7 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_IA32_UCODE_REV:
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
             break;
-        if ( !is_hardware_domain(currd) || !is_pinned_vcpu(curr) )
+        if ( !is_hwdom_pinned_vcpu(curr) )
             return X86EMUL_OKAY;
         if ( rdmsr_safe(reg, temp) )
             break;
@@ -1086,8 +1086,7 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_IA32_ENERGY_PERF_BIAS:
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
             break;
-        if ( !is_hardware_domain(currd) || !is_pinned_vcpu(curr) ||
-             wrmsr_safe(reg, val) == 0 )
+        if ( !is_hwdom_pinned_vcpu(curr) || wrmsr_safe(reg, val) == 0 )
             return X86EMUL_OKAY;
         break;
 

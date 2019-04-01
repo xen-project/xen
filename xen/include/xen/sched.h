@@ -381,8 +381,6 @@ struct domain
     bool             is_console;
     /* Is this a xenstore domain (not dom0)? */
     bool             is_xenstore;
-    /* Domain's VCPUs are pinned 1:1 to physical CPUs? */
-    bool             is_pinned;
     /* Non-migratable and non-restoreable? */
     bool             disable_migrate;
     /* Is this guest being debugged by dom0? */
@@ -961,8 +959,12 @@ static inline bool is_hvm_vcpu(const struct vcpu *v)
     return is_hvm_domain(v->domain);
 }
 
-#define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
-                           cpumask_weight((v)->cpu_hard_affinity) == 1)
+static inline bool is_hwdom_pinned_vcpu(const struct vcpu *v)
+{
+    return (is_hardware_domain(v->domain) &&
+            cpumask_weight(v->cpu_hard_affinity) == 1);
+}
+
 #ifdef CONFIG_HAS_PASSTHROUGH
 #define has_iommu_pt(d) (dom_iommu(d)->status != IOMMU_STATUS_disabled)
 #define need_iommu_pt_sync(d) (dom_iommu(d)->need_sync)

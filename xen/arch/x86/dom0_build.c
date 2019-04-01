@@ -213,7 +213,7 @@ struct vcpu *__init dom0_setup_vcpu(struct domain *d,
         }
         else
         {
-            if ( !d->is_pinned && !dom0_affinity_relaxed )
+            if ( !opt_dom0_vcpus_pin && !dom0_affinity_relaxed )
                 sched_set_affinity(v, &dom0_cpus, NULL);
             sched_set_affinity(v, NULL, &dom0_cpus);
         }
