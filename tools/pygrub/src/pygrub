@@ -457,7 +457,10 @@ class Grub:
         # limit read size to avoid pathological cases
         buf = f.read(FS_READ_MAX)
         del f
-        self.cf.parse(buf)
+        if sys.version_info[0] < 3:
+            self.cf.parse(buf)
+        else:
+            self.cf.parse(buf.decode())
 
     def image_index(self):
         if isinstance(self.cf.default, int):
@@ -960,5 +963,8 @@ if __name__ == "__main__":
         ostring = format_simple(bootcfg["kernel"], bootcfg["ramdisk"], args, "\0")
 
     sys.stdout.flush()
-    os.write(fd, ostring)
+    if sys.version_info[0] < 3:
+        os.write(fd, ostring)
+    else:
+        os.write(fd, ostring.encode())
     
