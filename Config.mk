@@ -275,15 +275,15 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 MINIOS_UPSTREAM_URL ?= git://xenbits.xen.org/mini-os.git
 endif
 OVMF_UPSTREAM_REVISION ?= ef529e6ab7c31290a33045bb1f1837447cc0eb56
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.12.0-rc1
-MINIOS_UPSTREAM_REVISION ?= xen-4.12.0-rc1
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.12.0
+MINIOS_UPSTREAM_REVISION ?= xen-RELEASE-4.12.0
 
 SEABIOS_UPSTREAM_REVISION ?= rel-1.12.0
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
 
-QEMU_TRADITIONAL_REVISION ?= xen-4.12.0-rc1
+QEMU_TRADITIONAL_REVISION ?= xen-4.12.0
 # Wed Oct 10 18:52:54 2018 +0000
 # xen/pt: allow QEMU to request MSI unmasking at bind time
 
