@@ -893,17 +893,6 @@ static int read_msr(unsigned int reg, uint64_t *val,
         *val = 0;
         return X86EMUL_OKAY;
 
-    case MSR_IA32_UCODE_REV:
-        BUILD_BUG_ON(MSR_IA32_UCODE_REV != MSR_AMD_PATCHLEVEL);
-        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        {
-            if ( wrmsr_safe(MSR_IA32_UCODE_REV, 0) )
-                break;
-            /* As documented in the SDM: Do a CPUID 1 here */
-            cpuid_eax(1);
-        }
-        goto normal;
-
     case MSR_IA32_MISC_ENABLE:
         rdmsrl(reg, *val);
         *val = guest_misc_enable(*val);
@@ -1046,17 +1035,6 @@ static int write_msr(unsigned int reg, uint64_t val,
         if ( wrmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, val) == 0 )
             return X86EMUL_OKAY;
         break;
-
-    case MSR_IA32_UCODE_REV:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
-            break;
-        if ( !is_hwdom_pinned_vcpu(curr) )
-            return X86EMUL_OKAY;
-        if ( rdmsr_safe(reg, temp) )
-            break;
-        if ( val )
-            goto invalid;
-        return X86EMUL_OKAY;
 
     case MSR_IA32_MISC_ENABLE:
         rdmsrl(reg, temp);
