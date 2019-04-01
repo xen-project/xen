@@ -1,6 +1,9 @@
 #!/usr/bin/python
 
+from __future__ import print_function
+
 import sys,os
+from functools import reduce
 
 import idl
 
@@ -78,7 +81,7 @@ def ocaml_type_of(ty):
     elif isinstance(ty,idl.Array):
         return "%s array" % ocaml_type_of(ty.elem_type)
     elif isinstance(ty,idl.Builtin):
-        if not builtins.has_key(ty.typename):
+        if ty.typename not in builtins:
             raise NotImplementedError("Unknown Builtin %s (%s)" % (ty.typename, type(ty)))
         typename,_,_ = builtins[ty.typename]
         if not typename:
@@ -251,7 +254,7 @@ def gen_ocaml_ml(ty, interface, indent=""):
             else:
                 s += "\texternal default : ctx -> %sunit -> t = \"stub_libxl_%s_init\"\n" % (union_args, ty.rawname)
 
-        if functions.has_key(ty.rawname):
+        if ty.rawname in functions:
             for name,args in functions[ty.rawname]:
                 s += "\texternal %s : " % name
                 s += " -> ".join(args)
@@ -278,7 +281,7 @@ def c_val(ty, c, o, indent="", parent = None):
         else:
             s += "%s = Int_val(%s);" % (c, o)
     elif isinstance(ty,idl.Builtin):
-        if not builtins.has_key(ty.typename):
+        if ty.typename not in builtins:
             raise NotImplementedError("Unknown Builtin %s (%s)" % (ty.typename, type(ty)))
         _,fn,_ = builtins[ty.typename]
         if not fn:
@@ -375,7 +378,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         else:
             s += "%s = Val_int(%s);" % (o, c)
     elif isinstance(ty,idl.Builtin):
-        if not builtins.has_key(ty.typename):
+        if ty.typename not in builtins:
             raise NotImplementedError("Unknown Builtin %s (%s)" % (ty.typename, type(ty)))
         _,_,fn = builtins[ty.typename]
         if not fn:
@@ -520,7 +523,7 @@ def autogen_header(open_comment, close_comment):
 
 if __name__ == '__main__':
     if len(sys.argv) < 4:
-        print >>sys.stderr, "Usage: genwrap.py <idl> <mli> <ml> <c-inc>"
+        print("Usage: genwrap.py <idl> <mli> <ml> <c-inc>", file=sys.stderr)
         sys.exit(1)
 
     (_,types) = idl.parse(sys.argv[1])
@@ -533,7 +536,7 @@ if __name__ == '__main__':
 
     for t in blacklist:
         if t not in [ty.rawname for ty in types]:
-            print "unknown type %s in blacklist" % t
+            print("unknown type %s in blacklist" % t)
 
     types = [ty for ty in types if not ty.rawname in blacklist]
 
@@ -564,7 +567,7 @@ if __name__ == '__main__':
             cinc.write("\n")
         cinc.write(gen_Val_ocaml(ty))
         cinc.write("\n")
-        if functions.has_key(ty.rawname):
+        if ty.rawname in functions:
             cinc.write(gen_c_stub_prototype(ty, functions[ty.rawname]))
             cinc.write("\n")
         if ty.init_fn is not None:
