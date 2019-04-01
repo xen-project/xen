@@ -236,7 +236,7 @@ class _GrubConfigFile(object):
             self._default = val
 
         if self._default < 0:
-            raise ValueError("default must be positive number")
+            raise ValueError("default must be non-negative number")
     default = property(_get_default, _set_default)
 
     def set_splash(self, val):
