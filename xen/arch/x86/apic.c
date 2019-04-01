@@ -884,6 +884,7 @@ void x2apic_ap_setup(void)
 void __init x2apic_bsp_setup(void)
 {
     struct IO_APIC_route_entry **ioapic_entries = NULL;
+    const char *orig_name;
 
     if ( !cpu_has_x2apic )
         return;
@@ -946,8 +947,10 @@ void __init x2apic_bsp_setup(void)
 
     force_iommu = 1;
 
+    orig_name = genapic.name;
     genapic = *apic_x2apic_probe();
-    printk("Switched to APIC driver %s.\n", genapic.name);
+    if ( genapic.name != orig_name )
+        printk("Switched to APIC driver %s\n", genapic.name);
 
     if ( !x2apic_enabled )
     {
