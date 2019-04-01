@@ -950,7 +950,9 @@ int paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
     return rc;
 }
 
-int paging_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
+#ifdef CONFIG_HVM
+int __init paging_set_allocation(struct domain *d, unsigned int pages,
+                                 bool *preempted)
 {
     int rc;
 
@@ -965,6 +967,7 @@ int paging_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
 
     return rc;
 }
+#endif
 
 /*
  * Local variables:
