@@ -23,6 +23,8 @@
 #   along with this program; If not, see <http://www.gnu.org/licenses/>.
 #####################################################################
 
+from __future__ import print_function
+
 import mmap
 import struct
 import os
@@ -248,8 +250,8 @@ def display(scr, row, col, str, attr=0):
         scr.keypad(0)
         _c.echo()
         _c.endwin()
-        print "Your terminal screen is not big enough; Please resize it."
-        print "row=%d, col=%d, str='%s'" % (row, col, str)
+        print("Your terminal screen is not big enough; Please resize it.")
+        print("row=%d, col=%d, str='%s'" % (row, col, str))
         sys.exit(1)
 
 
@@ -704,7 +706,7 @@ def main():
         try:
             writelog()
         except:
-            print 'Quitting.'
+            print('Quitting.')
     stop_xenbaked()
 
 if __name__ == "__main__":
