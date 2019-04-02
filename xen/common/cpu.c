@@ -103,11 +103,13 @@ int cpu_down(unsigned int cpu)
     if ( !cpu_hotplug_begin() )
         return -EBUSY;
 
-    if ( (cpu >= nr_cpu_ids) || (cpu == 0) || !cpu_online(cpu) )
-    {
-        cpu_hotplug_done();
-        return -EINVAL;
-    }
+    err = -EINVAL;
+    if ( (cpu >= nr_cpu_ids) || (cpu == 0) )
+        goto out;
+
+    err = -EEXIST;
+    if ( !cpu_online(cpu) )
+        goto out;
 
     err = cpu_notifier_call_chain(cpu, CPU_DOWN_PREPARE, &nb, false);
     if ( err )
@@ -130,6 +132,7 @@ int cpu_down(unsigned int cpu)
 
  fail:
     cpu_notifier_call_chain(cpu, CPU_DOWN_FAILED, &nb, true);
+ out:
     cpu_hotplug_done();
     return err;
 }
@@ -142,11 +145,13 @@ int cpu_up(unsigned int cpu)
     if ( !cpu_hotplug_begin() )
         return -EBUSY;
 
-    if ( (cpu >= nr_cpu_ids) || cpu_online(cpu) || !cpu_present(cpu) )
-    {
-        cpu_hotplug_done();
-        return -EINVAL;
-    }
+    err = -EINVAL;
+    if ( (cpu >= nr_cpu_ids) || !cpu_present(cpu) )
+        goto out;
+
+    err = -EEXIST;
+    if ( cpu_online(cpu) )
+        goto out;
 
     err = cpu_notifier_call_chain(cpu, CPU_UP_PREPARE, &nb, false);
     if ( err )
@@ -165,6 +170,7 @@ int cpu_up(unsigned int cpu)
 
  fail:
     cpu_notifier_call_chain(cpu, CPU_UP_CANCELED, &nb, true);
+ out:
     cpu_hotplug_done();
     return err;
 }
