@@ -592,11 +592,11 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
                 guest_printk(cd, XENLOG_G_DEBUG "%s%s\n", cd->pbuf, kbuf);
                 cd->pbuf_idx = 0;
             }
-            else if ( cd->pbuf_idx + kcount < (DOMAIN_PBUF_SIZE - 1) )
+            else if ( cd->pbuf_idx + (kout - kbuf) < (DOMAIN_PBUF_SIZE - 1) )
             {
                 /* buffer the output until a newline */
-                memcpy(cd->pbuf + cd->pbuf_idx, kbuf, kcount);
-                cd->pbuf_idx += kcount;
+                memcpy(cd->pbuf + cd->pbuf_idx, kbuf, kout - kbuf);
+                cd->pbuf_idx += (kout - kbuf);
             }
             else
             {
