@@ -561,33 +561,6 @@ static void vcpu_move_locked(struct vcpu *v, unsigned int new_cpu)
 }
 
 /*
- * Move a vcpu from its current processor to a target new processor,
- * without asking the scheduler to do any placement. This is intended
- * for being called from special contexts, where things are quiet
- * enough that no contention is supposed to happen (i.e., during
- * shutdown or software suspend, like ACPI S3).
- */
-static void vcpu_move_nosched(struct vcpu *v, unsigned int new_cpu)
-{
-    unsigned long flags;
-    spinlock_t *lock, *new_lock;
-
-    ASSERT(system_state == SYS_STATE_suspend);
-    ASSERT(!vcpu_runnable(v) && (atomic_read(&v->pause_count) ||
-                                 atomic_read(&v->domain->pause_count)));
-
-    lock = per_cpu(schedule_data, v->processor).schedule_lock;
-    new_lock = per_cpu(schedule_data, new_cpu).schedule_lock;
-
-    sched_spin_lock_double(lock, new_lock, &flags);
-    ASSERT(new_cpu != v->processor);
-    vcpu_move_locked(v, new_cpu);
-    sched_spin_unlock_double(lock, new_lock, flags);
-
-    sched_move_irqs(v);
-}
-
-/*
  * Initiating migration
  *
  * In order to migrate, we need the vcpu in question to have stopped
@@ -735,31 +708,36 @@ void restore_vcpu_affinity(struct domain *d)
 
         ASSERT(!vcpu_runnable(v));
 
-        lock = vcpu_schedule_lock_irq(v);
-
-        if ( v->affinity_broken )
-        {
-            sched_set_affinity(v, v->cpu_hard_affinity_saved, NULL);
-            v->affinity_broken = 0;
-
-        }
-
         /*
-         * During suspend (in cpu_disable_scheduler()), we moved every vCPU
-         * to BSP (which, as of now, is pCPU 0), as a temporary measure to
-         * allow the nonboot processors to have their data structure freed
-         * and go to sleep. But nothing guardantees that the BSP is a valid
-         * pCPU for a particular domain.
+         * Re-assign the initial processor as after resume we have no
+         * guarantee the old processor has come back to life again.
          *
          * Therefore, here, before actually unpausing the domains, we should
          * set v->processor of each of their vCPUs to something that will
          * make sense for the scheduler of the cpupool in which they are in.
          */
         cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
-                    cpupool_domain_cpumask(v->domain));
-        v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
+                    cpupool_domain_cpumask(d));
+        if ( cpumask_empty(cpumask_scratch_cpu(cpu)) )
+        {
+            if ( v->affinity_broken )
+            {
+                sched_set_affinity(v, v->cpu_hard_affinity_saved, NULL);
+                v->affinity_broken = 0;
+                cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                            cpupool_domain_cpumask(d));
+            }
 
-        spin_unlock_irq(lock);
+            if ( cpumask_empty(cpumask_scratch_cpu(cpu)) )
+            {
+                printk(XENLOG_DEBUG "Breaking affinity for %pv\n", v);
+                sched_set_affinity(v, &cpumask_all, NULL);
+                cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                            cpupool_domain_cpumask(d));
+            }
+        }
+
+        v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
 
         lock = vcpu_schedule_lock_irq(v);
         v->processor = SCHED_OP(vcpu_scheduler(v), pick_cpu, v);
@@ -783,7 +761,6 @@ int cpu_disable_scheduler(unsigned int cpu)
     struct vcpu *v;
     struct cpupool *c;
     cpumask_t online_affinity;
-    unsigned int new_cpu;
     int ret = 0;
 
     c = per_cpu(cpupool, cpu);
@@ -809,14 +786,7 @@ int cpu_disable_scheduler(unsigned int cpu)
                     break;
                 }
 
-                if (system_state == SYS_STATE_suspend)
-                {
-                    cpumask_copy(v->cpu_hard_affinity_saved,
-                                 v->cpu_hard_affinity);
-                    v->affinity_broken = 1;
-                }
-                else
-                    printk(XENLOG_DEBUG "Breaking affinity for %pv\n", v);
+                printk(XENLOG_DEBUG "Breaking affinity for %pv\n", v);
 
                 sched_set_affinity(v, &cpumask_all, NULL);
             }
@@ -828,60 +798,26 @@ int cpu_disable_scheduler(unsigned int cpu)
                 continue;
             }
 
-            /* If it is on this cpu, we must send it away. */
-            if ( unlikely(system_state == SYS_STATE_suspend) )
-            {
-                vcpu_schedule_unlock_irqrestore(lock, flags, v);
+            /* If it is on this cpu, we must send it away.
+             * We are doing some cpupool manipulations:
+             *  * we want to call the scheduler, and let it re-evaluation
+             *    the placement of the vcpu, taking into account the new
+             *    cpupool configuration;
+             *  * the scheduler will always find a suitable solution, or
+             *    things would have failed before getting in here.
+             */
+            vcpu_migrate_start(v);
+            vcpu_schedule_unlock_irqrestore(lock, flags, v);
 
-                /*
-                 * If we are doing a shutdown/suspend, it is not necessary to
-                 * ask the scheduler to chime in. In fact:
-                 *  * there is no reason for it: the end result we are after
-                 *    is just 'all the vcpus on the boot pcpu, and no vcpu
-                 *    anywhere else', so let's just go for it;
-                 *  * it's wrong, for cpupools with only non-boot pcpus, as
-                 *    the scheduler would always fail to send the vcpus away
-                 *    from the last online (non boot) pcpu!
-                 *
-                 * Therefore, in the shutdown/suspend case, we just pick up
-                 * one (still) online pcpu. Note that, at this stage, all
-                 * domains (including dom0) have been paused already, so we
-                 * do not expect any vcpu activity at all.
-                 */
-                cpumask_andnot(&online_affinity, &cpu_online_map,
-                               cpumask_of(cpu));
-                BUG_ON(cpumask_empty(&online_affinity));
-                /*
-                 * As boot cpu is, usually, pcpu #0, using cpumask_first()
-                 * will make us converge quicker.
-                 */
-                new_cpu = cpumask_first(&online_affinity);
-                vcpu_move_nosched(v, new_cpu);
-            }
-            else
-            {
-                /*
-                 * OTOH, if the system is still live, and we are here because
-                 * we are doing some cpupool manipulations:
-                 *  * we want to call the scheduler, and let it re-evaluation
-                 *    the placement of the vcpu, taking into account the new
-                 *    cpupool configuration;
-                 *  * the scheduler will always fine a suitable solution, or
-                 *    things would have failed before getting in here.
-                 */
-                vcpu_migrate_start(v);
-                vcpu_schedule_unlock_irqrestore(lock, flags, v);
+            vcpu_migrate_finish(v);
 
-                vcpu_migrate_finish(v);
-
-                /*
-                 * The only caveat, in this case, is that if a vcpu active in
-                 * the hypervisor isn't migratable. In this case, the caller
-                 * should try again after releasing and reaquiring all locks.
-                 */
-                if ( v->processor == cpu )
-                    ret = -EAGAIN;
-            }
+            /*
+             * The only caveat, in this case, is that if a vcpu active in
+             * the hypervisor isn't migratable. In this case, the caller
+             * should try again after releasing and reaquiring all locks.
+             */
+            if ( v->processor == cpu )
+                ret = -EAGAIN;
         }
     }
 
@@ -1742,25 +1678,32 @@ static int cpu_schedule_callback(
     switch ( action )
     {
     case CPU_STARTING:
-        SCHED_OP(sched, init_pdata, sd->sched_priv, cpu);
+        if ( system_state != SYS_STATE_resume )
+            SCHED_OP(sched, init_pdata, sd->sched_priv, cpu);
         break;
     case CPU_UP_PREPARE:
-        rc = cpu_schedule_up(cpu);
+        if ( system_state != SYS_STATE_resume )
+            rc = cpu_schedule_up(cpu);
         break;
     case CPU_DOWN_PREPARE:
         rcu_read_lock(&domlist_read_lock);
         rc = cpu_disable_scheduler_check(cpu);
         rcu_read_unlock(&domlist_read_lock);
         break;
+    case CPU_RESUME_FAILED:
     case CPU_DEAD:
+        if ( system_state == SYS_STATE_suspend )
+            break;
         rcu_read_lock(&domlist_read_lock);
         rc = cpu_disable_scheduler(cpu);
         BUG_ON(rc);
         rcu_read_unlock(&domlist_read_lock);
         SCHED_OP(sched, deinit_pdata, sd->sched_priv, cpu);
-        /* Fallthrough */
-    case CPU_UP_CANCELED:
         cpu_schedule_down(cpu);
+        break;
+    case CPU_UP_CANCELED:
+        if ( system_state != SYS_STATE_resume )
+            cpu_schedule_down(cpu);
         break;
     default:
         break;
