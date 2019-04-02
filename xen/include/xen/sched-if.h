@@ -214,7 +214,6 @@ struct cpupool
 {
     int              cpupool_id;
     cpumask_var_t    cpu_valid;      /* all cpus assigned to pool */
-    cpumask_var_t    cpu_suspended;  /* cpus in S3 that should be in this pool */
     struct cpupool   *next;
     unsigned int     n_dom;
     struct scheduler *sched;
