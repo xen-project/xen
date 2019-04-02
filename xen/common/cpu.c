@@ -218,7 +218,12 @@ void enable_nonboot_cpus(void)
             printk("Error bringing CPU%d up: %d\n", cpu, error);
             BUG_ON(error == -EBUSY);
         }
+        else
+            __cpumask_clear_cpu(cpu, &frozen_cpus);
     }
+
+    for_each_cpu ( cpu, &frozen_cpus )
+        cpu_notifier_call_chain(cpu, CPU_RESUME_FAILED, NULL, true);
 
     cpumask_clear(&frozen_cpus);
 }

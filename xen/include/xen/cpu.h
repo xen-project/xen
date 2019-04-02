@@ -22,33 +22,40 @@ void register_cpu_notifier(struct notifier_block *nb);
  *  CPU_UP_PREPARE -> CPU_STARTING -> CPU_ONLINE -- successful CPU up
  *  CPU_DOWN_PREPARE -> CPU_DOWN_FAILED          -- failed CPU down
  *  CPU_DOWN_PREPARE -> CPU_DYING -> CPU_DEAD    -- successful CPU down
- * 
+ * in the resume case we have additionally:
+ *  CPU_UP_PREPARE -> CPU_UP_CANCELLED -> CPU_RESUME_FAILED -- CPU not resumed
+ *  with the CPU_RESUME_FAILED handler called only after all CPUs have been
+ *  tried to put online again in order to know which CPUs did restart
+ *  successfully.
+ *
  * Hence note that only CPU_*_PREPARE handlers are allowed to fail. Also note
  * that once CPU_DYING is delivered, an offline action can no longer fail.
- * 
+ *
  * Notifiers are called highest-priority-first when:
  *  (a) A CPU is coming up; or (b) CPU_DOWN_FAILED
  * Notifiers are called lowest-priority-first when:
  *  (a) A CPU is going down; or (b) CPU_UP_CANCELED
  */
 /* CPU_UP_PREPARE: Preparing to bring CPU online. */
-#define CPU_UP_PREPARE   (0x0001 | NOTIFY_FORWARD)
+#define CPU_UP_PREPARE    (0x0001 | NOTIFY_FORWARD)
 /* CPU_UP_CANCELED: CPU is no longer being brought online. */
-#define CPU_UP_CANCELED  (0x0002 | NOTIFY_REVERSE)
+#define CPU_UP_CANCELED   (0x0002 | NOTIFY_REVERSE)
 /* CPU_STARTING: CPU nearly online. Runs on new CPU, irqs still disabled. */
-#define CPU_STARTING     (0x0003 | NOTIFY_FORWARD)
+#define CPU_STARTING      (0x0003 | NOTIFY_FORWARD)
 /* CPU_ONLINE: CPU is up. */
-#define CPU_ONLINE       (0x0004 | NOTIFY_FORWARD)
+#define CPU_ONLINE        (0x0004 | NOTIFY_FORWARD)
 /* CPU_DOWN_PREPARE: CPU is going down. */
-#define CPU_DOWN_PREPARE (0x0005 | NOTIFY_REVERSE)
+#define CPU_DOWN_PREPARE  (0x0005 | NOTIFY_REVERSE)
 /* CPU_DOWN_FAILED: CPU is no longer going down. */
-#define CPU_DOWN_FAILED  (0x0006 | NOTIFY_FORWARD)
+#define CPU_DOWN_FAILED   (0x0006 | NOTIFY_FORWARD)
 /* CPU_DYING: CPU is nearly dead (in stop_machine context). */
-#define CPU_DYING        (0x0007 | NOTIFY_REVERSE)
+#define CPU_DYING         (0x0007 | NOTIFY_REVERSE)
 /* CPU_DEAD: CPU is dead. */
-#define CPU_DEAD         (0x0008 | NOTIFY_REVERSE)
+#define CPU_DEAD          (0x0008 | NOTIFY_REVERSE)
 /* CPU_REMOVE: CPU was removed. */
-#define CPU_REMOVE       (0x0009 | NOTIFY_REVERSE)
+#define CPU_REMOVE        (0x0009 | NOTIFY_REVERSE)
+/* CPU_RESUME_FAILED: CPU failed to come up in resume, all other CPUs up. */
+#define CPU_RESUME_FAILED (0x000a | NOTIFY_REVERSE)
 
 /* Perform CPU hotplug. May return -EAGAIN. */
 int cpu_down(unsigned int cpu);
