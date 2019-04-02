@@ -1221,9 +1221,6 @@ void __cpu_disable(void)
     cpumask_clear_cpu(cpu, &cpu_online_map);
     fixup_irqs(&cpu_online_map, 1);
     fixup_eoi();
-
-    if ( cpu_disable_scheduler(cpu) )
-        BUG();
 }
 
 void __cpu_die(unsigned int cpu)
