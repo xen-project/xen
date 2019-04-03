@@ -129,6 +129,16 @@
 
 # Jobs below this line
 
+archlinux-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: archlinux:current
+
+archlinux-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: archlinux:current
+
 centos-7-2-gcc:
   extends: .gcc-x86-64-build
   variables:
