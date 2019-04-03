@@ -70,15 +70,17 @@ int __must_check amd_iommu_flush_iotlb_all(struct domain *d);
 void amd_iommu_share_p2m(struct domain *d);
 
 /* device table functions */
-int get_dma_requestor_id(u16 seg, u16 bdf);
-void amd_iommu_set_intremap_table(
-    u32 *dte, u64 intremap_ptr, u8 int_valid);
-void amd_iommu_set_root_page_table(
-    u32 *dte, u64 root_ptr, u16 domain_id, u8 paging_mode, u8 valid);
-void iommu_dte_set_iotlb(u32 *dte, u8 i);
-void iommu_dte_add_device_entry(u32 *dte, struct ivrs_mappings *ivrs_dev);
-void iommu_dte_set_guest_cr3(u32 *dte, u16 dom_id, u64 gcr3,
-                             int gv, unsigned int glx);
+int get_dma_requestor_id(uint16_t seg, uint16_t bdf);
+void amd_iommu_set_intremap_table(struct amd_iommu_dte *dte,
+                                  uint64_t intremap_ptr,
+                                  uint8_t int_valid);
+void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
+				   uint64_t root_ptr, uint16_t domain_id,
+				   uint8_t paging_mode, uint8_t valid);
+void iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
+                                struct ivrs_mappings *ivrs_dev);
+void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
+                             uint64_t gcr3_mfn, uint8_t gv, uint8_t glx);
 
 /* send cmd to iommu */
 void amd_iommu_flush_all_pages(struct domain *d);

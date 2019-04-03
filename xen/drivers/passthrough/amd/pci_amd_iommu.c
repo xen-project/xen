@@ -71,7 +71,7 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf)
  * Return original device id, if device has valid interrupt remapping
  * table setup for both select entry and alias entry.
  */
-int get_dma_requestor_id(u16 seg, u16 bdf)
+int get_dma_requestor_id(uint16_t seg, uint16_t bdf)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
     int req_id;
@@ -85,35 +85,11 @@ int get_dma_requestor_id(u16 seg, u16 bdf)
     return req_id;
 }
 
-static int is_translation_valid(u32 *entry)
-{
-    return (get_field_from_reg_u32(entry[0],
-                                   IOMMU_DEV_TABLE_VALID_MASK,
-                                   IOMMU_DEV_TABLE_VALID_SHIFT) &&
-            get_field_from_reg_u32(entry[0],
-                                   IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
-                                   IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT));
-}
-
-static void disable_translation(u32 *dte)
-{
-    u32 entry;
-
-    entry = dte[0];
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
-                         IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_DEV_TABLE_VALID_MASK,
-                         IOMMU_DEV_TABLE_VALID_SHIFT, &entry);
-    dte[0] = entry;
-}
-
 static void amd_iommu_setup_domain_device(
     struct domain *domain, struct amd_iommu *iommu,
-    u8 devfn, struct pci_dev *pdev)
+    uint8_t devfn, struct pci_dev *pdev)
 {
-    void *dte;
+    struct amd_iommu_dte *table, *dte;
     unsigned long flags;
     int req_id, valid = 1;
     int dte_i = 0;
@@ -131,20 +107,21 @@ static void amd_iommu_setup_domain_device(
 
     /* get device-table entry */
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
-    dte = iommu->dev_table.buffer + (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+    table = iommu->dev_table.buffer;
+    dte = &table[req_id];
 
     spin_lock_irqsave(&iommu->lock, flags);
 
-    if ( !is_translation_valid((u32 *)dte) )
+    if ( !dte->v || !dte->tv )
     {
         /* bind DTE to domain page-tables */
         amd_iommu_set_root_page_table(
-            (u32 *)dte, page_to_maddr(hd->arch.root_table), domain->domain_id,
+            dte, page_to_maddr(hd->arch.root_table), domain->domain_id,
             hd->arch.paging_mode, valid);
 
         if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
              iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
-            iommu_dte_set_iotlb((u32 *)dte, dte_i);
+            dte->i = dte_i;
 
         amd_iommu_flush_device(iommu, req_id);
 
@@ -272,23 +249,25 @@ void amd_iommu_disable_domain_device(struct domain *domain,
                                      struct amd_iommu *iommu,
                                      u8 devfn, struct pci_dev *pdev)
 {
-    void *dte;
+    struct amd_iommu_dte *table, *dte;
     unsigned long flags;
     int req_id;
     u8 bus = pdev->bus;
 
     BUG_ON ( iommu->dev_table.buffer == NULL );
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
-    dte = iommu->dev_table.buffer + (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+    table = iommu->dev_table.buffer;
+    dte = &table[req_id];
 
     spin_lock_irqsave(&iommu->lock, flags);
-    if ( is_translation_valid((u32 *)dte) )
+    if ( dte->tv && dte->v )
     {
-        disable_translation((u32 *)dte);
+        dte->tv = 0;
+        dte->v = 0;
 
         if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
              iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
-            iommu_dte_set_iotlb((u32 *)dte, 0);
+            dte->i = 0;
 
         amd_iommu_flush_device(iommu, req_id);
 

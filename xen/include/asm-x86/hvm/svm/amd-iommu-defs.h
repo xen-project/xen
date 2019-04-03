@@ -107,74 +107,58 @@
 #define IOMMU_DEV_TABLE_INT_CONTROL_FORWARDED	0x1
 #define IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED	0x2
 
-/* DeviceTable Entry[31:0] */
-#define IOMMU_DEV_TABLE_VALID_MASK			0x00000001
-#define IOMMU_DEV_TABLE_VALID_SHIFT			0
-#define IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK		0x00000002
-#define IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT		1
-#define IOMMU_DEV_TABLE_PAGING_MODE_MASK		0x00000E00
-#define IOMMU_DEV_TABLE_PAGING_MODE_SHIFT		9
-#define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_MASK		0xFFFFF000
-#define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT	12
+struct amd_iommu_dte {
+    /* 0 - 63 */
+    uint64_t v:1;
+    uint64_t tv:1;
+    uint64_t reserved0:5;
+    uint64_t had:2;
+    uint64_t paging_mode:3;
+    uint64_t pt_root:40;
+    uint64_t ppr:1;
+    uint64_t gprp:1;
+    uint64_t giov:1;
+    uint64_t gv:1;
+    uint64_t glx:2;
+    uint64_t gcr3_trp_14_12:3;
+    uint64_t ir:1;
+    uint64_t iw:1;
+    uint64_t reserved1:1;
 
-/* DeviceTable Entry[63:32] */
-#define IOMMU_DEV_TABLE_GV_SHIFT                    23
-#define IOMMU_DEV_TABLE_GV_MASK                     0x800000
-#define IOMMU_DEV_TABLE_GLX_SHIFT                   24
-#define IOMMU_DEV_TABLE_GLX_MASK                    0x3000000
-#define IOMMU_DEV_TABLE_GCR3_1_SHIFT                26
-#define IOMMU_DEV_TABLE_GCR3_1_MASK                 0x1c000000
+    /* 64 - 127 */
+    uint64_t domain_id:16;
+    uint64_t gcr3_trp_30_15:16;
+    uint64_t i:1;
+    uint64_t se:1;
+    uint64_t sa:1;
+    uint64_t ioctl:2;
+    uint64_t cache:1;
+    uint64_t sd:1;
+    uint64_t ex:1;
+    uint64_t sys_mgt:2;
+    uint64_t reserved2:1;
+    uint64_t gcr3_trp_51_31:21;
 
-#define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_MASK	0x000FFFFF
-#define IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_SHIFT	0
-#define IOMMU_DEV_TABLE_IO_READ_PERMISSION_MASK		0x20000000
-#define IOMMU_DEV_TABLE_IO_READ_PERMISSION_SHIFT	29
-#define IOMMU_DEV_TABLE_IO_WRITE_PERMISSION_MASK	0x40000000
-#define IOMMU_DEV_TABLE_IO_WRITE_PERMISSION_SHIFT	30
+    /* 128 - 191 */
+    uint64_t iv:1;
+    uint64_t int_tab_len:4;
+    uint64_t ig:1;
+    uint64_t it_root:46;
+    uint64_t reserved3:4;
+    uint64_t init_pass:1;
+    uint64_t ext_int_pass:1;
+    uint64_t nmi_pass:1;
+    uint64_t reserved4:1;
+    uint64_t int_ctl:2;
+    uint64_t lint0_pass:1;
+    uint64_t lint1_pass:1;
 
-/* DeviceTable Entry[95:64] */
-#define IOMMU_DEV_TABLE_DOMAIN_ID_MASK	0x0000FFFF
-#define IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT	0
-#define IOMMU_DEV_TABLE_GCR3_2_SHIFT                16
-#define IOMMU_DEV_TABLE_GCR3_2_MASK                 0xFFFF0000
-
-/* DeviceTable Entry[127:96] */
-#define IOMMU_DEV_TABLE_IOTLB_SUPPORT_MASK		0x00000001
-#define IOMMU_DEV_TABLE_IOTLB_SUPPORT_SHIFT		0
-#define IOMMU_DEV_TABLE_SUPRESS_LOGGED_PAGES_MASK	0x00000002
-#define IOMMU_DEV_TABLE_SUPRESS_LOGGED_PAGES_SHIFT	1
-#define IOMMU_DEV_TABLE_SUPRESS_ALL_PAGES_MASK		0x00000004
-#define IOMMU_DEV_TABLE_SUPRESS_ALL_PAGES_SHIFT		2
-#define IOMMU_DEV_TABLE_IO_CONTROL_MASK			0x00000018
-#define IOMMU_DEV_TABLE_IO_CONTROL_SHIFT		3
-#define IOMMU_DEV_TABLE_IOTLB_CACHE_HINT_MASK		0x00000020
-#define IOMMU_DEV_TABLE_IOTLB_CACHE_HINT_SHIFT		5
-#define IOMMU_DEV_TABLE_SNOOP_DISABLE_MASK		0x00000040
-#define IOMMU_DEV_TABLE_SNOOP_DISABLE_SHIFT		6
-#define IOMMU_DEV_TABLE_ALLOW_EXCLUSION_MASK		0x00000080
-#define IOMMU_DEV_TABLE_ALLOW_EXCLUSION_SHIFT		7
-#define IOMMU_DEV_TABLE_SYS_MGT_MSG_ENABLE_MASK		0x00000300
-#define IOMMU_DEV_TABLE_SYS_MGT_MSG_ENABLE_SHIFT	8
-
-/* DeviceTable Entry[159:128] */
-#define IOMMU_DEV_TABLE_INT_VALID_MASK          0x00000001
-#define IOMMU_DEV_TABLE_INT_VALID_SHIFT         0
-#define IOMMU_DEV_TABLE_INT_TABLE_LENGTH_MASK       0x0000001E
-#define IOMMU_DEV_TABLE_INT_TABLE_LENGTH_SHIFT      1
-#define IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_MASK      0x0000000020
-#define IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_SHIFT      5
-#define IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_MASK      0xFFFFFFC0
-#define IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_SHIFT     6
-#define IOMMU_DEV_TABLE_GCR3_3_SHIFT                11
-#define IOMMU_DEV_TABLE_GCR3_3_MASK                 0xfffff800
-
-/* DeviceTable Entry[191:160] */
-#define IOMMU_DEV_TABLE_INT_TABLE_PTR_HIGH_MASK     0x000FFFFF
-#define IOMMU_DEV_TABLE_INT_TABLE_PTR_HIGH_SHIFT    0
-#define IOMMU_DEV_TABLE_IVHD_FLAGS_SHIFT        24
-#define IOMMU_DEV_TABLE_IVHD_FLAGS_MASK         0xC7000000
-#define IOMMU_DEV_TABLE_INT_CONTROL_MASK        0x30000000
-#define IOMMU_DEV_TABLE_INT_CONTROL_SHIFT       28
+    /* 192 - 255 */
+    uint64_t reserved5:54;
+    uint64_t attr_v:1;
+    uint64_t mode0_fc:1;
+    uint64_t snoop_attr:8;
+};
 
 /* Command Buffer */
 #define IOMMU_CMD_BUFFER_BASE_LOW_OFFSET	0x08

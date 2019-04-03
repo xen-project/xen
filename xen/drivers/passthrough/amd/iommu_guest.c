@@ -76,39 +76,10 @@ static void guest_iommu_disable(struct guest_iommu *iommu)
     iommu->enabled = 0;
 }
 
-static uint64_t get_guest_cr3_from_dte(dev_entry_t *dte)
+static uint64_t get_guest_cr3_from_dte(struct amd_iommu_dte *dte)
 {
-    uint64_t gcr3_1, gcr3_2, gcr3_3;
-
-    gcr3_1 = get_field_from_reg_u32(dte->data[1],
-                                    IOMMU_DEV_TABLE_GCR3_1_MASK,
-                                    IOMMU_DEV_TABLE_GCR3_1_SHIFT);
-    gcr3_2 = get_field_from_reg_u32(dte->data[2],
-                                    IOMMU_DEV_TABLE_GCR3_2_MASK,
-                                    IOMMU_DEV_TABLE_GCR3_2_SHIFT);
-    gcr3_3 = get_field_from_reg_u32(dte->data[3],
-                                    IOMMU_DEV_TABLE_GCR3_3_MASK,
-                                    IOMMU_DEV_TABLE_GCR3_3_SHIFT);
-
-    return ((gcr3_3 << 31) | (gcr3_2 << 15 ) | (gcr3_1 << 12)) >> PAGE_SHIFT;
-}
-
-static uint16_t get_domid_from_dte(dev_entry_t *dte)
-{
-    return get_field_from_reg_u32(dte->data[2], IOMMU_DEV_TABLE_DOMAIN_ID_MASK,
-                                  IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT);
-}
-
-static uint16_t get_glx_from_dte(dev_entry_t *dte)
-{
-    return get_field_from_reg_u32(dte->data[1], IOMMU_DEV_TABLE_GLX_MASK,
-                                  IOMMU_DEV_TABLE_GLX_SHIFT);
-}
-
-static uint16_t get_gv_from_dte(dev_entry_t *dte)
-{
-    return get_field_from_reg_u32(dte->data[1],IOMMU_DEV_TABLE_GV_MASK,
-                                  IOMMU_DEV_TABLE_GV_SHIFT);
+    return ((dte->gcr3_trp_51_31 << 31) | (dte->gcr3_trp_30_15 << 15) |
+            (dte->gcr3_trp_14_12 << 12)) >> PAGE_SHIFT;
 }
 
 static unsigned int host_domid(struct domain *d, uint64_t g_domid)
@@ -397,7 +368,7 @@ static int do_completion_wait(struct domain *d, cmd_entry_t *cmd)
 static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
 {
     uint16_t gbdf, mbdf, req_id, gdom_id, hdom_id;
-    dev_entry_t *gdte, *mdte, *dte_base;
+    struct amd_iommu_dte *gdte, *mdte, *dte_base;
     struct amd_iommu *iommu = NULL;
     struct guest_iommu *g_iommu;
     uint64_t gcr3_gfn, gcr3_mfn;
@@ -414,23 +385,23 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
         return 0;
 
     /* Sometimes guest invalidates devices from non-exists dtes */
-    if ( (gbdf * sizeof(dev_entry_t)) > g_iommu->dev_table.size )
+    if ( (gbdf * sizeof(struct amd_iommu_dte)) > g_iommu->dev_table.size )
         return 0;
 
     dte_mfn = guest_iommu_get_table_mfn(d,
                                         reg_to_u64(g_iommu->dev_table.reg_base),
-                                        sizeof(dev_entry_t), gbdf);
+                                        sizeof(struct amd_iommu_dte), gbdf);
     ASSERT(mfn_valid(_mfn(dte_mfn)));
 
     /* Read guest dte information */
     dte_base = map_domain_page(_mfn(dte_mfn));
 
-    gdte = dte_base + gbdf % (PAGE_SIZE / sizeof(dev_entry_t));
+    gdte = &dte_base[gbdf % (PAGE_SIZE / sizeof(struct amd_iommu_dte))];
 
-    gdom_id  = get_domid_from_dte(gdte);
+    gdom_id = gdte->domain_id;
     gcr3_gfn = get_guest_cr3_from_dte(gdte);
-    glx      = get_glx_from_dte(gdte);
-    gv       = get_gv_from_dte(gdte);
+    glx = gdte->glx;
+    gv = gdte->gv;
 
     unmap_domain_page(dte_base);
 
@@ -454,11 +425,11 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     /* Setup host device entry */
     hdom_id = host_domid(d, gdom_id);
     req_id = get_dma_requestor_id(iommu->seg, mbdf);
-    mdte = iommu->dev_table.buffer + (req_id * sizeof(dev_entry_t));
+    dte_base = iommu->dev_table.buffer;
+    mdte = &dte_base[req_id];
 
     spin_lock_irqsave(&iommu->lock, flags);
-    iommu_dte_set_guest_cr3((u32 *)mdte, hdom_id,
-                            gcr3_mfn << PAGE_SHIFT, gv, glx);
+    iommu_dte_set_guest_cr3(mdte, hdom_id, gcr3_mfn, gv, glx);
 
     amd_iommu_flush_device(iommu, req_id);
     spin_unlock_irqrestore(&iommu->lock, flags);

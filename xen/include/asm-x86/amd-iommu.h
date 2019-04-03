@@ -46,11 +46,6 @@ typedef struct cmd_entry
 {
     uint32_t data[4];
 } cmd_entry_t;
-
-typedef struct dev_entry
-{
-    uint32_t data[8];
-} dev_entry_t;
 #pragma pack()
 
 struct table_struct {

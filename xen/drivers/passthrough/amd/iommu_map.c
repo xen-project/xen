@@ -99,167 +99,64 @@ static unsigned int set_iommu_pte_present(unsigned long pt_mfn,
     return flush_flags;
 }
 
-void amd_iommu_set_root_page_table(uint32_t *dte, uint64_t root_ptr,
-                                   uint16_t domain_id, uint8_t paging_mode,
-                                   uint8_t valid)
+void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
+                                   uint64_t root_ptr, uint16_t domain_id,
+                                   uint8_t paging_mode, uint8_t valid)
 {
-    uint32_t addr_hi, addr_lo, entry;
-    set_field_in_reg_u32(domain_id, 0,
-                         IOMMU_DEV_TABLE_DOMAIN_ID_MASK,
-                         IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT, &entry);
-    dte[2] = entry;
-
-    addr_lo = root_ptr & DMA_32BIT_MASK;
-    addr_hi = root_ptr >> 32;
-
-    set_field_in_reg_u32(addr_hi, 0,
-                         IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_MASK,
-                         IOMMU_DEV_TABLE_PAGE_TABLE_PTR_HIGH_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                         IOMMU_DEV_TABLE_IO_WRITE_PERMISSION_MASK,
-                         IOMMU_DEV_TABLE_IO_WRITE_PERMISSION_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                         IOMMU_DEV_TABLE_IO_READ_PERMISSION_MASK,
-                         IOMMU_DEV_TABLE_IO_READ_PERMISSION_SHIFT, &entry);
-    dte[1] = entry;
-
-    set_field_in_reg_u32(addr_lo >> PAGE_SHIFT, 0,
-                         IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_MASK,
-                         IOMMU_DEV_TABLE_PAGE_TABLE_PTR_LOW_SHIFT, &entry);
-    set_field_in_reg_u32(paging_mode, entry,
-                         IOMMU_DEV_TABLE_PAGING_MODE_MASK,
-                         IOMMU_DEV_TABLE_PAGING_MODE_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                         IOMMU_DEV_TABLE_TRANSLATION_VALID_MASK,
-                         IOMMU_DEV_TABLE_TRANSLATION_VALID_SHIFT, &entry);
-    set_field_in_reg_u32(valid ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_DEV_TABLE_VALID_MASK,
-                         IOMMU_DEV_TABLE_VALID_SHIFT, &entry);
-    dte[0] = entry;
-}
-
-void iommu_dte_set_iotlb(uint32_t *dte, uint8_t i)
-{
-    uint32_t entry;
-
-    entry = dte[3];
-    set_field_in_reg_u32(!!i, entry,
-                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_MASK,
-                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_SHIFT, &entry);
-    dte[3] = entry;
+    dte->domain_id = domain_id;
+    dte->pt_root = paddr_to_pfn(root_ptr);
+    dte->iw = 1;
+    dte->ir = 1;
+    dte->paging_mode = paging_mode;
+    dte->tv = 1;
+    dte->v = valid;
 }
 
 void __init amd_iommu_set_intremap_table(
-    uint32_t *dte, uint64_t intremap_ptr, uint8_t int_valid)
+    struct amd_iommu_dte *dte, uint64_t intremap_ptr, uint8_t int_valid)
 {
-    uint32_t addr_hi, addr_lo, entry;
-
-    addr_lo = intremap_ptr & DMA_32BIT_MASK;
-    addr_hi = intremap_ptr >> 32;
-
-    entry = dte[5];
-    set_field_in_reg_u32(addr_hi, entry,
-                         IOMMU_DEV_TABLE_INT_TABLE_PTR_HIGH_MASK,
-                         IOMMU_DEV_TABLE_INT_TABLE_PTR_HIGH_SHIFT, &entry);
-    /* Fixed and arbitrated interrupts remapepd */
-    set_field_in_reg_u32(2, entry,
-                         IOMMU_DEV_TABLE_INT_CONTROL_MASK,
-                         IOMMU_DEV_TABLE_INT_CONTROL_SHIFT, &entry);
-    dte[5] = entry;
-
-    set_field_in_reg_u32(addr_lo >> 6, 0,
-                         IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_MASK,
-                         IOMMU_DEV_TABLE_INT_TABLE_PTR_LOW_SHIFT, &entry);
-    /* 2048 entries */
-    set_field_in_reg_u32(0xB, entry,
-                         IOMMU_DEV_TABLE_INT_TABLE_LENGTH_MASK,
-                         IOMMU_DEV_TABLE_INT_TABLE_LENGTH_SHIFT, &entry);
-
-    /* unmapped interrupt results io page faults*/
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_MASK,
-                         IOMMU_DEV_TABLE_INT_TABLE_IGN_UNMAPPED_SHIFT, &entry);
-    set_field_in_reg_u32(int_valid ? IOMMU_CONTROL_ENABLED :
-                         IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_DEV_TABLE_INT_VALID_MASK,
-                         IOMMU_DEV_TABLE_INT_VALID_SHIFT, &entry);
-    dte[4] = entry;
+    dte->it_root = intremap_ptr >> 6;
+    dte->int_tab_len = 0xb; /* 2048 entries */
+    dte->int_ctl = 2; /* fixed and arbitrated interrupts remapped */
+    dte->ig = 0; /* unmapped interrupt results io page faults */
+    dte->iv = int_valid;
 }
 
-void __init iommu_dte_add_device_entry(uint32_t *dte,
+void __init iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
                                        struct ivrs_mappings *ivrs_dev)
 {
-    uint32_t entry;
-    uint8_t sys_mgt, dev_ex, flags;
-    uint8_t mask = ~(0x7 << 3);
+    uint8_t flags = ivrs_dev->device_flags;
 
-    dte[7] = dte[6] = dte[4] = dte[2] = dte[1] = dte[0] = 0;
+    memset(dte, 0, sizeof(*dte));
 
-    flags = ivrs_dev->device_flags;
-    sys_mgt = MASK_EXTR(flags, ACPI_IVHD_SYSTEM_MGMT);
-    dev_ex = ivrs_dev->dte_allow_exclusion;
-
-    flags &= mask;
-    set_field_in_reg_u32(flags, 0,
-                         IOMMU_DEV_TABLE_IVHD_FLAGS_MASK,
-                         IOMMU_DEV_TABLE_IVHD_FLAGS_SHIFT, &entry);
-    dte[5] = entry;
-
-    set_field_in_reg_u32(sys_mgt, 0,
-                         IOMMU_DEV_TABLE_SYS_MGT_MSG_ENABLE_MASK,
-                         IOMMU_DEV_TABLE_SYS_MGT_MSG_ENABLE_SHIFT, &entry);
-    set_field_in_reg_u32(dev_ex, entry,
-                         IOMMU_DEV_TABLE_ALLOW_EXCLUSION_MASK,
-                         IOMMU_DEV_TABLE_ALLOW_EXCLUSION_SHIFT, &entry);
-    dte[3] = entry;
+    dte->init_pass = MASK_EXTR(flags, ACPI_IVHD_INIT_PASS);
+    dte->ext_int_pass = MASK_EXTR(flags, ACPI_IVHD_EINT_PASS);
+    dte->nmi_pass = MASK_EXTR(flags, ACPI_IVHD_NMI_PASS);
+    dte->lint0_pass = MASK_EXTR(flags, ACPI_IVHD_LINT0_PASS);
+    dte->lint1_pass = MASK_EXTR(flags, ACPI_IVHD_LINT1_PASS);
+    dte->sys_mgt = MASK_EXTR(flags, ACPI_IVHD_SYSTEM_MGMT);
+    dte->ex = ivrs_dev->dte_allow_exclusion;
 }
 
-void iommu_dte_set_guest_cr3(uint32_t *dte, uint16_t dom_id, uint64_t gcr3,
-                             int gv, unsigned int glx)
+void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
+                             uint64_t gcr3_mfn, uint8_t gv, uint8_t glx)
 {
-    uint32_t entry, gcr3_1, gcr3_2, gcr3_3;
-
-    gcr3_3 = gcr3 >> 31;
-    gcr3_2 = (gcr3 >> 15) & 0xFFFF;
-    gcr3_1 = (gcr3 >> PAGE_SHIFT) & 0x7;
+#define GCR3_MASK(hi, lo) (((1ul << ((hi) + 1)) - 1) & ~((1ul << (lo)) - 1))
+#define GCR3_SHIFT(lo) ((lo) - PAGE_SHIFT)
 
     /* I bit must be set when gcr3 is enabled */
-    entry = dte[3];
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_MASK,
-                         IOMMU_DEV_TABLE_IOTLB_SUPPORT_SHIFT, &entry);
-    /* update gcr3 */
-    set_field_in_reg_u32(gcr3_3, entry,
-                         IOMMU_DEV_TABLE_GCR3_3_MASK,
-                         IOMMU_DEV_TABLE_GCR3_3_SHIFT, &entry);
-    dte[3] = entry;
+    dte->i = 1;
 
-    set_field_in_reg_u32(dom_id, entry,
-                         IOMMU_DEV_TABLE_DOMAIN_ID_MASK,
-                         IOMMU_DEV_TABLE_DOMAIN_ID_SHIFT, &entry);
-    /* update gcr3 */
-    entry = dte[2];
-    set_field_in_reg_u32(gcr3_2, entry,
-                         IOMMU_DEV_TABLE_GCR3_2_MASK,
-                         IOMMU_DEV_TABLE_GCR3_2_SHIFT, &entry);
-    dte[2] = entry;
+    dte->gcr3_trp_14_12 = (gcr3_mfn & GCR3_MASK(14, 12)) >> GCR3_SHIFT(12);
+    dte->gcr3_trp_30_15 = (gcr3_mfn & GCR3_MASK(30, 15)) >> GCR3_SHIFT(15);
+    dte->gcr3_trp_51_31 = (gcr3_mfn & GCR3_MASK(51, 31)) >> GCR3_SHIFT(31);
 
-    entry = dte[1];
-    /* Enable GV bit */
-    set_field_in_reg_u32(!!gv, entry,
-                         IOMMU_DEV_TABLE_GV_MASK,
-                         IOMMU_DEV_TABLE_GV_SHIFT, &entry);
+    dte->domain_id = dom_id;
+    dte->glx = glx;
+    dte->gv = gv;
 
-    /* 1 level guest cr3 table  */
-    set_field_in_reg_u32(glx, entry,
-                         IOMMU_DEV_TABLE_GLX_MASK,
-                         IOMMU_DEV_TABLE_GLX_SHIFT, &entry);
-    /* update gcr3 */
-    set_field_in_reg_u32(gcr3_1, entry,
-                         IOMMU_DEV_TABLE_GCR3_1_MASK,
-                         IOMMU_DEV_TABLE_GCR3_1_SHIFT, &entry);
-    dte[1] = entry;
+#undef GCR3_SHIFT
+#undef GCR3_MASK
 }
 
 /* Walk io page tables and build level page tables if necessary
@@ -369,7 +266,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
 static int update_paging_mode(struct domain *d, unsigned long dfn)
 {
     uint16_t bdf;
-    void *device_entry;
+    struct amd_iommu_dte *table, *dte;
     unsigned int req_id, level, offset;
     unsigned long flags;
     struct pci_dev *pdev;
@@ -438,11 +335,11 @@ static int update_paging_mode(struct domain *d, unsigned long dfn)
             spin_lock_irqsave(&iommu->lock, flags);
             do {
                 req_id = get_dma_requestor_id(pdev->seg, bdf);
-                device_entry = iommu->dev_table.buffer +
-                               (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+                table = iommu->dev_table.buffer;
+                dte = &table[req_id];
 
                 /* valid = 0 only works for dom0 passthrough mode */
-                amd_iommu_set_root_page_table((uint32_t *)device_entry,
+                amd_iommu_set_root_page_table(dte,
                                               page_to_maddr(hd->arch.root_table),
                                               d->domain_id,
                                               hd->arch.paging_mode, 1);
