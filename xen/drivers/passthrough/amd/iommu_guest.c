@@ -68,11 +68,39 @@ static void guest_iommu_disable(struct guest_iommu *iommu)
     iommu->enabled = 0;
 }
 
-static uint64_t get_guest_cr3_from_dte(struct amd_iommu_dte *dte)
+/*
+ * The Guest CR3 Table is a table written by the guest kernel, pointing at
+ * gCR3 values for PASID transactions to use.  The Device Table Entry points
+ * at a system physical address.
+ *
+ * However, these helpers deliberately use untyped parameters without
+ * reference to gfn/mfn because they are used both for programming the real
+ * IOMMU, and interpreting a guests programming of its vIOMMU.
+ */
+static uint64_t dte_get_gcr3_table(const struct amd_iommu_dte *dte)
 {
     return (((uint64_t)dte->gcr3_trp_51_31 << 31) |
             (dte->gcr3_trp_30_15 << 15) |
-            (dte->gcr3_trp_14_12 << 12)) >> PAGE_SHIFT;
+            (dte->gcr3_trp_14_12 << 12));
+}
+
+static void dte_set_gcr3_table(struct amd_iommu_dte *dte, uint16_t dom_id,
+                               uint64_t addr, bool gv, uint8_t glx)
+{
+#define GCR3_MASK(hi, lo) (((1ul << ((hi) + 1)) - 1) & ~((1ul << (lo)) - 1))
+
+    /* I bit must be set when gcr3 is enabled */
+    dte->i = true;
+
+    dte->gcr3_trp_14_12 = MASK_EXTR(addr, GCR3_MASK(14, 12));
+    dte->gcr3_trp_30_15 = MASK_EXTR(addr, GCR3_MASK(30, 15));
+    dte->gcr3_trp_51_31 = MASK_EXTR(addr, GCR3_MASK(51, 31));
+
+    dte->domain_id = dom_id;
+    dte->glx = glx;
+    dte->gv = gv;
+
+#undef GCR3_MASK
 }
 
 static unsigned int host_domid(struct domain *d, uint64_t g_domid)
@@ -389,7 +417,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     gdte = &dte_base[gbdf % (PAGE_SIZE / sizeof(struct amd_iommu_dte))];
 
     gdom_id = gdte->domain_id;
-    gcr3_gfn = get_guest_cr3_from_dte(gdte);
+    gcr3_gfn = dte_get_gcr3_table(gdte) >> PAGE_SHIFT;
     glx = gdte->glx;
     gv = gdte->gv;
 
@@ -419,7 +447,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     mdte = &dte_base[req_id];
 
     spin_lock_irqsave(&iommu->lock, flags);
-    iommu_dte_set_guest_cr3(mdte, hdom_id, gcr3_mfn, gv, glx);
+    dte_set_gcr3_table(mdte, hdom_id, gcr3_mfn << PAGE_SHIFT, gv, glx);
 
     amd_iommu_flush_device(iommu, req_id);
     spin_unlock_irqrestore(&iommu->lock, flags);

@@ -246,8 +246,6 @@ void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
 				   uint8_t paging_mode, bool valid);
 void iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
                                 const struct ivrs_mappings *ivrs_dev);
-void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
-                             uint64_t gcr3_mfn, bool gv, uint8_t glx);
 
 /* send cmd to iommu */
 void amd_iommu_flush_all_pages(struct domain *d);

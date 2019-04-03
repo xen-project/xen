@@ -173,27 +173,6 @@ void __init iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
     };
 }
 
-void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
-                             uint64_t gcr3_mfn, bool gv, uint8_t glx)
-{
-#define GCR3_MASK(hi, lo) (((1ul << ((hi) + 1)) - 1) & ~((1ul << (lo)) - 1))
-#define GCR3_SHIFT(lo) ((lo) - PAGE_SHIFT)
-
-    /* I bit must be set when gcr3 is enabled */
-    dte->i = true;
-
-    dte->gcr3_trp_14_12 = (gcr3_mfn & GCR3_MASK(14, 12)) >> GCR3_SHIFT(12);
-    dte->gcr3_trp_30_15 = (gcr3_mfn & GCR3_MASK(30, 15)) >> GCR3_SHIFT(15);
-    dte->gcr3_trp_51_31 = (gcr3_mfn & GCR3_MASK(51, 31)) >> GCR3_SHIFT(31);
-
-    dte->domain_id = dom_id;
-    dte->glx = glx;
-    dte->gv = gv;
-
-#undef GCR3_SHIFT
-#undef GCR3_MASK
-}
-
 /* Walk io page tables and build level page tables if necessary
  * {Re, un}mapping super page frames causes re-allocation of io
  * page tables.
