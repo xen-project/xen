@@ -1039,11 +1039,13 @@ int populate_pt_range(unsigned long virt, unsigned long nr_mfns)
 
 int destroy_xen_mappings(unsigned long v, unsigned long e)
 {
+    ASSERT(v <= e);
     return create_xen_entries(REMOVE, v, INVALID_MFN, (e - v) >> PAGE_SHIFT, 0);
 }
 
 int modify_xen_mappings(unsigned long s, unsigned long e, unsigned int flags)
 {
+    ASSERT(s <= e);
     return create_xen_entries(MODIFY, s, INVALID_MFN, (e - s) >> PAGE_SHIFT,
                               flags);
 }
