@@ -505,7 +505,7 @@ int p2m_get_mem_access(struct domain *d, gfn_t gfn, xenmem_access_t *access,
         if ( altp2m_idx )
             return -EINVAL;
     }
-    else
+    else if ( altp2m_idx ) /* altp2m view 0 is treated as the hostp2m */
     {
         if ( altp2m_idx >= MAX_ALTP2M ||
              d->arch.altp2m_eptp[altp2m_idx] == mfn_x(INVALID_MFN) )
