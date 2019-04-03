@@ -38,100 +38,45 @@ static unsigned int pfn_to_pde_idx(unsigned long pfn, unsigned int level)
 static unsigned int clear_iommu_pte_present(unsigned long l1_mfn,
                                             unsigned long dfn)
 {
-    uint64_t *table, *pte;
+    struct amd_iommu_pte *table, *pte;
     unsigned int flush_flags;
 
     table = map_domain_page(_mfn(l1_mfn));
+    pte = &table[pfn_to_pde_idx(dfn, 1)];
 
-    pte = (table + pfn_to_pde_idx(dfn, 1));
+    flush_flags = pte->pr ? IOMMU_FLUSHF_modified : 0;
+    memset(pte, 0, sizeof(*pte));
 
-    flush_flags = get_field_from_reg_u32(*pte, IOMMU_PTE_PRESENT_MASK,
-                                         IOMMU_PTE_PRESENT_SHIFT) ?
-                                         IOMMU_FLUSHF_modified : 0;
-
-    *pte = 0;
     unmap_domain_page(table);
 
     return flush_flags;
 }
 
-static unsigned int set_iommu_pde_present(uint32_t *pde,
+static unsigned int set_iommu_pde_present(struct amd_iommu_pte *pte,
                                           unsigned long next_mfn,
                                           unsigned int next_level, bool iw,
                                           bool ir)
 {
-    uint64_t maddr_next;
-    uint32_t addr_lo, addr_hi, entry;
-    bool old_present;
     unsigned int flush_flags = IOMMU_FLUSHF_added;
 
-    maddr_next = __pfn_to_paddr(next_mfn);
-
-    old_present = get_field_from_reg_u32(pde[0], IOMMU_PTE_PRESENT_MASK,
-                                         IOMMU_PTE_PRESENT_SHIFT);
-    if ( old_present )
-    {
-        bool old_r, old_w;
-        unsigned int old_level;
-        uint64_t maddr_old;
-
-        addr_hi = get_field_from_reg_u32(pde[1],
-                                         IOMMU_PTE_ADDR_HIGH_MASK,
-                                         IOMMU_PTE_ADDR_HIGH_SHIFT);
-        addr_lo = get_field_from_reg_u32(pde[0],
-                                         IOMMU_PTE_ADDR_LOW_MASK,
-                                         IOMMU_PTE_ADDR_LOW_SHIFT);
-        old_level = get_field_from_reg_u32(pde[0],
-                                           IOMMU_PDE_NEXT_LEVEL_MASK,
-                                           IOMMU_PDE_NEXT_LEVEL_SHIFT);
-        old_w = get_field_from_reg_u32(pde[1],
-                                       IOMMU_PTE_IO_WRITE_PERMISSION_MASK,
-                                       IOMMU_PTE_IO_WRITE_PERMISSION_SHIFT);
-        old_r = get_field_from_reg_u32(pde[1],
-                                       IOMMU_PTE_IO_READ_PERMISSION_MASK,
-                                       IOMMU_PTE_IO_READ_PERMISSION_SHIFT);
-
-        maddr_old = ((uint64_t)addr_hi << 32) |
-                    ((uint64_t)addr_lo << PAGE_SHIFT);
-
-        if ( maddr_old != maddr_next || iw != old_w || ir != old_r ||
-             old_level != next_level )
+    if ( pte->pr &&
+         (pte->mfn != next_mfn ||
+          pte->iw != iw ||
+          pte->ir != ir ||
+          pte->next_level != next_level) )
             flush_flags |= IOMMU_FLUSHF_modified;
-    }
 
-    addr_lo = maddr_next & DMA_32BIT_MASK;
-    addr_hi = maddr_next >> 32;
-
-    /* enable read/write permissions,which will be enforced at the PTE */
-    set_field_in_reg_u32(addr_hi, 0,
-                         IOMMU_PDE_ADDR_HIGH_MASK,
-                         IOMMU_PDE_ADDR_HIGH_SHIFT, &entry);
-    set_field_in_reg_u32(iw, entry,
-                         IOMMU_PDE_IO_WRITE_PERMISSION_MASK,
-                         IOMMU_PDE_IO_WRITE_PERMISSION_SHIFT, &entry);
-    set_field_in_reg_u32(ir, entry,
-                         IOMMU_PDE_IO_READ_PERMISSION_MASK,
-                         IOMMU_PDE_IO_READ_PERMISSION_SHIFT, &entry);
-
-    /* FC bit should be enabled in PTE, this helps to solve potential
+    /*
+     * FC bit should be enabled in PTE, this helps to solve potential
      * issues with ATS devices
      */
-    if ( next_level == 0 )
-        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                             IOMMU_PTE_FC_MASK, IOMMU_PTE_FC_SHIFT, &entry);
-    pde[1] = entry;
+    pte->fc = !next_level;
 
-    /* mark next level as 'present' */
-    set_field_in_reg_u32(addr_lo >> PAGE_SHIFT, 0,
-                         IOMMU_PDE_ADDR_LOW_MASK,
-                         IOMMU_PDE_ADDR_LOW_SHIFT, &entry);
-    set_field_in_reg_u32(next_level, entry,
-                         IOMMU_PDE_NEXT_LEVEL_MASK,
-                         IOMMU_PDE_NEXT_LEVEL_SHIFT, &entry);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                         IOMMU_PDE_PRESENT_MASK,
-                         IOMMU_PDE_PRESENT_SHIFT, &entry);
-    pde[0] = entry;
+    pte->mfn = next_mfn;
+    pte->iw = iw;
+    pte->ir = ir;
+    pte->next_level = next_level;
+    pte->pr = 1;
 
     return flush_flags;
 }
@@ -142,13 +87,11 @@ static unsigned int set_iommu_pte_present(unsigned long pt_mfn,
                                           int pde_level,
                                           bool iw, bool ir)
 {
-    uint64_t *table;
-    uint32_t *pde;
+    struct amd_iommu_pte *table, *pde;
     unsigned int flush_flags;
 
     table = map_domain_page(_mfn(pt_mfn));
-
-    pde = (uint32_t *)(table + pfn_to_pde_idx(dfn, pde_level));
+    pde = &table[pfn_to_pde_idx(dfn, pde_level)];
 
     flush_flags = set_iommu_pde_present(pde, next_mfn, 0, iw, ir);
     unmap_domain_page(table);
@@ -319,25 +262,6 @@ void iommu_dte_set_guest_cr3(uint32_t *dte, uint16_t dom_id, uint64_t gcr3,
     dte[1] = entry;
 }
 
-uint64_t amd_iommu_get_address_from_pte(void *pte)
-{
-    uint32_t *entry = pte;
-    uint32_t addr_lo, addr_hi;
-    uint64_t ptr;
-
-    addr_lo = get_field_from_reg_u32(entry[0],
-                                     IOMMU_PTE_ADDR_LOW_MASK,
-                                     IOMMU_PTE_ADDR_LOW_SHIFT);
-
-    addr_hi = get_field_from_reg_u32(entry[1],
-                                     IOMMU_PTE_ADDR_HIGH_MASK,
-                                     IOMMU_PTE_ADDR_HIGH_SHIFT);
-
-    ptr = ((uint64_t)addr_hi << 32) |
-          ((uint64_t)addr_lo << PAGE_SHIFT);
-    return ptr;
-}
-
 /* Walk io page tables and build level page tables if necessary
  * {Re, un}mapping super page frames causes re-allocation of io
  * page tables.
@@ -345,7 +269,7 @@ uint64_t amd_iommu_get_address_from_pte(void *pte)
 static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
                               unsigned long pt_mfn[])
 {
-    uint64_t *pde, *next_table_vaddr;
+    struct amd_iommu_pte *pde, *next_table_vaddr;
     unsigned long  next_table_mfn;
     unsigned int level;
     struct page_info *table;
@@ -370,15 +294,13 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         pt_mfn[level] = next_table_mfn;
 
         next_table_vaddr = map_domain_page(_mfn(next_table_mfn));
-        pde = next_table_vaddr + pfn_to_pde_idx(dfn, level);
+        pde = &next_table_vaddr[pfn_to_pde_idx(dfn, level)];
 
         /* Here might be a super page frame */
-        next_table_mfn = amd_iommu_get_address_from_pte(pde) >> PAGE_SHIFT;
+        next_table_mfn = pde->mfn;
 
         /* Split super page frame into smaller pieces.*/
-        if ( iommu_is_pte_present((uint32_t *)pde) &&
-             (iommu_next_level((uint32_t *)pde) == 0) &&
-             next_table_mfn != 0 )
+        if ( pde->pr && !pde->next_level && next_table_mfn )
         {
             int i;
             unsigned long mfn, pfn;
@@ -398,13 +320,13 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
             }
 
             next_table_mfn = mfn_x(page_to_mfn(table));
-            set_iommu_pde_present((uint32_t *)pde, next_table_mfn, next_level,
-                                  !!IOMMUF_writable, !!IOMMUF_readable);
+            set_iommu_pde_present(pde, next_table_mfn, next_level, true,
+                                  true);
 
             for ( i = 0; i < PTE_PER_TABLE_SIZE; i++ )
             {
                 set_iommu_pte_present(next_table_mfn, pfn, mfn, next_level,
-                                      !!IOMMUF_writable, !!IOMMUF_readable);
+                                      true, true);
                 mfn += page_sz;
                 pfn += page_sz;
              }
@@ -413,7 +335,7 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         }
 
         /* Install lower level page table for non-present entries */
-        else if ( !iommu_is_pte_present((uint32_t *)pde) )
+        else if ( !pde->pr )
         {
             if ( next_table_mfn == 0 )
             {
@@ -425,9 +347,8 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
                     return 1;
                 }
                 next_table_mfn = mfn_x(page_to_mfn(table));
-                set_iommu_pde_present((uint32_t *)pde, next_table_mfn,
-                                      next_level, !!IOMMUF_writable,
-                                      !!IOMMUF_readable);
+                set_iommu_pde_present(pde, next_table_mfn, next_level, true,
+                                      true);
             }
             else /* should never reach here */
             {
@@ -455,7 +376,7 @@ static int update_paging_mode(struct domain *d, unsigned long dfn)
     struct amd_iommu *iommu = NULL;
     struct page_info *new_root = NULL;
     struct page_info *old_root = NULL;
-    void *new_root_vaddr;
+    struct amd_iommu_pte *new_root_vaddr;
     unsigned long old_root_mfn;
     struct domain_iommu *hd = dom_iommu(d);
 
@@ -484,7 +405,7 @@ static int update_paging_mode(struct domain *d, unsigned long dfn)
         new_root_vaddr = __map_domain_page(new_root);
         old_root_mfn = mfn_x(page_to_mfn(old_root));
         set_iommu_pde_present(new_root_vaddr, old_root_mfn, level,
-                              !!IOMMUF_writable, !!IOMMUF_readable);
+                              true, true);
         level++;
         old_root = new_root;
         offset >>= PTE_PER_TABLE_SHIFT;

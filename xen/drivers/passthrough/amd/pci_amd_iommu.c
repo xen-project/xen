@@ -376,9 +376,8 @@ static void deallocate_next_page_table(struct page_info *pg, int level)
 
 static void deallocate_page_table(struct page_info *pg)
 {
-    void *table_vaddr, *pde;
-    u64 next_table_maddr;
-    unsigned int index, level = PFN_ORDER(pg), next_level;
+    struct amd_iommu_pte *table_vaddr;
+    unsigned int index, level = PFN_ORDER(pg);
 
     PFN_ORDER(pg) = 0;
 
@@ -392,17 +391,14 @@ static void deallocate_page_table(struct page_info *pg)
 
     for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {
-        pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
-        next_table_maddr = amd_iommu_get_address_from_pte(pde);
-        next_level = iommu_next_level(pde);
+        struct amd_iommu_pte *pde = &table_vaddr[index];
 
-        if ( (next_table_maddr != 0) && (next_level != 0) &&
-             iommu_is_pte_present(pde) )
+        if ( pde->mfn && pde->next_level && pde->pr )
         {
             /* We do not support skip levels yet */
-            ASSERT(next_level == level - 1);
-            deallocate_next_page_table(maddr_to_page(next_table_maddr), 
-                                       next_level);
+            ASSERT(pde->next_level == level - 1);
+            deallocate_next_page_table(mfn_to_page(_mfn(pde->mfn)),
+                                       pde->next_level);
         }
     }
 
@@ -500,10 +496,8 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
                                      paddr_t gpa, int indent)
 {
     paddr_t address;
-    void *table_vaddr, *pde;
-    paddr_t next_table_maddr;
-    int index, next_level, present;
-    u32 *entry;
+    struct amd_iommu_pte *table_vaddr;
+    int index;
 
     if ( level < 1 )
         return;
@@ -518,42 +512,32 @@ static void amd_dump_p2m_table_level(struct page_info* pg, int level,
 
     for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {
+        struct amd_iommu_pte *pde = &table_vaddr[index];
+
         if ( !(index % 2) )
             process_pending_softirqs();
 
-        pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
-        next_table_maddr = amd_iommu_get_address_from_pte(pde);
-        entry = pde;
-
-        present = get_field_from_reg_u32(entry[0],
-                                         IOMMU_PDE_PRESENT_MASK,
-                                         IOMMU_PDE_PRESENT_SHIFT);
-
-        if ( !present )
+        if ( !pde->pr )
             continue;
 
-        next_level = get_field_from_reg_u32(entry[0],
-                                            IOMMU_PDE_NEXT_LEVEL_MASK,
-                                            IOMMU_PDE_NEXT_LEVEL_SHIFT);
-
-        if ( next_level && (next_level != (level - 1)) )
+        if ( pde->next_level && (pde->next_level != (level - 1)) )
         {
             printk("IOMMU p2m table error. next_level = %d, expected %d\n",
-                   next_level, level - 1);
+                   pde->next_level, level - 1);
 
             continue;
         }
 
         address = gpa + amd_offset_level_address(index, level);
-        if ( next_level >= 1 )
+        if ( pde->next_level >= 1 )
             amd_dump_p2m_table_level(
-                maddr_to_page(next_table_maddr), next_level,
+                mfn_to_page(_mfn(pde->mfn)), pde->next_level,
                 address, indent + 1);
         else
             printk("%*sdfn: %08lx  mfn: %08lx\n",
                    indent, "",
                    (unsigned long)PFN_DOWN(address),
-                   (unsigned long)PFN_DOWN(next_table_maddr));
+                   (unsigned long)PFN_DOWN(pfn_to_paddr(pde->mfn)));
     }
 
     unmap_domain_page(table_vaddr);

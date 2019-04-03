@@ -57,7 +57,6 @@ int __must_check amd_iommu_map_page(struct domain *d, dfn_t dfn,
                                     unsigned int *flush_flags);
 int __must_check amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
                                       unsigned int *flush_flags);
-uint64_t amd_iommu_get_address_from_pte(void *entry);
 int __must_check amd_iommu_alloc_root(struct domain_iommu *hd);
 int amd_iommu_reserve_domain_unity_map(struct domain *domain,
                                        paddr_t phys_addr, unsigned long size,
@@ -278,20 +277,6 @@ static inline void iommu_set_addr_hi_to_reg(uint32_t *reg, uint32_t addr)
 {
     set_field_in_reg_u32(addr, *reg, IOMMU_REG_BASE_ADDR_HIGH_MASK,
                          IOMMU_REG_BASE_ADDR_HIGH_SHIFT, reg);
-}
-
-static inline int iommu_is_pte_present(const u32 *entry)
-{
-    return get_field_from_reg_u32(entry[0],
-                                  IOMMU_PDE_PRESENT_MASK,
-                                  IOMMU_PDE_PRESENT_SHIFT);
-}
-
-static inline unsigned int iommu_next_level(const u32 *entry)
-{
-    return get_field_from_reg_u32(entry[0],
-                                  IOMMU_PDE_NEXT_LEVEL_MASK,
-                                  IOMMU_PDE_NEXT_LEVEL_SHIFT);
 }
 
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */
