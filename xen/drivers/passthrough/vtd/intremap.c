@@ -314,8 +314,13 @@ static int remap_entry_to_ioapic_rte(
     old_rte->dest_mode = iremap_entry->remap.dm;
     old_rte->trigger = iremap_entry->remap.tm;
     old_rte->__reserved_2 = 0;
-    old_rte->dest.logical.__reserved_1 = 0;
-    old_rte->dest.logical.logical_dest = iremap_entry->remap.dst >> 8;
+    if ( x2apic_enabled )
+        old_rte->dest.dest32 = iremap_entry->remap.dst;
+    else
+    {
+        old_rte->dest.logical.__reserved_1 = 0;
+        old_rte->dest.logical.logical_dest = iremap_entry->remap.dst >> 8;
+    }
 
     unmap_vtd_domain_page(iremap_entries);
     spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
