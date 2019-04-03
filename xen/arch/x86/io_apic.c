@@ -410,7 +410,8 @@ void free_ioapic_entries(struct IO_APIC_route_entry **ioapic_entries)
     xfree(ioapic_entries);
 }
 
-static void __modify_IO_APIC_irq (unsigned int irq, unsigned long enable, unsigned long disable)
+static void modify_IO_APIC_irq(unsigned int irq, unsigned int enable,
+                               unsigned int disable)
 {
     struct irq_pin_list *entry = irq_2_pin + irq;
     unsigned int pin, reg;
@@ -432,25 +433,25 @@ static void __modify_IO_APIC_irq (unsigned int irq, unsigned long enable, unsign
 /* mask = 1 */
 static void __mask_IO_APIC_irq (unsigned int irq)
 {
-    __modify_IO_APIC_irq(irq, 0x00010000, 0);
+    modify_IO_APIC_irq(irq, IO_APIC_REDIR_MASKED, 0);
 }
 
 /* mask = 0 */
 static void __unmask_IO_APIC_irq (unsigned int irq)
 {
-    __modify_IO_APIC_irq(irq, 0, 0x00010000);
+    modify_IO_APIC_irq(irq, 0, IO_APIC_REDIR_MASKED);
 }
 
 /* trigger = 0 */
 static void __edge_IO_APIC_irq (unsigned int irq)
 {
-    __modify_IO_APIC_irq(irq, 0, 0x00008000);
+    modify_IO_APIC_irq(irq, 0, IO_APIC_REDIR_LEVEL_TRIGGER);
 }
 
 /* trigger = 1 */
 static void __level_IO_APIC_irq (unsigned int irq)
 {
-    __modify_IO_APIC_irq(irq, 0x00008000, 0);
+    modify_IO_APIC_irq(irq, IO_APIC_REDIR_LEVEL_TRIGGER, 0);
 }
 
 static void mask_IO_APIC_irq(struct irq_desc *desc)
@@ -571,7 +572,7 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
             io_apic_write(entry->apic, 0x10 + 1 + pin*2, dest);
             data = io_apic_read(entry->apic, 0x10 + pin*2);
             data &= ~IO_APIC_REDIR_VECTOR_MASK;
-            data |= desc->arch.vector & 0xFF;
+            data |= MASK_INSR(desc->arch.vector, IO_APIC_REDIR_VECTOR_MASK);
             io_apic_modify(entry->apic, 0x10 + pin*2, data);
 
             if (!entry->next)
