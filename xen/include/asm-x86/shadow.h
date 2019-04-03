@@ -237,7 +237,7 @@ static inline void pv_l1tf_domain_init(struct domain *d)
     d->arch.pv.check_l1tf = is_hardware_domain(d) ? opt_pv_l1tf_hwdom
                                                   : opt_pv_l1tf_domu;
 
-#if defined(CONFIG_SHADOW_PAGING) && defined(CONFIG_PV)
+#ifdef CONFIG_SHADOW_PAGING
     tasklet_init(&d->arch.paging.shadow.pv_l1tf_tasklet,
                  pv_l1tf_tasklet, (unsigned long)d);
 #endif
@@ -245,7 +245,7 @@ static inline void pv_l1tf_domain_init(struct domain *d)
 
 static inline void pv_l1tf_domain_destroy(struct domain *d)
 {
-#if defined(CONFIG_SHADOW_PAGING) && defined(CONFIG_PV)
+#ifdef CONFIG_SHADOW_PAGING
     tasklet_kill(&d->arch.paging.shadow.pv_l1tf_tasklet);
 #endif
 }
