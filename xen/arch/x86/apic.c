@@ -92,6 +92,11 @@ static int modern_apic(void)
     if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
         boot_cpu_data.x86 >= 0xf)
         return 1;
+
+    /* Hygon systems use modern APIC */
+    if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON)
+        return 1;
+
     lvr = apic_read(APIC_LVR);
     version = GET_APIC_VERSION(lvr);
     return version >= 0x14;
