@@ -254,18 +254,26 @@
  * sector-size
  *      Values:         <uint32_t>
  *
- *      The logical sector size, in bytes, of the backend device.
+ *      The logical block size, in bytes, of the underlying storage. This
+ *      must be a power of two with a minimum value of 512.
+ *
+ *      NOTE: Because of implementation bugs in some frontends this must be
+ *            set to 512, unless the frontend advertizes a non-zero value
+ *            in its "feature-large-sector-size" xenbus node. (See below).
  *
  * physical-sector-size
  *      Values:         <uint32_t>
+ *      Default Value:  <"sector-size">
  *
- *      The physical sector size, in bytes, of the backend device.
+ *      The physical block size, in bytes, of the backend storage. This
+ *      must be an integer multiple of "sector-size".
  *
  * sectors
  *      Values:         <uint64_t>
  *
- *      The size of the backend device, expressed in units of its logical
- *      sector size ("sector-size").
+ *      The size of the backend device, expressed in units of "sector-size".
+ *      The product of "sector-size" and "sectors" must also be an integer
+ *      multiple of "physical-sector-size", if that node is present.
  *
  *****************************************************************************
  *                            Frontend XenBus Nodes
@@ -321,6 +329,8 @@
  *      The size of the frontend allocated request ring buffer in units of
  *      machine pages.  The value must be a power of 2.
  *
+ *--------------------------------- Features ---------------------------------
+ *
  * feature-persistent
  *      Values:         0/1 (boolean)
  *      Default Value:  0
@@ -341,6 +351,17 @@
  *      grants gets used commonly. This is done in case the backend driver
  *      decides to limit the maximum number of persistently mapped grants
  *      to a value less than RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST.
+ *
+ * feature-large-sector-size
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *
+ *      A value of "1" indicates that the frontend will correctly supply and
+ *      interpret all sector-based quantities in terms of the "sector-size"
+ *      value supplied in the backend info, whatever that may be set to.
+ *      If this node is not present or its value is "0" then it is assumed
+ *      that the frontend requires that the logical block size is 512 as it
+ *      is hardcoded (which is the case in some frontend implementations).
  *
  *------------------------- Virtual Device Properties -------------------------
  *
@@ -607,12 +628,11 @@
 #define BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST 8
 
 /*
- * NB. first_sect and last_sect in blkif_request_segment, as well as
- * sector_number in blkif_request, are always expressed in 512-byte units.
- * However they must be properly aligned to the real sector size of the
- * physical disk, which is reported in the "physical-sector-size" node in
- * the backend xenbus info. Also the xenbus "sectors" node is expressed in
- * 512-byte units.
+ * NB. 'first_sect' and 'last_sect' in blkif_request_segment, as well as
+ * 'sector_number' in blkif_request, blkif_request_discard and
+ * blkif_request_indirect are sector-based quantities. See the description
+ * of the "feature-large-sector-size" frontend xenbus node above for
+ * more information.
  */
 struct blkif_request_segment {
     grant_ref_t gref;        /* reference to I/O buffer frame        */
