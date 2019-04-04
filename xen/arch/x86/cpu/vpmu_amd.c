@@ -538,28 +538,12 @@ int svm_vpmu_initialise(struct vcpu *v)
     return 0;
 }
 
-int __init amd_vpmu_init(void)
+static int __init common_init(void)
 {
     unsigned int i;
 
-    switch ( current_cpu_data.x86 )
+    if ( !num_counters )
     {
-    case 0x15:
-        num_counters = F15H_NUM_COUNTERS;
-        counters = AMD_F15H_COUNTERS;
-        ctrls = AMD_F15H_CTRLS;
-        k7_counters_mirrored = 1;
-        break;
-    case 0x10:
-    case 0x12:
-    case 0x14:
-    case 0x16:
-        num_counters = F10H_NUM_COUNTERS;
-        counters = AMD_F10H_COUNTERS;
-        ctrls = AMD_F10H_CTRLS;
-        k7_counters_mirrored = 0;
-        break;
-    default:
         printk(XENLOG_WARNING "VPMU: Unsupported CPU family %#x\n",
                current_cpu_data.x86);
         return -EINVAL;
@@ -586,3 +570,43 @@ int __init amd_vpmu_init(void)
     return 0;
 }
 
+int __init amd_vpmu_init(void)
+{
+    switch ( current_cpu_data.x86 )
+    {
+    case 0x15:
+    case 0x17:
+        num_counters = F15H_NUM_COUNTERS;
+        counters = AMD_F15H_COUNTERS;
+        ctrls = AMD_F15H_CTRLS;
+        k7_counters_mirrored = 1;
+        break;
+
+    case 0x10:
+    case 0x12:
+    case 0x14:
+    case 0x16:
+        num_counters = F10H_NUM_COUNTERS;
+        counters = AMD_F10H_COUNTERS;
+        ctrls = AMD_F10H_CTRLS;
+        k7_counters_mirrored = 0;
+        break;
+    }
+
+    return common_init();
+}
+
+int __init hygon_vpmu_init(void)
+{
+    switch ( current_cpu_data.x86 )
+    {
+    case 0x18:
+        num_counters = F15H_NUM_COUNTERS;
+        counters = AMD_F15H_COUNTERS;
+        ctrls = AMD_F15H_CTRLS;
+        k7_counters_mirrored = 1;
+        break;
+    }
+
+    return common_init();
+}

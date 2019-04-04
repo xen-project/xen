@@ -52,6 +52,7 @@ struct arch_vpmu_ops {
 int core2_vpmu_init(void);
 int vmx_vpmu_initialise(struct vcpu *);
 int amd_vpmu_init(void);
+int hygon_vpmu_init(void);
 int svm_vpmu_initialise(struct vcpu *);
 
 struct vpmu_struct {
