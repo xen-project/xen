@@ -176,6 +176,7 @@ static int update_domain_cpuid_info(struct domain *d,
                 break;
 
             case X86_VENDOR_AMD:
+            case X86_VENDOR_HYGON:
                 mask &= ((uint64_t)ecx << 32) | edx;
 
                 /*
@@ -220,7 +221,7 @@ static int update_domain_cpuid_info(struct domain *d,
             uint32_t eax = ctl->eax;
             uint32_t ebx = p->feat._7b0;
 
-            if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+            if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
                 mask &= ((uint64_t)eax << 32) | ebx;
 
             d->arch.pv.cpuidmasks->_7ab0 = mask;
@@ -281,8 +282,11 @@ static int update_domain_cpuid_info(struct domain *d,
             if ( cpu_has_cmp_legacy )
                 ecx |= cpufeat_mask(X86_FEATURE_CMP_LEGACY);
 
-            /* If not emulating AMD, clear the duplicated features in e1d. */
-            if ( p->x86_vendor != X86_VENDOR_AMD )
+            /*
+             * If not emulating AMD or Hygon, clear the duplicated features
+             * in e1d.
+             */
+            if ( !(p->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
                 edx &= ~CPUID_COMMON_1D_FEATURES;
 
             switch ( boot_cpu_data.x86_vendor )
@@ -292,6 +296,7 @@ static int update_domain_cpuid_info(struct domain *d,
                 break;
 
             case X86_VENDOR_AMD:
+            case X86_VENDOR_HYGON:
                 mask &= ((uint64_t)ecx << 32) | edx;
 
                 /*
