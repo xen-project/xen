@@ -542,7 +542,7 @@ int __init dom0_setup_permissions(struct domain *d)
                             paddr_to_pfn(MSI_ADDR_BASE_LO +
                                          MSI_ADDR_DEST_ID_MASK));
     /* HyperTransport range. */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
         rc |= iomem_deny_access(d, paddr_to_pfn(0xfdULL << 32),
                                 paddr_to_pfn((1ULL << 40) - 1));
 

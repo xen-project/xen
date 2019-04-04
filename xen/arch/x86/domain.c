@@ -1279,13 +1279,14 @@ arch_do_vcpu_op(
 }
 
 /*
- * Loading a nul selector does not clear bases and limits on AMD CPUs. Be on
- * the safe side and re-initialize both to flat segment values before loading
- * a nul selector.
+ * Loading a nul selector does not clear bases and limits on AMD or Hygon
+ * CPUs. Be on the safe side and re-initialize both to flat segment values
+ * before loading a nul selector.
  */
 #define preload_segment(seg, value) do {              \
     if ( !((value) & ~3) &&                           \
-         boot_cpu_data.x86_vendor == X86_VENDOR_AMD ) \
+         (boot_cpu_data.x86_vendor &                  \
+          (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )      \
         asm volatile ( "movl %k0, %%" #seg            \
                        :: "r" (FLAT_USER_DS32) );     \
 } while ( false )
