@@ -661,8 +661,7 @@ int cpufreq_cpu_init(unsigned int cpuid)
     int ret;
 
     /* Currently we only handle Intel and AMD processor */
-    if ( (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ) ||
-         (boot_cpu_data.x86_vendor == X86_VENDOR_AMD ) )
+    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_AMD) )
         ret = cpufreq_add_cpu(cpuid);
     else
         ret = -EFAULT;

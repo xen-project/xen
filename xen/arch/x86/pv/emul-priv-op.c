@@ -1066,8 +1066,7 @@ static int write_msr(unsigned int reg, uint64_t val,
 
     case MSR_IA32_MPERF:
     case MSR_IA32_APERF:
-        if ( (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL) &&
-             (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) )
+        if ( !(boot_cpu_data.x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_AMD)) )
             break;
         if ( likely(!is_cpufreq_controller(currd)) ||
              wrmsr_safe(reg, val) == 0 )
