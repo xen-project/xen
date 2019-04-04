@@ -71,6 +71,12 @@ static inline void cpuid_count_leaf(
  */
 unsigned int x86_cpuid_lookup_vendor(uint32_t ebx, uint32_t ecx, uint32_t edx);
 
+/**
+ * Given Xen's internal vendor ID, return a string suitable for printing.
+ * Returns "Unknown" for any unrecognised ID.
+ */
+const char *x86_cpuid_vendor_to_str(unsigned int vendor);
+
 #define CPUID_GUEST_NR_BASIC      (0xdu + 1)
 #define CPUID_GUEST_NR_CACHE      (5u + 1)
 #define CPUID_GUEST_NR_FEAT       (0u + 1)

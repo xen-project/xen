@@ -793,7 +793,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 }
 
 const struct cpu_dev amd_cpu_dev = {
-	.c_vendor	= "AMD",
 	.c_early_init	= early_init_amd,
 	.c_init		= init_amd,
 };

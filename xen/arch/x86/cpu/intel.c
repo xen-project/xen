@@ -349,7 +349,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 }
 
 const struct cpu_dev intel_cpu_dev = {
-	.c_vendor	= "Intel",
 	.c_early_init	= early_init_intel,
 	.c_init		= init_intel,
 };

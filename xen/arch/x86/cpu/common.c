@@ -102,7 +102,6 @@ static void default_init(struct cpuinfo_x86 * c)
 
 static const struct cpu_dev default_cpu = {
 	.c_init	= default_init,
-	.c_vendor = "Unknown",
 };
 static const struct cpu_dev *this_cpu = &default_cpu;
 
@@ -306,7 +305,7 @@ void __init early_cpu_init(void)
 
 	printk(XENLOG_INFO
 	       "CPU Vendor: %s, Family %u (%#x), Model %u (%#x), Stepping %u (raw %08x)\n",
-	       this_cpu->c_vendor, c->x86, c->x86,
+	       x86_cpuid_vendor_to_str(c->x86_vendor), c->x86, c->x86,
 	       c->x86_model, c->x86_model, c->x86_mask, eax);
 
 	eax = cpuid_eax(0x80000000);
@@ -661,12 +660,8 @@ void print_cpu_info(unsigned int cpu)
 
 	printk("CPU%u: ", cpu);
 
-	if (c->x86_vendor < X86_VENDOR_NUM)
-		vendor = this_cpu->c_vendor;
-	else
-		vendor = c->x86_vendor_id;
-
-	if (vendor && strncmp(c->x86_model_id, vendor, strlen(vendor)))
+	vendor = x86_cpuid_vendor_to_str(c->x86_vendor);
+	if (strncmp(c->x86_model_id, vendor, strlen(vendor)))
 		printk("%s ", vendor);
 
 	if (!c->x86_model_id[0])

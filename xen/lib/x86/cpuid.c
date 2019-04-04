@@ -34,6 +34,18 @@ unsigned int x86_cpuid_lookup_vendor(uint32_t ebx, uint32_t ecx, uint32_t edx)
     return X86_VENDOR_UNKNOWN;
 }
 
+const char *x86_cpuid_vendor_to_str(unsigned int vendor)
+{
+    switch ( vendor )
+    {
+    case X86_VENDOR_INTEL:    return "Intel";
+    case X86_VENDOR_AMD:      return "AMD";
+    case X86_VENDOR_CENTAUR:  return "Centaur";
+    case X86_VENDOR_SHANGHAI: return "Shanghai";
+    default:                  return "Unknown";
+    }
+}
+
 /* Recalculate the content in a CPUID policy which is derived from raw data. */
 static void recalculate_synth(struct cpuid_policy *p)
 {
