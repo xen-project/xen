@@ -46,6 +46,7 @@ static void test_vendor_identification(void)
         { { "AuthenticAMD" }, X86_VENDOR_AMD },
         { { "CentaurHauls" }, X86_VENDOR_CENTAUR },
         { { "  Shanghai  " }, X86_VENDOR_SHANGHAI },
+        { { "HygonGenuine" }, X86_VENDOR_HYGON },
 
         { { ""             }, X86_VENDOR_UNKNOWN },
         { { "            " }, X86_VENDOR_UNKNOWN },

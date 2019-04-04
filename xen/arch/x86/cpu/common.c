@@ -286,6 +286,7 @@ void __init early_cpu_init(void)
 	case X86_VENDOR_AMD:	  this_cpu = &amd_cpu_dev;      break;
 	case X86_VENDOR_CENTAUR:  this_cpu = &centaur_cpu_dev;  break;
 	case X86_VENDOR_SHANGHAI: this_cpu = &shanghai_cpu_dev; break;
+	case X86_VENDOR_HYGON:    this_cpu = &hygon_cpu_dev;    break;
 	default:
 		printk(XENLOG_ERR
 		       "Unrecognised or unsupported CPU vendor '%.12s'\n",

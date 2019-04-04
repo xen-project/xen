@@ -526,7 +526,7 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
                                                           : c->cpu_core_id);
 }
 
-static void early_init_amd(struct cpuinfo_x86 *c)
+void early_init_amd(struct cpuinfo_x86 *c)
 {
 	if (c == &boot_cpu_data)
 		amd_init_levelling();

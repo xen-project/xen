@@ -36,6 +36,12 @@ unsigned int x86_cpuid_lookup_vendor(uint32_t ebx, uint32_t ecx, uint32_t edx)
              edx == X86_VENDOR_SHANGHAI_EDX )
             return X86_VENDOR_SHANGHAI;
         break;
+
+    case X86_VENDOR_HYGON_EBX:
+        if ( ecx == X86_VENDOR_HYGON_ECX &&
+             edx == X86_VENDOR_HYGON_EDX )
+            return X86_VENDOR_HYGON;
+        break;
     }
 
     return X86_VENDOR_UNKNOWN;
@@ -49,6 +55,7 @@ const char *x86_cpuid_vendor_to_str(unsigned int vendor)
     case X86_VENDOR_AMD:      return "AMD";
     case X86_VENDOR_CENTAUR:  return "Centaur";
     case X86_VENDOR_SHANGHAI: return "Shanghai";
+    case X86_VENDOR_HYGON:    return "Hygon";
     default:                  return "Unknown";
     }
 }
