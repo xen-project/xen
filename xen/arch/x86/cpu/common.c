@@ -42,8 +42,6 @@ unsigned int __read_mostly levelling_caps;
 DEFINE_PER_CPU(struct cpuidmasks, cpuidmasks);
 struct cpuidmasks __read_mostly cpuidmask_defaults;
 
-const struct cpu_dev *__read_mostly cpu_devs[X86_VENDOR_NUM] = {};
-
 unsigned int paddr_bits __read_mostly = 36;
 unsigned int hap_paddr_bits __read_mostly = 36;
 unsigned int vaddr_bits __read_mostly = VADDR_BITS;
@@ -270,7 +268,7 @@ static inline u32 phys_pkg_id(u32 cpuid_apic, int index_msb)
 
    WARNING: this function is only called on the BP.  Don't add code here
    that is supposed to run on all CPUs. */
-static void __init early_cpu_detect(void)
+void __init early_cpu_init(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 	u32 eax, ebx, ecx, edx;
@@ -284,12 +282,16 @@ static void __init early_cpu_detect(void)
 	*(u32 *)&c->x86_vendor_id[4] = edx;
 
 	c->x86_vendor = x86_cpuid_lookup_vendor(ebx, ecx, edx);
-	if (c->x86_vendor < ARRAY_SIZE(cpu_devs) && cpu_devs[c->x86_vendor])
-		this_cpu = cpu_devs[c->x86_vendor];
-	else
+	switch (c->x86_vendor) {
+	case X86_VENDOR_INTEL:	  this_cpu = &intel_cpu_dev;    break;
+	case X86_VENDOR_AMD:	  this_cpu = &amd_cpu_dev;      break;
+	case X86_VENDOR_CENTAUR:  this_cpu = &centaur_cpu_dev;  break;
+	case X86_VENDOR_SHANGHAI: this_cpu = &shanghai_cpu_dev; break;
+	default:
 		printk(XENLOG_ERR
 		       "Unrecognised or unsupported CPU vendor '%.12s'\n",
 		       c->x86_vendor_id);
+	}
 
 	cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
 	c->x86 = get_cpu_family(eax, &c->x86_model, &c->x86_mask);
@@ -676,23 +678,6 @@ void print_cpu_info(unsigned int cpu)
 }
 
 static cpumask_t cpu_initialized;
-
-/* This is hacky. :)
- * We're emulating future behavior.
- * In the future, the cpu-specific init functions will be called implicitly
- * via the magic of initcalls.
- * They will insert themselves into the cpu_devs structure.
- * Then, when cpu_init() is called, we can just iterate over that array.
- */
-
-void __init early_cpu_init(void)
-{
-	intel_cpu_init();
-	amd_init_cpu();
-	centaur_init_cpu();
-	shanghai_init_cpu();
-	early_cpu_detect();
-}
 
 /*
  * Sets up system tables and descriptors.

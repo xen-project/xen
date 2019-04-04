@@ -348,17 +348,8 @@ static void init_intel(struct cpuinfo_x86 *c)
 		__set_bit(X86_FEATURE_ARAT, c->x86_capability);
 }
 
-static const struct cpu_dev intel_cpu_dev = {
+const struct cpu_dev intel_cpu_dev = {
 	.c_vendor	= "Intel",
 	.c_early_init	= early_init_intel,
 	.c_init		= init_intel,
 };
-
-int __init intel_cpu_init(void)
-{
-	cpu_devs[X86_VENDOR_INTEL] = &intel_cpu_dev;
-	return 0;
-}
-
-// arch_initcall(intel_cpu_init);
-

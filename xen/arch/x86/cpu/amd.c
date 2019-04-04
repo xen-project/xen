@@ -792,14 +792,8 @@ static void init_amd(struct cpuinfo_x86 *c)
 	check_syscfg_dram_mod_en();
 }
 
-static const struct cpu_dev amd_cpu_dev = {
+const struct cpu_dev amd_cpu_dev = {
 	.c_vendor	= "AMD",
 	.c_early_init	= early_init_amd,
 	.c_init		= init_amd,
 };
-
-int __init amd_init_cpu(void)
-{
-	cpu_devs[X86_VENDOR_AMD] = &amd_cpu_dev;
-	return 0;
-}
