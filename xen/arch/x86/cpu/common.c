@@ -331,7 +331,7 @@ void __init early_cpu_init(void)
 			hap_paddr_bits = PADDR_BITS;
 	}
 
-	if (c->x86_vendor != X86_VENDOR_AMD)
+	if (!(c->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)))
 		park_offline_cpus = opt_mce;
 
 	initialize_cpu_data(0);

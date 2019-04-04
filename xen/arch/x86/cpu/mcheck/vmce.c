@@ -154,6 +154,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
             break;
 
         case X86_VENDOR_AMD:
+        case X86_VENDOR_HYGON:
             ret = vmce_amd_rdmsr(v, msr, val);
             break;
 
@@ -284,6 +285,7 @@ static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
             break;
 
         case X86_VENDOR_AMD:
+        case X86_VENDOR_HYGON:
             ret = vmce_amd_wrmsr(v, msr, val);
             break;
 

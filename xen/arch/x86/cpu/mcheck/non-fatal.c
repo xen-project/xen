@@ -101,7 +101,8 @@ static int __init init_nonfatal_mce_checker(void)
 	 */
 	switch (c->x86_vendor) {
 	case X86_VENDOR_AMD:
-		/* Assume we are on K8 or newer AMD CPU here */
+	case X86_VENDOR_HYGON:
+		/* Assume we are on K8 or newer AMD or Hygon CPU here */
 		amd_nonfatal_mcheck_init(c);
 		break;
 

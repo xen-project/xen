@@ -778,6 +778,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     switch ( c->x86_vendor )
     {
     case X86_VENDOR_AMD:
+    case X86_VENDOR_HYGON:
         inited = amd_mcheck_init(c);
         break;
 
@@ -1172,10 +1173,10 @@ static bool x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
 
             /* MSRs that the HV will take care of */
             case MSR_K8_HWCR:
-                if ( c->x86_vendor == X86_VENDOR_AMD )
+                if ( c->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
                     reason = "HV will operate HWCR";
                 else
-                    reason = "only supported on AMD";
+                    reason = "only supported on AMD or Hygon";
                 break;
 
             default:

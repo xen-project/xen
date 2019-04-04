@@ -286,7 +286,10 @@ enum mcheck_type
 amd_mcheck_init(struct cpuinfo_x86 *ci)
 {
     uint32_t i;
-    enum mcequirk_amd_flags quirkflag = mcequirk_lookup_amd_quirkdata(ci);
+    enum mcequirk_amd_flags quirkflag = 0;
+
+    if ( ci->x86_vendor != X86_VENDOR_HYGON )
+        quirkflag = mcequirk_lookup_amd_quirkdata(ci);
 
     /* Assume that machine check support is available.
      * The minimum provided support is at least the K8. */
