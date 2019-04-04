@@ -1490,15 +1490,15 @@ int vmx_del_msr(struct vcpu *v, uint32_t msr, enum vmx_msr_list_type type)
     switch ( type )
     {
     case VMX_MSR_HOST:
-        __vmwrite(VM_EXIT_MSR_LOAD_COUNT, vmx->host_msr_count--);
+        __vmwrite(VM_EXIT_MSR_LOAD_COUNT, --vmx->host_msr_count);
         break;
 
     case VMX_MSR_GUEST:
-        __vmwrite(VM_EXIT_MSR_STORE_COUNT, vmx->msr_save_count--);
+        __vmwrite(VM_EXIT_MSR_STORE_COUNT, --vmx->msr_save_count);
 
         /* Fallthrough */
     case VMX_MSR_GUEST_LOADONLY:
-        __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, vmx->msr_load_count--);
+        __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, --vmx->msr_load_count);
         break;
     }
 
