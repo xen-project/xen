@@ -455,6 +455,8 @@ L:	xen-devel@lists.xenproject.org
 F:	xen/arch/x86/
 F:	xen/include/asm-x86/
 F:	xen/include/public/arch-x86/
+F:	xen/include/xen/lib/x86
+F:	xen/lib/x86
 F:	tools/firmware/hvmloader/
 F:	tools/firmware/rombios/
 F:	tools/firmware/vgabios/
