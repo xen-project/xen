@@ -947,6 +947,16 @@ static int create_xen_table(lpae_t *entry)
     return 0;
 }
 
+static lpae_t *xen_map_table(mfn_t mfn)
+{
+    return map_domain_page(mfn);
+}
+
+static void xen_unmap_table(const lpae_t *table)
+{
+    unmap_domain_page(table);
+}
+
 /* Sanity check of the entry */
 static bool xen_pt_check_entry(lpae_t entry, mfn_t mfn, unsigned int flags)
 {
@@ -1016,6 +1026,7 @@ static bool xen_pt_check_entry(lpae_t entry, mfn_t mfn, unsigned int flags)
 static int xen_pt_update_entry(unsigned long addr, mfn_t mfn,
                                unsigned int flags)
 {
+    int rc;
     lpae_t pte, *entry;
     lpae_t *third = NULL;
 
@@ -1034,15 +1045,17 @@ static int xen_pt_update_entry(unsigned long addr, mfn_t mfn,
 
     BUG_ON(!lpae_is_valid(*entry));
 
-    third = mfn_to_virt(lpae_get_mfn(*entry));
+    third = xen_map_table(lpae_get_mfn(*entry));
     entry = &third[third_table_offset(addr)];
 
+    rc = -EINVAL;
     if ( !xen_pt_check_entry(*entry, mfn, flags) )
-        return -EINVAL;
+        goto out;
 
     /* If we are only populating page-table, then we are done. */
+    rc = 0;
     if ( flags & _PAGE_POPULATE )
-        return 0;
+        goto out;
 
     /* We are removing the page */
     if ( !(flags & _PAGE_PRESENT) )
@@ -1067,7 +1080,12 @@ static int xen_pt_update_entry(unsigned long addr, mfn_t mfn,
 
     write_pte(entry, pte);
 
-    return 0;
+    rc = 0;
+
+out:
+    xen_unmap_table(third);
+
+    return rc;
 }
 
 static DEFINE_SPINLOCK(xen_pt_lock);
