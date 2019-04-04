@@ -587,7 +587,7 @@ static void vcpu_move_locked(struct vcpu *v, unsigned int new_cpu)
  * return if it can't (because v is still running); in that case
  * vcpu_migrate_finish() will be called by context_saved().
  */
-void vcpu_migrate_start(struct vcpu *v)
+static void vcpu_migrate_start(struct vcpu *v)
 {
     set_bit(_VPF_migrating, &v->pause_flags);
     vcpu_sleep_nosync_locked(v);
