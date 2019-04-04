@@ -192,7 +192,7 @@ int8_t __read_mostly opt_xpti_domu = -1;
 
 static __init void xpti_init_default(uint64_t caps)
 {
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
         caps = ARCH_CAPS_RDCL_NO;
 
     if ( caps & ARCH_CAPS_RDCL_NO )
@@ -438,7 +438,7 @@ static bool __init retpoline_safe(uint64_t caps)
 {
     unsigned int ucode_rev = this_cpu(ucode_cpu_info).cpu_sig.rev;
 
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
         return true;
 
     if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
