@@ -45,12 +45,8 @@ static inline void invalidate_icache_local(void)
     isb();
 }
 
-/*
- * Flush all hypervisor mappings from the data TLB of the local
- * processor. This is not sufficient when changing code mappings or
- * for self modifying code.
- */
-static inline void flush_xen_data_tlb_local(void)
+/* Flush all hypervisor mappings from the TLB of the local processor. */
+static inline void flush_xen_tlb_local(void)
 {
     asm volatile (
         "dsb    sy;"                    /* Ensure visibility of PTE writes */
@@ -61,14 +57,13 @@ static inline void flush_xen_data_tlb_local(void)
 }
 
 /* Flush TLB of local processor for address va. */
-static inline void  __flush_xen_data_tlb_one_local(vaddr_t va)
+static inline void  __flush_xen_tlb_one_local(vaddr_t va)
 {
     asm volatile("tlbi vae2, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
 }
 
-/* Flush TLB of all processors in the inner-shareable domain for
- * address va. */
-static inline void __flush_xen_data_tlb_one(vaddr_t va)
+/* Flush TLB of all processors in the inner-shareable domain for address va. */
+static inline void __flush_xen_tlb_one(vaddr_t va)
 {
     asm volatile("tlbi vae2is, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
 }

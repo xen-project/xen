@@ -234,18 +234,18 @@ static inline int clean_and_invalidate_dcache_va_range
 } while (0)
 
 /*
- * Flush a range of VA's hypervisor mappings from the data TLB of the
- * local processor. This is not sufficient when changing code mappings
- * or for self modifying code.
+ * Flush a range of VA's hypervisor mappings from the TLB of the local
+ * processor.
  */
-static inline void flush_xen_data_tlb_range_va_local(unsigned long va,
-                                                     unsigned long size)
+static inline void flush_xen_tlb_range_va_local(vaddr_t va,
+                                                unsigned long size)
 {
-    unsigned long end = va + size;
+    vaddr_t end = va + size;
+
     dsb(sy); /* Ensure preceding are visible */
     while ( va < end )
     {
-        __flush_xen_data_tlb_one_local(va);
+        __flush_xen_tlb_one_local(va);
         va += PAGE_SIZE;
     }
     dsb(sy); /* Ensure completion of the TLB flush */
@@ -253,18 +253,18 @@ static inline void flush_xen_data_tlb_range_va_local(unsigned long va,
 }
 
 /*
- * Flush a range of VA's hypervisor mappings from the data TLB of all
- * processors in the inner-shareable domain. This is not sufficient
- * when changing code mappings or for self modifying code.
+ * Flush a range of VA's hypervisor mappings from the TLB of all
+ * processors in the inner-shareable domain.
  */
-static inline void flush_xen_data_tlb_range_va(unsigned long va,
-                                               unsigned long size)
+static inline void flush_xen_tlb_range_va(vaddr_t va,
+                                          unsigned long size)
 {
-    unsigned long end = va + size;
+    vaddr_t end = va + size;
+
     dsb(sy); /* Ensure preceding are visible */
     while ( va < end )
     {
-        __flush_xen_data_tlb_one(va);
+        __flush_xen_tlb_one(va);
         va += PAGE_SIZE;
     }
     dsb(sy); /* Ensure completion of the TLB flush */

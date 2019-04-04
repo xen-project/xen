@@ -337,7 +337,7 @@ void set_fixmap(unsigned map, mfn_t mfn, unsigned int flags)
     pte.pt.table = 1; /* 4k mappings always have this bit set */
     pte.pt.xn = 1;
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
+    flush_xen_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 /* Remove a mapping from a fixmap entry */
@@ -345,7 +345,7 @@ void clear_fixmap(unsigned map)
 {
     lpae_t pte = {0};
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
+    flush_xen_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 /* Create Xen's mappings of memory.
@@ -379,7 +379,7 @@ static void __init create_mappings(lpae_t *second,
         write_pte(p + i, pte);
         pte.pt.base += 1 << LPAE_SHIFT;
     }
-    flush_xen_data_tlb_local();
+    flush_xen_tlb_local();
 }
 
 #ifdef CONFIG_DOMAIN_PAGE
@@ -457,7 +457,7 @@ void *map_domain_page(mfn_t mfn)
      * We may not have flushed this specific subpage at map time,
      * since we only flush the 4k page not the superpage
      */
-    flush_xen_data_tlb_range_va_local(va, PAGE_SIZE);
+    flush_xen_tlb_range_va_local(va, PAGE_SIZE);
 
     return (void *)va;
 }
@@ -573,7 +573,7 @@ void __init remove_early_mappings(void)
     write_pte(xen_second + second_table_offset(BOOT_FDT_VIRT_START), pte);
     write_pte(xen_second + second_table_offset(BOOT_FDT_VIRT_START + SZ_2M),
               pte);
-    flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, BOOT_FDT_SLOT_SIZE);
+    flush_xen_tlb_range_va(BOOT_FDT_VIRT_START, BOOT_FDT_SLOT_SIZE);
 }
 
 /*
@@ -590,7 +590,7 @@ static void xen_pt_enforce_wnx(void)
      * before flushing the TLBs.
      */
     isb();
-    flush_xen_data_tlb_local();
+    flush_xen_tlb_local();
 }
 
 extern void switch_ttbr(uint64_t ttbr);
@@ -843,7 +843,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
         vaddr += FIRST_SIZE;
     }
 
-    flush_xen_data_tlb_local();
+    flush_xen_tlb_local();
 }
 #endif
 
@@ -1016,7 +1016,7 @@ static int create_xen_entries(enum xenmap_operation op,
                 BUG();
         }
     }
-    flush_xen_data_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
+    flush_xen_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
 
     rc = 0;
 
@@ -1093,7 +1093,7 @@ static void set_pte_flags_on_range(const char *p, unsigned long l, enum mg mg)
         }
         write_pte(xen_xenmap + i, pte);
     }
-    flush_xen_data_tlb_local();
+    flush_xen_tlb_local();
 }
 
 /* Release all __init and __initdata ranges to be reused */
