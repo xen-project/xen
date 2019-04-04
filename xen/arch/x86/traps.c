@@ -1973,6 +1973,9 @@ static unsigned int calc_ler_msr(void)
             return MSR_IA32_LASTINTFROMIP;
         }
         break;
+
+    case X86_VENDOR_HYGON:
+        return MSR_IA32_LASTINTFROMIP;
     }
 
     return 0;
