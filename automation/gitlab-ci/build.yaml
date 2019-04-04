@@ -301,6 +301,16 @@ debian-unstable-32-gcc-debug:
   variables:
     CONTAINER: debian:unstable-i386
 
+fedora-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: fedora:latest
+
+fedora-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: fedora:latest
+
 # Ubuntu Trusty's Clang is 3.4 while Xen requires 3.5
 
 ubuntu-trusty-gcc:
