@@ -233,44 +233,6 @@ static inline int clean_and_invalidate_dcache_va_range
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)
 
-/*
- * Flush a range of VA's hypervisor mappings from the TLB of the local
- * processor.
- */
-static inline void flush_xen_tlb_range_va_local(vaddr_t va,
-                                                unsigned long size)
-{
-    vaddr_t end = va + size;
-
-    dsb(sy); /* Ensure preceding are visible */
-    while ( va < end )
-    {
-        __flush_xen_tlb_one_local(va);
-        va += PAGE_SIZE;
-    }
-    dsb(sy); /* Ensure completion of the TLB flush */
-    isb();
-}
-
-/*
- * Flush a range of VA's hypervisor mappings from the TLB of all
- * processors in the inner-shareable domain.
- */
-static inline void flush_xen_tlb_range_va(vaddr_t va,
-                                          unsigned long size)
-{
-    vaddr_t end = va + size;
-
-    dsb(sy); /* Ensure preceding are visible */
-    while ( va < end )
-    {
-        __flush_xen_tlb_one(va);
-        va += PAGE_SIZE;
-    }
-    dsb(sy); /* Ensure completion of the TLB flush */
-    isb();
-}
-
 /* Flush the dcache for an entire page. */
 void flush_page_to_ram(unsigned long mfn, bool sync_icache);
 

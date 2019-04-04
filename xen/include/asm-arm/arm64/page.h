@@ -45,29 +45,6 @@ static inline void invalidate_icache_local(void)
     isb();
 }
 
-/* Flush all hypervisor mappings from the TLB of the local processor. */
-static inline void flush_xen_tlb_local(void)
-{
-    asm volatile (
-        "dsb    sy;"                    /* Ensure visibility of PTE writes */
-        "tlbi   alle2;"                 /* Flush hypervisor TLB */
-        "dsb    sy;"                    /* Ensure completion of TLB flush */
-        "isb;"
-        : : : "memory");
-}
-
-/* Flush TLB of local processor for address va. */
-static inline void  __flush_xen_tlb_one_local(vaddr_t va)
-{
-    asm volatile("tlbi vae2, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
-}
-
-/* Flush TLB of all processors in the inner-shareable domain for address va. */
-static inline void __flush_xen_tlb_one(vaddr_t va)
-{
-    asm volatile("tlbi vae2is, %0;" : : "r" (va>>PAGE_SHIFT) : "memory");
-}
-
 /* Ask the MMU to translate a VA for us */
 static inline uint64_t __va_to_par(vaddr_t va)
 {
