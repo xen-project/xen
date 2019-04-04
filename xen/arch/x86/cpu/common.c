@@ -113,6 +113,14 @@ bool __init probe_cpuid_faulting(void)
 	uint64_t val;
 	int rc;
 
+	/*
+	 * Don't bother looking for CPUID faulting if we aren't virtualised on
+	 * AMD or Hygon hardware - it won't be present.
+	 */
+	if ((boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
+	    !cpu_has_hypervisor)
+		return false;
+
 	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val)) == 0)
 		raw_msr_policy.plaform_info.cpuid_faulting =
 			val & MSR_PLATFORM_INFO_CPUID_FAULTING;
