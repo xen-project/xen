@@ -957,6 +957,51 @@ static void xen_unmap_table(const lpae_t *table)
     unmap_domain_page(table);
 }
 
+#define XEN_TABLE_MAP_FAILED 0
+#define XEN_TABLE_SUPER_PAGE 1
+#define XEN_TABLE_NORMAL_PAGE 2
+
+/*
+ * Take the currently mapped table, find the corresponding entry,
+ * and map the next table, if available.
+ *
+ * The read_only parameters indicates whether intermediate tables should
+ * be allocated when not present.
+ *
+ * Return values:
+ *  XEN_TABLE_MAP_FAILED: Either read_only was set and the entry
+ *  was empty, or allocating a new page failed.
+ *  XEN_TABLE_NORMAL_PAGE: next level mapped normally
+ *  XEN_TABLE_SUPER_PAGE: The next entry points to a superpage.
+ */
+static int xen_pt_next_level(bool read_only, unsigned int level,
+                             lpae_t **table, unsigned int offset)
+{
+    lpae_t *entry;
+    int ret;
+
+    entry = *table + offset;
+
+    if ( !lpae_is_valid(*entry) )
+    {
+        if ( read_only )
+            return XEN_TABLE_MAP_FAILED;
+
+        ret = create_xen_table(entry);
+        if ( ret )
+            return XEN_TABLE_MAP_FAILED;
+    }
+
+    /* The function xen_pt_next_level is never called at the 3rd level */
+    if ( lpae_is_mapping(*entry, level) )
+        return XEN_TABLE_SUPER_PAGE;
+
+    xen_unmap_table(*table);
+    *table = xen_map_table(lpae_get_mfn(*entry));
+
+    return XEN_TABLE_NORMAL_PAGE;
+}
+
 /* Sanity check of the entry */
 static bool xen_pt_check_entry(lpae_t entry, mfn_t mfn, unsigned int flags)
 {
@@ -1023,30 +1068,65 @@ static bool xen_pt_check_entry(lpae_t entry, mfn_t mfn, unsigned int flags)
     return true;
 }
 
-static int xen_pt_update_entry(unsigned long addr, mfn_t mfn,
-                               unsigned int flags)
+static int xen_pt_update_entry(mfn_t root, unsigned long virt,
+                               mfn_t mfn, unsigned int flags)
 {
     int rc;
+    unsigned int level;
+    /* We only support 4KB mapping (i.e level 3) for now */
+    unsigned int target = 3;
+    lpae_t *table;
+    /*
+     * The intermediate page tables are read-only when the MFN is not valid
+     * and we are not populating page table.
+     * This means we either modify permissions or remove an entry.
+     */
+    bool read_only = mfn_eq(mfn, INVALID_MFN) && !(flags & _PAGE_POPULATE);
     lpae_t pte, *entry;
-    lpae_t *third = NULL;
+
+    /* convenience aliases */
+    DECLARE_OFFSETS(offsets, (paddr_t)virt);
 
     /* _PAGE_POPULATE and _PAGE_PRESENT should never be set together. */
     ASSERT((flags & (_PAGE_POPULATE|_PAGE_PRESENT)) != (_PAGE_POPULATE|_PAGE_PRESENT));
 
-    entry = &xen_second[second_linear_offset(addr)];
-    if ( !lpae_is_valid(*entry) || !lpae_is_table(*entry, 2) )
+    table = xen_map_table(root);
+    for ( level = HYP_PT_ROOT_LEVEL; level < target; level++ )
     {
-        int rc = create_xen_table(entry);
-        if ( rc < 0 ) {
-            printk("%s: L2 failed\n", __func__);
-            return rc;
+        rc = xen_pt_next_level(read_only, level, &table, offsets[level]);
+        if ( rc == XEN_TABLE_MAP_FAILED )
+        {
+            /*
+             * We are here because xen_pt_next_level has failed to map
+             * the intermediate page table (e.g the table does not exist
+             * and the pt is read-only). It is a valid case when
+             * removing a mapping as it may not exist in the page table.
+             * In this case, just ignore it.
+             */
+            if ( flags & (_PAGE_PRESENT|_PAGE_POPULATE) )
+            {
+                mm_printk("%s: Unable to map level %u\n", __func__, level);
+                rc = -ENOENT;
+                goto out;
+            }
+            else
+            {
+                rc = 0;
+                goto out;
+            }
         }
+        else if ( rc != XEN_TABLE_NORMAL_PAGE )
+            break;
     }
 
-    BUG_ON(!lpae_is_valid(*entry));
+    if ( level != target )
+    {
+        mm_printk("%s: Shattering superpage is not supported\n", __func__);
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
 
-    third = xen_map_table(lpae_get_mfn(*entry));
-    entry = &third[third_table_offset(addr)];
+    entry = table + offsets[level];
 
     rc = -EINVAL;
     if ( !xen_pt_check_entry(*entry, mfn, flags) )
@@ -1083,7 +1163,7 @@ static int xen_pt_update_entry(unsigned long addr, mfn_t mfn,
     rc = 0;
 
 out:
-    xen_unmap_table(third);
+    xen_unmap_table(table);
 
     return rc;
 }
@@ -1097,6 +1177,15 @@ static int xen_pt_update(unsigned long virt,
 {
     int rc = 0;
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
+
+    /*
+     * For arm32, page-tables are different on each CPUs. Yet, they share
+     * some common mappings. It is assumed that only common mappings
+     * will be modified with this function.
+     *
+     * XXX: Add a check.
+     */
+    const mfn_t root = virt_to_mfn(THIS_CPU_PGTABLE);
 
     /*
      * The hardware was configured to forbid mapping both writeable and
@@ -1119,9 +1208,9 @@ static int xen_pt_update(unsigned long virt,
 
     spin_lock(&xen_pt_lock);
 
-    for( ; addr < addr_end; addr += PAGE_SIZE )
+    for ( ; addr < addr_end; addr += PAGE_SIZE )
     {
-        rc = xen_pt_update_entry(addr, mfn, flags);
+        rc = xen_pt_update_entry(root, addr, mfn, flags);
         if ( rc )
             break;
 
