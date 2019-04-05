@@ -18,13 +18,8 @@
 
         .file "vmx/entry.S"
 
-#include <xen/errno.h>
-#include <xen/softirq.h>
-#include <asm/types.h>
 #include <asm/asm_defns.h>
-#include <asm/apicdef.h>
 #include <asm/page.h>
-#include <public/xen.h>
 
 #define VMRESUME     .byte 0x0f,0x01,0xc3
 #define VMLAUNCH     .byte 0x0f,0x01,0xc2

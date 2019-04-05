@@ -19,13 +19,8 @@
 
         .file "svm/entry.S"
 
-#include <xen/errno.h>
-#include <xen/softirq.h>
-#include <asm/types.h>
 #include <asm/asm_defns.h>
-#include <asm/apicdef.h>
 #include <asm/page.h>
-#include <public/xen.h>
 
 #define VMRUN  .byte 0x0F,0x01,0xD8
 #define STGI   .byte 0x0F,0x01,0xDC

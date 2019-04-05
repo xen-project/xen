@@ -4,10 +4,7 @@
 
         .file "x86_64/compat/entry.S"
 
-#include <xen/errno.h>
-#include <xen/softirq.h>
 #include <asm/asm_defns.h>
-#include <asm/apicdef.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
