@@ -59,7 +59,7 @@ int replace_grant_p2m_mapping(uint64_t addr, mfn_t frame,
     if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
         return GNTST_general_error;
 
-    old_mfn = get_gfn(d, gfn, &type);
+    old_mfn = get_gfn_query(d, gfn, &type);
     if ( !p2m_is_grant(type) || !mfn_eq(old_mfn, frame) )
     {
         put_gfn(d, gfn);
