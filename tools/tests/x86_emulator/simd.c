@@ -278,9 +278,33 @@ static inline bool _to_bool(byte_vec_t bv)
 #if (INT_SIZE == 4 || UINT_SIZE == 4 || INT_SIZE == 8 || UINT_SIZE == 8) && \
      defined(__AVX512F__) && (VEC_SIZE == 64 || defined(__AVX512VL__))
 # if INT_SIZE == 4 || UINT_SIZE == 4
+#  define broadcast(x) ({ \
+    vec_t t_; \
+    asm ( "%{evex%} vpbroadcastd %1, %0" \
+          : "=v" (t_) : "m" (*(int[1]){ x }) ); \
+    t_; \
+})
+#  define broadcast2(x) ({ \
+    vec_t t_; \
+    asm ( "vpbroadcastd %k1, %0" : "=v" (t_) : "r" (x) ); \
+    t_; \
+})
 #  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
                               (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
 # elif INT_SIZE == 8 || UINT_SIZE == 8
+#  define broadcast(x) ({ \
+    vec_t t_; \
+    asm ( "%{evex%} vpbroadcastq %1, %0" \
+          : "=v" (t_) : "m" (*(long long[1]){ x }) ); \
+    t_; \
+})
+#  ifdef __x86_64__
+#   define broadcast2(x) ({ \
+    vec_t t_; \
+    asm ( "vpbroadcastq %1, %0" : "=v" (t_) : "r" ((x) + 0ULL) ); \
+    t_; \
+})
+#  endif
 #  define mix(x, y) ((vec_t)B(movdqa64_, _mask, (vdi_t)(x), (vdi_t)(y), 0b01010101))
 # endif
 # if INT_SIZE == 4
@@ -977,8 +1001,12 @@ int simd_test(void)
     if ( !eq(swap2(src), inv) ) return __LINE__;
 #endif
 
-#if defined(broadcast)
+#ifdef broadcast
     if ( !eq(broadcast(ELEM_COUNT + 1), src + inv) ) return __LINE__;
+#endif
+
+#ifdef broadcast2
+    if ( !eq(broadcast2(ELEM_COUNT + 1), src + inv) ) return __LINE__;
 #endif
 
 #if defined(interleave_lo) && defined(interleave_hi)

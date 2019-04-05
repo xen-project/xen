@@ -164,6 +164,9 @@ static const struct test avx512f_all[] = {
     INSN(paddq,        66,   0f, d4,    vl,      q, vl),
     INSN(pand,         66,   0f, db,    vl,     dq, vl),
     INSN(pandn,        66,   0f, df,    vl,     dq, vl),
+//       pbroadcast,   66, 0f38, 7c,          dq64
+    INSN(pbroadcastd,  66, 0f38, 58,    el,      d, el),
+    INSN(pbroadcastq,  66, 0f38, 59,    el,      q, el),
     INSN(pcmp,         66, 0f3a, 1f,    vl,     dq, vl),
     INSN(pcmpeqd,      66,   0f, 76,    vl,      d, vl),
     INSN(pcmpeqq,      66, 0f38, 29,    vl,      q, vl),
@@ -222,6 +225,7 @@ static const struct test avx512f_128[] = {
 
 static const struct test avx512f_no128[] = {
     INSN(broadcastf32x4, 66, 0f38, 1a, el_4,  d, vl),
+    INSN(broadcasti32x4, 66, 0f38, 5a, el_4,  d, vl),
     INSN(broadcastsd,    66, 0f38, 19, el,    q, el),
     INSN(extractf32x4,   66, 0f3a, 19, el_4,  d, vl),
     INSN(extracti32x4,   66, 0f3a, 39, el_4,  d, vl),
@@ -231,6 +235,7 @@ static const struct test avx512f_no128[] = {
 
 static const struct test avx512f_512[] = {
     INSN(broadcastf64x4, 66, 0f38, 1b, el_4, q, vl),
+    INSN(broadcasti64x4, 66, 0f38, 5b, el_4, q, vl),
     INSN(extractf64x4,   66, 0f3a, 1b, el_4, q, vl),
     INSN(extracti64x4,   66, 0f3a, 3b, el_4, q, vl),
     INSN(insertf64x4,    66, 0f3a, 1a, el_4, q, vl),
@@ -250,6 +255,10 @@ static const struct test avx512bw_all[] = {
     INSN(paddw,       66,   0f, fd,    vl,    w, vl),
     INSN(pavgb,       66,   0f, e0,    vl,    b, vl),
     INSN(pavgw,       66,   0f, e3,    vl,    w, vl),
+    INSN(pbroadcastb, 66, 0f38, 78,    el,    b, el),
+//       pbroadcastb, 66, 0f38, 7a,           b
+    INSN(pbroadcastw, 66, 0f38, 79,    el_2,  b, vl),
+//       pbroadcastw, 66, 0f38, 7b,           b
     INSN(pcmp,        66, 0f3a, 3f,    vl,   bw, vl),
     INSN(pcmpeqb,     66,   0f, 74,    vl,    b, vl),
     INSN(pcmpeqw,     66,   0f, 75,    vl,    w, vl),
@@ -301,6 +310,7 @@ static const struct test avx512bw_128[] = {
 static const struct test avx512dq_all[] = {
     INSN_PFP(and,              0f, 54),
     INSN_PFP(andn,             0f, 55),
+    INSN(broadcasti32x2, 66, 0f38, 59, el_2,  d, vl),
     INSN_PFP(or,               0f, 56),
     INSN(pmullq,         66, 0f38, 40,   vl,  q, vl),
     INSN_PFP(xor,              0f, 57),
@@ -314,6 +324,7 @@ static const struct test avx512dq_128[] = {
 static const struct test avx512dq_no128[] = {
     INSN(broadcastf32x2, 66, 0f38, 19, el_2, d, vl),
     INSN(broadcastf64x2, 66, 0f38, 1a, el_2, q, vl),
+    INSN(broadcasti64x2, 66, 0f38, 5a, el_2, q, vl),
     INSN(extractf64x2,   66, 0f3a, 19, el_2, q, vl),
     INSN(extracti64x2,   66, 0f3a, 39, el_2, q, vl),
     INSN(insertf64x2,    66, 0f3a, 18, el_2, q, vl),
@@ -322,6 +333,7 @@ static const struct test avx512dq_no128[] = {
 
 static const struct test avx512dq_512[] = {
     INSN(broadcastf32x8, 66, 0f38, 1b, el_8, d, vl),
+    INSN(broadcasti32x8, 66, 0f38, 5b, el_8, d, vl),
     INSN(extractf32x8,   66, 0f3a, 1b, el_8, d, vl),
     INSN(extracti32x8,   66, 0f3a, 3b, el_8, d, vl),
     INSN(insertf32x8,    66, 0f3a, 1a, el_8, d, vl),

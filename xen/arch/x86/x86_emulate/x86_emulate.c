@@ -454,9 +454,13 @@ static const struct ext0f38_table {
     [0x40] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x41] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x45 ... 0x47] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
-    [0x58 ... 0x59] = { .simd_size = simd_other, .two_op = 1 },
-    [0x5a] = { .simd_size = simd_128, .two_op = 1 },
-    [0x78 ... 0x79] = { .simd_size = simd_other, .two_op = 1 },
+    [0x58] = { .simd_size = simd_other, .two_op = 1, .d8s = 2 },
+    [0x59] = { .simd_size = simd_other, .two_op = 1, .d8s = 3 },
+    [0x5a] = { .simd_size = simd_128, .two_op = 1, .d8s = 4 },
+    [0x5b] = { .simd_size = simd_256, .two_op = 1, .d8s = d8s_vl_by_2 },
+    [0x78] = { .simd_size = simd_other, .two_op = 1 },
+    [0x79] = { .simd_size = simd_other, .two_op = 1, .d8s = 1 },
+    [0x7a ... 0x7c] = { .simd_size = simd_none, .two_op = 1 },
     [0x8c] = { .simd_size = simd_packed_int },
     [0x8e] = { .simd_size = simd_packed_int, .to_mem = 1 },
     [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1 },
@@ -2634,6 +2638,11 @@ x86_decode_0f38(
         /* fall through */
     case 0xf6: /* adcx / adox */
         ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
+        break;
+
+    case X86EMUL_OPC_EVEX_66(0, 0x7a): /* vpbroadcastb */
+    case X86EMUL_OPC_EVEX_66(0, 0x7b): /* vpbroadcastw */
+    case X86EMUL_OPC_EVEX_66(0, 0x7c): /* vpbroadcast{d,q} */
         break;
 
     case 0xf0: /* movbe / crc32 */
@@ -8233,6 +8242,8 @@ x86_emulate(
         goto avx512f_no_sae;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x18): /* vbroadcastss xmm/m32,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x58): /* vpbroadcastd xmm/m32,[xyz]mm{k} */
+        op_bytes = elem_bytes;
         generate_exception_if(evex.w || evex.brs, EXC_UD);
     avx512_broadcast:
         /*
@@ -8252,17 +8263,27 @@ x86_emulate(
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x1b): /* vbroadcastf32x8 m256,zmm{k} */
                                             /* vbroadcastf64x4 m256,zmm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x5b): /* vbroadcasti32x8 m256,zmm{k} */
+                                            /* vbroadcasti64x4 m256,zmm{k} */
         generate_exception_if(ea.type != OP_MEM || evex.lr != 2, EXC_UD);
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x19): /* vbroadcastsd xmm/m64,{y,z}mm{k} */
                                             /* vbroadcastf32x2 xmm/m64,{y,z}mm{k} */
-        generate_exception_if(!evex.lr || evex.brs, EXC_UD);
+        generate_exception_if(!evex.lr, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x59): /* vpbroadcastq xmm/m64,[xyz]mm{k} */
+                                            /* vbroadcasti32x2 xmm/m64,[xyz]mm{k} */
+        if ( b == 0x59 )
+            op_bytes = 8;
+        generate_exception_if(evex.brs, EXC_UD);
         if ( !evex.w )
             host_and_vcpu_must_have(avx512dq);
         goto avx512_broadcast;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x1a): /* vbroadcastf32x4 m128,{y,z}mm{k} */
                                             /* vbroadcastf64x2 m128,{y,z}mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x5a): /* vbroadcasti32x4 m128,{y,z}mm{k} */
+                                            /* vbroadcasti64x2 m128,{y,z}mm{k} */
         generate_exception_if(ea.type != OP_MEM || !evex.lr || evex.brs,
                               EXC_UD);
         if ( evex.w )
@@ -8455,6 +8476,45 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x5a): /* vbroadcasti128 m128,ymm */
         generate_exception_if(ea.type != OP_MEM || !vex.l || vex.w, EXC_UD);
         goto simd_0f_avx2;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x78): /* vpbroadcastb xmm/m8,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x79): /* vpbroadcastw xmm/m16,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512bw);
+        generate_exception_if(evex.w || evex.brs, EXC_UD);
+        op_bytes = elem_bytes = 1 << (b & 1);
+        /* See the comment at the avx512_broadcast label. */
+        op_mask |= !(b & 1 ? !(uint32_t)op_mask : !op_mask);
+        goto avx512f_no_sae;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x7a): /* vpbroadcastb r32,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x7b): /* vpbroadcastw r32,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512bw);
+        generate_exception_if(evex.w, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x7c): /* vpbroadcast{d,q} reg,[xyz]mm{k} */
+        generate_exception_if((ea.type != OP_REG || evex.brs ||
+                               evex.reg != 0xf || !evex.RX),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        avx512_vlen_check(false);
+        get_fpu(X86EMUL_FPU_zmm);
+
+        opc = init_evex(stub);
+        opc[0] = b;
+        /* Convert GPR source to %rAX. */
+        evex.b = 1;
+        if ( !mode_64bit() )
+            evex.w = 0;
+        opc[1] = modrm & 0xf8;
+        insn_bytes = EVEX_PFX_BYTES + 2;
+        opc[2] = 0xc3;
+
+        copy_EVEX(opc, evex);
+        invoke_stub("", "", "=g" (dummy) : "a" (src.val));
+
+        put_stub(stub);
+        ASSERT(!state->simd_size);
+        break;
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8c): /* vpmaskmov{d,q} mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8e): /* vpmaskmov{d,q} {x,y}mm,{x,y}mm,mem */
