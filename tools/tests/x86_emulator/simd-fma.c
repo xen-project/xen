@@ -5,13 +5,13 @@ ENTRY(fma_test);
 
 #if VEC_SIZE < 16 && !defined(to_bool)
 # define to_bool(cmp) (!~(cmp)[0])
-#elif VEC_SIZE == 16
+#elif VEC_SIZE == 16 && !defined(__AVX512VL__)
 # if FLOAT_SIZE == 4
 #  define to_bool(cmp) __builtin_ia32_vtestcps(cmp, (vec_t){} == 0)
 # elif FLOAT_SIZE == 8
 #  define to_bool(cmp) __builtin_ia32_vtestcpd(cmp, (vec_t){} == 0)
 # endif
-#elif VEC_SIZE == 32
+#elif VEC_SIZE == 32 && !defined(__AVX512VL__)
 # if FLOAT_SIZE == 4
 #  define to_bool(cmp) __builtin_ia32_vtestcps256(cmp, (vec_t){} == 0)
 # elif FLOAT_SIZE == 8

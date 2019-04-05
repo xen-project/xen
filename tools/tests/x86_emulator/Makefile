@@ -63,7 +63,7 @@ avx2-sg-flts := 4 8
 xop-vecs := $(avx-vecs)
 xop-ints := 1 2 4 8
 xop-flts := $(avx-flts)
-avx512f-vecs := 64
+avx512f-vecs := 64 16 32
 avx512f-ints := 4 8
 avx512f-flts := 4 8
 

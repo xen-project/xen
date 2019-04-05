@@ -539,7 +539,7 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define rotr(x, n) ((vec_t)__builtin_ia32_palignr128((vdi_t)(x), (vdi_t)(x), (n) * 64))
 # endif
 #endif
-#if VEC_SIZE == 16 && defined(__SSE4_1__)
+#if VEC_SIZE == 16 && defined(__SSE4_1__) && !defined(__AVX512VL__)
 # if INT_SIZE == 1
 #  define max(x, y) ((vec_t)__builtin_ia32_pmaxsb128((vqi_t)(x), (vqi_t)(y)))
 #  define min(x, y) ((vec_t)__builtin_ia32_pminsb128((vqi_t)(x), (vqi_t)(y)))
@@ -593,7 +593,7 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define mix(x, y) __builtin_ia32_blendpd(x, y, 0b10)
 # endif
 #endif
-#if VEC_SIZE == 32 && defined(__AVX__)
+#if VEC_SIZE == 32 && defined(__AVX__) && !defined(__AVX512VL__)
 # if FLOAT_SIZE == 4
 #  define dot_product(x, y) ({ \
     vec_t t_ = __builtin_ia32_dpps256(x, y, 0b11110001); \

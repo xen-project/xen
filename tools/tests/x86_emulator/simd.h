@@ -92,6 +92,15 @@ typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
 
 #ifdef __AVX512F__
 
+# if VEC_SIZE > ELEM_SIZE && (defined(VEC_MAX) ? VEC_MAX : VEC_SIZE) < 64
+#  pragma GCC target ( "avx512vl" )
+# endif
+
+# define REN(insn, old, new)                     \
+    asm ( ".macro v" #insn #old " o:vararg \n\t" \
+          "v" #insn #new " \\o             \n\t" \
+          ".endm" )
+
 /*
  * The original plan was to effect use of EVEX encodings for scalar as well as
  * 128- and 256-bit insn variants by restricting the compiler to use (on 64-bit
@@ -135,25 +144,88 @@ asm ( ".macro override insn    \n\t"
 # define OVR_FP(n) OVR_VFP(n); OVR_SFP(n)
 # define OVR_INT(n) OVR_BW(n); OVR_DQ(n)
 
+OVR_INT(broadcast);
 OVR_SFP(broadcast);
 OVR_SFP(comi);
 OVR_FP(add);
+OVR_INT(add);
 OVR_FP(div);
 OVR(extractps);
 OVR_FMA(fmadd, FP);
+OVR_FMA(fmaddsub, VFP);
 OVR_FMA(fmsub, FP);
+OVR_FMA(fmsubadd, VFP);
 OVR_FMA(fnmadd, FP);
 OVR_FMA(fnmsub, FP);
 OVR(insertps);
 OVR_FP(max);
+OVR_INT(maxs);
+OVR_INT(maxu);
 OVR_FP(min);
+OVR_INT(mins);
+OVR_INT(minu);
 OVR(movd);
 OVR(movq);
 OVR_SFP(mov);
+OVR_VFP(mova);
+OVR_VFP(movnt);
+OVR_VFP(movu);
 OVR_FP(mul);
+OVR_VFP(shuf);
+OVR_INT(sll);
+OVR_DQ(sllv);
 OVR_FP(sqrt);
+OVR_INT(sra);
+OVR_DQ(srav);
+OVR_INT(srl);
+OVR_DQ(srlv);
 OVR_FP(sub);
+OVR_INT(sub);
 OVR_SFP(ucomi);
+OVR_VFP(unpckh);
+OVR_VFP(unpckl);
+
+# ifdef __AVX512VL__
+#  if ELEM_SIZE == 8 && defined(__AVX512DQ__)
+REN(extract, f128, f64x2);
+REN(extract, i128, i64x2);
+REN(insert, f128, f64x2);
+REN(insert, i128, i64x2);
+#  else
+REN(extract, f128, f32x4);
+REN(extract, i128, i32x4);
+REN(insert, f128, f32x4);
+REN(insert, i128, i32x4);
+#  endif
+#  if ELEM_SIZE == 8
+REN(movdqa, , 64);
+REN(movdqu, , 64);
+REN(pand, , q);
+REN(pandn, , q);
+REN(por, , q);
+REN(pxor, , q);
+#  else
+#   if ELEM_SIZE == 1 && defined(__AVX512BW__)
+REN(movdq, a, u8);
+REN(movdqu, , 8);
+#   elif ELEM_SIZE == 2 && defined(__AVX512BW__)
+REN(movdq, a, u16);
+REN(movdqu, , 16);
+#   else
+REN(movdqa, , 32);
+REN(movdqu, , 32);
+#   endif
+REN(pand, , d);
+REN(pandn, , d);
+REN(por, , d);
+REN(pxor, , d);
+#  endif
+OVR(movntdq);
+OVR(movntdqa);
+OVR(pmulld);
+OVR(pmuldq);
+OVR(pmuludq);
+# endif
 
 # undef OVR_VFP
 # undef OVR_SFP
