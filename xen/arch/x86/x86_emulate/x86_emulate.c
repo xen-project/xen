@@ -512,9 +512,13 @@ static const struct ext0f3a_table {
     [0x0a ... 0x0b] = { .simd_size = simd_scalar_opc },
     [0x0c ... 0x0d] = { .simd_size = simd_packed_fp },
     [0x0e ... 0x0f] = { .simd_size = simd_packed_int },
-    [0x14 ... 0x17] = { .simd_size = simd_none, .to_mem = 1, .two_op = 1 },
+    [0x14] = { .simd_size = simd_none, .to_mem = 1, .two_op = 1, .d8s = 0 },
+    [0x15] = { .simd_size = simd_none, .to_mem = 1, .two_op = 1, .d8s = 1 },
+    [0x16] = { .simd_size = simd_none, .to_mem = 1, .two_op = 1, .d8s = d8s_dq64 },
+    [0x17] = { .simd_size = simd_none, .to_mem = 1, .two_op = 1, .d8s = 2 },
     [0x18] = { .simd_size = simd_128 },
-    [0x19] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
+    [0x19] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1, .d8s = 4 },
+    [0x1b] = { .simd_size = simd_256, .to_mem = 1, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x1d] = { .simd_size = simd_other, .to_mem = 1, .two_op = 1 },
     [0x1e ... 0x1f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x20] = { .simd_size = simd_none },
@@ -523,7 +527,8 @@ static const struct ext0f3a_table {
     [0x25] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x30 ... 0x33] = { .simd_size = simd_other, .two_op = 1 },
     [0x38] = { .simd_size = simd_128 },
-    [0x39] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1 },
+    [0x39] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1, .d8s = 4 },
+    [0x3b] = { .simd_size = simd_256, .to_mem = 1, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x3e ... 0x3f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
     [0x42] = { .simd_size = simd_packed_int },
@@ -2676,6 +2681,8 @@ x86_decode_0f3a(
      ... X86EMUL_OPC_66(0, 0x17):     /* pextr*, extractps */
     case X86EMUL_OPC_VEX_66(0, 0x14)
      ... X86EMUL_OPC_VEX_66(0, 0x17): /* vpextr*, vextractps */
+    case X86EMUL_OPC_EVEX_66(0, 0x14)
+     ... X86EMUL_OPC_EVEX_66(0, 0x17): /* vpextr*, vextractps */
     case X86EMUL_OPC_VEX_F2(0, 0xf0): /* rorx */
         break;
 
@@ -8881,9 +8888,9 @@ x86_emulate(
         opc[0] = b;
         /* Convert memory/GPR operand to (%rAX). */
         rex_prefix &= ~REX_B;
-        vex.b = 1;
+        evex.b = vex.b = 1;
         if ( !mode_64bit() )
-            vex.w = 0;
+            evex.w = vex.w = 0;
         opc[1] = modrm & 0x38;
         opc[2] = imm1;
         opc[3] = 0xc3;
@@ -8893,7 +8900,10 @@ x86_emulate(
             --opc;
         }
 
-        copy_REX_VEX(opc, rex_prefix, vex);
+        if ( evex_encoded() )
+            copy_EVEX(opc, evex);
+        else
+            copy_REX_VEX(opc, rex_prefix, vex);
         invoke_stub("", "", "=m" (dst.val) : "a" (&dst.val));
         put_stub(stub);
 
@@ -8917,6 +8927,52 @@ x86_emulate(
 
         opc = init_prefixes(stub);
         goto pextr;
+
+    case X86EMUL_OPC_EVEX_66(0x0f, 0xc5):   /* vpextrw $imm8,xmm,reg */
+        generate_exception_if(ea.type != OP_REG, EXC_UD);
+        /* Convert to alternative encoding: We want to use a memory operand. */
+        evex.opcx = ext_0f3a;
+        b = 0x15;
+        modrm <<= 3;
+        evex.r = evex.b;
+        evex.R = evex.x;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x14): /* vpextrb $imm8,xmm,r/m */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x15): /* vpextrw $imm8,xmm,r/m */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x16): /* vpextr{d,q} $imm8,xmm,r/m */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x17): /* vextractps $imm8,xmm,r/m */
+        generate_exception_if((evex.lr || evex.reg != 0xf || !evex.RX ||
+                               evex.opmsk || evex.brs),
+                              EXC_UD);
+        if ( !(b & 2) )
+            host_and_vcpu_must_have(avx512bw);
+        else if ( !(b & 1) )
+            host_and_vcpu_must_have(avx512dq);
+        else
+            host_and_vcpu_must_have(avx512f);
+        get_fpu(X86EMUL_FPU_zmm);
+        opc = init_evex(stub);
+        goto pextr;
+
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x19): /* vextractf32x4 $imm8,{y,z}mm,xmm/m128{k} */
+                                            /* vextractf64x2 $imm8,{y,z}mm,xmm/m128{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x39): /* vextracti32x4 $imm8,{y,z}mm,xmm/m128{k} */
+                                            /* vextracti64x2 $imm8,{y,z}mm,xmm/m128{k} */
+        if ( evex.w )
+            host_and_vcpu_must_have(avx512dq);
+        generate_exception_if(!evex.lr || evex.brs, EXC_UD);
+        fault_suppression = false;
+        goto avx512f_imm8_no_sae;
+
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x1b): /* vextractf32x8 $imm8,zmm,ymm/m256{k} */
+                                            /* vextractf64x4 $imm8,zmm,ymm/m256{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x3b): /* vextracti32x8 $imm8,zmm,ymm/m256{k} */
+                                            /* vextracti64x4 $imm8,zmm,ymm/m256{k} */
+        if ( !evex.w )
+            host_and_vcpu_must_have(avx512dq);
+        generate_exception_if(evex.lr != 2 || evex.brs, EXC_UD);
+        fault_suppression = false;
+        goto avx512f_imm8_no_sae;
 
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x1d): /* vcvtps2ph $imm8,{x,y}mm,xmm/mem */
     {

@@ -212,6 +212,7 @@ static const struct test avx512f_all[] = {
 };
 
 static const struct test avx512f_128[] = {
+    INSN(extractps, 66, 0f3a, 17, el,    d, el),
     INSN(mov,       66,   0f, 6e, el, dq64, el),
     INSN(mov,       66,   0f, 7e, el, dq64, el),
     INSN(movq,      f3,   0f, 7e, el,    q, el),
@@ -221,10 +222,14 @@ static const struct test avx512f_128[] = {
 static const struct test avx512f_no128[] = {
     INSN(broadcastf32x4, 66, 0f38, 1a, el_4,  d, vl),
     INSN(broadcastsd,    66, 0f38, 19, el,    q, el),
+    INSN(extractf32x4,   66, 0f3a, 19, el_4,  d, vl),
+    INSN(extracti32x4,   66, 0f3a, 39, el_4,  d, vl),
 };
 
 static const struct test avx512f_512[] = {
     INSN(broadcastf64x4, 66, 0f38, 1b, el_4, q, vl),
+    INSN(extractf64x4,   66, 0f3a, 1b, el_4, q, vl),
+    INSN(extracti64x4,   66, 0f3a, 3b, el_4, q, vl),
 };
 
 static const struct test avx512bw_all[] = {
@@ -280,6 +285,12 @@ static const struct test avx512bw_all[] = {
     INSN(ptestnm,     f3, 0f38, 26,    vl,   bw, vl),
 };
 
+static const struct test avx512bw_128[] = {
+    INSN(pextrb, 66, 0f3a, 14, el, b, el),
+//       pextrw, 66,   0f, c5,     w
+    INSN(pextrw, 66, 0f3a, 15, el, w, el),
+};
+
 static const struct test avx512dq_all[] = {
     INSN_PFP(and,              0f, 54),
     INSN_PFP(andn,             0f, 55),
@@ -288,13 +299,21 @@ static const struct test avx512dq_all[] = {
     INSN_PFP(xor,              0f, 57),
 };
 
+static const struct test avx512dq_128[] = {
+    INSN(pextr, 66, 0f3a, 16, el, dq64, el),
+};
+
 static const struct test avx512dq_no128[] = {
     INSN(broadcastf32x2, 66, 0f38, 19, el_2, d, vl),
     INSN(broadcastf64x2, 66, 0f38, 1a, el_2, q, vl),
+    INSN(extractf64x2,   66, 0f3a, 19, el_2, q, vl),
+    INSN(extracti64x2,   66, 0f3a, 39, el_2, q, vl),
 };
 
 static const struct test avx512dq_512[] = {
     INSN(broadcastf32x8, 66, 0f38, 1b, el_8, d, vl),
+    INSN(extractf32x8,   66, 0f3a, 1b, el_8, d, vl),
+    INSN(extracti32x8,   66, 0f3a, 3b, el_8, d, vl),
 };
 
 static const unsigned char vl_all[] = { VL_512, VL_128, VL_256 };
@@ -632,7 +651,9 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512f, no128);
     RUN(avx512f, 512);
     RUN(avx512bw, all);
+    RUN(avx512bw, 128);
     RUN(avx512dq, all);
+    RUN(avx512dq, 128);
     RUN(avx512dq, no128);
     RUN(avx512dq, 512);
 }
