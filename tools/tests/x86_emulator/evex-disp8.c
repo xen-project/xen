@@ -213,6 +213,7 @@ static const struct test avx512f_all[] = {
 
 static const struct test avx512f_128[] = {
     INSN(extractps, 66, 0f3a, 17, el,    d, el),
+    INSN(insertps,  66, 0f3a, 21, el,    d, el),
     INSN(mov,       66,   0f, 6e, el, dq64, el),
     INSN(mov,       66,   0f, 7e, el, dq64, el),
     INSN(movq,      f3,   0f, 7e, el,    q, el),
@@ -224,12 +225,16 @@ static const struct test avx512f_no128[] = {
     INSN(broadcastsd,    66, 0f38, 19, el,    q, el),
     INSN(extractf32x4,   66, 0f3a, 19, el_4,  d, vl),
     INSN(extracti32x4,   66, 0f3a, 39, el_4,  d, vl),
+    INSN(insertf32x4,    66, 0f3a, 18, el_4,  d, vl),
+    INSN(inserti32x4,    66, 0f3a, 38, el_4,  d, vl),
 };
 
 static const struct test avx512f_512[] = {
     INSN(broadcastf64x4, 66, 0f38, 1b, el_4, q, vl),
     INSN(extractf64x4,   66, 0f3a, 1b, el_4, q, vl),
     INSN(extracti64x4,   66, 0f3a, 3b, el_4, q, vl),
+    INSN(insertf64x4,    66, 0f3a, 1a, el_4, q, vl),
+    INSN(inserti64x4,    66, 0f3a, 3a, el_4, q, vl),
 };
 
 static const struct test avx512bw_all[] = {
@@ -289,6 +294,8 @@ static const struct test avx512bw_128[] = {
     INSN(pextrb, 66, 0f3a, 14, el, b, el),
 //       pextrw, 66,   0f, c5,     w
     INSN(pextrw, 66, 0f3a, 15, el, w, el),
+    INSN(pinsrb, 66, 0f3a, 20, el, b, el),
+    INSN(pinsrw, 66,   0f, c4, el, w, el),
 };
 
 static const struct test avx512dq_all[] = {
@@ -301,6 +308,7 @@ static const struct test avx512dq_all[] = {
 
 static const struct test avx512dq_128[] = {
     INSN(pextr, 66, 0f3a, 16, el, dq64, el),
+    INSN(pinsr, 66, 0f3a, 22, el, dq64, el),
 };
 
 static const struct test avx512dq_no128[] = {
@@ -308,12 +316,16 @@ static const struct test avx512dq_no128[] = {
     INSN(broadcastf64x2, 66, 0f38, 1a, el_2, q, vl),
     INSN(extractf64x2,   66, 0f3a, 19, el_2, q, vl),
     INSN(extracti64x2,   66, 0f3a, 39, el_2, q, vl),
+    INSN(insertf64x2,    66, 0f3a, 18, el_2, q, vl),
+    INSN(inserti64x2,    66, 0f3a, 38, el_2, q, vl),
 };
 
 static const struct test avx512dq_512[] = {
     INSN(broadcastf32x8, 66, 0f38, 1b, el_8, d, vl),
     INSN(extractf32x8,   66, 0f3a, 1b, el_8, d, vl),
     INSN(extracti32x8,   66, 0f3a, 3b, el_8, d, vl),
+    INSN(insertf32x8,    66, 0f3a, 1a, el_8, d, vl),
+    INSN(inserti32x8,    66, 0f3a, 3a, el_8, d, vl),
 };
 
 static const unsigned char vl_all[] = { VL_512, VL_128, VL_256 };
