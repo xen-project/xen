@@ -755,6 +755,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     /* Initialize traps early allow us to get backtrace when an error occurred */
     init_traps();
 
+    setup_pagetables(boot_phys_offset);
+
     smp_clear_cpu_maps();
 
     device_tree_flattened = early_fdt_map(fdt_paddr);
@@ -775,8 +777,6 @@ void __init start_xen(unsigned long boot_phys_offset,
                              (paddr_t)(uintptr_t)(_start + boot_phys_offset),
                              (paddr_t)(uintptr_t)(_end - _start + 1), false);
     BUG_ON(!xen_bootmodule);
-
-    setup_pagetables(boot_phys_offset);
 
     setup_mm(fdt_paddr, fdt_size);
 

@@ -522,7 +522,6 @@ static inline lpae_t pte_of_xenaddr(vaddr_t va)
     return mfn_to_xen_entry(maddr_to_mfn(ma), MT_NORMAL);
 }
 
-/* Map the FDT in the early boot page table */
 void * __init early_fdt_map(paddr_t fdt_paddr)
 {
     /* We are using 2MB superpage for mapping the FDT */
@@ -545,7 +544,7 @@ void * __init early_fdt_map(paddr_t fdt_paddr)
     /* The FDT is mapped using 2MB superpage */
     BUILD_BUG_ON(BOOT_FDT_VIRT_START % SZ_2M);
 
-    create_mappings(boot_second, BOOT_FDT_VIRT_START, paddr_to_pfn(base_paddr),
+    create_mappings(xen_second, BOOT_FDT_VIRT_START, paddr_to_pfn(base_paddr),
                     SZ_2M >> PAGE_SHIFT, SZ_2M);
 
     offset = fdt_paddr % SECOND_SIZE;
@@ -560,7 +559,7 @@ void * __init early_fdt_map(paddr_t fdt_paddr)
 
     if ( (offset + size) > SZ_2M )
     {
-        create_mappings(boot_second, BOOT_FDT_VIRT_START + SZ_2M,
+        create_mappings(xen_second, BOOT_FDT_VIRT_START + SZ_2M,
                         paddr_to_pfn(base_paddr + SZ_2M),
                         SZ_2M >> PAGE_SHIFT, SZ_2M);
     }
@@ -670,12 +669,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     pte = pte_of_xenaddr((vaddr_t)xen_fixmap);
     pte.pt.table = 1;
     xen_second[second_table_offset(FIXMAP_ADDR(0))] = pte;
-
-    /* ... DTB */
-    pte = boot_second[second_table_offset(BOOT_FDT_VIRT_START)];
-    xen_second[second_table_offset(BOOT_FDT_VIRT_START)] = pte;
-    pte = boot_second[second_table_offset(BOOT_FDT_VIRT_START + SZ_2M)];
-    xen_second[second_table_offset(BOOT_FDT_VIRT_START + SZ_2M)] = pte;
 
 #ifdef CONFIG_ARM_64
     ttbr = (uintptr_t) xen_pgtable + phys_offset;
