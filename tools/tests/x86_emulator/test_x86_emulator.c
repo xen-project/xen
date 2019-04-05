@@ -21,6 +21,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512f-opmask.h"
 #include "avx512dq-opmask.h"
 #include "avx512bw-opmask.h"
+#include "avx512f.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -248,6 +249,14 @@ static const struct {
     SIMD(OPMASK/b,    avx512dq_opmask,         1),
     SIMD(OPMASK/d,    avx512bw_opmask,         4),
     SIMD(OPMASK/q,    avx512bw_opmask,         8),
+    SIMD(AVX512F f32 scalar,  avx512f,        f4),
+    SIMD(AVX512F f32x16,      avx512f,      64f4),
+    SIMD(AVX512F f64 scalar,  avx512f,        f8),
+    SIMD(AVX512F f64x8,       avx512f,      64f8),
+    SIMD(AVX512F s32x16,      avx512f,      64i4),
+    SIMD(AVX512F u32x16,      avx512f,      64u4),
+    SIMD(AVX512F s64x8,       avx512f,      64i8),
+    SIMD(AVX512F u64x8,       avx512f,      64u8),
 #undef SIMD_
 #undef SIMD
 };

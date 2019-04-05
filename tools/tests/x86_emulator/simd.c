@@ -2,7 +2,41 @@
 
 ENTRY(simd_test);
 
-#if VEC_SIZE == 8 && defined(__SSE__)
+#if defined(__AVX512F__)
+# define ALL_TRUE (~0ULL >> (64 - ELEM_COUNT))
+# if VEC_SIZE == 4
+#  define eq(x, y) ({ \
+    float x_ = (x)[0]; \
+    float __attribute__((vector_size(16))) y_ = { (y)[0] }; \
+    unsigned short r_; \
+    asm ( "vcmpss $0, %1, %2, %0"  : "=k" (r_) : "m" (x_), "v" (y_) ); \
+    r_ == 1; \
+})
+# elif VEC_SIZE == 8
+#  define eq(x, y) ({ \
+    double x_ = (x)[0]; \
+    double __attribute__((vector_size(16))) y_ = { (y)[0] }; \
+    unsigned short r_; \
+    asm ( "vcmpsd $0, %1, %2, %0"  : "=k" (r_) : "m" (x_), "v" (y_) ); \
+    r_ == 1; \
+})
+# elif FLOAT_SIZE == 4
+/*
+ * gcc's (up to at least 8.2) __builtin_ia32_cmpps256_mask() has an anomaly in
+ * that its return type is QI rather than UQI, and hence the value would get
+ * sign-extended before comapring to ALL_TRUE. The same oddity does not matter
+ * for __builtin_ia32_cmppd256_mask(), as there only 4 bits are significant.
+ * Hence the extra " & ALL_TRUE".
+ */
+#  define eq(x, y) ((BR(cmpps, _mask, x, y, 0, -1) & ALL_TRUE) == ALL_TRUE)
+# elif FLOAT_SIZE == 8
+#  define eq(x, y) (BR(cmppd, _mask, x, y, 0, -1) == ALL_TRUE)
+# elif INT_SIZE == 4 || UINT_SIZE == 4
+#  define eq(x, y) (B(pcmpeqd, _mask, (vsi_t)(x), (vsi_t)(y), -1) == ALL_TRUE)
+# elif INT_SIZE == 8 || UINT_SIZE == 8
+#  define eq(x, y) (B(pcmpeqq, _mask, (vdi_t)(x), (vdi_t)(y), -1) == ALL_TRUE)
+# endif
+#elif VEC_SIZE == 8 && defined(__SSE__)
 # define to_bool(cmp) (__builtin_ia32_pmovmskb(cmp) == 0xff)
 #elif VEC_SIZE == 16
 # if defined(__AVX__) && defined(FLOAT_SIZE)
@@ -93,6 +127,56 @@ static inline bool _to_bool(byte_vec_t bv)
     touch(x); \
     __builtin_ia32_pfrcpit2(__builtin_ia32_pfrsqit1(__builtin_ia32_pfmul(t_, t_), x), t_); \
 })
+#elif defined(FLOAT_SIZE) && VEC_SIZE == FLOAT_SIZE && defined(__AVX512F__)
+# if FLOAT_SIZE == 4
+#  define sqrt(x) scalar_1op(x, "vsqrtss %[in], %[out], %[out]")
+# elif FLOAT_SIZE == 8
+#  define sqrt(x) scalar_1op(x, "vsqrtsd %[in], %[out], %[out]")
+# endif
+#elif defined(FLOAT_SIZE) && defined(__AVX512F__) && \
+      (VEC_SIZE == 64 || defined(__AVX512VL__))
+# if FLOAT_SIZE == 4
+#  define broadcast(x) ({ \
+    vec_t t_; \
+    asm ( "%{evex%} vbroadcastss %1, %0" \
+          : "=v" (t_) : "m" (*(float[1]){ x }) ); \
+    t_; \
+})
+#  define max(x, y) BR_(maxps, _mask, x, y, undef(), ~0)
+#  define min(x, y) BR_(minps, _mask, x, y, undef(), ~0)
+#  define mix(x, y) B(movaps, _mask, x, y, (0b0101010101010101 & ALL_TRUE))
+#  define sqrt(x) BR(sqrtps, _mask, x, undef(), ~0)
+#  if VEC_SIZE == 16
+#   define interleave_hi(x, y) B(unpckhps, _mask, x, y, undef(), ~0)
+#   define interleave_lo(x, y) B(unpcklps, _mask, x, y, undef(), ~0)
+#   define swap(x) B(shufps, _mask, x, x, 0b00011011, undef(), ~0)
+#  endif
+# elif FLOAT_SIZE == 8
+#  if VEC_SIZE >= 32
+#   define broadcast(x) ({ \
+    vec_t t_; \
+    asm ( "%{evex%} vbroadcastsd %1, %0" : "=v" (t_) \
+          : "m" (*(double[1]){ x }) ); \
+    t_; \
+})
+#  else
+#   define broadcast(x) ({ \
+    vec_t t_; \
+    asm ( "%{evex%} vpbroadcastq %1, %0" \
+          : "=v" (t_) : "m" (*(double[1]){ x }) ); \
+    t_; \
+})
+#  endif
+#  define max(x, y) BR_(maxpd, _mask, x, y, undef(), ~0)
+#  define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
+#  define mix(x, y) B(movapd, _mask, x, y, 0b01010101)
+#  define sqrt(x) BR(sqrtpd, _mask, x, undef(), ~0)
+#  if VEC_SIZE == 16
+#   define interleave_hi(x, y) B(unpckhpd, _mask, x, y, undef(), ~0)
+#   define interleave_lo(x, y) B(unpcklpd, _mask, x, y, undef(), ~0)
+#   define swap(x) B(shufpd, _mask, x, x, 0b01, undef(), ~0)
+#  endif
+# endif
 #elif FLOAT_SIZE == 4 && defined(__SSE__)
 # if VEC_SIZE == 32 && defined(__AVX__)
 #  if defined(__AVX2__)
@@ -191,7 +275,30 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define sqrt(x) scalar_1op(x, "sqrtsd %[in], %[out]")
 # endif
 #endif
-#if VEC_SIZE == 16 && defined(__SSE2__)
+#if (INT_SIZE == 4 || UINT_SIZE == 4 || INT_SIZE == 8 || UINT_SIZE == 8) && \
+     defined(__AVX512F__) && (VEC_SIZE == 64 || defined(__AVX512VL__))
+# if INT_SIZE == 4 || UINT_SIZE == 4
+#  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
+                              (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
+# elif INT_SIZE == 8 || UINT_SIZE == 8
+#  define mix(x, y) ((vec_t)B(movdqa64_, _mask, (vdi_t)(x), (vdi_t)(y), 0b01010101))
+# endif
+# if INT_SIZE == 4
+#  define max(x, y) B(pmaxsd, _mask, x, y, undef(), ~0)
+#  define min(x, y) B(pminsd, _mask, x, y, undef(), ~0)
+#  define mul_full(x, y) ((vec_t)B(pmuldq, _mask, x, y, (vdi_t)undef(), ~0))
+# elif UINT_SIZE == 4
+#  define max(x, y) ((vec_t)B(pmaxud, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
+#  define min(x, y) ((vec_t)B(pminud, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
+#  define mul_full(x, y) ((vec_t)B(pmuludq, _mask, (vsi_t)(x), (vsi_t)(y), (vdi_t)undef(), ~0))
+# elif INT_SIZE == 8
+#  define max(x, y) ((vec_t)B(pmaxsq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
+#  define min(x, y) ((vec_t)B(pminsq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
+# elif UINT_SIZE == 8
+#  define max(x, y) ((vec_t)B(pmaxuq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
+#  define min(x, y) ((vec_t)B(pminuq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
+# endif
+#elif VEC_SIZE == 16 && defined(__SSE2__)
 # if INT_SIZE == 1 || UINT_SIZE == 1
 #  define interleave_hi(x, y) ((vec_t)__builtin_ia32_punpckhbw128((vqi_t)(x), (vqi_t)(y)))
 #  define interleave_lo(x, y) ((vec_t)__builtin_ia32_punpcklbw128((vqi_t)(x), (vqi_t)(y)))
@@ -585,6 +692,10 @@ static inline bool _to_bool(byte_vec_t bv)
 #   define frac(x) scalar_1op(x, "vfrczsd %[in], %[out]")
 #  endif
 # endif
+#endif
+
+#if defined(__AVX512F__) && defined(FLOAT_SIZE)
+# include "simd-fma.c"
 #endif
 
 int simd_test(void)
@@ -1034,7 +1145,8 @@ int simd_test(void)
 # endif
 #endif
 
-#if defined(__XOP__) && VEC_SIZE == 16 && (INT_SIZE == 2 || INT_SIZE == 4)
+#if (defined(__XOP__) && VEC_SIZE == 16 && (INT_SIZE == 2 || INT_SIZE == 4)) || \
+    (defined(__AVX512F__) && defined(FLOAT_SIZE))
     return -fma_test();
 #endif
 

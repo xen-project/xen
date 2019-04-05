@@ -1,10 +1,9 @@
+#if !defined(__XOP__) && !defined(__AVX512F__)
 #include "simd.h"
-
-#ifndef __XOP__
 ENTRY(fma_test);
 #endif
 
-#if VEC_SIZE < 16
+#if VEC_SIZE < 16 && !defined(to_bool)
 # define to_bool(cmp) (!~(cmp)[0])
 #elif VEC_SIZE == 16
 # if FLOAT_SIZE == 4
@@ -24,7 +23,13 @@ ENTRY(fma_test);
 # define eq(x, y) to_bool((x) == (y))
 #endif
 
-#if VEC_SIZE == 16
+#if defined(__AVX512F__) && VEC_SIZE > FLOAT_SIZE
+# if FLOAT_SIZE == 4
+#  define fmaddsub(x, y, z) BR(vfmaddsubps, _mask, x, y, z, ~0)
+# elif FLOAT_SIZE == 8
+#  define fmaddsub(x, y, z) BR(vfmaddsubpd, _mask, x, y, z, ~0)
+# endif
+#elif VEC_SIZE == 16
 # if FLOAT_SIZE == 4
 #  define addsub(x, y) __builtin_ia32_addsubps(x, y)
 #  if defined(__FMA4__) || defined(__FMA__)
@@ -48,6 +53,10 @@ ENTRY(fma_test);
 #   define fmaddsub(x, y, z) __builtin_ia32_vfmaddsubpd256(x, y, z)
 #  endif
 # endif
+#endif
+
+#if defined(fmaddsub) && !defined(addsub)
+# define addsub(x, y) fmaddsub(x, broadcast(1), y)
 #endif
 
 int fma_test(void)
