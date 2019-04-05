@@ -2813,7 +2813,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
                           bool preemptible)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
-    int rc = 0, iommu_ret = 0;
+    int rc = 0;
 
     ASSERT(!(type & ~(PGT_type_mask | PGT_pae_xen_l2)));
     ASSERT(!in_irq());
@@ -2925,18 +2925,14 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             mfn_t mfn = page_to_mfn(page);
 
             if ( (x & PGT_type_mask) == PGT_writable_page )
-                iommu_ret = iommu_legacy_unmap(d, _dfn(mfn_x(mfn)),
-                                               PAGE_ORDER_4K);
+                rc = iommu_legacy_unmap(d, _dfn(mfn_x(mfn)), PAGE_ORDER_4K);
             else if ( type == PGT_writable_page )
-                iommu_ret = iommu_legacy_map(d, _dfn(mfn_x(mfn)), mfn,
-                                             PAGE_ORDER_4K,
-                                             IOMMUF_readable |
-                                             IOMMUF_writable);
+                rc = iommu_legacy_map(d, _dfn(mfn_x(mfn)), mfn, PAGE_ORDER_4K,
+                                      IOMMUF_readable | IOMMUF_writable);
 
-            if ( unlikely(iommu_ret) )
+            if ( unlikely(rc) )
             {
                 _put_page_type(page, false, NULL);
-                rc = iommu_ret;
                 goto out;
             }
         }
