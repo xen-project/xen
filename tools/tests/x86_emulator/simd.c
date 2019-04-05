@@ -311,10 +311,12 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define max(x, y) B(pmaxsd, _mask, x, y, undef(), ~0)
 #  define min(x, y) B(pminsd, _mask, x, y, undef(), ~0)
 #  define mul_full(x, y) ((vec_t)B(pmuldq, _mask, x, y, (vdi_t)undef(), ~0))
+#  define widen1(x) ((vec_t)B(pmovsxdq, _mask, x, (vdi_t)undef(), ~0))
 # elif UINT_SIZE == 4
 #  define max(x, y) ((vec_t)B(pmaxud, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
 #  define min(x, y) ((vec_t)B(pminud, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
 #  define mul_full(x, y) ((vec_t)B(pmuludq, _mask, (vsi_t)(x), (vsi_t)(y), (vdi_t)undef(), ~0))
+#  define widen1(x) ((vec_t)B(pmovzxdq, _mask, (vsi_half_t)(x), (vdi_t)undef(), ~0))
 # elif INT_SIZE == 8
 #  define max(x, y) ((vec_t)B(pmaxsq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 #  define min(x, y) ((vec_t)B(pminsq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
