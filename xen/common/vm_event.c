@@ -366,7 +366,7 @@ int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
  * Note: responses are handled the same way regardless of which ring they
  * arrive on.
  */
-void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
+static int vm_event_resume(struct domain *d, struct vm_event_domain *ved)
 {
     vm_event_response_t rsp;
 
@@ -379,6 +379,9 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
      * of them more succintly.
      */
     ASSERT(d != current->domain);
+
+    if ( unlikely(!vm_event_check_ring(ved)) )
+         return -ENODEV;
 
     /* Pull all responses off the ring. */
     while ( vm_event_get_response(d, ved, &rsp) )
@@ -443,6 +446,8 @@ void vm_event_resume(struct domain *d, struct vm_event_domain *ved)
                 vm_event_vcpu_unpause(v);
         }
     }
+
+    return 0;
 }
 
 void vm_event_cancel_slot(struct domain *d, struct vm_event_domain *ved)
@@ -529,30 +534,21 @@ int __vm_event_claim_slot(struct domain *d, struct vm_event_domain *ved,
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_paging_notification(struct vcpu *v, unsigned int port)
 {
-    struct domain *domain = v->domain;
-
-    if ( likely(vm_event_check_ring(domain->vm_event_paging)) )
-        vm_event_resume(domain, domain->vm_event_paging);
+    vm_event_resume(v->domain, v->domain->vm_event_paging);
 }
 #endif
 
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void monitor_notification(struct vcpu *v, unsigned int port)
 {
-    struct domain *domain = v->domain;
-
-    if ( likely(vm_event_check_ring(domain->vm_event_monitor)) )
-        vm_event_resume(domain, domain->vm_event_monitor);
+    vm_event_resume(v->domain, v->domain->vm_event_monitor);
 }
 
 #ifdef CONFIG_HAS_MEM_SHARING
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_sharing_notification(struct vcpu *v, unsigned int port)
 {
-    struct domain *domain = v->domain;
-
-    if ( likely(vm_event_check_ring(domain->vm_event_share)) )
-        vm_event_resume(domain, domain->vm_event_share);
+    vm_event_resume(v->domain, v->domain->vm_event_share);
 }
 #endif
 
@@ -676,10 +672,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
             break;
 
         case XEN_VM_EVENT_RESUME:
-            if ( vm_event_check_ring(d->vm_event_paging) )
-                vm_event_resume(d, d->vm_event_paging);
-            else
-                rc = -ENODEV;
+            rc = vm_event_resume(d, d->vm_event_paging);
             break;
 
         default:
@@ -717,10 +710,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
             break;
 
         case XEN_VM_EVENT_RESUME:
-            if ( vm_event_check_ring(d->vm_event_monitor) )
-                vm_event_resume(d, d->vm_event_monitor);
-            else
-                rc = -ENODEV;
+            rc = vm_event_resume(d, d->vm_event_monitor);
             break;
 
         default:
@@ -764,10 +754,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
             break;
 
         case XEN_VM_EVENT_RESUME:
-            if ( vm_event_check_ring(d->vm_event_share) )
-                vm_event_resume(d, d->vm_event_share);
-            else
-                rc = -ENODEV;
+            rc = vm_event_resume(d, d->vm_event_share);
             break;
 
         default:
