@@ -934,6 +934,9 @@ void __init console_init_preirq(void)
            xen_compiler(), debug_build() ? 'y' : 'n', xen_compile_date());
     printk("Latest ChangeSet: %s\n", xen_changeset());
 
+    /* Locate and print the buildid, if applicable. */
+    xen_build_init();
+
     if ( opt_sync_console )
     {
         serial_start_sync(sercon_handle);
