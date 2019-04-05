@@ -4697,12 +4697,10 @@ static int do_altp2m_op(
         if ( rc > 0 )
         {
             a.u.set_mem_access_multi.opaque = rc;
+            rc = -ERESTART;
             if ( __copy_field_to_guest(guest_handle_cast(arg, xen_hvm_altp2m_op_t),
                                        &a, u.set_mem_access_multi.opaque) )
                 rc = -EFAULT;
-            else
-                rc = hypercall_create_continuation(__HYPERVISOR_hvm_op, "lh",
-                                                   HVMOP_altp2m, arg);
         }
         break;
 
@@ -4821,14 +4819,8 @@ static int compat_altp2m_op(
     switch ( a.cmd )
     {
     case HVMOP_altp2m_set_mem_access_multi:
-        /*
-         * The return code can be positive only if it is the return value
-         * of hypercall_create_continuation. In this case, the opaque value
-         * must be copied back to the guest.
-         */
-        if ( rc > 0 )
+        if ( rc == -ERESTART )
         {
-            ASSERT(rc == __HYPERVISOR_hvm_op);
             a.u.set_mem_access_multi.opaque =
                 nat.altp2m_op->u.set_mem_access_multi.opaque;
             if ( __copy_field_to_guest(guest_handle_cast(arg,
