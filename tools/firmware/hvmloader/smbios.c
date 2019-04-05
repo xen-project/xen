@@ -497,9 +497,11 @@ static void *
 smbios_type_2_init(void *start)
 {
     struct smbios_type_2 *p = (struct smbios_type_2 *)start;
+    const char *s;
     uint8_t *ptr;
     void *pts;
     uint32_t length;
+    unsigned int counter = 0;
 
     pts = get_smbios_pt_struct(2, &length);
     if ( (pts != NULL)&&(length > 0) )
@@ -518,8 +520,71 @@ smbios_type_2_init(void *start)
         return (start + length);
     }
 
-    /* Only present when passed in */
-    return start;
+    memset(p, 0, sizeof(*p));
+    p->header.type = 2;
+    p->header.length = sizeof(struct smbios_type_2);
+    p->header.handle = SMBIOS_HANDLE_TYPE2;
+    p->feature_flags = 0x09; /* Board is a hosting board and replaceable */
+    p->chassis_handle = SMBIOS_HANDLE_TYPE3;
+    p->board_type = 0x0a; /* Motherboard */
+    start += sizeof(*p);
+
+    s = xenstore_read(HVM_XS_BASEBOARD_MANUFACTURER, NULL);
+    if ( (s != NULL) && (*s != '\0') )
+    {
+        strcpy(start, s);
+        start += strlen(s) + 1;
+        p->manufacturer_str = ++counter;
+    }
+
+    s = xenstore_read(HVM_XS_BASEBOARD_PRODUCT_NAME, NULL);
+    if ( (s != NULL) && (*s != '\0') )
+    {
+        strcpy(start, s);
+        start += strlen(s) + 1;
+        p->product_name_str = ++counter;
+    }
+
+    s = xenstore_read(HVM_XS_BASEBOARD_VERSION, NULL);
+    if ( (s != NULL) && (*s != '\0') )
+    {
+        strcpy(start, s);
+        start += strlen(s) + 1;
+        p->version_str = ++counter;
+    }
+
+    s = xenstore_read(HVM_XS_BASEBOARD_SERIAL_NUMBER, NULL);
+    if ( (s != NULL) && (*s != '\0') )
+    {
+        strcpy(start, s);
+        start += strlen(s) + 1;
+        p->serial_number_str = ++counter;
+    }
+
+    s = xenstore_read(HVM_XS_BASEBOARD_ASSET_TAG, NULL);
+    if ( (s != NULL) && (*s != '\0') )
+    {
+        strcpy(start, s);
+        start += strlen(s) + 1;
+        p->asset_tag_str = ++counter;
+    }
+
+    s = xenstore_read(HVM_XS_BASEBOARD_LOCATION_IN_CHASSIS, NULL);
+    if ( (s != NULL) && (*s != '\0') )
+    {
+        strcpy(start, s);
+        start += strlen(s) + 1;
+        p->location_in_chassis_str = ++counter;
+    }
+
+    if ( counter )
+    {
+        *(uint8_t *)start = 0;
+        return start + 1;
+    }
+
+    /* Only present when passed in or with customized string */
+    return start - sizeof(*p);
 }
 
 /* Type 3 -- System Enclosure */

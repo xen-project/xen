@@ -90,6 +90,13 @@ struct smbios_type_2 {
     uint8_t product_name_str;
     uint8_t version_str;
     uint8_t serial_number_str;
+    uint8_t asset_tag_str;
+    uint8_t feature_flags;
+    uint8_t location_in_chassis_str;
+    uint16_t chassis_handle;
+    uint8_t board_type;
+    uint8_t contained_handle_count;
+    uint16_t contained_handles[];
 } __attribute__ ((packed));
 
 /* System Enclosure - Contained Elements */
