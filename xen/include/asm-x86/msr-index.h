@@ -31,6 +31,10 @@
 #define EFER_LMSLE		(1<<_EFER_LMSLE)
 #define EFER_FFXSE		(1<<_EFER_FFXSE)
 
+#define MSR_INTEL_CORE_THREAD_COUNT     0x00000035
+#define MSR_CTC_THREAD_MASK             0x0000ffff
+#define MSR_CTC_CORE_MASK               0xffff0000
+
 /* Speculation Controls. */
 #define MSR_SPEC_CTRL			0x00000048
 #define SPEC_CTRL_IBRS			(_AC(1, ULL) << 0)

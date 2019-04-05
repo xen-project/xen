@@ -4026,6 +4026,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
         wrmsrl(MSR_FLUSH_CMD, msr_content);
         break;
 
+    case MSR_INTEL_CORE_THREAD_COUNT:
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
     case MSR_TSX_FORCE_ABORT:

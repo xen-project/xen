@@ -2901,6 +2901,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 wrmsrl(regs->_ecx, msr_content);
             break;
 
+        case MSR_INTEL_CORE_THREAD_COUNT:
         case MSR_INTEL_PLATFORM_INFO:
         case MSR_ARCH_CAPABILITIES:
             /* The MSR is read-only. */
