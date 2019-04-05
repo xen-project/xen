@@ -375,6 +375,45 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
 #endif
 }
 
+static bool __init check_smt_enabled(void)
+{
+    uint64_t val;
+    unsigned int cpu;
+
+    /*
+     * x86_num_siblings defaults to 1 in the absence of other information, and
+     * is adjusted based on other topology information found in CPUID leaves.
+     *
+     * On AMD hardware, it will be the current SMT configuration.  On Intel
+     * hardware, it will represent the maximum capability, rather than the
+     * current configuration.
+     */
+    if ( boot_cpu_data.x86_num_siblings < 2 )
+        return false;
+
+    /*
+     * Intel Nehalem and later hardware does have an MSR which reports the
+     * current count of cores/threads in the package.
+     *
+     * At the time of writing, it is almost completely undocumented, so isn't
+     * virtualised reliably.
+     */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL && !cpu_has_hypervisor &&
+         !rdmsr_safe(MSR_INTEL_CORE_THREAD_COUNT, val) )
+        return (MASK_EXTR(val, MSR_CTC_CORE_MASK) !=
+                MASK_EXTR(val, MSR_CTC_THREAD_MASK));
+
+    /*
+     * Search over the CPUs reported in the ACPI tables.  Any whose APIC ID
+     * has a non-zero thread id component indicates that SMT is active.
+     */
+    for_each_present_cpu ( cpu )
+        if ( x86_cpu_to_apicid[cpu] & (boot_cpu_data.x86_num_siblings - 1) )
+            return true;
+
+    return false;
+}
+
 /* Calculate whether Retpoline is known-safe on this CPU. */
 static bool __init retpoline_safe(uint64_t caps)
 {
@@ -704,11 +743,13 @@ static __init void l1tf_calculations(uint64_t caps)
 void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
-    bool use_spec_ctrl = false, ibrs = false;
+    bool use_spec_ctrl = false, ibrs = false, hw_smt_enabled;
     uint64_t caps = 0;
 
     if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
         rdmsrl(MSR_ARCH_CAPABILITIES, caps);
+
+    hw_smt_enabled = check_smt_enabled();
 
     /*
      * Has the user specified any custom BTI mitigations?  If so, follow their
@@ -886,8 +927,7 @@ void __init init_speculation_mitigations(void)
      * However, if we are on affected hardware, with HT enabled, and the user
      * hasn't explicitly chosen whether to use HT or not, nag them to do so.
      */
-    if ( opt_smt == -1 && cpu_has_bug_l1tf && !pv_shim &&
-         boot_cpu_data.x86_num_siblings > 1 )
+    if ( opt_smt == -1 && cpu_has_bug_l1tf && !pv_shim && hw_smt_enabled )
         warning_add(
             "Booted on L1TF-vulnerable hardware with SMT/Hyperthreading\n"
             "enabled.  Please assess your configuration and choose an\n"

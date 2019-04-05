@@ -507,7 +507,7 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
                 u32 eax, ebx, ecx, edx;
 
                 cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
-                c->x86_num_siblings = ((ebx >> 8) & 0x3) + 1;
+                c->x86_num_siblings = ((ebx >> 8) & 0xff) + 1;
 
                 if (c->x86 < 0x17)
                         c->compute_unit_id = ebx & 0xFF;
