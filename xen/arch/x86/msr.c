@@ -200,6 +200,10 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                                    ARRAY_SIZE(msrs->dr_mask))];
         break;
 
+        /*
+         * TODO: Implement when we have better topology representation.
+    case MSR_INTEL_CORE_THREAD_COUNT:
+         */
     default:
         return X86EMUL_UNHANDLEABLE;
     }
@@ -229,6 +233,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     {
         uint64_t rsvd;
 
+    case MSR_INTEL_CORE_THREAD_COUNT:
     case MSR_INTEL_PLATFORM_INFO:
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
