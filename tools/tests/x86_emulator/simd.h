@@ -70,6 +70,23 @@ typedef int __attribute__((vector_size(VEC_SIZE))) vsi_t;
 typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
 #endif
 
+#if VEC_SIZE >= 16
+
+# if ELEM_COUNT >= 2
+#  if VEC_SIZE > 32
+#   define HALF_SIZE (VEC_SIZE / 2)
+#  else
+#   define HALF_SIZE 16
+#  endif
+typedef typeof((vec_t){}[0]) __attribute__((vector_size(HALF_SIZE))) half_t;
+typedef char __attribute__((vector_size(HALF_SIZE))) vqi_half_t;
+typedef short __attribute__((vector_size(HALF_SIZE))) vhi_half_t;
+typedef int __attribute__((vector_size(HALF_SIZE))) vsi_half_t;
+typedef long long __attribute__((vector_size(HALF_SIZE))) vdi_half_t;
+# endif
+
+#endif
+
 #if VEC_SIZE == 16
 # define B(n, s, a...)   __builtin_ia32_ ## n ## 128 ## s(a)
 # define B_(n, s, a...)  __builtin_ia32_ ## n ##        s(a)

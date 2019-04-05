@@ -3068,7 +3068,22 @@ x86_decode(
                 d |= vSIB;
             state->simd_size = ext0f38_table[b].simd_size;
             if ( evex_encoded() )
-                disp8scale = decode_disp8scale(ext0f38_table[b].d8s, state);
+            {
+                /*
+                 * VPMOVUS* are identical to VPMOVS* Disp8-scaling-wise, but
+                 * their attributes don't match those of the vex_66 encoded
+                 * insns with the same base opcodes. Rather than adding new
+                 * columns to the table, handle this here for now.
+                 */
+                if ( evex.pfx != vex_f3 || (b & 0xf8) != 0x10 )
+                    disp8scale = decode_disp8scale(ext0f38_table[b].d8s, state);
+                else
+                {
+                    disp8scale = decode_disp8scale(ext0f38_table[b ^ 0x30].d8s,
+                                                   state);
+                    state->simd_size = simd_other;
+                }
+            }
             break;
 
         case ext_0f3a:
@@ -8359,10 +8374,14 @@ x86_emulate(
         op_bytes = 16 >> (pmov_convert_delta[b & 7] - vex.l);
         goto simd_0f_int;
 
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x10): /* vpmovuswb [xyz]mm,{x,y}mm/mem{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x20): /* vpmovsxbw {x,y}mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x20): /* vpmovswb [xyz]mm,{x,y}mm/mem{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x30): /* vpmovzxbw {x,y}mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x30): /* vpmovwb [xyz]mm,{x,y}mm/mem{k} */
         host_and_vcpu_must_have(avx512bw);
-        /* fall through */
+        if ( evex.pfx != vex_f3 )
+        {
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x21): /* vpmovsxbd xmm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x22): /* vpmovsxbq xmm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x23): /* vpmovsxwd {x,y}mm/mem,[xyz]mm{k} */
@@ -8373,7 +8392,29 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x33): /* vpmovzxwd {x,y}mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x34): /* vpmovzxwq xmm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x35): /* vpmovzxdq {x,y}mm/mem,[xyz]mm{k} */
-        generate_exception_if(evex.brs || (evex.w && (b & 7) == 5), EXC_UD);
+            generate_exception_if(evex.w && (b & 7) == 5, EXC_UD);
+        }
+        else
+        {
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x11): /* vpmovusdb [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x12): /* vpmovusqb [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x13): /* vpmovusdw [xyz]mm,{x,y}mm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x14): /* vpmovusqw [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x15): /* vpmovusqd [xyz]mm,{x,y}mm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x21): /* vpmovsdb [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x22): /* vpmovsqb [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x23): /* vpmovsdw [xyz]mm,{x,y}mm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x24): /* vpmovsqw [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x25): /* vpmovsqd [xyz]mm,{x,y}mm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x31): /* vpmovdb [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x32): /* vpmovqb [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x33): /* vpmovdw [xyz]mm,{x,y}mm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x34): /* vpmovqw [xyz]mm,xmm/mem{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x35): /* vpmovqd [xyz]mm,{x,y}mm/mem{k} */
+            generate_exception_if(evex.w || (ea.type != OP_REG && evex.z), EXC_UD);
+            d = DstMem | SrcReg | TwoOp;
+        }
+        generate_exception_if(evex.brs, EXC_UD);
         op_bytes = 32 >> (pmov_convert_delta[b & 7] + 1 - evex.lr);
         elem_bytes = (b & 7) < 3 ? 1 : (b & 7) != 5 ? 2 : 4;
         goto avx512f_no_sae;
@@ -10215,6 +10256,12 @@ x86_insn_is_mem_write(const struct x86_emulate_state *state,
     case X86EMUL_OPC(0x0f, 0xab):        /* BTS */
     case X86EMUL_OPC(0x0f, 0xb3):        /* BTR */
     case X86EMUL_OPC(0x0f, 0xbb):        /* BTC */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x10) ...
+         X86EMUL_OPC_EVEX_F3(0x0f38, 0x15): /* VPMOVUS* */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x20) ...
+         X86EMUL_OPC_EVEX_F3(0x0f38, 0x25): /* VPMOVS* */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x30) ...
+         X86EMUL_OPC_EVEX_F3(0x0f38, 0x35): /* VPMOV{D,Q,W}* */
         return true;
 
     case 0xd9:

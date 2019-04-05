@@ -277,6 +277,17 @@ static inline bool _to_bool(byte_vec_t bv)
 #endif
 #if (INT_SIZE == 4 || UINT_SIZE == 4 || INT_SIZE == 8 || UINT_SIZE == 8) && \
      defined(__AVX512F__) && (VEC_SIZE == 64 || defined(__AVX512VL__))
+# if ELEM_COUNT == 8 /* vextracti{32,64}x4 */ || \
+     (ELEM_COUNT == 16 && ELEM_SIZE == 4 && defined(__AVX512DQ__)) /* vextracti32x8 */ || \
+     (ELEM_COUNT == 4 && ELEM_SIZE == 8 && defined(__AVX512DQ__)) /* vextracti64x2 */
+#  define low_half(x) ({ \
+    half_t t_; \
+    asm ( "vextracti%c[w]x%c[n] $0, %[s], %[d]" \
+          : [d] "=m" (t_) \
+          : [s] "v" (x), [w] "i" (ELEM_SIZE * 8), [n] "i" (ELEM_COUNT / 2) ); \
+    t_; \
+})
+# endif
 # if INT_SIZE == 4 || UINT_SIZE == 4
 #  define broadcast(x) ({ \
     vec_t t_; \
@@ -291,6 +302,7 @@ static inline bool _to_bool(byte_vec_t bv)
 })
 #  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
                               (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
+#  define shrink1(x) ((half_t)B(pmovqd, _mask, (vdi_t)(x), (vsi_half_t){}, ~0))
 # elif INT_SIZE == 8 || UINT_SIZE == 8
 #  define broadcast(x) ({ \
     vec_t t_; \
@@ -720,6 +732,27 @@ static inline bool _to_bool(byte_vec_t bv)
 # endif
 #endif
 
+#if VEC_SIZE >= 16
+
+# if !defined(low_half) && defined(HALF_SIZE)
+static inline half_t low_half(vec_t x)
+{
+#  if HALF_SIZE < VEC_SIZE
+    half_t y;
+    unsigned int i;
+
+    for ( i = 0; i < ELEM_COUNT / 2; ++i )
+        y[i] = x[i];
+
+    return y;
+#  else
+    return x;
+#  endif
+}
+# endif
+
+#endif
+
 #if defined(__AVX512F__) && defined(FLOAT_SIZE)
 # include "simd-fma.c"
 #endif
@@ -1085,6 +1118,21 @@ int simd_test(void)
     if ( !eq(x, interleave_lo(z, (vec_t){})) ) return __LINE__;
 # endif
 
+#endif
+
+#if defined(widen1) && defined(shrink1)
+    {
+        half_t aux1 = low_half(src), aux2;
+
+        touch(aux1);
+        x = widen1(aux1);
+        touch(x);
+        aux2 = shrink1(x);
+        touch(aux2);
+        for ( i = 0; i < ELEM_COUNT / 2; ++i )
+            if ( aux2[i] != src[i] )
+                return __LINE__;
+    }
 #endif
 
 #ifdef dup_lo
