@@ -1852,7 +1852,7 @@ out:
 }
 
 void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
-                              const struct libxl_device_type *dt, void *type)
+                              const struct libxl_device_type *dt, const void *dev)
 {
     int *num_dev;
     unsigned int i;
@@ -1862,7 +1862,7 @@ void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
 
     /* Check for existing device */
     for (i = 0; i < *num_dev; i++) {
-        if (dt->compare(libxl__device_type_get_elem(dt, d_config, i), type)) {
+        if (dt->compare(libxl__device_type_get_elem(dt, d_config, i), dev)) {
             item = libxl__device_type_get_elem(dt, d_config, i);
         }
     }
@@ -1878,7 +1878,7 @@ void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
     }
 
     dt->init(item);
-    dt->copy(CTX, item, type);
+    dt->copy(CTX, item, dev);
 }
 
 void libxl__device_add_async(libxl__egc *egc, uint32_t domid,

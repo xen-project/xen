@@ -4581,8 +4581,21 @@ static inline bool libxl__acpi_defbool_val(const libxl_domain_build_info *b_info
            libxl_defbool_val(b_info->u.hvm.acpi);
 }
 
+/*
+ * Add a device in libxl_domain_config structure
+ *
+ * If there is already a device with the same identifier in d_config,
+ * that entry is updated.
+ *
+ * parameters:
+ *  d_config: pointer to template domain config
+ *  dt:       type of `dev'
+ *  dev:      the device that is to be added / removed / updated
+ *            (a copy of `dev' will be made)
+ */
 void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
-                              const struct libxl_device_type *dt, void *type);
+                              const struct libxl_device_type *dt,
+                              const void *dev);
 
 void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
                              const struct libxl_device_type *dt, void *type,
