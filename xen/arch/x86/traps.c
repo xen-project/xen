@@ -2744,6 +2744,7 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
             wrmsrl(reg, val);
         return X86EMUL_OKAY;
 
+    case MSR_INTEL_CORE_THREAD_COUNT:
     case MSR_INTEL_PLATFORM_INFO:
     case MSR_ARCH_CAPABILITIES:
         /* The MSR is read-only. */
