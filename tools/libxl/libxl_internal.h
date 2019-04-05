@@ -3728,7 +3728,7 @@ typedef int (*device_to_device_fn_t)(libxl__gc *, uint32_t, void *,
 typedef void (*device_init_fn_t)(void *);
 typedef void (*device_copy_fn_t)(libxl_ctx *, void *, void *);
 typedef void (*device_dispose_fn_t)(void *);
-typedef int (*device_compare_fn_t)(void *, void *);
+typedef int (*device_compare_fn_t)(const void *, const void *);
 typedef void (*device_merge_fn_t)(libxl_ctx *, void *, void *);
 typedef int (*device_dm_needed_fn_t)(void *, unsigned);
 typedef void (*device_update_config_fn_t)(libxl__gc *, void *, void *);

@@ -183,8 +183,8 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
     return rc;
 }
 
-static int libxl_device_vtpm_compare(libxl_device_vtpm *d1,
-                                     libxl_device_vtpm *d2)
+static int libxl_device_vtpm_compare(const libxl_device_vtpm *d1,
+                                     const libxl_device_vtpm *d2)
 {
     return COMPARE_DEVID(d1, d2);
 }

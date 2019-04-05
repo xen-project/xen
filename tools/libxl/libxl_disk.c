@@ -1126,8 +1126,8 @@ LIBXL_DEFINE_DEVICE_ADD(disk)
 LIBXL_DEFINE_DEVICES_ADD(disk)
 LIBXL_DEFINE_DEVICE_REMOVE(disk)
 
-static int libxl_device_disk_compare(libxl_device_disk *d1,
-                                     libxl_device_disk *d2)
+static int libxl_device_disk_compare(const libxl_device_disk *d1,
+                                     const libxl_device_disk *d2)
 {
     return COMPARE_DISK(d1, d2);
 }

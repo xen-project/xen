@@ -1925,8 +1925,8 @@ out:
     return rc;
 }
 
-static int libxl_device_usbctrl_compare(libxl_device_usbctrl *d1,
-                                        libxl_device_usbctrl *d2)
+static int libxl_device_usbctrl_compare(const libxl_device_usbctrl *d1,
+                                        const libxl_device_usbctrl *d2)
 {
     return COMPARE_USBCTRL(d1, d2);
 }
@@ -1939,8 +1939,8 @@ static int libxl_device_usbctrl_dm_needed(void *e, unsigned domid)
            elem->backend_domid == domid;
 }
 
-static int libxl_device_usbdev_compare(libxl_device_usbdev *d1,
-                                       libxl_device_usbdev *d2)
+static int libxl_device_usbdev_compare(const libxl_device_usbdev *d1,
+                                       const libxl_device_usbdev *d2)
 {
     return COMPARE_USB(d1, d2);
 }

@@ -1679,8 +1679,8 @@ int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
     return 0;
 }
 
-static int libxl_device_pci_compare(libxl_device_pci *d1,
-                                    libxl_device_pci *d2)
+static int libxl_device_pci_compare(const libxl_device_pci *d1,
+                                    const libxl_device_pci *d2)
 {
     return COMPARE_PCI(d1, d2);
 }

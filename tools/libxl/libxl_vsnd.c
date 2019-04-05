@@ -290,8 +290,8 @@ static void libxl__update_config_vsnd(libxl__gc *gc,
     dst->devid = src->devid;
 }
 
-static int libxl_device_vsnd_compare(libxl_device_vsnd *d1,
-                                     libxl_device_vsnd *d2)
+static int libxl_device_vsnd_compare(const libxl_device_vsnd *d1,
+                                     const libxl_device_vsnd *d2)
 {
     return COMPARE_DEVID(d1, d2);
 }
