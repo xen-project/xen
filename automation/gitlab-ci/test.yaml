@@ -12,8 +12,7 @@ build-each-commit-gcc:
     paths:
       - '*.log'
     when: always
-  dependencies:
-    - debian-stretch-gcc-debug
+  dependencies: []
   tags:
     - x86_64
   except:
