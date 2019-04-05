@@ -1,4 +1,27 @@
 # Test jobs
+build-each-commit-gcc:
+  stage: test
+  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  variables:
+    CONTAINER: debian:stretch
+    XEN_TARGET_ARCH: x86_64
+    CC: gcc
+  script:
+    - ./automation/gitlab-ci/build-each-commit.sh 2>&1 | tee build-each-commit-gcc.log
+  artifacts:
+    paths:
+      - '*.log'
+    when: always
+  dependencies:
+    - debian-stretch-gcc-debug
+  tags:
+    - x86_64
+  except:
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
+
 qemu-smoke-x86-64-gcc:
   stage: test
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}

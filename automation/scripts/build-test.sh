@@ -5,6 +5,9 @@
 #
 # The default rune is rather simple. To do a cross-build, please put your usual
 # build rune in a shell script and invoke it with this script.
+#
+# Set NON_SYMBOLIC_REF=1 if you want to use this script in detached HEAD state.
+# This is currently used by automated test system.
 
 if test $# -lt 2 ; then
     echo "Usage:"
@@ -25,12 +28,17 @@ fi
 BASE=$1; shift
 TIP=$1; shift
 
-ORIG_BRANCH=`git symbolic-ref -q --short HEAD`
-if test $? -ne 0; then
-    echo "Detached HEAD, aborted"
-    exit 1
+if [[ "_${NON_SYMBOLIC_REF}" != "_1" ]]; then
+    ORIG=`git symbolic-ref -q --short HEAD`
+    if test $? -ne 0; then
+        echo "Detached HEAD, aborted"
+        exit 1
+    fi
+else
+    ORIG=`git rev-parse HEAD`
 fi
 
+ret=1
 while read num rev; do
     echo "Testing $num $rev"
 
@@ -55,7 +63,7 @@ while read num rev; do
 done < <(git rev-list $BASE..$TIP | nl -ba | tac)
 
 echo "Restoring original HEAD"
-git checkout $ORIG_BRANCH
+git checkout $ORIG
 gco_ret=$?
 if test $gco_ret -ne 0; then
     echo "Failed to restore orignal HEAD. Check tree status before doing anything else!"
