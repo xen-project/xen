@@ -180,7 +180,7 @@ sh_walk_guest_tables(struct vcpu *v, unsigned long va, walk_t *gw,
                              INVALID_MFN, v->arch.paging.shadow.gl3e);
 #else /* 32 or 64 */
     const struct domain *d = v->domain;
-    mfn_t root_mfn = ((v->arch.flags & TF_kernel_mode) || is_pv_32bit_domain(d)
+    mfn_t root_mfn = (v->arch.flags & TF_kernel_mode
                       ? pagetable_get_mfn(v->arch.guest_table)
                       : pagetable_get_mfn(v->arch.guest_table_user));
     void *root_map = map_domain_page(root_mfn);
@@ -3976,7 +3976,7 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
                   v, (unsigned long)pagetable_get_pfn(v->arch.guest_table));
 
 #if GUEST_PAGING_LEVELS == 4
-    if ( !(v->arch.flags & TF_kernel_mode) && !is_pv_32bit_domain(d) )
+    if ( !(v->arch.flags & TF_kernel_mode) )
         gmfn = pagetable_get_mfn(v->arch.guest_table_user);
     else
 #endif

@@ -843,9 +843,15 @@ int arch_set_info_guest(
             return -EINVAL;
     }
 
-    v->arch.flags &= ~TF_kernel_mode;
-    if ( (flags & VGCF_in_kernel) || is_hvm_domain(d)/*???*/ )
-        v->arch.flags |= TF_kernel_mode;
+    v->arch.flags |= TF_kernel_mode;
+    if ( unlikely(!(flags & VGCF_in_kernel)) &&
+         /*
+          * TF_kernel_mode is only allowed to be clear for 64-bit PV. See
+          * update_cr3(), sh_update_cr3(), sh_walk_guest_tables(), and
+          * shadow_one_bit_disable() for why that is.
+          */
+         !is_hvm_domain(d) && !is_pv_32bit_domain(d) )
+        v->arch.flags &= ~TF_kernel_mode;
 
     v->arch.vgc_flags = flags;
 
