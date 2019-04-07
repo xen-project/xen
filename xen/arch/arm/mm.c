@@ -696,11 +696,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
 #ifdef CONFIG_ARM_32
     per_cpu(xen_pgtable, 0) = cpu0_pgtable;
     per_cpu(xen_dommap, 0) = cpu0_dommap;
-
-    /* Make sure it is clear */
-    memset(this_cpu(xen_dommap), 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
-    clean_dcache_va_range(this_cpu(xen_dommap),
-                              DOMHEAP_SECOND_PAGES*PAGE_SIZE);
 #endif
 }
 
