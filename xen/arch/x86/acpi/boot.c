@@ -733,7 +733,7 @@ int __init acpi_boot_init(void)
 
 	acpi_mmcfg_init();
 
-	acpi_dmar_init();
+	acpi_iommu_init();
 
 	erst_init();
 

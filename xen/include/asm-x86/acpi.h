@@ -26,6 +26,7 @@
 #include <acpi/pdc_intel.h>
 #include <acpi/acconfig.h>
 #include <acpi/actbl.h>
+#include <xen/errno.h>
 
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
@@ -145,6 +146,15 @@ extern u32 pmtmr_ioport;
 extern unsigned int pmtmr_width;
 
 int acpi_dmar_init(void);
+int acpi_ivrs_init(void);
+
+static inline int acpi_iommu_init(void)
+{
+    int ret = acpi_dmar_init();
+
+    return ret == -ENODEV ? acpi_ivrs_init() : ret;
+}
+
 void acpi_mmcfg_init(void);
 
 /* Incremented whenever we transition through S3. Value is 1 during boot. */

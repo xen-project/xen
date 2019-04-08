@@ -23,6 +23,7 @@
 #include <xen/pci_regs.h>
 #include <xen/paging.h>
 #include <xen/softirq.h>
+#include <asm/acpi.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include "../ats.h"
@@ -147,7 +148,7 @@ static void amd_iommu_setup_domain_device(
     }
 }
 
-int __init amd_iov_detect(void)
+int __init acpi_ivrs_init(void)
 {
     INIT_LIST_HEAD(&amd_iommu_head);
 
@@ -160,6 +161,14 @@ int __init amd_iov_detect(void)
         iommu_intremap = 0;
         return -ENODEV;
     }
+
+    return 0;
+}
+
+int __init amd_iov_detect(void)
+{
+    if ( !iommu_enable && !iommu_intremap )
+        return 0;
 
     iommu_ops = amd_iommu_ops;
 
