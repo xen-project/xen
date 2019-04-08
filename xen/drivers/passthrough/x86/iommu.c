@@ -26,6 +26,20 @@
 const struct iommu_init_ops *__initdata iommu_init_ops;
 struct iommu_ops __read_mostly iommu_ops;
 
+int __init iommu_hardware_setup(void)
+{
+    if ( !iommu_init_ops )
+        return -ENODEV;
+
+    if ( !iommu_ops.init )
+        iommu_ops = *iommu_init_ops->ops;
+    else
+        /* x2apic setup may have previously initialised the struct. */
+        ASSERT(iommu_ops.init == iommu_init_ops->ops->init);
+
+    return iommu_init_ops->setup();
+}
+
 int iommu_enable_x2apic(void)
 {
     if ( system_state < SYS_STATE_active )

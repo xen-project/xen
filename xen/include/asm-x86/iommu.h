@@ -73,11 +73,6 @@ struct iommu_init_ops {
 
 extern const struct iommu_init_ops *iommu_init_ops;
 
-static inline int iommu_hardware_setup(void)
-{
-    return iommu_init_ops ? iommu_init_ops->setup() : -ENODEV;
-}
-
 /* Are we using the domain P2M table as its IOMMU pagetable? */
 #define iommu_use_hap_pt(d) \
     (hap_enabled(d) && has_iommu_pt(d) && iommu_hap_pt_share)

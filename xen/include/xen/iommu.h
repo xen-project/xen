@@ -65,6 +65,7 @@ extern int8_t iommu_hwdom_reserved;
 extern unsigned int iommu_dev_iotlb_timeout;
 
 int iommu_setup(void);
+int iommu_hardware_setup(void);
 
 int iommu_domain_init(struct domain *d);
 void iommu_hwdom_init(struct domain *d);

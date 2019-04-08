@@ -2305,8 +2305,6 @@ static int __init vtd_setup(void)
         goto error;
     }
 
-    iommu_ops = intel_iommu_ops;
-
     /* We enable the following features only if they are supported by all VT-d
      * engines: Snoop Control, DMA passthrough, Queued Invalidation, Interrupt
      * Remapping, and Posted Interrupt
