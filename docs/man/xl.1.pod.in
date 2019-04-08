@@ -393,39 +393,70 @@ less utilized than a high CPU workload.  Consider yourself warned.
 
 =back
 
-=item B<mem-max> I<domain-id> I<mem>
-
-Specify the maximum amount of memory the domain is able to use, appending 't'
-for terabytes, 'g' for gigabytes, 'm' for megabytes, 'k' for kilobytes and 'b'
-for bytes.
-
-The mem-max value may not correspond to the actual memory used in the
-domain, as it may balloon down its memory to give more back to the OS.
-
-The value given just sets the memory amount the domain is allowed to allocate
-in the hypervisor. It can't be set lower than the current reservation, but
-it is allowed to be higher than the configured maximum memory size of the
-domain (B<maxmem> parameter in the domain's configuration). Using B<xl mem-max>
-to set the maximum memory above the initial B<maxmem> value will not allow the
-additional memory to be used via B<xl mem-set>. The initial B<maxmem> value is
-still used as an upper limit for B<xl mem-set>.
-
-The domain will not receive any signal regarding the changed memory limit.
-
 =item B<mem-set> I<domain-id> I<mem>
 
-Set the domain's used memory using the balloon driver; append 't' for
-terabytes, 'g' for gigabytes, 'm' for megabytes, 'k' for kilobytes and 'b' for
-bytes.
+Set the target for the domain's balloon driver.
 
-Because this operation requires cooperation from the domain operating
-system, there is no guarantee that it will succeed.  This command will
-definitely not work unless the domain has the required paravirt
-driver.
+The default unit is kiB.  Add 't' for TiB, 'g' for GiB, 'm' for
+MiB, 'k' for kiB, and 'b' for bytes (e.g., `2048m` for 2048 MiB).
+
+This must be less than the initial B<maxmem> parameter in the domain's
+configuration.
+
+Note that this operation requests the guest operating system's balloon
+driver to reach the target amount of memory.  The guest may fail to
+reach that amount of memory for any number of reasons, including:
+
+=over 4
+
+=item
+
+The guest doesn't have a balloon driver installed
+
+=item
+
+The guest's balloon driver is buggy
+
+=item
+
+The guest's balloon driver cannot create free guest memory due to
+guest memory pressure
+
+=item
+
+The guest's balloon driver cannot allocate memory from Xen because of
+hypervisor memory pressure
+
+=item
+
+The guest administrator has disabled the balloon driver
+
+=back
 
 B<Warning:> There is no good way to know in advance how small of a
 mem-set will make a domain unstable and cause it to crash.  Be very
 careful when using this command on running domains.
+
+=item B<mem-max> I<domain-id> I<mem>
+
+Specify the limit Xen will place on the amount of memory a guest may
+allocate.
+
+The default unit is kiB.  Add 't' for TiB, 'g' for GiB, 'm' for
+MiB, 'k' for kiB, and 'b' for bytes (e.g., `2048m` for 2048 MiB).
+
+NB that users normally shouldn't need this command; B<xl mem-set> will
+set this as appropriate automatically.
+
+I<mem> can't be set lower than the current memory target for
+I<domain-id>.  It is allowed to be higher than the configured maximum
+memory size of the domain (B<maxmem> parameter in the domain's
+configuration). Note however that the initial B<maxmem> value is still
+used as an upper limit for B<xl mem-set>.  Also note that calling B<xl
+mem-set> will reset this value.
+
+The domain will not receive any signal regarding the changed memory
+limit.
 
 =item B<migrate> [I<OPTIONS>] I<domain-id> I<host>
 
