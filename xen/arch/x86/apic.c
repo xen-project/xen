@@ -899,14 +899,14 @@ void __init x2apic_bsp_setup(void)
         printk("x2APIC: Already enabled by BIOS: Ignoring cmdline disable.\n");
     }
 
-    if ( !iommu_supports_eim() )
+    if ( !iommu_supports_x2apic() )
     {
         if ( !x2apic_enabled )
         {
-            printk("Not enabling x2APIC: depends on iommu_supports_eim.\n");
+            printk("Not enabling x2APIC: depends on IOMMU support\n");
             return;
         }
-        panic("x2APIC: already enabled by BIOS, but iommu_supports_eim failed\n");
+        panic("x2APIC: already enabled by BIOS, but no IOMMU support\n");
     }
 
     if ( (ioapic_entries = alloc_ioapic_entries()) == NULL )

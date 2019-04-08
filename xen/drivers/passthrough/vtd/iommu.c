@@ -2737,6 +2737,7 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
 
 const struct iommu_init_ops __initconstrel intel_iommu_init_ops = {
     .setup = vtd_setup,
+    .supports_x2apic = intel_iommu_supports_eim,
 };
 
 /*

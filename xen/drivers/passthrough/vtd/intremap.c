@@ -142,13 +142,13 @@ static void set_hpet_source_id(unsigned int id, struct iremap_entry *ire)
     set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_13_IGNORE_3, hpetid_to_bdf(id));
 }
 
-bool_t __init iommu_supports_eim(void)
+bool __init intel_iommu_supports_eim(void)
 {
     struct acpi_drhd_unit *drhd;
     unsigned int apic;
 
     if ( !iommu_qinval || !iommu_intremap || list_empty(&acpi_drhd_units) )
-        return 0;
+        return false;
 
     /* We MUST have a DRHD unit for each IOAPIC. */
     for ( apic = 0; apic < nr_ioapics; apic++ )
@@ -157,16 +157,16 @@ bool_t __init iommu_supports_eim(void)
             dprintk(XENLOG_WARNING VTDPREFIX,
                     "There is not a DRHD for IOAPIC %#x (id: %#x)!\n",
                     apic, IO_APIC_ID(apic));
-            return 0;
+            return false;
         }
 
     for_each_drhd_unit ( drhd )
         if ( !ecap_queued_inval(drhd->iommu->ecap) ||
              !ecap_intr_remap(drhd->iommu->ecap) ||
              !ecap_eim(drhd->iommu->ecap) )
-            return 0;
+            return false;
 
-    return 1;
+    return true;
 }
 
 /*
@@ -894,7 +894,7 @@ int iommu_enable_x2apic_IR(void)
 
     if ( system_state < SYS_STATE_active )
     {
-        if ( !iommu_supports_eim() )
+        if ( !intel_iommu_supports_eim() )
             return -EOPNOTSUPP;
 
         if ( !platform_supports_x2apic() )

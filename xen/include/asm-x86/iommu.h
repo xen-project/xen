@@ -66,6 +66,7 @@ static inline const struct iommu_ops *iommu_get_ops(void)
 
 struct iommu_init_ops {
     int (*setup)(void);
+    bool (*supports_x2apic)(void);
 };
 
 extern const struct iommu_init_ops *iommu_init_ops;
@@ -87,7 +88,14 @@ int iommu_setup_hpet_msi(struct msi_desc *);
 int adjust_vtd_irq_affinities(void);
 int __must_check iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
                                  int order, int present);
-bool_t iommu_supports_eim(void);
+
+static inline bool iommu_supports_x2apic(void)
+{
+    return iommu_init_ops && iommu_init_ops->supports_x2apic
+           ? iommu_init_ops->supports_x2apic()
+           : false;
+}
+
 int iommu_enable_x2apic_IR(void);
 void iommu_disable_x2apic_IR(void);
 
