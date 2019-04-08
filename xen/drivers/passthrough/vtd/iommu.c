@@ -2720,6 +2720,8 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
     .free_page_table = iommu_free_page_table,
     .reassign_device = reassign_device_ownership,
     .get_device_group_id = intel_iommu_group_id,
+    .enable_x2apic = intel_iommu_enable_eim,
+    .disable_x2apic = intel_iommu_disable_eim,
     .update_ire_from_apic = io_apic_write_remap_rte,
     .update_ire_from_msi = msi_msg_write_remap_rte,
     .read_apic_from_ire = io_apic_read_remap_rte,
@@ -2736,6 +2738,7 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
 };
 
 const struct iommu_init_ops __initconstrel intel_iommu_init_ops = {
+    .ops = &intel_iommu_ops,
     .setup = vtd_setup,
     .supports_x2apic = intel_iommu_supports_eim,
 };

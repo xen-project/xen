@@ -887,23 +887,13 @@ out:
  * This function is used to enable Interrupt remapping when
  * enable x2apic
  */
-int iommu_enable_x2apic_IR(void)
+int intel_iommu_enable_eim(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
 
-    if ( system_state < SYS_STATE_active )
-    {
-        if ( !intel_iommu_supports_eim() )
-            return -EOPNOTSUPP;
-
-        if ( !platform_supports_x2apic() )
-            return -ENXIO;
-
-        iommu_ops = intel_iommu_ops;
-    }
-    else if ( !x2apic_enabled )
-        return -EOPNOTSUPP;
+    if ( system_state < SYS_STATE_active && !platform_supports_x2apic() )
+        return -ENXIO;
 
     for_each_drhd_unit ( drhd )
     {
@@ -948,16 +938,12 @@ int iommu_enable_x2apic_IR(void)
 }
 
 /*
- * This function is used to disable Interrutp remapping when
+ * This function is used to disable Interrupt remapping when
  * suspend local apic
  */
-void iommu_disable_x2apic_IR(void)
+void intel_iommu_disable_eim(void)
 {
     struct acpi_drhd_unit *drhd;
-
-    /* x2apic_enabled implies iommu_supports_eim(). */
-    if ( !x2apic_enabled )
-        return;
 
     for_each_drhd_unit ( drhd )
         disable_intremap(drhd->iommu);

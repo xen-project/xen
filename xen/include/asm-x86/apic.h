@@ -25,7 +25,6 @@ enum apic_mode {
 };
 
 extern u8 apic_verbosity;
-extern bool x2apic_enabled;
 extern bool directed_eoi_enabled;
 
 void check_x2apic_preenabled(void);

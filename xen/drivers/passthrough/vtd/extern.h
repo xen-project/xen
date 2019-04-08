@@ -35,6 +35,8 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn);
 keyhandler_fn_t vtd_dump_iommu_info;
 
 bool intel_iommu_supports_eim(void);
+int intel_iommu_enable_eim(void);
+void intel_iommu_disable_eim(void);
 
 int enable_qinval(struct iommu *iommu);
 void disable_qinval(struct iommu *iommu);

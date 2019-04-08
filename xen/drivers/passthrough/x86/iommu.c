@@ -26,6 +26,24 @@
 const struct iommu_init_ops *__initdata iommu_init_ops;
 struct iommu_ops __read_mostly iommu_ops;
 
+int iommu_enable_x2apic(void)
+{
+    if ( system_state < SYS_STATE_active )
+    {
+        if ( !iommu_supports_x2apic() )
+            return -EOPNOTSUPP;
+
+        iommu_ops = *iommu_init_ops->ops;
+    }
+    else if ( !x2apic_enabled )
+        return -EOPNOTSUPP;
+
+    if ( !iommu_ops.enable_x2apic )
+        return -EOPNOTSUPP;
+
+    return iommu_ops.enable_x2apic();
+}
+
 void iommu_update_ire_from_apic(
     unsigned int apic, unsigned int reg, unsigned int value)
 {

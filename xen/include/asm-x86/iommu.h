@@ -17,6 +17,7 @@
 #include <xen/errno.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>
+#include <asm/apicdef.h>
 #include <asm/processor.h>
 #include <asm/hvm/vmx/vmcs.h>
 
@@ -65,6 +66,7 @@ static inline const struct iommu_ops *iommu_get_ops(void)
 }
 
 struct iommu_init_ops {
+    const struct iommu_ops *ops;
     int (*setup)(void);
     bool (*supports_x2apic)(void);
 };
@@ -96,8 +98,13 @@ static inline bool iommu_supports_x2apic(void)
            : false;
 }
 
-int iommu_enable_x2apic_IR(void);
-void iommu_disable_x2apic_IR(void);
+int iommu_enable_x2apic(void);
+
+static inline void iommu_disable_x2apic(void)
+{
+    if ( x2apic_enabled && iommu_ops.disable_x2apic )
+        iommu_ops.disable_x2apic();
+}
 
 extern bool untrusted_msi;
 

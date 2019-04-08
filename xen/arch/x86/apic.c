@@ -510,7 +510,7 @@ static void resume_x2apic(void)
     mask_8259A();
     mask_IO_APIC_setup(ioapic_entries);
 
-    iommu_enable_x2apic_IR();
+    iommu_enable_x2apic();
     __enable_x2apic();
 
     restore_IO_APIC_setup(ioapic_entries);
@@ -720,7 +720,7 @@ int lapic_suspend(void)
 
     local_irq_save(flags);
     disable_local_APIC();
-    iommu_disable_x2apic_IR();
+    iommu_disable_x2apic();
     local_irq_restore(flags);
     return 0;
 }
@@ -924,7 +924,7 @@ void __init x2apic_bsp_setup(void)
     mask_8259A();
     mask_IO_APIC_setup(ioapic_entries);
 
-    switch ( iommu_enable_x2apic_IR() )
+    switch ( iommu_enable_x2apic() )
     {
     case 0:
         break;

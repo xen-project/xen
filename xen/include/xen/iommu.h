@@ -216,11 +216,16 @@ struct iommu_ops {
                                     unsigned int *flags);
 
     void (*free_page_table)(struct page_info *);
+
 #ifdef CONFIG_X86
+    int (*enable_x2apic)(void);
+    void (*disable_x2apic)(void);
+
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
     unsigned int (*read_apic_from_ire)(unsigned int apic, unsigned int reg);
     int (*setup_hpet_msi)(struct msi_desc *);
 #endif /* CONFIG_X86 */
+
     int __must_check (*suspend)(void);
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);

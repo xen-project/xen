@@ -126,4 +126,6 @@
 
 #define MAX_IO_APICS 128
 
+extern bool x2apic_enabled;
+
 #endif
