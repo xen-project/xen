@@ -12,5 +12,7 @@ if [[ $? -ne 0 ]]; then
     exit 0
 fi
 
+echo "Building ${CI_COMMIT_BEFORE_SHA}..${CI_COMMIT_SHA}"
+
 NON_SYMBOLIC_REF=1 ./automation/scripts/build-test.sh ${CI_COMMIT_BEFORE_SHA} ${CI_COMMIT_SHA} \
     bash -c "make -j4 distclean && ./automation/scripts/build"
