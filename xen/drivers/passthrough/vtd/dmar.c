@@ -993,7 +993,11 @@ int __init acpi_dmar_init(void)
     ret = parse_dmar_table(acpi_parse_dmar);
 
     if ( !ret )
+    {
+        iommu_init_ops = &intel_iommu_init_ops;
+
         return add_user_rmrr();
+    }
 
     return ret;
 }

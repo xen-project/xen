@@ -30,6 +30,7 @@
 
 static bool_t __read_mostly init_done;
 
+static const struct iommu_init_ops _iommu_init_ops;
 static const struct iommu_ops amd_iommu_ops;
 
 struct amd_iommu *find_iommu_for_device(int seg, int bdf)
@@ -162,10 +163,12 @@ int __init acpi_ivrs_init(void)
         return -ENODEV;
     }
 
+    iommu_init_ops = &_iommu_init_ops;
+
     return 0;
 }
 
-int __init amd_iov_detect(void)
+static int __init iov_detect(void)
 {
     if ( !iommu_enable && !iommu_intremap )
         return 0;
@@ -566,4 +569,8 @@ static const struct iommu_ops __initconstrel amd_iommu_ops = {
     .share_p2m = amd_iommu_share_p2m,
     .crash_shutdown = amd_iommu_crash_shutdown,
     .dump_p2m_table = amd_dump_p2m_table,
+};
+
+static const struct iommu_init_ops __initconstrel _iommu_init_ops = {
+    .setup = iov_detect,
 };

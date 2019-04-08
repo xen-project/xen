@@ -2280,7 +2280,7 @@ static void __hwdom_init setup_hwdom_rmrr(struct domain *d)
     pcidevs_unlock();
 }
 
-int __init intel_vtd_setup(void)
+static int __init vtd_setup(void)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
@@ -2733,6 +2733,10 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
     .iotlb_flush_all = iommu_flush_iotlb_all,
     .get_reserved_device_memory = intel_iommu_get_reserved_device_memory,
     .dump_p2m_table = vtd_dump_p2m_table,
+};
+
+const struct iommu_init_ops __initconstrel intel_iommu_init_ops = {
+    .setup = vtd_setup,
 };
 
 /*

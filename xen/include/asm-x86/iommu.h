@@ -56,9 +56,6 @@ struct arch_iommu
     struct guest_iommu *g_iommu;
 };
 
-int intel_vtd_setup(void);
-int amd_iov_detect(void);
-
 extern struct iommu_ops iommu_ops;
 
 static inline const struct iommu_ops *iommu_get_ops(void)
@@ -67,17 +64,15 @@ static inline const struct iommu_ops *iommu_get_ops(void)
     return &iommu_ops;
 }
 
+struct iommu_init_ops {
+    int (*setup)(void);
+};
+
+extern const struct iommu_init_ops *iommu_init_ops;
+
 static inline int iommu_hardware_setup(void)
 {
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
-        return intel_vtd_setup();
-    case X86_VENDOR_AMD:
-        return amd_iov_detect();
-    }
-
-    return -ENODEV;
+    return iommu_init_ops ? iommu_init_ops->setup() : -ENODEV;
 }
 
 /* Are we using the domain P2M table as its IOMMU pagetable? */

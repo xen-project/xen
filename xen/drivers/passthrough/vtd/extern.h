@@ -27,6 +27,7 @@
 
 struct pci_ats_dev;
 extern bool_t rwbf_quirk;
+extern const struct iommu_init_ops intel_iommu_init_ops;
 extern const struct iommu_ops intel_iommu_ops;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
