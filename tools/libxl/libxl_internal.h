@@ -2719,13 +2719,6 @@ struct libxl__multidev {
  *                   DONE.
  */
 
-/* AO operation to connect a disk device, called by
- * libxl_device_disk_add and libxl__add_disks. This function calls
- * libxl__wait_device_connection to wait for the device to
- * finish the connection (might involve executing hotplug scripts).
- *
- * Once finished, aodev->callback will be executed.
- */
 /*
  * As of Xen 4.5 we maintain various information, including hotplug
  * device information, in JSON files, so that we can use this JSON
