@@ -14,6 +14,12 @@ DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 
 #define raw_smp_processor_id() (get_processor_id())
 
+/*
+ * Do we, for platform reasons, need to actually keep CPUs online when we
+ * would otherwise prefer them to be off?
+ */
+#define park_offline_cpus false
+
 extern void noreturn stop_cpu(void);
 
 extern int arch_smp_init(void);

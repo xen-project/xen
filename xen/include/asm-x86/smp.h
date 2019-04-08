@@ -26,6 +26,10 @@ DECLARE_PER_CPU(cpumask_var_t, cpu_sibling_mask);
 DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 DECLARE_PER_CPU(cpumask_var_t, scratch_cpumask);
 
+/*
+ * Do we, for platform reasons, need to actually keep CPUs online when we
+ * would otherwise prefer them to be off?
+ */
 extern bool park_offline_cpus;
 
 void smp_send_nmi_allbutself(void);
