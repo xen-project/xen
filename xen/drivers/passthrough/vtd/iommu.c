@@ -2141,7 +2141,7 @@ static void adjust_irq_affinity(struct acpi_drhd_unit *drhd)
     dma_msi_set_affinity(irq_to_desc(drhd->iommu->msi.irq), cpumask);
 }
 
-int adjust_vtd_irq_affinities(void)
+static int adjust_vtd_irq_affinities(void)
 {
     struct acpi_drhd_unit *drhd;
 
@@ -2725,6 +2725,7 @@ const struct iommu_ops __initconstrel intel_iommu_ops = {
     .read_apic_from_ire = io_apic_read_remap_rte,
     .read_msi_from_ire = msi_msg_read_remap_rte,
     .setup_hpet_msi = intel_setup_hpet_msi,
+    .adjust_irq_affinities = adjust_vtd_irq_affinities,
     .suspend = vtd_suspend,
     .resume = vtd_resume,
     .share_p2m = iommu_set_pgd,

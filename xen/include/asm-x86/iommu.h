@@ -81,8 +81,14 @@ void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned in
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);
 int iommu_setup_hpet_msi(struct msi_desc *);
 
+static inline int iommu_adjust_irq_affinities(void)
+{
+    return iommu_ops.adjust_irq_affinities
+           ? iommu_ops.adjust_irq_affinities()
+           : 0;
+}
+
 /* While VT-d specific, this must get declared in a generic header. */
-int adjust_vtd_irq_affinities(void);
 int __must_check iommu_pte_flush(struct domain *d, u64 gfn, u64 *pte,
                                  int order, int present);
 

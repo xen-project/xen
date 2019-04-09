@@ -224,7 +224,10 @@ struct iommu_ops {
 
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
     unsigned int (*read_apic_from_ire)(unsigned int apic, unsigned int reg);
+
     int (*setup_hpet_msi)(struct msi_desc *);
+
+    int (*adjust_irq_affinities)(void);
 #endif /* CONFIG_X86 */
 
     int __must_check (*suspend)(void);
