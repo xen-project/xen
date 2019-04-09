@@ -649,6 +649,7 @@ typedef struct {
     libxl_device_disk disk_saved;
     libxl__ev_devlock qmp_lock;
     int dm_ver;
+    libxl__ev_time time;
 } libxl__cdrom_insert_state;
 
 static void cdrom_insert_lock_acquired(libxl__egc *, libxl__ev_devlock *,
@@ -657,6 +658,9 @@ static void cdrom_insert_ejected(libxl__egc *egc,
                                  libxl__cdrom_insert_state *cis);
 static void cdrom_insert_inserted(libxl__egc *egc,
                                   libxl__cdrom_insert_state *cis);
+static void cdrom_insert_timout(libxl__egc *egc, libxl__ev_time *ev,
+                                const struct timeval *requested_abs,
+                                int rc);
 static void cdrom_insert_done(libxl__egc *egc,
                               libxl__cdrom_insert_state *cis,
                               int rc);
@@ -679,6 +683,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     libxl__ev_devlock_init(&cis->qmp_lock);
     cis->qmp_lock.ao = ao;
     cis->qmp_lock.domid = domid;
+    libxl__ev_time_init(&cis->time);
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
@@ -745,6 +750,11 @@ static void cdrom_insert_lock_acquired(libxl__egc *egc,
     libxl__cdrom_insert_state *cis = CONTAINER_OF(lock, *cis, qmp_lock);
     STATE_AO_GC(cis->ao);
 
+    if (rc) goto out;
+
+    rc = libxl__ev_time_register_rel(ao, &cis->time,
+                                     cdrom_insert_timout,
+                                     LIBXL_HOTPLUG_TIMEOUT * 1000);
     if (rc) goto out;
 
     /* We need to eject the original image first. This is implemented
@@ -950,12 +960,23 @@ out:
     cdrom_insert_done(egc, cis, rc); /* must be last */
 }
 
+static void cdrom_insert_timout(libxl__egc *egc, libxl__ev_time *ev,
+                                const struct timeval *requested_abs,
+                                int rc)
+{
+    EGC_GC;
+    libxl__cdrom_insert_state *cis = CONTAINER_OF(ev, *cis, time);
+    LOGD(ERROR, cis->domid, "cdrom insertion timed out");
+    cdrom_insert_done(egc, cis, rc);
+}
+
 static void cdrom_insert_done(libxl__egc *egc,
                               libxl__cdrom_insert_state *cis,
                               int rc)
 {
     EGC_GC;
 
+    libxl__ev_time_deregister(gc, &cis->time);
     libxl__ev_devlock_unlock(gc, &cis->qmp_lock);
     libxl_device_disk_dispose(&cis->disk_saved);
     libxl__ao_complete(egc, cis->ao, rc);
