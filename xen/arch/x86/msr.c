@@ -115,7 +115,7 @@ int init_vcpu_msr_policy(struct vcpu *v)
     return 0;
 }
 
-int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
+int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
 {
     const struct vcpu *curr = current;
     const struct domain *d = v->domain;
@@ -182,13 +182,9 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
     case MSR_IA32_BNDCFGS:
-        if ( !cp->feat.mpx )
+        if ( !cp->feat.mpx || !is_hvm_domain(d) ||
+             !hvm_get_guest_bndcfgs(v, val) )
             goto gp_fault;
-
-        ASSERT(is_hvm_domain(d));
-        if (!hvm_get_guest_bndcfgs(v, val) )
-            goto gp_fault;
-
         break;
 
     case MSR_IA32_XSS:
@@ -375,13 +371,9 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         break;
 
     case MSR_IA32_BNDCFGS:
-        if ( !cp->feat.mpx )
+        if ( !cp->feat.mpx || !is_hvm_domain(d) ||
+             !hvm_set_guest_bndcfgs(v, val) )
             goto gp_fault;
-
-        ASSERT(is_hvm_domain(d));
-        if ( !hvm_set_guest_bndcfgs(v, val) )
-            goto gp_fault;
-
         break;
 
     case MSR_IA32_XSS:

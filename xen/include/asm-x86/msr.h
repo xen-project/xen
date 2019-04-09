@@ -296,6 +296,11 @@ struct vcpu_msrs
         };
     } misc_features_enables;
 
+    /* 0x00000da0 - MSR_IA32_XSS */
+    struct {
+        uint64_t raw;
+    } xss;
+
     /*
      * 0xc0000103 - MSR_TSC_AUX
      *
@@ -313,11 +318,6 @@ struct vcpu_msrs
      * values here may be stale in current context.
      */
     uint32_t dr_mask[4];
-
-    /* 0x00000da0 - MSR_IA32_XSS */
-    struct {
-        uint64_t raw;
-    } xss;
 };
 
 void init_guest_msr_policy(void);
@@ -333,7 +333,7 @@ int init_vcpu_msr_policy(struct vcpu *v);
  * These functions are also used by the migration logic, so need to cope with
  * being used outside of v's context.
  */
-int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val);
+int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val);
 int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val);
 
 #endif /* !__ASSEMBLY__ */

@@ -145,7 +145,7 @@ struct hvm_function_table {
     int  (*get_guest_pat)(struct vcpu *v, u64 *);
     int  (*set_guest_pat)(struct vcpu *v, u64);
 
-    bool (*get_guest_bndcfgs)(const struct vcpu *v, u64 *);
+    bool (*get_guest_bndcfgs)(struct vcpu *v, u64 *);
     bool (*set_guest_bndcfgs)(struct vcpu *v, u64);
 
     void (*set_tsc_offset)(struct vcpu *v, u64 offset, u64 at_tsc);
@@ -444,7 +444,7 @@ static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
     return hvm_funcs.get_shadow_gs_base(v);
 }
 
-static inline bool hvm_get_guest_bndcfgs(const struct vcpu *v, u64 *val)
+static inline bool hvm_get_guest_bndcfgs(struct vcpu *v, u64 *val)
 {
     return hvm_funcs.get_guest_bndcfgs &&
            hvm_funcs.get_guest_bndcfgs(v, val);
@@ -692,6 +692,7 @@ unsigned long hvm_get_shadow_gs_base(struct vcpu *v);
 void hvm_set_info_guest(struct vcpu *v);
 void hvm_cpuid_policy_changed(struct vcpu *v);
 void hvm_set_tsc_offset(struct vcpu *v, uint64_t offset, uint64_t at_tsc);
+bool hvm_get_guest_bndcfgs(struct vcpu *v, uint64_t *val);
 
 /* End of prototype list */
 

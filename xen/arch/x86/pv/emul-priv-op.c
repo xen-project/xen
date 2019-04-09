@@ -819,7 +819,7 @@ static inline bool is_cpufreq_controller(const struct domain *d)
 static int read_msr(unsigned int reg, uint64_t *val,
                     struct x86_emulate_ctxt *ctxt)
 {
-    const struct vcpu *curr = current;
+    struct vcpu *curr = current;
     const struct domain *currd = curr->domain;
     bool vpmu_msr = false;
     int ret;

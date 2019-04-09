@@ -1150,11 +1150,8 @@ static bool vmx_set_guest_bndcfgs(struct vcpu *v, u64 val)
     return true;
 }
 
-static bool vmx_get_guest_bndcfgs(const struct vcpu *cv, u64 *val)
+static bool vmx_get_guest_bndcfgs(struct vcpu *v, u64 *val)
 {
-    /* Get a non-const pointer for vmx_vmcs_enter() */
-    struct vcpu *v = cv->domain->vcpu[cv->vcpu_id];
-
     ASSERT(cpu_has_mpx && cpu_has_vmx_mpx);
 
     vmx_vmcs_enter(v);
