@@ -1158,7 +1158,7 @@ void p2m_change_type_range(struct domain *d,
  * Finish p2m type change for gfns which are marked as need_recalc in a range.
  * Uses the current p2m's max_mapped_pfn to further clip the invalidation
  * range for alternate p2ms.
- * Returns: 0/1 for success, negative for failure
+ * Returns: 0 for success, negative for failure
  */
 static int finish_type_change(struct p2m_domain *p2m,
                               gfn_t first_gfn, unsigned long max_nr)
@@ -1174,9 +1174,9 @@ static int finish_type_change(struct p2m_domain *p2m,
         /*
          * ept->recalc could return 0/1/-ENOMEM. pt->recalc could return
          * 0/-ENOMEM/-ENOENT, -ENOENT isn't an error as we are looping
-         * gfn here.
+         * gfn here. If rc is 1 we need to have it 0 for success.
          */
-        if ( rc == -ENOENT )
+        if ( rc == -ENOENT || rc > 0 )
             rc = 0;
         else if ( rc < 0 )
         {
@@ -1213,19 +1213,13 @@ int p2m_finish_type_change(struct domain *d,
             if ( d->arch.altp2m_eptp[i] != mfn_x(INVALID_MFN) )
             {
                 struct p2m_domain *altp2m = d->arch.altp2m_p2m[i];
-                int rc1;
 
                 p2m_lock(altp2m);
-                rc1 = finish_type_change(altp2m, first_gfn, max_nr);
+                rc = finish_type_change(altp2m, first_gfn, max_nr);
                 p2m_unlock(altp2m);
 
-                if ( rc1 < 0 )
-                {
-                    rc = rc1;
+                if ( rc < 0 )
                     goto out;
-                }
-
-                rc |= rc1;
             }
     }
 #endif
