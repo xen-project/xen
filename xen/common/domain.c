@@ -1665,13 +1665,18 @@ static void continue_hypercall_tasklet_handler(unsigned long _info)
 {
     struct migrate_info *info = (struct migrate_info *)_info;
     struct vcpu *v = info->vcpu;
+    long res = -EINVAL;
 
     /* Wait for vcpu to sleep so that we can access its register state. */
     vcpu_sleep_sync(v);
 
     this_cpu(continue_info) = info;
-    return_reg(v) = (info->cpu == smp_processor_id())
-        ? info->func(info->data) : -EINVAL;
+
+    if ( likely(info->cpu == smp_processor_id()) )
+        res = info->func(info->data);
+
+    arch_hypercall_tasklet_result(v, res);
+
     this_cpu(continue_info) = NULL;
 
     if ( info->nest-- == 0 )

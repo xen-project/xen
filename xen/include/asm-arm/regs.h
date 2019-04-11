@@ -57,8 +57,6 @@ static inline bool guest_mode(const struct cpu_user_regs *r)
     return (diff == 0);
 }
 
-#define return_reg(v) ((v)->arch.cpu_info->guest_cpu_user_regs.r0)
-
 register_t get_user_reg(struct cpu_user_regs *regs, int reg);
 void set_user_reg(struct cpu_user_regs *regs, int reg, register_t val);
 

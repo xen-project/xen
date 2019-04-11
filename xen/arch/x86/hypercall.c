@@ -166,6 +166,13 @@ unsigned long hypercall_create_continuation(
 
 #undef NEXT_ARG
 
+void arch_hypercall_tasklet_result(struct vcpu *v, long res)
+{
+    struct cpu_user_regs *regs = &v->arch.user_regs;
+
+    regs->rax = res;
+}
+
 int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
                                 unsigned int mask, ...)
 {

@@ -1485,6 +1485,13 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
         regs->pc -= 4;  /* re-execute 'hvc #XEN_HYPERCALL_TAG' */
 }
 
+void arch_hypercall_tasklet_result(struct vcpu *v, long res)
+{
+    struct cpu_user_regs *regs = &v->arch.cpu_info->guest_cpu_user_regs;
+
+    HYPERCALL_RESULT_REG(regs) = res;
+}
+
 static bool check_multicall_32bit_clean(struct multicall_entry *multi)
 {
     int i;

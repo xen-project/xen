@@ -103,6 +103,12 @@ void domctl_lock_release(void);
 int continue_hypercall_on_cpu(
     unsigned int cpu, long (*func)(void *data), void *data);
 
+/*
+ * Companion to continue_hypercall_on_cpu(), to feed func()'s result back into
+ * vcpu regsiter state.
+ */
+void arch_hypercall_tasklet_result(struct vcpu *v, long res);
+
 extern unsigned int xen_processor_pmbits;
 
 extern bool_t opt_dom0_vcpus_pin;
