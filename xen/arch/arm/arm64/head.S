@@ -277,15 +277,9 @@ GLOBAL(init_secondary)
         mov   x26, #1                /* X26 := skip_zero_bss */
 
 common_start:
-        mov   x24, #0                /* x24 := CPU ID. Initialy zero until we
-                                      * find that multiprocessor extensions are
-                                      * present and the system is SMP  */
         mrs   x0, mpidr_el1
-        tbnz  x0, _MPIDR_UP, 1f      /* Uniprocessor system? */
-
         ldr   x13, =(~MPIDR_HWID_MASK)
         bic   x24, x0, x13           /* Mask out flags to get CPU ID */
-1:
 
         /* Non-boot CPUs wait here until __cpu_up is ready for them */
         cbz   x22, 1f
