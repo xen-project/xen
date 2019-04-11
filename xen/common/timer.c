@@ -619,8 +619,6 @@ static void free_percpu_timers(unsigned int cpu)
 {
     struct timers *ts = &per_cpu(timers, cpu);
 
-    migrate_timers_from_cpu(cpu);
-
     ASSERT(heap_metadata(ts->heap)->size == 0);
     if ( heap_metadata(ts->heap)->limit )
     {
@@ -648,6 +646,8 @@ static int cpu_callback(
     case CPU_UP_CANCELED:
     case CPU_DEAD:
     case CPU_RESUME_FAILED:
+        migrate_timers_from_cpu(cpu);
+
         if ( !park_offline_cpus && system_state != SYS_STATE_suspend )
             free_percpu_timers(cpu);
         break;
