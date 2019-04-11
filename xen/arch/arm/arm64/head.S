@@ -579,9 +579,10 @@ launch:
         sub   x0, x0, #CPUINFO_sizeof /* Make room for CPU save record */
         mov   sp, x0
 
+        cbnz  x22, 1f
+
         mov   x0, x20                /* Marshal args: - phys_offset */
         mov   x1, x21                /*               - FDT */
-        cbnz  x22, 1f
         b     start_xen              /* and disappear into the land of C */
 1:
         b     start_secondary        /* (to the appropriate entry point) */

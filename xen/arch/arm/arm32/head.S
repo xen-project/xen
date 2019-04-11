@@ -447,9 +447,9 @@ launch:
         ldr   sp, [r0]
         add   sp, #STACK_SIZE        /* (which grows down from the top). */
         sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
-        mov   r0, r10                /* Marshal args: - phys_offset */
-        mov   r1, r8                 /*               - DTB address */
         teq   r12, #0
+        moveq r0, r10                /* Marshal args: - phys_offset */
+        moveq r1, r8                 /*               - DTB address */
         beq   start_xen              /* and disappear into the land of C */
         b     start_secondary        /* (to the appropriate entry point) */
 

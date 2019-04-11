@@ -297,9 +297,7 @@ smp_prepare_cpus(void)
 }
 
 /* Boot the current CPU */
-void start_secondary(unsigned long boot_phys_offset,
-                     unsigned long fdt_paddr,
-                     unsigned long hwid)
+void start_secondary(void)
 {
     unsigned int cpuid = init_data.cpuid;
 
