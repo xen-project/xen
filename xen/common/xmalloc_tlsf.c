@@ -65,8 +65,8 @@
 #define PREV_FREE       (0x2)
 #define PREV_USED       (0x0)
 
-static spinlock_t pool_list_lock;
-static struct list_head pool_list_head;
+static DEFINE_SPINLOCK(pool_list_lock);
+static LIST_HEAD(pool_list_head);
 
 struct free_ptr {
     struct bhdr *prev;
@@ -551,8 +551,6 @@ static void *xmalloc_whole_pages(unsigned long size, unsigned long align)
 
 static void tlsf_init(void)
 {
-    INIT_LIST_HEAD(&pool_list_head);
-    spin_lock_init(&pool_list_lock);
     xenpool = xmem_pool_create(
         "xmalloc", xmalloc_pool_get, xmalloc_pool_put,
         PAGE_SIZE, 0, PAGE_SIZE);
