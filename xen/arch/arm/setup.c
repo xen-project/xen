@@ -728,8 +728,7 @@ size_t __read_mostly dcache_line_bytes;
 
 /* C entry point for boot CPU */
 void __init start_xen(unsigned long boot_phys_offset,
-                      unsigned long fdt_paddr,
-                      unsigned long cpuid)
+                      unsigned long fdt_paddr)
 {
     size_t fdt_size;
     int cpus, i;
