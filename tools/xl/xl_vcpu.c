@@ -79,6 +79,7 @@ void apply_global_affinity_masks(libxl_domain_type type,
 
     switch (type) {
     case LIBXL_DOMAIN_TYPE_HVM:
+    case LIBXL_DOMAIN_TYPE_PVH:
         type_mask = &global_hvm_affinity_mask;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
