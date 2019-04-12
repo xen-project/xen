@@ -224,17 +224,7 @@ cpu_init_done:
         ldr   r0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(0))
         mcr   CP32(r0, HTCR)
 
-        /*
-         * Set up the HSCTLR:
-         * Exceptions in LE ARM,
-         * Low-latency IRQs disabled,
-         * Write-implies-XN disabled (for now),
-         * D-cache disabled (for now),
-         * I-cache enabled,
-         * Alignment checking enabled,
-         * MMU translation disabled (for now).
-         */
-        ldr   r0, =(HSCTLR_BASE|SCTLR_Axx_ELx_A)
+        ldr   r0, =HSCTLR_SET
         mcr   CP32(r0, HSCTLR)
 
         /*

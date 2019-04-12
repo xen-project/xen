@@ -352,15 +352,7 @@ skip_bss:
 
         msr   tcr_el2, x0
 
-        /* Set up the SCTLR_EL2:
-         * Exceptions in LE ARM,
-         * Low-latency IRQs disabled,
-         * Write-implies-XN disabled (for now),
-         * D-cache disabled (for now),
-         * I-cache enabled,
-         * Alignment checking disabled,
-         * MMU translation disabled (for now). */
-        ldr   x0, =(HSCTLR_BASE)
+        ldr   x0, =SCTLR_EL2_SET
         msr   SCTLR_EL2, x0
 
         /* Ensure that any exceptions encountered at EL2

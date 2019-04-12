@@ -127,6 +127,9 @@
 #define SCTLR_A32_ELx_TE    BIT(30, UL)
 #define SCTLR_A32_ELx_FI    BIT(21, UL)
 
+/* Common bits for SCTLR_ELx for Arm64 */
+#define SCTLR_A64_ELx_SA    BIT(3, UL)
+
 /* Common bits for SCTLR_ELx on all architectures */
 #define SCTLR_Axx_ELx_EE    BIT(25, UL)
 #define SCTLR_Axx_ELx_WXN   BIT(19, UL)
@@ -135,7 +138,58 @@
 #define SCTLR_Axx_ELx_A     BIT(1, UL)
 #define SCTLR_Axx_ELx_M     BIT(0, UL)
 
-#define HSCTLR_BASE     _AC(0x30c51878,U)
+#ifdef CONFIG_ARM_32
+
+#define HSCTLR_RES1     (BIT( 3, UL) | BIT( 4, UL) | BIT( 5, UL) |\
+                         BIT( 6, UL) | BIT(11, UL) | BIT(16, UL) |\
+                         BIT(18, UL) | BIT(22, UL) | BIT(23, UL) |\
+                         BIT(28, UL) | BIT(29, UL))
+
+#define HSCTLR_RES0     (BIT(7, UL)  | BIT(8, UL)  | BIT(9, UL)  | BIT(10, UL) |\
+                         BIT(13, UL) | BIT(14, UL) | BIT(15, UL) | BIT(17, UL) |\
+                         BIT(20, UL) | BIT(24, UL) | BIT(26, UL) | BIT(27, UL) |\
+                         BIT(31, UL))
+
+/* Initial value for HSCTLR */
+#define HSCTLR_SET      (HSCTLR_RES1    | SCTLR_Axx_ELx_A   | SCTLR_Axx_ELx_I)
+
+/* Only used a pre-processing time... */
+#define HSCTLR_CLEAR    (HSCTLR_RES0        | SCTLR_Axx_ELx_M   |\
+                         SCTLR_Axx_ELx_C    | SCTLR_Axx_ELx_WXN |\
+                         SCTLR_A32_ELx_FI   | SCTLR_Axx_ELx_EE  |\
+                         SCTLR_A32_ELx_TE)
+
+#if (HSCTLR_SET ^ HSCTLR_CLEAR) != 0xffffffffU
+#error "Inconsistent HSCTLR set/clear bits"
+#endif
+
+#else
+
+#define SCTLR_EL2_RES1  (BIT( 4, UL) | BIT( 5, UL) | BIT(11, UL) |\
+                         BIT(16, UL) | BIT(18, UL) | BIT(22, UL) |\
+                         BIT(23, UL) | BIT(28, UL) | BIT(29, UL))
+
+#define SCTLR_EL2_RES0  (BIT( 6, UL) | BIT( 7, UL) | BIT( 8, UL) |\
+                         BIT( 9, UL) | BIT(10, UL) | BIT(13, UL) |\
+                         BIT(14, UL) | BIT(15, UL) | BIT(17, UL) |\
+                         BIT(20, UL) | BIT(21, UL) | BIT(24, UL) |\
+                         BIT(26, UL) | BIT(27, UL) | BIT(30, UL) |\
+                         BIT(31, UL) | (0xffffffffULL << 32))
+
+/* Initial value for SCTLR_EL2 */
+#define SCTLR_EL2_SET   (SCTLR_EL2_RES1     | SCTLR_A64_ELx_SA  |\
+                         SCTLR_Axx_ELx_I)
+
+/* Only used a pre-processing time... */
+#define SCTLR_EL2_CLEAR (SCTLR_EL2_RES0     | SCTLR_Axx_ELx_M   |\
+                         SCTLR_Axx_ELx_A    | SCTLR_Axx_ELx_C   |\
+                         SCTLR_Axx_ELx_WXN  | SCTLR_Axx_ELx_EE)
+
+#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffffUL
+#error "Inconsistent SCTLR_EL2 set/clear bits"
+#endif
+
+#endif
 
 /* HCR Hyp Configuration Register */
 #define HCR_RW          (_AC(1,UL)<<31) /* Register Width, ARM64 only */
