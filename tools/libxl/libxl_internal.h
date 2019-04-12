@@ -1958,8 +1958,6 @@ _hidden int libxl__qmp_system_wakeup(libxl__gc *gc, int domid);
 _hidden int libxl__qmp_resume(libxl__gc *gc, int domid);
 /* Load current QEMU state from file. */
 _hidden int libxl__qmp_restore(libxl__gc *gc, int domid, const char *filename);
-/* Set dirty bitmap logging status */
-_hidden int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enable);
 /* Add a virtual CPU */
 _hidden int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int index);
 /* Query the bitmap of CPUs */
@@ -3413,6 +3411,7 @@ typedef struct libxl__logdirty_switch {
     const char *ret_path;
     libxl__ev_xswatch watch;
     libxl__ev_time timeout;
+    libxl__ev_qmp qmp;
 } libxl__logdirty_switch;
 
 _hidden void libxl__logdirty_init(libxl__logdirty_switch *lds);

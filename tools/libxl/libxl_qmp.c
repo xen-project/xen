@@ -1108,16 +1108,6 @@ int libxl__qmp_resume(libxl__gc *gc, int domid)
     return qmp_run_command(gc, domid, "cont", NULL, NULL, NULL);
 }
 
-int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enable)
-{
-    libxl__json_object *args = NULL;
-
-    libxl__qmp_param_add_bool(gc, &args, "enable", enable);
-
-    return qmp_run_command(gc, domid, "xen-set-global-dirty-log", args,
-                           NULL, NULL);
-}
-
 int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
 {
     libxl__json_object *args = NULL;

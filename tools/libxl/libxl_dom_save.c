@@ -44,6 +44,10 @@ static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch*,
 static void domain_suspend_switch_qemu_xen_logdirty
                                (libxl__egc *egc, int domid, unsigned enable,
                                 libxl__logdirty_switch *lds);
+static void switch_qemu_xen_logdirty_done(libxl__egc *egc,
+                                          libxl__ev_qmp *qmp,
+                                          const libxl__json_object *,
+                                          int rc);
 static void switch_logdirty_timeout(libxl__egc *egc, libxl__ev_time *ev,
                                     const struct timeval *requested_abs,
                                     int rc);
@@ -55,6 +59,7 @@ void libxl__logdirty_init(libxl__logdirty_switch *lds)
     lds->cmd_path = 0;
     libxl__ev_xswatch_init(&lds->watch);
     libxl__ev_time_init(&lds->timeout);
+    libxl__ev_qmp_init(&lds->qmp);
 }
 
 void libxl__domain_common_switch_qemu_logdirty(libxl__egc *egc,
@@ -207,13 +212,40 @@ static void domain_suspend_switch_qemu_xen_logdirty
 {
     STATE_AO_GC(lds->ao);
     int rc;
+    libxl__json_object *args = NULL;
 
-    rc = libxl__qmp_set_global_dirty_log(gc, domid, enable);
+    /* Convenience aliases. */
+    libxl__ev_qmp *const qmp = &lds->qmp;
+
+    rc = libxl__ev_time_register_rel(ao, &lds->timeout,
+                                     switch_logdirty_timeout, 10 * 1000);
+    if (rc) goto out;
+
+    qmp->ao = ao;
+    qmp->domid = domid;
+    qmp->payload_fd = -1;
+    qmp->callback = switch_qemu_xen_logdirty_done;
+    libxl__qmp_param_add_bool(gc, &args, "enable", enable);
+    rc = libxl__ev_qmp_send(gc, qmp, "xen-set-global-dirty-log", args);
+    if (rc) goto out;
+
+    return;
+out:
+    switch_qemu_xen_logdirty_done(egc, qmp, NULL, rc);
+}
+
+static void switch_qemu_xen_logdirty_done(libxl__egc *egc,
+                                          libxl__ev_qmp *qmp,
+                                          const libxl__json_object *r,
+                                          int rc)
+{
+    EGC_GC;
+    libxl__logdirty_switch *lds = CONTAINER_OF(qmp, *lds, qmp);
+
     if (rc)
-        LOGD(ERROR, domid,
+        LOGD(ERROR, qmp->domid,
              "logdirty switch failed (rc=%d), abandoning suspend",rc);
-
-    lds->callback(egc, lds, rc);
+    switch_logdirty_done(egc, lds, rc);
 }
 
 static void switch_logdirty_timeout(libxl__egc *egc, libxl__ev_time *ev,
@@ -234,6 +266,7 @@ static void switch_logdirty_done(libxl__egc *egc,
 
     libxl__ev_xswatch_deregister(gc, &lds->watch);
     libxl__ev_time_deregister(gc, &lds->timeout);
+    libxl__ev_qmp_dispose(gc, &lds->qmp);
 
     lds->callback(egc, lds, rc);
 }
