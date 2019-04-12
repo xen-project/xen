@@ -36,11 +36,17 @@ static void domain_save_done(libxl__egc *egc,
  * xenstore_process_logdirty_event
  */
 
+static void domain_suspend_switch_qemu_xen_traditional_logdirty
+                               (libxl__egc *egc, int domid, unsigned enable,
+                                libxl__logdirty_switch *lds);
+static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch*,
+                            const char *watch_path, const char *event_path);
+static void domain_suspend_switch_qemu_xen_logdirty
+                               (libxl__egc *egc, int domid, unsigned enable,
+                                libxl__logdirty_switch *lds);
 static void switch_logdirty_timeout(libxl__egc *egc, libxl__ev_time *ev,
                                     const struct timeval *requested_abs,
                                     int rc);
-static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch*,
-                            const char *watch_path, const char *event_path);
 static void switch_logdirty_done(libxl__egc *egc,
                                  libxl__logdirty_switch *lds, int rc);
 
@@ -49,6 +55,27 @@ void libxl__logdirty_init(libxl__logdirty_switch *lds)
     lds->cmd_path = 0;
     libxl__ev_xswatch_init(&lds->watch);
     libxl__ev_time_init(&lds->timeout);
+}
+
+void libxl__domain_common_switch_qemu_logdirty(libxl__egc *egc,
+                                               int domid, unsigned enable,
+                                               libxl__logdirty_switch *lds)
+{
+    STATE_AO_GC(lds->ao);
+
+    switch (libxl__device_model_version_running(gc, domid)) {
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+        domain_suspend_switch_qemu_xen_traditional_logdirty(egc, domid, enable,
+                                                            lds);
+        break;
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+        domain_suspend_switch_qemu_xen_logdirty(egc, domid, enable, lds);
+        break;
+    default:
+        LOGD(ERROR, domid, "logdirty switch failed"
+             ", no valid device model version found, abandoning suspend");
+        lds->callback(egc, lds, ERROR_FAIL);
+    }
 }
 
 static void domain_suspend_switch_qemu_xen_traditional_logdirty
@@ -120,83 +147,6 @@ static void domain_suspend_switch_qemu_xen_traditional_logdirty
     switch_logdirty_done(egc,lds,rc);
 }
 
-static void domain_suspend_switch_qemu_xen_logdirty
-                               (libxl__egc *egc, int domid, unsigned enable,
-                                libxl__logdirty_switch *lds)
-{
-    STATE_AO_GC(lds->ao);
-    int rc;
-
-    rc = libxl__qmp_set_global_dirty_log(gc, domid, enable);
-    if (rc)
-        LOGD(ERROR, domid,
-             "logdirty switch failed (rc=%d), abandoning suspend",rc);
-
-    lds->callback(egc, lds, rc);
-}
-
-static void domain_suspend_switch_qemu_logdirty_done
-                        (libxl__egc *egc, libxl__logdirty_switch *lds, int rc)
-{
-    libxl__domain_save_state *dss = CONTAINER_OF(lds, *dss, logdirty);
-
-    if (rc) {
-        dss->rc = rc;
-        libxl__xc_domain_saverestore_async_callback_done(egc,
-                                                         &dss->sws.shs, -1);
-    } else
-        libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, 0);
-}
-
-void libxl__domain_suspend_common_switch_qemu_logdirty
-                               (uint32_t domid, unsigned enable, void *user)
-{
-    libxl__save_helper_state *shs = user;
-    libxl__egc *egc = shs->egc;
-    libxl__domain_save_state *dss = shs->caller_state;
-
-    /* Convenience aliases. */
-    libxl__logdirty_switch *const lds = &dss->logdirty;
-
-    if (dss->type == LIBXL_DOMAIN_TYPE_PVH) {
-        domain_suspend_switch_qemu_logdirty_done(egc, lds, 0);
-        return;
-    }
-
-    lds->callback = domain_suspend_switch_qemu_logdirty_done;
-    libxl__domain_common_switch_qemu_logdirty(egc, domid, enable, lds);
-}
-
-void libxl__domain_common_switch_qemu_logdirty(libxl__egc *egc,
-                                               int domid, unsigned enable,
-                                               libxl__logdirty_switch *lds)
-{
-    STATE_AO_GC(lds->ao);
-
-    switch (libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-        domain_suspend_switch_qemu_xen_traditional_logdirty(egc, domid, enable,
-                                                            lds);
-        break;
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-        domain_suspend_switch_qemu_xen_logdirty(egc, domid, enable, lds);
-        break;
-    default:
-        LOGD(ERROR, domid, "logdirty switch failed"
-             ", no valid device model version found, abandoning suspend");
-        lds->callback(egc, lds, ERROR_FAIL);
-    }
-}
-static void switch_logdirty_timeout(libxl__egc *egc, libxl__ev_time *ev,
-                                    const struct timeval *requested_abs,
-                                    int rc)
-{
-    libxl__logdirty_switch *lds = CONTAINER_OF(ev, *lds, timeout);
-    STATE_AO_GC(lds->ao);
-    LOG(ERROR,"logdirty switch: wait for device model timed out");
-    switch_logdirty_done(egc,lds,ERROR_FAIL);
-}
-
 static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch *watch,
                             const char *watch_path, const char *event_path)
 {
@@ -251,6 +201,31 @@ static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch *watch,
     }
 }
 
+static void domain_suspend_switch_qemu_xen_logdirty
+                               (libxl__egc *egc, int domid, unsigned enable,
+                                libxl__logdirty_switch *lds)
+{
+    STATE_AO_GC(lds->ao);
+    int rc;
+
+    rc = libxl__qmp_set_global_dirty_log(gc, domid, enable);
+    if (rc)
+        LOGD(ERROR, domid,
+             "logdirty switch failed (rc=%d), abandoning suspend",rc);
+
+    lds->callback(egc, lds, rc);
+}
+
+static void switch_logdirty_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                                    const struct timeval *requested_abs,
+                                    int rc)
+{
+    libxl__logdirty_switch *lds = CONTAINER_OF(ev, *lds, timeout);
+    STATE_AO_GC(lds->ao);
+    LOG(ERROR,"logdirty switch: wait for device model timed out");
+    switch_logdirty_done(egc,lds,ERROR_FAIL);
+}
+
 static void switch_logdirty_done(libxl__egc *egc,
                                  libxl__logdirty_switch *lds,
                                  int rc)
@@ -261,6 +236,41 @@ static void switch_logdirty_done(libxl__egc *egc,
     libxl__ev_time_deregister(gc, &lds->timeout);
 
     lds->callback(egc, lds, rc);
+}
+
+static void domain_suspend_switch_qemu_logdirty_done
+                        (libxl__egc *egc, libxl__logdirty_switch *lds, int rc);
+
+void libxl__domain_suspend_common_switch_qemu_logdirty
+                               (uint32_t domid, unsigned enable, void *user)
+{
+    libxl__save_helper_state *shs = user;
+    libxl__egc *egc = shs->egc;
+    libxl__domain_save_state *dss = shs->caller_state;
+
+    /* Convenience aliases. */
+    libxl__logdirty_switch *const lds = &dss->logdirty;
+
+    if (dss->type == LIBXL_DOMAIN_TYPE_PVH) {
+        domain_suspend_switch_qemu_logdirty_done(egc, lds, 0);
+        return;
+    }
+
+    lds->callback = domain_suspend_switch_qemu_logdirty_done;
+    libxl__domain_common_switch_qemu_logdirty(egc, domid, enable, lds);
+}
+
+static void domain_suspend_switch_qemu_logdirty_done
+                        (libxl__egc *egc, libxl__logdirty_switch *lds, int rc)
+{
+    libxl__domain_save_state *dss = CONTAINER_OF(lds, *dss, logdirty);
+
+    if (rc) {
+        dss->rc = rc;
+        libxl__xc_domain_saverestore_async_callback_done(egc,
+                                                         &dss->sws.shs, -1);
+    } else
+        libxl__xc_domain_saverestore_async_callback_done(egc, &dss->sws.shs, 0);
 }
 
 /*----- callbacks, called by xc_domain_save -----*/
