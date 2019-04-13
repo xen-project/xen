@@ -1407,7 +1407,8 @@ static int alloc_l1_table(struct page_info *page)
     return 0;
 
  fail:
-    gdprintk(XENLOG_WARNING, "Failure in alloc_l1_table: slot %#x\n", i);
+    gdprintk(XENLOG_WARNING,
+             "Failure %d in alloc_l1_table: slot %#x\n", ret, i);
  out:
     while ( i-- > 0 )
         put_page_from_l1e(pl1e[i], d);
@@ -1505,7 +1506,8 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
         }
         else if ( rc < 0 && rc != -EINTR )
         {
-            gdprintk(XENLOG_WARNING, "Failure in alloc_l2_table: slot %#x\n", i);
+            gdprintk(XENLOG_WARNING,
+                     "Failure %d in alloc_l2_table: slot %#x\n", rc, i);
             if ( i )
             {
                 page->nr_validated_ptes = i;
@@ -1599,7 +1601,8 @@ static int alloc_l3_table(struct page_info *page)
         rc = -EINVAL;
     if ( rc < 0 && rc != -ERESTART && rc != -EINTR )
     {
-        gdprintk(XENLOG_WARNING, "Failure in alloc_l3_table: slot %#x\n", i);
+        gdprintk(XENLOG_WARNING,
+                 "Failure %d in alloc_l3_table: slot %#x\n", rc, i);
         if ( i )
         {
             page->nr_validated_ptes = i;
@@ -1767,7 +1770,7 @@ static int alloc_l4_table(struct page_info *page)
         {
             if ( rc != -EINTR )
                 gdprintk(XENLOG_WARNING,
-                         "Failure in alloc_l4_table: slot %#x\n", i);
+                         "Failure %d in alloc_l4_table: slot %#x\n", rc, i);
             if ( i )
             {
                 page->nr_validated_ptes = i;
@@ -2482,9 +2485,8 @@ int get_page(struct page_info *page, struct domain *domain)
 
     if ( !paging_mode_refcounts(domain) && !domain->is_dying )
         gprintk(XENLOG_INFO,
-                "Error mfn %"PRI_mfn": rd=%d od=%d caf=%08lx taf=%" PRtype_info "\n",
-                mfn_x(page_to_mfn(page)), domain->domain_id,
-                owner ? owner->domain_id : DOMID_INVALID,
+                "Error mfn %"PRI_mfn": rd=%pd od=%pd caf=%08lx taf=%"PRtype_info"\n",
+                mfn_x(page_to_mfn(page)), domain, owner,
                 page->count_info - !!owner, page->u.inuse.type_info);
 
     if ( owner )
