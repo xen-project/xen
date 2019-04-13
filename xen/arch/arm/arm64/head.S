@@ -344,8 +344,6 @@ el2:    PRINT("- Xen starting at EL2 -\r\n")
 skip_bss:
         PRINT("- Setting up control registers -\r\n")
 
-        /* XXXX call PROCINFO_cpu_init here */
-
         /* Set up memory attribute type tables */
         ldr   x0, =MAIRVAL
         msr   mair_el2, x0
