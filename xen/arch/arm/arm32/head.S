@@ -212,8 +212,6 @@ cpu_init_done:
         /* Set up memory attribute type tables */
         ldr   r0, =MAIR0VAL
         ldr   r1, =MAIR1VAL
-        mcr   CP32(r0, MAIR0)
-        mcr   CP32(r1, MAIR1)
         mcr   CP32(r0, HMAIR0)
         mcr   CP32(r1, HMAIR1)
 
