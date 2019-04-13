@@ -81,13 +81,10 @@
 /* Macro to print a string to the UART, if there is one.
  * Clobbers x0-x3. */
 #ifdef CONFIG_EARLY_PRINTK
-#define PRINT(_s)       \
-        adr   x0, 98f ; \
-        bl    puts    ; \
-        b     99f     ; \
-98:     .asciz _s     ; \
-        .align 2      ; \
-99:
+#define PRINT(_s)           \
+        adr   x0, 98f ;     \
+        bl    puts    ;     \
+        RODATA_STR(98, _s)
 #else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
 #endif /* !CONFIG_EARLY_PRINTK */
@@ -641,8 +638,7 @@ init_uart:
 #endif
         adr   x0, 1f
         b     puts
-1:      .asciz "- UART enabled -\r\n"
-        .align 4
+RODATA_STR(1, "- UART enabled -\r\n")
 
 /* Print early debug messages.
  * x0: Nul-terminated string to print.
