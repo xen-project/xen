@@ -495,9 +495,7 @@ create_page_tables:
         cmp   x19, #XEN_VIRT_START
         cset  x25, eq                /* x25 := identity map in place, or not */
 
-        /* Write Xen's PT's paddr into TTBR0_EL2 */
         load_paddr x4, boot_pgtable
-        msr   TTBR0_EL2, x4
 
         /* Setup boot_pgtable: */
         load_paddr x1, boot_first
@@ -624,6 +622,11 @@ enable_mmu:
          */
         tlbi  alle2                  /* Flush hypervisor TLBs */
         dsb   nsh
+
+        /* Write Xen's PT's paddr into TTBR0_EL2 */
+        load_paddr x0, boot_pgtable
+        msr   TTBR0_EL2, x0
+        isb
 
         mrs   x0, SCTLR_EL2
         orr   x0, x0, #SCTLR_Axx_ELx_M  /* Enable MMU */
