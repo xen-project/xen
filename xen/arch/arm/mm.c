@@ -48,6 +48,11 @@
 #undef mfn_to_virt
 #define mfn_to_virt(mfn) __mfn_to_virt(mfn_x(mfn))
 
+#define DEFINE_PAGE_TABLES(name, nr)                    \
+lpae_t __aligned(PAGE_SIZE) name[LPAE_ENTRIES * (nr)]
+
+#define DEFINE_PAGE_TABLE(name) DEFINE_PAGE_TABLES(name, 1)
+
 /* Static start-of-day pagetables that we use before the allocators
  * are up. These are used by all CPUs during bringup before switching
  * to the CPUs own pagetables.
@@ -71,13 +76,13 @@
  * Finally, if EARLY_PRINTK is enabled then xen_fixmap will be mapped
  * by the CPU once it has moved off the 1:1 mapping.
  */
-lpae_t boot_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+DEFINE_PAGE_TABLE(boot_pgtable);
 #ifdef CONFIG_ARM_64
-lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
-lpae_t boot_first_id[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+DEFINE_PAGE_TABLE(boot_first);
+DEFINE_PAGE_TABLE(boot_first_id);
 #endif
-lpae_t boot_second[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
-lpae_t boot_third[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
+DEFINE_PAGE_TABLE(boot_second);
+DEFINE_PAGE_TABLE(boot_third);
 
 /* Main runtime page tables */
 
@@ -91,8 +96,8 @@ lpae_t boot_third[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
 
 #ifdef CONFIG_ARM_64
 #define HYP_PT_ROOT_LEVEL 0
-lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
-lpae_t xen_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+static DEFINE_PAGE_TABLE(xen_pgtable);
+static DEFINE_PAGE_TABLE(xen_first);
 #define THIS_CPU_PGTABLE xen_pgtable
 #else
 #define HYP_PT_ROOT_LEVEL 1
@@ -105,17 +110,16 @@ static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
  * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
 static DEFINE_PER_CPU(lpae_t *, xen_dommap);
 /* Root of the trie for cpu0, other CPU's PTs are dynamically allocated */
-lpae_t cpu0_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+static DEFINE_PAGE_TABLE(cpu0_pgtable);
 /* cpu0's domheap page tables */
-lpae_t cpu0_dommap[LPAE_ENTRIES*DOMHEAP_SECOND_PAGES]
-    __attribute__((__aligned__(4096*DOMHEAP_SECOND_PAGES)));
+static DEFINE_PAGE_TABLES(cpu0_dommap, DOMHEAP_SECOND_PAGES);
 #endif
 
 #ifdef CONFIG_ARM_64
 /* The first page of the first level mapping of the xenheap. The
  * subsequent xenheap first level pages are dynamically allocated, but
  * we need this one to bootstrap ourselves. */
-lpae_t xenheap_first_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+static DEFINE_PAGE_TABLE(xenheap_first_first);
 /* The zeroeth level slot which uses xenheap_first_first. Used because
  * setup_xenheap_mappings otherwise relies on mfn_to_virt which isn't
  * valid for a non-xenheap mapping. */
@@ -129,12 +133,12 @@ static __initdata int xenheap_first_first_slot = -1;
  * addresses from 0 to 0x7fffffff. Offsets into it are calculated
  * with second_linear_offset(), not second_table_offset().
  */
-lpae_t xen_second[LPAE_ENTRIES*2] __attribute__((__aligned__(4096*2)));
+static DEFINE_PAGE_TABLES(xen_second, 2);
 /* First level page table used for fixmap */
-lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+DEFINE_PAGE_TABLE(xen_fixmap);
 /* First level page table used to map Xen itself with the XN bit set
  * as appropriate. */
-static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+static DEFINE_PAGE_TABLE(xen_xenmap);
 
 /* Non-boot CPUs use this to find the correct pagetables. */
 uint64_t init_ttbr;
