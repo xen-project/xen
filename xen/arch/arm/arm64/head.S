@@ -304,7 +304,6 @@ real_start_efi:
         mov   x22, #0                /* x22 := is_secondary_cpu */
 
         bl    check_cpu_mode
-        bl    zero_bss
         bl    cpu_init
         bl    create_page_tables
         bl    enable_mmu
@@ -318,6 +317,7 @@ primary_switched:
         /* Use a virtual address to access the UART. */
         ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
+        bl    zero_bss
         PRINT("- Ready -\r\n")
         /* Setup the arguments for start_xen and jump to C world */
         mov   x0, x20                /* x0 := Physical offset */
@@ -420,7 +420,6 @@ ENDPROC(check_cpu_mode)
  * Zero BSS
  *
  * Inputs:
- *   x20: Physical offset
  *   x26: Do we need to zero BSS?
  *
  * Clobbers x0 - x3
@@ -430,8 +429,8 @@ zero_bss:
         cbnz  x26, skip_bss
 
         PRINT("- Zero BSS -\r\n")
-        load_paddr x0, __bss_start    /* Load paddr of start & end of bss */
-        load_paddr x1, __bss_end
+        ldr   x0, =__bss_start       /* x0 := vaddr(__bss_start) */
+        ldr   x1, =__bss_end         /* x1 := vaddr(__bss_start) */
 
 1:      str   xzr, [x0], #8
         cmp   x0, x1

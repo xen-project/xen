@@ -149,7 +149,6 @@ past_zImage:
         mov   r12, #0                /* r12 := is_secondary_cpu */
 
         bl    check_cpu_mode
-        bl    zero_bss
         bl    cpu_init
         bl    create_page_tables
         bl    enable_mmu
@@ -163,6 +162,7 @@ primary_switched:
         /* Use a virtual address to access the UART. */
         mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
 #endif
+        bl    zero_bss
         PRINT("- Ready -\r\n")
         /* Setup the arguments for start_xen and jump to C world */
         mov   r0, r10                /* r0 := Physical offset */
@@ -273,17 +273,12 @@ ENDPROC(check_cpu_mode)
 /*
  * Zero BSS
  *
- * Inputs:
- *   r10: Physical offset
- *
  * Clobbers r0 - r3
  */
 zero_bss:
         PRINT("- Zero BSS -\r\n")
-        ldr   r0, =__bss_start       /* Load start & end of bss */
-        ldr   r1, =__bss_end
-        add   r0, r0, r10            /* Apply physical offset */
-        add   r1, r1, r10
+        ldr   r0, =__bss_start       /* r0 := vaddr(__bss_start) */
+        ldr   r1, =__bss_end         /* r1 := vaddr(__bss_start) */
 
         mov   r2, #0
 1:      str   r2, [r0], #4

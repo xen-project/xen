@@ -62,6 +62,17 @@ mm_printk(const char *fmt, ...) {}
     } while (0);
 #endif
 
+/*
+ * Macros to define page-tables:
+ *  - DEFINE_BOOT_PAGE_TABLE is used to define page-table that are used
+ *  in assembly code before BSS is zeroed.
+ *  - DEFINE_PAGE_TABLE{,S} are used to define one or multiple
+ *  page-tables to be used after BSS is zeroed (typically they are only used
+ *  in C).
+ */
+#define DEFINE_BOOT_PAGE_TABLE(name)                                          \
+lpae_t __aligned(PAGE_SIZE) __section(".data.page_aligned") name[LPAE_ENTRIES]
+
 #define DEFINE_PAGE_TABLES(name, nr)                    \
 lpae_t __aligned(PAGE_SIZE) name[LPAE_ENTRIES * (nr)]
 
@@ -90,13 +101,13 @@ lpae_t __aligned(PAGE_SIZE) name[LPAE_ENTRIES * (nr)]
  * Finally, if EARLY_PRINTK is enabled then xen_fixmap will be mapped
  * by the CPU once it has moved off the 1:1 mapping.
  */
-DEFINE_PAGE_TABLE(boot_pgtable);
+DEFINE_BOOT_PAGE_TABLE(boot_pgtable);
 #ifdef CONFIG_ARM_64
-DEFINE_PAGE_TABLE(boot_first);
-DEFINE_PAGE_TABLE(boot_first_id);
+DEFINE_BOOT_PAGE_TABLE(boot_first);
+DEFINE_BOOT_PAGE_TABLE(boot_first_id);
 #endif
-DEFINE_PAGE_TABLE(boot_second);
-DEFINE_PAGE_TABLE(boot_third);
+DEFINE_BOOT_PAGE_TABLE(boot_second);
+DEFINE_BOOT_PAGE_TABLE(boot_third);
 
 /* Main runtime page tables */
 
@@ -149,7 +160,7 @@ static __initdata int xenheap_first_first_slot = -1;
  */
 static DEFINE_PAGE_TABLES(xen_second, 2);
 /* First level page table used for fixmap */
-DEFINE_PAGE_TABLE(xen_fixmap);
+DEFINE_BOOT_PAGE_TABLE(xen_fixmap);
 /* First level page table used to map Xen itself with the XN bit set
  * as appropriate. */
 static DEFINE_PAGE_TABLE(xen_xenmap);
