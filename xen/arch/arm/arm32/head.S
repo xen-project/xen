@@ -79,8 +79,25 @@
 98:     .asciz _s          ;\
         .align 2           ;\
 99:
+
+/*
+ * Macro to print the value of register \rb
+ *
+ * Clobbers r0 - r4
+ */
+.macro print_reg rb
+        mov   r0, \rb
+        mov   r4, lr
+        bl    putn
+        mov   lr, r4
+.endm
+
 #else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
+
+.macro print_reg rb
+.endm
+
 #endif /* !CONFIG_EARLY_PRINTK */
 
         .arm
@@ -159,8 +176,7 @@ GLOBAL(init_secondary)
 #ifdef CONFIG_EARLY_PRINTK
         mov_w r11, EARLY_UART_BASE_ADDRESS   /* r11 := UART base address */
         PRINT("- CPU ")
-        mov   r0, r7
-        bl    putn
+        print_reg r7
         PRINT(" booting -\r\n")
 #endif
 
@@ -211,8 +227,7 @@ skip_bss:
         bne   1f
         mov   r4, r0
         PRINT("- Missing processor info: ")
-        mov   r0, r4
-        bl    putn
+        print_reg r4
         PRINT(" -\r\n")
         b     fail
 1:
