@@ -54,7 +54,7 @@
  *   r4  -
  *   r5  -
  *   r6  - identity map in place
- *   r7  - CPUID
+ *   r7  -
  *   r8  - DTB address (boot CPU only)
  *   r9  - paddr(start)
  *   r10 - phys offset
@@ -123,6 +123,12 @@ past_zImage:
         add   r8, r10                /* r8 := paddr(DTB) */
 #endif
 
+        /* Initialize the UART if earlyprintk has been enabled. */
+#ifdef CONFIG_EARLY_PRINTK
+        bl    init_uart
+#endif
+        PRINT("- Boot CPU booting -\r\n")
+
         mov   r12, #0                /* r12 := is_secondary_cpu */
 
         b     common_start
@@ -137,13 +143,8 @@ GLOBAL(init_secondary)
 
         mov   r12, #1                /* r12 := is_secondary_cpu */
 
-common_start:
         mrc   CP32(r1, MPIDR)
         bic   r7, r1, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
-
-        /* Non-boot CPUs wait here until __cpu_up is ready for them */
-        teq   r12, #0
-        beq   1f
 
         ldr   r0, =smp_up_cpu
         add   r0, r0, r10            /* Apply physical offset */
@@ -156,15 +157,14 @@ common_start:
 1:
 
 #ifdef CONFIG_EARLY_PRINTK
-        ldr   r11, =EARLY_UART_BASE_ADDRESS  /* r11 := UART base address */
-        teq   r12, #0                /* Boot CPU sets up the UART too */
-        bleq  init_uart
+        mov_w r11, EARLY_UART_BASE_ADDRESS   /* r11 := UART base address */
         PRINT("- CPU ")
         mov   r0, r7
         bl    putn
         PRINT(" booting -\r\n")
 #endif
 
+common_start:
         /* Check that this CPU has Hyp mode */
         mrc   CP32(r0, ID_PFR1)
         and   r0, r0, #0xf000        /* Bits 12-15 define virt extensions */
@@ -497,11 +497,15 @@ ENTRY(switch_ttbr)
 
 #ifdef CONFIG_EARLY_PRINTK
 /*
- * Bring up the UART.
- * r11: Early UART base address
- * Clobbers r0-r2
+ * Initialize the UART. Should only be called on the boot CPU.
+ *
+ * Output:
+ *  r11: Early UART base physical address
+ *
+ * Clobbers r0 - r3
  */
 init_uart:
+        mov_w r11, EARLY_UART_BASE_ADDRESS
 #ifdef EARLY_PRINTK_INIT_UART
         early_uart_init r11, r1, r2
 #endif
