@@ -306,6 +306,11 @@ primary_switched:
         /* Use a virtual address to access the UART. */
         ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
+        PRINT("- Ready -\r\n")
+        /* Setup the arguments for start_xen and jump to C world */
+        mov   x0, x20                /* x0 := Physical offset */
+        mov   x1, x21                /* x1 := paddr(FDT) */
+        ldr   x2, =start_xen
         b     launch
 ENDPROC(real_start)
 
@@ -368,6 +373,9 @@ secondary_switched:
         /* Use a virtual address to access the UART. */
         ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
+        PRINT("- Ready -\r\n")
+        /* Jump to C world */
+        ldr   x2, =start_secondary
         b     launch
 ENDPROC(init_secondary)
 
@@ -663,23 +671,26 @@ setup_fixmap:
         ret
 ENDPROC(setup_fixmap)
 
+/*
+ * Setup the initial stack and jump to the C world
+ *
+ * Inputs:
+ *   x0 : Argument 0 of the C function to call
+ *   x1 : Argument 1 of the C function to call
+ *   x2 : C entry point
+ *
+ * Clobbers x3
+ */
 launch:
-        PRINT("- Ready -\r\n")
+        ldr   x3, =init_data
+        add   x3, x3, #INITINFO_stack /* Find the boot-time stack */
+        ldr   x3, [x3]
+        add   x3, x3, #STACK_SIZE     /* (which grows down from the top). */
+        sub   x3, x3, #CPUINFO_sizeof /* Make room for CPU save record */
+        mov   sp, x3
 
-        ldr   x0, =init_data
-        add   x0, x0, #INITINFO_stack /* Find the boot-time stack */
-        ldr   x0, [x0]
-        add   x0, x0, #STACK_SIZE    /* (which grows down from the top). */
-        sub   x0, x0, #CPUINFO_sizeof /* Make room for CPU save record */
-        mov   sp, x0
-
-        cbnz  x22, 1f
-
-        mov   x0, x20                /* Marshal args: - phys_offset */
-        mov   x1, x21                /*               - FDT */
-        b     start_xen              /* and disappear into the land of C */
-1:
-        b     start_secondary        /* (to the appropriate entry point) */
+        /* Jump to C world */
+        br    x2
 ENDPROC(launch)
 
 /* Fail-stop */
