@@ -37,6 +37,15 @@
 #endif
 
 /*
+ * Move an immediate constant into a 32-bit register using movw/movt
+ * instructions.
+ */
+.macro mov_w reg, word
+        movw  \reg, #:lower16:\word
+        movt  \reg, #:upper16:\word
+.endm
+
+/*
  * Common register usage in this file:
  *   r0  -
  *   r1  -
