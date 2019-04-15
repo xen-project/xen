@@ -344,6 +344,23 @@ GLOBAL(init_secondary)
         br    x0
 secondary_switched:
         bl    setup_fixmap
+
+        /*
+         * Non-boot CPUs need to move on to the proper pagetables, which were
+         * setup in init_secondary_pagetables.
+         *
+         * XXX: This is not compliant with the Arm Arm.
+         */
+        ldr   x4, =init_ttbr         /* VA of TTBR0_EL2 stashed by CPU 0 */
+        ldr   x4, [x4]               /* Actual value */
+        dsb   sy
+        msr   TTBR0_EL2, x4
+        dsb   sy
+        isb
+        tlbi  alle2
+        dsb   sy                     /* Ensure completion of TLB flush */
+        isb
+
         b     launch
 ENDPROC(init_secondary)
 
@@ -650,23 +667,6 @@ ENDPROC(setup_fixmap)
 launch:
         PRINT("- Ready -\r\n")
 
-        /* The boot CPU should go straight into C now */
-        cbz   x22, 1f
-
-        /* Non-boot CPUs need to move on to the proper pagetables, which were
-         * setup in init_secondary_pagetables. */
-
-        ldr   x4, =init_ttbr         /* VA of TTBR0_EL2 stashed by CPU 0 */
-        ldr   x4, [x4]               /* Actual value */
-        dsb   sy
-        msr   TTBR0_EL2, x4
-        dsb   sy
-        isb
-        tlbi  alle2
-        dsb   sy                     /* Ensure completion of TLB flush */
-        isb
-
-1:
         ldr   x0, =init_data
         add   x0, x0, #INITINFO_stack /* Find the boot-time stack */
         ldr   x0, [x0]
