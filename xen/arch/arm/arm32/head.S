@@ -124,16 +124,8 @@ GLOBAL(init_secondary)
         mov   r12, #1                /* r12 := is_secondary_cpu */
 
 common_start:
-        mov   r7, #0                 /* r7 := CPU ID. Initialy zero until we
-                                      * find that multiprocessor extensions are
-                                      * present and the system is SMP */
         mrc   CP32(r1, MPIDR)
-        tst   r1, #MPIDR_SMP         /* Multiprocessor extension supported? */
-        beq   1f
-        tst   r1, #MPIDR_UP          /* Uniprocessor system? */
-        bne   1f
         bic   r7, r1, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
-1:
 
         /* Non-boot CPUs wait here until __cpu_up is ready for them */
         teq   r12, #0
