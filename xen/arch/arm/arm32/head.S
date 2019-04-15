@@ -64,15 +64,20 @@
  *   r14 - LR
  *   r15 - PC
  */
-/* Macro to print a string to the UART, if there is one.
- * Clobbers r0-r3. */
 #ifdef CONFIG_EARLY_PRINTK
-#define PRINT(_s)       \
-        adr   r0, 98f ; \
-        bl    puts    ; \
-        b     99f     ; \
-98:     .asciz _s     ; \
-        .align 2      ; \
+/*
+ * Macro to print a string to the UART, if there is one.
+ *
+ * Clobbers r0 - r3
+ */
+#define PRINT(_s)           \
+        mov   r3, lr       ;\
+        adr   r0, 98f      ;\
+        bl    puts         ;\
+        mov   lr, r3       ;\
+        b     99f          ;\
+98:     .asciz _s          ;\
+        .align 2           ;\
 99:
 #else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
@@ -500,10 +505,8 @@ init_uart:
 #ifdef EARLY_PRINTK_INIT_UART
         early_uart_init r11, r1, r2
 #endif
-        adr   r0, 1f
-        b     puts                  /* Jump to puts */
-1:      .asciz "- UART enabled -\r\n"
-        .align 4
+        PRINT("- UART enabled -\r\n")
+        mov   pc, lr
 
 /*
  * Print early debug messages.
