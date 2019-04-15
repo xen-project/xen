@@ -280,6 +280,7 @@ cpu_init_done:
         orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
         orr   r2, r2, #PT_LOWER(MEM)
         lsl   r1, r1, #3             /* r1 := Slot offset */
+        mov   r3, #0x0
         strd  r2, r3, [r4, r1]       /* Mapping of paddr(start) */
         mov   r6, #1                 /* r6 := identity map now in place */
 
@@ -382,11 +383,11 @@ paging:
 
         /* Add UART to the fixmap table */
         ldr   r1, =xen_fixmap        /* r1 := vaddr (xen_fixmap) */
-        mov   r3, #0
         lsr   r2, r11, #THIRD_SHIFT
         lsl   r2, r2, #THIRD_SHIFT   /* 4K aligned paddr of UART */
         orr   r2, r2, #PT_UPPER(DEV_L3)
         orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
+        mov   r3, #0x0
         strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
 1:
 
@@ -398,6 +399,7 @@ paging:
         orr   r2, r2, #PT_LOWER(PT)  /* r2:r3 := table map of xen_fixmap */
         ldr   r4, =FIXMAP_ADDR(0)
         mov   r4, r4, lsr #(SECOND_SHIFT - 3)   /* r4 := Slot for FIXMAP(0) */
+        mov   r3, #0x0
         strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
 
         /* Use a virtual address to access the UART. */
