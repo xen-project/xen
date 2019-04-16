@@ -206,6 +206,16 @@ secondary_switched:
         b     launch
 ENDPROC(init_secondary)
 
+/*
+ * Check if the CPU supports virtualization extensions and has been booted
+ * in Hypervisor mode.
+ *
+ * This function will never return when the CPU doesn't support
+ * virtualization extensions or is booted in another mode than
+ * Hypervisor mode.
+ *
+ * Clobbers r0 - r3
+ */
 check_cpu_mode:
         /* Check that this CPU has Hyp mode */
         mrc   CP32(r0, ID_PFR1)
@@ -220,15 +230,12 @@ check_cpu_mode:
         mrs   r0, cpsr
         and   r0, r0, #0x1f          /* Mode is in the low 5 bits of CPSR */
         teq   r0, #0x1a              /* Hyp Mode? */
-        beq   hyp
+        moveq pc, lr                 /* Yes, return */
 
         /* OK, we're boned. */
         PRINT("- Xen must be entered in NS Hyp mode -\r\n")
         PRINT("- Please update the bootloader -\r\n")
         b     fail
-
-hyp:    PRINT("- Xen starting in Hyp mode -\r\n")
-        mov   pc, lr
 ENDPROC(check_cpu_mode)
 
 zero_bss:
