@@ -2592,6 +2592,10 @@ typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
  * Once _prepare has been called on a libxl__ao_device, it is safe to just
  * discard this struct, there's no need to call any destroy function.
  * _prepare can also be called multiple times with the same libxl__ao_device.
+ *
+ * But if any of the fields `backend_ds', `timeout', `xswait', `qmp' is
+ * used by a caller of _prepare, the caller will have to arrange to clean
+ * or dispose of them.
  */
 _hidden void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev);
 
@@ -2623,6 +2627,7 @@ struct libxl__ao_device {
     bool update_json;
     /* for asynchronous execution of synchronous-only syscalls etc. */
     libxl__ev_child child;
+    libxl__ev_qmp qmp;
 };
 
 /*

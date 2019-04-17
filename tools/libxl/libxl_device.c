@@ -644,6 +644,8 @@ void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev)
      * without actually calling any hotplug script */
     libxl__async_exec_init(&aodev->aes);
     libxl__ev_child_init(&aodev->child);
+
+    libxl__ev_qmp_init(&aodev->qmp);
 }
 
 /* multidev */
