@@ -552,7 +552,7 @@ void libxl__update_domain_configuration(libxl__gc *gc,
                                         const libxl_domain_config *src)
 {
     int i, idx, num;
-    const struct libxl_device_type *dt;
+    const libxl__device_type *dt;
 
     for (idx = 0;; idx++) {
         dt = device_type_tbl[idx];

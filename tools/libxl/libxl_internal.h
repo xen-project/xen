@@ -192,6 +192,7 @@ typedef struct libxl__ao libxl__ao;
 typedef struct libxl__aop_occurred libxl__aop_occurred;
 typedef struct libxl__osevent_hook_nexus libxl__osevent_hook_nexus;
 typedef struct libxl__osevent_hook_nexi libxl__osevent_hook_nexi;
+typedef struct libxl__device_type libxl__device_type;
 typedef struct libxl__json_object libxl__json_object;
 typedef struct libxl__carefd libxl__carefd;
 typedef struct libxl__ev_devlock libxl__ev_devlock;
@@ -3741,7 +3742,7 @@ typedef int (*device_set_xenstore_config_fn_t)(libxl__gc *, uint32_t, void *,
                                                flexarray_t *, flexarray_t *,
                                                flexarray_t *);
 
-struct libxl_device_type {
+struct libxl__device_type {
     libxl__device_kind type;
     int skip_attach;   /* Skip entry in domcreate_attach_devices() if 1 */
     int ptr_offset;    /* Offset of device array ptr in libxl_domain_config */
@@ -3764,7 +3765,7 @@ struct libxl_device_type {
 };
 
 #define DEFINE_DEVICE_TYPE_STRUCT_X(name, sname, kind, ...)                    \
-    const struct libxl_device_type libxl__ ## name ## _devtype = {             \
+    const libxl__device_type libxl__ ## name ## _devtype = {                   \
         .type          = LIBXL__DEVICE_KIND_ ## kind,                       \
         .ptr_offset    = offsetof(libxl_domain_config, name ## s),             \
         .num_offset    = offsetof(libxl_domain_config, num_ ## name ## s),     \
@@ -3788,38 +3789,38 @@ struct libxl_device_type {
     DEFINE_DEVICE_TYPE_STRUCT_X(name, name, kind, __VA_ARGS__)
 
 static inline void **libxl__device_type_get_ptr(
-    const struct libxl_device_type *dt, const libxl_domain_config *d_config)
+    const libxl__device_type *dt, const libxl_domain_config *d_config)
 {
     return (void **)((void *)d_config + dt->ptr_offset);
 }
 
 static inline void *libxl__device_type_get_elem(
-    const struct libxl_device_type *dt, const libxl_domain_config *d_config,
+    const libxl__device_type *dt, const libxl_domain_config *d_config,
     int e)
 {
     return *libxl__device_type_get_ptr(dt, d_config) + dt->dev_elem_size * e;
 }
 
 static inline int *libxl__device_type_get_num(
-    const struct libxl_device_type *dt, const libxl_domain_config *d_config)
+    const libxl__device_type *dt, const libxl_domain_config *d_config)
 {
     return (int *)((void *)d_config + dt->num_offset);
 }
 
-extern const struct libxl_device_type libxl__vfb_devtype;
-extern const struct libxl_device_type libxl__vkb_devtype;
-extern const struct libxl_device_type libxl__disk_devtype;
-extern const struct libxl_device_type libxl__nic_devtype;
-extern const struct libxl_device_type libxl__vtpm_devtype;
-extern const struct libxl_device_type libxl__usbctrl_devtype;
-extern const struct libxl_device_type libxl__usbdev_devtype;
-extern const struct libxl_device_type libxl__pcidev_devtype;
-extern const struct libxl_device_type libxl__vdispl_devtype;
-extern const struct libxl_device_type libxl__p9_devtype;
-extern const struct libxl_device_type libxl__pvcallsif_devtype;
-extern const struct libxl_device_type libxl__vsnd_devtype;
+extern const libxl__device_type libxl__vfb_devtype;
+extern const libxl__device_type libxl__vkb_devtype;
+extern const libxl__device_type libxl__disk_devtype;
+extern const libxl__device_type libxl__nic_devtype;
+extern const libxl__device_type libxl__vtpm_devtype;
+extern const libxl__device_type libxl__usbctrl_devtype;
+extern const libxl__device_type libxl__usbdev_devtype;
+extern const libxl__device_type libxl__pcidev_devtype;
+extern const libxl__device_type libxl__vdispl_devtype;
+extern const libxl__device_type libxl__p9_devtype;
+extern const libxl__device_type libxl__pvcallsif_devtype;
+extern const libxl__device_type libxl__vsnd_devtype;
 
-extern const struct libxl_device_type *device_type_tbl[];
+extern const libxl__device_type *device_type_tbl[];
 
 /*----- Domain destruction -----*/
 
@@ -4603,21 +4604,21 @@ static inline bool libxl__acpi_defbool_val(const libxl_domain_build_info *b_info
  *            (a copy of `dev' will be made)
  */
 void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
-                              const struct libxl_device_type *dt,
+                              const libxl__device_type *dt,
                               const void *dev);
 
 void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
-                             const struct libxl_device_type *dt, void *type,
+                             const libxl__device_type *dt, void *type,
                              libxl__ao_device *aodev);
 int libxl__device_add(libxl__gc *gc, uint32_t domid,
-                      const struct libxl_device_type *dt, void *type);
+                      const libxl__device_type *dt, void *type);
 
 /* Caller is responsible for freeing the memory by calling
  * libxl__device_list_free
  */
-void* libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
+void* libxl__device_list(libxl__gc *gc, const libxl__device_type *dt,
                          uint32_t domid, int *num);
-void libxl__device_list_free(const struct libxl_device_type *dt,
+void libxl__device_list_free(const libxl__device_type *dt,
                              void *list, int num);
 
 static inline bool libxl__timer_mode_is_default(libxl_timer_mode *tm)

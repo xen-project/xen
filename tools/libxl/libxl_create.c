@@ -1536,7 +1536,7 @@ out:
 #define libxl__device_dtdev_update_devid NULL
 static DEFINE_DEVICE_TYPE_STRUCT(dtdev, NONE);
 
-const struct libxl_device_type *device_type_tbl[] = {
+const libxl__device_type *device_type_tbl[] = {
     &libxl__disk_devtype,
     &libxl__nic_devtype,
     &libxl__vtpm_devtype,
@@ -1589,7 +1589,7 @@ static void domcreate_attach_devices(libxl__egc *egc,
     STATE_AO_GC(dcs->ao);
     int domid = dcs->guest_domid;
     libxl_domain_config *const d_config = dcs->guest_config;
-    const struct libxl_device_type *dt;
+    const libxl__device_type *dt;
 
     if (ret) {
         LOGD(ERROR, domid, "unable to add %s devices",

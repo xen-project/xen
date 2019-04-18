@@ -1726,7 +1726,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
      *    retrieve from JSON.
      */
     {
-        const struct libxl_device_type *dt;
+        const libxl__device_type *dt;
         int idx;
 
         for (idx = 0;; idx++) {

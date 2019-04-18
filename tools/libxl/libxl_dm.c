@@ -3170,7 +3170,7 @@ int libxl__need_xenpv_qemu(libxl__gc *gc, libxl_domain_config *d_config)
 {
     int idx, i, ret, num;
     uint32_t domid;
-    const struct libxl_device_type *dt;
+    const libxl__device_type *dt;
 
     ret = libxl__get_domid(gc, &domid);
     if (ret) {

@@ -1823,7 +1823,7 @@ out:
 }
 
 void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
-                              const struct libxl_device_type *dt, const void *dev)
+                              const libxl__device_type *dt, const void *dev)
 {
     int *num_dev;
     unsigned int i;
@@ -1853,7 +1853,7 @@ void device_add_domain_config(libxl__gc *gc, libxl_domain_config *d_config,
 }
 
 void libxl__device_add_async(libxl__egc *egc, uint32_t domid,
-                             const struct libxl_device_type *dt, void *type,
+                             const libxl__device_type *dt, void *type,
                              libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
@@ -1968,7 +1968,7 @@ out:
 }
 
 int libxl__device_add(libxl__gc *gc, uint32_t domid,
-                      const struct libxl_device_type *dt, void *type)
+                      const libxl__device_type *dt, void *type)
 {
     flexarray_t *back;
     flexarray_t *front, *ro_front;
@@ -2017,7 +2017,7 @@ out:
     return rc;
 }
 
-void *libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
+void *libxl__device_list(libxl__gc *gc, const libxl__device_type *dt,
                          uint32_t domid, int *num)
 {
     void *r = NULL;
@@ -2082,7 +2082,7 @@ out:
     return r;
 }
 
-void libxl__device_list_free(const struct libxl_device_type *dt,
+void libxl__device_list_free(const libxl__device_type *dt,
                              void *list, int num)
 {
     int i;
