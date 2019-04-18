@@ -1517,72 +1517,6 @@ out:
     return rc;
 }
 
-static int do_usbdev_add(libxl__gc *gc, uint32_t domid,
-                         libxl_device_usbdev *usbdev,
-                         bool update_json)
-{
-    int rc;
-    char *busid;
-    libxl_device_usbctrl usbctrl;
-
-    libxl_device_usbctrl_init(&usbctrl);
-    rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
-    if (rc) goto out;
-
-    switch (usbctrl.type) {
-    case LIBXL_USBCTRL_TYPE_PV:
-        busid = usbdev_busaddr_to_busid(gc, usbdev->u.hostdev.hostbus,
-                                        usbdev->u.hostdev.hostaddr);
-        if (!busid) {
-            rc = ERROR_FAIL;
-            goto out;
-        }
-
-        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
-                                               LIBXL_USBCTRL_TYPE_PV,
-                                               update_json);
-        if (rc) goto out;
-
-        rc = usbback_dev_assign(gc, busid);
-        if (rc) {
-            libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
-                                                 LIBXL_USBCTRL_TYPE_PV);
-            goto out;
-        }
-        break;
-    case LIBXL_USBCTRL_TYPE_QUSB:
-        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
-                                               LIBXL_USBCTRL_TYPE_QUSB,
-                                               update_json);
-        if (rc) goto out;
-
-        break;
-    case LIBXL_USBCTRL_TYPE_DEVICEMODEL:
-        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
-                                               LIBXL_USBCTRL_TYPE_DEVICEMODEL,
-                                               update_json);
-        if (rc) goto out;
-
-        rc = libxl__device_usbdev_add_hvm(gc, domid, usbdev);
-        if (rc) {
-            libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
-                                             LIBXL_USBCTRL_TYPE_DEVICEMODEL);
-            goto out;
-        }
-        break;
-    default:
-        LOGD(ERROR, domid, "Unsupported usb controller type");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    rc = 0;
-
-out:
-    libxl_device_usbctrl_dispose(&usbctrl);
-    return rc;
-}
-
 /* AO operation to add a usb device.
  *
  * Generally, it does:
@@ -1608,6 +1542,7 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
     libxl_device_usbdev *assigned;
     int num_assigned;
     libxl_device_usbctrl usbctrl;
+    char *busid;
 
     libxl_device_usbctrl_init(&usbctrl);
 
@@ -1626,6 +1561,7 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
             rc = ERROR_INVAL;
             goto out;
         }
+        libxl_device_usbctrl_dispose(&usbctrl);
     }
 
     /* check usb device is assignable type */
@@ -1655,14 +1591,63 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
                                          aodev->update_json);
     if (rc) goto out;
 
+    rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
+    if (rc) goto out;
+
     /* do actual adding usb device operation */
-    rc = do_usbdev_add(gc, domid, usbdev, aodev->update_json);
+    switch (usbctrl.type) {
+    case LIBXL_USBCTRL_TYPE_PV:
+        busid = usbdev_busaddr_to_busid(gc, usbdev->u.hostdev.hostbus,
+                                        usbdev->u.hostdev.hostaddr);
+        if (!busid) {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+
+        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
+                                               LIBXL_USBCTRL_TYPE_PV,
+                                               aodev->update_json);
+        if (rc) goto out;
+
+        rc = usbback_dev_assign(gc, busid);
+        if (rc) {
+            libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
+                                                 LIBXL_USBCTRL_TYPE_PV);
+            goto out;
+        }
+        break;
+    case LIBXL_USBCTRL_TYPE_QUSB:
+        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
+                                               LIBXL_USBCTRL_TYPE_QUSB,
+                                               aodev->update_json);
+        if (rc) goto out;
+
+        break;
+    case LIBXL_USBCTRL_TYPE_DEVICEMODEL:
+        rc = libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
+                                               LIBXL_USBCTRL_TYPE_DEVICEMODEL,
+                                               aodev->update_json);
+        if (rc) goto out;
+
+        rc = libxl__device_usbdev_add_hvm(gc, domid, usbdev);
+        if (rc) {
+            libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
+                                             LIBXL_USBCTRL_TYPE_DEVICEMODEL);
+            goto out;
+        }
+        break;
+    default:
+        LOGD(ERROR, domid, "Unsupported usb controller type");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = 0;
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
     aodev->rc = rc;
     aodev->callback(egc, aodev);
-    return;
 }
 
 LIBXL_DEFINE_DEVICE_ADD(usbdev)
