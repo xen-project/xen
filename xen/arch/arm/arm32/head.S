@@ -348,7 +348,7 @@ ENDPROC(cpu_init)
  *   r9 : paddr(start)
  *   r10: phys offset
  *
- * Clobbers r0 - r6
+ * Clobbers r0 - r4, r6
  *
  * Register usage within this function:
  *   r6 : Identity map in place
@@ -363,11 +363,8 @@ create_page_tables:
         moveq r6, #1                 /* r6 := identity map now in place */
         movne r6, #0                 /* r6 := identity map not yet in place */
 
-        /* Write Xen's PT's paddr into the HTTBR */
         ldr   r4, =boot_pgtable
         add   r4, r4, r10            /* r4 := paddr (boot_pagetable) */
-        mov   r5, #0                 /* r4:r5 is paddr (boot_pagetable) */
-        mcrr  CP64(r4, r5, HTTBR)
 
         /* Setup boot_pgtable: */
         ldr   r1, =boot_second
@@ -472,6 +469,13 @@ enable_mmu:
          */
         mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLBs */
         dsb   nsh
+
+        /* Write Xen's PT's paddr into the HTTBR */
+        ldr   r0, =boot_pgtable
+        add   r0, r0, r10            /* r0 := paddr (boot_pagetable) */
+        mov   r1, #0                 /* r0:r1 is paddr (boot_pagetable) */
+        mcrr  CP64(r0, r1, HTTBR)
+        isb
 
         mrc   CP32(r0, HSCTLR)
         /* Enable MMU and D-cache */
