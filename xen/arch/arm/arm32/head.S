@@ -546,8 +546,21 @@ identity_mapping_removed:
         mov   pc, lr
 ENDPROC(remove_identity_mapping)
 
+/*
+ * Map the UART in the fixmap (when earlyprintk is used) and hook the
+ * fixmap table in the page tables.
+ *
+ * The fixmap cannot be mapped in create_page_tables because it may
+ * clash with the 1:1 mapping.
+ *
+ * Inputs:
+ *   r10: Physical offset
+ *   r11: Early UART base physical address
+ *
+ * Clobbers r1 - r4
+ */
 setup_fixmap:
-#if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
+#if defined(CONFIG_EARLY_PRINTK)
         /* Add UART to the fixmap table */
         ldr   r1, =xen_fixmap        /* r1 := vaddr (xen_fixmap) */
         lsr   r2, r11, #THIRD_SHIFT
@@ -556,6 +569,7 @@ setup_fixmap:
         orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
         mov   r3, #0x0
         strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
+#endif
 
         /* Map fixmap into boot_second */
         ldr   r1, =boot_second       /* r1 := vaddr (boot_second) */
@@ -570,7 +584,7 @@ setup_fixmap:
 
         /* Ensure any page table updates made above have occurred. */
         dsb   nshst
-#endif
+
         mov   pc, lr
 ENDPROC(setup_fixmap)
 
