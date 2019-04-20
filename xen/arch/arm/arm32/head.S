@@ -202,6 +202,25 @@ GLOBAL(init_secondary)
         mov   pc, r0
 secondary_switched:
         bl    setup_fixmap
+
+        /*
+         * Non-boot CPUs need to move on to the proper pagetables, which were
+         * setup in init_secondary_pagetables.
+         *
+         * XXX: This is not compliant with the Arm Arm.
+         */
+        ldr   r4, =init_ttbr         /* VA of HTTBR value stashed by CPU 0 */
+        ldrd  r4, r5, [r4]           /* Actual value */
+        dsb
+        mcrr  CP64(r4, r5, HTTBR)
+        dsb
+        isb
+        mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
+        mcr   CP32(r0, ICIALLU)      /* Flush I-cache */
+        mcr   CP32(r0, BPIALL)       /* Flush branch predictor */
+        dsb                          /* Ensure completion of TLB+BP flush */
+        isb
+
         b     launch
 ENDPROC(init_secondary)
 
@@ -505,28 +524,6 @@ ENDPROC(setup_fixmap)
 launch:
         PRINT("- Ready -\r\n")
 
-        /* The boot CPU should go straight into C now */
-        teq   r12, #0
-        beq   1f
-
-        /*
-         * Non-boot CPUs need to move on to the proper pagetables, which were
-         * setup in init_secondary_pagetables.
-         */
-
-        ldr   r4, =init_ttbr         /* VA of HTTBR value stashed by CPU 0 */
-        ldrd  r4, r5, [r4]           /* Actual value */
-        dsb
-        mcrr  CP64(r4, r5, HTTBR)
-        dsb
-        isb
-        mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
-        mcr   CP32(r0, ICIALLU)      /* Flush I-cache */
-        mcr   CP32(r0, BPIALL)       /* Flush branch predictor */
-        dsb                          /* Ensure completion of TLB+BP flush */
-        isb
-
-1:
         ldr   r0, =init_data
         add   r0, #INITINFO_stack    /* Find the boot-time stack */
         ldr   sp, [r0]
