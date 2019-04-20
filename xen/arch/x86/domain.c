@@ -1721,6 +1721,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     const struct domain *prevd = prev->domain, *nextd = next->domain;
     unsigned int dirty_cpu = next->dirty_cpu;
 
+    ASSERT(prev != next);
     ASSERT(local_irq_is_enabled());
 
     get_cpu_info()->use_pv_cr3 = false;
@@ -1732,12 +1733,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         flush_mask(cpumask_of(dirty_cpu), FLUSH_VCPU_STATE);
     }
 
-    if ( prev != next )
-    {
-        _update_runstate_area(prev);
-        vpmu_switch_from(prev);
-        np2m_schedule(NP2M_SCHEDLE_OUT);
-    }
+    _update_runstate_area(prev);
+    vpmu_switch_from(prev);
+    np2m_schedule(NP2M_SCHEDLE_OUT);
 
     if ( is_hvm_domain(prevd) && !list_empty(&prev->arch.hvm.tm_list) )
         pt_save_timer(prev);
@@ -1794,14 +1792,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     context_saved(prev);
 
-    if ( prev != next )
-    {
-        _update_runstate_area(next);
-
-        /* Must be done with interrupts enabled */
-        vpmu_switch_to(next);
-        np2m_schedule(NP2M_SCHEDLE_IN);
-    }
+    _update_runstate_area(next);
+    /* Must be done with interrupts enabled */
+    vpmu_switch_to(next);
+    np2m_schedule(NP2M_SCHEDLE_IN);
 
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(next);

@@ -343,8 +343,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     ASSERT(prev != next);
     ASSERT(!vcpu_cpu_dirty(next));
 
-    if ( prev != next )
-        update_runstate_area(prev);
+    update_runstate_area(prev);
 
     local_irq_disable();
 
