@@ -738,9 +738,6 @@ int init_secondary_pagetables(int cpu)
         write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);
     }
 
-    clean_dcache_va_range(first, PAGE_SIZE);
-    clean_dcache_va_range(domheap, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
-
     per_cpu(xen_pgtable, cpu) = first;
     per_cpu(xen_dommap, cpu) = domheap;
 
