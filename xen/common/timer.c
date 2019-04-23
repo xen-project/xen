@@ -638,9 +638,13 @@ static int cpu_callback(
     switch ( action )
     {
     case CPU_UP_PREPARE:
-        INIT_LIST_HEAD(&ts->inactive);
-        spin_lock_init(&ts->lock);
-        ts->heap = dummy_heap;
+        /* Only initialise ts once. */
+        if ( !ts->heap )
+        {
+            INIT_LIST_HEAD(&ts->inactive);
+            spin_lock_init(&ts->lock);
+            ts->heap = dummy_heap;
+        }
         break;
 
     case CPU_UP_CANCELED:
