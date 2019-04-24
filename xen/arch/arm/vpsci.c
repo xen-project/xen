@@ -33,7 +33,7 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
 
     vcpuid = vaffinity_to_vcpuid(target_cpu);
 
-    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
+    if ( (v = domain_vcpu(d, vcpuid)) == NULL )
         return PSCI_INVALID_PARAMETERS;
 
     /* THUMB set is not allowed with 64-bit domain */
@@ -82,14 +82,12 @@ static int do_common_cpu_on(register_t target_cpu, register_t entry_point,
 
     domain_lock(d);
     rc = arch_set_info_guest(v, ctxt);
+    domain_unlock(d);
+
     free_vcpu_guest_context(ctxt);
 
     if ( rc < 0 )
-    {
-        domain_unlock(d);
         return PSCI_DENIED;
-    }
-    domain_unlock(d);
 
     vcpu_wake(v);
 
