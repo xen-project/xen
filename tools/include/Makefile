@@ -32,7 +32,7 @@ endif
 	touch $@
 
 all-$(CONFIG_X86): xen/.dir
-	$(MAKE) -C xen/lib/x86 all XEN_ROOT=$(XEN_ROOT)
+	$(MAKE) -C xen/lib/x86 all XEN_ROOT=$(XEN_ROOT) PYTHON=$(PYTHON)
 
 # Not xen/xsm as that clashes with link to
 # $(XEN_ROOT)/xen/include/public/xsm above.
