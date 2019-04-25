@@ -965,7 +965,7 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
     }
 
     /* Acquire an extra reference, for the freeing below to be safe. */
-    if ( !get_page(cpage, cd) )
+    if ( !get_page(cpage, dom_cow) )
     {
         ret = -EOVERFLOW;
         mem_sharing_page_unlock(secondpg);
@@ -1171,7 +1171,7 @@ int __mem_sharing_unshare_page(struct domain *d,
         mem_sharing_page_unlock(page);
         if ( last_gfn )
         {
-            if ( !get_page(page, d) )
+            if ( !get_page(page, dom_cow) )
             {
                 put_gfn(d, gfn);
                 domain_crash(d);
