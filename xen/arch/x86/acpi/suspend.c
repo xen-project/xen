@@ -27,11 +27,13 @@ void save_rest_processor_state(void)
     rdmsrl(MSR_SHADOW_GS_BASE, saved_kernel_gs_base);
     rdmsrl(MSR_CSTAR, saved_cstar);
     rdmsrl(MSR_LSTAR, saved_lstar);
-    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR) )
+
+    if ( cpu_has_sep )
     {
         rdmsrl(MSR_IA32_SYSENTER_ESP, saved_sysenter_esp);
         rdmsrl(MSR_IA32_SYSENTER_EIP, saved_sysenter_eip);
     }
+
     if ( cpu_has_xsave )
         saved_xcr0 = get_xcr0();
 }
@@ -51,7 +53,7 @@ void restore_rest_processor_state(void)
     wrgsbase(saved_gs_base);
     wrmsrl(MSR_SHADOW_GS_BASE, saved_kernel_gs_base);
 
-    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR) )
+    if ( cpu_has_sep )
     {
         /* Recover sysenter MSRs */
         wrmsrl(MSR_IA32_SYSENTER_ESP, saved_sysenter_esp);

@@ -334,7 +334,7 @@ void subarch_percpu_traps_init(void)
                                    (unsigned long)lstar_enter);
     stub_va += offset;
 
-    if ( boot_cpu_data.x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_CENTAUR) )
+    if ( cpu_has_sep )
     {
         /* SYSENTER entry. */
         wrmsrl(MSR_IA32_SYSENTER_ESP, stack_bottom);
