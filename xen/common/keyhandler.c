@@ -71,12 +71,12 @@ static struct keyhandler {
 #undef KEYHANDLER
 };
 
-static void keypress_action(unsigned long unused)
+static void keypress_action(void *unused)
 {
     handle_keypress(keypress_key, NULL);
 }
 
-static DECLARE_TASKLET(keypress_tasklet, keypress_action, 0);
+static DECLARE_TASKLET(keypress_tasklet, keypress_action, NULL);
 
 void handle_keypress(unsigned char key, struct cpu_user_regs *regs)
 {
@@ -199,11 +199,11 @@ static void dump_registers(unsigned char key, struct cpu_user_regs *regs)
     watchdog_enable();
 }
 
-static DECLARE_TASKLET(dump_hwdom_tasklet, NULL, 0);
+static DECLARE_TASKLET(dump_hwdom_tasklet, NULL, NULL);
 
-static void dump_hwdom_action(unsigned long arg)
+static void dump_hwdom_action(void *data)
 {
-    struct vcpu *v = (void *)arg;
+    struct vcpu *v = data;
 
     for ( ; ; )
     {
@@ -212,7 +212,7 @@ static void dump_hwdom_action(unsigned long arg)
             break;
         if ( softirq_pending(smp_processor_id()) )
         {
-            dump_hwdom_tasklet.data = (unsigned long)v;
+            dump_hwdom_tasklet.data = v;
             tasklet_schedule_on_cpu(&dump_hwdom_tasklet, v->processor);
             break;
         }
@@ -233,8 +233,7 @@ static void dump_hwdom_registers(unsigned char key)
         if ( alt_key_handling && softirq_pending(smp_processor_id()) )
         {
             tasklet_kill(&dump_hwdom_tasklet);
-            tasklet_init(&dump_hwdom_tasklet, dump_hwdom_action,
-                         (unsigned long)v);
+            tasklet_init(&dump_hwdom_tasklet, dump_hwdom_action, v);
             tasklet_schedule_on_cpu(&dump_hwdom_tasklet, v->processor);
             return;
         }
@@ -433,7 +432,7 @@ static void read_clocks(unsigned char key)
            maxdif_cycles, sumdif_cycles/count, count, dif_cycles);
 }
 
-static void run_all_nonirq_keyhandlers(unsigned long unused)
+static void run_all_nonirq_keyhandlers(void *unused)
 {
     /* Fire all the non-IRQ-context diagnostic keyhandlers */
     struct keyhandler *h;
@@ -455,7 +454,7 @@ static void run_all_nonirq_keyhandlers(unsigned long unused)
 }
 
 static DECLARE_TASKLET(run_all_keyhandlers_tasklet,
-                       run_all_nonirq_keyhandlers, 0);
+                       run_all_nonirq_keyhandlers, NULL);
 
 static void run_all_keyhandlers(unsigned char key, struct cpu_user_regs *regs)
 {

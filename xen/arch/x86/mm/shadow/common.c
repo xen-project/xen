@@ -3471,9 +3471,9 @@ void shadow_audit_tables(struct vcpu *v)
 
 #ifdef CONFIG_PV
 
-void pv_l1tf_tasklet(unsigned long data)
+void pv_l1tf_tasklet(void *data)
 {
-    struct domain *d = (void *)data;
+    struct domain *d = data;
 
     domain_pause(d);
     paging_lock(d);

@@ -965,7 +965,7 @@ clear_overflow:
     }
 }
 
-static void do_iommu_page_fault(unsigned long data)
+static void do_iommu_page_fault(void *unused)
 {
     struct acpi_drhd_unit *drhd;
 
@@ -2309,7 +2309,7 @@ static int __init vtd_setup(void)
         }
     }
 
-    softirq_tasklet_init(&vtd_fault_tasklet, do_iommu_page_fault, 0);
+    softirq_tasklet_init(&vtd_fault_tasklet, do_iommu_page_fault, NULL);
 
     if ( !iommu_qinval && iommu_intremap )
     {

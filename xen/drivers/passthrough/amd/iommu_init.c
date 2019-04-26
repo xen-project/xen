@@ -33,8 +33,8 @@
 static int __initdata nr_amd_iommus;
 static bool __initdata pci_init;
 
-static void do_amd_iommu_irq(unsigned long data);
-static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, 0);
+static void do_amd_iommu_irq(void *data);
+static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, NULL);
 
 unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
@@ -723,7 +723,7 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
-static void do_amd_iommu_irq(unsigned long data)
+static void do_amd_iommu_irq(void *unused)
 {
     struct amd_iommu *iommu;
 

@@ -230,7 +230,7 @@ static inline bool pv_l1tf_check_l4e(struct domain *d, l4_pgentry_t l4e)
     return pv_l1tf_check_pte(d, 4, l4e.l4);
 }
 
-void pv_l1tf_tasklet(unsigned long data);
+void pv_l1tf_tasklet(void *data);
 
 static inline void pv_l1tf_domain_init(struct domain *d)
 {
@@ -238,8 +238,7 @@ static inline void pv_l1tf_domain_init(struct domain *d)
                                                   : opt_pv_l1tf_domu;
 
 #ifdef CONFIG_SHADOW_PAGING
-    tasklet_init(&d->arch.paging.shadow.pv_l1tf_tasklet,
-                 pv_l1tf_tasklet, (unsigned long)d);
+    tasklet_init(&d->arch.paging.shadow.pv_l1tf_tasklet, pv_l1tf_tasklet, d);
 #endif
 }
 

@@ -369,7 +369,7 @@ int iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
     return iommu_call(hd->platform_ops, lookup_page, d, dfn, mfn, flags);
 }
 
-static void iommu_free_pagetables(unsigned long unused)
+static void iommu_free_pagetables(void *unused)
 {
     do {
         struct page_info *pg;
@@ -500,7 +500,7 @@ int __init iommu_setup(void)
                iommu_hwdom_passthrough ? "Passthrough" :
                iommu_hwdom_strict ? "Strict" : "Relaxed");
         printk("Interrupt remapping %sabled\n", iommu_intremap ? "en" : "dis");
-        tasklet_init(&iommu_pt_cleanup_tasklet, iommu_free_pagetables, 0);
+        tasklet_init(&iommu_pt_cleanup_tasklet, iommu_free_pagetables, NULL);
     }
 
     return rc;

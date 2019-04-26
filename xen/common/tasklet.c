@@ -199,8 +199,7 @@ static void migrate_tasklets_from_cpu(unsigned int cpu, struct list_head *list)
     spin_unlock_irqrestore(&tasklet_lock, flags);
 }
 
-void tasklet_init(
-    struct tasklet *t, void (*func)(unsigned long), unsigned long data)
+void tasklet_init(struct tasklet *t, void (*func)(void *), void *data)
 {
     memset(t, 0, sizeof(*t));
     INIT_LIST_HEAD(&t->list);
@@ -209,8 +208,7 @@ void tasklet_init(
     t->data = data;
 }
 
-void softirq_tasklet_init(
-    struct tasklet *t, void (*func)(unsigned long), unsigned long data)
+void softirq_tasklet_init(struct tasklet *t, void (*func)(void *), void *data)
 {
     tasklet_init(t, func, data);
     t->is_softirq = 1;

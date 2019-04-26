@@ -150,7 +150,7 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
 
     spin_lock_init(&v->virq_lock);
 
-    tasklet_init(&v->continue_hypercall_tasklet, NULL, 0);
+    tasklet_init(&v->continue_hypercall_tasklet, NULL, NULL);
 
     grant_table_init_vcpu(v);
 
@@ -1661,9 +1661,9 @@ struct migrate_info {
 
 static DEFINE_PER_CPU(struct migrate_info *, continue_info);
 
-static void continue_hypercall_tasklet_handler(unsigned long _info)
+static void continue_hypercall_tasklet_handler(void *data)
 {
-    struct migrate_info *info = (struct migrate_info *)_info;
+    struct migrate_info *info = data;
     struct vcpu *v = info->vcpu;
     long res = -EINVAL;
 
@@ -1707,12 +1707,9 @@ int continue_hypercall_on_cpu(
         info->vcpu = curr;
         info->nest = 0;
 
-        tasklet_kill(
-            &curr->continue_hypercall_tasklet);
-        tasklet_init(
-            &curr->continue_hypercall_tasklet,
-            continue_hypercall_tasklet_handler,
-            (unsigned long)info);
+        tasklet_kill(&curr->continue_hypercall_tasklet);
+        tasklet_init(&curr->continue_hypercall_tasklet,
+                     continue_hypercall_tasklet_handler, info);
 
         get_knownalive_domain(curr->domain);
         vcpu_pause_nosync(curr);

@@ -309,9 +309,9 @@ static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
     vcpu_unpause(target);
 }
 
-static void vlapic_init_sipi_action(unsigned long _vcpu)
+static void vlapic_init_sipi_action(void *data)
 {
-    struct vcpu *origin = (struct vcpu *)_vcpu;
+    struct vcpu *origin = data;
     uint32_t icr = vcpu_vlapic(origin)->init_sipi.icr;
     uint32_t dest = vcpu_vlapic(origin)->init_sipi.dest;
     uint32_t short_hand = icr & APIC_SHORT_MASK;
@@ -1637,9 +1637,7 @@ int vlapic_init(struct vcpu *v)
 
     spin_lock_init(&vlapic->esr_lock);
 
-    tasklet_init(&vlapic->init_sipi.tasklet,
-                 vlapic_init_sipi_action,
-                 (unsigned long)v);
+    tasklet_init(&vlapic->init_sipi.tasklet, vlapic_init_sipi_action, v);
 
     if ( v->vcpu_id == 0 )
         register_mmio_handler(v->domain, &vlapic_mmio_ops);

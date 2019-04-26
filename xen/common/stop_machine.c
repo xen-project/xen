@@ -134,8 +134,9 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     return ret;
 }
 
-static void stopmachine_action(unsigned long cpu)
+static void stopmachine_action(void *data)
 {
+    unsigned int cpu = (unsigned long)data;
     enum stopmachine_state state = STOPMACHINE_START;
 
     BUG_ON(cpu != smp_processor_id());
@@ -181,7 +182,7 @@ static int cpu_callback(
 
     if ( action == CPU_UP_PREPARE )
         tasklet_init(&per_cpu(stopmachine_tasklet, cpu),
-                     stopmachine_action, cpu);
+                     stopmachine_action, hcpu);
 
     return NOTIFY_DONE;
 }

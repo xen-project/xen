@@ -435,11 +435,11 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     return 0;
 }
 
-static void guest_iommu_process_command(unsigned long _d)
+static void guest_iommu_process_command(void *data)
 {
     unsigned long opcode, tail, head, entries_per_page, cmd_mfn;
     cmd_entry_t *cmd, *cmd_base;
-    struct domain *d = (struct domain *)_d;
+    struct domain *d = data;
     struct guest_iommu *iommu;
 
     iommu = domain_iommu(d);
@@ -837,8 +837,7 @@ int guest_iommu_init(struct domain* d)
     iommu->domain = d;
     hd->arch.g_iommu = iommu;
 
-    tasklet_init(&iommu->cmd_buffer_tasklet,
-                 guest_iommu_process_command, (unsigned long)d);
+    tasklet_init(&iommu->cmd_buffer_tasklet, guest_iommu_process_command, d);
 
     spin_lock_init(&iommu->lock);
 
