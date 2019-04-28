@@ -52,13 +52,6 @@ GLOBAL(trampoline_realmode_entry)
         lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
         ljmpl   $BOOT_CS32,$bootsym_rel(trampoline_protmode_entry,6)
 
-        .balign 8
-        .word   0
-idt_48: .word   0, 0, 0 # base = limit = 0
-        .word   0
-gdt_48: .word   6*8-1
-        .long   bootsym_rel(trampoline_gdt,4)
-
 trampoline_gdt:
         /* 0x0000: unused */
         .quad   0x0000000000000000
@@ -177,6 +170,13 @@ start64:
         jmpq    *%rdi
 
 #include "wakeup.S"
+
+        .balign 8
+        .word   0
+idt_48: .word   0, 0, 0 # base = limit = 0
+        .word   0
+gdt_48: .word   6*8-1
+        .long   bootsym_rel(trampoline_gdt,4)
 
 /* The first page of trampoline is permanent, the rest boot-time only. */
 /* Reuse the boot trampoline on the 1st trampoline page as stack for wakeup. */

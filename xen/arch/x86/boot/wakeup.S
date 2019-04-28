@@ -40,11 +40,8 @@ ENTRY(wakeup_start)
         movw    %ax, %fs
         movw    $0x0e00 + 'L', %fs:(0x10)
 
-        # boot trampoline is under 1M, and shift its start into
-        # %fs to reference symbols in that area
-        mov     wakesym(trampoline_seg), %fs
-        lidt    %fs:bootsym(idt_48)
-        lgdt    %fs:bootsym(gdt_48)
+        lidt    wakesym(idt_48)
+        lgdt    wakesym(gdt_48)
 
         movw    $1, %ax
         lmsw    %ax             # Turn on CR0.PE 
@@ -102,10 +99,6 @@ GLOBAL(video_mode)
         .long 0
 GLOBAL(video_flags)
         .long 0
-trampoline_seg: .word 0
-        .pushsection .trampoline_seg, "a"
-        .long   trampoline_seg - .
-        .popsection
 
         .code32
 
