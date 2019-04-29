@@ -19,6 +19,8 @@
 #define guest_test_and_change_bit(d, nr, p) \
     ((void)(d), test_and_change_bit(nr, p))
 
+#define guest_cmpxchg(d, ptr, o, n) ((void)(d), cmpxchg(ptr, o, n))
+
 #endif /* _X86_GUEST_ATOMICS_H */
 /*
  * Local variables:
