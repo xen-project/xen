@@ -8,7 +8,6 @@ arm64:
 
 bitops: last sync @ v3.16-rc6 (last commit: 8715466b6027)
 
-linux/arch/arm64/lib/bitops.S           xen/arch/arm/arm64/lib/bitops.S
 linux/arch/arm64/include/asm/bitops.h   xen/include/asm-arm/arm64/bitops.h
 
 ---------------------------------------------------------------------
