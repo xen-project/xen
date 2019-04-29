@@ -51,6 +51,8 @@ int test_and_set_bit(int nr, volatile void *p);
 int test_and_clear_bit(int nr, volatile void *p);
 int test_and_change_bit(int nr, volatile void *p);
 
+void clear_mask16(uint16_t mask, volatile void *p);
+
 /*
  * The helpers below may fail to update the memory if the action takes
  * too long.
@@ -69,6 +71,8 @@ bool test_and_clear_bit_timeout(int nr, volatile void *p,
                                 int *oldbit, unsigned int max_try);
 bool test_and_change_bit_timeout(int nr, volatile void *p,
                                  int *oldbit, unsigned int max_try);
+bool clear_mask16_timeout(uint16_t mask, volatile void *p,
+                          unsigned int max_try);
 
 /**
  * __test_and_set_bit - Set a bit and return its old value
