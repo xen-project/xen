@@ -68,19 +68,9 @@ arm32
 
 bitops: last sync @ v3.16-rc6 (last commit: c32ffce0f66e)
 
-linux/arch/arm/lib/bitops.h             xen/arch/arm/arm32/lib/bitops.h
-linux/arch/arm/lib/changebit.S          xen/arch/arm/arm32/lib/changebit.S
-linux/arch/arm/lib/clearbit.S           xen/arch/arm/arm32/lib/clearbit.S
 linux/arch/arm/lib/findbit.S            xen/arch/arm/arm32/lib/findbit.S
-linux/arch/arm/lib/setbit.S             xen/arch/arm/arm32/lib/setbit.S
-linux/arch/arm/lib/testchangebit.S      xen/arch/arm/arm32/lib/testchangebit.S
-linux/arch/arm/lib/testclearbit.S       xen/arch/arm/arm32/lib/testclearbit.S
-linux/arch/arm/lib/testsetbit.S         xen/arch/arm/arm32/lib/testsetbit.S
 
-for i in bitops.h changebit.S clearbit.S findbit.S setbit.S testchangebit.S \
-         testclearbit.S testsetbit.S; do
-    diff -u ../linux/arch/arm/lib/$i xen/arch/arm/arm32/lib/$i;
-done
+diff -u ../linux/arch/arm/lib/findbit.S xen/arch/arm/arm32/lib/findbit.S
 
 ---------------------------------------------------------------------
 
