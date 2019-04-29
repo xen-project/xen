@@ -19,6 +19,7 @@ obj-y += gic.o
 obj-y += gic-v2.o
 obj-$(CONFIG_HAS_GICV3) += gic-v3.o
 obj-y += guestcopy.o
+obj-y += guest_atomics.o
 obj-y += hvm.o
 obj-y += io.o
 obj-y += irq.o
