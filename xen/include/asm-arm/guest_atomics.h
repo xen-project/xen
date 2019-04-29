@@ -73,6 +73,19 @@ guest_testop(test_and_change_bit)
 
 #undef guest_testop
 
+static inline void guest_clear_mask16(struct domain *d, uint16_t mask,
+                                      volatile uint16_t *p)
+{
+    perfc_incr(atomics_guest);
+
+    if ( clear_mask16_timeout(mask, p, this_cpu(guest_safe_atomic_max)) )
+        return;
+
+    domain_pause_nosync(d);
+    clear_mask16(mask, p);
+    domain_unpause(d);
+}
+
 static inline unsigned long __guest_cmpxchg(struct domain *d,
                                             volatile void *ptr,
                                             unsigned long old,
