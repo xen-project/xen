@@ -65,6 +65,31 @@ guest_testop(test_and_change_bit)
 
 #undef guest_testop
 
+static inline unsigned long __guest_cmpxchg(struct domain *d,
+                                            volatile void *ptr,
+                                            unsigned long old,
+                                            unsigned long new,
+                                            unsigned int size)
+{
+    unsigned long oldval = old;
+
+    if ( __cmpxchg_mb_timeout(ptr, &oldval, new, size,
+                              this_cpu(guest_safe_atomic_max)) )
+        return oldval;
+
+    domain_pause_nosync(d);
+    oldval = __cmpxchg_mb(ptr, old, new, size);
+    domain_unpause(d);
+
+    return oldval;
+}
+
+#define guest_cmpxchg(d, ptr, o, n)                         \
+    ((__typeof__(*(ptr)))__guest_cmpxchg(d, ptr,            \
+                                         (unsigned long)(o),\
+                                         (unsigned long)(n),\
+                                         sizeof (*(ptr))))
+
 #endif /* _ARM_GUEST_ATOMICS_H */
 /*
  * Local variables:
