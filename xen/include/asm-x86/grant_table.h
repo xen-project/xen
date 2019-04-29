@@ -64,7 +64,8 @@ static inline int replace_grant_host_mapping(uint64_t addr, mfn_t frame,
 
 #define gnttab_mark_dirty(d, f) paging_mark_dirty((d), f)
 
-static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
+static inline void gnttab_clear_flag(struct domain *d, unsigned int nr,
+                                     uint16_t *st)
 {
     /*
      * Note that this cannot be clear_bit(), as the access must be

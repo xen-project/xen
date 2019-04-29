@@ -40,6 +40,8 @@
 #include <xen/pfn.h>
 #include <xen/sizes.h>
 #include <xen/libfdt/libfdt.h>
+
+#include <asm/guest_atomics.h>
 #include <asm/setup.h>
 
 struct domain *dom_xen, *dom_io, *dom_cow;
@@ -1380,7 +1382,7 @@ void put_page_type(struct page_info *page)
     return;
 }
 
-void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
+void gnttab_clear_flag(struct domain *d, unsigned long nr, uint16_t *addr)
 {
     /*
      * Note that this cannot be clear_bit(), as the access must be
@@ -1390,7 +1392,7 @@ void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 
     do {
         old = *addr;
-    } while (cmpxchg(addr, old, old & mask) != old);
+    } while (guest_cmpxchg(d, addr, old, old & mask) != old);
 }
 
 void gnttab_mark_dirty(struct domain *d, mfn_t mfn)
