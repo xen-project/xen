@@ -72,6 +72,9 @@ PERFCOUNTER(phys_timer_irqs,  "Physical timer interrupts")
 PERFCOUNTER(virt_timer_irqs,  "Virtual timer interrupts")
 PERFCOUNTER(maintenance_irqs, "Maintenance interrupts")
 
+PERFCOUNTER(atomics_guest,    "atomics: guest access")
+PERFCOUNTER(atomics_guest_paused,   "atomics: guest paused")
+
 /*#endif*/ /* __XEN_PERFC_DEFN_H__ */
 
 /*
