@@ -706,6 +706,11 @@ extern int xsm_multiboot_policy_init(unsigned long *module_map,
 #endif
 
 #ifdef CONFIG_HAS_DEVICE_TREE
+/*
+ * Initialize XSM
+ *
+ * On success, return 1 if using SILO mode else 0.
+ */
 extern int xsm_dt_init(void);
 extern int xsm_dt_policy_init(void **policy_buffer, size_t *policy_size);
 extern bool has_xsm_magic(paddr_t);

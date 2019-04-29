@@ -90,7 +90,7 @@ config XENOPROF
 
 config XSM
 	bool "Xen Security Modules support"
-	default n
+	default ARM
 	---help---
 	  Enables the security framework known as Xen Security Modules which
 	  allows administrators fine-grained control over a Xen domain and
@@ -155,6 +155,7 @@ config XSM_SILO
 choice
 	prompt "Default XSM implementation"
 	depends on XSM
+	default XSM_SILO_DEFAULT if XSM_SILO && ARM
 	default XSM_FLASK_DEFAULT if XSM_FLASK
 	default XSM_SILO_DEFAULT if XSM_SILO
 	default XSM_DUMMY_DEFAULT
