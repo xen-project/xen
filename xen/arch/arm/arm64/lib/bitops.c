@@ -29,7 +29,8 @@
  */
 
 #define bitop(name, instr)                                                  \
-void name(int nr, volatile void *p)                                         \
+static always_inline bool int_##name(int nr, volatile void *p, bool timeout,\
+                                     unsigned int max_try)                  \
 {                                                                           \
     volatile uint32_t *ptr = (uint32_t *)p + BIT_WORD((unsigned int)nr);    \
     const uint32_t mask = BIT_MASK((unsigned int)nr);                       \
@@ -43,17 +44,33 @@ void name(int nr, volatile void *p)                                         \
         "   stxr    %w0, %w2, %1\n"                                         \
         : "=&r" (res), "+Q" (*ptr), "=&r" (tmp)                             \
         : "r" (mask));                                                      \
-    } while ( res );                                                        \
+                                                                            \
+        if ( !res )                                                         \
+            break;                                                          \
+    } while ( !timeout || ((--max_try) > 0) );                              \
+                                                                            \
+    return !res;                                                            \
 }                                                                           \
+                                                                            \
+void name(int nr, volatile void *p)                                         \
+{                                                                           \
+    if ( !int_##name(nr, p, false, 0) )                                     \
+        ASSERT_UNREACHABLE();                                               \
+}                                                                           \
+                                                                            \
+bool name##_timeout(int nr, volatile void *p, unsigned int max_try)         \
+{                                                                           \
+    return int_##name(nr, p, true, max_try);                                \
+}
 
 #define testop(name, instr)                                                 \
-int name(int nr, volatile void *p)                                          \
+static always_inline bool int_##name(int nr, volatile void *p, int *oldbit, \
+                                     bool timeout, unsigned int max_try)    \
 {                                                                           \
     volatile uint32_t *ptr = (uint32_t *)p + BIT_WORD((unsigned int)nr);    \
     unsigned int bit = (unsigned int)nr % BITS_PER_WORD;                    \
     const uint32_t mask = BIT_MASK(bit);                                    \
     unsigned long res, tmp;                                                 \
-    unsigned long oldbit;                                                   \
                                                                             \
     do                                                                      \
     {                                                                       \
@@ -62,14 +79,35 @@ int name(int nr, volatile void *p)                                          \
         "   lsr     %w1, %w3, %w5 // Save old value of bit\n"               \
         "   " __stringify(instr) "  %w3, %w3, %w4 // Toggle bit\n"          \
         "   stlxr   %w0, %w3, %2\n"                                         \
-        : "=&r" (res), "=&r" (oldbit), "+Q" (*ptr), "=&r" (tmp)             \
+        : "=&r" (res), "=&r" (*oldbit), "+Q" (*ptr), "=&r" (tmp)            \
         : "r" (mask), "r" (bit)                                             \
         : "memory");                                                        \
-    } while ( res );                                                        \
+                                                                            \
+        if ( !res )                                                         \
+            break;                                                          \
+    } while ( !timeout || ((--max_try) > 0) );                              \
                                                                             \
     dmb(ish);                                                               \
                                                                             \
-    return oldbit & 1;                                                      \
+    *oldbit &= 1;                                                           \
+                                                                            \
+    return !res;                                                            \
+}                                                                           \
+                                                                            \
+int name(int nr, volatile void *p)                                          \
+{                                                                           \
+    int oldbit;                                                             \
+                                                                            \
+    if ( !int_##name(nr, p, &oldbit, false, 0) )                            \
+        ASSERT_UNREACHABLE();                                               \
+                                                                            \
+    return oldbit;                                                          \
+}                                                                           \
+                                                                            \
+bool name##_timeout(int nr, volatile void *p,                               \
+                    int *oldbit, unsigned int max_try)                      \
+{                                                                           \
+    return int_##name(nr, p, oldbit, true, max_try);                        \
 }
 
 bitop(change_bit, eor)
