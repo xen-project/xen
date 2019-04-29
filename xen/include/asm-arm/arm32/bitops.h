@@ -1,19 +1,12 @@
 #ifndef _ARM_ARM32_BITOPS_H
 #define _ARM_ARM32_BITOPS_H
 
-extern void _set_bit(int nr, volatile void * p);
-extern void _clear_bit(int nr, volatile void * p);
-extern void _change_bit(int nr, volatile void * p);
-extern int _test_and_set_bit(int nr, volatile void * p);
-extern int _test_and_clear_bit(int nr, volatile void * p);
-extern int _test_and_change_bit(int nr, volatile void * p);
-
-#define set_bit(n,p)              _set_bit(n,p)
-#define clear_bit(n,p)            _clear_bit(n,p)
-#define change_bit(n,p)           _change_bit(n,p)
-#define test_and_set_bit(n,p)     _test_and_set_bit(n,p)
-#define test_and_clear_bit(n,p)   _test_and_clear_bit(n,p)
-#define test_and_change_bit(n,p)  _test_and_change_bit(n,p)
+extern void set_bit(int nr, volatile void * p);
+extern void clear_bit(int nr, volatile void * p);
+extern void change_bit(int nr, volatile void * p);
+extern int test_and_set_bit(int nr, volatile void * p);
+extern int test_and_clear_bit(int nr, volatile void * p);
+extern int test_and_change_bit(int nr, volatile void * p);
 
 #define flsl fls
 
