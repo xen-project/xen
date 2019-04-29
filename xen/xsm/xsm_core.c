@@ -164,7 +164,7 @@ int __init xsm_dt_init(void)
 
     xfree(policy_buffer);
 
-    return ret;
+    return ret ?: (xsm_bootparam == XSM_BOOTPARAM_SILO);
 }
 
 /**
