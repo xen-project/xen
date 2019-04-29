@@ -52,72 +52,50 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
  * indicated by comparing RETURN with OLD.
  */
 
-extern void __bad_cmpxchg(volatile void *ptr, int size);
+extern unsigned long __bad_cmpxchg(volatile void *ptr, int size);
+
+#define __CMPXCHG_CASE(sz, name)					\
+static inline unsigned long __cmpxchg_case_##name(volatile void *ptr,	\
+						  unsigned long old,	\
+						  unsigned long new)	\
+{									\
+	unsigned long oldval, res;					\
+									\
+	do {								\
+		asm volatile("@ __cmpxchg_case_" #name "\n"		\
+		"	ldrex" #sz "	%1, [%2]\n"			\
+		"	mov	%0, #0\n"				\
+		"	teq	%1, %3\n"				\
+		"	strex" #sz "eq %0, %4, [%2]\n"			\
+		: "=&r" (res), "=&r" (oldval)				\
+		: "r" (ptr), "Ir" (old), "r" (new)			\
+		: "memory", "cc");					\
+	} while (res);							\
+									\
+	return oldval;							\
+}
+
+__CMPXCHG_CASE(b, 1)
+__CMPXCHG_CASE(h, 2)
+__CMPXCHG_CASE( , 4)
 
 static always_inline unsigned long __cmpxchg(
     volatile void *ptr, unsigned long old, unsigned long new, int size)
 {
-	unsigned long oldval, res;
-
 	prefetchw((const void *)ptr);
 
 	switch (size) {
 	case 1:
-		do {
-			asm volatile("@ __cmpxchg1\n"
-			"	ldrexb	%1, [%2]\n"
-			"	mov	%0, #0\n"
-			"	teq	%1, %3\n"
-			"	strexbeq %0, %4, [%2]\n"
-				: "=&r" (res), "=&r" (oldval)
-				: "r" (ptr), "Ir" (old), "r" (new)
-				: "memory", "cc");
-		} while (res);
-		break;
+		return __cmpxchg_case_1(ptr, old, new);
 	case 2:
-		do {
-			asm volatile("@ __cmpxchg2\n"
-			"	ldrexh	%1, [%2]\n"
-			"	mov	%0, #0\n"
-			"	teq	%1, %3\n"
-			"	strexheq %0, %4, [%2]\n"
-				: "=&r" (res), "=&r" (oldval)
-				: "r" (ptr), "Ir" (old), "r" (new)
-				: "memory", "cc");
-		} while (res);
-		break;
+		return __cmpxchg_case_2(ptr, old, new);
 	case 4:
-		do {
-			asm volatile("@ __cmpxchg4\n"
-			"	ldrex	%1, [%2]\n"
-			"	mov	%0, #0\n"
-			"	teq	%1, %3\n"
-			"	strexeq	%0, %4, [%2]\n"
-				: "=&r" (res), "=&r" (oldval)
-				: "r" (ptr), "Ir" (old), "r" (new)
-				: "memory", "cc");
-	    } while (res);
-	    break;
-#if 0
-	case 8:
-		do {
-			asm volatile("@ __cmpxchg8\n"
-			"	ldrexd	%1, [%2]\n"
-			"	mov	%0, #0\n"
-			"	teq	%1, %3\n"
-			"	strexdeq %0, %4, [%2]\n"
-				: "=&r" (res), "=&r" (oldval)
-				: "r" (ptr), "Ir" (old), "r" (new)
-				: "memory", "cc");
-		} while (res);
-		break;
-#endif
+		return __cmpxchg_case_4(ptr, old, new);
 	default:
-		__bad_cmpxchg(ptr, size);
-		oldval = 0;
+		return __bad_cmpxchg(ptr, size);
 	}
 
-	return oldval;
+	ASSERT_UNREACHABLE();
 }
 
 static always_inline unsigned long __cmpxchg_mb(volatile void *ptr,
