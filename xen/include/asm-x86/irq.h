@@ -35,8 +35,8 @@ struct arch_irq_desc {
         cpumask_var_t cpu_mask;
         cpumask_var_t old_cpu_mask;
         cpumask_var_t pending_mask;
-        unsigned move_cleanup_count;
         vmask_t *used_vectors;
+        unsigned move_cleanup_count;
         u8 move_in_progress : 1;
         s8 used;
 };
