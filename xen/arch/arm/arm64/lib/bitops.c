@@ -118,6 +118,39 @@ testop(test_and_change_bit, eor)
 testop(test_and_clear_bit, bic)
 testop(test_and_set_bit, orr)
 
+static always_inline bool int_clear_mask16(uint16_t mask, volatile uint16_t *p,
+                                           bool timeout, unsigned int max_try)
+{
+    unsigned long res, tmp;
+
+    do
+    {
+        asm volatile ("//  int_clear_mask16\n"
+        "   ldxrh   %w2, %1\n"
+        "   bic     %w2, %w2, %w3\n"
+        "   stxrh   %w0, %w2, %1\n"
+        : "=&r" (res), "+Q" (*p), "=&r" (tmp)
+        : "r" (mask));
+
+        if ( !res )
+            break;
+    } while ( !timeout || ((--max_try) > 0) );
+
+    return !res;
+}
+
+void clear_mask16(uint16_t mask, volatile void *p)
+{
+    if ( !int_clear_mask16(mask, p, false, 0) )
+        ASSERT_UNREACHABLE();
+}
+
+bool clear_mask16_timeout(uint16_t mask, volatile void *p,
+                          unsigned int max_try)
+{
+    return int_clear_mask16(mask, p, true, max_try);
+}
+
 /*
  * Local variables:
  * mode: C
