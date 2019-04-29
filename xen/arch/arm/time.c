@@ -151,7 +151,7 @@ void __init preinit_xen_time(void)
     if ( res )
         panic("Timer: Cannot initialize platform timer\n");
 
-    boot_count = READ_SYSREG64(CNTPCT_EL0);
+    boot_count = get_cycles();
 }
 
 static void __init init_dt_xen_time(void)
@@ -192,7 +192,7 @@ int __init init_xen_time(void)
 /* Return number of nanoseconds since boot */
 s_time_t get_s_time(void)
 {
-    uint64_t ticks = READ_SYSREG64(CNTPCT_EL0) - boot_count;
+    uint64_t ticks = get_cycles() - boot_count;
     return ticks_to_ns(ticks);
 }
 

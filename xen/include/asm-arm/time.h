@@ -2,6 +2,7 @@
 #define __ARM_TIME_H__
 
 #include <asm/sysregs.h>
+#include <asm/system.h>
 
 #define DT_MATCH_TIMER                      \
     DT_MATCH_COMPATIBLE("arm,armv7-timer"), \
@@ -11,6 +12,7 @@ typedef uint64_t cycles_t;
 
 static inline cycles_t get_cycles (void)
 {
+        isb();
         return READ_SYSREG64(CNTPCT_EL0);
 }
 
