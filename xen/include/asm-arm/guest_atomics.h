@@ -24,8 +24,12 @@ DECLARE_PER_CPU(unsigned int, guest_safe_atomic_max);
 #define guest_bitop(name)                                                   \
 static inline void guest_##name(struct domain *d, int nr, volatile void *p) \
 {                                                                           \
+    perfc_incr(atomics_guest);                                              \
+                                                                            \
     if ( name##_timeout(nr, p, this_cpu(guest_safe_atomic_max)) )           \
         return;                                                             \
+                                                                            \
+    perfc_incr(atomics_guest_paused);                                       \
                                                                             \
     domain_pause_nosync(d);                                                 \
     name(nr, p);                                                            \
@@ -38,10 +42,14 @@ static inline int guest_##name(struct domain *d, int nr, volatile void *p)  \
     bool succeed;                                                           \
     int oldbit;                                                             \
                                                                             \
+    perfc_incr(atomics_guest);                                              \
+                                                                            \
     succeed = name##_timeout(nr, p, &oldbit,                                \
                              this_cpu(guest_safe_atomic_max));              \
     if ( succeed )                                                          \
         return oldbit;                                                      \
+                                                                            \
+    perfc_incr(atomics_guest_paused);                                       \
                                                                             \
     domain_pause_nosync(d);                                                 \
     oldbit = name(nr, p);                                                   \
@@ -73,9 +81,13 @@ static inline unsigned long __guest_cmpxchg(struct domain *d,
 {
     unsigned long oldval = old;
 
+    perfc_incr(atomics_guest);
+
     if ( __cmpxchg_mb_timeout(ptr, &oldval, new, size,
                               this_cpu(guest_safe_atomic_max)) )
         return oldval;
+
+    perfc_incr(atomics_guest_paused);
 
     domain_pause_nosync(d);
     oldval = __cmpxchg_mb(ptr, old, new, size);
