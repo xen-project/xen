@@ -652,11 +652,11 @@ static unsigned int nr_grant_entries(struct grant_table *gt)
     return 0;
 }
 
-static int _set_status_v1(domid_t  domid,
+static int _set_status_v1(const grant_entry_header_t *shah,
+                          struct active_grant_entry *act,
                           int readonly,
                           int mapflag,
-                          grant_entry_header_t *shah,
-                          struct active_grant_entry *act)
+                          domid_t  ldomid)
 {
     int rc = GNTST_okay;
     union grant_combo scombo, prev_scombo, new_scombo;
@@ -691,11 +691,11 @@ static int _set_status_v1(domid_t  domid,
         if ( !act->pin &&
              (((scombo.shorts.flags & mask) !=
                GTF_permit_access) ||
-              (scombo.shorts.domid != domid)) )
+              (scombo.shorts.domid != ldomid)) )
             PIN_FAIL(done, GNTST_general_error,
                      "Bad flags (%x) or dom (%d); expected d%d\n",
                      scombo.shorts.flags, scombo.shorts.domid,
-                     domid);
+                     ldomid);
 
         new_scombo = scombo;
         new_scombo.shorts.flags |= GTF_reading;
@@ -724,12 +724,12 @@ done:
     return rc;
 }
 
-static int _set_status_v2(domid_t  domid,
+static int _set_status_v2(const grant_entry_header_t *shah,
+                          grant_status_t *status,
+                          struct active_grant_entry *act,
                           int readonly,
                           int mapflag,
-                          grant_entry_header_t *shah,
-                          struct active_grant_entry *act,
-                          grant_status_t *status)
+                          domid_t  ldomid)
 {
     int      rc    = GNTST_okay;
     union grant_combo scombo;
@@ -755,10 +755,10 @@ static int _set_status_v2(domid_t  domid,
     if ( !act->pin &&
          ( (((flags & mask) != GTF_permit_access) &&
             ((flags & mask) != GTF_transitive)) ||
-          (id != domid)) )
+          (id != ldomid)) )
         PIN_FAIL(done, GNTST_general_error,
                  "Bad flags (%x) or dom (%d); expected d%d, flags %x\n",
-                 flags, id, domid, mask);
+                 flags, id, ldomid, mask);
 
     if ( readonly )
     {
@@ -785,14 +785,14 @@ static int _set_status_v2(domid_t  domid,
     {
         if ( (((flags & mask) != GTF_permit_access) &&
               ((flags & mask) != GTF_transitive)) ||
-             (id != domid) ||
+             (id != ldomid) ||
              (!readonly && (flags & GTF_readonly)) )
         {
             gnttab_clear_flag(_GTF_writing, status);
             gnttab_clear_flag(_GTF_reading, status);
             PIN_FAIL(done, GNTST_general_error,
                      "Unstable flags (%x) or dom (%d); expected d%d (r/w: %d)\n",
-                     flags, id, domid, !readonly);
+                     flags, id, ldomid, !readonly);
         }
     }
     else
@@ -810,19 +810,19 @@ done:
 }
 
 
-static int _set_status(unsigned gt_version,
-                       domid_t  domid,
+static int _set_status(const grant_entry_header_t *shah,
+                       grant_status_t *status,
+                       unsigned rgt_version,
+                       struct active_grant_entry *act,
                        int readonly,
                        int mapflag,
-                       grant_entry_header_t *shah,
-                       struct active_grant_entry *act,
-                       grant_status_t *status)
+                       domid_t ldomid)
 {
 
-    if ( gt_version == 1 )
-        return _set_status_v1(domid, readonly, mapflag, shah, act);
+    if ( rgt_version == 1 )
+        return _set_status_v1(shah, act, readonly, mapflag, ldomid);
     else
-        return _set_status_v2(domid, readonly, mapflag, shah, act, status);
+        return _set_status_v2(shah, status, act, readonly, mapflag, ldomid);
 }
 
 static struct active_grant_entry *grant_map_exists(const struct domain *ld,
@@ -993,9 +993,9 @@ map_grant_ref(
          (!(op->flags & GNTMAP_readonly) &&
           !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask))) )
     {
-        if ( (rc = _set_status(rgt->gt_version, ld->domain_id,
-                               op->flags & GNTMAP_readonly,
-                               1, shah, act, status) ) != GNTST_okay )
+        if ( (rc = _set_status(shah, status, rgt->gt_version, act,
+                               op->flags & GNTMAP_readonly, 1,
+                               ld->domain_id) != GNTST_okay) )
             goto act_release_out;
 
         if ( !act->pin )
@@ -2449,8 +2449,8 @@ acquire_grant_for_copy(
     {
         if ( (!old_pin || (!readonly &&
                            !(old_pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)))) &&
-             (rc = _set_status_v2(ldom, readonly, 0, shah, act,
-                                  status)) != GNTST_okay )
+             (rc = _set_status_v2(shah, status, act, readonly, 0,
+                                  ldom)) != GNTST_okay )
             goto unlock_out;
 
         if ( !allow_transitive )
@@ -2549,9 +2549,8 @@ acquire_grant_for_copy(
     else if ( !old_pin ||
               (!readonly && !(old_pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
     {
-        if ( (rc = _set_status(rgt->gt_version, ldom,
-                               readonly, 0, shah, act,
-                               status) ) != GNTST_okay )
+        if ( (rc = _set_status(shah, status, rgt->gt_version, act,
+                               readonly, 0, ldom)) != GNTST_okay )
              goto unlock_out;
 
         td = rd;
