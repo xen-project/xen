@@ -14,7 +14,7 @@ struct grant_table_arch {
     gfn_t *status_gfn;
 };
 
-void gnttab_clear_flag(unsigned long nr, uint16_t *addr);
+void gnttab_clear_flag(struct domain *d, unsigned long nr, uint16_t *addr);
 int create_grant_host_mapping(unsigned long gpaddr, mfn_t mfn,
                               unsigned int flags, unsigned int cache_flags);
 #define gnttab_host_mapping_get_page_type(ro, ld, rd) (0)

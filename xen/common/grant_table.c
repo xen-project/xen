@@ -40,6 +40,7 @@
 #include <xen/nospec.h>
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
+#include <asm/guest_atomics.h>
 
 /* Per-domain grant information. */
 struct grant_table {
@@ -671,6 +672,7 @@ static unsigned int nr_grant_entries(struct grant_table *gt)
 }
 
 static int _set_status_v1(const grant_entry_header_t *shah,
+                          struct domain *rd,
                           struct active_grant_entry *act,
                           int readonly,
                           int mapflag,
@@ -726,8 +728,8 @@ static int _set_status_v1(const grant_entry_header_t *shah,
                          "Attempt to write-pin a r/o grant entry\n");
         }
 
-        prev_scombo.word = cmpxchg((u32 *)shah,
-                                   scombo.word, new_scombo.word);
+        prev_scombo.word = guest_cmpxchg(rd, (u32 *)shah,
+                                         scombo.word, new_scombo.word);
         if ( likely(prev_scombo.word == scombo.word) )
             break;
 
@@ -744,6 +746,7 @@ done:
 
 static int _set_status_v2(const grant_entry_header_t *shah,
                           grant_status_t *status,
+                          struct domain *rd,
                           struct active_grant_entry *act,
                           int readonly,
                           int mapflag,
@@ -806,8 +809,8 @@ static int _set_status_v2(const grant_entry_header_t *shah,
              (id != ldomid) ||
              (!readonly && (flags & GTF_readonly)) )
         {
-            gnttab_clear_flag(_GTF_writing, status);
-            gnttab_clear_flag(_GTF_reading, status);
+            gnttab_clear_flag(rd, _GTF_writing, status);
+            gnttab_clear_flag(rd, _GTF_reading, status);
             PIN_FAIL(done, GNTST_general_error,
                      "Unstable flags (%x) or dom (%d); expected d%d (r/w: %d)\n",
                      flags, id, ldomid, !readonly);
@@ -817,7 +820,7 @@ static int _set_status_v2(const grant_entry_header_t *shah,
     {
         if ( unlikely(flags & GTF_readonly) )
         {
-            gnttab_clear_flag(_GTF_writing, status);
+            gnttab_clear_flag(rd, _GTF_writing, status);
             PIN_FAIL(done, GNTST_general_error,
                      "Unstable grant readonly flag\n");
         }
@@ -830,6 +833,7 @@ done:
 
 static int _set_status(const grant_entry_header_t *shah,
                        grant_status_t *status,
+                       struct domain *rd,
                        unsigned rgt_version,
                        struct active_grant_entry *act,
                        int readonly,
@@ -838,9 +842,9 @@ static int _set_status(const grant_entry_header_t *shah,
 {
 
     if ( rgt_version == 1 )
-        return _set_status_v1(shah, act, readonly, mapflag, ldomid);
+        return _set_status_v1(shah, rd, act, readonly, mapflag, ldomid);
     else
-        return _set_status_v2(shah, status, act, readonly, mapflag, ldomid);
+        return _set_status_v2(shah, status, rd, act, readonly, mapflag, ldomid);
 }
 
 static struct active_grant_entry *grant_map_exists(const struct domain *ld,
@@ -1005,7 +1009,7 @@ map_grant_ref(
          (!(op->flags & GNTMAP_readonly) &&
           !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask))) )
     {
-        if ( (rc = _set_status(shah, status, rgt->gt_version, act,
+        if ( (rc = _set_status(shah, status, rd, rgt->gt_version, act,
                                op->flags & GNTMAP_readonly, 1,
                                ld->domain_id) != GNTST_okay) )
             goto act_release_out;
@@ -1229,10 +1233,10 @@ map_grant_ref(
  unlock_out_clear:
     if ( !(op->flags & GNTMAP_readonly) &&
          !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
-        gnttab_clear_flag(_GTF_writing, status);
+        gnttab_clear_flag(rd, _GTF_writing, status);
 
     if ( !act->pin )
-        gnttab_clear_flag(_GTF_reading, status);
+        gnttab_clear_flag(rd, _GTF_reading, status);
 
  act_release_out:
     active_entry_release(act);
@@ -1502,10 +1506,10 @@ unmap_common_complete(struct gnttab_unmap_common *op)
 
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
          !(op->done & GNTMAP_readonly) )
-        gnttab_clear_flag(_GTF_writing, status);
+        gnttab_clear_flag(rd, _GTF_writing, status);
 
     if ( act->pin == 0 )
-        gnttab_clear_flag(_GTF_reading, status);
+        gnttab_clear_flag(rd, _GTF_reading, status);
 
     active_entry_release(act);
     grant_read_unlock(rgt);
@@ -2070,8 +2074,8 @@ gnttab_prepare_for_transfer(
         new_scombo = scombo;
         new_scombo.shorts.flags |= GTF_transfer_committed;
 
-        prev_scombo.word = cmpxchg((u32 *)&sha->flags,
-                                   scombo.word, new_scombo.word);
+        prev_scombo.word = guest_cmpxchg(rd, (u32 *)&sha->flags,
+                                         scombo.word, new_scombo.word);
         if ( likely(prev_scombo.word == scombo.word) )
             break;
 
@@ -2364,11 +2368,11 @@ release_grant_for_copy(
 
         act->pin -= GNTPIN_hstw_inc;
         if ( !(act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) )
-            gnttab_clear_flag(_GTF_writing, status);
+            gnttab_clear_flag(rd, _GTF_writing, status);
     }
 
     if ( !act->pin )
-        gnttab_clear_flag(_GTF_reading, status);
+        gnttab_clear_flag(rd, _GTF_reading, status);
 
     active_entry_release(act);
     grant_read_unlock(rgt);
@@ -2390,14 +2394,15 @@ release_grant_for_copy(
    under the domain's grant table lock. */
 /* Only safe on transitive grants.  Even then, note that we don't
    attempt to drop any pin on the referent grant. */
-static void fixup_status_for_copy_pin(const struct active_grant_entry *act,
+static void fixup_status_for_copy_pin(struct domain *rd,
+                                      const struct active_grant_entry *act,
                                       uint16_t *status)
 {
     if ( !(act->pin & (GNTPIN_hstw_mask | GNTPIN_devw_mask)) )
-        gnttab_clear_flag(_GTF_writing, status);
+        gnttab_clear_flag(rd, _GTF_writing, status);
 
     if ( !act->pin )
-        gnttab_clear_flag(_GTF_reading, status);
+        gnttab_clear_flag(rd, _GTF_reading, status);
 }
 
 /*
@@ -2459,7 +2464,7 @@ acquire_grant_for_copy(
     {
         if ( (!old_pin || (!readonly &&
                            !(old_pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)))) &&
-             (rc = _set_status_v2(shah, status, act, readonly, 0,
+             (rc = _set_status_v2(shah, status, rd, act, readonly, 0,
                                   ldom)) != GNTST_okay )
             goto unlock_out;
 
@@ -2508,7 +2513,7 @@ acquire_grant_for_copy(
 
         if ( rc != GNTST_okay )
         {
-            fixup_status_for_copy_pin(act, status);
+            fixup_status_for_copy_pin(rd, act, status);
             rcu_unlock_domain(td);
             active_entry_release(act);
             grant_read_unlock(rgt);
@@ -2531,7 +2536,7 @@ acquire_grant_for_copy(
                           !act->is_sub_page)) )
         {
             release_grant_for_copy(td, trans_gref, readonly);
-            fixup_status_for_copy_pin(act, status);
+            fixup_status_for_copy_pin(rd, act, status);
             rcu_unlock_domain(td);
             active_entry_release(act);
             grant_read_unlock(rgt);
@@ -2560,7 +2565,7 @@ acquire_grant_for_copy(
     else if ( !old_pin ||
               (!readonly && !(old_pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask))) )
     {
-        if ( (rc = _set_status(shah, status, rgt->gt_version, act,
+        if ( (rc = _set_status(shah, status, rd, rgt->gt_version, act,
                                readonly, 0, ldom)) != GNTST_okay )
              goto unlock_out;
 
@@ -2648,10 +2653,10 @@ acquire_grant_for_copy(
  unlock_out_clear:
     if ( !(readonly) &&
          !(act->pin & (GNTPIN_hstw_mask | GNTPIN_devw_mask)) )
-        gnttab_clear_flag(_GTF_writing, status);
+        gnttab_clear_flag(rd, _GTF_writing, status);
 
     if ( !act->pin )
-        gnttab_clear_flag(_GTF_reading, status);
+        gnttab_clear_flag(rd, _GTF_reading, status);
 
  unlock_out:
     active_entry_release(act);
@@ -3686,11 +3691,11 @@ gnttab_release_mappings(
             }
 
             if ( (act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0 )
-                gnttab_clear_flag(_GTF_writing, status);
+                gnttab_clear_flag(rd, _GTF_writing, status);
         }
 
         if ( act->pin == 0 )
-            gnttab_clear_flag(_GTF_reading, status);
+            gnttab_clear_flag(rd, _GTF_reading, status);
 
         active_entry_release(act);
         grant_read_unlock(rgt);
