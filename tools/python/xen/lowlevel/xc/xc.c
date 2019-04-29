@@ -972,11 +972,17 @@ static PyObject *pyxc_physinfo(XcObject *self)
     xc_physinfo_t pinfo;
     char cpu_cap[128], virt_caps[128], *p;
     int i;
-    const char *virtcap_names[] = { "hvm", "hvm_directio" };
+    const char *virtcap_names[] = { "hvm", "pv" };
+    const unsigned virtcaps_bits[] = { XEN_SYSCTL_PHYSCAP_hvm,
+                                       XEN_SYSCTL_PHYSCAP_pv };
 
     if ( xc_physinfo(self->xc_handle, &pinfo) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
+    /*
+     * Keep in sync with tools/xl/xl_info.c:output_xeninfo
+     * and struct xen_sysctl_physinfo (especially bit fields).
+     */
     p = cpu_cap;
     *p = '\0';
     for ( i = 0; i < sizeof(pinfo.hw_cap)/4; i++ )
@@ -985,9 +991,13 @@ static PyObject *pyxc_physinfo(XcObject *self)
 
     p = virt_caps;
     *p = '\0';
-    for ( i = 0; i < 2; i++ )
-        if ( (pinfo.capabilities >> i) & 1 )
+    for ( i = 0; i < ARRAY_SIZE(virtcaps_bits); i++ )
+        if ( pinfo.capabilities & virtcaps_bits[i] )
           p += sprintf(p, "%s ", virtcap_names[i]);
+    if ( pinfo.capabilities & XEN_SYSCTL_PHYSCAP_directio )
+        for ( i = 0; i < ARRAY_SIZE(virtcaps_bits); i++ )
+            if ( pinfo.capabilities & virtcaps_bits[i] )
+              p += sprintf(p, "%s_directio ", virtcap_names[i]);
     if ( p != virt_caps )
       *(p-1) = '\0';
 
