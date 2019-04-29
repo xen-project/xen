@@ -36,6 +36,14 @@
 # error "unknown ARM variant"
 #endif
 
+/* Atomics bitops */
+void set_bit(int nr, volatile void *p);
+void clear_bit(int nr, volatile void *p);
+void change_bit(int nr, volatile void *p);
+int test_and_set_bit(int nr, volatile void *p);
+int test_and_clear_bit(int nr, volatile void *p);
+int test_and_change_bit(int nr, volatile void *p);
+
 /**
  * __test_and_set_bit - Set a bit and return its old value
  * @nr: Bit to set
