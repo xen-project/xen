@@ -1,16 +1,6 @@
 #ifndef _ARM_ARM64_BITOPS_H
 #define _ARM_ARM64_BITOPS_H
 
-/*
- * Little endian assembly atomic bitops.
- */
-extern void set_bit(int nr, volatile void *p);
-extern void clear_bit(int nr, volatile void *p);
-extern void change_bit(int nr, volatile void *p);
-extern int test_and_set_bit(int nr, volatile void *p);
-extern int test_and_clear_bit(int nr, volatile void *p);
-extern int test_and_change_bit(int nr, volatile void *p);
-
 /* Based on linux/include/asm-generic/bitops/builtin-__ffs.h */
 /**
  * __ffs - find first bit in word.
