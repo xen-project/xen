@@ -24,6 +24,7 @@
 #include <asm/current.h>
 #include <asm/event.h>
 #include <asm/guest_access.h>
+#include <asm/guest_atomics.h>
 #include <asm/regs.h>
 #include <asm/p2m.h>
 #include <asm/irq.h>
@@ -935,7 +936,7 @@ void arch_dump_vcpu_info(struct vcpu *v)
 
 void vcpu_mark_events_pending(struct vcpu *v)
 {
-    int already_pending = test_and_set_bit(
+    bool already_pending = guest_test_and_set_bit(v->domain,
         0, (unsigned long *)&vcpu_info(v, evtchn_upcall_pending));
 
     if ( already_pending )
