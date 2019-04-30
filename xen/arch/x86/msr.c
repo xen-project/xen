@@ -143,6 +143,13 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         /* Not offered to guests. */
         goto gp_fault;
 
+    case MSR_IA32_PLATFORM_ID:
+        if ( !(cp->x86_vendor & X86_VENDOR_INTEL) ||
+             !(boot_cpu_data.x86_vendor & X86_VENDOR_INTEL) )
+            goto gp_fault;
+        rdmsrl(MSR_IA32_PLATFORM_ID, *val);
+        break;
+
     case MSR_AMD_PATCHLEVEL:
         BUILD_BUG_ON(MSR_IA32_UCODE_REV != MSR_AMD_PATCHLEVEL);
         /*
@@ -275,6 +282,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     {
         uint64_t rsvd;
 
+    case MSR_IA32_PLATFORM_ID:
     case MSR_INTEL_CORE_THREAD_COUNT:
     case MSR_INTEL_PLATFORM_INFO:
     case MSR_ARCH_CAPABILITIES:
