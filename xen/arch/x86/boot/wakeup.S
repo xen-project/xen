@@ -51,8 +51,9 @@ ENTRY(wakeup_start)
         lidt    wakesym(idt_48)
         lgdt    wakesym(gdt_48)
 
-        movw    $1, %ax
-        lmsw    %ax             # Turn on CR0.PE 
+        mov     $X86_CR0_PE, %eax
+        mov     %eax, %cr0
+
         ljmpl   $BOOT_CS32, $bootsym_rel(wakeup_32, 6)
 
 /* This code uses an extended set of video mode numbers. These include:

@@ -53,10 +53,9 @@ GLOBAL(trampoline_realmode_entry)
         cli
         lidt    bootsym(idt_48)
         lgdt    bootsym(gdt_48)
-        mov     $1,%bl                    # EBX != 0 indicates we are an AP
-        xor     %ax, %ax
-        inc     %ax
-        lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
+        mov     $X86_CR0_PE, %ebx         # EBX != 0 indicates we are an AP
+        mov     %ebx, %cr0                # Alias with CR0.PE for brevity
+
         ljmpl   $BOOT_CS32,$bootsym_rel(trampoline_protmode_entry,6)
 
 trampoline_gdt:
@@ -263,9 +262,8 @@ trampoline_boot_cpu_entry:
         lgdt    bootsym(gdt_48)
 
         /* Enter protected mode, and flush insn queue. */
-        xor     %ax,%ax
-        inc     %ax
-        lmsw    %ax                       # CR0.PE = 1 (enter protected mode)
+        mov     $X86_CR0_PE, %eax
+        mov     %eax, %cr0
 
         /* Load proper protected-mode values into all segment registers. */
         ljmpl   $BOOT_CS32,$bootsym_rel(1f,6)
