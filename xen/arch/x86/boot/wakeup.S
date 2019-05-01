@@ -2,7 +2,15 @@
 
 #define wakesym(sym) (sym - wakeup_start)
 
-        .align 16
+/*
+ * acpi_sleep_prepare() programs the S3 wakeup vector to point here.
+ *
+ * The ACPI spec says that we shall be entered in Real Mode with:
+ *   %cs = wakeup_start >> 4
+ *   %ip = wakeup_start & 0xf
+ *
+ * As wakeup_start is 16-byte aligned, %ip is 0 in practice.
+ */
 ENTRY(wakeup_start)
         cli
         cld

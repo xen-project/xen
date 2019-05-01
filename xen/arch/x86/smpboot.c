@@ -548,8 +548,11 @@ static int do_boot_cpu(int apicid, int cpu)
 
     booting_cpu = cpu;
 
-    /* start_eip had better be page-aligned! */
     start_eip = setup_trampoline();
+
+    /* start_eip needs be page aligned, and below the 1M boundary. */
+    if ( start_eip & ~0xff000 )
+        panic("AP trampoline %#lx not suitably positioned\n", start_eip);
 
     /* So we see what's up   */
     if ( opt_cpu_info )
