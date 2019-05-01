@@ -23,6 +23,70 @@ booted and the Xen tools to become available, domains created by Xen
 this way are started right away in parallel. Hence, their boot time is
 typically much shorter.
 
+
+Configuration
+-------------
+
+### Loading binaries into memory ###
+
+U-Boot needs to load not just Xen, the device tree binary, the dom0 kernel and
+ramdisk. It also needs to load the kernel and ramdisk of any additional domains
+to boot. For example if this is the bootcmd for Xen and Dom0:
+
+    tftpb 0x1280000 xen.dtb
+    tftpb 0x0x80000 xen-Image
+    tftpb 0x1400000 xen.ub
+    tftpb 0x9000000 xen-rootfs.cpio.gz.u-boot
+
+    bootm 0x1400000 0x9000000 0x1280000
+
+If we want to add one DomU with Image-DomU as the DomU kernel
+and ramdisk-DomU as DomU ramdisk:
+
+    tftpb 0x1280000 xen.dtb
+    tftpb 0x80000 xen-Image
+    tftpb 0x1400000 xen.ub
+    tftpb 0x9000000 xen-rootfs.cpio.gz.u-boot
+
+    tftpb 0x2000000 Image-DomU
+    tftpb 0x3000000 ramdisk-DomU
+
+    bootm 0x1400000 0x9000000 0x1280000
+
+
+### Device Tree configuration ###
+
+In addition to loading the necessary binaries, we also need to advertise
+the presence of the additional VM and its configuration. It is done via
+device tree adding a node under /chosen as follows:
+
+    domU1 {
+        compatible = "xen,domain";
+        memory = <0x20000>;
+        cpus = 1;
+        vpl011;
+
+        module@2000000 {
+            compatible = "multiboot,kernel", "multiboot,module";
+            reg = <0x2000000 0xffffff>;
+            bootargs = "console=ttyAMA0";
+        };
+
+        module@30000000 {
+            compatible = "multiboot,ramdisk", "multiboot,module";
+            reg = <0x3000000 0xffffff>;
+        };
+    };
+
+Where memory is the memory of the VM in KBs, cpus is the number of
+cpus. module@2000000 and module@3000000 advertise where the kernel and
+ramdisk are in memory.
+
+See docs/misc/arm/device-tree/booting.txt for more information.
+
+Limitations
+-----------
+
 Domains started by Xen at boot time currently have the following
 limitations:
 
