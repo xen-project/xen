@@ -40,16 +40,51 @@ static struct scif_uart {
     char __iomem *regs;
     struct irqaction irqaction;
     struct vuart_info vuart;
+    const struct port_params *params;
 } scif_com = {0};
+
+enum port_types
+{
+    SCIF_PORT,
+    NR_PORTS,
+};
+
+struct port_params
+{
+    unsigned int status_reg;
+    unsigned int tx_fifo_reg;
+    unsigned int rx_fifo_reg;
+    unsigned int overrun_reg;
+    unsigned int overrun_mask;
+    unsigned int error_mask;
+    unsigned int irq_flags;
+    unsigned int fifo_size;
+};
+
+static const struct port_params port_params[NR_PORTS] =
+{
+    [SCIF_PORT] =
+    {
+        .status_reg   = SCIF_SCFSR,
+        .tx_fifo_reg  = SCIF_SCFTDR,
+        .rx_fifo_reg  = SCIF_SCFRDR,
+        .overrun_reg  = SCIF_SCLSR,
+        .overrun_mask = SCLSR_ORER,
+        .error_mask   = SCFSR_PER | SCFSR_FER | SCFSR_BRK | SCFSR_ER,
+        .irq_flags    = SCSCR_RIE | SCSCR_TIE | SCSCR_REIE,
+        .fifo_size    = 16,
+    },
+};
 
 static void scif_uart_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 {
     struct serial_port *port = data;
     struct scif_uart *uart = port->uart;
+    const struct port_params *params = uart->params;
     uint16_t status, ctrl;
 
     ctrl = scif_readw(uart, SCIF_SCSCR);
-    status = scif_readw(uart, SCIF_SCFSR) & ~SCFSR_TEND;
+    status = scif_readw(uart, params->status_reg) & ~SCFSR_TEND;
     /* Ignore next flag if TX Interrupt is disabled */
     if ( !(ctrl & SCSCR_TIE) )
         status &= ~SCFSR_TDFE;
@@ -65,13 +100,13 @@ static void scif_uart_interrupt(int irq, void *data, struct cpu_user_regs *regs)
             serial_rx_interrupt(port, regs);
 
         /* Error Interrupt */
-        if ( status & SCIF_ERRORS )
-            scif_writew(uart, SCIF_SCFSR, ~SCIF_ERRORS);
-        if ( scif_readw(uart, SCIF_SCLSR) & SCLSR_ORER )
-            scif_writew(uart, SCIF_SCLSR, 0);
+        if ( status & params->error_mask )
+            scif_writew(uart, params->status_reg, ~params->error_mask);
+        if ( scif_readw(uart, params->overrun_reg) & params->overrun_mask )
+            scif_writew(uart, params->overrun_reg, ~params->overrun_mask);
 
         ctrl = scif_readw(uart, SCIF_SCSCR);
-        status = scif_readw(uart, SCIF_SCFSR) & ~SCFSR_TEND;
+        status = scif_readw(uart, params->status_reg) & ~SCFSR_TEND;
         /* Ignore next flag if TX Interrupt is disabled */
         if ( !(ctrl & SCSCR_TIE) )
             status &= ~SCFSR_TDFE;
@@ -81,12 +116,13 @@ static void scif_uart_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 static void __init scif_uart_init_preirq(struct serial_port *port)
 {
     struct scif_uart *uart = port->uart;
+    const struct port_params *params = uart->params;
 
     /*
      * Wait until last bit has been transmitted. This is needed for a smooth
      * transition when we come from early printk
      */
-    while ( !(scif_readw(uart, SCIF_SCFSR) & SCFSR_TEND) );
+    while ( !(scif_readw(uart, params->status_reg) & SCFSR_TEND) );
 
     /* Disable TX/RX parts and all interrupts */
     scif_writew(uart, SCIF_SCSCR, 0);
@@ -95,10 +131,10 @@ static void __init scif_uart_init_preirq(struct serial_port *port)
     scif_writew(uart, SCIF_SCFCR, SCFCR_RFRST | SCFCR_TFRST);
 
     /* Clear all errors and flags */
-    scif_readw(uart, SCIF_SCFSR);
-    scif_writew(uart, SCIF_SCFSR, 0);
-    scif_readw(uart, SCIF_SCLSR);
-    scif_writew(uart, SCIF_SCLSR, 0);
+    scif_readw(uart, params->status_reg);
+    scif_writew(uart, params->status_reg, 0);
+    scif_readw(uart, params->overrun_reg);
+    scif_writew(uart, params->overrun_reg, 0);
 
     /* Setup trigger level for TX/RX FIFOs */
     scif_writew(uart, SCIF_SCFCR, SCFCR_RTRG11 | SCFCR_TTRG11);
@@ -111,6 +147,7 @@ static void __init scif_uart_init_preirq(struct serial_port *port)
 static void __init scif_uart_init_postirq(struct serial_port *port)
 {
     struct scif_uart *uart = port->uart;
+    const struct port_params *params = uart->params;
     int rc;
 
     uart->irqaction.handler = scif_uart_interrupt;
@@ -122,14 +159,14 @@ static void __init scif_uart_init_postirq(struct serial_port *port)
                 uart->irq);
 
     /* Clear all errors */
-    if ( scif_readw(uart, SCIF_SCFSR) & SCIF_ERRORS )
-        scif_writew(uart, SCIF_SCFSR, ~SCIF_ERRORS);
-    if ( scif_readw(uart, SCIF_SCLSR) & SCLSR_ORER )
-        scif_writew(uart, SCIF_SCLSR, 0);
+    if ( scif_readw(uart, params->status_reg) & params->error_mask )
+        scif_writew(uart, params->status_reg, ~params->error_mask);
+    if ( scif_readw(uart, params->overrun_reg) & params->overrun_mask )
+        scif_writew(uart, params->overrun_reg, ~params->overrun_mask);
 
     /* Enable TX/RX and Error Interrupts  */
     scif_writew(uart, SCIF_SCSCR, scif_readw(uart, SCIF_SCSCR) |
-                 SCSCR_TIE | SCSCR_RIE | SCSCR_REIE);
+                params->irq_flags);
 }
 
 static void scif_uart_suspend(struct serial_port *port)
@@ -145,43 +182,47 @@ static void scif_uart_resume(struct serial_port *port)
 static int scif_uart_tx_ready(struct serial_port *port)
 {
     struct scif_uart *uart = port->uart;
+    const struct port_params *params = uart->params;
     uint16_t cnt;
 
     /* Check for empty space in TX FIFO */
-    if ( !(scif_readw(uart, SCIF_SCFSR) & SCFSR_TDFE) )
+    if ( !(scif_readw(uart, params->status_reg) & SCFSR_TDFE) )
         return 0;
 
      /* Check number of data bytes stored in TX FIFO */
     cnt = scif_readw(uart, SCIF_SCFDR) >> 8;
-    ASSERT( cnt >= 0 && cnt <= SCIF_FIFO_MAX_SIZE );
+    ASSERT( cnt >= 0 && cnt <= params->fifo_size );
 
-    return (SCIF_FIFO_MAX_SIZE - cnt);
+    return (params->fifo_size - cnt);
 }
 
 static void scif_uart_putc(struct serial_port *port, char c)
 {
     struct scif_uart *uart = port->uart;
+    const struct port_params *params = uart->params;
 
-    scif_writeb(uart, SCIF_SCFTDR, c);
+    scif_writeb(uart, params->tx_fifo_reg, c);
     /* Clear required TX flags */
-    scif_writew(uart, SCIF_SCFSR, scif_readw(uart, SCIF_SCFSR) &
-                 ~(SCFSR_TEND | SCFSR_TDFE));
+    scif_writew(uart, params->status_reg,
+                scif_readw(uart, params->status_reg) &
+                ~(SCFSR_TEND | SCFSR_TDFE));
 }
 
 static int scif_uart_getc(struct serial_port *port, char *pc)
 {
     struct scif_uart *uart = port->uart;
+    const struct port_params *params = uart->params;
 
     /* Check for available data bytes in RX FIFO */
-    if ( !(scif_readw(uart, SCIF_SCFSR) & (SCFSR_RDF | SCFSR_DR)) )
+    if ( !(scif_readw(uart, params->status_reg) & (SCFSR_RDF | SCFSR_DR)) )
         return 0;
 
-    *pc = scif_readb(uart, SCIF_SCFRDR);
+    *pc = scif_readb(uart, params->rx_fifo_reg);
 
     /* dummy read */
-    scif_readw(uart, SCIF_SCFSR);
+    scif_readw(uart, params->status_reg);
     /* Clear required RX flags */
-    scif_writew(uart, SCIF_SCFSR, ~(SCFSR_RDF | SCFSR_DR));
+    scif_writew(uart, params->status_reg, ~(SCFSR_RDF | SCFSR_DR));
 
     return 1;
 }
@@ -229,9 +270,16 @@ static struct uart_driver __read_mostly scif_uart_driver = {
     .vuart_info   = scif_vuart_info,
 };
 
+static const struct dt_device_match scif_uart_dt_match[] __initconst =
+{
+    { .compatible = "renesas,scif",  .data = (void *)SCIF_PORT },
+    { /* sentinel */ },
+};
+
 static int __init scif_uart_init(struct dt_device_node *dev,
                                  const void *data)
 {
+    const struct dt_device_match *match;
     const char *config = data;
     struct scif_uart *uart;
     int res;
@@ -265,10 +313,14 @@ static int __init scif_uart_init(struct dt_device_node *dev,
         return -ENOMEM;
     }
 
+    match = dt_match_node(scif_uart_dt_match, dev);
+    ASSERT( match );
+    uart->params = &port_params[(enum port_types)match->data];
+
     uart->vuart.base_addr  = addr;
     uart->vuart.size       = size;
-    uart->vuart.data_off   = SCIF_SCFTDR;
-    uart->vuart.status_off = SCIF_SCFSR;
+    uart->vuart.data_off   = uart->params->tx_fifo_reg;
+    uart->vuart.status_off = uart->params->status_reg;
     uart->vuart.status     = SCFSR_TDFE;
 
     /* Register with generic serial driver */
@@ -278,12 +330,6 @@ static int __init scif_uart_init(struct dt_device_node *dev,
 
     return 0;
 }
-
-static const struct dt_device_match scif_uart_dt_match[] __initconst =
-{
-    DT_MATCH_COMPATIBLE("renesas,scif"),
-    { /* sentinel */ },
-};
 
 DT_DEVICE_START(scif_uart, "SCIF UART", DEVICE_SERIAL)
     .dt_match = scif_uart_dt_match,

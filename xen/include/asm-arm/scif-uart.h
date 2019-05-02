@@ -21,8 +21,6 @@
 #ifndef __ASM_ARM_SCIF_UART_H
 #define __ASM_ARM_SCIF_UART_H
 
-#define SCIF_FIFO_MAX_SIZE    16
-
 /* Register offsets */
 #define SCIF_SCSMR     (0x00)    /* Serial mode register           */
 #define SCIF_SCBRR     (0x04)    /* Bit rate register              */
@@ -56,8 +54,6 @@
 #define SCFSR_PER     (1 << 2)    /* Parity Error */
 #define SCFSR_RDF     (1 << 1)    /* Receive FIFO Data Full */
 #define SCFSR_DR      (1 << 0)    /* Receive Data Ready */
-
-#define SCIF_ERRORS    (SCFSR_PER | SCFSR_FER | SCFSR_ER | SCFSR_BRK)
 
 /* Line Status Register (SCLSR) */
 #define SCLSR_TO      (1 << 2)    /* Timeout */
