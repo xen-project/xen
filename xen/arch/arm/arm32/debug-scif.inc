@@ -1,7 +1,7 @@
 /*
  * xen/arch/arm/arm32/debug-scif.inc
  *
- * SCIF specific debug code
+ * SCIF(A) specific debug code
  *
  * Oleksandr Tyshchenko <oleksandr.tyshchenko@globallogic.com>
  * Copyright (C) 2014, Globallogic.
@@ -22,6 +22,9 @@
 #ifdef EARLY_PRINTK_VERSION_NONE
 #define STATUS_REG    SCIF_SCFSR
 #define TX_FIFO_REG   SCIF_SCFTDR
+#elif EARLY_PRINTK_VERSION_A
+#define STATUS_REG    SCIFA_SCASSR
+#define TX_FIFO_REG   SCIFA_SCAFTDR
 #endif
 
 /*
