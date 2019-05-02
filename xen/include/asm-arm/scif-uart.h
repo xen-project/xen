@@ -2,7 +2,7 @@
  * xen/include/asm-arm/scif-uart.h
  *
  * Common constant definition between early printk and the UART driver
- * for the SCIF compatible UART.
+ * for the SCIF(A) compatible UART.
  *
  * Oleksandr Tyshchenko <oleksandr.tyshchenko@globallogic.com>
  * Copyright (C) 2014, Globallogic.
@@ -21,7 +21,7 @@
 #ifndef __ASM_ARM_SCIF_UART_H
 #define __ASM_ARM_SCIF_UART_H
 
-/* Register offsets */
+/* Register offsets (SCIF) */
 #define SCIF_SCSMR     (0x00)    /* Serial mode register           */
 #define SCIF_SCBRR     (0x04)    /* Bit rate register              */
 #define SCIF_SCSCR     (0x08)    /* Serial control register        */
@@ -78,6 +78,42 @@
 #define SCFCR_TTRG01    (SCFCR_TTRG0)
 #define SCFCR_TTRG10    (SCFCR_TTRG1)
 #define SCFCR_TTRG11    (SCFCR_TTRG1 | SCFCR_TTRG0)
+
+/* Register offsets (SCIFA) */
+#define SCIFA_SCASMR     (0x00)    /* Serial mode register           */
+#define SCIFA_SCABRR     (0x04)    /* Bit rate register              */
+#define SCIFA_SCASCR     (0x08)    /* Serial control register        */
+#define SCIFA_SCATDSR    (0x0C)    /* Transmit data stop register    */
+#define SCIFA_SCAFER     (0x10)    /* FIFO error count register      */
+#define SCIFA_SCASSR     (0x14)    /* Serial status register         */
+#define SCIFA_SCAFCR     (0x18)    /* FIFO control register          */
+#define SCIFA_SCAFDR     (0x1C)    /* FIFO data count register       */
+#define SCIFA_SCAFTDR    (0x20)    /* Transmit FIFO data register    */
+#define SCIFA_SCAFRDR    (0x24)    /* Receive FIFO data register     */
+#define SCIFA_SCAPCR     (0x30)    /* Serial port control register   */
+#define SCIFA_SCAPDR     (0x34)    /* Serial port data register      */
+
+/* Serial Control Register (SCASCR) */
+#define SCASCR_ERIE     (1 << 10)    /* Receive Error Interrupt Enable */
+#define SCASCR_BRIE     (1 << 9)     /* Break Interrupt Enable */
+#define SCASCR_DRIE     (1 << 8)     /* Receive Data Ready Interrupt Enable */
+#define SCASCR_TIE      (1 << 7)     /* Transmit Interrupt Enable */
+#define SCASCR_RIE      (1 << 6)     /* Receive Interrupt Enable */
+#define SCASCR_TE       (1 << 5)     /* Transmit Enable */
+#define SCASCR_RE       (1 << 4)     /* Receive Enable */
+#define SCASCR_CKE0     (1 << 0)     /* Clock Enable 0 */
+
+/* Serial Status Register (SCASSR) */
+#define SCASSR_ORER    (1 << 9)    /* Overrun Error */
+#define SCASSR_TSF     (1 << 8)    /* Transmit Data Stop */
+#define SCASSR_ER      (1 << 7)    /* Receive Error */
+#define SCASSR_TEND    (1 << 6)    /* Transmission End */
+#define SCASSR_TDFE    (1 << 5)    /* Transmit FIFO Data Empty */
+#define SCASSR_BRK     (1 << 4)    /* Break Detect */
+#define SCASSR_FER     (1 << 3)    /* Framing Error */
+#define SCASSR_PER     (1 << 2)    /* Parity Error */
+#define SCASSR_RDF     (1 << 1)    /* Receive FIFO Data Full */
+#define SCASSR_DR      (1 << 0)    /* Receive Data Ready */
 
 #endif /* __ASM_ARM_SCIF_UART_H */
 
