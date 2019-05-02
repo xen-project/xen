@@ -27,6 +27,11 @@ CONFIG_EARLY_PRINTK=<INC>,<BASE_ADDRESS>,<OTHER_OPTIONS>
       If <BAUD_RATE> is not given then the code will not try to
       initialize the UART, so that bootloader or firmware settings can
      be used for maximum compatibility.
+  - scif,<BASE_ADDRESS>,<VERSION>
+    - SCIF<VERSION> is, optionally, the interface version of the UART.
+
+      If <VERSION> is not given then the default interface version (SCIF)
+      will be used.
   - For all other uarts there are no additional options.
 
 As a convenience it is also possible to select from a list of

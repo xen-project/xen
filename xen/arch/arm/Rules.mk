@@ -68,6 +68,13 @@ EARLY_PRINTK_INIT_UART := y
 EARLY_PRINTK_BAUD := $(word 3,$(EARLY_PRINTK_CFG))
 endif
 endif
+ifeq ($(EARLY_PRINTK_INC),scif)
+ifneq ($(word 3,$(EARLY_PRINTK_CFG)),)
+CFLAGS-y += -DEARLY_PRINTK_VERSION_$(word 3,$(EARLY_PRINTK_CFG))
+else
+CFLAGS-y += -DEARLY_PRINTK_VERSION_NONE
+endif
+endif
 
 ifneq ($(EARLY_PRINTK_INC),)
 EARLY_PRINTK := y
