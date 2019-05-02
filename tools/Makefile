@@ -246,7 +246,6 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--prefix=$(LIBEXEC) \
 		--libdir=$(LIBEXEC_LIB) \
 		--includedir=$(LIBEXEC_INC) \
-		--source-path=$$source \
 		--extra-cflags="-DXC_WANT_COMPAT_EVTCHN_API=1 \
 		-DXC_WANT_COMPAT_GNTTAB_API=1 \
 		-DXC_WANT_COMPAT_MAP_FOREIGN_API=1 \
