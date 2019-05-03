@@ -1078,7 +1078,7 @@ debug hypervisor only).
 > Default: `new` unless directed-EOI is supported
 
 ### iommu
-> `= List of [ <boolean> | force | required | intremap | intpost | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | igfx | verbose | debug ]`
+> `= List of [ <boolean> | force | required | intremap | intpost | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | igfx | crash-disable | verbose | debug ]`
 
 > Sub-options:
 
@@ -1167,6 +1167,16 @@ debug hypervisor only).
 >> is `no-igfx`, which is similar to Linux `intel_iommu=igfx_off` option used
 >> to workaround graphics issues. If adding `no-igfx` fixes anything, you
 >> should file a bug reporting the problem.
+
+> `crash-disable`
+
+> Default: `false`
+
+>> This option controls disabling IOMMU functionality (DMAR/IR/QI) before
+>> switching to a crash kernel. This option is inactive by default and
+>> is for compatibility with older kdump kernels only. Modern kernels copy
+>> all the necessary tables from the previous one following kexec which makes
+>>  the transition transparent for them with IOMMU functions still on.
 
 > `verbose`
 
