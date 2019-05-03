@@ -802,14 +802,15 @@ int enable_intremap(struct iommu *iommu, int eim)
         ir_ctrl->iremap_num = 0;
     }
 
-    /* set extended interrupt mode bit */
-    ir_ctrl->iremap_maddr |= eim ? IRTA_EIME : 0;
-
     spin_lock_irqsave(&iommu->register_lock, flags);
 
-    /* set size of the interrupt remapping table */
-    ir_ctrl->iremap_maddr |= IRTA_REG_TABLE_SIZE;
-    dmar_writeq(iommu->reg, DMAR_IRTA_REG, ir_ctrl->iremap_maddr);
+    /*
+     * Set size of the interrupt remapping table and optionally Extended
+     * Interrupt Mode.
+     */
+    dmar_writeq(iommu->reg, DMAR_IRTA_REG,
+                ir_ctrl->iremap_maddr | IRTA_REG_TABLE_SIZE |
+                (eim ? IRTA_EIME : 0));
 
     /* set SIRTP */
     gcmd = dmar_readl(iommu->reg, DMAR_GSTS_REG);
