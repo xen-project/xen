@@ -270,8 +270,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (_7d0 & cpufeat_mask(X86_FEATURE_L1D_FLUSH)) ? " L1D_FLUSH" : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_SSBD))  ? " SSBD"      : "",
            (e8b  & cpufeat_mask(X86_FEATURE_IBPB))  ? " IBPB"      : "",
-           (caps & ARCH_CAPABILITIES_IBRS_ALL)      ? " IBRS_ALL"  : "",
-           (caps & ARCH_CAPABILITIES_RDCL_NO)       ? " RDCL_NO"   : "",
+           (caps & ARCH_CAPS_IBRS_ALL)              ? " IBRS_ALL"  : "",
+           (caps & ARCH_CAPS_RDCL_NO)               ? " RDCL_NO"   : "",
            (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "",
            (caps & ARCH_CAPS_SKIP_L1DFL)            ? " SKIP_L1DFL": "",
            (caps & ARCH_CAPS_SSB_NO)                ? " SSB_NO"    : "");
@@ -582,7 +582,7 @@ static __init void l1tf_calculations(uint64_t caps)
     }
 
     /* Any processor advertising RDCL_NO should be not vulnerable to L1TF. */
-    if ( caps & ARCH_CAPABILITIES_RDCL_NO )
+    if ( caps & ARCH_CAPS_RDCL_NO )
         cpu_has_bug_l1tf = false;
 
     if ( cpu_has_bug_l1tf && hit_default )
@@ -646,9 +646,9 @@ int8_t __read_mostly opt_xpti_domu = -1;
 static __init void xpti_init_default(uint64_t caps)
 {
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
-        caps = ARCH_CAPABILITIES_RDCL_NO;
+        caps = ARCH_CAPS_RDCL_NO;
 
-    if ( caps & ARCH_CAPABILITIES_RDCL_NO )
+    if ( caps & ARCH_CAPS_RDCL_NO )
     {
         if ( opt_xpti_hwdom < 0 )
             opt_xpti_hwdom = 0;
