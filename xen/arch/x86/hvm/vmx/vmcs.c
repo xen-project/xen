@@ -90,9 +90,9 @@ static int __init parse_ept_param(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !strncmp(s, "pml", ss - s) )
+        if ( !cmdline_strcmp(s, "pml") )
             opt_pml_enabled = val;
-        else if ( !strncmp(s, "ad", ss - s) )
+        else if ( !cmdline_strcmp(s, "ad") )
             opt_ept_ad = val;
         else
             rc = -EINVAL;
