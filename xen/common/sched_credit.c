@@ -1538,7 +1538,7 @@ csched_acct(void* dummy)
                 svc->pri = CSCHED_PRI_TS_UNDER;
 
                 /* Unpark any capped domains whose credits go positive */
-                if ( test_and_clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
+                if ( test_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
                 {
                     /*
                      * It's important to unset the flag AFTER the unpause()
@@ -1547,6 +1547,7 @@ csched_acct(void* dummy)
                      */
                     SCHED_STAT_CRANK(vcpu_unpark);
                     vcpu_unpause(svc->vcpu);
+                    clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags);
                 }
 
                 /* Upper bound on credits means VCPU stops earning */
