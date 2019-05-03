@@ -34,6 +34,7 @@ bool_t __read_mostly iommu_igfx = 1;
 bool_t __read_mostly iommu_snoop = 1;
 bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
+bool_t __read_mostly iommu_crash_disable;
 
 static bool __hwdom_initdata iommu_hwdom_none;
 bool __hwdom_initdata iommu_hwdom_strict;
@@ -85,6 +86,10 @@ static int __init parse_iommu_param(const char *s)
             iommu_intremap = val;
         else if ( (val = parse_boolean("intpost", s, ss)) >= 0 )
             iommu_intpost = val;
+#ifdef CONFIG_KEXEC
+        else if ( (val = parse_boolean("crash-disable", s, ss)) >= 0 )
+            iommu_crash_disable = val;
+#endif
         else if ( (val = parse_boolean("debug", s, ss)) >= 0 )
         {
             iommu_debug = val;
@@ -576,6 +581,9 @@ void iommu_share_p2m_table(struct domain* d)
 
 void iommu_crash_shutdown(void)
 {
+    if ( !iommu_crash_disable )
+        return;
+
     if ( iommu_enabled )
         iommu_get_ops()->crash_shutdown();
     iommu_enabled = iommu_intremap = iommu_intpost = 0;
