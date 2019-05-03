@@ -44,7 +44,7 @@ struct e820map __initdata e820_raw;
  */
 int __init e820_all_mapped(u64 start, u64 end, unsigned type)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < e820.nr_map; i++) {
 		struct e820entry *ei = &e820.map[i];
@@ -73,9 +73,7 @@ int __init e820_all_mapped(u64 start, u64 end, unsigned type)
 static void __init add_memory_region(unsigned long long start,
                                      unsigned long long size, int type)
 {
-    int x;
-
-    x = e820.nr_map;
+    unsigned int x = e820.nr_map;
 
     if (x == ARRAY_SIZE(e820.map)) {
         printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
@@ -140,11 +138,9 @@ int __init sanitize_e820_map(struct e820entry *biosmap, unsigned int *pnr_map)
     struct change_member *change_tmp;
     unsigned long current_type, last_type;
     unsigned long long last_addr;
-    int chgidx, still_changing;
-    int overlap_entries;
-    int new_bios_entry;
-    int old_nr, new_nr, chg_nr;
-    int i;
+    bool still_changing;
+    unsigned int i, chgidx, overlap_entries, new_bios_entry;
+    unsigned int old_nr, new_nr, chg_nr;
 
     /*
       Visually we're performing the following (1,2,3,4 = memory types)...
@@ -211,9 +207,9 @@ int __init sanitize_e820_map(struct e820entry *biosmap, unsigned int *pnr_map)
     chg_nr = chgidx;    	/* true number of change-points */
 
     /* sort change-point list by memory addresses (low -> high) */
-    still_changing = 1;
+    still_changing = true;
     while (still_changing)	{
-        still_changing = 0;
+        still_changing = false;
         for (i=1; i < chg_nr; i++)  {
             /* if <current_addr> > <last_addr>, swap */
             /* or, if current=<start_addr> & last=<end_addr>, swap */
@@ -226,7 +222,7 @@ int __init sanitize_e820_map(struct e820entry *biosmap, unsigned int *pnr_map)
                 change_tmp = change_point[i];
                 change_point[i] = change_point[i-1];
                 change_point[i-1] = change_tmp;
-                still_changing=1;
+                still_changing = true;
             }
         }
     }
@@ -304,9 +300,9 @@ int __init sanitize_e820_map(struct e820entry *biosmap, unsigned int *pnr_map)
  * thinkpad 560x, for example, does not cooperate with the memory
  * detection code.)
  */
-static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
+static int __init copy_e820_map(struct e820entry * biosmap, unsigned int nr_map)
 {
-    /* Only one memory region (or negative)? Ignore it */
+    /* Only one memory region? Ignore it */
     if (nr_map < 2)
         return -1;
 
@@ -345,7 +341,7 @@ static int __init copy_e820_map(struct e820entry * biosmap, int nr_map)
  */
 static unsigned long __init find_max_pfn(void)
 {
-    int i;
+    unsigned int i;
     unsigned long max_pfn = 0;
 
     for (i = 0; i < e820.nr_map; i++) {
@@ -366,7 +362,7 @@ static unsigned long __init find_max_pfn(void)
 
 static void __init clip_to_limit(uint64_t limit, char *warnmsg)
 {
-    int i;
+    unsigned int i;
     char _warnmsg[160];
     uint64_t old_limit = 0;
 
@@ -514,7 +510,7 @@ static void __init machine_specific_memory_setup(struct e820map *raw)
 {
     unsigned long mpt_limit, ro_mpt_limit;
     uint64_t top_of_ram, size;
-    int i;
+    unsigned int i;
 
     sanitize_e820_map(raw->map, &raw->nr_map);
     copy_e820_map(raw->map, raw->nr_map);
@@ -604,7 +600,7 @@ int __init e820_change_range_type(
     uint32_t orig_type, uint32_t new_type)
 {
     uint64_t rs = 0, re = 0;
-    int i;
+    unsigned int i;
 
     for ( i = 0; i < e820->nr_map; i++ )
     {
