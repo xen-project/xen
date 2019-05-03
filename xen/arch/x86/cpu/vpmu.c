@@ -91,6 +91,10 @@ static int __init parse_vpmu_params(const char *s)
 
             s = ss + 1;
         } while ( *ss );
+
+        if ( !vpmu_features ) /* rtm-abort doesn't imply vpmu=1 */
+            break;
+
         /* fall through */
     case 1:
         /* Default VPMU mode */
