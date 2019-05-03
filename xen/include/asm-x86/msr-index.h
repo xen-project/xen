@@ -44,8 +44,8 @@
 #define PRED_CMD_IBPB			(_AC(1, ULL) << 0)
 
 #define MSR_ARCH_CAPABILITIES		0x0000010a
-#define ARCH_CAPABILITIES_RDCL_NO	(_AC(1, ULL) << 0)
-#define ARCH_CAPABILITIES_IBRS_ALL	(_AC(1, ULL) << 1)
+#define ARCH_CAPS_RDCL_NO		(_AC(1, ULL) << 0)
+#define ARCH_CAPS_IBRS_ALL		(_AC(1, ULL) << 1)
 #define ARCH_CAPS_RSBA			(_AC(1, ULL) << 2)
 #define ARCH_CAPS_SKIP_L1DFL		(_AC(1, ULL) << 3)
 #define ARCH_CAPS_SSB_NO		(_AC(1, ULL) << 4)
