@@ -316,8 +316,11 @@ static bool __init retpoline_safe(uint64_t caps)
     /*
      * RSBA may be set by a hypervisor to indicate that we may move to a
      * processor which isn't retpoline-safe.
+     *
+     * Processors offering Enhanced IBRS are not guarenteed to be
+     * repoline-safe.
      */
-    if ( caps & ARCH_CAPS_RSBA )
+    if ( caps & (ARCH_CAPS_RSBA | ARCH_CAPS_IBRS_ALL) )
         return false;
 
     switch ( boot_cpu_data.x86_model )
@@ -376,6 +379,23 @@ static bool __init retpoline_safe(uint64_t caps)
     case 0x8e:
     case 0x9e:
         return false;
+
+        /*
+         * Atom processors before Goldmont Plus/Gemini Lake are retpoline-safe.
+         */
+    case 0x1c: /* Pineview */
+    case 0x26: /* Lincroft */
+    case 0x27: /* Penwell */
+    case 0x35: /* Cloverview */
+    case 0x36: /* Cedarview */
+    case 0x37: /* Baytrail / Valleyview (Silvermont) */
+    case 0x4d: /* Avaton / Rangely (Silvermont) */
+    case 0x4c: /* Cherrytrail / Brasswell */
+    case 0x4a: /* Merrifield */
+    case 0x5a: /* Moorefield */
+    case 0x5c: /* Goldmont */
+    case 0x5f: /* Denverton */
+        return true;
 
     default:
         printk("Unrecognised CPU model %#x - assuming not reptpoline safe\n",
