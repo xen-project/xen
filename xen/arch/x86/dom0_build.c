@@ -238,10 +238,10 @@ static int __init parse_dom0_param(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( !strncmp(s, "pvh", ss - s) )
+        if ( !cmdline_strcmp(s, "pvh") )
             dom0_pvh = true;
 #ifdef CONFIG_SHADOW_PAGING
-        else if ( !strncmp(s, "shadow", ss - s) )
+        else if ( !cmdline_strcmp(s, "shadow") )
             opt_dom0_shadow = true;
 #endif
         else
