@@ -51,6 +51,9 @@
 #define MSR_FLUSH_CMD			0x0000010b
 #define FLUSH_CMD_L1D			(_AC(1, ULL) << 0)
 
+#define MSR_TSX_FORCE_ABORT             0x0000010f
+#define TSX_FORCE_ABORT_RTM             (_AC(1, ULL) <<  0)
+
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
 #define MSR_IA32_A_PERFCTR0		0x000004c1
