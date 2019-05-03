@@ -53,6 +53,7 @@ CHECK_pmu_params;
 static unsigned int __read_mostly opt_vpmu_enabled;
 unsigned int __read_mostly vpmu_mode = XENPMU_MODE_OFF;
 unsigned int __read_mostly vpmu_features = 0;
+bool __read_mostly opt_rtm_abort;
 static int parse_vpmu_params(const char *s);
 custom_param("vpmu", parse_vpmu_params);
 
@@ -71,6 +72,8 @@ static int __init parse_vpmu_params(const char *s)
         break;
     default:
         do {
+            int val;
+
             ss = strchr(s, ',');
             if ( !ss )
                 ss = strchr(s, '\0');
@@ -81,11 +84,17 @@ static int __init parse_vpmu_params(const char *s)
                 vpmu_features |= XENPMU_FEATURE_IPC_ONLY;
             else if ( !cmdline_strcmp(s, "arch") )
                 vpmu_features |= XENPMU_FEATURE_ARCH_ONLY;
+            else if ( (val = parse_boolean("rtm-abort", s, ss)) >= 0 )
+                opt_rtm_abort = val;
             else
                 return -EINVAL;
 
             s = ss + 1;
         } while ( *ss );
+
+        if ( !vpmu_features ) /* rtm-abort doesn't imply vpmu=1 */
+            break;
+
         /* fall through */
     case 1:
         /* Default VPMU mode */

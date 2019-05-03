@@ -1990,7 +1990,7 @@ Use Virtual Processor ID support if available.  This prevents the need for TLB
 flushes on VM entry and exit, increasing performance.
 
 ### vpmu
-> `= ( <boolean> | { bts | ipc | arch [, ...] } )`
+> `= ( <boolean> | { bts | ipc | arch | rtm-abort=<bool> [, ...] } )`
 
 > Default: `off`
 
@@ -2015,6 +2015,21 @@ pre-defined architectural events only. These are exposed by cpuid, and listed
 in the Pre-Defined Architectural Performance Events table from the Intel 64
 and IA-32 Architectures Software Developer's Manual, Volume 3B, System
 Programming Guide, Part 2.
+
+vpmu=rtm-abort controls a trade-off between working Restricted Transactional
+Memory, and working performance counters.
+
+All processors released to date (Q1 2019) supporting Transactional Memory
+Extensions suffer an erratum which has been addressed in microcode.
+
+Processors based on the Skylake microarchitecture with up-to-date
+microcode internally use performance counter 3 to work around the erratum.
+A consequence is that the counter gets reprogrammed whenever an `XBEGIN`
+instruction is executed.
+
+An alternative mode exists where PCR3 behaves as before, at the cost of
+`XBEGIN` unconditionally aborting.  Enabling `rtm-abort` mode will
+activate this alternative mode.
 
 If a boolean is not used, combinations of flags are allowed, comma separated.
 For example, vpmu=arch,bts.
