@@ -395,26 +395,25 @@ static int libxl__device_usbctrl_del_hvm(libxl__gc *gc,
 }
 
 /* Send qmp commands to create a usb device in qemu. */
-static int libxl__device_usbdev_add_hvm(libxl__gc *gc, uint32_t domid,
+static int libxl__device_usbdev_add_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
                                         libxl_device_usbdev *usbdev)
 {
-    flexarray_t *qmp_args;
+    libxl__json_object *qmp_args = NULL;
 
-    qmp_args = flexarray_make(gc, 12, 1);
-    flexarray_append_pair(qmp_args, "id",
-                          GCSPRINTF("xenusb-%d-%d",
-                                    usbdev->u.hostdev.hostbus,
-                                    usbdev->u.hostdev.hostaddr));
-    flexarray_append_pair(qmp_args, "driver", "usb-host");
-    flexarray_append_pair(qmp_args, "bus",
-                          GCSPRINTF("xenusb-%d.0", usbdev->ctrl));
-    flexarray_append_pair(qmp_args, "port", GCSPRINTF("%d", usbdev->port));
-    flexarray_append_pair(qmp_args, "hostbus",
-                          GCSPRINTF("%d", usbdev->u.hostdev.hostbus));
-    flexarray_append_pair(qmp_args, "hostaddr",
-                          GCSPRINTF("%d", usbdev->u.hostdev.hostaddr));
+    libxl__qmp_param_add_string(gc, &qmp_args, "id",
+        GCSPRINTF("xenusb-%d-%d", usbdev->u.hostdev.hostbus,
+                  usbdev->u.hostdev.hostaddr));
+    libxl__qmp_param_add_string(gc, &qmp_args, "driver", "usb-host");
+    libxl__qmp_param_add_string(gc, &qmp_args, "bus",
+        GCSPRINTF("xenusb-%d.0", usbdev->ctrl));
+    libxl__qmp_param_add_string(gc, &qmp_args, "port",
+        GCSPRINTF("%d", usbdev->port));
+    libxl__qmp_param_add_string(gc, &qmp_args, "hostbus",
+        GCSPRINTF("%d", usbdev->u.hostdev.hostbus));
+    libxl__qmp_param_add_string(gc, &qmp_args, "hostaddr",
+        GCSPRINTF("%d", usbdev->u.hostdev.hostaddr));
 
-    return libxl__qmp_run_command_flexarray(gc, domid, "device_add", qmp_args);
+    return libxl__ev_qmp_send(gc, qmp, "device_add", qmp_args);
 }
 
 /* Send qmp commands to delete a usb device in qemu. */
@@ -1639,6 +1638,13 @@ out:
     return rc;
 }
 
+static void device_usbdev_add_qmp_cb(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *r, int rc);
+static void device_usbdev_add_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
+static void device_usbdev_add_done(libxl__egc *egc,
+    libxl__ao_device *aodev, int rc);
+
 /* AO operation to add a usb device.
  *
  * Generally, it does:
@@ -1665,8 +1671,13 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
     int num_assigned;
     libxl_device_usbctrl usbctrl;
     char *busid;
+    bool has_callback = false;
 
     libxl_device_usbctrl_init(&usbctrl);
+
+    /* Store *usbdev to be used by callbacks */
+    aodev->device_config = usbdev;
+    aodev->device_type = &libxl__usbdev_devtype;
 
     /* Currently only support adding USB device from Dom0 backend.
      * So, if USB controller is specified, check its backend domain,
@@ -1751,12 +1762,22 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
                                                aodev->update_json);
         if (rc) goto out;
 
-        rc = libxl__device_usbdev_add_hvm(gc, domid, usbdev);
+        rc = libxl__ev_time_register_rel(ao, &aodev->timeout,
+                                         device_usbdev_add_timeout,
+                                         LIBXL_QMP_CMD_TIMEOUT * 1000);
+        if (rc) goto out;
+
+        aodev->qmp.ao = ao;
+        aodev->qmp.domid = domid;
+        aodev->qmp.callback = device_usbdev_add_qmp_cb;
+        aodev->qmp.payload_fd = -1;
+        rc = libxl__device_usbdev_add_hvm(gc, &aodev->qmp, usbdev);
         if (rc) {
             libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
                                              LIBXL_USBCTRL_TYPE_DEVICEMODEL);
             goto out;
         }
+        has_callback = true;
         break;
     default:
         LOGD(ERROR, domid, "Unsupported usb controller type");
@@ -1768,6 +1789,48 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
+    /* Only call _done if no callback have been setup */
+    if (!has_callback)
+        device_usbdev_add_done(egc, aodev, rc); /* must be last */
+}
+
+static void device_usbdev_add_timeout(libxl__egc *egc,
+                                      libxl__ev_time *ev,
+                                      const struct timeval *requested_abs,
+                                      int rc)
+{
+    EGC_GC;
+    libxl__ao_device *aodev = CONTAINER_OF(ev, *aodev, timeout);
+
+    if (rc == ERROR_TIMEDOUT)
+        LOGD(ERROR, aodev->qmp.domid,
+             "Adding usbdev to QEMU timed out");
+    device_usbdev_add_qmp_cb(egc, &aodev->qmp, NULL, rc);
+}
+
+static void device_usbdev_add_qmp_cb(libxl__egc *egc,
+                                     libxl__ev_qmp *qmp,
+                                     const libxl__json_object *r,
+                                     int rc)
+{
+    EGC_GC;
+    libxl__ao_device *aodev = CONTAINER_OF(qmp, *aodev, qmp);
+    libxl_device_usbdev *const usbdev = aodev->device_config;
+
+    if (rc)
+        libxl__device_usbdev_remove_xenstore(gc, qmp->domid,
+            usbdev, LIBXL_USBCTRL_TYPE_DEVICEMODEL);
+    device_usbdev_add_done(egc, aodev, rc); /* must be last */
+}
+
+static void device_usbdev_add_done(libxl__egc *egc,
+                                   libxl__ao_device *aodev,
+                                   int rc)
+{
+    EGC_GC;
+
+    libxl__ev_time_deregister(gc, &aodev->timeout);
+    libxl__ev_qmp_dispose(gc, &aodev->qmp);
     aodev->rc = rc;
     aodev->callback(egc, aodev);
 }
