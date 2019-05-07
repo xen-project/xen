@@ -1653,17 +1653,38 @@ out:
 LIBXL_DEFINE_DEVICE_ADD(usbdev)
 static LIBXL_DEFINE_DEVICES_ADD(usbdev)
 
-static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
-                            libxl_device_usbdev *usbdev)
+/* Operation to remove usb device.
+ *
+ * Generally, it does:
+ * 1) check if the usb device is assigned to the domain
+ * 2) remove the usb device from xenstore controller/port.
+ * 3) unbind usb device from usbback and rebind to its original driver.
+ *    If usb device has many interfaces, do it to each interface.
+ */
+static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
+                                       libxl_device_usbdev *usbdev)
 {
     int rc;
     char *busid;
     libxl_device_usbctrl usbctrl;
 
+    if (usbdev->ctrl < 0 || usbdev->port < 1) {
+        LOGD(ERROR, domid, "Invalid USB device");
+        return ERROR_FAIL;
+    }
+
     libxl_device_usbctrl_init(&usbctrl);
     rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
     if (rc) goto out;
 
+    if (usbctrl.backend_domid != LIBXL_TOOLSTACK_DOMID) {
+        LOGD(ERROR, domid,
+             "Don't support removing USB device from non-Dom0 backend");
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    /* do actual removing usb device operation */
     switch (usbctrl.type) {
     case LIBXL_USBCTRL_TYPE_PV:
         busid = usbdev_busid_from_ctrlport(gc, domid, usbdev, usbctrl.type);
@@ -1735,44 +1756,6 @@ static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
     }
 
     rc = 0;
-
-out:
-    libxl_device_usbctrl_dispose(&usbctrl);
-    return rc;
-}
-
-/* Operation to remove usb device.
- *
- * Generally, it does:
- * 1) check if the usb device is assigned to the domain
- * 2) remove the usb device from xenstore controller/port.
- * 3) unbind usb device from usbback and rebind to its original driver.
- *    If usb device has many interfaces, do it to each interface.
- */
-static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
-                                       libxl_device_usbdev *usbdev)
-{
-    libxl_device_usbctrl usbctrl;
-    int rc;
-
-    if (usbdev->ctrl < 0 || usbdev->port < 1) {
-        LOGD(ERROR, domid, "Invalid USB device");
-        return ERROR_FAIL;
-    }
-
-    libxl_device_usbctrl_init(&usbctrl);
-    rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
-    if (rc) goto out;
-
-    if (usbctrl.backend_domid != LIBXL_TOOLSTACK_DOMID) {
-        LOGD(ERROR, domid,
-             "Don't support removing USB device from non-Dom0 backend");
-        rc = ERROR_INVAL;
-        goto out;
-    }
-
-    /* do actual removing usb device operation */
-    rc = do_usbdev_remove(gc, domid, usbdev);
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
