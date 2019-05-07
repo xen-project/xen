@@ -2628,6 +2628,12 @@ struct libxl__ao_device {
     /* for asynchronous execution of synchronous-only syscalls etc. */
     libxl__ev_child child;
     libxl__ev_qmp qmp;
+    /* 'device_config' can be used to to pass to callbacks a pointer of one
+     * of the type 'libxl_device_$type' corresponding to the device been
+     * hotplug. 'device_type' should have the corresponding
+     * 'libxl__$type_devtype'. */
+    void *device_config;
+    const libxl__device_type *device_type;
 };
 
 /*
