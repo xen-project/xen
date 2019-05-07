@@ -506,7 +506,7 @@ static inline struct page_info *get_page_from_gfn(
 }
 
 /* General conversion function from mfn to gfn */
-static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
+static inline unsigned long mfn_to_gfn(const struct domain *d, mfn_t mfn)
 {
     if ( paging_mode_translate(d) )
         return get_gpfn_from_mfn(mfn_x(mfn));
