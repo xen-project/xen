@@ -898,7 +898,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     int i;
 #endif
 
-    frametable_base_pdx = pfn_to_pdx(ps >> PAGE_SHIFT);
+    frametable_base_pdx = mfn_to_pdx(maddr_to_mfn(ps));
     /* Round up to 2M or 32M boundary, as appropriate. */
     frametable_size = ROUNDUP(frametable_size, mapping_size);
     base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 32<<(20-12));

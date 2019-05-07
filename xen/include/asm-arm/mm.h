@@ -225,7 +225,7 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 /* Convert between frame number and address formats.  */
 #define pfn_to_paddr(pfn) ((paddr_t)(pfn) << PAGE_SHIFT)
 #define paddr_to_pfn(pa)  ((unsigned long)((pa) >> PAGE_SHIFT))
-#define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
+#define paddr_to_pdx(pa)    mfn_to_pdx(maddr_to_mfn(pa))
 #define gfn_to_gaddr(gfn)   pfn_to_paddr(gfn_x(gfn))
 #define gaddr_to_gfn(ga)    _gfn(paddr_to_pfn(ga))
 #define mfn_to_maddr(mfn)   pfn_to_paddr(mfn_x(mfn))
@@ -253,7 +253,7 @@ static inline void *maddr_to_virt(paddr_t ma)
 #else
 static inline void *maddr_to_virt(paddr_t ma)
 {
-    ASSERT(pfn_to_pdx(ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
+    ASSERT(mfn_to_pdx(maddr_to_mfn(ma)) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
     return (void *)(XENHEAP_VIRT_START -
                     mfn_to_maddr(xenheap_mfn_start) +
                     ((ma & ma_va_bottom_mask) |
@@ -301,7 +301,7 @@ static inline struct page_info *virt_to_page(const void *v)
     ASSERT(va < xenheap_virt_end);
 
     pdx = (va - XENHEAP_VIRT_START) >> PAGE_SHIFT;
-    pdx += pfn_to_pdx(mfn_x(xenheap_mfn_start));
+    pdx += mfn_to_pdx(xenheap_mfn_start);
     return frame_table + pdx - frametable_base_pdx;
 }
 
