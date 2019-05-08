@@ -554,15 +554,22 @@ static int libxl__device_usbdev_list_for_usbctrl(libxl__gc *gc, uint32_t domid,
                                                  libxl_device_usbdev **usbdevs,
                                                  int *num);
 
-static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
-                                       libxl_device_usbdev *usbdev);
+static void libxl__device_usbdev_remove(libxl__egc *egc,
+    uint32_t domid, libxl_device_usbdev *usbdev, libxl__ao_device *aodev);
 
+static void device_usbctrl_usbdevs_removed(libxl__egc *,
+    libxl__multidev *, int rc);
 static void device_usbctrl_remove_timeout(libxl__egc *egc,
     libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
 static void device_usbctrl_remove_qmp_cb(libxl__egc *egc,
     libxl__ev_qmp *qmp, const libxl__json_object *resp, int rc);
 static void device_usbctrl_remove_done(libxl__egc *egc,
     libxl__ao_device *, int rc);
+
+typedef struct {
+    libxl__multidev multidev;
+    libxl__ao_device *aodev;
+} usbctrl_remove_state;
 
 /* AO function to remove a usb controller.
  *
@@ -584,6 +591,12 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
     uint32_t domid = aodev->dev->domid;
     int usbctrl_devid = aodev->dev->devid;
     libxl_device_usbctrl *usbctrl;
+    usbctrl_remove_state *ucrs;
+
+    GCNEW(ucrs);
+    ucrs->aodev = aodev;
+    ucrs->multidev.callback = device_usbctrl_usbdevs_removed;
+    libxl__multidev_begin(ao, &ucrs->multidev);
 
     GCNEW(usbctrl);
     libxl_device_usbctrl_init(usbctrl);
@@ -601,14 +614,29 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
     if (rc) goto out;
 
     for (i = 0; i < num_usbdev; i++) {
-        rc = libxl__device_usbdev_remove(gc, domid, &usbdevs[i]);
-        if (rc) {
-            LOGD(ERROR, domid, "libxl__device_usbdev_remove failed: controller %d, "
-                "port %d", usbdevs[i].ctrl, usbdevs[i].port);
-            goto out;
-        }
+        libxl__ao_device *usbdev_aodev =
+            libxl__multidev_prepare(&ucrs->multidev);
+        usbdev_aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
+        libxl__device_usbdev_remove(egc, domid, &usbdevs[i], usbdev_aodev);
     }
 
+out:
+    libxl__multidev_prepared(egc, &ucrs->multidev, rc); /* must be last */
+}
+
+static void device_usbctrl_usbdevs_removed(libxl__egc *egc,
+                                           libxl__multidev *multidev,
+                                           int rc)
+{
+    usbctrl_remove_state *ucrs =
+        CONTAINER_OF(multidev, *ucrs, multidev);
+    libxl__ao_device *aodev = ucrs->aodev;
+    STATE_AO_GC(aodev->ao);
+    libxl_device_usbctrl *const usbctrl = aodev->device_config;
+
+    if (rc) goto out;
+
+    /* Remove usbctrl */
     if (usbctrl->type == LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
         libxl__ev_qmp *const qmp = &aodev->qmp;
 
@@ -618,10 +646,10 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
         if (rc) goto out;
 
         qmp->ao = ao;
-        qmp->domid = domid;
+        qmp->domid = aodev->dev->domid;
         qmp->callback = device_usbctrl_remove_qmp_cb;
         qmp->payload_fd = -1;
-        rc = libxl__device_usbctrl_del_hvm(gc, qmp, usbctrl_devid);
+        rc = libxl__device_usbctrl_del_hvm(gc, qmp, aodev->dev->devid);
         if (rc) goto out;
         return;
     }
@@ -1845,20 +1873,31 @@ static LIBXL_DEFINE_DEVICES_ADD(usbdev)
  * 2) remove the usb device from xenstore controller/port.
  * 3) unbind usb device from usbback and rebind to its original driver.
  *    If usb device has many interfaces, do it to each interface.
+ *
+ * Before calling this function, aodev should be properly filled:
+ * aodev->ao, aodev->callback, ...
  */
-static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
-                                       libxl_device_usbdev *usbdev)
+static void libxl__device_usbdev_remove(libxl__egc *egc, uint32_t domid,
+                                        libxl_device_usbdev *usbdev,
+                                        libxl__ao_device *aodev)
 {
+    STATE_AO_GC(aodev->ao);
     int rc;
     char *busid;
     libxl_device_usbctrl usbctrl;
 
-    if (usbdev->ctrl < 0 || usbdev->port < 1) {
-        LOGD(ERROR, domid, "Invalid USB device");
-        return ERROR_FAIL;
-    }
+    /* Store *usbdev to be used by callbacks */
+    aodev->device_config = usbdev;
+    aodev->device_type = &libxl__usbdev_devtype;
 
     libxl_device_usbctrl_init(&usbctrl);
+
+    if (usbdev->ctrl < 0 || usbdev->port < 1) {
+        LOGD(ERROR, domid, "Invalid USB device");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
     if (rc) goto out;
 
@@ -1944,7 +1983,8 @@ static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
-    return rc;
+    aodev->rc = rc;
+    aodev->callback(egc, aodev);
 }
 
 int libxl_device_usbdev_remove(libxl_ctx *ctx, uint32_t domid,
@@ -1953,11 +1993,14 @@ int libxl_device_usbdev_remove(libxl_ctx *ctx, uint32_t domid,
 
 {
     AO_CREATE(ctx, domid, ao_how);
-    int rc;
+    libxl__ao_device *aodev;
 
-    rc = libxl__device_usbdev_remove(gc, domid, usbdev);
+    GCNEW(aodev);
+    libxl__prepare_ao_device(ao, aodev);
+    aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
+    aodev->callback = device_addrm_aocomplete;
+    libxl__device_usbdev_remove(egc, domid, usbdev, aodev);
 
-    libxl__ao_complete(egc, ao, rc);
     return AO_INPROGRESS;
 }
 
