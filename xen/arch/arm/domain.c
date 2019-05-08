@@ -305,6 +305,8 @@ static void update_runstate_area(struct vcpu *v)
 
 static void schedule_tail(struct vcpu *prev)
 {
+    ASSERT(prev != current);
+
     ctxt_switch_from(prev);
 
     ctxt_switch_to(current);
@@ -313,8 +315,7 @@ static void schedule_tail(struct vcpu *prev)
 
     context_saved(prev);
 
-    if ( prev != current )
-        update_runstate_area(current);
+    update_runstate_area(current);
 
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(current);
