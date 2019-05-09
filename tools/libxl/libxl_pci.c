@@ -47,7 +47,10 @@ static void pcidev_struct_fill(libxl_device_pci *pcidev, unsigned int domain,
     pcidev->vdevfn = vdevfn;
 }
 
-static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, int num, libxl_device_pci *pcidev)
+static void libxl_create_pci_backend_device(libxl__gc *gc,
+                                            flexarray_t *back,
+                                            int num,
+                                            const libxl_device_pci *pcidev)
 {
     flexarray_append(back, GCSPRINTF("key-%d", num));
     flexarray_append(back, GCSPRINTF(PCI_BDF, pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func));
@@ -64,7 +67,7 @@ static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, in
 }
 
 static void libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
-                                      libxl_device_pci *pcidev,
+                                      const libxl_device_pci *pcidev,
                                       libxl__device *device)
 {
     device->backend_devid = 0;
@@ -76,7 +79,8 @@ static void libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
 }
 
 static int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
-                                     libxl_device_pci *pcidev, int num)
+                                     const libxl_device_pci *pcidev,
+                                     int num)
 {
     flexarray_t *front = NULL;
     flexarray_t *back = NULL;
@@ -109,7 +113,10 @@ static int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
                                      NULL);
 }
 
-static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
+static int libxl__device_pci_add_xenstore(libxl__gc *gc,
+                                          uint32_t domid,
+                                          const libxl_device_pci *pcidev,
+                                          int starting)
 {
     flexarray_t *back;
     char *num_devs, *be_path;
@@ -117,12 +124,9 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
     xs_transaction_t t = XBT_NULL;
     int rc;
     libxl_domain_config d_config;
-    libxl_device_pci pcidev_saved;
     libxl__domain_userdata_lock *lock = NULL;
 
     libxl_domain_config_init(&d_config);
-    libxl_device_pci_init(&pcidev_saved);
-    libxl_device_pci_copy(CTX, &pcidev_saved, pcidev);
 
     be_path = libxl__domain_device_backend_path(gc, 0, domid, 0,
                                                 LIBXL__DEVICE_KIND_PCI);
@@ -158,7 +162,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
     if (rc) goto out;
 
     device_add_domain_config(gc, &d_config, &libxl__pcidev_devtype,
-                             &pcidev_saved);
+                             pcidev);
 
     rc = libxl__dm_check_start(gc, &d_config, domid);
     if (rc) goto out;
@@ -180,7 +184,6 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
 out:
     libxl__xs_transaction_abort(gc, &t);
     if (lock) libxl__unlock_domain_userdata(lock);
-    libxl_device_pci_dispose(&pcidev_saved);
     libxl_domain_config_dispose(&d_config);
     return rc;
 }
