@@ -995,15 +995,19 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
     uint32_t flag = XEN_DOMCTL_DEV_RDM_RELAXED;
     uint32_t domainid = domid;
     bool isstubdom = libxl_is_stubdom(ctx, domid, &domainid);
+    int r;
 
-    if (type == LIBXL_DOMAIN_TYPE_INVALID)
-        return ERROR_FAIL;
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
         hvm = 1;
         if (libxl__wait_for_device_model_deprecated(gc, domid, "running",
                                          NULL, NULL, NULL) < 0) {
-            return ERROR_FAIL;
+            rc = ERROR_FAIL;
+            goto out;
         }
         switch (libxl__device_model_version_running(gc, domid)) {
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
@@ -1013,10 +1017,10 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
                 rc = libxl__qmp_pci_add(gc, domid, pcidev);
                 break;
             default:
-                return ERROR_INVAL;
+                rc = ERROR_INVAL;
         }
         if ( rc )
-            return ERROR_FAIL;
+            goto out;
     }
 
     sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
@@ -1027,7 +1031,8 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
 
     if (f == NULL) {
         LOGED(ERROR, domainid, "Couldn't open %s", sysfs_path);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
     for (i = 0; i < PROC_PCI_NUM_RESOURCES; i++) {
         if (fscanf(f, "0x%llx 0x%llx 0x%llx\n", &start, &end, &flags) != 3)
@@ -1035,25 +1040,25 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
         size = end - start + 1;
         if (start) {
             if (flags & PCI_BAR_IO) {
-                rc = xc_domain_ioport_permission(ctx->xch, domid, start, size, 1);
-                if (rc < 0) {
+                r = xc_domain_ioport_permission(ctx->xch, domid, start, size, 1);
+                if (r < 0) {
                     LOGED(ERROR, domainid,
-                          "Error: xc_domain_ioport_permission error 0x%llx/0x%llx",
-                          start,
-                          size);
+                          "xc_domain_ioport_permission 0x%llx/0x%llx (error %d)",
+                          start, size, r);
                     fclose(f);
-                    return ERROR_FAIL;
+                    rc = ERROR_FAIL;
+                    goto out;
                 }
             } else {
-                rc = xc_domain_iomem_permission(ctx->xch, domid, start>>XC_PAGE_SHIFT,
+                r = xc_domain_iomem_permission(ctx->xch, domid, start>>XC_PAGE_SHIFT,
                                                 (size+(XC_PAGE_SIZE-1))>>XC_PAGE_SHIFT, 1);
-                if (rc < 0) {
+                if (r < 0) {
                     LOGED(ERROR, domainid,
-                          "Error: xc_domain_iomem_permission error 0x%llx/0x%llx",
-                          start,
-                          size);
+                          "xc_domain_iomem_permission 0x%llx/0x%llx (error %d)",
+                          start, size, r);
                     fclose(f);
-                    return ERROR_FAIL;
+                    rc = ERROR_FAIL;
+                    goto out;
                 }
             }
         }
@@ -1064,20 +1069,24 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
     f = fopen(sysfs_path, "r");
     if (f == NULL) {
         LOGED(ERROR, domainid, "Couldn't open %s", sysfs_path);
-        goto out;
+        goto out_no_irq;
     }
     if ((fscanf(f, "%u", &irq) == 1) && irq) {
-        rc = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
-        if (rc < 0) {
-            LOGED(ERROR, domainid, "Error: xc_physdev_map_pirq irq=%d", irq);
+        r = xc_physdev_map_pirq(ctx->xch, domid, irq, &irq);
+        if (r < 0) {
+            LOGED(ERROR, domainid, "xc_physdev_map_pirq irq=%d (error=%d)",
+                  irq, r);
             fclose(f);
-            return ERROR_FAIL;
+            rc = ERROR_FAIL;
+            goto out;
         }
-        rc = xc_domain_irq_permission(ctx->xch, domid, irq, 1);
-        if (rc < 0) {
-            LOGED(ERROR, domainid, "Error: xc_domain_irq_permission irq=%d", irq);
+        r = xc_domain_irq_permission(ctx->xch, domid, irq, 1);
+        if (r < 0) {
+            LOGED(ERROR, domainid,
+                  "xc_domain_irq_permission irq=%d (error=%d)", irq, r);
             fclose(f);
-            return ERROR_FAIL;
+            rc = ERROR_FAIL;
+            goto out;
         }
     }
     fclose(f);
@@ -1087,22 +1096,25 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
         if ( sysfs_write_bdf(gc, SYSFS_PCIBACK_DRIVER"/permissive",
                              pcidev) < 0 ) {
             LOGD(ERROR, domainid, "Setting permissive for device");
-            return ERROR_FAIL;
+            rc = ERROR_FAIL;
+            goto out;
         }
     }
 
-out:
+out_no_irq:
     if (!isstubdom) {
         if (pcidev->rdm_policy == LIBXL_RDM_RESERVE_POLICY_STRICT) {
             flag &= ~XEN_DOMCTL_DEV_RDM_RELAXED;
         } else if (pcidev->rdm_policy != LIBXL_RDM_RESERVE_POLICY_RELAXED) {
             LOGED(ERROR, domainid, "unknown rdm check flag.");
-            return ERROR_FAIL;
+            rc = ERROR_FAIL;
+            goto out;
         }
-        rc = xc_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev), flag);
-        if (rc < 0 && (hvm || errno != ENOSYS)) {
+        r = xc_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev), flag);
+        if (r < 0 && (hvm || errno != ENOSYS)) {
             LOGED(ERROR, domainid, "xc_assign_device failed");
-            return ERROR_FAIL;
+            rc = ERROR_FAIL;
+            goto out;
         }
     }
 
@@ -1110,6 +1122,7 @@ out:
         rc = libxl__device_pci_add_xenstore(gc, domid, pcidev, starting);
     else
         rc = 0;
+out:
     return rc;
 }
 
