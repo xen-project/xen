@@ -116,7 +116,7 @@ static int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
 static int libxl__device_pci_add_xenstore(libxl__gc *gc,
                                           uint32_t domid,
                                           const libxl_device_pci *pcidev,
-                                          int starting)
+                                          bool starting)
 {
     flexarray_t *back;
     char *num_devs, *be_path;
@@ -983,7 +983,8 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
-static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
+static int do_pci_add(libxl__gc *gc, uint32_t domid,
+                      libxl_device_pci *pcidev, bool starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_domain_type type = libxl__domain_type(gc, domid);
@@ -1164,7 +1165,7 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
 {
     AO_CREATE(ctx, domid, ao_how);
     int rc;
-    rc = libxl__device_pci_add(gc, domid, pcidev, 0);
+    rc = libxl__device_pci_add(gc, domid, pcidev, false);
     libxl__ao_complete(egc, ao, rc);
     return AO_INPROGRESS;
 }
@@ -1186,7 +1187,8 @@ static int libxl_pcidev_assignable(libxl_ctx *ctx, libxl_device_pci *pcidev)
     return i != num;
 }
 
-int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
+int libxl__device_pci_add(libxl__gc *gc, uint32_t domid,
+                          libxl_device_pci *pcidev, bool starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned int orig_vdev, pfunc_mask;
@@ -1241,7 +1243,7 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
     if (stubdomid != 0) {
         libxl_device_pci pcidev_s = *pcidev;
         /* stubdomain is always running by now, even at create time */
-        rc = do_pci_add(gc, stubdomid, &pcidev_s, 0);
+        rc = do_pci_add(gc, stubdomid, &pcidev_s, false);
         if ( rc )
             goto out;
     }
@@ -1294,7 +1296,7 @@ static void libxl__add_pcidevs(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
     int i, rc = 0;
 
     for (i = 0; i < d_config->num_pcidevs; i++) {
-        rc = libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], 1);
+        rc = libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], true);
         if (rc < 0) {
             LOGD(ERROR, domid, "libxl_device_pci_add failed: %d", rc);
             goto out;

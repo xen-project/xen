@@ -1557,7 +1557,8 @@ _hidden int libxl__pci_topology_init(libxl__gc *gc,
 
 /* from libxl_pci */
 
-_hidden int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting);
+_hidden int libxl__device_pci_add(libxl__gc *gc, uint32_t domid,
+                                  libxl_device_pci *pcidev, bool starting);
 _hidden int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid);
 _hidden bool libxl__is_igd_vga_passthru(libxl__gc *gc,
                                         const libxl_domain_config *d_config);
