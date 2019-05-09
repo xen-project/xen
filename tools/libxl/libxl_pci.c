@@ -75,8 +75,8 @@ static void libxl__device_from_pcidev(libxl__gc *gc, uint32_t domid,
     device->kind = LIBXL__DEVICE_KIND_PCI;
 }
 
-int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
-                              libxl_device_pci *pcidev, int num)
+static int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
+                                     libxl_device_pci *pcidev, int num)
 {
     flexarray_t *front = NULL;
     flexarray_t *back = NULL;
