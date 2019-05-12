@@ -736,54 +736,6 @@ void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid)
     }
 }
 
-static int pci_add_callback(libxl__qmp_handler *qmp,
-                            const libxl__json_object *response, void *opaque)
-{
-    libxl_device_pci *pcidev = opaque;
-    const libxl__json_object *bus = NULL;
-    GC_INIT(qmp->ctx);
-    int i, j, rc = -1;
-    char *asked_id = GCSPRINTF(PCI_PT_QDEV_ID,
-                               pcidev->bus, pcidev->dev, pcidev->func);
-
-    for (i = 0; (bus = libxl__json_array_get(response, i)); i++) {
-        const libxl__json_object *devices = NULL;
-        const libxl__json_object *device = NULL;
-        const libxl__json_object *o = NULL;
-        const char *id = NULL;
-
-        devices = libxl__json_map_get("devices", bus, JSON_ARRAY);
-
-        for (j = 0; (device = libxl__json_array_get(devices, j)); j++) {
-             o = libxl__json_map_get("qdev_id", device, JSON_STRING);
-             id = libxl__json_object_get_string(o);
-
-             if (id && strcmp(asked_id, id) == 0) {
-                 int dev_slot, dev_func;
-
-                 o = libxl__json_map_get("slot", device, JSON_INTEGER);
-                 if (!o)
-                     goto out;
-                 dev_slot = libxl__json_object_get_integer(o);
-                 o = libxl__json_map_get("function", device, JSON_INTEGER);
-                 if (!o)
-                     goto out;
-                 dev_func = libxl__json_object_get_integer(o);
-
-                 pcidev->vdevfn = PCI_DEVFN(dev_slot, dev_func);
-
-                 rc = 0;
-                 goto out;
-             }
-        }
-    }
-
-
-out:
-    GC_FREE;
-    return rc;
-}
-
 static int pci_del_callback(libxl__qmp_handler *qmp,
                             const libxl__json_object *response, void *opaque)
 {
@@ -828,54 +780,6 @@ static int qmp_run_command(libxl__gc *gc, int domid,
         return ERROR_FAIL;
 
     rc = qmp_synchronous_send(qmp, cmd, args, callback, opaque, qmp->timeout);
-
-    libxl__qmp_close(qmp);
-    return rc;
-}
-
-int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
-{
-    libxl__qmp_handler *qmp = NULL;
-    libxl__json_object *args = NULL;
-    char *hostaddr = NULL;
-    int rc = 0;
-
-    qmp = libxl__qmp_initialize(gc, domid);
-    if (!qmp)
-        return -1;
-
-    hostaddr = GCSPRINTF("%04x:%02x:%02x.%01x", pcidev->domain,
-                         pcidev->bus, pcidev->dev, pcidev->func);
-    if (!hostaddr)
-        return -1;
-
-    libxl__qmp_param_add_string(gc, &args, "driver", "xen-pci-passthrough");
-    QMP_PARAMETERS_SPRINTF(&args, "id", PCI_PT_QDEV_ID,
-                           pcidev->bus, pcidev->dev, pcidev->func);
-    libxl__qmp_param_add_string(gc, &args, "hostaddr", hostaddr);
-    if (pcidev->vdevfn) {
-        QMP_PARAMETERS_SPRINTF(&args, "addr", "%x.%x",
-                               PCI_SLOT(pcidev->vdevfn), PCI_FUNC(pcidev->vdevfn));
-    }
-    /*
-     * Version of QEMU prior to the XSA-131 fix did not support this
-     * property and were effectively always in permissive mode. The
-     * fix for XSA-131 switched the default to be restricted by
-     * default and added the permissive property.
-     *
-     * Therefore in order to support both old and new QEMU we only set
-     * the permissive flag if it is true. Users of older QEMU have no
-     * reason to set the flag so this is ok.
-     */
-    if (pcidev->permissive)
-        libxl__qmp_param_add_bool(gc, &args, "permissive", true);
-
-    rc = qmp_synchronous_send(qmp, "device_add", args,
-                              NULL, NULL, qmp->timeout);
-    if (rc == 0) {
-        rc = qmp_synchronous_send(qmp, "query-pci", NULL,
-                                  pci_add_callback, pcidev, qmp->timeout);
-    }
 
     libxl__qmp_close(qmp);
     return rc;

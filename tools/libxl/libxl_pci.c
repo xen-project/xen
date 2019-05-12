@@ -23,6 +23,7 @@
 #define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
 #define PCI_OPTIONS            "msitranslate=%d,power_mgmt=%d"
 #define PCI_BDF_XSPATH         "%04x-%02x-%02x-%01x"
+#define PCI_PT_QDEV_ID         "pci-pt-%02x_%02x.%01x"
 
 static unsigned int pcidev_encode_bdf(libxl_device_pci *pcidev)
 {
@@ -991,9 +992,24 @@ typedef struct pci_add_state {
     void (*callback)(libxl__egc *, struct pci_add_state *, int rc);
 
     /* private to do_pci_add */
+    libxl__xswait_state xswait;
+    libxl__ev_qmp qmp;
+    libxl__ev_time timeout;
     libxl_device_pci *pcidev;
     int pci_domid;
 } pci_add_state;
+
+static void pci_add_qemu_trad_watch_state_cb(libxl__egc *egc,
+    libxl__xswait_state *xswa, int rc, const char *state);
+static void pci_add_qmp_device_add(libxl__egc *, pci_add_state *);
+static void pci_add_qmp_device_add_cb(libxl__egc *,
+    libxl__ev_qmp *, const libxl__json_object *, int rc);
+static void pci_add_qmp_query_pci_cb(libxl__egc *,
+    libxl__ev_qmp *, const libxl__json_object *, int rc);
+static void pci_add_timeout(libxl__egc *egc, libxl__ev_time *ev,
+    const struct timeval *requested_abs, int rc);
+static void pci_add_dm_done(libxl__egc *,
+    pci_add_state *, int rc);
 
 static void do_pci_add(libxl__egc *egc,
                        libxl_domid domid,
@@ -1001,23 +1017,15 @@ static void do_pci_add(libxl__egc *egc,
                        pci_add_state *pas)
 {
     STATE_AO_GC(pas->aodev->ao);
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_domain_type type = libxl__domain_type(gc, domid);
-    char *sysfs_path;
-    FILE *f;
-    unsigned long long start, end, flags, size;
-    int irq, i, rc, hvm = 0;
-    uint32_t flag = XEN_DOMCTL_DEV_RDM_RELAXED;
-    uint32_t domainid = domid;
-    bool isstubdom = libxl_is_stubdom(ctx, domid, &domainid);
-    int r;
-
-    /* Convenience aliases */
-    bool starting = pas->starting;
+    int rc;
 
     /* init pci_add_state */
+    libxl__xswait_init(&pas->xswait);
+    libxl__ev_qmp_init(&pas->qmp);
     pas->pcidev = pcidev;
     pas->pci_domid = domid;
+    libxl__ev_time_init(&pas->timeout);
 
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
         rc = ERROR_FAIL;
@@ -1025,25 +1033,258 @@ static void do_pci_add(libxl__egc *egc,
     }
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        hvm = 1;
         switch (libxl__device_model_version_running(gc, domid)) {
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-                if (libxl__wait_for_device_model_deprecated(gc, domid,
-                        "running", NULL, NULL, NULL) < 0) {
-                    rc = ERROR_FAIL;
-                    goto out;
-                }
-                rc = qemu_pci_add_xenstore(gc, domid, pcidev);
-                break;
+                pas->xswait.ao = ao;
+                pas->xswait.what = "Device Model";
+                pas->xswait.path = DEVICE_MODEL_XS_PATH(gc,
+                    libxl_get_stubdom_id(CTX, domid), domid, "/state");
+                pas->xswait.timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
+                pas->xswait.callback = pci_add_qemu_trad_watch_state_cb;
+                rc = libxl__xswait_start(gc, &pas->xswait);
+                if (rc) goto out;
+                return;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-                rc = libxl__qmp_pci_add(gc, domid, pcidev);
-                break;
+                pci_add_qmp_device_add(egc, pas); /* must be last */
+                return;
             default:
                 rc = ERROR_INVAL;
+                break;
         }
-        if ( rc )
-            goto out;
     }
+
+    rc = 0;
+
+out:
+    pci_add_dm_done(egc, pas, rc); /* must be last */
+}
+
+static void pci_add_qemu_trad_watch_state_cb(libxl__egc *egc,
+                                             libxl__xswait_state *xswa,
+                                             int rc,
+                                             const char *state)
+{
+    pci_add_state *pas = CONTAINER_OF(xswa, *pas, xswait);
+    STATE_AO_GC(pas->aodev->ao);
+
+    /* Convenience aliases */
+    libxl_domid domid = pas->domid;
+    libxl_device_pci *pcidev = pas->pcidev;
+
+    if (rc) {
+        if (rc == ERROR_TIMEDOUT) {
+            LOGD(ERROR, domid, "%s not ready", xswa->what);
+        }
+        goto out;
+    }
+
+    if (!state)
+        return;
+    if (strcmp(state, "running"))
+        return;
+
+    rc = qemu_pci_add_xenstore(gc, domid, pcidev);
+out:
+    libxl__xswait_stop(gc, xswa);
+    pci_add_dm_done(egc, pas, rc); /* must be last */
+}
+
+static void pci_add_qmp_device_add(libxl__egc *egc, pci_add_state *pas)
+{
+    STATE_AO_GC(pas->aodev->ao);
+    libxl__json_object *args = NULL;
+    int rc;
+
+    /* Convenience aliases */
+    libxl_domid domid = pas->domid;
+    libxl_device_pci *pcidev = pas->pcidev;
+    libxl__ev_qmp *const qmp = &pas->qmp;
+
+    rc = libxl__ev_time_register_rel(ao, &pas->timeout,
+                                     pci_add_timeout,
+                                     LIBXL_QMP_CMD_TIMEOUT * 1000);
+    if (rc) goto out;
+
+    libxl__qmp_param_add_string(gc, &args, "driver",
+                                "xen-pci-passthrough");
+    QMP_PARAMETERS_SPRINTF(&args, "id", PCI_PT_QDEV_ID,
+                           pcidev->bus, pcidev->dev, pcidev->func);
+    QMP_PARAMETERS_SPRINTF(&args, "hostaddr",
+                           "%04x:%02x:%02x.%01x", pcidev->domain,
+                           pcidev->bus, pcidev->dev, pcidev->func);
+    if (pcidev->vdevfn) {
+        QMP_PARAMETERS_SPRINTF(&args, "addr", "%x.%x",
+                               PCI_SLOT(pcidev->vdevfn),
+                               PCI_FUNC(pcidev->vdevfn));
+    }
+    /*
+     * Version of QEMU prior to the XSA-131 fix did not support
+     * this property and were effectively always in permissive
+     * mode. The fix for XSA-131 switched the default to be
+     * restricted by default and added the permissive property.
+     *
+     * Therefore in order to support both old and new QEMU we only
+     * set the permissive flag if it is true. Users of older QEMU
+     * have no reason to set the flag so this is ok.
+     */
+    if (pcidev->permissive)
+        libxl__qmp_param_add_bool(gc, &args, "permissive", true);
+
+    qmp->ao = pas->aodev->ao;
+    qmp->domid = domid;
+    qmp->payload_fd = -1;
+    qmp->callback = pci_add_qmp_device_add_cb;
+    rc = libxl__ev_qmp_send(gc, qmp, "device_add", args);
+    if (rc) goto out;
+    return;
+
+out:
+    pci_add_dm_done(egc, pas, rc); /* must be last */
+}
+
+static void pci_add_qmp_device_add_cb(libxl__egc *egc,
+                                      libxl__ev_qmp *qmp,
+                                      const libxl__json_object *response,
+                                      int rc)
+{
+    EGC_GC;
+    pci_add_state *pas = CONTAINER_OF(qmp, *pas, qmp);
+
+    if (rc) goto out;
+
+    qmp->callback = pci_add_qmp_query_pci_cb;
+    rc = libxl__ev_qmp_send(gc, qmp, "query-pci", NULL);
+    if (rc) goto out;
+    return;
+
+out:
+    pci_add_dm_done(egc, pas, rc); /* must be last */
+}
+
+static void pci_add_qmp_query_pci_cb(libxl__egc *egc,
+                                     libxl__ev_qmp *qmp,
+                                     const libxl__json_object *response,
+                                     int rc)
+{
+    EGC_GC;
+    pci_add_state *pas = CONTAINER_OF(qmp, *pas, qmp);
+    const libxl__json_object *bus = NULL;
+    char *asked_id;
+    int i, j;
+    const libxl__json_object *devices = NULL;
+    const libxl__json_object *device = NULL;
+    const libxl__json_object *o = NULL;
+    const char *id = NULL;
+    int dev_slot, dev_func;
+
+    /* Convenience aliases */
+    libxl_device_pci *pcidev = pas->pcidev;
+
+    if (rc) goto out;
+
+    /* `query-pci' returns:
+     * [
+     *   {'bus': 'int',
+     *    'devices': [
+     *       {'bus': 'int', 'slot': 'int', 'function': 'int',
+     *        'class_info': 'PciDeviceClass', 'id': 'PciDeviceId',
+     *        '*irq': 'int', 'qdev_id': 'str',
+     *        '*pci_bridge': 'PciBridgeInfo',
+     *        'regions': ['PciMemoryRegion']
+     *       }
+     *    ]
+     *   }
+     * ]
+     * (See qemu.git/qapi/ for the struct that aren't detailed here)
+     */
+
+    asked_id = GCSPRINTF(PCI_PT_QDEV_ID,
+                         pcidev->bus, pcidev->dev, pcidev->func);
+
+    for (i = 0; (bus = libxl__json_array_get(response, i)); i++) {
+        devices = libxl__json_map_get("devices", bus, JSON_ARRAY);
+        if (!devices) {
+            rc = ERROR_QEMU_API;
+            goto out;
+        }
+
+        for (j = 0; (device = libxl__json_array_get(devices, j)); j++) {
+             o = libxl__json_map_get("qdev_id", device, JSON_STRING);
+             if (!o) {
+                 rc = ERROR_QEMU_API;
+                 goto out;
+             }
+             id = libxl__json_object_get_string(o);
+             if (!id || strcmp(asked_id, id))
+                 continue;
+
+             o = libxl__json_map_get("slot", device, JSON_INTEGER);
+             if (!o) {
+                 rc = ERROR_QEMU_API;
+                 goto out;
+             }
+             dev_slot = libxl__json_object_get_integer(o);
+             o = libxl__json_map_get("function", device, JSON_INTEGER);
+             if (!o) {
+                 rc = ERROR_QEMU_API;
+                 goto out;
+             }
+             dev_func = libxl__json_object_get_integer(o);
+
+             pcidev->vdevfn = PCI_DEVFN(dev_slot, dev_func);
+
+             rc = 0;
+             goto out;
+        }
+    }
+
+    rc = ERROR_FAIL;
+    LOGD(ERROR, qmp->domid,
+         "PCI device id '%s' wasn't found in QEMU's 'query-pci' response.",
+         asked_id);
+
+out:
+    if (rc == ERROR_QEMU_API) {
+        LOGD(ERROR, qmp->domid,
+             "Unexpected response to QMP cmd 'query-pci', received:\n%s",
+             JSON(response));
+    }
+    pci_add_dm_done(egc, pas, rc); /* must be last */
+}
+
+static void pci_add_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                            const struct timeval *requested_abs,
+                            int rc)
+{
+    pci_add_state *pas = CONTAINER_OF(ev, *pas, timeout);
+
+    pci_add_dm_done(egc, pas, rc);
+}
+
+static void pci_add_dm_done(libxl__egc *egc,
+                            pci_add_state *pas,
+                            int rc)
+{
+    STATE_AO_GC(pas->aodev->ao);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    libxl_domid domid = pas->pci_domid;
+    char *sysfs_path;
+    FILE *f;
+    unsigned long long start, end, flags, size;
+    int irq, i;
+    int r;
+    uint32_t flag = XEN_DOMCTL_DEV_RDM_RELAXED;
+    uint32_t domainid = domid;
+    bool isstubdom = libxl_is_stubdom(ctx, domid, &domainid);
+
+    /* Convenience aliases */
+    bool starting = pas->starting;
+    libxl_device_pci *pcidev = pas->pcidev;
+    bool hvm = libxl__domain_type(gc, domid) == LIBXL_DOMAIN_TYPE_HVM;
+
+    libxl__ev_qmp_dispose(gc, &pas->qmp);
+
+    if (rc) goto out;
 
     sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                            pcidev->bus, pcidev->dev, pcidev->func);
@@ -1145,6 +1386,7 @@ out_no_irq:
     else
         rc = 0;
 out:
+    libxl__ev_time_deregister(gc, &pas->timeout);
     pas->callback(egc, pas, rc);
 }
 
