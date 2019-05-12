@@ -518,3 +518,26 @@ void __ubsan_handle_pointer_overflow(struct pointer_overflow_data *data,
 
 	ubsan_epilogue(&flags);
 }
+
+void __ubsan_handle_invalid_builtin(struct invalid_builtin_data *data)
+{
+	unsigned long flags;
+	const char *fn = NULL;
+
+	if (suppress_report(&data->location))
+		return;
+
+	ubsan_prologue(&data->location, &flags);
+
+	switch (data->kind) {
+	case kind_ctz: fn = "ctz"; break;
+	case kind_clz: fn = "clz"; break;
+	}
+
+	if (fn)
+		pr_err("passing zero to %s(), which is not a valid argument\n", fn);
+	else
+		pr_err("Unknown kind %u\n", data->kind);
+
+	ubsan_epilogue(&flags);
+}

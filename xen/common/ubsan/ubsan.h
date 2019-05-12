@@ -84,6 +84,15 @@ struct pointer_overflow_data {
 	struct source_location location;
 };
 
+struct invalid_builtin_data {
+	struct source_location location;
+	unsigned char kind;
+};
+enum {
+	kind_ctz,
+	kind_clz,
+};
+
 #if defined(CONFIG_ARCH_SUPPORTS_INT128) && defined(__SIZEOF_INT128__)
 typedef __int128 s_max;
 typedef unsigned __int128 u_max;
