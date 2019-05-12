@@ -983,9 +983,24 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
-static int do_pci_add(libxl__gc *gc, uint32_t domid,
-                      libxl_device_pci *pcidev, bool starting)
+typedef struct pci_add_state {
+    /* filled by user of do_pci_add */
+    libxl__ao_device *aodev;
+    libxl_domid domid;
+    bool starting;
+    void (*callback)(libxl__egc *, struct pci_add_state *, int rc);
+
+    /* private to do_pci_add */
+    libxl_device_pci *pcidev;
+    int pci_domid;
+} pci_add_state;
+
+static void do_pci_add(libxl__egc *egc,
+                       libxl_domid domid,
+                       libxl_device_pci *pcidev,
+                       pci_add_state *pas)
 {
+    STATE_AO_GC(pas->aodev->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_domain_type type = libxl__domain_type(gc, domid);
     char *sysfs_path;
@@ -996,6 +1011,13 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
     uint32_t domainid = domid;
     bool isstubdom = libxl_is_stubdom(ctx, domid, &domainid);
     int r;
+
+    /* Convenience aliases */
+    bool starting = pas->starting;
+
+    /* init pci_add_state */
+    pas->pcidev = pcidev;
+    pas->pci_domid = domid;
 
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
         rc = ERROR_FAIL;
@@ -1123,7 +1145,7 @@ out_no_irq:
     else
         rc = 0;
 out:
-    return rc;
+    pas->callback(egc, pas, rc);
 }
 
 static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned int bus,
@@ -1177,9 +1199,14 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
                          const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
-    int rc;
-    rc = libxl__device_pci_add(gc, domid, pcidev, false);
-    libxl__ao_complete(egc, ao, rc);
+    libxl__ao_device *aodev;
+
+    GCNEW(aodev);
+    libxl__prepare_ao_device(ao, aodev);
+    aodev->action = LIBXL__DEVICE_ACTION_ADD;
+    aodev->callback = device_addrm_aocomplete;
+    aodev->update_json = true;
+    libxl__device_pci_add(egc, domid, pcidev, false, aodev);
     return AO_INPROGRESS;
 }
 
@@ -1200,14 +1227,31 @@ static int libxl_pcidev_assignable(libxl_ctx *ctx, libxl_device_pci *pcidev)
     return i != num;
 }
 
-int libxl__device_pci_add(libxl__gc *gc, uint32_t domid,
-                          libxl_device_pci *pcidev, bool starting)
+static void device_pci_add_stubdom_done(libxl__egc *egc,
+    pci_add_state *, int rc);
+static void device_pci_add_done(libxl__egc *egc,
+    pci_add_state *, int rc);
+
+void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
+                           libxl_device_pci *pcidev, bool starting,
+                           libxl__ao_device *aodev)
 {
+    STATE_AO_GC(aodev->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    unsigned int orig_vdev, pfunc_mask;
     libxl_device_pci *assigned;
-    int num_assigned, i, rc;
+    int num_assigned, rc;
     int stubdomid = 0;
+    pci_add_state *pas;
+
+    /* Store *pcidev to be used by callbacks */
+    aodev->device_config = pcidev;
+    aodev->device_type = &libxl__pcidev_devtype;
+
+    GCNEW(pas);
+    pas->aodev = aodev;
+    pas->domid = domid;
+    pas->starting = starting;
+    pas->callback = device_pci_add_stubdom_done;
 
     if (libxl__domain_type(gc, domid) == LIBXL_DOMAIN_TYPE_HVM) {
         rc = xc_test_assign_device(ctx->xch, domid, pcidev_encode_bdf(pcidev));
@@ -1254,12 +1298,38 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid,
 
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid != 0) {
-        libxl_device_pci pcidev_s = *pcidev;
+        libxl_device_pci *pcidev_s;
+
+        GCNEW(pcidev_s);
+        libxl_device_pci_init(pcidev_s);
+        libxl_device_pci_copy(CTX, pcidev_s, pcidev);
         /* stubdomain is always running by now, even at create time */
-        rc = do_pci_add(gc, stubdomid, &pcidev_s, false);
-        if ( rc )
-            goto out;
+        pas->callback = device_pci_add_stubdom_done;
+        do_pci_add(egc, stubdomid, pcidev_s, pas); /* must be last */
+        return;
     }
+
+    device_pci_add_stubdom_done(egc, pas, 0); /* must be last */
+    return;
+
+out:
+    device_pci_add_done(egc, pas, rc); /* must be last */
+}
+
+static void device_pci_add_stubdom_done(libxl__egc *egc,
+                                        pci_add_state *pas,
+                                        int rc)
+{
+    STATE_AO_GC(pas->aodev->ao);
+    unsigned int orig_vdev, pfunc_mask;
+    int i;
+
+    /* Convenience aliases */
+    libxl__ao_device *aodev = pas->aodev;
+    libxl_domid domid = pas->domid;
+    libxl_device_pci *pcidev = aodev->device_config;
+
+    if (rc) goto out;
 
     orig_vdev = pcidev->vdevfn & ~7U;
 
@@ -1291,30 +1361,82 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid,
                  */
                 pcidev->vdevfn = orig_vdev;
             }
-            if ( do_pci_add(gc, domid, pcidev, starting) )
-                rc = ERROR_FAIL;
+            pas->callback = device_pci_add_done;
+            do_pci_add(egc, domid, pcidev, pas); /* must be last */
+            return;
         }
     }
 
 out:
-    return rc;
+    device_pci_add_done(egc, pas, rc);
 }
+
+static void device_pci_add_done(libxl__egc *egc,
+                                pci_add_state *pas,
+                                int rc)
+{
+    EGC_GC;
+    libxl__ao_device *aodev = pas->aodev;
+    libxl_domid domid = pas->domid;
+    libxl_device_pci *pcidev = aodev->device_config;
+
+    if (rc) {
+        LOGD(ERROR, domid,
+             "libxl__device_pci_add  failed for "
+             "PCI device %x:%x:%x.%x (rc %d)",
+             pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func,
+             rc);
+    }
+    aodev->rc = rc;
+    aodev->callback(egc, aodev);
+}
+
+typedef struct {
+    libxl__multidev multidev;
+    libxl__ao_device *outer_aodev;
+    libxl_domain_config *d_config;
+    libxl_domid domid;
+} add_pcidevs_state;
+
+static void add_pcidevs_done(libxl__egc *, libxl__multidev *, int rc);
 
 static void libxl__add_pcidevs(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
                                libxl_domain_config *d_config,
                                libxl__multidev *multidev)
 {
     AO_GC;
-    libxl__ao_device *aodev = libxl__multidev_prepare(multidev);
-    int i, rc = 0;
+    add_pcidevs_state *apds;
+    int i;
+
+    /* We need to start a new multidev in order to be able to execute
+     * libxl__create_pci_backend only once. */
+
+    GCNEW(apds);
+    apds->outer_aodev = libxl__multidev_prepare(multidev);
+    apds->d_config = d_config;
+    apds->domid = domid;
+    apds->multidev.callback = add_pcidevs_done;
+    libxl__multidev_begin(ao, &apds->multidev);
 
     for (i = 0; i < d_config->num_pcidevs; i++) {
-        rc = libxl__device_pci_add(gc, domid, &d_config->pcidevs[i], true);
-        if (rc < 0) {
-            LOGD(ERROR, domid, "libxl_device_pci_add failed: %d", rc);
-            goto out;
-        }
+        libxl__ao_device *aodev = libxl__multidev_prepare(&apds->multidev);
+        libxl__device_pci_add(egc, domid, &d_config->pcidevs[i],
+                              true, aodev);
     }
+
+    libxl__multidev_prepared(egc, &apds->multidev, 0);
+}
+
+static void add_pcidevs_done(libxl__egc *egc, libxl__multidev *multidev,
+                             int rc)
+{
+    EGC_GC;
+    add_pcidevs_state *apds = CONTAINER_OF(multidev, *apds, multidev);
+
+    /* Convenience aliases */
+    libxl_domain_config *d_config = apds->d_config;
+    libxl_domid domid = apds->domid;
+    libxl__ao_device *aodev = apds->outer_aodev;
 
     if (d_config->num_pcidevs > 0) {
         rc = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
