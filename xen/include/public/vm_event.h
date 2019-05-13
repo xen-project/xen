@@ -29,7 +29,7 @@
 
 #include "xen.h"
 
-#define VM_EVENT_INTERFACE_VERSION 0x00000004
+#define VM_EVENT_INTERFACE_VERSION 0x00000005
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
@@ -198,6 +198,7 @@ struct vm_event_regs_x86 {
     uint64_t msr_efer;
     uint64_t msr_star;
     uint64_t msr_lstar;
+    uint64_t gdtr_base;
     uint32_t cs_base;
     uint32_t ss_base;
     uint32_t ds_base;
@@ -211,13 +212,14 @@ struct vm_event_regs_x86 {
     struct vm_event_x86_selector_reg fs;
     struct vm_event_x86_selector_reg gs;
     uint64_t shadow_gs;
+    uint16_t gdtr_limit;
     uint16_t cs_sel;
     uint16_t ss_sel;
     uint16_t ds_sel;
     uint16_t es_sel;
     uint16_t fs_sel;
     uint16_t gs_sel;
-    uint32_t _pad;
+    uint16_t _pad;
 };
 
 /*
