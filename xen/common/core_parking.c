@@ -31,15 +31,15 @@ static unsigned int core_parking_performance(unsigned int event);
 static uint32_t cur_idle_nums;
 static unsigned int core_parking_cpunum[NR_CPUS] = {[0 ... NR_CPUS-1] = -1};
 
-static struct core_parking_policy {
+static const struct cp_policy {
     char name[30];
     unsigned int (*next)(unsigned int event);
-} *core_parking_policy;
+} *__read_mostly core_parking_policy;
 
 static enum core_parking_controller {
     POWER_FIRST,
     PERFORMANCE_FIRST
-} core_parking_controller = POWER_FIRST;
+} core_parking_controller __initdata = POWER_FIRST;
 
 static int __init setup_core_parking_option(const char *str)
 {
@@ -205,17 +205,17 @@ uint32_t get_cur_idle_nums(void)
     return cur_idle_nums;
 }
 
-static struct core_parking_policy power_first = {
+static const struct cp_policy power_first = {
     .name = "power",
     .next = core_parking_power,
 };
 
-static struct core_parking_policy performance_first = {
+static const struct cp_policy performance_first = {
     .name = "performance",
     .next = core_parking_performance,
 };
 
-static int register_core_parking_policy(struct core_parking_policy *policy)
+static int __init register_core_parking_policy(const struct cp_policy *policy)
 {
     if ( !policy || !policy->next )
         return -EINVAL;
