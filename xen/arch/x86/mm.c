@@ -368,8 +368,6 @@ void __init arch_init_memory(void)
 
     efi_init_memory();
 
-    mem_sharing_init();
-
 #ifndef NDEBUG
     if ( highmem_start )
     {

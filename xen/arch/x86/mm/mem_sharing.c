@@ -65,8 +65,8 @@ static DEFINE_PER_CPU(pg_lock_data_t, __pld);
 
 #if MEM_SHARING_AUDIT
 
-static struct list_head shr_audit_list;
-static spinlock_t shr_audit_lock;
+static LIST_HEAD(shr_audit_list);
+static DEFINE_SPINLOCK(shr_audit_lock);
 static DEFINE_RCU_READ_LOCK(shr_audit_read_lock);
 
 /* RCU delayed free of audit list entry */
@@ -1650,13 +1650,3 @@ int mem_sharing_domctl(struct domain *d, struct xen_domctl_mem_sharing_op *mec)
 
     return rc;
 }
-
-void __init mem_sharing_init(void)
-{
-    printk("Initing memory sharing.\n");
-#if MEM_SHARING_AUDIT
-    spin_lock_init(&shr_audit_lock);
-    INIT_LIST_HEAD(&shr_audit_list);
-#endif
-}
-

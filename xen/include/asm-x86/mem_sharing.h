@@ -88,7 +88,6 @@ int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
 int mem_sharing_memop(XEN_GUEST_HANDLE_PARAM(xen_mem_sharing_op_t) arg);
 int mem_sharing_domctl(struct domain *d, 
                        struct xen_domctl_mem_sharing_op *mec);
-void mem_sharing_init(void);
 
 /* Scans the p2m and relinquishes any shared pages, destroying 
  * those for which this domain holds the final reference.
