@@ -2630,7 +2630,6 @@ int free_page_type(struct page_info *page, unsigned long type,
 {
 #ifdef CONFIG_PV
     struct domain *owner = page_get_owner(page);
-    unsigned long gmfn;
     int rc;
 
     if ( likely(owner != NULL) && unlikely(paging_mode_enabled(owner)) )
@@ -2638,11 +2637,11 @@ int free_page_type(struct page_info *page, unsigned long type,
         /* A page table is dirtied when its type count becomes zero. */
         paging_mark_dirty(owner, page_to_mfn(page));
 
-        ASSERT(!shadow_mode_refcounts(owner));
+        ASSERT(shadow_mode_enabled(owner));
+        ASSERT(!paging_mode_refcounts(owner));
+        ASSERT(!paging_mode_translate(owner));
 
-        gmfn = mfn_to_gmfn(owner, mfn_x(page_to_mfn(page)));
-        if ( VALID_M2P(gmfn) )
-            shadow_remove_all_shadows(owner, _mfn(gmfn));
+        shadow_remove_all_shadows(owner, page_to_mfn(page));
     }
 
     if ( !(type & PGT_partial) )
