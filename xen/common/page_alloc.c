@@ -1413,13 +1413,22 @@ static void free_heap_pages(
          *     in its pseudophysical address space).
          * In all the above cases there can be no guest mappings of this page.
          */
-        ASSERT(!page_state_is(&pg[i], offlined));
-        pg[i].count_info =
-            ((pg[i].count_info & PGC_broken) |
-             (page_state_is(&pg[i], offlining)
-              ? PGC_state_offlined : PGC_state_free));
-        if ( page_state_is(&pg[i], offlined) )
+        switch ( pg[i].count_info & PGC_state )
+        {
+        case PGC_state_inuse:
+            BUG_ON(pg[i].count_info & PGC_broken);
+            pg[i].count_info = PGC_state_free;
+            break;
+
+        case PGC_state_offlining:
+            pg[i].count_info = (pg[i].count_info & PGC_broken) |
+                               PGC_state_offlined;
             tainted = 1;
+            break;
+
+        default:
+            BUG();
+        }
 
         /* If a page has no owner it will need no safety TLB flush. */
         pg[i].u.free.need_tlbflush = (page_get_owner(&pg[i]) != NULL);
