@@ -214,6 +214,10 @@ custom_param("bootscrub", parse_bootscrub_param);
 static unsigned long __initdata opt_bootscrub_chunk = MB(128);
 size_param("bootscrub_chunk", opt_bootscrub_chunk);
 
+ /* scrub-domheap -> Domheap pages are scrubbed when freed */
+static bool __read_mostly opt_scrub_domheap;
+boolean_param("scrub-domheap", opt_scrub_domheap);
+
 #ifdef CONFIG_SCRUB_DEBUG
 static bool __read_mostly scrub_debug;
 #else
@@ -2378,9 +2382,10 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             /*
              * Normally we expect a domain to clear pages before freeing them,
              * if it cares about the secrecy of their contents. However, after
-             * a domain has died we assume responsibility for erasure.
+             * a domain has died we assume responsibility for erasure. We do
+             * scrub regardless if option scrub_domheap is set.
              */
-            scrub = d->is_dying || scrub_debug;
+            scrub = d->is_dying || scrub_debug || opt_scrub_domheap;
         }
         else
         {

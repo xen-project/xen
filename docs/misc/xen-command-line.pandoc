@@ -1779,6 +1779,14 @@ sockets, &c.  This will reduce performance somewhat, particularly on
 systems with hyperthreading enabled, but should reduce power by
 enabling more sockets and cores to go into deeper sleep states.
 
+### scrub-domheap
+> `= <boolean>`
+
+> Default: `false`
+
+Scrub domains' freed pages. This is a safety net against a (buggy) domain
+accidentally leaking secrets by releasing pages without proper sanitization.
+
 ### serial_tx_buffer
 > `= <size>`
 
