@@ -984,8 +984,6 @@ static void __init setup_IO_APIC_irqs(void)
 
     for (apic = 0; apic < nr_ioapics; apic++) {
         for (pin = 0; pin < nr_ioapic_entries[apic]; pin++) {
-            struct irq_desc *desc;
-
             /*
              * add it to the IO-APIC irq-routing table:
              */
@@ -1038,7 +1036,6 @@ static void __init setup_IO_APIC_irqs(void)
             if (platform_legacy_irq(irq))
                 disable_8259A_irq(irq_to_desc(irq));
 
-            desc = irq_to_desc(irq);
             SET_DEST(entry, logical, cpu_mask_to_apicid(TARGET_CPUS));
             spin_lock_irqsave(&ioapic_lock, flags);
             __ioapic_write_entry(apic, pin, 0, entry);
