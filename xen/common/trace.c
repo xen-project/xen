@@ -819,11 +819,17 @@ unlock:
 void __trace_hypercall(uint32_t event, unsigned long op,
                        const xen_ulong_t *args)
 {
-    struct __packed {
+    struct {
         uint32_t op;
         uint32_t args[6];
     } d;
     uint32_t *a = d.args;
+
+    /*
+     * In lieu of using __packed above, which gcc9 legitimately doesn't
+     * like in combination with the address of d.args[] taken.
+     */
+    BUILD_BUG_ON(offsetof(typeof(d), args) != sizeof(d.op));
 
 #define APPEND_ARG32(i)                         \
     do {                                        \
