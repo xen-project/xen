@@ -779,12 +779,18 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 
 static void vmx_save_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
+    if ( v == current )
+        vmx_save_guest_msrs(v);
+
     vmx_save_cpu_state(v, ctxt);
     vmx_vmcs_save(v, ctxt);
 }
 
 static int vmx_load_vmcs_ctxt(struct vcpu *v, struct hvm_hw_cpu *ctxt)
 {
+    /* Not currently safe to use in current context. */
+    ASSERT(v != current);
+
     vmx_load_cpu_state(v, ctxt);
 
     if ( vmx_vmcs_restore(v, ctxt) )
