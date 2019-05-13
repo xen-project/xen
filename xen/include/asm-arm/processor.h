@@ -6,6 +6,11 @@
 #endif
 #include <public/arch-arm.h>
 
+/* CTR Cache Type Register */
+#define CTR_L1Ip_MASK       0x3
+#define CTR_L1Ip_SHIFT      14
+#define CTR_L1Ip_AIVIVT     0x1
+
 /* MIDR Main ID Register */
 #define MIDR_REVISION_MASK      0xf
 #define MIDR_RESIVION(midr)     ((midr) & MIDR_REVISION_MASK)

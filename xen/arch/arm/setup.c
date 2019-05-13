@@ -526,9 +526,14 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     unsigned long boot_mfn_start, boot_mfn_end;
     int i;
     void *fdt;
+    const uint32_t ctr = READ_CP32(CTR);
 
     if ( !bootinfo.mem.nr_banks )
         panic("No memory bank\n");
+
+    /* We only supports instruction caches implementing the IVIPT extension. */
+    if ( ((ctr >> CTR_L1Ip_SHIFT) & CTR_L1Ip_MASK) == CTR_L1Ip_AIVIVT )
+        panic("AIVIVT instruction cache not supported\n");
 
     init_pdx();
 
