@@ -478,6 +478,42 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m)
         mm_write_unlock(&p2m->lock);
 }
 
+int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
+                               p2m_type_t *t, p2m_access_t *a,
+                               bool prepopulate)
+{
+    *mfn = ap2m->get_entry(ap2m, gfn, t, a, 0, NULL, NULL);
+
+    /* Check host p2m if no valid entry in alternate */
+    if ( !mfn_valid(*mfn) && !p2m_is_hostp2m(ap2m) )
+    {
+        struct p2m_domain *hp2m = p2m_get_hostp2m(ap2m->domain);
+        unsigned int page_order;
+        int rc;
+
+        *mfn = __get_gfn_type_access(hp2m, gfn_x(gfn), t, a,
+                                     P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
+
+        rc = -ESRCH;
+        if ( !mfn_valid(*mfn) || *t != p2m_ram_rw )
+            return rc;
+
+        /* If this is a superpage, copy that first */
+        if ( prepopulate && page_order != PAGE_ORDER_4K )
+        {
+            unsigned long mask = ~((1UL << page_order) - 1);
+            gfn_t gfn_aligned = _gfn(gfn_x(gfn) & mask);
+            mfn_t mfn_aligned = _mfn(mfn_x(*mfn) & mask);
+
+            rc = ap2m->set_entry(ap2m, gfn_aligned, mfn_aligned, page_order, *t, *a, 1);
+            if ( rc )
+                return rc;
+        }
+    }
+
+    return 0;
+}
+
 mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
                     unsigned int *page_order, bool_t locked)
@@ -2618,7 +2654,6 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     p2m_access_t a;
     p2m_type_t t;
     mfn_t mfn;
-    unsigned int page_order;
     int rc = -EINVAL;
 
     if ( idx >= MAX_ALTP2M || d->arch.altp2m_eptp[idx] == mfn_x(INVALID_MFN) )
@@ -2630,47 +2665,23 @@ int p2m_change_altp2m_gfn(struct domain *d, unsigned int idx,
     p2m_lock(hp2m);
     p2m_lock(ap2m);
 
-    mfn = ap2m->get_entry(ap2m, old_gfn, &t, &a, 0, NULL, NULL);
-
     if ( gfn_eq(new_gfn, INVALID_GFN) )
     {
+        mfn = ap2m->get_entry(ap2m, old_gfn, &t, &a, 0, NULL, NULL);
         if ( mfn_valid(mfn) )
             p2m_remove_page(ap2m, gfn_x(old_gfn), mfn_x(mfn), PAGE_ORDER_4K);
         rc = 0;
         goto out;
     }
 
-    /* Check host p2m if no valid entry in alternate */
-    if ( !mfn_valid(mfn) )
-    {
-        mfn = __get_gfn_type_access(hp2m, gfn_x(old_gfn), &t, &a,
-                                    P2M_ALLOC, &page_order, 0);
+    rc = altp2m_get_effective_entry(ap2m, old_gfn, &mfn, &t, &a,
+                                    AP2MGET_prepopulate);
+    if ( rc )
+        goto out;
 
-        if ( !mfn_valid(mfn) || t != p2m_ram_rw )
-            goto out;
-
-        /* If this is a superpage, copy that first */
-        if ( page_order != PAGE_ORDER_4K )
-        {
-            gfn_t gfn;
-            unsigned long mask;
-
-            mask = ~((1UL << page_order) - 1);
-            gfn = _gfn(gfn_x(old_gfn) & mask);
-            mfn = _mfn(mfn_x(mfn) & mask);
-
-            if ( ap2m->set_entry(ap2m, gfn, mfn, page_order, t, a, 1) )
-                goto out;
-        }
-    }
-
-    mfn = ap2m->get_entry(ap2m, new_gfn, &t, &a, 0, NULL, NULL);
-
-    if ( !mfn_valid(mfn) )
-        mfn = hp2m->get_entry(hp2m, new_gfn, &t, &a, 0, NULL, NULL);
-
-    /* Note: currently it is not safe to remap to a shared entry */
-    if ( !mfn_valid(mfn) || (t != p2m_ram_rw) )
+    rc = altp2m_get_effective_entry(ap2m, new_gfn, &mfn, &t, &a,
+                                    AP2MGET_query);
+    if ( rc )
         goto out;
 
     if ( !ap2m->set_entry(ap2m, old_gfn, mfn, PAGE_ORDER_4K, t, a,
@@ -3002,12 +3013,10 @@ int p2m_set_suppress_ve(struct domain *d, gfn_t gfn, bool suppress_ve,
     if ( ap2m )
         p2m_lock(ap2m);
 
-    mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL, NULL);
-    if ( !mfn_valid(mfn) )
-    {
-        rc = -ESRCH;
+    rc = altp2m_get_effective_entry(p2m, gfn, &mfn, &t, &a, AP2MGET_query);
+
+    if ( rc )
         goto out;
-    }
 
     rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, t, a, suppress_ve);
 

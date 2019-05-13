@@ -262,35 +262,12 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
     mfn_t mfn;
     p2m_type_t t;
     p2m_access_t old_a;
-    unsigned int page_order;
-    unsigned long gfn_l = gfn_x(gfn);
     int rc;
 
-    mfn = ap2m->get_entry(ap2m, gfn, &t, &old_a, 0, NULL, NULL);
-
-    /* Check host p2m if no valid entry in alternate */
-    if ( !mfn_valid(mfn) )
-    {
-
-        mfn = __get_gfn_type_access(hp2m, gfn_l, &t, &old_a,
-                                    P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
-
-        rc = -ESRCH;
-        if ( !mfn_valid(mfn) || t != p2m_ram_rw )
-            return rc;
-
-        /* If this is a superpage, copy that first */
-        if ( page_order != PAGE_ORDER_4K )
-        {
-            unsigned long mask = ~((1UL << page_order) - 1);
-            gfn_t gfn2 = _gfn(gfn_l & mask);
-            mfn_t mfn2 = _mfn(mfn_x(mfn) & mask);
-
-            rc = ap2m->set_entry(ap2m, gfn2, mfn2, page_order, t, old_a, 1);
-            if ( rc )
-                return rc;
-        }
-    }
+    rc = altp2m_get_effective_entry(ap2m, gfn, &mfn, &t, &old_a,
+                                    AP2MGET_prepopulate);
+    if ( rc )
+        return rc;
 
     /*
      * Inherit the old suppress #VE bit value if it is already set, or set it

@@ -514,6 +514,18 @@ static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
         return mfn_x(mfn);
 }
 
+#define AP2MGET_prepopulate true
+#define AP2MGET_query false
+
+/*
+ * Looks up altp2m entry. If the entry is not found it looks up the entry in
+ * hostp2m.
+ * The prepopulate param is used to set the found entry in altp2m.
+ */
+int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
+                               p2m_type_t *t, p2m_access_t *a,
+                               bool prepopulate);
+
 /* Deadlock-avoidance scheme when calling get_gfn on different gfn's */
 struct two_gfns {
     struct domain *first_domain, *second_domain;
