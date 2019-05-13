@@ -512,14 +512,14 @@ int __init iommu_setup(void)
     if ( !iommu_intremap )
         iommu_intpost = 0;
 
+    printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( !iommu_enabled )
     {
         iommu_snoop = 0;
         iommu_hwdom_passthrough = false;
         iommu_hwdom_strict = false;
     }
-    printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
-    if ( iommu_enabled )
+    else
     {
         printk(" - Dom0 mode: %s\n",
                iommu_hwdom_passthrough ? "Passthrough" :
