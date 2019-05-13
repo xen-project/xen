@@ -13,7 +13,7 @@
 
 static uint32_t nr_features;
 
-static const char *str_1d[32] =
+static const char *const str_1d[32] =
 {
     [ 0] = "fpu",  [ 1] = "vme",
     [ 2] = "de",   [ 3] = "pse",
@@ -33,7 +33,7 @@ static const char *str_1d[32] =
     [30] = "ia64", [31] = "pbe",
 };
 
-static const char *str_1c[32] =
+static const char *const str_1c[32] =
 {
     [ 0] = "sse3",    [ 1] = "pclmulqdq",
     [ 2] = "dtes64",  [ 3] = "monitor",
@@ -53,7 +53,7 @@ static const char *str_1c[32] =
     [30] = "rdrnd",   [31] = "hyper",
 };
 
-static const char *str_e1d[32] =
+static const char *const str_e1d[32] =
 {
     [ 0] = "fpu",    [ 1] = "vme",
     [ 2] = "de",     [ 3] = "pse",
@@ -73,7 +73,7 @@ static const char *str_e1d[32] =
     [30] = "3dnow+", [31] = "3dnow",
 };
 
-static const char *str_e1c[32] =
+static const char *const str_e1c[32] =
 {
     [ 0] = "lahf_lm",    [ 1] = "cmp",
     [ 2] = "svm",        [ 3] = "extapic",
@@ -92,7 +92,7 @@ static const char *str_e1c[32] =
     [28] = "pcx_l2i",    [29] = "monitorx",
 };
 
-static const char *str_7b0[32] =
+static const char *const str_7b0[32] =
 {
     [ 0] = "fsgsbase", [ 1] = "tsc-adj",
     [ 2] = "sgx",      [ 3] = "bmi1",
@@ -112,13 +112,13 @@ static const char *str_7b0[32] =
     [30] = "avx512bw", [31] = "avx512vl",
 };
 
-static const char *str_Da1[32] =
+static const char *const str_Da1[32] =
 {
     [ 0] = "xsaveopt", [ 1] = "xsavec",
     [ 2] = "xgetbv1",  [ 3] = "xsaves",
 };
 
-static const char *str_7c0[32] =
+static const char *const str_7c0[32] =
 {
     [ 0] = "prefetchwt1",      [ 1] = "avx512_vbmi",
     [ 2] = "umip",             [ 3] = "pku",
@@ -136,20 +136,20 @@ static const char *str_7c0[32] =
     [30] = "sgx_lc",
 };
 
-static const char *str_e7d[32] =
+static const char *const str_e7d[32] =
 {
     [ 8] = "itsc",
     [10] = "efro",
 };
 
-static const char *str_e8b[32] =
+static const char *const str_e8b[32] =
 {
     [ 0] = "clzero",
 
     [12] = "ibpb",
 };
 
-static const char *str_7d0[32] =
+static const char *const str_7d0[32] =
 {
     [ 2] = "avx512_4vnniw", [ 3] = "avx512_4fmaps",
     [ 4] = "fsrm",
@@ -163,10 +163,10 @@ static const char *str_7d0[32] =
     /* 30 */                [31] = "ssbd",
 };
 
-static struct {
+static const struct {
     const char *name;
     const char *abbr;
-    const char **strs;
+    const char *const *strs;
 } decodes[] =
 {
     { "0x00000001.edx",   "1d",  str_1d },
@@ -195,7 +195,7 @@ static struct fsinfo {
     [XEN_SYSCTL_cpu_featureset_hvm]  = { "HVM",  0, NULL },
 };
 
-static void dump_leaf(uint32_t leaf, const char **strs)
+static void dump_leaf(uint32_t leaf, const char *const *strs)
 {
     unsigned i;
 
@@ -332,7 +332,7 @@ int main(int argc, char **argv)
     {
         const char *tmp_optarg;
         int option_index = 0, c;
-        static struct option long_options[] =
+        static const struct option long_options[] =
         {
             { "help", no_argument, NULL, 'h' },
             { "info", no_argument, NULL, 'i' },
