@@ -12,9 +12,6 @@
 
 #define MAX_XRES 1900
 #define MAX_YRES 1200
-#define MAX_BPP 4
-#define MAX_FONT_W 8
-#define MAX_FONT_H 16
 
 struct lfb_status {
     struct lfb_prop lfbp;
