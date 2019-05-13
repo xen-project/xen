@@ -813,6 +813,8 @@ int xenmem_add_to_physmap(struct domain *d, struct xen_add_to_physmap *xatp,
     long rc = 0;
     union xen_add_to_physmap_batch_extra extra;
 
+    ASSERT(paging_mode_translate(d));
+
     if ( xatp->space != XENMAPSPACE_gmfn_foreign )
         extra.res0 = 0;
     else
@@ -995,12 +997,15 @@ static int get_reserved_device_memory(xen_pfn_t start, xen_ulong_t nr,
 
 static long xatp_permission_check(struct domain *d, unsigned int space)
 {
+    if ( !paging_mode_translate(d) )
+        return -EACCES;
+
     /*
      * XENMAPSPACE_dev_mmio mapping is only supported for hardware Domain
      * to map this kind of space to itself.
      */
     if ( (space == XENMAPSPACE_dev_mmio) &&
-         (!is_hardware_domain(current->domain) || (d != current->domain)) )
+         (!is_hardware_domain(d) || (d != current->domain)) )
         return -EACCES;
 
     return xsm_add_to_physmap(XSM_TARGET, current->domain, d);
@@ -1384,7 +1389,9 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        rc = xsm_remove_from_physmap(XSM_TARGET, curr_d, d);
+        rc = paging_mode_translate(d)
+             ? xsm_remove_from_physmap(XSM_TARGET, curr_d, d)
+             : -EACCES;
         if ( rc )
         {
             rcu_unlock_domain(d);

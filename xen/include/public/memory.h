@@ -231,7 +231,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 
 /*
  * Sets the GPFN at which a particular page appears in the specified guest's
- * pseudophysical address space.
+ * physical address space (translated guests only).
  * arg == addr of xen_add_to_physmap_t.
  */
 #define XENMEM_add_to_physmap      7
@@ -298,7 +298,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_range_t);
 
 /*
  * Unmaps the page appearing at a particular GPFN from the specified guest's
- * pseudophysical address space.
+ * physical address space (translated guests only).
  * arg == addr of xen_remove_from_physmap_t.
  */
 #define XENMEM_remove_from_physmap      15
