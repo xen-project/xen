@@ -107,7 +107,7 @@ typedef struct tmem_op tmem_op_t;
 DEFINE_XEN_GUEST_HANDLE(tmem_op_t);
 #endif
 
-#endif  /* __XEN_INTERFACE_VERSION__ < 0x00041200 */
+#endif  /* __XEN_INTERFACE_VERSION__ < 0x00041300 */
 
 #endif /* __XEN_PUBLIC_TMEM_H__ */
 
