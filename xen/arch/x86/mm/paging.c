@@ -837,7 +837,9 @@ int paging_enable(struct domain *d, u32 mode)
     switch ( mode & (PG_external | PG_translate | PG_refcounts) )
     {
     case 0:
+#if PG_external | PG_translate | PG_refcounts
     case PG_external | PG_translate | PG_refcounts:
+#endif
         break;
     default:
         return -EINVAL;

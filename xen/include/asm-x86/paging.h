@@ -46,19 +46,29 @@
 #define PG_SH_enable   0
 #define PG_SH_forced   0
 #endif
+#ifdef CONFIG_HVM
 #define PG_HAP_enable  (1U << PG_HAP_shift)
+#else
+#define PG_HAP_enable  0
+#endif
 
 /* common paging mode bits */
 #define PG_mode_shift  10 
+#ifdef CONFIG_HVM
 /* Refcounts based on shadow tables instead of guest tables */
 #define PG_refcounts   (XEN_DOMCTL_SHADOW_ENABLE_REFCOUNT << PG_mode_shift)
-/* Enable log dirty mode */
-#define PG_log_dirty   (XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY << PG_mode_shift)
 /* Xen does p2m translation, not guest */
 #define PG_translate   (XEN_DOMCTL_SHADOW_ENABLE_TRANSLATE << PG_mode_shift)
 /* Xen does not steal address space from the domain for its own booking;
  * requires VT or similar mechanisms */
 #define PG_external    (XEN_DOMCTL_SHADOW_ENABLE_EXTERNAL << PG_mode_shift)
+#else
+#define PG_refcounts   0
+#define PG_translate   0
+#define PG_external    0
+#endif
+/* Enable log dirty mode */
+#define PG_log_dirty   (XEN_DOMCTL_SHADOW_ENABLE_LOG_DIRTY << PG_mode_shift)
 
 /* All paging modes. */
 #define PG_MASK (PG_refcounts | PG_log_dirty | PG_translate | PG_external)
