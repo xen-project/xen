@@ -392,9 +392,9 @@ static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
     regs->cpsr |= PSR_IRQ_MASK;
     if ( mode == PSR_MODE_ABT )
         regs->cpsr |= PSR_ABT_MASK;
-    if ( sctlr & SCTLR_TE )
+    if ( sctlr & SCTLR_A32_ELx_TE )
         regs->cpsr |= PSR_THUMB;
-    if ( sctlr & SCTLR_EE )
+    if ( sctlr & SCTLR_Axx_ELx_EE )
         regs->cpsr |= PSR_BIG_ENDIAN;
 }
 
@@ -402,7 +402,7 @@ static vaddr_t exception_handler32(vaddr_t offset)
 {
     uint32_t sctlr = READ_SYSREG32(SCTLR_EL1);
 
-    if ( sctlr & SCTLR_V )
+    if ( sctlr & SCTLR_A32_EL1_V )
         return 0xffff0000 + offset;
     else /* always have security exceptions */
         return READ_SYSREG(VBAR_EL1) + offset;

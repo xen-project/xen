@@ -244,7 +244,7 @@ cpu_init_done:
          * Alignment checking enabled,
          * MMU translation disabled (for now).
          */
-        ldr   r0, =(HSCTLR_BASE|SCTLR_A)
+        ldr   r0, =(HSCTLR_BASE|SCTLR_Axx_ELx_A)
         mcr   CP32(r0, HSCTLR)
 
         /*
@@ -369,7 +369,8 @@ virtphys_clash:
 
         ldr   r1, =paging            /* Explicit vaddr, not RIP-relative */
         mrc   CP32(r0, HSCTLR)
-        orr   r0, r0, #(SCTLR_M|SCTLR_C) /* Enable MMU and D-cache */
+        /* Enable MMU and D-cache */
+        orr   r0, r0, #(SCTLR_Axx_ELx_M|SCTLR_Axx_ELx_C)
         dsb                          /* Flush PTE writes and finish reads */
         mcr   CP32(r0, HSCTLR)       /* now paging is enabled */
         isb                          /* Now, flush the icache */

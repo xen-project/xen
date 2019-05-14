@@ -391,10 +391,12 @@ static inline int set_foreign_p2m_entry(struct domain *d, unsigned long gfn,
  */
 static inline bool vcpu_has_cache_enabled(struct vcpu *v)
 {
+    const uint32_t mask = SCTLR_Axx_ELx_C | SCTLR_Axx_ELx_M;
+
     /* Only works with the current vCPU */
     ASSERT(current == v);
 
-    return (READ_SYSREG32(SCTLR_EL1) & (SCTLR_C|SCTLR_M)) == (SCTLR_C|SCTLR_M);
+    return (READ_SYSREG32(SCTLR_EL1) & mask) == mask;
 }
 
 #endif /* _XEN_P2M_H */

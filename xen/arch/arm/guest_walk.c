@@ -612,7 +612,7 @@ bool guest_walk_tables(const struct vcpu *v, vaddr_t gva,
     *perms = GV2M_READ;
 
     /* If the MMU is disabled, there is no need to translate the gva. */
-    if ( !(sctlr & SCTLR_M) )
+    if ( !(sctlr & SCTLR_Axx_ELx_M) )
     {
         *ipa = gva;
 

@@ -112,26 +112,23 @@
 #define TTBCR_PD1       (_AC(1,U)<<5)
 
 /* SCTLR System Control Register. */
-/* HSCTLR is a subset of this. */
-#define SCTLR_TE        (_AC(1,U)<<30)
-#define SCTLR_AFE       (_AC(1,U)<<29)
-#define SCTLR_TRE       (_AC(1,U)<<28)
-#define SCTLR_NMFI      (_AC(1,U)<<27)
-#define SCTLR_EE        (_AC(1,U)<<25)
-#define SCTLR_VE        (_AC(1,U)<<24)
-#define SCTLR_U         (_AC(1,U)<<22)
-#define SCTLR_FI        (_AC(1,U)<<21)
-#define SCTLR_WXN       (_AC(1,U)<<19)
-#define SCTLR_HA        (_AC(1,U)<<17)
-#define SCTLR_RR        (_AC(1,U)<<14)
-#define SCTLR_V         (_AC(1,U)<<13)
-#define SCTLR_I         (_AC(1,U)<<12)
-#define SCTLR_Z         (_AC(1,U)<<11)
-#define SCTLR_SW        (_AC(1,U)<<10)
-#define SCTLR_B         (_AC(1,U)<<7)
-#define SCTLR_C         (_AC(1,U)<<2)
-#define SCTLR_A         (_AC(1,U)<<1)
-#define SCTLR_M         (_AC(1,U)<<0)
+
+/* Bits specific to SCTLR_EL1 for Arm32 */
+
+#define SCTLR_A32_EL1_V     (_AC(1,U)<<13)
+
+/* Common bits for SCTLR_ELx for Arm32 */
+
+#define SCTLR_A32_ELx_TE    (_AC(1,U)<<30)
+#define SCTLR_A32_ELx_FI    (_AC(1,U)<<21)
+
+/* Common bits for SCTLR_ELx on all architectures */
+#define SCTLR_Axx_ELx_EE    (_AC(1,U)<<25)
+#define SCTLR_Axx_ELx_WXN   (_AC(1,U)<<19)
+#define SCTLR_Axx_ELx_I     (_AC(1,U)<<12)
+#define SCTLR_Axx_ELx_C     (_AC(1,U)<<2)
+#define SCTLR_Axx_ELx_A     (_AC(1,U)<<1)
+#define SCTLR_Axx_ELx_M     (_AC(1,U)<<0)
 
 #define HSCTLR_BASE     _AC(0x30c51878,U)
 

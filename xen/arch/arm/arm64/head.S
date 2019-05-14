@@ -514,8 +514,8 @@ virtphys_clash:
 
         ldr   x1, =paging            /* Explicit vaddr, not RIP-relative */
         mrs   x0, SCTLR_EL2
-        orr   x0, x0, #SCTLR_M       /* Enable MMU */
-        orr   x0, x0, #SCTLR_C       /* Enable D-cache */
+        orr   x0, x0, #SCTLR_Axx_ELx_M  /* Enable MMU */
+        orr   x0, x0, #SCTLR_Axx_ELx_C  /* Enable D-cache */
         dsb   sy                     /* Flush PTE writes and finish reads */
         msr   SCTLR_EL2, x0          /* now paging is enabled */
         isb                          /* Now, flush the icache */
