@@ -1374,6 +1374,8 @@ _hidden int libxl__device_nextid(libxl__gc *gc, uint32_t domid,
 _hidden int libxl__resolve_domid(libxl__gc *gc, const char *name,
                                  uint32_t *domid);
 
+_hidden int libxl__domain_set_device_model(libxl__gc *gc,
+                                           libxl_domain_config *d_config);
 /*
  * For each aggregate type which can be used as an input we provide:
  *
