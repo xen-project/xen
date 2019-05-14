@@ -601,6 +601,19 @@ void __init remove_early_mappings(void)
     flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, BOOT_FDT_SLOT_SIZE);
 }
 
+/*
+ * After boot, Xen page-tables should not contain mapping that are both
+ * Writable and eXecutables.
+ *
+ * This should be called on each CPU to enforce the policy.
+ */
+static void xen_pt_enforce_wnx(void)
+{
+    WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
+    /* Flush everything after setting WXN bit. */
+    flush_xen_text_tlb_local();
+}
+
 extern void switch_ttbr(uint64_t ttbr);
 
 /* Clear a translation table and clean & invalidate the cache */
@@ -702,10 +715,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     clear_table(boot_second);
     clear_table(boot_third);
 
-    /* From now on, no mapping may be both writable and executable. */
-    WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
-    /* Flush everything after setting WXN bit. */
-    flush_xen_text_tlb_local();
+    xen_pt_enforce_wnx();
 
 #ifdef CONFIG_ARM_32
     per_cpu(xen_pgtable, 0) = cpu0_pgtable;
@@ -777,9 +787,7 @@ int init_secondary_pagetables(int cpu)
 /* MMU setup for secondary CPUS (which already have paging enabled) */
 void mmu_init_secondary_cpu(void)
 {
-    /* From now on, no mapping may be both writable and executable. */
-    WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
-    flush_xen_text_tlb_local();
+    xen_pt_enforce_wnx();
 }
 
 #ifdef CONFIG_ARM_32
