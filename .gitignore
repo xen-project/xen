@@ -30,6 +30,7 @@ cscope.out
 cscope.po.out
 .config
 .vimrc
+.vscode
 
 dist
 stubdom/*.tar.gz
