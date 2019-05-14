@@ -181,6 +181,13 @@ Various tools, such as pygrub, have the following runtime dependencies:
           URL:    http://www.python.org/
           Debian: python
 
+Note that the build system expects `python` to be available. If your system
+only has `python2` or `python3` but not `python` (as in Linux From Scratch),
+you will need to create a symlink for it, or specify PYTHON= when invoking
+make, like (note the position of PYTHON= matters):
+
+    # make PYTHON=/usr/bin/python3
+
 Intel(R) Trusted Execution Technology Support
 =============================================
 
