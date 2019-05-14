@@ -849,22 +849,14 @@ guest_physmap_remove_page(struct domain *d, gfn_t gfn,
 }
 
 int
-guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
-                        unsigned int page_order, p2m_type_t t)
+guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
+                       unsigned int page_order)
 {
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    unsigned long i;
-    gfn_t ogfn;
-    p2m_type_t ot;
-    p2m_access_t a;
-    mfn_t omfn;
-    int pod_count = 0;
-    int rc = 0;
-
     /* IOMMU for PV guests is handled in get_page_type() and put_page(). */
     if ( !paging_mode_translate(d) )
     {
         struct page_info *page = mfn_to_page(mfn);
+        unsigned long i;
 
         /*
          * Our interface for PV guests wrt IOMMU entries hasn't been very
@@ -877,7 +869,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
          * any guest-requested type changes succeed and remove the IOMMU
          * entry).
          */
-        if ( !need_iommu_pt_sync(d) || t != p2m_ram_rw )
+        if ( !need_iommu_pt_sync(d) )
             return 0;
 
         for ( i = 0; i < (1UL << page_order); ++i, ++page )
@@ -889,6 +881,29 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
         }
 
         return 0;
+    }
+
+    return guest_physmap_add_entry(d, gfn, mfn, page_order, p2m_ram_rw);
+}
+
+#ifdef CONFIG_HVM
+int
+guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
+                        unsigned int page_order, p2m_type_t t)
+{
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned long i;
+    gfn_t ogfn;
+    p2m_type_t ot;
+    p2m_access_t a;
+    mfn_t omfn;
+    int pod_count = 0;
+    int rc = 0;
+
+    if ( !paging_mode_translate(d) )
+    {
+        ASSERT_UNREACHABLE();
+        return -EPERM;
     }
 
     /* foreign pages are added thru p2m_add_foreign */
@@ -1014,7 +1029,6 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                  gfn_x(gfn), mfn_x(mfn));
         rc = p2m_set_entry(p2m, gfn, INVALID_MFN, page_order,
                            p2m_invalid, p2m->default_access);
-#ifdef CONFIG_HVM
         if ( rc == 0 )
         {
             pod_lock(p2m);
@@ -1022,7 +1036,6 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
             BUG_ON(p2m->pod.entry_count < 0);
             pod_unlock(p2m);
         }
-#endif
     }
 
 out:
@@ -1030,7 +1043,7 @@ out:
 
     return rc;
 }
-
+#endif
 
 /*
  * Modify the p2m type of a single gfn from ot to nt.
