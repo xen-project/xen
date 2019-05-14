@@ -47,9 +47,20 @@ int libxl__domain_set_device_model(libxl__gc *gc, libxl_domain_config *d_config)
         }
         break;
     default:
-        b_info->device_model_version =
-            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-        break;
+        ret = libxl__need_xenpv_qemu(gc, d_config);
+        switch (ret) {
+        case 1:
+            d_config->b_info.device_model_version =
+                LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+            break;
+        case 0:
+            d_config->b_info.device_model_version =
+                LIBXL_DEVICE_MODEL_VERSION_NONE;
+            break;
+        default:
+            LOGE(ERROR, "Unable to determine QEMU requisite");
+            return ret;
+        }
     }
 
     if (b_info->device_model_version == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {

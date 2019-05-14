@@ -379,7 +379,9 @@ static void domain_suspend_common_guest_suspended(libxl__egc *egc,
     libxl__ev_xswatch_deregister(gc, &dsps->guest_watch);
     libxl__ev_time_deregister(gc, &dsps->guest_timeout);
 
-    if (dsps->type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (dsps->type == LIBXL_DOMAIN_TYPE_HVM ||
+        libxl__device_model_version_running(gc, dsps->domid) ==
+        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
         dsps->callback_device_model_done = domain_suspend_common_done;
         libxl__domain_suspend_device_model(egc, dsps); /* must be last */
         return;
@@ -459,7 +461,9 @@ int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
         goto out;
     }
 
-    if (type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (type == LIBXL_DOMAIN_TYPE_HVM ||
+        libxl__device_model_version_running(gc, domid) ==
+        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
         rc = libxl__domain_resume_device_model(gc, domid);
         if (rc) {
             LOGD(ERROR, domid, "failed to resume device model:%d", rc);
