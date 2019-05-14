@@ -38,12 +38,12 @@
 #define GITS_PIDR2                      GICR_PIDR2
 
 /* Register bits */
-#define GITS_VALID_BIT                  BIT(63)
+#define GITS_VALID_BIT                  BIT(63, UL)
 
-#define GITS_CTLR_QUIESCENT             BIT(31)
-#define GITS_CTLR_ENABLE                BIT(0)
+#define GITS_CTLR_QUIESCENT             BIT(31, UL)
+#define GITS_CTLR_ENABLE                BIT(0, UL)
 
-#define GITS_TYPER_PTA                  BIT(19)
+#define GITS_TYPER_PTA                  BIT(19, UL)
 #define GITS_TYPER_DEVIDS_SHIFT         13
 #define GITS_TYPER_DEVIDS_MASK          (0x1fUL << GITS_TYPER_DEVIDS_SHIFT)
 #define GITS_TYPER_DEVICE_ID_BITS(r)    (((r & GITS_TYPER_DEVIDS_MASK) >> \
@@ -60,7 +60,7 @@
                                                  GITS_TYPER_ITT_SIZE_SHIFT) + 1)
 #define GITS_TYPER_PHYSICAL             (1U << 0)
 
-#define GITS_BASER_INDIRECT             BIT(62)
+#define GITS_BASER_INDIRECT             BIT(62, UL)
 #define GITS_BASER_INNER_CACHEABILITY_SHIFT        59
 #define GITS_BASER_TYPE_SHIFT           56
 #define GITS_BASER_TYPE_MASK            (7ULL << GITS_BASER_TYPE_SHIFT)

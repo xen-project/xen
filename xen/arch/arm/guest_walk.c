@@ -327,8 +327,8 @@ static unsigned int get_top_bit(struct domain *d, vaddr_t gva, register_t tcr)
         topbit = 31;
     else
     {
-        if ( ((gva & BIT_ULL(55)) && (tcr & TCR_EL1_TBI1)) ||
-             (!(gva & BIT_ULL(55)) && (tcr & TCR_EL1_TBI0)) )
+        if ( ((gva & BIT(55, ULL)) && (tcr & TCR_EL1_TBI1)) ||
+             (!(gva & BIT(55, ULL)) && (tcr & TCR_EL1_TBI0)) )
             topbit = 55;
         else
             topbit = 63;
@@ -419,7 +419,7 @@ static bool guest_walk_ld(const struct vcpu *v,
     {
         /* Select the TTBR(0|1)_EL1 that will be used for address translation. */
 
-        if ( (gva & BIT_ULL(topbit)) == 0 )
+        if ( (gva & BIT(topbit, ULL)) == 0 )
         {
             input_size = 64 - t0_sz;
 
@@ -554,7 +554,7 @@ static bool guest_walk_ld(const struct vcpu *v,
          * inherited by page table attributes (ARM DDI 0487B.a J1-5928).
          */
         xn_table |= pte.pt.xnt;             /* Execute-Never */
-        ro_table |= pte.pt.apt & BIT(1);    /* Read-Only */
+        ro_table |= pte.pt.apt & BIT(1, UL);/* Read-Only */
 
         /* Compute the base address of the next level translation table. */
         mask = GENMASK_ULL(47, grainsizes[gran]);

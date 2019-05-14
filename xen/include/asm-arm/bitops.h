@@ -21,10 +21,8 @@
 #define __clear_bit(n,p)          clear_bit(n,p)
 
 #define BITS_PER_WORD           32
-#define BIT(nr)                 (1UL << (nr))
 #define BIT_MASK(nr)            (1UL << ((nr) % BITS_PER_WORD))
 #define BIT_WORD(nr)            ((nr) / BITS_PER_WORD)
-#define BIT_ULL(nr)             (1ULL << (nr))
 #define BITS_PER_BYTE           8
 
 #define ADDR (*(volatile int *) addr)

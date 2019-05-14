@@ -58,7 +58,7 @@ int32_t aarch32_get_branch_offset(uint32_t insn)
      * Check the imm signed bit. If the imm is a negative value, we
      * have to extend the imm to a full 32 bit negative value.
      */
-    if ( imm & BIT(23) )
+    if ( imm & BIT(23, UL) )
         imm |= GENMASK(31, 24);
 
     return (int32_t)(imm << 2);

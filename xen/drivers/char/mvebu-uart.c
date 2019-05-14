@@ -29,27 +29,27 @@
 #define UART_TX_REG             0x04
 
 #define UART_CTRL_REG           0x08
-#define CTRL_TXFIFO_RST         BIT(15)
-#define CTRL_RXFIFO_RST         BIT(14)
-#define CTRL_TX_RDY_INT         BIT(5)
-#define CTRL_RX_RDY_INT         BIT(4)
-#define CTRL_BRK_DET_INT        BIT(3)
-#define CTRL_FRM_ERR_INT        BIT(2)
-#define CTRL_PAR_ERR_INT        BIT(1)
-#define CTRL_OVR_ERR_INT        BIT(0)
+#define CTRL_TXFIFO_RST         BIT(15, UL)
+#define CTRL_RXFIFO_RST         BIT(14, UL)
+#define CTRL_TX_RDY_INT         BIT(5, UL)
+#define CTRL_RX_RDY_INT         BIT(4, UL)
+#define CTRL_BRK_DET_INT        BIT(3, UL)
+#define CTRL_FRM_ERR_INT        BIT(2, UL)
+#define CTRL_PAR_ERR_INT        BIT(1, UL)
+#define CTRL_OVR_ERR_INT        BIT(0, UL)
 #define CTRL_ERR_INT            (CTRL_BRK_DET_INT | CTRL_FRM_ERR_INT | \
                                  CTRL_PAR_ERR_INT | CTRL_OVR_ERR_INT)
 
 #define UART_STATUS_REG         0x0c
-#define STATUS_TXFIFO_EMP       BIT(13)
-#define STATUS_TXFIFO_FUL       BIT(11)
-#define STATUS_TXFIFO_HFL       BIT(10)
-#define STATUS_TX_RDY           BIT(5)
-#define STATUS_RX_RDY           BIT(4)
-#define STATUS_BRK_DET          BIT(3)
-#define STATUS_FRM_ERR          BIT(2)
-#define STATUS_PAR_ERR          BIT(1)
-#define STATUS_OVR_ERR          BIT(0)
+#define STATUS_TXFIFO_EMP       BIT(13, UL)
+#define STATUS_TXFIFO_FUL       BIT(11, UL)
+#define STATUS_TXFIFO_HFL       BIT(10, UL)
+#define STATUS_TX_RDY           BIT(5, UL)
+#define STATUS_RX_RDY           BIT(4, UL)
+#define STATUS_BRK_DET          BIT(3, UL)
+#define STATUS_FRM_ERR          BIT(2, UL)
+#define STATUS_PAR_ERR          BIT(1, UL)
+#define STATUS_OVR_ERR          BIT(0, UL)
 #define STATUS_BRK_ERR          (STATUS_BRK_DET | STATUS_FRM_ERR | \
                                  STATUS_PAR_ERR | STATUS_OVR_ERR)
 

@@ -31,16 +31,16 @@
 #define AML_UART_MISC_REG               0x10
 
 /* UART_CONTROL bits */
-#define AML_UART_TX_RST                 BIT(22)
-#define AML_UART_RX_RST                 BIT(23)
-#define AML_UART_CLEAR_ERR              BIT(24)
-#define AML_UART_RX_INT_EN              BIT(27)
-#define AML_UART_TX_INT_EN              BIT(28)
+#define AML_UART_TX_RST                 BIT(22, UL)
+#define AML_UART_RX_RST                 BIT(23, UL)
+#define AML_UART_CLEAR_ERR              BIT(24, UL)
+#define AML_UART_RX_INT_EN              BIT(27, UL)
+#define AML_UART_TX_INT_EN              BIT(28, UL)
 
 /* UART_STATUS bits */
-#define AML_UART_RX_FIFO_EMPTY          BIT(20)
-#define AML_UART_TX_FIFO_FULL           BIT(21)
-#define AML_UART_TX_FIFO_EMPTY          BIT(22)
+#define AML_UART_RX_FIFO_EMPTY          BIT(20, UL)
+#define AML_UART_TX_FIFO_FULL           BIT(21, UL)
+#define AML_UART_TX_FIFO_EMPTY          BIT(22, UL)
 #define AML_UART_TX_CNT_MASK            GENMASK(14, 8)
 
 /* AML_UART_MISC bits */

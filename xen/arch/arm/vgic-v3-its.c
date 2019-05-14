@@ -97,7 +97,7 @@ typedef uint16_t coll_table_entry_t;
  */
 typedef uint64_t dev_table_entry_t;
 #define DEV_TABLE_ITT_ADDR(x) ((x) & GENMASK(51, 8))
-#define DEV_TABLE_ITT_SIZE(x) (BIT(((x) & GENMASK(4, 0)) + 1))
+#define DEV_TABLE_ITT_SIZE(x) (BIT(((x) & GENMASK(4, 0)) + 1, UL))
 #define DEV_TABLE_ENTRY(addr, bits)                     \
         (((addr) & GENMASK(51, 8)) | (((bits) - 1) & GENMASK(4, 0)))
 
@@ -111,7 +111,7 @@ typedef uint64_t dev_table_entry_t;
  */
 static paddr_t get_baser_phys_addr(uint64_t reg)
 {
-    if ( reg & BIT(9) )
+    if ( reg & BIT(9, UL) )
         return (reg & GENMASK(47, 16)) |
                 ((reg & GENMASK(15, 12)) << 36);
     else
@@ -125,7 +125,7 @@ static int its_set_collection(struct virt_its *its, uint16_t collid,
     paddr_t addr = get_baser_phys_addr(its->baser_coll);
 
     /* The collection table entry must be able to store a VCPU ID. */
-    BUILD_BUG_ON(BIT(sizeof(coll_table_entry_t) * 8) < MAX_VIRT_CPUS);
+    BUILD_BUG_ON(BIT(sizeof(coll_table_entry_t) * 8, UL) < MAX_VIRT_CPUS);
 
     ASSERT(spin_is_locked(&its->its_lock));
 
@@ -690,7 +690,7 @@ static int its_handle_mapd(struct virt_its *its, uint64_t *cmdptr)
          */
         ret = gicv3_its_map_guest_device(its->d, its->doorbell_address, devid,
                                          its->doorbell_address, devid,
-                                         BIT(size), valid);
+                                         BIT(size, UL), valid);
         if ( ret && valid )
             return ret;
     }
@@ -1356,8 +1356,8 @@ static int vgic_v3_its_mmio_write(struct vcpu *v, mmio_info_t *info,
         if ( reg & GITS_VALID_BIT )
         {
             its->max_devices = its_baser_nr_entries(reg);
-            if ( its->max_devices > BIT(its->devid_bits) )
-                its->max_devices = BIT(its->devid_bits);
+            if ( its->max_devices > BIT(its->devid_bits, UL) )
+                its->max_devices = BIT(its->devid_bits, UL);
         }
         else
             its->max_devices = 0;

@@ -363,11 +363,12 @@ static int its_map_baser(void __iomem *basereg, uint64_t regc,
      * attributes), retrying if necessary.
      */
 retry:
-    table_size = ROUNDUP(nr_items * entry_size, BIT(BASER_PAGE_BITS(pagesz)));
+    table_size = ROUNDUP(nr_items * entry_size,
+                         BIT(BASER_PAGE_BITS(pagesz), UL));
     /* The BASE registers support at most 256 pages. */
     table_size = min(table_size, 256U << BASER_PAGE_BITS(pagesz));
 
-    buffer = _xzalloc(table_size, BIT(BASER_PAGE_BITS(pagesz)));
+    buffer = _xzalloc(table_size, BIT(BASER_PAGE_BITS(pagesz), UL));
     if ( !buffer )
         return -ENOMEM;
 
@@ -483,7 +484,7 @@ static int gicv3_its_init_single_its(struct host_its *hw_its)
         case GITS_BASER_TYPE_NONE:
             continue;
         case GITS_BASER_TYPE_DEVICE:
-            ret = its_map_baser(basereg, reg, BIT(hw_its->devid_bits));
+            ret = its_map_baser(basereg, reg, BIT(hw_its->devid_bits, UL));
             if ( ret )
                 return ret;
             break;
@@ -635,7 +636,7 @@ int gicv3_its_map_guest_device(struct domain *d,
         return ret;
 
     /* Sanitise the provided hardware values against the host ITS. */
-    if ( host_devid >= BIT(hw_its->devid_bits) )
+    if ( host_devid >= BIT(hw_its->devid_bits, UL) )
         return -EINVAL;
 
     /*
@@ -645,10 +646,10 @@ int gicv3_its_map_guest_device(struct domain *d,
      * TODO: Investigate if the number of events can be limited to smaller
      * values if the guest does not require that many.
      */
-    nr_events = BIT(fls(nr_events - 1));
+    nr_events = BIT(fls(nr_events - 1), UL);
     if ( nr_events < LPI_BLOCK )
         nr_events = LPI_BLOCK;
-    if ( nr_events >= BIT(hw_its->evid_bits) )
+    if ( nr_events >= BIT(hw_its->evid_bits, UL) )
         return -EINVAL;
 
     /* check for already existing mappings */

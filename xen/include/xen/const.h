@@ -21,4 +21,6 @@
 #define _AT(T,X)	((T)(X))
 #endif
 
+#define BIT(pos, sfx)   (_AC(1, sfx) << (pos))
+
 #endif /* __XEN_CONST_H__ */

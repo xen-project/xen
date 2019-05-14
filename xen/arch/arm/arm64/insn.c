@@ -45,40 +45,40 @@ static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
 
 	switch (type) {
 	case AARCH64_INSN_IMM_26:
-		mask = BIT(26) - 1;
+		mask = BIT(26, UL) - 1;
 		shift = 0;
 		break;
 	case AARCH64_INSN_IMM_19:
-		mask = BIT(19) - 1;
+		mask = BIT(19, UL) - 1;
 		shift = 5;
 		break;
 	case AARCH64_INSN_IMM_16:
-		mask = BIT(16) - 1;
+		mask = BIT(16, UL) - 1;
 		shift = 5;
 		break;
 	case AARCH64_INSN_IMM_14:
-		mask = BIT(14) - 1;
+		mask = BIT(14, UL) - 1;
 		shift = 5;
 		break;
 	case AARCH64_INSN_IMM_12:
-		mask = BIT(12) - 1;
+		mask = BIT(12, UL) - 1;
 		shift = 10;
 		break;
 	case AARCH64_INSN_IMM_9:
-		mask = BIT(9) - 1;
+		mask = BIT(9, UL) - 1;
 		shift = 12;
 		break;
 	case AARCH64_INSN_IMM_7:
-		mask = BIT(7) - 1;
+		mask = BIT(7, UL) - 1;
 		shift = 15;
 		break;
 	case AARCH64_INSN_IMM_6:
 	case AARCH64_INSN_IMM_S:
-		mask = BIT(6) - 1;
+		mask = BIT(6, UL) - 1;
 		shift = 10;
 		break;
 	case AARCH64_INSN_IMM_R:
-		mask = BIT(6) - 1;
+		mask = BIT(6, UL) - 1;
 		shift = 16;
 		break;
 	default:

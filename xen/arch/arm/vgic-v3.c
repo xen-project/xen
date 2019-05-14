@@ -442,7 +442,7 @@ static uint64_t sanitize_pendbaser(uint64_t reg)
 static void vgic_vcpu_enable_lpis(struct vcpu *v)
 {
     uint64_t reg = v->domain->arch.vgic.rdist_propbase;
-    unsigned int nr_lpis = BIT((reg & 0x1f) + 1);
+    unsigned int nr_lpis = BIT((reg & 0x1f) + 1, UL);
 
     /* rdists_enabled is protected by the domain lock. */
     ASSERT(spin_is_locked(&v->domain->arch.vgic.lock));

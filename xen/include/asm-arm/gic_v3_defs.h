@@ -149,9 +149,9 @@
 	(7UL << GICR_PENDBASER_INNER_CACHEABILITY_SHIFT)
 #define GICR_PENDBASER_OUTER_CACHEABILITY_MASK               \
         (7UL << GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT)
-#define GICR_PENDBASER_PTZ                              BIT(62)
+#define GICR_PENDBASER_PTZ                              BIT(62, UL)
 #define GICR_PENDBASER_RES0_MASK                             \
-        (BIT(63) | GENMASK(61, 59) | GENMASK(55, 52) |       \
+        (BIT(63, UL) | GENMASK(61, 59) | GENMASK(55, 52) |  \
          GENMASK(15, 12) | GENMASK(6, 0))
 
 #define DEFAULT_PMR_VALUE            0xff
