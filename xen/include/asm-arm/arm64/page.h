@@ -37,23 +37,12 @@ static inline void invalidate_icache(void)
     isb();
 }
 
-/*
- * Flush all hypervisor mappings from the TLB of the local processor.
- *
- * This is needed after changing Xen code mappings.
- *
- * The caller needs to issue the necessary DSB and D-cache flushes
- * before calling flush_xen_text_tlb.
- */
-static inline void flush_xen_text_tlb_local(void)
+/* Invalidate all instruction caches on the local processor to PoU */
+static inline void invalidate_icache_local(void)
 {
-    asm volatile (
-        "isb;"       /* Ensure synchronization with previous changes to text */
-        "tlbi   alle2;"                 /* Flush hypervisor TLB */
-        "ic     iallu;"                 /* Flush I-cache */
-        "dsb    sy;"                    /* Ensure completion of TLB flush */
-        "isb;"
-        : : : "memory");
+    asm volatile ("ic iallu");
+    dsb(nsh);               /* Ensure completion of the I-cache flush */
+    isb();
 }
 
 /*

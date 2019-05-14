@@ -610,8 +610,12 @@ void __init remove_early_mappings(void)
 static void xen_pt_enforce_wnx(void)
 {
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
-    /* Flush everything after setting WXN bit. */
-    flush_xen_text_tlb_local();
+    /*
+     * The TLBs may cache SCTLR_EL2.WXN. So ensure it is synchronized
+     * before flushing the TLBs.
+     */
+    isb();
+    flush_xen_data_tlb_local();
 }
 
 extern void switch_ttbr(uint64_t ttbr);
@@ -1123,7 +1127,7 @@ static void set_pte_flags_on_range(const char *p, unsigned long l, enum mg mg)
         }
         write_pte(xen_xenmap + i, pte);
     }
-    flush_xen_text_tlb_local();
+    flush_xen_data_tlb_local();
 }
 
 /* Release all __init and __initdata ranges to be reused */
@@ -1136,6 +1140,13 @@ void free_init_memory(void)
     uint32_t *p;
 
     set_pte_flags_on_range(__init_begin, len, mg_rw);
+
+    /*
+     * From now on, init will not be used for execution anymore,
+     * so nuke the instruction cache to remove entries related to init.
+     */
+    invalidate_icache_local();
+
 #ifdef CONFIG_ARM_32
     /* udf instruction i.e (see A8.8.247 in ARM DDI 0406C.c) */
     insn = 0xe7f000f0;
