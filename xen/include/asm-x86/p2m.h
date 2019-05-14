@@ -514,6 +514,7 @@ static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
         return mfn_x(mfn);
 }
 
+#ifdef CONFIG_HVM
 #define AP2MGET_prepopulate true
 #define AP2MGET_query false
 
@@ -525,6 +526,7 @@ static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
 int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
                                p2m_type_t *t, p2m_access_t *a,
                                bool prepopulate);
+#endif
 
 /* Deadlock-avoidance scheme when calling get_gfn on different gfn's */
 struct two_gfns {

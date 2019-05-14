@@ -478,42 +478,6 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m)
         mm_write_unlock(&p2m->lock);
 }
 
-int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
-                               p2m_type_t *t, p2m_access_t *a,
-                               bool prepopulate)
-{
-    *mfn = ap2m->get_entry(ap2m, gfn, t, a, 0, NULL, NULL);
-
-    /* Check host p2m if no valid entry in alternate */
-    if ( !mfn_valid(*mfn) && !p2m_is_hostp2m(ap2m) )
-    {
-        struct p2m_domain *hp2m = p2m_get_hostp2m(ap2m->domain);
-        unsigned int page_order;
-        int rc;
-
-        *mfn = __get_gfn_type_access(hp2m, gfn_x(gfn), t, a,
-                                     P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
-
-        rc = -ESRCH;
-        if ( !mfn_valid(*mfn) || *t != p2m_ram_rw )
-            return rc;
-
-        /* If this is a superpage, copy that first */
-        if ( prepopulate && page_order != PAGE_ORDER_4K )
-        {
-            unsigned long mask = ~((1UL << page_order) - 1);
-            gfn_t gfn_aligned = _gfn(gfn_x(gfn) & mask);
-            mfn_t mfn_aligned = _mfn(mfn_x(*mfn) & mask);
-
-            rc = ap2m->set_entry(ap2m, gfn_aligned, mfn_aligned, page_order, *t, *a, 1);
-            if ( rc )
-                return rc;
-        }
-    }
-
-    return 0;
-}
-
 mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
                     unsigned int *page_order, bool_t locked)
@@ -2377,6 +2341,42 @@ int unmap_mmio_regions(struct domain *d,
 }
 
 #ifdef CONFIG_HVM
+
+int altp2m_get_effective_entry(struct p2m_domain *ap2m, gfn_t gfn, mfn_t *mfn,
+                               p2m_type_t *t, p2m_access_t *a,
+                               bool prepopulate)
+{
+    *mfn = ap2m->get_entry(ap2m, gfn, t, a, 0, NULL, NULL);
+
+    /* Check host p2m if no valid entry in alternate */
+    if ( !mfn_valid(*mfn) && !p2m_is_hostp2m(ap2m) )
+    {
+        struct p2m_domain *hp2m = p2m_get_hostp2m(ap2m->domain);
+        unsigned int page_order;
+        int rc;
+
+        *mfn = __get_gfn_type_access(hp2m, gfn_x(gfn), t, a,
+                                     P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
+
+        rc = -ESRCH;
+        if ( !mfn_valid(*mfn) || *t != p2m_ram_rw )
+            return rc;
+
+        /* If this is a superpage, copy that first */
+        if ( prepopulate && page_order != PAGE_ORDER_4K )
+        {
+            unsigned long mask = ~((1UL << page_order) - 1);
+            gfn_t gfn_aligned = _gfn(gfn_x(gfn) & mask);
+            mfn_t mfn_aligned = _mfn(mfn_x(*mfn) & mask);
+
+            rc = ap2m->set_entry(ap2m, gfn_aligned, mfn_aligned, page_order, *t, *a, 1);
+            if ( rc )
+                return rc;
+        }
+    }
+
+    return 0;
+}
 
 void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
 {
