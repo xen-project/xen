@@ -492,4 +492,17 @@ AC_ARG_ENABLE([9pfs],
 
 AC_SUBST(ninepfs)
 
+AC_ARG_ENABLE([pvshim],
+    AS_HELP_STRING([--disable-pvshim],
+                   [Disable pvshim build (enabled by default on 64bit x86)]),
+    [AS_IF([test "x$enable_pvshim" = "xno"], [pvshim=n], [pvshim=y])], [
+    cpu=`test -z "$target_cpu" && echo "$host_cpu" || echo "$target_cpu"`
+    case "$cpu" in
+        x86_64)
+           pvshim="y";;
+        *) pvshim="n";;
+    esac
+])
+AC_SUBST(pvshim)
+
 AC_OUTPUT()

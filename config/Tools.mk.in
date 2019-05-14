@@ -75,3 +75,5 @@ TINFO_LIBS          := @TINFO_LIBS@
 ARGP_LDFLAGS        := @argp_ldflags@
 
 FILE_OFFSET_BITS    := @FILE_OFFSET_BITS@
+
+CONFIG_PV_SHIM      := @pvshim@
