@@ -409,7 +409,7 @@ int iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->lookup_page )
         return -EOPNOTSUPP;
 
     return hd->platform_ops->lookup_page(d, dfn, mfn, flags);
