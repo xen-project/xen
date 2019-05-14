@@ -225,7 +225,6 @@ XEN_BUILD_TIME=hh:mm:ss
 SMBIOS_REL_DATE=mm/dd/yyyy
 VGABIOS_REL_DATE="dd Mon yyyy"
 
-During tools build external repos will be cloned into the source tree.
 This variable can be used to point to a different git binary to be used.
 GIT=
 
