@@ -115,20 +115,20 @@
 
 /* Bits specific to SCTLR_EL1 for Arm32 */
 
-#define SCTLR_A32_EL1_V     (_AC(1,U)<<13)
+#define SCTLR_A32_EL1_V     BIT(13, UL)
 
 /* Common bits for SCTLR_ELx for Arm32 */
 
-#define SCTLR_A32_ELx_TE    (_AC(1,U)<<30)
-#define SCTLR_A32_ELx_FI    (_AC(1,U)<<21)
+#define SCTLR_A32_ELx_TE    BIT(30, UL)
+#define SCTLR_A32_ELx_FI    BIT(21, UL)
 
 /* Common bits for SCTLR_ELx on all architectures */
-#define SCTLR_Axx_ELx_EE    (_AC(1,U)<<25)
-#define SCTLR_Axx_ELx_WXN   (_AC(1,U)<<19)
-#define SCTLR_Axx_ELx_I     (_AC(1,U)<<12)
-#define SCTLR_Axx_ELx_C     (_AC(1,U)<<2)
-#define SCTLR_Axx_ELx_A     (_AC(1,U)<<1)
-#define SCTLR_Axx_ELx_M     (_AC(1,U)<<0)
+#define SCTLR_Axx_ELx_EE    BIT(25, UL)
+#define SCTLR_Axx_ELx_WXN   BIT(19, UL)
+#define SCTLR_Axx_ELx_I     BIT(12, UL)
+#define SCTLR_Axx_ELx_C     BIT(2, UL)
+#define SCTLR_Axx_ELx_A     BIT(1, UL)
+#define SCTLR_Axx_ELx_M     BIT(0, UL)
 
 #define HSCTLR_BASE     _AC(0x30c51878,U)
 
