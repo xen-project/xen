@@ -657,6 +657,15 @@ typedef struct libxl__ctx libxl_ctx;
 #define LIBXL_HAVE_BUILDINFO_VCPU_AFFINITY_ARRAYS 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_VKB_DEVICE
+ *
+ * If this is defined, then the libxl_domain_build_info structure will
+ * contain a boolean hvm.vkb_device which instructs libxl whether to include
+ * a vkbd at build time or not.
+ */
+#define LIBXL_HAVE_BUILDINFO_VKB_DEVICE 1
+
+/*
  * LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST
  *
  * If this is defined, then the libxl_domain_build_info structure will

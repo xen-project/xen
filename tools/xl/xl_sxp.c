@@ -138,6 +138,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config, FILE *fh)
         fprintf(fh, "\t\t\t(boot %s)\n", b_info->u.hvm.boot);
         fprintf(fh, "\t\t\t(usb %s)\n", libxl_defbool_to_string(b_info->u.hvm.usb));
         fprintf(fh, "\t\t\t(usbdevice %s)\n", b_info->u.hvm.usbdevice);
+        fprintf(fh, "\t\t\t(vkb_device %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.vkb_device));
         fprintf(fh, "\t\t)\n");
         break;
     case LIBXL_DOMAIN_TYPE_PV:

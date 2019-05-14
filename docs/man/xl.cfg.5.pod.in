@@ -2423,6 +2423,10 @@ devices are defined by the device model configuration, please see the
 B<qemu(1)> manpage for details. The default is not to export any sound
 device.
 
+=item B<vkb_device=BOOLEAN>
+
+Specifies that the HVM guest gets a vkdb. The default is true (1).
+
 =item B<usb=BOOLEAN>
 
 Enables or disables an emulated USB bus in the guest.

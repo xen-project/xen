@@ -2652,6 +2652,7 @@ skip_usbdev:
             fprintf(stderr,"xl: Unable to parse usbdevice.\n");
             exit(-ERROR_FAIL);
         }
+        xlu_cfg_get_defbool(config, "vkb_device", &b_info->u.hvm.vkb_device, 0);
         xlu_cfg_replace_string (config, "soundhw", &b_info->u.hvm.soundhw, 0);
         xlu_cfg_get_defbool(config, "xen_platform_pci",
                             &b_info->u.hvm.xen_platform_pci, 0);
