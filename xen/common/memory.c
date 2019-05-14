@@ -268,16 +268,10 @@ static void populate_physmap(struct memop_args *a)
 
             guest_physmap_add_page(d, _gfn(gpfn), mfn, a->extent_order);
 
-            if ( !paging_mode_translate(d) )
-            {
-                for ( j = 0; j < (1U << a->extent_order); j++ )
-                    set_gpfn_from_mfn(mfn_x(mfn_add(mfn, j)), gpfn + j);
-
-                /* Inform the domain of the new page's machine address. */ 
-                if ( unlikely(__copy_mfn_to_guest_offset(a->extent_list, i,
-                                                         mfn)) )
-                    goto out;
-            }
+            if ( !paging_mode_translate(d) &&
+                 /* Inform the domain of the new page's machine address. */
+                 unlikely(__copy_mfn_to_guest_offset(a->extent_list, i, mfn)) )
+                goto out;
         }
     }
 
@@ -753,15 +747,11 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
             guest_physmap_add_page(d, _gfn(gpfn), mfn,
                                    exch.out.extent_order);
 
-            if ( !paging_mode_translate(d) )
-            {
-                for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
-                    set_gpfn_from_mfn(mfn_x(mfn_add(mfn, k)), gpfn + k);
-                if ( __copy_mfn_to_guest_offset(exch.out.extent_start,
-                                                (i << out_chunk_order) + j,
-                                                mfn) )
-                    rc = -EFAULT;
-            }
+            if ( !paging_mode_translate(d) &&
+                 __copy_mfn_to_guest_offset(exch.out.extent_start,
+                                            (i << out_chunk_order) + j,
+                                            mfn) )
+                rc = -EFAULT;
         }
         BUG_ON( !(d->is_dying) && (j != (1UL << out_chunk_order)) );
 

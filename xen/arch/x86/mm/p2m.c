@@ -869,15 +869,16 @@ guest_physmap_add_page(struct domain *d, gfn_t gfn, mfn_t mfn,
          * any guest-requested type changes succeed and remove the IOMMU
          * entry).
          */
-        if ( !need_iommu_pt_sync(d) )
-            return 0;
-
         for ( i = 0; i < (1UL << page_order); ++i, ++page )
         {
-            if ( get_page_and_type(page, d, PGT_writable_page) )
+            if ( !need_iommu_pt_sync(d) )
+                /* nothing */;
+            else if ( get_page_and_type(page, d, PGT_writable_page) )
                 put_page_and_type(page);
             else
                 return -EINVAL;
+
+            set_gpfn_from_mfn(mfn_x(mfn) + i, gfn_x(gfn) + i);
         }
 
         return 0;
