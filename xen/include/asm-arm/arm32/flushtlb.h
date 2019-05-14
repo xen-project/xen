@@ -2,7 +2,7 @@
 #define __ASM_ARM_ARM32_FLUSHTLB_H__
 
 /* Flush local TLBs, current VMID only */
-static inline void flush_tlb_local(void)
+static inline void flush_guest_tlb_local(void)
 {
     dsb(sy);
 
@@ -13,7 +13,7 @@ static inline void flush_tlb_local(void)
 }
 
 /* Flush inner shareable TLBs, current VMID only */
-static inline void flush_tlb(void)
+static inline void flush_guest_tlb(void)
 {
     dsb(sy);
 
@@ -24,7 +24,7 @@ static inline void flush_tlb(void)
 }
 
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
-static inline void flush_tlb_all_local(void)
+static inline void flush_all_guests_tlb_local(void)
 {
     dsb(sy);
 
@@ -35,7 +35,7 @@ static inline void flush_tlb_all_local(void)
 }
 
 /* Flush innershareable TLBs, all VMIDs, non-hypervisor mode */
-static inline void flush_tlb_all(void)
+static inline void flush_all_guests_tlb(void)
 {
     dsb(sy);
 

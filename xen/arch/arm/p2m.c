@@ -151,7 +151,7 @@ void p2m_restore_state(struct vcpu *n)
      * when running multiple vCPU of the same domain on a single pCPU.
      */
     if ( *last_vcpu_ran != INVALID_VCPU_ID && *last_vcpu_ran != n->vcpu_id )
-        flush_tlb_local();
+        flush_guest_tlb_local();
 
     *last_vcpu_ran = n->vcpu_id;
 }
@@ -196,7 +196,7 @@ static void p2m_force_tlb_flush_sync(struct p2m_domain *p2m)
         isb();
     }
 
-    flush_tlb();
+    flush_guest_tlb();
 
     if ( ovttbr != READ_SYSREG64(VTTBR_EL2) )
     {
@@ -1969,7 +1969,7 @@ static void setup_virt_paging_one(void *data)
         WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_VM, HCR_EL2);
         isb();
 
-        flush_tlb_all_local();
+        flush_all_guests_tlb_local();
     }
 }
 

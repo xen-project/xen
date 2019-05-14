@@ -1921,7 +1921,7 @@ static void do_trap_stage2_abort_guest(struct cpu_user_regs *regs,
          * still be inaccurate.
          */
         if ( !is_data )
-            flush_tlb_local();
+            flush_guest_tlb_local();
 
         rc = gva_to_ipa(gva, &gpa, GV2M_READ);
         /*
