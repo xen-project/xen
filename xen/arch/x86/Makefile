@@ -139,7 +139,7 @@ $(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
 	$(NM) -pa --format=sysv $(@D)/$(@F) \
 		| $(BASEDIR)/tools/symbols --xensyms --sysv --sort \
 		>$(@D)/$(@F).map
-	rm -f $(@D)/.$(@F).[0-9]*
+	rm -f $(@D)/.$(@F).[0-9]* $(@D)/..$(@F).[0-9]*
 
 note.o: $(TARGET)-syms
 	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id  $(BASEDIR)/xen-syms $@.bin
@@ -192,7 +192,7 @@ $(TARGET).efi: prelink-efi.o $(note_file) efi.lds efi/relocs-dummy.o $(BASEDIR)/
 	if $(guard) false; then rm -f $@; echo 'EFI support disabled'; \
 	else $(NM) -pa --format=sysv $(@D)/$(@F) \
 		| $(BASEDIR)/tools/symbols --xensyms --sysv --sort >$(@D)/$(@F).map; fi
-	rm -f $(@D)/.$(@F).[0-9]*
+	rm -f $(@D)/.$(@F).[0-9]* $(@D)/..$(@F).[0-9]*
 
 efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o: $(BASEDIR)/arch/x86/efi/built_in.o
 efi/boot.init.o efi/runtime.o efi/compat.o efi/buildid.o: ;
@@ -223,3 +223,9 @@ clean::
 	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.o efi/.*.d efi/*.efi efi/disabled efi/mkreloc
 	rm -f boot/reloc.S boot/reloc.lnk boot/reloc.bin
 	rm -f note.o
+
+# Suppress loading of DEPS files for internal, temporary target files.  This
+# then also suppresses re-generation of the respective .*.d2 files.
+ifeq ($(filter-out .xen%.o,$(notdir $(MAKECMDGOALS))),)
+DEPS:=
+endif
