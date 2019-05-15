@@ -7,7 +7,7 @@ build-each-commit-gcc:
     XEN_TARGET_ARCH: x86_64
     CC: gcc
   script:
-    - ./automation/gitlab-ci/build-each-commit.sh 2>&1 | tee ../build-each-commit-gcc.log
+    - BASE=${BASE_SHA:-${CI_COMMIT_BEFORE_SHA}} TIP=${TIP_SHA:-${CI_COMMIT_SHA}} ./automation/gitlab-ci/build-each-commit.sh 2>&1 | tee ../build-each-commit-gcc.log
     - mv ../build-each-commit-gcc.log .
   artifacts:
     paths:
