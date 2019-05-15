@@ -8549,6 +8549,9 @@ x86_emulate(
         invoke_stub("", "", "+m" (mask) : "a" (&mask));
         put_stub(stub);
 
+        if ( rc != X86EMUL_OKAY )
+            goto done;
+
         state->simd_size = simd_none;
         break;
     }
