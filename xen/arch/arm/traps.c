@@ -1304,10 +1304,15 @@ int do_bug_frame(const struct cpu_user_regs *regs, vaddr_t pc)
 #ifdef CONFIG_ARM_64
 static void do_trap_brk(struct cpu_user_regs *regs, const union hsr hsr)
 {
-    /* HCR_EL2.TGE and MDCR_EL2.TDE are not set so we never receive
-     * software breakpoint exception for EL1 and EL0 here.
+    /*
+     * HCR_EL2.TGE and MDCR_EL2.TDR are currently not set. So we should
+     * never receive software breakpoing exception for EL1 and EL0 here.
      */
-    BUG_ON(!hyp_mode(regs));
+    if ( !hyp_mode(regs) )
+    {
+        domain_crash(current->domain);
+        return;
+    }
 
     switch ( hsr.brk.comment )
     {
