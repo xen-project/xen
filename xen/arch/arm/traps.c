@@ -914,21 +914,11 @@ static void _show_registers(const struct cpu_user_regs *regs,
 
     if ( guest_mode )
     {
-        if ( is_32bit_domain(v->domain) )
+        if ( psr_mode_is_32bit(regs) )
             show_registers_32(regs, ctxt, guest_mode, v);
 #ifdef CONFIG_ARM_64
-        else if ( is_64bit_domain(v->domain) )
-        {
-            if ( psr_mode_is_32bit(regs) )
-            {
-                BUG_ON(!usr_mode(regs));
-                show_registers_32(regs, ctxt, guest_mode, v);
-            }
-            else
-            {
-                show_registers_64(regs, ctxt, guest_mode, v);
-            }
-        }
+        else
+            show_registers_64(regs, ctxt, guest_mode, v);
 #endif
     }
     else
