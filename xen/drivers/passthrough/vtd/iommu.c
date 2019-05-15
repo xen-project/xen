@@ -2284,7 +2284,7 @@ int __init intel_vtd_setup(void)
          * not supported, since we count on this feature to
          * atomically update 16-byte IRTE in posted format.
          */
-        if ( !cap_intr_post(iommu->cap) || !cpu_has_cx16 )
+        if ( !cap_intr_post(iommu->cap) || !iommu_intremap || !cpu_has_cx16 )
             iommu_intpost = 0;
 
         if ( !vtd_ept_page_compatible(iommu) )
