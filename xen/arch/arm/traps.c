@@ -1650,12 +1650,9 @@ int check_conditional_instr(struct cpu_user_regs *regs, const union hsr hsr)
 void advance_pc(struct cpu_user_regs *regs, const union hsr hsr)
 {
     unsigned long itbits, cond, cpsr = regs->cpsr;
+    bool is_thumb = psr_mode_is_32bit(cpsr) && (cpsr & PSR_THUMB);
 
-    /* PSR_IT_MASK bits can only be set for 32-bit processors in Thumb mode. */
-    BUG_ON( (!psr_mode_is_32bit(cpsr)||!(cpsr&PSR_THUMB))
-            && (cpsr&PSR_IT_MASK) );
-
-    if ( cpsr&PSR_IT_MASK )
+    if ( is_thumb && (cpsr & PSR_IT_MASK) )
     {
         /* The ITSTATE[7:0] block is contained in CPSR[15:10],CPSR[26:25]
          *
