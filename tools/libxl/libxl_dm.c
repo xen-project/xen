@@ -2744,6 +2744,9 @@ static void device_model_spawn_outcome(libxl__egc *egc,
     STATE_AO_GC(dmss->spawn.ao);
     int ret2;
 
+    /* Convenience aliases */
+    libxl_domain_config *const d_config = dmss->guest_config;
+
     if (rc)
         LOGD(ERROR, dmss->guest_domid,
              "%s: spawn failed (rc=%d)", dmss->spawn.what, rc);
@@ -2758,6 +2761,11 @@ static void device_model_spawn_outcome(libxl__egc *egc,
             rc = ERROR_FAIL;
             goto out;
         }
+    }
+
+    if (d_config->b_info.device_model_version
+            == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+        libxl__qmp_initializations(gc, dmss->guest_domid, d_config);
     }
 
  out:

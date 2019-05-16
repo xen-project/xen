@@ -1557,19 +1557,9 @@ static void domcreate_devmodel_started(libxl__egc *egc,
     STATE_AO_GC(dmss->spawn.ao);
     int domid = dcs->guest_domid;
 
-    /* convenience aliases */
-    libxl_domain_config *const d_config = dcs->guest_config;
-
     if (ret) {
         LOGD(ERROR, domid, "device model did not start: %d", ret);
         goto error_out;
-    }
-
-    if (dcs->sdss.dm.guest_domid) {
-        if (d_config->b_info.device_model_version
-            == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-            libxl__qmp_initializations(gc, domid, d_config);
-        }
     }
 
     dcs->device_type_idx = -1;
