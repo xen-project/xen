@@ -984,7 +984,15 @@ static struct page_info *alloc_heap_pages(
     for ( i = 0; i < (1 << order); i++ )
     {
         /* Reference count must continuously be zero for free pages. */
-        BUG_ON((pg[i].count_info & ~PGC_need_scrub) != PGC_state_free);
+        if ( (pg[i].count_info & ~PGC_need_scrub) != PGC_state_free )
+        {
+            printk(XENLOG_ERR
+                   "pg[%u] MFN %"PRI_mfn" c=%#lx o=%u v=%#lx t=%#x\n",
+                   i, mfn_x(page_to_mfn(pg + i)),
+                   pg[i].count_info, pg[i].v.free.order,
+                   pg[i].u.free.val, pg[i].tlbflush_timestamp);
+            BUG();
+        }
 
         /* PGC_need_scrub can only be set if first_dirty is valid */
         ASSERT(first_dirty != INVALID_DIRTY_IDX || !(pg[i].count_info & PGC_need_scrub));
@@ -1393,6 +1401,11 @@ static void free_heap_pages(
             break;
 
         default:
+            printk(XENLOG_ERR
+                   "pg[%u] MFN %"PRI_mfn" c=%#lx o=%u v=%#lx t=%#x\n",
+                   i, mfn_x(page_to_mfn(pg + i)),
+                   pg[i].count_info, pg[i].v.free.order,
+                   pg[i].u.free.val, pg[i].tlbflush_timestamp);
             BUG();
         }
 
@@ -2336,7 +2349,15 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
 
             for ( i = 0; i < (1 << order); i++ )
             {
-                BUG_ON((pg[i].u.inuse.type_info & PGT_count_mask) != 0);
+                if ( pg[i].u.inuse.type_info & PGT_count_mask )
+                {
+                    printk(XENLOG_ERR
+                           "pg[%u] MFN %"PRI_mfn" c=%#lx o=%u v=%#lx t=%#x\n",
+                           i, mfn_x(page_to_mfn(pg + i)),
+                           pg[i].count_info, pg[i].v.free.order,
+                           pg[i].u.free.val, pg[i].tlbflush_timestamp);
+                    BUG();
+                }
                 arch_free_heap_page(d, &pg[i]);
             }
 
