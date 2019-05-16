@@ -734,6 +734,11 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
     uint32_t domid;
     int libxl_only = dev->backend_kind == LIBXL__DEVICE_KIND_NONE;
 
+    if (!libxl_only) {
+        be_path = libxl__device_backend_path(gc, dev);
+        fe_path = libxl__device_frontend_path(gc, dev);
+    }
+
     rc = libxl__get_domid(gc, &domid);
     if (rc) goto out;
 
