@@ -797,7 +797,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 
     if ( guest_mode )
     {
-        printk("USR: SP: %08"PRIx32" LR: %08"PRIregister"\n",
+        printk("USR: SP: %08"PRIx32" LR: %"PRIregister"\n",
                regs->sp_usr, regs->lr);
         printk("SVC: SP: %08"PRIx32" LR: %08"PRIx32" SPSR:%08"PRIx32"\n",
                regs->sp_svc, regs->lr_svc, regs->spsr_svc);
@@ -815,7 +815,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 #ifndef CONFIG_ARM_64
     else
     {
-        printk("HYP: SP: %08"PRIx32" LR: %08"PRIregister"\n", regs->sp, regs->lr);
+        printk("HYP: SP: %08"PRIx32" LR: %"PRIregister"\n", regs->sp, regs->lr);
     }
 #endif
     printk("\n");
@@ -823,7 +823,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
     if ( guest_mode )
     {
         printk("     SCTLR: %"PRIregister"\n", ctxt->sctlr_el1);
-        printk("       TCR: %08"PRIregister"\n", ctxt->tcr_el1);
+        printk("       TCR: %"PRIregister"\n", ctxt->tcr_el1);
         printk("     TTBR0: %016"PRIx64"\n", ctxt->ttbr0_el1);
         printk("     TTBR1: %016"PRIx64"\n", ctxt->ttbr1_el1);
         printk("      IFAR: %08"PRIx32", IFSR: %08"PRIx32"\n"
@@ -895,7 +895,7 @@ static void show_registers_64(const struct cpu_user_regs *regs,
         printk("   FAR_EL1: %016"PRIx64"\n", ctxt->far);
         printk("\n");
         printk(" SCTLR_EL1: %"PRIregister"\n", ctxt->sctlr_el1);
-        printk("   TCR_EL1: %08"PRIregister"\n", ctxt->tcr_el1);
+        printk("   TCR_EL1: %"PRIregister"\n", ctxt->tcr_el1);
         printk(" TTBR0_EL1: %016"PRIx64"\n", ctxt->ttbr0_el1);
         printk(" TTBR1_EL1: %016"PRIx64"\n", ctxt->ttbr1_el1);
         printk("\n");
@@ -934,7 +934,7 @@ static void _show_registers(const struct cpu_user_regs *regs,
     printk("\n");
 
     printk(" SCTLR_EL2: %08"PRIx32"\n", READ_SYSREG32(SCTLR_EL2));
-    printk("   HCR_EL2: %016"PRIregister"\n", READ_SYSREG(HCR_EL2));
+    printk("   HCR_EL2: %"PRIregister"\n", READ_SYSREG(HCR_EL2));
     printk(" TTBR0_EL2: %016"PRIx64"\n", READ_SYSREG64(TTBR0_EL2));
     printk("\n");
     printk("   ESR_EL2: %08"PRIx32"\n", regs->hsr);
