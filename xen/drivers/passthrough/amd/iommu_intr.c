@@ -503,7 +503,7 @@ static struct amd_iommu *_find_iommu_for_device(int seg, int bdf)
 {
     struct amd_iommu *iommu;
 
-    list_for_each_entry ( iommu, &amd_iommu_head, list )
+    for_each_amd_iommu ( iommu )
         if ( iommu->seg == seg && iommu->bdf == bdf )
             return NULL;
 
