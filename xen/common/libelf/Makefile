@@ -1,4 +1,5 @@
 obj-bin-y := libelf.o
+nocov-y += libelf.o
 
 SECTIONS := text data $(SPECIAL_DATA_SECTIONS)
 

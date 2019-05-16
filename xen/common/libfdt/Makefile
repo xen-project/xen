@@ -3,6 +3,7 @@ include Makefile.libfdt
 SECTIONS := text data $(SPECIAL_DATA_SECTIONS)
 
 obj-y += libfdt.o
+nocov-y += libfdt.o
 
 CFLAGS += -I$(BASEDIR)/include/xen/libfdt/
 
