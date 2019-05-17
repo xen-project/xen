@@ -1660,6 +1660,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     do_presmp_initcalls();
 
+    alternative_branches();
+
     /*
      * NB: when running as a PV shim VCPUOP_up/down is wired to the shim
      * physical cpu_add/remove functions, so launch the guest with only

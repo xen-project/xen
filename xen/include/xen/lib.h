@@ -66,6 +66,10 @@
 
 #define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
 
+#define count_args_(dot, a1, a2, a3, a4, a5, a6, a7, a8, x, ...) x
+#define count_args(args...) \
+    count_args_(., ## args, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+
 struct domain;
 
 void cmdline_parse(const char *cmdline);

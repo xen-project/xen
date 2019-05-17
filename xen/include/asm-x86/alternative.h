@@ -4,8 +4,8 @@
 #ifdef __ASSEMBLY__
 #include <asm/alternative-asm.h>
 #else
+#include <xen/lib.h>
 #include <xen/stringify.h>
-#include <xen/types.h>
 #include <asm/asm-macros.h>
 
 struct __packed alt_instr {
@@ -26,6 +26,7 @@ extern void add_nops(void *insns, unsigned int len);
 /* Similar to alternative_instructions except it can be run with IRQs enabled. */
 extern void apply_alternatives(struct alt_instr *start, struct alt_instr *end);
 extern void alternative_instructions(void);
+extern void alternative_branches(void);
 
 #define alt_orig_len       "(.LXEN%=_orig_e - .LXEN%=_orig_s)"
 #define alt_pad_len        "(.LXEN%=_orig_p - .LXEN%=_orig_e)"
@@ -148,6 +149,233 @@ extern void alternative_instructions(void);
 
 /* Use this macro(s) if you need more than one output parameter. */
 #define ASM_OUTPUT2(a...) a
+
+/*
+ * Machinery to allow converting indirect to direct calls, when the called
+ * function is determined once at boot and later never changed.
+ */
+
+#define ALT_CALL_arg1 "rdi"
+#define ALT_CALL_arg2 "rsi"
+#define ALT_CALL_arg3 "rdx"
+#define ALT_CALL_arg4 "rcx"
+#define ALT_CALL_arg5 "r8"
+#define ALT_CALL_arg6 "r9"
+
+#define ALT_CALL_ARG(arg, n) \
+    register typeof((arg) ? (arg) : 0) a ## n ## _ \
+    asm ( ALT_CALL_arg ## n ) = (arg)
+#define ALT_CALL_NO_ARG(n) \
+    register unsigned long a ## n ## _ asm ( ALT_CALL_arg ## n )
+
+#define ALT_CALL_NO_ARG6 ALT_CALL_NO_ARG(6)
+#define ALT_CALL_NO_ARG5 ALT_CALL_NO_ARG(5); ALT_CALL_NO_ARG6
+#define ALT_CALL_NO_ARG4 ALT_CALL_NO_ARG(4); ALT_CALL_NO_ARG5
+#define ALT_CALL_NO_ARG3 ALT_CALL_NO_ARG(3); ALT_CALL_NO_ARG4
+#define ALT_CALL_NO_ARG2 ALT_CALL_NO_ARG(2); ALT_CALL_NO_ARG3
+#define ALT_CALL_NO_ARG1 ALT_CALL_NO_ARG(1); ALT_CALL_NO_ARG2
+
+/*
+ * Unfortunately ALT_CALL_NO_ARG() above can't use a fake initializer (to
+ * suppress "uninitialized variable" warnings), as various versions of gcc
+ * older than 8.1 fall on the nose in various ways with that (always because
+ * of some other construct elsewhere in the same function needing to use the
+ * same hard register). Otherwise the asm() below could uniformly use "+r"
+ * output constraints, making unnecessary all these ALT_CALL<n>_OUT macros.
+ */
+#define ALT_CALL0_OUT "=r" (a1_), "=r" (a2_), "=r" (a3_), \
+                      "=r" (a4_), "=r" (a5_), "=r" (a6_)
+#define ALT_CALL1_OUT "+r" (a1_), "=r" (a2_), "=r" (a3_), \
+                      "=r" (a4_), "=r" (a5_), "=r" (a6_)
+#define ALT_CALL2_OUT "+r" (a1_), "+r" (a2_), "=r" (a3_), \
+                      "=r" (a4_), "=r" (a5_), "=r" (a6_)
+#define ALT_CALL3_OUT "+r" (a1_), "+r" (a2_), "+r" (a3_), \
+                      "=r" (a4_), "=r" (a5_), "=r" (a6_)
+#define ALT_CALL4_OUT "+r" (a1_), "+r" (a2_), "+r" (a3_), \
+                      "+r" (a4_), "=r" (a5_), "=r" (a6_)
+#define ALT_CALL5_OUT "+r" (a1_), "+r" (a2_), "+r" (a3_), \
+                      "+r" (a4_), "+r" (a5_), "=r" (a6_)
+#define ALT_CALL6_OUT "+r" (a1_), "+r" (a2_), "+r" (a3_), \
+                      "+r" (a4_), "+r" (a5_), "+r" (a6_)
+
+#define alternative_callN(n, rettype, func) ({                     \
+    rettype ret_;                                                  \
+    register unsigned long r10_ asm("r10");                        \
+    register unsigned long r11_ asm("r11");                        \
+    asm volatile (__stringify(ALTERNATIVE "call *%c[addr](%%rip)", \
+                                          "call .",                \
+                                          X86_FEATURE_ALWAYS)      \
+                  : ALT_CALL ## n ## _OUT, "=a" (ret_),            \
+                    "=r" (r10_), "=r" (r11_) ASM_CALL_CONSTRAINT   \
+                  : [addr] "i" (&(func)), "g" (func)               \
+                  : "memory" );                                    \
+    ret_;                                                          \
+})
+
+#define alternative_vcall0(func) ({             \
+    ALT_CALL_NO_ARG1;                           \
+    ((void)alternative_callN(0, int, func));    \
+})
+
+#define alternative_call0(func) ({              \
+    ALT_CALL_NO_ARG1;                           \
+    alternative_callN(0, typeof(func()), func); \
+})
+
+#define alternative_vcall1(func, arg) ({           \
+    ALT_CALL_ARG(arg, 1);                          \
+    ALT_CALL_NO_ARG2;                              \
+    (void)sizeof(func(arg));                       \
+    (void)alternative_callN(1, int, func);         \
+})
+
+#define alternative_call1(func, arg) ({            \
+    ALT_CALL_ARG(arg, 1);                          \
+    ALT_CALL_NO_ARG2;                              \
+    alternative_callN(1, typeof(func(arg)), func); \
+})
+
+#define alternative_vcall2(func, arg1, arg2) ({           \
+    typeof(arg2) v2_ = (arg2);                            \
+    ALT_CALL_ARG(arg1, 1);                                \
+    ALT_CALL_ARG(v2_, 2);                                 \
+    ALT_CALL_NO_ARG3;                                     \
+    (void)sizeof(func(arg1, arg2));                       \
+    (void)alternative_callN(2, int, func);                \
+})
+
+#define alternative_call2(func, arg1, arg2) ({            \
+    typeof(arg2) v2_ = (arg2);                            \
+    ALT_CALL_ARG(arg1, 1);                                \
+    ALT_CALL_ARG(v2_, 2);                                 \
+    ALT_CALL_NO_ARG3;                                     \
+    alternative_callN(2, typeof(func(arg1, arg2)), func); \
+})
+
+#define alternative_vcall3(func, arg1, arg2, arg3) ({    \
+    typeof(arg2) v2_ = (arg2);                           \
+    typeof(arg3) v3_ = (arg3);                           \
+    ALT_CALL_ARG(arg1, 1);                               \
+    ALT_CALL_ARG(v2_, 2);                                \
+    ALT_CALL_ARG(v3_, 3);                                \
+    ALT_CALL_NO_ARG4;                                    \
+    (void)sizeof(func(arg1, arg2, arg3));                \
+    (void)alternative_callN(3, int, func);               \
+})
+
+#define alternative_call3(func, arg1, arg2, arg3) ({     \
+    typeof(arg2) v2_ = (arg2);                           \
+    typeof(arg3) v3_ = (arg3);                           \
+    ALT_CALL_ARG(arg1, 1);                               \
+    ALT_CALL_ARG(v2_, 2);                                \
+    ALT_CALL_ARG(v3_, 3);                                \
+    ALT_CALL_NO_ARG4;                                    \
+    alternative_callN(3, typeof(func(arg1, arg2, arg3)), \
+                      func);                             \
+})
+
+#define alternative_vcall4(func, arg1, arg2, arg3, arg4) ({ \
+    typeof(arg2) v2_ = (arg2);                              \
+    typeof(arg3) v3_ = (arg3);                              \
+    typeof(arg4) v4_ = (arg4);                              \
+    ALT_CALL_ARG(arg1, 1);                                  \
+    ALT_CALL_ARG(v2_, 2);                                   \
+    ALT_CALL_ARG(v3_, 3);                                   \
+    ALT_CALL_ARG(v4_, 4);                                   \
+    ALT_CALL_NO_ARG5;                                       \
+    (void)sizeof(func(arg1, arg2, arg3, arg4));             \
+    (void)alternative_callN(4, int, func);                  \
+})
+
+#define alternative_call4(func, arg1, arg2, arg3, arg4) ({  \
+    typeof(arg2) v2_ = (arg2);                              \
+    typeof(arg3) v3_ = (arg3);                              \
+    typeof(arg4) v4_ = (arg4);                              \
+    ALT_CALL_ARG(arg1, 1);                                  \
+    ALT_CALL_ARG(v2_, 2);                                   \
+    ALT_CALL_ARG(v3_, 3);                                   \
+    ALT_CALL_ARG(v4_, 4);                                   \
+    ALT_CALL_NO_ARG5;                                       \
+    alternative_callN(4, typeof(func(arg1, arg2,            \
+                                     arg3, arg4)),          \
+                      func);                                \
+})
+
+#define alternative_vcall5(func, arg1, arg2, arg3, arg4, arg5) ({ \
+    typeof(arg2) v2_ = (arg2);                                    \
+    typeof(arg3) v3_ = (arg3);                                    \
+    typeof(arg4) v4_ = (arg4);                                    \
+    typeof(arg5) v5_ = (arg5);                                    \
+    ALT_CALL_ARG(arg1, 1);                                        \
+    ALT_CALL_ARG(v2_, 2);                                         \
+    ALT_CALL_ARG(v3_, 3);                                         \
+    ALT_CALL_ARG(v4_, 4);                                         \
+    ALT_CALL_ARG(v5_, 5);                                         \
+    ALT_CALL_NO_ARG6;                                             \
+    (void)sizeof(func(arg1, arg2, arg3, arg4, arg5));             \
+    (void)alternative_callN(5, int, func);                        \
+})
+
+#define alternative_call5(func, arg1, arg2, arg3, arg4, arg5) ({  \
+    typeof(arg2) v2_ = (arg2);                                    \
+    typeof(arg3) v3_ = (arg3);                                    \
+    typeof(arg4) v4_ = (arg4);                                    \
+    typeof(arg5) v5_ = (arg5);                                    \
+    ALT_CALL_ARG(arg1, 1);                                        \
+    ALT_CALL_ARG(v2_, 2);                                         \
+    ALT_CALL_ARG(v3_, 3);                                         \
+    ALT_CALL_ARG(v4_, 4);                                         \
+    ALT_CALL_ARG(v5_, 5);                                         \
+    ALT_CALL_NO_ARG6;                                             \
+    alternative_callN(5, typeof(func(arg1, arg2, arg3,            \
+                                     arg4, arg5)),                \
+                      func);                                      \
+})
+
+#define alternative_vcall6(func, arg1, arg2, arg3, arg4, arg5, arg6) ({ \
+    typeof(arg2) v2_ = (arg2);                                          \
+    typeof(arg3) v3_ = (arg3);                                          \
+    typeof(arg4) v4_ = (arg4);                                          \
+    typeof(arg5) v5_ = (arg5);                                          \
+    typeof(arg6) v6_ = (arg6);                                          \
+    ALT_CALL_ARG(arg1, 1);                                              \
+    ALT_CALL_ARG(v2_, 2);                                               \
+    ALT_CALL_ARG(v3_, 3);                                               \
+    ALT_CALL_ARG(v4_, 4);                                               \
+    ALT_CALL_ARG(v5_, 5);                                               \
+    ALT_CALL_ARG(v6_, 6);                                               \
+    (void)sizeof(func(arg1, arg2, arg3, arg4, arg5, arg6));             \
+    (void)alternative_callN(6, int, func);                              \
+})
+
+#define alternative_call6(func, arg1, arg2, arg3, arg4, arg5, arg6) ({  \
+    typeof(arg2) v2_ = (arg2);                                          \
+    typeof(arg3) v3_ = (arg3);                                          \
+    typeof(arg4) v4_ = (arg4);                                          \
+    typeof(arg5) v5_ = (arg5);                                          \
+    typeof(arg6) v6_ = (arg6);                                          \
+    ALT_CALL_ARG(arg1, 1);                                              \
+    ALT_CALL_ARG(v2_, 2);                                               \
+    ALT_CALL_ARG(v3_, 3);                                               \
+    ALT_CALL_ARG(v4_, 4);                                               \
+    ALT_CALL_ARG(v5_, 5);                                               \
+    ALT_CALL_ARG(v6_, 6);                                               \
+    alternative_callN(6, typeof(func(arg1, arg2, arg3,                  \
+                                     arg4, arg5, arg6)),                \
+                      func);                                            \
+})
+
+#define alternative_vcall__(nr) alternative_vcall ## nr
+#define alternative_call__(nr)  alternative_call ## nr
+
+#define alternative_vcall_(nr) alternative_vcall__(nr)
+#define alternative_call_(nr)  alternative_call__(nr)
+
+#define alternative_vcall(func, args...) \
+    alternative_vcall_(count_args(args))(func, ## args)
+
+#define alternative_call(func, args...) \
+    alternative_call_(count_args(args))(func, ## args)
 
 #endif /*  !__ASSEMBLY__  */
 

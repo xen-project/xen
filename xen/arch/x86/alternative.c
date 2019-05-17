@@ -177,9 +177,14 @@ text_poke(void *addr, const void *opcode, size_t len)
  * self modifying code. This implies that asymmetric systems where
  * APs have less capabilities than the boot processor are not handled.
  * Tough. Make sure you disable such features by hand.
+ *
+ * The caller will set the "force" argument to true for the final
+ * invocation, such that no CALLs/JMPs to NULL pointers will be left
+ * around. See also the further comment below.
  */
-void init_or_livepatch apply_alternatives(struct alt_instr *start,
-                                          struct alt_instr *end)
+static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
+                                                  struct alt_instr *end,
+                                                  bool force)
 {
     struct alt_instr *a, *base;
 
@@ -208,15 +213,23 @@ void init_or_livepatch apply_alternatives(struct alt_instr *start,
         /*
          * Detect sequences of alt_instr's patching the same origin site, and
          * keep base pointing at the first alt_instr entry.  This is so we can
-         * refer to a single ->priv field for patching decisions.  We
-         * deliberately use the alt_instr itself rather than a local variable
-         * in case we end up making multiple passes.
+         * refer to a single ->priv field for some of our patching decisions,
+         * in particular the NOP optimization. We deliberately use the alt_instr
+         * itself rather than a local variable in case we end up making multiple
+         * passes.
          *
          * ->priv being nonzero means that the origin site has already been
          * modified, and we shouldn't try to optimise the nops again.
          */
         if ( ALT_ORIG_PTR(base) != orig )
             base = a;
+
+        /* Skip patch sites already handled during the first pass. */
+        if ( a->priv )
+        {
+            ASSERT(force);
+            continue;
+        }
 
         /* If there is no replacement to make, see about optimising the nops. */
         if ( !boot_cpu_has(a->cpuid) )
@@ -225,7 +238,7 @@ void init_or_livepatch apply_alternatives(struct alt_instr *start,
             if ( base->priv )
                 continue;
 
-            base->priv = 1;
+            a->priv = 1;
 
             /* Nothing useful to do? */
             if ( toolchain_nops_are_ideal || a->pad_len <= 1 )
@@ -236,20 +249,74 @@ void init_or_livepatch apply_alternatives(struct alt_instr *start,
             continue;
         }
 
-        base->priv = 1;
-
         memcpy(buf, repl, a->repl_len);
 
         /* 0xe8/0xe9 are relative branches; fix the offset. */
         if ( a->repl_len >= 5 && (*buf & 0xfe) == 0xe8 )
-            *(int32_t *)(buf + 1) += repl - orig;
+        {
+            /*
+             * Detect the special case of indirect-to-direct branch patching:
+             * - replacement is a direct CALL/JMP (opcodes 0xE8/0xE9; already
+             *   checked above),
+             * - replacement's displacement is -5 (pointing back at the very
+             *   insn, which makes no sense in a real replacement insn),
+             * - original is an indirect CALL/JMP (opcodes 0xFF/2 or 0xFF/4)
+             *   using RIP-relative addressing.
+             * Some branch destinations may still be NULL when we come here
+             * the first time. Defer patching of those until the post-presmp-
+             * initcalls re-invocation (with force set to true). If at that
+             * point the branch destination is still NULL, insert "UD2; UD0"
+             * (for ease of recognition) instead of CALL/JMP.
+             */
+            if ( a->cpuid == X86_FEATURE_ALWAYS &&
+                 *(int32_t *)(buf + 1) == -5 &&
+                 a->orig_len >= 6 &&
+                 orig[0] == 0xff &&
+                 orig[1] == (*buf & 1 ? 0x25 : 0x15) )
+            {
+                long disp = *(int32_t *)(orig + 2);
+                const uint8_t *dest = *(void **)(orig + 6 + disp);
+
+                if ( dest )
+                {
+                    disp = dest - (orig + 5);
+                    ASSERT(disp == (int32_t)disp);
+                    *(int32_t *)(buf + 1) = disp;
+                }
+                else if ( force )
+                {
+                    buf[0] = 0x0f;
+                    buf[1] = 0x0b;
+                    buf[2] = 0x0f;
+                    buf[3] = 0xff;
+                    buf[4] = 0xff;
+                }
+                else
+                    continue;
+            }
+            else if ( force && system_state < SYS_STATE_active )
+                ASSERT_UNREACHABLE();
+            else
+                *(int32_t *)(buf + 1) += repl - orig;
+        }
+        else if ( force && system_state < SYS_STATE_active  )
+            ASSERT_UNREACHABLE();
+
+        a->priv = 1;
 
         add_nops(buf + a->repl_len, total_len - a->repl_len);
         text_poke(orig, buf, total_len);
     }
 }
 
-static bool __initdata alt_done;
+void init_or_livepatch apply_alternatives(struct alt_instr *start,
+                                          struct alt_instr *end)
+{
+    _apply_alternatives(start, end, true);
+}
+
+static unsigned int __initdata alt_todo;
+static unsigned int __initdata alt_done;
 
 /*
  * At boot time, we patch alternatives in NMI context.  This means that the
@@ -264,7 +331,7 @@ static int __init nmi_apply_alternatives(const struct cpu_user_regs *regs,
      * More than one NMI may occur between the two set_nmi_callback() below.
      * We only need to apply alternatives once.
      */
-    if ( !alt_done )
+    if ( !(alt_done & alt_todo) )
     {
         unsigned long cr0;
 
@@ -273,11 +340,12 @@ static int __init nmi_apply_alternatives(const struct cpu_user_regs *regs,
         /* Disable WP to allow patching read-only pages. */
         write_cr0(cr0 & ~X86_CR0_WP);
 
-        apply_alternatives(__alt_instructions, __alt_instructions_end);
+        _apply_alternatives(__alt_instructions, __alt_instructions_end,
+                            alt_done);
 
         write_cr0(cr0);
 
-        alt_done = true;
+        alt_done |= alt_todo;
     }
 
     return 1;
@@ -287,12 +355,10 @@ static int __init nmi_apply_alternatives(const struct cpu_user_regs *regs,
  * This routine is called with local interrupt disabled and used during
  * bootup.
  */
-void __init alternative_instructions(void)
+static void __init _alternative_instructions(bool force)
 {
     unsigned int i;
     nmi_callback_t *saved_nmi_callback;
-
-    arch_init_ideal_nops();
 
     /*
      * Don't stop machine check exceptions while patching.
@@ -305,6 +371,10 @@ void __init alternative_instructions(void)
      * patching.
      */
     ASSERT(!local_irq_is_enabled());
+
+    /* Set what operation to perform /before/ setting the callback. */
+    alt_todo = 1u << force;
+    barrier();
 
     /*
      * As soon as the callback is set up, the next NMI will trigger patching,
@@ -321,11 +391,24 @@ void __init alternative_instructions(void)
      * cover the (hopefully never) async case, poll alt_done for up to one
      * second.
      */
-    for ( i = 0; !ACCESS_ONCE(alt_done) && i < 1000; ++i )
+    for ( i = 0; !(ACCESS_ONCE(alt_done) & alt_todo) && i < 1000; ++i )
         mdelay(1);
 
-    if ( !ACCESS_ONCE(alt_done) )
+    if ( !(ACCESS_ONCE(alt_done) & alt_todo) )
         panic("Timed out waiting for alternatives self-NMI to hit\n");
 
     set_nmi_callback(saved_nmi_callback);
+}
+
+void __init alternative_instructions(void)
+{
+    arch_init_ideal_nops();
+    _alternative_instructions(false);
+}
+
+void __init alternative_branches(void)
+{
+    local_irq_disable();
+    _alternative_instructions(true);
+    local_irq_enable();
 }
