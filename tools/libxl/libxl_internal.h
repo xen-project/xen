@@ -100,6 +100,7 @@
 #define LIBXL_DEVICE_MODEL_START_TIMEOUT 60
 #define LIBXL_DEVICE_MODEL_SAVE_FILE XEN_LIB_DIR "/qemu-save" /* .$domid */
 #define LIBXL_DEVICE_MODEL_RESTORE_FILE XEN_LIB_DIR "/qemu-resume" /* .$domid */
+#define LIBXL_QMP_CMD_TIMEOUT 10
 #define LIBXL_STUBDOM_START_TIMEOUT 30
 #define LIBXL_QEMU_BODGE_TIMEOUT 2
 #define LIBXL_XENCONSOLE_LIMIT 1048576
@@ -1947,8 +1948,6 @@ _hidden libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc,
 _hidden int libxl__qmp_run_command_flexarray(libxl__gc *gc, int domid,
                                              const char *cmd,
                                              flexarray_t *array);
-/* ask to QEMU the serial port information and store it in xenstore. */
-_hidden int libxl__qmp_query_serial(libxl__qmp_handler *qmp);
 _hidden int libxl__qmp_pci_add(libxl__gc *gc, int d, libxl_device_pci *pcidev);
 _hidden int libxl__qmp_pci_del(libxl__gc *gc, int domid,
                                libxl_device_pci *pcidev);
@@ -1993,10 +1992,6 @@ _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,
  * nothing happen */
 _hidden void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid);
-
-/* this helper calls qmp_initialize, query_serial and qmp_close */
-_hidden int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
-                                       const libxl_domain_config *guest_config);
 
 /* `data' should contain a byte to send.
  * When dealing with a non-blocking fd, it returns
@@ -3954,6 +3949,7 @@ struct libxl__dm_spawn_state {
     /* mixed - spawn.ao must be initialised by user; rest is private: */
     libxl__spawn_state spawn;
     libxl__ev_qmp qmp;
+    libxl__ev_time timeout;
     /* filled in by user, must remain valid: */
     uint32_t guest_domid; /* domain being served */
     libxl_domain_config *guest_config;

@@ -2063,11 +2063,13 @@ retry_transaction:
 static void dmss_init(libxl__dm_spawn_state *dmss)
 {
     libxl__ev_qmp_init(&dmss->qmp);
+    libxl__ev_time_init(&dmss->timeout);
 }
 
 static void dmss_dispose(libxl__gc *gc, libxl__dm_spawn_state *dmss)
 {
     libxl__ev_qmp_dispose(gc, &dmss->qmp);
+    libxl__ev_time_deregister(gc, &dmss->timeout);
 }
 
 static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
@@ -2462,6 +2464,16 @@ static void device_model_qmp_cb(libxl__egc *egc, libxl__ev_qmp *ev,
 static void device_model_spawn_outcome(libxl__egc *egc,
                                        libxl__dm_spawn_state *dmss,
                                        int rc);
+static void device_model_postconfig_chardev(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void device_model_postconfig_vnc(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void device_model_postconfig_vnc_passwd(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void devise_model_postconfig_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
+static void device_model_postconfig_done(libxl__egc *egc,
+    libxl__dm_spawn_state *dmss, int rc);
 
 void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
 {
@@ -2763,12 +2775,209 @@ static void device_model_spawn_outcome(libxl__egc *egc,
         }
     }
 
+    /* Check if spawn failed */
+    if (rc) goto out;
+
     if (d_config->b_info.device_model_version
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-        libxl__qmp_initializations(gc, dmss->guest_domid, d_config);
+        rc = libxl__ev_time_register_rel(ao, &dmss->timeout,
+                                         devise_model_postconfig_timeout,
+                                         LIBXL_QMP_CMD_TIMEOUT * 1000);
+        if (rc) goto out;
+        dmss->qmp.ao = ao;
+        dmss->qmp.domid = dmss->guest_domid;
+        dmss->qmp.payload_fd = -1;
+        dmss->qmp.callback = device_model_postconfig_chardev;
+        rc = libxl__ev_qmp_send(gc, &dmss->qmp, "query-chardev", NULL);
+        if (rc) goto out;
+        return;
     }
 
  out:
+    device_model_postconfig_done(egc, dmss, rc); /* must be last */
+}
+
+static void device_model_postconfig_chardev(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(qmp, *dmss, qmp);
+    const libxl__json_object *item = NULL;
+    const libxl__json_object *o = NULL;
+    int i = 0;
+    const char *label;
+    const char *filename;
+    int port;
+    char *endptr;
+    const char *dompath;
+    const char serial[] = "serial";
+    const size_t seriall = sizeof(serial) - 1;
+    const char pty[] = "pty:";
+    const size_t ptyl = sizeof(pty) - 1;
+
+    if (rc) goto out;
+
+    /*
+     * query-chardev response:
+     * [{ 'label': 'str',
+     *    'filename': 'str',
+     *    'frontend-open': 'bool' }, ...]
+     */
+
+    for (i = 0; (item = libxl__json_array_get(response, i)); i++) {
+        o = libxl__json_map_get("label", item, JSON_STRING);
+        if (!o) goto protocol_error;
+        label = libxl__json_object_get_string(o);
+
+        /* Check if the "label" start with "serial". */
+        if (!label || strncmp(label, serial, seriall))
+            continue;
+        port = strtol(label + seriall, &endptr, 10);
+        if (*(label + seriall) == '\0' || *endptr != '\0') {
+            LOGD(ERROR, qmp->domid,
+                 "Invalid serial port number: %s", label);
+            rc = ERROR_QEMU_API;
+            goto out;
+        }
+
+        o = libxl__json_map_get("filename", item, JSON_STRING);
+        if (!o) goto protocol_error;
+        filename = libxl__json_object_get_string(o);
+
+        /* Check if filename start with "pty:" */
+        if (!filename || strncmp(filename, pty, ptyl))
+            continue;
+
+        dompath = libxl__xs_get_dompath(gc, qmp->domid);
+        if (!dompath) {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+        rc = libxl__xs_printf(gc, XBT_NULL,
+                              GCSPRINTF("%s/serial/%d/tty", dompath, port),
+                              "%s", filename + ptyl);
+        if (rc) goto out;
+    }
+
+    qmp->callback = device_model_postconfig_vnc;
+    rc = libxl__ev_qmp_send(gc, qmp, "query-vnc", NULL);
+    if (rc) goto out;
+    return;
+
+protocol_error:
+    rc = ERROR_QEMU_API;
+    LOGD(ERROR, qmp->domid,
+         "unexpected response to QMP cmd 'query-chardev', received:\n%s",
+         JSON(response));
+out:
+    device_model_postconfig_done(egc, dmss, rc); /* must be last */
+}
+
+static void device_model_postconfig_vnc(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(qmp, *dmss, qmp);
+    const libxl_vnc_info *vnc = libxl__dm_vnc(dmss->guest_config);
+    const libxl__json_object *o;
+    libxl__json_object *args = NULL;
+
+    if (rc) goto out;
+
+    /*
+     * query-vnc response:
+     * { 'enabled': 'bool', '*host': 'str', '*service': 'str' }
+     */
+
+    o = libxl__json_map_get("enabled", response, JSON_BOOL);
+    if (!o) goto protocol_error;
+    if (libxl__json_object_get_bool(o)) {
+        const char *addr, *port;
+        const char *dompath;
+
+        o = libxl__json_map_get("host", response, JSON_STRING);
+        if (!o) goto protocol_error;
+        addr = libxl__json_object_get_string(o);
+        o = libxl__json_map_get("service", response, JSON_STRING);
+        if (!o) goto protocol_error;
+        port = libxl__json_object_get_string(o);
+
+        dompath = libxl__xs_get_dompath(gc, qmp->domid);
+        if (!dompath) {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+        rc = libxl__xs_printf(gc, XBT_NULL,
+                              GCSPRINTF("%s/console/vnc-listen", dompath),
+                              "%s", addr);
+        if (rc) goto out;
+        rc = libxl__xs_printf(gc, XBT_NULL,
+                              GCSPRINTF("%s/console/vnc-port", dompath),
+                              "%s", port);
+        if (rc) goto out;
+    }
+
+    if (vnc && vnc->passwd) {
+        qmp->callback = device_model_postconfig_vnc_passwd;
+        libxl__qmp_param_add_string(gc, &args, "password", vnc->passwd);
+        rc = libxl__ev_qmp_send(gc, qmp, "change-vnc-password", args);
+        if (rc) goto out;
+        return;
+    }
+
+    rc = 0;
+    goto out;
+
+protocol_error:
+    rc = ERROR_QEMU_API;
+    LOGD(ERROR, qmp->domid,
+         "unexpected response to QMP cmd 'query-vnc', received:\n%s",
+         JSON(response));
+out:
+    device_model_postconfig_done(egc, dmss, rc); /* must be last */
+}
+
+static void device_model_postconfig_vnc_passwd(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(qmp, *dmss, qmp);
+    const libxl_vnc_info *vnc = libxl__dm_vnc(dmss->guest_config);
+    const char *dompath;
+
+    if (rc) goto out;
+
+    dompath = libxl__xs_get_dompath(gc, qmp->domid);
+    if (!dompath) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    rc = libxl__xs_printf(gc, XBT_NULL,
+                          GCSPRINTF("%s/console/vnc-pass", dompath),
+                          "%s", vnc->passwd);
+
+out:
+    device_model_postconfig_done(egc, dmss, rc); /* must be last */
+}
+
+void devise_model_postconfig_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                                     const struct timeval *requested_abs,
+                                     int rc)
+{
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(ev, *dmss, timeout);
+    device_model_postconfig_done(egc, dmss, rc); /* must be last */
+}
+
+
+static void device_model_postconfig_done(libxl__egc *egc,
+                                         libxl__dm_spawn_state *dmss,
+                                         int rc)
+{
+    EGC_GC;
+
+    if (rc)
+        LOGD(ERROR, dmss->guest_domid,
+             "Post DM startup configs failed, rc=%d", rc);
     dmss_dispose(gc, dmss);
     dmss->callback(egc, dmss, rc);
 }

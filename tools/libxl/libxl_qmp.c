@@ -143,121 +143,6 @@ static const int QMP_SOCKET_CONNECT_TIMEOUT = 5;
  * QMP callbacks functions
  */
 
-static int store_serial_port_info(libxl__qmp_handler *qmp,
-                                  const char *chardev,
-                                  int port)
-{
-    GC_INIT(qmp->ctx);
-    char *path = NULL;
-    int ret = 0;
-
-    if (!(chardev && strncmp("pty:", chardev, 4) == 0)) {
-        return 0;
-    }
-
-    path = libxl__xs_get_dompath(gc, qmp->domid);
-    path = GCSPRINTF("%s/serial/%d/tty", path, port);
-
-    ret = libxl__xs_printf(gc, XBT_NULL, path, "%s", chardev + 4);
-
-    GC_FREE;
-    return ret;
-}
-
-static int register_serials_chardev_callback(libxl__qmp_handler *qmp,
-                                             const libxl__json_object *o,
-                                             void *unused)
-{
-    const libxl__json_object *obj = NULL;
-    const libxl__json_object *label = NULL;
-    const char *s = NULL;
-    int i = 0;
-    const char *chardev = NULL;
-    int ret = 0;
-
-    for (i = 0; (obj = libxl__json_array_get(o, i)); i++) {
-        if (!libxl__json_object_is_map(obj))
-            continue;
-        label = libxl__json_map_get("label", obj, JSON_STRING);
-        s = libxl__json_object_get_string(label);
-
-        if (s && strncmp("serial", s, strlen("serial")) == 0) {
-            const libxl__json_object *filename = NULL;
-            char *endptr = NULL;
-            int port_number;
-
-            filename = libxl__json_map_get("filename", obj, JSON_STRING);
-            chardev = libxl__json_object_get_string(filename);
-
-            s += strlen("serial");
-            port_number = strtol(s, &endptr, 10);
-            if (*s == 0 || *endptr != 0) {
-                LIBXL__LOGD(qmp->ctx, LIBXL__LOG_ERROR, qmp->domid,
-                            "Invalid serial port number: %s", s);
-                return -1;
-            }
-            ret = store_serial_port_info(qmp, chardev, port_number);
-            if (ret) {
-                LIBXL__LOGD_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, qmp->domid,
-                                  "Failed to store serial port information"
-                                  " in xenstore");
-                return ret;
-            }
-        }
-    };
-
-    return ret;
-}
-
-static int qmp_write_domain_console_item(libxl__gc *gc, int domid,
-                                         const char *item, const char *value)
-{
-    char *path;
-
-    path = libxl__xs_get_dompath(gc, domid);
-    path = GCSPRINTF("%s/console/%s", path, item);
-
-    return libxl__xs_printf(gc, XBT_NULL, path, "%s", value);
-}
-
-static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,
-                                     const libxl__json_object *o,
-                                     void *unused)
-{
-    GC_INIT(qmp->ctx);
-    const libxl__json_object *obj;
-    const char *addr, *port;
-    int rc = -1;
-
-    if (!libxl__json_object_is_map(o)) {
-        goto out;
-    }
-
-    obj = libxl__json_map_get("enabled", o, JSON_BOOL);
-    if (!obj || !libxl__json_object_get_bool(obj)) {
-        rc = 0;
-        goto out;
-    }
-
-    obj = libxl__json_map_get("host", o, JSON_STRING);
-    addr = libxl__json_object_get_string(obj);
-    obj = libxl__json_map_get("service", o, JSON_STRING);
-    port = libxl__json_object_get_string(obj);
-
-    if (!addr || !port) {
-        LOGD(ERROR, qmp->domid, "Failed to retrieve VNC connect information.");
-        goto out;
-    }
-
-    rc = qmp_write_domain_console_item(gc, qmp->domid, "vnc-listen", addr);
-    if (!rc)
-        rc = qmp_write_domain_console_item(gc, qmp->domid, "vnc-port", port);
-
-out:
-    GC_FREE;
-    return rc;
-}
-
 static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
                                      const libxl__json_object *o, void *unused)
 {
@@ -851,20 +736,6 @@ void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid)
     }
 }
 
-int libxl__qmp_query_serial(libxl__qmp_handler *qmp)
-{
-    return qmp_synchronous_send(qmp, "query-chardev", NULL,
-                                register_serials_chardev_callback,
-                                NULL, qmp->timeout);
-}
-
-static int qmp_query_vnc(libxl__qmp_handler *qmp)
-{
-    return qmp_synchronous_send(qmp, "query-vnc", NULL,
-                                qmp_register_vnc_callback,
-                                NULL, qmp->timeout);
-}
-
 static int pci_add_callback(libxl__qmp_handler *qmp,
                             const libxl__json_object *response, void *opaque)
 {
@@ -1085,24 +956,6 @@ int libxl__qmp_restore(libxl__gc *gc, int domid, const char *state_file)
                            NULL, NULL);
 }
 
-static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
-                      char *device, char *target, char *arg)
-{
-    libxl__json_object *args = NULL;
-    int rc = 0;
-
-    libxl__qmp_param_add_string(gc, &args, "device", device);
-    libxl__qmp_param_add_string(gc, &args, "target", target);
-    if (arg) {
-        libxl__qmp_param_add_string(gc, &args, "arg", arg);
-    }
-
-    rc = qmp_synchronous_send(qmp, "change", args,
-                              NULL, NULL, qmp->timeout);
-
-    return rc;
-}
-
 int libxl__qmp_resume(libxl__gc *gc, int domid)
 {
     return qmp_run_command(gc, domid, "cont", NULL, NULL, NULL);
@@ -1291,28 +1144,6 @@ int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
 
     libxl__ao_complete(egc, ao, rc);
     return AO_INPROGRESS;
-}
-
-int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
-                               const libxl_domain_config *guest_config)
-{
-    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
-    libxl__qmp_handler *qmp = NULL;
-    int ret = 0;
-
-    qmp = libxl__qmp_initialize(gc, domid);
-    if (!qmp)
-        return -1;
-    ret = libxl__qmp_query_serial(qmp);
-    if (!ret && vnc && vnc->passwd) {
-        ret = qmp_change(gc, qmp, "vnc", "password", vnc->passwd);
-        qmp_write_domain_console_item(gc, domid, "vnc-pass", vnc->passwd);
-    }
-    if (!ret) {
-        ret = qmp_query_vnc(qmp);
-    }
-    libxl__qmp_close(qmp);
-    return ret;
 }
 
 
