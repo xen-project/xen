@@ -273,12 +273,12 @@ void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable)
     struct vcpu *v;
 
     for_each_vcpu ( d, v )
-        hvm_funcs.set_rdtsc_exiting(v, enable);
+        alternative_vcall(hvm_funcs.set_rdtsc_exiting, v, enable);
 }
 
 void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat)
 {
-    if ( !hvm_funcs.get_guest_pat(v, guest_pat) )
+    if ( !alternative_call(hvm_funcs.get_guest_pat, v, guest_pat) )
         *guest_pat = v->arch.hvm.pat_cr;
 }
 
@@ -303,7 +303,7 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
             return 0;
         }
 
-    if ( !hvm_funcs.set_guest_pat(v, guest_pat) )
+    if ( !alternative_call(hvm_funcs.set_guest_pat, v, guest_pat) )
         v->arch.hvm.pat_cr = guest_pat;
 
     return 1;
@@ -343,7 +343,7 @@ bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val)
             /* nothing, best effort only */;
     }
 
-    return hvm_funcs.set_guest_bndcfgs(v, val);
+    return alternative_call(hvm_funcs.set_guest_bndcfgs, v, val);
 }
 
 /*
@@ -507,7 +507,8 @@ void hvm_migrate_pirqs(struct vcpu *v)
 static bool hvm_get_pending_event(struct vcpu *v, struct x86_event *info)
 {
     info->cr2 = v->arch.hvm.guest_cr[2];
-    return hvm_funcs.get_pending_event(v, info);
+
+    return alternative_call(hvm_funcs.get_pending_event, v, info);
 }
 
 void hvm_do_resume(struct vcpu *v)
@@ -1674,7 +1675,7 @@ void hvm_inject_event(const struct x86_event *event)
         }
     }
 
-    hvm_funcs.inject_event(event);
+    alternative_vcall(hvm_funcs.inject_event, event);
 }
 
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
@@ -2262,7 +2263,7 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
          (!rangeset_is_empty(d->iomem_caps) ||
           !rangeset_is_empty(d->arch.ioport_caps) ||
           has_arch_pdevs(d)) )
-        hvm_funcs.handle_cd(v, value);
+        alternative_vcall(hvm_funcs.handle_cd, v, value);
 
     hvm_update_cr(v, 0, value);
 
@@ -3479,7 +3480,8 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
             goto gp_fault;
         /* If ret == 0 then this is not an MCE MSR, see other MSRs. */
         ret = ((ret == 0)
-               ? hvm_funcs.msr_read_intercept(msr, msr_content)
+               ? alternative_call(hvm_funcs.msr_read_intercept,
+                                  msr, msr_content)
                : X86EMUL_OKAY);
         break;
     }
@@ -3612,7 +3614,8 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
             goto gp_fault;
         /* If ret == 0 then this is not an MCE MSR, see other MSRs. */
         ret = ((ret == 0)
-               ? hvm_funcs.msr_write_intercept(msr, msr_content)
+               ? alternative_call(hvm_funcs.msr_write_intercept,
+                                  msr, msr_content)
                : X86EMUL_OKAY);
         break;
     }
@@ -3804,7 +3807,7 @@ void hvm_hypercall_page_initialise(struct domain *d,
                                    void *hypercall_page)
 {
     hvm_latch_shinfo_size(d);
-    hvm_funcs.init_hypercall_page(d, hypercall_page);
+    alternative_vcall(hvm_funcs.init_hypercall_page, d, hypercall_page);
 }
 
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
@@ -5053,7 +5056,7 @@ void hvm_domain_soft_reset(struct domain *d)
 void hvm_get_segment_register(struct vcpu *v, enum x86_segment seg,
                               struct segment_register *reg)
 {
-    hvm_funcs.get_segment_register(v, seg, reg);
+    alternative_vcall(hvm_funcs.get_segment_register, v, seg, reg);
 
     switch ( seg )
     {
@@ -5199,7 +5202,7 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         return;
     }
 
-    hvm_funcs.set_segment_register(v, seg, reg);
+    alternative_vcall(hvm_funcs.set_segment_register, v, seg, reg);
 }
 
 /*

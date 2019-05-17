@@ -2152,7 +2152,7 @@ static int hvmemul_write_msr(
 static int hvmemul_wbinvd(
     struct x86_emulate_ctxt *ctxt)
 {
-    hvm_funcs.wbinvd_intercept();
+    alternative_vcall(hvm_funcs.wbinvd_intercept);
     return X86EMUL_OKAY;
 }
 
@@ -2170,7 +2170,7 @@ static int hvmemul_get_fpu(
     struct vcpu *curr = current;
 
     if ( !curr->fpu_dirtied )
-        hvm_funcs.fpu_dirty_intercept();
+        alternative_vcall(hvm_funcs.fpu_dirty_intercept);
     else if ( type == X86EMUL_FPU_fpu )
     {
         const typeof(curr->arch.xsave_area->fpu_sse) *fpu_ctxt =
@@ -2287,7 +2287,7 @@ static void hvmemul_put_fpu(
         {
             curr->fpu_dirtied = false;
             stts();
-            hvm_funcs.fpu_leave(curr);
+            alternative_vcall(hvm_funcs.fpu_leave, curr);
         }
     }
 }
@@ -2449,7 +2449,8 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     if ( hvmemul_ctxt->intr_shadow != new_intr_shadow )
     {
         hvmemul_ctxt->intr_shadow = new_intr_shadow;
-        hvm_funcs.set_interrupt_shadow(curr, new_intr_shadow);
+        alternative_vcall(hvm_funcs.set_interrupt_shadow,
+                          curr, new_intr_shadow);
     }
 
     if ( hvmemul_ctxt->ctxt.retire.hlt &&
@@ -2586,7 +2587,8 @@ void hvm_emulate_init_once(
 
     memset(hvmemul_ctxt, 0, sizeof(*hvmemul_ctxt));
 
-    hvmemul_ctxt->intr_shadow = hvm_funcs.get_interrupt_shadow(curr);
+    hvmemul_ctxt->intr_shadow =
+        alternative_call(hvm_funcs.get_interrupt_shadow, curr);
     hvmemul_get_seg_reg(x86_seg_cs, hvmemul_ctxt);
     hvmemul_get_seg_reg(x86_seg_ss, hvmemul_ctxt);
 
