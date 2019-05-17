@@ -52,6 +52,11 @@ CFLAGS += -fno-jump-tables
 export CONFIG_INDIRECT_THUNK=y
 endif
 
+# If supported by the compiler, reduce stack alignment to 8 bytes. But allow
+# this to be overridden elsewhere.
+$(call cc-option-add,CFLAGS-stack-boundary,CC,-mpreferred-stack-boundary=3)
+CFLAGS += $(CFLAGS-stack-boundary)
+
 # Set up the assembler include path properly for older toolchains.
 CFLAGS += -Wa,-I$(BASEDIR)/include
 
