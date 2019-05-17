@@ -641,9 +641,9 @@ void domain_init(void)
 
 	*xgt_handle = xengnttab_open(NULL, 0);
 	if (*xgt_handle == NULL)
-		xprintf("WARNING: Failed to open connection to gnttab\n");
-	else
-		talloc_set_destructor(xgt_handle, close_xgt_handle);
+		barf_perror("Failed to open connection to gnttab");
+
+	talloc_set_destructor(xgt_handle, close_xgt_handle);
 
 	xce_handle = xenevtchn_open(NULL, 0);
 
