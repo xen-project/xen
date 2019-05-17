@@ -157,15 +157,16 @@ static int MP_processor_info_x(struct mpc_config_processor *m,
 	set_apicid(apicid, &phys_cpu_present_map);
 
 	if (num_processors >= nr_cpu_ids) {
-		printk(KERN_WARNING "WARNING: NR_CPUS limit of %u reached."
-			"  Processor ignored.\n", nr_cpu_ids);
+		printk_once(XENLOG_WARNING
+			    "WARNING: NR_CPUS limit of %u reached - ignoring further processors\n",
+			    nr_cpu_ids);
 		return -ENOSPC;
 	}
 
 	if (num_processors >= 8 && hotplug
 	    && genapic.name == apic_default.name) {
-		printk(KERN_WARNING "WARNING: CPUs limit of 8 reached."
-			" Processor ignored.\n");
+		printk_once(XENLOG_WARNING
+			    "WARNING: CPUs limit of 8 reached - ignoring futher processors\n");
 		return -ENOSPC;
 	}
 
