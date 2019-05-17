@@ -15,8 +15,18 @@
 #define TARGET_CPUS ((const typeof(cpu_online_map) *)&cpu_online_map)
 #define init_apic_ldr (genapic.init_apic_ldr)
 #define clustered_apic_check (genapic.clustered_apic_check)
-#define cpu_mask_to_apicid (genapic.cpu_mask_to_apicid)
-#define vector_allocation_cpumask(cpu) (genapic.vector_allocation_cpumask(cpu))
+#define cpu_mask_to_apicid(mask) ({ \
+	/* \
+	 * There are a number of places where the address of a local variable \
+	 * gets passed here. The use of ?: in alternative_call<N>() triggers an \
+	 * "address of ... is always true" warning in such a case with at least \
+	 * gcc 7 and 8. Hence the seemingly pointless local variable here. \
+	 */ \
+	const cpumask_t *m_ = (mask); \
+	alternative_call(genapic.cpu_mask_to_apicid, m_); \
+})
+#define vector_allocation_cpumask(cpu) \
+	alternative_call(genapic.vector_allocation_cpumask, cpu)
 
 static inline void enable_apic_mode(void)
 {
