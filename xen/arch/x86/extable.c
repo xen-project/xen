@@ -168,7 +168,7 @@ static int __init stub_selftest(void)
                        "jmp .Lret%=\n\t"
                        ".popsection\n\t"
                        _ASM_EXTABLE(.Lret%=, .Lfix%=)
-                       : [exn] "+m" (res)
+                       : [exn] "+m" (res) ASM_CALL_CONSTRAINT
                        : [stb] "r" (addr), "a" (tests[i].rax));
 
         if ( res.raw != tests[i].res.raw )

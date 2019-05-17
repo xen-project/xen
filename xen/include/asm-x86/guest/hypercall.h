@@ -40,7 +40,7 @@
         long res, tmp__;                                                \
         asm volatile (                                                  \
             "call hypercall_page + %c[offset]"                          \
-            : "=a" (res), "=D" (tmp__)                                  \
+            : "=a" (res), "=D" (tmp__) ASM_CALL_CONSTRAINT              \
             : [offset] "i" (hcall * 32),                                \
               "1" ((long)(a1))                                          \
             : "memory" );                                               \
@@ -53,6 +53,7 @@
         asm volatile (                                                  \
             "call hypercall_page + %c[offset]"                          \
             : "=a" (res), "=D" (tmp__), "=S" (tmp__)                    \
+              ASM_CALL_CONSTRAINT                                       \
             : [offset] "i" (hcall * 32),                                \
               "1" ((long)(a1)), "2" ((long)(a2))                        \
             : "memory" );                                               \
@@ -65,6 +66,7 @@
         asm volatile (                                                  \
             "call hypercall_page + %c[offset]"                          \
             : "=a" (res), "=D" (tmp__), "=S" (tmp__), "=d" (tmp__)      \
+              ASM_CALL_CONSTRAINT                                       \
             : [offset] "i" (hcall * 32),                                \
               "1" ((long)(a1)), "2" ((long)(a2)), "3" ((long)(a3))      \
             : "memory" );                                               \
@@ -78,7 +80,7 @@
         asm volatile (                                                  \
             "call hypercall_page + %c[offset]"                          \
             : "=a" (res), "=D" (tmp__), "=S" (tmp__), "=d" (tmp__),     \
-              "=&r" (tmp__)                                             \
+              "=&r" (tmp__) ASM_CALL_CONSTRAINT                         \
             : [offset] "i" (hcall * 32),                                \
               "1" ((long)(a1)), "2" ((long)(a2)), "3" ((long)(a3)),     \
               "4" (_a4)                                                 \

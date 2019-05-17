@@ -25,6 +25,19 @@ asm ( "\t.equ CONFIG_INDIRECT_THUNK, "
 
 #ifndef __ASSEMBLY__
 void ret_from_intr(void);
+
+/*
+ * This output constraint should be used for any inline asm which has a "call"
+ * instruction.  Otherwise the asm may be inserted before the frame pointer
+ * gets set up by the containing function.
+ */
+#ifdef CONFIG_FRAME_POINTER
+register unsigned long current_stack_pointer asm("rsp");
+# define ASM_CALL_CONSTRAINT , "+r" (current_stack_pointer)
+#else
+# define ASM_CALL_CONSTRAINT
+#endif
+
 #endif
 
 #ifndef NDEBUG

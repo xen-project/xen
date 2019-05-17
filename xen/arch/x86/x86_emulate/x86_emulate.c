@@ -1122,7 +1122,8 @@ static inline int mkec(uint8_t e, int32_t ec, ...)
                    "jmp .Lret%=\n\t"                                    \
                    ".popsection\n\t"                                    \
                    _ASM_EXTABLE(.Lret%=, .Lfix%=)                       \
-                   : [exn] "+g" (stub_exn.info), constraints,           \
+                   : [exn] "+g" (stub_exn.info) ASM_CALL_CONSTRAINT,    \
+                     constraints,                                       \
                      [stub] "r" (stub.func),                            \
                      "m" (*(uint8_t(*)[MAX_INST_LEN + 1])stub.ptr) );   \
     if ( unlikely(~stub_exn.info.raw) )                                 \
