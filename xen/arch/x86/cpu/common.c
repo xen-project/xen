@@ -182,7 +182,7 @@ void ctxt_switch_levelling(const struct vcpu *next)
 	}
 
 	if (ctxt_switch_masking)
-		ctxt_switch_masking(next);
+		alternative_vcall(ctxt_switch_masking, next);
 }
 
 bool_t opt_cpu_info;
