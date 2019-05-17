@@ -171,24 +171,16 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 	return len;
 }
 
-static void *map_interface(domid_t domid, unsigned long mfn)
+static void *map_interface(domid_t domid)
 {
-	if (*xgt_handle != NULL) {
-		/* this is the preferred method */
-		return xengnttab_map_grant_ref(*xgt_handle, domid,
-			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
-	} else {
-		return xc_map_foreign_range(*xc_handle, domid,
-			XC_PAGE_SIZE, PROT_READ|PROT_WRITE, mfn);
-	}
+	return xengnttab_map_grant_ref(*xgt_handle, domid,
+				       GNTTAB_RESERVED_XENSTORE,
+				       PROT_READ|PROT_WRITE);
 }
 
 static void unmap_interface(void *interface)
 {
-	if (*xgt_handle != NULL)
-		xengnttab_unmap(*xgt_handle, interface, 1);
-	else
-		munmap(interface, XC_PAGE_SIZE);
+	xengnttab_unmap(*xgt_handle, interface, 1);
 }
 
 static int destroy_domain(void *_domain)
@@ -396,7 +388,7 @@ int do_introduce(struct connection *conn, struct buffered_data *in)
 	domain = find_domain_by_domid(domid);
 
 	if (domain == NULL) {
-		interface = map_interface(domid, mfn);
+		interface = map_interface(domid);
 		if (!interface)
 			return errno;
 		/* Hang domain off "in" until we're finished. */
