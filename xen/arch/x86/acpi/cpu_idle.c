@@ -102,8 +102,6 @@ bool lapic_timer_init(void)
     return true;
 }
 
-static uint64_t (*__read_mostly tick_to_ns)(uint64_t) = acpi_pm_tick_to_ns;
-
 void (*__read_mostly pm_idle_save)(void);
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
 integer_param("max_cstate", max_cstate);
@@ -289,9 +287,9 @@ static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
         return ((0xFFFFFFFF - t1) + t2 +1);
 }
 
-uint64_t (*__read_mostly cpuidle_get_tick)(void) = get_acpi_pm_tick;
-static uint64_t (*__read_mostly ticks_elapsed)(uint64_t, uint64_t)
-    = acpi_pm_ticks_elapsed;
+uint64_t (*__read_mostly cpuidle_get_tick)(void);
+static uint64_t (*__read_mostly tick_to_ns)(uint64_t);
+static uint64_t (*__read_mostly ticks_elapsed)(uint64_t, uint64_t);
 
 static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 {
@@ -548,7 +546,7 @@ void update_idle_stats(struct acpi_processor_power *power,
                        struct acpi_processor_cx *cx,
                        uint64_t before, uint64_t after)
 {
-    int64_t sleep_ticks = ticks_elapsed(before, after);
+    int64_t sleep_ticks = alternative_call(ticks_elapsed, before, after);
     /* Interrupts are disabled */
 
     spin_lock(&power->stat_lock);
@@ -556,7 +554,8 @@ void update_idle_stats(struct acpi_processor_power *power,
     cx->usage++;
     if ( sleep_ticks > 0 )
     {
-        power->last_residency = tick_to_ns(sleep_ticks) / 1000UL;
+        power->last_residency = alternative_call(tick_to_ns, sleep_ticks) /
+                                1000UL;
         cx->time += sleep_ticks;
     }
     power->last_state = &power->states[0];
@@ -636,7 +635,7 @@ static void acpi_processor_idle(void)
         if ( cx->type == ACPI_STATE_C1 || local_apic_timer_c2_ok )
         {
             /* Get start time (ticks) */
-            t1 = cpuidle_get_tick();
+            t1 = alternative_call(cpuidle_get_tick);
             /* Trace cpu idle entry */
             TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
 
@@ -645,7 +644,7 @@ static void acpi_processor_idle(void)
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
-            t2 = cpuidle_get_tick();
+            t2 = alternative_call(cpuidle_get_tick);
             trace_exit_reason(irq_traced);
             /* Trace cpu idle exit */
             TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
@@ -667,7 +666,7 @@ static void acpi_processor_idle(void)
         lapic_timer_off();
 
         /* Get start time (ticks) */
-        t1 = cpuidle_get_tick();
+        t1 = alternative_call(cpuidle_get_tick);
         /* Trace cpu idle entry */
         TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
 
@@ -718,7 +717,7 @@ static void acpi_processor_idle(void)
         }
 
         /* Get end time (ticks) */
-        t2 = cpuidle_get_tick();
+        t2 = alternative_call(cpuidle_get_tick);
 
         /* recovering TSC */
         cstate_restore_tsc();
@@ -828,11 +827,20 @@ int cpuidle_init_cpu(unsigned int cpu)
     {
         unsigned int i;
 
-        if ( cpu == 0 && boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+        if ( cpu == 0 && system_state < SYS_STATE_active )
         {
-            cpuidle_get_tick = get_stime_tick;
-            ticks_elapsed = stime_ticks_elapsed;
-            tick_to_ns = stime_tick_to_ns;
+            if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+            {
+                cpuidle_get_tick = get_stime_tick;
+                ticks_elapsed = stime_ticks_elapsed;
+                tick_to_ns = stime_tick_to_ns;
+            }
+            else
+            {
+                cpuidle_get_tick = get_acpi_pm_tick;
+                ticks_elapsed = acpi_pm_ticks_elapsed;
+                tick_to_ns = acpi_pm_tick_to_ns;
+            }
         }
 
         acpi_power = xzalloc(struct acpi_processor_power);

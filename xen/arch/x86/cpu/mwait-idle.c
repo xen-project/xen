@@ -778,7 +778,7 @@ static void mwait_idle(void)
 	if (!(lapic_timer_reliable_states & (1 << cstate)))
 		lapic_timer_off();
 
-	before = cpuidle_get_tick();
+	before = alternative_call(cpuidle_get_tick);
 	TRACE_4D(TRC_PM_IDLE_ENTRY, cx->type, before, exp, pred);
 
 	update_last_cx_stat(power, cx, before);
@@ -786,7 +786,7 @@ static void mwait_idle(void)
 	if (cpu_is_haltable(cpu))
 		mwait_idle_with_hints(eax, MWAIT_ECX_INTERRUPT_BREAK);
 
-	after = cpuidle_get_tick();
+	after = alternative_call(cpuidle_get_tick);
 
 	cstate_restore_tsc();
 	trace_exit_reason(irq_traced);
