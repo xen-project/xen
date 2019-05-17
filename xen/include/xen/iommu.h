@@ -244,6 +244,11 @@ struct iommu_ops {
 
 #include <asm/iommu.h>
 
+#ifndef iommu_call
+# define iommu_call(ops, fn, args...) ((ops)->fn(args))
+# define iommu_vcall iommu_call
+#endif
+
 enum iommu_status
 {
     IOMMU_STATUS_disabled,

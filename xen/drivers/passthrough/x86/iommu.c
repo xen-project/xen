@@ -61,14 +61,12 @@ int iommu_enable_x2apic(void)
 void iommu_update_ire_from_apic(
     unsigned int apic, unsigned int reg, unsigned int value)
 {
-    const struct iommu_ops *ops = iommu_get_ops();
-    ops->update_ire_from_apic(apic, reg, value);
+    iommu_vcall(&iommu_ops, update_ire_from_apic, apic, reg, value);
 }
 
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg)
 {
-    const struct iommu_ops *ops = iommu_get_ops();
-    return ops->read_apic_from_ire(apic, reg);
+    return iommu_call(&iommu_ops, read_apic_from_ire, apic, reg);
 }
 
 int __init iommu_setup_hpet_msi(struct msi_desc *msi)

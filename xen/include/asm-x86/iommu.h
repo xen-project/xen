@@ -59,6 +59,12 @@ struct arch_iommu
 
 extern struct iommu_ops iommu_ops;
 
+#ifdef NDEBUG
+# include <asm/alternative.h>
+# define iommu_call(ops, fn, args...)  alternative_call(iommu_ops.fn, ## args)
+# define iommu_vcall(ops, fn, args...) alternative_vcall(iommu_ops.fn, ## args)
+#endif
+
 static inline const struct iommu_ops *iommu_get_ops(void)
 {
     BUG_ON(!iommu_ops.init);

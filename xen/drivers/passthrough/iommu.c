@@ -304,8 +304,8 @@ int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
 
     for ( i = 0; i < (1ul << page_order); i++ )
     {
-        rc = hd->platform_ops->map_page(d, dfn_add(dfn, i), mfn_add(mfn, i),
-                                        flags, flush_flags);
+        rc = iommu_call(hd->platform_ops, map_page, d, dfn_add(dfn, i),
+                        mfn_add(mfn, i), flags, flush_flags);
 
         if ( likely(!rc) )
             continue;
@@ -318,8 +318,8 @@ int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
 
         while ( i-- )
             /* if statement to satisfy __must_check */
-            if ( hd->platform_ops->unmap_page(d, dfn_add(dfn, i),
-                                              flush_flags) )
+            if ( iommu_call(hd->platform_ops, unmap_page, d, dfn_add(dfn, i),
+                            flush_flags) )
                 continue;
 
         if ( !is_hardware_domain(d) )
@@ -363,8 +363,8 @@ int iommu_unmap(struct domain *d, dfn_t dfn, unsigned int page_order,
 
     for ( i = 0; i < (1ul << page_order); i++ )
     {
-        int err = hd->platform_ops->unmap_page(d, dfn_add(dfn, i),
-                                               flush_flags);
+        int err = iommu_call(hd->platform_ops, unmap_page, d, dfn_add(dfn, i),
+                             flush_flags);
 
         if ( likely(!err) )
             continue;
@@ -412,7 +412,7 @@ int iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
     if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->lookup_page )
         return -EOPNOTSUPP;
 
-    return hd->platform_ops->lookup_page(d, dfn, mfn, flags);
+    return iommu_call(hd->platform_ops, lookup_page, d, dfn, mfn, flags);
 }
 
 static void iommu_free_pagetables(unsigned long unused)
@@ -425,7 +425,7 @@ static void iommu_free_pagetables(unsigned long unused)
         spin_unlock(&iommu_pt_cleanup_lock);
         if ( !pg )
             return;
-        iommu_get_ops()->free_page_table(pg);
+        iommu_vcall(iommu_get_ops(), free_page_table, pg);
     } while ( !softirq_pending(smp_processor_id()) );
 
     tasklet_schedule_on_cpu(&iommu_pt_cleanup_tasklet,
@@ -445,7 +445,8 @@ int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count,
     if ( dfn_eq(dfn, INVALID_DFN) )
         return -EINVAL;
 
-    rc = hd->platform_ops->iotlb_flush(d, dfn, page_count, flush_flags);
+    rc = iommu_call(hd->platform_ops, iotlb_flush, d, dfn, page_count,
+                    flush_flags);
     if ( unlikely(rc) )
     {
         if ( !d->is_shutting_down && printk_ratelimit() )
@@ -473,7 +474,7 @@ int iommu_iotlb_flush_all(struct domain *d, unsigned int flush_flags)
      * The operation does a full flush so we don't need to pass the
      * flush_flags in.
      */
-    rc = hd->platform_ops->iotlb_flush_all(d);
+    rc = iommu_call(hd->platform_ops, iotlb_flush_all, d);
     if ( unlikely(rc) )
     {
         if ( !d->is_shutting_down && printk_ratelimit() )
