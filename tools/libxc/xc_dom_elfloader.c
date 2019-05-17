@@ -165,15 +165,6 @@ static elf_negerrnoval xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
         return rc;
     }
 
-    /* Find the section-header strings table. */
-    if ( ELF_PTRVAL_INVALID(elf->sec_strtab) )
-    {
-        xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: ELF image"
-                     " has no shstrtab", __FUNCTION__);
-        rc = -EINVAL;
-        goto out;
-    }
-
     /* parse binary and get xen meta info */
     elf_parse_binary(elf);
     if ( elf_xen_parse(elf, &dom->parms) != 0 )
