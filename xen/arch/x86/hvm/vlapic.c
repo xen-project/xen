@@ -111,10 +111,15 @@ static void vlapic_clear_irr(int vector, struct vlapic *vlapic)
     vlapic_clear_vector(vector, &vlapic->regs->data[APIC_IRR]);
 }
 
-static int vlapic_find_highest_irr(struct vlapic *vlapic)
+static void sync_pir_to_irr(struct vcpu *v)
 {
     if ( hvm_funcs.sync_pir_to_irr )
-        hvm_funcs.sync_pir_to_irr(vlapic_vcpu(vlapic));
+        alternative_vcall(hvm_funcs.sync_pir_to_irr, v);
+}
+
+static int vlapic_find_highest_irr(struct vlapic *vlapic)
+{
+    sync_pir_to_irr(vlapic_vcpu(vlapic));
 
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
 }
@@ -143,7 +148,7 @@ bool vlapic_test_irq(const struct vlapic *vlapic, uint8_t vec)
         return false;
 
     if ( hvm_funcs.test_pir &&
-         hvm_funcs.test_pir(const_vlapic_vcpu(vlapic), vec) )
+         alternative_call(hvm_funcs.test_pir, const_vlapic_vcpu(vlapic), vec) )
         return true;
 
     return vlapic_test_vector(vec, &vlapic->regs->data[APIC_IRR]);
@@ -165,10 +170,10 @@ void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
         vlapic_clear_vector(vec, &vlapic->regs->data[APIC_TMR]);
 
     if ( hvm_funcs.update_eoi_exit_bitmap )
-        hvm_funcs.update_eoi_exit_bitmap(target, vec, trig);
+        alternative_vcall(hvm_funcs.update_eoi_exit_bitmap, target, vec, trig);
 
     if ( hvm_funcs.deliver_posted_intr )
-        hvm_funcs.deliver_posted_intr(target, vec);
+        alternative_vcall(hvm_funcs.deliver_posted_intr, target, vec);
     else if ( !vlapic_test_and_set_irr(vec, vlapic) )
         vcpu_kick(target);
 }
@@ -448,7 +453,8 @@ void vlapic_EOI_set(struct vlapic *vlapic)
     vlapic_clear_vector(vector, &vlapic->regs->data[APIC_ISR]);
 
     if ( hvm_funcs.handle_eoi )
-        hvm_funcs.handle_eoi(vector, vlapic_find_highest_isr(vlapic));
+        alternative_vcall(hvm_funcs.handle_eoi, vector,
+                          vlapic_find_highest_isr(vlapic));
 
     vlapic_handle_EOI(vlapic, vector);
 
@@ -1487,8 +1493,7 @@ static int lapic_save_regs(struct vcpu *v, hvm_domain_context_t *h)
     if ( !has_vlapic(v->domain) )
         return 0;
 
-    if ( hvm_funcs.sync_pir_to_irr )
-        hvm_funcs.sync_pir_to_irr(v);
+    sync_pir_to_irr(v);
 
     return hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, vcpu_vlapic(v)->regs);
 }
@@ -1584,7 +1589,8 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
         lapic_load_fixup(s);
 
     if ( hvm_funcs.process_isr )
-        hvm_funcs.process_isr(vlapic_find_highest_isr(s), v);
+        alternative_vcall(hvm_funcs.process_isr,
+                          vlapic_find_highest_isr(s), v);
 
     vlapic_adjust_i8259_target(d);
     lapic_rearm(s);

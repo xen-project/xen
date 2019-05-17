@@ -2277,12 +2277,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .nhvm_vcpu_vmexit_event = nvmx_vmexit_event,
     .nhvm_intr_blocked    = nvmx_intr_blocked,
     .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources,
-    .update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap,
-    .process_isr          = vmx_process_isr,
-    .deliver_posted_intr  = vmx_deliver_posted_intr,
-    .sync_pir_to_irr      = vmx_sync_pir_to_irr,
-    .test_pir             = vmx_test_pir,
-    .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
     .enable_msr_interception = vmx_enable_msr_interception,
     .is_singlestep_supported = vmx_is_singlestep_supported,
@@ -2410,26 +2404,23 @@ const struct hvm_function_table * __init start_vmx(void)
         setup_ept_dump();
     }
 
-    if ( !cpu_has_vmx_virtual_intr_delivery )
+    if ( cpu_has_vmx_virtual_intr_delivery )
     {
-        vmx_function_table.update_eoi_exit_bitmap = NULL;
-        vmx_function_table.process_isr = NULL;
-        vmx_function_table.handle_eoi = NULL;
-    }
-    else
+        vmx_function_table.update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap;
+        vmx_function_table.process_isr = vmx_process_isr;
+        vmx_function_table.handle_eoi = vmx_handle_eoi;
         vmx_function_table.virtual_intr_delivery_enabled = true;
+    }
 
     if ( cpu_has_vmx_posted_intr_processing )
     {
         alloc_direct_apic_vector(&posted_intr_vector, pi_notification_interrupt);
         if ( iommu_intpost )
             alloc_direct_apic_vector(&pi_wakeup_vector, pi_wakeup_interrupt);
-    }
-    else
-    {
-        vmx_function_table.deliver_posted_intr = NULL;
-        vmx_function_table.sync_pir_to_irr = NULL;
-        vmx_function_table.test_pir = NULL;
+
+        vmx_function_table.deliver_posted_intr = vmx_deliver_posted_intr;
+        vmx_function_table.sync_pir_to_irr     = vmx_sync_pir_to_irr;
+        vmx_function_table.test_pir            = vmx_test_pir;
     }
 
     if ( cpu_has_vmx_tsc_scaling )
