@@ -35,14 +35,9 @@ static bool zynqmp_smc(struct cpu_user_regs *regs)
      */
     if ( !cpus_have_const_cap(ARM_SMCCC_1_1) )
     {
-        static bool once = true;
+        printk_once(XENLOG_WARNING
+                    "ZynqMP firmware Error: no SMCCC 1.1 support. Disabling firmware calls\n");
 
-        if ( once )
-        {
-            printk(XENLOG_WARNING "ZynqMP firmware Error: no SMCCC 1.1 "
-                   "support. Disabling firmware calls.");
-            once = false;
-        }
         return false;
     }
     return zynqmp_eemi(regs);

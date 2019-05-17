@@ -336,18 +336,11 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
     switch ( ssbd_state )
     {
     case ARM_SSBD_FORCE_DISABLE:
-    {
-        static bool once = true;
-
-        if ( once )
-            printk("%s disabled from command-line\n", entry->desc);
-        once = false;
+        printk_once("%s disabled from command-line\n", entry->desc);
 
         arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 0, NULL);
         required = false;
-
         break;
-    }
 
     case ARM_SSBD_RUNTIME:
         if ( required )
@@ -359,18 +352,11 @@ static bool has_ssbd_mitigation(const struct arm_cpu_capabilities *entry)
         break;
 
     case ARM_SSBD_FORCE_ENABLE:
-    {
-        static bool once = true;
-
-        if ( once )
-            printk("%s forced from command-line\n", entry->desc);
-        once = false;
+        printk_once("%s forced from command-line\n", entry->desc);
 
         arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
         required = true;
-
         break;
-    }
 
     default:
         ASSERT_UNREACHABLE();

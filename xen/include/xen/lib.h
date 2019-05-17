@@ -105,6 +105,17 @@ debugtrace_printk(const char *fmt, ...) {}
 #define _p(_x) ((void *)(unsigned long)(_x))
 extern void printk(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
+
+#define printk_once(fmt, args...)               \
+({                                              \
+    static bool __read_mostly once_;            \
+    if ( unlikely(!once_) )                     \
+    {                                           \
+        once_ = true;                           \
+        printk(fmt, ## args);                   \
+    }                                           \
+})
+
 extern void guest_printk(const struct domain *d, const char *format, ...)
     __attribute__ ((format (printf, 2, 3)));
 extern void noreturn panic(const char *format, ...)
