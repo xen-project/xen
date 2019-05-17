@@ -524,9 +524,11 @@ static bool __init retpoline_safe(uint64_t caps)
     case 0x4d: /* Avaton / Rangely (Silvermont) */
     case 0x4c: /* Cherrytrail / Brasswell */
     case 0x4a: /* Merrifield */
+    case 0x57: /* Knights Landing */
     case 0x5a: /* Moorefield */
     case 0x5c: /* Goldmont */
     case 0x5f: /* Denverton */
+    case 0x85: /* Knights Mill */
         return true;
 
     default:
