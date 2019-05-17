@@ -36,7 +36,7 @@ static struct tasklet amd_iommu_irq_tasklet;
 unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
 static struct radix_tree_root ivrs_maps;
-struct list_head amd_iommu_head;
+LIST_HEAD_READ_MOSTLY(amd_iommu_head);
 struct table_struct device_table;
 bool_t iommuv2_enabled;
 

@@ -150,8 +150,6 @@ static void amd_iommu_setup_domain_device(
 
 int __init acpi_ivrs_init(void)
 {
-    INIT_LIST_HEAD(&amd_iommu_head);
-
     if ( !iommu_enable && !iommu_intremap )
         return 0;
 
