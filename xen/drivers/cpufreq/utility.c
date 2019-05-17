@@ -364,7 +364,8 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
     {
         unsigned int prev_freq = policy->cur;
 
-        retval = cpufreq_driver.target(policy, target_freq, relation);
+        retval = alternative_call(cpufreq_driver.target,
+                                  policy, target_freq, relation);
         if ( retval == 0 )
             TRACE_2D(TRC_PM_FREQ_CHANGE, prev_freq/1000, policy->cur/1000);
     }
