@@ -7,7 +7,8 @@ boot.init.o: buildid.o
 
 EFIOBJ := boot.init.o compat.o runtime.o
 
-$(EFIOBJ): CFLAGS-stack-boundary := -mpreferred-stack-boundary=4
+$(call cc-option-add,cflags-stack-boundary,CC,-mpreferred-stack-boundary=4)
+$(EFIOBJ): CFLAGS-stack-boundary := $(cflags-stack-boundary)
 
 obj-y := stub.o
 obj-$(XEN_BUILD_EFI) := $(EFIOBJ) relocs-dummy.o
