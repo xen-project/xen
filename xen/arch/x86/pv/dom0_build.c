@@ -345,9 +345,10 @@ int __init dom0_construct_pv(struct domain *d,
 
     if ( (rc = elf_init(&elf, image_start, image_len)) != 0 )
         return rc;
-#ifdef CONFIG_VERBOSE_DEBUG
-    elf_set_verbose(&elf);
-#endif
+
+    if ( opt_dom0_verbose )
+        elf_set_verbose(&elf);
+
     elf_parse_binary(&elf);
     if ( (rc = elf_xen_parse(&elf, &parms)) != 0 )
         goto out;

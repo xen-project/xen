@@ -687,7 +687,8 @@ Controls for how dom0 is constructed on x86 systems.
     guests do no require any paging support by default.
 
 *   The `verbose` boolean is intended for diagnostics, and prints out extra
-    information during the dom0 build.  It defaults to false.
+    information during the dom0 build.  It defaults to the compile time choice
+    of `CONFIG_VERBOSE_DEBUG`.
 
 ### dom0-iommu
     = List of [ passthrough=<bool>, strict=<bool>, map-inclusive=<bool>,

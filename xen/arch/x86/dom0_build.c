@@ -281,7 +281,7 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 bool __initdata opt_dom0_shadow;
 #endif
 bool __initdata opt_dom0_pvh = !IS_ENABLED(CONFIG_PV);
-bool __initdata opt_dom0_verbose;
+bool __initdata opt_dom0_verbose = IS_ENABLED(CONFIG_VERBOSE_DEBUG);
 
 static int __init parse_dom0_param(const char *s)
 {
