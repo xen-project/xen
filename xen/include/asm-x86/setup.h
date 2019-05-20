@@ -64,8 +64,8 @@ extern bool opt_dom0_shadow;
 #else
 #define opt_dom0_shadow false
 #endif
-extern bool dom0_pvh;
-extern bool dom0_verbose;
+extern bool opt_dom0_pvh;
+extern bool opt_dom0_verbose;
 
 #define max_init_domid (0)
 

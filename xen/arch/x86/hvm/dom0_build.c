@@ -484,7 +484,7 @@ static int __init pvh_populate_p2m(struct domain *d)
             return rc;
     }
 
-    if ( dom0_verbose )
+    if ( opt_dom0_verbose )
         print_order_stats(d);
 
     return 0;
