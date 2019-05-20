@@ -735,7 +735,7 @@ int __init dom0_construct_pv(struct domain *d,
             mapcache_override_current(NULL);
             switch_cr3_cr4(current->arch.cr3, read_cr4());
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
-            rc = -1;
+            rc = -EINVAL;
             goto out;
         }
         hypercall_page_initialise(
@@ -903,21 +903,15 @@ int __init dom0_construct_pv(struct domain *d,
     rc = dom0_setup_permissions(d);
     BUG_ON(rc != 0);
 
-    if ( elf_check_broken(&elf) )
-        printk(" Xen warning: dom0 kernel broken ELF: %s\n",
-               elf_check_broken(&elf));
-
     if ( d->domain_id == hardware_domid )
         iommu_hwdom_init(d);
 
     v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);
 
-    return 0;
-
 out:
     if ( elf_check_broken(&elf) )
-        printk(" Xen dom0 kernel broken ELF: %s\n",
+        printk(XENLOG_WARNING "Dom0 kernel broken ELF: %s\n",
                elf_check_broken(&elf));
 
     return rc;
