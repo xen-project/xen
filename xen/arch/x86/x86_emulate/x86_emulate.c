@@ -8441,6 +8441,21 @@ x86_emulate(
         elem_bytes = (b & 7) < 3 ? 1 : (b & 7) != 5 ? 2 : 4;
         goto avx512f_no_sae;
 
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x29): /* vpmov{b,w}2m [xyz]mm,k */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x39): /* vpmov{d,q}2m [xyz]mm,k */
+        generate_exception_if(!evex.r || !evex.R, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x28): /* vpmovm2{b,w} k,[xyz]mm */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x38): /* vpmovm2{d,q} k,[xyz]mm */
+        if ( b & 0x10 )
+            host_and_vcpu_must_have(avx512dq);
+        else
+            host_and_vcpu_must_have(avx512bw);
+        generate_exception_if(evex.opmsk || ea.type != OP_REG, EXC_UD);
+        d |= TwoOp;
+        op_bytes = 16 << evex.lr;
+        goto avx512f_no_sae;
+
     case X86EMUL_OPC_66(0x0f38, 0x2a):     /* movntdqa m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x2a): /* vmovntdqa mem,{x,y}mm */
         generate_exception_if(ea.type != OP_MEM, EXC_UD);

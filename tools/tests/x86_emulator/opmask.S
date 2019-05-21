@@ -12,16 +12,22 @@
 
 #if SIZE == 1
 # define _(x) x##b
+# define _v(x, t) _v_(x##q, t)
 #elif SIZE == 2
 # define _(x) x##w
+# define _v(x, t) _v_(x##d, t)
 # define WIDEN(x) x##bw
 #elif SIZE == 4
 # define _(x) x##d
+# define _v(x, t) _v_(x##w, t)
 # define WIDEN(x) x##wd
 #elif SIZE == 8
 # define _(x) x##q
+# define _v(x, t) _v_(x##b, t)
 # define WIDEN(x) x##dq
 #endif
+
+#define _v_(x, t) v##x##t
 
     .macro check res1:req, res2:req, line:req
     _(kmov)       %\res1, DATA(out)
@@ -128,6 +134,15 @@ _start:
     mov           $__LINE__, %eax
     ret
 1:
+
+#endif
+
+#if SIZE > 2 ? defined(__AVX512BW__) : defined(__AVX512DQ__)
+
+    _(kmov)       DATA(in1), %k0
+    _v(pmovm2,)   %k0, %zmm7
+    _v(pmov,2m)   %zmm7, %k3
+    check         k0, k3, __LINE__
 
 #endif
 
