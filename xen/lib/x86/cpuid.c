@@ -2,6 +2,13 @@
 
 #include <xen/lib/x86/cpuid.h>
 
+static void zero_leaves(struct cpuid_leaf *l,
+                        unsigned int first, unsigned int last)
+{
+    if ( first <= last )
+        memset(&l[first], 0, sizeof(*l) * (last - first + 1));
+}
+
 unsigned int x86_cpuid_lookup_vendor(uint32_t ebx, uint32_t ecx, uint32_t edx)
 {
     switch ( ebx )
@@ -146,6 +153,9 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
 
         xstates = cpuid_policy_xstates(p);
 
+        /* This logic will probably need adjusting when XCR0[63] gets used. */
+        BUILD_BUG_ON(ARRAY_SIZE(p->xstate.raw) > 63);
+
         for ( i = 2; i < min_t(unsigned int, 63,
                                ARRAY_SIZE(p->xstate.raw)); ++i )
         {
@@ -161,6 +171,59 @@ void x86_cpuid_policy_fill_native(struct cpuid_policy *p)
         cpuid_leaf(0x80000000 + i, &p->extd.raw[i]);
 
     recalculate_synth(p);
+}
+
+void x86_cpuid_policy_clear_out_of_range_leaves(struct cpuid_policy *p)
+{
+    unsigned int i;
+
+    zero_leaves(p->basic.raw, p->basic.max_leaf + 1,
+                ARRAY_SIZE(p->basic.raw) - 1);
+
+    if ( p->basic.max_leaf < 4 )
+        memset(p->cache.raw, 0, sizeof(p->cache.raw));
+    else
+    {
+        for ( i = 0; (i < ARRAY_SIZE(p->cache.raw) &&
+                      p->cache.subleaf[i].type); ++i )
+            ;
+
+        zero_leaves(p->cache.raw, i, ARRAY_SIZE(p->cache.raw) - 1);
+    }
+
+    if ( p->basic.max_leaf < 7 )
+        memset(p->feat.raw, 0, sizeof(p->feat.raw));
+    else
+        zero_leaves(p->feat.raw, p->feat.max_subleaf + 1,
+                    ARRAY_SIZE(p->feat.raw) - 1);
+
+    if ( p->basic.max_leaf < 0xb )
+        memset(p->topo.raw, 0, sizeof(p->topo.raw));
+    else
+    {
+        for ( i = 0; (i < ARRAY_SIZE(p->topo.raw) &&
+                      p->topo.subleaf[i].type); ++i )
+            ;
+
+        zero_leaves(p->topo.raw, i, ARRAY_SIZE(p->topo.raw) - 1);
+    }
+
+    if ( p->basic.max_leaf < 0xd || !cpuid_policy_xstates(p) )
+        memset(p->xstate.raw, 0, sizeof(p->xstate.raw));
+    else
+    {
+        /* This logic will probably need adjusting when XCR0[63] gets used. */
+        BUILD_BUG_ON(ARRAY_SIZE(p->xstate.raw) > 63);
+
+        /* First two leaves always valid.  Rest depend on xstates. */
+        i = max(2, 64 - __builtin_clzll(cpuid_policy_xstates(p)));
+
+        zero_leaves(p->xstate.raw, i,
+                    ARRAY_SIZE(p->xstate.raw) - 1);
+    }
+
+    zero_leaves(p->extd.raw, (p->extd.max_leaf & 0xffff) + 1,
+                ARRAY_SIZE(p->extd.raw) - 1);
 }
 
 const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature)

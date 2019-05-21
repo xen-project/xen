@@ -20,6 +20,17 @@ static unsigned int nr_failures;
     printf(fmt, ##__VA_ARGS__);                 \
 })
 
+#define memdup(ptr)                             \
+({                                              \
+    typeof(*(ptr)) *p_ = (ptr);                 \
+    void *n_ = malloc(sizeof(*p_));             \
+                                                \
+    if ( !n_ )                                  \
+        err(1, "%s malloc failure", __func__);  \
+                                                \
+    memcpy(n_, p_, sizeof(*p_));                \
+})
+
 static void test_vendor_identification(void)
 {
     static const struct test {
@@ -345,6 +356,151 @@ static void test_msr_deserialise_failure(void)
     }
 }
 
+static void test_cpuid_out_of_range_clearing(void)
+{
+    static const struct test {
+        const char *name;
+        unsigned int nr_markers;
+        struct cpuid_policy p;
+    } tests[] = {
+        {
+            .name = "basic",
+            .nr_markers = 1,
+            .p = {
+                /* Retains marker in leaf 0.  Clears others. */
+                .basic.max_leaf = 0,
+                .basic.vendor_ebx = 0xc2,
+
+                .basic.raw_fms = 0xc2,
+                .cache.raw[0].a = 0xc2,
+                .feat.raw[0].a = 0xc2,
+                .topo.raw[0].a = 0xc2,
+                .xstate.raw[0].a = 0xc2,
+                .xstate.raw[1].a = 0xc2,
+            },
+        },
+        {
+            .name = "cache",
+            .nr_markers = 1,
+            .p = {
+                /* Retains marker in subleaf 0.  Clears others. */
+                .basic.max_leaf = 4,
+                .cache.raw[0] = { .a = 1, .b = 0xc2 },
+
+                .cache.raw[1].b = 0xc2,
+                .feat.raw[0].a = 0xc2,
+                .topo.raw[0].a = 0xc2,
+                .xstate.raw[0].a = 0xc2,
+                .xstate.raw[1].a = 0xc2,
+            },
+        },
+        {
+            .name = "feat",
+            .nr_markers = 1,
+            .p = {
+                /* Retains marker in subleaf 0.  Clears others. */
+                .basic.max_leaf = 7,
+                .feat.raw[0].b = 0xc2,
+
+                .feat.raw[1].b = 0xc2,
+                .topo.raw[0].a = 0xc2,
+                .xstate.raw[0].a = 0xc2,
+                .xstate.raw[1].a = 0xc2,
+            },
+        },
+        {
+            .name = "topo",
+            .nr_markers = 1,
+            .p = {
+                /* Retains marker in subleaf 0.  Clears others. */
+                .basic.max_leaf = 0xb,
+                .topo.raw[0] = { .b = 0xc2, .c = 0x0100 },
+
+                .topo.raw[1].b = 0xc2,
+                .xstate.raw[0].a = 0xc2,
+                .xstate.raw[1].a = 0xc2,
+            },
+        },
+        {
+            .name = "xstate x87",
+            .nr_markers = 2,
+            .p = {
+                /* First two subleaves always valid.  Others cleared. */
+                .basic.max_leaf = 0xd,
+                .xstate.raw[0].a = 1,
+                .xstate.raw[0].b = 0xc2,
+                .xstate.raw[1].b = 0xc2,
+
+                .xstate.raw[2].b = 0xc2,
+                .xstate.raw[3].b = 0xc2,
+            },
+        },
+        {
+            .name = "xstate sse",
+            .nr_markers = 2,
+            .p = {
+                /* First two subleaves always valid.  Others cleared. */
+                .basic.max_leaf = 0xd,
+                .xstate.raw[0].a = 2,
+                .xstate.raw[0].b = 0xc2,
+                .xstate.raw[1].b = 0xc2,
+
+                .xstate.raw[2].b = 0xc2,
+                .xstate.raw[3].b = 0xc2,
+            },
+        },
+        {
+            .name = "xstate avx",
+            .nr_markers = 3,
+            .p = {
+                /* Third subleaf also valid.  Others cleared. */
+                .basic.max_leaf = 0xd,
+                .xstate.raw[0].a = 7,
+                .xstate.raw[0].b = 0xc2,
+                .xstate.raw[1].b = 0xc2,
+                .xstate.raw[2].b = 0xc2,
+
+                .xstate.raw[3].b = 0xc2,
+            },
+        },
+        {
+            .name = "extd",
+            .nr_markers = 1,
+            .p = {
+                /* Retains marker in leaf 0.  Clears others. */
+                .extd.max_leaf = 0,
+                .extd.vendor_ebx = 0xc2,
+
+                .extd.raw_fms = 0xc2,
+            },
+        },
+    };
+
+    printf("Testing CPUID out-of-range clearing:\n");
+
+    for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
+    {
+        const struct test *t = &tests[i];
+        struct cpuid_policy *p = memdup(&t->p);
+        void *ptr;
+        unsigned int nr_markers;
+
+        x86_cpuid_policy_clear_out_of_range_leaves(p);
+
+        /* Count the number of 0xc2's still remaining. */
+        for ( ptr = p, nr_markers = 0;
+              (ptr = memchr(ptr, 0xc2, (void *)p + sizeof(*p) - ptr));
+              ptr++, nr_markers++ )
+            ;
+
+        if ( nr_markers != t->nr_markers )
+             fail("  Test %s fail - expected %u markers, got %u\n",
+                  t->name, t->nr_markers, nr_markers);
+
+        free(p);
+    }
+}
+
 int main(int argc, char **argv)
 {
     printf("CPU Policy unit tests\n");
@@ -352,9 +508,10 @@ int main(int argc, char **argv)
     test_vendor_identification();
 
     test_cpuid_serialise_success();
-    test_msr_serialise_success();
-
     test_cpuid_deserialise_failure();
+    test_cpuid_out_of_range_clearing();
+
+    test_msr_serialise_success();
     test_msr_deserialise_failure();
 
     if ( nr_failures )

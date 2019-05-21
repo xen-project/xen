@@ -331,6 +331,17 @@ const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
  */
 void x86_cpuid_policy_fill_native(struct cpuid_policy *p);
 
+/**
+ * Clear leaf data beyond the policies max leaf/subleaf settings.
+ *
+ * Policy serialisation purposefully omits out-of-range leaves, because there
+ * are a large number of them due to vendor differences.  However, when
+ * constructing new policies (e.g. levelling down), it is possible to end up
+ * with out-of-range leaves with stale content in them.  This helper clears
+ * them.
+ */
+void x86_cpuid_policy_clear_out_of_range_leaves(struct cpuid_policy *p);
+
 #ifdef __XEN__
 #include <public/arch-x86/xen.h>
 typedef XEN_GUEST_HANDLE_64(xen_cpuid_leaf_t) cpuid_leaf_buffer_t;

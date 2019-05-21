@@ -21,6 +21,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 #include <xen/asm/msr-index.h>
 #include <xen/asm/x86-vendors.h>
