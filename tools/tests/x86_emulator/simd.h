@@ -252,6 +252,10 @@ OVR(pmovzxwq);
 OVR(pmulld);
 OVR(pmuldq);
 OVR(pmuludq);
+OVR(punpckhdq);
+OVR(punpckhqdq);
+OVR(punpckldq);
+OVR(punpcklqdq);
 # endif
 
 # undef OVR_VFP

@@ -300,6 +300,10 @@ static inline bool _to_bool(byte_vec_t bv)
     asm ( "vpbroadcastd %k1, %0" : "=v" (t_) : "r" (x) ); \
     t_; \
 })
+#  if VEC_SIZE == 16
+#   define interleave_hi(x, y) ((vec_t)B(punpckhdq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(punpckldq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
+#  endif
 #  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
                               (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
 #  define shrink1(x) ((half_t)B(pmovqd, _mask, (vdi_t)(x), (vsi_half_t){}, ~0))
@@ -316,6 +320,10 @@ static inline bool _to_bool(byte_vec_t bv)
     asm ( "vpbroadcastq %1, %0" : "=v" (t_) : "r" ((x) + 0ULL) ); \
     t_; \
 })
+#  endif
+#  if VEC_SIZE == 16
+#   define interleave_hi(x, y) ((vec_t)B(punpckhqdq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(punpcklqdq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 #  endif
 #  define mix(x, y) ((vec_t)B(movdqa64_, _mask, (vdi_t)(x), (vdi_t)(y), 0b01010101))
 # endif
