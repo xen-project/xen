@@ -286,11 +286,11 @@ static const struct twobyte_table {
     [0x0f] = { ModRM|SrcImmByte },
     [0x10] = { DstImplicit|SrcMem|ModRM|Mov, simd_any_fp, d8s_vl },
     [0x11] = { DstMem|SrcImplicit|ModRM|Mov, simd_any_fp, d8s_vl },
-    [0x12] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
-    [0x13] = { DstMem|SrcImplicit|ModRM|Mov, simd_other },
+    [0x12] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, 3 },
+    [0x13] = { DstMem|SrcImplicit|ModRM|Mov, simd_other, 3 },
     [0x14 ... 0x15] = { DstImplicit|SrcMem|ModRM, simd_packed_fp, d8s_vl },
-    [0x16] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
-    [0x17] = { DstMem|SrcImplicit|ModRM|Mov, simd_other },
+    [0x16] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, 3 },
+    [0x17] = { DstMem|SrcImplicit|ModRM|Mov, simd_other, 3 },
     [0x18 ... 0x1f] = { ImplicitOps|ModRM },
     [0x20 ... 0x21] = { DstMem|SrcImplicit|ModRM },
     [0x22 ... 0x23] = { DstImplicit|SrcMem|ModRM },
@@ -6005,6 +6005,25 @@ x86_emulate(
             d &= ~TwoOp;
         op_bytes = 8;
         goto simd_0f_fp;
+
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x12):   /* vmovlpd m64,xmm,xmm */
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x13): /* vmovlp{s,d} xmm,m64 */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x16):   /* vmovhpd m64,xmm,xmm */
+    CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x17): /* vmovhp{s,d} xmm,m64 */
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX(0x0f, 0x12):      /* vmovlps m64,xmm,xmm */
+                                            /* vmovhlps xmm,xmm,xmm */
+    case X86EMUL_OPC_EVEX(0x0f, 0x16):      /* vmovhps m64,xmm,xmm */
+                                            /* vmovlhps xmm,xmm,xmm */
+        generate_exception_if((evex.lr || evex.opmsk || evex.brs ||
+                               evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK)),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        if ( (d & DstMask) != DstMem )
+            d &= ~TwoOp;
+        op_bytes = 8;
+        goto simd_zmm;
 
     case X86EMUL_OPC_F3(0x0f, 0x12):       /* movsldup xmm/m128,xmm */
     case X86EMUL_OPC_VEX_F3(0x0f, 0x12):   /* vmovsldup {x,y}mm/mem,{x,y}mm */

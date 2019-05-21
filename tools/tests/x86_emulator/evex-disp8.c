@@ -253,6 +253,16 @@ static const struct test avx512f_128[] = {
     INSN(insertps,  66, 0f3a, 21, el,    d, el),
     INSN(mov,       66,   0f, 6e, el, dq64, el),
     INSN(mov,       66,   0f, 7e, el, dq64, el),
+//       movhlps,     ,   0f, 12,        d
+    INSN(movhpd,    66,   0f, 16, el,    q, vl),
+    INSN(movhpd,    66,   0f, 17, el,    q, vl),
+    INSN(movhps,      ,   0f, 16, el_2,  d, vl),
+    INSN(movhps,      ,   0f, 17, el_2,  d, vl),
+//       movlhps,     ,   0f, 16,        d
+    INSN(movlpd,    66,   0f, 12, el,    q, vl),
+    INSN(movlpd,    66,   0f, 13, el,    q, vl),
+    INSN(movlps,      ,   0f, 12, el_2,  d, vl),
+    INSN(movlps,      ,   0f, 13, el_2,  d, vl),
     INSN(movq,      f3,   0f, 7e, el,    q, el),
     INSN(movq,      66,   0f, d6, el,    q, el),
 };
