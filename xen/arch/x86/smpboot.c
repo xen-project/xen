@@ -33,6 +33,7 @@
 #include <xen/serial.h>
 #include <xen/numa.h>
 #include <xen/cpu.h>
+#include <asm/cpuidle.h>
 #include <asm/current.h>
 #include <asm/mc146818rtc.h>
 #include <asm/desc.h>
@@ -209,8 +210,7 @@ static void smp_callin(void)
     halt:
         clear_local_APIC();
         spin_debug_enable();
-        cpu_exit_clear(cpu);
-        (*dead_idle)();
+        play_dead();
     }
 
     /* Allow the master to continue. */

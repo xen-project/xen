@@ -100,13 +100,19 @@ void default_dead_idle(void)
      */
     spec_ctrl_enter_idle(get_cpu_info());
     wbinvd();
-    for ( ; ; )
-        halt();
+    halt();
+    spec_ctrl_exit_idle(get_cpu_info());
 }
 
-static void play_dead(void)
+void play_dead(void)
 {
+    unsigned int cpu = smp_processor_id();
+
     local_irq_disable();
+
+    /* Change the NMI handler to a nop (see comment below). */
+    _set_gate_lower(&idt_tables[cpu][TRAP_nmi], SYS_DESC_irq_gate, 0,
+                    &trap_nop);
 
     /*
      * NOTE: After cpu_exit_clear, per-cpu variables may no longer accessible,
@@ -118,9 +124,10 @@ static void play_dead(void)
      * Consider very carefully when adding code to *dead_idle. Most hypervisor
      * subsystems are unsafe to call.
      */
-    cpu_exit_clear(smp_processor_id());
+    cpu_exit_clear(cpu);
 
-    (*dead_idle)();
+    for ( ; ; )
+        dead_idle();
 }
 
 static void idle_loop(void)

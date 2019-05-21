@@ -20,6 +20,7 @@ int mwait_idle_init(struct notifier_block *);
 int cpuidle_init_cpu(unsigned int cpu);
 void default_dead_idle(void);
 void acpi_dead_idle(void);
+void play_dead(void);
 void trace_exit_reason(u32 *irq_traced);
 void update_idle_stats(struct acpi_processor_power *,
                        struct acpi_processor_cx *, uint64_t, uint64_t);
