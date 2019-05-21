@@ -119,6 +119,12 @@ typedef long long __attribute__((vector_size(HALF_SIZE))) vdi_half_t;
 
 #ifdef __AVX512F__
 
+/* Sadly there are a few exceptions to the general naming rules. */
+# define __builtin_ia32_shuf_f32x4_512_mask __builtin_ia32_shuf_f32x4_mask
+# define __builtin_ia32_shuf_f64x2_512_mask __builtin_ia32_shuf_f64x2_mask
+# define __builtin_ia32_shuf_i32x4_512_mask __builtin_ia32_shuf_i32x4_mask
+# define __builtin_ia32_shuf_i64x2_512_mask __builtin_ia32_shuf_i64x2_mask
+
 # if VEC_SIZE > ELEM_SIZE && (defined(VEC_MAX) ? VEC_MAX : VEC_SIZE) < 64
 #  pragma GCC target ( "avx512vl" )
 # endif
@@ -262,6 +268,7 @@ OVR(pmovzxwq);
 OVR(pmulld);
 OVR(pmuldq);
 OVR(pmuludq);
+OVR(pshufd);
 OVR(punpckhdq);
 OVR(punpckhqdq);
 OVR(punpckldq);

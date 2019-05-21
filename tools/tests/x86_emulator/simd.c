@@ -153,6 +153,10 @@ static inline bool _to_bool(byte_vec_t bv)
 #  else
 #   define interleave_hi(x, y) B(vpermi2varps, _mask, x, interleave_hi, y, ~0)
 #   define interleave_lo(x, y) B(vpermt2varps, _mask, interleave_lo, x, y, ~0)
+#   define swap(x) ({ \
+    vec_t t_ = B(shuf_f32x4_, _mask, x, x, VEC_SIZE == 32 ? 0b01 : 0b00011011, undef(), ~0); \
+    B(shufps, _mask, t_, t_, 0b00011011, undef(), ~0); \
+})
 #  endif
 # elif FLOAT_SIZE == 8
 #  if VEC_SIZE >= 32
@@ -181,6 +185,10 @@ static inline bool _to_bool(byte_vec_t bv)
 #  else
 #   define interleave_hi(x, y) B(vpermi2varpd, _mask, x, interleave_hi, y, ~0)
 #   define interleave_lo(x, y) B(vpermt2varpd, _mask, interleave_lo, x, y, ~0)
+#   define swap(x) ({ \
+    vec_t t_ = B(shuf_f64x2_, _mask, x, x, VEC_SIZE == 32 ? 0b01 : 0b00011011, undef(), ~0); \
+    B(shufpd, _mask, t_, t_, 0b01010101, undef(), ~0); \
+})
 #  endif
 # endif
 #elif FLOAT_SIZE == 4 && defined(__SSE__)
@@ -309,9 +317,14 @@ static inline bool _to_bool(byte_vec_t bv)
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhdq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(punpckldq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
+#   define swap(x) ((vec_t)B(pshufd, _mask, (vsi_t)(x), 0b00011011, (vsi_t)undef(), ~0))
 #  else
 #   define interleave_hi(x, y) ((vec_t)B(vpermi2vard, _mask, (vsi_t)(x), interleave_hi, (vsi_t)(y), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(vpermt2vard, _mask, interleave_lo, (vsi_t)(x), (vsi_t)(y), ~0))
+#   define swap(x) ((vec_t)B(pshufd, _mask, \
+                             B(shuf_i32x4_, _mask, (vsi_t)(x), (vsi_t)(x), \
+                               VEC_SIZE == 32 ? 0b01 : 0b00011011, (vsi_t)undef(), ~0), \
+                             0b00011011, (vsi_t)undef(), ~0))
 #  endif
 #  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
                               (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
@@ -333,9 +346,14 @@ static inline bool _to_bool(byte_vec_t bv)
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhqdq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(punpcklqdq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
+#   define swap(x) ((vec_t)B(pshufd, _mask, (vsi_t)(x), 0b01001110, (vsi_t)undef(), ~0))
 #  else
 #   define interleave_hi(x, y) ((vec_t)B(vpermi2varq, _mask, (vdi_t)(x), interleave_hi, (vdi_t)(y), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(vpermt2varq, _mask, interleave_lo, (vdi_t)(x), (vdi_t)(y), ~0))
+#   define swap(x) ((vec_t)B(pshufd, _mask, \
+                             (vsi_t)B(shuf_i64x2_, _mask, (vdi_t)(x), (vdi_t)(x), \
+                                      VEC_SIZE == 32 ? 0b01 : 0b00011011, (vdi_t)undef(), ~0), \
+                             0b01001110, (vsi_t)undef(), ~0))
 #  endif
 #  define mix(x, y) ((vec_t)B(movdqa64_, _mask, (vdi_t)(x), (vdi_t)(y), 0b01010101))
 # endif

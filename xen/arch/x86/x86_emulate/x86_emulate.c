@@ -318,7 +318,7 @@ static const struct twobyte_table {
     [0x6b ... 0x6d] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0x6e] = { DstImplicit|SrcMem|ModRM|Mov, simd_none, d8s_dq64 },
     [0x6f] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_int, d8s_vl },
-    [0x70] = { SrcImmByte|ModRM|TwoOp, simd_other },
+    [0x70] = { SrcImmByte|ModRM|TwoOp, simd_other, d8s_vl },
     [0x71 ... 0x73] = { DstImplicit|SrcImmByte|ModRM, simd_none, d8s_vl },
     [0x74 ... 0x76] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0x77] = { DstImplicit|SrcNone },
@@ -432,7 +432,8 @@ static const struct ext0f38_table {
     uint8_t vsib:1;
     disp8scale_t d8s:4;
 } ext0f38_table[256] = {
-    [0x00 ... 0x0b] = { .simd_size = simd_packed_int },
+    [0x00] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
+    [0x01 ... 0x0b] = { .simd_size = simd_packed_int },
     [0x0c ... 0x0f] = { .simd_size = simd_packed_fp },
     [0x10 ... 0x12] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x13] = { .simd_size = simd_other, .two_op = 1 },
@@ -543,6 +544,7 @@ static const struct ext0f3a_table {
     [0x20] = { .simd_size = simd_none, .d8s = 0 },
     [0x21] = { .simd_size = simd_other, .d8s = 2 },
     [0x22] = { .simd_size = simd_none, .d8s = d8s_dq64 },
+    [0x23] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x25] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x30 ... 0x33] = { .simd_size = simd_other, .two_op = 1 },
     [0x38] = { .simd_size = simd_128, .d8s = 4 },
@@ -552,6 +554,7 @@ static const struct ext0f3a_table {
     [0x3e ... 0x3f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
     [0x42] = { .simd_size = simd_packed_int },
+    [0x43] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x44] = { .simd_size = simd_packed_int },
     [0x46] = { .simd_size = simd_packed_int },
     [0x48 ... 0x49] = { .simd_size = simd_packed_fp, .four_op = 1 },
@@ -6677,6 +6680,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f, 0xe1): /* vpsraw xmm/m128,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xf1): /* vpsllw xmm/m128,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xf5): /* vpmaddwd [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x00): /* vpshufb [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         fault_suppression = false;
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xd5): /* vpmullw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
@@ -6930,6 +6934,21 @@ x86_emulate(
         opc[2] = imm1;
         insn_bytes = PFX_BYTES + 3;
         break;
+
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x70): /* vpshufd $imm8,[xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f, 0x70): /* vpshufhw $imm8,[xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F2(0x0f, 0x70): /* vpshuflw $imm8,[xyz]mm/mem,[xyz]mm{k} */
+        if ( evex.pfx == vex_66 )
+            generate_exception_if(evex.w, EXC_UD);
+        else
+        {
+            host_and_vcpu_must_have(avx512bw);
+            generate_exception_if(evex.brs, EXC_UD);
+        }
+        d = (d & ~SrcMask) | SrcMem | TwoOp;
+        op_bytes = 16 << evex.lr;
+        fault_suppression = false;
+        goto avx512f_imm8_no_sae;
 
     CASE_SIMD_PACKED_INT(0x0f, 0x71):    /* Grp12 */
     case X86EMUL_OPC_VEX_66(0x0f, 0x71):
@@ -9129,7 +9148,13 @@ x86_emulate(
                                             /* vextracti64x2 $imm8,{y,z}mm,xmm/m128{k} */
         if ( evex.w )
             host_and_vcpu_must_have(avx512dq);
-        generate_exception_if(!evex.lr || evex.brs, EXC_UD);
+        generate_exception_if(evex.brs, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x23): /* vshuff32x4 $imm8,{y,z}mm/mem,{y,z}mm,{y,z}mm{k} */
+                                            /* vshuff64x2 $imm8,{y,z}mm/mem,{y,z}mm,{y,z}mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x43): /* vshufi32x4 $imm8,{y,z}mm/mem,{y,z}mm,{y,z}mm{k} */
+                                            /* vshufi64x2 $imm8,{y,z}mm/mem,{y,z}mm,{y,z}mm{k} */
+        generate_exception_if(!evex.lr, EXC_UD);
         fault_suppression = false;
         goto avx512f_imm8_no_sae;
 
