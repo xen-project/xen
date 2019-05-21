@@ -146,6 +146,7 @@ static const struct test avx512f_all[] = {
     INSN_SFP(mov,            0f, 11),
     INSN_PFP_NB(mova,        0f, 28),
     INSN_PFP_NB(mova,        0f, 29),
+    INSN(movddup,      f2,   0f, 12,    vl,   q_nb, vl),
     INSN(movdqa32,     66,   0f, 6f,    vl,   d_nb, vl),
     INSN(movdqa32,     66,   0f, 7f,    vl,   d_nb, vl),
     INSN(movdqa64,     66,   0f, 6f,    vl,   q_nb, vl),
@@ -157,6 +158,8 @@ static const struct test avx512f_all[] = {
     INSN(movntdq,      66,   0f, e7,    vl,   d_nb, vl),
     INSN(movntdqa,     66, 0f38, 2a,    vl,   d_nb, vl),
     INSN_PFP_NB(movnt,       0f, 2b),
+    INSN(movshdup,     f3,   0f, 16,    vl,   d_nb, vl),
+    INSN(movsldup,     f3,   0f, 12,    vl,   d_nb, vl),
     INSN_PFP_NB(movu,        0f, 10),
     INSN_PFP_NB(movu,        0f, 11),
     INSN_FP(mul,             0f, 59),
@@ -694,6 +697,19 @@ static void test_group(const struct test tests[], unsigned int nr_test,
 
             switch ( tests[i].esz )
             {
+            case ESZ_q_nb:
+                /* The 128-bit form of VMOVDDUP needs special casing. */
+                if ( vl[j] == VL_128 && tests[i].spc == SPC_0f &&
+                     tests[i].opc == 0x12 && tests[i].pfx == PFX_f2 )
+                {
+                    struct test test = tests[i];
+
+                    test.vsz = VSZ_el;
+                    test.scale = SC_el;
+                    test_one(&test, vl[j], instr, ctxt);
+                    continue;
+                }
+                /* fall through */
             default:
                 test_one(&tests[i], vl[j], instr, ctxt);
                 break;

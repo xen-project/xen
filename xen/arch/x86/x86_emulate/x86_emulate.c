@@ -3016,6 +3016,15 @@ x86_decode(
 
             switch ( b )
             {
+            case 0x12: /* vmovsldup / vmovddup */
+                if ( evex.pfx == vex_f2 )
+                    disp8scale = evex.lr ? 4 + evex.lr : 3;
+                /* fall through */
+            case 0x16: /* vmovshdup */
+                if ( evex.pfx == vex_f3 )
+                    disp8scale = 4 + evex.lr;
+                break;
+
             case 0x20: /* mov cr,reg */
             case 0x21: /* mov dr,reg */
             case 0x22: /* mov reg,cr */
@@ -6039,6 +6048,20 @@ x86_emulate(
             goto simd_0f_avx;
         host_and_vcpu_must_have(sse3);
         goto simd_0f_xmm;
+
+    case X86EMUL_OPC_EVEX_F3(0x0f, 0x12):   /* vmovsldup [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F2(0x0f, 0x12):   /* vmovddup [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_F3(0x0f, 0x16):   /* vmovshdup [xyz]mm/mem,[xyz]mm{k} */
+        generate_exception_if((evex.brs ||
+                               evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK)),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        avx512_vlen_check(false);
+        d |= TwoOp;
+        op_bytes = !(evex.pfx & VEX_PREFIX_DOUBLE_MASK) || evex.lr
+                   ? 16 << evex.lr : 8;
+        fault_suppression = false;
+        goto simd_zmm;
 
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x14): /* vunpcklp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0x15): /* vunpckhp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */

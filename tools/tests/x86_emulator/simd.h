@@ -326,8 +326,11 @@ REN(pandn, , d);
 REN(por, , d);
 REN(pxor, , d);
 #  endif
+OVR(movddup);
 OVR(movntdq);
 OVR(movntdqa);
+OVR(movshdup);
+OVR(movsldup);
 OVR(pmovsxbd);
 OVR(pmovsxbq);
 OVR(pmovsxdq);
