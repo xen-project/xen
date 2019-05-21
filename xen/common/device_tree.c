@@ -987,8 +987,19 @@ unsigned int dt_number_of_irq(const struct dt_device_node *device)
     const struct dt_device_node *p;
     const __be32 *intspec, *tmp;
     u32 intsize, intlen;
+    int intnum;
 
     dt_dprintk("dt_irq_number: dev=%s\n", device->full_name);
+
+    /* Try the new-style interrupts-extended first */
+    intnum = dt_count_phandle_with_args(device, "interrupts-extended",
+                                        "#interrupt-cells");
+    if ( intnum >= 0 )
+    {
+        dt_dprintk(" using 'interrupts-extended' property\n");
+        dt_dprintk(" intnum=%d\n", intnum);
+        return intnum;
+    }
 
     /* Get the interrupts property */
     intspec = dt_get_property(device, "interrupts", &intlen);
@@ -996,6 +1007,7 @@ unsigned int dt_number_of_irq(const struct dt_device_node *device)
         return 0;
     intlen /= sizeof(*intspec);
 
+    dt_dprintk(" using 'interrupts' property\n");
     dt_dprintk(" intspec=%d intlen=%d\n", be32_to_cpup(intspec), intlen);
 
     /* Look for the interrupt parent. */
@@ -1420,9 +1432,29 @@ int dt_device_get_raw_irq(const struct dt_device_node *device,
     const __be32 *intspec, *tmp, *addr;
     u32 intsize, intlen;
     int res = -EINVAL;
+    struct dt_phandle_args args;
+    int i;
 
     dt_dprintk("dt_device_get_raw_irq: dev=%s, index=%u\n",
                device->full_name, index);
+
+    /* Get the reg property (if any) */
+    addr = dt_get_property(device, "reg", NULL);
+
+    /* Try the new-style interrupts-extended first */
+    res = dt_parse_phandle_with_args(device, "interrupts-extended",
+                                     "#interrupt-cells", index, &args);
+    if ( !res )
+    {
+        dt_dprintk(" using 'interrupts-extended' property\n");
+        dt_dprintk(" intspec=%d intsize=%d\n", args.args[0], args.args_count);
+
+        for ( i = 0; i < args.args_count; i++ )
+            args.args[i] = cpu_to_be32(args.args[i]);
+
+        return dt_irq_map_raw(args.np, args.args, args.args_count,
+                              addr, out_irq);
+    }
 
     /* Get the interrupts property */
     intspec = dt_get_property(device, "interrupts", &intlen);
@@ -1430,10 +1462,8 @@ int dt_device_get_raw_irq(const struct dt_device_node *device,
         return -EINVAL;
     intlen /= sizeof(*intspec);
 
+    dt_dprintk(" using 'interrupts' property\n");
     dt_dprintk(" intspec=%d intlen=%d\n", be32_to_cpup(intspec), intlen);
-
-    /* Get the reg property (if any) */
-    addr = dt_get_property(device, "reg", NULL);
 
     /* Look for the interrupt parent. */
     p = dt_irq_find_parent(device);
