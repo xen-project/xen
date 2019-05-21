@@ -121,6 +121,34 @@ typedef int __attribute__((vector_size(EIGHTH_SIZE))) vsi_eighth_t;
 typedef long long __attribute__((vector_size(EIGHTH_SIZE))) vdi_eighth_t;
 # endif
 
+# define DECL_PAIR(w) \
+typedef w ## _t pair_t; \
+typedef vsi_ ## w ## _t vsi_pair_t; \
+typedef vdi_ ## w ## _t vdi_pair_t
+# define DECL_QUARTET(w) \
+typedef w ## _t quartet_t; \
+typedef vsi_ ## w ## _t vsi_quartet_t; \
+typedef vdi_ ## w ## _t vdi_quartet_t
+# define DECL_OCTET(w) \
+typedef w ## _t octet_t; \
+typedef vsi_ ## w ## _t vsi_octet_t; \
+typedef vdi_ ## w ## _t vdi_octet_t
+
+# if ELEM_COUNT == 4
+DECL_PAIR(half);
+# elif ELEM_COUNT == 8
+DECL_PAIR(quarter);
+DECL_QUARTET(half);
+# elif ELEM_COUNT == 16
+DECL_PAIR(eighth);
+DECL_QUARTET(quarter);
+DECL_OCTET(half);
+# endif
+
+# undef DECL_OCTET
+# undef DECL_QUARTET
+# undef DECL_PAIR
+
 #endif
 
 #if VEC_SIZE == 16
@@ -146,6 +174,14 @@ typedef long long __attribute__((vector_size(EIGHTH_SIZE))) vdi_eighth_t;
 #ifdef __AVX512F__
 
 /* Sadly there are a few exceptions to the general naming rules. */
+# define __builtin_ia32_broadcastf32x4_512_mask __builtin_ia32_broadcastf32x4_512
+# define __builtin_ia32_broadcasti32x4_512_mask __builtin_ia32_broadcasti32x4_512
+# define __builtin_ia32_insertf32x4_512_mask __builtin_ia32_insertf32x4_mask
+# define __builtin_ia32_insertf32x8_512_mask __builtin_ia32_insertf32x8_mask
+# define __builtin_ia32_insertf64x4_512_mask __builtin_ia32_insertf64x4_mask
+# define __builtin_ia32_inserti32x4_512_mask __builtin_ia32_inserti32x4_mask
+# define __builtin_ia32_inserti32x8_512_mask __builtin_ia32_inserti32x8_mask
+# define __builtin_ia32_inserti64x4_512_mask __builtin_ia32_inserti64x4_mask
 # define __builtin_ia32_shuf_f32x4_512_mask __builtin_ia32_shuf_f32x4_mask
 # define __builtin_ia32_shuf_f64x2_512_mask __builtin_ia32_shuf_f64x2_mask
 # define __builtin_ia32_shuf_i32x4_512_mask __builtin_ia32_shuf_i32x4_mask
@@ -329,6 +365,20 @@ OVR(punpckhwd);
 OVR(punpcklbw);
 OVR(punpcklwd);
 #  endif
+# endif
+
+# ifdef __AVX512DQ__
+OVR_VFP(and);
+OVR_VFP(andn);
+OVR_VFP(or);
+OVR(pextrd);
+OVR(pextrq);
+OVR(pinsrd);
+OVR(pinsrq);
+#  ifdef __AVX512VL__
+OVR(pmullq);
+#  endif
+OVR_VFP(xor);
 # endif
 
 # undef OVR_VFP

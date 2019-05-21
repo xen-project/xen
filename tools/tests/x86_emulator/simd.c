@@ -139,6 +139,27 @@ static inline bool _to_bool(byte_vec_t bv)
 # endif
 #elif defined(FLOAT_SIZE) && defined(__AVX512F__) && \
       (VEC_SIZE == 64 || defined(__AVX512VL__))
+# if ELEM_COUNT == 8 /* vextractf{32,64}x4 */ || \
+     (ELEM_COUNT == 16 && ELEM_SIZE == 4 && defined(__AVX512DQ__)) /* vextractf32x8 */ || \
+     (ELEM_COUNT == 4 && ELEM_SIZE == 8 && defined(__AVX512DQ__)) /* vextractf64x2 */
+#  define low_half(x) ({ \
+    half_t t_; \
+    asm ( "vextractf%c[w]x%c[n] $0, %[s], %[d]" \
+          : [d] "=m" (t_) \
+          : [s] "v" (x), [w] "i" (ELEM_SIZE * 8), [n] "i" (ELEM_COUNT / 2) ); \
+    t_; \
+})
+# endif
+# if (ELEM_COUNT == 16 && ELEM_SIZE == 4) /* vextractf32x4 */ || \
+     (ELEM_COUNT == 8 && ELEM_SIZE == 8 && defined(__AVX512DQ__)) /* vextractf64x2 */
+#  define low_quarter(x) ({ \
+    quarter_t t_; \
+    asm ( "vextractf%c[w]x%c[n] $0, %[s], %[d]" \
+          : [d] "=m" (t_) \
+          : [s] "v" (x), [w] "i" (ELEM_SIZE * 8), [n] "i" (ELEM_COUNT / 4) ); \
+    t_; \
+})
+# endif
 # if FLOAT_SIZE == 4
 #  define broadcast(x) ({ \
     vec_t t_; \
@@ -146,6 +167,17 @@ static inline bool _to_bool(byte_vec_t bv)
           : "=v" (t_) : "m" (*(float[1]){ x }) ); \
     t_; \
 })
+#  if VEC_SIZE >= 32 && defined(__AVX512DQ__)
+#   define broadcast_pair(x) ({ \
+    vec_t t_; \
+    asm ( "vbroadcastf32x2 %1, %0" : "=v" (t_) : "m" (x) ); \
+    t_; \
+})
+#  endif
+#  if VEC_SIZE == 64 && defined(__AVX512DQ__)
+#   define broadcast_octet(x) B(broadcastf32x8_, _mask, x, undef(), ~0)
+#   define insert_octet(x, y, p) B(insertf32x8_, _mask, x, y, p, undef(), ~0)
+#  endif
 #  define max(x, y) BR_(maxps, _mask, x, y, undef(), ~0)
 #  define min(x, y) BR_(minps, _mask, x, y, undef(), ~0)
 #  define mix(x, y) B(movaps, _mask, x, y, (0b0101010101010101 & ALL_TRUE))
@@ -155,6 +187,13 @@ static inline bool _to_bool(byte_vec_t bv)
 #   define interleave_lo(x, y) B(unpcklps, _mask, x, y, undef(), ~0)
 #   define swap(x) B(shufps, _mask, x, x, 0b00011011, undef(), ~0)
 #  else
+#   define broadcast_quartet(x) B(broadcastf32x4_, _mask, x, undef(), ~0)
+#   define insert_pair(x, y, p) \
+    B(insertf32x4_, _mask, x, \
+      /* Cast needed below to work around gcc 7.x quirk. */ \
+      (p) & 1 ? (typeof(y))__builtin_ia32_shufps(y, y, 0b01000100) : (y), \
+      (p) >> 1, x, 3 << ((p) * 2))
+#   define insert_quartet(x, y, p) B(insertf32x4_, _mask, x, y, p, undef(), ~0)
 #   define interleave_hi(x, y) B(vpermi2varps, _mask, x, interleave_hi, y, ~0)
 #   define interleave_lo(x, y) B(vpermt2varps, _mask, interleave_lo, x, y, ~0)
 #   define swap(x) ({ \
@@ -177,6 +216,14 @@ static inline bool _to_bool(byte_vec_t bv)
           : "=v" (t_) : "m" (*(double[1]){ x }) ); \
     t_; \
 })
+#  endif
+#  if VEC_SIZE >= 32 && defined(__AVX512DQ__)
+#   define broadcast_pair(x) B(broadcastf64x2_, _mask, x, undef(), ~0)
+#   define insert_pair(x, y, p) B(insertf64x2_, _mask, x, y, p, undef(), ~0)
+#  endif
+#  if VEC_SIZE == 64
+#   define broadcast_quartet(x) B(broadcastf64x4_, , x, undef(), ~0)
+#   define insert_quartet(x, y, p) B(insertf64x4_, _mask, x, y, p, undef(), ~0)
 #  endif
 #  define max(x, y) BR_(maxpd, _mask, x, y, undef(), ~0)
 #  define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
@@ -306,6 +353,16 @@ static inline bool _to_bool(byte_vec_t bv)
     t_; \
 })
 # endif
+# if (ELEM_COUNT == 16 && ELEM_SIZE == 4) /* vextracti32x4 */ || \
+       (ELEM_COUNT == 8 && ELEM_SIZE == 8 && defined(__AVX512DQ__)) /* vextracti64x2 */
+#  define low_quarter(x) ({ \
+    quarter_t t_; \
+    asm ( "vextracti%c[w]x%c[n] $0, %[s], %[d]" \
+          : [d] "=m" (t_) \
+          : [s] "v" (x), [w] "i" (ELEM_SIZE * 8), [n] "i" (ELEM_COUNT / 4) ); \
+    t_; \
+})
+# endif
 # if INT_SIZE == 4 || UINT_SIZE == 4
 #  define broadcast(x) ({ \
     vec_t t_; \
@@ -318,11 +375,30 @@ static inline bool _to_bool(byte_vec_t bv)
     asm ( "vpbroadcastd %k1, %0" : "=v" (t_) : "r" (x) ); \
     t_; \
 })
+#  ifdef __AVX512DQ__
+#   define broadcast_pair(x) ({ \
+    vec_t t_; \
+    asm ( "vbroadcasti32x2 %1, %0" : "=v" (t_) : "m" (x) ); \
+    t_; \
+})
+#  endif
+#  if VEC_SIZE == 64 && defined(__AVX512DQ__)
+#   define broadcast_octet(x) ((vec_t)B(broadcasti32x8_, _mask, (vsi_octet_t)(x), (vsi_t)undef(), ~0))
+#   define insert_octet(x, y, p) ((vec_t)B(inserti32x8_, _mask, (vsi_t)(x), (vsi_octet_t)(y), p, (vsi_t)undef(), ~0))
+#  endif
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhdq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(punpckldq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
 #   define swap(x) ((vec_t)B(pshufd, _mask, (vsi_t)(x), 0b00011011, (vsi_t)undef(), ~0))
 #  else
+#   define broadcast_quartet(x) ((vec_t)B(broadcasti32x4_, _mask, (vsi_quartet_t)(x), (vsi_t)undef(), ~0))
+#   define insert_pair(x, y, p) \
+    (vec_t)(B(inserti32x4_, _mask, (vsi_t)(x), \
+              /* First cast needed below to work around gcc 7.x quirk. */ \
+              (p) & 1 ? (vsi_pair_t)__builtin_ia32_pshufd((vsi_pair_t)(y), 0b01000100) \
+                      : (vsi_pair_t)(y), \
+              (p) >> 1, (vsi_t)(x), 3 << ((p) * 2)))
+#   define insert_quartet(x, y, p) ((vec_t)B(inserti32x4_, _mask, (vsi_t)(x), (vsi_quartet_t)(y), p, (vsi_t)undef(), ~0))
 #   define interleave_hi(x, y) ((vec_t)B(vpermi2vard, _mask, (vsi_t)(x), interleave_hi, (vsi_t)(y), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(vpermt2vard, _mask, interleave_lo, (vsi_t)(x), (vsi_t)(y), ~0))
 #   define swap(x) ((vec_t)B(pshufd, _mask, \
@@ -346,6 +422,14 @@ static inline bool _to_bool(byte_vec_t bv)
     asm ( "vpbroadcastq %1, %0" : "=v" (t_) : "r" ((x) + 0ULL) ); \
     t_; \
 })
+#  endif
+#  if VEC_SIZE >= 32 && defined(__AVX512DQ__)
+#   define broadcast_pair(x) ((vec_t)B(broadcasti64x2_, _mask, (vdi_pair_t)(x), (vdi_t)undef(), ~0))
+#   define insert_pair(x, y, p) ((vec_t)B(inserti64x2_, _mask, (vdi_t)(x), (vdi_pair_t)(y), p, (vdi_t)undef(), ~0))
+#  endif
+#  if VEC_SIZE == 64
+#   define broadcast_quartet(x) ((vec_t)B(broadcasti64x4_, , (vdi_quartet_t)(x), (vdi_t)undef(), ~0))
+#   define insert_quartet(x, y, p) ((vec_t)B(inserti64x4_, _mask, (vdi_t)(x), (vdi_quartet_t)(y), p, (vdi_t)undef(), ~0))
 #  endif
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhqdq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
@@ -898,7 +982,7 @@ static inline eighth_t low_eighth(vec_t x)
     eighth_t y;
     unsigned int i;
 
-    for ( i = 0; i < ELEM_COUNT / 4; ++i )
+    for ( i = 0; i < ELEM_COUNT / 8; ++i )
         y[i] = x[i];
 
     return y;
@@ -908,6 +992,50 @@ static inline eighth_t low_eighth(vec_t x)
 }
 # endif
 
+#endif
+
+#ifdef broadcast_pair
+# if ELEM_COUNT == 4
+#  define broadcast_half broadcast_pair
+# elif ELEM_COUNT == 8
+#  define broadcast_quarter broadcast_pair
+# elif ELEM_COUNT == 16
+#  define broadcast_eighth broadcast_pair
+# endif
+#endif
+
+#ifdef insert_pair
+# if ELEM_COUNT == 4
+#  define insert_half insert_pair
+# elif ELEM_COUNT == 8
+#  define insert_quarter insert_pair
+# elif ELEM_COUNT == 16
+#  define insert_eighth insert_pair
+# endif
+#endif
+
+#ifdef broadcast_quartet
+# if ELEM_COUNT == 8
+#  define broadcast_half broadcast_quartet
+# elif ELEM_COUNT == 16
+#  define broadcast_quarter broadcast_quartet
+# endif
+#endif
+
+#ifdef insert_quartet
+# if ELEM_COUNT == 8
+#  define insert_half insert_quartet
+# elif ELEM_COUNT == 16
+#  define insert_quarter insert_quartet
+# endif
+#endif
+
+#if defined(broadcast_octet) && ELEM_COUNT == 16
+# define broadcast_half broadcast_octet
+#endif
+
+#if defined(insert_octet) && ELEM_COUNT == 16
+# define insert_half insert_octet
 #endif
 
 #if defined(__AVX512F__) && defined(FLOAT_SIZE)
@@ -1203,6 +1331,60 @@ int simd_test(void)
 
 #ifdef broadcast2
     if ( !eq(broadcast2(ELEM_COUNT + 1), src + inv) ) return __LINE__;
+#endif
+
+#if defined(broadcast_half) && defined(insert_half)
+    {
+        half_t aux = low_half(src);
+
+        touch(aux);
+        x = broadcast_half(aux);
+        touch(aux);
+        y = insert_half(src, aux, 1);
+        if ( !eq(x, y) ) return __LINE__;
+    }
+#endif
+
+#if defined(broadcast_quarter) && defined(insert_quarter)
+    {
+        quarter_t aux = low_quarter(src);
+
+        touch(aux);
+        x = broadcast_quarter(aux);
+        touch(aux);
+        y = insert_quarter(src, aux, 1);
+        touch(aux);
+        y = insert_quarter(y, aux, 2);
+        touch(aux);
+        y = insert_quarter(y, aux, 3);
+        if ( !eq(x, y) ) return __LINE__;
+    }
+#endif
+
+#if defined(broadcast_eighth) && defined(insert_eighth) && \
+    /* At least gcc 7.3 "optimizes" away all insert_eighth() calls below. */ \
+    __GNUC__ >= 8
+    {
+        eighth_t aux = low_eighth(src);
+
+        touch(aux);
+        x = broadcast_eighth(aux);
+        touch(aux);
+        y = insert_eighth(src, aux, 1);
+        touch(aux);
+        y = insert_eighth(y, aux, 2);
+        touch(aux);
+        y = insert_eighth(y, aux, 3);
+        touch(aux);
+        y = insert_eighth(y, aux, 4);
+        touch(aux);
+        y = insert_eighth(y, aux, 5);
+        touch(aux);
+        y = insert_eighth(y, aux, 6);
+        touch(aux);
+        y = insert_eighth(y, aux, 7);
+        if ( !eq(x, y) ) return __LINE__;
+    }
 #endif
 
 #if defined(interleave_lo) && defined(interleave_hi)

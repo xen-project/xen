@@ -23,6 +23,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512bw-opmask.h"
 #include "avx512f.h"
 #include "avx512bw.h"
+#include "avx512dq.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -99,6 +100,11 @@ static bool simd_check_avx512dq(void)
     return cpu_has_avx512dq;
 }
 #define simd_check_avx512dq_opmask simd_check_avx512dq
+
+static bool simd_check_avx512dq_vl(void)
+{
+    return cpu_has_avx512dq && cpu_has_avx512vl;
+}
 
 static bool simd_check_avx512bw(void)
 {
@@ -267,9 +273,10 @@ static const struct {
     SIMD(XOP i32x8,               xop,      32i4),
     SIMD(XOP i64x4,               xop,      32i8),
     SIMD(OPMASK/w,     avx512f_opmask,         2),
-    SIMD(OPMASK/b,    avx512dq_opmask,         1),
-    SIMD(OPMASK/d,    avx512bw_opmask,         4),
-    SIMD(OPMASK/q,    avx512bw_opmask,         8),
+    SIMD(OPMASK+DQ/b, avx512dq_opmask,         1),
+    SIMD(OPMASK+DQ/w, avx512dq_opmask,         2),
+    SIMD(OPMASK+BW/d, avx512bw_opmask,         4),
+    SIMD(OPMASK+BW/q, avx512bw_opmask,         8),
     SIMD(AVX512F f32 scalar,  avx512f,        f4),
     SIMD(AVX512F f32x16,      avx512f,      64f4),
     SIMD(AVX512F f64 scalar,  avx512f,        f8),
@@ -302,6 +309,24 @@ static const struct {
     AVX512VL(BW+VL u16x8,    avx512bw,      16u2),
     AVX512VL(BW+VL s16x16,   avx512bw,      32i2),
     AVX512VL(BW+VL u16x16,   avx512bw,      32u2),
+    SIMD(AVX512DQ f32x16,    avx512dq,      64f4),
+    SIMD(AVX512DQ f64x8,     avx512dq,      64f8),
+    SIMD(AVX512DQ s32x16,    avx512dq,      64i4),
+    SIMD(AVX512DQ u32x16,    avx512dq,      64u4),
+    SIMD(AVX512DQ s64x8,     avx512dq,      64i8),
+    SIMD(AVX512DQ u64x8,     avx512dq,      64u8),
+    AVX512VL(DQ+VL f32x4,    avx512dq,      16f4),
+    AVX512VL(DQ+VL f64x2,    avx512dq,      16f8),
+    AVX512VL(DQ+VL f32x8,    avx512dq,      32f4),
+    AVX512VL(DQ+VL f64x4,    avx512dq,      32f8),
+    AVX512VL(DQ+VL s32x4,    avx512dq,      16i4),
+    AVX512VL(DQ+VL u32x4,    avx512dq,      16u4),
+    AVX512VL(DQ+VL s32x8,    avx512dq,      32i4),
+    AVX512VL(DQ+VL u32x8,    avx512dq,      32u4),
+    AVX512VL(DQ+VL s64x2,    avx512dq,      16i8),
+    AVX512VL(DQ+VL u64x2,    avx512dq,      16u8),
+    AVX512VL(DQ+VL s64x4,    avx512dq,      32i8),
+    AVX512VL(DQ+VL u64x4,    avx512dq,      32u8),
 #undef AVX512VL_
 #undef AVX512VL
 #undef SIMD_
