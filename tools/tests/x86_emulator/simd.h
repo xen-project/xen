@@ -70,6 +70,16 @@ typedef int __attribute__((vector_size(VEC_SIZE))) vsi_t;
 typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
 #endif
 
+#if ELEM_SIZE == 1
+typedef vqi_t vint_t;
+#elif ELEM_SIZE == 2
+typedef vhi_t vint_t;
+#elif ELEM_SIZE == 4
+typedef vsi_t vint_t;
+#elif ELEM_SIZE == 8
+typedef vdi_t vint_t;
+#endif
+
 #if VEC_SIZE >= 16
 
 # if ELEM_COUNT >= 2

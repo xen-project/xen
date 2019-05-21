@@ -136,6 +136,7 @@ static inline bool xcr0_mask(uint64_t mask)
 #define cpu_has_avx512dq  (cp.feat.avx512dq && xcr0_mask(0xe6))
 #define cpu_has_avx512bw  (cp.feat.avx512bw && xcr0_mask(0xe6))
 #define cpu_has_avx512vl  (cp.feat.avx512vl && xcr0_mask(0xe6))
+#define cpu_has_avx512_vbmi (cp.feat.avx512_vbmi && xcr0_mask(0xe6))
 
 #define cpu_has_xgetbv1   (cpu_has_xsave && cp.xstate.xgetbv1)
 

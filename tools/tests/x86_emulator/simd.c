@@ -150,6 +150,9 @@ static inline bool _to_bool(byte_vec_t bv)
 #   define interleave_hi(x, y) B(unpckhps, _mask, x, y, undef(), ~0)
 #   define interleave_lo(x, y) B(unpcklps, _mask, x, y, undef(), ~0)
 #   define swap(x) B(shufps, _mask, x, x, 0b00011011, undef(), ~0)
+#  else
+#   define interleave_hi(x, y) B(vpermi2varps, _mask, x, interleave_hi, y, ~0)
+#   define interleave_lo(x, y) B(vpermt2varps, _mask, interleave_lo, x, y, ~0)
 #  endif
 # elif FLOAT_SIZE == 8
 #  if VEC_SIZE >= 32
@@ -175,6 +178,9 @@ static inline bool _to_bool(byte_vec_t bv)
 #   define interleave_hi(x, y) B(unpckhpd, _mask, x, y, undef(), ~0)
 #   define interleave_lo(x, y) B(unpcklpd, _mask, x, y, undef(), ~0)
 #   define swap(x) B(shufpd, _mask, x, x, 0b01, undef(), ~0)
+#  else
+#   define interleave_hi(x, y) B(vpermi2varpd, _mask, x, interleave_hi, y, ~0)
+#   define interleave_lo(x, y) B(vpermt2varpd, _mask, interleave_lo, x, y, ~0)
 #  endif
 # endif
 #elif FLOAT_SIZE == 4 && defined(__SSE__)
@@ -303,6 +309,9 @@ static inline bool _to_bool(byte_vec_t bv)
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhdq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(punpckldq, _mask, (vsi_t)(x), (vsi_t)(y), (vsi_t)undef(), ~0))
+#  else
+#   define interleave_hi(x, y) ((vec_t)B(vpermi2vard, _mask, (vsi_t)(x), interleave_hi, (vsi_t)(y), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(vpermt2vard, _mask, interleave_lo, (vsi_t)(x), (vsi_t)(y), ~0))
 #  endif
 #  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
                               (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
@@ -324,6 +333,9 @@ static inline bool _to_bool(byte_vec_t bv)
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhqdq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(punpcklqdq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
+#  else
+#   define interleave_hi(x, y) ((vec_t)B(vpermi2varq, _mask, (vdi_t)(x), interleave_hi, (vdi_t)(y), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(vpermt2varq, _mask, interleave_lo, (vdi_t)(x), (vdi_t)(y), ~0))
 #  endif
 #  define mix(x, y) ((vec_t)B(movdqa64_, _mask, (vdi_t)(x), (vdi_t)(y), 0b01010101))
 # endif
@@ -769,6 +781,7 @@ int simd_test(void)
 {
     unsigned int i, j;
     vec_t x, y, z, src, inv, alt, sh;
+    vint_t interleave_lo, interleave_hi;
 
     for ( i = 0, j = ELEM_SIZE << 3; i < ELEM_COUNT; ++i )
     {
@@ -782,6 +795,9 @@ int simd_test(void)
         if ( !(i & (i + 1)) )
             --j;
         sh[i] = j;
+
+        interleave_lo[i] = ((i & 1) * ELEM_COUNT) | (i >> 1);
+        interleave_hi[i] = interleave_lo[i] + (ELEM_COUNT / 2);
     }
 
     touch(src);
@@ -1075,7 +1091,7 @@ int simd_test(void)
     x = src * alt;
     y = interleave_lo(x, alt < 0);
     touch(x);
-    z = widen1(x);
+    z = widen1(low_half(x));
     touch(x);
     if ( !eq(z, y) ) return __LINE__;
 
@@ -1107,7 +1123,7 @@ int simd_test(void)
 
 # ifdef widen1
     touch(src);
-    x = widen1(src);
+    x = widen1(low_half(src));
     touch(src);
     if ( !eq(x, y) ) return __LINE__;
 # endif

@@ -107,6 +107,7 @@
 #define cpu_has_avx512vl        boot_cpu_has(X86_FEATURE_AVX512VL)
 
 /* CPUID level 0x00000007:0.ecx */
+#define cpu_has_avx512_vbmi     boot_cpu_has(X86_FEATURE_AVX512_VBMI)
 #define cpu_has_rdpid           boot_cpu_has(X86_FEATURE_RDPID)
 
 /* CPUID level 0x80000007.edx */

@@ -260,12 +260,17 @@ def crunch_numbers(state):
         AVX2: [AVX512F],
 
         # AVX512F is taken to mean hardware support for 512bit registers
-        # (which in practice depends on the EVEX prefix to encode), and the
-        # instructions themselves. All further AVX512 features are built on
-        # top of AVX512F
+        # (which in practice depends on the EVEX prefix to encode) as well
+        # as mask registers, and the instructions themselves. All further
+        # AVX512 features are built on top of AVX512F
         AVX512F: [AVX512DQ, AVX512IFMA, AVX512PF, AVX512ER, AVX512CD,
-                  AVX512BW, AVX512VL, AVX512VBMI, AVX512_4VNNIW,
-                  AVX512_4FMAPS, AVX512_VPOPCNTDQ],
+                  AVX512BW, AVX512VL, AVX512_4VNNIW, AVX512_4FMAPS,
+                  AVX512_VPOPCNTDQ],
+
+        # AVX512 extensions acting solely on vectors of bytes/words are made
+        # dependents of AVX512BW (as to requiring wider than 16-bit mask
+        # registers), despite the SDM not formally making this connection.
+        AVX512BW: [AVX512_VBMI],
 
         # The features:
         #   * Single Thread Indirect Branch Predictors

@@ -173,6 +173,10 @@ static const struct test avx512f_all[] = {
     INSN(pcmpgtd,      66,   0f, 66,    vl,      d, vl),
     INSN(pcmpgtq,      66, 0f38, 37,    vl,      q, vl),
     INSN(pcmpu,        66, 0f3a, 1e,    vl,     dq, vl),
+    INSN(permi2,       66, 0f38, 76,    vl,     dq, vl),
+    INSN(permi2,       66, 0f38, 77,    vl,     sd, vl),
+    INSN(permt2,       66, 0f38, 7e,    vl,     dq, vl),
+    INSN(permt2,       66, 0f38, 7f,    vl,     sd, vl),
     INSN(pmaxs,        66, 0f38, 3d,    vl,     dq, vl),
     INSN(pmaxu,        66, 0f38, 3f,    vl,     dq, vl),
     INSN(pmins,        66, 0f38, 39,    vl,     dq, vl),
@@ -294,6 +298,8 @@ static const struct test avx512bw_all[] = {
     INSN(pcmpgtb,     66,   0f, 64,    vl,    b, vl),
     INSN(pcmpgtw,     66,   0f, 65,    vl,    w, vl),
     INSN(pcmpu,       66, 0f3a, 3e,    vl,   bw, vl),
+    INSN(permi2w,     66, 0f38, 75,    vl,    w, vl),
+    INSN(permt2w,     66, 0f38, 7d,    vl,    w, vl),
     INSN(pmaddwd,     66,   0f, f5,    vl,    w, vl),
     INSN(pmaxsb,      66, 0f38, 3c,    vl,    b, vl),
     INSN(pmaxsw,      66,   0f, ee,    vl,    w, vl),
@@ -376,6 +382,11 @@ static const struct test avx512dq_512[] = {
     INSN(extracti32x8,   66, 0f3a, 3b, el_8, d, vl),
     INSN(insertf32x8,    66, 0f3a, 1a, el_8, d, vl),
     INSN(inserti32x8,    66, 0f3a, 3a, el_8, d, vl),
+};
+
+static const struct test avx512_vbmi_all[] = {
+    INSN(permi2b,       66, 0f38, 75, vl, b, vl),
+    INSN(permt2b,       66, 0f38, 7d, vl, b, vl),
 };
 
 static const unsigned char vl_all[] = { VL_512, VL_128, VL_256 };
@@ -718,4 +729,5 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512dq, 128);
     RUN(avx512dq, no128);
     RUN(avx512dq, 512);
+    RUN(avx512_vbmi, all);
 }
