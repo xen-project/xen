@@ -277,9 +277,6 @@ static void menu_reflect(struct acpi_processor_power *power)
 
 static int menu_enable_device(struct acpi_processor_power *power)
 {
-    if (!cpu_online(power->cpu))
-        return -1;
-
     memset(&per_cpu(menu_devices, power->cpu), 0, sizeof(struct menu_device));
 
     return 0;

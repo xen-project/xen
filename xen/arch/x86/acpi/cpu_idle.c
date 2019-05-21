@@ -349,12 +349,22 @@ static void dump_cx(unsigned char key)
     unsigned int cpu;
 
     printk("'%c' pressed -> printing ACPI Cx structures\n", key);
-    for_each_online_cpu ( cpu )
-        if (processor_powers[cpu])
-        {
-            print_acpi_power(cpu, processor_powers[cpu]);
-            process_pending_softirqs();
-        }
+    for_each_present_cpu ( cpu )
+    {
+        struct acpi_processor_power *power = processor_powers[cpu];
+
+        if ( !power )
+            continue;
+
+        if ( cpu_online(cpu) )
+            print_acpi_power(cpu, power);
+        else if ( park_offline_cpus )
+            printk("CPU%u parked in state %u (C%u)\n", cpu,
+                   power->last_state ? power->last_state->idx : 1,
+                   power->last_state ? power->last_state->type : 1);
+
+        process_pending_softirqs();
+    }
 }
 
 static int __init cpu_idle_key_init(void)
@@ -764,6 +774,7 @@ void acpi_dead_idle(void)
         goto default_halt;
 
     cx = &power->states[power->count - 1];
+    power->last_state = cx;
 
     if ( cx->entry_method == ACPI_CSTATE_EM_FFH )
     {
@@ -1225,9 +1236,30 @@ long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
         set_cx(acpi_power, &xen_cx);
     }
 
-    if ( cpuidle_current_governor->enable &&
-         cpuidle_current_governor->enable(acpi_power) )
-        return -EFAULT;
+    if ( !cpu_online(cpu_id) )
+    {
+        uint32_t apic_id = x86_cpu_to_apicid[cpu_id];
+
+        /*
+         * If we've just learned of more available C states, wake the CPU if
+         * it's parked, so it can go back to sleep in perhaps a deeper state.
+         */
+        if ( park_offline_cpus && apic_id != BAD_APICID )
+        {
+            unsigned long flags;
+
+            local_irq_save(flags);
+            apic_wait_icr_idle();
+            apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, apic_id);
+            local_irq_restore(flags);
+        }
+    }
+    else if ( cpuidle_current_governor->enable )
+    {
+        ret = cpuidle_current_governor->enable(acpi_power);
+        if ( ret < 0 )
+            return ret;
+    }
 
     /* FIXME: C-state dependency is not supported by far */
 
@@ -1387,19 +1419,22 @@ static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
     unsigned int cpu = (unsigned long)hcpu;
+    int rc = 0;
 
-    /* Only hook on CPU_ONLINE because a dead cpu may utilize the info to
-     * to enter deep C-state */
+    /*
+     * Only hook on CPU_UP_PREPARE because a dead cpu may utilize the info
+     * to enter deep C-state.
+     */
     switch ( action )
     {
-    case CPU_ONLINE:
-        (void)cpuidle_init_cpu(cpu);
-        break;
-    default:
+    case CPU_UP_PREPARE:
+        rc = cpuidle_init_cpu(cpu);
+        if ( !rc && cpuidle_current_governor->enable )
+            rc = cpuidle_current_governor->enable(processor_powers[cpu]);
         break;
     }
 
-    return NOTIFY_DONE;
+    return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
 }
 
 static struct notifier_block cpu_nfb = {
@@ -1414,6 +1449,7 @@ static int __init cpuidle_presmp_init(void)
         return 0;
 
     mwait_idle_init(&cpu_nfb);
+    cpu_nfb.notifier_call(&cpu_nfb, CPU_UP_PREPARE, cpu);
     cpu_nfb.notifier_call(&cpu_nfb, CPU_ONLINE, cpu);
     register_cpu_notifier(&cpu_nfb);
     return 0;

@@ -1166,12 +1166,17 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 	struct acpi_processor_power *dev = processor_powers[cpu];
 
 	switch (action) {
+		int rc;
+
 	default:
 		return NOTIFY_DONE;
 
 	case CPU_UP_PREPARE:
-		cpuidle_init_cpu(cpu);
-		return NOTIFY_DONE;
+		rc = cpuidle_init_cpu(cpu);
+		dev = processor_powers[cpu];
+		if (!rc && cpuidle_current_governor->enable)
+			rc = cpuidle_current_governor->enable(dev);
+		return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
 
 	case CPU_ONLINE:
 		if (!dev)
@@ -1260,8 +1265,6 @@ int __init mwait_idle_init(struct notifier_block *nfb)
 	}
 	if (!err) {
 		nfb->notifier_call = mwait_idle_cpu_init;
-		mwait_idle_cpu_init(nfb, CPU_UP_PREPARE, NULL);
-
 		pm_idle_save = pm_idle;
 		pm_idle = mwait_idle;
 		dead_idle = acpi_dead_idle;
