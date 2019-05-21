@@ -738,6 +738,25 @@ int dt_parse_phandle_with_args(const struct dt_device_node *np,
                                const char *cells_name, int index,
                                struct dt_phandle_args *out_args);
 
+/**
+ * dt_count_phandle_with_args() - Find the number of phandles references in a property
+ * @np: pointer to a device tree node containing a list
+ * @list_name: property name that contains a list
+ * @cells_name: property name that specifies phandles' arguments count
+ *
+ * Returns the number of phandle + argument tuples within a property. It
+ * is a typical pattern to encode a list of phandle and variable
+ * arguments into a single property. The number of arguments is encoded
+ * by a property in the phandle-target node. For example, a gpios
+ * property would contain a list of GPIO specifies consisting of a
+ * phandle and 1 or more arguments. The number of arguments are
+ * determined by the #gpio-cells property in the node pointed to by the
+ * phandle.
+ */
+int dt_count_phandle_with_args(const struct dt_device_node *np,
+                               const char *list_name,
+                               const char *cells_name);
+
 #ifdef CONFIG_DEVICE_TREE_DEBUG
 #define dt_dprintk(fmt, args...)  \
     printk(XENLOG_DEBUG fmt, ## args)

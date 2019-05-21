@@ -1663,6 +1663,13 @@ int dt_parse_phandle_with_args(const struct dt_device_node *np,
                                         index, out_args);
 }
 
+int dt_count_phandle_with_args(const struct dt_device_node *np,
+                               const char *list_name,
+                               const char *cells_name)
+{
+    return __dt_parse_phandle_with_args(np, list_name, cells_name, 0, -1, NULL);
+}
+
 /**
  * unflatten_dt_node - Alloc and populate a device_node from the flat tree
  * @fdt: The parent device tree blob
