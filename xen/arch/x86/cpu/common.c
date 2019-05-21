@@ -391,11 +391,17 @@ static void generic_identify(struct cpuinfo_x86 *c)
 			= cpuid_ebx(0x80000008);
 
 	/* Intel-defined flags: level 0x00000007 */
-	if ( c->cpuid_level >= 0x00000007 )
-		cpuid_count(0x00000007, 0, &tmp,
+	if ( c->cpuid_level >= 0x00000007 ) {
+		cpuid_count(0x00000007, 0, &eax,
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)],
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_PKU)],
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_AVX512_4VNNIW)]);
+		if (eax > 0)
+			cpuid_count(0x00000007, 1,
+				    &c->x86_capability[cpufeat_word(X86_FEATURE_AVX512_BF16)],
+				    &tmp, &tmp, &tmp);
+	}
+
 	if (c->cpuid_level >= 0xd)
 		cpuid_count(0xd, 1,
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)],

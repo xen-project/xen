@@ -164,6 +164,11 @@ static const char *const str_7d0[32] =
     /* 30 */                [31] = "ssbd",
 };
 
+static const char *const str_7a1[32] =
+{
+    /* 4 */                 [ 5] = "avx512_bf16",
+};
+
 static const struct {
     const char *name;
     const char *abbr;
@@ -180,6 +185,7 @@ static const struct {
     { "0x80000007.edx",   "e7d", str_e7d },
     { "0x80000008.ebx",   "e8b", str_e8b },
     { "0x00000007:0.edx", "7d0", str_7d0 },
+    { "0x00000007:1.eax", "7a1", str_7a1 },
 };
 
 #define COL_ALIGN "18"
