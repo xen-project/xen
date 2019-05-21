@@ -178,6 +178,10 @@ static const struct test avx512f_all[] = {
     INSN(pcmpu,        66, 0f3a, 1e,    vl,     dq, vl),
     INSN(permi2,       66, 0f38, 76,    vl,     dq, vl),
     INSN(permi2,       66, 0f38, 77,    vl,     sd, vl),
+    INSN(permilpd,     66, 0f38, 0d,    vl,      q, vl),
+    INSN(permilpd,     66, 0f3a, 05,    vl,      q, vl),
+    INSN(permilps,     66, 0f38, 0c,    vl,      d, vl),
+    INSN(permilps,     66, 0f3a, 04,    vl,      d, vl),
     INSN(permt2,       66, 0f38, 7e,    vl,     dq, vl),
     INSN(permt2,       66, 0f38, 7f,    vl,     sd, vl),
     INSN(pmaxs,        66, 0f38, 3d,    vl,     dq, vl),
@@ -278,6 +282,10 @@ static const struct test avx512f_no128[] = {
     INSN(extracti32x4,   66, 0f3a, 39, el_4,  d, vl),
     INSN(insertf32x4,    66, 0f3a, 18, el_4,  d, vl),
     INSN(inserti32x4,    66, 0f3a, 38, el_4,  d, vl),
+    INSN(perm,           66, 0f38, 36, vl,   dq, vl),
+    INSN(perm,           66, 0f38, 16, vl,   sd, vl),
+    INSN(permpd,         66, 0f3a, 01, vl,    q, vl),
+    INSN(permq,          66, 0f3a, 00, vl,    q, vl),
     INSN(shuff32x4,      66, 0f3a, 23, vl,    d, vl),
     INSN(shuff64x2,      66, 0f3a, 23, vl,    q, vl),
     INSN(shufi32x4,      66, 0f3a, 43, vl,    d, vl),
@@ -316,6 +324,7 @@ static const struct test avx512bw_all[] = {
     INSN(pcmpgtb,     66,   0f, 64,    vl,    b, vl),
     INSN(pcmpgtw,     66,   0f, 65,    vl,    w, vl),
     INSN(pcmpu,       66, 0f3a, 3e,    vl,   bw, vl),
+    INSN(permw,       66, 0f38, 8d,    vl,    w, vl),
     INSN(permi2w,     66, 0f38, 75,    vl,    w, vl),
     INSN(permt2w,     66, 0f38, 7d,    vl,    w, vl),
     INSN(pmaddwd,     66,   0f, f5,    vl,    w, vl),
@@ -412,6 +421,7 @@ static const struct test avx512dq_512[] = {
 };
 
 static const struct test avx512_vbmi_all[] = {
+    INSN(permb,         66, 0f38, 8d, vl, b, vl),
     INSN(permi2b,       66, 0f38, 75, vl, b, vl),
     INSN(permt2b,       66, 0f38, 7d, vl, b, vl),
 };

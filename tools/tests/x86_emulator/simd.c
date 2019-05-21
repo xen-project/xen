@@ -186,6 +186,7 @@ static inline bool _to_bool(byte_vec_t bv)
 #   define interleave_hi(x, y) B(unpckhps, _mask, x, y, undef(), ~0)
 #   define interleave_lo(x, y) B(unpcklps, _mask, x, y, undef(), ~0)
 #   define swap(x) B(shufps, _mask, x, x, 0b00011011, undef(), ~0)
+#   define swap2(x) B_(vpermilps, _mask, x, 0b00011011, undef(), ~0)
 #  else
 #   define broadcast_quartet(x) B(broadcastf32x4_, _mask, x, undef(), ~0)
 #   define insert_pair(x, y, p) \
@@ -200,6 +201,10 @@ static inline bool _to_bool(byte_vec_t bv)
     vec_t t_ = B(shuf_f32x4_, _mask, x, x, VEC_SIZE == 32 ? 0b01 : 0b00011011, undef(), ~0); \
     B(shufps, _mask, t_, t_, 0b00011011, undef(), ~0); \
 })
+#   define swap2(x) B(vpermilps, _mask, \
+                       B(shuf_f32x4_, _mask, x, x, \
+                         VEC_SIZE == 32 ? 0b01 : 0b00011011, undef(), ~0), \
+                       0b00011011, undef(), ~0)
 #  endif
 # elif FLOAT_SIZE == 8
 #  if VEC_SIZE >= 32
@@ -233,6 +238,7 @@ static inline bool _to_bool(byte_vec_t bv)
 #   define interleave_hi(x, y) B(unpckhpd, _mask, x, y, undef(), ~0)
 #   define interleave_lo(x, y) B(unpcklpd, _mask, x, y, undef(), ~0)
 #   define swap(x) B(shufpd, _mask, x, x, 0b01, undef(), ~0)
+#   define swap2(x) B_(vpermilpd, _mask, x, 0b01, undef(), ~0)
 #  else
 #   define interleave_hi(x, y) B(vpermi2varpd, _mask, x, interleave_hi, y, ~0)
 #   define interleave_lo(x, y) B(vpermt2varpd, _mask, interleave_lo, x, y, ~0)
@@ -240,6 +246,10 @@ static inline bool _to_bool(byte_vec_t bv)
     vec_t t_ = B(shuf_f64x2_, _mask, x, x, VEC_SIZE == 32 ? 0b01 : 0b00011011, undef(), ~0); \
     B(shufpd, _mask, t_, t_, 0b01010101, undef(), ~0); \
 })
+#   define swap2(x) B(vpermilpd, _mask, \
+                       B(shuf_f64x2_, _mask, x, x, \
+                         VEC_SIZE == 32 ? 0b01 : 0b00011011, undef(), ~0), \
+                       0b01010101, undef(), ~0)
 #  endif
 # endif
 #elif FLOAT_SIZE == 4 && defined(__SSE__)
@@ -405,6 +415,7 @@ static inline bool _to_bool(byte_vec_t bv)
                              B(shuf_i32x4_, _mask, (vsi_t)(x), (vsi_t)(x), \
                                VEC_SIZE == 32 ? 0b01 : 0b00011011, (vsi_t)undef(), ~0), \
                              0b00011011, (vsi_t)undef(), ~0))
+#   define swap2(x) ((vec_t)B_(permvarsi, _mask, (vsi_t)(x), (vsi_t)(inv - 1), (vsi_t)undef(), ~0))
 #  endif
 #  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
                               (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
@@ -442,8 +453,17 @@ static inline bool _to_bool(byte_vec_t bv)
                              (vsi_t)B(shuf_i64x2_, _mask, (vdi_t)(x), (vdi_t)(x), \
                                       VEC_SIZE == 32 ? 0b01 : 0b00011011, (vdi_t)undef(), ~0), \
                              0b01001110, (vsi_t)undef(), ~0))
+#   define swap2(x) ((vec_t)B(permvardi, _mask, (vdi_t)(x), (vdi_t)(inv - 1), (vdi_t)undef(), ~0))
 #  endif
 #  define mix(x, y) ((vec_t)B(movdqa64_, _mask, (vdi_t)(x), (vdi_t)(y), 0b01010101))
+#  if VEC_SIZE == 32
+#   define swap3(x) ((vec_t)B_(permdi, _mask, (vdi_t)(x), 0b00011011, (vdi_t)undef(), ~0))
+#  elif VEC_SIZE == 64
+#   define swap3(x) ({ \
+    vdi_t t_ = B_(permdi, _mask, (vdi_t)(x), 0b00011011, (vdi_t)undef(), ~0); \
+    B(shuf_i64x2_, _mask, t_, t_, 0b01001110, (vdi_t)undef(), ~0); \
+})
+#  endif
 # endif
 # if INT_SIZE == 4
 #  define max(x, y) B(pmaxsd, _mask, x, y, undef(), ~0)
@@ -489,6 +509,9 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define shrink1(x) ((half_t)B(pmovwb, _mask, (vhi_t)(x), (vqi_half_t){}, ~0))
 #  define shrink2(x) ((quarter_t)B(pmovdb, _mask, (vsi_t)(x), (vqi_quarter_t){}, ~0))
 #  define shrink3(x) ((eighth_t)B(pmovqb, _mask, (vdi_t)(x), (vqi_eighth_t){}, ~0))
+#  ifdef __AVX512VBMI__
+#   define swap2(x) ((vec_t)B(permvarqi, _mask, (vqi_t)(x), (vqi_t)(inv - 1), (vqi_t)undef(), ~0))
+#  endif
 # elif INT_SIZE == 2 || UINT_SIZE == 2
 #  define broadcast(x) ({ \
     vec_t t_; \
@@ -517,6 +540,7 @@ static inline bool _to_bool(byte_vec_t bv)
                               (0b01010101010101010101010101010101 & ALL_TRUE)))
 #  define shrink1(x) ((half_t)B(pmovdw, _mask, (vsi_t)(x), (vhi_half_t){}, ~0))
 #  define shrink2(x) ((quarter_t)B(pmovqw, _mask, (vdi_t)(x), (vhi_quarter_t){}, ~0))
+#  define swap2(x) ((vec_t)B(permvarhi, _mask, (vhi_t)(x), (vhi_t)(inv - 1), (vhi_t)undef(), ~0))
 # endif
 # if INT_SIZE == 1
 #  define max(x, y) ((vec_t)B(pmaxsb, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
@@ -1323,6 +1347,12 @@ int simd_test(void)
 #ifdef swap2
     touch(src);
     if ( !eq(swap2(src), inv) ) return __LINE__;
+#endif
+
+#ifdef swap3
+    touch(src);
+    if ( !eq(swap3(src), inv) ) return __LINE__;
+    touch(src);
 #endif
 
 #ifdef broadcast
