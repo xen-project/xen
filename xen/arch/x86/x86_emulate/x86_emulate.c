@@ -453,7 +453,7 @@ static const struct ext0f38_table {
     [0x25] = { .simd_size = simd_other, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x26 ... 0x29] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x2a] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
-    [0x2b] = { .simd_size = simd_packed_int },
+    [0x2b] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x2c ... 0x2d] = { .simd_size = simd_packed_fp },
     [0x2e ... 0x2f] = { .simd_size = simd_packed_fp, .to_mem = 1 },
     [0x30] = { .simd_size = simd_other, .two_op = 1, .d8s = d8s_vl_by_2 },
@@ -6720,6 +6720,8 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f, 0x69): /* vpunpckhwd [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         op_bytes = 16 << evex.lr;
         /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x63): /* vpacksswb [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x67): /* vpackuswb [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xd1): /* vpsrlw xmm/m128,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xe1): /* vpsraw xmm/m128,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0xf1): /* vpsllw xmm/m128,[xyz]mm,[xyz]mm{k} */
@@ -6780,6 +6782,12 @@ x86_emulate(
         elem_bytes = 1 << (ext == ext_0f ? b & 1 : evex.w);
         avx512_vlen_check(false);
         goto simd_zmm;
+
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x6b): /* vpackssdw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x2b): /* vpackusdw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        generate_exception_if(evex.w || evex.brs, EXC_UD);
+        fault_suppression = false;
+        goto avx512f_no_sae;
 
     case X86EMUL_OPC_EVEX_66(0x0f, 0x6c): /* vpunpcklqdq [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0x6d): /* vpunpckhqdq [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */

@@ -361,6 +361,10 @@ OVR(pextrw);
 OVR(pinsrb);
 OVR(pinsrw);
 #  ifdef __AVX512VL__
+OVR(packssdw);
+OVR(packsswb);
+OVR(packusdw);
+OVR(packuswb);
 OVR(pmaddwd);
 OVR(pmovsxbw);
 OVR(pmovzxbw);
