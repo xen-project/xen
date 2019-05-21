@@ -208,7 +208,7 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, void *dest, u64 val,
     sval >>= lsb;
 
     /* Extract the value bits and shift them to bit 0. */
-    imm_mask = (BIT(lsb + len) - 1) >> lsb;
+    imm_mask = (BIT(lsb + len, UL) - 1) >> lsb;
     imm = sval & imm_mask;
 
     /* Update the instruction's immediate field. */
