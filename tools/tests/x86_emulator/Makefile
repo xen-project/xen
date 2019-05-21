@@ -16,7 +16,7 @@ vpath %.c $(XEN_ROOT)/xen/lib/x86
 
 CFLAGS += $(CFLAGS_xeninclude)
 
-SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f
+SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f avx512bw
 FMA := fma4 fma
 SG := avx2-sg
 TESTCASES := blowfish $(SIMD) $(FMA) $(SG)
@@ -66,6 +66,9 @@ xop-flts := $(avx-flts)
 avx512f-vecs := 64 16 32
 avx512f-ints := 4 8
 avx512f-flts := 4 8
+avx512bw-vecs := $(avx512f-vecs)
+avx512bw-ints := 1 2
+avx512bw-flts :=
 
 avx512f-opmask-vecs := 2
 avx512dq-opmask-vecs := 1

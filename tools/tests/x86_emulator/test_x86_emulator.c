@@ -22,6 +22,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512dq-opmask.h"
 #include "avx512bw-opmask.h"
 #include "avx512f.h"
+#include "avx512bw.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -104,6 +105,11 @@ static bool simd_check_avx512bw(void)
     return cpu_has_avx512bw;
 }
 #define simd_check_avx512bw_opmask simd_check_avx512bw
+
+static bool simd_check_avx512bw_vl(void)
+{
+    return cpu_has_avx512bw && cpu_has_avx512vl;
+}
 
 static void simd_set_regs(struct cpu_user_regs *regs)
 {
@@ -284,6 +290,18 @@ static const struct {
     AVX512VL(VL u64x2,        avx512f,      16u8),
     AVX512VL(VL s64x4,        avx512f,      32i8),
     AVX512VL(VL u64x4,        avx512f,      32u8),
+    SIMD(AVX512BW s8x64,     avx512bw,      64i1),
+    SIMD(AVX512BW u8x64,     avx512bw,      64u1),
+    SIMD(AVX512BW s16x32,    avx512bw,      64i2),
+    SIMD(AVX512BW u16x32,    avx512bw,      64u2),
+    AVX512VL(BW+VL s8x16,    avx512bw,      16i1),
+    AVX512VL(BW+VL u8x16,    avx512bw,      16u1),
+    AVX512VL(BW+VL s8x32,    avx512bw,      32i1),
+    AVX512VL(BW+VL u8x32,    avx512bw,      32u1),
+    AVX512VL(BW+VL s16x8,    avx512bw,      16i2),
+    AVX512VL(BW+VL u16x8,    avx512bw,      16u2),
+    AVX512VL(BW+VL s16x16,   avx512bw,      32i2),
+    AVX512VL(BW+VL u16x16,   avx512bw,      32u2),
 #undef AVX512VL_
 #undef AVX512VL
 #undef SIMD_

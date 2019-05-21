@@ -31,6 +31,10 @@ ENTRY(simd_test);
 #  define eq(x, y) ((BR(cmpps, _mask, x, y, 0, -1) & ALL_TRUE) == ALL_TRUE)
 # elif FLOAT_SIZE == 8
 #  define eq(x, y) (BR(cmppd, _mask, x, y, 0, -1) == ALL_TRUE)
+# elif (INT_SIZE == 1 || UINT_SIZE == 1) && defined(__AVX512BW__)
+#  define eq(x, y) (B(pcmpeqb, _mask, (vqi_t)(x), (vqi_t)(y), -1) == ALL_TRUE)
+# elif (INT_SIZE == 2 || UINT_SIZE == 2) && defined(__AVX512BW__)
+#  define eq(x, y) (B(pcmpeqw, _mask, (vhi_t)(x), (vhi_t)(y), -1) == ALL_TRUE)
 # elif INT_SIZE == 4 || UINT_SIZE == 4
 #  define eq(x, y) (B(pcmpeqd, _mask, (vsi_t)(x), (vsi_t)(y), -1) == ALL_TRUE)
 # elif INT_SIZE == 8 || UINT_SIZE == 8
@@ -374,6 +378,87 @@ static inline bool _to_bool(byte_vec_t bv)
 #  define max(x, y) ((vec_t)B(pmaxuq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 #  define min(x, y) ((vec_t)B(pminuq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 # endif
+#elif (INT_SIZE == 1 || UINT_SIZE == 1 || INT_SIZE == 2 || UINT_SIZE == 2) && \
+      defined(__AVX512BW__) && (VEC_SIZE == 64 || defined(__AVX512VL__))
+# if INT_SIZE == 1 || UINT_SIZE == 1
+#  define broadcast(x) ({ \
+    vec_t t_; \
+    asm ( "%{evex%} vpbroadcastb %1, %0" \
+          : "=v" (t_) : "m" (*(char[1]){ x }) ); \
+    t_; \
+})
+#  define broadcast2(x) ({ \
+    vec_t t_; \
+    asm ( "vpbroadcastb %k1, %0" : "=v" (t_) : "r" (x) ); \
+    t_; \
+})
+#  if VEC_SIZE == 16
+#   define interleave_hi(x, y) ((vec_t)B(punpckhbw, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(punpcklbw, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
+#   define swap(x) ((vec_t)B(pshufb, _mask, (vqi_t)(x), (vqi_t)(inv - 1), (vqi_t)undef(), ~0))
+#  elif defined(__AVX512VBMI__)
+#   define interleave_hi(x, y) ((vec_t)B(vpermi2varqi, _mask, (vqi_t)(x), interleave_hi, (vqi_t)(y), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(vpermt2varqi, _mask, interleave_lo, (vqi_t)(x), (vqi_t)(y), ~0))
+#  endif
+#  define mix(x, y) ((vec_t)B(movdquqi, _mask, (vqi_t)(x), (vqi_t)(y), \
+                              (0b0101010101010101010101010101010101010101010101010101010101010101LL & ALL_TRUE)))
+#  define shrink1(x) ((half_t)B(pmovwb, _mask, (vhi_t)(x), (vqi_half_t){}, ~0))
+#  define shrink2(x) ((quarter_t)B(pmovdb, _mask, (vsi_t)(x), (vqi_quarter_t){}, ~0))
+#  define shrink3(x) ((eighth_t)B(pmovqb, _mask, (vdi_t)(x), (vqi_eighth_t){}, ~0))
+# elif INT_SIZE == 2 || UINT_SIZE == 2
+#  define broadcast(x) ({ \
+    vec_t t_; \
+    asm ( "%{evex%} vpbroadcastw %1, %0" \
+          : "=v" (t_) : "m" (*(short[1]){ x }) ); \
+    t_; \
+})
+#  define broadcast2(x) ({ \
+    vec_t t_; \
+    asm ( "vpbroadcastw %k1, %0" : "=v" (t_) : "r" (x) ); \
+    t_; \
+})
+#  if VEC_SIZE == 16
+#   define interleave_hi(x, y) ((vec_t)B(punpckhwd, _mask, (vhi_t)(x), (vhi_t)(y), (vhi_t)undef(), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(punpcklwd, _mask, (vhi_t)(x), (vhi_t)(y), (vhi_t)undef(), ~0))
+#   define swap(x) ((vec_t)B(pshufd, _mask, \
+                             (vsi_t)B(pshufhw, _mask, \
+                                      B(pshuflw, _mask, (vhi_t)(x), 0b00011011, (vhi_t)undef(), ~0), \
+                                      0b00011011, (vhi_t)undef(), ~0), \
+                             0b01001110, (vsi_t)undef(), ~0))
+#  else
+#   define interleave_hi(x, y) ((vec_t)B(vpermi2varhi, _mask, (vhi_t)(x), interleave_hi, (vhi_t)(y), ~0))
+#   define interleave_lo(x, y) ((vec_t)B(vpermt2varhi, _mask, interleave_lo, (vhi_t)(x), (vhi_t)(y), ~0))
+#  endif
+#  define mix(x, y) ((vec_t)B(movdquhi, _mask, (vhi_t)(x), (vhi_t)(y), \
+                              (0b01010101010101010101010101010101 & ALL_TRUE)))
+#  define shrink1(x) ((half_t)B(pmovdw, _mask, (vsi_t)(x), (vhi_half_t){}, ~0))
+#  define shrink2(x) ((quarter_t)B(pmovqw, _mask, (vdi_t)(x), (vhi_quarter_t){}, ~0))
+# endif
+# if INT_SIZE == 1
+#  define max(x, y) ((vec_t)B(pmaxsb, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
+#  define min(x, y) ((vec_t)B(pminsb, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
+#  define widen1(x) ((vec_t)B(pmovsxbw, _mask, (vqi_half_t)(x), (vhi_t)undef(), ~0))
+#  define widen2(x) ((vec_t)B(pmovsxbd, _mask, (vqi_quarter_t)(x), (vsi_t)undef(), ~0))
+#  define widen3(x) ((vec_t)B(pmovsxbq, _mask, (vqi_eighth_t)(x), (vdi_t)undef(), ~0))
+# elif UINT_SIZE == 1
+#  define max(x, y) ((vec_t)B(pmaxub, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
+#  define min(x, y) ((vec_t)B(pminub, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
+#  define widen1(x) ((vec_t)B(pmovzxbw, _mask, (vqi_half_t)(x), (vhi_t)undef(), ~0))
+#  define widen2(x) ((vec_t)B(pmovzxbd, _mask, (vqi_quarter_t)(x), (vsi_t)undef(), ~0))
+#  define widen3(x) ((vec_t)B(pmovzxbq, _mask, (vqi_eighth_t)(x), (vdi_t)undef(), ~0))
+# elif INT_SIZE == 2
+#  define max(x, y) B(pmaxsw, _mask, x, y, undef(), ~0)
+#  define min(x, y) B(pminsw, _mask, x, y, undef(), ~0)
+#  define mul_hi(x, y) B(pmulhw, _mask, x, y, undef(), ~0)
+#  define widen1(x) ((vec_t)B(pmovsxwd, _mask, x, (vsi_t)undef(), ~0))
+#  define widen2(x) ((vec_t)B(pmovsxwq, _mask, x, (vdi_t)undef(), ~0))
+# elif UINT_SIZE == 2
+#  define max(x, y) ((vec_t)B(pmaxuw, _mask, (vhi_t)(x), (vhi_t)(y), (vhi_t)undef(), ~0))
+#  define min(x, y) ((vec_t)B(pminuw, _mask, (vhi_t)(x), (vhi_t)(y), (vhi_t)undef(), ~0))
+#  define mul_hi(x, y) ((vec_t)B(pmulhuw, _mask, (vhi_t)(x), (vhi_t)(y), (vhi_t)undef(), ~0))
+#  define widen1(x) ((vec_t)B(pmovzxwd, _mask, (vhi_half_t)(x), (vsi_t)undef(), ~0))
+#  define widen2(x) ((vec_t)B(pmovzxwq, _mask, (vhi_quarter_t)(x), (vdi_t)undef(), ~0))
+# endif
 #elif VEC_SIZE == 16 && defined(__SSE2__)
 # if INT_SIZE == 1 || UINT_SIZE == 1
 #  define interleave_hi(x, y) ((vec_t)__builtin_ia32_punpckhbw128((vqi_t)(x), (vqi_t)(y)))
@@ -565,7 +650,7 @@ static inline bool _to_bool(byte_vec_t bv)
 #  endif
 # endif
 #endif
-#if VEC_SIZE == 16 && defined(__SSSE3__)
+#if VEC_SIZE == 16 && defined(__SSSE3__) && !defined(__AVX512VL__)
 # if INT_SIZE == 1
 #  define abs(x) ((vec_t)__builtin_ia32_pabsb128((vqi_t)(x)))
 # elif INT_SIZE == 2
@@ -780,6 +865,40 @@ static inline half_t low_half(vec_t x)
     unsigned int i;
 
     for ( i = 0; i < ELEM_COUNT / 2; ++i )
+        y[i] = x[i];
+
+    return y;
+#  else
+    return x;
+#  endif
+}
+# endif
+
+# if !defined(low_quarter) && defined(QUARTER_SIZE)
+static inline quarter_t low_quarter(vec_t x)
+{
+#  if QUARTER_SIZE < VEC_SIZE
+    quarter_t y;
+    unsigned int i;
+
+    for ( i = 0; i < ELEM_COUNT / 4; ++i )
+        y[i] = x[i];
+
+    return y;
+#  else
+    return x;
+#  endif
+}
+# endif
+
+# if !defined(low_eighth) && defined(EIGHTH_SIZE)
+static inline eighth_t low_eighth(vec_t x)
+{
+#  if EIGHTH_SIZE < VEC_SIZE
+    eighth_t y;
+    unsigned int i;
+
+    for ( i = 0; i < ELEM_COUNT / 4; ++i )
         y[i] = x[i];
 
     return y;
@@ -1117,7 +1236,7 @@ int simd_test(void)
     y = interleave_lo(alt < 0, alt < 0);
     y = interleave_lo(z, y);
     touch(x);
-    z = widen2(x);
+    z = widen2(low_quarter(x));
     touch(x);
     if ( !eq(z, y) ) return __LINE__;
 
@@ -1126,7 +1245,7 @@ int simd_test(void)
     y = interleave_lo(y, y);
     y = interleave_lo(z, y);
     touch(x);
-    z = widen3(x);
+    z = widen3(low_eighth(x));
     touch(x);
     if ( !eq(z, y) ) return __LINE__;
 #  endif
@@ -1148,14 +1267,14 @@ int simd_test(void)
 
 # ifdef widen2
     touch(src);
-    x = widen2(src);
+    x = widen2(low_quarter(src));
     touch(src);
     if ( !eq(x, z) ) return __LINE__;
 # endif
 
 # ifdef widen3
     touch(src);
-    x = widen3(src);
+    x = widen3(low_eighth(src));
     touch(src);
     if ( !eq(x, interleave_lo(z, (vec_t){})) ) return __LINE__;
 # endif
@@ -1172,6 +1291,36 @@ int simd_test(void)
         aux2 = shrink1(x);
         touch(aux2);
         for ( i = 0; i < ELEM_COUNT / 2; ++i )
+            if ( aux2[i] != src[i] )
+                return __LINE__;
+    }
+#endif
+
+#if defined(widen2) && defined(shrink2)
+    {
+        quarter_t aux1 = low_quarter(src), aux2;
+
+        touch(aux1);
+        x = widen2(aux1);
+        touch(x);
+        aux2 = shrink2(x);
+        touch(aux2);
+        for ( i = 0; i < ELEM_COUNT / 4; ++i )
+            if ( aux2[i] != src[i] )
+                return __LINE__;
+    }
+#endif
+
+#if defined(widen3) && defined(shrink3)
+    {
+        eighth_t aux1 = low_eighth(src), aux2;
+
+        touch(aux1);
+        x = widen3(aux1);
+        touch(x);
+        aux2 = shrink3(x);
+        touch(aux2);
+        for ( i = 0; i < ELEM_COUNT / 8; ++i )
             if ( aux2[i] != src[i] )
                 return __LINE__;
     }

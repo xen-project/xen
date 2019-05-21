@@ -95,6 +95,32 @@ typedef int __attribute__((vector_size(HALF_SIZE))) vsi_half_t;
 typedef long long __attribute__((vector_size(HALF_SIZE))) vdi_half_t;
 # endif
 
+# if ELEM_COUNT >= 4
+#  if VEC_SIZE > 64
+#   define QUARTER_SIZE (VEC_SIZE / 4)
+#  else
+#   define QUARTER_SIZE 16
+#  endif
+typedef typeof((vec_t){}[0]) __attribute__((vector_size(QUARTER_SIZE))) quarter_t;
+typedef char __attribute__((vector_size(QUARTER_SIZE))) vqi_quarter_t;
+typedef short __attribute__((vector_size(QUARTER_SIZE))) vhi_quarter_t;
+typedef int __attribute__((vector_size(QUARTER_SIZE))) vsi_quarter_t;
+typedef long long __attribute__((vector_size(QUARTER_SIZE))) vdi_quarter_t;
+# endif
+
+# if ELEM_COUNT >= 8
+#  if VEC_SIZE > 128
+#   define EIGHTH_SIZE (VEC_SIZE / 8)
+#  else
+#   define EIGHTH_SIZE 16
+#  endif
+typedef typeof((vec_t){}[0]) __attribute__((vector_size(EIGHTH_SIZE))) eighth_t;
+typedef char __attribute__((vector_size(EIGHTH_SIZE))) vqi_eighth_t;
+typedef short __attribute__((vector_size(EIGHTH_SIZE))) vhi_eighth_t;
+typedef int __attribute__((vector_size(EIGHTH_SIZE))) vsi_eighth_t;
+typedef long long __attribute__((vector_size(EIGHTH_SIZE))) vdi_eighth_t;
+# endif
+
 #endif
 
 #if VEC_SIZE == 16
@@ -182,6 +208,9 @@ OVR_SFP(broadcast);
 OVR_SFP(comi);
 OVR_FP(add);
 OVR_INT(add);
+OVR_BW(adds);
+OVR_BW(addus);
+OVR_BW(avg);
 OVR_FP(div);
 OVR(extractps);
 OVR_FMA(fmadd, FP);
@@ -214,6 +243,8 @@ OVR_INT(srl);
 OVR_DQ(srlv);
 OVR_FP(sub);
 OVR_INT(sub);
+OVR_BW(subs);
+OVR_BW(subus);
 OVR_SFP(ucomi);
 OVR_VFP(unpckh);
 OVR_VFP(unpckl);
@@ -273,6 +304,31 @@ OVR(punpckhdq);
 OVR(punpckhqdq);
 OVR(punpckldq);
 OVR(punpcklqdq);
+# endif
+
+# ifdef __AVX512BW__
+OVR(pextrb);
+OVR(pextrw);
+OVR(pinsrb);
+OVR(pinsrw);
+#  ifdef __AVX512VL__
+OVR(pmaddwd);
+OVR(pmovsxbw);
+OVR(pmovzxbw);
+OVR(pmulhuw);
+OVR(pmulhw);
+OVR(pmullw);
+OVR(psadbw);
+OVR(pshufb);
+OVR(pshufhw);
+OVR(pshuflw);
+OVR(pslldq);
+OVR(psrldq);
+OVR(punpckhbw);
+OVR(punpckhwd);
+OVR(punpcklbw);
+OVR(punpcklwd);
+#  endif
 # endif
 
 # undef OVR_VFP
