@@ -65,6 +65,77 @@ static void test_cpuid_serialise_success(void)
             .name = "empty policy",
             .nr_leaves = 4,
         },
+
+        /* Leaf 4 serialisation stops at the first subleaf with type 0. */
+        {
+            .name = "empty leaf 4",
+            .p = {
+                .basic.max_leaf = 4,
+            },
+            .nr_leaves = 4 + 4,
+        },
+        {
+            .name = "partial leaf 4",
+            .p = {
+                .basic.max_leaf = 4,
+                .cache.subleaf[0].type = 1,
+            },
+            .nr_leaves = 4 + 4 + 1,
+        },
+
+        /* Leaf 7 serialisation stops at max_subleaf. */
+        {
+            .name = "empty leaf 7",
+            .p = {
+                .basic.max_leaf = 7,
+            },
+            .nr_leaves = 4 + 7,
+        },
+        {
+            .name = "partial leaf 7",
+            .p = {
+                .basic.max_leaf = 7,
+                .feat.max_subleaf = 1,
+            },
+            .nr_leaves = 4 + 7 + 1,
+        },
+
+        /* Leaf 0xb serialisation stops at the first subleaf with type 0. */
+        {
+            .name = "empty leaf 0xb",
+            .p = {
+                .basic.max_leaf = 0xb,
+            },
+            .nr_leaves = 4 + 0xb,
+        },
+        {
+            .name = "partial leaf 0xb",
+            .p = {
+                .basic.max_leaf = 0xb,
+                .topo.subleaf[0].type = 1,
+            },
+            .nr_leaves = 4 + 0xb + 1,
+        },
+
+        /*
+         * Leaf 0xd serialisation automatically has two leaves, and stops the
+         * highest bit set in {xcr0,xss}_{high,low}.
+         */
+        {
+            .name = "empty leaf 0xd",
+            .p = {
+                .basic.max_leaf = 0xd,
+            },
+            .nr_leaves = 4 + 0xd + 1,
+        },
+        {
+            .name = "partial 0xd",
+            .p = {
+                .basic.max_leaf = 0xd,
+                .xstate.xcr0_low = 7,
+            },
+            .nr_leaves = 4 + 0xd + 1 + 1,
+        },
     };
 
     printf("Testing CPUID serialise success:\n");
