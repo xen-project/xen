@@ -302,9 +302,6 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
 
     printk("==cpu%d==\n", cpu);
     last_state_idx = power->last_state ? power->last_state->idx : -1;
-    printk("active state:\t\tC%d\n", last_state_idx);
-    printk("max_cstate:\t\tC%d\n", max_cstate);
-    printk("states:\n");
 
     spin_lock_irq(&power->stat_lock);
     current_tick = cpuidle_get_tick();
@@ -329,16 +326,14 @@ static void print_acpi_power(uint32_t cpu, struct acpi_processor_power *power)
         idle_usage += usage[i];
         idle_res += tick_to_ns(res_tick[i]);
 
-        printk((last_state_idx == i) ? "   *" : "    ");
-        printk("C%d:\t", i);
-        printk("type[C%d] ", power->states[i].type);
-        printk("latency[%03d] ", power->states[i].latency);
-        printk("usage[%08"PRIu64"] ", usage[i]);
-        printk("method[%5s] ", acpi_cstate_method_name[power->states[i].entry_method]);
-        printk("duration[%"PRIu64"]\n", tick_to_ns(res_tick[i]));
+        printk("   %cC%u:\ttype[C%d] latency[%3u] usage[%8"PRIu64"] method[%5s] duration[%"PRIu64"]\n",
+               (last_state_idx == i) ? '*' : ' ', i,
+               power->states[i].type, power->states[i].latency, usage[i],
+               acpi_cstate_method_name[power->states[i].entry_method],
+               tick_to_ns(res_tick[i]));
     }
-    printk((last_state_idx == 0) ? "   *" : "    ");
-    printk("C0:\tusage[%08"PRIu64"] duration[%"PRIu64"]\n",
+    printk("   %cC0:\tusage[%8"PRIu64"] duration[%"PRIu64"]\n",
+           (last_state_idx == 0) ? '*' : ' ',
            usage[0] + idle_usage, current_stime - idle_res);
 
     print_hw_residencies(cpu);
@@ -349,6 +344,7 @@ static void dump_cx(unsigned char key)
     unsigned int cpu;
 
     printk("'%c' pressed -> printing ACPI Cx structures\n", key);
+    printk("max cstate: C%u\n", max_cstate);
     for_each_present_cpu ( cpu )
     {
         struct acpi_processor_power *power = processor_powers[cpu];
