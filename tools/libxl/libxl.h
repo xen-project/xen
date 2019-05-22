@@ -1191,13 +1191,6 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_PVCALLS 1
 
-/*
- * LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE
- *
- * If this is defined, libxl will only run a device-model if required.
- */
-#define LIBXL_HAVE_DEVICE_MODEL_VERSION_NONE 1
-
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
