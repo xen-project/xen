@@ -308,6 +308,18 @@ static inline void cpuid_featureset_to_policy(
     p->feat._7a1  = fs[FEATURESET_7a1];
 }
 
+static inline uint64_t cpuid_policy_xcr0_max(const struct cpuid_policy *p)
+{
+    return ((uint64_t)p->xstate.xcr0_high << 32) | p->xstate.xcr0_low;
+}
+
+static inline uint64_t cpuid_policy_xstates(const struct cpuid_policy *p)
+{
+    uint64_t val = p->xstate.xcr0_high | p->xstate.xss_high;
+
+    return (val << 32) | p->xstate.xcr0_low | p->xstate.xss_low;
+}
+
 const uint32_t *x86_cpuid_lookup_deep_deps(uint32_t feature);
 
 /**
