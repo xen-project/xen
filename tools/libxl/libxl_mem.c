@@ -457,24 +457,6 @@ int libxl_domain_need_memory(libxl_ctx *ctx,
     libxl_domain_build_info_init(b_info);
     libxl_domain_build_info_copy(ctx, b_info, b_info_in);
 
-    /*
-     * It has become a requirement that to figure out which QEMU to
-     * use, libxl will need to peek d_config's content. The code has
-     * been changed such that one will need to call
-     * libxl__domain_set_device_model before calling
-     * libxl__domain_build_info_setdefault inside libxl.
-     *
-     * This (problematic) public API is the only one which takes a
-     * b_info. Imposing the same requirement on the users of this
-     * public API will break them.
-     *
-     * Provide a compatibility setting for this function. The
-     * calculation doesn't really care which QEMU is set here, so we
-     * go with the upstream default.
-     */
-    if (!b_info->device_model_version)
-        b_info->device_model_version = LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
-
     rc = libxl__domain_build_info_setdefault(gc, b_info);
     if (rc) goto out;
 
