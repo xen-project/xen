@@ -480,7 +480,7 @@ static void colo_preresume_cb(libxl__egc *egc,
      * no disk migration.
      */
     if (css->paused) {
-        rc = libxl_domain_unpause(CTX, dss->domid);
+        rc = libxl__domain_unpause(gc, dss->domid);
         if (rc) {
             LOGD(ERROR, dss->domid, "cannot unpause primary vm");
             goto out;

@@ -638,7 +638,8 @@ typedef struct libxl__ctx libxl_ctx;
 /* API compatibility. */
 #ifdef LIBXL_API_VERSION
 #if LIBXL_API_VERSION != 0x040200 && LIBXL_API_VERSION != 0x040300 && \
-    LIBXL_API_VERSION != 0x040400 && LIBXL_API_VERSION != 0x040500
+    LIBXL_API_VERSION != 0x040400 && LIBXL_API_VERSION != 0x040500 && \
+    LIBXL_API_VERSION != 0x041300
 #error Unknown LIBXL_API_VERSION
 #endif
 #endif
@@ -1210,6 +1211,17 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_PVCALLS 1
 
+/*
+ * LIBXL_HAVE_FN_USING_QMP_ASYNC
+ *
+ * This define indicates that some function's API has changed and have an
+ * extra parameter "ao_how" which means that the function can be executed
+ * asynchronously. Those functions are:
+ *   libxl_domain_pause()
+ *   libxl_domain_unpause()
+ */
+#define LIBXL_HAVE_FN_USING_QMP_ASYNC 1
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -1614,8 +1626,27 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
    * transactionally that the domain has the old old name; if
    * trans is not 0 we use caller's transaction and caller must do retries */
 
-int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid);
-int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid);
+int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid,
+                       const libxl_asyncop_how *ao_how)
+                       LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid,
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+static inline int libxl_domain_pause_0x041200(
+    libxl_ctx *ctx, uint32_t domid)
+{
+    return libxl_domain_pause(ctx, domid, NULL);
+}
+static inline int libxl_domain_unpause_0x041200(
+    libxl_ctx *ctx, uint32_t domid)
+{
+    return libxl_domain_unpause(ctx, domid, NULL);
+}
+#define libxl_domain_pause libxl_domain_pause_0x041200
+#define libxl_domain_unpause libxl_domain_unpause_0x041200
+#endif
+
 
 int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
                            const char *filename,

@@ -4109,6 +4109,7 @@ _hidden void libxl__remus_teardown(libxl__egc *egc,
                                    int rc);
 _hidden void libxl__remus_restore_setup(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
+_hidden int libxl__domain_unpause(libxl__gc *, libxl_domid domid);
 
 
 /*

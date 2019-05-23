@@ -34,12 +34,12 @@ static int fd_lock = -1;
 
 static void pause_domain(uint32_t domid)
 {
-    libxl_domain_pause(ctx, domid);
+    libxl_domain_pause(ctx, domid, NULL);
 }
 
 static void unpause_domain(uint32_t domid)
 {
-    libxl_domain_unpause(ctx, domid);
+    libxl_domain_unpause(ctx, domid, NULL);
 }
 
 static void destroy_domain(uint32_t domid, int force)
@@ -972,7 +972,7 @@ start:
     }
 
     if (!paused)
-        libxl_domain_unpause(ctx, domid);
+        libxl_domain_unpause(ctx, domid, NULL);
 
     ret = domid; /* caller gets success in parent */
     if (!daemonize && !monitor)

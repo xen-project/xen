@@ -394,7 +394,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
             /* The guest is running after failover in COLO mode */
             exit(rc ? -ERROR_FAIL: 0);
 
-        rc = libxl_domain_unpause(ctx, domid);
+        rc = libxl_domain_unpause(ctx, domid, NULL);
         if (rc)
             fprintf(stderr, "migration target (%s): "
                     "Failed to unpause domain %s (id: %u):%d\n",
@@ -429,7 +429,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
     }
 
     if (!pause_after_migration) {
-        rc = libxl_domain_unpause(ctx, domid);
+        rc = libxl_domain_unpause(ctx, domid, NULL);
         if (rc) goto perhaps_destroy_notify_rc;
     }
 

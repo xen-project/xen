@@ -557,18 +557,18 @@ int libxl_domain_suspend_only(libxl_ctx *ctx, uint32_t domid,
     return AO_CREATE_FAIL(rc);
 }
 
-int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid)
+int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid,
+                       const libxl_asyncop_how *ao_how)
 {
-    int ret;
-    GC_INIT(ctx);
-    ret = xc_domain_pause(ctx->xch, domid);
-    if (ret<0) {
+    AO_CREATE(ctx, domid, ao_how);
+    int r;
+    r = xc_domain_pause(ctx->xch, domid);
+    if (r < 0) {
         LOGED(ERROR, domid, "Pausing domain");
-        GC_FREE;
-        return ERROR_FAIL;
+        return AO_CREATE_FAIL(ERROR_FAIL);
     }
-    GC_FREE;
-    return 0;
+    libxl__ao_complete(egc, ao, 0);
+    return AO_INPROGRESS;
 }
 
 int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
@@ -593,10 +593,9 @@ out:
     return AO_INPROGRESS;
 }
 
-int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
+int libxl__domain_unpause(libxl__gc *gc, libxl_domid domid)
 {
-    GC_INIT(ctx);
-    int ret, rc = 0;
+    int r, rc;
 
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
@@ -612,14 +611,31 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
             goto out;
         }
     }
-    ret = xc_domain_unpause(ctx->xch, domid);
-    if (ret<0) {
+    r = xc_domain_unpause(CTX->xch, domid);
+    if (r < 0) {
         LOGED(ERROR, domid, "Unpausing domain");
         rc = ERROR_FAIL;
+        goto out;
     }
- out:
-    GC_FREE;
+    rc = 0;
+out:
     return rc;
+}
+
+int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid,
+                         const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, domid, ao_how);
+    int rc = 0;
+
+    rc = libxl__domain_unpause(gc, domid);
+    if (rc) goto out;
+
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
+
+ out:
+    return AO_CREATE_FAIL(rc);
 }
 
 int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid)

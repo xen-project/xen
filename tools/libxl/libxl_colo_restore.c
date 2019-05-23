@@ -853,7 +853,7 @@ static void colo_unpause_svm(libxl__egc *egc,
     EGC_GC;
 
     /* We have enabled secondary vm's logdirty, so we can unpause it now */
-    rc = libxl_domain_unpause(CTX, domid);
+    rc = libxl__domain_unpause(gc, domid);
     if (rc) {
         LOGD(ERROR, domid, "cannot unpause secondary vm");
         goto out;

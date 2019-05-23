@@ -150,7 +150,7 @@ static int save_domain(uint32_t domid, const char *filename, int checkpoint,
     }
     else if (leavepaused || checkpoint) {
         if (leavepaused)
-            libxl_domain_pause(ctx, domid);
+            libxl_domain_pause(ctx, domid, NULL);
         libxl_domain_resume(ctx, domid, 1, 0);
     }
     else
