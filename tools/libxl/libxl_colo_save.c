@@ -470,7 +470,7 @@ static void colo_preresume_cb(libxl__egc *egc,
     }
 
     /* Resumes the domain and the device model */
-    if (libxl__domain_resume(gc, dss->domid, /* Fast Suspend */1)) {
+    if (libxl__domain_resume_deprecated(gc, dss->domid, /* Fast Suspend */1)) {
         LOGD(ERROR, dss->domid, "cannot resume primary vm");
         goto out;
     }
@@ -480,7 +480,7 @@ static void colo_preresume_cb(libxl__egc *egc,
      * no disk migration.
      */
     if (css->paused) {
-        rc = libxl__domain_unpause(gc, dss->domid);
+        rc = libxl__domain_unpause_deprecated(gc, dss->domid);
         if (rc) {
             LOGD(ERROR, dss->domid, "cannot unpause primary vm");
             goto out;

@@ -178,7 +178,7 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel,
                         const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
-    int rc = libxl__domain_resume(gc, domid, suspend_cancel);
+    int rc = libxl__domain_resume_deprecated(gc, domid, suspend_cancel);
     libxl__ao_complete(egc, ao, rc);
     return AO_INPROGRESS;
 }
@@ -593,7 +593,7 @@ out:
     return AO_INPROGRESS;
 }
 
-int libxl__domain_unpause(libxl__gc *gc, libxl_domid domid)
+int libxl__domain_unpause_deprecated(libxl__gc *gc, libxl_domid domid)
 {
     int r, rc;
 
@@ -604,7 +604,7 @@ int libxl__domain_unpause(libxl__gc *gc, libxl_domid domid)
     }
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        rc = libxl__domain_resume_device_model(gc, domid);
+        rc = libxl__domain_resume_device_model_deprecated(gc, domid);
         if (rc < 0) {
             LOGD(ERROR, domid,
                  "Failed to unpause device model for domain: %d", rc);
@@ -628,7 +628,7 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid,
     AO_CREATE(ctx, domid, ao_how);
     int rc = 0;
 
-    rc = libxl__domain_unpause(gc, domid);
+    rc = libxl__domain_unpause_deprecated(gc, domid);
     if (rc) goto out;
 
     libxl__ao_complete(egc, ao, rc);

@@ -124,7 +124,7 @@ static void colo_resume_vm(libxl__egc *egc,
                 return;
             }
         }
-        rc = libxl__domain_resume(gc, crs->domid, 0);
+        rc = libxl__domain_resume_deprecated(gc, crs->domid, 0);
         if (rc)
             LOGD(ERROR, crs->domid, "cannot resume secondary vm");
 
@@ -853,7 +853,7 @@ static void colo_unpause_svm(libxl__egc *egc,
     EGC_GC;
 
     /* We have enabled secondary vm's logdirty, so we can unpause it now */
-    rc = libxl__domain_unpause(gc, domid);
+    rc = libxl__domain_unpause_deprecated(gc, domid);
     if (rc) {
         LOGD(ERROR, domid, "cannot unpause secondary vm");
         goto out;

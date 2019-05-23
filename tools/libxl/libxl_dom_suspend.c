@@ -421,7 +421,7 @@ static void domain_suspend_callback_common_done(libxl__egc *egc,
 
 /*======================= Domain resume ========================*/
 
-int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
+int libxl__domain_resume_device_model_deprecated(libxl__gc *gc, uint32_t domid)
 {
     const char *path, *state;
 
@@ -449,7 +449,7 @@ int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
     return 0;
 }
 
-int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
+int libxl__domain_resume_deprecated(libxl__gc *gc, uint32_t domid, int suspend_cancel)
 {
     int rc = 0;
 
@@ -460,7 +460,7 @@ int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
     }
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        rc = libxl__domain_resume_device_model(gc, domid);
+        rc = libxl__domain_resume_device_model_deprecated(gc, domid);
         if (rc) {
             LOGD(ERROR, domid, "failed to resume device model:%d", rc);
             goto out;

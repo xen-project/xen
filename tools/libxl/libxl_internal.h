@@ -1315,7 +1315,8 @@ _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                                  const char *old_name, const char *new_name,
                                  xs_transaction_t trans);
 
-_hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
+/* Deprecated, use libxl__dm_resume instead. */
+_hidden int libxl__domain_resume_device_model_deprecated(libxl__gc *gc, uint32_t domid);
 
 _hidden const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
                                          const char *userdata_userid,
@@ -1332,8 +1333,12 @@ _hidden int libxl__userdata_store(libxl__gc *gc, uint32_t domid,
                                   const char *userdata_userid,
                                   const uint8_t *data, int datalen);
 
-_hidden int libxl__domain_resume(libxl__gc *gc, uint32_t domid,
-                                 int suspend_cancel);
+/* Deprecated, use libxl__domain_resume instead */
+_hidden int libxl__domain_resume_deprecated(libxl__gc *gc, uint32_t domid,
+                                            int suspend_cancel);
+/* Deprecated, use libxl__domain_unpause instead */
+_hidden int libxl__domain_unpause_deprecated(libxl__gc *,
+                                             libxl_domid domid);
 
 /* returns 0 or 1, or a libxl error code */
 _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
@@ -4104,7 +4109,6 @@ _hidden void libxl__remus_teardown(libxl__egc *egc,
                                    int rc);
 _hidden void libxl__remus_restore_setup(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
-_hidden int libxl__domain_unpause(libxl__gc *, libxl_domid domid);
 
 
 /*

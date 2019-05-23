@@ -2404,7 +2404,7 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
         goto out;
     }
 
-    rc = libxl__domain_unpause(gc, dm_domid);
+    rc = libxl__domain_unpause_deprecated(gc, dm_domid);
     if (rc) goto out;
 
     sdss->xswait.ao = ao;

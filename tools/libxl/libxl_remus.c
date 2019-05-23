@@ -267,7 +267,7 @@ static void remus_devices_preresume_cb(libxl__egc *egc,
         goto out;
 
     /* Resumes the domain and the device model */
-    rc = libxl__domain_resume(gc, dss->domid, /* Fast Suspend */1);
+    rc = libxl__domain_resume_deprecated(gc, dss->domid, /* Fast Suspend */1);
     if (rc)
         goto out;
 
