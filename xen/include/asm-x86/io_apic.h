@@ -33,42 +33,42 @@
  * The structure of the IO-APIC:
  */
 union IO_APIC_reg_00 {
-	u32	raw;
-	struct __packed {
-		u32	__reserved_2	: 14,
-			LTS		:  1,
-			delivery_type	:  1,
-			__reserved_1	:  8,
-			ID		:  8;
-	} bits;
+    uint32_t raw;
+    struct {
+        unsigned int __reserved_2:14;
+        unsigned int LTS:1;
+        unsigned int delivery_type:1;
+        unsigned int __reserved_1:8;
+        unsigned int ID:8;
+    } bits;
 };
 
 union IO_APIC_reg_01 {
-	u32	raw;
-	struct __packed {
-		u32	version		:  8,
-			__reserved_2	:  7,
-			PRQ		:  1,
-			entries		:  8,
-			__reserved_1	:  8;
-	} bits;
+    uint32_t raw;
+    struct {
+        unsigned int version:8;
+        unsigned int __reserved_2:7;
+        unsigned int PRQ:1;
+        unsigned int entries:8;
+        unsigned int __reserved_1:8;
+    } bits;
 };
 
 union IO_APIC_reg_02 {
-	u32	raw;
-	struct __packed {
-		u32	__reserved_2	: 24,
-			arbitration	:  4,
-			__reserved_1	:  4;
-	} bits;
+    uint32_t raw;
+    struct {
+        unsigned int __reserved_2:24;
+        unsigned int arbitration:4;
+        unsigned int __reserved_1:4;
+    } bits;
 };
 
 union IO_APIC_reg_03 {
-	u32	raw;
-	struct __packed {
-		u32	boot_DT		:  1,
-			__reserved_1	: 31;
-	} bits;
+    uint32_t raw;
+    struct {
+        unsigned int boot_DT:1;
+        unsigned int __reserved_1:31;
+    } bits;
 };
 
 /*
@@ -88,35 +88,36 @@ enum ioapic_irq_destination_types {
 	dest_ExtINT = 7
 };
 
-struct __packed IO_APIC_route_entry {
-	__u32	vector		:  8,
-		delivery_mode	:  3,	/* 000: FIXED
-					 * 001: lowest prio
-					 * 111: ExtINT
-					 */
-		dest_mode	:  1,	/* 0: physical, 1: logical */
-		delivery_status	:  1,
-		polarity	:  1,
-		irr		:  1,
-		trigger		:  1,	/* 0: edge, 1: level */
-		mask		:  1,	/* 0: enabled, 1: disabled */
-		__reserved_2	: 15;
+struct IO_APIC_route_entry {
+    unsigned int vector:8;
+    unsigned int delivery_mode:3; /*
+                                   * 000: FIXED
+                                   * 001: lowest prio
+                                   * 111: ExtINT
+                                   */
+    unsigned int dest_mode:1;     /* 0: physical, 1: logical */
+    unsigned int delivery_status:1;
+    unsigned int polarity:1;      /* 0: low, 1: high */
+    unsigned int irr:1;
+    unsigned int trigger:1;       /* 0: edge, 1: level */
+    unsigned int mask:1;          /* 0: enabled, 1: disabled */
+    unsigned int __reserved_2:15;
 
-	union {		struct { __u32
-					__reserved_1	: 24,
-					physical_dest	:  4,
-					__reserved_2	:  4;
-			} physical;
+    union {
+        struct {
+            unsigned int __reserved_1:24;
+            unsigned int physical_dest:4;
+            unsigned int __reserved_2:4;
+        } physical;
 
-			struct { __u32
-					__reserved_1	: 24,
-					logical_dest	:  8;
-			} logical;
+        struct {
+            unsigned int __reserved_1:24;
+            unsigned int logical_dest:8;
+        } logical;
 
-			/* used when Interrupt Remapping with EIM is enabled */
-			__u32 dest32;
-	} dest;
-
+        /* used when Interrupt Remapping with EIM is enabled */
+        unsigned int dest32;
+    } dest;
 };
 
 /*
