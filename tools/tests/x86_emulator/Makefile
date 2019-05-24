@@ -191,7 +191,10 @@ $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 		(echo 'static const unsigned int __attribute__((section(".test, \"ax\", @progbits #")))' \
 		      "$${prefix}_$(arch)$${flavor}[] = {"; \
 		 od -v -t x $*.bin | sed -e 's/^[0-9]* /0x/' -e 's/ /, 0x/g' -e 's/$$/,/'; \
-		 echo "};") >>$@.new; \
+		 echo "};"; \
+		 echo "asm(\".type $${prefix}_$(arch)$${flavor}, STT_NOTYPE;\");"; \
+		 echo "asm(\".type $${prefix}_$(arch)$${flavor}, STT_FUNC;\");"; \
+		) >>$@.new; \
 		rm -f $*.bin; \
 	    done; \
 	)
@@ -207,7 +210,10 @@ $(addsuffix -opmask.h,$(OPMASK)): %.h: opmask.S testcase.mk Makefile
 		(echo 'static const unsigned int __attribute__((section(".test, \"ax\", @progbits #")))' \
 		      "$${prefix}_$(arch)$${flavor}[] = {"; \
 		 od -v -t x $*.bin | sed -e 's/^[0-9]* /0x/' -e 's/ /, 0x/g' -e 's/$$/,/'; \
-		 echo "};") >>$@.new; \
+		 echo "};"; \
+		 echo "asm(\".type $${prefix}_$(arch)$${flavor}, STT_NOTYPE;\");"; \
+		 echo "asm(\".type $${prefix}_$(arch)$${flavor}, STT_FUNC;\");"; \
+		) >>$@.new; \
 		rm -f $*.bin; \
 	    done; \
 	)
