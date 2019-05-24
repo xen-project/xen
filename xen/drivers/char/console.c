@@ -36,7 +36,8 @@
 #ifdef CONFIG_X86
 #include <xen/consoled.h>
 #include <asm/guest.h>
-#else
+#endif
+#ifdef CONFIG_SBSA_VUART_CONSOLE
 #include <asm/vpl011.h>
 #endif
 
