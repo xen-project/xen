@@ -211,8 +211,10 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #elif defined(FLOAT_SIZE) && VEC_SIZE == FLOAT_SIZE && defined(__AVX512F__)
 # if FLOAT_SIZE == 4
 #  define sqrt(x) scalar_1op(x, "vsqrtss %[in], %[out], %[out]")
+#  define trunc(x) scalar_1op(x, "vrndscaless $0b1011, %[in], %[out], %[out]")
 # elif FLOAT_SIZE == 8
 #  define sqrt(x) scalar_1op(x, "vsqrtsd %[in], %[out], %[out]")
+#  define trunc(x) scalar_1op(x, "vrndscalesd $0b1011, %[in], %[out], %[out]")
 # endif
 #elif defined(FLOAT_SIZE) && defined(__AVX512F__) && \
       (VEC_SIZE == 64 || defined(__AVX512VL__))
@@ -263,6 +265,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define mix(x, y) B(movaps, _mask, x, y, (0b0101010101010101 & ALL_TRUE))
 #  define shrink1(x) BR_(cvtpd2ps, _mask, (vdf_t)(x), (vsf_half_t){}, ~0)
 #  define sqrt(x) BR(sqrtps, _mask, x, undef(), ~0)
+#  define trunc(x) BR(rndscaleps_, _mask, x, 0b1011, undef(), ~0)
 #  define widen1(x) ((vec_t)BR(cvtps2pd, _mask, x, (vdf_t)undef(), ~0))
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) B(unpckhps, _mask, x, y, undef(), ~0)
@@ -316,6 +319,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
 #  define mix(x, y) B(movapd, _mask, x, y, 0b01010101)
 #  define sqrt(x) BR(sqrtpd, _mask, x, undef(), ~0)
+#  define trunc(x) BR(rndscalepd_, _mask, x, 0b1011, undef(), ~0)
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) B(unpckhpd, _mask, x, y, undef(), ~0)
 #   define interleave_lo(x, y) B(unpcklpd, _mask, x, y, undef(), ~0)
@@ -548,6 +552,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  endif
 # endif
 # if INT_SIZE == 4
+#  define abs(x) B(pabsd, _mask, x, undef(), ~0)
 #  define max(x, y) B(pmaxsd, _mask, x, y, undef(), ~0)
 #  define min(x, y) B(pminsd, _mask, x, y, undef(), ~0)
 #  define mul_full(x, y) ((vec_t)B(pmuldq, _mask, x, y, (vdi_t)undef(), ~0))
@@ -558,6 +563,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define mul_full(x, y) ((vec_t)B(pmuludq, _mask, (vsi_t)(x), (vsi_t)(y), (vdi_t)undef(), ~0))
 #  define widen1(x) ((vec_t)B(pmovzxdq, _mask, (vsi_half_t)(x), (vdi_t)undef(), ~0))
 # elif INT_SIZE == 8
+#  define abs(x) ((vec_t)B(pabsq, _mask, (vdi_t)(x), (vdi_t)undef(), ~0))
 #  define max(x, y) ((vec_t)B(pmaxsq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 #  define min(x, y) ((vec_t)B(pminsq, _mask, (vdi_t)(x), (vdi_t)(y), (vdi_t)undef(), ~0))
 # elif UINT_SIZE == 8
@@ -625,6 +631,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define swap2(x) ((vec_t)B(permvarhi, _mask, (vhi_t)(x), (vhi_t)(inv - 1), (vhi_t)undef(), ~0))
 # endif
 # if INT_SIZE == 1
+#  define abs(x) ((vec_t)B(pabsb, _mask, (vqi_t)(x), (vqi_t)undef(), ~0))
 #  define max(x, y) ((vec_t)B(pmaxsb, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
 #  define min(x, y) ((vec_t)B(pminsb, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
 #  define widen1(x) ((vec_t)B(pmovsxbw, _mask, (vqi_half_t)(x), (vhi_t)undef(), ~0))
@@ -637,6 +644,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define widen2(x) ((vec_t)B(pmovzxbd, _mask, (vqi_quarter_t)(x), (vsi_t)undef(), ~0))
 #  define widen3(x) ((vec_t)B(pmovzxbq, _mask, (vqi_eighth_t)(x), (vdi_t)undef(), ~0))
 # elif INT_SIZE == 2
+#  define abs(x) B(pabsw, _mask, x, undef(), ~0)
 #  define max(x, y) B(pmaxsw, _mask, x, y, undef(), ~0)
 #  define min(x, y) B(pminsw, _mask, x, y, undef(), ~0)
 #  define mul_hi(x, y) B(pmulhw, _mask, x, y, undef(), ~0)
@@ -948,19 +956,11 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #if VEC_SIZE == FLOAT_SIZE
 # define max(x, y) ((vec_t){({ typeof(x[0]) x_ = (x)[0], y_ = (y)[0]; x_ > y_ ? x_ : y_; })})
 # define min(x, y) ((vec_t){({ typeof(x[0]) x_ = (x)[0], y_ = (y)[0]; x_ < y_ ? x_ : y_; })})
-# ifdef __SSE4_1__
+# if defined(__SSE4_1__) && !defined(__AVX512F__)
 #  if FLOAT_SIZE == 4
-#   define trunc(x) ({ \
-    float __attribute__((vector_size(16))) r_; \
-    asm ( "roundss $0b1011,%1,%0" : "=x" (r_) : "m" (x) ); \
-    (vec_t){ r_[0] }; \
-})
+#   define trunc(x) scalar_1op(x, "roundss $0b1011, %[in], %[out]")
 #  elif FLOAT_SIZE == 8
-#   define trunc(x) ({ \
-    double __attribute__((vector_size(16))) r_; \
-    asm ( "roundsd $0b1011,%1,%0" : "=x" (r_) : "m" (x) ); \
-    (vec_t){ r_[0] }; \
-})
+#   define trunc(x) scalar_1op(x, "roundsd $0b1011, %[in], %[out]")
 #  endif
 # endif
 #endif

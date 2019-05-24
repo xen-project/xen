@@ -184,6 +184,8 @@ DECL_OCTET(half);
 # define __builtin_ia32_inserti32x4_512_mask __builtin_ia32_inserti32x4_mask
 # define __builtin_ia32_inserti32x8_512_mask __builtin_ia32_inserti32x8_mask
 # define __builtin_ia32_inserti64x4_512_mask __builtin_ia32_inserti64x4_mask
+# define __builtin_ia32_rndscalepd_512_mask __builtin_ia32_rndscalepd_mask
+# define __builtin_ia32_rndscaleps_512_mask __builtin_ia32_rndscaleps_mask
 # define __builtin_ia32_shuf_f32x4_512_mask __builtin_ia32_shuf_f32x4_mask
 # define __builtin_ia32_shuf_f64x2_512_mask __builtin_ia32_shuf_f64x2_mask
 # define __builtin_ia32_shuf_i32x4_512_mask __builtin_ia32_shuf_i32x4_mask
@@ -245,6 +247,7 @@ OVR_INT(broadcast);
 OVR_SFP(broadcast);
 OVR_SFP(comi);
 OVR_VFP(cvtdq2);
+OVR_INT(abs);
 OVR_FP(add);
 OVR_INT(add);
 OVR_BW(adds);
