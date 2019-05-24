@@ -2107,8 +2107,11 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     libxl__domain_build_state *const d_state = sdss->dm.build_state;
     libxl__domain_build_state *const stubdom_state = &sdss->dm_state;
 
+    /* Initialise private part of sdss */
     libxl__domain_build_state_init(stubdom_state);
     dmss_init(&sdss->dm);
+    dmss_init(&sdss->pvqemu);
+    libxl__xswait_init(&sdss->xswait);
 
     if (guest_config->b_info.device_model_version !=
         LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
@@ -2393,8 +2396,6 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
     STATE_AO_GC(sdss->dm.spawn.ao);
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
 
-    libxl__xswait_init(&sdss->xswait);
-
     if (rc) {
         LOGED(ERROR, sdss->dm.guest_domid,
               "error connecting nics devices");
@@ -2441,6 +2442,7 @@ static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
     libxl__domain_build_state_dispose(&sdss->dm_state);
     libxl__xswait_stop(gc, xswait);
     dmss_dispose(gc, &sdss->dm);
+    dmss_dispose(gc, &sdss->pvqemu);
     sdss->callback(egc, &sdss->dm, rc);
 }
 
