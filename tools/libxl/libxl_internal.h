@@ -3949,6 +3949,8 @@ typedef struct libxl__dm_spawn_state libxl__dm_spawn_state;
 typedef void libxl__dm_spawn_cb(libxl__egc *egc, libxl__dm_spawn_state*,
                                 int rc /* if !0, error was logged */);
 
+/* Call dmss_init and dmss_dispose to initialise and dispose of
+ * libxl__dm_spawn_state */
 struct libxl__dm_spawn_state {
     /* mixed - spawn.ao must be initialised by user; rest is private: */
     libxl__spawn_state spawn;
