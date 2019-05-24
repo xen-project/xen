@@ -3985,6 +3985,7 @@ struct libxl__dm_spawn_state {
     libxl__spawn_state spawn;
     libxl__ev_qmp qmp;
     libxl__ev_time timeout;
+    libxl__dm_resume_state dmrs;
     /* filled in by user, must remain valid: */
     uint32_t guest_domid; /* domain being served */
     libxl_domain_config *guest_config;

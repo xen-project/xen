@@ -2082,6 +2082,9 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
 static void stubdom_pvqemu_cb(libxl__egc *egc,
                               libxl__multidev *aodevs,
                               int rc);
+static void stubdom_pvqemu_unpaused(libxl__egc *egc,
+                                    libxl__dm_resume_state *dmrs,
+                                    int rc);
 
 static void stubdom_xswait_cb(libxl__egc *egc, libxl__xswait_state *xswait,
                               int rc, const char *p);
@@ -2404,7 +2407,24 @@ static void stubdom_pvqemu_cb(libxl__egc *egc,
         goto out;
     }
 
-    rc = libxl__domain_unpause_deprecated(gc, dm_domid);
+    sdss->pvqemu.dmrs.ao = ao;
+    sdss->pvqemu.dmrs.domid = dm_domid;
+    sdss->pvqemu.dmrs.callback = stubdom_pvqemu_unpaused;
+    libxl__domain_unpause(egc, &sdss->pvqemu.dmrs); /* must be last */
+    return;
+out:
+    stubdom_pvqemu_unpaused(egc, &sdss->pvqemu.dmrs, rc);
+}
+
+static void stubdom_pvqemu_unpaused(libxl__egc *egc,
+                                    libxl__dm_resume_state *dmrs,
+                                    int rc)
+{
+    libxl__stub_dm_spawn_state *sdss =
+        CONTAINER_OF(dmrs, *sdss, pvqemu.dmrs);
+    STATE_AO_GC(sdss->dm.spawn.ao);
+    uint32_t dm_domid = sdss->pvqemu.guest_domid;
+
     if (rc) goto out;
 
     sdss->xswait.ao = ao;
