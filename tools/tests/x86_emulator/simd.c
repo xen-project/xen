@@ -587,6 +587,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhbw, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(punpcklbw, _mask, (vqi_t)(x), (vqi_t)(y), (vqi_t)undef(), ~0))
+#   define rotr(x, n) ((vec_t)B(palignr, _mask, (vdi_t)(x), (vdi_t)(x), (n) * 8, (vdi_t)undef(), ~0))
 #   define swap(x) ((vec_t)B(pshufb, _mask, (vqi_t)(x), (vqi_t)(inv - 1), (vqi_t)undef(), ~0))
 #  elif defined(__AVX512VBMI__)
 #   define interleave_hi(x, y) ((vec_t)B(vpermi2varqi, _mask, (vqi_t)(x), interleave_hi, (vqi_t)(y), ~0))
@@ -615,6 +616,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  if VEC_SIZE == 16
 #   define interleave_hi(x, y) ((vec_t)B(punpckhwd, _mask, (vhi_t)(x), (vhi_t)(y), (vhi_t)undef(), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(punpcklwd, _mask, (vhi_t)(x), (vhi_t)(y), (vhi_t)undef(), ~0))
+#   define rotr(x, n) ((vec_t)B(palignr, _mask, (vdi_t)(x), (vdi_t)(x), (n) * 16, (vdi_t)undef(), ~0))
 #   define swap(x) ((vec_t)B(pshufd, _mask, \
                              (vsi_t)B(pshufhw, _mask, \
                                       B(pshuflw, _mask, (vhi_t)(x), 0b00011011, (vhi_t)undef(), ~0), \
