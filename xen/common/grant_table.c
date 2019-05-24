@@ -37,6 +37,7 @@
 #include <xen/paging.h>
 #include <xen/keyhandler.h>
 #include <xen/vmap.h>
+#include <xen/nospec.h>
 #include <xsm/xsm.h>
 #include <asm/flushtlb.h>
 
@@ -203,8 +204,9 @@ static inline unsigned int nr_status_frames(const struct grant_table *gt)
 }
 
 #define MAPTRACK_PER_PAGE (PAGE_SIZE / sizeof(struct grant_mapping))
-#define maptrack_entry(t, e) \
-    ((t)->maptrack[(e)/MAPTRACK_PER_PAGE][(e)%MAPTRACK_PER_PAGE])
+#define maptrack_entry(t, e)                                                   \
+    ((t)->maptrack[array_index_nospec(e, (t)->maptrack_limit) /                \
+                                    MAPTRACK_PER_PAGE][(e) % MAPTRACK_PER_PAGE])
 
 static inline unsigned int
 nr_maptrack_frames(struct grant_table *t)
@@ -226,10 +228,23 @@ nr_maptrack_frames(struct grant_table *t)
 static grant_entry_header_t *
 shared_entry_header(struct grant_table *t, grant_ref_t ref)
 {
-    if ( t->gt_version == 1 )
+    switch ( t->gt_version )
+    {
+    case 1:
+        /* Returned values should be independent of speculative execution */
+        block_speculation();
         return (grant_entry_header_t*)&shared_entry_v1(t, ref);
-    else
+
+    case 2:
+        /* Returned values should be independent of speculative execution */
+        block_speculation();
         return &shared_entry_v2(t, ref).hdr;
+    }
+
+    ASSERT_UNREACHABLE();
+    block_speculation();
+
+    return NULL;
 }
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */
@@ -634,13 +649,23 @@ static unsigned int nr_grant_entries(struct grant_table *gt)
     case 1:
         BUILD_BUG_ON(f2e(INITIAL_NR_GRANT_FRAMES, 1) <
                      GNTTAB_NR_RESERVED_ENTRIES);
+
+        /* Make sure we return a value independently of speculative execution */
+        block_speculation();
         return f2e(nr_grant_frames(gt), 1);
+
     case 2:
         BUILD_BUG_ON(f2e(INITIAL_NR_GRANT_FRAMES, 2) <
                      GNTTAB_NR_RESERVED_ENTRIES);
+
+        /* Make sure we return a value independently of speculative execution */
+        block_speculation();
         return f2e(nr_grant_frames(gt), 2);
 #undef f2e
     }
+
+    ASSERT_UNREACHABLE();
+    block_speculation();
 
     return 0;
 }
