@@ -279,12 +279,8 @@ xen/.banner
 xen/.config
 xen/.config.old
 xen/System.map
-xen/arch/arm/asm-offsets.s
-xen/arch/arm/xen.lds
 xen/arch/x86/asm-macros.i
-xen/arch/x86/asm-offsets.s
 xen/arch/x86/boot/mkelf32
-xen/arch/x86/xen.lds
 xen/arch/x86/boot/cmdline.S
 xen/arch/x86/boot/reloc.S
 xen/arch/x86/boot/*.bin
@@ -292,6 +288,8 @@ xen/arch/x86/boot/*.lnk
 xen/arch/x86/efi.lds
 xen/arch/x86/efi/check.efi
 xen/arch/x86/efi/mkreloc
+xen/arch/*/xen.lds
+xen/arch/*/asm-offsets.s
 xen/arch/*/efi/boot.c
 xen/arch/*/efi/compat.c
 xen/arch/*/efi/efi.h
