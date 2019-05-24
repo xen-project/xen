@@ -109,8 +109,12 @@ static const struct test avx512f_all[] = {
     INSN_FP(cmp,             0f, c2),
     INSN(comisd,       66,   0f, 2f,    el,      q, el),
     INSN(comiss,         ,   0f, 2f,    el,      d, el),
+    INSN(cvtdq2pd,     f3,   0f, e6,    vl_2,    d, vl),
+    INSN(cvtdq2ps,       ,   0f, 5b,    vl,      d, vl),
+    INSN(cvtpd2dq,     f2,   0f, e6,    vl,      q, vl),
     INSN(cvtpd2ps,     66,   0f, 5a,    vl,      q, vl),
     INSN(cvtph2ps,     66, 0f38, 13,    vl_2, d_nb, vl),
+    INSN(cvtps2dq,     66,   0f, 5b,    vl,      d, vl),
     INSN(cvtps2pd,       ,   0f, 5a,    vl_2,    d, vl),
     INSN(cvtps2ph,     66, 0f3a, 1d,    vl_2, d_nb, vl),
     INSN(cvtsd2ss,     f2,   0f, 5a,    el,      q, el),
@@ -398,6 +402,8 @@ static const struct test avx512dq_all[] = {
     INSN_PFP(and,              0f, 54),
     INSN_PFP(andn,             0f, 55),
     INSN(broadcasti32x2, 66, 0f38, 59, el_2,  d, vl),
+    INSN(cvtqq2pd,       f3,   0f, e6,   vl,  q, vl),
+    INSN(cvtqq2ps,         ,   0f, 5b,   vl,  q, vl),
     INSN_PFP(or,               0f, 56),
 //       pmovd2m,        f3, 0f38, 39,        d
 //       pmovm2,         f3, 0f38, 38,       dq

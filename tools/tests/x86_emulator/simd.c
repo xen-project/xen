@@ -92,6 +92,13 @@ static inline bool _to_bool(byte_vec_t bv)
 # define to_int(x) ((vec_t){ (int)(x)[0] })
 #elif VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW__)
 # define to_int(x) __builtin_ia32_pi2fd(__builtin_ia32_pf2id(x))
+#elif defined(FLOAT_SIZE) && VEC_SIZE > FLOAT_SIZE && defined(__AVX512F__) && \
+      (VEC_SIZE == 64 || defined(__AVX512VL__))
+# if FLOAT_SIZE == 4
+#  define to_int(x) BR(cvtdq2ps, _mask, BR(cvtps2dq, _mask, x, (vsi_t)undef(), ~0), undef(), ~0)
+# elif FLOAT_SIZE == 8
+#  define to_int(x) B(cvtdq2pd, _mask, BR(cvtpd2dq, _mask, x, (vsi_half_t){}, ~0), undef(), ~0)
+# endif
 #elif VEC_SIZE == 16 && defined(__SSE2__)
 # if FLOAT_SIZE == 4
 #  define to_int(x) __builtin_ia32_cvtdq2ps(__builtin_ia32_cvtps2dq(x))
@@ -1142,15 +1149,21 @@ int simd_test(void)
     touch(src);
     if ( !eq(x * -alt, -src) ) return __LINE__;
 
-# if defined(recip) && defined(to_int)
+# ifdef to_int
 
+    touch(src);
+    x = to_int(src);
+    touch(src);
+    if ( !eq(x, src) ) return __LINE__;
+
+#  ifdef recip
     touch(src);
     x = recip(src);
     touch(src);
     touch(x);
     if ( !eq(to_int(recip(x)), src) ) return __LINE__;
 
-#  ifdef rsqrt
+#   ifdef rsqrt
     x = src * src;
     touch(x);
     y = rsqrt(x);
@@ -1158,6 +1171,7 @@ int simd_test(void)
     if ( !eq(to_int(recip(y)), src) ) return __LINE__;
     touch(src);
     if ( !eq(to_int(y), to_int(recip(src))) ) return __LINE__;
+#   endif
 #  endif
 
 # endif

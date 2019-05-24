@@ -244,6 +244,7 @@ asm ( ".macro override insn    \n\t"
 OVR_INT(broadcast);
 OVR_SFP(broadcast);
 OVR_SFP(comi);
+OVR_VFP(cvtdq2);
 OVR_FP(add);
 OVR_INT(add);
 OVR_BW(adds);
@@ -330,13 +331,19 @@ REN(pandn, , d);
 REN(por, , d);
 REN(pxor, , d);
 #  endif
+OVR(cvtpd2dqx);
+OVR(cvtpd2dqy);
 OVR(cvtpd2psx);
 OVR(cvtpd2psy);
 OVR(cvtph2ps);
+OVR(cvtps2dq);
 OVR(cvtps2pd);
 OVR(cvtps2ph);
 OVR(cvtsd2ss);
 OVR(cvtss2sd);
+OVR(cvttpd2dqx);
+OVR(cvttpd2dqy);
+OVR(cvttps2dq);
 OVR(movddup);
 OVR(movntdq);
 OVR(movntdqa);
