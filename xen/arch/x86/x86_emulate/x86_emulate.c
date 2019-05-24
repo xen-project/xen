@@ -323,8 +323,7 @@ static const struct twobyte_table {
     [0x71 ... 0x73] = { DstImplicit|SrcImmByte|ModRM, simd_none, d8s_vl },
     [0x74 ... 0x76] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
     [0x77] = { DstImplicit|SrcNone },
-    [0x78] = { ImplicitOps|ModRM },
-    [0x79] = { DstReg|SrcMem|ModRM, simd_packed_int },
+    [0x78 ... 0x79] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, d8s_vl },
     [0x7a] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_fp, d8s_vl },
     [0x7b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, d8s_dq64 },
     [0x7c ... 0x7d] = { DstImplicit|SrcMem|ModRM, simd_other },
@@ -2491,6 +2490,8 @@ x86_decode_twobyte(
         break;
 
     case 0x78:
+        state->desc = ImplicitOps;
+        state->simd_size = simd_none;
         switch ( vex.pfx )
         {
         case vex_66: /* extrq $imm8, $imm8, xmm */
@@ -2503,7 +2504,7 @@ x86_decode_twobyte(
     case 0x10 ... 0x18:
     case 0x28 ... 0x2f:
     case 0x50 ... 0x77:
-    case 0x79 ... 0x7d:
+    case 0x7a ... 0x7d:
     case 0x7f:
     case 0xc2 ... 0xc3:
     case 0xc5 ... 0xc6:
@@ -2523,6 +2524,12 @@ x86_decode_twobyte(
         ASSERT(ea.type == OP_REG); /* Early operand adjustment ensures this. */
         generate_exception_if(lock_prefix, EXC_UD);
         op_bytes = mode_64bit() ? 8 : 4;
+        break;
+
+    case 0x79:
+        state->desc = DstReg | SrcMem;
+        state->simd_size = simd_packed_int;
+        ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
         break;
 
     case 0x7e:
@@ -3042,6 +3049,18 @@ x86_decode(
                 modrm_mod = 3;
                 break;
 
+            case 0x78:
+            case 0x79:
+                if ( !evex.pfx )
+                    break;
+                /* vcvt{,t}ps2uqq need special casing */
+                if ( evex.pfx == vex_66 )
+                {
+                    if ( !evex.w && !evex.brs )
+                        --disp8scale;
+                    break;
+                }
+                /* vcvt{,t}s{s,d}2usi need special casing: fall through */
             case 0x2c: /* vcvtts{s,d}2si need special casing */
             case 0x2d: /* vcvts{s,d}2si need special casing */
                 if ( evex_encoded() )
@@ -6303,6 +6322,8 @@ x86_emulate(
 
     CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x2c): /* vcvtts{s,d}2si xmm/mem,reg */
     CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x2d): /* vcvts{s,d}2si xmm/mem,reg */
+    CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x78): /* vcvtts{s,d}2usi xmm/mem,reg */
+    CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x79): /* vcvts{s,d}2usi xmm/mem,reg */
         generate_exception_if((evex.reg != 0xf || !evex.RX || evex.opmsk ||
                                (ea.type != OP_REG && evex.brs)),
                               EXC_UD);
@@ -6664,7 +6685,11 @@ x86_emulate(
         if ( evex.w )
             host_and_vcpu_must_have(avx512dq);
         else
+        {
+    case X86EMUL_OPC_EVEX(0x0f, 0x78):    /* vcvttp{s,d}2udq [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX(0x0f, 0x79):    /* vcvtp{s,d}2udq [xyz]mm/mem,[xyz]mm{k} */
             host_and_vcpu_must_have(avx512f);
+        }
         if ( ea.type != OP_REG || !evex.brs )
             avx512_vlen_check(false);
         d |= TwoOp;
@@ -7349,6 +7374,10 @@ x86_emulate(
             host_and_vcpu_must_have(avx512f);
         else if ( evex.w )
         {
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x78):   /* vcvttps2uqq {x,y}mm/mem,[xyz]mm{k} */
+                                            /* vcvttpd2uqq [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x79):   /* vcvtps2uqq {x,y}mm/mem,[xyz]mm{k} */
+                                            /* vcvtpd2uqq [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0x7a):   /* vcvttps2qq {x,y}mm/mem,[xyz]mm{k} */
                                             /* vcvttpd2qq [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f, 0x7b):   /* vcvtps2qq {x,y}mm/mem,[xyz]mm{k} */

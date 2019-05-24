@@ -93,31 +93,65 @@ static inline bool _to_bool(byte_vec_t bv)
 # ifdef __x86_64__
 #  define to_wint(x) ({ long l_ = (x)[0]; touch(l_); ((vec_t){ l_ }); })
 # endif
+# ifdef __AVX512F__
+/*
+ * Sadly even gcc 9.x, at the time of writing, does not carry out at least
+ * uint -> FP conversions using VCVTUSI2S{S,D}, so we need to use builtins
+ * or inline assembly here. The full-vector parameter types of the builtins
+ * aren't very helpful for our purposes, so use inline assembly.
+ */
+#  if FLOAT_SIZE == 4
+#   define to_u_int(type, x) ({ \
+    unsigned type u_; \
+    float __attribute__((vector_size(16))) t_; \
+    asm ( "vcvtss2usi %1, %0" : "=r" (u_) : "m" ((x)[0]) ); \
+    asm ( "vcvtusi2ss%z1 %1, %0, %0" : "=v" (t_) : "m" (u_) ); \
+    (vec_t){ t_[0] }; \
+})
+#  elif FLOAT_SIZE == 8
+#   define to_u_int(type, x) ({ \
+    unsigned type u_; \
+    double __attribute__((vector_size(16))) t_; \
+    asm ( "vcvtsd2usi %1, %0" : "=r" (u_) : "m" ((x)[0]) ); \
+    asm ( "vcvtusi2sd%z1 %1, %0, %0" : "=v" (t_) : "m" (u_) ); \
+    (vec_t){ t_[0] }; \
+})
+#  endif
+#  define to_uint(x) to_u_int(int, x)
+#  ifdef __x86_64__
+#   define to_uwint(x) to_u_int(long, x)
+#  endif
+# endif
 #elif VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW__)
 # define to_int(x) __builtin_ia32_pi2fd(__builtin_ia32_pf2id(x))
 #elif defined(FLOAT_SIZE) && VEC_SIZE > FLOAT_SIZE && defined(__AVX512F__) && \
       (VEC_SIZE == 64 || defined(__AVX512VL__))
 # if FLOAT_SIZE == 4
 #  define to_int(x) BR(cvtdq2ps, _mask, BR(cvtps2dq, _mask, x, (vsi_t)undef(), ~0), undef(), ~0)
+#  define to_uint(x) BR(cvtudq2ps, _mask, BR(cvtps2udq, _mask, x, (vsi_t)undef(), ~0), undef(), ~0)
 #  ifdef __AVX512DQ__
-#   define to_wint(x) ({ \
+#   define to_w_int(x, s) ({ \
     vsf_half_t t_ = low_half(x); \
     vdi_t lo_, hi_; \
     touch(t_); \
-    lo_ = BR(cvtps2qq, _mask, t_, (vdi_t)undef(), ~0); \
+    lo_ = BR(cvtps2 ## s ## qq, _mask, t_, (vdi_t)undef(), ~0); \
     t_ = high_half(x); \
     touch(t_); \
-    hi_ = BR(cvtps2qq, _mask, t_, (vdi_t)undef(), ~0); \
+    hi_ = BR(cvtps2 ## s ## qq, _mask, t_, (vdi_t)undef(), ~0); \
     touch(lo_); touch(hi_); \
     insert_half(insert_half(undef(), \
-                            BR(cvtqq2ps, _mask, lo_, (vsf_half_t){}, ~0), 0), \
-                BR(cvtqq2ps, _mask, hi_, (vsf_half_t){}, ~0), 1); \
+                            BR(cvt ## s ## qq2ps, _mask, lo_, (vsf_half_t){}, ~0), 0), \
+                BR(cvt ## s ## qq2ps, _mask, hi_, (vsf_half_t){}, ~0), 1); \
 })
+#   define to_wint(x) to_w_int(x, )
+#   define to_uwint(x) to_w_int(x, u)
 #  endif
 # elif FLOAT_SIZE == 8
 #  define to_int(x) B(cvtdq2pd, _mask, BR(cvtpd2dq, _mask, x, (vsi_half_t){}, ~0), undef(), ~0)
+#  define to_uint(x) B(cvtudq2pd, _mask, BR(cvtpd2udq, _mask, x, (vsi_half_t){}, ~0), undef(), ~0)
 #  ifdef __AVX512DQ__
 #   define to_wint(x) BR(cvtqq2pd, _mask, BR(cvtpd2qq, _mask, x, (vdi_t)undef(), ~0), undef(), ~0)
+#   define to_uwint(x) BR(cvtuqq2pd, _mask, BR(cvtpd2uqq, _mask, x, (vdi_t)undef(), ~0), undef(), ~0)
 #  endif
 # endif
 #elif VEC_SIZE == 16 && defined(__SSE2__)
@@ -1218,6 +1252,20 @@ int simd_test(void)
 # ifdef to_wint
     touch(src);
     x = to_wint(src);
+    touch(src);
+    if ( !eq(x, src) ) return __LINE__;
+# endif
+
+# ifdef to_uint
+    touch(src);
+    x = to_uint(src);
+    touch(src);
+    if ( !eq(x, src) ) return __LINE__;
+# endif
+
+# ifdef to_uwint
+    touch(src);
+    x = to_uwint(src);
     touch(src);
     if ( !eq(x, src) ) return __LINE__;
 # endif
