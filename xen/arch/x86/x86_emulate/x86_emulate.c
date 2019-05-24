@@ -325,6 +325,8 @@ static const struct twobyte_table {
     [0x77] = { DstImplicit|SrcNone },
     [0x78] = { ImplicitOps|ModRM },
     [0x79] = { DstReg|SrcMem|ModRM, simd_packed_int },
+    [0x7a] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_fp, d8s_vl },
+    [0x7b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, d8s_vl },
     [0x7c ... 0x7d] = { DstImplicit|SrcMem|ModRM, simd_other },
     [0x7e] = { DstMem|SrcImplicit|ModRM|Mov, simd_none, d8s_dq64 },
     [0x7f] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_int, d8s_vl },
@@ -3048,6 +3050,12 @@ x86_decode(
 
             case 0x5a: /* vcvtps2pd needs special casing */
                 if ( disp8scale && !evex.pfx && !evex.brs )
+                    --disp8scale;
+                break;
+
+            case 0x7a: /* vcvttps2qq needs special casing */
+            case 0x7b: /* vcvtps2qq needs special casing */
+                if ( disp8scale && evex.pfx == vex_66 && !evex.w && !evex.brs )
                     --disp8scale;
                 break;
 
@@ -7331,7 +7339,13 @@ x86_emulate(
         if ( evex.pfx != vex_f3 )
             host_and_vcpu_must_have(avx512f);
         else if ( evex.w )
+        {
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x7a):   /* vcvttps2qq {x,y}mm/mem,[xyz]mm{k} */
+                                            /* vcvttpd2qq [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f, 0x7b):   /* vcvtps2qq {x,y}mm/mem,[xyz]mm{k} */
+                                            /* vcvtpd2qq [xyz]mm/mem,[xyz]mm{k} */
             host_and_vcpu_must_have(avx512dq);
+        }
         else
         {
             host_and_vcpu_must_have(avx512f);

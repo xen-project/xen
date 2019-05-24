@@ -90,14 +90,35 @@ static inline bool _to_bool(byte_vec_t bv)
 
 #if VEC_SIZE == FLOAT_SIZE
 # define to_int(x) ({ int i_ = (x)[0]; touch(i_); ((vec_t){ i_ }); })
+# ifdef __x86_64__
+#  define to_wint(x) ({ long l_ = (x)[0]; touch(l_); ((vec_t){ l_ }); })
+# endif
 #elif VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW__)
 # define to_int(x) __builtin_ia32_pi2fd(__builtin_ia32_pf2id(x))
 #elif defined(FLOAT_SIZE) && VEC_SIZE > FLOAT_SIZE && defined(__AVX512F__) && \
       (VEC_SIZE == 64 || defined(__AVX512VL__))
 # if FLOAT_SIZE == 4
 #  define to_int(x) BR(cvtdq2ps, _mask, BR(cvtps2dq, _mask, x, (vsi_t)undef(), ~0), undef(), ~0)
+#  ifdef __AVX512DQ__
+#   define to_wint(x) ({ \
+    vsf_half_t t_ = low_half(x); \
+    vdi_t lo_, hi_; \
+    touch(t_); \
+    lo_ = BR(cvtps2qq, _mask, t_, (vdi_t)undef(), ~0); \
+    t_ = high_half(x); \
+    touch(t_); \
+    hi_ = BR(cvtps2qq, _mask, t_, (vdi_t)undef(), ~0); \
+    touch(lo_); touch(hi_); \
+    insert_half(insert_half(undef(), \
+                            BR(cvtqq2ps, _mask, lo_, (vsf_half_t){}, ~0), 0), \
+                BR(cvtqq2ps, _mask, hi_, (vsf_half_t){}, ~0), 1); \
+})
+#  endif
 # elif FLOAT_SIZE == 8
 #  define to_int(x) B(cvtdq2pd, _mask, BR(cvtpd2dq, _mask, x, (vsi_half_t){}, ~0), undef(), ~0)
+#  ifdef __AVX512DQ__
+#   define to_wint(x) BR(cvtqq2pd, _mask, BR(cvtpd2qq, _mask, x, (vdi_t)undef(), ~0), undef(), ~0)
+#  endif
 # endif
 #elif VEC_SIZE == 16 && defined(__SSE2__)
 # if FLOAT_SIZE == 4
@@ -119,6 +140,21 @@ static inline bool _to_bool(byte_vec_t bv)
     asm ( op : [out] "=&x" (r_) : [in] "m" (x) ); \
     (vec_t){ r_[0] }; \
 })
+#endif
+
+#if VEC_SIZE == 16 && FLOAT_SIZE == 4 && defined(__SSE__)
+# define low_half(x) (x)
+# define high_half(x) B_(movhlps, , undef(), x)
+/*
+ * GCC 7 (and perhaps earlier) report a bogus type mismatch for the conditional
+ * expression below. All works well with this no-op wrapper.
+ */
+static inline vec_t movlhps(vec_t x, vec_t y) {
+    return __builtin_ia32_movlhps(x, y);
+}
+# define insert_pair(x, y, p) \
+    ((p) ? movlhps(x, y) \
+         : ({ vec_t t_ = (x); t_[0] = (y)[0]; t_[1] = (y)[1]; t_; }))
 #endif
 
 #if VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW_A__)
@@ -149,13 +185,16 @@ static inline bool _to_bool(byte_vec_t bv)
 # if ELEM_COUNT == 8 /* vextractf{32,64}x4 */ || \
      (ELEM_COUNT == 16 && ELEM_SIZE == 4 && defined(__AVX512DQ__)) /* vextractf32x8 */ || \
      (ELEM_COUNT == 4 && ELEM_SIZE == 8 && defined(__AVX512DQ__)) /* vextractf64x2 */
-#  define low_half(x) ({ \
+#  define _half(x, lh) ({ \
     half_t t_; \
-    asm ( "vextractf%c[w]x%c[n] $0, %[s], %[d]" \
+    asm ( "vextractf%c[w]x%c[n] %[sel], %[s], %[d]" \
           : [d] "=m" (t_) \
-          : [s] "v" (x), [w] "i" (ELEM_SIZE * 8), [n] "i" (ELEM_COUNT / 2) ); \
+          : [s] "v" (x), [sel] "i" (lh), \
+            [w] "i" (ELEM_SIZE * 8), [n] "i" (ELEM_COUNT / 2) ); \
     t_; \
 })
+#  define low_half(x)  _half(x, 0)
+#  define high_half(x) _half(x, 1)
 # endif
 # if (ELEM_COUNT == 16 && ELEM_SIZE == 4) /* vextractf32x4 */ || \
      (ELEM_COUNT == 8 && ELEM_SIZE == 8 && defined(__AVX512DQ__)) /* vextractf64x2 */
@@ -1174,6 +1213,13 @@ int simd_test(void)
 #   endif
 #  endif
 
+# endif
+
+# ifdef to_wint
+    touch(src);
+    x = to_wint(src);
+    touch(src);
+    if ( !eq(x, src) ) return __LINE__;
 # endif
 
 # ifdef sqrt
