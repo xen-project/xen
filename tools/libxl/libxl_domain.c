@@ -691,20 +691,31 @@ out:
     dmrs->callback(egc, dmrs, rc);
 }
 
+static void domain_unpause_ao_done(libxl__egc *egc,
+                                   libxl__dm_resume_state *,
+                                   int rc);
+
 int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid,
                          const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
-    int rc = 0;
+    libxl__dm_resume_state *dmrs;
 
-    rc = libxl__domain_unpause_deprecated(gc, domid);
-    if (rc) goto out;
+    GCNEW(dmrs);
+    dmrs->ao = ao;
+    dmrs->domid = domid;
+    dmrs->callback = domain_unpause_ao_done;
+    libxl__domain_unpause(egc, dmrs); /* must be last */
+    return AO_INPROGRESS;
+}
+
+static void domain_unpause_ao_done(libxl__egc *egc,
+                                   libxl__dm_resume_state *dmrs,
+                                   int rc)
+{
+    STATE_AO_GC(dmrs->ao);
 
     libxl__ao_complete(egc, ao, rc);
-    return AO_INPROGRESS;
-
- out:
-    return AO_CREATE_FAIL(rc);
 }
 
 int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid)
