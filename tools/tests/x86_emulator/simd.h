@@ -68,6 +68,7 @@ typedef short __attribute__((vector_size(VEC_SIZE))) vhi_t;
 typedef int __attribute__((vector_size(VEC_SIZE))) vsi_t;
 #if VEC_SIZE >= 8
 typedef long long __attribute__((vector_size(VEC_SIZE))) vdi_t;
+typedef double __attribute__((vector_size(VEC_SIZE))) vdf_t;
 #endif
 
 #if ELEM_SIZE == 1
@@ -93,6 +94,7 @@ typedef char __attribute__((vector_size(HALF_SIZE))) vqi_half_t;
 typedef short __attribute__((vector_size(HALF_SIZE))) vhi_half_t;
 typedef int __attribute__((vector_size(HALF_SIZE))) vsi_half_t;
 typedef long long __attribute__((vector_size(HALF_SIZE))) vdi_half_t;
+typedef float __attribute__((vector_size(HALF_SIZE))) vsf_half_t;
 # endif
 
 # if ELEM_COUNT >= 4
@@ -328,6 +330,13 @@ REN(pandn, , d);
 REN(por, , d);
 REN(pxor, , d);
 #  endif
+OVR(cvtpd2psx);
+OVR(cvtpd2psy);
+OVR(cvtph2ps);
+OVR(cvtps2pd);
+OVR(cvtps2ph);
+OVR(cvtsd2ss);
+OVR(cvtss2sd);
 OVR(movddup);
 OVR(movntdq);
 OVR(movntdqa);

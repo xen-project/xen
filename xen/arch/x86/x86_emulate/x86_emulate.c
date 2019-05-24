@@ -310,7 +310,8 @@ static const struct twobyte_table {
     [0x52 ... 0x53] = { DstImplicit|SrcMem|ModRM|TwoOp, simd_single_fp },
     [0x54 ... 0x57] = { DstImplicit|SrcMem|ModRM, simd_packed_fp, d8s_vl },
     [0x58 ... 0x59] = { DstImplicit|SrcMem|ModRM, simd_any_fp, d8s_vl },
-    [0x5a ... 0x5b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
+    [0x5a] = { DstImplicit|SrcMem|ModRM|Mov, simd_any_fp, d8s_vl },
+    [0x5b] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x5c ... 0x5f] = { DstImplicit|SrcMem|ModRM, simd_any_fp, d8s_vl },
     [0x60 ... 0x62] = { DstImplicit|SrcMem|ModRM, simd_other, d8s_vl },
     [0x63 ... 0x67] = { DstImplicit|SrcMem|ModRM, simd_packed_int, d8s_vl },
@@ -437,7 +438,7 @@ static const struct ext0f38_table {
     [0x0c ... 0x0d] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0x0e ... 0x0f] = { .simd_size = simd_packed_fp },
     [0x10 ... 0x12] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
-    [0x13] = { .simd_size = simd_other, .two_op = 1 },
+    [0x13] = { .simd_size = simd_other, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x14 ... 0x16] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0x17] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x18] = { .simd_size = simd_scalar_opc, .two_op = 1, .d8s = 2 },
@@ -541,7 +542,7 @@ static const struct ext0f3a_table {
     [0x19] = { .simd_size = simd_128, .to_mem = 1, .two_op = 1, .d8s = 4 },
     [0x1a] = { .simd_size = simd_256, .d8s = d8s_vl_by_2 },
     [0x1b] = { .simd_size = simd_256, .to_mem = 1, .two_op = 1, .d8s = d8s_vl_by_2 },
-    [0x1d] = { .simd_size = simd_other, .to_mem = 1, .two_op = 1 },
+    [0x1d] = { .simd_size = simd_other, .to_mem = 1, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x1e ... 0x1f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x20] = { .simd_size = simd_none, .d8s = 0 },
     [0x21] = { .simd_size = simd_other, .d8s = 2 },
@@ -3037,6 +3038,11 @@ x86_decode(
                  * disp/SIB bytes are fetched.
                  */
                 modrm_mod = 3;
+                break;
+
+            case 0x5a: /* vcvtps2pd needs special casing */
+                if ( disp8scale && !evex.pfx && !evex.brs )
+                    --disp8scale;
                 break;
 
             case 0x7e: /* vmovq xmm/m64,xmm needs special casing */
@@ -5972,6 +5978,7 @@ x86_emulate(
     CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5d):    /* vmin{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5e):    /* vdiv{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5f):    /* vmax{p,s}{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    avx512f_all_fp:
         generate_exception_if((evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK) ||
                                (ea.type != OP_REG && evex.brs &&
                                 (evex.pfx & VEX_PREFIX_SCALAR_MASK))),
@@ -6531,7 +6538,7 @@ x86_emulate(
         goto simd_zmm;
 
     CASE_SIMD_ALL_FP(, 0x0f, 0x5a):        /* cvt{p,s}{s,d}2{p,s}{s,d} xmm/mem,xmm */
-    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5a):    /* vcvtp{s,d}2p{s,d} xmm/mem,xmm */
+    CASE_SIMD_ALL_FP(_VEX, 0x0f, 0x5a):    /* vcvtp{s,d}2p{s,d} {x,y}mm/mem,{x,y}mm */
                                            /* vcvts{s,d}2s{s,d} xmm/mem,xmm,xmm */
         op_bytes = 4 << (((vex.pfx & VEX_PREFIX_SCALAR_MASK) ? 0 : 1 + vex.l) +
                          !!(vex.pfx & VEX_PREFIX_DOUBLE_MASK));
@@ -6539,6 +6546,12 @@ x86_emulate(
         if ( vex.opcx == vex_none )
             goto simd_0f_sse2;
         goto simd_0f_avx;
+
+    CASE_SIMD_ALL_FP(_EVEX, 0x0f, 0x5a):   /* vcvtp{s,d}2p{s,d} [xyz]mm/mem,[xyz]mm{k} */
+                                           /* vcvts{s,d}2s{s,d} xmm/mem,xmm,xmm{k} */
+        op_bytes = 4 << (((evex.pfx & VEX_PREFIX_SCALAR_MASK) ? 0 : 1 + evex.lr) +
+                         evex.w);
+        goto avx512f_all_fp;
 
     CASE_SIMD_PACKED_FP(, 0x0f, 0x5b):     /* cvt{ps,dq}2{dq,ps} xmm/mem,xmm */
     CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x5b): /* vcvt{ps,dq}2{dq,ps} {x,y}mm/mem,{x,y}mm */
@@ -8431,6 +8444,15 @@ x86_emulate(
         op_bytes = 8 << vex.l;
         goto simd_0f_ymm;
 
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x13): /* vcvtph2ps {x,y}mm/mem,[xyz]mm{k} */
+        generate_exception_if(evex.w || (ea.type != OP_REG && evex.brs), EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        if ( !evex.brs )
+            avx512_vlen_check(false);
+        op_bytes = 8 << evex.lr;
+        elem_bytes = 2;
+        goto simd_zmm;
+
     case X86EMUL_OPC_VEX_66(0x0f38, 0x16): /* vpermps ymm/m256,ymm,ymm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x36): /* vpermd ymm/m256,ymm,ymm */
         generate_exception_if(!vex.l || vex.w, EXC_UD);
@@ -9262,27 +9284,79 @@ x86_emulate(
         goto avx512f_imm8_no_sae;
 
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x1d): /* vcvtps2ph $imm8,{x,y}mm,xmm/mem */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x1d): /* vcvtps2ph $imm8,[xyz]mm,{x,y}mm/mem{k} */
     {
         uint32_t mxcsr;
 
-        generate_exception_if(vex.w || vex.reg != 0xf, EXC_UD);
-        host_and_vcpu_must_have(f16c);
         fail_if(!ops->write);
+        if ( evex_encoded() )
+        {
+            generate_exception_if((evex.w || evex.reg != 0xf || !evex.RX ||
+                                   (ea.type != OP_REG && (evex.z || evex.brs))),
+                                  EXC_UD);
+            host_and_vcpu_must_have(avx512f);
+            avx512_vlen_check(false);
+            opc = init_evex(stub);
+        }
+        else
+        {
+            generate_exception_if(vex.w || vex.reg != 0xf, EXC_UD);
+            host_and_vcpu_must_have(f16c);
+            opc = init_prefixes(stub);
+        }
 
-        opc = init_prefixes(stub);
+        op_bytes = 8 << evex.lr;
+
         opc[0] = b;
         opc[1] = modrm;
         if ( ea.type == OP_MEM )
         {
             /* Convert memory operand to (%rAX). */
             vex.b = 1;
+            evex.b = 1;
             opc[1] &= 0x38;
         }
         opc[2] = imm1;
-        insn_bytes = PFX_BYTES + 3;
+        if ( evex_encoded() )
+        {
+            unsigned int full = 0;
+
+            insn_bytes = EVEX_PFX_BYTES + 3;
+            copy_EVEX(opc, evex);
+
+            if ( ea.type == OP_MEM && evex.opmsk )
+            {
+                full = 0xffff >> (16 - op_bytes / 2);
+                op_mask &= full;
+                if ( !op_mask )
+                    goto complete_insn;
+
+                first_byte = __builtin_ctz(op_mask);
+                op_mask >>= first_byte;
+                full >>= first_byte;
+                first_byte <<= 1;
+                op_bytes = (32 - __builtin_clz(op_mask)) << 1;
+
+                /*
+                 * We may need to read (parts of) the memory operand for the
+                 * purpose of merging in order to avoid splitting the write
+                 * below into multiple ones.
+                 */
+                if ( op_mask != full &&
+                     (rc = ops->read(ea.mem.seg,
+                                     truncate_ea(ea.mem.off + first_byte),
+                                     (void *)mmvalp + first_byte, op_bytes,
+                                     ctxt)) != X86EMUL_OKAY )
+                    goto done;
+            }
+        }
+        else
+        {
+            insn_bytes = PFX_BYTES + 3;
+            copy_VEX(opc, vex);
+        }
         opc[3] = 0xc3;
 
-        copy_VEX(opc, vex);
         /* Latch MXCSR - we may need to restore it below. */
         invoke_stub("stmxcsr %[mxcsr]", "",
                     "=m" (*mmvalp), [mxcsr] "=m" (mxcsr) : "a" (mmvalp));
@@ -9291,7 +9365,8 @@ x86_emulate(
 
         if ( ea.type == OP_MEM )
         {
-            rc = ops->write(ea.mem.seg, ea.mem.off, mmvalp, 8 << vex.l, ctxt);
+            rc = ops->write(ea.mem.seg, truncate_ea(ea.mem.off + first_byte),
+                            (void *)mmvalp + first_byte, op_bytes, ctxt);
             if ( rc != X86EMUL_OKAY )
             {
                 asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );

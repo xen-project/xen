@@ -3871,6 +3871,49 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing vcvtph2ps 32(%ecx),%zmm7{%k4}...");
+    if ( stack_exec && cpu_has_avx512f )
+    {
+        decl_insn(evex_vcvtph2ps);
+        decl_insn(evex_vcvtps2ph);
+
+        asm volatile ( "vpternlogd $0x81, %%zmm7, %%zmm7, %%zmm7\n\t"
+                       "kmovw %1,%%k4\n"
+                       put_insn(evex_vcvtph2ps, "vcvtph2ps 32(%0), %%zmm7%{%%k4%}")
+                       :: "c" (NULL), "r" (0x3333) );
+
+        set_insn(evex_vcvtph2ps);
+        memset(res, 0xff, 128);
+        res[8] = 0x40003c00; /* (1.0, 2.0) */
+        res[10] = 0x44004200; /* (3.0, 4.0) */
+        res[12] = 0x3400b800; /* (-.5, .25) */
+        res[14] = 0xbc000000; /* (0.0, -1.) */
+        regs.ecx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        asm volatile ( "vmovups %%zmm7, %0" : "=m" (res[16]) );
+        if ( rc != X86EMUL_OKAY || !check_eip(evex_vcvtph2ps) )
+            goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing vcvtps2ph $0,%zmm3,64(%edx){%k4}...");
+        asm volatile ( "vmovups %0, %%zmm3\n"
+                       put_insn(evex_vcvtps2ph, "vcvtps2ph $0, %%zmm3, 128(%1)%{%%k4%}")
+                       :: "m" (res[16]), "d" (NULL) );
+
+        set_insn(evex_vcvtps2ph);
+        regs.edx = (unsigned long)res;
+        memset(res + 32, 0xcc, 32);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(evex_vcvtps2ph) )
+            goto fail;
+        res[15] = res[13] = res[11] = res[9] = 0xcccccccc;
+        if ( memcmp(res + 8, res + 32, 32) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
 #undef decl_insn
 #undef put_insn
 #undef set_insn
