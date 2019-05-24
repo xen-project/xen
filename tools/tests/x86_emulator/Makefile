@@ -97,7 +97,7 @@ $(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-check-cc,$(flavor))))
 TARGET-$(shell echo 'asm("{evex} vzeroall");' | $(CC) -x c -c -o /dev/null - || echo y) :=
 
 ifeq ($(TARGET-y),)
-$(warning Test harness not built, use newer compiler than "$(CC)")
+$(warning Test harness not built, use newer compiler than "$(CC)" (version $(shell $(CC) -dumpversion)) and an "{evex}" capable assembler)
 endif
 
 all: $(TARGET-y)

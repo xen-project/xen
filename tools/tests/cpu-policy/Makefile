@@ -1,8 +1,21 @@
 XEN_ROOT = $(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+TARGET-y := test-cpu-policy
+
+# For brevity, these tests make extensive use of designated initialisers in
+# anonymous unions, but GCCs older than 4.6 can't cope.  Ignore the test in
+# this case.
+ifneq ($(clang),y)
+TARGET-$(call cc-ver,$(CC),lt,0x040600) :=
+endif
+
+ifeq ($(TARGET-y),)
+$(warning Test harness not built, use newer compiler than "$(CC)" (version $(shell $(CC) -dumpversion)))
+endif
+
 .PHONY: all
-all: test-cpu-policy
+all: $(TARGET-y)
 
 .PHONY: clean
 clean:
