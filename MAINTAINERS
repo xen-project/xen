@@ -311,7 +311,7 @@ F:	tools/ocaml/
 
 OVMF UPSTREAM
 M:	Anthony PERARD <anthony.perard@citrix.com>
-M:	Wei Liu <wei.liu2@citrix.com>
+M:	Wei Liu <wl@xen.org>
 S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/ovmf.git
 
@@ -370,7 +370,7 @@ S:	Supported
 F:	xen/common/sched*
 
 SEABIOS UPSTREAM
-M:	Wei Liu <wei.liu2@citrix.com>
+M:	Wei Liu <wl@xen.org>
 S:	Supported
 T:	git https://xenbits.xenproject.org/git-http/seabios.git
 
@@ -383,7 +383,7 @@ F:	stubdom/
 
 TOOLSTACK
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
-M:	Wei Liu <wei.liu2@citrix.com>
+M:	Wei Liu <wl@xen.org>
 S:	Supported
 F:	autogen.sh
 F:	config/*.in
@@ -437,7 +437,7 @@ F:	docs/misc/vtpm-platforms.txt
 X86 ARCHITECTURE
 M:	Jan Beulich <jbeulich@suse.com>
 M:	Andrew Cooper <andrew.cooper3@citrix.com>
-R:	Wei Liu <wei.liu2@citrix.com>
+R:	Wei Liu <wl@xen.org>
 R:	Roger Pau Monné <roger.pau@citrix.com>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
@@ -513,7 +513,7 @@ M:	Julien Grall <julien.grall@arm.com>
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Tim Deegan <tim@xen.org>
-M:	Wei Liu <wei.liu2@citrix.com>
+M:	Wei Liu <wl@xen.org>
 L:	xen-devel@lists.xenproject.org
 S:	Supported
 F:	*
