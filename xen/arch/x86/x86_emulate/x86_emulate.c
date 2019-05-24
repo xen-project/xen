@@ -296,7 +296,7 @@ static const struct twobyte_table {
     [0x22 ... 0x23] = { DstImplicit|SrcMem|ModRM },
     [0x28] = { DstImplicit|SrcMem|ModRM|Mov, simd_packed_fp, d8s_vl },
     [0x29] = { DstMem|SrcImplicit|ModRM|Mov, simd_packed_fp, d8s_vl },
-    [0x2a] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
+    [0x2a] = { DstImplicit|SrcMem|ModRM|Mov, simd_other, d8s_dq64 },
     [0x2b] = { DstMem|SrcImplicit|ModRM|Mov, simd_any_fp, d8s_vl },
     [0x2c ... 0x2d] = { DstImplicit|SrcMem|ModRM|Mov, simd_other },
     [0x2e ... 0x2f] = { ImplicitOps|ModRM|TwoOp, simd_none, d8s_dq },
@@ -3038,6 +3038,12 @@ x86_decode(
                  * disp/SIB bytes are fetched.
                  */
                 modrm_mod = 3;
+                break;
+
+            case 0x2c: /* vcvtts{s,d}2si need special casing */
+            case 0x2d: /* vcvts{s,d}2si need special casing */
+                if ( evex_encoded() )
+                    disp8scale = 2 + (evex.pfx & VEX_PREFIX_DOUBLE_MASK);
                 break;
 
             case 0x5a: /* vcvtps2pd needs special casing */
@@ -6173,6 +6179,48 @@ x86_emulate(
         state->simd_size = simd_none;
         goto simd_0f_rm;
 
+    CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x2a): /* vcvtsi2s{s,d} r/m,xmm,xmm */
+        generate_exception_if(evex.opmsk || (ea.type != OP_REG && evex.brs),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        if ( !evex.brs )
+            avx512_vlen_check(true);
+        get_fpu(X86EMUL_FPU_zmm);
+
+        if ( ea.type == OP_MEM )
+        {
+            rc = read_ulong(ea.mem.seg, ea.mem.off, &src.val,
+                            rex_prefix & REX_W ? 8 : 4, ctxt, ops);
+            if ( rc != X86EMUL_OKAY )
+                goto done;
+        }
+        else
+            src.val = *ea.reg;
+
+        opc = init_evex(stub);
+        opc[0] = b;
+        /* Convert memory/GPR source to %rAX. */
+        evex.b = 1;
+        if ( !mode_64bit() )
+            evex.w = 0;
+        /*
+         * SDM version 067 claims that exception type E10NF implies #UD when
+         * EVEX.L'L is non-zero for 32-bit VCVT{,U}SI2SD. Experimentally this
+         * cannot be confirmed, but be on the safe side for the stub.
+         */
+        if ( !evex.w && evex.pfx == vex_f2 )
+            evex.lr = 0;
+        opc[1] = (modrm & 0x38) | 0xc0;
+        insn_bytes = EVEX_PFX_BYTES + 2;
+        opc[2] = 0xc3;
+
+        copy_EVEX(opc, evex);
+        invoke_stub("", "", "=g" (dummy) : "a" (src.val));
+
+        put_stub(stub);
+        state->simd_size = simd_none;
+        break;
+
     CASE_SIMD_SCALAR_FP(, 0x0f, 0x2c):     /* cvtts{s,d}2si xmm/mem,reg */
     CASE_SIMD_SCALAR_FP(_VEX, 0x0f, 0x2c): /* vcvtts{s,d}2si xmm/mem,reg */
     CASE_SIMD_SCALAR_FP(, 0x0f, 0x2d):     /* cvts{s,d}2si xmm/mem,reg */
@@ -6196,14 +6244,17 @@ x86_emulate(
         }
 
         opc = init_prefixes(stub);
+    cvts_2si:
         opc[0] = b;
         /* Convert GPR destination to %rAX and memory operand to (%rCX). */
         rex_prefix &= ~REX_R;
         vex.r = 1;
+        evex.r = 1;
         if ( ea.type == OP_MEM )
         {
             rex_prefix &= ~REX_B;
             vex.b = 1;
+            evex.b = 1;
             opc[1] = 0x01;
 
             rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp,
@@ -6214,17 +6265,40 @@ x86_emulate(
         else
             opc[1] = modrm & 0xc7;
         if ( !mode_64bit() )
+        {
             vex.w = 0;
-        insn_bytes = PFX_BYTES + 2;
+            evex.w = 0;
+        }
+        if ( evex_encoded() )
+        {
+            insn_bytes = EVEX_PFX_BYTES + 2;
+            copy_EVEX(opc, evex);
+        }
+        else
+        {
+            insn_bytes = PFX_BYTES + 2;
+            copy_REX_VEX(opc, rex_prefix, vex);
+        }
         opc[2] = 0xc3;
 
-        copy_REX_VEX(opc, rex_prefix, vex);
         ea.reg = decode_gpr(&_regs, modrm_reg);
         invoke_stub("", "", "=a" (*ea.reg) : "c" (mmvalp), "m" (*mmvalp));
 
         put_stub(stub);
         state->simd_size = simd_none;
         break;
+
+    CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x2c): /* vcvtts{s,d}2si xmm/mem,reg */
+    CASE_SIMD_SCALAR_FP(_EVEX, 0x0f, 0x2d): /* vcvts{s,d}2si xmm/mem,reg */
+        generate_exception_if((evex.reg != 0xf || !evex.RX || evex.opmsk ||
+                               (ea.type != OP_REG && evex.brs)),
+                              EXC_UD);
+        host_and_vcpu_must_have(avx512f);
+        if ( !evex.brs )
+            avx512_vlen_check(true);
+        get_fpu(X86EMUL_FPU_zmm);
+        opc = init_evex(stub);
+        goto cvts_2si;
 
     CASE_SIMD_PACKED_FP(, 0x0f, 0x2e):     /* ucomis{s,d} xmm/mem,xmm */
     CASE_SIMD_PACKED_FP(_VEX, 0x0f, 0x2e): /* vucomis{s,d} xmm/mem,xmm */

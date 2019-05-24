@@ -89,7 +89,7 @@ static inline bool _to_bool(byte_vec_t bv)
 #endif
 
 #if VEC_SIZE == FLOAT_SIZE
-# define to_int(x) ((vec_t){ (int)(x)[0] })
+# define to_int(x) ({ int i_ = (x)[0]; touch(i_); ((vec_t){ i_ }); })
 #elif VEC_SIZE == 8 && FLOAT_SIZE == 4 && defined(__3dNOW__)
 # define to_int(x) __builtin_ia32_pi2fd(__builtin_ia32_pf2id(x))
 #elif defined(FLOAT_SIZE) && VEC_SIZE > FLOAT_SIZE && defined(__AVX512F__) && \

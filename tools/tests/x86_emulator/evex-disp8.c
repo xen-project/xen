@@ -117,8 +117,16 @@ static const struct test avx512f_all[] = {
     INSN(cvtps2dq,     66,   0f, 5b,    vl,      d, vl),
     INSN(cvtps2pd,       ,   0f, 5a,    vl_2,    d, vl),
     INSN(cvtps2ph,     66, 0f3a, 1d,    vl_2, d_nb, vl),
+    INSN(cvtsd2si,     f2,   0f, 2d,    el,      q, el),
     INSN(cvtsd2ss,     f2,   0f, 5a,    el,      q, el),
+    INSN(cvtsi2sd,     f2,   0f, 2a,    el,   dq64, el),
+    INSN(cvtsi2ss,     f3,   0f, 2a,    el,   dq64, el),
     INSN(cvtss2sd,     f3,   0f, 5a,    el,      d, el),
+    INSN(cvtss2si,     f3,   0f, 2d,    el,      d, el),
+    INSN(cvttpd2dq,    66,   0f, e6,    vl,      q, vl),
+    INSN(cvttps2dq,    f3,   0f, 5b,    vl,      d, vl),
+    INSN(cvttsd2si,    f2,   0f, 2c,    el,      q, el),
+    INSN(cvttss2si,    f3,   0f, 2c,    el,      d, el),
     INSN_FP(div,             0f, 5e),
     INSN(fmadd132,     66, 0f38, 98,    vl,     sd, vl),
     INSN(fmadd132,     66, 0f38, 99,    el,     sd, el),
@@ -746,8 +754,9 @@ static void test_group(const struct test tests[], unsigned int nr_test,
                 break;
 
             case ESZ_dq:
-                test_pair(&tests[i], vl[j], ESZ_d, "d", ESZ_q, "q",
-                          instr, ctxt);
+                test_pair(&tests[i], vl[j], ESZ_d,
+                          strncmp(tests[i].mnemonic, "cvt", 3) ? "d" : "l",
+                          ESZ_q, "q", instr, ctxt);
                 break;
 
 #ifdef __i386__
