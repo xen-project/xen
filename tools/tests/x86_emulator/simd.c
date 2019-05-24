@@ -210,9 +210,23 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 })
 #elif defined(FLOAT_SIZE) && VEC_SIZE == FLOAT_SIZE && defined(__AVX512F__)
 # if FLOAT_SIZE == 4
+#  ifdef __AVX512ER__
+#   define recip(x) scalar_1op(x, "vrcp28ss %[in], %[out], %[out]")
+#   define rsqrt(x) scalar_1op(x, "vrsqrt28ss %[in], %[out], %[out]")
+#  else
+#   define recip(x) scalar_1op(x, "vrcp14ss %[in], %[out], %[out]")
+#   define rsqrt(x) scalar_1op(x, "vrsqrt14ss %[in], %[out], %[out]")
+#  endif
 #  define sqrt(x) scalar_1op(x, "vsqrtss %[in], %[out], %[out]")
 #  define trunc(x) scalar_1op(x, "vrndscaless $0b1011, %[in], %[out], %[out]")
 # elif FLOAT_SIZE == 8
+#  ifdef __AVX512ER__
+#   define recip(x) scalar_1op(x, "vrcp28sd %[in], %[out], %[out]")
+#   define rsqrt(x) scalar_1op(x, "vrsqrt28sd %[in], %[out], %[out]")
+#  else
+#   define recip(x) scalar_1op(x, "vrcp14sd %[in], %[out], %[out]")
+#   define rsqrt(x) scalar_1op(x, "vrsqrt14sd %[in], %[out], %[out]")
+#  endif
 #  define sqrt(x) scalar_1op(x, "vsqrtsd %[in], %[out], %[out]")
 #  define trunc(x) scalar_1op(x, "vrndscalesd $0b1011, %[in], %[out], %[out]")
 # endif
@@ -263,6 +277,13 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define max(x, y) BR_(maxps, _mask, x, y, undef(), ~0)
 #  define min(x, y) BR_(minps, _mask, x, y, undef(), ~0)
 #  define mix(x, y) B(movaps, _mask, x, y, (0b0101010101010101 & ALL_TRUE))
+#  if VEC_SIZE == 64 && defined(__AVX512ER__)
+#   define recip(x) BR(rcp28ps, _mask, x, undef(), ~0)
+#   define rsqrt(x) BR(rsqrt28ps, _mask, x, undef(), ~0)
+#  else
+#   define recip(x) B(rcp14ps, _mask, x, undef(), ~0)
+#   define rsqrt(x) B(rsqrt14ps, _mask, x, undef(), ~0)
+#  endif
 #  define shrink1(x) BR_(cvtpd2ps, _mask, (vdf_t)(x), (vsf_half_t){}, ~0)
 #  define sqrt(x) BR(sqrtps, _mask, x, undef(), ~0)
 #  define trunc(x) BR(rndscaleps_, _mask, x, 0b1011, undef(), ~0)
@@ -318,6 +339,13 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #  define max(x, y) BR_(maxpd, _mask, x, y, undef(), ~0)
 #  define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
 #  define mix(x, y) B(movapd, _mask, x, y, 0b01010101)
+#  if VEC_SIZE == 64 && defined(__AVX512ER__)
+#   define recip(x) BR(rcp28pd, _mask, x, undef(), ~0)
+#   define rsqrt(x) BR(rsqrt28pd, _mask, x, undef(), ~0)
+#  else
+#   define recip(x) B(rcp14pd, _mask, x, undef(), ~0)
+#   define rsqrt(x) B(rsqrt14pd, _mask, x, undef(), ~0)
+#  endif
 #  define sqrt(x) BR(sqrtpd, _mask, x, undef(), ~0)
 #  define trunc(x) BR(rndscalepd_, _mask, x, 0b1011, undef(), ~0)
 #  if VEC_SIZE == 16

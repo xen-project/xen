@@ -24,6 +24,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512f.h"
 #include "avx512bw.h"
 #include "avx512dq.h"
+#include "avx512er.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -104,6 +105,11 @@ static bool simd_check_avx512dq(void)
 static bool simd_check_avx512dq_vl(void)
 {
     return cpu_has_avx512dq && cpu_has_avx512vl;
+}
+
+static bool simd_check_avx512er(void)
+{
+    return cpu_has_avx512er;
 }
 
 static bool simd_check_avx512bw(void)
@@ -327,6 +333,10 @@ static const struct {
     AVX512VL(DQ+VL u64x2,    avx512dq,      16u8),
     AVX512VL(DQ+VL s64x4,    avx512dq,      32i8),
     AVX512VL(DQ+VL u64x4,    avx512dq,      32u8),
+    SIMD(AVX512ER f32 scalar,avx512er,        f4),
+    SIMD(AVX512ER f32x16,    avx512er,      64f4),
+    SIMD(AVX512ER f64 scalar,avx512er,        f8),
+    SIMD(AVX512ER f64x8,     avx512er,      64f8),
 #undef AVX512VL_
 #undef AVX512VL
 #undef SIMD_

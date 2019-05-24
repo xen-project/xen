@@ -278,10 +278,14 @@ static const struct test avx512f_all[] = {
     INSN(punpckldq,    66,   0f, 62,    vl,      d, vl),
     INSN(punpcklqdq,   66,   0f, 6c,    vl,      q, vl),
     INSN(pxor,         66,   0f, ef,    vl,     dq, vl),
+    INSN(rcp14,        66, 0f38, 4c,    vl,     sd, vl),
+    INSN(rcp14,        66, 0f38, 4d,    el,     sd, el),
     INSN(rndscalepd,   66, 0f3a, 09,    vl,      q, vl),
     INSN(rndscaleps,   66, 0f3a, 08,    vl,      d, vl),
     INSN(rndscalesd,   66, 0f3a, 0b,    el,      q, el),
     INSN(rndscaless,   66, 0f3a, 0a,    el,      d, el),
+    INSN(rsqrt14,      66, 0f38, 4e,    vl,     sd, vl),
+    INSN(rsqrt14,      66, 0f38, 4f,    el,     sd, el),
     INSN_PFP(shuf,           0f, c6),
     INSN_FP(sqrt,            0f, 51),
     INSN_FP(sub,             0f, 5c),
@@ -475,6 +479,14 @@ static const struct test avx512dq_512[] = {
     INSN(extracti32x8,   66, 0f3a, 3b, el_8, d, vl),
     INSN(insertf32x8,    66, 0f3a, 1a, el_8, d, vl),
     INSN(inserti32x8,    66, 0f3a, 3a, el_8, d, vl),
+};
+
+static const struct test avx512er_512[] = {
+    INSN(exp2,    66, 0f38, c8, vl, sd, vl),
+    INSN(rcp28,   66, 0f38, ca, vl, sd, vl),
+    INSN(rcp28,   66, 0f38, cb, el, sd, el),
+    INSN(rsqrt28, 66, 0f38, cc, vl, sd, vl),
+    INSN(rsqrt28, 66, 0f38, cd, el, sd, el),
 };
 
 static const struct test avx512_vbmi_all[] = {
@@ -837,5 +849,6 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512dq, 128);
     RUN(avx512dq, no128);
     RUN(avx512dq, 512);
+    RUN(avx512er, 512);
     RUN(avx512_vbmi, all);
 }
