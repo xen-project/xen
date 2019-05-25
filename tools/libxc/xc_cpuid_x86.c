@@ -229,6 +229,59 @@ int xc_get_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     return ret;
 }
 
+int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
+                             uint32_t nr_leaves, xen_cpuid_leaf_t *leaves,
+                             uint32_t nr_msrs, xen_msr_entry_t *msrs,
+                             uint32_t *err_leaf_p, uint32_t *err_subleaf_p,
+                             uint32_t *err_msr_p)
+{
+    DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BOUNCE(leaves,
+                             nr_leaves * sizeof(*leaves),
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    DECLARE_HYPERCALL_BOUNCE(msrs,
+                             nr_msrs * sizeof(*msrs),
+                             XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    int ret;
+
+    if ( err_leaf_p )
+        *err_leaf_p = -1;
+    if ( err_subleaf_p )
+        *err_subleaf_p = -1;
+    if ( err_msr_p )
+        *err_msr_p = -1;
+
+    if ( xc_hypercall_bounce_pre(xch, leaves) )
+        return -1;
+
+    if ( xc_hypercall_bounce_pre(xch, msrs) )
+        return -1;
+
+    domctl.cmd = XEN_DOMCTL_set_cpu_policy;
+    domctl.domain = domid;
+    domctl.u.cpu_policy.nr_leaves = nr_leaves;
+    set_xen_guest_handle(domctl.u.cpu_policy.cpuid_policy, leaves);
+    domctl.u.cpu_policy.nr_msrs = nr_msrs;
+    set_xen_guest_handle(domctl.u.cpu_policy.msr_policy, msrs);
+    domctl.u.cpu_policy.err_leaf = -1;
+    domctl.u.cpu_policy.err_subleaf = -1;
+    domctl.u.cpu_policy.err_msr = -1;
+
+    ret = do_domctl(xch, &domctl);
+
+    xc_hypercall_bounce_post(xch, leaves);
+    xc_hypercall_bounce_post(xch, msrs);
+
+    if ( err_leaf_p )
+        *err_leaf_p = domctl.u.cpu_policy.err_leaf;
+    if ( err_subleaf_p )
+        *err_subleaf_p = domctl.u.cpu_policy.err_subleaf;
+    if ( err_msr_p )
+        *err_msr_p = domctl.u.cpu_policy.err_msr;
+
+    return ret;
+}
+
 struct cpuid_domain_info
 {
     unsigned int vendor; /* X86_VENDOR_* */

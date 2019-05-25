@@ -294,6 +294,65 @@ static int update_domain_cpuid_info(struct domain *d,
     return 0;
 }
 
+static int update_domain_cpu_policy(struct domain *d,
+                                    xen_domctl_cpu_policy_t *xdpc)
+{
+    struct cpu_policy new = {};
+    const struct cpu_policy *sys = is_pv_domain(d)
+        ? &system_policies[XEN_SYSCTL_cpu_policy_pv_max]
+        : &system_policies[XEN_SYSCTL_cpu_policy_hvm_max];
+    struct cpu_policy_errors err = INIT_CPU_POLICY_ERRORS;
+    int ret = -ENOMEM;
+
+    /* Start by copying the domain's existing policies. */
+    if ( !(new.cpuid = xmemdup(d->arch.cpuid)) ||
+         !(new.msr   = xmemdup(d->arch.msr)) )
+        goto out;
+
+    /* Merge the toolstack provided data. */
+    if ( (ret = x86_cpuid_copy_from_buffer(
+              new.cpuid, xdpc->cpuid_policy, xdpc->nr_leaves,
+              &err.leaf, &err.subleaf)) ||
+         (ret = x86_msr_copy_from_buffer(
+              new.msr, xdpc->msr_policy, xdpc->nr_msrs, &err.msr)) )
+        goto out;
+
+    /* Trim any newly-stale out-of-range leaves. */
+    x86_cpuid_policy_clear_out_of_range_leaves(new.cpuid);
+
+    /* Audit the combined dataset. */
+    ret = x86_cpu_policies_are_compatible(sys, &new, &err);
+    if ( ret )
+        goto out;
+
+    /*
+     * Audit was successful.  Replace existing policies, leaving the old
+     * policies to be freed.
+     */
+    SWAP(new.cpuid, d->arch.cpuid);
+    SWAP(new.msr,   d->arch.msr);
+
+    /* TODO: Drop when x86_cpu_policies_are_compatible() is completed. */
+    recalculate_cpuid_policy(d);
+
+    /* Recalculate relevant dom/vcpu state now the policy has changed. */
+    domain_cpu_policy_changed(d);
+
+ out:
+    /* Free whichever cpuid/msr structs are not installed in struct domain. */
+    xfree(new.cpuid);
+    xfree(new.msr);
+
+    if ( ret )
+    {
+        xdpc->err_leaf    = err.leaf;
+        xdpc->err_subleaf = err.subleaf;
+        xdpc->err_msr     = err.msr;
+    }
+
+    return ret;
+}
+
 static int vcpu_set_vmce(struct vcpu *v,
                          const struct xen_domctl_ext_vcpucontext *evc)
 {
@@ -1474,6 +1533,27 @@ long arch_do_domctl(
             break;
 
         copyback = true;
+        break;
+
+    case XEN_DOMCTL_set_cpu_policy:
+        if ( d == currd ) /* No domain_pause() */
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        domain_pause(d);
+
+        if ( d->creation_finished )
+            ret = -EEXIST; /* No changing once the domain is running. */
+        else
+        {
+            ret = update_domain_cpu_policy(d, &domctl->u.cpu_policy);
+            if ( ret ) /* Copy domctl->u.cpu_policy.err_* to guest. */
+                copyback = true;
+        }
+
+        domain_unpause(d);
         break;
 
     default:

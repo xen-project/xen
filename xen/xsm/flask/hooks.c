@@ -715,6 +715,7 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_set_virq_handler:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SET_VIRQ_HANDLER);
 
+    case XEN_DOMCTL_set_cpu_policy:
     case XEN_DOMCTL_set_cpuid:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SET_CPUID);
 
