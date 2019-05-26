@@ -174,13 +174,30 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
+static void domain_resume_done(libxl__egc *egc,
+                               libxl__dm_resume_state *,
+                               int rc);
+
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel,
                         const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
-    int rc = libxl__domain_resume_deprecated(gc, domid, suspend_cancel);
-    libxl__ao_complete(egc, ao, rc);
+    libxl__dm_resume_state *dmrs;
+
+    GCNEW(dmrs);
+    dmrs->ao = ao;
+    dmrs->domid = domid;
+    dmrs->callback = domain_resume_done;
+    libxl__domain_resume(egc, dmrs, suspend_cancel);
     return AO_INPROGRESS;
+}
+
+static void domain_resume_done(libxl__egc *egc,
+                               libxl__dm_resume_state *dmrs,
+                               int rc)
+{
+    STATE_AO_GC(dmrs->ao);
+    libxl__ao_complete(egc, ao, rc);
 }
 
 /*
