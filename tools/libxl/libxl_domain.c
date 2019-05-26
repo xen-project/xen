@@ -639,6 +639,58 @@ out:
     return rc;
 }
 
+static void domain_unpause_done(libxl__egc *egc,
+                                libxl__dm_resume_state *,
+                                int rc);
+
+void libxl__domain_unpause(libxl__egc *egc,
+                           libxl__dm_resume_state *dmrs)
+{
+    STATE_AO_GC(dmrs->ao);
+    int rc = 0;
+
+    /* Convenience aliases */
+    libxl_domid domid = dmrs->domid;
+
+    libxl_domain_type type = libxl__domain_type(gc, domid);
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (type == LIBXL_DOMAIN_TYPE_HVM) {
+        dmrs->dm_resumed_callback = domain_unpause_done;
+        libxl__dm_resume(egc, dmrs); /* must be last */
+        return;
+    }
+    rc = 0;
+out:
+    domain_unpause_done(egc, dmrs, rc);
+}
+
+static void domain_unpause_done(libxl__egc *egc,
+                                libxl__dm_resume_state *dmrs,
+                                int rc)
+{
+    EGC_GC;
+    int r;
+
+    /* Convenience aliases */
+    libxl_domid domid = dmrs->domid;
+
+    if (rc) goto out;
+
+    r = xc_domain_unpause(CTX->xch, domid);
+    if (r < 0) {
+        LOGED(ERROR, domid, "Unpausing domain");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    rc = 0;
+out:
+    dmrs->callback(egc, dmrs, rc);
+}
+
 int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid,
                          const libxl_asyncop_how *ao_how)
 {

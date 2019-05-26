@@ -1351,9 +1351,10 @@ struct libxl__dm_resume_state {
     libxl_domid domid;
     void (*callback)(libxl__egc *, libxl__dm_resume_state *, int rc);
 
-    /* private to libxl__domain_resume */
+    /* private to libxl__domain_resume and libxl__domain_unpause */
     void (*dm_resumed_callback)(libxl__egc *,
                                 libxl__dm_resume_state *, int rc);
+    /* private to libxl__domain_resume */
     bool suspend_cancel;
 
     /* private to libxl__dm_resume */
@@ -1366,6 +1367,8 @@ _hidden void libxl__dm_resume(libxl__egc *egc,
 _hidden void libxl__domain_resume(libxl__egc *egc,
                                   libxl__dm_resume_state *dmrs,
                                   bool suspend_cancel);
+_hidden void libxl__domain_unpause(libxl__egc *,
+                                   libxl__dm_resume_state *dmrs);
 
 /* returns 0 or 1, or a libxl error code */
 _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
