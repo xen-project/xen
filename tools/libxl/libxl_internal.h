@@ -197,6 +197,7 @@ typedef struct libxl__device_type libxl__device_type;
 typedef struct libxl__json_object libxl__json_object;
 typedef struct libxl__carefd libxl__carefd;
 typedef struct libxl__ev_devlock libxl__ev_devlock;
+typedef struct libxl__dm_resume_state libxl__dm_resume_state;
 
 typedef struct libxl__domain_create_state libxl__domain_create_state;
 typedef void libxl__domain_create_cb(struct libxl__egc *egc,
@@ -1339,6 +1340,32 @@ _hidden int libxl__domain_resume_deprecated(libxl__gc *gc, uint32_t domid,
 /* Deprecated, use libxl__domain_unpause instead */
 _hidden int libxl__domain_unpause_deprecated(libxl__gc *,
                                              libxl_domid domid);
+
+/* Call libxl__dm_resume_init() and fill the first few fields,
+ * then call one of libxl__domain_resume / libxl__domain_unpause
+ * or directly libxl__dm_resume if only the device model needs to be
+ * "resumed". */
+struct libxl__dm_resume_state {
+    /* caller must fill these in, and they must all remain valid */
+    libxl__ao *ao;
+    libxl_domid domid;
+    void (*callback)(libxl__egc *, libxl__dm_resume_state *, int rc);
+
+    /* private to libxl__domain_resume */
+    void (*dm_resumed_callback)(libxl__egc *,
+                                libxl__dm_resume_state *, int rc);
+    bool suspend_cancel;
+
+    /* private to libxl__dm_resume */
+    libxl__ev_qmp qmp;
+    libxl__ev_time time;
+    libxl__ev_xswatch watch;
+};
+_hidden void libxl__dm_resume(libxl__egc *egc,
+                              libxl__dm_resume_state *dmrs);
+_hidden void libxl__domain_resume(libxl__egc *egc,
+                                  libxl__dm_resume_state *dmrs,
+                                  bool suspend_cancel);
 
 /* returns 0 or 1, or a libxl error code */
 _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
