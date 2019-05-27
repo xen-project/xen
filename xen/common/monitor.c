@@ -98,7 +98,7 @@ int monitor_traps(struct vcpu *v, bool sync, vm_event_request_t *req)
     {
     case 0:
         break;
-    case -ENOSYS:
+    case -EOPNOTSUPP:
         /*
          * If there was no ring to handle the event, then
          * simply continue executing normally.

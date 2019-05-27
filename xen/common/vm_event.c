@@ -64,7 +64,7 @@ static int vm_event_enable(
     /* The parameter defaults to zero, and it should be
      * set to something */
     if ( ring_gfn == 0 )
-        return -ENOSYS;
+        return -EOPNOTSUPP;
 
     vm_event_ring_lock_init(*ved);
     vm_event_ring_lock(*ved);
@@ -465,7 +465,7 @@ static int vm_event_grab_slot(struct vm_event_domain *ved, int foreign)
     unsigned int avail_req;
 
     if ( !ved->ring_page )
-        return -ENOSYS;
+        return -EOPNOTSUPP;
 
     vm_event_ring_lock(ved);
 
@@ -513,7 +513,7 @@ bool vm_event_check_ring(struct vm_event_domain *ved)
  * this function will always return 0 for a guest.  For a non-guest, we check
  * for space and return -EBUSY if the ring is not available.
  *
- * Return codes: -ENOSYS: the ring is not yet configured
+ * Return codes: -EOPNOTSUPP: the ring is not yet configured
  *               -EBUSY: the ring is busy
  *               0: a spot has been reserved
  *
