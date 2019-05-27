@@ -144,7 +144,7 @@ static int skip_atoi(const char **s)
 #define LARGE   64              /* use 'ABCDEF' instead of 'abcdef' */
 
 static char *number(
-    char *buf, char *end, unsigned long long num,
+    char *buf, const char *end, unsigned long long num,
     int base, int size, int precision, int type)
 {
     char c,sign,tmp[66];
@@ -238,7 +238,7 @@ static char *number(
     return buf;
 }
 
-static char *string(char *str, char *end, const char *s,
+static char *string(char *str, const char *end, const char *s,
                     int field_width, int precision, int flags)
 {
     int i, len = (precision < 0) ? strlen(s) : strnlen(s, precision);
@@ -265,8 +265,9 @@ static char *string(char *str, char *end, const char *s,
 }
 
 /* Print a bitmap as '0-3,6-15' */
-static char *print_bitmap_list(
-    char *str, char *end, const unsigned long *bitmap, unsigned int nr_bits)
+static char *print_bitmap_list(char *str, const char *end,
+                               const unsigned long *bitmap,
+                               unsigned int nr_bits)
 {
     /* current bit is 'cur', most recently seen range is [rbot, rtop] */
     unsigned int cur, rbot, rtop;
@@ -306,8 +307,9 @@ static char *print_bitmap_list(
 }
 
 /* Print a bitmap as a comma separated hex string. */
-static char *print_bitmap_string(
-    char *str, char *end, const unsigned long *bitmap, unsigned int nr_bits)
+static char *print_bitmap_string(char *str, const char *end,
+                                 const unsigned long *bitmap,
+                                 unsigned int nr_bits)
 {
     const unsigned int CHUNKSZ = 32;
     unsigned int chunksz;
@@ -347,7 +349,7 @@ static char *print_bitmap_string(
 }
 
 /* Print a domain id, using names for system domains.  (e.g. d0 or d[IDLE]) */
-static char *print_domain(char *str, char *end, const struct domain *d)
+static char *print_domain(char *str, const char *end, const struct domain *d)
 {
     const char *name = NULL;
 
@@ -378,7 +380,7 @@ static char *print_domain(char *str, char *end, const struct domain *d)
 }
 
 /* Print a vcpu id.  (e.g. d0v1 or d[IDLE]v0) */
-static char *print_vcpu(char *str, char *end, const struct vcpu *v)
+static char *print_vcpu(char *str, const char *end, const struct vcpu *v)
 {
     /* Some debugging may have an optionally-NULL pointer. */
     if ( unlikely(!v) )
@@ -392,7 +394,7 @@ static char *print_vcpu(char *str, char *end, const struct vcpu *v)
     return number(str + 1, end, v->vcpu_id, 10, -1, -1, 0);
 }
 
-static char *pointer(char *str, char *end, const char **fmt_ptr,
+static char *pointer(char *str, const char *end, const char **fmt_ptr,
                      const void *arg, int field_width, int precision,
                      int flags)
 {
