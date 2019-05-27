@@ -196,18 +196,16 @@ def crunch_numbers(state):
         # instructions.  Several futher instruction sets are built on core
         # %XMM support, without specific inter-dependencies.  Additionally
         # AMD has a special mis-alignment sub-mode.
-        SSE: [SSE2, SSE3, SSSE3, SSE4A, MISALIGNSSE],
+        SSE: [SSE2, MISALIGNSSE],
 
         # SSE2 was re-specified as core instructions for 64bit.  Also ISA
         # extensions dealing with vectors of integers are added here rather
         # than to SSE.
-        SSE2: [LM, AESNI, PCLMULQDQ, SHA],
+        SSE2: [SSE3, LM, AESNI, PCLMULQDQ, SHA],
 
-        # SSE4.1 explicitly depends on SSE3 and SSSE3
-        SSE3: [SSE4_1],
-        SSSE3: [SSE4_1],
-
-        # SSE4.2 explicitly depends on SSE4.1
+        # Other SSEn each depend on their predecessor versions.
+        SSE3: [SSSE3],
+        SSSE3: [SSE4_1, SSE4A],
         SSE4_1: [SSE4_2],
 
         # AMD specify no relationship between POPCNT and SSE4.2.  Intel
