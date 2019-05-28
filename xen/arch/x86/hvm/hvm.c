@@ -1692,6 +1692,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     int sharing_enomem = 0;
     vm_event_request_t *req_ptr = NULL;
     bool_t ap2m_active, sync = 0;
+    unsigned int page_order;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -1758,19 +1759,23 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     hostp2m = p2m_get_hostp2m(currd);
     mfn = get_gfn_type_access(hostp2m, gfn, &p2mt, &p2ma,
                               P2M_ALLOC | (npfec.write_access ? P2M_UNSHARE : 0),
-                              NULL);
+                              &page_order);
 
     if ( ap2m_active )
     {
-        if ( p2m_altp2m_lazy_copy(curr, gpa, gla, npfec, &p2m) )
-        {
-            /* entry was lazily copied from host -- retry */
-            __put_gfn(hostp2m, gfn);
-            rc = 1;
-            goto out;
-        }
+        p2m = p2m_get_altp2m(curr);
 
-        mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 0, NULL);
+        /* 
+         * Get the altp2m entry if present; or if not, propagate from
+         * the host p2m.  NB that this returns with gfn locked in the
+         * altp2m.
+         */
+        if ( p2m_altp2m_get_or_propagate(p2m, gfn, &mfn, &p2mt, &p2ma, page_order) )
+        {
+            /* Entry was copied from host -- retry fault */
+            rc = 1;
+            goto out_put_gfn;
+        }
     }
     else
         p2m = hostp2m;
