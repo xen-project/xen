@@ -185,26 +185,168 @@ struct scheduler {
     void         (*tick_resume)     (const struct scheduler *, unsigned int);
 };
 
+static inline int sched_init(struct scheduler *s)
+{
+    return s->init(s);
+}
+
+static inline void sched_deinit(struct scheduler *s)
+{
+    s->deinit(s);
+}
+
+static inline void sched_switch_sched(struct scheduler *s, unsigned int cpu,
+                                      void *pdata, void *vdata)
+{
+    s->switch_sched(s, cpu, pdata, vdata);
+}
+
+static inline void sched_dump_settings(const struct scheduler *s)
+{
+    if ( s->dump_settings )
+        s->dump_settings(s);
+}
+
+static inline void sched_dump_cpu_state(const struct scheduler *s, int cpu)
+{
+    if ( s->dump_cpu_state )
+        s->dump_cpu_state(s, cpu);
+}
+
+static inline void sched_do_tick_suspend(const struct scheduler *s, int cpu)
+{
+    if ( s->tick_suspend )
+        s->tick_suspend(s, cpu);
+}
+
+static inline void sched_do_tick_resume(const struct scheduler *s, int cpu)
+{
+    if ( s->tick_resume )
+        s->tick_resume(s, cpu);
+}
+
 static inline void *sched_alloc_domdata(const struct scheduler *s,
                                         struct domain *d)
 {
-    if ( s->alloc_domdata )
-        return s->alloc_domdata(s, d);
-    else
-        return NULL;
+    return s->alloc_domdata ? s->alloc_domdata(s, d) : NULL;
 }
 
 static inline void sched_free_domdata(const struct scheduler *s,
                                       void *data)
 {
+    ASSERT(s->free_domdata || !data);
     if ( s->free_domdata )
         s->free_domdata(s, data);
+}
+
+static inline void *sched_alloc_pdata(const struct scheduler *s, int cpu)
+{
+    return s->alloc_pdata ? s->alloc_pdata(s, cpu) : NULL;
+}
+
+static inline void sched_free_pdata(const struct scheduler *s, void *data,
+                                    int cpu)
+{
+    ASSERT(s->free_pdata || !data);
+    if ( s->free_pdata )
+        s->free_pdata(s, data, cpu);
+}
+
+static inline void sched_init_pdata(const struct scheduler *s, void *data,
+                                    int cpu)
+{
+    if ( s->init_pdata )
+        s->init_pdata(s, data, cpu);
+}
+
+static inline void sched_deinit_pdata(const struct scheduler *s, void *data,
+                                      int cpu)
+{
+    if ( s->deinit_pdata )
+        s->deinit_pdata(s, data, cpu);
+}
+
+static inline void *sched_alloc_vdata(const struct scheduler *s, struct vcpu *v,
+                                      void *dom_data)
+{
+    return s->alloc_vdata(s, v, dom_data);
+}
+
+static inline void sched_free_vdata(const struct scheduler *s, void *data)
+{
+    s->free_vdata(s, data);
+}
+
+static inline void sched_insert_vcpu(const struct scheduler *s, struct vcpu *v)
+{
+    if ( s->insert_vcpu )
+        s->insert_vcpu(s, v);
+}
+
+static inline void sched_remove_vcpu(const struct scheduler *s, struct vcpu *v)
+{
+    if ( s->remove_vcpu )
+        s->remove_vcpu(s, v);
+}
+
+static inline void sched_sleep(const struct scheduler *s, struct vcpu *v)
+{
+    if ( s->sleep )
+        s->sleep(s, v);
+}
+
+static inline void sched_wake(const struct scheduler *s, struct vcpu *v)
+{
+    if ( s->wake )
+        s->wake(s, v);
+}
+
+static inline void sched_yield(const struct scheduler *s, struct vcpu *v)
+{
+    if ( s->yield )
+        s->yield(s, v);
+}
+
+static inline void sched_context_saved(const struct scheduler *s,
+                                       struct vcpu *v)
+{
+    if ( s->context_saved )
+        s->context_saved(s, v);
+}
+
+static inline void sched_migrate(const struct scheduler *s, struct vcpu *v,
+                                 unsigned int cpu)
+{
+    if ( s->migrate )
+        s->migrate(s, v, cpu);
     else
-        /*
-         * Check that if there isn't a free_domdata hook, we haven't got any
-         * data we're expected to deal with.
-         */
-        ASSERT(!data);
+        v->processor = cpu;
+}
+
+static inline int sched_pick_cpu(const struct scheduler *s, struct vcpu *v)
+{
+    return s->pick_cpu(s, v);
+}
+
+static inline void sched_adjust_affinity(const struct scheduler *s,
+                                         struct vcpu *v,
+                                         const cpumask_t *hard,
+                                         const cpumask_t *soft)
+{
+    if ( s->adjust_affinity )
+        s->adjust_affinity(s, v, hard, soft);
+}
+
+static inline int sched_adjust_dom(const struct scheduler *s, struct domain *d,
+                                   struct xen_domctl_scheduler_op *op)
+{
+    return s->adjust ? s->adjust(s, d, op) : 0;
+}
+
+static inline int sched_adjust_cpupool(const struct scheduler *s,
+                                       struct xen_sysctl_scheduler_op *op)
+{
+    return s->adjust_global ? s->adjust_global(s, op) : 0;
 }
 
 #define REGISTER_SCHEDULER(x) static const struct scheduler *x##_entry \
