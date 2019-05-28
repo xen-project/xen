@@ -1727,9 +1727,33 @@ void __init scheduler_init(void)
 
     for ( i = 0; i < NUM_SCHEDULERS; i++)
     {
+#define sched_test_func(f)                               \
+        if ( !schedulers[i]->f )                         \
+        {                                                \
+            printk("scheduler %s misses .%s, dropped\n", \
+                   schedulers[i]->opt_name, #f);         \
+            schedulers[i] = NULL;                        \
+        }
+
+        sched_test_func(init);
+        sched_test_func(deinit);
+        sched_test_func(pick_cpu);
+        sched_test_func(alloc_vdata);
+        sched_test_func(free_vdata);
+        sched_test_func(switch_sched);
+        sched_test_func(do_schedule);
+
+#undef sched_test_func
+
         if ( schedulers[i]->global_init && schedulers[i]->global_init() < 0 )
+        {
+            printk("scheduler %s failed initialization, dropped\n",
+                   schedulers[i]->opt_name);
             schedulers[i] = NULL;
-        else if ( !ops.name && !strcmp(schedulers[i]->opt_name, opt_sched) )
+        }
+
+        if ( schedulers[i] && !ops.name &&
+             !strcmp(schedulers[i]->opt_name, opt_sched) )
             ops = *schedulers[i];
     }
 
