@@ -1812,7 +1812,8 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     struct scheduler *old_ops = per_cpu(scheduler, cpu);
     struct scheduler *new_ops = (c == NULL) ? &ops : c->sched;
     struct cpupool *old_pool = per_cpu(cpupool, cpu);
-    spinlock_t * old_lock;
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    spinlock_t *old_lock, *new_lock;
 
     /*
      * pCPUs only move from a valid cpupool to free (i.e., out of any pool),
@@ -1870,8 +1871,19 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     old_lock = pcpu_schedule_lock_irq(cpu);
 
     vpriv_old = idle->sched_priv;
-    ppriv_old = per_cpu(schedule_data, cpu).sched_priv;
-    sched_switch_sched(new_ops, cpu, ppriv, vpriv);
+    ppriv_old = sd->sched_priv;
+    new_lock = sched_switch_sched(new_ops, cpu, ppriv, vpriv);
+
+    per_cpu(scheduler, cpu) = new_ops;
+    sd->sched_priv = ppriv;
+
+    /*
+     * The data above is protected under new_lock, which may be unlocked.
+     * Another CPU can take new_lock as soon as sd->schedule_lock is visible,
+     * and must observe all prior initialisation.
+     */
+    smp_wmb();
+    sd->schedule_lock = new_lock;
 
     /* _Not_ pcpu_schedule_unlock(): schedule_lock may have changed! */
     spin_unlock_irq(old_lock);

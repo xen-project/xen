@@ -3855,7 +3855,7 @@ csched2_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 }
 
 /* Change the scheduler of cpu to us (Credit2). */
-static void
+static spinlock_t *
 csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
                      void *pdata, void *vdata)
 {
@@ -3888,18 +3888,9 @@ csched2_switch_sched(struct scheduler *new_ops, unsigned int cpu,
      */
     ASSERT(per_cpu(schedule_data, cpu).schedule_lock != &prv->rqd[rqi].lock);
 
-    per_cpu(scheduler, cpu) = new_ops;
-    per_cpu(schedule_data, cpu).sched_priv = pdata;
-
-    /*
-     * (Re?)route the lock to the per pCPU lock as /last/ thing. In fact,
-     * if it is free (and it can be) we want that anyone that manages
-     * taking it, find all the initializations we've done above in place.
-     */
-    smp_mb();
-    per_cpu(schedule_data, cpu).schedule_lock = &prv->rqd[rqi].lock;
-
     write_unlock(&prv->lock);
+
+    return &prv->rqd[rqi].lock;
 }
 
 static void

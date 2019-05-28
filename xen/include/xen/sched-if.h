@@ -153,7 +153,7 @@ struct scheduler {
     /* Idempotent. */
     void         (*free_domdata)   (const struct scheduler *, void *);
 
-    void         (*switch_sched)   (struct scheduler *, unsigned int,
+    spinlock_t * (*switch_sched)   (struct scheduler *, unsigned int,
                                     void *, void *);
 
     /* Activate / deactivate vcpus in a cpu pool */
@@ -195,10 +195,11 @@ static inline void sched_deinit(struct scheduler *s)
     s->deinit(s);
 }
 
-static inline void sched_switch_sched(struct scheduler *s, unsigned int cpu,
-                                      void *pdata, void *vdata)
+static inline spinlock_t *sched_switch_sched(struct scheduler *s,
+                                             unsigned int cpu,
+                                             void *pdata, void *vdata)
 {
-    s->switch_sched(s, cpu, pdata, vdata);
+    return s->switch_sched(s, cpu, pdata, vdata);
 }
 
 static inline void sched_dump_settings(const struct scheduler *s)

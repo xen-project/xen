@@ -630,7 +630,7 @@ a653sched_pick_cpu(const struct scheduler *ops, struct vcpu *vc)
  * @param pdata     scheduler specific PCPU data (we don't have any)
  * @param vdata     scheduler specific VCPU data of the idle vcpu
  */
-static void
+static spinlock_t *
 a653_switch_sched(struct scheduler *new_ops, unsigned int cpu,
                   void *pdata, void *vdata)
 {
@@ -641,17 +641,7 @@ a653_switch_sched(struct scheduler *new_ops, unsigned int cpu,
 
     idle_vcpu[cpu]->sched_priv = vdata;
 
-    per_cpu(scheduler, cpu) = new_ops;
-    per_cpu(schedule_data, cpu).sched_priv = NULL; /* no pdata */
-
-    /*
-     * (Re?)route the lock to its default location. We actually do not use
-     * it, but if we leave it pointing to where it does now (i.e., the
-     * runqueue lock for this PCPU in the default scheduler), we'd be
-     * causing unnecessary contention on that lock (in cases where it is
-     * shared among multiple PCPUs, like in Credit2 and RTDS).
-     */
-    sd->schedule_lock = &sd->_lock;
+    return &sd->_lock;
 }
 
 /**
