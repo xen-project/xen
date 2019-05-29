@@ -1594,13 +1594,12 @@ out:
 }
 
 int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
-                                        libxl_domain_config *d_config)
+                                        libxl_domain_config *d_config,
+                                        const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     int rc;
     libxl__domain_userdata_lock *lock = NULL;
-
-    CTX_LOCK;
 
     lock = libxl__lock_domain_userdata(gc, domid);
     if (!lock) {
@@ -1808,9 +1807,10 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
 
 out:
     if (lock) libxl__unlock_domain_userdata(lock);
-    CTX_UNLOCK;
-    GC_FREE;
-    return rc;
+    if (rc)
+        return AO_CREATE_FAIL(rc);
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 /*

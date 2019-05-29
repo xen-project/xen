@@ -1221,6 +1221,7 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  *   libxl_domain_unpause()
  *   libxl_send_trigger()
  *   libxl_set_vcpuonline()
+ *   libxl_retrieve_domain_configuration()
  */
 #define LIBXL_HAVE_FN_USING_QMP_ASYNC 1
 
@@ -1564,8 +1565,18 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config);
  * works with DomU.
  */
 int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
-                                        libxl_domain_config *d_config)
+                                        libxl_domain_config *d_config,
+                                        const libxl_asyncop_how *ao_how)
                                         LIBXL_EXTERNAL_CALLERS_ONLY;
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+static inline int libxl_retrieve_domain_configuration_0x041200(
+    libxl_ctx *ctx, uint32_t domid, libxl_domain_config *d_config)
+{
+    return libxl_retrieve_domain_configuration(ctx, domid, d_config, NULL);
+}
+#define libxl_retrieve_domain_configuration \
+    libxl_retrieve_domain_configuration_0x041200
+#endif
 
 int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
                          int flags, /* LIBXL_SUSPEND_* */

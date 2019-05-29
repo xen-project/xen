@@ -56,7 +56,8 @@ void save_domain_core_begin(uint32_t domid,
                           &d_config);
         free(config_v);
     } else {
-        rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config);
+        rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config,
+                                                 NULL);
         if (rc) {
             fprintf(stderr, "unable to retrieve domain configuration\n");
             exit(EXIT_FAILURE);

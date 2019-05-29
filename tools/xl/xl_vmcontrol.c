@@ -377,7 +377,8 @@ static void reload_domain_config(uint32_t domid,
     }
 
     libxl_domain_config_init(&d_config_new);
-    rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config_new);
+    rc = libxl_retrieve_domain_configuration(ctx, domid, &d_config_new,
+                                             NULL);
     if (rc) {
         LOG("failed to retrieve guest configuration (rc=%d). "
             "reusing old configuration", rc);

@@ -464,7 +464,8 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 
     for (i = 0; i < nb_domain; i++) {
         libxl_domain_config_init(&d_config);
-        rc = libxl_retrieve_domain_configuration(ctx, info[i].domid, &d_config);
+        rc = libxl_retrieve_domain_configuration(ctx, info[i].domid,
+                                                 &d_config, NULL);
         if (rc)
             continue;
         if (default_output_format == OUTPUT_FORMAT_JSON)
