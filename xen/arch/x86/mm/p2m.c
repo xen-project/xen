@@ -2440,7 +2440,7 @@ bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
      * gfns below.
      */
     p2m_lock(ap2m);
-    
+
     amfn = get_gfn_type_access(ap2m, gfn_l, &ap2mt, &ap2ma, 0, NULL);
 
     if ( !mfn_eq(amfn, INVALID_MFN) )
@@ -2474,11 +2474,11 @@ bool p2m_altp2m_get_or_propagate(struct p2m_domain *ap2m, unsigned long gfn_l,
     if ( rc )
     {
         gprintk(XENLOG_ERR,
-        "failed to set entry for %#"PRIx64" -> %#"PRIx64" altp2m %#"PRIx16". rc: %"PRIi32"\n",
-        gfn_l, mfn_x(amfn), vcpu_altp2m(current).p2midx, rc);
+                "failed to set entry for %"PRI_gfn" -> %"PRI_mfn" altp2m %u, rc %d\n",
+                gfn_l, mfn_x(amfn), vcpu_altp2m(current).p2midx, rc);
         domain_crash(ap2m->domain);
     }
-    
+
     return true;
 }
 

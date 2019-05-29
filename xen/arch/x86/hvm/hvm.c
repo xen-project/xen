@@ -1765,12 +1765,13 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     {
         p2m = p2m_get_altp2m(curr);
 
-        /* 
+        /*
          * Get the altp2m entry if present; or if not, propagate from
          * the host p2m.  NB that this returns with gfn locked in the
          * altp2m.
          */
-        if ( p2m_altp2m_get_or_propagate(p2m, gfn, &mfn, &p2mt, &p2ma, page_order) )
+        if ( p2m_altp2m_get_or_propagate(p2m, gfn, &mfn, &p2mt,
+                                         &p2ma, page_order) )
         {
             /* Entry was copied from host -- retry fault */
             rc = 1;
