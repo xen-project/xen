@@ -515,7 +515,7 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
     libxl_device_usbdev *usbdevs = NULL;
     int num_usbdev = 0;
     int i, rc;
-    uint32_t domid = ao->domid;
+    uint32_t domid = aodev->dev->domid;
     int usbctrl_devid = aodev->dev->devid;
     libxl_device_usbctrl usbctrl;
     libxl_usbctrlinfo usbctrlinfo;
