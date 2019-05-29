@@ -1222,6 +1222,7 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  *   libxl_send_trigger()
  *   libxl_set_vcpuonline()
  *   libxl_retrieve_domain_configuration()
+ *   libxl_qemu_monitor_command()
  */
 #define LIBXL_HAVE_FN_USING_QMP_ASYNC 1
 
@@ -2571,7 +2572,18 @@ int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock);
  * via output.
  */
 int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
-                               const char *command_line, char **output);
+                               const char *command_line, char **output,
+                               const libxl_asyncop_how *ao_how)
+                               LIBXL_EXTERNAL_CALLERS_ONLY;
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+static inline int libxl_qemu_monitor_command_0x041200(libxl_ctx *ctx,
+    uint32_t domid, const char *command_line, char **output)
+{
+    return libxl_qemu_monitor_command(ctx, domid, command_line, output,
+                                      NULL);
+}
+#define libxl_qemu_monitor_command libxl_qemu_monitor_command_0x041200
+#endif
 
 #include <libxl_event.h>
 

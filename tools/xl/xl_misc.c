@@ -228,7 +228,7 @@ int main_qemu_monitor_command(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    ret = libxl_qemu_monitor_command(ctx, domid, cmd, &output);
+    ret = libxl_qemu_monitor_command(ctx, domid, cmd, &output, NULL);
     if (!ret && output) {
         printf("%s\n", output);
         free(output);

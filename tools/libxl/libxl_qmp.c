@@ -1291,15 +1291,16 @@ int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line,
 }
 
 int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
-                               const char *command_line, char **output)
+                               const char *command_line, char **output,
+                               const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     int rc;
 
     rc = libxl__qmp_hmp(gc, domid, command_line, output);
 
-    GC_FREE;
-    return rc;
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
