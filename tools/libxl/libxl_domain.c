@@ -1470,10 +1470,11 @@ static int libxl__domain_s3_resume(libxl__gc *gc, int domid)
 }
 
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
-                       libxl_trigger trigger, uint32_t vcpuid)
+                       libxl_trigger trigger, uint32_t vcpuid,
+                       const libxl_asyncop_how *ao_how)
 {
+    AO_CREATE(ctx, domid, ao_how);
     int rc;
-    GC_INIT(ctx);
 
     switch (trigger) {
     case LIBXL_TRIGGER_POWER:
@@ -1509,10 +1510,13 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
         LOGED(ERROR, domid, "Send trigger '%s' failed",
               libxl_trigger_to_string(trigger));
         rc = ERROR_FAIL;
+        goto out;
     }
 
-    GC_FREE;
-    return rc;
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
+out:
+    return AO_CREATE_FAIL(rc);
 }
 
 uint32_t libxl_vm_get_start_time(libxl_ctx *ctx, uint32_t domid)

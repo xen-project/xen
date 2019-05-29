@@ -1219,6 +1219,7 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  * asynchronously. Those functions are:
  *   libxl_domain_pause()
  *   libxl_domain_unpause()
+ *   libxl_send_trigger()
  */
 #define LIBXL_HAVE_FN_USING_QMP_ASYNC 1
 
@@ -2380,7 +2381,17 @@ int libxl_vcpu_sched_params_set_all(libxl_ctx *ctx, uint32_t domid,
                                     const libxl_vcpu_sched_params *params);
 
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
-                       libxl_trigger trigger, uint32_t vcpuid);
+                       libxl_trigger trigger, uint32_t vcpuid,
+                       const libxl_asyncop_how *ao_how)
+                       LIBXL_EXTERNAL_CALLERS_ONLY;
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+static inline int libxl_send_trigger_0x041200(
+    libxl_ctx *ctx, uint32_t domid, libxl_trigger trigger, uint32_t vcpuid)
+{
+    return libxl_send_trigger_0x041200(ctx, domid, trigger, vcpuid, NULL);
+}
+#define libxl_send_trigger libxl_send_trigger_0x041200
+#endif
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq);
 int libxl_send_debug_keys(libxl_ctx *ctx, char *keys);
 int libxl_set_parameters(libxl_ctx *ctx, char *params);

@@ -108,7 +108,7 @@ static void reboot_domain(uint32_t domid, libxl_evgen_domain_death **deathw,
         if (fallback_trigger) {
             fprintf(stderr, "PV control interface not available:"
                     " sending ACPI reset button event.\n");
-            rc = libxl_send_trigger(ctx, domid, LIBXL_TRIGGER_RESET, 0);
+            rc = libxl_send_trigger(ctx, domid, LIBXL_TRIGGER_RESET, 0, NULL);
         } else {
             fprintf(stderr, "PV control interface not available:"
                     " external graceful reboot not possible.\n");
@@ -141,7 +141,7 @@ static void shutdown_domain(uint32_t domid,
         if (fallback_trigger) {
             fprintf(stderr, "PV control interface not available:"
                     " sending ACPI power button event.\n");
-            rc = libxl_send_trigger(ctx, domid, LIBXL_TRIGGER_POWER, 0);
+            rc = libxl_send_trigger(ctx, domid, LIBXL_TRIGGER_POWER, 0, NULL);
         } else {
             fprintf(stderr, "PV control interface not available:"
                     " external graceful shutdown not possible.\n");

@@ -36,7 +36,7 @@ static void button_press(uint32_t domid, const char *b)
         exit(EXIT_FAILURE);
     }
 
-    libxl_send_trigger(ctx, domid, trigger, 0);
+    libxl_send_trigger(ctx, domid, trigger, 0, NULL);
 }
 
 int main_button_press(int argc, char **argv)
@@ -106,7 +106,7 @@ int main_trigger(int argc, char **argv)
         }
     }
 
-    libxl_send_trigger(ctx, domid, trigger, vcpuid);
+    libxl_send_trigger(ctx, domid, trigger, vcpuid, NULL);
 
     return EXIT_SUCCESS;
 }
