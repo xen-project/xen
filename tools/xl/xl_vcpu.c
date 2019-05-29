@@ -369,7 +369,7 @@ static int vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
     for (i = 0; i < max_vcpus; i++)
         libxl_bitmap_set(&cpumap, i);
 
-    rc = libxl_set_vcpuonline(ctx, domid, &cpumap);
+    rc = libxl_set_vcpuonline(ctx, domid, &cpumap, NULL);
     if (rc == ERROR_DOMAIN_NOTFOUND)
         fprintf(stderr, "Domain %u does not exist.\n", domid);
     else if (rc)

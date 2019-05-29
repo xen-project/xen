@@ -546,7 +546,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         fprintf(stderr, "error on getting info for Domain-0\n");
         goto out;
     }
-    if (info.vcpu_online > n && libxl_set_vcpuonline(ctx, 0, &cpumap)) {
+    if (info.vcpu_online > n && libxl_set_vcpuonline(ctx, 0, &cpumap, NULL)) {
         fprintf(stderr, "error on removing vcpus for Domain-0\n");
         goto out;
     }

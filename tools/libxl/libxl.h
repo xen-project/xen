@@ -1220,6 +1220,7 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  *   libxl_domain_pause()
  *   libxl_domain_unpause()
  *   libxl_send_trigger()
+ *   libxl_set_vcpuonline()
  */
 #define LIBXL_HAVE_FN_USING_QMP_ASYNC 1
 
@@ -2318,7 +2319,19 @@ int libxl_domain_set_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
                                   libxl_bitmap *nodemap);
 int libxl_domain_get_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
                                   libxl_bitmap *nodemap);
-int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap);
+int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid,
+                         libxl_bitmap *cpumap,
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+static inline int libxl_set_vcpuonline_0x041200(libxl_ctx *ctx,
+                                                uint32_t domid,
+                                                libxl_bitmap *cpumap)
+{
+    return libxl_set_vcpuonline(ctx, domid, cpumap, NULL);
+}
+#define libxl_set_vcpuonline libxl_set_vcpuonline_0x041200
+#endif
 
 /* A return value less than 0 should be interpreted as a libxl_error, while a
  * return value greater than or equal to 0 should be interpreted as a

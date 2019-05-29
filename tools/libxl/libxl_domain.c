@@ -1386,9 +1386,11 @@ out:
     return rc;
 }
 
-int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
+int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid,
+                         libxl_bitmap *cpumap,
+                         const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     int rc, maxcpus;
     libxl_dominfo info;
 
@@ -1439,8 +1441,10 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
 
 out:
     libxl_dominfo_dispose(&info);
-    GC_FREE;
-    return rc;
+    if (rc)
+        return AO_CREATE_FAIL(rc);
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 static int libxl__domain_s3_resume(libxl__gc *gc, int domid)
