@@ -252,7 +252,7 @@ static inline void vm_event_release_slot(struct domain *d,
  * vm_event_mark_and_pause() tags vcpu and put it to sleep.
  * The vcpu will resume execution in vm_event_wake_blocked().
  */
-void vm_event_mark_and_pause(struct vcpu *v, struct vm_event_domain *ved)
+static void vm_event_mark_and_pause(struct vcpu *v, struct vm_event_domain *ved)
 {
     if ( !test_and_set_bit(ved->pause_flag, &v->pause_flags) )
     {
@@ -324,8 +324,8 @@ void vm_event_put_request(struct domain *d,
     notify_via_xen_event_channel(d, ved->xen_port);
 }
 
-int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
-                          vm_event_response_t *rsp)
+static int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
+                                 vm_event_response_t *rsp)
 {
     vm_event_front_ring_t *front_ring;
     RING_IDX rsp_cons;

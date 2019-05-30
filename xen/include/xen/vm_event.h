@@ -64,9 +64,6 @@ void vm_event_cancel_slot(struct domain *d, struct vm_event_domain *ved);
 void vm_event_put_request(struct domain *d, struct vm_event_domain *ved,
                           vm_event_request_t *req);
 
-int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
-                          vm_event_response_t *rsp);
-
 int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
                     XEN_GUEST_HANDLE_PARAM(void) u_domctl);
 
