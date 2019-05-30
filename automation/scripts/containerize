@@ -26,7 +26,7 @@ case "_${CONTAINER}" in
     _xenial) CONTAINER="${BASE}/ubuntu:xenial" ;;
 esac
 
-# Use this variable to control whehter root should be used
+# Use this variable to control whether root should be used
 case "_${CONTAINER_UID0}" in
     _1)   userarg= ;;
     _0|_) userarg="-u $(id -u)" ;;
