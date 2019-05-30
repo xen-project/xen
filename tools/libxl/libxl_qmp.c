@@ -767,15 +767,6 @@ int libxl__qmp_resume(libxl__gc *gc, int domid)
     return qmp_run_command(gc, domid, "cont", NULL, NULL, NULL);
 }
 
-int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
-{
-    libxl__json_object *args = NULL;
-
-    libxl__qmp_param_add_integer(gc, &args, "id", idx);
-
-    return qmp_run_command(gc, domid, "cpu-add", args, NULL, NULL);
-}
-
 static int query_cpus_callback(libxl__qmp_handler *qmp,
                                const libxl__json_object *response,
                                void *opaque)
