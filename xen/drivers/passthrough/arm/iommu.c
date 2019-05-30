@@ -32,7 +32,10 @@ void __init iommu_set_ops(const struct iommu_ops *ops)
     BUG_ON(ops == NULL);
 
     if ( iommu_ops && iommu_ops != ops )
+    {
         printk("WARNING: Cannot set IOMMU ops, already set to a different value\n");
+        return;
+    }
 
     iommu_ops = ops;
 }
