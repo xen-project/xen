@@ -1984,8 +1984,6 @@ typedef struct libxl__qmp_handler libxl__qmp_handler;
  */
 _hidden libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc,
                                                   uint32_t domid);
-/* Resume hvm domain */
-_hidden int libxl__qmp_system_wakeup(libxl__gc *gc, int domid);
 /* Resume QEMU. */
 _hidden int libxl__qmp_resume(libxl__gc *gc, int domid);
 /* Load current QEMU state from file. */

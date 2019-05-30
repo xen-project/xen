@@ -752,11 +752,6 @@ static int qmp_run_command(libxl__gc *gc, int domid,
     return rc;
 }
 
-int libxl__qmp_system_wakeup(libxl__gc *gc, int domid)
-{
-    return qmp_run_command(gc, domid, "system_wakeup", NULL, NULL, NULL);
-}
-
 int libxl__qmp_restore(libxl__gc *gc, int domid, const char *state_file)
 {
     libxl__json_object *args = NULL;

@@ -1556,19 +1556,39 @@ out:
     return AO_INPROGRESS;
 }
 
-static int libxl__domain_s3_resume(libxl__gc *gc, int domid)
+static void domain_s3_resume_done(libxl__egc *egc, libxl__ev_qmp *qmp,
+                                  const libxl__json_object *response,
+                                  int rc);
+
+static void domain_s3_resume(libxl__ao *ao, libxl__egc *egc, int domid)
 {
+    AO_GC;
+    libxl__ev_qmp *qmp;
     int rc = 0;
+    int r;
+
+    GCNEW(qmp);
+    libxl__ev_qmp_init(qmp);
+    qmp->ao = ao;
+    qmp->domid = domid;
+    qmp->payload_fd = -1;
+    qmp->callback = domain_s3_resume_done;
 
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         switch (libxl__device_model_version_running(gc, domid)) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            rc = xc_hvm_param_set(CTX->xch, domid, HVM_PARAM_ACPI_S_STATE, 0);
+            r = xc_hvm_param_set(CTX->xch, domid, HVM_PARAM_ACPI_S_STATE, 0);
+            if (r) {
+                LOGED(ERROR, domid, "Send trigger '%s' failed",
+                      libxl_trigger_to_string(LIBXL_TRIGGER_S3RESUME));
+                rc = ERROR_FAIL;
+            }
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            rc = libxl__qmp_system_wakeup(gc, domid);
-            break;
+            rc = libxl__ev_qmp_send(gc, qmp, "system_wakeup", NULL);
+            if (rc) goto out;
+            return;
         default:
             rc = ERROR_INVAL;
             break;
@@ -1579,7 +1599,22 @@ static int libxl__domain_s3_resume(libxl__gc *gc, int domid)
         break;
     }
 
-    return rc;
+out:
+    domain_s3_resume_done(egc, qmp, NULL, rc);
+}
+
+static void domain_s3_resume_done(libxl__egc *egc, libxl__ev_qmp *qmp,
+                                  const libxl__json_object *response,
+                                  int rc)
+{
+    EGC_GC;
+
+    if (rc)
+        LOGD(ERROR, qmp->domid, "Send trigger '%s' failed, rc=%d",
+              libxl_trigger_to_string(LIBXL_TRIGGER_S3RESUME), rc);
+
+    libxl__ev_qmp_dispose(gc, qmp);
+    libxl__ao_complete(egc, qmp->ao, rc);
 }
 
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
@@ -1611,8 +1646,8 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                                     XEN_DOMCTL_SENDTRIGGER_RESET, vcpuid);
         break;
     case LIBXL_TRIGGER_S3RESUME:
-        rc = libxl__domain_s3_resume(gc, domid);
-        break;
+        domain_s3_resume(ao, egc, domid); /* must be last */
+        return AO_INPROGRESS;
     default:
         rc = -1;
         errno = EINVAL;
