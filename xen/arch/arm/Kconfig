@@ -12,6 +12,7 @@ config ARM_32
 config ARM_64
 	def_bool y
 	depends on 64BIT
+	select HAS_FAST_MULTIPLY
 
 config ARM
 	def_bool y
