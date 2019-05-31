@@ -38,74 +38,63 @@
 static int vm_event_enable(
     struct domain *d,
     struct xen_domctl_vm_event_op *vec,
-    struct vm_event_domain **ved,
+    struct vm_event_domain **p_ved,
     int pause_flag,
     int param,
     xen_event_channel_notification_t notification_fn)
 {
     int rc;
     unsigned long ring_gfn = d->arch.hvm.params[param];
+    struct vm_event_domain *ved;
 
-    if ( !*ved )
-        *ved = xzalloc(struct vm_event_domain);
-    if ( !*ved )
-        return -ENOMEM;
-
-    /* Only one helper at a time. If the helper crashed,
-     * the ring is in an undefined state and so is the guest.
+    /*
+     * Only one connected agent at a time.  If the helper crashed, the ring is
+     * in an undefined state, and the guest is most likely unrecoverable.
      */
-    if ( (*ved)->ring_page )
-        return -EBUSY;;
+    if ( *p_ved != NULL )
+        return -EBUSY;
 
-    /* The parameter defaults to zero, and it should be
-     * set to something */
+    /* No chosen ring GFN?  Nothing we can do. */
     if ( ring_gfn == 0 )
         return -EOPNOTSUPP;
 
-    spin_lock_init(&(*ved)->lock);
-    spin_lock(&(*ved)->lock);
+    ved = xzalloc(struct vm_event_domain);
+    if ( !ved )
+        return -ENOMEM;
+
+    /* Trivial setup. */
+    spin_lock_init(&ved->lock);
+    init_waitqueue_head(&ved->wq);
+    ved->pause_flag = pause_flag;
 
     rc = vm_event_init_domain(d);
-
     if ( rc < 0 )
         goto err;
 
-    rc = prepare_ring_for_helper(d, ring_gfn, &(*ved)->ring_pg_struct,
-                                 &(*ved)->ring_page);
+    rc = prepare_ring_for_helper(d, ring_gfn, &ved->ring_pg_struct,
+                                 &ved->ring_page);
     if ( rc < 0 )
         goto err;
 
-    /* Set the number of currently blocked vCPUs to 0. */
-    (*ved)->blocked = 0;
+    FRONT_RING_INIT(&ved->front_ring,
+                    (vm_event_sring_t *)ved->ring_page,
+                    PAGE_SIZE);
 
-    /* Allocate event channel */
     rc = alloc_unbound_xen_event_channel(d, 0, current->domain->domain_id,
                                          notification_fn);
     if ( rc < 0 )
         goto err;
 
-    (*ved)->xen_port = vec->u.enable.port = rc;
+    ved->xen_port = vec->u.enable.port = rc;
 
-    /* Prepare ring buffer */
-    FRONT_RING_INIT(&(*ved)->front_ring,
-                    (vm_event_sring_t *)(*ved)->ring_page,
-                    PAGE_SIZE);
+    /* Success.  Fill in the domain's appropriate ved. */
+    *p_ved = ved;
 
-    /* Save the pause flag for this particular ring. */
-    (*ved)->pause_flag = pause_flag;
-
-    /* Initialize the last-chance wait queue. */
-    init_waitqueue_head(&(*ved)->wq);
-
-    spin_unlock(&(*ved)->lock);
     return 0;
 
  err:
-    destroy_ring_for_helper(&(*ved)->ring_page,
-                            (*ved)->ring_pg_struct);
-    spin_unlock(&(*ved)->lock);
-    xfree(*ved);
-    *ved = NULL;
+    destroy_ring_for_helper(&ved->ring_page, ved->ring_pg_struct);
+    xfree(ved);
 
     return rc;
 }
@@ -190,43 +179,44 @@ void vm_event_wake(struct domain *d, struct vm_event_domain *ved)
         vm_event_wake_blocked(d, ved);
 }
 
-static int vm_event_disable(struct domain *d, struct vm_event_domain **ved)
+static int vm_event_disable(struct domain *d, struct vm_event_domain **p_ved)
 {
-    if ( vm_event_check_ring(*ved) )
+    struct vm_event_domain *ved = *p_ved;
+
+    if ( vm_event_check_ring(ved) )
     {
         struct vcpu *v;
 
-        spin_lock(&(*ved)->lock);
+        spin_lock(&ved->lock);
 
-        if ( !list_empty(&(*ved)->wq.list) )
+        if ( !list_empty(&ved->wq.list) )
         {
-            spin_unlock(&(*ved)->lock);
+            spin_unlock(&ved->lock);
             return -EBUSY;
         }
 
         /* Free domU's event channel and leave the other one unbound */
-        free_xen_event_channel(d, (*ved)->xen_port);
+        free_xen_event_channel(d, ved->xen_port);
 
         /* Unblock all vCPUs */
         for_each_vcpu ( d, v )
         {
-            if ( test_and_clear_bit((*ved)->pause_flag, &v->pause_flags) )
+            if ( test_and_clear_bit(ved->pause_flag, &v->pause_flags) )
             {
                 vcpu_unpause(v);
-                (*ved)->blocked--;
+                ved->blocked--;
             }
         }
 
-        destroy_ring_for_helper(&(*ved)->ring_page,
-                                (*ved)->ring_pg_struct);
+        destroy_ring_for_helper(&ved->ring_page, ved->ring_pg_struct);
 
         vm_event_cleanup_domain(d);
 
-        spin_unlock(&(*ved)->lock);
+        spin_unlock(&ved->lock);
     }
 
-    xfree(*ved);
-    *ved = NULL;
+    xfree(ved);
+    *p_ved = NULL;
 
     return 0;
 }
