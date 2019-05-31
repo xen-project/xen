@@ -892,19 +892,67 @@ int libxl__qmp_hmp(libxl__gc *gc, int domid, const char *command_line,
                            hmp_callback, output);
 }
 
+
+typedef struct {
+    libxl__ev_qmp qmp;
+    char **output; /* user pointer */
+} qemu_monitor_command_state;
+
+static void qemu_monitor_command_done(libxl__egc *, libxl__ev_qmp *,
+                                      const libxl__json_object *response,
+                                      int rc);
+
 int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
                                const char *command_line, char **output,
                                const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
+    qemu_monitor_command_state *qmcs;
+    libxl__json_object *args = NULL;
     int rc;
 
-    rc = libxl__qmp_hmp(gc, domid, command_line, output);
+    if (!output) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
 
-    libxl__ao_complete(egc, ao, rc);
+    GCNEW(qmcs);
+    libxl__ev_qmp_init(&qmcs->qmp);
+    qmcs->qmp.ao = ao;
+    qmcs->qmp.domid = domid;
+    qmcs->qmp.payload_fd = -1;
+    qmcs->qmp.callback = qemu_monitor_command_done;
+    qmcs->output = output;
+    libxl__qmp_param_add_string(gc, &args, "command-line", command_line);
+    rc = libxl__ev_qmp_send(gc, &qmcs->qmp, "human-monitor-command", args);
+out:
+    if (rc) return AO_CREATE_FAIL(rc);
     return AO_INPROGRESS;
 }
 
+static void qemu_monitor_command_done(libxl__egc *egc, libxl__ev_qmp *qmp,
+                                      const libxl__json_object *response,
+                                      int rc)
+{
+    STATE_AO_GC(qmp->ao);
+    qemu_monitor_command_state *qmcs = CONTAINER_OF(qmp, *qmcs, qmp);
+
+    if (rc) goto out;
+
+    if (!libxl__json_object_is_string(response)) {
+        rc = ERROR_QEMU_API;
+        LOGD(ERROR, qmp->domid, "Response has unexpected format");
+        goto out;
+    }
+
+    *(qmcs->output) =
+        libxl__strdup(NOGC, libxl__json_object_get_string(response));
+    rc = 0;
+
+out:
+    libxl__ev_qmp_dispose(gc, qmp);
+    libxl__ao_complete(egc, ao, rc);
+}
 
 /*
  * Functions using libxl__ev_qmp
