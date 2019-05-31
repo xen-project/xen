@@ -1988,9 +1988,6 @@ _hidden libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc,
 _hidden int libxl__qmp_resume(libxl__gc *gc, int domid);
 /* Load current QEMU state from file. */
 _hidden int libxl__qmp_restore(libxl__gc *gc, int domid, const char *filename);
-/* Query the bitmap of CPUs */
-_hidden int libxl__qmp_query_cpus(libxl__gc *gc, int domid,
-                                  libxl_bitmap *map);
 /* Start NBD server */
 _hidden int libxl__qmp_nbd_server_start(libxl__gc *gc, int domid,
                                         const char *host, const char *port);

@@ -1800,27 +1800,6 @@ uint32_t libxl_vm_get_start_time(libxl_ctx *ctx, uint32_t domid)
     return ret;
 }
 
-/* For QEMU upstream we always need to provide the number of cpus present to
- * QEMU whether they are online or not; otherwise QEMU won't accept the saved
- * state. See implementation of libxl__qmp_query_cpus.
- */
-static int libxl__update_avail_vcpus_qmp(libxl__gc *gc, uint32_t domid,
-                                         unsigned int max_vcpus,
-                                         libxl_bitmap *map)
-{
-    int rc;
-
-    rc = libxl__qmp_query_cpus(gc, domid, map);
-    if (rc) {
-        LOGD(ERROR, domid, "Fail to get number of cpus");
-        goto out;
-    }
-
-    rc = 0;
-out:
-    return rc;
-}
-
 static int libxl__update_avail_vcpus_xenstore(libxl__gc *gc, uint32_t domid,
                                               unsigned int max_vcpus,
                                               libxl_bitmap *map)
@@ -1849,13 +1828,61 @@ out:
     return rc;
 }
 
+typedef struct {
+    libxl__ev_qmp qmp;
+    libxl__ev_time timeout;
+    libxl_domain_config *d_config; /* user pointer */
+    libxl__ev_devlock devlock;
+    libxl_bitmap qemuu_cpus;
+} retrieve_domain_configuration_state;
+
+static void retrieve_domain_configuration_lock_acquired(
+    libxl__egc *egc, libxl__ev_devlock *, int rc);
+static void retrieve_domain_configuration_cpu_queried(
+    libxl__egc *egc, libxl__ev_qmp *qmp,
+    const libxl__json_object *response, int rc);
+static void retrieve_domain_configuration_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
+static void retrieve_domain_configuration_end(libxl__egc *egc,
+    retrieve_domain_configuration_state *rdcs, int rc);
+
 int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
                                         libxl_domain_config *d_config,
                                         const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
-    int rc;
+    retrieve_domain_configuration_state *rdcs;
+
+    GCNEW(rdcs);
+    libxl__ev_qmp_init(&rdcs->qmp);
+    rdcs->qmp.ao = ao;
+    rdcs->qmp.domid = domid;
+    rdcs->qmp.payload_fd = -1;
+    libxl__ev_time_init(&rdcs->timeout);
+    rdcs->d_config = d_config;
+    libxl_bitmap_init(&rdcs->qemuu_cpus);
+    libxl__ev_devlock_init(&rdcs->devlock);
+    rdcs->devlock.ao = ao;
+    rdcs->devlock.domid = domid;
+    rdcs->devlock.callback = retrieve_domain_configuration_lock_acquired;
+    libxl__ev_devlock_lock(egc, &rdcs->devlock);
+    return AO_INPROGRESS;
+}
+
+static void retrieve_domain_configuration_lock_acquired(
+    libxl__egc *egc, libxl__ev_devlock *devlock, int rc)
+{
+    retrieve_domain_configuration_state *rdcs =
+        CONTAINER_OF(devlock, *rdcs, devlock);
+    STATE_AO_GC(rdcs->qmp.ao);
     libxl__domain_userdata_lock *lock = NULL;
+    bool has_callback = false;
+
+    /* Convenience aliases */
+    libxl_domid domid = rdcs->qmp.domid;
+    libxl_domain_config *const d_config = rdcs->d_config;
+
+    if (rc) goto out;
 
     lock = libxl__lock_domain_userdata(gc, domid);
     if (!lock) {
@@ -1870,10 +1897,81 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
         goto out;
     }
 
+    libxl__unlock_domain_userdata(lock);
+    lock = NULL;
+
+    /* We start by querying QEMU, if it is running, for its cpumap as this
+     * is a long operation. */
+    if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+        libxl__device_model_version_running(gc, domid) ==
+            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+        /* For QEMU upstream we always need to provide the number
+         * of cpus present to QEMU whether they are online or not;
+         * otherwise QEMU won't accept the saved state.
+         */
+        rc = libxl__ev_time_register_rel(ao, &rdcs->timeout,
+            retrieve_domain_configuration_timeout,
+            LIBXL_QMP_CMD_TIMEOUT * 1000);
+        if (rc) goto out;
+        libxl_bitmap_alloc(CTX, &rdcs->qemuu_cpus,
+                           d_config->b_info.max_vcpus);
+        rdcs->qmp.callback = retrieve_domain_configuration_cpu_queried;
+        rc = libxl__ev_qmp_send(gc, &rdcs->qmp, "query-cpus", NULL);
+        if (rc) goto out;
+        has_callback = true;
+    }
+
+out:
+    if (lock) libxl__unlock_domain_userdata(lock);
+    if (!has_callback)
+        retrieve_domain_configuration_end(egc, rdcs, rc);
+}
+
+static void retrieve_domain_configuration_cpu_queried(
+    libxl__egc *egc, libxl__ev_qmp *qmp,
+    const libxl__json_object *response, int rc)
+{
+    EGC_GC;
+    retrieve_domain_configuration_state *rdcs =
+        CONTAINER_OF(qmp, *rdcs, qmp);
+
+    if (rc) goto out;
+
+    rc = qmp_parse_query_cpus(gc, qmp->domid, response, &rdcs->qemuu_cpus);
+
+out:
+    retrieve_domain_configuration_end(egc, rdcs, rc);
+}
+
+static void retrieve_domain_configuration_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc)
+{
+    retrieve_domain_configuration_state *rdcs =
+        CONTAINER_OF(ev, *rdcs, timeout);
+
+    retrieve_domain_configuration_end(egc, rdcs, rc);
+}
+
+static void retrieve_domain_configuration_end(libxl__egc *egc,
+    retrieve_domain_configuration_state *rdcs, int rc)
+{
+    STATE_AO_GC(rdcs->qmp.ao);
+    libxl__domain_userdata_lock *lock;
+
+    /* Convenience aliases */
+    libxl_domain_config *const d_config = rdcs->d_config;
+    libxl_domid domid = rdcs->qmp.domid;
+
+    lock = libxl__lock_domain_userdata(gc, domid);
+    if (!lock) {
+        rc = ERROR_LOCK_FAIL;
+        goto out;
+    }
+
     /* Domain name */
     {
         char *domname;
-        domname = libxl_domid_to_name(ctx, domid);
+        domname = libxl_domid_to_name(CTX, domid);
         if (!domname) {
             LOGD(ERROR, domid, "Fail to get domain name");
             goto out;
@@ -1886,13 +1984,13 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
     {
         libxl_dominfo info;
         libxl_dominfo_init(&info);
-        rc = libxl_domain_info(ctx, &info, domid);
+        rc = libxl_domain_info(CTX, &info, domid);
         if (rc) {
             LOGD(ERROR, domid, "Fail to get domain info");
             libxl_dominfo_dispose(&info);
             goto out;
         }
-        libxl_uuid_copy(ctx, &d_config->c_info.uuid, &info.uuid);
+        libxl_uuid_copy(CTX, &d_config->c_info.uuid, &info.uuid);
         libxl_dominfo_dispose(&info);
     }
 
@@ -1913,8 +2011,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
             assert(version != LIBXL_DEVICE_MODEL_VERSION_UNKNOWN);
             switch (version) {
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-                rc = libxl__update_avail_vcpus_qmp(gc, domid,
-                                                   max_vcpus, map);
+                libxl_bitmap_copy(CTX, map, &rdcs->qemuu_cpus);
                 break;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
                 rc = libxl__update_avail_vcpus_xenstore(gc, domid,
@@ -1938,6 +2035,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
             goto out;
         }
     }
+
 
     /* Memory limits:
      *
@@ -1972,7 +2070,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
     /* Scheduler params */
     {
         libxl_domain_sched_params_dispose(&d_config->b_info.sched_params);
-        rc = libxl_domain_sched_params_get(ctx, domid,
+        rc = libxl_domain_sched_params_get(CTX, domid,
                                            &d_config->b_info.sched_params);
         if (rc) {
             LOGD(ERROR, domid, "Fail to get scheduler parameters");
@@ -2034,7 +2132,7 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
 
                 if (j < num) {         /* found in xenstore */
                     if (dt->merge)
-                        dt->merge(ctx, p + dt->dev_elem_size * j, q);
+                        dt->merge(CTX, p + dt->dev_elem_size * j, q);
                 } else {                /* not found in xenstore */
                     LOGD(WARN, domid,
                          "Device present in JSON but not in xenstore, ignored");
@@ -2062,11 +2160,12 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
     }
 
 out:
+    libxl__ev_devlock_unlock(gc, &rdcs->devlock);
     if (lock) libxl__unlock_domain_userdata(lock);
-    if (rc)
-        return AO_CREATE_FAIL(rc);
+    libxl_bitmap_dispose(&rdcs->qemuu_cpus);
+    libxl__ev_qmp_dispose(gc, &rdcs->qmp);
+    libxl__ev_time_deregister(gc, &rdcs->timeout);
     libxl__ao_complete(egc, ao, rc);
-    return AO_INPROGRESS;
 }
 
 /*
