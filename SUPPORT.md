@@ -236,16 +236,6 @@ Allow pages belonging to guests to be paged to disk
 
     Status, x86 HVM: Experimenal
 
-### Transcendent Memory
-
-Transcendent Memory (tmem) allows the creation of hypervisor memory pools
-which guests can use to store memory
-rather than caching in its own memory or swapping to disk.
-Having these in the hypervisor
-can allow more efficient aggregate use of memory across VMs.
-
-    Status: Experimental
-
 ### Alternative p2m
 
 Alternative p2m (altp2m) allows external monitoring of guest memory
