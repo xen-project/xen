@@ -102,6 +102,7 @@ static int vm_event_enable(
 static unsigned int vm_event_ring_available(struct vm_event_domain *ved)
 {
     int avail_req = RING_FREE_REQUESTS(&ved->front_ring);
+
     avail_req -= ved->target_producers;
     avail_req -= ved->foreign_producers;
 
@@ -168,7 +169,7 @@ static void vm_event_wake_queued(struct domain *d, struct vm_event_domain *ved)
  */
 void vm_event_wake(struct domain *d, struct vm_event_domain *ved)
 {
-    if (!list_empty(&ved->wq.list))
+    if ( !list_empty(&ved->wq.list) )
         vm_event_wake_queued(d, ved);
     else
         vm_event_wake_blocked(d, ved);
@@ -216,8 +217,8 @@ static int vm_event_disable(struct domain *d, struct vm_event_domain **p_ved)
     return 0;
 }
 
-static inline void vm_event_release_slot(struct domain *d,
-                                         struct vm_event_domain *ved)
+static void vm_event_release_slot(struct domain *d,
+                                  struct vm_event_domain *ved)
 {
     /* Update the accounting */
     if ( current->domain == d )
@@ -258,17 +259,16 @@ void vm_event_put_request(struct domain *d,
     RING_IDX req_prod;
     struct vcpu *curr = current;
 
-    if( !vm_event_check_ring(ved))
+    if( !vm_event_check_ring(ved) )
         return;
 
     if ( curr->domain != d )
     {
         req->flags |= VM_EVENT_FLAG_FOREIGN;
-#ifndef NDEBUG
+
         if ( !(req->flags & VM_EVENT_FLAG_VCPU_PAUSED) )
-            gdprintk(XENLOG_G_WARNING, "d%dv%d was not paused.\n",
+            gdprintk(XENLOG_WARNING, "d%dv%d was not paused.\n",
                      d->domain_id, req->vcpu_id);
-#endif
     }
 
     req->version = VM_EVENT_INTERFACE_VERSION;
@@ -474,6 +474,7 @@ static int vm_event_grab_slot(struct vm_event_domain *ved, int foreign)
 static int vm_event_wait_try_grab(struct vm_event_domain *ved, int *rc)
 {
     *rc = vm_event_grab_slot(ved, 0);
+
     return *rc;
 }
 
@@ -481,13 +482,15 @@ static int vm_event_wait_try_grab(struct vm_event_domain *ved, int *rc)
 static int vm_event_wait_slot(struct vm_event_domain *ved)
 {
     int rc = -EBUSY;
+
     wait_event(ved->wq, vm_event_wait_try_grab(ved, &rc) != -EBUSY);
+
     return rc;
 }
 
 bool vm_event_check_ring(struct vm_event_domain *ved)
 {
-    return (ved && ved->ring_page);
+    return ved && ved->ring_page;
 }
 
 /*
@@ -511,7 +514,7 @@ int __vm_event_claim_slot(struct domain *d, struct vm_event_domain *ved,
     if ( (current->domain == d) && allow_sleep )
         return vm_event_wait_slot(ved);
     else
-        return vm_event_grab_slot(ved, (current->domain != d));
+        return vm_event_grab_slot(ved, current->domain != d);
 }
 
 #ifdef CONFIG_HAS_MEM_PAGING
