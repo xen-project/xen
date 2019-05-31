@@ -1870,7 +1870,7 @@ static int intel_iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
     if ( !pg_maddr )
     {
         spin_unlock(&hd->arch.mapping_lock);
-        return -ENOMEM;
+        return -ENOENT;
     }
 
     page = map_vtd_domain_page(pg_maddr);
