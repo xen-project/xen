@@ -273,10 +273,14 @@ static void hpet_set_timer(HPETState *h, unsigned int tn,
      * Detect time values set in the past. This is hard to do for 32-bit
      * comparators as the timer does not have to be set that far in the future
      * for the counter difference to wrap a 32-bit signed integer. We fudge
-     * by looking for a 'small' time value in the past.
+     * by looking for a 'small' time value in the past. However, if we
+     * are restoring after migrate, treat any wrap as past since the value
+     * is unlikely to be 'small'.
      */
     if ( (int64_t)diff < 0 )
-        diff = (timer_is_32bit(h, tn) && (-diff > HPET_TINY_TIME_SPAN))
+        diff = (timer_is_32bit(h, tn) &&
+                vhpet_domain(h)->creation_finished &&
+                (-diff > HPET_TINY_TIME_SPAN))
             ? (uint32_t)diff : 0;
 
     destroy_periodic_time(&h->pt[tn]);
