@@ -583,8 +583,7 @@ void vm_event_cleanup(struct domain *d)
 #endif
 }
 
-int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
-                    XEN_GUEST_HANDLE_PARAM(void) u_domctl)
+int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
 {
     int rc;
 
@@ -593,9 +592,6 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec,
         vec->u.version = VM_EVENT_INTERFACE_VERSION;
         return 0;
     }
-
-    if ( unlikely(d == NULL) )
-        return -ESRCH;
 
     rc = xsm_vm_event_control(XSM_PRIV, d, vec->mode, vec->op);
     if ( rc )

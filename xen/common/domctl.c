@@ -1018,9 +1018,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         break;
 
     case XEN_DOMCTL_vm_event_op:
-        ret = vm_event_domctl(d, &op->u.vm_event_op,
-                              guest_handle_cast(u_domctl, void));
-        copyback = 1;
+        ret = vm_event_domctl(d, &op->u.vm_event_op);
+        if ( ret == 0 )
+            copyback = true;
         break;
 
 #ifdef CONFIG_MEM_ACCESS
