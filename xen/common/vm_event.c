@@ -119,34 +119,29 @@ static unsigned int vm_event_ring_available(struct vm_event_domain *ved)
 static void vm_event_wake_blocked(struct domain *d, struct vm_event_domain *ved)
 {
     struct vcpu *v;
-    unsigned int avail_req = vm_event_ring_available(ved);
+    unsigned int i, j, k, avail_req = vm_event_ring_available(ved);
 
     if ( avail_req == 0 || ved->blocked == 0 )
         return;
 
     /* We remember which vcpu last woke up to avoid scanning always linearly
      * from zero and starving higher-numbered vcpus under high load */
-    if ( d->vcpu )
+    for ( i = ved->last_vcpu_wake_up + 1, j = 0; j < d->max_vcpus; i++, j++ )
     {
-        int i, j, k;
+        k = i % d->max_vcpus;
+        v = d->vcpu[k];
+        if ( !v )
+            continue;
 
-        for (i = ved->last_vcpu_wake_up + 1, j = 0; j < d->max_vcpus; i++, j++)
+        if ( !ved->blocked || avail_req == 0 )
+            break;
+
+        if ( test_and_clear_bit(ved->pause_flag, &v->pause_flags) )
         {
-            k = i % d->max_vcpus;
-            v = d->vcpu[k];
-            if ( !v )
-                continue;
-
-            if ( !(ved->blocked) || avail_req == 0 )
-               break;
-
-            if ( test_and_clear_bit(ved->pause_flag, &v->pause_flags) )
-            {
-                vcpu_unpause(v);
-                avail_req--;
-                ved->blocked--;
-                ved->last_vcpu_wake_up = k;
-            }
+            vcpu_unpause(v);
+            avail_req--;
+            ved->blocked--;
+            ved->last_vcpu_wake_up = k;
         }
     }
 }
@@ -382,10 +377,9 @@ static int vm_event_resume(struct domain *d, struct vm_event_domain *ved)
         }
 
         /* Validate the vcpu_id in the response. */
-        if ( (rsp.vcpu_id >= d->max_vcpus) || !d->vcpu[rsp.vcpu_id] )
+        v = domain_vcpu(d, rsp.vcpu_id);
+        if ( !v )
             continue;
-
-        v = d->vcpu[rsp.vcpu_id];
 
         /*
          * In some cases the response type needs extra handling, so here
