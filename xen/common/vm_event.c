@@ -35,10 +35,6 @@
 #define xen_rmb()  smp_rmb()
 #define xen_wmb()  smp_wmb()
 
-#define vm_event_ring_lock_init(_ved)  spin_lock_init(&(_ved)->ring_lock)
-#define vm_event_ring_lock(_ved)       spin_lock(&(_ved)->ring_lock)
-#define vm_event_ring_unlock(_ved)     spin_unlock(&(_ved)->ring_lock)
-
 static int vm_event_enable(
     struct domain *d,
     struct xen_domctl_vm_event_op *vec,
@@ -66,8 +62,8 @@ static int vm_event_enable(
     if ( ring_gfn == 0 )
         return -EOPNOTSUPP;
 
-    vm_event_ring_lock_init(*ved);
-    vm_event_ring_lock(*ved);
+    spin_lock_init(&(*ved)->lock);
+    spin_lock(&(*ved)->lock);
 
     rc = vm_event_init_domain(d);
 
@@ -101,13 +97,13 @@ static int vm_event_enable(
     /* Initialize the last-chance wait queue. */
     init_waitqueue_head(&(*ved)->wq);
 
-    vm_event_ring_unlock(*ved);
+    spin_unlock(&(*ved)->lock);
     return 0;
 
  err:
     destroy_ring_for_helper(&(*ved)->ring_page,
                             (*ved)->ring_pg_struct);
-    vm_event_ring_unlock(*ved);
+    spin_unlock(&(*ved)->lock);
     xfree(*ved);
     *ved = NULL;
 
@@ -200,11 +196,11 @@ static int vm_event_disable(struct domain *d, struct vm_event_domain **ved)
     {
         struct vcpu *v;
 
-        vm_event_ring_lock(*ved);
+        spin_lock(&(*ved)->lock);
 
         if ( !list_empty(&(*ved)->wq.list) )
         {
-            vm_event_ring_unlock(*ved);
+            spin_unlock(&(*ved)->lock);
             return -EBUSY;
         }
 
@@ -226,7 +222,7 @@ static int vm_event_disable(struct domain *d, struct vm_event_domain **ved)
 
         vm_event_cleanup_domain(d);
 
-        vm_event_ring_unlock(*ved);
+        spin_unlock(&(*ved)->lock);
     }
 
     xfree(*ved);
@@ -292,7 +288,7 @@ void vm_event_put_request(struct domain *d,
 
     req->version = VM_EVENT_INTERFACE_VERSION;
 
-    vm_event_ring_lock(ved);
+    spin_lock(&ved->lock);
 
     /* Due to the reservations, this step must succeed. */
     front_ring = &ved->front_ring;
@@ -319,7 +315,7 @@ void vm_event_put_request(struct domain *d,
         !atomic_read(&curr->vm_event_pause_count) )
         vm_event_mark_and_pause(curr, ved);
 
-    vm_event_ring_unlock(ved);
+    spin_unlock(&ved->lock);
 
     notify_via_xen_event_channel(d, ved->xen_port);
 }
@@ -329,17 +325,15 @@ static int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
 {
     vm_event_front_ring_t *front_ring;
     RING_IDX rsp_cons;
+    int rc = 0;
 
-    vm_event_ring_lock(ved);
+    spin_lock(&ved->lock);
 
     front_ring = &ved->front_ring;
     rsp_cons = front_ring->rsp_cons;
 
     if ( !RING_HAS_UNCONSUMED_RESPONSES(front_ring) )
-    {
-        vm_event_ring_unlock(ved);
-        return 0;
-    }
+        goto out;
 
     /* Copy response */
     memcpy(rsp, RING_GET_RESPONSE(front_ring, rsp_cons), sizeof(*rsp));
@@ -353,9 +347,12 @@ static int vm_event_get_response(struct domain *d, struct vm_event_domain *ved,
      * there may be additional space available in the ring. */
     vm_event_wake(d, ved);
 
-    vm_event_ring_unlock(ved);
+    rc = 1;
 
-    return 1;
+ out:
+    spin_unlock(&ved->lock);
+
+    return rc;
 }
 
 /*
@@ -455,35 +452,38 @@ void vm_event_cancel_slot(struct domain *d, struct vm_event_domain *ved)
     if( !vm_event_check_ring(ved) )
         return;
 
-    vm_event_ring_lock(ved);
+    spin_lock(&ved->lock);
     vm_event_release_slot(d, ved);
-    vm_event_ring_unlock(ved);
+    spin_unlock(&ved->lock);
 }
 
 static int vm_event_grab_slot(struct vm_event_domain *ved, int foreign)
 {
     unsigned int avail_req;
+    int rc;
 
     if ( !ved->ring_page )
         return -EOPNOTSUPP;
 
-    vm_event_ring_lock(ved);
+    spin_lock(&ved->lock);
 
     avail_req = vm_event_ring_available(ved);
+
+    rc = -EBUSY;
     if ( avail_req == 0 )
-    {
-        vm_event_ring_unlock(ved);
-        return -EBUSY;
-    }
+        goto out;
 
     if ( !foreign )
         ved->target_producers++;
     else
         ved->foreign_producers++;
 
-    vm_event_ring_unlock(ved);
+    rc = 0;
 
-    return 0;
+ out:
+    spin_unlock(&ved->lock);
+
+    return rc;
 }
 
 /* Simple try_grab wrapper for use in the wait_event() macro. */
