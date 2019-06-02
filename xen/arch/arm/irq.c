@@ -199,6 +199,7 @@ int request_irq(unsigned int irq, unsigned int irqflags,
 void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
+    struct irqaction *action;
 
     perfc_incr(irqs);
 
@@ -242,35 +243,22 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
         goto out_no_end;
     }
 
-    set_bit(_IRQ_PENDING, &desc->status);
-
-    /*
-     * Since we set PENDING, if another processor is handling a different
-     * instance of this same irq, the other processor will take care of it.
-     */
-    if ( test_bit(_IRQ_DISABLED, &desc->status) ||
-         test_bit(_IRQ_INPROGRESS, &desc->status) )
+    if ( test_bit(_IRQ_DISABLED, &desc->status) )
         goto out;
 
     set_bit(_IRQ_INPROGRESS, &desc->status);
 
-    while ( test_bit(_IRQ_PENDING, &desc->status) )
+    action = desc->action;
+
+    spin_unlock_irq(&desc->lock);
+
+    do
     {
-        struct irqaction *action;
+        action->handler(irq, action->dev_id, regs);
+        action = action->next;
+    } while ( action );
 
-        clear_bit(_IRQ_PENDING, &desc->status);
-        action = desc->action;
-
-        spin_unlock_irq(&desc->lock);
-
-        do
-        {
-            action->handler(irq, action->dev_id, regs);
-            action = action->next;
-        } while ( action );
-
-        spin_lock_irq(&desc->lock);
-    }
+    spin_lock_irq(&desc->lock);
 
     clear_bit(_IRQ_INPROGRESS, &desc->status);
 
