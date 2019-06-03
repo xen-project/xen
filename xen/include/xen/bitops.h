@@ -153,41 +153,52 @@ static __inline__ int get_count_order(unsigned int count)
 
 static inline unsigned int generic_hweight32(unsigned int w)
 {
-    unsigned int res = (w & 0x55555555) + ((w >> 1) & 0x55555555);
-    res = (res & 0x33333333) + ((res >> 2) & 0x33333333);
-    res = (res & 0x0F0F0F0F) + ((res >> 4) & 0x0F0F0F0F);
-    res = (res & 0x00FF00FF) + ((res >> 8) & 0x00FF00FF);
-    return (res & 0x0000FFFF) + ((res >> 16) & 0x0000FFFF);
+    w -= (w >> 1) & 0x55555555;
+    w =  (w & 0x33333333) + ((w >> 2) & 0x33333333);
+    w =  (w + (w >> 4)) & 0x0f0f0f0f;
+
+    if ( IS_ENABLED(CONFIG_HAS_FAST_MULTIPLY) )
+        return (w * 0x01010101) >> 24;
+
+    w += w >> 8;
+
+    return (w + (w >> 16)) & 0xff;
 }
 
 static inline unsigned int generic_hweight16(unsigned int w)
 {
-    unsigned int res = (w & 0x5555) + ((w >> 1) & 0x5555);
-    res = (res & 0x3333) + ((res >> 2) & 0x3333);
-    res = (res & 0x0F0F) + ((res >> 4) & 0x0F0F);
-    return (res & 0x00FF) + ((res >> 8) & 0x00FF);
+    w -= ((w >> 1) & 0x5555);
+    w =  (w & 0x3333) + ((w >> 2) & 0x3333);
+    w =  (w + (w >> 4)) & 0x0f0f;
+
+    return (w + (w >> 8)) & 0xff;
 }
 
 static inline unsigned int generic_hweight8(unsigned int w)
 {
-    unsigned int res = (w & 0x55) + ((w >> 1) & 0x55);
-    res = (res & 0x33) + ((res >> 2) & 0x33);
-    return (res & 0x0F) + ((res >> 4) & 0x0F);
+    w -= ((w >> 1) & 0x55);
+    w =  (w & 0x33) + ((w >> 2) & 0x33);
+
+    return (w + (w >> 4)) & 0x0f;
 }
 
-static inline unsigned long generic_hweight64(__u64 w)
+static inline unsigned int generic_hweight64(uint64_t w)
 {
 #if BITS_PER_LONG < 64
     return generic_hweight32((unsigned int)(w >> 32)) +
         generic_hweight32((unsigned int)w);
 #else
-    u64 res;
-    res = (w & 0x5555555555555555ul) + ((w >> 1) & 0x5555555555555555ul);
-    res = (res & 0x3333333333333333ul) + ((res >> 2) & 0x3333333333333333ul);
-    res = (res & 0x0F0F0F0F0F0F0F0Ful) + ((res >> 4) & 0x0F0F0F0F0F0F0F0Ful);
-    res = (res & 0x00FF00FF00FF00FFul) + ((res >> 8) & 0x00FF00FF00FF00FFul);
-    res = (res & 0x0000FFFF0000FFFFul) + ((res >> 16) & 0x0000FFFF0000FFFFul);
-    return (res & 0x00000000FFFFFFFFul) + ((res >> 32) & 0x00000000FFFFFFFFul);
+    w -= (w >> 1) & 0x5555555555555555ul;
+    w =  (w & 0x3333333333333333ul) + ((w >> 2) & 0x3333333333333333ul);
+    w =  (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0ful;
+
+    if ( IS_ENABLED(CONFIG_HAS_FAST_MULTIPLY) )
+        return (w * 0x0101010101010101ul) >> 56;
+
+    w += w >> 8;
+    w += w >> 16;
+
+    return (w + (w >> 32)) & 0xFF;
 #endif
 }
 

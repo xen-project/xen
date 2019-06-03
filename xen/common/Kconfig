@@ -31,6 +31,9 @@ config HAS_DEVICE_TREE
 config HAS_EX_TABLE
 	bool
 
+config HAS_FAST_MULTIPLY
+	bool
+
 config MEM_ACCESS_ALWAYS_ON
 	bool
 
