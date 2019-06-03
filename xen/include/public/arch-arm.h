@@ -413,12 +413,12 @@ typedef uint64_t xen_callback_t;
 #define GUEST_GICV3_GICR0_SIZE     xen_mk_ullong(0x01000000)
 
 /* ACPI tables physical address */
-#define GUEST_ACPI_BASE 0x20000000ULL
-#define GUEST_ACPI_SIZE 0x02000000ULL
+#define GUEST_ACPI_BASE xen_mk_ullong(0x20000000)
+#define GUEST_ACPI_SIZE xen_mk_ullong(0x02000000)
 
 /* PL011 mappings */
-#define GUEST_PL011_BASE    0x22000000ULL
-#define GUEST_PL011_SIZE    0x00001000ULL
+#define GUEST_PL011_BASE    xen_mk_ullong(0x22000000)
+#define GUEST_PL011_SIZE    xen_mk_ullong(0x00001000)
 
 /*
  * 16MB == 4096 pages reserved for guest to use as a region to map its
