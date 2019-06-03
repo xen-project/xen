@@ -1385,12 +1385,13 @@ long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
 
 static void vcpu_periodic_timer_work(struct vcpu *v)
 {
-    s_time_t now = NOW();
+    s_time_t now;
     s_time_t periodic_next_event;
 
     if ( v->periodic_period == 0 )
         return;
 
+    now = NOW();
     periodic_next_event = v->periodic_last_event + v->periodic_period;
 
     if ( now >= periodic_next_event )
