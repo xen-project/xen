@@ -64,6 +64,7 @@
 #define X86_CR4_OSFXSR     0x00000200 /* enable fast FPU save and restore */
 #define X86_CR4_OSXMMEXCPT 0x00000400 /* enable unmasked SSE exceptions */
 #define X86_CR4_UMIP       0x00000800 /* enable UMIP */
+#define X86_CR4_LA57       0x00001000 /* enable 5-level paging */
 #define X86_CR4_VMXE       0x00002000 /* enable VMX */
 #define X86_CR4_SMXE       0x00004000 /* enable SMX */
 #define X86_CR4_FSGSBASE   0x00010000 /* enable {rd,wr}{fs,gs}base */

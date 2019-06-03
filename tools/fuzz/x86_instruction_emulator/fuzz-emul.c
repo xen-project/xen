@@ -662,21 +662,21 @@ static void set_sizes(struct x86_emulate_ctxt *ctxt)
     }
 }
 
-#define CANONICALIZE(x)                                   \
+#define CANONICALIZE(x, bits)                             \
     do {                                                  \
         uint64_t _y = (x);                                \
-        if ( _y & (1ULL << 47) )                          \
-            _y |= (~0ULL) << 48;                          \
+        if ( _y & (1ULL << ((bits) - 1)) )                \
+            _y |= (~0ULL) << (bits);                      \
         else                                              \
-            _y &= (1ULL << 48)-1;                         \
+            _y &= (1ULL << (bits)) - 1;                   \
         printf("Canonicalized %" PRIx64 " to %" PRIx64 "\n", x, _y);    \
         (x) = _y;                                       \
     } while( 0 )
 
-/* Expects bitmap and regs to be defined */
+/* Expects bitmap, regs, and c to be defined */
 #define CANONICALIZE_MAYBE(reg)                       \
     if ( !(bitmap & (1 << CANONICALIZE_##reg)) )      \
-        CANONICALIZE(regs->reg);                      \
+        CANONICALIZE(regs->reg, c->cr[4] & X86_CR4_LA57 ? 57 : 48); \
 
 enum {
     HOOK_read,
