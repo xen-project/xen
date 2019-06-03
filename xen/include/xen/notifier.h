@@ -29,13 +29,12 @@ struct notifier_block {
 };
 
 struct notifier_head {
-    struct notifier_block head;
+    struct list_head head;
 };
 
-#define NOTIFIER_INIT(name) { .head.chain = LIST_HEAD_INIT(name.head.chain) }
-
 #define NOTIFIER_HEAD(name) \
-    struct notifier_head name = NOTIFIER_INIT(name)
+    struct notifier_head name = { .head = LIST_HEAD_INIT(name.head) }
+
 
 void notifier_chain_register(
     struct notifier_head *nh, struct notifier_block *nb);

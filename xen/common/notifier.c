@@ -21,10 +21,10 @@
 void __init notifier_chain_register(
     struct notifier_head *nh, struct notifier_block *n)
 {
-    struct list_head *chain = &nh->head.chain;
+    struct list_head *chain = &nh->head;
     struct notifier_block *nb;
 
-    while ( chain->next != &nh->head.chain )
+    while ( chain->next != &nh->head )
     {
         nb = list_entry(chain->next, struct notifier_block, chain);
         if ( n->priority > nb->priority )
@@ -71,16 +71,16 @@ int notifier_call_chain(
 {
     int ret = NOTIFY_DONE;
     struct list_head *cursor;
-    struct notifier_block *nb;
+    struct notifier_block *nb = NULL;
     bool_t reverse = !!(val & NOTIFY_REVERSE);
 
-    cursor = &(pcursor && *pcursor ? *pcursor : &nh->head)->chain;
+    cursor = pcursor && *pcursor ? &(*pcursor)->chain : &nh->head;
 
     do {
         cursor = reverse ? cursor->prev : cursor->next;
-        nb = list_entry(cursor, struct notifier_block, chain);
-        if ( cursor == &nh->head.chain )
+        if ( cursor == &nh->head )
             break;
+        nb = list_entry(cursor, struct notifier_block, chain);
         ret = nb->notifier_call(nb, val, v);
     } while ( !(ret & NOTIFY_STOP_MASK) );
 
