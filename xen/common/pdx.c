@@ -83,8 +83,10 @@ void __init pfn_pdx_hole_setup(unsigned long mask)
      */
     for ( j = MAX_ORDER-1; ; )
     {
-        i = find_next_zero_bit(&mask, BITS_PER_LONG, j);
-        j = find_next_bit(&mask, BITS_PER_LONG, i);
+        i = find_next_zero_bit(&mask, BITS_PER_LONG, j + 1);
+        if ( i >= BITS_PER_LONG )
+            break;
+        j = find_next_bit(&mask, BITS_PER_LONG, i + 1);
         if ( j >= BITS_PER_LONG )
             break;
         if ( j - i > hole_shift )
