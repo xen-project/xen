@@ -51,16 +51,6 @@ void put_cpu_maps(void)
     spin_unlock_recursive(&cpu_add_remove_lock);
 }
 
-bool_t cpu_hotplug_begin(void)
-{
-    return get_cpu_maps();
-}
-
-void cpu_hotplug_done(void)
-{
-    put_cpu_maps();
-}
-
 static NOTIFIER_HEAD(cpu_chain);
 
 void __init register_cpu_notifier(struct notifier_block *nb)
