@@ -202,9 +202,8 @@ extern void alternative_branches(void);
     rettype ret_;                                                  \
     register unsigned long r10_ asm("r10");                        \
     register unsigned long r11_ asm("r11");                        \
-    asm volatile (__stringify(ALTERNATIVE "call *%c[addr](%%rip)", \
-                                          "call .",                \
-                                          X86_FEATURE_ALWAYS)      \
+    asm volatile (ALTERNATIVE("call *%c[addr](%%rip)", "call .",   \
+                              X86_FEATURE_ALWAYS)                  \
                   : ALT_CALL ## n ## _OUT, "=a" (ret_),            \
                     "=r" (r10_), "=r" (r11_) ASM_CALL_CONSTRAINT   \
                   : [addr] "i" (&(func)), "g" (func)               \
