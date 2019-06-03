@@ -31,7 +31,6 @@
 #include <xen/sched.h>
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
-#include <xen/keyhandler.h>
 #include <xen/trace.h>
 
 /*
@@ -871,7 +870,7 @@ static void null_dump(const struct scheduler *ops)
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 
-const struct scheduler sched_null_def = {
+static const struct scheduler sched_null_def = {
     .name           = "null Scheduler",
     .opt_name       = "null",
     .sched_id       = XEN_SCHEDULER_NULL,
