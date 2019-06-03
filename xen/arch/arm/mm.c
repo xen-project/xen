@@ -889,8 +889,8 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
 /* Map a frame table to cover physical addresses ps through pe */
 void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 {
-    unsigned long nr_pages = (pe - ps) >> PAGE_SHIFT;
-    unsigned long nr_pdxs = pfn_to_pdx(nr_pages);
+    unsigned long nr_pdxs = mfn_to_pdx(mfn_add(maddr_to_mfn(pe), -1)) -
+                            mfn_to_pdx(maddr_to_mfn(ps)) + 1;
     unsigned long frametable_size = nr_pdxs * sizeof(struct page_info);
     mfn_t base_mfn;
     const unsigned long mapping_size = frametable_size < MB(32) ? MB(2) : MB(32);
