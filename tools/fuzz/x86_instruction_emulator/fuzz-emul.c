@@ -76,6 +76,8 @@ static inline bool input_read(struct fuzz_state *s, void *dst, size_t size)
     return true;
 }
 
+static bool check_state(struct x86_emulate_ctxt *ctxt);
+
 static const char* const x86emul_return_string[] = {
     [X86EMUL_OKAY] = "X86EMUL_OKAY",
     [X86EMUL_UNHANDLEABLE] = "X86EMUL_UNHANDLEABLE",
@@ -424,7 +426,18 @@ static int fuzz_write_segment(
     rc = maybe_fail(ctxt, "write_segment", true);
 
     if ( rc == X86EMUL_OKAY )
+    {
+        struct segment_register old = c->segments[seg];
+
         c->segments[seg] = *reg;
+
+        if ( !check_state(ctxt) )
+        {
+            c->segments[seg] = old;
+            x86_emul_hw_exception(13 /* #GP */, 0, ctxt);
+            rc = X86EMUL_EXCEPTION;
+        }
+    }
 
     return rc;
 }
@@ -452,6 +465,7 @@ static int fuzz_write_cr(
 {
     struct fuzz_state *s = ctxt->data;
     struct fuzz_corpus *c = s->corpus;
+    unsigned long old;
     int rc;
 
     if ( reg >= ARRAY_SIZE(c->cr) )
@@ -461,9 +475,17 @@ static int fuzz_write_cr(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
+    old = c->cr[reg];
     c->cr[reg] = val;
 
-    return X86EMUL_OKAY;
+    if ( !check_state(ctxt) )
+    {
+        c->cr[reg] = old;
+        x86_emul_hw_exception(13 /* #GP */, 0, ctxt);
+        rc = X86EMUL_EXCEPTION;
+    }
+
+    return rc;
 }
 
 #define fuzz_read_xcr emul_test_read_xcr
@@ -561,7 +583,16 @@ static int fuzz_write_msr(
     {
         if ( msr_index[idx] == reg )
         {
+            uint64_t old = c->msr[idx];
+
             c->msr[idx] = val;
+
+            if ( !check_state(ctxt) )
+            {
+                c->msr[idx] = old;
+                break;
+            }
+
             return X86EMUL_OKAY;
         }
     }
@@ -809,6 +840,30 @@ static void sanitize_input(struct x86_emulate_ctxt *ctxt)
         c->segments[x86_seg_cs].db = 0;
         c->segments[x86_seg_ss].db = 0;
     }
+}
+
+/*
+ * Call this function from hooks potentially altering machine state into
+ * something that's not architecturally valid, yet which - as per above -
+ * the emulator relies on.
+ */
+static bool check_state(struct x86_emulate_ctxt *ctxt)
+{
+    const struct fuzz_state *s = ctxt->data;
+    const struct fuzz_corpus *c = s->corpus;
+    const struct cpu_user_regs *regs = &c->regs;
+
+    if ( long_mode_active(ctxt) && !(c->cr[0] & X86_CR0_PG) )
+        return false;
+
+    if ( (c->cr[0] & X86_CR0_PG) && !(c->cr[0] & X86_CR0_PE) )
+        return false;
+
+    if ( (regs->rflags & X86_EFLAGS_VM) &&
+         (c->segments[x86_seg_cs].db || c->segments[x86_seg_ss].db) )
+        return false;
+
+    return true;
 }
 
 int LLVMFuzzerInitialize(int *argc, char ***argv)
