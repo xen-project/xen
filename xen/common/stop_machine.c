@@ -69,8 +69,8 @@ static void stopmachine_wait_state(void)
 
 int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 {
-    cpumask_t allbutself;
     unsigned int i, nr_cpus;
+    unsigned int this = smp_processor_id();
     int ret;
 
     BUG_ON(!local_irq_is_enabled());
@@ -79,9 +79,9 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     if ( !get_cpu_maps() )
         return -EBUSY;
 
-    cpumask_andnot(&allbutself, &cpu_online_map,
-                   cpumask_of(smp_processor_id()));
-    nr_cpus = cpumask_weight(&allbutself);
+    nr_cpus = num_online_cpus();
+    if ( cpu_online(this) )
+        nr_cpus--;
 
     /* Must not spin here as the holder will expect us to be descheduled. */
     if ( !spin_trylock(&stopmachine_lock) )
@@ -100,8 +100,9 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
 
     smp_wmb();
 
-    for_each_cpu ( i, &allbutself )
-        tasklet_schedule_on_cpu(&per_cpu(stopmachine_tasklet, i), i);
+    for_each_online_cpu ( i )
+        if ( i != this )
+            tasklet_schedule_on_cpu(&per_cpu(stopmachine_tasklet, i), i);
 
     stopmachine_set_state(STOPMACHINE_PREPARE);
     stopmachine_wait_state();
@@ -112,7 +113,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     spin_debug_disable();
 
     stopmachine_set_state(STOPMACHINE_INVOKE);
-    if ( (cpu == smp_processor_id()) || (cpu == NR_CPUS) )
+    if ( (cpu == this) || (cpu == NR_CPUS) )
     {
         ret = (*fn)(data);
         if ( ret )
