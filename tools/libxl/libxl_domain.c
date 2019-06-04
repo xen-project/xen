@@ -1023,14 +1023,13 @@ static void domain_destroy_domid_cb(libxl__egc *egc,
 void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
 {
     STATE_AO_GC(dis->ao);
-    libxl_ctx *ctx = CTX;
     uint32_t domid = dis->domid;
-    char *dom_path;
     int rc, dm_present;
+    int r;
 
     libxl__ev_child_init(&dis->destroyer);
 
-    rc = libxl_domain_info(ctx, NULL, domid);
+    rc = libxl_domain_info(CTX, NULL, domid);
     switch(rc) {
     case 0:
         break;
@@ -1058,17 +1057,12 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
         abort();
     }
 
-    dom_path = libxl__xs_get_dompath(gc, domid);
-    if (!dom_path) {
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
     if (libxl__device_pci_destroy_all(gc, domid) < 0)
         LOGD(ERROR, domid, "Pci shutdown failed");
-    rc = xc_domain_pause(ctx->xch, domid);
-    if (rc < 0) {
-        LOGEVD(ERROR, rc, domid, "xc_domain_pause failed");
+    r = xc_domain_pause(CTX->xch, domid);
+    if (r < 0) {
+        LOGEVD(ERROR, r, domid, "xc_domain_pause failed");
+        rc = ERROR_FAIL;
     }
 
     if (dm_present) {
