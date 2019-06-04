@@ -439,9 +439,10 @@ int main(int argc, char **argv)
             pop_block();
         }
     } else {
-        stmt("OperationRegion", "SEJ, SystemIO, 0xae08, 0x04");
+        stmt("OperationRegion", "SEJ, SystemIO, 0xae08, 0x08");
         push_block("Field", "SEJ, DWordAcc, NoLock, WriteAsZeros");
         indent(); printf("B0EJ, 32,\n");
+        indent(); printf("B0RM, 32,\n");
         pop_block();
 
         /* hotplug_slot */
@@ -452,6 +453,12 @@ int main(int argc, char **argv)
                     stmt("Store", "%#010x, B0EJ", 1 << slot);
                 } pop_block();
                 stmt("Name", "_SUN, %i", slot);
+                push_block("Method", "_STA, 0"); {
+                    push_block("If", "And(B0RM, ShiftLeft(1, %i))", slot);
+                    stmt("Return", "0xF");
+                    pop_block();
+                    stmt("Return", "0x0");
+                } pop_block();
             } pop_block();
         }
     }
