@@ -184,10 +184,9 @@ static inline unsigned int generic_hweight8(unsigned int w)
 
 static inline unsigned int generic_hweight64(uint64_t w)
 {
-#if BITS_PER_LONG < 64
-    return generic_hweight32((unsigned int)(w >> 32)) +
-        generic_hweight32((unsigned int)w);
-#else
+    if ( BITS_PER_LONG < 64 )
+        return generic_hweight32(w >> 32) + generic_hweight32(w);
+
     w -= (w >> 1) & 0x5555555555555555ul;
     w =  (w & 0x3333333333333333ul) + ((w >> 2) & 0x3333333333333333ul);
     w =  (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0ful;
@@ -199,7 +198,6 @@ static inline unsigned int generic_hweight64(uint64_t w)
     w += w >> 16;
 
     return (w + (w >> 32)) & 0xFF;
-#endif
 }
 
 static inline unsigned long hweight_long(unsigned long w)
