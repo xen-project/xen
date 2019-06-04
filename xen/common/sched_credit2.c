@@ -3814,21 +3814,20 @@ init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
         activate_runqueue(prv, spc->runq_id);
     }
 
-    __cpumask_set_cpu(cpu, &rqd->idle);
-    __cpumask_set_cpu(cpu, &rqd->active);
-    __cpumask_set_cpu(cpu, &prv->initialized);
-    __cpumask_set_cpu(cpu, &rqd->smt_idle);
+    __cpumask_set_cpu(cpu, &spc->sibling_mask);
 
-    /* On the boot cpu we are called before cpu_sibling_mask has been set up. */
-    if ( cpu == 0 && system_state < SYS_STATE_active )
-        __cpumask_set_cpu(cpu, &csched2_pcpu(cpu)->sibling_mask);
-    else
+    if ( cpumask_weight(&rqd->active) > 0 )
         for_each_cpu ( rcpu, per_cpu(cpu_sibling_mask, cpu) )
             if ( cpumask_test_cpu(rcpu, &rqd->active) )
             {
                 __cpumask_set_cpu(cpu, &csched2_pcpu(rcpu)->sibling_mask);
-                __cpumask_set_cpu(rcpu, &csched2_pcpu(cpu)->sibling_mask);
+                __cpumask_set_cpu(rcpu, &spc->sibling_mask);
             }
+
+    __cpumask_set_cpu(cpu, &rqd->idle);
+    __cpumask_set_cpu(cpu, &rqd->active);
+    __cpumask_set_cpu(cpu, &prv->initialized);
+    __cpumask_set_cpu(cpu, &rqd->smt_idle);
 
     if ( cpumask_weight(&rqd->active) == 1 )
         rqd->pick_bias = cpu;
@@ -3938,12 +3937,12 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     printk(XENLOG_INFO "Removing cpu %d from runqueue %d\n", cpu, spc->runq_id);
 
-    for_each_cpu ( rcpu, &rqd->active )
-        __cpumask_clear_cpu(cpu, &csched2_pcpu(rcpu)->sibling_mask);
-
     __cpumask_clear_cpu(cpu, &rqd->idle);
     __cpumask_clear_cpu(cpu, &rqd->smt_idle);
     __cpumask_clear_cpu(cpu, &rqd->active);
+
+    for_each_cpu ( rcpu, &rqd->active )
+        __cpumask_clear_cpu(cpu, &csched2_pcpu(rcpu)->sibling_mask);
 
     if ( cpumask_empty(&rqd->active) )
     {
