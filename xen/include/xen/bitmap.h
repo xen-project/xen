@@ -126,6 +126,8 @@ static inline void bitmap_fill(unsigned long *dst, int nbits)
 	size_t nlongs = BITS_TO_LONGS(nbits);
 
 	switch (nlongs) {
+	case 0:
+		break;
 	default:
 		memset(dst, -1, (nlongs - 1) * sizeof(unsigned long));
 		/* fall through */
