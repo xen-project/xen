@@ -22,6 +22,7 @@
 
 #include "../../../include/xen/stdbool.h"
 
+#define __maybe_unused	__attribute__((__unused__))
 #define __packed	__attribute__((__packed__))
 #define __stdcall	__attribute__((__stdcall__))
 
