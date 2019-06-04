@@ -40,10 +40,12 @@ typedef struct __packed {
     u8 opt_edd;
     u8 opt_edid;
     u8 padding;
+#ifdef CONFIG_VIDEO
     u16 boot_vid_mode;
     u16 vesa_width;
     u16 vesa_height;
     u16 vesa_depth;
+#endif
 } early_boot_opts_t;
 
 /*
@@ -127,7 +129,8 @@ static size_t strcspn(const char *s, const char *reject)
     return count;
 }
 
-static unsigned int strtoui(const char *s, const char *stop, const char **next)
+static unsigned int __maybe_unused strtoui(
+    const char *s, const char *stop, const char **next)
 {
     char base = 10, l;
     unsigned long long res = 0;
@@ -176,7 +179,7 @@ static int strmaxcmp(const char *cs, const char *ct, const char *_delim_chars)
     return strncmp(cs, ct, max(strcspn(cs, _delim_chars), strlen(ct)));
 }
 
-static int strsubcmp(const char *cs, const char *ct)
+static int __maybe_unused strsubcmp(const char *cs, const char *ct)
 {
     return strncmp(cs, ct, strlen(ct));
 }
@@ -241,6 +244,7 @@ static u8 edid_parse(const char *cmdline)
     return !strmaxcmp(c, "no", delim_chars);
 }
 
+#ifdef CONFIG_VIDEO
 static u16 rows2vmode(unsigned int rows)
 {
     switch ( rows )
@@ -328,6 +332,7 @@ static void vga_parse(const char *cmdline, early_boot_opts_t *ebo)
         ebo->boot_vid_mode = tmp;
     }
 }
+#endif
 
 void __stdcall cmdline_parse_early(const char *cmdline, early_boot_opts_t *ebo)
 {
@@ -338,6 +343,7 @@ void __stdcall cmdline_parse_early(const char *cmdline, early_boot_opts_t *ebo)
     ebo->opt_edd = edd_parse(cmdline);
     ebo->opt_edid = edid_parse(cmdline);
 
-    if ( IS_ENABLED(CONFIG_VIDEO) )
-        vga_parse(cmdline, ebo);
+#ifdef CONFIG_VIDEO
+    vga_parse(cmdline, ebo);
+#endif
 }
