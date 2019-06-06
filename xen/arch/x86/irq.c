@@ -1109,9 +1109,8 @@ static void irq_guest_eoi_timer_fn(void *data)
     unsigned int irq = desc - irq_desc;
     irq_guest_action_t *action;
     cpumask_t cpu_eoi_map;
-    unsigned long flags;
 
-    spin_lock_irqsave(&desc->lock, flags);
+    spin_lock_irq(&desc->lock);
     
     if ( !(desc->status & IRQ_GUEST) )
         goto out;
@@ -1143,12 +1142,11 @@ static void irq_guest_eoi_timer_fn(void *data)
         cpumask_copy(&cpu_eoi_map, action->cpu_eoi_map);
         spin_unlock_irq(&desc->lock);
         on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
-        spin_lock_irq(&desc->lock);
-        break;
+        return;
     }
 
  out:
-    spin_unlock_irqrestore(&desc->lock, flags);
+    spin_unlock_irq(&desc->lock);
 }
 
 static void __do_IRQ_guest(int irq)
