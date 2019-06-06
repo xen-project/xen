@@ -160,9 +160,6 @@ l1_pgentry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
 
 paddr_t __read_mostly mem_hotplug;
 
-/* Private domain structs for DOMID_XEN and DOMID_IO. */
-struct domain *dom_xen, *dom_io, *dom_cow;
-
 /* Frame table size in pages. */
 unsigned long max_page;
 unsigned long total_pages;
@@ -281,31 +278,6 @@ void __init arch_init_memory(void)
     base_disallow_mask =
         ~(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_ACCESSED |
           _PAGE_DIRTY | _PAGE_AVAIL | _PAGE_AVAIL_HIGH | _PAGE_NX);
-
-    /*
-     * Initialise our DOMID_XEN domain.
-     * Any Xen-heap pages that we will allow to be mapped will have
-     * their domain field set to dom_xen.
-     * Hidden PCI devices will also be associated with this domain
-     * (but be [partly] controlled by Dom0 nevertheless).
-     */
-    dom_xen = domain_create(DOMID_XEN, NULL, false);
-    BUG_ON(IS_ERR(dom_xen));
-
-    /*
-     * Initialise our DOMID_IO domain.
-     * This domain owns I/O pages that are within the range of the page_info
-     * array. Mappings occur at the priv of the caller.
-     */
-    dom_io = domain_create(DOMID_IO, NULL, false);
-    BUG_ON(IS_ERR(dom_io));
-
-    /*
-     * Initialise our COW domain.
-     * This domain owns sharable pages.
-     */
-    dom_cow = domain_create(DOMID_COW, NULL, false);
-    BUG_ON(IS_ERR(dom_cow));
 
     /*
      * First 1MB of RAM is historically marked as I/O.

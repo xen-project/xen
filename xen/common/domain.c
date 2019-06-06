@@ -71,6 +71,11 @@ domid_t hardware_domid __read_mostly;
 integer_param("hardware_dom", hardware_domid);
 #endif
 
+/* Private domain structs for DOMID_XEN, DOMID_IO, etc. */
+struct domain *__read_mostly dom_xen;
+struct domain *__read_mostly dom_io;
+struct domain *__read_mostly dom_cow;
+
 struct vcpu *idle_vcpu[NR_CPUS] __read_mostly;
 
 vcpu_info_t dummy_vcpu_info;
@@ -520,6 +525,36 @@ struct domain *domain_create(domid_t domid,
     return ERR_PTR(err);
 }
 
+void __init setup_system_domains(void)
+{
+    /*
+     * Initialise our DOMID_XEN domain.
+     * Any Xen-heap pages that we will allow to be mapped will have
+     * their domain field set to dom_xen.
+     * Hidden PCI devices will also be associated with this domain
+     * (but be [partly] controlled by Dom0 nevertheless).
+     */
+    dom_xen = domain_create(DOMID_XEN, NULL, false);
+    if ( IS_ERR(dom_xen) )
+        panic("Failed to create d[XEN]: %ld\n", PTR_ERR(dom_xen));
+
+    /*
+     * Initialise our DOMID_IO domain.
+     * This domain owns I/O pages that are within the range of the page_info
+     * array. Mappings occur at the priv of the caller.
+     */
+    dom_io = domain_create(DOMID_IO, NULL, false);
+    if ( IS_ERR(dom_io) )
+        panic("Failed to create d[IO]: %ld\n", PTR_ERR(dom_io));
+
+    /*
+     * Initialise our COW domain.
+     * This domain owns sharable pages.
+     */
+    dom_cow = domain_create(DOMID_COW, NULL, false);
+    if ( IS_ERR(dom_cow) )
+        panic("Failed to create d[COW]: %ld\n", PTR_ERR(dom_cow));
+}
 
 void domain_update_node_affinity(struct domain *d)
 {

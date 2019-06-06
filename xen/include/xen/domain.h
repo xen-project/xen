@@ -22,6 +22,8 @@ struct vcpu *alloc_dom0_vcpu0(struct domain *dom0);
 int vcpu_reset(struct vcpu *);
 int vcpu_up(struct vcpu *v);
 
+void setup_system_domains(void);
+
 struct xen_domctl_getdomaininfo;
 void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
 void arch_get_domain_info(const struct domain *d,

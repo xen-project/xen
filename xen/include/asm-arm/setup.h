@@ -77,8 +77,6 @@ extern struct bootinfo bootinfo;
 
 extern domid_t max_init_domid;
 
-void arch_init_memory(void);
-
 void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
 
 size_t estimate_efi_size(int mem_nr_banks);

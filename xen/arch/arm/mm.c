@@ -42,8 +42,6 @@
 #include <xen/libfdt/libfdt.h>
 #include <asm/setup.h>
 
-struct domain *dom_xen, *dom_io, *dom_cow;
-
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef virt_to_mfn
 #define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
@@ -511,32 +509,6 @@ void flush_page_to_ram(unsigned long mfn, bool sync_icache)
      */
     if ( sync_icache )
         invalidate_icache();
-}
-
-void __init arch_init_memory(void)
-{
-    /*
-     * Initialise our DOMID_XEN domain.
-     * Any Xen-heap pages that we will allow to be mapped will have
-     * their domain field set to dom_xen.
-     */
-    dom_xen = domain_create(DOMID_XEN, NULL, false);
-    BUG_ON(IS_ERR(dom_xen));
-
-    /*
-     * Initialise our DOMID_IO domain.
-     * This domain owns I/O pages that are within the range of the page_info
-     * array. Mappings occur at the priv of the caller.
-     */
-    dom_io = domain_create(DOMID_IO, NULL, false);
-    BUG_ON(IS_ERR(dom_io));
-
-    /*
-     * Initialise our COW domain.
-     * This domain owns sharable pages.
-     */
-    dom_cow = domain_create(DOMID_COW, NULL, false);
-    BUG_ON(IS_ERR(dom_cow));
 }
 
 static inline lpae_t pte_of_xenaddr(vaddr_t va)

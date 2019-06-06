@@ -273,6 +273,9 @@ struct npfec {
 #define MAX_ORDER 20 /* 2^20 contiguous pages */
 #endif
 
+/* Private domain structs for DOMID_XEN, DOMID_IO, etc. */
+extern struct domain *dom_xen, *dom_io, *dom_cow;
+
 #define page_list_entry list_head
 
 #include <asm/mm.h>

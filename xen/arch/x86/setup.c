@@ -1533,6 +1533,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
                                   RANGESETF_prettyprint_hex);
 
+    setup_system_domains();
+
     acpi_boot_init();
 
     if ( smp_found_config )

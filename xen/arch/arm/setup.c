@@ -846,7 +846,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     rcu_init();
 
-    arch_init_memory();
+    setup_system_domains();
 
     local_irq_enable();
     local_abort_enable();
