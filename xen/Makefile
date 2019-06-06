@@ -264,7 +264,7 @@ $(foreach base,arch/x86/mm/guest_walk_% \
 
 kconfig := silentoldconfig oldconfig config menuconfig defconfig \
 	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig \
-	randconfig
+	randconfig $(notdir $(wildcard arch/$(SRCARCH)/configs/*_defconfig))
 .PHONY: $(kconfig)
 $(kconfig):
 	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)" $@

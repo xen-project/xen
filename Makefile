@@ -54,6 +54,10 @@ build: $(TARGS_BUILD)
 build-xen:
 	$(MAKE) -C xen build
 
+.PHONY: %_defconfig
+%_defconfig:
+	$(MAKE) -C xen $@
+
 .PHONY: build-tools
 build-tools: build-tools-public-headers
 	$(MAKE) -C tools build
