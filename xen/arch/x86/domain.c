@@ -496,7 +496,6 @@ int arch_domain_create(struct domain *d,
     uint32_t emflags;
     int rc;
 
-    INIT_LIST_HEAD(&d->arch.pdev_list);
     INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
 
     spin_lock_init(&d->arch.e820_lock);

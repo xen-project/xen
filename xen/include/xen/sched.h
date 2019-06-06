@@ -369,6 +369,10 @@ struct domain
 
     int64_t          time_offset_seconds;
 
+#ifdef CONFIG_HAS_PCI
+    struct list_head pdev_list;
+#endif
+
 #ifdef CONFIG_HAS_PASSTHROUGH
     struct domain_iommu iommu;
 #endif

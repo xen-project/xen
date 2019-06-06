@@ -389,6 +389,10 @@ struct domain *domain_create(domid_t domid,
 
     rwlock_init(&d->vnuma_rwlock);
 
+#ifdef CONFIG_HAS_PCI
+    INIT_LIST_HEAD(&d->pdev_list);
+#endif
+
     err = -ENOMEM;
     if ( !zalloc_cpumask_var(&d->dirty_cpumask) )
         goto fail;

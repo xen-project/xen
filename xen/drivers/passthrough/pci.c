@@ -467,7 +467,7 @@ static void _pci_hide_device(struct pci_dev *pdev)
     if ( pdev->domain )
         return;
     pdev->domain = dom_xen;
-    list_add(&pdev->domain_list, &dom_xen->arch.pdev_list);
+    list_add(&pdev->domain_list, &dom_xen->pdev_list);
 }
 
 int __init pci_hide_device(unsigned int seg, unsigned int bus,
@@ -803,7 +803,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
             goto out;
         }
 
-        list_add(&pdev->domain_list, &hardware_domain->arch.pdev_list);
+        list_add(&pdev->domain_list, &hardware_domain->pdev_list);
     }
     else
         iommu_enable_device(pdev);
@@ -1153,7 +1153,7 @@ static int __hwdom_init _setup_hwdom_pci_devices(struct pci_seg *pseg, void *arg
             if ( !pdev->domain )
             {
                 pdev->domain = ctxt->d;
-                list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
+                list_add(&pdev->domain_list, &ctxt->d->pdev_list);
                 setup_one_hwdom_device(ctxt, pdev);
             }
             else if ( pdev->domain == dom_xen )

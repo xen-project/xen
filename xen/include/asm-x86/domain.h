@@ -298,8 +298,6 @@ struct arch_domain
 
     bool_t s3_integrity;
 
-    struct list_head pdev_list;
-
     union {
         struct pv_domain pv;
         struct hvm_domain hvm;
@@ -475,8 +473,6 @@ struct arch_domain
 #define has_vpit(d)        (!!((d)->arch.emulation_flags & X86_EMU_PIT))
 #define has_pirq(d)        (!!((d)->arch.emulation_flags & X86_EMU_USE_PIRQ))
 #define has_vpci(d)        (!!((d)->arch.emulation_flags & X86_EMU_VPCI))
-
-#define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 
 #define gdt_ldt_pt_idx(v) \
       ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))

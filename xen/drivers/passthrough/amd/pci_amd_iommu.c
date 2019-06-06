@@ -315,7 +315,7 @@ static int reassign_device(struct domain *source, struct domain *target,
 
     if ( devfn == pdev->devfn )
     {
-        list_move(&pdev->domain_list, &target->arch.pdev_list);
+        list_move(&pdev->domain_list, &target->pdev_list);
         pdev->domain = target;
     }
 

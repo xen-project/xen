@@ -291,7 +291,6 @@ void __init arch_init_memory(void)
      */
     dom_xen = domain_create(DOMID_XEN, NULL, false);
     BUG_ON(IS_ERR(dom_xen));
-    INIT_LIST_HEAD(&dom_xen->arch.pdev_list);
 
     /*
      * Initialise our DOMID_IO domain.

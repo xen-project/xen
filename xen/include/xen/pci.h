@@ -121,7 +121,9 @@ struct pci_dev {
 };
 
 #define for_each_pdev(domain, pdev) \
-    list_for_each_entry(pdev, &(domain->arch.pdev_list), domain_list)
+    list_for_each_entry(pdev, &(domain)->pdev_list, domain_list)
+
+#define has_arch_pdevs(d) (!list_empty(&(d)->pdev_list))
 
 /*
  * The pcidevs_lock protect alldevs_list, and the assignment for the 

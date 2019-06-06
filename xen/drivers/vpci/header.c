@@ -267,7 +267,7 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
      * Check for overlaps with other BARs. Note that only BARs that are
      * currently mapped (enabled) are checked for overlaps.
      */
-    list_for_each_entry(tmp, &pdev->domain->arch.pdev_list, domain_list)
+    for_each_pdev ( pdev->domain, tmp )
     {
         if ( tmp == pdev )
         {

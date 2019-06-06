@@ -282,7 +282,7 @@ void vpci_dump_msi(void)
 
         printk("vPCI MSI/MSI-X d%d\n", d->domain_id);
 
-        list_for_each_entry ( pdev, &d->arch.pdev_list, domain_list )
+        for_each_pdev ( d, pdev )
         {
             const struct vpci_msi *msi;
             const struct vpci_msix *msix;
