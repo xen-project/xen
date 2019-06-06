@@ -75,6 +75,19 @@ bool timer_expires_before(struct timer *timer, s_time_t t);
 
 #define timer_is_expired(t) timer_expires_before(t, NOW())
 
+/*
+ * True if a timer is active.
+ *
+ * Unlike for timer_expires_before(), it is the caller's responsibility to
+ * use suitable locking such that the returned value isn't stale by the time
+ * it gets acted upon.
+ */
+static inline bool timer_is_active(const struct timer *timer)
+{
+    ASSERT(timer->status <= TIMER_STATUS_in_list);
+    return timer->status >= TIMER_STATUS_in_heap;
+}
+
 /* Migrate a timer to a different CPU. The timer may be currently active. */
 void migrate_timer(struct timer *timer, unsigned int new_cpu);
 

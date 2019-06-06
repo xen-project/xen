@@ -1117,6 +1117,13 @@ static void irq_guest_eoi_timer_fn(void *data)
 
     action = (irq_guest_action_t *)desc->action;
 
+    /*
+     * Is another instance of this timer already running? Skip everything
+     * to avoid forcing an EOI early.
+     */
+    if ( timer_is_active(&action->eoi_timer) )
+        goto out;
+
     if ( action->ack_type != ACKTYPE_NONE )
     {
         unsigned int i;
@@ -1168,6 +1175,13 @@ static void __do_IRQ_guest(int irq)
         return;
     }
 
+    /*
+     * Stop the timer as soon as we're certain we'll set it again further down,
+     * to prevent the current timeout (if any) to needlessly expire.
+     */
+    if ( action->ack_type != ACKTYPE_NONE )
+        stop_timer(&action->eoi_timer);
+
     if ( action->ack_type == ACKTYPE_EOI )
     {
         sp = pending_eoi_sp(peoi);
@@ -1195,7 +1209,6 @@ static void __do_IRQ_guest(int irq)
 
     if ( action->ack_type != ACKTYPE_NONE )
     {
-        stop_timer(&action->eoi_timer);
         migrate_timer(&action->eoi_timer, smp_processor_id());
         set_timer(&action->eoi_timer, NOW() + MILLISECS(1));
     }
@@ -1457,6 +1470,8 @@ void desc_guest_eoi(struct irq_desc *desc, struct pirq *pirq)
         spin_unlock_irq(&desc->lock);
         return;
     }
+
+    stop_timer(&action->eoi_timer);
 
     if ( action->ack_type == ACKTYPE_UNMASK )
     {
