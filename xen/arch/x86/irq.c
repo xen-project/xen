@@ -1106,7 +1106,7 @@ static void set_eoi_ready(void *data);
 static void irq_guest_eoi_timer_fn(void *data)
 {
     struct irq_desc *desc = data;
-    unsigned int irq = desc - irq_desc;
+    unsigned int i, irq = desc - irq_desc;
     irq_guest_action_t *action;
     cpumask_t cpu_eoi_map;
 
@@ -1117,6 +1117,8 @@ static void irq_guest_eoi_timer_fn(void *data)
 
     action = (irq_guest_action_t *)desc->action;
 
+    ASSERT(action->ack_type != ACKTYPE_NONE);
+
     /*
      * Is no IRQ in flight at all, or another instance of this timer already
      * running? Skip everything to avoid forcing an EOI early.
@@ -1124,16 +1126,13 @@ static void irq_guest_eoi_timer_fn(void *data)
     if ( !action->in_flight || timer_is_active(&action->eoi_timer) )
         goto out;
 
-    if ( action->ack_type != ACKTYPE_NONE )
+    for ( i = 0; i < action->nr_guests; i++ )
     {
-        unsigned int i;
-        for ( i = 0; i < action->nr_guests; i++ )
-        {
-            struct domain *d = action->guest[i];
-            unsigned int pirq = domain_irq_to_pirq(d, irq);
-            if ( test_and_clear_bool(pirq_info(d, pirq)->masked) )
-                action->in_flight--;
-        }
+        struct domain *d = action->guest[i];
+        unsigned int pirq = domain_irq_to_pirq(d, irq);
+
+        if ( test_and_clear_bool(pirq_info(d, pirq)->masked) )
+            action->in_flight--;
     }
 
     if ( action->in_flight )
