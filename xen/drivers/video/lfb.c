@@ -10,12 +10,6 @@
 #include "lfb.h"
 #include "font.h"
 
-#define MAX_XRES 1900
-#define MAX_YRES 1200
-#define MAX_BPP 4
-#define MAX_FONT_W 8
-#define MAX_FONT_H 16
-
 struct lfb_status {
     struct lfb_prop lfbp;
 
@@ -149,13 +143,6 @@ void lfb_carriage_return(void)
 
 int __init lfb_init(struct lfb_prop *lfbp)
 {
-    if ( lfbp->width > MAX_XRES || lfbp->height > MAX_YRES )
-    {
-        printk(XENLOG_WARNING "Couldn't initialize a %ux%u framebuffer early.\n",
-               lfbp->width, lfbp->height);
-        return -EINVAL;
-    }
-
     lfb.lfbp = *lfbp;
 
     lfb.lbuf = xmalloc_bytes(lfb.lfbp.bytes_per_line);
