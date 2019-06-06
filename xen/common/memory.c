@@ -541,6 +541,9 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         goto fail_early;
     }
 
+    if ( exch.nr_exchanged == exch.in.nr_extents )
+        return 0;
+
     if ( !guest_handle_subrange_okay(exch.in.extent_start, exch.nr_exchanged,
                                      exch.in.nr_extents - 1) )
     {
@@ -866,8 +869,11 @@ static int xenmem_add_to_physmap_batch(struct domain *d,
                                        struct xen_add_to_physmap_batch *xatpb,
                                        unsigned int extent)
 {
-    if ( xatpb->size < extent )
+    if ( unlikely(xatpb->size < extent) )
         return -EILSEQ;
+
+    if ( unlikely(xatpb->size == extent) )
+        return extent ? -EILSEQ : 0;
 
     if ( !guest_handle_subrange_okay(xatpb->idxs, extent, xatpb->size - 1) ||
          !guest_handle_subrange_okay(xatpb->gpfns, extent, xatpb->size - 1) ||
