@@ -6130,6 +6130,8 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f, 0xef): /* vpxor {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xf4):     /* pmuludq xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0xf4): /* vpmuludq {x,y}mm/mem,{x,y}mm,{x,y}mm */
+    CASE_SIMD_PACKED_INT(0x0f, 0xf5):    /* pmaddwd {,x}mm/mem,{,x}mm */
+    case X86EMUL_OPC_VEX_66(0x0f, 0xf5): /* vpmaddwd {x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_66(0x0f, 0xf6):     /* psadbw xmm/m128,xmm */
     case X86EMUL_OPC_VEX_66(0x0f, 0xf6): /* vpsadbw {x,y}mm/mem,{x,y}mm,{x,y}mm */
     CASE_SIMD_PACKED_INT(0x0f, 0xf8):    /* psubb {,x}mm/mem,{,x}mm */
