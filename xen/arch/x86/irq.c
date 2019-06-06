@@ -1118,10 +1118,10 @@ static void irq_guest_eoi_timer_fn(void *data)
     action = (irq_guest_action_t *)desc->action;
 
     /*
-     * Is another instance of this timer already running? Skip everything
-     * to avoid forcing an EOI early.
+     * Is no IRQ in flight at all, or another instance of this timer already
+     * running? Skip everything to avoid forcing an EOI early.
      */
-    if ( timer_is_active(&action->eoi_timer) )
+    if ( !action->in_flight || timer_is_active(&action->eoi_timer) )
         goto out;
 
     if ( action->ack_type != ACKTYPE_NONE )
@@ -1136,8 +1136,13 @@ static void irq_guest_eoi_timer_fn(void *data)
         }
     }
 
-    if ( action->in_flight != 0 )
-        goto out;
+    if ( action->in_flight )
+    {
+        printk(XENLOG_G_WARNING
+               "IRQ%u: %d/%d handler(s) still in flight at forced EOI\n",
+               irq, action->in_flight, action->nr_guests);
+        ASSERT_UNREACHABLE();
+    }
 
     switch ( action->ack_type )
     {
