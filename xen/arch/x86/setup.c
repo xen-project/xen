@@ -1533,6 +1533,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
                                   RANGESETF_prettyprint_hex);
 
+    xsm_multiboot_init(module_map, mbi);
+
     setup_system_domains();
 
     acpi_boot_init();
@@ -1582,8 +1584,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     console_init_irq();
 
     init_IRQ();
-
-    xsm_multiboot_init(module_map, mbi);
 
     microcode_grab_module(module_map, mbi);
 
