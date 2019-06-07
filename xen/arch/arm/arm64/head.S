@@ -71,7 +71,7 @@
  *  x23 - UART address
  *  x24 -
  *  x25 - identity map in place
- *  x26 - skip_zero_bss
+ *  x26 - skip_zero_bss (boot cpu only)
  *  x27 -
  *  x28 -
  *  x29 -
@@ -313,8 +313,6 @@ GLOBAL(init_secondary)
         sub   x20, x19, x0           /* x20 := phys-offset */
 
         mov   x22, #1                /* x22 := is_secondary_cpu */
-        /* Boot CPU already zero BSS so skip it on secondary CPUs. */
-        mov   x26, #1                /* X26 := skip_zero_bss */
 
         mrs   x0, mpidr_el1
         ldr   x13, =(~MPIDR_HWID_MASK)
@@ -337,7 +335,6 @@ GLOBAL(init_secondary)
         PRINT(" booting -\r\n")
 #endif
         bl    check_cpu_mode
-        bl    zero_bss
         bl    cpu_init
         bl    create_page_tables
         bl    enable_mmu
@@ -375,6 +372,15 @@ check_cpu_mode:
         b fail
 ENDPROC(check_cpu_mode)
 
+/*
+ * Zero BSS
+ *
+ * Inputs:
+ *   x20: Physical offset
+ *   x26: Do we need to zero BSS?
+ *
+ * Clobbers x0 - x3
+ */
 zero_bss:
         /* Zero BSS only when requested */
         cbnz  x26, skip_bss
