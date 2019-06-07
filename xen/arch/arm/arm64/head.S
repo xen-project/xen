@@ -397,19 +397,26 @@ skip_bss:
         ret
 ENDPROC(zero_bss)
 
+/*
+ * Initialize the processor for turning the MMU on.
+ *
+ * Clobbers x0 - x3
+ */
 cpu_init:
-        PRINT("- Setting up control registers -\r\n")
+        PRINT("- Initialize CPU -\r\n")
 
         /* Set up memory attribute type tables */
         ldr   x0, =MAIRVAL
         msr   mair_el2, x0
 
-        /* Set up TCR_EL2:
+        /*
+         * Set up TCR_EL2:
          * PS -- Based on ID_AA64MMFR0_EL1.PARange
          * Top byte is used
          * PT walks use Inner-Shareable accesses,
          * PT walks are write-back, write-allocate in both cache levels,
-         * 48-bit virtual address space goes through this table. */
+         * 48-bit virtual address space goes through this table.
+         */
         ldr   x0, =(TCR_RES1|TCR_SH0_IS|TCR_ORGN0_WBWA|TCR_IRGN0_WBWA|TCR_T0SZ(64-48))
         /* ID_AA64MMFR0_EL1[3:0] (PARange) corresponds to TCR_EL2[18:16] (PS) */
         mrs   x1, ID_AA64MMFR0_EL1
@@ -420,9 +427,11 @@ cpu_init:
         ldr   x0, =SCTLR_EL2_SET
         msr   SCTLR_EL2, x0
 
-        /* Ensure that any exceptions encountered at EL2
+        /*
+         * Ensure that any exceptions encountered at EL2
          * are handled using the EL2 stack pointer, rather
-         * than SP_EL0. */
+         * than SP_EL0.
+         */
         msr spsel, #1
         ret
 ENDPROC(cpu_init)
