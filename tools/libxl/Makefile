@@ -35,6 +35,9 @@ ifeq ($(CONFIG_LIBNL),y)
 CFLAGS_LIBXL += $(LIBNL3_CFLAGS)
 endif
 CFLAGS_LIBXL += -Wshadow
+ifeq ($(debug),y)
+CFLAGS_LIBXL += -DCONFIG_DEBUG
+endif
 
 LIBXL_LIBS-$(CONFIG_ARM) += -lfdt
 

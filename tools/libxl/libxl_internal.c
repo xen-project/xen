@@ -620,6 +620,25 @@ static void ev_lock_prepare_fork(libxl__egc *egc, libxl__ev_devlock *lock)
     }
     fd = lock->fd;
 
+    /* Enable this optimisation only in releases, so the fork code is
+     * exercised while libxl is built with debug=y. */
+#ifndef CONFIG_DEBUG
+    /*
+     * We try to grab the lock before forking as it is likely to be free.
+     * Even though we are supposed to CTX_UNLOCK before attempting to grab
+     * the ev_lock, it is fine to do a non-blocking request now with the
+     * CTX_LOCK held as if that fails we'll try again in a fork (CTX_UNLOCK
+     * will be called in libxl), that will avoid deadlocks.
+     */
+    int r = flock(fd, LOCK_EX | LOCK_NB);
+    if (!r) {
+        libxl_fd_set_cloexec(CTX, fd, 1);
+        /* We held a lock, no need to fork but we need to check it. */
+        ev_lock_child_callback(egc, &lock->child, 0, 0);
+        return;
+    }
+#endif
+
     pid = libxl__ev_child_fork(gc, &lock->child, ev_lock_child_callback);
     if (pid < 0)
         goto out;
