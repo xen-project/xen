@@ -70,7 +70,7 @@
  *  x22 - is_secondary_cpu
  *  x23 - UART address
  *  x24 -
- *  x25 - identity map in place
+ *  x25 -
  *  x26 - skip_zero_bss (boot cpu only)
  *  x27 -
  *  x28 -
@@ -436,16 +436,27 @@ cpu_init:
         ret
 ENDPROC(cpu_init)
 
+/*
+ * Rebuild the boot pagetable's first-level entries. The structure
+ * is described in mm.c.
+ *
+ * After the CPU enables paging it will add the fixmap mapping
+ * to these page tables, however this may clash with the 1:1
+ * mapping. So each CPU must rebuild the page tables here with
+ * the 1:1 in place.
+ *
+ * Inputs:
+ *   x19: paddr(start)
+ *   x20: phys offset
+ *
+ * Clobbers x0 - x4, x25
+ *
+ * Register usage within this function:
+ *   x25: Identity map in place
+ */
 create_page_tables:
-        /* Rebuild the boot pagetable's first-level entries. The structure
-         * is described in mm.c.
-         *
-         * After the CPU enables paging it will add the fixmap mapping
-         * to these page tables, however this may clash with the 1:1
-         * mapping. So each CPU must rebuild the page tables here with
-         * the 1:1 in place. */
-
-        /* If Xen is loaded at exactly XEN_VIRT_START then we don't
+        /*
+         * If Xen is loaded at exactly XEN_VIRT_START then we don't
          * need an additional 1:1 mapping, the virtual mapping will
          * suffice.
          */
@@ -469,7 +480,8 @@ create_page_tables:
         cbz   x1, 1f                 /* It's in slot 0, map in boot_first
                                       * or boot_second later on */
 
-        /* Level zero does not support superpage mappings, so we have
+        /*
+         * Level zero does not support superpage mappings, so we have
          * to use an extra first level page in which we create a 1GB mapping.
          */
         load_paddr x2, boot_first_id
