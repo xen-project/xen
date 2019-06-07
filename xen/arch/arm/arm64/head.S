@@ -290,7 +290,19 @@ real_start_efi:
 
         mov   x22, #0                /* x22 := is_secondary_cpu */
 
-        b     common_start
+        bl    check_cpu_mode
+        bl    zero_bss
+        bl    cpu_init
+        bl    create_page_tables
+        bl    enable_mmu
+
+        /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
+        ldr   x0, =primary_switched
+        br    x0
+primary_switched:
+        bl    setup_fixmap
+        b     launch
+ENDPROC(real_start)
 
 GLOBAL(init_secondary)
         msr   DAIFSet, 0xf           /* Disable all interrupts */
@@ -324,9 +336,21 @@ GLOBAL(init_secondary)
         print_reg x24
         PRINT(" booting -\r\n")
 #endif
+        bl    check_cpu_mode
+        bl    zero_bss
+        bl    cpu_init
+        bl    create_page_tables
+        bl    enable_mmu
 
-common_start:
+        /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
+        ldr   x0, =secondary_switched
+        br    x0
+secondary_switched:
+        bl    setup_fixmap
+        b     launch
+ENDPROC(init_secondary)
 
+check_cpu_mode:
         PRINT("- Current EL ")
         mrs   x5, CurrentEL
         print_reg x5
@@ -343,7 +367,10 @@ common_start:
         b fail
 
 el2:    PRINT("- Xen starting at EL2 -\r\n")
+        ret
+ENDPROC(check_cpu_mode)
 
+zero_bss:
         /* Zero BSS only when requested */
         cbnz  x26, skip_bss
 
@@ -356,6 +383,10 @@ el2:    PRINT("- Xen starting at EL2 -\r\n")
         b.lo  1b
 
 skip_bss:
+        ret
+ENDPROC(zero_bss)
+
+cpu_init:
         PRINT("- Setting up control registers -\r\n")
 
         /* Set up memory attribute type tables */
@@ -382,7 +413,10 @@ skip_bss:
          * are handled using the EL2 stack pointer, rather
          * than SP_EL0. */
         msr spsel, #1
+        ret
+ENDPROC(cpu_init)
 
+create_page_tables:
         /* Rebuild the boot pagetable's first-level entries. The structure
          * is described in mm.c.
          *
@@ -507,6 +541,10 @@ virtphys_clash:
         b     fail
 
 1:
+        ret
+ENDPROC(create_page_tables)
+
+enable_mmu:
         PRINT("- Turning on paging -\r\n")
 
         /*
@@ -516,16 +554,16 @@ virtphys_clash:
         tlbi  alle2                  /* Flush hypervisor TLBs */
         dsb   nsh
 
-        ldr   x1, =paging            /* Explicit vaddr, not RIP-relative */
         mrs   x0, SCTLR_EL2
         orr   x0, x0, #SCTLR_Axx_ELx_M  /* Enable MMU */
         orr   x0, x0, #SCTLR_Axx_ELx_C  /* Enable D-cache */
         dsb   sy                     /* Flush PTE writes and finish reads */
         msr   SCTLR_EL2, x0          /* now paging is enabled */
         isb                          /* Now, flush the icache */
-        br    x1                     /* Get a proper vaddr into PC */
-paging:
+        ret
+ENDPROC(enable_mmu)
 
+setup_fixmap:
         /* Now we can install the fixmap and dtb mappings, since we
          * don't need the 1:1 map any more */
         dsb   sy
@@ -567,11 +605,14 @@ paging:
         tlbi  alle2
         dsb   sy                     /* Ensure completion of TLB flush */
         isb
+        ret
+ENDPROC(setup_fixmap)
 
+launch:
         PRINT("- Ready -\r\n")
 
         /* The boot CPU should go straight into C now */
-        cbz   x22, launch
+        cbz   x22, 1f
 
         /* Non-boot CPUs need to move on to the proper pagetables, which were
          * setup in init_secondary_pagetables. */
@@ -586,7 +627,7 @@ paging:
         dsb   sy                     /* Ensure completion of TLB flush */
         isb
 
-launch:
+1:
         ldr   x0, =init_data
         add   x0, x0, #INITINFO_stack /* Find the boot-time stack */
         ldr   x0, [x0]
@@ -601,6 +642,7 @@ launch:
         b     start_xen              /* and disappear into the land of C */
 1:
         b     start_secondary        /* (to the appropriate entry point) */
+ENDPROC(launch)
 
 /* Fail-stop */
 fail:   PRINT("- Boot failed -\r\n")
