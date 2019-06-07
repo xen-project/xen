@@ -576,6 +576,13 @@ virtphys_clash:
         ret
 ENDPROC(create_page_tables)
 
+/*
+ * Turn on the Data Cache and the MMU. The function will return on the 1:1
+ * mapping. In other word, the caller is responsible to switch to the runtime
+ * mapping.
+ *
+ * Clobbers x0 - x3
+ */
 enable_mmu:
         PRINT("- Turning on paging -\r\n")
 
