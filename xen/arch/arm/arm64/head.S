@@ -350,6 +350,13 @@ secondary_switched:
         b     launch
 ENDPROC(init_secondary)
 
+/*
+ * Check if the CPU has been booted in Hypervisor mode.
+ * This function will never return when the CPU is booted in another mode
+ * than Hypervisor mode.
+ *
+ * Clobbers x0 - x5
+ */
 check_cpu_mode:
         PRINT("- Current EL ")
         mrs   x5, CurrentEL
@@ -359,15 +366,13 @@ check_cpu_mode:
         /* Are we in EL2 */
         cmp   x5, #PSR_MODE_EL2t
         ccmp  x5, #PSR_MODE_EL2h, #0x4, ne
-        b.eq  el2 /* Yes */
-
+        b.ne  1f /* No */
+        ret
+1:
         /* OK, we're boned. */
         PRINT("- Xen must be entered in NS EL2 mode -\r\n")
         PRINT("- Please update the bootloader -\r\n")
         b fail
-
-el2:    PRINT("- Xen starting at EL2 -\r\n")
-        ret
 ENDPROC(check_cpu_mode)
 
 zero_bss:
