@@ -301,6 +301,10 @@ real_start_efi:
         br    x0
 primary_switched:
         bl    setup_fixmap
+#ifdef CONFIG_EARLY_PRINTK
+        /* Use a virtual address to access the UART. */
+        ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
+#endif
         b     launch
 ENDPROC(real_start)
 
@@ -343,8 +347,6 @@ GLOBAL(init_secondary)
         ldr   x0, =secondary_switched
         br    x0
 secondary_switched:
-        bl    setup_fixmap
-
         /*
          * Non-boot CPUs need to move on to the proper pagetables, which were
          * setup in init_secondary_pagetables.
@@ -361,6 +363,10 @@ secondary_switched:
         dsb   sy                     /* Ensure completion of TLB flush */
         isb
 
+#ifdef CONFIG_EARLY_PRINTK
+        /* Use a virtual address to access the UART. */
+        ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
+#endif
         b     launch
 ENDPROC(init_secondary)
 
@@ -624,10 +630,6 @@ setup_fixmap:
          * don't need the 1:1 map any more */
         dsb   sy
 #if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
-        /* Non-boot CPUs don't need to rebuild the fixmap itself, just
-         * the mapping from boot_second to xen_fixmap */
-        cbnz  x22, 1f
-
         /* Add UART to the fixmap table */
         ldr   x1, =xen_fixmap        /* x1 := vaddr (xen_fixmap) */
         lsr   x2, x23, #THIRD_SHIFT
@@ -635,7 +637,6 @@ setup_fixmap:
         mov   x3, #PT_DEV_L3
         orr   x2, x2, x3             /* x2 := 4K dev map including UART */
         str   x2, [x1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
-1:
 
         /* Map fixmap into boot_second */
         ldr   x4, =boot_second       /* x4 := vaddr (boot_second) */
@@ -645,9 +646,6 @@ setup_fixmap:
         ldr   x1, =FIXMAP_ADDR(0)
         lsr   x1, x1, #(SECOND_SHIFT - 3)   /* x1 := Slot for FIXMAP(0) */
         str   x2, [x4, x1]           /* Map it in the fixmap's slot */
-
-        /* Use a virtual address to access the UART. */
-        ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
 
         /*
