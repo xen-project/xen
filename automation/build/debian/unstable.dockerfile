@@ -42,6 +42,19 @@ RUN apt-get update && \
         wget \
         git \
         nasm \
+        gnupg \
+        && \
+        apt-get autoremove -y && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
+
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|apt-key add -
+COPY unstable-llvm-8.list /etc/apt/sources.list.d/
+
+RUN apt-get update && \
+    apt-get --quiet --yes install \
+        clang-8 \
+        lld-8 \
         && \
         apt-get autoremove -y && \
         apt-get clean && \

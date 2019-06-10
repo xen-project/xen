@@ -26,6 +26,13 @@
     CXX: clang++
     clang: y
 
+.clang-8-tmpl:
+  variables: &clang-8
+    CC: clang-8
+    CXX: clang++-8
+    LD: ld.lld-8
+    clang: y
+
 .x86-64-build-tmpl:
   <<: *build
   variables:
@@ -89,6 +96,16 @@
   extends: .x86-64-build-debug
   variables:
     <<: *clang
+
+.clang-8-x86-64-build:
+  extends: .x86-64-build
+  variables:
+    <<: *clang-8
+
+.clang-8-x86-64-build-debug:
+  extends: .x86-64-build-debug
+  variables:
+    <<: *clang-8
 
 .clang-x86-32-build:
   extends: .x86-32-build
@@ -219,6 +236,16 @@ debian-stretch-clang-debug:
   variables:
     CONTAINER: debian:stretch
 
+debian-stretch-clang-8:
+  extends: .clang-8-x86-64-build
+  variables:
+    CONTAINER: debian:stretch
+
+debian-stretch-clang-8-debug:
+  extends: .clang-8-x86-64-build-debug
+  variables:
+    CONTAINER: debian:stretch
+
 debian-stretch-gcc:
   extends: .gcc-x86-64-build
   variables:
@@ -256,6 +283,16 @@ debian-unstable-clang:
 
 debian-unstable-clang-debug:
   extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-clang-8:
+  extends: .clang-8-x86-64-build
+  variables:
+    CONTAINER: debian:unstable
+
+debian-unstable-clang-8-debug:
+  extends: .clang-8-x86-64-build-debug
   variables:
     CONTAINER: debian:unstable
 

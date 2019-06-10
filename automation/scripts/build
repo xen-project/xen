@@ -19,7 +19,7 @@ fi
 cfgargs=()
 cfgargs+=("--enable-docs")
 
-if [[ "${CC}" == "clang" ]]; then
+if [[ "${CC}" == "clang"* ]]; then
     # SeaBIOS cannot be built with clang
     cfgargs+=("--with-system-seabios=/usr/share/seabios/bios.bin")
     # iPXE cannot be built with clang
