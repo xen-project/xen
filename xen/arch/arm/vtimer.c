@@ -136,7 +136,7 @@ void vcpu_timer_destroy(struct vcpu *v)
     kill_timer(&v->arch.phys_timer.timer);
 }
 
-int virt_timer_save(struct vcpu *v)
+void virt_timer_save(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
 
@@ -149,10 +149,9 @@ int virt_timer_save(struct vcpu *v)
         set_timer(&v->arch.virt_timer.timer, ticks_to_ns(v->arch.virt_timer.cval +
                   v->domain->arch.virt_timer_base.offset - boot_count));
     }
-    return 0;
 }
 
-int virt_timer_restore(struct vcpu *v)
+void virt_timer_restore(struct vcpu *v)
 {
     ASSERT(!is_idle_vcpu(v));
 
@@ -163,7 +162,6 @@ int virt_timer_restore(struct vcpu *v)
     WRITE_SYSREG64(v->domain->arch.virt_timer_base.offset, CNTVOFF_EL2);
     WRITE_SYSREG64(v->arch.virt_timer.cval, CNTV_CVAL_EL0);
     WRITE_SYSREG32(v->arch.virt_timer.ctl, CNTV_CTL_EL0);
-    return 0;
 }
 
 static bool vtimer_cntp_ctl(struct cpu_user_regs *regs, uint32_t *r, bool read)
