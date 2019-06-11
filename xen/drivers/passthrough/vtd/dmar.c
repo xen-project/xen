@@ -1047,7 +1047,7 @@ int intel_iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
 
         rc = func(PFN_DOWN(rmrr->base_address),
                   PFN_UP(rmrr->end_address) - PFN_DOWN(rmrr->base_address),
-                  PCI_SBDF2(rmrr->segment, bdf), ctxt);
+                  PCI_SBDF2(rmrr->segment, bdf).sbdf, ctxt);
 
         if ( unlikely(rc < 0) )
             return rc;
