@@ -174,6 +174,11 @@ static inline bool _to_bool(byte_vec_t bv)
     asm ( op : [out] "=&x" (r_) : [in] "m" (x) ); \
     (vec_t){ r_[0] }; \
 })
+# define scalar_2op(x, y, op) ({ \
+    typeof((x)[0]) __attribute__((vector_size(16))) r_ = { x[0] }; \
+    asm ( op : [out] "=&x" (r_) : [in1] "[out]" (r_), [in2] "m" (y) ); \
+    (vec_t){ r_[0] }; \
+})
 #endif
 
 #if VEC_SIZE == 16 && FLOAT_SIZE == 4 && defined(__SSE__)
@@ -210,6 +215,8 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 })
 #elif defined(FLOAT_SIZE) && VEC_SIZE == FLOAT_SIZE && defined(__AVX512F__)
 # if FLOAT_SIZE == 4
+#  define getexp(x) scalar_1op(x, "vgetexpss %[in], %[out], %[out]")
+#  define getmant(x) scalar_1op(x, "vgetmantss $0, %[in], %[out], %[out]")
 #  ifdef __AVX512ER__
 #   define recip(x) scalar_1op(x, "vrcp28ss %[in], %[out], %[out]")
 #   define rsqrt(x) scalar_1op(x, "vrsqrt28ss %[in], %[out], %[out]")
@@ -217,9 +224,12 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define recip(x) scalar_1op(x, "vrcp14ss %[in], %[out], %[out]")
 #   define rsqrt(x) scalar_1op(x, "vrsqrt14ss %[in], %[out], %[out]")
 #  endif
+#  define scale(x, y) scalar_2op(x, y, "vscalefss %[in2], %[in1], %[out]")
 #  define sqrt(x) scalar_1op(x, "vsqrtss %[in], %[out], %[out]")
 #  define trunc(x) scalar_1op(x, "vrndscaless $0b1011, %[in], %[out], %[out]")
 # elif FLOAT_SIZE == 8
+#  define getexp(x) scalar_1op(x, "vgetexpsd %[in], %[out], %[out]")
+#  define getmant(x) scalar_1op(x, "vgetmantsd $0, %[in], %[out], %[out]")
 #  ifdef __AVX512ER__
 #   define recip(x) scalar_1op(x, "vrcp28sd %[in], %[out], %[out]")
 #   define rsqrt(x) scalar_1op(x, "vrsqrt28sd %[in], %[out], %[out]")
@@ -227,6 +237,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define recip(x) scalar_1op(x, "vrcp14sd %[in], %[out], %[out]")
 #   define rsqrt(x) scalar_1op(x, "vrsqrt14sd %[in], %[out], %[out]")
 #  endif
+#  define scale(x, y) scalar_2op(x, y, "vscalefsd %[in2], %[in1], %[out]")
 #  define sqrt(x) scalar_1op(x, "vsqrtsd %[in], %[out], %[out]")
 #  define trunc(x) scalar_1op(x, "vrndscalesd $0b1011, %[in], %[out], %[out]")
 # endif
@@ -274,9 +285,12 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define broadcast_octet(x) B(broadcastf32x8_, _mask, x, undef(), ~0)
 #   define insert_octet(x, y, p) B(insertf32x8_, _mask, x, y, p, undef(), ~0)
 #  endif
+#  define getexp(x) BR(getexpps, _mask, x, undef(), ~0)
+#  define getmant(x) BR(getmantps, _mask, x, 0, undef(), ~0)
 #  define max(x, y) BR_(maxps, _mask, x, y, undef(), ~0)
 #  define min(x, y) BR_(minps, _mask, x, y, undef(), ~0)
 #  define mix(x, y) B(movaps, _mask, x, y, (0b0101010101010101 & ALL_TRUE))
+#  define scale(x, y) BR(scalefps, _mask, x, y, undef(), ~0)
 #  if VEC_SIZE == 64 && defined(__AVX512ER__)
 #   define recip(x) BR(rcp28ps, _mask, x, undef(), ~0)
 #   define rsqrt(x) BR(rsqrt28ps, _mask, x, undef(), ~0)
@@ -336,9 +350,12 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define broadcast_quartet(x) B(broadcastf64x4_, , x, undef(), ~0)
 #   define insert_quartet(x, y, p) B(insertf64x4_, _mask, x, y, p, undef(), ~0)
 #  endif
+#  define getexp(x) BR(getexppd, _mask, x, undef(), ~0)
+#  define getmant(x) BR(getmantpd, _mask, x, 0, undef(), ~0)
 #  define max(x, y) BR_(maxpd, _mask, x, y, undef(), ~0)
 #  define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
 #  define mix(x, y) B(movapd, _mask, x, y, 0b01010101)
+#  define scale(x, y) BR(scalefpd, _mask, x, y, undef(), ~0)
 #  if VEC_SIZE == 64 && defined(__AVX512ER__)
 #   define recip(x) BR(rcp28pd, _mask, x, undef(), ~0)
 #   define rsqrt(x) BR(rsqrt28pd, _mask, x, undef(), ~0)
@@ -1763,6 +1780,28 @@ int simd_test(void)
     for ( i = ELEM_COUNT; i >>= 1; )
         x = hadd(x, (vec_t){});
     if ( !eq(x, (vec_t){}) ) return __LINE__;
+# endif
+#endif
+
+#if defined(getexp) && defined(getmant)
+    touch(src);
+    x = getmant(src);
+    touch(src);
+    y = getexp(src);
+    touch(src);
+    for ( j = i = 0; i < ELEM_COUNT; ++i )
+    {
+        if ( y[i] != j ) return __LINE__;
+
+        if ( !((i + 1) & (i + 2)) )
+            ++j;
+
+        if ( !(i & (i + 1)) && x[i] != 1 ) return __LINE__;
+    }
+# ifdef scale
+    touch(y);
+    z = scale(x, y);
+    if ( !eq(src, z) ) return __LINE__;
 # endif
 #endif
 

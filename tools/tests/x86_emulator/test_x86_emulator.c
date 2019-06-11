@@ -3924,6 +3924,44 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    printf("%-40s", "Testing vfixupimmpd $0,8(%edx){1to8},%zmm3,%zmm4...");
+    if ( stack_exec && cpu_has_avx512f )
+    {
+        decl_insn(vfixupimmpd);
+        static const struct {
+            double d[4];
+        }
+        src = { { -1, 0, 1, 2 } },
+        dst = { { 3, 4, 5, 6 } },
+        out = { { .5, -1, 90, 2 } };
+
+        asm volatile ( "vbroadcastf64x4 %1, %%zmm3\n\t"
+                       "vbroadcastf64x4 %2, %%zmm4\n"
+                       put_insn(vfixupimmpd,
+                                "vfixupimmpd $0, 8(%0)%{1to8%}, %%zmm3, %%zmm4")
+                       :: "d" (NULL), "m" (src), "m" (dst) );
+
+        set_insn(vfixupimmpd);
+        /*
+         * Nibble (token) mapping (unused ones simply set to zero):
+         * 2 (ZERO)    ->  -1 (0x9)
+         * 3 (POS_ONE) ->  90 (0xc)
+         * 6 (NEG)     -> 1/2 (0xb)
+         * 7 (POS)     -> src (0x1)
+         */
+        res[2] = 0x1b00c900;
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        asm volatile ( "vmovupd %%zmm4, %0" : "=m" (res[0]) );
+        if ( rc != X86EMUL_OKAY || !check_eip(vfixupimmpd) ||
+             memcmp(res + 0, &out, sizeof(out)) ||
+             memcmp(res + 8, &out, sizeof(out)) )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
 #undef decl_insn
 #undef put_insn
 #undef set_insn
