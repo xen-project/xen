@@ -1104,6 +1104,9 @@ static void destroy_finish_check(libxl__egc *egc,
 }
 
 /* Callbacks for libxl__destroy_domid */
+static void destroy_domid_pci_done(libxl__egc *egc,
+                                   libxl__multidev *multidev,
+                                   int rc);
 static void dm_destroy_cb(libxl__egc *egc,
                           libxl__destroy_devicemodel_state *ddms,
                           int rc);
@@ -1120,8 +1123,7 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
 {
     STATE_AO_GC(dis->ao);
     uint32_t domid = dis->domid;
-    int rc, dm_present;
-    int r;
+    int rc;
 
     libxl__ev_child_init(&dis->destroyer);
 
@@ -1133,6 +1135,41 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
         LOGD(ERROR, domid, "Non-existant domain");
     default:
         goto out;
+    }
+
+    libxl__multidev_begin(ao, &dis->multidev);
+    dis->multidev.callback = destroy_domid_pci_done;
+    libxl__device_pci_destroy_all(egc, domid, &dis->multidev);
+    libxl__multidev_prepared(egc, &dis->multidev, 0);
+    return;
+
+out:
+    assert(rc);
+    dis->callback(egc, dis, rc);
+}
+
+static void destroy_domid_pci_done(libxl__egc *egc,
+                                   libxl__multidev *multidev,
+                                   int rc)
+{
+    STATE_AO_GC(multidev->ao);
+    libxl__destroy_domid_state *dis =
+        CONTAINER_OF(multidev, *dis, multidev);
+    int dm_present;
+    int r;
+
+    /* Convenience aliases */
+    libxl_domid domid = dis->domid;
+
+    if (rc) {
+        LOGD(ERROR, domid, "Pci shutdown failed");
+        goto out;
+    }
+
+    r = xc_domain_pause(CTX->xch, domid);
+    if (r < 0) {
+        LOGEVD(ERROR, r, domid, "xc_domain_pause failed");
+        rc = ERROR_FAIL;
     }
 
     switch (libxl__domain_type(gc, domid)) {
@@ -1151,14 +1188,6 @@ void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
         goto out;
     default:
         abort();
-    }
-
-    if (libxl__device_pci_destroy_all(gc, domid) < 0)
-        LOGD(ERROR, domid, "Pci shutdown failed");
-    r = xc_domain_pause(CTX->xch, domid);
-    if (r < 0) {
-        LOGEVD(ERROR, r, domid, "xc_domain_pause failed");
-        rc = ERROR_FAIL;
     }
 
     if (dm_present) {

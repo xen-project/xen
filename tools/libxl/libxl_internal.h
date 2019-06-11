@@ -199,6 +199,7 @@ typedef struct libxl__carefd libxl__carefd;
 typedef struct libxl__ev_devlock libxl__ev_devlock;
 typedef struct libxl__dm_resume_state libxl__dm_resume_state;
 typedef struct libxl__ao_device libxl__ao_device;
+typedef struct libxl__multidev libxl__multidev;
 
 typedef struct libxl__domain_create_state libxl__domain_create_state;
 typedef void libxl__domain_create_cb(struct libxl__egc *egc,
@@ -1597,7 +1598,8 @@ _hidden int libxl__pci_topology_init(libxl__gc *gc,
 _hidden void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
                                    libxl_device_pci *pcidev, bool starting,
                                    libxl__ao_device *aodev);
-_hidden int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid);
+_hidden void libxl__device_pci_destroy_all(libxl__egc *egc, uint32_t domid,
+                                           libxl__multidev *);
 _hidden bool libxl__is_igd_vga_passthru(libxl__gc *gc,
                                         const libxl_domain_config *d_config);
 
@@ -2573,7 +2575,6 @@ _hidden void libxl__kill(libxl__gc *gc, pid_t pid, int sig, const char *what);
 
 /*----- device addition/removal -----*/
 
-typedef struct libxl__multidev libxl__multidev;
 typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
 
 /* This functions sets the necessary libxl__ao_device struct values to use
@@ -3924,6 +3925,7 @@ struct libxl__destroy_domid_state {
     libxl__destroy_devicemodel_state ddms;
     libxl__ev_child destroyer;
     bool soft_reset;
+    libxl__multidev multidev;
 };
 
 struct libxl__domain_destroy_state {
