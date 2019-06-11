@@ -212,7 +212,7 @@ static uint32_t vpci_read_hw(pci_sbdf_t sbdf, unsigned int reg,
     switch ( size )
     {
     case 4:
-        data = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg);
+        data = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg);
         break;
 
     case 3:
@@ -222,26 +222,26 @@ static uint32_t vpci_read_hw(pci_sbdf_t sbdf, unsigned int reg,
          */
         if ( reg & 1 )
         {
-            data = pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func,
+            data = pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
                                   reg);
-            data |= pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func,
+            data |= pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
                                     reg + 1) << 8;
         }
         else
         {
-            data = pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func,
+            data = pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
                                    reg);
-            data |= pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func,
+            data |= pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
                                    reg + 2) << 16;
         }
         break;
 
     case 2:
-        data = pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg);
+        data = pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg);
         break;
 
     case 1:
-        data = pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg);
+        data = pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg);
         break;
 
     default:
@@ -259,7 +259,7 @@ static void vpci_write_hw(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
     switch ( size )
     {
     case 4:
-        pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg, data);
+        pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg, data);
         break;
 
     case 3:
@@ -269,26 +269,26 @@ static void vpci_write_hw(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
          */
         if ( reg & 1 )
         {
-            pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg,
+            pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg,
                             data);
-            pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg + 1,
+            pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg + 1,
                              data >> 8);
         }
         else
         {
-            pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg,
+            pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg,
                              data);
-            pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg + 2,
+            pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg + 2,
                             data >> 16);
         }
         break;
 
     case 2:
-        pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg, data);
+        pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg, data);
         break;
 
     case 1:
-        pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.func, reg, data);
+        pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg, data);
         break;
 
     default:

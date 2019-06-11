@@ -46,7 +46,7 @@ typedef union {
             struct {
                 union {
                     struct {
-                        uint8_t func : 3,
+                        uint8_t fn   : 3,
                                 dev  : 5;
                     };
                     uint8_t     extfunc;
