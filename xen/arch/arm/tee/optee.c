@@ -25,8 +25,13 @@
  */
 
 #include <xen/device_tree.h>
+#include <xen/domain_page.h>
+#include <xen/err.h>
+#include <xen/guest_access.h>
+#include <xen/mm.h>
 #include <xen/sched.h>
 
+#include <asm/event.h>
 #include <asm/smccc.h>
 #include <asm/tee/tee.h>
 #include <asm/tee/optee_msg.h>
@@ -34,6 +39,19 @@
 
 /* Number of SMCs known to the mediator */
 #define OPTEE_MEDIATOR_SMC_COUNT   11
+
+/*
+ * "The return code is an error that originated within the underlying
+ * communications stack linking the rich OS with the TEE" as described
+ * in GP TEE Client API Specification.
+ */
+#define TEEC_ORIGIN_COMMS 0x00000002
+
+/*
+ * "Input parameters were invalid" as described
+ * in GP TEE Client API Specification.
+ */
+#define TEEC_ERROR_BAD_PARAMETERS 0xFFFF0006
 
 /* Client ID 0 is reserved for the hypervisor itself */
 #define OPTEE_CLIENT_ID(domain) ((domain)->domain_id + 1)
@@ -43,8 +61,31 @@
                               OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM | \
                               OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
 
+static unsigned int __read_mostly max_optee_threads;
+
+/*
+ * Call context. OP-TEE can issue multiple RPC returns during one call.
+ * We need to preserve context during them.
+ */
+struct optee_std_call {
+    struct list_head list;
+    /* Page where shadowed copy of call arguments is stored */
+    struct page_info *xen_arg_pg;
+    /* Above page mapped into XEN */
+    struct optee_msg_arg *xen_arg;
+    /* Address of original call arguments */
+    paddr_t guest_arg_ipa;
+    int optee_thread_id;
+    int rpc_op;
+    bool in_flight;
+    register_t rpc_params[2];
+};
+
 /* Domain context */
 struct optee_domain {
+    struct list_head call_list;
+    atomic_t call_count;
+    spinlock_t lock;
 };
 
 static bool optee_probe(void)
@@ -65,6 +106,23 @@ static bool optee_probe(void)
          (uint32_t)resp.a2 != OPTEE_MSG_UID_2 ||
          (uint32_t)resp.a3 != OPTEE_MSG_UID_3 )
         return false;
+
+    /* Read number of threads */
+    arm_smccc_smc(OPTEE_SMC_GET_THREAD_COUNT, &resp);
+    if ( resp.a0 == OPTEE_SMC_RETURN_OK )
+    {
+        max_optee_threads = resp.a1;
+        printk(XENLOG_INFO
+               "OP-TEE supports %u simultaneous threads per guest.\n",
+               max_optee_threads);
+    }
+    else
+    {
+        printk(XENLOG_ERR
+               "Can't read number of threads supported by OP-TEE: %x\n",
+               (uint32_t)resp.a0);
+        return false;
+    }
 
     return true;
 }
@@ -99,17 +157,162 @@ static int optee_domain_init(struct domain *d)
         return -ENODEV;
     }
 
+    INIT_LIST_HEAD(&ctx->call_list);
+    atomic_set(&ctx->call_count, 0);
+    spin_lock_init(&ctx->lock);
+
     d->arch.tee = ctx;
 
     return 0;
 }
 
+static uint64_t regpair_to_uint64(register_t reg0, register_t reg1)
+{
+    return ((uint64_t)reg0 << 32) | (uint32_t)reg1;
+}
+
+static void uint64_to_regpair(register_t *reg0, register_t *reg1, uint64_t val)
+{
+    *reg0 = val >> 32;
+    *reg1 = (uint32_t)val;
+}
+
+static struct page_info *get_domain_ram_page(gfn_t gfn)
+{
+    struct page_info *page;
+    p2m_type_t t;
+
+    page = get_page_from_gfn(current->domain, gfn_x(gfn), &t, P2M_ALLOC);
+    if ( !page || t != p2m_ram_rw )
+    {
+        if ( page )
+            put_page(page);
+
+        return NULL;
+    }
+
+    return page;
+}
+
+static struct optee_std_call *allocate_std_call(struct optee_domain *ctx)
+{
+    struct optee_std_call *call;
+    int count;
+
+    /* Make sure that guest does not execute more than max_optee_threads */
+    count = atomic_add_unless(&ctx->call_count, 1, max_optee_threads);
+    if ( count == max_optee_threads )
+        return ERR_PTR(-ENOSPC);
+
+    call = xzalloc(struct optee_std_call);
+    if ( !call )
+    {
+        atomic_dec(&ctx->call_count);
+        return ERR_PTR(-ENOMEM);
+    }
+
+    call->optee_thread_id = -1;
+    call->in_flight = true;
+
+    spin_lock(&ctx->lock);
+    list_add_tail(&call->list, &ctx->call_list);
+    spin_unlock(&ctx->lock);
+
+    return call;
+}
+
+static void free_std_call(struct optee_domain *ctx,
+                          struct optee_std_call *call)
+{
+    atomic_dec(&ctx->call_count);
+
+    spin_lock(&ctx->lock);
+    list_del(&call->list);
+    spin_unlock(&ctx->lock);
+
+    ASSERT(!call->in_flight);
+    ASSERT(!call->xen_arg);
+
+    if ( call->xen_arg_pg )
+        free_domheap_page(call->xen_arg_pg);
+
+    xfree(call);
+}
+
+static void map_xen_arg(struct optee_std_call *call)
+{
+    ASSERT(!call->xen_arg);
+
+    call->xen_arg = __map_domain_page(call->xen_arg_pg);
+}
+
+static void unmap_xen_arg(struct optee_std_call *call)
+{
+    if ( !call->xen_arg )
+        return;
+
+    unmap_domain_page(call->xen_arg);
+    call->xen_arg = NULL;
+}
+
+static struct optee_std_call *get_std_call(struct optee_domain *ctx,
+                                           int thread_id)
+{
+    struct optee_std_call *call;
+
+    spin_lock(&ctx->lock);
+    list_for_each_entry( call, &ctx->call_list, list )
+    {
+        if ( call->optee_thread_id == thread_id )
+        {
+            if ( call->in_flight )
+            {
+                gdprintk(XENLOG_WARNING,
+                         "Guest tries to execute call which is already in flight.\n");
+                goto out;
+            }
+            call->in_flight = true;
+            spin_unlock(&ctx->lock);
+            map_xen_arg(call);
+
+            return call;
+        }
+    }
+
+out:
+    spin_unlock(&ctx->lock);
+
+    return NULL;
+}
+
+static void put_std_call(struct optee_domain *ctx, struct optee_std_call *call)
+{
+    ASSERT(call->in_flight);
+    unmap_xen_arg(call);
+    spin_lock(&ctx->lock);
+    call->in_flight = false;
+    spin_unlock(&ctx->lock);
+}
+
 static int optee_relinquish_resources(struct domain *d)
 {
     struct arm_smccc_res resp;
+    struct optee_std_call *call, *call_tmp;
+    struct optee_domain *ctx = d->arch.tee;
 
-    if ( !d->arch.tee )
+    if ( !ctx )
         return 0;
+
+    /*
+     * We need to free up to max_optee_threads calls. Usually, this is
+     * no more than 8-16 calls. But it depends on OP-TEE configuration
+     * (CFG_NUM_THREADS option).
+     */
+    list_for_each_entry_safe( call, call_tmp, &ctx->call_list, list )
+        free_std_call(ctx, call);
+
+    if ( hypercall_preempt_check() )
+        return -ERESTART;
 
     /*
      * Inform OP-TEE that domain is shutting down. This is
@@ -123,9 +326,306 @@ static int optee_relinquish_resources(struct domain *d)
     arm_smccc_smc(OPTEE_SMC_VM_DESTROYED, OPTEE_CLIENT_ID(d), 0, 0, 0, 0, 0, 0,
                   &resp);
 
+    ASSERT(!spin_is_locked(&ctx->lock));
+    ASSERT(!atomic_read(&ctx->call_count));
+
     XFREE(d->arch.tee);
 
     return 0;
+}
+
+/*
+ * Copy command buffer into domheap memory to:
+ * 1) Hide translated addresses from guest
+ * 2) Make sure that guest wouldn't change data in command buffer during call
+ */
+static bool copy_std_request(struct cpu_user_regs *regs,
+                             struct optee_std_call *call)
+{
+    call->guest_arg_ipa = regpair_to_uint64(get_user_reg(regs, 1),
+                                            get_user_reg(regs, 2));
+
+    /*
+     * Command buffer should start at page boundary.
+     * This is OP-TEE ABI requirement.
+     */
+    if ( call->guest_arg_ipa & (OPTEE_MSG_NONCONTIG_PAGE_SIZE - 1) )
+    {
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_EBADADDR);
+        return false;
+    }
+
+    BUILD_BUG_ON(OPTEE_MSG_NONCONTIG_PAGE_SIZE > PAGE_SIZE);
+
+    call->xen_arg_pg = alloc_domheap_page(current->domain, 0);
+    if ( !call->xen_arg_pg )
+    {
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_ENOMEM);
+        return false;
+    }
+
+    map_xen_arg(call);
+
+    if ( access_guest_memory_by_ipa(current->domain, call->guest_arg_ipa,
+                                    call->xen_arg,
+                                    OPTEE_MSG_NONCONTIG_PAGE_SIZE, false) )
+    {
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_EBADADDR);
+        return false;
+    }
+
+    return true;
+}
+
+/*
+ * Copy result of completed request back to guest's buffer.
+ * We are copying only values that subjected to change to minimize
+ * possible information leak.
+ *
+ * Because there can be multiple RPCs during standard call, and guest
+ * is not obligated to return from RPC immediately, there can be
+ * arbitrary time span between calling copy_std_request() and
+ * copy_std_request(). So we need to validate guest's command buffer
+ * again.
+ */
+static void copy_std_request_back(struct optee_domain *ctx,
+                                  struct cpu_user_regs *regs,
+                                  struct optee_std_call *call)
+{
+    struct optee_msg_arg *guest_arg;
+    struct page_info *page;
+    unsigned int i;
+    uint32_t attr;
+
+    page = get_domain_ram_page(gaddr_to_gfn(call->guest_arg_ipa));
+    if ( !page )
+    {
+        /*
+         * Guest did something to own command buffer during the call.
+         * Now we even can't write error code to the command
+         * buffer. Let's try to return generic error via
+         * register. Problem is that OP-TEE does not know that guest
+         * didn't received valid response. But at least guest will
+         * know that something bad happened.
+         */
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_EBADADDR);
+
+        return;
+    }
+
+    guest_arg = __map_domain_page(page);
+
+    guest_arg->ret = call->xen_arg->ret;
+    guest_arg->ret_origin = call->xen_arg->ret_origin;
+    guest_arg->session = call->xen_arg->session;
+
+    for ( i = 0; i < call->xen_arg->num_params; i++ )
+    {
+        attr = call->xen_arg->params[i].attr;
+
+        switch ( attr & OPTEE_MSG_ATTR_TYPE_MASK )
+        {
+        case OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT:
+        case OPTEE_MSG_ATTR_TYPE_TMEM_INOUT:
+            guest_arg->params[i].u.tmem.size =
+                call->xen_arg->params[i].u.tmem.size;
+            continue;
+        case OPTEE_MSG_ATTR_TYPE_RMEM_OUTPUT:
+        case OPTEE_MSG_ATTR_TYPE_RMEM_INOUT:
+            guest_arg->params[i].u.rmem.size =
+                call->xen_arg->params[i].u.rmem.size;
+            continue;
+        case OPTEE_MSG_ATTR_TYPE_VALUE_OUTPUT:
+        case OPTEE_MSG_ATTR_TYPE_VALUE_INOUT:
+            guest_arg->params[i].u.value.a =
+                call->xen_arg->params[i].u.value.a;
+            guest_arg->params[i].u.value.b =
+                call->xen_arg->params[i].u.value.b;
+            guest_arg->params[i].u.value.c =
+                call->xen_arg->params[i].u.value.c;
+            continue;
+        case OPTEE_MSG_ATTR_TYPE_NONE:
+        case OPTEE_MSG_ATTR_TYPE_RMEM_INPUT:
+        case OPTEE_MSG_ATTR_TYPE_TMEM_INPUT:
+            continue;
+        }
+    }
+
+    unmap_domain_page(guest_arg);
+    put_page(page);
+}
+
+/* Handle RPC return from OP-TEE */
+static void handle_rpc_return(struct arm_smccc_res *res,
+                              struct cpu_user_regs *regs,
+                              struct optee_std_call *call)
+{
+    call->rpc_op = OPTEE_SMC_RETURN_GET_RPC_FUNC(res->a0);
+    call->rpc_params[0] = res->a1;
+    call->rpc_params[1] = res->a2;
+    call->optee_thread_id = res->a3;
+
+    set_user_reg(regs, 0, res->a0);
+    set_user_reg(regs, 1, res->a1);
+    set_user_reg(regs, 2, res->a2);
+    set_user_reg(regs, 3, res->a3);
+}
+
+/*
+ * (Re)start standard call. This function will be called in two cases:
+ * 1. Guest initiates new standard call
+ * 2. Guest finished RPC handling and asks OP-TEE to resume the call
+ *
+ * In any case OP-TEE can either complete call or issue another RPC.
+ * If this is RPC - we need to store call context and return back to guest.
+ * If call is complete - we need to return results with copy_std_request_back()
+ * and then we will destroy the call context as it is not needed anymore.
+ */
+static void do_call_with_arg(struct optee_domain *ctx,
+                             struct optee_std_call *call,
+                             struct cpu_user_regs *regs,
+                             register_t a0, register_t a1, register_t a2,
+                             register_t a3, register_t a4, register_t a5)
+{
+    struct arm_smccc_res res;
+
+    arm_smccc_smc(a0, a1, a2, a3, a4, a5, 0, OPTEE_CLIENT_ID(current->domain),
+                  &res);
+
+    if ( OPTEE_SMC_RETURN_IS_RPC(res.a0) )
+    {
+        handle_rpc_return(&res, regs, call);
+        put_std_call(ctx, call);
+
+        return;
+    }
+
+    copy_std_request_back(ctx, regs, call);
+    set_user_reg(regs, 0, res.a0);
+
+    put_std_call(ctx, call);
+    free_std_call(ctx, call);
+}
+
+/*
+ * Standard call handling. This is the main type of the call which
+ * makes OP-TEE useful. Most of the other calls type are utility
+ * calls, while standard calls are needed to interact with Trusted
+ * Applications which are running inside the OP-TEE.
+ *
+ * All arguments for this type of call are passed in the command
+ * buffer in the guest memory. We will copy this buffer into
+ * own shadow buffer and provide the copy to OP-TEE.
+ *
+ * This call is preemptible. OP-TEE will return from the call if there
+ * is an interrupt request pending. Also, OP-TEE will interrupt the
+ * call if it needs some service from guest. In both cases it will
+ * issue RPC, which is processed by handle_rpc_return() function.
+ */
+static void handle_std_call(struct optee_domain *ctx,
+                            struct cpu_user_regs *regs)
+{
+    register_t a1, a2;
+    paddr_t xen_addr;
+    size_t arg_size;
+    struct optee_std_call *call = allocate_std_call(ctx);
+
+    if ( IS_ERR(call) )
+    {
+        if ( PTR_ERR(call) == -ENOMEM )
+            set_user_reg(regs, 0, OPTEE_SMC_RETURN_ENOMEM);
+        else
+            set_user_reg(regs, 0, OPTEE_SMC_RETURN_ETHREAD_LIMIT);
+
+        return;
+    }
+
+    if ( !copy_std_request(regs, call) )
+        goto err;
+
+    arg_size = OPTEE_MSG_GET_ARG_SIZE(call->xen_arg->num_params);
+    if ( arg_size > OPTEE_MSG_NONCONTIG_PAGE_SIZE )
+    {
+        call->xen_arg->ret = TEEC_ERROR_BAD_PARAMETERS;
+        call->xen_arg->ret_origin = TEEC_ORIGIN_COMMS;
+        /* Make sure that copy_std_request_back() will stay within the buffer */
+        call->xen_arg->num_params = 0;
+
+        copy_std_request_back(ctx, regs, call);
+
+        goto err;
+    }
+
+    switch ( call->xen_arg->cmd )
+    {
+    case OPTEE_MSG_CMD_OPEN_SESSION:
+    case OPTEE_MSG_CMD_CLOSE_SESSION:
+    case OPTEE_MSG_CMD_INVOKE_COMMAND:
+    case OPTEE_MSG_CMD_CANCEL:
+    case OPTEE_MSG_CMD_REGISTER_SHM:
+    case OPTEE_MSG_CMD_UNREGISTER_SHM:
+        xen_addr = page_to_maddr(call->xen_arg_pg);
+        uint64_to_regpair(&a1, &a2, xen_addr);
+
+        do_call_with_arg(ctx, call, regs, OPTEE_SMC_CALL_WITH_ARG, a1, a2,
+                         OPTEE_SMC_SHM_CACHED, 0, 0);
+        return;
+    default:
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_EBADCMD);
+        break;
+    }
+
+err:
+    put_std_call(ctx, call);
+    free_std_call(ctx, call);
+
+    return;
+}
+
+/*
+ * This function is called when guest is finished processing RPC
+ * request from OP-TEE and wished to resume the interrupted standard
+ * call.
+ */
+static void handle_rpc(struct optee_domain *ctx, struct cpu_user_regs *regs)
+{
+    struct optee_std_call *call;
+    int optee_thread_id = get_user_reg(regs, 3);
+
+    call = get_std_call(ctx, optee_thread_id);
+
+    if ( !call )
+    {
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_ERESUME);
+        return;
+    }
+
+    /*
+     * This is to prevent race between new call with the same thread id.
+     * OP-TEE can reuse thread id right after it finished handling the call,
+     * before XEN had chance to free old call context.
+     */
+    call->optee_thread_id = -1;
+
+    switch ( call->rpc_op )
+    {
+    case OPTEE_SMC_RPC_FUNC_ALLOC:
+        /* TODO: Add handling */
+        break;
+    case OPTEE_SMC_RPC_FUNC_FREE:
+        /* TODO: Add handling */
+        break;
+    case OPTEE_SMC_RPC_FUNC_FOREIGN_INTR:
+        break;
+    case OPTEE_SMC_RPC_FUNC_CMD:
+        /* TODO: Add handling */
+        break;
+    }
+
+    do_call_with_arg(ctx, call, regs, OPTEE_SMC_CALL_RETURN_FROM_RPC,
+                     call->rpc_params[0], call->rpc_params[1],
+                     optee_thread_id, 0, 0);
+    return;
 }
 
 static void handle_exchange_capabilities(struct cpu_user_regs *regs)
@@ -166,8 +666,9 @@ static void handle_exchange_capabilities(struct cpu_user_regs *regs)
 static bool optee_handle_call(struct cpu_user_regs *regs)
 {
     struct arm_smccc_res resp;
+    struct optee_domain *ctx = current->domain->arch.tee;
 
-    if ( !current->domain->arch.tee )
+    if ( !ctx )
         return false;
 
     switch ( get_user_reg(regs, 0) )
@@ -234,8 +735,11 @@ static bool optee_handle_call(struct cpu_user_regs *regs)
         return true;
 
     case OPTEE_SMC_CALL_WITH_ARG:
+        handle_std_call(ctx, regs);
+        return true;
+
     case OPTEE_SMC_CALL_RETURN_FROM_RPC:
-        set_user_reg(regs, 0, OPTEE_SMC_RETURN_ENOTAVAIL);
+        handle_rpc(ctx, regs);
         return true;
 
     default:
