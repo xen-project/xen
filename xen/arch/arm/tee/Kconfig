@@ -1,0 +1,4 @@
+config OPTEE
+	bool "Enable OP-TEE mediator"
+	default n
+	depends on TEE

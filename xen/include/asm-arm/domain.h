@@ -98,6 +98,9 @@ struct arch_domain
     struct vpl011 vpl011;
 #endif
 
+#ifdef CONFIG_TEE
+    void *tee;
+#endif
 }  __cacheline_aligned;
 
 struct arch_vcpu

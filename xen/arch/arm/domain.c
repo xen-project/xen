@@ -649,7 +649,8 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    if ( config->arch.tee_type != XEN_DOMCTL_CONFIG_TEE_NONE )
+    if ( config->arch.tee_type != XEN_DOMCTL_CONFIG_TEE_NONE &&
+         config->arch.tee_type != tee_get_type() )
     {
         dprintk(XENLOG_INFO, "Unsupported TEE type\n");
         return -EINVAL;
