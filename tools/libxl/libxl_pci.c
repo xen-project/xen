@@ -1740,6 +1740,10 @@ typedef struct pci_remove_state {
     unsigned int pfunc_mask;
     int next_func;
     libxl__ao_device stubdom_aodev;
+    libxl__xswait_state xswait;
+    libxl__ev_qmp qmp;
+    libxl__ev_time timeout;
+    libxl__ev_time retry_timer;
 } pci_remove_state;
 
 static void libxl__device_pci_remove_common(libxl__egc *egc,
@@ -1747,10 +1751,23 @@ static void libxl__device_pci_remove_common(libxl__egc *egc,
     libxl__ao_device *aodev);
 static void device_pci_remove_common_next(libxl__egc *egc,
     pci_remove_state *prs, int rc);
+
+static void pci_remove_qemu_trad_watch_state_cb(libxl__egc *egc,
+    libxl__xswait_state *xswa, int rc, const char *state);
+static void pci_remove_qmp_device_del(libxl__egc *egc,
+    pci_remove_state *prs);
+static void pci_remove_qmp_device_del_cb(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void pci_remove_qmp_retry_timer_cb(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
+static void pci_remove_qmp_query_cb(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
 static void pci_remove_detatched(libxl__egc *egc,
     pci_remove_state *prs, int rc);
 static void pci_remove_stubdom_done(libxl__egc *egc,
     libxl__ao_device *aodev);
+static void pci_remove_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
 static void pci_remove_done(libxl__egc *egc,
     pci_remove_state *prs, int rc);
 
@@ -1784,20 +1801,20 @@ static void do_pci_remove(libxl__egc *egc, uint32_t domid,
         prs->hvm = true;
         switch (libxl__device_model_version_running(gc, domid)) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            if (libxl__wait_for_device_model_deprecated(gc, domid,
-                    "running", NULL, NULL, NULL) < 0)
-                goto out_fail;
-            rc = qemu_pci_remove_xenstore(gc, domid, pcidev, force);
-            break;
+            prs->xswait.ao = ao;
+            prs->xswait.what = "Device Model";
+            prs->xswait.path = DEVICE_MODEL_XS_PATH(gc,
+                libxl_get_stubdom_id(CTX, domid), domid, "/state");
+            prs->xswait.timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
+            prs->xswait.callback = pci_remove_qemu_trad_watch_state_cb;
+            rc = libxl__xswait_start(gc, &prs->xswait);
+            if (rc) goto out_fail;
+            return;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            rc = libxl__qmp_pci_del(gc, domid, pcidev);
-            break;
+            pci_remove_qmp_device_del(egc, prs); /* must be last */
+            return;
         default:
             rc = ERROR_INVAL;
-            goto out_fail;
-        }
-        if (rc && !force) {
-            rc = ERROR_FAIL;
             goto out_fail;
         }
     } else {
@@ -1861,7 +1878,161 @@ skip1:
 skip_irq:
     rc = 0;
 out_fail:
+    pci_remove_detatched(egc, prs, rc); /* must be last */
+}
+
+static void pci_remove_qemu_trad_watch_state_cb(libxl__egc *egc,
+                                                libxl__xswait_state *xswa,
+                                                int rc,
+                                                const char *state)
+{
+    pci_remove_state *prs = CONTAINER_OF(xswa, *prs, xswait);
+    STATE_AO_GC(prs->aodev->ao);
+
+    /* Convenience aliases */
+    libxl_domid domid = prs->domid;
+    libxl_device_pci *const pcidev = prs->pcidev;
+
+    if (rc) {
+        if (rc == ERROR_TIMEDOUT) {
+            LOGD(ERROR, domid, "%s not ready", xswa->what);
+        }
+        goto out;
+    }
+
+    if (!state)
+        return;
+    if (strcmp(state, "running"))
+        return;
+
+    rc = qemu_pci_remove_xenstore(gc, domid, pcidev, prs->force);
+
+out:
+    libxl__xswait_stop(gc, xswa);
     pci_remove_detatched(egc, prs, rc);
+}
+
+static void pci_remove_qmp_device_del(libxl__egc *egc,
+                                      pci_remove_state *prs)
+{
+    STATE_AO_GC(prs->aodev->ao);
+    libxl__json_object *args = NULL;
+    int rc;
+
+    /* Convenience aliases */
+    libxl_device_pci *const pcidev = prs->pcidev;
+
+    rc = libxl__ev_time_register_rel(ao, &prs->timeout,
+                                     pci_remove_timeout,
+                                     LIBXL_QMP_CMD_TIMEOUT * 1000);
+    if (rc) goto out;
+
+    QMP_PARAMETERS_SPRINTF(&args, "id", PCI_PT_QDEV_ID,
+                           pcidev->bus, pcidev->dev, pcidev->func);
+    prs->qmp.callback = pci_remove_qmp_device_del_cb;
+    rc = libxl__ev_qmp_send(gc, &prs->qmp, "device_del", args);
+    if (rc) goto out;
+    return;
+
+out:
+    pci_remove_detatched(egc, prs, rc);
+}
+
+static void pci_remove_qmp_device_del_cb(libxl__egc *egc,
+                                         libxl__ev_qmp *qmp,
+                                         const libxl__json_object *response,
+                                         int rc)
+{
+    EGC_GC;
+    pci_remove_state *prs = CONTAINER_OF(qmp, *prs, qmp);
+
+    if (rc) goto out;
+
+    /* Now that the command is sent, we want to wait until QEMU has
+     * confirmed that the device is removed. */
+    /* TODO: Instead of using a poll loop { ev_timer ; query-pci }, it
+     * could be possible to listen to events sent by QEMU via QMP in order
+     * to wait for the passthrough pci-device to be removed from QEMU.  */
+    pci_remove_qmp_retry_timer_cb(egc, &prs->retry_timer, NULL,
+                                  ERROR_TIMEDOUT);
+    return;
+
+out:
+    pci_remove_detatched(egc, prs, rc);
+}
+
+static void pci_remove_qmp_retry_timer_cb(libxl__egc *egc, libxl__ev_time *ev,
+                                          const struct timeval *requested_abs,
+                                          int rc)
+{
+    EGC_GC;
+    pci_remove_state *prs = CONTAINER_OF(ev, *prs, retry_timer);
+
+    prs->qmp.callback = pci_remove_qmp_query_cb;
+    rc = libxl__ev_qmp_send(gc, &prs->qmp, "query-pci", NULL);
+    if (rc) goto out;
+    return;
+
+out:
+    pci_remove_detatched(egc, prs, rc);
+}
+
+static void pci_remove_qmp_query_cb(libxl__egc *egc,
+                                    libxl__ev_qmp *qmp,
+                                    const libxl__json_object *response,
+                                    int rc)
+{
+    EGC_GC;
+    pci_remove_state *prs = CONTAINER_OF(qmp, *prs, qmp);
+    const libxl__json_object *bus = NULL;
+    const char *asked_id;
+    int i, j;
+
+    /* Convenience aliases */
+    libxl__ao *const ao = prs->aodev->ao;
+    libxl_device_pci *const pcidev = prs->pcidev;
+
+    if (rc) goto out;
+
+    asked_id = GCSPRINTF(PCI_PT_QDEV_ID,
+                         pcidev->bus, pcidev->dev, pcidev->func);
+
+    /* query-pci response:
+     * [{ 'devices': [ 'qdev_id': 'str', ...  ], ... }]
+     * */
+
+    for (i = 0; (bus = libxl__json_array_get(response, i)); i++) {
+        const libxl__json_object *devices = NULL;
+        const libxl__json_object *device = NULL;
+        const libxl__json_object *o = NULL;
+        const char *id = NULL;
+
+        devices = libxl__json_map_get("devices", bus, JSON_ARRAY);
+        if (!devices) {
+            rc = ERROR_QEMU_API;
+            goto out;
+        }
+
+        for (j = 0; (device = libxl__json_array_get(devices, j)); j++) {
+             o = libxl__json_map_get("qdev_id", device, JSON_STRING);
+             if (!o) {
+                 rc = ERROR_QEMU_API;
+                 goto out;
+             }
+             id = libxl__json_object_get_string(o);
+
+             if (id && !strcmp(asked_id, id)) {
+                 /* Device still in QEMU, need to wait longuer. */
+                 rc = libxl__ev_time_register_rel(ao, &prs->retry_timer,
+                     pci_remove_qmp_retry_timer_cb, 1000);
+                 if (rc) goto out;
+                 return;
+             }
+        }
+    }
+
+out:
+    pci_remove_detatched(egc, prs, rc); /* must be last */
 }
 
 static void pci_remove_detatched(libxl__egc *egc,
@@ -1877,7 +2048,8 @@ static void pci_remove_detatched(libxl__egc *egc,
     libxl_device_pci *const pcidev = prs->pcidev;
     libxl_domid domid = prs->domid;
 
-    if (rc) goto out;
+    if (rc && !prs->force)
+        goto out;
 
     isstubdom = libxl_is_stubdom(CTX, domid, &domainid);
 
@@ -1923,6 +2095,15 @@ static void pci_remove_stubdom_done(libxl__egc *egc,
     pci_remove_done(egc, prs, 0);
 }
 
+static void pci_remove_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                               const struct timeval *requested_abs,
+                               int rc)
+{
+    pci_remove_state *prs = CONTAINER_OF(ev, *prs, timeout);
+
+    pci_remove_done(egc, prs, rc);
+}
+
 static void pci_remove_done(libxl__egc *egc,
                             pci_remove_state *prs,
                             int rc)
@@ -1930,6 +2111,10 @@ static void pci_remove_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) goto out;
+
+    libxl__ev_qmp_dispose(gc, &prs->qmp);
+    libxl__ev_time_deregister(gc, &prs->timeout);
+    libxl__ev_time_deregister(gc, &prs->retry_timer);
 
     libxl__device_pci_remove_xenstore(gc, prs->domid, prs->pcidev);
 out:
@@ -1951,6 +2136,13 @@ static void libxl__device_pci_remove_common(libxl__egc *egc,
     prs->domid = domid;
     prs->pcidev = pcidev;
     prs->force = force;
+    libxl__xswait_init(&prs->xswait);
+    libxl__ev_qmp_init(&prs->qmp);
+    prs->qmp.ao = prs->aodev->ao;
+    prs->qmp.domid = prs->domid;
+    prs->qmp.payload_fd = -1;
+    libxl__ev_time_init(&prs->timeout);
+    libxl__ev_time_init(&prs->retry_timer);
 
     prs->orig_vdev = pcidev->vdevfn & ~7U;
 
@@ -1974,6 +2166,8 @@ static void device_pci_remove_common_next(libxl__egc *egc,
                                           pci_remove_state *prs,
                                           int rc)
 {
+    EGC_GC;
+
     /* Convenience aliases */
     libxl_domid domid = prs->domid;
     libxl_device_pci *const pcidev = prs->pcidev;
@@ -2000,6 +2194,10 @@ static void device_pci_remove_common_next(libxl__egc *egc,
 
     rc = 0;
 out:
+    libxl__ev_qmp_dispose(gc, &prs->qmp);
+    libxl__xswait_stop(gc, &prs->xswait);
+    libxl__ev_time_deregister(gc, &prs->timeout);
+    libxl__ev_time_deregister(gc, &prs->retry_timer);
     aodev->rc = rc;
     aodev->callback(egc, aodev);
 }
