@@ -533,7 +533,7 @@ void identify_cpu(struct cpuinfo_x86 *c)
  * Check for extended topology enumeration cpuid leaf 0xb and if it
  * exists, use it for cpu topology detection.
  */
-void detect_extended_topology(struct cpuinfo_x86 *c)
+bool detect_extended_topology(struct cpuinfo_x86 *c)
 {
 	unsigned int eax, ebx, ecx, edx, sub_index;
 	unsigned int ht_mask_width, core_plus_mask_width;
@@ -541,13 +541,13 @@ void detect_extended_topology(struct cpuinfo_x86 *c)
 	unsigned int initial_apicid;
 
 	if ( c->cpuid_level < 0xb )
-		return;
+		return false;
 
 	cpuid_count(0xb, SMT_LEVEL, &eax, &ebx, &ecx, &edx);
 
 	/* Check if the cpuid leaf 0xb is actually implemented */
 	if ( ebx == 0 || (LEAFB_SUBTYPE(ecx) != SMT_TYPE) )
-		return;
+		return false;
 
 	__set_bit(X86_FEATURE_XTOPOLOGY, c->x86_capability);
 
@@ -588,6 +588,8 @@ void detect_extended_topology(struct cpuinfo_x86 *c)
 			printk("CPU: Processor Core ID: %d\n",
 			       c->cpu_core_id);
 	}
+
+	return true;
 }
 
 void detect_ht(struct cpuinfo_x86 *c)

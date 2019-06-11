@@ -15,4 +15,7 @@ extern unsigned int opt_cpuid_mask_ext_ecx, opt_cpuid_mask_ext_edx;
 extern int get_model_name(struct cpuinfo_x86 *c);
 extern void display_cacheinfo(struct cpuinfo_x86 *c);
 
+extern void detect_ht(struct cpuinfo_x86 *c);
+extern bool detect_extended_topology(struct cpuinfo_x86 *c);
+
 void early_init_amd(struct cpuinfo_x86 *c);

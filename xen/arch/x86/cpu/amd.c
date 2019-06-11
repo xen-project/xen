@@ -515,6 +515,13 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
                         c->cpu_core_id = ebx & 0xFF;
                         c->x86_max_cores /= c->x86_num_siblings;
                 }
+
+                /*
+                 * In case leaf B is available, use it to derive
+                 * topology information.
+                 */
+                if (detect_extended_topology(c))
+                        return;
         }
         
         if (opt_cpu_info)
