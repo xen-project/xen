@@ -32,8 +32,16 @@
 #include <asm/tee/optee_msg.h>
 #include <asm/tee/optee_smc.h>
 
+/* Number of SMCs known to the mediator */
+#define OPTEE_MEDIATOR_SMC_COUNT   11
+
 /* Client ID 0 is reserved for the hypervisor itself */
 #define OPTEE_CLIENT_ID(domain) ((domain)->domain_id + 1)
+
+#define OPTEE_KNOWN_NSEC_CAPS OPTEE_SMC_NSEC_CAP_UNIPROCESSOR
+#define OPTEE_KNOWN_SEC_CAPS (OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM | \
+                              OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM | \
+                              OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
 
 /* Domain context */
 struct optee_domain {
@@ -120,22 +128,111 @@ static int optee_relinquish_resources(struct domain *d)
     return 0;
 }
 
+static void handle_exchange_capabilities(struct cpu_user_regs *regs)
+{
+    struct arm_smccc_res resp;
+    uint32_t caps;
+
+    /* Filter out unknown guest caps */
+    caps = get_user_reg(regs, 1);
+    caps &= OPTEE_KNOWN_NSEC_CAPS;
+
+    arm_smccc_smc(OPTEE_SMC_EXCHANGE_CAPABILITIES, caps, 0, 0, 0, 0, 0,
+                  OPTEE_CLIENT_ID(current->domain), &resp);
+    if ( resp.a0 != OPTEE_SMC_RETURN_OK ) {
+        set_user_reg(regs, 0, resp.a0);
+        return;
+    }
+
+    caps = resp.a1;
+
+    /* Filter out unknown OP-TEE caps */
+    caps &= OPTEE_KNOWN_SEC_CAPS;
+
+    /* Drop static SHM_RPC cap */
+    caps &= ~OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM;
+
+    /* Don't allow guests to work without dynamic SHM */
+    if ( !(caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM) )
+    {
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_ENOTAVAIL);
+        return;
+    }
+
+    set_user_reg(regs, 0, OPTEE_SMC_RETURN_OK);
+    set_user_reg(regs, 1, caps);
+}
+
 static bool optee_handle_call(struct cpu_user_regs *regs)
 {
+    struct arm_smccc_res resp;
+
     if ( !current->domain->arch.tee )
         return false;
 
     switch ( get_user_reg(regs, 0) )
     {
     case OPTEE_SMC_CALLS_COUNT:
+        set_user_reg(regs, 0, OPTEE_MEDIATOR_SMC_COUNT);
+        return true;
+
     case OPTEE_SMC_CALLS_UID:
+        arm_smccc_smc(OPTEE_SMC_CALLS_UID, 0, 0, 0, 0, 0, 0,
+                      OPTEE_CLIENT_ID(current->domain), &resp);
+        set_user_reg(regs, 0, resp.a0);
+        set_user_reg(regs, 1, resp.a1);
+        set_user_reg(regs, 2, resp.a2);
+        set_user_reg(regs, 3, resp.a3);
+        return true;
+
     case OPTEE_SMC_CALLS_REVISION:
+        arm_smccc_smc(OPTEE_SMC_CALLS_REVISION, 0, 0, 0, 0, 0, 0,
+                      OPTEE_CLIENT_ID(current->domain), &resp);
+        set_user_reg(regs, 0, resp.a0);
+        set_user_reg(regs, 1, resp.a1);
+        return true;
+
     case OPTEE_SMC_CALL_GET_OS_UUID:
+        arm_smccc_smc(OPTEE_SMC_CALL_GET_OS_UUID, 0, 0, 0, 0, 0, 0,
+                      OPTEE_CLIENT_ID(current->domain),&resp);
+        set_user_reg(regs, 0, resp.a0);
+        set_user_reg(regs, 1, resp.a1);
+        set_user_reg(regs, 2, resp.a2);
+        set_user_reg(regs, 3, resp.a3);
+        return true;
+
     case OPTEE_SMC_CALL_GET_OS_REVISION:
+        arm_smccc_smc(OPTEE_SMC_CALL_GET_OS_REVISION, 0, 0, 0, 0, 0, 0,
+                      OPTEE_CLIENT_ID(current->domain), &resp);
+        set_user_reg(regs, 0, resp.a0);
+        set_user_reg(regs, 1, resp.a1);
+        return true;
+
     case OPTEE_SMC_ENABLE_SHM_CACHE:
+        arm_smccc_smc(OPTEE_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
+                      OPTEE_CLIENT_ID(current->domain), &resp);
+        set_user_reg(regs, 0, resp.a0);
+        return true;
+
     case OPTEE_SMC_DISABLE_SHM_CACHE:
+        arm_smccc_smc(OPTEE_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
+                      OPTEE_CLIENT_ID(current->domain), &resp);
+        set_user_reg(regs, 0, resp.a0);
+        if ( resp.a0 == OPTEE_SMC_RETURN_OK ) {
+            set_user_reg(regs, 1, resp.a1);
+            set_user_reg(regs, 2, resp.a2);
+        }
+        return true;
+
     case OPTEE_SMC_GET_SHM_CONFIG:
+        /* No static SHM available for guests */
+        set_user_reg(regs, 0, OPTEE_SMC_RETURN_ENOTAVAIL);
+        return true;
+
     case OPTEE_SMC_EXCHANGE_CAPABILITIES:
+        handle_exchange_capabilities(regs);
+        return true;
+
     case OPTEE_SMC_CALL_WITH_ARG:
     case OPTEE_SMC_CALL_RETURN_FROM_RPC:
         set_user_reg(regs, 0, OPTEE_SMC_RETURN_ENOTAVAIL);
