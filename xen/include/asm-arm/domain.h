@@ -58,6 +58,7 @@ struct arch_domain
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,
+        RELMEM_tee,
         RELMEM_xen,
         RELMEM_page,
         RELMEM_mapping,

@@ -137,6 +137,13 @@ SECTIONS
       _aedevice = .;
   } :text
 
+  . = ALIGN(8);
+  .teemediator.info : {
+      _steemediator = .;
+      *(.teemediator.info)
+      _eteemediator = .;
+  } :text
+
   . = ALIGN(PAGE_SIZE);             /* Init code and data */
   __init_begin = .;
   .init.text : {

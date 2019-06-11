@@ -106,6 +106,13 @@ config HARDEN_BRANCH_PREDICTOR
 
 	  If unsure, say Y.
 
+config TEE
+	bool "Enable TEE mediators support" if EXPERT = "y"
+	default n
+	help
+	  This option enables generic TEE mediators support. It allows guests
+	  to access real TEE via one of TEE mediators implemented in XEN.
+
 endmenu
 
 menu "ARM errata workaround via the alternative framework"

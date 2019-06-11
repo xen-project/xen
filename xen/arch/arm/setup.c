@@ -50,6 +50,7 @@
 #include <asm/platform.h>
 #include <asm/procinfo.h>
 #include <asm/setup.h>
+#include <asm/tee/tee.h>
 #include <xsm/xsm.h>
 #include <asm/acpi.h>
 
@@ -903,6 +904,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     dom0_cfg.arch.nr_spis = min(gic_number_lines(), (unsigned int) 992) - 32;
     if ( gic_number_lines() > 992 )
         printk(XENLOG_WARNING "Maximum number of vGIC IRQs exceeded.\n");
+    dom0_cfg.arch.tee_type = tee_get_type();
     dom0_cfg.max_vcpus = dom0_max_vcpus();
 
     dom0 = domain_create(0, &dom0_cfg, true);

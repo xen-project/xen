@@ -33,6 +33,7 @@
 #include <asm/platform.h>
 #include <asm/procinfo.h>
 #include <asm/regs.h>
+#include <asm/tee/tee.h>
 #include <asm/vfp.h>
 #include <asm/vgic.h>
 #include <asm/vtimer.h>
@@ -648,6 +649,12 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( config->arch.tee_type != XEN_DOMCTL_CONFIG_TEE_NONE )
+    {
+        dprintk(XENLOG_INFO, "Unsupported TEE type\n");
+        return -EINVAL;
+    }
+
     return 0;
 }
 
@@ -703,6 +710,9 @@ int arch_domain_create(struct domain *d,
         goto fail;
 
     if ( (rc = domain_vtimer_init(d, &config->arch)) != 0 )
+        goto fail;
+
+    if ( (rc = tee_domain_init(d, config->arch.tee_type)) != 0 )
         goto fail;
 
     update_domain_wallclock_time(d);
@@ -948,6 +958,14 @@ int domain_relinquish_resources(struct domain *d)
          * allocated via a DOMCTL call XEN_DOMCTL_vuart_op.
          */
         domain_vpl011_deinit(d);
+
+        d->arch.relmem = RELMEM_tee;
+        /* Fallthrough */
+
+    case RELMEM_tee:
+        ret = tee_relinquish_resources(d);
+        if (ret )
+            return ret;
 
         d->arch.relmem = RELMEM_xen;
         /* Fallthrough */

@@ -381,6 +381,12 @@ F:	config/Stubdom.mk.in
 F:	m4/stubdom.m4
 F:	stubdom/
 
+TEE MEDIATORS
+M:	Volodymyr Babchuk <volodymyr_babchuk@epam.com>
+S:	Supported
+F:	xen/arch/arm/tee/
+F:	xen/include/asm-arm/tee
+
 TOOLSTACK
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 M:	Wei Liu <wl@xen.org>
