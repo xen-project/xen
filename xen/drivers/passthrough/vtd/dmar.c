@@ -1115,7 +1115,8 @@ static int __init parse_rmrr_param(const char *str)
 
             /* Keep sbdf's even if they differ and later report an error. */
             dev_count = user_rmrrs[nr_rmrr].dev_count;
-            user_rmrrs[nr_rmrr].sbdf[dev_count] = PCI_SBDF(seg, bus, dev, func);
+            user_rmrrs[nr_rmrr].sbdf[dev_count] =
+               PCI_SBDF(seg, bus, dev, func).sbdf;
 
             user_rmrrs[nr_rmrr].dev_count++;
             s = stmp;
