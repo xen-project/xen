@@ -285,10 +285,18 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define broadcast_octet(x) B(broadcastf32x8_, _mask, x, undef(), ~0)
 #   define insert_octet(x, y, p) B(insertf32x8_, _mask, x, y, p, undef(), ~0)
 #  endif
+#  ifdef __AVX512DQ__
+#   define frac(x) B(reduceps, _mask, x, 0b00001011, undef(), ~0)
+#  endif
 #  define getexp(x) BR(getexpps, _mask, x, undef(), ~0)
 #  define getmant(x) BR(getmantps, _mask, x, 0, undef(), ~0)
-#  define max(x, y) BR_(maxps, _mask, x, y, undef(), ~0)
-#  define min(x, y) BR_(minps, _mask, x, y, undef(), ~0)
+#  ifdef __AVX512DQ__
+#   define max(x, y) BR(rangeps, _mask, x, y, 0b0101, undef(), ~0)
+#   define min(x, y) BR(rangeps, _mask, x, y, 0b0100, undef(), ~0)
+#  else
+#   define max(x, y) BR_(maxps, _mask, x, y, undef(), ~0)
+#   define min(x, y) BR_(minps, _mask, x, y, undef(), ~0)
+#  endif
 #  define mix(x, y) B(movaps, _mask, x, y, (0b0101010101010101 & ALL_TRUE))
 #  define scale(x, y) BR(scalefps, _mask, x, y, undef(), ~0)
 #  if VEC_SIZE == 64 && defined(__AVX512ER__)
@@ -350,10 +358,18 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define broadcast_quartet(x) B(broadcastf64x4_, , x, undef(), ~0)
 #   define insert_quartet(x, y, p) B(insertf64x4_, _mask, x, y, p, undef(), ~0)
 #  endif
+#  ifdef __AVX512DQ__
+#   define frac(x) B(reducepd, _mask, x, 0b00001011, undef(), ~0)
+#  endif
 #  define getexp(x) BR(getexppd, _mask, x, undef(), ~0)
 #  define getmant(x) BR(getmantpd, _mask, x, 0, undef(), ~0)
-#  define max(x, y) BR_(maxpd, _mask, x, y, undef(), ~0)
-#  define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
+#  ifdef __AVX512DQ__
+#   define max(x, y) BR(rangepd, _mask, x, y, 0b0101, undef(), ~0)
+#   define min(x, y) BR(rangepd, _mask, x, y, 0b0100, undef(), ~0)
+#  else
+#   define max(x, y) BR_(maxpd, _mask, x, y, undef(), ~0)
+#   define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
+#  endif
 #  define mix(x, y) B(movapd, _mask, x, y, 0b01010101)
 #  define scale(x, y) BR(scalefpd, _mask, x, y, undef(), ~0)
 #  if VEC_SIZE == 64 && defined(__AVX512ER__)

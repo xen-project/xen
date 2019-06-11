@@ -3962,6 +3962,39 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+
+    printf("%-40s", "Testing vfpclasspsz $0x46,64(%edx),%k2...");
+    if ( stack_exec && cpu_has_avx512dq )
+    {
+        decl_insn(vfpclassps);
+
+        asm volatile ( put_insn(vfpclassps,
+                                /* 0x46: check for +/- 0 and neg. */
+                                "vfpclasspsz $0x46, 64(%0), %%k2")
+                       :: "d" (NULL) );
+
+        set_insn(vfpclassps);
+        for ( i = 0; i < 3; ++i )
+        {
+            res[16 + i * 5 + 0] = 0x00000000; /* +0 */
+            res[16 + i * 5 + 1] = 0x80000000; /* -0 */
+            res[16 + i * 5 + 2] = 0x80000001; /* -DEN */
+            res[16 + i * 5 + 3] = 0xff000000; /* -FIN */
+            res[16 + i * 5 + 4] = 0x7f000000; /* +FIN */
+        }
+        res[31] = 0;
+        regs.edx = (unsigned long)res;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vfpclassps) )
+            goto fail;
+        asm volatile ( "kmovw %%k2, %0" : "=g" (rc) );
+        if ( rc != 0xbdef )
+            goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
 #undef decl_insn
 #undef put_insn
 #undef set_insn
