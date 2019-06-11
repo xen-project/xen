@@ -762,9 +762,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
             {
                 unsigned int idx = pos + PCI_SRIOV_BAR + i * 4;
                 u32 bar = pci_conf_read32(seg, bus, slot, func, idx);
-                pci_sbdf_t sbdf = {
-                    .sbdf = PCI_SBDF3(seg, bus, devfn),
-                };
+                pci_sbdf_t sbdf = PCI_SBDF3(seg, bus, devfn);
 
                 if ( (bar & PCI_BASE_ADDRESS_SPACE) ==
                      PCI_BASE_ADDRESS_SPACE_IO )

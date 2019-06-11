@@ -27,8 +27,8 @@ static int get_reserved_device_memory(xen_pfn_t start, xen_ulong_t nr,
                                       u32 id, void *ctxt)
 {
     struct get_reserved_device_memory *grdm = ctxt;
-    u32 sbdf = PCI_SBDF3(grdm->map.dev.pci.seg, grdm->map.dev.pci.bus,
-                         grdm->map.dev.pci.devfn);
+    uint32_t sbdf = PCI_SBDF3(grdm->map.dev.pci.seg, grdm->map.dev.pci.bus,
+                              grdm->map.dev.pci.devfn).sbdf;
 
     if ( !(grdm->map.flags & XENMEM_RDM_ALL) && (sbdf != id) )
         return 0;
