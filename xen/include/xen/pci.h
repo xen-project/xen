@@ -81,9 +81,15 @@ struct pci_dev {
     struct arch_msix *msix;
 
     struct domain *domain;
-    const u16 seg;
-    const u8 bus;
-    const u8 devfn;
+
+    const union {
+        struct {
+            uint8_t devfn;
+            uint8_t bus;
+            uint16_t seg;
+        };
+        pci_sbdf_t sbdf;
+    };
 
     u8 phantom_stride;
 

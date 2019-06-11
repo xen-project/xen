@@ -461,9 +461,6 @@ static int init_bars(struct pci_dev *pdev)
     unsigned int i, num_bars, rom_reg;
     struct vpci_header *header = &pdev->vpci->header;
     struct vpci_bar *bars = header->bars;
-    pci_sbdf_t sbdf = {
-        .sbdf = PCI_SBDF3(pdev->seg, pdev->bus, pdev->devfn),
-    };
     int rc;
 
     switch ( pci_conf_read8(pdev->seg, pdev->bus, slot, func, PCI_HEADER_TYPE)
@@ -530,7 +527,7 @@ static int init_bars(struct pci_dev *pdev)
         else
             bars[i].type = VPCI_BAR_MEM32;
 
-        rc = pci_size_mem_bar(sbdf, reg, &addr, &size,
+        rc = pci_size_mem_bar(pdev->sbdf, reg, &addr, &size,
                               (i == num_bars - 1) ? PCI_BAR_LAST : 0);
         if ( rc < 0 )
         {
@@ -560,7 +557,7 @@ static int init_bars(struct pci_dev *pdev)
     }
 
     /* Check expansion ROM. */
-    rc = pci_size_mem_bar(sbdf, rom_reg, &addr, &size, PCI_BAR_ROM);
+    rc = pci_size_mem_bar(pdev->sbdf, rom_reg, &addr, &size, PCI_BAR_ROM);
     if ( rc > 0 && size )
     {
         struct vpci_bar *rom = &header->bars[num_bars];
