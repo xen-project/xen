@@ -913,7 +913,8 @@ static int read_msr(unsigned int reg, uint64_t *val,
             /* fall through */
     case MSR_AMD_FAM15H_EVNTSEL0 ... MSR_AMD_FAM15H_PERFCTR5:
     case MSR_K7_EVNTSEL0 ... MSR_K7_PERFCTR3:
-            if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
+            if ( vpmu_msr || (boot_cpu_data.x86_vendor &
+                              (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             {
                 if ( vpmu_do_rdmsr(reg, val) )
                     break;
@@ -995,7 +996,8 @@ static int write_msr(unsigned int reg, uint64_t val,
     case MSR_K8_PSTATE6:
     case MSR_K8_PSTATE7:
     case MSR_K8_HWCR:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
+        if ( !(boot_cpu_data.x86_vendor &
+               (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             break;
         if ( likely(!is_cpufreq_controller(currd)) ||
              wrmsr_safe(reg, val) == 0 )
@@ -1044,7 +1046,8 @@ static int write_msr(unsigned int reg, uint64_t val,
 
     case MSR_IA32_MPERF:
     case MSR_IA32_APERF:
-        if ( !(boot_cpu_data.x86_vendor & (X86_VENDOR_INTEL | X86_VENDOR_AMD)) )
+        if ( !(boot_cpu_data.x86_vendor &
+               (X86_VENDOR_INTEL | X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             break;
         if ( likely(!is_cpufreq_controller(currd)) ||
              wrmsr_safe(reg, val) == 0 )
@@ -1076,7 +1079,8 @@ static int write_msr(unsigned int reg, uint64_t val,
             vpmu_msr = true;
     case MSR_AMD_FAM15H_EVNTSEL0 ... MSR_AMD_FAM15H_PERFCTR5:
     case MSR_K7_EVNTSEL0 ... MSR_K7_PERFCTR3:
-            if ( vpmu_msr || (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
+            if ( vpmu_msr || (boot_cpu_data.x86_vendor &
+                              (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
             {
                 if ( (vpmu_mode & XENPMU_MODE_ALL) &&
                      !is_hardware_domain(currd) )
