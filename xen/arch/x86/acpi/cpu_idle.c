@@ -802,7 +802,8 @@ void acpi_dead_idle(void)
             __mwait(cx->address, 0);
         }
     }
-    else if ( current_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+    else if ( (current_cpu_data.x86_vendor &
+               (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
               cx->entry_method == ACPI_CSTATE_EM_SYSIO )
     {
         /* Intel prefers not to use SYSIO */
