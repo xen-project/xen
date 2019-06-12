@@ -765,27 +765,20 @@ iov_count(const xen_argo_iov_t *piov, unsigned int niov,
 static int
 ringbuf_insert(const struct domain *d, struct argo_ring_info *ring_info,
                const struct argo_ring_id *src_id, xen_argo_iov_t *iovs,
-               unsigned int niov, uint32_t message_type,
-               unsigned long *out_len)
+               unsigned int niov, uint32_t message_type, unsigned int len)
 {
     xen_argo_ring_t ring;
     struct xen_argo_ring_message_header mh = { };
     int sp, ret;
-    unsigned int len = 0;
     xen_argo_iov_t *piov;
     XEN_GUEST_HANDLE(uint8) NULL_hnd = { };
 
     ASSERT(LOCKING_L3(d, ring_info));
 
     /*
-     * Obtain the total size of data to transmit -- sets the 'len' variable
-     * -- and sanity check that the iovs conform to size and number limits.
      * Enforced below: no more than 'len' bytes of guest data
      * (plus the message header) will be sent in this operation.
      */
-    ret = iov_count(iovs, niov, &len);
-    if ( ret )
-        return ret;
 
     /*
      * Upper bound check the message len against the ring size.
@@ -982,8 +975,6 @@ ringbuf_insert(const struct domain *d, struct argo_ring_info *ring_info,
      * An XSM policy control over level of confidentiality required
      * versus performance cost could be added to decide that here.
      */
-
-    *out_len = len;
 
     return ret;
 }
@@ -1976,7 +1967,7 @@ sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
     struct argo_ring_id src_id;
     struct argo_ring_info *ring_info;
     int ret = 0;
-    unsigned long len = 0;
+    unsigned int len = 0;
 
     argo_dprintk("sendv: (%u:%x)->(%u:%x) niov:%u type:%x\n",
                  src_addr->domain_id, src_addr->aport, dst_addr->domain_id,
@@ -2044,17 +2035,25 @@ sendv(struct domain *src_d, xen_argo_addr_t *src_addr,
     {
         spin_lock(&ring_info->L3_lock);
 
-        ret = ringbuf_insert(dst_d, ring_info, &src_id, iovs, niov,
-                             message_type, &len);
-        if ( ret == -EAGAIN )
+        /*
+         * Obtain the total size of data to transmit -- sets the 'len' variable
+         * -- and sanity check that the iovs conform to size and number limits.
+         */
+        ret = iov_count(iovs, niov, &len);
+        if ( !ret )
         {
-            int rc;
+            ret = ringbuf_insert(dst_d, ring_info, &src_id, iovs, niov,
+                                 message_type, len);
+            if ( ret == -EAGAIN )
+            {
+                int rc;
 
-            argo_dprintk("argo_ringbuf_sendv failed, EAGAIN\n");
-            /* requeue to issue a notification when space is there */
-            rc = pending_requeue(dst_d, ring_info, src_id.domain_id, len);
-            if ( rc )
-                ret = rc;
+                argo_dprintk("argo_ringbuf_sendv failed, EAGAIN\n");
+                /* requeue to issue a notification when space is there */
+                rc = pending_requeue(dst_d, ring_info, src_id.domain_id, len);
+                if ( rc )
+                    ret = rc;
+            }
         }
 
         spin_unlock(&ring_info->L3_lock);
