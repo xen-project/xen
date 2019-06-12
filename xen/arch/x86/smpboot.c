@@ -46,8 +46,6 @@
 #include <asm/time.h>
 #include <asm/tboot.h>
 #include <mach_apic.h>
-#include <mach_wakecpu.h>
-#include <smpboot_hooks.h>
 
 #define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
 
@@ -565,10 +563,6 @@ static int do_boot_cpu(int apicid, int cpu)
 
     set_cpu_state(CPU_STATE_INIT);
 
-    Dprintk("Setting warm reset code and vector.\n");
-
-    smpboot_setup_warm_reset_vector(start_eip);
-
     /* Starting actual IPI sequence... */
     if ( !tboot_in_measured_env() || tboot_wake_ap(apicid, start_eip) )
         boot_error = wakeup_secondary_cpu(apicid, start_eip);
@@ -622,8 +616,6 @@ static int do_boot_cpu(int apicid, int cpu)
     /* mark "stuck" area as not stuck */
     bootsym(trampoline_cpu_started) = 0;
     smp_mb();
-
-    smpboot_restore_warm_reset_vector();
 
     return rc;
 }
@@ -1162,7 +1154,8 @@ void __init smp_prepare_cpus(void)
     connect_bsp_APIC();
     setup_local_APIC();
 
-    smpboot_setup_io_apic();
+    if ( !skip_ioapic_setup && nr_ioapics )
+        setup_IO_APIC();
 
     setup_boot_APIC_clock();
 }
