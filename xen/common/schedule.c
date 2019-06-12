@@ -1486,7 +1486,6 @@ static void schedule(void)
         ((prev->pause_flags & VPF_blocked) ? RUNSTATE_blocked :
          (vcpu_runnable(prev) ? RUNSTATE_runnable : RUNSTATE_offline)),
         now);
-    prev->last_run_time = now;
 
     ASSERT(next->runstate.state != RUNSTATE_running);
     vcpu_runstate_change(next, RUNSTATE_running, now);

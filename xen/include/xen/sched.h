@@ -174,9 +174,6 @@ struct vcpu
     } runstate_guest; /* guest address */
 #endif
 
-    /* last time when vCPU is scheduled out */
-    uint64_t last_run_time;
-
     /* Has the FPU been initialised? */
     bool             fpu_initialised;
     /* Has the FPU been used since it was last saved? */
