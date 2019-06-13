@@ -561,81 +561,53 @@ out:
     return;
 }
 
-libxl_device_usbctrl *
-libxl_device_usbctrl_list(libxl_ctx *ctx, uint32_t domid, int *num)
+static int libxl__usbctrl_from_xenstore(libxl__gc *gc,
+                                        const char *libxl_path,
+                                        libxl_devid devid,
+                                        libxl_device_usbctrl *usbctrl_r)
 {
-    GC_INIT(ctx);
-    libxl_device_usbctrl *usbctrls = NULL;
-    char *libxl_vusbs_path = NULL;
-    char **entry = NULL;
-    unsigned int nentries = 0;
-
-    *num = 0;
-
-    libxl_vusbs_path = GCSPRINTF("%s/device/%s",
-                     libxl__xs_libxl_path(gc, domid),
-                     libxl__device_kind_to_string(LIBXL__DEVICE_KIND_VUSB));
-    entry = libxl__xs_directory(gc, XBT_NULL, libxl_vusbs_path, &nentries);
-
-    if (entry && nentries) {
-        usbctrls = libxl__zalloc(NOGC, sizeof(*usbctrls) * nentries);
-        libxl_device_usbctrl *usbctrl;
-        libxl_device_usbctrl *end = usbctrls + nentries;
-        for (usbctrl = usbctrls;
-             usbctrl < end;
-             usbctrl++, entry++, (*num)++) {
-            const char *tmp, *be_path, *libxl_path;
-            int ret;
-
-            libxl_device_usbctrl_init(usbctrl);
-            usbctrl->devid = atoi(*entry);
+    int rc;
+    const char *tmp;
+    const char *be_path;
 
 #define READ_SUBPATH(path, subpath) ({                                  \
-        ret = libxl__xs_read_checked(gc, XBT_NULL,                      \
+        rc = libxl__xs_read_checked(gc, XBT_NULL,                      \
                                      GCSPRINTF("%s/" subpath, path),    \
                                      &tmp);                             \
-        if (ret) goto out;                                              \
+        if (rc) goto out;                                              \
         (char *)tmp;                                                    \
     })
 
 #define READ_SUBPATH_INT(path, subpath) ({                              \
-        ret = libxl__xs_read_checked(gc, XBT_NULL,                      \
+        rc = libxl__xs_read_checked(gc, XBT_NULL,                      \
                                      GCSPRINTF("%s/" subpath, path),    \
                                      &tmp);                             \
-        if (ret) goto out;                                              \
+        if (rc) goto out;                                              \
         tmp ? atoi(tmp) : -1;                                           \
     })
 
-            libxl_path = GCSPRINTF("%s/%s", libxl_vusbs_path, *entry);
-            libxl_usbctrl_type_from_string(READ_SUBPATH(libxl_path, "type"),
-                                           &usbctrl->type);
-            if (usbctrl->type == LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
-                be_path = libxl_path;
-                ret = libxl__get_domid(gc, &usbctrl->backend_domid);
-            } else {
-                be_path = READ_SUBPATH(libxl_path, "backend");
-                if (!be_path) goto out;
-                ret = libxl__backendpath_parse_domid(gc, be_path,
-                                                     &usbctrl->backend_domid);
-            }
-            if (ret) goto out;
-            usbctrl->version = READ_SUBPATH_INT(be_path, "usb-ver");
-            usbctrl->ports = READ_SUBPATH_INT(be_path, "num-ports");
+    usbctrl_r->devid = devid;
+    libxl_usbctrl_type_from_string(READ_SUBPATH(libxl_path, "type"),
+                                   &usbctrl_r->type);
+    if (usbctrl_r->type == LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
+        be_path = libxl_path;
+        rc = libxl__get_domid(gc, &usbctrl_r->backend_domid);
+    } else {
+        be_path = READ_SUBPATH(libxl_path, "backend");
+        if (!be_path) goto out;
+        rc = libxl__backendpath_parse_domid(gc, be_path,
+                                             &usbctrl_r->backend_domid);
+    }
+    if (rc) goto out;
+    usbctrl_r->version = READ_SUBPATH_INT(be_path, "usb-ver");
+    usbctrl_r->ports = READ_SUBPATH_INT(be_path, "num-ports");
 
 #undef READ_SUBPATH
 #undef READ_SUBPATH_INT
-       }
-    }
-
-    GC_FREE;
-    return usbctrls;
-
 out:
-    LOGD(ERROR, domid, "Unable to list USB Controllers");
-    libxl_device_usbctrl_list_free(usbctrls, *num);
-    GC_FREE;
-    *num = 0;
-    return NULL;
+    if (rc)
+        libxl_device_usbctrl_dispose(usbctrl_r);
+    return rc;
 }
 
 int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
@@ -703,30 +675,6 @@ out:
     return rc;
 }
 
-int libxl_devid_to_device_usbctrl(libxl_ctx *ctx,
-                                  uint32_t domid,
-                                  int devid,
-                                  libxl_device_usbctrl *usbctrl)
-{
-    libxl_device_usbctrl *usbctrls;
-    int nb = 0;
-    int i, rc;
-
-    usbctrls = libxl_device_usbctrl_list(ctx, domid, &nb);
-    if (!usbctrls) return ERROR_FAIL;
-
-    rc = ERROR_FAIL;
-    for (i = 0; i < nb; i++) {
-        if (devid == usbctrls[i].devid) {
-            libxl_device_usbctrl_copy(ctx, usbctrl, &usbctrls[i]);
-            rc = 0;
-            break;
-        }
-    }
-
-    libxl_device_usbctrl_list_free(usbctrls, nb);
-    return rc;
-}
 
 static char *usbdev_busaddr_to_busid(libxl__gc *gc, int bus, int addr)
 {
@@ -1943,15 +1891,6 @@ static int libxl_device_usbdev_compare(const libxl_device_usbdev *d1,
     return COMPARE_USB(d1, d2);
 }
 
-void libxl_device_usbctrl_list_free(libxl_device_usbctrl *list, int nr)
-{
-   int i;
-
-   for (i = 0; i < nr; i++)
-       libxl_device_usbctrl_dispose(&list[i]);
-   free(list);
-}
-
 void libxl_device_usbdev_list_free(libxl_device_usbdev *list, int nr)
 {
    int i;
@@ -1963,7 +1902,10 @@ void libxl_device_usbdev_list_free(libxl_device_usbdev *list, int nr)
 
 #define libxl__device_usbctrl_update_devid NULL
 
+LIBXL_DEFINE_DEVID_TO_DEVICE(usbctrl)
+LIBXL_DEFINE_DEVICE_LIST(usbctrl)
 DEFINE_DEVICE_TYPE_STRUCT(usbctrl, VUSB,
+    .from_xenstore = (device_from_xenstore_fn_t)libxl__usbctrl_from_xenstore,
     .dm_needed = libxl_device_usbctrl_dm_needed
 );
 
