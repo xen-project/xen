@@ -349,33 +349,36 @@ static char *pvusb_get_device_type(libxl_usbctrl_type type)
  * - usb-ehci       (version=2), always 6 ports
  * - nec-usb-xhci   (version=3), up to 15 ports
  */
-static int libxl__device_usbctrl_add_hvm(libxl__gc *gc, uint32_t domid,
+static int libxl__device_usbctrl_add_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
                                          libxl_device_usbctrl *usbctrl)
 {
-    flexarray_t *qmp_args;
-
-    qmp_args = flexarray_make(gc, 8, 1);
+    libxl__json_object *qmp_args = NULL;
 
     switch (usbctrl->version) {
     case 1:
-        flexarray_append_pair(qmp_args, "driver", "piix3-usb-uhci");
+        libxl__qmp_param_add_string(gc, &qmp_args,
+                                    "driver", "piix3-usb-uhci");
         break;
     case 2:
-        flexarray_append_pair(qmp_args, "driver", "usb-ehci");
+        libxl__qmp_param_add_string(gc, &qmp_args,
+                                    "driver", "usb-ehci");
         break;
     case 3:
-        flexarray_append_pair(qmp_args, "driver", "nec-usb-xhci");
-        flexarray_append_pair(qmp_args, "p2", GCSPRINTF("%d", usbctrl->ports));
-        flexarray_append_pair(qmp_args, "p3", GCSPRINTF("%d", usbctrl->ports));
+        libxl__qmp_param_add_string(gc, &qmp_args,
+                                    "driver", "nec-usb-xhci");
+        libxl__qmp_param_add_string(gc, &qmp_args, "p2",
+                                    GCSPRINTF("%d", usbctrl->ports));
+        libxl__qmp_param_add_string(gc, &qmp_args, "p3",
+                                    GCSPRINTF("%d", usbctrl->ports));
         break;
     default:
         abort(); /* Should not be possible. */
     }
 
-    flexarray_append_pair(qmp_args, "id",
-                          GCSPRINTF("xenusb-%d", usbctrl->devid));
+    libxl__qmp_param_add_string(gc, &qmp_args, "id",
+                                GCSPRINTF("xenusb-%d", usbctrl->devid));
 
-    return libxl__qmp_run_command_flexarray(gc, domid, "device_add", qmp_args);
+    return libxl__ev_qmp_send(gc, qmp, "device_add", qmp_args);
 }
 
 /* Send qmp commands to delete a usb controller in qemu.  */
@@ -430,6 +433,13 @@ static int libxl__device_usbdev_del_hvm(libxl__gc *gc, uint32_t domid,
 
 static LIBXL_DEFINE_UPDATE_DEVID(usbctrl)
 
+static void device_usbctrl_add_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
+static void device_usbctrl_add_qmp_cb(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *r, int rc);
+static void device_usbctrl_add_done(libxl__egc *egc,
+    libxl__ao_device *aodev, int rc);
+
 /* AO operation to add a usb controller.
  *
  * Generally, it does:
@@ -450,6 +460,10 @@ static void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
     libxl__device *device;
     int rc;
 
+    /* Store *usbctrl to be used by callbacks */
+    aodev->device_config = usbctrl;
+    aodev->device_type = &libxl__usbctrl_devtype;
+
     rc = libxl__device_usbctrl_setdefault(gc, domid, usbctrl,
                                           aodev->update_json);
     if (rc < 0) goto out;
@@ -464,14 +478,25 @@ static void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
     GCNEW(device);
     rc = libxl__device_from_usbctrl(gc, domid, usbctrl, device);
     if (rc) goto outrm;
+    aodev->dev = device;
 
     if (device->backend_kind == LIBXL__DEVICE_KIND_NONE) {
-        rc = libxl__device_usbctrl_add_hvm(gc, domid, usbctrl);
+        libxl__ev_qmp *const qmp = &aodev->qmp;
+
+        rc = libxl__ev_time_register_rel(ao, &aodev->timeout,
+                                         device_usbctrl_add_timeout,
+                                         LIBXL_QMP_CMD_TIMEOUT * 1000);
         if (rc) goto outrm;
-        goto out;
+
+        qmp->ao = ao;
+        qmp->domid = domid;
+        qmp->payload_fd = -1;
+        qmp->callback = device_usbctrl_add_qmp_cb;
+        rc = libxl__device_usbctrl_add_hvm(gc, qmp, usbctrl);
+        if (rc) goto outrm;
+        return;
     }
 
-    aodev->dev = device;
     aodev->action = LIBXL__DEVICE_ACTION_ADD;
     libxl__wait_device_connection(egc, aodev);
     return;
@@ -479,9 +504,45 @@ static void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
 outrm:
     libxl__device_usbctrl_del_xenstore(gc, domid, usbctrl);
 out:
+    device_usbctrl_add_done(egc, aodev, rc);
+}
+
+static void device_usbctrl_add_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                                       const struct timeval *requested_abs,
+                                       int rc)
+{
+    EGC_GC;
+    libxl__ao_device *aodev = CONTAINER_OF(ev, *aodev, timeout);
+
+    if (rc == ERROR_TIMEDOUT)
+        LOGD(ERROR, aodev->dev->domid, "Adding usbctrl to QEMU timed out");
+    device_usbctrl_add_qmp_cb(egc, &aodev->qmp, NULL, rc);
+}
+
+static void device_usbctrl_add_qmp_cb(libxl__egc *egc,
+                                      libxl__ev_qmp *qmp,
+                                      const libxl__json_object *r,
+                                      int rc)
+{
+    EGC_GC;
+    libxl__ao_device *aodev = CONTAINER_OF(qmp, *aodev, qmp);
+    libxl_device_usbctrl *const usbctrl = aodev->device_config;
+
+    if (rc)
+        libxl__device_usbctrl_del_xenstore(gc, aodev->dev->domid, usbctrl);
+
+    device_usbctrl_add_done(egc, aodev, rc);
+}
+
+static void device_usbctrl_add_done(libxl__egc *egc,
+                                    libxl__ao_device *aodev,
+                                    int rc)
+{
+    EGC_GC;
+    libxl__ev_qmp_dispose(gc, &aodev->qmp);
+    libxl__ev_time_deregister(gc, &aodev->timeout);
     aodev->rc = rc;
     aodev->callback(egc, aodev);
-    return;
 }
 
 LIBXL_DEFINE_DEVICE_ADD(usbctrl)
