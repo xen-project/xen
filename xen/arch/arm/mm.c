@@ -707,16 +707,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
 
     switch_ttbr(ttbr);
 
-    /* Clear the copy of the boot pagetables. Each secondary CPU
-     * rebuilds these itself (see head.S) */
-    clear_table(boot_pgtable);
-#ifdef CONFIG_ARM_64
-    clear_table(boot_first);
-    clear_table(boot_first_id);
-#endif
-    clear_table(boot_second);
-    clear_table(boot_third);
-
     xen_pt_enforce_wnx();
 
 #ifdef CONFIG_ARM_32
@@ -725,9 +715,26 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
 #endif
 }
 
+static void clear_boot_pagetables(void)
+{
+    /*
+     * Clear the copy of the boot pagetables. Each secondary CPU
+     * rebuilds these itself (see head.S).
+     */
+    clear_table(boot_pgtable);
+#ifdef CONFIG_ARM_64
+    clear_table(boot_first);
+    clear_table(boot_first_id);
+#endif
+    clear_table(boot_second);
+    clear_table(boot_third);
+}
+
 #ifdef CONFIG_ARM_64
 int init_secondary_pagetables(int cpu)
 {
+    clear_boot_pagetables();
+
     /* Set init_ttbr for this CPU coming up. All CPus share a single setof
      * pagetables, but rewrite it each time for consistency with 32 bit. */
     init_ttbr = (uintptr_t) xen_pgtable + phys_offset;
@@ -769,6 +776,8 @@ int init_secondary_pagetables(int cpu)
 
     per_cpu(xen_pgtable, cpu) = first;
     per_cpu(xen_dommap, cpu) = domheap;
+
+    clear_boot_pagetables();
 
     /* Set init_ttbr for this CPU coming up */
     init_ttbr = __pa(first);
