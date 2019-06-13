@@ -639,7 +639,7 @@ out:
 }
 
 int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
-                                 libxl_device_usbctrl *usbctrl,
+                                 const libxl_device_usbctrl *usbctrl,
                                  libxl_usbctrlinfo *usbctrlinfo)
 {
     GC_INIT(ctx);
@@ -676,7 +676,7 @@ int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
         be_path = READ_SUBPATH(libxl_path, "backend");
         usbctrlinfo->backend = libxl__strdup(NOGC, be_path);
         rc = libxl__backendpath_parse_domid(gc, be_path,
-                                            &usbctrl->backend_domid);
+                                            &usbctrlinfo->backend_id);
         if (rc) goto out;
         usbctrlinfo->state = READ_SUBPATH_INT(fe_path, "state");
         usbctrlinfo->evtch = READ_SUBPATH_INT(fe_path, "event-channel");
@@ -689,7 +689,7 @@ int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
     } else {
         usbctrlinfo->ports = READ_SUBPATH_INT(libxl_path, "num-ports");
         usbctrlinfo->version = READ_SUBPATH_INT(libxl_path, "usb-ver");
-        rc = libxl__get_domid(gc, &usbctrl->backend_domid);
+        rc = libxl__get_domid(gc, &usbctrlinfo->backend_id);
         if (rc) goto out;
     }
 

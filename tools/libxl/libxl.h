@@ -1969,7 +1969,7 @@ void libxl_device_usbctrl_list_free(libxl_device_usbctrl *list, int nr);
 
 
 int libxl_device_usbctrl_getinfo(libxl_ctx *ctx, uint32_t domid,
-                                 libxl_device_usbctrl *usbctrl,
+                                 const libxl_device_usbctrl *usbctrl,
                                  libxl_usbctrlinfo *usbctrlinfo);
 
 /* USB Devices */
