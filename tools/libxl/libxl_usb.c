@@ -147,8 +147,7 @@ static int libxl__device_from_usbctrl(libxl__gc *gc, uint32_t domid,
         device->backend_kind = LIBXL__DEVICE_KIND_NONE;
         break;
     default:
-        assert(0); /* can't really happen. */
-        break;
+        abort(); /* can't really happen. */
     }
     device->devid           = usbctrl->devid;
     device->domid           = domid;
@@ -370,8 +369,7 @@ static int libxl__device_usbctrl_add_hvm(libxl__gc *gc, uint32_t domid,
         flexarray_append_pair(qmp_args, "p3", GCSPRINTF("%d", usbctrl->ports));
         break;
     default:
-        assert(0); /* Should not be possible. */
-        break;
+        abort(); /* Should not be possible. */
     }
 
     flexarray_append_pair(qmp_args, "id",
