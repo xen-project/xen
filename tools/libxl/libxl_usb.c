@@ -382,15 +382,16 @@ static int libxl__device_usbctrl_add_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
 }
 
 /* Send qmp commands to delete a usb controller in qemu.  */
-static int libxl__device_usbctrl_del_hvm(libxl__gc *gc, uint32_t domid,
+static int libxl__device_usbctrl_del_hvm(libxl__gc *gc,
+                                         libxl__ev_qmp *qmp,
                                          int devid)
 {
-    flexarray_t *qmp_args;
+    libxl__json_object *qmp_args = NULL;
 
-    qmp_args = flexarray_make(gc, 2, 1);
-    flexarray_append_pair(qmp_args, "id", GCSPRINTF("xenusb-%d", devid));
+    libxl__qmp_param_add_string(gc, &qmp_args,
+                                "id", GCSPRINTF("xenusb-%d", devid));
 
-    return libxl__qmp_run_command_flexarray(gc, domid, "device_del", qmp_args);
+    return libxl__ev_qmp_send(gc, qmp, "device_del", qmp_args);
 }
 
 /* Send qmp commands to create a usb device in qemu. */
@@ -557,6 +558,13 @@ static int libxl__device_usbdev_list_for_usbctrl(libxl__gc *gc, uint32_t domid,
 static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
                                        libxl_device_usbdev *usbdev);
 
+static void device_usbctrl_remove_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
+static void device_usbctrl_remove_qmp_cb(libxl__egc *egc,
+    libxl__ev_qmp *qmp, const libxl__json_object *resp, int rc);
+static void device_usbctrl_remove_done(libxl__egc *egc,
+    libxl__ao_device *, int rc);
+
 /* AO function to remove a usb controller.
  *
  * Generally, it does:
@@ -576,12 +584,17 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
     int i, rc;
     uint32_t domid = aodev->dev->domid;
     int usbctrl_devid = aodev->dev->devid;
-    libxl_device_usbctrl usbctrl;
+    libxl_device_usbctrl *usbctrl;
 
-    libxl_device_usbctrl_init(&usbctrl);
+    GCNEW(usbctrl);
+    libxl_device_usbctrl_init(usbctrl);
     rc = libxl_devid_to_device_usbctrl(CTX, domid, usbctrl_devid,
-                                       &usbctrl);
+                                       usbctrl);
     if (rc) goto out;
+
+    /* Store *usbctrl to be used by callbacks */
+    aodev->device_config = usbctrl;
+    aodev->device_type = &libxl__usbctrl_devtype;
 
     /* Remove usb devices first */
     rc = libxl__device_usbdev_list_for_usbctrl(gc, domid, usbctrl_devid,
@@ -597,24 +610,72 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
         }
     }
 
-    if (usbctrl.type == LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
-        rc = libxl__device_usbctrl_del_hvm(gc, domid, usbctrl_devid);
-        if (!rc)
-            libxl__device_usbctrl_del_xenstore(gc, domid, &usbctrl);
-        goto out;
+    if (usbctrl->type == LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
+        libxl__ev_qmp *const qmp = &aodev->qmp;
+
+        rc = libxl__ev_time_register_rel(ao, &aodev->timeout,
+                                         device_usbctrl_remove_timeout,
+                                         LIBXL_QMP_CMD_TIMEOUT * 1000);
+        if (rc) goto out;
+
+        qmp->ao = ao;
+        qmp->domid = domid;
+        qmp->callback = device_usbctrl_remove_qmp_cb;
+        qmp->payload_fd = -1;
+        rc = libxl__device_usbctrl_del_hvm(gc, qmp, usbctrl_devid);
+        if (rc) goto out;
+        return;
     }
 
-    libxl_device_usbctrl_dispose(&usbctrl);
+    libxl_device_usbctrl_dispose(usbctrl);
 
     /* Remove usbctrl */
-    libxl__initiate_device_generic_remove(egc, aodev);
+    libxl__initiate_device_generic_remove(egc, aodev); /* must be last */
     return;
-
 out:
-    libxl_device_usbctrl_dispose(&usbctrl);
+    device_usbctrl_remove_done(egc, aodev, rc); /* must be last */
+}
+
+static void device_usbctrl_remove_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc)
+{
+    EGC_GC;
+    libxl__ao_device *aodev = CONTAINER_OF(ev, *aodev, timeout);
+
+    if (rc == ERROR_TIMEDOUT)
+        LOGD(ERROR, aodev->dev->domid,
+             "Removing usbctrl from QEMU timed out");
+    device_usbctrl_remove_qmp_cb(egc, &aodev->qmp, NULL, rc);
+}
+
+static void device_usbctrl_remove_qmp_cb(libxl__egc *egc,
+                                         libxl__ev_qmp *qmp,
+                                         const libxl__json_object *resp,
+                                         int rc)
+{
+    EGC_GC;
+    libxl__ao_device *aodev = CONTAINER_OF(qmp, *aodev, qmp);
+    libxl_device_usbctrl *const usbctrl = aodev->device_config;
+
+    if (!rc)
+        libxl__device_usbctrl_del_xenstore(gc, aodev->dev->domid, usbctrl);
+
+    device_usbctrl_remove_done(egc, aodev, rc);
+}
+
+static void device_usbctrl_remove_done(libxl__egc *egc,
+                                       libxl__ao_device *aodev,
+                                       int rc)
+{
+    EGC_GC;
+    libxl_device_usbctrl *const usbctrl = aodev->device_config;
+
+    libxl_device_usbctrl_dispose(usbctrl);
+    libxl__ev_qmp_dispose(gc, &aodev->qmp);
+    libxl__ev_time_deregister(gc, &aodev->timeout);
+
     aodev->rc = rc;
     aodev->callback(egc, aodev);
-    return;
 }
 
 static int libxl__usbctrl_from_xenstore(libxl__gc *gc,
