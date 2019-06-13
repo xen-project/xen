@@ -516,13 +516,10 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
     uint32_t domid = aodev->dev->domid;
     int usbctrl_devid = aodev->dev->devid;
     libxl_device_usbctrl usbctrl;
-    libxl_usbctrlinfo usbctrlinfo;
 
     libxl_device_usbctrl_init(&usbctrl);
-    libxl_usbctrlinfo_init(&usbctrlinfo);
-    usbctrl.devid = usbctrl_devid;
-
-    rc = libxl_device_usbctrl_getinfo(CTX, domid, &usbctrl, &usbctrlinfo);
+    rc = libxl_devid_to_device_usbctrl(CTX, domid, usbctrl_devid,
+                                       &usbctrl);
     if (rc) goto out;
 
     /* Remove usb devices first */
@@ -539,7 +536,7 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
         }
     }
 
-    if (usbctrlinfo.type == LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
+    if (usbctrl.type == LIBXL_USBCTRL_TYPE_DEVICEMODEL) {
         rc = libxl__device_usbctrl_del_hvm(gc, domid, usbctrl_devid);
         if (!rc)
             libxl__device_usbctrl_del_xenstore(gc, domid, &usbctrl);
@@ -547,7 +544,6 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
     }
 
     libxl_device_usbctrl_dispose(&usbctrl);
-    libxl_usbctrlinfo_dispose(&usbctrlinfo);
 
     /* Remove usbctrl */
     libxl__initiate_device_generic_remove(egc, aodev);
@@ -555,7 +551,6 @@ void libxl__initiate_device_usbctrl_remove(libxl__egc *egc,
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
-    libxl_usbctrlinfo_dispose(&usbctrlinfo);
     aodev->rc = rc;
     aodev->callback(egc, aodev);
     return;
@@ -1529,16 +1524,12 @@ static int do_usbdev_add(libxl__gc *gc, uint32_t domid,
     int rc;
     char *busid;
     libxl_device_usbctrl usbctrl;
-    libxl_usbctrlinfo usbctrlinfo;
 
     libxl_device_usbctrl_init(&usbctrl);
-    libxl_usbctrlinfo_init(&usbctrlinfo);
-    usbctrl.devid = usbdev->ctrl;
-
-    rc = libxl_device_usbctrl_getinfo(CTX, domid, &usbctrl, &usbctrlinfo);
+    rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
     if (rc) goto out;
 
-    switch (usbctrlinfo.type) {
+    switch (usbctrl.type) {
     case LIBXL_USBCTRL_TYPE_PV:
         busid = usbdev_busaddr_to_busid(gc, usbdev->u.hostdev.hostbus,
                                         usbdev->u.hostdev.hostaddr);
@@ -1589,7 +1580,6 @@ static int do_usbdev_add(libxl__gc *gc, uint32_t domid,
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
-    libxl_usbctrlinfo_dispose(&usbctrlinfo);
     return rc;
 }
 
@@ -1618,21 +1608,19 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
     libxl_device_usbdev *assigned;
     int num_assigned;
     libxl_device_usbctrl usbctrl;
-    libxl_usbctrlinfo usbctrlinfo;
 
     libxl_device_usbctrl_init(&usbctrl);
-    libxl_usbctrlinfo_init(&usbctrlinfo);
 
     /* Currently only support adding USB device from Dom0 backend.
      * So, if USB controller is specified, check its backend domain,
      * if it's not Dom0, report error.
      */
     if (usbdev->ctrl != -1) {
-        usbctrl.devid = usbdev->ctrl;
-        rc = libxl_device_usbctrl_getinfo(CTX, domid, &usbctrl, &usbctrlinfo);
+        rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl,
+                                           &usbctrl);
         if (rc) goto out;
 
-        if (usbctrlinfo.backend_id != LIBXL_TOOLSTACK_DOMID) {
+        if (usbctrl.backend_domid != LIBXL_TOOLSTACK_DOMID) {
             LOGD(ERROR, domid,
                  "Don't support adding USB device from non-Dom0 backend");
             rc = ERROR_INVAL;
@@ -1672,7 +1660,6 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
-    libxl_usbctrlinfo_dispose(&usbctrlinfo);
     aodev->rc = rc;
     aodev->callback(egc, aodev);
     return;
@@ -1687,18 +1674,14 @@ static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
     int rc;
     char *busid;
     libxl_device_usbctrl usbctrl;
-    libxl_usbctrlinfo usbctrlinfo;
 
     libxl_device_usbctrl_init(&usbctrl);
-    libxl_usbctrlinfo_init(&usbctrlinfo);
-    usbctrl.devid = usbdev->ctrl;
-
-    rc = libxl_device_usbctrl_getinfo(CTX, domid, &usbctrl, &usbctrlinfo);
+    rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
     if (rc) goto out;
 
-    switch (usbctrlinfo.type) {
+    switch (usbctrl.type) {
     case LIBXL_USBCTRL_TYPE_PV:
-        busid = usbdev_busid_from_ctrlport(gc, domid, usbdev, usbctrlinfo.type);
+        busid = usbdev_busid_from_ctrlport(gc, domid, usbdev, usbctrl.type);
         if (!busid) {
             rc = ERROR_FAIL;
             goto out;
@@ -1770,7 +1753,6 @@ static int do_usbdev_remove(libxl__gc *gc, uint32_t domid,
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
-    libxl_usbctrlinfo_dispose(&usbctrlinfo);
     return rc;
 }
 
@@ -1785,7 +1767,6 @@ out:
 static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
                                        libxl_device_usbdev *usbdev)
 {
-    libxl_usbctrlinfo usbctrlinfo;
     libxl_device_usbctrl usbctrl;
     int rc;
 
@@ -1795,13 +1776,10 @@ static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
     }
 
     libxl_device_usbctrl_init(&usbctrl);
-    libxl_usbctrlinfo_init(&usbctrlinfo);
-    usbctrl.devid = usbdev->ctrl;
-
-    rc = libxl_device_usbctrl_getinfo(CTX, domid, &usbctrl, &usbctrlinfo);
+    rc = libxl_devid_to_device_usbctrl(CTX, domid, usbdev->ctrl, &usbctrl);
     if (rc) goto out;
 
-    if (usbctrlinfo.backend_id != LIBXL_TOOLSTACK_DOMID) {
+    if (usbctrl.backend_domid != LIBXL_TOOLSTACK_DOMID) {
         LOGD(ERROR, domid,
              "Don't support removing USB device from non-Dom0 backend");
         rc = ERROR_INVAL;
@@ -1813,7 +1791,6 @@ static int libxl__device_usbdev_remove(libxl__gc *gc, uint32_t domid,
 
 out:
     libxl_device_usbctrl_dispose(&usbctrl);
-    libxl_usbctrlinfo_dispose(&usbctrlinfo);
     return rc;
 }
 
