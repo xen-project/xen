@@ -563,7 +563,7 @@ out:
 }
 
 static int libxl__device_pcm_getinfo(libxl__gc *gc, const char *path,
-                                     libxl_device_vsnd *vsnd,
+                                     const libxl_device_vsnd *vsnd,
                                      libxl_vsndinfo *info)
 {
     int i;
@@ -588,7 +588,7 @@ out:
 }
 
 int libxl_device_vsnd_getinfo(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_vsnd *vsnd,
+                              const libxl_device_vsnd *vsnd,
                               libxl_vsndinfo *info)
 {
     GC_INIT(ctx);

@@ -1907,7 +1907,7 @@ libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx,
 void libxl_device_disk_list_free(libxl_device_disk* list, int num)
                                  LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_disk *disk, libxl_diskinfo *diskinfo)
+                              const libxl_device_disk *disk, libxl_diskinfo *diskinfo)
                               LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /*
@@ -2008,7 +2008,7 @@ libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx,
 void libxl_device_nic_list_free(libxl_device_nic* list, int num)
                                 LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
-                             libxl_device_nic *nic, libxl_nicinfo *nicinfo)
+                             const libxl_device_nic *nic, libxl_nicinfo *nicinfo)
                              LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /*
@@ -2019,7 +2019,7 @@ libxl_device_channel *libxl_device_channel_list(libxl_ctx *ctx,
                                                 uint32_t domid,
                                                 int *num);
 int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
-                                 libxl_device_channel *channel,
+                                 const libxl_device_channel *channel,
                                  libxl_channelinfo *channelinfo);
 
 /* Virtual TPMs */
@@ -2041,7 +2041,7 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx,
 void libxl_device_vtpm_list_free(libxl_device_vtpm*, int num)
                                  LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vtpm_getinfo(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_vtpm *vtpm, libxl_vtpminfo *vtpminfo)
+                              const libxl_device_vtpm *vtpm, libxl_vtpminfo *vtpminfo)
                               LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* Virtual displays */
@@ -2064,7 +2064,7 @@ libxl_device_vdispl *libxl_device_vdispl_list(libxl_ctx *ctx,
 void libxl_device_vdispl_list_free(libxl_device_vdispl* list, int num)
                                    LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vdispl_getinfo(libxl_ctx *ctx, uint32_t domid,
-                                libxl_device_vdispl *vdispl,
+                                const libxl_device_vdispl *vdispl,
                                 libxl_vdisplinfo *vdisplinfo)
                                 LIBXL_EXTERNAL_CALLERS_ONLY;
 
@@ -2088,7 +2088,7 @@ libxl_device_vsnd *libxl_device_vsnd_list(libxl_ctx *ctx,
 void libxl_device_vsnd_list_free(libxl_device_vsnd* list, int num)
                                  LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vsnd_getinfo(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_vsnd *vsnd,
+                              const libxl_device_vsnd *vsnd,
                               libxl_vsndinfo *vsndlinfo)
                               LIBXL_EXTERNAL_CALLERS_ONLY;
 
@@ -2111,7 +2111,7 @@ libxl_device_vkb *libxl_device_vkb_list(libxl_ctx *ctx,
 void libxl_device_vkb_list_free(libxl_device_vkb* list, int num)
                                 LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vkb_getinfo(libxl_ctx *ctx, uint32_t domid,
-                             libxl_device_vkb *vkb,
+                             const libxl_device_vkb *vkb,
                              libxl_vkbinfo *vkbinfo)
                              LIBXL_EXTERNAL_CALLERS_ONLY;
 

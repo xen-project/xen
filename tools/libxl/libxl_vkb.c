@@ -270,7 +270,7 @@ out:
 }
 
 int libxl_device_vkb_getinfo(libxl_ctx *ctx, uint32_t domid,
-                             libxl_device_vkb *vkb,
+                             const libxl_device_vkb *vkb,
                              libxl_vkbinfo *info)
 {
     GC_INIT(ctx);

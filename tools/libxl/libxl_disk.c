@@ -598,7 +598,8 @@ int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_disk *disk, libxl_diskinfo *diskinfo)
+                              const libxl_device_disk *disk,
+                              libxl_diskinfo *diskinfo)
 {
     GC_INIT(ctx);
     char *fe_path, *libxl_path;

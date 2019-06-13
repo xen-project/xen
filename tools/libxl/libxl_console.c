@@ -566,7 +566,7 @@ out_err:
 }
 
 int libxl_device_channel_getinfo(libxl_ctx *ctx, uint32_t domid,
-                                 libxl_device_channel *channel,
+                                 const libxl_device_channel *channel,
                                  libxl_channelinfo *channelinfo)
 {
     GC_INIT(ctx);

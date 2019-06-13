@@ -90,7 +90,7 @@ static int libxl__vtpm_from_xenstore(libxl__gc *gc, const char *libxl_path,
 
 int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
                               uint32_t domid,
-                              libxl_device_vtpm *vtpm,
+                              const libxl_device_vtpm *vtpm,
                               libxl_vtpminfo *vtpminfo)
 {
     GC_INIT(ctx);

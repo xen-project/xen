@@ -399,7 +399,8 @@ void libxl_device_nic_list_free(libxl_device_nic* list, int num)
 }
 
 int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_nic *nic, libxl_nicinfo *nicinfo)
+                              const libxl_device_nic *nic,
+                              libxl_nicinfo *nicinfo)
 {
     GC_INIT(ctx);
     char *nicpath, *libxl_path;

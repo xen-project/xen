@@ -152,7 +152,7 @@ out:
 }
 
 int libxl_device_vdispl_getinfo(libxl_ctx *ctx, uint32_t domid,
-                                libxl_device_vdispl *vdispl,
+                                const libxl_device_vdispl *vdispl,
                                 libxl_vdisplinfo *info)
 {
     GC_INIT(ctx);
