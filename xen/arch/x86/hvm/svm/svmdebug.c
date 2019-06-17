@@ -29,6 +29,15 @@ static void svm_dump_sel(const char *name, const struct segment_register *s)
 
 void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
 {
+    struct vcpu *curr = current;
+
+    /*
+     * If we are dumping the VMCB currently in context, some guest state may
+     * still be cached in hardware.  Retrieve it.
+     */
+    if ( vmcb == curr->arch.hvm.svm.vmcb )
+        svm_sync_vmcb(curr, vmcb_in_sync);
+
     printk("Dumping guest's current state at %s...\n", from);
     printk("Size of VMCB = %zu, paddr = %"PRIpaddr", vaddr = %p\n",
            sizeof(struct vmcb_struct), virt_to_maddr(vmcb), vmcb);
