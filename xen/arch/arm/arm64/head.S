@@ -112,6 +112,18 @@
 
 #endif /* !CONFIG_EARLY_PRINTK */
 
+/*
+ * Pseudo-op for PC relative adr <reg>, <symbol> where <symbol> is
+ * within the range +/- 4GB of the PC.
+ *
+ * @dst: destination register (64 bit wide)
+ * @sym: name of the symbol
+ */
+.macro  adr_l, dst, sym
+        adrp \dst, \sym
+        add  \dst, \dst, :lo12:\sym
+.endm
+
 /* Load the physical address of a symbol into xb */
 .macro load_paddr xb, sym
         ldr \xb, =\sym
@@ -817,11 +829,9 @@ ENTRY(efi_xen_start)
          * Flush dcache covering current runtime addresses
          * of xen text/data. Then flush all of icache.
          */
-        adrp  x1, _start
-        add   x1, x1, #:lo12:_start
+        adr_l x1, _start
         mov   x0, x1
-        adrp  x2, _end
-        add   x2, x2, #:lo12:_end
+        adr_l x2, _end
         sub   x1, x2, x1
 
         bl    __flush_dcache_area
