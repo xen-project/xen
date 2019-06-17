@@ -1189,21 +1189,21 @@ static void /*__init*/ __print_IO_APIC(bool boot)
 
 	printk(KERN_DEBUG ".... IRQ redirection table:\n");
 
-	printk(KERN_DEBUG " NR Log Phy Mask Trig IRR Pol"
-               " Stat Dest Deli Vect:   \n");
+	printk(KERN_DEBUG " NR %s Msk Trg IRR Pol Stat DstM DelM Vec\n",
+               x2apic_enabled ? " DestID" : "Dst");
 
 	for (i = 0; i <= reg_01.bits.entries; i++) {
             struct IO_APIC_route_entry entry;
 
             entry = ioapic_read_entry(apic, i, 0);
 
-            printk(KERN_DEBUG " %02x %03X %02X  ",
-                   i,
-                   entry.dest.logical.logical_dest,
-                   entry.dest.physical.physical_dest
-		);
+            if ( x2apic_enabled )
+                printk(KERN_DEBUG " %02x %08x", i, entry.dest.dest32);
+            else
+                printk(KERN_DEBUG " %02x  %02x ", i,
+                       entry.dest.logical.logical_dest);
 
-            printk("%1d    %1d    %1d   %1d   %1d    %1d    %1d    %02X\n",
+            printk(" %d   %d   %d   %d   %d    %d    %d    %02X\n",
                    entry.mask,
                    entry.trigger,
                    entry.irr,
@@ -2479,12 +2479,14 @@ void dump_ioapic_irq_info(void)
             rte = ioapic_read_entry(entry->apic, pin, 0);
 
             printk("vec=%02x delivery=%-5s dest=%c status=%d "
-                   "polarity=%d irr=%d trig=%c mask=%d dest_id:%d\n",
+                   "polarity=%d irr=%d trig=%c mask=%d dest_id:%0*x\n",
                    rte.vector, delivery_mode_2_str(rte.delivery_mode),
                    rte.dest_mode ? 'L' : 'P',
                    rte.delivery_status, rte.polarity, rte.irr,
                    rte.trigger ? 'L' : 'E', rte.mask,
-                   rte.dest.logical.logical_dest);
+                   x2apic_enabled ? 8 : 2,
+                   x2apic_enabled ? rte.dest.dest32
+                                  : rte.dest.logical.logical_dest);
 
             if ( entry->next == 0 )
                 break;
