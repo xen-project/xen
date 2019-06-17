@@ -492,6 +492,68 @@ cpu_init:
 ENDPROC(cpu_init)
 
 /*
+ * Macro to create a page table entry in \ptbl to \tbl
+ *
+ * ptbl:    table symbol where the entry will be created
+ * tbl:     table symbol to point to
+ * virt:    virtual address
+ * shift:   #imm page table shift
+ * tmp1:    scratch register
+ * tmp2:    scratch register
+ * tmp3:    scratch register
+ *
+ * Preserves \virt
+ * Clobbers \tmp1, \tmp2, \tmp3
+ *
+ * Also use x20 for the phys offset.
+ *
+ * Note that all parameters using registers should be distinct.
+ */
+.macro create_table_entry, ptbl, tbl, virt, shift, tmp1, tmp2, tmp3
+        lsr   \tmp1, \virt, #\shift
+        and   \tmp1, \tmp1, #LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
+
+        load_paddr \tmp2, \tbl
+        mov   \tmp3, #PT_PT                 /* \tmp3 := right for linear PT */
+        orr   \tmp3, \tmp3, \tmp2           /*          + \tlb paddr */
+
+        adr_l \tmp2, \ptbl
+
+        str   \tmp3, [\tmp2, \tmp1, lsl #3]
+.endm
+
+/*
+ * Macro to create a mapping entry in \tbl to \phys. Only mapping in 3rd
+ * level table (i.e page granularity) is supported.
+ *
+ * ptbl:     table symbol where the entry will be created
+ * virt:    virtual address
+ * phys:    physical address (should be page aligned)
+ * tmp1:    scratch register
+ * tmp2:    scratch register
+ * tmp3:    scratch register
+ * type:    mapping type. If not specified it will be normal memory (PT_MEM_L3)
+ *
+ * Preserves \virt, \phys
+ * Clobbers \tmp1, \tmp2, \tmp3
+ *
+ * Note that all parameters using registers should be distinct.
+ */
+.macro create_mapping_entry, ptbl, virt, phys, tmp1, tmp2, tmp3, type=PT_MEM_L3
+        and   \tmp3, \phys, #THIRD_MASK     /* \tmp3 := PAGE_ALIGNED(phys) */
+
+        lsr   \tmp1, \virt, #THIRD_SHIFT
+        and   \tmp1, \tmp1, #LPAE_ENTRY_MASK/* \tmp1 := slot in \tlb */
+
+        mov   \tmp2, #\type                 /* \tmp2 := right for section PT */
+        orr   \tmp2, \tmp2, \tmp3           /*          + PAGE_ALIGNED(phys) */
+
+        adr_l \tmp3, \ptbl
+
+        str   \tmp2, [\tmp3, \tmp1, lsl #3]
+.endm
+
+/*
  * Rebuild the boot pagetable's first-level entries. The structure
  * is described in mm.c.
  *
@@ -731,28 +793,17 @@ ENDPROC(remove_identity_mapping)
  *   x20: Physical offset
  *   x23: Early UART base physical address
  *
- * Clobbers x1 - x4
+ * Clobbers x0 - x3
  */
 setup_fixmap:
 #ifdef CONFIG_EARLY_PRINTK
         /* Add UART to the fixmap table */
-        ldr   x1, =xen_fixmap        /* x1 := vaddr (xen_fixmap) */
-        lsr   x2, x23, #THIRD_SHIFT
-        lsl   x2, x2, #THIRD_SHIFT   /* 4K aligned paddr of UART */
-        mov   x3, #PT_DEV_L3
-        orr   x2, x2, x3             /* x2 := 4K dev map including UART */
-        str   x2, [x1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
+        ldr   x0, =EARLY_UART_VIRTUAL_ADDRESS
+        create_mapping_entry xen_fixmap, x0, x23, x1, x2, x3, type=PT_DEV_L3
 #endif
-
         /* Map fixmap into boot_second */
-        ldr   x4, =boot_second       /* x4 := vaddr (boot_second) */
-        load_paddr x2, xen_fixmap
-        mov   x3, #PT_PT
-        orr   x2, x2, x3             /* x2 := table map of xen_fixmap */
-        ldr   x1, =FIXMAP_ADDR(0)
-        lsr   x1, x1, #(SECOND_SHIFT - 3)   /* x1 := Slot for FIXMAP(0) */
-        str   x2, [x4, x1]           /* Map it in the fixmap's slot */
-
+        ldr   x0, =FIXMAP_ADDR(0)
+        create_table_entry boot_second, xen_fixmap, x0, SECOND_SHIFT, x1, x2, x3
         /* Ensure any page table updates made above have occurred. */
         dsb   nshst
 
