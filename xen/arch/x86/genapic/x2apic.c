@@ -154,7 +154,7 @@ static void send_IPI_mask_x2apic_cluster(const cpumask_t *cpumask, int vector)
             msr_content |= per_cpu(cpu_2_logical_apicid, cpu);
         }
 
-        BUG_ON(!msr_content);
+        BUG_ON(!(msr_content & 0xffff));
         msr_content = (msr_content << 32) | APIC_DM_FIXED |
                       APIC_DEST_LOGICAL | vector;
         apic_wrmsr(APIC_ICR, msr_content);
