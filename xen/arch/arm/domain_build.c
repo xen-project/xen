@@ -742,8 +742,7 @@ static int __init make_hypervisor_node(struct domain *d,
     return res;
 }
 
-static int __init make_psci_node(void *fdt,
-                                 const struct dt_device_node *parent)
+static int __init make_psci_node(void *fdt)
 {
     int res;
     const char compat[] =
@@ -779,8 +778,7 @@ static int __init make_psci_node(void *fdt,
     return res;
 }
 
-static int __init make_cpus_node(const struct domain *d, void *fdt,
-                                 const struct dt_device_node *parent)
+static int __init make_cpus_node(const struct domain *d, void *fdt)
 {
     int res;
     const struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
@@ -962,8 +960,7 @@ static int __init make_gic_node(const struct domain *d, void *fdt,
     return res;
 }
 
-static int __init make_timer_node(const struct domain *d, void *fdt,
-                                  const struct dt_device_node *node)
+static int __init make_timer_node(const struct domain *d, void *fdt)
 {
     static const struct dt_device_match timer_ids[] __initconst =
     {
@@ -1380,7 +1377,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     if ( device_get_class(node) == DEVICE_GIC )
         return make_gic_node(d, kinfo->fdt, node);
     if ( dt_match_node(timer_matches, node) )
-        return make_timer_node(d, kinfo->fdt, node);
+        return make_timer_node(d, kinfo->fdt);
 
     /* Skip nodes used by Xen */
     if ( dt_device_used_by(node) == DOMID_XEN )
@@ -1472,11 +1469,11 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_psci_node(kinfo->fdt, node);
+        res = make_psci_node(kinfo->fdt);
         if ( res )
             return res;
 
-        res = make_cpus_node(d, kinfo->fdt, node);
+        res = make_cpus_node(d, kinfo->fdt);
         if ( res )
             return res;
 
@@ -1731,11 +1728,11 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    ret = make_psci_node(kinfo->fdt, NULL);
+    ret = make_psci_node(kinfo->fdt);
     if ( ret )
         goto err;
 
-    ret = make_cpus_node(d, kinfo->fdt, NULL);
+    ret = make_cpus_node(d, kinfo->fdt);
     if ( ret )
         goto err;
 
