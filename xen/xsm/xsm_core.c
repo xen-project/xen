@@ -38,9 +38,9 @@ enum xsm_bootparam {
 };
 
 static enum xsm_bootparam __initdata xsm_bootparam =
-#ifdef CONFIG_XSM_FLASK_DEFAULT
+#if defined(CONFIG_XSM_FLASK_DEFAULT)
     XSM_BOOTPARAM_FLASK;
-#elif CONFIG_XSM_SILO_DEFAULT
+#elif defined(CONFIG_XSM_SILO_DEFAULT)
     XSM_BOOTPARAM_SILO;
 #else
     XSM_BOOTPARAM_DUMMY;
@@ -52,11 +52,11 @@ static int __init parse_xsm_param(const char *s)
 
     if ( !strcmp(s, "dummy") )
         xsm_bootparam = XSM_BOOTPARAM_DUMMY;
-#ifdef CONFIG_XSM_FLASK
+#ifdef CONFIG_FLASK
     else if ( !strcmp(s, "flask") )
         xsm_bootparam = XSM_BOOTPARAM_FLASK;
 #endif
-#ifdef CONFIG_XSM_SILO
+#ifdef CONFIG_SILO
     else if ( !strcmp(s, "silo") )
         xsm_bootparam = XSM_BOOTPARAM_SILO;
 #endif
