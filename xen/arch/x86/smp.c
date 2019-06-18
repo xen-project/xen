@@ -302,23 +302,31 @@ static void stop_this_cpu(void *dummy)
  */
 void smp_send_stop(void)
 {
-    int timeout = 10;
+    unsigned int cpu = smp_processor_id();
 
-    local_irq_disable();
-    fixup_irqs(cpumask_of(smp_processor_id()), 0);
-    local_irq_enable();
+    if ( num_online_cpus() > 1 )
+    {
+        int timeout = 10;
 
-    smp_call_function(stop_this_cpu, NULL, 0);
+        local_irq_disable();
+        fixup_irqs(cpumask_of(cpu), 0);
+        local_irq_enable();
 
-    /* Wait 10ms for all other CPUs to go offline. */
-    while ( (num_online_cpus() > 1) && (timeout-- > 0) )
-        mdelay(1);
+        smp_call_function(stop_this_cpu, NULL, 0);
 
-    local_irq_disable();
-    disable_IO_APIC();
-    hpet_disable();
-    __stop_this_cpu();
-    local_irq_enable();
+        /* Wait 10ms for all other CPUs to go offline. */
+        while ( (num_online_cpus() > 1) && (timeout-- > 0) )
+            mdelay(1);
+    }
+
+    if ( cpu_online(cpu) )
+    {
+        local_irq_disable();
+        disable_IO_APIC();
+        hpet_disable();
+        __stop_this_cpu();
+        local_irq_enable();
+    }
 }
 
 void smp_send_nmi_allbutself(void)
