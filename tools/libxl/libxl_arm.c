@@ -89,6 +89,19 @@ int libxl__arch_domain_prepare_config(libxl__gc *gc,
         return ERROR_FAIL;
     }
 
+    switch (d_config->b_info.tee) {
+    case LIBXL_TEE_TYPE_NONE:
+        config->arch.tee_type = XEN_DOMCTL_CONFIG_TEE_NONE;
+        break;
+    case LIBXL_TEE_TYPE_OPTEE:
+        config->arch.tee_type = XEN_DOMCTL_CONFIG_TEE_OPTEE;
+        break;
+    default:
+        LOG(ERROR, "Unknown TEE type %d",
+            d_config->b_info.tee);
+        return ERROR_FAIL;
+    }
+
     return 0;
 }
 

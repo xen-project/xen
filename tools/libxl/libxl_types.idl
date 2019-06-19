@@ -460,6 +460,11 @@ libxl_gic_version = Enumeration("gic_version", [
     (0x30, "v3")
     ], init_val = "LIBXL_GIC_VERSION_DEFAULT")
 
+libxl_tee_type = Enumeration("tee_type", [
+    (0, "none"),
+    (1, "optee")
+    ], init_val = "LIBXL_TEE_TYPE_NONE")
+
 libxl_rdm_reserve = Struct("rdm_reserve", [
     ("strategy",    libxl_rdm_reserve_strategy),
     ("policy",      libxl_rdm_reserve_policy),
@@ -537,6 +542,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("nested_hvm",       libxl_defbool),
     ("apic",             libxl_defbool),
     ("dm_restrict",      libxl_defbool),
+    ("tee",              libxl_tee_type),
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),
                                        ("bios",             libxl_bios_type),

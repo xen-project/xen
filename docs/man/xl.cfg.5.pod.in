@@ -1544,6 +1544,35 @@ Set maximum height for pointer device.
 
 =back
 
+=item B<tee="STRING">
+
+B<Arm only.> Set TEE type for the guest. TEE is a Trusted Execution
+Environment -- separate secure OS found on some platforms. B<STRING> can be one of the:
+
+=over 4
+
+=item B<none>
+
+"Don't allow the guest to use TEE if present on the platform. This is
+the default value.
+
+=item B<optee>
+
+Allow a guest to access the host OP-TEE OS. Xen will mediate the
+access to OP-TEE and the resource isolation will be provided directly
+by OP-TEE. OP-TEE itself may limit the number of guests that can
+concurrently use it. This requires a virtualization-aware OP-TEE for
+this to work.
+
+You can refer to
+L<OP-TEE documentation|https://optee.readthedocs.io/architecture/virtualization.html>
+for more information about how to enable and configure virtualization support
+in OP-TEE.
+
+This feature is a B<technology preview>.
+
+=back
+
 =back
 
 =head2 Paravirtualised (PV) Guest Specific Options
