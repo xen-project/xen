@@ -339,6 +339,16 @@ static always_inline unsigned int cpuid_edx(unsigned int op)
     return edx;
 }
 
+static always_inline unsigned int cpuid_count_edx(
+    unsigned int leaf, unsigned int subleaf)
+{
+    unsigned int edx, tmp;
+
+    cpuid_count(leaf, subleaf, &tmp, &tmp, &tmp, &edx);
+
+    return edx;
+}
+
 static inline unsigned long read_cr0(void)
 {
     unsigned long cr0;
@@ -691,6 +701,9 @@ static inline void pv_cpuid_regs(struct cpu_user_regs *regs)
     pv_cpuid(regs->_eax, regs->_ecx,
              &regs->_eax, &regs->_ebx, &regs->_ecx, &regs->_edx);
 }
+
+extern int8_t opt_tsx, cpu_has_tsx_ctrl;
+void tsx_init(void);
 
 #endif /* !__ASSEMBLY__ */
 

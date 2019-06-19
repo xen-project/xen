@@ -55,12 +55,17 @@
 #define ARCH_CAPS_SSB_NO		(_AC(1, ULL) << 4)
 #define ARCH_CAPS_MDS_NO		(_AC(1, ULL) << 5)
 #define ARCH_CAPS_IF_PSCHANGE_MC_NO	(_AC(1, ULL) << 6)
+#define ARCH_CAPS_TSX_CTRL		(_AC(1, ULL) << 7)
 
 #define MSR_FLUSH_CMD			0x0000010b
 #define FLUSH_CMD_L1D			(_AC(1, ULL) << 0)
 
 #define MSR_TSX_FORCE_ABORT             0x0000010f
 #define TSX_FORCE_ABORT_RTM             (_AC(1, ULL) <<  0)
+
+#define MSR_TSX_CTRL                    0x00000122
+#define TSX_CTRL_RTM_DISABLE            (_AC(1, ULL) <<  0)
+#define TSX_CTRL_CPUID_CLEAR            (_AC(1, ULL) <<  1)
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1

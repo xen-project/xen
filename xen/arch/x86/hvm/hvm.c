@@ -3600,9 +3600,22 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     case 0x7:
         if ( count == 0 )
         {
-            /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
-            *ebx &= (hvm_featureset[FEATURESET_7b0] &
-                     ~special_features[FEATURESET_7b0]);
+            /*
+             * Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view.
+             *
+             * On hardware with MSR_TSX_CTRL, the admin may have elected to
+             * disable TSX and hide the feature bits.  Migrating-in VMs may
+             * have been booted pre-mitigation when the TSX features were
+             * visbile.
+             *
+             * This situation is compatible (albeit with a perf hit to any TSX
+             * code in the guest), so allow the feature bits to remain set.
+             */
+            *ebx &= ((hvm_featureset[FEATURESET_7b0] &
+                      ~special_features[FEATURESET_7b0]) |
+                     (cpu_has_tsx_ctrl ?
+                      (cpufeat_mask(X86_FEATURE_HLE) |
+                       cpufeat_mask(X86_FEATURE_RTM)) : 0));
             *ebx |= (host_featureset[FEATURESET_7b0] &
                      special_features[FEATURESET_7b0]);
 
@@ -3955,6 +3968,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     case MSR_FLUSH_CMD:
         /* Write-only */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
         /* Not offered to guests. */
         goto gp_fault;
 
@@ -4201,6 +4215,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
         /* Not offered to guests. */
         goto gp_fault;
 

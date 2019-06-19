@@ -1141,9 +1141,22 @@ void pv_cpuid(uint32_t leaf, uint32_t subleaf,
     case 0x00000007:
         if ( subleaf == 0 )
         {
-            /* Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view. */
-            b &= (pv_featureset[FEATURESET_7b0] &
-                  ~special_features[FEATURESET_7b0]);
+            /*
+             * Fold host's FDP_EXCP_ONLY and NO_FPU_SEL into guest's view.
+             *
+             * On hardware with MSR_TSX_CTRL, the admin may have elected to
+             * disable TSX and hide the feature bits.  Migrating-in VMs may
+             * have been booted pre-mitigation when the TSX features were
+             * visbile.
+             *
+             * This situation is compatible (albeit with a perf hit to any TSX
+             * code in the guest), so allow the feature bits to remain set.
+             */
+            b &= ((pv_featureset[FEATURESET_7b0] &
+                   ~special_features[FEATURESET_7b0]) |
+                  (cpu_has_tsx_ctrl ?
+                   (cpufeat_mask(X86_FEATURE_HLE) |
+                    cpufeat_mask(X86_FEATURE_RTM)) : 0));
             b |= (host_featureset[FEATURESET_7b0] &
                   special_features[FEATURESET_7b0]);
 
@@ -2531,6 +2544,7 @@ static int priv_op_read_msr(unsigned int reg, uint64_t *val,
     case MSR_FLUSH_CMD:
         /* Write-only */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
         /* Not offered to guests. */
         break;
 
@@ -2762,6 +2776,7 @@ static int priv_op_write_msr(unsigned int reg, uint64_t val,
     case MSR_ARCH_CAPABILITIES:
         /* The MSR is read-only. */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
         /* Not offered to guests. */
         break;
 

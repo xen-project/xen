@@ -103,6 +103,16 @@ extern int printk_ratelimit(void);
 #define gprintk(lvl, fmt, args...) \
     printk(XENLOG_GUEST lvl "%pv " fmt, current, ## args)
 
+#define printk_once(fmt, args...)               \
+({                                              \
+    static bool __read_mostly once_;            \
+    if ( unlikely(!once_) )                     \
+    {                                           \
+        once_ = true;                           \
+        printk(fmt, ## args);                   \
+    }                                           \
+})
+
 #ifdef NDEBUG
 
 static inline void
