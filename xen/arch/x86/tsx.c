@@ -5,7 +5,8 @@
  * Valid values:
  *   1 => Explicit tsx=1
  *   0 => Explicit tsx=0
- *  -1 => Default, implicit tsx=1
+ *  -1 => Default, implicit tsx=1, may change to 0 to mitigate TAA
+ *  -3 => Implicit tsx=1 (feed-through from spec-ctrl=0)
  *
  * This is arranged such that the bottom bit encodes whether TSX is actually
  * disabled, while identifying various explicit (>=0) and implicit (<0)

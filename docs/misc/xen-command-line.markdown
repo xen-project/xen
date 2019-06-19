@@ -1617,7 +1617,7 @@ extreme care.**
 An overall boolean value, `spec-ctrl=no`, can be specified to turn off all
 mitigations, including pieces of infrastructure used to virtualise certain
 mitigation features for guests.  This also includes settings which `xpti`,
-`smt`, `pv-l1tf` control, unless the respective option(s) have been
+`smt`, `pv-l1tf`, `tsx` control, unless the respective option(s) have been
 specified earlier on the command line.
 
 Alternatively, a slightly more restricted `spec-ctrl=no-xen` can be used to
@@ -1731,7 +1731,7 @@ pages) must also be specified via the tbuf\_size parameter.
     = <bool>
 
     Applicability: x86
-    Default: true
+    Default: false on parts vulnerable to TAA, true otherwise
 
 Controls for the use of Transactional Synchronization eXtensions.
 
@@ -1740,6 +1740,19 @@ a control has been introduced which allows TSX to be turned off.
 
 On systems with the ability to turn TSX off, this boolean offers system wide
 control of whether TSX is enabled or disabled.
+
+On parts vulnerable to CVE-2019-11135 / TSX Asynchronous Abort, the following
+logic applies:
+
+ * An explicit `tsx=` choice is honoured, even if it is `true` and would
+   result in a vulnerable system.
+
+ * When no explicit `tsx=` choice is given, parts vulnerable to TAA will be
+   mitigated by disabling TSX, as this is the lowest overhead option.
+
+ * If the use of TSX is important, the more expensive TAA mitigations can be
+   opted in to with `smt=0 spec-ctrl=md-clear`, at which point TSX will remain
+   active by default.
 
 ### ucode
 > `= [<integer> | scan]`
