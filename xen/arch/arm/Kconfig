@@ -113,6 +113,8 @@ config TEE
 	  This option enables generic TEE mediators support. It allows guests
 	  to access real TEE via one of TEE mediators implemented in XEN.
 
+source "arch/arm/tee/Kconfig"
+
 endmenu
 
 menu "ARM errata workaround via the alternative framework"
@@ -238,5 +240,3 @@ source "arch/arm/platforms/Kconfig"
 source "common/Kconfig"
 
 source "drivers/Kconfig"
-
-source "arch/arm/tee/Kconfig"
