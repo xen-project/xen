@@ -21,7 +21,6 @@
 
 #include "config.h"
 #include "util.h"
-#include <xen/arch-x86/hvm/start_info.h>
 
 #define TEST_FAIL 0
 #define TEST_PASS 1
@@ -221,66 +220,6 @@ void perform_tests(void)
         printf("Skipping tests due to overlap with base image\n");
         return;
     }
-
-    if ( hvm_start_info->cmdline_paddr &&
-         hvm_start_info->cmdline_paddr < TEST_MEM_BASE + TEST_MEM_SIZE &&
-         ((hvm_start_info->cmdline_paddr +
-           strlen((char *)(uintptr_t)hvm_start_info->cmdline_paddr)) >=
-          TEST_MEM_BASE) )
-    {
-        printf("Skipping tests due to overlap with command line\n");
-        return;
-    }
-
-    if ( hvm_start_info->rsdp_paddr )
-    {
-        printf("Skipping tests due to non-zero RSDP address\n");
-        return;
-    }
-
-    if ( hvm_start_info->nr_modules )
-    {
-        const struct hvm_modlist_entry *modlist =
-            (void *)(uintptr_t)hvm_start_info->modlist_paddr;
-
-        if ( hvm_start_info->modlist_paddr > UINTPTR_MAX ||
-             ((UINTPTR_MAX - (uintptr_t)modlist) / sizeof(*modlist) <
-              hvm_start_info->nr_modules) )
-        {
-            printf("Skipping tests due to inaccessible module list\n");
-            return;
-        }
-
-        if ( TEST_MEM_BASE < (uintptr_t)(modlist +
-                                         hvm_start_info->nr_modules) &&
-             (uintptr_t)modlist < TEST_MEM_BASE + TEST_MEM_SIZE )
-        {
-            printf("Skipping tests due to overlap with module list\n");
-            return;
-        }
-
-        for ( i = 0; i < hvm_start_info->nr_modules; ++i )
-        {
-            if ( TEST_MEM_BASE < modlist[i].paddr + modlist[i].size &&
-                 modlist[i].paddr < TEST_MEM_BASE + TEST_MEM_SIZE )
-            {
-                printf("Skipping tests due to overlap with module %u\n", i);
-                return;
-            }
-
-            if ( modlist[i].cmdline_paddr &&
-                 modlist[i].cmdline_paddr < TEST_MEM_BASE + TEST_MEM_SIZE &&
-                 ((modlist[i].cmdline_paddr +
-                   strlen((char *)(uintptr_t)modlist[i].cmdline_paddr)) >=
-                  TEST_MEM_BASE) )
-            {
-                printf("Skipping tests due to overlap with module %u cmdline\n",
-                       i);
-                return;
-            }
-        }
-    }
-
     passed = skipped = 0;
     for ( i = 0; tests[i].test; i++ )
     {
