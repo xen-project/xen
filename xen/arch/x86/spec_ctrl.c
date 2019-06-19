@@ -135,6 +135,9 @@ static int __init parse_spec_ctrl(char *s)
             if ( opt_pv_l1tf_domu < 0 )
                 opt_pv_l1tf_domu = 0;
 
+            if ( opt_tsx == -1 )
+                opt_tsx = -3;
+
         disable_common:
             opt_rsb_pv = false;
             opt_rsb_hvm = false;
@@ -345,7 +348,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
     printk("Speculative mitigation facilities:\n");
 
     /* Hardware features which pertain to speculative mitigations. */
-    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    printk("  Hardware features:%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
            (_7d0 & cpufeat_mask(X86_FEATURE_IBRSB)) ? " IBRS/IBPB" : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_STIBP)) ? " STIBP"     : "",
            (_7d0 & cpufeat_mask(X86_FEATURE_L1D_FLUSH)) ? " L1D_FLUSH" : "",
@@ -357,7 +360,9 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (caps & ARCH_CAPS_RSBA)                  ? " RSBA"      : "",
            (caps & ARCH_CAPS_SKIP_L1DFL)            ? " SKIP_L1DFL": "",
            (caps & ARCH_CAPS_SSB_NO)                ? " SSB_NO"    : "",
-           (caps & ARCH_CAPS_MDS_NO)                ? " MDS_NO"    : "");
+           (caps & ARCH_CAPS_MDS_NO)                ? " MDS_NO"    : "",
+           (caps & ARCH_CAPS_TSX_CTRL)              ? " TSX_CTRL"  : "",
+           (caps & ARCH_CAPS_TAA_NO)                ? " TAA_NO"    : "");
 
     /* Compiled-in support which pertains to mitigations. */
     if ( IS_ENABLED(CONFIG_INDIRECT_THUNK) || IS_ENABLED(CONFIG_SHADOW_PAGING) )
@@ -371,7 +376,7 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
                "\n");
 
     /* Settings for Xen's protection, irrespective of guests. */
-    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s, Other:%s%s%s\n",
+    printk("  Xen settings: BTI-Thunk %s, SPEC_CTRL: %s%s%s, Other:%s%s%s\n",
            thunk == THUNK_NONE      ? "N/A" :
            thunk == THUNK_RETPOLINE ? "RETPOLINE" :
            thunk == THUNK_LFENCE    ? "LFENCE" :
@@ -380,6 +385,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ? "IBRS+" :  "IBRS-",
            !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
+           !(caps & ARCH_CAPS_TSX_CTRL)              ? "" :
+           (opt_tsx & 1)                             ? " TSX+" : " TSX-",
            opt_ibpb                                  ? " IBPB"  : "",
            opt_l1d_flush                             ? " L1D_FLUSH" : "",
            opt_md_clear_pv || opt_md_clear_hvm       ? " VERW"  : "");
@@ -870,6 +877,7 @@ void __init init_speculation_mitigations(void)
 {
     enum ind_thunk thunk = THUNK_DEFAULT;
     bool use_spec_ctrl = false, ibrs = false, hw_smt_enabled;
+    bool cpu_has_bug_taa;
     uint64_t caps = 0;
 
     if ( boot_cpu_has(X86_FEATURE_ARCH_CAPS) )
@@ -1095,6 +1103,53 @@ void __init init_speculation_mitigations(void)
             "Booted on MLPDS/MFBDS-vulnerable hardware with SMT/Hyperthreading\n"
             "enabled.  Mitigations will not be fully effective.  Please\n"
             "choose an explicit smt=<bool> setting.  See XSA-297.\n");
+
+    /*
+     * Vulnerability to TAA is a little complicated to quantify.
+     *
+     * In the pipeline, it is just another way to get speculative access to
+     * stale load port, store buffer or fill buffer data, and therefore can be
+     * considered a superset of MDS (on TSX-capable parts).  On parts which
+     * predate MDS_NO, the existing VERW flushing will mitigate this
+     * sidechannel as well.
+     *
+     * On parts which contain MDS_NO, the lack of VERW flushing means that an
+     * attacker can still use TSX to target microarchitectural buffers to leak
+     * secrets.  Therefore, we consider TAA to be the set of TSX-capable parts
+     * which have MDS_NO but lack TAA_NO.
+     *
+     * Note: cpu_has_rtm (== hle) could already be hidden by `tsx=0` on the
+     *       cmdline.  MSR_TSX_CTRL will only appear on TSX-capable parts, so
+     *       we check both to spot TSX in a microcode/cmdline independent way.
+     */
+    cpu_has_bug_taa =
+        (cpu_has_rtm || (caps & ARCH_CAPS_TSX_CTRL)) &&
+        (caps & (ARCH_CAPS_MDS_NO | ARCH_CAPS_TAA_NO)) == ARCH_CAPS_MDS_NO;
+
+    /*
+     * On TAA-affected hardware, disabling TSX is the preferred mitigation, vs
+     * the MDS mitigation of disabling HT and using VERW flushing.
+     *
+     * On CPUs which advertise MDS_NO, VERW has no flushing side effect until
+     * the TSX_CTRL microcode is loaded, despite the MD_CLEAR CPUID bit being
+     * advertised, and there isn't a MD_CLEAR_2 flag to use...
+     *
+     * If we're on affected hardware, able to do something about it (which
+     * implies that VERW now works), no explicit TSX choice and traditional
+     * MDS mitigations (no-SMT, VERW) not obviosuly in use (someone might
+     * plausibly value TSX higher than Hyperthreading...), disable TSX to
+     * mitigate TAA.
+     */
+    if ( opt_tsx == -1 && cpu_has_bug_taa && (caps & ARCH_CAPS_TSX_CTRL) &&
+         ((hw_smt_enabled && opt_smt) ||
+          !boot_cpu_has(X86_FEATURE_SC_VERW_IDLE)) )
+    {
+        setup_clear_cpu_cap(X86_FEATURE_HLE);
+        setup_clear_cpu_cap(X86_FEATURE_RTM);
+
+        opt_tsx = 0;
+        tsx_init();
+    }
 
     print_details(thunk, caps);
 
