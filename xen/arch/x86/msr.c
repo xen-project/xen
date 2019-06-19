@@ -133,6 +133,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_FLUSH_CMD:
         /* Write-only */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
         /* Not offered to guests. */
@@ -275,6 +276,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
     case MSR_AMD64_LWP_CFG:
     case MSR_AMD64_LWP_CBADDR:
         /* Not offered to guests. */

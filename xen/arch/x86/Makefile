@@ -67,6 +67,7 @@ obj-y += sysctl.o
 obj-y += time.o
 obj-y += trace.o
 obj-y += traps.o
+obj-y += tsx.o
 obj-y += usercopy.o
 obj-y += x86_emulate.o
 obj-$(CONFIG_TBOOT) += tboot.o
