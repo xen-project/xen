@@ -420,6 +420,32 @@ static int make_psci_node(libxl__gc *gc, void *fdt)
     return 0;
 }
 
+static int make_optee_node(libxl__gc *gc, void *fdt)
+{
+    int res;
+    LOG(DEBUG, "Creating OP-TEE node in dtb");
+
+    res = fdt_begin_node(fdt, "firmware");
+    if (res) return res;
+
+    res = fdt_begin_node(fdt, "optee");
+    if (res) return res;
+
+    res = fdt_property_compat(gc, fdt, 1, "linaro,optee-tz");
+    if (res) return res;
+
+    res = fdt_property_string(fdt, "method", "hvc");
+    if (res) return res;
+
+    res = fdt_end_node(fdt);
+    if (res) return res;
+
+    res = fdt_end_node(fdt);
+    if (res) return res;
+
+    return 0;
+}
+
 static int make_memory_nodes(libxl__gc *gc, void *fdt,
                              const struct xc_dom_image *dom)
 {
@@ -932,6 +958,9 @@ next_resize:
 
         if (info->arch_arm.vuart == LIBXL_VUART_TYPE_SBSA_UART)
             FDT( make_vpl011_uart_node(gc, fdt, ainfo, dom) );
+
+        if (info->tee == LIBXL_TEE_TYPE_OPTEE)
+            FDT( make_optee_node(gc, fdt) );
 
         if (pfdt)
             FDT( copy_partial_fdt(gc, fdt, pfdt) );
