@@ -172,6 +172,16 @@ static bool optee_probe(void)
         return false;
     }
 
+    /*
+     * Workaround: OP-TEE 3.5 have no way to tell if it is build with
+     * virtualization support. But we can probe for OPTEE_SMC_VM_DESTROYED
+     * call. It will return OPTEE_SMC_RETURN_UNKNOWN_FUNCTION if
+     * OP-TEE have no virtualization support enabled.
+     */
+    arm_smccc_smc(OPTEE_SMC_VM_DESTROYED, 0, 0, 0, 0, 0, 0, 0, &resp);
+    if ( resp.a0 == OPTEE_SMC_RETURN_UNKNOWN_FUNCTION )
+        return false;
+
     return true;
 }
 
