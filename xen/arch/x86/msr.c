@@ -153,6 +153,7 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_FLUSH_CMD:
         /* Write-only */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
         /* Not offered to guests. */
         goto gp_fault;
 
@@ -233,6 +234,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     case MSR_ARCH_CAPABILITIES:
         /* Read-only */
     case MSR_TSX_FORCE_ABORT:
+    case MSR_TSX_CTRL:
         /* Not offered to guests. */
         goto gp_fault;
 
