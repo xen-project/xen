@@ -370,6 +370,8 @@ void start_secondary(void *unused)
     if ( boot_cpu_has(X86_FEATURE_IBRSB) )
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
 
+    tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
+
     if ( xen_guest )
         hypervisor_ap_setup();
 

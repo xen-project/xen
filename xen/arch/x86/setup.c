@@ -1540,6 +1540,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     early_microcode_init();
 
+    tsx_init(); /* Needs microcode.  May change HLE/RTM feature bits. */
+
     identify_cpu(&boot_cpu_data);
 
     set_in_cr4(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT);

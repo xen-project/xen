@@ -268,6 +268,16 @@ static always_inline unsigned int cpuid_count_ebx(
     return ebx;
 }
 
+static always_inline unsigned int cpuid_count_edx(
+    unsigned int leaf, unsigned int subleaf)
+{
+    unsigned int edx, tmp;
+
+    cpuid_count(leaf, subleaf, &tmp, &tmp, &tmp, &edx);
+
+    return edx;
+}
+
 static always_inline void cpuid_count_leaf(uint32_t leaf, uint32_t subleaf,
                                            struct cpuid_leaf *data)
 {
@@ -621,6 +631,9 @@ static inline uint8_t get_cpu_family(uint32_t raw, uint8_t *model,
         *stepping = raw & 0xf;
     return fam;
 }
+
+extern int8_t opt_tsx, cpu_has_tsx_ctrl;
+void tsx_init(void);
 
 #endif /* !__ASSEMBLY__ */
 
