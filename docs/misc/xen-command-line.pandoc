@@ -2048,6 +2048,20 @@ Xen version.
 ### tsc (x86)
 > `= unstable | skewed | stable:socket`
 
+### tsx
+    = <bool>
+
+    Applicability: x86
+    Default: true
+
+Controls for the use of Transactional Synchronization eXtensions.
+
+On Intel parts released in Q3 2019 (with updated microcode), and future parts,
+a control has been introduced which allows TSX to be turned off.
+
+On systems with the ability to turn TSX off, this boolean offers system wide
+control of whether TSX is enabled or disabled.
+
 ### ucode (x86)
 > `= [<integer> | scan]`
 

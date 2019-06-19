@@ -524,6 +524,20 @@ void recalculate_cpuid_policy(struct domain *d)
     if ( cpu_has_itsc && (d->disable_migrate || d->arch.vtsc) )
         __set_bit(X86_FEATURE_ITSC, max_fs);
 
+    /*
+     * On hardware with MSR_TSX_CTRL, the admin may have elected to disable
+     * TSX and hide the feature bits.  Migrating-in VMs may have been booted
+     * pre-mitigation when the TSX features were visbile.
+     *
+     * This situation is compatible (albeit with a perf hit to any TSX code in
+     * the guest), so allow the feature bits to remain set.
+     */
+    if ( cpu_has_tsx_ctrl )
+    {
+        __set_bit(X86_FEATURE_HLE, max_fs);
+        __set_bit(X86_FEATURE_RTM, max_fs);
+    }
+
     /* Clamp the toolstacks choices to reality. */
     for ( i = 0; i < ARRAY_SIZE(fs); i++ )
         fs[i] &= max_fs[i];
