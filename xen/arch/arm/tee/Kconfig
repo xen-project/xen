@@ -2,3 +2,8 @@ config OPTEE
 	bool "Enable OP-TEE mediator"
 	default n
 	depends on TEE
+	help
+	  Enable experimental OP-TEE mediator. It allows guests to access
+	  OP-TEE running on your platform. This requires virtualization-enabled
+	  OP-TEE present. You can learn more about virtualization for OP-TEE
+	  at https://optee.readthedocs.io/architecture/virtualization.html
