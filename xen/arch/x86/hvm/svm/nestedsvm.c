@@ -1030,7 +1030,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     struct vmcb_struct *ns_vmcb = nv->nv_vvmcx;
     struct vmcb_struct *n2vmcb = nv->nv_n2vmcx;
 
-    svm_vmsave(nv->nv_n1vmcx);
+    svm_vmsave_pa(nv->nv_n1vmcx_pa);
 
     /* Cache guest physical address of virtual vmcb
      * for VMCB Cleanbit emulation.

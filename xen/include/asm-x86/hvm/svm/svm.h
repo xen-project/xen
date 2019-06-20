@@ -22,9 +22,6 @@
 
 #include <xen/types.h>
 
-#define svm_vmload(x)     svm_vmload_pa(__pa(x))
-#define svm_vmsave(x)     svm_vmsave_pa(__pa(x))
-
 static inline void svm_vmload_pa(paddr_t vmcb)
 {
     asm volatile (
