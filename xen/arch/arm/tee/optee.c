@@ -707,6 +707,19 @@ static int translate_noncontig(struct optee_domain *ctx,
     gfn = gaddr_to_gfn(param->u.tmem.buf_ptr &
                        ~(OPTEE_MSG_NONCONTIG_PAGE_SIZE - 1));
 
+    /*
+     * We are initializing guest_pg, guest_data and xen_data with NULL
+     * to make GCC 4.8 happy, as it can't infer that those variables
+     * will be initialized with correct values in the loop below.
+     *
+     * This silences old GCC, but can lead to NULL dereference, in
+     * case of programmer's mistake. To minimize chance of this, we
+     * are initializing those variables there, instead of doing this
+     * at beginning of the function.
+     */
+    guest_pg = NULL;
+    xen_data = NULL;
+    guest_data = NULL;
     while ( pg_count )
     {
         struct page_info *page;
