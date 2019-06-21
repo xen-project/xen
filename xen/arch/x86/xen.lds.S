@@ -298,12 +298,12 @@ SECTIONS
 
 #ifdef EFI
   . = ALIGN(4);
-  .reloc : {
+  DECL_SECTION(.reloc) {
     *(.reloc)
   } :text
   /* Trick the linker into setting the image size to exactly 16Mb. */
   . = ALIGN(__section_alignment__);
-  .pad : {
+  DECL_SECTION(.pad) {
     . = ALIGN(MB(16));
   } :text
 #endif
