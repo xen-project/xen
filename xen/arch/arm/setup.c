@@ -484,7 +484,7 @@ static void __init init_pdx(void)
 {
     paddr_t bank_start, bank_size, bank_end;
 
-    u64 mask = pdx_init_mask(bootinfo.mem.bank[0].start);
+    uint64_t mask = pdx_init_mask(bootinfo.mem.bank[0].start);
     int bank;
 
     for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )

@@ -50,7 +50,7 @@ static u64 __init fill_mask(u64 mask)
     return mask;
 }
 
-u64 __init pdx_init_mask(u64 base_addr)
+uint64_t __init pdx_init_mask(uint64_t base_addr)
 {
     return fill_mask(base_addr - 1);
 }

@@ -401,7 +401,7 @@ static int __init nodes_cover_memory(void)
 
 void __init acpi_numa_arch_fixup(void) {}
 
-static u64 __initdata srat_region_mask;
+static uint64_t __initdata srat_region_mask;
 
 static int __init srat_parse_region(struct acpi_subtable_header *header,
 				    const unsigned long end)

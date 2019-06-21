@@ -13,7 +13,7 @@ extern unsigned long pfn_top_mask, ma_top_mask;
                          (sizeof(*frame_table) & -sizeof(*frame_table)))
 extern unsigned long pdx_group_valid[];
 
-extern u64 pdx_init_mask(u64 base_addr);
+extern uint64_t pdx_init_mask(u64 base_addr);
 extern u64 pdx_region_mask(u64 base, u64 len);
 
 extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
