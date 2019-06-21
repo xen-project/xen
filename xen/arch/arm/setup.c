@@ -484,7 +484,14 @@ static void __init init_pdx(void)
 {
     paddr_t bank_start, bank_size, bank_end;
 
-    uint64_t mask = pdx_init_mask(bootinfo.mem.bank[0].start);
+    /*
+     * Arm does not have any restrictions on the bits to compress. Pass 0 to
+     * let the common code further restrict the mask.
+     *
+     * If the logic changes in pfn_pdx_hole_setup we might have to
+     * update this function too.
+     */
+    uint64_t mask = pdx_init_mask(0x0);
     int bank;
 
     for ( bank = 0 ; bank < bootinfo.mem.nr_banks; bank++ )
