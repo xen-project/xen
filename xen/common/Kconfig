@@ -124,7 +124,7 @@ config FLASK_AVC_STATS
 config XSM_POLICY
 	bool "Compile Xen with a built-in security policy"
 	default y if HAS_CHECKPOLICY = "y"
-	depends on XSM
+	depends on FLASK
 	---help---
 	  This includes a default XSM policy in the hypervisor so that the
 	  bootloader does not need to load a policy to get sane behavior from an
@@ -137,7 +137,7 @@ config XSM_POLICY
 
 	  If unsure, say Y.
 
-config XSM_SILO
+config SILO
 	def_bool y
 	prompt "SILO support"
 	depends on XSM
@@ -152,16 +152,16 @@ config XSM_SILO
 choice
 	prompt "Default XSM implementation"
 	depends on XSM
-	default XSM_SILO_DEFAULT if XSM_SILO && ARM
-	default XSM_FLASK_DEFAULT if XSM_FLASK
-	default XSM_SILO_DEFAULT if XSM_SILO
+	default XSM_SILO_DEFAULT if SILO && ARM
+	default XSM_FLASK_DEFAULT if FLASK
+	default XSM_SILO_DEFAULT if SILO
 	default XSM_DUMMY_DEFAULT
 	config XSM_DUMMY_DEFAULT
 		bool "Match non-XSM behavior"
 	config XSM_FLASK_DEFAULT
-		bool "FLux Advanced Security Kernel" if XSM_FLASK
+		bool "FLux Advanced Security Kernel" if FLASK
 	config XSM_SILO_DEFAULT
-		bool "SILO" if XSM_SILO
+		bool "SILO" if SILO
 endchoice
 
 config LATE_HWDOM
