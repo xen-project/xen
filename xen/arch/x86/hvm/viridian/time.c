@@ -26,9 +26,10 @@ typedef struct _HV_REFERENCE_TSC_PAGE
     uint64_t Reserved2[509];
 } HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
 
-static void update_reference_tsc(struct domain *d, bool initialize)
+static void update_reference_tsc(const struct domain *d, bool initialize)
 {
     struct viridian_domain *vd = d->arch.hvm.viridian;
+    const struct viridian_time_ref_count *trc = &vd->time_ref_count;
     const struct viridian_page *rt = &vd->reference_tsc;
     HV_REFERENCE_TSC_PAGE *p = rt->ptr;
     uint32_t seq;
@@ -44,7 +45,9 @@ static void update_reference_tsc(struct domain *d, bool initialize)
      * with this, allowing vtsc to be turned off, but support for this is
      * not yet present in the hypervisor. Thus is it is possible that
      * migrating a Windows VM between hosts of differing TSC frequencies
-     * may result in large differences in guest performance.
+     * may result in large differences in guest performance. Any jump in
+     * TSC due to migration down-time can, however, be compensated for by
+     * setting the TscOffset value (see below).
      */
     if ( !host_tsc_is_safe() || d->arch.vtsc )
     {
@@ -62,8 +65,6 @@ static void update_reference_tsc(struct domain *d, bool initialize)
 
         printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: invalidated\n",
                d->domain_id);
-
-        vd->reference_tsc_valid = false;
         return;
     }
 
@@ -75,8 +76,11 @@ static void update_reference_tsc(struct domain *d, bool initialize)
      *
      * Windows uses a 100ns tick, so we need a scale which is cpu
      * ticks per 100ns shifted left by 64.
+     * The offset value is calculated on restore after migration and
+     * ensures that Windows will not see a large jump in ReferenceTime.
      */
     p->TscScale = ((10000ul << 32) / d->arch.tsc_khz) << 32;
+    p->TscOffset = trc->off;
     smp_wmb();
 
     seq = p->TscSequence + 1;
@@ -84,46 +88,6 @@ static void update_reference_tsc(struct domain *d, bool initialize)
         seq = 1;
 
     p->TscSequence = seq;
-    vd->reference_tsc_valid = true;
-}
-
-static int64_t raw_trc_val(const struct domain *d)
-{
-    uint64_t tsc;
-    struct time_scale tsc_to_ns;
-
-    tsc = hvm_get_guest_tsc(pt_global_vcpu_target(d));
-
-    /* convert tsc to count of 100ns periods */
-    set_time_scale(&tsc_to_ns, d->arch.tsc_khz * 1000ul);
-    return scale_delta(tsc, &tsc_to_ns) / 100ul;
-}
-
-static void time_ref_count_freeze(const struct domain *d)
-{
-    struct viridian_time_ref_count *trc =
-        &d->arch.hvm.viridian->time_ref_count;
-
-    if ( test_and_clear_bit(_TRC_running, &trc->flags) )
-        trc->val = raw_trc_val(d) + trc->off;
-}
-
-static void time_ref_count_thaw(const struct domain *d)
-{
-    struct viridian_time_ref_count *trc =
-        &d->arch.hvm.viridian->time_ref_count;
-
-    if ( !d->is_shutting_down &&
-         !test_and_set_bit(_TRC_running, &trc->flags) )
-        trc->off = (int64_t)trc->val - raw_trc_val(d);
-}
-
-static int64_t time_ref_count(const struct domain *d)
-{
-    struct viridian_time_ref_count *trc =
-        &d->arch.hvm.viridian->time_ref_count;
-
-    return raw_trc_val(d) + trc->off;
 }
 
 /*
@@ -136,7 +100,7 @@ static int64_t time_ref_count(const struct domain *d)
  * 128 bit number which is then shifted 64 times to the right to obtain
  * the high 64 bits."
  */
-static uint64_t scale_tsc(uint64_t tsc, uint64_t scale, uint64_t offset)
+static uint64_t scale_tsc(uint64_t tsc, uint64_t scale, int64_t offset)
 {
     uint64_t result;
 
@@ -153,22 +117,46 @@ static uint64_t scale_tsc(uint64_t tsc, uint64_t scale, uint64_t offset)
     return result + offset;
 }
 
-static uint64_t time_now(struct domain *d)
+static uint64_t trc_val(const struct domain *d, int64_t offset)
 {
     uint64_t tsc, scale;
 
-    /*
-     * If the reference TSC page is not enabled, or has been invalidated
-     * fall back to the partition reference counter.
-     */
-    if ( !d->arch.hvm.viridian->reference_tsc_valid )
-        return time_ref_count(d);
-
-    /* Otherwise compute reference time in the same way the guest would */
     tsc = hvm_get_guest_tsc(pt_global_vcpu_target(d));
     scale = ((10000ul << 32) / d->arch.tsc_khz) << 32;
 
-    return scale_tsc(tsc, scale, 0);
+    return scale_tsc(tsc, scale, offset);
+}
+
+static void time_ref_count_freeze(const struct domain *d)
+{
+    struct viridian_time_ref_count *trc =
+        &d->arch.hvm.viridian->time_ref_count;
+
+    if ( test_and_clear_bit(_TRC_running, &trc->flags) )
+        trc->val = trc_val(d, trc->off);
+}
+
+static void time_ref_count_thaw(const struct domain *d)
+{
+    struct viridian_domain *vd = d->arch.hvm.viridian;
+    struct viridian_time_ref_count *trc = &vd->time_ref_count;
+
+    if ( d->is_shutting_down ||
+         test_and_set_bit(_TRC_running, &trc->flags) )
+        return;
+
+    trc->off = (int64_t)trc->val - trc_val(d, 0);
+
+    if ( vd->reference_tsc.msr.enabled )
+        update_reference_tsc(d, false);
+}
+
+static uint64_t time_ref_count(const struct domain *d)
+{
+    const struct viridian_time_ref_count *trc =
+        &d->arch.hvm.viridian->time_ref_count;
+
+    return trc_val(d, trc->off);
 }
 
 static void stop_stimer(struct viridian_stimer *vs)
@@ -196,7 +184,7 @@ static void start_stimer(struct viridian_stimer *vs)
     const struct vcpu *v = vs->v;
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
     unsigned int stimerx = vs - &vv->stimer[0];
-    int64_t now = time_now(v->domain);
+    int64_t now = time_ref_count(v->domain);
     int64_t expiration;
     s_time_t timeout;
 
@@ -285,7 +273,7 @@ static void poll_stimer(struct vcpu *v, unsigned int stimerx)
 
     if ( !viridian_synic_deliver_timer_msg(v, vs->config.sintx,
                                            stimerx, vs->expiration,
-                                           time_now(v->domain)) )
+                                           time_ref_count(v->domain)) )
         return;
 
     clear_bit(stimerx, &vv->stimer_pending);
@@ -641,10 +629,7 @@ void viridian_time_load_domain_ctxt(
     vd->reference_tsc.msr.raw = ctxt->reference_tsc;
 
     if ( vd->reference_tsc.msr.enabled )
-    {
         viridian_map_guest_page(d, &vd->reference_tsc);
-        update_reference_tsc(d, false);
-    }
 }
 
 /*
