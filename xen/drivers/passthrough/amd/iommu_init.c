@@ -31,7 +31,8 @@
 
 static int __initdata nr_amd_iommus;
 
-static struct tasklet amd_iommu_irq_tasklet;
+static void do_amd_iommu_irq(unsigned long data);
+static DECLARE_SOFTIRQ_TASKLET(amd_iommu_irq_tasklet, do_amd_iommu_irq, 0);
 
 unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
@@ -1055,8 +1056,6 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
     enable_iommu(iommu);
     printk("AMD-Vi: IOMMU %d Enabled.\n", nr_amd_iommus );
     nr_amd_iommus++;
-
-    softirq_tasklet_init(&amd_iommu_irq_tasklet, do_amd_iommu_irq, 0);
 
     return 0;
 
