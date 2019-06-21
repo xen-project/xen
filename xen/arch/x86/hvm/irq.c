@@ -503,12 +503,6 @@ int hvm_local_events_need_delivery(struct vcpu *v)
     return !hvm_interrupt_blocked(v, intack);
 }
 
-void arch_evtchn_inject(struct vcpu *v)
-{
-    if ( has_hvm_container_vcpu(v) )
-        hvm_assert_evtchn_irq(v);
-}
-
 static void irq_dump(struct domain *d)
 {
     struct hvm_irq *hvm_irq = &d->arch.hvm_domain.irq;
