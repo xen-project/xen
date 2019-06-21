@@ -50,9 +50,11 @@ static u64 __init fill_mask(u64 mask)
     return mask;
 }
 
+/* We don't want to compress the low MAX_ORDER bits of the addresses. */
 uint64_t __init pdx_init_mask(uint64_t base_addr)
 {
-    return fill_mask(base_addr - 1);
+    return fill_mask(max(base_addr,
+                         (uint64_t)1 << (MAX_ORDER + PAGE_SHIFT)) - 1);
 }
 
 u64 __init pdx_region_mask(u64 base, u64 len)
@@ -80,6 +82,9 @@ void __init pfn_pdx_hole_setup(unsigned long mask)
      * This guarantees that page-pointer arithmetic remains valid within
      * contiguous aligned ranges of 2^MAX_ORDER pages. Among others, our
      * buddy allocator relies on this assumption.
+     *
+     * If the logic changes here, we might have to update the ARM specific
+     * init_pdx too.
      */
     for ( j = MAX_ORDER-1; ; )
     {
