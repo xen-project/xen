@@ -57,6 +57,14 @@ endif
 $(call cc-option-add,CFLAGS-stack-boundary,CC,-mpreferred-stack-boundary=3)
 CFLAGS += $(CFLAGS-stack-boundary)
 
+ifeq ($(CONFIG_UBSAN),y)
+# Don't enable alignment sanitisation.  x86 has efficient unaligned accesses,
+# and various things (ACPI tables, hypercall pages, stubs, etc) are wont-fix.
+# It also causes an as-yet-unidentified crash on native boot before the
+# console starts.
+$(call cc-option-add,CFLAGS_UBSAN,CC,-fno-sanitize=alignment)
+endif
+
 # Set up the assembler include path properly for older toolchains.
 CFLAGS += -Wa,-I$(BASEDIR)/include
 

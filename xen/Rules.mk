@@ -41,6 +41,9 @@ ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(CONFIG_CRYPTO)   += $(BASEDIR)/crypto/built_in.o
 
+# Initialise some variables
+CFLAGS_UBSAN :=
+
 ifeq ($(CONFIG_DEBUG),y)
 CFLAGS += -O1
 else
@@ -138,7 +141,10 @@ $(filter-out %.init.o $(nocov-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += $(
 endif
 
 ifeq ($(CONFIG_UBSAN),y)
-$(filter-out %.init.o $(noubsan-y),$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -fsanitize=undefined
+CFLAGS_UBSAN += -fsanitize=undefined
+# Any -fno-sanitize= options need to come after any -fsanitize= options
+$(filter-out %.init.o $(noubsan-y),$(obj-y) $(obj-bin-y) $(extra-y)): \
+CFLAGS += $(filter-out -fno-%,$(CFLAGS_UBSAN)) $(filter -fno-%,$(CFLAGS_UBSAN))
 endif
 
 ifeq ($(CONFIG_LTO),y)
