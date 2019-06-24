@@ -627,8 +627,8 @@ void domain_update_node_affinity(struct domain *d)
 
 int domain_set_node_affinity(struct domain *d, const nodemask_t *affinity)
 {
-    /* Being affine with no nodes is just wrong */
-    if ( nodes_empty(*affinity) )
+    /* Being disjoint with the system is just wrong. */
+    if ( !nodes_intersects(*affinity, node_online_map) )
         return -EINVAL;
 
     spin_lock(&d->node_affinity_lock);
