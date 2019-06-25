@@ -192,9 +192,7 @@ void __init numa_init_array(void)
         if ( cpu_to_node[i] != NUMA_NO_NODE )
             continue;
         numa_set_node(i, rr);
-        rr = next_node(rr, node_online_map);
-        if ( rr == MAX_NUMNODES )
-            rr = first_node(node_online_map);
+        rr = cycle_node(rr, node_online_map);
     }
 }
 

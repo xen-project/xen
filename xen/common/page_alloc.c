@@ -819,11 +819,8 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
     if ( node == NUMA_NO_NODE )
     {
         if ( d != NULL )
-        {
-            node = next_node(d->last_alloc_node, nodemask);
-            if ( node >= MAX_NUMNODES )
-                node = first_node(nodemask);
-        }
+            node = cycle_node(d->last_alloc_node, nodemask);
+
         if ( node >= MAX_NUMNODES )
             node = cpu_to_node(smp_processor_id());
     }
