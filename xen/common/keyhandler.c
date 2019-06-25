@@ -293,7 +293,7 @@ static void dump_domains(unsigned char key)
         dump_pageframe_info(d);
 
         printk("NODE affinity for domain %d: [%*pbl]\n",
-               d->domain_id, MAX_NUMNODES, d->node_affinity.bits);
+               d->domain_id, NODEMASK_PR(&d->node_affinity));
 
         printk("VCPU information and callbacks for domain %u:\n",
                d->domain_id);

@@ -39,7 +39,7 @@
  * nodemask_t nodemask_of_node(node)	Return nodemask with bit 'node' set
  * NODE_MASK_ALL			Initializer - all bits set
  * NODE_MASK_NONE			Initializer - no bits set
- * unsigned long *nodes_addr(mask)	Array of unsigned long's in mask
+ * unsigned long *nodemask_bits(mask)	Array of unsigned long's in mask
  *
  * for_each_node_mask(node, mask)	for-loop node over mask
  *
@@ -58,6 +58,15 @@
 #include <xen/numa.h>
 
 typedef struct { DECLARE_BITMAP(bits, MAX_NUMNODES); } nodemask_t;
+
+/*
+ * printf arguments for a nodemask.  Shorthand for using '%*pb[l]' when
+ * printing a nodemask.
+ */
+#define NODEMASK_PR(src) MAX_NUMNODES, nodemask_bits(src)
+
+#define nodemask_bits(src) ((src)->bits)
+
 extern nodemask_t _unused_nodemask_arg_;
 
 #define node_set(node, dst) __node_set((node), &(dst))
@@ -249,8 +258,6 @@ static inline int __cycle_node(int n, const nodemask_t *maskp, int nbits)
 ((nodemask_t) { {							\
 	[0 ... BITS_TO_LONGS(MAX_NUMNODES)-1] =  0UL			\
 } })
-
-#define nodes_addr(src) ((src).bits)
 
 #if MAX_NUMNODES > 1
 #define for_each_node_mask(node, mask)			\

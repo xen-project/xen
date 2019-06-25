@@ -123,14 +123,14 @@ int xenctl_bitmap_to_cpumask(cpumask_var_t *cpumask,
 static int nodemask_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_nodemap,
                                      const nodemask_t *nodemask)
 {
-    return bitmap_to_xenctl_bitmap(xenctl_nodemap, nodes_addr(*nodemask),
+    return bitmap_to_xenctl_bitmap(xenctl_nodemap, nodemask_bits(nodemask),
                                    MAX_NUMNODES);
 }
 
 static int xenctl_bitmap_to_nodemask(nodemask_t *nodemask,
                                      const struct xenctl_bitmap *xenctl_nodemap)
 {
-    return xenctl_bitmap_to_bitmap(nodes_addr(*nodemask), xenctl_nodemap,
+    return xenctl_bitmap_to_bitmap(nodemask_bits(nodemask), xenctl_nodemap,
                                    MAX_NUMNODES);
 }
 
