@@ -68,12 +68,12 @@ DECLARE_PER_CPU(struct cpu_user_regs *, __irq_regs);
 
 static inline struct cpu_user_regs *get_irq_regs(void)
 {
-	return __get_cpu_var(__irq_regs);
+	return this_cpu(__irq_regs);
 }
 
 static inline struct cpu_user_regs *set_irq_regs(struct cpu_user_regs *new_regs)
 {
-	struct cpu_user_regs *old_regs, **pp_regs = &__get_cpu_var(__irq_regs);
+	struct cpu_user_regs *old_regs, **pp_regs = &this_cpu(__irq_regs);
 
 	old_regs = *pp_regs;
 	*pp_regs = new_regs;

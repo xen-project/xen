@@ -146,7 +146,7 @@ static inline int which_bucket(unsigned int duration)
 
 static inline s_time_t avg_intr_interval_us(void)
 {
-    struct menu_device *data = &__get_cpu_var(menu_devices);
+    struct menu_device *data = &this_cpu(menu_devices);
     s_time_t    duration, now;
     s_time_t    avg_interval;
     unsigned int irq_sum;
@@ -187,7 +187,7 @@ static unsigned int get_sleep_length_us(void)
 
 static int menu_select(struct acpi_processor_power *power)
 {
-    struct menu_device *data = &__get_cpu_var(menu_devices);
+    struct menu_device *data = &this_cpu(menu_devices);
     int i;
     s_time_t    io_interval;
 
@@ -239,7 +239,7 @@ static int menu_select(struct acpi_processor_power *power)
 
 static void menu_reflect(struct acpi_processor_power *power)
 {
-    struct menu_device *data = &__get_cpu_var(menu_devices);
+    struct menu_device *data = &this_cpu(menu_devices);
     u64 new_factor;
 
     data->measured_us = power->last_residency;
@@ -294,7 +294,8 @@ static struct cpuidle_governor menu_governor =
 struct cpuidle_governor *cpuidle_current_governor = &menu_governor;
 void menu_get_trace_data(u32 *expected, u32 *pred)
 {
-    struct menu_device *data = &__get_cpu_var(menu_devices);
+    const struct menu_device *data = &this_cpu(menu_devices);
+
     *expected = data->expected_us;
     *pred = data->predicted_us;
 }

@@ -651,7 +651,7 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         unsigned int irq;
         unsigned int irr;
         struct irq_desc *desc;
-        irq = __get_cpu_var(vector_irq)[vector];
+        irq = per_cpu(vector_irq, me)[vector];
 
         if ((int)irq < 0)
             continue;
@@ -690,7 +690,7 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP,
                  irq, vector, smp_processor_id());
 
-        __get_cpu_var(vector_irq)[vector] = ~irq;
+        per_cpu(vector_irq, me)[vector] = ~irq;
         desc->arch.move_cleanup_count--;
 
         if ( desc->arch.move_cleanup_count == 0 )
@@ -822,7 +822,7 @@ void do_IRQ(struct cpu_user_regs *regs)
     uint32_t          tsc_in;
     struct irq_desc  *desc;
     unsigned int      vector = (u8)regs->entry_vector;
-    int irq = __get_cpu_var(vector_irq[vector]);
+    int               irq = this_cpu(vector_irq)[vector];
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
     
     perfc_incr(irqs);
