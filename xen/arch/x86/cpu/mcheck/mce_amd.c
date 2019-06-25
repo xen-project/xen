@@ -297,7 +297,7 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
     x86_mce_vector_register(mcheck_cmn_handler);
     mce_need_clearbank_register(amd_need_clearbank_scan);
 
-    for ( i = 0; i < nr_mce_banks; i++ )
+    for ( i = 0; i < this_cpu(nr_mce_banks); i++ )
     {
         if ( quirkflag == MCEQUIRK_K8_GART && i == 4 )
             mcequirk_amd_apply(quirkflag);

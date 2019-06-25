@@ -34,7 +34,7 @@ bool __read_mostly opt_mce = true;
 boolean_param("mce", opt_mce);
 bool __read_mostly mce_broadcast;
 bool is_mc_panic;
-unsigned int __read_mostly nr_mce_banks;
+DEFINE_PER_CPU_READ_MOSTLY(unsigned int, nr_mce_banks);
 unsigned int __read_mostly firstbank;
 uint8_t __read_mostly cmci_apic_vector;
 
@@ -120,13 +120,20 @@ void mce_recoverable_register(mce_recoverable_t cbfunc)
     mc_recoverable_scan = cbfunc;
 }
 
-struct mca_banks *mcabanks_alloc(void)
+struct mca_banks *mcabanks_alloc(unsigned int nr_mce_banks)
 {
     struct mca_banks *mb;
 
     mb = xmalloc(struct mca_banks);
     if ( !mb )
         return NULL;
+
+    /*
+     * For APs allocations get done by the BSP, i.e. when the bank count may
+     * may not be known yet. A zero bank count is a clear indication of this.
+     */
+    if ( !nr_mce_banks )
+        nr_mce_banks = MCG_CAP_COUNT;
 
     mb->bank_map = xzalloc_array(unsigned long,
                                  BITS_TO_LONGS(nr_mce_banks));
@@ -319,7 +326,7 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
      */
     recover = mc_recoverable_scan ? 1 : 0;
 
-    for ( i = 0; i < nr_mce_banks; i++ )
+    for ( i = 0; i < this_cpu(nr_mce_banks); i++ )
     {
         /* Skip bank if corresponding bit in bankmask is clear */
         if ( !mcabanks_test(i, bankmask) )
@@ -565,7 +572,7 @@ void mcheck_mca_clearbanks(struct mca_banks *bankmask)
 {
     int i;
 
-    for ( i = 0; i < nr_mce_banks; i++ )
+    for ( i = 0; i < this_cpu(nr_mce_banks); i++ )
     {
         if ( !mcabanks_test(i, bankmask) )
             continue;
@@ -638,54 +645,56 @@ static void set_poll_bankmask(struct cpuinfo_x86 *c)
 
     if ( cmci_support && opt_mce )
     {
-        mb->num = per_cpu(no_cmci_banks, cpu)->num;
-        bitmap_copy(mb->bank_map, per_cpu(no_cmci_banks, cpu)->bank_map,
-                    nr_mce_banks);
+        const struct mca_banks *cmci = per_cpu(no_cmci_banks, cpu);
+
+        if ( unlikely(cmci->num < mb->num) )
+            bitmap_fill(mb->bank_map, mb->num);
+        bitmap_copy(mb->bank_map, cmci->bank_map, min(mb->num, cmci->num));
     }
     else
     {
-        bitmap_copy(mb->bank_map, mca_allbanks->bank_map, nr_mce_banks);
+        bitmap_copy(mb->bank_map, mca_allbanks->bank_map,
+                    per_cpu(nr_mce_banks, cpu));
         if ( mce_firstbank(c) )
             mcabanks_clear(0, mb);
     }
 }
 
 /* The perbank ctl/status init is platform specific because of AMD's quirk */
-int mca_cap_init(void)
+static int mca_cap_init(void)
 {
     uint64_t msr_content;
+    unsigned int nr, cpu = smp_processor_id();
 
     rdmsrl(MSR_IA32_MCG_CAP, msr_content);
 
     if ( msr_content & MCG_CTL_P ) /* Control register present ? */
         wrmsrl(MSR_IA32_MCG_CTL, 0xffffffffffffffffULL);
 
-    if ( nr_mce_banks && (msr_content & MCG_CAP_COUNT) != nr_mce_banks )
-    {
-        dprintk(XENLOG_WARNING, "Different bank number on cpu %x\n",
-                smp_processor_id());
-        return -ENODEV;
-    }
-    nr_mce_banks = msr_content & MCG_CAP_COUNT;
+    per_cpu(nr_mce_banks, cpu) = nr = MASK_EXTR(msr_content, MCG_CAP_COUNT);
 
-    if ( !nr_mce_banks )
+    if ( !nr )
     {
-        printk(XENLOG_INFO "CPU%u: No MCE banks present. "
-               "Machine check support disabled\n", smp_processor_id());
+        printk(XENLOG_INFO
+               "CPU%u: No MCE banks present. Machine check support disabled\n",
+               cpu);
         return -ENODEV;
     }
 
     /* mcabanks_alloc depends on nr_mce_banks */
-    if ( !mca_allbanks )
+    if ( !mca_allbanks || nr > mca_allbanks->num )
     {
-        int i;
+        unsigned int i;
+        struct mca_banks *all = mcabanks_alloc(nr);
 
-        mca_allbanks = mcabanks_alloc();
-        for ( i = 0; i < nr_mce_banks; i++ )
+        if ( !all )
+            return -ENOMEM;
+        for ( i = 0; i < nr; i++ )
             mcabanks_set(i, mca_allbanks);
+        mcabanks_free(xchg(&mca_allbanks, all));
     }
 
-    return mca_allbanks ? 0 : -ENOMEM;
+    return 0;
 }
 
 static void cpu_bank_free(unsigned int cpu)
@@ -702,8 +711,9 @@ static void cpu_bank_free(unsigned int cpu)
 
 static int cpu_bank_alloc(unsigned int cpu)
 {
-    struct mca_banks *poll = per_cpu(poll_bankmask, cpu) ?: mcabanks_alloc();
-    struct mca_banks *clr = per_cpu(mce_clear_banks, cpu) ?: mcabanks_alloc();
+    unsigned int nr = per_cpu(nr_mce_banks, cpu);
+    struct mca_banks *poll = per_cpu(poll_bankmask, cpu) ?: mcabanks_alloc(nr);
+    struct mca_banks *clr = per_cpu(mce_clear_banks, cpu) ?: mcabanks_alloc(nr);
 
     if ( !poll || !clr )
     {
@@ -752,6 +762,7 @@ static struct notifier_block cpu_nfb = {
 void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
 {
     enum mcheck_type inited = mcheck_none;
+    unsigned int cpu = smp_processor_id();
 
     if ( !opt_mce )
     {
@@ -762,8 +773,7 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
 
     if ( !mce_available(c) )
     {
-        printk(XENLOG_INFO "CPU%i: No machine check support available\n",
-               smp_processor_id());
+        printk(XENLOG_INFO "CPU%i: No machine check support available\n", cpu);
         return;
     }
 
@@ -771,9 +781,13 @@ void mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     if ( mca_cap_init() )
         return;
 
-    /* Early MCE initialisation for BSP. */
-    if ( bsp && cpu_bank_alloc(smp_processor_id()) )
-        BUG();
+    if ( !bsp )
+    {
+        per_cpu(poll_bankmask, cpu)->num = per_cpu(nr_mce_banks, cpu);
+        per_cpu(mce_clear_banks, cpu)->num = per_cpu(nr_mce_banks, cpu);
+    }
+    else if ( cpu_bank_alloc(cpu) )
+        panic("Insufficient memory for MCE bank allocations\n");
 
     switch ( c->x86_vendor )
     {
@@ -1111,24 +1125,22 @@ bool intpose_inval(unsigned int cpu_nr, uint64_t msr)
     return true;
 }
 
-#define IS_MCA_BANKREG(r) \
+#define IS_MCA_BANKREG(r, cpu) \
     ((r) >= MSR_IA32_MC0_CTL && \
-    (r) <= MSR_IA32_MCx_MISC(nr_mce_banks - 1) && \
-    ((r) - MSR_IA32_MC0_CTL) % 4 != 0) /* excludes MCi_CTL */
+     (r) <= MSR_IA32_MCx_MISC(per_cpu(nr_mce_banks, cpu) - 1) && \
+     ((r) - MSR_IA32_MC0_CTL) % 4) /* excludes MCi_CTL */
 
 static bool x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
 {
-    struct cpuinfo_x86 *c;
+    const struct cpuinfo_x86 *c = &cpu_data[mci->mcinj_cpunr];
     int i, errs = 0;
-
-    c = &cpu_data[smp_processor_id()];
 
     for ( i = 0; i < mci->mcinj_count; i++ )
     {
         uint64_t reg = mci->mcinj_msr[i].reg;
         const char *reason = NULL;
 
-        if ( IS_MCA_BANKREG(reg) )
+        if ( IS_MCA_BANKREG(reg, mci->mcinj_cpunr) )
         {
             if ( c->x86_vendor == X86_VENDOR_AMD )
             {
@@ -1448,7 +1460,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         break;
 
     case XEN_MC_msrinject:
-        if ( nr_mce_banks == 0 )
+        if ( !mca_allbanks || !mca_allbanks->num )
             return x86_mcerr("do_mca inject", -ENODEV);
 
         mc_msrinject = &op->u.mc_msrinject;
@@ -1460,6 +1472,9 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         if ( !cpu_online(target) )
             return x86_mcerr("do_mca inject: target offline",
                              -EINVAL);
+
+        if ( !per_cpu(nr_mce_banks, target) )
+            return x86_mcerr("do_mca inject: no banks", -ENOENT);
 
         if ( mc_msrinject->mcinj_count == 0 )
             return 0;
@@ -1521,7 +1536,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         break;
 
     case XEN_MC_mceinject:
-        if ( nr_mce_banks == 0 )
+        if ( !mca_allbanks || !mca_allbanks->num )
             return x86_mcerr("do_mca #MC", -ENODEV);
 
         mc_mceinject = &op->u.mc_mceinject;
@@ -1532,6 +1547,9 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
         if ( !cpu_online(target) )
             return x86_mcerr("do_mca #MC: target offline", -EINVAL);
+
+        if ( !per_cpu(nr_mce_banks, target) )
+            return x86_mcerr("do_mca #MC: no banks", -ENOENT);
 
         add_taint(TAINT_ERROR_INJECT);
 
@@ -1548,7 +1566,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         cpumask_var_t cmv;
         bool broadcast = op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST;
 
-        if ( nr_mce_banks == 0 )
+        if ( !mca_allbanks || !mca_allbanks->num )
             return x86_mcerr("do_mca #MC", -ENODEV);
 
         if ( broadcast )
@@ -1569,6 +1587,16 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                 dprintk(XENLOG_INFO,
                         "Not all required CPUs are online\n");
         }
+
+        for_each_cpu(target, cpumap)
+            if ( cpu_online(target) && !per_cpu(nr_mce_banks, target) )
+            {
+                ret = x86_mcerr("do_mca #MC: CPU%u has no banks",
+                                -ENOENT, target);
+                break;
+            }
+        if ( ret )
+            break;
 
         switch ( op->u.mc_inject_v2.flags & XEN_MC_INJECT_TYPE_MASK )
         {

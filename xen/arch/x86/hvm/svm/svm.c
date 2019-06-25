@@ -2374,7 +2374,7 @@ static int svm_is_erratum_383(struct cpu_user_regs *regs)
         return 0;
     
     /* Clear MCi_STATUS registers */
-    for (i = 0; i < nr_mce_banks; i++)
+    for (i = 0; i < this_cpu(nr_mce_banks); i++)
         wrmsrl(MSR_IA32_MCx_STATUS(i), 0ULL);
     
     rdmsrl(MSR_IA32_MCG_STATUS, msr_content);

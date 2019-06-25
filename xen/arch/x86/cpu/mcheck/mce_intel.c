@@ -535,16 +535,16 @@ out:
 static void cmci_discover(void)
 {
     unsigned long flags;
-    int i;
+    unsigned int i, cpu = smp_processor_id();
     mctelem_cookie_t mctc;
     struct mca_summary bs;
 
-    mce_printk(MCE_VERBOSE, "CMCI: find owner on CPU%d\n", smp_processor_id());
+    mce_printk(MCE_VERBOSE, "CMCI: find owner on CPU%u\n", cpu);
 
     spin_lock_irqsave(&cmci_discover_lock, flags);
 
-    for ( i = 0; i < nr_mce_banks; i++ )
-        if ( !mcabanks_test(i, __get_cpu_var(mce_banks_owned)) )
+    for ( i = 0; i < per_cpu(nr_mce_banks, cpu); i++ )
+        if ( !mcabanks_test(i, per_cpu(mce_banks_owned, cpu)) )
             do_cmci_discover(i);
 
     spin_unlock_irqrestore(&cmci_discover_lock, flags);
@@ -557,7 +557,7 @@ static void cmci_discover(void)
      */
 
     mctc = mcheck_mca_logout(
-        MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
+        MCA_CMCI_HANDLER, per_cpu(mce_banks_owned, cpu), &bs, NULL);
 
     if ( bs.errcnt && mctc != NULL )
     {
@@ -576,9 +576,9 @@ static void cmci_discover(void)
         mctelem_dismiss(mctc);
 
     mce_printk(MCE_VERBOSE, "CMCI: CPU%d owner_map[%lx], no_cmci_map[%lx]\n",
-               smp_processor_id(),
-               *((unsigned long *)__get_cpu_var(mce_banks_owned)->bank_map),
-               *((unsigned long *)__get_cpu_var(no_cmci_banks)->bank_map));
+               cpu,
+               per_cpu(mce_banks_owned, cpu)->bank_map[0],
+               per_cpu(no_cmci_banks, cpu)->bank_map[0]);
 }
 
 /*
@@ -613,24 +613,24 @@ static void cpu_mcheck_distribute_cmci(void)
 
 static void clear_cmci(void)
 {
-    int i;
+    unsigned int i, cpu = smp_processor_id();
 
     if ( !cmci_support || !opt_mce )
         return;
 
-    mce_printk(MCE_VERBOSE, "CMCI: clear_cmci support on CPU%d\n",
-               smp_processor_id());
+    mce_printk(MCE_VERBOSE, "CMCI: clear_cmci support on CPU%u\n", cpu);
 
-    for ( i = 0; i < nr_mce_banks; i++ )
+    for ( i = 0; i < per_cpu(nr_mce_banks, cpu); i++ )
     {
         unsigned msr = MSR_IA32_MCx_CTL2(i);
         u64 val;
-        if ( !mcabanks_test(i, __get_cpu_var(mce_banks_owned)) )
+
+        if ( !mcabanks_test(i, per_cpu(mce_banks_owned, cpu)) )
             continue;
         rdmsrl(msr, val);
         if ( val & (CMCI_EN|CMCI_THRESHOLD_MASK) )
             wrmsrl(msr, val & ~(CMCI_EN|CMCI_THRESHOLD_MASK));
-        mcabanks_clear(i, __get_cpu_var(mce_banks_owned));
+        mcabanks_clear(i, per_cpu(mce_banks_owned, cpu));
     }
 }
 
@@ -826,7 +826,7 @@ static void intel_init_mce(void)
     intel_mce_post_reset();
 
     /* clear all banks */
-    for ( i = firstbank; i < nr_mce_banks; i++ )
+    for ( i = firstbank; i < this_cpu(nr_mce_banks); i++ )
     {
         /*
          * Some banks are shared across cores, use MCi_CTRL to judge whether
@@ -866,8 +866,9 @@ static void cpu_mcabank_free(unsigned int cpu)
 
 static int cpu_mcabank_alloc(unsigned int cpu)
 {
-    struct mca_banks *cmci = mcabanks_alloc();
-    struct mca_banks *owned = mcabanks_alloc();
+    unsigned int nr = per_cpu(nr_mce_banks, cpu);
+    struct mca_banks *cmci = mcabanks_alloc(nr);
+    struct mca_banks *owned = mcabanks_alloc(nr);
 
     if ( !cmci || !owned )
         goto out;
@@ -923,6 +924,13 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp)
             BUG();
         register_cpu_notifier(&cpu_nfb);
         mcheck_intel_therm_init();
+    }
+    else
+    {
+        unsigned int cpu = smp_processor_id();
+
+        per_cpu(no_cmci_banks, cpu)->num = per_cpu(nr_mce_banks, cpu);
+        per_cpu(mce_banks_owned, cpu)->num = per_cpu(nr_mce_banks, cpu);
     }
 
     intel_init_mca(c);

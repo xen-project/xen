@@ -40,6 +40,6 @@ extern int vmce_rdmsr(uint32_t msr, uint64_t *val);
 extern bool vmce_has_lmce(const struct vcpu *v);
 extern int vmce_enable_mca_cap(struct domain *d, uint64_t cap);
 
-extern unsigned int nr_mce_banks;
+DECLARE_PER_CPU(unsigned int, nr_mce_banks);
 
 #endif
