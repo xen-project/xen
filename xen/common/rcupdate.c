@@ -225,7 +225,7 @@ void call_rcu(struct rcu_head *head,
     head->func = func;
     head->next = NULL;
     local_irq_save(flags);
-    rdp = &__get_cpu_var(rcu_data);
+    rdp = &this_cpu(rcu_data);
     *rdp->nxttail = head;
     rdp->nxttail = &head->next;
     if (unlikely(++rdp->qlen > qhimark)) {
@@ -409,7 +409,7 @@ static void __rcu_process_callbacks(struct rcu_ctrlblk *rcp,
 
 static void rcu_process_callbacks(void)
 {
-    __rcu_process_callbacks(&rcu_ctrlblk, &__get_cpu_var(rcu_data));
+    __rcu_process_callbacks(&rcu_ctrlblk, &this_cpu(rcu_data));
 }
 
 static int __rcu_pending(struct rcu_ctrlblk *rcp, struct rcu_data *rdp)

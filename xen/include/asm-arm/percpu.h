@@ -17,12 +17,12 @@ void percpu_init_areas(void);
 
 #define per_cpu(var, cpu)  \
     (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
-#define __get_cpu_var(var) \
+#define this_cpu(var) \
     (*RELOC_HIDE(&per_cpu__##var, READ_SYSREG(TPIDR_EL2)))
 
 #define per_cpu_ptr(var, cpu)  \
     (*RELOC_HIDE(var, __per_cpu_offset[cpu]))
-#define __get_cpu_ptr(var) \
+#define this_cpu_ptr(var) \
     (*RELOC_HIDE(var, READ_SYSREG(TPIDR_EL2)))
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name

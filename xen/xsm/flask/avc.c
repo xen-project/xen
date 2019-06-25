@@ -57,9 +57,9 @@ const struct selinux_class_perm selinux_class_perm = {
 #define AVC_CACHE_RECLAIM        16
 
 #ifdef CONFIG_XSM_FLASK_AVC_STATS
-#define avc_cache_stats_incr(field)                 \
-do {                                \
-    __get_cpu_var(avc_cache_stats).field++;        \
+#define avc_cache_stats_incr(field)    \
+do {                                   \
+    this_cpu(avc_cache_stats).field++; \
 } while (0)
 #else
 #define avc_cache_stats_incr(field)    do {} while (0)

@@ -15,12 +15,12 @@ void percpu_init_areas(void);
 /* var is in discarded region: offset to particular copy we want */
 #define per_cpu(var, cpu)  \
     (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
-#define __get_cpu_var(var) \
+#define this_cpu(var) \
     (*RELOC_HIDE(&per_cpu__##var, get_cpu_info()->per_cpu_offset))
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
 
-#define __get_cpu_ptr(var) \
+#define this_cpu_ptr(var) \
     (*RELOC_HIDE(var, get_cpu_info()->per_cpu_offset))
 
 #define per_cpu_ptr(var, cpu)  \
