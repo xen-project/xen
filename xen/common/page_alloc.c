@@ -810,7 +810,7 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
                                         unsigned int order, unsigned int memflags,
                                         const struct domain *d)
 {
-    nodeid_t first_node, node = MEMF_get_node(memflags), req_node = node;
+    nodeid_t first, node = MEMF_get_node(memflags), req_node = node;
     nodemask_t nodemask = d ? d->node_affinity : node_online_map;
     unsigned int j, zone, nodemask_retry = 0;
     struct page_info *pg;
@@ -832,7 +832,7 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
         ASSERT_UNREACHABLE();
         return NULL;
     }
-    first_node = node;
+    first = node;
 
     /*
      * Start with requested node, but exhaust all node memory in requested
@@ -878,19 +878,19 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
         {
             /* Very first node may be caller-specified and outside nodemask. */
             ASSERT(!nodemask_retry);
-            first_node = node = first_node(nodemask);
+            first = node = first_node(nodemask);
             if ( node < MAX_NUMNODES )
                 continue;
         }
         else if ( (node = next_node(node, nodemask)) >= MAX_NUMNODES )
             node = first_node(nodemask);
-        if ( node == first_node )
+        if ( node == first )
         {
             /* When we have tried all in nodemask, we fall back to others. */
             if ( (memflags & MEMF_exact_node) || nodemask_retry++ )
                 return NULL;
             nodes_andnot(nodemask, node_online_map, nodemask);
-            first_node = node = first_node(nodemask);
+            first = node = first_node(nodemask);
             if ( node >= MAX_NUMNODES )
                 return NULL;
         }
