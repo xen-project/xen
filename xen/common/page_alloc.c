@@ -887,7 +887,7 @@ static struct page_info *get_free_buddy(unsigned int zone_lo,
             return NULL;
 
         /* Pick next node. */
-        if ( !node_isset(node, nodemask) )
+        if ( !nodemask_test(node, &nodemask) )
         {
             /* Very first node may be caller-specified and outside nodemask. */
             ASSERT(!nodemask_retry);

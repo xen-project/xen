@@ -495,7 +495,7 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 	for (i = 0; i < nr_cpu_ids; i++) {
 		if (cpu_to_node[i] == NUMA_NO_NODE)
 			continue;
-		if (!node_isset(cpu_to_node[i], processor_nodes_parsed))
+		if (!nodemask_test(cpu_to_node[i], &processor_nodes_parsed))
 			numa_set_node(i, NUMA_NO_NODE);
 	}
 	numa_init_array();

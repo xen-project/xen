@@ -14,7 +14,7 @@
  * void cpumask_clear_cpu(cpu, mask)	turn off bit 'cpu' in mask
  * void cpumask_setall(mask)		set all bits
  * void cpumask_clear(mask)		clear all bits
- * int cpumask_test_cpu(cpu, mask)	true iff bit 'cpu' set in mask
+ * bool cpumask_test_cpu(cpu, mask)	true iff bit 'cpu' set in mask
  * int cpumask_test_and_set_cpu(cpu, mask) test and set bit 'cpu' in mask
  * int cpumask_test_and_clear_cpu(cpu, mask) test and clear bit 'cpu' in mask
  *
@@ -53,15 +53,6 @@
  * for_each_possible_cpu(cpu)		for-loop cpu over cpu_possible_map
  * for_each_online_cpu(cpu)		for-loop cpu over cpu_online_map
  * for_each_present_cpu(cpu)		for-loop cpu over cpu_present_map
- *
- * Subtlety:
- * 1) The 'type-checked' form of cpumask_test_cpu() causes gcc (3.3.2, anyway)
- *    to generate slightly worse code.  Note for example the additional
- *    40 lines of assembly code compiling the "for each possible cpu"
- *    loops buried in the disk_stat_read() macros calls when compiling
- *    drivers/block/genhd.c (arch i386, CONFIG_SMP=y).  So use a simple
- *    one-line #define for cpumask_test_cpu(), instead of wrapping an inline
- *    inside a macro, the way we do the other calls.
  */
 
 #include <xen/bitmap.h>
@@ -117,9 +108,10 @@ static inline void cpumask_clear(cpumask_t *dstp)
 	bitmap_zero(dstp->bits, nr_cpumask_bits);
 }
 
-/* No static inline type checking - see Subtlety (1) above. */
-#define cpumask_test_cpu(cpu, cpumask) \
-	test_bit(cpumask_check(cpu), (cpumask)->bits)
+static inline bool cpumask_test_cpu(unsigned int cpu, const cpumask_t *src)
+{
+    return test_bit(cpumask_check(cpu), src->bits);
+}
 
 static inline int cpumask_test_and_set_cpu(int cpu, volatile cpumask_t *addr)
 {

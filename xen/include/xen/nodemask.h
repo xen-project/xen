@@ -14,7 +14,7 @@
  * void node_clear(node, mask)		turn off bit 'node' in mask
  * void nodes_setall(mask)		set all bits
  * void nodes_clear(mask)		clear all bits
- * int node_isset(node, mask)		true iff bit 'node' set in mask
+ * bool nodemask_test(node, mask)	true iff bit 'node' set in mask
  * int node_test_and_set(node, mask)	test and set bit 'node' in mask
  *
  * void nodes_and(dst, src1, src2)	dst = src1 & src2  [intersection]
@@ -45,18 +45,12 @@
  *
  * int num_online_nodes()		Number of online Nodes
  *
- * int node_online(node)		Is some node online?
+ * bool node_online(node)		Is this node online?
  *
  * node_set_online(node)		set bit 'node' in node_online_map
  * node_set_offline(node)		clear bit 'node' in node_online_map
  *
  * for_each_online_node(node)		for-loop node over node_online_map
- *
- * Subtlety:
- * 1) The 'type-checked' form of node_isset() causes gcc (3.3.2, anyway)
- *    to generate slightly worse code.  So use a simple one-line #define
- *    for node_isset(), instead of wrapping an inline inside a macro, the
- *    way we do the other calls.
  */
 
 #include <xen/kernel.h>
@@ -90,8 +84,10 @@ static inline void __nodes_clear(nodemask_t *dstp, int nbits)
 	bitmap_zero(dstp->bits, nbits);
 }
 
-/* No static inline type checking - see Subtlety (1) above. */
-#define node_isset(node, nodemask) test_bit((node), (nodemask).bits)
+static inline bool nodemask_test(unsigned int node, const nodemask_t *dst)
+{
+    return test_bit(node, dst->bits);
+}
 
 #define node_test_and_set(node, nodemask) \
 			__node_test_and_set((node), &(nodemask))
@@ -276,7 +272,7 @@ extern nodemask_t node_online_map;
 
 #if MAX_NUMNODES > 1
 #define num_online_nodes()	nodes_weight(node_online_map)
-#define node_online(node)	node_isset((node), node_online_map)
+#define node_online(node)	nodemask_test(node, &node_online_map)
 #else
 #define num_online_nodes()	1
 #define node_online(node)	((node) == 0)
