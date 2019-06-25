@@ -344,8 +344,7 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
             has_extratime(svc),
             vcpu_on_q(svc),
             vcpu_runnable(svc->vcpu),
-            svc->flags,
-            nr_cpu_ids, cpumask_bits(mask));
+            svc->flags, CPUMASK_PR(mask));
 }
 
 static void

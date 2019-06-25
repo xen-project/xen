@@ -2057,8 +2057,8 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
 
     printk("CPU[%02d] nr_run=%d, sort=%d, sibling=%*pb, core=%*pb\n",
            cpu, spc->nr_runnable, spc->runq_sort_last,
-           nr_cpu_ids, cpumask_bits(per_cpu(cpu_sibling_mask, cpu)),
-           nr_cpu_ids, cpumask_bits(per_cpu(cpu_core_mask, cpu)));
+           CPUMASK_PR(per_cpu(cpu_sibling_mask, cpu)),
+           CPUMASK_PR(per_cpu(cpu_core_mask, cpu)));
 
     /* current VCPU (nothing to say if that's the idle vcpu). */
     svc = CSCHED_VCPU(curr_on_cpu(cpu));
@@ -2119,7 +2119,7 @@ csched_dump(const struct scheduler *ops)
            prv->ticks_per_tslice,
            prv->vcpu_migr_delay/ MICROSECS(1));
 
-    printk("idlers: %*pb\n", nr_cpu_ids, cpumask_bits(prv->idlers));
+    printk("idlers: %*pb\n", CPUMASK_PR(prv->idlers));
 
     printk("active vcpus:\n");
     loop = 0;

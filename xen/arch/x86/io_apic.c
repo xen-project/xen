@@ -2238,8 +2238,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
         SET_DEST(entry, logical, cpu_mask_to_apicid(mask));
     } else {
         printk(XENLOG_ERR "IRQ%d: no target CPU (%*pb vs %*pb)\n",
-               irq, nr_cpu_ids, cpumask_bits(desc->arch.cpu_mask),
-               nr_cpu_ids, cpumask_bits(TARGET_CPUS));
+               irq, CPUMASK_PR(desc->arch.cpu_mask), CPUMASK_PR(TARGET_CPUS));
         desc->status |= IRQ_DISABLED;
     }
 
@@ -2437,8 +2436,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     else
     {
         gprintk(XENLOG_ERR, "IRQ%d: no target CPU (%*pb vs %*pb)\n",
-               irq, nr_cpu_ids, cpumask_bits(desc->arch.cpu_mask),
-               nr_cpu_ids, cpumask_bits(TARGET_CPUS));
+               irq, CPUMASK_PR(desc->arch.cpu_mask), CPUMASK_PR(TARGET_CPUS));
         desc->status |= IRQ_DISABLED;
         rte.mask = 1;
     }

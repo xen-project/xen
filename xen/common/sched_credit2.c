@@ -3654,8 +3654,8 @@ dump_pcpu(const struct scheduler *ops, int cpu)
 
     printk("CPU[%02d] runq=%d, sibling=%*pb, core=%*pb\n",
            cpu, c2r(cpu),
-           nr_cpu_ids, cpumask_bits(per_cpu(cpu_sibling_mask, cpu)),
-           nr_cpu_ids, cpumask_bits(per_cpu(cpu_core_mask, cpu)));
+           CPUMASK_PR(per_cpu(cpu_sibling_mask, cpu)),
+           CPUMASK_PR(per_cpu(cpu_core_mask, cpu)));
 
     /* current VCPU (nothing to say if that's the idle vcpu) */
     svc = csched2_vcpu(curr_on_cpu(cpu));
@@ -3699,7 +3699,7 @@ csched2_dump(const struct scheduler *ops)
                "\taveload            = %"PRI_stime" (~%"PRI_stime"%%)\n",
                i,
                prv->rqd[i].nr_cpus,
-               nr_cpu_ids, cpumask_bits(&prv->rqd[i].active),
+               CPUMASK_PR(&prv->rqd[i].active),
                prv->rqd[i].max_weight,
                prv->rqd[i].pick_bias,
                prv->rqd[i].load,
@@ -3709,9 +3709,9 @@ csched2_dump(const struct scheduler *ops)
         printk("\tidlers: %*pb\n"
                "\ttickled: %*pb\n"
                "\tfully idle cores: %*pb\n",
-               nr_cpu_ids, cpumask_bits(&prv->rqd[i].idle),
-               nr_cpu_ids, cpumask_bits(&prv->rqd[i].tickled),
-               nr_cpu_ids, cpumask_bits(&prv->rqd[i].smt_idle));
+               CPUMASK_PR(&prv->rqd[i].idle),
+               CPUMASK_PR(&prv->rqd[i].tickled),
+               CPUMASK_PR(&prv->rqd[i].smt_idle));
     }
 
     printk("Domain info:\n");

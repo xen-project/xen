@@ -712,18 +712,17 @@ void dump_runq(unsigned char key)
             sched_smt_power_savings? "enabled":"disabled");
     printk("NOW=%"PRI_stime"\n", now);
 
-    printk("Online Cpus: %*pbl\n", nr_cpu_ids, cpumask_bits(&cpu_online_map));
+    printk("Online Cpus: %*pbl\n", CPUMASK_PR(&cpu_online_map));
     if ( !cpumask_empty(&cpupool_free_cpus) )
     {
-        printk("Free Cpus: %*pbl\n",
-               nr_cpu_ids, cpumask_bits(&cpupool_free_cpus));
+        printk("Free Cpus: %*pbl\n", CPUMASK_PR(&cpupool_free_cpus));
         schedule_dump(NULL);
     }
 
     for_each_cpupool(c)
     {
         printk("Cpupool %d:\n", (*c)->cpupool_id);
-        printk("Cpus: %*pbl\n", nr_cpu_ids, cpumask_bits((*c)->cpu_valid));
+        printk("Cpus: %*pbl\n", CPUMASK_PR((*c)->cpu_valid));
         schedule_dump(*c);
     }
 

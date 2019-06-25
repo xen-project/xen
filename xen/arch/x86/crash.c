@@ -160,7 +160,7 @@ static void nmi_shootdown_cpus(void)
         printk("Shot down all CPUs\n");
     else
         printk("Failed to shoot down CPUs {%*pbl}\n",
-               nr_cpu_ids, cpumask_bits(&waiting_to_crash));
+               CPUMASK_PR(&waiting_to_crash));
 
     /*
      * Try to crash shutdown IOMMU functionality as some old crashdump

@@ -61,6 +61,12 @@
 
 typedef struct cpumask{ DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
 
+/*
+ * printf arguments for a cpumask.  Shorthand for using '%*pb[l]' when
+ * printing a cpumask.
+ */
+#define CPUMASK_PR(src) nr_cpu_ids, cpumask_bits(src)
+
 extern unsigned int nr_cpu_ids;
 
 #if NR_CPUS > 4 * BITS_PER_LONG

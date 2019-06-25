@@ -2398,8 +2398,7 @@ static void dump_irqs(unsigned char key)
         spin_lock_irqsave(&desc->lock, flags);
 
         printk("   IRQ:%4d aff:{%*pbl}/{%*pbl} vec:%02x %-15s status=%03x ",
-               irq, nr_cpu_ids, cpumask_bits(desc->affinity),
-               nr_cpu_ids, cpumask_bits(desc->arch.cpu_mask),
+               irq, CPUMASK_PR(desc->affinity), CPUMASK_PR(desc->arch.cpu_mask),
                desc->arch.vector, desc->handler->typename, desc->status);
 
         if ( ssid )
@@ -2563,7 +2562,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
             printk("Cannot set affinity for IRQ%u\n", irq);
         else if ( break_affinity )
             printk("Broke affinity for IRQ%u, new: %*pb\n",
-                   irq, nr_cpu_ids, cpumask_bits(affinity));
+                   irq, CPUMASK_PR(affinity));
     }
 
     /* That doesn't seem sufficient.  Give it 1ms. */

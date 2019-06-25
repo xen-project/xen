@@ -272,8 +272,8 @@ static void dump_domains(unsigned char key)
         printk("    nr_pages=%d xenheap_pages=%d shared_pages=%u paged_pages=%u "
                "dirty_cpus={%*pbl} max_pages=%u\n",
                d->tot_pages, d->xenheap_pages, atomic_read(&d->shr_pages),
-               atomic_read(&d->paged_pages), nr_cpu_ids,
-               cpumask_bits(d->dirty_cpumask), d->max_pages);
+               atomic_read(&d->paged_pages), CPUMASK_PR(d->dirty_cpumask),
+               d->max_pages);
         printk("    handle=%02x%02x%02x%02x-%02x%02x-%02x%02x-"
                "%02x%02x-%02x%02x%02x%02x%02x%02x vm_assist=%08lx\n",
                d->handle[ 0], d->handle[ 1], d->handle[ 2], d->handle[ 3],
@@ -312,8 +312,8 @@ static void dump_domains(unsigned char key)
                 printk("dirty_cpu=%u", v->dirty_cpu);
             printk("\n");
             printk("    cpu_hard_affinity={%*pbl} cpu_soft_affinity={%*pbl}\n",
-                   nr_cpu_ids, cpumask_bits(v->cpu_hard_affinity),
-                   nr_cpu_ids, cpumask_bits(v->cpu_soft_affinity));
+                   CPUMASK_PR(v->cpu_hard_affinity),
+                   CPUMASK_PR(v->cpu_soft_affinity));
             printk("    pause_count=%d pause_flags=%lx\n",
                    atomic_read(&v->pause_count), v->pause_flags);
             arch_dump_vcpu_info(v);

@@ -782,9 +782,8 @@ static void null_dump_pcpu(const struct scheduler *ops, int cpu)
     lock = pcpu_schedule_lock_irqsave(cpu, &flags);
 
     printk("CPU[%02d] sibling=%*pb, core=%*pb",
-           cpu,
-           nr_cpu_ids, cpumask_bits(per_cpu(cpu_sibling_mask, cpu)),
-           nr_cpu_ids, cpumask_bits(per_cpu(cpu_core_mask, cpu)));
+           cpu, CPUMASK_PR(per_cpu(cpu_sibling_mask, cpu)),
+           CPUMASK_PR(per_cpu(cpu_core_mask, cpu)));
     if ( per_cpu(npc, cpu).vcpu != NULL )
         printk(", vcpu=%pv", per_cpu(npc, cpu).vcpu);
     printk("\n");
@@ -810,7 +809,7 @@ static void null_dump(const struct scheduler *ops)
 
     spin_lock_irqsave(&prv->lock, flags);
 
-    printk("\tcpus_free = %*pbl\n", nr_cpu_ids, cpumask_bits(&prv->cpus_free));
+    printk("\tcpus_free = %*pbl\n", CPUMASK_PR(&prv->cpus_free));
 
     printk("Domain info:\n");
     loop = 0;

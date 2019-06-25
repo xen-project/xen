@@ -150,8 +150,7 @@ static long smt_up_down_helper(void *data)
 
     if ( !ret )
         printk(XENLOG_INFO "SMT %s - online CPUs 0x%*pb\n",
-               up ? "enabled" : "disabled",
-               nr_cpu_ids, cpumask_bits(&cpu_online_map));
+               up ? "enabled" : "disabled", CPUMASK_PR(&cpu_online_map));
 
     return ret;
 }

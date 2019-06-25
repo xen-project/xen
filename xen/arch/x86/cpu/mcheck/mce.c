@@ -547,7 +547,7 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
 
             snprintf(ebuf, sizeof(ebuf),
                      "MCE: Fatal error happened on CPUs %*pb",
-                     nr_cpu_ids, cpumask_bits(&mce_fatal_cpus));
+                     CPUMASK_PR(&mce_fatal_cpus));
 
             mc_panic(ebuf);
         }
