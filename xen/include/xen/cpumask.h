@@ -31,9 +31,6 @@
  * int cpumask_full(mask)		Is mask full (all bits sets)?
  * int cpumask_weight(mask)		Hamming weigh - number of set bits
  *
- * void cpumask_shift_right(dst, src, n) Shift right
- * void cpumask_shift_left(dst, src, n)	Shift left
- *
  * int cpumask_first(mask)		Number lowest set bit, or NR_CPUS
  * int cpumask_next(cpu, mask)		Next cpu past 'cpu', or NR_CPUS
  * int cpumask_last(mask)		Number highest set bit, or NR_CPUS
@@ -211,18 +208,6 @@ static inline int cpumask_weight(const cpumask_t *srcp)
 static inline void cpumask_copy(cpumask_t *dstp, const cpumask_t *srcp)
 {
 	bitmap_copy(dstp->bits, srcp->bits, nr_cpumask_bits);
-}
-
-static inline void cpumask_shift_right(cpumask_t *dstp,
-				       const cpumask_t *srcp, int n)
-{
-	bitmap_shift_right(dstp->bits, srcp->bits, n, nr_cpumask_bits);
-}
-
-static inline void cpumask_shift_left(cpumask_t *dstp,
-				      const cpumask_t *srcp, int n)
-{
-	bitmap_shift_left(dstp->bits, srcp->bits, n, nr_cpumask_bits);
 }
 
 static inline int cpumask_first(const cpumask_t *srcp)

@@ -38,8 +38,6 @@
  * bitmap_empty(src, nbits)			Are all bits zero in *src?
  * bitmap_full(src, nbits)			Are all bits set in *src?
  * bitmap_weight(src, nbits)			Hamming Weight: number set bits
- * bitmap_shift_right(dst, src, n, nbits)	*dst = *src >> n
- * bitmap_shift_left(dst, src, n, nbits)	*dst = *src << n
  */
 
 /*
@@ -74,10 +72,6 @@ extern int __bitmap_equal(const unsigned long *bitmap1,
                 	const unsigned long *bitmap2, int bits);
 extern void __bitmap_complement(unsigned long *dst, const unsigned long *src,
 			int bits);
-extern void __bitmap_shift_right(unsigned long *dst,
-                        const unsigned long *src, int shift, int bits);
-extern void __bitmap_shift_left(unsigned long *dst,
-                        const unsigned long *src, int shift, int bits);
 extern void __bitmap_and(unsigned long *dst, const unsigned long *bitmap1,
 			const unsigned long *bitmap2, int bits);
 extern void __bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
@@ -231,22 +225,6 @@ static inline int bitmap_full(const unsigned long *src, int nbits)
 static inline int bitmap_weight(const unsigned long *src, int nbits)
 {
 	return __bitmap_weight(src, nbits);
-}
-
-static inline void bitmap_shift_right(unsigned long *dst,
-			const unsigned long *src, int n, int nbits)
-{
-	bitmap_switch(nbits,,
-		*dst = *src >> n,
-		__bitmap_shift_right(dst, src, n, nbits));
-}
-
-static inline void bitmap_shift_left(unsigned long *dst,
-			const unsigned long *src, int n, int nbits)
-{
-	bitmap_switch(nbits,,
-		*dst = (*src << n) & BITMAP_LAST_WORD_MASK(nbits),
-		__bitmap_shift_left(dst, src, n, nbits));
 }
 
 #undef bitmap_switch
