@@ -473,7 +473,8 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
     static atomic_t found_error = ATOMIC_INIT(0);
     static cpumask_t mce_fatal_cpus;
     struct mca_banks *bankmask = mca_allbanks;
-    struct mca_banks *clear_bank = __get_cpu_var(mce_clear_banks);
+    unsigned int cpu = smp_processor_id();
+    struct mca_banks *clear_bank = per_cpu(mce_clear_banks, cpu);
     uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
@@ -504,17 +505,17 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
              * the telemetry after reboot (the MSRs are sticky)
              */
             if ( bs.pcc || !bs.recoverable )
-                cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
+                cpumask_set_cpu(cpu, &mce_fatal_cpus);
         }
         else if ( mctc != NULL )
             mctelem_commit(mctc);
         atomic_set(&found_error, 1);
 
         /* The last CPU will be take check/clean-up etc */
-        atomic_set(&severity_cpu, smp_processor_id());
+        atomic_set(&severity_cpu, cpu);
 
-        mce_printk(MCE_CRITICAL, "MCE: clear_bank map %lx on CPU%d\n",
-                   *((unsigned long *)clear_bank), smp_processor_id());
+        mce_printk(MCE_CRITICAL, "MCE: clear_bank map %lx on CPU%u\n",
+                   *((unsigned long *)clear_bank), cpu);
         if ( clear_bank != NULL )
             mcheck_mca_clearbanks(clear_bank);
     }
@@ -524,14 +525,14 @@ void mcheck_cmn_handler(const struct cpu_user_regs *regs)
 
     mce_barrier_enter(&mce_trap_bar, bcast);
     if ( mctc != NULL && mce_urgent_action(regs, mctc) )
-        cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
+        cpumask_set_cpu(cpu, &mce_fatal_cpus);
     mce_barrier_exit(&mce_trap_bar, bcast);
 
     /*
      * Wait until everybody has processed the trap.
      */
     mce_barrier_enter(&mce_trap_bar, bcast);
-    if ( lmce || atomic_read(&severity_cpu) == smp_processor_id() )
+    if ( lmce || atomic_read(&severity_cpu) == cpu )
     {
         /*
          * According to SDM, if no error bank found on any cpus,
