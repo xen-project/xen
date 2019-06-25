@@ -33,8 +33,6 @@
  * int first_node(mask)			Number lowest set bit, or MAX_NUMNODES
  * int next_node(node, mask)		Next node past 'node', or MAX_NUMNODES
  * int last_node(mask)			Number highest set bit, or MAX_NUMNODES
- * int first_unset_node(mask)		First node not set in mask, or 
- *					MAX_NUMNODES.
  * int cycle_node(node, mask)		Next node cycling from 'node', or
  *					MAX_NUMNODES
  *
@@ -48,8 +46,6 @@
  * int num_online_nodes()		Number of online Nodes
  *
  * int node_online(node)		Is some node online?
- *
- * int any_online_node(mask)		First online node in mask
  *
  * node_set_online(node)		set bit 'node' in node_online_map
  * node_set_offline(node)		clear bit 'node' in node_online_map
@@ -224,13 +220,6 @@ static inline int __last_node(const nodemask_t *srcp, int nbits)
 	m;								\
 })
 
-#define first_unset_node(mask) __first_unset_node(&(mask))
-static inline int __first_unset_node(const nodemask_t *maskp)
-{
-	return min_t(int,MAX_NUMNODES,
-			find_first_zero_bit(maskp->bits, MAX_NUMNODES));
-}
-
 #define cycle_node(n, src) __cycle_node((n), &(src), MAX_NUMNODES)
 static inline int __cycle_node(int n, const nodemask_t *maskp, int nbits)
 {
@@ -292,15 +281,6 @@ extern nodemask_t node_online_map;
 #define num_online_nodes()	1
 #define node_online(node)	((node) == 0)
 #endif
-
-#define any_online_node(mask)			\
-({						\
-	int node;				\
-	for_each_node_mask(node, (mask))	\
-		if (node_online(node))		\
-			break;			\
-	node;					\
-})
 
 #define node_set_online(node)	   set_bit((node), node_online_map.bits)
 #define node_set_offline(node)	   clear_bit((node), node_online_map.bits)
