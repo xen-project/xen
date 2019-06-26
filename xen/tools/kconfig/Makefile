@@ -2,7 +2,7 @@
 # Kernel configuration targets
 # These targets are used from top-level makefile
 
-PHONY += xconfig gconfig menuconfig config silentoldconfig update-po-config \
+PHONY += xconfig gconfig menuconfig config silentoldconfig \
 	localmodconfig localyesconfig
 
 ifdef KBUILD_KCONFIG
@@ -51,29 +51,6 @@ localyesconfig localmodconfig: $(obj)/streamline_config.pl $(obj)/conf
 			$(obj)/conf $(silent) --silentoldconfig $(Kconfig); \
 	fi
 	$(Q)rm -f .tmp.config
-
-# Create new linux.pot file
-# Adjust charset to UTF-8 in .po file to accept UTF-8 in Kconfig files
-update-po-config: $(obj)/kxgettext $(obj)/gconf.glade.h
-	$(Q)$(kecho) "  GEN     config.pot"
-	$(Q)xgettext --default-domain=linux                         \
-	    --add-comments --keyword=_ --keyword=N_                 \
-	    --from-code=UTF-8                                       \
-	    --files-from=$(srctree)/scripts/kconfig/POTFILES.in     \
-	    --directory=$(srctree) --directory=$(objtree)           \
-	    --output $(obj)/config.pot
-	$(Q)sed -i s/CHARSET/UTF-8/ $(obj)/config.pot
-	$(Q)(for i in `ls $(srctree)/arch/*/Kconfig      \
-	    $(srctree)/arch/*/um/Kconfig`;               \
-	    do                                           \
-		$(kecho) "  GEN     $$i";                    \
-		$(obj)/kxgettext $$i                     \
-		     >> $(obj)/config.pot;               \
-	    done )
-	$(Q)$(kecho) "  GEN     linux.pot"
-	$(Q)msguniq --sort-by-file --to-code=UTF-8 $(obj)/config.pot \
-	    --output $(obj)/linux.pot
-	$(Q)rm -f $(obj)/config.pot
 
 # These targets map 1:1 to the commandline options of 'conf'
 simple-targets := oldconfig allnoconfig allyesconfig allmodconfig \
@@ -176,16 +153,14 @@ lxdialog += lxdialog/textbox.o lxdialog/yesno.o lxdialog/menubox.o
 conf-objs	:= conf.o  zconf.tab.o
 mconf-objs     := mconf.o zconf.tab.o $(lxdialog)
 nconf-objs     := nconf.o zconf.tab.o nconf.gui.o
-kxgettext-objs	:= kxgettext.o zconf.tab.o
 qconf-cxxobjs	:= qconf.o
 qconf-objs	:= zconf.tab.o
 gconf-objs	:= gconf.o zconf.tab.o
 
-hostprogs-y := conf nconf mconf kxgettext qconf gconf
+hostprogs-y := conf nconf mconf qconf gconf
 
 clean-files	:= qconf.moc .tmp_qtcheck .tmp_gtkcheck
-clean-files	+= zconf.tab.c zconf.lex.c zconf.hash.c gconf.glade.h
-clean-files     += config.pot linux.pot
+clean-files	+= zconf.tab.c zconf.lex.c zconf.hash.c
 
 # Check that we have the required ncurses stuff installed for lxdialog (menuconfig)
 PHONY += $(obj)/dochecklxdialog
@@ -194,9 +169,6 @@ $(obj)/dochecklxdialog:
 	$(Q)$(CONFIG_SHELL) $(check-lxdialog) -check $(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTLOADLIBES_mconf)
 
 always := dochecklxdialog
-
-# Add environment specific flags
-HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh $(HOSTCC) $(HOSTCFLAGS))
 
 # generated files seem to need this to find local include files
 HOSTCFLAGS_zconf.lex.o	:= -I$(src)
@@ -310,8 +282,3 @@ quiet_cmd_moc = MOC     $@
 
 $(obj)/%.moc: $(src)/%.h $(obj)/.tmp_qtcheck
 	$(call cmd,moc)
-
-# Extract gconf menu items for i18n support
-$(obj)/gconf.glade.h: $(obj)/gconf.glade
-	$(Q)intltool-extract --type=gettext/glade --srcdir=$(srctree) \
-	$(obj)/gconf.glade

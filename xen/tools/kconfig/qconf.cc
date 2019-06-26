@@ -49,10 +49,6 @@
 #include "qconf.moc"
 #include "images.c"
 
-#ifdef _
-# undef _
-# define _ qgettext
-#endif
 
 static QApplication *configApp;
 static ConfigSettings *configSettings;
@@ -61,12 +57,7 @@ Q3Action *ConfigMainWindow::saveAction;
 
 static inline QString qgettext(const char* str)
 {
-	return QString::fromLocal8Bit(gettext(str));
-}
-
-static inline QString qgettext(const QString& str)
-{
-	return QString::fromLocal8Bit(gettext(str.latin1()));
+	return QString::fromLocal8Bit(str);
 }
 
 ConfigSettings::ConfigSettings()
@@ -135,7 +126,7 @@ void ConfigItem::updateMenu(void)
 
 	sym = menu->sym;
 	prop = menu->prompt;
-	prompt = _(menu_get_prompt(menu));
+	prompt = qgettext(menu_get_prompt(menu));
 
 	if (prop) switch (prop->type) {
 	case P_MENU:
@@ -227,7 +218,7 @@ void ConfigItem::updateMenu(void)
 		break;
 	}
 	if (!sym_has_value(sym) && visible)
-		prompt += _(" (NEW)");
+		prompt += " (NEW)";
 set_prompt:
 	setText(promptColIdx, prompt);
 }
@@ -365,7 +356,7 @@ ConfigList::ConfigList(ConfigView* p, const char *name)
 
 	for (i = 0; i < colNr; i++)
 		colMap[i] = colRevMap[i] = -1;
-	addColumn(promptColIdx, _("Option"));
+	addColumn(promptColIdx, "Option");
 
 	reinit();
 }
@@ -390,14 +381,14 @@ void ConfigList::reinit(void)
 	removeColumn(nameColIdx);
 
 	if (showName)
-		addColumn(nameColIdx, _("Name"));
+		addColumn(nameColIdx, "Name");
 	if (showRange) {
 		addColumn(noColIdx, "N");
 		addColumn(modColIdx, "M");
 		addColumn(yesColIdx, "Y");
 	}
 	if (showData)
-		addColumn(dataColIdx, _("Value"));
+		addColumn(dataColIdx, "Value");
 
 	updateListAll();
 }
@@ -831,7 +822,7 @@ void ConfigList::contextMenuEvent(QContextMenuEvent *e)
 			Q3Action *action;
 
 			headerPopup = new Q3PopupMenu(this);
-			action = new Q3Action(NULL, _("Show Name"), 0, this);
+			action = new Q3Action(NULL, "Show Name", 0, this);
 			  action->setToggleAction(TRUE);
 			  connect(action, SIGNAL(toggled(bool)),
 				  parent(), SLOT(setShowName(bool)));
@@ -839,7 +830,7 @@ void ConfigList::contextMenuEvent(QContextMenuEvent *e)
 				  action, SLOT(setOn(bool)));
 			  action->setOn(showName);
 			  action->addTo(headerPopup);
-			action = new Q3Action(NULL, _("Show Range"), 0, this);
+			action = new Q3Action(NULL, "Show Range", 0, this);
 			  action->setToggleAction(TRUE);
 			  connect(action, SIGNAL(toggled(bool)),
 				  parent(), SLOT(setShowRange(bool)));
@@ -847,7 +838,7 @@ void ConfigList::contextMenuEvent(QContextMenuEvent *e)
 				  action, SLOT(setOn(bool)));
 			  action->setOn(showRange);
 			  action->addTo(headerPopup);
-			action = new Q3Action(NULL, _("Show Data"), 0, this);
+			action = new Q3Action(NULL, "Show Data", 0, this);
 			  action->setToggleAction(TRUE);
 			  connect(action, SIGNAL(toggled(bool)),
 				  parent(), SLOT(setShowData(bool)));
@@ -1022,7 +1013,7 @@ void ConfigInfoView::menuInfo(void)
 	if (sym) {
 		if (_menu->prompt) {
 			head += "<big><b>";
-			head += print_filter(_(_menu->prompt->text));
+			head += print_filter(_menu->prompt->text);
 			head += "</b></big>";
 			if (sym->name) {
 				head += " (";
@@ -1053,7 +1044,7 @@ void ConfigInfoView::menuInfo(void)
 		str_free(&help_gstr);
 	} else if (_menu->prompt) {
 		head += "<big><b>";
-		head += print_filter(_(_menu->prompt->text));
+		head += print_filter(_menu->prompt->text);
 		head += "</b></big><br><br>";
 		if (showDebug()) {
 			if (_menu->prompt->visible.expr) {
@@ -1088,7 +1079,7 @@ QString ConfigInfoView::debug_info(struct symbol *sym)
 		case P_PROMPT:
 		case P_MENU:
 			debug += QString().sprintf("prompt: <a href=\"m%p\">", prop->menu);
-			debug += print_filter(_(prop->text));
+			debug += print_filter(prop->text);
 			debug += "</a><br>";
 			break;
 		case P_DEFAULT:
@@ -1170,7 +1161,7 @@ void ConfigInfoView::expr_print_help(void *data, struct symbol *sym, const char 
 Q3PopupMenu* ConfigInfoView::createPopupMenu(const QPoint& pos)
 {
 	Q3PopupMenu* popup = Parent::createPopupMenu(pos);
-	Q3Action* action = new Q3Action(NULL, _("Show Debug Info"), 0, popup);
+	Q3Action* action = new Q3Action(NULL, "Show Debug Info", 0, popup);
 	  action->setToggleAction(TRUE);
 	  connect(action, SIGNAL(toggled(bool)), SLOT(setShowDebug(bool)));
 	  connect(this, SIGNAL(showDebugChanged(bool)), action, SLOT(setOn(bool)));
@@ -1192,11 +1183,11 @@ ConfigSearchWindow::ConfigSearchWindow(ConfigMainWindow* parent, const char *nam
 
 	QVBoxLayout* layout1 = new QVBoxLayout(this, 11, 6);
 	QHBoxLayout* layout2 = new QHBoxLayout(0, 0, 6);
-	layout2->addWidget(new QLabel(_("Find:"), this));
+	layout2->addWidget(new QLabel("Find:", this));
 	editField = new QLineEdit(this);
 	connect(editField, SIGNAL(returnPressed()), SLOT(search()));
 	layout2->addWidget(editField);
-	searchButton = new QPushButton(_("Search"), this);
+	searchButton = new QPushButton("Search", this);
 	searchButton->setAutoDefault(FALSE);
 	connect(searchButton, SIGNAL(clicked()), SLOT(search()));
 	layout2->addWidget(searchButton);
@@ -1322,40 +1313,40 @@ ConfigMainWindow::ConfigMainWindow(void)
 	menu = menuBar();
 	toolBar = new Q3ToolBar("Tools", this);
 
-	backAction = new Q3Action("Back", QPixmap(xpm_back), _("Back"), 0, this);
+	backAction = new Q3Action("Back", QPixmap(xpm_back), "Back", 0, this);
 	  connect(backAction, SIGNAL(activated()), SLOT(goBack()));
 	  backAction->setEnabled(FALSE);
-	Q3Action *quitAction = new Q3Action("Quit", _("&Quit"), Qt::CTRL + Qt::Key_Q, this);
+	Q3Action *quitAction = new Q3Action("Quit", "&Quit", Qt::CTRL + Qt::Key_Q, this);
 	  connect(quitAction, SIGNAL(activated()), SLOT(close()));
-	Q3Action *loadAction = new Q3Action("Load", QPixmap(xpm_load), _("&Load"), Qt::CTRL + Qt::Key_L, this);
+	Q3Action *loadAction = new Q3Action("Load", QPixmap(xpm_load), "&Load", Qt::CTRL + Qt::Key_L, this);
 	  connect(loadAction, SIGNAL(activated()), SLOT(loadConfig()));
-	saveAction = new Q3Action("Save", QPixmap(xpm_save), _("&Save"), Qt::CTRL + Qt::Key_S, this);
+	saveAction = new Q3Action("Save", QPixmap(xpm_save), "&Save", Qt::CTRL + Qt::Key_S, this);
 	  connect(saveAction, SIGNAL(activated()), SLOT(saveConfig()));
 	conf_set_changed_callback(conf_changed);
 	// Set saveAction's initial state
 	conf_changed();
-	Q3Action *saveAsAction = new Q3Action("Save As...", _("Save &As..."), 0, this);
+	Q3Action *saveAsAction = new Q3Action("Save As...", "Save &As...", 0, this);
 	  connect(saveAsAction, SIGNAL(activated()), SLOT(saveConfigAs()));
-	Q3Action *searchAction = new Q3Action("Find", _("&Find"), Qt::CTRL + Qt::Key_F, this);
+	Q3Action *searchAction = new Q3Action("Find", "&Find", Qt::CTRL + Qt::Key_F, this);
 	  connect(searchAction, SIGNAL(activated()), SLOT(searchConfig()));
-	Q3Action *singleViewAction = new Q3Action("Single View", QPixmap(xpm_single_view), _("Single View"), 0, this);
+	Q3Action *singleViewAction = new Q3Action("Single View", QPixmap(xpm_single_view), "Single View", 0, this);
 	  connect(singleViewAction, SIGNAL(activated()), SLOT(showSingleView()));
-	Q3Action *splitViewAction = new Q3Action("Split View", QPixmap(xpm_split_view), _("Split View"), 0, this);
+	Q3Action *splitViewAction = new Q3Action("Split View", QPixmap(xpm_split_view), "Split View", 0, this);
 	  connect(splitViewAction, SIGNAL(activated()), SLOT(showSplitView()));
-	Q3Action *fullViewAction = new Q3Action("Full View", QPixmap(xpm_tree_view), _("Full View"), 0, this);
+	Q3Action *fullViewAction = new Q3Action("Full View", QPixmap(xpm_tree_view), "Full View", 0, this);
 	  connect(fullViewAction, SIGNAL(activated()), SLOT(showFullView()));
 
-	Q3Action *showNameAction = new Q3Action(NULL, _("Show Name"), 0, this);
+	Q3Action *showNameAction = new Q3Action(NULL, "Show Name", 0, this);
 	  showNameAction->setToggleAction(TRUE);
 	  connect(showNameAction, SIGNAL(toggled(bool)), configView, SLOT(setShowName(bool)));
 	  connect(configView, SIGNAL(showNameChanged(bool)), showNameAction, SLOT(setOn(bool)));
 	  showNameAction->setOn(configView->showName());
-	Q3Action *showRangeAction = new Q3Action(NULL, _("Show Range"), 0, this);
+	Q3Action *showRangeAction = new Q3Action(NULL, "Show Range", 0, this);
 	  showRangeAction->setToggleAction(TRUE);
 	  connect(showRangeAction, SIGNAL(toggled(bool)), configView, SLOT(setShowRange(bool)));
 	  connect(configView, SIGNAL(showRangeChanged(bool)), showRangeAction, SLOT(setOn(bool)));
 	  showRangeAction->setOn(configList->showRange);
-	Q3Action *showDataAction = new Q3Action(NULL, _("Show Data"), 0, this);
+	Q3Action *showDataAction = new Q3Action(NULL, "Show Data", 0, this);
 	  showDataAction->setToggleAction(TRUE);
 	  connect(showDataAction, SIGNAL(toggled(bool)), configView, SLOT(setShowData(bool)));
 	  connect(configView, SIGNAL(showDataChanged(bool)), showDataAction, SLOT(setOn(bool)));
@@ -1369,13 +1360,13 @@ ConfigMainWindow::ConfigMainWindow(void)
 		SLOT(setOptionMode(QAction *)));
 
 #if QT_VERSION >= 0x040000
-	configView->showNormalAction = new QAction(_("Show Normal Options"), optGroup);
-	configView->showAllAction = new QAction(_("Show All Options"), optGroup);
-	configView->showPromptAction = new QAction(_("Show Prompt Options"), optGroup);
+	configView->showNormalAction = new QAction("Show Normal Options", optGroup);
+	configView->showAllAction = new QAction("Show All Options", optGroup);
+	configView->showPromptAction = new QAction("Show Prompt Options", optGroup);
 #else
-	configView->showNormalAction = new QAction(_("Show Normal Options"), 0, optGroup);
-	configView->showAllAction = new QAction(_("Show All Options"), 0, optGroup);
-	configView->showPromptAction = new QAction(_("Show Prompt Options"), 0, optGroup);
+	configView->showNormalAction = new QAction("Show Normal Options", 0, optGroup);
+	configView->showAllAction = new QAction("Show All Options", 0, optGroup);
+	configView->showPromptAction = new QAction("Show Prompt Options", 0, optGroup);
 #endif
 	configView->showNormalAction->setToggleAction(TRUE);
 	configView->showNormalAction->setOn(configList->optMode == normalOpt);
@@ -1384,15 +1375,15 @@ ConfigMainWindow::ConfigMainWindow(void)
 	configView->showPromptAction->setToggleAction(TRUE);
 	configView->showPromptAction->setOn(configList->optMode == promptOpt);
 
-	Q3Action *showDebugAction = new Q3Action(NULL, _("Show Debug Info"), 0, this);
+	Q3Action *showDebugAction = new Q3Action(NULL, "Show Debug Info", 0, this);
 	  showDebugAction->setToggleAction(TRUE);
 	  connect(showDebugAction, SIGNAL(toggled(bool)), helpText, SLOT(setShowDebug(bool)));
 	  connect(helpText, SIGNAL(showDebugChanged(bool)), showDebugAction, SLOT(setOn(bool)));
 	  showDebugAction->setOn(helpText->showDebug());
 
-	Q3Action *showIntroAction = new Q3Action(NULL, _("Introduction"), 0, this);
+	Q3Action *showIntroAction = new Q3Action(NULL, "Introduction", 0, this);
 	  connect(showIntroAction, SIGNAL(activated()), SLOT(showIntro()));
-	Q3Action *showAboutAction = new Q3Action(NULL, _("About"), 0, this);
+	Q3Action *showAboutAction = new Q3Action(NULL, "About", 0, this);
 	  connect(showAboutAction, SIGNAL(activated()), SLOT(showAbout()));
 
 	// init tool bar
@@ -1407,7 +1398,7 @@ ConfigMainWindow::ConfigMainWindow(void)
 
 	// create config menu
 	Q3PopupMenu* config = new Q3PopupMenu(this);
-	menu->insertItem(_("&File"), config);
+	menu->insertItem("&File", config);
 	loadAction->addTo(config);
 	saveAction->addTo(config);
 	saveAsAction->addTo(config);
@@ -1416,12 +1407,12 @@ ConfigMainWindow::ConfigMainWindow(void)
 
 	// create edit menu
 	Q3PopupMenu* editMenu = new Q3PopupMenu(this);
-	menu->insertItem(_("&Edit"), editMenu);
+	menu->insertItem("&Edit", editMenu);
 	searchAction->addTo(editMenu);
 
 	// create options menu
 	Q3PopupMenu* optionMenu = new Q3PopupMenu(this);
-	menu->insertItem(_("&Option"), optionMenu);
+	menu->insertItem("&Option", optionMenu);
 	showNameAction->addTo(optionMenu);
 	showRangeAction->addTo(optionMenu);
 	showDataAction->addTo(optionMenu);
@@ -1432,7 +1423,7 @@ ConfigMainWindow::ConfigMainWindow(void)
 	// create help menu
 	Q3PopupMenu* helpMenu = new Q3PopupMenu(this);
 	menu->insertSeparator();
-	menu->insertItem(_("&Help"), helpMenu);
+	menu->insertItem("&Help", helpMenu);
 	showIntroAction->addTo(helpMenu);
 	showAboutAction->addTo(helpMenu);
 
@@ -1480,14 +1471,14 @@ void ConfigMainWindow::loadConfig(void)
 	if (s.isNull())
 		return;
 	if (conf_read(QFile::encodeName(s)))
-		QMessageBox::information(this, "qconf", _("Unable to load configuration!"));
+		QMessageBox::information(this, "qconf", "Unable to load configuration!");
 	ConfigView::updateListAll();
 }
 
 bool ConfigMainWindow::saveConfig(void)
 {
 	if (conf_write(NULL)) {
-		QMessageBox::information(this, "qconf", _("Unable to save configuration!"));
+		QMessageBox::information(this, "qconf", "Unable to save configuration!");
 		return false;
 	}
 	return true;
@@ -1644,11 +1635,11 @@ void ConfigMainWindow::closeEvent(QCloseEvent* e)
 		e->accept();
 		return;
 	}
-	QMessageBox mb("qconf", _("Save configuration?"), QMessageBox::Warning,
+	QMessageBox mb("qconf", "Save configuration?", QMessageBox::Warning,
 			QMessageBox::Yes | QMessageBox::Default, QMessageBox::No, QMessageBox::Cancel | QMessageBox::Escape);
-	mb.setButtonText(QMessageBox::Yes, _("&Save Changes"));
-	mb.setButtonText(QMessageBox::No, _("&Discard Changes"));
-	mb.setButtonText(QMessageBox::Cancel, _("Cancel Exit"));
+	mb.setButtonText(QMessageBox::Yes, "&Save Changes");
+	mb.setButtonText(QMessageBox::No, "&Discard Changes");
+	mb.setButtonText(QMessageBox::Cancel, "Cancel Exit");
 	switch (mb.exec()) {
 	case QMessageBox::Yes:
 		if (saveConfig())
@@ -1667,7 +1658,7 @@ void ConfigMainWindow::closeEvent(QCloseEvent* e)
 
 void ConfigMainWindow::showIntro(void)
 {
-	static const QString str = _("Welcome to the qconf graphical configuration tool.\n\n"
+	static const QString str = "Welcome to the qconf graphical configuration tool.\n\n"
 		"For each option, a blank box indicates the feature is disabled, a check\n"
 		"indicates it is enabled, and a dot indicates that it is to be compiled\n"
 		"as a module.  Clicking on the box will cycle through the three states.\n\n"
@@ -1684,8 +1675,8 @@ void ConfigMainWindow::showIntro(void)
 
 void ConfigMainWindow::showAbout(void)
 {
-	static const QString str = _("qconf is Copyright (C) 2002 Roman Zippel <zippel@linux-m68k.org>.\n\n"
-		"Bug reports and feature request can also be entered at http://bugzilla.kernel.org/\n");
+	static const QString str = "qconf is Copyright (C) 2002 Roman Zippel <zippel@linux-m68k.org>.\n\n"
+		"Bug reports and feature request can also be entered at http://bugzilla.kernel.org/\n";
 
 	QMessageBox::information(this, "qconf", str);
 }
@@ -1746,7 +1737,7 @@ static const char *progname;
 
 static void usage(void)
 {
-	printf(_("%s [-s] <config>\n"), progname);
+	printf("%s [-s] <config>\n", progname);
 	exit(0);
 }
 
@@ -1754,9 +1745,6 @@ int main(int ac, char** av)
 {
 	ConfigMainWindow* v;
 	const char *name;
-
-	bindtextdomain(PACKAGE, LOCALEDIR);
-	textdomain(PACKAGE);
 
 	progname = av[0];
 	configApp = new QApplication(ac, av);

@@ -550,7 +550,7 @@ static void get_prompt_str(struct gstr *r, struct property *prop,
 	struct menu *submenu[8], *menu, *location = NULL;
 	struct jump_key *jump = NULL;
 
-	str_printf(r, _("Prompt: %s\n"), _(prop->text));
+	str_printf(r, "Prompt: %s\n", prop->text);
 	menu = prop->menu->parent;
 	for (i = 0; menu != &rootmenu && i < 8; menu = menu->parent) {
 		bool accessible = menu_is_visible(menu);
@@ -583,16 +583,16 @@ static void get_prompt_str(struct gstr *r, struct property *prop,
 	}
 
 	if (i > 0) {
-		str_printf(r, _("  Location:\n"));
+		str_printf(r, "  Location:\n");
 		for (j = 4; --i >= 0; j += 2) {
 			menu = submenu[i];
 			if (jump && menu == location)
 				jump->offset = strlen(r->s);
 			str_printf(r, "%*c-> %s", j, ' ',
-				   _(menu_get_prompt(menu)));
+				   menu_get_prompt(menu));
 			if (menu->sym) {
 				str_printf(r, " (%s [=%s])", menu->sym->name ?
-					menu->sym->name : _("<choice>"),
+					menu->sym->name : "<choice>",
 					sym_get_string_value(menu->sym));
 			}
 			str_append(r, "\n");
@@ -639,10 +639,10 @@ static void get_symbol_str(struct gstr *r, struct symbol *sym,
 
 	prop = get_symbol_prop(sym);
 	if (prop) {
-		str_printf(r, _("  Defined at %s:%d\n"), prop->menu->file->name,
+		str_printf(r, "  Defined at %s:%d\n", prop->menu->file->name,
 			prop->menu->lineno);
 		if (!expr_is_yes(prop->visible.expr)) {
-			str_append(r, _("  Depends on: "));
+			str_append(r, "  Depends on: ");
 			expr_gstr_print(prop->visible.expr, r);
 			str_append(r, "\n");
 		}
@@ -660,7 +660,7 @@ static void get_symbol_str(struct gstr *r, struct symbol *sym,
 	if (hit)
 		str_append(r, "\n");
 	if (sym->rev_dep.expr) {
-		str_append(r, _("  Selected by: "));
+		str_append(r, "  Selected by: ");
 		expr_gstr_print(sym->rev_dep.expr, r);
 		str_append(r, "\n");
 	}
@@ -676,7 +676,7 @@ struct gstr get_relations_str(struct symbol **sym_arr, struct list_head *head)
 	for (i = 0; sym_arr && (sym = sym_arr[i]); i++)
 		get_symbol_str(&res, sym, head);
 	if (!i)
-		str_append(&res, _("No matches found.\n"));
+		str_append(&res, "No matches found.\n");
 	return res;
 }
 
@@ -691,7 +691,7 @@ void menu_get_ext_help(struct menu *menu, struct gstr *help)
 			str_printf(help, "%s%s:\n\n", CONFIG_, sym->name);
 		help_text = menu_get_help(menu);
 	}
-	str_printf(help, "%s\n", _(help_text));
+	str_printf(help, "%s\n", help_text);
 	if (sym)
 		get_symbol_str(help, sym, NULL);
 }
