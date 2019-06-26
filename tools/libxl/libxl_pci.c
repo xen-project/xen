@@ -1547,12 +1547,13 @@ int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid,
     return AO_INPROGRESS;
 }
 
-static void libxl__device_pci_from_xs_be(libxl__gc *gc,
-                                         const char *be_path,
-                                         int nr, libxl_device_pci *pci)
+static int libxl__device_pci_from_xs_be(libxl__gc *gc,
+                                        const char *be_path,
+                                        libxl_devid nr, void *data)
 {
     char *s;
     unsigned int domain = 0, bus = 0, dev = 0, func = 0, vdevfn = 0;
+    libxl_device_pci *pci = data;
 
     s = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/dev-%d", be_path, nr));
     sscanf(s, PCI_BDF, &domain, &bus, &dev, &func);
@@ -1582,24 +1583,39 @@ static void libxl__device_pci_from_xs_be(libxl__gc *gc,
             }
         } while ((p = strtok_r(NULL, ",=", &saveptr)) != NULL);
     }
+
+    return 0;
+}
+
+static int libxl__device_pci_get_num(libxl__gc *gc, const char *be_path,
+                                     unsigned int *num)
+{
+    char *num_devs;
+    int rc = 0;
+
+    num_devs = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/num_devs", be_path));
+    if (!num_devs)
+        rc = ERROR_FAIL;
+    else
+        *num = atoi(num_devs);
+
+    return rc;
 }
 
 libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num)
 {
     GC_INIT(ctx);
-    char *be_path, *num_devs;
-    int n, i;
+    char *be_path;
+    unsigned int n, i;
     libxl_device_pci *pcidevs = NULL;
 
     *num = 0;
 
     be_path = libxl__domain_device_backend_path(gc, 0, domid, 0,
                                                 LIBXL__DEVICE_KIND_PCI);
-    num_devs = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/num_devs", be_path));
-    if (!num_devs)
+    if (libxl__device_pci_get_num(gc, be_path, &n))
         goto out;
 
-    n = atoi(num_devs);
     pcidevs = calloc(n, sizeof(libxl_device_pci));
 
     for (i = 0; i < n; i++)
@@ -1688,7 +1704,8 @@ static int libxl_device_pci_compare(const libxl_device_pci *d1,
 #define libxl__device_pci_update_devid NULL
 
 DEFINE_DEVICE_TYPE_STRUCT_X(pcidev, pci, PCI,
-    .from_xenstore = (device_from_xenstore_fn_t)libxl__device_pci_from_xs_be,
+    .get_num = libxl__device_pci_get_num,
+    .from_xenstore = libxl__device_pci_from_xs_be,
 );
 
 /*

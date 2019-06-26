@@ -2026,6 +2026,7 @@ void *libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
     char *libxl_path;
     char **dir = NULL;
     unsigned int ndirs = 0;
+    unsigned int ndevs = 0;
     int rc;
 
     *num = 0;
@@ -2037,21 +2038,34 @@ void *libxl__device_list(libxl__gc *gc, const struct libxl_device_type *dt,
     dir = libxl__xs_directory(gc, XBT_NULL, libxl_path, &ndirs);
 
     if (dir && ndirs) {
-        list = libxl__malloc(NOGC, dt->dev_elem_size * ndirs);
+        if (dt->get_num) {
+            if (ndirs != 1) {
+                LOGD(ERROR, domid, "multiple entries in %s\n", libxl_path);
+                rc = ERROR_FAIL;
+                goto out;
+            }
+            rc = dt->get_num(gc, GCSPRINTF("%s/%s", libxl_path, *dir), &ndevs);
+            if (rc) goto out;
+        } else {
+            ndevs = ndirs;
+        }
+        list = libxl__malloc(NOGC, dt->dev_elem_size * ndevs);
         item = list;
 
-        while (*num < ndirs) {
+        while (*num < ndevs) {
             dt->init(item);
-            ++(*num);
 
             if (dt->from_xenstore) {
+                int nr = dt->get_num ? *num : atoi(*dir);
                 char *device_libxl_path = GCSPRINTF("%s/%s", libxl_path, *dir);
-                rc = dt->from_xenstore(gc, device_libxl_path, atoi(*dir), item);
+                rc = dt->from_xenstore(gc, device_libxl_path, nr, item);
                 if (rc) goto out;
             }
 
             item = (uint8_t *)item + dt->dev_elem_size;
-            ++dir;
+            ++(*num);
+            if (!dt->get_num)
+                ++dir;
         }
     }
 

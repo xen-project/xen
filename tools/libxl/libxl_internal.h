@@ -3707,6 +3707,7 @@ typedef void (*device_merge_fn_t)(libxl_ctx *, void *, void *);
 typedef int (*device_dm_needed_fn_t)(void *, unsigned);
 typedef void (*device_update_config_fn_t)(libxl__gc *, void *, void *);
 typedef int (*device_update_devid_fn_t)(libxl__gc *, uint32_t, void *);
+typedef int (*device_get_num_fn_t)(libxl__gc *, const char *, unsigned int *);
 typedef int (*device_from_xenstore_fn_t)(libxl__gc *, const char *,
                                          libxl_devid, void *);
 typedef int (*device_set_xenstore_config_fn_t)(libxl__gc *, uint32_t, void *,
@@ -3730,6 +3731,7 @@ struct libxl_device_type {
     device_dm_needed_fn_t           dm_needed;
     device_update_config_fn_t       update_config;
     device_update_devid_fn_t        update_devid;
+    device_get_num_fn_t             get_num;
     device_from_xenstore_fn_t       from_xenstore;
     device_set_xenstore_config_fn_t set_xenstore_config;
 };
