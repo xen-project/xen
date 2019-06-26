@@ -192,7 +192,6 @@ GLOBAL(init_secondary)
         PRINT(" booting -\r\n")
 #endif
         bl    check_cpu_mode
-        bl    zero_bss
         bl    cpu_init
         bl    create_page_tables
         bl    enable_mmu
@@ -238,11 +237,15 @@ check_cpu_mode:
         b     fail
 ENDPROC(check_cpu_mode)
 
+/*
+ * Zero BSS
+ *
+ * Inputs:
+ *   r10: Physical offset
+ *
+ * Clobbers r0 - r3
+ */
 zero_bss:
-        /* Zero BSS On the boot CPU to avoid nasty surprises */
-        teq   r12, #0
-        bne   skip_bss
-
         PRINT("- Zero BSS -\r\n")
         ldr   r0, =__bss_start       /* Load start & end of bss */
         ldr   r1, =__bss_end
@@ -254,7 +257,6 @@ zero_bss:
         cmp   r0, r1
         blo   1b
 
-skip_bss:
         mov   pc, lr
 ENDPROC(zero_bss)
 
