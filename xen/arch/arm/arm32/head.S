@@ -518,6 +518,7 @@ puts:
         moveq pc, lr
         early_uart_transmit r11, r1
         b puts
+ENDPROC(puts)
 
 /*
  * Print a 32-bit number in hex.  Specific to the PL011 UART.
@@ -537,6 +538,7 @@ putn:
         subs  r3, r3, #1
         bne   1b
         mov   pc, lr
+ENDPROC(putn)
 
 hex:    .ascii "0123456789abcdef"
         .align 2
