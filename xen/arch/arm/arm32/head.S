@@ -148,7 +148,19 @@ past_zImage:
 
         mov   r12, #0                /* r12 := is_secondary_cpu */
 
-        b     common_start
+        bl    check_cpu_mode
+        bl    zero_bss
+        bl    cpu_init
+        bl    create_page_tables
+        bl    enable_mmu
+
+        /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
+        ldr   r0, =primary_switched
+        mov   pc, r0
+primary_switched:
+        bl    setup_fixmap
+        b     launch
+ENDPROC(start)
 
 GLOBAL(init_secondary)
         cpsid aif                    /* Disable all interrupts */
@@ -179,8 +191,22 @@ GLOBAL(init_secondary)
         print_reg r7
         PRINT(" booting -\r\n")
 #endif
+        bl    check_cpu_mode
+        bl    zero_bss
+        bl    cpu_init
+        bl    create_page_tables
+        bl    enable_mmu
 
-common_start:
+
+        /* We are still in the 1:1 mapping. Jump to the runtime Virtual Address. */
+        ldr   r0, =secondary_switched
+        mov   pc, r0
+secondary_switched:
+        bl    setup_fixmap
+        b     launch
+ENDPROC(init_secondary)
+
+check_cpu_mode:
         /* Check that this CPU has Hyp mode */
         mrc   CP32(r0, ID_PFR1)
         and   r0, r0, #0xf000        /* Bits 12-15 define virt extensions */
@@ -202,7 +228,10 @@ common_start:
         b     fail
 
 hyp:    PRINT("- Xen starting in Hyp mode -\r\n")
+        mov   pc, lr
+ENDPROC(check_cpu_mode)
 
+zero_bss:
         /* Zero BSS On the boot CPU to avoid nasty surprises */
         teq   r12, #0
         bne   skip_bss
@@ -219,7 +248,13 @@ hyp:    PRINT("- Xen starting in Hyp mode -\r\n")
         blo   1b
 
 skip_bss:
+        mov   pc, lr
+ENDPROC(zero_bss)
+
+cpu_init:
         PRINT("- Setting up control registers -\r\n")
+
+        mov   r5, lr                       /* r5 := return address */
 
         /* Get processor specific proc info into r1 */
         bl    __lookup_processor_type
@@ -231,7 +266,6 @@ skip_bss:
         PRINT(" -\r\n")
         b     fail
 1:
-
         /* Jump to cpu_init */
         ldr   r1, [r1, #PROCINFO_cpu_init]  /* r1 := vaddr(init func) */
         adr   lr, cpu_init_done             /* Save return address */
@@ -256,6 +290,10 @@ cpu_init_done:
         ldr   r0, =HSCTLR_SET
         mcr   CP32(r0, HSCTLR)
 
+        mov   pc, r5                        /* Return address is in r5 */
+ENDPROC(cpu_init)
+
+create_page_tables:
         /*
          * Rebuild the boot pagetable's first-level entries. The structure
          * is described in mm.c.
@@ -359,15 +397,16 @@ cpu_init_done:
         /* boot pagetable setup complete */
 
         cmp   r6, #1                /* Did we manage to create an identity mapping ? */
-        beq   1f
+        moveq pc, lr
         PRINT("Unable to build boot page tables - Failed to identity map Xen.\r\n")
         b     fail
 virtphys_clash:
         /* Identity map clashes with boot_third, which we cannot handle yet */
         PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")
         b     fail
+ENDPROC(create_page_tables)
 
-1:
+enable_mmu:
         PRINT("- Turning on paging -\r\n")
 
         /*
@@ -377,16 +416,16 @@ virtphys_clash:
         mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLBs */
         dsb   nsh
 
-        ldr   r1, =paging            /* Explicit vaddr, not RIP-relative */
         mrc   CP32(r0, HSCTLR)
         /* Enable MMU and D-cache */
         orr   r0, r0, #(SCTLR_Axx_ELx_M|SCTLR_Axx_ELx_C)
         dsb                          /* Flush PTE writes and finish reads */
         mcr   CP32(r0, HSCTLR)       /* now paging is enabled */
         isb                          /* Now, flush the icache */
-        mov   pc, r1                 /* Get a proper vaddr into PC */
-paging:
+        mov   pc, lr
+ENDPROC(enable_mmu)
 
+setup_fixmap:
         /*
          * Now we can install the fixmap and dtb mappings, since we
          * don't need the 1:1 map any more
@@ -436,12 +475,15 @@ paging:
         mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
         dsb                          /* Ensure completion of TLB flush */
         isb
+        mov   pc, lr
+ENDPROC(setup_fixmap)
 
+launch:
         PRINT("- Ready -\r\n")
 
         /* The boot CPU should go straight into C now */
         teq   r12, #0
-        beq   launch
+        beq   1f
 
         /*
          * Non-boot CPUs need to move on to the proper pagetables, which were
@@ -460,7 +502,7 @@ paging:
         dsb                          /* Ensure completion of TLB+BP flush */
         isb
 
-launch:
+1:
         ldr   r0, =init_data
         add   r0, #INITINFO_stack    /* Find the boot-time stack */
         ldr   sp, [r0]
@@ -471,6 +513,7 @@ launch:
         moveq r1, r8                 /*               - DTB address */
         beq   start_xen              /* and disappear into the land of C */
         b     start_secondary        /* (to the appropriate entry point) */
+ENDPROC(launch)
 
 /* Fail-stop */
 fail:   PRINT("- Boot failed -\r\n")
