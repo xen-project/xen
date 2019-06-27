@@ -154,8 +154,7 @@ SECTIONS
   . = ALIGN(PAGE_SIZE);
   .init.data : {
        *(.init.rodata)
-       *(.init.rodata.rel)
-       *(.init.rodata.str*)
+       *(.init.rodata.*)
 
        . = ALIGN(POINTER_ALIGN);
        __setup_start = .;
