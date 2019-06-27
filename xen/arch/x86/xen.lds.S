@@ -175,6 +175,19 @@ SECTIONS
   } :text
 #endif
 #endif
+
+/*
+ * ELF builds are linked to a fixed virtual address, and in principle
+ * shouldn't have a .reloc section.  However, due to the way EFI support is
+ * currently implemented, retaining the .reloc section is necessary.
+ */
+#if defined(XEN_BUILD_EFI) && !defined(EFI)
+  . = ALIGN(4);
+  DECL_SECTION(.reloc) {
+    *(.reloc)
+  } :text
+#endif
+
   _erodata = .;
 
   . = ALIGN(SECTION_ALIGN);
