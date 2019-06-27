@@ -81,8 +81,8 @@ static void __init add_ivrs_mapping_entry(
              ivrs_mappings[alias_id].intremap_inuse = shared_intremap_inuse;
          }
     }
-    /* assgin iommu hardware */
-    ivrs_mappings[bdf].iommu = iommu;
+    /* Assign IOMMU hardware, but don't map an IOMMU by itself. */
+    ivrs_mappings[bdf].iommu = iommu->bdf != bdf ? iommu : NULL;
 }
 
 static struct amd_iommu * __init find_iommu_from_bdf_cap(

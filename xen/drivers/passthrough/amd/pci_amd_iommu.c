@@ -43,7 +43,7 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf)
     {
         unsigned int bd0 = bdf & ~PCI_FUNC(~0);
 
-        if ( ivrs_mappings[bd0].iommu )
+        if ( ivrs_mappings[bd0].iommu && ivrs_mappings[bd0].iommu->bdf != bdf )
         {
             struct ivrs_mappings tmp = ivrs_mappings[bd0];
 
@@ -424,6 +424,11 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         return -EINVAL;
 
     bdf = PCI_BDF2(pdev->bus, pdev->devfn);
+
+    for_each_amd_iommu(iommu)
+        if ( pdev->seg == iommu->seg && bdf == iommu->bdf )
+            return is_hardware_domain(pdev->domain) ? 0 : -ENODEV;
+
     iommu = find_iommu_for_device(pdev->seg, bdf);
     if ( unlikely(!iommu) )
     {
