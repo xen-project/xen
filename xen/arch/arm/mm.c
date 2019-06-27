@@ -105,6 +105,8 @@ DEFINE_BOOT_PAGE_TABLE(boot_pgtable);
 #ifdef CONFIG_ARM_64
 DEFINE_BOOT_PAGE_TABLE(boot_first);
 DEFINE_BOOT_PAGE_TABLE(boot_first_id);
+DEFINE_BOOT_PAGE_TABLE(boot_second_id);
+DEFINE_BOOT_PAGE_TABLE(boot_third_id);
 #endif
 DEFINE_BOOT_PAGE_TABLE(boot_second);
 DEFINE_BOOT_PAGE_TABLE(boot_third);
