@@ -380,7 +380,8 @@ static struct shm_rpc *allocate_and_pin_shm_rpc(struct optee_domain *ctx,
         if ( shm_rpc_tmp->cookie == cookie )
         {
             spin_unlock(&ctx->lock);
-            gdprintk(XENLOG_WARNING, "Guest tries to use the same RPC SHM cookie %lx\n",
+            gdprintk(XENLOG_WARNING,
+                     "Guest tries to use the same RPC SHM cookie %"PRIx64"\n",
                      cookie);
             goto err;
         }
@@ -493,7 +494,8 @@ static struct optee_shm_buf *allocate_optee_shm_buf(struct optee_domain *ctx,
         if ( optee_shm_buf_tmp->cookie == cookie )
         {
             spin_unlock(&ctx->lock);
-            gdprintk(XENLOG_WARNING, "Guest tries to use the same SHM buffer cookie %lx\n",
+            gdprintk(XENLOG_WARNING,
+                     "Guest tries to use the same SHM buffer cookie %"PRIx64"\n",
                      cookie);
             err_code = -EINVAL;
             goto err;
@@ -574,7 +576,8 @@ static void free_optee_shm_buf_pg_list(struct optee_domain *ctx,
     if ( found )
         free_pg_list(optee_shm_buf);
     else
-        gdprintk(XENLOG_ERR, "Can't find pagelist for SHM buffer with cookie %lx to free it\n",
+        gdprintk(XENLOG_ERR,
+                 "Can't find pagelist for SHM buffer with cookie %"PRIx64" to free it\n",
                  cookie);
 }
 
@@ -1018,7 +1021,8 @@ static int handle_rpc_return(struct optee_domain *ctx,
              * will overwrite it with actual result. So we can just
              * continue the call.
              */
-            gprintk(XENLOG_ERR, "Can't find SHM-RPC with cookie %lx\n", cookie);
+            gprintk(XENLOG_ERR, "Can't find SHM-RPC with cookie %"PRIx64"\n",
+                    cookie);
 
             return -ERESTART;
         }
@@ -1219,7 +1223,8 @@ static void handle_rpc_cmd_alloc(struct optee_domain *ctx,
     if ( shm_rpc->xen_arg->params[0].attr != (OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT |
                                               OPTEE_MSG_ATTR_NONCONTIG) )
     {
-        gdprintk(XENLOG_WARNING, "Invalid attrs for shared mem buffer: %lx\n",
+        gdprintk(XENLOG_WARNING,
+                 "Invalid attrs for shared mem buffer: %"PRIx64"\n",
                  shm_rpc->xen_arg->params[0].attr);
         return;
     }
@@ -1268,7 +1273,8 @@ static void handle_rpc_cmd(struct optee_domain *ctx, struct cpu_user_regs *regs,
 
     if ( !shm_rpc )
     {
-        gdprintk(XENLOG_ERR, "Can't find SHM-RPC with cookie %lx\n", cookie);
+        gdprintk(XENLOG_ERR, "Can't find SHM-RPC with cookie %"PRIx64"\n",
+                 cookie);
         return;
     }
 
