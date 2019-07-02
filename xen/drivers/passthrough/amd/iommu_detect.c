@@ -62,6 +62,7 @@ void __init get_iommu_features(struct amd_iommu *iommu)
 {
     u32 low, high;
     int i = 0 ;
+    const struct amd_iommu *first;
     static const char *__initdata feature_str[] = {
         "- Prefetch Pages Command", 
         "- Peripheral Page Service Request", 
@@ -88,6 +89,11 @@ void __init get_iommu_features(struct amd_iommu *iommu)
     high = readl(iommu->mmio_base + IOMMU_EXT_FEATURE_MMIO_OFFSET + 4);
 
     iommu->features = ((u64)high << 32) | low;
+
+    /* Don't log the same set of features over and over. */
+    first = list_first_entry(&amd_iommu_head, struct amd_iommu, list);
+    if ( iommu != first && iommu->features == first->features )
+        return;
 
     printk("AMD-Vi: IOMMU Extended Features:\n");
 
