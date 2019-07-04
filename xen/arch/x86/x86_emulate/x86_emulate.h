@@ -662,9 +662,12 @@ static inline unsigned long *decode_gpr(struct cpu_user_regs *regs,
     BUILD_BUG_ON(ARRAY_SIZE(cpu_user_regs_gpr_offsets) &
                  (ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1));
 
-    ASSERT(modrm < ARRAY_SIZE(cpu_user_regs_gpr_offsets));
-
-    /* Note that this also acts as array_access_nospec() stand-in. */
+    /*
+     * Note that this also acts as array_access_nospec() stand-in.  Higher
+     * bits may legitimately come in set here, from EVEX decoding, and
+     * hence truncation is what we want (bits not ignored will get checked
+     * elsewhere).
+     */
     modrm &= ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1;
 
     return (void *)regs + cpu_user_regs_gpr_offsets[modrm];

@@ -3022,7 +3022,8 @@ x86_decode(
 
         d &= ~ModRM;
 #undef ModRM /* Only its aliases are valid to use from here on. */
-        modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3);
+        modrm_reg = ((rex_prefix & 4) << 1) | ((modrm & 0x38) >> 3) |
+                    ((evex_encoded() && !evex.R) << 4);
         modrm_rm  = modrm & 0x07;
 
         /*
@@ -3192,7 +3193,8 @@ x86_decode(
         if ( modrm_mod == 3 )
         {
             generate_exception_if(d & vSIB, EXC_UD);
-            modrm_rm |= (rex_prefix & 1) << 3;
+            modrm_rm |= ((rex_prefix & 1) << 3) |
+                        (evex_encoded() && !evex.x) << 4;
             ea.type = OP_REG;
         }
         else if ( ad_bytes == 2 )
@@ -3257,7 +3259,10 @@ x86_decode(
 
                 state->sib_index = ((sib >> 3) & 7) | ((rex_prefix << 2) & 8);
                 state->sib_scale = (sib >> 6) & 3;
-                if ( state->sib_index != 4 && !(d & vSIB) )
+                if ( unlikely(d & vSIB) )
+                    state->sib_index |= (mode_64bit() && evex_encoded() &&
+                                         !evex.RX) << 4;
+                else if ( state->sib_index != 4 )
                 {
                     ea.mem.off = *decode_gpr(state->regs, state->sib_index);
                     ea.mem.off <<= state->sib_scale;
@@ -3560,7 +3565,7 @@ x86_emulate(
     generate_exception_if(state->not_64bit && mode_64bit(), EXC_UD);
 
     if ( ea.type == OP_REG )
-        ea.reg = _decode_gpr(&_regs, modrm_rm, (d & ByteOp) && !rex_prefix);
+        ea.reg = _decode_gpr(&_regs, modrm_rm, (d & ByteOp) && !rex_prefix && !vex.opcx);
 
     memset(mmvalp, 0xaa /* arbitrary */, sizeof(*mmvalp));
 
@@ -3574,7 +3579,7 @@ x86_emulate(
         src.type = OP_REG;
         if ( d & ByteOp )
         {
-            src.reg = _decode_gpr(&_regs, modrm_reg, !rex_prefix);
+            src.reg = _decode_gpr(&_regs, modrm_reg, !rex_prefix && !vex.opcx);
             src.val = *(uint8_t *)src.reg;
             src.bytes = 1;
         }
@@ -3681,7 +3686,7 @@ x86_emulate(
         dst.type = OP_REG;
         if ( d & ByteOp )
         {
-            dst.reg = _decode_gpr(&_regs, modrm_reg, !rex_prefix);
+            dst.reg = _decode_gpr(&_regs, modrm_reg, !rex_prefix && !vex.opcx);
             dst.val = *(uint8_t *)dst.reg;
             dst.bytes = 1;
         }
