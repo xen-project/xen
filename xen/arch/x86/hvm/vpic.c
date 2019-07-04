@@ -335,7 +335,7 @@ static int vpic_intercept_pic_io(
         return X86EMUL_OKAY;
     }
 
-    vpic = &current->domain->arch.hvm.vpic[port >> 7];
+    vpic = &current->domain->arch.hvm.vpic[!!(port & 0x80)];
 
     if ( dir == IOREQ_WRITE )
         vpic_ioport_write(vpic, port, (uint8_t)*val);
@@ -448,7 +448,7 @@ void vpic_init(struct domain *d)
 
 void vpic_irq_positive_edge(struct domain *d, int irq)
 {
-    struct hvm_hw_vpic *vpic = &d->arch.hvm.vpic[irq >> 3];
+    struct hvm_hw_vpic *vpic = &d->arch.hvm.vpic[!!(irq & 8)];
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(has_vpic(d));
@@ -466,7 +466,7 @@ void vpic_irq_positive_edge(struct domain *d, int irq)
 
 void vpic_irq_negative_edge(struct domain *d, int irq)
 {
-    struct hvm_hw_vpic *vpic = &d->arch.hvm.vpic[irq >> 3];
+    struct hvm_hw_vpic *vpic = &d->arch.hvm.vpic[!!(irq & 8)];
     uint8_t mask = 1 << (irq & 7);
 
     ASSERT(has_vpic(d));
