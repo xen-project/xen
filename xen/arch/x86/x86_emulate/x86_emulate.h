@@ -642,6 +642,12 @@ int x86_emulate_wrapper(
 #define x86_emulate x86_emulate_wrapper
 #endif
 
+#ifdef __XEN__
+# include <xen/nospec.h>
+#else
+# define array_access_nospec(arr, idx) arr[idx]
+#endif
+
 /* Map GPRs by ModRM encoding to their offset within struct cpu_user_regs. */
 extern const uint8_t cpu_user_regs_gpr_offsets[X86_NR_GPRS];
 
@@ -658,7 +664,7 @@ static inline unsigned long *decode_gpr(struct cpu_user_regs *regs,
 
     ASSERT(modrm < ARRAY_SIZE(cpu_user_regs_gpr_offsets));
 
-    /* For safety in release builds.  Debug builds will hit the ASSERT() */
+    /* Note that this also acts as array_access_nospec() stand-in. */
     modrm &= ARRAY_SIZE(cpu_user_regs_gpr_offsets) - 1;
 
     return (void *)regs + cpu_user_regs_gpr_offsets[modrm];

@@ -102,7 +102,7 @@ int x86emul_read_dr(unsigned int reg, unsigned long *val,
     switch ( reg )
     {
     case 0 ... 3:
-        *val = curr->arch.dr[reg];
+        *val = array_access_nospec(curr->arch.dr, reg);
         break;
 
     case 4:

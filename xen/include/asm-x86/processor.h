@@ -13,7 +13,6 @@
 #include <asm/types.h>
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
-#include <asm/x86_emulate.h>
 #endif
 
 #include <asm/x86-defns.h>

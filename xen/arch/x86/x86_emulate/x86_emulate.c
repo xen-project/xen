@@ -2235,7 +2235,7 @@ static void *_decode_gpr(
 
     ASSERT(modrm_reg < ARRAY_SIZE(byte_reg_offsets));
 
-    /* For safety in release builds.  Debug builds will hit the ASSERT() */
+    /* Note that this also acts as array_access_nospec() stand-in. */
     modrm_reg &= ARRAY_SIZE(byte_reg_offsets) - 1;
 
     return (void *)regs + byte_reg_offsets[modrm_reg];
@@ -2985,7 +2985,7 @@ x86_decode(
                     b = insn_fetch_type(uint8_t);
                     opcode |= MASK_INSR(0x8f08 + ext - ext_8f08,
                                         X86EMUL_OPC_EXT_MASK);
-                    d = xop_table[ext - ext_8f08];
+                    d = array_access_nospec(xop_table, ext - ext_8f08);
                 }
                 else
                 {
