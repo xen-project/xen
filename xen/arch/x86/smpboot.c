@@ -985,6 +985,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( gdt == NULL )
         goto out;
     per_cpu(gdt_table, cpu) = gdt;
+    per_cpu(gdt_table_l1e, cpu) =
+        l1e_from_pfn(virt_to_mfn(gdt), __PAGE_HYPERVISOR_RW);
     memcpy(gdt, boot_cpu_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     BUILD_BUG_ON(NR_CPUS > 0x10000);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
@@ -992,6 +994,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     per_cpu(compat_gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
     if ( gdt == NULL )
         goto out;
+    per_cpu(compat_gdt_table_l1e, cpu) =
+        l1e_from_pfn(virt_to_mfn(gdt), __PAGE_HYPERVISOR_RW);
     memcpy(gdt, boot_cpu_compat_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 

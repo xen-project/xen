@@ -1635,23 +1635,42 @@ static void _update_runstate_area(struct vcpu *v)
         v->arch.pv.need_update_runstate_area = 1;
 }
 
+/*
+ * Overview of Xen's GDTs.
+ *
+ * Xen maintains per-CPU compat and regular GDTs which are both a single page
+ * in size.  Some content is specific to each CPU (the TSS, the per-CPU marker
+ * for #DF handling, and optionally the LDT).  The compat and regular GDTs
+ * differ by the layout and content of the guest accessible selectors.
+ *
+ * The Xen selectors live from 0xe000 (slot 14 of 16), and need to always
+ * appear in this position for interrupt/exception handling to work.
+ *
+ * A PV guest may specify GDT frames of their own (slots 0 to 13).  Room for a
+ * full GDT exists in the per-domain mappings.
+ *
+ * To schedule a PV vcpu, we point slot 14 of the guest's full GDT at the
+ * current CPU's compat or regular (as appropriate) GDT frame.  This is so
+ * that the per-CPU parts still work correctly after switching pagetables and
+ * loading the guests full GDT into GDTR.
+ *
+ * To schedule Idle or HVM vcpus, we load a GDT base address which causes the
+ * regular per-CPU GDT frame to appear with selectors at the appropriate
+ * offset.
+ */
 static inline bool need_full_gdt(const struct domain *d)
 {
     return is_pv_domain(d) && !is_idle_domain(d);
 }
 
-static void write_full_gdt_ptes(seg_desc_t *gdt, const struct vcpu *v)
+static void update_xen_slot_in_full_gdt(const struct vcpu *v, unsigned int cpu)
 {
-    unsigned long mfn = virt_to_mfn(gdt);
-    l1_pgentry_t *pl1e = pv_gdt_ptes(v);
-    unsigned int i;
-
-    for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
-        l1e_write(pl1e + FIRST_RESERVED_GDT_PAGE + i,
-                  l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR_RW));
+    l1e_write(pv_gdt_ptes(v) + FIRST_RESERVED_GDT_PAGE,
+              !is_pv_32bit_vcpu(v) ? per_cpu(gdt_table_l1e, cpu)
+                                   : per_cpu(compat_gdt_table_l1e, cpu));
 }
 
-static void load_full_gdt(const struct vcpu *v, unsigned int cpu)
+static void load_full_gdt(const struct vcpu *v)
 {
     struct desc_ptr gdt_desc = {
         .limit = LAST_RESERVED_GDT_BYTE,
@@ -1661,11 +1680,12 @@ static void load_full_gdt(const struct vcpu *v, unsigned int cpu)
     lgdt(&gdt_desc);
 }
 
-static void load_default_gdt(const seg_desc_t *gdt, unsigned int cpu)
+static void load_default_gdt(unsigned int cpu)
 {
     struct desc_ptr gdt_desc = {
         .limit = LAST_RESERVED_GDT_BYTE,
-        .base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY),
+        .base  = (unsigned long)(per_cpu(gdt_table, cpu) -
+                                 FIRST_RESERVED_GDT_ENTRY),
     };
 
     lgdt(&gdt_desc);
@@ -1678,7 +1698,6 @@ static void __context_switch(void)
     struct vcpu          *p = per_cpu(curr_vcpu, cpu);
     struct vcpu          *n = current;
     struct domain        *pd = p->domain, *nd = n->domain;
-    seg_desc_t           *gdt;
 
     ASSERT(p != n);
     ASSERT(!vcpu_cpu_dirty(n));
@@ -1718,15 +1737,12 @@ static void __context_switch(void)
 
     psr_ctxt_switch_to(nd);
 
-    gdt = !is_pv_32bit_domain(nd) ? per_cpu(gdt_table, cpu) :
-                                    per_cpu(compat_gdt_table, cpu);
-
     if ( need_full_gdt(nd) )
-        write_full_gdt_ptes(gdt, n);
+        update_xen_slot_in_full_gdt(n, cpu);
 
     if ( need_full_gdt(pd) &&
          ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(nd)) )
-        load_default_gdt(gdt, cpu);
+        load_default_gdt(cpu);
 
     write_ptbase(n);
 
@@ -1739,7 +1755,7 @@ static void __context_switch(void)
 
     if ( need_full_gdt(nd) &&
          ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(pd)) )
-        load_full_gdt(n, cpu);
+        load_full_gdt(n);
 
     if ( pd != nd )
         cpumask_clear_cpu(cpu, pd->dirty_cpumask);

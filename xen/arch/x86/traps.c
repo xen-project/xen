@@ -97,7 +97,9 @@ DEFINE_PER_CPU(uint64_t, efer);
 static DEFINE_PER_CPU(unsigned long, last_extable_addr);
 
 DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, gdt_table);
+DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, gdt_table_l1e);
 DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, compat_gdt_table);
+DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, compat_gdt_table_l1e);
 
 /* Master table, used by CPU0. */
 idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
@@ -2058,6 +2060,14 @@ void __init trap_init(void)
             ASSERT(idt_table[vector].b != 0);
         }
     }
+
+    /* Cache {,compat_}gdt_table_l1e now that physically relocation is done. */
+    this_cpu(gdt_table_l1e) =
+        l1e_from_pfn(virt_to_mfn(boot_cpu_gdt_table),
+                     __PAGE_HYPERVISOR_RW);
+    this_cpu(compat_gdt_table_l1e) =
+        l1e_from_pfn(virt_to_mfn(boot_cpu_compat_gdt_table),
+                     __PAGE_HYPERVISOR_RW);
 
     percpu_traps_init();
 
