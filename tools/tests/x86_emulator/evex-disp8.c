@@ -105,6 +105,8 @@ enum esz {
 
 static const struct test avx512f_all[] = {
     INSN_FP(add,             0f, 58),
+    INSN(align,        66, 0f3a, 03,    vl,     dq, vl),
+    INSN(blendm,       66, 0f38, 65,    vl,     sd, vl),
     INSN(broadcastss,  66, 0f38, 18,    el,      d, el),
     INSN_FP(cmp,             0f, c2),
     INSN(comisd,       66,   0f, 2f,    el,      q, el),
@@ -207,6 +209,7 @@ static const struct test avx512f_all[] = {
     INSN(paddq,        66,   0f, d4,    vl,      q, vl),
     INSN(pand,         66,   0f, db,    vl,     dq, vl),
     INSN(pandn,        66,   0f, df,    vl,     dq, vl),
+    INSN(pblendm,      66, 0f38, 64,    vl,     dq, vl),
 //       pbroadcast,   66, 0f38, 7c,          dq64
     INSN(pbroadcastd,  66, 0f38, 58,    el,      d, el),
     INSN(pbroadcastq,  66, 0f38, 59,    el,      q, el),
@@ -354,6 +357,7 @@ static const struct test avx512f_512[] = {
 };
 
 static const struct test avx512bw_all[] = {
+    INSN(dbpsadbw,    66, 0f3a, 42,    vl,    b, vl),
     INSN(movdqu8,     f2,   0f, 6f,    vl,    b, vl),
     INSN(movdqu8,     f2,   0f, 7f,    vl,    b, vl),
     INSN(movdqu16,    f2,   0f, 6f,    vl,    w, vl),
@@ -373,6 +377,7 @@ static const struct test avx512bw_all[] = {
     INSN(palignr,     66, 0f3a, 0f,    vl,    b, vl),
     INSN(pavgb,       66,   0f, e0,    vl,    b, vl),
     INSN(pavgw,       66,   0f, e3,    vl,    w, vl),
+    INSN(pblendm,     66, 0f38, 66,    vl,   bw, vl),
     INSN(pbroadcastb, 66, 0f38, 78,    el,    b, el),
 //       pbroadcastb, 66, 0f38, 7a,           b
     INSN(pbroadcastw, 66, 0f38, 79,    el_2,  b, vl),

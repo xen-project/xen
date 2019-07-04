@@ -484,6 +484,7 @@ static const struct ext0f38_table {
     [0x5b] = { .simd_size = simd_256, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x62] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_bw },
     [0x63] = { .simd_size = simd_packed_int, .to_mem = 1, .two_op = 1, .d8s = d8s_bw },
+    [0x64 ... 0x66] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x75 ... 0x76] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x77] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0x78] = { .simd_size = simd_other, .two_op = 1 },
@@ -550,6 +551,7 @@ static const struct ext0f3a_table {
     [0x00] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x01] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0x02] = { .simd_size = simd_packed_int },
+    [0x03] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x04 ... 0x05] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0x06] = { .simd_size = simd_packed_fp },
     [0x08 ... 0x09] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
@@ -581,8 +583,7 @@ static const struct ext0f3a_table {
     [0x3b] = { .simd_size = simd_256, .to_mem = 1, .two_op = 1, .d8s = d8s_vl_by_2 },
     [0x3e ... 0x3f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
-    [0x42] = { .simd_size = simd_packed_int },
-    [0x43] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
+    [0x42 ... 0x43] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x44] = { .simd_size = simd_packed_int },
     [0x46] = { .simd_size = simd_packed_int },
     [0x48 ... 0x49] = { .simd_size = simd_packed_fp, .four_op = 1 },
@@ -6178,6 +6179,8 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x47): /* vpsllv{d,q} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x4c): /* vrcp14p{s,d} [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x4e): /* vrsqrt14p{s,d} [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x64): /* vpblendm{d,q} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x65): /* vblendmp{s,d} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     avx512f_no_sae:
         host_and_vcpu_must_have(avx512f);
         generate_exception_if(ea.type != OP_MEM && evex.brs, EXC_UD);
@@ -6937,6 +6940,7 @@ x86_emulate(
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x0b): /* vpmulhrsw [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x1c): /* vpabsb [xyz]mm/mem,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x1d): /* vpabsw [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x66): /* vpblendm{b,w} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         host_and_vcpu_must_have(avx512bw);
         generate_exception_if(evex.brs, EXC_UD);
         elem_bytes = 1 << (b & 1);
@@ -8106,9 +8110,11 @@ x86_emulate(
         goto simd_0f_to_gpr;
 
     CASE_SIMD_PACKED_FP(_EVEX, 0x0f, 0xc6): /* vshufp{s,d} $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
-        fault_suppression = false;
         generate_exception_if(evex.w != (evex.pfx & VEX_PREFIX_DOUBLE_MASK),
                               EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x03): /* valign{d,q} $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        fault_suppression = false;
         /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f3a, 0x25): /* vpternlog{d,q} $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     avx512f_imm8_no_sae:
@@ -9450,6 +9456,9 @@ x86_emulate(
         insn_bytes = PFX_BYTES + 4;
         break;
 
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x42): /* vdbpsadbw $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        generate_exception_if(evex.w, EXC_UD);
+        /* fall through */
     case X86EMUL_OPC_EVEX_66(0x0f3a, 0x0f): /* vpalignr $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
         fault_suppression = false;
         goto avx512bw_imm;

@@ -297,7 +297,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define max(x, y) BR_(maxps, _mask, x, y, undef(), ~0)
 #   define min(x, y) BR_(minps, _mask, x, y, undef(), ~0)
 #  endif
-#  define mix(x, y) B(movaps, _mask, x, y, (0b0101010101010101 & ALL_TRUE))
+#  define mix(x, y) B(blendmps_, _mask, x, y, (0b1010101010101010 & ALL_TRUE))
 #  define scale(x, y) BR(scalefps, _mask, x, y, undef(), ~0)
 #  if VEC_SIZE == 64 && defined(__AVX512ER__)
 #   define recip(x) BR(rcp28ps, _mask, x, undef(), ~0)
@@ -370,7 +370,7 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define max(x, y) BR_(maxpd, _mask, x, y, undef(), ~0)
 #   define min(x, y) BR_(minpd, _mask, x, y, undef(), ~0)
 #  endif
-#  define mix(x, y) B(movapd, _mask, x, y, 0b01010101)
+#  define mix(x, y) B(blendmpd_, _mask, x, y, 0b10101010)
 #  define scale(x, y) BR(scalefpd, _mask, x, y, undef(), ~0)
 #  if VEC_SIZE == 64 && defined(__AVX512ER__)
 #   define recip(x) BR(rcp28pd, _mask, x, undef(), ~0)
@@ -564,8 +564,9 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
                              0b00011011, (vsi_t)undef(), ~0))
 #   define swap2(x) ((vec_t)B_(permvarsi, _mask, (vsi_t)(x), (vsi_t)(inv - 1), (vsi_t)undef(), ~0))
 #  endif
-#  define mix(x, y) ((vec_t)B(movdqa32_, _mask, (vsi_t)(x), (vsi_t)(y), \
-                              (0b0101010101010101 & ((1 << ELEM_COUNT) - 1))))
+#  define mix(x, y) ((vec_t)B(blendmd_, _mask, (vsi_t)(x), (vsi_t)(y), \
+                              (0b1010101010101010 & ((1 << ELEM_COUNT) - 1))))
+#  define rotr(x, n) ((vec_t)B(alignd, _mask, (vsi_t)(x), (vsi_t)(x), n, (vsi_t)undef(), ~0))
 #  define shrink1(x) ((half_t)B(pmovqd, _mask, (vdi_t)(x), (vsi_half_t){}, ~0))
 # elif INT_SIZE == 8 || UINT_SIZE == 8
 #  define broadcast(x) ({ \
@@ -602,7 +603,8 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
                              0b01001110, (vsi_t)undef(), ~0))
 #   define swap2(x) ((vec_t)B(permvardi, _mask, (vdi_t)(x), (vdi_t)(inv - 1), (vdi_t)undef(), ~0))
 #  endif
-#  define mix(x, y) ((vec_t)B(movdqa64_, _mask, (vdi_t)(x), (vdi_t)(y), 0b01010101))
+#  define mix(x, y) ((vec_t)B(blendmq_, _mask, (vdi_t)(x), (vdi_t)(y), 0b10101010))
+#  define rotr(x, n) ((vec_t)B(alignq, _mask, (vdi_t)(x), (vdi_t)(x), n, (vdi_t)undef(), ~0))
 #  if VEC_SIZE == 32
 #   define swap3(x) ((vec_t)B_(permdi, _mask, (vdi_t)(x), 0b00011011, (vdi_t)undef(), ~0))
 #  elif VEC_SIZE == 64
@@ -654,8 +656,8 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define interleave_hi(x, y) ((vec_t)B(vpermi2varqi, _mask, (vqi_t)(x), interleave_hi, (vqi_t)(y), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(vpermt2varqi, _mask, interleave_lo, (vqi_t)(x), (vqi_t)(y), ~0))
 #  endif
-#  define mix(x, y) ((vec_t)B(movdquqi, _mask, (vqi_t)(x), (vqi_t)(y), \
-                              (0b0101010101010101010101010101010101010101010101010101010101010101LL & ALL_TRUE)))
+#  define mix(x, y) ((vec_t)B(blendmb_, _mask, (vqi_t)(x), (vqi_t)(y), \
+                              (0b1010101010101010101010101010101010101010101010101010101010101010LL & ALL_TRUE)))
 #  define shrink1(x) ((half_t)B(pmovwb, _mask, (vhi_t)(x), (vqi_half_t){}, ~0))
 #  define shrink2(x) ((quarter_t)B(pmovdb, _mask, (vsi_t)(x), (vqi_quarter_t){}, ~0))
 #  define shrink3(x) ((eighth_t)B(pmovqb, _mask, (vdi_t)(x), (vqi_eighth_t){}, ~0))
@@ -687,8 +689,8 @@ static inline vec_t movlhps(vec_t x, vec_t y) {
 #   define interleave_hi(x, y) ((vec_t)B(vpermi2varhi, _mask, (vhi_t)(x), interleave_hi, (vhi_t)(y), ~0))
 #   define interleave_lo(x, y) ((vec_t)B(vpermt2varhi, _mask, interleave_lo, (vhi_t)(x), (vhi_t)(y), ~0))
 #  endif
-#  define mix(x, y) ((vec_t)B(movdquhi, _mask, (vhi_t)(x), (vhi_t)(y), \
-                              (0b01010101010101010101010101010101 & ALL_TRUE)))
+#  define mix(x, y) ((vec_t)B(blendmw_, _mask, (vhi_t)(x), (vhi_t)(y), \
+                              (0b10101010101010101010101010101010 & ALL_TRUE)))
 #  define shrink1(x) ((half_t)B(pmovdw, _mask, (vsi_t)(x), (vhi_half_t){}, ~0))
 #  define shrink2(x) ((quarter_t)B(pmovqw, _mask, (vdi_t)(x), (vhi_quarter_t){}, ~0))
 #  define swap2(x) ((vec_t)B(permvarhi, _mask, (vhi_t)(x), (vhi_t)(inv - 1), (vhi_t)undef(), ~0))
