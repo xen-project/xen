@@ -595,7 +595,7 @@ void *_xmalloc(unsigned long size, unsigned long align)
         char *q = (char *)p + pad;
         struct bhdr *b = (struct bhdr *)(q - BHDR_OVERHEAD);
         ASSERT(q > (char *)p);
-        b->size = pad | 1;
+        b->size = pad | FREE_BLOCK;
         p = q;
     }
 
@@ -638,12 +638,12 @@ void xfree(void *p)
     }
 
     /* Strip alignment padding. */
-    b = (struct bhdr *)((char *) p - BHDR_OVERHEAD);
-    if ( b->size & 1 )
+    b = (struct bhdr *)((char *)p - BHDR_OVERHEAD);
+    if ( b->size & FREE_BLOCK )
     {
-        p = (char *)p - (b->size & ~1u);
+        p = (char *)p - (b->size & ~FREE_BLOCK);
         b = (struct bhdr *)((char *)p - BHDR_OVERHEAD);
-        ASSERT(!(b->size & 1));
+        ASSERT(!(b->size & FREE_BLOCK));
     }
 
     xmem_pool_free(p, xenpool);
