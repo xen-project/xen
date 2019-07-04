@@ -29,6 +29,7 @@
 #include <xen/xmalloc.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/nospec.h>
 #include <xen/sched.h>
 #include <xen/softirq.h>
 #include <xen/irq.h>
@@ -231,8 +232,10 @@ static int msixtbl_read(const struct hvm_io_handler *handler,
     {
         nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
         index = offset / sizeof(uint32_t);
-        if ( nr_entry >= MAX_MSIX_ACC_ENTRIES ||
-             !acc_bit(test, entry, nr_entry, index) )
+        if ( nr_entry >= ARRAY_SIZE(entry->gentries) )
+            goto out;
+        nr_entry = array_index_nospec(nr_entry, ARRAY_SIZE(entry->gentries));
+        if ( !acc_bit(test, entry, nr_entry, index) )
             goto out;
         *pval = entry->gentries[nr_entry].msi_ad[index];
         if ( len == 8 )
@@ -284,14 +287,18 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     entry = msixtbl_find_entry(v, address);
     if ( !entry )
         goto out;
-    nr_entry = (address - entry->gtable) / PCI_MSIX_ENTRY_SIZE;
+    nr_entry = array_index_nospec(((address - entry->gtable) /
+                                   PCI_MSIX_ENTRY_SIZE),
+                                  MAX_MSIX_TABLE_ENTRIES);
 
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
     {
         index = offset / sizeof(uint32_t);
-        if ( nr_entry < MAX_MSIX_ACC_ENTRIES ) 
+        if ( nr_entry < ARRAY_SIZE(entry->gentries) )
         {
+            nr_entry = array_index_nospec(nr_entry,
+                                          ARRAY_SIZE(entry->gentries));
             entry->gentries[nr_entry].msi_ad[index] = val;
             acc_bit(set, entry, nr_entry, index);
             if ( len == 8 && !index )
