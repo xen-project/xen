@@ -698,7 +698,7 @@ static void test_one(const struct test *test, enum vl vl,
     instr[3] = evex.raw[2];
     instr[4] = test->opc;
     instr[5] = 0x44 | (test->ext << 3); /* ModR/M */
-    instr[6] = 0x12; /* SIB: base rDX, index none / xMM4 */
+    instr[6] = 0x22; /* SIB: base rDX, index none / xMM4 */
     instr[7] = 1; /* Disp8 */
     instr[8] = 0; /* immediate, if any */
 
@@ -718,7 +718,8 @@ static void test_one(const struct test *test, enum vl vl,
          if ( accessed[i] )
              goto fail;
     for ( ; i < (test->scale == SC_vl ? vsz : esz) + (sg ? esz : vsz); ++i )
-         if ( accessed[i] != (sg ? vsz / esz : 1) )
+         if ( accessed[i] != (sg ? (vsz / esz) >> (test->opc & 1 & !evex.w)
+                                 : 1) )
              goto fail;
     for ( ; i < ARRAY_SIZE(accessed); ++i )
          if ( accessed[i] )

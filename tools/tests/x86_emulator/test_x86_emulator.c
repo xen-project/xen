@@ -4260,7 +4260,7 @@ int main(int argc, char **argv)
 
         if ( !blobs[j].size )
         {
-            printf("%-39s n/a\n", blobs[j].name);
+            printf("%-39s n/a (%u-bit)\n", blobs[j].name, blobs[j].bitness);
             continue;
         }
 
