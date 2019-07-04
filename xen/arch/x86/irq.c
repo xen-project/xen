@@ -99,8 +99,8 @@ void unlock_vector_lock(void)
     spin_unlock(&vector_lock);
 }
 
-static void trace_irq_mask(uint32_t event, int irq, int vector,
-                           const cpumask_t *mask)
+static void _trace_irq_mask(uint32_t event, int irq, int vector,
+                            const cpumask_t *mask)
 {
     struct {
         unsigned int irq:16, vec:16;
@@ -113,6 +113,13 @@ static void trace_irq_mask(uint32_t event, int irq, int vector,
     memcpy(d.mask, mask,
            min(sizeof(d.mask), BITS_TO_LONGS(nr_cpu_ids) * sizeof(long)));
     trace_var(event, 1, sizeof(d), &d);
+}
+
+static void trace_irq_mask(uint32_t event, int irq, int vector,
+                           const cpumask_t *mask)
+{
+    if ( unlikely(tb_init_done) )
+        _trace_irq_mask(event, irq, vector, mask);
 }
 
 static int __init __bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
