@@ -284,6 +284,13 @@ F:	xen/include/{kexec,kimage}.h
 F:	xen/arch/x86/machine_kexec.c
 F:	xen/arch/x86/x86_64/kexec_reloc.S
 
+LIBXENLIGHT
+M:	Ian Jackson <ian.jackson@eu.citrix.com>
+M:	Wei Liu <wl@xen.org>
+M:	Anthony PERARD <anthony.perard@citrix.com>
+S:	Supported
+F:	tools/libxl/
+
 LIVEPATCH
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Ross Lagerwall <ross.lagerwall@citrix.com>
