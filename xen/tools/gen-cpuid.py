@@ -265,10 +265,10 @@ def crunch_numbers(state):
                   AVX512BW, AVX512VL, AVX512_4VNNIW, AVX512_4FMAPS,
                   AVX512_VPOPCNTDQ],
 
-        # AVX512 extensions acting solely on vectors of bytes/words are made
+        # AVX512 extensions acting on vectors of bytes/words are made
         # dependents of AVX512BW (as to requiring wider than 16-bit mask
         # registers), despite the SDM not formally making this connection.
-        AVX512BW: [AVX512_BF16, AVX512_VBMI],
+        AVX512BW: [AVX512_BF16, AVX512_VBMI, AVX512_VBMI2],
 
         # The features:
         #   * Single Thread Indirect Branch Predictors

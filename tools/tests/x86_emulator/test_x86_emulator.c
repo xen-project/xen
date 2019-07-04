@@ -3995,6 +3995,227 @@ int main(int argc, char **argv)
     else
         printf("skipped\n");
 
+    /*
+     * The following compress/expand tests are not only making sure the
+     * accessed data is correct, but they also verify (by placing operands
+     * on the mapping boundaries) that elements controlled by clear mask
+     * bits don't get accessed.
+     */
+    if ( stack_exec && cpu_has_avx512f )
+    {
+        decl_insn(vpcompressd);
+        decl_insn(vpcompressq);
+        decl_insn(vpexpandd);
+        decl_insn(vpexpandq);
+        static const struct {
+            unsigned int d[16];
+        } dsrc = { { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 } };
+        static const struct {
+            unsigned long long q[8];
+        } qsrc = { { 0, 1, 2, 3, 4, 5, 6, 7 } };
+        unsigned int *ptr = res + MMAP_SZ / sizeof(*res) - 32;
+
+        printf("%-40s", "Testing vpcompressd %zmm1,24*4(%ecx){%k2}...");
+        asm volatile ( "kmovw %1, %%k2\n\t"
+                       "vmovdqu32 %2, %%zmm1\n"
+                       put_insn(vpcompressd,
+                                "vpcompressd %%zmm1, 24*4(%0)%{%%k2%}")
+                       :: "c" (NULL), "r" (0x55aa), "m" (dsrc) );
+
+        memset(ptr, 0xdb, 32 * 4);
+        set_insn(vpcompressd);
+        regs.ecx = (unsigned long)ptr;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpcompressd) ||
+             memcmp(ptr, ptr + 8, 16 * 4) )
+            goto fail;
+        for ( i = 0; i < 4; ++i )
+            if ( ptr[24 + i] != 2 * i + 1 )
+                goto fail;
+        for ( ; i < 8; ++i )
+            if ( ptr[24 + i] != 2 * i )
+                goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing vpexpandd 8*4(%edx),%zmm3{%k2}{z}...");
+        asm volatile ( "vpternlogd $0x81, %%zmm3, %%zmm3, %%zmm3\n"
+                       put_insn(vpexpandd,
+                                "vpexpandd 8*4(%0), %%zmm3%{%%k2%}%{z%}")
+                       :: "d" (NULL) );
+        set_insn(vpexpandd);
+        regs.edx = (unsigned long)(ptr + 16);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpexpandd) )
+            goto fail;
+        asm ( "vmovdqa32 %%zmm1, %%zmm2%{%%k2%}%{z%}\n\t"
+              "vpcmpeqd %%zmm2, %%zmm3, %%k0\n\t"
+              "kmovw %%k0, %0"
+              : "=r" (rc) );
+        if ( rc != 0xffff )
+            goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing vpcompressq %zmm4,12*8(%edx){%k3}...");
+        asm volatile ( "kmovw %1, %%k3\n\t"
+                       "vmovdqu64 %2, %%zmm4\n"
+                       put_insn(vpcompressq,
+                                "vpcompressq %%zmm4, 12*8(%0)%{%%k3%}")
+                       :: "d" (NULL), "r" (0x5a), "m" (qsrc) );
+
+        memset(ptr, 0xdb, 16 * 8);
+        set_insn(vpcompressq);
+        regs.edx = (unsigned long)ptr;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpcompressq) ||
+             memcmp(ptr, ptr + 8, 8 * 8) )
+            goto fail;
+        for ( i = 0; i < 2; ++i )
+        {
+            if ( ptr[(12 + i) * 2] != 2 * i + 1 ||
+                 ptr[(12 + i) * 2 + 1] )
+                goto fail;
+        }
+        for ( ; i < 4; ++i )
+        {
+            if ( ptr[(12 + i) * 2] != 2 * i ||
+                 ptr[(12 + i) * 2 + 1] )
+                goto fail;
+        }
+        printf("okay\n");
+
+        printf("%-40s", "Testing vpexpandq 4*8(%ecx),%zmm5{%k3}{z}...");
+        asm volatile ( "vpternlogq $0x81, %%zmm5, %%zmm5, %%zmm5\n"
+                       put_insn(vpexpandq,
+                                "vpexpandq 4*8(%0), %%zmm5%{%%k3%}%{z%}")
+                       :: "c" (NULL) );
+        set_insn(vpexpandq);
+        regs.ecx = (unsigned long)(ptr + 16);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpexpandq) )
+            goto fail;
+        asm ( "vmovdqa64 %%zmm4, %%zmm6%{%%k3%}%{z%}\n\t"
+              "vpcmpeqq %%zmm5, %%zmm6, %%k0\n\t"
+              "kmovw %%k0, %0"
+              : "=r" (rc) );
+        if ( rc != 0xff )
+            goto fail;
+        printf("okay\n");
+    }
+
+#if __GNUC__ > 7 /* can't check for __AVX512VBMI2__ here */
+    if ( stack_exec && cpu_has_avx512_vbmi2 )
+    {
+        decl_insn(vpcompressb);
+        decl_insn(vpcompressw);
+        decl_insn(vpexpandb);
+        decl_insn(vpexpandw);
+        static const struct {
+            unsigned char b[64];
+        } bsrc = { { 0,  1,  2,  3,  4,  5,  6,  7,
+                     8,  9, 10, 11, 12, 13, 14, 15,
+                    16, 17, 18, 19, 20, 21, 22, 23,
+                    24, 25, 26, 27, 28, 29, 30, 31,
+                    32, 33, 34, 35, 36, 37, 38, 39,
+                    40, 41, 42, 43, 44, 45, 46, 47,
+                    48, 49, 50, 51, 52, 53, 54, 55,
+                    56, 57, 58, 59, 60, 61, 62, 63 } };
+        static const struct {
+            unsigned short w[32];
+        } wsrc = { { 0,  1,  2,  3,  4,  5,  6,  7,
+                     8,  9, 10, 11, 12, 13, 14, 15,
+                    16, 17, 18, 19, 20, 21, 22, 23,
+                    24, 25, 26, 27, 28, 29, 30, 31 } };
+        unsigned char *ptr = (void *)res + MMAP_SZ - 128;
+        unsigned long long w = 0x55555555aaaaaaaaULL;
+
+        printf("%-40s", "Testing vpcompressb %zmm1,96*1(%ecx){%k2}...");
+        asm volatile ( "kmovq %1, %%k2\n\t"
+                       "vmovdqu8 %2, %%zmm1\n"
+                       put_insn(vpcompressb,
+                                "vpcompressb %%zmm1, 96*1(%0)%{%%k2%}")
+                       :: "c" (NULL), "m" (w), "m" (bsrc) );
+
+        memset(ptr, 0xdb, 128 * 1);
+        set_insn(vpcompressb);
+        regs.ecx = (unsigned long)ptr;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpcompressb) ||
+             memcmp(ptr, ptr + 32, 64 * 1) )
+            goto fail;
+        for ( i = 0; i < 16; ++i )
+            if ( ptr[96 + i] != 2 * i + 1 )
+                goto fail;
+        for ( ; i < 32; ++i )
+            if ( ptr[96 + i] != 2 * i )
+                goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing vpexpandb 32*1(%edx),%zmm3{%k2}{z}...");
+        asm volatile ( "vpternlogd $0x81, %%zmm3, %%zmm3, %%zmm3\n"
+                       put_insn(vpexpandb,
+                                "vpexpandb 32*1(%0), %%zmm3%{%%k2%}%{z%}")
+                       :: "d" (NULL) );
+        set_insn(vpexpandb);
+        regs.edx = (unsigned long)(ptr + 64);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpexpandb) )
+            goto fail;
+        asm ( "vmovdqu8 %%zmm1, %%zmm2%{%%k2%}%{z%}\n\t"
+              "vpcmpeqb %%zmm2, %%zmm3, %%k0\n\t"
+              "kmovq %%k0, %0"
+              : "=m" (w) );
+        if ( w != 0xffffffffffffffffULL )
+            goto fail;
+        printf("okay\n");
+
+        printf("%-40s", "Testing vpcompressw %zmm4,48*2(%edx){%k3}...");
+        asm volatile ( "kmovd %1, %%k3\n\t"
+                       "vmovdqu16 %2, %%zmm4\n"
+                       put_insn(vpcompressw,
+                                "vpcompressw %%zmm4, 48*2(%0)%{%%k3%}")
+                       :: "d" (NULL), "r" (0x5555aaaa), "m" (wsrc) );
+
+        memset(ptr, 0xdb, 64 * 2);
+        set_insn(vpcompressw);
+        regs.edx = (unsigned long)ptr;
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpcompressw) ||
+             memcmp(ptr, ptr + 32, 32 * 2) )
+            goto fail;
+        for ( i = 0; i < 8; ++i )
+        {
+            if ( ptr[(48 + i) * 2] != 2 * i + 1 ||
+                 ptr[(48 + i) * 2 + 1] )
+                goto fail;
+        }
+        for ( ; i < 16; ++i )
+        {
+            if ( ptr[(48 + i) * 2] != 2 * i ||
+                 ptr[(48 + i) * 2 + 1] )
+                goto fail;
+        }
+        printf("okay\n");
+
+        printf("%-40s", "Testing vpexpandw 16*2(%ecx),%zmm5{%k3}{z}...");
+        asm volatile ( "vpternlogd $0x81, %%zmm5, %%zmm5, %%zmm5\n"
+                       put_insn(vpexpandw,
+                                "vpexpandw 16*2(%0), %%zmm5%{%%k3%}%{z%}")
+                       :: "c" (NULL) );
+        set_insn(vpexpandw);
+        regs.ecx = (unsigned long)(ptr + 64);
+        rc = x86_emulate(&ctxt, &emulops);
+        if ( rc != X86EMUL_OKAY || !check_eip(vpexpandw) )
+            goto fail;
+        asm ( "vmovdqu16 %%zmm4, %%zmm6%{%%k3%}%{z%}\n\t"
+              "vpcmpeqw %%zmm5, %%zmm6, %%k0\n\t"
+              "kmovq %%k0, %0"
+              : "=m" (w) );
+        if ( w != 0xffffffff )
+            goto fail;
+        printf("okay\n");
+    }
+#endif
+
 #undef decl_insn
 #undef put_insn
 #undef set_insn

@@ -109,6 +109,7 @@ static const struct test avx512f_all[] = {
     INSN_FP(cmp,             0f, c2),
     INSN(comisd,       66,   0f, 2f,    el,      q, el),
     INSN(comiss,         ,   0f, 2f,    el,      d, el),
+    INSN(compress,     66, 0f38, 8a,    vl,     sd, el),
     INSN(cvtdq2pd,     f3,   0f, e6,    vl_2,    d, vl),
     INSN(cvtdq2ps,       ,   0f, 5b,    vl,      d, vl),
     INSN(cvtpd2dq,     f2,   0f, e6,    vl,      q, vl),
@@ -140,6 +141,7 @@ static const struct test avx512f_all[] = {
     INSN(cvtusi2sd,    f2,   0f, 7b,    el,   dq64, el),
     INSN(cvtusi2ss,    f3,   0f, 7b,    el,   dq64, el),
     INSN_FP(div,             0f, 5e),
+    INSN(expand,       66, 0f38, 88,    vl,     sd, el),
     INSN(fixupimm,     66, 0f3a, 54,    vl,     sd, vl),
     INSN(fixupimm,     66, 0f3a, 55,    el,     sd, el),
     INSN(fmadd132,     66, 0f38, 98,    vl,     sd, vl),
@@ -214,6 +216,7 @@ static const struct test avx512f_all[] = {
     INSN(pcmpgtd,      66,   0f, 66,    vl,      d, vl),
     INSN(pcmpgtq,      66, 0f38, 37,    vl,      q, vl),
     INSN(pcmpu,        66, 0f3a, 1e,    vl,     dq, vl),
+    INSN(pcompress,    66, 0f38, 8b,    vl,     dq, el),
     INSN(permi2,       66, 0f38, 76,    vl,     dq, vl),
     INSN(permi2,       66, 0f38, 77,    vl,     sd, vl),
     INSN(permilpd,     66, 0f38, 0d,    vl,      q, vl),
@@ -222,6 +225,7 @@ static const struct test avx512f_all[] = {
     INSN(permilps,     66, 0f3a, 04,    vl,      d, vl),
     INSN(permt2,       66, 0f38, 7e,    vl,     dq, vl),
     INSN(permt2,       66, 0f38, 7f,    vl,     sd, vl),
+    INSN(pexpand,      66, 0f38, 89,    vl,     dq, el),
     INSN(pmaxs,        66, 0f38, 3d,    vl,     dq, vl),
     INSN(pmaxu,        66, 0f38, 3f,    vl,     dq, vl),
     INSN(pmins,        66, 0f38, 39,    vl,     dq, vl),
@@ -507,6 +511,11 @@ static const struct test avx512_vbmi_all[] = {
     INSN(permb,         66, 0f38, 8d, vl, b, vl),
     INSN(permi2b,       66, 0f38, 75, vl, b, vl),
     INSN(permt2b,       66, 0f38, 7d, vl, b, vl),
+};
+
+static const struct test avx512_vbmi2_all[] = {
+    INSN(pcompress, 66, 0f38, 63, vl, bw, el),
+    INSN(pexpand,   66, 0f38, 62, vl, bw, el),
 };
 
 static const unsigned char vl_all[] = { VL_512, VL_128, VL_256 };
@@ -865,4 +874,5 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512dq, 512);
     RUN(avx512er, 512);
     RUN(avx512_vbmi, all);
+    RUN(avx512_vbmi2, all);
 }

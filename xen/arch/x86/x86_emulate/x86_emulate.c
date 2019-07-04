@@ -482,6 +482,8 @@ static const struct ext0f38_table {
     [0x59] = { .simd_size = simd_other, .two_op = 1, .d8s = 3 },
     [0x5a] = { .simd_size = simd_128, .two_op = 1, .d8s = 4 },
     [0x5b] = { .simd_size = simd_256, .two_op = 1, .d8s = d8s_vl_by_2 },
+    [0x62] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_bw },
+    [0x63] = { .simd_size = simd_packed_int, .to_mem = 1, .two_op = 1, .d8s = d8s_bw },
     [0x75 ... 0x76] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x77] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0x78] = { .simd_size = simd_other, .two_op = 1 },
@@ -489,6 +491,10 @@ static const struct ext0f38_table {
     [0x7a ... 0x7c] = { .simd_size = simd_none, .two_op = 1 },
     [0x7d ... 0x7e] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x7f] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0x88] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_dq },
+    [0x89] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_dq },
+    [0x8a] = { .simd_size = simd_packed_fp, .to_mem = 1, .two_op = 1, .d8s = d8s_dq },
+    [0x8b] = { .simd_size = simd_packed_int, .to_mem = 1, .two_op = 1, .d8s = d8s_dq },
     [0x8c] = { .simd_size = simd_packed_int },
     [0x8d] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x8e] = { .simd_size = simd_packed_int, .to_mem = 1 },
@@ -1868,6 +1874,7 @@ in_protmode(
 #define vcpu_has_avx512bw()    (ctxt->cpuid->feat.avx512bw)
 #define vcpu_has_avx512vl()    (ctxt->cpuid->feat.avx512vl)
 #define vcpu_has_avx512_vbmi() (ctxt->cpuid->feat.avx512_vbmi)
+#define vcpu_has_avx512_vbmi2() (ctxt->cpuid->feat.avx512_vbmi2)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
 
 #define vcpu_must_have(feat) \
@@ -8880,6 +8887,36 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x5a): /* vbroadcasti128 m128,ymm */
         generate_exception_if(ea.type != OP_MEM || !vex.l || vex.w, EXC_UD);
         goto simd_0f_avx2;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x62): /* vpexpand{b,w} [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x63): /* vpcompress{b,w} [xyz]mm,[xyz]mm/mem{k} */
+        host_and_vcpu_must_have(avx512_vbmi2);
+        elem_bytes = 1 << evex.w;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x88): /* vexpandp{s,d} [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x89): /* vpexpand{d,q} [xyz]mm/mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x8a): /* vcompressp{s,d} [xyz]mm,[xyz]mm/mem{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x8b): /* vpcompress{d,q} [xyz]mm,[xyz]mm/mem{k} */
+        host_and_vcpu_must_have(avx512f);
+        generate_exception_if(evex.brs, EXC_UD);
+        avx512_vlen_check(false);
+        /*
+         * For the respective code below the main switch() to work we need to
+         * compact op_mask here: Memory accesses are non-sparse even if the
+         * mask register has sparsely set bits.
+         */
+        if ( likely(fault_suppression) )
+        {
+            n = 1 << ((b & 8 ? 2 : 4) + evex.lr - evex.w);
+            EXPECT(elem_bytes > 0);
+            ASSERT(op_bytes == n * elem_bytes);
+            op_mask &= ~0ULL >> (64 - n);
+            n = hweight64(op_mask);
+            op_bytes = n * elem_bytes;
+            if ( n )
+                op_mask = ~0ULL >> (64 - n);
+        }
+        goto simd_zmm;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x75): /* vpermi2{b,w} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x7d): /* vpermt2{b,w} [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */

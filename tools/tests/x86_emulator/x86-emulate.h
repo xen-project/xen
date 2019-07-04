@@ -59,6 +59,9 @@
     (type *)((char *)mptr__ - offsetof(type, member)); \
 })
 
+#define hweight32 __builtin_popcount
+#define hweight64 __builtin_popcountll
+
 #define is_canonical_address(x) (((int64_t)(x) >> 47) == ((int64_t)(x) >> 63))
 
 extern uint32_t mxcsr_mask;
@@ -138,6 +141,7 @@ static inline bool xcr0_mask(uint64_t mask)
 #define cpu_has_avx512bw  (cp.feat.avx512bw && xcr0_mask(0xe6))
 #define cpu_has_avx512vl  (cp.feat.avx512vl && xcr0_mask(0xe6))
 #define cpu_has_avx512_vbmi (cp.feat.avx512_vbmi && xcr0_mask(0xe6))
+#define cpu_has_avx512_vbmi2 (cp.feat.avx512_vbmi2 && xcr0_mask(0xe6))
 
 #define cpu_has_xgetbv1   (cpu_has_xsave && cp.xstate.xgetbv1)
 
