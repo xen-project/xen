@@ -2323,7 +2323,7 @@ static void dump_irqs(unsigned char key)
 
         spin_lock_irqsave(&desc->lock, flags);
 
-        printk("   IRQ:%4d affinity:%*pb vec:%02x type=%-15s status=%08x ",
+        printk("   IRQ:%4d aff:%*pb vec:%02x %-15s status=%03x ",
                irq, nr_cpu_ids, cpumask_bits(desc->affinity), desc->arch.vector,
                desc->handler->typename, desc->status);
 
@@ -2334,23 +2334,21 @@ static void dump_irqs(unsigned char key)
         {
             action = (irq_guest_action_t *)desc->action;
 
-            printk("in-flight=%d domain-list=", action->in_flight);
+            printk("in-flight=%d%c",
+                   action->in_flight, action->nr_guests ? ' ' : '\n');
 
-            for ( i = 0; i < action->nr_guests; i++ )
+            for ( i = 0; i < action->nr_guests; )
             {
-                d = action->guest[i];
+                d = action->guest[i++];
                 pirq = domain_irq_to_pirq(d, irq);
                 info = pirq_info(d, pirq);
-                printk("%u:%3d(%c%c%c)",
+                printk("d%d:%3d(%c%c%c)%c",
                        d->domain_id, pirq,
                        evtchn_port_is_pending(d, info->evtchn) ? 'P' : '-',
                        evtchn_port_is_masked(d, info->evtchn) ? 'M' : '-',
-                       (info->masked ? 'M' : '-'));
-                if ( i != action->nr_guests )
-                    printk(",");
+                       info->masked ? 'M' : '-',
+                       i < action->nr_guests ? ',' : '\n');
             }
-
-            printk("\n");
         }
         else if ( desc->action )
             printk("%ps()\n", desc->action->handler);
