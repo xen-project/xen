@@ -1527,17 +1527,8 @@ int pirq_guest_unmask(struct domain *d)
     return 0;
 }
 
-static int pirq_acktype(struct domain *d, int pirq)
+static int irq_acktype(const struct irq_desc *desc)
 {
-    struct irq_desc  *desc;
-    int irq;
-
-    irq = domain_pirq_to_irq(d, pirq);
-    if ( irq <= 0 )
-        return ACKTYPE_NONE;
-
-    desc = irq_to_desc(irq);
-
     if ( desc->handler == &no_irq_type )
         return ACKTYPE_NONE;
 
@@ -1568,7 +1559,8 @@ static int pirq_acktype(struct domain *d, int pirq)
     if ( !strcmp(desc->handler->typename, "XT-PIC") )
         return ACKTYPE_UNMASK;
 
-    printk("Unknown PIC type '%s' for IRQ %d\n", desc->handler->typename, irq);
+    printk("Unknown PIC type '%s' for IRQ%d\n",
+           desc->handler->typename, desc->irq);
     BUG();
 
     return 0;
@@ -1645,7 +1637,7 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
         action->nr_guests   = 0;
         action->in_flight   = 0;
         action->shareable   = will_share;
-        action->ack_type    = pirq_acktype(v->domain, pirq->pirq);
+        action->ack_type    = irq_acktype(desc);
         init_timer(&action->eoi_timer, irq_guest_eoi_timer_fn, desc, 0);
 
         desc->status |= IRQ_GUEST;
