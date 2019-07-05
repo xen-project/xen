@@ -473,6 +473,7 @@ static const struct ext0f38_table {
     [0x41] = { .simd_size = simd_packed_int, .two_op = 1 },
     [0x42] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0x43] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0x44] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x45 ... 0x47] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x4c] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0x4d] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
@@ -525,6 +526,7 @@ static const struct ext0f38_table {
     [0xbd] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xbe] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0xbf] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xc4] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0xc6 ... 0xc7] = { .simd_size = simd_other, .vsib = 1, .d8s = d8s_dq },
     [0xc8] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0xc9] = { .simd_size = simd_other },
@@ -1874,6 +1876,7 @@ in_protmode(
 #define vcpu_has_clwb()        (ctxt->cpuid->feat.clwb)
 #define vcpu_has_avx512pf()    (ctxt->cpuid->feat.avx512pf)
 #define vcpu_has_avx512er()    (ctxt->cpuid->feat.avx512er)
+#define vcpu_has_avx512cd()    (ctxt->cpuid->feat.avx512cd)
 #define vcpu_has_sha()         (ctxt->cpuid->feat.sha)
 #define vcpu_has_avx512bw()    (ctxt->cpuid->feat.avx512bw)
 #define vcpu_has_avx512vl()    (ctxt->cpuid->feat.avx512vl)
@@ -8791,6 +8794,20 @@ x86_emulate(
         b = 0x6f;
         evex.opcx = vex_0f;
         goto vmovdqa;
+
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x2a): /* vpbroadcastmb2q k,[xyz]mm */
+    case X86EMUL_OPC_EVEX_F3(0x0f38, 0x3a): /* vpbroadcastmw2d k,[xyz]mm */
+        generate_exception_if((ea.type != OP_REG || evex.opmsk ||
+                               evex.w == ((b >> 4) & 1)),
+                              EXC_UD);
+        d |= TwoOp;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xc4): /* vpconflict{d,q} [xyz]mm/mem,[xyz]mm{k} */
+        fault_suppression = false;
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x44): /* vplzcnt{d,q} [xyz]mm/mem,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512cd);
+        goto avx512f_no_sae;
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x2c): /* vmaskmovps mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x2d): /* vmaskmovpd mem,{x,y}mm,{x,y}mm */

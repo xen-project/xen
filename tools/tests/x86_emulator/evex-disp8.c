@@ -458,6 +458,13 @@ static const struct test avx512bw_128[] = {
     INSN(pinsrw, 66,   0f, c4, el, w, el),
 };
 
+static const struct test avx512cd_all[] = {
+//       pbroadcastmb2q, f3, 0f38, 2a,      q
+//       pbroadcastmw2d, f3, 0f38, 3a,      d
+    INSN(pconflict,      66, 0f38, c4, vl, dq, vl),
+    INSN(plzcnt,         66, 0f38, 44, vl, dq, vl),
+};
+
 static const struct test avx512dq_all[] = {
     INSN_PFP(and,              0f, 54),
     INSN_PFP(andn,             0f, 55),
@@ -903,6 +910,7 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512f, 512);
     RUN(avx512bw, all);
     RUN(avx512bw, 128);
+    RUN(avx512cd, all);
     RUN(avx512dq, all);
     RUN(avx512dq, 128);
     RUN(avx512dq, no128);
