@@ -266,6 +266,9 @@ static const struct {
     SIMD(AVX2 S/G i64[4x32],  avx2_sg,    32x4i8),
     SIMD(AVX2 S/G i32[4x64],  avx2_sg,    32x8i4),
     SIMD(AVX2 S/G i64[4x64],  avx2_sg,    32x8i8),
+#ifdef __x86_64__
+    SIMD_(64, AVX2 S/G %ymm8+, avx2_sg,     high),
+#endif
     SIMD(XOP 128bit single,       xop,      16f4),
     SIMD(XOP 256bit single,       xop,      32f4),
     SIMD(XOP 128bit double,       xop,      16f8),
@@ -303,6 +306,10 @@ static const struct {
     SIMD(AVX512F S/G i64[ 8x32], avx512f_sg, 64x4i8),
     SIMD(AVX512F S/G i32[ 8x64], avx512f_sg, 64x8i4),
     SIMD(AVX512F S/G i64[ 8x64], avx512f_sg, 64x8i8),
+#ifdef __x86_64__
+    SIMD_(64, AVX512F S/G %zmm8+, avx512f_sg, higher),
+    SIMD_(64, AVX512F S/G %zmm16+, avx512f_sg, highest),
+#endif
     AVX512VL(VL f32x4,        avx512f,      16f4),
     AVX512VL(VL f64x2,        avx512f,      16f8),
     AVX512VL(VL f32x8,        avx512f,      32f4),

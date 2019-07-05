@@ -147,6 +147,12 @@ $(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-defs,$(flavor))))
 $(foreach flavor,$(SG),$(eval $(call simd-sg-defs,$(flavor))))
 $(foreach flavor,$(OPMASK),$(eval $(call opmask-defs,$(flavor))))
 
+first-string = $(shell for s in $(1); do echo "$$s"; break; done)
+
+avx2-sg-cflags-x86_64    := "-D_high $(foreach n,7 6 5 4 3 2 1,-ffixed-ymm$(n)) $(call first-string,$(avx2-sg-cflags))"
+avx512f-sg-cflags-x86_64 := "-D_higher $(foreach n,7 6 5 4 3 2 1,-ffixed-zmm$(n)) $(call first-string,$(avx512f-sg-cflags))"
+avx512f-sg-cflags-x86_64 += "-D_highest $(foreach n,15 14 13 12 11 10 9 8,-ffixed-zmm$(n)) $(call first-string,$(avx512f-sg-cflags-x86_64))"
+
 $(addsuffix .h,$(TESTCASES)): %.h: %.c testcase.mk Makefile
 	rm -f $@.new $*.bin
 	$(foreach arch,$(filter-out $(XEN_COMPILE_ARCH),x86_32) $(XEN_COMPILE_ARCH), \
