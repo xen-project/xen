@@ -520,6 +520,17 @@ static const struct test avx512er_512[] = {
     INSN(rsqrt28, 66, 0f38, cd, el, sd, el),
 };
 
+static const struct test avx512pf_512[] = {
+    INSNX(gatherpf0d,  66, 0f38, c6, 1, vl, sd, el),
+    INSNX(gatherpf0q,  66, 0f38, c7, 1, vl, sd, el),
+    INSNX(gatherpf1d,  66, 0f38, c6, 2, vl, sd, el),
+    INSNX(gatherpf1q,  66, 0f38, c7, 2, vl, sd, el),
+    INSNX(scatterpf0d, 66, 0f38, c6, 5, vl, sd, el),
+    INSNX(scatterpf0q, 66, 0f38, c7, 5, vl, sd, el),
+    INSNX(scatterpf1d, 66, 0f38, c6, 6, vl, sd, el),
+    INSNX(scatterpf1q, 66, 0f38, c7, 6, vl, sd, el),
+};
+
 static const struct test avx512_vbmi_all[] = {
     INSN(permb,         66, 0f38, 8d, vl, b, vl),
     INSN(permi2b,       66, 0f38, 75, vl, b, vl),
@@ -580,7 +591,7 @@ static bool record_access(enum x86_segment seg, unsigned long offset,
 static int read(enum x86_segment seg, unsigned long offset, void *p_data,
                 unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
-    if ( !record_access(seg, offset, bytes) )
+    if ( !record_access(seg, offset, bytes + !bytes) )
         return X86EMUL_UNHANDLEABLE;
     memset(p_data, 0, bytes);
     return X86EMUL_OKAY;
@@ -589,7 +600,7 @@ static int read(enum x86_segment seg, unsigned long offset, void *p_data,
 static int write(enum x86_segment seg, unsigned long offset, void *p_data,
                  unsigned int bytes, struct x86_emulate_ctxt *ctxt)
 {
-    if ( !record_access(seg, offset, bytes) )
+    if ( !record_access(seg, offset, bytes + !bytes) )
         return X86EMUL_UNHANDLEABLE;
     return X86EMUL_OKAY;
 }
@@ -597,7 +608,7 @@ static int write(enum x86_segment seg, unsigned long offset, void *p_data,
 static void test_one(const struct test *test, enum vl vl,
                      unsigned char *instr, struct x86_emulate_ctxt *ctxt)
 {
-    unsigned int vsz, esz, i;
+    unsigned int vsz, esz, i, n;
     int rc;
     bool sg = strstr(test->mnemonic, "gather") ||
               strstr(test->mnemonic, "scatter");
@@ -725,10 +736,20 @@ static void test_one(const struct test *test, enum vl vl,
     for ( i = 0; i < (test->scale == SC_vl ? vsz : esz); ++i )
          if ( accessed[i] )
              goto fail;
-    for ( ; i < (test->scale == SC_vl ? vsz : esz) + (sg ? esz : vsz); ++i )
+
+    n = test->scale == SC_vl ? vsz : esz;
+    if ( !sg )
+        n += vsz;
+    else if ( !strstr(test->mnemonic, "pf") )
+        n += esz;
+    else
+        ++n;
+
+    for ( ; i < n; ++i )
          if ( accessed[i] != (sg ? (vsz / esz) >> (test->opc & 1 & !evex.w)
                                  : 1) )
              goto fail;
+
     for ( ; i < ARRAY_SIZE(accessed); ++i )
          if ( accessed[i] )
              goto fail;
@@ -887,6 +908,8 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512dq, no128);
     RUN(avx512dq, 512);
     RUN(avx512er, 512);
+#define cpu_has_avx512pf cpu_has_avx512f
+    RUN(avx512pf, 512);
     RUN(avx512_vbmi, all);
     RUN(avx512_vbmi2, all);
 }

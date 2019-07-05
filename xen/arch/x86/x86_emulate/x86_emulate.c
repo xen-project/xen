@@ -525,6 +525,7 @@ static const struct ext0f38_table {
     [0xbd] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xbe] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0xbf] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xc6 ... 0xc7] = { .simd_size = simd_other, .vsib = 1, .d8s = d8s_dq },
     [0xc8] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0xc9] = { .simd_size = simd_other },
     [0xca] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
@@ -1871,6 +1872,7 @@ in_protmode(
 #define vcpu_has_smap()        (ctxt->cpuid->feat.smap)
 #define vcpu_has_clflushopt()  (ctxt->cpuid->feat.clflushopt)
 #define vcpu_has_clwb()        (ctxt->cpuid->feat.clwb)
+#define vcpu_has_avx512pf()    (ctxt->cpuid->feat.avx512pf)
 #define vcpu_has_avx512er()    (ctxt->cpuid->feat.avx512er)
 #define vcpu_has_sha()         (ctxt->cpuid->feat.sha)
 #define vcpu_has_avx512bw()    (ctxt->cpuid->feat.avx512bw)
@@ -9407,6 +9409,97 @@ x86_emulate(
 
         if ( rc != X86EMUL_OKAY )
             goto done;
+
+        state->simd_size = simd_none;
+        break;
+    }
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xc6):
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xc7):
+    {
+#ifndef __XEN__
+        typeof(evex) *pevex;
+        union {
+            int32_t dw[16];
+            int64_t qw[8];
+        } index;
+#endif
+
+        ASSERT(ea.type == OP_MEM);
+        generate_exception_if((!cpu_has_avx512f || !evex.opmsk || evex.brs ||
+                               evex.z || evex.reg != 0xf || evex.lr != 2),
+                              EXC_UD);
+
+        switch ( modrm_reg & 7 )
+        {
+        case 1: /* vgatherpf0{d,q}p{s,d} mem{k} */
+        case 2: /* vgatherpf1{d,q}p{s,d} mem{k} */
+        case 5: /* vscatterpf0{d,q}p{s,d} mem{k} */
+        case 6: /* vscatterpf1{d,q}p{s,d} mem{k} */
+            vcpu_must_have(avx512pf);
+            break;
+        default:
+            generate_exception(EXC_UD);
+        }
+
+        get_fpu(X86EMUL_FPU_zmm);
+
+#ifndef __XEN__
+        /*
+         * For the test harness perform zero byte memory accesses, such that
+         * in particular correct Disp8 scaling can be verified.
+         */
+        fail_if((modrm_reg & 4) && !ops->write);
+
+        /* Read index register. */
+        opc = init_evex(stub);
+        pevex = copy_EVEX(opc, evex);
+        pevex->opcx = vex_0f;
+        /* vmovdqu{32,64} */
+        opc[0] = 0x7f;
+        pevex->pfx = vex_f3;
+        pevex->w = b & 1;
+        /* Use (%rax) as destination and sib_index as source. */
+        pevex->b = 1;
+        opc[1] = (state->sib_index & 7) << 3;
+        pevex->r = !mode_64bit() || !(state->sib_index & 0x08);
+        pevex->R = !mode_64bit() || !(state->sib_index & 0x10);
+        pevex->RX = 1;
+        opc[2] = 0xc3;
+
+        invoke_stub("", "", "=m" (index) : "a" (&index));
+        put_stub(stub);
+
+        /* Clear untouched parts of the mask value. */
+        n = 1 << (4 - ((b & 1) | evex.w));
+        op_mask &= (1 << n) - 1;
+
+        for ( i = 0; rc == X86EMUL_OKAY && op_mask; ++i )
+        {
+            long idx = b & 1 ? index.qw[i] : index.dw[i];
+
+            if ( !(op_mask & (1 << i)) )
+                continue;
+
+            rc = (modrm_reg & 4
+                  ? ops->write
+                  : ops->read)(ea.mem.seg,
+                               truncate_ea(ea.mem.off +
+                                           (idx << state->sib_scale)),
+                               NULL, 0, ctxt);
+            if ( rc == X86EMUL_EXCEPTION )
+            {
+                /* Squash memory access related exceptions. */
+                x86_emul_reset_event(ctxt);
+                rc = X86EMUL_OKAY;
+            }
+
+            op_mask &= ~(1 << i);
+        }
+
+        if ( rc != X86EMUL_OKAY )
+            goto done;
+#endif
 
         state->simd_size = simd_none;
         break;
