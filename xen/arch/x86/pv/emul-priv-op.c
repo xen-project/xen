@@ -195,7 +195,7 @@ static bool pci_cfg_ok(struct domain *currd, unsigned int start,
     /* AMD extended configuration space access? */
     if ( CF8_ADDR_HI(currd->arch.pci_cf8) &&
          boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
-         boot_cpu_data.x86 >= 0x10 && boot_cpu_data.x86 <= 0x17 )
+         boot_cpu_data.x86 >= 0x10 && boot_cpu_data.x86 < 0x17 )
     {
         uint64_t msr_val;
 
@@ -904,6 +904,17 @@ static int read_msr(unsigned int reg, uint64_t *val,
         }
         goto normal;
 
+    case MSR_FAM10H_MMIO_CONF_BASE:
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
+             boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 >= 0x17 )
+            break;
+        /* fall through */
+    case MSR_AMD64_NB_CFG:
+        if ( !is_hardware_domain(currd) || !is_pinned_vcpu(curr) )
+            goto normal;
+        *val = 0;
+        return X86EMUL_OKAY;
+
     case MSR_IA32_MISC_ENABLE:
         rdmsrl(reg, *val);
         *val = guest_misc_enable(*val);
@@ -1014,9 +1025,6 @@ static int write_msr(unsigned int reg, uint64_t val,
         break;
 
     case MSR_AMD64_NB_CFG:
-        if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
-             boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
-            break;
         if ( !is_hardware_domain(currd) || !is_pinned_vcpu(curr) )
             return X86EMUL_OKAY;
         if ( (rdmsr_safe(MSR_AMD64_NB_CFG, temp) != 0) ||
@@ -1028,7 +1036,7 @@ static int write_msr(unsigned int reg, uint64_t val,
 
     case MSR_FAM10H_MMIO_CONF_BASE:
         if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD ||
-             boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 > 0x17 )
+             boot_cpu_data.x86 < 0x10 || boot_cpu_data.x86 >= 0x17 )
             break;
         if ( !is_hardware_domain(currd) || !is_pinned_vcpu(curr) )
             return X86EMUL_OKAY;
