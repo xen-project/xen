@@ -48,10 +48,14 @@ typedef long long __attribute__((vector_size(IVEC_SIZE))) idi_t;
 #  endif
 #  define BG_(dt, it, reg, mem, idx, msk, scl) \
     __builtin_ia32_gather##it##dt(reg, mem, idx, to_mask(msk), scl)
+#  define BS_(dt, it, mem, idx, reg, msk, scl) \
+    __builtin_ia32_scatter##it##dt(mem, to_mask(msk), idx, reg, scl)
 # else
 #  define eq(x, y) (B(pcmpeqq, _mask, (vdi_t)(x), (vdi_t)(y), -1) == ALL_TRUE)
 #  define BG_(dt, it, reg, mem, idx, msk, scl) \
     __builtin_ia32_gather##it##dt(reg, mem, idx, B(ptestmq, , (vdi_t)(msk), (vdi_t)(msk), ~0), scl)
+#  define BS_(dt, it, mem, idx, reg, msk, scl) \
+    __builtin_ia32_scatter##it##dt(mem, B(ptestmq, , (vdi_t)(msk), (vdi_t)(msk), ~0), idx, reg, scl)
 # endif
 /*
  * Instead of replicating the main IDX_SIZE conditional below three times, use
@@ -59,6 +63,7 @@ typedef long long __attribute__((vector_size(IVEC_SIZE))) idi_t;
  * respective relevant macro argument tokens.
  */
 # define BG(dt, it, reg, mem, idx, msk, scl) BG_(dt, it, reg, mem, idx, msk, scl)
+# define BS(dt, it, mem, idx, reg, msk, scl) BS_(dt, it##i, mem, idx, reg, msk, scl)
 # if VEC_MAX < 64
 /*
  * The sub-512-bit built-ins have an extra "3" infix, presumably because the
@@ -82,22 +87,30 @@ typedef long long __attribute__((vector_size(IVEC_SIZE))) idi_t;
 # if IDX_SIZE == 4
 #  if INT_SIZE == 4
 #   define gather(reg, mem, idx, msk, scl) BG(v16si, si, reg, mem, idx, msk, scl)
+#   define scatter(mem, idx, reg, msk, scl) BS(v16si, s, mem, idx, reg, msk, scl)
 #  elif INT_SIZE == 8
 #   define gather(reg, mem, idx, msk, scl) (vec_t)(BG(v8di, si, (vdi_t)(reg), mem, idx, msk, scl))
+#   define scatter(mem, idx, reg, msk, scl) BS(v8di, s, mem, idx, (vdi_t)(reg), msk, scl)
 #  elif FLOAT_SIZE == 4
 #   define gather(reg, mem, idx, msk, scl) BG(v16sf, si, reg, mem, idx, msk, scl)
+#   define scatter(mem, idx, reg, msk, scl) BS(v16sf, s, mem, idx, reg, msk, scl)
 #  elif FLOAT_SIZE == 8
 #   define gather(reg, mem, idx, msk, scl) BG(v8df, si, reg, mem, idx, msk, scl)
+#   define scatter(mem, idx, reg, msk, scl) BS(v8df, s, mem, idx, reg, msk, scl)
 #  endif
 # elif IDX_SIZE == 8
 #  if INT_SIZE == 4
 #   define gather(reg, mem, idx, msk, scl) BG(v16si, di, reg, mem, (idi_t)(idx), msk, scl)
+#   define scatter(mem, idx, reg, msk, scl) BS(v16si, d, mem, (idi_t)(idx), reg, msk, scl)
 #  elif INT_SIZE == 8
 #   define gather(reg, mem, idx, msk, scl) (vec_t)(BG(v8di, di, (vdi_t)(reg), mem, (idi_t)(idx), msk, scl))
+#   define scatter(mem, idx, reg, msk, scl) BS(v8di, d, mem, (idi_t)(idx), (vdi_t)(reg), msk, scl)
 #  elif FLOAT_SIZE == 4
 #   define gather(reg, mem, idx, msk, scl) BG(v16sf, di, reg, mem, (idi_t)(idx), msk, scl)
+#   define scatter(mem, idx, reg, msk, scl) BS(v16sf, d, mem, (idi_t)(idx), reg, msk, scl)
 #  elif FLOAT_SIZE == 8
 #   define gather(reg, mem, idx, msk, scl) BG(v8df, di, reg, mem, (idi_t)(idx), msk, scl)
+#   define scatter(mem, idx, reg, msk, scl) BS(v8df, d, mem, (idi_t)(idx), reg, msk, scl)
 #  endif
 # endif
 #elif defined(__AVX2__)
@@ -195,6 +208,8 @@ const typeof((vec_t){}[0]) array[] = {
     GLUE(PUT, VEC_MAX)(VEC_MAX + 1)
 };
 
+typeof((vec_t){}[0]) out[VEC_MAX * 2];
+
 int sg_test(void)
 {
     unsigned int i;
@@ -273,6 +288,42 @@ int sg_test(void)
         if ( y[i] )
             return __LINE__;
 # endif
+#endif
+
+#ifdef scatter
+
+    for ( i = 0; i < sizeof(out) / sizeof(*out); ++i )
+        out[i] = 0;
+
+    for ( i = 0; i < ITEM_COUNT; ++i )
+        x[i] = i + 1;
+
+    touch(x);
+
+    scatter(out, (idx_t){}, x, (vec_t){ 1 } != 0, 1);
+    if ( out[0] != 1 )
+        return __LINE__;
+    for ( i = 1; i < ITEM_COUNT; ++i )
+        if ( out[i] )
+            return __LINE__;
+
+    scatter(out, (idx_t){}, x, full, 1);
+    if ( out[0] != ITEM_COUNT )
+        return __LINE__;
+    for ( i = 1; i < ITEM_COUNT; ++i )
+        if ( out[i] )
+            return __LINE__;
+
+    scatter(out, idx, x, full, ELEM_SIZE);
+    for ( i = 1; i <= ITEM_COUNT; ++i )
+        if ( out[i] != i )
+            return __LINE__;
+
+    scatter(out, inv, x, full, ELEM_SIZE);
+    for ( i = 1; i <= ITEM_COUNT; ++i )
+        if ( out[i] != ITEM_COUNT + 1 - i )
+            return __LINE__;
+
 #endif
 
     return 0;
