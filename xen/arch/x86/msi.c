@@ -1328,6 +1328,7 @@ int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
     {
         uint16_t cntl;
         uint32_t unused;
+        unsigned int nvec = entry->msi.nvec;
 
         pos = entry->msi_attrib.pos;
         if ( reg < pos || reg >= entry->msi.mpos + 8 )
@@ -1340,7 +1341,7 @@ int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
 
         cntl = pci_conf_read16(seg, bus, slot, func, msi_control_reg(pos));
         unused = ~(uint32_t)0 >> (32 - multi_msi_capable(cntl));
-        for ( pos = 0; pos < entry->msi.nvec; ++pos, ++entry )
+        for ( pos = 0; pos < nvec; ++pos, ++entry )
         {
             entry->msi_attrib.guest_masked =
                 *data >> entry->msi_attrib.entry_nr;
