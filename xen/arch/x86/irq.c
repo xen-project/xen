@@ -679,7 +679,8 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
          * next attempt by sending another IRQ_MOVE_CLEANUP_VECTOR
          * to myself.
          */
-        if (irr  & (1 << (vector % 32))) {
+        if ( irr & (1u << (vector % 32)) )
+        {
             send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
             TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP_DELAY,
                      irq, vector, smp_processor_id());
