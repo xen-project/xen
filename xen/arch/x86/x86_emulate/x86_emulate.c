@@ -499,7 +499,7 @@ static const struct ext0f38_table {
     [0x8c] = { .simd_size = simd_packed_int },
     [0x8d] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x8e] = { .simd_size = simd_packed_int, .to_mem = 1 },
-    [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1 },
+    [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1, .d8s = d8s_dq },
     [0x96 ... 0x98] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0x99] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0x9a] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
@@ -9097,6 +9097,133 @@ x86_emulate(
         opc[1] = (mask_reg & 7) << 3;
 
         invoke_stub("", "", "+m" (mask) : "a" (&mask));
+        put_stub(stub);
+
+        if ( rc != X86EMUL_OKAY )
+            goto done;
+
+        state->simd_size = simd_none;
+        break;
+    }
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x90): /* vpgatherd{d,q} mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x91): /* vpgatherq{d,q} mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x92): /* vgatherdp{s,d} mem,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x93): /* vgatherqp{s,d} mem,[xyz]mm{k} */
+    {
+        typeof(evex) *pevex;
+        union {
+            int32_t dw[16];
+            int64_t qw[8];
+        } index;
+        bool done = false;
+
+        ASSERT(ea.type == OP_MEM);
+        generate_exception_if((!evex.opmsk || evex.brs || evex.z ||
+                               evex.reg != 0xf ||
+                               modrm_reg == state->sib_index),
+                              EXC_UD);
+        avx512_vlen_check(false);
+        host_and_vcpu_must_have(avx512f);
+        get_fpu(X86EMUL_FPU_zmm);
+
+        /* Read destination and index registers. */
+        opc = init_evex(stub);
+        pevex = copy_EVEX(opc, evex);
+        pevex->opcx = vex_0f;
+        opc[0] = 0x7f; /* vmovdqa{32,64} */
+        /*
+         * The register writeback below has to retain masked-off elements, but
+         * needs to clear upper portions in the index-wider-than-data cases.
+         * Therefore read (and write below) the full register. The alternative
+         * would have been to fiddle with the mask register used.
+         */
+        pevex->opmsk = 0;
+        /* Use (%rax) as destination and modrm_reg as source. */
+        pevex->b = 1;
+        opc[1] = (modrm_reg & 7) << 3;
+        pevex->RX = 1;
+        opc[2] = 0xc3;
+
+        invoke_stub("", "", "=m" (*mmvalp) : "a" (mmvalp));
+
+        pevex->pfx = vex_f3; /* vmovdqu{32,64} */
+        pevex->w = b & 1;
+        /* Switch to sib_index as source. */
+        pevex->r = !mode_64bit() || !(state->sib_index & 0x08);
+        pevex->R = !mode_64bit() || !(state->sib_index & 0x10);
+        opc[1] = (state->sib_index & 7) << 3;
+
+        invoke_stub("", "", "=m" (index) : "a" (&index));
+        put_stub(stub);
+
+        /* Clear untouched parts of the destination and mask values. */
+        n = 1 << (2 + evex.lr - ((b & 1) | evex.w));
+        op_bytes = 4 << evex.w;
+        memset((void *)mmvalp + n * op_bytes, 0, 64 - n * op_bytes);
+        op_mask &= (1 << n) - 1;
+
+        for ( i = 0; op_mask; ++i )
+        {
+            long idx = b & 1 ? index.qw[i] : index.dw[i];
+
+            if ( !(op_mask & (1 << i)) )
+                continue;
+
+            rc = ops->read(ea.mem.seg,
+                           truncate_ea(ea.mem.off + (idx << state->sib_scale)),
+                           (void *)mmvalp + i * op_bytes, op_bytes, ctxt);
+            if ( rc != X86EMUL_OKAY )
+            {
+                /*
+                 * If we've made some progress and the access did not fault,
+                 * force a retry instead. This is for example necessary to
+                 * cope with the limited capacity of HVM's MMIO cache.
+                 */
+                if ( rc != X86EMUL_EXCEPTION && done )
+                    rc = X86EMUL_RETRY;
+                break;
+            }
+
+            op_mask &= ~(1 << i);
+            done = true;
+
+#ifdef __XEN__
+            if ( op_mask && local_events_need_delivery() )
+            {
+                rc = X86EMUL_RETRY;
+                break;
+            }
+#endif
+        }
+
+        /* Write destination and mask registers. */
+        opc = init_evex(stub);
+        pevex = copy_EVEX(opc, evex);
+        pevex->opcx = vex_0f;
+        opc[0] = 0x6f; /* vmovdqa{32,64} */
+        pevex->opmsk = 0;
+        /* Use modrm_reg as destination and (%rax) as source. */
+        pevex->b = 1;
+        opc[1] = (modrm_reg & 7) << 3;
+        pevex->RX = 1;
+        opc[2] = 0xc3;
+
+        invoke_stub("", "", "+m" (*mmvalp) : "a" (mmvalp));
+
+        /*
+         * kmovw: This is VEX-encoded, so we can't use pevex. Avoid copy_VEX() etc
+         * as well, since we can easily use the 2-byte VEX form here.
+         */
+        opc -= EVEX_PFX_BYTES;
+        opc[0] = 0xc5;
+        opc[1] = 0xf8;
+        opc[2] = 0x90;
+        /* Use (%rax) as source. */
+        opc[3] = evex.opmsk << 3;
+        opc[4] = 0xc3;
+
+        invoke_stub("", "", "+m" (op_mask) : "a" (&op_mask));
         put_stub(stub);
 
         if ( rc != X86EMUL_OKAY )

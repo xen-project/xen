@@ -35,13 +35,78 @@ typedef long long __attribute__((vector_size(IVEC_SIZE))) idi_t;
 #define ITEM_COUNT (VEC_SIZE / ELEM_SIZE < IVEC_SIZE / IDX_SIZE ? \
                     VEC_SIZE / ELEM_SIZE : IVEC_SIZE / IDX_SIZE)
 
-#if VEC_SIZE == 16
-# define to_bool(cmp) __builtin_ia32_ptestc128(cmp, (vec_t){} == 0)
-#else
-# define to_bool(cmp) __builtin_ia32_ptestc256(cmp, (vec_t){} == 0)
-#endif
+#if defined(__AVX512F__)
+# define ALL_TRUE (~0ULL >> (64 - ELEM_COUNT))
+# if ELEM_SIZE == 4
+#  if IDX_SIZE == 4 || defined(__AVX512VL__)
+#   define to_mask(msk) B(ptestmd, , (vsi_t)(msk), (vsi_t)(msk), ~0)
+#   define eq(x, y) (B(pcmpeqd, _mask, (vsi_t)(x), (vsi_t)(y), -1) == ALL_TRUE)
+#  else
+#   define widen(x) __builtin_ia32_pmovzxdq512_mask((vsi_t)(x), (idi_t){}, ~0)
+#   define to_mask(msk) __builtin_ia32_ptestmq512(widen(msk), widen(msk), ~0)
+#   define eq(x, y) (__builtin_ia32_pcmpeqq512_mask(widen(x), widen(y), ~0) == ALL_TRUE)
+#  endif
+#  define BG_(dt, it, reg, mem, idx, msk, scl) \
+    __builtin_ia32_gather##it##dt(reg, mem, idx, to_mask(msk), scl)
+# else
+#  define eq(x, y) (B(pcmpeqq, _mask, (vdi_t)(x), (vdi_t)(y), -1) == ALL_TRUE)
+#  define BG_(dt, it, reg, mem, idx, msk, scl) \
+    __builtin_ia32_gather##it##dt(reg, mem, idx, B(ptestmq, , (vdi_t)(msk), (vdi_t)(msk), ~0), scl)
+# endif
+/*
+ * Instead of replicating the main IDX_SIZE conditional below three times, use
+ * a double layer of macro invocations, allowing for substitution of the
+ * respective relevant macro argument tokens.
+ */
+# define BG(dt, it, reg, mem, idx, msk, scl) BG_(dt, it, reg, mem, idx, msk, scl)
+# if VEC_MAX < 64
+/*
+ * The sub-512-bit built-ins have an extra "3" infix, presumably because the
+ * 512-bit names were chosen without the AVX512VL extension in mind (and hence
+ * making the latter collide with the AVX2 ones).
+ */
+#  define si 3si
+#  define di 3di
+# endif
+# if VEC_MAX == 16
+#  define v8df v2df
+#  define v8di v2di
+#  define v16sf v4sf
+#  define v16si v4si
+# elif VEC_MAX == 32
+#  define v8df v4df
+#  define v8di v4di
+#  define v16sf v8sf
+#  define v16si v8si
+# endif
+# if IDX_SIZE == 4
+#  if INT_SIZE == 4
+#   define gather(reg, mem, idx, msk, scl) BG(v16si, si, reg, mem, idx, msk, scl)
+#  elif INT_SIZE == 8
+#   define gather(reg, mem, idx, msk, scl) (vec_t)(BG(v8di, si, (vdi_t)(reg), mem, idx, msk, scl))
+#  elif FLOAT_SIZE == 4
+#   define gather(reg, mem, idx, msk, scl) BG(v16sf, si, reg, mem, idx, msk, scl)
+#  elif FLOAT_SIZE == 8
+#   define gather(reg, mem, idx, msk, scl) BG(v8df, si, reg, mem, idx, msk, scl)
+#  endif
+# elif IDX_SIZE == 8
+#  if INT_SIZE == 4
+#   define gather(reg, mem, idx, msk, scl) BG(v16si, di, reg, mem, (idi_t)(idx), msk, scl)
+#  elif INT_SIZE == 8
+#   define gather(reg, mem, idx, msk, scl) (vec_t)(BG(v8di, di, (vdi_t)(reg), mem, (idi_t)(idx), msk, scl))
+#  elif FLOAT_SIZE == 4
+#   define gather(reg, mem, idx, msk, scl) BG(v16sf, di, reg, mem, (idi_t)(idx), msk, scl)
+#  elif FLOAT_SIZE == 8
+#   define gather(reg, mem, idx, msk, scl) BG(v8df, di, reg, mem, (idi_t)(idx), msk, scl)
+#  endif
+# endif
+#elif defined(__AVX2__)
+# if VEC_SIZE == 16
+#  define to_bool(cmp) __builtin_ia32_ptestc128(cmp, (vec_t){} == 0)
+# else
+#  define to_bool(cmp) __builtin_ia32_ptestc256(cmp, (vec_t){} == 0)
+# endif
 
-#if defined(__AVX2__)
 # if VEC_MAX == 16
 #  if IDX_SIZE == 4
 #   if INT_SIZE == 4
@@ -111,6 +176,10 @@ typedef long long __attribute__((vector_size(IVEC_SIZE))) idi_t;
 # endif
 #endif
 
+#ifndef eq
+# define eq(x, y) to_bool((x) == (y))
+#endif
+
 #define GLUE_(x, y) x ## y
 #define GLUE(x, y) GLUE_(x, y)
 
@@ -119,6 +188,7 @@ typedef long long __attribute__((vector_size(IVEC_SIZE))) idi_t;
 #define PUT8(n)  PUT4(n),   PUT4((n) +  4)
 #define PUT16(n) PUT8(n),   PUT8((n) +  8)
 #define PUT32(n) PUT16(n), PUT16((n) + 16)
+#define PUT64(n) PUT32(n), PUT32((n) + 32)
 
 const typeof((vec_t){}[0]) array[] = {
     GLUE(PUT, VEC_MAX)(1),
@@ -174,7 +244,7 @@ int sg_test(void)
 
     y = gather(full, array + ITEM_COUNT, -idx, full, ELEM_SIZE);
 #if ITEM_COUNT == ELEM_COUNT
-    if ( !to_bool(y == x - 1) )
+    if ( !eq(y, x - 1) )
         return __LINE__;
 #else
     for ( i = 0; i < ITEM_COUNT; ++i )

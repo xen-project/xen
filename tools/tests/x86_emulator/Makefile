@@ -18,7 +18,7 @@ CFLAGS += $(CFLAGS_xeninclude)
 
 SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f avx512bw avx512dq avx512er
 FMA := fma4 fma
-SG := avx2-sg
+SG := avx2-sg avx512f-sg avx512vl-sg
 TESTCASES := blowfish $(SIMD) $(FMA) $(SG)
 
 OPMASK := avx512f avx512dq avx512bw
@@ -66,6 +66,14 @@ xop-flts := $(avx-flts)
 avx512f-vecs := 64 16 32
 avx512f-ints := 4 8
 avx512f-flts := 4 8
+avx512f-sg-vecs := 64
+avx512f-sg-idxs := 4 8
+avx512f-sg-ints := $(avx512f-ints)
+avx512f-sg-flts := $(avx512f-flts)
+avx512vl-sg-vecs := 16 32
+avx512vl-sg-idxs := $(avx512f-sg-idxs)
+avx512vl-sg-ints := $(avx512f-ints)
+avx512vl-sg-flts := $(avx512f-flts)
 avx512bw-vecs := $(avx512f-vecs)
 avx512bw-ints := 1 2
 avx512bw-flts :=

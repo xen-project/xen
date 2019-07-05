@@ -22,6 +22,8 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512dq-opmask.h"
 #include "avx512bw-opmask.h"
 #include "avx512f.h"
+#include "avx512f-sg.h"
+#include "avx512vl-sg.h"
 #include "avx512bw.h"
 #include "avx512dq.h"
 #include "avx512er.h"
@@ -90,11 +92,13 @@ static bool simd_check_avx512f(void)
     return cpu_has_avx512f;
 }
 #define simd_check_avx512f_opmask simd_check_avx512f
+#define simd_check_avx512f_sg simd_check_avx512f
 
 static bool simd_check_avx512f_vl(void)
 {
     return cpu_has_avx512f && cpu_has_avx512vl;
 }
+#define simd_check_avx512vl_sg simd_check_avx512f_vl
 
 static bool simd_check_avx512dq(void)
 {
@@ -291,6 +295,14 @@ static const struct {
     SIMD(AVX512F u32x16,      avx512f,      64u4),
     SIMD(AVX512F s64x8,       avx512f,      64i8),
     SIMD(AVX512F u64x8,       avx512f,      64u8),
+    SIMD(AVX512F S/G f32[16x32], avx512f_sg, 64x4f4),
+    SIMD(AVX512F S/G f64[ 8x32], avx512f_sg, 64x4f8),
+    SIMD(AVX512F S/G f32[ 8x64], avx512f_sg, 64x8f4),
+    SIMD(AVX512F S/G f64[ 8x64], avx512f_sg, 64x8f8),
+    SIMD(AVX512F S/G i32[16x32], avx512f_sg, 64x4i4),
+    SIMD(AVX512F S/G i64[ 8x32], avx512f_sg, 64x4i8),
+    SIMD(AVX512F S/G i32[ 8x64], avx512f_sg, 64x8i4),
+    SIMD(AVX512F S/G i64[ 8x64], avx512f_sg, 64x8i8),
     AVX512VL(VL f32x4,        avx512f,      16f4),
     AVX512VL(VL f64x2,        avx512f,      16f8),
     AVX512VL(VL f32x8,        avx512f,      32f4),
@@ -303,6 +315,22 @@ static const struct {
     AVX512VL(VL u64x2,        avx512f,      16u8),
     AVX512VL(VL s64x4,        avx512f,      32i8),
     AVX512VL(VL u64x4,        avx512f,      32u8),
+    SIMD(AVX512VL S/G f32[4x32], avx512vl_sg, 16x4f4),
+    SIMD(AVX512VL S/G f64[2x32], avx512vl_sg, 16x4f8),
+    SIMD(AVX512VL S/G f32[2x64], avx512vl_sg, 16x8f4),
+    SIMD(AVX512VL S/G f64[2x64], avx512vl_sg, 16x8f8),
+    SIMD(AVX512VL S/G f32[8x32], avx512vl_sg, 32x4f4),
+    SIMD(AVX512VL S/G f64[4x32], avx512vl_sg, 32x4f8),
+    SIMD(AVX512VL S/G f32[4x64], avx512vl_sg, 32x8f4),
+    SIMD(AVX512VL S/G f64[4x64], avx512vl_sg, 32x8f8),
+    SIMD(AVX512VL S/G i32[4x32], avx512vl_sg, 16x4i4),
+    SIMD(AVX512VL S/G i64[2x32], avx512vl_sg, 16x4i8),
+    SIMD(AVX512VL S/G i32[2x64], avx512vl_sg, 16x8i4),
+    SIMD(AVX512VL S/G i64[2x64], avx512vl_sg, 16x8i8),
+    SIMD(AVX512VL S/G i32[8x32], avx512vl_sg, 32x4i4),
+    SIMD(AVX512VL S/G i64[4x32], avx512vl_sg, 32x4i8),
+    SIMD(AVX512VL S/G i32[4x64], avx512vl_sg, 32x8i4),
+    SIMD(AVX512VL S/G i64[4x64], avx512vl_sg, 32x8i8),
     SIMD(AVX512BW s8x64,     avx512bw,      64i1),
     SIMD(AVX512BW u8x64,     avx512bw,      64u1),
     SIMD(AVX512BW s16x32,    avx512bw,      64i2),
