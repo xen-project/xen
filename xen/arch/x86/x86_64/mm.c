@@ -1105,7 +1105,7 @@ int check_descriptor(const struct domain *dom, struct desc_struct *d)
              * 0xf6800000. Extend these to allow access to the larger read-only
              * M2P table available in 32on64 mode.
              */
-            base = (b & (0xff << 24)) | ((b & 0xff) << 16) | (a >> 16);
+            base = (b & 0xff000000) | ((b & 0xff) << 16) | (a >> 16);
 
             limit = (b & 0xf0000) | (a & 0xffff);
             limit++; /* We add one because limit is inclusive. */
