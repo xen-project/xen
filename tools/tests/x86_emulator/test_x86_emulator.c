@@ -27,6 +27,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512bw.h"
 #include "avx512dq.h"
 #include "avx512er.h"
+#include "avx512vbmi.h"
 
 #define verbose false /* Switch to true for far more logging. */
 
@@ -125,6 +126,16 @@ static bool simd_check_avx512bw(void)
 static bool simd_check_avx512bw_vl(void)
 {
     return cpu_has_avx512bw && cpu_has_avx512vl;
+}
+
+static bool simd_check_avx512vbmi(void)
+{
+    return cpu_has_avx512_vbmi;
+}
+
+static bool simd_check_avx512vbmi_vl(void)
+{
+    return cpu_has_avx512_vbmi && cpu_has_avx512vl;
 }
 
 static void simd_set_regs(struct cpu_user_regs *regs)
@@ -372,6 +383,18 @@ static const struct {
     SIMD(AVX512ER f32x16,    avx512er,      64f4),
     SIMD(AVX512ER f64 scalar,avx512er,        f8),
     SIMD(AVX512ER f64x8,     avx512er,      64f8),
+    SIMD(AVX512_VBMI s8x64,  avx512vbmi,    64i1),
+    SIMD(AVX512_VBMI u8x64,  avx512vbmi,    64u1),
+    SIMD(AVX512_VBMI s16x32, avx512vbmi,    64i2),
+    SIMD(AVX512_VBMI u16x32, avx512vbmi,    64u2),
+    AVX512VL(_VBMI+VL s8x16, avx512vbmi,    16i1),
+    AVX512VL(_VBMI+VL u8x16, avx512vbmi,    16u1),
+    AVX512VL(_VBMI+VL s8x32, avx512vbmi,    32i1),
+    AVX512VL(_VBMI+VL u8x32, avx512vbmi,    32u1),
+    AVX512VL(_VBMI+VL s16x8, avx512vbmi,    16i2),
+    AVX512VL(_VBMI+VL u16x8, avx512vbmi,    16u2),
+    AVX512VL(_VBMI+VL s16x16, avx512vbmi,   32i2),
+    AVX512VL(_VBMI+VL u16x16, avx512vbmi,   32u2),
 #undef AVX512VL_
 #undef AVX512VL
 #undef SIMD_

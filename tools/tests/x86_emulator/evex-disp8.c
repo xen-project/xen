@@ -542,6 +542,7 @@ static const struct test avx512_vbmi_all[] = {
     INSN(permb,         66, 0f38, 8d, vl, b, vl),
     INSN(permi2b,       66, 0f38, 75, vl, b, vl),
     INSN(permt2b,       66, 0f38, 7d, vl, b, vl),
+    INSN(pmultishiftqb, 66, 0f38, 83, vl, q, vl),
 };
 
 static const struct test avx512_vbmi2_all[] = {

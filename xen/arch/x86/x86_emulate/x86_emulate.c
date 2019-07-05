@@ -493,6 +493,7 @@ static const struct ext0f38_table {
     [0x7a ... 0x7c] = { .simd_size = simd_none, .two_op = 1 },
     [0x7d ... 0x7e] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x7f] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0x83] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x88] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_dq },
     [0x89] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_dq },
     [0x8a] = { .simd_size = simd_packed_fp, .to_mem = 1, .two_op = 1, .d8s = d8s_dq },
@@ -8998,6 +8999,12 @@ x86_emulate(
         put_stub(stub);
         ASSERT(!state->simd_size);
         break;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x83): /* vpmultishiftqb [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        generate_exception_if(!evex.w, EXC_UD);
+        host_and_vcpu_must_have(avx512_vbmi);
+        fault_suppression = false;
+        goto avx512f_no_sae;
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8c): /* vpmaskmov{d,q} mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x8e): /* vpmaskmov{d,q} {x,y}mm,{x,y}mm,mem */
