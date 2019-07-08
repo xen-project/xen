@@ -106,6 +106,8 @@ void *memchr(const void *, int, size_t);
 #define memchr(s, c, n) __builtin_memchr(s, c, n)
 #endif
 
+void *memchr_inv(const void *, int, size_t);
+
 #define is_char_array(x) __builtin_types_compatible_p(typeof(x), char[])
 
 /* safe_xxx always NUL-terminates and returns !=0 if result is truncated. */

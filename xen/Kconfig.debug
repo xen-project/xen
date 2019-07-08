@@ -105,6 +105,13 @@ config DEBUG_TRACE
 	  either directly to the console or are printed to console in case of
 	  a system crash.
 
+config XMEM_POOL_POISON
+	bool "Poison free xenpool blocks"
+	default DEBUG
+	---help---
+	  Poison free blocks with 0xAA bytes and verify them when a block is
+	  allocated in order to spot use-after-free issues.
+
 endif # DEBUG || EXPERT
 
 endmenu

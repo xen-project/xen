@@ -423,6 +423,26 @@ void *(memchr)(const void *s, int c, size_t n)
 }
 #endif
 
+/**
+ * memchr_inv - Find an unmatching character in an area of memory.
+ * @s: The memory area
+ * @c: The byte that is expected
+ * @n: The size of the area.
+ *
+ * returns the address of the first occurrence of a character other than @c,
+ * or %NULL if the whole buffer contains just @c.
+ */
+void *memchr_inv(const void *s, int c, size_t n)
+{
+	const unsigned char *p = s;
+
+	while (n--)
+		if ((unsigned char)c != *p++)
+			return (void *)(p - 1);
+
+	return NULL;
+}
+
 /*
  * Local variables:
  * mode: C

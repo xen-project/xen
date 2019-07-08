@@ -215,6 +215,8 @@ static inline void EXTRACT_BLOCK_HDR(struct bhdr *b, struct xmem_pool *p, int fl
     b->ptr.free_ptr = (struct free_ptr) {NULL, NULL};
 }
 
+#define POISON_BYTE 0xAA
+
 /**
  * Removes block(b) from free list with indexes (fl, sl)
  */
@@ -238,6 +240,12 @@ static inline void EXTRACT_BLOCK(struct bhdr *b, struct xmem_pool *p, int fl,
         }
     }
     b->ptr.free_ptr = (struct free_ptr) {NULL, NULL};
+
+#ifdef CONFIG_XMEM_POOL_POISON
+    if ( (b->size & BLOCK_SIZE_MASK) > MIN_BLOCK_SIZE )
+        ASSERT(!memchr_inv(b->ptr.buffer + MIN_BLOCK_SIZE, POISON_BYTE,
+                           (b->size & BLOCK_SIZE_MASK) - MIN_BLOCK_SIZE));
+#endif /* CONFIG_XMEM_POOL_POISON */
 }
 
 /**
@@ -245,6 +253,12 @@ static inline void EXTRACT_BLOCK(struct bhdr *b, struct xmem_pool *p, int fl,
  */
 static inline void INSERT_BLOCK(struct bhdr *b, struct xmem_pool *p, int fl, int sl)
 {
+#ifdef CONFIG_XMEM_POOL_POISON
+    if ( (b->size & BLOCK_SIZE_MASK) > MIN_BLOCK_SIZE )
+        memset(b->ptr.buffer + MIN_BLOCK_SIZE, POISON_BYTE,
+               (b->size & BLOCK_SIZE_MASK) - MIN_BLOCK_SIZE);
+#endif /* CONFIG_XMEM_POOL_POISON */
+
     b->ptr.free_ptr = (struct free_ptr) {NULL, p->matrix[fl][sl]};
     if ( p->matrix[fl][sl] )
         p->matrix[fl][sl]->ptr.free_ptr.prev = b;
