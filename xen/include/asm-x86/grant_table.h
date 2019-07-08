@@ -64,7 +64,7 @@ static inline void gnttab_clear_flags(struct domain *d,
                                       unsigned int mask, uint16_t *addr)
 {
     /* Access must be confined to the specified 2 bytes. */
-    asm volatile ("lock and %1,%0" : "+m" (*addr) : "ir" ((uint16_t)~mask));
+    asm volatile ("lock andw %1,%0" : "+m" (*addr) : "ir" ((uint16_t)~mask));
 }
 
 /* Foreign mappings of HVM-guest pages do not modify the type count. */
