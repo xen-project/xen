@@ -101,7 +101,6 @@ struct xmem_pool {
 
     spinlock_t lock;
 
-    unsigned long init_size;
     unsigned long max_size;
     unsigned long grow_size;
 
@@ -115,7 +114,6 @@ struct xmem_pool {
 
     struct list_head list;
 
-    void *init_region;
     char name[MAX_POOL_NAME_LEN];
 };
 
@@ -287,14 +285,13 @@ struct xmem_pool *xmem_pool_create(
     const char *name,
     xmem_pool_get_memory get_mem,
     xmem_pool_put_memory put_mem,
-    unsigned long init_size,
     unsigned long max_size,
     unsigned long grow_size)
 {
     struct xmem_pool *pool;
     int pool_bytes, pool_order;
 
-    BUG_ON(max_size && (max_size < init_size));
+    BUG_ON(max_size && (max_size < grow_size));
 
     pool_bytes = ROUNDUP_SIZE(sizeof(*pool));
     pool_order = get_order_from_bytes(pool_bytes);
@@ -305,22 +302,17 @@ struct xmem_pool *xmem_pool_create(
     memset(pool, 0, pool_bytes);
 
     /* Round to next page boundary */
-    init_size = ROUNDUP_PAGE(init_size);
     max_size = ROUNDUP_PAGE(max_size);
     grow_size = ROUNDUP_PAGE(grow_size);
 
     /* pool global overhead not included in used size */
     pool->used_size = 0;
 
-    pool->init_size = init_size;
     pool->max_size = max_size;
     pool->grow_size = grow_size;
     pool->get_mem = get_mem;
     pool->put_mem = put_mem;
     strlcpy(pool->name, name, sizeof(pool->name));
-
-    /* always obtain init_region lazily now to ensure it is get_mem'd
-     * in the same "context" as all other regions */
 
     spin_lock_init(&pool->lock);
 
@@ -340,7 +332,6 @@ unsigned long xmem_pool_get_total_size(struct xmem_pool *pool)
 {
     unsigned long total;
     total = ROUNDUP_SIZE(sizeof(*pool))
-        + pool->init_size
         + (pool->num_regions - 1) * pool->grow_size;
     return total;
 }
@@ -351,13 +342,6 @@ void xmem_pool_destroy(struct xmem_pool *pool)
 
     if ( pool == NULL )
         return;
-
-    /* User is destroying without ever allocating from this pool */
-    if ( xmem_pool_get_used_size(pool) == BHDR_OVERHEAD )
-    {
-        ASSERT(!pool->init_region);
-        pool->used_size -= BHDR_OVERHEAD;
-    }
 
     /* Check for memory leaks in this pool */
     if ( xmem_pool_get_used_size(pool) )
@@ -380,14 +364,6 @@ void *xmem_pool_alloc(unsigned long size, struct xmem_pool *pool)
     int fl, sl;
     unsigned long tmp_size;
 
-    if ( pool->init_region == NULL )
-    {
-        if ( (region = pool->get_mem(pool->init_size)) == NULL )
-            goto out;
-        ADD_REGION(region, pool->init_size, pool);
-        pool->init_region = region;
-    }
-
     size = (size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE : ROUNDUP_SIZE(size);
     /* Rounding up the requested size and calculating fl and sl */
 
@@ -401,8 +377,7 @@ void *xmem_pool_alloc(unsigned long size, struct xmem_pool *pool)
         /* Not found */
         if ( size > (pool->grow_size - 2 * BHDR_OVERHEAD) )
             goto out_locked;
-        if ( pool->max_size && (pool->init_size +
-                                pool->num_regions * pool->grow_size
+        if ( pool->max_size && (pool->num_regions * pool->grow_size
                                 > pool->max_size) )
             goto out_locked;
         spin_unlock(&pool->lock);
@@ -551,9 +526,8 @@ static void *xmalloc_whole_pages(unsigned long size, unsigned long align)
 
 static void tlsf_init(void)
 {
-    xenpool = xmem_pool_create(
-        "xmalloc", xmalloc_pool_get, xmalloc_pool_put,
-        PAGE_SIZE, 0, PAGE_SIZE);
+    xenpool = xmem_pool_create("xmalloc", xmalloc_pool_get,
+                               xmalloc_pool_put, 0, PAGE_SIZE);
     BUG_ON(!xenpool);
 }
 

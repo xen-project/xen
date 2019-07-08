@@ -84,7 +84,6 @@ typedef void (xmem_pool_put_memory)(void *ptr);
  * @name: name of the pool
  * @get_mem: callback function used to expand pool
  * @put_mem: callback function used to shrink pool
- * @init_size: inital pool size (in bytes)
  * @max_size: maximum pool size (in bytes) - set this as 0 for no limit
  * @grow_size: amount of memory (in bytes) added to pool whenever required
  *
@@ -94,7 +93,6 @@ struct xmem_pool *xmem_pool_create(
     const char *name,
     xmem_pool_get_memory get_mem,
     xmem_pool_put_memory put_mem,
-    unsigned long init_size,
     unsigned long max_size,
     unsigned long grow_size);
 
