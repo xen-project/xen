@@ -1715,7 +1715,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret < 0 )
         goto err;
 
-    ret = fdt_begin_node(kinfo->fdt, "/");
+    ret = fdt_begin_node(kinfo->fdt, "");
     if ( ret < 0 )
         goto err;
 

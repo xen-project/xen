@@ -145,7 +145,7 @@ static int __init create_acpi_dtb(struct kernel_info *kinfo,
     if ( ret < 0 )
         goto err;
 
-    ret = fdt_begin_node(kinfo->fdt, "/");
+    ret = fdt_begin_node(kinfo->fdt, "");
     if ( ret < 0 )
         goto err;
 
