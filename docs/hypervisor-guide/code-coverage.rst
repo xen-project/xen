@@ -8,9 +8,8 @@ so some extra steps are required to collect and process the data.
 
 .. warning::
 
-  Coverage has only been tested on x86 at the moment.  ARM doesn't currently
-  boot when the final binary exceeds 2MB in size, and the coverage build tends
-  to exceeds this limit.
+  ARM doesn't currently boot when the final binary exceeds 2MB in size,
+  and the coverage build tends to exceed this limit.
 
 
 Compiling Xen
