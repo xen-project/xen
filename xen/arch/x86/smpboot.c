@@ -902,7 +902,7 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
  */
 static void cpu_smpboot_free(unsigned int cpu, bool remove)
 {
-    unsigned int order, socket = cpu_to_socket(cpu);
+    unsigned int socket = cpu_to_socket(cpu);
     struct cpuinfo_x86 *c = cpu_data;
 
     if ( cpumask_empty(socket_cpumask[socket]) )
@@ -944,16 +944,12 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
             free_domheap_page(mfn_to_page(mfn));
     }
 
-    order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
-    if ( remove )
-        FREE_XENHEAP_PAGES(per_cpu(gdt_table, cpu), order);
-
-    free_xenheap_pages(per_cpu(compat_gdt_table, cpu), order);
+    FREE_XENHEAP_PAGE(per_cpu(compat_gdt_table, cpu));
 
     if ( remove )
     {
-        order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
-        FREE_XENHEAP_PAGES(idt_tables[cpu], order);
+        FREE_XENHEAP_PAGE(per_cpu(gdt_table, cpu));
+        FREE_XENHEAP_PAGE(idt_tables[cpu]);
 
         if ( stack_base[cpu] )
         {
@@ -965,7 +961,7 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
 
 static int cpu_smpboot_alloc(unsigned int cpu)
 {
-    unsigned int i, order, memflags = 0;
+    unsigned int i, memflags = 0;
     nodeid_t node = cpu_to_node(cpu);
     seg_desc_t *gdt;
     unsigned long stub_page;
@@ -980,8 +976,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         goto out;
     memguard_guard_stack(stack_base[cpu]);
 
-    order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
-    gdt = per_cpu(gdt_table, cpu) ?: alloc_xenheap_pages(order, memflags);
+    gdt = per_cpu(gdt_table, cpu) ?: alloc_xenheap_pages(0, memflags);
     if ( gdt == NULL )
         goto out;
     per_cpu(gdt_table, cpu) = gdt;
@@ -991,7 +986,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     BUILD_BUG_ON(NR_CPUS > 0x10000);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
-    per_cpu(compat_gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
+    per_cpu(compat_gdt_table, cpu) = gdt = alloc_xenheap_pages(0, memflags);
     if ( gdt == NULL )
         goto out;
     per_cpu(compat_gdt_table_l1e, cpu) =
@@ -999,9 +994,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     memcpy(gdt, boot_cpu_compat_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
-    order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
     if ( idt_tables[cpu] == NULL )
-        idt_tables[cpu] = alloc_xenheap_pages(order, memflags);
+        idt_tables[cpu] = alloc_xenheap_pages(0, memflags);
     if ( idt_tables[cpu] == NULL )
         goto out;
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
