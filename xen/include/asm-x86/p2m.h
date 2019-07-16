@@ -946,6 +946,7 @@ static inline int p2m_entry_modify(struct p2m_domain *p2m, p2m_type_t nt,
                                    p2m_type_t ot, mfn_t nfn, mfn_t ofn,
                                    unsigned int level)
 {
+    BUG_ON(!level);
     BUG_ON(level > 1 && (nt == p2m_ioreq_server || nt == p2m_map_foreign));
 
     if ( level != 1 || (nt == ot && mfn_eq(nfn, ofn)) )

@@ -51,7 +51,7 @@ static int atomic_write_ept_entry(struct p2m_domain *p2m,
                                   int level)
 {
     int rc = p2m_entry_modify(p2m, new.sa_p2mt, entryptr->sa_p2mt,
-                              _mfn(new.mfn), _mfn(entryptr->mfn), level);
+                              _mfn(new.mfn), _mfn(entryptr->mfn), level + 1);
 
     if ( rc )
         return rc;
