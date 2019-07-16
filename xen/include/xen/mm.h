@@ -667,9 +667,11 @@ static inline void put_page_alloc_ref(struct page_info *page)
      * the caller holding an additional reference. I.e. the allocation
      * reference must never be the last reference held.
      */
-    BUG_ON((page->count_info & PGC_count_mask) <= 1);
     if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+    {
+        BUG_ON((page->count_info & PGC_count_mask) <= 1);
         put_page(page);
+    }
 }
 
 #endif /* __XEN_MM_H__ */
