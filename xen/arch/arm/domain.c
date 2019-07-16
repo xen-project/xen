@@ -926,9 +926,7 @@ static int relinquish_memory(struct domain *d, struct page_list_head *list)
              */
             continue;
 
-        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-            put_page(page);
-
+        put_page_alloc_ref(page);
         put_page(page);
 
         if ( hypercall_preempt_check() )

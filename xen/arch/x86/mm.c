@@ -498,8 +498,7 @@ void share_xen_page_with_guest(struct page_info *page, struct domain *d,
 
 void free_shared_domheap_page(struct page_info *page)
 {
-    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-        put_page(page);
+    put_page_alloc_ref(page);
     if ( !test_and_clear_bit(_PGC_xen_heap, &page->count_info) )
         ASSERT_UNREACHABLE();
     page->u.inuse.type_info = 0;

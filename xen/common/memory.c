@@ -388,9 +388,8 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
      * For this purpose (and to match populate_physmap() behavior), the page
      * is kept allocated.
      */
-    if ( !rc && !is_domain_direct_mapped(d) &&
-         test_and_clear_bit(_PGC_allocated, &page->count_info) )
-        put_page(page);
+    if ( !rc && !is_domain_direct_mapped(d) )
+        put_page_alloc_ref(page);
 
     put_page(page);
 

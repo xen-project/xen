@@ -274,9 +274,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
             if ( test_and_clear_bit(_PGT_pinned, &(page+i)->u.inuse.type_info) )
                 put_page_and_type(page + i);
 
-            if ( test_and_clear_bit(_PGC_allocated, &(page+i)->count_info) )
-                put_page(page + i);
-
+            put_page_alloc_ref(page + i);
             put_page(page + i);
 
             if ( preemptible && pod_target != p2m->pod.count &&

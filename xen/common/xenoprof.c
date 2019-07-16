@@ -173,8 +173,7 @@ unshare_xenoprof_page_with_guest(struct xenoprof *x)
         struct page_info *page = mfn_to_page(mfn_add(mfn, i));
 
         BUG_ON(page_get_owner(page) != current->domain);
-        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-            put_page(page);
+        put_page_alloc_ref(page);
     }
 }
 

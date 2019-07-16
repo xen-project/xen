@@ -1000,8 +1000,7 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
     mem_sharing_page_unlock(firstpg);
 
     /* Free the client page */
-    if(test_and_clear_bit(_PGC_allocated, &cpage->count_info))
-        put_page(cpage);
+    put_page_alloc_ref(cpage);
     put_page(cpage);
 
     /* We managed to free a domain page. */
@@ -1082,8 +1081,7 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
                     ret = -EOVERFLOW;
                     goto err_unlock;
                 }
-                if ( test_and_clear_bit(_PGC_allocated, &cpage->count_info) )
-                    put_page(cpage);
+                put_page_alloc_ref(cpage);
                 put_page(cpage);
             }
         }
@@ -1177,8 +1175,7 @@ int __mem_sharing_unshare_page(struct domain *d,
                 domain_crash(d);
                 return -EOVERFLOW;
             }
-            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-                put_page(page);
+            put_page_alloc_ref(page);
             put_page(page);
         }
         put_gfn(d, gfn);

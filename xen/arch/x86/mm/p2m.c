@@ -1609,8 +1609,7 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn_l)
         goto out_put;
 
     /* Decrement guest domain's ref count of the page */
-    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-        put_page(page);
+    put_page_alloc_ref(page);
 
     /* Remove mapping from p2m table */
     ret = p2m_set_entry(p2m, gfn, INVALID_MFN, PAGE_ORDER_4K,

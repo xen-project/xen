@@ -658,4 +658,18 @@ static inline void share_xen_page_with_privileged_guests(
     share_xen_page_with_guest(page, dom_xen, flags);
 }
 
+static inline void put_page_alloc_ref(struct page_info *page)
+{
+    /*
+     * Whenever a page is assigned to a domain then the _PGC_allocated bit
+     * is set and the reference count is set to at least 1. This function
+     * clears that 'allocation reference' but it is unsafe to do so without
+     * the caller holding an additional reference. I.e. the allocation
+     * reference must never be the last reference held.
+     */
+    BUG_ON((page->count_info & PGC_count_mask) <= 1);
+    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+        put_page(page);
+}
+
 #endif /* __XEN_MM_H__ */

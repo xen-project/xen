@@ -398,8 +398,7 @@ static int hvm_alloc_ioreq_mfn(struct hvm_ioreq_server *s, bool buf)
     return 0;
 
  fail:
-    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-        put_page(page);
+    put_page_alloc_ref(page);
     put_page_and_type(page);
 
     return -ENOMEM;
@@ -418,13 +417,7 @@ static void hvm_free_ioreq_mfn(struct hvm_ioreq_server *s, bool buf)
     unmap_domain_page_global(iorp->va);
     iorp->va = NULL;
 
-    /*
-     * Check whether we need to clear the allocation reference before
-     * dropping the explicit references taken by get_page_and_type().
-     */
-    if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-        put_page(page);
-
+    put_page_alloc_ref(page);
     put_page_and_type(page);
 }
 
