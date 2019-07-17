@@ -479,6 +479,7 @@ static const struct ext0f38_table {
     [0x4d] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0x4e] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0x4f] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0x52 ... 0x53] = { .simd_size = simd_128, .d8s = 4 },
     [0x54 ... 0x55] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x58] = { .simd_size = simd_other, .two_op = 1, .d8s = 2 },
     [0x59] = { .simd_size = simd_other, .two_op = 1, .d8s = 3 },
@@ -1892,6 +1893,7 @@ in_protmode(
 #define vcpu_has_avx512_bitalg() (ctxt->cpuid->feat.avx512_bitalg)
 #define vcpu_has_avx512_vpopcntdq() (ctxt->cpuid->feat.avx512_vpopcntdq)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
+#define vcpu_has_avx512_4vnniw() (ctxt->cpuid->feat.avx512_4vnniw)
 #define vcpu_has_avx512_4fmaps() (ctxt->cpuid->feat.avx512_4fmaps)
 
 #define vcpu_must_have(feat) \
@@ -8919,6 +8921,15 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x41): /* vphminposuw xmm/m128,xmm,xmm */
         generate_exception_if(vex.l, EXC_UD);
         goto simd_0f_avx;
+
+    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x52): /* vp4dpwssd m128,zmm+3,zmm{k} */
+    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x53): /* vp4dpwssds m128,zmm+3,zmm{k} */
+        host_and_vcpu_must_have(avx512_4vnniw);
+        generate_exception_if((ea.type != OP_MEM || evex.w || evex.brs ||
+                               evex.lr != 2),
+                              EXC_UD);
+        op_mask = op_mask & 0xffff ? 0xf : 0;
+        goto simd_zmm;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x8f): /* vpshufbitqmb [xyz]mm/mem,[xyz]mm,k{k} */
         generate_exception_if(evex.w || !evex.r || !evex.R || evex.z, EXC_UD);
