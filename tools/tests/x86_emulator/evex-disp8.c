@@ -538,6 +538,11 @@ static const struct test avx512pf_512[] = {
     INSNX(scatterpf1q, 66, 0f38, c7, 6, vl, sd, el),
 };
 
+static const struct test avx512_bitalg_all[] = {
+    INSN(popcnt,      66, 0f38, 54, vl, bw, vl),
+    INSN(pshufbitqmb, 66, 0f38, 8f, vl,  b, vl),
+};
+
 static const struct test avx512_vbmi_all[] = {
     INSN(permb,         66, 0f38, 8d, vl, b, vl),
     INSN(permi2b,       66, 0f38, 75, vl, b, vl),
@@ -548,6 +553,10 @@ static const struct test avx512_vbmi_all[] = {
 static const struct test avx512_vbmi2_all[] = {
     INSN(pcompress, 66, 0f38, 63, vl, bw, el),
     INSN(pexpand,   66, 0f38, 62, vl, bw, el),
+};
+
+static const struct test avx512_vpopcntdq_all[] = {
+    INSN(popcnt, 66, 0f38, 55, vl, dq, vl)
 };
 
 static const unsigned char vl_all[] = { VL_512, VL_128, VL_256 };
@@ -919,6 +928,8 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512er, 512);
 #define cpu_has_avx512pf cpu_has_avx512f
     RUN(avx512pf, 512);
+    RUN(avx512_bitalg, all);
     RUN(avx512_vbmi, all);
     RUN(avx512_vbmi2, all);
+    RUN(avx512_vpopcntdq, all);
 }

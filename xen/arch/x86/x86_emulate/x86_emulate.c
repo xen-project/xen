@@ -479,6 +479,7 @@ static const struct ext0f38_table {
     [0x4d] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0x4e] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0x4f] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0x54 ... 0x55] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x58] = { .simd_size = simd_other, .two_op = 1, .d8s = 2 },
     [0x59] = { .simd_size = simd_other, .two_op = 1, .d8s = 3 },
     [0x5a] = { .simd_size = simd_128, .two_op = 1, .d8s = 4 },
@@ -501,6 +502,7 @@ static const struct ext0f38_table {
     [0x8c] = { .simd_size = simd_packed_int },
     [0x8d] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x8e] = { .simd_size = simd_packed_int, .to_mem = 1 },
+    [0x8f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x90 ... 0x93] = { .simd_size = simd_other, .vsib = 1, .d8s = d8s_dq },
     [0x96 ... 0x98] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0x99] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
@@ -1883,6 +1885,8 @@ in_protmode(
 #define vcpu_has_avx512vl()    (ctxt->cpuid->feat.avx512vl)
 #define vcpu_has_avx512_vbmi() (ctxt->cpuid->feat.avx512_vbmi)
 #define vcpu_has_avx512_vbmi2() (ctxt->cpuid->feat.avx512_vbmi2)
+#define vcpu_has_avx512_bitalg() (ctxt->cpuid->feat.avx512_bitalg)
+#define vcpu_has_avx512_vpopcntdq() (ctxt->cpuid->feat.avx512_vpopcntdq)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
 
 #define vcpu_must_have(feat) \
@@ -8898,6 +8902,19 @@ x86_emulate(
     case X86EMUL_OPC_VEX_66(0x0f38, 0x41): /* vphminposuw xmm/m128,xmm,xmm */
         generate_exception_if(vex.l, EXC_UD);
         goto simd_0f_avx;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x8f): /* vpshufbitqmb [xyz]mm/mem,[xyz]mm,k{k} */
+        generate_exception_if(evex.w || !evex.r || !evex.R || evex.z, EXC_UD);
+        /* fall through */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x54): /* vpopcnt{b,w} [xyz]mm/mem,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512_bitalg);
+        generate_exception_if(evex.brs, EXC_UD);
+        elem_bytes = 1 << evex.w;
+        goto avx512f_no_sae;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x55): /* vpopcnt{d,q} [xyz]mm/mem,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512_vpopcntdq);
+        goto avx512f_no_sae;
 
     case X86EMUL_OPC_VEX_66(0x0f38, 0x58): /* vpbroadcastd xmm/m32,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f38, 0x59): /* vpbroadcastq xmm/m64,{x,y}mm */
