@@ -521,6 +521,7 @@ static const struct ext0f38_table {
     [0xad] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xae] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0xaf] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
+    [0xb4 ... 0xb5] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0xb6 ... 0xb8] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
     [0xb9] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0xba] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
@@ -1875,6 +1876,7 @@ in_protmode(
 #define vcpu_has_rdseed()      (ctxt->cpuid->feat.rdseed)
 #define vcpu_has_adx()         (ctxt->cpuid->feat.adx)
 #define vcpu_has_smap()        (ctxt->cpuid->feat.smap)
+#define vcpu_has_avx512_ifma() (ctxt->cpuid->feat.avx512_ifma)
 #define vcpu_has_clflushopt()  (ctxt->cpuid->feat.clflushopt)
 #define vcpu_has_clwb()        (ctxt->cpuid->feat.clwb)
 #define vcpu_has_avx512pf()    (ctxt->cpuid->feat.avx512pf)
@@ -9454,6 +9456,12 @@ x86_emulate(
         state->simd_size = simd_none;
         break;
     }
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xb4): /* vpmadd52luq [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0xb5): /* vpmadd52huq [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512_ifma);
+        generate_exception_if(!evex.w, EXC_UD);
+        goto avx512f_no_sae;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xc6):
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xc7):

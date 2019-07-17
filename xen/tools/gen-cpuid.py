@@ -261,7 +261,7 @@ def crunch_numbers(state):
         # (which in practice depends on the EVEX prefix to encode) as well
         # as mask registers, and the instructions themselves. All further
         # AVX512 features are built on top of AVX512F
-        AVX512F: [AVX512DQ, AVX512IFMA, AVX512PF, AVX512ER, AVX512CD,
+        AVX512F: [AVX512DQ, AVX512_IFMA, AVX512PF, AVX512ER, AVX512CD,
                   AVX512BW, AVX512VL, AVX512_4VNNIW, AVX512_4FMAPS,
                   AVX512_VPOPCNTDQ],
 
