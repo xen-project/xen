@@ -558,6 +558,14 @@ static const struct test avx512_vbmi_all[] = {
 static const struct test avx512_vbmi2_all[] = {
     INSN(pcompress, 66, 0f38, 63, vl, bw, el),
     INSN(pexpand,   66, 0f38, 62, vl, bw, el),
+    INSN(pshld,     66, 0f3a, 71, vl, dq, vl),
+    INSN(pshldv,    66, 0f38, 71, vl, dq, vl),
+    INSN(pshldvw,   66, 0f38, 70, vl,  w, vl),
+    INSN(pshldw,    66, 0f3a, 70, vl,  w, vl),
+    INSN(pshrd,     66, 0f3a, 73, vl, dq, vl),
+    INSN(pshrdv,    66, 0f38, 73, vl, dq, vl),
+    INSN(pshrdvw,   66, 0f38, 72, vl,  w, vl),
+    INSN(pshrdw,    66, 0f3a, 72, vl,  w, vl),
 };
 
 static const struct test avx512_vpopcntdq_all[] = {
