@@ -538,6 +538,13 @@ static const struct test avx512pf_512[] = {
     INSNX(scatterpf1q, 66, 0f38, c7, 6, vl, sd, el),
 };
 
+static const struct test avx512_4fmaps_512[] = {
+    INSN(4fmaddps,  f2, 0f38, 9a, el_4, d, vl),
+    INSN(4fmaddss,  f2, 0f38, 9b, el_4, d, vl),
+    INSN(4fnmaddps, f2, 0f38, aa, el_4, d, vl),
+    INSN(4fnmaddss, f2, 0f38, ab, el_4, d, vl),
+};
+
 static const struct test avx512_bitalg_all[] = {
     INSN(popcnt,      66, 0f38, 54, vl, bw, vl),
     INSN(pshufbitqmb, 66, 0f38, 8f, vl,  b, vl),
@@ -941,6 +948,7 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512er, 512);
 #define cpu_has_avx512pf cpu_has_avx512f
     RUN(avx512pf, 512);
+    RUN(avx512_4fmaps, 512);
     RUN(avx512_bitalg, all);
     RUN(avx512_ifma, all);
     RUN(avx512_vbmi, all);

@@ -1892,6 +1892,7 @@ in_protmode(
 #define vcpu_has_avx512_bitalg() (ctxt->cpuid->feat.avx512_bitalg)
 #define vcpu_has_avx512_vpopcntdq() (ctxt->cpuid->feat.avx512_vpopcntdq)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
+#define vcpu_has_avx512_4fmaps() (ctxt->cpuid->feat.avx512_4fmaps)
 
 #define vcpu_must_have(feat) \
     generate_exception_if(!vcpu_has_##feat(), EXC_UD)
@@ -3172,6 +3173,18 @@ x86_decode(
                     disp8scale = decode_disp8scale(ext0f38_table[b ^ 0x30].d8s,
                                                    state);
                     state->simd_size = simd_other;
+                }
+
+                switch ( b )
+                {
+                /* v4f{,n}madd{p,s}s need special casing */
+                case 0x9a: case 0x9b: case 0xaa: case 0xab:
+                    if ( evex.pfx == vex_f2 )
+                    {
+                        disp8scale = 4;
+                        state->simd_size = simd_128;
+                    }
+                    break;
                 }
             }
             break;
@@ -9368,6 +9381,24 @@ x86_emulate(
         generate_exception_if(ea.type != OP_REG && evex.brs, EXC_UD);
         if ( !evex.brs )
             avx512_vlen_check(true);
+        goto simd_zmm;
+
+    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x9a): /* v4fmaddps m128,zmm+3,zmm{k} */
+    case X86EMUL_OPC_EVEX_F2(0x0f38, 0xaa): /* v4fnmaddps m128,zmm+3,zmm{k} */
+        host_and_vcpu_must_have(avx512_4fmaps);
+        generate_exception_if((ea.type != OP_MEM || evex.w || evex.brs ||
+                               evex.lr != 2),
+                              EXC_UD);
+        op_mask = op_mask & 0xffff ? 0xf : 0;
+        goto simd_zmm;
+
+    case X86EMUL_OPC_EVEX_F2(0x0f38, 0x9b): /* v4fmaddss m128,xmm+3,xmm{k} */
+    case X86EMUL_OPC_EVEX_F2(0x0f38, 0xab): /* v4fnmaddss m128,xmm+3,xmm{k} */
+        host_and_vcpu_must_have(avx512_4fmaps);
+        generate_exception_if((ea.type != OP_MEM || evex.w || evex.brs ||
+                               evex.lr == 3),
+                              EXC_UD);
+        op_mask = op_mask & 1 ? 0xf : 0;
         goto simd_zmm;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0xa0): /* vpscatterd{d,q} [xyz]mm,mem{k} */
