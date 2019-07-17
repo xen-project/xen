@@ -340,6 +340,10 @@ REN(pandn, , d);
 REN(por, , d);
 REN(pxor, , d);
 #  endif
+OVR(aesdec);
+OVR(aesdeclast);
+OVR(aesenc);
+OVR(aesenclast);
 OVR(cvtpd2dqx);
 OVR(cvtpd2dqy);
 OVR(cvtpd2psx);

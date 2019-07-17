@@ -19,8 +19,9 @@ CFLAGS += $(CFLAGS_xeninclude)
 SIMD := 3dnow sse sse2 sse4 avx avx2 xop avx512f avx512bw avx512dq avx512er avx512vbmi
 FMA := fma4 fma
 SG := avx2-sg avx512f-sg avx512vl-sg
+AES := ssse3-aes avx-aes avx2-vaes avx512bw-vaes
 GF := sse2-gf avx2-gf avx512bw-gf
-TESTCASES := blowfish $(SIMD) $(FMA) $(SG) $(GF)
+TESTCASES := blowfish $(SIMD) $(FMA) $(SG) $(AES) $(GF)
 
 OPMASK := avx512f avx512dq avx512bw
 
@@ -143,6 +144,10 @@ $(1)-cflags := \
 	   $(foreach flt,$($(1)-flts), \
 	     "-D_$(vec)x$(idx)f$(flt) -m$(1:-sg=) $(call non-sse,$(1)) -Os -DVEC_MAX=$(vec) -DIDX_SIZE=$(idx) -DFLOAT_SIZE=$(flt)")))
 endef
+define simd-aes-defs
+$(1)-cflags := $(foreach vec,$($(patsubst %-aes,sse,$(1))-vecs) $($(patsubst %-vaes,%,$(1))-vecs), \
+	         "-D_$(vec) -maes $(addprefix -m,$(subst -,$(space),$(1))) $(call non-sse,$(1)) -Os -DVEC_SIZE=$(vec)")
+endef
 define simd-gf-defs
 $(1)-cflags := $(foreach vec,$($(1:-gf=)-vecs), \
 	         "-D_$(vec) -mgfni -m$(1:-gf=) $(call non-sse,$(1)) -Os -DVEC_SIZE=$(vec)")
@@ -153,6 +158,7 @@ endef
 
 $(foreach flavor,$(SIMD) $(FMA),$(eval $(call simd-defs,$(flavor))))
 $(foreach flavor,$(SG),$(eval $(call simd-sg-defs,$(flavor))))
+$(foreach flavor,$(AES),$(eval $(call simd-aes-defs,$(flavor))))
 $(foreach flavor,$(GF),$(eval $(call simd-gf-defs,$(flavor))))
 $(foreach flavor,$(OPMASK),$(eval $(call opmask-defs,$(flavor))))
 
@@ -203,10 +209,13 @@ $(addsuffix .c,$(FMA)):
 $(addsuffix .c,$(SG)):
 	ln -sf simd-sg.c $@
 
+$(addsuffix .c,$(AES)):
+	ln -sf simd-aes.c $@
+
 $(addsuffix .c,$(GF)):
 	ln -sf simd-gf.c $@
 
-$(addsuffix .h,$(SIMD) $(FMA) $(SG) $(GF)): simd.h
+$(addsuffix .h,$(SIMD) $(FMA) $(SG) $(AES) $(GF)): simd.h
 
 xop.h avx512f.h: simd-fma.c
 

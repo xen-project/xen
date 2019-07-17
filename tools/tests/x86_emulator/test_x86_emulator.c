@@ -12,12 +12,15 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "sse.h"
 #include "sse2.h"
 #include "sse2-gf.h"
+#include "ssse3-aes.h"
 #include "sse4.h"
 #include "avx.h"
+#include "avx-aes.h"
 #include "fma4.h"
 #include "fma.h"
 #include "avx2.h"
 #include "avx2-sg.h"
+#include "avx2-vaes.h"
 #include "avx2-gf.h"
 #include "xop.h"
 #include "avx512f-opmask.h"
@@ -27,6 +30,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512f-sg.h"
 #include "avx512vl-sg.h"
 #include "avx512bw.h"
+#include "avx512bw-vaes.h"
 #include "avx512bw-gf.h"
 #include "avx512dq.h"
 #include "avx512er.h"
@@ -91,6 +95,16 @@ static bool simd_check_xop(void)
     return cpu_has_xop;
 }
 
+static bool simd_check_ssse3_aes(void)
+{
+    return cpu_has_aesni && cpu_has_ssse3;
+}
+
+static bool simd_check_avx_aes(void)
+{
+    return cpu_has_aesni && cpu_has_avx;
+}
+
 static bool simd_check_avx512f(void)
 {
     return cpu_has_avx512f;
@@ -139,6 +153,22 @@ static bool simd_check_avx512vbmi(void)
 static bool simd_check_avx512vbmi_vl(void)
 {
     return cpu_has_avx512_vbmi && cpu_has_avx512vl;
+}
+
+static bool simd_check_avx2_vaes(void)
+{
+    return cpu_has_aesni && cpu_has_vaes && cpu_has_avx2;
+}
+
+static bool simd_check_avx512bw_vaes(void)
+{
+    return cpu_has_aesni && cpu_has_vaes && cpu_has_avx512bw;
+}
+
+static bool simd_check_avx512bw_vaes_vl(void)
+{
+    return cpu_has_aesni && cpu_has_vaes &&
+           cpu_has_avx512bw && cpu_has_avx512vl;
 }
 
 static bool simd_check_sse2_gf(void)
@@ -319,6 +349,8 @@ static const struct {
     SIMD(XOP i16x16,              xop,      32i2),
     SIMD(XOP i32x8,               xop,      32i4),
     SIMD(XOP i64x4,               xop,      32i8),
+    SIMD(AES (legacy),      ssse3_aes,        16),
+    SIMD(AES (VEX/x16),       avx_aes,        16),
     SIMD(OPMASK/w,     avx512f_opmask,         2),
     SIMD(OPMASK+DQ/b, avx512dq_opmask,         1),
     SIMD(OPMASK+DQ/w, avx512dq_opmask,         2),
@@ -418,6 +450,10 @@ static const struct {
     AVX512VL(_VBMI+VL u16x8, avx512vbmi,    16u2),
     AVX512VL(_VBMI+VL s16x16, avx512vbmi,   32i2),
     AVX512VL(_VBMI+VL u16x16, avx512vbmi,   32u2),
+    SIMD(VAES (VEX/x32),    avx2_vaes,        32),
+    SIMD(VAES (EVEX/x64), avx512bw_vaes,      64),
+    AVX512VL(VL+VAES (x16), avx512bw_vaes,    16),
+    AVX512VL(VL+VAES (x32), avx512bw_vaes,    32),
     SIMD(GFNI (legacy),       sse2_gf,        16),
     SIMD(GFNI (VEX/x16),      avx2_gf,        16),
     SIMD(GFNI (VEX/x32),      avx2_gf,        32),
