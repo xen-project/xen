@@ -568,7 +568,8 @@ struct page_info *p2m_get_page_from_gfn(
             }
             else if ( !get_page(page, p2m->domain) &&
                       /* Page could be shared */
-                      (!p2m_is_shared(*t) || !get_page(page, dom_cow)) )
+                      (!dom_cow || !p2m_is_shared(*t) ||
+                       !get_page(page, dom_cow)) )
                 page = NULL;
         }
         p2m_read_unlock(p2m);
@@ -941,7 +942,8 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
     /* Then, look for m->p mappings for this range and deal with them */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
-        if ( page_get_owner(mfn_to_page(mfn_add(mfn, i))) == dom_cow )
+        if ( dom_cow &&
+             page_get_owner(mfn_to_page(mfn_add(mfn, i))) == dom_cow )
         {
             /* This is no way to add a shared page to your physmap! */
             gdprintk(XENLOG_ERR, "Adding shared mfn %lx directly to dom%d physmap not allowed.\n",

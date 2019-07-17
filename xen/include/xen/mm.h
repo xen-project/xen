@@ -274,7 +274,12 @@ struct npfec {
 #endif
 
 /* Private domain structs for DOMID_XEN, DOMID_IO, etc. */
-extern struct domain *dom_xen, *dom_io, *dom_cow;
+extern struct domain *dom_xen, *dom_io;
+#ifdef CONFIG_HAS_MEM_SHARING
+extern struct domain *dom_cow;
+#else
+# define dom_cow NULL
+#endif
 
 #define page_list_entry list_head
 

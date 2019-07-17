@@ -1085,7 +1085,7 @@ map_grant_ref(
             host_map_created = true;
         }
     }
-    else if ( owner == rd || owner == dom_cow )
+    else if ( owner == rd || (dom_cow && owner == dom_cow) )
     {
         if ( (op->flags & GNTMAP_device_map) && !(op->flags & GNTMAP_readonly) )
         {

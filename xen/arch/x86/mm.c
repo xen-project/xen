@@ -966,8 +966,8 @@ get_page_from_l1e(
         return flip;
     }
 
-    if ( unlikely( (real_pg_owner != pg_owner) &&
-                   (real_pg_owner != dom_cow) ) )
+    if ( unlikely((real_pg_owner != pg_owner) &&
+                  (!dom_cow || (real_pg_owner != dom_cow))) )
     {
         /*
          * Let privileged domains transfer the right to map their target
