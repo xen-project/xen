@@ -371,6 +371,7 @@ OVR(cvttsd2siq);
 OVR(cvttss2si);
 OVR(cvttss2sil);
 OVR(cvttss2siq);
+OVR(gf2p8mulb);
 OVR(movddup);
 OVR(movntdq);
 OVR(movntdqa);

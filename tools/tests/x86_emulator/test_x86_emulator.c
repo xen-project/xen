@@ -11,12 +11,14 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "3dnow.h"
 #include "sse.h"
 #include "sse2.h"
+#include "sse2-gf.h"
 #include "sse4.h"
 #include "avx.h"
 #include "fma4.h"
 #include "fma.h"
 #include "avx2.h"
 #include "avx2-sg.h"
+#include "avx2-gf.h"
 #include "xop.h"
 #include "avx512f-opmask.h"
 #include "avx512dq-opmask.h"
@@ -25,6 +27,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512f-sg.h"
 #include "avx512vl-sg.h"
 #include "avx512bw.h"
+#include "avx512bw-gf.h"
 #include "avx512dq.h"
 #include "avx512er.h"
 #include "avx512vbmi.h"
@@ -136,6 +139,26 @@ static bool simd_check_avx512vbmi(void)
 static bool simd_check_avx512vbmi_vl(void)
 {
     return cpu_has_avx512_vbmi && cpu_has_avx512vl;
+}
+
+static bool simd_check_sse2_gf(void)
+{
+    return cpu_has_gfni && cpu_has_sse2;
+}
+
+static bool simd_check_avx2_gf(void)
+{
+    return cpu_has_gfni && cpu_has_avx2;
+}
+
+static bool simd_check_avx512bw_gf(void)
+{
+    return cpu_has_gfni && cpu_has_avx512bw;
+}
+
+static bool simd_check_avx512bw_gf_vl(void)
+{
+    return cpu_has_gfni && cpu_has_avx512vl;
 }
 
 static void simd_set_regs(struct cpu_user_regs *regs)
@@ -395,6 +418,12 @@ static const struct {
     AVX512VL(_VBMI+VL u16x8, avx512vbmi,    16u2),
     AVX512VL(_VBMI+VL s16x16, avx512vbmi,   32i2),
     AVX512VL(_VBMI+VL u16x16, avx512vbmi,   32u2),
+    SIMD(GFNI (legacy),       sse2_gf,        16),
+    SIMD(GFNI (VEX/x16),      avx2_gf,        16),
+    SIMD(GFNI (VEX/x32),      avx2_gf,        32),
+    SIMD(GFNI (EVEX/x64), avx512bw_gf,        64),
+    AVX512VL(VL+GFNI (x16), avx512bw_gf,      16),
+    AVX512VL(VL+GFNI (x32), avx512bw_gf,      32),
 #undef AVX512VL_
 #undef AVX512VL
 #undef SIMD_

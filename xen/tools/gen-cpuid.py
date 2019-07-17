@@ -201,7 +201,7 @@ def crunch_numbers(state):
         # SSE2 was re-specified as core instructions for 64bit.  Also ISA
         # extensions dealing with vectors of integers are added here rather
         # than to SSE.
-        SSE2: [SSE3, LM, AESNI, PCLMULQDQ, SHA],
+        SSE2: [SSE3, LM, AESNI, PCLMULQDQ, SHA, GFNI],
 
         # Other SSEn each depend on their predecessor versions.
         SSE3: [SSSE3],
