@@ -479,7 +479,7 @@ static const struct ext0f38_table {
     [0x4d] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
     [0x4e] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_vl },
     [0x4f] = { .simd_size = simd_scalar_vexw, .d8s = d8s_dq },
-    [0x52 ... 0x53] = { .simd_size = simd_128, .d8s = 4 },
+    [0x50 ... 0x53] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x54 ... 0x55] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_vl },
     [0x58] = { .simd_size = simd_other, .two_op = 1, .d8s = 2 },
     [0x59] = { .simd_size = simd_other, .two_op = 1, .d8s = 3 },
@@ -1890,6 +1890,7 @@ in_protmode(
 #define vcpu_has_avx512vl()    (ctxt->cpuid->feat.avx512vl)
 #define vcpu_has_avx512_vbmi() (ctxt->cpuid->feat.avx512_vbmi)
 #define vcpu_has_avx512_vbmi2() (ctxt->cpuid->feat.avx512_vbmi2)
+#define vcpu_has_avx512_vnni() (ctxt->cpuid->feat.avx512_vnni)
 #define vcpu_has_avx512_bitalg() (ctxt->cpuid->feat.avx512_bitalg)
 #define vcpu_has_avx512_vpopcntdq() (ctxt->cpuid->feat.avx512_vpopcntdq)
 #define vcpu_has_rdpid()       (ctxt->cpuid->feat.rdpid)
@@ -3179,6 +3180,8 @@ x86_decode(
 
                 switch ( b )
                 {
+                /* vp4dpwssd{,s} need special casing */
+                case 0x52: case 0x53:
                 /* v4f{,n}madd{p,s}s need special casing */
                 case 0x9a: case 0x9b: case 0xaa: case 0xab:
                     if ( evex.pfx == vex_f2 )
@@ -9393,6 +9396,14 @@ x86_emulate(
         if ( !evex.brs )
             avx512_vlen_check(true);
         goto simd_zmm;
+
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x50): /* vpdpbusd [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x51): /* vpdpbusds [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x52): /* vpdpwssd [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+    case X86EMUL_OPC_EVEX_66(0x0f38, 0x53): /* vpdpwssds [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */
+        host_and_vcpu_must_have(avx512_vnni);
+        generate_exception_if(evex.w, EXC_UD);
+        goto avx512f_no_sae;
 
     case X86EMUL_OPC_EVEX_F2(0x0f38, 0x9a): /* v4fmaddps m128,zmm+3,zmm{k} */
     case X86EMUL_OPC_EVEX_F2(0x0f38, 0xaa): /* v4fnmaddps m128,zmm+3,zmm{k} */
