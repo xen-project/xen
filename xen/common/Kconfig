@@ -357,4 +357,13 @@ config DOM0_MEM
 
 	  Leave empty if you are not sure what to specify.
 
+config TRACEBUFFER
+	bool "Enable tracing infrastructure" if EXPERT = "y"
+	default y
+	---help---
+	  Enable tracing infrastructure and pre-defined tracepoints within Xen.
+	  This will allow live information about Xen’s execution and performance
+	  to be collected at run time for debugging or performance analysis.
+	  Memory and execution overhead when not active is minimal.
+
 endmenu
