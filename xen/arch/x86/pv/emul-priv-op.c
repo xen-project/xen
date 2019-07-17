@@ -723,8 +723,7 @@ static int read_cr(unsigned int reg, unsigned long *val,
             unmap_domain_page(pl4e);
             *val = compat_pfn_to_cr3(mfn_to_gmfn(currd, mfn_x(mfn)));
         }
-        /* PTs should not be shared */
-        BUG_ON(page_get_owner(mfn_to_page(mfn)) == dom_cow);
+
         return X86EMUL_OKAY;
     }
     }
