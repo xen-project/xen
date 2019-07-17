@@ -381,6 +381,7 @@ OVR(movntdq);
 OVR(movntdqa);
 OVR(movshdup);
 OVR(movsldup);
+OVR(pclmulqdq);
 OVR(permd);
 OVR(permq);
 OVR(pmovsxbd);

@@ -125,6 +125,7 @@ static inline bool xcr0_mask(uint64_t mask)
 #define cpu_has_sse        cp.basic.sse
 #define cpu_has_sse2       cp.basic.sse2
 #define cpu_has_sse3       cp.basic.sse3
+#define cpu_has_pclmulqdq  cp.basic.pclmulqdq
 #define cpu_has_ssse3      cp.basic.ssse3
 #define cpu_has_fma       (cp.basic.fma && xcr0_mask(6))
 #define cpu_has_sse4_1     cp.basic.sse4_1
