@@ -591,6 +591,18 @@ static const struct test avx512_vpopcntdq_all[] = {
     INSN(popcnt, 66, 0f38, 55, vl, dq, vl)
 };
 
+/*
+ * The uses of b in this table are simply (one of) the shortest form(s) of
+ * saying "no broadcast" without introducing a 128-bit granularity enumerator.
+ * Due to all of the insns being WIG, w, d_nb, and q_nb would all also fit.
+ */
+static const struct test vaes_all[] = {
+    INSN(aesdec,     66, 0f38, de, vl, b, vl),
+    INSN(aesdeclast, 66, 0f38, df, vl, b, vl),
+    INSN(aesenc,     66, 0f38, dc, vl, b, vl),
+    INSN(aesenclast, 66, 0f38, dd, vl, b, vl),
+};
+
 static const struct test vpclmulqdq_all[] = {
     INSN(pclmulqdq, 66, 0f3a, 44, vl, q_nb, vl)
 };
@@ -975,6 +987,7 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
 
     if ( cpu_has_avx512f )
     {
+        RUN(vaes, all);
         RUN(vpclmulqdq, all);
     }
 }

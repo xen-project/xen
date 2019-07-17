@@ -256,7 +256,7 @@ def crunch_numbers(state):
         # feature flags.  If want to use AVX512, AVX2 must be supported and
         # enabled.  Certain later extensions, acting on 256-bit vectors of
         # integers, better depend on AVX2 than AVX.
-        AVX2: [AVX512F, VPCLMULQDQ],
+        AVX2: [AVX512F, VAES, VPCLMULQDQ],
 
         # AVX512F is taken to mean hardware support for 512bit registers
         # (which in practice depends on the EVEX prefix to encode) as well
@@ -274,6 +274,7 @@ def crunch_numbers(state):
         # Extensions with VEX/EVEX encodings keyed to a separate feature
         # flag are made dependents of their respective legacy feature.
         PCLMULQDQ: [VPCLMULQDQ],
+        AESNI: [VAES],
 
         # The features:
         #   * Single Thread Indirect Branch Predictors
