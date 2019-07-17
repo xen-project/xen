@@ -591,6 +591,10 @@ static const struct test avx512_vpopcntdq_all[] = {
     INSN(popcnt, 66, 0f38, 55, vl, dq, vl)
 };
 
+static const struct test vpclmulqdq_all[] = {
+    INSN(pclmulqdq, 66, 0f3a, 44, vl, q_nb, vl)
+};
+
 static const unsigned char vl_all[] = { VL_512, VL_128, VL_256 };
 static const unsigned char vl_128[] = { VL_128 };
 static const unsigned char vl_no128[] = { VL_512, VL_256 };
@@ -968,4 +972,9 @@ void evex_disp8_test(void *instr, struct x86_emulate_ctxt *ctxt,
     RUN(avx512_vbmi2, all);
     RUN(avx512_vnni, all);
     RUN(avx512_vpopcntdq, all);
+
+    if ( cpu_has_avx512f )
+    {
+        RUN(vpclmulqdq, all);
+    }
 }

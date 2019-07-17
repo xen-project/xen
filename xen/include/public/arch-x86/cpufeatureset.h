@@ -121,7 +121,7 @@ XEN_CPUFEATURE(PBE,           0*32+31) /*   Pending Break Enable */
 
 /* Intel-defined CPU features, CPUID level 0x00000001.ecx, word 1 */
 XEN_CPUFEATURE(SSE3,          1*32+ 0) /*A  Streaming SIMD Extensions-3 */
-XEN_CPUFEATURE(PCLMULQDQ,     1*32+ 1) /*A  Carry-less mulitplication */
+XEN_CPUFEATURE(PCLMULQDQ,     1*32+ 1) /*A  Carry-less multiplication */
 XEN_CPUFEATURE(DTES64,        1*32+ 2) /*   64-bit Debug Store */
 XEN_CPUFEATURE(MONITOR,       1*32+ 3) /*   Monitor/Mwait support */
 XEN_CPUFEATURE(DSCPL,         1*32+ 4) /*   CPL Qualified Debug Store */
@@ -229,6 +229,7 @@ XEN_CPUFEATURE(UMIP,          6*32+ 2) /*S  User Mode Instruction Prevention */
 XEN_CPUFEATURE(PKU,           6*32+ 3) /*H  Protection Keys for Userspace */
 XEN_CPUFEATURE(OSPKE,         6*32+ 4) /*!  OS Protection Keys Enable */
 XEN_CPUFEATURE(AVX512_VBMI2,  6*32+ 6) /*A  Additional AVX-512 Vector Byte Manipulation Instrs */
+XEN_CPUFEATURE(VPCLMULQDQ,    6*32+10) /*A  Vector Carry-less Multiplication Instrs */
 XEN_CPUFEATURE(AVX512_VNNI,   6*32+11) /*A  Vector Neural Network Instrs */
 XEN_CPUFEATURE(AVX512_BITALG, 6*32+12) /*A  Support for VPOPCNT[B,W] and VPSHUFBITQMB */
 XEN_CPUFEATURE(AVX512_VPOPCNTDQ, 6*32+14) /*A  POPCNT for vectors of DW/QW */

@@ -254,8 +254,9 @@ def crunch_numbers(state):
 
         # This is just the dependency between AVX512 and AVX2 of XSTATE
         # feature flags.  If want to use AVX512, AVX2 must be supported and
-        # enabled.
-        AVX2: [AVX512F],
+        # enabled.  Certain later extensions, acting on 256-bit vectors of
+        # integers, better depend on AVX2 than AVX.
+        AVX2: [AVX512F, VPCLMULQDQ],
 
         # AVX512F is taken to mean hardware support for 512bit registers
         # (which in practice depends on the EVEX prefix to encode) as well
@@ -269,6 +270,10 @@ def crunch_numbers(state):
         # dependents of AVX512BW (as to requiring wider than 16-bit mask
         # registers), despite the SDM not formally making this connection.
         AVX512BW: [AVX512_VBMI, AVX512_VBMI2, AVX512_BITALG, AVX512_BF16],
+
+        # Extensions with VEX/EVEX encodings keyed to a separate feature
+        # flag are made dependents of their respective legacy feature.
+        PCLMULQDQ: [VPCLMULQDQ],
 
         # The features:
         #   * Single Thread Indirect Branch Predictors

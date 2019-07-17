@@ -594,7 +594,7 @@ static const struct ext0f3a_table {
     [0x3e ... 0x3f] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x40 ... 0x41] = { .simd_size = simd_packed_fp },
     [0x42 ... 0x43] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
-    [0x44] = { .simd_size = simd_packed_int },
+    [0x44] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x46] = { .simd_size = simd_packed_int },
     [0x48 ... 0x49] = { .simd_size = simd_packed_fp, .four_op = 1 },
     [0x4a ... 0x4b] = { .simd_size = simd_packed_fp, .four_op = 1 },
@@ -1890,6 +1890,7 @@ in_protmode(
 #define vcpu_has_avx512vl()    (ctxt->cpuid->feat.avx512vl)
 #define vcpu_has_avx512_vbmi() (ctxt->cpuid->feat.avx512_vbmi)
 #define vcpu_has_avx512_vbmi2() (ctxt->cpuid->feat.avx512_vbmi2)
+#define vcpu_has_vpclmulqdq()  (ctxt->cpuid->feat.vpclmulqdq)
 #define vcpu_has_avx512_vnni() (ctxt->cpuid->feat.avx512_vnni)
 #define vcpu_has_avx512_bitalg() (ctxt->cpuid->feat.avx512_bitalg)
 #define vcpu_has_avx512_vpopcntdq() (ctxt->cpuid->feat.avx512_vpopcntdq)
@@ -10207,12 +10208,18 @@ x86_emulate(
         goto opmask_shift_imm;
 
     case X86EMUL_OPC_66(0x0f3a, 0x44):     /* pclmulqdq $imm8,xmm/m128,xmm */
-    case X86EMUL_OPC_VEX_66(0x0f3a, 0x44): /* vpclmulqdq $imm8,xmm/m128,xmm,xmm */
+    case X86EMUL_OPC_VEX_66(0x0f3a, 0x44): /* vpclmulqdq $imm8,{x,y}mm/mem,{x,y}mm,{x,y}mm */
         host_and_vcpu_must_have(pclmulqdq);
         if ( vex.opcx == vex_none )
             goto simd_0f3a_common;
-        generate_exception_if(vex.l, EXC_UD);
+        if ( vex.l )
+            host_and_vcpu_must_have(vpclmulqdq);
         goto simd_0f_imm8_avx;
+
+    case X86EMUL_OPC_EVEX_66(0x0f3a, 0x44): /* vpclmulqdq $imm8,[xyz]mm/mem,[xyz]mm,[xyz]mm */
+        host_and_vcpu_must_have(vpclmulqdq);
+        generate_exception_if(evex.brs || evex.opmsk, EXC_UD);
+        goto avx512f_imm8_no_sae;
 
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x4a): /* vblendvps {x,y}mm,{x,y}mm/mem,{x,y}mm,{x,y}mm */
     case X86EMUL_OPC_VEX_66(0x0f3a, 0x4b): /* vblendvpd {x,y}mm,{x,y}mm/mem,{x,y}mm,{x,y}mm */
