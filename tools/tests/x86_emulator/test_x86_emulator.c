@@ -14,8 +14,10 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "sse2-gf.h"
 #include "ssse3-aes.h"
 #include "sse4.h"
+#include "sse4-sha.h"
 #include "avx.h"
 #include "avx-aes.h"
+#include "avx-sha.h"
 #include "fma4.h"
 #include "fma.h"
 #include "avx2.h"
@@ -28,6 +30,7 @@ asm ( ".pushsection .test, \"ax\", @progbits; .popsection" );
 #include "avx512bw-opmask.h"
 #include "avx512f.h"
 #include "avx512f-sg.h"
+#include "avx512f-sha.h"
 #include "avx512vl-sg.h"
 #include "avx512bw.h"
 #include "avx512bw-vaes.h"
@@ -153,6 +156,21 @@ static bool simd_check_avx512vbmi(void)
 static bool simd_check_avx512vbmi_vl(void)
 {
     return cpu_has_avx512_vbmi && cpu_has_avx512vl;
+}
+
+static bool simd_check_sse4_sha(void)
+{
+    return cpu_has_sha && cpu_has_sse4_2;
+}
+
+static bool simd_check_avx_sha(void)
+{
+    return cpu_has_sha && cpu_has_avx;
+}
+
+static bool simd_check_avx512f_sha_vl(void)
+{
+    return cpu_has_sha && cpu_has_avx512vl;
 }
 
 static bool simd_check_avx2_vaes(void)
@@ -450,6 +468,9 @@ static const struct {
     AVX512VL(_VBMI+VL u16x8, avx512vbmi,    16u2),
     AVX512VL(_VBMI+VL s16x16, avx512vbmi,   32i2),
     AVX512VL(_VBMI+VL u16x16, avx512vbmi,   32u2),
+    SIMD(SHA,                sse4_sha,        16),
+    SIMD(AVX+SHA,             avx_sha,        16),
+    AVX512VL(VL+SHA,      avx512f_sha,        16),
     SIMD(VAES (VEX/x32),    avx2_vaes,        32),
     SIMD(VAES (EVEX/x64), avx512bw_vaes,      64),
     AVX512VL(VL+VAES (x16), avx512bw_vaes,    16),
