@@ -41,9 +41,9 @@ int tb_control(struct xen_sysctl_tbuf_op *tbc);
 
 int trace_will_trace_event(u32 event);
 
-void __trace_var(u32 event, bool_t cycles, unsigned int extra, const void *);
+void __trace_var(uint32_t event, bool cycles, unsigned int extra, const void *);
 
-static inline void trace_var(u32 event, int cycles, int extra,
+static inline void trace_var(uint32_t event, bool cycles, unsigned int extra,
                              const void *extra_data)
 {
     if ( unlikely(tb_init_done) )
@@ -68,7 +68,7 @@ static inline int trace_will_trace_event(uint32_t event)
     return 0;
 }
 
-static inline void trace_var(uint32_t event, int cycles, int extra,
+static inline void trace_var(uint32_t event, bool cycles, unsigned int extra,
                              const void *extra_data) {}
 static inline void __trace_var(uint32_t event, bool cycles, unsigned int extra,
                                const void *extra_data) {}
