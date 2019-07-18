@@ -135,6 +135,7 @@ extern mfn_t xenheap_mfn_start, xenheap_mfn_end;
 extern vaddr_t xenheap_virt_end;
 #ifdef CONFIG_ARM_64
 extern vaddr_t xenheap_virt_start;
+extern unsigned long xenheap_base_pdx;
 #endif
 
 #ifdef CONFIG_ARM_32
@@ -253,9 +254,10 @@ static inline void *maddr_to_virt(paddr_t ma)
 #else
 static inline void *maddr_to_virt(paddr_t ma)
 {
-    ASSERT(pfn_to_pdx(ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
+    ASSERT((pfn_to_pdx(ma >> PAGE_SHIFT) - xenheap_base_pdx) <
+           (DIRECTMAP_SIZE >> PAGE_SHIFT));
     return (void *)(XENHEAP_VIRT_START -
-                    mfn_to_maddr(xenheap_mfn_start) +
+                    (xenheap_base_pdx << PAGE_SHIFT) +
                     ((ma & ma_va_bottom_mask) |
                      ((ma & ma_top_mask) >> pfn_pdx_hole_shift)));
 }
