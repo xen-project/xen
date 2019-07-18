@@ -518,6 +518,7 @@ M:	George Dunlap <george.dunlap@eu.citrix.com>
 S:	Supported
 F:	tools/xentrace/
 F:	xen/common/trace.c
+F:	xen/include/xen/trace.h
 
 XSM/FLASK
 M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
