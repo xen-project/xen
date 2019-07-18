@@ -233,7 +233,7 @@ tools/tests/x86_emulator/asm
 tools/tests/x86_emulator/avx*.[ch]
 tools/tests/x86_emulator/blowfish.h
 tools/tests/x86_emulator/fma*.[ch]
-tools/tests/x86_emulator/sse*.[ch]
+tools/tests/x86_emulator/*sse*.[ch]
 tools/tests/x86_emulator/test_x86_emulator
 tools/tests/x86_emulator/x86_emulate
 tools/tests/x86_emulator/xop*.[ch]
