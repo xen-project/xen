@@ -53,7 +53,10 @@ static inline void trace_var(u32 event, int cycles, int extra,
 void __trace_hypercall(uint32_t event, unsigned long op,
                        const xen_ulong_t *args);
 
-#else
+#else /* CONFIG_TRACEBUFFER */
+
+#include <xen/errno.h>
+
 static inline void init_trace_bufs(void) {}
 static inline int tb_control(struct xen_sysctl_tbuf_op *tbc)
 {
@@ -71,7 +74,7 @@ static inline void __trace_var(uint32_t event, bool cycles, unsigned int extra,
                                const void *extra_data) {}
 static inline void __trace_hypercall(uint32_t event, unsigned long op,
                                      const xen_ulong_t *args) {}
-#endif
+#endif /* CONFIG_TRACEBUFFER */
 
 /* Convenience macros for calling the trace function. */
 #define TRACE_0D(_e)                            \
