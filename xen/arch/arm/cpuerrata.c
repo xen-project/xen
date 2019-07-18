@@ -75,7 +75,7 @@ static bool copy_hyp_vect_bpi(unsigned int slot, const char *hyp_vec_start,
     clean_dcache_va_range(dst_remapped, VECTOR_TABLE_SIZE);
     invalidate_icache();
 
-    vunmap(dst_remapped);
+    vunmap((void *)((vaddr_t)dst_remapped & PAGE_MASK));
 
     return true;
 }
