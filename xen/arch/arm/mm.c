@@ -165,6 +165,7 @@ mfn_t xenheap_mfn_end __read_mostly;
 vaddr_t xenheap_virt_end __read_mostly;
 #ifdef CONFIG_ARM_64
 vaddr_t xenheap_virt_start __read_mostly;
+unsigned long xenheap_base_pdx __read_mostly;
 #endif
 
 unsigned long frametable_base_pdx __read_mostly;
@@ -796,6 +797,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     if ( mfn_eq(xenheap_mfn_start, INVALID_MFN) )
     {
         xenheap_mfn_start = _mfn(base_mfn);
+        xenheap_base_pdx = mfn_to_pdx(_mfn(base_mfn));
         xenheap_virt_start = DIRECTMAP_VIRT_START +
             (base_mfn - mfn) * PAGE_SIZE;
     }
