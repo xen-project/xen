@@ -648,10 +648,6 @@ static int page_make_private(struct domain *d, struct page_info *page)
         return -EBUSY;
     }
 
-    /* We can only change the type if count is one */
-    /* Because we are locking pages individually, we need to drop
-     * the lock here, while the page is typed. We cannot risk the 
-     * race of page_unlock and then put_page_type. */
     expected_type = (PGT_shared_page | PGT_validated | PGT_locked | 2);
     if ( page->u.inuse.type_info != expected_type )
     {
@@ -660,11 +656,10 @@ static int page_make_private(struct domain *d, struct page_info *page)
         return -EEXIST;
     }
 
+    mem_sharing_page_unlock(page);
+
     /* Drop the final typecount */
     put_page_and_type(page);
-
-    /* Now that we've dropped the type, we can unlock */
-    mem_sharing_page_unlock(page);
 
     /* Change the owner */
     ASSERT(page_get_owner(page) == dom_cow);
@@ -900,6 +895,7 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
     p2m_type_t smfn_type, cmfn_type;
     struct two_gfns tg;
     struct rmap_iterator ri;
+    unsigned long put_count = 0;
 
     get_two_gfns(sd, sgfn, &smfn_type, NULL, &smfn,
                  cd, cgfn, &cmfn_type, NULL, &cmfn, 0, &tg);
@@ -964,15 +960,6 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
         goto err_out;
     }
 
-    /* Acquire an extra reference, for the freeing below to be safe. */
-    if ( !get_page(cpage, dom_cow) )
-    {
-        ret = -EOVERFLOW;
-        mem_sharing_page_unlock(secondpg);
-        mem_sharing_page_unlock(firstpg);
-        goto err_out;
-    }
-
     /* Merge the lists together */
     rmap_seed_iterator(cpage, &ri);
     while ( (gfn = rmap_iterate(cpage, &ri)) != NULL)
@@ -984,13 +971,14 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
          * Don't change the type of rmap for the client page. */
         rmap_del(gfn, cpage, 0);
         rmap_add(gfn, spage);
-        put_page_and_type(cpage);
+        put_count++;
         d = get_domain_by_id(gfn->domain);
         BUG_ON(!d);
         BUG_ON(set_shared_p2m_entry(d, gfn->gfn, smfn));
         put_domain(d);
     }
     ASSERT(list_empty(&cpage->sharing->gfns));
+    BUG_ON(!put_count);
 
     /* Clear the rest of the shared state */
     page_sharing_dispose(cpage);
@@ -1001,7 +989,9 @@ static int share_pages(struct domain *sd, gfn_t sgfn, shr_handle_t sh,
 
     /* Free the client page */
     put_page_alloc_ref(cpage);
-    put_page(cpage);
+
+    while ( put_count-- )
+        put_page_and_type(cpage);
 
     /* We managed to free a domain page. */
     atomic_dec(&nr_shared_mfns);
@@ -1165,19 +1155,13 @@ int __mem_sharing_unshare_page(struct domain *d,
     {
         if ( !last_gfn )
             mem_sharing_gfn_destroy(page, d, gfn_info);
-        put_page_and_type(page);
+
         mem_sharing_page_unlock(page);
+
         if ( last_gfn )
-        {
-            if ( !get_page(page, dom_cow) )
-            {
-                put_gfn(d, gfn);
-                domain_crash(d);
-                return -EOVERFLOW;
-            }
             put_page_alloc_ref(page);
-            put_page(page);
-        }
+
+        put_page_and_type(page);
         put_gfn(d, gfn);
 
         return 0;
