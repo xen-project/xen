@@ -916,6 +916,38 @@ out:
     return rc;
 }
 
+static int pci_del_callback(libxl__qmp_handler *qmp,
+                            const libxl__json_object *response, void *opaque)
+{
+    const char *asked_id = opaque;
+    const libxl__json_object *bus = NULL;
+    GC_INIT(qmp->ctx);
+    int i, j, rc = 0;
+
+    for (i = 0; (bus = libxl__json_array_get(response, i)); i++) {
+        const libxl__json_object *devices = NULL;
+        const libxl__json_object *device = NULL;
+        const libxl__json_object *o = NULL;
+        const char *id = NULL;
+
+        devices = libxl__json_map_get("devices", bus, JSON_ARRAY);
+
+        for (j = 0; (device = libxl__json_array_get(devices, j)); j++) {
+             o = libxl__json_map_get("qdev_id", device, JSON_STRING);
+             id = libxl__json_object_get_string(o);
+
+             if (id && strcmp(asked_id, id) == 0) {
+                 rc = 1;
+                 goto out;
+             }
+        }
+    }
+
+out:
+    GC_FREE;
+    return rc;
+}
+
 static int qmp_run_command(libxl__gc *gc, int domid,
                            const char *cmd, libxl__json_object *args,
                            qmp_callback_t callback, void *opaque)
@@ -1000,9 +1032,36 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 static int qmp_device_del(libxl__gc *gc, int domid, char *id)
 {
     libxl__json_object *args = NULL;
+    libxl__qmp_handler *qmp = NULL;
+    int rc = 0;
+
+    qmp = libxl__qmp_initialize(gc, domid);
+    if (!qmp)
+        return ERROR_FAIL;
 
     qmp_parameters_add_string(gc, &args, "id", id);
-    return qmp_run_command(gc, domid, "device_del", args, NULL, NULL);
+    rc = qmp_synchronous_send(qmp, "device_del", args,
+                              NULL, NULL, qmp->timeout);
+    if (rc == 0) {
+        unsigned int retry = 0;
+
+        do {
+            rc = qmp_synchronous_send(qmp, "query-pci", NULL,
+                                      pci_del_callback, id, qmp->timeout);
+            if (rc != 1) {
+                break;
+            }
+            sleep(1);
+        } while (retry++ < 5);
+
+        if (rc != 0) {
+            LOGD(WARN, qmp->domid,
+                 "device model may not complete removing device %s", id);
+        }
+    }
+
+    libxl__qmp_close(qmp);
+    return rc;
 }
 
 int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
