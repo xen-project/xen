@@ -25,7 +25,11 @@
 #include <public/memory.h>
 
 /* Auditing of memory sharing code? */
+#ifndef NDEBUG
 #define MEM_SHARING_AUDIT 1
+#else
+#define MEM_SHARING_AUDIT 0
+#endif
 
 typedef uint64_t shr_handle_t; 
 
