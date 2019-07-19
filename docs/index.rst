@@ -6,6 +6,10 @@ The Xen Hypervisor documentation
    Xen's Sphinx/RST documentation is a work in progress.  The existing
    documentation can be found at https://xenbits.xen.org/docs/
 
+Xen is an open source, bare metal hypervisor.  It runs as the most privileged
+piece of software on the system, and shares the resources of the hardware
+between virtual machines.  See :doc:`admin-guide/introduction` for an
+introduction to a Xen system.
 
 User documentation
 ------------------
@@ -45,3 +49,11 @@ kind of development environment.
    :maxdepth: 2
 
    hypervisor-guide/index
+
+
+Miscellanea
+-----------
+
+.. toctree::
+
+   glossary
