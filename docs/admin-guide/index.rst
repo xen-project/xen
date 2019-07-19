@@ -2,4 +2,4 @@ Admin Guide
 ===========
 
 .. toctree::
-  microcode-loading
+   microcode-loading

@@ -12,22 +12,22 @@ Registers
 The registers used for hypercalls depends on the operating mode of the guest.
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - ABI
-    - Hypercall Index
-    - Parameters (1 - 6)
-    - Result
+   * - ABI
+     - Hypercall Index
+     - Parameters (1 - 6)
+     - Result
 
-  * - 64bit
-    - RAX
-    - RDI RSI RDX R10 R8 R9
-    - RAX
+   * - 64bit
+     - RAX
+     - RDI RSI RDX R10 R8 R9
+     - RAX
 
-  * - 32bit
-    - EAX
-    - EBX ECX EDX ESI EDI EBP
-    - EAX
+   * - 32bit
+     - EAX
+     - EBX ECX EDX ESI EDI EBP
+     - EAX
 
 32 and 64bit PV guests have an ABI fixed by their guest type.  The ABI for an
 HVM guest depends on whether the vCPU is operating in a 64bit segment or not
@@ -51,22 +51,22 @@ The exact sequence of instructions required to issue a hypercall differs
 between virtualisation mode and hardware vendor.
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - Guest
-    - Transfer instruction
+   * - Guest
+     - Transfer instruction
 
-  * - 32bit PV
-    - INT 0x82
+   * - 32bit PV
+     - INT 0x82
 
-  * - 64bit PV
-    - SYSCALL
+   * - 64bit PV
+     - SYSCALL
 
-  * - Intel HVM
-    - VMCALL
+   * - Intel HVM
+     - VMCALL
 
-  * - AMD HVM
-    - VMMCALL
+   * - AMD HVM
+     - VMMCALL
 
 To abstract away the details, Xen implements an interface known as the
 Hypercall Page.  This allows a guest to make a hypercall without needing to
@@ -89,7 +89,7 @@ To invoke a specific hypercall, ``call`` the relevant stub [3]_:
 
 .. code-block:: none
 
-  call hypercall_page + index * 32
+   call hypercall_page + index * 32
 
 There result is an ABI which is invariant of the exact operating mode or
 hardware vendor.  This is intended to simplify guest kernel interfaces by

@@ -2,6 +2,6 @@ Guest documentation
 ===================
 
 .. toctree::
-  :maxdepth: 2
+   :maxdepth: 2
 
-  x86/index
+   x86/index

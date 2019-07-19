@@ -3,8 +3,8 @@ The Xen Hypervisor documentation
 
 .. note::
 
-  Xen's Sphinx/RST documentation is a work in progress.  The existing
-  documentation can be found at https://xenbits.xen.org/docs/
+   Xen's Sphinx/RST documentation is a work in progress.  The existing
+   documentation can be found at https://xenbits.xen.org/docs/
 
 
 User documentation
@@ -16,9 +16,9 @@ preferred distribution, and is attempting to run virtual machines and
 configure the system.
 
 .. toctree::
-  :maxdepth: 2
+   :maxdepth: 2
 
-  admin-guide/index
+   admin-guide/index
 
 
 Guest documentation
@@ -29,9 +29,9 @@ intended for OS developers trying to use a Xen feature, and for Xen developers
 to avoid breaking things.
 
 .. toctree::
-  :maxdepth: 3
+   :maxdepth: 3
 
-  guest-guide/index
+   guest-guide/index
 
 
 Hypervisor developer documentation
@@ -42,6 +42,6 @@ who is building Xen from source, and is running the new hypervisor in some
 kind of development environment.
 
 .. toctree::
-  :maxdepth: 2
+   :maxdepth: 2
 
-  hypervisor-guide/index
+   hypervisor-guide/index
