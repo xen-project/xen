@@ -1613,6 +1613,37 @@ static inline bool need_full_gdt(const struct domain *d)
     return is_pv_domain(d) && !is_idle_domain(d);
 }
 
+static void write_full_gdt_ptes(seg_desc_t *gdt, const struct vcpu *v)
+{
+    unsigned long mfn = virt_to_mfn(gdt);
+    l1_pgentry_t *pl1e = pv_gdt_ptes(v);
+    unsigned int i;
+
+    for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
+        l1e_write(pl1e + FIRST_RESERVED_GDT_PAGE + i,
+                  l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR_RW));
+}
+
+static void load_full_gdt(const struct vcpu *v, unsigned int cpu)
+{
+    struct desc_ptr gdt_desc = {
+        .limit = LAST_RESERVED_GDT_BYTE,
+        .base = GDT_VIRT_START(v),
+    };
+
+    lgdt(&gdt_desc);
+}
+
+static void load_default_gdt(const seg_desc_t *gdt, unsigned int cpu)
+{
+    struct desc_ptr gdt_desc = {
+        .limit = LAST_RESERVED_GDT_BYTE,
+        .base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY),
+    };
+
+    lgdt(&gdt_desc);
+}
+
 static void __context_switch(void)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
@@ -1621,7 +1652,6 @@ static void __context_switch(void)
     struct vcpu          *n = current;
     struct domain        *pd = p->domain, *nd = n->domain;
     seg_desc_t           *gdt;
-    struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
     ASSERT(!vcpu_cpu_dirty(n));
@@ -1663,25 +1693,13 @@ static void __context_switch(void)
 
     gdt = !is_pv_32bit_domain(nd) ? per_cpu(gdt_table, cpu) :
                                     per_cpu(compat_gdt_table, cpu);
-    if ( need_full_gdt(nd) )
-    {
-        unsigned long mfn = virt_to_mfn(gdt);
-        l1_pgentry_t *pl1e = pv_gdt_ptes(n);
-        unsigned int i;
 
-        for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
-            l1e_write(pl1e + FIRST_RESERVED_GDT_PAGE + i,
-                      l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR_RW));
-    }
+    if ( need_full_gdt(nd) )
+        write_full_gdt_ptes(gdt, n);
 
     if ( need_full_gdt(pd) &&
          ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(nd)) )
-    {
-        gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
-        gdt_desc.base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY);
-
-        lgdt(&gdt_desc);
-    }
+        load_default_gdt(gdt, cpu);
 
     write_ptbase(n);
 
@@ -1694,12 +1712,7 @@ static void __context_switch(void)
 
     if ( need_full_gdt(nd) &&
          ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(pd)) )
-    {
-        gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
-        gdt_desc.base = GDT_VIRT_START(n);
-
-        lgdt(&gdt_desc);
-    }
+        load_full_gdt(n, cpu);
 
     if ( pd != nd )
         cpumask_clear_cpu(cpu, pd->dirty_cpumask);
