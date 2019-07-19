@@ -628,7 +628,6 @@ static inline bool arch_mfn_in_directmap(unsigned long mfn)
 
 int arch_acquire_resource(struct domain *d, unsigned int type,
                           unsigned int id, unsigned long frame,
-                          unsigned int nr_frames, xen_pfn_t mfn_list[],
-                          unsigned int *flags);
+                          unsigned int nr_frames, xen_pfn_t mfn_list[]);
 
 #endif /* __ASM_X86_MM_H__ */

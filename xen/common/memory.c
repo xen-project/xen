@@ -1060,7 +1060,7 @@ static int acquire_resource(
     if ( copy_from_guest(&xmar, arg, 1) )
         return -EFAULT;
 
-    if ( xmar.flags != 0 )
+    if ( xmar.pad != 0 )
         return -EINVAL;
 
     if ( guest_handle_is_null(xmar.frame_list) )
@@ -1096,7 +1096,7 @@ static int acquire_resource(
 
     default:
         rc = arch_acquire_resource(d, xmar.type, xmar.id, xmar.frame,
-                                   xmar.nr_frames, mfn_list, &xmar.flags);
+                                   xmar.nr_frames, mfn_list);
         break;
     }
 
@@ -1116,11 +1116,9 @@ static int acquire_resource(
         /*
          * FIXME: Until foreign pages inserted into the P2M are properly
          *        reference counted, it is unsafe to allow mapping of
-         *        non-caller-owned resource pages unless the caller is
-         *        the hardware domain.
+         *        resource pages unless the caller is the hardware domain.
          */
-        if ( !(xmar.flags & XENMEM_rsrc_acq_caller_owned) &&
-             !is_hardware_domain(currd) )
+        if ( !is_hardware_domain(currd) )
             return -EACCES;
 
         if ( copy_from_guest(gfn_list, xmar.frame_list, xmar.nr_frames) )
@@ -1135,10 +1133,6 @@ static int acquire_resource(
                 rc = -EIO;
         }
     }
-
-    if ( xmar.flags != 0 &&
-         __copy_field_to_guest(arg, &xmar, flags) )
-        rc = -EFAULT;
 
  out:
     rcu_unlock_domain(d);

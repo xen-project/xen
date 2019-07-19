@@ -632,16 +632,7 @@ struct xen_mem_acquire_resource {
      *          maximum value supported by the implementation on return.
      */
     uint32_t nr_frames;
-    /*
-     * OUT - Must be zero on entry. On return this may contain a bitwise
-     *       OR of the following values.
-     */
-    uint32_t flags;
-
-    /* The resource pages have been assigned to the calling domain */
-#define _XENMEM_rsrc_acq_caller_owned 0
-#define XENMEM_rsrc_acq_caller_owned (1u << _XENMEM_rsrc_acq_caller_owned)
-
+    uint32_t pad;
     /*
      * IN - the index of the initial frame to be mapped. This parameter
      *      is ignored if nr_frames is 0.
