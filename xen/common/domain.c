@@ -74,7 +74,7 @@ integer_param("hardware_dom", hardware_domid);
 /* Private domain structs for DOMID_XEN, DOMID_IO, etc. */
 struct domain *__read_mostly dom_xen;
 struct domain *__read_mostly dom_io;
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
 struct domain *__read_mostly dom_cow;
 #endif
 
@@ -549,7 +549,7 @@ void __init setup_system_domains(void)
     if ( IS_ERR(dom_io) )
         panic("Failed to create d[IO]: %ld\n", PTR_ERR(dom_io));
 
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
     /*
      * Initialise our COW domain.
      * This domain owns sharable pages.
@@ -966,7 +966,7 @@ static void complete_domain_destroy(struct rcu_head *head)
     xfree(d->vm_event_paging);
 #endif
     xfree(d->vm_event_monitor);
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
     xfree(d->vm_event_share);
 #endif
 

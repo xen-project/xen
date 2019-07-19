@@ -48,9 +48,6 @@ config MEM_ACCESS
 config HAS_MEM_PAGING
 	bool
 
-config HAS_MEM_SHARING
-	bool
-
 config HAS_PDX
 	bool
 

@@ -127,6 +127,8 @@ struct page_info
         /* For non-pinnable single-page shadows, a higher entry that points
          * at us. */
         paddr_t up;
+
+#ifdef CONFIG_MEM_SHARING
         /* For shared/sharable pages, we use a doubly-linked list
          * of all the {pfn,domain} pairs that map this page. We also include
          * an opaque handle, which is effectively a version, so that clients
@@ -134,6 +136,7 @@ struct page_info
          * This list is allocated and freed when a page is shared/unshared.
          */
         struct page_sharing_info *sharing;
+#endif
     };
 
     /* Reference count and various PGC_xxx flags and fields. */

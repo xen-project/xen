@@ -1236,9 +1236,11 @@ long arch_do_domctl(
         break;
     }
 
+#ifdef CONFIG_MEM_SHARING
     case XEN_DOMCTL_mem_sharing_op:
         ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
         break;
+#endif
 
 #if P2M_AUDIT && defined(CONFIG_HVM)
     case XEN_DOMCTL_audit_p2m:

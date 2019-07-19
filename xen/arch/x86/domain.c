@@ -2095,6 +2095,7 @@ int domain_relinquish_resources(struct domain *d)
             d->arch.auto_unmask = 0;
         }
 
+#ifdef CONFIG_MEM_SHARING
     PROGRESS(shared):
 
         if ( is_hvm_domain(d) )
@@ -2105,6 +2106,7 @@ int domain_relinquish_resources(struct domain *d)
             if ( ret )
                 return ret;
         }
+#endif
 
         spin_lock(&d->page_alloc_lock);
         page_list_splice(&d->arch.relmem_list, &d->page_list);

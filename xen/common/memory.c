@@ -1676,7 +1676,7 @@ int check_get_page_from_gfn(struct domain *d, gfn_t gfn, bool readonly,
         return -EAGAIN;
     }
 #endif
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
     if ( (q & P2M_UNSHARE) && p2m_is_shared(p2mt) )
     {
         if ( page )

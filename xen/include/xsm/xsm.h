@@ -150,7 +150,7 @@ struct xsm_operations {
     int (*mem_paging) (struct domain *d);
 #endif
 
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
     int (*mem_sharing) (struct domain *d);
 #endif
 
@@ -597,7 +597,7 @@ static inline int xsm_mem_paging (xsm_default_t def, struct domain *d)
 }
 #endif
 
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
 static inline int xsm_mem_sharing (xsm_default_t def, struct domain *d)
 {
     return xsm_ops->mem_sharing(d);

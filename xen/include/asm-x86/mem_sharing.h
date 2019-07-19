@@ -24,6 +24,8 @@
 #include <public/domctl.h>
 #include <public/memory.h>
 
+#ifdef CONFIG_MEM_SHARING
+
 /* Auditing of memory sharing code? */
 #ifndef NDEBUG
 #define MEM_SHARING_AUDIT 1
@@ -98,5 +100,31 @@ int mem_sharing_domctl(struct domain *d,
  * Preemptible.
  */
 int relinquish_shared_pages(struct domain *d);
+
+#else
+
+static inline unsigned int mem_sharing_get_nr_saved_mfns(void)
+{
+    return 0;
+}
+static inline unsigned int mem_sharing_get_nr_shared_mfns(void)
+{
+    return 0;
+}
+static inline int mem_sharing_unshare_page(struct domain *d,
+                                           unsigned long gfn,
+                                           uint16_t flags)
+{
+    ASSERT_UNREACHABLE();
+    return -EOPNOTSUPP;
+}
+static inline int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
+                              bool allow_sleep)
+{
+    ASSERT_UNREACHABLE();
+    return -EOPNOTSUPP;
+}
+
+#endif
 
 #endif /* __MEM_SHARING_H__ */

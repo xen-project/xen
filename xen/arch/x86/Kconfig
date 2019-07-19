@@ -18,7 +18,6 @@ config X86
 	select HAS_KEXEC
 	select MEM_ACCESS_ALWAYS_ON
 	select HAS_MEM_PAGING
-	select HAS_MEM_SHARING
 	select HAS_NS16550
 	select HAS_PASSTHROUGH
 	select HAS_PCI
@@ -199,6 +198,11 @@ config PV_SHIM_EXCLUSIVE
 	  firmware, and will not function correctly in other scenarios.
 
 	  If unsure, say N.
+
+config MEM_SHARING
+	bool "Xen memory sharing support" if EXPERT = "y"
+	depends on HVM
+
 endmenu
 
 source "common/Kconfig"

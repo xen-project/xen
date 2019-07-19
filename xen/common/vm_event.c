@@ -531,7 +531,7 @@ static void monitor_notification(struct vcpu *v, unsigned int port)
     vm_event_resume(v->domain, v->domain->vm_event_monitor);
 }
 
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_sharing_notification(struct vcpu *v, unsigned int port)
 {
@@ -561,7 +561,7 @@ void vm_event_cleanup(struct domain *d)
         destroy_waitqueue_head(&d->vm_event_monitor->wq);
         (void)vm_event_disable(d, &d->vm_event_monitor);
     }
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
     if ( vm_event_check_ring(d->vm_event_share) )
     {
         destroy_waitqueue_head(&d->vm_event_share->wq);
@@ -703,7 +703,7 @@ int vm_event_domctl(struct domain *d, struct xen_domctl_vm_event_op *vec)
     }
     break;
 
-#ifdef CONFIG_HAS_MEM_SHARING
+#ifdef CONFIG_MEM_SHARING
     case XEN_DOMCTL_VM_EVENT_OP_SHARING:
     {
         rc = -EINVAL;
