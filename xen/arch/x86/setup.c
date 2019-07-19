@@ -680,7 +680,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     unsigned int initrdidx, num_parked = 0;
     multiboot_info_t *mbi;
     module_t *mod;
-    unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
+    unsigned long nr_pages, raw_max_page, modules_headroom, module_map[1];
     int i, j, e820_warn = 0, bytes = 0;
     bool acpi_boot_table_init_done = false, relocated = false;
     int ret;
@@ -839,6 +839,17 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /* Check that we have at least one Multiboot module. */
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
         panic("dom0 kernel not specified. Check bootloader configuration\n");
+
+    /* Check that we don't have a silly number of modules. */
+    if ( mbi->mods_count > sizeof(module_map) * 8 )
+    {
+        mbi->mods_count = sizeof(module_map) * 8;
+        printk("Excessive multiboot modules - using the first %u only\n",
+               mbi->mods_count);
+    }
+
+    bitmap_fill(module_map, mbi->mods_count);
+    __clear_bit(0, module_map); /* Dom0 kernel is always first */
 
     if ( pvh_boot )
     {
@@ -1577,10 +1588,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     console_init_irq();
 
     init_IRQ();
-
-    module_map = xmalloc_array(unsigned long, BITS_TO_LONGS(mbi->mods_count));
-    bitmap_fill(module_map, mbi->mods_count);
-    __clear_bit(0, module_map); /* Dom0 kernel is always first */
 
     xsm_multiboot_init(module_map, mbi);
 
