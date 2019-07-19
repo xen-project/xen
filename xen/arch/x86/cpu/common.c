@@ -414,6 +414,10 @@ static void generic_identify(struct cpuinfo_x86 *c)
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_FSGSBASE)],
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_PKU)],
 			    &c->x86_capability[cpufeat_word(X86_FEATURE_AVX512_4VNNIW)]);
+	if (c->cpuid_level >= 0xd)
+		cpuid_count(0xd, 1,
+			    &c->x86_capability[cpufeat_word(X86_FEATURE_XSAVEOPT)],
+			    &tmp, &tmp, &tmp);
 }
 
 /*
