@@ -356,24 +356,15 @@ struct platform_bad_page {
 const struct platform_bad_page *get_platform_badpages(unsigned int *array_size);
 
 /* Per page locks:
- * page_lock() is used for two purposes: pte serialization, and memory sharing.
+ * page_lock() is used for pte serialization.
  *
  * All users of page lock for pte serialization live in mm.c, use it
  * to lock a page table page during pte updates, do not take other locks within
  * the critical section delimited by page_lock/unlock, and perform no
  * nesting.
  *
- * All users of page lock for memory sharing live in mm/mem_sharing.c. Page_lock
- * is used in memory sharing to protect addition (share) and removal (unshare)
- * of (gfn,domain) tupples to a list of gfn's that the shared page is currently
- * backing. Nesting may happen when sharing (and locking) two pages -- deadlock
- * is avoided by locking pages in increasing order.
- * All memory sharing code paths take the p2m lock of the affected gfn before
- * taking the lock for the underlying page. We enforce ordering between page_lock
- * and p2m_lock using an mm-locks.h construct.
- *
- * These two users (pte serialization and memory sharing) do not collide, since
- * sharing is only supported for hvm guests, which do not perform pv pte updates.
+ * The use of PGT_locked in mem_sharing does not collide, since mem_sharing is
+ * only supported for hvm guests, which do not have PV PTEs updated.
  */
 int page_lock(struct page_info *page);
 void page_unlock(struct page_info *page);

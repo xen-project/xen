@@ -112,13 +112,59 @@ static inline void page_sharing_dispose(struct page_info *page)
 
 #endif /* MEM_SHARING_AUDIT */
 
-static inline int mem_sharing_page_lock(struct page_info *pg)
+/*
+ * Private implementations of page_lock/unlock to bypass PV-only
+ * sanity checks not applicable to mem-sharing.
+ *
+ * _page_lock is used in memory sharing to protect addition (share) and removal
+ * (unshare) of (gfn,domain) tupples to a list of gfn's that the shared page is
+ * currently backing.
+ * Nesting may happen when sharing (and locking) two pages.
+ * Deadlock is avoided by locking pages in increasing order.
+ * All memory sharing code paths take the p2m lock of the affected gfn before
+ * taking the lock for the underlying page. We enforce ordering between page_lock
+ * and p2m_lock using an mm-locks.h construct.
+ *
+ * TODO: Investigate if PGT_validated is necessary.
+ */
+static inline bool _page_lock(struct page_info *page)
 {
-    int rc;
+    unsigned long x, nx;
+
+    do {
+        while ( (x = page->u.inuse.type_info) & PGT_locked )
+            cpu_relax();
+        nx = x + (1 | PGT_locked);
+        if ( !(x & PGT_validated) ||
+             !(x & PGT_count_mask) ||
+             !(nx & PGT_count_mask) )
+            return false;
+    } while ( cmpxchg(&page->u.inuse.type_info, x, nx) != x );
+
+    return true;
+}
+
+static inline void _page_unlock(struct page_info *page)
+{
+    unsigned long x, nx, y = page->u.inuse.type_info;
+
+    do {
+        x = y;
+        ASSERT((x & PGT_count_mask) && (x & PGT_locked));
+
+        nx = x - (1 | PGT_locked);
+        /* We must not drop the last reference here. */
+        ASSERT(nx & PGT_count_mask);
+    } while ( (y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x );
+}
+
+static inline bool mem_sharing_page_lock(struct page_info *pg)
+{
+    bool rc;
     pg_lock_data_t *pld = &(this_cpu(__pld));
 
     page_sharing_mm_pre_lock();
-    rc = page_lock(pg);
+    rc = _page_lock(pg);
     if ( rc )
     {
         preempt_disable();
@@ -135,7 +181,7 @@ static inline void mem_sharing_page_unlock(struct page_info *pg)
     page_sharing_mm_unlock(pld->mm_unlock_level, 
                            &pld->recurse_count);
     preempt_enable();
-    page_unlock(pg);
+    _page_unlock(pg);
 }
 
 static inline shr_handle_t get_next_handle(void)
