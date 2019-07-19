@@ -206,8 +206,10 @@ struct __packed desc_ptr {
 
 extern seg_desc_t boot_cpu_gdt_table[];
 DECLARE_PER_CPU(seg_desc_t *, gdt_table);
+DECLARE_PER_CPU(l1_pgentry_t, gdt_table_l1e);
 extern seg_desc_t boot_cpu_compat_gdt_table[];
 DECLARE_PER_CPU(seg_desc_t *, compat_gdt_table);
+DECLARE_PER_CPU(l1_pgentry_t, compat_gdt_table_l1e);
 
 extern void load_TR(void);
 
