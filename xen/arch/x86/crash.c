@@ -169,7 +169,7 @@ static void nmi_shootdown_cpus(void)
      */
     iommu_crash_shutdown();
 
-    if ( num_online_cpus() > 1 )
+    if ( cpu_online(cpu) )
     {
         __stop_this_cpu();
 
