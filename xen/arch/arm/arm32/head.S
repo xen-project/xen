@@ -53,7 +53,7 @@
  *   r3  -
  *   r4  -
  *   r5  -
- *   r6  - identity map in place
+ *   r6  -
  *   r7  -
  *   r8  - DTB address (boot CPU only)
  *   r9  - paddr(start)
@@ -302,17 +302,25 @@ cpu_init_done:
         mov   pc, r5                        /* Return address is in r5 */
 ENDPROC(cpu_init)
 
+/*
+ * Rebuild the boot pagetable's first-level entries. The structure
+ * is described in mm.c.
+ *
+ * After the CPU enables paging it will add the fixmap mapping
+ * to these page tables, however this may clash with the 1:1
+ * mapping. So each CPU must rebuild the page tables here with
+ * the 1:1 in place.
+ *
+ * Inputs:
+ *   r9 : paddr(start)
+ *   r10: phys offset
+ *
+ * Clobbers r0 - r6
+ *
+ * Register usage within this function:
+ *   r6 : Identity map in place
+ */
 create_page_tables:
-        /*
-         * Rebuild the boot pagetable's first-level entries. The structure
-         * is described in mm.c.
-         *
-         * After the CPU enables paging it will add the fixmap mapping
-         * to these page tables, however this may clash with the 1:1
-         * mapping. So each CPU must rebuild the page tables here with
-         * the 1:1 in place.
-         */
-
         /*
          * If Xen is loaded at exactly XEN_VIRT_START then we don't
          * need an additional 1:1 mapping, the virtual mapping will
