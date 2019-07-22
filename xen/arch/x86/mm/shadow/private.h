@@ -709,11 +709,26 @@ struct sh_emulate_ctxt {
 #endif
 };
 
+#ifdef CONFIG_HVM
 const struct x86_emulate_ops *shadow_init_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
     unsigned int pte_size);
 void shadow_continue_emulation(
     struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs);
+#else
+static inline const struct x86_emulate_ops *shadow_init_emulation(
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
+    unsigned int pte_size)
+{
+    BUG();
+    return NULL;
+}
+static inline void shadow_continue_emulation(
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs)
+{
+    BUG();
+}
+#endif
 
 /* Stop counting towards early unshadows, as we've seen a real page fault */
 static inline void sh_reset_early_unshadow(struct vcpu *v)

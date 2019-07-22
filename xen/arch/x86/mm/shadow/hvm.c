@@ -54,7 +54,7 @@ static void sh_emulate_unmap_dest(struct vcpu *v, void *addr,
  * Callers which pass a known in-range x86_segment can rely on the return
  * pointer being valid.  Other callers must explicitly check for errors.
  */
-struct segment_register *hvm_get_seg_reg(
+static struct segment_register *hvm_get_seg_reg(
     enum x86_segment seg, struct sh_emulate_ctxt *sh_ctxt)
 {
     unsigned int idx = seg;
@@ -69,7 +69,7 @@ struct segment_register *hvm_get_seg_reg(
     return seg_reg;
 }
 
-int hvm_translate_virtual_addr(
+static int hvm_translate_virtual_addr(
     enum x86_segment seg,
     unsigned long offset,
     unsigned int bytes,
@@ -292,12 +292,88 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
     return rc;
 }
 
-const struct x86_emulate_ops hvm_shadow_emulator_ops = {
+static const struct x86_emulate_ops hvm_shadow_emulator_ops = {
     .read       = hvm_emulate_read,
     .insn_fetch = hvm_emulate_insn_fetch,
     .write      = hvm_emulate_write,
     .cmpxchg    = hvm_emulate_cmpxchg,
 };
+
+const struct x86_emulate_ops *shadow_init_emulation(
+    struct sh_emulate_ctxt *sh_ctxt, struct cpu_user_regs *regs,
+    unsigned int pte_size)
+{
+    struct segment_register *creg, *sreg;
+    const struct vcpu *curr = current;
+    unsigned long addr;
+
+    ASSERT(is_hvm_vcpu(curr));
+
+    memset(sh_ctxt, 0, sizeof(*sh_ctxt));
+
+    sh_ctxt->ctxt.regs = regs;
+    sh_ctxt->ctxt.cpuid = curr->domain->arch.cpuid;
+    sh_ctxt->ctxt.lma = hvm_long_mode_active(curr);
+
+    /* Segment cache initialisation. Primed with CS. */
+    creg = hvm_get_seg_reg(x86_seg_cs, sh_ctxt);
+
+    /* Work out the emulation mode. */
+    if ( sh_ctxt->ctxt.lma && creg->l )
+        sh_ctxt->ctxt.addr_size = sh_ctxt->ctxt.sp_size = 64;
+    else
+    {
+        sreg = hvm_get_seg_reg(x86_seg_ss, sh_ctxt);
+        sh_ctxt->ctxt.addr_size = creg->db ? 32 : 16;
+        sh_ctxt->ctxt.sp_size   = sreg->db ? 32 : 16;
+    }
+
+    sh_ctxt->pte_size = pte_size;
+
+    /* Attempt to prefetch whole instruction. */
+    sh_ctxt->insn_buf_eip = regs->rip;
+    sh_ctxt->insn_buf_bytes =
+        (!hvm_translate_virtual_addr(
+            x86_seg_cs, regs->rip, sizeof(sh_ctxt->insn_buf),
+            hvm_access_insn_fetch, sh_ctxt, &addr) &&
+         !hvm_copy_from_guest_linear(
+             sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf),
+             PFEC_insn_fetch, NULL))
+        ? sizeof(sh_ctxt->insn_buf) : 0;
+
+    return &hvm_shadow_emulator_ops;
+}
+
+/*
+ * Update an initialized emulation context to prepare for the next
+ * instruction.
+ */
+void shadow_continue_emulation(struct sh_emulate_ctxt *sh_ctxt,
+                               struct cpu_user_regs *regs)
+{
+    unsigned long addr, diff;
+
+    ASSERT(is_hvm_vcpu(current));
+
+    /*
+     * We don't refetch the segment bases, because we don't emulate
+     * writes to segment registers
+     */
+    diff = regs->rip - sh_ctxt->insn_buf_eip;
+    if ( diff > sh_ctxt->insn_buf_bytes )
+    {
+        /* Prefetch more bytes. */
+        sh_ctxt->insn_buf_bytes =
+            (!hvm_translate_virtual_addr(
+                x86_seg_cs, regs->rip, sizeof(sh_ctxt->insn_buf),
+                hvm_access_insn_fetch, sh_ctxt, &addr) &&
+             !hvm_copy_from_guest_linear(
+                 sh_ctxt->insn_buf, addr, sizeof(sh_ctxt->insn_buf),
+                 PFEC_insn_fetch, NULL))
+            ? sizeof(sh_ctxt->insn_buf) : 0;
+        sh_ctxt->insn_buf_eip = regs->rip;
+    }
+}
 
 /**************************************************************************/
 /* Handling guest writes to pagetables. */
