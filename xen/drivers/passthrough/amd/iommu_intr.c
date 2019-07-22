@@ -22,6 +22,7 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/io_apic.h>
 #include <xen/keyhandler.h>
+#include <xen/softirq.h>
 
 #define INTREMAP_TABLE_ORDER    1
 #define INTREMAP_LENGTH 0xB
@@ -697,6 +698,8 @@ static int dump_intremap_mapping(u16 seg, struct ivrs_mappings *ivrs_mapping)
     spin_lock_irqsave(&(ivrs_mapping->intremap_lock), flags);
     dump_intremap_table(ivrs_mapping->intremap_table);
     spin_unlock_irqrestore(&(ivrs_mapping->intremap_lock), flags);
+
+    process_pending_softirqs();
 
     return 0;
 }
