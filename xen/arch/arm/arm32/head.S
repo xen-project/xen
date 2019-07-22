@@ -159,6 +159,10 @@ past_zImage:
         mov   pc, r0
 primary_switched:
         bl    setup_fixmap
+#ifdef CONFIG_EARLY_PRINTK
+        /* Use a virtual address to access the UART. */
+        mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
+#endif
         b     launch
 ENDPROC(start)
 
@@ -201,8 +205,6 @@ GLOBAL(init_secondary)
         ldr   r0, =secondary_switched
         mov   pc, r0
 secondary_switched:
-        bl    setup_fixmap
-
         /*
          * Non-boot CPUs need to move on to the proper pagetables, which were
          * setup in init_secondary_pagetables.
@@ -221,6 +223,10 @@ secondary_switched:
         dsb                          /* Ensure completion of TLB+BP flush */
         isb
 
+#ifdef CONFIG_EARLY_PRINTK
+        /* Use a virtual address to access the UART. */
+        mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
+#endif
         b     launch
 ENDPROC(init_secondary)
 
@@ -475,13 +481,6 @@ setup_fixmap:
          */
         dsb
 #if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
-        /*
-         * Non-boot CPUs don't need to rebuild the fixmap itself, just
-         * the mapping from boot_second to xen_fixmap
-         */
-        teq   r12, #0
-        bne   1f
-
         /* Add UART to the fixmap table */
         ldr   r1, =xen_fixmap        /* r1 := vaddr (xen_fixmap) */
         lsr   r2, r11, #THIRD_SHIFT
@@ -502,9 +501,6 @@ setup_fixmap:
         mov   r4, r4, lsr #(SECOND_SHIFT - 3)   /* r4 := Slot for FIXMAP(0) */
         mov   r3, #0x0
         strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
-
-        /* Use a virtual address to access the UART. */
-        ldr   r11, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
 
         /*
