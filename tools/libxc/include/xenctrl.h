@@ -1906,6 +1906,9 @@ int xc_set_sched_opt_smt(xc_interface *xch, uint32_t value);
 int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value);
 int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value);
 
+int xc_get_cpuidle_max_csubstate(xc_interface *xch, uint32_t *value);
+int xc_set_cpuidle_max_csubstate(xc_interface *xch, uint32_t value);
+
 int xc_enable_turbo(xc_interface *xch, int cpuid);
 int xc_disable_turbo(xc_interface *xch, int cpuid);
 

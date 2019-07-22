@@ -166,9 +166,22 @@ static inline void acpi_set_cstate_limit(unsigned int new_limit)
 	max_cstate = new_limit;
 	return;
 }
+
+static inline unsigned int acpi_get_csubstate_limit(void)
+{
+	return max_csubstate;
+}
+
+static inline void acpi_set_csubstate_limit(unsigned int new_limit)
+{
+	max_csubstate = new_limit;
+}
+
 #else
 static inline unsigned int acpi_get_cstate_limit(void) { return 0; }
 static inline void acpi_set_cstate_limit(unsigned int new_limit) { return; }
+static inline unsigned int acpi_get_csubstate_limit(void) { return 0; }
+static inline void acpi_set_csubstate_limit(unsigned int new_limit) { return; }
 #endif
 
 #ifdef XEN_GUEST_HANDLE_PARAM

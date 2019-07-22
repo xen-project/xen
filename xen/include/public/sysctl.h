@@ -350,7 +350,11 @@ struct xen_sysctl_pm_op {
     /* set/reset scheduler power saving option */
     #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
 
-    /* cpuidle max_cstate access command */
+    /*
+     * cpuidle max C-state and max C-sub-state access command:
+     * Set cpuid to 0 for max C-state.
+     * Set cpuid to 1 for max C-sub-state.
+     */
     #define XEN_SYSCTL_pm_op_get_max_cstate       0x22
     #define XEN_SYSCTL_pm_op_set_max_cstate       0x23
 

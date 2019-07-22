@@ -367,7 +367,7 @@ int xc_set_sched_opt_smt(xc_interface *xch, uint32_t value)
    return rc;
 }
 
-int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value)
+static int get_max_cstate(xc_interface *xch, uint32_t *value, uint32_t type)
 {
     int rc;
     DECLARE_SYSCTL;
@@ -379,7 +379,7 @@ int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value)
     }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_get_max_cstate;
-    sysctl.u.pm_op.cpuid = 0;
+    sysctl.u.pm_op.cpuid = type;
     sysctl.u.pm_op.u.get_max_cstate = 0;
     rc = do_sysctl(xch, &sysctl);
     *value = sysctl.u.pm_op.u.get_max_cstate;
@@ -387,7 +387,17 @@ int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value)
     return rc;
 }
 
-int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value)
+int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value)
+{
+    return get_max_cstate(xch, value, 0);
+}
+
+int xc_get_cpuidle_max_csubstate(xc_interface *xch, uint32_t *value)
+{
+    return get_max_cstate(xch, value, 1);
+}
+
+static int set_max_cstate(xc_interface *xch, uint32_t value, uint32_t type)
 {
     DECLARE_SYSCTL;
 
@@ -398,10 +408,20 @@ int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value)
     }
     sysctl.cmd = XEN_SYSCTL_pm_op;
     sysctl.u.pm_op.cmd = XEN_SYSCTL_pm_op_set_max_cstate;
-    sysctl.u.pm_op.cpuid = 0;
+    sysctl.u.pm_op.cpuid = type;
     sysctl.u.pm_op.u.set_max_cstate = value;
 
     return do_sysctl(xch, &sysctl);
+}
+
+int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value)
+{
+    return set_max_cstate(xch, value, 0);
+}
+
+int xc_set_cpuidle_max_csubstate(xc_interface *xch, uint32_t value)
+{
+    return set_max_cstate(xch, value, 1);
 }
 
 int xc_enable_turbo(xc_interface *xch, int cpuid)
