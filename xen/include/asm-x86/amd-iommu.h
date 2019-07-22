@@ -127,7 +127,8 @@ extern u8 ivhd_type;
 
 struct ivrs_mappings *get_ivrs_mappings(u16 seg);
 int iterate_ivrs_mappings(int (*)(u16 seg, struct ivrs_mappings *));
-int iterate_ivrs_entries(int (*)(u16 seg, struct ivrs_mappings *));
+int iterate_ivrs_entries(int (*)(const struct amd_iommu *,
+                                 struct ivrs_mappings *));
 
 /* iommu tables in guest space */
 struct mmio_reg {

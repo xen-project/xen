@@ -607,7 +607,7 @@ void amd_iommu_read_msi_from_ire(
 }
 
 int __init amd_iommu_free_intremap_table(
-    u16 seg, struct ivrs_mappings *ivrs_mapping)
+    const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping)
 {
     void *tb = ivrs_mapping->intremap_table;
 
@@ -683,14 +683,15 @@ static void dump_intremap_table(const u32 *table)
     }
 }
 
-static int dump_intremap_mapping(u16 seg, struct ivrs_mappings *ivrs_mapping)
+static int dump_intremap_mapping(const struct amd_iommu *iommu,
+                                 struct ivrs_mappings *ivrs_mapping)
 {
     unsigned long flags;
 
     if ( !ivrs_mapping )
         return 0;
 
-    printk("  %04x:%02x:%02x:%u:\n", seg,
+    printk("  %04x:%02x:%02x:%u:\n", iommu->seg,
            PCI_BUS(ivrs_mapping->dte_requestor_id),
            PCI_SLOT(ivrs_mapping->dte_requestor_id),
            PCI_FUNC(ivrs_mapping->dte_requestor_id));

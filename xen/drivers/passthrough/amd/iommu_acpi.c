@@ -65,7 +65,11 @@ static void __init add_ivrs_mapping_entry(
     /* override flags for range of devices */
     ivrs_mappings[bdf].device_flags = flags;
 
-    if (ivrs_mappings[alias_id].intremap_table == NULL )
+    /* Don't map an IOMMU by itself. */
+    if ( iommu->bdf == bdf )
+        return;
+
+    if ( !ivrs_mappings[alias_id].intremap_table )
     {
          /* allocate per-device interrupt remapping table */
          if ( amd_iommu_perdev_intremap )
@@ -81,8 +85,9 @@ static void __init add_ivrs_mapping_entry(
              ivrs_mappings[alias_id].intremap_inuse = shared_intremap_inuse;
          }
     }
-    /* Assign IOMMU hardware, but don't map an IOMMU by itself. */
-    ivrs_mappings[bdf].iommu = iommu->bdf != bdf ? iommu : NULL;
+
+    /* Assign IOMMU hardware. */
+    ivrs_mappings[bdf].iommu = iommu;
 }
 
 static struct amd_iommu * __init find_iommu_from_bdf_cap(

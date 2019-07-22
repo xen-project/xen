@@ -1122,7 +1122,8 @@ int iterate_ivrs_mappings(int (*handler)(u16 seg, struct ivrs_mappings *))
     return rc;
 }
 
-int iterate_ivrs_entries(int (*handler)(u16 seg, struct ivrs_mappings *))
+int iterate_ivrs_entries(int (*handler)(const struct amd_iommu *,
+                                        struct ivrs_mappings *))
 {
     u16 seg = 0;
     int rc = 0;
@@ -1135,7 +1136,12 @@ int iterate_ivrs_entries(int (*handler)(u16 seg, struct ivrs_mappings *))
             break;
         seg = IVRS_MAPPINGS_SEG(map);
         for ( bdf = 0; !rc && bdf < ivrs_bdf_entries; ++bdf )
-            rc = handler(seg, map + bdf);
+        {
+            const struct amd_iommu *iommu = map[bdf].iommu;
+
+            if ( iommu && map[bdf].dte_requestor_id == bdf )
+                rc = handler(iommu, &map[bdf]);
+        }
     } while ( !rc && ++seg );
 
     return rc;
