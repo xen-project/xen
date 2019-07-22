@@ -32,6 +32,12 @@ struct irq_desc;
 struct arch_irq_desc {
         s16 vector;                  /* vector itself is only 8 bits, */
         s16 old_vector;              /* but we use -1 for unassigned  */
+        /*
+         * Except for high priority interrupts @cpu_mask may have bits set for
+         * offline CPUs.  Consumers need to be careful to mask this down to
+         * online ones as necessary.  There is supposed to always be a non-
+         * empty intersection with cpu_online_map.
+         */
         cpumask_var_t cpu_mask;
         cpumask_var_t old_cpu_mask;
         cpumask_var_t pending_mask;

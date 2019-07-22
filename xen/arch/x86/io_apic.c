@@ -680,7 +680,7 @@ void /*__init*/ setup_ioapic_dest(void)
                 continue;
             irq = pin_2_irq(irq_entry, ioapic, pin);
             desc = irq_to_desc(irq);
-            BUG_ON(cpumask_empty(desc->arch.cpu_mask));
+            BUG_ON(!cpumask_intersects(desc->arch.cpu_mask, &cpu_online_map));
             set_ioapic_affinity_irq(desc, desc->arch.cpu_mask);
         }
 
@@ -2194,7 +2194,6 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 {
     struct irq_desc *desc = irq_to_desc(irq);
     struct IO_APIC_route_entry entry;
-    cpumask_t mask;
     unsigned long flags;
     int vector;
 
@@ -2229,11 +2228,17 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
         return vector;
     entry.vector = vector;
 
-    cpumask_copy(&mask, TARGET_CPUS);
-    /* Don't chance ending up with an empty mask. */
-    if (cpumask_intersects(&mask, desc->arch.cpu_mask))
-        cpumask_and(&mask, &mask, desc->arch.cpu_mask);
-    SET_DEST(entry, logical, cpu_mask_to_apicid(&mask));
+    if (cpumask_intersects(desc->arch.cpu_mask, TARGET_CPUS)) {
+        cpumask_t *mask = this_cpu(scratch_cpumask);
+
+        cpumask_and(mask, desc->arch.cpu_mask, TARGET_CPUS);
+        SET_DEST(entry, logical, cpu_mask_to_apicid(mask));
+    } else {
+        printk(XENLOG_ERR "IRQ%d: no target CPU (%*pb vs %*pb)\n",
+               irq, nr_cpu_ids, cpumask_bits(desc->arch.cpu_mask),
+               nr_cpu_ids, cpumask_bits(TARGET_CPUS));
+        desc->status |= IRQ_DISABLED;
+    }
 
     apic_printk(APIC_DEBUG, KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry "
 		"(%d-%d -> %#x -> IRQ %d Mode:%i Active:%i)\n", ioapic,
@@ -2419,7 +2424,21 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     /* Set the vector field to the real vector! */
     rte.vector = desc->arch.vector;
 
-    SET_DEST(rte, logical, cpu_mask_to_apicid(desc->arch.cpu_mask));
+    if ( cpumask_intersects(desc->arch.cpu_mask, TARGET_CPUS) )
+    {
+        cpumask_t *mask = this_cpu(scratch_cpumask);
+
+        cpumask_and(mask, desc->arch.cpu_mask, TARGET_CPUS);
+        SET_DEST(rte, logical, cpu_mask_to_apicid(mask));
+    }
+    else
+    {
+        gprintk(XENLOG_ERR, "IRQ%d: no target CPU (%*pb vs %*pb)\n",
+               irq, nr_cpu_ids, cpumask_bits(desc->arch.cpu_mask),
+               nr_cpu_ids, cpumask_bits(TARGET_CPUS));
+        desc->status |= IRQ_DISABLED;
+        rte.mask = 1;
+    }
 
     __ioapic_write_entry(apic, pin, 0, rte);
     

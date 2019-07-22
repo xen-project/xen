@@ -478,11 +478,13 @@ static int __assign_irq_vector(
      */
     static int current_vector = FIRST_DYNAMIC_VECTOR, current_offset = 0;
     int cpu, err, old_vector;
-    cpumask_t tmp_mask;
     vmask_t *irq_used_vectors = NULL;
 
     old_vector = irq_to_vector(irq);
-    if (old_vector > 0) {
+    if ( old_vector > 0 )
+    {
+        cpumask_t tmp_mask;
+
         cpumask_and(&tmp_mask, mask, &cpu_online_map);
         if (cpumask_intersects(&tmp_mask, desc->arch.cpu_mask)) {
             desc->arch.vector = old_vector;
@@ -505,7 +507,9 @@ static int __assign_irq_vector(
     else
         irq_used_vectors = irq_get_used_vector_mask(irq);
 
-    for_each_cpu(cpu, mask) {
+    for_each_cpu(cpu, mask)
+    {
+        const cpumask_t *vec_mask;
         int new_cpu;
         int vector, offset;
 
@@ -513,8 +517,7 @@ static int __assign_irq_vector(
         if (!cpu_online(cpu))
             continue;
 
-        cpumask_and(&tmp_mask, vector_allocation_cpumask(cpu),
-                    &cpu_online_map);
+        vec_mask = vector_allocation_cpumask(cpu);
 
         vector = current_vector;
         offset = current_offset;
@@ -535,7 +538,7 @@ next:
             && test_bit(vector, irq_used_vectors) )
             goto next;
 
-        for_each_cpu(new_cpu, &tmp_mask)
+        for_each_cpu(new_cpu, vec_mask)
             if (per_cpu(vector_irq, new_cpu)[vector] >= 0)
                 goto next;
         /* Found one! */
@@ -554,12 +557,12 @@ next:
                 release_old_vec(desc);
         }
 
-        trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, &tmp_mask);
+        trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, vec_mask);
 
-        for_each_cpu(new_cpu, &tmp_mask)
+        for_each_cpu(new_cpu, vec_mask)
             per_cpu(vector_irq, new_cpu)[vector] = irq;
         desc->arch.vector = vector;
-        cpumask_copy(desc->arch.cpu_mask, &tmp_mask);
+        cpumask_copy(desc->arch.cpu_mask, vec_mask);
 
         desc->arch.used = IRQ_USED;
         ASSERT((desc->arch.used_vectors == NULL)
@@ -791,6 +794,7 @@ unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
 
     cpumask_copy(desc->affinity, mask);
     cpumask_and(&dest_mask, mask, desc->arch.cpu_mask);
+    cpumask_and(&dest_mask, &dest_mask, &cpu_online_map);
 
     return cpu_mask_to_apicid(&dest_mask);
 }
