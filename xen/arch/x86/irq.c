@@ -2464,7 +2464,19 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         vector = irq_to_vector(irq);
         if ( vector >= FIRST_HIPRIORITY_VECTOR &&
              vector <= LAST_HIPRIORITY_VECTOR )
+        {
             cpumask_and(desc->arch.cpu_mask, desc->arch.cpu_mask, mask);
+
+            /*
+             * This can in particular happen when parking secondary threads
+             * during boot and when the serial console wants to use a PCI IRQ.
+             */
+            if ( desc->handler == &no_irq_type )
+            {
+                spin_unlock(&desc->lock);
+                continue;
+            }
+        }
 
         if ( desc->arch.move_cleanup_count )
         {
