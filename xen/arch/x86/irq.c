@@ -283,14 +283,13 @@ void destroy_irq(unsigned int irq)
 
 static void _clear_irq_vector(struct irq_desc *desc)
 {
-    unsigned int cpu;
-    int vector, old_vector, irq = desc->irq;
+    unsigned int cpu, old_vector, irq = desc->irq;
+    unsigned int vector = desc->arch.vector;
     cpumask_t tmp_mask;
 
-    BUG_ON(!desc->arch.vector);
+    BUG_ON(!valid_irq_vector(vector));
 
     /* Always clear desc->arch.vector */
-    vector = desc->arch.vector;
     cpumask_and(&tmp_mask, desc->arch.cpu_mask, &cpu_online_map);
 
     for_each_cpu(cpu, &tmp_mask) {
