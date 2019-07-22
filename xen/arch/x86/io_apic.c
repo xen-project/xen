@@ -1039,7 +1039,6 @@ static void __init setup_IO_APIC_irqs(void)
             SET_DEST(entry, logical, cpu_mask_to_apicid(TARGET_CPUS));
             spin_lock_irqsave(&ioapic_lock, flags);
             __ioapic_write_entry(apic, pin, 0, entry);
-            set_native_irq_info(irq, TARGET_CPUS);
             spin_unlock_irqrestore(&ioapic_lock, flags);
         }
     }
@@ -2248,7 +2247,6 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
     spin_lock_irqsave(&ioapic_lock, flags);
     __ioapic_write_entry(ioapic, pin, 0, entry);
-    set_native_irq_info(irq, TARGET_CPUS);
     spin_unlock(&ioapic_lock);
 
     spin_lock(&desc->lock);

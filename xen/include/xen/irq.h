@@ -162,11 +162,6 @@ extern irq_desc_t *domain_spin_lock_irq_desc(
 extern irq_desc_t *pirq_spin_lock_irq_desc(
     const struct pirq *, unsigned long *pflags);
 
-static inline void set_native_irq_info(unsigned int irq, const cpumask_t *mask)
-{
-    cpumask_copy(irq_to_desc(irq)->affinity, mask);
-}
-
 unsigned int set_desc_affinity(struct irq_desc *, const cpumask_t *);
 
 #ifndef arch_hwdom_irqs

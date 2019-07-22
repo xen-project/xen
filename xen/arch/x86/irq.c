@@ -589,11 +589,16 @@ int assign_irq_vector(int irq, const cpumask_t *mask)
 
     spin_lock_irqsave(&vector_lock, flags);
     ret = __assign_irq_vector(irq, desc, mask ?: TARGET_CPUS);
-    if (!ret) {
+    if ( !ret )
+    {
         ret = desc->arch.vector;
-        cpumask_copy(desc->affinity, desc->arch.cpu_mask);
+        if ( mask )
+            cpumask_copy(desc->affinity, mask);
+        else
+            cpumask_setall(desc->affinity);
     }
     spin_unlock_irqrestore(&vector_lock, flags);
+
     return ret;
 }
 
@@ -2345,9 +2350,10 @@ static void dump_irqs(unsigned char key)
 
         spin_lock_irqsave(&desc->lock, flags);
 
-        printk("   IRQ:%4d aff:%*pb vec:%02x %-15s status=%03x ",
-               irq, nr_cpu_ids, cpumask_bits(desc->affinity), desc->arch.vector,
-               desc->handler->typename, desc->status);
+        printk("   IRQ:%4d aff:{%*pbl}/{%*pbl} vec:%02x %-15s status=%03x ",
+               irq, nr_cpu_ids, cpumask_bits(desc->affinity),
+               nr_cpu_ids, cpumask_bits(desc->arch.cpu_mask),
+               desc->arch.vector, desc->handler->typename, desc->status);
 
         if ( ssid )
             printk("Z=%-25s ", ssid);
@@ -2435,8 +2441,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
                 release_old_vec(desc);
         }
 
-        cpumask_copy(&affinity, desc->affinity);
-        if ( !desc->action || cpumask_subset(&affinity, mask) )
+        if ( !desc->action || cpumask_subset(desc->affinity, mask) )
         {
             spin_unlock(&desc->lock);
             continue;
@@ -2469,12 +2474,13 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
             desc->arch.move_in_progress = 0;
         }
 
-        cpumask_and(&affinity, &affinity, mask);
-        if ( cpumask_empty(&affinity) )
+        if ( !cpumask_intersects(mask, desc->affinity) )
         {
             break_affinity = true;
-            cpumask_copy(&affinity, mask);
+            cpumask_setall(&affinity);
         }
+        else
+            cpumask_copy(&affinity, desc->affinity);
 
         if ( desc->handler->disable )
             desc->handler->disable(desc);
