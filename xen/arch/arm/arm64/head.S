@@ -90,8 +90,25 @@
         bl    puts    ;    \
         mov   lr, x3 ;     \
         RODATA_STR(98, _s)
+
+/*
+ * Macro to print the value of register \xb
+ *
+ * Clobbers x0 - x4
+ */
+.macro print_reg xb
+        mov   x0, \xb
+        mov   x4, lr
+        bl    putn
+        mov   lr, x4
+.endm
+
 #else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
+
+.macro print_reg xb
+.endm
+
 #endif /* !CONFIG_EARLY_PRINTK */
 
 /* Load the physical address of a symbol into xb */
@@ -304,22 +321,20 @@ GLOBAL(init_secondary)
 #ifdef CONFIG_EARLY_PRINTK
         ldr   x23, =EARLY_UART_BASE_ADDRESS /* x23 := UART base address */
         PRINT("- CPU ")
-        mov   x0, x24
-        bl    putn
+        print_reg x24
         PRINT(" booting -\r\n")
 #endif
 
 common_start:
 
         PRINT("- Current EL ")
-        mrs   x4, CurrentEL
-        mov   x0, x4
-        bl    putn
+        mrs   x5, CurrentEL
+        print_reg x5
         PRINT(" -\r\n")
 
         /* Are we in EL2 */
-        cmp   x4, #PSR_MODE_EL2t
-        ccmp  x4, #PSR_MODE_EL2h, #0x4, ne
+        cmp   x5, #PSR_MODE_EL2t
+        ccmp  x5, #PSR_MODE_EL2h, #0x4, ne
         b.eq  el2 /* Yes */
 
         /* OK, we're boned. */
