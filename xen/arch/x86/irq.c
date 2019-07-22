@@ -99,6 +99,27 @@ void unlock_vector_lock(void)
     spin_unlock(&vector_lock);
 }
 
+static inline bool valid_irq_vector(unsigned int vector)
+{
+    return vector >= FIRST_DYNAMIC_VECTOR && vector <= LAST_HIPRIORITY_VECTOR;
+}
+
+static void release_old_vec(struct irq_desc *desc)
+{
+    unsigned int vector = desc->arch.old_vector;
+
+    desc->arch.old_vector = IRQ_VECTOR_UNASSIGNED;
+    cpumask_clear(desc->arch.old_cpu_mask);
+
+    if ( !valid_irq_vector(vector) )
+        ASSERT_UNREACHABLE();
+    else if ( desc->arch.used_vectors )
+    {
+        ASSERT(test_bit(vector, desc->arch.used_vectors));
+        clear_bit(vector, desc->arch.used_vectors);
+    }
+}
+
 static void _trace_irq_mask(uint32_t event, int irq, int vector,
                             const cpumask_t *mask)
 {
@@ -295,14 +316,7 @@ static void __clear_irq_vector(int irq)
         per_cpu(vector_irq, cpu)[old_vector] = ~irq;
     }
 
-    desc->arch.old_vector = IRQ_VECTOR_UNASSIGNED;
-    cpumask_clear(desc->arch.old_cpu_mask);
-
-    if ( desc->arch.used_vectors )
-    {
-        ASSERT(test_bit(old_vector, desc->arch.used_vectors));
-        clear_bit(old_vector, desc->arch.used_vectors);
-    }
+    release_old_vec(desc);
 
     desc->arch.move_in_progress = 0;
 }
@@ -527,12 +541,21 @@ next:
         /* Found one! */
         current_vector = vector;
         current_offset = offset;
-        if (old_vector > 0) {
-            desc->arch.move_in_progress = 1;
-            cpumask_copy(desc->arch.old_cpu_mask, desc->arch.cpu_mask);
+
+        if ( old_vector > 0 )
+        {
+            cpumask_and(desc->arch.old_cpu_mask, desc->arch.cpu_mask,
+                        &cpu_online_map);
             desc->arch.old_vector = desc->arch.vector;
+            if ( !cpumask_empty(desc->arch.old_cpu_mask) )
+                desc->arch.move_in_progress = 1;
+            else
+                /* This can happen while offlining a CPU. */
+                release_old_vec(desc);
         }
+
         trace_irq_mask(TRC_HW_IRQ_ASSIGN_VECTOR, irq, vector, &tmp_mask);
+
         for_each_cpu(new_cpu, &tmp_mask)
             per_cpu(vector_irq, new_cpu)[vector] = irq;
         desc->arch.vector = vector;
@@ -702,14 +725,8 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 
         if ( desc->arch.move_cleanup_count == 0 )
         {
-            desc->arch.old_vector = IRQ_VECTOR_UNASSIGNED;
-            cpumask_clear(desc->arch.old_cpu_mask);
-
-            if ( desc->arch.used_vectors )
-            {
-                ASSERT(test_bit(vector, desc->arch.used_vectors));
-                clear_bit(vector, desc->arch.used_vectors);
-            }
+            ASSERT(vector == desc->arch.old_vector);
+            release_old_vec(desc);
         }
 unlock:
         spin_unlock(&desc->lock);
@@ -2409,6 +2426,33 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
             continue;
         }
 
+        /*
+         * In order for the affinity adjustment below to be successful, we
+         * need __assign_irq_vector() to succeed. This in particular means
+         * clearing desc->arch.move_in_progress if this would otherwise
+         * prevent the function from succeeding. Since there's no way for the
+         * flag to get cleared anymore when there's no possible destination
+         * left (the only possibility then would be the IRQs enabled window
+         * after this loop), there's then also no race with us doing it here.
+         *
+         * Therefore the logic here and there need to remain in sync.
+         */
+        if ( desc->arch.move_in_progress &&
+             !cpumask_intersects(mask, desc->arch.cpu_mask) )
+        {
+            unsigned int cpu;
+
+            cpumask_and(&affinity, desc->arch.old_cpu_mask, &cpu_online_map);
+
+            spin_lock(&vector_lock);
+            for_each_cpu(cpu, &affinity)
+                per_cpu(vector_irq, cpu)[desc->arch.old_vector] = ~irq;
+            spin_unlock(&vector_lock);
+
+            release_old_vec(desc);
+            desc->arch.move_in_progress = 0;
+        }
+
         cpumask_and(&affinity, &affinity, mask);
         if ( cpumask_empty(&affinity) )
         {
@@ -2427,15 +2471,18 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         if ( desc->handler->enable )
             desc->handler->enable(desc);
 
+        cpumask_copy(&affinity, desc->affinity);
+
         spin_unlock(&desc->lock);
 
         if ( !verbose )
             continue;
 
-        if ( break_affinity && set_affinity )
-            printk("Broke affinity for irq %i\n", irq);
-        else if ( !set_affinity )
-            printk("Cannot set affinity for irq %i\n", irq);
+        if ( !set_affinity )
+            printk("Cannot set affinity for IRQ%u\n", irq);
+        else if ( break_affinity )
+            printk("Broke affinity for IRQ%u, new: %*pb\n",
+                   irq, nr_cpu_ids, cpumask_bits(&affinity));
     }
 
     /* That doesn't seem sufficient.  Give it 1ms. */
