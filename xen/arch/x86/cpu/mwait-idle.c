@@ -724,11 +724,14 @@ static void mwait_idle(void)
 	u64 before, after;
 	u32 exp = 0, pred = 0, irq_traced[4] = { 0 };
 
-	if (max_cstate > 0 && power && !sched_has_urgent_vcpu() &&
+	if (max_cstate > 0 && power &&
 	    (next_state = cpuidle_current_governor->select(power)) > 0) {
+		unsigned int max_state = sched_has_urgent_vcpu() ? ACPI_STATE_C1
+								 : max_cstate;
+
 		do {
 			cx = &power->states[next_state];
-		} while (cx->type > max_cstate && --next_state);
+		} while (cx->type > max_state && --next_state);
 		if (!next_state)
 			cx = NULL;
 		else if (tb_init_done)

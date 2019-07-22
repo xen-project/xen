@@ -582,12 +582,15 @@ static void acpi_processor_idle(void)
     u32 exp = 0, pred = 0;
     u32 irq_traced[4] = { 0 };
 
-    if ( max_cstate > 0 && power && !sched_has_urgent_vcpu() &&
+    if ( max_cstate > 0 && power &&
          (next_state = cpuidle_current_governor->select(power)) > 0 )
     {
+        unsigned int max_state = sched_has_urgent_vcpu() ? ACPI_STATE_C1
+                                                         : max_cstate;
+
         do {
             cx = &power->states[next_state];
-        } while ( cx->type > max_cstate && --next_state );
+        } while ( cx->type > max_state && --next_state );
         if ( next_state )
         {
             if ( cx->type == ACPI_STATE_C3 && power->flags.bm_check &&
