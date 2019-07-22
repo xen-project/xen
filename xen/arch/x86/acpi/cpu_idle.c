@@ -103,7 +103,7 @@ bool lapic_timer_init(void)
 }
 
 void (*__read_mostly pm_idle_save)(void);
-unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
+unsigned int max_cstate __read_mostly = UINT_MAX;
 integer_param("max_cstate", max_cstate);
 static bool __read_mostly local_apic_timer_c2_ok;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
@@ -344,7 +344,10 @@ static void dump_cx(unsigned char key)
     unsigned int cpu;
 
     printk("'%c' pressed -> printing ACPI Cx structures\n", key);
-    printk("max cstate: C%u\n", max_cstate);
+    if ( max_cstate < UINT_MAX )
+        printk("max state: C%u\n", max_cstate);
+    else
+        printk("max state: unlimited\n");
     for_each_present_cpu ( cpu )
     {
         struct acpi_processor_power *power = processor_powers[cpu];
@@ -582,13 +585,19 @@ static void acpi_processor_idle(void)
     if ( max_cstate > 0 && power && !sched_has_urgent_vcpu() &&
          (next_state = cpuidle_current_governor->select(power)) > 0 )
     {
-        cx = &power->states[next_state];
-        if ( cx->type == ACPI_STATE_C3 && power->flags.bm_check &&
-             acpi_idle_bm_check() )
-            cx = power->safe_state;
-        if ( cx->idx > max_cstate )
-            cx = &power->states[max_cstate];
-        menu_get_trace_data(&exp, &pred);
+        do {
+            cx = &power->states[next_state];
+        } while ( cx->type > max_cstate && --next_state );
+        if ( next_state )
+        {
+            if ( cx->type == ACPI_STATE_C3 && power->flags.bm_check &&
+                 acpi_idle_bm_check() )
+                cx = power->safe_state;
+            if ( tb_init_done )
+                menu_get_trace_data(&exp, &pred);
+        }
+        else
+            cx = NULL;
     }
     if ( !cx )
     {
@@ -1396,12 +1405,12 @@ int pmstat_reset_cx_stat(uint32_t cpuid)
 
 void cpuidle_disable_deep_cstate(void)
 {
-    if ( max_cstate > 1 )
+    if ( max_cstate > ACPI_STATE_C1 )
     {
         if ( local_apic_timer_c2_ok )
-            max_cstate = 2;
+            max_cstate = ACPI_STATE_C2;
         else
-            max_cstate = 1;
+            max_cstate = ACPI_STATE_C1;
     }
 
     hpet_disable_legacy_broadcast();
@@ -1409,7 +1418,8 @@ void cpuidle_disable_deep_cstate(void)
 
 bool cpuidle_using_deep_cstate(void)
 {
-    return xen_cpuidle && max_cstate > (local_apic_timer_c2_ok ? 2 : 1);
+    return xen_cpuidle && max_cstate > (local_apic_timer_c2_ok ? ACPI_STATE_C2
+                                                               : ACPI_STATE_C1);
 }
 
 static int cpu_callback(

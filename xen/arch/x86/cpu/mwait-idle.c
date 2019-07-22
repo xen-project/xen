@@ -731,7 +731,8 @@ static void mwait_idle(void)
 		} while (cx->type > max_cstate && --next_state);
 		if (!next_state)
 			cx = NULL;
-		menu_get_trace_data(&exp, &pred);
+		else if (tb_init_done)
+			menu_get_trace_data(&exp, &pred);
 	}
 	if (!cx) {
 		if (pm_idle_save)

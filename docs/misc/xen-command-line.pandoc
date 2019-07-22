@@ -1376,6 +1376,8 @@ This option is ignored in **pv-shim** mode.
 ### max_cstate (x86)
 > `= <integer>`
 
+Specify the deepest C-state CPUs are permitted to be placed in.
+
 ### max_gsi_irqs (x86)
 > `= <integer>`
 

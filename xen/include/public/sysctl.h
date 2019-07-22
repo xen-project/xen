@@ -370,6 +370,7 @@ struct xen_sysctl_pm_op {
         struct xen_set_cpufreq_para set_para;
         uint64_aligned_t get_avgfreq;
         uint32_t                    set_sched_opt_smt;
+#define XEN_SYSCTL_CX_UNLIMITED 0xffffffff
         uint32_t                    get_max_cstate;
         uint32_t                    set_max_cstate;
     } u;

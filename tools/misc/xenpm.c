@@ -64,7 +64,7 @@ void show_help(void)
             " set-sched-smt           enable|disable enable/disable scheduler smt power saving\n"
             " set-vcpu-migration-delay      <num> set scheduler vcpu migration delay in us\n"
             " get-vcpu-migration-delay            get scheduler vcpu migration delay\n"
-            " set-max-cstate        <num>         set the C-State limitation (<num> >= 0)\n"
+            " set-max-cstate        <num>|'unlimited' set the C-State limitation (<num> >= 0)\n"
             " start [seconds]                     start collect Cx/Px statistics,\n"
             "                                     output after CTRL-C or SIGINT or several seconds.\n"
             " enable-turbo-mode     [cpuid]       enable Turbo Mode for processors that support it.\n"
@@ -194,7 +194,11 @@ static int show_max_cstate(xc_interface *xc_handle)
     if ( (ret = xc_get_cpuidle_max_cstate(xc_handle, &value)) )
         return ret;
 
-    printf("Max possible C-state: C%d\n\n", value);
+    if ( value < XEN_SYSCTL_CX_UNLIMITED )
+        printf("Max possible C-state: C%"PRIu32"\n\n", value);
+    else
+        printf("All C-states allowed\n\n");
+
     return 0;
 }
 
@@ -1117,18 +1121,24 @@ void get_vcpu_migration_delay_func(int argc, char *argv[])
 void set_max_cstate_func(int argc, char *argv[])
 {
     int value;
+    char buf[12];
 
-    if ( argc != 1 || sscanf(argv[0], "%d", &value) != 1 || value < 0 )
+    if ( argc != 1 ||
+         (sscanf(argv[0], "%d", &value) == 1
+          ? value < 0
+          : (value = XEN_SYSCTL_CX_UNLIMITED, strcmp(argv[0], "unlimited"))) )
     {
-        fprintf(stderr, "Missing or invalid argument(s)\n");
+        fprintf(stderr, "Missing, excess, or invalid argument(s)\n");
         exit(EINVAL);
     }
 
+    snprintf(buf, ARRAY_SIZE(buf), "C%d", value);
+
     if ( !xc_set_cpuidle_max_cstate(xc_handle, (uint32_t)value) )
-        printf("set max_cstate to C%d succeeded\n", value);
+        printf("max C-state set to %s\n", value >= 0 ? buf : argv[0]);
     else
-        fprintf(stderr, "set max_cstate to C%d failed (%d - %s)\n",
-                value, errno, strerror(errno));
+        fprintf(stderr, "Failed to set max C-state to %s (%d - %s)\n",
+                value >= 0 ? buf : argv[0], errno, strerror(errno));
 }
 
 void enable_turbo_mode(int argc, char *argv[])

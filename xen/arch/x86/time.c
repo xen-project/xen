@@ -2268,7 +2268,7 @@ static void dump_softtsc(unsigned char key)
     else if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC ) )
     {
         printk("TSC has constant rate, ");
-        if (max_cstate <= 2 && tsc_max_warp == 0)
+        if ( max_cstate <= ACPI_STATE_C2 && tsc_max_warp == 0 )
             printk("no deep Cstates, passed warp test, deemed reliable, ");
         else
             printk("deep Cstates possible, so not reliable, ");

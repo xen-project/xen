@@ -451,6 +451,7 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
 
     case XEN_SYSCTL_pm_op_get_max_cstate:
     {
+        BUILD_BUG_ON(XEN_SYSCTL_CX_UNLIMITED != UINT_MAX);
         op->u.get_max_cstate = acpi_get_cstate_limit();
         break;
     }
