@@ -74,12 +74,14 @@ static void __init add_ivrs_mapping_entry(
          /* allocate per-device interrupt remapping table */
          if ( amd_iommu_perdev_intremap )
              ivrs_mappings[alias_id].intremap_table =
-                amd_iommu_alloc_intremap_table(
-                    &ivrs_mappings[alias_id].intremap_inuse);
+                 amd_iommu_alloc_intremap_table(
+                     iommu,
+                     &ivrs_mappings[alias_id].intremap_inuse);
          else
          {
              if ( shared_intremap_table == NULL  )
                  shared_intremap_table = amd_iommu_alloc_intremap_table(
+                     iommu,
                      &shared_intremap_inuse);
              ivrs_mappings[alias_id].intremap_table = shared_intremap_table;
              ivrs_mappings[alias_id].intremap_inuse = shared_intremap_inuse;

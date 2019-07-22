@@ -97,7 +97,8 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf);
 
 /* interrupt remapping */
 int amd_iommu_setup_ioapic_remapping(void);
-void *amd_iommu_alloc_intremap_table(unsigned long **);
+void *amd_iommu_alloc_intremap_table(
+    const struct amd_iommu *, unsigned long **);
 int amd_iommu_free_intremap_table(
     const struct amd_iommu *, struct ivrs_mappings *);
 void amd_iommu_ioapic_update_ire(

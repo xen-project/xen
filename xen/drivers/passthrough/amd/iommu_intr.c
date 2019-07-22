@@ -622,7 +622,8 @@ int __init amd_iommu_free_intremap_table(
     return 0;
 }
 
-void* __init amd_iommu_alloc_intremap_table(unsigned long **inuse_map)
+void *__init amd_iommu_alloc_intremap_table(
+    const struct amd_iommu *iommu, unsigned long **inuse_map)
 {
     void *tb;
     tb = __alloc_amd_iommu_tables(INTREMAP_TABLE_ORDER);
