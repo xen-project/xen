@@ -69,7 +69,7 @@
  *  x21 - DTB address (boot cpu only)
  *  x22 - is_secondary_cpu
  *  x23 - UART address
- *  x24 - cpuid
+ *  x24 -
  *  x25 - identity map in place
  *  x26 - skip_zero_bss
  *  x27 -
@@ -265,6 +265,12 @@ real_start_efi:
         load_paddr x21, _sdtb
 #endif
 
+        /* Initialize the UART if earlyprintk has been enabled. */
+#ifdef CONFIG_EARLY_PRINTK
+        bl    init_uart
+#endif
+        PRINT("- Boot CPU booting -\r\n")
+
         mov   x22, #0                /* x22 := is_secondary_cpu */
 
         b     common_start
@@ -281,14 +287,11 @@ GLOBAL(init_secondary)
         /* Boot CPU already zero BSS so skip it on secondary CPUs. */
         mov   x26, #1                /* X26 := skip_zero_bss */
 
-common_start:
         mrs   x0, mpidr_el1
         ldr   x13, =(~MPIDR_HWID_MASK)
         bic   x24, x0, x13           /* Mask out flags to get CPU ID */
 
-        /* Non-boot CPUs wait here until __cpu_up is ready for them */
-        cbz   x22, 1f
-
+        /* Wait here until __cpu_up is ready to handle the CPU */
         load_paddr x0, smp_up_cpu
         dsb   sy
 2:      ldr   x1, [x0]
@@ -300,13 +303,13 @@ common_start:
 
 #ifdef CONFIG_EARLY_PRINTK
         ldr   x23, =EARLY_UART_BASE_ADDRESS /* x23 := UART base address */
-        cbnz  x22, 1f
-        bl    init_uart                 /* Boot CPU sets up the UART too */
-1:      PRINT("- CPU ")
+        PRINT("- CPU ")
         mov   x0, x24
         bl    putn
         PRINT(" booting -\r\n")
 #endif
+
+common_start:
 
         PRINT("- Current EL ")
         mrs   x4, CurrentEL
@@ -620,10 +623,16 @@ ENTRY(switch_ttbr)
         ret
 
 #ifdef CONFIG_EARLY_PRINTK
-/* Bring up the UART.
- * x23: Early UART base address
- * Clobbers x0-x1 */
+/*
+ * Initialize the UART. Should only be called on the boot CPU.
+ *
+ * Ouput:
+ *  x23: Early UART base physical address
+ *
+ * Clobbers x0 - x1
+ */
 init_uart:
+        ldr   x23, =EARLY_UART_BASE_ADDRESS
 #ifdef EARLY_PRINTK_INIT_UART
         early_uart_init x23, 0
 #endif
