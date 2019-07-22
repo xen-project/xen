@@ -285,14 +285,15 @@ static void _clear_irq_vector(struct irq_desc *desc)
 {
     unsigned int cpu, old_vector, irq = desc->irq;
     unsigned int vector = desc->arch.vector;
-    cpumask_t tmp_mask;
+    cpumask_t *tmp_mask = this_cpu(scratch_cpumask);
 
     BUG_ON(!valid_irq_vector(vector));
 
     /* Always clear desc->arch.vector */
-    cpumask_and(&tmp_mask, desc->arch.cpu_mask, &cpu_online_map);
+    cpumask_and(tmp_mask, desc->arch.cpu_mask, &cpu_online_map);
 
-    for_each_cpu(cpu, &tmp_mask) {
+    for_each_cpu(cpu, tmp_mask)
+    {
         ASSERT( per_cpu(vector_irq, cpu)[vector] == irq );
         per_cpu(vector_irq, cpu)[vector] = ~irq;
     }
@@ -308,16 +309,17 @@ static void _clear_irq_vector(struct irq_desc *desc)
 
     desc->arch.used = IRQ_UNUSED;
 
-    trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, &tmp_mask);
+    trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, tmp_mask);
 
     if ( likely(!desc->arch.move_in_progress) )
         return;
 
     /* If we were in motion, also clear desc->arch.old_vector */
     old_vector = desc->arch.old_vector;
-    cpumask_and(&tmp_mask, desc->arch.old_cpu_mask, &cpu_online_map);
+    cpumask_and(tmp_mask, desc->arch.old_cpu_mask, &cpu_online_map);
 
-    for_each_cpu(cpu, &tmp_mask) {
+    for_each_cpu(cpu, tmp_mask)
+    {
         ASSERT( per_cpu(vector_irq, cpu)[old_vector] == irq );
         TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
         per_cpu(vector_irq, cpu)[old_vector] = ~irq;
@@ -1161,7 +1163,6 @@ static void irq_guest_eoi_timer_fn(void *data)
     struct irq_desc *desc = data;
     unsigned int i, irq = desc - irq_desc;
     irq_guest_action_t *action;
-    cpumask_t cpu_eoi_map;
 
     spin_lock_irq(&desc->lock);
     
@@ -1198,14 +1199,18 @@ static void irq_guest_eoi_timer_fn(void *data)
 
     switch ( action->ack_type )
     {
+        cpumask_t *cpu_eoi_map;
+
     case ACKTYPE_UNMASK:
         if ( desc->handler->end )
             desc->handler->end(desc, 0);
         break;
+
     case ACKTYPE_EOI:
-        cpumask_copy(&cpu_eoi_map, action->cpu_eoi_map);
+        cpu_eoi_map = this_cpu(scratch_cpumask);
+        cpumask_copy(cpu_eoi_map, action->cpu_eoi_map);
         spin_unlock_irq(&desc->lock);
-        on_selected_cpus(&cpu_eoi_map, set_eoi_ready, desc, 0);
+        on_selected_cpus(cpu_eoi_map, set_eoi_ready, desc, 0);
         return;
     }
 
@@ -2450,7 +2455,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
     {
         bool break_affinity = false, set_affinity = true;
         unsigned int vector;
-        cpumask_t affinity;
+        cpumask_t *affinity = this_cpu(scratch_cpumask);
 
         if ( irq == 2 )
             continue;
@@ -2481,9 +2486,9 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         if ( desc->arch.move_cleanup_count )
         {
             /* The cleanup IPI may have got sent while we were still online. */
-            cpumask_andnot(&affinity, desc->arch.old_cpu_mask,
+            cpumask_andnot(affinity, desc->arch.old_cpu_mask,
                            &cpu_online_map);
-            desc->arch.move_cleanup_count -= cpumask_weight(&affinity);
+            desc->arch.move_cleanup_count -= cpumask_weight(affinity);
             if ( !desc->arch.move_cleanup_count )
                 release_old_vec(desc);
         }
@@ -2510,10 +2515,10 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         {
             unsigned int cpu;
 
-            cpumask_and(&affinity, desc->arch.old_cpu_mask, &cpu_online_map);
+            cpumask_and(affinity, desc->arch.old_cpu_mask, &cpu_online_map);
 
             spin_lock(&vector_lock);
-            for_each_cpu(cpu, &affinity)
+            for_each_cpu(cpu, affinity)
                 per_cpu(vector_irq, cpu)[desc->arch.old_vector] = ~irq;
             spin_unlock(&vector_lock);
 
@@ -2524,23 +2529,23 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         if ( !cpumask_intersects(mask, desc->affinity) )
         {
             break_affinity = true;
-            cpumask_setall(&affinity);
+            cpumask_setall(affinity);
         }
         else
-            cpumask_copy(&affinity, desc->affinity);
+            cpumask_copy(affinity, desc->affinity);
 
         if ( desc->handler->disable )
             desc->handler->disable(desc);
 
         if ( desc->handler->set_affinity )
-            desc->handler->set_affinity(desc, &affinity);
+            desc->handler->set_affinity(desc, affinity);
         else if ( !(warned++) )
             set_affinity = false;
 
         if ( desc->handler->enable )
             desc->handler->enable(desc);
 
-        cpumask_copy(&affinity, desc->affinity);
+        cpumask_copy(affinity, desc->affinity);
 
         spin_unlock(&desc->lock);
 
@@ -2551,7 +2556,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
             printk("Cannot set affinity for IRQ%u\n", irq);
         else if ( break_affinity )
             printk("Broke affinity for IRQ%u, new: %*pb\n",
-                   irq, nr_cpu_ids, cpumask_bits(&affinity));
+                   irq, nr_cpu_ids, cpumask_bits(affinity));
     }
 
     /* That doesn't seem sufficient.  Give it 1ms. */
