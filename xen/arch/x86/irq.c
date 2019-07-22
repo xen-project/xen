@@ -1695,9 +1695,27 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
 
         desc->status |= IRQ_GUEST;
 
-        /* Attempt to bind the interrupt target to the correct CPU. */
-        if ( !opt_noirqbalance && (desc->handler->set_affinity != NULL) )
-            desc->handler->set_affinity(desc, cpumask_of(v->processor));
+        /*
+         * Attempt to bind the interrupt target to the correct (or at least
+         * some online) CPU.
+         */
+        if ( desc->handler->set_affinity )
+        {
+            const cpumask_t *affinity = NULL;
+
+            if ( !opt_noirqbalance )
+                affinity = cpumask_of(v->processor);
+            else if ( !cpumask_intersects(desc->affinity, &cpu_online_map) )
+            {
+                cpumask_setall(desc->affinity);
+                affinity = &cpumask_all;
+            }
+            else if ( !cpumask_intersects(desc->arch.cpu_mask,
+                                          &cpu_online_map) )
+                affinity = desc->affinity;
+            if ( affinity )
+                desc->handler->set_affinity(desc, affinity);
+        }
 
         desc->status &= ~IRQ_DISABLED;
         desc->handler->startup(desc);
