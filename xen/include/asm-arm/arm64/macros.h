@@ -21,5 +21,10 @@
     ldr     \dst, [\dst, \tmp]
     .endm
 
+/*
+ * Register aliases.
+ */
+lr      .req    x30             /* link register */
+
 #endif /* __ASM_ARM_ARM64_MACROS_H */
 

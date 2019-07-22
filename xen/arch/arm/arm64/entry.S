@@ -7,11 +7,6 @@
 #include <public/xen.h>
 
 /*
- * Register aliases.
- */
-lr      .req    x30             /* link register */
-
-/*
  * Stack pushing/popping (register pairs only). Equivalent to store decrement
  * before, load increment after.
  */
