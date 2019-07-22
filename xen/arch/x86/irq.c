@@ -658,9 +658,6 @@ void move_masked_irq(struct irq_desc *desc)
     
     desc->status &= ~IRQ_MOVE_PENDING;
 
-    if (unlikely(cpumask_empty(pending_mask)))
-        return;
-
     if (!desc->handler->set_affinity)
         return;
 
