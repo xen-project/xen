@@ -163,6 +163,11 @@ primary_switched:
         /* Use a virtual address to access the UART. */
         mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
 #endif
+        PRINT("- Ready -\r\n")
+        /* Setup the arguments for start_xen and jump to C world */
+        mov   r0, r10                /* r0 := Physical offset */
+        mov   r1, r8                 /* r1 := paddr(FDT) */
+        ldr   r2, =start_xen
         b     launch
 ENDPROC(start)
 
@@ -227,6 +232,9 @@ secondary_switched:
         /* Use a virtual address to access the UART. */
         mov_w r11, EARLY_UART_VIRTUAL_ADDRESS
 #endif
+        PRINT("- Ready -\r\n")
+        /* Jump to C world */
+        ldr   r2, =start_secondary
         b     launch
 ENDPROC(init_secondary)
 
@@ -517,19 +525,25 @@ setup_fixmap:
         mov   pc, lr
 ENDPROC(setup_fixmap)
 
+/*
+ * Setup the initial stack and jump to the C world
+ *
+ * Inputs:
+ *   r0 : Argument 0 of the C function to call
+ *   r1 : Argument 1 of the C function to call
+ *   r2 : C entry point
+ *
+ * Clobbers r3
+ */
 launch:
-        PRINT("- Ready -\r\n")
-
-        ldr   r0, =init_data
-        add   r0, #INITINFO_stack    /* Find the boot-time stack */
-        ldr   sp, [r0]
+        ldr   r3, =init_data
+        add   r3, #INITINFO_stack    /* Find the boot-time stack */
+        ldr   sp, [r3]
         add   sp, #STACK_SIZE        /* (which grows down from the top). */
         sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
-        teq   r12, #0
-        moveq r0, r10                /* Marshal args: - phys_offset */
-        moveq r1, r8                 /*               - DTB address */
-        beq   start_xen              /* and disappear into the land of C */
-        b     start_secondary        /* (to the appropriate entry point) */
+
+        /* Jump to C world */
+       bx    r2
 ENDPROC(launch)
 
 /* Fail-stop */
