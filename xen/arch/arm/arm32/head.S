@@ -32,6 +32,10 @@
 #define PT_UPPER(x) (PT_##x & 0xf00)
 #define PT_LOWER(x) (PT_##x & 0x0ff)
 
+/* Convenience defines to get slot used by Xen mapping. */
+#define XEN_FIRST_SLOT      first_table_offset(XEN_VIRT_START)
+#define XEN_SECOND_SLOT     second_table_offset(XEN_VIRT_START)
+
 #if (defined (CONFIG_EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
 #include EARLY_PRINTK_INC
 #endif
@@ -157,6 +161,13 @@ past_zImage:
         ldr   r0, =primary_switched
         mov   pc, r0
 primary_switched:
+        /*
+         * The 1:1 map may clash with other parts of the Xen virtual memory
+         * layout. As it is not used anymore, remove it completely to
+         * avoid having to worry about replacing existing mapping
+         * afterwards.
+         */
+        bl    remove_identity_mapping
         bl    setup_fixmap
 #ifdef CONFIG_EARLY_PRINTK
         /* Use a virtual address to access the UART. */
@@ -481,12 +492,61 @@ enable_mmu:
         mov   pc, lr
 ENDPROC(enable_mmu)
 
-setup_fixmap:
+/*
+ * Remove the 1:1 map from the page-tables. It is not easy to keep track
+ * where the 1:1 map was mapped, so we will look for the top-level entry
+ * exclusive to the 1:1 map and remove it.
+ *
+ * Inputs:
+ *   r9 : paddr(start)
+ *
+ * Clobbers r0 - r3
+ */
+remove_identity_mapping:
+        /* r2:r3 := invalid page-table entry */
+        mov   r2, #0x0
+        mov   r3, #0x0
         /*
-         * Now we can install the fixmap and dtb mappings, since we
-         * don't need the 1:1 map any more
+         * Find the first slot used. Remove the entry for the first
+         * table if the slot is not XEN_FIRST_SLOT.
          */
-        dsb
+        lsr   r1, r9, #FIRST_SHIFT
+        mov_w r0, LPAE_ENTRY_MASK
+        and   r1, r1, r0              /* r1 := first slot */
+        cmp   r1, #XEN_FIRST_SLOT
+        beq   1f
+        /* It is not in slot 0, remove the entry */
+        ldr   r0, =boot_pgtable      /* r0 := root table */
+        lsl   r1, r1, #3             /* r1 := Slot offset */
+        strd  r2, r3, [r0, r1]
+        b     identity_mapping_removed
+
+1:
+        /*
+         * Find the second slot used. Remove the entry for the first
+         * table if the slot is not XEN_SECOND_SLOT.
+         */
+        lsr   r1, r9, #SECOND_SHIFT
+        mov_w r0, LPAE_ENTRY_MASK
+        and   r1, r1, r0             /* r1 := second slot */
+        cmp   r1, #XEN_SECOND_SLOT
+        beq   identity_mapping_removed
+        /* It is not in slot 1, remove the entry */
+        ldr   r0, =boot_second       /* r0 := second table */
+        lsl   r1, r1, #3             /* r1 := Slot offset */
+        strd  r2, r3, [r0, r1]
+
+identity_mapping_removed:
+        /* See asm-arm/arm32/flushtlb.h for the explanation of the sequence. */
+        dsb   nshst
+        mcr   CP32(r0, TLBIALLH)
+        dsb   nsh
+        isb
+
+        mov   pc, lr
+ENDPROC(remove_identity_mapping)
+
+setup_fixmap:
 #if defined(CONFIG_EARLY_PRINTK) /* Fixmap is only used by early printk */
         /* Add UART to the fixmap table */
         ldr   r1, =xen_fixmap        /* r1 := vaddr (xen_fixmap) */
@@ -496,7 +556,6 @@ setup_fixmap:
         orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
         mov   r3, #0x0
         strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
-1:
 
         /* Map fixmap into boot_second */
         ldr   r1, =boot_second       /* r1 := vaddr (boot_second) */
@@ -508,19 +567,10 @@ setup_fixmap:
         mov   r4, r4, lsr #(SECOND_SHIFT - 3)   /* r4 := Slot for FIXMAP(0) */
         mov   r3, #0x0
         strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
+
+        /* Ensure any page table updates made above have occurred. */
+        dsb   nshst
 #endif
-
-        /*
-         * Flush the TLB in case the 1:1 mapping happens to clash with
-         * the virtual addresses used by the fixmap or DTB.
-         */
-        dsb                          /* Ensure any page table updates made above
-                                      * have occurred. */
-
-        isb
-        mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
-        dsb                          /* Ensure completion of TLB flush */
-        isb
         mov   pc, lr
 ENDPROC(setup_fixmap)
 
