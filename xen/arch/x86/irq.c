@@ -27,7 +27,6 @@
 #include <public/physdev.h>
 
 static int parse_irq_vector_map_param(const char *s);
-static void _clear_irq_vector(struct irq_desc *desc);
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 bool __read_mostly opt_noirqbalance;
@@ -191,6 +190,67 @@ int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
     return ret;
 }
 
+static void _clear_irq_vector(struct irq_desc *desc)
+{
+    unsigned int cpu, old_vector, irq = desc->irq;
+    unsigned int vector = desc->arch.vector;
+    cpumask_t *tmp_mask = this_cpu(scratch_cpumask);
+
+    BUG_ON(!valid_irq_vector(vector));
+
+    /* Always clear desc->arch.vector */
+    cpumask_and(tmp_mask, desc->arch.cpu_mask, &cpu_online_map);
+
+    for_each_cpu(cpu, tmp_mask)
+    {
+        ASSERT(per_cpu(vector_irq, cpu)[vector] == irq);
+        per_cpu(vector_irq, cpu)[vector] = ~irq;
+    }
+
+    desc->arch.vector = IRQ_VECTOR_UNASSIGNED;
+    cpumask_clear(desc->arch.cpu_mask);
+
+    if ( desc->arch.used_vectors )
+    {
+        ASSERT(test_bit(vector, desc->arch.used_vectors));
+        clear_bit(vector, desc->arch.used_vectors);
+    }
+
+    desc->arch.used = IRQ_UNUSED;
+
+    trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, tmp_mask);
+
+    if ( likely(!desc->arch.move_in_progress) )
+        return;
+
+    /* If we were in motion, also clear desc->arch.old_vector */
+    old_vector = desc->arch.old_vector;
+    cpumask_and(tmp_mask, desc->arch.old_cpu_mask, &cpu_online_map);
+
+    for_each_cpu(cpu, tmp_mask)
+    {
+        ASSERT(per_cpu(vector_irq, cpu)[old_vector] == irq);
+        TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
+        per_cpu(vector_irq, cpu)[old_vector] = ~irq;
+    }
+
+    release_old_vec(desc);
+
+    desc->arch.move_in_progress = 0;
+}
+
+void __init clear_irq_vector(int irq)
+{
+    struct irq_desc *desc = irq_to_desc(irq);
+    unsigned long flags;
+
+    spin_lock_irqsave(&desc->lock, flags);
+    spin_lock(&vector_lock);
+    _clear_irq_vector(desc);
+    spin_unlock(&vector_lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
+}
+
 /*
  * Dynamic irq allocate and deallocation for MSI
  */
@@ -279,67 +339,6 @@ void destroy_irq(unsigned int irq)
     spin_unlock_irqrestore(&desc->lock, flags);
 
     xfree(action);
-}
-
-static void _clear_irq_vector(struct irq_desc *desc)
-{
-    unsigned int cpu, old_vector, irq = desc->irq;
-    unsigned int vector = desc->arch.vector;
-    cpumask_t *tmp_mask = this_cpu(scratch_cpumask);
-
-    BUG_ON(!valid_irq_vector(vector));
-
-    /* Always clear desc->arch.vector */
-    cpumask_and(tmp_mask, desc->arch.cpu_mask, &cpu_online_map);
-
-    for_each_cpu(cpu, tmp_mask)
-    {
-        ASSERT( per_cpu(vector_irq, cpu)[vector] == irq );
-        per_cpu(vector_irq, cpu)[vector] = ~irq;
-    }
-
-    desc->arch.vector = IRQ_VECTOR_UNASSIGNED;
-    cpumask_clear(desc->arch.cpu_mask);
-
-    if ( desc->arch.used_vectors )
-    {
-        ASSERT(test_bit(vector, desc->arch.used_vectors));
-        clear_bit(vector, desc->arch.used_vectors);
-    }
-
-    desc->arch.used = IRQ_UNUSED;
-
-    trace_irq_mask(TRC_HW_IRQ_CLEAR_VECTOR, irq, vector, tmp_mask);
-
-    if ( likely(!desc->arch.move_in_progress) )
-        return;
-
-    /* If we were in motion, also clear desc->arch.old_vector */
-    old_vector = desc->arch.old_vector;
-    cpumask_and(tmp_mask, desc->arch.old_cpu_mask, &cpu_online_map);
-
-    for_each_cpu(cpu, tmp_mask)
-    {
-        ASSERT( per_cpu(vector_irq, cpu)[old_vector] == irq );
-        TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
-        per_cpu(vector_irq, cpu)[old_vector] = ~irq;
-    }
-
-    release_old_vec(desc);
-
-    desc->arch.move_in_progress = 0;
-}
-
-void clear_irq_vector(int irq)
-{
-    struct irq_desc *desc = irq_to_desc(irq);
-    unsigned long flags;
-
-    spin_lock_irqsave(&desc->lock, flags);
-    spin_lock(&vector_lock);
-    _clear_irq_vector(desc);
-    spin_unlock(&vector_lock);
-    spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 int irq_to_vector(int irq)
