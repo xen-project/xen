@@ -610,6 +610,8 @@ int __init amd_iommu_free_intremap_table(
 {
     void *tb = ivrs_mapping->intremap_table;
 
+    XFREE(ivrs_mapping->intremap_inuse);
+
     if ( tb )
     {
         __free_amd_iommu_tables(tb, INTREMAP_TABLE_ORDER);
