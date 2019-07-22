@@ -78,12 +78,17 @@
  *  x30 - lr
  */
 
-/* Macro to print a string to the UART, if there is one.
- * Clobbers x0-x3. */
 #ifdef CONFIG_EARLY_PRINTK
-#define PRINT(_s)           \
-        adr   x0, 98f ;     \
-        bl    puts    ;     \
+/*
+ * Macro to print a string to the UART, if there is one.
+ *
+ * Clobbers x0 - x3
+ */
+#define PRINT(_s)          \
+        mov   x3, lr ;     \
+        adr   x0, 98f ;    \
+        bl    puts    ;    \
+        mov   lr, x3 ;     \
         RODATA_STR(98, _s)
 #else /* CONFIG_EARLY_PRINTK */
 #define PRINT(s)
@@ -622,9 +627,8 @@ init_uart:
 #ifdef EARLY_PRINTK_INIT_UART
         early_uart_init x23, 0
 #endif
-        adr   x0, 1f
-        b     puts
-RODATA_STR(1, "- UART enabled -\r\n")
+        PRINT("- UART enabled -\r\n")
+        ret
 
 /* Print early debug messages.
  * x0: Nul-terminated string to print.
