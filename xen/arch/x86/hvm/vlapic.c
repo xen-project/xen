@@ -23,6 +23,7 @@
 #include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <xen/event.h>
+#include <xen/nospec.h>
 #include <xen/trace.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
@@ -64,12 +65,6 @@ static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
      /* LVTERR */
      LVT_MASK
 };
-
-#define vlapic_lvt_vector(vlapic, lvt_type)                     \
-    (vlapic_get_reg(vlapic, lvt_type) & APIC_VECTOR_MASK)
-
-#define vlapic_lvt_dm(vlapic, lvt_type)                         \
-    (vlapic_get_reg(vlapic, lvt_type) & APIC_MODE_MASK)
 
 #define vlapic_lvtt_period(vlapic)                              \
     ((vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_MASK) \
@@ -676,7 +671,7 @@ int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val)
     };
     const struct vlapic *vlapic = vcpu_vlapic(v);
     uint64_t high = 0;
-    uint32_t reg = msr - MSR_X2APIC_FIRST, offset = reg << 4;
+    uint32_t reg = msr - MSR_X2APIC_FIRST, offset;
 
     /*
      * The read side looks as if it might be safe to use outside of current
@@ -686,9 +681,14 @@ int guest_rdmsr_x2apic(const struct vcpu *v, uint32_t msr, uint64_t *val)
     ASSERT(v == current);
 
     if ( !vlapic_x2apic_mode(vlapic) ||
-         (reg >= sizeof(readable) * 8) || !test_bit(reg, readable) )
+         (reg >= sizeof(readable) * 8) )
         return X86EMUL_EXCEPTION;
 
+    reg = array_index_nospec(reg, sizeof(readable) * 8);
+    if ( !test_bit(reg, readable) )
+        return X86EMUL_EXCEPTION;
+
+    offset = reg << 4;
     if ( offset == APIC_ICR )
         high = (uint64_t)vlapic_read_aligned(vlapic, APIC_ICR2) << 32;
 
@@ -867,7 +867,7 @@ void vlapic_reg_write(struct vcpu *v, unsigned int reg, uint32_t val)
     case APIC_LVTERR:       /* LVT Error Reg */
         if ( vlapic_sw_disabled(vlapic) )
             val |= APIC_LVT_MASKED;
-        val &= vlapic_lvt_mask[(reg - APIC_LVTT) >> 4];
+        val &= array_access_nospec(vlapic_lvt_mask, (reg - APIC_LVTT) >> 4);
         vlapic_set_reg(vlapic, reg, val);
         if ( reg == APIC_LVT0 )
         {
@@ -957,7 +957,7 @@ static int vlapic_mmio_write(struct vcpu *v, unsigned long address,
 int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
-    uint32_t val = vlapic_get_reg(vlapic, offset);
+    uint32_t val = vlapic_get_reg(vlapic, offset & ~0xf);
 
     if ( vlapic_x2apic_mode(vlapic) )
     {
@@ -1053,7 +1053,7 @@ int guest_wrmsr_x2apic(struct vcpu *v, uint32_t msr, uint64_t msr_content)
         }
     }
 
-    vlapic_reg_write(v, offset, msr_content);
+    vlapic_reg_write(v, array_index_nospec(offset, PAGE_SIZE), msr_content);
 
     return X86EMUL_OKAY;
 }
