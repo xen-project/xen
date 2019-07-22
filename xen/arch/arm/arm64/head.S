@@ -638,6 +638,7 @@ puts:
         b     puts
 1:
         ret
+ENDPROC(puts)
 
 /* Print a 32-bit number in hex.  Specific to the PL011 UART.
  * x0: Number to print.
@@ -656,6 +657,7 @@ putn:
         subs  x3, x3, #1
         b.ne  1b
         ret
+ENDPROC(putn)
 
 hex:    .ascii "0123456789abcdef"
         .align 2
