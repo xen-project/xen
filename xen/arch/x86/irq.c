@@ -675,6 +675,9 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
     ack_APIC_irq();
 
     me = smp_processor_id();
+    if ( !cpu_online(me) )
+        return;
+
     for ( vector = FIRST_DYNAMIC_VECTOR;
           vector <= LAST_HIPRIORITY_VECTOR; vector++)
     {
@@ -735,11 +738,14 @@ unlock:
 
 static void send_cleanup_vector(struct irq_desc *desc)
 {
-    cpumask_t cleanup_mask;
+    cpumask_and(desc->arch.old_cpu_mask, desc->arch.old_cpu_mask,
+                &cpu_online_map);
+    desc->arch.move_cleanup_count = cpumask_weight(desc->arch.old_cpu_mask);
 
-    cpumask_and(&cleanup_mask, desc->arch.old_cpu_mask, &cpu_online_map);
-    desc->arch.move_cleanup_count = cpumask_weight(&cleanup_mask);
-    send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+    if ( desc->arch.move_cleanup_count )
+        send_IPI_mask(desc->arch.old_cpu_mask, IRQ_MOVE_CLEANUP_VECTOR);
+    else
+        release_old_vec(desc);
 
     desc->arch.move_in_progress = 0;
 }
@@ -2418,6 +2424,16 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
         if ( vector >= FIRST_HIPRIORITY_VECTOR &&
              vector <= LAST_HIPRIORITY_VECTOR )
             cpumask_and(desc->arch.cpu_mask, desc->arch.cpu_mask, mask);
+
+        if ( desc->arch.move_cleanup_count )
+        {
+            /* The cleanup IPI may have got sent while we were still online. */
+            cpumask_andnot(&affinity, desc->arch.old_cpu_mask,
+                           &cpu_online_map);
+            desc->arch.move_cleanup_count -= cpumask_weight(&affinity);
+            if ( !desc->arch.move_cleanup_count )
+                release_old_vec(desc);
+        }
 
         cpumask_copy(&affinity, desc->affinity);
         if ( !desc->action || cpumask_subset(&affinity, mask) )
