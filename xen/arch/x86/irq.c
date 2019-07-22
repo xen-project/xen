@@ -27,6 +27,7 @@
 #include <public/physdev.h>
 
 static int parse_irq_vector_map_param(const char *s);
+static void _clear_irq_vector(struct irq_desc *desc);
 
 /* opt_noirqbalance: If true, software IRQ balancing/affinity is disabled. */
 bool __read_mostly opt_noirqbalance;
@@ -143,13 +144,12 @@ static void trace_irq_mask(uint32_t event, int irq, int vector,
         _trace_irq_mask(event, irq, vector, mask);
 }
 
-static int __init __bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
+static int __init _bind_irq_vector(struct irq_desc *desc, int vector,
+                                   const cpumask_t *cpu_mask)
 {
     cpumask_t online_mask;
     int cpu;
-    struct irq_desc *desc = irq_to_desc(irq);
 
-    BUG_ON((unsigned)irq >= nr_irqs);
     BUG_ON((unsigned)vector >= NR_VECTORS);
 
     cpumask_and(&online_mask, cpu_mask, &cpu_online_map);
@@ -160,9 +160,9 @@ static int __init __bind_irq_vector(int irq, int vector, const cpumask_t *cpu_ma
         return 0;
     if ( desc->arch.vector != IRQ_VECTOR_UNASSIGNED )
         return -EBUSY;
-    trace_irq_mask(TRC_HW_IRQ_BIND_VECTOR, irq, vector, &online_mask);
+    trace_irq_mask(TRC_HW_IRQ_BIND_VECTOR, desc->irq, vector, &online_mask);
     for_each_cpu(cpu, &online_mask)
-        per_cpu(vector_irq, cpu)[vector] = irq;
+        per_cpu(vector_irq, cpu)[vector] = desc->irq;
     desc->arch.vector = vector;
     cpumask_copy(desc->arch.cpu_mask, &online_mask);
     if ( desc->arch.used_vectors )
@@ -176,12 +176,18 @@ static int __init __bind_irq_vector(int irq, int vector, const cpumask_t *cpu_ma
 
 int __init bind_irq_vector(int irq, int vector, const cpumask_t *cpu_mask)
 {
+    struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;
     int ret;
 
-    spin_lock_irqsave(&vector_lock, flags);
-    ret = __bind_irq_vector(irq, vector, cpu_mask);
-    spin_unlock_irqrestore(&vector_lock, flags);
+    BUG_ON((unsigned)irq >= nr_irqs);
+
+    spin_lock_irqsave(&desc->lock, flags);
+    spin_lock(&vector_lock);
+    ret = _bind_irq_vector(desc, vector, cpu_mask);
+    spin_unlock(&vector_lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
+
     return ret;
 }
 
@@ -266,18 +272,20 @@ void destroy_irq(unsigned int irq)
 
     spin_lock_irqsave(&desc->lock, flags);
     desc->handler = &no_irq_type;
-    clear_irq_vector(irq);
+    spin_lock(&vector_lock);
+    _clear_irq_vector(desc);
+    spin_unlock(&vector_lock);
     desc->arch.used_vectors = NULL;
     spin_unlock_irqrestore(&desc->lock, flags);
 
     xfree(action);
 }
 
-static void __clear_irq_vector(int irq)
+static void _clear_irq_vector(struct irq_desc *desc)
 {
-    int cpu, vector, old_vector;
+    unsigned int cpu;
+    int vector, old_vector, irq = desc->irq;
     cpumask_t tmp_mask;
-    struct irq_desc *desc = irq_to_desc(irq);
 
     BUG_ON(!desc->arch.vector);
 
@@ -323,11 +331,14 @@ static void __clear_irq_vector(int irq)
 
 void clear_irq_vector(int irq)
 {
+    struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;
 
-    spin_lock_irqsave(&vector_lock, flags);
-    __clear_irq_vector(irq);
-    spin_unlock_irqrestore(&vector_lock, flags);
+    spin_lock_irqsave(&desc->lock, flags);
+    spin_lock(&vector_lock);
+    _clear_irq_vector(desc);
+    spin_unlock(&vector_lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 int irq_to_vector(int irq)
@@ -462,8 +473,7 @@ static vmask_t *irq_get_used_vector_mask(int irq)
     return ret;
 }
 
-static int __assign_irq_vector(
-    int irq, struct irq_desc *desc, const cpumask_t *mask)
+static int _assign_irq_vector(struct irq_desc *desc, const cpumask_t *mask)
 {
     /*
      * NOTE! The local APIC isn't very good at handling
@@ -477,7 +487,8 @@ static int __assign_irq_vector(
      * 0x80, because int 0x80 is hm, kind of importantish. ;)
      */
     static int current_vector = FIRST_DYNAMIC_VECTOR, current_offset = 0;
-    int cpu, err, old_vector;
+    unsigned int cpu;
+    int err, old_vector, irq = desc->irq;
     vmask_t *irq_used_vectors = NULL;
 
     old_vector = irq_to_vector(irq);
@@ -590,8 +601,12 @@ int assign_irq_vector(int irq, const cpumask_t *mask)
     
     BUG_ON(irq >= nr_irqs || irq <0);
 
-    spin_lock_irqsave(&vector_lock, flags);
-    ret = __assign_irq_vector(irq, desc, mask ?: TARGET_CPUS);
+    spin_lock_irqsave(&desc->lock, flags);
+
+    spin_lock(&vector_lock);
+    ret = _assign_irq_vector(desc, mask ?: TARGET_CPUS);
+    spin_unlock(&vector_lock);
+
     if ( !ret )
     {
         ret = desc->arch.vector;
@@ -600,14 +615,16 @@ int assign_irq_vector(int irq, const cpumask_t *mask)
         else
             cpumask_setall(desc->affinity);
     }
-    spin_unlock_irqrestore(&vector_lock, flags);
+
+    spin_unlock_irqrestore(&desc->lock, flags);
 
     return ret;
 }
 
 /*
  * Initialize vector_irq on a new cpu. This function must be called
- * with vector_lock held.
+ * with vector_lock held.  For this reason it may not itself acquire
+ * the IRQ descriptor locks, as lock nesting is the other way around.
  */
 void setup_vector_irq(unsigned int cpu)
 {
@@ -775,7 +792,6 @@ void irq_complete_move(struct irq_desc *desc)
 
 unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
-    unsigned int irq;
     int ret;
     unsigned long flags;
     cpumask_t dest_mask;
@@ -783,10 +799,8 @@ unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
     if (!cpumask_intersects(mask, &cpu_online_map))
         return BAD_APICID;
 
-    irq = desc->irq;
-
     spin_lock_irqsave(&vector_lock, flags);
-    ret = __assign_irq_vector(irq, desc, mask);
+    ret = _assign_irq_vector(desc, mask);
     spin_unlock_irqrestore(&vector_lock, flags);
 
     if (ret < 0)
@@ -2453,7 +2467,7 @@ void fixup_irqs(const cpumask_t *mask, bool verbose)
 
         /*
          * In order for the affinity adjustment below to be successful, we
-         * need __assign_irq_vector() to succeed. This in particular means
+         * need _assign_irq_vector() to succeed. This in particular means
          * clearing desc->arch.move_in_progress if this would otherwise
          * prevent the function from succeeding. Since there's no way for the
          * flag to get cleared anymore when there's no possible destination

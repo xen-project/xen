@@ -550,14 +550,14 @@ static void clear_IO_APIC (void)
 static void
 set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
 {
-    unsigned long flags;
     unsigned int dest;
     int pin, irq;
     struct irq_pin_list *entry;
 
     irq = desc->irq;
 
-    spin_lock_irqsave(&ioapic_lock, flags);
+    spin_lock(&ioapic_lock);
+
     dest = set_desc_affinity(desc, mask);
     if (dest != BAD_APICID) {
         if ( !x2apic_enabled )
@@ -580,8 +580,8 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
             entry = irq_2_pin + entry->next;
         }
     }
-    spin_unlock_irqrestore(&ioapic_lock, flags);
 
+    spin_unlock(&ioapic_lock);
 }
 
 /*
@@ -674,16 +674,19 @@ void /*__init*/ setup_ioapic_dest(void)
     for (ioapic = 0; ioapic < nr_ioapics; ioapic++) {
         for (pin = 0; pin < nr_ioapic_entries[ioapic]; pin++) {
             struct irq_desc *desc;
+            unsigned long flags;
 
             irq_entry = find_irq_entry(ioapic, pin, mp_INT);
             if (irq_entry == -1)
                 continue;
             irq = pin_2_irq(irq_entry, ioapic, pin);
             desc = irq_to_desc(irq);
+
+            spin_lock_irqsave(&desc->lock, flags);
             BUG_ON(!cpumask_intersects(desc->arch.cpu_mask, &cpu_online_map));
             set_ioapic_affinity_irq(desc, desc->arch.cpu_mask);
+            spin_unlock_irqrestore(&desc->lock, flags);
         }
-
     }
 }
 
