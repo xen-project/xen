@@ -110,6 +110,13 @@ boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
 struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
 
+/*
+ * This field starts out as zero, and can be set to -1 just to signal it has
+ * been set (and that vendor specific logic has failed, and shouldn't be
+ * tried again), or to +1 to ignore Dom0 side uploads of C-state ACPI data.
+ */
+static int8_t __read_mostly vendor_override;
+
 struct hw_residencies
 {
     uint64_t mc0;
@@ -1214,6 +1221,9 @@ long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
     if ( pm_idle_save && pm_idle != acpi_processor_idle )
         return 0;
 
+    if ( vendor_override > 0 )
+        return 0;
+
     print_cx_pminfo(acpi_id, power);
 
     cpu_id = get_cpu_id(acpi_id);
@@ -1284,6 +1294,102 @@ long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
     }
  
     return 0;
+}
+
+static void amd_cpuidle_init(struct acpi_processor_power *power)
+{
+    unsigned int i, nr = 0;
+    const struct cpuinfo_x86 *c = &current_cpu_data;
+    const unsigned int ecx_req = CPUID5_ECX_EXTENSIONS_SUPPORTED |
+                                 CPUID5_ECX_INTERRUPT_BREAK;
+    const struct acpi_processor_cx *cx = NULL;
+    static const struct acpi_processor_cx fam17[] = {
+        {
+            .type = ACPI_STATE_C1,
+            .entry_method = ACPI_CSTATE_EM_FFH,
+            .latency = 1,
+        },
+        {
+            .type = ACPI_STATE_C2,
+            .entry_method = ACPI_CSTATE_EM_HALT,
+            .latency = 400,
+        },
+    };
+
+    if ( pm_idle_save && pm_idle != acpi_processor_idle )
+        return;
+
+    if ( vendor_override < 0 )
+        return;
+
+    switch ( c->x86 )
+    {
+    case 0x18:
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_HYGON )
+        {
+    default:
+            vendor_override = -1;
+            return;
+        }
+        /* fall through */
+    case 0x17:
+        if ( cpu_has_monitor && c->cpuid_level >= CPUID_MWAIT_LEAF &&
+             (cpuid_ecx(CPUID_MWAIT_LEAF) & ecx_req) == ecx_req )
+        {
+            cx = fam17;
+            nr = ARRAY_SIZE(fam17);
+            local_apic_timer_c2_ok = true;
+            break;
+        }
+        /* fall through */
+    case 0x15:
+    case 0x16:
+        cx = &fam17[1];
+        nr = ARRAY_SIZE(fam17) - 1;
+        break;
+    }
+
+    power->flags.has_cst = true;
+
+    for ( i = 0; i < nr; ++i )
+    {
+        if ( cx[i].type > max_cstate )
+            break;
+        power->states[i + 1] = cx[i];
+        power->states[i + 1].idx = i + 1;
+        power->states[i + 1].target_residency = cx[i].latency * latency_factor;
+    }
+
+    if ( i )
+    {
+        power->count = i + 1;
+        power->safe_state = &power->states[i];
+
+        if ( !vendor_override )
+        {
+            if ( !boot_cpu_has(X86_FEATURE_ARAT) )
+                hpet_broadcast_init();
+
+            if ( !lapic_timer_init() )
+            {
+                vendor_override = -1;
+                cpuidle_init_cpu(power->cpu);
+                return;
+            }
+
+            if ( !pm_idle_save )
+            {
+                pm_idle_save = pm_idle;
+                pm_idle = acpi_processor_idle;
+            }
+
+            dead_idle = acpi_dead_idle;
+
+            vendor_override = 1;
+        }
+    }
+    else
+        vendor_override = -1;
 }
 
 uint32_t pmstat_get_cx_nr(uint32_t cpuid)
@@ -1432,8 +1538,8 @@ static int cpu_callback(
     int rc = 0;
 
     /*
-     * Only hook on CPU_UP_PREPARE because a dead cpu may utilize the info
-     * to enter deep C-state.
+     * Only hook on CPU_UP_PREPARE / CPU_ONLINE because a dead cpu may utilize
+     * the info to enter deep C-state.
      */
     switch ( action )
     {
@@ -1441,6 +1547,13 @@ static int cpu_callback(
         rc = cpuidle_init_cpu(cpu);
         if ( !rc && cpuidle_current_governor->enable )
             rc = cpuidle_current_governor->enable(processor_powers[cpu]);
+        break;
+
+    case CPU_ONLINE:
+        if ( (boot_cpu_data.x86_vendor &
+              (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
+             processor_powers[cpu] )
+            amd_cpuidle_init(processor_powers[cpu]);
         break;
     }
 
