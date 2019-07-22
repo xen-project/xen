@@ -104,7 +104,17 @@ bool lapic_timer_init(void)
 
 void (*__read_mostly pm_idle_save)(void);
 unsigned int max_cstate __read_mostly = UINT_MAX;
-integer_param("max_cstate", max_cstate);
+unsigned int max_csubstate __read_mostly = UINT_MAX;
+
+static int __init parse_cstate(const char *s)
+{
+    max_cstate = simple_strtoul(s, &s, 0);
+    if ( *s == ',' )
+        max_csubstate = simple_strtoul(s + 1, NULL, 0);
+    return 0;
+}
+custom_param("max_cstate", parse_cstate);
+
 static bool __read_mostly local_apic_timer_c2_ok;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
@@ -352,7 +362,13 @@ static void dump_cx(unsigned char key)
 
     printk("'%c' pressed -> printing ACPI Cx structures\n", key);
     if ( max_cstate < UINT_MAX )
+    {
         printk("max state: C%u\n", max_cstate);
+        if ( max_csubstate < UINT_MAX )
+            printk("max sub-state: %u\n", max_csubstate);
+        else
+            printk("max sub-state: unlimited\n");
+    }
     else
         printk("max state: unlimited\n");
     for_each_present_cpu ( cpu )
@@ -597,7 +613,12 @@ static void acpi_processor_idle(void)
 
         do {
             cx = &power->states[next_state];
-        } while ( cx->type > max_state && --next_state );
+        } while ( (cx->type > max_state ||
+                   cx->entry_method == ACPI_CSTATE_EM_NONE ||
+                   (cx->entry_method == ACPI_CSTATE_EM_FFH &&
+                    cx->type == max_cstate &&
+                    (cx->address & MWAIT_SUBSTATE_MASK) > max_csubstate)) &&
+                  --next_state );
         if ( next_state )
         {
             if ( cx->type == ACPI_STATE_C3 && power->flags.bm_check &&

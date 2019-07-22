@@ -141,13 +141,21 @@ void acpi_unregister_gsi (u32 gsi);
 
 #ifdef	CONFIG_ACPI_CSTATE
 /*
- * Set highest legal C-state
- * 0: C0 okay, but not C1
- * 1: C1 okay, but not C2
- * 2: C2 okay, but not C3 etc.
+ * max_cstate sets the highest legal C-state.
+ * max_cstate = 0: C0 okay, but not C1
+ * max_cstate = 1: C1 okay, but not C2
+ * max_cstate = 2: C2 okay, but not C3 etc.
+
+ * max_csubstate sets the highest legal C-state sub-state. Only applies to the
+ * highest legal C-state.
+ * max_cstate = 1, max_csubstate = 0 ==> C0, C1 okay, but not C1E
+ * max_cstate = 1, max_csubstate = 1 ==> C0, C1 and C1E okay, but not C2
+ * max_cstate = 2, max_csubstate = 0 ==> C0, C1, C1E, C2 okay, but not C3
+ * max_cstate = 2, max_csubstate = 1 ==> C0, C1, C1E, C2 okay, but not C3
  */
 
 extern unsigned int max_cstate;
+extern unsigned int max_csubstate;
 
 static inline unsigned int acpi_get_cstate_limit(void)
 {

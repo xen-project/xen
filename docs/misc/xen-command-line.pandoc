@@ -1374,9 +1374,11 @@ Specify the maximum number of CPUs that should be brought up.
 This option is ignored in **pv-shim** mode.
 
 ### max_cstate (x86)
-> `= <integer>`
+> `= <integer>[,<integer>]`
 
-Specify the deepest C-state CPUs are permitted to be placed in.
+Specify the deepest C-state CPUs are permitted to be placed in, and
+optionally the maximum sub C-state to be used used.  The latter only applies
+to the highest permitted C-state.
 
 ### max_gsi_irqs (x86)
 > `= <integer>`

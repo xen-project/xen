@@ -731,7 +731,9 @@ static void mwait_idle(void)
 
 		do {
 			cx = &power->states[next_state];
-		} while (cx->type > max_state && --next_state);
+		} while ((cx->type > max_state || (cx->type == max_cstate &&
+			  MWAIT_HINT2SUBSTATE(cx->address) > max_csubstate)) &&
+			 --next_state);
 		if (!next_state)
 			cx = NULL;
 		else if (tb_init_done)
