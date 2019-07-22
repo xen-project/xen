@@ -342,7 +342,7 @@ void clear_irq_vector(int irq)
 
 int irq_to_vector(int irq)
 {
-    int vector = -1;
+    int vector = IRQ_VECTOR_UNASSIGNED;
 
     BUG_ON(irq >= nr_irqs || irq < 0);
 
@@ -452,15 +452,18 @@ static vmask_t *irq_get_used_vector_mask(int irq)
             int vector;
             
             vector = irq_to_vector(irq);
-            if ( vector > 0 )
+            if ( valid_irq_vector(vector) )
             {
-                printk(XENLOG_INFO "IRQ %d already assigned vector %d\n",
+                printk(XENLOG_INFO "IRQ%d already assigned vector %02x\n",
                        irq, vector);
                 
                 ASSERT(!test_bit(vector, ret));
 
                 set_bit(vector, ret);
             }
+            else if ( vector != IRQ_VECTOR_UNASSIGNED )
+                printk(XENLOG_WARNING "IRQ%d mapped to bogus vector %02x\n",
+                       irq, vector);
         }
     }
     else if ( IO_APIC_IRQ(irq) &&
@@ -491,7 +494,7 @@ static int _assign_irq_vector(struct irq_desc *desc, const cpumask_t *mask)
     vmask_t *irq_used_vectors = NULL;
 
     old_vector = irq_to_vector(irq);
-    if ( old_vector > 0 )
+    if ( valid_irq_vector(old_vector) )
     {
         cpumask_t tmp_mask;
 
@@ -555,7 +558,7 @@ next:
         current_vector = vector;
         current_offset = offset;
 
-        if ( old_vector > 0 )
+        if ( valid_irq_vector(old_vector) )
         {
             cpumask_and(desc->arch.old_cpu_mask, desc->arch.cpu_mask,
                         &cpu_online_map);
