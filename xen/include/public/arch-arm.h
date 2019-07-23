@@ -291,7 +291,7 @@ struct vcpu_guest_context {
 
     struct vcpu_guest_core_regs user_regs;  /* Core CPU registers */
 
-    uint32_t sctlr;
+    uint64_t sctlr;
     uint64_t ttbcr, ttbr0, ttbr1;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
@@ -374,7 +374,7 @@ typedef uint64_t xen_callback_t;
 #define PSR_GUEST32_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC)
 #define PSR_GUEST64_INIT (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_EL1h)
 
-#define SCTLR_GUEST_INIT    0x00c50078
+#define SCTLR_GUEST_INIT    xen_mk_ullong(0x00c50078)
 
 /*
  * Virtual machine platform (memory layout, interrupts)
