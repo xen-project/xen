@@ -708,6 +708,8 @@ void restore_vcpu_affinity(struct domain *d)
          * set v->processor of each of their vCPUs to something that will
          * make sense for the scheduler of the cpupool in which they are in.
          */
+        lock = vcpu_schedule_lock_irq(v);
+
         cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
                     cpupool_domain_cpumask(d));
         if ( cpumask_empty(cpumask_scratch_cpu(cpu)) )
@@ -731,6 +733,9 @@ void restore_vcpu_affinity(struct domain *d)
 
         v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
 
+        spin_unlock_irq(lock);
+
+        /* v->processor might have changed, so reacquire the lock. */
         lock = vcpu_schedule_lock_irq(v);
         v->processor = sched_pick_cpu(vcpu_scheduler(v), v);
         spin_unlock_irq(lock);
