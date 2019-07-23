@@ -1593,30 +1593,6 @@ static void pci_serr_softirq(void)
     outb(inb(0x61) & 0x0b, 0x61); /* re-enable the PCI SERR error line. */
 }
 
-void async_exception_cleanup(struct vcpu *curr)
-{
-    int trap;
-
-    if ( !curr->async_exception_mask )
-        return;
-
-    if ( !(curr->async_exception_mask & (curr->async_exception_mask - 1)) )
-        trap = __scanbit(curr->async_exception_mask, VCPU_TRAP_NONE);
-    else
-        for ( trap = VCPU_TRAP_NONE + 1; trap <= VCPU_TRAP_LAST; ++trap )
-            if ( (curr->async_exception_mask ^
-                  curr->async_exception_state(trap).old_mask) == (1 << trap) )
-                break;
-    if ( unlikely(trap > VCPU_TRAP_LAST) )
-    {
-        ASSERT_UNREACHABLE();
-        return;
-    }
-
-    /* Restore previous asynchronous exception mask. */
-    curr->async_exception_mask = curr->async_exception_state(trap).old_mask;
-}
-
 static void nmi_hwdom_report(unsigned int reason_idx)
 {
     struct domain *d = hardware_domain;

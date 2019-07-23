@@ -19,8 +19,6 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
-void async_exception_cleanup(struct vcpu *);
-
 const char *trapstr(unsigned int trapnr);
 
 #endif /* ASM_TRAP_H */
