@@ -589,7 +589,7 @@ static bool guest_walk_ld(const struct vcpu *v,
 bool guest_walk_tables(const struct vcpu *v, vaddr_t gva,
                        paddr_t *ipa, unsigned int *perms)
 {
-    uint32_t sctlr = READ_SYSREG(SCTLR_EL1);
+    register_t sctlr = READ_SYSREG(SCTLR_EL1);
     register_t tcr = READ_SYSREG(TCR_EL1);
     unsigned int _perms;
 

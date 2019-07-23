@@ -598,6 +598,8 @@ static void print_ctx_32(vcpu_guest_context_t *ctx)
 
     printf("r12_fiq: %08"PRIx32"\n", regs->r12_fiq);
     printf("\n");
+    /* SCTLR is always 32-bit */
+    printf("SCTLR: %08"PRIx32"\n", (uint32_t)ctx->sctlr);
 }
 
 #ifdef __aarch64__
@@ -659,6 +661,7 @@ static void print_ctx_64(vcpu_guest_context_t *ctx)
     printf("x28: %016"PRIx64"\t", regs->x28);
     printf("x29: %016"PRIx64"\n", regs->x29);
     printf("\n");
+    printf("SCTLR_EL1: %016"PRIx64"\n", ctx->sctlr);
 }
 #endif /* __aarch64__ */
 
@@ -675,7 +678,6 @@ static void print_ctx(vcpu_guest_context_any_t *ctx_any)
     print_ctx_32(ctx);
 #endif
 
-    printf("SCTLR: %08"PRIx32"\n", ctx->sctlr);
     printf("TTBCR: %016"PRIx64"\n", ctx->ttbcr);
     printf("TTBR0: %016"PRIx64"\n", ctx->ttbr0);
     printf("TTBR1: %016"PRIx64"\n", ctx->ttbr1);
