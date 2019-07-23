@@ -5950,7 +5950,7 @@ const struct platform_bad_page *__init get_platform_badpages(unsigned int *array
     }
 
     *array_size = ARRAY_SIZE(snb_bad_pages);
-    igd_id = pci_conf_read32(0, 0, 2, 0, 0);
+    igd_id = pci_conf_read32(PCI_SBDF(0, 0, 2, 0), 0);
     if ( IS_SNB_GFX(igd_id) )
         return snb_bad_pages;
 

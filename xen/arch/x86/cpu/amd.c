@@ -417,7 +417,8 @@ static void disable_c1_ramping(void)
 	int node, nr_nodes;
 
 	/* Read the number of nodes from the first Northbridge. */
-	nr_nodes = ((pci_conf_read32(0, 0, 0x18, 0x0, 0x60)>>4)&0x07)+1;
+	nr_nodes = ((pci_conf_read32(PCI_SBDF(0, 0, 0x18, 0), 0x60) >> 4) &
+		    0x07) + 1;
 	for (node = 0; node < nr_nodes; node++) {
 		/* PMM7: bus=0, dev=0x18+node, function=0x3, register=0x87. */
 		pmm7 = pci_conf_read8(PCI_SBDF(0, 0, 0x18 + node, 3), 0x87);
@@ -703,8 +704,8 @@ static void init_amd(struct cpuinfo_x86 *c)
 
 	if (c->x86 == 0x16 && c->x86_model <= 0xf) {
 		if (c == &boot_cpu_data) {
-			l = pci_conf_read32(0, 0, 0x18, 0x3, 0x58);
-			h = pci_conf_read32(0, 0, 0x18, 0x3, 0x5c);
+			l = pci_conf_read32(PCI_SBDF(0, 0, 0x18, 3), 0x58);
+			h = pci_conf_read32(PCI_SBDF(0, 0, 0x18, 3), 0x5c);
 			if ((l & 0x1f) | (h & 0x1))
 				printk(KERN_WARNING
 				       "Applying workaround for erratum 792: %s%s%s\n",

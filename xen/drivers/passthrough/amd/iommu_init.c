@@ -845,7 +845,7 @@ static void amd_iommu_erratum_746_workaround(struct amd_iommu *iommu)
         return;
 
     pci_conf_write32(iommu->seg, bus, dev, func, 0xf0, 0x90);
-    value = pci_conf_read32(iommu->seg, bus, dev, func, 0xf4);
+    value = pci_conf_read32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf4);
 
     if ( value & (1 << 2) )
         return;
@@ -1233,7 +1233,7 @@ static bool_t __init amd_sp5100_erratum28(void)
 
     for (bus = 0; bus < 256; bus++)
     {
-        id = pci_conf_read32(0, bus, 0x14, 0, PCI_VENDOR_ID);
+        id = pci_conf_read32(PCI_SBDF(0, bus, 0x14, 0), PCI_VENDOR_ID);
 
         vendor_id = id & 0xffff;
         dev_id = (id >> 16) & 0xffff;

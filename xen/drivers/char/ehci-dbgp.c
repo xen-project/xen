@@ -682,7 +682,8 @@ static int dbgp_control_msg(struct ehci_dbgp *dbgp, unsigned int devnum,
 
 static unsigned int __init __find_dbgp(u8 bus, u8 slot, u8 func)
 {
-    u32 class = pci_conf_read32(0, bus, slot, func, PCI_CLASS_REVISION);
+    uint32_t class = pci_conf_read32(PCI_SBDF(0, bus, slot, func),
+                                     PCI_CLASS_REVISION);
 
     if ( (class >> 8) != PCI_CLASS_SERIAL_USB_EHCI )
         return 0;
@@ -1006,7 +1007,8 @@ static set_debug_port_t __read_mostly set_debug_port = default_set_debug_port;
 
 static void nvidia_set_debug_port(struct ehci_dbgp *dbgp, unsigned int port)
 {
-    u32 dword = pci_conf_read32(0, dbgp->bus, dbgp->slot, dbgp->func, 0x74);
+    uint32_t dword = pci_conf_read32(PCI_SBDF(0, dbgp->bus, dbgp->slot,
+                                              dbgp->func), 0x74);
 
     dword &= ~(0x0f << 12);
     dword |= (port & 0x0f) << 12;
@@ -1039,7 +1041,8 @@ static void ehci_dbgp_bios_handoff(struct ehci_dbgp *dbgp, u32 hcc_params)
     if ( !offset )
         return;
 
-    cap = pci_conf_read32(0, dbgp->bus, dbgp->slot, dbgp->func, offset);
+    cap = pci_conf_read32(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
+                          offset);
     dbgp_printk("dbgp: EHCI BIOS state %08x\n", cap);
 
     if ( (cap & 0xff) == 1 && (cap & EHCI_USBLEGSUP_BIOS) )
@@ -1054,7 +1057,8 @@ static void ehci_dbgp_bios_handoff(struct ehci_dbgp *dbgp, u32 hcc_params)
     {
         mdelay(10);
         msec -= 10;
-        cap = pci_conf_read32(0, dbgp->bus, dbgp->slot, dbgp->func, offset);
+        cap = pci_conf_read32(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
+                              offset);
     }
 
     if ( cap & EHCI_USBLEGSUP_BIOS )
@@ -1307,7 +1311,7 @@ static void __init ehci_dbgp_init_preirq(struct serial_port *port)
     u32 debug_port, offset;
     void __iomem *ehci_bar;
 
-    debug_port = pci_conf_read32(0, dbgp->bus, dbgp->slot, dbgp->func,
+    debug_port = pci_conf_read32(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
                                  dbgp->cap);
     offset = (debug_port >> 16) & 0xfff;
 
@@ -1504,7 +1508,7 @@ void __init ehci_dbgp_init(void)
     else
         return;
 
-    debug_port = pci_conf_read32(0, dbgp->bus, dbgp->slot, dbgp->func,
+    debug_port = pci_conf_read32(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
                                  dbgp->cap);
     dbgp->bar = (debug_port >> 29) & 0x7;
     dbgp->bar = ((dbgp->bar - 1) * 4) + PCI_BASE_ADDRESS_0;
@@ -1516,8 +1520,8 @@ void __init ehci_dbgp_init(void)
         return;
     }
 
-    dbgp->bar_val = bar_val = pci_conf_read32(0, dbgp->bus, dbgp->slot,
-                                              dbgp->func, dbgp->bar);
+    dbgp->bar_val = bar_val = pci_conf_read32(PCI_SBDF(0, dbgp->bus, dbgp->slot,
+                                                       dbgp->func), dbgp->bar);
     dbgp_printk("bar_val: %08x\n", bar_val);
     if ( bar_val & ~PCI_BASE_ADDRESS_MEM_MASK )
     {

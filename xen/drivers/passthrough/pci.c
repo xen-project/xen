@@ -632,8 +632,7 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
                               uint64_t *paddr, uint64_t *psize,
                               unsigned int flags)
 {
-    uint32_t hi = 0, bar = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev,
-                                           sbdf.fn, pos);
+    uint32_t hi = 0, bar = pci_conf_read32(sbdf, pos);
     uint64_t size;
     bool is64bits = !(flags & PCI_BAR_ROM) &&
         (bar & PCI_BASE_ADDRESS_MEM_TYPE_MASK) == PCI_BASE_ADDRESS_MEM_TYPE_64;
@@ -655,15 +654,13 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
             *psize = 0;
             return 1;
         }
-        hi = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, pos + 4);
+        hi = pci_conf_read32(sbdf, pos + 4);
         pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, pos + 4, ~0);
     }
-    size = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
-                           pos) & mask;
+    size = pci_conf_read32(sbdf, pos) & mask;
     if ( is64bits )
     {
-        size |= (uint64_t)pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev,
-                                          sbdf.fn, pos + 4) << 32;
+        size |= (uint64_t)pci_conf_read32(sbdf, pos + 4) << 32;
         pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, pos + 4, hi);
     }
     else if ( size )
@@ -750,7 +747,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
             for ( i = 0; i < PCI_SRIOV_NUM_BARS; )
             {
                 unsigned int idx = pos + PCI_SRIOV_BAR + i * 4;
-                u32 bar = pci_conf_read32(seg, bus, slot, func, idx);
+                uint32_t bar = pci_conf_read32(pdev->sbdf, idx);
                 pci_sbdf_t sbdf = PCI_SBDF3(seg, bus, devfn);
 
                 if ( (bar & PCI_BASE_ADDRESS_SPACE) ==
@@ -1002,7 +999,7 @@ bool_t __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
 {
     u32 vendor;
 
-    vendor = pci_conf_read32(seg, bus, dev, func, PCI_VENDOR_ID);
+    vendor = pci_conf_read32(PCI_SBDF(seg, bus, dev, func), PCI_VENDOR_ID);
     /* some broken boards return 0 or ~0 if a slot is empty: */
     if ( (vendor == 0xffffffff) || (vendor == 0x00000000) ||
          (vendor == 0x0000ffff) || (vendor == 0xffff0000) )

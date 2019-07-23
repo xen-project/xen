@@ -511,7 +511,7 @@ static int init_bars(struct pci_dev *pdev)
             continue;
         }
 
-        val = pci_conf_read32(pdev->seg, pdev->bus, slot, func, reg);
+        val = pci_conf_read32(pdev->sbdf, reg);
         if ( (val & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_IO )
         {
             bars[i].type = VPCI_BAR_IO;
@@ -561,8 +561,8 @@ static int init_bars(struct pci_dev *pdev)
         rom->type = VPCI_BAR_ROM;
         rom->size = size;
         rom->addr = addr;
-        header->rom_enabled = pci_conf_read32(pdev->seg, pdev->bus, slot, func,
-                                              rom_reg) & PCI_ROM_ADDRESS_ENABLE;
+        header->rom_enabled = pci_conf_read32(pdev->sbdf, rom_reg) &
+                              PCI_ROM_ADDRESS_ENABLE;
 
         rc = vpci_add_register(pdev->vpci, vpci_hw_read32, rom_write, rom_reg,
                                4, rom);

@@ -48,7 +48,7 @@ static int __init get_iommu_capabilities(
 {
     u8 type;
 
-    iommu->cap.header = pci_conf_read32(seg, bus, dev, func, cap_ptr);
+    iommu->cap.header = pci_conf_read32(PCI_SBDF(seg, bus, dev, func), cap_ptr);
     type = get_field_from_reg_u32(iommu->cap.header, PCI_CAP_TYPE_MASK,
                                   PCI_CAP_TYPE_SHIFT);
 

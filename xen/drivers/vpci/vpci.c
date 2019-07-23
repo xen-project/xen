@@ -120,8 +120,7 @@ uint32_t vpci_hw_read16(const struct pci_dev *pdev, unsigned int reg,
 uint32_t vpci_hw_read32(const struct pci_dev *pdev, unsigned int reg,
                         void *data)
 {
-    return pci_conf_read32(pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                           PCI_FUNC(pdev->devfn), reg);
+    return pci_conf_read32(pdev->sbdf, reg);
 }
 
 int vpci_add_register(struct vpci *vpci, vpci_read_t *read_handler,
@@ -211,7 +210,7 @@ static uint32_t vpci_read_hw(pci_sbdf_t sbdf, unsigned int reg,
     switch ( size )
     {
     case 4:
-        data = pci_conf_read32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg);
+        data = pci_conf_read32(sbdf, reg);
         break;
 
     case 3:

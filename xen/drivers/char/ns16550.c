@@ -1112,27 +1112,28 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
                 }
 
                 uart->io_base = 0;
-                bar = pci_conf_read32(0, b, d, f,
-                                      PCI_BASE_ADDRESS_0 + bar_idx*4);
+                bar = pci_conf_read32(PCI_SBDF(0, b, d, f),
+                                      PCI_BASE_ADDRESS_0 + bar_idx * 4);
 
                 /* MMIO based */
                 if ( param->mmio && !(bar & PCI_BASE_ADDRESS_SPACE_IO) )
                 {
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, ~0u);
-                    len = pci_conf_read32(0, b, d, f, PCI_BASE_ADDRESS_0 + bar_idx*4);
+                    len = pci_conf_read32(PCI_SBDF(0, b, d, f),
+                                          PCI_BASE_ADDRESS_0 + bar_idx * 4);
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, bar);
 
                     /* Handle 64 bit BAR if found */
                     if ( bar & PCI_BASE_ADDRESS_MEM_TYPE_64 )
                     {
-                        bar_64 = pci_conf_read32(0, b, d, f,
-                                      PCI_BASE_ADDRESS_0 + (bar_idx+1)*4);
+                        bar_64 = pci_conf_read32(PCI_SBDF(0, b, d, f),
+                                      PCI_BASE_ADDRESS_0 + (bar_idx + 1) * 4);
                         pci_conf_write32(0, b, d, f,
                                     PCI_BASE_ADDRESS_0 + (bar_idx+1)*4, ~0u);
-                        len_64 = pci_conf_read32(0, b, d, f,
-                                    PCI_BASE_ADDRESS_0 + (bar_idx+1)*4);
+                        len_64 = pci_conf_read32(PCI_SBDF(0, b, d, f),
+                                    PCI_BASE_ADDRESS_0 + (bar_idx + 1) * 4);
                         pci_conf_write32(0, b, d, f,
                                     PCI_BASE_ADDRESS_0 + (bar_idx+1)*4, bar_64);
                         size  = ((u64)~0 << 32) | PCI_BASE_ADDRESS_MEM_MASK;
@@ -1149,7 +1150,8 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
                 {
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, ~0u);
-                    len = pci_conf_read32(0, b, d, f, PCI_BASE_ADDRESS_0);
+                    len = pci_conf_read32(PCI_SBDF(0, b, d, f),
+                                          PCI_BASE_ADDRESS_0);
                     pci_conf_write32(0, b, d, f,
                                      PCI_BASE_ADDRESS_0 + bar_idx*4, bar);
                     size = len & PCI_BASE_ADDRESS_IO_MASK;

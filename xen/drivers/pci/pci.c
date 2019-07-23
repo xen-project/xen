@@ -93,7 +93,7 @@ int pci_find_next_ext_capability(int seg, int bus, int devfn, int start, int cap
     int ttl = 480; /* 3840 bytes, minimum 8 bytes per capability */
     int pos = max(start, 0x100);
 
-    header = pci_conf_read32(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
+    header = pci_conf_read32(PCI_SBDF3(seg, bus, devfn), pos);
 
     /*
      * If we have no capabilities, this is indicated by cap ID,
@@ -109,7 +109,7 @@ int pci_find_next_ext_capability(int seg, int bus, int devfn, int start, int cap
         pos = PCI_EXT_CAP_NEXT(header);
         if ( pos < 0x100 )
             break;
-        header = pci_conf_read32(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
+        header = pci_conf_read32(PCI_SBDF3(seg, bus, devfn), pos);
     }
     return 0;
 }

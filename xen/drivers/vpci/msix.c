@@ -469,11 +469,9 @@ static int init_msix(struct pci_dev *pdev)
     pdev->vpci->msix->pdev = pdev;
 
     pdev->vpci->msix->tables[VPCI_MSIX_TABLE] =
-        pci_conf_read32(pdev->seg, pdev->bus, slot, func,
-                        msix_table_offset_reg(msix_offset));
+        pci_conf_read32(pdev->sbdf, msix_table_offset_reg(msix_offset));
     pdev->vpci->msix->tables[VPCI_MSIX_PBA] =
-        pci_conf_read32(pdev->seg, pdev->bus, slot, func,
-                        msix_pba_offset_reg(msix_offset));
+        pci_conf_read32(pdev->sbdf, msix_pba_offset_reg(msix_offset));
 
     for ( i = 0; i < pdev->vpci->msix->max_entries; i++)
     {

@@ -191,16 +191,13 @@ static bool read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     {
         struct pci_dev *dev = entry->dev;
         int pos = entry->msi_attrib.pos;
-        u16 data, seg = dev->seg;
-        u8 bus = dev->bus;
-        u8 slot = PCI_SLOT(dev->devfn);
-        u8 func = PCI_FUNC(dev->devfn);
+        uint16_t data;
 
-        msg->address_lo = pci_conf_read32(seg, bus, slot, func,
+        msg->address_lo = pci_conf_read32(dev->sbdf,
                                           msi_lower_address_reg(pos));
         if ( entry->msi_attrib.is_64 )
         {
-            msg->address_hi = pci_conf_read32(seg, bus, slot, func,
+            msg->address_hi = pci_conf_read32(dev->sbdf,
                                               msi_upper_address_reg(pos));
             data = pci_conf_read16(dev->sbdf, msi_data_reg(pos, 1));
         }
@@ -396,7 +393,7 @@ static bool msi_set_mask_bit(struct irq_desc *desc, bool host, bool guest)
         {
             u32 mask_bits;
 
-            mask_bits = pci_conf_read32(seg, bus, slot, func, entry->msi.mpos);
+            mask_bits = pci_conf_read32(pdev->sbdf, entry->msi.mpos);
             mask_bits &= ~((u32)1 << entry->msi_attrib.entry_nr);
             mask_bits |= (u32)flag << entry->msi_attrib.entry_nr;
             pci_conf_write32(seg, bus, slot, func, entry->msi.mpos, mask_bits);
@@ -465,10 +462,7 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
     case PCI_CAP_ID_MSI:
         if ( !entry->msi_attrib.maskbit )
             break;
-        return (pci_conf_read32(entry->dev->seg, entry->dev->bus,
-                                PCI_SLOT(entry->dev->devfn),
-                                PCI_FUNC(entry->dev->devfn),
-                                entry->msi.mpos) >>
+        return (pci_conf_read32(entry->dev->sbdf, entry->msi.mpos) >>
                 entry->msi_attrib.entry_nr) & 1;
     case PCI_CAP_ID_MSIX:
         if ( unlikely(!msix_memory_decoded(entry->dev,
@@ -723,7 +717,7 @@ static int msi_capability_init(struct pci_dev *dev,
         u32 maskbits;
 
         /* All MSIs are unmasked by default, Mask them all */
-        maskbits = pci_conf_read32(seg, bus, slot, func, mpos);
+        maskbits = pci_conf_read32(dev->sbdf, mpos);
         maskbits |= ~(u32)0 >> (32 - maxvec);
         pci_conf_write32(seg, bus, slot, func, mpos, maskbits);
     }
@@ -808,7 +802,7 @@ static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
 
     if ( bir >= limit )
         return 0;
-    addr = pci_conf_read32(seg, bus, slot, func, base + bir * 4);
+    addr = pci_conf_read32(PCI_SBDF(seg, bus, slot, func), base + bir * 4);
     if ( (addr & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_IO )
         return 0;
     if ( (addr & PCI_BASE_ADDRESS_MEM_TYPE_MASK) == PCI_BASE_ADDRESS_MEM_TYPE_64 )
@@ -817,8 +811,8 @@ static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
         if ( ++bir >= limit )
             return 0;
         return addr + disp +
-               ((u64)pci_conf_read32(seg, bus, slot, func,
-                                     base + bir * 4) << 32);
+               ((uint64_t)pci_conf_read32(PCI_SBDF(seg, bus, slot, func),
+                                          base + bir * 4) << 32);
     }
     return (addr & PCI_BASE_ADDRESS_MEM_MASK) + disp;
 }
@@ -886,8 +880,7 @@ static int msix_capability_init(struct pci_dev *dev,
     }
 
     /* Locate MSI-X table region */
-    table_offset = pci_conf_read32(seg, bus, slot, func,
-                                   msix_table_offset_reg(pos));
+    table_offset = pci_conf_read32(dev->sbdf, msix_table_offset_reg(pos));
     bir = (u8)(table_offset & PCI_MSIX_BIRMASK);
     table_offset &= ~PCI_MSIX_BIRMASK;
 
@@ -933,8 +926,7 @@ static int msix_capability_init(struct pci_dev *dev,
         WARN_ON(rangeset_overlaps_range(mmio_ro_ranges, msix->table.first,
                                         msix->table.last));
 
-        pba_offset = pci_conf_read32(seg, bus, slot, func,
-                                     msix_pba_offset_reg(pos));
+        pba_offset = pci_conf_read32(dev->sbdf, msix_pba_offset_reg(pos));
         bir = (u8)(pba_offset & PCI_MSIX_BIRMASK);
         pba_paddr = read_pci_mem_bar(seg, pbus, pslot, pfunc, bir, vf);
         WARN_ON(!pba_paddr);

@@ -52,7 +52,7 @@ static void __init get_fam10h_pci_mmconf_base(void)
 
 		bus = pci_probes[i].bus;
 		slot = pci_probes[i].slot;
-		id = pci_conf_read32(0, bus, slot, 0, PCI_VENDOR_ID);
+		id = pci_conf_read32(PCI_SBDF(0, bus, slot, 0), PCI_VENDOR_ID);
 
 		vendor = id & 0xffff;
 		device = (id>>16) & 0xffff;
@@ -83,12 +83,14 @@ static void __init get_fam10h_pci_mmconf_base(void)
 	 * above 4G
 	 */
 	for (hi_mmio_num = i = 0; i < 8; i++) {
-		val = pci_conf_read32(0, bus, slot, 1, 0x80 + (i << 3));
+		val = pci_conf_read32(PCI_SBDF(0, bus, slot, 1),
+				      0x80 + (i << 3));
 		if (!(val & 3))
 			continue;
 
 		start = (val & 0xffffff00) << 8; /* 39:16 on 31:8*/
-		val = pci_conf_read32(0, bus, slot, 1, 0x84 + (i << 3));
+		val = pci_conf_read32(PCI_SBDF(0, bus, slot, 1),
+				      0x84 + (i << 3));
 		end = ((val & 0xffffff00) << 8) | 0xffff; /* 39:16 on 31:8*/
 
 		if (end < tom2)
