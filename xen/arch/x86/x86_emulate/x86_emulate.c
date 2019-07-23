@@ -10525,6 +10525,16 @@ x86_emulate(
         }
         goto unrecognized_insn;
 
+    case X86EMUL_OPC_XOP(09, 0x12): /* XOP Grp3 */
+        switch ( modrm_reg & 7 )
+        {
+        case 0: /* llwpcb r */
+        case 1: /* slwpcb r */
+            /* LWP is unsupported, so produce #UD unconditionally. */
+            generate_exception(EXC_UD);
+        }
+        goto unrecognized_insn;
+
     case X86EMUL_OPC_XOP(09, 0x82): /* vfrczss xmm/m128,xmm */
     case X86EMUL_OPC_XOP(09, 0x83): /* vfrczsd xmm/m128,xmm */
         generate_exception_if(vex.l, EXC_UD);
@@ -10608,6 +10618,16 @@ x86_emulate(
         put_stub(stub);
         break;
     }
+
+    case X86EMUL_OPC_XOP(0a, 0x12): /* XOP Grp4 */
+        switch ( modrm_reg & 7 )
+        {
+        case 0: /* lwpins $imm32,r/m,r */
+        case 1: /* lwpval $imm32,r/m,r */
+            /* LWP is unsupported, so produce #UD unconditionally. */
+            generate_exception(EXC_UD);
+        }
+        goto unrecognized_insn;
 
     default:
     unimplemented_insn:
