@@ -185,6 +185,10 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
     register_keyhandler('o', &iommu_dump_p2m_table, "dump iommu p2m table", 0);
 
     hd->status = IOMMU_STATUS_initializing;
+    /*
+     * NB: relaxed hw domains don't need sync because all ram is already
+     * mapped in the iommu page tables.
+     */
     hd->need_sync = iommu_hwdom_strict && !iommu_use_hap_pt(d);
     if ( need_iommu_pt_sync(d) )
     {
