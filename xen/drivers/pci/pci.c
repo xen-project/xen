@@ -15,7 +15,7 @@ int pci_find_cap_offset(u16 seg, u8 bus, u8 dev, u8 func, u8 cap)
     u8 pos = PCI_CAPABILITY_LIST;
     u16 status;
 
-    status = pci_conf_read16(seg, bus, dev, func, PCI_STATUS);
+    status = pci_conf_read16(PCI_SBDF(seg, bus, dev, func), PCI_STATUS);
     if ( (status & PCI_STATUS_CAP_LIST) == 0 )
         return 0;
 
@@ -120,7 +120,7 @@ void pci_intx(const struct pci_dev *pdev, bool enable)
     uint8_t bus = pdev->bus;
     uint8_t slot = PCI_SLOT(pdev->devfn);
     uint8_t func = PCI_FUNC(pdev->devfn);
-    uint16_t cmd = pci_conf_read16(seg, bus, slot, func, PCI_COMMAND);
+    uint16_t cmd = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
 
     if ( enable )
         cmd &= ~PCI_COMMAND_INTX_DISABLE;

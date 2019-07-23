@@ -799,8 +799,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
                         PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf));
         return 0;
     }
-    control = pci_conf_read16(iommu->seg, PCI_BUS(iommu->bdf),
-                              PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf),
+    control = pci_conf_read16(PCI_SBDF2(iommu->seg, iommu->bdf),
                               iommu->msi.msi_attrib.pos + PCI_MSI_FLAGS);
     iommu->msi.msi.nvec = 1;
     if ( is_mask_bit_support(control) )

@@ -114,8 +114,7 @@ static void vpci_ignored_write(const struct pci_dev *pdev, unsigned int reg,
 uint32_t vpci_hw_read16(const struct pci_dev *pdev, unsigned int reg,
                         void *data)
 {
-    return pci_conf_read16(pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                           PCI_FUNC(pdev->devfn), reg);
+    return pci_conf_read16(pdev->sbdf, reg);
 }
 
 uint32_t vpci_hw_read32(const struct pci_dev *pdev, unsigned int reg,
@@ -223,19 +222,17 @@ static uint32_t vpci_read_hw(pci_sbdf_t sbdf, unsigned int reg,
         if ( reg & 1 )
         {
             data = pci_conf_read8(sbdf, reg);
-            data |= pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
-                                    reg + 1) << 8;
+            data |= pci_conf_read16(sbdf, reg + 1) << 8;
         }
         else
         {
-            data = pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
-                                   reg);
+            data = pci_conf_read16(sbdf, reg);
             data |= pci_conf_read8(sbdf, reg + 2) << 16;
         }
         break;
 
     case 2:
-        data = pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg);
+        data = pci_conf_read16(sbdf, reg);
         break;
 
     case 1:

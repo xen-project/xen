@@ -35,8 +35,8 @@ static inline int pci_ats_enabled(int seg, int bus, int devfn)
     pos = pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
     BUG_ON(!pos);
 
-    value = pci_conf_read16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                            pos + ATS_REG_CTL);
+    value = pci_conf_read16(PCI_SBDF3(seg, bus, devfn), pos + ATS_REG_CTL);
+
     return value & ATS_ENABLE;
 }
 

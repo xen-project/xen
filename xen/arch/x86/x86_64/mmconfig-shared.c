@@ -64,7 +64,7 @@ custom_param("mmcfg", parse_mmcfg);
 static const char __init *pci_mmcfg_e7520(void)
 {
     u32 win;
-    win = pci_conf_read16(0, 0, 0, 0, 0xce);
+    win = pci_conf_read16(PCI_SBDF(0, 0, 0, 0), 0xce);
 
     win = win & 0xf000;
     if(win == 0x0000 || win == 0xf000)

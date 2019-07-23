@@ -469,15 +469,15 @@ static int __init ich10_bios_quirk(struct dmi_system_id *d)
 {
     u32 port, smictl;
 
-    if ( pci_conf_read16(0, 0, 0x1f, 0, PCI_VENDOR_ID) != 0x8086 )
+    if ( pci_conf_read16(PCI_SBDF(0, 0, 0x1f, 0), PCI_VENDOR_ID) != 0x8086 )
         return 0;
 
-    switch ( pci_conf_read16(0, 0, 0x1f, 0, PCI_DEVICE_ID) ) {
+    switch ( pci_conf_read16(PCI_SBDF(0, 0, 0x1f, 0), PCI_DEVICE_ID) ) {
     case 0x3a14:
     case 0x3a16:
     case 0x3a18:
     case 0x3a1a:
-        port = (pci_conf_read16(0, 0, 0x1f, 0, 0x40) & 0xff80) + 0x30;
+        port = (pci_conf_read16(PCI_SBDF(0, 0, 0x1f, 0), 0x40) & 0xff80) + 0x30;
         smictl = inl(port);
         /* turn off LEGACY_USB{,2}_EN if enabled */
         if ( smictl & 0x20008 )

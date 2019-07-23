@@ -846,8 +846,8 @@ static void ns16550_suspend(struct serial_port *port)
 
 #ifdef CONFIG_HAS_PCI
     if ( uart->bar )
-       uart->cr = pci_conf_read16(0, uart->ps_bdf[0], uart->ps_bdf[1],
-                                  uart->ps_bdf[2], PCI_COMMAND);
+       uart->cr = pci_conf_read16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
+                                  uart->ps_bdf[2]), PCI_COMMAND);
 #endif
 }
 
@@ -1064,10 +1064,12 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
                 u64 size = 0;
                 const struct ns16550_config_param *param = uart_param;
 
-                nextf = (f || (pci_conf_read16(0, b, d, f, PCI_HEADER_TYPE) &
+                nextf = (f || (pci_conf_read16(PCI_SBDF(0, b, d, f),
+                                               PCI_HEADER_TYPE) &
                                0x80)) ? f + 1 : 8;
 
-                switch ( pci_conf_read16(0, b, d, f, PCI_CLASS_DEVICE) )
+                switch ( pci_conf_read16(PCI_SBDF(0, b, d, f),
+                                         PCI_CLASS_DEVICE) )
                 {
                 case 0x0700: /* single port serial */
                 case 0x0702: /* multi port serial */
@@ -1084,8 +1086,10 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
                 /* Check for params in uart_config lookup table */
                 for ( i = 0; i < ARRAY_SIZE(uart_config); i++ )
                 {
-                    u16 vendor = pci_conf_read16(0, b, d, f, PCI_VENDOR_ID);
-                    u16 device = pci_conf_read16(0, b, d, f, PCI_DEVICE_ID);
+                    u16 vendor = pci_conf_read16(PCI_SBDF(0, b, d, f),
+                                                 PCI_VENDOR_ID);
+                    u16 device = pci_conf_read16(PCI_SBDF(0, b, d, f),
+                                                 PCI_DEVICE_ID);
 
                     if ( uart_config[i].vendor_id == vendor &&
                          uart_config[i].dev_id == device )

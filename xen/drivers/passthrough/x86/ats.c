@@ -34,8 +34,7 @@ int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
         dprintk(XENLOG_INFO, "%04x:%02x:%02x.%u: ATS capability found\n",
                 seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-    value = pci_conf_read16(seg, bus, PCI_SLOT(devfn),
-                            PCI_FUNC(devfn), pos + ATS_REG_CTL);
+    value = pci_conf_read16(pdev->sbdf, pos + ATS_REG_CTL);
     if ( value & ATS_ENABLE )
     {
         struct pci_dev *other;
@@ -58,8 +57,7 @@ int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
     if ( pos )
     {
         pdev->ats.cap_pos = pos;
-        value = pci_conf_read16(seg, bus, PCI_SLOT(devfn),
-                                PCI_FUNC(devfn), pos + ATS_REG_CAP);
+        value = pci_conf_read16(pdev->sbdf, pos + ATS_REG_CAP);
         pdev->ats.queue_depth = value & ATS_QUEUE_DEPTH_MASK ?:
                                 ATS_QUEUE_DEPTH_MASK + 1;
         list_add(&pdev->ats.list, ats_list);
@@ -81,8 +79,7 @@ void disable_ats_device(struct pci_dev *pdev)
 
     BUG_ON(!pdev->ats.cap_pos);
 
-    value = pci_conf_read16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                            pdev->ats.cap_pos + ATS_REG_CTL);
+    value = pci_conf_read16(pdev->sbdf, pdev->ats.cap_pos + ATS_REG_CTL);
     value &= ~ATS_ENABLE;
     pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                      pdev->ats.cap_pos + ATS_REG_CTL, value);

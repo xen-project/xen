@@ -211,8 +211,7 @@ static int init_msi(struct pci_dev *pdev)
         return ret;
 
     /* Get the maximum number of vectors the device supports. */
-    control = pci_conf_read16(pdev->seg, pdev->bus, slot, func,
-                              msi_control_reg(pos));
+    control = pci_conf_read16(pdev->sbdf, msi_control_reg(pos));
 
     /*
      * FIXME: I've only been able to test this code with devices using a single

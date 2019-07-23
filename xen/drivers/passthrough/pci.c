@@ -246,11 +246,11 @@ static void check_pdev(const struct pci_dev *pdev)
 
     if ( command_mask )
     {
-        val = pci_conf_read16(seg, bus, dev, func, PCI_COMMAND);
+        val = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
         if ( val & command_mask )
             pci_conf_write16(seg, bus, dev, func, PCI_COMMAND,
                              val & ~command_mask);
-        val = pci_conf_read16(seg, bus, dev, func, PCI_STATUS);
+        val = pci_conf_read16(pdev->sbdf, PCI_STATUS);
         if ( val & PCI_STATUS_CHECK )
         {
             printk(XENLOG_INFO "%04x:%02x:%02x.%u status %04x -> %04x\n",
@@ -265,11 +265,11 @@ static void check_pdev(const struct pci_dev *pdev)
     case PCI_HEADER_TYPE_BRIDGE:
         if ( !bridge_ctl_mask )
             break;
-        val = pci_conf_read16(seg, bus, dev, func, PCI_BRIDGE_CONTROL);
+        val = pci_conf_read16(pdev->sbdf, PCI_BRIDGE_CONTROL);
         if ( val & bridge_ctl_mask )
             pci_conf_write16(seg, bus, dev, func, PCI_BRIDGE_CONTROL,
                              val & ~bridge_ctl_mask);
-        val = pci_conf_read16(seg, bus, dev, func, PCI_SEC_STATUS);
+        val = pci_conf_read16(pdev->sbdf, PCI_SEC_STATUS);
         if ( val & PCI_STATUS_CHECK )
         {
             printk(XENLOG_INFO
@@ -289,12 +289,8 @@ static void check_pdev(const struct pci_dev *pdev)
 
 static void apply_quirks(struct pci_dev *pdev)
 {
-    uint16_t vendor = pci_conf_read16(pdev->seg, pdev->bus,
-                                      PCI_SLOT(pdev->devfn),
-                                      PCI_FUNC(pdev->devfn), PCI_VENDOR_ID);
-    uint16_t device = pci_conf_read16(pdev->seg, pdev->bus,
-                                      PCI_SLOT(pdev->devfn),
-                                      PCI_FUNC(pdev->devfn), PCI_DEVICE_ID);
+    uint16_t vendor = pci_conf_read16(pdev->sbdf, PCI_VENDOR_ID);
+    uint16_t device = pci_conf_read16(pdev->sbdf, PCI_DEVICE_ID);
     static const struct {
         uint16_t vendor, device;
     } ignore_bars[] = {
@@ -387,8 +383,7 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
             pos = pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn),
                                       PCI_FUNC(devfn), PCI_CAP_ID_EXP);
             BUG_ON(!pos);
-            cap = pci_conf_read16(pseg->nr, bus, PCI_SLOT(devfn),
-                                  PCI_FUNC(devfn), pos + PCI_EXP_DEVCAP);
+            cap = pci_conf_read16(pdev->sbdf, pos + PCI_EXP_DEVCAP);
             if ( cap & PCI_EXP_DEVCAP_PHANTOM )
             {
                 pdev->phantom_stride = 8 >> MASK_EXTR(cap,
@@ -611,8 +606,8 @@ static void pci_enable_acs(struct pci_dev *pdev)
     if (!pos)
         return;
 
-    cap = pci_conf_read16(seg, bus, dev, func, pos + PCI_ACS_CAP);
-    ctrl = pci_conf_read16(seg, bus, dev, func, pos + PCI_ACS_CTRL);
+    cap = pci_conf_read16(pdev->sbdf, pos + PCI_ACS_CAP);
+    ctrl = pci_conf_read16(pdev->sbdf, pos + PCI_ACS_CTRL);
 
     /* Source Validation */
     ctrl |= (cap & PCI_ACS_SV);
@@ -743,7 +738,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn,
     {
         unsigned int pos = pci_find_ext_capability(seg, bus, devfn,
                                                    PCI_EXT_CAP_ID_SRIOV);
-        u16 ctrl = pci_conf_read16(seg, bus, slot, func, pos + PCI_SRIOV_CTRL);
+        uint16_t ctrl = pci_conf_read16(pdev->sbdf, pos + PCI_SRIOV_CTRL);
 
         if ( !pos )
             /* Nothing */;
@@ -937,13 +932,13 @@ enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn)
     u8 d = PCI_SLOT(devfn), f = PCI_FUNC(devfn);
     int pos = pci_find_cap_offset(seg, bus, d, f, PCI_CAP_ID_EXP);
 
-    class_device = pci_conf_read16(seg, bus, d, f, PCI_CLASS_DEVICE);
+    class_device = pci_conf_read16(PCI_SBDF(seg, bus, d, f), PCI_CLASS_DEVICE);
     switch ( class_device )
     {
     case PCI_CLASS_BRIDGE_PCI:
         if ( !pos )
             return DEV_TYPE_LEGACY_PCI_BRIDGE;
-        creg = pci_conf_read16(seg, bus, d, f, pos + PCI_EXP_FLAGS);
+        creg = pci_conf_read16(PCI_SBDF(seg, bus, d, f), pos + PCI_EXP_FLAGS);
         switch ( (creg & PCI_EXP_FLAGS_TYPE) >> 4 )
         {
         case PCI_EXP_TYPE_PCI_BRIDGE:
@@ -1040,8 +1035,7 @@ void pci_check_disable_device(u16 seg, u8 bus, u8 devfn)
     /* Tell the device to stop DMAing; we can't rely on the guest to
      * control it for us. */
     devfn = pdev->devfn;
-    cword = pci_conf_read16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                            PCI_COMMAND);
+    cword = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
     pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                      PCI_COMMAND, cword & ~PCI_COMMAND_MASTER);
 }
@@ -1209,10 +1203,7 @@ static bool_t hest_match_type(const struct acpi_hest_header *hest_hdr,
                                            PCI_SLOT(pdev->devfn),
                                            PCI_FUNC(pdev->devfn),
                                            PCI_CAP_ID_EXP);
-    u8 pcie = MASK_EXTR(pci_conf_read16(pdev->seg, pdev->bus,
-                                        PCI_SLOT(pdev->devfn),
-                                        PCI_FUNC(pdev->devfn),
-                                        pos + PCI_EXP_FLAGS),
+    u8 pcie = MASK_EXTR(pci_conf_read16(pdev->sbdf, pos + PCI_EXP_FLAGS),
                         PCI_EXP_FLAGS_TYPE);
 
     switch ( hest_hdr->type )
@@ -1222,8 +1213,7 @@ static bool_t hest_match_type(const struct acpi_hest_header *hest_hdr,
     case ACPI_HEST_TYPE_AER_ENDPOINT:
         return pcie == PCI_EXP_TYPE_ENDPOINT;
     case ACPI_HEST_TYPE_AER_BRIDGE:
-        return pci_conf_read16(pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                               PCI_FUNC(pdev->devfn), PCI_CLASS_DEVICE) ==
+        return pci_conf_read16(pdev->sbdf, PCI_CLASS_DEVICE) ==
                PCI_CLASS_BRIDGE_PCI;
     }
 

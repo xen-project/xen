@@ -1016,7 +1016,7 @@ static void nvidia_set_debug_port(struct ehci_dbgp *dbgp, unsigned int port)
 
 static void __init detect_set_debug_port(struct ehci_dbgp *dbgp)
 {
-    if ( pci_conf_read16(0, dbgp->bus, dbgp->slot, dbgp->func,
+    if ( pci_conf_read16(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
                          PCI_VENDOR_ID) == 0x10de )
     {
         dbgp_printk("using nvidia set_debug_port\n");
@@ -1416,7 +1416,8 @@ static void ehci_dbgp_suspend(struct serial_port *port)
     stop_timer(&dbgp->timer);
     dbgp->timer.expires = 0;
 
-    dbgp->pci_cr = pci_conf_read16(0, dbgp->bus, dbgp->slot, dbgp->func,
+    dbgp->pci_cr = pci_conf_read16(PCI_SBDF(0, dbgp->bus, dbgp->slot,
+                                            dbgp->func),
                                    PCI_COMMAND);
 
     dbgp->state = dbgp_unsafe;

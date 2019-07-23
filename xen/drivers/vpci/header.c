@@ -336,8 +336,7 @@ static void cmd_write(const struct pci_dev *pdev, unsigned int reg,
                       uint32_t cmd, void *data)
 {
     uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
-    uint16_t current_cmd = pci_conf_read16(pdev->seg, pdev->bus, slot, func,
-                                           reg);
+    uint16_t current_cmd = pci_conf_read16(pdev->sbdf, reg);
 
     /*
      * Let Dom0 play with all the bits directly except for the memory
@@ -371,8 +370,7 @@ static void bar_write(const struct pci_dev *pdev, unsigned int reg,
     else
         val &= PCI_BASE_ADDRESS_MEM_MASK;
 
-    if ( pci_conf_read16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND) &
-         PCI_COMMAND_MEMORY )
+    if ( pci_conf_read16(pdev->sbdf, PCI_COMMAND) & PCI_COMMAND_MEMORY )
     {
         /* If the value written is the current one avoid printing a warning. */
         if ( val != (uint32_t)(bar->addr >> (hi ? 32 : 0)) )
@@ -409,8 +407,7 @@ static void rom_write(const struct pci_dev *pdev, unsigned int reg,
     struct vpci_header *header = &pdev->vpci->header;
     struct vpci_bar *rom = data;
     uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
-    uint16_t cmd = pci_conf_read16(pdev->seg, pdev->bus, slot, func,
-                                   PCI_COMMAND);
+    uint16_t cmd = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
     bool new_enabled = val & PCI_ROM_ADDRESS_ENABLE;
 
     if ( (cmd & PCI_COMMAND_MEMORY) && header->rom_enabled && new_enabled )
@@ -489,7 +486,7 @@ static int init_bars(struct pci_dev *pdev)
         return 0;
 
     /* Disable memory decoding before sizing. */
-    cmd = pci_conf_read16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND);
+    cmd = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
     if ( cmd & PCI_COMMAND_MEMORY )
         pci_conf_write16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND,
                          cmd & ~PCI_COMMAND_MEMORY);

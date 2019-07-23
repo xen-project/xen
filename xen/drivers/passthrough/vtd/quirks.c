@@ -74,7 +74,7 @@ int is_igd_vt_enabled_quirk(void)
         return 1;
 
     /* integrated graphics on Intel platforms is located at 0:2.0 */
-    ggc = pci_conf_read16(0, 0, IGD_DEV, 0, GGC);
+    ggc = pci_conf_read16(PCI_SBDF(0, 0, IGD_DEV, 0), GGC);
     return ( ggc & GGC_MEMORY_VT_ENABLED ? 1 : 0 );
 }
 
@@ -88,7 +88,7 @@ static void __init cantiga_b3_errata_init(void)
     u16 vid;
     u8 did_hi, rid;
 
-    vid = pci_conf_read16(0, 0, IGD_DEV, 0, 0);
+    vid = pci_conf_read16(PCI_SBDF(0, 0, IGD_DEV, 0), 0);
     if ( vid != 0x8086 )
         return;
 
@@ -424,11 +424,10 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
     paddr_t pa;
     const char *action;
 
-    if ( pci_conf_read16(seg, bus, dev, func, PCI_VENDOR_ID) !=
-         PCI_VENDOR_ID_INTEL )
+    if ( pci_conf_read16(pdev->sbdf, PCI_VENDOR_ID) != PCI_VENDOR_ID_INTEL )
         return;
 
-    switch ( pci_conf_read16(seg, bus, dev, func, PCI_DEVICE_ID) )
+    switch ( pci_conf_read16(pdev->sbdf, PCI_DEVICE_ID) )
     {
     /*
      * Mask reporting Intel VT-d faults to IOH core logic:

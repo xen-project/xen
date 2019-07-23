@@ -457,8 +457,7 @@ static int init_msix(struct pci_dev *pdev)
     if ( !msix_offset )
         return 0;
 
-    control = pci_conf_read16(pdev->seg, pdev->bus, slot, func,
-                              msix_control_reg(msix_offset));
+    control = pci_conf_read16(pdev->sbdf, msix_control_reg(msix_offset));
 
     max_entries = msix_table_size(control);
 
