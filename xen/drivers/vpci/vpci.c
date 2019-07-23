@@ -253,7 +253,7 @@ static void vpci_write_hw(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
     switch ( size )
     {
     case 4:
-        pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg, data);
+        pci_conf_write32(sbdf, reg, data);
         break;
 
     case 3:

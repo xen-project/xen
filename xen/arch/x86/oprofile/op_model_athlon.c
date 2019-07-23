@@ -472,7 +472,9 @@ static int __init init_ibs_nmi(void)
 				if ((vendor_id == PCI_VENDOR_ID_AMD) &&
 					(dev_id == PCI_DEVICE_ID_AMD_10H_NB_MISC)) {
 
-					pci_conf_write32(0, bus, dev, func, IBSCTL,
+					pci_conf_write32(
+						PCI_SBDF(0, bus, dev, func),
+						IBSCTL,
 						IBSCTL_LVTOFFSETVAL | APIC_EILVT_LVTOFF_IBS);
 
 					value = pci_conf_read32(PCI_SBDF(0, bus, dev, func),

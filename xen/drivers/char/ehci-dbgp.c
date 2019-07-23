@@ -1012,7 +1012,8 @@ static void nvidia_set_debug_port(struct ehci_dbgp *dbgp, unsigned int port)
 
     dword &= ~(0x0f << 12);
     dword |= (port & 0x0f) << 12;
-    pci_conf_write32(0, dbgp->bus, dbgp->slot, dbgp->func, 0x74, dword);
+    pci_conf_write32(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func), 0x74,
+                     dword);
     dbgp_printk("set debug port to %u\n", port);
 }
 
@@ -1436,7 +1437,7 @@ static void ehci_dbgp_resume(struct serial_port *port)
     if ( !dbgp->ehci_debug )
         return;
 
-    pci_conf_write32(0, dbgp->bus, dbgp->slot, dbgp->func, dbgp->bar,
+    pci_conf_write32(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func), dbgp->bar,
                      dbgp->bar_val);
     pci_conf_write16(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
                      PCI_COMMAND, dbgp->pci_cr);

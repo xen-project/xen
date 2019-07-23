@@ -251,21 +251,17 @@ static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     {
         struct pci_dev *dev = entry->dev;
         int pos = entry->msi_attrib.pos;
-        u16 seg = dev->seg;
-        u8 bus = dev->bus;
-        u8 slot = PCI_SLOT(dev->devfn);
-        u8 func = PCI_FUNC(dev->devfn);
         int nr = entry->msi_attrib.entry_nr;
 
         ASSERT((msg->data & (entry[-nr].msi.nvec - 1)) == nr);
         if ( nr )
             return 0;
 
-        pci_conf_write32(seg, bus, slot, func, msi_lower_address_reg(pos),
+        pci_conf_write32(dev->sbdf, msi_lower_address_reg(pos),
                          msg->address_lo);
         if ( entry->msi_attrib.is_64 )
         {
-            pci_conf_write32(seg, bus, slot, func, msi_upper_address_reg(pos),
+            pci_conf_write32(dev->sbdf, msi_upper_address_reg(pos),
                              msg->address_hi);
             pci_conf_write16(dev->sbdf, msi_data_reg(pos, 1), msg->data);
         }
@@ -395,7 +391,7 @@ static bool msi_set_mask_bit(struct irq_desc *desc, bool host, bool guest)
             mask_bits = pci_conf_read32(pdev->sbdf, entry->msi.mpos);
             mask_bits &= ~((u32)1 << entry->msi_attrib.entry_nr);
             mask_bits |= (u32)flag << entry->msi_attrib.entry_nr;
-            pci_conf_write32(seg, bus, slot, func, entry->msi.mpos, mask_bits);
+            pci_conf_write32(pdev->sbdf, entry->msi.mpos, mask_bits);
         }
         break;
     case PCI_CAP_ID_MSIX:
@@ -716,7 +712,7 @@ static int msi_capability_init(struct pci_dev *dev,
         /* All MSIs are unmasked by default, Mask them all */
         maskbits = pci_conf_read32(dev->sbdf, mpos);
         maskbits |= ~(u32)0 >> (32 - maxvec);
-        pci_conf_write32(seg, bus, slot, func, mpos, maskbits);
+        pci_conf_write32(dev->sbdf, mpos, maskbits);
     }
     list_add_tail(&entry->list, &dev->msi_list);
 

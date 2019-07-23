@@ -714,11 +714,11 @@ static void init_amd(struct cpuinfo_x86 *c)
 				       (h & 0x1) ? "clearing D18F3x5C[0]" : "");
 
 			if (l & 0x1f)
-				pci_conf_write32(0, 0, 0x18, 0x3, 0x58,
+				pci_conf_write32(PCI_SBDF(0, 0, 0x18, 3), 0x58,
 						 l & ~0x1f);
 
 			if (h & 0x1)
-				pci_conf_write32(0, 0, 0x18, 0x3, 0x5c,
+				pci_conf_write32(PCI_SBDF(0, 0, 0x18, 3), 0x5c,
 						 h & ~0x1);
 		}
 

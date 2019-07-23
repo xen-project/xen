@@ -844,22 +844,22 @@ static void amd_iommu_erratum_746_workaround(struct amd_iommu *iommu)
          (boot_cpu_data.x86_model > 0x1f) )
         return;
 
-    pci_conf_write32(iommu->seg, bus, dev, func, 0xf0, 0x90);
+    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf0, 0x90);
     value = pci_conf_read32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf4);
 
     if ( value & (1 << 2) )
         return;
 
     /* Select NB indirect register 0x90 and enable writing */
-    pci_conf_write32(iommu->seg, bus, dev, func, 0xf0, 0x90 | (1 << 8));
+    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf0, 0x90 | (1 << 8));
 
-    pci_conf_write32(iommu->seg, bus, dev, func, 0xf4, value | (1 << 2));
+    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf4, value | (1 << 2));
     printk(XENLOG_INFO
            "AMD-Vi: Applying erratum 746 workaround for IOMMU at %04x:%02x:%02x.%u\n",
            iommu->seg, bus, dev, func);
 
     /* Clear the enable writing bit */
-    pci_conf_write32(iommu->seg, bus, dev, func, 0xf0, 0x90);
+    pci_conf_write32(PCI_SBDF2(iommu->seg, iommu->bdf), 0xf0, 0x90);
 }
 
 static void enable_iommu(struct amd_iommu *iommu)

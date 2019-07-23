@@ -85,7 +85,6 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
                             bool rom_only)
 {
     struct vpci_header *header = &pdev->vpci->header;
-    uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
     bool map = cmd & PCI_COMMAND_MEMORY;
     unsigned int i;
 
@@ -113,7 +112,7 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
                            (map ? PCI_ROM_ADDRESS_ENABLE : 0);
 
             header->bars[i].enabled = header->rom_enabled = map;
-            pci_conf_write32(pdev->seg, pdev->bus, slot, func, rom_pos, val);
+            pci_conf_write32(pdev->sbdf, rom_pos, val);
             return;
         }
 
@@ -395,7 +394,7 @@ static void bar_write(const struct pci_dev *pdev, unsigned int reg,
         val |= bar->prefetchable ? PCI_BASE_ADDRESS_MEM_PREFETCH : 0;
     }
 
-    pci_conf_write32(pdev->seg, pdev->bus, slot, func, reg, val);
+    pci_conf_write32(pdev->sbdf, reg, val);
 }
 
 static void rom_write(const struct pci_dev *pdev, unsigned int reg,
@@ -426,7 +425,7 @@ static void rom_write(const struct pci_dev *pdev, unsigned int reg,
     {
         /* Just update the ROM BAR field. */
         header->rom_enabled = new_enabled;
-        pci_conf_write32(pdev->seg, pdev->bus, slot, func, reg, val);
+        pci_conf_write32(pdev->sbdf, reg, val);
     }
     /*
      * Pass PCI_COMMAND_MEMORY or 0 to signal a map/unmap request, note that

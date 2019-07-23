@@ -638,7 +638,7 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
     ASSERT(!((flags & PCI_BAR_VF) && (flags & PCI_BAR_ROM)));
     ASSERT((flags & PCI_BAR_ROM) ||
            (bar & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY);
-    pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, pos, ~0);
+    pci_conf_write32(sbdf, pos, ~0);
     if ( is64bits )
     {
         if ( flags & PCI_BAR_LAST )
@@ -651,17 +651,17 @@ unsigned int pci_size_mem_bar(pci_sbdf_t sbdf, unsigned int pos,
             return 1;
         }
         hi = pci_conf_read32(sbdf, pos + 4);
-        pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, pos + 4, ~0);
+        pci_conf_write32(sbdf, pos + 4, ~0);
     }
     size = pci_conf_read32(sbdf, pos) & mask;
     if ( is64bits )
     {
         size |= (uint64_t)pci_conf_read32(sbdf, pos + 4) << 32;
-        pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, pos + 4, hi);
+        pci_conf_write32(sbdf, pos + 4, hi);
     }
     else if ( size )
         size |= (uint64_t)~0 << 32;
-    pci_conf_write32(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, pos, bar);
+    pci_conf_write32(sbdf, pos, bar);
     size = -size;
 
     if ( paddr )

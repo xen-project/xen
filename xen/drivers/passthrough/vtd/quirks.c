@@ -439,7 +439,7 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
     case 0x3728: /* Xeon C5500/C3500 (JasperForest) */
     case 0x3c28: /* Sandybridge */
         val = pci_conf_read32(pdev->sbdf, 0x1AC);
-        pci_conf_write32(seg, bus, dev, func, 0x1AC, val | (1 << 31));
+        pci_conf_write32(pdev->sbdf, 0x1AC, val | (1 << 31));
         printk(XENLOG_INFO "Masked VT-d error signaling on %04x:%02x:%02x.%u\n",
                seg, bus, dev, func);
         break;
@@ -487,9 +487,9 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
             action = "Found masked";
         else if ( !ff )
         {
-            pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_UNCOR_MASK,
+            pci_conf_write32(pdev->sbdf, pos + PCI_ERR_UNCOR_MASK,
                              val | PCI_ERR_UNC_UNSUP);
-            pci_conf_write32(seg, bus, dev, func, pos + PCI_ERR_COR_MASK,
+            pci_conf_write32(pdev->sbdf, pos + PCI_ERR_COR_MASK,
                              val2 | PCI_ERR_COR_ADV_NFAT);
             action = "Masked";
         }
@@ -498,7 +498,7 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
 
         /* XPUNCERRMSK Send Completion with Unsupported Request */
         val = pci_conf_read32(pdev->sbdf, 0x20c);
-        pci_conf_write32(seg, bus, dev, func, 0x20c, val | (1 << 4));
+        pci_conf_write32(pdev->sbdf, 0x20c, val | (1 << 4));
 
         printk(XENLOG_INFO "%s UR signaling on %04x:%02x:%02x.%u\n",
                action, seg, bus, dev, func);
