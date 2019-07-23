@@ -1243,7 +1243,7 @@ static bool_t __init amd_sp5100_erratum28(void)
         if (vendor_id != 0x1002 || dev_id != 0x4385)
             continue;
 
-        byte = pci_conf_read8(0, bus, 0x14, 0, 0xad);
+        byte = pci_conf_read8(PCI_SBDF(0, bus, 0x14, 0), 0xad);
         if ( (byte >> 3) & 1 )
         {
             printk(XENLOG_WARNING "AMD-Vi: SP5100 erratum 28 detected, disabling IOMMU.\n"

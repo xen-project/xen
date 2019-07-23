@@ -8,26 +8,25 @@
 #include <xen/pci.h>
 #include <asm/io.h>
 
-#define PCI_CONF_ADDRESS(bus, dev, func, reg) \
-    (0x80000000 | (bus << 16) | (dev << 11) | (func << 8) | (reg & ~3))
+#define PCI_CONF_ADDRESS(sbdf, reg) \
+    (0x80000000 | ((sbdf).bdf << 8) | ((reg) & ~3))
 
-uint8_t pci_conf_read8(
-    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
-    unsigned int reg)
+uint8_t pci_conf_read8(pci_sbdf_t sbdf, unsigned int reg)
 {
-    u32 value;
+    uint32_t value;
 
-    if ( seg || reg > 255 )
+    if ( sbdf.seg || reg > 255 )
     {
-        pci_mmcfg_read(seg, bus, PCI_DEVFN(dev, func), reg, 1, &value);
+        pci_mmcfg_read(sbdf.seg, sbdf.bus, sbdf.devfn, reg, 1, &value);
         return value;
     }
-    else
-    {
-        BUG_ON((bus > 255) || (dev > 31) || (func > 7));
-        return pci_conf_read(PCI_CONF_ADDRESS(bus, dev, func, reg), reg & 3, 1);
-    }
+
+    return pci_conf_read(PCI_CONF_ADDRESS(sbdf, reg), reg & 3, 1);
 }
+
+#undef PCI_CONF_ADDRESS
+#define PCI_CONF_ADDRESS(bus, dev, func, reg) \
+    (0x80000000 | (bus << 16) | (dev << 11) | (func << 8) | (reg & ~3))
 
 uint16_t pci_conf_read16(
     unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,

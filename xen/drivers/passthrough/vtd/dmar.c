@@ -348,7 +348,7 @@ static int __init acpi_parse_dev_scope(
 
         while ( --depth > 0 )
         {
-            bus = pci_conf_read8(seg, bus, path->dev, path->fn,
+            bus = pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
                                  PCI_SECONDARY_BUS);
             path++;
         }
@@ -356,9 +356,9 @@ static int __init acpi_parse_dev_scope(
         switch ( acpi_scope->entry_type )
         {
         case ACPI_DMAR_SCOPE_TYPE_BRIDGE:
-            sec_bus = pci_conf_read8(seg, bus, path->dev, path->fn,
+            sec_bus = pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
                                      PCI_SECONDARY_BUS);
-            sub_bus = pci_conf_read8(seg, bus, path->dev, path->fn,
+            sub_bus = pci_conf_read8(PCI_SBDF(seg, bus, path->dev, path->fn),
                                      PCI_SUBORDINATE_BUS);
             if ( iommu_verbose )
                 printk(VTDPREFIX

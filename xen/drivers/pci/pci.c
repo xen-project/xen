@@ -21,12 +21,12 @@ int pci_find_cap_offset(u16 seg, u8 bus, u8 dev, u8 func, u8 cap)
 
     while ( max_cap-- )
     {
-        pos = pci_conf_read8(seg, bus, dev, func, pos);
+        pos = pci_conf_read8(PCI_SBDF(seg, bus, dev, func), pos);
         if ( pos < 0x40 )
             break;
 
         pos &= ~3;
-        id = pci_conf_read8(seg, bus, dev, func, pos + PCI_CAP_LIST_ID);
+        id = pci_conf_read8(PCI_SBDF(seg, bus, dev, func), pos + PCI_CAP_LIST_ID);
 
         if ( id == 0xff )
             break;
@@ -46,13 +46,12 @@ int pci_find_next_cap(u16 seg, u8 bus, unsigned int devfn, u8 pos, int cap)
 
     while ( ttl-- )
     {
-        pos = pci_conf_read8(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
+        pos = pci_conf_read8(PCI_SBDF3(seg, bus, devfn), pos);
         if ( pos < 0x40 )
             break;
 
         pos &= ~3;
-        id = pci_conf_read8(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                            pos + PCI_CAP_LIST_ID);
+        id = pci_conf_read8(PCI_SBDF3(seg, bus, devfn), pos + PCI_CAP_LIST_ID);
 
         if ( id == 0xff )
             break;

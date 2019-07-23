@@ -222,8 +222,7 @@ static uint32_t vpci_read_hw(pci_sbdf_t sbdf, unsigned int reg,
          */
         if ( reg & 1 )
         {
-            data = pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
-                                  reg);
+            data = pci_conf_read8(sbdf, reg);
             data |= pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
                                     reg + 1) << 8;
         }
@@ -231,8 +230,7 @@ static uint32_t vpci_read_hw(pci_sbdf_t sbdf, unsigned int reg,
         {
             data = pci_conf_read16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
                                    reg);
-            data |= pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn,
-                                   reg + 2) << 16;
+            data |= pci_conf_read8(sbdf, reg + 2) << 16;
         }
         break;
 
@@ -241,7 +239,7 @@ static uint32_t vpci_read_hw(pci_sbdf_t sbdf, unsigned int reg,
         break;
 
     case 1:
-        data = pci_conf_read8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg);
+        data = pci_conf_read8(sbdf, reg);
         break;
 
     default:

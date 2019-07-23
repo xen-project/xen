@@ -1188,8 +1188,10 @@ pci_uart_config(struct ns16550 *uart, bool_t skip_amt, unsigned int idx)
                 uart->bar64 = bar_64;
                 uart->io_size = max(8U << param->reg_shift,
                                     param->uart_offset);
-                uart->irq = pci_conf_read8(0, b, d, f, PCI_INTERRUPT_PIN) ?
-                    pci_conf_read8(0, b, d, f, PCI_INTERRUPT_LINE) : 0;
+                uart->irq = pci_conf_read8(PCI_SBDF(0, b, d, f),
+                                           PCI_INTERRUPT_PIN) ?
+                            pci_conf_read8(PCI_SBDF(0, b, d, f),
+                                           PCI_INTERRUPT_LINE) : 0;
 
                 return 0;
             }

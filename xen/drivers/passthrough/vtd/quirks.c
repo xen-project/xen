@@ -92,8 +92,8 @@ static void __init cantiga_b3_errata_init(void)
     if ( vid != 0x8086 )
         return;
 
-    did_hi = pci_conf_read8(0, 0, IGD_DEV, 0, 3);
-    rid = pci_conf_read8(0, 0, IGD_DEV, 0, 8);
+    did_hi = pci_conf_read8(PCI_SBDF(0, 0, IGD_DEV, 0), 3);
+    rid = pci_conf_read8(PCI_SBDF(0, 0, IGD_DEV, 0), 8);
 
     if ( (did_hi == 0x2A) && (rid == 0x7) )
         is_cantiga_b3 = 1;
@@ -281,7 +281,7 @@ static void __init tylersburg_intremap_quirk(void)
     {
         /* Match on System Management Registers on Device 20 Function 0 */
         device = pci_conf_read32(0, bus, 20, 0, PCI_VENDOR_ID);
-        rev = pci_conf_read8(0, bus, 20, 0, PCI_REVISION_ID);
+        rev = pci_conf_read8(PCI_SBDF(0, bus, 20, 0), PCI_REVISION_ID);
 
         if ( rev == 0x13 && device == 0x342e8086 )
         {

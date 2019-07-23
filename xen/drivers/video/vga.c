@@ -136,8 +136,7 @@ void __init video_endboot(void)
                         b = 0;
                         break;
                     case 1:
-                        switch ( pci_conf_read8(0, b, PCI_SLOT(df),
-                                                PCI_FUNC(df),
+                        switch ( pci_conf_read8(PCI_SBDF3(0, b, df),
                                                 PCI_HEADER_TYPE) )
                         {
                         case PCI_HEADER_TYPE_BRIDGE:

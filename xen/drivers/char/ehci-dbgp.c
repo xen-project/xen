@@ -713,7 +713,7 @@ static unsigned int __init find_dbgp(struct ehci_dbgp *dbgp,
                 cap = __find_dbgp(bus, slot, func);
                 if ( !cap || ehci_num-- )
                 {
-                    if ( !func && !(pci_conf_read8(0, bus, slot, func,
+                    if ( !func && !(pci_conf_read8(PCI_SBDF(0, bus, slot, func),
                                                    PCI_HEADER_TYPE) & 0x80) )
                         break;
                     continue;
@@ -1312,7 +1312,8 @@ static void __init ehci_dbgp_init_preirq(struct serial_port *port)
     offset = (debug_port >> 16) & 0xfff;
 
     /* double check if the mem space is enabled */
-    dbgp->pci_cr = pci_conf_read8(0, dbgp->bus, dbgp->slot, dbgp->func,
+    dbgp->pci_cr = pci_conf_read8(PCI_SBDF(0, dbgp->bus, dbgp->slot,
+                                           dbgp->func),
                                   PCI_COMMAND);
     if ( !(dbgp->pci_cr & PCI_COMMAND_MEMORY) )
     {

@@ -463,8 +463,7 @@ static int init_bars(struct pci_dev *pdev)
     struct vpci_bar *bars = header->bars;
     int rc;
 
-    switch ( pci_conf_read8(pdev->seg, pdev->bus, slot, func, PCI_HEADER_TYPE)
-             & 0x7f )
+    switch ( pci_conf_read8(pdev->sbdf, PCI_HEADER_TYPE) & 0x7f )
     {
     case PCI_HEADER_TYPE_NORMAL:
         num_bars = PCI_HEADER_NORMAL_NR_BARS;

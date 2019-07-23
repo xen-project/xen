@@ -260,7 +260,7 @@ static void check_pdev(const struct pci_dev *pdev)
         }
     }
 
-    switch ( pci_conf_read8(seg, bus, dev, func, PCI_HEADER_TYPE) & 0x7f )
+    switch ( pci_conf_read8(pdev->sbdf, PCI_HEADER_TYPE) & 0x7f )
     {
     case PCI_HEADER_TYPE_BRIDGE:
         if ( !bridge_ctl_mask )
@@ -370,10 +370,8 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
 
         case DEV_TYPE_PCIe2PCI_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
-            sec_bus = pci_conf_read8(pseg->nr, bus, PCI_SLOT(devfn),
-                                     PCI_FUNC(devfn), PCI_SECONDARY_BUS);
-            sub_bus = pci_conf_read8(pseg->nr, bus, PCI_SLOT(devfn),
-                                     PCI_FUNC(devfn), PCI_SUBORDINATE_BUS);
+            sec_bus = pci_conf_read8(pdev->sbdf, PCI_SECONDARY_BUS);
+            sub_bus = pci_conf_read8(pdev->sbdf, PCI_SUBORDINATE_BUS);
 
             spin_lock(&pseg->bus2bridge_lock);
             for ( ; sec_bus <= sub_bus; sec_bus++ )
@@ -436,16 +434,12 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
     /* update bus2bridge */
     switch ( pdev->type )
     {
-        u8 dev, func, sec_bus, sub_bus;
+        uint8_t sec_bus, sub_bus;
 
         case DEV_TYPE_PCIe2PCI_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
-            dev = PCI_SLOT(pdev->devfn);
-            func = PCI_FUNC(pdev->devfn);
-            sec_bus = pci_conf_read8(pseg->nr, pdev->bus, dev, func,
-                                     PCI_SECONDARY_BUS);
-            sub_bus = pci_conf_read8(pseg->nr, pdev->bus, dev, func,
-                                     PCI_SUBORDINATE_BUS);
+            sec_bus = pci_conf_read8(pdev->sbdf, PCI_SECONDARY_BUS);
+            sub_bus = pci_conf_read8(pdev->sbdf, PCI_SUBORDINATE_BUS);
 
             spin_lock(&pseg->bus2bridge_lock);
             for ( ; sec_bus <= sub_bus; sec_bus++ )
@@ -1082,7 +1076,8 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
                     return -ENOMEM;
                 }
 
-                if ( !func && !(pci_conf_read8(pseg->nr, bus, dev, func,
+                if ( !func && !(pci_conf_read8(PCI_SBDF(pseg->nr, bus, dev,
+                                                        func),
                                                PCI_HEADER_TYPE) & 0x80) )
                     break;
             }

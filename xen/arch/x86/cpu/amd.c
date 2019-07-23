@@ -420,7 +420,7 @@ static void disable_c1_ramping(void)
 	nr_nodes = ((pci_conf_read32(0, 0, 0x18, 0x0, 0x60)>>4)&0x07)+1;
 	for (node = 0; node < nr_nodes; node++) {
 		/* PMM7: bus=0, dev=0x18+node, function=0x3, register=0x87. */
-		pmm7 = pci_conf_read8(0, 0, 0x18+node, 0x3, 0x87);
+		pmm7 = pci_conf_read8(PCI_SBDF(0, 0, 0x18 + node, 3), 0x87);
 		/* Invalid read means we've updated every Northbridge. */
 		if (pmm7 == 0xFF)
 			break;

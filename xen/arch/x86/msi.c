@@ -800,7 +800,7 @@ static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
         disp = vf * pdev->vf_rlen[bir];
         limit = PCI_SRIOV_NUM_BARS;
     }
-    else switch ( pci_conf_read8(seg, bus, slot, func,
+    else switch ( pci_conf_read8(PCI_SBDF(seg, bus, slot, func),
                                  PCI_HEADER_TYPE) & 0x7f )
     {
     case PCI_HEADER_TYPE_NORMAL:
