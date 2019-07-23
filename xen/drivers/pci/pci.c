@@ -116,17 +116,13 @@ int pci_find_next_ext_capability(int seg, int bus, int devfn, int start, int cap
 
 void pci_intx(const struct pci_dev *pdev, bool enable)
 {
-    uint16_t seg = pdev->seg;
-    uint8_t bus = pdev->bus;
-    uint8_t slot = PCI_SLOT(pdev->devfn);
-    uint8_t func = PCI_FUNC(pdev->devfn);
     uint16_t cmd = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
 
     if ( enable )
         cmd &= ~PCI_COMMAND_INTX_DISABLE;
     else
         cmd |= PCI_COMMAND_INTX_DISABLE;
-    pci_conf_write16(seg, bus, slot, func, PCI_COMMAND, cmd);
+    pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd);
 }
 
 const char *__init parse_pci(const char *s, unsigned int *seg_p,

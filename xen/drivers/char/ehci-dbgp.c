@@ -1324,8 +1324,8 @@ static void __init ehci_dbgp_init_preirq(struct serial_port *port)
     if ( !(dbgp->pci_cr & PCI_COMMAND_MEMORY) )
     {
         dbgp->pci_cr |= PCI_COMMAND_MEMORY;
-        pci_conf_write16(0, dbgp->bus, dbgp->slot, dbgp->func, PCI_COMMAND,
-                         dbgp->pci_cr);
+        pci_conf_write16(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
+                         PCI_COMMAND, dbgp->pci_cr);
         dbgp_printk("MMIO for EHCI enabled\n");
     }
 
@@ -1438,7 +1438,7 @@ static void ehci_dbgp_resume(struct serial_port *port)
 
     pci_conf_write32(0, dbgp->bus, dbgp->slot, dbgp->func, dbgp->bar,
                      dbgp->bar_val);
-    pci_conf_write16(0, dbgp->bus, dbgp->slot, dbgp->func,
+    pci_conf_write16(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
                      PCI_COMMAND, dbgp->pci_cr);
 
     ehci_dbgp_setup_preirq(dbgp);

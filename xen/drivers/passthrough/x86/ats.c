@@ -50,8 +50,7 @@ int enable_ats_device(struct pci_dev *pdev, struct list_head *ats_list)
     if ( !(value & ATS_ENABLE) )
     {
         value |= ATS_ENABLE;
-        pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                         pos + ATS_REG_CTL, value);
+        pci_conf_write16(pdev->sbdf, pos + ATS_REG_CTL, value);
     }
 
     if ( pos )
@@ -81,8 +80,7 @@ void disable_ats_device(struct pci_dev *pdev)
 
     value = pci_conf_read16(pdev->sbdf, pdev->ats.cap_pos + ATS_REG_CTL);
     value &= ~ATS_ENABLE;
-    pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                     pdev->ats.cap_pos + ATS_REG_CTL, value);
+    pci_conf_write16(pdev->sbdf, pdev->ats.cap_pos + ATS_REG_CTL, value);
 
     list_del(&pdev->ats.list);
 

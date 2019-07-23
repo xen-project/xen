@@ -123,8 +123,7 @@ static void modify_decoding(const struct pci_dev *pdev, uint16_t cmd,
     }
 
     if ( !rom_only )
-        pci_conf_write16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND,
-                         cmd);
+        pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd);
     else
         ASSERT_UNREACHABLE();
 }
@@ -335,7 +334,6 @@ static int modify_bars(const struct pci_dev *pdev, uint16_t cmd, bool rom_only)
 static void cmd_write(const struct pci_dev *pdev, unsigned int reg,
                       uint32_t cmd, void *data)
 {
-    uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
     uint16_t current_cmd = pci_conf_read16(pdev->sbdf, reg);
 
     /*
@@ -351,7 +349,7 @@ static void cmd_write(const struct pci_dev *pdev, unsigned int reg,
          */
         modify_bars(pdev, cmd, false);
     else
-        pci_conf_write16(pdev->seg, pdev->bus, slot, func, reg, cmd);
+        pci_conf_write16(pdev->sbdf, reg, cmd);
 }
 
 static void bar_write(const struct pci_dev *pdev, unsigned int reg,
@@ -397,8 +395,7 @@ static void bar_write(const struct pci_dev *pdev, unsigned int reg,
         val |= bar->prefetchable ? PCI_BASE_ADDRESS_MEM_PREFETCH : 0;
     }
 
-    pci_conf_write32(pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                     PCI_FUNC(pdev->devfn), reg, val);
+    pci_conf_write32(pdev->seg, pdev->bus, slot, func, reg, val);
 }
 
 static void rom_write(const struct pci_dev *pdev, unsigned int reg,
@@ -452,7 +449,6 @@ static void rom_write(const struct pci_dev *pdev, unsigned int reg,
 
 static int init_bars(struct pci_dev *pdev)
 {
-    uint8_t slot = PCI_SLOT(pdev->devfn), func = PCI_FUNC(pdev->devfn);
     uint16_t cmd;
     uint64_t addr, size;
     unsigned int i, num_bars, rom_reg;
@@ -488,8 +484,7 @@ static int init_bars(struct pci_dev *pdev)
     /* Disable memory decoding before sizing. */
     cmd = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
     if ( cmd & PCI_COMMAND_MEMORY )
-        pci_conf_write16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND,
-                         cmd & ~PCI_COMMAND_MEMORY);
+        pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd & ~PCI_COMMAND_MEMORY);
 
     for ( i = 0; i < num_bars; i++ )
     {
@@ -503,8 +498,7 @@ static int init_bars(struct pci_dev *pdev)
                                    4, &bars[i]);
             if ( rc )
             {
-                pci_conf_write16(pdev->seg, pdev->bus, slot, func,
-                                 PCI_COMMAND, cmd);
+                pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd);
                 return rc;
             }
 
@@ -527,8 +521,7 @@ static int init_bars(struct pci_dev *pdev)
                               (i == num_bars - 1) ? PCI_BAR_LAST : 0);
         if ( rc < 0 )
         {
-            pci_conf_write16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND,
-                             cmd);
+            pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd);
             return rc;
         }
 
@@ -546,8 +539,7 @@ static int init_bars(struct pci_dev *pdev)
                                &bars[i]);
         if ( rc )
         {
-            pci_conf_write16(pdev->seg, pdev->bus, slot, func, PCI_COMMAND,
-                             cmd);
+            pci_conf_write16(pdev->sbdf, PCI_COMMAND, cmd);
             return rc;
         }
     }

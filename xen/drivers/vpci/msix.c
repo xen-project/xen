@@ -146,7 +146,7 @@ static void control_write(const struct pci_dev *pdev, unsigned int reg,
 
     val = control_read(pdev, reg, data);
     if ( pci_msi_conf_write_intercept(msix->pdev, reg, 2, &val) >= 0 )
-        pci_conf_write16(pdev->seg, pdev->bus, slot, func, reg, val);
+        pci_conf_write16(pdev->sbdf, reg, val);
 }
 
 static struct vpci_msix *msix_find(const struct domain *d, unsigned long addr)

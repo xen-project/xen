@@ -624,7 +624,8 @@ static void pci_serial_early_init(struct ns16550 *uart)
         return;
 
     if ( uart->pb_bdf_enable )
-        pci_conf_write16(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+        pci_conf_write16(PCI_SBDF(0, uart->pb_bdf[0], uart->pb_bdf[1],
+                                  uart->pb_bdf[2]),
                          PCI_IO_BASE,
                          (uart->io_base & 0xF000) |
                          ((uart->io_base & 0xF000) >> 8));
@@ -632,7 +633,8 @@ static void pci_serial_early_init(struct ns16550 *uart)
     pci_conf_write32(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
                      PCI_BASE_ADDRESS_0,
                      uart->io_base | PCI_BASE_ADDRESS_SPACE_IO);
-    pci_conf_write16(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
+    pci_conf_write16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
+                              uart->ps_bdf[2]),
                      PCI_COMMAND, PCI_COMMAND_IO);
 #endif
 }
@@ -867,7 +869,8 @@ static void _ns16550_resume(struct serial_port *port)
                         uart->ps_bdf[1], uart->ps_bdf[2],
                         PCI_BASE_ADDRESS_0 + (uart->bar_idx+1)*4, uart->bar64);
 
-       pci_conf_write16(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
+       pci_conf_write16(PCI_SBDF(0, uart->ps_bdf[0], uart->ps_bdf[1],
+                                 uart->ps_bdf[2]),
                         PCI_COMMAND, uart->cr);
     }
 #endif

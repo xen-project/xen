@@ -176,9 +176,7 @@ uint8_t pci_conf_read8(pci_sbdf_t sbdf, unsigned int reg);
 uint16_t pci_conf_read16(pci_sbdf_t sbdf, unsigned int reg);
 uint32_t pci_conf_read32(pci_sbdf_t sbdf, unsigned int reg);
 void pci_conf_write8(pci_sbdf_t sbdf, unsigned int reg, uint8_t data);
-void pci_conf_write16(
-    unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
-    unsigned int reg, uint16_t data);
+void pci_conf_write16(pci_sbdf_t sbdf, unsigned int reg, uint16_t data);
 void pci_conf_write32(
     unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,
     unsigned int reg, uint32_t data);

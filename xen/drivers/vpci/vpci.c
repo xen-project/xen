@@ -264,19 +264,17 @@ static void vpci_write_hw(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
         if ( reg & 1 )
         {
             pci_conf_write8(sbdf, reg, data);
-            pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg + 1,
-                             data >> 8);
+            pci_conf_write16(sbdf, reg + 1, data >> 8);
         }
         else
         {
-            pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg,
-                             data);
+            pci_conf_write16(sbdf, reg, data);
             pci_conf_write8(sbdf, reg + 2, data >> 16);
         }
         break;
 
     case 2:
-        pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg, data);
+        pci_conf_write16(sbdf, reg, data);
         break;
 
     case 1:

@@ -248,15 +248,13 @@ static void check_pdev(const struct pci_dev *pdev)
     {
         val = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
         if ( val & command_mask )
-            pci_conf_write16(seg, bus, dev, func, PCI_COMMAND,
-                             val & ~command_mask);
+            pci_conf_write16(pdev->sbdf, PCI_COMMAND, val & ~command_mask);
         val = pci_conf_read16(pdev->sbdf, PCI_STATUS);
         if ( val & PCI_STATUS_CHECK )
         {
             printk(XENLOG_INFO "%04x:%02x:%02x.%u status %04x -> %04x\n",
                    seg, bus, dev, func, val, val & ~PCI_STATUS_CHECK);
-            pci_conf_write16(seg, bus, dev, func, PCI_STATUS,
-                             val & PCI_STATUS_CHECK);
+            pci_conf_write16(pdev->sbdf, PCI_STATUS, val & PCI_STATUS_CHECK);
         }
     }
 
@@ -267,7 +265,7 @@ static void check_pdev(const struct pci_dev *pdev)
             break;
         val = pci_conf_read16(pdev->sbdf, PCI_BRIDGE_CONTROL);
         if ( val & bridge_ctl_mask )
-            pci_conf_write16(seg, bus, dev, func, PCI_BRIDGE_CONTROL,
+            pci_conf_write16(pdev->sbdf, PCI_BRIDGE_CONTROL,
                              val & ~bridge_ctl_mask);
         val = pci_conf_read16(pdev->sbdf, PCI_SEC_STATUS);
         if ( val & PCI_STATUS_CHECK )
@@ -275,7 +273,7 @@ static void check_pdev(const struct pci_dev *pdev)
             printk(XENLOG_INFO
                    "%04x:%02x:%02x.%u secondary status %04x -> %04x\n",
                    seg, bus, dev, func, val, val & ~PCI_STATUS_CHECK);
-            pci_conf_write16(seg, bus, dev, func, PCI_SEC_STATUS,
+            pci_conf_write16(pdev->sbdf, PCI_SEC_STATUS,
                              val & PCI_STATUS_CHECK);
         }
         break;
@@ -596,8 +594,6 @@ static void pci_enable_acs(struct pci_dev *pdev)
     int pos;
     u16 cap, ctrl, seg = pdev->seg;
     u8 bus = pdev->bus;
-    u8 dev = PCI_SLOT(pdev->devfn);
-    u8 func = PCI_FUNC(pdev->devfn);
 
     if ( !iommu_enabled )
         return;
@@ -621,7 +617,7 @@ static void pci_enable_acs(struct pci_dev *pdev)
     /* Upstream Forwarding */
     ctrl |= (cap & PCI_ACS_UF);
 
-    pci_conf_write16(seg, bus, dev, func, pos + PCI_ACS_CTRL, ctrl);
+    pci_conf_write16(pdev->sbdf, pos + PCI_ACS_CTRL, ctrl);
 }
 
 static int iommu_add_device(struct pci_dev *pdev);
@@ -1031,10 +1027,8 @@ void pci_check_disable_device(u16 seg, u8 bus, u8 devfn)
 
     /* Tell the device to stop DMAing; we can't rely on the guest to
      * control it for us. */
-    devfn = pdev->devfn;
     cword = pci_conf_read16(pdev->sbdf, PCI_COMMAND);
-    pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                     PCI_COMMAND, cword & ~PCI_COMMAND_MASTER);
+    pci_conf_write16(pdev->sbdf, PCI_COMMAND, cword & ~PCI_COMMAND_MASTER);
 }
 
 /*

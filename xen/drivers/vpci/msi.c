@@ -77,9 +77,7 @@ static void control_write(const struct pci_dev *pdev, unsigned int reg,
     msi->vectors = vectors;
     msi->enabled = new_enabled;
 
-    pci_conf_write16(pdev->seg, pdev->bus, PCI_SLOT(pdev->devfn),
-                     PCI_FUNC(pdev->devfn), reg,
-                     control_read(pdev, reg, data));
+    pci_conf_write16(pdev->sbdf, reg, control_read(pdev, reg, data));
 }
 
 static void update_msi(const struct pci_dev *pdev, struct vpci_msi *msi)
