@@ -384,7 +384,7 @@ void panic_PAR(uint64_t par)
 
 static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
 {
-    uint32_t sctlr = READ_SYSREG32(SCTLR_EL1);
+    register_t sctlr = READ_SYSREG(SCTLR_EL1);
 
     regs->cpsr &= ~(PSR_MODE_MASK|PSR_IT_MASK|PSR_JAZELLE|PSR_BIG_ENDIAN|PSR_THUMB);
 
@@ -400,7 +400,7 @@ static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
 
 static vaddr_t exception_handler32(vaddr_t offset)
 {
-    uint32_t sctlr = READ_SYSREG32(SCTLR_EL1);
+    register_t sctlr = READ_SYSREG(SCTLR_EL1);
 
     if ( sctlr & SCTLR_A32_EL1_V )
         return 0xffff0000 + offset;
@@ -719,7 +719,7 @@ crash_system:
 
 struct reg_ctxt {
     /* Guest-side state */
-    uint32_t sctlr_el1;
+    register_t sctlr_el1;
     register_t tcr_el1;
     uint64_t ttbr0_el1, ttbr1_el1;
 #ifdef CONFIG_ARM_32
@@ -822,7 +822,7 @@ static void show_registers_32(const struct cpu_user_regs *regs,
 
     if ( guest_mode )
     {
-        printk("     SCTLR: %08"PRIx32"\n", ctxt->sctlr_el1);
+        printk("     SCTLR: %"PRIregister"\n", ctxt->sctlr_el1);
         printk("       TCR: %08"PRIregister"\n", ctxt->tcr_el1);
         printk("     TTBR0: %016"PRIx64"\n", ctxt->ttbr0_el1);
         printk("     TTBR1: %016"PRIx64"\n", ctxt->ttbr1_el1);
@@ -894,7 +894,7 @@ static void show_registers_64(const struct cpu_user_regs *regs,
         printk("   ESR_EL1: %08"PRIx32"\n", ctxt->esr_el1);
         printk("   FAR_EL1: %016"PRIx64"\n", ctxt->far);
         printk("\n");
-        printk(" SCTLR_EL1: %08"PRIx32"\n", ctxt->sctlr_el1);
+        printk(" SCTLR_EL1: %"PRIregister"\n", ctxt->sctlr_el1);
         printk("   TCR_EL1: %08"PRIregister"\n", ctxt->tcr_el1);
         printk(" TTBR0_EL1: %016"PRIx64"\n", ctxt->ttbr0_el1);
         printk(" TTBR1_EL1: %016"PRIx64"\n", ctxt->ttbr1_el1);
