@@ -263,8 +263,7 @@ static void vpci_write_hw(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
          */
         if ( reg & 1 )
         {
-            pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg,
-                            data);
+            pci_conf_write8(sbdf, reg, data);
             pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg + 1,
                              data >> 8);
         }
@@ -272,8 +271,7 @@ static void vpci_write_hw(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
         {
             pci_conf_write16(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg,
                              data);
-            pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg + 2,
-                            data >> 16);
+            pci_conf_write8(sbdf, reg + 2, data >> 16);
         }
         break;
 
@@ -282,7 +280,7 @@ static void vpci_write_hw(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
         break;
 
     case 1:
-        pci_conf_write8(sbdf.seg, sbdf.bus, sbdf.dev, sbdf.fn, reg, data);
+        pci_conf_write8(sbdf, reg, data);
         break;
 
     default:

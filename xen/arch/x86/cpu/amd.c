@@ -426,7 +426,7 @@ static void disable_c1_ramping(void)
 		if (pmm7 == 0xFF)
 			break;
 		pmm7 &= 0xFC; /* clear pmm7[1:0] */
-		pci_conf_write8(0, 0, 0x18+node, 0x3, 0x87, pmm7);
+		pci_conf_write8(PCI_SBDF(0, 0, 0x18 + node, 3), 0x87, pmm7);
 		printk ("AMD: Disabling C1 Clock Ramping Node #%x\n", node);
 	}
 }

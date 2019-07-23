@@ -1048,7 +1048,8 @@ static void ehci_dbgp_bios_handoff(struct ehci_dbgp *dbgp, u32 hcc_params)
     if ( (cap & 0xff) == 1 && (cap & EHCI_USBLEGSUP_BIOS) )
     {
         dbgp_printk("dbgp: BIOS handoff\n");
-        pci_conf_write8(0, dbgp->bus, dbgp->slot, dbgp->func, offset + 3, 1);
+        pci_conf_write8(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
+                        offset + 3, 1);
     }
 
     /* if boot firmware now owns EHCI, spin till it hands it over. */
@@ -1066,11 +1067,12 @@ static void ehci_dbgp_bios_handoff(struct ehci_dbgp *dbgp, u32 hcc_params)
         /* well, possibly buggy BIOS... try to shut it down,
          * and hope nothing goes too wrong */
         dbgp_printk("dbgp: BIOS handoff failed: %08x\n", cap);
-        pci_conf_write8(0, dbgp->bus, dbgp->slot, dbgp->func, offset + 2, 0);
+        pci_conf_write8(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
+                        offset + 2, 0);
     }
 
     /* just in case, always disable EHCI SMIs */
-    pci_conf_write8(0, dbgp->bus, dbgp->slot, dbgp->func,
+    pci_conf_write8(PCI_SBDF(0, dbgp->bus, dbgp->slot, dbgp->func),
                     offset + EHCI_USBLEGCTLSTS, 0);
 }
 
