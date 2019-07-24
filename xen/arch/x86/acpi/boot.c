@@ -332,7 +332,6 @@ static int __init acpi_invalidate_bgrt(struct acpi_table_header *table)
 	return 0;
 }
 
-#ifdef CONFIG_ACPI_SLEEP
 #define acpi_fadt_copy_address(dst, src, len) do {			\
 	if (fadt->header.revision >= FADT2_REVISION_ID &&		\
 	    fadt->header.length >= ACPI_FADT_V2_SIZE)			\
@@ -457,7 +456,6 @@ bad:
 	memset(&acpi_sinfo.sleep_status + 1, 0,
 	       (long)(&acpi_sinfo + 1) - (long)(&acpi_sinfo.sleep_status + 1));
 }
-#endif
 
 static int __init acpi_parse_fadt(struct acpi_table_header *table)
 {
@@ -501,9 +499,7 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 	acpi_enable_value  = fadt->acpi_enable;
 	acpi_disable_value = fadt->acpi_disable;
 
-#ifdef CONFIG_ACPI_SLEEP
 	acpi_fadt_parse_sleep_info(fadt);
-#endif
 
 	return 0;
 }
