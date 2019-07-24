@@ -24,7 +24,7 @@ struct dmi_strmatch {
 };
 
 struct dmi_system_id {
-	int (*callback)(struct dmi_system_id *);
+	int (*callback)(const struct dmi_system_id *);
 	char *ident;
 	struct dmi_strmatch matches[4];
 	void *driver_data;
@@ -32,7 +32,7 @@ struct dmi_system_id {
 
 #define DMI_MATCH(a,b)	{ a, b }
 
-extern int dmi_check_system(struct dmi_system_id *list);
+extern int dmi_check_system(const struct dmi_system_id *list);
 extern void dmi_scan_machine(void);
 extern const char *dmi_get_table(paddr_t *base, u32 *len);
 extern void dmi_efi_get_table(const void *smbios, const void *smbios3);

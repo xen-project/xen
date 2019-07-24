@@ -24,7 +24,7 @@
 s8 __read_mostly hvm_port80_allowed = -1;
 boolean_param("hvm_port80", hvm_port80_allowed);
 
-static int __init dmi_hvm_deny_port80(/*const*/ struct dmi_system_id *id)
+static int __init dmi_hvm_deny_port80(const struct dmi_system_id *id)
 {
     printk(XENLOG_WARNING "%s: port 0x80 access %s allowed for HVM guests\n",
            id->ident, hvm_port80_allowed > 0 ? "forcibly" : "not");
@@ -41,7 +41,7 @@ static int __init check_port80(void)
      * Quirk table for systems that misbehave (lock up, etc.) if port
      * 0x80 is used:
      */
-    static struct dmi_system_id __initdata hvm_no_port80_dmi_table[] =
+    static const struct dmi_system_id __initconstrel hvm_no_port80_dmi_table[] =
     {
         {
             .callback = dmi_hvm_deny_port80,

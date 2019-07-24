@@ -34,7 +34,7 @@ static bool ioemul_handle_proliant_quirk(
 }
 
 /* This table is the set of system-specific I/O emulation hooks. */
-static struct dmi_system_id __initdata ioport_quirks_tbl[] = {
+static const struct dmi_system_id __initconstrel ioport_quirks_tbl[] = {
     /*
      * I/O emulation hook for certain HP ProLiant servers with
      * 'special' SMM goodness.

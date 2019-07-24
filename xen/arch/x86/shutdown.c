@@ -157,7 +157,7 @@ static void default_reboot_type(void)
         reboot_type = BOOT_ACPI;
 }
 
-static int __init override_reboot(struct dmi_system_id *d)
+static int __init override_reboot(const struct dmi_system_id *d)
 {
     enum reboot_type type = (long)d->driver_data;
 
@@ -181,7 +181,7 @@ static int __init override_reboot(struct dmi_system_id *d)
     return 0;
 }
 
-static struct dmi_system_id __initdata reboot_dmi_table[] = {
+static const struct dmi_system_id __initconstrel reboot_dmi_table[] = {
     {    /* Handle problems with rebooting on Dell E520's */
         .callback = override_reboot,
         .driver_data = (void *)(long)BOOT_KBD,

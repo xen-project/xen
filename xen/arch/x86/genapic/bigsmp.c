@@ -11,7 +11,7 @@
 #include <asm/mach-default/mach_mpparse.h>
 #include <asm/io_apic.h>
 
-static __init int force_bigsmp(struct dmi_system_id *d)
+static __init int force_bigsmp(const struct dmi_system_id *d)
 {
 	printk(KERN_NOTICE "%s detected: force use of apic=bigsmp\n", d->ident);
 	def_to_bigsmp = true;
@@ -19,7 +19,7 @@ static __init int force_bigsmp(struct dmi_system_id *d)
 }
 
 
-static struct dmi_system_id __initdata bigsmp_dmi_table[] = {
+static const struct dmi_system_id __initconstrel bigsmp_dmi_table[] = {
 	{ force_bigsmp, "UNISYS ES7000-ONE", {
 		DMI_MATCH(DMI_PRODUCT_NAME, "ES7000-ONE")
 	 }},

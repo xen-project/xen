@@ -455,7 +455,7 @@ static void __init dmi_save_ident(struct dmi_header *dm, int slot, int string)
 #define NO_MATCH	{ DMI_NONE, NULL}
 #define MATCH		DMI_MATCH
 
-static int __init ich10_bios_quirk(struct dmi_system_id *d)
+static int __init ich10_bios_quirk(const struct dmi_system_id *d)
 {
     u32 port, smictl;
 
@@ -478,14 +478,14 @@ static int __init ich10_bios_quirk(struct dmi_system_id *d)
     return 0;
 }
 
-static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
+static __init int reset_videomode_after_s3(const struct dmi_blacklist *d)
 {
 	/* See wakeup.S */
 	acpi_video_flags |= 2;
 	return 0;
 }
 
-static __init int dmi_disable_acpi(struct dmi_blacklist *d) 
+static __init int dmi_disable_acpi(const struct dmi_blacklist *d)
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: acpi off\n",d->ident);
@@ -500,7 +500,7 @@ static __init int dmi_disable_acpi(struct dmi_blacklist *d)
 /*
  * Limit ACPI to CPU enumeration for HT
  */
-static __init int force_acpi_ht(struct dmi_blacklist *d) 
+static __init int force_acpi_ht(const struct dmi_blacklist *d)
 { 
 	if (!acpi_force) { 
 		printk(KERN_NOTICE "%s detected: force use of acpi=ht\n", d->ident);
@@ -523,7 +523,7 @@ static __init int force_acpi_ht(struct dmi_blacklist *d)
  *	interrupt mask settings according to the laptop
  */
  
-static __initdata struct dmi_blacklist dmi_blacklist[]={
+static const struct dmi_blacklist __initconstrel dmi_blacklist[] = {
 
 	{ reset_videomode_after_s3, "Toshiba Satellite 4030cdt", { /* Reset video mode after returning from ACPI S3 sleep */
 			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
@@ -693,10 +693,10 @@ void __init dmi_scan_machine(void)
  *	returns non zero or we hit the end. Callback function is called for
  *	each successfull match. Returns the number of matches.
  */
-int __init dmi_check_system(struct dmi_system_id *list)
+int __init dmi_check_system(const struct dmi_system_id *list)
 {
 	int i, count = 0;
-	struct dmi_system_id *d = list;
+	const struct dmi_system_id *d = list;
 
 	while (d->ident) {
 		for (i = 0; i < ARRAY_SIZE(d->matches); i++) {
