@@ -133,7 +133,6 @@ static void vcpu_info_reset(struct vcpu *v)
 static void vcpu_destroy(struct vcpu *v)
 {
     free_cpumask_var(v->cpu_hard_affinity);
-    free_cpumask_var(v->cpu_hard_affinity_tmp);
     free_cpumask_var(v->cpu_hard_affinity_saved);
     free_cpumask_var(v->cpu_soft_affinity);
 
@@ -161,7 +160,6 @@ struct vcpu *vcpu_create(
     grant_table_init_vcpu(v);
 
     if ( !zalloc_cpumask_var(&v->cpu_hard_affinity) ||
-         !zalloc_cpumask_var(&v->cpu_hard_affinity_tmp) ||
          !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||
          !zalloc_cpumask_var(&v->cpu_soft_affinity) )
         goto fail;
@@ -1269,7 +1267,6 @@ int vcpu_reset(struct vcpu *v)
     v->async_exception_mask = 0;
     memset(v->async_exception_state, 0, sizeof(v->async_exception_state));
 #endif
-    cpumask_clear(v->cpu_hard_affinity_tmp);
     clear_bit(_VPF_blocked, &v->pause_flags);
     clear_bit(_VPF_in_reset, &v->pause_flags);
 

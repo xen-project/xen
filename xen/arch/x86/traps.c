@@ -1600,14 +1600,6 @@ void async_exception_cleanup(struct vcpu *curr)
     if ( !curr->async_exception_mask )
         return;
 
-    /* Restore affinity.  */
-    if ( !cpumask_empty(curr->cpu_hard_affinity_tmp) &&
-         !cpumask_equal(curr->cpu_hard_affinity_tmp, curr->cpu_hard_affinity) )
-    {
-        vcpu_set_hard_affinity(curr, curr->cpu_hard_affinity_tmp);
-        cpumask_clear(curr->cpu_hard_affinity_tmp);
-    }
-
     if ( !(curr->async_exception_mask & (curr->async_exception_mask - 1)) )
         trap = __scanbit(curr->async_exception_mask, VCPU_TRAP_NONE);
     else
@@ -1634,7 +1626,7 @@ static void nmi_hwdom_report(unsigned int reason_idx)
 
     set_bit(reason_idx, nmi_reason(d));
 
-    pv_raise_interrupt(d->vcpu[0], TRAP_nmi);
+    pv_raise_nmi(d->vcpu[0]);
 }
 
 static void pci_serr_error(const struct cpu_user_regs *regs)

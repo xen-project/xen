@@ -27,8 +27,7 @@
 
 void pv_trap_init(void);
 
-/* Deliver interrupt to PV guest. Return 0 on success. */
-int pv_raise_interrupt(struct vcpu *v, uint8_t vector);
+int pv_raise_nmi(struct vcpu *v);
 
 int pv_emulate_privileged_op(struct cpu_user_regs *regs);
 void pv_emulate_gate_op(struct cpu_user_regs *regs);
@@ -46,8 +45,7 @@ static inline bool pv_trap_callback_registered(const struct vcpu *v,
 
 static inline void pv_trap_init(void) {}
 
-/* Deliver interrupt to PV guest. Return 0 on success. */
-static inline int pv_raise_interrupt(struct vcpu *v, uint8_t vector) { return -EOPNOTSUPP; }
+static inline int pv_raise_nmi(struct vcpu *v) { return -EOPNOTSUPP; }
 
 static inline int pv_emulate_privileged_op(struct cpu_user_regs *regs) { return 0; }
 static inline void pv_emulate_gate_op(struct cpu_user_regs *regs) {}

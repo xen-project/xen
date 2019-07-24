@@ -136,47 +136,20 @@ bool set_guest_nmi_trapbounce(void)
     return !null_trap_bounce(curr, tb);
 }
 
-struct softirq_trap {
-    struct domain *domain;   /* domain to inject trap */
-    struct vcpu *vcpu;       /* vcpu to inject trap */
-    unsigned int processor;  /* physical cpu to inject trap */
-};
+static DEFINE_PER_CPU(struct vcpu *, softirq_nmi_vcpu);
 
-static DEFINE_PER_CPU(struct softirq_trap, softirq_trap);
-
-static void nmi_mce_softirq(void)
+static void nmi_softirq(void)
 {
-    unsigned int cpu = smp_processor_id();
-    struct softirq_trap *st = &per_cpu(softirq_trap, cpu);
+    struct vcpu **v_ptr = &this_cpu(softirq_nmi_vcpu);
 
-    BUG_ON(st->vcpu == NULL);
-
-    /*
-     * Set the tmp value unconditionally, so that the check in the iret
-     * hypercall works.
-     */
-    cpumask_copy(st->vcpu->cpu_hard_affinity_tmp,
-                 st->vcpu->cpu_hard_affinity);
-
-    if ( (cpu != st->processor) ||
-         (st->processor != st->vcpu->processor) )
-    {
-
-        /*
-         * We are on a different physical cpu.  Make sure to wakeup the vcpu on
-         * the specified processor.
-         */
-        vcpu_set_hard_affinity(st->vcpu, cpumask_of(st->processor));
-
-        /* Affinity is restored in the iret hypercall. */
-    }
+    BUG_ON(*v_ptr == NULL);
 
     /*
-     * Only used to defer wakeup of domain/vcpu to a safe (non-NMI/MCE)
+     * Only used to defer wakeup of domain/vcpu to a safe (non-NMI)
      * context.
      */
-    vcpu_kick(st->vcpu);
-    st->vcpu = NULL;
+    vcpu_kick(*v_ptr);
+    *v_ptr = NULL;
 }
 
 void __init pv_trap_init(void)
@@ -189,50 +162,26 @@ void __init pv_trap_init(void)
     _set_gate(idt_table + LEGACY_SYSCALL_VECTOR, SYS_DESC_trap_gate, 3,
               &int80_direct_trap);
 
-    open_softirq(NMI_MCE_SOFTIRQ, nmi_mce_softirq);
+    open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
 
-int pv_raise_interrupt(struct vcpu *v, uint8_t vector)
+/*
+ * Deliver NMI to PV guest. Return 0 on success.
+ * Called in NMI context, so no use of printk().
+ */
+int pv_raise_nmi(struct vcpu *v)
 {
-    struct softirq_trap *st = &per_cpu(softirq_trap, smp_processor_id());
+    struct vcpu **v_ptr = &per_cpu(softirq_nmi_vcpu, smp_processor_id());
 
-    switch ( vector )
+    if ( cmpxchgptr(v_ptr, NULL, v) )
+        return -EBUSY;
+    if ( !test_and_set_bool(v->nmi_pending) )
     {
-    case TRAP_nmi:
-        if ( cmpxchgptr(&st->vcpu, NULL, v) )
-            return -EBUSY;
-        if ( !test_and_set_bool(v->nmi_pending) )
-        {
-            st->domain = v->domain;
-            st->processor = v->processor;
-
-            /* Not safe to wake up a vcpu here */
-            raise_softirq(NMI_MCE_SOFTIRQ);
-            return 0;
-        }
-        st->vcpu = NULL;
-        break;
-
-    case TRAP_machine_check:
-        if ( cmpxchgptr(&st->vcpu, NULL, v) )
-            return -EBUSY;
-
-        /*
-         * We are called by the machine check (exception or polling) handlers
-         * on the physical CPU that reported a machine check error.
-         */
-        if ( !test_and_set_bool(v->mce_pending) )
-        {
-            st->domain = v->domain;
-            st->processor = v->processor;
-
-            /* not safe to wake up a vcpu here */
-            raise_softirq(NMI_MCE_SOFTIRQ);
-            return 0;
-        }
-        st->vcpu = NULL;
-        break;
+        /* Not safe to wake up a vcpu here */
+        raise_softirq(NMI_SOFTIRQ);
+        return 0;
     }
+    *v_ptr = NULL;
 
     /* Delivery failed */
     return -EIO;

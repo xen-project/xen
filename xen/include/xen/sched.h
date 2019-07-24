@@ -245,8 +245,6 @@ struct vcpu
 
     /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_var_t    cpu_hard_affinity;
-    /* Used to change affinity temporarily. */
-    cpumask_var_t    cpu_hard_affinity_tmp;
     /* Used to restore affinity across S3. */
     cpumask_var_t    cpu_hard_affinity_saved;
 
