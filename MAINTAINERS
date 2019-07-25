@@ -240,9 +240,7 @@ S:	Maintained
 F:	tools/golang
 
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
-M:	Gang Wei <gang.wei@intel.com>
-M:	Shane Wang <shane.wang@intel.com>
-S:	Supported
+S:	Orphaned
 F:	xen/arch/x86/tboot.c
 F:	xen/include/asm-x86/tboot.h
 
