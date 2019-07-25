@@ -232,19 +232,9 @@ static bool __hwdom_init hwdom_iommu_map(const struct domain *d,
             return false;
     }
 
-    /*
-     * Check that it doesn't overlap with the LAPIC
-     * TODO: if the guest relocates the MMIO area of the LAPIC Xen should make
-     * sure there's nothing in the new address that would prevent trapping.
-     */
-    if ( has_vlapic(d) )
-    {
-        const struct vcpu *v;
-
-        for_each_vcpu(d, v)
-            if ( pfn == PFN_DOWN(vlapic_base_address(vcpu_vlapic(v))) )
-                return false;
-    }
+    /* Check that it doesn't overlap with the Interrupt Address Range. */
+    if ( pfn >= 0xfee00 && pfn <= 0xfeeff )
+        return false;
     /* ... or the IO-APIC */
     for ( i = 0; has_vioapic(d) && i < d->arch.hvm.nr_vioapics; i++ )
         if ( pfn == PFN_DOWN(domain_vioapic(d, i)->base_address) )
