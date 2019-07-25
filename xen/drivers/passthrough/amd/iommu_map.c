@@ -364,9 +364,6 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
     int rc;
     unsigned long pt_mfn[7];
 
-    if ( iommu_use_hap_pt(d) )
-        return 0;
-
     memset(pt_mfn, 0, sizeof(pt_mfn));
 
     spin_lock(&hd->arch.mapping_lock);
@@ -419,9 +416,6 @@ int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
 {
     unsigned long pt_mfn[7];
     struct domain_iommu *hd = dom_iommu(d);
-
-    if ( iommu_use_hap_pt(d) )
-        return 0;
 
     memset(pt_mfn, 0, sizeof(pt_mfn));
 
@@ -556,28 +550,6 @@ int amd_iommu_reserve_domain_unity_map(struct domain *domain,
         break;
 
     return rt;
-}
-
-/* Share p2m table with iommu. */
-void amd_iommu_share_p2m(struct domain *d)
-{
-    struct domain_iommu *hd = dom_iommu(d);
-    struct page_info *p2m_table;
-    mfn_t pgd_mfn;
-
-    pgd_mfn = pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
-    p2m_table = mfn_to_page(pgd_mfn);
-
-    if ( hd->arch.root_table != p2m_table )
-    {
-        free_amd_iommu_pgtable(hd->arch.root_table);
-        hd->arch.root_table = p2m_table;
-
-        /* When sharing p2m with iommu, paging mode = 4 */
-        hd->arch.paging_mode = 4;
-        AMD_IOMMU_DEBUG("Share p2m table with iommu: p2m table = %#lx\n",
-                        mfn_x(pgd_mfn));
-    }
 }
 
 /*

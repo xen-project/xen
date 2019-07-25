@@ -397,9 +397,6 @@ static void deallocate_iommu_page_tables(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
-    if ( iommu_use_hap_pt(d) )
-        return;
-
     spin_lock(&hd->arch.mapping_lock);
     if ( hd->arch.root_table )
     {
@@ -567,7 +564,6 @@ static const struct iommu_ops __initconstrel _iommu_ops = {
     .setup_hpet_msi = amd_setup_hpet_msi,
     .suspend = amd_iommu_suspend,
     .resume = amd_iommu_resume,
-    .share_p2m = amd_iommu_share_p2m,
     .crash_shutdown = amd_iommu_crash_shutdown,
     .dump_p2m_table = amd_dump_p2m_table,
 };
