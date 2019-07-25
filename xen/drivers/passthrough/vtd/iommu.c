@@ -2377,10 +2377,6 @@ static int __init vtd_setup(void)
     P(iommu_hap_pt_share, "Shared EPT tables");
 #undef P
 
-    ret = scan_pci_devices();
-    if ( ret )
-        goto error;
-
     ret = init_vtd_hw();
     if ( ret )
         goto error;

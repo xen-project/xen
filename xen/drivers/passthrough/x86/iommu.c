@@ -28,8 +28,14 @@ struct iommu_ops __read_mostly iommu_ops;
 
 int __init iommu_hardware_setup(void)
 {
+    int rc;
+
     if ( !iommu_init_ops )
         return -ENODEV;
+
+    rc = scan_pci_devices();
+    if ( rc )
+        return rc;
 
     if ( !iommu_ops.init )
         iommu_ops = *iommu_init_ops->ops;

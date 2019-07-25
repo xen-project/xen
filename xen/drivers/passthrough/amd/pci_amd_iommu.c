@@ -180,7 +180,8 @@ static int __init iov_detect(void)
 
     if ( !amd_iommu_perdev_intremap )
         printk(XENLOG_WARNING "AMD-Vi: Using global interrupt remap table is not recommended (see XSA-36)!\n");
-    return scan_pci_devices();
+
+    return 0;
 }
 
 int amd_iommu_alloc_root(struct domain_iommu *hd)
