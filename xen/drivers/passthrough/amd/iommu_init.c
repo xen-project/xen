@@ -887,7 +887,7 @@ static void enable_iommu(struct amd_iommu *iommu)
 
     desc = irq_to_desc(iommu->msi.irq);
     spin_lock(&desc->lock);
-    set_msi_affinity(desc, &cpu_online_map);
+    set_msi_affinity(desc, NULL);
     spin_unlock(&desc->lock);
 
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);

@@ -2133,11 +2133,11 @@ static void adjust_irq_affinity(struct acpi_drhd_unit *drhd)
     const struct acpi_rhsa_unit *rhsa = drhd_to_rhsa(drhd);
     unsigned int node = rhsa ? pxm_to_node(rhsa->proximity_domain)
                              : NUMA_NO_NODE;
-    const cpumask_t *cpumask = &cpu_online_map;
+    const cpumask_t *cpumask = NULL;
     struct irq_desc *desc;
 
     if ( node < MAX_NUMNODES && node_online(node) &&
-         cpumask_intersects(&node_to_cpumask(node), cpumask) )
+         cpumask_intersects(&node_to_cpumask(node), &cpu_online_map) )
         cpumask = &node_to_cpumask(node);
 
     desc = irq_to_desc(drhd->iommu->msi.irq);

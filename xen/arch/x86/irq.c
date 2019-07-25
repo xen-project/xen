@@ -796,18 +796,26 @@ unsigned int set_desc_affinity(struct irq_desc *desc, const cpumask_t *mask)
     unsigned long flags;
     cpumask_t dest_mask;
 
-    if (!cpumask_intersects(mask, &cpu_online_map))
+    if ( mask && !cpumask_intersects(mask, &cpu_online_map) )
         return BAD_APICID;
 
     spin_lock_irqsave(&vector_lock, flags);
-    ret = _assign_irq_vector(desc, mask);
+    ret = _assign_irq_vector(desc, mask ?: TARGET_CPUS);
     spin_unlock_irqrestore(&vector_lock, flags);
 
-    if (ret < 0)
+    if ( ret < 0 )
         return BAD_APICID;
 
-    cpumask_copy(desc->affinity, mask);
-    cpumask_and(&dest_mask, mask, desc->arch.cpu_mask);
+    if ( mask )
+    {
+        cpumask_copy(desc->affinity, mask);
+        cpumask_and(&dest_mask, mask, desc->arch.cpu_mask);
+    }
+    else
+    {
+        cpumask_setall(desc->affinity);
+        cpumask_copy(&dest_mask, desc->arch.cpu_mask);
+    }
     cpumask_and(&dest_mask, &dest_mask, &cpu_online_map);
 
     return cpu_mask_to_apicid(&dest_mask);
