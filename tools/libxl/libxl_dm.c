@@ -1634,8 +1634,10 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                         nics[i].colo_compare_out &&
                         nics[i].colo_compare_notify_dev) {
                         flexarray_append(dm_args, "-object");
+                        flexarray_append(dm_args, "iothread,id=colo-compare-iothread-1");
+                        flexarray_append(dm_args, "-object");
                         flexarray_append(dm_args,
-                           GCSPRINTF("colo-compare,id=c1,primary_in=%s,secondary_in=%s,outdev=%s,notify_dev=%s",
+                           GCSPRINTF("colo-compare,id=c1,primary_in=%s,secondary_in=%s,outdev=%s,notify_dev=%s,iothread=colo-compare-iothread-1",
                                      nics[i].colo_compare_pri_in,
                                      nics[i].colo_compare_sec_in,
                                      nics[i].colo_compare_out,
