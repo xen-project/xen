@@ -27,12 +27,6 @@ void percpu_init_areas(void);
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
 
-DECLARE_PER_CPU(unsigned int, cpu_id);
-#define get_processor_id()    (this_cpu(cpu_id))
-#define set_processor_id(id)  do {                      \
-    WRITE_SYSREG(__per_cpu_offset[id], TPIDR_EL2);      \
-    this_cpu(cpu_id) = (id);                            \
-} while(0)
 #endif
 
 #endif /* __ARM_PERCPU_H__ */
