@@ -3,7 +3,6 @@
 
 #include <xen/cache.h>
 #include <asm/page.h>
-#include <asm/percpu.h>
 #undef ENTRY
 #undef ALIGN
 

@@ -4,7 +4,7 @@
 #ifdef CONFIG_KEXEC
 
 #include <public/kexec.h>
-#include <asm/percpu.h>
+
 #include <xen/elfcore.h>
 #include <xen/kimage.h>
 

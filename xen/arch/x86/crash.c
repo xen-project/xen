@@ -10,7 +10,6 @@
 
 #include <asm/atomic.h>
 #include <asm/elf.h>
-#include <asm/percpu.h>
 #include <xen/types.h>
 #include <xen/irq.h>
 #include <asm/nmi.h>

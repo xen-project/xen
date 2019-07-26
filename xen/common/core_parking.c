@@ -19,7 +19,7 @@
 #include <xen/cpu.h>
 #include <xen/init.h>
 #include <xen/cpumask.h>
-#include <asm/percpu.h>
+
 #include <asm/smp.h>
 
 #define CORE_PARKING_INCREMENT 1
