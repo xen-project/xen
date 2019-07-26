@@ -41,7 +41,7 @@ linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 $(D): linkfarm.stamp
 	$(MAKE) -C $(D)/xen distclean
 
-$(D)/xen/.config: $(D)
+$(D)/xen/.config: $(D) $(D)/xen/arch/x86/configs/pvshim_defconfig
 	$(MAKE) -C $(@D) KBUILD_DEFCONFIG=pvshim_defconfig XEN_CONFIG_EXPERT=y defconfig
 
 xen-shim: $(D)/xen/.config
