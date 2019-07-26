@@ -49,6 +49,8 @@ unsigned int vaddr_bits __read_mostly = VADDR_BITS;
 static unsigned int cleared_caps[NCAPINTS];
 static unsigned int forced_caps[NCAPINTS];
 
+DEFINE_PER_CPU(bool, full_gdt_loaded);
+
 void __init setup_clear_cpu_cap(unsigned int cap)
 {
 	const uint32_t *dfs;
@@ -756,6 +758,7 @@ void load_system_tables(void)
 		offsetof(struct tss_struct, __cacheline_filler) - 1,
 		SYS_DESC_tss_busy);
 
+	per_cpu(full_gdt_loaded, cpu) = false;
 	lgdt(&gdtr);
 	lidt(&idtr);
 	ltr(TSS_ENTRY << 3);
