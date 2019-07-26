@@ -200,7 +200,9 @@ struct vcpu
     /* VCPU is paused following shutdown request (d->is_shutting_down)? */
     bool             paused_for_shutdown;
     /* VCPU need affinity restored */
-    bool             affinity_broken;
+    uint8_t          affinity_broken;
+#define VCPU_AFFINITY_OVERRIDE    0x01
+#define VCPU_AFFINITY_WAIT        0x02
 
     /* A hypercall has been preempted. */
     bool             hcall_preempted;
@@ -245,7 +247,7 @@ struct vcpu
 
     /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_var_t    cpu_hard_affinity;
-    /* Used to restore affinity across S3. */
+    /* Used to save affinity during temporary pinning. */
     cpumask_var_t    cpu_hard_affinity_saved;
 
     /* Bitmask of CPUs on which this VCPU prefers to run. */
@@ -873,10 +875,10 @@ int cpu_disable_scheduler(unsigned int cpu);
 /* We need it in dom0_setup_vcpu */
 void sched_set_affinity(struct vcpu *v, const cpumask_t *hard,
                         const cpumask_t *soft);
+int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason);
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
 int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity);
 void restore_vcpu_affinity(struct domain *d);
-int vcpu_pin_override(struct vcpu *v, int cpu);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 uint64_t get_cpu_idle_time(unsigned int cpu);

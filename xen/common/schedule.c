@@ -1106,43 +1106,59 @@ void watchdog_domain_destroy(struct domain *d)
         kill_timer(&d->watchdog_timer[i]);
 }
 
-int vcpu_pin_override(struct vcpu *v, int cpu)
+/*
+ * Pin a vcpu temporarily to a specific CPU (or restore old pinning state if
+ * cpu is NR_CPUS).
+ * Temporary pinning can be done due to two reasons, which may be nested:
+ * - VCPU_AFFINITY_OVERRIDE (requested by guest): is allowed to fail in case
+ *   of a conflict (e.g. in case cpupool doesn't include requested CPU, or
+ *   another conflicting temporary pinning is already in effect.
+ * - VCPU_AFFINITY_WAIT (called by wait_event()): only used to pin vcpu to the
+ *   CPU it is just running on. Can't fail if used properly.
+ */
+int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason)
 {
     spinlock_t *lock;
     int ret = -EINVAL;
+    bool migrate;
 
     lock = vcpu_schedule_lock_irq(v);
 
-    if ( cpu < 0 )
+    if ( cpu == NR_CPUS )
     {
-        if ( v->affinity_broken )
+        if ( v->affinity_broken & reason )
         {
-            sched_set_affinity(v, v->cpu_hard_affinity_saved, NULL);
-            v->affinity_broken = 0;
             ret = 0;
+            v->affinity_broken &= ~reason;
         }
+        if ( !ret && !v->affinity_broken )
+            sched_set_affinity(v, v->cpu_hard_affinity_saved, NULL);
     }
     else if ( cpu < nr_cpu_ids )
     {
-        if ( v->affinity_broken )
+        if ( (v->affinity_broken & reason) ||
+             (v->affinity_broken && v->processor != cpu) )
             ret = -EBUSY;
         else if ( cpumask_test_cpu(cpu, VCPU2ONLINE(v)) )
         {
-            cpumask_copy(v->cpu_hard_affinity_saved, v->cpu_hard_affinity);
-            v->affinity_broken = 1;
-            sched_set_affinity(v, cpumask_of(cpu), NULL);
+            if ( !v->affinity_broken )
+            {
+                cpumask_copy(v->cpu_hard_affinity_saved, v->cpu_hard_affinity);
+                sched_set_affinity(v, cpumask_of(cpu), NULL);
+            }
+            v->affinity_broken |= reason;
             ret = 0;
         }
     }
 
-    if ( ret == 0 )
+    migrate = !ret && !cpumask_test_cpu(v->processor, v->cpu_hard_affinity);
+    if ( migrate )
         vcpu_migrate_start(v);
 
     vcpu_schedule_unlock_irq(lock, v);
 
-    domain_update_node_affinity(v->domain);
-
-    vcpu_migrate_finish(v);
+    if ( migrate )
+        vcpu_migrate_finish(v);
 
     return ret;
 }
@@ -1258,6 +1274,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case SCHEDOP_pin_override:
     {
         struct sched_pin_override sched_pin_override;
+        unsigned int cpu;
 
         ret = -EPERM;
         if ( !is_hardware_domain(current->domain) )
@@ -1267,7 +1284,12 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&sched_pin_override, arg, 1) )
             break;
 
-        ret = vcpu_pin_override(current, sched_pin_override.pcpu);
+        ret = -EINVAL;
+        if ( sched_pin_override.pcpu >= NR_CPUS )
+           break;
+
+        cpu = sched_pin_override.pcpu < 0 ? NR_CPUS : sched_pin_override.pcpu;
+        ret = vcpu_temporary_affinity(current, cpu, VCPU_AFFINITY_OVERRIDE);
 
         break;
     }
