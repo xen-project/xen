@@ -147,13 +147,15 @@ static int __must_check queue_invalidate_wait(struct iommu *iommu,
                                               u8 iflag, u8 sw, u8 fn,
                                               bool_t flush_dev_iotlb)
 {
-    volatile u32 poll_slot = QINVAL_STAT_INIT;
+    static DEFINE_PER_CPU(uint32_t, poll_slot);
     unsigned int index;
     unsigned long flags;
     u64 entry_base;
     struct qinval_entry *qinval_entry, *qinval_entries;
+    uint32_t *this_poll_slot = &this_cpu(poll_slot);
 
     spin_lock_irqsave(&iommu->register_lock, flags);
+    ACCESS_ONCE(*this_poll_slot) = QINVAL_STAT_INIT;
     index = qinval_next_index(iommu);
     entry_base = iommu_qi_ctrl(iommu)->qinval_maddr +
                  ((index >> QINVAL_ENTRY_ORDER) << PAGE_SHIFT);
@@ -166,8 +168,7 @@ static int __must_check queue_invalidate_wait(struct iommu *iommu,
     qinval_entry->q.inv_wait_dsc.lo.fn = fn;
     qinval_entry->q.inv_wait_dsc.lo.res_1 = 0;
     qinval_entry->q.inv_wait_dsc.lo.sdata = QINVAL_STAT_DONE;
-    qinval_entry->q.inv_wait_dsc.hi.res_1 = 0;
-    qinval_entry->q.inv_wait_dsc.hi.saddr = virt_to_maddr(&poll_slot) >> 2;
+    qinval_entry->q.inv_wait_dsc.hi.saddr = virt_to_maddr(this_poll_slot);
 
     unmap_vtd_domain_page(qinval_entries);
     qinval_update_qtail(iommu, index);
@@ -182,7 +183,7 @@ static int __must_check queue_invalidate_wait(struct iommu *iommu,
         timeout = NOW() + MILLISECS(flush_dev_iotlb ?
                                     iommu_dev_iotlb_timeout : VTD_QI_TIMEOUT);
 
-        while ( poll_slot != QINVAL_STAT_DONE )
+        while ( ACCESS_ONCE(*this_poll_slot) != QINVAL_STAT_DONE )
         {
             if ( NOW() > timeout )
             {
