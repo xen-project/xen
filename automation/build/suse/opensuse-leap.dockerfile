@@ -21,6 +21,7 @@ RUN zypper install -y \
         discount \
         flex \
         gcc \
+        gcc-c++ \
         gettext-tools \
         git \
         glib2-devel \
