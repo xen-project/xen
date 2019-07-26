@@ -358,9 +358,14 @@ static void vcpu_assign(struct null_private *prv, struct vcpu *v,
     }
 }
 
-static void vcpu_deassign(struct null_private *prv, struct vcpu *v,
-                          unsigned int cpu)
+static void vcpu_deassign(struct null_private *prv, struct vcpu *v)
 {
+    unsigned int bs;
+    unsigned int cpu = v->processor;
+    struct null_vcpu *wvc;
+
+    ASSERT(list_empty(&null_vcpu(v)->waitq_elem));
+
     per_cpu(npc, cpu).vcpu = NULL;
     cpumask_set_cpu(cpu, &prv->cpus_free);
 
@@ -377,6 +382,32 @@ static void vcpu_deassign(struct null_private *prv, struct vcpu *v,
         d.cpu = cpu;
         __trace_var(TRC_SNULL_VCPU_DEASSIGN, 1, sizeof(d), &d);
     }
+
+    spin_lock(&prv->waitq_lock);
+
+    /*
+     * If v is assigned to a pCPU, let's see if there is someone waiting,
+     * suitable to be assigned to it (prioritizing vcpus that have
+     * soft-affinity with cpu).
+     */
+    for_each_affinity_balance_step( bs )
+    {
+        list_for_each_entry( wvc, &prv->waitq, waitq_elem )
+        {
+            if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(wvc->vcpu) )
+                continue;
+
+            if ( vcpu_check_affinity(wvc->vcpu, cpu, bs) )
+            {
+                list_del_init(&wvc->waitq_elem);
+                vcpu_assign(prv, wvc->vcpu, cpu);
+                cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+                spin_unlock(&prv->waitq_lock);
+                return;
+            }
+        }
+    }
+    spin_unlock(&prv->waitq_lock);
 }
 
 /* Change the scheduler of cpu to us (null). */
@@ -459,43 +490,6 @@ static void null_vcpu_insert(const struct scheduler *ops, struct vcpu *v)
     SCHED_STAT_CRANK(vcpu_insert);
 }
 
-static void _vcpu_remove(struct null_private *prv, struct vcpu *v)
-{
-    unsigned int bs;
-    unsigned int cpu = v->processor;
-    struct null_vcpu *wvc;
-
-    ASSERT(list_empty(&null_vcpu(v)->waitq_elem));
-
-    vcpu_deassign(prv, v, cpu);
-
-    spin_lock(&prv->waitq_lock);
-
-    /*
-     * If v is assigned to a pCPU, let's see if there is someone waiting,
-     * suitable to be assigned to it (prioritizing vcpus that have
-     * soft-affinity with cpu).
-     */
-    for_each_affinity_balance_step( bs )
-    {
-        list_for_each_entry( wvc, &prv->waitq, waitq_elem )
-        {
-            if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(wvc->vcpu) )
-                continue;
-
-            if ( vcpu_check_affinity(wvc->vcpu, cpu, bs) )
-            {
-                list_del_init(&wvc->waitq_elem);
-                vcpu_assign(prv, wvc->vcpu, cpu);
-                cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-                spin_unlock(&prv->waitq_lock);
-                return;
-            }
-        }
-    }
-    spin_unlock(&prv->waitq_lock);
-}
-
 static void null_vcpu_remove(const struct scheduler *ops, struct vcpu *v)
 {
     struct null_private *prv = null_priv(ops);
@@ -519,7 +513,7 @@ static void null_vcpu_remove(const struct scheduler *ops, struct vcpu *v)
     ASSERT(per_cpu(npc, v->processor).vcpu == v);
     ASSERT(!cpumask_test_cpu(v->processor, &prv->cpus_free));
 
-    _vcpu_remove(prv, v);
+    vcpu_deassign(prv, v);
 
  out:
     vcpu_schedule_unlock_irq(lock, v);
@@ -605,7 +599,7 @@ static void null_vcpu_migrate(const struct scheduler *ops, struct vcpu *v,
      */
     if ( likely(list_empty(&nvc->waitq_elem)) )
     {
-        _vcpu_remove(prv, v);
+        vcpu_deassign(prv, v);
         SCHED_STAT_CRANK(migrate_running);
     }
     else
