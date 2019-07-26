@@ -1,6 +1,7 @@
 #ifndef __RWLOCK_H__
 #define __RWLOCK_H__
 
+#include <xen/percpu.h>
 #include <xen/spinlock.h>
 
 #include <asm/atomic.h>

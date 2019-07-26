@@ -33,7 +33,6 @@
 
 #include <xen/cache.h>
 #include <xen/spinlock.h>
-#include <xen/percpu.h>
 #include <xen/cpumask.h>
 #include <xen/preempt.h>
 

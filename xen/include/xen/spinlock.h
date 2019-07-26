@@ -4,7 +4,6 @@
 #include <asm/system.h>
 #include <asm/spinlock.h>
 #include <asm/types.h>
-#include <xen/percpu.h>
 
 #ifndef NDEBUG
 struct lock_debug {
