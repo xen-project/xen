@@ -1574,7 +1574,7 @@ static int cpu_schedule_up(unsigned int cpu)
     init_timer(&sd->s_timer, s_timer_fn, NULL, cpu);
     atomic_set(&sd->urgent_count, 0);
 
-    /* Boot CPU is dealt with later in schedule_init(). */
+    /* Boot CPU is dealt with later in scheduler_init(). */
     if ( cpu == 0 )
         return 0;
 
