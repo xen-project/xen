@@ -6,10 +6,10 @@
 #include <asm/atomic.h>
 #include <asm/numa.h>
 #include <xen/cpumask.h>
+#include <xen/percpu.h>
 #include <xen/smp.h>
 #include <asm/hvm/irq.h>
 #include <irq_vectors.h>
-#include <asm/percpu.h>
 
 extern unsigned int nr_irqs_gsi;
 extern unsigned int nr_irqs;

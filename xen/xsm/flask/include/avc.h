@@ -11,8 +11,9 @@
 
 #include <xen/errno.h>
 #include <xen/lib.h>
+#include <xen/percpu.h>
 #include <xen/spinlock.h>
-#include <asm/percpu.h>
+
 #include "flask.h"
 #include "av_permissions.h"
 #include "security.h"

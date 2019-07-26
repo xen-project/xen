@@ -3,11 +3,17 @@
 
 #include <asm/percpu.h>
 
+#define DECLARE_PER_CPU(type, name) \
+    extern __typeof__(type) per_cpu__ ## name
+
+#define __DEFINE_PER_CPU(attr, type, name) \
+    attr __typeof__(type) per_cpu_ ## name
+
 /*
  * Separate out the type, so (int[3], foo) works.
  *
  * The _##name concatenation is being used here to prevent 'name' from getting
- * macro expanded, while still allowing a per-architecture symbol name prefix.
+ * macro expanded.
  */
 #define DEFINE_PER_CPU(type, name) \
     __DEFINE_PER_CPU(__section(".bss.percpu"), type, _ ## name)

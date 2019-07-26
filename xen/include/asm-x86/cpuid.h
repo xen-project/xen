@@ -2,11 +2,11 @@
 #define __X86_CPUID_H__
 
 #include <asm/cpufeatureset.h>
-#include <asm/percpu.h>
 
 #ifndef __ASSEMBLY__
 #include <xen/types.h>
 #include <xen/kernel.h>
+#include <xen/percpu.h>
 
 #include <xen/lib/x86/cpu-policy.h>
 #include <xen/lib/x86/cpuid.h>

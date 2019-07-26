@@ -3,12 +3,13 @@
 #define _MCE_H
 
 #include <xen/init.h>
+#include <xen/percpu.h>
 #include <xen/sched.h>
 #include <xen/smp.h>
+
 #include <asm/types.h>
 #include <asm/traps.h>
 #include <asm/atomic.h>
-#include <asm/percpu.h>
 
 #include "x86_mca.h"
 #include "mctelem.h"

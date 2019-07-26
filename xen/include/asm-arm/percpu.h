@@ -10,9 +10,6 @@ extern char __per_cpu_start[], __per_cpu_data_end[];
 extern unsigned long __per_cpu_offset[NR_CPUS];
 void percpu_init_areas(void);
 
-#define __DEFINE_PER_CPU(attr, type, name) \
-    attr __typeof__(type) per_cpu_ ## name
-
 #define per_cpu(var, cpu)  \
     (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
 #define this_cpu(var) \
@@ -22,8 +19,6 @@ void percpu_init_areas(void);
     (*RELOC_HIDE(var, __per_cpu_offset[cpu]))
 #define this_cpu_ptr(var) \
     (*RELOC_HIDE(var, READ_SYSREG(TPIDR_EL2)))
-
-#define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
 
 #endif
 
