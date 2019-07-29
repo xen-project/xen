@@ -1585,6 +1585,12 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
     if ( uart->reg_width != 1 && uart->reg_width != 4 )
         return -EINVAL;
 
+    if ( dt_device_is_compatible(dev, "brcm,bcm2835-aux-uart") )
+    {
+        uart->reg_width = 4;
+        uart->reg_shift = 2;
+    }
+
     res = platform_get_irq(dev, 0);
     if ( ! res )
         return -EINVAL;
@@ -1611,6 +1617,7 @@ static const struct dt_device_match ns16550_dt_match[] __initconst =
     DT_MATCH_COMPATIBLE("ns16550"),
     DT_MATCH_COMPATIBLE("ns16550a"),
     DT_MATCH_COMPATIBLE("snps,dw-apb-uart"),
+    DT_MATCH_COMPATIBLE("brcm,bcm2835-aux-uart"),
     { /* sentinel */ },
 };
 
