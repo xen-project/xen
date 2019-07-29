@@ -466,6 +466,7 @@ struct csched2_runqueue_data {
     spinlock_t lock;           /* Lock for this runqueue                     */
 
     struct list_head runq;     /* Ordered list of runnable vms               */
+    unsigned int nr_cpus;      /* How many CPUs are sharing this runqueue    */
     int id;                    /* ID of this runqueue (-1 if invalid)        */
 
     int load;                  /* Instantaneous load (num of non-idle vcpus) */
@@ -2613,8 +2614,8 @@ retry:
         if ( st.orqd->b_avgload > load_max )
             load_max = st.orqd->b_avgload;
 
-        cpus_max = cpumask_weight(&st.lrqd->active);
-        i = cpumask_weight(&st.orqd->active);
+        cpus_max = st.lrqd->nr_cpus;
+        i = st.orqd->nr_cpus;
         if ( i > cpus_max )
             cpus_max = i;
 
@@ -3697,7 +3698,7 @@ csched2_dump(const struct scheduler *ops)
                "\tinstload           = %d\n"
                "\taveload            = %"PRI_stime" (~%"PRI_stime"%%)\n",
                i,
-               cpumask_weight(&prv->rqd[i].active),
+               prv->rqd[i].nr_cpus,
                nr_cpu_ids, cpumask_bits(&prv->rqd[i].active),
                prv->rqd[i].max_weight,
                prv->rqd[i].pick_bias,
@@ -3815,7 +3816,7 @@ init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
 
     __cpumask_set_cpu(cpu, &spc->sibling_mask);
 
-    if ( cpumask_weight(&rqd->active) > 0 )
+    if ( rqd->nr_cpus > 0 )
         for_each_cpu ( rcpu, per_cpu(cpu_sibling_mask, cpu) )
             if ( cpumask_test_cpu(rcpu, &rqd->active) )
             {
@@ -3828,7 +3829,10 @@ init_pdata(struct csched2_private *prv, struct csched2_pcpu *spc,
     __cpumask_set_cpu(cpu, &prv->initialized);
     __cpumask_set_cpu(cpu, &rqd->smt_idle);
 
-    if ( cpumask_weight(&rqd->active) == 1 )
+    rqd->nr_cpus++;
+    ASSERT(cpumask_weight(&rqd->active) == rqd->nr_cpus);
+
+    if ( rqd->nr_cpus == 1 )
         rqd->pick_bias = cpu;
 
     return spc->runq_id;
@@ -3934,7 +3938,10 @@ csched2_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     for_each_cpu ( rcpu, &rqd->active )
         __cpumask_clear_cpu(cpu, &csched2_pcpu(rcpu)->sibling_mask);
 
-    if ( cpumask_empty(&rqd->active) )
+    rqd->nr_cpus--;
+    ASSERT(cpumask_weight(&rqd->active) == rqd->nr_cpus);
+
+    if ( rqd->nr_cpus == 0 )
     {
         printk(XENLOG_INFO " No cpus left on runqueue, disabling\n");
         deactivate_runqueue(prv, spc->runq_id);
