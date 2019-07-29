@@ -196,6 +196,11 @@ void check_wakeup_from_wait(void)
     {
         gdprintk(XENLOG_ERR, "vcpu affinity lost\n");
         domain_crash(curr->domain);
+
+        /* Re-initiate scheduler and don't longjmp(). */
+        raise_softirq(SCHEDULE_SOFTIRQ);
+        for ( ; ; )
+            do_softirq();
     }
 
     /*
