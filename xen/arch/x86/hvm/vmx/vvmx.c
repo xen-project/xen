@@ -43,7 +43,7 @@ int nvmx_cpu_up_prepare(unsigned int cpu)
     uint64_t **vvmcs_buf;
 
     if ( cpu_has_vmx_vmcs_shadowing &&
-         (vvmcs_buf = &per_cpu(vvmcs_buf, cpu)) == NULL )
+         *(vvmcs_buf = &per_cpu(vvmcs_buf, cpu)) == NULL )
     {
         void *ptr = xzalloc_array(uint64_t, VMCS_BUF_SIZE);
 
@@ -922,11 +922,11 @@ static void vvmcs_to_shadow_bulk(struct vcpu *v, unsigned int n,
     if ( !cpu_has_vmx_vmcs_shadowing )
         goto fallback;
 
-    if ( !value || n > VMCS_BUF_SIZE )
+    if ( n > VMCS_BUF_SIZE )
     {
-        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, "
-                 "buffer: %p, buffer size: %d, fields number: %d.\n",
-                 value, VMCS_BUF_SIZE, n);
+        if ( IS_ENABLED(CONFIG_DEBUG) )
+            printk_once(XENLOG_ERR "%pv VMCS sync too many fields %u\n",
+                        v, n);
         goto fallback;
     }
 
@@ -962,11 +962,11 @@ static void shadow_to_vvmcs_bulk(struct vcpu *v, unsigned int n,
     if ( !cpu_has_vmx_vmcs_shadowing )
         goto fallback;
 
-    if ( !value || n > VMCS_BUF_SIZE )
+    if ( n > VMCS_BUF_SIZE )
     {
-        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, "
-                 "buffer: %p, buffer size: %d, fields number: %d.\n",
-                 value, VMCS_BUF_SIZE, n);
+        if ( IS_ENABLED(CONFIG_DEBUG) )
+            printk_once(XENLOG_ERR "%pv VMCS sync too many fields %u\n",
+                        v, n);
         goto fallback;
     }
 
