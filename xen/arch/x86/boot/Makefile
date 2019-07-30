@@ -4,7 +4,10 @@ DEFS_H_DEPS = defs.h $(BASEDIR)/include/xen/stdbool.h
 
 CMDLINE_DEPS = $(DEFS_H_DEPS) video.h
 
-RELOC_DEPS = $(DEFS_H_DEPS) $(BASEDIR)/include/xen/multiboot.h \
+RELOC_DEPS = $(DEFS_H_DEPS) \
+	     $(BASEDIR)/include/generated/autoconf.h \
+	     $(BASEDIR)/include/xen/kconfig.h \
+	     $(BASEDIR)/include/xen/multiboot.h \
 	     $(BASEDIR)/include/xen/multiboot2.h \
 	     $(BASEDIR)/include/public/arch-x86/hvm/start_info.h
 
