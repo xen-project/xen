@@ -357,6 +357,7 @@ struct domain
     unsigned int     nr_pirqs;
 
     enum guest_type guest_type;
+    unsigned int     options;         /* copy of createdomain flags */
 
     /* Is this guest dying (i.e., a zombie)? */
     enum { DOMDYING_alive, DOMDYING_dying, DOMDYING_dead } is_dying;

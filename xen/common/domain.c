@@ -331,6 +331,8 @@ struct domain *domain_create(domid_t domid,
     if ( (d = alloc_domain_struct()) == NULL )
         return ERR_PTR(-ENOMEM);
 
+    d->options = config ? config->flags : 0;
+
     /* Sort out our idea of is_system_domain(). */
     d->domain_id = domid;
 
@@ -352,7 +354,7 @@ struct domain *domain_create(domid_t domid,
     }
 
     /* Sort out our idea of is_{pv,hvm}_domain().  All system domains are PV. */
-    d->guest_type = ((config && (config->flags & XEN_DOMCTL_CDF_hvm_guest))
+    d->guest_type = ((d->options & XEN_DOMCTL_CDF_hvm_guest)
                      ? guest_type_hvm : guest_type_pv);
 
     TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
@@ -429,7 +431,7 @@ struct domain *domain_create(domid_t domid,
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
 
-        if ( config->flags & XEN_DOMCTL_CDF_xs_domain )
+        if ( d->options & XEN_DOMCTL_CDF_xs_domain )
         {
             d->is_xenstore = 1;
             d->disable_migrate = 1;
