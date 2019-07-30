@@ -1004,13 +1004,13 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid,
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
         hvm = 1;
-        if (libxl__wait_for_device_model_deprecated(gc, domid, "running",
-                                         NULL, NULL, NULL) < 0) {
-            rc = ERROR_FAIL;
-            goto out;
-        }
         switch (libxl__device_model_version_running(gc, domid)) {
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+                if (libxl__wait_for_device_model_deprecated(gc, domid,
+                        "running", NULL, NULL, NULL) < 0) {
+                    rc = ERROR_FAIL;
+                    goto out;
+                }
                 rc = qemu_pci_add_xenstore(gc, domid, pcidev);
                 break;
             case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
@@ -1395,12 +1395,11 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
     rc = ERROR_FAIL;
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
         hvm = 1;
-        if (libxl__wait_for_device_model_deprecated(gc, domid, "running",
-                                         NULL, NULL, NULL) < 0)
-            goto out_fail;
-
         switch (libxl__device_model_version_running(gc, domid)) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+            if (libxl__wait_for_device_model_deprecated(gc, domid,
+                    "running", NULL, NULL, NULL) < 0)
+                goto out_fail;
             rc = qemu_pci_remove_xenstore(gc, domid, pcidev, force);
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
