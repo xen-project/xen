@@ -28,6 +28,7 @@
 #include <xen/kernel.h>
 #include <xen/errno.h>
 #include <xen/delay.h>
+#include <xen/init.h>
 #include <xen/string.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>

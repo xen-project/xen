@@ -21,6 +21,7 @@
 #include <xen/kernel.h>
 #include <xen/errno.h>
 #include <xen/delay.h>
+#include <xen/init.h>
 #include <xen/string.h>
 #include <xen/xmalloc.h>
 #include <xen/types.h>

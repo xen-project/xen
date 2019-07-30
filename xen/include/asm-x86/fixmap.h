@@ -21,9 +21,7 @@
 #include <xen/acpi.h>
 #include <xen/pfn.h>
 #include <xen/kexec.h>
-#include <xen/iommu.h>
 #include <asm/apicdef.h>
-#include <asm/amd-iommu.h>
 #include <asm/msi.h>
 #include <acpi/apei.h>
 
