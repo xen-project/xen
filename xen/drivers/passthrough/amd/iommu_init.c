@@ -969,14 +969,6 @@ static void * __init allocate_ppr_log(struct amd_iommu *iommu)
 
 static int __init amd_iommu_init_one(struct amd_iommu *iommu)
 {
-    if ( map_iommu_mmio_region(iommu) != 0 )
-        goto error_out;
-
-    get_iommu_features(iommu);
-
-    if ( iommu->features.raw )
-        iommuv2_enabled = 1;
-
     if ( allocate_cmd_buffer(iommu) == NULL )
         goto error_out;
 
@@ -1201,6 +1193,23 @@ static bool_t __init amd_sp5100_erratum28(void)
     return 0;
 }
 
+static int __init amd_iommu_prepare_one(struct amd_iommu *iommu)
+{
+    int rc = alloc_ivrs_mappings(iommu->seg);
+
+    if ( !rc )
+        rc = map_iommu_mmio_region(iommu);
+    if ( rc )
+        return rc;
+
+    get_iommu_features(iommu);
+
+    if ( iommu->features.raw )
+        iommuv2_enabled = true;
+
+    return 0;
+}
+
 int __init amd_iommu_init(void)
 {
     struct amd_iommu *iommu;
@@ -1231,7 +1240,7 @@ int __init amd_iommu_init(void)
     radix_tree_init(&ivrs_maps);
     for_each_amd_iommu ( iommu )
     {
-        rc = alloc_ivrs_mappings(iommu->seg);
+        rc = amd_iommu_prepare_one(iommu);
         if ( rc )
             goto error_out;
     }
