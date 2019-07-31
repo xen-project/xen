@@ -39,12 +39,36 @@ union irte32 {
     } flds;
 };
 
+union irte128 {
+    uint64_t raw[2];
+    struct {
+        bool remap_en:1;
+        bool sup_io_pf:1;
+        unsigned int int_type:3;
+        bool rq_eoi:1;
+        bool dm:1;
+        bool guest_mode:1; /* MBZ */
+        unsigned int dest_lo:24;
+        unsigned int :32;
+        unsigned int vector:8;
+        unsigned int :24;
+        unsigned int :24;
+        unsigned int dest_hi:8;
+    } full;
+};
+
 union irte_ptr {
     void *ptr;
     union irte32 *ptr32;
+    union irte128 *ptr128;
 };
 
-#define INTREMAP_TABLE_ORDER    1
+union irte_cptr {
+    const void *ptr;
+    const union irte32 *ptr32;
+    const union irte128 *ptr128;
+} __transparent__;
+
 #define INTREMAP_LENGTH 0xB
 #define INTREMAP_ENTRIES (1 << INTREMAP_LENGTH)
 
@@ -56,6 +80,13 @@ static DEFINE_SPINLOCK(shared_intremap_lock);
 unsigned int nr_ioapic_sbdf;
 
 static void dump_intremap_tables(unsigned char key);
+
+static unsigned int __init intremap_table_order(const struct amd_iommu *iommu)
+{
+    return iommu->ctrl.ga_en
+           ? get_order_from_bytes(INTREMAP_ENTRIES * sizeof(union irte128))
+           : get_order_from_bytes(INTREMAP_ENTRIES * sizeof(union irte32));
+}
 
 unsigned int ioapic_id_to_index(unsigned int apic_id)
 {
@@ -131,7 +162,10 @@ static union irte_ptr get_intremap_entry(const struct amd_iommu *iommu,
 
     ASSERT(table.ptr && (index < INTREMAP_ENTRIES));
 
-    table.ptr32 += index;
+    if ( iommu->ctrl.ga_en )
+        table.ptr128 += index;
+    else
+        table.ptr32 += index;
 
     return table;
 }
@@ -141,7 +175,22 @@ static void free_intremap_entry(const struct amd_iommu *iommu,
 {
     union irte_ptr entry = get_intremap_entry(iommu, bdf, index);
 
-    ACCESS_ONCE(entry.ptr32->raw) = 0;
+    if ( iommu->ctrl.ga_en )
+    {
+        ACCESS_ONCE(entry.ptr128->raw[0]) = 0;
+        /*
+         * Low half (containing RemapEn) needs to be cleared first.  Note that
+         * strictly speaking smp_wmb() isn't enough, as conceptually it expands
+         * to just barrier() when !CONFIG_SMP.  But wmb() would be more than we
+         * need, since the IOMMU is a cache-coherent entity on the bus.  And
+         * given that we don't allow CONFIG_SMP to be turned off, the SMP
+         * variant will do.
+         */
+        smp_wmb();
+        entry.ptr128->raw[1] = 0;
+    }
+    else
+        ACCESS_ONCE(entry.ptr32->raw) = 0;
 
     __clear_bit(index, get_ivrs_mappings(iommu->seg)[bdf].intremap_inuse);
 }
@@ -151,17 +200,44 @@ static void update_intremap_entry(const struct amd_iommu *iommu,
                                   unsigned int vector, unsigned int int_type,
                                   unsigned int dest_mode, unsigned int dest)
 {
-    union irte32 irte = {
-        .flds = {
-            .remap_en = true,
-            .int_type = int_type,
-            .dm = dest_mode,
-            .dest = dest,
-            .vector = vector,
-        },
-    };
+    if ( iommu->ctrl.ga_en )
+    {
+        union irte128 irte = {
+            .full = {
+                .remap_en = true,
+                .int_type = int_type,
+                .dm = dest_mode,
+                .dest_lo = dest,
+                .dest_hi = dest >> 24,
+                .vector = vector,
+            },
+        };
 
-    ACCESS_ONCE(entry.ptr32->raw) = irte.raw;
+        ACCESS_ONCE(entry.ptr128->raw[0]) = 0;
+        /*
+         * Low half, in particular RemapEn, needs to be cleared first.  See
+         * comment in free_intremap_entry() regarding the choice of barrier.
+         */
+        smp_wmb();
+        entry.ptr128->raw[1] = irte.raw[1];
+        /* High half needs to be set before low one (containing RemapEn). */
+        smp_wmb();
+        ACCESS_ONCE(entry.ptr128->raw[0]) = irte.raw[0];
+    }
+    else
+    {
+        union irte32 irte = {
+            .flds = {
+                .remap_en = true,
+                .int_type = int_type,
+                .dm = dest_mode,
+                .dest = dest,
+                .vector = vector,
+            },
+        };
+
+        ACCESS_ONCE(entry.ptr32->raw) = irte.raw;
+    }
 }
 
 static inline int get_rte_index(const struct IO_APIC_route_entry *rte)
@@ -175,6 +251,11 @@ static inline void set_rte_index(struct IO_APIC_route_entry *rte, int offset)
     rte->delivery_mode = offset >> 8;
 }
 
+static inline unsigned int get_full_dest(const union irte128 *entry)
+{
+    return entry->full.dest_lo | ((unsigned int)entry->full.dest_hi << 24);
+}
+
 static int update_intremap_entry_from_ioapic(
     int bdf,
     struct amd_iommu *iommu,
@@ -184,10 +265,11 @@ static int update_intremap_entry_from_ioapic(
 {
     unsigned long flags;
     union irte_ptr entry;
-    u8 delivery_mode, dest, vector, dest_mode;
+    uint8_t delivery_mode, vector, dest_mode;
     int req_id;
     spinlock_t *lock;
-    unsigned int offset;
+    unsigned int dest, offset;
+    bool fresh = false;
 
     req_id = get_intremap_requestor_id(iommu->seg, bdf);
     lock = get_intremap_lock(iommu->seg, req_id);
@@ -195,7 +277,7 @@ static int update_intremap_entry_from_ioapic(
     delivery_mode = rte->delivery_mode;
     vector = rte->vector;
     dest_mode = rte->dest_mode;
-    dest = rte->dest.logical.logical_dest;
+    dest = x2apic_enabled ? rte->dest.dest32 : rte->dest.logical.logical_dest;
 
     spin_lock_irqsave(lock, flags);
 
@@ -210,25 +292,40 @@ static int update_intremap_entry_from_ioapic(
             return -ENOSPC;
         }
         *index = offset;
-        lo_update = 1;
+        fresh = true;
     }
 
     entry = get_intremap_entry(iommu, req_id, offset);
-    if ( !lo_update )
+    if ( fresh )
+        /* nothing */;
+    else if ( !lo_update )
     {
         /*
          * Low half of incoming RTE is already in remapped format,
          * so need to recover vector and delivery mode from IRTE.
          */
         ASSERT(get_rte_index(rte) == offset);
-        vector = entry.ptr32->flds.vector;
+        if ( iommu->ctrl.ga_en )
+            vector = entry.ptr128->full.vector;
+        else
+            vector = entry.ptr32->flds.vector;
+        /* The IntType fields match for both formats. */
         delivery_mode = entry.ptr32->flds.int_type;
+    }
+    else if ( x2apic_enabled )
+    {
+        /*
+         * High half of incoming RTE was read from the I/O APIC and hence may
+         * not hold the full destination, so need to recover full destination
+         * from IRTE.
+         */
+        dest = get_full_dest(entry.ptr128);
     }
     update_intremap_entry(iommu, entry, vector, delivery_mode, dest_mode, dest);
 
     spin_unlock_irqrestore(lock, flags);
 
-    if ( iommu->enabled )
+    if ( iommu->enabled && !fresh )
     {
         spin_lock_irqsave(&iommu->lock, flags);
         amd_iommu_flush_intremap(iommu, req_id);
@@ -286,6 +383,18 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             dest_mode = rte.dest_mode;
             dest = rte.dest.logical.logical_dest;
 
+            if ( iommu->ctrl.xt_en )
+            {
+                /*
+                 * In x2APIC mode we have no way of discovering the high 24
+                 * bits of the destination of an already enabled interrupt.
+                 * We come here earlier than for xAPIC mode, so no interrupts
+                 * should have been set up before.
+                 */
+                AMD_IOMMU_DEBUG("Unmasked IO-APIC#%u entry %u in x2APIC mode\n",
+                                IO_APIC_ID(apic), pin);
+            }
+
             spin_lock_irqsave(lock, flags);
             offset = alloc_intremap_entry(seg, req_id, 1);
             BUG_ON(offset >= INTREMAP_ENTRIES);
@@ -320,7 +429,8 @@ void amd_iommu_ioapic_update_ire(
     struct IO_APIC_route_entry new_rte = { 0 };
     unsigned int rte_lo = (reg & 1) ? reg - 1 : reg;
     unsigned int pin = (reg - 0x10) / 2;
-    int saved_mask, seg, bdf, rc;
+    int seg, bdf, rc;
+    bool saved_mask, fresh = false;
     struct amd_iommu *iommu;
     unsigned int idx;
 
@@ -362,12 +472,22 @@ void amd_iommu_ioapic_update_ire(
         *(((u32 *)&new_rte) + 1) = value;
     }
 
-    if ( new_rte.mask &&
-         ioapic_sbdf[idx].pin_2_idx[pin] >= INTREMAP_ENTRIES )
+    if ( ioapic_sbdf[idx].pin_2_idx[pin] >= INTREMAP_ENTRIES )
     {
         ASSERT(saved_mask);
-        __io_apic_write(apic, reg, value);
-        return;
+
+        /*
+         * There's nowhere except the IRTE to store a full 32-bit destination,
+         * so we may not bypass entry allocation and updating of the low RTE
+         * half in the (usual) case of the high RTE half getting written first.
+         */
+        if ( new_rte.mask && !x2apic_enabled )
+        {
+            __io_apic_write(apic, reg, value);
+            return;
+        }
+
+        fresh = true;
     }
 
     /* mask the interrupt while we change the intremap table */
@@ -396,8 +516,12 @@ void amd_iommu_ioapic_update_ire(
     if ( reg == rte_lo )
         return;
 
-    /* unmask the interrupt after we have updated the intremap table */
-    if ( !saved_mask )
+    /*
+     * Unmask the interrupt after we have updated the intremap table. Also
+     * write the low half if a fresh entry was allocated for a high half
+     * update in x2APIC mode.
+     */
+    if ( !saved_mask || (x2apic_enabled && fresh) )
     {
         old_rte.mask = saved_mask;
         __io_apic_write(apic, rte_lo, *((u32 *)&old_rte));
@@ -411,31 +535,40 @@ unsigned int amd_iommu_read_ioapic_from_ire(
     unsigned int offset;
     unsigned int val = __io_apic_read(apic, reg);
     unsigned int pin = (reg - 0x10) / 2;
+    uint16_t seg, bdf, req_id;
+    const struct amd_iommu *iommu;
+    union irte_ptr entry;
 
     idx = ioapic_id_to_index(IO_APIC_ID(apic));
     if ( idx == MAX_IO_APICS )
         return val;
 
     offset = ioapic_sbdf[idx].pin_2_idx[pin];
+    if ( offset >= INTREMAP_ENTRIES )
+        return val;
 
-    if ( !(reg & 1) && offset < INTREMAP_ENTRIES )
+    seg = ioapic_sbdf[idx].seg;
+    bdf = ioapic_sbdf[idx].bdf;
+    iommu = find_iommu_for_device(seg, bdf);
+    if ( !iommu )
+        return val;
+    req_id = get_intremap_requestor_id(seg, bdf);
+    entry = get_intremap_entry(iommu, req_id, offset);
+
+    if ( !(reg & 1) )
     {
-        u16 bdf = ioapic_sbdf[idx].bdf;
-        u16 seg = ioapic_sbdf[idx].seg;
-        u16 req_id = get_intremap_requestor_id(seg, bdf);
-        const struct amd_iommu *iommu = find_iommu_for_device(seg, bdf);
-        union irte_ptr entry;
-
-        if ( !iommu )
-            return val;
         ASSERT(offset == (val & (INTREMAP_ENTRIES - 1)));
-        entry = get_intremap_entry(iommu, req_id, offset);
         val &= ~(INTREMAP_ENTRIES - 1);
+        /* The IntType fields match for both formats. */
         val |= MASK_INSR(entry.ptr32->flds.int_type,
                          IO_APIC_REDIR_DELIV_MODE_MASK);
-        val |= MASK_INSR(entry.ptr32->flds.vector,
+        val |= MASK_INSR(iommu->ctrl.ga_en
+                         ? entry.ptr128->full.vector
+                         : entry.ptr32->flds.vector,
                          IO_APIC_REDIR_VECTOR_MASK);
     }
+    else if ( x2apic_enabled )
+        val = get_full_dest(entry.ptr128);
 
     return val;
 }
@@ -447,9 +580,9 @@ static int update_intremap_entry_from_msi_msg(
     unsigned long flags;
     union irte_ptr entry;
     u16 req_id, alias_id;
-    u8 delivery_mode, dest, vector, dest_mode;
+    uint8_t delivery_mode, vector, dest_mode;
     spinlock_t *lock;
-    unsigned int offset, i;
+    unsigned int dest, offset, i;
 
     req_id = get_dma_requestor_id(iommu->seg, bdf);
     alias_id = get_intremap_requestor_id(iommu->seg, bdf);
@@ -470,7 +603,12 @@ static int update_intremap_entry_from_msi_msg(
     dest_mode = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
     delivery_mode = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
     vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) & MSI_DATA_VECTOR_MASK;
-    dest = (msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT) & 0xff;
+
+    if ( x2apic_enabled )
+        dest = msg->dest32;
+    else
+        dest = MASK_EXTR(msg->address_lo, MSI_ADDR_DEST_ID_MASK);
+
     offset = *remap_index;
     if ( offset >= INTREMAP_ENTRIES )
     {
@@ -616,10 +754,21 @@ void amd_iommu_read_msi_from_ire(
     }
 
     msg->data &= ~(INTREMAP_ENTRIES - 1);
+    /* The IntType fields match for both formats. */
     msg->data |= MASK_INSR(entry.ptr32->flds.int_type,
                            MSI_DATA_DELIVERY_MODE_MASK);
-    msg->data |= MASK_INSR(entry.ptr32->flds.vector,
-                           MSI_DATA_VECTOR_MASK);
+    if ( iommu->ctrl.ga_en )
+    {
+        msg->data |= MASK_INSR(entry.ptr128->full.vector,
+                               MSI_DATA_VECTOR_MASK);
+        msg->dest32 = get_full_dest(entry.ptr128);
+    }
+    else
+    {
+        msg->data |= MASK_INSR(entry.ptr32->flds.vector,
+                               MSI_DATA_VECTOR_MASK);
+        msg->dest32 = entry.ptr32->flds.dest;
+    }
 }
 
 int __init amd_iommu_free_intremap_table(
@@ -631,7 +780,7 @@ int __init amd_iommu_free_intremap_table(
 
     if ( tb )
     {
-        __free_amd_iommu_tables(tb, INTREMAP_TABLE_ORDER);
+        __free_amd_iommu_tables(tb, intremap_table_order(iommu));
         ivrs_mapping->intremap_table = NULL;
     }
 
@@ -641,10 +790,10 @@ int __init amd_iommu_free_intremap_table(
 void *__init amd_iommu_alloc_intremap_table(
     const struct amd_iommu *iommu, unsigned long **inuse_map)
 {
-    void *tb;
-    tb = __alloc_amd_iommu_tables(INTREMAP_TABLE_ORDER);
+    void *tb = __alloc_amd_iommu_tables(intremap_table_order(iommu));
+
     BUG_ON(tb == NULL);
-    memset(tb, 0, PAGE_SIZE * (1UL << INTREMAP_TABLE_ORDER));
+    memset(tb, 0, PAGE_SIZE << intremap_table_order(iommu));
     *inuse_map = xzalloc_array(unsigned long, BITS_TO_LONGS(INTREMAP_ENTRIES));
     BUG_ON(*inuse_map == NULL);
     return tb;
@@ -685,18 +834,29 @@ int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
     return rc;
 }
 
-static void dump_intremap_table(const u32 *table)
+static void dump_intremap_table(const struct amd_iommu *iommu,
+                                union irte_cptr tbl)
 {
-    u32 count;
+    unsigned int count;
 
-    if ( !table )
+    if ( !tbl.ptr )
         return;
 
     for ( count = 0; count < INTREMAP_ENTRIES; count++ )
     {
-        if ( !table[count] )
-            continue;
-        printk("    IRTE[%03x] %08x\n", count, table[count]);
+        if ( iommu->ctrl.ga_en )
+        {
+            if ( !tbl.ptr128[count].raw[0] && !tbl.ptr128[count].raw[1] )
+                continue;
+            printk("    IRTE[%03x] %016lx_%016lx\n",
+                   count, tbl.ptr128[count].raw[1], tbl.ptr128[count].raw[0]);
+        }
+        else
+        {
+            if ( !tbl.ptr32[count].raw )
+                continue;
+            printk("    IRTE[%03x] %08x\n", count, tbl.ptr32[count].raw);
+        }
     }
 }
 
@@ -714,7 +874,7 @@ static int dump_intremap_mapping(const struct amd_iommu *iommu,
            PCI_FUNC(ivrs_mapping->dte_requestor_id));
 
     spin_lock_irqsave(&(ivrs_mapping->intremap_lock), flags);
-    dump_intremap_table(ivrs_mapping->intremap_table);
+    dump_intremap_table(iommu, ivrs_mapping->intremap_table);
     spin_unlock_irqrestore(&(ivrs_mapping->intremap_lock), flags);
 
     process_pending_softirqs();
@@ -733,6 +893,8 @@ static void dump_intremap_tables(unsigned char key)
     printk("--- Dumping Shared IOMMU Interrupt Remapping Table ---\n");
 
     spin_lock_irqsave(&shared_intremap_lock, flags);
-    dump_intremap_table(shared_intremap_table);
+    dump_intremap_table(list_first_entry(&amd_iommu_head, struct amd_iommu,
+                                         list),
+                        shared_intremap_table);
     spin_unlock_irqrestore(&shared_intremap_lock, flags);
 }
