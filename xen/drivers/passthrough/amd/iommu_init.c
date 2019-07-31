@@ -472,6 +472,44 @@ static hw_irq_controller iommu_maskable_msi_type = {
     .set_affinity = set_msi_affinity,
 };
 
+static void set_x2apic_affinity(struct irq_desc *desc, const cpumask_t *mask)
+{
+    struct amd_iommu *iommu = desc->action->dev_id;
+    unsigned int dest = set_desc_affinity(desc, mask);
+    union amd_iommu_x2apic_control ctrl = {};
+    unsigned long flags;
+
+    if ( dest == BAD_APICID )
+        return;
+
+    msi_compose_msg(desc->arch.vector, NULL, &iommu->msi.msg);
+    iommu->msi.msg.dest32 = dest;
+
+    ctrl.dest_mode = MASK_EXTR(iommu->msi.msg.address_lo,
+                               MSI_ADDR_DESTMODE_MASK);
+    ctrl.int_type = MASK_EXTR(iommu->msi.msg.data,
+                              MSI_DATA_DELIVERY_MODE_MASK);
+    ctrl.vector = desc->arch.vector;
+    ctrl.dest_lo = dest;
+    ctrl.dest_hi = dest >> 24;
+
+    spin_lock_irqsave(&iommu->lock, flags);
+    writeq(ctrl.raw, iommu->mmio_base + IOMMU_XT_INT_CTRL_MMIO_OFFSET);
+    writeq(ctrl.raw, iommu->mmio_base + IOMMU_XT_PPR_INT_CTRL_MMIO_OFFSET);
+    spin_unlock_irqrestore(&iommu->lock, flags);
+}
+
+static hw_irq_controller iommu_x2apic_type = {
+    .typename     = "IOMMU-x2APIC",
+    .startup      = irq_startup_none,
+    .shutdown     = irq_shutdown_none,
+    .enable       = irq_enable_none,
+    .disable      = irq_disable_none,
+    .ack          = ack_nonmaskable_msi_irq,
+    .end          = end_nonmaskable_msi_irq,
+    .set_affinity = set_x2apic_affinity,
+};
+
 static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
     u16 domain_id, device_id, flags;
@@ -726,8 +764,6 @@ static void iommu_interrupt_handler(int irq, void *dev_id,
 static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
-    hw_irq_controller *handler;
-    u16 control;
 
     irq = create_irq(NUMA_NO_NODE);
     if ( irq <= 0 )
@@ -747,19 +783,42 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
                         PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf));
         return 0;
     }
-    control = pci_conf_read16(PCI_SBDF2(iommu->seg, iommu->bdf),
-                              iommu->msi.msi_attrib.pos + PCI_MSI_FLAGS);
-    iommu->msi.msi.nvec = 1;
-    if ( is_mask_bit_support(control) )
+
+    if ( iommu->ctrl.int_cap_xt_en )
     {
-        iommu->msi.msi_attrib.maskbit = 1;
-        iommu->msi.msi.mpos = msi_mask_bits_reg(iommu->msi.msi_attrib.pos,
-                                                is_64bit_address(control));
-        handler = &iommu_maskable_msi_type;
+        struct irq_desc *desc = irq_to_desc(irq);
+
+        iommu->msi.msi_attrib.pos = MSI_TYPE_IOMMU;
+        iommu->msi.msi_attrib.maskbit = 0;
+        iommu->msi.msi_attrib.is_64 = 1;
+
+        desc->msi_desc = &iommu->msi;
+        desc->handler = &iommu_x2apic_type;
+
+        ret = 0;
     }
     else
-        handler = &iommu_msi_type;
-    ret = __setup_msi_irq(irq_to_desc(irq), &iommu->msi, handler);
+    {
+        hw_irq_controller *handler;
+        u16 control;
+
+        control = pci_conf_read16(PCI_SBDF2(iommu->seg, iommu->bdf),
+                                  iommu->msi.msi_attrib.pos + PCI_MSI_FLAGS);
+
+        iommu->msi.msi.nvec = 1;
+        if ( is_mask_bit_support(control) )
+        {
+            iommu->msi.msi_attrib.maskbit = 1;
+            iommu->msi.msi.mpos = msi_mask_bits_reg(iommu->msi.msi_attrib.pos,
+                                                    is_64bit_address(control));
+            handler = &iommu_maskable_msi_type;
+        }
+        else
+            handler = &iommu_msi_type;
+
+        ret = __setup_msi_irq(irq_to_desc(irq), &iommu->msi, handler);
+    }
+
     if ( !ret )
         ret = request_irq(irq, 0, iommu_interrupt_handler, "amd_iommu", iommu);
     if ( ret )
@@ -837,8 +896,19 @@ static void enable_iommu(struct amd_iommu *iommu)
         struct irq_desc *desc = irq_to_desc(iommu->msi.irq);
 
         spin_lock(&desc->lock);
-        set_msi_affinity(desc, NULL);
-        spin_unlock(&desc->lock);
+
+        if ( iommu->ctrl.int_cap_xt_en )
+        {
+            set_x2apic_affinity(desc, NULL);
+            spin_unlock(&desc->lock);
+        }
+        else
+        {
+            set_msi_affinity(desc, NULL);
+            spin_unlock(&desc->lock);
+
+            amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
+        }
     }
 
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
@@ -878,7 +948,9 @@ static void disable_iommu(struct amd_iommu *iommu)
         return;
     }
 
-    amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
+    if ( !iommu->ctrl.int_cap_xt_en )
+        amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
+
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_DISABLED);
     set_iommu_event_log_control(iommu, IOMMU_CONTROL_DISABLED);
 

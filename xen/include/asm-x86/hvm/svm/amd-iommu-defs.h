@@ -416,6 +416,25 @@ union amd_iommu_ext_features {
     } flds;
 };
 
+/* x2APIC Control Registers */
+#define IOMMU_XT_INT_CTRL_MMIO_OFFSET		0x0170
+#define IOMMU_XT_PPR_INT_CTRL_MMIO_OFFSET	0x0178
+#define IOMMU_XT_GA_INT_CTRL_MMIO_OFFSET	0x0180
+
+union amd_iommu_x2apic_control {
+    uint64_t raw;
+    struct {
+        unsigned int :2;
+        unsigned int dest_mode:1;
+        unsigned int :5;
+        unsigned int dest_lo:24;
+        unsigned int vector:8;
+        unsigned int int_type:1; /* DM in IOMMU spec 3.04 */
+        unsigned int :15;
+        unsigned int dest_hi:8;
+    };
+};
+
 /* Status Register*/
 #define IOMMU_STATUS_MMIO_OFFSET		0x2020
 #define IOMMU_STATUS_EVENT_OVERFLOW_MASK	0x00000001
