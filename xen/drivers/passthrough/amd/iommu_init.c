@@ -813,7 +813,6 @@ static void amd_iommu_erratum_746_workaround(struct amd_iommu *iommu)
 static void enable_iommu(struct amd_iommu *iommu)
 {
     unsigned long flags;
-    struct irq_desc *desc;
 
     spin_lock_irqsave(&iommu->lock, flags);
 
@@ -833,19 +832,27 @@ static void enable_iommu(struct amd_iommu *iommu)
     if ( iommu->features.flds.ppr_sup )
         register_iommu_ppr_log_in_mmio_space(iommu);
 
-    desc = irq_to_desc(iommu->msi.irq);
-    spin_lock(&desc->lock);
-    set_msi_affinity(desc, NULL);
-    spin_unlock(&desc->lock);
+    if ( iommu->msi.irq > 0 )
+    {
+        struct irq_desc *desc = irq_to_desc(iommu->msi.irq);
+
+        spin_lock(&desc->lock);
+        set_msi_affinity(desc, NULL);
+        spin_unlock(&desc->lock);
+    }
 
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
 
     set_iommu_ht_flags(iommu);
     set_iommu_command_buffer_control(iommu, IOMMU_CONTROL_ENABLED);
-    set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
 
-    if ( iommu->features.flds.ppr_sup )
-        set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_ENABLED);
+    if ( iommu->msi.irq > 0 )
+    {
+        set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
+
+        if ( iommu->features.flds.ppr_sup )
+            set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_ENABLED);
+    }
 
     if ( iommu->features.flds.gt_sup )
         set_iommu_guest_translation_control(iommu, IOMMU_CONTROL_ENABLED);
