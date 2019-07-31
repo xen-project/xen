@@ -799,6 +799,35 @@ void *__init amd_iommu_alloc_intremap_table(
     return tb;
 }
 
+bool __init iov_supports_xt(void)
+{
+    unsigned int apic;
+
+    if ( !iommu_enable || !iommu_intremap )
+        return false;
+
+    if ( amd_iommu_prepare(true) )
+        return false;
+
+    for ( apic = 0; apic < nr_ioapics; apic++ )
+    {
+        unsigned int idx = ioapic_id_to_index(IO_APIC_ID(apic));
+
+        if ( idx == MAX_IO_APICS )
+            return false;
+
+        if ( !find_iommu_for_device(ioapic_sbdf[idx].seg,
+                                    ioapic_sbdf[idx].bdf) )
+        {
+            AMD_IOMMU_DEBUG("No IOMMU for IO-APIC %#x (ID %x)\n",
+                            apic, IO_APIC_ID(apic));
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
 {
     spinlock_t *lock;

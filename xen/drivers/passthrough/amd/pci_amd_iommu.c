@@ -170,7 +170,8 @@ static int __init iov_detect(void)
     if ( !iommu_enable && !iommu_intremap )
         return 0;
 
-    if ( amd_iommu_init() != 0 )
+    else if ( (init_done ? amd_iommu_init_interrupt()
+                         : amd_iommu_init(false)) != 0 )
     {
         printk("AMD-Vi: Error initialization\n");
         return -ENODEV;
@@ -180,6 +181,25 @@ static int __init iov_detect(void)
 
     if ( !amd_iommu_perdev_intremap )
         printk(XENLOG_WARNING "AMD-Vi: Using global interrupt remap table is not recommended (see XSA-36)!\n");
+
+    return 0;
+}
+
+static int iov_enable_xt(void)
+{
+    int rc;
+
+    if ( system_state >= SYS_STATE_active )
+        return 0;
+
+    if ( (rc = amd_iommu_init(true)) != 0 )
+    {
+        printk("AMD-Vi: Error %d initializing for x2APIC mode\n", rc);
+        /* -ENXIO has special meaning to the caller - convert it. */
+        return rc != -ENXIO ? rc : -ENODATA;
+    }
+
+    init_done = true;
 
     return 0;
 }
@@ -557,11 +577,13 @@ static const struct iommu_ops __initconstrel _iommu_ops = {
     .free_page_table = deallocate_page_table,
     .reassign_device = reassign_device,
     .get_device_group_id = amd_iommu_group_id,
+    .enable_x2apic = iov_enable_xt,
     .update_ire_from_apic = amd_iommu_ioapic_update_ire,
     .update_ire_from_msi = amd_iommu_msi_msg_update_ire,
     .read_apic_from_ire = amd_iommu_read_ioapic_from_ire,
     .read_msi_from_ire = amd_iommu_read_msi_from_ire,
     .setup_hpet_msi = amd_setup_hpet_msi,
+    .adjust_irq_affinities = iov_adjust_irq_affinities,
     .suspend = amd_iommu_suspend,
     .resume = amd_iommu_resume,
     .crash_shutdown = amd_iommu_crash_shutdown,
@@ -571,4 +593,5 @@ static const struct iommu_ops __initconstrel _iommu_ops = {
 static const struct iommu_init_ops __initconstrel _iommu_init_ops = {
     .ops = &_iommu_ops,
     .setup = iov_detect,
+    .supports_x2apic = iov_supports_xt,
 };

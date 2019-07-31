@@ -833,6 +833,30 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     return 1;
 }
 
+int iov_adjust_irq_affinities(void)
+{
+    const struct amd_iommu *iommu;
+
+    if ( !iommu_enabled )
+        return 0;
+
+    for_each_amd_iommu ( iommu )
+    {
+        struct irq_desc *desc = irq_to_desc(iommu->msi.irq);
+        unsigned long flags;
+
+        spin_lock_irqsave(&desc->lock, flags);
+        if ( iommu->ctrl.int_cap_xt_en )
+            set_x2apic_affinity(desc, NULL);
+        else
+            set_msi_affinity(desc, NULL);
+        spin_unlock_irqrestore(&desc->lock, flags);
+    }
+
+    return 0;
+}
+__initcall(iov_adjust_irq_affinities);
+
 /*
  * Family15h Model 10h-1fh erratum 746 (IOMMU Logging May Stall Translations)
  * Workaround:
@@ -1046,7 +1070,7 @@ static void * __init allocate_ppr_log(struct amd_iommu *iommu)
                                 IOMMU_PPR_LOG_DEFAULT_ENTRIES, "PPR Log");
 }
 
-static int __init amd_iommu_init_one(struct amd_iommu *iommu)
+static int __init amd_iommu_init_one(struct amd_iommu *iommu, bool intr)
 {
     if ( allocate_cmd_buffer(iommu) == NULL )
         goto error_out;
@@ -1057,7 +1081,7 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
     if ( iommu->features.flds.ppr_sup && !allocate_ppr_log(iommu) )
         goto error_out;
 
-    if ( !set_iommu_interrupt_handler(iommu) )
+    if ( intr && !set_iommu_interrupt_handler(iommu) )
         goto error_out;
 
     /* To make sure that device_table.buffer has been successfully allocated */
@@ -1086,8 +1110,16 @@ static void __init amd_iommu_init_cleanup(void)
     list_for_each_entry_safe ( iommu, next, &amd_iommu_head, list )
     {
         list_del(&iommu->list);
+
+        iommu->ctrl.ga_en = 0;
+        iommu->ctrl.xt_en = 0;
+        iommu->ctrl.int_cap_xt_en = 0;
+
         if ( iommu->enabled )
             disable_iommu(iommu);
+        else if ( iommu->mmio_base )
+            writeq(iommu->ctrl.raw,
+                   iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 
         deallocate_ring_buffer(&iommu->cmd_buffer);
         deallocate_ring_buffer(&iommu->event_log);
@@ -1289,7 +1321,7 @@ static int __init amd_iommu_prepare_one(struct amd_iommu *iommu)
     return 0;
 }
 
-int __init amd_iommu_init(void)
+int __init amd_iommu_prepare(bool xt)
 {
     struct amd_iommu *iommu;
     int rc = -ENODEV;
@@ -1304,9 +1336,14 @@ int __init amd_iommu_init(void)
     if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI) )
         goto error_out;
 
+    /* Have we been here before? */
+    if ( ivhd_type )
+        return 0;
+
     rc = amd_iommu_get_supported_ivhd_type();
     if ( rc < 0 )
         goto error_out;
+    BUG_ON(!rc);
     ivhd_type = rc;
 
     rc = amd_iommu_get_ivrs_dev_entries();
@@ -1322,9 +1359,37 @@ int __init amd_iommu_init(void)
         rc = amd_iommu_prepare_one(iommu);
         if ( rc )
             goto error_out;
+
+        rc = -ENODEV;
+        if ( xt && (!iommu->features.flds.ga_sup || !iommu->features.flds.xt_sup) )
+            goto error_out;
+    }
+
+    for_each_amd_iommu ( iommu )
+    {
+        /* NB: There's no need to actually write these out right here. */
+        iommu->ctrl.ga_en |= xt;
+        iommu->ctrl.xt_en = xt;
+        iommu->ctrl.int_cap_xt_en = xt;
     }
 
     rc = amd_iommu_update_ivrs_mapping_acpi();
+
+ error_out:
+    if ( rc )
+    {
+        amd_iommu_init_cleanup();
+        ivhd_type = 0;
+    }
+
+    return rc;
+}
+
+int __init amd_iommu_init(bool xt)
+{
+    struct amd_iommu *iommu;
+    int rc = amd_iommu_prepare(xt);
+
     if ( rc )
         goto error_out;
 
@@ -1350,7 +1415,12 @@ int __init amd_iommu_init(void)
     /* per iommu initialization  */
     for_each_amd_iommu ( iommu )
     {
-        rc = amd_iommu_init_one(iommu);
+        /*
+         * Setting up of the IOMMU interrupts cannot occur yet at the (very
+         * early) time we get here when enabling x2APIC mode. Suppress it
+         * here, and do it explicitly in amd_iommu_init_interrupt().
+         */
+        rc = amd_iommu_init_one(iommu, !xt);
         if ( rc )
             goto error_out;
     }
@@ -1359,6 +1429,40 @@ int __init amd_iommu_init(void)
 
 error_out:
     amd_iommu_init_cleanup();
+    return rc;
+}
+
+int __init amd_iommu_init_interrupt(void)
+{
+    struct amd_iommu *iommu;
+    int rc = 0;
+
+    for_each_amd_iommu ( iommu )
+    {
+        struct irq_desc *desc;
+
+        if ( !set_iommu_interrupt_handler(iommu) )
+        {
+            rc = -EIO;
+            break;
+        }
+
+        desc = irq_to_desc(iommu->msi.irq);
+
+        spin_lock(&desc->lock);
+        ASSERT(iommu->ctrl.int_cap_xt_en);
+        set_x2apic_affinity(desc, &cpu_online_map);
+        spin_unlock(&desc->lock);
+
+        set_iommu_event_log_control(iommu, IOMMU_CONTROL_ENABLED);
+
+        if ( iommu->features.flds.ppr_sup )
+            set_iommu_ppr_log_control(iommu, IOMMU_CONTROL_ENABLED);
+    }
+
+    if ( rc )
+        amd_iommu_init_cleanup();
+
     return rc;
 }
 

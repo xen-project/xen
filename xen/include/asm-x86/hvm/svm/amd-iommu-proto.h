@@ -48,8 +48,11 @@ int amd_iommu_detect_acpi(void);
 void get_iommu_features(struct amd_iommu *iommu);
 
 /* amd-iommu-init functions */
-int amd_iommu_init(void);
+int amd_iommu_prepare(bool xt);
+int amd_iommu_init(bool xt);
+int amd_iommu_init_interrupt(void);
 int amd_iommu_update_ivrs_mapping_acpi(void);
+int iov_adjust_irq_affinities(void);
 
 /* mapping functions */
 int __must_check amd_iommu_map_page(struct domain *d, dfn_t dfn,
@@ -93,6 +96,7 @@ void amd_iommu_flush_all_caches(struct amd_iommu *iommu);
 struct amd_iommu *find_iommu_for_device(int seg, int bdf);
 
 /* interrupt remapping */
+bool iov_supports_xt(void);
 int amd_iommu_setup_ioapic_remapping(void);
 void *amd_iommu_alloc_intremap_table(
     const struct amd_iommu *, unsigned long **);
