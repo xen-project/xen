@@ -457,6 +457,30 @@ opensuse-leap-gcc-debug:
   variables:
     CONTAINER: suse:opensuse-leap
 
+opensuse-tumbleweed-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
+
+opensuse-tumbleweed-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
+
+opensuse-tumbleweed-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
+
+opensuse-tumbleweed-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: suse:opensuse-tumbleweed
+  allow_failure: true
+
 alpine-3.12-gcc:
   extends: .gcc-x86-64-build
   variables:
