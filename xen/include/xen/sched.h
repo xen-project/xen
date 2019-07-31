@@ -302,10 +302,6 @@ struct vm_event_domain
 
 struct evtchn_port_ops;
 
-enum guest_type {
-    guest_type_pv, guest_type_hvm
-};
-
 struct domain
 {
     domid_t          domain_id;
@@ -356,7 +352,6 @@ struct domain
     struct radix_tree_root pirq_tree;
     unsigned int     nr_pirqs;
 
-    enum guest_type guest_type;
     unsigned int     options;         /* copy of createdomain flags */
 
     /* Is this guest dying (i.e., a zombie)? */
@@ -918,8 +913,8 @@ void watchdog_domain_destroy(struct domain *d);
 
 static inline bool is_pv_domain(const struct domain *d)
 {
-    return IS_ENABLED(CONFIG_PV)
-           ? evaluate_nospec(d->guest_type == guest_type_pv) : false;
+    return IS_ENABLED(CONFIG_PV) &&
+        evaluate_nospec(!(d->options & XEN_DOMCTL_CDF_hvm_guest));
 }
 
 static inline bool is_pv_vcpu(const struct vcpu *v)
@@ -950,8 +945,8 @@ static inline bool is_pv_64bit_vcpu(const struct vcpu *v)
 #endif
 static inline bool is_hvm_domain(const struct domain *d)
 {
-    return IS_ENABLED(CONFIG_HVM)
-           ? evaluate_nospec(d->guest_type == guest_type_hvm) : false;
+    return IS_ENABLED(CONFIG_HVM) &&
+        evaluate_nospec(d->options & XEN_DOMCTL_CDF_hvm_guest);
 }
 
 static inline bool is_hvm_vcpu(const struct vcpu *v)

@@ -353,10 +353,6 @@ struct domain *domain_create(domid_t domid,
         hardware_domain = d;
     }
 
-    /* Sort out our idea of is_{pv,hvm}_domain().  All system domains are PV. */
-    d->guest_type = ((d->options & XEN_DOMCTL_CDF_hvm_guest)
-                     ? guest_type_hvm : guest_type_pv);
-
     TRACE_1D(TRC_DOM0_DOM_ADD, d->domain_id);
 
     /*
