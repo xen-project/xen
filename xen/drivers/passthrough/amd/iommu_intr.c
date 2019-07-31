@@ -883,7 +883,8 @@ int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
 }
 
 static void dump_intremap_table(const struct amd_iommu *iommu,
-                                union irte_cptr tbl)
+                                union irte_cptr tbl,
+                                const struct ivrs_mappings *ivrs_mapping)
 {
     unsigned int count;
 
@@ -892,19 +893,25 @@ static void dump_intremap_table(const struct amd_iommu *iommu,
 
     for ( count = 0; count < INTREMAP_ENTRIES; count++ )
     {
-        if ( iommu->ctrl.ga_en )
-        {
-            if ( !tbl.ptr128[count].raw[0] && !tbl.ptr128[count].raw[1] )
+        if ( iommu->ctrl.ga_en
+             ? !tbl.ptr128[count].raw[0] && !tbl.ptr128[count].raw[1]
+             : !tbl.ptr32[count].raw )
                 continue;
+
+        if ( ivrs_mapping )
+        {
+            printk("  %04x:%02x:%02x:%u:\n", iommu->seg,
+                   PCI_BUS(ivrs_mapping->dte_requestor_id),
+                   PCI_SLOT(ivrs_mapping->dte_requestor_id),
+                   PCI_FUNC(ivrs_mapping->dte_requestor_id));
+            ivrs_mapping = NULL;
+        }
+
+        if ( iommu->ctrl.ga_en )
             printk("    IRTE[%03x] %016lx_%016lx\n",
                    count, tbl.ptr128[count].raw[1], tbl.ptr128[count].raw[0]);
-        }
         else
-        {
-            if ( !tbl.ptr32[count].raw )
-                continue;
             printk("    IRTE[%03x] %08x\n", count, tbl.ptr32[count].raw);
-        }
     }
 }
 
@@ -916,13 +923,8 @@ static int dump_intremap_mapping(const struct amd_iommu *iommu,
     if ( !ivrs_mapping )
         return 0;
 
-    printk("  %04x:%02x:%02x:%u:\n", iommu->seg,
-           PCI_BUS(ivrs_mapping->dte_requestor_id),
-           PCI_SLOT(ivrs_mapping->dte_requestor_id),
-           PCI_FUNC(ivrs_mapping->dte_requestor_id));
-
     spin_lock_irqsave(&(ivrs_mapping->intremap_lock), flags);
-    dump_intremap_table(iommu, ivrs_mapping->intremap_table);
+    dump_intremap_table(iommu, ivrs_mapping->intremap_table, ivrs_mapping);
     spin_unlock_irqrestore(&(ivrs_mapping->intremap_lock), flags);
 
     process_pending_softirqs();
@@ -932,17 +934,22 @@ static int dump_intremap_mapping(const struct amd_iommu *iommu,
 
 static void dump_intremap_tables(unsigned char key)
 {
-    unsigned long flags;
+    if ( !shared_intremap_table )
+    {
+        printk("--- Dumping Per-dev IOMMU Interrupt Remapping Table ---\n");
 
-    printk("--- Dumping Per-dev IOMMU Interrupt Remapping Table ---\n");
+        iterate_ivrs_entries(dump_intremap_mapping);
+    }
+    else
+    {
+        unsigned long flags;
 
-    iterate_ivrs_entries(dump_intremap_mapping);
+        printk("--- Dumping Shared IOMMU Interrupt Remapping Table ---\n");
 
-    printk("--- Dumping Shared IOMMU Interrupt Remapping Table ---\n");
-
-    spin_lock_irqsave(&shared_intremap_lock, flags);
-    dump_intremap_table(list_first_entry(&amd_iommu_head, struct amd_iommu,
-                                         list),
-                        shared_intremap_table);
-    spin_unlock_irqrestore(&shared_intremap_lock, flags);
+        spin_lock_irqsave(&shared_intremap_lock, flags);
+        dump_intremap_table(list_first_entry(&amd_iommu_head, struct amd_iommu,
+                                             list),
+                            shared_intremap_table, NULL);
+        spin_unlock_irqrestore(&shared_intremap_lock, flags);
+    }
 }
