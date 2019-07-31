@@ -88,6 +88,8 @@ struct amd_iommu {
     void *mmio_base;
     unsigned long mmio_base_phys;
 
+    union amd_iommu_control ctrl;
+
     struct table_struct dev_table;
     struct ring_buffer cmd_buffer;
     struct ring_buffer event_log;
@@ -173,7 +175,7 @@ struct guest_iommu {
     uint64_t                mmio_base;             /* MMIO base address */
 
     /* MMIO regs */
-    struct mmio_reg         reg_ctrl;              /* MMIO offset 0018h */
+    union amd_iommu_control reg_ctrl;              /* MMIO offset 0018h */
     struct mmio_reg         reg_status;            /* MMIO offset 2020h */
     union amd_iommu_ext_features reg_ext_feature;  /* MMIO offset 0030h */
 

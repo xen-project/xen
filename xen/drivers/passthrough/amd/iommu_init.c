@@ -41,7 +41,7 @@ LIST_HEAD_READ_MOSTLY(amd_iommu_head);
 struct table_struct device_table;
 bool_t iommuv2_enabled;
 
-static int iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
+static bool iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
 {
     return iommu->ht_flags & mask;
 }
@@ -69,31 +69,18 @@ static void __init unmap_iommu_mmio_region(struct amd_iommu *iommu)
 
 static void set_iommu_ht_flags(struct amd_iommu *iommu)
 {
-    u32 entry;
-    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-
     /* Setup HT flags */
     if ( iommu_has_cap(iommu, PCI_CAP_HT_TUNNEL_SHIFT) )
-        iommu_has_ht_flag(iommu, ACPI_IVHD_TT_ENABLE) ?
-            iommu_set_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT) :
-            iommu_clear_bit(&entry, IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT);
+        iommu->ctrl.ht_tun_en = iommu_has_ht_flag(iommu, ACPI_IVHD_TT_ENABLE);
 
-    iommu_has_ht_flag(iommu, ACPI_IVHD_RES_PASS_PW) ?
-        iommu_set_bit(&entry, IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT):
-        iommu_clear_bit(&entry, IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT);
-
-    iommu_has_ht_flag(iommu, ACPI_IVHD_ISOC) ?
-        iommu_set_bit(&entry, IOMMU_CONTROL_ISOCHRONOUS_SHIFT):
-        iommu_clear_bit(&entry, IOMMU_CONTROL_ISOCHRONOUS_SHIFT);
-
-    iommu_has_ht_flag(iommu, ACPI_IVHD_PASS_PW) ?
-        iommu_set_bit(&entry, IOMMU_CONTROL_PASS_POSTED_WRITE_SHIFT):
-        iommu_clear_bit(&entry, IOMMU_CONTROL_PASS_POSTED_WRITE_SHIFT);
+    iommu->ctrl.pass_pw     = iommu_has_ht_flag(iommu, ACPI_IVHD_PASS_PW);
+    iommu->ctrl.res_pass_pw = iommu_has_ht_flag(iommu, ACPI_IVHD_RES_PASS_PW);
+    iommu->ctrl.isoc        = iommu_has_ht_flag(iommu, ACPI_IVHD_ISOC);
 
     /* Force coherent */
-    iommu_set_bit(&entry, IOMMU_CONTROL_COHERENT_SHIFT);
+    iommu->ctrl.coherent = true;
 
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+    writeq(iommu->ctrl.raw, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
 static void register_iommu_dev_table_in_mmio_space(struct amd_iommu *iommu)
@@ -205,55 +192,37 @@ static void register_iommu_ppr_log_in_mmio_space(struct amd_iommu *iommu)
 
 
 static void set_iommu_translation_control(struct amd_iommu *iommu,
-                                                 int enable)
+                                          bool enable)
 {
-    u32 entry;
+    iommu->ctrl.iommu_en = enable;
 
-    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-
-    enable ?
-        iommu_set_bit(&entry, IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT) :
-        iommu_clear_bit(&entry, IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT);
-
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+    writeq(iommu->ctrl.raw, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
 static void set_iommu_guest_translation_control(struct amd_iommu *iommu,
-                                                int enable)
+                                                bool enable)
 {
-    u32 entry;
+    iommu->ctrl.gt_en = enable;
 
-    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-
-    enable ?
-        iommu_set_bit(&entry, IOMMU_CONTROL_GT_ENABLE_SHIFT) :
-        iommu_clear_bit(&entry, IOMMU_CONTROL_GT_ENABLE_SHIFT);
-
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+    writeq(iommu->ctrl.raw, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 
     if ( enable )
         AMD_IOMMU_DEBUG("Guest Translation Enabled.\n");
 }
 
 static void set_iommu_command_buffer_control(struct amd_iommu *iommu,
-                                                    int enable)
+                                             bool enable)
 {
-    u32 entry;
-
-    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-
-    /*reset head and tail pointer manually before enablement */
+    /* Reset head and tail pointer manually before enablement */
     if ( enable )
     {
         writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
         writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
-
-        iommu_set_bit(&entry, IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT);
     }
-    else
-        iommu_clear_bit(&entry, IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT);
 
-    writel(entry, iommu->mmio_base+IOMMU_CONTROL_MMIO_OFFSET);
+    iommu->ctrl.cmd_buf_en = enable;
+
+    writeq(iommu->ctrl.raw, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
 static void register_iommu_exclusion_range(struct amd_iommu *iommu)
@@ -295,57 +264,38 @@ static void register_iommu_exclusion_range(struct amd_iommu *iommu)
 }
 
 static void set_iommu_event_log_control(struct amd_iommu *iommu,
-            int enable)
+                                        bool enable)
 {
-    u32 entry;
-
-    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-
-    /*reset head and tail pointer manually before enablement */
+    /* Reset head and tail pointer manually before enablement */
     if ( enable )
     {
         writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
         writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
-
-        iommu_set_bit(&entry, IOMMU_CONTROL_EVENT_LOG_INT_SHIFT);
-        iommu_set_bit(&entry, IOMMU_CONTROL_EVENT_LOG_ENABLE_SHIFT);
-    }
-    else
-    {
-        iommu_clear_bit(&entry, IOMMU_CONTROL_EVENT_LOG_INT_SHIFT);
-        iommu_clear_bit(&entry, IOMMU_CONTROL_EVENT_LOG_ENABLE_SHIFT);
     }
 
-    iommu_clear_bit(&entry, IOMMU_CONTROL_COMP_WAIT_INT_SHIFT);
+    iommu->ctrl.event_int_en = enable;
+    iommu->ctrl.event_log_en = enable;
+    iommu->ctrl.com_wait_int_en = false;
 
-    writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+    writeq(iommu->ctrl.raw, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 }
 
 static void set_iommu_ppr_log_control(struct amd_iommu *iommu,
-                                      int enable)
+                                      bool enable)
 {
-    u32 entry;
-
-    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-
-    /*reset head and tail pointer manually before enablement */
+    /* Reset head and tail pointer manually before enablement */
     if ( enable )
     {
         writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_HEAD_OFFSET);
         writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_TAIL_OFFSET);
-
-        iommu_set_bit(&entry, IOMMU_CONTROL_PPR_ENABLE_SHIFT);
-        iommu_set_bit(&entry, IOMMU_CONTROL_PPR_LOG_INT_SHIFT);
-        iommu_set_bit(&entry, IOMMU_CONTROL_PPR_LOG_ENABLE_SHIFT);
-    }
-    else
-    {
-        iommu_clear_bit(&entry, IOMMU_CONTROL_PPR_ENABLE_SHIFT);
-        iommu_clear_bit(&entry, IOMMU_CONTROL_PPR_LOG_INT_SHIFT);
-        iommu_clear_bit(&entry, IOMMU_CONTROL_PPR_LOG_ENABLE_SHIFT);
     }
 
-    writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+    iommu->ctrl.ppr_en = enable;
+    iommu->ctrl.ppr_int_en = enable;
+    iommu->ctrl.ppr_log_en = enable;
+
+    writeq(iommu->ctrl.raw, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+
     if ( enable )
         AMD_IOMMU_DEBUG("PPR Log Enabled.\n");
 }
@@ -398,7 +348,7 @@ static int iommu_read_log(struct amd_iommu *iommu,
 /* reset event log or ppr log when overflow */
 static void iommu_reset_log(struct amd_iommu *iommu,
                             struct ring_buffer *log,
-                            void (*ctrl_func)(struct amd_iommu *iommu, int))
+                            void (*ctrl_func)(struct amd_iommu *iommu, bool))
 {
     u32 entry;
     int log_run, run_bit;
@@ -615,11 +565,11 @@ static void iommu_check_event_log(struct amd_iommu *iommu)
         iommu_reset_log(iommu, &iommu->event_log, set_iommu_event_log_control);
     else
     {
-        entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-        if ( !(entry & IOMMU_CONTROL_EVENT_LOG_INT_MASK) )
+        if ( !iommu->ctrl.event_int_en )
         {
-            entry |= IOMMU_CONTROL_EVENT_LOG_INT_MASK;
-            writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+            iommu->ctrl.event_int_en = true;
+            writeq(iommu->ctrl.raw,
+                   iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
             /*
              * Re-schedule the tasklet to handle eventual log entries added
              * between reading the log above and re-enabling the interrupt.
@@ -704,11 +654,11 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
         iommu_reset_log(iommu, &iommu->ppr_log, set_iommu_ppr_log_control);
     else
     {
-        entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-        if ( !(entry & IOMMU_CONTROL_PPR_LOG_INT_MASK) )
+        if ( !iommu->ctrl.ppr_int_en )
         {
-            entry |= IOMMU_CONTROL_PPR_LOG_INT_MASK;
-            writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+            iommu->ctrl.ppr_int_en = true;
+            writeq(iommu->ctrl.raw,
+                   iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
             /*
              * Re-schedule the tasklet to handle eventual log entries added
              * between reading the log above and re-enabling the interrupt.
@@ -754,7 +704,6 @@ static void do_amd_iommu_irq(unsigned long data)
 static void iommu_interrupt_handler(int irq, void *dev_id,
                                     struct cpu_user_regs *regs)
 {
-    u32 entry;
     unsigned long flags;
     struct amd_iommu *iommu = dev_id;
 
@@ -764,10 +713,9 @@ static void iommu_interrupt_handler(int irq, void *dev_id,
      * Silence interrupts from both event and PPR by clearing the
      * enable logging bits in the control register
      */
-    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
-    iommu_clear_bit(&entry, IOMMU_CONTROL_EVENT_LOG_INT_SHIFT);
-    iommu_clear_bit(&entry, IOMMU_CONTROL_PPR_LOG_INT_SHIFT);
-    writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+    iommu->ctrl.event_int_en = false;
+    iommu->ctrl.ppr_int_en = false;
+    writeq(iommu->ctrl.raw, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 

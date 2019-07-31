@@ -317,7 +317,7 @@ static int do_invalidate_iotlb_pages(struct domain *d, cmd_entry_t *cmd)
 
 static int do_completion_wait(struct domain *d, cmd_entry_t *cmd)
 {
-    bool_t com_wait_int_en, com_wait_int, i, s;
+    bool com_wait_int, i, s;
     struct guest_iommu *iommu;
     unsigned long gfn;
     p2m_type_t p2mt;
@@ -354,12 +354,10 @@ static int do_completion_wait(struct domain *d, cmd_entry_t *cmd)
         unmap_domain_page(vaddr);
     }
 
-    com_wait_int_en = iommu_get_bit(iommu->reg_ctrl.lo,
-                                    IOMMU_CONTROL_COMP_WAIT_INT_SHIFT);
     com_wait_int = iommu_get_bit(iommu->reg_status.lo,
                                  IOMMU_STATUS_COMP_WAIT_INT_SHIFT);
 
-    if ( com_wait_int_en && com_wait_int )
+    if ( iommu->reg_ctrl.com_wait_int_en && com_wait_int )
         guest_iommu_deliver_msi(d);
 
     return 0;
@@ -521,40 +519,17 @@ static void guest_iommu_process_command(unsigned long _d)
     return;
 }
 
-static int guest_iommu_write_ctrl(struct guest_iommu *iommu, uint64_t newctrl)
+static int guest_iommu_write_ctrl(struct guest_iommu *iommu, uint64_t val)
 {
-    bool_t cmd_en, event_en, iommu_en, ppr_en, ppr_log_en;
-    bool_t cmd_en_old, event_en_old, iommu_en_old;
-    bool_t cmd_run;
+    union amd_iommu_control newctrl = { .raw = val };
 
-    iommu_en = iommu_get_bit(newctrl,
-                             IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT);
-    iommu_en_old = iommu_get_bit(iommu->reg_ctrl.lo,
-                                 IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT);
-
-    cmd_en = iommu_get_bit(newctrl,
-                           IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT);
-    cmd_en_old = iommu_get_bit(iommu->reg_ctrl.lo,
-                               IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT);
-    cmd_run = iommu_get_bit(iommu->reg_status.lo,
-                            IOMMU_STATUS_CMD_BUFFER_RUN_SHIFT);
-    event_en = iommu_get_bit(newctrl,
-                             IOMMU_CONTROL_EVENT_LOG_ENABLE_SHIFT);
-    event_en_old = iommu_get_bit(iommu->reg_ctrl.lo,
-                                 IOMMU_CONTROL_EVENT_LOG_ENABLE_SHIFT);
-
-    ppr_en = iommu_get_bit(newctrl,
-                           IOMMU_CONTROL_PPR_ENABLE_SHIFT);
-    ppr_log_en = iommu_get_bit(newctrl,
-                               IOMMU_CONTROL_PPR_LOG_ENABLE_SHIFT);
-
-    if ( iommu_en )
+    if ( newctrl.iommu_en )
     {
         guest_iommu_enable(iommu);
         guest_iommu_enable_dev_table(iommu);
     }
 
-    if ( iommu_en && cmd_en )
+    if ( newctrl.iommu_en && newctrl.cmd_buf_en )
     {
         guest_iommu_enable_ring_buffer(iommu, &iommu->cmd_buffer,
                                        sizeof(cmd_entry_t));
@@ -562,7 +537,7 @@ static int guest_iommu_write_ctrl(struct guest_iommu *iommu, uint64_t newctrl)
         tasklet_schedule(&iommu->cmd_buffer_tasklet);
     }
 
-    if ( iommu_en && event_en )
+    if ( newctrl.iommu_en && newctrl.event_log_en )
     {
         guest_iommu_enable_ring_buffer(iommu, &iommu->event_log,
                                        sizeof(event_entry_t));
@@ -570,7 +545,7 @@ static int guest_iommu_write_ctrl(struct guest_iommu *iommu, uint64_t newctrl)
         guest_iommu_clear_status(iommu, IOMMU_STATUS_EVENT_OVERFLOW_SHIFT);
     }
 
-    if ( iommu_en && ppr_en && ppr_log_en )
+    if ( newctrl.iommu_en && newctrl.ppr_en && newctrl.ppr_log_en )
     {
         guest_iommu_enable_ring_buffer(iommu, &iommu->ppr_log,
                                        sizeof(ppr_entry_t));
@@ -578,19 +553,21 @@ static int guest_iommu_write_ctrl(struct guest_iommu *iommu, uint64_t newctrl)
         guest_iommu_clear_status(iommu, IOMMU_STATUS_PPR_LOG_OVERFLOW_SHIFT);
     }
 
-    if ( iommu_en && cmd_en_old && !cmd_en )
+    if ( newctrl.iommu_en && iommu->reg_ctrl.cmd_buf_en &&
+         !newctrl.cmd_buf_en )
     {
         /* Disable iommu command processing */
         tasklet_kill(&iommu->cmd_buffer_tasklet);
     }
 
-    if ( event_en_old && !event_en )
+    if ( iommu->reg_ctrl.event_log_en && !newctrl.event_log_en )
         guest_iommu_clear_status(iommu, IOMMU_STATUS_EVENT_LOG_RUN_SHIFT);
 
-    if ( iommu_en_old && !iommu_en )
+    if ( iommu->reg_ctrl.iommu_en && !newctrl.iommu_en )
         guest_iommu_disable(iommu);
 
-    u64_to_reg(&iommu->reg_ctrl, newctrl);
+    iommu->reg_ctrl = newctrl;
+
     return 0;
 }
 
@@ -632,7 +609,7 @@ static uint64_t iommu_mmio_read64(struct guest_iommu *iommu,
         val = reg_to_u64(iommu->ppr_log.reg_tail);
         break;
     case IOMMU_CONTROL_MMIO_OFFSET:
-        val = reg_to_u64(iommu->reg_ctrl);
+        val = iommu->reg_ctrl.raw;
         break;
     case IOMMU_STATUS_MMIO_OFFSET:
         val = reg_to_u64(iommu->reg_status);

@@ -295,38 +295,56 @@ struct amd_iommu_dte {
 
 /* Control Register */
 #define IOMMU_CONTROL_MMIO_OFFSET			0x18
-#define IOMMU_CONTROL_TRANSLATION_ENABLE_MASK		0x00000001
-#define IOMMU_CONTROL_TRANSLATION_ENABLE_SHIFT		0
-#define IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_MASK	0x00000002
-#define IOMMU_CONTROL_HT_TUNNEL_TRANSLATION_SHIFT	1
-#define IOMMU_CONTROL_EVENT_LOG_ENABLE_MASK		0x00000004
-#define IOMMU_CONTROL_EVENT_LOG_ENABLE_SHIFT		2
-#define IOMMU_CONTROL_EVENT_LOG_INT_MASK		0x00000008
-#define IOMMU_CONTROL_EVENT_LOG_INT_SHIFT		3
-#define IOMMU_CONTROL_COMP_WAIT_INT_MASK		0x00000010
-#define IOMMU_CONTROL_COMP_WAIT_INT_SHIFT		4
-#define IOMMU_CONTROL_INVALIDATION_TIMEOUT_MASK		0x000000E0
-#define IOMMU_CONTROL_INVALIDATION_TIMEOUT_SHIFT	5
-#define IOMMU_CONTROL_PASS_POSTED_WRITE_MASK		0x00000100
-#define IOMMU_CONTROL_PASS_POSTED_WRITE_SHIFT		8
-#define IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_MASK	0x00000200
-#define IOMMU_CONTROL_RESP_PASS_POSTED_WRITE_SHIFT	9
-#define IOMMU_CONTROL_COHERENT_MASK			0x00000400
-#define IOMMU_CONTROL_COHERENT_SHIFT			10
-#define IOMMU_CONTROL_ISOCHRONOUS_MASK			0x00000800
-#define IOMMU_CONTROL_ISOCHRONOUS_SHIFT			11
-#define IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_MASK	0x00001000
-#define IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT	12
-#define IOMMU_CONTROL_PPR_LOG_ENABLE_MASK		0x00002000
-#define IOMMU_CONTROL_PPR_LOG_ENABLE_SHIFT		13
-#define IOMMU_CONTROL_PPR_LOG_INT_MASK			0x00004000
-#define IOMMU_CONTROL_PPR_LOG_INT_SHIFT			14
-#define IOMMU_CONTROL_PPR_ENABLE_MASK			0x00008000
-#define IOMMU_CONTROL_PPR_ENABLE_SHIFT			15
-#define IOMMU_CONTROL_GT_ENABLE_MASK			0x00010000
-#define IOMMU_CONTROL_GT_ENABLE_SHIFT			16
-#define IOMMU_CONTROL_RESTART_MASK			0x80000000
-#define IOMMU_CONTROL_RESTART_SHIFT			31
+
+union amd_iommu_control {
+    uint64_t raw;
+    struct {
+        bool iommu_en:1;
+        bool ht_tun_en:1;
+        bool event_log_en:1;
+        bool event_int_en:1;
+        bool com_wait_int_en:1;
+        unsigned int inv_timeout:3;
+        bool pass_pw:1;
+        bool res_pass_pw:1;
+        bool coherent:1;
+        bool isoc:1;
+        bool cmd_buf_en:1;
+        bool ppr_log_en:1;
+        bool ppr_int_en:1;
+        bool ppr_en:1;
+        bool gt_en:1;
+        bool ga_en:1;
+        unsigned int crw:4;
+        bool smif_en:1;
+        bool slf_wb_dis:1;
+        bool smif_log_en:1;
+        unsigned int gam_en:3;
+        bool ga_log_en:1;
+        bool ga_int_en:1;
+        unsigned int dual_ppr_log_en:2;
+        unsigned int dual_event_log_en:2;
+        unsigned int dev_tbl_seg_en:3;
+        unsigned int priv_abrt_en:2;
+        bool ppr_auto_rsp_en:1;
+        bool marc_en:1;
+        bool blk_stop_mrk_en:1;
+        bool ppr_auto_rsp_aon:1;
+        bool domain_id_pne:1;
+        unsigned int :1;
+        bool eph_en:1;
+        unsigned int had_update:2;
+        bool gd_update_dis:1;
+        unsigned int :1;
+        bool xt_en:1;
+        bool int_cap_xt_en:1;
+        bool vcmd_en:1;
+        bool viommu_en:1;
+        bool ga_update_dis:1;
+        bool gappi_en:1;
+        unsigned int :8;
+    };
+};
 
 /* Exclusion Register */
 #define IOMMU_EXCLUSION_BASE_LOW_OFFSET		0x20
