@@ -827,7 +827,7 @@ static int _set_status(const grant_entry_header_t *shah,
                        domid_t ldomid)
 {
 
-    if ( rgt_version == 1 )
+    if ( evaluate_nospec(rgt_version == 1) )
         return _set_status_v1(shah, rd, act, readonly, mapflag, ldomid);
     else
         return _set_status_v2(shah, status, rd, act, readonly, mapflag, ldomid);
@@ -982,8 +982,11 @@ map_grant_ref(
 
     /* This call also ensures the above check cannot be passed speculatively */
     shah = shared_entry_header(rgt, ref);
-    status = rgt->gt_version == 1 ? &shah->flags : &status_entry(rgt, ref);
     act = active_entry_acquire(rgt, ref);
+
+    /* Make sure we do not access memory speculatively */
+    status = evaluate_nospec(rgt->gt_version == 1) ? &shah->flags
+                                                 : &status_entry(rgt, ref);
 
     /* If already pinned, check the active domid and avoid refcnt overflow. */
     if ( act->pin &&
@@ -1005,7 +1008,7 @@ map_grant_ref(
 
         if ( !act->pin )
         {
-            unsigned long gfn = rgt->gt_version == 1 ?
+            unsigned long gfn = evaluate_nospec(rgt->gt_version == 1) ?
                                 shared_entry_v1(rgt, ref).frame :
                                 shared_entry_v2(rgt, ref).full_page.frame;
 
@@ -1461,7 +1464,7 @@ unmap_common_complete(struct gnttab_unmap_common *op)
     act = active_entry_acquire(rgt, op->ref);
     sha = shared_entry_header(rgt, op->ref);
 
-    if ( rgt->gt_version == 1 )
+    if ( evaluate_nospec(rgt->gt_version == 1) )
         status = &sha->flags;
     else
         status = &status_entry(rgt, op->ref);
@@ -1657,6 +1660,10 @@ gnttab_populate_status_frames(struct domain *d, struct grant_table *gt,
     unsigned req_status_frames;
 
     req_status_frames = grant_to_status_frames(req_nr_frames);
+
+    /* Make sure, prior version checks are architectural visible */
+    block_speculation();
+
     for ( i = nr_status_frames(gt); i < req_status_frames; i++ )
     {
         if ( (gt->status[i] = alloc_xenheap_page()) == NULL )
@@ -1684,6 +1691,9 @@ static int
 gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
 {
     unsigned int i;
+
+    /* Make sure, prior version checks are architectural visible */
+    block_speculation();
 
     for ( i = 0; i < nr_status_frames(gt); i++ )
     {
@@ -1795,7 +1805,7 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
     }
 
     /* Status pages - version 2 */
-    if ( gt->gt_version > 1 )
+    if ( evaluate_nospec(gt->gt_version > 1) )
     {
         if ( gnttab_populate_status_frames(d, gt, req_nr_frames) )
             goto shared_alloc_failed;
@@ -2289,7 +2299,7 @@ gnttab_transfer(
         grant_read_lock(e->grant_table);
         act = active_entry_acquire(e->grant_table, gop.ref);
 
-        if ( e->grant_table->gt_version == 1 )
+        if ( evaluate_nospec(e->grant_table->gt_version == 1) )
         {
             grant_entry_v1_t *sha = &shared_entry_v1(e->grant_table, gop.ref);
 
@@ -2351,7 +2361,7 @@ release_grant_for_copy(
     sha = shared_entry_header(rgt, gref);
     mfn = act->mfn;
 
-    if ( rgt->gt_version == 1 )
+    if ( evaluate_nospec(rgt->gt_version == 1) )
     {
         status = &sha->flags;
         td = rd;
@@ -2459,7 +2469,7 @@ acquire_grant_for_copy(
     shah = shared_entry_header(rgt, gref);
     act = active_entry_acquire(rgt, gref);
 
-    if ( rgt->gt_version == 1 )
+    if ( evaluate_nospec(rgt->gt_version == 1) )
     {
         sha2 = NULL;
         status = &shah->flags;
@@ -3281,7 +3291,7 @@ swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
     if ( act_b->pin )
         PIN_FAIL(out, GNTST_eagain, "ref b %#x busy\n", ref_b);
 
-    if ( gt->gt_version == 1 )
+    if ( evaluate_nospec(gt->gt_version == 1) )
     {
         grant_entry_v1_t shared;
 
@@ -3835,7 +3845,7 @@ int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
         rc = -EINVAL;
     else if ( ref >= nr_grant_entries(gt) )
         rc = -ENOENT;
-    else if ( gt->gt_version == 1 )
+    else if ( evaluate_nospec(gt->gt_version == 1) )
     {
         const grant_entry_v1_t *sha1 = &shared_entry_v1(gt, ref);
 
@@ -3857,7 +3867,7 @@ int mem_sharing_gref_to_gfn(struct grant_table *gt, grant_ref_t ref,
         rc = -ENXIO;
     else if ( !rc && status )
     {
-        if ( gt->gt_version == 1 )
+        if ( evaluate_nospec(gt->gt_version == 1) )
             *status = flags;
         else
             *status = status_entry(gt, ref);
@@ -3876,6 +3886,9 @@ static int gnttab_get_status_frame_mfn(struct domain *d,
     const struct grant_table *gt = d->grant_table;
 
     ASSERT(gt->gt_version == 2);
+
+    /* Make sure we have version equal to 2 even under speculation */
+    block_speculation();
 
     if ( idx >= nr_status_frames(gt) )
     {
@@ -3945,7 +3958,7 @@ int gnttab_map_frame(struct domain *d, unsigned long idx, gfn_t gfn, mfn_t *mfn)
 
     grant_write_lock(gt);
 
-    if ( gt->gt_version == 2 && (idx & XENMAPIDX_grant_table_status) )
+    if ( evaluate_nospec(gt->gt_version == 2) && (idx & XENMAPIDX_grant_table_status) )
     {
         idx &= ~XENMAPIDX_grant_table_status;
         status = true;
