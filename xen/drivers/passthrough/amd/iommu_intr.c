@@ -213,14 +213,12 @@ static void update_intremap_entry(const struct amd_iommu *iommu,
             },
         };
 
-        ACCESS_ONCE(entry.ptr128->raw[0]) = 0;
+        ASSERT(!entry.ptr128->full.remap_en);
+        entry.ptr128->raw[1] = irte.raw[1];
         /*
-         * Low half, in particular RemapEn, needs to be cleared first.  See
+         * High half needs to be set before low one (containing RemapEn).  See
          * comment in free_intremap_entry() regarding the choice of barrier.
          */
-        smp_wmb();
-        entry.ptr128->raw[1] = irte.raw[1];
-        /* High half needs to be set before low one (containing RemapEn). */
         smp_wmb();
         ACCESS_ONCE(entry.ptr128->raw[0]) = irte.raw[0];
     }
@@ -296,6 +294,20 @@ static int update_intremap_entry_from_ioapic(
     }
 
     entry = get_intremap_entry(iommu, req_id, offset);
+
+    /* The RemapEn fields match for all formats. */
+    while ( iommu->enabled && entry.ptr32->flds.remap_en )
+    {
+        entry.ptr32->flds.remap_en = false;
+        spin_unlock(lock);
+
+        spin_lock(&iommu->lock);
+        amd_iommu_flush_intremap(iommu, req_id);
+        spin_unlock(&iommu->lock);
+
+        spin_lock(lock);
+    }
+
     if ( fresh )
         /* nothing */;
     else if ( !lo_update )
@@ -324,13 +336,6 @@ static int update_intremap_entry_from_ioapic(
     update_intremap_entry(iommu, entry, vector, delivery_mode, dest_mode, dest);
 
     spin_unlock_irqrestore(lock, flags);
-
-    if ( iommu->enabled && !fresh )
-    {
-        spin_lock_irqsave(&iommu->lock, flags);
-        amd_iommu_flush_intremap(iommu, req_id);
-        spin_unlock_irqrestore(&iommu->lock, flags);
-    }
 
     set_rte_index(rte, offset);
 
@@ -587,19 +592,27 @@ static int update_intremap_entry_from_msi_msg(
     req_id = get_dma_requestor_id(iommu->seg, bdf);
     alias_id = get_intremap_requestor_id(iommu->seg, bdf);
 
+    lock = get_intremap_lock(iommu->seg, req_id);
+    spin_lock_irqsave(lock, flags);
+
     if ( msg == NULL )
     {
-        lock = get_intremap_lock(iommu->seg, req_id);
-        spin_lock_irqsave(lock, flags);
         for ( i = 0; i < nr; ++i )
             free_intremap_entry(iommu, req_id, *remap_index + i);
         spin_unlock_irqrestore(lock, flags);
-        goto done;
+
+        if ( iommu->enabled )
+        {
+            spin_lock_irqsave(&iommu->lock, flags);
+            amd_iommu_flush_intremap(iommu, req_id);
+            if ( alias_id != req_id )
+                amd_iommu_flush_intremap(iommu, alias_id);
+            spin_unlock_irqrestore(&iommu->lock, flags);
+        }
+
+        return 0;
     }
 
-    lock = get_intremap_lock(iommu->seg, req_id);
-
-    spin_lock_irqsave(lock, flags);
     dest_mode = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
     delivery_mode = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
     vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) & MSI_DATA_VECTOR_MASK;
@@ -623,6 +636,22 @@ static int update_intremap_entry_from_msi_msg(
     }
 
     entry = get_intremap_entry(iommu, req_id, offset);
+
+    /* The RemapEn fields match for all formats. */
+    while ( iommu->enabled && entry.ptr32->flds.remap_en )
+    {
+        entry.ptr32->flds.remap_en = false;
+        spin_unlock(lock);
+
+        spin_lock(&iommu->lock);
+        amd_iommu_flush_intremap(iommu, req_id);
+        if ( alias_id != req_id )
+            amd_iommu_flush_intremap(iommu, alias_id);
+        spin_unlock(&iommu->lock);
+
+        spin_lock(lock);
+    }
+
     update_intremap_entry(iommu, entry, vector, delivery_mode, dest_mode, dest);
     spin_unlock_irqrestore(lock, flags);
 
@@ -640,16 +669,6 @@ static int update_intremap_entry_from_msi_msg(
     {
         BUG_ON(get_ivrs_mappings(iommu->seg)[req_id].intremap_table !=
                get_ivrs_mappings(iommu->seg)[alias_id].intremap_table);
-    }
-
-done:
-    if ( iommu->enabled )
-    {
-        spin_lock_irqsave(&iommu->lock, flags);
-        amd_iommu_flush_intremap(iommu, req_id);
-        if ( alias_id != req_id )
-            amd_iommu_flush_intremap(iommu, alias_id);
-        spin_unlock_irqrestore(&iommu->lock, flags);
     }
 
     return 0;
