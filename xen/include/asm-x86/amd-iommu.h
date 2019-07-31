@@ -83,7 +83,7 @@ struct amd_iommu {
     iommu_cap_t cap;
 
     u8 ht_flags;
-    u64 features;
+    union amd_iommu_ext_features features;
 
     void *mmio_base;
     unsigned long mmio_base_phys;
@@ -175,7 +175,7 @@ struct guest_iommu {
     /* MMIO regs */
     struct mmio_reg         reg_ctrl;              /* MMIO offset 0018h */
     struct mmio_reg         reg_status;            /* MMIO offset 2020h */
-    struct mmio_reg         reg_ext_feature;       /* MMIO offset 0030h */
+    union amd_iommu_ext_features reg_ext_feature;  /* MMIO offset 0030h */
 
     /* guest interrupt settings */
     struct guest_iommu_msi  msi;

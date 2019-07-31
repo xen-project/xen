@@ -638,7 +638,7 @@ static uint64_t iommu_mmio_read64(struct guest_iommu *iommu,
         val = reg_to_u64(iommu->reg_status);
         break;
     case IOMMU_EXT_FEATURE_MMIO_OFFSET:
-        val = reg_to_u64(iommu->reg_ext_feature);
+        val = iommu->reg_ext_feature.raw;
         break;
 
     default:
@@ -802,39 +802,26 @@ int guest_iommu_set_base(struct domain *d, uint64_t base)
 /* Initialize mmio read only bits */
 static void guest_iommu_reg_init(struct guest_iommu *iommu)
 {
-    uint32_t lower, upper;
+    union amd_iommu_ext_features ef = {
+        /* Support prefetch */
+        .flds.pref_sup = 1,
+        /* Support PPR log */
+        .flds.ppr_sup = 1,
+        /* Support guest translation */
+        .flds.gt_sup = 1,
+        /* Support invalidate all command */
+        .flds.ia_sup = 1,
+        /* Host translation size has 6 levels */
+        .flds.hats = HOST_ADDRESS_SIZE_6_LEVEL,
+        /* Guest translation size has 6 levels */
+        .flds.gats = GUEST_ADDRESS_SIZE_6_LEVEL,
+        /* Single level gCR3 */
+        .flds.glx_sup = GUEST_CR3_1_LEVEL,
+        /* 9 bit PASID */
+        .flds.pas_max = PASMAX_9_bit,
+    };
 
-    lower = upper = 0;
-    /* Support prefetch */
-    iommu_set_bit(&lower,IOMMU_EXT_FEATURE_PREFSUP_SHIFT);
-    /* Support PPR log */
-    iommu_set_bit(&lower,IOMMU_EXT_FEATURE_PPRSUP_SHIFT);
-    /* Support guest translation */
-    iommu_set_bit(&lower,IOMMU_EXT_FEATURE_GTSUP_SHIFT);
-    /* Support invalidate all command */
-    iommu_set_bit(&lower,IOMMU_EXT_FEATURE_IASUP_SHIFT);
-
-    /* Host translation size has 6 levels */
-    set_field_in_reg_u32(HOST_ADDRESS_SIZE_6_LEVEL, lower,
-                         IOMMU_EXT_FEATURE_HATS_MASK,
-                         IOMMU_EXT_FEATURE_HATS_SHIFT,
-                         &lower);
-    /* Guest translation size has 6 levels */
-    set_field_in_reg_u32(GUEST_ADDRESS_SIZE_6_LEVEL, lower,
-                         IOMMU_EXT_FEATURE_GATS_MASK,
-                         IOMMU_EXT_FEATURE_GATS_SHIFT,
-                         &lower);
-    /* Single level gCR3 */
-    set_field_in_reg_u32(GUEST_CR3_1_LEVEL, lower,
-                         IOMMU_EXT_FEATURE_GLXSUP_MASK,
-                         IOMMU_EXT_FEATURE_GLXSUP_SHIFT, &lower);
-    /* 9 bit PASID */
-    set_field_in_reg_u32(PASMAX_9_bit, upper,
-                         IOMMU_EXT_FEATURE_PASMAX_MASK,
-                         IOMMU_EXT_FEATURE_PASMAX_SHIFT, &upper);
-
-    iommu->reg_ext_feature.lo = lower;
-    iommu->reg_ext_feature.hi = upper;
+    iommu->reg_ext_feature = ef;
 }
 
 static int guest_iommu_mmio_range(struct vcpu *v, unsigned long addr)

@@ -218,13 +218,6 @@ static inline int iommu_has_cap(struct amd_iommu *iommu, uint32_t bit)
     return !!(iommu->cap.header & (1u << bit));
 }
 
-static inline int amd_iommu_has_feature(struct amd_iommu *iommu, uint32_t bit)
-{
-    if ( !iommu_has_cap(iommu, PCI_CAP_EFRSUP_SHIFT) )
-        return 0;
-    return !!(iommu->features & (1U << bit));
-}
-
 /* access tail or head pointer of ring buffer */
 static inline uint32_t iommu_get_rb_pointer(uint32_t reg)
 {

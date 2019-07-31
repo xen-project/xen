@@ -346,26 +346,57 @@ struct amd_iommu_dte {
 #define IOMMU_EXCLUSION_LIMIT_HIGH_MASK		0xFFFFFFFF
 #define IOMMU_EXCLUSION_LIMIT_HIGH_SHIFT	0
 
-/* Extended Feature Register*/
+/* Extended Feature Register */
 #define IOMMU_EXT_FEATURE_MMIO_OFFSET                   0x30
-#define IOMMU_EXT_FEATURE_PREFSUP_SHIFT                 0x0
-#define IOMMU_EXT_FEATURE_PPRSUP_SHIFT                  0x1
-#define IOMMU_EXT_FEATURE_XTSUP_SHIFT                   0x2
-#define IOMMU_EXT_FEATURE_NXSUP_SHIFT                   0x3
-#define IOMMU_EXT_FEATURE_GTSUP_SHIFT                   0x4
-#define IOMMU_EXT_FEATURE_IASUP_SHIFT                   0x6
-#define IOMMU_EXT_FEATURE_GASUP_SHIFT                   0x7
-#define IOMMU_EXT_FEATURE_HESUP_SHIFT                   0x8
-#define IOMMU_EXT_FEATURE_PCSUP_SHIFT                   0x9
-#define IOMMU_EXT_FEATURE_HATS_SHIFT                    0x10
-#define IOMMU_EXT_FEATURE_HATS_MASK                     0x00000C00
-#define IOMMU_EXT_FEATURE_GATS_SHIFT                    0x12
-#define IOMMU_EXT_FEATURE_GATS_MASK                     0x00003000
-#define IOMMU_EXT_FEATURE_GLXSUP_SHIFT                  0x14
-#define IOMMU_EXT_FEATURE_GLXSUP_MASK                   0x0000C000
 
-#define IOMMU_EXT_FEATURE_PASMAX_SHIFT                  0x0
-#define IOMMU_EXT_FEATURE_PASMAX_MASK                   0x0000001F
+union amd_iommu_ext_features {
+    uint64_t raw;
+    struct {
+        unsigned int pref_sup:1;
+        unsigned int ppr_sup:1;
+        unsigned int xt_sup:1;
+        unsigned int nx_sup:1;
+        unsigned int gt_sup:1;
+        unsigned int gappi_sup:1;
+        unsigned int ia_sup:1;
+        unsigned int ga_sup:1;
+        unsigned int he_sup:1;
+        unsigned int pc_sup:1;
+        unsigned int hats:2;
+        unsigned int gats:2;
+        unsigned int glx_sup:2;
+        unsigned int smif_sup:2;
+        unsigned int smif_rc:3;
+        unsigned int gam_sup:3;
+        unsigned int dual_ppr_log_sup:2;
+        unsigned int :2;
+        unsigned int dual_event_log_sup:2;
+        unsigned int :1;
+        unsigned int sats_sup:1;
+        unsigned int pas_max:5;
+        unsigned int us_sup:1;
+        unsigned int dev_tbl_seg_sup:2;
+        unsigned int ppr_early_of_sup:1;
+        unsigned int ppr_auto_rsp_sup:1;
+        unsigned int marc_sup:2;
+        unsigned int blk_stop_mrk_sup:1;
+        unsigned int perf_opt_sup:1;
+        unsigned int msi_cap_mmio_sup:1;
+        unsigned int :1;
+        unsigned int gio_sup:1;
+        unsigned int ha_sup:1;
+        unsigned int eph_sup:1;
+        unsigned int attr_fw_sup:1;
+        unsigned int hd_sup:1;
+        unsigned int :1;
+        unsigned int inv_iotlb_type_sup:1;
+        unsigned int viommu_sup:1;
+        unsigned int vm_guard_io_sup:1;
+        unsigned int vm_table_size:4;
+        unsigned int ga_update_dis_sup:1;
+        unsigned int :2;
+    } flds;
+};
 
 /* Status Register*/
 #define IOMMU_STATUS_MMIO_OFFSET		0x2020

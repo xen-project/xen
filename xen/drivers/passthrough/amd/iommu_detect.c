@@ -60,49 +60,76 @@ static int __init get_iommu_capabilities(
 
 void __init get_iommu_features(struct amd_iommu *iommu)
 {
-    u32 low, high;
-    int i = 0 ;
     const struct amd_iommu *first;
-    static const char *__initdata feature_str[] = {
-        "- Prefetch Pages Command", 
-        "- Peripheral Page Service Request", 
-        "- X2APIC Supported", 
-        "- NX bit Supported", 
-        "- Guest Translation", 
-        "- Reserved bit [5]",
-        "- Invalidate All Command", 
-        "- Guest APIC supported", 
-        "- Hardware Error Registers", 
-        "- Performance Counters", 
-        NULL
-    };
-
     ASSERT( iommu->mmio_base );
 
     if ( !iommu_has_cap(iommu, PCI_CAP_EFRSUP_SHIFT) )
     {
-        iommu->features = 0;
+        iommu->features.raw = 0;
         return;
     }
 
-    low = readl(iommu->mmio_base + IOMMU_EXT_FEATURE_MMIO_OFFSET);
-    high = readl(iommu->mmio_base + IOMMU_EXT_FEATURE_MMIO_OFFSET + 4);
-
-    iommu->features = ((u64)high << 32) | low;
+    iommu->features.raw =
+        readq(iommu->mmio_base + IOMMU_EXT_FEATURE_MMIO_OFFSET);
 
     /* Don't log the same set of features over and over. */
     first = list_first_entry(&amd_iommu_head, struct amd_iommu, list);
-    if ( iommu != first && iommu->features == first->features )
+    if ( iommu != first && iommu->features.raw == first->features.raw )
         return;
 
     printk("AMD-Vi: IOMMU Extended Features:\n");
 
-    while ( feature_str[i] )
+#define FEAT(fld, str) do {                                    \
+    if ( --((union amd_iommu_ext_features){}).flds.fld > 1 )   \
+        printk( "- " str ": %#x\n", iommu->features.flds.fld); \
+    else if ( iommu->features.flds.fld )                       \
+        printk( "- " str "\n");                                \
+} while ( false )
+
+    FEAT(pref_sup,           "Prefetch Pages Command");
+    FEAT(ppr_sup,            "Peripheral Page Service Request");
+    FEAT(xt_sup,             "x2APIC");
+    FEAT(nx_sup,             "NX bit");
+    FEAT(gappi_sup,          "Guest APIC Physical Processor Interrupt");
+    FEAT(ia_sup,             "Invalidate All Command");
+    FEAT(ga_sup,             "Guest APIC");
+    FEAT(he_sup,             "Hardware Error Registers");
+    FEAT(pc_sup,             "Performance Counters");
+    FEAT(hats,               "Host Address Translation Size");
+
+    if ( iommu->features.flds.gt_sup )
     {
-        if ( amd_iommu_has_feature(iommu, i) )
-            printk( " %s\n", feature_str[i]);
-        i++;
+        FEAT(gats,           "Guest Address Translation Size");
+        FEAT(glx_sup,        "Guest CR3 Root Table Level");
+        FEAT(pas_max,        "Maximum PASID");
     }
+
+    FEAT(smif_sup,           "SMI Filter Register");
+    FEAT(smif_rc,            "SMI Filter Register Count");
+    FEAT(gam_sup,            "Guest Virtual APIC Modes");
+    FEAT(dual_ppr_log_sup,   "Dual PPR Log");
+    FEAT(dual_event_log_sup, "Dual Event Log");
+    FEAT(sats_sup,           "Secure ATS");
+    FEAT(us_sup,             "User / Supervisor Page Protection");
+    FEAT(dev_tbl_seg_sup,    "Device Table Segmentation");
+    FEAT(ppr_early_of_sup,   "PPR Log Overflow Early Warning");
+    FEAT(ppr_auto_rsp_sup,   "PPR Automatic Response");
+    FEAT(marc_sup,           "Memory Access Routing and Control");
+    FEAT(blk_stop_mrk_sup,   "Block StopMark Message");
+    FEAT(perf_opt_sup ,      "Performance Optimization");
+    FEAT(msi_cap_mmio_sup,   "MSI Capability MMIO Access");
+    FEAT(gio_sup,            "Guest I/O Protection");
+    FEAT(ha_sup,             "Host Access");
+    FEAT(eph_sup,            "Enhanced PPR Handling");
+    FEAT(attr_fw_sup,        "Attribute Forward");
+    FEAT(hd_sup,             "Host Dirty");
+    FEAT(inv_iotlb_type_sup, "Invalidate IOTLB Type");
+    FEAT(viommu_sup,         "Virtualized IOMMU");
+    FEAT(vm_guard_io_sup,    "VMGuard I/O Support");
+    FEAT(vm_table_size,      "VM Table Size");
+    FEAT(ga_update_dis_sup,  "Guest Access Bit Update Disable");
+
+#undef FEAT
 }
 
 int __init amd_iommu_detect_one_acpi(
