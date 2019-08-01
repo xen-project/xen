@@ -226,6 +226,29 @@ int xc_physinfo(xc_interface *xch,
     return 0;
 }
 
+int xc_microcode_update(xc_interface *xch, const void *buf, size_t len)
+{
+    int ret;
+    DECLARE_PLATFORM_OP;
+    DECLARE_HYPERCALL_BUFFER(struct xenpf_microcode_update, uc);
+
+    uc = xc_hypercall_buffer_alloc(xch, uc, len);
+    if ( uc == NULL )
+        return -1;
+
+    memcpy(uc, buf, len);
+
+    platform_op.cmd = XENPF_microcode_update;
+    platform_op.u.microcode.length = len;
+    set_xen_guest_handle(platform_op.u.microcode.data, uc);
+
+    ret = do_platform_op(xch, &platform_op);
+
+    xc_hypercall_buffer_free(xch, uc);
+
+    return ret;
+}
+
 int xc_cputopoinfo(xc_interface *xch, unsigned *max_cpus,
                    xc_cputopo_t *cputopo)
 {
