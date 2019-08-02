@@ -3,8 +3,6 @@
 
 #include "msr-index.h"
 
-#ifndef __ASSEMBLY__
-
 #include <xen/types.h>
 #include <xen/percpu.h>
 #include <xen/errno.h>
@@ -335,7 +333,5 @@ int init_vcpu_msr_policy(struct vcpu *v);
  */
 int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val);
 int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val);
-
-#endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_MSR_H */

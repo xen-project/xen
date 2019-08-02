@@ -16,7 +16,7 @@
 #include <xen/kimage.h>
 
 #include <asm/asm_defns.h>
-#include <asm/msr.h>
+#include <asm/msr-index.h>
 #include <asm/page.h>
 #include <asm/machine_kexec.h>
 

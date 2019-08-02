@@ -6,7 +6,7 @@
 #include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/processor.h>
-#include <asm/msr.h>
+#include <asm/msr-index.h>
 #include <asm/cpufeature.h>
 #include <public/elfnote.h>
 
