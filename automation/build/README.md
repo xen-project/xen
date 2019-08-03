@@ -66,6 +66,10 @@ There is a makefile to make this process easier. You should be
 able to run `make DISTRO/VERSION` to have Docker build the container
 for you. If you define the `PUSH` environment variable when running the
 former `make` command, it will push the container to the [registry] if
-you have access to do so.
+you have access to do so and have your Docker logged into the registry.
+
+To login you must run `docker login registry.gitlab.com`. For more
+information see the [registry help].
 
 [registry]: https://gitlab.com/xen-project/xen/container_registry
+[registry help]: https://gitlab.com/help/user/project/container_registry
