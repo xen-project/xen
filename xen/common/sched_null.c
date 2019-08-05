@@ -368,6 +368,8 @@ static bool vcpu_deassign(struct null_private *prv, struct vcpu *v)
     struct null_vcpu *wvc;
 
     ASSERT(list_empty(&null_vcpu(v)->waitq_elem));
+    ASSERT(per_cpu(npc, v->processor).vcpu == v);
+    ASSERT(!cpumask_test_cpu(v->processor, &prv->cpus_free));
 
     per_cpu(npc, cpu).vcpu = NULL;
     cpumask_set_cpu(cpu, &prv->cpus_free);
@@ -528,9 +530,6 @@ static void null_vcpu_remove(const struct scheduler *ops, struct vcpu *v)
 
         goto out;
     }
-
-    ASSERT(per_cpu(npc, v->processor).vcpu == v);
-    ASSERT(!cpumask_test_cpu(v->processor, &prv->cpus_free));
 
     vcpu_deassign(prv, v);
 
