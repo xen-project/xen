@@ -250,7 +250,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
                    "mov    %[cr4], %%cr4\n\t"
 #endif
                    "movabs $__start_xen, %[rip]\n\t"
-                   "lgdt   gdt_descr(%%rip)\n\t"
+                   "lgdt   boot_gdtr(%%rip)\n\t"
                    "mov    stack_start(%%rip), %%rsp\n\t"
                    "mov    %[ds], %%ss\n\t"
                    "mov    %[ds], %%ds\n\t"

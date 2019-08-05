@@ -204,12 +204,12 @@ struct __packed desc_ptr {
 	unsigned long base;
 };
 
-extern seg_desc_t boot_cpu_gdt_table[];
-DECLARE_PER_CPU(seg_desc_t *, gdt_table);
-DECLARE_PER_CPU(l1_pgentry_t, gdt_table_l1e);
-extern seg_desc_t boot_cpu_compat_gdt_table[];
-DECLARE_PER_CPU(seg_desc_t *, compat_gdt_table);
-DECLARE_PER_CPU(l1_pgentry_t, compat_gdt_table_l1e);
+extern seg_desc_t boot_gdt[];
+DECLARE_PER_CPU(seg_desc_t *, gdt);
+DECLARE_PER_CPU(l1_pgentry_t, gdt_l1e);
+extern seg_desc_t boot_compat_gdt[];
+DECLARE_PER_CPU(seg_desc_t *, compat_gdt);
+DECLARE_PER_CPU(l1_pgentry_t, compat_gdt_l1e);
 DECLARE_PER_CPU(bool, full_gdt_loaded);
 
 extern void load_TR(void);

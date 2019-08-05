@@ -3,7 +3,7 @@
 
 ENTRY(__high_start)
         /* Install relocated data selectors. */
-        lgdt    gdt_descr(%rip)
+        lgdt    boot_gdtr(%rip)
         mov     $(__HYPERVISOR_DS64),%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
@@ -44,16 +44,16 @@ multiboot_ptr:
         .long   0
 
         .word   0
-GLOBAL(gdt_descr)
+GLOBAL(boot_gdtr)
         .word   LAST_RESERVED_GDT_BYTE
-        .quad   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
+        .quad   boot_gdt - FIRST_RESERVED_GDT_BYTE
 
 GLOBAL(stack_start)
         .quad   cpu0_stack
 
         .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0
-GLOBAL(boot_cpu_gdt_table)
+GLOBAL(boot_gdt)
         .quad 0x0000000000000000     /* unused */
         .quad 0x00af9b000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
         .quad 0x00cf93000000ffff     /* 0xe010 ring 0 data                */
@@ -68,7 +68,7 @@ GLOBAL(boot_cpu_gdt_table)
         .align PAGE_SIZE, 0
 /* NB. Even rings != 0 get access to the full 4Gb, as only the            */
 /*     (compatibility) machine->physical mapping table lives there.       */
-GLOBAL(boot_cpu_compat_gdt_table)
+GLOBAL(boot_compat_gdt)
         .quad 0x0000000000000000     /* unused */
         .quad 0x00af9b000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
         .quad 0x00cf93000000ffff     /* 0xe010 ring 0 data                */

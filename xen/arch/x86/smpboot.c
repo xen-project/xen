@@ -944,11 +944,11 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
             free_domheap_page(mfn_to_page(mfn));
     }
 
-    FREE_XENHEAP_PAGE(per_cpu(compat_gdt_table, cpu));
+    FREE_XENHEAP_PAGE(per_cpu(compat_gdt, cpu));
 
     if ( remove )
     {
-        FREE_XENHEAP_PAGE(per_cpu(gdt_table, cpu));
+        FREE_XENHEAP_PAGE(per_cpu(gdt, cpu));
         FREE_XENHEAP_PAGE(idt_tables[cpu]);
 
         if ( stack_base[cpu] )
@@ -976,22 +976,22 @@ static int cpu_smpboot_alloc(unsigned int cpu)
         goto out;
     memguard_guard_stack(stack_base[cpu]);
 
-    gdt = per_cpu(gdt_table, cpu) ?: alloc_xenheap_pages(0, memflags);
+    gdt = per_cpu(gdt, cpu) ?: alloc_xenheap_pages(0, memflags);
     if ( gdt == NULL )
         goto out;
-    per_cpu(gdt_table, cpu) = gdt;
-    per_cpu(gdt_table_l1e, cpu) =
+    per_cpu(gdt, cpu) = gdt;
+    per_cpu(gdt_l1e, cpu) =
         l1e_from_pfn(virt_to_mfn(gdt), __PAGE_HYPERVISOR_RW);
-    memcpy(gdt, boot_cpu_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
+    memcpy(gdt, boot_gdt, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     BUILD_BUG_ON(NR_CPUS > 0x10000);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
-    per_cpu(compat_gdt_table, cpu) = gdt = alloc_xenheap_pages(0, memflags);
+    per_cpu(compat_gdt, cpu) = gdt = alloc_xenheap_pages(0, memflags);
     if ( gdt == NULL )
         goto out;
-    per_cpu(compat_gdt_table_l1e, cpu) =
+    per_cpu(compat_gdt_l1e, cpu) =
         l1e_from_pfn(virt_to_mfn(gdt), __PAGE_HYPERVISOR_RW);
-    memcpy(gdt, boot_cpu_compat_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
+    memcpy(gdt, boot_compat_gdt, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
     if ( idt_tables[cpu] == NULL )

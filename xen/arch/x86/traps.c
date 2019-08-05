@@ -96,10 +96,10 @@ string_param("nmi", opt_nmi);
 DEFINE_PER_CPU(uint64_t, efer);
 static DEFINE_PER_CPU(unsigned long, last_extable_addr);
 
-DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, gdt_table);
-DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, gdt_table_l1e);
-DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, compat_gdt_table);
-DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, compat_gdt_table_l1e);
+DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, gdt);
+DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, gdt_l1e);
+DEFINE_PER_CPU_READ_MOSTLY(seg_desc_t *, compat_gdt);
+DEFINE_PER_CPU_READ_MOSTLY(l1_pgentry_t, compat_gdt_l1e);
 
 /* Master table, used by CPU0. */
 idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
@@ -1899,17 +1899,17 @@ void load_TR(void)
 {
     struct tss_struct *tss = &this_cpu(init_tss);
     struct desc_ptr old_gdt, tss_gdt = {
-        .base = (long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
+        .base = (long)(this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY),
         .limit = LAST_RESERVED_GDT_BYTE
     };
 
     _set_tssldt_desc(
-        this_cpu(gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        this_cpu(gdt) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         SYS_DESC_tss_avail);
     _set_tssldt_desc(
-        this_cpu(compat_gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+        this_cpu(compat_gdt) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         SYS_DESC_tss_busy);
@@ -2000,8 +2000,8 @@ void __init init_idt_traps(void)
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;
 
-    this_cpu(gdt_table) = boot_cpu_gdt_table;
-    this_cpu(compat_gdt_table) = boot_cpu_compat_gdt_table;
+    this_cpu(gdt) = boot_gdt;
+    this_cpu(compat_gdt) = boot_compat_gdt;
 }
 
 extern void (*const autogen_entrypoints[NR_VECTORS])(void);
@@ -2029,13 +2029,11 @@ void __init trap_init(void)
         }
     }
 
-    /* Cache {,compat_}gdt_table_l1e now that physically relocation is done. */
-    this_cpu(gdt_table_l1e) =
-        l1e_from_pfn(virt_to_mfn(boot_cpu_gdt_table),
-                     __PAGE_HYPERVISOR_RW);
-    this_cpu(compat_gdt_table_l1e) =
-        l1e_from_pfn(virt_to_mfn(boot_cpu_compat_gdt_table),
-                     __PAGE_HYPERVISOR_RW);
+    /* Cache {,compat_}gdt_l1e now that physically relocation is done. */
+    this_cpu(gdt_l1e) =
+        l1e_from_pfn(virt_to_mfn(boot_gdt), __PAGE_HYPERVISOR_RW);
+    this_cpu(compat_gdt_l1e) =
+        l1e_from_pfn(virt_to_mfn(boot_compat_gdt), __PAGE_HYPERVISOR_RW);
 
     percpu_traps_init();
 

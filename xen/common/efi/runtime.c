@@ -104,7 +104,7 @@ struct efi_rs_state efi_rs_enter(void)
     {
         struct desc_ptr gdt_desc = {
             .limit = LAST_RESERVED_GDT_BYTE,
-            .base  = (unsigned long)(per_cpu(gdt_table, smp_processor_id()) -
+            .base  = (unsigned long)(per_cpu(gdt, smp_processor_id()) -
                                      FIRST_RESERVED_GDT_ENTRY)
         };
 

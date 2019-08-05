@@ -709,9 +709,9 @@ void load_system_tables(void)
 
 	struct tss_struct *tss = &this_cpu(init_tss);
 	seg_desc_t *gdt =
-		this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY;
+		this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY;
 	seg_desc_t *compat_gdt =
-		this_cpu(compat_gdt_table) - FIRST_RESERVED_GDT_ENTRY;
+		this_cpu(compat_gdt) - FIRST_RESERVED_GDT_ENTRY;
 
 	const struct desc_ptr gdtr = {
 		.base = (unsigned long)gdt,

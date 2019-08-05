@@ -1666,8 +1666,8 @@ static inline bool need_full_gdt(const struct domain *d)
 static void update_xen_slot_in_full_gdt(const struct vcpu *v, unsigned int cpu)
 {
     l1e_write(pv_gdt_ptes(v) + FIRST_RESERVED_GDT_PAGE,
-              !is_pv_32bit_vcpu(v) ? per_cpu(gdt_table_l1e, cpu)
-                                   : per_cpu(compat_gdt_table_l1e, cpu));
+              !is_pv_32bit_vcpu(v) ? per_cpu(gdt_l1e, cpu)
+                                   : per_cpu(compat_gdt_l1e, cpu));
 }
 
 static void load_full_gdt(const struct vcpu *v, unsigned int cpu)
@@ -1686,8 +1686,7 @@ static void load_default_gdt(unsigned int cpu)
 {
     struct desc_ptr gdt_desc = {
         .limit = LAST_RESERVED_GDT_BYTE,
-        .base  = (unsigned long)(per_cpu(gdt_table, cpu) -
-                                 FIRST_RESERVED_GDT_ENTRY),
+        .base  = (unsigned long)(per_cpu(gdt, cpu) - FIRST_RESERVED_GDT_ENTRY),
     };
 
     lgdt(&gdt_desc);
