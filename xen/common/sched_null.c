@@ -542,15 +542,19 @@ static void null_vcpu_remove(const struct scheduler *ops, struct vcpu *v)
 
 static void null_vcpu_wake(const struct scheduler *ops, struct vcpu *v)
 {
+    struct null_private *prv = null_priv(ops);
+    struct null_vcpu *nvc = null_vcpu(v);
+    unsigned int cpu = v->processor;
+
     ASSERT(!is_idle_vcpu(v));
 
-    if ( unlikely(curr_on_cpu(v->processor) == v) )
+    if ( unlikely(curr_on_cpu(cpu) == v) )
     {
         SCHED_STAT_CRANK(vcpu_wake_running);
         return;
     }
 
-    if ( unlikely(!list_empty(&null_vcpu(v)->waitq_elem)) )
+    if ( unlikely(!list_empty(&nvc->waitq_elem)) )
     {
         /* Not exactly "on runq", but close enough for reusing the counter */
         SCHED_STAT_CRANK(vcpu_wake_onrunq);
@@ -561,6 +565,48 @@ static void null_vcpu_wake(const struct scheduler *ops, struct vcpu *v)
         SCHED_STAT_CRANK(vcpu_wake_runnable);
     else
         SCHED_STAT_CRANK(vcpu_wake_not_runnable);
+
+    /*
+     * If a vcpu is neither on a pCPU nor in the waitqueue, it means it was
+     * offline, and that it is now coming back being online.
+     */
+    if ( unlikely(per_cpu(npc, cpu).vcpu != v && list_empty(&nvc->waitq_elem)) )
+    {
+        spin_lock(&prv->waitq_lock);
+        list_add_tail(&nvc->waitq_elem, &prv->waitq);
+        spin_unlock(&prv->waitq_lock);
+
+        cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                    cpupool_domain_cpumask(v->domain));
+
+        if ( !cpumask_intersects(&prv->cpus_free, cpumask_scratch_cpu(cpu)) )
+        {
+            dprintk(XENLOG_G_WARNING, "WARNING: d%dv%d not assigned to any CPU!\n",
+                    v->domain->domain_id, v->vcpu_id);
+            return;
+        }
+
+        /*
+         * Now we would want to assign the vcpu to cpu, but we can't, because
+         * we don't have the lock. So, let's do the following:
+         * - try to remove cpu from the list of free cpus, to avoid races with
+         *   other onlining, inserting or migrating operations;
+         * - tickle the cpu, which will pickup work from the waitqueue, and
+         *   assign it to itself;
+         * - if we're racing already, and if there still are free cpus, try
+         *   again.
+         */
+        while ( cpumask_intersects(&prv->cpus_free, cpumask_scratch_cpu(cpu)) )
+        {
+            unsigned int new_cpu = pick_cpu(prv, v);
+
+            if ( test_and_clear_bit(new_cpu, &prv->cpus_free) )
+            {
+                cpu_raise_softirq(new_cpu, SCHEDULE_SOFTIRQ);
+                return;
+            }
+        }
+    }
 
     /* Note that we get here only for vCPUs assigned to a pCPU */
     cpu_raise_softirq(v->processor, SCHEDULE_SOFTIRQ);
@@ -808,6 +854,9 @@ static struct task_slice null_schedule(const struct scheduler *ops,
         }
  unlock:
         spin_unlock(&prv->waitq_lock);
+
+        if ( ret.task == NULL && !cpumask_test_cpu(cpu, &prv->cpus_free) )
+            cpumask_set_cpu(cpu, &prv->cpus_free);
     }
 
     if ( unlikely(ret.task == NULL || !vcpu_runnable(ret.task)) )
