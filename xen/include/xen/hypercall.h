@@ -83,8 +83,8 @@ do_xen_version(
 
 extern long
 do_console_io(
-    int cmd,
-    int count,
+    unsigned int cmd,
+    unsigned int count,
     XEN_GUEST_HANDLE_PARAM(char) buffer);
 
 extern long

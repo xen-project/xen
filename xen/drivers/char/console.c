@@ -524,7 +524,8 @@ static inline void xen_console_write_debug_port(const char *buf, size_t len)
 }
 #endif
 
-static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
+static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
+                                unsigned int count)
 {
     char kbuf[128];
     unsigned int kcount = 0;
@@ -612,7 +613,8 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
     return 0;
 }
 
-long do_console_io(int cmd, int count, XEN_GUEST_HANDLE_PARAM(char) buffer)
+long do_console_io(unsigned int cmd, unsigned int count,
+                   XEN_GUEST_HANDLE_PARAM(char) buffer)
 {
     long rc;
     unsigned int idx, len;
@@ -627,6 +629,15 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE_PARAM(char) buffer)
         rc = guest_console_write(buffer, count);
         break;
     case CONSOLEIO_read:
+        /*
+         * The return value is either the number of characters read or
+         * a negative value in case of error. So we need to prevent
+         * overlap between the two sets.
+         */
+        rc = -E2BIG;
+        if ( count > INT_MAX )
+            break;
+
         rc = 0;
         while ( (serial_rx_cons != serial_rx_prod) && (rc < count) )
         {
