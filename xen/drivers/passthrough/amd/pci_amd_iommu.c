@@ -155,7 +155,6 @@ int __init acpi_ivrs_init(void)
 
     if ( (amd_iommu_detect_acpi() !=0) || (iommu_found() == 0) )
     {
-        printk("AMD-Vi: IOMMU not found!\n");
         iommu_intremap = 0;
         return -ENODEV;
     }
