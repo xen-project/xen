@@ -636,6 +636,7 @@ typedef struct {
     (dev)->backend_kind == LIBXL__DEVICE_KIND_QDISK || \
     (dev)->backend_kind == LIBXL__DEVICE_KIND_VFB || \
     (dev)->backend_kind == LIBXL__DEVICE_KIND_QUSB || \
+    (dev)->backend_kind == LIBXL__DEVICE_KIND_9PFS || \
     (dev)->backend_kind == LIBXL__DEVICE_KIND_VKBD)
 
 #define XC_PCI_BDF             "0x%x, 0x%x, 0x%x, 0x%x"

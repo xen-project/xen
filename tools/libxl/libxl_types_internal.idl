@@ -13,6 +13,7 @@ libxl__qmp_message_type = Enumeration("qmp_message_type", [
     (5, "invalid"),
     ])
 
+# Consider adding to QEMU_BACKEND in libxl_internal.h
 libxl__device_kind = Enumeration("device_kind", [
     (0, "NONE"),
     (1, "VIF"),
