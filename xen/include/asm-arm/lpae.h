@@ -245,19 +245,19 @@ TABLE_OFFSET_HELPERS(64);
 
 #define THIRD_SHIFT    (PAGE_SHIFT)
 #define THIRD_ORDER    (THIRD_SHIFT - PAGE_SHIFT)
-#define THIRD_SIZE     ((paddr_t)1 << THIRD_SHIFT)
+#define THIRD_SIZE     (_AT(paddr_t, 1) << THIRD_SHIFT)
 #define THIRD_MASK     (~(THIRD_SIZE - 1))
 #define SECOND_SHIFT   (THIRD_SHIFT + LPAE_SHIFT)
 #define SECOND_ORDER   (SECOND_SHIFT - PAGE_SHIFT)
-#define SECOND_SIZE    ((paddr_t)1 << SECOND_SHIFT)
+#define SECOND_SIZE    (_AT(paddr_t, 1) << SECOND_SHIFT)
 #define SECOND_MASK    (~(SECOND_SIZE - 1))
 #define FIRST_SHIFT    (SECOND_SHIFT + LPAE_SHIFT)
 #define FIRST_ORDER    (FIRST_SHIFT - PAGE_SHIFT)
-#define FIRST_SIZE     ((paddr_t)1 << FIRST_SHIFT)
+#define FIRST_SIZE     (_AT(paddr_t, 1) << FIRST_SHIFT)
 #define FIRST_MASK     (~(FIRST_SIZE - 1))
 #define ZEROETH_SHIFT  (FIRST_SHIFT + LPAE_SHIFT)
 #define ZEROETH_ORDER  (ZEROETH_SHIFT - PAGE_SHIFT)
-#define ZEROETH_SIZE   ((paddr_t)1 << ZEROETH_SHIFT)
+#define ZEROETH_SIZE   (_AT(paddr_t, 1) << ZEROETH_SHIFT)
 #define ZEROETH_MASK   (~(ZEROETH_SIZE - 1))
 
 /* Calculate the offsets into the pagetables for a given VA */
@@ -266,7 +266,7 @@ TABLE_OFFSET_HELPERS(64);
 #define second_linear_offset(va) ((va) >> SECOND_SHIFT)
 #define third_linear_offset(va) ((va) >> THIRD_SHIFT)
 
-#define TABLE_OFFSET(offs) ((unsigned int)(offs) & LPAE_ENTRY_MASK)
+#define TABLE_OFFSET(offs) (_AT(unsigned int, offs) & LPAE_ENTRY_MASK)
 #define first_table_offset(va)  TABLE_OFFSET(first_linear_offset(va))
 #define second_table_offset(va) TABLE_OFFSET(second_linear_offset(va))
 #define third_table_offset(va)  TABLE_OFFSET(third_linear_offset(va))
