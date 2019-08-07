@@ -93,7 +93,6 @@ static void amd_iommu_setup_domain_device(
     struct amd_iommu_dte *table, *dte;
     unsigned long flags;
     int req_id, valid = 1;
-    int dte_i = 0;
     u8 bus = pdev->bus;
     const struct domain_iommu *hd = dom_iommu(domain);
 
@@ -102,9 +101,6 @@ static void amd_iommu_setup_domain_device(
 
     if ( iommu_hwdom_passthrough && is_hardware_domain(domain) )
         valid = 0;
-
-    if ( ats_enabled )
-        dte_i = 1;
 
     /* get device-table entry */
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
@@ -122,7 +118,7 @@ static void amd_iommu_setup_domain_device(
 
         if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
              iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
-            dte->i = dte_i;
+            dte->i = ats_enabled;
 
         amd_iommu_flush_device(iommu, req_id);
 
@@ -287,14 +283,11 @@ void amd_iommu_disable_domain_device(struct domain *domain,
     dte = &table[req_id];
 
     spin_lock_irqsave(&iommu->lock, flags);
-    if ( dte->tv && dte->v )
+    if ( dte->tv || dte->v )
     {
-        dte->tv = 0;
-        dte->v = 0;
-
-        if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
-             iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
-            dte->i = 0;
+        dte->tv = false;
+        dte->v = false;
+        dte->i = false;
 
         amd_iommu_flush_device(iommu, req_id);
 

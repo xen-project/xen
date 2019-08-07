@@ -101,51 +101,52 @@ static unsigned int set_iommu_pte_present(unsigned long pt_mfn,
 
 void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
                                    uint64_t root_ptr, uint16_t domain_id,
-                                   uint8_t paging_mode, uint8_t valid)
+                                   uint8_t paging_mode, bool valid)
 {
     dte->domain_id = domain_id;
     dte->pt_root = paddr_to_pfn(root_ptr);
-    dte->iw = 1;
-    dte->ir = 1;
+    dte->iw = true;
+    dte->ir = true;
     dte->paging_mode = paging_mode;
-    dte->tv = 1;
+    dte->tv = true;
     dte->v = valid;
 }
 
 void __init amd_iommu_set_intremap_table(
-    struct amd_iommu_dte *dte, uint64_t intremap_ptr, uint8_t int_valid)
+    struct amd_iommu_dte *dte, uint64_t intremap_ptr, bool valid)
 {
     dte->it_root = intremap_ptr >> 6;
-    dte->int_tab_len = 0xb; /* 2048 entries */
-    dte->int_ctl = 2; /* fixed and arbitrated interrupts remapped */
-    dte->ig = 0; /* unmapped interrupt results io page faults */
-    dte->iv = int_valid;
+    dte->int_tab_len = IOMMU_INTREMAP_ORDER;
+    dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED;
+    dte->ig = false; /* unmapped interrupts result in i/o page faults */
+    dte->iv = valid;
 }
 
 void __init iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
-                                       struct ivrs_mappings *ivrs_dev)
+                                       const struct ivrs_mappings *ivrs_dev)
 {
     uint8_t flags = ivrs_dev->device_flags;
 
-    memset(dte, 0, sizeof(*dte));
-
-    dte->init_pass = MASK_EXTR(flags, ACPI_IVHD_INIT_PASS);
-    dte->ext_int_pass = MASK_EXTR(flags, ACPI_IVHD_EINT_PASS);
-    dte->nmi_pass = MASK_EXTR(flags, ACPI_IVHD_NMI_PASS);
-    dte->lint0_pass = MASK_EXTR(flags, ACPI_IVHD_LINT0_PASS);
-    dte->lint1_pass = MASK_EXTR(flags, ACPI_IVHD_LINT1_PASS);
-    dte->sys_mgt = MASK_EXTR(flags, ACPI_IVHD_SYSTEM_MGMT);
-    dte->ex = ivrs_dev->dte_allow_exclusion;
+    *dte = (struct amd_iommu_dte){
+        .init_pass = flags & ACPI_IVHD_INIT_PASS,
+        .ext_int_pass = flags & ACPI_IVHD_EINT_PASS,
+        .nmi_pass = flags & ACPI_IVHD_NMI_PASS,
+        .lint0_pass = flags & ACPI_IVHD_LINT0_PASS,
+        .lint1_pass = flags & ACPI_IVHD_LINT1_PASS,
+        .ioctl = IOMMU_DEV_TABLE_IO_CONTROL_ABORTED,
+        .sys_mgt = MASK_EXTR(flags, ACPI_IVHD_SYSTEM_MGMT),
+        .ex = ivrs_dev->dte_allow_exclusion,
+    };
 }
 
 void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
-                             uint64_t gcr3_mfn, uint8_t gv, uint8_t glx)
+                             uint64_t gcr3_mfn, bool gv, uint8_t glx)
 {
 #define GCR3_MASK(hi, lo) (((1ul << ((hi) + 1)) - 1) & ~((1ul << (lo)) - 1))
 #define GCR3_SHIFT(lo) ((lo) - PAGE_SHIFT)
 
     /* I bit must be set when gcr3 is enabled */
-    dte->i = 1;
+    dte->i = true;
 
     dte->gcr3_trp_14_12 = (gcr3_mfn & GCR3_MASK(14, 12)) >> GCR3_SHIFT(12);
     dte->gcr3_trp_30_15 = (gcr3_mfn & GCR3_MASK(30, 15)) >> GCR3_SHIFT(15);

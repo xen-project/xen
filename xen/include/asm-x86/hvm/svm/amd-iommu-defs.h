@@ -107,57 +107,60 @@
 #define IOMMU_DEV_TABLE_INT_CONTROL_FORWARDED	0x1
 #define IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED	0x2
 
+/* For now, we always allocate the maximum: 2048 entries. */
+#define IOMMU_INTREMAP_ORDER			0xB
+
 struct amd_iommu_dte {
     /* 0 - 63 */
-    uint64_t v:1;
-    uint64_t tv:1;
-    uint64_t reserved0:5;
-    uint64_t had:2;
-    uint64_t paging_mode:3;
+    bool v:1;
+    bool tv:1;
+    unsigned int :5;
+    unsigned int had:2;
+    unsigned int paging_mode:3;
     uint64_t pt_root:40;
-    uint64_t ppr:1;
-    uint64_t gprp:1;
-    uint64_t giov:1;
-    uint64_t gv:1;
-    uint64_t glx:2;
-    uint64_t gcr3_trp_14_12:3;
-    uint64_t ir:1;
-    uint64_t iw:1;
-    uint64_t reserved1:1;
+    bool ppr:1;
+    bool gprp:1;
+    bool giov:1;
+    bool gv:1;
+    unsigned int glx:2;
+    unsigned int gcr3_trp_14_12:3;
+    bool ir:1;
+    bool iw:1;
+    unsigned int :1;
 
     /* 64 - 127 */
-    uint64_t domain_id:16;
-    uint64_t gcr3_trp_30_15:16;
-    uint64_t i:1;
-    uint64_t se:1;
-    uint64_t sa:1;
-    uint64_t ioctl:2;
-    uint64_t cache:1;
-    uint64_t sd:1;
-    uint64_t ex:1;
-    uint64_t sys_mgt:2;
-    uint64_t reserved2:1;
-    uint64_t gcr3_trp_51_31:21;
+    unsigned int domain_id:16;
+    unsigned int gcr3_trp_30_15:16;
+    bool i:1;
+    bool se:1;
+    bool sa:1;
+    unsigned int ioctl:2;
+    bool cache:1;
+    bool sd:1;
+    bool ex:1;
+    unsigned int sys_mgt:2;
+    unsigned int :1;
+    unsigned int gcr3_trp_51_31:21;
 
     /* 128 - 191 */
-    uint64_t iv:1;
-    uint64_t int_tab_len:4;
-    uint64_t ig:1;
+    bool iv:1;
+    unsigned int int_tab_len:4;
+    bool ig:1;
     uint64_t it_root:46;
-    uint64_t reserved3:4;
-    uint64_t init_pass:1;
-    uint64_t ext_int_pass:1;
-    uint64_t nmi_pass:1;
-    uint64_t reserved4:1;
-    uint64_t int_ctl:2;
-    uint64_t lint0_pass:1;
-    uint64_t lint1_pass:1;
+    unsigned int :4;
+    bool init_pass:1;
+    bool ext_int_pass:1;
+    bool nmi_pass:1;
+    unsigned int :1;
+    unsigned int int_ctl:2;
+    bool lint0_pass:1;
+    bool lint1_pass:1;
 
     /* 192 - 255 */
-    uint64_t reserved5:54;
-    uint64_t attr_v:1;
-    uint64_t mode0_fc:1;
-    uint64_t snoop_attr:8;
+    uint64_t :54;
+    bool attr_v:1;
+    bool mode0_fc:1;
+    unsigned int snoop_attr:8;
 };
 
 /* Command Buffer */

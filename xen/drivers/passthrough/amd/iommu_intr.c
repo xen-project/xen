@@ -69,8 +69,7 @@ union irte_cptr {
     const union irte128 *ptr128;
 } __transparent__;
 
-#define INTREMAP_LENGTH 0xB
-#define INTREMAP_ENTRIES (1 << INTREMAP_LENGTH)
+#define INTREMAP_ENTRIES (1 << IOMMU_INTREMAP_ORDER)
 
 struct ioapic_sbdf ioapic_sbdf[MAX_IO_APICS];
 struct hpet_sbdf hpet_sbdf;

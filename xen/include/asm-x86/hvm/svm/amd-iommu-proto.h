@@ -73,14 +73,14 @@ int __must_check amd_iommu_flush_iotlb_all(struct domain *d);
 int get_dma_requestor_id(uint16_t seg, uint16_t bdf);
 void amd_iommu_set_intremap_table(struct amd_iommu_dte *dte,
                                   uint64_t intremap_ptr,
-                                  uint8_t int_valid);
+                                  bool valid);
 void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
 				   uint64_t root_ptr, uint16_t domain_id,
-				   uint8_t paging_mode, uint8_t valid);
+				   uint8_t paging_mode, bool valid);
 void iommu_dte_add_device_entry(struct amd_iommu_dte *dte,
-                                struct ivrs_mappings *ivrs_dev);
+                                const struct ivrs_mappings *ivrs_dev);
 void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
-                             uint64_t gcr3_mfn, uint8_t gv, uint8_t glx);
+                             uint64_t gcr3_mfn, bool gv, uint8_t glx);
 
 /* send cmd to iommu */
 void amd_iommu_flush_all_pages(struct domain *d);
