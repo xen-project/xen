@@ -952,16 +952,16 @@ void __init x2apic_bsp_setup(void)
 
     force_iommu = 1;
 
-    orig_name = genapic.name;
-    genapic = *apic_x2apic_probe();
-    if ( genapic.name != orig_name )
-        printk("Switched to APIC driver %s\n", genapic.name);
-
     if ( !x2apic_enabled )
     {
         x2apic_enabled = true;
         __enable_x2apic();
     }
+
+    orig_name = genapic.name;
+    genapic = *apic_x2apic_probe();
+    if ( genapic.name != orig_name )
+        printk("Switched to APIC driver %s\n", genapic.name);
 
 restore_out:
     restore_IO_APIC_setup(ioapic_entries);
