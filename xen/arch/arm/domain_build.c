@@ -973,10 +973,8 @@ static int __init make_timer_node(const struct kernel_info *kinfo)
         { /* sentinel */ },
     };
     struct dt_device_node *dev;
-    u32 len;
-    const void *compatible;
     int res;
-    unsigned int irq;
+    unsigned int irq[MAX_TIMER_PPI];
     gic_interrupt_t intrs[3];
     u32 clock_frequency;
     bool clock_valid;
@@ -990,35 +988,43 @@ static int __init make_timer_node(const struct kernel_info *kinfo)
         return -FDT_ERR_XEN(ENOENT);
     }
 
-    compatible = dt_get_property(dev, "compatible", &len);
-    if ( !compatible )
-    {
-        dprintk(XENLOG_ERR, "Can't find compatible property for timer node\n");
-        return -FDT_ERR_XEN(ENOENT);
-    }
-
     res = fdt_begin_node(fdt, "timer");
     if ( res )
         return res;
 
-    res = fdt_property(fdt, "compatible", compatible, len);
+    if ( !is_64bit_domain(kinfo->d) )
+        res = fdt_property_string(fdt, "compatible", "arm,armv7-timer");
+    else
+        res = fdt_property_string(fdt, "compatible", "arm,armv8-timer");
     if ( res )
         return res;
 
-    /* The timer IRQ is emulated by Xen. It always exposes an active-low
-     * level-sensitive interrupt */
+    /*
+     * The timer IRQ is emulated by Xen.
+     * It always exposes an active-low level-sensitive interrupt.
+     */
 
-    irq = timer_get_irq(TIMER_PHYS_SECURE_PPI);
-    dt_dprintk("  Secure interrupt %u\n", irq);
-    set_interrupt(intrs[0], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-
-    irq = timer_get_irq(TIMER_PHYS_NONSECURE_PPI);
-    dt_dprintk("  Non secure interrupt %u\n", irq);
-    set_interrupt(intrs[1], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-
-    irq = timer_get_irq(TIMER_VIRT_PPI);
-    dt_dprintk("  Virt interrupt %u\n", irq);
-    set_interrupt(intrs[2], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    if ( is_hardware_domain(kinfo->d) )
+    {
+        irq[TIMER_PHYS_SECURE_PPI] = timer_get_irq(TIMER_PHYS_SECURE_PPI);
+        irq[TIMER_PHYS_NONSECURE_PPI] =
+                                    timer_get_irq(TIMER_PHYS_NONSECURE_PPI);
+        irq[TIMER_VIRT_PPI] = timer_get_irq(TIMER_VIRT_PPI);
+    }
+    else
+    {
+        irq[TIMER_PHYS_SECURE_PPI] = GUEST_TIMER_PHYS_S_PPI;
+        irq[TIMER_PHYS_NONSECURE_PPI] = GUEST_TIMER_PHYS_NS_PPI;
+        irq[TIMER_VIRT_PPI] = GUEST_TIMER_VIRT_PPI;
+    }
+    dt_dprintk("  Secure interrupt %u\n", irq[TIMER_PHYS_SECURE_PPI]);
+    set_interrupt(intrs[0], irq[TIMER_PHYS_SECURE_PPI],
+                  0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    dt_dprintk("  Non secure interrupt %u\n", irq[TIMER_PHYS_NONSECURE_PPI]);
+    set_interrupt(intrs[1], irq[TIMER_PHYS_NONSECURE_PPI],
+                  0xf, DT_IRQ_TYPE_LEVEL_LOW);
+    dt_dprintk("  Virt interrupt %u\n", irq[TIMER_VIRT_PPI]);
+    set_interrupt(intrs[2], irq[TIMER_VIRT_PPI], 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(kinfo, intrs, 3);
     if ( res )
@@ -1603,46 +1609,6 @@ static int __init make_gic_domU_node(const struct domain *d, void *fdt)
     }
 }
 
-static int __init make_timer_domU_node(const struct domain *d, void *fdt)
-{
-    int res;
-    gic_interrupt_t intrs[3];
-
-    res = fdt_begin_node(fdt, "timer");
-    if ( res )
-        return res;
-
-    if ( !is_64bit_domain(d) )
-    {
-        res = fdt_property_string(fdt, "compatible", "arm,armv7-timer");
-        if ( res )
-            return res;
-    }
-    else
-    {
-        res = fdt_property_string(fdt, "compatible", "arm,armv8-timer");
-        if ( res )
-            return res;
-    }
-
-    set_interrupt(intrs[0], GUEST_TIMER_PHYS_S_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-    set_interrupt(intrs[1], GUEST_TIMER_PHYS_NS_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-    set_interrupt(intrs[2], GUEST_TIMER_VIRT_PPI, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-
-    res = fdt_property(fdt, "interrupts", intrs, sizeof (intrs[0]) * 3);
-    if ( res )
-        return res;
-
-    res = fdt_property_cell(fdt, "interrupt-parent",
-                            GUEST_PHANDLE_GIC);
-    if (res)
-        return res;
-
-    res = fdt_end_node(fdt);
-
-    return res;
-}
-
 #ifdef CONFIG_SBSA_VUART_CONSOLE
 static int __init make_vpl011_uart_node(const struct domain *d, void *fdt)
 {
@@ -1748,7 +1714,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    ret = make_timer_domU_node(d, kinfo->fdt);
+    ret = make_timer_node(kinfo);
     if ( ret )
         goto err;
 
