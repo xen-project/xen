@@ -1781,12 +1781,6 @@ int xc_domain_unbind_pt_spi_irq(xc_interface *xch,
                                 uint16_t vspi,
                                 uint16_t spi);
 
-int xc_domain_set_machine_address_size(xc_interface *xch,
-				       uint32_t domid,
-				       unsigned int width);
-int xc_domain_get_machine_address_size(xc_interface *xch,
-				       uint32_t domid);
-
 /* Set the target domain */
 int xc_domain_set_target(xc_interface *xch,
                          uint32_t domid,

@@ -759,32 +759,6 @@ CAMLprim value stub_xc_domain_memory_increase_reservation(value xch,
 	CAMLreturn(Val_unit);
 }
 
-CAMLprim value stub_xc_domain_set_machine_address_size(value xch,
-						       value domid,
-						       value width)
-{
-	CAMLparam3(xch, domid, width);
-	uint32_t c_domid = _D(domid);
-	int c_width = Int_val(width);
-
-	int retval = xc_domain_set_machine_address_size(_H(xch), c_domid, c_width);
-	if (retval)
-		failwith_xc(_H(xch));
-	CAMLreturn(Val_unit);
-}
-
-CAMLprim value stub_xc_domain_get_machine_address_size(value xch,
-                                                       value domid)
-{
-	CAMLparam2(xch, domid);
-	int retval;
-
-	retval = xc_domain_get_machine_address_size(_H(xch), _D(domid));
-	if (retval < 0)
-		failwith_xc(_H(xch));
-	CAMLreturn(Val_int(retval));
-}
-
 CAMLprim value stub_xc_domain_cpuid_set(value xch, value domid,
                                         value input,
                                         value config)

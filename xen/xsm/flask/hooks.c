@@ -684,11 +684,9 @@ static int flask_domctl(struct domain *d, int cmd)
         return current_has_perm(d, SECCLASS_HVM, HVM__GETHVMC);
 
     case XEN_DOMCTL_set_address_size:
-    case XEN_DOMCTL_set_machine_address_size:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETADDRSIZE);
 
     case XEN_DOMCTL_get_address_size:
-    case XEN_DOMCTL_get_machine_address_size:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETADDRSIZE);
 
     case XEN_DOMCTL_mem_sharing_op:

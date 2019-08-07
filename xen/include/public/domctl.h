@@ -691,13 +691,6 @@ struct xen_domctl_subscribe {
     uint32_t port; /* IN */
 };
 
-/*
- * Define the maximum machine address size which should be allocated
- * to a guest.
- */
-/* XEN_DOMCTL_set_machine_address_size */
-/* XEN_DOMCTL_get_machine_address_size */
-
 /* XEN_DOMCTL_debug_op */
 #define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF         0
 #define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON          1
@@ -1165,8 +1158,8 @@ struct xen_domctl {
 #define XEN_DOMCTL_unbind_pt_irq                 48
 #define XEN_DOMCTL_set_cpuid                     49
 #define XEN_DOMCTL_get_device_group              50
-#define XEN_DOMCTL_set_machine_address_size      51
-#define XEN_DOMCTL_get_machine_address_size      52
+/* #define XEN_DOMCTL_set_machine_address_size   51 - Obsolete */
+/* #define XEN_DOMCTL_get_machine_address_size   52 - Obsolete */
 /* #define XEN_DOMCTL_suppress_spurious_page_faults 53 - Obsolete */
 #define XEN_DOMCTL_debug_op                      54
 #define XEN_DOMCTL_gethvmcontext_partial         55

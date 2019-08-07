@@ -643,18 +643,6 @@ long arch_do_domctl(
             ASSERT_UNREACHABLE();
         break;
 
-    case XEN_DOMCTL_set_machine_address_size:
-        if ( d->tot_pages > 0 )
-            ret = -EBUSY;
-        else
-            d->arch.physaddr_bitsize = domctl->u.address_size.size;
-        break;
-
-    case XEN_DOMCTL_get_machine_address_size:
-        domctl->u.address_size.size = d->arch.physaddr_bitsize;
-        copyback = true;
-        break;
-
     case XEN_DOMCTL_sendtrigger:
     {
         struct vcpu *v;

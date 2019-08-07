@@ -2161,35 +2161,6 @@ int xc_domain_subscribe_for_suspend(
     return do_domctl(xch, &domctl);
 }
 
-int xc_domain_set_machine_address_size(xc_interface *xch,
-                                       uint32_t domid,
-                                       unsigned int width)
-{
-    DECLARE_DOMCTL;
-
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd    = XEN_DOMCTL_set_machine_address_size;
-    domctl.u.address_size.size = width;
-
-    return do_domctl(xch, &domctl);
-}
-
-
-int xc_domain_get_machine_address_size(xc_interface *xch, uint32_t domid)
-{
-    DECLARE_DOMCTL;
-    int rc;
-
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd    = XEN_DOMCTL_get_machine_address_size;
-
-    rc = do_domctl(xch, &domctl);
-
-    return rc == 0 ? domctl.u.address_size.size : rc;
-}
-
 int xc_domain_debug_control(xc_interface *xc, uint32_t domid, uint32_t sop, uint32_t vcpu)
 {
     DECLARE_DOMCTL;

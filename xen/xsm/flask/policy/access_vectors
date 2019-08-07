@@ -166,9 +166,9 @@ class domain
     set_target
 # SCHEDOP_remote_shutdown
     shutdown
-# XEN_DOMCTL_set{,_machine}_address_size
+# XEN_DOMCTL_set_address_size
     setaddrsize
-# XEN_DOMCTL_get{,_machine}_address_size
+# XEN_DOMCTL_get_address_size
     getaddrsize
 # XEN_DOMCTL_sendtrigger
     trigger

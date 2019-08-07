@@ -202,11 +202,6 @@ val pages_to_mib : int64 -> int64
 external watchdog : handle -> int -> int32 -> int
   = "stub_xc_watchdog"
 
-external domain_set_machine_address_size: handle -> domid -> int -> unit
-  = "stub_xc_domain_set_machine_address_size"
-external domain_get_machine_address_size: handle -> domid -> int
-       = "stub_xc_domain_get_machine_address_size"
-
 external domain_cpuid_set: handle -> domid -> (int64 * (int64 option))
                         -> string option array
                         -> string option array
