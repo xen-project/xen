@@ -240,7 +240,8 @@ S:	Maintained
 F:	tools/golang
 
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
-S:	Orphaned
+R:	Lukasz Hawrylko <lukasz.hawrylko@linux.intel.com>
+S:	Odd Fixes
 F:	xen/arch/x86/tboot.c
 F:	xen/include/asm-x86/tboot.h
 
