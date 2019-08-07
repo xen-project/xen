@@ -165,8 +165,8 @@ static int __init iov_detect(void)
     if ( !iommu_enable && !iommu_intremap )
         return 0;
 
-    else if ( (init_done ? amd_iommu_init_interrupt()
-                         : amd_iommu_init(false)) != 0 )
+    if ( (init_done ? amd_iommu_init_interrupt()
+                    : amd_iommu_init(false)) != 0 )
     {
         printk("AMD-Vi: Error initialization\n");
         return -ENODEV;
