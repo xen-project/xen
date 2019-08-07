@@ -621,17 +621,20 @@ static void __init set_interrupt(gic_interrupt_t interrupt,
  *  "interrupts": contains the list of interrupts
  *  "interrupt-parent": link to the GIC
  */
-static int __init fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
+static int __init fdt_property_interrupts(const struct kernel_info *kinfo,
+                                          gic_interrupt_t *intr,
                                           unsigned num_irq)
 {
     int res;
+    uint32_t phandle = is_hardware_domain(kinfo->d) ?
+                       dt_interrupt_controller->phandle : GUEST_PHANDLE_GIC;
 
-    res = fdt_property(fdt, "interrupts", intr, sizeof (intr[0]) * num_irq);
+    res = fdt_property(kinfo->fdt, "interrupts",
+                       intr, sizeof(intr[0]) * num_irq);
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "interrupt-parent",
-                            dt_interrupt_controller->phandle);
+    res = fdt_property_cell(kinfo->fdt, "interrupt-parent", phandle);
 
     return res;
 }
@@ -733,7 +736,7 @@ static int __init make_hypervisor_node(struct domain *d,
      *  TODO: Handle properly the cpumask;
      */
     set_interrupt(intr, d->arch.evtchn_irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
-    res = fdt_property_interrupts(fdt, &intr, 1);
+    res = fdt_property_interrupts(kinfo, &intr, 1);
     if ( res )
         return res;
 
@@ -960,8 +963,9 @@ static int __init make_gic_node(const struct domain *d, void *fdt,
     return res;
 }
 
-static int __init make_timer_node(const struct domain *d, void *fdt)
+static int __init make_timer_node(const struct kernel_info *kinfo)
 {
+    void *fdt = kinfo->fdt;
     static const struct dt_device_match timer_ids[] __initconst =
     {
         DT_MATCH_COMPATIBLE("arm,armv7-timer"),
@@ -1016,7 +1020,7 @@ static int __init make_timer_node(const struct domain *d, void *fdt)
     dt_dprintk("  Virt interrupt %u\n", irq);
     set_interrupt(intrs[2], irq, 0xf, DT_IRQ_TYPE_LEVEL_LOW);
 
-    res = fdt_property_interrupts(fdt, intrs, 3);
+    res = fdt_property_interrupts(kinfo, intrs, 3);
     if ( res )
         return res;
 
@@ -1377,7 +1381,7 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     if ( device_get_class(node) == DEVICE_GIC )
         return make_gic_node(d, kinfo->fdt, node);
     if ( dt_match_node(timer_matches, node) )
-        return make_timer_node(d, kinfo->fdt);
+        return make_timer_node(kinfo);
 
     /* Skip nodes used by Xen */
     if ( dt_device_used_by(node) == DOMID_XEN )
