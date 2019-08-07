@@ -2190,18 +2190,6 @@ int xc_domain_get_machine_address_size(xc_interface *xch, uint32_t domid)
     return rc == 0 ? domctl.u.address_size.size : rc;
 }
 
-int xc_domain_suppress_spurious_page_faults(xc_interface *xc, uint32_t domid)
-{
-    DECLARE_DOMCTL;
-
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd    = XEN_DOMCTL_suppress_spurious_page_faults;
-
-    return do_domctl(xc, &domctl);
-
-}
-
 int xc_domain_debug_control(xc_interface *xc, uint32_t domid, uint32_t sop, uint32_t vcpu)
 {
     DECLARE_DOMCTL;

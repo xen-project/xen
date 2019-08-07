@@ -337,9 +337,6 @@ struct arch_domain
     /* Is shared-info page in 32-bit format? */
     bool_t has_32bit_shinfo;
 
-    /* Domain cannot handle spurious page faults? */
-    bool_t suppress_spurious_page_faults;
-
     /* Is PHYSDEVOP_eoi to automatically unmask the event channel? */
     bool_t auto_unmask;
 

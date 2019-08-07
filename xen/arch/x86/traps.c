@@ -1402,7 +1402,6 @@ void do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
     unsigned int error_code;
-    enum pf_type pf_type;
 
     addr = read_cr2();
 
@@ -1419,7 +1418,8 @@ void do_page_fault(struct cpu_user_regs *regs)
 
     if ( unlikely(!guest_mode(regs)) )
     {
-        pf_type = spurious_page_fault(addr, regs);
+        enum pf_type pf_type = spurious_page_fault(addr, regs);
+
         if ( (pf_type == smep_fault) || (pf_type == smap_fault) )
         {
             console_start_sync();
@@ -1450,20 +1450,6 @@ void do_page_fault(struct cpu_user_regs *regs)
               "[error_code=%04x]\n"
               "Faulting linear address: %p\n",
               error_code, _p(addr));
-    }
-
-    if ( unlikely(current->domain->arch.suppress_spurious_page_faults) )
-    {
-        pf_type = spurious_page_fault(addr, regs);
-        if ( (pf_type == smep_fault) || (pf_type == smap_fault))
-        {
-            printk(XENLOG_G_ERR "%pv fatal SM%cP violation\n",
-                   current, (pf_type == smep_fault) ? 'E' : 'A');
-
-            domain_crash(current->domain);
-        }
-        if ( pf_type != real_fault )
-            return;
     }
 
     if ( unlikely(regs->error_code & PFEC_reserved_bit) )

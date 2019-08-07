@@ -698,11 +698,6 @@ struct xen_domctl_subscribe {
 /* XEN_DOMCTL_set_machine_address_size */
 /* XEN_DOMCTL_get_machine_address_size */
 
-/*
- * Do not inject spurious page faults into this domain.
- */
-/* XEN_DOMCTL_suppress_spurious_page_faults */
-
 /* XEN_DOMCTL_debug_op */
 #define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF         0
 #define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON          1
@@ -1172,7 +1167,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_get_device_group              50
 #define XEN_DOMCTL_set_machine_address_size      51
 #define XEN_DOMCTL_get_machine_address_size      52
-#define XEN_DOMCTL_suppress_spurious_page_faults 53
+/* #define XEN_DOMCTL_suppress_spurious_page_faults 53 - Obsolete */
 #define XEN_DOMCTL_debug_op                      54
 #define XEN_DOMCTL_gethvmcontext_partial         55
 #define XEN_DOMCTL_vm_event_op                   56

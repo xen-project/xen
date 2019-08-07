@@ -988,10 +988,6 @@ long arch_do_domctl(
         }
         break;
 
-    case XEN_DOMCTL_suppress_spurious_page_faults:
-        d->arch.suppress_spurious_page_faults = 1;
-        break;
-
 #ifdef CONFIG_HVM
     case XEN_DOMCTL_debug_op:
     {

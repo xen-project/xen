@@ -1787,9 +1787,6 @@ int xc_domain_set_machine_address_size(xc_interface *xch,
 int xc_domain_get_machine_address_size(xc_interface *xch,
 				       uint32_t domid);
 
-int xc_domain_suppress_spurious_page_faults(xc_interface *xch,
-					  uint32_t domid);
-
 /* Set the target domain */
 int xc_domain_set_target(xc_interface *xch,
                          uint32_t domid,
