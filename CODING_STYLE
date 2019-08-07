@@ -88,6 +88,19 @@ Braces should be omitted for blocks with a single statement. e.g.,
 if ( condition )
     single_statement();
 
+Types
+-----
+
+Use basic C types and C standard mandated typedef-s where possible (and
+with preference in this order).  This in particular means to avoid u8,
+u16, etc despite those types continuing to exist in our code base.
+Fixed width types should only be used when a fixed width quantity is
+meant (which for example may be a value read from or to be written to a
+register).
+
+Especially with pointer types, whenever the pointed to object is not
+(supposed to be) modified, qualify the pointed to type with "const".
+
 Comments
 --------
 
