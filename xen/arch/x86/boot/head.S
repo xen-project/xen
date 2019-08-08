@@ -556,24 +556,17 @@ trampoline_setup:
         /*
          * Called on legacy BIOS and EFI platforms.
          *
-         * Initialize bits 0-15 of BOOT_FS segment descriptor base address.
+         * Set the BOOT_FS descriptor base address to %esi.
          */
-        mov     %si,BOOT_FS+2+sym_esi(trampoline_gdt)
+        mov     %esi, %edx
+        shr     $16, %edx
+        mov     %si, BOOT_FS + 2 + sym_esi(trampoline_gdt) /* Bits  0-15 */
+        mov     %dl, BOOT_FS + 4 + sym_esi(trampoline_gdt) /* Bits 16-23 */
+        mov     %dh, BOOT_FS + 7 + sym_esi(trampoline_gdt) /* Bits 24-31 */
 
-        /* Initialize bits 16-23 of BOOT_FS segment descriptor base address. */
-        shld    $16,%esi,%edx
-        mov     %dl,BOOT_FS+4+sym_esi(trampoline_gdt)
-
-        /* Initialize bits 24-31 of BOOT_FS segment descriptor base address. */
-        mov     %dh,BOOT_FS+7+sym_esi(trampoline_gdt)
-
-        /*
-         * Initialize %fs and later use it to access Xen data where possible.
-         * According to Intel 64 and IA-32 Architectures Software Developer's
-         * Manual it is safe to do that without reloading GDTR before.
-         */
-        mov     $BOOT_FS,%edx
-        mov     %edx,%fs
+        /* Load %fs to allow for access to Xen data. */
+        mov     $BOOT_FS, %edx
+        mov     %edx, %fs
 
         /* Save Xen image load base address for later use. */
         mov     %esi,sym_fs(xen_phys_start)
