@@ -186,7 +186,7 @@ static PyObject *xspy_ls(XsHandle *self, PyObject *args)
     Py_END_ALLOW_THREADS
 
     if (xsval) {
-        int i;
+        size_t i;
         PyObject *val = PyList_New(xsval_n);
         for (i = 0; i < xsval_n; i++)
 #if PY_MAJOR_VERSION >= 3
@@ -276,7 +276,7 @@ static PyObject *xspy_get_permissions(XsHandle *self, PyObject *args)
     struct xs_handle *xh = xshandle(self);
     struct xs_permissions *perms;
     unsigned int perms_n = 0;
-    int i;
+    size_t i;
 
     xs_transaction_t th;
     char *thstr;

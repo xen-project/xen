@@ -117,7 +117,8 @@ static PyObject *pyxc_domain_create(XcObject *self,
                                     PyObject *kwds)
 {
     uint32_t dom = 0, target = 0;
-    int      ret, i;
+    int      ret;
+    size_t   i;
     PyObject *pyhandle = NULL;
     struct xen_domctl_createdomain config = {
         .handle = {
@@ -295,7 +296,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
 
 static PyObject *pyxc_domain_sethandle(XcObject *self, PyObject *args)
 {
-    int i;
+    size_t i;
     uint32_t dom;
     PyObject *pyhandle;
     xen_domain_handle_t handle;
@@ -336,7 +337,8 @@ static PyObject *pyxc_domain_getinfo(XcObject *self,
     PyObject *list, *info_dict, *pyhandle;
 
     uint32_t first_dom = 0;
-    int max_doms = 1024, nr_doms, i, j;
+    int max_doms = 1024, nr_doms, i;
+    size_t j;
     xc_dominfo_t *info;
 
     static char *kwd_list[] = { "first_dom", "max_doms", NULL };
@@ -631,7 +633,8 @@ static PyObject *pyxc_get_device_group(XcObject *self,
 {
     uint32_t sbdf;
     uint32_t max_sdevs, num_sdevs;
-    int domid, seg, bus, dev, func, rc, i;
+    int domid, seg, bus, dev, func, rc;
+    size_t i;
     PyObject *Pystr;
     char *group_str;
     char dev_str[9];
@@ -971,7 +974,7 @@ static PyObject *pyxc_physinfo(XcObject *self)
 {
     xc_physinfo_t pinfo;
     char cpu_cap[128], virt_caps[128], *p;
-    int i;
+    size_t i;
     const char *virtcap_names[] = { "hvm", "pv" };
     const unsigned virtcaps_bits[] = { XEN_SYSCTL_PHYSCAP_hvm,
                                        XEN_SYSCTL_PHYSCAP_pv };
