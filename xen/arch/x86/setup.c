@@ -16,7 +16,6 @@
 #include <xen/domain_page.h>
 #include <xen/version.h>
 #include <xen/gdbstub.h>
-#include <xen/percpu.h>
 #include <xen/hypercall.h>
 #include <xen/keyhandler.h>
 #include <xen/numa.h>
@@ -99,8 +98,6 @@ cpumask_t __read_mostly cpu_present_map;
 unsigned long __read_mostly xen_phys_start;
 
 unsigned long __read_mostly xen_virt_end;
-
-DEFINE_PER_CPU(struct tss_struct, init_tss);
 
 char __section(".bss.stack_aligned") __aligned(STACK_SIZE)
     cpu0_stack[STACK_SIZE];
