@@ -1771,6 +1771,18 @@ static void init_heap_pages(
     bool idle_scrub = false;
 
     /*
+     * Keep MFN 0 away from the buddy allocator to avoid crossing zone
+     * boundary when merging two buddies.
+     */
+    if ( !mfn_x(page_to_mfn(pg)) )
+    {
+        if ( nr_pages-- <= 1 )
+            return;
+        pg++;
+    }
+
+
+    /*
      * Some pages may not go through the boot allocator (e.g reserved
      * memory at boot but released just after --- kernel, initramfs,
      * etc.).
