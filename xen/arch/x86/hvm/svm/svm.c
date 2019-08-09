@@ -1572,7 +1572,7 @@ bool svm_load_segs(unsigned int ldt_ents, unsigned long ldt_base,
 
         _set_tssldt_desc(desc, ldt_base, ldt_ents * 8 - 1, SYS_DESC_ldt);
 
-        vmcb->ldtr.sel = LDT_ENTRY << 3;
+        vmcb->ldtr.sel = LDT_SELECTOR;
         vmcb->ldtr.attr = SYS_DESC_ldt | (_SEGMENT_P >> 8);
         vmcb->ldtr.limit = ldt_ents * 8 - 1;
         vmcb->ldtr.base = ldt_base;

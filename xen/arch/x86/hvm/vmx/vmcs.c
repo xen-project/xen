@@ -1128,7 +1128,7 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_GS_SELECTOR, 0);
     __vmwrite(HOST_FS_BASE, 0);
     __vmwrite(HOST_GS_BASE, 0);
-    __vmwrite(HOST_TR_SELECTOR, TSS_ENTRY << 3);
+    __vmwrite(HOST_TR_SELECTOR, TSS_SELECTOR);
 
     /* Host control registers. */
     v->arch.hvm.vmx.host_cr0 = read_cr0() & ~X86_CR0_TS;

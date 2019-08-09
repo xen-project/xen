@@ -1917,7 +1917,7 @@ void load_TR(void)
     /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
     asm volatile (
         "sgdt %0; lgdt %2; ltr %w1; lgdt %0"
-        : "=m" (old_gdt) : "rm" (TSS_ENTRY << 3), "m" (tss_gdt) : "memory" );
+        : "=m" (old_gdt) : "rm" (TSS_SELECTOR), "m" (tss_gdt) : "memory" );
 }
 
 static unsigned int calc_ler_msr(void)

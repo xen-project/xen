@@ -36,6 +36,10 @@
 #define LDT_ENTRY (TSS_ENTRY + 2)
 #define PER_CPU_GDT_ENTRY (LDT_ENTRY + 2)
 
+#define TSS_SELECTOR     (TSS_ENTRY << 3)
+#define LDT_SELECTOR     (LDT_ENTRY << 3)
+#define PER_CPU_SELECTOR (PER_CPU_GDT_ENTRY << 3)
+
 #ifndef __ASSEMBLY__
 
 #define GUEST_KERNEL_RPL(d) (is_pv_32bit_domain(d) ? 1 : 3)

@@ -761,7 +761,7 @@ void load_system_tables(void)
 	per_cpu(full_gdt_loaded, cpu) = false;
 	lgdt(&gdtr);
 	lidt(&idtr);
-	ltr(TSS_ENTRY << 3);
+	ltr(TSS_SELECTOR);
 	lldt(0);
 
 	enable_each_ist(idt_tables[cpu]);
