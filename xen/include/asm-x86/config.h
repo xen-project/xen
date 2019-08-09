@@ -264,9 +264,7 @@ extern unsigned char boot_edid_info[128];
 
 #endif
 
-#define __HYPERVISOR_CS64 0xe008
-#define __HYPERVISOR_CS32 0xe038
-#define __HYPERVISOR_CS   __HYPERVISOR_CS64
+#define __HYPERVISOR_CS   0xe008
 #define __HYPERVISOR_DS64 0x0000
 #define __HYPERVISOR_DS32 0xe010
 #define __HYPERVISOR_DS   __HYPERVISOR_DS64

@@ -23,7 +23,7 @@ ENTRY(__high_start)
         popf
 
         /* Reload code selector. */
-        pushq   $(__HYPERVISOR_CS64)
+        pushq   $__HYPERVISOR_CS
         leaq    1f(%rip),%rax
         pushq   %rax
         lretq

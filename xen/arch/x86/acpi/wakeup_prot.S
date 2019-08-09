@@ -74,7 +74,7 @@ ENTRY(__ret_point)
         LOAD_GREG(sp)
 
         /* Reload code selector */
-        pushq   $(__HYPERVISOR_CS64)
+        pushq   $__HYPERVISOR_CS
         leaq    1f(%rip),%rax
         pushq   %rax
         lretq

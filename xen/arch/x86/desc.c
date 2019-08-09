@@ -31,7 +31,7 @@ __section(".data.page_aligned") __aligned(PAGE_SIZE)
 seg_desc_t boot_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
 {
     /* 0xe008 - Ring 0 code, 64bit mode */
-    [SEL2GDT(__HYPERVISOR_CS64)] =    { 0x00af9b000000ffff },
+    [SEL2GDT(__HYPERVISOR_CS)] =      { 0x00af9b000000ffff },
 
     /* 0xe010 - Ring 0 data */
     [SEL2GDT(__HYPERVISOR_DS32)] =    { 0x00cf93000000ffff },
@@ -47,9 +47,7 @@ seg_desc_t boot_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
     /* 0xe033 - Ring 3 code, 64-bit mode */
     [SEL2GDT(FLAT_RING3_CS64)] =      { 0x00affb000000ffff },
 
-    /* 0xe038 - Ring 0 code, compatibility */
-    [SEL2GDT(__HYPERVISOR_CS32)] =    { 0x00cf9b000000ffff },
-
+    /* 0xe038 - reserved */
     /* 0xe040 - TSS */
     /* 0xe050 - LDT */
 
@@ -61,7 +59,7 @@ __section(".data.page_aligned") __aligned(PAGE_SIZE)
 seg_desc_t boot_compat_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
 {
     /* 0xe008 - Ring 0 code, 64bit mode */
-    [SEL2GDT(__HYPERVISOR_CS64)] =    { 0x00af9b000000ffff },
+    [SEL2GDT(__HYPERVISOR_CS)] =      { 0x00af9b000000ffff },
 
     /* 0xe010 - Ring 0 data */
     [SEL2GDT(__HYPERVISOR_DS32)] =    { 0x00cf93000000ffff },
@@ -78,9 +76,7 @@ seg_desc_t boot_compat_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
     /* 0xe033 - Ring 3 data */
     [SEL2GDT(FLAT_COMPAT_RING3_DS)] = { 0x00cff3000000ffff },
 
-    /* 0xe038 - Ring 0 code, compatibility */
-    [SEL2GDT(__HYPERVISOR_CS32)] =    { 0x00cf9b000000ffff },
-
+    /* 0xe038 - reserved */
     /* 0xe040 - TSS */
     /* 0xe050 - LDT */
 

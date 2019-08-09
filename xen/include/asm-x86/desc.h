@@ -155,7 +155,7 @@ do {                                                     \
         ((unsigned long)(dpl) << 45) |                   \
         ((unsigned long)(type) << 40) |                  \
         ((unsigned long)(addr) & 0xFFFFUL) |             \
-        ((unsigned long)__HYPERVISOR_CS64 << 16) |       \
+        ((unsigned long)__HYPERVISOR_CS << 16) |         \
         (1UL << 47);                                     \
 } while (0)
 
@@ -169,7 +169,7 @@ static inline void _set_gate_lower(idt_entry_t *gate, unsigned long type,
         ((unsigned long)(dpl) << 45) |
         ((unsigned long)(type) << 40) |
         ((unsigned long)(addr) & 0xFFFFUL) |
-        ((unsigned long)__HYPERVISOR_CS64 << 16) |
+        ((unsigned long)__HYPERVISOR_CS << 16) |
         (1UL << 47);
     _write_gate_lower(gate, &idte);
 }
