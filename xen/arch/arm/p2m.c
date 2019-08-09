@@ -1052,14 +1052,6 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, sgfn);
     }
 
-    /*
-     * Free the entry only if the original pte was valid and the base
-     * is different (to avoid freeing when permission is changed).
-     */
-    if ( p2m_is_valid(orig_pte) &&
-         !mfn_eq(lpae_get_mfn(*entry), lpae_get_mfn(orig_pte)) )
-        p2m_free_entry(p2m, orig_pte, level);
-
     if ( is_iommu_enabled(p2m->domain) &&
          (lpae_is_valid(orig_pte) || lpae_is_valid(*entry)) )
     {
@@ -1075,6 +1067,14 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
     }
     else
         rc = 0;
+
+    /*
+     * Free the entry only if the original pte was valid and the base
+     * is different (to avoid freeing when permission is changed).
+     */
+    if ( p2m_is_valid(orig_pte) &&
+         !mfn_eq(lpae_get_mfn(*entry), lpae_get_mfn(orig_pte)) )
+        p2m_free_entry(p2m, orig_pte, level);
 
 out:
     unmap_domain_page(table);
