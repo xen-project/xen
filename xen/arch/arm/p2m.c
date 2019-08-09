@@ -942,18 +942,18 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, sgfn);
     }
 
+    if ( need_iommu(p2m->domain) &&
+         (lpae_valid(orig_pte) || lpae_valid(*entry)) )
+        rc = iommu_iotlb_flush(p2m->domain, gfn_x(sgfn), 1UL << page_order);
+    else
+        rc = 0;
+
     /*
      * Free the entry only if the original pte was valid and the base
      * is different (to avoid freeing when permission is changed).
      */
     if ( lpae_valid(orig_pte) && entry->p2m.base != orig_pte.p2m.base )
         p2m_free_entry(p2m, orig_pte, level);
-
-    if ( need_iommu(p2m->domain) &&
-         (lpae_valid(orig_pte) || lpae_valid(*entry)) )
-        rc = iommu_iotlb_flush(p2m->domain, gfn_x(sgfn), 1UL << page_order);
-    else
-        rc = 0;
 
 out:
     unmap_domain_page(table);
