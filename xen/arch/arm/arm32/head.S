@@ -447,73 +447,13 @@ ENDPROC(cpu_init)
  *   r6 : Identity map in place
  */
 create_page_tables:
-        /*
-         * If Xen is loaded at exactly XEN_VIRT_START then we don't
-         * need an additional 1:1 mapping, the virtual mapping will
-         * suffice.
-         */
-        cmp   r9, #XEN_VIRT_START
-        moveq r6, #1                 /* r6 := identity map now in place */
-        movne r6, #0                 /* r6 := identity map not yet in place */
-
-        ldr   r4, =boot_pgtable
-        add   r4, r4, r10            /* r4 := paddr (boot_pagetable) */
-
-        /* Setup boot_pgtable: */
-        ldr   r1, =boot_second
-        add   r1, r1, r10            /* r1 := paddr (boot_second) */
-
-        /* ... map boot_second in boot_pgtable[0] */
-        orr   r2, r1, #PT_UPPER(PT)  /* r2:r3 := table map of boot_second */
-        orr   r2, r2, #PT_LOWER(PT)  /* (+ rights for linear PT) */
-        mov   r3, #0x0
-        strd  r2, r3, [r4, #0]       /* Map it in slot 0 */
-
-        /* ... map of paddr(start) in boot_pgtable */
-        lsrs  r1, r9, #FIRST_SHIFT   /* Offset of base paddr in boot_pgtable */
-        beq   1f                     /* If it is in slot 0 then map in boot_second
-                                      * later on */
-        lsl   r2, r1, #FIRST_SHIFT   /* Base address for 1GB mapping */
-        orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
-        orr   r2, r2, #PT_LOWER(MEM)
-        lsl   r1, r1, #3             /* r1 := Slot offset */
-        mov   r3, #0x0
-        strd  r2, r3, [r4, r1]       /* Mapping of paddr(start) */
-        mov   r6, #1                 /* r6 := identity map now in place */
-
-1:      /* Setup boot_second: */
-        ldr   r4, =boot_second
-        add   r4, r4, r10            /* r4 := paddr (boot_second) */
-
-        ldr   r1, =boot_third
-        add   r1, r1, r10            /* r1 := paddr (boot_third) */
-
-        /* ... map boot_third in boot_second[1] */
-        orr   r2, r1, #PT_UPPER(PT)  /* r2:r3 := table map of boot_third */
-        orr   r2, r2, #PT_LOWER(PT)  /* (+ rights for linear PT) */
-        mov   r3, #0x0
-        strd  r2, r3, [r4, #8]       /* Map it in slot 1 */
-
-        /* ... map of paddr(start) in boot_second */
-        cmp   r6, #1                 /* r6 is set if already created */
-        beq   1f
-        lsr   r2, r9, #SECOND_SHIFT  /* Offset of base paddr in boot_second */
-        ldr   r3, =LPAE_ENTRY_MASK
-        and   r1, r2, r3
-        cmp   r1, #1
-        beq   virtphys_clash         /* It's in slot 1, which we cannot handle */
-
-        lsl   r2, r2, #SECOND_SHIFT  /* Base address for 2MB mapping */
-        orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
-        orr   r2, r2, #PT_LOWER(MEM)
-        mov   r3, #0x0
-        lsl   r1, r1, #3             /* r1 := Slot offset */
-        strd  r2, r3, [r4, r1]       /* Mapping of paddr(start) */
-        mov   r6, #1                 /* r6 := identity map now in place */
+        /* Prepare the page-tables for mapping Xen */
+        ldr   r0, =XEN_VIRT_START
+        create_table_entry boot_pgtable, boot_second, r0, FIRST_SHIFT
+        create_table_entry boot_second, boot_third, r0, SECOND_SHIFT
 
         /* Setup boot_third: */
-1:      ldr   r4, =boot_third
-        add   r4, r4, r10            /* r4 := paddr (boot_third) */
+        adr_l r4, boot_third, mmu=0
 
         lsr   r2, r9, #THIRD_SHIFT  /* Base address for 4K mapping */
         lsl   r2, r2, #THIRD_SHIFT
@@ -530,16 +470,52 @@ create_page_tables:
         blo   1b
 
         /*
-         * Defer fixmap and dtb mapping until after paging enabled, to
-         * avoid them clashing with the 1:1 mapping.
+         * If Xen is loaded at exactly XEN_VIRT_START then we don't
+         * need an additional 1:1 mapping, the virtual mapping will
+         * suffice.
+         */
+        cmp   r9, #XEN_VIRT_START
+        moveq pc, lr
+
+        /*
+         * Setup the 1:1 mapping so we can turn the MMU on. Note that
+         * only the first page of Xen will be part of the 1:1 mapping.
          */
 
-        /* boot pagetable setup complete */
+        /*
+         * Find the first slot used. If the slot is not XEN_FIRST_SLOT,
+         * then the 1:1 mapping will use its own set of page-tables from
+         * the second level.
+         */
+        lsr   r1, r9, #FIRST_SHIFT
+        mov_w r0, LPAE_ENTRY_MASK
+        and   r1, r1, r0              /* r1 := first slot */
+        cmp   r1, #XEN_FIRST_SLOT
+        beq   1f
+        create_table_entry boot_pgtable, boot_second_id, r9, FIRST_SHIFT
+        b     link_from_second_id
 
-        cmp   r6, #1                /* Did we manage to create an identity mapping ? */
-        moveq pc, lr
-        PRINT("Unable to build boot page tables - Failed to identity map Xen.\r\n")
-        b     fail
+1:
+        /*
+         * Find the second slot used. If the slot is XEN_SECOND_SLOT, then the
+         * 1:1 mapping will use its own set of page-tables from the
+         * third level. For slot XEN_SECOND_SLOT, Xen is not yet able to handle
+         * it.
+         */
+        lsr   r1, r9, #SECOND_SHIFT
+        mov_w r0, LPAE_ENTRY_MASK
+        and   r1, r1, r0             /* r1 := second slot */
+        cmp   r1, #XEN_SECOND_SLOT
+        beq   virtphys_clash
+        create_table_entry boot_second, boot_third_id, r9, SECOND_SHIFT
+        b     link_from_third_id
+
+link_from_second_id:
+        create_table_entry boot_second_id, boot_third_id, r9, SECOND_SHIFT
+link_from_third_id:
+        create_mapping_entry boot_third_id, r9, r9
+        mov   pc, lr
+
 virtphys_clash:
         /* Identity map clashes with boot_third, which we cannot handle yet */
         PRINT("- Unable to build boot page tables - virt and phys addresses clash. -\r\n")
