@@ -779,17 +779,17 @@ void __init start_xen(unsigned long boot_phys_offset,
               "Please check your bootloader.\n",
               fdt_paddr);
 
-    fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
-
-    cmdline = boot_fdt_cmdline(device_tree_flattened);
-    printk("Command line: %s\n", cmdline);
-    cmdline_parse(cmdline);
-
     /* Register Xen's load address as a boot module. */
     xen_bootmodule = add_boot_module(BOOTMOD_XEN,
                              (paddr_t)(uintptr_t)(_start + boot_phys_offset),
                              (paddr_t)(uintptr_t)(_end - _start + 1), false);
     BUG_ON(!xen_bootmodule);
+
+    fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
+
+    cmdline = boot_fdt_cmdline(device_tree_flattened);
+    printk("Command line: %s\n", cmdline);
+    cmdline_parse(cmdline);
 
     setup_mm(fdt_paddr, fdt_size);
 
