@@ -107,10 +107,10 @@
 #define SYS_DESC_trap_gate    15
 
 typedef union {
+    uint64_t raw;
     struct {
         uint32_t a, b;
     };
-    uint64_t raw;
 } seg_desc_t;
 
 typedef union {

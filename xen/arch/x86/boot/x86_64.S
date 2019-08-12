@@ -43,44 +43,11 @@ ENTRY(__high_start)
 multiboot_ptr:
         .long   0
 
-        .word   0
-GLOBAL(boot_gdtr)
-        .word   LAST_RESERVED_GDT_BYTE
-        .quad   boot_gdt - FIRST_RESERVED_GDT_BYTE
-
 GLOBAL(stack_start)
         .quad   cpu0_stack
 
         .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0
-GLOBAL(boot_gdt)
-        .quad 0x0000000000000000     /* unused */
-        .quad 0x00af9b000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
-        .quad 0x00cf93000000ffff     /* 0xe010 ring 0 data                */
-        .quad 0x0000000000000000     /* reserved                          */
-        .quad 0x00cffb000000ffff     /* 0xe023 ring 3 code, compatibility */
-        .quad 0x00cff3000000ffff     /* 0xe02b ring 3 data                */
-        .quad 0x00affb000000ffff     /* 0xe033 ring 3 code, 64-bit mode   */
-        .quad 0x00cf9b000000ffff     /* 0xe038 ring 0 code, compatibility */
-        .fill (PER_CPU_GDT_ENTRY - __HYPERVISOR_CS32 / 8 - 1), 8, 0
-        .quad 0x0000910000000000     /* per-CPU entry (limit == cpu)      */
-
-        .align PAGE_SIZE, 0
-/* NB. Even rings != 0 get access to the full 4Gb, as only the            */
-/*     (compatibility) machine->physical mapping table lives there.       */
-GLOBAL(boot_compat_gdt)
-        .quad 0x0000000000000000     /* unused */
-        .quad 0x00af9b000000ffff     /* 0xe008 ring 0 code, 64-bit mode   */
-        .quad 0x00cf93000000ffff     /* 0xe010 ring 0 data                */
-        .quad 0x00cfbb000000ffff     /* 0xe019 ring 1 code, compatibility */
-        .quad 0x00cfb3000000ffff     /* 0xe021 ring 1 data                */
-        .quad 0x00cffb000000ffff     /* 0xe02b ring 3 code, compatibility */
-        .quad 0x00cff3000000ffff     /* 0xe033 ring 3 data                */
-        .quad 0x00cf9b000000ffff     /* 0xe038 ring 0 code, compatibility */
-        .fill (PER_CPU_GDT_ENTRY - __HYPERVISOR_CS32 / 8 - 1), 8, 0
-        .quad 0x0000910000000000     /* per-CPU entry (limit == cpu)      */
-        .align PAGE_SIZE, 0
-
 /*
  * Mapping of first 2 megabytes of memory. This is mapped with 4kB mappings
  * to avoid type conflicts with fixed-range MTRRs covering the lowest megabyte

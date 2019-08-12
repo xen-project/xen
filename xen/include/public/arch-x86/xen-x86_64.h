@@ -44,11 +44,11 @@
  */
 
 #define FLAT_RING3_CS32 0xe023  /* GDT index 260 */
-#define FLAT_RING3_CS64 0xe033  /* GDT index 261 */
-#define FLAT_RING3_DS32 0xe02b  /* GDT index 262 */
+#define FLAT_RING3_CS64 0xe033  /* GDT index 262 */
+#define FLAT_RING3_DS32 0xe02b  /* GDT index 261 */
 #define FLAT_RING3_DS64 0x0000  /* NULL selector */
-#define FLAT_RING3_SS32 0xe02b  /* GDT index 262 */
-#define FLAT_RING3_SS64 0xe02b  /* GDT index 262 */
+#define FLAT_RING3_SS32 0xe02b  /* GDT index 261 */
+#define FLAT_RING3_SS64 0xe02b  /* GDT index 261 */
 
 #define FLAT_KERNEL_DS64 FLAT_RING3_DS64
 #define FLAT_KERNEL_DS32 FLAT_RING3_DS32

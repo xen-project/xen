@@ -21,6 +21,7 @@ obj-$(CONFIG_PV) += compat.o x86_64/compat.o
 obj-$(CONFIG_KEXEC) += crash.o
 obj-y += debug.o
 obj-y += delay.o
+obj-y += desc.o
 obj-bin-y += dmi_scan.init.o
 obj-y += domctl.o
 obj-y += domain.o
