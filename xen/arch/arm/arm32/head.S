@@ -50,6 +50,23 @@
 .endm
 
 /*
+ * There are no easy way to have a PC relative address within the range
+ * +/- 4GB of the PC.
+ *
+ * This macro workaround it by asking the user to tell whether the MMU
+ * has been turned on or not.
+ *
+ * When the MMU is turned off, we need to apply the physical offset
+ * (r10) in order to find the associated physical address.
+ */
+.macro adr_l, dst, sym, mmu
+        ldr   \dst, =\sym
+        .if \mmu == 0
+        add   \dst, \dst, r10
+        .endif
+.endm
+
+/*
  * Common register usage in this file:
  *   r0  -
  *   r1  -
@@ -342,6 +359,76 @@ cpu_init_done:
 ENDPROC(cpu_init)
 
 /*
+ * Macro to create a page table entry in \ptbl to \tbl
+ *
+ * ptbl:    table symbol where the entry will be created
+ * tbl:     table symbol to point to
+ * virt:    virtual address
+ * shift:   #imm page table shift
+ * mmu:     Is the MMU turned on/off. If not specified it will be off
+ *
+ * Preserves \virt
+ * Clobbers r1 - r4
+ *
+ * Also use r10 for the phys offset.
+ *
+ * Note that \virt should be in a register other than r1 - r4
+ */
+.macro create_table_entry, ptbl, tbl, virt, shift, mmu=0
+        lsr   r1, \virt, #\shift
+        mov_w r2, LPAE_ENTRY_MASK
+        and   r1, r1, r2             /* r1 := slot in \tlb */
+        lsl   r1, r1, #3             /* r1 := slot offset in \tlb */
+
+        ldr   r4, =\tbl
+        add   r4, r4, r10            /* r4 := paddr(\tlb) */
+
+        mov   r2, #PT_PT             /* r2:r3 := right for linear PT */
+        orr   r2, r2, r4             /*           + \tlb paddr */
+        mov   r3, #0
+
+        adr_l r4, \ptbl, \mmu
+
+        strd  r2, r3, [r4, r1]
+.endm
+
+/*
+ * Macro to create a mapping entry in \tbl to \paddr. Only mapping in 3rd
+ * level table (i.e page granularity) is supported.
+ *
+ * ptbl:     table symbol where the entry will be created
+ * virt:    virtual address
+ * phys:    physical address
+ * type:    mapping type. If not specified it will be normal memory (PT_MEM_L3)
+ * mmu:     Is the MMU turned on/off. If not specified it will be off
+ *
+ * Preserves \virt, \phys
+ * Clobbers r1 - r4
+ *
+ * * Also use r10 for the phys offset.
+ *
+ * Note that \virt and \paddr should be in other registers than r1 - r4
+ * and be distinct.
+ */
+.macro create_mapping_entry, ptbl, virt, phys, type=PT_MEM_L3, mmu=0
+        mov_w r2, LPAE_ENTRY_MASK
+        lsr   r1, \virt, #THIRD_SHIFT
+        and   r1, r1, r2             /* r1 := slot in \tlb */
+        lsl   r1, r1, #3             /* r1 := slot offset in \tlb */
+
+        lsr   r4, \phys, #THIRD_SHIFT
+        lsl   r4, r4, #THIRD_SHIFT   /* r4 := PAGE_ALIGNED(phys) */
+
+        mov   r2, #\type             /* r2:r3 := right for section PT */
+        orr   r2, r2, r4             /*          + PAGE_ALIGNED(phys) */
+        mov   r3, #0
+
+        adr_l r4, \ptbl, \mmu
+
+        strd  r2, r3, [r4, r1]
+.endm
+
+/*
  * Rebuild the boot pagetable's first-level entries. The structure
  * is described in mm.c.
  *
@@ -557,31 +644,17 @@ ENDPROC(remove_identity_mapping)
  *   r10: Physical offset
  *   r11: Early UART base physical address
  *
- * Clobbers r1 - r4
+ * Clobbers r0 - r4
  */
 setup_fixmap:
 #if defined(CONFIG_EARLY_PRINTK)
         /* Add UART to the fixmap table */
-        ldr   r1, =xen_fixmap        /* r1 := vaddr (xen_fixmap) */
-        lsr   r2, r11, #THIRD_SHIFT
-        lsl   r2, r2, #THIRD_SHIFT   /* 4K aligned paddr of UART */
-        orr   r2, r2, #PT_UPPER(DEV_L3)
-        orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
-        mov   r3, #0x0
-        strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
+        ldr   r0, =EARLY_UART_VIRTUAL_ADDRESS
+        create_mapping_entry xen_fixmap, r0, r11, type=PT_DEV_L3, mmu=1
 #endif
-
         /* Map fixmap into boot_second */
-        ldr   r1, =boot_second       /* r1 := vaddr (boot_second) */
-        ldr   r2, =xen_fixmap
-        add   r2, r2, r10            /* r2 := paddr (xen_fixmap) */
-        orr   r2, r2, #PT_UPPER(PT)
-        orr   r2, r2, #PT_LOWER(PT)  /* r2:r3 := table map of xen_fixmap */
-        ldr   r4, =FIXMAP_ADDR(0)
-        mov   r4, r4, lsr #(SECOND_SHIFT - 3)   /* r4 := Slot for FIXMAP(0) */
-        mov   r3, #0x0
-        strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
-
+        mov_w r0, FIXMAP_ADDR(0)
+        create_table_entry boot_second, xen_fixmap, r0, SECOND_SHIFT, mmu=1
         /* Ensure any page table updates made above have occurred. */
         dsb   nshst
 
