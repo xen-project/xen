@@ -174,6 +174,8 @@ static int enter_state(u32 state)
         return -EBUSY;
 
     BUG_ON(system_state != SYS_STATE_active);
+    BUG_ON(!is_idle_vcpu(current));
+    BUG_ON(smp_processor_id() != 0);
     system_state = SYS_STATE_suspend;
 
     printk(XENLOG_INFO "Preparing system for ACPI S%d state.\n", state);
