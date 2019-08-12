@@ -1887,27 +1887,6 @@ static void __init set_intr_gate(unsigned int n, void *addr)
     __set_intr_gate(n, 0, addr);
 }
 
-void load_TR(void)
-{
-    struct tss64 *tss = &this_cpu(tss_page).tss;
-    struct desc_ptr old_gdt, tss_gdt = {
-        .base = (long)(this_cpu(gdt) - FIRST_RESERVED_GDT_ENTRY),
-        .limit = LAST_RESERVED_GDT_BYTE
-    };
-
-    _set_tssldt_desc(
-        this_cpu(gdt) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)tss, sizeof(*tss) - 1, SYS_DESC_tss_avail);
-    _set_tssldt_desc(
-        this_cpu(compat_gdt) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)tss, sizeof(*tss) - 1, SYS_DESC_tss_busy);
-
-    /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
-    asm volatile (
-        "sgdt %0; lgdt %2; ltr %w1; lgdt %0"
-        : "=m" (old_gdt) : "rm" (TSS_SELECTOR), "m" (tss_gdt) : "memory" );
-}
-
 static unsigned int calc_ler_msr(void)
 {
     switch ( boot_cpu_data.x86_vendor )

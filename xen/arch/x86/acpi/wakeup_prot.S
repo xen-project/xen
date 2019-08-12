@@ -34,10 +34,6 @@ ENTRY(do_suspend_lowlevel)
 
         mov     %ss, REF(saved_ss)
 
-        sgdt    REF(saved_gdt)
-        sidt    REF(saved_idt)
-        sldt    REF(saved_ldt)
-
         mov     %cr0, GREG(ax)
         mov     GREG(ax), REF(saved_cr0)
 
@@ -55,6 +51,7 @@ ENTRY(do_suspend_lowlevel)
 
 
 ENTRY(__ret_point)
+        lgdt    boot_gdtr(%rip)
 
         /* mmu_cr4_features contains latest cr4 setting */
         mov     REF(mmu_cr4_features), GREG(ax)
@@ -65,10 +62,6 @@ ENTRY(__ret_point)
 
         mov     REF(saved_cr0), GREG(ax)
         mov     GREG(ax), %cr0
-
-        lgdt    REF(saved_gdt)
-        lidt    REF(saved_idt)
-        lldt    REF(saved_ldt)
 
         mov     REF(saved_ss), %ss
         LOAD_GREG(sp)
@@ -128,10 +121,6 @@ DECLARE_GREG(12)
 DECLARE_GREG(13)
 DECLARE_GREG(14)
 DECLARE_GREG(15)
-
-saved_gdt:      .quad   0,0
-saved_idt:      .quad   0,0
-saved_ldt:      .quad   0,0
 
 saved_cr0:      .quad   0
 saved_cr3:      .quad   0

@@ -216,8 +216,6 @@ DECLARE_PER_CPU(seg_desc_t *, compat_gdt);
 DECLARE_PER_CPU(l1_pgentry_t, compat_gdt_l1e);
 DECLARE_PER_CPU(bool, full_gdt_loaded);
 
-extern void load_TR(void);
-
 static inline void lgdt(const struct desc_ptr *gdtr)
 {
     __asm__ __volatile__ ( "lgdt %0" :: "m" (*gdtr) : "memory" );

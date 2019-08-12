@@ -41,7 +41,7 @@ void save_rest_processor_state(void)
 
 void restore_rest_processor_state(void)
 {
-    load_TR();
+    load_system_tables();
 
     /* Recover syscall MSRs */
     wrmsrl(MSR_LSTAR, saved_lstar);
