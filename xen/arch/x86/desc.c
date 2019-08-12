@@ -89,7 +89,7 @@ seg_desc_t boot_compat_gdt[PAGE_SIZE / sizeof(seg_desc_t)] =
  * References boot_cpu_gdt_table for a short period, until the CPUs switch
  * onto their per-CPU GDTs.
  */
-struct desc_ptr boot_gdtr = {
+const struct desc_ptr boot_gdtr = {
     .limit = LAST_RESERVED_GDT_BYTE,
     .base = (unsigned long)(boot_gdt - FIRST_RESERVED_GDT_ENTRY),
 };
