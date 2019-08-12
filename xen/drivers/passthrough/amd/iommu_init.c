@@ -899,11 +899,8 @@ static void enable_iommu(struct amd_iommu *iommu)
 
     spin_lock_irqsave(&iommu->lock, flags);
 
-    if ( iommu->enabled )
-    {
-        spin_unlock_irqrestore(&iommu->lock, flags); 
-        return;
-    }
+    if ( unlikely(iommu->enabled) )
+        goto out;
 
     amd_iommu_erratum_746_workaround(iommu);
 
@@ -957,6 +954,8 @@ static void enable_iommu(struct amd_iommu *iommu)
         amd_iommu_flush_all_caches(iommu);
 
     iommu->enabled = 1;
+
+ out:
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
@@ -966,11 +965,8 @@ static void disable_iommu(struct amd_iommu *iommu)
 
     spin_lock_irqsave(&iommu->lock, flags);
 
-    if ( !iommu->enabled )
-    {
-        spin_unlock_irqrestore(&iommu->lock, flags);
-        return;
-    }
+    if ( unlikely(!iommu->enabled) )
+        goto out;
 
     if ( !iommu->ctrl.int_cap_xt_en )
         amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
@@ -988,6 +984,7 @@ static void disable_iommu(struct amd_iommu *iommu)
 
     iommu->enabled = 0;
 
+ out:
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
