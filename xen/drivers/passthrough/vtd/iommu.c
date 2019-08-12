@@ -2135,15 +2135,16 @@ static void adjust_irq_affinity(struct acpi_drhd_unit *drhd)
                              : NUMA_NO_NODE;
     const cpumask_t *cpumask = NULL;
     struct irq_desc *desc;
+    unsigned long flags;
 
     if ( node < MAX_NUMNODES && node_online(node) &&
          cpumask_intersects(&node_to_cpumask(node), &cpu_online_map) )
         cpumask = &node_to_cpumask(node);
 
     desc = irq_to_desc(drhd->iommu->msi.irq);
-    spin_lock_irq(&desc->lock);
+    spin_lock_irqsave(&desc->lock, flags);
     dma_msi_set_affinity(desc, cpumask);
-    spin_unlock_irq(&desc->lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 static int adjust_vtd_irq_affinities(void)
