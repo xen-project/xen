@@ -440,7 +440,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                     arg_strip = arg.strip()
                     if arg_strip == "${saved_entry}" or arg_strip == "${next_entry}":
                         logging.warning("grub2's saved_entry/next_entry not supported")
-                        arg = "0"
+                        arg_strip = "0"
                     setattr(self, self.commands[com], arg_strip)
                 else:
                     logging.info("Ignored directive %s" %(com,))
