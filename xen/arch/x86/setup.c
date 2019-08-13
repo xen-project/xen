@@ -669,6 +669,16 @@ static char * __init cmdline_cook(char *p, const char *loader_name)
     return p;
 }
 
+static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int limit)
+{
+    unsigned int n = min(bootsym(bios_e820nr), limit);
+
+    if ( n )
+        memcpy(map, bootsym(bios_e820map), sizeof(*map) * n);
+
+    return n;
+}
+
 void __init noreturn __start_xen(unsigned long mbi_p)
 {
     char *memmap_type = NULL;

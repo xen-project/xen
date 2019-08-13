@@ -7,7 +7,7 @@ get_memory_map:
 
 .Lmeme820:
         xorl    %ebx, %ebx                      # continuation counter
-        movw    $bootsym(e820map), %di             # point into the whitelist
+        movw    $bootsym(bios_e820map), %di     # point into the whitelist
                                                 # so we can have the bios
                                                 # directly write into it.
 
@@ -22,8 +22,8 @@ get_memory_map:
         cmpl    $SMAP,%eax                      # check the return is `SMAP'
         jne     .Lmem88
 
-        incw    bootsym(e820nr)
-        cmpw    $E820_BIOS_MAX,bootsym(e820nr)  # up to this many entries
+        incw    bootsym(bios_e820nr)
+        cmpw    $E820_BIOS_MAX, bootsym(bios_e820nr) # up to this many entries
         jae     .Lmem88
 
         movw    %di,%ax
@@ -66,27 +66,10 @@ get_memory_map:
 
         ret
 
-/*
- * Copy E820 map obtained from BIOS to a buffer allocated by Xen.
- * Input: %rdi: target address of e820 entry array
- *        %esi: maximum number of entries to copy
- * Output: %eax: number of entries copied
- */
-        .code64
-ENTRY(e820map_copy)
-        mov     %esi, %eax
-        lea     e820map(%rip), %rsi
-        mov     e820nr(%rip), %ecx
-        cmp     %ecx, %eax
-        cmova   %ecx, %eax                      # number of entries to move
-        imul    $5, %eax, %ecx
-        rep movsl                               # do the move
-        ret
-
         .align  4
-e820map:
+GLOBAL(bios_e820map)
         .fill   E820_BIOS_MAX*20,1,0
-e820nr:
+GLOBAL(bios_e820nr)
         .long   0
 GLOBAL(lowmem_kb)
         .long   0
