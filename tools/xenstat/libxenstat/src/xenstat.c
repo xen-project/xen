@@ -131,20 +131,6 @@ void xenstat_uninit(xenstat_handle * handle)
 	}
 }
 
-static inline unsigned long long parse(char *s, char *match)
-{
-	char *s1 = strstr(s,match);
-	unsigned long long ret;
-
-	if ( s1 == NULL )
-		return 0LL;
-	s1 += 2;
-	if ( *s1++ != ':' )
-		return 0LL;
-	sscanf(s1,"%llu",&ret);
-	return ret;
-}
-
 xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 {
 #define DOMAIN_CHUNK_SIZE 256
