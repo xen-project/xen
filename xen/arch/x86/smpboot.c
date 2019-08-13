@@ -826,9 +826,11 @@ static int setup_cpu_root_pgt(unsigned int cpu)
         rc = clone_mapping(idt_tables[cpu], rpt);
     if ( !rc )
     {
-        BUILD_BUG_ON(sizeof(this_cpu(tss_page)) != PAGE_SIZE);
+        struct tss_page *ptr = &per_cpu(tss_page, cpu);
 
-        rc = clone_mapping(&per_cpu(tss_page, cpu).tss, rpt);
+        BUILD_BUG_ON(sizeof(*ptr) != PAGE_SIZE);
+
+        rc = clone_mapping(&ptr->tss, rpt);
     }
     if ( !rc )
         rc = clone_mapping((void *)per_cpu(stubs.addr, cpu), rpt);
