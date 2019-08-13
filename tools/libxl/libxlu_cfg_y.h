@@ -1,8 +1,8 @@
-/* A Bison parser, made by GNU Bison 3.0.2.  */
+/* A Bison parser, made by GNU Bison 3.0.4.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2013 Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989-1990, 2000-2015 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -48,13 +48,14 @@ extern int xlu__cfg_yydebug;
     IDENT = 258,
     STRING = 259,
     NUMBER = 260,
-    NEWLINE = 261
+    NEWLINE = 261,
+    OP_ADD = 262
   };
 #endif
 
 /* Value type.  */
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef union YYSTYPE YYSTYPE;
+
 union YYSTYPE
 {
 #line 25 "libxlu_cfg_y.y" /* yacc.c:1909  */
@@ -62,8 +63,10 @@ union YYSTYPE
   char *string;
   XLU_ConfigValue *value;
 
-#line 66 "libxlu_cfg_y.h" /* yacc.c:1909  */
+#line 67 "libxlu_cfg_y.h" /* yacc.c:1909  */
 };
+
+typedef union YYSTYPE YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define YYSTYPE_IS_DECLARED 1
 #endif

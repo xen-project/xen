@@ -38,6 +38,7 @@
 %token <string>                IDENT STRING NUMBER NEWLINE
 %type <string>            atom
 %destructor { free($$); } atom IDENT STRING NUMBER
+%token OP_ADD "+="
 
 %type <value>                             value valuelist values
 %destructor { xlu__cfg_value_free($$); }  value valuelist values
@@ -54,7 +55,8 @@ stmt:   assignment endstmt
  |      endstmt
  |      error NEWLINE
 
-assignment: IDENT '=' value { xlu__cfg_set_store(ctx,$1,$3,@3.first_line); }
+assignment: IDENT '=' value { xlu__cfg_set_store(ctx,$1,XLU_OP_ASSIGNMENT,$3,@3.first_line); }
+ |          IDENT "+=" value { xlu__cfg_set_store(ctx,$1,XLU_OP_ADDITION,$3,@3.first_line); }
 
 endstmt: NEWLINE
  |      ';'

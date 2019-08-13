@@ -276,6 +276,14 @@ int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
     char *ep;
 
     e= find_atom(cfg,n,&set,dont_warn);  if (e) return e;
+    if (set->op == XLU_OP_ADDITION) {
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d: warning: can't use += with numbers"
+                    " for parameter `%s'\n",
+                    cfg->config_source, set->lineno, n);
+        return EINVAL;
+    }
     errno= 0; l= strtol(set->value->u.string, &ep, 0);
     e= errno;
     if (errno) {
@@ -450,23 +458,111 @@ void xlu__cfg_list_append(CfgParseContext *ctx,
     list->u.list.nvalues++;
 }
 
+static int xlu__cfg_concat_vals(CfgParseContext *ctx,
+                                XLU_ConfigValue *prev,
+                                XLU_ConfigValue *to_add)
+{
+    int r;
+
+    if (prev->type != to_add->type) {
+        xlu__cfgl_lexicalerror(ctx,
+                           "can't add [list] to \"string\" or vice versa");
+        return EINVAL;
+    }
+
+    switch (to_add->type) {
+    case XLU_STRING: {
+        char *new_string = NULL;
+
+        r = asprintf(&new_string, "%s%s", prev->u.string,
+                     to_add->u.string);
+        if (r < 0) {
+            return errno;
+        }
+        free(to_add->u.string);
+        to_add->u.string = new_string;
+        return 0;
+    }
+    case XLU_LIST: {
+        XLU_ConfigList *const prev_list = &prev->u.list;
+        XLU_ConfigList *const cur_list = &to_add->u.list;
+        int nvalues;
+
+        if (prev->u.list.nvalues > INT_MAX - to_add->u.list.nvalues) {
+            return ERANGE;
+        }
+        nvalues = prev->u.list.nvalues + to_add->u.list.nvalues;
+
+        if (nvalues >= cur_list->avalues) {
+            XLU_ConfigValue **new_vals;
+            new_vals = realloc(cur_list->values,
+                               nvalues * sizeof(*new_vals));
+            if (!new_vals) {
+                return ENOMEM;
+            }
+            cur_list->avalues = nvalues;
+            cur_list->values = new_vals;
+        }
+
+        /* make space for `prev' into `to_add' */
+        memmove(cur_list->values + prev_list->nvalues,
+                cur_list->values,
+                cur_list->nvalues * sizeof(XLU_ConfigValue *));
+        /* move values from `prev' to `to_add' as the list in `prev' will
+         * not be reachable by find(). */
+        memcpy(cur_list->values,
+               prev_list->values,
+               prev_list->nvalues * sizeof(XLU_ConfigValue *));
+        cur_list->nvalues = nvalues;
+        prev_list->nvalues = 0;
+        memset(prev_list->values, 0,
+               prev_list->nvalues * sizeof(XLU_ConfigValue *));
+        return 0;
+    }
+    default:
+        abort();
+    }
+    return -1;
+}
+
 void xlu__cfg_set_store(CfgParseContext *ctx, char *name,
+                        enum XLU_Operation op,
                         XLU_ConfigValue *val, int lineno) {
     XLU_ConfigSetting *set;
+    int r;
 
-    if (ctx->err) return;
+    if (ctx->err) goto out;
 
     assert(name);
+
+    if (op == XLU_OP_ADDITION) {
+        /* If we have += concatenate with previous value with same name */
+        XLU_ConfigSetting *prev_set = find(ctx->cfg, name);
+        if (prev_set) {
+            r = xlu__cfg_concat_vals(ctx, prev_set->value, val);
+            if (r) {
+                ctx->err = r;
+                goto out;
+            }
+        }
+    }
+
     set = malloc(sizeof(*set));
     if (!set) {
         ctx->err = errno;
-        return;
+        goto out;
     }
     set->name= name;
     set->value = val;
+    set->op = op;
     set->lineno= lineno;
     set->next= ctx->cfg->settings;
     ctx->cfg->settings= set;
+    return;
+out:
+    assert(ctx->err);
+    free(name);
+    xlu__cfg_value_free(val);
 }
 
 char *xlu__cfgl_strdup(CfgParseContext *ctx, const char *src) {

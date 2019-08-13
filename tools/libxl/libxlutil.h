@@ -25,6 +25,11 @@ enum XLU_ConfigValueType {
     XLU_LIST,
 };
 
+enum XLU_Operation {
+    XLU_OP_ASSIGNMENT = 0,
+    XLU_OP_ADDITION,
+};
+
 /* Unless otherwise stated, all functions return an errno value. */
 typedef struct XLU_Config XLU_Config;
 typedef struct XLU_ConfigList XLU_ConfigList;

@@ -24,6 +24,7 @@
 
 void xlu__cfg_set_free(XLU_ConfigSetting *set);
 void xlu__cfg_set_store(CfgParseContext*, char *name,
+                        enum XLU_Operation op,
                         XLU_ConfigValue *val, int lineno);
 XLU_ConfigValue *xlu__cfg_string_mk(CfgParseContext *ctx,
                                     char *atom, YYLTYPE *loc);
