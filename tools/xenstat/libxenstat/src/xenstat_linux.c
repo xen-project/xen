@@ -264,7 +264,7 @@ int xenstat_collect_networks(xenstat_node * node)
 {
 	/* Helper variables for parseNetDevLine() function defined above */
 	int i;
-	char line[512] = { 0 }, iface[16] = { 0 }, devBridge[16] = { 0 }, devNoBridge[16] = { 0 };
+	char line[512] = { 0 }, iface[16] = { 0 }, devBridge[16] = { 0 }, devNoBridge[17] = { 0 };
 	unsigned long long rxBytes, rxPackets, rxErrs, rxDrops, txBytes, txPackets, txErrs, txDrops;
 
 	struct priv_data *priv = get_priv_data(node->handle);
@@ -304,7 +304,7 @@ int xenstat_collect_networks(xenstat_node * node)
 
 	/* We get the bridge devices for use with bonding interface to get bonding interface stats */
 	getBridge("vir", devBridge, sizeof(devBridge));
-	snprintf(devNoBridge, 16, "p%s", devBridge);
+	snprintf(devNoBridge, sizeof(devNoBridge), "p%s", devBridge);
 
 	while (fgets(line, 512, priv->procnetdev)) {
 		xenstat_domain *domain;
