@@ -171,7 +171,7 @@ The kernel sub-node has the following properties:
 
 - compatible
 
-    "multiboot,kernel"
+    "multiboot,kernel", "multiboot,module"
 
 - reg
 
@@ -186,7 +186,7 @@ The ramdisk sub-node has the following properties:
 
 - compatible
 
-    "multiboot,ramdisk"
+    "multiboot,ramdisk", "multiboot,module"
 
 - reg
 
@@ -207,13 +207,13 @@ chosen {
         vpl011;
 
         module@0x4a000000 {
-            compatible = "multiboot,kernel";
+            compatible = "multiboot,kernel", "multiboot,module";
             reg = <0x0 0x4a000000 0xffffff>;
             bootargs = "console=ttyAMA0 init=/bin/sh";
         };
 
         module@0x4b000000 {
-            compatible = "multiboot,ramdisk";
+            compatible = "multiboot,ramdisk", "multiboot,module";
             reg = <0x0 0x4b000000 0xffffff>;
         };
     };
@@ -226,13 +226,13 @@ chosen {
         cpus = <1>;
 
         module@0x4c000000 {
-            compatible = "multiboot,kernel";
+            compatible = "multiboot,kernel", "multiboot,module";
             reg = <0x0 0x4c000000 0xffffff>;
             bootargs = "console=ttyAMA0 init=/bin/sh";
         };
 
         module@0x4d000000 {
-            compatible = "multiboot,ramdisk";
+            compatible = "multiboot,ramdisk", "multiboot,module";
             reg = <0x0 0x4d000000 0xffffff>;
         };
     };
