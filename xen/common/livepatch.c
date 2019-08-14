@@ -251,8 +251,8 @@ static int resolve_old_address(struct livepatch_func *f,
         f->old_addr = (void *)livepatch_symbols_lookup_by_name(f->name);
         if ( !f->old_addr )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Could not resolve old address of %s\n",
-                    elf->name, f->name);
+            printk(XENLOG_ERR LIVEPATCH "%s: Could not resolve old address of %s\n",
+                   elf->name, f->name);
             return -ENOENT;
         }
     }
@@ -370,8 +370,8 @@ static int move_payload(struct payload *payload, struct livepatch_elf *elf)
     text_buf = vmalloc_xen(size * PAGE_SIZE);
     if ( !text_buf )
     {
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: Could not allocate memory for payload!\n",
-                elf->name);
+        printk(XENLOG_ERR LIVEPATCH "%s: Could not allocate memory for payload\n",
+               elf->name);
         rc = -ENOMEM;
         goto out;
     }
@@ -468,8 +468,8 @@ static bool section_ok(const struct livepatch_elf *elf,
 
     if ( sec->sec->sh_size % sz )
     {
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong size %"PRIuElfWord" of %s (must be multiple of %zu)\n",
-                elf->name, sec->sec->sh_size, sec->name, sz);
+        printk(XENLOG_ERR LIVEPATCH "%s: Wrong size %"PRIuElfWord" of %s (must be multiple of %zu)\n",
+               elf->name, sec->sec->sh_size, sec->name, sz);
         return false;
     }
 
@@ -491,22 +491,22 @@ static int check_special_sections(const struct livepatch_elf *elf)
         sec = livepatch_elf_sec_by_name(elf, names[i]);
         if ( !sec )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: %s is missing!\n",
-                    elf->name, names[i]);
+            printk(XENLOG_ERR LIVEPATCH "%s: %s is missing\n",
+                   elf->name, names[i]);
             return -EINVAL;
         }
 
         if ( !sec->sec->sh_size )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: %s is empty!\n",
-                    elf->name, names[i]);
+            printk(XENLOG_ERR LIVEPATCH "%s: %s is empty\n",
+                   elf->name, names[i]);
             return -EINVAL;
         }
 
         if ( test_and_set_bit(i, found) )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: %s was seen more than once!\n",
-                    elf->name, names[i]);
+            printk(XENLOG_ERR LIVEPATCH "%s: %s was seen more than once\n",
+                   elf->name, names[i]);
             return -EINVAL;
         }
     }
@@ -539,16 +539,16 @@ static int prepare_payload(struct payload *payload,
 
         if ( f->version != LIVEPATCH_PAYLOAD_VERSION )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Wrong version (%u). Expected %d!\n",
-                    elf->name, f->version, LIVEPATCH_PAYLOAD_VERSION);
+            printk(XENLOG_ERR LIVEPATCH "%s: Wrong version (%u). Expected %d\n",
+                   elf->name, f->version, LIVEPATCH_PAYLOAD_VERSION);
             return -EOPNOTSUPP;
         }
 
         /* 'old_addr', 'new_addr', 'new_size' can all be zero. */
         if ( !f->old_size )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Address or size fields are zero!\n",
-                    elf->name);
+            printk(XENLOG_ERR LIVEPATCH "%s: Address or size fields are zero\n",
+                   elf->name);
             return -EINVAL;
         }
 
@@ -677,15 +677,15 @@ static int prepare_payload(struct payload *payload,
             if ( (instr < region->start && instr >= region->end) ||
                  (replacement < region->start && replacement >= region->end) )
             {
-                dprintk(XENLOG_ERR, LIVEPATCH "%s Alt patching outside payload: %p!\n",
-                        elf->name, instr);
+                printk(XENLOG_ERR LIVEPATCH "%s Alt patching outside payload: %p\n",
+                       elf->name, instr);
                 return -EINVAL;
             }
         }
         apply_alternatives(start, end);
 #else
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: We don't support alternative patching!\n",
-                elf->name);
+        printk(XENLOG_ERR LIVEPATCH "%s: We don't support alternative patching\n",
+               elf->name);
         return -EOPNOTSUPP;
 #endif
     }
@@ -707,8 +707,8 @@ static int prepare_payload(struct payload *payload,
         region->ex = s;
         region->ex_end = e;
 #else
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: We don't support .ex_table!\n",
-                elf->name);
+        printk(XENLOG_ERR LIVEPATCH "%s: We don't support .ex_table\n",
+               elf->name);
         return -EOPNOTSUPP;
 #endif
     }
@@ -816,8 +816,8 @@ static int build_symbol_table(struct payload *payload,
             if ( symbols_lookup_by_name(symtab[i].name) ||
                  livepatch_symbols_lookup_by_name(symtab[i].name) )
             {
-                dprintk(XENLOG_ERR, LIVEPATCH "%s: duplicate new symbol: %s\n",
-                        elf->name, symtab[i].name);
+                printk(XENLOG_ERR LIVEPATCH "%s: duplicate new symbol: %s\n",
+                       elf->name, symtab[i].name);
                 xfree(symtab);
                 xfree(strtab);
                 return -EEXIST;
@@ -1444,8 +1444,8 @@ static int build_id_dep(struct payload *payload, bool_t internal)
     if ( payload->dep.len != len ||
          memcmp(id, payload->dep.p, len) )
     {
-        dprintk(XENLOG_ERR, "%s%s: check against %s build-id failed!\n",
-                LIVEPATCH, payload->name, name);
+        printk(XENLOG_ERR LIVEPATCH "%s: check against %s build-id failed\n",
+               payload->name, name);
         return -EINVAL;
     }
 
@@ -1504,8 +1504,8 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
             /* We should be the last applied one. */
             if ( p != data )
             {
-                dprintk(XENLOG_ERR, "%s%s: can't unload. Top is %s!\n",
-                        LIVEPATCH, data->name, p->name);
+                printk(XENLOG_ERR LIVEPATCH "%s: can't unload. Top is %s\n",
+                       data->name, p->name);
                 rc = -EBUSY;
                 break;
             }
@@ -1525,8 +1525,8 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
              */
             if ( data->reverted && !data->safe_to_reapply )
             {
-                dprintk(XENLOG_ERR, "%s%s: can't revert as payload has .data. Please unload!\n",
-                        LIVEPATCH, data->name);
+                printk(XENLOG_ERR LIVEPATCH "%s: can't revert as payload has .data. Please unload\n",
+                       data->name);
                 data->rc = -EINVAL;
                 break;
             }

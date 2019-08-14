@@ -126,8 +126,8 @@ int arch_livepatch_verify_elf(const struct livepatch_elf *elf)
          hdr->e_ident[EI_CLASS] != ELFCLASS64 ||
          hdr->e_ident[EI_DATA] != ELFDATA2LSB )
     {
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: Unsupported ELF Machine type!\n",
-                elf->name);
+        printk(XENLOG_ERR LIVEPATCH "%s: Unsupported ELF Machine type\n",
+               elf->name);
         return -EOPNOTSUPP;
     }
 
@@ -152,8 +152,8 @@ int arch_livepatch_perform_rel(struct livepatch_elf *elf,
                                const struct livepatch_elf_sec *base,
                                const struct livepatch_elf_sec *rela)
 {
-    dprintk(XENLOG_ERR, LIVEPATCH "%s: SHT_REL relocation unsupported\n",
-            elf->name);
+    printk(XENLOG_ERR LIVEPATCH "%s: SHT_REL relocation unsupported\n",
+           elf->name);
     return -EOPNOTSUPP;
 }
 
@@ -172,20 +172,20 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
 
         if ( symndx == STN_UNDEF )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Encountered STN_UNDEF\n",
-                    elf->name);
+            printk(XENLOG_ERR LIVEPATCH "%s: Encountered STN_UNDEF\n",
+                   elf->name);
             return -EOPNOTSUPP;
         }
         else if ( symndx >= elf->nsym )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative relocation wants symbol@%u which is past end!\n",
-                    elf->name, symndx);
+            printk(XENLOG_ERR LIVEPATCH "%s: Relative relocation wants symbol@%u which is past end\n",
+                   elf->name, symndx);
             return -EINVAL;
         }
         else if ( !elf->sym[symndx].sym )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: No symbol@%u\n",
-                    elf->name, symndx);
+            printk(XENLOG_ERR LIVEPATCH "%s: No symbol@%u\n",
+                   elf->name, symndx);
             return -EINVAL;
         }
 
@@ -222,15 +222,15 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
             *(int32_t *)dest = val;
             if ( (int64_t)val != *(int32_t *)dest )
             {
-                dprintk(XENLOG_ERR, LIVEPATCH "%s: Overflow in relocation %u in %s for %s!\n",
-                        elf->name, i, rela->name, base->name);
+                printk(XENLOG_ERR LIVEPATCH "%s: Overflow in relocation %u in %s for %s\n",
+                       elf->name, i, rela->name, base->name);
                 return -EOVERFLOW;
             }
             break;
 
         default:
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Unhandled relocation %lu\n",
-                    elf->name, ELF64_R_TYPE(r->r_info));
+            printk(XENLOG_ERR LIVEPATCH "%s: Unhandled relocation %lu\n",
+                   elf->name, ELF64_R_TYPE(r->r_info));
             return -EOPNOTSUPP;
         }
     }
@@ -238,8 +238,8 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
     return 0;
 
  bad_offset:
-    dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative relocation offset is past %s section!\n",
-            elf->name, base->name);
+    printk(XENLOG_ERR LIVEPATCH "%s: Relative relocation offset is past %s section\n",
+           elf->name, base->name);
     return -EINVAL;
 }
 
