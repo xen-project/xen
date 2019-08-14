@@ -938,7 +938,7 @@ static void _show_registers(const struct cpu_user_regs *regs,
     printk(" TTBR0_EL2: %016"PRIx64"\n", READ_SYSREG64(TTBR0_EL2));
     printk("\n");
     printk("   ESR_EL2: %08"PRIx32"\n", regs->hsr);
-    printk(" HPFAR_EL2: %016"PRIregister"\n", READ_SYSREG(HPFAR_EL2));
+    printk(" HPFAR_EL2: %"PRIregister"\n", READ_SYSREG(HPFAR_EL2));
 
 #ifdef CONFIG_ARM_32
     printk("     HDFAR: %08"PRIx32"\n", READ_CP32(HDFAR));
@@ -1759,7 +1759,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
     mfn = gfn_to_mfn(d, gaddr_to_gfn(ttbr0));
 
     printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
-    printk("    TTBCR: 0x%08"PRIregister"\n", ttbcr);
+    printk("    TTBCR: 0x%"PRIregister"\n", ttbcr);
     printk("    TTBR0: 0x%016"PRIx64" = 0x%"PRIpaddr"\n",
            ttbr0, mfn_to_maddr(mfn));
 
