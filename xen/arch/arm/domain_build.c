@@ -1661,8 +1661,7 @@ static int __init make_vpl011_uart_node(const struct domain *d, void *fdt)
     dt_child_set_range(&cells, GUEST_ROOT_ADDRESS_CELLS,
                        GUEST_ROOT_SIZE_CELLS, GUEST_PL011_BASE,
                        GUEST_PL011_SIZE);
-    if ( res )
-        return res;
+
     res = fdt_property(fdt, "reg", reg, sizeof(reg));
     if ( res )
         return res;
