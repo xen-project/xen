@@ -2007,7 +2007,7 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
     {
         if ( vcpu_create(d, i) == NULL )
         {
-            printk("Failed to allocate d0v%u\n", i);
+            printk("Failed to allocate d%dv%d\n", d->domain_id, i);
             break;
         }
 
