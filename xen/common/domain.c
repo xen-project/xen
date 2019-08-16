@@ -348,7 +348,7 @@ struct domain *domain_create(domid_t domid,
         if ( hardware_domid < 0 || hardware_domid >= DOMID_FIRST_RESERVED )
             panic("The value of hardware_dom must be a valid domain ID\n");
 
-        d->disable_migrate = 1;
+        d->disable_migrate = true;
         old_hwdom = hardware_domain;
         hardware_domain = d;
     }
@@ -427,11 +427,8 @@ struct domain *domain_create(domid_t domid,
         watchdog_domain_init(d);
         init_status |= INIT_watchdog;
 
-        if ( d->options & XEN_DOMCTL_CDF_xs_domain )
-        {
-            d->is_xenstore = 1;
-            d->disable_migrate = 1;
-        }
+        if ( is_xenstore_domain(d) )
+            d->disable_migrate = true;
 
         d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
         d->irq_caps   = rangeset_new(d, "Interrupts", 0);

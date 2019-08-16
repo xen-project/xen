@@ -79,7 +79,7 @@ static always_inline int xsm_default_action(
         {
             return 0;
     case XSM_XS_PRIV:
-            if ( src->is_xenstore )
+            if ( is_xenstore_domain(src) )
                 return 0;
         }
         /* fall through */

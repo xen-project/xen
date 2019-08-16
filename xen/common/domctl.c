@@ -186,7 +186,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
         (d->is_shut_down                ? XEN_DOMINF_shutdown  : 0) |
         (d->controller_pause_count > 0  ? XEN_DOMINF_paused    : 0) |
         (d->debugger_attached           ? XEN_DOMINF_debugged  : 0) |
-        (d->is_xenstore                 ? XEN_DOMINF_xs_domain : 0) |
+        (is_xenstore_domain(d)          ? XEN_DOMINF_xs_domain : 0) |
         (is_hvm_domain(d)               ? XEN_DOMINF_hvm_guest : 0) |
         d->shutdown_code << XEN_DOMINF_shutdownshift;
 

@@ -375,8 +375,6 @@ struct domain
     bool             is_privileged;
     /* Can this guest access the Xen console? */
     bool             is_console;
-    /* Is this a xenstore domain (not dom0)? */
-    bool             is_xenstore;
     /* Non-migratable and non-restoreable? */
     bool             disable_migrate;
     /* Is this guest being debugged by dom0? */
@@ -971,6 +969,11 @@ static inline bool is_hwdom_pinned_vcpu(const struct vcpu *v)
 static inline bool is_vcpu_online(const struct vcpu *v)
 {
     return !test_bit(_VPF_down, &v->pause_flags);
+}
+
+static inline bool is_xenstore_domain(const struct domain *d)
+{
+    return d->options & XEN_DOMCTL_CDF_xs_domain;
 }
 
 extern bool sched_smt_power_savings;
