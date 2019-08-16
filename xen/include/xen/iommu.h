@@ -70,7 +70,6 @@ int iommu_hardware_setup(void);
 int iommu_domain_init(struct domain *d);
 void iommu_hwdom_init(struct domain *d);
 void iommu_domain_destroy(struct domain *d);
-int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn);
 
 void arch_iommu_domain_destroy(struct domain *d);
 int arch_iommu_domain_init(struct domain *d);

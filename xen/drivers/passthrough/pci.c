@@ -889,6 +889,56 @@ static int pci_clean_dpci_irqs(struct domain *d)
     return 0;
 }
 
+/* Caller should hold the pcidevs_lock */
+static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
+                           uint8_t devfn)
+{
+    const struct domain_iommu *hd = dom_iommu(d);
+    struct pci_dev *pdev;
+    int ret = 0;
+
+    if ( !iommu_enabled || !hd->platform_ops )
+        return -EINVAL;
+
+    ASSERT(pcidevs_locked());
+    pdev = pci_get_pdev_by_domain(d, seg, bus, devfn);
+    if ( !pdev )
+        return -ENODEV;
+
+    while ( pdev->phantom_stride )
+    {
+        devfn += pdev->phantom_stride;
+        if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
+            break;
+        ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn,
+                                                pci_to_dev(pdev));
+        if ( !ret )
+            continue;
+
+        printk(XENLOG_G_ERR "%pd: deassign %04x:%02x:%02x.%u failed (%d)\n",
+               d, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), ret);
+        return ret;
+    }
+
+    devfn = pdev->devfn;
+    ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn,
+                                            pci_to_dev(pdev));
+    if ( ret )
+    {
+        dprintk(XENLOG_G_ERR,
+                "%pd: deassign device (%04x:%02x:%02x.%u) failed\n",
+                d, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+        return ret;
+    }
+
+    pdev->fault.count = 0;
+
+    if ( !has_arch_pdevs(d) && has_iommu_pt(d) )
+        iommu_teardown(d);
+
+    return ret;
+}
+
 int pci_release_devices(struct domain *d)
 {
     struct pci_dev *pdev;
@@ -1474,55 +1524,6 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     pcidevs_unlock();
 
     return rc;
-}
-
-/* caller should hold the pcidevs_lock */
-int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
-{
-    const struct domain_iommu *hd = dom_iommu(d);
-    struct pci_dev *pdev = NULL;
-    int ret = 0;
-
-    if ( !iommu_enabled || !hd->platform_ops )
-        return -EINVAL;
-
-    ASSERT(pcidevs_locked());
-    pdev = pci_get_pdev_by_domain(d, seg, bus, devfn);
-    if ( !pdev )
-        return -ENODEV;
-
-    while ( pdev->phantom_stride )
-    {
-        devfn += pdev->phantom_stride;
-        if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
-            break;
-        ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn,
-                                                pci_to_dev(pdev));
-        if ( !ret )
-            continue;
-
-        printk(XENLOG_G_ERR "d%d: deassign %04x:%02x:%02x.%u failed (%d)\n",
-               d->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), ret);
-        return ret;
-    }
-
-    devfn = pdev->devfn;
-    ret = hd->platform_ops->reassign_device(d, hardware_domain, devfn,
-                                            pci_to_dev(pdev));
-    if ( ret )
-    {
-        dprintk(XENLOG_G_ERR,
-                "d%d: deassign device (%04x:%02x:%02x.%u) failed\n",
-                d->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        return ret;
-    }
-
-    pdev->fault.count = 0;
-
-    if ( !has_arch_pdevs(d) && has_iommu_pt(d) )
-        iommu_teardown(d);
-
-    return ret;
 }
 
 static int iommu_get_device_group(
