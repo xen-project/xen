@@ -696,7 +696,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         .stop_bits = 1
     };
     struct xen_domctl_createdomain dom0_cfg = {
-        .flags = XEN_DOMCTL_CDF_s3_integrity,
+        .flags = IS_ENABLED(CONFIG_TBOOT) ? XEN_DOMCTL_CDF_s3_integrity : 0,
         .max_evtchn_port = -1,
         .max_grant_frames = opt_max_grant_frames,
         .max_maptrack_frames = opt_max_maptrack_frames,

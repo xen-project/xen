@@ -296,8 +296,6 @@ struct arch_domain
     uint32_t pci_cf8;
     uint8_t cmos_idx;
 
-    bool_t s3_integrity;
-
     union {
         struct pv_domain pv;
         struct hvm_domain hvm;

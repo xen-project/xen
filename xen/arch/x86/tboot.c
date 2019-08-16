@@ -212,7 +212,7 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
     vmac_set_key((uint8_t *)key, &ctx);
     for_each_domain( d )
     {
-        if ( !d->arch.s3_integrity )
+        if ( !(d->options & XEN_DOMCTL_CDF_s3_integrity) )
             continue;
         printk("MACing Domain %u\n", d->domain_id);
 
