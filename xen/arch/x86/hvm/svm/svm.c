@@ -2945,6 +2945,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_MONITOR:
     case VMEXIT_MWAIT:
+    case VMEXIT_SKINIT:
+    case VMEXIT_RDPRU:
         hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
 
@@ -2962,9 +2964,6 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         break;
     case VMEXIT_CLGI:
         svm_vmexit_do_clgi(regs, v);
-        break;
-    case VMEXIT_SKINIT:
-        hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
         break;
 
     case VMEXIT_XSETBV:

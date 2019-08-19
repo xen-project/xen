@@ -74,7 +74,8 @@ enum GenericIntercept2bits
     GENERAL2_INTERCEPT_MONITOR = 1 << 10,
     GENERAL2_INTERCEPT_MWAIT   = 1 << 11,
     GENERAL2_INTERCEPT_MWAIT_CONDITIONAL = 1 << 12,
-    GENERAL2_INTERCEPT_XSETBV  = 1 << 13
+    GENERAL2_INTERCEPT_XSETBV  = 1 << 13,
+    GENERAL2_INTERCEPT_RDPRU   = 1 << 14,
 };
 
 
@@ -300,6 +301,7 @@ enum VMEXIT_EXITCODE
     VMEXIT_MWAIT            = 139, /* 0x8b */
     VMEXIT_MWAIT_CONDITIONAL= 140, /* 0x8c */
     VMEXIT_XSETBV           = 141, /* 0x8d */
+    VMEXIT_RDPRU            = 142, /* 0x8e */
     VMEXIT_NPF              = 1024, /* 0x400, nested paging fault */
     VMEXIT_INVALID          =  -1
 };
