@@ -351,9 +351,10 @@ static int __init early_scan_node(const void *fdt,
 static void __init early_print_info(void)
 {
     struct meminfo *mi = &bootinfo.mem;
+    struct meminfo *mem_resv = &bootinfo.reserved_mem;
     struct bootmodules *mods = &bootinfo.modules;
     struct bootcmdlines *cmds = &bootinfo.cmdlines;
-    int i, nr_rsvd;
+    unsigned int i, j, nr_rsvd;
 
     for ( i = 0; i < mi->nr_banks; i++ )
         printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
@@ -375,7 +376,13 @@ static void __init early_print_info(void)
             continue;
         /* fdt_get_mem_rsv returns length */
         e += s;
-        printk(" RESVD[%d]: %"PRIpaddr" - %"PRIpaddr"\n", i, s, e);
+        printk(" RESVD[%u]: %"PRIpaddr" - %"PRIpaddr"\n", i, s, e);
+    }
+    for ( j = 0; j < mem_resv->nr_banks; j++, i++ )
+    {
+        printk(" RESVD[%u]: %"PRIpaddr" - %"PRIpaddr"\n", i,
+               mem_resv->bank[j].start,
+               mem_resv->bank[j].start + mem_resv->bank[j].size - 1);
     }
     printk("\n");
     for ( i = 0 ; i < cmds->nr_mods; i++ )
