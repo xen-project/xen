@@ -58,46 +58,6 @@ GLOBAL(trampoline_realmode_entry)
 
         ljmpl   $BOOT_CS32,$bootsym_rel(trampoline_protmode_entry,6)
 
-trampoline_gdt:
-        /* 0x0000: unused */
-        .quad   0x0000000000000000
-        /* 0x0008: ring 0 code, 32-bit mode */
-        .quad   0x00cf9b000000ffff
-        /* 0x0010: ring 0 code, 64-bit mode */
-        .quad   0x00af9b000000ffff
-        /* 0x0018: ring 0 data */
-        .quad   0x00cf93000000ffff
-        /* 0x0020: real-mode code @ BOOT_TRAMPOLINE */
-        .long   0x0000ffff
-        .long   0x00009b00
-        /* 0x0028: real-mode data @ BOOT_TRAMPOLINE */
-        .long   0x0000ffff
-        .long   0x00009300
-        /*
-         * 0x0030: ring 0 Xen data, 16 MiB size, base
-         * address is computed at runtime.
-         */
-        .quad   0x00c0930000000fff
-.Ltrampoline_gdt_end:
-
-        .pushsection .trampoline_rel, "a"
-        .long   trampoline_gdt + BOOT_PSEUDORM_CS + 2 - .
-        .long   trampoline_gdt + BOOT_PSEUDORM_DS + 2 - .
-        .popsection
-
-GLOBAL(trampoline_misc_enable_off)
-        .quad   0
-
-/* EFER OR-mask for boot paths.  This gets adjusted with NX when available. */
-GLOBAL(trampoline_efer)
-        .long   EFER_LME | EFER_SCE
-
-GLOBAL(trampoline_xen_phys_start)
-        .long   0
-
-GLOBAL(trampoline_cpu_started)
-        .byte   0
-
         .code32
 trampoline_protmode_entry:
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
@@ -182,6 +142,35 @@ idt_48: .word   0, 0, 0 # base = limit = 0
         .word   0
 gdt_48: .word   .Ltrampoline_gdt_end - trampoline_gdt - 1
         .long   bootsym_rel(trampoline_gdt,4)
+
+trampoline_gdt:
+        .quad   0x0000000000000000 /* 0x0000: unused */
+        .quad   0x00cf9b000000ffff /* 0x0008: ring 0 code, 32-bit mode */
+        .quad   0x00af9b000000ffff /* 0x0010: ring 0 code, 64-bit mode */
+        .quad   0x00cf93000000ffff /* 0x0018: ring 0 data */
+        .quad   0x00009b000000ffff /* 0x0020: real-mode code @ BOOT_TRAMPOLINE */
+        .quad   0x000093000000ffff /* 0x0028: real-mode data @ BOOT_TRAMPOLINE */
+        .quad   0x00c0930000000fff /* 0x0030: ring 0 Xen data, 16M @ XEN */
+.Ltrampoline_gdt_end:
+
+        /* Relocations for trampoline Real Mode segments. */
+        .pushsection .trampoline_rel, "a"
+        .long   trampoline_gdt + BOOT_PSEUDORM_CS + 2 - .
+        .long   trampoline_gdt + BOOT_PSEUDORM_DS + 2 - .
+        .popsection
+
+GLOBAL(trampoline_misc_enable_off)
+        .quad   0
+
+/* EFER OR-mask for boot paths.  This gets adjusted with NX when available. */
+GLOBAL(trampoline_efer)
+        .long   EFER_LME | EFER_SCE
+
+GLOBAL(trampoline_xen_phys_start)
+        .long   0
+
+GLOBAL(trampoline_cpu_started)
+        .byte   0
 
 /* The first page of trampoline is permanent, the rest boot-time only. */
 /* Reuse the boot trampoline on the 1st trampoline page as stack for wakeup. */
