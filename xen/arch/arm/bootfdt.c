@@ -75,9 +75,10 @@ static u32 __init device_tree_get_u32(const void *fdt, int node,
 }
 
 /**
- * device_tree_for_each_node - iterate over all device tree nodes
+ * device_tree_for_each_node - iterate over all device tree sub-nodes
  * @fdt: flat device tree.
- * @func: function to call for each node.
+ * @node: parent node to start the search from
+ * @func: function to call for each sub-node.
  * @data: data to pass to @func.
  *
  * Any nodes nested at DEVICE_TREE_MAX_DEPTH or deeper are ignored.
@@ -85,20 +86,21 @@ static u32 __init device_tree_get_u32(const void *fdt, int node,
  * Returns 0 if all nodes were iterated over successfully.  If @func
  * returns a value different from 0, that value is returned immediately.
  */
-int __init device_tree_for_each_node(const void *fdt,
+int __init device_tree_for_each_node(const void *fdt, int node,
                                      device_tree_node_func func,
                                      void *data)
 {
-    int node;
-    int depth;
+    /*
+     * We only care about relative depth increments, assume depth of
+     * node is 0 for simplicity.
+     */
+    int depth = 0;
+    const int first_node = node;
     u32 address_cells[DEVICE_TREE_MAX_DEPTH];
     u32 size_cells[DEVICE_TREE_MAX_DEPTH];
     int ret;
 
-    for ( node = 0, depth = 0;
-          node >=0 && depth >= 0;
-          node = fdt_next_node(fdt, node, &depth) )
-    {
+    do {
         const char *name = fdt_get_name(fdt, node, NULL);
         u32 as, ss;
 
@@ -117,10 +119,17 @@ int __init device_tree_for_each_node(const void *fdt,
         size_cells[depth] = device_tree_get_u32(fdt, node,
                                                 "#size-cells", ss);
 
-        ret = func(fdt, node, name, depth, as, ss, data);
-        if ( ret != 0 )
-            return ret;
-    }
+        /* skip the first node */
+        if ( node != first_node )
+        {
+            ret = func(fdt, node, name, depth, as, ss, data);
+            if ( ret != 0 )
+                return ret;
+        }
+
+        node = fdt_next_node(fdt, node, &depth);
+    } while ( node >= 0 && depth > 0 );
+
     return 0;
 }
 
@@ -357,7 +366,7 @@ size_t __init boot_fdt_info(const void *fdt, paddr_t paddr)
 
     add_boot_module(BOOTMOD_FDT, paddr, fdt_totalsize(fdt), false);
 
-    device_tree_for_each_node((void *)fdt, early_scan_node, NULL);
+    device_tree_for_each_node((void *)fdt, 0, early_scan_node, NULL);
     early_print_info();
 
     return fdt_totalsize(fdt);
