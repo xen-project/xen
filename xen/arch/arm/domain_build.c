@@ -642,11 +642,11 @@ static int __init fdt_property_interrupts(const struct kernel_info *kinfo,
 static int __init make_memory_node(const struct domain *d,
                                    void *fdt,
                                    int addrcells, int sizecells,
-                                   const struct kernel_info *kinfo)
+                                   struct meminfo *mem)
 {
     int res, i;
     int reg_size = addrcells + sizecells;
-    int nr_cells = reg_size*kinfo->mem.nr_banks;
+    int nr_cells = reg_size * mem->nr_banks;
     __be32 reg[NR_MEM_BANKS * 4 /* Worst case addrcells + sizecells */];
     __be32 *cells;
 
@@ -665,10 +665,10 @@ static int __init make_memory_node(const struct domain *d,
         return res;
 
     cells = &reg[0];
-    for ( i = 0 ; i < kinfo->mem.nr_banks; i++ )
+    for ( i = 0 ; i < mem->nr_banks; i++ )
     {
-        u64 start = kinfo->mem.bank[i].start;
-        u64 size = kinfo->mem.bank[i].size;
+        u64 start = mem->bank[i].start;
+        u64 size = mem->bank[i].size;
 
         dt_dprintk("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
                    i, start, start + size);
@@ -1496,10 +1496,18 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells, kinfo);
+        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells, &kinfo->mem);
         if ( res )
             return res;
 
+        /*
+         * Create a second memory node to store the ranges covering
+         * reserved-memory regions.
+         */
+        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
+                               &bootinfo.reserved_mem);
+        if ( res )
+            return res;
     }
 
     res = fdt_end_node(kinfo->fdt);
@@ -1715,7 +1723,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    ret = make_memory_node(d, kinfo->fdt, addrcells, sizecells, kinfo);
+    ret = make_memory_node(d, kinfo->fdt, addrcells, sizecells, &kinfo->mem);
     if ( ret )
         goto err;
 
