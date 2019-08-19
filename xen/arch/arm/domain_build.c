@@ -1165,15 +1165,24 @@ static int __init map_range_to_domain(const struct dt_device_node *dev,
     bool need_mapping = !dt_device_for_passthrough(dev);
     int res;
 
-    res = iomem_permit_access(d, paddr_to_pfn(addr),
-                              paddr_to_pfn(PAGE_ALIGN(addr + len - 1)));
-    if ( res )
+    /*
+     * reserved-memory regions are RAM carved out for a special purpose.
+     * They are not MMIO and therefore a domain should not be able to
+     * manage them via the IOMEM interface.
+     */
+    if ( strnicmp(dt_node_full_name(dev), "/reserved-memory/",
+         strlen("/reserved-memory/")) != 0 )
     {
-        printk(XENLOG_ERR "Unable to permit to dom%d access to"
-               " 0x%"PRIx64" - 0x%"PRIx64"\n",
-               d->domain_id,
-               addr & PAGE_MASK, PAGE_ALIGN(addr + len) - 1);
-        return res;
+        res = iomem_permit_access(d, paddr_to_pfn(addr),
+                paddr_to_pfn(PAGE_ALIGN(addr + len - 1)));
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to permit to dom%d access to"
+                    " 0x%"PRIx64" - 0x%"PRIx64"\n",
+                    d->domain_id,
+                    addr & PAGE_MASK, PAGE_ALIGN(addr + len) - 1);
+            return res;
+        }
     }
 
     if ( need_mapping )
