@@ -133,9 +133,10 @@ int __init device_tree_for_each_node(const void *fdt, int node,
     return 0;
 }
 
-static void __init process_memory_node(const void *fdt, int node,
-                                       const char *name,
-                                       u32 address_cells, u32 size_cells)
+static int __init process_memory_node(const void *fdt, int node,
+                                      const char *name, int depth,
+                                      u32 address_cells, u32 size_cells,
+                                      void *data)
 {
     const struct fdt_property *prop;
     int i;
@@ -148,15 +149,12 @@ static void __init process_memory_node(const void *fdt, int node,
     {
         printk("fdt: node `%s': invalid #address-cells or #size-cells",
                name);
-        return;
+        return -EINVAL;
     }
 
     prop = fdt_get_property(fdt, node, "reg", NULL);
     if ( !prop )
-    {
-        printk("fdt: node `%s': missing `reg' property\n", name);
-        return;
-    }
+        return -ENOENT;
 
     cell = (const __be32 *)prop->data;
     banks = fdt32_to_cpu(prop->len) / (reg_cells * sizeof (u32));
@@ -165,11 +163,15 @@ static void __init process_memory_node(const void *fdt, int node,
     {
         device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
         if ( !size )
-            continue;
+            return -EINVAL;
         bootinfo.mem.bank[bootinfo.mem.nr_banks].start = start;
         bootinfo.mem.bank[bootinfo.mem.nr_banks].size = size;
         bootinfo.mem.nr_banks++;
     }
+
+    if ( i < banks )
+        return -ENOSPC;
+    return 0;
 }
 
 static void __init process_multiboot_node(const void *fdt, int node,
@@ -301,15 +303,20 @@ static int __init early_scan_node(const void *fdt,
                                   u32 address_cells, u32 size_cells,
                                   void *data)
 {
+    int rc = 0;
+
     if ( device_tree_node_matches(fdt, node, "memory") )
-        process_memory_node(fdt, node, name, address_cells, size_cells);
+        rc = process_memory_node(fdt, node, name, depth,
+                                 address_cells, size_cells, NULL);
     else if ( depth <= 3 && (device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) ||
               device_tree_node_compatible(fdt, node, "multiboot,module" )))
         process_multiboot_node(fdt, node, name, address_cells, size_cells);
     else if ( depth == 1 && device_tree_node_matches(fdt, node, "chosen") )
         process_chosen_node(fdt, node, name, address_cells, size_cells);
 
-    return 0;
+    if ( rc < 0 )
+        printk("fdt: node `%s': parsing failed\n", name);
+    return rc;
 }
 
 static void __init early_print_info(void)
