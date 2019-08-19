@@ -408,7 +408,13 @@ let do_introduce con _t domains cons data =
 		in
 	let dom =
 		if Domains.exist domains domid then
-			Domains.find domains domid
+			let edom = Domains.find domains domid in
+			if (Domain.get_mfn edom) = mfn && (Connections.find_domain cons domid) != con then begin
+				(* Use XS_INTRODUCE for recreating the xenbus event-channel. *)
+				edom.remote_port <- port;
+				Domain.bind_interdomain edom;
+			end;
+			edom
 		else try
 			let ndom = Domains.create domains domid mfn port in
 			Connections.add_domain cons ndom;

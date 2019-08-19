@@ -23,9 +23,9 @@ type t =
 {
 	id: Xenctrl.domid;
 	mfn: nativeint;
-	remote_port: int;
 	interface: Xenmmap.mmap_interface;
 	eventchn: Event.t;
+	mutable remote_port: int;
 	mutable port: Xeneventchn.t option;
 	mutable bad_client: bool;
 	mutable io_credit: int; (* the rounds of ring process left to do, default is 0,
@@ -71,6 +71,10 @@ let notify dom = match dom.port with
 	Event.notify dom.eventchn port
 
 let bind_interdomain dom =
+	begin match dom.port with
+	| None -> ()
+	| Some port -> Event.unbind dom.eventchn port
+	end;
 	dom.port <- Some (Event.bind_interdomain dom.eventchn dom.id dom.remote_port);
 	debug "bound domain %d remote port %d to local port %s" dom.id dom.remote_port (string_of_port dom.port)
 
