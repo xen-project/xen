@@ -357,15 +357,15 @@ static void __init early_print_info(void)
 
     for ( i = 0; i < mi->nr_banks; i++ )
         printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
-                     mi->bank[i].start,
-                     mi->bank[i].start + mi->bank[i].size - 1);
+                mi->bank[i].start,
+                mi->bank[i].start + mi->bank[i].size - 1);
     printk("\n");
     for ( i = 0 ; i < mods->nr_mods; i++ )
         printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %-12s\n",
-                     i,
-                     mods->module[i].start,
-                     mods->module[i].start + mods->module[i].size,
-                     boot_module_kind_as_string(mods->module[i].kind));
+                i,
+                mods->module[i].start,
+                mods->module[i].start + mods->module[i].size,
+                boot_module_kind_as_string(mods->module[i].kind));
 
     nr_rsvd = fdt_num_mem_rsv(device_tree_flattened);
     for ( i = 0; i < nr_rsvd; i++ )
@@ -375,8 +375,7 @@ static void __init early_print_info(void)
             continue;
         /* fdt_get_mem_rsv returns length */
         e += s;
-        printk(" RESVD[%d]: %"PRIpaddr" - %"PRIpaddr"\n",
-                     i, s, e);
+        printk(" RESVD[%d]: %"PRIpaddr" - %"PRIpaddr"\n", i, s, e);
     }
     printk("\n");
     for ( i = 0 ; i < cmds->nr_mods; i++ )
