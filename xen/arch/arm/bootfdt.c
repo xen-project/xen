@@ -144,6 +144,7 @@ static int __init process_memory_node(const void *fdt, int node,
     const __be32 *cell;
     paddr_t start, size;
     u32 reg_cells = address_cells + size_cells;
+    struct meminfo *mem = data;
 
     if ( address_cells < 1 || size_cells < 1 )
     {
@@ -159,19 +160,44 @@ static int __init process_memory_node(const void *fdt, int node,
     cell = (const __be32 *)prop->data;
     banks = fdt32_to_cpu(prop->len) / (reg_cells * sizeof (u32));
 
-    for ( i = 0; i < banks && bootinfo.mem.nr_banks < NR_MEM_BANKS; i++ )
+    for ( i = 0; i < banks && mem->nr_banks < NR_MEM_BANKS; i++ )
     {
         device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
         if ( !size )
             return -EINVAL;
-        bootinfo.mem.bank[bootinfo.mem.nr_banks].start = start;
-        bootinfo.mem.bank[bootinfo.mem.nr_banks].size = size;
-        bootinfo.mem.nr_banks++;
+        mem->bank[mem->nr_banks].start = start;
+        mem->bank[mem->nr_banks].size = size;
+        mem->nr_banks++;
     }
 
     if ( i < banks )
         return -ENOSPC;
     return 0;
+}
+
+static int __init process_reserved_memory_node(const void *fdt, int node,
+                                               const char *name, int depth,
+                                               u32 address_cells,
+                                               u32 size_cells,
+                                               void *data)
+{
+    int rc = process_memory_node(fdt, node, name, depth, address_cells,
+                                 size_cells, data);
+
+    if ( rc == -ENOSPC )
+        panic("Max number of supported reserved-memory regions reached.");
+    else if ( rc != -ENOENT )
+        return rc;
+    return 0;
+}
+
+static int __init process_reserved_memory(const void *fdt, int node,
+                                          const char *name, int depth,
+                                          u32 address_cells, u32 size_cells)
+{
+    return device_tree_for_each_node(fdt, node,
+                                     process_reserved_memory_node,
+                                     &bootinfo.reserved_mem);
 }
 
 static void __init process_multiboot_node(const void *fdt, int node,
@@ -307,7 +333,10 @@ static int __init early_scan_node(const void *fdt,
 
     if ( device_tree_node_matches(fdt, node, "memory") )
         rc = process_memory_node(fdt, node, name, depth,
-                                 address_cells, size_cells, NULL);
+                                 address_cells, size_cells, &bootinfo.mem);
+    else if ( depth == 1 && !dt_node_cmp(name, "reserved-memory") )
+        rc = process_reserved_memory(fdt, node, name, depth,
+                                     address_cells, size_cells);
     else if ( depth <= 3 && (device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) ||
               device_tree_node_compatible(fdt, node, "multiboot,module" )))
         process_multiboot_node(fdt, node, name, address_cells, size_cells);

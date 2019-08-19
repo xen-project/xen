@@ -66,6 +66,7 @@ struct bootcmdlines {
 
 struct bootinfo {
     struct meminfo mem;
+    struct meminfo reserved_mem;
     struct bootmodules modules;
     struct bootcmdlines cmdlines;
 #ifdef CONFIG_ACPI
