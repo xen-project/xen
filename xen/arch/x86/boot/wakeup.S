@@ -138,6 +138,21 @@ wakeup_32:
         add     bootsym_rel(trampoline_xen_phys_start,4,%eax)
         mov     %eax,%cr3
 
+        /* Reapply IA32_MISC_ENABLE modifications from early_init_intel(). */
+        mov     bootsym_rel(trampoline_misc_enable_off, 4, %esi)
+        mov     bootsym_rel(trampoline_misc_enable_off + 4, 4, %edi)
+        mov     %esi, %eax
+        or      %edi, %eax
+        jz      1f
+        mov     $MSR_IA32_MISC_ENABLE, %ecx
+        rdmsr
+        not     %esi
+        not     %edi
+        and     %esi, %eax
+        and     %edi, %edx
+        wrmsr
+1:
+
         /* Will cpuid feature change after resume? */
         /* Set up EFER (Extended Feature Enable Register). */
         mov     bootsym_rel(cpuid_ext_features,4,%edi)
