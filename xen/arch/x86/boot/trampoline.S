@@ -63,22 +63,23 @@ trampoline_gdt:
         /* 0x0000: unused */
         .quad   0x0000000000000000
         /* 0x0008: ring 0 code, 32-bit mode */
-        .quad   0x00cf9a000000ffff
+        .quad   0x00cf9b000000ffff
         /* 0x0010: ring 0 code, 64-bit mode */
-        .quad   0x00af9a000000ffff
+        .quad   0x00af9b000000ffff
         /* 0x0018: ring 0 data */
-        .quad   0x00cf92000000ffff
+        .quad   0x00cf93000000ffff
         /* 0x0020: real-mode code @ BOOT_TRAMPOLINE */
         .long   0x0000ffff
-        .long   0x00009a00
+        .long   0x00009b00
         /* 0x0028: real-mode data @ BOOT_TRAMPOLINE */
         .long   0x0000ffff
-        .long   0x00009200
+        .long   0x00009300
         /*
          * 0x0030: ring 0 Xen data, 16 MiB size, base
          * address is computed at runtime.
          */
-        .quad   0x00c0920000000fff
+        .quad   0x00c0930000000fff
+.Ltrampoline_gdt_end:
 
         .pushsection .trampoline_rel, "a"
         .long   trampoline_gdt + BOOT_PSEUDORM_CS + 2 - .
@@ -182,7 +183,7 @@ start64:
         .word   0
 idt_48: .word   0, 0, 0 # base = limit = 0
         .word   0
-gdt_48: .word   6*8-1
+gdt_48: .word   .Ltrampoline_gdt_end - trampoline_gdt - 1
         .long   bootsym_rel(trampoline_gdt,4)
 
 /* The first page of trampoline is permanent, the rest boot-time only. */

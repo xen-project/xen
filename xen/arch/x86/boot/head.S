@@ -129,7 +129,7 @@ multiboot2_header:
 
         .word   0
 gdt_boot_descr:
-        .word   7*8-1
+        .word   .Ltrampoline_gdt_end - trampoline_gdt - 1
 gdt_boot_base:
         .long   sym_offs(trampoline_gdt)
         .long   0 /* Needed for 64-bit lgdt */

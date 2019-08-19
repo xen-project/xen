@@ -176,14 +176,15 @@ compatibility_mode_far:
         .word 0x0010
 
 compat_mode_gdt_desc:
-        .word (3*8)-1
+        .word .Lcompat_mode_gdt_end - compat_mode_gdt -1
         .quad 0x0000000000000000     /* set in call_32_bit above */
 
         .align 8
 compat_mode_gdt:
         .quad 0x0000000000000000     /* null                              */
-        .quad 0x00cf92000000ffff     /* 0x0008 ring 0 data                */
-        .quad 0x00cf9a000000ffff     /* 0x0010 ring 0 code, compatibility */
+        .quad 0x00cf93000000ffff     /* 0x0008 ring 0 data                */
+        .quad 0x00cf9b000000ffff     /* 0x0010 ring 0 code, compatibility */
+.Lcompat_mode_gdt_end:
 
 compat_mode_idt:
         .word 0                      /* limit */
