@@ -139,12 +139,13 @@ start64:
         .balign 8
         .word   0
 idt_48: .word   0, 0, 0 # base = limit = 0
-        .word   0
-gdt_48: .word   .Ltrampoline_gdt_end - trampoline_gdt - 1
-        .long   bootsym_rel(trampoline_gdt,4)
 
 trampoline_gdt:
-        .quad   0x0000000000000000 /* 0x0000: unused */
+        .word   0                  /* 0x0000: unused (reused for GDTR) */
+gdt_48:
+        .word   .Ltrampoline_gdt_end - trampoline_gdt - 1
+        .long   bootsym_rel(trampoline_gdt, 4)
+
         .quad   0x00cf9b000000ffff /* 0x0008: ring 0 code, 32-bit mode */
         .quad   0x00af9b000000ffff /* 0x0010: ring 0 code, 64-bit mode */
         .quad   0x00cf93000000ffff /* 0x0018: ring 0 data */
