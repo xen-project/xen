@@ -52,6 +52,14 @@ int __init iommu_hardware_setup(void)
         rc = device_init(np, DEVICE_IOMMU, NULL);
         if ( !rc )
             num_iommus++;
+        /*
+         * Ignore the following error codes:
+         *   - EBADF: Indicate the current is not an IOMMU
+         *   - ENODEV: The IOMMU is not present or cannot be used by
+         *     Xen.
+         */
+        else if ( rc != -EBADF && rc != -ENODEV )
+            return rc;
     }
 
     return ( num_iommus > 0 ) ? 0 : -ENODEV;
