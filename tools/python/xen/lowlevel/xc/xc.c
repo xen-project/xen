@@ -1214,6 +1214,26 @@ out:
     return ret_obj ? ret_obj : pyxc_error_to_exception(self->xc_handle);
 }
 
+static PyObject *pyxc_xenbuildid(XcObject *self)
+{
+    xen_build_id_t *buildid;
+    int i, r;
+    char *str;
+
+    buildid = alloca(XC_PAGE_SIZE);
+    buildid->len = XC_PAGE_SIZE - sizeof(*buildid);
+
+    r = xc_version(self->xc_handle, XENVER_build_id, buildid);
+    if ( r <= 0 )
+        return pyxc_error_to_exception(self->xc_handle);
+
+    str = alloca((r * 2) + 1);
+    for ( i = 0; i < r; i++ )
+        snprintf(&str[i * 2], 3, "%02hhx", buildid->buf[i]);
+
+    return Py_BuildValue("s", str);
+}
+
 static PyObject *pyxc_xeninfo(XcObject *self)
 {
     xen_extraversion_t xen_extra;
@@ -2295,6 +2315,13 @@ static PyMethodDef pyxc_methods[] = {
       METH_NOARGS, "\n"
       "Get information about the Xen host\n"
       "Returns [dict]: information about Xen"
+      "        [None]: on failure.\n" },
+
+    { "buildid",
+      (PyCFunction)pyxc_xenbuildid,
+      METH_NOARGS, "\n"
+      "Get Xen buildid\n"
+      "Returns [str]: Xen buildid"
       "        [None]: on failure.\n" },
 
     { "shadow_control", 
