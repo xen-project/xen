@@ -531,6 +531,7 @@ again:
     free(xsval);
 
     if (!val && errno == EAGAIN) {
+        PyErr_Clear();
         goto again;
     }
 
