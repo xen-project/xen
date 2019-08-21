@@ -71,8 +71,8 @@ int arch_livepatch_verify_elf(const struct livepatch_elf *elf)
     if ( hdr->e_machine != EM_AARCH64 ||
          hdr->e_ident[EI_CLASS] != ELFCLASS64 )
     {
-        dprintk(XENLOG_ERR, LIVEPATCH "%s: Unsupported ELF Machine type!\n",
-                elf->name);
+        printk(XENLOG_ERR LIVEPATCH "%s: Unsupported ELF Machine type\n",
+               elf->name);
         return -EOPNOTSUPP;
     }
 
@@ -254,20 +254,20 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
 
         if ( symndx == STN_UNDEF )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Encountered STN_UNDEF\n",
-                    elf->name);
+            printk(XENLOG_ERR LIVEPATCH "%s: Encountered STN_UNDEF\n",
+                   elf->name);
             return -EOPNOTSUPP;
         }
         else if ( symndx >= elf->nsym )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative relocation wants symbol@%u which is past end!\n",
-                    elf->name, symndx);
+            printk(XENLOG_ERR LIVEPATCH "%s: Relative relocation wants symbol@%u which is past end\n",
+                   elf->name, symndx);
             return -EINVAL;
         }
         else if ( !elf->sym[symndx].sym )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: No relative symbol@%u\n",
-                    elf->name, symndx);
+            printk(XENLOG_ERR LIVEPATCH "%s: No relative symbol@%u\n",
+                   elf->name, symndx);
             return -EINVAL;
         }
 
@@ -465,23 +465,23 @@ int arch_livepatch_perform_rela(struct livepatch_elf *elf,
             break;
 
         default:
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Unhandled relocation %lu\n",
-                    elf->name, ELF64_R_TYPE(r->r_info));
+            printk(XENLOG_ERR LIVEPATCH "%s: Unhandled relocation %lu\n",
+                   elf->name, ELF64_R_TYPE(r->r_info));
             return -EOPNOTSUPP;
         }
 
         if ( overflow_check && ovf == -EOVERFLOW )
         {
-            dprintk(XENLOG_ERR, LIVEPATCH "%s: Overflow in relocation %u in %s for %s!\n",
-                    elf->name, i, rela->name, base->name);
+            printk(XENLOG_ERR LIVEPATCH "%s: Overflow in relocation %u in %s for %s\n",
+                   elf->name, i, rela->name, base->name);
             return ovf;
         }
     }
     return 0;
 
  bad_offset:
-    dprintk(XENLOG_ERR, LIVEPATCH "%s: Relative relocation offset is past %s section!\n",
-            elf->name, base->name);
+    printk(XENLOG_ERR LIVEPATCH "%s: Relative relocation offset is past %s section\n",
+           elf->name, base->name);
     return -EINVAL;
 }
 
