@@ -1187,7 +1187,7 @@ static void debugtrace_dump_worker(void)
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
     if ( debugtrace_buf[debugtrace_prd] != '\0' )
         sercon_puts(&debugtrace_buf[debugtrace_prd],
-                    strlen(&debugtrace_buf[debugtrace_prd]));
+                    debugtrace_bytes - debugtrace_prd - 1);
 
     /* Print youngest portion of the ring. */
     debugtrace_buf[debugtrace_prd] = '\0';
