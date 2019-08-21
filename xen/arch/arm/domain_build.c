@@ -358,10 +358,9 @@ static void __init allocate_memory_11(struct domain *d,
     }
 
     if ( kinfo->unassigned_mem )
-        printk("WARNING: Failed to allocate requested dom0 memory."
-               /* Don't want format this as PRIpaddr (16 digit hex) */
-               " %ldMB unallocated\n",
-               (unsigned long)kinfo->unassigned_mem >> 20);
+        /* Don't want format this as PRIpaddr (16 digit hex) */
+        panic("Failed to allocate requested dom0 memory. %ldMB unallocated\n",
+              (unsigned long)kinfo->unassigned_mem >> 20);
 
     for( i = 0; i < kinfo->mem.nr_banks; i++ )
     {
