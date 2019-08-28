@@ -425,7 +425,7 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
         goto out;
     }
 
-    mc_amd = xmalloc(struct microcode_amd);
+    mc_amd = xzalloc(struct microcode_amd);
     if ( !mc_amd )
     {
         printk(KERN_ERR "microcode: Cannot allocate memory for microcode patch\n");
@@ -479,6 +479,7 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
 
     if ( error )
     {
+        xfree(mc_amd->equiv_cpu_table);
         xfree(mc_amd);
         goto out;
     }
@@ -491,8 +492,6 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
      * It's possible the data file has multiple matching ucode,
      * lets keep searching till the latest version
      */
-    mc_amd->mpb = NULL;
-    mc_amd->mpb_size = 0;
     last_offset = offset;
     while ( (error = get_ucode_from_buffer_amd(mc_amd, buf, bufsize,
                                                &offset)) == 0 )
@@ -549,11 +548,13 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
 
     if ( save_error )
     {
-        xfree(mc_amd);
         uci->mc.mc_amd = mc_old;
+        mc_old = mc_amd;
     }
-    else
-        xfree(mc_old);
+
+    xfree(mc_old->mpb);
+    xfree(mc_old->equiv_cpu_table);
+    xfree(mc_old);
 
   out:
 #if CONFIG_HVM
