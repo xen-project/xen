@@ -313,6 +313,13 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( !(config->flags & XEN_DOMCTL_CDF_hvm_guest) &&
+         (config->flags & XEN_DOMCTL_CDF_hap) )
+    {
+        dprintk(XENLOG_INFO, "HAP requested for non-HVM guest\n");
+        return -EINVAL;
+    }
+
     return arch_sanitise_domain_config(config);
 }
 

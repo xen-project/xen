@@ -573,9 +573,7 @@ int iommu_do_domctl(
 
 void iommu_share_p2m_table(struct domain* d)
 {
-#ifdef CONFIG_X86
     ASSERT(hap_enabled(d));
-#endif
     /*
      * iommu_use_hap_pt(d) cannot be used here because during domain
      * construction need_iommu(d) will always return false here.

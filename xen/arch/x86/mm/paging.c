@@ -632,7 +632,7 @@ void paging_log_dirty_init(struct domain *d, const struct log_dirty_ops *ops)
 /*           CODE FOR PAGING SUPPORT            */
 /************************************************/
 /* Domain paging struct initialization. */
-int paging_domain_init(struct domain *d, unsigned int domcr_flags)
+int paging_domain_init(struct domain *d)
 {
     int rc;
 
@@ -653,7 +653,7 @@ int paging_domain_init(struct domain *d, unsigned int domcr_flags)
     if ( hap_enabled(d) )
         hap_domain_init(d);
     else
-        rc = shadow_domain_init(d, domcr_flags);
+        rc = shadow_domain_init(d, d->options);
 
     return rc;
 }

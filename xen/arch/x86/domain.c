@@ -467,6 +467,12 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( (config->flags & XEN_DOMCTL_CDF_hap) && !hvm_hap_supported() )
+    {
+        dprintk(XENLOG_INFO, "HAP requested but not supported\n");
+        return -EINVAL;
+    }
+
     return 0;
 }
 
@@ -569,12 +575,7 @@ int arch_domain_create(struct domain *d,
     HYPERVISOR_COMPAT_VIRT_START(d) =
         is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
 
-    /* Need to determine if HAP is enabled before initialising paging */
-    if ( is_hvm_domain(d) )
-        d->arch.hvm.hap_enabled =
-            hvm_hap_supported() && (config->flags & XEN_DOMCTL_CDF_hap);
-
-    if ( (rc = paging_domain_init(d, config->flags)) != 0 )
+    if ( (rc = paging_domain_init(d)) != 0 )
         goto fail;
     paging_initialised = true;
 
