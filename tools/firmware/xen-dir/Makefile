@@ -32,9 +32,9 @@ linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 		echo $(f) >> linkfarm.stamp.tmp ;)
 	cmp -s linkfarm.stamp.tmp linkfarm.stamp && \
 		rm linkfarm.stamp.tmp || { \
+		cat linkfarm.stamp.tmp | while read f; \
+		  do rm -f "$(D)/$$f"; ln -s "$(XEN_ROOT)/$$f" "$(D)/$$f"; done; \
 		mv linkfarm.stamp.tmp linkfarm.stamp; \
-		cat linkfarm.stamp | while read f; \
-		  do rm -f "$(D)/$$f"; ln -s "$(XEN_ROOT)/$$f" "$(D)/$$f"; done \
 		}
 
 # Copy enough of the tree to build the shim hypervisor
