@@ -33,8 +33,32 @@
 
 uint32_t system_reset_counter = 1;
 
-static char __initdata opt_acpi_sleep[20];
-string_param("acpi_sleep", opt_acpi_sleep);
+static int __init parse_acpi_sleep(const char *s)
+{
+    const char *ss;
+    unsigned int flag = 0;
+    int rc = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
+
+        if ( !cmdline_strcmp(s, "s3_bios") )
+            flag |= 1;
+        else if ( !cmdline_strcmp(s, "s3_mode") )
+            flag |= 2;
+        else
+            rc = -EINVAL;
+
+        s = ss + 1;
+    } while ( *ss );
+
+    acpi_video_flags |= flag;
+
+    return rc;
+}
+custom_param("acpi_sleep", parse_acpi_sleep);
 
 static DEFINE_SPINLOCK(pm_lock);
 
@@ -456,22 +480,3 @@ acpi_status acpi_enter_sleep_state(u8 sleep_state)
 
     return_ACPI_STATUS(AE_OK);
 }
-
-static int __init acpi_sleep_init(void)
-{
-    char *p = opt_acpi_sleep;
-
-    while ( (p != NULL) && (*p != '\0') )
-    {
-        if ( !strncmp(p, "s3_bios", 7) )
-            acpi_video_flags |= 1;
-        if ( !strncmp(p, "s3_mode", 7) )
-            acpi_video_flags |= 2;
-        p = strchr(p, ',');
-        if ( p != NULL )
-            p += strspn(p, ", \t");
-    }
-
-    return 0;
-}
-__initcall(acpi_sleep_init);
