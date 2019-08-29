@@ -508,7 +508,18 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
     l2_pgentry_t l2e_content;
     l3_pgentry_t l3e_content;
     int rc;
-    unsigned int flags;
+    unsigned int iommu_pte_flags = p2m_get_iommu_flags(p2mt, mfn);
+    /*
+     * old_mfn and iommu_old_flags control possible flush/update needs on the
+     * IOMMU: We need to flush when MFN or flags (i.e. permissions) change.
+     * iommu_old_flags being initialized to zero covers the case of the entry
+     * getting replaced being a non-present (leaf or intermediate) one. For
+     * present leaf entries the real value will get calculated below, while
+     * for present intermediate entries ~0 (guaranteed != iommu_pte_flags)
+     * will be used (to cover all cases of what the leaf entries underneath
+     * the intermediate one might be).
+     */
+    unsigned int flags, iommu_old_flags = 0;
     unsigned long old_mfn = mfn_x(INVALID_MFN);
 
     if ( !sve )
@@ -556,9 +567,17 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         if ( flags & _PAGE_PRESENT )
         {
             if ( flags & _PAGE_PSE )
+            {
                 old_mfn = l1e_get_pfn(*p2m_entry);
+                iommu_old_flags =
+                    p2m_get_iommu_flags(p2m_flags_to_type(flags),
+                                        _mfn(old_mfn));
+            }
             else
+            {
+                iommu_old_flags = ~0;
                 intermediate_entry = *p2m_entry;
+            }
         }
 
         check_entry(mfn, p2mt, p2m_flags_to_type(flags), page_order);
@@ -594,6 +613,9 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
                                    0, L1_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
         old_mfn = l1e_get_pfn(*p2m_entry);
+        iommu_old_flags =
+            p2m_get_iommu_flags(p2m_flags_to_type(l1e_get_flags(*p2m_entry)),
+                                _mfn(old_mfn));
 
         if ( mfn_valid(mfn) || p2m_allows_invalid_mfn(p2mt) )
             entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
@@ -617,9 +639,17 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         if ( flags & _PAGE_PRESENT )
         {
             if ( flags & _PAGE_PSE )
+            {
                 old_mfn = l1e_get_pfn(*p2m_entry);
+                iommu_old_flags =
+                    p2m_get_iommu_flags(p2m_flags_to_type(flags),
+                                        _mfn(old_mfn));
+            }
             else
+            {
+                iommu_old_flags = ~0;
                 intermediate_entry = *p2m_entry;
+            }
         }
 
         check_entry(mfn, p2mt, p2m_flags_to_type(flags), page_order);
@@ -640,9 +670,17 @@ p2m_pt_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
          && (gfn + (1UL << page_order) - 1 > p2m->max_mapped_pfn) )
         p2m->max_mapped_pfn = gfn + (1UL << page_order) - 1;
 
+    if ( need_iommu_pt_sync(p2m->domain) &&
+         (iommu_old_flags != iommu_pte_flags || old_mfn != mfn_x(mfn)) )
+        rc = iommu_pte_flags
+             ? iommu_legacy_map(d, _dfn(gfn), mfn, page_order,
+                                iommu_pte_flags)
+             : iommu_legacy_unmap(d, _dfn(gfn), page_order);
+
     /*
      * Free old intermediate tables if necessary.  This has to be the
-     * last thing we do so as to avoid a potential use-after-free.
+     * last thing we do, after removal from the IOMMU tables, so as to
+     * avoid a potential use-after-free.
      */
     if ( l1e_get_flags(intermediate_entry) & _PAGE_PRESENT )
         p2m_free_entry(p2m, &intermediate_entry, page_order);
