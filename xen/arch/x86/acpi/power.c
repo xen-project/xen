@@ -36,7 +36,6 @@ uint32_t system_reset_counter = 1;
 static char __initdata opt_acpi_sleep[20];
 string_param("acpi_sleep", opt_acpi_sleep);
 
-static u8 sleep_states[ACPI_S_STATE_COUNT];
 static DEFINE_SPINLOCK(pm_lock);
 
 struct acpi_sleep_info acpi_sinfo;
@@ -460,7 +459,6 @@ acpi_status acpi_enter_sleep_state(u8 sleep_state)
 
 static int __init acpi_sleep_init(void)
 {
-    int i;
     char *p = opt_acpi_sleep;
 
     while ( (p != NULL) && (*p != '\0') )
@@ -473,19 +471,6 @@ static int __init acpi_sleep_init(void)
         if ( p != NULL )
             p += strspn(p, ", \t");
     }
-
-    printk(XENLOG_INFO "ACPI sleep modes:");
-    for ( i = 0; i < ACPI_S_STATE_COUNT; i++ )
-    {
-        if ( i == ACPI_STATE_S3 )
-        {
-            sleep_states[i] = 1;
-            printk(" S%d", i);
-        }
-        else
-            sleep_states[i] = 0;
-    }
-    printk("\n");
 
     return 0;
 }
