@@ -240,7 +240,6 @@ extern const struct hvm_function_table *start_vmx(void);
 int hvm_domain_initialise(struct domain *d);
 void hvm_domain_relinquish_resources(struct domain *d);
 void hvm_domain_destroy(struct domain *d);
-void hvm_domain_soft_reset(struct domain *d);
 
 int hvm_vcpu_initialise(struct vcpu *v);
 void hvm_vcpu_destroy(struct vcpu *v);

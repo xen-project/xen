@@ -5045,11 +5045,6 @@ void hvm_toggle_singlestep(struct vcpu *v)
     v->arch.hvm.single_step = !v->arch.hvm.single_step;
 }
 
-void hvm_domain_soft_reset(struct domain *d)
-{
-    hvm_destroy_all_ioreq_servers(d);
-}
-
 /*
  * Segment caches in VMCB/VMCS are inconsistent about which bits are checked,
  * important, and preserved across vmentry/exit.  Cook the values to make them

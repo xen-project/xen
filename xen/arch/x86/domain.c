@@ -713,8 +713,6 @@ int arch_domain_soft_reset(struct domain *d)
     if ( !is_hvm_domain(d) )
         return -EINVAL;
 
-    hvm_domain_soft_reset(d);
-
     spin_lock(&d->event_lock);
     for ( i = 0; i < d->nr_pirqs ; i++ )
     {
