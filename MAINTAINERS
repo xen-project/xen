@@ -97,6 +97,9 @@ Descriptions of section entries:
 	      matches patches or files that contain one or more of the words
 	      printk, pr_info or pr_err
 	   One regex pattern per line.  Multiple K: lines acceptable.
+	V: Version identifier that must be under THE REST and follows
+	   the format:
+	   xen-maintainers-<version format number of this file>
 
 
 The meaning of nesting:
@@ -539,3 +542,4 @@ L:	xen-devel@lists.xenproject.org
 S:	Supported
 F:	*
 F:	*/
+V:	xen-maintainers-1
