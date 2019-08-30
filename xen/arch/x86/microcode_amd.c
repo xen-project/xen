@@ -552,9 +552,12 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
         mc_old = mc_amd;
     }
 
-    xfree(mc_old->mpb);
-    xfree(mc_old->equiv_cpu_table);
-    xfree(mc_old);
+    if ( mc_old )
+    {
+        xfree(mc_old->mpb);
+        xfree(mc_old->equiv_cpu_table);
+        xfree(mc_old);
+    }
 
   out:
 #if CONFIG_HVM
