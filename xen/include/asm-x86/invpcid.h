@@ -5,11 +5,6 @@
 
 extern bool use_invpcid;
 
-#define INVPCID_TYPE_INDIV_ADDR      0
-#define INVPCID_TYPE_SINGLE_CTXT     1
-#define INVPCID_TYPE_ALL_INCL_GLOBAL 2
-#define INVPCID_TYPE_ALL_NON_GLOBAL  3
-
 #define INVPCID_OPCODE ".byte 0x66, 0x0f, 0x38, 0x82\n"
 #define MODRM_ECX_01   ".byte 0x01\n"
 
@@ -38,25 +33,25 @@ static inline void invpcid(unsigned int pcid, unsigned long addr,
 /* Flush all mappings for a given PCID and addr, not including globals */
 static inline void invpcid_flush_one(unsigned int pcid, unsigned long addr)
 {
-    invpcid(pcid, addr, INVPCID_TYPE_INDIV_ADDR);
+    invpcid(pcid, addr, X86_INVPCID_INDIV_ADDR);
 }
 
 /* Flush all mappings for a given PCID, not including globals */
 static inline void invpcid_flush_single_context(unsigned int pcid)
 {
-    invpcid(pcid, 0, INVPCID_TYPE_SINGLE_CTXT);
+    invpcid(pcid, 0, X86_INVPCID_SINGLE_CTXT);
 }
 
 /* Flush all mappings, including globals, for all PCIDs */
 static inline void invpcid_flush_all(void)
 {
-    invpcid(0, 0, INVPCID_TYPE_ALL_INCL_GLOBAL);
+    invpcid(0, 0, X86_INVPCID_ALL_INCL_GLOBAL);
 }
 
 /* Flush all mappings for all PCIDs, excluding globals */
 static inline void invpcid_flush_all_nonglobals(void)
 {
-    invpcid(0, 0, INVPCID_TYPE_ALL_NON_GLOBAL);
+    invpcid(0, 0, X86_INVPCID_ALL_NON_GLOBAL);
 }
 
 #endif	/* _ASM_X86_INVPCID_H_ */

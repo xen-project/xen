@@ -108,4 +108,12 @@
  */
 #define X86_DR7_DEFAULT         0x00000400  /* Default %dr7 value. */
 
+/*
+ * Invalidation types for the INVPCID instruction.
+ */
+#define X86_INVPCID_INDIV_ADDR      0
+#define X86_INVPCID_SINGLE_CTXT     1
+#define X86_INVPCID_ALL_INCL_GLOBAL 2
+#define X86_INVPCID_ALL_NON_GLOBAL  3
+
 #endif	/* __XEN_X86_DEFNS_H__ */
