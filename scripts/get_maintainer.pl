@@ -265,11 +265,6 @@ if ($email &&
     die "$P: Please select at least 1 email option\n";
 }
 
-if (!top_of_tree($xen_path)) {
-    die "$P: The current directory does not appear to be "
-	. "a Xen source tree.\n";
-}
-
 ## Read MAINTAINERS for type/value pairs
 
 my @typevalue = ();
@@ -311,6 +306,16 @@ while (<$maint>) {
 }
 close($maint);
 
+# Check whether we have a V entry under the REST
+# and use it to get the file's version number
+my $maintainers_file_version = get_xen_maintainers_file_version();
+if (!$maintainers_file_version) {
+    die "$P: the MAINTAINERS file ".
+         "in the current directory does not appear to be from ".
+         "the xen.git source tree or a sister tree.\n\n".
+         "A 'V: xen-maintainers-<version>' entry under THE REST ".
+         "is needed to identify a Xen MAINTAINERS file.\n\n";
+}
 
 #
 # Read mail address map
@@ -560,6 +565,31 @@ sub range_has_maintainer {
 		return 1;
 	    }
 	}
+    }
+    return 0;
+}
+
+sub get_xen_maintainers_file_version {
+    my $tvi = find_first_section();
+
+    while ($tvi < @typevalue) {
+        my $start = find_starting_index($tvi);
+        my $end = find_ending_index($tvi);
+        my $i;
+
+        for ($i = $start; $i < $end; $i++) {
+            my $line = $typevalue[$i];
+            if ($line =~ m/^V:\s*(.*)/) {
+                # Note that get_maintainer_role() requires processing
+                # of more of the file. So do it directly
+                if ($typevalue[$start] eq "THE REST") {
+                    if ($line =~ m/xen-maintainers-(.*)/) {
+                        return $1;
+                    }
+                }
+	    }
+        }
+        $tvi = $end + 1;
     }
     return 0;
 }
@@ -865,23 +895,6 @@ Notes:
       This file is prepended to any additional command line arguments.
       Multiple lines and # comments are allowed.
 EOT
-}
-
-sub top_of_tree {
-    my ($xen_path) = @_;
-
-    if ($xen_path ne "" && substr($xen_path,length($xen_path)-1,1) ne "/") {
-	$xen_path .= "/";
-    }
-    if (    (-f "${xen_path}COPYING")
-        && (-f "${xen_path}MAINTAINERS")
-        && (-f "${xen_path}Makefile")
-        && (-d "${xen_path}docs")
-        && (-f "${xen_path}CODING_STYLE")
-        && (-d "${xen_path}xen")) {
-	return 1;
-    }
-    return 0;
 }
 
 sub parse_email {
