@@ -105,7 +105,7 @@ int cpu_down(unsigned int cpu)
     if ( err )
         goto fail;
 
-    if ( unlikely(system_state < SYS_STATE_active) )
+    if ( system_state < SYS_STATE_active || system_state == SYS_STATE_resume )
         on_selected_cpus(cpumask_of(cpu), _take_cpu_down, NULL, true);
     else if ( (err = stop_machine_run(take_cpu_down, NULL, cpu)) < 0 )
         goto fail;
@@ -207,15 +207,19 @@ void enable_nonboot_cpus(void)
 
     printk("Enabling non-boot CPUs  ...\n");
 
-    for_each_cpu ( cpu, &frozen_cpus )
+    for_each_present_cpu ( cpu )
     {
+        if ( park_offline_cpus ? cpu == smp_processor_id()
+                               : !cpumask_test_cpu(cpu, &frozen_cpus) )
+            continue;
         if ( (error = cpu_up(cpu)) )
         {
             printk("Error bringing CPU%d up: %d\n", cpu, error);
             BUG_ON(error == -EBUSY);
         }
-        else
-            __cpumask_clear_cpu(cpu, &frozen_cpus);
+        else if ( !__cpumask_test_and_clear_cpu(cpu, &frozen_cpus) &&
+                  (error = cpu_down(cpu)) )
+            printk("Error re-offlining CPU%d: %d\n", cpu, error);
     }
 
     for_each_cpu ( cpu, &frozen_cpus )
