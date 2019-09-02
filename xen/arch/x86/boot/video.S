@@ -455,14 +455,17 @@ check_vesa:
         cmpb    $0x99, %al
         jnz     _setbad                 # Doh! No linear frame buffer.
 
+        pushw   %bx
         subb    $VIDEO_FIRST_VESA>>8, %bh
         orw     $0x4000, %bx            # Use linear frame buffer
         movw    $0x4f02, %ax            # VESA BIOS mode set call
         int     $0x10
+        popw    %bx
         cmpw    $0x004f, %ax            # AL=4f if implemented
         jnz     _setbad                 # AH=0 if OK
 
         movb    $1, bootsym(graphic_mode)  # flag graphic mode
+        movw    %bx, bootsym(video_mode)
         stc
         ret
 
