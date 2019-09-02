@@ -63,9 +63,9 @@ static struct heap_metadata *heap_metadata(struct timer **heap)
 }
 
 /* Sink down element @pos of @heap. */
-static void down_heap(struct timer **heap, int pos)
+static void down_heap(struct timer **heap, unsigned int pos)
 {
-    int sz = heap_metadata(heap)->size, nxt;
+    unsigned int sz = heap_metadata(heap)->size, nxt;
     struct timer *t = heap[pos];
 
     while ( (nxt = (pos << 1)) <= sz )
@@ -84,7 +84,7 @@ static void down_heap(struct timer **heap, int pos)
 }
 
 /* Float element @pos up @heap. */
-static void up_heap(struct timer **heap, int pos)
+static void up_heap(struct timer **heap, unsigned int pos)
 {
     struct timer *t = heap[pos];
 
@@ -103,8 +103,8 @@ static void up_heap(struct timer **heap, int pos)
 /* Delete @t from @heap. Return TRUE if new top of heap. */
 static int remove_from_heap(struct timer **heap, struct timer *t)
 {
-    int sz = heap_metadata(heap)->size;
-    int pos = t->heap_offset;
+    unsigned int sz = heap_metadata(heap)->size;
+    unsigned int pos = t->heap_offset;
 
     if ( unlikely(pos == sz) )
     {
@@ -130,7 +130,7 @@ static int remove_from_heap(struct timer **heap, struct timer *t)
 /* Add new entry @t to @heap. Return TRUE if new top of heap. */
 static int add_to_heap(struct timer **heap, struct timer *t)
 {
-    int sz = heap_metadata(heap)->size;
+    unsigned int sz = heap_metadata(heap)->size;
 
     /* Fail if the heap is full. */
     if ( unlikely(sz == heap_metadata(heap)->limit) )
@@ -462,9 +462,17 @@ static void timer_softirq_action(void)
     if ( unlikely(ts->list != NULL) )
     {
         /* old_limit == (2^n)-1; new_limit == (2^(n+4))-1 */
-        int old_limit = heap_metadata(heap)->limit;
-        int new_limit = ((old_limit + 1) << 4) - 1;
-        struct timer **newheap = xmalloc_array(struct timer *, new_limit + 1);
+        unsigned int old_limit = heap_metadata(heap)->limit;
+        unsigned int new_limit = ((old_limit + 1) << 4) - 1;
+        struct timer **newheap = NULL;
+
+        /* Don't grow the heap beyond what is representable in its metadata. */
+        if ( new_limit == (typeof(heap_metadata(heap)->limit))new_limit &&
+             new_limit + 1 )
+            newheap = xmalloc_array(struct timer *, new_limit + 1);
+        else
+            printk_once(XENLOG_WARNING "CPU%u: timer heap limit reached\n",
+                        smp_processor_id());
         if ( newheap != NULL )
         {
             spin_lock_irq(&ts->lock);
@@ -543,7 +551,7 @@ static void dump_timerq(unsigned char key)
     struct timers *ts;
     unsigned long  flags;
     s_time_t       now = NOW();
-    int            i, j;
+    unsigned int   i, j;
 
     printk("Dumping timer queues:\n");
 
@@ -555,7 +563,7 @@ static void dump_timerq(unsigned char key)
         spin_lock_irqsave(&ts->lock, flags);
         for ( j = 1; j <= heap_metadata(ts->heap)->size; j++ )
             dump_timer(ts->heap[j], now);
-        for ( t = ts->list, j = 0; t != NULL; t = t->list_next, j++ )
+        for ( t = ts->list; t != NULL; t = t->list_next )
             dump_timer(t, now);
         spin_unlock_irqrestore(&ts->lock, flags);
     }
