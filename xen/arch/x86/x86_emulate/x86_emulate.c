@@ -5933,8 +5933,11 @@ x86_emulate(
     case X86EMUL_OPC(0x0f, 0x08): /* invd */
     case X86EMUL_OPC(0x0f, 0x09): /* wbinvd */
         generate_exception_if(!mode_ring0(), EXC_GP, 0);
-        fail_if(ops->wbinvd == NULL);
-        if ( (rc = ops->wbinvd(ctxt)) != 0 )
+        fail_if(!ops->cache_op);
+        if ( (rc = ops->cache_op(b == 0x09 ? x86emul_wbinvd
+                                           : x86emul_invd,
+                                 x86_seg_none, 0,
+                                 ctxt)) != X86EMUL_OKAY )
             goto done;
         break;
 
@@ -7801,8 +7804,9 @@ x86_emulate(
             /* else clwb */
             fail_if(!vex.pfx);
             vcpu_must_have(clwb);
-            fail_if(!ops->wbinvd);
-            if ( (rc = ops->wbinvd(ctxt)) != X86EMUL_OKAY )
+            fail_if(!ops->cache_op);
+            if ( (rc = ops->cache_op(x86emul_clwb, ea.mem.seg, ea.mem.off,
+                                     ctxt)) != X86EMUL_OKAY )
                 goto done;
             break;
         case 7:
@@ -7818,8 +7822,11 @@ x86_emulate(
                 vcpu_must_have(clflush);
             else
                 vcpu_must_have(clflushopt);
-            fail_if(ops->wbinvd == NULL);
-            if ( (rc = ops->wbinvd(ctxt)) != 0 )
+            fail_if(!ops->cache_op);
+            if ( (rc = ops->cache_op(vex.pfx ? x86emul_clflushopt
+                                             : x86emul_clflush,
+                                     ea.mem.seg, ea.mem.off,
+                                     ctxt)) != X86EMUL_OKAY )
                 goto done;
             break;
         default:

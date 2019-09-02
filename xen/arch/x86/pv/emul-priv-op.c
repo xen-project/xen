@@ -1117,9 +1117,11 @@ static int write_msr(unsigned int reg, uint64_t val,
     return X86EMUL_UNHANDLEABLE;
 }
 
-/* Name it differently to avoid clashing with wbinvd() */
-static int _wbinvd(struct x86_emulate_ctxt *ctxt)
+static int cache_op(enum x86emul_cache_op op, enum x86_segment seg,
+                    unsigned long offset, struct x86_emulate_ctxt *ctxt)
 {
+    ASSERT(op == x86emul_wbinvd);
+
     /* Ignore the instruction if unprivileged. */
     if ( !cache_flush_permitted(current->domain) )
         /*
@@ -1237,7 +1239,7 @@ static const struct x86_emulate_ops priv_op_ops = {
     .read_msr            = read_msr,
     .write_msr           = write_msr,
     .cpuid               = x86emul_cpuid,
-    .wbinvd              = _wbinvd,
+    .cache_op            = cache_op,
 };
 
 int pv_emulate_privileged_op(struct cpu_user_regs *regs)

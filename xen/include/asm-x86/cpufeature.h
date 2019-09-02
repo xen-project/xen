@@ -102,6 +102,8 @@
 #define cpu_has_rdseed          boot_cpu_has(X86_FEATURE_RDSEED)
 #define cpu_has_smap            boot_cpu_has(X86_FEATURE_SMAP)
 #define cpu_has_avx512_ifma     boot_cpu_has(X86_FEATURE_AVX512_IFMA)
+#define cpu_has_clflushopt      boot_cpu_has(X86_FEATURE_CLFLUSHOPT)
+#define cpu_has_clwb            boot_cpu_has(X86_FEATURE_CLWB)
 #define cpu_has_avx512er        boot_cpu_has(X86_FEATURE_AVX512ER)
 #define cpu_has_avx512cd        boot_cpu_has(X86_FEATURE_AVX512CD)
 #define cpu_has_sha             boot_cpu_has(X86_FEATURE_SHA)

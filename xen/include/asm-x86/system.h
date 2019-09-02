@@ -21,6 +21,23 @@ static inline void clflush(const void *p)
     asm volatile ( "clflush %0" :: "m" (*(const char *)p) );
 }
 
+static inline void clflushopt(const void *p)
+{
+    asm volatile ( "data16 clflush %0" :: "m" (*(const char *)p) );
+}
+
+static inline void clwb(const void *p)
+{
+#if defined(HAVE_AS_CLWB)
+    asm volatile ( "clwb %0" :: "m" (*(const char *)p) );
+#elif defined(HAVE_AS_XSAVEOPT)
+    asm volatile ( "data16 xsaveopt %0" :: "m" (*(const char *)p) );
+#else
+    asm volatile ( ".byte 0x66, 0x0f, 0xae, 0x32"
+                   :: "d" (p), "m" (*(const char *)p) );
+#endif
+}
+
 #define xchg(ptr,v) \
     ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
 

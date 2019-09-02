@@ -176,6 +176,14 @@ enum x86_emulate_fpu_type {
     X86EMUL_FPU_none
 };
 
+enum x86emul_cache_op {
+    x86emul_clflush,
+    x86emul_clflushopt,
+    x86emul_clwb,
+    x86emul_invd,
+    x86emul_wbinvd,
+};
+
 struct x86_emulate_state;
 
 /*
@@ -452,8 +460,15 @@ struct x86_emulate_ops
         uint64_t val,
         struct x86_emulate_ctxt *ctxt);
 
-    /* wbinvd: Write-back and invalidate cache contents. */
-    int (*wbinvd)(
+    /*
+     * cache_op: Write-back and/or invalidate cache contents.
+     *
+     * @seg:@offset applicable only to some of enum x86emul_cache_op.
+     */
+    int (*cache_op)(
+        enum x86emul_cache_op op,
+        enum x86_segment seg,
+        unsigned long offset,
         struct x86_emulate_ctxt *ctxt);
 
     /* cpuid: Emulate CPUID via given set of EAX-EDX inputs/outputs. */

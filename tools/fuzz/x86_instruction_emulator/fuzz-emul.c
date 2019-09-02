@@ -382,10 +382,13 @@ static int fuzz_invlpg(
     return maybe_fail(ctxt, "invlpg", false);
 }
 
-static int fuzz_wbinvd(
+static int fuzz_cache_op(
+    enum x86emul_cache_op op,
+    enum x86_segment seg,
+    unsigned long offset,
     struct x86_emulate_ctxt *ctxt)
 {
-    return maybe_fail(ctxt, "wbinvd", true);
+    return maybe_fail(ctxt, "cache-management", true);
 }
 
 static int fuzz_write_io(
@@ -620,7 +623,7 @@ static const struct x86_emulate_ops all_fuzzer_ops = {
     SET(read_xcr),
     SET(read_msr),
     SET(write_msr),
-    SET(wbinvd),
+    SET(cache_op),
     SET(invlpg),
     .get_fpu    = emul_test_get_fpu,
     .put_fpu    = emul_test_put_fpu,
@@ -729,7 +732,7 @@ enum {
     HOOK_read_xcr,
     HOOK_read_msr,
     HOOK_write_msr,
-    HOOK_wbinvd,
+    HOOK_cache_op,
     HOOK_cpuid,
     HOOK_inject_hw_exception,
     HOOK_inject_sw_interrupt,
@@ -773,7 +776,7 @@ static void disable_hooks(struct x86_emulate_ctxt *ctxt)
     MAYBE_DISABLE_HOOK(read_xcr);
     MAYBE_DISABLE_HOOK(read_msr);
     MAYBE_DISABLE_HOOK(write_msr);
-    MAYBE_DISABLE_HOOK(wbinvd);
+    MAYBE_DISABLE_HOOK(cache_op);
     MAYBE_DISABLE_HOOK(cpuid);
     MAYBE_DISABLE_HOOK(get_fpu);
     MAYBE_DISABLE_HOOK(invlpg);

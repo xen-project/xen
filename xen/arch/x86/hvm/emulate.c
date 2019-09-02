@@ -25,6 +25,7 @@
 #include <asm/hvm/trace.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/svm.h>
+#include <asm/iocap.h>
 #include <asm/vm_event.h>
 
 static void hvmtrace_io_assist(const ioreq_t *p)
@@ -555,16 +556,12 @@ static void *hvmemul_map_linear_addr(
     mfn_t *mfn = &hvmemul_ctxt->mfn[0];
 
     /*
-     * The caller has no legitimate reason for trying a zero-byte write, but
-     * all other code here is written to work if the check below was dropped.
-     *
-     * The maximum write size depends on the number of adjacent mfns[] which
+     * The maximum access size depends on the number of adjacent mfns[] which
      * can be vmap()'d, accouting for possible misalignment within the region.
      * The higher level emulation callers are responsible for ensuring that
-     * mfns[] is large enough for the requested write size.
+     * mfns[] is large enough for the requested access size.
      */
-    if ( bytes == 0 ||
-         nr_frames > ARRAY_SIZE(hvmemul_ctxt->mfn) )
+    if ( nr_frames > ARRAY_SIZE(hvmemul_ctxt->mfn) )
     {
         ASSERT_UNREACHABLE();
         goto unhandleable;
@@ -668,8 +665,6 @@ static void hvmemul_unmap_linear_addr(
         (linear >> PAGE_SHIFT) + 1;
     unsigned int i;
     mfn_t *mfn = &hvmemul_ctxt->mfn[0];
-
-    ASSERT(bytes > 0);
 
     if ( nr_frames == 1 )
         unmap_domain_page(mapping);
@@ -1483,7 +1478,10 @@ static int hvmemul_write_msr_discard(
     return X86EMUL_OKAY;
 }
 
-static int hvmemul_wbinvd_discard(
+static int hvmemul_cache_op_discard(
+    enum x86emul_cache_op op,
+    enum x86_segment seg,
+    unsigned long offset,
     struct x86_emulate_ctxt *ctxt)
 {
     return X86EMUL_OKAY;
@@ -2159,10 +2157,65 @@ static int hvmemul_write_msr(
     return rc;
 }
 
-static int hvmemul_wbinvd(
+static int hvmemul_cache_op(
+    enum x86emul_cache_op op,
+    enum x86_segment seg,
+    unsigned long offset,
     struct x86_emulate_ctxt *ctxt)
 {
-    alternative_vcall(hvm_funcs.wbinvd_intercept);
+    struct hvm_emulate_ctxt *hvmemul_ctxt =
+        container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
+    uint32_t pfec = PFEC_page_present;
+
+    if ( !cache_flush_permitted(current->domain) )
+        return X86EMUL_OKAY;
+
+    switch ( op )
+    {
+        unsigned long addr;
+        int rc;
+        void *mapping;
+
+    case x86emul_clflush:
+    case x86emul_clflushopt:
+    case x86emul_clwb:
+        ASSERT(!is_x86_system_segment(seg));
+
+        rc = hvmemul_virtual_to_linear(seg, offset, 0, NULL,
+                                       hvm_access_read, hvmemul_ctxt, &addr);
+        if ( rc != X86EMUL_OKAY )
+            break;
+
+        if ( hvmemul_ctxt->seg_reg[x86_seg_ss].dpl == 3 )
+            pfec |= PFEC_user_mode;
+
+        mapping = hvmemul_map_linear_addr(addr, 0, pfec, hvmemul_ctxt);
+        if ( mapping == ERR_PTR(~X86EMUL_EXCEPTION) )
+            return X86EMUL_EXCEPTION;
+        if ( IS_ERR_OR_NULL(mapping) )
+            break;
+
+        if ( cpu_has_clflush )
+        {
+            if ( op == x86emul_clwb && cpu_has_clwb )
+                clwb(mapping);
+            else if ( op == x86emul_clflushopt && cpu_has_clflushopt )
+                clflushopt(mapping);
+            else
+                clflush(mapping);
+
+            hvmemul_unmap_linear_addr(mapping, addr, 0, hvmemul_ctxt);
+            break;
+        }
+
+        hvmemul_unmap_linear_addr(mapping, addr, 0, hvmemul_ctxt);
+        /* fall through */
+    case x86emul_invd:
+    case x86emul_wbinvd:
+        alternative_vcall(hvm_funcs.wbinvd_intercept);
+        break;
+    }
+
     return X86EMUL_OKAY;
 }
 
@@ -2363,7 +2416,7 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .write_xcr     = hvmemul_write_xcr,
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr,
-    .wbinvd        = hvmemul_wbinvd,
+    .cache_op      = hvmemul_cache_op,
     .cpuid         = x86emul_cpuid,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
@@ -2390,7 +2443,7 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .write_xcr     = hvmemul_write_xcr,
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr_discard,
-    .wbinvd        = hvmemul_wbinvd_discard,
+    .cache_op      = hvmemul_cache_op_discard,
     .cpuid         = x86emul_cpuid,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
