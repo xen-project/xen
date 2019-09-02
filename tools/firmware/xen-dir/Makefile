@@ -14,6 +14,26 @@ LINK_FILES=Config.mk
 DEP_DIRS=$(foreach i, $(LINK_DIRS), $(XEN_ROOT)/$(i))
 DEP_FILES=$(foreach i, $(LINK_FILES), $(XEN_ROOT)/$(i))
 
+# Exclude some intermediate files and final build products
+LINK_EXCLUDES := '*.[isoa]' '.*.d' '.*.d2' '.config'
+LINK_EXCLUDES += '*.map' 'xen' 'xen.gz' 'xen.efi' 'xen-syms'
+
+# This is all a giant mess and doesn't really work.
+#
+# The correct solution is to fix Xen to be able to do out-of-tree builds.
+#
+# Until that happens, we set up a linkfarm by iterating over the xen/ tree,
+# linking source files.  This is repeated each time we enter this directory,
+# which poses a problem for a two-step "make; make install" build process.
+#
+# Any time the list of files to link changes, we relink all files, then
+# distclean to take out not-easy-to-classify intermediate files.  This is to
+# support easy development of the shim, but has a side effect of clobbering
+# the already-built shim.
+#
+# $(LINK_EXCLUDES) should be set such that a parallel build of shim and xen/
+# doesn't cause a subsequent `make install` to decide to regenerate the
+# linkfarm.  This means that all final build artefacts must be excluded.
 linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 	mkdir -p $(D)
 	rm -f linkfarm.stamp.tmp
@@ -25,8 +45,7 @@ linkfarm.stamp: $(DEP_DIRS) $(DEP_FILES) FORCE
 			sed 's,^$(XEN_ROOT)/$(d)/,,g' | xargs mkdir -p .);) \
 	$(foreach d, $(LINK_DIRS), \
 		(cd $(XEN_ROOT); \
-		 find $(d) ! -type l -type f \
-		 $(addprefix ! -name , '*.[isoa]' '.*.d' '.*.d2')) \
+		 find $(d) ! -type l -type f $(addprefix ! -name ,$(LINK_EXCLUDES))) \
 		 >> linkfarm.stamp.tmp ; ) \
 	$(foreach f, $(LINK_FILES), \
 		echo $(f) >> linkfarm.stamp.tmp ;)
