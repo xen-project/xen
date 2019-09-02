@@ -82,10 +82,9 @@ bogus_real_magic:
 
         .align 4
 real_magic:     .long 0x12345678
-GLOBAL(video_mode)
-        .long 0
+video_mode:     .word 0
 GLOBAL(video_flags)
-        .long 0
+        .byte 0
 
         .code32
 
