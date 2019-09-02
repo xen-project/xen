@@ -176,6 +176,7 @@ start64:
 
         jmpq    *%rdi
 
+#include "video.h"
 #include "wakeup.S"
 
         .balign 8
@@ -281,8 +282,6 @@ trampoline_boot_cpu_entry:
 
         /* Jump to the common bootstrap entry point. */
         jmp     trampoline_protmode_entry
-
-#include "video.h"
 
         .align  2
 /* Keep in sync with cmdline.c:early_boot_opts_t type! */

@@ -384,9 +384,6 @@ lmbad:  leaw    bootsym(unknt), %si
         jmp     mode_menu
 lmdef:  ret
 
-_setrec:    jmp setrec                  # Ugly...
-_set_80x25: jmp set_80x25
-
 # Setting of user mode (AX=mode ID) => CF=success
 mode_set:
         movw    %ax, bootsym(boot_vid_mode)
@@ -396,7 +393,7 @@ mode_set:
         je      setvesabysize
 
         testb   $VIDEO_RECALC>>8, %ah
-        jnz     _setrec
+        jnz     setrec
 
         cmpb    $VIDEO_FIRST_SPECIAL>>8, %ah
         jz      setspc
@@ -421,7 +418,7 @@ setspc: xorb    %bh, %bh                # Set special mode
 
 setmenu:
         orb     %al, %al                # 80x25 is an exception
-        jz      _set_80x25
+        jz      set_80x25
         
         pushw   %bx                     # Set mode chosen from menu
         call    mode_table              # Build the mode table
@@ -441,35 +438,31 @@ check_vesa:
         cmpw    $0x004f, %ax
         jnz     setbad
 
-        leaw    vesa_mode_info, %di
-        subb    $VIDEO_FIRST_VESA>>8, %bh
-        movw    %bx, %cx                # Get mode information structure
+        leaw    vesa_mode_info, %di     # Get mode information structure
+        leaw    -VIDEO_FIRST_VESA(%bx), %cx
         movw    $0x4f01, %ax
         int     $0x10
-        addb    $VIDEO_FIRST_VESA>>8, %bh
         cmpw    $0x004f, %ax
         jnz     setbad
 
         movb    (%di), %al              # Check mode attributes.
         andb    $0x99, %al
         cmpb    $0x99, %al
-        jnz     _setbad                 # Doh! No linear frame buffer.
+        jnz     setbad                  # Doh! No linear frame buffer.
 
         pushw   %bx
         subb    $VIDEO_FIRST_VESA>>8, %bh
-        orw     $0x4000, %bx            # Use linear frame buffer
+        orb     $0x40, %bh              # Use linear frame buffer
         movw    $0x4f02, %ax            # VESA BIOS mode set call
         int     $0x10
         popw    %bx
         cmpw    $0x004f, %ax            # AL=4f if implemented
-        jnz     _setbad                 # AH=0 if OK
+        jnz     setbad                  # AH=0 if OK
 
         movb    $1, bootsym(graphic_mode)  # flag graphic mode
         movw    %bx, bootsym(video_mode)
         stc
         ret
-
-_setbad: jmp    setbad                  # Ugly...
 
 # Recalculate vertical display end registers -- this fixes various
 # inconsistencies of extended modes on many adapters. Called when
@@ -515,7 +508,7 @@ setvesabysize:
         leaw    modelist,%si
 1:      add     $8,%si
         cmpw    $ASK_VGA,-8(%si)        # End?
-        je      _setbad
+        je      setbad
         movw    -6(%si),%ax
         cmpw    %ax,bootsym(vesa_size)+0
         jne     1b
@@ -948,6 +941,7 @@ store_edid:
 #endif
         ret
 
+                .p2align 1
 mt_end:         .word   0       # End of video mode table if built
 edit_buf:       .space  6       # Line editor buffer
 card_name:      .word   0       # Pointer to adapter name
@@ -991,6 +985,7 @@ vesa_name:      .asciz  "VESA"
 
 name_bann:      .asciz  "Video adapter: "
 
+                .p2align 1
 force_size:     .word   0       # Use this size instead of the one in BIOS vars
 
 GLOBAL(boot_vid_info)

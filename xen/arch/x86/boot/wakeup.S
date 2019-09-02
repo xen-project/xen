@@ -30,7 +30,7 @@ ENTRY(wakeup_start)
         jne     bogus_real_magic
 
         # for acpi_sleep=s3_bios
-        testl   $1, wakesym(video_flags)
+        testb   $1, wakesym(video_flags)
         jz      1f
         lcall   $0xc000, $3
         movw    %cs, %ax        # In case messed by BIOS
@@ -38,9 +38,9 @@ ENTRY(wakeup_start)
         movw    %ax, %ss        # Need this? How to ret if clobbered?
 
 1:      # for acpi_sleep=s3_mode
-        testl   $2, wakesym(video_flags)
+        testb   $2, wakesym(video_flags)
         jz      1f
-        movl    wakesym(video_mode), %eax
+        movw    wakesym(video_mode), %ax
         call    mode_setw
 
 1:      # Show some progress if VGA is resumed
@@ -56,47 +56,25 @@ ENTRY(wakeup_start)
 
         ljmpl   $BOOT_CS32, $bootsym_rel(wakeup_32, 6)
 
-/* This code uses an extended set of video mode numbers. These include:
- * Aliases for standard modes
- *      NORMAL_VGA (-1)
- *      EXTENDED_VGA (-2)
- *      ASK_VGA (-3)
- * Video modes numbered by menu position -- NOT RECOMMENDED because of lack
- * of compatibility when extending the table. These are between 0x00 and 0xff.
- */
-#define VIDEO_FIRST_MENU 0x0000
-
-/* Standard BIOS video modes (BIOS number + 0x0100) */
-#define VIDEO_FIRST_BIOS 0x0100
-
-/* VESA BIOS video modes (VESA number + 0x0200) */
-#define VIDEO_FIRST_VESA 0x0200
-
-/* Video7 special modes (BIOS number + 0x0900) */
-#define VIDEO_FIRST_V7 0x0900
-
 # Setting of user mode (AX=mode ID) => CF=success
 mode_setw:
         movw    %ax, %bx
         cmpb    $VIDEO_FIRST_VESA>>8, %ah
         jnc     check_vesaw
-        decb    %ah
 
 setbadw: clc
         ret
 
 check_vesaw:
         subb    $VIDEO_FIRST_VESA>>8, %bh
-        orw     $0x4000, %bx                    # Use linear frame buffer
+        orb     $0x40, %bh                      # Use linear frame buffer
         movw    $0x4f02, %ax                    # VESA BIOS mode set call
         int     $0x10
         cmpw    $0x004f, %ax                    # AL=4f if implemented
-        jnz     _setbadw                        # AH=0 if OK
+        jnz     setbadw                         # AH=0 if OK
 
         stc
         ret
-
-_setbadw: jmp    setbadw
 
 bogus_real_magic:
         movw    $0x0e00 + 'B', %fs:(0x12)
