@@ -653,7 +653,7 @@ int paging_domain_init(struct domain *d)
     if ( hap_enabled(d) )
         hap_domain_init(d);
     else
-        rc = shadow_domain_init(d, d->options);
+        rc = shadow_domain_init(d);
 
     return rc;
 }

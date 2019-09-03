@@ -115,7 +115,6 @@ struct shadow_domain {
 
     /* OOS */
     bool_t oos_active;
-    bool_t oos_off;
 
     /* Has this domain ever used HVMOP_pagetable_dying? */
     bool_t pagetable_dying_op;

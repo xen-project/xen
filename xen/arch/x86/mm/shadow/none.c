@@ -18,7 +18,7 @@ static void _clean_dirty_bitmap(struct domain *d)
     ASSERT(is_pv_domain(d));
 }
 
-int shadow_domain_init(struct domain *d, unsigned int domcr_flags)
+int shadow_domain_init(struct domain *d)
 {
     static const struct log_dirty_ops sh_none_ops = {
         .enable  = _enable_log_dirty,

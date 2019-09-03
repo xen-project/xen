@@ -473,6 +473,13 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( !(config->flags & XEN_DOMCTL_CDF_hvm_guest) )
+        /*
+         * It is only meaningful for XEN_DOMCTL_CDF_oos_off to be clear
+         * for HVM guests.
+         */
+        config->flags |= XEN_DOMCTL_CDF_oos_off;
+
     return 0;
 }
 
