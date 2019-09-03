@@ -82,11 +82,7 @@ typedef struct xen_argo_ring
      * multiple of the message slot size.
      */
     uint8_t reserved[56];
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint8_t ring[];
-#elif defined(__GNUC__)
-    uint8_t ring[0];
-#endif
+    uint8_t ring[XEN_FLEX_ARRAY_DIM];
 } xen_argo_ring_t;
 
 typedef struct xen_argo_register_ring
@@ -136,11 +132,7 @@ typedef struct xen_argo_ring_data
 {
     uint32_t nent;
     uint32_t pad;
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    struct xen_argo_ring_data_ent data[];
-#elif defined(__GNUC__)
-    struct xen_argo_ring_data_ent data[0];
-#endif
+    struct xen_argo_ring_data_ent data[XEN_FLEX_ARRAY_DIM];
 } xen_argo_ring_data_t;
 
 struct xen_argo_ring_message_header
@@ -148,11 +140,7 @@ struct xen_argo_ring_message_header
     uint32_t len;
     struct xen_argo_addr source;
     uint32_t message_type;
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint8_t data[];
-#elif defined(__GNUC__)
-    uint8_t data[0];
-#endif
+    uint8_t data[XEN_FLEX_ARRAY_DIM];
 };
 
 /*

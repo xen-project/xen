@@ -41,4 +41,6 @@
 #error "These header files do not support the requested interface version."
 #endif
 
+#define COMPAT_FLEX_ARRAY_DIM XEN_FLEX_ARRAY_DIM
+
 #endif /* __XEN_PUBLIC_XEN_COMPAT_H__ */

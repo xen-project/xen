@@ -300,11 +300,7 @@ struct physdev_pci_device_add {
      * First element ([0]) is PXM domain associated with the device (if
      * XEN_PCI_DEV_PXM is set)
      */
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint32_t optarr[];
-#elif defined(__GNUC__)
-    uint32_t optarr[0];
-#endif
+    uint32_t optarr[XEN_FLEX_ARRAY_DIM];
 };
 typedef struct physdev_pci_device_add physdev_pci_device_add_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_add_t);
