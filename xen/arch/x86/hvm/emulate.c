@@ -2210,10 +2210,17 @@ static int hvmemul_cache_op(
 
         hvmemul_unmap_linear_addr(mapping, addr, 0, hvmemul_ctxt);
         /* fall through */
-    case x86emul_invd:
     case x86emul_wbinvd:
     case x86emul_wbnoinvd:
         alternative_vcall(hvm_funcs.wbinvd_intercept);
+        break;
+
+    case x86emul_invd:
+        /*
+         * Deliberately ignored: We mustn't issue INVD, and issuing WBINVD
+         * wouldn't match the request. And the only place we'd expect the insn
+         * to be sensibly used is in (virtualization unaware) firmware.
+         */
         break;
     }
 
