@@ -2212,6 +2212,7 @@ static int hvmemul_cache_op(
         /* fall through */
     case x86emul_invd:
     case x86emul_wbinvd:
+    case x86emul_wbnoinvd:
         alternative_vcall(hvm_funcs.wbinvd_intercept);
         break;
     }

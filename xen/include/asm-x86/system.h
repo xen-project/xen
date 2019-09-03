@@ -16,6 +16,11 @@ static inline void wbinvd(void)
     asm volatile ( "wbinvd" ::: "memory" );
 }
 
+static inline void wbnoinvd(void)
+{
+    asm volatile ( "repe; wbinvd" : : : "memory" );
+}
+
 static inline void clflush(const void *p)
 {
     asm volatile ( "clflush %0" :: "m" (*(const char *)p) );

@@ -146,6 +146,8 @@ static const char *const str_e8b[32] =
 {
     [ 0] = "clzero",
 
+    /* [ 8] */            [ 9] = "wbnoinvd",
+
     [12] = "ibpb",
 };
 

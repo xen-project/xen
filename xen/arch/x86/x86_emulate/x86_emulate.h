@@ -182,6 +182,7 @@ enum x86emul_cache_op {
     x86emul_clwb,
     x86emul_invd,
     x86emul_wbinvd,
+    x86emul_wbnoinvd,
 };
 
 struct x86_emulate_state;

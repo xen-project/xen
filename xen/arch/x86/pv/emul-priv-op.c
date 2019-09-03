@@ -1120,7 +1120,7 @@ static int write_msr(unsigned int reg, uint64_t val,
 static int cache_op(enum x86emul_cache_op op, enum x86_segment seg,
                     unsigned long offset, struct x86_emulate_ctxt *ctxt)
 {
-    ASSERT(op == x86emul_wbinvd);
+    ASSERT(op == x86emul_wbinvd || op == x86emul_wbnoinvd);
 
     /* Ignore the instruction if unprivileged. */
     if ( !cache_flush_permitted(current->domain) )
@@ -1129,6 +1129,8 @@ static int cache_op(enum x86emul_cache_op op, enum x86_segment seg,
          * newer linux uses this in some start-of-day timing loops.
          */
         ;
+    else if ( op == x86emul_wbnoinvd /* && cpu_has_wbnoinvd */ )
+        wbnoinvd();
     else
         wbinvd();
 
