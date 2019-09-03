@@ -684,6 +684,38 @@ static int read_msr(
     return X86EMUL_UNHANDLEABLE;
 }
 
+#define INVPCID_ADDR 0x12345678
+#define INVPCID_PCID 0x123
+
+static int read_cr_invpcid(
+    unsigned int reg,
+    unsigned long *val,
+    struct x86_emulate_ctxt *ctxt)
+{
+    int rc = emul_test_read_cr(reg, val, ctxt);
+
+    if ( rc == X86EMUL_OKAY && reg == 4 )
+        *val |= X86_CR4_PCIDE;
+
+    return rc;
+}
+
+static int tlb_op_invpcid(
+    enum x86emul_tlb_op op,
+    unsigned long addr,
+    unsigned long aux,
+    struct x86_emulate_ctxt *ctxt)
+{
+    static unsigned int seq;
+
+    if ( op != x86emul_invpcid || addr != INVPCID_ADDR ||
+         x86emul_invpcid_pcid(aux) != (seq < 4 ? 0 : INVPCID_PCID) ||
+         x86emul_invpcid_type(aux) != (seq++ & 3) )
+        return X86EMUL_UNHANDLEABLE;
+
+    return X86EMUL_OKAY;
+}
+
 static struct x86_emulate_ops emulops = {
     .read       = read,
     .insn_fetch = fetch,
@@ -4479,6 +4511,46 @@ int main(int argc, char **argv)
               "kmovw %%k0, %0" : "=g" (rc) : "m" (out) );
         if ( rc != 0xffff )
             goto fail;
+        printf("okay\n");
+    }
+    else
+        printf("skipped\n");
+
+    printf("%-40s", "Testing invpcid 16(%ecx),%%edx...");
+    if ( stack_exec )
+    {
+        decl_insn(invpcid);
+
+        asm volatile ( put_insn(invpcid, "invpcid 16(%0), %1")
+                       :: "c" (NULL), "d" (0L) );
+
+        res[4] = 0;
+        res[5] = 0;
+        res[6] = INVPCID_ADDR;
+        res[7] = 0;
+        regs.ecx = (unsigned long)res;
+        emulops.tlb_op = tlb_op_invpcid;
+
+        for ( ; ; )
+        {
+            for ( regs.edx = 0; regs.edx < 4; ++regs.edx )
+            {
+                set_insn(invpcid);
+                rc = x86_emulate(&ctxt, &emulops);
+                if ( rc != X86EMUL_OKAY || !check_eip(invpcid) )
+                    goto fail;
+            }
+
+            if ( ctxt.addr_size < 64 || res[4] == INVPCID_PCID )
+                break;
+
+            emulops.read_cr = read_cr_invpcid;
+            res[4] = INVPCID_PCID;
+        }
+
+        emulops.read_cr = emul_test_read_cr;
+        emulops.tlb_op = NULL;
+
         printf("okay\n");
     }
     else

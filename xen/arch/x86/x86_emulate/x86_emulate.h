@@ -188,7 +188,25 @@ enum x86emul_cache_op {
 enum x86emul_tlb_op {
     x86emul_invlpg,
     x86emul_invlpga,
+    x86emul_invpcid,
 };
+
+static inline unsigned int x86emul_invpcid_aux(unsigned int pcid,
+                                            unsigned int type)
+{
+    ASSERT(!(pcid & ~0xfff));
+    return (type << 12) | pcid;
+}
+
+static inline unsigned int x86emul_invpcid_pcid(unsigned int aux)
+{
+    return aux & 0xfff;
+}
+
+static inline unsigned int x86emul_invpcid_type(unsigned int aux)
+{
+    return aux >> 12;
+}
 
 struct x86_emulate_state;
 
@@ -483,6 +501,8 @@ struct x86_emulate_ops
      * @addr and @aux have @op-specific meaning:
      * - INVLPG:  @aux:@addr represent seg:offset
      * - INVLPGA: @addr is the linear address, @aux the ASID
+     * - INVPCID: @addr is the linear address, @aux the combination of
+     *            PCID and type (see x86emul_invpcid_*()).
      */
     int (*tlb_op)(
         enum x86emul_tlb_op op,

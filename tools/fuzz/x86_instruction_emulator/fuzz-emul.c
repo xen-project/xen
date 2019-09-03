@@ -382,6 +382,7 @@ static int fuzz_tlb_op(
         assert(is_x86_user_segment(aux));
         /* fall through */
     case x86emul_invlpga:
+    case x86emul_invpcid:
         assert(ctxt->addr_size == 64 || !(addr >> 32));
         break;
     }

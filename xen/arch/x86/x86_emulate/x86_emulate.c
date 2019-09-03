@@ -496,6 +496,7 @@ static const struct ext0f38_table {
     [0x7a ... 0x7c] = { .simd_size = simd_none, .two_op = 1 },
     [0x7d ... 0x7e] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x7f] = { .simd_size = simd_packed_fp, .d8s = d8s_vl },
+    [0x82] = { .simd_size = simd_other },
     [0x83] = { .simd_size = simd_packed_int, .d8s = d8s_vl },
     [0x88] = { .simd_size = simd_packed_fp, .two_op = 1, .d8s = d8s_dq },
     [0x89] = { .simd_size = simd_packed_int, .two_op = 1, .d8s = d8s_dq },
@@ -1875,6 +1876,7 @@ in_protmode(
 #define vcpu_has_hle()         (ctxt->cpuid->feat.hle)
 #define vcpu_has_avx2()        (ctxt->cpuid->feat.avx2)
 #define vcpu_has_bmi2()        (ctxt->cpuid->feat.bmi2)
+#define vcpu_has_invpcid()     (ctxt->cpuid->feat.invpcid)
 #define vcpu_has_rtm()         (ctxt->cpuid->feat.rtm)
 #define vcpu_has_mpx()         (ctxt->cpuid->feat.mpx)
 #define vcpu_has_avx512f()     (ctxt->cpuid->feat.avx512f)
@@ -9122,6 +9124,48 @@ x86_emulate(
 
         put_stub(stub);
         ASSERT(!state->simd_size);
+        break;
+
+    case X86EMUL_OPC_66(0x0f38, 0x82): /* invpcid reg,m128 */
+        vcpu_must_have(invpcid);
+        generate_exception_if(ea.type != OP_MEM, EXC_UD);
+        generate_exception_if(!mode_ring0(), EXC_GP, 0);
+
+        if ( (rc = ops->read(ea.mem.seg, ea.mem.off, mmvalp, 16,
+                             ctxt)) != X86EMUL_OKAY )
+            goto done;
+
+        generate_exception_if(mmvalp->xmm[0] & ~0xfff, EXC_GP, 0);
+        dst.val = mode_64bit() ? *dst.reg : (uint32_t)*dst.reg;
+
+        switch ( dst.val )
+        {
+        case X86_INVPCID_INDIV_ADDR:
+             generate_exception_if(!is_canonical_address(mmvalp->xmm[1]),
+                                   EXC_GP, 0);
+             /* fall through */
+        case X86_INVPCID_SINGLE_CTXT:
+             if ( !mode_64bit() || !ops->read_cr )
+                 cr4 = 0;
+             else if ( (rc = ops->read_cr(4, &cr4, ctxt)) != X86EMUL_OKAY )
+                 goto done;
+             generate_exception_if(!(cr4 & X86_CR4_PCIDE) && mmvalp->xmm[0],
+                                   EXC_GP, 0);
+             break;
+        case X86_INVPCID_ALL_INCL_GLOBAL:
+        case X86_INVPCID_ALL_NON_GLOBAL:
+             break;
+        default:
+             generate_exception(EXC_GP, 0);
+        }
+
+        fail_if(!ops->tlb_op);
+        if ( (rc = ops->tlb_op(x86emul_invpcid, truncate_ea(mmvalp->xmm[1]),
+                               x86emul_invpcid_aux(mmvalp->xmm[0], dst.val),
+                               ctxt)) != X86EMUL_OKAY )
+            goto done;
+
+        state->simd_size = simd_none;
         break;
 
     case X86EMUL_OPC_EVEX_66(0x0f38, 0x83): /* vpmultishiftqb [xyz]mm/mem,[xyz]mm,[xyz]mm{k} */

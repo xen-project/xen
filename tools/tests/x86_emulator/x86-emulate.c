@@ -72,6 +72,7 @@ bool emul_test_init(void)
      * them.
      */
     cp.basic.movbe = true;
+    cp.feat.invpcid = true;
     cp.feat.adx = true;
     cp.feat.avx512pf = cp.feat.avx512f;
     cp.feat.rdpid = true;
@@ -141,7 +142,7 @@ int emul_test_cpuid(
      */
     if ( leaf == 7 && subleaf == 0 )
     {
-        res->b |= 1U << 19;
+        res->b |= (1U << 10) | (1U << 19);
         if ( res->b & (1U << 16) )
             res->b |= 1U << 26;
         res->c |= 1U << 22;
