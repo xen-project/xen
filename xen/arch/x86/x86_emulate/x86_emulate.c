@@ -5590,10 +5590,9 @@ x86_emulate(
             generate_exception_if(!(msr_val & EFER_SVME) ||
                                   !in_protmode(ctxt, ops), EXC_UD);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
-            generate_exception_if(_regs.ecx, EXC_UD); /* TODO: Support ASIDs. */
-            fail_if(ops->invlpg == NULL);
-            if ( (rc = ops->invlpg(x86_seg_none, truncate_ea(_regs.r(ax)),
-                                   ctxt)) )
+            fail_if(!ops->tlb_op);
+            if ( (rc = ops->tlb_op(x86emul_invlpga, truncate_ea(_regs.r(ax)),
+                                   _regs.ecx, ctxt)) != X86EMUL_OKAY )
                 goto done;
             break;
 
@@ -5747,8 +5746,9 @@ x86_emulate(
         case GRP7_MEM(7): /* invlpg */
             ASSERT(ea.type == OP_MEM);
             generate_exception_if(!mode_ring0(), EXC_GP, 0);
-            fail_if(ops->invlpg == NULL);
-            if ( (rc = ops->invlpg(ea.mem.seg, ea.mem.off, ctxt)) )
+            fail_if(!ops->tlb_op);
+            if ( (rc = ops->tlb_op(x86emul_invlpg, ea.mem.off, ea.mem.seg,
+                                   ctxt)) != X86EMUL_OKAY )
                 goto done;
             break;
 

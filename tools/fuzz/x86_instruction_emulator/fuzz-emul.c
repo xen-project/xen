@@ -370,16 +370,23 @@ static int fuzz_cmpxchg(
     return maybe_fail(ctxt, "cmpxchg", true);
 }
 
-static int fuzz_invlpg(
-    enum x86_segment seg,
-    unsigned long offset,
+static int fuzz_tlb_op(
+    enum x86emul_tlb_op op,
+    unsigned long addr,
+    unsigned long aux,
     struct x86_emulate_ctxt *ctxt)
 {
-    /* invlpg(), unlike all other hooks, may be called with x86_seg_none. */
-    assert(is_x86_user_segment(seg) || seg == x86_seg_none);
-    assert(ctxt->addr_size == 64 || !(offset >> 32));
+    switch ( op )
+    {
+    case x86emul_invlpg:
+        assert(is_x86_user_segment(aux));
+        /* fall through */
+    case x86emul_invlpga:
+        assert(ctxt->addr_size == 64 || !(addr >> 32));
+        break;
+    }
 
-    return maybe_fail(ctxt, "invlpg", false);
+    return maybe_fail(ctxt, "TLB-management", false);
 }
 
 static int fuzz_cache_op(
@@ -624,7 +631,7 @@ static const struct x86_emulate_ops all_fuzzer_ops = {
     SET(read_msr),
     SET(write_msr),
     SET(cache_op),
-    SET(invlpg),
+    SET(tlb_op),
     .get_fpu    = emul_test_get_fpu,
     .put_fpu    = emul_test_put_fpu,
     .cpuid      = emul_test_cpuid,
@@ -733,12 +740,12 @@ enum {
     HOOK_read_msr,
     HOOK_write_msr,
     HOOK_cache_op,
+    HOOK_tlb_op,
     HOOK_cpuid,
     HOOK_inject_hw_exception,
     HOOK_inject_sw_interrupt,
     HOOK_get_fpu,
     HOOK_put_fpu,
-    HOOK_invlpg,
     HOOK_vmfunc,
     CANONICALIZE_rip,
     CANONICALIZE_rsp,
@@ -777,9 +784,9 @@ static void disable_hooks(struct x86_emulate_ctxt *ctxt)
     MAYBE_DISABLE_HOOK(read_msr);
     MAYBE_DISABLE_HOOK(write_msr);
     MAYBE_DISABLE_HOOK(cache_op);
+    MAYBE_DISABLE_HOOK(tlb_op);
     MAYBE_DISABLE_HOOK(cpuid);
     MAYBE_DISABLE_HOOK(get_fpu);
-    MAYBE_DISABLE_HOOK(invlpg);
 }
 
 /*

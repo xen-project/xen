@@ -2356,35 +2356,51 @@ static void hvmemul_put_fpu(
     }
 }
 
-static int hvmemul_invlpg(
-    enum x86_segment seg,
-    unsigned long offset,
+static int hvmemul_tlb_op(
+    enum x86emul_tlb_op op,
+    unsigned long addr,
+    unsigned long aux,
     struct x86_emulate_ctxt *ctxt)
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long addr;
-    int rc;
+    int rc = X86EMUL_OKAY;
 
-    rc = hvmemul_virtual_to_linear(
-        seg, offset, 1, NULL, hvm_access_none, hvmemul_ctxt, &addr);
-
-    if ( rc == X86EMUL_EXCEPTION )
+    switch ( op )
     {
-        /*
-         * `invlpg` takes segment bases into account, but is not subject to
-         * faults from segment type/limit checks, and is specified as a NOP
-         * when issued on non-canonical addresses.
-         *
-         * hvmemul_virtual_to_linear() raises exceptions for type/limit
-         * violations, so squash them.
-         */
-        x86_emul_reset_event(ctxt);
-        rc = X86EMUL_OKAY;
-    }
+    case x86emul_invlpg:
+        rc = hvmemul_virtual_to_linear(aux, addr, 1, NULL, hvm_access_none,
+                                       hvmemul_ctxt, &addr);
 
-    if ( rc == X86EMUL_OKAY )
-        paging_invlpg(current, addr);
+        if ( rc == X86EMUL_EXCEPTION )
+        {
+            /*
+             * `invlpg` takes segment bases into account, but is not subject
+             * to faults from segment type/limit checks, and is specified as
+             * a NOP when issued on non-canonical addresses.
+             *
+             * hvmemul_virtual_to_linear() raises exceptions for type/limit
+             * violations, so squash them.
+             */
+            x86_emul_reset_event(ctxt);
+            rc = X86EMUL_OKAY;
+        }
+
+        if ( rc == X86EMUL_OKAY )
+            paging_invlpg(current, addr);
+        break;
+
+    case x86emul_invlpga:
+        /* TODO: Support ASIDs. */
+        if ( !aux )
+            paging_invlpg(current, addr);
+        else
+        {
+            x86_emul_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC, ctxt);
+            rc = X86EMUL_EXCEPTION;
+        }
+        break;
+    }
 
     return rc;
 }
@@ -2425,10 +2441,10 @@ static const struct x86_emulate_ops hvm_emulate_ops = {
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr,
     .cache_op      = hvmemul_cache_op,
+    .tlb_op        = hvmemul_tlb_op,
     .cpuid         = x86emul_cpuid,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
-    .invlpg        = hvmemul_invlpg,
     .vmfunc        = hvmemul_vmfunc,
 };
 
@@ -2452,10 +2468,10 @@ static const struct x86_emulate_ops hvm_emulate_ops_no_write = {
     .read_msr      = hvmemul_read_msr,
     .write_msr     = hvmemul_write_msr_discard,
     .cache_op      = hvmemul_cache_op_discard,
+    .tlb_op        = hvmemul_tlb_op,
     .cpuid         = x86emul_cpuid,
     .get_fpu       = hvmemul_get_fpu,
     .put_fpu       = hvmemul_put_fpu,
-    .invlpg        = hvmemul_invlpg,
     .vmfunc        = hvmemul_vmfunc,
 };
 

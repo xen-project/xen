@@ -185,6 +185,11 @@ enum x86emul_cache_op {
     x86emul_wbnoinvd,
 };
 
+enum x86emul_tlb_op {
+    x86emul_invlpg,
+    x86emul_invlpga,
+};
+
 struct x86_emulate_state;
 
 /*
@@ -472,6 +477,19 @@ struct x86_emulate_ops
         unsigned long offset,
         struct x86_emulate_ctxt *ctxt);
 
+    /*
+     * tlb_op: Invalidate paging structures which map addressed byte.
+     *
+     * @addr and @aux have @op-specific meaning:
+     * - INVLPG:  @aux:@addr represent seg:offset
+     * - INVLPGA: @addr is the linear address, @aux the ASID
+     */
+    int (*tlb_op)(
+        enum x86emul_tlb_op op,
+        unsigned long addr,
+        unsigned long aux,
+        struct x86_emulate_ctxt *ctxt);
+
     /* cpuid: Emulate CPUID via given set of EAX-EDX inputs/outputs. */
     int (*cpuid)(
         uint32_t leaf,
@@ -498,12 +516,6 @@ struct x86_emulate_ops
         struct x86_emulate_ctxt *ctxt,
         enum x86_emulate_fpu_type backout,
         const struct x86_emul_fpu_aux *aux);
-
-    /* invlpg: Invalidate paging structures which map addressed byte. */
-    int (*invlpg)(
-        enum x86_segment seg,
-        unsigned long offset,
-        struct x86_emulate_ctxt *ctxt);
 
     /* vmfunc: Emulate VMFUNC via given set of EAX ECX inputs */
     int (*vmfunc)(
