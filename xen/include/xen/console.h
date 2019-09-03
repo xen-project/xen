@@ -46,6 +46,9 @@ void console_giveback(int id);
 int console_suspend(void);
 int console_resume(void);
 
+/* Emit a string via the serial console. */
+void console_serial_puts(const char *s, size_t nr);
+
 extern int8_t opt_console_xen;
 
 #endif /* __CONSOLE_H__ */

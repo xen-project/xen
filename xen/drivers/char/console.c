@@ -346,7 +346,7 @@ void console_giveback(int id)
         serial_steal_fn = NULL;
 }
 
-static void sercon_puts(const char *s, size_t nr)
+void console_serial_puts(const char *s, size_t nr)
 {
     if ( serial_steal_fn != NULL )
         serial_steal_fn(s, nr);
@@ -388,7 +388,7 @@ static void dump_console_ring_key(unsigned char key)
         c += len;
     }
 
-    sercon_puts(buf, sofar);
+    console_serial_puts(buf, sofar);
     video_puts(buf, sofar);
 
     free_xenheap_pages(buf, order);
@@ -547,7 +547,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
             /* Use direct console output as it could be interactive */
             spin_lock_irq(&console_lock);
 
-            sercon_puts(kbuf, kcount);
+            console_serial_puts(kbuf, kcount);
             video_puts(kbuf, kcount);
 
 #ifdef CONFIG_X86
@@ -674,7 +674,7 @@ static void __putstr(const char *str)
 
     ASSERT(spin_is_locked(&console_lock));
 
-    sercon_puts(str, len);
+    console_serial_puts(str, len);
     video_puts(str, len);
 
 #ifdef CONFIG_X86
@@ -1186,12 +1186,12 @@ static void debugtrace_dump_worker(void)
     /* Print oldest portion of the ring. */
     ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
     if ( debugtrace_buf[debugtrace_prd] != '\0' )
-        sercon_puts(&debugtrace_buf[debugtrace_prd],
-                    debugtrace_bytes - debugtrace_prd - 1);
+        console_serial_puts(&debugtrace_buf[debugtrace_prd],
+                            debugtrace_bytes - debugtrace_prd - 1);
 
     /* Print youngest portion of the ring. */
     debugtrace_buf[debugtrace_prd] = '\0';
-    sercon_puts(&debugtrace_buf[0], debugtrace_prd);
+    console_serial_puts(&debugtrace_buf[0], debugtrace_prd);
 
     memset(debugtrace_buf, '\0', debugtrace_bytes);
 
@@ -1274,8 +1274,8 @@ void debugtrace_printk(const char *fmt, ...)
     {
         unsigned int n = scnprintf(cntbuf, sizeof(cntbuf), "%u ", ++count);
 
-        serial_puts(sercon_handle, cntbuf, n);
-        serial_puts(sercon_handle, buf, nr);
+        console_serial_puts(cntbuf, n);
+        console_serial_puts(buf, nr);
     }
     else
     {
