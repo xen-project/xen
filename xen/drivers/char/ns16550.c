@@ -763,23 +763,16 @@ static void __init ns16550_init_postirq(struct serial_port *port)
 #ifdef CONFIG_HAS_PCI
     if ( uart->bar || uart->ps_bdf_enable )
     {
-        if ( !uart->param )
-            pci_hide_device(0, uart->ps_bdf[0], PCI_DEVFN(uart->ps_bdf[1],
-                            uart->ps_bdf[2]));
-        else
-        {
-            if ( uart->param->mmio &&
-                 rangeset_add_range(mmio_ro_ranges,
-                                    uart->io_base,
-                                    uart->io_base + uart->io_size - 1) )
-                printk(XENLOG_INFO "Error while adding MMIO range of device to mmio_ro_ranges\n");
+        if ( uart->param && uart->param->mmio &&
+             rangeset_add_range(mmio_ro_ranges, uart->io_base,
+                                uart->io_base + uart->io_size - 1) )
+            printk(XENLOG_INFO "Error while adding MMIO range of device to mmio_ro_ranges\n");
 
-            if ( pci_ro_device(0, uart->ps_bdf[0],
-                               PCI_DEVFN(uart->ps_bdf[1], uart->ps_bdf[2])) )
-                printk(XENLOG_INFO "Could not mark config space of %02x:%02x.%u read-only.\n",
-                                    uart->ps_bdf[0], uart->ps_bdf[1],
-                                    uart->ps_bdf[2]);
-        }
+        if ( pci_ro_device(0, uart->ps_bdf[0],
+                           PCI_DEVFN(uart->ps_bdf[1], uart->ps_bdf[2])) )
+            printk(XENLOG_INFO "Could not mark config space of %02x:%02x.%u read-only.\n",
+                   uart->ps_bdf[0], uart->ps_bdf[1],
+                   uart->ps_bdf[2]);
 
         if ( uart->msi )
         {
