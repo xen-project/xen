@@ -304,6 +304,11 @@ struct xen_hvm_altp2m_change_gfn {
 typedef struct xen_hvm_altp2m_change_gfn xen_hvm_altp2m_change_gfn_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_change_gfn_t);
 
+struct xen_hvm_altp2m_get_vcpu_p2m_idx {
+    uint32_t vcpu_id;
+    uint16_t altp2m_idx;
+};
+
 struct xen_hvm_altp2m_op {
     uint32_t version;   /* HVMOP_ALTP2M_INTERFACE_VERSION */
     uint32_t cmd;
@@ -332,6 +337,8 @@ struct xen_hvm_altp2m_op {
 #define HVMOP_altp2m_get_mem_access       12
 /* Disable altp2m event notifications for a given VCPU */
 #define HVMOP_altp2m_vcpu_disable_notify  13
+/* Get the active vcpu p2m index */
+#define HVMOP_altp2m_get_p2m_idx          14
     domid_t domain;
     uint16_t pad1;
     uint32_t pad2;
@@ -347,6 +354,7 @@ struct xen_hvm_altp2m_op {
         struct xen_hvm_altp2m_set_mem_access_multi set_mem_access_multi;
         struct xen_hvm_altp2m_suppress_ve          suppress_ve;
         struct xen_hvm_altp2m_vcpu_disable_notify  disable_notify;
+        struct xen_hvm_altp2m_get_vcpu_p2m_idx     get_vcpu_p2m_idx;
         uint8_t pad[64];
     } u;
 };

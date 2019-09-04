@@ -4500,6 +4500,7 @@ static int do_altp2m_op(
     case HVMOP_altp2m_set_mem_access_multi:
     case HVMOP_altp2m_get_mem_access:
     case HVMOP_altp2m_change_gfn:
+    case HVMOP_altp2m_get_p2m_idx:
         break;
 
     default:
@@ -4735,6 +4736,28 @@ static int do_altp2m_op(
                     _gfn(a.u.change_gfn.old_gfn),
                     _gfn(a.u.change_gfn.new_gfn));
         break;
+
+    case HVMOP_altp2m_get_p2m_idx:
+    {
+        struct vcpu *v;
+
+        if ( !altp2m_active(d) )
+        {
+            rc = -EOPNOTSUPP;
+            break;
+        }
+
+        if ( (v = domain_vcpu(d, a.u.get_vcpu_p2m_idx.vcpu_id)) == NULL )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        a.u.get_vcpu_p2m_idx.altp2m_idx = altp2m_vcpu_idx(v);
+        rc = __copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
+        break;
+    }
+
     default:
         ASSERT_UNREACHABLE();
     }

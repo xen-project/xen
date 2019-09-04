@@ -1937,6 +1937,8 @@ int xc_altp2m_get_mem_access(xc_interface *handle, uint32_t domid,
 int xc_altp2m_change_gfn(xc_interface *handle, uint32_t domid,
                          uint16_t view_id, xen_pfn_t old_gfn,
                          xen_pfn_t new_gfn);
+int xc_altp2m_get_vcpu_p2m_idx(xc_interface *handle, uint32_t domid,
+                               uint32_t vcpuid, uint16_t *p2midx);
 
 /** 
  * Mem paging operations.

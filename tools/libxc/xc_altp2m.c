@@ -352,3 +352,28 @@ int xc_altp2m_get_mem_access(xc_interface *handle, uint32_t domid,
     xc_hypercall_buffer_free(handle, arg);
     return rc;
 }
+
+int xc_altp2m_get_vcpu_p2m_idx(xc_interface *handle, uint32_t domid,
+                               uint32_t vcpuid, uint16_t *altp2m_idx)
+{
+    int rc;
+
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_altp2m_op_t, arg);
+
+    arg = xc_hypercall_buffer_alloc(handle, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_ALTP2M_INTERFACE_VERSION;
+    arg->cmd = HVMOP_altp2m_get_p2m_idx;
+    arg->domain = domid;
+    arg->u.get_vcpu_p2m_idx.vcpu_id = vcpuid;
+
+    rc = xencall2(handle->xcall, __HYPERVISOR_hvm_op, HVMOP_altp2m,
+                 HYPERCALL_BUFFER_AS_ARG(arg));
+    if ( !rc )
+        *altp2m_idx = arg->u.get_vcpu_p2m_idx.altp2m_idx;
+
+    xc_hypercall_buffer_free(handle, arg);
+    return rc;
+}
