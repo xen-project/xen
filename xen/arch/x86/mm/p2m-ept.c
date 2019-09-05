@@ -348,13 +348,19 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
  * present entries in the given page table, optionally marking the entries
  * also for their subtrees needing P2M type re-calculation.
  */
-static bool_t ept_invalidate_emt(struct p2m_domain *p2m, mfn_t mfn,
-                                 bool_t recalc, unsigned int parent_level)
+static bool ept_invalidate_emt_subtree(struct p2m_domain *p2m, mfn_t mfn,
+                                       bool recalc, unsigned int level)
 {
     int rc;
     ept_entry_t *epte = map_domain_page(mfn);
     unsigned int i;
-    bool_t changed = 0;
+    bool changed = false;
+
+    if ( !level )
+    {
+        ASSERT_UNREACHABLE();
+        return false;
+    }
 
     for ( i = 0; i < EPT_PAGETABLE_ENTRIES; i++ )
     {
@@ -367,9 +373,9 @@ static bool_t ept_invalidate_emt(struct p2m_domain *p2m, mfn_t mfn,
         e.emt = MTRR_NUM_TYPES;
         if ( recalc )
             e.recalc = 1;
-        rc = atomic_write_ept_entry(p2m, &epte[i], e, parent_level - 1);
+        rc = atomic_write_ept_entry(p2m, &epte[i], e, level - 1);
         ASSERT(rc == 0);
-        changed = 1;
+        changed = true;
     }
 
     unmap_domain_page(epte);
@@ -378,7 +384,7 @@ static bool_t ept_invalidate_emt(struct p2m_domain *p2m, mfn_t mfn,
 }
 
 /*
- * Just like ept_invalidate_emt() except that
+ * Just like ept_invalidate_emt_subtree() except that
  * - not all entries at the targeted level may need processing,
  * - the re-calculation flag gets always set.
  * The passed in range is guaranteed to not cross a page (table)
@@ -574,7 +580,7 @@ static int resolve_misconfig(struct p2m_domain *p2m, unsigned long gfn)
         if ( e.emt == MTRR_NUM_TYPES )
         {
             ASSERT(is_epte_present(&e));
-            ept_invalidate_emt(p2m, _mfn(e.mfn), e.recalc, level);
+            ept_invalidate_emt_subtree(p2m, _mfn(e.mfn), e.recalc, level);
             smp_wmb();
             e.emt = 0;
             e.recalc = 0;
@@ -1006,7 +1012,7 @@ static void ept_change_entry_type_global(struct p2m_domain *p2m,
     if ( !mfn )
         return;
 
-    if ( ept_invalidate_emt(p2m, _mfn(mfn), 1, p2m->ept.wl) )
+    if ( ept_invalidate_emt_subtree(p2m, _mfn(mfn), 1, p2m->ept.wl) )
         ept_sync_domain(p2m);
 }
 
@@ -1064,7 +1070,7 @@ static void ept_memory_type_changed(struct p2m_domain *p2m)
     if ( !mfn )
         return;
 
-    if ( ept_invalidate_emt(p2m, _mfn(mfn), 0, p2m->ept.wl) )
+    if ( ept_invalidate_emt_subtree(p2m, _mfn(mfn), 0, p2m->ept.wl) )
         ept_sync_domain(p2m);
 }
 
