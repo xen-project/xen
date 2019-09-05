@@ -42,15 +42,16 @@ static void test_vendor_identification(void)
         };
         unsigned int vendor;
     } tests[] = {
+        /* The 1st entry should remain here to work around gcc bug 91667. */
+        { { ""             }, X86_VENDOR_UNKNOWN },
+        { { "            " }, X86_VENDOR_UNKNOWN },
+        { { "xxxxxxxxxxxx" }, X86_VENDOR_UNKNOWN },
+
         { { "GenuineIntel" }, X86_VENDOR_INTEL },
         { { "AuthenticAMD" }, X86_VENDOR_AMD },
         { { "CentaurHauls" }, X86_VENDOR_CENTAUR },
         { { "  Shanghai  " }, X86_VENDOR_SHANGHAI },
         { { "HygonGenuine" }, X86_VENDOR_HYGON },
-
-        { { ""             }, X86_VENDOR_UNKNOWN },
-        { { "            " }, X86_VENDOR_UNKNOWN },
-        { { "xxxxxxxxxxxx" }, X86_VENDOR_UNKNOWN },
     };
 
     printf("Testing CPU vendor identification:\n");
