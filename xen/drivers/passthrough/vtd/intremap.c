@@ -760,7 +760,6 @@ int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)
 
 int enable_intremap(struct iommu *iommu, int eim)
 {
-    struct acpi_drhd_unit *drhd;
     struct ir_ctrl *ir_ctrl;
     u32 sts, gcmd;
     unsigned long flags;
@@ -796,8 +795,8 @@ int enable_intremap(struct iommu *iommu, int eim)
 
     if ( ir_ctrl->iremap_maddr == 0 )
     {
-        drhd = iommu_to_drhd(iommu);
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(drhd, IREMAP_ARCH_PAGE_NR);
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(iommu->intel->drhd,
+                                                    IREMAP_ARCH_PAGE_NR);
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

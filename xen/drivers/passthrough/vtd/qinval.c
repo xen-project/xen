@@ -397,7 +397,6 @@ static int __must_check flush_iotlb_qi(void *_iommu, u16 did, u64 addr,
 
 int enable_qinval(struct iommu *iommu)
 {
-    struct acpi_drhd_unit *drhd;
     struct qi_ctrl *qi_ctrl;
     struct iommu_flush *flush;
     u32 sts;
@@ -416,8 +415,8 @@ int enable_qinval(struct iommu *iommu)
 
     if ( qi_ctrl->qinval_maddr == 0 )
     {
-        drhd = iommu_to_drhd(iommu);
-        qi_ctrl->qinval_maddr = alloc_pgtable_maddr(drhd, QINVAL_ARCH_PAGE_NR);
+        qi_ctrl->qinval_maddr = alloc_pgtable_maddr(iommu->intel->drhd,
+                                                    QINVAL_ARCH_PAGE_NR);
         if ( qi_ctrl->qinval_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

@@ -128,7 +128,7 @@ static int acpi_ioapic_device_match(
     return 0;
 }
 
-struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id)
+struct acpi_drhd_unit *ioapic_to_drhd(unsigned int apic_id)
 {
     struct acpi_drhd_unit *drhd;
     list_for_each_entry( drhd, &acpi_drhd_units, list )
@@ -137,21 +137,7 @@ struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id)
     return NULL;
 }
 
-struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu)
-{
-    struct acpi_drhd_unit *drhd;
-
-    if ( iommu == NULL )
-        return NULL;
-
-    list_for_each_entry( drhd, &acpi_drhd_units, list )
-        if ( drhd->iommu == iommu )
-            return drhd;
-
-    return NULL;
-}
-
-struct iommu * ioapic_to_iommu(unsigned int apic_id)
+struct iommu *ioapic_to_iommu(unsigned int apic_id)
 {
     struct acpi_drhd_unit *drhd;
 
@@ -265,7 +251,7 @@ struct acpi_atsr_unit *acpi_find_matched_atsr_unit(const struct pci_dev *pdev)
     return all_ports;
 }
 
-struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd)
+struct acpi_rhsa_unit *drhd_to_rhsa(const struct acpi_drhd_unit *drhd)
 {
     struct acpi_rhsa_unit *rhsa;
 

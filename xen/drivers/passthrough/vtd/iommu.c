@@ -224,7 +224,6 @@ void free_pgtable_maddr(u64 maddr)
 /* context entry handling */
 static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
 {
-    struct acpi_drhd_unit *drhd;
     struct root_entry *root, *root_entries;
     u64 maddr;
 
@@ -233,8 +232,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
     root = &root_entries[bus];
     if ( !root_present(*root) )
     {
-        drhd = iommu_to_drhd(iommu);
-        maddr = alloc_pgtable_maddr(drhd, 1);
+        maddr = alloc_pgtable_maddr(iommu->intel->drhd, 1);
         if ( maddr == 0 )
         {
             unmap_vtd_domain_page(root_entries);
