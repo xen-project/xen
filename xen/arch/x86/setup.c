@@ -3,7 +3,6 @@
 #include <xen/err.h>
 #include <xen/grant_table.h>
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/domain.h>
 #include <xen/serial.h>
 #include <xen/softirq.h>

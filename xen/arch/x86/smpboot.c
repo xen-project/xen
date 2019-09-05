@@ -25,7 +25,6 @@
 #include <xen/domain.h>
 #include <xen/domain_page.h>
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/irq.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>

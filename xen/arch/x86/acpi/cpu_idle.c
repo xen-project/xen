@@ -38,7 +38,6 @@
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
 #include <xen/trace.h>
-#include <xen/sched-if.h>
 #include <xen/irq.h>
 #include <asm/cache.h>
 #include <asm/io.h>

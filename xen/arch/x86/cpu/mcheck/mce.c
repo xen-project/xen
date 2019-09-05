@@ -10,7 +10,6 @@
 #include <xen/errno.h>
 #include <xen/console.h>
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/cpumask.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
