@@ -184,17 +184,11 @@ void iommu_flush_cache_page(void *addr, unsigned long npages)
 }
 
 /* Allocate page table, return its machine address */
-u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
+uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node)
 {
-    struct acpi_rhsa_unit *rhsa;
     struct page_info *pg, *cur_pg;
     u64 *vaddr;
-    nodeid_t node = NUMA_NO_NODE;
     unsigned int i;
-
-    rhsa = drhd_to_rhsa(drhd);
-    if ( rhsa )
-        node =  pxm_to_node(rhsa->proximity_domain);
 
     pg = alloc_domheap_pages(NULL, get_order_from_pages(npages),
                              (node == NUMA_NO_NODE) ? 0 : MEMF_node(node));
@@ -232,7 +226,7 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
     root = &root_entries[bus];
     if ( !root_present(*root) )
     {
-        maddr = alloc_pgtable_maddr(iommu->intel->drhd, 1);
+        maddr = alloc_pgtable_maddr(1, iommu->node);
         if ( maddr == 0 )
         {
             unmap_vtd_domain_page(root_entries);
@@ -249,8 +243,6 @@ static u64 bus_to_context_maddr(struct iommu *iommu, u8 bus)
 
 static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 {
-    struct acpi_drhd_unit *drhd;
-    struct pci_dev *pdev;
     struct domain_iommu *hd = dom_iommu(domain);
     int addr_width = agaw_to_width(hd->arch.agaw);
     struct dma_pte *parent, *pte = NULL;
@@ -260,17 +252,10 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
 
     addr &= (((u64)1) << addr_width) - 1;
     ASSERT(spin_is_locked(&hd->arch.mapping_lock));
-    if ( hd->arch.pgd_maddr == 0 )
-    {
-        /*
-         * just get any passthrough device in the domainr - assume user
-         * assigns only devices from same node to a given guest.
-         */
-        pdev = pci_get_pdev_by_domain(domain, -1, -1, -1);
-        drhd = acpi_find_matched_drhd_unit(pdev);
-        if ( !alloc || ((hd->arch.pgd_maddr = alloc_pgtable_maddr(drhd, 1)) == 0) )
-            goto out;
-    }
+    if ( !hd->arch.pgd_maddr &&
+         (!alloc ||
+          ((hd->arch.pgd_maddr = alloc_pgtable_maddr(1, hd->node)) == 0)) )
+        goto out;
 
     parent = (struct dma_pte *)map_vtd_domain_page(hd->arch.pgd_maddr);
     while ( level > 1 )
@@ -284,9 +269,7 @@ static u64 addr_to_dma_page_maddr(struct domain *domain, u64 addr, int alloc)
             if ( !alloc )
                 break;
 
-            pdev = pci_get_pdev_by_domain(domain, -1, -1, -1);
-            drhd = acpi_find_matched_drhd_unit(pdev);
-            pte_maddr = alloc_pgtable_maddr(drhd, 1);
+            pte_maddr = alloc_pgtable_maddr(1, hd->node);
             if ( !pte_maddr )
                 break;
 
@@ -1181,6 +1164,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
 
     iommu->msi.irq = -1; /* No irq assigned yet. */
+    iommu->node = NUMA_NO_NODE;
     INIT_LIST_HEAD(&iommu->ats_devices);
 
     iommu->intel = alloc_intel_iommu();
@@ -1191,9 +1175,6 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     }
     iommu->intel->drhd = drhd;
     drhd->iommu = iommu;
-
-    if ( !(iommu->root_maddr = alloc_pgtable_maddr(drhd, 1)) )
-        return -ENOMEM;
 
     iommu->reg = ioremap(drhd->address, PAGE_SIZE);
     if ( !iommu->reg )
@@ -1487,6 +1468,17 @@ static int domain_context_mapping(struct domain *domain, u8 devfn,
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
         return -ENODEV;
+
+    /*
+     * Generally we assume only devices from one node to get assigned to a
+     * given guest.  But even if not, by replacing the prior value here we
+     * guarantee that at least some basic allocations for the device being
+     * added will get done against its node.  Any further allocations for
+     * this or other devices may be penalized then, but some would also be
+     * if we left other than NUMA_NO_NODE untouched here.
+     */
+    if ( drhd->iommu->node != NUMA_NO_NODE )
+        dom_iommu(domain)->node = drhd->iommu->node;
 
     ASSERT(pcidevs_locked());
 

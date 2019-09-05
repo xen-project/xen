@@ -542,6 +542,7 @@ struct iommu {
     spinlock_t lock; /* protect context, domain ids */
     spinlock_t register_lock; /* protect iommu register handling */
     u64 root_maddr; /* root entry machine address */
+    nodeid_t node;
     struct msi_desc msi;
     struct intel_iommu *intel;
     struct list_head ats_devices;

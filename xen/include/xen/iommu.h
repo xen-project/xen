@@ -266,6 +266,11 @@ struct domain_iommu {
     struct list_head dt_devices;
 #endif
 
+#ifdef CONFIG_NUMA
+    /* NUMA node to do IOMMU related allocations against. */
+    nodeid_t node;
+#endif
+
     /* Features supported by the IOMMU */
     DECLARE_BITMAP(features, IOMMU_FEAT_count);
 

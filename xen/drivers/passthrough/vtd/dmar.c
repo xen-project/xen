@@ -965,6 +965,7 @@ int __init acpi_dmar_init(void)
 {
     acpi_physical_address dmar_addr;
     acpi_native_uint dmar_len;
+    const struct acpi_drhd_unit *drhd;
     int ret;
 
     if ( ACPI_SUCCESS(acpi_get_table_phys(ACPI_SIG_DMAR, 0,
@@ -977,6 +978,21 @@ int __init acpi_dmar_init(void)
     }
 
     ret = parse_dmar_table(acpi_parse_dmar);
+
+    for_each_drhd_unit ( drhd )
+    {
+        const struct acpi_rhsa_unit *rhsa = drhd_to_rhsa(drhd);
+        struct iommu *iommu = drhd->iommu;
+
+        if ( ret )
+            break;
+
+        if ( rhsa )
+            iommu->node = pxm_to_node(rhsa->proximity_domain);
+
+        if ( !(iommu->root_maddr = alloc_pgtable_maddr(1, iommu->node)) )
+            ret = -ENOMEM;
+    }
 
     if ( !ret )
     {

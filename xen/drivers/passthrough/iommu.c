@@ -151,6 +151,10 @@ int iommu_domain_init(struct domain *d)
     struct domain_iommu *hd = dom_iommu(d);
     int ret = 0;
 
+#ifdef CONFIG_NUMA
+    hd->node = NUMA_NO_NODE;
+#endif
+
     ret = arch_iommu_domain_init(d);
     if ( ret )
         return ret;

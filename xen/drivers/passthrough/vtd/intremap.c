@@ -795,8 +795,8 @@ int enable_intremap(struct iommu *iommu, int eim)
 
     if ( ir_ctrl->iremap_maddr == 0 )
     {
-        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(iommu->intel->drhd,
-                                                    IREMAP_ARCH_PAGE_NR);
+        ir_ctrl->iremap_maddr = alloc_pgtable_maddr(IREMAP_ARCH_PAGE_NR,
+                                                    iommu->node);
         if ( ir_ctrl->iremap_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

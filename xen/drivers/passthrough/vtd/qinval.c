@@ -415,8 +415,8 @@ int enable_qinval(struct iommu *iommu)
 
     if ( qi_ctrl->qinval_maddr == 0 )
     {
-        qi_ctrl->qinval_maddr = alloc_pgtable_maddr(iommu->intel->drhd,
-                                                    QINVAL_ARCH_PAGE_NR);
+        qi_ctrl->qinval_maddr = alloc_pgtable_maddr(QINVAL_ARCH_PAGE_NR,
+                                                    iommu->node);
         if ( qi_ctrl->qinval_maddr == 0 )
         {
             dprintk(XENLOG_WARNING VTDPREFIX,

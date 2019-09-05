@@ -73,7 +73,7 @@ unsigned int get_cache_line_size(void);
 void cacheline_flush(char *);
 void flush_all_cache(void);
 
-u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages);
+uint64_t alloc_pgtable_maddr(unsigned long npages, nodeid_t node);
 void free_pgtable_maddr(u64 maddr);
 void *map_vtd_domain_page(u64 maddr);
 void unmap_vtd_domain_page(void *va);
