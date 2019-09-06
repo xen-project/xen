@@ -212,6 +212,10 @@ void clear_local_APIC(void)
         apic_write(APIC_LVTTHMR, APIC_LVT_MASKED);
     if (maxlvt >= 6)
         apic_write(APIC_CMCI, APIC_LVT_MASKED);
+    if (!x2apic_enabled) {
+        v = apic_read(APIC_LDR) & ~APIC_LDR_MASK;
+        apic_write(APIC_LDR, v);
+    }
 
     if (maxlvt > 3)        /* Due to Pentium errata 3AP and 11AP. */
         apic_write(APIC_ESR, 0);
