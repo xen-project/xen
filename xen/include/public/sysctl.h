@@ -81,13 +81,13 @@ struct xen_sysctl_tbuf_op {
  * Get physical information about the host machine
  */
 /* XEN_SYSCTL_physinfo */
- /* (x86) The platform supports HVM guests. */
+ /* The platform supports HVM guests. */
 #define _XEN_SYSCTL_PHYSCAP_hvm          0
 #define XEN_SYSCTL_PHYSCAP_hvm           (1u<<_XEN_SYSCTL_PHYSCAP_hvm)
- /* (x86) The platform supports PV guests. */
+ /* The platform supports PV guests. */
 #define _XEN_SYSCTL_PHYSCAP_pv           1
 #define XEN_SYSCTL_PHYSCAP_pv            (1u<<_XEN_SYSCTL_PHYSCAP_pv)
- /* (x86) The platform supports direct access to I/O devices with IOMMU. */
+ /* The platform supports direct access to I/O devices with IOMMU. */
 #define _XEN_SYSCTL_PHYSCAP_directio     2
 #define XEN_SYSCTL_PHYSCAP_directio  (1u<<_XEN_SYSCTL_PHYSCAP_directio)
 struct xen_sysctl_physinfo {

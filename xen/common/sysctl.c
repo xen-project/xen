@@ -267,6 +267,8 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         pi->cpu_khz = cpu_khz;
         pi->max_mfn = get_upper_mfn_bound();
         arch_do_physinfo(pi);
+        if ( iommu_enabled )
+            pi->capabilities |= XEN_SYSCTL_PHYSCAP_directio;
 
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
