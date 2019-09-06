@@ -51,7 +51,6 @@ bool __read_mostly lmce_support;
 #define INTEL_SRAR_DATA_LOAD	0x134
 #define INTEL_SRAR_INSTR_FETCH	0x150
 
-#ifdef CONFIG_X86_MCE_THERMAL
 #define MCE_RING                0x1
 static DEFINE_PER_CPU(int, last_state);
 
@@ -174,9 +173,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     if ( opt_cpu_info )
         printk(KERN_INFO "CPU%u: Thermal monitoring enabled (%s)\n",
                cpu, tm2 ? "TM2" : "TM1");
-    return;
 }
-#endif /* CONFIG_X86_MCE_THERMAL */
 
 /* Intel MCE handler */
 static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
@@ -941,9 +938,8 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     intel_init_mce();
 
     intel_init_cmci(c);
-#ifdef CONFIG_X86_MCE_THERMAL
+
     intel_init_thermal(c);
-#endif
 
     return mcheck_intel;
 }

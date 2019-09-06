@@ -189,19 +189,15 @@ void clear_local_APIC(void)
         v = apic_read(APIC_LVTPC);
         apic_write(APIC_LVTPC, v | APIC_LVT_MASKED);
     }
-
-/* lets not touch this if we didn't frob it */
-#ifdef CONFIG_X86_MCE_THERMAL
     if (maxlvt >= 5) {
         v = apic_read(APIC_LVTTHMR);
         apic_write(APIC_LVTTHMR, v | APIC_LVT_MASKED);
     }
-#endif
-
     if (maxlvt >= 6) {
         v = apic_read(APIC_CMCI);
         apic_write(APIC_CMCI, v | APIC_LVT_MASKED);
     }
+
     /*
      * Clean APIC state for other OSs:
      */
@@ -212,11 +208,8 @@ void clear_local_APIC(void)
         apic_write(APIC_LVTERR, APIC_LVT_MASKED);
     if (maxlvt >= 4)
         apic_write(APIC_LVTPC, APIC_LVT_MASKED);
-
-#ifdef CONFIG_X86_MCE_THERMAL
     if (maxlvt >= 5)
         apic_write(APIC_LVTTHMR, APIC_LVT_MASKED);
-#endif
     if (maxlvt >= 6)
         apic_write(APIC_CMCI, APIC_LVT_MASKED);
 
