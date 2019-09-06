@@ -962,6 +962,7 @@ static const struct x86_cpu_id intel_idle_ids[] __initconstrel = {
 	ICPU(0x5c, bxt),
 	ICPU(0x7a, bxt),
 	ICPU(0x5f, dnv),
+	ICPU(0x86, dnv),
 	{}
 };
 
