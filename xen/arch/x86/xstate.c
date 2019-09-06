@@ -576,7 +576,11 @@ unsigned int xstate_ctxt_size(u64 xcr0)
 /* Collect the information of processor's extended state */
 void xstate_init(struct cpuinfo_x86 *c)
 {
-    static bool __initdata use_xsave = true;
+    /*
+     * NB: use_xsave cannot live in initdata because llvm might optimize
+     * reading it, see: https://bugs.llvm.org/show_bug.cgi?id=39707
+     */
+    static bool __read_mostly use_xsave = true;
     boolean_param("xsave", use_xsave);
 
     bool bsp = c == &boot_cpu_data;
