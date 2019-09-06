@@ -218,11 +218,16 @@ static int update_domain_cpuid_info(struct domain *d,
         if ( is_pv_domain(d) && ((levelling_caps & LCAP_7ab0) == LCAP_7ab0) )
         {
             uint64_t mask = cpuidmask_defaults._7ab0;
-            uint32_t eax = ctl->eax;
-            uint32_t ebx = p->feat._7b0;
 
-            if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
-                mask &= ((uint64_t)eax << 32) | ebx;
+            /*
+             * Leaf 7[0].eax is max_subleaf, not a feature mask.  Take it
+             * wholesale from the policy, but clamp the features in 7[0].ebx
+             * per usual.
+             */
+            if ( boot_cpu_data.x86_vendor &
+                 (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
+                mask = (((uint64_t)p->feat.max_subleaf << 32) |
+                        ((uint32_t)mask & p->feat._7b0));
 
             d->arch.pv.cpuidmasks->_7ab0 = mask;
         }
