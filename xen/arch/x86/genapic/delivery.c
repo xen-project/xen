@@ -40,11 +40,7 @@ unsigned int cpu_mask_to_apicid_flat(const cpumask_t *cpumask)
 
 void init_apic_ldr_phys(void)
 {
-	unsigned long val;
-	apic_write(APIC_DFR, APIC_DFR_FLAT);
-	/* A dummy logical ID should be fine. We only deliver in phys mode. */
-	val = apic_read(APIC_LDR) & ~APIC_LDR_MASK;
-	apic_write(APIC_LDR, val);
+	/* We only deliver in phys mode - no setup needed. */
 }
 
 void __init clustered_apic_check_phys(void)

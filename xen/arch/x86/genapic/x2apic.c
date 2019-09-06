@@ -38,10 +38,6 @@ static inline u32 x2apic_cluster(unsigned int cpu)
     return per_cpu(cpu_2_logical_apicid, cpu) >> 16;
 }
 
-static void init_apic_ldr_x2apic_phys(void)
-{
-}
-
 static void init_apic_ldr_x2apic_cluster(void)
 {
     unsigned int cpu, this_cpu = smp_processor_id();
@@ -167,7 +163,7 @@ static const struct genapic __initconstrel apic_x2apic_phys = {
     APIC_INIT("x2apic_phys", NULL),
     .int_delivery_mode = dest_Fixed,
     .int_dest_mode = 0 /* physical delivery */,
-    .init_apic_ldr = init_apic_ldr_x2apic_phys,
+    .init_apic_ldr = init_apic_ldr_phys,
     .clustered_apic_check = clustered_apic_check_x2apic,
     .vector_allocation_cpumask = vector_allocation_cpumask_phys,
     .cpu_mask_to_apicid = cpu_mask_to_apicid_phys,
