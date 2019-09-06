@@ -206,94 +206,6 @@ static void domain_cpu_policy_changed(struct domain *d)
     }
 }
 
-static int update_domain_cpuid_info(struct domain *d,
-                                    const struct xen_domctl_cpuid *ctl)
-{
-    struct cpuid_policy *p = d->arch.cpuid;
-    const struct cpuid_leaf leaf = { ctl->eax, ctl->ebx, ctl->ecx, ctl->edx };
-
-    /*
-     * Skip update for leaves we don't care about, to avoid the overhead of
-     * recalculate_cpuid_policy().
-     */
-    switch ( ctl->input[0] )
-    {
-    case 0x00000000 ... ARRAY_SIZE(p->basic.raw) - 1:
-        if ( ctl->input[0] == 4 &&
-             ctl->input[1] >= ARRAY_SIZE(p->cache.raw) )
-            return 0;
-
-        if ( ctl->input[0] == 7 &&
-             ctl->input[1] >= ARRAY_SIZE(p->feat.raw) )
-            return 0;
-
-        if ( ctl->input[0] == 0xb &&
-             ctl->input[1] >= ARRAY_SIZE(p->topo.raw) )
-            return 0;
-
-        BUILD_BUG_ON(ARRAY_SIZE(p->xstate.raw) < 2);
-        if ( ctl->input[0] == XSTATE_CPUID &&
-             ctl->input[1] != 1 ) /* Everything else automatically calculated. */
-            return 0;
-        break;
-
-    case 0x40000000: case 0x40000100:
-        /* Only care about the max_leaf limit. */
-
-    case 0x80000000 ... 0x80000000 + ARRAY_SIZE(p->extd.raw) - 1:
-        break;
-
-    default:
-        return 0;
-    }
-
-    /* Insert ctl data into cpuid_policy. */
-    switch ( ctl->input[0] )
-    {
-    case 0x00000000 ... ARRAY_SIZE(p->basic.raw) - 1:
-        switch ( ctl->input[0] )
-        {
-        case 4:
-            p->cache.raw[ctl->input[1]] = leaf;
-            break;
-
-        case 7:
-            p->feat.raw[ctl->input[1]] = leaf;
-            break;
-
-        case 0xb:
-            p->topo.raw[ctl->input[1]] = leaf;
-            break;
-
-        case XSTATE_CPUID:
-            p->xstate.raw[ctl->input[1]] = leaf;
-            break;
-
-        default:
-            p->basic.raw[ctl->input[0]] = leaf;
-            break;
-        }
-        break;
-
-    case 0x40000000:
-        p->hv_limit = ctl->eax;
-        break;
-
-    case 0x40000100:
-        p->hv2_limit = ctl->eax;
-        break;
-
-    case 0x80000000 ... 0x80000000 + ARRAY_SIZE(p->extd.raw) - 1:
-        p->extd.raw[ctl->input[0] - 0x80000000] = leaf;
-        break;
-    }
-
-    recalculate_cpuid_policy(d);
-    domain_cpu_policy_changed(d);
-
-    return 0;
-}
-
 static int update_domain_cpu_policy(struct domain *d,
                                     xen_domctl_cpu_policy_t *xdpc)
 {
@@ -950,19 +862,6 @@ long arch_do_domctl(
         }
         break;
     }
-
-    case XEN_DOMCTL_set_cpuid:
-        if ( d == currd ) /* no domain_pause() */
-            ret = -EINVAL;
-        else if ( d->creation_finished )
-            ret = -EEXIST; /* No changing once the domain is running. */
-        else
-        {
-            domain_pause(d);
-            ret = update_domain_cpuid_info(d, &domctl->u.cpuid);
-            domain_unpause(d);
-        }
-        break;
 
     case XEN_DOMCTL_gettscinfo:
         if ( d == currd ) /* no domain_pause() */

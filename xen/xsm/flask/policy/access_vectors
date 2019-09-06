@@ -208,8 +208,7 @@ class domain2
 #  target = the new target domain
     set_as_target
 # XEN_DOMCTL_set_cpu_policy
-# XEN_DOMCTL_set_cpuid
-    set_cpuid
+    set_cpu_policy
 # XEN_DOMCTL_gettscinfo
     gettsc
 # XEN_DOMCTL_settscinfo

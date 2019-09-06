@@ -659,14 +659,6 @@ struct xen_domctl_set_target {
 
 #if defined(__i386__) || defined(__x86_64__)
 # define XEN_CPUID_INPUT_UNUSED  0xFFFFFFFF
-/* XEN_DOMCTL_set_cpuid */
-struct xen_domctl_cpuid {
-  uint32_t input[2];
-  uint32_t eax;
-  uint32_t ebx;
-  uint32_t ecx;
-  uint32_t edx;
-};
 
 /*
  * XEN_DOMCTL_{get,set}_cpu_policy (x86 specific)
@@ -1177,7 +1169,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_target                    46
 #define XEN_DOMCTL_deassign_device               47
 #define XEN_DOMCTL_unbind_pt_irq                 48
-#define XEN_DOMCTL_set_cpuid                     49
+/* #define XEN_DOMCTL_set_cpuid                  49 - Obsolete - use set_cpu_policy */
 #define XEN_DOMCTL_get_device_group              50
 /* #define XEN_DOMCTL_set_machine_address_size   51 - Obsolete */
 /* #define XEN_DOMCTL_get_machine_address_size   52 - Obsolete */
@@ -1254,7 +1246,6 @@ struct xen_domctl {
         struct xen_domctl_vm_event_op       vm_event_op;
         struct xen_domctl_mem_sharing_op    mem_sharing_op;
 #if defined(__i386__) || defined(__x86_64__)
-        struct xen_domctl_cpuid             cpuid;
         struct xen_domctl_cpu_policy        cpu_policy;
         struct xen_domctl_vcpuextstate      vcpuextstate;
         struct xen_domctl_vcpu_msrs         vcpu_msrs;
