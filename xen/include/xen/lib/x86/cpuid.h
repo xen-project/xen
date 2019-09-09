@@ -154,8 +154,12 @@ struct cpuid_policy
     union {
         struct cpuid_leaf raw[CPUID_GUEST_NR_CACHE];
         struct cpuid_cache_leaf {
-            uint32_t type:5,
-                :27, :32, :32, :32;
+            uint32_t /* a */ type:5, level:3;
+            bool self_init:1, fully_assoc:1;
+            uint32_t :4, threads_per_cache:12, cores_per_package:6;
+            uint32_t /* b */ line_size:12, partitions:10, ways:10;
+            uint32_t /* c */ sets;
+            bool /* d */ wbinvd:1, inclusive:1, complex:1;
         } subleaf[CPUID_GUEST_NR_CACHE];
     } cache;
 
@@ -259,7 +263,8 @@ struct cpuid_policy
                 uint32_t e8b;
                 struct { DECL_BITFIELD(e8b); };
             };
-            uint32_t /* c */:32, /* d */:32;
+            uint32_t nc:8, :4, apic_id_size:4, :16;
+            uint32_t /* d */:32;
         };
     } extd;
 

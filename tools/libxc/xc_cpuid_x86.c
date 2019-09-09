@@ -34,17 +34,12 @@ enum {
 
 #include <xen/asm/x86-vendors.h>
 
-#include <xen/lib/x86/cpuid.h>
-#include <xen/lib/x86/msr.h>
+#include <xen/lib/x86/cpu-policy.h>
 
 #define bitmaskof(idx)      (1u << ((idx) & 31))
 #define featureword_of(idx) ((idx) >> 5)
 #define clear_feature(idx, dst) ((dst) &= ~bitmaskof(idx))
 #define set_feature(idx, dst)   ((dst) |=  bitmaskof(idx))
-
-#define DEF_MAX_BASE 0x0000000du
-#define DEF_MAX_INTELEXT  0x80000008u
-#define DEF_MAX_AMDEXT    0x8000001cu
 
 int xc_get_cpu_levelling_caps(xc_interface *xch, uint32_t *caps)
 {
@@ -282,622 +277,6 @@ int xc_set_domain_cpu_policy(xc_interface *xch, uint32_t domid,
     return ret;
 }
 
-struct cpuid_domain_info
-{
-    unsigned int vendor; /* X86_VENDOR_* */
-
-    bool hvm;
-    uint64_t xfeature_mask;
-
-    /*
-     * Careful with featureset lengths.
-     *
-     * Code in this file requires featureset to have at least
-     * xc_get_cpu_featureset_size() entries.  This is a libxc compiletime
-     * constant.
-     *
-     * The featureset length used by the hypervisor may be different.  If the
-     * hypervisor version is longer, XEN_SYSCTL_get_cpu_featureset will fail
-     * with -ENOBUFS, and libxc really does need rebuilding.  If the
-     * hypervisor version is shorter, it is safe to zero-extend.
-     */
-    uint32_t *featureset;
-    unsigned int nr_features;
-
-    /* PV-only information. */
-    bool pv64;
-
-    /* HVM-only information. */
-    bool pae;
-    bool nestedhvm;
-};
-
-static void cpuid(const unsigned int *input, unsigned int *regs)
-{
-    unsigned int count = (input[1] == XEN_CPUID_INPUT_UNUSED) ? 0 : input[1];
-#ifdef __i386__
-    /* Use the stack to avoid reg constraint failures with some gcc flags */
-    asm (
-        "push %%ebx; push %%edx\n\t"
-        "cpuid\n\t"
-        "mov %%ebx,4(%4)\n\t"
-        "mov %%edx,12(%4)\n\t"
-        "pop %%edx; pop %%ebx\n\t"
-        : "=a" (regs[0]), "=c" (regs[2])
-        : "0" (input[0]), "1" (count), "S" (regs)
-        : "memory" );
-#else
-    asm (
-        "cpuid"
-        : "=a" (regs[0]), "=b" (regs[1]), "=c" (regs[2]), "=d" (regs[3])
-        : "0" (input[0]), "2" (count) );
-#endif
-}
-
-static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
-                                 struct cpuid_domain_info *info,
-                                 const uint32_t *featureset,
-                                 unsigned int nr_features)
-{
-    struct xen_domctl domctl = {};
-    xc_dominfo_t di;
-    unsigned int in[2] = { 0, ~0U }, regs[4];
-    unsigned int i, host_nr_features = xc_get_cpu_featureset_size();
-    int rc;
-
-    cpuid(in, regs);
-    info->vendor = x86_cpuid_lookup_vendor(regs[1], regs[2], regs[3]);
-
-    if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
-         di.domid != domid )
-        return -ESRCH;
-
-    info->hvm = di.hvm;
-
-    info->featureset = calloc(host_nr_features, sizeof(*info->featureset));
-    if ( !info->featureset )
-        return -ENOMEM;
-
-    info->nr_features = host_nr_features;
-
-    if ( featureset )
-    {
-        /*
-         * The user supplied featureset may be shorter or longer than
-         * host_nr_features.  Shorter is fine, and we will zero-extend.
-         * Longer is fine, so long as it only padded with zeros.
-         */
-        unsigned int fslen = min(host_nr_features, nr_features);
-
-        memcpy(info->featureset, featureset,
-               fslen * sizeof(*info->featureset));
-
-        /* Check for truncated set bits. */
-        for ( i = fslen; i < nr_features; ++i )
-            if ( featureset[i] != 0 )
-                return -EOPNOTSUPP;
-    }
-    else
-    {
-        rc = xc_get_cpu_featureset(xch, (info->hvm
-                                         ? XEN_SYSCTL_cpu_featureset_hvm
-                                         : XEN_SYSCTL_cpu_featureset_pv),
-                                   &host_nr_features, info->featureset);
-        if ( rc )
-            return -errno;
-    }
-
-    /* Get xstate information. */
-    domctl.cmd = XEN_DOMCTL_getvcpuextstate;
-    domctl.domain = domid;
-    rc = do_domctl(xch, &domctl);
-    if ( rc )
-        return -errno;
-
-    info->xfeature_mask = domctl.u.vcpuextstate.xfeature_mask;
-
-    if ( di.hvm )
-    {
-        uint64_t val;
-
-        rc = xc_hvm_param_get(xch, domid, HVM_PARAM_PAE_ENABLED, &val);
-        if ( rc )
-            return -errno;
-
-        info->pae = !!val;
-
-        rc = xc_hvm_param_get(xch, domid, HVM_PARAM_NESTEDHVM, &val);
-        if ( rc )
-            return -errno;
-
-        info->nestedhvm = !!val;
-    }
-    else
-    {
-        unsigned int width;
-
-        rc = xc_domain_get_guest_width(xch, domid, &width);
-        if ( rc )
-            return -errno;
-
-        info->pv64 = (width == 8);
-    }
-
-    return 0;
-}
-
-static void free_cpuid_domain_info(struct cpuid_domain_info *info)
-{
-    free(info->featureset);
-}
-
-static void amd_xc_cpuid_policy(const struct cpuid_domain_info *info,
-                                const unsigned int *input, unsigned int *regs)
-{
-    switch ( input[0] )
-    {
-    case 0x00000002:
-    case 0x00000004:
-        regs[0] = regs[1] = regs[2] = regs[3] = 0;
-        break;
-
-    case 0x80000000:
-        if ( regs[0] > DEF_MAX_AMDEXT )
-            regs[0] = DEF_MAX_AMDEXT;
-        break;
-
-    case 0x80000008:
-        /*
-         * ECX[15:12] is ApicIdCoreSize.
-         * ECX[7:0] is NumberOfCores (minus one).
-         * Update to reflect vLAPIC_ID = vCPU_ID * 2.  But make sure to avoid
-         * - overflow,
-         * - going out of sync with leaf 1 EBX[23:16],
-         * - incrementing ApicIdCoreSize when it's zero (which changes the
-         *   meaning of bits 7:0).
-         */
-        if ( (regs[2] & 0xffu) < 0x7fu )
-        {
-            if ( (regs[2] & 0xf000u) && (regs[2] & 0xf000u) != 0xf000u )
-                regs[2] = ((regs[2] + 0x1000u) & 0xf000u) | (regs[2] & 0xffu);
-            regs[2] = (regs[2] & 0xf000u) | ((regs[2] & 0x7fu) << 1) | 1u;
-        }
-        break;
-
-    case 0x8000000a: {
-        if ( !info->nestedhvm )
-        {
-            regs[0] = regs[1] = regs[2] = regs[3] = 0;
-            break;
-        }
-
-#define SVM_FEATURE_NPT            0x00000001 /* Nested page table support */
-#define SVM_FEATURE_LBRV           0x00000002 /* LBR virtualization support */
-#define SVM_FEATURE_SVML           0x00000004 /* SVM locking MSR support */
-#define SVM_FEATURE_NRIPS          0x00000008 /* Next RIP save on VMEXIT */
-#define SVM_FEATURE_TSCRATEMSR     0x00000010 /* TSC ratio MSR support */
-#define SVM_FEATURE_VMCBCLEAN      0x00000020 /* VMCB clean bits support */
-#define SVM_FEATURE_FLUSHBYASID    0x00000040 /* TLB flush by ASID support */
-#define SVM_FEATURE_DECODEASSISTS  0x00000080 /* Decode assists support */
-#define SVM_FEATURE_PAUSEFILTER    0x00000400 /* Pause intercept filter */
-
-        /* Pass 1: Only passthrough SVM features which are
-         * available in hw and which are implemented
-         */
-        regs[3] &= (SVM_FEATURE_NPT | SVM_FEATURE_LBRV | \
-            SVM_FEATURE_NRIPS | SVM_FEATURE_PAUSEFILTER | \
-            SVM_FEATURE_DECODEASSISTS);
-
-        /* Pass 2: Always enable SVM features which are emulated */
-        regs[3] |= SVM_FEATURE_VMCBCLEAN | SVM_FEATURE_TSCRATEMSR;
-        break;
-    }
-
-    }
-}
-
-static void intel_xc_cpuid_policy(const struct cpuid_domain_info *info,
-                                  const unsigned int *input, unsigned int *regs)
-{
-    switch ( input[0] )
-    {
-    case 0x00000004:
-        /*
-         * EAX[31:26] is Maximum Cores Per Package (minus one).
-         * Update to reflect vLAPIC_ID = vCPU_ID * 2.
-         */
-        regs[0] = (((regs[0] & 0x7c000000u) << 1) | 0x04000000u |
-                   (regs[0] & 0x3ffu));
-        regs[3] &= 0x3ffu;
-        break;
-
-    case 0x80000000:
-        if ( regs[0] > DEF_MAX_INTELEXT )
-            regs[0] = DEF_MAX_INTELEXT;
-        break;
-
-    case 0x80000005:
-        regs[0] = regs[1] = regs[2] = 0;
-        break;
-
-    case 0x80000008:
-        /* Mask AMD Number of Cores information. */
-        regs[2] = 0;
-        break;
-    }
-}
-
-static void xc_cpuid_hvm_policy(const struct cpuid_domain_info *info,
-                                const unsigned int *input, unsigned int *regs)
-{
-    switch ( input[0] )
-    {
-    case 0x00000000:
-        if ( regs[0] > DEF_MAX_BASE )
-            regs[0] = DEF_MAX_BASE;
-        break;
-
-    case 0x00000001:
-        /*
-         * EBX[23:16] is Maximum Logical Processors Per Package.
-         * Update to reflect vLAPIC_ID = vCPU_ID * 2, but make sure to avoid
-         * overflow.
-         */
-        if ( !(regs[1] & 0x00800000u) )
-            regs[1] = (regs[1] & 0x0000ffffu) | ((regs[1] & 0x007f0000u) << 1);
-        else
-            regs[1] &= 0x00ffffffu;
-
-        regs[2] = info->featureset[featureword_of(X86_FEATURE_SSE3)];
-        regs[3] = (info->featureset[featureword_of(X86_FEATURE_FPU)] |
-                   bitmaskof(X86_FEATURE_HTT));
-        break;
-
-    case 0x00000007: /* Intel-defined CPU features */
-        if ( input[1] == 0 )
-        {
-            regs[1] = info->featureset[featureword_of(X86_FEATURE_FSGSBASE)];
-            regs[2] = info->featureset[featureword_of(X86_FEATURE_PREFETCHWT1)];
-            regs[3] = info->featureset[featureword_of(X86_FEATURE_AVX512_4VNNIW)];
-        }
-        else
-        {
-            regs[1] = 0;
-            regs[2] = 0;
-            regs[3] = 0;
-        }
-        regs[0] = 0;
-        break;
-
-    case 0x0000000d: /* Xen automatically calculates almost everything. */
-        if ( input[1] == 1 )
-            regs[0] = info->featureset[featureword_of(X86_FEATURE_XSAVEOPT)];
-        else
-            regs[0] = 0;
-        regs[1] = regs[2] = regs[3] = 0;
-        break;
-
-    case 0x80000000:
-        /* Passthrough to cpu vendor specific functions */
-        break;
-
-    case 0x80000001:
-        regs[2] = (info->featureset[featureword_of(X86_FEATURE_LAHF_LM)] &
-                   ~bitmaskof(X86_FEATURE_CMP_LEGACY));
-        regs[3] = info->featureset[featureword_of(X86_FEATURE_SYSCALL)];
-        break;
-
-    case 0x80000007:
-        /*
-         * Keep only TSCInvariant. This may be cleared by the hypervisor
-         * depending on guest TSC and migration settings.
-         */
-        regs[0] = regs[1] = regs[2] = 0;
-        regs[3] &= 1u<<8;
-        break;
-
-    case 0x80000008:
-        regs[0] &= 0x0000ffffu;
-        regs[1] = info->featureset[featureword_of(X86_FEATURE_CLZERO)];
-        /* regs[2] handled in the per-vendor logic. */
-        regs[3] = 0;
-        break;
-
-    case 0x00000002: /* Intel cache info (dumped by AMD policy) */
-    case 0x00000004: /* Intel cache info (dumped by AMD policy) */
-    case 0x0000000a: /* Architectural Performance Monitor Features */
-    case 0x80000002: /* Processor name string */
-    case 0x80000003: /* ... continued         */
-    case 0x80000004: /* ... continued         */
-    case 0x80000005: /* AMD L1 cache/TLB info (dumped by Intel policy) */
-    case 0x80000006: /* AMD L2/3 cache/TLB info ; Intel L2 cache features */
-    case 0x8000000a: /* AMD SVM feature bits */
-    case 0x80000019: /* AMD 1G TLB */
-    case 0x8000001a: /* AMD perf hints */
-    case 0x8000001c: /* AMD lightweight profiling */
-        break;
-
-    default:
-        regs[0] = regs[1] = regs[2] = regs[3] = 0;
-        break;
-    }
-
-    if ( info->vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
-        amd_xc_cpuid_policy(info, input, regs);
-    else
-        intel_xc_cpuid_policy(info, input, regs);
-}
-
-static void xc_cpuid_pv_policy(const struct cpuid_domain_info *info,
-                               const unsigned int *input, unsigned int *regs)
-{
-    switch ( input[0] )
-    {
-    case 0x00000000:
-        if ( regs[0] > DEF_MAX_BASE )
-            regs[0] = DEF_MAX_BASE;
-        break;
-
-    case 0x00000001:
-    {
-        /* Host topology exposed to PV guest.  Provide host value. */
-        bool host_htt = regs[3] & bitmaskof(X86_FEATURE_HTT);
-
-        /*
-         * Don't pick host's Initial APIC ID which can change from run
-         * to run.
-         */
-        regs[1] &= 0x00ffffffu;
-
-        regs[2] = info->featureset[featureword_of(X86_FEATURE_SSE3)];
-        regs[3] = (info->featureset[featureword_of(X86_FEATURE_FPU)] &
-                   ~bitmaskof(X86_FEATURE_HTT));
-
-        if ( host_htt )
-            regs[3] |= bitmaskof(X86_FEATURE_HTT);
-        break;
-    }
-
-    case 0x00000007:
-        if ( input[1] == 0 )
-        {
-            regs[1] = info->featureset[featureword_of(X86_FEATURE_FSGSBASE)];
-            regs[2] = info->featureset[featureword_of(X86_FEATURE_PREFETCHWT1)];
-            regs[3] = info->featureset[featureword_of(X86_FEATURE_AVX512_4VNNIW)];
-        }
-        else
-        {
-            regs[1] = 0;
-            regs[2] = 0;
-            regs[3] = 0;
-        }
-        regs[0] = 0;
-        break;
-
-    case 0x0000000d: /* Xen automatically calculates almost everything. */
-        if ( input[1] == 1 )
-            regs[0] = info->featureset[featureword_of(X86_FEATURE_XSAVEOPT)];
-        else
-            regs[0] = 0;
-        regs[1] = regs[2] = regs[3] = 0;
-        break;
-
-    case 0x80000000:
-    {
-        unsigned int max = (info->vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON))
-            ? DEF_MAX_AMDEXT : DEF_MAX_INTELEXT;
-
-        if ( regs[0] > max )
-            regs[0] = max;
-        break;
-    }
-
-    case 0x80000001:
-    {
-        /* Host topology exposed to PV guest.  Provide host CMP_LEGACY value. */
-        bool host_cmp_legacy = regs[2] & bitmaskof(X86_FEATURE_CMP_LEGACY);
-
-        regs[2] = (info->featureset[featureword_of(X86_FEATURE_LAHF_LM)] &
-                   ~bitmaskof(X86_FEATURE_CMP_LEGACY));
-        regs[3] = info->featureset[featureword_of(X86_FEATURE_SYSCALL)];
-
-        if ( host_cmp_legacy )
-            regs[2] |= bitmaskof(X86_FEATURE_CMP_LEGACY);
-
-        break;
-    }
-
-    case 0x80000008:
-        regs[0] &= 0x0000ffffu;
-        regs[1] = info->featureset[featureword_of(X86_FEATURE_CLZERO)];
-        regs[2] = regs[3] = 0;
-        break;
-
-    case 0x00000005: /* MONITOR/MWAIT */
-    case 0x0000000b: /* Extended Topology Enumeration */
-    case 0x8000000a: /* SVM revision and features */
-    case 0x8000001b: /* Instruction Based Sampling */
-    case 0x8000001c: /* Light Weight Profiling */
-    case 0x8000001e: /* Extended topology reporting */
-        regs[0] = regs[1] = regs[2] = regs[3] = 0;
-        break;
-    }
-}
-
-static void xc_cpuid_policy(const struct cpuid_domain_info *info,
-                            const unsigned int *input, unsigned int *regs)
-{
-    /*
-     * For hypervisor leaves (0x4000XXXX) only 0x4000xx00.EAX[7:0] bits (max
-     * number of leaves) can be set by user. Hypervisor will enforce this so
-     * all other bits are don't-care and we can set them to zero.
-     */
-    if ( (input[0] & 0xffff0000) == 0x40000000 )
-    {
-        regs[0] = regs[1] = regs[2] = regs[3] = 0;
-        return;
-    }
-
-    if ( info->hvm )
-        xc_cpuid_hvm_policy(info, input, regs);
-    else
-        xc_cpuid_pv_policy(info, input, regs);
-}
-
-static int xc_cpuid_do_domctl(
-    xc_interface *xch, uint32_t domid,
-    const unsigned int *input, const unsigned int *regs)
-{
-    DECLARE_DOMCTL;
-
-    memset(&domctl, 0, sizeof (domctl));
-    domctl.domain = domid;
-    domctl.cmd = XEN_DOMCTL_set_cpuid;
-    domctl.u.cpuid.input[0] = input[0];
-    domctl.u.cpuid.input[1] = input[1];
-    domctl.u.cpuid.eax = regs[0];
-    domctl.u.cpuid.ebx = regs[1];
-    domctl.u.cpuid.ecx = regs[2];
-    domctl.u.cpuid.edx = regs[3];
-
-    return do_domctl(xch, &domctl);
-}
-
-static void sanitise_featureset(struct cpuid_domain_info *info)
-{
-    const uint32_t fs_size = xc_get_cpu_featureset_size();
-    uint32_t disabled_features[fs_size];
-    static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
-    unsigned int i, b;
-
-    if ( info->hvm )
-    {
-        /* HVM or PVH Guest */
-
-        if ( !info->pae )
-            clear_bit(X86_FEATURE_PAE, info->featureset);
-
-        if ( !info->nestedhvm )
-        {
-            clear_bit(X86_FEATURE_SVM, info->featureset);
-            clear_bit(X86_FEATURE_VMX, info->featureset);
-        }
-    }
-    else
-    {
-        /* PV Guest */
-
-        if ( !info->pv64 )
-        {
-            clear_bit(X86_FEATURE_LM, info->featureset);
-            if ( !(info->vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
-                clear_bit(X86_FEATURE_SYSCALL, info->featureset);
-        }
-
-        clear_bit(X86_FEATURE_PSE, info->featureset);
-        clear_bit(X86_FEATURE_PSE36, info->featureset);
-        clear_bit(X86_FEATURE_PGE, info->featureset);
-        clear_bit(X86_FEATURE_PAGE1GB, info->featureset);
-    }
-
-    if ( info->xfeature_mask == 0 )
-        clear_bit(X86_FEATURE_XSAVE, info->featureset);
-
-    /* Disable deep dependencies of disabled features. */
-    for ( i = 0; i < ARRAY_SIZE(disabled_features); ++i )
-        disabled_features[i] = ~info->featureset[i] & deep_features[i];
-
-    for ( b = 0; b < sizeof(disabled_features) * CHAR_BIT; ++b )
-    {
-        const uint32_t *dfs;
-
-        if ( !test_bit(b, disabled_features) ||
-             !(dfs = x86_cpuid_lookup_deep_deps(b)) )
-             continue;
-
-        for ( i = 0; i < ARRAY_SIZE(disabled_features); ++i )
-        {
-            info->featureset[i] &= ~dfs[i];
-            disabled_features[i] &= ~dfs[i];
-        }
-    }
-}
-
-int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
-                          const uint32_t *featureset, unsigned int nr_features)
-{
-    struct cpuid_domain_info info = {};
-    unsigned int input[2] = { 0, 0 }, regs[4];
-    unsigned int base_max, ext_max;
-    int rc;
-
-    rc = get_cpuid_domain_info(xch, domid, &info, featureset, nr_features);
-    if ( rc )
-        goto out;
-
-    cpuid(input, regs);
-    base_max = (regs[0] <= DEF_MAX_BASE) ? regs[0] : DEF_MAX_BASE;
-    input[0] = 0x80000000;
-    cpuid(input, regs);
-
-    if ( info.vendor == X86_VENDOR_AMD || info.vendor == X86_VENDOR_HYGON )
-        ext_max = (regs[0] <= DEF_MAX_AMDEXT) ? regs[0] : DEF_MAX_AMDEXT;
-    else
-        ext_max = (regs[0] <= DEF_MAX_INTELEXT) ? regs[0] : DEF_MAX_INTELEXT;
-
-    sanitise_featureset(&info);
-
-    input[0] = 0;
-    input[1] = XEN_CPUID_INPUT_UNUSED;
-    for ( ; ; )
-    {
-        cpuid(input, regs);
-        xc_cpuid_policy(&info, input, regs);
-
-        if ( regs[0] || regs[1] || regs[2] || regs[3] )
-        {
-            rc = xc_cpuid_do_domctl(xch, domid, input, regs);
-            if ( rc )
-                goto out;
-        }
-
-        /* Intel cache descriptor leaves. */
-        if ( input[0] == 4 )
-        {
-            input[1]++;
-            /* More to do? Then loop keeping %%eax==0x00000004. */
-            if ( (regs[0] & 0x1f) != 0 )
-                continue;
-        }
-        /* Extended Topology leaves. */
-        else if ( input[0] == 0xb )
-        {
-            uint8_t level_type = regs[2] >> 8;
-
-            input[1]++;
-            if ( level_type >= 1 && level_type <= 2 )
-                continue;
-        }
-
-        input[0]++;
-        if ( !(input[0] & 0x80000000u) && (input[0] > base_max ) )
-            input[0] = 0x80000000u;
-
-        input[1] = XEN_CPUID_INPUT_UNUSED;
-        if ( (input[0] == 4) || (input[0] == 7) || (input[0] == 0xb) )
-            input[1] = 0;
-        else if ( input[0] == 0xd )
-            input[1] = 1; /* Xen automatically calculates almost everything. */
-
-        if ( (input[0] & 0x80000000u) && (input[0] > ext_max) )
-            break;
-    }
-
- out:
-    free_cpuid_domain_info(&info);
-    return rc;
-}
-
 /*
  * Configure a single input with the informatiom from config.
  *
@@ -1070,6 +449,216 @@ int xc_cpuid_set(
     }
 
  out:
+    free(leaves);
+
+    return rc;
+}
+
+int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
+                          const uint32_t *featureset, unsigned int nr_features)
+{
+    int rc;
+    xc_dominfo_t di;
+    unsigned int i, nr_leaves, nr_msrs;
+    xen_cpuid_leaf_t *leaves = NULL;
+    struct cpuid_policy *p = NULL;
+    uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
+
+    if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
+         di.domid != domid )
+    {
+        ERROR("Failed to obtain d%d info", domid);
+        rc = -ESRCH;
+        goto out;
+    }
+
+    rc = xc_get_cpu_policy_size(xch, &nr_leaves, &nr_msrs);
+    if ( rc )
+    {
+        PERROR("Failed to obtain policy info size");
+        rc = -errno;
+        goto out;
+    }
+
+    rc = -ENOMEM;
+    if ( (leaves = calloc(nr_leaves, sizeof(*leaves))) == NULL ||
+         (p = calloc(1, sizeof(*p))) == NULL )
+        goto out;
+
+    /* Get the domain's default policy. */
+    nr_msrs = 0;
+    rc = xc_get_system_cpu_policy(xch, di.hvm ? XEN_SYSCTL_cpu_policy_hvm_default
+                                              : XEN_SYSCTL_cpu_policy_pv_default,
+                                  &nr_leaves, leaves, &nr_msrs, NULL);
+    if ( rc )
+    {
+        PERROR("Failed to obtain %s default policy", di.hvm ? "hvm" : "pv");
+        rc = -errno;
+        goto out;
+    }
+
+    rc = x86_cpuid_copy_from_buffer(p, leaves, nr_leaves,
+                                    &err_leaf, &err_subleaf);
+    if ( rc )
+    {
+        ERROR("Failed to deserialise CPUID (err leaf %#x, subleaf %#x) (%d = %s)",
+              err_leaf, err_subleaf, -rc, strerror(-rc));
+        goto out;
+    }
+
+    if ( featureset )
+    {
+        uint32_t disabled_features[FEATURESET_NR_ENTRIES],
+            feat[FEATURESET_NR_ENTRIES] = {};
+        static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
+        unsigned int i, b;
+
+        /*
+         * The user supplied featureset may be shorter or longer than
+         * FEATURESET_NR_ENTRIES.  Shorter is fine, and we will zero-extend.
+         * Longer is fine, so long as it only padded with zeros.
+         */
+        unsigned int user_len = min(FEATURESET_NR_ENTRIES + 0u, nr_features);
+
+        /* Check for truncated set bits. */
+        rc = -EOPNOTSUPP;
+        for ( i = user_len; i < nr_features; ++i )
+            if ( featureset[i] != 0 )
+                goto out;
+
+        memcpy(feat, featureset, sizeof(*featureset) * user_len);
+
+        /* Disable deep dependencies of disabled features. */
+        for ( i = 0; i < ARRAY_SIZE(disabled_features); ++i )
+            disabled_features[i] = ~feat[i] & deep_features[i];
+
+        for ( b = 0; b < sizeof(disabled_features) * CHAR_BIT; ++b )
+        {
+            const uint32_t *dfs;
+
+            if ( !test_bit(b, disabled_features) ||
+                 !(dfs = x86_cpuid_lookup_deep_deps(b)) )
+                continue;
+
+            for ( i = 0; i < ARRAY_SIZE(disabled_features); ++i )
+            {
+                feat[i] &= ~dfs[i];
+                disabled_features[i] &= ~dfs[i];
+            }
+        }
+
+        cpuid_featureset_to_policy(feat, p);
+    }
+
+    if ( !di.hvm )
+    {
+        uint32_t host_featureset[FEATURESET_NR_ENTRIES] = {};
+        uint32_t len = ARRAY_SIZE(host_featureset);
+
+        rc = xc_get_cpu_featureset(xch, XEN_SYSCTL_cpu_featureset_host,
+                                   &len, host_featureset);
+        if ( rc )
+        {
+            /* Tolerate "buffer too small", as we've got the bits we need. */
+            if ( errno == ENOBUFS )
+                rc = 0;
+            else
+            {
+                PERROR("Failed to obtain host featureset");
+                rc = -errno;
+                goto out;
+            }
+        }
+
+        /*
+         * On hardware without CPUID Faulting, PV guests see real topology.
+         * As a consequence, they also need to see the host htt/cmp fields.
+         */
+        p->basic.htt       = test_bit(X86_FEATURE_HTT, host_featureset);
+        p->extd.cmp_legacy = test_bit(X86_FEATURE_CMP_LEGACY, host_featureset);
+    }
+    else
+    {
+        /*
+         * Topology for HVM guests is entirely controlled by Xen.  For now, we
+         * hardcode APIC_ID = vcpu_id * 2 to give the illusion of no SMT.
+         */
+        p->basic.htt = true;
+        p->extd.cmp_legacy = false;
+
+        /*
+         * Leaf 1 EBX[23:16] is Maximum Logical Processors Per Package.
+         * Update to reflect vLAPIC_ID = vCPU_ID * 2, but make sure to avoid
+         * overflow.
+         */
+        if ( !(p->basic.lppp & 0x80) )
+            p->basic.lppp *= 2;
+
+        switch ( p->x86_vendor )
+        {
+        case X86_VENDOR_INTEL:
+            for ( i = 0; (p->cache.subleaf[i].type &&
+                          i < ARRAY_SIZE(p->cache.raw)); ++i )
+            {
+                p->cache.subleaf[i].cores_per_package =
+                    (p->cache.subleaf[i].cores_per_package << 1) | 1;
+                p->cache.subleaf[i].threads_per_cache = 0;
+            }
+            break;
+
+        case X86_VENDOR_AMD:
+        case X86_VENDOR_HYGON:
+            /*
+             * Leaf 0x80000008 ECX[15:12] is ApicIdCoreSize.
+             * Leaf 0x80000008 ECX[7:0] is NumberOfCores (minus one).
+             * Update to reflect vLAPIC_ID = vCPU_ID * 2.  But avoid
+             * - overflow,
+             * - going out of sync with leaf 1 EBX[23:16],
+             * - incrementing ApicIdCoreSize when it's zero (which changes the
+             *   meaning of bits 7:0).
+             */
+            if ( p->extd.nc < 0x7f )
+            {
+                if ( p->extd.apic_id_size != 0 && p->extd.apic_id_size != 0xf )
+                    p->extd.apic_id_size++;
+
+                p->extd.nc = (p->extd.nc << 1) | 1;
+            }
+            break;
+        }
+
+        /*
+         * These settings are necessary to cause earlier HVM_PARAM_NESTEDHVM /
+         * XEN_DOMCTL_disable_migrate settings to be reflected correctly in
+         * CPUID.  Xen will discard these bits if configuration hasn't been
+         * set for the domain.
+         */
+        p->extd.itsc = true;
+        p->basic.vmx = true;
+        p->extd.svm = true;
+    }
+
+    rc = x86_cpuid_copy_to_buffer(p, leaves, &nr_leaves);
+    if ( rc )
+    {
+        ERROR("Failed to serialise CPUID (%d = %s)", -rc, strerror(-rc));
+        goto out;
+    }
+
+    rc = xc_set_domain_cpu_policy(xch, domid, nr_leaves, leaves, 0, NULL,
+                                  &err_leaf, &err_subleaf, &err_msr);
+    if ( rc )
+    {
+        PERROR("Failed to set d%d's policy (err leaf %#x, subleaf %#x, msr %#x)",
+               domid, err_leaf, err_subleaf, err_msr);
+        rc = -errno;
+        goto out;
+    }
+
+    rc = 0;
+
+out:
+    free(p);
     free(leaves);
 
     return rc;
