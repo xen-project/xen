@@ -88,8 +88,9 @@ trampoline_gdt:
 GLOBAL(trampoline_misc_enable_off)
         .quad   0
 
-GLOBAL(cpuid_ext_features)
-        .long   0
+/* EFER OR-mask for boot paths.  This gets adjusted with NX when available. */
+GLOBAL(trampoline_efer)
+        .long   EFER_LME | EFER_SCE
 
 GLOBAL(trampoline_xen_phys_start)
         .long   0
@@ -132,14 +133,10 @@ trampoline_protmode_entry:
 1:
 
         /* Set up EFER (Extended Feature Enable Register). */
-        mov     bootsym_rel(cpuid_ext_features,4,%edi)
         movl    $MSR_EFER,%ecx
         rdmsr
-        or      $EFER_LME|EFER_SCE,%eax   /* Long Mode + SYSCALL/SYSRET */
-        bt      $cpufeat_bit(X86_FEATURE_NX),%edi /* No Execute? */
-        jnc     1f
-        btsl    $_EFER_NX,%eax  /* No Execute     */
-1:      wrmsr
+        or      bootsym_rel(trampoline_efer, 4, %eax)
+        wrmsr
 
         mov     $(X86_CR0_PG | X86_CR0_AM | X86_CR0_WP | X86_CR0_NE |\
                   X86_CR0_ET | X86_CR0_MP | X86_CR0_PE), %eax

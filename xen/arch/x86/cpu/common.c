@@ -391,9 +391,6 @@ static void generic_identify(struct cpuinfo_x86 *c)
 		cpuid(0x80000001, &tmp, &tmp,
 		      &c->x86_capability[cpufeat_word(X86_FEATURE_LAHF_LM)],
 		      &c->x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]);
-	if (c == &boot_cpu_data)
-		bootsym(cpuid_ext_features) =
-			c->x86_capability[cpufeat_word(X86_FEATURE_NX)];
 
 	if (c->extended_cpuid_level >= 0x80000004)
 		get_model_name(c); /* Default name */

@@ -270,6 +270,7 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 	if (disable) {
 		wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable & ~disable);
 		bootsym(trampoline_misc_enable_off) |= disable;
+		bootsym(trampoline_efer) |= EFER_NX;
 	}
 
 	if (disable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID)

@@ -640,8 +640,13 @@ trampoline_setup:
         jbe     1f
         mov     $0x80000001,%eax
         cpuid
-1:      mov     %edx,sym_fs(cpuid_ext_features)
-        mov     %edx,sym_fs(boot_cpu_data)+CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM)
+1:      mov     %edx, sym_fs(boot_cpu_data) + CPUINFO_FEATURE_OFFSET(X86_FEATURE_LM)
+
+        /* Check for NX. Adjust EFER setting if available. */
+        bt      $cpufeat_bit(X86_FEATURE_NX), %edx
+        jnc     1f
+        orb     $EFER_NX >> 8, 1 + sym_esi(trampoline_efer)
+1:
 
         /* Check for availability of long mode. */
         bt      $cpufeat_bit(X86_FEATURE_LM),%edx

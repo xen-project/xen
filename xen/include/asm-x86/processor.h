@@ -151,7 +151,7 @@ extern void ctxt_switch_levelling(const struct vcpu *next);
 extern void (*ctxt_switch_masking)(const struct vcpu *next);
 
 extern bool_t opt_cpu_info;
-extern u32 cpuid_ext_features;
+extern u32 trampoline_efer;
 extern u64 trampoline_misc_enable_off;
 
 /* Maximum width of physical addresses supported by the hardware. */

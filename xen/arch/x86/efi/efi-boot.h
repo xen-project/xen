@@ -238,7 +238,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
     asm volatile("pushq $0\n\tpopfq");
     rdmsrl(MSR_EFER, efer);
     efer |= EFER_SCE;
-    if ( cpuid_ext_features & cpufeat_mask(X86_FEATURE_NX) )
+    if ( cpu_has_nx )
         efer |= EFER_NX;
     wrmsrl(MSR_EFER, efer);
     write_cr0(X86_CR0_PE | X86_CR0_MP | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP |
@@ -640,9 +640,11 @@ static void __init efi_arch_cpu(void)
 
     if ( (eax >> 16) == 0x8000 && eax > 0x80000000 )
     {
-        cpuid_ext_features = cpuid_edx(0x80000001);
         boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]
-            = cpuid_ext_features;
+            = cpuid_edx(0x80000001);
+
+        if ( cpu_has_nx )
+            trampoline_efer |= EFER_NX;
     }
 }
 

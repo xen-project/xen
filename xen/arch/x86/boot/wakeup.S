@@ -131,20 +131,11 @@ wakeup_32:
         wrmsr
 1:
 
-        /* Will cpuid feature change after resume? */
         /* Set up EFER (Extended Feature Enable Register). */
-        mov     bootsym_rel(cpuid_ext_features,4,%edi)
-        test    $0x20100800,%edi /* SYSCALL/SYSRET, No Execute, Long Mode? */
-        jz      .Lskip_eferw
         movl    $MSR_EFER,%ecx
         rdmsr
-        btsl    $_EFER_LME,%eax /* Long Mode      */
-        btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */
-        btl     $20,%edi        /* No Execute?    */
-        jnc     1f
-        btsl    $_EFER_NX,%eax  /* No Execute     */
-1:      wrmsr
-.Lskip_eferw:
+        or      bootsym_rel(trampoline_efer, 4, %eax)
+        wrmsr
 
         wbinvd
 
