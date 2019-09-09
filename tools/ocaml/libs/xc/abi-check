@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Data::Dumper;
+
+our %enums;
+
+@ARGV == 2 or die;
+our ($c, $o) = @ARGV;
+
+open STDIN, "<", $c or die $!;
+
+our $cline = -1;
+our $ei;
+
+while (<>) {
+    if ($cline == -1) {
+        if (m/c_bitmap_to_ocaml_list/) {
+            $cline = 0;
+            $ei = { };
+        }
+    } else {
+        $cline++;
+        m{^\s+/\* \s+ ! \s+ (.*?) \s* \*/\s*$}x or die "$cline $_ ?";
+        my @vals = split /\s+/, $1;
+        if ($cline == 1 && !@vals) {
+            $cline = -1;
+        } elsif ($cline == 1 && @vals == 3) {
+            $ei->{$_} = shift @vals foreach qw(OType OPrefix Mangle);
+        } elsif ($cline == 2 && @vals == 3) {
+            $ei->{$_} = shift @vals foreach qw(CPrefix CFinal CFinalHow);
+            die if $enums{ $ei->{OType} };
+            $enums{ $ei->{OType} } = $ei;
+            $cline = -1;
+        } else {
+            die "$_ ?";
+        }
+    }
+}
+
+sub expect ($$) {
+    printf "BUILD_BUG_ON( %-30s != %-10s );\n", @_ or die $!;
+}
+
+open STDIN, "<", $o or die $!;
+my $cval;
+$ei = undef;
+my $bitnum = 0;
+while (<>) {
+    if (!$ei) {
+        if (m{^type \s+ (\w+) \s* \= \s* $/}x && $enums{$1}) {
+            $ei = $enums{$1};
+            $cval = '';
+            $bitnum = 0;
+        }
+    } else {
+        if (m{^\s+ \| \s* $ei->{OPrefix} (\w+) \s*$}x) {
+            $cval = $1;
+            if ($ei->{Mangle} eq 'lc') {
+                $cval = lc $cval;
+            } elsif ($ei->{Mangle} eq 'none') {
+            } else {
+                die;
+            }
+            $cval = $ei->{CPrefix}.$cval;
+            expect($cval, "(1u << $bitnum)");
+            $bitnum++;
+        } elsif (m/^\w|\{/) {
+            if ($ei->{CFinalHow} eq 'max') {
+                expect($ei->{CFinal}, "(1u << ".($bitnum-1).")");
+            } elsif ($ei->{CFinalHow} eq 'all') {
+                expect($ei->{CFinal}, "(1u << $bitnum)-1u");
+            } else {
+                die Dumper($ei)." ?";
+            }
+            $ei = undef;
+        } elsif (!m{\S}) {
+        } else {
+            die "$_ ?";
+        }
+    }
+}
+
+close STDOUT or die $!;
