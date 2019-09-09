@@ -1173,6 +1173,7 @@ static char        *debugtrace_buf; /* Debug-trace buffer */
 static unsigned int debugtrace_prd; /* Producer index     */
 static unsigned int debugtrace_kilobytes = 128, debugtrace_bytes;
 static unsigned int debugtrace_used;
+static bool debugtrace_buf_empty = true;
 static DEFINE_SPINLOCK(debugtrace_lock);
 integer_param("debugtrace", debugtrace_kilobytes);
 
@@ -1184,16 +1185,17 @@ static void debugtrace_dump_worker(void)
     printk("debugtrace_dump() starting\n");
 
     /* Print oldest portion of the ring. */
-    ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
     if ( debugtrace_buf[debugtrace_prd] != '\0' )
         console_serial_puts(&debugtrace_buf[debugtrace_prd],
-                            debugtrace_bytes - debugtrace_prd - 1);
+                            debugtrace_bytes - debugtrace_prd);
 
     /* Print youngest portion of the ring. */
     debugtrace_buf[debugtrace_prd] = '\0';
     console_serial_puts(&debugtrace_buf[0], debugtrace_prd);
 
     memset(debugtrace_buf, '\0', debugtrace_bytes);
+    debugtrace_prd = 0;
+    debugtrace_buf_empty = true;
 
     printk("debugtrace_dump() finished\n");
 }
@@ -1241,8 +1243,7 @@ static void debugtrace_add_to_buf(char *buf)
     for ( p = buf; *p != '\0'; p++ )
     {
         debugtrace_buf[debugtrace_prd++] = *p;
-        /* Always leave a nul byte at the end of the buffer. */
-        if ( debugtrace_prd == (debugtrace_bytes - 1) )
+        if ( debugtrace_prd == debugtrace_bytes )
             debugtrace_prd = 0;
     }
 }
@@ -1264,8 +1265,6 @@ void debugtrace_printk(const char *fmt, ...)
 
     spin_lock_irqsave(&debugtrace_lock, flags);
 
-    ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
-
     va_start(args, fmt);
     nr = vscnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
@@ -1279,8 +1278,9 @@ void debugtrace_printk(const char *fmt, ...)
     }
     else
     {
-        if ( strcmp(buf, last_buf) )
+        if ( debugtrace_buf_empty || strcmp(buf, last_buf) )
         {
+            debugtrace_buf_empty = false;
             last_prd = debugtrace_prd;
             last_count = ++count;
             safe_strcpy(last_buf, buf);
