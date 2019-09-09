@@ -40,6 +40,7 @@ type x86_arch_emulation_flags =
   | X86_EMU_IOMMU
   | X86_EMU_PIT
   | X86_EMU_USE_PIRQ
+  | X86_EMU_VPCI
 
 type xen_x86_arch_domainconfig = {
   emulation_flags: x86_arch_emulation_flags list;
