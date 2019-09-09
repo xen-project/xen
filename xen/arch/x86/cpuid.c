@@ -29,7 +29,7 @@ static int __init parse_xen_cpuid(const char *s)
             const char *name;
             unsigned int bit;
         } features[] __initconstrel = INIT_FEATURE_NAMES;
-        const struct feature *lhs, *mid, *rhs;
+        const struct feature *lhs, *rhs, *mid = NULL /* GCC... */;
         const char *feat;
 
         ss = strchr(s, ',');
