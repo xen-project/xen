@@ -83,7 +83,10 @@ type domaininfo = {
   arch_config : arch_domainconfig;
 }
 type sched_control = { weight : int; cap : int; }
-type physinfo_cap_flag = CAP_HVM | CAP_DirectIO
+type physinfo_cap_flag =
+  | CAP_HVM
+  | CAP_PV
+  | CAP_DirectIO
 type physinfo = {
   threads_per_core : int;
   cores_per_socket : int;

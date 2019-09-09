@@ -100,6 +100,7 @@ type sched_control =
 
 type physinfo_cap_flag =
 	| CAP_HVM
+	| CAP_PV
 	| CAP_DirectIO
 
 type physinfo =
