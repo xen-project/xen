@@ -46,8 +46,6 @@
 #include <asm/tboot.h>
 #include <mach_apic.h>
 
-#define setup_trampoline()    (bootsym_phys(trampoline_realmode_entry))
-
 unsigned long __read_mostly trampoline_phys;
 
 /* representing HT siblings of each logical CPU */
@@ -545,7 +543,7 @@ static int do_boot_cpu(int apicid, int cpu)
 
     booting_cpu = cpu;
 
-    start_eip = setup_trampoline();
+    start_eip = bootsym_phys(trampoline_realmode_entry);
 
     /* start_eip needs be page aligned, and below the 1M boundary. */
     if ( start_eip & ~0xff000 )
