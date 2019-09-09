@@ -91,8 +91,8 @@ extern unsigned long trampoline_phys;
 #define bootsym_phys(sym)                                 \
     (((unsigned long)&(sym)-(unsigned long)&trampoline_start)+trampoline_phys)
 #define bootsym(sym)                                      \
-    (*RELOC_HIDE((typeof(&(sym)))__va(__pa(&(sym))),      \
-                 trampoline_phys-__pa(trampoline_start)))
+    (*((typeof(sym) *)__va(bootsym_phys(sym))))
+
 extern char trampoline_start[], trampoline_end[];
 extern char trampoline_realmode_entry[];
 extern unsigned int trampoline_xen_phys_start;
