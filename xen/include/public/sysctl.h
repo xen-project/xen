@@ -93,9 +93,12 @@ struct xen_sysctl_tbuf_op {
 /* The platform supports Hardware Assisted Paging. */
 #define _XEN_SYSCTL_PHYSCAP_hap          3
 #define XEN_SYSCTL_PHYSCAP_hap           (1u<<_XEN_SYSCTL_PHYSCAP_hap)
+/* The platform supports software paging. */
+#define _XEN_SYSCTL_PHYSCAP_shadow       4
+#define XEN_SYSCTL_PHYSCAP_shadow        (1u<<_XEN_SYSCTL_PHYSCAP_shadow)
 
 /* Max XEN_SYSCTL_PHYSCAP_* constant.  Used for ABI checking. */
-#define XEN_SYSCTL_PHYSCAP_MAX XEN_SYSCTL_PHYSCAP_hap
+#define XEN_SYSCTL_PHYSCAP_MAX XEN_SYSCTL_PHYSCAP_shadow
 
 struct xen_sysctl_physinfo {
     uint32_t threads_per_core;

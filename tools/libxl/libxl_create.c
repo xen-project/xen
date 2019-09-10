@@ -44,7 +44,15 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
         if (rc)
             return rc;
 
-        libxl_defbool_setdefault(&c_info->hap, info.cap_hap);
+        if (info.cap_hap)
+            libxl_defbool_setdefault(&c_info->hap, true);
+        else if (info.cap_shadow)
+            libxl_defbool_setdefault(&c_info->hap, false);
+        else {
+            LOG(ERROR, "neither hap nor shadow paging available");
+            return ERROR_INVAL;
+        }
+
         libxl_defbool_setdefault(&c_info->oos, true);
     }
 

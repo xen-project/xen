@@ -165,6 +165,8 @@ void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_pv;
     if ( hvm_hap_supported() )
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_hap;
+    if ( IS_ENABLED(CONFIG_SHADOW_PAGING) )
+        pi->capabilities |= XEN_SYSCTL_PHYSCAP_shadow;
 }
 
 long arch_do_sysctl(
