@@ -922,20 +922,80 @@ int xc_cpuid_set(
     const char **config, char **config_transformed)
 {
     int rc;
-    unsigned int i, j, regs[4], polregs[4];
-    struct cpuid_domain_info info = {};
+    unsigned int i, j, regs[4] = {}, polregs[4] = {};
+    xc_dominfo_t di;
+    xen_cpuid_leaf_t *leaves = NULL;
+    unsigned int nr_leaves, policy_leaves, nr_msrs;
+    uint32_t err_leaf = -1, err_subleaf = -1, err_msr = -1;
 
     for ( i = 0; i < 4; ++i )
         config_transformed[i] = NULL;
 
-    rc = get_cpuid_domain_info(xch, domid, &info, NULL, 0);
+    if ( xc_domain_getinfo(xch, domid, 1, &di) != 1 ||
+         di.domid != domid )
+    {
+        ERROR("Failed to obtain d%d info", domid);
+        rc = -ESRCH;
+        goto fail;
+    }
+
+    rc = xc_get_cpu_policy_size(xch, &nr_leaves, &nr_msrs);
     if ( rc )
-        goto out;
+    {
+        PERROR("Failed to obtain policy info size");
+        rc = -errno;
+        goto fail;
+    }
 
-    cpuid(input, regs);
+    rc = -ENOMEM;
+    if ( (leaves = calloc(nr_leaves, sizeof(*leaves))) == NULL )
+    {
+        ERROR("Unable to allocate memory for %u CPUID leaves", nr_leaves);
+        goto fail;
+    }
 
-    memcpy(polregs, regs, sizeof(regs));
-    xc_cpuid_policy(&info, input, polregs);
+    /* Get the domain's max policy. */
+    nr_msrs = 0;
+    policy_leaves = nr_leaves;
+    rc = xc_get_system_cpu_policy(xch, di.hvm ? XEN_SYSCTL_cpu_policy_hvm_max
+                                              : XEN_SYSCTL_cpu_policy_pv_max,
+                                  &policy_leaves, leaves, &nr_msrs, NULL);
+    if ( rc )
+    {
+        PERROR("Failed to obtain %s max policy", di.hvm ? "hvm" : "pv");
+        rc = -errno;
+        goto fail;
+    }
+    for ( i = 0; i < policy_leaves; ++i )
+        if ( leaves[i].leaf == input[0] && leaves[i].subleaf == input[1] )
+        {
+            polregs[0] = leaves[i].a;
+            polregs[1] = leaves[i].b;
+            polregs[2] = leaves[i].c;
+            polregs[3] = leaves[i].d;
+            break;
+        }
+
+    /* Get the host policy. */
+    nr_msrs = 0;
+    policy_leaves = nr_leaves;
+    rc = xc_get_system_cpu_policy(xch, XEN_SYSCTL_cpu_policy_host,
+                                  &policy_leaves, leaves, &nr_msrs, NULL);
+    if ( rc )
+    {
+        PERROR("Failed to obtain host policy");
+        rc = -errno;
+        goto fail;
+    }
+    for ( i = 0; i < policy_leaves; ++i )
+        if ( leaves[i].leaf == input[0] && leaves[i].subleaf == input[1] )
+        {
+            regs[0] = leaves[i].a;
+            regs[1] = leaves[i].b;
+            regs[2] = leaves[i].c;
+            regs[3] = leaves[i].d;
+            break;
+        }
 
     for ( i = 0; i < 4; i++ )
     {
@@ -986,9 +1046,21 @@ int xc_cpuid_set(
         }
     }
 
-    rc = xc_cpuid_do_domctl(xch, domid, input, regs);
-    if ( rc == 0 )
-        goto out;
+    /* Feed the transformed leaf back up to Xen. */
+    leaves[0] = (xen_cpuid_leaf_t){ input[0], input[1],
+                                    regs[0], regs[1], regs[2], regs[3] };
+    rc = xc_set_domain_cpu_policy(xch, domid, 1, leaves, 0, NULL,
+                                  &err_leaf, &err_subleaf, &err_msr);
+    if ( rc )
+    {
+        PERROR("Failed to set d%d's policy (err leaf %#x, subleaf %#x, msr %#x)",
+               domid, err_leaf, err_subleaf, err_msr);
+        rc = -errno;
+        goto fail;
+    }
+
+    /* Success! */
+    goto out;
 
  fail:
     for ( i = 0; i < 4; i++ )
@@ -998,6 +1070,7 @@ int xc_cpuid_set(
     }
 
  out:
-    free_cpuid_domain_info(&info);
+    free(leaves);
+
     return rc;
 }
