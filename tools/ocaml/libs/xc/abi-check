@@ -15,7 +15,7 @@ our %enums;
 @ARGV == 2 or die;
 our ($c, $o) = @ARGV;
 
-open STDIN, "<", $c or die $!;
+open C_FILE, "<", $c or die $!;
 
 our $cline = -1;
 our $ei;
@@ -29,7 +29,7 @@ our $ei;
 #   /* ! CPrefix CFinal CFinalHow */
 #
 # The function definitions use /* ! */ which simply skips that instance.
-while (<>) {
+while (<C_FILE>) {
     if ($cline == -1) {
         if (m/c_bitmap_to_ocaml_list|ocaml_list_to_c_bitmap/) {
             $cline = 0;
@@ -37,7 +37,8 @@ while (<>) {
         }
     } else {
         $cline++;
-        m{^\s+/\* \s+ ! \s+ (.*?) \s* \*/\s*$}x or die "$cline $_ ?";
+        m{^\s+/\* \s+ ! \s+ (.*?) \s* \*/\s*$}x or
+            die "at line $cline of annotation, did not expect $_ ?";
         my @vals = split /\s+/, $1;
         if ($cline == 1 && !@vals) {
             $cline = -1;
@@ -45,7 +46,7 @@ while (<>) {
             $ei->{$_} = shift @vals foreach qw(OType OPrefix Mangle);
         } elsif ($cline == 2 && @vals == 3) {
             $ei->{$_} = shift @vals foreach qw(CPrefix CFinal CFinalHow);
-            die if $enums{ $ei->{OType} };
+            die "redefining OType $ei->{OType}" if $enums{ $ei->{OType} };
             $enums{ $ei->{OType} } = $ei;
             $cline = -1;
         } else {
@@ -58,13 +59,14 @@ sub expect ($$) {
     printf "BUILD_BUG_ON( %-30s != %-10s );\n", @_ or die $!;
 }
 
-open STDIN, "<", $o or die $!;
+open OCAML_FILE, "<", $o or die $!;
 my $cval;
 $ei = undef;
 my $bitnum = 0;
-while (<>) {
+while (<OCAML_FILE>) {
     if (!$ei) {
         if (m{^type \s+ (\w+) \s* \= \s* $/}x && $enums{$1}) {
+            print "// found ocaml type $1 at $o:$.\n" or die $!;
             $ei = $enums{$1};
             $cval = '';
             $bitnum = 0;
