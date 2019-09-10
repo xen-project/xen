@@ -47,6 +47,7 @@ while (<C_FILE>) {
         } elsif ($cline == 1 && @vals == 1) {
             my ($otype) = @vals;
             die "reference to undefined OType $otype" unless $enums{$otype};
+            $cline = -1;
         } elsif ($cline == 1 && @vals == 3) {
             $ei->{$_} = shift @vals foreach qw(OType OPrefix Mangle);
         } elsif ($cline == 2 && @vals == 3) {
@@ -70,7 +71,7 @@ $ei = undef;
 my $bitnum = 0;
 while (<OCAML_FILE>) {
     if (!$ei) {
-        if (m{^type \s+ (\w+) \s* \= \s* $/}x && $enums{$1}) {
+        if (m{^type \s+ (\w+) \s* \= \s* $}x && $enums{$1}) {
             print "// found ocaml type $1 at $o:$.\n" or die $!;
             $ei = $enums{$1};
             $cval = '';
@@ -96,12 +97,18 @@ while (<OCAML_FILE>) {
             } else {
                 die Dumper($ei)." ?";
             }
+            $ei->{Checked} = 1;
             $ei = undef;
         } elsif (!m{\S}) {
         } else {
             die "$_ ?";
         }
     }
+}
+
+foreach $ei (values %enums) {
+    next if $ei->{Checked};
+    die "did not find ocaml type definition for $ei->{OType} in $o";
 }
 
 close STDOUT or die $!;
