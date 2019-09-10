@@ -557,7 +557,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
         };
 
         if (info->type != LIBXL_DOMAIN_TYPE_PV) {
-            create.flags |= XEN_DOMCTL_CDF_hvm_guest;
+            create.flags |= XEN_DOMCTL_CDF_hvm;
             create.flags |=
                 libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
             create.flags |=

@@ -608,7 +608,7 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
     unsigned int max_vcpus;
 
-    if ( config->flags != (XEN_DOMCTL_CDF_hvm_guest | XEN_DOMCTL_CDF_hap) )
+    if ( config->flags != (XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap) )
     {
         dprintk(XENLOG_INFO, "Unsupported configuration %#x\n", config->flags);
         return -EINVAL;

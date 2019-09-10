@@ -297,7 +297,7 @@ static void _domain_destroy(struct domain *d)
 
 static int sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
-    if ( config->flags & ~(XEN_DOMCTL_CDF_hvm_guest |
+    if ( config->flags & ~(XEN_DOMCTL_CDF_hvm |
                            XEN_DOMCTL_CDF_hap |
                            XEN_DOMCTL_CDF_s3_integrity |
                            XEN_DOMCTL_CDF_oos_off |
@@ -313,7 +313,7 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    if ( !(config->flags & XEN_DOMCTL_CDF_hvm_guest) &&
+    if ( !(config->flags & XEN_DOMCTL_CDF_hvm) &&
          (config->flags & XEN_DOMCTL_CDF_hap) )
     {
         dprintk(XENLOG_INFO, "HAP requested for non-HVM guest\n");
