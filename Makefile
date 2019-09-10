@@ -80,6 +80,9 @@ build-docs:
 test:
 	$(MAKE) -C tools/python test
 
+run-tests-%: build-tools-public-headers tools/tests/%/
+	$(MAKE) -C tools/tests/$* run
+
 # For most targets here,
 #   make COMPONENT-TARGET
 # is implemented, more or less, by

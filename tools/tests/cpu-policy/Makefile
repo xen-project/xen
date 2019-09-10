@@ -17,6 +17,10 @@ endif
 .PHONY: all
 all: $(TARGET-y)
 
+.PHONY: run
+run: $(TARGET-y)
+	./$(TARGET-y)
+
 .PHONY: clean
 clean:
 	$(RM) -f -- *.o .*.d .*.d2 test-cpu-policy
