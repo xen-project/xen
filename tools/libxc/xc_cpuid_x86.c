@@ -1,5 +1,5 @@
 /******************************************************************************
- * xc_cpuid_x86.c 
+ * xc_cpuid_x86.c
  *
  * Compute cpuid of a domain.
  *
@@ -336,7 +336,7 @@ static void cpuid(const unsigned int *input, unsigned int *regs)
 
 static int get_cpuid_domain_info(xc_interface *xch, uint32_t domid,
                                  struct cpuid_domain_info *info,
-                                 uint32_t *featureset,
+                                 const uint32_t *featureset,
                                  unsigned int nr_features)
 {
     struct xen_domctl domctl = {};
@@ -824,8 +824,7 @@ static void sanitise_featureset(struct cpuid_domain_info *info)
 }
 
 int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
-                          uint32_t *featureset,
-                          unsigned int nr_features)
+                          const uint32_t *featureset, unsigned int nr_features)
 {
     struct cpuid_domain_info info = {};
     unsigned int input[2] = { 0, 0 }, regs[4];
@@ -915,7 +914,7 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
  *   'k' -> pass through host value
  *   's' -> pass through the first time and then keep the same value
  *          across save/restore and migration.
- * 
+ *
  * For 's' and 'x' the configuration is overwritten with the value applied.
  */
 int xc_cpuid_set(
@@ -926,7 +925,8 @@ int xc_cpuid_set(
     unsigned int i, j, regs[4], polregs[4];
     struct cpuid_domain_info info = {};
 
-    memset(config_transformed, 0, 4 * sizeof(*config_transformed));
+    for ( i = 0; i < 4; ++i )
+        config_transformed[i] = NULL;
 
     rc = get_cpuid_domain_info(xch, domid, &info, NULL, 0);
     if ( rc )
@@ -944,7 +944,7 @@ int xc_cpuid_set(
             regs[i] = polregs[i];
             continue;
         }
-        
+
         config_transformed[i] = calloc(33, 1); /* 32 bits, NUL terminator. */
         if ( config_transformed[i] == NULL )
         {
@@ -952,6 +952,13 @@ int xc_cpuid_set(
             goto fail;
         }
 
+        /*
+         * Notes for following this algorithm:
+         *
+         * While it will accept any leaf data, it only makes sense to use on
+         * feature leaves.  regs[] initially contains the host values.  This,
+         * with the fall-through chain, is how the 's' and 'k' options work.
+         */
         for ( j = 0; j < 32; j++ )
         {
             unsigned char val = !!((regs[i] & (1U << (31 - j))));
