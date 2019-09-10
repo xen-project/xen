@@ -22,6 +22,7 @@ our $ei;
 
 # Parse the C file looking for calls to:
 #   c_bitmap_to_ocaml_list()
+#   ocaml_list_to_c_bitmap()
 #
 # followed by anotations of the following form:
 #   /* ! OType OPrefix Mangle */
@@ -30,7 +31,7 @@ our $ei;
 # The function definitions use /* ! */ which simply skips that instance.
 while (<>) {
     if ($cline == -1) {
-        if (m/c_bitmap_to_ocaml_list/) {
+        if (m/c_bitmap_to_ocaml_list|ocaml_list_to_c_bitmap/) {
             $cline = 0;
             $ei = { };
         }

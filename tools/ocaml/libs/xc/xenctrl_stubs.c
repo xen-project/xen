@@ -153,6 +153,23 @@ static value c_bitmap_to_ocaml_list
 	CAMLreturn(list);
 }
 
+#if 0 /* unused, will be used in a moment */
+static unsigned int ocaml_list_to_c_bitmap(value l)
+             /* ! */
+             /*
+	      * All calls to this function must be in a form suitable
+	      * for xenctrl_abi_check.  The parsing there is ad-hoc.
+	      */
+{
+	unsigned int val;
+
+	for ( ; l != Val_none; l = Field(l, 1) )
+		val |= 1u << Int_val(Field(l, 0));
+
+	return val;
+}
+#endif
+
 CAMLprim value stub_xc_domain_create(value xch, value config)
 {
 	CAMLparam2(xch, config);
