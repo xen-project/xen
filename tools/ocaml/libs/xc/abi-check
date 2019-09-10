@@ -5,6 +5,13 @@ use Data::Dumper;
 
 our %enums;
 
+# Usage: abi-check C-file Ocaml-file
+# Writes out a BUILD_BUG_ON() list to be included back into C.
+#
+# Ocaml-file should be the .ml file.  The ocaml compiler will check
+# that any declarations in a .mli correspond.  We check the .ml
+# rather than the .mli in case there are private types in future.
+
 @ARGV == 2 or die;
 our ($c, $o) = @ARGV;
 
@@ -13,6 +20,14 @@ open STDIN, "<", $c or die $!;
 our $cline = -1;
 our $ei;
 
+# Parse the C file looking for calls to:
+#   c_bitmap_to_ocaml_list()
+#
+# followed by anotations of the following form:
+#   /* ! OType OPrefix Mangle */
+#   /* ! CPrefix CFinal CFinalHow */
+#
+# The function definitions use /* ! */ which simply skips that instance.
 while (<>) {
     if ($cline == -1) {
         if (m/c_bitmap_to_ocaml_list/) {
