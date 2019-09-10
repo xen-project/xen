@@ -160,7 +160,7 @@ static unsigned int ocaml_list_to_c_bitmap(value l)
 	      * for xenctrl_abi_check.  The parsing there is ad-hoc.
 	      */
 {
-	unsigned int val;
+	unsigned int val = 0;
 
 	for ( ; l != Val_none; l = Field(l, 1) )
 		val |= 1u << Int_val(Field(l, 0));
