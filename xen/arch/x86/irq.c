@@ -2397,9 +2397,9 @@ static void dump_irqs(unsigned char key)
 
         spin_lock_irqsave(&desc->lock, flags);
 
-        printk("   IRQ:%4d aff:{%*pbl}/{%*pbl} vec:%02x %-15s status=%03x ",
-               irq, CPUMASK_PR(desc->affinity), CPUMASK_PR(desc->arch.cpu_mask),
-               desc->arch.vector, desc->handler->typename, desc->status);
+        printk("   IRQ:%4d vec:%02x %-15s status=%03x aff:{%*pbl}/{%*pbl} ",
+               irq, desc->arch.vector, desc->handler->typename, desc->status,
+               CPUMASK_PR(desc->affinity), CPUMASK_PR(desc->arch.cpu_mask));
 
         if ( ssid )
             printk("Z=%-25s ", ssid);
