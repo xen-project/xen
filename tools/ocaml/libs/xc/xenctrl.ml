@@ -57,7 +57,9 @@ type arch_domainconfig =
 	| ARM of xen_arm_arch_domainconfig
 	| X86 of xen_x86_arch_domainconfig
 
-type domain_create_flag = CDF_HVM | CDF_HAP
+type domain_create_flag =
+	| CDF_HVM
+	| CDF_HAP
 
 type domctl_create_config =
 {
