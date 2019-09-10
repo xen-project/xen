@@ -64,6 +64,10 @@ struct xen_domctl_createdomain {
  /* Is this a xenstore domain? */
 #define _XEN_DOMCTL_CDF_xs_domain     4
 #define XEN_DOMCTL_CDF_xs_domain      (1U<<_XEN_DOMCTL_CDF_xs_domain)
+
+/* Max XEN_DOMCTL_CDF_* constant.  Used for ABI checking. */
+#define XEN_DOMCTL_CDF_MAX XEN_DOMCTL_CDF_xs_domain
+
     uint32_t flags;
 
     /*

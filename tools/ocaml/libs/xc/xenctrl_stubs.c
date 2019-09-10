@@ -153,7 +153,6 @@ static value c_bitmap_to_ocaml_list
 	CAMLreturn(list);
 }
 
-#if 0 /* unused, will be used in a moment */
 static unsigned int ocaml_list_to_c_bitmap(value l)
              /* ! */
              /*
@@ -168,7 +167,6 @@ static unsigned int ocaml_list_to_c_bitmap(value l)
 
 	return val;
 }
-#endif
 
 CAMLprim value stub_xc_domain_create(value xch, value config)
 {
@@ -197,8 +195,10 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 
 	domain_handle_of_uuid_string(cfg.handle, String_val(VAL_HANDLE));
 
-	for ( l = VAL_FLAGS; l != Val_none; l = Field(l, 1) )
-		cfg.flags |= 1u << Int_val(Field(l, 0));
+	cfg.flags = ocaml_list_to_c_bitmap
+		/* ! domain_create_flag CDF_ lc */
+		/* ! XEN_DOMCTL_CDF_ XEN_DOMCTL_CDF_MAX max */
+		(VAL_FLAGS);
 
 	arch_domconfig = Field(VAL_ARCH, 0);
 	switch ( Tag_val(VAL_ARCH) )
@@ -213,8 +213,10 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
         /* Mnemonics for the named fields inside xen_x86_arch_domainconfig */
 #define VAL_EMUL_FLAGS          Field(arch_domconfig, 0)
 
-		for ( l = VAL_EMUL_FLAGS; l != Val_none; l = Field(l, 1) )
-			cfg.arch.emulation_flags |= 1u << Int_val(Field(l, 0));
+		cfg.arch.emulation_flags = ocaml_list_to_c_bitmap
+			/* ! x86_arch_emulation_flags X86_EMU_ none */
+			/* ! XEN_X86_EMU_ XEN_X86_EMU_ALL all */
+			(VAL_EMUL_FLAGS);
 
 #undef VAL_EMUL_FLAGS
 
@@ -370,8 +372,7 @@ static value alloc_domaininfo(xc_domaininfo_t * info)
 	 * emulation_flags: x86_arch_emulation_flags list;
 	 */
 	emul_list = c_bitmap_to_ocaml_list
-		/* ! x86_arch_emulation_flags X86_EMU_ none */
-		/* ! XEN_X86_EMU_ XEN_X86_EMU_ALL all */
+		/* ! x86_arch_emulation_flags */
 		(info->arch_config.emulation_flags);
 
 	/* xen_x86_arch_domainconfig */
