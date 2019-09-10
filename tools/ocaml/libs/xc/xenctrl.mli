@@ -53,6 +53,9 @@ type arch_domainconfig =
 type domain_create_flag =
   | CDF_HVM
   | CDF_HAP
+  | CDF_S3_INTEGRITY
+  | CDF_OOS_OFF
+  | CDF_XS_DOMAIN
 
 type domctl_create_config = {
   ssidref: int32;
