@@ -135,7 +135,20 @@ static value c_bitmap_to_ocaml_list
 	CAMLparam0();
 	CAMLlocal2(list, tmp);
 
+#if defined(__i386__) || defined(__x86_64__)
+/*
+ * This check file contains a mixture of stuff, because it is
+ * generated from the whole of this xenctrl_stubs.c file (without
+ * regard to arch ifdefs) and the whole of xenctrl.ml (which does not
+ * have any arch ifdeffery).  Currently, there is only x86 and
+ * arch-independent stuff, and there is no facility in the abi-check
+ * script for arch conditionals.  So for now we make the checks
+ * effective on x86 only; this will suffice to defend even ARM
+ * because breaking changes to common code will break the build
+ * on x86 and not make it to master.  This is a bit of a bodge.
+ */
 #include "xenctrl_abi_check.h"
+#endif
 
 	list = tmp = Val_emptylist;
 
