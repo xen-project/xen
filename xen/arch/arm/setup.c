@@ -399,6 +399,19 @@ void __init discard_initial_modules(void)
     remove_early_mappings();
 }
 
+/* Relocate the FDT in Xen heap */
+static void * __init relocate_fdt(paddr_t dtb_paddr, size_t dtb_size)
+{
+    void *fdt = xmalloc_bytes(dtb_size);
+
+    if ( !fdt )
+        panic("Unable to allocate memory for relocating the Device-Tree.\n");
+
+    copy_from_paddr(fdt, dtb_paddr, dtb_size);
+
+    return fdt;
+}
+
 #ifdef CONFIG_ARM_32
 /*
  * Returns the end address of the highest region in the range s..e
@@ -572,16 +585,13 @@ static void __init init_pdx(void)
 }
 
 #ifdef CONFIG_ARM_32
-static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+static void __init setup_mm(void)
 {
     paddr_t ram_start, ram_end, ram_size;
     paddr_t s, e;
     unsigned long ram_pages;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
-    unsigned long dtb_pages;
-    unsigned long boot_mfn_start, boot_mfn_end;
     int i;
-    void *fdt;
     const uint32_t ctr = READ_CP32(CTR);
 
     if ( !bootinfo.mem.nr_banks )
@@ -655,21 +665,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
-    /*
-     * Need a single mapped page for populating bootmem_region_list
-     * and enough mapped pages for copying the DTB.
-     */
-    dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
-    boot_mfn_start = mfn_x(xenheap_mfn_end) - dtb_pages - 1;
-    boot_mfn_end = mfn_x(xenheap_mfn_end);
-
-    init_boot_pages(pfn_to_paddr(boot_mfn_start), pfn_to_paddr(boot_mfn_end));
-
-    /* Copy the DTB. */
-    fdt = mfn_to_virt(mfn_x(alloc_boot_pages(dtb_pages, 1)));
-    copy_from_paddr(fdt, dtb_paddr, dtb_size);
-    device_tree_flattened = fdt;
-
     /* Add non-xenheap memory */
     for ( i = 0; i < bootinfo.mem.nr_banks; i++ )
     {
@@ -713,20 +708,17 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);
 
-    /* Add xenheap memory that was not already added to the boot
-       allocator. */
+    /* Add xenheap memory that was not already added to the boot allocator. */
     init_xenheap_pages(mfn_to_maddr(xenheap_mfn_start),
-                       pfn_to_paddr(boot_mfn_start));
+                       mfn_to_maddr(xenheap_mfn_end));
 }
 #else /* CONFIG_ARM_64 */
-static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+static void __init setup_mm(void)
 {
     paddr_t ram_start = ~0;
     paddr_t ram_end = 0;
     paddr_t ram_size = 0;
     int bank;
-    unsigned long dtb_pages;
-    void *fdt;
 
     init_pdx();
 
@@ -769,16 +761,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     xenheap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
     xenheap_mfn_start = maddr_to_mfn(ram_start);
     xenheap_mfn_end = maddr_to_mfn(ram_end);
-
-    /*
-     * Need enough mapped pages for copying the DTB.
-     */
-    dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
-
-    /* Copy the DTB. */
-    fdt = mfn_to_virt(mfn_x(alloc_boot_pages(dtb_pages, 1)));
-    copy_from_paddr(fdt, dtb_paddr, dtb_size);
-    device_tree_flattened = fdt;
 
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);
@@ -838,7 +820,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     printk("Command line: %s\n", cmdline);
     cmdline_parse(cmdline);
 
-    setup_mm(fdt_paddr, fdt_size);
+    setup_mm();
 
     /* Parse the ACPI tables for possible boot-time configuration */
     acpi_boot_table_init();
@@ -856,10 +838,14 @@ void __init start_xen(unsigned long boot_phys_offset,
     if ( acpi_disabled )
     {
         printk("Booting using Device Tree\n");
+        device_tree_flattened = relocate_fdt(fdt_paddr, fdt_size);
         dt_unflatten_host_device_tree();
     }
     else
+    {
         printk("Booting using ACPI\n");
+        device_tree_flattened = NULL;
+    }
 
     init_IRQ();
 
