@@ -47,6 +47,9 @@ various drivers, support functions and header files within Xen-aware
 Linux source trees. In all such cases, license terms are stated at the
 top of the file or in a COPYING file in the same directory.
 
+Sphinx documentation is licensed under CC-BY 4.0.  See
+docs/README.source for more specific information.
+
 In some cases, compatible 3rd party code has been imported into the
 Xen tree, retaining the original license, such as
   - AES-128 3.0
