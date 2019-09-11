@@ -14,7 +14,7 @@
 
 void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
 {
-    pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm;
+    pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm | XEN_SYSCTL_PHYSCAP_hap;
 }
 
 long arch_do_sysctl(struct xen_sysctl *sysctl,

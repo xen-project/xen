@@ -399,6 +399,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->cap_pv = !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_pv);
     physinfo->cap_hvm_directio =
         !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_directio);
+    physinfo->cap_hap = !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_hap);
 
     GC_FREE;
     return 0;

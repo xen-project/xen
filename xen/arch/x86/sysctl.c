@@ -163,6 +163,8 @@ void arch_do_physinfo(struct xen_sysctl_physinfo *pi)
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm;
     if ( IS_ENABLED(CONFIG_PV) )
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_pv;
+    if ( hvm_hap_supported() )
+        pi->capabilities |= XEN_SYSCTL_PHYSCAP_hap;
 }
 
 long arch_do_sysctl(

@@ -92,6 +92,7 @@ type physinfo_cap_flag =
   | CAP_HVM
   | CAP_PV
   | CAP_DirectIO
+  | CAP_HAP
 type physinfo = {
   threads_per_core : int;
   cores_per_socket : int;

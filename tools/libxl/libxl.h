@@ -395,6 +395,13 @@
 #define LIBXL_HAVE_EXTENDED_VKB 1
 
 /*
+ * LIBXL_HAVE_PHYSINFO_CAP_HAP indicates that libxl_physinfo has a cap_hap
+ * field that indicates whether the hardware supports Hardware Assisted
+ * Paging.
+ */
+#define LIBXL_HAVE_PHYSINFO_CAP_HAP 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

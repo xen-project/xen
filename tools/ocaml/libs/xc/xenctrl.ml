@@ -107,6 +107,7 @@ type physinfo_cap_flag =
 	| CAP_HVM
 	| CAP_PV
 	| CAP_DirectIO
+	| CAP_HAP
 
 type physinfo =
 {

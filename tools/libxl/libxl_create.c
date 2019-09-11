@@ -38,7 +38,13 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     libxl__arch_domain_create_info_setdefault(gc, c_info);
 
     if (c_info->type != LIBXL_DOMAIN_TYPE_PV) {
-        libxl_defbool_setdefault(&c_info->hap, true);
+        libxl_physinfo info;
+        int rc = libxl_get_physinfo(CTX, &info);
+
+        if (rc)
+            return rc;
+
+        libxl_defbool_setdefault(&c_info->hap, info.cap_hap);
         libxl_defbool_setdefault(&c_info->oos, true);
     }
 
