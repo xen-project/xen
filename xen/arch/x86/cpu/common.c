@@ -10,11 +10,14 @@
 #include <asm/io.h>
 #include <asm/mpspec.h>
 #include <asm/apic.h>
+#include <asm/setup.h>
 #include <mach_apic.h>
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
 
 #include "cpu.h"
 #include "mcheck/x86_mca.h"
+
+bool __read_mostly opt_dom0_cpuid_faulting = true;
 
 bool_t opt_arat = 1;
 boolean_param("arat", opt_arat);
@@ -171,20 +174,19 @@ void ctxt_switch_levelling(const struct vcpu *next)
 		/*
 		 * We *should* be enabling faulting for PV control domains.
 		 *
-		 * Unfortunately, the domain builder (having only ever been a
-		 * PV guest) expects to be able to see host cpuid state in a
-		 * native CPUID instruction, to correctly build a CPUID policy
-		 * for HVM guests (notably the xstate leaves).
+		 * The domain builder has now been updated to not depend on
+		 * seeing host CPUID values.  This makes it compatible with
+		 * PVH toolstack domains, and lets us enable faulting by
+		 * default for all PV domains.
 		 *
-		 * This logic is fundimentally broken for HVM toolstack
-		 * domains, and faulting causes PV guests to behave like HVM
-		 * guests from their point of view.
-		 *
-		 * Future development plans will move responsibility for
-		 * generating the maximum full cpuid policy into Xen, at which
-		 * this problem will disappear.
+		 * However, as PV control domains have never had faulting
+		 * enforced on them before, there might plausibly be other
+		 * dependenices on host CPUID data.  Therefore, we have left
+		 * an interim escape hatch in the form of
+		 * `dom0=no-cpuid-faulting` to restore the older behaviour.
 		 */
-		set_cpuid_faulting(nextd && (!is_control_domain(nextd) ||
+		set_cpuid_faulting(nextd && (opt_dom0_cpuid_faulting ||
+					     !is_control_domain(nextd) ||
 					     !is_pv_domain(nextd)) &&
 				   (is_pv_domain(nextd) ||
 				    next->arch.msrs->

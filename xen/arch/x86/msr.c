@@ -26,6 +26,7 @@
 
 #include <asm/debugreg.h>
 #include <asm/msr.h>
+#include <asm/setup.h>
 
 DEFINE_PER_CPU(uint32_t, tsc_aux);
 
@@ -92,7 +93,7 @@ int init_domain_msr_policy(struct domain *d)
         return -ENOMEM;
 
     /* See comment in ctxt_switch_levelling() */
-    if ( is_control_domain(d) && is_pv_domain(d) )
+    if ( !opt_dom0_cpuid_faulting && is_control_domain(d) && is_pv_domain(d) )
         mp->platform_info.cpuid_faulting = false;
 
     d->arch.msr = mp;

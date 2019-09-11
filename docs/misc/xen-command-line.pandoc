@@ -658,7 +658,8 @@ The debug trace feature is only enabled in debugging builds of Xen.
 Specify the bit width of the DMA heap.
 
 ### dom0
-    = List of [ pv | pvh, shadow=<bool>, verbose=<bool> ]
+    = List of [ pv | pvh, shadow=<bool>, verbose=<bool>,
+                cpuid-faulting=<bool> ]
 
     Applicability: x86
 
@@ -690,6 +691,22 @@ Controls for how dom0 is constructed on x86 systems.
 *   The `verbose` boolean is intended for diagnostics, and prints out extra
     information during the dom0 build.  It defaults to the compile time choice
     of `CONFIG_VERBOSE_DEBUG`.
+
+*   The `cpuid-faulting` boolean is an interim option, is only applicable to
+    PV dom0, and defaults to true.
+
+    Before Xen 4.13, the domain builder logic for guest construction depended
+    on seeing host CPUID values to function correctly.  As a result, CPUID
+    Faulting was never activated for PV dom0's, even on capable hardware.
+
+    In Xen 4.13, the domain builder logic has been fixed, and no longer has
+    this dependency.  As a consequence, CPUID Faulting is activated by default
+    even for PV dom0's.
+
+    However, as PV dom0's have always seen host CPUID data in the past, there
+    is a chance that further dependencies exist.  This boolean can be used to
+    restore the pre-4.13 behaviour.  If specifying `no-cpuid-faulting` fixes
+    an issue in dom0, please report a bug.
 
 ### dom0-iommu
     = List of [ passthrough=<bool>, strict=<bool>, map-inclusive=<bool>,

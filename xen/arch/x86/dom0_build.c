@@ -305,6 +305,9 @@ static int __init parse_dom0_param(const char *s)
 #endif
         else if ( (val = parse_boolean("verbose", s, ss)) >= 0 )
             opt_dom0_verbose = val;
+        else if ( IS_ENABLED(CONFIG_PV) &&
+                  (val = parse_boolean("cpuid-faulting", s, ss)) >= 0 )
+            opt_dom0_cpuid_faulting = val;
         else
             rc = -EINVAL;
 
