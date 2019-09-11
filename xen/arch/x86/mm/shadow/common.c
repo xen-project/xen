@@ -1256,29 +1256,26 @@ static unsigned int sh_min_allocation(const struct domain *d)
      * up of slot zero and an LAPIC page), plus one for HVM's 1-to-1 pagetable.
      */
     return shadow_min_acceptable_pages(d) +
-           max(d->tot_pages / 256,
-               is_hvm_domain(d) ? CONFIG_PAGING_LEVELS + 2 : 0U) +
-           is_hvm_domain(d);
+           max(max(d->tot_pages / 256,
+                   is_hvm_domain(d) ? CONFIG_PAGING_LEVELS + 2 : 0U) +
+               is_hvm_domain(d),
+               d->arch.paging.shadow.p2m_pages);
 }
 
 int shadow_set_allocation(struct domain *d, unsigned int pages, bool *preempted)
 {
     struct page_info *sp;
-    unsigned int lower_bound;
 
     ASSERT(paging_locked_by_me(d));
 
     if ( pages > 0 )
     {
         /* Check for minimum value. */
-        if ( pages < d->arch.paging.shadow.p2m_pages )
-            pages = 0;
-        else
-            pages -= d->arch.paging.shadow.p2m_pages;
+        unsigned int lower_bound = sh_min_allocation(d);
 
-        lower_bound = sh_min_allocation(d);
         if ( pages < lower_bound )
             pages = lower_bound;
+        pages -= d->arch.paging.shadow.p2m_pages;
     }
 
     SHADOW_PRINTK("current %i target %i\n",
@@ -2607,7 +2604,7 @@ int shadow_enable(struct domain *d, u32 mode)
 
     /* Init the shadow memory allocation if the user hasn't done so */
     old_pages = d->arch.paging.shadow.total_pages;
-    if ( old_pages < sh_min_allocation(d) + d->arch.paging.shadow.p2m_pages )
+    if ( old_pages < sh_min_allocation(d) )
     {
         paging_lock(d);
         rv = shadow_set_allocation(d, 1024, NULL); /* Use at least 4MB */
@@ -2864,8 +2861,7 @@ static int shadow_one_bit_enable(struct domain *d, u32 mode)
 
     mode |= PG_SH_enable;
 
-    if ( d->arch.paging.shadow.total_pages <
-         sh_min_allocation(d) + d->arch.paging.shadow.p2m_pages )
+    if ( d->arch.paging.shadow.total_pages < sh_min_allocation(d) )
     {
         /* Init the shadow memory allocation if the user hasn't done so */
         if ( shadow_set_allocation(d, 1, NULL) != 0 )
