@@ -264,7 +264,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
         case 1: kind = BOOTMOD_RAMDISK; break;
         default: break;
         }
-	if ( kind_guess > 1 && has_xsm_magic(start) )
+        if ( kind_guess > 1 && has_xsm_magic(start) )
             kind = BOOTMOD_XSM;
     }
 
