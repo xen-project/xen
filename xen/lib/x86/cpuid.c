@@ -381,6 +381,11 @@ int x86_cpuid_copy_from_buffer(struct cpuid_policy *p,
     unsigned int i;
     xen_cpuid_leaf_t data;
 
+    if ( err_leaf )
+        *err_leaf = -1;
+    if ( err_subleaf )
+        *err_subleaf = -1;
+
     /*
      * A well formed caller is expected to pass an array with leaves in order,
      * and without any repetitions.  However, due to per-vendor differences,

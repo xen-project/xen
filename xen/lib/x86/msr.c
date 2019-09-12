@@ -55,6 +55,9 @@ int x86_msr_copy_from_buffer(struct msr_policy *p,
     xen_msr_entry_t data;
     int rc;
 
+    if ( err_msr )
+        *err_msr = -1;
+
     /*
      * A well formed caller is expected to pass an array with entries in
      * order, and without any repetitions.  However, due to per-vendor

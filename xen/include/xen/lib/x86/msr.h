@@ -54,14 +54,14 @@ int x86_msr_copy_to_buffer(const struct msr_policy *policy,
  * @param policy     The msr_policy object to unserialise into.
  * @param msrs       The array of msrs to unserialise from.
  * @param nr_entries The number of entries in 'msrs'.
- * @param err_msr    Optional hint filled on error.
+ * @param err_msr    Optional hint for error diagnostics.
  * @returns -errno
  *
  * Reads at most MSR_MAX_SERIALISED_ENTRIES.  May fail for a number of reasons
  * based on the content in an individual 'msrs' entry, including the MSR index
  * not being valid in the policy, the flags field being nonzero, or if the
  * value provided would truncate when stored in the policy.  In such cases,
- * the optional err_* pointer is filled in to aid diagnostics.
+ * the optional err_* pointer will identify the problematic MSR.
  *
  * No content validation is performed on the data stored in the policy object.
  */

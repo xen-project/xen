@@ -283,7 +283,7 @@ static void test_cpuid_deserialise_failure(void)
     for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
     {
         const struct test *t = &tests[i];
-        uint32_t err_leaf = ~0u, err_subleaf = ~0u;
+        uint32_t err_leaf, err_subleaf;
         int rc;
 
         /* No writes should occur.  Use NULL to catch errors. */
@@ -336,7 +336,7 @@ static void test_msr_deserialise_failure(void)
     for ( size_t i = 0; i < ARRAY_SIZE(tests); ++i )
     {
         const struct test *t = &tests[i];
-        uint32_t err_msr = ~0u;
+        uint32_t err_msr;
         int rc;
 
         /* No writes should occur.  Use NULL to catch errors. */
