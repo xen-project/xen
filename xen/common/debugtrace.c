@@ -15,11 +15,14 @@
 #include <xen/spinlock.h>
 #include <xen/watchdog.h>
 
+#define DEBUGTRACE_COUNT_WRAP 99999999
+
 /* Send output direct to console, or buffer it? */
 static volatile bool debugtrace_send_to_console;
 
 struct debugtrace_data {
     unsigned long prd;   /* Producer index. */
+    unsigned long wrap_cnt;
     char          buf[];
 };
 
@@ -72,6 +75,7 @@ static void debugtrace_dump_buffer(struct debugtrace_data *data,
     /* Print youngest portion of the ring. */
     data->buf[data->prd] = '\0';
     console_serial_puts(&data->buf[0], data->prd);
+    printk("wrap: %lu\n", data->wrap_cnt);
 
     memset(data->buf, '\0', debugtrace_bytes);
     data->prd = 0;
@@ -153,9 +157,9 @@ void debugtrace_printk(const char *fmt, ...)
 {
     static char buf[1024], last_buf[1024];
     static unsigned int count, last_count, last_cpu;
-    static unsigned long last_prd;
+    static unsigned long last_prd, wrap_cnt;
 
-    char          cntbuf[24];
+    char          cntbuf[50];
     va_list       args;
     unsigned long flags;
     unsigned int nr;
@@ -173,10 +177,23 @@ void debugtrace_printk(const char *fmt, ...)
     nr = vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
 
+    if ( count == DEBUGTRACE_COUNT_WRAP )
+    {
+        count = 0;
+        wrap_cnt++;
+    }
+
     if ( debugtrace_send_to_console )
     {
-        unsigned int n = scnprintf(cntbuf, sizeof(cntbuf), "%u ", ++count);
+        unsigned int n;
 
+        if ( count == 0 )
+        {
+            n = scnprintf(cntbuf, sizeof(cntbuf), "wrap: %lu\n", wrap_cnt);
+            console_serial_puts(cntbuf, n);
+        }
+
+        n = scnprintf(cntbuf, sizeof(cntbuf), "%u ", ++count);
         console_serial_puts(cntbuf, n);
         console_serial_puts(buf, nr);
     }
@@ -184,8 +201,16 @@ void debugtrace_printk(const char *fmt, ...)
     {
         unsigned int cpu = debugtrace_per_cpu ? smp_processor_id() : 0;
 
-        if ( debugtrace_buf_empty || cpu != last_cpu || strcmp(buf, last_buf) )
+        if ( debugtrace_buf_empty || cpu != last_cpu ||
+             wrap_cnt != data->wrap_cnt || strcmp(buf, last_buf) )
         {
+            if ( wrap_cnt != data->wrap_cnt )
+            {
+                snprintf(cntbuf, sizeof(cntbuf), "wrap: %lu->%lu\n",
+                         data->wrap_cnt, wrap_cnt);
+                debugtrace_add_to_buf(cntbuf);
+                data->wrap_cnt = wrap_cnt;
+            }
             debugtrace_buf_empty = false;
             last_prd = data->prd;
             last_count = ++count;
