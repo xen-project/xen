@@ -6,6 +6,7 @@
 
 
 #include <xen/console.h>
+#include <xen/cpu.h>
 #include <xen/init.h>
 #include <xen/keyhandler.h>
 #include <xen/lib.h>
@@ -23,35 +24,79 @@ struct debugtrace_data {
 };
 
 static struct debugtrace_data *dt_data;
+static DEFINE_PER_CPU(struct debugtrace_data *, dt_cpu_data);
 
-static unsigned int debugtrace_kilobytes = 128;
-static unsigned long debugtrace_bytes;
+static unsigned long __read_mostly debugtrace_bytes = 128 << 10;
+static bool __read_mostly debugtrace_per_cpu;
 static bool debugtrace_buf_empty = true;
 static bool debugtrace_used;
 static DEFINE_SPINLOCK(debugtrace_lock);
-integer_param("debugtrace", debugtrace_kilobytes);
+
+static int __init debugtrace_parse_param(const char *s)
+{
+    unsigned long bytes;
+
+    if ( !strncmp(s, "cpu:", 4) )
+    {
+        debugtrace_per_cpu = true;
+        s += 4;
+    }
+    bytes = parse_size_and_unit(s, &s);
+
+    if ( *s )
+        return -EINVAL;
+
+    debugtrace_bytes = MAX(bytes, PAGE_SIZE);
+
+    /* Round size down to next power of two. */
+    while ( (bytes = (debugtrace_bytes & (debugtrace_bytes - 1))) != 0 )
+        debugtrace_bytes = bytes;
+
+    return 0;
+}
+custom_param("debugtrace", debugtrace_parse_param);
+
+static void debugtrace_dump_buffer(struct debugtrace_data *data,
+                                   const char *which)
+{
+    if ( !data )
+        return;
+
+    printk("debugtrace_dump() %s buffer starting\n", which);
+
+    /* Print oldest portion of the ring. */
+    if ( data->buf[data->prd] != '\0' )
+        console_serial_puts(&data->buf[data->prd],
+                            debugtrace_bytes - data->prd);
+
+    /* Print youngest portion of the ring. */
+    data->buf[data->prd] = '\0';
+    console_serial_puts(&data->buf[0], data->prd);
+
+    memset(data->buf, '\0', debugtrace_bytes);
+    data->prd = 0;
+
+    printk("debugtrace_dump() %s buffer finished\n", which);
+}
 
 static void debugtrace_dump_worker(void)
 {
+    unsigned int cpu;
+
     if ( !debugtrace_used )
         return;
 
-    printk("debugtrace_dump() starting\n");
+    debugtrace_dump_buffer(dt_data, "global");
 
-    /* Print oldest portion of the ring. */
-    if ( dt_data->buf[dt_data->prd] != '\0' )
-        console_serial_puts(&dt_data->buf[dt_data->prd],
-                            debugtrace_bytes - dt_data->prd);
+    for ( cpu = 0; cpu < nr_cpu_ids; cpu++ )
+    {
+        char buf[16];
 
-    /* Print youngest portion of the ring. */
-    dt_data->buf[dt_data->prd] = '\0';
-    console_serial_puts(&dt_data->buf[0], dt_data->prd);
+        snprintf(buf, sizeof(buf), "cpu %u", cpu);
+        debugtrace_dump_buffer(per_cpu(dt_cpu_data, cpu), buf);
+    }
 
-    memset(dt_data->buf, '\0', debugtrace_bytes);
-    dt_data->prd = 0;
     debugtrace_buf_empty = true;
-
-    printk("debugtrace_dump() finished\n");
 }
 
 static void debugtrace_toggle(void)
@@ -91,28 +136,33 @@ void debugtrace_dump(void)
 
 static void debugtrace_add_to_buf(char *buf)
 {
+    struct debugtrace_data *data;
     char *p;
+
+    data = debugtrace_per_cpu ? this_cpu(dt_cpu_data) : dt_data;
 
     for ( p = buf; *p != '\0'; p++ )
     {
-        dt_data->buf[dt_data->prd++] = *p;
-        if ( dt_data->prd == debugtrace_bytes )
-            dt_data->prd = 0;
+        data->buf[data->prd++] = *p;
+        if ( data->prd == debugtrace_bytes )
+            data->prd = 0;
     }
 }
 
 void debugtrace_printk(const char *fmt, ...)
 {
     static char buf[1024], last_buf[1024];
-    static unsigned int count, last_count;
+    static unsigned int count, last_count, last_cpu;
     static unsigned long last_prd;
 
     char          cntbuf[24];
     va_list       args;
     unsigned long flags;
     unsigned int nr;
+    struct debugtrace_data *data;
 
-    if ( !dt_data )
+    data = debugtrace_per_cpu ? this_cpu(dt_cpu_data) : dt_data;
+    if ( !data )
         return;
 
     debugtrace_used = true;
@@ -132,17 +182,20 @@ void debugtrace_printk(const char *fmt, ...)
     }
     else
     {
-        if ( debugtrace_buf_empty || strcmp(buf, last_buf) )
+        unsigned int cpu = debugtrace_per_cpu ? smp_processor_id() : 0;
+
+        if ( debugtrace_buf_empty || cpu != last_cpu || strcmp(buf, last_buf) )
         {
             debugtrace_buf_empty = false;
-            last_prd = dt_data->prd;
+            last_prd = data->prd;
             last_count = ++count;
+            last_cpu = cpu;
             safe_strcpy(last_buf, buf);
             snprintf(cntbuf, sizeof(cntbuf), "%u ", count);
         }
         else
         {
-            dt_data->prd = last_prd;
+            data->prd = last_prd;
             snprintf(cntbuf, sizeof(cntbuf), "%u-%u ", last_count, ++count);
         }
         debugtrace_add_to_buf(cntbuf);
@@ -157,33 +210,68 @@ static void debugtrace_key(unsigned char key)
     debugtrace_toggle();
 }
 
-static int __init debugtrace_init(void)
+static void debugtrace_alloc_buffer(struct debugtrace_data **ptr,
+                                    unsigned int cpu)
 {
     int order;
-    unsigned long kbytes;
     struct debugtrace_data *data;
 
-    /* Round size down to next power of two. */
-    while ( (kbytes = (debugtrace_kilobytes & (debugtrace_kilobytes-1))) != 0 )
-        debugtrace_kilobytes = kbytes;
-
-    debugtrace_bytes = debugtrace_kilobytes << 10;
-    if ( debugtrace_bytes == 0 )
-        return 0;
+    if ( *ptr )
+        return;
 
     order = get_order_from_bytes(debugtrace_bytes);
     data = alloc_xenheap_pages(order, 0);
     if ( !data )
-        return -ENOMEM;
+    {
+        if ( debugtrace_per_cpu )
+            printk("CPU%u: failed to allocate debugtrace buffer\n", cpu);
+        else
+            printk("failed to allocate debugtrace buffer\n");
+        return;
+    }
 
-    debugtrace_bytes = PAGE_SIZE << order;
-    memset(data, '\0', debugtrace_bytes);
-    debugtrace_bytes -= sizeof(*data);
+    memset(data, '\0', debugtrace_bytes + sizeof(*data));
 
     dt_data = data;
+    *ptr = data;
+}
+
+static int debugtrace_cpu_callback(struct notifier_block *nfb,
+                                   unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    /* Buffers are only ever allocated, never freed. */
+    if ( action == CPU_UP_PREPARE )
+        debugtrace_alloc_buffer(&per_cpu(dt_cpu_data, cpu), cpu);
+
+    return 0;
+}
+
+static struct notifier_block debugtrace_nfb = {
+    .notifier_call = debugtrace_cpu_callback
+};
+
+static int __init debugtrace_init(void)
+{
+    unsigned int cpu;
+
+    if ( !debugtrace_bytes )
+        return 0;
 
     register_keyhandler('T', debugtrace_key,
                         "toggle debugtrace to console/buffer", 0);
+
+    debugtrace_bytes -= sizeof(struct debugtrace_data);
+
+    if ( debugtrace_per_cpu )
+    {
+        for_each_online_cpu ( cpu )
+            debugtrace_alloc_buffer(&per_cpu(dt_cpu_data, cpu), cpu);
+        register_cpu_notifier(&debugtrace_nfb);
+    }
+    else
+        debugtrace_alloc_buffer(&dt_data, 0);
 
     return 0;
 }

@@ -644,12 +644,13 @@ over the PCI busses sequentially) or by PCI device (must be on segment 0).
 Limits the number lines printed in Xen stack traces.
 
 ### debugtrace
-> `= <integer>`
+> `= [cpu:]<size>`
 
 > Default: `128`
 
-Specify the size of the console debug trace buffer in KiB. The debug
-trace feature is only enabled in debugging builds of Xen.
+Specify the size of the console debug trace buffer. By specifying `cpu:`
+additionally a trace buffer of the specified size is allocated per cpu.
+The debug trace feature is only enabled in debugging builds of Xen.
 
 ### dma_bits
 > `= <integer>`
