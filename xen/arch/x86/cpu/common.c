@@ -124,7 +124,7 @@ bool __init probe_cpuid_faulting(void)
 		return false;
 
 	if ((rc = rdmsr_safe(MSR_INTEL_PLATFORM_INFO, val)) == 0)
-		raw_msr_policy.plaform_info.cpuid_faulting =
+		raw_msr_policy.platform_info.cpuid_faulting =
 			val & MSR_PLATFORM_INFO_CPUID_FAULTING;
 
 	if (rc ||

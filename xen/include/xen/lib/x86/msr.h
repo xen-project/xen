@@ -22,7 +22,7 @@ struct msr_policy
             uint32_t :31;
             bool cpuid_faulting:1;
         };
-    } plaform_info;
+    } platform_info;
 };
 
 #ifdef __XEN__

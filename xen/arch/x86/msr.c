@@ -51,7 +51,7 @@ static void __init calculate_host_policy(void)
 
     /* 0x000000ce  MSR_INTEL_PLATFORM_INFO */
     /* probe_cpuid_faulting() sanity checks presence of MISC_FEATURES_ENABLES */
-    mp->plaform_info.cpuid_faulting = cpu_has_cpuid_faulting;
+    mp->platform_info.cpuid_faulting = cpu_has_cpuid_faulting;
 }
 
 static void __init calculate_hvm_max_policy(void)
@@ -64,7 +64,7 @@ static void __init calculate_hvm_max_policy(void)
     *mp = host_msr_policy;
 
     /* It's always possible to emulate CPUID faulting for HVM guests */
-    mp->plaform_info.cpuid_faulting = true;
+    mp->platform_info.cpuid_faulting = true;
 }
 
 static void __init calculate_pv_max_policy(void)
@@ -93,7 +93,7 @@ int init_domain_msr_policy(struct domain *d)
 
     /* See comment in intel_ctxt_switch_levelling() */
     if ( is_control_domain(d) )
-        mp->plaform_info.cpuid_faulting = false;
+        mp->platform_info.cpuid_faulting = false;
 
     d->arch.msr = mp;
 
@@ -165,7 +165,7 @@ int guest_rdmsr(struct vcpu *v, uint32_t msr, uint64_t *val)
         break;
 
     case MSR_INTEL_PLATFORM_INFO:
-        *val = mp->plaform_info.raw;
+        *val = mp->platform_info.raw;
         break;
 
     case MSR_ARCH_CAPABILITIES:
@@ -358,7 +358,7 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
         bool old_cpuid_faulting = msrs->misc_features_enables.cpuid_faulting;
 
         rsvd = ~0ull;
-        if ( mp->plaform_info.cpuid_faulting )
+        if ( mp->platform_info.cpuid_faulting )
             rsvd &= ~MSR_MISC_FEATURES_CPUID_FAULTING;
 
         if ( val & rsvd )
