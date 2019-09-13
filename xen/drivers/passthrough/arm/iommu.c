@@ -15,9 +15,10 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/lib.h>
-#include <xen/iommu.h>
 #include <xen/device_tree.h>
+#include <xen/iommu.h>
+#include <xen/lib.h>
+
 #include <asm/device.h>
 
 static const struct iommu_ops *iommu_ops;
