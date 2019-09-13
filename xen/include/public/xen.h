@@ -775,12 +775,17 @@ struct shared_info {
     xen_ulong_t evtchn_mask[sizeof(xen_ulong_t) * 8];
 
     /*
-     * Wallclock time: updated only by control software. Guests should base
-     * their gettimeofday() syscall on this wallclock-base value.
+     * Wallclock time: updated by control software or RTC emulation.
+     * Guests should base their gettimeofday() syscall on this
+     * wallclock-base value.
+     * The values of wc_sec and wc_nsec are offsets from the Unix epoch
+     * adjusted by the domain's 'time offset' (in seconds) as set either
+     * by XEN_DOMCTL_settimeoffset, or adjusted via a guest write to the
+     * emulated RTC.
      */
     uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
-    uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+    uint32_t wc_sec;
+    uint32_t wc_nsec;
 #if !defined(__i386__)
     uint32_t wc_sec_hi;
 # define xen_wc_sec_hi wc_sec_hi
