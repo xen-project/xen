@@ -438,7 +438,7 @@ static bool __init check_smt_enabled(void)
 /* Calculate whether Retpoline is known-safe on this CPU. */
 static bool __init retpoline_safe(uint64_t caps)
 {
-    unsigned int ucode_rev = this_cpu(ucode_cpu_info).cpu_sig.rev;
+    unsigned int ucode_rev = this_cpu(cpu_sig).rev;
 
     if ( boot_cpu_data.x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON) )
         return true;

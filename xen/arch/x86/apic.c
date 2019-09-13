@@ -1190,7 +1190,7 @@ static void __init check_deadline_errata(void)
     else
         rev = (unsigned long)m->driver_data;
 
-    if ( this_cpu(ucode_cpu_info).cpu_sig.rev >= rev )
+    if ( this_cpu(cpu_sig).rev >= rev )
         return;
 
     setup_clear_cpu_cap(X86_FEATURE_TSC_DEADLINE);

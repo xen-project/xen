@@ -231,10 +231,10 @@ static enum microcode_match_result microcode_update_match(
     const struct extended_sigtable *ext_header;
     const struct extended_signature *ext_sig;
     unsigned int i;
-    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    unsigned int sig = uci->cpu_sig.sig;
-    unsigned int pf = uci->cpu_sig.pf;
-    unsigned int rev = uci->cpu_sig.rev;
+    struct cpu_signature *cpu_sig = &per_cpu(cpu_sig, cpu);
+    unsigned int sig = cpu_sig->sig;
+    unsigned int pf = cpu_sig->pf;
+    unsigned int rev = cpu_sig->rev;
     unsigned long data_size = get_datasize(mc_header);
     const void *end = (const void *)mc_header + get_totalsize(mc_header);
 
@@ -296,7 +296,6 @@ static enum microcode_match_result compare_patch(
  */
 static int get_matching_microcode(const void *mc, unsigned int cpu)
 {
-    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     const struct microcode_header_intel *mc_header = mc;
     unsigned long total_size = get_totalsize(mc_header);
     void *new_mc = xmalloc_bytes(total_size);
@@ -322,17 +321,8 @@ static int get_matching_microcode(const void *mc, unsigned int cpu)
 
     pr_debug("microcode: CPU%d found a matching microcode update with"
              " version %#x (current=%#x)\n",
-             cpu, mc_header->rev, uci->cpu_sig.rev);
-    new_mc = xmalloc_bytes(total_size);
-    if ( new_mc == NULL )
-    {
-        printk(KERN_ERR "microcode: error! Can not allocate memory\n");
-        return -ENOMEM;
-    }
+             cpu, mc_header->rev, per_cpu(cpu_sig, cpu).rev);
 
-    memcpy(new_mc, mc, total_size);
-    xfree(uci->mc.mc_intel);
-    uci->mc.mc_intel = new_mc;
     return 1;
 }
 
@@ -342,7 +332,7 @@ static int apply_microcode(unsigned int cpu)
     uint64_t msr_content;
     unsigned int val[2];
     unsigned int cpu_num = raw_smp_processor_id();
-    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
+    struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     const struct microcode_intel *mc_intel;
     const struct microcode_patch *patch = microcode_get_cache();
 
@@ -376,14 +366,14 @@ static int apply_microcode(unsigned int cpu)
     {
         printk(KERN_ERR "microcode: CPU%d update from revision "
                "%#x to %#x failed. Resulting revision is %#x.\n", cpu_num,
-               uci->cpu_sig.rev, mc_intel->hdr.rev, val[1]);
+               sig->rev, mc_intel->hdr.rev, val[1]);
         return -EIO;
     }
     printk(KERN_INFO "microcode: CPU%d updated from revision "
            "%#x to %#x, date = %04x-%02x-%02x \n",
-           cpu_num, uci->cpu_sig.rev, val[1], mc_intel->hdr.year,
+           cpu_num, sig->rev, val[1], mc_intel->hdr.year,
            mc_intel->hdr.month, mc_intel->hdr.day);
-    uci->cpu_sig.rev = val[1];
+    sig->rev = val[1];
 
     return 0;
 }
