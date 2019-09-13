@@ -454,13 +454,7 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
     return error;
 }
 
-static int microcode_resume_match(unsigned int cpu, const void *mc)
-{
-    return get_matching_microcode(mc, cpu);
-}
-
 static const struct microcode_ops microcode_intel_ops = {
-    .microcode_resume_match           = microcode_resume_match,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,

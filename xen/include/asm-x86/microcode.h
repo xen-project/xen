@@ -21,7 +21,6 @@ struct microcode_patch {
 };
 
 struct microcode_ops {
-    int (*microcode_resume_match)(unsigned int cpu, const void *mc);
     int (*cpu_request_microcode)(unsigned int cpu, const void *buf,
                                  size_t size);
     int (*collect_cpu_info)(unsigned int cpu, struct cpu_signature *csig);

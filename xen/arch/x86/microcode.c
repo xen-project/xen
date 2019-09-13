@@ -215,8 +215,6 @@ int microcode_resume_cpu(unsigned int cpu)
 {
     int err;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    struct cpu_signature nsig;
-    unsigned int cpu2;
 
     if ( !microcode_ops )
         return 0;
@@ -224,42 +222,8 @@ int microcode_resume_cpu(unsigned int cpu)
     spin_lock(&microcode_mutex);
 
     err = microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
-    if ( err )
-    {
-        __microcode_fini_cpu(cpu);
-        spin_unlock(&microcode_mutex);
-        return err;
-    }
-
-    if ( uci->mc.mc_valid )
-    {
-        err = microcode_ops->microcode_resume_match(cpu, uci->mc.mc_valid);
-        if ( err >= 0 )
-        {
-            if ( err )
-                err = microcode_ops->apply_microcode(cpu);
-            spin_unlock(&microcode_mutex);
-            return err;
-        }
-    }
-
-    nsig = uci->cpu_sig;
-    __microcode_fini_cpu(cpu);
-    uci->cpu_sig = nsig;
-
-    err = -EIO;
-    for_each_online_cpu ( cpu2 )
-    {
-        uci = &per_cpu(ucode_cpu_info, cpu2);
-        if ( uci->mc.mc_valid &&
-             microcode_ops->microcode_resume_match(cpu, uci->mc.mc_valid) > 0 )
-        {
-            err = microcode_ops->apply_microcode(cpu);
-            break;
-        }
-    }
-
-    __microcode_fini_cpu(cpu);
+    if ( likely(!err) )
+        err = microcode_ops->apply_microcode(cpu);
     spin_unlock(&microcode_mutex);
 
     return err;

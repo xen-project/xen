@@ -654,52 +654,6 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
     return error;
 }
 
-static int microcode_resume_match(unsigned int cpu, const void *mc)
-{
-    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
-    struct microcode_amd *mc_amd = uci->mc.mc_amd;
-    const struct microcode_amd *src = mc;
-
-    if ( microcode_fits(src, cpu) != NEW_UCODE )
-        return 0;
-
-    if ( src != mc_amd )
-    {
-        if ( mc_amd )
-        {
-            xfree(mc_amd->equiv_cpu_table);
-            xfree(mc_amd->mpb);
-            xfree(mc_amd);
-        }
-
-        mc_amd = xmalloc(struct microcode_amd);
-        uci->mc.mc_amd = mc_amd;
-        if ( !mc_amd )
-            return -ENOMEM;
-        mc_amd->equiv_cpu_table = xmalloc_bytes(src->equiv_cpu_table_size);
-        if ( !mc_amd->equiv_cpu_table )
-            goto err1;
-        mc_amd->mpb = xmalloc_bytes(src->mpb_size);
-        if ( !mc_amd->mpb )
-            goto err2;
-
-        mc_amd->equiv_cpu_table_size = src->equiv_cpu_table_size;
-        mc_amd->mpb_size = src->mpb_size;
-        memcpy(mc_amd->mpb, src->mpb, src->mpb_size);
-        memcpy(mc_amd->equiv_cpu_table, src->equiv_cpu_table,
-               src->equiv_cpu_table_size);
-    }
-
-    return 1;
-
-err2:
-    xfree(mc_amd->equiv_cpu_table);
-err1:
-    xfree(mc_amd);
-    uci->mc.mc_amd = NULL;
-    return -ENOMEM;
-}
-
 static int start_update(void)
 {
 #if CONFIG_HVM
@@ -719,7 +673,6 @@ static int start_update(void)
 }
 
 static const struct microcode_ops microcode_amd_ops = {
-    .microcode_resume_match           = microcode_resume_match,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
