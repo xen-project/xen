@@ -134,21 +134,11 @@ static int collect_cpu_info(unsigned int cpu_num, struct cpu_signature *csig)
     return 0;
 }
 
-static inline int microcode_update_match(
-    unsigned int cpu_num, const struct microcode_header_intel *mc_header,
-    int sig, int pf)
+static int microcode_sanity_check(const void *mc)
 {
-    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu_num);
-
-    return (sigmatch(sig, uci->cpu_sig.sig, pf, uci->cpu_sig.pf) &&
-            (mc_header->rev > uci->cpu_sig.rev));
-}
-
-static int microcode_sanity_check(void *mc)
-{
-    struct microcode_header_intel *mc_header = mc;
-    struct extended_sigtable *ext_header = NULL;
-    struct extended_signature *ext_sig;
+    const struct microcode_header_intel *mc_header = mc;
+    const struct extended_sigtable *ext_header = NULL;
+    const struct extended_signature *ext_sig;
     unsigned long total_size, data_size, ext_table_size;
     unsigned int ext_sigcount = 0, i;
     uint32_t sum, orig_sum;
@@ -234,6 +224,41 @@ static int microcode_sanity_check(void *mc)
     return 0;
 }
 
+/* Check an update against the CPU signature and current update revision */
+static enum microcode_match_result microcode_update_match(
+    const struct microcode_header_intel *mc_header, unsigned int cpu)
+{
+    const struct extended_sigtable *ext_header;
+    const struct extended_signature *ext_sig;
+    unsigned int i;
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
+    unsigned int sig = uci->cpu_sig.sig;
+    unsigned int pf = uci->cpu_sig.pf;
+    unsigned int rev = uci->cpu_sig.rev;
+    unsigned long data_size = get_datasize(mc_header);
+    const void *end = (const void *)mc_header + get_totalsize(mc_header);
+
+    ASSERT(!microcode_sanity_check(mc_header));
+    if ( sigmatch(sig, mc_header->sig, pf, mc_header->pf) )
+        return (mc_header->rev > rev) ? NEW_UCODE : OLD_UCODE;
+
+    ext_header = (const void *)(mc_header + 1) + data_size;
+    ext_sig = (const void *)(ext_header + 1);
+
+    /*
+     * Make sure there is enough space to hold an extended header and enough
+     * array elements.
+     */
+    if ( end <= (const void *)ext_sig )
+        return MIS_UCODE;
+
+    for ( i = 0; i < ext_header->count; i++ )
+        if ( sigmatch(sig, ext_sig[i].sig, pf, ext_sig[i].pf) )
+            return (mc_header->rev > rev) ? NEW_UCODE : OLD_UCODE;
+
+    return MIS_UCODE;
+}
+
 /*
  * return 0 - no update found
  * return 1 - found update
@@ -243,31 +268,12 @@ static int get_matching_microcode(const void *mc, unsigned int cpu)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     const struct microcode_header_intel *mc_header = mc;
-    const struct extended_sigtable *ext_header;
     unsigned long total_size = get_totalsize(mc_header);
-    int ext_sigcount, i;
-    struct extended_signature *ext_sig;
     void *new_mc;
 
-    if ( microcode_update_match(cpu, mc_header,
-                                mc_header->sig, mc_header->pf) )
-        goto find;
-
-    if ( total_size <= (get_datasize(mc_header) + MC_HEADER_SIZE) )
+    if ( microcode_update_match(mc, cpu) != NEW_UCODE )
         return 0;
 
-    ext_header = mc + get_datasize(mc_header) + MC_HEADER_SIZE;
-    ext_sigcount = ext_header->count;
-    ext_sig = (void *)ext_header + EXT_HEADER_SIZE;
-    for ( i = 0; i < ext_sigcount; i++ )
-    {
-        if ( microcode_update_match(cpu, mc_header,
-                                    ext_sig->sig, ext_sig->pf) )
-            goto find;
-        ext_sig++;
-    }
-    return 0;
- find:
     pr_debug("microcode: CPU%d found a matching microcode update with"
              " version %#x (current=%#x)\n",
              cpu, mc_header->rev, uci->cpu_sig.rev);

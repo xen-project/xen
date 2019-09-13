@@ -3,6 +3,12 @@
 
 #include <xen/percpu.h>
 
+enum microcode_match_result {
+    OLD_UCODE, /* signature matched, but revision id is older or equal */
+    NEW_UCODE, /* signature matched, but revision id is newer */
+    MIS_UCODE, /* signature mismatched */
+};
+
 struct cpu_signature;
 struct ucode_cpu_info;
 
