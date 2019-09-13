@@ -857,10 +857,7 @@ static int __init vpmu_init(void)
     int vendor = current_cpu_data.x86_vendor;
 
     if ( !opt_vpmu_enabled )
-    {
-        printk(XENLOG_INFO "VPMU: disabled\n");
         return 0;
-    }
 
     /* NMI watchdog uses LVTPC and HW counter */
     if ( opt_watchdog && opt_vpmu_enabled )
