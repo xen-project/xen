@@ -152,8 +152,8 @@ static bool_t find_equiv_cpu_id(const struct equiv_cpu_entry *equiv_cpu_table,
     return 0;
 }
 
-static bool_t microcode_fits(const struct microcode_amd *mc_amd,
-                             unsigned int cpu)
+static enum microcode_match_result microcode_fits(
+    const struct microcode_amd *mc_amd, unsigned int cpu)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     const struct microcode_header_amd *mc_header = mc_amd->mpb;
@@ -167,27 +167,27 @@ static bool_t microcode_fits(const struct microcode_amd *mc_amd,
     current_cpu_id = cpuid_eax(0x00000001);
 
     if ( !find_equiv_cpu_id(equiv_cpu_table, current_cpu_id, &equiv_cpu_id) )
-        return 0;
+        return MIS_UCODE;
 
     if ( (mc_header->processor_rev_id) != equiv_cpu_id )
-        return 0;
+        return MIS_UCODE;
 
     if ( !verify_patch_size(mc_amd->mpb_size) )
     {
         pr_debug("microcode: patch size mismatch\n");
-        return 0;
+        return MIS_UCODE;
     }
 
     if ( mc_header->patch_id <= uci->cpu_sig.rev )
     {
         pr_debug("microcode: patch is already at required level or greater.\n");
-        return 0;
+        return OLD_UCODE;
     }
 
     pr_debug("microcode: CPU%d found a matching microcode update with version %#x (current=%#x)\n",
              cpu, mc_header->patch_id, uci->cpu_sig.rev);
 
-    return 1;
+    return NEW_UCODE;
 }
 
 static int apply_microcode(unsigned int cpu)
@@ -496,7 +496,7 @@ static int cpu_request_microcode(unsigned int cpu, const void *buf,
     while ( (error = get_ucode_from_buffer_amd(mc_amd, buf, bufsize,
                                                &offset)) == 0 )
     {
-        if ( microcode_fits(mc_amd, cpu) )
+        if ( microcode_fits(mc_amd, cpu) == NEW_UCODE )
         {
             error = apply_microcode(cpu);
             if ( error )
@@ -579,7 +579,7 @@ static int microcode_resume_match(unsigned int cpu, const void *mc)
     struct microcode_amd *mc_amd = uci->mc.mc_amd;
     const struct microcode_amd *src = mc;
 
-    if ( !microcode_fits(src, cpu) )
+    if ( microcode_fits(src, cpu) != NEW_UCODE )
         return 0;
 
     if ( src != mc_amd )
