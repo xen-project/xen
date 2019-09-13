@@ -363,7 +363,7 @@ void start_secondary(void *unused)
     if ( system_state <= SYS_STATE_smp_boot )
         early_microcode_update_cpu(false);
     else
-        microcode_resume_cpu(cpu);
+        microcode_resume_cpu();
 
     /*
      * If MSR_SPEC_CTRL is available, apply Xen's default setting and discard

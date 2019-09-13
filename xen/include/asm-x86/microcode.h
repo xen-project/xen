@@ -20,10 +20,9 @@ struct microcode_patch {
 };
 
 struct microcode_ops {
-    int (*cpu_request_microcode)(unsigned int cpu, const void *buf,
-                                 size_t size);
-    int (*collect_cpu_info)(unsigned int cpu, struct cpu_signature *csig);
-    int (*apply_microcode)(unsigned int cpu);
+    int (*cpu_request_microcode)(const void *buf, size_t size);
+    int (*collect_cpu_info)(struct cpu_signature *csig);
+    int (*apply_microcode)(void);
     int (*start_update)(void);
     void (*free_patch)(void *mc);
     bool (*match_cpu)(const struct microcode_patch *patch);

@@ -196,19 +196,19 @@ struct microcode_info {
     char buffer[1];
 };
 
-int microcode_resume_cpu(unsigned int cpu)
+int microcode_resume_cpu(void)
 {
     int err;
-    struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
+    struct cpu_signature *sig = &this_cpu(cpu_sig);
 
     if ( !microcode_ops )
         return 0;
 
     spin_lock(&microcode_mutex);
 
-    err = microcode_ops->collect_cpu_info(cpu, sig);
+    err = microcode_ops->collect_cpu_info(sig);
     if ( likely(!err) )
-        err = microcode_ops->apply_microcode(cpu);
+        err = microcode_ops->apply_microcode();
     spin_unlock(&microcode_mutex);
 
     return err;
@@ -257,9 +257,9 @@ static int microcode_update_cpu(const void *buf, size_t size)
 
     spin_lock(&microcode_mutex);
 
-    err = microcode_ops->collect_cpu_info(cpu, sig);
+    err = microcode_ops->collect_cpu_info(sig);
     if ( likely(!err) )
-        err = microcode_ops->cpu_request_microcode(cpu, buf, size);
+        err = microcode_ops->cpu_request_microcode(buf, size);
     spin_unlock(&microcode_mutex);
 
     return err;
@@ -348,8 +348,6 @@ __initcall(microcode_init);
 
 int __init early_microcode_update_cpu(bool start_update)
 {
-    unsigned int cpu = smp_processor_id();
-    struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     int rc = 0;
     void *data = NULL;
     size_t len;
@@ -368,7 +366,7 @@ int __init early_microcode_update_cpu(bool start_update)
         data = bootstrap_map(&ucode_mod);
     }
 
-    microcode_ops->collect_cpu_info(cpu, sig);
+    microcode_ops->collect_cpu_info(&this_cpu(cpu_sig));
 
     if ( data )
     {
@@ -386,8 +384,6 @@ int __init early_microcode_update_cpu(bool start_update)
 
 int __init early_microcode_init(void)
 {
-    unsigned int cpu = smp_processor_id();
-    struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     int rc;
 
     rc = microcode_init_intel();
@@ -400,7 +396,7 @@ int __init early_microcode_init(void)
 
     if ( microcode_ops )
     {
-        microcode_ops->collect_cpu_info(cpu, sig);
+        microcode_ops->collect_cpu_info(&this_cpu(cpu_sig));
 
         if ( ucode_mod.mod_end || ucode_blob.size )
             rc = early_microcode_update_cpu(true);

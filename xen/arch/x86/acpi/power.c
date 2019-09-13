@@ -278,7 +278,7 @@ static int enter_state(u32 state)
 
     console_end_sync();
 
-    microcode_resume_cpu(0);
+    microcode_resume_cpu();
 
     if ( !recheck_cpu_features(0) )
         panic("Missing previously available feature(s)\n");
