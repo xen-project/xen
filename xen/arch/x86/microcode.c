@@ -61,6 +61,9 @@ static struct ucode_mod_blob __initdata ucode_blob;
  */
 static bool_t __initdata ucode_scan;
 
+/* Protected by microcode_mutex */
+static struct microcode_patch *microcode_cache;
+
 void __init microcode_set_module(unsigned int idx)
 {
     ucode_mod_idx = idx;
@@ -260,6 +263,41 @@ int microcode_resume_cpu(unsigned int cpu)
     spin_unlock(&microcode_mutex);
 
     return err;
+}
+
+void microcode_free_patch(struct microcode_patch *microcode_patch)
+{
+    microcode_ops->free_patch(microcode_patch->mc);
+    xfree(microcode_patch);
+}
+
+const struct microcode_patch *microcode_get_cache(void)
+{
+    ASSERT(spin_is_locked(&microcode_mutex));
+
+    return microcode_cache;
+}
+
+/* Return true if cache gets updated. Otherwise, return false */
+bool microcode_update_cache(struct microcode_patch *patch)
+{
+    ASSERT(spin_is_locked(&microcode_mutex));
+
+    if ( !microcode_cache )
+        microcode_cache = patch;
+    else if ( microcode_ops->compare_patch(patch,
+                                           microcode_cache) == NEW_UCODE )
+    {
+        microcode_free_patch(microcode_cache);
+        microcode_cache = patch;
+    }
+    else
+    {
+        microcode_free_patch(patch);
+        return false;
+    }
+
+    return true;
 }
 
 static int microcode_update_cpu(const void *buf, size_t size)

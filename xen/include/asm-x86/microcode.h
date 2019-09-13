@@ -12,6 +12,14 @@ enum microcode_match_result {
 struct cpu_signature;
 struct ucode_cpu_info;
 
+struct microcode_patch {
+    union {
+        struct microcode_intel *mc_intel;
+        struct microcode_amd *mc_amd;
+        void *mc;
+    };
+};
+
 struct microcode_ops {
     int (*microcode_resume_match)(unsigned int cpu, const void *mc);
     int (*cpu_request_microcode)(unsigned int cpu, const void *buf,
@@ -19,6 +27,10 @@ struct microcode_ops {
     int (*collect_cpu_info)(unsigned int cpu, struct cpu_signature *csig);
     int (*apply_microcode)(unsigned int cpu);
     int (*start_update)(void);
+    void (*free_patch)(void *mc);
+    bool (*match_cpu)(const struct microcode_patch *patch);
+    enum microcode_match_result (*compare_patch)(
+        const struct microcode_patch *new, const struct microcode_patch *old);
 };
 
 struct cpu_signature {
@@ -38,5 +50,9 @@ struct ucode_cpu_info {
 
 DECLARE_PER_CPU(struct ucode_cpu_info, ucode_cpu_info);
 extern const struct microcode_ops *microcode_ops;
+
+const struct microcode_patch *microcode_get_cache(void);
+bool microcode_update_cache(struct microcode_patch *patch);
+void microcode_free_patch(struct microcode_patch *patch);
 
 #endif /* ASM_X86__MICROCODE_H */
