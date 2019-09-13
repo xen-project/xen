@@ -791,10 +791,9 @@ int __init erst_init(void)
 		return -ENODEV;
 
 	status = acpi_get_table_phys(ACPI_SIG_ERST, 0, &erst_addr, &erst_len);
-	if (status == AE_NOT_FOUND) {
-		printk(KERN_INFO "ERST table was not found\n");
+	if (status == AE_NOT_FOUND)
 		return -ENODEV;
-	}
+
 	if (ACPI_FAILURE(status)) {
 		const char *msg = acpi_format_exception(status);
 		printk(KERN_WARNING "Failed to get ERST table: %s\n", msg);
