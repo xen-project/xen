@@ -91,8 +91,8 @@ int init_domain_msr_policy(struct domain *d)
     if ( !mp )
         return -ENOMEM;
 
-    /* See comment in intel_ctxt_switch_levelling() */
-    if ( is_control_domain(d) )
+    /* See comment in ctxt_switch_levelling() */
+    if ( is_control_domain(d) && is_pv_domain(d) )
         mp->platform_info.cpuid_faulting = false;
 
     d->arch.msr = mp;

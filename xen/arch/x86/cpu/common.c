@@ -169,7 +169,7 @@ void ctxt_switch_levelling(const struct vcpu *next)
 		if (nextd && is_idle_domain(nextd))
 			return;
 		/*
-		 * We *should* be enabling faulting for the control domain.
+		 * We *should* be enabling faulting for PV control domains.
 		 *
 		 * Unfortunately, the domain builder (having only ever been a
 		 * PV guest) expects to be able to see host cpuid state in a
@@ -184,7 +184,8 @@ void ctxt_switch_levelling(const struct vcpu *next)
 		 * generating the maximum full cpuid policy into Xen, at which
 		 * this problem will disappear.
 		 */
-		set_cpuid_faulting(nextd && !is_control_domain(nextd) &&
+		set_cpuid_faulting(nextd && (!is_control_domain(nextd) ||
+					     !is_pv_domain(nextd)) &&
 				   (is_pv_domain(nextd) ||
 				    next->arch.msrs->
 				    misc_features_enables.cpuid_faulting));
