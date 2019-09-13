@@ -22,7 +22,7 @@ struct microcode_patch {
 struct microcode_ops {
     int (*cpu_request_microcode)(const void *buf, size_t size);
     int (*collect_cpu_info)(struct cpu_signature *csig);
-    int (*apply_microcode)(void);
+    int (*apply_microcode)(const struct microcode_patch *patch);
     int (*start_update)(void);
     void (*end_update_percpu)(void);
     void (*free_patch)(void *mc);

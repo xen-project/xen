@@ -208,7 +208,7 @@ int microcode_resume_cpu(void)
 
     err = microcode_ops->collect_cpu_info(sig);
     if ( likely(!err) )
-        err = microcode_ops->apply_microcode();
+        err = microcode_ops->apply_microcode(microcode_cache);
     spin_unlock(&microcode_mutex);
 
     return err;

@@ -322,7 +322,7 @@ static int get_matching_microcode(const void *mc)
     return 1;
 }
 
-static int apply_microcode(void)
+static int apply_microcode(const struct microcode_patch *patch)
 {
     unsigned long flags;
     uint64_t msr_content;
@@ -330,7 +330,6 @@ static int apply_microcode(void)
     unsigned int cpu_num = raw_smp_processor_id();
     struct cpu_signature *sig = &this_cpu(cpu_sig);
     const struct microcode_intel *mc_intel;
-    const struct microcode_patch *patch = microcode_get_cache();
 
     if ( !patch )
         return -ENOENT;
@@ -428,7 +427,7 @@ static int cpu_request_microcode(const void *buf, size_t size)
         error = offset;
 
     if ( !error && match_cpu(microcode_get_cache()) )
-        error = apply_microcode();
+        error = apply_microcode(microcode_get_cache());
 
     return error;
 }

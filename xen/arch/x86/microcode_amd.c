@@ -253,7 +253,7 @@ static enum microcode_match_result compare_patch(
     return MIS_UCODE;
 }
 
-static int apply_microcode(void)
+static int apply_microcode(const struct microcode_patch *patch)
 {
     unsigned long flags;
     uint32_t rev;
@@ -261,7 +261,6 @@ static int apply_microcode(void)
     unsigned int cpu = smp_processor_id();
     struct cpu_signature *sig = &per_cpu(cpu_sig, cpu);
     const struct microcode_header_amd *hdr;
-    const struct microcode_patch *patch = microcode_get_cache();
 
     if ( !patch )
         return -ENOENT;
@@ -565,7 +564,7 @@ static int cpu_request_microcode(const void *buf, size_t bufsize)
 
         if ( match_cpu(microcode_get_cache()) )
         {
-            error = apply_microcode();
+            error = apply_microcode(microcode_get_cache());
             if ( error )
                 break;
         }
