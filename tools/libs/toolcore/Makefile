@@ -4,14 +4,13 @@ include $(XEN_ROOT)/tools/Rules.mk
 MAJOR	= 1
 MINOR	= 0
 LIBNAME  := toolcore
+AUTOINCS := include/_xentoolcore_list.h
 
 SRCS-y	+= handlereg.c
 
 include $(XEN_ROOT)/tools/libs/libs.mk
 
 $(PKG_CONFIG_LOCAL): PKG_CONFIG_INCDIR = $(XEN_LIBXENTOOLCORE)/include
-
-AUTOINCS=include/_xentoolcore_list.h
 
 $(LIB_OBJS): $(AUTOINCS)
 $(PIC_OBJS): $(AUTOINCS)
