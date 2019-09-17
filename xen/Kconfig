@@ -2,24 +2,12 @@
 # For a description of the syntax of this configuration file,
 # see docs/misc/kconfig-language.txt
 #
-mainmenu "Xen/$SRCARCH $XEN_FULLVERSION Configuration"
-
-config SRCARCH
-	string
-	option env="SRCARCH"
-
-config ARCH
-	string
-	option env="ARCH"
+mainmenu "Xen/$(SRCARCH) $(XEN_FULLVERSION) Configuration"
 
 config BROKEN
 	bool
 
-source "arch/$SRCARCH/Kconfig"
-
-config XEN_FULLVERSION
-	string
-	option env="XEN_FULLVERSION"
+source "arch/$(SRCARCH)/Kconfig"
 
 config DEFCONFIG_LIST
 	string
@@ -28,7 +16,7 @@ config DEFCONFIG_LIST
 
 config EXPERT
 	string
-	option env="XEN_CONFIG_EXPERT"
+	default y if "$(XEN_CONFIG_EXPERT)" = "y"
 
 config LTO
 	bool "Link Time Optimisation"

@@ -267,7 +267,7 @@ $(foreach base,arch/x86/mm/guest_walk_% \
                arch/x86/mm/shadow/guest_%, \
     $(foreach ext,o i s,$(call build-intermediate,$(base).$(ext))))
 
-kconfig := silentoldconfig oldconfig config menuconfig defconfig \
+kconfig := oldconfig config menuconfig defconfig \
 	nconfig xconfig gconfig savedefconfig listnewconfig olddefconfig \
 	randconfig $(notdir $(wildcard arch/$(SRCARCH)/configs/*_defconfig))
 .PHONY: $(kconfig)
@@ -275,7 +275,7 @@ $(kconfig):
 	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)" $@
 
 include/config/%.conf: include/config/auto.conf.cmd $(KCONFIG_CONFIG)
-	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)" silentoldconfig
+	$(MAKE) -f $(BASEDIR)/tools/kconfig/Makefile.kconfig ARCH=$(ARCH) SRCARCH=$(SRCARCH) HOSTCC="$(HOSTCC)" HOSTCXX="$(HOSTCXX)" syncconfig
 
 # Allow people to just run `make` as before and not force them to configure
 $(KCONFIG_CONFIG):

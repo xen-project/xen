@@ -69,14 +69,6 @@ config NEEDS_LIBELF
 config NEEDS_LIST_SORT
 	bool
 
-config HAS_BUILD_ID
-	string
-	option env="XEN_HAS_BUILD_ID"
-
-config HAS_CHECKPOLICY
-	string
-	option env="XEN_HAS_CHECKPOLICY"
-
 menu "Speculative hardening"
 
 config SPECULATIVE_HARDEN_ARRAY
@@ -195,7 +187,7 @@ config XSM_FLASK_AVC_STATS
 
 config XSM_FLASK_POLICY
 	bool "Compile Xen with a built-in FLASK security policy"
-	default y if HAS_CHECKPOLICY = "y"
+	default y if "$(XEN_HAS_CHECKPOLICY)" = "y"
 	depends on XSM_FLASK
 	---help---
 	  This includes a default XSM policy in the hypervisor so that the
@@ -283,7 +275,7 @@ config CRYPTO
 config LIVEPATCH
 	bool "Live patching support"
 	default X86
-	depends on HAS_BUILD_ID = "y"
+	depends on "$(XEN_HAS_BUILD_ID)" = "y"
 	---help---
 	  Allows a running Xen hypervisor to be dynamically patched using
 	  binary patches without rebooting. This is primarily used to binarily

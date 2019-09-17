@@ -1,12 +1,11 @@
 #
 # Generated files
 #
-config*
 *.lex.c
 *.tab.c
 *.tab.h
-zconf.hash.c
 *.moc
+*conf-cfg
 
 #
 # configuration programs

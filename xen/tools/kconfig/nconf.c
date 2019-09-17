@@ -1,11 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2008 Nir Tzachar <nir.tzachar@gmail.com?
- * Released under the terms of the GNU GPL v2.0.
+ * Copyright (C) 2008 Nir Tzachar <nir.tzachar@gmail.com>
  *
  * Derived from menuconfig.
- *
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <string.h>
 #include <stdlib.h>
 
@@ -269,7 +270,7 @@ static struct mitem k_menu_items[MAX_MENU_ITEMS];
 static int items_num;
 static int global_exit;
 /* the currently selected button */
-const char *current_instructions = menu_instructions;
+static const char *current_instructions = menu_instructions;
 
 static char *dialog_input_result;
 static int dialog_input_result_len;
@@ -303,7 +304,7 @@ struct function_keys {
 };
 
 static const int function_keys_num = 9;
-struct function_keys function_keys[] = {
+static struct function_keys function_keys[] = {
 	{
 		.key_str = "F1",
 		.func = "Help",
@@ -506,7 +507,7 @@ static int get_mext_match(const char *match_str, match_f flag)
 	index = (index + items_num) % items_num;
 	while (true) {
 		char *str = k_menu_items[index].str;
-		if (strcasestr(str, match_str) != 0)
+		if (strcasestr(str, match_str) != NULL)
 			return index;
 		if (flag == FIND_NEXT_MATCH_UP ||
 		    flag == MATCH_TINKER_PATTERN_UP)
@@ -672,6 +673,7 @@ static int do_exit(void)
 				  "Your configuration changes were NOT saved.",
 				  1,
 				  "<OK>");
+		conf_write_autoconf(0);
 		break;
 	default:
 		btn_dialog(
@@ -801,7 +803,7 @@ static void build_conf(struct menu *menu)
 		}
 
 		val = sym_get_tristate_value(sym);
-		if (sym_is_changable(sym)) {
+		if (sym_is_changeable(sym)) {
 			switch (type) {
 			case S_BOOLEAN:
 				item_make(menu, 't', "[%c]",
@@ -855,7 +857,7 @@ static void build_conf(struct menu *menu)
 		} else {
 			switch (type) {
 			case S_BOOLEAN:
-				if (sym_is_changable(sym))
+				if (sym_is_changeable(sym))
 					item_make(menu, 't', "[%c]",
 						val == no ? ' ' : '*');
 				else
@@ -874,7 +876,7 @@ static void build_conf(struct menu *menu)
 					ch = ' ';
 					break;
 				}
-				if (sym_is_changable(sym)) {
+				if (sym_is_changeable(sym)) {
 					if (sym->rev_dep.tri == mod)
 						item_make(menu,
 							't', "{%c}", ch);
@@ -894,14 +896,14 @@ static void build_conf(struct menu *menu)
 				item_add_str("%*c%s%s", tmp, ' ',
 						menu_get_prompt(menu),
 						(sym_has_value(sym) ||
-						 !sym_is_changable(sym)) ? "" :
+						 !sym_is_changeable(sym)) ? "" :
 						" (NEW)");
 				goto conf_childs;
 			}
 		}
 		item_add_str("%*c%s%s", indent + 1, ' ',
 				menu_get_prompt(menu),
-				(sym_has_value(sym) || !sym_is_changable(sym)) ?
+				(sym_has_value(sym) || !sym_is_changeable(sym)) ?
 				"" : " (NEW)");
 		if (menu->prompt && menu->prompt->type == P_MENU) {
 			item_add_str("  %s", menu_is_empty(menu) ? "----" : "--->");
@@ -1046,7 +1048,7 @@ static int do_match(int key, struct match_state *state, int *ans)
 		state->match_direction = FIND_NEXT_MATCH_UP;
 		*ans = get_mext_match(state->pattern,
 				state->match_direction);
-	} else if (key == KEY_BACKSPACE || key == 127) {
+	} else if (key == KEY_BACKSPACE || key == 8 || key == 127) {
 		state->pattern[strlen(state->pattern)-1] = '\0';
 		adj_match_dir(&state->match_direction);
 	} else
@@ -1065,7 +1067,7 @@ static int do_match(int key, struct match_state *state, int *ans)
 
 static void conf(struct menu *menu)
 {
-	struct menu *submenu = 0;
+	struct menu *submenu = NULL;
 	const char *prompt = menu_get_prompt(menu);
 	struct symbol *sym;
 	int res;
@@ -1208,12 +1210,9 @@ static void conf(struct menu *menu)
 	}
 }
 
-static void conf_message_callback(const char *fmt, va_list ap)
+static void conf_message_callback(const char *s)
 {
-	char buf[1024];
-
-	vsnprintf(buf, sizeof(buf), fmt, ap);
-	btn_dialog(main_window, buf, 1, "<OK>");
+	btn_dialog(main_window, s, 1, "<OK>");
 }
 
 static void show_help(struct menu *menu)
@@ -1232,7 +1231,7 @@ static void show_help(struct menu *menu)
 static void conf_choice(struct menu *menu)
 {
 	const char *prompt = menu_get_prompt(menu);
-	struct menu *child = 0;
+	struct menu *child = NULL;
 	struct symbol *active;
 	int selected_index = 0;
 	int last_top_row = 0;
@@ -1439,8 +1438,7 @@ static void conf_save(void)
 				set_config_filename(dialog_input_result);
 				return;
 			}
-			btn_dialog(main_window, "Can't create file! "
-				"Probably a nonexistent directory.",
+			btn_dialog(main_window, "Can't create file!",
 				1, "<OK>");
 			break;
 		case 1:
@@ -1454,7 +1452,7 @@ static void conf_save(void)
 	}
 }
 
-void setup_windows(void)
+static void setup_windows(void)
 {
 	int lines, columns;
 

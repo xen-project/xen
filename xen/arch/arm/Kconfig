@@ -1,6 +1,6 @@
 config 64BIT
 	bool
-	default ARCH != "arm32"
+	default "$(ARCH)" != "arm32"
 	help
 	  Say yes to build a 64-bit Xen
 	  Say no to build a 32-bit Xen

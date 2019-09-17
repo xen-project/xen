@@ -4,8 +4,8 @@
 all:
 
 # Xen doesn't have a silent build flag
-quiet := silent_
-Q := @
+quiet :=
+Q :=
 kecho := :
 
 # eventually you'll want to do out of tree builds
@@ -13,15 +13,43 @@ srctree := $(XEN_ROOT)/xen
 objtree := $(srctree)
 src := tools/kconfig
 obj := $(src)
-KBUILD_SRC :=
 
 # handle functions (most of these lifted from different Linux makefiles
 dot-target = $(dir $@).$(notdir $@)
 depfile = $(subst $(comma),,$(dot-target).d)
 basetarget = $(basename $(notdir $@))
+# target with $(obj)/ and its suffix stripped
+target-stem = $(basename $(patsubst $(obj)/%,%,$@))
 cmd = $(cmd_$(1))
 if_changed = $(cmd_$(1))
 if_changed_dep = $(cmd_$(1))
+
+###
+# filechk is used to check if the content of a generated file is updated.
+# Sample usage:
+#
+# filechk_sample = echo $(KERNELRELEASE)
+# version.h: FORCE
+#	$(call filechk,sample)
+#
+# The rule defined shall write to stdout the content of the new file.
+# The existing file will be compared with the new one.
+# - If no file exist it is created
+# - If the content differ the new file is used
+# - If they are equal no change, and no timestamp update
+# - stdin is piped in from the first prerequisite ($<) so one has
+#   to specify a valid file as first prerequisite (often the kbuild file)
+define filechk
+	$(Q)set -e;				\
+	mkdir -p $(dir $@);			\
+	{ $(filechk_$(1)); } > $@.tmp;		\
+	if [ -r $@ ] && cmp -s $@ $@.tmp; then	\
+		rm -f $@.tmp;			\
+	else					\
+		$(kecho) '  UPD     $@';	\
+		mv -f $@.tmp $@;		\
+	fi
+endef
 
 define multi_depend
 $(foreach m, $(notdir $1), \
@@ -38,6 +66,8 @@ CONFIG_SHELL := $(SHELL)
 # provide the host compiler
 HOSTCC ?= gcc
 HOSTCXX ?= g++
+YACC = $(if $(BISON),$(BISON),bison)
+LEX = $(if $(FLEX),$(FLEX),flex)
 
 # force target
 PHONY += FORCE
@@ -47,6 +77,18 @@ FORCE:
 # include the original Makefile and Makefile.host from Linux
 include $(src)/Makefile
 include $(src)/Makefile.host
+
+# Add intermediate targets:
+# When building objects with specific suffix patterns, add intermediate
+# targets that the final targets are derived from.
+intermediate_targets = $(foreach sfx, $(2), \
+				$(patsubst %$(strip $(1)),%$(sfx), \
+					$(filter %$(strip $(1)), $(targets))))
+
+# %.lex.o <- %.lex.c <- %.l
+# %.tab.o <- %.tab.[ch] <- %.y
+targets += $(call intermediate_targets, .lex.o, .lex.c) \
+	   $(call intermediate_targets, .tab.o, .tab.c .tab.h)
 
 # clean up rule
 clean-deps = $(foreach f,$(host-cobjs) $(host-cxxobjs),$(dir $f).$(notdir $f).d)
@@ -59,4 +101,6 @@ clean:
 	rm -rf $(clean-shipped)
 
 $(obj)/zconf%: $(src)/zconf%_shipped
-	@cp -f $< $@
+	cp -f $< $@
+
+.PHONY: $(PHONY)
