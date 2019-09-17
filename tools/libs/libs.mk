@@ -47,7 +47,7 @@ build:
 .PHONY: libs
 libs: headers.chk $(LIB) $(PKG_CONFIG_INST) $(PKG_CONFIG_LOCAL)
 
-headers.chk: $(wildcard include/*.h)
+headers.chk: $(wildcard include/*.h) $(AUTOINCS)
 
 libxen$(LIBNAME).a: $(LIB_OBJS)
 	$(AR) rc $@ $^
