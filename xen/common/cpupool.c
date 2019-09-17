@@ -762,18 +762,28 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-static int __init cpupool_presmp_init(void)
+static int __init cpupool_init(void)
 {
+    unsigned int cpu;
     int err;
-    void *cpu = (void *)(long)smp_processor_id();
+
     cpupool0 = cpupool_create(0, 0, &err);
     BUG_ON(cpupool0 == NULL);
     cpupool_put(cpupool0);
-    cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
     register_cpu_notifier(&cpu_nfb);
+
+    spin_lock(&cpupool_lock);
+
+    cpumask_copy(&cpupool_free_cpus, &cpu_online_map);
+
+    for_each_cpu ( cpu, &cpupool_free_cpus )
+        cpupool_assign_cpu_locked(cpupool0, cpu);
+
+    spin_unlock(&cpupool_lock);
+
     return 0;
 }
-presmp_initcall(cpupool_presmp_init);
+__initcall(cpupool_init);
 
 /*
  * Local variables:
