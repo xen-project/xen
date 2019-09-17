@@ -411,12 +411,17 @@ void vpci_write(pci_sbdf_t sbdf, unsigned int reg, unsigned int size,
     const struct pci_dev *pdev;
     const struct vpci_register *r;
     unsigned int data_offset = 0;
+    const unsigned long *ro_map = pci_get_ro_map(sbdf.seg);
 
     if ( !size )
     {
         ASSERT_UNREACHABLE();
         return;
     }
+
+    if ( ro_map && test_bit(sbdf.bdf, ro_map) )
+        /* Ignore writes to read-only devices. */
+        return;
 
     /*
      * Find the PCI dev matching the address.
