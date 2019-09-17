@@ -260,7 +260,7 @@ static bool_t ept_split_super_page(struct p2m_domain *p2m,
         *epte = *ept_entry;
         epte->sp = (level > 1);
         epte->mfn += i * trunk;
-        epte->snp = (iommu_enabled && iommu_snoop);
+        epte->snp = is_iommu_enabled(p2m->domain) && iommu_snoop;
         epte->suppress_ve = 1;
 
         ept_p2m_type_to_flags(p2m, epte, epte->sa_p2mt, epte->access);
@@ -772,7 +772,7 @@ ept_set_entry(struct p2m_domain *p2m, gfn_t gfn_, mfn_t mfn,
         new_entry.sp = !!i;
         new_entry.sa_p2mt = p2mt;
         new_entry.access = p2ma;
-        new_entry.snp = (iommu_enabled && iommu_snoop);
+        new_entry.snp = is_iommu_enabled(d) && iommu_snoop;
 
         /* the caller should take care of the previous page */
         new_entry.mfn = mfn_x(mfn);

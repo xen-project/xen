@@ -1531,7 +1531,7 @@ int p2m_init(struct domain *d)
      * shared with the CPU, Xen has to make sure that the PT changes have
      * reached the memory
      */
-    p2m->clean_pte = iommu_enabled &&
+    p2m->clean_pte = is_iommu_enabled(d) &&
         !iommu_has_feature(d, IOMMU_FEAT_COHERENT_WALK);
 
     rc = p2m_alloc_table(d);

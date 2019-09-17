@@ -883,7 +883,7 @@ static int flask_map_domain_msi (struct domain *d, int irq, const void *data,
 #endif
 }
 
-static u32 flask_iommu_resource_use_perm(void)
+static u32 flask_iommu_resource_use_perm(const struct domain *d)
 {
     /* Obtain the permission level required for allowing a domain
      * to use an assigned device.
@@ -896,7 +896,7 @@ static u32 flask_iommu_resource_use_perm(void)
      */
     u32 perm = RESOURCE__USE_NOIOMMU;
 
-    if (iommu_enabled)
+    if ( is_iommu_enabled(d) )
         perm = ( iommu_intremap ? RESOURCE__USE_IOMMU :
                                   RESOURCE__USE_IOMMU_NOINTREMAP );
     return perm;
@@ -907,7 +907,7 @@ static int flask_map_domain_irq (struct domain *d, int irq, const void *data)
     u32 sid, dsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
-    u32 dperm = flask_iommu_resource_use_perm();
+    u32 dperm = flask_iommu_resource_use_perm(d);
 
     if ( irq >= nr_static_irqs && data ) {
         rc = flask_map_domain_msi(d, irq, data, &sid, &ad);
@@ -973,7 +973,7 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
     int rc = -EPERM;
     int irq;
     struct avc_audit_data ad;
-    u32 dperm = flask_iommu_resource_use_perm();
+    u32 dperm = flask_iommu_resource_use_perm(d);
 
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
@@ -1046,7 +1046,7 @@ static int flask_iomem_permission(struct domain *d, uint64_t start, uint64_t end
 
     data.ssid = domain_sid(current->domain);
     data.dsid = domain_sid(d);
-    data.use_perm = flask_iommu_resource_use_perm();
+    data.use_perm = flask_iommu_resource_use_perm(d);
 
     return security_iterate_iomem_sids(start, end, _iomem_has_perm, &data);
 }
@@ -1071,7 +1071,7 @@ static int flask_pci_config_permission(struct domain *d, uint32_t machine_bdf, u
     if ( access && (end >= 0x10 && start < 0x28) )
         perm = RESOURCE__SETUP;
     else
-        perm = flask_iommu_resource_use_perm();
+        perm = flask_iommu_resource_use_perm(d);
 
     AVC_AUDIT_DATA_INIT(&ad, DEV);
     ad.device = (unsigned long) machine_bdf;
@@ -1296,7 +1296,7 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
     u32 dsid, rsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
-    u32 dperm = flask_iommu_resource_use_perm();
+    u32 dperm = flask_iommu_resource_use_perm(d);
 
     if ( !d )
         return flask_test_assign_device(machine_bdf);
@@ -1355,7 +1355,7 @@ static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
     u32 dsid, rsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
-    u32 dperm = flask_iommu_resource_use_perm();
+    u32 dperm = flask_iommu_resource_use_perm(d);
 
     if ( !d )
         return flask_test_assign_dtdevice(dtpath);
@@ -1540,7 +1540,7 @@ static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t en
 
     data.ssid = domain_sid(current->domain);
     data.dsid = domain_sid(d);
-    data.use_perm = flask_iommu_resource_use_perm();
+    data.use_perm = flask_iommu_resource_use_perm(d);
 
     return security_iterate_ioport_sids(start, end, _ioport_has_perm, &data);
 }

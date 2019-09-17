@@ -1087,7 +1087,7 @@ static int construct_vmcs(struct vcpu *v)
         vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_CS, VMX_MSR_RW);
         vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_ESP, VMX_MSR_RW);
         vmx_clear_msr_intercept(v, MSR_IA32_SYSENTER_EIP, VMX_MSR_RW);
-        if ( paging_mode_hap(d) && (!iommu_enabled || iommu_snoop) )
+        if ( paging_mode_hap(d) && (!is_iommu_enabled(d) || iommu_snoop) )
             vmx_clear_msr_intercept(v, MSR_IA32_CR_PAT, VMX_MSR_RW);
         if ( (vmexit_ctl & VM_EXIT_CLEAR_BNDCFGS) &&
              (vmentry_ctl & VM_ENTRY_LOAD_BNDCFGS) )

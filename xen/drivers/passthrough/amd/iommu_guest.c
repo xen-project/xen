@@ -821,7 +821,7 @@ int guest_iommu_init(struct domain* d)
     struct guest_iommu *iommu;
     struct domain_iommu *hd = dom_iommu(d);
 
-    if ( !is_hvm_domain(d) || !iommu_enabled || !iommuv2_enabled ||
+    if ( !is_hvm_domain(d) || !is_iommu_enabled(d) || !iommuv2_enabled ||
          !has_viommu(d) )
         return 0;
 

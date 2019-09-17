@@ -29,7 +29,7 @@ int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev)
     int rc = -EBUSY;
     struct domain_iommu *hd = dom_iommu(d);
 
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(d) )
         return -EINVAL;
 
     if ( !dt_device_is_protected(dev) )
@@ -71,7 +71,7 @@ int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev)
     const struct domain_iommu *hd = dom_iommu(d);
     int rc;
 
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(d) )
         return -EINVAL;
 
     if ( !dt_device_is_protected(dev) )

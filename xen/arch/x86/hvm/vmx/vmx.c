@@ -1210,7 +1210,7 @@ static void vmx_handle_cd(struct vcpu *v, unsigned long value)
         {
             v->arch.hvm.cache_mode = NORMAL_CACHE_MODE;
             vmx_set_guest_pat(v, *pat);
-            if ( !iommu_enabled || iommu_snoop )
+            if ( !is_iommu_enabled(v->domain) || iommu_snoop )
                 vmx_clear_msr_intercept(v, MSR_IA32_CR_PAT, VMX_MSR_RW);
             hvm_asid_flush_vcpu(v); /* no need to flush cache */
         }

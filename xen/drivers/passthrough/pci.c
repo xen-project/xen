@@ -601,7 +601,7 @@ static void pci_enable_acs(struct pci_dev *pdev)
     u16 cap, ctrl, seg = pdev->seg;
     u8 bus = pdev->bus;
 
-    if ( !iommu_enabled )
+    if ( !is_iommu_enabled(pdev->domain) )
         return;
 
     pos = pci_find_ext_capability(seg, bus, pdev->devfn, PCI_EXT_CAP_ID_ACS);
@@ -870,7 +870,7 @@ static int pci_clean_dpci_irqs(struct domain *d)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = NULL;
 
-    if ( !iommu_enabled )
+    if ( !is_iommu_enabled(d) )
         return 0;
 
     if ( !is_hvm_domain(d) )
@@ -903,7 +903,7 @@ static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
     struct pci_dev *pdev;
     int ret = 0;
 
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(d) )
         return -EINVAL;
 
     ASSERT(pcidevs_locked());
@@ -1389,7 +1389,7 @@ static int iommu_add_device(struct pci_dev *pdev)
     ASSERT(pcidevs_locked());
 
     hd = dom_iommu(pdev->domain);
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(pdev->domain) )
         return 0;
 
     rc = hd->platform_ops->add_device(pdev->devfn, pci_to_dev(pdev));
@@ -1418,7 +1418,7 @@ static int iommu_enable_device(struct pci_dev *pdev)
     ASSERT(pcidevs_locked());
 
     hd = dom_iommu(pdev->domain);
-    if ( !iommu_enabled || !hd->platform_ops ||
+    if ( !is_iommu_enabled(pdev->domain) ||
          !hd->platform_ops->enable_device )
         return 0;
 
@@ -1434,7 +1434,7 @@ static int iommu_remove_device(struct pci_dev *pdev)
         return -EINVAL;
 
     hd = dom_iommu(pdev->domain);
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(pdev->domain) )
         return 0;
 
     for ( devfn = pdev->devfn ; pdev->phantom_stride; )
@@ -1477,7 +1477,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     struct pci_dev *pdev;
     int rc = 0;
 
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(d) )
         return 0;
 
     /* Prevent device assign if mem paging or mem sharing have been 
@@ -1543,7 +1543,7 @@ static int iommu_get_device_group(
     int i = 0;
     const struct iommu_ops *ops = hd->platform_ops;
 
-    if ( !iommu_enabled || !ops || !ops->get_device_group_id )
+    if ( !is_iommu_enabled(d) || !ops->get_device_group_id )
         return 0;
 
     group_id = ops->get_device_group_id(seg, bus, devfn);

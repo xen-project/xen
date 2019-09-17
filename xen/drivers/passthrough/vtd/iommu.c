@@ -1719,7 +1719,7 @@ static void iommu_domain_teardown(struct domain *d)
         xfree(mrmrr);
     }
 
-    ASSERT(iommu_enabled);
+    ASSERT(is_iommu_enabled(d));
 
     /*
      * We can't use iommu_use_hap_pt here because either IOMMU state

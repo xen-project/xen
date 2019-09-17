@@ -465,7 +465,7 @@ void hvm_migrate_timers(struct vcpu *v)
 
 void hvm_migrate_pirq(struct hvm_pirq_dpci *pirq_dpci, const struct vcpu *v)
 {
-    ASSERT(iommu_enabled &&
+    ASSERT(is_iommu_enabled(v->domain) &&
            (is_hardware_domain(v->domain) || hvm_domain_irq(v->domain)->dpci));
 
     if ( (pirq_dpci->flags & HVM_IRQ_DPCI_MACH_MSI) &&
@@ -496,7 +496,7 @@ void hvm_migrate_pirqs(struct vcpu *v)
 {
     struct domain *d = v->domain;
 
-    if ( !iommu_enabled || !hvm_domain_irq(d)->dpci )
+    if ( !is_iommu_enabled(d) || !hvm_domain_irq(d)->dpci )
        return;
 
     spin_lock(&d->event_lock);
@@ -2264,7 +2264,7 @@ int hvm_set_cr0(unsigned long value, bool may_defer)
     }
 
     if ( ((value ^ old_value) & X86_CR0_CD) &&
-         iommu_enabled && hvm_funcs.handle_cd &&
+         is_iommu_enabled(d) && hvm_funcs.handle_cd &&
          (!rangeset_is_empty(d->iomem_caps) ||
           !rangeset_is_empty(d->arch.ioport_caps) ||
           has_arch_pdevs(d)) )

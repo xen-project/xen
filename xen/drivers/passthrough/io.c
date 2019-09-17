@@ -434,7 +434,7 @@ int pt_irq_create_bind(
             if ( vcpu )
                 pirq_dpci->gmsi.posted = true;
         }
-        if ( vcpu && iommu_enabled )
+        if ( vcpu && is_iommu_enabled(d) )
             hvm_migrate_pirq(pirq_dpci, vcpu);
 
         /* Use interrupt posting if it is supported. */
@@ -817,7 +817,7 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
 
     ASSERT(is_hvm_domain(d));
 
-    if ( !iommu_enabled || (!is_hardware_domain(d) && !dpci) ||
+    if ( !is_iommu_enabled(d) || (!is_hardware_domain(d) && !dpci) ||
          !pirq_dpci || !(pirq_dpci->flags & HVM_IRQ_DPCI_MAPPED) )
         return 0;
 
@@ -869,7 +869,7 @@ static int _hvm_dpci_msi_eoi(struct domain *d,
 
 void hvm_dpci_msi_eoi(struct domain *d, int vector)
 {
-    if ( !iommu_enabled ||
+    if ( !is_iommu_enabled(d) ||
          (!hvm_domain_irq(d)->dpci && !is_hardware_domain(d)) )
        return;
 
@@ -1001,7 +1001,7 @@ void hvm_dpci_eoi(struct domain *d, unsigned int guest_gsi,
     const struct hvm_irq_dpci *hvm_irq_dpci;
     const struct hvm_girq_dpci_mapping *girq;
 
-    if ( !iommu_enabled )
+    if ( !is_iommu_enabled(d) )
         return;
 
     if ( is_hardware_domain(d) )

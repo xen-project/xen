@@ -180,7 +180,7 @@ int arch_iommu_populate_page_table(struct domain *d)
 
 void __hwdom_init arch_iommu_check_autotranslated_hwdom(struct domain *d)
 {
-    if ( !iommu_enabled )
+    if ( !is_iommu_enabled(d) )
         panic("Presently, iommu must be enabled for PVH hardware domain\n");
 }
 

@@ -183,7 +183,7 @@ void __hwdom_init iommu_hwdom_init(struct domain *d)
 
     check_hwdom_reqs(d);
 
-    if ( !iommu_enabled )
+    if ( !is_iommu_enabled(d) )
         return;
 
     register_keyhandler('o', &iommu_dump_p2m_table, "dump iommu p2m table", 0);
@@ -288,7 +288,7 @@ int iommu_construct(struct domain *d)
 
 void iommu_domain_destroy(struct domain *d)
 {
-    if ( !iommu_enabled || !dom_iommu(d)->platform_ops )
+    if ( !is_iommu_enabled(d) )
         return;
 
     iommu_teardown(d);
@@ -304,7 +304,7 @@ int iommu_map(struct domain *d, dfn_t dfn, mfn_t mfn,
     unsigned long i;
     int rc = 0;
 
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(d) )
         return 0;
 
     ASSERT(IS_ALIGNED(dfn_x(dfn), (1ul << page_order)));
@@ -364,7 +364,7 @@ int iommu_unmap(struct domain *d, dfn_t dfn, unsigned int page_order,
     unsigned long i;
     int rc = 0;
 
-    if ( !iommu_enabled || !hd->platform_ops )
+    if ( !is_iommu_enabled(d) )
         return 0;
 
     ASSERT(IS_ALIGNED(dfn_x(dfn), (1ul << page_order)));
@@ -417,7 +417,7 @@ int iommu_lookup_page(struct domain *d, dfn_t dfn, mfn_t *mfn,
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
-    if ( !iommu_enabled || !hd->platform_ops || !hd->platform_ops->lookup_page )
+    if ( !is_iommu_enabled(d) || !hd->platform_ops->lookup_page )
         return -EOPNOTSUPP;
 
     return iommu_call(hd->platform_ops, lookup_page, d, dfn, mfn, flags);
@@ -446,8 +446,8 @@ int iommu_iotlb_flush(struct domain *d, dfn_t dfn, unsigned int page_count,
     const struct domain_iommu *hd = dom_iommu(d);
     int rc;
 
-    if ( !iommu_enabled || !hd->platform_ops ||
-         !hd->platform_ops->iotlb_flush || !page_count || !flush_flags )
+    if ( !is_iommu_enabled(d) || !hd->platform_ops->iotlb_flush ||
+         !page_count || !flush_flags )
         return 0;
 
     if ( dfn_eq(dfn, INVALID_DFN) )
@@ -474,8 +474,8 @@ int iommu_iotlb_flush_all(struct domain *d, unsigned int flush_flags)
     const struct domain_iommu *hd = dom_iommu(d);
     int rc;
 
-    if ( !iommu_enabled || !hd->platform_ops ||
-         !hd->platform_ops->iotlb_flush_all || !flush_flags )
+    if ( !is_iommu_enabled(d) || !hd->platform_ops->iotlb_flush_all ||
+         !flush_flags )
         return 0;
 
     /*
@@ -560,8 +560,8 @@ int iommu_do_domctl(
 {
     int ret = -ENODEV;
 
-    if ( !iommu_enabled )
-        return -ENOSYS;
+    if ( !is_iommu_enabled(d) )
+        return -EOPNOTSUPP;
 
 #ifdef CONFIG_HAS_PCI
     ret = iommu_do_pci_domctl(domctl, d, u_domctl);
@@ -580,9 +580,9 @@ void iommu_share_p2m_table(struct domain* d)
     ASSERT(hap_enabled(d));
     /*
      * iommu_use_hap_pt(d) cannot be used here because during domain
-     * construction need_iommu(d) will always return false here.
+     * construction has_iommu_pt(d) will always return false here.
      */
-    if ( iommu_enabled && iommu_hap_pt_share )
+    if ( is_iommu_enabled(d) && iommu_hap_pt_share )
         iommu_get_ops()->share_p2m(d);
 }
 
@@ -612,10 +612,7 @@ int iommu_get_reserved_device_memory(iommu_grdm_t *func, void *ctxt)
 
 bool_t iommu_has_feature(struct domain *d, enum iommu_feature feature)
 {
-    if ( !iommu_enabled )
-        return 0;
-
-    return test_bit(feature, dom_iommu(d)->features);
+    return is_iommu_enabled(d) && test_bit(feature, dom_iommu(d)->features);
 }
 
 static void iommu_dump_p2m_table(unsigned char key)

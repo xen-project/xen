@@ -708,7 +708,7 @@ long arch_do_domctl(
             break;
 
         ret = -ESRCH;
-        if ( iommu_enabled )
+        if ( is_iommu_enabled(d) )
         {
             pcidevs_lock();
             ret = pt_irq_create_bind(d, bind);
@@ -737,7 +737,7 @@ long arch_do_domctl(
         if ( ret )
             break;
 
-        if ( iommu_enabled )
+        if ( is_iommu_enabled(d) )
         {
             pcidevs_lock();
             ret = pt_irq_destroy_bind(d, bind);

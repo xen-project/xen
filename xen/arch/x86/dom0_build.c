@@ -356,7 +356,7 @@ unsigned long __init dom0_compute_nr_pages(
         avail -= d->max_vcpus - 1;
 
     /* Reserve memory for iommu_dom0_init() (rough estimate). */
-    if ( iommu_enabled )
+    if ( is_iommu_enabled(d) )
     {
         unsigned int s;
 

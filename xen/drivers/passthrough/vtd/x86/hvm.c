@@ -51,7 +51,7 @@ void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq)
     struct hvm_irq_dpci *dpci = NULL;
 
     ASSERT(isairq < NR_ISAIRQS);
-    if ( !iommu_enabled )
+    if ( !is_iommu_enabled(d) )
         return;
 
     spin_lock(&d->event_lock);
