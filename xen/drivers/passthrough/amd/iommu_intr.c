@@ -792,14 +792,23 @@ void amd_iommu_read_msi_from_ire(
 int __init amd_iommu_free_intremap_table(
     const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping)
 {
-    void *tb = ivrs_mapping->intremap_table;
+    void **tblp;
 
-    XFREE(ivrs_mapping->intremap_inuse);
-
-    if ( tb )
+    if ( ivrs_mapping )
     {
-        __free_amd_iommu_tables(tb, intremap_table_order(iommu));
-        ivrs_mapping->intremap_table = NULL;
+        XFREE(ivrs_mapping->intremap_inuse);
+        tblp = &ivrs_mapping->intremap_table;
+    }
+    else
+    {
+        XFREE(shared_intremap_inuse);
+        tblp = &shared_intremap_table;
+    }
+
+    if ( *tblp )
+    {
+        __free_amd_iommu_tables(*tblp, intremap_table_order(iommu));
+        *tblp = NULL;
     }
 
     return 0;

@@ -1103,6 +1103,15 @@ static void __init amd_iommu_init_cleanup(void)
 {
     struct amd_iommu *iommu, *next;
 
+    /* free interrupt remapping table */
+    if ( amd_iommu_perdev_intremap )
+        iterate_ivrs_entries(amd_iommu_free_intremap_table);
+    else if ( shared_intremap_table )
+        amd_iommu_free_intremap_table(list_first_entry(&amd_iommu_head,
+                                                       struct amd_iommu,
+                                                       list),
+                                      NULL);
+
     /* free amd iommu list */
     list_for_each_entry_safe ( iommu, next, &amd_iommu_head, list )
     {
@@ -1124,9 +1133,6 @@ static void __init amd_iommu_init_cleanup(void)
         unmap_iommu_mmio_region(iommu);
         xfree(iommu);
     }
-
-    /* free interrupt remapping table */
-    iterate_ivrs_entries(amd_iommu_free_intremap_table);
 
     /* free device table */
     deallocate_device_table(&device_table);
