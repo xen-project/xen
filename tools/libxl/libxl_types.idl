@@ -1027,6 +1027,7 @@ libxl_physinfo = Struct("physinfo", [
     ("cap_hvm_directio", bool), # No longer HVM specific
     ("cap_hap", bool),
     ("cap_shadow", bool),
+    ("cap_iommu_hap_pt_share", bool),
     ], dir=DIR_OUT)
 
 libxl_connectorinfo = Struct("connectorinfo", [

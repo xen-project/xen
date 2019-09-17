@@ -142,6 +142,23 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
+static bool __init hap_supported(const struct hvm_function_table *fns)
+{
+    if ( !fns->hap_supported )
+    {
+        printk("HVM: Hardware Assisted Paging (HAP) not detected\n");
+        return false;
+    }
+
+    if ( !opt_hap_enabled )
+    {
+        printk("HVM: Hardware Assisted Paging (HAP) detected but disabled\n");
+        return false;
+    }
+
+    return true;
+}
+
 static int __init hvm_enable(void)
 {
     const struct hvm_function_table *fns = NULL;
@@ -158,13 +175,8 @@ static int __init hvm_enable(void)
     hvm_enabled = 1;
 
     printk("HVM: %s enabled\n", fns->name);
-    if ( !fns->hap_supported )
-        printk("HVM: Hardware Assisted Paging (HAP) not detected\n");
-    else if ( !opt_hap_enabled )
-    {
-        hvm_funcs.hap_supported = 0;
-        printk("HVM: Hardware Assisted Paging (HAP) detected but disabled\n");
-    }
+    if ( !hap_supported(fns) )
+        clear_iommu_hap_pt_share();
     else
     {
         printk("HVM: Hardware Assisted Paging (HAP) detected\n");

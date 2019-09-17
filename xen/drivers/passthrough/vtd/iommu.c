@@ -2310,7 +2310,7 @@ static int __init vtd_setup(void)
             iommu_intpost = 0;
 
         if ( !vtd_ept_page_compatible(iommu) )
-            iommu_hap_pt_share = 0;
+            clear_iommu_hap_pt_share();
 
         ret = iommu_set_interrupt(drhd);
         if ( ret )

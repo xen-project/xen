@@ -1412,7 +1412,8 @@ int __init amd_iommu_init(bool xt)
      * since it only supports p2m_ram_rw, and this would
      * prevent doing IO to/from mapped grant frames.
      */
-    iommu_hap_pt_share = 0;
+    clear_iommu_hap_pt_share();
+
     printk(XENLOG_DEBUG "AMD-Vi: Disabled HAP memory map sharing with IOMMU\n");
 
     /* per iommu initialization  */

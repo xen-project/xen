@@ -110,6 +110,7 @@ type physinfo_cap_flag =
 	| CAP_DirectIO
 	| CAP_HAP
 	| CAP_Shadow
+	| CAP_IOMMU_HAP_PT_SHARE
 
 type physinfo =
 {

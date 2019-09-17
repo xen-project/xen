@@ -402,6 +402,13 @@
 #define LIBXL_HAVE_PHYSINFO_CAP_HAP_SHADOW 1
 
 /*
+ * LIBXL_HAVE_PHYSINFO_CAP_IOMMU_HAP_PT_SHARE indicates that libxl_physinfo
+ * has a cap_iommu_hap_pt_share field that indicates whether the hardware
+ * supports sharing the IOMMU and HAP page tables.
+ */
+#define LIBXL_HAVE_PHYSINFO_CAP_IOMMU_HAP_PT_SHARE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

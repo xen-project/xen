@@ -210,13 +210,14 @@ static void output_physinfo(void)
          info.hw_cap[4], info.hw_cap[5], info.hw_cap[6], info.hw_cap[7]
         );
 
-    maybe_printf("virt_caps              :%s%s%s%s%s%s\n",
+    maybe_printf("virt_caps              :%s%s%s%s%s%s%s\n",
          info.cap_pv ? " pv" : "",
          info.cap_hvm ? " hvm" : "",
          info.cap_hvm && info.cap_hvm_directio ? " hvm_directio" : "",
          info.cap_pv && info.cap_hvm_directio ? " pv_directio" : "",
          info.cap_hap ? " hap" : "",
-         info.cap_shadow ? " shadow" : ""
+         info.cap_shadow ? " shadow" : "",
+         info.cap_iommu_hap_pt_share ? " iommu_hap_pt_share" : ""
         );
 
     vinfo = libxl_get_version_info(ctx);

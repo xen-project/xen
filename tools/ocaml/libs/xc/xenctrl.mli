@@ -57,7 +57,6 @@ type domain_create_flag =
   | CDF_OOS_OFF
   | CDF_XS_DOMAIN
   | CDF_IOMMU
-
 type domctl_create_config = {
   ssidref: int32;
   handle: string;
@@ -95,6 +94,8 @@ type physinfo_cap_flag =
   | CAP_DirectIO
   | CAP_HAP
   | CAP_Shadow
+  | CAP_IOMMU_HAP_PT_SHARE
+
 type physinfo = {
   threads_per_core : int;
   cores_per_socket : int;
