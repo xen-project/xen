@@ -44,8 +44,9 @@ config COVERAGE
 
 	  If unsure, say N here.
 
-config LOCK_PROFILE
+config DEBUG_LOCK_PROFILE
 	bool "Lock Profiling"
+	select DEBUG_LOCKS
 	---help---
 	  Lock profiling allows you to see how often locks are taken and blocked.
 	  You can use serial console to print (and reset) using 'l' and 'L'

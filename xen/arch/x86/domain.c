@@ -305,7 +305,7 @@ struct domain *alloc_domain_struct(void)
 #endif
 
 
-#ifndef CONFIG_LOCK_PROFILE
+#ifndef CONFIG_DEBUG_LOCK_PROFILE
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
 #endif
     d = alloc_xenheap_pages(order, MEMF_bits(bits));

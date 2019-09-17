@@ -108,7 +108,7 @@ void spin_debug_disable(void)
 
 #endif
 
-#ifdef CONFIG_LOCK_PROFILE
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
 
 #define LOCK_PROFILE_REL                                                     \
     if (lock->profile)                                                       \
@@ -245,7 +245,7 @@ int _spin_trylock(spinlock_t *lock)
                  old.head_tail, new.head_tail) != old.head_tail )
         return 0;
     got_lock(&lock->debug);
-#ifdef CONFIG_LOCK_PROFILE
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
     if (lock->profile)
         lock->profile->time_locked = NOW();
 #endif
@@ -260,7 +260,7 @@ int _spin_trylock(spinlock_t *lock)
 void _spin_barrier(spinlock_t *lock)
 {
     spinlock_tickets_t sample;
-#ifdef CONFIG_LOCK_PROFILE
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
     s_time_t block = NOW();
 #endif
 
@@ -271,7 +271,7 @@ void _spin_barrier(spinlock_t *lock)
     {
         while ( observe_head(&lock->tickets) == sample.head )
             arch_lock_relax();
-#ifdef CONFIG_LOCK_PROFILE
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
         if ( lock->profile )
         {
             lock->profile->time_block += NOW() - block;
@@ -330,7 +330,7 @@ void _spin_unlock_recursive(spinlock_t *lock)
     }
 }
 
-#ifdef CONFIG_LOCK_PROFILE
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
 
 struct lock_profile_anc {
     struct lock_profile_qhead *head_q;   /* first head of this type */
@@ -365,14 +365,19 @@ static void spinlock_profile_iterate(lock_profile_subfunc *sub, void *par)
 static void spinlock_profile_print_elem(struct lock_profile *data,
     int32_t type, int32_t idx, void *par)
 {
-    if ( type == LOCKPROF_TYPE_GLOBAL )
-        printk("%s %s:\n", lock_profile_ancs[type].name, data->name);
+    struct spinlock *lock = data->lock;
+
+    printk("%s ", lock_profile_ancs[type].name);
+    if ( type != LOCKPROF_TYPE_GLOBAL )
+        printk("%d ", idx);
+    printk("%s: addr=%p, lockval=%08x, ", data->name, lock,
+           lock->tickets.head_tail);
+    if ( lock->debug.cpu == SPINLOCK_NO_CPU )
+        printk("not locked\n");
     else
-        printk("%s %d %s:\n", lock_profile_ancs[type].name, idx, data->name);
-    printk("  lock:%12"PRId64"(%08X:%08X), block:%12"PRId64"(%08X:%08X)\n",
-           data->lock_cnt, (u32)(data->time_hold >> 32), (u32)data->time_hold,
-           data->block_cnt, (u32)(data->time_block >> 32),
-           (u32)data->time_block);
+        printk("cpu=%d\n", lock->debug.cpu);
+    printk("  lock:%" PRId64 "(%" PRI_stime "), block:%" PRId64 "(%" PRI_stime ")\n",
+           data->lock_cnt, data->time_hold, data->block_cnt, data->time_block);
 }
 
 void spinlock_profile_printall(unsigned char key)
@@ -491,7 +496,6 @@ void _lock_profile_deregister_struct(
     spin_unlock(&lock_profile_lock);
 }
 
-#ifdef CONFIG_LOCK_PROFILE
 static int __init lock_prof_init(void)
 {
     struct lock_profile **q;
@@ -510,6 +514,5 @@ static int __init lock_prof_init(void)
     return 0;
 }
 __initcall(lock_prof_init);
-#endif
 
-#endif /* LOCK_PROFILE */
+#endif /* CONFIG_DEBUG_LOCK_PROFILE */

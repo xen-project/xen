@@ -1,6 +1,7 @@
 #ifndef __SPINLOCK_H__
 #define __SPINLOCK_H__
 
+#include <xen/time.h>
 #include <asm/system.h>
 #include <asm/spinlock.h>
 #include <asm/types.h>
@@ -29,7 +30,7 @@ union lock_debug { };
 #define spin_debug_disable() ((void)0)
 #endif
 
-#ifdef CONFIG_LOCK_PROFILE
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
 
 #include <public/sysctl.h>
 
@@ -75,9 +76,9 @@ struct lock_profile {
     struct spinlock     *lock;       /* the lock itself */
     u64                 lock_cnt;    /* # of complete locking ops */
     u64                 block_cnt;   /* # of complete wait for lock */
-    s64                 time_hold;   /* cumulated lock time */
-    s64                 time_block;  /* cumulated wait time */
-    s64                 time_locked; /* system time of last locking */
+    s_time_t            time_hold;   /* cumulated lock time */
+    s_time_t            time_block;  /* cumulated wait time */
+    s_time_t            time_locked; /* system time of last locking */
 };
 
 struct lock_profile_qhead {
@@ -133,6 +134,7 @@ struct lock_profile_qhead { };
 #define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
 #define lock_profile_register_struct(type, ptr, idx, print)
 #define lock_profile_deregister_struct(type, ptr)
+#define spinlock_profile_printall(key)
 
 #endif
 
@@ -154,7 +156,7 @@ typedef struct spinlock {
     u16 recurse_cnt:SPINLOCK_RECURSE_BITS;
 #define SPINLOCK_MAX_RECURSE   ((1u << SPINLOCK_RECURSE_BITS) - 1)
     union lock_debug debug;
-#ifdef CONFIG_LOCK_PROFILE
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
     struct lock_profile *profile;
 #endif
 } spinlock_t;

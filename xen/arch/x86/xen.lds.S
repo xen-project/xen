@@ -128,12 +128,6 @@ SECTIONS
        *(.ex_table.pre)
        __stop___pre_ex_table = .;
 
-#ifdef CONFIG_LOCK_PROFILE
-       . = ALIGN(POINTER_ALIGN);
-       __lock_profile_start = .;
-       *(.lockprofile.data)
-       __lock_profile_end = .;
-#endif
        . = ALIGN(POINTER_ALIGN);
        __param_start = .;
        *(.data.param)
@@ -250,6 +244,13 @@ SECTIONS
         __alt_instructions = .;
         *(.altinstructions)
         __alt_instructions_end = .;
+
+#ifdef CONFIG_DEBUG_LOCK_PROFILE
+       . = ALIGN(POINTER_ALIGN);
+       __lock_profile_start = .;
+       *(.lockprofile.data)
+       __lock_profile_end = .;
+#endif
 
        . = ALIGN(8);
        __ctors_start = .;

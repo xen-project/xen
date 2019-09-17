@@ -1170,7 +1170,9 @@ void panic(const char *fmt, ...)
     unsigned long flags;
     static DEFINE_SPINLOCK(lock);
     static char buf[128];
-    
+
+    spin_debug_disable();
+    spinlock_profile_printall('\0');
     debugtrace_dump();
 
     /* Protects buf[] and ensure multi-line message prints atomically. */
