@@ -111,6 +111,7 @@ struct ivrs_mappings {
     u8 unity_map_enable;
     u8 write_permission;
     u8 read_permission;
+    bool valid;
     unsigned long addr_range_start;
     unsigned long addr_range_length;
     struct amd_iommu *iommu;

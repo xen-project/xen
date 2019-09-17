@@ -1241,7 +1241,6 @@ static int __init amd_iommu_setup_device_table(
     u16 seg, struct ivrs_mappings *ivrs_mappings)
 {
     unsigned int bdf;
-    void *intr_tb, *dte;
 
     BUG_ON( (ivrs_bdf_entries == 0) );
 
@@ -1261,16 +1260,17 @@ static int __init amd_iommu_setup_device_table(
     /* Add device table entries */
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
     {
-        intr_tb = ivrs_mappings[bdf].intremap_table;
-
-        if ( intr_tb )
+        if ( ivrs_mappings[bdf].valid )
         {
+            void *dte;
+
             /* add device table entry */
             dte = device_table.buffer + (bdf * IOMMU_DEV_TABLE_ENTRY_SIZE);
             iommu_dte_add_device_entry(dte, &ivrs_mappings[bdf]);
 
             amd_iommu_set_intremap_table(
-                dte, (u64)virt_to_maddr(intr_tb), iommu_intremap);
+                dte, virt_to_maddr(ivrs_mappings[bdf].intremap_table),
+                iommu_intremap);
         }
     }
 

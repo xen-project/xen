@@ -69,8 +69,8 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf)
  * table and I/O page table respectively. Such devices will have
  * both alias entry and select entry in IVRS structure.
  *
- * Return original device id, if device has valid interrupt remapping
- * table setup for both select entry and alias entry.
+ * Return original device id if both the specific entry and the alias entry
+ * have been marked valid.
  */
 int get_dma_requestor_id(uint16_t seg, uint16_t bdf)
 {
@@ -79,8 +79,7 @@ int get_dma_requestor_id(uint16_t seg, uint16_t bdf)
 
     BUG_ON ( bdf >= ivrs_bdf_entries );
     req_id = ivrs_mappings[bdf].dte_requestor_id;
-    if ( (ivrs_mappings[bdf].intremap_table != NULL) &&
-         (ivrs_mappings[req_id].intremap_table != NULL) )
+    if ( ivrs_mappings[bdf].valid && ivrs_mappings[req_id].valid )
         req_id = bdf;
 
     return req_id;

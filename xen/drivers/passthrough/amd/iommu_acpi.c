@@ -88,6 +88,8 @@ static void __init add_ivrs_mapping_entry(
          }
     }
 
+    ivrs_mappings[alias_id].valid = true;
+
     /* Assign IOMMU hardware. */
     ivrs_mappings[bdf].iommu = iommu;
 }
