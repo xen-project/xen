@@ -171,7 +171,6 @@ int msi_free_irq(struct msi_desc *entry);
 #define msix_enable(control)	 	control |= PCI_MSIX_FLAGS_ENABLE
 #define msix_disable(control)	 	control &= ~PCI_MSIX_FLAGS_ENABLE
 #define msix_table_size(control) 	((control & PCI_MSIX_FLAGS_QSIZE)+1)
-#define multi_msix_capable		msix_table_size
 #define msix_unmask(address)	 	(address & ~PCI_MSIX_VECTOR_BITMASK)
 #define msix_mask(address)		(address | PCI_MSIX_VECTOR_BITMASK)
 

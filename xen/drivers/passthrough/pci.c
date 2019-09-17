@@ -324,6 +324,7 @@ static void apply_quirks(struct pci_dev *pdev)
 static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
+    unsigned int pos;
 
     list_for_each_entry ( pdev, &pseg->alldevs_list, alldevs_list )
         if ( pdev->bus == bus && pdev->devfn == devfn )
@@ -339,10 +340,12 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     pdev->domain = NULL;
     INIT_LIST_HEAD(&pdev->msi_list);
 
-    if ( pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                             PCI_CAP_ID_MSIX) )
+    pos = pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                              PCI_CAP_ID_MSIX);
+    if ( pos )
     {
         struct arch_msix *msix = xzalloc(struct arch_msix);
+        uint16_t ctrl;
 
         if ( !msix )
         {
@@ -350,6 +353,10 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
             return NULL;
         }
         spin_lock_init(&msix->table_lock);
+
+        ctrl = pci_conf_read16(pdev->sbdf, msix_control_reg(pos));
+        msix->nr_entries = msix_table_size(ctrl);
+
         pdev->msix = msix;
     }
 
@@ -358,7 +365,6 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     /* update bus2bridge */
     switch ( pdev->type = pdev_type(pseg->nr, bus, devfn) )
     {
-        int pos;
         u16 cap;
         u8 sec_bus, sub_bus;
 

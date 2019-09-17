@@ -821,10 +821,8 @@ static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
  * requested MSI-X entries with allocated irqs or non-zero for otherwise.
  **/
 static int msix_capability_init(struct pci_dev *dev,
-                                unsigned int pos,
                                 struct msi_info *msi,
-                                struct msi_desc **desc,
-                                unsigned int nr_entries)
+                                struct msi_desc **desc)
 {
     struct arch_msix *msix = dev->msix;
     struct msi_desc *entry = NULL;
@@ -838,6 +836,11 @@ static int msix_capability_init(struct pci_dev *dev,
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
     bool maskall = msix->host_maskall;
+    unsigned int pos = pci_find_cap_offset(seg, bus, slot, func,
+                                           PCI_CAP_ID_MSIX);
+
+    if ( !pos )
+        return -ENODEV;
 
     ASSERT(pcidevs_locked());
 
@@ -912,10 +915,9 @@ static int msix_capability_init(struct pci_dev *dev,
         u64 pba_paddr;
         u32 pba_offset;
 
-        msix->nr_entries = nr_entries;
         msix->table.first = PFN_DOWN(table_paddr);
         msix->table.last = PFN_DOWN(table_paddr +
-                                    nr_entries * PCI_MSIX_ENTRY_SIZE - 1);
+                                    msix->nr_entries * PCI_MSIX_ENTRY_SIZE - 1);
         WARN_ON(rangeset_overlaps_range(mmio_ro_ranges, msix->table.first,
                                         msix->table.last));
 
@@ -927,7 +929,7 @@ static int msix_capability_init(struct pci_dev *dev,
 
         msix->pba.first = PFN_DOWN(pba_paddr);
         msix->pba.last = PFN_DOWN(pba_paddr +
-                                  BITS_TO_LONGS(nr_entries) - 1);
+                                  BITS_TO_LONGS(msix->nr_entries) - 1);
         WARN_ON(rangeset_overlaps_range(mmio_ro_ranges, msix->pba.first,
                                         msix->pba.last));
     }
@@ -999,7 +1001,6 @@ static int msix_capability_init(struct pci_dev *dev,
             /* XXX How to deal with existing mappings? */
         }
     }
-    WARN_ON(msix->nr_entries != nr_entries);
     WARN_ON(msix->table.first != (table_paddr >> PAGE_SHIFT));
     ++msix->used_entries;
 
@@ -1093,22 +1094,17 @@ static void __pci_disable_msi(struct msi_desc *entry)
  **/
 static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
 {
-    int pos, nr_entries;
     struct pci_dev *pdev;
-    u16 control;
     u8 slot = PCI_SLOT(msi->devfn);
     u8 func = PCI_FUNC(msi->devfn);
     struct msi_desc *old_desc;
 
     ASSERT(pcidevs_locked());
     pdev = pci_get_pdev(msi->seg, msi->bus, msi->devfn);
-    pos = pci_find_cap_offset(msi->seg, msi->bus, slot, func, PCI_CAP_ID_MSIX);
-    if ( !pdev || !pos )
+    if ( !pdev || !pdev->msix )
         return -ENODEV;
 
-    control = pci_conf_read16(pdev->sbdf, msix_control_reg(pos));
-    nr_entries = multi_msix_capable(control);
-    if ( msi->entry_nr >= nr_entries )
+    if ( msi->entry_nr >= pdev->msix->nr_entries )
         return -EINVAL;
 
     old_desc = find_msi_entry(pdev, msi->irq, PCI_CAP_ID_MSIX);
@@ -1127,7 +1123,7 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
         __pci_disable_msi(old_desc);
     }
 
-    return msix_capability_init(pdev, pos, msi, desc, nr_entries);
+    return msix_capability_init(pdev, msi, desc);
 }
 
 static void _pci_cleanup_msix(struct arch_msix *msix)
@@ -1187,15 +1183,9 @@ int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool off)
 {
     int rc;
     struct pci_dev *pdev;
-    u8 slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
-    unsigned int pos = pci_find_cap_offset(seg, bus, slot, func,
-                                           PCI_CAP_ID_MSIX);
 
     if ( !use_msi )
         return 0;
-
-    if ( !pos )
-        return -ENODEV;
 
     pcidevs_lock();
     pdev = pci_get_pdev(seg, bus, devfn);
@@ -1209,13 +1199,7 @@ int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool off)
         rc = 0;
     }
     else
-    {
-        uint16_t control = pci_conf_read16(PCI_SBDF3(seg, bus, devfn),
-                                           msix_control_reg(pos));
-
-        rc = msix_capability_init(pdev, pos, NULL, NULL,
-                                  multi_msix_capable(control));
-    }
+        rc = msix_capability_init(pdev, NULL, NULL);
     pcidevs_unlock();
 
     return rc;
