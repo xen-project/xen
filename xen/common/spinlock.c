@@ -13,9 +13,11 @@
 
 static atomic_t spin_debug __read_mostly = ATOMIC_INIT(0);
 
-static void check_lock(struct lock_debug *debug)
+static void check_lock(union lock_debug *debug)
 {
-    int irq_safe = !local_irq_is_enabled();
+    bool irq_safe = !local_irq_is_enabled();
+
+    BUILD_BUG_ON(LOCK_DEBUG_PAD_BITS <= 0);
 
     if ( unlikely(atomic_read(&spin_debug) <= 0) )
         return;
@@ -43,18 +45,21 @@ static void check_lock(struct lock_debug *debug)
      */
     if ( unlikely(debug->irq_safe != irq_safe) )
     {
-        int seen = cmpxchg(&debug->irq_safe, -1, irq_safe);
+        union lock_debug seen, new = { 0 };
 
-        if ( seen == !irq_safe )
+        new.irq_safe = irq_safe;
+        seen.val = cmpxchg(&debug->val, LOCK_DEBUG_INITVAL, new.val);
+
+        if ( !seen.unseen && seen.irq_safe == !irq_safe )
         {
             printk("CHECKLOCK FAILURE: prev irqsafe: %d, curr irqsafe %d\n",
-                   seen, irq_safe);
+                   seen.irq_safe, irq_safe);
             BUG();
         }
     }
 }
 
-static void check_barrier(struct lock_debug *debug)
+static void check_barrier(union lock_debug *debug)
 {
     if ( unlikely(atomic_read(&spin_debug) <= 0) )
         return;
@@ -70,7 +75,18 @@ static void check_barrier(struct lock_debug *debug)
      * However, if we spin on an IRQ-unsafe lock with IRQs disabled then that
      * is clearly wrong, for the same reason outlined in check_lock() above.
      */
-    BUG_ON(!local_irq_is_enabled() && (debug->irq_safe == 0));
+    BUG_ON(!local_irq_is_enabled() && !debug->irq_safe);
+}
+
+static void got_lock(union lock_debug *debug)
+{
+    debug->cpu = smp_processor_id();
+}
+
+static void rel_lock(union lock_debug *debug)
+{
+    ASSERT(debug->cpu == smp_processor_id());
+    debug->cpu = SPINLOCK_NO_CPU;
 }
 
 void spin_debug_enable(void)
@@ -87,6 +103,8 @@ void spin_debug_disable(void)
 
 #define check_lock(l) ((void)0)
 #define check_barrier(l) ((void)0)
+#define got_lock(l) ((void)0)
+#define rel_lock(l) ((void)0)
 
 #endif
 
@@ -150,6 +168,7 @@ void inline _spin_lock_cb(spinlock_t *lock, void (*cb)(void *), void *data)
             cb(data);
         arch_lock_relax();
     }
+    got_lock(&lock->debug);
     LOCK_PROFILE_GOT;
     preempt_disable();
     arch_lock_acquire_barrier();
@@ -181,6 +200,7 @@ void _spin_unlock(spinlock_t *lock)
     arch_lock_release_barrier();
     preempt_enable();
     LOCK_PROFILE_REL;
+    rel_lock(&lock->debug);
     add_sized(&lock->tickets.head, 1);
     arch_lock_signal();
 }
@@ -224,6 +244,7 @@ int _spin_trylock(spinlock_t *lock)
     if ( cmpxchg(&lock->tickets.head_tail,
                  old.head_tail, new.head_tail) != old.head_tail )
         return 0;
+    got_lock(&lock->debug);
 #ifdef CONFIG_LOCK_PROFILE
     if (lock->profile)
         lock->profile->time_locked = NOW();
@@ -267,6 +288,7 @@ int _spin_trylock_recursive(spinlock_t *lock)
 
     /* Don't allow overflow of recurse_cpu field. */
     BUILD_BUG_ON(NR_CPUS > SPINLOCK_NO_CPU);
+    BUILD_BUG_ON(SPINLOCK_RECURSE_BITS < 3);
 
     check_lock(&lock->debug);
 
