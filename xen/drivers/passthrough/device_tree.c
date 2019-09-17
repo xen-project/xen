@@ -119,6 +119,9 @@ int iommu_release_dt_devices(struct domain *d)
     struct dt_device_node *dev, *_dev;
     int rc;
 
+    if ( !is_iommu_enabled(d) )
+        return 0;
+
     list_for_each_entry_safe(dev, _dev, &hd->dt_devices, domain_list)
     {
         rc = iommu_deassign_dt_device(d, dev);

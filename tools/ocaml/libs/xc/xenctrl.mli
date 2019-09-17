@@ -56,6 +56,7 @@ type domain_create_flag =
   | CDF_S3_INTEGRITY
   | CDF_OOS_OFF
   | CDF_XS_DOMAIN
+  | CDF_IOMMU
 
 type domctl_create_config = {
   ssidref: int32;

@@ -151,6 +151,9 @@ int iommu_domain_init(struct domain *d)
     struct domain_iommu *hd = dom_iommu(d);
     int ret = 0;
 
+    if ( !is_iommu_enabled(d) )
+        return 0;
+
 #ifdef CONFIG_NUMA
     hd->node = NUMA_NO_NODE;
 #endif
@@ -158,9 +161,6 @@ int iommu_domain_init(struct domain *d)
     ret = arch_iommu_domain_init(d);
     if ( ret )
         return ret;
-
-    if ( !iommu_enabled )
-        return 0;
 
     hd->platform_ops = iommu_get_ops();
     return hd->platform_ops->init(d);

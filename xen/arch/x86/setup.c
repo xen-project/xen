@@ -1732,6 +1732,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     }
     dom0_cfg.max_vcpus = dom0_max_vcpus();
 
+    if ( iommu_enabled )
+        dom0_cfg.flags |= XEN_DOMCTL_CDF_iommu;
+
     /* Create initial domain 0. */
     dom0 = domain_create(get_initial_domain_id(), &dom0_cfg, !pv_shim);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )

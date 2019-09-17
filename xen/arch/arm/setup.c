@@ -947,6 +947,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     dom0_cfg.arch.tee_type = tee_get_type();
     dom0_cfg.max_vcpus = dom0_max_vcpus();
 
+    if ( iommu_enabled )
+        dom0_cfg.flags |= XEN_DOMCTL_CDF_iommu;
+
     dom0 = domain_create(0, &dom0_cfg, true);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0(dom0) == NULL) )
         panic("Error creating domain 0\n");
