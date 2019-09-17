@@ -9,7 +9,7 @@
 #include <asm/processor.h>
 #include <asm/atomic.h>
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG_LOCKS
 
 static atomic_t spin_debug __read_mostly = ATOMIC_INIT(0);
 
@@ -99,7 +99,7 @@ void spin_debug_disable(void)
     atomic_dec(&spin_debug);
 }
 
-#else /* defined(NDEBUG) */
+#else /* CONFIG_DEBUG_LOCKS */
 
 #define check_lock(l) ((void)0)
 #define check_barrier(l) ((void)0)

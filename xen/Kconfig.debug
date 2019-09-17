@@ -51,6 +51,13 @@ config LOCK_PROFILE
 	  You can use serial console to print (and reset) using 'l' and 'L'
 	  respectively, or the 'xenlockprof' tool.
 
+config DEBUG_LOCKS
+	bool "Lock debugging"
+	default DEBUG
+	---help---
+	  Enable debugging features of lock handling.  Some additional
+	  checks will be performed when acquiring and releasing locks.
+
 config PERF_COUNTERS
 	bool "Performance Counters"
 	---help---

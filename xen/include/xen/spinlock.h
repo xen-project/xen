@@ -7,7 +7,7 @@
 
 #define SPINLOCK_CPU_BITS  12
 
-#ifndef NDEBUG
+#ifdef CONFIG_DEBUG_LOCKS
 union lock_debug {
     uint16_t val;
 #define LOCK_DEBUG_INITVAL 0xffff
