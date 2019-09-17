@@ -86,6 +86,10 @@ static void __init add_ivrs_mapping_entry(
              ivrs_mappings[alias_id].intremap_table = shared_intremap_table;
              ivrs_mappings[alias_id].intremap_inuse = shared_intremap_inuse;
          }
+
+         if ( !ivrs_mappings[alias_id].intremap_table )
+             panic("No memory for %04x:%02x:%02x.%u's IRT\n", iommu->seg,
+                   PCI_BUS(alias_id), PCI_SLOT(alias_id), PCI_FUNC(alias_id));
     }
 
     ivrs_mappings[alias_id].valid = true;

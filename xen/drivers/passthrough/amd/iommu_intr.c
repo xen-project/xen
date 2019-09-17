@@ -817,12 +817,22 @@ int __init amd_iommu_free_intremap_table(
 void *__init amd_iommu_alloc_intremap_table(
     const struct amd_iommu *iommu, unsigned long **inuse_map)
 {
-    void *tb = __alloc_amd_iommu_tables(intremap_table_order(iommu));
+    unsigned int order = intremap_table_order(iommu);
+    void *tb = __alloc_amd_iommu_tables(order);
 
-    BUG_ON(tb == NULL);
-    memset(tb, 0, PAGE_SIZE << intremap_table_order(iommu));
-    *inuse_map = xzalloc_array(unsigned long, BITS_TO_LONGS(INTREMAP_ENTRIES));
-    BUG_ON(*inuse_map == NULL);
+    if ( tb )
+    {
+        *inuse_map = xzalloc_array(unsigned long,
+                                   BITS_TO_LONGS(INTREMAP_ENTRIES));
+        if ( *inuse_map )
+            memset(tb, 0, PAGE_SIZE << order);
+        else
+        {
+            __free_amd_iommu_tables(tb, order);
+            tb = NULL;
+        }
+    }
+
     return tb;
 }
 
