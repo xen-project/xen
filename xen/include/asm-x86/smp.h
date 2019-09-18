@@ -63,6 +63,7 @@ long cpu_up_helper(void *data);
 long cpu_down_helper(void *data);
 
 long core_parking_helper(void *data);
+bool core_parking_remove(unsigned int cpu);
 uint32_t get_cur_idle_nums(void);
 
 /*

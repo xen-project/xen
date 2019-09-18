@@ -128,6 +128,9 @@ static long smt_up_down_helper(void *data)
         if ( !(x86_cpu_to_apicid[cpu] & sibling_mask) )
             continue;
 
+        if ( !up && core_parking_remove(cpu) )
+            continue;
+
         ret = up ? cpu_up_helper(_p(cpu))
                  : cpu_down_helper(_p(cpu));
 

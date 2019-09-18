@@ -25,9 +25,7 @@
 #define CORE_PARKING_INCREMENT 1
 #define CORE_PARKING_DECREMENT 2
 
-static unsigned int core_parking_power(unsigned int event);
-static unsigned int core_parking_performance(unsigned int event);
-
+static DEFINE_SPINLOCK(accounting_lock);
 static uint32_t cur_idle_nums;
 static unsigned int core_parking_cpunum[NR_CPUS] = {[0 ... NR_CPUS-1] = -1};
 
@@ -100,10 +98,10 @@ static unsigned int core_parking_performance(unsigned int event)
     break;
 
     case CORE_PARKING_DECREMENT:
-    {
-        cpu = core_parking_cpunum[cur_idle_nums -1];
-    }
-    break;
+        spin_lock(&accounting_lock);
+        cpu = core_parking_cpunum[cur_idle_nums - 1];
+        spin_unlock(&accounting_lock);
+        break;
 
     default:
         break;
@@ -158,10 +156,10 @@ static unsigned int core_parking_power(unsigned int event)
     break;
 
     case CORE_PARKING_DECREMENT:
-    {
-        cpu = core_parking_cpunum[cur_idle_nums -1];
-    }
-    break;
+        spin_lock(&accounting_lock);
+        cpu = core_parking_cpunum[cur_idle_nums - 1];
+        spin_unlock(&accounting_lock);
+        break;
 
     default:
         break;
@@ -185,7 +183,11 @@ long core_parking_helper(void *data)
         ret = cpu_down(cpu);
         if ( ret )
             return ret;
+
+        spin_lock(&accounting_lock);
+        BUG_ON(cur_idle_nums >= ARRAY_SIZE(core_parking_cpunum));
         core_parking_cpunum[cur_idle_nums++] = cpu;
+        spin_unlock(&accounting_lock);
     }
 
     while ( cur_idle_nums > idle_nums )
@@ -194,10 +196,41 @@ long core_parking_helper(void *data)
         ret = cpu_up(cpu);
         if ( ret )
             return ret;
-        core_parking_cpunum[--cur_idle_nums] = -1;
+
+        if ( !core_parking_remove(cpu) )
+        {
+            ret = cpu_down(cpu);
+            if ( ret == -EEXIST )
+                ret = 0;
+            if ( ret )
+                break;
+        }
     }
 
     return ret;
+}
+
+bool core_parking_remove(unsigned int cpu)
+{
+    unsigned int i;
+    bool found = false;
+
+    spin_lock(&accounting_lock);
+
+    for ( i = 0; i < cur_idle_nums; ++i )
+        if ( core_parking_cpunum[i] == cpu )
+        {
+            found = true;
+            --cur_idle_nums;
+            break;
+        }
+
+    for ( ; i < cur_idle_nums; ++i )
+        core_parking_cpunum[i] = core_parking_cpunum[i + 1];
+
+    spin_unlock(&accounting_lock);
+
+    return found;
 }
 
 uint32_t get_cur_idle_nums(void)
