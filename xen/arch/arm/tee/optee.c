@@ -85,6 +85,14 @@
  */
 #define MAX_SHM_BUFFER_PG       129
 
+/*
+ * Limits the number of shared buffers that guest can have at once.
+ * This is to prevent case, when guests tricks XEN into exhausting
+ * own memory by allocating zillions of one-byte buffers. Value is
+ * chosen arbitrary.
+ */
+#define MAX_SHM_BUFFER_COUNT   16
+
 #define OPTEE_KNOWN_NSEC_CAPS OPTEE_SMC_NSEC_CAP_UNIPROCESSOR
 #define OPTEE_KNOWN_SEC_CAPS (OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM | \
                               OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM | \
@@ -146,6 +154,7 @@ struct optee_domain {
     struct list_head optee_shm_buf_list;
     atomic_t call_count;
     atomic_t optee_shm_buf_pages;
+    atomic_t optee_shm_buf_count;
     spinlock_t lock;
 };
 
@@ -233,6 +242,7 @@ static int optee_domain_init(struct domain *d)
     INIT_LIST_HEAD(&ctx->optee_shm_buf_list);
     atomic_set(&ctx->call_count, 0);
     atomic_set(&ctx->optee_shm_buf_pages, 0);
+    atomic_set(&ctx->optee_shm_buf_count, 0);
     spin_lock_init(&ctx->lock);
 
     d->arch.tee = ctx;
@@ -481,23 +491,26 @@ static struct optee_shm_buf *allocate_optee_shm_buf(struct optee_domain *ctx,
     struct optee_shm_buf *optee_shm_buf, *optee_shm_buf_tmp;
     int old, new;
     int err_code;
+    int count;
+
+    count = atomic_add_unless(&ctx->optee_shm_buf_count, 1,
+                              MAX_SHM_BUFFER_COUNT);
+    if ( count == MAX_SHM_BUFFER_COUNT )
+        return ERR_PTR(-ENOMEM);
 
     do
     {
         old = atomic_read(&ctx->optee_shm_buf_pages);
         new = old + pages_cnt;
         if ( new >= MAX_TOTAL_SMH_BUF_PG )
-            return ERR_PTR(-ENOMEM);
+        {
+            err_code = -ENOMEM;
+            goto err_dec_cnt;
+        }
     }
     while ( unlikely(old != atomic_cmpxchg(&ctx->optee_shm_buf_pages,
                                            old, new)) );
 
-    /*
-     * TODO: Guest can try to register many small buffers, thus, forcing
-     * XEN to allocate context for every buffer. Probably we need to
-     * limit not only total number of pages pinned but also number
-     * of buffer objects.
-     */
     optee_shm_buf = xzalloc_bytes(sizeof(struct optee_shm_buf) +
                                   pages_cnt * sizeof(struct page *));
     if ( !optee_shm_buf )
@@ -533,6 +546,8 @@ static struct optee_shm_buf *allocate_optee_shm_buf(struct optee_domain *ctx,
 err:
     xfree(optee_shm_buf);
     atomic_sub(pages_cnt, &ctx->optee_shm_buf_pages);
+err_dec_cnt:
+    atomic_dec(&ctx->optee_shm_buf_count);
 
     return ERR_PTR(err_code);
 }
@@ -575,6 +590,7 @@ static void free_optee_shm_buf(struct optee_domain *ctx, uint64_t cookie)
     free_pg_list(optee_shm_buf);
 
     atomic_sub(optee_shm_buf->page_cnt, &ctx->optee_shm_buf_pages);
+    atomic_dec(&ctx->optee_shm_buf_count);
 
     xfree(optee_shm_buf);
 }
