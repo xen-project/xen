@@ -1995,7 +1995,8 @@ protmode_load_seg(
         case x86_seg_tr:
             goto raise_exn;
         }
-        if ( cp->x86_vendor != X86_VENDOR_AMD || !ops->read_segment ||
+        if ( !(cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) ||
+             !ops->read_segment ||
              ops->read_segment(seg, sreg, ctxt) != X86EMUL_OKAY )
             memset(sreg, 0, sizeof(*sreg));
         else
@@ -2122,7 +2123,8 @@ protmode_load_seg(
          */
         bool wide = desc.b & 0x1000
                     ? false : (desc.b & 0xf00) != 0xc00 &&
-                               cp->x86_vendor != X86_VENDOR_AMD
+                               !(cp->x86_vendor &
+                                 (X86_VENDOR_AMD | X86_VENDOR_HYGON))
                                ? mode_64bit() : ctxt->lma;
 
         if ( wide )
@@ -2140,7 +2142,8 @@ protmode_load_seg(
             default:
                 return rc;
             }
-            if ( !mode_64bit() && cp->x86_vendor == X86_VENDOR_AMD &&
+            if ( !mode_64bit() &&
+                 (cp->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) &&
                  (desc.b & 0xf00) != 0xc00 )
                 desc_hi.b = desc_hi.a = 0;
             if ( (desc_hi.b & 0x00001f00) ||
