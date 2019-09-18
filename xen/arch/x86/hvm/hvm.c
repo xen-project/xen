@@ -2323,7 +2323,7 @@ int hvm_set_cr3(unsigned long value, bool may_defer)
     }
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
-         (value != v->arch.hvm.guest_cr[3]) )
+         ((value ^ v->arch.hvm.guest_cr[3]) >> PAGE_SHIFT) )
     {
         /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
