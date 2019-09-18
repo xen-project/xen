@@ -337,11 +337,11 @@ case "$host_os" in
   freebsd*) ;;
   *) AX_PATH_PROG_OR_FAIL([BASH], [bash]);;
 esac
-AS_IF([echo "$PYTHON" | grep -q "^/"], [
-    PYTHONPATH=$PYTHON
-    PYTHON=`basename $PYTHONPATH`
-],[test -z "$PYTHON"], [PYTHON="python"],
-[AC_MSG_ERROR([PYTHON specified, but is not an absolute path])])
+AS_IF([test -z "$PYTHON"], [PYTHON="python"])
+AS_IF([echo "$PYTHON" | grep -q "^/"], [], [PYTHON=`type -p "$PYTHON"`])
+PYTHONPATH=$PYTHON
+PYTHON=`basename $PYTHONPATH`
+
 AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
 AX_CHECK_PYTHON_VERSION([2], [6])
 

@@ -6925,16 +6925,17 @@ then
     as_fn_error $? "Unable to find bash, please install bash" "$LINENO" 5
 fi;;
 esac
+if test -z "$PYTHON"; then :
+  PYTHON="python"
+fi
 if echo "$PYTHON" | grep -q "^/"; then :
 
-    PYTHONPATH=$PYTHON
-    PYTHON=`basename $PYTHONPATH`
-
-elif test -z "$PYTHON"; then :
-  PYTHON="python"
 else
-  as_fn_error $? "PYTHON specified, but is not an absolute path" "$LINENO" 5
+  PYTHON=`type -p "$PYTHON"`
 fi
+PYTHONPATH=$PYTHON
+PYTHON=`basename $PYTHONPATH`
+
 # Extract the first word of "$PYTHON", so it can be a program name with args.
 set dummy $PYTHON; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
