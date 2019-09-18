@@ -103,7 +103,8 @@ static void do_tlb_flush(void)
 
 void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
 {
-    unsigned long flags, old_cr4, old_pcid;
+    unsigned long flags, old_cr4;
+    unsigned int old_pcid;
     u32 t;
 
     /* This non-reentrant function is sometimes called in interrupt context. */

@@ -287,7 +287,7 @@ static inline unsigned long cr3_pa(unsigned long cr3)
     return cr3 & X86_CR3_ADDR_MASK;
 }
 
-static inline unsigned long cr3_pcid(unsigned long cr3)
+static inline unsigned int cr3_pcid(unsigned long cr3)
 {
     return cr3 & X86_CR3_PCID_MASK;
 }
