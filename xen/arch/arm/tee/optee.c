@@ -633,17 +633,14 @@ static int optee_relinquish_resources(struct domain *d)
     list_for_each_entry_safe( shm_rpc, shm_rpc_tmp, &ctx->shm_rpc_list, list )
         free_shm_rpc(ctx, shm_rpc->cookie);
 
-    if ( hypercall_preempt_check() )
-        return -ERESTART;
-
-    /*
-     * TODO: Guest can pin up to MAX_TOTAL_SMH_BUF_PG pages and all of
-     * them will be put in this loop. It is worth considering to
-     * check for preemption inside the loop.
-     */
     list_for_each_entry_safe( optee_shm_buf, optee_shm_buf_tmp,
                               &ctx->optee_shm_buf_list, list )
+    {
+        if ( hypercall_preempt_check() )
+            return -ERESTART;
+
         free_optee_shm_buf(ctx, optee_shm_buf->cookie);
+    }
 
     if ( hypercall_preempt_check() )
         return -ERESTART;
