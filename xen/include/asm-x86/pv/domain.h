@@ -50,8 +50,13 @@
  */
 static inline unsigned long get_pcid_bits(const struct vcpu *v, bool is_xpti)
 {
+#ifdef CONFIG_PV
     return X86_CR3_NOFLUSH | (is_xpti ? PCID_PV_XPTI : 0) |
            ((v->arch.flags & TF_kernel_mode) ? PCID_PV_PRIV : PCID_PV_USER);
+#else
+    ASSERT_UNREACHABLE();
+    return 0;
+#endif
 }
 
 #ifdef CONFIG_PV

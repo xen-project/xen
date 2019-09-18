@@ -24,6 +24,11 @@
 #define WRAP_MASK (0x000003FFU)
 #endif
 
+#ifndef CONFIG_PV
+# undef X86_CR4_PCIDE
+# define X86_CR4_PCIDE 0
+#endif
+
 u32 tlbflush_clock = 1U;
 DEFINE_PER_CPU(u32, tlbflush_time);
 

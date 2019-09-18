@@ -289,7 +289,7 @@ static inline unsigned long cr3_pa(unsigned long cr3)
 
 static inline unsigned int cr3_pcid(unsigned long cr3)
 {
-    return cr3 & X86_CR3_PCID_MASK;
+    return IS_ENABLED(CONFIG_PV) ? cr3 & X86_CR3_PCID_MASK : 0;
 }
 
 static inline unsigned long read_cr4(void)
@@ -301,8 +301,12 @@ static inline void write_cr4(unsigned long val)
 {
     struct cpu_info *info = get_cpu_info();
 
+#ifdef CONFIG_PV
     /* No global pages in case of PCIDs enabled! */
     ASSERT(!(val & X86_CR4_PGE) || !(val & X86_CR4_PCIDE));
+#else
+    ASSERT(!(val & X86_CR4_PCIDE));
+#endif
 
     /*
      * On hardware supporting FSGSBASE, the value in %cr4 is the kernel's
