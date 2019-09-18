@@ -104,8 +104,10 @@ static void do_tlb_flush(void)
 void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
 {
     unsigned long flags, old_cr4;
-    unsigned int old_pcid;
     u32 t;
+
+    /* Throughout this function we make this assumption: */
+    ASSERT(!(cr4 & X86_CR4_PCIDE) || !(cr4 & X86_CR4_PGE));
 
     /* This non-reentrant function is sometimes called in interrupt context. */
     local_irq_save(flags);
@@ -113,73 +115,54 @@ void switch_cr3_cr4(unsigned long cr3, unsigned long cr4)
     t = pre_flush();
 
     old_cr4 = read_cr4();
-    if ( old_cr4 & X86_CR4_PGE )
+    ASSERT(!(old_cr4 & X86_CR4_PCIDE) || !(old_cr4 & X86_CR4_PGE));
+
+    /*
+     * We need to write CR4 before CR3 if we're about to enable PCIDE, at the
+     * very least when the new PCID is non-zero.
+     *
+     * As we also need to do two CR4 writes in total when PGE is enabled and
+     * is to remain enabled, do the one temporarily turning off the bit right
+     * here as well.
+     *
+     * The only TLB flushing effect we depend on here is in case we move from
+     * PGE set to PCIDE set, where we want global page entries gone (and none
+     * to re-appear) after this write.
+     */
+    if ( !(old_cr4 & X86_CR4_PCIDE) &&
+         ((cr4 & X86_CR4_PCIDE) || (cr4 & old_cr4 & X86_CR4_PGE)) )
     {
-        /*
-         * X86_CR4_PGE set means PCID is inactive.
-         * We have to purge the TLB via flipping cr4.pge.
-         */
         old_cr4 = cr4 & ~X86_CR4_PGE;
         write_cr4(old_cr4);
     }
-    else if ( use_invpcid )
-    {
-        /*
-         * Flushing the TLB via INVPCID is necessary only in case PCIDs are
-         * in use, which is true only with INVPCID being available.
-         * Without PCID usage the following write_cr3() will purge the TLB
-         * (we are in the cr4.pge off path) of all entries.
-         * Using invpcid_flush_all_nonglobals() seems to be faster than
-         * invpcid_flush_all(), so use that.
-         */
-        invpcid_flush_all_nonglobals();
-
-        /*
-         * CR4.PCIDE needs to be set before the CR3 write below. Otherwise
-         * - the CR3 write will fault when CR3.NOFLUSH is set (which is the
-         *   case normally),
-         * - the subsequent CR4 write will fault if CR3.PCID != 0.
-         */
-        if ( (old_cr4 & X86_CR4_PCIDE) < (cr4 & X86_CR4_PCIDE) )
-        {
-            write_cr4(cr4);
-            old_cr4 = cr4;
-        }
-    }
 
     /*
-     * If we don't change PCIDs, the CR3 write below needs to flush this very
-     * PCID, even when a full flush was performed above, as we are currently
-     * accumulating TLB entries again from the old address space.
-     * NB: Clearing the bit when we don't use PCID is benign (as it is clear
-     * already in that case), but allows the if() to be more simple.
+     * If the CR4 write is to turn off PCIDE, we don't need the CR3 write to
+     * flush anything, as that transition is a full flush itself.
      */
-    old_pcid = cr3_pcid(read_cr3());
-    if ( old_pcid == cr3_pcid(cr3) )
-        cr3 &= ~X86_CR3_NOFLUSH;
-
+    if ( (old_cr4 & X86_CR4_PCIDE) > (cr4 & X86_CR4_PCIDE) )
+        cr3 |= X86_CR3_NOFLUSH;
     write_cr3(cr3);
 
     if ( old_cr4 != cr4 )
         write_cr4(cr4);
 
     /*
-     * Make sure no TLB entries related to the old PCID created between
-     * flushing the TLB and writing the new %cr3 value remain in the TLB.
-     *
-     * The write to CR4 just above has performed a wider flush in certain
-     * cases, which therefore get excluded here. Since that write is
-     * conditional, note in particular that it won't be skipped if PCIDE
-     * transitions from 1 to 0. This is because the CR4 write further up will
-     * have been skipped in this case, as PCIDE and PGE won't both be set at
-     * the same time.
-     *
-     * Note also that PGE is always clear in old_cr4.
+     *  PGE  | PCIDE | flush at
+     * ------+-------+------------------------
+     *  0->0 | 0->0  | CR3 write
+     *  0->0 | 0->1  | n/a (see 1st CR4 write)
+     *  0->x | 1->0  | CR4 write
+     *  x->1 | x->1  | n/a
+     *  0->0 | 1->1  | INVPCID
+     *  0->1 | 0->0  | CR3 and CR4 writes
+     *  1->0 | 0->0  | CR4 write
+     *  1->0 | 0->1  | n/a (see 1st CR4 write)
+     *  1->1 | 0->0  | n/a (see 1st CR4 write)
+     *  1->x | 1->x  | n/a
      */
-    if ( old_pcid != cr3_pcid(cr3) &&
-         !(cr4 & X86_CR4_PGE) &&
-         (old_cr4 & X86_CR4_PCIDE) <= (cr4 & X86_CR4_PCIDE) )
-        invpcid_flush_single_context(old_pcid);
+    if ( cr4 & X86_CR4_PCIDE )
+        invpcid_flush_all_nonglobals();
 
     post_flush(t);
 
