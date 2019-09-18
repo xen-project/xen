@@ -218,10 +218,6 @@ def crunch_numbers(state):
         #
         # SSE4_2: [POPCNT]
 
-        # The INVPCID instruction depends on PCID infrastructure being
-        # available.
-        PCID: [INVPCID],
-
         # XSAVE is an extra set of instructions for state management, but
         # doesn't constitue new state itself.  Some of the dependent features
         # are instructions built on top of base XSAVE, while others are new
