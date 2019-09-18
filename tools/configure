@@ -7442,7 +7442,7 @@ fi
 if test x"$pyconfig" = x"no"; then :
 
         CPPFLAGS="$CFLAGS `$PYTHON -c 'import distutils.sysconfig; \
-        print "-I" + distutils.sysconfig.get_config_var("INCLUDEPY")'`"
+        print("-I" + distutils.sysconfig.get_config_var("INCLUDEPY"))'`"
     CPPFLAGS="$CPPFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print(distutils.sysconfig.get_config_var("CFLAGS"))'`"
     LDFLAGS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \

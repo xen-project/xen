@@ -6,7 +6,7 @@ AC_PATH_PROG([pyconfig], [$PYTHON-config], [no])
 AS_IF([test x"$pyconfig" = x"no"], [
     dnl For those that don't have python-config
     CPPFLAGS="$CFLAGS `$PYTHON -c 'import distutils.sysconfig; \
-        print "-I" + distutils.sysconfig.get_config_var("INCLUDEPY")'`"
+        print("-I" + distutils.sysconfig.get_config_var("INCLUDEPY"))'`"
     CPPFLAGS="$CPPFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print(distutils.sysconfig.get_config_var("CFLAGS"))'`"
     LDFLAGS="$LDFLAGS `$PYTHON -c 'import distutils.sysconfig; \
