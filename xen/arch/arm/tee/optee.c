@@ -72,6 +72,19 @@
  */
 #define MAX_TOTAL_SMH_BUF_PG    16384
 
+/*
+ * Limit for shared buffer size. Please note that this define limits
+ * number of pages. But user buffer can be not aligned to a page
+ * boundary. So it is possible that user would not be able to share
+ * exactly MAX_SHM_BUFFER_PG * PAGE_SIZE bytes with OP-TEE.
+ *
+ * Global Platform specification for TEE requires that any TEE
+ * implementation should allow to share buffers with size of at least
+ * 512KB, which equals to 128 4kB pages. Due to align issue mentioned
+ * above, we need to increase this value to 129.
+ */
+#define MAX_SHM_BUFFER_PG       129
+
 #define OPTEE_KNOWN_NSEC_CAPS OPTEE_SMC_NSEC_CAP_UNIPROCESSOR
 #define OPTEE_KNOWN_SEC_CAPS (OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM | \
                               OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM | \
@@ -697,16 +710,29 @@ static int translate_noncontig(struct optee_domain *ctx,
     size = ROUNDUP(param->u.tmem.size + offset, OPTEE_MSG_NONCONTIG_PAGE_SIZE);
 
     pg_count = DIV_ROUND_UP(size, OPTEE_MSG_NONCONTIG_PAGE_SIZE);
+    if ( pg_count > MAX_SHM_BUFFER_PG )
+        return -ENOMEM;
+
     order = get_order_from_bytes(get_pages_list_size(pg_count));
 
     /*
-     * In the worst case we will want to allocate 33 pages, which is
-     * MAX_TOTAL_SMH_BUF_PG/511 rounded up. This gives order 6 or at
-     * most 64 pages allocated. This buffer will be freed right after
-     * the end of the call and there can be no more than
+     * In the worst case we will want to allocate 1 page, which is
+     * MAX_SHM_BUFFER_PG/511 rounded up. This buffer will be freed
+     * right after the end of the call and there can be no more than
      * max_optee_threads calls simultaneously. So in the worst case
-     * guest can trick us to allocate 64 * max_optee_threads pages in
+     * guest can trick us to allocate 1 * max_optee_threads pages in
      * total.
+     *
+     * It may seem strange to have such complex calculations if we
+     * always will allocate exactly one page. Those calculations exist
+     * in the first place because earlier there were bigger limit for
+     * shared buffer size, so there were cases, when we needed more
+     * that one page there. Right now this is not true, but this code
+     * remains for two reasons:
+     * - Users can change MAX_SHM_BUFFER_PG to a higher value, in which
+     *   case they will need this code.
+     * - There is a plan to implement preemption in the code below, which
+     *   will allow use to increase default MAX_SHM_BUFFER_PG value.
      */
     xen_pgs = alloc_domheap_pages(current->domain, order, 0);
     if ( !xen_pgs )
@@ -747,13 +773,7 @@ static int translate_noncontig(struct optee_domain *ctx,
             xen_data = __map_domain_page(xen_pgs);
         }
 
-        /*
-         * TODO: That function can pin up to 64MB of guest memory by
-         * calling lookup_and_pin_guest_ram_addr() 16384 times
-         * (assuming that PAGE_SIZE equals to 4096).
-         * This should be addressed before declaring OP-TEE security
-         * supported.
-         */
+        /* Only 4kB pages are supported right now */
         BUILD_BUG_ON(PAGE_SIZE != 4096);
         page = get_domain_ram_page(gaddr_to_gfn(guest_data->pages_list[idx]));
         if ( !page )
