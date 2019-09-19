@@ -23,6 +23,8 @@
 
 #include <xen/types.h>
 
+#include <asm/asm_defns.h>
+
 #include <public/xen.h>
 #include <public/sched.h>
 #include <public/hvm/hvm_op.h>
@@ -179,6 +181,8 @@ static inline long xen_hypercall_set_evtchn_upcall_vector(
 }
 
 #else /* CONFIG_XEN_GUEST */
+
+#include <xen/lib.h>
 
 #include <public/sched.h>
 
