@@ -1,7 +1,7 @@
 subdir-y += acpi
 subdir-y += cpu
 subdir-y += genapic
-subdir-$(CONFIG_XEN_GUEST) += guest
+subdir-$(CONFIG_GUEST) += guest
 subdir-$(CONFIG_HVM) += hvm
 subdir-y += mm
 subdir-$(CONFIG_XENOPROF) += oprofile
