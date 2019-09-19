@@ -995,7 +995,7 @@ domid_t get_initial_domain_id(void)
     if ( !pv_shim )
         return 0;
 
-    cpuid(hypervisor_cpuid_base() + 4, &eax, &ebx, &ecx, &edx);
+    cpuid(xen_cpuid_base + 4, &eax, &ebx, &ecx, &edx);
 
     return (eax & XEN_HVM_CPUID_DOMID_PRESENT) ? ecx : 1;
 }

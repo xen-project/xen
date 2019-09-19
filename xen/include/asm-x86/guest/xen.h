@@ -30,13 +30,13 @@
 
 extern bool xen_guest;
 extern bool pv_console;
+extern uint32_t xen_cpuid_base;
 
 void probe_hypervisor(void);
 void hypervisor_setup(void);
 void hypervisor_ap_setup(void);
 int hypervisor_alloc_unused_page(mfn_t *mfn);
 int hypervisor_free_unused_page(mfn_t mfn);
-uint32_t hypervisor_cpuid_base(void);
 void hypervisor_resume(void);
 
 DECLARE_PER_CPU(unsigned int, vcpu_id);

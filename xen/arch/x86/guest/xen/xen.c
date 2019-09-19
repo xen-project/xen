@@ -37,7 +37,7 @@
 
 bool __read_mostly xen_guest;
 
-static __read_mostly uint32_t xen_cpuid_base;
+uint32_t __read_mostly xen_cpuid_base;
 extern char hypercall_page[];
 static struct rangeset *mem;
 
@@ -295,11 +295,6 @@ int hypervisor_alloc_unused_page(mfn_t *mfn)
 int hypervisor_free_unused_page(mfn_t mfn)
 {
     return rangeset_remove_range(mem, mfn_x(mfn), mfn_x(mfn));
-}
-
-uint32_t hypervisor_cpuid_base(void)
-{
-    return xen_cpuid_base;
 }
 
 static void ap_resume(void *unused)
