@@ -984,6 +984,27 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     return rc;
 }
 
+static int check_qemu_running(libxl__gc *gc,
+                              libxl_domid domid,
+                              libxl__xswait_state *xswa,
+                              int rc,
+                              const char *state)
+{
+    if (rc) {
+        if (rc == ERROR_TIMEDOUT) {
+            LOGD(ERROR, domid, "%s not ready", xswa->what);
+        }
+        goto out;
+    }
+
+    if (!state || strcmp(state, "running"))
+        return ERROR_NOT_READY;
+
+out:
+    libxl__xswait_stop(gc, xswa);
+    return rc;
+}
+
 typedef struct pci_add_state {
     /* filled by user of do_pci_add */
     libxl__ao_device *aodev;
@@ -1071,21 +1092,14 @@ static void pci_add_qemu_trad_watch_state_cb(libxl__egc *egc,
     libxl_domid domid = pas->domid;
     libxl_device_pci *pcidev = pas->pcidev;
 
-    if (rc) {
-        if (rc == ERROR_TIMEDOUT) {
-            LOGD(ERROR, domid, "%s not ready", xswa->what);
-        }
+    rc = check_qemu_running(gc, domid, xswa, rc, state);
+    if (rc == ERROR_NOT_READY)
+        return;
+    if (rc)
         goto out;
-    }
-
-    if (!state)
-        return;
-    if (strcmp(state, "running"))
-        return;
 
     rc = qemu_pci_add_xenstore(gc, domid, pcidev);
 out:
-    libxl__xswait_stop(gc, xswa);
     pci_add_dm_done(egc, pas, rc); /* must be last */
 }
 
@@ -1893,22 +1907,15 @@ static void pci_remove_qemu_trad_watch_state_cb(libxl__egc *egc,
     libxl_domid domid = prs->domid;
     libxl_device_pci *const pcidev = prs->pcidev;
 
-    if (rc) {
-        if (rc == ERROR_TIMEDOUT) {
-            LOGD(ERROR, domid, "%s not ready", xswa->what);
-        }
+    rc = check_qemu_running(gc, domid, xswa, rc, state);
+    if (rc == ERROR_NOT_READY)
+        return;
+    if (rc)
         goto out;
-    }
-
-    if (!state)
-        return;
-    if (strcmp(state, "running"))
-        return;
 
     rc = qemu_pci_remove_xenstore(gc, domid, pcidev, prs->force);
 
 out:
-    libxl__xswait_stop(gc, xswa);
     pci_remove_detatched(egc, prs, rc);
 }
 
