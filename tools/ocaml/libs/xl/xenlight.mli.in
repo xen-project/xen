@@ -43,10 +43,10 @@ module Domain : sig
 	external reboot : ctx -> domid -> unit = "stub_libxl_domain_reboot"
 	external destroy : ctx -> domid -> ?async:'a -> unit -> unit = "stub_libxl_domain_destroy"
 	external suspend : ctx -> domid -> Unix.file_descr -> ?async:'a -> unit -> unit = "stub_libxl_domain_suspend"
-	external pause : ctx -> domid -> unit = "stub_libxl_domain_pause"
-	external unpause : ctx -> domid -> unit = "stub_libxl_domain_unpause"
+	external pause : ctx -> domid -> ?async:'a -> unit = "stub_libxl_domain_pause"
+	external unpause : ctx -> domid -> ?async:'a -> unit = "stub_libxl_domain_unpause"
 
-	external send_trigger : ctx -> domid -> trigger -> int -> unit = "stub_xl_send_trigger"
+	external send_trigger : ctx -> domid -> trigger -> int -> ?async:'a -> unit = "stub_xl_send_trigger"
 	external send_sysrq : ctx -> domid -> char -> unit = "stub_xl_send_sysrq"
 end
 

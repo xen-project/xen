@@ -622,15 +622,18 @@ value stub_libxl_domain_suspend(value ctx, value domid, value fd, value async, v
 	CAMLreturn(Val_unit);
 }
 
-value stub_libxl_domain_pause(value ctx, value domid)
+value stub_libxl_domain_pause(value ctx, value domid, value async)
 {
-	CAMLparam2(ctx, domid);
+	CAMLparam3(ctx, domid, async);
 	int ret;
 	uint32_t c_domid = Int_val(domid);
+	libxl_asyncop_how *ao_how = aohow_val(async);
 
 	caml_enter_blocking_section();
-	ret = libxl_domain_pause(CTX, c_domid);
+	ret = libxl_domain_pause(CTX, c_domid, ao_how);
 	caml_leave_blocking_section();
+
+	free(ao_how);
 
 	if (ret != 0)
 		failwith_xl(ret, "domain_pause");
@@ -638,15 +641,18 @@ value stub_libxl_domain_pause(value ctx, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_libxl_domain_unpause(value ctx, value domid)
+value stub_libxl_domain_unpause(value ctx, value domid, value async)
 {
-	CAMLparam2(ctx, domid);
+	CAMLparam3(ctx, domid, async);
 	int ret;
 	uint32_t c_domid = Int_val(domid);
+	libxl_asyncop_how *ao_how = aohow_val(async);
 
 	caml_enter_blocking_section();
-	ret = libxl_domain_unpause(CTX, c_domid);
+	ret = libxl_domain_unpause(CTX, c_domid, ao_how);
 	caml_leave_blocking_section();
+
+	free(ao_how);
 
 	if (ret != 0)
 		failwith_xl(ret, "domain_unpause");
@@ -1031,19 +1037,22 @@ value stub_xl_domain_sched_params_set(value ctx, value domid, value scinfo)
 	CAMLreturn(Val_unit);
 }
 
-value stub_xl_send_trigger(value ctx, value domid, value trigger, value vcpuid)
+value stub_xl_send_trigger(value ctx, value domid, value trigger, value vcpuid, value async)
 {
-	CAMLparam4(ctx, domid, trigger, vcpuid);
+	CAMLparam5(ctx, domid, trigger, vcpuid, async);
 	int ret;
 	uint32_t c_domid = Int_val(domid);
 	libxl_trigger c_trigger = LIBXL_TRIGGER_UNKNOWN;
 	int c_vcpuid = Int_val(vcpuid);
+	libxl_asyncop_how *ao_how = aohow_val(async);
 
 	trigger_val(CTX, &c_trigger, trigger);
 
 	caml_enter_blocking_section();
-	ret = libxl_send_trigger(CTX, c_domid, c_trigger, c_vcpuid);
+	ret = libxl_send_trigger(CTX, c_domid, c_trigger, c_vcpuid, ao_how);
 	caml_leave_blocking_section();
+
+	free(ao_how);
 
 	if (ret != 0)
 		failwith_xl(ret, "send_trigger");
