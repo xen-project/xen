@@ -116,13 +116,11 @@ int apply_alternatives(const struct alt_instr *start, const struct alt_instr *en
  * The code that follows this macro will be assembled and linked as
  * normal. There are no restrictions on this code.
  */
-.macro alternative_if_not cap, enable = 1
-	.if \enable
+.macro alternative_if_not cap
 	.pushsection .altinstructions, "a"
 	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
 	.popsection
 661:
-	.endif
 .endm
 
 /*
