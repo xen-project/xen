@@ -2413,7 +2413,7 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
 static inline int libxl_send_trigger_0x041200(
     libxl_ctx *ctx, uint32_t domid, libxl_trigger trigger, uint32_t vcpuid)
 {
-    return libxl_send_trigger_0x041200(ctx, domid, trigger, vcpuid, NULL);
+    return libxl_send_trigger(ctx, domid, trigger, vcpuid, NULL);
 }
 #define libxl_send_trigger libxl_send_trigger_0x041200
 #endif
