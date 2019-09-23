@@ -106,6 +106,12 @@ idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
 /* Pointer to the IDT of every CPU. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
+/*
+ * The TSS is smaller than a page, but we give it a full page to avoid
+ * adjacent per-cpu data leaking via Meltdown when XPTI is in use.
+ */
+DEFINE_PER_CPU_PAGE_ALIGNED(struct tss_page, tss_page);
+
 bool (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
@@ -557,7 +563,7 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 
     printk("Valid stack range: %p-%p, sp=%p, tss.rsp0=%p\n",
            (void *)esp_top, (void *)esp_bottom, (void *)esp,
-           (void *)per_cpu(init_tss, cpu).rsp0);
+           (void *)per_cpu(tss_page, cpu).tss.rsp0);
 
     /*
      * Trigger overflow trace if %esp is anywhere within the guard page, or
@@ -1917,7 +1923,7 @@ static void __init set_intr_gate(unsigned int n, void *addr)
 
 void load_TR(void)
 {
-    struct tss_struct *tss = &this_cpu(init_tss);
+    struct tss64 *tss = &this_cpu(tss_page).tss;
     struct desc_ptr old_gdt, tss_gdt = {
         .base = (long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
         .limit = LAST_RESERVED_GDT_BYTE
@@ -1925,14 +1931,10 @@ void load_TR(void)
 
     _set_tssldt_desc(
         this_cpu(gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)tss,
-        offsetof(struct tss_struct, __cacheline_filler) - 1,
-        SYS_DESC_tss_avail);
+        (unsigned long)tss, sizeof(*tss) - 1, SYS_DESC_tss_avail);
     _set_tssldt_desc(
         this_cpu(compat_gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)tss,
-        offsetof(struct tss_struct, __cacheline_filler) - 1,
-        SYS_DESC_tss_busy);
+        (unsigned long)tss, sizeof(*tss) - 1, SYS_DESC_tss_busy);
 
     /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
     asm volatile (
