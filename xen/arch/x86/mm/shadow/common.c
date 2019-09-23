@@ -2984,7 +2984,8 @@ static int shadow_one_bit_enable(struct domain *d, u32 mode)
 
     mode |= PG_SH_enable;
 
-    if ( d->arch.paging.shadow.total_pages == 0 )
+    if ( d->arch.paging.shadow.total_pages <
+         sh_min_allocation(d) + d->arch.paging.shadow.p2m_pages )
     {
         /* Init the shadow memory allocation if the user hasn't done so */
         if ( shadow_set_allocation(d, 1, NULL) != 0 )
