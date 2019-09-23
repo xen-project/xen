@@ -118,7 +118,7 @@ abort_guest_exit_end:
         bne return_from_trap
 
 skip_check:
-        mov pc, lr
+        b   enter_hypervisor_from_guest_preirq
 ENDPROC(prepare_context_from_guest)
 
         /*

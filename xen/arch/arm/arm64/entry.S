@@ -191,6 +191,7 @@
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
+        bl      enter_hypervisor_from_guest_preirq
         msr     daifclr, \iflags
         bl      enter_hypervisor_from_guest
         mov     x0, sp
