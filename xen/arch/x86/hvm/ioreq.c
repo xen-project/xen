@@ -1202,7 +1202,7 @@ int hvm_all_ioreq_servers_add_vcpu(struct domain *d, struct vcpu *v)
     return 0;
 
  fail:
-    while ( id-- != 0 )
+    while ( ++id != MAX_NR_IOREQ_SERVERS )
     {
         s = GET_IOREQ_SERVER(d, id);
 
