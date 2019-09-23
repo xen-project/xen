@@ -574,8 +574,9 @@ void __init paging_init(void)
                     page_to_mfn(l1_pg),
                     1UL << (2 * PAGETABLE_ORDER),
                     PAGE_HYPERVISOR);
+                /* Fill with INVALID_M2P_ENTRY. */
                 memset((void *)(RDWR_MPT_VIRT_START + (i << L2_PAGETABLE_SHIFT)),
-                       0x77, 1UL << L3_PAGETABLE_SHIFT);
+                       0xFF, 1UL << L3_PAGETABLE_SHIFT);
 
                 ASSERT(!l2_table_offset(va));
                 /* NB. Cannot be GLOBAL: guest user mode should not see it. */
@@ -666,10 +667,10 @@ void __init paging_init(void)
             page_to_mfn(l1_pg),
             1UL << PAGETABLE_ORDER,
             PAGE_HYPERVISOR);
+        /* Fill with INVALID_M2P_ENTRY. */
         memset((void *)(RDWR_COMPAT_MPT_VIRT_START +
                         (i << L2_PAGETABLE_SHIFT)),
-               0x55,
-               1UL << L2_PAGETABLE_SHIFT);
+               0xFF, 1UL << L2_PAGETABLE_SHIFT);
         /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
         l2e_write(l2_ro_mpt, l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
     }
