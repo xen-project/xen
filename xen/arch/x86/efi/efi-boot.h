@@ -550,6 +550,7 @@ static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
         vga_console_info.u.vesa_lfb.bytes_per_line =
             (mode_info->PixelsPerScanLine * bpp + 7) >> 3;
         vga_console_info.u.vesa_lfb.lfb_base = gop->Mode->FrameBufferBase;
+        vga_console_info.u.vesa_lfb.ext_lfb_base = gop->Mode->FrameBufferBase >> 32;
         vga_console_info.u.vesa_lfb.lfb_size =
             (gop->Mode->FrameBufferSize + 0xffff) >> 16;
     }
