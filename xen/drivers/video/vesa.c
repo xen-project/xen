@@ -40,6 +40,11 @@ static int __init parse_font_height(const char *s)
 }
 custom_param("font", parse_font_height);
 
+static inline paddr_t lfb_base(void)
+{
+    return ((paddr_t)vlfb_info.ext_lfb_base << 32) | vlfb_info.lfb_base;
+}
+
 void __init vesa_early_init(void)
 {
     unsigned int vram_vmode;
@@ -97,15 +102,14 @@ void __init vesa_init(void)
     lfbp.text_columns = vlfb_info.width / font->width;
     lfbp.text_rows = vlfb_info.height / font->height;
 
-    lfbp.lfb = lfb = ioremap(vlfb_info.lfb_base, vram_remap);
+    lfbp.lfb = lfb = ioremap(lfb_base(), vram_remap);
     if ( !lfb )
         return;
 
     memset(lfb, 0, vram_remap);
 
-    printk(XENLOG_INFO "vesafb: framebuffer at %#x, mapped to 0x%p, "
-           "using %uk, total %uk\n",
-           vlfb_info.lfb_base, lfb,
+    printk(XENLOG_INFO "vesafb: framebuffer at 0x%" PRIpaddr ", mapped to 0x%p, using %uk, total %uk\n",
+           lfb_base(), lfb,
            vram_remap >> 10, vram_total >> 10);
     printk(XENLOG_INFO "vesafb: mode is %dx%dx%u, linelength=%d, font %ux%u\n",
            vlfb_info.width, vlfb_info.height,
@@ -167,7 +171,7 @@ void __init vesa_mtrr_init(void)
 
     /* Try and find a power of two to add */
     do {
-        rc = mtrr_add(vlfb_info.lfb_base, size_total, type, 1);
+        rc = mtrr_add(lfb_base(), size_total, type, 1);
         size_total >>= 1;
     } while ( (size_total >= PAGE_SIZE) && (rc == -EINVAL) );
 }
