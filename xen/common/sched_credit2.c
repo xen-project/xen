@@ -4072,6 +4072,8 @@ csched2_deinit(struct scheduler *ops)
 
     prv = csched2_priv(ops);
     ops->sched_data = NULL;
+    if ( prv )
+        xfree(prv->rqd);
     xfree(prv);
 }
 
