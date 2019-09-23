@@ -349,7 +349,7 @@ static int ept_next_level(struct p2m_domain *p2m, bool_t read_only,
  * also for their subtrees needing P2M type re-calculation.
  */
 static bool_t ept_invalidate_emt(struct p2m_domain *p2m, mfn_t mfn,
-                                 bool_t recalc, int level)
+                                 bool_t recalc, unsigned int parent_level)
 {
     int rc;
     ept_entry_t *epte = map_domain_page(mfn);
@@ -367,7 +367,7 @@ static bool_t ept_invalidate_emt(struct p2m_domain *p2m, mfn_t mfn,
         e.emt = MTRR_NUM_TYPES;
         if ( recalc )
             e.recalc = 1;
-        rc = atomic_write_ept_entry(p2m, &epte[i], e, level);
+        rc = atomic_write_ept_entry(p2m, &epte[i], e, parent_level - 1);
         ASSERT(rc == 0);
         changed = 1;
     }
