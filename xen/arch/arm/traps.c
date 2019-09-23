@@ -1978,15 +1978,25 @@ static inline bool needs_ssbd_flip(struct vcpu *v)
 
 /*
  * Actions that needs to be done after entering the hypervisor from the
- * guest and before we handle any request.
+ * guest and before the interrupts are unmasked.
  */
-void enter_hypervisor_from_guest(void)
+void enter_hypervisor_from_guest_preirq(void)
 {
     struct vcpu *v = current;
 
     /* If the guest has disabled the workaround, bring it back on. */
     if ( needs_ssbd_flip(v) )
         arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+}
+
+/*
+ * Actions that needs to be done after entering the hypervisor from the
+ * guest and before we handle any request. Depending on the exception trap,
+ * this may be called with interrupts unmasked.
+ */
+void enter_hypervisor_from_guest(void)
+{
+    struct vcpu *v = current;
 
     /*
      * If we pended a virtual abort, preserve it until it gets cleared.
