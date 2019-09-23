@@ -383,9 +383,14 @@ static struct notifier_block microcode_percpu_nfb = {
 
 int __init early_microcode_update_cpu(bool start_update)
 {
+    unsigned int cpu = smp_processor_id();
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     int rc = 0;
     void *data = NULL;
     size_t len;
+
+    if ( !microcode_ops )
+        return -ENOSYS;
 
     if ( ucode_blob.size )
     {
@@ -397,6 +402,9 @@ int __init early_microcode_update_cpu(bool start_update)
         len = ucode_mod.mod_end;
         data = bootstrap_map(&ucode_mod);
     }
+
+    microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
+
     if ( data )
     {
         if ( start_update && microcode_ops->start_update )
@@ -413,6 +421,8 @@ int __init early_microcode_update_cpu(bool start_update)
 
 int __init early_microcode_init(void)
 {
+    unsigned int cpu = smp_processor_id();
+    struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     int rc;
 
     rc = microcode_init_intel();
@@ -425,6 +435,8 @@ int __init early_microcode_init(void)
 
     if ( microcode_ops )
     {
+        microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
+
         if ( ucode_mod.mod_end || ucode_blob.size )
             rc = early_microcode_update_cpu(true);
 
