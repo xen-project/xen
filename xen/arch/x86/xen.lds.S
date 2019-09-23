@@ -277,14 +277,16 @@ SECTIONS
        __bss_start = .;
        *(.bss.stack_aligned)
        *(.bss.page_aligned*)
-       *(.bss)
-       . = ALIGN(SMP_CACHE_BYTES);
+       . = ALIGN(PAGE_SIZE);
        __per_cpu_start = .;
+       *(.bss.percpu.page_aligned)
        *(.bss.percpu)
        . = ALIGN(SMP_CACHE_BYTES);
        *(.bss.percpu.read_mostly)
        . = ALIGN(SMP_CACHE_BYTES);
        __per_cpu_data_end = .;
+       *(.bss)
+       . = ALIGN(POINTER_ALIGN);
        __bss_end = .;
   } :text
   _end = . ;
