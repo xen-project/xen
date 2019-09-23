@@ -472,7 +472,7 @@ void identify_cpu(struct cpuinfo_x86 *c)
 		this_cpu->c_init(c);
 
 
-   	if ( !opt_pku )
+   	if (c == &boot_cpu_data && !opt_pku)
 		setup_clear_cpu_cap(X86_FEATURE_PKU);
 
 	/*
