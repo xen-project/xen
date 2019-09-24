@@ -193,9 +193,11 @@ lr      .req    x30             /* link register */
          * is not set. If a vSError took place, the initial exception will be
          * skipped. Exit ASAP
          */
-        ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
-                    "nop; nop",
-                    SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
+        alternative_if_not SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+        bl      check_pending_vserror
+        cbnz    x0, 1f
+        alternative_else_nop_endif
+
         bl      enter_hypervisor_from_guest_preirq
         msr     daifclr, \iflags
         bl      enter_hypervisor_from_guest
