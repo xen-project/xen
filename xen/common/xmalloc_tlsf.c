@@ -549,11 +549,6 @@ static void tlsf_init(void)
  * xmalloc()
  */
 
-#ifndef ZERO_BLOCK_PTR
-/* Return value for zero-size allocation, distinguished from NULL. */
-#define ZERO_BLOCK_PTR ((void *)-1L)
-#endif
-
 void *_xmalloc(unsigned long size, unsigned long align)
 {
     void *p = NULL;

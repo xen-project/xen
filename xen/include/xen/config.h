@@ -86,4 +86,9 @@
 #define NDEBUG
 #endif
 
+#ifndef ZERO_BLOCK_PTR
+/* Return value for zero-size allocation, distinguished from NULL. */
+#define ZERO_BLOCK_PTR ((void *)-1L)
+#endif
+
 #endif /* __XEN_CONFIG_H__ */
