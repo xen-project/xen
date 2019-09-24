@@ -30,8 +30,6 @@
 #include <asm/byteorder.h>
 #include <asm/cpufeature.h>
 #include <asm/insn.h>
-/* XXX: Move ARCH_PATCH_INSN_SIZE out of livepatch.h */
-#include <asm/livepatch.h>
 #include <asm/page.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */

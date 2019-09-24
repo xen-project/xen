@@ -11,6 +11,9 @@
 # error "unknown ARM variant"
 #endif
 
+/* On ARM32,64 instructions are always 4 bytes long. */
+#define ARCH_PATCH_INSN_SIZE 4
+
 #endif /* !__ARCH_ARM_INSN */
 /*
  * Local variables:

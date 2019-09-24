@@ -7,9 +7,7 @@
 #define __XEN_ARM_LIVEPATCH_H__
 
 #include <xen/sizes.h> /* For SZ_* macros. */
-
-/* On ARM32,64 instructions are always 4 bytes long. */
-#define ARCH_PATCH_INSN_SIZE 4
+#include <asm/insn.h>
 
 /*
  * The va of the hypervisor .text region. We need this as the
