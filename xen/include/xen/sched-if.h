@@ -437,4 +437,6 @@ affinity_balance_cpumask(const struct vcpu *v, int step, cpumask_t *mask)
         cpumask_copy(mask, v->cpu_hard_affinity);
 }
 
+void sched_rm_cpu(unsigned int cpu);
+
 #endif /* __XEN_SCHED_IF_H__ */
