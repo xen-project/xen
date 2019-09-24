@@ -492,17 +492,31 @@ static void _show_trace(unsigned long sp, unsigned long bp)
 
 static void show_trace(const struct cpu_user_regs *regs)
 {
-    unsigned long *sp = ESP_BEFORE_EXCEPTION(regs);
+    unsigned long *sp = ESP_BEFORE_EXCEPTION(regs), tos = 0;
+    bool fault = false;
 
     printk("Xen call trace:\n");
+
+    /* Guarded read of the stack top. */
+    asm ( "1: mov %[data], %[tos]; 2:\n"
+          ".pushsection .fixup,\"ax\"\n"
+          "3: movb $1, %[fault]; jmp 2b\n"
+          ".popsection\n"
+          _ASM_EXTABLE(1b, 3b)
+          : [tos] "+r" (tos), [fault] "+qm" (fault) : [data] "m" (*sp) );
 
     /*
      * If RIP looks sensible, or the top of the stack doesn't, print RIP at
      * the top of the stack trace.
      */
     if ( is_active_kernel_text(regs->rip) ||
-         !is_active_kernel_text(*sp) )
+         !is_active_kernel_text(tos) )
         printk("   [<%p>] %pS\n", _p(regs->rip), _p(regs->rip));
+    else if ( fault )
+    {
+        printk("   [Fault on access]\n");
+        return;
+    }
     /*
      * Else RIP looks bad but the top of the stack looks good.  Perhaps we
      * followed a wild function pointer? Lets assume the top of the stack is a
@@ -511,7 +525,7 @@ static void show_trace(const struct cpu_user_regs *regs)
      */
     else
     {
-        printk("   [<%p>] %pS\n", _p(*sp), _p(*sp));
+        printk("   [<%p>] %pS\n", _p(tos), _p(tos));
         sp++;
     }
 
