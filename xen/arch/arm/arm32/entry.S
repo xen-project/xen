@@ -59,9 +59,10 @@ prepare_context_from_guest:
          * If the SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT has been set in the cpu
          * feature, the checking of pending SErrors will be skipped.
          */
-        ALTERNATIVE("nop",
-                    "b skip_check",
-                    SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
+        alternative_if SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT
+        b   skip_check
+        alternative_else_nop_endif
+
         /*
          * Start to check pending virtual abort in the gap of Guest -> HYP
          * world switch.
