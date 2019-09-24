@@ -439,7 +439,7 @@ static void _show_trace(unsigned long sp, unsigned long __maybe_unused bp)
     {
         addr = *stack++;
         if ( is_active_kernel_text(addr) )
-            printk("   [<%p>] %pS\n", _p(addr), _p(addr));
+            printk("   [<%p>] S %pS\n", _p(addr), _p(addr));
     }
 }
 
@@ -482,7 +482,7 @@ static void _show_trace(unsigned long sp, unsigned long bp)
             addr  = frame[1];
         }
 
-        printk("   [<%p>] %pS\n", _p(addr), _p(addr));
+        printk("   [<%p>] F %pS\n", _p(addr), _p(addr));
 
         low = (unsigned long)&frame[2];
     }
@@ -511,21 +511,26 @@ static void show_trace(const struct cpu_user_regs *regs)
      */
     if ( is_active_kernel_text(regs->rip) ||
          !is_active_kernel_text(tos) )
-        printk("   [<%p>] %pS\n", _p(regs->rip), _p(regs->rip));
-    else if ( fault )
+        printk("   [<%p>] R %pS\n", _p(regs->rip), _p(regs->rip));
+
+    if ( fault )
     {
         printk("   [Fault on access]\n");
         return;
     }
+
     /*
-     * Else RIP looks bad but the top of the stack looks good.  Perhaps we
-     * followed a wild function pointer? Lets assume the top of the stack is a
+     * If RIP looks bad or the top of the stack looks good, log the top of
+     * stack as well.  Perhaps we followed a wild function pointer, or we're
+     * in a function without frame pointer, or in a function prologue before
+     * the frame pointer gets set up?  Let's assume the top of the stack is a
      * return address; print it and skip past so _show_trace() doesn't print
      * it again.
      */
-    else
+    if ( !is_active_kernel_text(regs->rip) ||
+         is_active_kernel_text(tos) )
     {
-        printk("   [<%p>] %pS\n", _p(tos), _p(tos));
+        printk("   [<%p>] S %pS\n", _p(tos), _p(tos));
         sp++;
     }
 
