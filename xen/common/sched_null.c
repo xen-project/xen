@@ -167,16 +167,9 @@ static void init_pdata(struct null_private *prv, unsigned int cpu)
 static void null_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 {
     struct null_private *prv = null_priv(ops);
-    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
 
     /* alloc_pdata is not implemented, so we want this to be NULL. */
     ASSERT(!pdata);
-
-    /*
-     * The scheduler lock points already to the default per-cpu spinlock,
-     * so there is no remapping to be done.
-     */
-    ASSERT(sd->schedule_lock == &sd->_lock && !spin_is_locked(&sd->_lock));
 
     init_pdata(prv, cpu);
 }

@@ -617,15 +617,6 @@ csched_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 {
     unsigned long flags;
     struct csched_private *prv = CSCHED_PRIV(ops);
-    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
-
-    /*
-     * This is called either during during boot, resume or hotplug, in
-     * case Credit1 is the scheduler chosen at boot. In such cases, the
-     * scheduler lock for cpu is already pointing to the default per-cpu
-     * spinlock, as Credit1 needs it, so there is no remapping to be done.
-     */
-    ASSERT(sd->schedule_lock == &sd->_lock && !spin_is_locked(&sd->_lock));
 
     spin_lock_irqsave(&prv->lock, flags);
     init_pdata(prv, pdata, cpu);
