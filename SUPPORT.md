@@ -660,6 +660,10 @@ No support for QEMU backends in a 16K or 64K domain.
 
     Status: Supported
 
+### Arm: OP-TEE Mediator
+
+    Status: Tech Preview
+
 ## Virtual Hardware, QEMU
 
 This section describes supported devices available in HVM mode using a
