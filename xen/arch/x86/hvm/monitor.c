@@ -23,8 +23,10 @@
  */
 
 #include <xen/vm_event.h>
+#include <xen/mem_access.h>
 #include <xen/monitor.h>
 #include <asm/hvm/monitor.h>
+#include <asm/altp2m.h>
 #include <asm/monitor.h>
 #include <asm/paging.h>
 #include <asm/vm_event.h>
@@ -213,6 +215,82 @@ void hvm_monitor_interrupt(unsigned int vector, unsigned int type,
     };
 
     monitor_traps(current, 1, &req);
+}
+
+/*
+ * Send memory access vm_events based on pfec. Returns true if the event was
+ * sent and false for p2m_get_mem_access() error, no violation and event send
+ * error. Assumes the caller will enable/disable arch.vm_event->send_event.
+ */
+bool hvm_monitor_check_p2m(unsigned long gla, gfn_t gfn, uint32_t pfec,
+                           uint16_t kind)
+{
+    xenmem_access_t access;
+    struct vcpu *curr = current;
+    vm_event_request_t req = {};
+    paddr_t gpa = (gfn_to_gaddr(gfn) | (gla & ~PAGE_MASK));
+    int rc;
+
+    ASSERT(curr->arch.vm_event->send_event);
+
+    /*
+     * p2m_get_mem_access() can fail from a invalid MFN and return -ESRCH
+     * in which case access must be restricted.
+     */
+    rc = p2m_get_mem_access(curr->domain, gfn, &access, altp2m_vcpu_idx(curr));
+
+    if ( rc == -ESRCH )
+        access = XENMEM_access_n;
+    else if ( rc )
+        return false;
+
+    switch ( access )
+    {
+    case XENMEM_access_x:
+    case XENMEM_access_rx:
+        if ( pfec & PFEC_write_access )
+            req.u.mem_access.flags = MEM_ACCESS_R | MEM_ACCESS_W;
+        break;
+
+    case XENMEM_access_w:
+    case XENMEM_access_rw:
+        if ( pfec & PFEC_insn_fetch )
+            req.u.mem_access.flags = MEM_ACCESS_X;
+        break;
+
+    case XENMEM_access_r:
+    case XENMEM_access_n:
+        if ( pfec & PFEC_write_access )
+            req.u.mem_access.flags |= MEM_ACCESS_R | MEM_ACCESS_W;
+        if ( pfec & PFEC_insn_fetch )
+            req.u.mem_access.flags |= MEM_ACCESS_X;
+        break;
+
+    case XENMEM_access_wx:
+    case XENMEM_access_rwx:
+    case XENMEM_access_rx2rw:
+    case XENMEM_access_n2rwx:
+    case XENMEM_access_default:
+        break;
+    }
+
+    if ( !req.u.mem_access.flags )
+        return false; /* no violation */
+
+    if ( kind == npfec_kind_with_gla )
+        req.u.mem_access.flags |= MEM_ACCESS_FAULT_WITH_GLA |
+                                  MEM_ACCESS_GLA_VALID;
+    else if ( kind == npfec_kind_in_gpt )
+        req.u.mem_access.flags |= MEM_ACCESS_FAULT_IN_GPT |
+                                  MEM_ACCESS_GLA_VALID;
+
+
+    req.reason = VM_EVENT_REASON_MEM_ACCESS;
+    req.u.mem_access.gfn = gfn_x(gfn);
+    req.u.mem_access.gla = gla;
+    req.u.mem_access.offset = gpa & ~PAGE_MASK;
+
+    return monitor_traps(curr, true, &req) >= 0;
 }
 
 /*

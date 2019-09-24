@@ -36,6 +36,8 @@ struct arch_vm_event {
     bool set_gprs;
     /* A sync vm_event has been sent and we're not done handling it. */
     bool sync_event;
+    /* Send mem access events from emulator */
+    bool send_event;
 };
 
 int vm_event_init_domain(struct domain *d);

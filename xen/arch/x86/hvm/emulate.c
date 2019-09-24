@@ -548,6 +548,7 @@ static void *hvmemul_map_linear_addr(
     unsigned int nr_frames = ((linear + bytes - !!bytes) >> PAGE_SHIFT) -
         (linear >> PAGE_SHIFT) + 1;
     unsigned int i;
+    gfn_t gfn;
 
     /*
      * mfn points to the next free slot.  All used slots have a page reference
@@ -582,7 +583,7 @@ static void *hvmemul_map_linear_addr(
         ASSERT(mfn_x(*mfn) == 0);
 
         res = hvm_translate_get_page(curr, addr, true, pfec,
-                                     &pfinfo, &page, NULL, &p2mt);
+                                     &pfinfo, &page, &gfn, &p2mt);
 
         switch ( res )
         {
@@ -599,6 +600,13 @@ static void *hvmemul_map_linear_addr(
             err = NULL;
             goto out;
 
+        case HVMTRANS_need_retry:
+            /*
+             * hvm_translate_get_page() does not currently return
+             * HVMTRANS_need_retry.
+             */
+            ASSERT_UNREACHABLE();
+            /* fall through */
         case HVMTRANS_gfn_paged_out:
         case HVMTRANS_gfn_shared:
             err = ERR_PTR(~X86EMUL_RETRY);
@@ -625,6 +633,14 @@ static void *hvmemul_map_linear_addr(
             }
 
             ASSERT(p2mt == p2m_ram_logdirty || !p2m_is_readonly(p2mt));
+        }
+
+        if ( unlikely(curr->arch.vm_event) &&
+             curr->arch.vm_event->send_event &&
+             hvm_monitor_check_p2m(addr, gfn, pfec, npfec_kind_with_gla) )
+        {
+            err = ERR_PTR(~X86EMUL_RETRY);
+            goto out;
         }
     }
 
@@ -1141,6 +1157,7 @@ static int linear_read(unsigned long addr, unsigned int bytes, void *p_data,
 
     case HVMTRANS_gfn_paged_out:
     case HVMTRANS_gfn_shared:
+    case HVMTRANS_need_retry:
         return X86EMUL_RETRY;
     }
 
@@ -1192,6 +1209,7 @@ static int linear_write(unsigned long addr, unsigned int bytes, void *p_data,
 
     case HVMTRANS_gfn_paged_out:
     case HVMTRANS_gfn_shared:
+    case HVMTRANS_need_retry:
         return X86EMUL_RETRY;
     }
 
@@ -1852,19 +1870,27 @@ static int hvmemul_rep_movs(
 
     xfree(buf);
 
-    if ( rc == HVMTRANS_gfn_paged_out )
-        return X86EMUL_RETRY;
-    if ( rc == HVMTRANS_gfn_shared )
-        return X86EMUL_RETRY;
-    if ( rc != HVMTRANS_okay )
+    switch ( rc )
     {
-        gdprintk(XENLOG_WARNING, "Failed memory-to-memory REP MOVS: sgpa=%"
-                 PRIpaddr" dgpa=%"PRIpaddr" reps=%lu bytes_per_rep=%u\n",
-                 sgpa, dgpa, *reps, bytes_per_rep);
-        return X86EMUL_UNHANDLEABLE;
+    case HVMTRANS_need_retry:
+        /*
+         * hvm_copy_{from,to}_guest_phys() do not currently return
+         * HVMTRANS_need_retry.
+         */
+        ASSERT_UNREACHABLE();
+        /* fall through */
+    case HVMTRANS_gfn_paged_out:
+    case HVMTRANS_gfn_shared:
+        return X86EMUL_RETRY;
+    case HVMTRANS_okay:
+        return X86EMUL_OKAY;
     }
 
-    return X86EMUL_OKAY;
+    gdprintk(XENLOG_WARNING, "Failed memory-to-memory REP MOVS: sgpa=%"
+             PRIpaddr" dgpa=%"PRIpaddr" reps=%lu bytes_per_rep=%u\n",
+             sgpa, dgpa, *reps, bytes_per_rep);
+
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static int hvmemul_rep_stos(
@@ -1966,6 +1992,13 @@ static int hvmemul_rep_stos(
 
         switch ( rc )
         {
+        case HVMTRANS_need_retry:
+            /*
+             * hvm_copy_to_guest_phys() does not currently return
+             * HVMTRANS_need_retry.
+             */
+            ASSERT_UNREACHABLE();
+            /* fall through */
         case HVMTRANS_gfn_paged_out:
         case HVMTRANS_gfn_shared:
             return X86EMUL_RETRY;

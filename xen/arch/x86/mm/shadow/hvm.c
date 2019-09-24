@@ -139,6 +139,7 @@ hvm_read(enum x86_segment seg,
         return X86EMUL_UNHANDLEABLE;
     case HVMTRANS_gfn_paged_out:
     case HVMTRANS_gfn_shared:
+    case HVMTRANS_need_retry:
         return X86EMUL_RETRY;
     }
 

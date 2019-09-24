@@ -210,11 +210,18 @@ bool p2m_mem_access_check(paddr_t gpa, unsigned long gla,
             return true;
         }
     }
+
+    /*
+     * Try to avoid sending a mem event. Suppress events caused by page-walks
+     * by emulating but still checking mem_access violations.
+     */
     if ( vm_event_check_ring(d->vm_event_monitor) &&
          d->arch.monitor.inguest_pagefault_disabled &&
-         npfec.kind != npfec_kind_with_gla ) /* don't send a mem_event */
+         npfec.kind == npfec_kind_in_gpt )
     {
+        v->arch.vm_event->send_event = true;
         hvm_emulate_one_vm_event(EMUL_KIND_NORMAL, TRAP_invalid_op, X86_EVENT_NO_EC);
+        v->arch.vm_event->send_event = false;
 
         return true;
     }

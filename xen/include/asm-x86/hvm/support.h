@@ -61,6 +61,7 @@ enum hvm_translation_result {
     HVMTRANS_unhandleable,
     HVMTRANS_gfn_paged_out,
     HVMTRANS_gfn_shared,
+    HVMTRANS_need_retry,
 };
 
 /*

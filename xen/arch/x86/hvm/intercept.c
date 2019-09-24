@@ -145,6 +145,7 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                 case HVMTRANS_bad_linear_to_gfn:
                 case HVMTRANS_gfn_paged_out:
                 case HVMTRANS_gfn_shared:
+                case HVMTRANS_need_retry:
                     ASSERT_UNREACHABLE();
                     /* fall through */
                 default:
@@ -174,6 +175,7 @@ int hvm_process_io_intercept(const struct hvm_io_handler *handler,
                 case HVMTRANS_bad_linear_to_gfn:
                 case HVMTRANS_gfn_paged_out:
                 case HVMTRANS_gfn_shared:
+                case HVMTRANS_need_retry:
                     ASSERT_UNREACHABLE();
                     /* fall through */
                 default:
