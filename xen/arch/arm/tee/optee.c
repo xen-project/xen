@@ -98,6 +98,11 @@
                               OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM | \
                               OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
 
+enum optee_call_state {
+    OPTEE_CALL_NORMAL,
+    OPTEE_CALL_XEN_RPC,
+};
+
 static unsigned int __read_mostly max_optee_threads;
 
 /*
@@ -114,6 +119,9 @@ struct optee_std_call {
     paddr_t guest_arg_ipa;
     int optee_thread_id;
     int rpc_op;
+    /* Saved buffer type for the current buffer allocate request */
+    unsigned int rpc_buffer_type;
+    enum optee_call_state state;
     uint64_t rpc_data_cookie;
     bool in_flight;
     register_t rpc_params[2];
@@ -301,6 +309,7 @@ static struct optee_std_call *allocate_std_call(struct optee_domain *ctx)
 
     call->optee_thread_id = -1;
     call->in_flight = true;
+    call->state = OPTEE_CALL_NORMAL;
 
     spin_lock(&ctx->lock);
     list_add_tail(&call->list, &ctx->call_list);
@@ -1086,6 +1095,10 @@ static int handle_rpc_return(struct optee_domain *ctx,
             ret = -ERESTART;
         }
 
+        /* Save the buffer type in case we will want to free it */
+        if ( shm_rpc->xen_arg->cmd == OPTEE_RPC_CMD_SHM_ALLOC )
+            call->rpc_buffer_type = shm_rpc->xen_arg->params[0].u.value.a;
+
         unmap_domain_page(shm_rpc->xen_arg);
     }
 
@@ -1251,17 +1264,107 @@ err:
 }
 
 /*
+ * Prepare RPC request to free shared buffer in the same way, as
+ * OP-TEE does this.
+ *
+ * Return values:
+ *  true  - successfully prepared RPC request
+ *  false - there was an error
+ */
+static bool issue_rpc_cmd_free(struct optee_domain *ctx,
+                               struct cpu_user_regs *regs,
+                               struct optee_std_call *call,
+                               struct shm_rpc *shm_rpc,
+                               uint64_t cookie)
+{
+    register_t r1, r2;
+
+    /* In case if guest will forget to update it with meaningful value */
+    shm_rpc->xen_arg->ret = TEEC_ERROR_GENERIC;
+    shm_rpc->xen_arg->cmd = OPTEE_RPC_CMD_SHM_FREE;
+    shm_rpc->xen_arg->num_params = 1;
+    shm_rpc->xen_arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_VALUE_INPUT;
+    shm_rpc->xen_arg->params[0].u.value.a = call->rpc_buffer_type;
+    shm_rpc->xen_arg->params[0].u.value.b = cookie;
+
+    if ( access_guest_memory_by_ipa(current->domain,
+                                    gfn_to_gaddr(shm_rpc->gfn),
+                                    shm_rpc->xen_arg,
+                                    OPTEE_MSG_GET_ARG_SIZE(1),
+                                    true) )
+    {
+        /*
+         * Well, this is quite bad. We have error in the error
+         * path. This can happen only if guest behaves badly, so all
+         * we can do is to return error to OP-TEE and leave guest's
+         * memory leaked. We already have freed all resources
+         * allocated for this buffer, but guest will never receive
+         * OPTEE_RPC_CMD_SHM_FREE request, so it will not know that it
+         * can release allocated buffer.
+         */
+        shm_rpc->xen_arg->ret = TEEC_ERROR_GENERIC;
+        shm_rpc->xen_arg->num_params = 0;
+
+        return false;
+    }
+
+    uint64_to_regpair(&r1, &r2, shm_rpc->cookie);
+
+    call->state = OPTEE_CALL_XEN_RPC;
+    call->rpc_op = OPTEE_SMC_RPC_FUNC_CMD;
+    call->rpc_params[0] = r1;
+    call->rpc_params[1] = r2;
+    call->optee_thread_id = get_user_reg(regs, 3);
+
+    set_user_reg(regs, 0, OPTEE_SMC_RETURN_RPC_CMD);
+    set_user_reg(regs, 1, r1);
+    set_user_reg(regs, 2, r2);
+
+    return true;
+}
+
+/* Handles return from Xen-issued RPC */
+static void handle_xen_rpc_return(struct optee_domain *ctx,
+                                  struct cpu_user_regs *regs,
+                                  struct optee_std_call *call,
+                                  struct shm_rpc *shm_rpc)
+{
+    call->state = OPTEE_CALL_NORMAL;
+
+    /*
+     * Right now we have only one reason to be there - we asked guest
+     * to free shared buffer and it did it. Now we can tell OP-TEE
+     * that buffer allocation failed. We are not storing exact command
+     * type, only type of RPC return. So, this is the only check we
+     * can perform there.
+     */
+    if ( call->rpc_op != OPTEE_SMC_RPC_FUNC_CMD )
+        domain_crash(current->domain);
+
+    /*
+     * We are not checking return value from a guest because we assume
+     * that OPTEE_RPC_CMD_SHM_FREE never fails.
+     */
+    shm_rpc->xen_arg->ret = TEEC_ERROR_GENERIC;
+    shm_rpc->xen_arg->num_params = 0;
+}
+
+/*
  * This function is called when guest is finished processing RPC
  * request from OP-TEE and wished to resume the interrupted standard
  * call.
+ *
+ * Return values:
+ *  false - there was an error, do not call OP-TEE
+ *  true  - success, proceed as normal
  */
-static void handle_rpc_cmd_alloc(struct optee_domain *ctx,
+static bool handle_rpc_cmd_alloc(struct optee_domain *ctx,
                                  struct cpu_user_regs *regs,
                                  struct optee_std_call *call,
                                  struct shm_rpc *shm_rpc)
 {
     if ( shm_rpc->xen_arg->ret || shm_rpc->xen_arg->num_params != 1 )
-        return;
+        return true;
 
     if ( shm_rpc->xen_arg->params[0].attr != (OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT |
                                               OPTEE_MSG_ATTR_NONCONTIG) )
@@ -1269,7 +1372,7 @@ static void handle_rpc_cmd_alloc(struct optee_domain *ctx,
         gdprintk(XENLOG_WARNING,
                  "Invalid attrs for shared mem buffer: %"PRIx64"\n",
                  shm_rpc->xen_arg->params[0].attr);
-        return;
+        return true;
     }
 
     /* Free pg list for buffer */
@@ -1285,21 +1388,14 @@ static void handle_rpc_cmd_alloc(struct optee_domain *ctx,
     {
         call->rpc_data_cookie = 0;
         /*
-         * Okay, so there was problem with guest's buffer and we need
-         * to tell about this to OP-TEE.
+         * We are unable to translate guest's buffer, so we need tell guest
+         * to free it, before reporting an error to OP-TEE.
          */
-        shm_rpc->xen_arg->ret = TEEC_ERROR_GENERIC;
-        shm_rpc->xen_arg->num_params = 0;
-        /*
-         * TODO: With current implementation, OP-TEE will not issue
-         * RPC to free this buffer. Guest and OP-TEE will be out of
-         * sync: guest believes that it provided buffer to OP-TEE,
-         * while OP-TEE thinks of opposite. Ideally, we need to
-         * emulate RPC with OPTEE_MSG_RPC_CMD_SHM_FREE command.
-         */
-        gprintk(XENLOG_WARNING,
-                "translate_noncontig() failed, OP-TEE/guest state is out of sync.\n");
+        return !issue_rpc_cmd_free(ctx, regs, call, shm_rpc,
+                                   shm_rpc->xen_arg->params[0].u.tmem.shm_ref);
     }
+
+    return true;
 }
 
 static void handle_rpc_cmd(struct optee_domain *ctx, struct cpu_user_regs *regs,
@@ -1349,22 +1445,37 @@ static void handle_rpc_cmd(struct optee_domain *ctx, struct cpu_user_regs *regs,
         goto out;
     }
 
-    switch (shm_rpc->xen_arg->cmd)
+    if ( call->state == OPTEE_CALL_NORMAL )
     {
-    case OPTEE_RPC_CMD_GET_TIME:
-    case OPTEE_RPC_CMD_WAIT_QUEUE:
-    case OPTEE_RPC_CMD_SUSPEND:
-        break;
-    case OPTEE_RPC_CMD_SHM_ALLOC:
-        handle_rpc_cmd_alloc(ctx, regs, call, shm_rpc);
-        break;
-    case OPTEE_RPC_CMD_SHM_FREE:
-        free_optee_shm_buf(ctx, shm_rpc->xen_arg->params[0].u.value.b);
-        if ( call->rpc_data_cookie == shm_rpc->xen_arg->params[0].u.value.b )
-            call->rpc_data_cookie = 0;
-        break;
-    default:
-        break;
+        switch (shm_rpc->xen_arg->cmd)
+        {
+        case OPTEE_RPC_CMD_GET_TIME:
+        case OPTEE_RPC_CMD_WAIT_QUEUE:
+        case OPTEE_RPC_CMD_SUSPEND:
+            break;
+        case OPTEE_RPC_CMD_SHM_ALLOC:
+            if ( !handle_rpc_cmd_alloc(ctx, regs, call, shm_rpc) )
+            {
+                /* We failed to translate buffer, report back to guest */
+                unmap_domain_page(shm_rpc->xen_arg);
+                put_std_call(ctx, call);
+
+                return;
+            }
+            break;
+        case OPTEE_RPC_CMD_SHM_FREE:
+            free_optee_shm_buf(ctx, shm_rpc->xen_arg->params[0].u.value.b);
+            if ( call->rpc_data_cookie ==
+                 shm_rpc->xen_arg->params[0].u.value.b )
+                call->rpc_data_cookie = 0;
+            break;
+        default:
+            break;
+        }
+    }
+    else
+    {
+        handle_xen_rpc_return(ctx, regs, call, shm_rpc);
     }
 
 out:
