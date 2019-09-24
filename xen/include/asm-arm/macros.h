@@ -13,4 +13,11 @@
 # error "unknown ARM variant"
 #endif
 
+    /* NOP sequence  */
+    .macro nops, num
+    .rept   \num
+    nop
+    .endr
+    .endm
+
 #endif /* __ASM_ARM_MACROS_H */
