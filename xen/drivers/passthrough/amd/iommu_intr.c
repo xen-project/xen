@@ -789,7 +789,7 @@ void amd_iommu_read_msi_from_ire(
     }
 }
 
-int __init amd_iommu_free_intremap_table(
+int amd_iommu_free_intremap_table(
     const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping)
 {
     void **tblp;
@@ -814,7 +814,7 @@ int __init amd_iommu_free_intremap_table(
     return 0;
 }
 
-void *__init amd_iommu_alloc_intremap_table(
+void *amd_iommu_alloc_intremap_table(
     const struct amd_iommu *iommu, unsigned long **inuse_map)
 {
     unsigned int order = intremap_table_order(iommu);

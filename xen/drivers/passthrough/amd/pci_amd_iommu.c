@@ -164,7 +164,7 @@ static int __init iov_detect(void)
     if ( !iommu_enable && !iommu_intremap )
         return 0;
 
-    if ( (init_done ? amd_iommu_init_interrupt()
+    if ( (init_done ? amd_iommu_init_late()
                     : amd_iommu_init(false)) != 0 )
     {
         printk("AMD-Vi: Error initialization\n");
@@ -428,6 +428,7 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
 {
     struct amd_iommu *iommu;
     u16 bdf;
+    struct ivrs_mappings *ivrs_mappings;
 
     if ( !pdev->domain )
         return -EINVAL;
@@ -457,6 +458,36 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
         return -ENODEV;
     }
 
+    ivrs_mappings = get_ivrs_mappings(pdev->seg);
+    bdf = PCI_BDF2(pdev->bus, devfn);
+    if ( !ivrs_mappings ||
+         !ivrs_mappings[ivrs_mappings[bdf].dte_requestor_id].valid )
+        return -EPERM;
+
+    if ( iommu_intremap &&
+         ivrs_mappings[bdf].dte_requestor_id == bdf &&
+         !ivrs_mappings[bdf].intremap_table )
+    {
+        unsigned long flags;
+
+        ivrs_mappings[bdf].intremap_table =
+            amd_iommu_alloc_intremap_table(
+                iommu, &ivrs_mappings[bdf].intremap_inuse);
+        if ( !ivrs_mappings[bdf].intremap_table )
+            return -ENOMEM;
+
+        spin_lock_irqsave(&iommu->lock, flags);
+
+        amd_iommu_set_intremap_table(
+            iommu->dev_table.buffer + (bdf * IOMMU_DEV_TABLE_ENTRY_SIZE),
+            virt_to_maddr(ivrs_mappings[bdf].intremap_table),
+            iommu_intremap);
+
+        amd_iommu_flush_device(iommu, bdf);
+
+        spin_unlock_irqrestore(&iommu->lock, flags);
+    }
+
     amd_iommu_setup_domain_device(pdev->domain, iommu, devfn, pdev);
     return 0;
 }
@@ -465,6 +496,8 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 {
     struct amd_iommu *iommu;
     u16 bdf;
+    struct ivrs_mappings *ivrs_mappings;
+
     if ( !pdev->domain )
         return -EINVAL;
 
@@ -480,6 +513,14 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     }
 
     amd_iommu_disable_domain_device(pdev->domain, iommu, devfn, pdev);
+
+    ivrs_mappings = get_ivrs_mappings(pdev->seg);
+    bdf = PCI_BDF2(pdev->bus, devfn);
+    if ( amd_iommu_perdev_intremap &&
+         ivrs_mappings[bdf].dte_requestor_id == bdf &&
+         ivrs_mappings[bdf].intremap_table )
+        amd_iommu_free_intremap_table(iommu, &ivrs_mappings[bdf]);
+
     return 0;
 }
 

@@ -116,8 +116,9 @@ void __init amd_iommu_set_intremap_table(
     struct amd_iommu_dte *dte, uint64_t intremap_ptr, bool valid)
 {
     dte->it_root = intremap_ptr >> 6;
-    dte->int_tab_len = IOMMU_INTREMAP_ORDER;
-    dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED;
+    dte->int_tab_len = intremap_ptr ? IOMMU_INTREMAP_ORDER : 0;
+    dte->int_ctl = intremap_ptr ? IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED
+                                : IOMMU_DEV_TABLE_INT_CONTROL_ABORTED;
     dte->ig = false; /* unmapped interrupts result in i/o page faults */
     dte->iv = valid;
 }

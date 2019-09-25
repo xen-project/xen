@@ -50,7 +50,7 @@ void get_iommu_features(struct amd_iommu *iommu);
 /* amd-iommu-init functions */
 int amd_iommu_prepare(bool xt);
 int amd_iommu_init(bool xt);
-int amd_iommu_init_interrupt(void);
+int amd_iommu_init_late(void);
 int amd_iommu_update_ivrs_mapping_acpi(void);
 int iov_adjust_irq_affinities(void);
 
