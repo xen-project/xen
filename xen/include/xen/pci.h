@@ -94,7 +94,8 @@ struct pci_dev {
         pci_sbdf_t sbdf;
     };
 
-    u8 phantom_stride;
+    uint8_t msi_maxvec;
+    uint8_t phantom_stride;
 
     nodeid_t node; /* NUMA node */
 

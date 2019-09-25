@@ -664,7 +664,7 @@ static int msi_capability_init(struct pci_dev *dev,
 {
     struct msi_desc *entry;
     int pos;
-    unsigned int i, maxvec, mpos;
+    unsigned int i, mpos;
     u16 control, seg = dev->seg;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
@@ -675,9 +675,8 @@ static int msi_capability_init(struct pci_dev *dev,
     if ( !pos )
         return -ENODEV;
     control = pci_conf_read16(dev->sbdf, msi_control_reg(pos));
-    maxvec = multi_msi_capable(control);
-    if ( nvec > maxvec )
-        return maxvec;
+    if ( nvec > dev->msi_maxvec )
+        return dev->msi_maxvec;
     control &= ~PCI_MSI_FLAGS_QSIZE;
     multi_msi_enable(control, nvec);
 
@@ -711,7 +710,7 @@ static int msi_capability_init(struct pci_dev *dev,
 
         /* All MSIs are unmasked by default, Mask them all */
         maskbits = pci_conf_read32(dev->sbdf, mpos);
-        maskbits |= ~(u32)0 >> (32 - maxvec);
+        maskbits |= ~(uint32_t)0 >> (32 - dev->msi_maxvec);
         pci_conf_write32(dev->sbdf, mpos, maskbits);
     }
     list_add_tail(&entry->list, &dev->msi_list);
@@ -1284,7 +1283,6 @@ int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
     entry = find_msi_entry(pdev, -1, PCI_CAP_ID_MSI);
     if ( entry && entry->msi_attrib.maskbit )
     {
-        uint16_t cntl;
         uint32_t unused;
         unsigned int nvec = entry->msi.nvec;
 
@@ -1297,8 +1295,7 @@ int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
         if ( reg < entry->msi.mpos || reg >= entry->msi.mpos + 4 || size != 4 )
             return -EACCES;
 
-        cntl = pci_conf_read16(pdev->sbdf, msi_control_reg(pos));
-        unused = ~(uint32_t)0 >> (32 - multi_msi_capable(cntl));
+        unused = ~(uint32_t)0 >> (32 - pdev->msi_maxvec);
         for ( pos = 0; pos < nvec; ++pos, ++entry )
         {
             entry->msi_attrib.guest_masked =
