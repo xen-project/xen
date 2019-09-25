@@ -385,7 +385,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         if ( vcpu_priv[v->vcpu_id] == NULL )
         {
             for_each_vcpu ( d, v )
-                xfree(vcpu_priv[v->vcpu_id]);
+                sched_free_vdata(c->sched, vcpu_priv[v->vcpu_id]);
             xfree(vcpu_priv);
             sched_free_domdata(c->sched, domdata);
             return -ENOMEM;
