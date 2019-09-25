@@ -69,7 +69,7 @@ union irte_cptr {
     const union irte128 *ptr128;
 } __transparent__;
 
-#define INTREMAP_ENTRIES (1 << IOMMU_INTREMAP_ORDER)
+#define INTREMAP_MAX_ENTRIES (1 << IOMMU_INTREMAP_ORDER)
 
 struct ioapic_sbdf ioapic_sbdf[MAX_IO_APICS];
 struct hpet_sbdf hpet_sbdf;
@@ -83,8 +83,20 @@ static void dump_intremap_tables(unsigned char key);
 static unsigned int __init intremap_table_order(const struct amd_iommu *iommu)
 {
     return iommu->ctrl.ga_en
-           ? get_order_from_bytes(INTREMAP_ENTRIES * sizeof(union irte128))
-           : get_order_from_bytes(INTREMAP_ENTRIES * sizeof(union irte32));
+           ? get_order_from_bytes(INTREMAP_MAX_ENTRIES * sizeof(union irte128))
+           : get_order_from_bytes(INTREMAP_MAX_ENTRIES * sizeof(union irte32));
+}
+
+unsigned int amd_iommu_intremap_table_order(
+    const void *irt, const struct amd_iommu *iommu)
+{
+    return IOMMU_INTREMAP_ORDER;
+}
+
+static unsigned int intremap_table_entries(
+    const void *irt, const struct amd_iommu *iommu)
+{
+    return 1u << amd_iommu_intremap_table_order(irt, iommu);
 }
 
 unsigned int ioapic_id_to_index(unsigned int apic_id)
@@ -122,20 +134,24 @@ static int get_intremap_requestor_id(int seg, int bdf)
     return get_ivrs_mappings(seg)[bdf].dte_requestor_id;
 }
 
-static unsigned int alloc_intremap_entry(int seg, int bdf, unsigned int nr)
+static unsigned int alloc_intremap_entry(const struct amd_iommu *iommu,
+                                         unsigned int bdf, unsigned int nr)
 {
-    unsigned long *inuse = get_ivrs_mappings(seg)[bdf].intremap_inuse;
-    unsigned int slot = find_first_zero_bit(inuse, INTREMAP_ENTRIES);
+    const struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(iommu->seg);
+    unsigned long *inuse = ivrs_mappings[bdf].intremap_inuse;
+    unsigned int nr_ents =
+        intremap_table_entries(ivrs_mappings[bdf].intremap_table, iommu);
+    unsigned int slot = find_first_zero_bit(inuse, nr_ents);
 
     for ( ; ; )
     {
         unsigned int end;
 
-        if ( slot >= INTREMAP_ENTRIES )
+        if ( slot >= nr_ents )
             break;
-        end = find_next_bit(inuse, INTREMAP_ENTRIES, slot + 1);
-        if ( end > INTREMAP_ENTRIES )
-            end = INTREMAP_ENTRIES;
+        end = find_next_bit(inuse, nr_ents, slot + 1);
+        if ( end > nr_ents )
+            end = nr_ents;
         slot = (slot + nr - 1) & ~(nr - 1);
         if ( slot + nr <= end )
         {
@@ -144,12 +160,12 @@ static unsigned int alloc_intremap_entry(int seg, int bdf, unsigned int nr)
             break;
         }
         slot = (end + nr) & ~(nr - 1);
-        if ( slot >= INTREMAP_ENTRIES )
+        if ( slot >= nr_ents )
             break;
-        slot = find_next_zero_bit(inuse, INTREMAP_ENTRIES, slot);
+        slot = find_next_zero_bit(inuse, nr_ents, slot);
     }
 
-    return slot;
+    return slot < nr_ents ? slot : INTREMAP_MAX_ENTRIES;
 }
 
 static union irte_ptr get_intremap_entry(const struct amd_iommu *iommu,
@@ -159,7 +175,7 @@ static union irte_ptr get_intremap_entry(const struct amd_iommu *iommu,
         .ptr = get_ivrs_mappings(iommu->seg)[bdf].intremap_table
     };
 
-    ASSERT(table.ptr && (index < INTREMAP_ENTRIES));
+    ASSERT(table.ptr && (index < intremap_table_entries(table.ptr, iommu)));
 
     if ( iommu->ctrl.ga_en )
         table.ptr128 += index;
@@ -279,10 +295,10 @@ static int update_intremap_entry_from_ioapic(
     spin_lock_irqsave(lock, flags);
 
     offset = *index;
-    if ( offset >= INTREMAP_ENTRIES )
+    if ( offset >= INTREMAP_MAX_ENTRIES )
     {
-        offset = alloc_intremap_entry(iommu->seg, req_id, 1);
-        if ( offset >= INTREMAP_ENTRIES )
+        offset = alloc_intremap_entry(iommu, req_id, 1);
+        if ( offset >= INTREMAP_MAX_ENTRIES )
         {
             spin_unlock_irqrestore(lock, flags);
             rte->mask = 1;
@@ -400,8 +416,8 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             }
 
             spin_lock_irqsave(lock, flags);
-            offset = alloc_intremap_entry(seg, req_id, 1);
-            BUG_ON(offset >= INTREMAP_ENTRIES);
+            offset = alloc_intremap_entry(iommu, req_id, 1);
+            BUG_ON(offset >= INTREMAP_MAX_ENTRIES);
             entry = get_intremap_entry(iommu, req_id, offset);
             update_intremap_entry(iommu, entry, vector,
                                   delivery_mode, dest_mode, dest);
@@ -476,7 +492,7 @@ void amd_iommu_ioapic_update_ire(
         *(((u32 *)&new_rte) + 1) = value;
     }
 
-    if ( ioapic_sbdf[idx].pin_2_idx[pin] >= INTREMAP_ENTRIES )
+    if ( ioapic_sbdf[idx].pin_2_idx[pin] >= INTREMAP_MAX_ENTRIES )
     {
         ASSERT(saved_mask);
 
@@ -548,7 +564,7 @@ unsigned int amd_iommu_read_ioapic_from_ire(
         return val;
 
     offset = ioapic_sbdf[idx].pin_2_idx[pin];
-    if ( offset >= INTREMAP_ENTRIES )
+    if ( offset >= INTREMAP_MAX_ENTRIES )
         return val;
 
     seg = ioapic_sbdf[idx].seg;
@@ -561,8 +577,8 @@ unsigned int amd_iommu_read_ioapic_from_ire(
 
     if ( !(reg & 1) )
     {
-        ASSERT(offset == (val & (INTREMAP_ENTRIES - 1)));
-        val &= ~(INTREMAP_ENTRIES - 1);
+        ASSERT(offset == (val & (INTREMAP_MAX_ENTRIES - 1)));
+        val &= ~(INTREMAP_MAX_ENTRIES - 1);
         /* The IntType fields match for both formats. */
         val |= MASK_INSR(entry.ptr32->flds.int_type,
                          IO_APIC_REDIR_DELIV_MODE_MASK);
@@ -622,11 +638,11 @@ static int update_intremap_entry_from_msi_msg(
         dest = MASK_EXTR(msg->address_lo, MSI_ADDR_DEST_ID_MASK);
 
     offset = *remap_index;
-    if ( offset >= INTREMAP_ENTRIES )
+    if ( offset >= INTREMAP_MAX_ENTRIES )
     {
         ASSERT(nr);
-        offset = alloc_intremap_entry(iommu->seg, bdf, nr);
-        if ( offset >= INTREMAP_ENTRIES )
+        offset = alloc_intremap_entry(iommu, bdf, nr);
+        if ( offset >= INTREMAP_MAX_ENTRIES )
         {
             spin_unlock_irqrestore(lock, flags);
             return -ENOSPC;
@@ -654,7 +670,7 @@ static int update_intremap_entry_from_msi_msg(
     update_intremap_entry(iommu, entry, vector, delivery_mode, dest_mode, dest);
     spin_unlock_irqrestore(lock, flags);
 
-    *data = (msg->data & ~(INTREMAP_ENTRIES - 1)) | offset;
+    *data = (msg->data & ~(INTREMAP_MAX_ENTRIES - 1)) | offset;
 
     /*
      * In some special cases, a pci-e device(e.g SATA controller in IDE mode)
@@ -738,7 +754,7 @@ int amd_iommu_msi_msg_update_ire(
 void amd_iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
-    unsigned int offset = msg->data & (INTREMAP_ENTRIES - 1);
+    unsigned int offset = msg->data & (INTREMAP_MAX_ENTRIES - 1);
     const struct pci_dev *pdev = msi_desc->dev;
     u16 bdf = pdev ? PCI_BDF2(pdev->bus, pdev->devfn) : hpet_sbdf.bdf;
     u16 seg = pdev ? pdev->seg : hpet_sbdf.seg;
@@ -758,7 +774,7 @@ void amd_iommu_read_msi_from_ire(
         offset |= nr;
     }
 
-    msg->data &= ~(INTREMAP_ENTRIES - 1);
+    msg->data &= ~(INTREMAP_MAX_ENTRIES - 1);
     /* The IntType fields match for both formats. */
     msg->data |= MASK_INSR(entry.ptr32->flds.int_type,
                            MSI_DATA_DELIVERY_MODE_MASK);
@@ -824,8 +840,9 @@ void *amd_iommu_alloc_intremap_table(
 
     if ( tb )
     {
-        *inuse_map = xzalloc_array(unsigned long,
-                                   BITS_TO_LONGS(INTREMAP_ENTRIES));
+        unsigned int nr = intremap_table_entries(tb, iommu);
+
+        *inuse_map = xzalloc_array(unsigned long, BITS_TO_LONGS(nr));
         if ( *inuse_map )
             memset(tb, 0, PAGE_SIZE << order);
         else
@@ -869,6 +886,7 @@ bool __init iov_supports_xt(void)
 
 int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
 {
+    const struct amd_iommu *iommu;
     spinlock_t *lock;
     unsigned long flags;
     int rc = 0;
@@ -886,12 +904,15 @@ int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
         return -ENODEV;
     }
 
+    iommu = find_iommu_for_device(hpet_sbdf.seg, hpet_sbdf.bdf);
+    if ( !iommu )
+        return -ENXIO;
+
     lock = get_intremap_lock(hpet_sbdf.seg, hpet_sbdf.bdf);
     spin_lock_irqsave(lock, flags);
 
-    msi_desc->remap_index = alloc_intremap_entry(hpet_sbdf.seg,
-                                                 hpet_sbdf.bdf, 1);
-    if ( msi_desc->remap_index >= INTREMAP_ENTRIES )
+    msi_desc->remap_index = alloc_intremap_entry(iommu, hpet_sbdf.bdf, 1);
+    if ( msi_desc->remap_index >= INTREMAP_MAX_ENTRIES )
     {
         msi_desc->remap_index = -1;
         rc = -ENXIO;
@@ -906,12 +927,12 @@ static void dump_intremap_table(const struct amd_iommu *iommu,
                                 union irte_cptr tbl,
                                 const struct ivrs_mappings *ivrs_mapping)
 {
-    unsigned int count;
+    unsigned int count, nr = intremap_table_entries(tbl.ptr, iommu);
 
     if ( !tbl.ptr )
         return;
 
-    for ( count = 0; count < INTREMAP_ENTRIES; count++ )
+    for ( count = 0; count < nr; count++ )
     {
         if ( iommu->ctrl.ga_en
              ? !tbl.ptr128[count].raw[0] && !tbl.ptr128[count].raw[1]
