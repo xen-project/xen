@@ -403,7 +403,7 @@ static void amd_xc_cpuid_policy(const struct cpuid_domain_info *info,
          * - incrementing ApicIdCoreSize when it's zero (which changes the
          *   meaning of bits 7:0).
          */
-        if ( (regs[2] & 0x7fu) < 0x7fu )
+        if ( (regs[2] & 0xffu) < 0x7fu )
         {
             if ( (regs[2] & 0xf000u) && (regs[2] & 0xf000u) != 0xf000u )
                 regs[2] = ((regs[2] + 0x1000u) & 0xf000u) | (regs[2] & 0xffu);
