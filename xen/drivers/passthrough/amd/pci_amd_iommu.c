@@ -470,18 +470,22 @@ static int amd_iommu_add_device(u8 devfn, struct pci_dev *pdev)
     {
         unsigned long flags;
 
-        ivrs_mappings[bdf].intremap_table =
-            amd_iommu_alloc_intremap_table(
-                iommu, &ivrs_mappings[bdf].intremap_inuse);
-        if ( !ivrs_mappings[bdf].intremap_table )
-            return -ENOMEM;
+        if ( pdev->msix || pdev->msi_maxvec )
+        {
+            ivrs_mappings[bdf].intremap_table =
+                amd_iommu_alloc_intremap_table(
+                    iommu, &ivrs_mappings[bdf].intremap_inuse,
+                    pdev->msix ? pdev->msix->nr_entries
+                               : pdev->msi_maxvec);
+            if ( !ivrs_mappings[bdf].intremap_table )
+                return -ENOMEM;
+        }
 
         spin_lock_irqsave(&iommu->lock, flags);
 
         amd_iommu_set_intremap_table(
             iommu->dev_table.buffer + (bdf * IOMMU_DEV_TABLE_ENTRY_SIZE),
-            virt_to_maddr(ivrs_mappings[bdf].intremap_table),
-            iommu_intremap);
+            ivrs_mappings[bdf].intremap_table, iommu, iommu_intremap);
 
         amd_iommu_flush_device(iommu, bdf);
 

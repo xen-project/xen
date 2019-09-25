@@ -113,12 +113,22 @@ void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
 }
 
 void __init amd_iommu_set_intremap_table(
-    struct amd_iommu_dte *dte, uint64_t intremap_ptr, bool valid)
+    struct amd_iommu_dte *dte, const void *ptr,
+    const struct amd_iommu *iommu, bool valid)
 {
-    dte->it_root = intremap_ptr >> 6;
-    dte->int_tab_len = intremap_ptr ? IOMMU_INTREMAP_ORDER : 0;
-    dte->int_ctl = intremap_ptr ? IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED
-                                : IOMMU_DEV_TABLE_INT_CONTROL_ABORTED;
+    if ( ptr )
+    {
+        dte->it_root = virt_to_maddr(ptr) >> 6;
+        dte->int_tab_len = amd_iommu_intremap_table_order(ptr, iommu);
+        dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED;
+    }
+    else
+    {
+        dte->it_root = 0;
+        dte->int_tab_len = 0;
+        dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_ABORTED;
+    }
+
     dte->ig = false; /* unmapped interrupts result in i/o page faults */
     dte->iv = valid;
 }

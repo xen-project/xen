@@ -69,7 +69,8 @@ union irte_cptr {
     const union irte128 *ptr128;
 } __transparent__;
 
-#define INTREMAP_MAX_ENTRIES (1 << IOMMU_INTREMAP_ORDER)
+#define INTREMAP_MAX_ORDER   0xB
+#define INTREMAP_MAX_ENTRIES (1 << INTREMAP_MAX_ORDER)
 
 struct ioapic_sbdf ioapic_sbdf[MAX_IO_APICS];
 struct hpet_sbdf hpet_sbdf;
@@ -80,17 +81,13 @@ unsigned int nr_ioapic_sbdf;
 
 static void dump_intremap_tables(unsigned char key);
 
-static unsigned int __init intremap_table_order(const struct amd_iommu *iommu)
-{
-    return iommu->ctrl.ga_en
-           ? get_order_from_bytes(INTREMAP_MAX_ENTRIES * sizeof(union irte128))
-           : get_order_from_bytes(INTREMAP_MAX_ENTRIES * sizeof(union irte32));
-}
+#define intremap_page_order(irt) PFN_ORDER(virt_to_page(irt))
 
 unsigned int amd_iommu_intremap_table_order(
     const void *irt, const struct amd_iommu *iommu)
 {
-    return IOMMU_INTREMAP_ORDER;
+    return intremap_page_order(irt) + PAGE_SHIFT -
+           (iommu->ctrl.ga_en ? 4 : 2);
 }
 
 static unsigned int intremap_table_entries(
@@ -825,7 +822,10 @@ int amd_iommu_free_intremap_table(
 
     if ( *tblp )
     {
-        __free_amd_iommu_tables(*tblp, intremap_table_order(iommu));
+        unsigned int order = intremap_page_order(*tblp);
+
+        intremap_page_order(*tblp) = 0;
+        __free_amd_iommu_tables(*tblp, order);
         *tblp = NULL;
     }
 
@@ -833,15 +833,23 @@ int amd_iommu_free_intremap_table(
 }
 
 void *amd_iommu_alloc_intremap_table(
-    const struct amd_iommu *iommu, unsigned long **inuse_map)
+    const struct amd_iommu *iommu, unsigned long **inuse_map, unsigned int nr)
 {
-    unsigned int order = intremap_table_order(iommu);
-    void *tb = __alloc_amd_iommu_tables(order);
+    unsigned int order;
+    void *tb;
 
+    if ( !nr )
+        nr = INTREMAP_MAX_ENTRIES;
+
+    order = iommu->ctrl.ga_en
+            ? get_order_from_bytes(nr * sizeof(union irte128))
+            : get_order_from_bytes(nr * sizeof(union irte32));
+
+    tb = __alloc_amd_iommu_tables(order);
     if ( tb )
     {
-        unsigned int nr = intremap_table_entries(tb, iommu);
-
+        intremap_page_order(tb) = order;
+        nr = intremap_table_entries(tb, iommu);
         *inuse_map = xzalloc_array(unsigned long, BITS_TO_LONGS(nr));
         if ( *inuse_map )
             memset(tb, 0, PAGE_SIZE << order);

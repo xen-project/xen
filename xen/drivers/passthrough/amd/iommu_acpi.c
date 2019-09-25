@@ -77,7 +77,7 @@ static void __init add_ivrs_mapping_entry(
         {
             if ( !shared_intremap_table )
                 shared_intremap_table = amd_iommu_alloc_intremap_table(
-                    iommu, &shared_intremap_inuse);
+                    iommu, &shared_intremap_inuse, 0);
 
             if ( !shared_intremap_table )
                 panic("No memory for shared IRT\n");
@@ -89,7 +89,7 @@ static void __init add_ivrs_mapping_entry(
         {
             ivrs_mappings[alias_id].intremap_table =
                 amd_iommu_alloc_intremap_table(
-                    iommu, &ivrs_mappings[alias_id].intremap_inuse);
+                    iommu, &ivrs_mappings[alias_id].intremap_inuse, 0);
 
             if ( !ivrs_mappings[alias_id].intremap_table )
                 panic("No memory for %04x:%02x:%02x.%u's IRT\n",

@@ -72,7 +72,8 @@ int __must_check amd_iommu_flush_iotlb_all(struct domain *d);
 /* device table functions */
 int get_dma_requestor_id(uint16_t seg, uint16_t bdf);
 void amd_iommu_set_intremap_table(struct amd_iommu_dte *dte,
-                                  uint64_t intremap_ptr,
+                                  const void *ptr,
+                                  const struct amd_iommu *iommu,
                                   bool valid);
 void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
 				   uint64_t root_ptr, uint16_t domain_id,
@@ -99,7 +100,7 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf);
 bool iov_supports_xt(void);
 int amd_iommu_setup_ioapic_remapping(void);
 void *amd_iommu_alloc_intremap_table(
-    const struct amd_iommu *, unsigned long **);
+    const struct amd_iommu *, unsigned long **, unsigned int nr);
 int amd_iommu_free_intremap_table(
     const struct amd_iommu *, struct ivrs_mappings *, uint16_t);
 unsigned int amd_iommu_intremap_table_order(

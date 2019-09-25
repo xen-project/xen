@@ -1284,12 +1284,14 @@ static int __init amd_iommu_setup_device_table(
                 pcidevs_unlock();
             }
 
-            if ( pdev )
+            if ( pdev && (pdev->msix || pdev->msi_maxvec) )
             {
                 ivrs_mappings[bdf].intremap_table =
                     amd_iommu_alloc_intremap_table(
                         ivrs_mappings[bdf].iommu,
-                        &ivrs_mappings[bdf].intremap_inuse);
+                        &ivrs_mappings[bdf].intremap_inuse,
+                        pdev->msix ? pdev->msix->nr_entries
+                                   : pdev->msi_maxvec);
                 if ( !ivrs_mappings[bdf].intremap_table )
                     return -ENOMEM;
 
@@ -1312,11 +1314,8 @@ static int __init amd_iommu_setup_device_table(
             }
 
             amd_iommu_set_intremap_table(
-                dte,
-                ivrs_mappings[bdf].intremap_table
-                ? virt_to_maddr(ivrs_mappings[bdf].intremap_table)
-                : 0,
-                iommu_intremap);
+                dte, ivrs_mappings[bdf].intremap_table,
+                ivrs_mappings[bdf].iommu, iommu_intremap);
         }
     }
 

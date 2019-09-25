@@ -107,9 +107,6 @@
 #define IOMMU_DEV_TABLE_INT_CONTROL_FORWARDED	0x1
 #define IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED	0x2
 
-/* For now, we always allocate the maximum: 2048 entries. */
-#define IOMMU_INTREMAP_ORDER			0xB
-
 struct amd_iommu_dte {
     /* 0 - 63 */
     bool v:1;
