@@ -711,33 +711,20 @@ int amd_iommu_msi_msg_update_ire(
 
     if ( msi_desc->remap_index >= 0 && !msg )
     {
-        do {
-            update_intremap_entry_from_msi_msg(iommu, bdf, nr,
-                                               &msi_desc->remap_index,
-                                               NULL, NULL);
-            if ( !pdev || !pdev->phantom_stride )
-                break;
-            bdf += pdev->phantom_stride;
-        } while ( PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
+        update_intremap_entry_from_msi_msg(iommu, bdf, nr,
+                                           &msi_desc->remap_index,
+                                           NULL, NULL);
 
         for ( i = 0; i < nr; ++i )
             msi_desc[i].remap_index = -1;
-        if ( pdev )
-            bdf = PCI_BDF2(pdev->bus, pdev->devfn);
     }
 
     if ( !msg )
         return 0;
 
-    do {
-        rc = update_intremap_entry_from_msi_msg(iommu, bdf, nr,
-                                                &msi_desc->remap_index,
-                                                msg, &data);
-        if ( rc || !pdev || !pdev->phantom_stride )
-            break;
-        bdf += pdev->phantom_stride;
-    } while ( PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
-
+    rc = update_intremap_entry_from_msi_msg(iommu, bdf, nr,
+                                            &msi_desc->remap_index,
+                                            msg, &data);
     if ( !rc )
     {
         for ( i = 1; i < nr; ++i )
@@ -790,12 +777,27 @@ void amd_iommu_read_msi_from_ire(
 }
 
 int amd_iommu_free_intremap_table(
-    const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping)
+    const struct amd_iommu *iommu, struct ivrs_mappings *ivrs_mapping,
+    uint16_t bdf)
 {
     void **tblp;
 
     if ( ivrs_mapping )
     {
+        unsigned int i;
+
+        /*
+         * PCI device phantom functions use the same tables as their "base"
+         * function: Look ahead to zap the pointers.
+         */
+        for ( i = 1; PCI_FUNC(bdf + i) && bdf + i < ivrs_bdf_entries; ++i )
+            if ( ivrs_mapping[i].intremap_table ==
+                 ivrs_mapping->intremap_table )
+            {
+                ivrs_mapping[i].intremap_table = NULL;
+                ivrs_mapping[i].intremap_inuse = NULL;
+            }
+
         XFREE(ivrs_mapping->intremap_inuse);
         tblp = &ivrs_mapping->intremap_table;
     }
@@ -934,7 +936,8 @@ static void dump_intremap_table(const struct amd_iommu *iommu,
 }
 
 static int dump_intremap_mapping(const struct amd_iommu *iommu,
-                                 struct ivrs_mappings *ivrs_mapping)
+                                 struct ivrs_mappings *ivrs_mapping,
+                                 uint16_t unused)
 {
     unsigned long flags;
 

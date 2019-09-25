@@ -1111,7 +1111,7 @@ static void __init amd_iommu_init_cleanup(void)
         amd_iommu_free_intremap_table(list_first_entry(&amd_iommu_head,
                                                        struct amd_iommu,
                                                        list),
-                                      NULL);
+                                      NULL, 0);
 
     /* free amd iommu list */
     list_for_each_entry_safe ( iommu, next, &amd_iommu_head, list )
@@ -1176,7 +1176,7 @@ int iterate_ivrs_mappings(int (*handler)(u16 seg, struct ivrs_mappings *))
 }
 
 int iterate_ivrs_entries(int (*handler)(const struct amd_iommu *,
-                                        struct ivrs_mappings *))
+                                        struct ivrs_mappings *, uint16_t bdf))
 {
     u16 seg = 0;
     int rc = 0;
@@ -1193,7 +1193,7 @@ int iterate_ivrs_entries(int (*handler)(const struct amd_iommu *,
             const struct amd_iommu *iommu = map[bdf].iommu;
 
             if ( iommu && map[bdf].dte_requestor_id == bdf )
-                rc = handler(iommu, &map[bdf]);
+                rc = handler(iommu, &map[bdf], bdf);
         }
     } while ( !rc && ++seg );
 
@@ -1286,20 +1286,29 @@ static int __init amd_iommu_setup_device_table(
 
             if ( pdev )
             {
-                unsigned int req_id = bdf;
+                ivrs_mappings[bdf].intremap_table =
+                    amd_iommu_alloc_intremap_table(
+                        ivrs_mappings[bdf].iommu,
+                        &ivrs_mappings[bdf].intremap_inuse);
+                if ( !ivrs_mappings[bdf].intremap_table )
+                    return -ENOMEM;
 
-                do {
-                    ivrs_mappings[req_id].intremap_table =
-                        amd_iommu_alloc_intremap_table(
-                            ivrs_mappings[bdf].iommu,
-                            &ivrs_mappings[req_id].intremap_inuse);
-                    if ( !ivrs_mappings[req_id].intremap_table )
-                        return -ENOMEM;
+                if ( pdev->phantom_stride )
+                {
+                    unsigned int req_id = bdf;
 
-                    if ( !pdev->phantom_stride )
-                        break;
-                    req_id += pdev->phantom_stride;
-                } while ( PCI_SLOT(req_id) == pdev->sbdf.dev );
+                    for ( ; ; )
+                    {
+                        req_id += pdev->phantom_stride;
+                        if ( PCI_SLOT(req_id) != pdev->sbdf.dev )
+                            break;
+
+                        ivrs_mappings[req_id].intremap_table =
+                            ivrs_mappings[bdf].intremap_table;
+                        ivrs_mappings[req_id].intremap_inuse =
+                            ivrs_mappings[bdf].intremap_inuse;
+                    }
+                }
             }
 
             amd_iommu_set_intremap_table(

@@ -101,7 +101,7 @@ int amd_iommu_setup_ioapic_remapping(void);
 void *amd_iommu_alloc_intremap_table(
     const struct amd_iommu *, unsigned long **);
 int amd_iommu_free_intremap_table(
-    const struct amd_iommu *, struct ivrs_mappings *);
+    const struct amd_iommu *, struct ivrs_mappings *, uint16_t);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
 unsigned int amd_iommu_read_ioapic_from_ire(

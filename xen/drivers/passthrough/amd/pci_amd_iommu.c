@@ -519,7 +519,7 @@ static int amd_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
     if ( amd_iommu_perdev_intremap &&
          ivrs_mappings[bdf].dte_requestor_id == bdf &&
          ivrs_mappings[bdf].intremap_table )
-        amd_iommu_free_intremap_table(iommu, &ivrs_mappings[bdf]);
+        amd_iommu_free_intremap_table(iommu, &ivrs_mappings[bdf], bdf);
 
     return 0;
 }
