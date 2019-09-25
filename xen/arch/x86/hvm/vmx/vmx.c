@@ -2489,29 +2489,6 @@ static void vmx_fpu_dirty_intercept(void)
     }
 }
 
-static int vmx_do_cpuid(struct cpu_user_regs *regs)
-{
-    struct vcpu *curr = current;
-    uint32_t leaf = regs->eax, subleaf = regs->ecx;
-    struct cpuid_leaf res;
-
-    if ( hvm_check_cpuid_faulting(current) )
-    {
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
-        return 1;  /* Don't advance the guest IP! */
-    }
-
-    guest_cpuid(curr, leaf, subleaf, &res);
-    HVMTRACE_5D(CPUID, leaf, res.a, res.b, res.c, res.d);
-
-    regs->rax = res.a;
-    regs->rbx = res.b;
-    regs->rcx = res.c;
-    regs->rdx = res.d;
-
-    return hvm_monitor_cpuid(get_instruction_length(), leaf, subleaf);
-}
-
 static void vmx_dr_access(unsigned long exit_qualification,
                           struct cpu_user_regs *regs)
 {
@@ -3862,7 +3839,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
     case EXIT_REASON_CPUID:
     {
-        int rc = vmx_do_cpuid(regs);
+        int rc = hvm_vmexit_cpuid(regs, get_instruction_length());
 
         /*
          * rc < 0 error in monitor/vm_event, crash

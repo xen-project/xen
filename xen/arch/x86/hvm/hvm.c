@@ -3358,14 +3358,28 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
     return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
-bool hvm_check_cpuid_faulting(struct vcpu *v)
+int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
 {
-    const struct vcpu_msrs *msrs = v->arch.msrs;
+    struct vcpu *curr = current;
+    unsigned int leaf = regs->eax, subleaf = regs->ecx;
+    struct cpuid_leaf res;
 
-    if ( !msrs->misc_features_enables.cpuid_faulting )
-        return false;
+    if ( curr->arch.msrs->misc_features_enables.cpuid_faulting &&
+         hvm_get_cpl(curr) > 0 )
+    {
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        return 1; /* Don't advance the guest IP! */
+    }
 
-    return hvm_get_cpl(v) > 0;
+    guest_cpuid(curr, leaf, subleaf, &res);
+    HVMTRACE_6D(CPUID, leaf, subleaf, res.a, res.b, res.c, res.d);
+
+    regs->rax = res.a;
+    regs->rbx = res.b;
+    regs->rcx = res.c;
+    regs->rdx = res.d;
+
+    return hvm_monitor_cpuid(inst_len, leaf, subleaf);
 }
 
 static uint64_t _hvm_rdtsc_intercept(void)

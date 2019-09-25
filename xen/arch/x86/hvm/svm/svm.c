@@ -1784,28 +1784,6 @@ static void svm_fpu_dirty_intercept(void)
         vmcb_set_cr0(vmcb, vmcb_get_cr0(vmcb) & ~X86_CR0_TS);
 }
 
-static int svm_vmexit_do_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
-{
-    struct vcpu *curr = current;
-    struct cpuid_leaf res;
-
-    if ( hvm_check_cpuid_faulting(curr) )
-    {
-        hvm_inject_hw_exception(TRAP_gp_fault, 0);
-        return 1; /* Don't advance the guest IP! */
-    }
-
-    guest_cpuid(curr, regs->eax, regs->ecx, &res);
-    HVMTRACE_5D(CPUID, regs->eax, res.a, res.b, res.c, res.d);
-
-    regs->rax = res.a;
-    regs->rbx = res.b;
-    regs->rcx = res.c;
-    regs->rdx = res.d;
-
-    return hvm_monitor_cpuid(inst_len, regs->eax, regs->ecx);
-}
-
 static void svm_vmexit_do_cr_access(
     struct vmcb_struct *vmcb, struct cpu_user_regs *regs)
 {
@@ -2828,7 +2806,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( inst_len == 0 )
             break;
 
-        rc = svm_vmexit_do_cpuid(regs, inst_len);
+        rc = hvm_vmexit_cpuid(regs, inst_len);
 
         if ( rc < 0 )
             goto unexpected_exit_type;

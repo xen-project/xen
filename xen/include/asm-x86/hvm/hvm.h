@@ -280,7 +280,7 @@ void hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
 bool hvm_set_guest_bndcfgs(struct vcpu *v, u64 val);
 
-bool hvm_check_cpuid_faulting(struct vcpu *v);
+int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len);
 void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirq(struct hvm_pirq_dpci *pirq_dpci, const struct vcpu *v);
