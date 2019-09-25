@@ -13,3 +13,6 @@ config ARM_SMMU
 	  Say Y here if your SoC includes an IOMMU device implementing the
 	  ARM SMMU architecture.
 endif
+
+config IOMMU_FORCE_PT_SHARE
+	bool

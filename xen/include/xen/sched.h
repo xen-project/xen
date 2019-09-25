@@ -965,12 +965,6 @@ static inline bool is_hwdom_pinned_vcpu(const struct vcpu *v)
             cpumask_weight(v->cpu_hard_affinity) == 1);
 }
 
-#ifdef CONFIG_HAS_PASSTHROUGH
-#define need_iommu_pt_sync(d) (dom_iommu(d)->need_sync)
-#else
-#define need_iommu_pt_sync(d) false
-#endif
-
 static inline bool is_vcpu_online(const struct vcpu *v)
 {
     return !test_bit(_VPF_down, &v->pause_flags);

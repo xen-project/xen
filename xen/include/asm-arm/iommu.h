@@ -20,9 +20,6 @@ struct arch_iommu
     void *priv;
 };
 
-/* Always share P2M Table between the CPU and the IOMMU */
-#define iommu_use_hap_pt(d) is_iommu_enabled(d)
-
 const struct iommu_ops *iommu_get_ops(void);
 void iommu_set_ops(const struct iommu_ops *ops);
 

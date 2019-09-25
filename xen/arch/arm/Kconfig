@@ -20,6 +20,7 @@ config ARM
 	select HAS_DEVICE_TREE
 	select HAS_PASSTHROUGH
 	select HAS_PDX
+	select IOMMU_FORCE_PT_SHARE
 
 config ARCH_DEFCONFIG
 	string
