@@ -190,11 +190,12 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 #define VAL_SSIDREF             Field(config, 0)
 #define VAL_HANDLE              Field(config, 1)
 #define VAL_FLAGS               Field(config, 2)
-#define VAL_MAX_VCPUS           Field(config, 3)
-#define VAL_MAX_EVTCHN_PORT     Field(config, 4)
-#define VAL_MAX_GRANT_FRAMES    Field(config, 5)
-#define VAL_MAX_MAPTRACK_FRAMES Field(config, 6)
-#define VAL_ARCH                Field(config, 7)
+#define VAL_IOMMU_OPTS          Field(config, 3)
+#define VAL_MAX_VCPUS           Field(config, 4)
+#define VAL_MAX_EVTCHN_PORT     Field(config, 5)
+#define VAL_MAX_GRANT_FRAMES    Field(config, 6)
+#define VAL_MAX_MAPTRACK_FRAMES Field(config, 7)
+#define VAL_ARCH                Field(config, 8)
 
 	uint32_t domid = 0;
 	int result;
@@ -212,6 +213,11 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 		/* ! domain_create_flag CDF_ lc */
 		/* ! XEN_DOMCTL_CDF_ XEN_DOMCTL_CDF_MAX max */
 		(VAL_FLAGS);
+
+	cfg.iommu_opts = ocaml_list_to_c_bitmap
+		/* ! domain_create_iommu_opts IOMMU_ lc */
+		/* ! XEN_DOMCTL_IOMMU_ XEN_DOMCTL_IOMMU_MAX max */
+		(VAL_IOMMU_OPTS);
 
 	arch_domconfig = Field(VAL_ARCH, 0);
 	switch ( Tag_val(VAL_ARCH) )
@@ -247,6 +253,7 @@ CAMLprim value stub_xc_domain_create(value xch, value config)
 #undef VAL_MAX_GRANT_FRAMES
 #undef VAL_MAX_EVTCHN_PORT
 #undef VAL_MAX_VCPUS
+#undef VAL_IOMMU_OPTS
 #undef VAL_FLAGS
 #undef VAL_HANDLE
 #undef VAL_SSIDREF

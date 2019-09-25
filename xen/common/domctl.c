@@ -515,19 +515,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             rover = dom;
         }
 
-        /*
-         * For now, make sure the createdomain IOMMU flag is set if the
-         * IOMMU is enabled. When the flag comes under toolstack control
-         * this can go away.
-         */
-        if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_iommu )
-        {
-            ASSERT_UNREACHABLE();
-            return -EINVAL;
-        }
-        if ( iommu_enabled )
-            op->u.createdomain.flags |= XEN_DOMCTL_CDF_iommu;
-
         d = domain_create(dom, &op->u.createdomain, false);
         if ( IS_ERR(d) )
         {

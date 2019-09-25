@@ -617,6 +617,14 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    /* The P2M table must always be shared between the CPU and the IOMMU */
+    if ( config->iommu_opts & XEN_DOMCTL_IOMMU_no_sharept )
+    {
+        dprintk(XENLOG_INFO,
+                "Unsupported iommu option: XEN_DOMCTL_IOMMU_no_sharept\n");
+        return -EINVAL;
+    }
+
     /* Fill in the native GIC version, passed back to the toolstack. */
     if ( config->arch.gic_version == XEN_DOMCTL_CONFIG_GIC_NATIVE )
     {
@@ -677,7 +685,7 @@ int arch_domain_create(struct domain *d,
     ASSERT(config != NULL);
 
     /* p2m_init relies on some value initialized by the IOMMU subsystem */
-    if ( (rc = iommu_domain_init(d)) != 0 )
+    if ( (rc = iommu_domain_init(d, config->iommu_opts)) != 0 )
         goto fail;
 
     if ( (rc = p2m_init(d)) != 0 )

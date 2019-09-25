@@ -30,6 +30,13 @@
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info)
 {
+    libxl_physinfo info;
+    int rc;
+
+    rc = libxl_get_physinfo(CTX, &info);
+    if (rc)
+        return rc;
+
     if (!c_info->type) {
         LOG(ERROR, "domain type unspecified");
         return ERROR_INVAL;
@@ -38,12 +45,6 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     libxl__arch_domain_create_info_setdefault(gc, c_info);
 
     if (c_info->type != LIBXL_DOMAIN_TYPE_PV) {
-        libxl_physinfo info;
-        int rc = libxl_get_physinfo(CTX, &info);
-
-        if (rc)
-            return rc;
-
         if (info.cap_hap)
             libxl_defbool_setdefault(&c_info->hap, true);
         else if (info.cap_shadow)
@@ -61,6 +62,13 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
 
     if (!c_info->ssidref)
         c_info->ssidref = SECINITSID_DOMU;
+
+    if (info.cap_hvm_directio &&
+        (c_info->passthrough == LIBXL_PASSTHROUGH_ENABLED)) {
+        c_info->passthrough = ((c_info->type == LIBXL_DOMAIN_TYPE_PV) ||
+                               !info.cap_iommu_hap_pt_share) ?
+            LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
+    }
 
     return 0;
 }
@@ -577,6 +585,16 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
             create.flags |=
                 libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
         }
+
+        assert(info->passthrough != LIBXL_PASSTHROUGH_ENABLED);
+        LOG(DETAIL, "passthrough: %s",
+            libxl_passthrough_to_string(info->passthrough));
+
+        if (info->passthrough != LIBXL_PASSTHROUGH_DISABLED)
+            create.flags |= XEN_DOMCTL_CDF_iommu;
+
+        if (info->passthrough == LIBXL_PASSTHROUGH_SYNC_PT)
+            create.iommu_opts |= XEN_DOMCTL_IOMMU_no_sharept;
 
         /* Ultimately, handle is an array of 16 uint8_t, same as uuid */
         libxl_uuid_copy(ctx, (libxl_uuid *)&create.handle, &info->uuid);

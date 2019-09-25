@@ -1461,6 +1461,113 @@ void parse_config_data(const char *config_source,
         exit(1);
     }
 
+    if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
+        d_config->num_pcidevs = 0;
+        d_config->pcidevs = NULL;
+        for(i = 0; (buf = xlu_cfg_get_listitem (pcis, i)) != NULL; i++) {
+            libxl_device_pci *pcidev;
+
+            pcidev = ARRAY_EXTEND_INIT_NODEVID(d_config->pcidevs,
+                                               d_config->num_pcidevs,
+                                               libxl_device_pci_init);
+            pcidev->msitranslate = pci_msitranslate;
+            pcidev->power_mgmt = pci_power_mgmt;
+            pcidev->permissive = pci_permissive;
+            pcidev->seize = pci_seize;
+            /*
+             * Like other pci option, the per-device policy always follows
+             * the global policy by default.
+             */
+            pcidev->rdm_policy = b_info->u.hvm.rdm.policy;
+            e = xlu_pci_parse_bdf(config, pcidev, buf);
+            if (e) {
+                fprintf(stderr,
+                        "unable to parse PCI BDF `%s' for passthrough\n",
+                        buf);
+                exit(-e);
+            }
+        }
+        if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
+            libxl_defbool_set(&b_info->u.pv.e820_host, true);
+    }
+
+    if (!xlu_cfg_get_list (config, "dtdev", &dtdevs, 0, 0)) {
+        d_config->num_dtdevs = 0;
+        d_config->dtdevs = NULL;
+        for (i = 0; (buf = xlu_cfg_get_listitem(dtdevs, i)) != NULL; i++) {
+            libxl_device_dtdev *dtdev;
+
+            dtdev = ARRAY_EXTEND_INIT_NODEVID(d_config->dtdevs,
+                                              d_config->num_dtdevs,
+                                              libxl_device_dtdev_init);
+
+            dtdev->path = strdup(buf);
+            if (dtdev->path == NULL) {
+                fprintf(stderr, "unable to duplicate string for dtdevs\n");
+                exit(-1);
+            }
+        }
+    }
+
+    if (xlu_cfg_get_string(config, "passthrough", &buf, 0)) {
+        c_info->passthrough =
+            (d_config->num_pcidevs || d_config->num_dtdevs)
+            ? LIBXL_PASSTHROUGH_ENABLED : LIBXL_PASSTHROUGH_DISABLED;
+    } else {
+        libxl_passthrough o;
+
+        e = libxl_passthrough_from_string(buf, &o);
+        if (e) {
+            fprintf(stderr,
+                    "ERROR: unknown passthrough option '%s'\n",
+                    buf);
+            exit(-ERROR_FAIL);
+        }
+
+        c_info->passthrough = o;
+    }
+
+    switch (c_info->passthrough) {
+    case LIBXL_PASSTHROUGH_ENABLED:
+        /*
+         * Choose a suitable default. libxl would also do this but
+         * choosing here allows the code calculating 'iommu_memkb'
+         * below make an informed decision.
+         */
+        c_info->passthrough =
+            (c_info->type == LIBXL_DOMAIN_TYPE_PV) || !iommu_hap_pt_share
+            ? LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
+        break;
+
+    case LIBXL_PASSTHROUGH_DISABLED:
+        if (d_config->num_pcidevs || d_config->num_dtdevs) {
+            fprintf(stderr,
+                    "ERROR: passthrough disabled but devices are specified\n");
+            exit(-ERROR_FAIL);
+        }
+        break;
+    case LIBXL_PASSTHROUGH_SHARE_PT:
+        if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
+            fprintf(stderr,
+                    "ERROR: passthrough=\"share_pt\" not valid for PV domain\n");
+            exit(-ERROR_FAIL);
+        } else if (!iommu_hap_pt_share) {
+            fprintf(stderr,
+                    "ERROR: passthrough=\"share_pt\" not supported on this platform\n");
+            exit(-ERROR_FAIL);
+        }
+        break;
+    case LIBXL_PASSTHROUGH_SYNC_PT:
+        break;
+    }
+
+    if ((c_info->passthrough != LIBXL_PASSTHROUGH_DISABLED) &&
+        !iommu_enabled) {
+        fprintf(stderr,
+                "ERROR: passthrough not supported on this platform\n");
+        exit(-ERROR_FAIL);
+    }
+
     /* libxl_get_required_shadow_memory() and
      * libxl_get_required_iommu_memory() must be called after final values
      * (default or specified) for vcpus and memory are set, because the
@@ -1470,11 +1577,10 @@ void parse_config_data(const char *config_source,
         : libxl_get_required_shadow_memory(b_info->max_memkb,
                                            b_info->max_vcpus);
 
-    /* No IOMMU reservation is needed if either the IOMMU is disabled or it
-     * can share the P2M. */
-    b_info->iommu_memkb = (!iommu_enabled || iommu_hap_pt_share)
-        ? 0
-        : libxl_get_required_iommu_memory(b_info->max_memkb);
+    /* No IOMMU reservation is needed if passthrough mode is not 'sync_pt' */
+    b_info->iommu_memkb = (c_info->passthrough == LIBXL_PASSTHROUGH_SYNC_PT)
+        ? libxl_get_required_iommu_memory(b_info->max_memkb)
+        : 0;
 
     xlu_cfg_get_defbool(config, "nomigrate", &b_info->disable_migrate, 0);
 
@@ -2295,54 +2401,6 @@ skip_vfb:
         if (!xlu_rdm_parse(config, &rdm, buf)) {
             b_info->u.hvm.rdm.strategy = rdm.strategy;
             b_info->u.hvm.rdm.policy = rdm.policy;
-        }
-    }
-
-    if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
-        d_config->num_pcidevs = 0;
-        d_config->pcidevs = NULL;
-        for(i = 0; (buf = xlu_cfg_get_listitem (pcis, i)) != NULL; i++) {
-            libxl_device_pci *pcidev;
-
-            pcidev = ARRAY_EXTEND_INIT_NODEVID(d_config->pcidevs,
-                                               d_config->num_pcidevs,
-                                               libxl_device_pci_init);
-            pcidev->msitranslate = pci_msitranslate;
-            pcidev->power_mgmt = pci_power_mgmt;
-            pcidev->permissive = pci_permissive;
-            pcidev->seize = pci_seize;
-            /*
-             * Like other pci option, the per-device policy always follows
-             * the global policy by default.
-             */
-            pcidev->rdm_policy = b_info->u.hvm.rdm.policy;
-            e = xlu_pci_parse_bdf(config, pcidev, buf);
-            if (e) {
-                fprintf(stderr,
-                        "unable to parse PCI BDF `%s' for passthrough\n",
-                        buf);
-                exit(-e);
-            }
-        }
-        if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
-            libxl_defbool_set(&b_info->u.pv.e820_host, true);
-    }
-
-    if (!xlu_cfg_get_list (config, "dtdev", &dtdevs, 0, 0)) {
-        d_config->num_dtdevs = 0;
-        d_config->dtdevs = NULL;
-        for (i = 0; (buf = xlu_cfg_get_listitem(dtdevs, i)) != NULL; i++) {
-            libxl_device_dtdev *dtdev;
-
-            dtdev = ARRAY_EXTEND_INIT_NODEVID(d_config->dtdevs,
-                                              d_config->num_dtdevs,
-                                              libxl_device_dtdev_init);
-
-            dtdev->path = strdup(buf);
-            if (dtdev->path == NULL) {
-                fprintf(stderr, "unable to duplicate string for dtdevs\n");
-                exit(-1);
-            }
         }
     }
 

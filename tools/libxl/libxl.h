@@ -421,6 +421,15 @@
 #define LIBXL_HAVE_BUILDINFO_IOMMU_MEMKB 1
 
 /*
+ * LIBXL_HAVE_CREATEINFO_PASSTHROUGH indicates that
+ * libxl_domain_create_info has a passthrough field (which is a
+ * libxl_passthrough enumeration) that indicates whether device pass-
+ * through is enabled for the domain and, if so, whether the IOMMU and
+ * HAP page tables may be shared or not.
+ */
+#define LIBXL_HAVE_CREATEINFO_PASSTHROUGH 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

@@ -308,6 +308,13 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
+    if ( !(config->flags & XEN_DOMCTL_CDF_iommu) && config->iommu_opts )
+    {
+        dprintk(XENLOG_INFO,
+                "IOMMU options specified but IOMMU not enabled\n");
+        return -EINVAL;
+    }
+
     if ( config->max_vcpus < 1 )
     {
         dprintk(XENLOG_INFO, "No vCPUS\n");

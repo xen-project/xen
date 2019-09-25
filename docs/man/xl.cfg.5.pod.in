@@ -605,6 +605,63 @@ option should only be used with a trusted device tree.
 Note that the partial device tree should avoid using the phandle 65000
 which is reserved by the toolstack.
 
+=item B<passthrough="STRING">
+
+Specify whether IOMMU mappings are enabled for the domain and hence whether
+it will be enabled for passthrough hardware. Valid values for this option
+are:
+
+=over 4
+
+=item B<disabled>
+
+IOMMU mappings are disabled for the domain and so hardware may not be
+passed through.
+
+This option is the default if no passthrough hardware is specified in the
+domain's configuration.
+
+=item B<enabled>
+
+This option enables IOMMU mappings and selects an appropriate default
+operating mode (see below for details of the operating modes). For HVM/PVH
+domains running on platforms where the option is available, this is
+equivalent to B<share_pt>. Otherwise, and also for PV domains, this
+option is equivalent to B<sync_pt>.
+
+This option is the default if passthrough hardware is specified in the
+domain's configuration.
+
+=item B<sync_pt>
+
+This option means that IOMMU mappings will be synchronized with the
+domain's P2M table as follows:
+
+For a PV domain, all writable pages assigned to the domain are identity
+mapped by MFN in the IOMMU page table. Thus a device driver running in the
+domain may program passthrough hardware for DMA using MFN values
+(i.e. host/machine frame numbers) looked up in its P2M.
+
+For an HVM/PVH domain, all non-foreign RAM pages present in its P2M will be
+mapped by GFN in the IOMMU page table. Thus a device driver running in the
+domain may program passthrough hardware using GFN values (i.e. guest
+physical frame numbers) without any further translation.
+
+This option is not currently available on Arm.
+
+=item B<share_pt>
+
+This option is unavailable for a PV domain. For an HVM/PVH domain, this
+option means that the IOMMU will be programmed to directly reference the
+domain's P2M table as its page table. From the point of view of a device
+driver running in the domain this is functionally equivalent to B<sync_pt>
+but places less load on the hypervisor and so should generally be selected
+in preference. However, the availability of this option is hardware
+specific. If B<xl info> reports B<virt_caps> containing
+B<iommu_hap_pt_share> then this option may be used.
+
+=back
+
 =back
 
 =head2 Devices
