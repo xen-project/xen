@@ -88,14 +88,8 @@ void iommu_domain_destroy(struct domain *d);
 
 void arch_iommu_domain_destroy(struct domain *d);
 int arch_iommu_domain_init(struct domain *d);
-int arch_iommu_populate_page_table(struct domain *d);
 void arch_iommu_check_autotranslated_hwdom(struct domain *d);
 void arch_iommu_hwdom_init(struct domain *d);
-
-int iommu_construct(struct domain *d);
-
-/* Function used internally, use iommu_domain_destroy */
-void iommu_teardown(struct domain *d);
 
 /*
  * The following flags are passed to map operations and passed by lookup
@@ -263,13 +257,6 @@ struct iommu_ops {
 # define iommu_vcall iommu_call
 #endif
 
-enum iommu_status
-{
-    IOMMU_STATUS_disabled,
-    IOMMU_STATUS_initializing,
-    IOMMU_STATUS_initialized
-};
-
 struct domain_iommu {
     struct arch_iommu arch;
 
@@ -288,9 +275,6 @@ struct domain_iommu {
 
     /* Features supported by the IOMMU */
     DECLARE_BITMAP(features, IOMMU_FEAT_count);
-
-    /* Status of guest IOMMU mappings */
-    enum iommu_status status;
 
     /*
      * Does the guest reqire mappings to be synchonized, to maintain

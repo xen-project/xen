@@ -88,7 +88,7 @@ extern const struct iommu_init_ops *iommu_init_ops;
 
 /* Are we using the domain P2M table as its IOMMU pagetable? */
 #define iommu_use_hap_pt(d) \
-    (hap_enabled(d) && has_iommu_pt(d) && iommu_hap_pt_share)
+    (hap_enabled(d) && is_iommu_enabled(d) && iommu_hap_pt_share)
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);

@@ -461,15 +461,17 @@ int libxl_domain_need_memory(libxl_ctx *ctx,
     if (rc) goto out;
 
     *need_memkb = b_info->target_memkb;
+    *need_memkb += b_info->shadow_memkb + b_info->iommu_memkb;
+
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_PVH:
     case LIBXL_DOMAIN_TYPE_HVM:
-        *need_memkb += b_info->shadow_memkb + LIBXL_HVM_EXTRA_MEMORY;
+        *need_memkb += LIBXL_HVM_EXTRA_MEMORY;
         if (libxl_defbool_val(b_info->device_model_stubdomain))
             *need_memkb += 32 * 1024;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        *need_memkb += b_info->shadow_memkb + LIBXL_PV_EXTRA_MEMORY;
+        *need_memkb += LIBXL_PV_EXTRA_MEMORY;
         break;
     default:
         rc = ERROR_INVAL;

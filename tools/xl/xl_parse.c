@@ -1207,6 +1207,7 @@ void parse_config_data(const char *config_source,
                        int config_len,
                        libxl_domain_config *d_config)
 {
+    libxl_physinfo physinfo;
     const char *buf;
     long l, vcpus = 0;
     XLU_Config *config;
@@ -1221,9 +1222,21 @@ void parse_config_data(const char *config_source,
     int pci_seize = 0;
     int i, e;
     char *kernel_basename;
+    bool iommu_enabled, iommu_hap_pt_share;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
+
+    libxl_physinfo_init(&physinfo);
+    if (libxl_get_physinfo(ctx, &physinfo) != 0) {
+        libxl_physinfo_dispose(&physinfo);
+        fprintf(stderr, "libxl_get_physinfo failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    iommu_enabled = physinfo.cap_hvm_directio;
+    iommu_hap_pt_share = physinfo.cap_iommu_hap_pt_share;
+    libxl_physinfo_dispose(&physinfo);
 
     config= xlu_cfg_init(stderr, config_source);
     if (!config) {
@@ -1448,13 +1461,20 @@ void parse_config_data(const char *config_source,
         exit(1);
     }
 
-    /* libxl_get_required_shadow_memory() must be called after final values
+    /* libxl_get_required_shadow_memory() and
+     * libxl_get_required_iommu_memory() must be called after final values
      * (default or specified) for vcpus and memory are set, because the
-     * calculation depends on those values. */
+     * calculations depend on those values. */
     b_info->shadow_memkb = !xlu_cfg_get_long(config, "shadow_memory", &l, 0)
         ? l * 1024
         : libxl_get_required_shadow_memory(b_info->max_memkb,
                                            b_info->max_vcpus);
+
+    /* No IOMMU reservation is needed if either the IOMMU is disabled or it
+     * can share the P2M. */
+    b_info->iommu_memkb = (!iommu_enabled || iommu_hap_pt_share)
+        ? 0
+        : libxl_get_required_iommu_memory(b_info->max_memkb);
 
     xlu_cfg_get_defbool(config, "nomigrate", &b_info->disable_migrate, 0);
 

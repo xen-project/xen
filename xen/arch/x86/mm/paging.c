@@ -213,7 +213,7 @@ int paging_log_dirty_enable(struct domain *d, bool_t log_global)
 {
     int ret;
 
-    if ( has_iommu_pt(d) && log_global )
+    if ( is_iommu_enabled(d) && log_global )
     {
         /*
          * Refuse to turn on global log-dirty mode

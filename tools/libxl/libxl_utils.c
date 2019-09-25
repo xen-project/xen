@@ -48,6 +48,21 @@ unsigned long libxl_get_required_shadow_memory(unsigned long maxmem_kb, unsigned
     return 4 * (256 * smp_cpus + 2 * (maxmem_kb / 1024));
 }
 
+unsigned long libxl_get_required_iommu_memory(unsigned long maxmem_kb)
+{
+    unsigned long iommu_pages = 0, mem_pages = maxmem_kb / 4;
+    unsigned int level;
+
+    /* Assume a 4 level page table with 512 entries per level */
+    for (level = 0; level < 4; level++)
+    {
+        mem_pages = DIV_ROUNDUP(mem_pages, 512);
+        iommu_pages += mem_pages;
+    }
+
+    return iommu_pages * 4;
+}
+
 char *libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid)
 {
     unsigned int len;

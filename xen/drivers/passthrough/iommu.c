@@ -152,6 +152,17 @@ static int __init parse_dom0_iommu_param(const char *s)
 }
 custom_param("dom0-iommu", parse_dom0_iommu_param);
 
+static void __hwdom_init check_hwdom_reqs(struct domain *d)
+{
+    if ( iommu_hwdom_none || !paging_mode_translate(d) )
+        return;
+
+    arch_iommu_check_autotranslated_hwdom(d);
+
+    iommu_hwdom_passthrough = false;
+    iommu_hwdom_strict = true;
+}
+
 int iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
@@ -169,127 +180,42 @@ int iommu_domain_init(struct domain *d)
         return ret;
 
     hd->platform_ops = iommu_get_ops();
-    return hd->platform_ops->init(d);
-}
+    ret = hd->platform_ops->init(d);
+    if ( ret )
+        return ret;
 
-static void __hwdom_init check_hwdom_reqs(struct domain *d)
-{
-    if ( iommu_hwdom_none || !paging_mode_translate(d) )
-        return;
+    if ( is_hardware_domain(d) )
+        check_hwdom_reqs(d); /* may modify iommu_hwdom_strict */
 
-    arch_iommu_check_autotranslated_hwdom(d);
+    /*
+     * NB: 'relaxed' h/w domains don't need the IOMMU mappings to be kept
+     *     in-sync with their assigned pages because all host RAM will be
+     *     mapped during hwdom_init().
+     */
+    if ( !is_hardware_domain(d) || iommu_hwdom_strict )
+        hd->need_sync = !iommu_use_hap_pt(d);
 
-    iommu_hwdom_passthrough = false;
-    iommu_hwdom_strict = true;
+    return 0;
 }
 
 void __hwdom_init iommu_hwdom_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
-    check_hwdom_reqs(d);
-
     if ( !is_iommu_enabled(d) )
         return;
 
     register_keyhandler('o', &iommu_dump_p2m_table, "dump iommu p2m table", 0);
 
-    hd->status = IOMMU_STATUS_initializing;
-    /*
-     * NB: relaxed hw domains don't need sync because all ram is already
-     * mapped in the iommu page tables.
-     */
-    hd->need_sync = iommu_hwdom_strict && !iommu_use_hap_pt(d);
-    if ( need_iommu_pt_sync(d) )
-    {
-        struct page_info *page;
-        unsigned int i = 0, flush_flags = 0;
-        int rc = 0;
-
-        page_list_for_each ( page, &d->page_list )
-        {
-            unsigned long mfn = mfn_x(page_to_mfn(page));
-            unsigned long dfn = mfn_to_gmfn(d, mfn);
-            unsigned int mapping = IOMMUF_readable;
-            int ret;
-
-            if ( ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
-                 ((page->u.inuse.type_info & PGT_type_mask)
-                  == PGT_writable_page) )
-                mapping |= IOMMUF_writable;
-
-            ret = iommu_map(d, _dfn(dfn), _mfn(mfn), 0, mapping,
-                            &flush_flags);
-
-            if ( !rc )
-                rc = ret;
-
-            if ( !(i++ & 0xfffff) )
-                process_pending_softirqs();
-        }
-
-        /* Use while-break to avoid compiler warning */
-        while ( iommu_iotlb_flush_all(d, flush_flags) )
-            break;
-
-        if ( rc )
-            printk(XENLOG_WARNING "d%d: IOMMU mapping failed: %d\n",
-                   d->domain_id, rc);
-    }
-
     hd->platform_ops->hwdom_init(d);
-
-    hd->status = IOMMU_STATUS_initialized;
 }
 
-void iommu_teardown(struct domain *d)
+static void iommu_teardown(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
-    hd->status = IOMMU_STATUS_disabled;
     hd->platform_ops->teardown(d);
     tasklet_schedule(&iommu_pt_cleanup_tasklet);
-}
-
-int iommu_construct(struct domain *d)
-{
-    struct domain_iommu *hd = dom_iommu(d);
-
-    if ( hd->status == IOMMU_STATUS_initialized )
-        return 0;
-
-    hd->status = IOMMU_STATUS_initializing;
-
-    if ( !iommu_use_hap_pt(d) )
-    {
-        int rc;
-
-        hd->need_sync = true;
-
-        rc = arch_iommu_populate_page_table(d);
-        if ( rc )
-        {
-            if ( rc != -ERESTART )
-            {
-                hd->need_sync = false;
-                hd->status = IOMMU_STATUS_disabled;
-            }
-
-            return rc;
-        }
-    }
-
-    hd->status = IOMMU_STATUS_initialized;
-
-    /*
-     * There may be dirty cache lines when a device is assigned
-     * and before has_iommu_pt(d) becoming true, this will cause
-     * memory_type_changed lose effect if memory type changes.
-     * Call memory_type_changed here to amend this.
-     */
-    memory_type_changed(d);
-
-    return 0;
 }
 
 void iommu_domain_destroy(struct domain *d)
@@ -587,11 +513,8 @@ int iommu_do_domctl(
 void iommu_share_p2m_table(struct domain* d)
 {
     ASSERT(hap_enabled(d));
-    /*
-     * iommu_use_hap_pt(d) cannot be used here because during domain
-     * construction has_iommu_pt(d) will always return false here.
-     */
-    if ( is_iommu_enabled(d) && iommu_hap_pt_share )
+
+    if ( iommu_use_hap_pt(d) )
         iommu_get_ops()->share_p2m(d);
 }
 
@@ -638,8 +561,7 @@ static void iommu_dump_p2m_table(unsigned char key)
     ops = iommu_get_ops();
     for_each_domain(d)
     {
-        if ( is_hardware_domain(d) ||
-             dom_iommu(d)->status < IOMMU_STATUS_initialized )
+        if ( is_hardware_domain(d) || !is_iommu_enabled(d) )
             continue;
 
         if ( iommu_use_hap_pt(d) )

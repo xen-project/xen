@@ -1434,7 +1434,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
      * shared or being kept in sync then newly added memory needs to be
      * mapped here.
      */
-    if ( has_iommu_pt(hardware_domain) &&
+    if ( is_iommu_enabled(hardware_domain) &&
          !iommu_use_hap_pt(hardware_domain) &&
          !need_iommu_pt_sync(hardware_domain) )
     {

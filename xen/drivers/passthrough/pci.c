@@ -948,9 +948,6 @@ static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
 
     pdev->fault.count = 0;
 
-    if ( !has_arch_pdevs(d) && has_iommu_pt(d) )
-        iommu_teardown(d);
-
     return ret;
 }
 
@@ -1499,13 +1496,6 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     if ( !pcidevs_trylock() )
         return -ERESTART;
 
-    rc = iommu_construct(d);
-    if ( rc )
-    {
-        pcidevs_unlock();
-        return rc;
-    }
-
     pdev = pci_get_pdev_by_domain(hardware_domain, seg, bus, devfn);
     if ( !pdev )
     {
@@ -1534,8 +1524,6 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     }
 
  done:
-    if ( !has_arch_pdevs(d) && has_iommu_pt(d) )
-        iommu_teardown(d);
     pcidevs_unlock();
 
     return rc;

@@ -1721,15 +1721,7 @@ static void iommu_domain_teardown(struct domain *d)
 
     ASSERT(is_iommu_enabled(d));
 
-    /*
-     * We can't use iommu_use_hap_pt here because either IOMMU state
-     * is already changed to IOMMU_STATUS_disabled at this point or
-     * has always been IOMMU_STATUS_disabled.
-     *
-     * We also need to test if HAP is enabled because PV guests can
-     * enter this path too.
-     */
-    if ( hap_enabled(d) && iommu_hap_pt_share )
+    if ( iommu_use_hap_pt(d) )
         return;
 
     spin_lock(&hd->arch.mapping_lock);

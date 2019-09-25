@@ -414,6 +414,13 @@
 #define LIBXL_HAVE_PHYSINFO_CAP_IOMMU_HAP_PT_SHARE 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_IOMMU_MEMKB indicates thate libxl_domain_build_info
+ * has an iommu_memkb field which should be set with the amount of memory
+ * overhead needed by the domain for populating IOMMU page tables.
+ */
+#define LIBXL_HAVE_BUILDINFO_IOMMU_MEMKB 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

@@ -1341,7 +1341,7 @@ int set_identity_p2m_entry(struct domain *d, unsigned long gfn_l,
 
     if ( !paging_mode_translate(p2m->domain) )
     {
-        if ( !has_iommu_pt(d) )
+        if ( !is_iommu_enabled(d) )
             return 0;
         return iommu_legacy_map(d, _dfn(gfn_l), _mfn(gfn_l), PAGE_ORDER_4K,
                                 IOMMUF_readable | IOMMUF_writable);
@@ -1432,7 +1432,7 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn_l)
 
     if ( !paging_mode_translate(d) )
     {
-        if ( !has_iommu_pt(d) )
+        if ( !is_iommu_enabled(d) )
             return 0;
         return iommu_legacy_unmap(d, _dfn(gfn_l), PAGE_ORDER_4K);
     }

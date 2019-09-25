@@ -365,7 +365,7 @@ unsigned long __init dom0_compute_nr_pages(
     }
 
     need_paging = is_hvm_domain(d) &&
-        (!iommu_hap_pt_share || !paging_mode_hap(d));
+        (!iommu_use_hap_pt(d) || !paging_mode_hap(d));
     for ( ; ; need_paging = false )
     {
         nr_pages = get_memsize(&dom0_size, avail);

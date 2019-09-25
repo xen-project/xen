@@ -1056,7 +1056,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
          !mfn_eq(lpae_get_mfn(*entry), lpae_get_mfn(orig_pte)) )
         p2m_free_entry(p2m, orig_pte, level);
 
-    if ( has_iommu_pt(p2m->domain) &&
+    if ( is_iommu_enabled(p2m->domain) &&
          (lpae_is_valid(orig_pte) || lpae_is_valid(*entry)) )
     {
         unsigned int flush_flags = 0;

@@ -491,6 +491,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("target_memkb",    MemKB),
     ("video_memkb",     MemKB),
     ("shadow_memkb",    MemKB),
+    ("iommu_memkb",     MemKB),
     ("rtc_timeoffset",  uint32),
     ("exec_ssidref",    uint32),
     ("exec_ssid_label", string),

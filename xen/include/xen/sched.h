@@ -966,10 +966,8 @@ static inline bool is_hwdom_pinned_vcpu(const struct vcpu *v)
 }
 
 #ifdef CONFIG_HAS_PASSTHROUGH
-#define has_iommu_pt(d) (dom_iommu(d)->status != IOMMU_STATUS_disabled)
 #define need_iommu_pt_sync(d) (dom_iommu(d)->need_sync)
 #else
-#define has_iommu_pt(d) false
 #define need_iommu_pt_sync(d) false
 #endif
 
