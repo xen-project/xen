@@ -165,7 +165,7 @@ static void __init reserve_unity_map_for_device(
     /* extend r/w permissioms and keep aggregate */
     ivrs_mappings[bdf].write_permission = iw;
     ivrs_mappings[bdf].read_permission = ir;
-    ivrs_mappings[bdf].unity_map_enable = IOMMU_CONTROL_ENABLED;
+    ivrs_mappings[bdf].unity_map_enable = true;
     ivrs_mappings[bdf].addr_range_start = base;
     ivrs_mappings[bdf].addr_range_length = length;
 }
@@ -242,8 +242,8 @@ static int __init register_exclusion_range_for_device(
     if ( limit >= iommu_top  )
     {
         reserve_iommu_exclusion_range(iommu, base, limit);
-        ivrs_mappings[bdf].dte_allow_exclusion = IOMMU_CONTROL_ENABLED;
-        ivrs_mappings[req].dte_allow_exclusion = IOMMU_CONTROL_ENABLED;
+        ivrs_mappings[bdf].dte_allow_exclusion = true;
+        ivrs_mappings[req].dte_allow_exclusion = true;
     }
 
     return 0;

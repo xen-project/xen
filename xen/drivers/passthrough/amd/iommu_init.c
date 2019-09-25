@@ -1222,12 +1222,6 @@ static int __init alloc_ivrs_mappings(u16 seg)
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
     {
         ivrs_mappings[bdf].dte_requestor_id = bdf;
-        ivrs_mappings[bdf].dte_allow_exclusion = IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].unity_map_enable = IOMMU_CONTROL_DISABLED;
-        ivrs_mappings[bdf].iommu = NULL;
-
-        ivrs_mappings[bdf].intremap_table = NULL;
-        ivrs_mappings[bdf].device_flags = 0;
 
         if ( amd_iommu_perdev_intremap )
             spin_lock_init(&ivrs_mappings[bdf].intremap_lock);
