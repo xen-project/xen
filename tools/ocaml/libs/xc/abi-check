@@ -70,14 +70,7 @@ my $cval;
 $ei = undef;
 my $bitnum = 0;
 while (<OCAML_FILE>) {
-    if (!$ei) {
-        if (m{^type \s+ (\w+) \s* \= \s* $}x && $enums{$1}) {
-            print "// found ocaml type $1 at $o:$.\n" or die $!;
-            $ei = $enums{$1};
-            $cval = '';
-            $bitnum = 0;
-        }
-    } else {
+    if ($ei) {
         if (m{^\s+ \| \s* $ei->{OPrefix} (\w+) \s*$}x) {
             $cval = $1;
             if ($ei->{Mangle} eq 'lc') {
@@ -102,6 +95,14 @@ while (<OCAML_FILE>) {
         } elsif (!m{\S}) {
         } else {
             die "$_ ?";
+        }
+    }
+    if (!$ei) {
+        if (m{^type \s+ (\w+) \s* \= \s* $}x && $enums{$1}) {
+            print "// found ocaml type $1 at $o:$.\n" or die $!;
+            $ei = $enums{$1};
+            $cval = '';
+            $bitnum = 0;
         }
     }
 }
