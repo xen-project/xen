@@ -29,7 +29,7 @@
 #include <xen/cpumask.h>
 #include <xen/spinlock.h>
 
-#define ACPI_PROCESSOR_MAX_POWER        8
+#define ACPI_PROCESSOR_MAX_POWER        12
 #define CPUIDLE_NAME_LEN                16
 
 #define ACPI_CSTATE_EM_NONE     0
