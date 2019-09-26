@@ -22,6 +22,8 @@
 #include <xen/sched.h>
 #include <xsm/xsm.h>
 
+#include <asm/iommu_fwspec.h>
+
 static spinlock_t dtdevs_lock = SPIN_LOCK_UNLOCKED;
 
 int iommu_assign_dt_device(struct domain *d, struct dt_device_node *dev)
@@ -125,6 +127,68 @@ int iommu_release_dt_devices(struct domain *d)
     return 0;
 }
 
+int iommu_add_dt_device(struct dt_device_node *np)
+{
+    const struct iommu_ops *ops = iommu_get_ops();
+    struct dt_phandle_args iommu_spec;
+    struct device *dev = dt_to_dev(np);
+    int rc = 1, index = 0;
+
+    if ( !iommu_enabled )
+        return 1;
+
+    if ( !ops )
+        return -EINVAL;
+
+    if ( dev_iommu_fwspec_get(dev) )
+        return -EEXIST;
+
+    /*
+     * According to the Documentation/devicetree/bindings/iommu/iommu.txt
+     * from Linux.
+     */
+    while ( !dt_parse_phandle_with_args(np, "iommus", "#iommu-cells",
+                                        index, &iommu_spec) )
+    {
+        /*
+         * The driver which supports generic IOMMU DT bindings must have
+         * these callback implemented.
+         */
+        if ( !ops->add_device || !ops->dt_xlate )
+            return -EINVAL;
+
+        if ( !dt_device_is_available(iommu_spec.np) )
+            break;
+
+        rc = iommu_fwspec_init(dev, &iommu_spec.np->dev);
+        if ( rc )
+            break;
+
+        /*
+         * Provide DT IOMMU specifier which describes the IOMMU master
+         * interfaces of that device (device IDs, etc) to the driver.
+         * The driver is responsible to decide how to interpret them.
+         */
+        rc = ops->dt_xlate(dev, &iommu_spec);
+        if ( rc )
+            break;
+
+        index++;
+    }
+
+    /*
+     * Add master device to the IOMMU if latter is present and available.
+     * The driver is responsible to mark that device as protected.
+     */
+    if ( !rc )
+        rc = ops->add_device(0, dev);
+
+    if ( rc < 0 )
+        iommu_fwspec_free(dev);
+
+    return rc;
+}
+
 int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
                        XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
@@ -163,6 +227,19 @@ int iommu_do_dt_domctl(struct xen_domctl *domctl, struct domain *d,
                        dt_node_full_name(dev));
                 ret = -EINVAL;
             }
+            break;
+        }
+
+        ret = iommu_add_dt_device(dev);
+        /*
+         * Ignore "-EEXIST" error code as it would mean that the device is
+         * already added to the IOMMU (positive result). Such happens after
+         * re-creating guest domain.
+         */
+        if ( ret < 0 && ret != -EEXIST )
+        {
+            printk(XENLOG_G_ERR "Failed to add %s to the IOMMU\n",
+                   dt_node_full_name(dev));
             break;
         }
 

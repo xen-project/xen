@@ -182,6 +182,17 @@ int iommu_deassign_dt_device(struct domain *d, struct dt_device_node *dev);
 int iommu_dt_domain_init(struct domain *d);
 int iommu_release_dt_devices(struct domain *d);
 
+/*
+ * Helper to add master device to the IOMMU using generic IOMMU DT bindings.
+ *
+ * Return values:
+ *  0 : device is protected by an IOMMU
+ * <0 : device is not protected by an IOMMU, but must be (error condition)
+ * >0 : device doesn't need to be protected by an IOMMU
+ *      (IOMMU is not enabled/present or device is not connected to it).
+ */
+int iommu_add_dt_device(struct dt_device_node *np);
+
 int iommu_do_dt_domctl(struct xen_domctl *, struct domain *,
                        XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 
@@ -250,6 +261,16 @@ struct iommu_ops {
     int __must_check (*iotlb_flush_all)(struct domain *d);
     int (*get_reserved_device_memory)(iommu_grdm_t *, void *);
     void (*dump_p2m_table)(struct domain *d);
+
+#ifdef CONFIG_HAS_DEVICE_TREE
+    /*
+     * All IOMMU drivers which support generic IOMMU DT bindings should use
+     * this callback. This is a way for the framework to provide the driver
+     * with DT IOMMU specifier which describes the IOMMU master interfaces of
+     * that device (device IDs, etc).
+     */
+    int (*dt_xlate)(device_t *dev, const struct dt_phandle_args *args);
+#endif
 };
 
 #include <asm/iommu.h>
