@@ -1225,7 +1225,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
              * hypercall has failed and only part of the extents where
              * processed.
              */
-            pv_shim_offline_memory(args.nr_extents, args.nr_done);
+            pv_shim_offline_memory(args.nr_done, args.extent_order);
 #endif
 
         break;
