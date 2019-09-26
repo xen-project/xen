@@ -23,6 +23,16 @@ struct arch_iommu
 const struct iommu_ops *iommu_get_ops(void);
 void iommu_set_ops(const struct iommu_ops *ops);
 
+/*
+ * The mapping helpers below should only be used if P2M Table is shared
+ * between the CPU and the IOMMU.
+ */
+int __must_check arm_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
+                                    unsigned int flags,
+                                    unsigned int *flush_flags);
+int __must_check arm_iommu_unmap_page(struct domain *d, dfn_t dfn,
+                                      unsigned int *flush_flags);
+
 #endif /* __ARCH_ARM_IOMMU_H__ */
 
 /*

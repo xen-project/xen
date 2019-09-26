@@ -2734,50 +2734,6 @@ static void arm_smmu_iommu_domain_teardown(struct domain *d)
 	xfree(xen_domain);
 }
 
-static int __must_check arm_smmu_map_page(struct domain *d, dfn_t dfn,
-					  mfn_t mfn, unsigned int flags,
-					  unsigned int *flush_flags)
-{
-	p2m_type_t t;
-
-	/*
-	 * Grant mappings can be used for DMA requests. The dev_bus_addr
-	 * returned by the hypercall is the MFN (not the IPA). For device
-	 * protected by an IOMMU, Xen needs to add a 1:1 mapping in the domain
-	 * p2m to allow DMA request to work.
-	 * This is only valid when the domain is directed mapped. Hence this
-	 * function should only be used by gnttab code with gfn == mfn == dfn.
-	 */
-	BUG_ON(!is_domain_direct_mapped(d));
-	BUG_ON(mfn_x(mfn) != dfn_x(dfn));
-
-	/* We only support readable and writable flags */
-	if (!(flags & (IOMMUF_readable | IOMMUF_writable)))
-		return -EINVAL;
-
-	t = (flags & IOMMUF_writable) ? p2m_iommu_map_rw : p2m_iommu_map_ro;
-
-	/*
-	 * The function guest_physmap_add_entry replaces the current mapping
-	 * if there is already one...
-	 */
-	return guest_physmap_add_entry(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)),
-				       0, t);
-}
-
-static int __must_check arm_smmu_unmap_page(struct domain *d, dfn_t dfn,
-                                            unsigned int *flush_flags)
-{
-	/*
-	 * This function should only be used by gnttab code when the domain
-	 * is direct mapped (i.e. gfn == mfn == dfn).
-	 */
-	if ( !is_domain_direct_mapped(d) )
-		return -EINVAL;
-
-	return guest_physmap_remove_page(d, _gfn(dfn_x(dfn)), _mfn(dfn_x(dfn)), 0);
-}
-
 static const struct iommu_ops arm_smmu_iommu_ops = {
     .init = arm_smmu_iommu_domain_init,
     .hwdom_init = arm_smmu_iommu_hwdom_init,
@@ -2786,8 +2742,8 @@ static const struct iommu_ops arm_smmu_iommu_ops = {
     .iotlb_flush_all = arm_smmu_iotlb_flush_all,
     .assign_device = arm_smmu_assign_dev,
     .reassign_device = arm_smmu_reassign_dev,
-    .map_page = arm_smmu_map_page,
-    .unmap_page = arm_smmu_unmap_page,
+    .map_page = arm_iommu_map_page,
+    .unmap_page = arm_iommu_unmap_page,
 };
 
 static __init const struct arm_smmu_device *find_smmu(const struct device *dev)
