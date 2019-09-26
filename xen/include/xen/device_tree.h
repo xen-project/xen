@@ -92,6 +92,13 @@ struct dt_device_node {
 
     /* IOMMU specific fields */
     bool is_protected;
+    /*
+     * The main purpose of this list is to link the structure in the list
+     * of devices assigned to domain.
+     *
+     * Boot code (iommu_hardware_setup) re-uses this list to link the structure
+     * in the list of devices for which driver requested deferred probing.
+     */
     struct list_head domain_list;
 
     struct device dev;

@@ -44,7 +44,11 @@ struct device_desc {
     enum device_class class;
     /* List of devices supported by this driver */
     const struct dt_device_match *dt_match;
-    /* Device initialization */
+    /*
+     * Device initialization.
+     *
+     * -EAGAIN is used to indicate that device probing is deferred.
+     */
     int (*init)(struct dt_device_node *dev, const void *data);
 };
 
