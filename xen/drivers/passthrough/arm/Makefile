@@ -1,2 +1,2 @@
-obj-y += iommu.o iommu_helpers.o
+obj-y += iommu.o iommu_helpers.o iommu_fwspec.o
 obj-$(CONFIG_ARM_SMMU) += smmu.o
