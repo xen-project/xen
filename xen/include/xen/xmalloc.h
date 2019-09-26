@@ -51,6 +51,7 @@ extern void xfree(void *);
 /* Underlying functions */
 extern void *_xmalloc(unsigned long size, unsigned long align);
 extern void *_xzalloc(unsigned long size, unsigned long align);
+extern void *_xrealloc(void *ptr, unsigned long size, unsigned long align);
 
 static inline void *_xmalloc_array(
     unsigned long size, unsigned long align, unsigned long num)

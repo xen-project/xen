@@ -549,10 +549,40 @@ static void tlsf_init(void)
  * xmalloc()
  */
 
+static void *strip_padding(void *p)
+{
+    const struct bhdr *b = p - BHDR_OVERHEAD;
+
+    if ( b->size & FREE_BLOCK )
+    {
+        p -= b->size & ~FREE_BLOCK;
+        b = p - BHDR_OVERHEAD;
+        ASSERT(!(b->size & FREE_BLOCK));
+    }
+
+    return p;
+}
+
+static void *add_padding(void *p, unsigned long align)
+{
+    unsigned int pad;
+
+    if ( (pad = -(long)p & (align - 1)) != 0 )
+    {
+        void *q = p + pad;
+        struct bhdr *b = q - BHDR_OVERHEAD;
+
+        ASSERT(q > p);
+        b->size = pad | FREE_BLOCK;
+        p = q;
+    }
+
+    return p;
+}
+
 void *_xmalloc(unsigned long size, unsigned long align)
 {
     void *p = NULL;
-    u32 pad;
 
     ASSERT(!in_irq());
 
@@ -573,14 +603,7 @@ void *_xmalloc(unsigned long size, unsigned long align)
         return xmalloc_whole_pages(size - align + MEM_ALIGN, align);
 
     /* Add alignment padding. */
-    if ( (pad = -(long)p & (align - 1)) != 0 )
-    {
-        char *q = (char *)p + pad;
-        struct bhdr *b = (struct bhdr *)(q - BHDR_OVERHEAD);
-        ASSERT(q > (char *)p);
-        b->size = pad | FREE_BLOCK;
-        p = q;
-    }
+    p = add_padding(p, align);
 
     ASSERT(((unsigned long)p & (align - 1)) == 0);
     return p;
@@ -593,10 +616,69 @@ void *_xzalloc(unsigned long size, unsigned long align)
     return p ? memset(p, 0, size) : p;
 }
 
+void *_xrealloc(void *ptr, unsigned long size, unsigned long align)
+{
+    unsigned long curr_size;
+    void *p;
+
+    if ( !size )
+    {
+        xfree(ptr);
+        return ZERO_BLOCK_PTR;
+    }
+
+    if ( ptr == NULL || ptr == ZERO_BLOCK_PTR )
+        return _xmalloc(size, align);
+
+    ASSERT(!(align & (align - 1)));
+    if ( align < MEM_ALIGN )
+        align = MEM_ALIGN;
+
+    if ( !((unsigned long)ptr & (PAGE_SIZE - 1)) )
+    {
+        curr_size = (unsigned long)PFN_ORDER(virt_to_page(ptr)) << PAGE_SHIFT;
+
+        if ( size <= curr_size && !((unsigned long)ptr & (align - 1)) )
+            return ptr;
+    }
+    else
+    {
+        unsigned long tmp_size = size + align - MEM_ALIGN;
+        const struct bhdr *b;
+
+        if ( tmp_size < PAGE_SIZE )
+            tmp_size = (tmp_size < MIN_BLOCK_SIZE) ? MIN_BLOCK_SIZE :
+                ROUNDUP_SIZE(tmp_size);
+
+        /* Strip alignment padding. */
+        p = strip_padding(ptr);
+
+        b = p - BHDR_OVERHEAD;
+        curr_size = b->size & BLOCK_SIZE_MASK;
+
+        if ( tmp_size <= curr_size )
+        {
+            /* Add alignment padding. */
+            p = add_padding(p, align);
+
+            ASSERT(!((unsigned long)p & (align - 1)));
+
+            return p;
+        }
+    }
+
+    p = _xmalloc(size, align);
+    if ( p )
+    {
+        memcpy(p, ptr, min(curr_size, size));
+        xfree(ptr);
+    }
+
+    return p;
+}
+
 void xfree(void *p)
 {
-    struct bhdr *b;
-
     if ( p == NULL || p == ZERO_BLOCK_PTR )
         return;
 
@@ -621,13 +703,7 @@ void xfree(void *p)
     }
 
     /* Strip alignment padding. */
-    b = (struct bhdr *)((char *)p - BHDR_OVERHEAD);
-    if ( b->size & FREE_BLOCK )
-    {
-        p = (char *)p - (b->size & ~FREE_BLOCK);
-        b = (struct bhdr *)((char *)p - BHDR_OVERHEAD);
-        ASSERT(!(b->size & FREE_BLOCK));
-    }
+    p = strip_padding(p);
 
     xmem_pool_free(p, xenpool);
 }
