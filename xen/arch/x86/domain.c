@@ -1600,11 +1600,14 @@ bool update_runstate_area(struct vcpu *v)
     bool rc;
     struct guest_memory_policy policy = { .nested_guest_mode = false };
     void __user *guest_handle = NULL;
+    struct vcpu_runstate_info runstate;
 
     if ( guest_handle_is_null(runstate_guest(v)) )
         return true;
 
     update_guest_memory_policy(v, &policy);
+
+    memcpy(&runstate, &v->runstate, sizeof(runstate));
 
     if ( VM_ASSIST(v->domain, runstate_update_flag) )
     {
@@ -1612,9 +1615,9 @@ bool update_runstate_area(struct vcpu *v)
             ? &v->runstate_guest.compat.p->state_entry_time + 1
             : &v->runstate_guest.native.p->state_entry_time + 1;
         guest_handle--;
-        v->runstate.state_entry_time |= XEN_RUNSTATE_UPDATE;
+        runstate.state_entry_time |= XEN_RUNSTATE_UPDATE;
         __raw_copy_to_guest(guest_handle,
-                            (void *)(&v->runstate.state_entry_time + 1) - 1, 1);
+                            (void *)(&runstate.state_entry_time + 1) - 1, 1);
         smp_wmb();
     }
 
@@ -1622,20 +1625,20 @@ bool update_runstate_area(struct vcpu *v)
     {
         struct compat_vcpu_runstate_info info;
 
-        XLAT_vcpu_runstate_info(&info, &v->runstate);
+        XLAT_vcpu_runstate_info(&info, &runstate);
         __copy_to_guest(v->runstate_guest.compat, &info, 1);
         rc = true;
     }
     else
-        rc = __copy_to_guest(runstate_guest(v), &v->runstate, 1) !=
-             sizeof(v->runstate);
+        rc = __copy_to_guest(runstate_guest(v), &runstate, 1) !=
+             sizeof(runstate);
 
     if ( guest_handle )
     {
-        v->runstate.state_entry_time &= ~XEN_RUNSTATE_UPDATE;
+        runstate.state_entry_time &= ~XEN_RUNSTATE_UPDATE;
         smp_wmb();
         __raw_copy_to_guest(guest_handle,
-                            (void *)(&v->runstate.state_entry_time + 1) - 1, 1);
+                            (void *)(&runstate.state_entry_time + 1) - 1, 1);
     }
 
     update_guest_memory_policy(v, &policy);
