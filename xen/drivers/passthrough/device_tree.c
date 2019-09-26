@@ -15,11 +15,11 @@
  * GNU General Public License for more details.
  */
 
-#include <xen/lib.h>
-#include <xen/sched.h>
+#include <xen/device_tree.h>
 #include <xen/guest_access.h>
 #include <xen/iommu.h>
-#include <xen/device_tree.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
 #include <xsm/xsm.h>
 
 static spinlock_t dtdevs_lock = SPIN_LOCK_UNLOCKED;
