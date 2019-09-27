@@ -442,16 +442,22 @@ a653sched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
 static void
 a653sched_free_vdata(const struct scheduler *ops, void *priv)
 {
+    a653sched_priv_t *sched_priv = SCHED_PRIV(ops);
     arinc653_vcpu_t *av = priv;
+    unsigned long flags;
 
     if (av == NULL)
         return;
+
+    spin_lock_irqsave(&sched_priv->lock, flags);
 
     if ( !is_idle_vcpu(av->vc) )
         list_del(&av->list);
 
     xfree(av);
     update_schedule_vcpus(ops);
+
+    spin_unlock_irqrestore(&sched_priv->lock, flags);
 }
 
 /**
