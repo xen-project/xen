@@ -1993,9 +1993,9 @@ out:
      */
     ret.time = (is_idle_vcpu(snext->vcpu) ?
                 -1 : tslice);
-    ret.task = snext->vcpu;
+    ret.task = snext->vcpu->sched_unit;
 
-    CSCHED_VCPU_CHECK(ret.task);
+    CSCHED_VCPU_CHECK(ret.task->vcpu_list);
     return ret;
 }
 

@@ -226,9 +226,9 @@ static inline spinlock_t *pcpu_schedule_trylock(unsigned int cpu)
 }
 
 struct task_slice {
-    struct vcpu *task;
-    s_time_t     time;
-    bool_t       migrated;
+    struct sched_unit *task;
+    s_time_t           time;
+    bool_t             migrated;
 };
 
 struct scheduler {

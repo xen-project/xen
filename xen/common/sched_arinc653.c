@@ -560,9 +560,9 @@ a653sched_do_schedule(
 
     /*
      * If there are more domains to run in the current major frame, set
-     * new_task equal to the address of next domain's VCPU structure.
-     * Otherwise, set new_task equal to the address of the idle task's VCPU
-     * structure.
+     * new_task equal to the address of next domain's sched_unit structure.
+     * Otherwise, set new_task equal to the address of the idle task's
+     * sched_unit structure.
      */
     new_task = (sched_index < sched_priv->num_schedule_entries)
         ? sched_priv->schedule[sched_index].vc
@@ -598,7 +598,7 @@ a653sched_do_schedule(
      * of the selected task's VCPU structure.
      */
     ret.time = next_switch_time - now;
-    ret.task = new_task;
+    ret.task = new_task->sched_unit;
     ret.migrated = 0;
 
     BUG_ON(ret.time <= 0);

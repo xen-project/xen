@@ -115,7 +115,7 @@ static struct task_slice sched_idle_schedule(
     const unsigned int cpu = smp_processor_id();
     struct task_slice ret = { .time = -1 };
 
-    ret.task = idle_vcpu[cpu];
+    ret.task = sched_idle_unit(cpu);
     return ret;
 }
 
@@ -1627,7 +1627,7 @@ static void schedule(void)
     sched = this_cpu(scheduler);
     next_slice = sched->do_schedule(sched, now, tasklet_work_scheduled);
 
-    next = next_slice.task;
+    next = next_slice.task->vcpu_list;
 
     sd->curr = next->sched_unit;
 
