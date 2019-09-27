@@ -668,7 +668,7 @@ __csched_vcpu_check(struct vcpu *vc)
         BUG_ON( !is_idle_vcpu(vc) );
     }
 
-    SCHED_STAT_CRANK(vcpu_check);
+    SCHED_STAT_CRANK(unit_check);
 }
 #define CSCHED_VCPU_CHECK(_vc)  (__csched_vcpu_check(_vc))
 #else
@@ -692,7 +692,7 @@ __csched_vcpu_is_cache_hot(const struct csched_private *prv,
                (NOW() - svc->last_sched_time) < prv->vcpu_migr_delay;
 
     if ( hot )
-        SCHED_STAT_CRANK(vcpu_hot);
+        SCHED_STAT_CRANK(unit_hot);
 
     return hot;
 }
@@ -881,7 +881,7 @@ __csched_vcpu_acct_start(struct csched_private *prv, struct csched_unit *svc)
     if ( list_empty(&svc->active_vcpu_elem) )
     {
         SCHED_VCPU_STAT_CRANK(svc, state_active);
-        SCHED_STAT_CRANK(acct_vcpu_active);
+        SCHED_STAT_CRANK(acct_unit_active);
 
         sdom->active_vcpu_count++;
         list_add(&svc->active_vcpu_elem, &sdom->active_vcpu);
@@ -908,7 +908,7 @@ __csched_vcpu_acct_stop_locked(struct csched_private *prv,
     BUG_ON( list_empty(&svc->active_vcpu_elem) );
 
     SCHED_VCPU_STAT_CRANK(svc, state_idle);
-    SCHED_STAT_CRANK(acct_vcpu_idle);
+    SCHED_STAT_CRANK(acct_unit_idle);
 
     BUG_ON( prv->weight < sdom->weight );
     sdom->active_vcpu_count--;
@@ -1010,7 +1010,7 @@ csched_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
     svc->pri = is_idle_domain(vc->domain) ?
         CSCHED_PRI_IDLE : CSCHED_PRI_TS_UNDER;
     SCHED_VCPU_STATS_RESET(svc);
-    SCHED_STAT_CRANK(vcpu_alloc);
+    SCHED_STAT_CRANK(unit_alloc);
     return svc;
 }
 
@@ -1038,7 +1038,7 @@ csched_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 
     unit_schedule_unlock_irq(lock, unit);
 
-    SCHED_STAT_CRANK(vcpu_insert);
+    SCHED_STAT_CRANK(unit_insert);
 }
 
 static void
@@ -1058,13 +1058,13 @@ csched_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
     struct csched_unit * const svc = CSCHED_UNIT(unit);
     struct csched_dom * const sdom = svc->sdom;
 
-    SCHED_STAT_CRANK(vcpu_remove);
+    SCHED_STAT_CRANK(unit_remove);
 
     ASSERT(!__vcpu_on_runq(svc));
 
     if ( test_and_clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
     {
-        SCHED_STAT_CRANK(vcpu_unpark);
+        SCHED_STAT_CRANK(unit_unpark);
         vcpu_unpause(svc->vcpu);
     }
 
@@ -1085,7 +1085,7 @@ csched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
     struct csched_unit * const svc = CSCHED_UNIT(unit);
     unsigned int cpu = vc->processor;
 
-    SCHED_STAT_CRANK(vcpu_sleep);
+    SCHED_STAT_CRANK(unit_sleep);
 
     BUG_ON( is_idle_vcpu(vc) );
 
@@ -1114,19 +1114,19 @@ csched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 
     if ( unlikely(curr_on_cpu(vc->processor) == unit) )
     {
-        SCHED_STAT_CRANK(vcpu_wake_running);
+        SCHED_STAT_CRANK(unit_wake_running);
         return;
     }
     if ( unlikely(__vcpu_on_runq(svc)) )
     {
-        SCHED_STAT_CRANK(vcpu_wake_onrunq);
+        SCHED_STAT_CRANK(unit_wake_onrunq);
         return;
     }
 
     if ( likely(vcpu_runnable(vc)) )
-        SCHED_STAT_CRANK(vcpu_wake_runnable);
+        SCHED_STAT_CRANK(unit_wake_runnable);
     else
-        SCHED_STAT_CRANK(vcpu_wake_not_runnable);
+        SCHED_STAT_CRANK(unit_wake_not_runnable);
 
     /*
      * We temporarly boost the priority of awaking VCPUs!
@@ -1156,7 +1156,7 @@ csched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
          !test_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
     {
         TRACE_2D(TRC_CSCHED_BOOST_START, vc->domain->domain_id, vc->vcpu_id);
-        SCHED_STAT_CRANK(vcpu_boost);
+        SCHED_STAT_CRANK(unit_boost);
         svc->pri = CSCHED_PRI_TS_BOOST;
     }
 
@@ -1515,7 +1515,7 @@ csched_acct(void* dummy)
                      credit < -credit_cap &&
                      !test_and_set_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
                 {
-                    SCHED_STAT_CRANK(vcpu_park);
+                    SCHED_STAT_CRANK(unit_park);
                     vcpu_pause_nosync(svc->vcpu);
                 }
 
@@ -1539,7 +1539,7 @@ csched_acct(void* dummy)
                      * call to make sure the VCPU's priority is not boosted
                      * if it is woken up here.
                      */
-                    SCHED_STAT_CRANK(vcpu_unpark);
+                    SCHED_STAT_CRANK(unit_unpark);
                     vcpu_unpause(svc->vcpu);
                     clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags);
                 }

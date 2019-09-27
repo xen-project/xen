@@ -861,7 +861,7 @@ rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
     if ( !is_idle_vcpu(vc) )
         svc->budget = RTDS_DEFAULT_BUDGET;
 
-    SCHED_STAT_CRANK(vcpu_alloc);
+    SCHED_STAT_CRANK(unit_alloc);
 
     return svc;
 }
@@ -910,7 +910,7 @@ rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
     }
     unit_schedule_unlock_irq(lock, unit);
 
-    SCHED_STAT_CRANK(vcpu_insert);
+    SCHED_STAT_CRANK(unit_insert);
 }
 
 /*
@@ -923,7 +923,7 @@ rt_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
     struct rt_dom * const sdom = svc->sdom;
     spinlock_t *lock;
 
-    SCHED_STAT_CRANK(vcpu_remove);
+    SCHED_STAT_CRANK(unit_remove);
 
     BUG_ON( sdom == NULL );
 
@@ -1145,7 +1145,7 @@ rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
     struct rt_unit * const svc = rt_unit(unit);
 
     BUG_ON( is_idle_vcpu(vc) );
-    SCHED_STAT_CRANK(vcpu_sleep);
+    SCHED_STAT_CRANK(unit_sleep);
 
     if ( curr_on_cpu(vc->processor) == unit )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
@@ -1266,21 +1266,21 @@ rt_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 
     if ( unlikely(curr_on_cpu(vc->processor) == unit) )
     {
-        SCHED_STAT_CRANK(vcpu_wake_running);
+        SCHED_STAT_CRANK(unit_wake_running);
         return;
     }
 
     /* on RunQ/DepletedQ, just update info is ok */
     if ( unlikely(vcpu_on_q(svc)) )
     {
-        SCHED_STAT_CRANK(vcpu_wake_onrunq);
+        SCHED_STAT_CRANK(unit_wake_onrunq);
         return;
     }
 
     if ( likely(vcpu_runnable(vc)) )
-        SCHED_STAT_CRANK(vcpu_wake_runnable);
+        SCHED_STAT_CRANK(unit_wake_runnable);
     else
-        SCHED_STAT_CRANK(vcpu_wake_not_runnable);
+        SCHED_STAT_CRANK(unit_wake_not_runnable);
 
     /*
      * If a deadline passed while svc was asleep/blocked, we need new

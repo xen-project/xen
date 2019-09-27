@@ -2020,7 +2020,7 @@ csched2_vcpu_check(struct vcpu *vc)
     {
         BUG_ON( !is_idle_vcpu(vc) );
     }
-    SCHED_STAT_CRANK(vcpu_check);
+    SCHED_STAT_CRANK(unit_check);
 }
 #define CSCHED2_VCPU_CHECK(_vc)  (csched2_vcpu_check(_vc))
 #else
@@ -2067,7 +2067,7 @@ csched2_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
     svc->budget_quota = 0;
     INIT_LIST_HEAD(&svc->parked_elem);
 
-    SCHED_STAT_CRANK(vcpu_alloc);
+    SCHED_STAT_CRANK(unit_alloc);
 
     return svc;
 }
@@ -2079,7 +2079,7 @@ csched2_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
     struct csched2_unit * const svc = csched2_unit(unit);
 
     ASSERT(!is_idle_vcpu(vc));
-    SCHED_STAT_CRANK(vcpu_sleep);
+    SCHED_STAT_CRANK(unit_sleep);
 
     if ( curr_on_cpu(vc->processor) == unit )
     {
@@ -2109,20 +2109,20 @@ csched2_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 
     if ( unlikely(curr_on_cpu(cpu) == unit) )
     {
-        SCHED_STAT_CRANK(vcpu_wake_running);
+        SCHED_STAT_CRANK(unit_wake_running);
         goto out;
     }
 
     if ( unlikely(vcpu_on_runq(svc)) )
     {
-        SCHED_STAT_CRANK(vcpu_wake_onrunq);
+        SCHED_STAT_CRANK(unit_wake_onrunq);
         goto out;
     }
 
     if ( likely(vcpu_runnable(vc)) )
-        SCHED_STAT_CRANK(vcpu_wake_runnable);
+        SCHED_STAT_CRANK(unit_wake_runnable);
     else
-        SCHED_STAT_CRANK(vcpu_wake_not_runnable);
+        SCHED_STAT_CRANK(unit_wake_not_runnable);
 
     /* If the context hasn't been saved for this vcpu yet, we can't put it on
      * another runqueue.  Instead, we set a flag so that it will be put on the runqueue
@@ -3138,7 +3138,7 @@ csched2_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 
     sdom->nr_vcpus++;
 
-    SCHED_STAT_CRANK(vcpu_insert);
+    SCHED_STAT_CRANK(unit_insert);
 
     CSCHED2_VCPU_CHECK(vc);
 }
@@ -3161,7 +3161,7 @@ csched2_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
     ASSERT(!is_idle_vcpu(vc));
     ASSERT(list_empty(&svc->runq_elem));
 
-    SCHED_STAT_CRANK(vcpu_remove);
+    SCHED_STAT_CRANK(unit_remove);
 
     /* Remove from runqueue */
     lock = unit_schedule_lock_irq(unit);
