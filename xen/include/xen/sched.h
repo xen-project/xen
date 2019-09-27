@@ -278,6 +278,7 @@ struct sched_unit {
     struct vcpu           *vcpu_list;
     void                  *priv;      /* scheduler private data */
     struct sched_unit     *next_in_list;
+    struct sched_resource *res;
     unsigned int           unit_id;
 };
 

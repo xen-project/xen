@@ -67,6 +67,7 @@ static void poll_timer_fn(void *data);
 /* This is global for now so that private implementations can reach it */
 DEFINE_PER_CPU(struct schedule_data, schedule_data);
 DEFINE_PER_CPU(struct scheduler *, scheduler);
+DEFINE_PER_CPU_READ_MOSTLY(struct sched_resource *, sched_res);
 
 /* Scratch space for cpumasks. */
 DEFINE_PER_CPU(cpumask_t, cpumask_scratch);
@@ -89,7 +90,7 @@ sched_idle_switch_sched(struct scheduler *new_ops, unsigned int cpu,
 static int
 sched_idle_cpu_pick(const struct scheduler *ops, const struct sched_unit *unit)
 {
-    return unit->vcpu_list->processor;
+    return unit->res->master_cpu;
 }
 
 static void *
@@ -364,6 +365,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     if ( (unit = sched_alloc_unit(v)) == NULL )
         return 1;
 
+    unit->res = get_sched_res(processor);
     /* Initialise the per-vcpu timers. */
     spin_lock_init(&v->periodic_timer_lock);
     init_timer(&v->periodic_timer, vcpu_periodic_timer_fn,
@@ -479,6 +481,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         sched_set_affinity(v, &cpumask_all, &cpumask_all);
 
         v->processor = new_p;
+        v->sched_unit->res = get_sched_res(new_p);
         /*
          * With v->processor modified we must not
          * - make any further changes assuming we hold the scheduler lock,
@@ -831,12 +834,14 @@ void restore_vcpu_affinity(struct domain *d)
         }
 
         v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
+        v->sched_unit->res = get_sched_res(v->processor);
 
         spin_unlock_irq(lock);
 
         /* v->processor might have changed, so reacquire the lock. */
         lock = vcpu_schedule_lock_irq(v);
         v->processor = sched_pick_cpu(vcpu_scheduler(v), v->sched_unit);
+        v->sched_unit->res = get_sched_res(v->processor);
         spin_unlock_irq(lock);
 
         if ( old_cpu != v->processor )
@@ -1710,6 +1715,13 @@ static void poll_timer_fn(void *data)
 static int cpu_schedule_up(unsigned int cpu)
 {
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    struct sched_resource *res;
+
+    res = xzalloc(struct sched_resource);
+    if ( res == NULL )
+        return -ENOMEM;
+    res->master_cpu = cpu;
+    set_sched_res(cpu, res);
 
     per_cpu(scheduler, cpu) = &sched_idle_ops;
     spin_lock_init(&sd->_lock);
@@ -1723,6 +1735,8 @@ static int cpu_schedule_up(unsigned int cpu)
 
     if ( idle_vcpu[cpu] == NULL )
         vcpu_create(idle_vcpu[0]->domain, cpu, cpu);
+    else
+        idle_vcpu[cpu]->sched_unit->res = res;
 
     if ( idle_vcpu[cpu] == NULL )
         return -ENOMEM;
@@ -1745,6 +1759,9 @@ static void cpu_schedule_down(unsigned int cpu)
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
 
     kill_timer(&sd->s_timer);
+
+    set_sched_res(cpu, NULL);
+    xfree(sd);
 }
 
 void sched_rm_cpu(unsigned int cpu)

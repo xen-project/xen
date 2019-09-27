@@ -893,6 +893,7 @@ rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 
     /* This is safe because vc isn't yet being scheduled */
     vc->processor = rt_cpu_pick(ops, unit);
+    unit->res = get_sched_res(vc->processor);
 
     lock = vcpu_schedule_lock_irq(vc);
 
@@ -1123,6 +1124,7 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
         if ( snext->vcpu->processor != cpu )
         {
             snext->vcpu->processor = cpu;
+            snext->vcpu->sched_unit->res = get_sched_res(cpu);
             ret.migrated = 1;
         }
         ret.time = snext->cur_budget; /* invoke the scheduler next time */

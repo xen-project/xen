@@ -1026,6 +1026,7 @@ csched_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
     lock = vcpu_schedule_lock_irq(vc);
 
     vc->processor = csched_cpu_pick(ops, unit);
+    unit->res = get_sched_res(vc->processor);
 
     spin_unlock_irq(lock);
 
@@ -1662,6 +1663,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
             WARN_ON(vc->is_urgent);
             runq_remove(speer);
             vc->processor = cpu;
+            vc->sched_unit->res = get_sched_res(cpu);
             /*
              * speer will start executing directly on cpu, without having to
              * go through runq_insert(). So we must update the runnable count
