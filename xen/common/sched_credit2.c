@@ -171,7 +171,7 @@
  * - runqueue lock
  *  + it is per-runqueue, so:
  *   * cpus in a runqueue take the runqueue lock, when using
- *     pcpu_schedule_lock() / vcpu_schedule_lock() (and friends),
+ *     pcpu_schedule_lock() / unit_schedule_lock() (and friends),
  *   * a cpu may (try to) take a "remote" runqueue lock, e.g., for
  *     load balancing;
  *  + serializes runqueue operations (removing and inserting vcpus);
@@ -1891,7 +1891,7 @@ unpark_parked_vcpus(const struct scheduler *ops, struct list_head *vcpus)
         unsigned long flags;
         s_time_t now;
 
-        lock = vcpu_schedule_lock_irqsave(svc->vcpu, &flags);
+        lock = unit_schedule_lock_irqsave(svc->vcpu->sched_unit, &flags);
 
         __clear_bit(_VPF_parked, &svc->vcpu->pause_flags);
         if ( unlikely(svc->flags & CSFLAG_scheduled) )
@@ -1924,7 +1924,7 @@ unpark_parked_vcpus(const struct scheduler *ops, struct list_head *vcpus)
         }
         list_del_init(&svc->parked_elem);
 
-        vcpu_schedule_unlock_irqrestore(lock, flags, svc->vcpu);
+        unit_schedule_unlock_irqrestore(lock, flags, svc->vcpu->sched_unit);
     }
 }
 
@@ -2163,7 +2163,7 @@ csched2_context_saved(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct vcpu *vc = unit->vcpu_list;
     struct csched2_unit * const svc = csched2_unit(unit);
-    spinlock_t *lock = vcpu_schedule_lock_irq(vc);
+    spinlock_t *lock = unit_schedule_lock_irq(unit);
     s_time_t now = NOW();
     LIST_HEAD(were_parked);
 
@@ -2195,7 +2195,7 @@ csched2_context_saved(const struct scheduler *ops, struct sched_unit *unit)
     else if ( !is_idle_vcpu(vc) )
         update_load(ops, svc->rqd, svc, -1, now);
 
-    vcpu_schedule_unlock_irq(lock, vc);
+    unit_schedule_unlock_irq(lock, unit);
 
     unpark_parked_vcpus(ops, &were_parked);
 }
@@ -2848,14 +2848,14 @@ csched2_dom_cntl(
             for_each_vcpu ( d, v )
             {
                 struct csched2_unit *svc = csched2_unit(v->sched_unit);
-                spinlock_t *lock = vcpu_schedule_lock(svc->vcpu);
+                spinlock_t *lock = unit_schedule_lock(svc->vcpu->sched_unit);
 
                 ASSERT(svc->rqd == c2rqd(ops, svc->vcpu->processor));
 
                 svc->weight = sdom->weight;
                 update_max_weight(svc->rqd, svc->weight, old_weight);
 
-                vcpu_schedule_unlock(lock, svc->vcpu);
+                unit_schedule_unlock(lock, svc->vcpu->sched_unit);
             }
         }
         /* Cap */
@@ -2886,7 +2886,7 @@ csched2_dom_cntl(
             for_each_vcpu ( d, v )
             {
                 svc = csched2_unit(v->sched_unit);
-                lock = vcpu_schedule_lock(svc->vcpu);
+                lock = unit_schedule_lock(svc->vcpu->sched_unit);
                 /*
                  * Too small quotas would in theory cause a lot of overhead,
                  * which then won't happen because, in csched2_runtime(),
@@ -2894,7 +2894,7 @@ csched2_dom_cntl(
                  */
                 svc->budget_quota = max(sdom->tot_budget / sdom->nr_vcpus,
                                         CSCHED2_MIN_TIMER);
-                vcpu_schedule_unlock(lock, svc->vcpu);
+                unit_schedule_unlock(lock, svc->vcpu->sched_unit);
             }
 
             if ( sdom->cap == 0 )
@@ -2929,7 +2929,7 @@ csched2_dom_cntl(
                 for_each_vcpu ( d, v )
                 {
                     svc = csched2_unit(v->sched_unit);
-                    lock = vcpu_schedule_lock(svc->vcpu);
+                    lock = unit_schedule_lock(svc->vcpu->sched_unit);
                     if ( v->is_running )
                     {
                         unsigned int cpu = v->processor;
@@ -2960,7 +2960,7 @@ csched2_dom_cntl(
                         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
                     }
                     svc->budget = 0;
-                    vcpu_schedule_unlock(lock, svc->vcpu);
+                    unit_schedule_unlock(lock, svc->vcpu->sched_unit);
                 }
             }
 
@@ -2976,12 +2976,12 @@ csched2_dom_cntl(
             for_each_vcpu ( d, v )
             {
                 struct csched2_unit *svc = csched2_unit(v->sched_unit);
-                spinlock_t *lock = vcpu_schedule_lock(svc->vcpu);
+                spinlock_t *lock = unit_schedule_lock(svc->vcpu->sched_unit);
 
                 svc->budget = STIME_MAX;
                 svc->budget_quota = 0;
 
-                vcpu_schedule_unlock(lock, svc->vcpu);
+                unit_schedule_unlock(lock, svc->vcpu->sched_unit);
             }
             sdom->cap = 0;
             /*
@@ -3120,19 +3120,19 @@ csched2_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
     ASSERT(list_empty(&svc->runq_elem));
 
     /* csched2_res_pick() expects the pcpu lock to be held */
-    lock = vcpu_schedule_lock_irq(vc);
+    lock = unit_schedule_lock_irq(unit);
 
     unit->res = csched2_res_pick(ops, unit);
     vc->processor = unit->res->master_cpu;
 
     spin_unlock_irq(lock);
 
-    lock = vcpu_schedule_lock_irq(vc);
+    lock = unit_schedule_lock_irq(unit);
 
     /* Add vcpu to runqueue of initial processor */
     runq_assign(ops, vc);
 
-    vcpu_schedule_unlock_irq(lock, vc);
+    unit_schedule_unlock_irq(lock, unit);
 
     sdom->nr_vcpus++;
 
@@ -3162,11 +3162,11 @@ csched2_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
     SCHED_STAT_CRANK(vcpu_remove);
 
     /* Remove from runqueue */
-    lock = vcpu_schedule_lock_irq(vc);
+    lock = unit_schedule_lock_irq(unit);
 
     runq_deassign(ops, vc);
 
-    vcpu_schedule_unlock_irq(lock, vc);
+    unit_schedule_unlock_irq(lock, unit);
 
     svc->sdom->nr_vcpus--;
 }
@@ -3750,12 +3750,12 @@ csched2_dump(const struct scheduler *ops)
             struct csched2_unit * const svc = csched2_unit(v->sched_unit);
             spinlock_t *lock;
 
-            lock = vcpu_schedule_lock(svc->vcpu);
+            lock = unit_schedule_lock(svc->vcpu->sched_unit);
 
             printk("\t%3d: ", ++loop);
             csched2_dump_vcpu(prv, svc);
 
-            vcpu_schedule_unlock(lock, svc->vcpu);
+            unit_schedule_unlock(lock, svc->vcpu->sched_unit);
         }
     }
 
