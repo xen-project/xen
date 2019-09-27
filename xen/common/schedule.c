@@ -260,6 +260,23 @@ static inline void vcpu_runstate_change(
     v->runstate.state = new_state;
 }
 
+static inline void sched_unit_runstate_change(struct sched_unit *unit,
+    bool running, s_time_t new_entry_time)
+{
+    struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+    {
+        if ( running )
+            vcpu_runstate_change(v, RUNSTATE_running, new_entry_time);
+        else
+            vcpu_runstate_change(v,
+                ((v->pause_flags & VPF_blocked) ? RUNSTATE_blocked :
+                 (vcpu_runnable(v) ? RUNSTATE_runnable : RUNSTATE_offline)),
+                new_entry_time);
+    }
+}
+
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
 {
     spinlock_t *lock = likely(v == current)
@@ -1631,7 +1648,7 @@ void vcpu_set_periodic_timer(struct vcpu *v, s_time_t value)
  */
 static void schedule(void)
 {
-    struct vcpu          *prev = current, *next = NULL;
+    struct sched_unit    *prev = current->sched_unit, *next = NULL;
     s_time_t              now;
     struct scheduler     *sched;
     unsigned long        *tasklet_work = &this_cpu(tasklet_work_to_do);
@@ -1675,9 +1692,9 @@ static void schedule(void)
     sched = this_cpu(scheduler);
     next_slice = sched->do_schedule(sched, now, tasklet_work_scheduled);
 
-    next = next_slice.task->vcpu_list;
+    next = next_slice.task;
 
-    sd->curr = next->sched_unit;
+    sd->curr = next;
 
     if ( next_slice.time >= 0 ) /* -ve means no limit */
         set_timer(&sd->s_timer, now + next_slice.time);
@@ -1686,59 +1703,55 @@ static void schedule(void)
     {
         pcpu_schedule_unlock_irq(lock, cpu);
         TRACE_4D(TRC_SCHED_SWITCH_INFCONT,
-                 next->domain->domain_id, next->vcpu_id,
-                 now - prev->runstate.state_entry_time,
+                 next->domain->domain_id, next->unit_id,
+                 now - prev->state_entry_time,
                  next_slice.time);
-        trace_continue_running(next);
-        return continue_running(prev);
+        trace_continue_running(next->vcpu_list);
+        return continue_running(prev->vcpu_list);
     }
 
     TRACE_3D(TRC_SCHED_SWITCH_INFPREV,
-             prev->domain->domain_id, prev->vcpu_id,
-             now - prev->runstate.state_entry_time);
+             prev->domain->domain_id, prev->unit_id,
+             now - prev->state_entry_time);
     TRACE_4D(TRC_SCHED_SWITCH_INFNEXT,
-             next->domain->domain_id, next->vcpu_id,
-             (next->runstate.state == RUNSTATE_runnable) ?
-             (now - next->runstate.state_entry_time) : 0,
+             next->domain->domain_id, next->unit_id,
+             (next->vcpu_list->runstate.state == RUNSTATE_runnable) ?
+             (now - next->state_entry_time) : 0,
              next_slice.time);
 
-    ASSERT(prev->runstate.state == RUNSTATE_running);
+    ASSERT(prev->vcpu_list->runstate.state == RUNSTATE_running);
 
     TRACE_4D(TRC_SCHED_SWITCH,
-             prev->domain->domain_id, prev->vcpu_id,
-             next->domain->domain_id, next->vcpu_id);
+             prev->domain->domain_id, prev->unit_id,
+             next->domain->domain_id, next->unit_id);
 
-    vcpu_runstate_change(
-        prev,
-        ((prev->pause_flags & VPF_blocked) ? RUNSTATE_blocked :
-         (vcpu_runnable(prev) ? RUNSTATE_runnable : RUNSTATE_offline)),
-        now);
+    sched_unit_runstate_change(prev, false, now);
 
-    ASSERT(next->runstate.state != RUNSTATE_running);
-    vcpu_runstate_change(next, RUNSTATE_running, now);
+    ASSERT(next->vcpu_list->runstate.state != RUNSTATE_running);
+    sched_unit_runstate_change(next, true, now);
 
     /*
      * NB. Don't add any trace records from here until the actual context
      * switch, else lost_records resume will not work properly.
      */
 
-    ASSERT(!next->sched_unit->is_running);
-    next->is_running = 1;
-    next->sched_unit->is_running = true;
-    next->sched_unit->state_entry_time = now;
+    ASSERT(!next->is_running);
+    next->vcpu_list->is_running = 1;
+    next->is_running = true;
+    next->state_entry_time = now;
 
     pcpu_schedule_unlock_irq(lock, cpu);
 
     SCHED_STAT_CRANK(sched_ctx);
 
-    stop_timer(&prev->periodic_timer);
+    stop_timer(&prev->vcpu_list->periodic_timer);
 
     if ( next_slice.migrated )
-        sched_move_irqs(next);
+        sched_move_irqs(next->vcpu_list);
 
-    vcpu_periodic_timer_work(next);
+    vcpu_periodic_timer_work(next->vcpu_list);
 
-    context_switch(prev, next);
+    context_switch(prev->vcpu_list, next->vcpu_list);
 }
 
 void context_saved(struct vcpu *prev)
