@@ -117,15 +117,14 @@ sched_idle_free_udata(const struct scheduler *ops, void *priv)
 {
 }
 
-static struct task_slice sched_idle_schedule(
-    const struct scheduler *ops, s_time_t now,
+static void sched_idle_schedule(
+    const struct scheduler *ops, struct sched_unit *unit, s_time_t now,
     bool tasklet_work_scheduled)
 {
     const unsigned int cpu = smp_processor_id();
-    struct task_slice ret = { .time = -1 };
 
-    ret.task = sched_idle_unit(cpu);
-    return ret;
+    unit->next_time = -1;
+    unit->next_task = sched_idle_unit(cpu);
 }
 
 static struct scheduler sched_idle_ops = {
@@ -1726,10 +1725,9 @@ static void schedule(void)
     s_time_t              now;
     struct scheduler     *sched;
     unsigned long        *tasklet_work = &this_cpu(tasklet_work_to_do);
-    bool_t                tasklet_work_scheduled = 0;
+    bool                  tasklet_work_scheduled = false;
     struct sched_resource *sd;
     spinlock_t           *lock;
-    struct task_slice     next_slice;
     int cpu = smp_processor_id();
 
     ASSERT_NOT_IN_ATOMIC();
@@ -1745,12 +1743,12 @@ static void schedule(void)
         set_bit(_TASKLET_scheduled, tasklet_work);
         /* fallthrough */
     case TASKLET_enqueued|TASKLET_scheduled:
-        tasklet_work_scheduled = 1;
+        tasklet_work_scheduled = true;
         break;
     case TASKLET_scheduled:
         clear_bit(_TASKLET_scheduled, tasklet_work);
     case 0:
-        /*tasklet_work_scheduled = 0;*/
+        /*tasklet_work_scheduled = false;*/
         break;
     default:
         BUG();
@@ -1764,14 +1762,14 @@ static void schedule(void)
 
     /* get policy-specific decision on scheduling... */
     sched = this_cpu(scheduler);
-    next_slice = sched->do_schedule(sched, now, tasklet_work_scheduled);
+    sched->do_schedule(sched, prev, now, tasklet_work_scheduled);
 
-    next = next_slice.task;
+    next = prev->next_task;
 
     sd->curr = next;
 
-    if ( next_slice.time >= 0 ) /* -ve means no limit */
-        set_timer(&sd->s_timer, now + next_slice.time);
+    if ( prev->next_time >= 0 ) /* -ve means no limit */
+        set_timer(&sd->s_timer, now + prev->next_time);
 
     if ( unlikely(prev == next) )
     {
@@ -1779,7 +1777,7 @@ static void schedule(void)
         TRACE_4D(TRC_SCHED_SWITCH_INFCONT,
                  next->domain->domain_id, next->unit_id,
                  now - prev->state_entry_time,
-                 next_slice.time);
+                 prev->next_time);
         trace_continue_running(next->vcpu_list);
         return continue_running(prev->vcpu_list);
     }
@@ -1791,7 +1789,7 @@ static void schedule(void)
              next->domain->domain_id, next->unit_id,
              (next->vcpu_list->runstate.state == RUNSTATE_runnable) ?
              (now - next->state_entry_time) : 0,
-             next_slice.time);
+             prev->next_time);
 
     ASSERT(prev->vcpu_list->runstate.state == RUNSTATE_running);
 
@@ -1820,7 +1818,7 @@ static void schedule(void)
 
     stop_timer(&prev->vcpu_list->periodic_timer);
 
-    if ( next_slice.migrated )
+    if ( next->migrated )
         vcpu_move_irqs(next->vcpu_list);
 
     vcpu_periodic_timer_work(next->vcpu_list);

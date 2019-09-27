@@ -779,16 +779,14 @@ static inline void null_unit_check(struct sched_unit *unit)
  *  - the unit assigned to the pCPU, if there's one and it can run;
  *  - the idle unit, otherwise.
  */
-static struct task_slice null_schedule(const struct scheduler *ops,
-                                       s_time_t now,
-                                       bool_t tasklet_work_scheduled)
+static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
+                          s_time_t now, bool tasklet_work_scheduled)
 {
     unsigned int bs;
     const unsigned int cur_cpu = smp_processor_id();
     const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
     struct null_private *prv = null_priv(ops);
     struct null_unit *wvc;
-    struct task_slice ret;
 
     SCHED_STAT_CRANK(schedule);
     NULL_UNIT_CHECK(current->sched_unit);
@@ -816,19 +814,18 @@ static struct task_slice null_schedule(const struct scheduler *ops,
     if ( tasklet_work_scheduled )
     {
         trace_var(TRC_SNULL_TASKLET, 1, 0, NULL);
-        ret.task = sched_idle_unit(sched_cpu);
+        prev->next_task = sched_idle_unit(sched_cpu);
     }
     else
-        ret.task = per_cpu(npc, sched_cpu).unit;
-    ret.migrated = 0;
-    ret.time = -1;
+        prev->next_task = per_cpu(npc, sched_cpu).unit;
+    prev->next_time = -1;
 
     /*
      * We may be new in the cpupool, or just coming back online. In which
      * case, there may be units in the waitqueue that we can assign to us
      * and run.
      */
-    if ( unlikely(ret.task == NULL) )
+    if ( unlikely(prev->next_task == NULL) )
     {
         spin_lock(&prv->waitq_lock);
 
@@ -854,7 +851,7 @@ static struct task_slice null_schedule(const struct scheduler *ops,
                 {
                     unit_assign(prv, wvc->unit, sched_cpu);
                     list_del_init(&wvc->waitq_elem);
-                    ret.task = wvc->unit;
+                    prev->next_task = wvc->unit;
                     goto unlock;
                 }
             }
@@ -862,15 +859,17 @@ static struct task_slice null_schedule(const struct scheduler *ops,
  unlock:
         spin_unlock(&prv->waitq_lock);
 
-        if ( ret.task == NULL && !cpumask_test_cpu(sched_cpu, &prv->cpus_free) )
+        if ( prev->next_task == NULL &&
+             !cpumask_test_cpu(sched_cpu, &prv->cpus_free) )
             cpumask_set_cpu(sched_cpu, &prv->cpus_free);
     }
 
-    if ( unlikely(ret.task == NULL || !unit_runnable(ret.task)) )
-        ret.task = sched_idle_unit(sched_cpu);
+    if ( unlikely(prev->next_task == NULL || !unit_runnable(prev->next_task)) )
+        prev->next_task = sched_idle_unit(sched_cpu);
 
-    NULL_UNIT_CHECK(ret.task);
-    return ret;
+    NULL_UNIT_CHECK(prev->next_task);
+
+    prev->next_task->migrated = false;
 }
 
 static inline void dump_unit(struct null_private *prv, struct null_unit *nvc)

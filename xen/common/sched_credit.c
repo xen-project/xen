@@ -1675,7 +1675,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
 
 static struct csched_unit *
 csched_load_balance(struct csched_private *prv, int cpu,
-    struct csched_unit *snext, bool_t *stolen)
+    struct csched_unit *snext, bool *stolen)
 {
     struct cpupool *c = per_cpu(cpupool, cpu);
     struct csched_unit *speer;
@@ -1791,7 +1791,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
                 /* As soon as one unit is found, balancing ends */
                 if ( speer != NULL )
                 {
-                    *stolen = 1;
+                    *stolen = true;
                     /*
                      * Next time we'll look for work to steal on this node, we
                      * will start from the next pCPU, with respect to this one,
@@ -1821,19 +1821,18 @@ csched_load_balance(struct csched_private *prv, int cpu,
  * This function is in the critical path. It is designed to be simple and
  * fast for the common case.
  */
-static struct task_slice
-csched_schedule(
-    const struct scheduler *ops, s_time_t now, bool_t tasklet_work_scheduled)
+static void csched_schedule(
+    const struct scheduler *ops, struct sched_unit *unit, s_time_t now,
+    bool tasklet_work_scheduled)
 {
     const unsigned int cur_cpu = smp_processor_id();
     const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
     struct list_head * const runq = RUNQ(sched_cpu);
-    struct sched_unit *unit = current->sched_unit;
     struct csched_unit * const scurr = CSCHED_UNIT(unit);
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_unit *snext;
-    struct task_slice ret;
     s_time_t runtime, tslice;
+    bool migrated = false;
 
     SCHED_STAT_CRANK(schedule);
     CSCHED_UNIT_CHECK(unit);
@@ -1924,7 +1923,6 @@ csched_schedule(
                         (unsigned char *)&d);
         }
 
-        ret.migrated = 0;
         goto out;
     }
     tslice = prv->tslice;
@@ -1942,7 +1940,6 @@ csched_schedule(
     }
 
     snext = __runq_elem(runq->next);
-    ret.migrated = 0;
 
     /* Tasklet work (which runs in idle UNIT context) overrides all else. */
     if ( tasklet_work_scheduled )
@@ -1968,7 +1965,7 @@ csched_schedule(
     if ( snext->pri > CSCHED_PRI_TS_OVER )
         __runq_remove(snext);
     else
-        snext = csched_load_balance(prv, sched_cpu, snext, &ret.migrated);
+        snext = csched_load_balance(prv, sched_cpu, snext, &migrated);
 
     /*
      * Update idlers mask if necessary. When we're idling, other CPUs
@@ -1991,12 +1988,12 @@ out:
     /*
      * Return task to run next...
      */
-    ret.time = (is_idle_unit(snext->unit) ?
+    unit->next_time = (is_idle_unit(snext->unit) ?
                 -1 : tslice);
-    ret.task = snext->unit;
+    unit->next_task = snext->unit;
+    snext->unit->migrated = migrated;
 
-    CSCHED_UNIT_CHECK(ret.task);
-    return ret;
+    CSCHED_UNIT_CHECK(unit->next_task);
 }
 
 static void

@@ -3446,19 +3446,18 @@ runq_candidate(struct csched2_runqueue_data *rqd,
  * This function is in the critical path. It is designed to be simple and
  * fast for the common case.
  */
-static struct task_slice
-csched2_schedule(
-    const struct scheduler *ops, s_time_t now, bool tasklet_work_scheduled)
+static void csched2_schedule(
+    const struct scheduler *ops, struct sched_unit *currunit, s_time_t now,
+    bool tasklet_work_scheduled)
 {
     const unsigned int cur_cpu = smp_processor_id();
     const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
     struct csched2_runqueue_data *rqd;
-    struct sched_unit *currunit = current->sched_unit;
     struct csched2_unit * const scurr = csched2_unit(currunit);
     struct csched2_unit *snext = NULL;
     unsigned int skipped_units = 0;
-    struct task_slice ret;
     bool tickled;
+    bool migrated = false;
 
     SCHED_STAT_CRANK(schedule);
     CSCHED2_UNIT_CHECK(currunit);
@@ -3543,8 +3542,6 @@ csched2_schedule(
          && unit_runnable(currunit) )
         __set_bit(__CSFLAG_delayed_runq_add, &scurr->flags);
 
-    ret.migrated = 0;
-
     /* Accounting for non-idle tasks */
     if ( !is_idle_unit(snext->unit) )
     {
@@ -3594,7 +3591,7 @@ csched2_schedule(
             snext->credit += CSCHED2_MIGRATE_COMPENSATION;
             sched_set_res(snext->unit, get_sched_res(sched_cpu));
             SCHED_STAT_CRANK(migrated);
-            ret.migrated = 1;
+            migrated = true;
         }
     }
     else
@@ -3625,11 +3622,11 @@ csched2_schedule(
     /*
      * Return task to run next...
      */
-    ret.time = csched2_runtime(ops, sched_cpu, snext, now);
-    ret.task = snext->unit;
+    currunit->next_time = csched2_runtime(ops, sched_cpu, snext, now);
+    currunit->next_task = snext->unit;
+    snext->unit->migrated = migrated;
 
-    CSCHED2_UNIT_CHECK(ret.task);
-    return ret;
+    CSCHED2_UNIT_CHECK(currunit->next_task);
 }
 
 static void

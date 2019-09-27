@@ -503,18 +503,14 @@ a653sched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
  *
  * @param ops       Pointer to this instance of the scheduler structure
  * @param now       Current time
- *
- * @return          Address of the UNIT structure scheduled to be run next
- *                  Amount of time to execute the returned UNIT
- *                  Flag for whether the UNIT was migrated
  */
-static struct task_slice
+static void
 a653sched_do_schedule(
     const struct scheduler *ops,
+    struct sched_unit *prev,
     s_time_t now,
-    bool_t tasklet_work_scheduled)
+    bool tasklet_work_scheduled)
 {
-    struct task_slice ret;                      /* hold the chosen domain */
     struct sched_unit *new_task = NULL;
     static unsigned int sched_index = 0;
     static s_time_t next_switch_time;
@@ -592,13 +588,11 @@ a653sched_do_schedule(
      * Return the amount of time the next domain has to run and the address
      * of the selected task's UNIT structure.
      */
-    ret.time = next_switch_time - now;
-    ret.task = new_task;
-    ret.migrated = 0;
+    prev->next_time = next_switch_time - now;
+    prev->next_task = new_task;
+    new_task->migrated = false;
 
-    BUG_ON(ret.time <= 0);
-
-    return ret;
+    BUG_ON(prev->next_time <= 0);
 }
 
 /**
