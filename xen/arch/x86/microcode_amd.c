@@ -74,9 +74,6 @@ struct mpbhdr {
     uint8_t data[];
 };
 
-/* serialize access to the physical write */
-static DEFINE_SPINLOCK(microcode_update_lock);
-
 /* See comment in start_update() for cases when this routine fails */
 static int collect_cpu_info(struct cpu_signature *csig)
 {
@@ -232,7 +229,6 @@ static enum microcode_match_result compare_patch(
 
 static int apply_microcode(const struct microcode_patch *patch)
 {
-    unsigned long flags;
     uint32_t rev;
     int hw_err;
     unsigned int cpu = smp_processor_id();
@@ -247,14 +243,12 @@ static int apply_microcode(const struct microcode_patch *patch)
 
     hdr = patch->mc_amd->mpb;
 
-    spin_lock_irqsave(&microcode_update_lock, flags);
+    BUG_ON(local_irq_is_enabled());
 
     hw_err = wrmsr_safe(MSR_AMD_PATCHLOADER, (unsigned long)hdr);
 
     /* get patch id after patching */
     rdmsrl(MSR_AMD_PATCHLEVEL, rev);
-
-    spin_unlock_irqrestore(&microcode_update_lock, flags);
 
     /*
      * Some processors leave the ucode blob mapping as UC after the update.

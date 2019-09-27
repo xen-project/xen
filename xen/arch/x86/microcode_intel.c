@@ -93,9 +93,6 @@ struct extended_sigtable {
 
 #define exttable_size(et) ((et)->count * EXT_SIGNATURE_SIZE + EXT_HEADER_SIZE)
 
-/* serialize access to the physical write to MSR 0x79 */
-static DEFINE_SPINLOCK(microcode_update_lock);
-
 static int collect_cpu_info(struct cpu_signature *csig)
 {
     unsigned int cpu_num = smp_processor_id();
@@ -287,7 +284,6 @@ static enum microcode_match_result compare_patch(
 
 static int apply_microcode(const struct microcode_patch *patch)
 {
-    unsigned long flags;
     uint64_t msr_content;
     unsigned int val[2];
     unsigned int cpu_num = raw_smp_processor_id();
@@ -302,8 +298,7 @@ static int apply_microcode(const struct microcode_patch *patch)
 
     mc_intel = patch->mc_intel;
 
-    /* serialize access to the physical write to MSR 0x79 */
-    spin_lock_irqsave(&microcode_update_lock, flags);
+    BUG_ON(local_irq_is_enabled());
 
     /* write microcode via MSR 0x79 */
     wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc_intel->bits);
@@ -316,7 +311,6 @@ static int apply_microcode(const struct microcode_patch *patch)
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
     val[1] = (uint32_t)(msr_content >> 32);
 
-    spin_unlock_irqrestore(&microcode_update_lock, flags);
     if ( val[1] != mc_intel->hdr.rev )
     {
         printk(KERN_ERR "microcode: CPU%d update from revision "
