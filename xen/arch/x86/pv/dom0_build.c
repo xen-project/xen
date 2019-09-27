@@ -285,7 +285,7 @@ int __init dom0_construct_pv(struct domain *d,
                              module_t *initrd,
                              char *cmdline)
 {
-    int i, cpu, rc, compatible, order, machine;
+    int i, rc, compatible, order, machine;
     struct cpu_user_regs *regs;
     unsigned long pfn, mfn;
     unsigned long nr_pages;
@@ -694,16 +694,8 @@ int __init dom0_construct_pv(struct domain *d,
 
     printk("Dom%u has maximum %u VCPUs\n", d->domain_id, d->max_vcpus);
 
-    cpu = v->processor;
-    for ( i = 1; i < d->max_vcpus; i++ )
-    {
-        const struct vcpu *p = dom0_setup_vcpu(d, i, cpu);
+    sched_setup_dom0_vcpus(d);
 
-        if ( p )
-            cpu = p->processor;
-    }
-
-    domain_update_node_affinity(d);
     d->arch.paging.mode = 0;
 
     /* Set up CR3 value for write_ptbase */

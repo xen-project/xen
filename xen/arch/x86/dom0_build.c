@@ -165,7 +165,7 @@ custom_param("dom0_max_vcpus", parse_dom0_max_vcpus);
 static __initdata unsigned int dom0_nr_pxms;
 static __initdata unsigned int dom0_pxms[MAX_NUMNODES] =
     { [0 ... MAX_NUMNODES - 1] = ~0 };
-static __initdata bool dom0_affinity_relaxed;
+bool __initdata dom0_affinity_relaxed;
 
 static int __init parse_dom0_nodes(const char *s)
 {
@@ -196,32 +196,7 @@ static int __init parse_dom0_nodes(const char *s)
 }
 custom_param("dom0_nodes", parse_dom0_nodes);
 
-static cpumask_t __initdata dom0_cpus;
-
-struct vcpu *__init dom0_setup_vcpu(struct domain *d,
-                                    unsigned int vcpu_id,
-                                    unsigned int prev_cpu)
-{
-    unsigned int cpu = cpumask_cycle(prev_cpu, &dom0_cpus);
-    struct vcpu *v = vcpu_create(d, vcpu_id, cpu);
-
-    if ( v )
-    {
-        if ( pv_shim )
-        {
-            sched_set_affinity(v, cpumask_of(vcpu_id), cpumask_of(vcpu_id));
-        }
-        else
-        {
-            if ( !opt_dom0_vcpus_pin && !dom0_affinity_relaxed )
-                sched_set_affinity(v, &dom0_cpus, NULL);
-            sched_set_affinity(v, NULL, &dom0_cpus);
-        }
-    }
-
-    return v;
-}
-
+cpumask_t __initdata dom0_cpus;
 static nodemask_t __initdata dom0_nodes;
 
 unsigned int __init dom0_max_vcpus(void)
@@ -273,8 +248,7 @@ struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
     dom0->node_affinity = dom0_nodes;
     dom0->auto_node_affinity = !dom0_nr_pxms;
 
-    return dom0_setup_vcpu(dom0, 0,
-                           cpumask_last(&dom0_cpus) /* so it wraps around to first pcpu */);
+    return vcpu_create(dom0, 0);
 }
 
 #ifdef CONFIG_SHADOW_PAGING

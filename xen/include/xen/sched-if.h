@@ -498,7 +498,7 @@ struct cpupool
 #define cpupool_online_cpumask(_pool) \
     (((_pool) == NULL) ? &cpu_online_map : (_pool)->cpu_valid)
 
-static inline cpumask_t* cpupool_domain_cpumask(struct domain *d)
+static inline cpumask_t *cpupool_domain_cpumask(const struct domain *d)
 {
     /*
      * d->cpupool is NULL only for the idle domain, and no one should

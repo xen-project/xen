@@ -532,8 +532,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_max_vcpus:
     {
-        unsigned int i, max = op->u.max_vcpus.max, cpu;
-        cpumask_t *online;
+        unsigned int i, max = op->u.max_vcpus.max;
 
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
@@ -544,18 +543,13 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         domain_pause(d);
 
         ret = -ENOMEM;
-        online = cpupool_domain_cpumask(d);
 
         for ( i = 0; i < max; i++ )
         {
             if ( d->vcpu[i] != NULL )
                 continue;
 
-            cpu = (i == 0) ?
-                cpumask_any(online) :
-                cpumask_cycle(d->vcpu[i-1]->processor, online);
-
-            if ( vcpu_create(d, i, cpu) == NULL )
+            if ( vcpu_create(d, i) == NULL )
                 goto maxvcpu_out;
         }
 

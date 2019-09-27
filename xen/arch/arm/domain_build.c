@@ -80,7 +80,7 @@ unsigned int __init dom0_max_vcpus(void)
 
 struct vcpu *__init alloc_dom0_vcpu0(struct domain *dom0)
 {
-    return vcpu_create(dom0, 0, 0);
+    return vcpu_create(dom0, 0);
 }
 
 static unsigned int __init get_allocation_size(paddr_t size)
@@ -1940,7 +1940,7 @@ static void __init find_gnttab_region(struct domain *d,
 
 static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
 {
-    int i, cpu;
+    unsigned int i;
     struct vcpu *v = d->vcpu[0];
     struct cpu_user_regs *regs = &v->arch.cpu_info->guest_cpu_user_regs;
 
@@ -2003,12 +2003,11 @@ static int __init construct_domain(struct domain *d, struct kernel_info *kinfo)
     }
 #endif
 
-    for ( i = 1, cpu = 0; i < d->max_vcpus; i++ )
+    for ( i = 1; i < d->max_vcpus; i++ )
     {
-        cpu = cpumask_cycle(cpu, &cpu_online_map);
-        if ( vcpu_create(d, i, cpu) == NULL )
+        if ( vcpu_create(d, i) == NULL )
         {
-            printk("Failed to allocate dom0 vcpu %d on pcpu %d\n", i, cpu);
+            printk("Failed to allocate d0v%u\n", i);
             break;
         }
 
@@ -2043,7 +2042,7 @@ static int __init construct_domU(struct domain *d,
 
     kinfo.vpl011 = dt_property_read_bool(node, "vpl011");
 
-    if ( vcpu_create(d, 0, 0) == NULL )
+    if ( vcpu_create(d, 0) == NULL )
         return -ENOMEM;
     d->max_pages = ~0U;
 

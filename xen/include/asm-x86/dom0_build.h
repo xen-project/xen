@@ -11,8 +11,6 @@ extern unsigned int dom0_memflags;
 unsigned long dom0_compute_nr_pages(struct domain *d,
                                     struct elf_dom_parms *parms,
                                     unsigned long initrd_len);
-struct vcpu *dom0_setup_vcpu(struct domain *d, unsigned int vcpu_id,
-                             unsigned int cpu);
 int dom0_setup_permissions(struct domain *d);
 
 int dom0_construct_pv(struct domain *d, const module_t *image,

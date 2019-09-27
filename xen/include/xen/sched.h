@@ -661,7 +661,7 @@ void __domain_crash(struct domain *d);
 void noreturn asm_domain_crash_synchronous(unsigned long addr);
 
 void scheduler_init(void);
-int  sched_init_vcpu(struct vcpu *v, unsigned int processor);
+int  sched_init_vcpu(struct vcpu *v);
 void sched_destroy_vcpu(struct vcpu *v);
 int  sched_init_domain(struct domain *d, int poolid);
 void sched_destroy_domain(struct domain *d);
@@ -906,9 +906,7 @@ void scheduler_free(struct scheduler *sched);
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_set_periodic_timer(struct vcpu *v, s_time_t value);
 int cpu_disable_scheduler(unsigned int cpu);
-/* We need it in dom0_setup_vcpu */
-void sched_set_affinity(struct vcpu *v, const cpumask_t *hard,
-                        const cpumask_t *soft);
+void sched_setup_dom0_vcpus(struct domain *d);
 int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason);
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
 int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity);

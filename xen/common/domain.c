@@ -135,8 +135,7 @@ static void vcpu_destroy(struct vcpu *v)
     free_vcpu_struct(v);
 }
 
-struct vcpu *vcpu_create(
-    struct domain *d, unsigned int vcpu_id, unsigned int cpu_id)
+struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
 {
     struct vcpu *v;
 
@@ -168,7 +167,7 @@ struct vcpu *vcpu_create(
         init_waitqueue_vcpu(v);
     }
 
-    if ( sched_init_vcpu(v, cpu_id) != 0 )
+    if ( sched_init_vcpu(v) != 0 )
         goto fail_wq;
 
     if ( arch_vcpu_create(v) != 0 )
