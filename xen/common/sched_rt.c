@@ -235,7 +235,7 @@ static inline struct rt_private *rt_priv(const struct scheduler *ops)
 
 static inline struct rt_vcpu *rt_vcpu(const struct vcpu *vcpu)
 {
-    return vcpu->sched_priv;
+    return vcpu->sched_unit->priv;
 }
 
 static inline struct list_head *rt_runq(const struct scheduler *ops)
@@ -760,7 +760,7 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
         dprintk(XENLOG_DEBUG, "RTDS: timer initialized on cpu %u\n", cpu);
     }
 
-    idle_vcpu[cpu]->sched_priv = vdata;
+    idle_vcpu[cpu]->sched_unit->priv = vdata;
 
     return &prv->lock;
 }

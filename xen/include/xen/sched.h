@@ -162,7 +162,6 @@ struct vcpu
     struct timer     poll_timer;    /* timeout for SCHEDOP_poll */
 
     struct sched_unit *sched_unit;
-    void            *sched_priv;    /* scheduler-specific data */
 
     struct vcpu_runstate_info runstate;
 #ifndef CONFIG_COMPAT
@@ -277,6 +276,7 @@ struct vcpu
 struct sched_unit {
     struct domain         *domain;
     struct vcpu           *vcpu_list;
+    void                  *priv;      /* scheduler private data */
     unsigned int           unit_id;
 };
 

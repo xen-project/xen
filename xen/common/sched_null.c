@@ -116,7 +116,7 @@ static inline struct null_private *null_priv(const struct scheduler *ops)
 
 static inline struct null_vcpu *null_vcpu(const struct vcpu *v)
 {
-    return v->sched_priv;
+    return v->sched_unit->priv;
 }
 
 static inline bool vcpu_check_affinity(struct vcpu *v, unsigned int cpu,
@@ -422,7 +422,7 @@ static spinlock_t *null_switch_sched(struct scheduler *new_ops,
 
     ASSERT(nvc && is_idle_vcpu(nvc->vcpu));
 
-    idle_vcpu[cpu]->sched_priv = vdata;
+    idle_vcpu[cpu]->sched_unit->priv = vdata;
 
     /*
      * We are holding the runqueue lock already (it's been taken in

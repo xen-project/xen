@@ -53,7 +53,7 @@
  * Return a pointer to the ARINC 653-specific scheduler data information
  * associated with the given VCPU (vc)
  */
-#define AVCPU(vc) ((arinc653_vcpu_t *)(vc)->sched_priv)
+#define AVCPU(vc) ((arinc653_vcpu_t *)(vc)->sched_unit->priv)
 
 /**
  * Return the global scheduler private data given the scheduler ops pointer
@@ -653,7 +653,7 @@ a653_switch_sched(struct scheduler *new_ops, unsigned int cpu,
 
     ASSERT(!pdata && svc && is_idle_vcpu(svc->vc));
 
-    idle_vcpu[cpu]->sched_priv = vdata;
+    idle_vcpu[cpu]->sched_unit->priv = vdata;
 
     return &sd->_lock;
 }

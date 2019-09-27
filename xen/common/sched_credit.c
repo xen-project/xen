@@ -83,7 +83,7 @@
     ((struct csched_private *)((_ops)->sched_data))
 #define CSCHED_PCPU(_c)     \
     ((struct csched_pcpu *)per_cpu(schedule_data, _c).sched_priv)
-#define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_priv)
+#define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_unit->priv)
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
 #define RUNQ(_cpu)          (&(CSCHED_PCPU(_cpu)->runq))
 
@@ -634,7 +634,7 @@ csched_switch_sched(struct scheduler *new_ops, unsigned int cpu,
 
     ASSERT(svc && is_idle_vcpu(svc->vcpu));
 
-    idle_vcpu[cpu]->sched_priv = vdata;
+    idle_vcpu[cpu]->sched_unit->priv = vdata;
 
     /*
      * We are holding the runqueue lock already (it's been taken in
@@ -1017,7 +1017,7 @@ static void
 csched_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct vcpu *vc = unit->vcpu_list;
-    struct csched_vcpu *svc = vc->sched_priv;
+    struct csched_vcpu *svc = unit->priv;
     spinlock_t *lock;
 
     BUG_ON( is_idle_vcpu(vc) );
