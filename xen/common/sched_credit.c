@@ -1660,8 +1660,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
             SCHED_STAT_CRANK(migrate_queued);
             WARN_ON(vc->is_urgent);
             runq_remove(speer);
-            vc->processor = cpu;
-            vc->sched_unit->res = get_sched_res(cpu);
+            sched_set_res(vc->sched_unit, get_sched_res(cpu));
             /*
              * speer will start executing directly on cpu, without having to
              * go through runq_insert(). So we must update the runnable count

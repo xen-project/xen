@@ -63,6 +63,93 @@ static inline struct sched_unit *curr_on_cpu(unsigned int cpu)
     return get_sched_res(cpu)->curr;
 }
 
+static inline bool is_idle_unit(const struct sched_unit *unit)
+{
+    return is_idle_vcpu(unit->vcpu_list);
+}
+
+/* Returns true if at least one vcpu of the unit is online. */
+static inline bool is_unit_online(const struct sched_unit *unit)
+{
+    const struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+        if ( is_vcpu_online(v) )
+            return true;
+
+    return false;
+}
+
+/* Returns true if at least one vcpu of the unit is runnable. */
+static inline bool unit_runnable(const struct sched_unit *unit)
+{
+    const struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+        if ( vcpu_runnable(v) )
+            return true;
+
+    return false;
+}
+
+static inline void sched_set_res(struct sched_unit *unit,
+                                 struct sched_resource *res)
+{
+    unit->vcpu_list->processor = res->master_cpu;
+    unit->res = res;
+}
+
+/* Return master cpu of the scheduling resource the unit is assigned to. */
+static inline unsigned int sched_unit_master(const struct sched_unit *unit)
+{
+    return unit->res->master_cpu;
+}
+
+/* Set a bit in pause_flags of all vcpus of a unit. */
+static inline void sched_set_pause_flags(struct sched_unit *unit,
+                                         unsigned int bit)
+{
+    struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+        __set_bit(bit, &v->pause_flags);
+}
+
+/* Clear a bit in pause_flags of all vcpus of a unit. */
+static inline void sched_clear_pause_flags(struct sched_unit *unit,
+                                           unsigned int bit)
+{
+    struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+        __clear_bit(bit, &v->pause_flags);
+}
+
+/* Set a bit in pause_flags of all vcpus of a unit via atomic updates. */
+static inline void sched_set_pause_flags_atomic(struct sched_unit *unit,
+                                                unsigned int bit)
+{
+    struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+        set_bit(bit, &v->pause_flags);
+}
+
+/* Clear a bit in pause_flags of all vcpus of a unit via atomic updates. */
+static inline void sched_clear_pause_flags_atomic(struct sched_unit *unit,
+                                                  unsigned int bit)
+{
+    struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+        clear_bit(bit, &v->pause_flags);
+}
+
+static inline struct sched_unit *sched_idle_unit(unsigned int cpu)
+{
+    return idle_vcpu[cpu]->sched_unit;
+}
+
 /*
  * Scratch space, for avoiding having too many cpumask_t on the stack.
  * Within each scheduler, when using the scratch mask of one pCPU:
@@ -349,10 +436,7 @@ static inline void sched_migrate(const struct scheduler *s,
     if ( s->migrate )
         s->migrate(s, unit, cpu);
     else
-    {
-        unit->vcpu_list->processor = cpu;
-        unit->res = get_sched_res(cpu);
-    }
+        sched_set_res(unit, get_sched_res(cpu));
 }
 
 static inline struct sched_resource *sched_pick_resource(
