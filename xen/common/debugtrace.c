@@ -259,7 +259,6 @@ static void debugtrace_alloc_buffer(struct debugtrace_data **ptr,
 
     memset(data, '\0', debugtrace_bytes + sizeof(*data));
 
-    dt_data = data;
     *ptr = data;
 }
 
