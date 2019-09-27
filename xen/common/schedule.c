@@ -329,6 +329,11 @@ static void sched_free_unit(struct sched_unit *unit)
     }
 
     unit->vcpu_list->sched_unit = NULL;
+
+    free_cpumask_var(unit->cpu_hard_affinity);
+    free_cpumask_var(unit->cpu_hard_affinity_saved);
+    free_cpumask_var(unit->cpu_soft_affinity);
+
     xfree(unit);
 }
 
@@ -353,9 +358,18 @@ static struct sched_unit *sched_alloc_unit(struct vcpu *v)
     unit->next_in_list = *prev_unit;
     *prev_unit = unit;
 
+    if ( !zalloc_cpumask_var(&unit->cpu_hard_affinity) ||
+         !zalloc_cpumask_var(&unit->cpu_hard_affinity_saved) ||
+         !zalloc_cpumask_var(&unit->cpu_soft_affinity) )
+        goto fail;
+
     v->sched_unit = unit;
 
     return unit;
+
+ fail:
+    sched_free_unit(unit);
+    return NULL;
 }
 
 int sched_init_vcpu(struct vcpu *v, unsigned int processor)
@@ -745,7 +759,7 @@ static void vcpu_migrate_finish(struct vcpu *v)
              */
             if ( pick_called &&
                  (new_lock == get_sched_res(new_cpu)->schedule_lock) &&
-                 cpumask_test_cpu(new_cpu, v->cpu_hard_affinity) &&
+                 cpumask_test_cpu(new_cpu, v->sched_unit->cpu_hard_affinity) &&
                  cpumask_test_cpu(new_cpu, v->domain->cpupool->cpu_valid) )
                 break;
 
@@ -803,6 +817,7 @@ void restore_vcpu_affinity(struct domain *d)
     {
         spinlock_t *lock;
         unsigned int old_cpu = v->processor;
+        struct sched_unit *unit = v->sched_unit;
 
         ASSERT(!vcpu_runnable(v));
 
@@ -814,17 +829,17 @@ void restore_vcpu_affinity(struct domain *d)
          * set v->processor of each of their vCPUs to something that will
          * make sense for the scheduler of the cpupool in which they are in.
          */
-        lock = unit_schedule_lock_irq(v->sched_unit);
+        lock = unit_schedule_lock_irq(unit);
 
-        cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+        cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
                     cpupool_domain_cpumask(d));
         if ( cpumask_empty(cpumask_scratch_cpu(cpu)) )
         {
             if ( v->affinity_broken )
             {
-                sched_set_affinity(v, v->cpu_hard_affinity_saved, NULL);
+                sched_set_affinity(v, unit->cpu_hard_affinity_saved, NULL);
                 v->affinity_broken = 0;
-                cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
                             cpupool_domain_cpumask(d));
             }
 
@@ -832,21 +847,20 @@ void restore_vcpu_affinity(struct domain *d)
             {
                 printk(XENLOG_DEBUG "Breaking affinity for %pv\n", v);
                 sched_set_affinity(v, &cpumask_all, NULL);
-                cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+                cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
                             cpupool_domain_cpumask(d));
             }
         }
 
         v->processor = cpumask_any(cpumask_scratch_cpu(cpu));
-        v->sched_unit->res = get_sched_res(v->processor);
+        unit->res = get_sched_res(v->processor);
 
         spin_unlock_irq(lock);
 
         /* v->processor might have changed, so reacquire the lock. */
-        lock = unit_schedule_lock_irq(v->sched_unit);
-        v->sched_unit->res = sched_pick_resource(vcpu_scheduler(v),
-                                                 v->sched_unit);
-        v->processor = v->sched_unit->res->master_cpu;
+        lock = unit_schedule_lock_irq(unit);
+        unit->res = sched_pick_resource(vcpu_scheduler(v), unit);
+        v->processor = unit->res->master_cpu;
         spin_unlock_irq(lock);
 
         if ( old_cpu != v->processor )
@@ -878,16 +892,17 @@ int cpu_disable_scheduler(unsigned int cpu)
         for_each_vcpu ( d, v )
         {
             unsigned long flags;
-            spinlock_t *lock = unit_schedule_lock_irqsave(v->sched_unit, &flags);
+            struct sched_unit *unit = v->sched_unit;
+            spinlock_t *lock = unit_schedule_lock_irqsave(unit, &flags);
 
-            cpumask_and(&online_affinity, v->cpu_hard_affinity, c->cpu_valid);
+            cpumask_and(&online_affinity, unit->cpu_hard_affinity, c->cpu_valid);
             if ( cpumask_empty(&online_affinity) &&
-                 cpumask_test_cpu(cpu, v->cpu_hard_affinity) )
+                 cpumask_test_cpu(cpu, unit->cpu_hard_affinity) )
             {
                 if ( v->affinity_broken )
                 {
                     /* The vcpu is temporarily pinned, can't move it. */
-                    unit_schedule_unlock_irqrestore(lock, flags, v->sched_unit);
+                    unit_schedule_unlock_irqrestore(lock, flags, unit);
                     ret = -EADDRINUSE;
                     break;
                 }
@@ -900,7 +915,7 @@ int cpu_disable_scheduler(unsigned int cpu)
             if ( v->processor != cpu )
             {
                 /* The vcpu is not on this cpu, so we can move on. */
-                unit_schedule_unlock_irqrestore(lock, flags, v->sched_unit);
+                unit_schedule_unlock_irqrestore(lock, flags, unit);
                 continue;
             }
 
@@ -913,7 +928,7 @@ int cpu_disable_scheduler(unsigned int cpu)
              *    things would have failed before getting in here.
              */
             vcpu_migrate_start(v);
-            unit_schedule_unlock_irqrestore(lock, flags, v->sched_unit);
+            unit_schedule_unlock_irqrestore(lock, flags, unit);
 
             vcpu_migrate_finish(v);
 
@@ -958,26 +973,29 @@ static int cpu_disable_scheduler_check(unsigned int cpu)
 void sched_set_affinity(
     struct vcpu *v, const cpumask_t *hard, const cpumask_t *soft)
 {
-    sched_adjust_affinity(dom_scheduler(v->domain), v->sched_unit, hard, soft);
+    struct sched_unit *unit = v->sched_unit;
+
+    sched_adjust_affinity(dom_scheduler(v->domain), unit, hard, soft);
 
     if ( hard )
-        cpumask_copy(v->cpu_hard_affinity, hard);
+        cpumask_copy(unit->cpu_hard_affinity, hard);
     if ( soft )
-        cpumask_copy(v->cpu_soft_affinity, soft);
+        cpumask_copy(unit->cpu_soft_affinity, soft);
 
-    v->soft_aff_effective = !cpumask_subset(v->cpu_hard_affinity,
-                                            v->cpu_soft_affinity) &&
-                            cpumask_intersects(v->cpu_soft_affinity,
-                                               v->cpu_hard_affinity);
+    unit->soft_aff_effective = !cpumask_subset(unit->cpu_hard_affinity,
+                                               unit->cpu_soft_affinity) &&
+                               cpumask_intersects(unit->cpu_soft_affinity,
+                                                  unit->cpu_hard_affinity);
 }
 
 static int vcpu_set_affinity(
     struct vcpu *v, const cpumask_t *affinity, const cpumask_t *which)
 {
+    struct sched_unit *unit = v->sched_unit;
     spinlock_t *lock;
     int ret = 0;
 
-    lock = unit_schedule_lock_irq(v->sched_unit);
+    lock = unit_schedule_lock_irq(unit);
 
     if ( v->affinity_broken )
         ret = -EBUSY;
@@ -987,19 +1005,19 @@ static int vcpu_set_affinity(
          * Tell the scheduler we changes something about affinity,
          * and ask to re-evaluate vcpu placement.
          */
-        if ( which == v->cpu_hard_affinity )
+        if ( which == unit->cpu_hard_affinity )
         {
             sched_set_affinity(v, affinity, NULL);
         }
         else
         {
-            ASSERT(which == v->cpu_soft_affinity);
+            ASSERT(which == unit->cpu_soft_affinity);
             sched_set_affinity(v, NULL, affinity);
         }
         vcpu_migrate_start(v);
     }
 
-    unit_schedule_unlock_irq(lock, v->sched_unit);
+    unit_schedule_unlock_irq(lock, unit);
 
     domain_update_node_affinity(v->domain);
 
@@ -1018,12 +1036,12 @@ int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity)
     if ( cpumask_empty(&online_affinity) )
         return -EINVAL;
 
-    return vcpu_set_affinity(v, affinity, v->cpu_hard_affinity);
+    return vcpu_set_affinity(v, affinity, v->sched_unit->cpu_hard_affinity);
 }
 
 int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity)
 {
-    return vcpu_set_affinity(v, affinity, v->cpu_soft_affinity);
+    return vcpu_set_affinity(v, affinity, v->sched_unit->cpu_soft_affinity);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -1227,11 +1245,12 @@ void watchdog_domain_destroy(struct domain *d)
  */
 int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason)
 {
+    struct sched_unit *unit = v->sched_unit;
     spinlock_t *lock;
     int ret = -EINVAL;
     bool migrate;
 
-    lock = unit_schedule_lock_irq(v->sched_unit);
+    lock = unit_schedule_lock_irq(unit);
 
     if ( cpu == NR_CPUS )
     {
@@ -1241,7 +1260,7 @@ int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason)
             v->affinity_broken &= ~reason;
         }
         if ( !ret && !v->affinity_broken )
-            sched_set_affinity(v, v->cpu_hard_affinity_saved, NULL);
+            sched_set_affinity(v, unit->cpu_hard_affinity_saved, NULL);
     }
     else if ( cpu < nr_cpu_ids )
     {
@@ -1252,7 +1271,8 @@ int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason)
         {
             if ( !v->affinity_broken )
             {
-                cpumask_copy(v->cpu_hard_affinity_saved, v->cpu_hard_affinity);
+                cpumask_copy(unit->cpu_hard_affinity_saved,
+                             unit->cpu_hard_affinity);
                 sched_set_affinity(v, cpumask_of(cpu), NULL);
             }
             v->affinity_broken |= reason;
@@ -1260,11 +1280,11 @@ int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason)
         }
     }
 
-    migrate = !ret && !cpumask_test_cpu(v->processor, v->cpu_hard_affinity);
+    migrate = !ret && !cpumask_test_cpu(v->processor, unit->cpu_hard_affinity);
     if ( migrate )
         vcpu_migrate_start(v);
 
-    unit_schedule_unlock_irq(lock, v->sched_unit);
+    unit_schedule_unlock_irq(lock, unit);
 
     if ( migrate )
         vcpu_migrate_finish(v);

@@ -132,10 +132,6 @@ static void vcpu_info_reset(struct vcpu *v)
 
 static void vcpu_destroy(struct vcpu *v)
 {
-    free_cpumask_var(v->cpu_hard_affinity);
-    free_cpumask_var(v->cpu_hard_affinity_saved);
-    free_cpumask_var(v->cpu_soft_affinity);
-
     free_vcpu_struct(v);
 }
 
@@ -158,11 +154,6 @@ struct vcpu *vcpu_create(
     tasklet_init(&v->continue_hypercall_tasklet, NULL, 0);
 
     grant_table_init_vcpu(v);
-
-    if ( !zalloc_cpumask_var(&v->cpu_hard_affinity) ||
-         !zalloc_cpumask_var(&v->cpu_hard_affinity_saved) ||
-         !zalloc_cpumask_var(&v->cpu_soft_affinity) )
-        goto fail;
 
     if ( is_idle_domain(d) )
     {
@@ -203,7 +194,6 @@ struct vcpu *vcpu_create(
     sched_destroy_vcpu(v);
  fail_wq:
     destroy_waitqueue_vcpu(v);
- fail:
     vcpu_destroy(v);
 
     return NULL;
@@ -614,9 +604,10 @@ void domain_update_node_affinity(struct domain *d)
          */
         for_each_vcpu ( d, v )
         {
-            cpumask_or(dom_cpumask, dom_cpumask, v->cpu_hard_affinity);
+            cpumask_or(dom_cpumask, dom_cpumask,
+                       v->sched_unit->cpu_hard_affinity);
             cpumask_or(dom_cpumask_soft, dom_cpumask_soft,
-                       v->cpu_soft_affinity);
+                       v->sched_unit->cpu_soft_affinity);
         }
         /* Filter out non-online cpus */
         cpumask_and(dom_cpumask, dom_cpumask, online);

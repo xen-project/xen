@@ -122,7 +122,8 @@ static inline struct null_unit *null_unit(const struct sched_unit *unit)
 static inline bool vcpu_check_affinity(struct vcpu *v, unsigned int cpu,
                                        unsigned int balance_step)
 {
-    affinity_balance_cpumask(v, balance_step, cpumask_scratch_cpu(cpu));
+    affinity_balance_cpumask(v->sched_unit, balance_step,
+                             cpumask_scratch_cpu(cpu));
     cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                 cpupool_domain_cpumask(v->domain));
 
@@ -273,10 +274,10 @@ pick_res(struct null_private *prv, const struct sched_unit *unit)
 
     for_each_affinity_balance_step( bs )
     {
-        if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(v) )
+        if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(unit) )
             continue;
 
-        affinity_balance_cpumask(v, bs, cpumask_scratch_cpu(cpu));
+        affinity_balance_cpumask(unit, bs, cpumask_scratch_cpu(cpu));
         cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu), cpus);
 
         /*
@@ -313,7 +314,7 @@ pick_res(struct null_private *prv, const struct sched_unit *unit)
      * as we will actually assign the vCPU to the pCPU we return from here,
      * only if the pCPU is free.
      */
-    cpumask_and(cpumask_scratch_cpu(cpu), cpus, v->cpu_hard_affinity);
+    cpumask_and(cpumask_scratch_cpu(cpu), cpus, unit->cpu_hard_affinity);
     new_cpu = cpumask_any(cpumask_scratch_cpu(cpu));
 
  out:
@@ -396,7 +397,8 @@ static bool vcpu_deassign(struct null_private *prv, struct vcpu *v)
     {
         list_for_each_entry( wvc, &prv->waitq, waitq_elem )
         {
-            if ( bs == BALANCE_SOFT_AFFINITY && !has_soft_affinity(wvc->vcpu) )
+            if ( bs == BALANCE_SOFT_AFFINITY &&
+                 !has_soft_affinity(wvc->vcpu->sched_unit) )
                 continue;
 
             if ( vcpu_check_affinity(wvc->vcpu, cpu, bs) )
@@ -466,7 +468,7 @@ static void null_unit_insert(const struct scheduler *ops,
 
     lock = unit_schedule_lock(unit);
 
-    cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+    cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
                 cpupool_domain_cpumask(v->domain));
 
     /* If the pCPU is free, we assign v to it */
@@ -579,7 +581,7 @@ static void null_unit_wake(const struct scheduler *ops,
         list_add_tail(&nvc->waitq_elem, &prv->waitq);
         spin_unlock(&prv->waitq_lock);
 
-        cpumask_and(cpumask_scratch_cpu(cpu), v->cpu_hard_affinity,
+        cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
                     cpupool_domain_cpumask(v->domain));
 
         if ( !cpumask_intersects(&prv->cpus_free, cpumask_scratch_cpu(cpu)) )
@@ -848,7 +850,7 @@ static struct task_slice null_schedule(const struct scheduler *ops,
             list_for_each_entry( wvc, &prv->waitq, waitq_elem )
             {
                 if ( bs == BALANCE_SOFT_AFFINITY &&
-                     !has_soft_affinity(wvc->vcpu) )
+                     !has_soft_affinity(wvc->vcpu->sched_unit) )
                     continue;
 
                 if ( vcpu_check_affinity(wvc->vcpu, cpu, bs) )

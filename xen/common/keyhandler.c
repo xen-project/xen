@@ -251,6 +251,7 @@ static void reboot_machine(unsigned char key, struct cpu_user_regs *regs)
 static void dump_domains(unsigned char key)
 {
     struct domain *d;
+    const struct sched_unit *unit;
     struct vcpu   *v;
     s_time_t       now = NOW();
 
@@ -297,33 +298,38 @@ static void dump_domains(unsigned char key)
 
         printk("VCPU information and callbacks for domain %u:\n",
                d->domain_id);
-        for_each_vcpu ( d, v )
+
+        for_each_sched_unit ( d, unit )
         {
-            if ( !(v->vcpu_id & 0x3f) )
-                process_pending_softirqs();
+            printk("  UNIT%d affinities: hard={%*pbl} soft={%*pbl}\n",
+                   unit->unit_id, CPUMASK_PR(unit->cpu_hard_affinity),
+                   CPUMASK_PR(unit->cpu_soft_affinity));
 
-            printk("    VCPU%d: CPU%d [has=%c] poll=%d "
-                   "upcall_pend=%02x upcall_mask=%02x ",
-                   v->vcpu_id, v->processor,
-                   v->is_running ? 'T':'F', v->poll_evtchn,
-                   vcpu_info(v, evtchn_upcall_pending),
-                   !vcpu_event_delivery_is_enabled(v));
-            if ( vcpu_cpu_dirty(v) )
-                printk("dirty_cpu=%u", v->dirty_cpu);
-            printk("\n");
-            printk("    cpu_hard_affinity={%*pbl} cpu_soft_affinity={%*pbl}\n",
-                   CPUMASK_PR(v->cpu_hard_affinity),
-                   CPUMASK_PR(v->cpu_soft_affinity));
-            printk("    pause_count=%d pause_flags=%lx\n",
-                   atomic_read(&v->pause_count), v->pause_flags);
-            arch_dump_vcpu_info(v);
+            for_each_sched_unit_vcpu ( unit, v )
+            {
+                if ( !(v->vcpu_id & 0x3f) )
+                    process_pending_softirqs();
 
-            if ( v->periodic_period == 0 )
-                printk("No periodic timer\n");
-            else
-                printk("%"PRI_stime" Hz periodic timer (period %"PRI_stime" ms)\n",
-                       1000000000 / v->periodic_period,
-                       v->periodic_period / 1000000);
+                printk("    VCPU%d: CPU%d [has=%c] poll=%d "
+                       "upcall_pend=%02x upcall_mask=%02x ",
+                       v->vcpu_id, v->processor,
+                       v->is_running ? 'T':'F', v->poll_evtchn,
+                       vcpu_info(v, evtchn_upcall_pending),
+                       !vcpu_event_delivery_is_enabled(v));
+                if ( vcpu_cpu_dirty(v) )
+                    printk("dirty_cpu=%u", v->dirty_cpu);
+                printk("\n");
+                printk("    pause_count=%d pause_flags=%lx\n",
+                       atomic_read(&v->pause_count), v->pause_flags);
+                arch_dump_vcpu_info(v);
+
+                if ( v->periodic_period == 0 )
+                    printk("No periodic timer\n");
+                else
+                    printk("%"PRI_stime" Hz periodic timer (period %"PRI_stime" ms)\n",
+                           1000000000 / v->periodic_period,
+                           v->periodic_period / 1000000);
+            }
         }
     }
 

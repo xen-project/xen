@@ -212,9 +212,6 @@ struct vcpu
     bool             hcall_compat;
 #endif
 
-    /* Does soft affinity actually play a role (given hard affinity)? */
-    bool             soft_aff_effective;
-
     /* The CPU, if any, which is holding onto this VCPU's state. */
 #define VCPU_CPU_CLEAN (~0u)
     unsigned int     dirty_cpu;
@@ -246,14 +243,6 @@ struct vcpu
     evtchn_port_t    virq_to_evtchn[NR_VIRQS];
     spinlock_t       virq_lock;
 
-    /* Bitmask of CPUs on which this VCPU may run. */
-    cpumask_var_t    cpu_hard_affinity;
-    /* Used to save affinity during temporary pinning. */
-    cpumask_var_t    cpu_hard_affinity_saved;
-
-    /* Bitmask of CPUs on which this VCPU prefers to run. */
-    cpumask_var_t    cpu_soft_affinity;
-
     /* Tasklet for continue_hypercall_on_cpu(). */
     struct tasklet   continue_hypercall_tasklet;
 
@@ -280,6 +269,15 @@ struct sched_unit {
     struct sched_unit     *next_in_list;
     struct sched_resource *res;
     unsigned int           unit_id;
+
+    /* Does soft affinity actually play a role (given hard affinity)? */
+    bool                   soft_aff_effective;
+    /* Bitmask of CPUs on which this VCPU may run. */
+    cpumask_var_t          cpu_hard_affinity;
+    /* Used to save affinity during temporary pinning. */
+    cpumask_var_t          cpu_hard_affinity_saved;
+    /* Bitmask of CPUs on which this VCPU prefers to run. */
+    cpumask_var_t          cpu_soft_affinity;
 };
 
 #define for_each_sched_unit(d, u)                                         \
@@ -998,7 +996,7 @@ static inline bool hap_enabled(const struct domain *d)
 static inline bool is_hwdom_pinned_vcpu(const struct vcpu *v)
 {
     return (is_hardware_domain(v->domain) &&
-            cpumask_weight(v->cpu_hard_affinity) == 1);
+            cpumask_weight(v->sched_unit->cpu_hard_affinity) == 1);
 }
 
 static inline bool is_vcpu_online(const struct vcpu *v)

@@ -352,6 +352,7 @@ DEFINE_PER_CPU(unsigned int, last_tickle_cpu);
 static inline void __runq_tickle(struct csched_unit *new)
 {
     unsigned int cpu = new->vcpu->processor;
+    struct sched_unit *unit = new->vcpu->sched_unit;
     struct csched_unit * const cur = CSCHED_UNIT(curr_on_cpu(cpu));
     struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
     cpumask_t mask, idle_mask, *online;
@@ -377,7 +378,7 @@ static inline void __runq_tickle(struct csched_unit *new)
     if ( unlikely(test_bit(CSCHED_FLAG_VCPU_PINNED, &new->flags) &&
                   cpumask_test_cpu(cpu, &idle_mask)) )
     {
-        ASSERT(cpumask_cycle(cpu, new->vcpu->cpu_hard_affinity) == cpu);
+        ASSERT(cpumask_cycle(cpu, unit->cpu_hard_affinity) == cpu);
         SCHED_STAT_CRANK(tickled_idle_cpu_excl);
         __cpumask_set_cpu(cpu, &mask);
         goto tickle;
@@ -412,11 +413,11 @@ static inline void __runq_tickle(struct csched_unit *new)
             int new_idlers_empty;
 
             if ( balance_step == BALANCE_SOFT_AFFINITY
-                 && !has_soft_affinity(new->vcpu) )
+                 && !has_soft_affinity(unit) )
                 continue;
 
             /* Are there idlers suitable for new (for this balance step)? */
-            affinity_balance_cpumask(new->vcpu, balance_step,
+            affinity_balance_cpumask(unit, balance_step,
                                      cpumask_scratch_cpu(cpu));
             cpumask_and(cpumask_scratch_cpu(cpu),
                         cpumask_scratch_cpu(cpu), &idle_mask);
@@ -445,8 +446,7 @@ static inline void __runq_tickle(struct csched_unit *new)
              */
             if ( new_idlers_empty && new->pri > cur->pri )
             {
-                if ( cpumask_intersects(cur->vcpu->cpu_hard_affinity,
-                                        &idle_mask) )
+                if ( cpumask_intersects(unit->cpu_hard_affinity, &idle_mask) )
                 {
                     SCHED_VCPU_STAT_CRANK(cur, kicked_away);
                     SCHED_VCPU_STAT_CRANK(cur, migrate_r);
@@ -728,7 +728,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
 
     for_each_affinity_balance_step( balance_step )
     {
-        affinity_balance_cpumask(vc, balance_step, cpus);
+        affinity_balance_cpumask(vc->sched_unit, balance_step, cpus);
         cpumask_and(cpus, online, cpus);
         /*
          * We want to pick up a pcpu among the ones that are online and
@@ -747,7 +747,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
          * balancing step all together.
          */
         if ( balance_step == BALANCE_SOFT_AFFINITY &&
-             (!has_soft_affinity(vc) || cpumask_empty(cpus)) )
+             (!has_soft_affinity(vc->sched_unit) || cpumask_empty(cpus)) )
             continue;
 
         /* If present, prefer vc's current processor */
@@ -1647,10 +1647,10 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
          * or counter.
          */
         if ( vc->is_running || (balance_step == BALANCE_SOFT_AFFINITY &&
-                                !has_soft_affinity(vc)) )
+                                !has_soft_affinity(vc->sched_unit)) )
             continue;
 
-        affinity_balance_cpumask(vc, balance_step, cpumask_scratch);
+        affinity_balance_cpumask(vc->sched_unit, balance_step, cpumask_scratch);
         if ( __csched_vcpu_is_migrateable(prv, vc, cpu, cpumask_scratch) )
         {
             /* We got a candidate. Grab it! */
