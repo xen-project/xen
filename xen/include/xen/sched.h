@@ -153,6 +153,7 @@ struct vcpu
 
     struct vcpu     *next_in_list;
 
+    spinlock_t       periodic_timer_lock;
     s_time_t         periodic_period;
     s_time_t         periodic_last_event;
     struct timer     periodic_timer;
@@ -864,7 +865,7 @@ struct scheduler *scheduler_get_default(void);
 struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr);
 void scheduler_free(struct scheduler *sched);
 int schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
-void vcpu_force_reschedule(struct vcpu *v);
+void vcpu_set_periodic_timer(struct vcpu *v, s_time_t value);
 int cpu_disable_scheduler(unsigned int cpu);
 /* We need it in dom0_setup_vcpu */
 void sched_set_affinity(struct vcpu *v, const cpumask_t *hard,

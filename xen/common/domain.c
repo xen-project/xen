@@ -1508,15 +1508,13 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( set.period_ns > STIME_DELTA_MAX )
             return -EINVAL;
 
-        v->periodic_period = set.period_ns;
-        vcpu_force_reschedule(v);
+        vcpu_set_periodic_timer(v, set.period_ns);
 
         break;
     }
 
     case VCPUOP_stop_periodic_timer:
-        v->periodic_period = 0;
-        vcpu_force_reschedule(v);
+        vcpu_set_periodic_timer(v, 0);
         break;
 
     case VCPUOP_set_singleshot_timer:

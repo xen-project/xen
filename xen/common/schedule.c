@@ -312,6 +312,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     v->processor = processor;
 
     /* Initialise the per-vcpu timers. */
+    spin_lock_init(&v->periodic_timer_lock);
     init_timer(&v->periodic_timer, vcpu_periodic_timer_fn,
                v, v->processor);
     init_timer(&v->singleshot_timer, vcpu_singleshot_timer_fn,
@@ -722,24 +723,6 @@ static void vcpu_migrate_finish(struct vcpu *v)
 
     /* Wake on new CPU. */
     vcpu_wake(v);
-}
-
-/*
- * Force a VCPU through a deschedule/reschedule path.
- * For example, using this when setting the periodic timer period means that
- * most periodic-timer state need only be touched from within the scheduler
- * which can thus be done without need for synchronisation.
- */
-void vcpu_force_reschedule(struct vcpu *v)
-{
-    spinlock_t *lock = vcpu_schedule_lock_irq(v);
-
-    if ( v->is_running )
-        vcpu_migrate_start(v);
-
-    vcpu_schedule_unlock_irq(lock, v);
-
-    vcpu_migrate_finish(v);
 }
 
 void restore_vcpu_affinity(struct domain *d)
@@ -1458,13 +1441,10 @@ long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
     return rc;
 }
 
-static void vcpu_periodic_timer_work(struct vcpu *v)
+static void vcpu_periodic_timer_work_locked(struct vcpu *v)
 {
     s_time_t now;
     s_time_t periodic_next_event;
-
-    if ( v->periodic_period == 0 )
-        return;
 
     now = NOW();
     periodic_next_event = v->periodic_last_event + v->periodic_period;
@@ -1476,8 +1456,35 @@ static void vcpu_periodic_timer_work(struct vcpu *v)
         periodic_next_event = now + v->periodic_period;
     }
 
-    migrate_timer(&v->periodic_timer, smp_processor_id());
+    migrate_timer(&v->periodic_timer, v->processor);
     set_timer(&v->periodic_timer, periodic_next_event);
+}
+
+static void vcpu_periodic_timer_work(struct vcpu *v)
+{
+    if ( v->periodic_period == 0 )
+        return;
+
+    spin_lock(&v->periodic_timer_lock);
+    if ( v->periodic_period )
+        vcpu_periodic_timer_work_locked(v);
+    spin_unlock(&v->periodic_timer_lock);
+}
+
+/*
+ * Set the periodic timer of a vcpu.
+ */
+void vcpu_set_periodic_timer(struct vcpu *v, s_time_t value)
+{
+    spin_lock(&v->periodic_timer_lock);
+
+    stop_timer(&v->periodic_timer);
+
+    v->periodic_period = value;
+    if ( value )
+        vcpu_periodic_timer_work_locked(v);
+
+    spin_unlock(&v->periodic_timer_lock);
 }
 
 /*

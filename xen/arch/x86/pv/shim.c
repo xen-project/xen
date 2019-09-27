@@ -410,7 +410,7 @@ int pv_shim_shutdown(uint8_t reason)
         unmap_vcpu_info(v);
 
         /* Reset the periodic timer to the default value. */
-        v->periodic_period = MILLISECS(10);
+        vcpu_set_periodic_timer(v, MILLISECS(10));
         /* Stop the singleshot timer. */
         stop_timer(&v->singleshot_timer);
 
@@ -419,8 +419,6 @@ int pv_shim_shutdown(uint8_t reason)
 
         if ( v != current )
             vcpu_unpause_by_systemcontroller(v);
-        else
-            vcpu_force_reschedule(v);
     }
 
     return 0;
