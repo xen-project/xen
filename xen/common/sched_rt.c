@@ -36,7 +36,7 @@
  *
  * Migration compensation and resist like credit2 to better use cache;
  * Lock Holder Problem, using yield?
- * Self switch problem: VCPUs of the same domain may preempt each other;
+ * Self switch problem: UNITs of the same domain may preempt each other;
  */
 
 /*
@@ -44,30 +44,30 @@
  *
  * This scheduler follows the Preemptive Global Earliest Deadline First (EDF)
  * theory in real-time field.
- * At any scheduling point, the VCPU with earlier deadline has higher priority.
- * The scheduler always picks highest priority VCPU to run on a feasible PCPU.
- * A PCPU is feasible if the VCPU can run on this PCPU and (the PCPU is idle or
- * has a lower-priority VCPU running on it.)
+ * At any scheduling point, the UNIT with earlier deadline has higher priority.
+ * The scheduler always picks highest priority UNIT to run on a feasible PCPU.
+ * A PCPU is feasible if the UNIT can run on this PCPU and (the PCPU is idle or
+ * has a lower-priority UNIT running on it.)
  *
- * Each VCPU has a dedicated period, budget and a extratime flag
- * The deadline of a VCPU is at the end of each period;
- * A VCPU has its budget replenished at the beginning of each period;
- * While scheduled, a VCPU burns its budget.
- * The VCPU needs to finish its budget before its deadline in each period;
- * The VCPU discards its unused budget at the end of each period.
- * When a VCPU runs out of budget in a period, if its extratime flag is set,
- * the VCPU increases its priority_level by 1 and refills its budget; otherwise,
+ * Each UNIT has a dedicated period, budget and a extratime flag
+ * The deadline of an UNIT is at the end of each period;
+ * An UNIT has its budget replenished at the beginning of each period;
+ * While scheduled, an UNIT burns its budget.
+ * The UNIT needs to finish its budget before its deadline in each period;
+ * The UNIT discards its unused budget at the end of each period.
+ * When an UNIT runs out of budget in a period, if its extratime flag is set,
+ * the UNIT increases its priority_level by 1 and refills its budget; otherwise,
  * it has to wait until next period.
  *
- * Each VCPU is implemented as a deferable server.
- * When a VCPU has a task running on it, its budget is continuously burned;
- * When a VCPU has no task but with budget left, its budget is preserved.
+ * Each UNIT is implemented as a deferable server.
+ * When an UNIT has a task running on it, its budget is continuously burned;
+ * When an UNIT has no task but with budget left, its budget is preserved.
  *
  * Queue scheme:
  * A global runqueue and a global depletedqueue for each CPU pool.
- * The runqueue holds all runnable VCPUs with budget,
+ * The runqueue holds all runnable UNITs with budget,
  * sorted by priority_level and deadline;
- * The depletedqueue holds all VCPUs without budget, unsorted;
+ * The depletedqueue holds all UNITs without budget, unsorted;
  *
  * Note: cpumask and cpupool is supported.
  */
@@ -82,7 +82,7 @@
  * in schedule.c
  *
  * The functions involes RunQ and needs to grab locks are:
- *    vcpu_insert, vcpu_remove, context_saved, runq_insert
+ *    unit_insert, unit_remove, context_saved, runq_insert
  */
 
 
@@ -95,7 +95,7 @@
 
 /*
  * Max period: max delta of time type, because period is added to the time
- * a vcpu activates, so this must not overflow.
+ * an unit activates, so this must not overflow.
  * Min period: 10 us, considering the scheduling overhead (when period is
  * too low, scheduling is invoked too frequently, causing high overhead).
  */
@@ -121,12 +121,12 @@
  * Flags
  */
 /*
- * RTDS_scheduled: Is this vcpu either running on, or context-switching off,
+ * RTDS_scheduled: Is this unit either running on, or context-switching off,
  * a phyiscal cpu?
  * + Accessed only with global lock held.
  * + Set when chosen as next in rt_schedule().
  * + Cleared after context switch has been saved in rt_context_saved()
- * + Checked in vcpu_wake to see if we can add to the Runqueue, or if we should
+ * + Checked in unit_wake to see if we can add to the Runqueue, or if we should
  *   set RTDS_delayed_runq_add
  * + Checked to be false in runq_insert.
  */
@@ -146,15 +146,15 @@
 /*
  * RTDS_depleted: Does this vcp run out of budget?
  * This flag is
- * + set in burn_budget() if a vcpu has zero budget left;
+ * + set in burn_budget() if an unit has zero budget left;
  * + cleared and checked in the repenishment handler,
- *   for the vcpus that are being replenished.
+ *   for the units that are being replenished.
  */
 #define __RTDS_depleted     3
 #define RTDS_depleted (1<<__RTDS_depleted)
 
 /*
- * RTDS_extratime: Can the vcpu run in the time that is
+ * RTDS_extratime: Can the unit run in the time that is
  * not part of any real-time reservation, and would therefore
  * be otherwise left idle?
  */
@@ -183,11 +183,11 @@ struct rt_private {
     spinlock_t lock;            /* the global coarse-grained lock */
     struct list_head sdom;      /* list of availalbe domains, used for dump */
 
-    struct list_head runq;      /* ordered list of runnable vcpus */
-    struct list_head depletedq; /* unordered list of depleted vcpus */
+    struct list_head runq;      /* ordered list of runnable units */
+    struct list_head depletedq; /* unordered list of depleted units */
 
     struct timer repl_timer;    /* replenishment timer */
-    struct list_head replq;     /* ordered list of vcpus that need replenishment */
+    struct list_head replq;     /* ordered list of units that need replenishment */
 
     cpumask_t tickled;          /* cpus been tickled */
 };
@@ -199,18 +199,18 @@ struct rt_unit {
     struct list_head q_elem;     /* on the runq/depletedq list */
     struct list_head replq_elem; /* on the replenishment events list */
 
-    /* VCPU parameters, in nanoseconds */
+    /* UNIT parameters, in nanoseconds */
     s_time_t period;
     s_time_t budget;
 
-    /* VCPU current information in nanosecond */
+    /* UNIT current information in nanosecond */
     s_time_t cur_budget;         /* current budget */
     s_time_t last_start;         /* last start time */
     s_time_t cur_deadline;       /* current deadline for EDF */
 
     /* Up-pointers */
     struct rt_dom *sdom;
-    struct vcpu *vcpu;
+    struct sched_unit *unit;
 
     unsigned priority_level;
 
@@ -263,7 +263,7 @@ static inline bool has_extratime(const struct rt_unit *svc)
  * and the replenishment events queue.
  */
 static int
-vcpu_on_q(const struct rt_unit *svc)
+unit_on_q(const struct rt_unit *svc)
 {
    return !list_empty(&svc->q_elem);
 }
@@ -281,7 +281,7 @@ replq_elem(struct list_head *elem)
 }
 
 static int
-vcpu_on_replq(const struct rt_unit *svc)
+unit_on_replq(const struct rt_unit *svc)
 {
     return !list_empty(&svc->replq_elem);
 }
@@ -291,7 +291,7 @@ vcpu_on_replq(const struct rt_unit *svc)
  * Otherwise, return value < 0
  */
 static s_time_t
-compare_vcpu_priority(const struct rt_unit *v1, const struct rt_unit *v2)
+compare_unit_priority(const struct rt_unit *v1, const struct rt_unit *v2)
 {
     int prio = v2->priority_level - v1->priority_level;
 
@@ -302,15 +302,15 @@ compare_vcpu_priority(const struct rt_unit *v1, const struct rt_unit *v2)
 }
 
 /*
- * Debug related code, dump vcpu/cpu information
+ * Debug related code, dump unit/cpu information
  */
 static void
-rt_dump_vcpu(const struct scheduler *ops, const struct rt_unit *svc)
+rt_dump_unit(const struct scheduler *ops, const struct rt_unit *svc)
 {
     cpumask_t *cpupool_mask, *mask;
 
     ASSERT(svc != NULL);
-    /* idle vcpu */
+    /* idle unit */
     if( svc->sdom == NULL )
     {
         printk("\n");
@@ -321,20 +321,20 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_unit *svc)
      * We can't just use 'cpumask_scratch' because the dumping can
      * happen from a pCPU outside of this scheduler's cpupool, and
      * hence it's not right to use its pCPU's scratch mask.
-     * On the other hand, it is safe to use svc->vcpu->processor's
+     * On the other hand, it is safe to use sched_unit_master(svc->unit)'s
      * own scratch space, since we hold the runqueue lock.
      */
-    mask = cpumask_scratch_cpu(svc->vcpu->processor);
+    mask = cpumask_scratch_cpu(sched_unit_master(svc->unit));
 
-    cpupool_mask = cpupool_domain_cpumask(svc->vcpu->domain);
-    cpumask_and(mask, cpupool_mask, svc->vcpu->sched_unit->cpu_hard_affinity);
+    cpupool_mask = cpupool_domain_cpumask(svc->unit->domain);
+    cpumask_and(mask, cpupool_mask, svc->unit->cpu_hard_affinity);
     printk("[%5d.%-2u] cpu %u, (%"PRI_stime", %"PRI_stime"),"
            " cur_b=%"PRI_stime" cur_d=%"PRI_stime" last_start=%"PRI_stime"\n"
            " \t\t priority_level=%d has_extratime=%d\n"
            " \t\t onQ=%d runnable=%d flags=%x effective hard_affinity=%*pbl\n",
-            svc->vcpu->domain->domain_id,
-            svc->vcpu->vcpu_id,
-            svc->vcpu->processor,
+            svc->unit->domain->domain_id,
+            svc->unit->unit_id,
+            sched_unit_master(svc->unit),
             svc->period,
             svc->budget,
             svc->cur_budget,
@@ -342,8 +342,8 @@ rt_dump_vcpu(const struct scheduler *ops, const struct rt_unit *svc)
             svc->last_start,
             svc->priority_level,
             has_extratime(svc),
-            vcpu_on_q(svc),
-            vcpu_runnable(svc->vcpu),
+            unit_on_q(svc),
+            unit_runnable(svc->unit),
             svc->flags, CPUMASK_PR(mask));
 }
 
@@ -356,11 +356,11 @@ rt_dump_pcpu(const struct scheduler *ops, int cpu)
 
     spin_lock_irqsave(&prv->lock, flags);
     printk("CPU[%02d]\n", cpu);
-    /* current VCPU (nothing to say if that's the idle vcpu). */
+    /* current UNIT (nothing to say if that's the idle unit). */
     svc = rt_unit(curr_on_cpu(cpu));
-    if ( svc && !is_idle_vcpu(svc->vcpu) )
+    if ( svc && !is_idle_unit(svc->unit) )
     {
-        rt_dump_vcpu(ops, svc);
+        rt_dump_unit(ops, svc);
     }
     spin_unlock_irqrestore(&prv->lock, flags);
 }
@@ -387,35 +387,35 @@ rt_dump(const struct scheduler *ops)
     list_for_each ( iter, runq )
     {
         svc = q_elem(iter);
-        rt_dump_vcpu(ops, svc);
+        rt_dump_unit(ops, svc);
     }
 
     printk("Global DepletedQueue info:\n");
     list_for_each ( iter, depletedq )
     {
         svc = q_elem(iter);
-        rt_dump_vcpu(ops, svc);
+        rt_dump_unit(ops, svc);
     }
 
     printk("Global Replenishment Events info:\n");
     list_for_each ( iter, replq )
     {
         svc = replq_elem(iter);
-        rt_dump_vcpu(ops, svc);
+        rt_dump_unit(ops, svc);
     }
 
     printk("Domain info:\n");
     list_for_each ( iter, &prv->sdom )
     {
-        struct vcpu *v;
+        struct sched_unit *unit;
 
         sdom = list_entry(iter, struct rt_dom, sdom_elem);
         printk("\tdomain: %d\n", sdom->dom->domain_id);
 
-        for_each_vcpu ( sdom->dom, v )
+        for_each_sched_unit ( sdom->dom, unit )
         {
-            svc = rt_unit(v->sched_unit);
-            rt_dump_vcpu(ops, svc);
+            svc = rt_unit(unit);
+            rt_dump_unit(ops, svc);
         }
     }
 
@@ -457,12 +457,12 @@ rt_update_deadline(s_time_t now, struct rt_unit *svc)
     /* TRACE */
     {
         struct __packed {
-            unsigned vcpu:16, dom:16;
+            unsigned unit:16, dom:16;
             unsigned priority_level;
             uint64_t cur_deadline, cur_budget;
         } d;
-        d.dom = svc->vcpu->domain->domain_id;
-        d.vcpu = svc->vcpu->vcpu_id;
+        d.dom = svc->unit->domain->domain_id;
+        d.unit = svc->unit->unit_id;
         d.priority_level = svc->priority_level;
         d.cur_deadline = (uint64_t) svc->cur_deadline;
         d.cur_budget = (uint64_t) svc->cur_budget;
@@ -475,15 +475,15 @@ rt_update_deadline(s_time_t now, struct rt_unit *svc)
 }
 
 /*
- * Helpers for removing and inserting a vcpu in a queue
- * that is being kept ordered by the vcpus' deadlines (as EDF
+ * Helpers for removing and inserting an unit in a queue
+ * that is being kept ordered by the units' deadlines (as EDF
  * mandates).
  *
- * For callers' convenience, the vcpu removing helper returns
- * true if the vcpu removed was the one at the front of the
+ * For callers' convenience, the unit removing helper returns
+ * true if the unit removed was the one at the front of the
  * queue; similarly, the inserting helper returns true if the
  * inserted ended at the front of the queue (i.e., in both
- * cases, if the vcpu with the earliest deadline is what we
+ * cases, if the unit with the earliest deadline is what we
  * are dealing with).
  */
 static inline bool
@@ -509,7 +509,7 @@ deadline_queue_insert(struct rt_unit * (*qelem)(struct list_head *),
     list_for_each ( iter, queue )
     {
         struct rt_unit * iter_svc = (*qelem)(iter);
-        if ( compare_vcpu_priority(svc, iter_svc) > 0 )
+        if ( compare_unit_priority(svc, iter_svc) > 0 )
             break;
         pos++;
     }
@@ -524,7 +524,7 @@ deadline_queue_insert(struct rt_unit * (*qelem)(struct list_head *),
 static inline void
 q_remove(struct rt_unit *svc)
 {
-    ASSERT( vcpu_on_q(svc) );
+    ASSERT( unit_on_q(svc) );
     list_del_init(&svc->q_elem);
 }
 
@@ -534,14 +534,14 @@ replq_remove(const struct scheduler *ops, struct rt_unit *svc)
     struct rt_private *prv = rt_priv(ops);
     struct list_head *replq = rt_replq(ops);
 
-    ASSERT( vcpu_on_replq(svc) );
+    ASSERT( unit_on_replq(svc) );
 
     if ( deadline_queue_remove(replq, &svc->replq_elem) )
     {
         /*
          * The replenishment timer needs to be set to fire when a
-         * replenishment for the vcpu at the front of the replenishment
-         * queue is due. If it is such vcpu that we just removed, we may
+         * replenishment for the unit at the front of the replenishment
+         * queue is due. If it is such unit that we just removed, we may
          * need to reprogram the timer.
          */
         if ( !list_empty(replq) )
@@ -556,7 +556,7 @@ replq_remove(const struct scheduler *ops, struct rt_unit *svc)
 
 /*
  * Insert svc with budget in RunQ according to EDF:
- * vcpus with smaller deadlines go first.
+ * units with smaller deadlines go first.
  * Insert svc without budget in DepletedQ unsorted;
  */
 static void
@@ -566,8 +566,8 @@ runq_insert(const struct scheduler *ops, struct rt_unit *svc)
     struct list_head *runq = rt_runq(ops);
 
     ASSERT( spin_is_locked(&prv->lock) );
-    ASSERT( !vcpu_on_q(svc) );
-    ASSERT( vcpu_on_replq(svc) );
+    ASSERT( !unit_on_q(svc) );
+    ASSERT( unit_on_replq(svc) );
 
     /* add svc to runq if svc still has budget or its extratime is set */
     if ( svc->cur_budget > 0 ||
@@ -583,7 +583,7 @@ replq_insert(const struct scheduler *ops, struct rt_unit *svc)
     struct list_head *replq = rt_replq(ops);
     struct rt_private *prv = rt_priv(ops);
 
-    ASSERT( !vcpu_on_replq(svc) );
+    ASSERT( !unit_on_replq(svc) );
 
     /*
      * The timer may be re-programmed if svc is inserted
@@ -606,12 +606,12 @@ replq_reinsert(const struct scheduler *ops, struct rt_unit *svc)
     struct rt_unit *rearm_svc = svc;
     bool_t rearm = 0;
 
-    ASSERT( vcpu_on_replq(svc) );
+    ASSERT( unit_on_replq(svc) );
 
     /*
      * If svc was at the front of the replenishment queue, we certainly
      * need to re-program the timer, and we want to use the deadline of
-     * the vcpu which is now at the front of the queue (which may still
+     * the unit which is now at the front of the queue (which may still
      * be svc or not).
      *
      * We may also need to re-program, if svc has been put at the front
@@ -631,24 +631,23 @@ replq_reinsert(const struct scheduler *ops, struct rt_unit *svc)
 }
 
 /*
- * Pick a valid resource for the vcpu vc
- * Valid resource of a vcpu is intesection of vcpu's affinity
+ * Pick a valid resource for the unit vc
+ * Valid resource of an unit is intesection of unit's affinity
  * and available resources
  */
 static struct sched_resource *
 rt_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
 {
-    struct vcpu *vc = unit->vcpu_list;
     cpumask_t cpus;
     cpumask_t *online;
     int cpu;
 
-    online = cpupool_domain_cpumask(vc->domain);
+    online = cpupool_domain_cpumask(unit->domain);
     cpumask_and(&cpus, online, unit->cpu_hard_affinity);
 
-    cpu = cpumask_test_cpu(vc->processor, &cpus)
-            ? vc->processor
-            : cpumask_cycle(vc->processor, &cpus);
+    cpu = cpumask_test_cpu(sched_unit_master(unit), &cpus)
+            ? sched_unit_master(unit)
+            : cpumask_cycle(sched_unit_master(unit), &cpus);
     ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
 
     return get_sched_res(cpu);
@@ -736,7 +735,7 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
     struct rt_private *prv = rt_priv(new_ops);
     struct rt_unit *svc = vdata;
 
-    ASSERT(!pdata && svc && is_idle_vcpu(svc->vcpu));
+    ASSERT(!pdata && svc && is_idle_unit(svc->unit));
 
     /*
      * We are holding the runqueue lock already (it's been taken in
@@ -760,7 +759,7 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
         dprintk(XENLOG_DEBUG, "RTDS: timer initialized on cpu %u\n", cpu);
     }
 
-    idle_vcpu[cpu]->sched_unit->priv = vdata;
+    sched_idle_unit(cpu)->priv = vdata;
 
     return &prv->lock;
 }
@@ -840,10 +839,9 @@ rt_free_domdata(const struct scheduler *ops, void *data)
 static void *
 rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
 {
-    struct vcpu *vc = unit->vcpu_list;
     struct rt_unit *svc;
 
-    /* Allocate per-VCPU info */
+    /* Allocate per-UNIT info */
     svc = xzalloc(struct rt_unit);
     if ( svc == NULL )
         return NULL;
@@ -852,13 +850,13 @@ rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
     INIT_LIST_HEAD(&svc->replq_elem);
     svc->flags = 0U;
     svc->sdom = dd;
-    svc->vcpu = vc;
+    svc->unit = unit;
     svc->last_start = 0;
 
     __set_bit(__RTDS_extratime, &svc->flags);
     svc->priority_level = 0;
     svc->period = RTDS_DEFAULT_PERIOD;
-    if ( !is_idle_vcpu(vc) )
+    if ( !is_idle_unit(unit) )
         svc->budget = RTDS_DEFAULT_BUDGET;
 
     SCHED_STAT_CRANK(unit_alloc);
@@ -878,22 +876,20 @@ rt_free_udata(const struct scheduler *ops, void *priv)
  * It is called in sched_move_domain() and sched_init_vcpu
  * in schedule.c.
  * When move a domain to a new cpupool.
- * It inserts vcpus of moving domain to the scheduler's RunQ in
+ * It inserts units of moving domain to the scheduler's RunQ in
  * dest. cpupool.
  */
 static void
 rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 {
-    struct vcpu *vc = unit->vcpu_list;
     struct rt_unit *svc = rt_unit(unit);
     s_time_t now;
     spinlock_t *lock;
 
-    BUG_ON( is_idle_vcpu(vc) );
+    BUG_ON( is_idle_unit(unit) );
 
-    /* This is safe because vc isn't yet being scheduled */
-    unit->res = rt_res_pick(ops, unit);
-    vc->processor = unit->res->master_cpu;
+    /* This is safe because unit isn't yet being scheduled */
+    sched_set_res(unit, rt_res_pick(ops, unit));
 
     lock = unit_schedule_lock_irq(unit);
 
@@ -901,7 +897,7 @@ rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
     if ( now >= svc->cur_deadline )
         rt_update_deadline(now, svc);
 
-    if ( !vcpu_on_q(svc) && vcpu_runnable(vc) )
+    if ( !unit_on_q(svc) && unit_runnable(unit) )
     {
         replq_insert(ops, svc);
 
@@ -928,10 +924,10 @@ rt_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
     BUG_ON( sdom == NULL );
 
     lock = unit_schedule_lock_irq(unit);
-    if ( vcpu_on_q(svc) )
+    if ( unit_on_q(svc) )
         q_remove(svc);
 
-    if ( vcpu_on_replq(svc) )
+    if ( unit_on_replq(svc) )
         replq_remove(ops,svc);
 
     unit_schedule_unlock_irq(lock, unit);
@@ -945,8 +941,8 @@ burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
 {
     s_time_t delta;
 
-    /* don't burn budget for idle VCPU */
-    if ( is_idle_vcpu(svc->vcpu) )
+    /* don't burn budget for idle UNIT */
+    if ( is_idle_unit(svc->unit) )
         return;
 
     /* burn at nanoseconds level */
@@ -983,14 +979,14 @@ burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
     /* TRACE */
     {
         struct __packed {
-            unsigned vcpu:16, dom:16;
+            unsigned unit:16, dom:16;
             uint64_t cur_budget;
             int delta;
             unsigned priority_level;
             bool has_extratime;
         } d;
-        d.dom = svc->vcpu->domain->domain_id;
-        d.vcpu = svc->vcpu->vcpu_id;
+        d.dom = svc->unit->domain->domain_id;
+        d.unit = svc->unit->unit_id;
         d.cur_budget = (uint64_t) svc->cur_budget;
         d.delta = delta;
         d.priority_level = svc->priority_level;
@@ -1020,9 +1016,8 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask)
         iter_svc = q_elem(iter);
 
         /* mask cpu_hard_affinity & cpupool & mask */
-        online = cpupool_domain_cpumask(iter_svc->vcpu->domain);
-        cpumask_and(&cpu_common, online,
-                    iter_svc->vcpu->sched_unit->cpu_hard_affinity);
+        online = cpupool_domain_cpumask(iter_svc->unit->domain);
+        cpumask_and(&cpu_common, online, iter_svc->unit->cpu_hard_affinity);
         cpumask_and(&cpu_common, mask, &cpu_common);
         if ( cpumask_empty(&cpu_common) )
             continue;
@@ -1038,11 +1033,11 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask)
         if( svc != NULL )
         {
             struct __packed {
-                unsigned vcpu:16, dom:16;
+                unsigned unit:16, dom:16;
                 uint64_t cur_deadline, cur_budget;
             } d;
-            d.dom = svc->vcpu->domain->domain_id;
-            d.vcpu = svc->vcpu->vcpu_id;
+            d.dom = svc->unit->domain->domain_id;
+            d.unit = svc->unit->unit_id;
             d.cur_deadline = (uint64_t) svc->cur_deadline;
             d.cur_budget = (uint64_t) svc->cur_budget;
             trace_var(TRC_RTDS_RUNQ_PICK, 1,
@@ -1066,6 +1061,7 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
     struct rt_unit *const scurr = rt_unit(current->sched_unit);
     struct rt_unit *snext = NULL;
     struct task_slice ret = { .migrated = 0 };
+    struct sched_unit *currunit = current->sched_unit;
 
     /* TRACE */
     {
@@ -1075,7 +1071,7 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
         d.cpu = cpu;
         d.tasklet = tasklet_work_scheduled;
         d.tickled = cpumask_test_cpu(cpu, &prv->tickled);
-        d.idle = is_idle_vcpu(current);
+        d.idle = is_idle_unit(currunit);
         trace_var(TRC_RTDS_SCHEDULE, 1,
                   sizeof(d),
                   (unsigned char *)&d);
@@ -1084,72 +1080,70 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
     /* clear ticked bit now that we've been scheduled */
     cpumask_clear_cpu(cpu, &prv->tickled);
 
-    /* burn_budget would return for IDLE VCPU */
+    /* burn_budget would return for IDLE UNIT */
     burn_budget(ops, scurr, now);
 
     if ( tasklet_work_scheduled )
     {
         trace_var(TRC_RTDS_SCHED_TASKLET, 1, 0,  NULL);
-        snext = rt_unit(idle_vcpu[cpu]->sched_unit);
+        snext = rt_unit(sched_idle_unit(cpu));
     }
     else
     {
         snext = runq_pick(ops, cpumask_of(cpu));
         if ( snext == NULL )
-            snext = rt_unit(idle_vcpu[cpu]->sched_unit);
+            snext = rt_unit(sched_idle_unit(cpu));
 
         /* if scurr has higher priority and budget, still pick scurr */
-        if ( !is_idle_vcpu(current) &&
-             vcpu_runnable(current) &&
+        if ( !is_idle_unit(currunit) &&
+             unit_runnable(currunit) &&
              scurr->cur_budget > 0 &&
-             ( is_idle_vcpu(snext->vcpu) ||
-               compare_vcpu_priority(scurr, snext) > 0 ) )
+             ( is_idle_unit(snext->unit) ||
+               compare_unit_priority(scurr, snext) > 0 ) )
             snext = scurr;
     }
 
     if ( snext != scurr &&
-         !is_idle_vcpu(current) &&
-         vcpu_runnable(current) )
+         !is_idle_unit(currunit) &&
+         unit_runnable(currunit) )
         __set_bit(__RTDS_delayed_runq_add, &scurr->flags);
 
     snext->last_start = now;
-    ret.time =  -1; /* if an idle vcpu is picked */
-    if ( !is_idle_vcpu(snext->vcpu) )
+    ret.time =  -1; /* if an idle unit is picked */
+    if ( !is_idle_unit(snext->unit) )
     {
         if ( snext != scurr )
         {
             q_remove(snext);
             __set_bit(__RTDS_scheduled, &snext->flags);
         }
-        if ( snext->vcpu->processor != cpu )
+        if ( sched_unit_master(snext->unit) != cpu )
         {
-            snext->vcpu->processor = cpu;
-            snext->vcpu->sched_unit->res = get_sched_res(cpu);
+            sched_set_res(snext->unit, get_sched_res(cpu));
             ret.migrated = 1;
         }
         ret.time = snext->cur_budget; /* invoke the scheduler next time */
     }
-    ret.task = snext->vcpu->sched_unit;
+    ret.task = snext->unit;
 
     return ret;
 }
 
 /*
- * Remove VCPU from RunQ
+ * Remove UNIT from RunQ
  * The lock is already grabbed in schedule.c, no need to lock here
  */
 static void
 rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
-    struct vcpu *vc = unit->vcpu_list;
     struct rt_unit * const svc = rt_unit(unit);
 
-    BUG_ON( is_idle_vcpu(vc) );
+    BUG_ON( is_idle_unit(unit) );
     SCHED_STAT_CRANK(unit_sleep);
 
-    if ( curr_on_cpu(vc->processor) == unit )
-        cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
-    else if ( vcpu_on_q(svc) )
+    if ( curr_on_cpu(sched_unit_master(unit)) == unit )
+        cpu_raise_softirq(sched_unit_master(unit), SCHEDULE_SOFTIRQ);
+    else if ( unit_on_q(svc) )
     {
         q_remove(svc);
         replq_remove(ops, svc);
@@ -1159,20 +1153,20 @@ rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 }
 
 /*
- * Pick a cpu where to run a vcpu,
- * possibly kicking out the vcpu running there
+ * Pick a cpu where to run an unit,
+ * possibly kicking out the unit running there
  * Called by wake() and context_saved()
  * We have a running candidate here, the kick logic is:
  * Among all the cpus that are within the cpu affinity
  * 1) if there are any idle CPUs, kick one.
       For cache benefit, we check new->cpu as first
  * 2) now all pcpus are busy;
- *    among all the running vcpus, pick lowest priority one
+ *    among all the running units, pick lowest priority one
  *    if snext has higher priority, kick it.
  *
  * TODO:
- * 1) what if these two vcpus belongs to the same domain?
- *    replace a vcpu belonging to the same domain introduces more overhead
+ * 1) what if these two units belongs to the same domain?
+ *    replace an unit belonging to the same domain introduces more overhead
  *
  * lock is grabbed before calling this function
  */
@@ -1180,18 +1174,18 @@ static void
 runq_tickle(const struct scheduler *ops, struct rt_unit *new)
 {
     struct rt_private *prv = rt_priv(ops);
-    struct rt_unit *latest_deadline_vcpu = NULL; /* lowest priority */
+    struct rt_unit *latest_deadline_unit = NULL; /* lowest priority */
     struct rt_unit *iter_svc;
-    struct vcpu *iter_vc;
+    struct sched_unit *iter_unit;
     int cpu = 0, cpu_to_tickle = 0;
     cpumask_t not_tickled;
     cpumask_t *online;
 
-    if ( new == NULL || is_idle_vcpu(new->vcpu) )
+    if ( new == NULL || is_idle_unit(new->unit) )
         return;
 
-    online = cpupool_domain_cpumask(new->vcpu->domain);
-    cpumask_and(&not_tickled, online, new->vcpu->sched_unit->cpu_hard_affinity);
+    online = cpupool_domain_cpumask(new->unit->domain);
+    cpumask_and(&not_tickled, online, new->unit->cpu_hard_affinity);
     cpumask_andnot(&not_tickled, &not_tickled, &prv->tickled);
 
     /*
@@ -1199,31 +1193,31 @@ runq_tickle(const struct scheduler *ops, struct rt_unit *new)
      *    For cache benefit,we first search new->cpu.
      *    The same loop also find the one with lowest priority.
      */
-    cpu = cpumask_test_or_cycle(new->vcpu->processor, &not_tickled);
+    cpu = cpumask_test_or_cycle(sched_unit_master(new->unit), &not_tickled);
     while ( cpu!= nr_cpu_ids )
     {
-        iter_vc = curr_on_cpu(cpu)->vcpu_list;
-        if ( is_idle_vcpu(iter_vc) )
+        iter_unit = curr_on_cpu(cpu);
+        if ( is_idle_unit(iter_unit) )
         {
             SCHED_STAT_CRANK(tickled_idle_cpu);
             cpu_to_tickle = cpu;
             goto out;
         }
-        iter_svc = rt_unit(iter_vc->sched_unit);
-        if ( latest_deadline_vcpu == NULL ||
-             compare_vcpu_priority(iter_svc, latest_deadline_vcpu) < 0 )
-            latest_deadline_vcpu = iter_svc;
+        iter_svc = rt_unit(iter_unit);
+        if ( latest_deadline_unit == NULL ||
+             compare_unit_priority(iter_svc, latest_deadline_unit) < 0 )
+            latest_deadline_unit = iter_svc;
 
         cpumask_clear_cpu(cpu, &not_tickled);
         cpu = cpumask_cycle(cpu, &not_tickled);
     }
 
-    /* 2) candicate has higher priority, kick out lowest priority vcpu */
-    if ( latest_deadline_vcpu != NULL &&
-         compare_vcpu_priority(latest_deadline_vcpu, new) < 0 )
+    /* 2) candicate has higher priority, kick out lowest priority unit */
+    if ( latest_deadline_unit != NULL &&
+         compare_unit_priority(latest_deadline_unit, new) < 0 )
     {
         SCHED_STAT_CRANK(tickled_busy_cpu);
-        cpu_to_tickle = latest_deadline_vcpu->vcpu->processor;
+        cpu_to_tickle = sched_unit_master(latest_deadline_unit->unit);
         goto out;
     }
 
@@ -1249,35 +1243,34 @@ runq_tickle(const struct scheduler *ops, struct rt_unit *new)
 }
 
 /*
- * Should always wake up runnable vcpu, put it back to RunQ.
+ * Should always wake up runnable unit, put it back to RunQ.
  * Check priority to raise interrupt
  * The lock is already grabbed in schedule.c, no need to lock here
- * TODO: what if these two vcpus belongs to the same domain?
+ * TODO: what if these two units belongs to the same domain?
  */
 static void
 rt_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 {
-    struct vcpu *vc = unit->vcpu_list;
     struct rt_unit * const svc = rt_unit(unit);
     s_time_t now;
     bool_t missed;
 
-    BUG_ON( is_idle_vcpu(vc) );
+    BUG_ON( is_idle_unit(unit) );
 
-    if ( unlikely(curr_on_cpu(vc->processor) == unit) )
+    if ( unlikely(curr_on_cpu(sched_unit_master(unit)) == unit) )
     {
         SCHED_STAT_CRANK(unit_wake_running);
         return;
     }
 
     /* on RunQ/DepletedQ, just update info is ok */
-    if ( unlikely(vcpu_on_q(svc)) )
+    if ( unlikely(unit_on_q(svc)) )
     {
         SCHED_STAT_CRANK(unit_wake_onrunq);
         return;
     }
 
-    if ( likely(vcpu_runnable(vc)) )
+    if ( likely(unit_runnable(unit)) )
         SCHED_STAT_CRANK(unit_wake_runnable);
     else
         SCHED_STAT_CRANK(unit_wake_not_runnable);
@@ -1293,16 +1286,16 @@ rt_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
         rt_update_deadline(now, svc);
 
     /*
-     * If context hasn't been saved for this vcpu yet, we can't put it on
+     * If context hasn't been saved for this unit yet, we can't put it on
      * the run-queue/depleted-queue. Instead, we set the appropriate flag,
-     * the vcpu will be put back on queue after the context has been saved
+     * the unit will be put back on queue after the context has been saved
      * (in rt_context_save()).
      */
     if ( unlikely(svc->flags & RTDS_scheduled) )
     {
         __set_bit(__RTDS_delayed_runq_add, &svc->flags);
         /*
-         * The vcpu is waking up already, and we didn't even had the time to
+         * The unit is waking up already, and we didn't even had the time to
          * remove its next replenishment event from the replenishment queue
          * when it blocked! No big deal. If we did not miss the deadline in
          * the meantime, let's just leave it there. If we did, let's remove it
@@ -1323,22 +1316,21 @@ rt_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 
 /*
  * scurr has finished context switch, insert it back to the RunQ,
- * and then pick the highest priority vcpu from runq to run
+ * and then pick the highest priority unit from runq to run
  */
 static void
 rt_context_saved(const struct scheduler *ops, struct sched_unit *unit)
 {
-    struct vcpu *vc = unit->vcpu_list;
     struct rt_unit *svc = rt_unit(unit);
     spinlock_t *lock = unit_schedule_lock_irq(unit);
 
     __clear_bit(__RTDS_scheduled, &svc->flags);
-    /* not insert idle vcpu to runq */
-    if ( is_idle_vcpu(vc) )
+    /* not insert idle unit to runq */
+    if ( is_idle_unit(unit) )
         goto out;
 
     if ( __test_and_clear_bit(__RTDS_delayed_runq_add, &svc->flags) &&
-         likely(vcpu_runnable(vc)) )
+         likely(unit_runnable(unit)) )
     {
         runq_insert(ops, svc);
         runq_tickle(ops, svc);
@@ -1351,7 +1343,7 @@ out:
 }
 
 /*
- * set/get each vcpu info of each domain
+ * set/get each unit info of each domain
  */
 static int
 rt_dom_cntl(
@@ -1361,7 +1353,7 @@ rt_dom_cntl(
 {
     struct rt_private *prv = rt_priv(ops);
     struct rt_unit *svc;
-    struct vcpu *v;
+    struct sched_unit *unit;
     unsigned long flags;
     int rc = 0;
     struct xen_domctl_schedparam_vcpu local_sched;
@@ -1382,9 +1374,9 @@ rt_dom_cntl(
             break;
         }
         spin_lock_irqsave(&prv->lock, flags);
-        for_each_vcpu ( d, v )
+        for_each_sched_unit ( d, unit )
         {
-            svc = rt_unit(v->sched_unit);
+            svc = rt_unit(unit);
             svc->period = MICROSECS(op->u.rtds.period); /* transfer to nanosec */
             svc->budget = MICROSECS(op->u.rtds.budget);
         }
@@ -1452,7 +1444,7 @@ rt_dom_cntl(
                 break;
         }
         if ( !rc )
-            /* notify upper caller how many vcpus have been processed. */
+            /* notify upper caller how many units have been processed. */
             op->u.v.nr_vcpus = index;
         break;
     }
@@ -1461,7 +1453,7 @@ rt_dom_cntl(
 }
 
 /*
- * The replenishment timer handler picks vcpus
+ * The replenishment timer handler picks units
  * from the replq and does the actual replenishment.
  */
 static void repl_timer_handler(void *data){
@@ -1479,7 +1471,7 @@ static void repl_timer_handler(void *data){
     now = NOW();
 
     /*
-     * Do the replenishment and move replenished vcpus
+     * Do the replenishment and move replenished units
      * to the temporary list to tickle.
      * If svc is on run queue, we need to put it at
      * the correct place since its deadline changes.
@@ -1495,7 +1487,7 @@ static void repl_timer_handler(void *data){
         rt_update_deadline(now, svc);
         list_add(&svc->replq_elem, &tmp_replq);
 
-        if ( vcpu_on_q(svc) )
+        if ( unit_on_q(svc) )
         {
             q_remove(svc);
             runq_insert(ops, svc);
@@ -1503,26 +1495,26 @@ static void repl_timer_handler(void *data){
     }
 
     /*
-     * Iterate through the list of updated vcpus.
-     * If an updated vcpu is running, tickle the head of the
+     * Iterate through the list of updated units.
+     * If an updated unit is running, tickle the head of the
      * runqueue if it has a higher priority.
-     * If an updated vcpu was depleted and on the runqueue, tickle it.
-     * Finally, reinsert the vcpus back to replenishement events list.
+     * If an updated unit was depleted and on the runqueue, tickle it.
+     * Finally, reinsert the units back to replenishement events list.
      */
     list_for_each_safe ( iter, tmp, &tmp_replq )
     {
         svc = replq_elem(iter);
 
-        if ( curr_on_cpu(svc->vcpu->processor) == svc->vcpu->sched_unit &&
+        if ( curr_on_cpu(sched_unit_master(svc->unit)) == svc->unit &&
              !list_empty(runq) )
         {
             struct rt_unit *next_on_runq = q_elem(runq->next);
 
-            if ( compare_vcpu_priority(svc, next_on_runq) < 0 )
+            if ( compare_unit_priority(svc, next_on_runq) < 0 )
                 runq_tickle(ops, next_on_runq);
         }
         else if ( __test_and_clear_bit(__RTDS_depleted, &svc->flags) &&
-                  vcpu_on_q(svc) )
+                  unit_on_q(svc) )
             runq_tickle(ops, svc);
 
         list_del(&svc->replq_elem);
@@ -1530,7 +1522,7 @@ static void repl_timer_handler(void *data){
     }
 
     /*
-     * If there are vcpus left in the replenishment event list,
+     * If there are units left in the replenishment event list,
      * set the next replenishment to happen at the deadline of
      * the one in the front.
      */
