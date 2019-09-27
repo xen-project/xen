@@ -277,6 +277,8 @@ struct sched_unit {
 
     /* Last time unit got (de-)scheduled. */
     uint64_t               state_entry_time;
+    /* Vcpu state summary. */
+    unsigned int           runstate_cnt[4];
 
     /* Bitmask of CPUs on which this VCPU may run. */
     cpumask_var_t          cpu_hard_affinity;
