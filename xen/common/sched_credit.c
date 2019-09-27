@@ -709,7 +709,7 @@ __csched_vcpu_is_migrateable(const struct csched_private *prv, struct vcpu *vc,
      * The caller is supposed to have already checked that vc is also
      * not running.
      */
-    ASSERT(!vc->is_running);
+    ASSERT(!vc->sched_unit->is_running);
 
     return !__csched_vcpu_is_cache_hot(prv, svc) &&
            cpumask_test_cpu(dest_cpu, mask);
@@ -1033,7 +1033,8 @@ csched_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 
     lock = unit_schedule_lock_irq(unit);
 
-    if ( !__vcpu_on_runq(svc) && vcpu_runnable(vc) && !vc->is_running )
+    if ( !__vcpu_on_runq(svc) && vcpu_runnable(vc) &&
+         !vc->sched_unit->is_running )
         runq_insert(svc);
 
     unit_schedule_unlock_irq(lock, unit);
@@ -1646,8 +1647,9 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
          * vCPUs with useful soft affinities in some sort of bitmap
          * or counter.
          */
-        if ( vc->is_running || (balance_step == BALANCE_SOFT_AFFINITY &&
-                                !has_soft_affinity(vc->sched_unit)) )
+        if ( vc->sched_unit->is_running ||
+             (balance_step == BALANCE_SOFT_AFFINITY &&
+              !has_soft_affinity(vc->sched_unit)) )
             continue;
 
         affinity_balance_cpumask(vc->sched_unit, balance_step, cpumask_scratch);
@@ -1855,7 +1857,7 @@ csched_schedule(
                     (unsigned char *)&d);
     }
 
-    runtime = now - current->runstate.state_entry_time;
+    runtime = now - current->sched_unit->state_entry_time;
     if ( runtime < 0 ) /* Does this ever happen? */
         runtime = 0;
 

@@ -905,7 +905,7 @@ rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
     {
         replq_insert(ops, svc);
 
-        if ( !vc->is_running )
+        if ( !unit->is_running )
             runq_insert(ops, svc);
     }
     unit_schedule_unlock_irq(lock, unit);

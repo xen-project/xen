@@ -412,6 +412,8 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     {
         get_sched_res(v->processor)->curr = unit;
         v->is_running = 1;
+        unit->is_running = true;
+        unit->state_entry_time = NOW();
     }
     else
     {
@@ -732,7 +734,8 @@ static void vcpu_migrate_finish(struct vcpu *v)
      * context_saved(); and in any case, if the bit is cleared, then
      * someone else has already done the work so we don't need to.
      */
-    if ( v->is_running || !test_bit(_VPF_migrating, &v->pause_flags) )
+    if ( v->sched_unit->is_running ||
+         !test_bit(_VPF_migrating, &v->pause_flags) )
         return;
 
     old_cpu = new_cpu = v->processor;
@@ -786,7 +789,7 @@ static void vcpu_migrate_finish(struct vcpu *v)
      * because they both happen in (different) spinlock regions, and those
      * regions are strictly serialised.
      */
-    if ( v->is_running ||
+    if ( v->sched_unit->is_running ||
          !test_and_clear_bit(_VPF_migrating, &v->pause_flags) )
     {
         sched_spin_unlock_double(old_lock, new_lock, flags);
@@ -1674,8 +1677,10 @@ static void schedule(void)
      * switch, else lost_records resume will not work properly.
      */
 
-    ASSERT(!next->is_running);
+    ASSERT(!next->sched_unit->is_running);
     next->is_running = 1;
+    next->sched_unit->is_running = true;
+    next->sched_unit->state_entry_time = now;
 
     pcpu_schedule_unlock_irq(lock, cpu);
 
@@ -1697,6 +1702,8 @@ void context_saved(struct vcpu *prev)
     smp_wmb();
 
     prev->is_running = 0;
+    prev->sched_unit->is_running = false;
+    prev->sched_unit->state_entry_time = NOW();
 
     /* Check for migration request /after/ clearing running flag. */
     smp_mb();
