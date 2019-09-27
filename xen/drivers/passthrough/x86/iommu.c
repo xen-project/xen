@@ -200,8 +200,8 @@ void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
                            IOMMUF_readable | IOMMUF_writable, &flush_flags);
 
         if ( rc )
-            printk(XENLOG_WARNING " d%d: IOMMU mapping failed: %d\n",
-                   d->domain_id, rc);
+            printk(XENLOG_WARNING "%pd: identity %smapping of %lx failed: %d\n",
+                   d, !paging_mode_translate(d) ? "IOMMU " : "", pfn, rc);
 
         if (!(i & 0xfffff))
             process_pending_softirqs();
