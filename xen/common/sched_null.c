@@ -784,7 +784,8 @@ static struct task_slice null_schedule(const struct scheduler *ops,
                                        bool_t tasklet_work_scheduled)
 {
     unsigned int bs;
-    const unsigned int cpu = smp_processor_id();
+    const unsigned int cur_cpu = smp_processor_id();
+    const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
     struct null_private *prv = null_priv(ops);
     struct null_unit *wvc;
     struct task_slice ret;
@@ -798,16 +799,16 @@ static struct task_slice null_schedule(const struct scheduler *ops,
             uint16_t tasklet, cpu;
             int16_t unit, dom;
         } d;
-        d.cpu = cpu;
+        d.cpu = cur_cpu;
         d.tasklet = tasklet_work_scheduled;
-        if ( per_cpu(npc, cpu).unit == NULL )
+        if ( per_cpu(npc, sched_cpu).unit == NULL )
         {
             d.unit = d.dom = -1;
         }
         else
         {
-            d.unit = per_cpu(npc, cpu).unit->unit_id;
-            d.dom = per_cpu(npc, cpu).unit->domain->domain_id;
+            d.unit = per_cpu(npc, sched_cpu).unit->unit_id;
+            d.dom = per_cpu(npc, sched_cpu).unit->domain->domain_id;
         }
         __trace_var(TRC_SNULL_SCHEDULE, 1, sizeof(d), &d);
     }
@@ -815,10 +816,10 @@ static struct task_slice null_schedule(const struct scheduler *ops,
     if ( tasklet_work_scheduled )
     {
         trace_var(TRC_SNULL_TASKLET, 1, 0, NULL);
-        ret.task = sched_idle_unit(cpu);
+        ret.task = sched_idle_unit(sched_cpu);
     }
     else
-        ret.task = per_cpu(npc, cpu).unit;
+        ret.task = per_cpu(npc, sched_cpu).unit;
     ret.migrated = 0;
     ret.time = -1;
 
@@ -849,9 +850,9 @@ static struct task_slice null_schedule(const struct scheduler *ops,
                      !has_soft_affinity(wvc->unit) )
                     continue;
 
-                if ( unit_check_affinity(wvc->unit, cpu, bs) )
+                if ( unit_check_affinity(wvc->unit, sched_cpu, bs) )
                 {
-                    unit_assign(prv, wvc->unit, cpu);
+                    unit_assign(prv, wvc->unit, sched_cpu);
                     list_del_init(&wvc->waitq_elem);
                     ret.task = wvc->unit;
                     goto unlock;
@@ -861,12 +862,12 @@ static struct task_slice null_schedule(const struct scheduler *ops,
  unlock:
         spin_unlock(&prv->waitq_lock);
 
-        if ( ret.task == NULL && !cpumask_test_cpu(cpu, &prv->cpus_free) )
-            cpumask_set_cpu(cpu, &prv->cpus_free);
+        if ( ret.task == NULL && !cpumask_test_cpu(sched_cpu, &prv->cpus_free) )
+            cpumask_set_cpu(sched_cpu, &prv->cpus_free);
     }
 
     if ( unlikely(ret.task == NULL || !unit_runnable(ret.task)) )
-        ret.task = sched_idle_unit(cpu);
+        ret.task = sched_idle_unit(sched_cpu);
 
     NULL_UNIT_CHECK(ret.task);
     return ret;

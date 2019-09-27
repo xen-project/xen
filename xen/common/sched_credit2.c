@@ -3450,7 +3450,8 @@ static struct task_slice
 csched2_schedule(
     const struct scheduler *ops, s_time_t now, bool tasklet_work_scheduled)
 {
-    const int cpu = smp_processor_id();
+    const unsigned int cur_cpu = smp_processor_id();
+    const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
     struct csched2_runqueue_data *rqd;
     struct sched_unit *currunit = current->sched_unit;
     struct csched2_unit * const scurr = csched2_unit(currunit);
@@ -3462,22 +3463,22 @@ csched2_schedule(
     SCHED_STAT_CRANK(schedule);
     CSCHED2_UNIT_CHECK(currunit);
 
-    BUG_ON(!cpumask_test_cpu(cpu, &csched2_priv(ops)->initialized));
+    BUG_ON(!cpumask_test_cpu(sched_cpu, &csched2_priv(ops)->initialized));
 
-    rqd = c2rqd(ops, cpu);
-    BUG_ON(!cpumask_test_cpu(cpu, &rqd->active));
+    rqd = c2rqd(ops, sched_cpu);
+    BUG_ON(!cpumask_test_cpu(sched_cpu, &rqd->active));
 
-    ASSERT(spin_is_locked(get_sched_res(cpu)->schedule_lock));
+    ASSERT(spin_is_locked(get_sched_res(sched_cpu)->schedule_lock));
 
     BUG_ON(!is_idle_unit(currunit) && scurr->rqd != rqd);
 
     /* Clear "tickled" bit now that we've been scheduled */
-    tickled = cpumask_test_cpu(cpu, &rqd->tickled);
+    tickled = cpumask_test_cpu(sched_cpu, &rqd->tickled);
     if ( tickled )
     {
-        __cpumask_clear_cpu(cpu, &rqd->tickled);
+        __cpumask_clear_cpu(sched_cpu, &rqd->tickled);
         cpumask_andnot(cpumask_scratch, &rqd->idle, &rqd->tickled);
-        smt_idle_mask_set(cpu, cpumask_scratch, &rqd->smt_idle);
+        smt_idle_mask_set(sched_cpu, cpumask_scratch, &rqd->smt_idle);
     }
 
     if ( unlikely(tb_init_done) )
@@ -3486,11 +3487,11 @@ csched2_schedule(
             unsigned cpu:16, rq_id:16;
             unsigned tasklet:8, idle:8, smt_idle:8, tickled:8;
         } d;
-        d.cpu = cpu;
-        d.rq_id = c2r(cpu);
+        d.cpu = cur_cpu;
+        d.rq_id = c2r(sched_cpu);
         d.tasklet = tasklet_work_scheduled;
         d.idle = is_idle_unit(currunit);
-        d.smt_idle = cpumask_test_cpu(cpu, &rqd->smt_idle);
+        d.smt_idle = cpumask_test_cpu(sched_cpu, &rqd->smt_idle);
         d.tickled = tickled;
         __trace_var(TRC_CSCHED2_SCHEDULE, 1,
                     sizeof(d),
@@ -3530,10 +3531,10 @@ csched2_schedule(
     {
         __clear_bit(__CSFLAG_unit_yield, &scurr->flags);
         trace_var(TRC_CSCHED2_SCHED_TASKLET, 1, 0, NULL);
-        snext = csched2_unit(sched_idle_unit(cpu));
+        snext = csched2_unit(sched_idle_unit(sched_cpu));
     }
     else
-        snext = runq_candidate(rqd, scurr, cpu, now, &skipped_units);
+        snext = runq_candidate(rqd, scurr, sched_cpu, now, &skipped_units);
 
     /* If switching from a non-idle runnable unit, put it
      * back on the runqueue. */
@@ -3558,10 +3559,10 @@ csched2_schedule(
         }
 
         /* Clear the idle mask if necessary */
-        if ( cpumask_test_cpu(cpu, &rqd->idle) )
+        if ( cpumask_test_cpu(sched_cpu, &rqd->idle) )
         {
-            __cpumask_clear_cpu(cpu, &rqd->idle);
-            smt_idle_mask_clear(cpu, &rqd->smt_idle);
+            __cpumask_clear_cpu(sched_cpu, &rqd->idle);
+            smt_idle_mask_clear(sched_cpu, &rqd->smt_idle);
         }
 
         /*
@@ -3580,18 +3581,18 @@ csched2_schedule(
          */
         if ( skipped_units == 0 && snext->credit <= CSCHED2_CREDIT_RESET )
         {
-            reset_credit(ops, cpu, now, snext);
-            balance_load(ops, cpu, now);
+            reset_credit(ops, sched_cpu, now, snext);
+            balance_load(ops, sched_cpu, now);
         }
 
         snext->start_time = now;
         snext->tickled_cpu = -1;
 
         /* Safe because lock for old processor is held */
-        if ( sched_unit_master(snext->unit) != cpu )
+        if ( sched_unit_master(snext->unit) != sched_cpu )
         {
             snext->credit += CSCHED2_MIGRATE_COMPENSATION;
-            sched_set_res(snext->unit, get_sched_res(cpu));
+            sched_set_res(snext->unit, get_sched_res(sched_cpu));
             SCHED_STAT_CRANK(migrated);
             ret.migrated = 1;
         }
@@ -3604,17 +3605,17 @@ csched2_schedule(
          */
         if ( tasklet_work_scheduled )
         {
-            if ( cpumask_test_cpu(cpu, &rqd->idle) )
+            if ( cpumask_test_cpu(sched_cpu, &rqd->idle) )
             {
-                __cpumask_clear_cpu(cpu, &rqd->idle);
-                smt_idle_mask_clear(cpu, &rqd->smt_idle);
+                __cpumask_clear_cpu(sched_cpu, &rqd->idle);
+                smt_idle_mask_clear(sched_cpu, &rqd->smt_idle);
             }
         }
-        else if ( !cpumask_test_cpu(cpu, &rqd->idle) )
+        else if ( !cpumask_test_cpu(sched_cpu, &rqd->idle) )
         {
-            __cpumask_set_cpu(cpu, &rqd->idle);
+            __cpumask_set_cpu(sched_cpu, &rqd->idle);
             cpumask_andnot(cpumask_scratch, &rqd->idle, &rqd->tickled);
-            smt_idle_mask_set(cpu, cpumask_scratch, &rqd->smt_idle);
+            smt_idle_mask_set(sched_cpu, cpumask_scratch, &rqd->smt_idle);
         }
         /* Make sure avgload gets updated periodically even
          * if there's no activity */
@@ -3624,7 +3625,7 @@ csched2_schedule(
     /*
      * Return task to run next...
      */
-    ret.time = csched2_runtime(ops, cpu, snext, now);
+    ret.time = csched2_runtime(ops, sched_cpu, snext, now);
     ret.task = snext->unit;
 
     CSCHED2_UNIT_CHECK(ret.task);

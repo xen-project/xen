@@ -519,7 +519,7 @@ a653sched_do_schedule(
     static unsigned int sched_index = 0;
     static s_time_t next_switch_time;
     a653sched_priv_t *sched_priv = SCHED_PRIV(ops);
-    const unsigned int cpu = smp_processor_id();
+    const unsigned int cpu = sched_get_resource_cpu(smp_processor_id());
     unsigned long flags;
 
     spin_lock_irqsave(&sched_priv->lock, flags);

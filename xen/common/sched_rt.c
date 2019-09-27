@@ -1056,7 +1056,8 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask)
 static struct task_slice
 rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_scheduled)
 {
-    const int cpu = smp_processor_id();
+    const unsigned int cur_cpu = smp_processor_id();
+    const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
     struct rt_private *prv = rt_priv(ops);
     struct rt_unit *const scurr = rt_unit(current->sched_unit);
     struct rt_unit *snext = NULL;
@@ -1068,9 +1069,9 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
         struct __packed {
             unsigned cpu:16, tasklet:8, tickled:4, idle:4;
         } d;
-        d.cpu = cpu;
+        d.cpu = cur_cpu;
         d.tasklet = tasklet_work_scheduled;
-        d.tickled = cpumask_test_cpu(cpu, &prv->tickled);
+        d.tickled = cpumask_test_cpu(sched_cpu, &prv->tickled);
         d.idle = is_idle_unit(currunit);
         trace_var(TRC_RTDS_SCHEDULE, 1,
                   sizeof(d),
@@ -1078,7 +1079,7 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
     }
 
     /* clear ticked bit now that we've been scheduled */
-    cpumask_clear_cpu(cpu, &prv->tickled);
+    cpumask_clear_cpu(sched_cpu, &prv->tickled);
 
     /* burn_budget would return for IDLE UNIT */
     burn_budget(ops, scurr, now);
@@ -1086,13 +1087,13 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
     if ( tasklet_work_scheduled )
     {
         trace_var(TRC_RTDS_SCHED_TASKLET, 1, 0,  NULL);
-        snext = rt_unit(sched_idle_unit(cpu));
+        snext = rt_unit(sched_idle_unit(sched_cpu));
     }
     else
     {
-        snext = runq_pick(ops, cpumask_of(cpu));
+        snext = runq_pick(ops, cpumask_of(sched_cpu));
         if ( snext == NULL )
-            snext = rt_unit(sched_idle_unit(cpu));
+            snext = rt_unit(sched_idle_unit(sched_cpu));
 
         /* if scurr has higher priority and budget, still pick scurr */
         if ( !is_idle_unit(currunit) &&
@@ -1117,9 +1118,9 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
             q_remove(snext);
             __set_bit(__RTDS_scheduled, &snext->flags);
         }
-        if ( sched_unit_master(snext->unit) != cpu )
+        if ( sched_unit_master(snext->unit) != sched_cpu )
         {
-            sched_set_res(snext->unit, get_sched_res(cpu));
+            sched_set_res(snext->unit, get_sched_res(sched_cpu));
             ret.migrated = 1;
         }
         ret.time = snext->cur_budget; /* invoke the scheduler next time */
