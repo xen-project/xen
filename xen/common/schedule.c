@@ -487,10 +487,18 @@ int sched_init_vcpu(struct vcpu *v)
     return 0;
 }
 
-static void sched_move_irqs(struct vcpu *v)
+static void vcpu_move_irqs(struct vcpu *v)
 {
     arch_move_irqs(v);
     evtchn_move_pirqs(v);
+}
+
+static void sched_move_irqs(const struct sched_unit *unit)
+{
+    struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+        vcpu_move_irqs(v);
 }
 
 int sched_move_domain(struct domain *d, struct cpupool *c)
@@ -572,7 +580,7 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
         v->sched_unit->priv = vcpu_priv[v->vcpu_id];
         if ( !d->is_dying )
-            sched_move_irqs(v);
+            sched_move_irqs(v->sched_unit);
 
         new_p = cpumask_cycle(new_p, c->cpu_valid);
 
@@ -865,7 +873,7 @@ static void vcpu_migrate_finish(struct vcpu *v)
     sched_spin_unlock_double(old_lock, new_lock, flags);
 
     if ( old_cpu != new_cpu )
-        sched_move_irqs(v);
+        sched_move_irqs(v->sched_unit);
 
     /* Wake on new CPU. */
     vcpu_wake(v);
@@ -930,7 +938,7 @@ void restore_vcpu_affinity(struct domain *d)
         spin_unlock_irq(lock);
 
         if ( old_cpu != v->processor )
-            sched_move_irqs(v);
+            sched_move_irqs(v->sched_unit);
     }
 
     domain_update_node_affinity(d);
@@ -1747,7 +1755,7 @@ static void schedule(void)
     stop_timer(&prev->vcpu_list->periodic_timer);
 
     if ( next_slice.migrated )
-        sched_move_irqs(next->vcpu_list);
+        vcpu_move_irqs(next->vcpu_list);
 
     vcpu_periodic_timer_work(next->vcpu_list);
 
