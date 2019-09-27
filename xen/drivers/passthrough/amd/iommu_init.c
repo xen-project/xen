@@ -766,7 +766,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
 
-    irq = create_irq(NUMA_NO_NODE);
+    irq = create_irq(NUMA_NO_NODE, false);
     if ( irq <= 0 )
     {
         dprintk(XENLOG_ERR, "IOMMU: no irqs\n");

@@ -1097,7 +1097,8 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
     struct irq_desc *desc;
 
     irq = create_irq(rhsa ? pxm_to_node(rhsa->proximity_domain)
-                          : NUMA_NO_NODE);
+                          : NUMA_NO_NODE,
+                     false);
     if ( irq <= 0 )
     {
         dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: no irq available!\n");

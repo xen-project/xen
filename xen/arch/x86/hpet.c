@@ -11,6 +11,7 @@
 #include <xen/softirq.h>
 #include <xen/irq.h>
 #include <xen/numa.h>
+#include <xen/sched.h>
 #include <asm/fixmap.h>
 #include <asm/div64.h>
 #include <asm/hpet.h>
@@ -368,7 +369,7 @@ static int __init hpet_assign_irq(struct hpet_event_channel *ch)
 {
     int irq;
 
-    if ( (irq = create_irq(NUMA_NO_NODE)) < 0 )
+    if ( (irq = create_irq(NUMA_NO_NODE, false)) < 0 )
         return irq;
 
     ch->msi.irq = irq;

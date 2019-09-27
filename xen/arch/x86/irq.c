@@ -254,7 +254,8 @@ void __init clear_irq_vector(int irq)
 /*
  * Dynamic irq allocate and deallocation for MSI
  */
-int create_irq(nodeid_t node)
+
+int create_irq(nodeid_t node, bool grant_access)
 {
     int irq, ret;
     struct irq_desc *desc;
@@ -282,18 +283,25 @@ int create_irq(nodeid_t node)
         }
         ret = assign_irq_vector(irq, mask);
     }
+
+    ASSERT(desc->arch.creator_domid == DOMID_INVALID);
+
     if (ret < 0)
     {
         desc->arch.used = IRQ_UNUSED;
         irq = ret;
     }
-    else if ( hardware_domain )
+    else if ( grant_access )
     {
-        ret = irq_permit_access(hardware_domain, irq);
+        struct domain *currd = current->domain;
+
+        ret = irq_permit_access(currd, irq);
         if ( ret )
             printk(XENLOG_G_ERR
-                   "Could not grant Dom0 access to IRQ%d (error %d)\n",
-                   irq, ret);
+                   "Could not grant %pd access to IRQ%d (error %d)\n",
+                   currd, irq, ret);
+        else
+            desc->arch.creator_domid = currd->domain_id;
     }
 
     return irq;
@@ -307,14 +315,23 @@ void destroy_irq(unsigned int irq)
 
     BUG_ON(!MSI_IRQ(irq));
 
-    if ( hardware_domain )
+    if ( desc->arch.creator_domid != DOMID_INVALID )
     {
-        int err = irq_deny_access(hardware_domain, irq);
+        struct domain *d = get_domain_by_id(desc->arch.creator_domid);
 
-        if ( err )
-            printk(XENLOG_G_ERR
-                   "Could not revoke Dom0 access to IRQ%u (error %d)\n",
-                   irq, err);
+        if ( d )
+        {
+            int err = irq_deny_access(d, irq);
+
+            if ( err )
+                printk(XENLOG_G_ERR
+                       "Could not revoke %pd access to IRQ%u (error %d)\n",
+                       d, irq, err);
+
+            put_domain(d);
+        }
+
+        desc->arch.creator_domid = DOMID_INVALID;
     }
 
     spin_lock_irqsave(&desc->lock, flags);
@@ -381,6 +398,7 @@ int arch_init_one_irq_desc(struct irq_desc *desc)
 
     desc->arch.vector = IRQ_VECTOR_UNASSIGNED;
     desc->arch.old_vector = IRQ_VECTOR_UNASSIGNED;
+    desc->arch.creator_domid = DOMID_INVALID;
 
     return 0;
 }
@@ -2133,7 +2151,7 @@ int map_domain_pirq(
             spin_unlock_irqrestore(&desc->lock, flags);
 
             info = NULL;
-            irq = create_irq(NUMA_NO_NODE);
+            irq = create_irq(NUMA_NO_NODE, true);
             ret = irq >= 0 ? prepare_domain_irq_pirq(d, irq, pirq + nr, &info)
                            : irq;
             if ( ret < 0 )
@@ -2818,7 +2836,7 @@ int allocate_and_map_msi_pirq(struct domain *d, int index, int *pirq_p,
         if ( irq == -1 )
         {
     case MAP_PIRQ_TYPE_MULTI_MSI:
-            irq = create_irq(NUMA_NO_NODE);
+            irq = create_irq(NUMA_NO_NODE, true);
         }
 
         if ( irq < nr_irqs_gsi || irq >= nr_irqs )
