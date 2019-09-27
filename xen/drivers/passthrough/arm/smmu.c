@@ -1110,7 +1110,11 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
 			reg = TTBCR_TG0_64K;
 
 		if (!stage1) {
-			reg |= (64 - smmu->s2_input_size) << TTBCR_T0SZ_SHIFT;
+			/*
+			 * Xen: The IOMMU share the page-tables with the P2M
+			 * which may have restrict the size further.
+			 */
+			reg |= (64 - p2m_ipa_bits) << TTBCR_T0SZ_SHIFT;
 
 			switch (smmu->s2_output_size) {
 			case 32:
@@ -2198,14 +2202,9 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 	size = arm_smmu_id_size_to_bits((id >> ID2_IAS_SHIFT) & ID2_IAS_MASK);
 	smmu->s1_output_size = min_t(unsigned long, PHYS_MASK_SHIFT, size);
 
-	/* Xen: Stage-2 input size has to match p2m_ipa_bits.  */
-	if (size < p2m_ipa_bits) {
-		dev_err(smmu->dev,
-			"P2M IPA size not supported (P2M=%u SMMU=%lu)!\n",
-			p2m_ipa_bits, size);
-		return -ENODEV;
-	}
-	smmu->s2_input_size = p2m_ipa_bits;
+	/* Xen: Set maximum Stage-2 input size supported by the SMMU. */
+	p2m_restrict_ipa_bits(size);
+	smmu->s2_input_size = size;
 #if 0
 	/* Stage-2 input size limited due to pgd allocation (PTRS_PER_PGD) */
 #ifdef CONFIG_64BIT

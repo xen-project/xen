@@ -928,11 +928,16 @@ void __init start_xen(unsigned long boot_phys_offset,
     printk("Brought up %ld CPUs\n", (long)num_online_cpus());
     /* TODO: smp_cpus_done(); */
 
-    setup_virt_paging();
-
+    /*
+     * The IOMMU subsystem must be initialized before P2M as we need
+     * to gather requirements regarding the maximum IPA bits supported by
+     * each IOMMU device.
+     */
     rc = iommu_setup();
     if ( !iommu_enabled && rc != -ENODEV )
         panic("Couldn't configure correctly all the IOMMUs.\n");
+
+    setup_virt_paging();
 
     do_initcalls();
 

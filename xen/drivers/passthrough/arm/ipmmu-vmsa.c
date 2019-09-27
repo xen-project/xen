@@ -844,22 +844,8 @@ static int ipmmu_probe(struct dt_device_node *node)
             goto out;
         }
 
-        /*
-         * As 4-level translation table is not supported in IPMMU, we need
-         * to check IPA size used for P2M table beforehand to be sure it is
-         * 3-level and the IPMMU will be able to use it.
-         *
-         * TODO: First initialize the IOMMU and gather the requirements and
-         * then initialize the P2M. In the P2M code, take into the account
-         * the IOMMU requirements and restrict "pa_range" if necessary.
-         */
-        if ( IPMMU_MAX_P2M_IPA_BITS < p2m_ipa_bits )
-        {
-            printk(XENLOG_ERR "ipmmu: P2M IPA size is not supported (P2M=%u IPMMU=%u)!\n",
-                   p2m_ipa_bits, IPMMU_MAX_P2M_IPA_BITS);
-            ret = -ENODEV;
-            goto out;
-        }
+        /* Set maximum Stage-2 input size supported by the IPMMU. */
+        p2m_restrict_ipa_bits(IPMMU_MAX_P2M_IPA_BITS);
 
         irq = platform_get_irq(node, 0);
         if ( irq < 0 )

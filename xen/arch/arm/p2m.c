@@ -34,7 +34,11 @@ static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
 
 #define P2M_ROOT_PAGES    (1<<P2M_ROOT_ORDER)
 
-unsigned int __read_mostly p2m_ipa_bits;
+/*
+ * Set larger than any possible value, so the number of IPA bits can be
+ * restricted by external entity (e.g. IOMMU).
+ */
+unsigned int __read_mostly p2m_ipa_bits = 64;
 
 /* Helpers to lookup the properties of each level */
 static const paddr_t level_masks[] =
@@ -1927,6 +1931,16 @@ struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
     return page;
 }
 
+void __init p2m_restrict_ipa_bits(unsigned int ipa_bits)
+{
+    /*
+     * Calculate the minimum of the maximum IPA bits that any external entity
+     * can support.
+     */
+    if ( ipa_bits < p2m_ipa_bits )
+        p2m_ipa_bits = ipa_bits;
+}
+
 /* VTCR value to be configured by all CPUs. Set only once by the boot CPU */
 static uint32_t __read_mostly vtcr;
 
@@ -1958,6 +1972,10 @@ void __init setup_virt_paging(void)
     unsigned long val = VTCR_RES1|VTCR_SH0_IS|VTCR_ORGN0_WBWA|VTCR_IRGN0_WBWA;
 
 #ifdef CONFIG_ARM_32
+    if ( p2m_ipa_bits < 40 )
+        panic("P2M: Not able to support %u-bit IPA at the moment\n",
+              p2m_ipa_bits);
+
     printk("P2M: 40-bit IPA\n");
     p2m_ipa_bits = 40;
     val |= VTCR_T0SZ(0x18); /* 40 bit IPA */
@@ -1981,15 +1999,20 @@ void __init setup_virt_paging(void)
         [7] = { 0 }  /* Invalid */
     };
 
-    unsigned int cpu;
+    unsigned int i, cpu;
     unsigned int pa_range = 0x10; /* Larger than any possible value */
     bool vmid_8_bit = false;
 
     for_each_online_cpu ( cpu )
     {
         const struct cpuinfo_arm *info = &cpu_data[cpu];
-        if ( info->mm64.pa_range < pa_range )
-            pa_range = info->mm64.pa_range;
+
+        /*
+         * Restrict "p2m_ipa_bits" if needed. As P2M table is always configured
+         * with IPA bits == PA bits, compare against "pabits".
+         */
+        if ( pa_range_info[info->mm64.pa_range].pabits < p2m_ipa_bits )
+            p2m_ipa_bits = pa_range_info[info->mm64.pa_range].pabits;
 
         /* Set a flag if the current cpu does not support 16 bit VMIDs. */
         if ( info->mm64.vmid_bits != MM64_VMID_16_BITS_SUPPORT )
@@ -2002,6 +2025,16 @@ void __init setup_virt_paging(void)
      */
     if ( !vmid_8_bit )
         max_vmid = MAX_VMID_16_BIT;
+
+    /* Choose suitable "pa_range" according to the resulted "p2m_ipa_bits". */
+    for ( i = 0; i < ARRAY_SIZE(pa_range_info); i++ )
+    {
+        if ( p2m_ipa_bits == pa_range_info[i].pabits )
+        {
+            pa_range = i;
+            break;
+        }
+    }
 
     /* pa_range is 4 bits, but the defined encodings are only 3 bits */
     if ( pa_range >= ARRAY_SIZE(pa_range_info) || !pa_range_info[pa_range].pabits )

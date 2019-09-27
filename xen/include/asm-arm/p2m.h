@@ -159,6 +159,15 @@ void p2m_altp2m_check(struct vcpu *v, uint16_t idx)
     /* Not supported on ARM. */
 }
 
+/*
+ * Helper to restrict "p2m_ipa_bits" according the external entity
+ * (e.g. IOMMU) requirements.
+ *
+ * Each corresponding driver should report the maximum IPA bits
+ * (Stage-2 input size) it can support.
+ */
+void p2m_restrict_ipa_bits(unsigned int ipa_bits);
+
 /* Second stage paging setup, to be called on all CPUs */
 void setup_virt_paging(void);
 
