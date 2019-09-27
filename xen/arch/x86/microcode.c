@@ -30,18 +30,52 @@
 #include <xen/smp.h>
 #include <xen/softirq.h>
 #include <xen/spinlock.h>
+#include <xen/stop_machine.h>
 #include <xen/tasklet.h>
 #include <xen/guest_access.h>
 #include <xen/earlycpio.h>
+#include <xen/watchdog.h>
 
+#include <asm/delay.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/setup.h>
 #include <asm/microcode.h>
 
+/*
+ * Before performing a late microcode update on any thread, we
+ * rendezvous all cpus in stop_machine context. The timeout for
+ * waiting for cpu rendezvous is 30ms. It is the timeout used by
+ * live patching
+ */
+#define MICROCODE_CALLIN_TIMEOUT_US 30000
+
+/*
+ * Timeout for each thread to complete update is set to 1s. It is a
+ * conservative choice considering all possible interference.
+ */
+#define MICROCODE_UPDATE_TIMEOUT_US 1000000
+
 static module_t __initdata ucode_mod;
 static signed int __initdata ucode_mod_idx;
 static bool_t __initdata ucode_mod_forced;
+static unsigned int nr_cores;
+
+/*
+ * These states help to coordinate CPUs during loading an update.
+ *
+ * The semantics of each state is as follow:
+ *  - LOADING_PREPARE: initial state of 'loading_state'.
+ *  - LOADING_CALLIN: CPUs are allowed to callin.
+ *  - LOADING_ENTER: all CPUs have called in. Initiate ucode loading.
+ *  - LOADING_EXIT: ucode loading is done or aborted.
+ */
+static enum {
+    LOADING_PREPARE,
+    LOADING_CALLIN,
+    LOADING_ENTER,
+    LOADING_EXIT,
+} loading_state;
 
 /*
  * If we scan the initramfs.cpio for the early microcode code
@@ -190,6 +224,16 @@ static DEFINE_SPINLOCK(microcode_mutex);
 DEFINE_PER_CPU(struct cpu_signature, cpu_sig);
 
 /*
+ * Count the CPUs that have entered, exited the rendezvous and succeeded in
+ * microcode update during late microcode update respectively.
+ *
+ * Note that a bitmap is used for callin to allow cpu to set a bit multiple
+ * times. It is required to do busy-loop in #NMI handling.
+ */
+static cpumask_t cpu_callin_map;
+static atomic_t cpu_out, cpu_updated;
+
+/*
  * Return a patch that covers current CPU. If there are multiple patches,
  * return the one with the highest revision number. Return error If no
  * patch is found and an error occurs during the parsing process. Otherwise
@@ -231,6 +275,34 @@ static bool microcode_update_cache(struct microcode_patch *patch)
     return true;
 }
 
+/* Wait for a condition to be met with a timeout (us). */
+static int wait_for_condition(bool (*func)(unsigned int data),
+                              unsigned int data, unsigned int timeout)
+{
+    while ( !func(data) )
+    {
+        if ( !timeout-- )
+        {
+            printk("CPU%u: Timeout in %pS\n",
+                   smp_processor_id(), __builtin_return_address(0));
+            return -EBUSY;
+        }
+        udelay(1);
+    }
+
+    return 0;
+}
+
+static bool wait_cpu_callin(unsigned int nr)
+{
+    return cpumask_weight(&cpu_callin_map) >= nr;
+}
+
+static bool wait_cpu_callout(unsigned int nr)
+{
+    return atomic_read(&cpu_out) >= nr;
+}
+
 /*
  * Load a microcode update to current CPU.
  *
@@ -264,40 +336,149 @@ static int microcode_update_cpu(const struct microcode_patch *patch)
     return err;
 }
 
-static long do_microcode_update(void *patch)
+static bool wait_for_state(typeof(loading_state) state)
 {
-    unsigned int cpu;
-    int ret = microcode_update_cpu(patch);
+    typeof(loading_state) cur_state;
 
-    /* Store the patch after a successful loading */
-    if ( !ret && patch )
+    while ( (cur_state = ACCESS_ONCE(loading_state)) != state )
     {
-        spin_lock(&microcode_mutex);
-        microcode_update_cache(patch);
-        spin_unlock(&microcode_mutex);
-        patch = NULL;
+        if ( cur_state == LOADING_EXIT )
+            return false;
+        cpu_relax();
     }
+
+    return true;
+}
+
+static void set_state(typeof(loading_state) state)
+{
+    ACCESS_ONCE(loading_state) = state;
+}
+
+static int secondary_thread_fn(void)
+{
+    unsigned int primary = cpumask_first(this_cpu(cpu_sibling_mask));
+
+    if ( !wait_for_state(LOADING_CALLIN) )
+        return -EBUSY;
+
+    cpumask_set_cpu(smp_processor_id(), &cpu_callin_map);
+
+    if ( !wait_for_state(LOADING_EXIT) )
+        return -EBUSY;
+
+    /* Copy update revision from the primary thread. */
+    this_cpu(cpu_sig).rev = per_cpu(cpu_sig, primary).rev;
+
+    return 0;
+}
+
+static int primary_thread_fn(const struct microcode_patch *patch)
+{
+    int ret = 0;
+
+    if ( !wait_for_state(LOADING_CALLIN) )
+        return -EBUSY;
+
+    cpumask_set_cpu(smp_processor_id(), &cpu_callin_map);
+
+    if ( !wait_for_state(LOADING_ENTER) )
+        return -EBUSY;
+
+    ret = microcode_ops->apply_microcode(patch);
+    if ( !ret )
+        atomic_inc(&cpu_updated);
+    atomic_inc(&cpu_out);
+
+    return ret;
+}
+
+static int control_thread_fn(const struct microcode_patch *patch)
+{
+    unsigned int cpu = smp_processor_id(), done;
+    unsigned long tick;
+    int ret;
+
+    /*
+     * We intend to keep interrupt disabled for a long time, which may lead to
+     * watchdog timeout.
+     */
+    watchdog_disable();
+
+    /* Allow threads to call in */
+    set_state(LOADING_CALLIN);
+
+    cpumask_set_cpu(cpu, &cpu_callin_map);
+
+    /* Waiting for all threads calling in */
+    ret = wait_for_condition(wait_cpu_callin, num_online_cpus(),
+                             MICROCODE_CALLIN_TIMEOUT_US);
+    if ( ret )
+    {
+        set_state(LOADING_EXIT);
+        return ret;
+    }
+
+    /* Let primary threads load the given ucode update */
+    set_state(LOADING_ENTER);
+
+    ret = microcode_ops->apply_microcode(patch);
+    if ( !ret )
+        atomic_inc(&cpu_updated);
+    atomic_inc(&cpu_out);
+
+    tick = rdtsc_ordered();
+    /* Wait for primary threads finishing update */
+    while ( (done = atomic_read(&cpu_out)) != nr_cores )
+    {
+        /*
+         * During each timeout interval, at least a CPU is expected to
+         * finish its update. Otherwise, something goes wrong.
+         *
+         * Note that RDTSC (in wait_for_condition()) is safe for threads to
+         * execute while waiting for completion of loading an update.
+         */
+        if ( wait_for_condition(wait_cpu_callout, (done + 1),
+                                MICROCODE_UPDATE_TIMEOUT_US) )
+            panic("Timeout when finished updating microcode (finished %u/%u)",
+                  done, nr_cores);
+
+        /* Print warning message once if long time is spent here */
+        if ( tick && rdtsc_ordered() - tick >= cpu_khz * 1000 )
+        {
+            printk(XENLOG_WARNING
+                   "WARNING: UPDATING MICROCODE HAS CONSUMED MORE THAN 1 SECOND!\n");
+            tick = 0;
+        }
+    }
+
+    /* Mark loading is done to unblock other threads */
+    set_state(LOADING_EXIT);
+
+    watchdog_enable();
+
+    return ret;
+}
+
+static int do_microcode_update(void *patch)
+{
+    unsigned int cpu = smp_processor_id();
+    int ret;
+
+    /*
+     * The control thread set state to coordinate ucode loading. Primary
+     * threads load the given ucode patch. Secondary threads just wait for
+     * the completion of the ucode loading process.
+     */
+    if ( cpu == cpumask_first(&cpu_online_map) )
+        ret = control_thread_fn(patch);
+    else if ( cpu == cpumask_first(this_cpu(cpu_sibling_mask)) )
+        ret = primary_thread_fn(patch);
+    else
+        ret = secondary_thread_fn();
 
     if ( microcode_ops->end_update_percpu )
         microcode_ops->end_update_percpu();
-
-    /*
-     * Each thread tries to load ucode. Only the first thread of a core
-     * would succeed while other threads would encounter -EINVAL which
-     * indicates current ucode revision is equal to or newer than the
-     * given patch. It is actually expected; so ignore this error.
-     */
-    if ( ret == -EINVAL )
-        ret = 0;
-
-    cpu = cpumask_next(smp_processor_id(), &cpu_online_map);
-    if ( cpu < nr_cpu_ids )
-        return continue_hypercall_on_cpu(cpu, do_microcode_update, patch) ?:
-               ret;
-
-    /* Free the patch if no CPU has loaded it successfully. */
-    if ( patch )
-        microcode_free_patch(patch);
 
     return ret;
 }
@@ -306,6 +487,7 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
 {
     int ret;
     void *buffer;
+    unsigned int cpu, updated;
     struct microcode_patch *patch;
 
     if ( len != (uint32_t)len )
@@ -325,30 +507,84 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
         return -EFAULT;
     }
 
+    /* cpu_online_map must not change during update */
+    if ( !get_cpu_maps() )
+    {
+        xfree(buffer);
+        return -EBUSY;
+    }
+
     patch = parse_blob(buffer, len);
     xfree(buffer);
     if ( IS_ERR(patch) )
     {
         ret = PTR_ERR(patch);
         printk(XENLOG_WARNING "Parsing microcode blob error %d\n", ret);
-        return ret;
+        goto put;
     }
 
     if ( !patch )
-        return -ENOENT;
+    {
+        ret = -ENOENT;
+        goto put;
+    }
 
     if ( microcode_ops->start_update )
     {
         ret = microcode_ops->start_update();
-        if ( ret != 0 )
+        if ( ret )
         {
             microcode_free_patch(patch);
-            return ret;
+            goto put;
         }
     }
 
-    return continue_hypercall_on_cpu(cpumask_first(&cpu_online_map),
-                                     do_microcode_update, patch);
+    cpumask_clear(&cpu_callin_map);
+    atomic_set(&cpu_out, 0);
+    atomic_set(&cpu_updated, 0);
+    loading_state = LOADING_PREPARE;
+
+    /* Calculate the number of online CPU core */
+    nr_cores = 0;
+    for_each_online_cpu(cpu)
+        if ( cpu == cpumask_first(per_cpu(cpu_sibling_mask, cpu)) )
+            nr_cores++;
+
+    printk(XENLOG_INFO "%u cores are to update their microcode\n", nr_cores);
+
+    /*
+     * Late loading dance. Why the heavy-handed stop_machine effort?
+     *
+     * - HT siblings must be idle and not execute other code while the other
+     *   sibling is loading microcode in order to avoid any negative
+     *   interactions cause by the loading.
+     *
+     * - In addition, microcode update on the cores must be serialized until
+     *   this requirement can be relaxed in the future. Right now, this is
+     *   conservative and good.
+     */
+    ret = stop_machine_run(do_microcode_update, patch, NR_CPUS);
+
+    updated = atomic_read(&cpu_updated);
+    if ( updated > 0 )
+    {
+        spin_lock(&microcode_mutex);
+        microcode_update_cache(patch);
+        spin_unlock(&microcode_mutex);
+    }
+    else
+        microcode_free_patch(patch);
+
+    if ( updated && updated != nr_cores )
+        printk(XENLOG_ERR "ERROR: Updating microcode succeeded on %u cores and failed\n"
+               XENLOG_ERR "on other %u cores. A system with differing microcode\n"
+               XENLOG_ERR "revisions is considered unstable. Please reboot and do not\n"
+               XENLOG_ERR "load the microcode that triggers this warning!\n",
+               updated, nr_cores - updated);
+
+ put:
+    put_cpu_maps();
+    return ret;
 }
 
 static int __init microcode_init(void)
