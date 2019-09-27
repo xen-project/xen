@@ -85,6 +85,9 @@ void __hwdom_init arch_iommu_check_autotranslated_hwdom(struct domain *d)
 {
     if ( !is_iommu_enabled(d) )
         panic("Presently, iommu must be enabled for PVH hardware domain\n");
+
+    if ( !iommu_hwdom_strict )
+        panic("PVH hardware domain iommu must be set in 'strict' mode\n");
 }
 
 int arch_iommu_domain_init(struct domain *d)

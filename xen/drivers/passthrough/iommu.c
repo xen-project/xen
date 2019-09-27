@@ -154,13 +154,13 @@ custom_param("dom0-iommu", parse_dom0_iommu_param);
 
 static void __hwdom_init check_hwdom_reqs(struct domain *d)
 {
-    if ( iommu_hwdom_none || !paging_mode_translate(d) )
+    if ( iommu_hwdom_none || !hap_enabled(d) )
         return;
-
-    arch_iommu_check_autotranslated_hwdom(d);
 
     iommu_hwdom_passthrough = false;
     iommu_hwdom_strict = true;
+
+    arch_iommu_check_autotranslated_hwdom(d);
 }
 
 int iommu_domain_init(struct domain *d, unsigned int opts)
