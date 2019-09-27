@@ -883,6 +883,17 @@ static inline struct vcpu *domain_vcpu(const struct domain *d,
 
 void cpu_init(void);
 
+/*
+ * vcpu is urgent if vcpu is polling event channel
+ *
+ * if urgent vcpu exists, CPU should not enter deep C state
+ */
+DECLARE_PER_CPU(atomic_t, sched_urgent_count);
+static inline bool sched_has_urgent_vcpu(void)
+{
+    return atomic_read(&this_cpu(sched_urgent_count));
+}
+
 struct scheduler;
 
 struct scheduler *scheduler_get_default(void);

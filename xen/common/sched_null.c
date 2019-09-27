@@ -269,7 +269,7 @@ pick_res(struct null_private *prv, const struct sched_unit *unit)
     unsigned int cpu = v->processor, new_cpu;
     cpumask_t *cpus = cpupool_domain_cpumask(v->domain);
 
-    ASSERT(spin_is_locked(per_cpu(schedule_data, cpu).schedule_lock));
+    ASSERT(spin_is_locked(get_sched_res(cpu)->schedule_lock));
 
     for_each_affinity_balance_step( bs )
     {
@@ -419,7 +419,7 @@ static spinlock_t *null_switch_sched(struct scheduler *new_ops,
                                      unsigned int cpu,
                                      void *pdata, void *vdata)
 {
-    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
+    struct sched_resource *sr = get_sched_res(cpu);
     struct null_private *prv = null_priv(new_ops);
     struct null_unit *nvc = vdata;
 
@@ -436,7 +436,7 @@ static spinlock_t *null_switch_sched(struct scheduler *new_ops,
 
     init_pdata(prv, cpu);
 
-    return &sd->_lock;
+    return &sr->_lock;
 }
 
 static void null_unit_insert(const struct scheduler *ops,
