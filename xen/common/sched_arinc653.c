@@ -481,7 +481,7 @@ a653sched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
      * If the VCPU being put to sleep is the same one that is currently
      * running, raise a softirq to invoke the scheduler to switch domains.
      */
-    if ( per_cpu(schedule_data, vc->processor).curr == vc )
+    if ( per_cpu(schedule_data, vc->processor).curr == unit )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
 }
 

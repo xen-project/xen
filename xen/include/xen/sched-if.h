@@ -36,7 +36,7 @@ extern int sched_ratelimit_us;
 struct schedule_data {
     spinlock_t         *schedule_lock,
                        _lock;
-    struct vcpu        *curr;           /* current task                    */
+    struct sched_unit  *curr;
     void               *sched_priv;
     struct timer        s_timer;        /* scheduling timer                */
     atomic_t            urgent_count;   /* how many urgent vcpus           */

@@ -195,7 +195,7 @@ struct rt_private {
 /*
  * Virtual CPU
  */
-struct rt_vcpu {
+struct rt_unit {
     struct list_head q_elem;     /* on the runq/depletedq list */
     struct list_head replq_elem; /* on the replenishment events list */
 
@@ -233,9 +233,9 @@ static inline struct rt_private *rt_priv(const struct scheduler *ops)
     return ops->sched_data;
 }
 
-static inline struct rt_vcpu *rt_vcpu(const struct vcpu *vcpu)
+static inline struct rt_unit *rt_unit(const struct sched_unit *unit)
 {
-    return vcpu->sched_unit->priv;
+    return unit->priv;
 }
 
 static inline struct list_head *rt_runq(const struct scheduler *ops)
@@ -253,7 +253,7 @@ static inline struct list_head *rt_replq(const struct scheduler *ops)
     return &rt_priv(ops)->replq;
 }
 
-static inline bool has_extratime(const struct rt_vcpu *svc)
+static inline bool has_extratime(const struct rt_unit *svc)
 {
     return svc->flags & RTDS_extratime;
 }
@@ -263,25 +263,25 @@ static inline bool has_extratime(const struct rt_vcpu *svc)
  * and the replenishment events queue.
  */
 static int
-vcpu_on_q(const struct rt_vcpu *svc)
+vcpu_on_q(const struct rt_unit *svc)
 {
    return !list_empty(&svc->q_elem);
 }
 
-static struct rt_vcpu *
+static struct rt_unit *
 q_elem(struct list_head *elem)
 {
-    return list_entry(elem, struct rt_vcpu, q_elem);
+    return list_entry(elem, struct rt_unit, q_elem);
 }
 
-static struct rt_vcpu *
+static struct rt_unit *
 replq_elem(struct list_head *elem)
 {
-    return list_entry(elem, struct rt_vcpu, replq_elem);
+    return list_entry(elem, struct rt_unit, replq_elem);
 }
 
 static int
-vcpu_on_replq(const struct rt_vcpu *svc)
+vcpu_on_replq(const struct rt_unit *svc)
 {
     return !list_empty(&svc->replq_elem);
 }
@@ -291,7 +291,7 @@ vcpu_on_replq(const struct rt_vcpu *svc)
  * Otherwise, return value < 0
  */
 static s_time_t
-compare_vcpu_priority(const struct rt_vcpu *v1, const struct rt_vcpu *v2)
+compare_vcpu_priority(const struct rt_unit *v1, const struct rt_unit *v2)
 {
     int prio = v2->priority_level - v1->priority_level;
 
@@ -305,7 +305,7 @@ compare_vcpu_priority(const struct rt_vcpu *v1, const struct rt_vcpu *v2)
  * Debug related code, dump vcpu/cpu information
  */
 static void
-rt_dump_vcpu(const struct scheduler *ops, const struct rt_vcpu *svc)
+rt_dump_vcpu(const struct scheduler *ops, const struct rt_unit *svc)
 {
     cpumask_t *cpupool_mask, *mask;
 
@@ -351,13 +351,13 @@ static void
 rt_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct rt_private *prv = rt_priv(ops);
-    struct rt_vcpu *svc;
+    struct rt_unit *svc;
     unsigned long flags;
 
     spin_lock_irqsave(&prv->lock, flags);
     printk("CPU[%02d]\n", cpu);
     /* current VCPU (nothing to say if that's the idle vcpu). */
-    svc = rt_vcpu(curr_on_cpu(cpu));
+    svc = rt_unit(curr_on_cpu(cpu));
     if ( svc && !is_idle_vcpu(svc->vcpu) )
     {
         rt_dump_vcpu(ops, svc);
@@ -370,7 +370,7 @@ rt_dump(const struct scheduler *ops)
 {
     struct list_head *runq, *depletedq, *replq, *iter;
     struct rt_private *prv = rt_priv(ops);
-    struct rt_vcpu *svc;
+    struct rt_unit *svc;
     struct rt_dom *sdom;
     unsigned long flags;
 
@@ -414,7 +414,7 @@ rt_dump(const struct scheduler *ops)
 
         for_each_vcpu ( sdom->dom, v )
         {
-            svc = rt_vcpu(v);
+            svc = rt_unit(v->sched_unit);
             rt_dump_vcpu(ops, svc);
         }
     }
@@ -428,7 +428,7 @@ rt_dump(const struct scheduler *ops)
  * it needs to be updated to the deadline of the current period
  */
 static void
-rt_update_deadline(s_time_t now, struct rt_vcpu *svc)
+rt_update_deadline(s_time_t now, struct rt_unit *svc)
 {
     ASSERT(now >= svc->cur_deadline);
     ASSERT(svc->period != 0);
@@ -499,8 +499,8 @@ deadline_queue_remove(struct list_head *queue, struct list_head *elem)
 }
 
 static inline bool
-deadline_queue_insert(struct rt_vcpu * (*qelem)(struct list_head *),
-                      struct rt_vcpu *svc, struct list_head *elem,
+deadline_queue_insert(struct rt_unit * (*qelem)(struct list_head *),
+                      struct rt_unit *svc, struct list_head *elem,
                       struct list_head *queue)
 {
     struct list_head *iter;
@@ -508,7 +508,7 @@ deadline_queue_insert(struct rt_vcpu * (*qelem)(struct list_head *),
 
     list_for_each ( iter, queue )
     {
-        struct rt_vcpu * iter_svc = (*qelem)(iter);
+        struct rt_unit * iter_svc = (*qelem)(iter);
         if ( compare_vcpu_priority(svc, iter_svc) > 0 )
             break;
         pos++;
@@ -522,14 +522,14 @@ deadline_queue_insert(struct rt_vcpu * (*qelem)(struct list_head *),
   deadline_queue_insert(&replq_elem, ##__VA_ARGS__)
 
 static inline void
-q_remove(struct rt_vcpu *svc)
+q_remove(struct rt_unit *svc)
 {
     ASSERT( vcpu_on_q(svc) );
     list_del_init(&svc->q_elem);
 }
 
 static inline void
-replq_remove(const struct scheduler *ops, struct rt_vcpu *svc)
+replq_remove(const struct scheduler *ops, struct rt_unit *svc)
 {
     struct rt_private *prv = rt_priv(ops);
     struct list_head *replq = rt_replq(ops);
@@ -546,7 +546,7 @@ replq_remove(const struct scheduler *ops, struct rt_vcpu *svc)
          */
         if ( !list_empty(replq) )
         {
-            struct rt_vcpu *svc_next = replq_elem(replq->next);
+            struct rt_unit *svc_next = replq_elem(replq->next);
             set_timer(&prv->repl_timer, svc_next->cur_deadline);
         }
         else
@@ -560,7 +560,7 @@ replq_remove(const struct scheduler *ops, struct rt_vcpu *svc)
  * Insert svc without budget in DepletedQ unsorted;
  */
 static void
-runq_insert(const struct scheduler *ops, struct rt_vcpu *svc)
+runq_insert(const struct scheduler *ops, struct rt_unit *svc)
 {
     struct rt_private *prv = rt_priv(ops);
     struct list_head *runq = rt_runq(ops);
@@ -578,7 +578,7 @@ runq_insert(const struct scheduler *ops, struct rt_vcpu *svc)
 }
 
 static void
-replq_insert(const struct scheduler *ops, struct rt_vcpu *svc)
+replq_insert(const struct scheduler *ops, struct rt_unit *svc)
 {
     struct list_head *replq = rt_replq(ops);
     struct rt_private *prv = rt_priv(ops);
@@ -600,10 +600,10 @@ replq_insert(const struct scheduler *ops, struct rt_vcpu *svc)
  * changed.
  */
 static void
-replq_reinsert(const struct scheduler *ops, struct rt_vcpu *svc)
+replq_reinsert(const struct scheduler *ops, struct rt_unit *svc)
 {
     struct list_head *replq = rt_replq(ops);
-    struct rt_vcpu *rearm_svc = svc;
+    struct rt_unit *rearm_svc = svc;
     bool_t rearm = 0;
 
     ASSERT( vcpu_on_replq(svc) );
@@ -734,7 +734,7 @@ rt_switch_sched(struct scheduler *new_ops, unsigned int cpu,
                 void *pdata, void *vdata)
 {
     struct rt_private *prv = rt_priv(new_ops);
-    struct rt_vcpu *svc = vdata;
+    struct rt_unit *svc = vdata;
 
     ASSERT(!pdata && svc && is_idle_vcpu(svc->vcpu));
 
@@ -841,10 +841,10 @@ static void *
 rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
 {
     struct vcpu *vc = unit->vcpu_list;
-    struct rt_vcpu *svc;
+    struct rt_unit *svc;
 
     /* Allocate per-VCPU info */
-    svc = xzalloc(struct rt_vcpu);
+    svc = xzalloc(struct rt_unit);
     if ( svc == NULL )
         return NULL;
 
@@ -869,7 +869,7 @@ rt_alloc_udata(const struct scheduler *ops, struct sched_unit *unit, void *dd)
 static void
 rt_free_udata(const struct scheduler *ops, void *priv)
 {
-    struct rt_vcpu *svc = priv;
+    struct rt_unit *svc = priv;
 
     xfree(svc);
 }
@@ -885,7 +885,7 @@ static void
 rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct vcpu *vc = unit->vcpu_list;
-    struct rt_vcpu *svc = rt_vcpu(vc);
+    struct rt_unit *svc = rt_unit(unit);
     s_time_t now;
     spinlock_t *lock;
 
@@ -914,13 +914,13 @@ rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 }
 
 /*
- * Remove rt_vcpu svc from the old scheduler in source cpupool.
+ * Remove rt_unit svc from the old scheduler in source cpupool.
  */
 static void
 rt_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct vcpu *vc = unit->vcpu_list;
-    struct rt_vcpu * const svc = rt_vcpu(vc);
+    struct rt_unit * const svc = rt_unit(unit);
     struct rt_dom * const sdom = svc->sdom;
     spinlock_t *lock;
 
@@ -942,7 +942,7 @@ rt_unit_remove(const struct scheduler *ops, struct sched_unit *unit)
  * Burn budget in nanosecond granularity
  */
 static void
-burn_budget(const struct scheduler *ops, struct rt_vcpu *svc, s_time_t now)
+burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
 {
     s_time_t delta;
 
@@ -1006,13 +1006,13 @@ burn_budget(const struct scheduler *ops, struct rt_vcpu *svc, s_time_t now)
  * RunQ is sorted. Pick first one within cpumask. If no one, return NULL
  * lock is grabbed before calling this function
  */
-static struct rt_vcpu *
+static struct rt_unit *
 runq_pick(const struct scheduler *ops, const cpumask_t *mask)
 {
     struct list_head *runq = rt_runq(ops);
     struct list_head *iter;
-    struct rt_vcpu *svc = NULL;
-    struct rt_vcpu *iter_svc = NULL;
+    struct rt_unit *svc = NULL;
+    struct rt_unit *iter_svc = NULL;
     cpumask_t cpu_common;
     cpumask_t *online;
 
@@ -1063,8 +1063,8 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
 {
     const int cpu = smp_processor_id();
     struct rt_private *prv = rt_priv(ops);
-    struct rt_vcpu *const scurr = rt_vcpu(current);
-    struct rt_vcpu *snext = NULL;
+    struct rt_unit *const scurr = rt_unit(current->sched_unit);
+    struct rt_unit *snext = NULL;
     struct task_slice ret = { .migrated = 0 };
 
     /* TRACE */
@@ -1090,13 +1090,13 @@ rt_schedule(const struct scheduler *ops, s_time_t now, bool_t tasklet_work_sched
     if ( tasklet_work_scheduled )
     {
         trace_var(TRC_RTDS_SCHED_TASKLET, 1, 0,  NULL);
-        snext = rt_vcpu(idle_vcpu[cpu]);
+        snext = rt_unit(idle_vcpu[cpu]->sched_unit);
     }
     else
     {
         snext = runq_pick(ops, cpumask_of(cpu));
         if ( snext == NULL )
-            snext = rt_vcpu(idle_vcpu[cpu]);
+            snext = rt_unit(idle_vcpu[cpu]->sched_unit);
 
         /* if scurr has higher priority and budget, still pick scurr */
         if ( !is_idle_vcpu(current) &&
@@ -1142,12 +1142,12 @@ static void
 rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct vcpu *vc = unit->vcpu_list;
-    struct rt_vcpu * const svc = rt_vcpu(vc);
+    struct rt_unit * const svc = rt_unit(unit);
 
     BUG_ON( is_idle_vcpu(vc) );
     SCHED_STAT_CRANK(vcpu_sleep);
 
-    if ( curr_on_cpu(vc->processor) == vc )
+    if ( curr_on_cpu(vc->processor) == unit )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( vcpu_on_q(svc) )
     {
@@ -1177,11 +1177,11 @@ rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
  * lock is grabbed before calling this function
  */
 static void
-runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
+runq_tickle(const struct scheduler *ops, struct rt_unit *new)
 {
     struct rt_private *prv = rt_priv(ops);
-    struct rt_vcpu *latest_deadline_vcpu = NULL; /* lowest priority */
-    struct rt_vcpu *iter_svc;
+    struct rt_unit *latest_deadline_vcpu = NULL; /* lowest priority */
+    struct rt_unit *iter_svc;
     struct vcpu *iter_vc;
     int cpu = 0, cpu_to_tickle = 0;
     cpumask_t not_tickled;
@@ -1202,14 +1202,14 @@ runq_tickle(const struct scheduler *ops, struct rt_vcpu *new)
     cpu = cpumask_test_or_cycle(new->vcpu->processor, &not_tickled);
     while ( cpu!= nr_cpu_ids )
     {
-        iter_vc = curr_on_cpu(cpu);
+        iter_vc = curr_on_cpu(cpu)->vcpu_list;
         if ( is_idle_vcpu(iter_vc) )
         {
             SCHED_STAT_CRANK(tickled_idle_cpu);
             cpu_to_tickle = cpu;
             goto out;
         }
-        iter_svc = rt_vcpu(iter_vc);
+        iter_svc = rt_unit(iter_vc->sched_unit);
         if ( latest_deadline_vcpu == NULL ||
              compare_vcpu_priority(iter_svc, latest_deadline_vcpu) < 0 )
             latest_deadline_vcpu = iter_svc;
@@ -1258,13 +1258,13 @@ static void
 rt_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct vcpu *vc = unit->vcpu_list;
-    struct rt_vcpu * const svc = rt_vcpu(vc);
+    struct rt_unit * const svc = rt_unit(unit);
     s_time_t now;
     bool_t missed;
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( unlikely(curr_on_cpu(vc->processor) == vc) )
+    if ( unlikely(curr_on_cpu(vc->processor) == unit) )
     {
         SCHED_STAT_CRANK(vcpu_wake_running);
         return;
@@ -1329,7 +1329,7 @@ static void
 rt_context_saved(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct vcpu *vc = unit->vcpu_list;
-    struct rt_vcpu *svc = rt_vcpu(vc);
+    struct rt_unit *svc = rt_unit(unit);
     spinlock_t *lock = vcpu_schedule_lock_irq(vc);
 
     __clear_bit(__RTDS_scheduled, &svc->flags);
@@ -1360,7 +1360,7 @@ rt_dom_cntl(
     struct xen_domctl_scheduler_op *op)
 {
     struct rt_private *prv = rt_priv(ops);
-    struct rt_vcpu *svc;
+    struct rt_unit *svc;
     struct vcpu *v;
     unsigned long flags;
     int rc = 0;
@@ -1384,7 +1384,7 @@ rt_dom_cntl(
         spin_lock_irqsave(&prv->lock, flags);
         for_each_vcpu ( d, v )
         {
-            svc = rt_vcpu(v);
+            svc = rt_unit(v->sched_unit);
             svc->period = MICROSECS(op->u.rtds.period); /* transfer to nanosec */
             svc->budget = MICROSECS(op->u.rtds.budget);
         }
@@ -1410,7 +1410,7 @@ rt_dom_cntl(
             if ( op->cmd == XEN_DOMCTL_SCHEDOP_getvcpuinfo )
             {
                 spin_lock_irqsave(&prv->lock, flags);
-                svc = rt_vcpu(d->vcpu[local_sched.vcpuid]);
+                svc = rt_unit(d->vcpu[local_sched.vcpuid]->sched_unit);
                 local_sched.u.rtds.budget = svc->budget / MICROSECS(1);
                 local_sched.u.rtds.period = svc->period / MICROSECS(1);
                 if ( has_extratime(svc) )
@@ -1438,7 +1438,7 @@ rt_dom_cntl(
                 }
 
                 spin_lock_irqsave(&prv->lock, flags);
-                svc = rt_vcpu(d->vcpu[local_sched.vcpuid]);
+                svc = rt_unit(d->vcpu[local_sched.vcpuid]->sched_unit);
                 svc->period = period;
                 svc->budget = budget;
                 if ( local_sched.u.rtds.flags & XEN_DOMCTL_SCHEDRT_extra )
@@ -1471,7 +1471,7 @@ static void repl_timer_handler(void *data){
     struct list_head *replq = rt_replq(ops);
     struct list_head *runq = rt_runq(ops);
     struct list_head *iter, *tmp;
-    struct rt_vcpu *svc;
+    struct rt_unit *svc;
     LIST_HEAD(tmp_replq);
 
     spin_lock_irq(&prv->lock);
@@ -1513,10 +1513,10 @@ static void repl_timer_handler(void *data){
     {
         svc = replq_elem(iter);
 
-        if ( curr_on_cpu(svc->vcpu->processor) == svc->vcpu &&
+        if ( curr_on_cpu(svc->vcpu->processor) == svc->vcpu->sched_unit &&
              !list_empty(runq) )
         {
-            struct rt_vcpu *next_on_runq = q_elem(runq->next);
+            struct rt_unit *next_on_runq = q_elem(runq->next);
 
             if ( compare_vcpu_priority(svc, next_on_runq) < 0 )
                 runq_tickle(ops, next_on_runq);

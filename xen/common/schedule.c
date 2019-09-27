@@ -394,7 +394,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     /* Idle VCPUs are scheduled immediately, so don't put them in runqueue. */
     if ( is_idle_domain(d) )
     {
-        per_cpu(schedule_data, v->processor).curr = v;
+        per_cpu(schedule_data, v->processor).curr = unit;
         v->is_running = 1;
     }
     else
@@ -1607,7 +1607,7 @@ static void schedule(void)
 
     next = next_slice.task;
 
-    sd->curr = next;
+    sd->curr = next->sched_unit;
 
     if ( next_slice.time >= 0 ) /* -ve means no limit */
         set_timer(&sd->s_timer, now + next_slice.time);
@@ -1749,7 +1749,7 @@ static int cpu_schedule_up(unsigned int cpu)
      * allocated.
      */
 
-    sd->curr = idle_vcpu[cpu];
+    sd->curr = idle_vcpu[cpu]->sched_unit;
 
     sd->sched_priv = NULL;
 
@@ -1917,7 +1917,7 @@ void __init scheduler_init(void)
     idle_domain->max_vcpus = nr_cpu_ids;
     if ( vcpu_create(idle_domain, 0, 0) == NULL )
         BUG();
-    this_cpu(schedule_data).curr = idle_vcpu[0];
+    this_cpu(schedule_data).curr = idle_vcpu[0]->sched_unit;
 }
 
 /*

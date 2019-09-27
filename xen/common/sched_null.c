@@ -93,7 +93,7 @@ DEFINE_PER_CPU(struct null_pcpu, npc);
 /*
  * Virtual CPU
  */
-struct null_vcpu {
+struct null_unit {
     struct list_head waitq_elem;
     struct vcpu *vcpu;
 };
@@ -114,9 +114,9 @@ static inline struct null_private *null_priv(const struct scheduler *ops)
     return ops->sched_data;
 }
 
-static inline struct null_vcpu *null_vcpu(const struct vcpu *v)
+static inline struct null_unit *null_unit(const struct sched_unit *unit)
 {
-    return v->sched_unit->priv;
+    return unit->priv;
 }
 
 static inline bool vcpu_check_affinity(struct vcpu *v, unsigned int cpu,
@@ -189,9 +189,9 @@ static void *null_alloc_udata(const struct scheduler *ops,
                               struct sched_unit *unit, void *dd)
 {
     struct vcpu *v = unit->vcpu_list;
-    struct null_vcpu *nvc;
+    struct null_unit *nvc;
 
-    nvc = xzalloc(struct null_vcpu);
+    nvc = xzalloc(struct null_unit);
     if ( nvc == NULL )
         return NULL;
 
@@ -205,7 +205,7 @@ static void *null_alloc_udata(const struct scheduler *ops,
 
 static void null_free_udata(const struct scheduler *ops, void *priv)
 {
-    struct null_vcpu *nvc = priv;
+    struct null_unit *nvc = priv;
 
     xfree(nvc);
 }
@@ -362,9 +362,9 @@ static bool vcpu_deassign(struct null_private *prv, struct vcpu *v)
 {
     unsigned int bs;
     unsigned int cpu = v->processor;
-    struct null_vcpu *wvc;
+    struct null_unit *wvc;
 
-    ASSERT(list_empty(&null_vcpu(v)->waitq_elem));
+    ASSERT(list_empty(&null_unit(v->sched_unit)->waitq_elem));
     ASSERT(per_cpu(npc, v->processor).vcpu == v);
     ASSERT(!cpumask_test_cpu(v->processor, &prv->cpus_free));
 
@@ -421,7 +421,7 @@ static spinlock_t *null_switch_sched(struct scheduler *new_ops,
 {
     struct schedule_data *sd = &per_cpu(schedule_data, cpu);
     struct null_private *prv = null_priv(new_ops);
-    struct null_vcpu *nvc = vdata;
+    struct null_unit *nvc = vdata;
 
     ASSERT(nvc && is_idle_vcpu(nvc->vcpu));
 
@@ -444,7 +444,7 @@ static void null_unit_insert(const struct scheduler *ops,
 {
     struct vcpu *v = unit->vcpu_list;
     struct null_private *prv = null_priv(ops);
-    struct null_vcpu *nvc = null_vcpu(v);
+    struct null_unit *nvc = null_unit(unit);
     unsigned int cpu;
     spinlock_t *lock;
 
@@ -508,7 +508,7 @@ static void null_unit_remove(const struct scheduler *ops,
 {
     struct vcpu *v = unit->vcpu_list;
     struct null_private *prv = null_priv(ops);
-    struct null_vcpu *nvc = null_vcpu(v);
+    struct null_unit *nvc = null_unit(unit);
     spinlock_t *lock;
 
     ASSERT(!is_idle_vcpu(v));
@@ -546,12 +546,12 @@ static void null_unit_wake(const struct scheduler *ops,
 {
     struct vcpu *v = unit->vcpu_list;
     struct null_private *prv = null_priv(ops);
-    struct null_vcpu *nvc = null_vcpu(v);
+    struct null_unit *nvc = null_unit(unit);
     unsigned int cpu = v->processor;
 
     ASSERT(!is_idle_vcpu(v));
 
-    if ( unlikely(curr_on_cpu(cpu) == v) )
+    if ( unlikely(curr_on_cpu(cpu) == unit) )
     {
         SCHED_STAT_CRANK(vcpu_wake_running);
         return;
@@ -631,7 +631,7 @@ static void null_unit_sleep(const struct scheduler *ops,
      */
     if ( unlikely(!is_vcpu_online(v)) )
     {
-        struct null_vcpu *nvc = null_vcpu(v);
+        struct null_unit *nvc = null_unit(unit);
 
         if ( unlikely(!list_empty(&nvc->waitq_elem)) )
         {
@@ -644,7 +644,7 @@ static void null_unit_sleep(const struct scheduler *ops,
     }
 
     /* If v is not assigned to a pCPU, or is not running, no need to bother */
-    if ( likely(!tickled && curr_on_cpu(cpu) == v) )
+    if ( likely(!tickled && curr_on_cpu(cpu) == unit) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
 
     SCHED_STAT_CRANK(vcpu_sleep);
@@ -662,7 +662,7 @@ static void null_unit_migrate(const struct scheduler *ops,
 {
     struct vcpu *v = unit->vcpu_list;
     struct null_private *prv = null_priv(ops);
-    struct null_vcpu *nvc = null_vcpu(v);
+    struct null_unit *nvc = null_unit(unit);
 
     ASSERT(!is_idle_vcpu(v));
 
@@ -758,7 +758,7 @@ static void null_unit_migrate(const struct scheduler *ops,
 #ifndef NDEBUG
 static inline void null_vcpu_check(struct vcpu *v)
 {
-    struct null_vcpu * const nvc = null_vcpu(v);
+    struct null_unit * const nvc = null_unit(v->sched_unit);
     struct null_dom * const ndom = v->domain->sched_priv;
 
     BUG_ON(nvc->vcpu != v);
@@ -788,7 +788,7 @@ static struct task_slice null_schedule(const struct scheduler *ops,
     unsigned int bs;
     const unsigned int cpu = smp_processor_id();
     struct null_private *prv = null_priv(ops);
-    struct null_vcpu *wvc;
+    struct null_unit *wvc;
     struct task_slice ret;
 
     SCHED_STAT_CRANK(schedule);
@@ -874,7 +874,7 @@ static struct task_slice null_schedule(const struct scheduler *ops,
     return ret;
 }
 
-static inline void dump_vcpu(struct null_private *prv, struct null_vcpu *nvc)
+static inline void dump_vcpu(struct null_private *prv, struct null_unit *nvc)
 {
     printk("[%i.%i] pcpu=%d", nvc->vcpu->domain->domain_id,
             nvc->vcpu->vcpu_id, list_empty(&nvc->waitq_elem) ?
@@ -884,7 +884,7 @@ static inline void dump_vcpu(struct null_private *prv, struct null_vcpu *nvc)
 static void null_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct null_private *prv = null_priv(ops);
-    struct null_vcpu *nvc;
+    struct null_unit *nvc;
     spinlock_t *lock;
     unsigned long flags;
 
@@ -898,7 +898,7 @@ static void null_dump_pcpu(const struct scheduler *ops, int cpu)
     printk("\n");
 
     /* current VCPU (nothing to say if that's the idle vcpu) */
-    nvc = null_vcpu(curr_on_cpu(cpu));
+    nvc = null_unit(curr_on_cpu(cpu));
     if ( nvc && !is_idle_vcpu(nvc->vcpu) )
     {
         printk("\trun: ");
@@ -932,7 +932,7 @@ static void null_dump(const struct scheduler *ops)
         printk("\tDomain: %d\n", ndom->dom->domain_id);
         for_each_vcpu( ndom->dom, v )
         {
-            struct null_vcpu * const nvc = null_vcpu(v);
+            struct null_unit * const nvc = null_unit(v->sched_unit);
             spinlock_t *lock;
 
             lock = vcpu_schedule_lock(nvc->vcpu);
@@ -950,7 +950,7 @@ static void null_dump(const struct scheduler *ops)
     spin_lock(&prv->waitq_lock);
     list_for_each( iter, &prv->waitq )
     {
-        struct null_vcpu *nvc = list_entry(iter, struct null_vcpu, waitq_elem);
+        struct null_unit *nvc = list_entry(iter, struct null_unit, waitq_elem);
 
         if ( loop++ != 0 )
             printk(", ");
