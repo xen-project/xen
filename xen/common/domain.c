@@ -568,7 +568,7 @@ void domain_update_node_affinity(struct domain *d)
     cpumask_var_t dom_cpumask, dom_cpumask_soft;
     cpumask_t *dom_affinity;
     const cpumask_t *online;
-    struct vcpu *v;
+    struct sched_unit *unit;
     unsigned int cpu;
 
     /* Do we have vcpus already? If not, no need to update node-affinity. */
@@ -601,12 +601,11 @@ void domain_update_node_affinity(struct domain *d)
          * and the full mask of where it would prefer to run (the union of
          * the soft affinity of all its various vcpus). Let's build them.
          */
-        for_each_vcpu ( d, v )
+        for_each_sched_unit ( d, unit )
         {
-            cpumask_or(dom_cpumask, dom_cpumask,
-                       v->sched_unit->cpu_hard_affinity);
+            cpumask_or(dom_cpumask, dom_cpumask, unit->cpu_hard_affinity);
             cpumask_or(dom_cpumask_soft, dom_cpumask_soft,
-                       v->sched_unit->cpu_soft_affinity);
+                       unit->cpu_soft_affinity);
         }
         /* Filter out non-online cpus */
         cpumask_and(dom_cpumask, dom_cpumask, online);
