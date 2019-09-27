@@ -194,36 +194,6 @@ static bool match_cpu(const struct microcode_patch *patch)
     return patch && (microcode_fits(patch->mc_amd) == NEW_UCODE);
 }
 
-static struct microcode_patch *alloc_microcode_patch(
-    const struct microcode_amd *mc_amd)
-{
-    struct microcode_patch *microcode_patch = xmalloc(struct microcode_patch);
-    struct microcode_amd *cache = xmalloc(struct microcode_amd);
-    void *mpb = xmalloc_bytes(mc_amd->mpb_size);
-    struct equiv_cpu_entry *equiv_cpu_table =
-                                xmalloc_bytes(mc_amd->equiv_cpu_table_size);
-
-    if ( !microcode_patch || !cache || !mpb || !equiv_cpu_table )
-    {
-        xfree(microcode_patch);
-        xfree(cache);
-        xfree(mpb);
-        xfree(equiv_cpu_table);
-        return ERR_PTR(-ENOMEM);
-    }
-
-    memcpy(mpb, mc_amd->mpb, mc_amd->mpb_size);
-    cache->mpb = mpb;
-    cache->mpb_size = mc_amd->mpb_size;
-    memcpy(equiv_cpu_table, mc_amd->equiv_cpu_table,
-           mc_amd->equiv_cpu_table_size);
-    cache->equiv_cpu_table = equiv_cpu_table;
-    cache->equiv_cpu_table_size = mc_amd->equiv_cpu_table_size;
-    microcode_patch->mc_amd = cache;
-
-    return microcode_patch;
-}
-
 static void free_patch(void *mc)
 {
     struct microcode_amd *mc_amd = mc;
@@ -236,6 +206,17 @@ static void free_patch(void *mc)
     }
 }
 
+static enum microcode_match_result compare_header(
+    const struct microcode_header_amd *new_header,
+    const struct microcode_header_amd *old_header)
+{
+    if ( new_header->processor_rev_id == old_header->processor_rev_id )
+        return (new_header->patch_id > old_header->patch_id) ? NEW_UCODE
+                                                             : OLD_UCODE;
+
+    return MIS_UCODE;
+}
+
 static enum microcode_match_result compare_patch(
     const struct microcode_patch *new, const struct microcode_patch *old)
 {
@@ -246,11 +227,7 @@ static enum microcode_match_result compare_patch(
     ASSERT(microcode_fits(new->mc_amd) != MIS_UCODE);
     ASSERT(microcode_fits(new->mc_amd) != MIS_UCODE);
 
-    if ( new_header->processor_rev_id == old_header->processor_rev_id )
-        return (new_header->patch_id > old_header->patch_id) ?
-                NEW_UCODE : OLD_UCODE;
-
-    return MIS_UCODE;
+    return compare_header(new_header, old_header);
 }
 
 static int apply_microcode(const struct microcode_patch *patch)
@@ -328,18 +305,10 @@ static int get_ucode_from_buffer_amd(
         return -EINVAL;
     }
 
-    if ( mc_amd->mpb_size < mpbuf->len )
-    {
-        if ( mc_amd->mpb )
-        {
-            xfree(mc_amd->mpb);
-            mc_amd->mpb_size = 0;
-        }
-        mc_amd->mpb = xmalloc_bytes(mpbuf->len);
-        if ( mc_amd->mpb == NULL )
-            return -ENOMEM;
-        mc_amd->mpb_size = mpbuf->len;
-    }
+    mc_amd->mpb = xmalloc_bytes(mpbuf->len);
+    if ( !mc_amd->mpb )
+        return -ENOMEM;
+    mc_amd->mpb_size = mpbuf->len;
     memcpy(mc_amd->mpb, mpbuf->data, mpbuf->len);
 
     pr_debug("microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
@@ -459,8 +428,9 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
                                                      size_t bufsize)
 {
     struct microcode_amd *mc_amd;
+    struct microcode_header_amd *saved = NULL;
     struct microcode_patch *patch = NULL;
-    size_t offset = 0;
+    size_t offset = 0, saved_size = 0;
     int error = 0;
     unsigned int current_cpu_id;
     unsigned int equiv_cpu_id;
@@ -550,24 +520,22 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
     while ( (error = get_ucode_from_buffer_amd(mc_amd, buf, bufsize,
                                                &offset)) == 0 )
     {
-        struct microcode_patch *new_patch = alloc_microcode_patch(mc_amd);
-
-        if ( IS_ERR(new_patch) )
-        {
-            error = PTR_ERR(new_patch);
-            break;
-        }
-
         /*
-         * If the new patch covers current CPU, compare patches and store the
+         * If the new ucode covers current CPU, compare ucodes and store the
          * one with higher revision.
          */
-        if ( (microcode_fits(new_patch->mc_amd) != MIS_UCODE) &&
-             (!patch || (compare_patch(new_patch, patch) == NEW_UCODE)) )
-            SWAP(patch, new_patch);
-
-        if ( new_patch )
-            microcode_free_patch(new_patch);
+        if ( (microcode_fits(mc_amd) != MIS_UCODE) &&
+             (!saved || (compare_header(mc_amd->mpb, saved) == NEW_UCODE)) )
+        {
+            xfree(saved);
+            saved = mc_amd->mpb;
+            saved_size = mc_amd->mpb_size;
+        }
+        else
+        {
+            xfree(mc_amd->mpb);
+            mc_amd->mpb = NULL;
+        }
 
         if ( offset >= bufsize )
             break;
@@ -596,7 +564,22 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
              *(const uint32_t *)(buf + offset) == UCODE_MAGIC )
             break;
     }
-    free_patch(mc_amd);
+
+    if ( saved )
+    {
+        mc_amd->mpb = saved;
+        mc_amd->mpb_size = saved_size;
+        patch = xmalloc(struct microcode_patch);
+        if ( patch )
+            patch->mc_amd = mc_amd;
+        else
+        {
+            free_patch(mc_amd);
+            error = -ENOMEM;
+        }
+    }
+    else
+        free_patch(mc_amd);
 
   out:
     if ( error && !patch )

@@ -285,25 +285,6 @@ static enum microcode_match_result compare_patch(
                                                              : OLD_UCODE;
 }
 
-static struct microcode_patch *alloc_microcode_patch(
-    const struct microcode_header_intel *mc_header)
-{
-    unsigned long total_size = get_totalsize(mc_header);
-    void *new_mc = xmalloc_bytes(total_size);
-    struct microcode_patch *new_patch = xmalloc(struct microcode_patch);
-
-    if ( !new_patch || !new_mc )
-    {
-        xfree(new_patch);
-        xfree(new_mc);
-        return ERR_PTR(-ENOMEM);
-    }
-    memcpy(new_mc, mc_header, total_size);
-    new_patch->mc_intel = new_mc;
-
-    return new_patch;
-}
-
 static int apply_microcode(const struct microcode_patch *patch)
 {
     unsigned long flags;
@@ -352,8 +333,9 @@ static int apply_microcode(const struct microcode_patch *patch)
     return 0;
 }
 
-static long get_next_ucode_from_buffer(void **mc, const u8 *buf,
-                                       unsigned long size, long offset)
+static long get_next_ucode_from_buffer(struct microcode_intel **mc,
+                                       const uint8_t *buf, unsigned long size,
+                                       unsigned long offset)
 {
     struct microcode_header_intel *mc_header;
     unsigned long total_size;
@@ -385,41 +367,45 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
 {
     long offset = 0;
     int error = 0;
-    void *mc;
+    struct microcode_intel *mc, *saved = NULL;
     struct microcode_patch *patch = NULL;
 
     while ( (offset = get_next_ucode_from_buffer(&mc, buf, size, offset)) > 0 )
     {
-        struct microcode_patch *new_patch;
-
         error = microcode_sanity_check(mc);
         if ( error )
-            break;
-
-        new_patch = alloc_microcode_patch(mc);
-        if ( IS_ERR(new_patch) )
         {
-            error = PTR_ERR(new_patch);
+            xfree(mc);
             break;
         }
 
         /*
-         * If the new patch covers current CPU, compare patches and store the
+         * If the new update covers current CPU, compare updates and store the
          * one with higher revision.
          */
-        if ( (microcode_update_match(&new_patch->mc_intel->hdr) != MIS_UCODE) &&
-             (!patch || (compare_patch(new_patch, patch) == NEW_UCODE)) )
-            SWAP(patch, new_patch);
-
-        if ( new_patch )
-            microcode_free_patch(new_patch);
-
-        xfree(mc);
+        if ( (microcode_update_match(&mc->hdr) != MIS_UCODE) &&
+             (!saved || (mc->hdr.rev > saved->hdr.rev)) )
+        {
+            xfree(saved);
+            saved = mc;
+        }
+        else
+            xfree(mc);
     }
-    if ( offset > 0 )
-        xfree(mc);
     if ( offset < 0 )
         error = offset;
+
+    if ( saved )
+    {
+        patch = xmalloc(struct microcode_patch);
+        if ( patch )
+            patch->mc_intel = saved;
+        else
+        {
+            xfree(saved);
+            error = -ENOMEM;
+        }
+    }
 
     if ( error && !patch )
         patch = ERR_PTR(error);
