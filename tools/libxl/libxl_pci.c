@@ -1300,6 +1300,10 @@ static void pci_add_dm_done(libxl__egc *egc,
 
     if (rc) goto out;
 
+    /* stubdomain is always running by now, even at create time */
+    if (isstubdom)
+        starting = false;
+
     sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/resource", pcidev->domain,
                            pcidev->bus, pcidev->dev, pcidev->func);
     f = fopen(sysfs_path, "r");
@@ -1559,7 +1563,6 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
         GCNEW(pcidev_s);
         libxl_device_pci_init(pcidev_s);
         libxl_device_pci_copy(CTX, pcidev_s, pcidev);
-        /* stubdomain is always running by now, even at create time */
         pas->callback = device_pci_add_stubdom_done;
         do_pci_add(egc, stubdomid, pcidev_s, pas); /* must be last */
         return;
