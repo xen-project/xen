@@ -375,9 +375,9 @@ static void __init allocate_memory_11(struct domain *d,
 }
 
 static bool __init allocate_bank_memory(struct domain *d,
-                                       struct kernel_info *kinfo,
-                                       gfn_t sgfn,
-                                       paddr_t tot_size)
+                                        struct kernel_info *kinfo,
+                                        gfn_t sgfn,
+                                        paddr_t tot_size)
 {
     int res;
     struct page_info *pg;
