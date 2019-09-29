@@ -25,7 +25,7 @@ static unsigned int __read_mostly max_vmid = MAX_VMID_8_BIT;
 /* VMID is by default 8 bit width on AArch64 */
 #define MAX_VMID       max_vmid
 #else
-/* First level P2M is alway 2 consecutive pages */
+/* First level P2M is always 2 consecutive pages */
 #define P2M_ROOT_LEVEL 1
 #define P2M_ROOT_ORDER    1
 /* VMID is always 8 bit width on AArch32 */
