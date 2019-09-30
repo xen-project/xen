@@ -21,7 +21,6 @@
 #include <xen/lib.h>
 #include <xen/warning.h>
 
-#include <asm/cpuid.h>
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/processor.h>

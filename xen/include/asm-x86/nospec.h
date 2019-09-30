@@ -15,7 +15,7 @@ static always_inline bool barrier_nospec_true(void)
     return true;
 }
 
-/* Allow to protect evaluation of conditionasl with respect to speculation */
+/* Allow to protect evaluation of conditionals with respect to speculation */
 static always_inline bool evaluate_nospec(bool condition)
 {
     return condition ? barrier_nospec_true() : !barrier_nospec_true();
