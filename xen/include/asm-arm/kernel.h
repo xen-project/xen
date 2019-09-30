@@ -36,6 +36,9 @@ struct kernel_info {
     /* Enable pl011 emulation */
     bool vpl011;
 
+    /* GIC phandle */
+    uint32_t phandle_gic;
+
     /* loader to use for this kernel */
     void (*load)(struct kernel_info *info);
     /* loader specific state */

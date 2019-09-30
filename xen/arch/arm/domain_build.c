@@ -625,15 +625,14 @@ static int __init fdt_property_interrupts(const struct kernel_info *kinfo,
                                           unsigned num_irq)
 {
     int res;
-    uint32_t phandle = is_hardware_domain(kinfo->d) ?
-                       dt_interrupt_controller->phandle : GUEST_PHANDLE_GIC;
 
     res = fdt_property(kinfo->fdt, "interrupts",
                        intr, sizeof(intr[0]) * num_irq);
     if ( res )
         return res;
 
-    res = fdt_property_cell(kinfo->fdt, "interrupt-parent", phandle);
+    res = fdt_property_cell(kinfo->fdt, "interrupt-parent",
+                            kinfo->phandle_gic);
 
     return res;
 }
@@ -1551,8 +1550,9 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
     return res;
 }
 
-static int __init make_gicv2_domU_node(const struct domain *d, void *fdt)
+static int __init make_gicv2_domU_node(struct kernel_info *kinfo)
 {
+    void *fdt = kinfo->fdt;
     int res = 0;
     __be32 reg[(GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS) * 2];
     __be32 *cells;
@@ -1587,11 +1587,11 @@ static int __init make_gicv2_domU_node(const struct domain *d, void *fdt)
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "linux,phandle", GUEST_PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "linux,phandle", kinfo->phandle_gic);
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "phandle", GUEST_PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "phandle", kinfo->phandle_gic);
     if (res)
         return res;
 
@@ -1600,8 +1600,9 @@ static int __init make_gicv2_domU_node(const struct domain *d, void *fdt)
     return res;
 }
 
-static int __init make_gicv3_domU_node(const struct domain *d, void *fdt)
+static int __init make_gicv3_domU_node(struct kernel_info *kinfo)
 {
+    void *fdt = kinfo->fdt;
     int res = 0;
     __be32 reg[(GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS) * 2];
     __be32 *cells;
@@ -1636,11 +1637,11 @@ static int __init make_gicv3_domU_node(const struct domain *d, void *fdt)
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "linux,phandle", GUEST_PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "linux,phandle", kinfo->phandle_gic);
     if (res)
         return res;
 
-    res = fdt_property_cell(fdt, "phandle", GUEST_PHANDLE_GIC);
+    res = fdt_property_cell(fdt, "phandle", kinfo->phandle_gic);
     if (res)
         return res;
 
@@ -1649,22 +1650,23 @@ static int __init make_gicv3_domU_node(const struct domain *d, void *fdt)
     return res;
 }
 
-static int __init make_gic_domU_node(const struct domain *d, void *fdt)
+static int __init make_gic_domU_node(struct kernel_info *kinfo)
 {
-    switch ( d->arch.vgic.version )
+    switch ( kinfo->d->arch.vgic.version )
     {
     case GIC_V3:
-        return make_gicv3_domU_node(d, fdt);
+        return make_gicv3_domU_node(kinfo);
     case GIC_V2:
-        return make_gicv2_domU_node(d, fdt);
+        return make_gicv2_domU_node(kinfo);
     default:
         panic("Unsupported GIC version\n");
     }
 }
 
 #ifdef CONFIG_SBSA_VUART_CONSOLE
-static int __init make_vpl011_uart_node(const struct domain *d, void *fdt)
+static int __init make_vpl011_uart_node(struct kernel_info *kinfo)
 {
+    void *fdt = kinfo->fdt;
     int res;
     gic_interrupt_t intr;
     __be32 reg[GUEST_ROOT_ADDRESS_CELLS + GUEST_ROOT_SIZE_CELLS];
@@ -1694,7 +1696,7 @@ static int __init make_vpl011_uart_node(const struct domain *d, void *fdt)
         return res;
 
     res = fdt_property_cell(fdt, "interrupt-parent",
-                            GUEST_PHANDLE_GIC);
+                            kinfo->phandle_gic);
     if ( res )
         return res;
 
@@ -1718,6 +1720,8 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
 {
     int addrcells, sizecells;
     int ret;
+
+    kinfo->phandle_gic = GUEST_PHANDLE_GIC;
 
     addrcells = GUEST_ROOT_ADDRESS_CELLS;
     sizecells = GUEST_ROOT_SIZE_CELLS;
@@ -1762,7 +1766,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     if ( ret )
         goto err;
 
-    ret = make_gic_domU_node(d, kinfo->fdt);
+    ret = make_gic_domU_node(kinfo);
     if ( ret )
         goto err;
 
@@ -1774,7 +1778,7 @@ static int __init prepare_dtb_domU(struct domain *d, struct kernel_info *kinfo)
     {
         ret = -EINVAL;
 #ifdef CONFIG_SBSA_VUART_CONSOLE
-        ret = make_vpl011_uart_node(d, kinfo->fdt);
+        ret = make_vpl011_uart_node(kinfo);
 #endif
         if ( ret )
             goto err;
@@ -1806,6 +1810,7 @@ static int __init prepare_dtb_hwdom(struct domain *d, struct kernel_info *kinfo)
 
     ASSERT(dt_host && (dt_host->sibling == NULL));
 
+    kinfo->phandle_gic = dt_interrupt_controller->phandle;
     fdt = device_tree_flattened;
 
     new_size = fdt_totalsize(fdt) + DOM0_FDT_EXTRA_SIZE;
