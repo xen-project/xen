@@ -1694,6 +1694,8 @@ static void add_pcidevs_done(libxl__egc *egc, libxl__multidev *multidev,
     libxl_domid domid = apds->domid;
     libxl__ao_device *aodev = apds->outer_aodev;
 
+    if (rc) goto out;
+
     if (d_config->num_pcidevs > 0) {
         rc = libxl__create_pci_backend(gc, domid, d_config->pcidevs,
             d_config->num_pcidevs);
