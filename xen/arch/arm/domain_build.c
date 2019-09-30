@@ -1238,56 +1238,22 @@ static int __init map_device_children(struct domain *d,
 }
 
 /*
- * For a given device node:
- *  - Give permission to the guest to manage IRQ and MMIO range
- *  - Retrieve the IRQ configuration (i.e edge/level) from device tree
- * When the device is not marked for guest passthrough:
- *  - Try to call iommu_add_dt_device to protect the device by an IOMMU
- *  - Assign the device to the guest if it's protected by an IOMMU
- *  - Map the IRQs and iomem regions to DOM0
+ * handle_device_interrupts retrieves the interrupts configuration from
+ * a device tree node and maps those interrupts to the target domain.
+ *
+ * Returns:
+ *   < 0 error
+ *   0   success
  */
-static int __init handle_device(struct domain *d, struct dt_device_node *dev,
-                                p2m_type_t p2mt)
+static int __init handle_device_interrupts(struct domain *d,
+                                           struct dt_device_node *dev,
+                                           bool need_mapping)
 {
-    unsigned int nirq;
-    unsigned int naddr;
-    unsigned int i;
+    unsigned int i, nirq;
     int res;
     struct dt_raw_irq rirq;
-    u64 addr, size;
-    bool need_mapping = !dt_device_for_passthrough(dev);
 
     nirq = dt_number_of_irq(dev);
-    naddr = dt_number_of_address(dev);
-
-    dt_dprintk("%s passthrough = %d nirq = %d naddr = %u\n",
-               dt_node_full_name(dev), need_mapping, nirq, naddr);
-
-    if ( need_mapping )
-    {
-        dt_dprintk("Check if %s is behind the IOMMU and add it\n",
-                   dt_node_full_name(dev));
-
-        res = iommu_add_dt_device(dev);
-        if ( res < 0 )
-        {
-            printk(XENLOG_ERR "Failed to add %s to the IOMMU\n",
-                   dt_node_full_name(dev));
-            return res;
-        }
-
-        if ( dt_device_is_protected(dev) )
-        {
-            dt_dprintk("%s setup iommu\n", dt_node_full_name(dev));
-            res = iommu_assign_dt_device(d, dev);
-            if ( res )
-            {
-                printk(XENLOG_ERR "Failed to setup the IOMMU for %s\n",
-                       dt_node_full_name(dev));
-                return res;
-            }
-        }
-    }
 
     /* Give permission and map IRQs */
     for ( i = 0; i < nirq; i++ )
@@ -1323,6 +1289,62 @@ static int __init handle_device(struct domain *d, struct dt_device_node *dev,
         if ( res )
             return res;
     }
+
+    return 0;
+}
+
+/*
+ * For a given device node:
+ *  - Give permission to the guest to manage IRQ and MMIO range
+ *  - Retrieve the IRQ configuration (i.e edge/level) from device tree
+ * When the device is not marked for guest passthrough:
+ *  - Try to call iommu_add_dt_device to protect the device by an IOMMU
+ *  - Assign the device to the guest if it's protected by an IOMMU
+ *  - Map the IRQs and iomem regions to DOM0
+ */
+static int __init handle_device(struct domain *d, struct dt_device_node *dev,
+                                p2m_type_t p2mt)
+{
+    unsigned int naddr;
+    unsigned int i;
+    int res;
+    u64 addr, size;
+    bool need_mapping = !dt_device_for_passthrough(dev);
+
+    naddr = dt_number_of_address(dev);
+
+    dt_dprintk("%s passthrough = %d naddr = %u\n",
+               dt_node_full_name(dev), need_mapping, naddr);
+
+    if ( need_mapping )
+    {
+        dt_dprintk("Check if %s is behind the IOMMU and add it\n",
+                   dt_node_full_name(dev));
+
+        res = iommu_add_dt_device(dev);
+        if ( res < 0 )
+        {
+            printk(XENLOG_ERR "Failed to add %s to the IOMMU\n",
+                   dt_node_full_name(dev));
+            return res;
+        }
+
+        if ( dt_device_is_protected(dev) )
+        {
+            dt_dprintk("%s setup iommu\n", dt_node_full_name(dev));
+            res = iommu_assign_dt_device(d, dev);
+            if ( res )
+            {
+                printk(XENLOG_ERR "Failed to setup the IOMMU for %s\n",
+                       dt_node_full_name(dev));
+                return res;
+            }
+        }
+    }
+
+    res = handle_device_interrupts(d, dev, need_mapping);
+    if ( res < 0 )
+        return res;
 
     /* Give permission and map MMIOs */
     for ( i = 0; i < naddr; i++ )
