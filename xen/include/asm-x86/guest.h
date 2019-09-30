@@ -20,6 +20,7 @@
 #define __X86_GUEST_H__
 
 #include <asm/guest/hypercall.h>
+#include <asm/guest/hypervisor.h>
 #include <asm/guest/pvh-boot.h>
 #include <asm/guest/xen.h>
 #include <asm/pv/shim.h>
