@@ -154,7 +154,7 @@ custom_param("dom0-iommu", parse_dom0_iommu_param);
 
 static void __hwdom_init check_hwdom_reqs(struct domain *d)
 {
-    if ( iommu_hwdom_none || !hap_enabled(d) )
+    if ( iommu_hwdom_none || !is_hvm_domain(d) )
         return;
 
     iommu_hwdom_passthrough = false;
