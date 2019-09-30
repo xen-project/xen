@@ -33,8 +33,8 @@ extern bool pv_console;
 extern uint32_t xen_cpuid_base;
 
 void probe_hypervisor(void);
-int hypervisor_alloc_unused_page(mfn_t *mfn);
-int hypervisor_free_unused_page(mfn_t mfn);
+int xg_alloc_unused_page(mfn_t *mfn);
+int xg_free_unused_page(mfn_t mfn);
 
 DECLARE_PER_CPU(unsigned int, vcpu_id);
 DECLARE_PER_CPU(struct vcpu_info *, vcpu_info);

@@ -742,7 +742,7 @@ static long pv_shim_grant_table_op(unsigned int cmd,
                 };
                 mfn_t mfn;
 
-                rc = hypervisor_alloc_unused_page(&mfn);
+                rc = xg_alloc_unused_page(&mfn);
                 if ( rc )
                 {
                     gprintk(XENLOG_ERR,
@@ -754,7 +754,7 @@ static long pv_shim_grant_table_op(unsigned int cmd,
                 rc = xen_hypercall_memory_op(XENMEM_add_to_physmap, &xatp);
                 if ( rc )
                 {
-                    hypervisor_free_unused_page(mfn);
+                    xg_free_unused_page(mfn);
                     break;
                 }
 
