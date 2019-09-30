@@ -383,7 +383,7 @@ ENDPROC(cpu_init)
         ldr   r4, =\tbl
         add   r4, r4, r10            /* r4 := paddr(\tlb) */
 
-        mov   r2, #PT_PT             /* r2:r3 := right for linear PT */
+        movw  r2, #PT_PT             /* r2:r3 := right for linear PT */
         orr   r2, r2, r4             /*           + \tlb paddr */
         mov   r3, #0
 
@@ -419,7 +419,7 @@ ENDPROC(cpu_init)
         lsr   r4, \phys, #THIRD_SHIFT
         lsl   r4, r4, #THIRD_SHIFT   /* r4 := PAGE_ALIGNED(phys) */
 
-        mov   r2, #\type             /* r2:r3 := right for section PT */
+        movw  r2, #\type             /* r2:r3 := right for section PT */
         orr   r2, r2, r4             /*          + PAGE_ALIGNED(phys) */
         mov   r3, #0
 
