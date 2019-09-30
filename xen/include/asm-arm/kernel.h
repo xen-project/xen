@@ -28,7 +28,7 @@ struct kernel_info {
     paddr_t gnttab_size;
 
     /* boot blob load addresses */
-    const struct bootmodule *kernel_bootmodule, *initrd_bootmodule;
+    const struct bootmodule *kernel_bootmodule, *initrd_bootmodule, *dtb_bootmodule;
     const char* cmdline;
     paddr_t dtb_paddr;
     paddr_t initrd_paddr;
