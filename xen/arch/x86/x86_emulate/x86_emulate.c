@@ -4061,6 +4061,8 @@ x86_emulate(
             /* arpl */
             unsigned int src_rpl = dst.val & 3;
 
+            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
+
             dst = ea;
             dst.bytes = 2;
             if ( dst.type == OP_REG )
@@ -4078,7 +4080,6 @@ x86_emulate(
                 _regs.eflags &= ~X86_EFLAGS_ZF;
                 dst.type = OP_NONE;
             }
-            generate_exception_if(!in_protmode(ctxt, ops), EXC_UD);
         }
         break;
 
