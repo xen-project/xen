@@ -175,7 +175,7 @@ F:	tools/libxc/xc_arinc653.c
 
 ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
 M:	Stefano Stabellini <sstabellini@kernel.org>
-M:	Julien Grall <julien.grall@arm.com>
+M:	Julien Grall <julien@xen.org>
 R:	Volodymyr Babchuk <Volodymyr_Babchuk@epam.com>
 S:	Supported
 L:	xen-devel@lists.xenproject.org
@@ -212,7 +212,7 @@ F:	xen/common/cpupool.c
 
 DEVICE TREE
 M:	Stefano Stabellini <sstabellini@kernel.org>
-M:	Julien Grall <julien.grall@arm.com>
+M:	Julien Grall <julien@xen.org>
 S:	Supported
 F:	xen/common/libfdt/
 F:	xen/common/device_tree.c
@@ -533,7 +533,7 @@ M:	Andrew Cooper <andrew.cooper3@citrix.com>
 M:	George Dunlap <George.Dunlap@eu.citrix.com>
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 M:	Jan Beulich <jbeulich@suse.com>
-M:	Julien Grall <julien.grall@arm.com>
+M:	Julien Grall <julien@xen.org>
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Stefano Stabellini <sstabellini@kernel.org>
 M:	Tim Deegan <tim@xen.org>
