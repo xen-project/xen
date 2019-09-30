@@ -1778,12 +1778,12 @@ static void pci_remove_qmp_retry_timer_cb(libxl__egc *egc,
     libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
 static void pci_remove_qmp_query_cb(libxl__egc *egc,
     libxl__ev_qmp *qmp, const libxl__json_object *response, int rc);
+static void pci_remove_timeout(libxl__egc *egc,
+    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
 static void pci_remove_detatched(libxl__egc *egc,
     pci_remove_state *prs, int rc);
 static void pci_remove_stubdom_done(libxl__egc *egc,
     libxl__ao_device *aodev);
-static void pci_remove_timeout(libxl__egc *egc,
-    libxl__ev_time *ev, const struct timeval *requested_abs, int rc);
 static void pci_remove_done(libxl__egc *egc,
     pci_remove_state *prs, int rc);
 
@@ -2044,6 +2044,25 @@ out:
     pci_remove_detatched(egc, prs, rc); /* must be last */
 }
 
+static void pci_remove_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                               const struct timeval *requested_abs,
+                               int rc)
+{
+    EGC_GC;
+    pci_remove_state *prs = CONTAINER_OF(ev, *prs, timeout);
+
+    /* Convenience aliases */
+    libxl_device_pci *const pcidev = prs->pcidev;
+
+    LOGD(WARN, prs->domid, "timed out waiting for DM to remove "
+         PCI_PT_QDEV_ID, pcidev->bus, pcidev->dev, pcidev->func);
+
+    /* If we timed out, we might still want to keep destroying the device
+     * (when force==true), so let the next function decide what to do on
+     * error */
+    pci_remove_detatched(egc, prs, rc);
+}
+
 static void pci_remove_detatched(libxl__egc *egc,
                                  pci_remove_state *prs,
                                  int rc)
@@ -2056,6 +2075,11 @@ static void pci_remove_detatched(libxl__egc *egc,
     /* Convenience aliases */
     libxl_device_pci *const pcidev = prs->pcidev;
     libxl_domid domid = prs->domid;
+
+    /* Cleaning QMP states ASAP */
+    libxl__ev_qmp_dispose(gc, &prs->qmp);
+    libxl__ev_time_deregister(gc, &prs->timeout);
+    libxl__ev_time_deregister(gc, &prs->retry_timer);
 
     if (rc && !prs->force)
         goto out;
@@ -2104,15 +2128,6 @@ static void pci_remove_stubdom_done(libxl__egc *egc,
     pci_remove_done(egc, prs, 0);
 }
 
-static void pci_remove_timeout(libxl__egc *egc, libxl__ev_time *ev,
-                               const struct timeval *requested_abs,
-                               int rc)
-{
-    pci_remove_state *prs = CONTAINER_OF(ev, *prs, timeout);
-
-    pci_remove_done(egc, prs, rc);
-}
-
 static void pci_remove_done(libxl__egc *egc,
                             pci_remove_state *prs,
                             int rc)
@@ -2120,10 +2135,6 @@ static void pci_remove_done(libxl__egc *egc,
     EGC_GC;
 
     if (rc) goto out;
-
-    libxl__ev_qmp_dispose(gc, &prs->qmp);
-    libxl__ev_time_deregister(gc, &prs->timeout);
-    libxl__ev_time_deregister(gc, &prs->retry_timer);
 
     libxl__device_pci_remove_xenstore(gc, prs->domid, prs->pcidev);
 out:
