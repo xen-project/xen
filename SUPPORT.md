@@ -373,6 +373,12 @@ Guest-side driver capable of speaking the Xen PV Framebuffer protocol
 
     Status, Linux (xen-fbfront): Supported
 
+### PV display (frontend)
+
+Guest-side driver capable of speaking the Xen PV display protocol
+
+    Status, Linux: Supported
+
 ### PV Console (frontend)
 
 Guest-side driver capable of speaking the Xen PV console protocol
@@ -385,7 +391,8 @@ Guest-side driver capable of speaking the Xen PV console protocol
 ### PV keyboard (frontend)
 
 Guest-side driver capable of speaking the Xen PV keyboard protocol.
-Note that the "keyboard protocol" includes mouse / pointer support as well.
+Note that the "keyboard protocol" includes mouse / pointer /
+multi-touch support as well.
 
     Status, Linux (xen-kbdfront): Supported
 
@@ -417,6 +424,12 @@ Guest-side driver capable of speaking the Xen 9pfs protocol
 Guest-side driver capable of making pv system calls
 
     Status, Linux: Tech Preview
+
+### PV sound (frontend)
+
+Guest-side driver capable of speaking the Xen PV sound protocol
+
+    Status, Linux: Supported
 
 ## Virtual device support, host side
 
