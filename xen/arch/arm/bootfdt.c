@@ -55,15 +55,15 @@ static bool __init device_tree_node_compatible(const void *fdt, int node,
     return false;
 }
 
-static void __init device_tree_get_reg(const __be32 **cell, u32 address_cells,
-                                       u32 size_cells, u64 *start, u64 *size)
+void __init device_tree_get_reg(const __be32 **cell, u32 address_cells,
+                                u32 size_cells, u64 *start, u64 *size)
 {
     *start = dt_next_cell(address_cells, cell);
     *size = dt_next_cell(size_cells, cell);
 }
 
-static u32 __init device_tree_get_u32(const void *fdt, int node,
-                                      const char *prop_name, u32 dflt)
+u32 __init device_tree_get_u32(const void *fdt, int node,
+                               const char *prop_name, u32 dflt)
 {
     const struct fdt_property *prop;
 

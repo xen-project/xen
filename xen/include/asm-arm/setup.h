@@ -115,6 +115,12 @@ const char *boot_module_kind_as_string(bootmodule_kind kind);
 extern uint32_t hyp_traps_vector[];
 void init_traps(void);
 
+void device_tree_get_reg(const __be32 **cell, u32 address_cells,
+                         u32 size_cells, u64 *start, u64 *size);
+
+u32 device_tree_get_u32(const void *fdt, int node,
+                        const char *prop_name, u32 dflt);
+
 #endif
 /*
  * Local variables:
