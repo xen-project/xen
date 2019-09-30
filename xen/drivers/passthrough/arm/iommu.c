@@ -132,12 +132,6 @@ void arch_iommu_domain_destroy(struct domain *d)
 {
 }
 
-int arch_iommu_populate_page_table(struct domain *d)
-{
-    /* The IOMMU shares the p2m with the CPU */
-    return -ENOSYS;
-}
-
 void __hwdom_init arch_iommu_hwdom_init(struct domain *d)
 {
 }
