@@ -9,7 +9,7 @@
 /* Allow to insert a read memory barrier into conditionals */
 static always_inline bool barrier_nospec_true(void)
 {
-#ifdef CONFIG_HVM
+#ifdef CONFIG_SPECULATIVE_HARDEN_BRANCH
     alternative("", "lfence", X86_FEATURE_SC_L1TF_VULN);
 #endif
     return true;
