@@ -1278,7 +1278,7 @@ int cpu_add(uint32_t apic_id, uint32_t acpi_id, uint32_t pxm)
                     "Setup node failed for pxm %x\n", pxm);
             x86_acpiid_to_apicid[acpi_id] = BAD_APICID;
             mp_unregister_lapic(apic_id, cpu);
-            cpu = node;
+            cpu = -ENOSPC;
             goto out;
         }
         if ( apic_id < MAX_LOCAL_APIC )
