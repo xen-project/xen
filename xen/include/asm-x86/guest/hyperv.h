@@ -1,5 +1,5 @@
 /******************************************************************************
- * asm-x86/guest.h
+ * asm-x86/guest/hyperv.h
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms and conditions of the GNU General Public
@@ -13,20 +13,24 @@
  * You should have received a copy of the GNU General Public
  * License along with this program; If not, see <http://www.gnu.org/licenses/>.
  *
- * Copyright (c) 2017 Citrix Systems Ltd.
+ * Copyright (c) 2019 Microsoft.
  */
 
-#ifndef __X86_GUEST_H__
-#define __X86_GUEST_H__
+#ifndef __X86_GUEST_HYPERV_H__
+#define __X86_GUEST_HYPERV_H__
 
-#include <asm/guest/hypercall.h>
-#include <asm/guest/hyperv.h>
+#ifdef CONFIG_HYPERV_GUEST
+
 #include <asm/guest/hypervisor.h>
-#include <asm/guest/pvh-boot.h>
-#include <asm/guest/xen.h>
-#include <asm/pv/shim.h>
 
-#endif /* __X86_GUEST_H__ */
+const struct hypervisor_ops *hyperv_probe(void);
+
+#else
+
+static inline const struct hypervisor_ops *hyperv_probe(void) { return NULL; }
+
+#endif /* CONFIG_HYPERV_GUEST */
+#endif /* __X86_GUEST_HYPERV_H__ */
 
 /*
  * Local variables:

@@ -1,7 +1,7 @@
 /******************************************************************************
- * arch/x86/guest/hypervisor.c
+ * arch/x86/guest/hyperv/hyperv.c
  *
- * Support for detecting and running under a hypervisor.
+ * Support for detecting and running under Hyper-V.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,49 +19,28 @@
  * Copyright (c) 2019 Microsoft.
  */
 #include <xen/init.h>
-#include <xen/types.h>
 
-#include <asm/cache.h>
 #include <asm/guest.h>
 
-static const struct hypervisor_ops *__read_mostly ops;
+static const struct hypervisor_ops ops = {
+    .name = "Hyper-V",
+};
 
-const char *__init hypervisor_probe(void)
+const struct hypervisor_ops *__init hyperv_probe(void)
 {
-    if ( !cpu_has_hypervisor )
+    uint32_t eax, ebx, ecx, edx;
+
+    cpuid(0x40000000, &eax, &ebx, &ecx, &edx);
+    if ( !((ebx == 0x7263694d) &&  /* "Micr" */
+           (ecx == 0x666f736f) &&  /* "osof" */
+           (edx == 0x76482074)) )  /* "t Hv" */
         return NULL;
 
-    ops = xg_probe();
-    if ( ops )
-        return ops->name;
+    cpuid(0x40000001, &eax, &ebx, &ecx, &edx);
+    if ( eax != 0x31237648 )    /* Hv#1 */
+        return NULL;
 
-    /*
-     * Detection of Hyper-V must come after Xen to avoid false positive due
-     * to viridian support
-     */
-    ops = hyperv_probe();
-    if ( ops )
-        return ops->name;
-
-    return NULL;
-}
-
-void __init hypervisor_setup(void)
-{
-    if ( ops && ops->setup )
-        ops->setup();
-}
-
-void hypervisor_ap_setup(void)
-{
-    if ( ops && ops->ap_setup )
-        ops->ap_setup();
-}
-
-void hypervisor_resume(void)
-{
-    if ( ops && ops->resume )
-        ops->resume();
+    return &ops;
 }
 
 /*
