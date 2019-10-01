@@ -170,16 +170,16 @@ config XEN_GUEST
 	  If unsure, say N.
 
 config PVH_GUEST
-	def_bool n
+	def_bool y
 	prompt "PVH Guest"
 	depends on XEN_GUEST
 	---help---
 	  Support booting using the PVH ABI.
 
-	  If unsure, say N.
+	  If unsure, say Y.
 
 config PV_SHIM
-	def_bool n
+	def_bool y
 	prompt "PV Shim"
 	depends on PV && XEN_GUEST
 	---help---
@@ -187,7 +187,7 @@ config PV_SHIM
 	  in an HVM/PVH container. This mode can only be enabled with command
 	  line option.
 
-	  If unsure, say N.
+	  If unsure, say Y.
 
 config PV_SHIM_EXCLUSIVE
 	def_bool n
