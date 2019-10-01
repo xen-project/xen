@@ -37,8 +37,8 @@ module Domain = struct
 	external create_new : ctx -> Domain_config.t -> ?async:'a -> unit -> domid = "stub_libxl_domain_create_new"
 	external create_restore : ctx -> Domain_config.t -> (Unix.file_descr * Domain_restore_params.t) ->
 		?async:'a -> unit -> domid = "stub_libxl_domain_create_restore"
-	external shutdown : ctx -> domid -> unit = "stub_libxl_domain_shutdown"
-	external reboot : ctx -> domid -> unit = "stub_libxl_domain_reboot"
+	external shutdown : ctx -> domid -> ?async:'a -> unit -> unit = "stub_libxl_domain_shutdown"
+	external reboot : ctx -> domid -> ?async:'a -> unit -> unit = "stub_libxl_domain_reboot"
 	external destroy : ctx -> domid -> ?async:'a -> unit -> unit = "stub_libxl_domain_destroy"
 	external suspend : ctx -> domid -> Unix.file_descr -> ?async:'a -> unit -> unit = "stub_libxl_domain_suspend"
 	external pause : ctx -> domid -> ?async:'a -> unit = "stub_libxl_domain_pause"

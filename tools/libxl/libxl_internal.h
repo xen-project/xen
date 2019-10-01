@@ -1378,8 +1378,6 @@ _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
 _hidden const char *libxl__domain_pvcontrol_xspath(libxl__gc*, uint32_t domid);
 _hidden char * libxl__domain_pvcontrol_read(libxl__gc *gc,
                                             xs_transaction_t t, uint32_t domid);
-_hidden int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
-                                          uint32_t domid, const char *cmd);
 
 /* from xl_device */
 _hidden char *libxl__device_disk_string_of_backend(libxl_disk_backend backend);
@@ -4718,6 +4716,11 @@ struct libxl__ev_devlock {
 _hidden void libxl__ev_devlock_init(libxl__ev_devlock *);
 _hidden void libxl__ev_devlock_lock(libxl__egc *, libxl__ev_devlock *);
 _hidden void libxl__ev_devlock_unlock(libxl__gc *, libxl__ev_devlock *);
+
+/* Send control commands over xenstore and wait for an Ack. */
+_hidden int libxl__domain_pvcontrol(libxl__egc *egc,
+                                    libxl__xswait_state *pvcontrol,
+                                    domid_t domid, const char *cmd);
 
 #endif
 

@@ -103,7 +103,7 @@ static void reboot_domain(uint32_t domid, libxl_evgen_domain_death **deathw,
     int rc;
 
     fprintf(stderr, "Rebooting domain %u\n", domid);
-    rc=libxl_domain_reboot(ctx, domid);
+    rc = libxl_domain_reboot(ctx, domid, NULL);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
             fprintf(stderr, "PV control interface not available:"
@@ -136,7 +136,7 @@ static void shutdown_domain(uint32_t domid,
     int rc;
 
     fprintf(stderr, "Shutting down domain %u\n", domid);
-    rc=libxl_domain_shutdown(ctx, domid);
+    rc = libxl_domain_shutdown(ctx, domid, NULL);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
             fprintf(stderr, "PV control interface not available:"

@@ -193,16 +193,11 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     LOGD(DEBUG, domid, "issuing %s suspend request via XenBus control node",
         dsps->type != LIBXL_DOMAIN_TYPE_PV ? "PVH/HVM" : "PV");
 
-    libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, "suspend");
-
-    dsps->pvcontrol.path = libxl__domain_pvcontrol_xspath(gc, domid);
-    if (!dsps->pvcontrol.path) { rc = ERROR_FAIL; goto err; }
-
     dsps->pvcontrol.ao = ao;
-    dsps->pvcontrol.what = "guest acknowledgement of suspend request";
-    dsps->pvcontrol.timeout_ms = 60 * 1000;
     dsps->pvcontrol.callback = domain_suspend_common_pvcontrol_suspending;
-    libxl__xswait_start(gc, &dsps->pvcontrol);
+    rc = libxl__domain_pvcontrol(egc, &dsps->pvcontrol, domid, "suspend");
+    if (rc) goto err;
+
     return;
 
  err:

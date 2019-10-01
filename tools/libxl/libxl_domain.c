@@ -763,49 +763,91 @@ char * libxl__domain_pvcontrol_read(libxl__gc *gc, xs_transaction_t t,
     return libxl__xs_read(gc, t, shutdown_path);
 }
 
-int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
-                                  uint32_t domid, const char *cmd)
+int libxl__domain_pvcontrol(libxl__egc *egc, libxl__xswait_state *pvcontrol,
+                            domid_t domid, const char *cmd)
 {
+    STATE_AO_GC(pvcontrol->ao);
     const char *shutdown_path;
+    int rc;
+
+    rc = libxl__domain_pvcontrol_available(gc, domid);
+    if (rc < 0)
+        return rc;
 
     shutdown_path = libxl__domain_pvcontrol_xspath(gc, domid);
     if (!shutdown_path)
         return ERROR_FAIL;
 
-    return libxl__xs_printf(gc, t, shutdown_path, "%s", cmd);
+    rc = libxl__xs_printf(gc, XBT_NULL, shutdown_path, "%s", cmd);
+    if (rc)
+        return rc;
+
+    pvcontrol->path = shutdown_path;
+    pvcontrol->what = GCSPRINTF("guest acknowledgement of %s request", cmd);
+    pvcontrol->timeout_ms = 60 * 1000;
+    rc = libxl__xswait_start(gc, pvcontrol);
+    if (rc)
+        return rc;
+
+    return 0;
 }
 
-static int libxl__domain_pvcontrol(libxl__gc *gc, uint32_t domid,
-                                   const char *cmd)
+static bool pvcontrol_acked(const char *state)
 {
-    int ret;
+    if (!state || !strcmp(state,""))
+        return true;
 
-    ret = libxl__domain_pvcontrol_available(gc, domid);
-    if (ret < 0)
-        return ret;
-
-    if (!ret)
-        return ERROR_NOPARAVIRT;
-
-    return libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, cmd);
+    return false;
 }
 
-int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid)
+/* Xenstore watch callback prototype for the reboot/poweroff operations. */
+static void pvcontrol_cb(libxl__egc *egc, libxl__xswait_state *xswa, int rc,
+                         const char *state);
+
+int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid,
+                          const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
-    int ret;
-    ret = libxl__domain_pvcontrol(gc, domid, "poweroff");
-    GC_FREE;
-    return ret;
+    AO_CREATE(ctx, domid, ao_how);
+    libxl__xswait_state *pvcontrol;
+    int rc;
+
+    GCNEW(pvcontrol);
+    pvcontrol->ao = ao;
+    pvcontrol->callback = pvcontrol_cb;
+    rc = libxl__domain_pvcontrol(egc, pvcontrol, domid, "poweroff");
+
+    return rc ? AO_CREATE_FAIL(rc) : AO_INPROGRESS;
 }
 
-int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid)
+int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid,
+                        const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
-    int ret;
-    ret = libxl__domain_pvcontrol(gc, domid, "reboot");
-    GC_FREE;
-    return ret;
+    AO_CREATE(ctx, domid, ao_how);
+    libxl__xswait_state *pvcontrol;
+    int rc;
+
+    GCNEW(pvcontrol);
+    pvcontrol->ao = ao;
+    pvcontrol->callback = pvcontrol_cb;
+    rc = libxl__domain_pvcontrol(egc, pvcontrol, domid, "reboot");
+
+    return rc ? AO_CREATE_FAIL(rc) : AO_INPROGRESS;
+}
+
+static void pvcontrol_cb(libxl__egc *egc, libxl__xswait_state *xswa, int rc,
+                         const char *state)
+{
+    STATE_AO_GC(xswa->ao);
+
+    if (!rc && !pvcontrol_acked(state))
+        return;
+
+    libxl__xswait_stop(gc, xswa);
+
+    if (rc)
+        LOG(ERROR, "guest didn't acknowledge control request: %d", rc);
+
+    libxl__ao_complete(egc, ao, rc);
 }
 
 static void domain_death_occurred(libxl__egc *egc,

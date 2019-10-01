@@ -551,15 +551,18 @@ value stub_libxl_domain_create_restore(value ctx, value domain_config, value par
 	CAMLreturn(Val_int(c_domid));
 }
 
-value stub_libxl_domain_shutdown(value ctx, value domid)
+value stub_libxl_domain_shutdown(value ctx, value domid, value async, value unit)
 {
-	CAMLparam2(ctx, domid);
+	CAMLparam4(ctx, domid, async, unit);
 	int ret;
 	uint32_t c_domid = Int_val(domid);
+	libxl_asyncop_how *ao_how = aohow_val(async);
 
 	caml_enter_blocking_section();
-	ret = libxl_domain_shutdown(CTX, c_domid);
+	ret = libxl_domain_shutdown(CTX, c_domid, ao_how);
 	caml_leave_blocking_section();
+
+	free(ao_how);
 
 	if (ret != 0)
 		failwith_xl(ret, "domain_shutdown");
@@ -567,15 +570,18 @@ value stub_libxl_domain_shutdown(value ctx, value domid)
 	CAMLreturn(Val_unit);
 }
 
-value stub_libxl_domain_reboot(value ctx, value domid)
+value stub_libxl_domain_reboot(value ctx, value domid, value async, value unit)
 {
-	CAMLparam2(ctx, domid);
+	CAMLparam4(ctx, domid, async, unit);
 	int ret;
 	uint32_t c_domid = Int_val(domid);
+	libxl_asyncop_how *ao_how = aohow_val(async);
 
 	caml_enter_blocking_section();
-	ret = libxl_domain_reboot(CTX, c_domid);
+	ret = libxl_domain_reboot(CTX, c_domid, ao_how);
 	caml_leave_blocking_section();
+
+	free(ao_how);
 
 	if (ret != 0)
 		failwith_xl(ret, "domain_reboot");

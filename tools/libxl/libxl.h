@@ -1239,6 +1239,8 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  *   libxl_set_vcpuonline()
  *   libxl_retrieve_domain_configuration()
  *   libxl_qemu_monitor_command()
+ *   libxl_domain_shutdown()
+ *   libxl_domain_reboot()
  */
 #define LIBXL_HAVE_FN_USING_QMP_ASYNC 1
 
@@ -1628,8 +1630,27 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
                              const libxl_asyncop_how *ao_how)
                              LIBXL_EXTERNAL_CALLERS_ONLY;
 
-int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid);
-int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid);
+int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid,
+                          const libxl_asyncop_how *ao_how)
+                          LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid,
+                        const libxl_asyncop_how *ao_how)
+                        LIBXL_EXTERNAL_CALLERS_ONLY;
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+static inline int libxl_domain_shutdown_0x041200(libxl_ctx *ctx,
+                                                 uint32_t domid)
+{
+    return libxl_domain_shutdown(ctx, domid, NULL);
+}
+#define libxl_domain_shutdown libxl_domain_shutdown_0x041200
+static inline int libxl_domain_reboot_0x041200(libxl_ctx *ctx,
+                                               uint32_t domid)
+{
+    return libxl_domain_reboot(ctx, domid, NULL);
+}
+#define libxl_domain_reboot libxl_domain_reboot_0x041200
+#endif
+
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid,
                          const libxl_asyncop_how *ao_how)
                          LIBXL_EXTERNAL_CALLERS_ONLY;
