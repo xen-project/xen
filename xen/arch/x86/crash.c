@@ -29,6 +29,7 @@
 #include <asm/io_apic.h>
 #include <xen/iommu.h>
 #include <asm/hpet.h>
+#include <xen/console.h>
 
 static cpumask_t waiting_to_crash;
 static unsigned int crashing_cpu;
@@ -153,6 +154,12 @@ static void nmi_shootdown_cpus(void)
         mdelay(1);
         msecs--;
     }
+
+    /*
+     * We may have NMI'd another CPU while it was holding the console lock.
+     * It won't be in a position to release the lock...
+     */
+    console_force_unlock();
 
     /* Leave a hint of how well we did trying to shoot down the other cpus */
     if ( cpumask_empty(&waiting_to_crash) )
