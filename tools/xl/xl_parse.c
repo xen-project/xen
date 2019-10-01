@@ -1512,23 +1512,27 @@ void parse_config_data(const char *config_source,
     if (xlu_cfg_get_string(config, "passthrough", &buf, 0)) {
         c_info->passthrough =
             (d_config->num_pcidevs || d_config->num_dtdevs)
-            ? LIBXL_PASSTHROUGH_ENABLED : LIBXL_PASSTHROUGH_DISABLED;
+            ? LIBXL_PASSTHROUGH_UNKNOWN : LIBXL_PASSTHROUGH_DISABLED;
     } else {
-        libxl_passthrough o;
+        if (!strcasecmp("enabled", buf))
+            c_info->passthrough = LIBXL_PASSTHROUGH_UNKNOWN;
+        else {
+            libxl_passthrough o;
 
-        e = libxl_passthrough_from_string(buf, &o);
-        if (e) {
-            fprintf(stderr,
-                    "ERROR: unknown passthrough option '%s'\n",
-                    buf);
-            exit(-ERROR_FAIL);
+            e = libxl_passthrough_from_string(buf, &o);
+            if (e || !strcasecmp("unknown", buf)) {
+                fprintf(stderr,
+                        "ERROR: unknown passthrough option '%s'\n",
+                        buf);
+                exit(-ERROR_FAIL);
+            }
+
+            c_info->passthrough = o;
         }
-
-        c_info->passthrough = o;
     }
 
     switch (c_info->passthrough) {
-    case LIBXL_PASSTHROUGH_ENABLED:
+    case LIBXL_PASSTHROUGH_UNKNOWN:
         /*
          * Choose a suitable default. libxl would also do this but
          * choosing here allows the code calculating 'iommu_memkb'

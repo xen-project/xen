@@ -64,7 +64,7 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
         c_info->ssidref = SECINITSID_DOMU;
 
     if (info.cap_hvm_directio &&
-        (c_info->passthrough == LIBXL_PASSTHROUGH_ENABLED)) {
+        (c_info->passthrough == LIBXL_PASSTHROUGH_UNKNOWN)) {
         c_info->passthrough = ((c_info->type == LIBXL_DOMAIN_TYPE_PV) ||
                                !info.cap_iommu_hap_pt_share) ?
             LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
@@ -586,7 +586,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
                 libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
         }
 
-        assert(info->passthrough != LIBXL_PASSTHROUGH_ENABLED);
+        assert(info->passthrough != LIBXL_PASSTHROUGH_UNKNOWN);
         LOG(DETAIL, "passthrough: %s",
             libxl_passthrough_to_string(info->passthrough));
 
