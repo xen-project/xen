@@ -116,30 +116,37 @@ abort_guest_exit_end:
 
         mov pc, lr
 
+
+        /*
+         * Macro to define a trap entry. The iflags is optional and
+         * corresponds to alist of interrupts (Asynchronous Abort, IRQ, FIQ)
+         * to unmask.
+         */
+        .macro vector trap, iflags=n
+        SAVE_ALL
+        .if \iflags != n
+        cpsie   \iflags
+        .endif
+        adr     lr, return_from_trap
+        mov     r0, sp
+        /*
+         * Save the stack pointer in r11. It will be restored after the
+         * trap has been handled (see return_from_trap).
+         */
+        mov     r11, sp
+        bic     sp, #7      /* Align the stack pointer (noop on guest trap) */
+        b       do_trap_\trap
+        .endm
+
 #define DEFINE_TRAP_ENTRY(trap)                                         \
         ALIGN;                                                          \
 trap_##trap:                                                            \
-        SAVE_ALL;                                                       \
-        cpsie i;        /* local_irq_enable */                          \
-        adr lr, return_from_trap;                                       \
-        mov r0, sp;                                                     \
-        /*                                                              \
-         * Save the stack pointer in r11. It will be restored after the \
-         * trap has been handled (see return_from_trap).                \
-         */                                                             \
-        mov r11, sp;                                                    \
-        bic sp, #7; /* Align the stack pointer (noop on guest trap) */  \
-        b do_trap_##trap
+        vector trap, iflags=i                                           \
 
 #define DEFINE_TRAP_ENTRY_NOIRQ(trap)                                   \
         ALIGN;                                                          \
 trap_##trap:                                                            \
-        SAVE_ALL;                                                       \
-        adr lr, return_from_trap;                                       \
-        mov r0, sp;                                                     \
-        mov r11, sp;                                                    \
-        bic sp, #7; /* Align the stack pointer (noop on guest trap) */  \
-        b do_trap_##trap
+        vector trap
 
         .align 5
 GLOBAL(hyp_traps_vector)
