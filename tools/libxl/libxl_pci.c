@@ -1012,6 +1012,9 @@ typedef struct pci_add_state {
     bool starting;
     void (*callback)(libxl__egc *, struct pci_add_state *, int rc);
 
+    /* private to device_pci_add_stubdom_wait */
+    libxl__ev_devstate pciback_ds;
+
     /* private to do_pci_add */
     libxl__xswait_state xswait;
     libxl__ev_qmp qmp;
@@ -1487,6 +1490,10 @@ static int libxl_pcidev_assignable(libxl_ctx *ctx, libxl_device_pci *pcidev)
     return i != num;
 }
 
+static void device_pci_add_stubdom_wait(libxl__egc *egc,
+    pci_add_state *pas, int rc);
+static void device_pci_add_stubdom_ready(libxl__egc *egc,
+    libxl__ev_devstate *ds, int rc);
 static void device_pci_add_stubdom_done(libxl__egc *egc,
     pci_add_state *, int rc);
 static void device_pci_add_done(libxl__egc *egc,
@@ -1563,7 +1570,8 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
         GCNEW(pcidev_s);
         libxl_device_pci_init(pcidev_s);
         libxl_device_pci_copy(CTX, pcidev_s, pcidev);
-        pas->callback = device_pci_add_stubdom_done;
+        pas->callback = device_pci_add_stubdom_wait;
+
         do_pci_add(egc, stubdomid, pcidev_s, pas); /* must be last */
         return;
     }
@@ -1573,6 +1581,41 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
 
 out:
     device_pci_add_done(egc, pas, rc); /* must be last */
+}
+
+static void device_pci_add_stubdom_wait(libxl__egc *egc,
+                                        pci_add_state *pas,
+                                        int rc)
+{
+    libxl__ao_device *aodev = pas->aodev;
+    STATE_AO_GC(aodev->ao);
+    int stubdomid = libxl_get_stubdom_id(CTX, pas->domid);
+    char *state_path;
+
+    if (rc) goto out;
+
+    /* Wait for the device actually being connected, otherwise device model
+     * running there will fail to find the device. */
+    state_path = GCSPRINTF("%s/state",
+            libxl__domain_device_backend_path(gc, 0, stubdomid, 0,
+                                              LIBXL__DEVICE_KIND_PCI));
+    rc = libxl__ev_devstate_wait(ao, &pas->pciback_ds,
+            device_pci_add_stubdom_ready,
+            state_path, XenbusStateConnected,
+            LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000);
+    if (rc) goto out;
+    return;
+out:
+    device_pci_add_done(egc, pas, rc); /* must be last */
+}
+
+static void device_pci_add_stubdom_ready(libxl__egc *egc,
+                                         libxl__ev_devstate *ds,
+                                         int rc)
+{
+    pci_add_state *pas = CONTAINER_OF(ds, *pas, pciback_ds);
+
+    device_pci_add_stubdom_done(egc, pas, rc); /* must be last */
 }
 
 static void device_pci_add_stubdom_done(libxl__egc *egc,
