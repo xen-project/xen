@@ -530,6 +530,15 @@ int main(int argc, char **argv)
                 break;
             }
 
+            if ( !i )
+            {
+                fprintf(stderr, "'%s' unrecognized - skipping\n", ptr);
+                continue;
+            }
+
+            if ( *ptr )
+                fprintf(stderr, "'%s' unrecognized - ignoring\n", ptr);
+
             decode_featureset(fs, i, "Raw", true);
         }
     }
