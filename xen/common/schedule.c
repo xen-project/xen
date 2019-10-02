@@ -75,7 +75,6 @@ static void vcpu_singleshot_timer_fn(void *data);
 static void poll_timer_fn(void *data);
 
 /* This is global for now so that private implementations can reach it */
-DEFINE_PER_CPU(struct scheduler *, scheduler);
 DEFINE_PER_CPU_READ_MOSTLY(struct sched_resource *, sched_res);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned int, sched_res_idx);
 
@@ -200,7 +199,7 @@ static inline struct scheduler *unit_scheduler(const struct sched_unit *unit)
      */
 
     ASSERT(is_idle_domain(d));
-    return per_cpu(scheduler, unit->res->master_cpu);
+    return unit->res->scheduler;
 }
 
 static inline struct scheduler *vcpu_scheduler(const struct vcpu *v)
@@ -1921,8 +1920,8 @@ static bool sched_tasklet_check(unsigned int cpu)
 static struct sched_unit *do_schedule(struct sched_unit *prev, s_time_t now,
                                       unsigned int cpu)
 {
-    struct scheduler *sched = per_cpu(scheduler, cpu);
     struct sched_resource *sr = get_sched_res(cpu);
+    struct scheduler *sched = sr->scheduler;
     struct sched_unit *next;
 
     /* get policy-specific decision on scheduling... */
@@ -2346,7 +2345,7 @@ static int cpu_schedule_up(unsigned int cpu)
     sr->cpus = cpumask_of(cpu);
     set_sched_res(cpu, sr);
 
-    per_cpu(scheduler, cpu) = &sched_idle_ops;
+    sr->scheduler = &sched_idle_ops;
     spin_lock_init(&sr->_lock);
     sr->schedule_lock = &sched_free_cpu_lock;
     init_timer(&sr->s_timer, s_timer_fn, NULL, cpu);
@@ -2557,7 +2556,7 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
 {
     struct vcpu *idle;
     void *ppriv, *ppriv_old, *vpriv, *vpriv_old;
-    struct scheduler *old_ops = per_cpu(scheduler, cpu);
+    struct scheduler *old_ops = get_sched_res(cpu)->scheduler;
     struct scheduler *new_ops = (c == NULL) ? &sched_idle_ops : c->sched;
     struct cpupool *old_pool = per_cpu(cpupool, cpu);
     struct sched_resource *sd = get_sched_res(cpu);
@@ -2621,7 +2620,7 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     ppriv_old = sd->sched_priv;
     new_lock = sched_switch_sched(new_ops, cpu, ppriv, vpriv);
 
-    per_cpu(scheduler, cpu) = new_ops;
+    sd->scheduler = new_ops;
     sd->sched_priv = ppriv;
 
     /*
@@ -2721,7 +2720,7 @@ void sched_tick_suspend(void)
     struct scheduler *sched;
     unsigned int cpu = smp_processor_id();
 
-    sched = per_cpu(scheduler, cpu);
+    sched = get_sched_res(cpu)->scheduler;
     sched_do_tick_suspend(sched, cpu);
     rcu_idle_enter(cpu);
     rcu_idle_timer_start();
@@ -2734,7 +2733,7 @@ void sched_tick_resume(void)
 
     rcu_idle_timer_stop();
     rcu_idle_exit(cpu);
-    sched = per_cpu(scheduler, cpu);
+    sched = get_sched_res(cpu)->scheduler;
     sched_do_tick_resume(sched, cpu);
 }
 

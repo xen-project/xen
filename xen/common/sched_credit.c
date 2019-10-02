@@ -352,9 +352,10 @@ DEFINE_PER_CPU(unsigned int, last_tickle_cpu);
 static inline void __runq_tickle(struct csched_unit *new)
 {
     unsigned int cpu = sched_unit_master(new->unit);
+    struct sched_resource *sr = get_sched_res(cpu);
     struct sched_unit *unit = new->unit;
     struct csched_unit * const cur = CSCHED_UNIT(curr_on_cpu(cpu));
-    struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
+    struct csched_private *prv = CSCHED_PRIV(sr->scheduler);
     cpumask_t mask, idle_mask, *online;
     int balance_step, idlers_empty;
 
@@ -931,7 +932,8 @@ csched_unit_acct(struct csched_private *prv, unsigned int cpu)
 {
     struct sched_unit *currunit = current->sched_unit;
     struct csched_unit * const svc = CSCHED_UNIT(currunit);
-    const struct scheduler *ops = per_cpu(scheduler, cpu);
+    struct sched_resource *sr = get_sched_res(cpu);
+    const struct scheduler *ops = sr->scheduler;
 
     ASSERT( sched_unit_master(currunit) == cpu );
     ASSERT( svc->sdom != NULL );
@@ -987,8 +989,7 @@ csched_unit_acct(struct csched_private *prv, unsigned int cpu)
              * idlers. But, if we are here, it means there is someone running
              * on it, and hence the bit must be zero already.
              */
-            ASSERT(!cpumask_test_cpu(cpu,
-                                     CSCHED_PRIV(per_cpu(scheduler, cpu))->idlers));
+            ASSERT(!cpumask_test_cpu(cpu, CSCHED_PRIV(ops)->idlers));
             cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
         }
     }
@@ -1083,6 +1084,7 @@ csched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched_unit * const svc = CSCHED_UNIT(unit);
     unsigned int cpu = sched_unit_master(unit);
+    struct sched_resource *sr = get_sched_res(cpu);
 
     SCHED_STAT_CRANK(unit_sleep);
 
@@ -1095,7 +1097,7 @@ csched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
          * But, we are here because unit is going to sleep while running on cpu,
          * so the bit must be zero already.
          */
-        ASSERT(!cpumask_test_cpu(cpu, CSCHED_PRIV(per_cpu(scheduler, cpu))->idlers));
+        ASSERT(!cpumask_test_cpu(cpu, CSCHED_PRIV(sr->scheduler)->idlers));
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     }
     else if ( __unit_on_runq(svc) )
@@ -1575,8 +1577,9 @@ static void
 csched_tick(void *_cpu)
 {
     unsigned int cpu = (unsigned long)_cpu;
+    struct sched_resource *sr = get_sched_res(cpu);
     struct csched_pcpu *spc = CSCHED_PCPU(cpu);
-    struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
+    struct csched_private *prv = CSCHED_PRIV(sr->scheduler);
 
     spc->tick++;
 
@@ -1601,7 +1604,8 @@ csched_tick(void *_cpu)
 static struct csched_unit *
 csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
 {
-    const struct csched_private * const prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
+    struct sched_resource *sr = get_sched_res(cpu);
+    const struct csched_private * const prv = CSCHED_PRIV(sr->scheduler);
     const struct csched_pcpu * const peer_pcpu = CSCHED_PCPU(peer_cpu);
     struct csched_unit *speer;
     struct list_head *iter;

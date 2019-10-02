@@ -36,6 +36,7 @@ extern const cpumask_t *sched_res_mask;
  * as the rest of the struct.  Just have the scheduler point to the
  * one it wants (This may be the one right in front of it).*/
 struct sched_resource {
+    struct scheduler   *scheduler;
     spinlock_t         *schedule_lock,
                        _lock;
     struct sched_unit  *curr;
@@ -49,7 +50,6 @@ struct sched_resource {
     const cpumask_t    *cpus;           /* cpus covered by this struct     */
 };
 
-DECLARE_PER_CPU(struct scheduler *, scheduler);
 DECLARE_PER_CPU(struct cpupool *, cpupool);
 DECLARE_PER_CPU(struct sched_resource *, sched_res);
 
