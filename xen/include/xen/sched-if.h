@@ -10,6 +10,7 @@
 
 #include <xen/percpu.h>
 #include <xen/err.h>
+#include <xen/rcupdate.h>
 
 /* A global pointer to the initial cpupool (POOL0). */
 extern struct cpupool *cpupool0;
@@ -57,18 +58,20 @@ struct sched_resource {
     unsigned int        master_cpu;
     unsigned int        granularity;
     const cpumask_t    *cpus;           /* cpus covered by this struct     */
+    struct rcu_head     rcu;
 };
 
 DECLARE_PER_CPU(struct sched_resource *, sched_res);
+extern rcu_read_lock_t sched_res_rculock;
 
 static inline struct sched_resource *get_sched_res(unsigned int cpu)
 {
-    return per_cpu(sched_res, cpu);
+    return rcu_dereference(per_cpu(sched_res, cpu));
 }
 
 static inline void set_sched_res(unsigned int cpu, struct sched_resource *res)
 {
-    per_cpu(sched_res, cpu) = res;
+    rcu_assign_pointer(per_cpu(sched_res, cpu), res);
 }
 
 static inline struct sched_unit *curr_on_cpu(unsigned int cpu)
