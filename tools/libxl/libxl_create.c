@@ -68,8 +68,9 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
         c_info->passthrough = ((c_info->type == LIBXL_DOMAIN_TYPE_PV) ||
                                !info.cap_iommu_hap_pt_share) ?
             LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
-    } else if (!info.cap_hvm_directio)
+    } else if (!info.cap_hvm_directio) {
         c_info->passthrough = LIBXL_PASSTHROUGH_DISABLED;
+    }
 
     /* An explicit setting should now have been chosen */
     assert(c_info->passthrough != LIBXL_PASSTHROUGH_UNKNOWN);
