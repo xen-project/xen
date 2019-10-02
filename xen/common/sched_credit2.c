@@ -3291,7 +3291,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
      * In fact, it may be the case that scurr is about to spin, and there's
      * no point forcing it to do so until rate limiting expires.
      */
-    if ( !yield && prv->ratelimit_us && unit_runnable(scurr->unit) &&
+    if ( !yield && prv->ratelimit_us && unit_runnable_state(scurr->unit) &&
          (now - scurr->unit->state_entry_time) < MICROSECS(prv->ratelimit_us) )
     {
         if ( unlikely(tb_init_done) )
@@ -3345,7 +3345,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
      *
      * Of course, we also default to idle also if scurr is not runnable.
      */
-    if ( unit_runnable(scurr->unit) && !soft_aff_preempt )
+    if ( unit_runnable_state(scurr->unit) && !soft_aff_preempt )
         snext = scurr;
     else
         snext = csched2_unit(sched_idle_unit(cpu));
@@ -3405,7 +3405,8 @@ runq_candidate(struct csched2_runqueue_data *rqd,
          * some budget, then choose it.
          */
         if ( (yield || svc->credit > snext->credit) &&
-             (!has_cap(svc) || unit_grab_budget(svc)) )
+             (!has_cap(svc) || unit_grab_budget(svc)) &&
+             unit_runnable_state(svc->unit) )
             snext = svc;
 
         /* In any case, if we got this far, break. */

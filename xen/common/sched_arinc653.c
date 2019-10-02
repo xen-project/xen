@@ -563,7 +563,7 @@ a653sched_do_schedule(
     if ( !((new_task != NULL)
            && (AUNIT(new_task) != NULL)
            && AUNIT(new_task)->awake
-           && unit_runnable(new_task)) )
+           && unit_runnable_state(new_task)) )
         new_task = IDLETASK(cpu);
     BUG_ON(new_task == NULL);
 

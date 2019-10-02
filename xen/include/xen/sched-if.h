@@ -93,6 +93,36 @@ static inline bool unit_runnable(const struct sched_unit *unit)
     return false;
 }
 
+/*
+ * Returns whether a sched_unit is runnable and sets new_state for each of its
+ * vcpus. It is mandatory to determine the new runstate for all vcpus of a unit
+ * without dropping the schedule lock (which happens when synchronizing the
+ * context switch of the vcpus of a unit) in order to avoid races with e.g.
+ * vcpu_sleep().
+ */
+static inline bool unit_runnable_state(const struct sched_unit *unit)
+{
+    struct vcpu *v;
+    bool runnable, ret = false;
+
+    if ( is_idle_unit(unit) )
+        return true;
+
+    for_each_sched_unit_vcpu ( unit, v )
+    {
+        runnable = vcpu_runnable(v);
+
+        v->new_state = runnable ? RUNSTATE_running
+                                : (v->pause_flags & VPF_blocked)
+                                  ? RUNSTATE_blocked : RUNSTATE_offline;
+
+        if ( runnable )
+            ret = true;
+    }
+
+    return ret;
+}
+
 static inline void sched_set_res(struct sched_unit *unit,
                                  struct sched_resource *res)
 {

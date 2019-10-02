@@ -1092,12 +1092,18 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
     else
     {
         snext = runq_pick(ops, cpumask_of(sched_cpu));
+
         if ( snext == NULL )
             snext = rt_unit(sched_idle_unit(sched_cpu));
+        else if ( !unit_runnable_state(snext->unit) )
+        {
+            q_remove(snext);
+            snext = rt_unit(sched_idle_unit(sched_cpu));
+        }
 
         /* if scurr has higher priority and budget, still pick scurr */
         if ( !is_idle_unit(currunit) &&
-             unit_runnable(currunit) &&
+             unit_runnable_state(currunit) &&
              scurr->cur_budget > 0 &&
              ( is_idle_unit(snext->unit) ||
                compare_unit_priority(scurr, snext) > 0 ) )

@@ -1894,7 +1894,7 @@ static void csched_schedule(
     if ( !test_bit(CSCHED_FLAG_UNIT_YIELD, &scurr->flags)
          && !tasklet_work_scheduled
          && prv->ratelimit
-         && unit_runnable(unit)
+         && unit_runnable_state(unit)
          && !is_idle_unit(unit)
          && runtime < prv->ratelimit )
     {
@@ -1939,33 +1939,36 @@ static void csched_schedule(
         dec_nr_runnable(sched_cpu);
     }
 
-    snext = __runq_elem(runq->next);
-
-    /* Tasklet work (which runs in idle UNIT context) overrides all else. */
-    if ( tasklet_work_scheduled )
-    {
-        TRACE_0D(TRC_CSCHED_SCHED_TASKLET);
-        snext = CSCHED_UNIT(sched_idle_unit(sched_cpu));
-        snext->pri = CSCHED_PRI_TS_BOOST;
-    }
-
     /*
      * Clear YIELD flag before scheduling out
      */
     clear_bit(CSCHED_FLAG_UNIT_YIELD, &scurr->flags);
 
-    /*
-     * SMP Load balance:
-     *
-     * If the next highest priority local runnable UNIT has already eaten
-     * through its credits, look on other PCPUs to see if we have more
-     * urgent work... If not, csched_load_balance() will return snext, but
-     * already removed from the runq.
-     */
-    if ( snext->pri > CSCHED_PRI_TS_OVER )
-        __runq_remove(snext);
-    else
-        snext = csched_load_balance(prv, sched_cpu, snext, &migrated);
+    do {
+        snext = __runq_elem(runq->next);
+
+        /* Tasklet work (which runs in idle UNIT context) overrides all else. */
+        if ( tasklet_work_scheduled )
+        {
+            TRACE_0D(TRC_CSCHED_SCHED_TASKLET);
+            snext = CSCHED_UNIT(sched_idle_unit(sched_cpu));
+            snext->pri = CSCHED_PRI_TS_BOOST;
+        }
+
+        /*
+         * SMP Load balance:
+         *
+         * If the next highest priority local runnable UNIT has already eaten
+         * through its credits, look on other PCPUs to see if we have more
+         * urgent work... If not, csched_load_balance() will return snext, but
+         * already removed from the runq.
+         */
+        if ( snext->pri > CSCHED_PRI_TS_OVER )
+            __runq_remove(snext);
+        else
+            snext = csched_load_balance(prv, sched_cpu, snext, &migrated);
+
+    } while ( !unit_runnable_state(snext->unit) );
 
     /*
      * Update idlers mask if necessary. When we're idling, other CPUs

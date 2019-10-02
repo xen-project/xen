@@ -157,6 +157,7 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     if ( is_idle_domain(d) )
     {
         v->runstate.state = RUNSTATE_running;
+        v->new_state = RUNSTATE_running;
     }
     else
     {
