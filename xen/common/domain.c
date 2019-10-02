@@ -584,7 +584,7 @@ void domain_update_node_affinity(struct domain *d)
         return;
     }
 
-    online = cpupool_domain_cpumask(d);
+    online = cpupool_domain_master_cpumask(d);
 
     spin_lock(&d->node_affinity_lock);
 

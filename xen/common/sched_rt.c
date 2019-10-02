@@ -326,7 +326,7 @@ rt_dump_unit(const struct scheduler *ops, const struct rt_unit *svc)
      */
     mask = cpumask_scratch_cpu(sched_unit_master(svc->unit));
 
-    cpupool_mask = cpupool_domain_cpumask(svc->unit->domain);
+    cpupool_mask = cpupool_domain_master_cpumask(svc->unit->domain);
     cpumask_and(mask, cpupool_mask, svc->unit->cpu_hard_affinity);
     printk("[%5d.%-2u] cpu %u, (%"PRI_stime", %"PRI_stime"),"
            " cur_b=%"PRI_stime" cur_d=%"PRI_stime" last_start=%"PRI_stime"\n"
@@ -642,7 +642,7 @@ rt_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
     cpumask_t *online;
     int cpu;
 
-    online = cpupool_domain_cpumask(unit->domain);
+    online = cpupool_domain_master_cpumask(unit->domain);
     cpumask_and(&cpus, online, unit->cpu_hard_affinity);
 
     cpu = cpumask_test_cpu(sched_unit_master(unit), &cpus)
@@ -1016,7 +1016,7 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask)
         iter_svc = q_elem(iter);
 
         /* mask cpu_hard_affinity & cpupool & mask */
-        online = cpupool_domain_cpumask(iter_svc->unit->domain);
+        online = cpupool_domain_master_cpumask(iter_svc->unit->domain);
         cpumask_and(&cpu_common, online, iter_svc->unit->cpu_hard_affinity);
         cpumask_and(&cpu_common, mask, &cpu_common);
         if ( cpumask_empty(&cpu_common) )
@@ -1191,7 +1191,7 @@ runq_tickle(const struct scheduler *ops, struct rt_unit *new)
     if ( new == NULL || is_idle_unit(new->unit) )
         return;
 
-    online = cpupool_domain_cpumask(new->unit->domain);
+    online = cpupool_domain_master_cpumask(new->unit->domain);
     cpumask_and(&not_tickled, online, new->unit->cpu_hard_affinity);
     cpumask_andnot(&not_tickled, &not_tickled, &prv->tickled);
 

@@ -705,7 +705,7 @@ static int get_fallback_cpu(struct csched2_unit *svc)
 
         affinity_balance_cpumask(unit, bs, cpumask_scratch_cpu(cpu));
         cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
-                    cpupool_domain_cpumask(unit->domain));
+                    cpupool_domain_master_cpumask(unit->domain));
 
         /*
          * This is cases 1 or 3 (depending on bs): if processor is (still)
@@ -1440,7 +1440,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_unit *new, s_time_t now)
     struct sched_unit *unit = new->unit;
     unsigned int bs, cpu = sched_unit_master(unit);
     struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
-    cpumask_t *online = cpupool_domain_cpumask(unit->domain);
+    cpumask_t *online = cpupool_domain_master_cpumask(unit->domain);
     cpumask_t mask;
 
     ASSERT(new->rqd == rqd);
@@ -2243,7 +2243,7 @@ csched2_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
     }
 
     cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                cpupool_domain_cpumask(unit->domain));
+                cpupool_domain_master_cpumask(unit->domain));
 
     /*
      * First check to see if we're here because someone else suggested a place
@@ -2358,8 +2358,8 @@ csched2_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
          * ok because:
          * - we know that unit->cpu_hard_affinity and ->cpu_soft_affinity have
          *   a non-empty intersection (because has_soft is true);
-         * - we have unit->cpu_hard_affinity & cpupool_domain_cpumask() already
-         *   in cpumask_scratch, we do save a lot doing like this.
+         * - we have unit->cpu_hard_affinity & cpupool_domain_master_cpumask()
+         *   already in cpumask_scratch, we do save a lot doing like this.
          *
          * It's kind of like open coding affinity_balance_cpumask() but, in
          * this specific case, calling that would mean a lot of (unnecessary)
@@ -2378,7 +2378,7 @@ csched2_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
          * affinity, so go for it.
          *
          * cpumask_scratch already has unit->cpu_hard_affinity &
-         * cpupool_domain_cpumask() in it, so it's enough that we filter
+         * cpupool_domain_master_cpumask() in it, so it's enough that we filter
          * with the cpus of the runq.
          */
         cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
@@ -2513,7 +2513,7 @@ static void migrate(const struct scheduler *ops,
         _runq_deassign(svc);
 
         cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                    cpupool_domain_cpumask(unit->domain));
+                    cpupool_domain_master_cpumask(unit->domain));
         cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
                     &trqd->active);
         sched_set_res(unit,
@@ -2547,7 +2547,7 @@ static bool unit_is_migrateable(struct csched2_unit *svc,
     int cpu = sched_unit_master(unit);
 
     cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                cpupool_domain_cpumask(unit->domain));
+                cpupool_domain_master_cpumask(unit->domain));
 
     return !(svc->flags & CSFLAG_runq_migrate_request) &&
            cpumask_intersects(cpumask_scratch_cpu(cpu), &rqd->active);
@@ -2763,7 +2763,7 @@ csched2_unit_migrate(
      * v->processor will be chosen, and during actual domain unpause that
      * the unit will be assigned to and added to the proper runqueue.
      */
-    if ( unlikely(!cpumask_test_cpu(new_cpu, cpupool_domain_cpumask(d))) )
+    if ( unlikely(!cpumask_test_cpu(new_cpu, cpupool_domain_master_cpumask(d))) )
     {
         ASSERT(system_state == SYS_STATE_suspend);
         if ( unit_on_runq(svc) )
@@ -3069,7 +3069,7 @@ csched2_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     sdom->nr_units = 0;
 
     init_timer(&sdom->repl_timer, replenish_domain_budget, sdom,
-               cpumask_any(cpupool_domain_cpumask(dom)));
+               cpumask_any(cpupool_domain_master_cpumask(dom)));
     spin_lock_init(&sdom->budget_lock);
     INIT_LIST_HEAD(&sdom->parked_units);
 
@@ -3317,7 +3317,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
                                  cpumask_scratch);
         if ( unlikely(!cpumask_test_cpu(cpu, cpumask_scratch)) )
         {
-            cpumask_t *online = cpupool_domain_cpumask(scurr->unit->domain);
+            cpumask_t *online = cpupool_domain_master_cpumask(scurr->unit->domain);
 
             /* Ok, is any of the pcpus in scurr soft-affinity idle? */
             cpumask_and(cpumask_scratch, cpumask_scratch, &rqd->idle);

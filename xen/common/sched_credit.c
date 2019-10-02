@@ -361,7 +361,7 @@ static inline void __runq_tickle(struct csched_unit *new)
     ASSERT(cur);
     cpumask_clear(&mask);
 
-    online = cpupool_domain_cpumask(new->sdom->dom);
+    online = cpupool_domain_master_cpumask(new->sdom->dom);
     cpumask_and(&idle_mask, prv->idlers, online);
     idlers_empty = cpumask_empty(&idle_mask);
 
@@ -724,7 +724,7 @@ _csched_cpu_pick(const struct scheduler *ops, const struct sched_unit *unit,
     /* We must always use cpu's scratch space */
     cpumask_t *cpus = cpumask_scratch_cpu(cpu);
     cpumask_t idlers;
-    cpumask_t *online = cpupool_domain_cpumask(unit->domain);
+    cpumask_t *online = cpupool_domain_master_cpumask(unit->domain);
     struct csched_pcpu *spc = NULL;
     int balance_step;
 

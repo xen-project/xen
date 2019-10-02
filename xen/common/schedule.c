@@ -63,6 +63,7 @@ integer_param("sched_ratelimit_us", sched_ratelimit_us);
 
 /* Number of vcpus per struct sched_unit. */
 static unsigned int __read_mostly sched_granularity = 1;
+const cpumask_t *sched_res_mask = &cpumask_all;
 
 /* Common lock for free cpus. */
 static DEFINE_SPINLOCK(sched_free_cpu_lock);
@@ -188,7 +189,7 @@ static inline struct scheduler *vcpu_scheduler(const struct vcpu *v)
 {
     return unit_scheduler(v->sched_unit);
 }
-#define VCPU2ONLINE(_v) cpupool_domain_cpumask((_v)->domain)
+#define VCPU2ONLINE(_v) cpupool_domain_master_cpumask((_v)->domain)
 
 static inline void trace_runstate_change(struct vcpu *v, int new_state)
 {
@@ -425,9 +426,9 @@ static unsigned int sched_select_initial_cpu(const struct vcpu *v)
     cpumask_clear(cpus);
     for_each_node_mask ( node, d->node_affinity )
         cpumask_or(cpus, cpus, &node_to_cpumask(node));
-    cpumask_and(cpus, cpus, cpupool_domain_cpumask(d));
+    cpumask_and(cpus, cpus, d->cpupool->cpu_valid);
     if ( cpumask_empty(cpus) )
-        cpumask_copy(cpus, cpupool_domain_cpumask(d));
+        cpumask_copy(cpus, d->cpupool->cpu_valid);
 
     if ( v->vcpu_id == 0 )
         cpu_ret = cpumask_first(cpus);
@@ -973,7 +974,7 @@ void restore_vcpu_affinity(struct domain *d)
         lock = unit_schedule_lock_irq(unit);
 
         cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                    cpupool_domain_cpumask(d));
+                    cpupool_domain_master_cpumask(d));
         if ( cpumask_empty(cpumask_scratch_cpu(cpu)) )
         {
             if ( sched_check_affinity_broken(unit) )
@@ -981,7 +982,7 @@ void restore_vcpu_affinity(struct domain *d)
                 sched_set_affinity(unit, unit->cpu_hard_affinity_saved, NULL);
                 sched_reset_affinity_broken(unit);
                 cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                            cpupool_domain_cpumask(d));
+                            cpupool_domain_master_cpumask(d));
             }
 
             if ( cpumask_empty(cpumask_scratch_cpu(cpu)) )
@@ -991,7 +992,7 @@ void restore_vcpu_affinity(struct domain *d)
                        unit->vcpu_list);
                 sched_set_affinity(unit, &cpumask_all, NULL);
                 cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                            cpupool_domain_cpumask(d));
+                            cpupool_domain_master_cpumask(d));
             }
         }
 

@@ -22,6 +22,8 @@ extern cpumask_t cpupool_free_cpus;
 #define SCHED_DEFAULT_RATELIMIT_US 1000
 extern int sched_ratelimit_us;
 
+/* Scheduling resource mask. */
+extern const cpumask_t *sched_res_mask;
 
 /*
  * In order to allow a scheduler to remap the lock->cpu mapping,
@@ -535,6 +537,7 @@ struct cpupool
     int              cpupool_id;
     unsigned int     n_dom;
     cpumask_var_t    cpu_valid;      /* all cpus assigned to pool */
+    cpumask_var_t    res_valid;      /* all scheduling resources of pool */
     struct cpupool   *next;
     struct scheduler *sched;
     atomic_t         refcnt;
@@ -543,14 +546,14 @@ struct cpupool
 #define cpupool_online_cpumask(_pool) \
     (((_pool) == NULL) ? &cpu_online_map : (_pool)->cpu_valid)
 
-static inline cpumask_t *cpupool_domain_cpumask(const struct domain *d)
+static inline cpumask_t *cpupool_domain_master_cpumask(const struct domain *d)
 {
     /*
      * d->cpupool is NULL only for the idle domain, and no one should
      * be interested in calling this for the idle domain.
      */
     ASSERT(d->cpupool != NULL);
-    return d->cpupool->cpu_valid;
+    return d->cpupool->res_valid;
 }
 
 /*
@@ -590,7 +593,7 @@ static inline cpumask_t *cpupool_domain_cpumask(const struct domain *d)
 static inline int has_soft_affinity(const struct sched_unit *unit)
 {
     return unit->soft_aff_effective &&
-           !cpumask_subset(cpupool_domain_cpumask(unit->domain),
+           !cpumask_subset(cpupool_domain_master_cpumask(unit->domain),
                            unit->cpu_soft_affinity);
 }
 

@@ -36,24 +36,31 @@ static DEFINE_SPINLOCK(cpupool_lock);
 
 DEFINE_PER_CPU(struct cpupool *, cpupool);
 
+static void free_cpupool_struct(struct cpupool *c)
+{
+    if ( c )
+    {
+        free_cpumask_var(c->res_valid);
+        free_cpumask_var(c->cpu_valid);
+    }
+    xfree(c);
+}
+
 static struct cpupool *alloc_cpupool_struct(void)
 {
     struct cpupool *c = xzalloc(struct cpupool);
 
-    if ( !c || !zalloc_cpumask_var(&c->cpu_valid) )
+    if ( !c )
+        return NULL;
+
+    if ( !zalloc_cpumask_var(&c->cpu_valid) ||
+         !zalloc_cpumask_var(&c->res_valid) )
     {
-        xfree(c);
+        free_cpupool_struct(c);
         c = NULL;
     }
 
     return c;
-}
-
-static void free_cpupool_struct(struct cpupool *c)
-{
-    if ( c )
-        free_cpumask_var(c->cpu_valid);
-    xfree(c);
 }
 
 /*
@@ -269,6 +276,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
         cpupool_cpu_moving = NULL;
     }
     cpumask_set_cpu(cpu, c->cpu_valid);
+    cpumask_and(c->res_valid, c->cpu_valid, sched_res_mask);
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain_in_cpupool(d, c)
@@ -361,6 +369,7 @@ static int cpupool_unassign_cpu_start(struct cpupool *c, unsigned int cpu)
     atomic_inc(&c->refcnt);
     cpupool_cpu_moving = c;
     cpumask_clear_cpu(cpu, c->cpu_valid);
+    cpumask_and(c->res_valid, c->cpu_valid, sched_res_mask);
 
 out:
     spin_unlock(&cpupool_lock);

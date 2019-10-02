@@ -614,7 +614,7 @@ a653sched_pick_resource(const struct scheduler *ops,
      * If present, prefer unit's current processor, else
      * just find the first valid unit.
      */
-    online = cpupool_domain_cpumask(unit->domain);
+    online = cpupool_domain_master_cpumask(unit->domain);
 
     cpu = cpumask_first(online);
 

@@ -125,7 +125,7 @@ static inline bool unit_check_affinity(struct sched_unit *unit,
 {
     affinity_balance_cpumask(unit, balance_step, cpumask_scratch_cpu(cpu));
     cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
-                cpupool_domain_cpumask(unit->domain));
+                cpupool_domain_master_cpumask(unit->domain));
 
     return cpumask_test_cpu(cpu, cpumask_scratch_cpu(cpu));
 }
@@ -266,7 +266,7 @@ pick_res(struct null_private *prv, const struct sched_unit *unit)
 {
     unsigned int bs;
     unsigned int cpu = sched_unit_master(unit), new_cpu;
-    cpumask_t *cpus = cpupool_domain_cpumask(unit->domain);
+    cpumask_t *cpus = cpupool_domain_master_cpumask(unit->domain);
 
     ASSERT(spin_is_locked(get_sched_res(cpu)->schedule_lock));
 
@@ -467,7 +467,7 @@ static void null_unit_insert(const struct scheduler *ops,
     lock = unit_schedule_lock(unit);
 
     cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                cpupool_domain_cpumask(unit->domain));
+                cpupool_domain_master_cpumask(unit->domain));
 
     /* If the pCPU is free, we assign unit to it */
     if ( likely(per_cpu(npc, cpu).unit == NULL) )
@@ -579,7 +579,7 @@ static void null_unit_wake(const struct scheduler *ops,
         spin_unlock(&prv->waitq_lock);
 
         cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                    cpupool_domain_cpumask(unit->domain));
+                    cpupool_domain_master_cpumask(unit->domain));
 
         if ( !cpumask_intersects(&prv->cpus_free, cpumask_scratch_cpu(cpu)) )
         {
