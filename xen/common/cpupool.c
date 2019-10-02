@@ -271,7 +271,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 
     if ( (cpupool_moving_cpu == cpu) && (c != cpupool_cpu_moving) )
         return -EADDRNOTAVAIL;
-    ret = schedule_cpu_switch(cpu, c);
+    ret = schedule_cpu_add(cpu, c);
     if ( ret )
         return ret;
 
@@ -321,7 +321,7 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
      */
     if ( !ret )
     {
-        ret = schedule_cpu_switch(cpu, NULL);
+        ret = schedule_cpu_rm(cpu);
         if ( ret )
             cpumask_clear_cpu(cpu, &cpupool_free_cpus);
         else
