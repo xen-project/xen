@@ -1782,6 +1782,34 @@ Set the timeslice of the credit1 scheduler, in milliseconds.  The
 default is 30ms.  Reasonable values may include 10, 5, or even 1 for
 very latency-sensitive workloads.
 
+### sched-gran (x86)
+> `= cpu | core | socket`
+
+> Default: `sched-gran=cpu`
+
+Set the scheduling granularity. In case the granularity is larger than 1 (e.g.
+`core`on a SMT-enabled system, or `socket`) multiple vcpus are assigned
+statically to a "scheduling unit" which will then be subject to scheduling.
+This assignment of vcpus to scheduling units is fixed.
+
+`cpu`: Vcpus will be scheduled individually on single cpus (e.g. a
+hyperthread using x86/Intel terminology)
+
+`core`: As many vcpus as there are cpus on a physical core are scheduled
+together on a physical core.
+
+`socket`: As many vcpus as there are cpus on a physical sockets are scheduled
+together on a physical socket.
+
+Note: a value other than `cpu` will result in rejecting a runtime modification
+attempt of the "smt" setting.
+
+Note: for AMD x86 processors before Fam17 the terminology in the official data
+sheets is different: a cpu is named "core" and multiple "cores" are running
+in the same "compute unit". As from Fam17 on AMD is using the same names as
+Intel ("thread" and "core") the topology levels are named "cpu", "core" and
+"socket" even on older AMD processors.
+
 ### sched_ratelimit_us
 > `= <integer>`
 
