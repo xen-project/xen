@@ -186,6 +186,8 @@ struct vcpu
     bool             is_running;
     /* VCPU should wake fast (do not deep sleep the CPU). */
     bool             is_urgent;
+    /* VCPU must context_switch without scheduling unit. */
+    bool             force_context_switch;
 
 #ifdef VCPU_TRAP_LAST
 #define VCPU_TRAP_NONE    0

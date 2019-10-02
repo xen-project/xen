@@ -102,6 +102,11 @@ static inline bool unit_runnable(const struct sched_unit *unit)
     return false;
 }
 
+static inline int vcpu_runstate_blocked(const struct vcpu *v)
+{
+    return (v->pause_flags & VPF_blocked) ? RUNSTATE_blocked : RUNSTATE_offline;
+}
+
 /*
  * Returns whether a sched_unit is runnable and sets new_state for each of its
  * vcpus. It is mandatory to determine the new runstate for all vcpus of a unit
@@ -121,9 +126,7 @@ static inline bool unit_runnable_state(const struct sched_unit *unit)
     {
         runnable = vcpu_runnable(v);
 
-        v->new_state = runnable ? RUNSTATE_running
-                                : (v->pause_flags & VPF_blocked)
-                                  ? RUNSTATE_blocked : RUNSTATE_offline;
+        v->new_state = runnable ? RUNSTATE_running : vcpu_runstate_blocked(v);
 
         if ( runnable )
             ret = true;

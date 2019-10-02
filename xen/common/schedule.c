@@ -751,8 +751,10 @@ void sched_destroy_domain(struct domain *d)
     }
 }
 
-void vcpu_sleep_nosync_locked(struct vcpu *v)
+static void vcpu_sleep_nosync_locked(struct vcpu *v)
 {
+    struct sched_unit *unit = v->sched_unit;
+
     ASSERT(spin_is_locked(get_sched_res(v->processor)->schedule_lock));
 
     if ( likely(!vcpu_runnable(v)) )
@@ -760,7 +762,15 @@ void vcpu_sleep_nosync_locked(struct vcpu *v)
         if ( v->runstate.state == RUNSTATE_runnable )
             vcpu_runstate_change(v, RUNSTATE_offline, NOW());
 
-        sched_sleep(vcpu_scheduler(v), v->sched_unit);
+        /* Only put unit to sleep in case all vcpus are not runnable. */
+        if ( likely(!unit_runnable(unit)) )
+            sched_sleep(unit_scheduler(unit), unit);
+        else if ( unit_running(unit) > 1 && v->is_running &&
+                  !v->force_context_switch )
+        {
+            v->force_context_switch = true;
+            cpu_raise_softirq(v->processor, SCHED_SLAVE_SOFTIRQ);
+        }
     }
 }
 
@@ -792,16 +802,27 @@ void vcpu_wake(struct vcpu *v)
 {
     unsigned long flags;
     spinlock_t *lock;
+    struct sched_unit *unit = v->sched_unit;
 
     TRACE_2D(TRC_SCHED_WAKE, v->domain->domain_id, v->vcpu_id);
 
-    lock = unit_schedule_lock_irqsave(v->sched_unit, &flags);
+    lock = unit_schedule_lock_irqsave(unit, &flags);
 
     if ( likely(vcpu_runnable(v)) )
     {
         if ( v->runstate.state >= RUNSTATE_blocked )
             vcpu_runstate_change(v, RUNSTATE_runnable, NOW());
-        sched_wake(vcpu_scheduler(v), v->sched_unit);
+        /*
+         * Call sched_wake() unconditionally, even if unit is running already.
+         * We might have not been de-scheduled after vcpu_sleep_nosync_locked()
+         * and are now to be woken up again.
+         */
+        sched_wake(unit_scheduler(unit), unit);
+        if ( unit->is_running && !v->is_running && !v->force_context_switch )
+        {
+            v->force_context_switch = true;
+            cpu_raise_softirq(v->processor, SCHED_SLAVE_SOFTIRQ);
+        }
     }
     else if ( !(v->pause_flags & VPF_blocked) )
     {
@@ -809,7 +830,7 @@ void vcpu_wake(struct vcpu *v)
             vcpu_runstate_change(v, RUNSTATE_offline, NOW());
     }
 
-    unit_schedule_unlock_irqrestore(lock, flags, v->sched_unit);
+    unit_schedule_unlock_irqrestore(lock, flags, unit);
 }
 
 void vcpu_unblock(struct vcpu *v)
@@ -2028,6 +2049,65 @@ static void sched_context_switch(struct vcpu *vprev, struct vcpu *vnext,
 }
 
 /*
+ * Force a context switch of a single vcpu of an unit.
+ * Might be called either if a vcpu of an already running unit is woken up
+ * or if a vcpu of a running unit is put asleep with other vcpus of the same
+ * unit still running.
+ * Returns either NULL if v is already in the correct state or the vcpu to
+ * run next.
+ */
+static struct vcpu *sched_force_context_switch(struct vcpu *vprev,
+                                               struct vcpu *v,
+                                               unsigned int cpu, s_time_t now)
+{
+    v->force_context_switch = false;
+
+    if ( vcpu_runnable(v) == v->is_running )
+        return NULL;
+
+    if ( vcpu_runnable(v) )
+    {
+        if ( is_idle_vcpu(vprev) )
+        {
+            vcpu_runstate_change(vprev, RUNSTATE_runnable, now);
+            vprev->sched_unit = get_sched_res(cpu)->sched_unit_idle;
+        }
+        vcpu_runstate_change(v, RUNSTATE_running, now);
+    }
+    else
+    {
+        /* Make sure not to switch last vcpu of an unit away. */
+        if ( unit_running(v->sched_unit) == 1 )
+            return NULL;
+
+        v->new_state = vcpu_runstate_blocked(v);
+        vcpu_runstate_change(v, v->new_state, now);
+        v = sched_unit2vcpu_cpu(vprev->sched_unit, cpu);
+        if ( v != vprev )
+        {
+            if ( is_idle_vcpu(vprev) )
+            {
+                vcpu_runstate_change(vprev, RUNSTATE_runnable, now);
+                vprev->sched_unit = get_sched_res(cpu)->sched_unit_idle;
+            }
+            else
+            {
+                v->sched_unit = vprev->sched_unit;
+                vcpu_runstate_change(v, RUNSTATE_running, now);
+            }
+        }
+    }
+
+    /* This vcpu will be switched to. */
+    v->is_running = true;
+
+    /* Make sure not to loose another slave call. */
+    raise_softirq(SCHED_SLAVE_SOFTIRQ);
+
+    return v;
+}
+
+/*
  * Rendezvous before taking a scheduling decision.
  * Called with schedule lock held, so all accesses to the rendezvous counter
  * can be normal ones (no atomic accesses needed).
@@ -2042,6 +2122,7 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
                                                    s_time_t now)
 {
     struct sched_unit *next;
+    struct vcpu *v;
 
     if ( !--prev->rendezvous_in_cnt )
     {
@@ -2050,8 +2131,30 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
         return next;
     }
 
+    v = unit2vcpu_cpu(prev, cpu);
     while ( prev->rendezvous_in_cnt )
     {
+        if ( v && v->force_context_switch )
+        {
+            struct vcpu *vprev = current;
+
+            v = sched_force_context_switch(vprev, v, cpu, now);
+
+            if ( v )
+            {
+                /* We'll come back another time, so adjust rendezvous_in_cnt. */
+                prev->rendezvous_in_cnt++;
+                atomic_set(&prev->rendezvous_out_cnt, 0);
+
+                pcpu_schedule_unlock_irq(*lock, cpu);
+
+                sched_context_switch(vprev, v, false, now);
+
+                return NULL;     /* ARM only. */
+            }
+
+            v = unit2vcpu_cpu(prev, cpu);
+        }
         /*
          * Coming from idle might need to do tasklet work.
          * In order to avoid deadlocks we can't do that here, but have to
@@ -2086,10 +2189,11 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
 
 static void sched_slave(void)
 {
-    struct vcpu          *vprev = current;
+    struct vcpu          *v, *vprev = current;
     struct sched_unit    *prev = vprev->sched_unit, *next;
     s_time_t              now;
     spinlock_t           *lock;
+    bool                  do_softirq = false;
     unsigned int          cpu = smp_processor_id();
 
     ASSERT_NOT_IN_ATOMIC();
@@ -2098,9 +2202,31 @@ static void sched_slave(void)
 
     now = NOW();
 
+    v = unit2vcpu_cpu(prev, cpu);
+    if ( v && v->force_context_switch )
+    {
+        v = sched_force_context_switch(vprev, v, cpu, now);
+
+        if ( v )
+        {
+            pcpu_schedule_unlock_irq(lock, cpu);
+
+            sched_context_switch(vprev, v, false, now);
+
+            return;
+        }
+
+        do_softirq = true;
+    }
+
     if ( !prev->rendezvous_in_cnt )
     {
         pcpu_schedule_unlock_irq(lock, cpu);
+
+        /* Check for failed forced context switch. */
+        if ( do_softirq )
+            raise_softirq(SCHEDULE_SOFTIRQ);
+
         return;
     }
 
