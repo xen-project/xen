@@ -33,8 +33,8 @@ static void __do_softirq(unsigned long ignore_mask)
     for ( ; ; )
     {
         /*
-         * Initialise @cpu on every iteration: SCHEDULE_SOFTIRQ may move
-         * us to another processor.
+         * Initialise @cpu on every iteration: SCHEDULE_SOFTIRQ or
+         * SCHED_SLAVE_SOFTIRQ may move us to another processor.
          */
         cpu = smp_processor_id();
 
@@ -55,7 +55,7 @@ void process_pending_softirqs(void)
 {
     ASSERT(!in_irq() && local_irq_is_enabled());
     /* Do not enter scheduler as it can preempt the calling context. */
-    __do_softirq(1ul<<SCHEDULE_SOFTIRQ);
+    __do_softirq((1ul << SCHEDULE_SOFTIRQ) | (1ul << SCHED_SLAVE_SOFTIRQ));
 }
 
 void do_softirq(void)

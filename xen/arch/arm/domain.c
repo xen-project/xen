@@ -318,7 +318,7 @@ static void schedule_tail(struct vcpu *prev)
 
     local_irq_enable();
 
-    context_saved(prev);
+    sched_context_switched(prev, current);
 
     update_runstate_area(current);
 
