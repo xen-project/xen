@@ -63,7 +63,7 @@ integer_param("sched_ratelimit_us", sched_ratelimit_us);
 
 /* Number of vcpus per struct sched_unit. */
 bool __read_mostly sched_disable_smt_switching;
-const cpumask_t *sched_res_mask = &cpumask_all;
+cpumask_t sched_res_mask;
 
 /* Common lock for free cpus. */
 static DEFINE_SPINLOCK(sched_free_cpu_lock);
@@ -2430,8 +2430,14 @@ static int cpu_schedule_up(unsigned int cpu)
     sr = xzalloc(struct sched_resource);
     if ( sr == NULL )
         return -ENOMEM;
+    if ( !zalloc_cpumask_var(&sr->cpus) )
+    {
+        xfree(sr);
+        return -ENOMEM;
+    }
+
     sr->master_cpu = cpu;
-    sr->cpus = cpumask_of(cpu);
+    cpumask_copy(sr->cpus, cpumask_of(cpu));
     set_sched_res(cpu, sr);
 
     sr->scheduler = &sched_idle_ops;
@@ -2442,6 +2448,8 @@ static int cpu_schedule_up(unsigned int cpu)
 
     /* We start with cpu granularity. */
     sr->granularity = 1;
+
+    cpumask_set_cpu(cpu, &sched_res_mask);
 
     /* Boot CPU is dealt with later in scheduler_init(). */
     if ( cpu == 0 )
@@ -2475,6 +2483,7 @@ static void sched_res_free(struct rcu_head *head)
 {
     struct sched_resource *sr = container_of(head, struct sched_resource, rcu);
 
+    free_cpumask_var(sr->cpus);
     xfree(sr);
 }
 
@@ -2488,7 +2497,9 @@ static void cpu_schedule_down(unsigned int cpu)
 
     kill_timer(&sr->s_timer);
 
+    cpumask_clear_cpu(cpu, &sched_res_mask);
     set_sched_res(cpu, NULL);
+
     call_rcu(&sr->rcu, sched_res_free);
 
     rcu_read_unlock(&sched_res_rculock);

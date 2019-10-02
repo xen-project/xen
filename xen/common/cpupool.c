@@ -283,7 +283,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
         cpupool_cpu_moving = NULL;
     }
     cpumask_set_cpu(cpu, c->cpu_valid);
-    cpumask_and(c->res_valid, c->cpu_valid, sched_res_mask);
+    cpumask_and(c->res_valid, c->cpu_valid, &sched_res_mask);
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain_in_cpupool(d, c)
@@ -376,7 +376,7 @@ static int cpupool_unassign_cpu_start(struct cpupool *c, unsigned int cpu)
     atomic_inc(&c->refcnt);
     cpupool_cpu_moving = c;
     cpumask_clear_cpu(cpu, c->cpu_valid);
-    cpumask_and(c->res_valid, c->cpu_valid, sched_res_mask);
+    cpumask_and(c->res_valid, c->cpu_valid, &sched_res_mask);
 
 out:
     spin_unlock(&cpupool_lock);
