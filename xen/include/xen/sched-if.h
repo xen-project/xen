@@ -81,6 +81,11 @@ static inline bool is_unit_online(const struct sched_unit *unit)
     return false;
 }
 
+static inline unsigned int unit_running(const struct sched_unit *unit)
+{
+    return unit->runstate_cnt[RUNSTATE_running];
+}
+
 /* Returns true if at least one vcpu of the unit is runnable. */
 static inline bool unit_runnable(const struct sched_unit *unit)
 {
@@ -126,7 +131,16 @@ static inline bool unit_runnable_state(const struct sched_unit *unit)
 static inline void sched_set_res(struct sched_unit *unit,
                                  struct sched_resource *res)
 {
-    unit->vcpu_list->processor = res->master_cpu;
+    unsigned int cpu = cpumask_first(res->cpus);
+    struct vcpu *v;
+
+    for_each_sched_unit_vcpu ( unit, v )
+    {
+        ASSERT(cpu < nr_cpu_ids);
+        v->processor = cpu;
+        cpu = cpumask_next(cpu, res->cpus);
+    }
+
     unit->res = res;
 }
 

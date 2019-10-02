@@ -252,8 +252,9 @@ static inline void vcpu_runstate_change(
     s_time_t delta;
     struct sched_unit *unit = v->sched_unit;
 
-    ASSERT(v->runstate.state != new_state);
     ASSERT(spin_is_locked(get_sched_res(v->processor)->schedule_lock));
+    if ( v->runstate.state == new_state )
+        return;
 
     vcpu_urgent_count_update(v);
 
@@ -1729,14 +1730,14 @@ static void sched_switch_units(struct sched_resource *sr,
              (next->vcpu_list->runstate.state == RUNSTATE_runnable) ?
              (now - next->state_entry_time) : 0, prev->next_time);
 
-    ASSERT(prev->vcpu_list->runstate.state == RUNSTATE_running);
+    ASSERT(unit_running(prev));
 
     TRACE_4D(TRC_SCHED_SWITCH, prev->domain->domain_id, prev->unit_id,
              next->domain->domain_id, next->unit_id);
 
     sched_unit_runstate_change(prev, false, now);
 
-    ASSERT(next->vcpu_list->runstate.state != RUNSTATE_running);
+    ASSERT(!unit_running(next));
     sched_unit_runstate_change(next, true, now);
 
     /*
@@ -1858,7 +1859,7 @@ void sched_context_switched(struct vcpu *vprev, struct vcpu *vnext)
             while ( atomic_read(&next->rendezvous_out_cnt) )
                 cpu_relax();
     }
-    else if ( vprev != vnext )
+    else if ( vprev != vnext && sched_granularity == 1 )
         context_saved(vprev);
 }
 
