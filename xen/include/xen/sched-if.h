@@ -25,6 +25,13 @@ extern int sched_ratelimit_us;
 /* Scheduling resource mask. */
 extern const cpumask_t *sched_res_mask;
 
+/* Number of vcpus per struct sched_unit. */
+enum sched_gran {
+    SCHED_GRAN_cpu,
+    SCHED_GRAN_core,
+    SCHED_GRAN_socket
+};
+
 /*
  * In order to allow a scheduler to remap the lock->cpu mapping,
  * we have a per-cpu pointer, along with a pre-allocated set of
@@ -48,6 +55,7 @@ struct sched_resource {
 
     /* Cpu with lowest id in scheduling resource. */
     unsigned int        master_cpu;
+    unsigned int        granularity;
     const cpumask_t    *cpus;           /* cpus covered by this struct     */
 };
 
@@ -546,6 +554,7 @@ struct cpupool
     struct cpupool   *next;
     struct scheduler *sched;
     atomic_t         refcnt;
+    enum sched_gran  gran;
 };
 
 #define cpupool_online_cpumask(_pool) \
@@ -560,6 +569,8 @@ static inline cpumask_t *cpupool_domain_master_cpumask(const struct domain *d)
     ASSERT(d->cpupool != NULL);
     return d->cpupool->res_valid;
 }
+
+unsigned int cpupool_get_granularity(const struct cpupool *c);
 
 /*
  * Hard and soft affinity load balancing.

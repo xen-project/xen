@@ -34,6 +34,14 @@ static cpumask_t cpupool_locked_cpus;
 
 static DEFINE_SPINLOCK(cpupool_lock);
 
+static enum sched_gran __read_mostly opt_sched_granularity = SCHED_GRAN_cpu;
+static unsigned int __read_mostly sched_granularity = 1;
+
+unsigned int cpupool_get_granularity(const struct cpupool *c)
+{
+    return c ? sched_granularity : 1;
+}
+
 static void free_cpupool_struct(struct cpupool *c)
 {
     if ( c )
@@ -173,6 +181,7 @@ static struct cpupool *cpupool_create(
             return NULL;
         }
     }
+    c->gran = opt_sched_granularity;
 
     *q = c;
 
