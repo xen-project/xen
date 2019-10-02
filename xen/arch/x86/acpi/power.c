@@ -145,11 +145,15 @@ static void freeze_domains(void)
     for_each_domain ( d )
         domain_pause(d);
     rcu_read_unlock(&domlist_read_lock);
+
+    scheduler_disable();
 }
 
 static void thaw_domains(void)
 {
     struct domain *d;
+
+    scheduler_enable();
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )

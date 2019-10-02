@@ -91,6 +91,8 @@ extern const struct scheduler *__start_schedulers_array[], *__end_schedulers_arr
 
 static struct scheduler __read_mostly ops;
 
+static bool scheduler_active;
+
 static void sched_set_affinity(
     struct sched_unit *unit, const cpumask_t *hard, const cpumask_t *soft);
 
@@ -2277,6 +2279,13 @@ static struct sched_unit *sched_wait_rendezvous_in(struct sched_unit *prev,
         cpu_relax();
 
         *lock = pcpu_schedule_lock_irq(cpu);
+
+        if ( unlikely(!scheduler_active) )
+        {
+            ASSERT(is_idle_unit(prev));
+            atomic_set(&prev->next_task->rendezvous_out_cnt, 0);
+            prev->rendezvous_in_cnt = 0;
+        }
     }
 
     return prev->next_task;
@@ -2633,14 +2642,32 @@ const cpumask_t *sched_get_opt_cpumask(enum sched_gran opt, unsigned int cpu)
     return mask;
 }
 
+static void schedule_dummy(void)
+{
+    sched_tasklet_check_cpu(smp_processor_id());
+}
+
+void scheduler_disable(void)
+{
+    scheduler_active = false;
+    open_softirq(SCHEDULE_SOFTIRQ, schedule_dummy);
+    open_softirq(SCHED_SLAVE_SOFTIRQ, schedule_dummy);
+}
+
+void scheduler_enable(void)
+{
+    open_softirq(SCHEDULE_SOFTIRQ, schedule);
+    open_softirq(SCHED_SLAVE_SOFTIRQ, sched_slave);
+    scheduler_active = true;
+}
+
 /* Initialise the data structures. */
 void __init scheduler_init(void)
 {
     struct domain *idle_domain;
     int i;
 
-    open_softirq(SCHEDULE_SOFTIRQ, schedule);
-    open_softirq(SCHED_SLAVE_SOFTIRQ, sched_slave);
+    scheduler_enable();
 
     for ( i = 0; i < NUM_SCHEDULERS; i++)
     {
