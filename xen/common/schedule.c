@@ -2610,8 +2610,7 @@ static struct notifier_block cpu_schedule_nfb = {
     .notifier_call = cpu_schedule_callback
 };
 
-static const cpumask_t *sched_get_opt_cpumask(enum sched_gran opt,
-                                              unsigned int cpu)
+const cpumask_t *sched_get_opt_cpumask(enum sched_gran opt, unsigned int cpu)
 {
     const cpumask_t *mask;
 

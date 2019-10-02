@@ -268,22 +268,29 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 {
     int ret;
     struct domain *d;
+    const cpumask_t *cpus;
+
+    cpus = sched_get_opt_cpumask(c->gran, cpu);
 
     if ( (cpupool_moving_cpu == cpu) && (c != cpupool_cpu_moving) )
         return -EADDRNOTAVAIL;
-    ret = schedule_cpu_add(cpu, c);
+    ret = schedule_cpu_add(cpumask_first(cpus), c);
     if ( ret )
         return ret;
 
-    cpumask_clear_cpu(cpu, &cpupool_free_cpus);
+    rcu_read_lock(&sched_res_rculock);
+
+    cpumask_andnot(&cpupool_free_cpus, &cpupool_free_cpus, cpus);
     if (cpupool_moving_cpu == cpu)
     {
         cpupool_moving_cpu = -1;
         cpupool_put(cpupool_cpu_moving);
         cpupool_cpu_moving = NULL;
     }
-    cpumask_set_cpu(cpu, c->cpu_valid);
+    cpumask_or(c->cpu_valid, c->cpu_valid, cpus);
     cpumask_and(c->res_valid, c->cpu_valid, &sched_res_mask);
+
+    rcu_read_unlock(&sched_res_rculock);
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain_in_cpupool(d, c)
@@ -298,6 +305,7 @@ static int cpupool_assign_cpu_locked(struct cpupool *c, unsigned int cpu)
 static int cpupool_unassign_cpu_finish(struct cpupool *c)
 {
     int cpu = cpupool_moving_cpu;
+    const cpumask_t *cpus;
     struct domain *d;
     int ret;
 
@@ -310,7 +318,10 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
      */
     rcu_read_lock(&domlist_read_lock);
     ret = cpu_disable_scheduler(cpu);
-    cpumask_set_cpu(cpu, &cpupool_free_cpus);
+
+    rcu_read_lock(&sched_res_rculock);
+    cpus = get_sched_res(cpu)->cpus;
+    cpumask_or(&cpupool_free_cpus, &cpupool_free_cpus, cpus);
 
     /*
      * cpu_disable_scheduler() returning an error doesn't require resetting
@@ -323,7 +334,7 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
     {
         ret = schedule_cpu_rm(cpu);
         if ( ret )
-            cpumask_clear_cpu(cpu, &cpupool_free_cpus);
+            cpumask_andnot(&cpupool_free_cpus, &cpupool_free_cpus, cpus);
         else
         {
             cpupool_moving_cpu = -1;
@@ -331,6 +342,7 @@ static int cpupool_unassign_cpu_finish(struct cpupool *c)
             cpupool_cpu_moving = NULL;
         }
     }
+    rcu_read_unlock(&sched_res_rculock);
 
     for_each_domain_in_cpupool(d, c)
     {
@@ -345,6 +357,7 @@ static int cpupool_unassign_cpu_start(struct cpupool *c, unsigned int cpu)
 {
     int ret;
     struct domain *d;
+    const cpumask_t *cpus;
 
     spin_lock(&cpupool_lock);
     ret = -EADDRNOTAVAIL;
@@ -353,7 +366,11 @@ static int cpupool_unassign_cpu_start(struct cpupool *c, unsigned int cpu)
         goto out;
 
     ret = 0;
-    if ( (c->n_dom > 0) && (cpumask_weight(c->cpu_valid) == 1) &&
+    rcu_read_lock(&sched_res_rculock);
+    cpus = get_sched_res(cpu)->cpus;
+
+    if ( (c->n_dom > 0) &&
+         (cpumask_weight(c->cpu_valid) == cpumask_weight(cpus)) &&
          (cpu != cpupool_moving_cpu) )
     {
         rcu_read_lock(&domlist_read_lock);
@@ -375,9 +392,10 @@ static int cpupool_unassign_cpu_start(struct cpupool *c, unsigned int cpu)
     cpupool_moving_cpu = cpu;
     atomic_inc(&c->refcnt);
     cpupool_cpu_moving = c;
-    cpumask_clear_cpu(cpu, c->cpu_valid);
+    cpumask_andnot(c->cpu_valid, c->cpu_valid, cpus);
     cpumask_and(c->res_valid, c->cpu_valid, &sched_res_mask);
 
+    rcu_read_unlock(&domlist_read_lock);
 out:
     spin_unlock(&cpupool_lock);
 
@@ -417,11 +435,13 @@ static int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
 {
     int work_cpu;
     int ret;
+    unsigned int master_cpu;
 
     debugtrace_printk("cpupool_unassign_cpu(pool=%d,cpu=%d)\n",
                       c->cpupool_id, cpu);
 
-    ret = cpupool_unassign_cpu_start(c, cpu);
+    master_cpu = sched_get_resource_cpu(cpu);
+    ret = cpupool_unassign_cpu_start(c, master_cpu);
     if ( ret )
     {
         debugtrace_printk("cpupool_unassign_cpu(pool=%d,cpu=%d) ret %d\n",
@@ -429,12 +449,12 @@ static int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
         return ret;
     }
 
-    work_cpu = smp_processor_id();
-    if ( work_cpu == cpu )
+    work_cpu = sched_get_resource_cpu(smp_processor_id());
+    if ( work_cpu == master_cpu )
     {
         work_cpu = cpumask_first(cpupool0->cpu_valid);
-        if ( work_cpu == cpu )
-            work_cpu = cpumask_next(cpu, cpupool0->cpu_valid);
+        if ( work_cpu == master_cpu )
+            work_cpu = cpumask_last(cpupool0->cpu_valid);
     }
     return continue_hypercall_on_cpu(work_cpu, cpupool_unassign_cpu_helper, c);
 }
@@ -500,6 +520,7 @@ void cpupool_rm_domain(struct domain *d)
 static int cpupool_cpu_add(unsigned int cpu)
 {
     int ret = 0;
+    const cpumask_t *cpus;
 
     spin_lock(&cpupool_lock);
     cpumask_clear_cpu(cpu, &cpupool_locked_cpus);
@@ -513,7 +534,11 @@ static int cpupool_cpu_add(unsigned int cpu)
      */
     rcu_read_lock(&sched_res_rculock);
     get_sched_res(cpu)->cpupool = NULL;
-    ret = cpupool_assign_cpu_locked(cpupool0, cpu);
+
+    cpus = sched_get_opt_cpumask(cpupool0->gran, cpu);
+    if ( cpumask_subset(cpus, &cpupool_free_cpus) )
+        ret = cpupool_assign_cpu_locked(cpupool0, cpu);
+
     rcu_read_unlock(&sched_res_rculock);
 
     spin_unlock(&cpupool_lock);
@@ -548,27 +573,33 @@ static void cpupool_cpu_remove(unsigned int cpu)
 static int cpupool_cpu_remove_prologue(unsigned int cpu)
 {
     int ret = 0;
+    cpumask_t *cpus;
+    unsigned int master_cpu;
 
     spin_lock(&cpupool_lock);
 
-    if ( cpumask_test_cpu(cpu, &cpupool_locked_cpus) )
+    rcu_read_lock(&sched_res_rculock);
+    cpus = get_sched_res(cpu)->cpus;
+    master_cpu = sched_get_resource_cpu(cpu);
+    if ( cpumask_intersects(cpus, &cpupool_locked_cpus) )
         ret = -EBUSY;
     else
         cpumask_set_cpu(cpu, &cpupool_locked_cpus);
+    rcu_read_unlock(&sched_res_rculock);
 
     spin_unlock(&cpupool_lock);
 
     if ( ret )
         return  ret;
 
-    if ( cpumask_test_cpu(cpu, cpupool0->cpu_valid) )
+    if ( cpumask_test_cpu(master_cpu, cpupool0->cpu_valid) )
     {
         /* Cpupool0 is populated only after all cpus are up. */
         ASSERT(system_state == SYS_STATE_active);
 
-        ret = cpupool_unassign_cpu_start(cpupool0, cpu);
+        ret = cpupool_unassign_cpu_start(cpupool0, master_cpu);
     }
-    else if ( !cpumask_test_cpu(cpu, &cpupool_free_cpus) )
+    else if ( !cpumask_test_cpu(master_cpu, &cpupool_free_cpus) )
         ret = -ENODEV;
 
     return ret;
@@ -585,12 +616,13 @@ static void cpupool_cpu_remove_forced(unsigned int cpu)
 {
     struct cpupool **c;
     int ret;
+    unsigned int master_cpu = sched_get_resource_cpu(cpu);
 
     for_each_cpupool ( c )
     {
-        if ( cpumask_test_cpu(cpu, (*c)->cpu_valid) )
+        if ( cpumask_test_cpu(master_cpu, (*c)->cpu_valid) )
         {
-            ret = cpupool_unassign_cpu_start(*c, cpu);
+            ret = cpupool_unassign_cpu_start(*c, master_cpu);
             BUG_ON(ret);
             ret = cpupool_unassign_cpu_finish(*c);
             BUG_ON(ret);
@@ -658,29 +690,45 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     case XEN_SYSCTL_CPUPOOL_OP_ADDCPU:
     {
         unsigned cpu;
+        const cpumask_t *cpus;
 
         cpu = op->cpu;
         debugtrace_printk("cpupool_assign_cpu(pool=%d,cpu=%d)\n",
                           op->cpupool_id, cpu);
+
         spin_lock(&cpupool_lock);
-        if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
-            cpu = cpumask_first(&cpupool_free_cpus);
-        ret = -EINVAL;
-        if ( cpu >= nr_cpu_ids )
-            goto addcpu_out;
-        ret = -ENODEV;
-        if ( !cpumask_test_cpu(cpu, &cpupool_free_cpus) ||
-             cpumask_test_cpu(cpu, &cpupool_locked_cpus) )
-            goto addcpu_out;
+
         c = cpupool_find_by_id(op->cpupool_id);
         ret = -ENOENT;
         if ( c == NULL )
             goto addcpu_out;
+        if ( cpu == XEN_SYSCTL_CPUPOOL_PAR_ANY )
+        {
+            for_each_cpu ( cpu, &cpupool_free_cpus )
+            {
+                cpus = sched_get_opt_cpumask(c->gran, cpu);
+                if ( cpumask_subset(cpus, &cpupool_free_cpus) )
+                    break;
+            }
+            ret = -ENODEV;
+            if ( cpu >= nr_cpu_ids )
+                goto addcpu_out;
+        }
+        ret = -EINVAL;
+        if ( cpu >= nr_cpu_ids )
+            goto addcpu_out;
+        ret = -ENODEV;
+        cpus = sched_get_opt_cpumask(c->gran, cpu);
+        if ( !cpumask_subset(cpus, &cpupool_free_cpus) ||
+             cpumask_intersects(cpus, &cpupool_locked_cpus) )
+            goto addcpu_out;
         ret = cpupool_assign_cpu_locked(c, cpu);
+
     addcpu_out:
         spin_unlock(&cpupool_lock);
         debugtrace_printk("cpupool_assign_cpu(pool=%d,cpu=%d) ret %d\n",
                           op->cpupool_id, cpu, ret);
+
     }
     break;
 
