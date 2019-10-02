@@ -172,7 +172,7 @@ attempted as normal and may fail due to memory exhaustion.
 
 =item C<1>
 
-Normal memory and freeable pool of ephemeral pages (tmem) is used when
+Free memory as reported by the hypervisor is used for
 calculating whether there is enough memory free to launch a guest.
 This guarantees immediate feedback whether the guest can be launched due
 to memory exhaustion (which can take a long time to find out if launching

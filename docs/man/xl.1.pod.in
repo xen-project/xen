@@ -1921,18 +1921,6 @@ ignored:
 
 =back
 
-=head1 TO BE DOCUMENTED
-
-We need better documentation for:
-
-=over 4
-
-=item B<tmem>
-
-Transcendent Memory.
-
-=back
-
 =head1 SEE ALSO
 
 The following man pages:
