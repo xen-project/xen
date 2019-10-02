@@ -209,6 +209,11 @@ long arch_do_sysctl(
                 ret = -EOPNOTSUPP;
                 break;
             }
+            if ( sched_disable_smt_switching )
+            {
+                ret = -EBUSY;
+                break;
+            }
             plug = op == XEN_SYSCTL_CPU_HOTPLUG_SMT_ENABLE;
             fn = smt_up_down_helper;
             hcpu = _p(plug);

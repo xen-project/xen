@@ -63,6 +63,7 @@ integer_param("sched_ratelimit_us", sched_ratelimit_us);
 
 /* Number of vcpus per struct sched_unit. */
 static unsigned int __read_mostly sched_granularity = 1;
+bool __read_mostly sched_disable_smt_switching;
 const cpumask_t *sched_res_mask = &cpumask_all;
 
 /* Common lock for free cpus. */

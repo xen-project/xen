@@ -1037,6 +1037,7 @@ static inline bool is_iommu_enabled(const struct domain *d)
 }
 
 extern bool sched_smt_power_savings;
+extern bool sched_disable_smt_switching;
 
 extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen
