@@ -77,6 +77,13 @@ void set_nr_sockets(void);
 /* Representing HT and core siblings in each socket. */
 extern cpumask_t **socket_cpumask;
 
+/*
+ * To be used only while no context switch can occur on the cpu, i.e.
+ * by certain scheduling code only.
+ */
+#define get_cpu_current(cpu) \
+    (get_cpu_info_from_stack((unsigned long)stack_base[cpu])->current_vcpu)
+
 #endif /* !__ASSEMBLY__ */
 
 #endif

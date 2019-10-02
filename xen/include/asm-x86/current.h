@@ -77,6 +77,11 @@ struct cpu_info {
     /* get_stack_bottom() must be 16-byte aligned */
 };
 
+static inline struct cpu_info *get_cpu_info_from_stack(unsigned long sp)
+{
+    return (struct cpu_info *)((sp | (STACK_SIZE - 1)) + 1) - 1;
+}
+
 static inline struct cpu_info *get_cpu_info(void)
 {
 #ifdef __clang__
@@ -87,7 +92,7 @@ static inline struct cpu_info *get_cpu_info(void)
     register unsigned long sp asm("rsp");
 #endif
 
-    return (struct cpu_info *)((sp | (STACK_SIZE - 1)) + 1) - 1;
+    return get_cpu_info_from_stack(sp);
 }
 
 #define get_current()         (get_cpu_info()->current_vcpu)
@@ -124,15 +129,21 @@ unsigned long get_stack_dump_bottom (unsigned long sp);
 # define CHECK_FOR_LIVEPATCH_WORK ""
 #endif
 
-#define reset_stack_and_jump(__fn)                                      \
+#define switch_stack_and_jump(fn, instr)                                \
     ({                                                                  \
         __asm__ __volatile__ (                                          \
             "mov %0,%%"__OP"sp;"                                        \
-            CHECK_FOR_LIVEPATCH_WORK                                      \
+            instr                                                       \
              "jmp %c1"                                                  \
-            : : "r" (guest_cpu_user_regs()), "i" (__fn) : "memory" );   \
+            : : "r" (guest_cpu_user_regs()), "i" (fn) : "memory" );     \
         unreachable();                                                  \
     })
+
+#define reset_stack_and_jump(fn)                                        \
+    switch_stack_and_jump(fn, CHECK_FOR_LIVEPATCH_WORK)
+
+#define reset_stack_and_jump_nolp(fn)                                   \
+    switch_stack_and_jump(fn, "")
 
 /*
  * Which VCPU's state is currently running on each CPU?

@@ -39,6 +39,8 @@ struct sched_resource {
     spinlock_t         *schedule_lock,
                        _lock;
     struct sched_unit  *curr;
+    struct sched_unit  *sched_unit_idle;
+    struct sched_unit  *prev;
     void               *sched_priv;
     struct timer        s_timer;        /* scheduling timer                */
 
@@ -194,7 +196,7 @@ static inline void sched_clear_pause_flags_atomic(struct sched_unit *unit,
 
 static inline struct sched_unit *sched_idle_unit(unsigned int cpu)
 {
-    return idle_vcpu[cpu]->sched_unit;
+    return get_sched_res(cpu)->sched_unit_idle;
 }
 
 static inline unsigned int sched_get_resource_cpu(unsigned int cpu)

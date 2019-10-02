@@ -159,6 +159,25 @@ static void idle_loop(void)
     }
 }
 
+/*
+ * Idle loop for siblings in active schedule units.
+ * We don't do any standard idle work like tasklets or livepatching.
+ */
+static void guest_idle_loop(void)
+{
+    unsigned int cpu = smp_processor_id();
+
+    for ( ; ; )
+    {
+        ASSERT(!cpu_is_offline(cpu));
+
+        if ( !softirq_pending(cpu) && !scrub_free_pages() &&
+             !softirq_pending(cpu))
+            sched_guest_idle(pm_idle, cpu);
+        do_softirq();
+    }
+}
+
 void startup_cpu_idle_loop(void)
 {
     struct vcpu *v = current;
@@ -172,6 +191,10 @@ void startup_cpu_idle_loop(void)
 
 static void noreturn continue_idle_domain(struct vcpu *v)
 {
+    /* Idle vcpus might be attached to non-idle units! */
+    if ( !is_idle_domain(v->sched_unit->domain) )
+        reset_stack_and_jump_nolp(guest_idle_loop);
+
     reset_stack_and_jump(idle_loop);
 }
 
