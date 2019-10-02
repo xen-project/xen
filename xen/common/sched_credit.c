@@ -1681,7 +1681,7 @@ static struct csched_unit *
 csched_load_balance(struct csched_private *prv, int cpu,
     struct csched_unit *snext, bool *stolen)
 {
-    struct cpupool *c = per_cpu(cpupool, cpu);
+    struct cpupool *c = get_sched_res(cpu)->cpupool;
     struct csched_unit *speer;
     cpumask_t workers;
     cpumask_t *online;

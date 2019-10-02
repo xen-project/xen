@@ -1120,7 +1120,7 @@ int cpu_disable_scheduler(unsigned int cpu)
     cpumask_t online_affinity;
     int ret = 0;
 
-    c = per_cpu(cpupool, cpu);
+    c = get_sched_res(cpu)->cpupool;
     if ( c == NULL )
         return ret;
 
@@ -1189,7 +1189,7 @@ static int cpu_disable_scheduler_check(unsigned int cpu)
     struct vcpu *v;
     struct cpupool *c;
 
-    c = per_cpu(cpupool, cpu);
+    c = get_sched_res(cpu)->cpupool;
     if ( c == NULL )
         return 0;
 
@@ -2558,8 +2558,8 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     void *ppriv, *ppriv_old, *vpriv, *vpriv_old;
     struct scheduler *old_ops = get_sched_res(cpu)->scheduler;
     struct scheduler *new_ops = (c == NULL) ? &sched_idle_ops : c->sched;
-    struct cpupool *old_pool = per_cpu(cpupool, cpu);
     struct sched_resource *sd = get_sched_res(cpu);
+    struct cpupool *old_pool = sd->cpupool;
     spinlock_t *old_lock, *new_lock;
     unsigned long flags;
 
@@ -2641,7 +2641,7 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c)
     sched_free_udata(old_ops, vpriv_old);
     sched_free_pdata(old_ops, ppriv_old, cpu);
 
-    per_cpu(cpupool, cpu) = c;
+    get_sched_res(cpu)->cpupool = c;
     /* When a cpu is added to a pool, trigger it to go pick up some work */
     if ( c != NULL )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);

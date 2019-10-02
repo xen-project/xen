@@ -774,7 +774,7 @@ rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     if ( prv->repl_timer.cpu == cpu )
     {
-        struct cpupool *c = per_cpu(cpupool, cpu);
+        struct cpupool *c = get_sched_res(cpu)->cpupool;
         unsigned int new_cpu = cpumask_cycle(cpu, cpupool_online_cpumask(c));
 
         /*
