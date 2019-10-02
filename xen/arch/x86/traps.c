@@ -126,6 +126,8 @@ boolean_param("ler", opt_ler);
 /* LastExceptionFromIP on this hardware.  Zero if LER is not in use. */
 unsigned int __read_mostly ler_msr;
 
+const unsigned int nmi_cpu;
+
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 
@@ -1698,7 +1700,7 @@ void do_nmi(const struct cpu_user_regs *regs)
      * this port before we re-arm the NMI watchdog, we reduce the chance
      * of having an NMI watchdog expire while in the SMI handler.
      */
-    if ( cpu == 0 )
+    if ( cpu == nmi_cpu )
         reason = inb(0x61);
 
     if ( (nmi_watchdog == NMI_NONE) ||
@@ -1706,7 +1708,7 @@ void do_nmi(const struct cpu_user_regs *regs)
         handle_unknown = true;
 
     /* Only the BSP gets external NMIs from the system. */
-    if ( cpu == 0 )
+    if ( cpu == nmi_cpu )
     {
         if ( reason & 0x80 )
             pci_serr_error(regs);

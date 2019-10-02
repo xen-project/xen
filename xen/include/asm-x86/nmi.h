@@ -11,6 +11,9 @@ extern bool opt_watchdog;
 
 /* Watchdog force parameter from the command line */
 extern bool watchdog_force;
+
+/* CPU to handle platform NMI */
+extern const unsigned int nmi_cpu;
  
 typedef int nmi_callback_t(const struct cpu_user_regs *regs, int cpu);
  

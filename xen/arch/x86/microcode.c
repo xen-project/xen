@@ -36,8 +36,10 @@
 #include <xen/earlycpio.h>
 #include <xen/watchdog.h>
 
+#include <asm/apic.h>
 #include <asm/delay.h>
 #include <asm/msr.h>
+#include <asm/nmi.h>
 #include <asm/processor.h>
 #include <asm/setup.h>
 #include <asm/microcode.h>
@@ -95,6 +97,9 @@ static struct ucode_mod_blob __initdata ucode_blob;
  */
 static bool_t __initdata ucode_scan;
 
+/* By default, ucode loading is done in NMI handler */
+static bool ucode_in_nmi = true;
+
 /* Protected by microcode_mutex */
 static struct microcode_patch *microcode_cache;
 
@@ -105,23 +110,40 @@ void __init microcode_set_module(unsigned int idx)
 }
 
 /*
- * The format is '[<integer>|scan]'. Both options are optional.
- * If the EFI has forced which of the multiboot payloads is to be used,
- * no parsing will be attempted.
+ * The format is '[<integer>|scan=<bool>, nmi=<bool>]'. Both options are
+ * optional. If the EFI has forced which of the multiboot payloads is to be
+ * used, only nmi=<bool> is parsed.
  */
 static int __init parse_ucode(const char *s)
 {
-    const char *q = NULL;
+    const char *ss;
+    int val, rc = 0;
 
-    if ( ucode_mod_forced ) /* Forced by EFI */
-       return 0;
+    do {
+        ss = strchr(s, ',');
+        if ( !ss )
+            ss = strchr(s, '\0');
 
-    if ( !strncmp(s, "scan", 4) )
-        ucode_scan = 1;
-    else
-        ucode_mod_idx = simple_strtol(s, &q, 0);
+        if ( (val = parse_boolean("nmi", s, ss)) >= 0 )
+            ucode_in_nmi = val;
+        else if ( !ucode_mod_forced ) /* Not forced by EFI */
+        {
+            if ( (val = parse_boolean("scan", s, ss)) >= 0 )
+                ucode_scan = val;
+            else
+            {
+                const char *q;
 
-    return (q && *q) ? -EINVAL : 0;
+                ucode_mod_idx = simple_strtol(s, &q, 0);
+                if ( q != ss )
+                    rc = -EINVAL;
+            }
+        }
+
+        s = ss + 1;
+    } while ( *ss );
+
+    return rc;
 }
 custom_param("ucode", parse_ucode);
 
@@ -222,6 +244,8 @@ const struct microcode_ops *microcode_ops;
 static DEFINE_SPINLOCK(microcode_mutex);
 
 DEFINE_PER_CPU(struct cpu_signature, cpu_sig);
+/* Store error code of the work done in NMI handler */
+static DEFINE_PER_CPU(int, loading_err);
 
 /*
  * Count the CPUs that have entered, exited the rendezvous and succeeded in
@@ -232,6 +256,7 @@ DEFINE_PER_CPU(struct cpu_signature, cpu_sig);
  */
 static cpumask_t cpu_callin_map;
 static atomic_t cpu_out, cpu_updated;
+static const struct microcode_patch *nmi_patch = ZERO_BLOCK_PTR;
 
 /*
  * Return a patch that covers current CPU. If there are multiple patches,
@@ -355,30 +380,16 @@ static void set_state(typeof(loading_state) state)
     ACCESS_ONCE(loading_state) = state;
 }
 
-static int secondary_thread_fn(void)
+static int secondary_nmi_work(void)
 {
-    unsigned int primary = cpumask_first(this_cpu(cpu_sibling_mask));
-
-    if ( !wait_for_state(LOADING_CALLIN) )
-        return -EBUSY;
-
     cpumask_set_cpu(smp_processor_id(), &cpu_callin_map);
 
-    if ( !wait_for_state(LOADING_EXIT) )
-        return -EBUSY;
-
-    /* Copy update revision from the primary thread. */
-    this_cpu(cpu_sig).rev = per_cpu(cpu_sig, primary).rev;
-
-    return 0;
+    return wait_for_state(LOADING_EXIT) ? 0 : -EBUSY;
 }
 
-static int primary_thread_fn(const struct microcode_patch *patch)
+static int primary_thread_work(const struct microcode_patch *patch)
 {
-    int ret = 0;
-
-    if ( !wait_for_state(LOADING_CALLIN) )
-        return -EBUSY;
+    int ret;
 
     cpumask_set_cpu(smp_processor_id(), &cpu_callin_map);
 
@@ -393,17 +404,94 @@ static int primary_thread_fn(const struct microcode_patch *patch)
     return ret;
 }
 
+static int microcode_nmi_callback(const struct cpu_user_regs *regs, int cpu)
+{
+    unsigned int primary = cpumask_first(this_cpu(cpu_sibling_mask));
+    int ret;
+
+    /* System-generated NMI, leave to main handler */
+    if ( ACCESS_ONCE(loading_state) != LOADING_CALLIN )
+        return 0;
+
+    /*
+     * Primary threads load ucode in NMI handler on if ucode_in_nmi is true.
+     * Secondary threads are expected to stay in NMI handler regardless of
+     * ucode_in_nmi.
+     */
+    if ( cpu == cpumask_first(&cpu_online_map) ||
+         (!ucode_in_nmi && cpu == primary) )
+        return 0;
+
+    if ( cpu == primary )
+        ret = primary_thread_work(nmi_patch);
+    else
+        ret = secondary_nmi_work();
+    this_cpu(loading_err) = ret;
+
+    return 0;
+}
+
+static int secondary_thread_fn(void)
+{
+    if ( !wait_for_state(LOADING_CALLIN) )
+        return -EBUSY;
+
+    self_nmi();
+
+    /*
+     * Wait for ucode loading is done in case that the NMI does not arrive
+     * synchronously, which may lead to a not-yet-updated CPU signature is
+     * copied below.
+     */
+    if ( unlikely(!wait_for_state(LOADING_EXIT)) )
+        ASSERT_UNREACHABLE();
+
+    /* Copy update revision from the primary thread. */
+    this_cpu(cpu_sig).rev =
+        per_cpu(cpu_sig, cpumask_first(this_cpu(cpu_sibling_mask))).rev;
+
+    return this_cpu(loading_err);
+}
+
+static int primary_thread_fn(const struct microcode_patch *patch)
+{
+    if ( !wait_for_state(LOADING_CALLIN) )
+        return -EBUSY;
+
+    if ( ucode_in_nmi )
+    {
+        self_nmi();
+
+        /*
+         * Wait for ucode loading is done in case that the NMI does not arrive
+         * synchronously, which may lead to a not-yet-updated error is returned
+         * below.
+         */
+        if ( unlikely(!wait_for_state(LOADING_EXIT)) )
+            ASSERT_UNREACHABLE();
+
+        return this_cpu(loading_err);
+    }
+
+    return primary_thread_work(patch);
+}
+
 static int control_thread_fn(const struct microcode_patch *patch)
 {
     unsigned int cpu = smp_processor_id(), done;
     unsigned long tick;
     int ret;
+    nmi_callback_t *saved_nmi_callback;
 
     /*
      * We intend to keep interrupt disabled for a long time, which may lead to
      * watchdog timeout.
      */
     watchdog_disable();
+
+    nmi_patch = patch;
+    smp_wmb();
+    saved_nmi_callback = set_nmi_callback(microcode_nmi_callback);
 
     /* Allow threads to call in */
     set_state(LOADING_CALLIN);
@@ -419,13 +507,22 @@ static int control_thread_fn(const struct microcode_patch *patch)
         return ret;
     }
 
-    /* Let primary threads load the given ucode update */
-    set_state(LOADING_ENTER);
-
+    /* Control thread loads ucode first while others are in NMI handler. */
     ret = microcode_ops->apply_microcode(patch);
     if ( !ret )
         atomic_inc(&cpu_updated);
     atomic_inc(&cpu_out);
+
+    if ( ret == -EIO )
+    {
+        printk(XENLOG_ERR
+               "Late loading aborted: CPU%u failed to update ucode\n", cpu);
+        set_state(LOADING_EXIT);
+        return ret;
+    }
+
+    /* Let primary threads load the given ucode update */
+    set_state(LOADING_ENTER);
 
     tick = rdtsc_ordered();
     /* Wait for primary threads finishing update */
@@ -454,6 +551,10 @@ static int control_thread_fn(const struct microcode_patch *patch)
 
     /* Mark loading is done to unblock other threads */
     set_state(LOADING_EXIT);
+
+    set_nmi_callback(saved_nmi_callback);
+    smp_wmb();
+    nmi_patch = ZERO_BLOCK_PTR;
 
     watchdog_enable();
 
@@ -512,6 +613,20 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
     {
         xfree(buffer);
         return -EBUSY;
+    }
+
+    /*
+     * CPUs except the first online CPU would send a fake (self) NMI to
+     * rendezvous in NMI handler. But a fake NMI to nmi_cpu may trigger
+     * unknown_nmi_error(). It ensures nmi_cpu won't receive a fake NMI.
+     */
+    if ( unlikely(cpumask_first(&cpu_online_map) != nmi_cpu) )
+    {
+        xfree(buffer);
+        printk(XENLOG_WARNING
+               "CPU%u is expected to lead ucode loading (but got CPU%u)\n",
+               nmi_cpu, cpumask_first(&cpu_online_map));
+        return -EPERM;
     }
 
     patch = parse_blob(buffer, len);

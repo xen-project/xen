@@ -2053,7 +2053,7 @@ pages) must also be specified via the tbuf_size parameter.
 > `= unstable | skewed | stable:socket`
 
 ### ucode (x86)
-> `= [<integer> | scan]`
+> `= List of [ <integer> | scan=<bool>, nmi=<bool> ]`
 
 Specify how and where to find CPU microcode update blob.
 
@@ -2073,6 +2073,10 @@ image that contains microcode. Depending on the platform the blob with the
 microcode in the cpio name space must be:
   - on Intel: kernel/x86/microcode/GenuineIntel.bin
   - on AMD  : kernel/x86/microcode/AuthenticAMD.bin
+
+'nmi' determines late loading is performed in NMI handler or just in
+stop_machine context. In NMI handler, even NMIs are blocked, which is
+considered safer. The default value is `true`.
 
 ### unrestricted_guest (Intel)
 > `= <boolean>`
