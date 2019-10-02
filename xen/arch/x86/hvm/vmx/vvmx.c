@@ -2491,6 +2491,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             nvcpu->nv_vmexit_pending = 1;
         break;
     case EXIT_REASON_RDTSC:
+    case EXIT_REASON_RDTSCP:
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_RDTSC_EXITING )
             nvcpu->nv_vmexit_pending = 1;
@@ -2501,6 +2502,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
              * avoiding changing guest_tsc and messing up timekeeping in L1
              */
             msr_split(regs, hvm_get_guest_tsc(v) + get_vvmcs(v, TSC_OFFSET));
+            if ( exit_reason == EXIT_REASON_RDTSCP )
+                regs->rcx = v->arch.msrs->tsc_aux;
             update_guest_eip();
 
             return 1;
