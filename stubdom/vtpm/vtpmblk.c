@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
 
 /*Encryption key and block sizes */
 #define BLKSZ 16
