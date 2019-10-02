@@ -77,6 +77,7 @@ static void poll_timer_fn(void *data);
 /* This is global for now so that private implementations can reach it */
 DEFINE_PER_CPU(struct scheduler *, scheduler);
 DEFINE_PER_CPU_READ_MOSTLY(struct sched_resource *, sched_res);
+static DEFINE_PER_CPU_READ_MOSTLY(unsigned int, sched_res_idx);
 
 /* Scratch space for cpumasks. */
 DEFINE_PER_CPU(cpumask_t, cpumask_scratch);
@@ -143,6 +144,12 @@ static struct scheduler sched_idle_ops = {
     .free_udata     = sched_idle_free_udata,
     .switch_sched   = sched_idle_switch_sched,
 };
+
+static inline struct vcpu *sched_unit2vcpu_cpu(const struct sched_unit *unit,
+                                               unsigned int cpu)
+{
+    return unit->domain->vcpu[unit->unit_id + per_cpu(sched_res_idx, cpu)];
+}
 
 static inline struct scheduler *dom_scheduler(const struct domain *d)
 {
@@ -2030,7 +2037,7 @@ static void sched_slave(void)
 
     pcpu_schedule_unlock_irq(lock, cpu);
 
-    sched_context_switch(vprev, next->vcpu_list, now);
+    sched_context_switch(vprev, sched_unit2vcpu_cpu(next, cpu), now);
 }
 
 /*
@@ -2091,7 +2098,7 @@ static void schedule(void)
 
     pcpu_schedule_unlock_irq(lock, cpu);
 
-    vnext = next->vcpu_list;
+    vnext = sched_unit2vcpu_cpu(next, cpu);
     sched_context_switch(vprev, vnext, now);
 }
 
