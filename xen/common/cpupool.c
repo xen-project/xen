@@ -17,6 +17,7 @@
 #include <xen/percpu.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
+#include <xen/warning.h>
 #include <xen/keyhandler.h>
 #include <xen/cpu.h>
 
@@ -36,6 +37,83 @@ static DEFINE_SPINLOCK(cpupool_lock);
 
 static enum sched_gran __read_mostly opt_sched_granularity = SCHED_GRAN_cpu;
 static unsigned int __read_mostly sched_granularity = 1;
+
+#ifdef CONFIG_HAS_SCHED_GRANULARITY
+static int __init sched_select_granularity(const char *str)
+{
+    if ( strcmp("cpu", str) == 0 )
+        opt_sched_granularity = SCHED_GRAN_cpu;
+    else if ( strcmp("core", str) == 0 )
+        opt_sched_granularity = SCHED_GRAN_core;
+    else if ( strcmp("socket", str) == 0 )
+        opt_sched_granularity = SCHED_GRAN_socket;
+    else
+        return -EINVAL;
+
+    return 0;
+}
+custom_param("sched-gran", sched_select_granularity);
+#endif
+
+static unsigned int __init cpupool_check_granularity(void)
+{
+    unsigned int cpu;
+    unsigned int siblings, gran = 0;
+
+    if ( opt_sched_granularity == SCHED_GRAN_cpu )
+        return 1;
+
+    for_each_online_cpu ( cpu )
+    {
+        siblings = cpumask_weight(sched_get_opt_cpumask(opt_sched_granularity,
+                                                        cpu));
+        if ( gran == 0 )
+            gran = siblings;
+        else if ( gran != siblings )
+            return 0;
+    }
+
+    sched_disable_smt_switching = true;
+
+    return gran;
+}
+
+/* Setup data for selected scheduler granularity. */
+static void __init cpupool_gran_init(void)
+{
+    unsigned int gran = 0;
+    const char *fallback = NULL;
+
+    while ( gran == 0 )
+    {
+        gran = cpupool_check_granularity();
+
+        if ( gran == 0 )
+        {
+            switch ( opt_sched_granularity )
+            {
+            case SCHED_GRAN_core:
+                opt_sched_granularity = SCHED_GRAN_cpu;
+                fallback = "Asymmetric cpu configuration.\n"
+                           "Falling back to sched-gran=cpu.\n";
+                break;
+            case SCHED_GRAN_socket:
+                opt_sched_granularity = SCHED_GRAN_core;
+                fallback = "Asymmetric cpu configuration.\n"
+                           "Falling back to sched-gran=core.\n";
+                break;
+            default:
+                ASSERT_UNREACHABLE();
+                break;
+            }
+        }
+    }
+
+    if ( fallback )
+        warning_add(fallback);
+
+    sched_granularity = gran;
+}
 
 unsigned int cpupool_get_granularity(const struct cpupool *c)
 {
@@ -870,6 +948,8 @@ static int __init cpupool_init(void)
 {
     unsigned int cpu;
     int err;
+
+    cpupool_gran_init();
 
     cpupool0 = cpupool_create(0, 0, &err);
     BUG_ON(cpupool0 == NULL);

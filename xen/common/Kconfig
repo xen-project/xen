@@ -63,6 +63,9 @@ config HAS_GDBSX
 config HAS_IOPORTS
 	bool
 
+config HAS_SCHED_GRANULARITY
+	bool
+
 config NEEDS_LIBELF
 	bool
 
