@@ -1440,6 +1440,9 @@ _hidden int libxl__resolve_domid(libxl__gc *gc, const char *name,
  *     All libxl API functions are expected to have arranged for this
  *     to be called before using any values within these structures.
  */
+_hidden int libxl__domain_config_setdefault(libxl__gc *gc,
+                                            libxl_domain_config *d_config,
+                                            uint32_t domid /* logging only */);
 _hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                         libxl_domain_create_info *c_info);
 _hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,

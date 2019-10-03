@@ -862,21 +862,13 @@ static void domcreate_destruction_cb(libxl__egc *egc,
                                      libxl__domain_destroy_state *dds,
                                      int rc);
 
-static void initiate_domain_create(libxl__egc *egc,
-                                   libxl__domain_create_state *dcs)
+int libxl__domain_config_setdefault(libxl__gc *gc,
+                                    libxl_domain_config *d_config,
+                                    uint32_t domid)
 {
-    STATE_AO_GC(dcs->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    uint32_t domid;
-    int i, ret;
+    int ret;
     bool pod_enabled = false;
-
-    /* convenience aliases */
-    libxl_domain_config *const d_config = dcs->guest_config;
-    const int restore_fd = dcs->restore_fd;
-
-    domid = dcs->domid_soft_reset;
-    libxl__domain_build_state_init(&dcs->build_state);
 
     if (d_config->c_info.ssid_label) {
         char *s = d_config->c_info.ssid_label;
@@ -1008,6 +1000,28 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
+    ret = 0;
+ error_out:
+    return ret;
+}
+
+static void initiate_domain_create(libxl__egc *egc,
+                                   libxl__domain_create_state *dcs)
+{
+    STATE_AO_GC(dcs->ao);
+    uint32_t domid;
+    int i, ret;
+
+    /* convenience aliases */
+    libxl_domain_config *const d_config = dcs->guest_config;
+    const int restore_fd = dcs->restore_fd;
+
+    domid = dcs->domid_soft_reset;
+    libxl__domain_build_state_init(&dcs->build_state);
+
+    ret = libxl__domain_config_setdefault(gc,d_config,domid);
+    if (ret) goto error_out;
+
     ret = libxl__domain_make(gc, d_config, &dcs->build_state, &domid);
     if (ret) {
         LOGD(ERROR, domid, "cannot make domain: %d", ret);
@@ -1018,6 +1032,9 @@ static void initiate_domain_create(libxl__egc *egc,
 
     dcs->guest_domid = domid;
     dcs->sdss.dm.guest_domid = 0; /* means we haven't spawned */
+
+    /* post-4.13 todo: move these next bits of defaulting to
+     * libxl__domain_config_setdefault */
 
     /*
      * Set the dm version quite early so that libxl doesn't have to pass the
