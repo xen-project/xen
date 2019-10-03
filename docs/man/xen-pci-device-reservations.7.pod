@@ -29,7 +29,7 @@ multiple Xen vendors using conflicting IDs.
 
 =item 3. The vendor is responsible for allocations within the range and should
          try to record specific device IDs in PCI ID databases such as
-         http://pciids.sourceforge.net and http//www.pcidatabase.com
+         https://pci-ids.ucw.cz and https://devicehunt.com
 
 =back
 

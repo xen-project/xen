@@ -380,4 +380,4 @@ C<hwinitpcrs=5,12-16> will copy pcrs 5, 12, 13, 14, 15, and 16.
 
 =head1 REFERENCES
 
-Berlios TPM Emulator: L<http://tpm-emulator.berlios.de/>
+Berlios TPM Emulator: L<https://github.com/PeterHuewe/tpm-emulator>

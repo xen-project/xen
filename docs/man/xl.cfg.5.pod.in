@@ -748,7 +748,7 @@ Specify the backend domain name or id, defaults to dom0.
 Creates a Xen pvcalls connection to handle pvcalls requests from
 frontend to backend. It can be used as an alternative networking model.
 For more information about the protocol, see
-https://xenbits.xen.org/docs/unstable/misc/pvcalls.html.
+https://xenbits.xenproject.org/docs/unstable/misc/pvcalls.html.
 
 =item B<vfb=[ "VFB_SPEC_STRING", "VFB_SPEC_STRING", ...]>
 
@@ -1196,7 +1196,7 @@ to initialize the graphics card.
 
 Most graphics adapters require vendor specific tweaks for properly
 working graphics passthrough. See the XenVGAPassthroughTestedAdapters
-L<http://wiki.xen.org/wiki/XenVGAPassthroughTestedAdapters> wiki page
+L<https://wiki.xenproject.org/wiki/XenVGAPassthroughTestedAdapters> wiki page
 for graphics cards currently supported by B<gfx_passthru>.
 
 B<gfx_passthru> is currently supported both with the qemu-xen-traditional
@@ -1239,7 +1239,7 @@ graphics card, and VNC output is available from the QEMU-emulated
 primary adapter.
 
 More information about the Xen B<gfx_passthru> feature is available
-on the XenVGAPassthrough L<http://wiki.xen.org/wiki/XenVGAPassthrough>
+on the XenVGAPassthrough L<https://wiki.xenproject.org/wiki/XenVGAPassthrough>
 wiki page.
 
 =item B<rdm_mem_boundary=MBYTES>
@@ -1622,7 +1622,7 @@ concurrently use it. This requires a virtualization-aware OP-TEE for
 this to work.
 
 You can refer to
-L<OP-TEE documentation|https://optee.readthedocs.io/architecture/virtualization.html>
+L<OP-TEE documentation|https://optee.readthedocs.io/en/latest/architecture/virtualization.html>
 for more information about how to enable and configure virtualization support
 in OP-TEE.
 
@@ -2008,7 +2008,7 @@ xend: [ "1:ecx=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0,edx=xx0xxxxxxxxxxxxxxxxxxxxxxxxx
 libxl: "host,tm=0,sse3=0"
 
 More info about the CPUID instruction can be found in the processor manuals,
-and on Wikipedia: L<http://en.wikipedia.org/wiki/CPUID>
+and on Wikipedia: L<https://en.wikipedia.org/wiki/CPUID>
 
 =item B<acpi_firmware="STRING">
 
@@ -2057,7 +2057,7 @@ Do not provide a VM generation ID.
 =back
 
 See also "Virtual Machine Generation ID" by Microsoft:
-L<http://www.microsoft.com/en-us/download/details.aspx?id=30707>
+L<https://docs.microsoft.com/en-us/windows/win32/hyperv_v2/virtual-machine-generation-identifier>
 
 =back 
 
@@ -2191,8 +2191,8 @@ availability of suitable drivers) to make use of paravirtualisation
 features such as disk and network devices etc. Enabling these drivers
 improves performance and is strongly recommended when available. PV
 drivers are available for various Operating Systems including HVM
-Linux L<http://wiki.xen.org/wiki/XenLinuxPVonHVMdrivers> and Microsoft
-Windows L<http://wiki.xen.org/wiki/XenWindowsGplPv>.
+Linux (out-of-the-box) and Microsoft
+Windows L<https://xenproject.org/windows-pv-drivers/>.
 
 Setting B<xen_platform_pci=0> with the default device_model "qemu-xen"
 requires at least QEMU 1.6.
@@ -2857,7 +2857,7 @@ F<@XEN_DUMP_DIR@/NAME>
 
 This document may contain items which require further
 documentation. Patches to improve incomplete items (or any other item)
-are gratefully received on the xen-devel@lists.xen.org mailing
-list. Please see L<http://wiki.xen.org/wiki/SubmittingXenPatches> for
+are gratefully received on the xen-devel@lists.xenproject.org mailing
+list. Please see L<https://wiki.xenproject.org/wiki/Submitting_Xen_Project_Patches> for
 information on how to submit a patch to Xen.
 

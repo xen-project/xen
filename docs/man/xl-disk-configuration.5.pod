@@ -292,7 +292,7 @@ networking subsystem.  This can cause crashes when using certain
 backends with certain underlying storage.
 
 See:
- L<http://lists.xen.org/archives/html/xen-devel/2012-12/msg01154.html>
+ L<https://lists.xenproject.org/archives/html/xen-devel/2012-12/msg01154.html>
 
 For this reason, (this version of) the Xen libxl toolstack disables
 O_DIRECT when using the qemu-based Xen PV backend (C<qdisk>).
@@ -354,7 +354,7 @@ file.
 =item B<colo>
 
 Enable COLO HA for disk. For better understanding block replication on
-QEMU, please refer to: L<http://wiki.qemu.org/Features/BlockReplication>
+QEMU, please refer to: L<https://wiki.qemu.org/Features/BlockReplication>
 Note that the COLO configuration settings should be considered unstable.
 They may change incompatibly in future versions of Xen.
 

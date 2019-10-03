@@ -101,7 +101,7 @@ Written by Judy Fischbach, David Hendricks, and Josh Triplett
 
 =head1 REPORTING BUGS
 
-Report bugs to <xen-devel@lists.xen.org>.
+Report bugs to <xen-devel@lists.xenproject.org>.
 
 =head1 COPYRIGHT
 

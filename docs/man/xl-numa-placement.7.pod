@@ -23,7 +23,7 @@ running memory-intensive workloads on a shared host. In fact, the cost
 of accessing non node-local memory locations is very high, and the
 performance degradation is likely to be noticeable.
 
-For more information, have a look at the L<Xen NUMA Introduction|http://wiki.xen.org/wiki/Xen_NUMA_Introduction>
+For more information, have a look at the L<Xen NUMA Introduction|https://wiki.xenproject.org/wiki/Xen_on_NUMA_Machines>
 page on the Wiki.
 
 
@@ -58,7 +58,7 @@ also goes under the name of vCPU pinning, and can be done through the
 "cpus=" option in the config file (more about this below). Another option
 is to pool together the pCPUs spanning the node and put the domain in
 such a I<cpupool> with the "pool=" config option (as documented in our
-L<Wiki|http://wiki.xen.org/wiki/Cpupools_Howto>).
+L<Wiki|https://wiki.xenproject.org/wiki/Cpupools_Howto>).
 
 In both the above cases, the domain will not be able to execute outside
 the specified set of pCPUs for any reasons, even if all those pCPUs are

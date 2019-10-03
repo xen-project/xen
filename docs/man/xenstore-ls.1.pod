@@ -58,5 +58,5 @@ Connect to the Xenstore daemon using a local socket only.
 
 =head1 BUGS
 
-Send bugs to xen-devel@lists.xen.org, see
-http://wiki.xen.org/xenwiki/ReportingBugs on how to send bug reports.
+Send bugs to xen-devel@lists.xenproject.org, see
+https://wiki.xenproject.org/wiki/Reporting_Bugs_against_Xen_Project on how to send bug reports.

@@ -43,7 +43,7 @@ six groups of two hexadecimal digits, separated by colons (:).
 
 The default if this keyword is not specified is to be automatically
 generate a MAC address inside the space assigned to Xen's
-L<Organizationally Unique Identifier|http://en.wikipedia.org/wiki/Organizationally_Unique_Identifier> (00:16:3e).
+L<Organizationally Unique Identifier|https://en.wikipedia.org/wiki/Organizationally_Unique_Identifier> (00:16:3e).
 
 If you are choosing a MAC address then it is strongly recommend to
 follow one of the following strategies:
@@ -57,7 +57,7 @@ bit (bit 2 of the first byte) and clear the multicast bit (bit 1
 of the first byte). In other words the first byte should have the
 bit pattern xxxxxx10 (where x is a randomly generated bit) and the
 remaining 5 bytes are randomly generated See
-[http://en.wikipedia.org/wiki/MAC_address] for more details the
+[https://en.wikipedia.org/wiki/MAC_address] for more details the
 structure of a MAC address.
 
 
@@ -87,7 +87,7 @@ bits of randomness than using the Xen OUI.
 
 Specifies the name of the network bridge which this VIF should be
 added to. The default is C<xenbr0>. The bridge must be configured using
-your distribution's network configuration tools. See the L<wiki|http://wiki.xen.org/wiki/HostConfiguration/Networking>
+your distribution's network configuration tools. See the L<wiki|https://wiki.xenproject.org/wiki/Network_Configuration_Examples_(Xen_4.1%2B)>
 for guidance and examples.
 
 
@@ -95,7 +95,7 @@ for guidance and examples.
 
 Specifies the name of the network interface which has an IP and which
 is in the network the VIF should communicate with. This is used in the host
-by the vif-route hotplug script. See L<wiki|http://wiki.xen.org/wiki/Vif-route> for guidance and
+by the vif-route hotplug script. See L<wiki|https://wiki.xenproject.org/wiki/Vif-route> for guidance and
 examples.
 
 NOTE: netdev is a deprecated alias of this option.

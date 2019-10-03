@@ -879,7 +879,7 @@ Clears Xen's message buffer.
 
 Print information about the Xen host in I<name : value> format.  When
 reporting a Xen bug, please provide this information as part of the
-bug report. See I<http://wiki.xen.org/xenwiki/ReportingBugs> on how to
+bug report. See I<https://wiki.xenproject.org/wiki/Reporting_Bugs_against_Xen_Project> on how to
 report Xen bugs.
 
 Sample output looks as follows:
@@ -1721,7 +1721,7 @@ permitted. Some example of what you can do using XSM/FLASK:
    domains.
 
 You can find more details on how to use FLASK and an example security
-policy here: L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
+policy here: L<https://xenbits.xenproject.org/docs/unstable/misc/xsm-flask.txt>
 
 =over 4
 
@@ -1749,7 +1749,7 @@ Intel Haswell and later server platforms offer shared resource monitoring
 and control technologies. The availability of these technologies and the
 hardware capabilities can be shown with B<psr-hwinfo>.
 
-See L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html> for more
+See L<https://xenbits.xenproject.org/docs/unstable/misc/xl-psr.html> for more
 information.
 
 =over 4
@@ -1834,7 +1834,7 @@ and data) are mutually exclusive. There is no CDP support on L2 so far.
 =item B<psr-cat-set> [I<OPTIONS>] I<domain-id> I<cbm>
 
 Set cache capacity bitmasks(CBM) for a domain. For how to specify I<cbm>
-please refer to L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>.
+please refer to L<https://xenbits.xenproject.org/docs/unstable/misc/xl-psr.html>.
 
 B<OPTIONS>
 
@@ -1890,7 +1890,7 @@ throttling value (THRTL) for the domain.
 =item B<psr-mba-set> [I<OPTIONS>] I<domain-id> I<thrtl>
 
 Set throttling value (THRTL) for a domain. For how to specify I<thrtl>
-please refer to L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>.
+please refer to L<https://xenbits.xenproject.org/docs/unstable/misc/xl-psr.html>.
 
 B<OPTIONS>
 
@@ -1928,16 +1928,16 @@ The following man pages:
 L<xl.cfg(5)>, L<xlcpupool.cfg(5)>, L<xentop(1)>, L<xl-disk-configuration(5)>
 L<xl-network-configuration(5)>
 
-And the following documents on the xen.org website:
+And the following documents on the xenproject.org website:
 
-L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
-L<http://xenbits.xen.org/docs/unstable/misc/xl-psr.html>
+L<https://xenbits.xenproject.org/docs/unstable/misc/xsm-flask.txt>
+L<https://xenbits.xenproject.org/docs/unstable/misc/xl-psr.html>
 
 For systems that don't automatically bring the CPU online:
 
-L<http://wiki.xen.org/wiki/Paravirt_Linux_CPU_Hotplug>
+L<https://wiki.xenproject.org/wiki/Paravirt_Linux_CPU_Hotplug>
 
 =head1 BUGS
 
-Send bugs to xen-devel@lists.xen.org, see
-http://wiki.xen.org/xenwiki/ReportingBugs on how to send bug reports.
+Send bugs to xen-devel@lists.xenproject.org, see
+https://wiki.xenproject.org/wiki/Reporting_Bugs_against_Xen_Project on how to send bug reports.

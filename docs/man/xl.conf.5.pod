@@ -133,7 +133,7 @@ Default: C</etc/xen/scripts/colo-proxy-setup>
 
 Configures the default output format used by xl when printing "machine
 readable" information. The default is to use the C<JSON>
-L<http://www.json.org/> syntax. However for compatibility with the
+L<https://www.json.org/> syntax. However for compatibility with the
 previous C<xm> toolstack this can be configured to use the old C<SXP>
 (S-Expression-like) syntax instead.
 
@@ -212,6 +212,6 @@ check that the required affinity has taken effect.
 
 =item L<xl.cfg(5)>
 
-=item http://www.json.org/
+=item https://www.json.org/
 
 =back
