@@ -322,7 +322,7 @@ static bool freemem(uint32_t domid, libxl_domain_config *d_config)
     if (!autoballoon)
         return true;
 
-    rc = libxl_domain_need_memory(ctx, &d_config->b_info, &need_memkb);
+    rc = libxl_domain_need_memory(ctx, d_config, domid, &need_memkb);
     if (rc < 0)
         return false;
 

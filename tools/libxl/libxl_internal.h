@@ -1450,6 +1450,10 @@ _hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
 _hidden void libxl__rdm_setdefault(libxl__gc *gc,
                                    libxl_domain_build_info *b_info);
 
+_hidden int libxl__domain_need_memory_calculate(libxl__gc *gc,
+                                      libxl_domain_build_info *b_info,
+                                      uint64_t *need_memkb);
+
 _hidden const char *libxl__device_nic_devname(libxl__gc *gc,
                                               uint32_t domid,
                                               uint32_t devid,

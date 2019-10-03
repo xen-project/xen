@@ -1245,6 +1245,20 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, const libxl_mac *src);
  */
 #define LIBXL_HAVE_FN_USING_QMP_ASYNC 1
 
+/*
+ * LIBXL_HAVE_DOMAIN_NEED_MEMORY_CONFIG
+ *
+ * If this is set, libxl_domain_need_memory takes a
+ * libxl_domain_config* (non-const) and uint32_t domid_for_logging
+ * (instead of a const libxl_domain_build_info*).
+ *
+ * If this is set, there is no need to call
+ * libxl_get_required_shadow_memory and instead the caller should
+ * simply leave shadow_memkb set to LIBXL_MEMKB_DEFAULT and allow
+ * libxl to fill in a suitable default in the usual way.
+ */
+#define LIBXL_HAVE_DOMAIN_NEED_MEMORY_CONFIG
+
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
 int libxl_string_list_length(const libxl_string_list *sl);
@@ -1723,8 +1737,13 @@ int libxl_get_memory_target_0x040700(libxl_ctx *ctx, uint32_t domid,
  */
 /* how much free memory in the system a domain needs to be built */
 int libxl_domain_need_memory(libxl_ctx *ctx,
-                             const libxl_domain_build_info *b_info_in,
+                             libxl_domain_config *config
+                             /* ^ will be partially defaulted */,
+                             uint32_t domid_for_logging /* INVALID_DOMID ok */,
                              uint64_t *need_memkb);
+int libxl_domain_need_memory_0x041200(libxl_ctx *ctx,
+                                      const libxl_domain_build_info *b_info_in,
+                                      uint64_t *need_memkb);
 int libxl_domain_need_memory_0x040700(libxl_ctx *ctx,
                                       const libxl_domain_build_info *b_info_in,
                                       uint32_t *need_memkb)
@@ -1754,6 +1773,8 @@ int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
 #define libxl_get_memory_target libxl_get_memory_target_0x040700
 #define libxl_domain_need_memory libxl_domain_need_memory_0x040700
 #define libxl_get_free_memory libxl_get_free_memory_0x040700
+#elif defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+#define libxl_domain_need_memory libxl_domain_need_memory_0x041200
 #endif
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);

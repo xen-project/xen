@@ -140,8 +140,9 @@ static int numa_cmpf(const libxl__numa_candidate *c1,
 
 /* The actual automatic NUMA placement routine */
 static int numa_place_domain(libxl__gc *gc, uint32_t domid,
-                             libxl_domain_build_info *info)
+                             libxl_domain_config *d_config)
 {
+    libxl_domain_build_info *info = &d_config->b_info;
     int found;
     libxl__numa_candidate candidate;
     libxl_bitmap cpumap, cpupool_nodemap, *map;
@@ -195,7 +196,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
         }
     }
 
-    rc = libxl_domain_need_memory(CTX, info, &memkb);
+    rc = libxl__domain_need_memory_calculate(gc, info, &memkb);
     if (rc)
         goto out;
     if (libxl_node_bitmap_alloc(CTX, &cpupool_nodemap, 0)) {
@@ -432,7 +433,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
             if (rc)
                 return rc;
 
-            rc = numa_place_domain(gc, domid, info);
+            rc = numa_place_domain(gc, domid, d_config);
             if (rc) {
                 libxl_bitmap_dispose(&cpumap_soft);
                 return rc;
