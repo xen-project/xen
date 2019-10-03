@@ -314,7 +314,7 @@ static int domain_wait_event(uint32_t domid, libxl_event **event_r)
  * Returns true in case there is already, or we manage to free it, enough
  * memory, but also if autoballoon is false.
  */
-static bool freemem(uint32_t domid, libxl_domain_build_info *b_info)
+static bool freemem(uint32_t domid, libxl_domain_config *d_config)
 {
     int rc, retries = 3;
     uint64_t need_memkb, free_memkb;
@@ -322,7 +322,7 @@ static bool freemem(uint32_t domid, libxl_domain_build_info *b_info)
     if (!autoballoon)
         return true;
 
-    rc = libxl_domain_need_memory(ctx, b_info, &need_memkb);
+    rc = libxl_domain_need_memory(ctx, &d_config->b_info, &need_memkb);
     if (rc < 0)
         return false;
 
@@ -879,7 +879,7 @@ start:
         goto error_out;
 
     if (domid_soft_reset == INVALID_DOMID) {
-        if (!freemem(domid, &d_config.b_info)) {
+        if (!freemem(domid, &d_config)) {
             fprintf(stderr, "failed to free memory for the domain\n");
             ret = ERROR_FAIL;
             goto error_out;
