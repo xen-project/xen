@@ -2408,7 +2408,6 @@ void __init create_domUs(void)
         struct domain *d;
         struct xen_domctl_createdomain d_cfg = {
             .arch.gic_version = XEN_DOMCTL_CONFIG_GIC_NATIVE,
-            .arch.nr_spis = 0,
             .flags = XEN_DOMCTL_CDF_hvm | XEN_DOMCTL_CDF_hap,
             .max_evtchn_port = -1,
             .max_grant_frames = 64,
@@ -2418,15 +2417,25 @@ void __init create_domUs(void)
         if ( !dt_device_is_compatible(node, "xen,domain") )
             continue;
 
-        if ( dt_property_read_bool(node, "vpl011") )
-            d_cfg.arch.nr_spis = GUEST_VPL011_SPI - 32 + 1;
-
         if ( !dt_property_read_u32(node, "cpus", &d_cfg.max_vcpus) )
             panic("Missing property 'cpus' for domain %s\n",
                   dt_node_name(node));
 
         if ( dt_find_compatible_node(node, NULL, "multiboot,device-tree") )
             d_cfg.flags |= XEN_DOMCTL_CDF_iommu;
+
+        if ( !dt_property_read_u32(node, "nr_spis", &d_cfg.arch.nr_spis) )
+        {
+            d_cfg.arch.nr_spis = gic_number_lines() - 32;
+
+            /*
+             * vpl011 uses one emulated SPI. If vpl011 is requested, make
+             * sure that we allocate enough SPIs for it.
+             */
+            if ( dt_property_read_bool(node, "vpl011") )
+                d_cfg.arch.nr_spis = MAX(d_cfg.arch.nr_spis,
+                                         GUEST_VPL011_SPI - 32 + 1);
+        }
 
         d = domain_create(++max_init_domid, &d_cfg, false);
         if ( IS_ERR(d) )
