@@ -505,13 +505,13 @@ static bool __init retpoline_safe(uint64_t caps)
         /*
          * Skylake, Kabylake and Cannonlake processors are not retpoline-safe.
          */
-    case 0x4e:
-    case 0x55:
-    case 0x5e:
-    case 0x66:
-    case 0x67:
-    case 0x8e:
-    case 0x9e:
+    case 0x4e: /* Skylake M */
+    case 0x55: /* Skylake X */
+    case 0x5e: /* Skylake D */
+    case 0x66: /* Cannonlake */
+    case 0x67: /* Cannonlake? */
+    case 0x8e: /* Kabylake M */
+    case 0x9e: /* Kabylake D */
         return false;
 
         /*
@@ -842,10 +842,10 @@ static __init void mds_calculations(uint64_t caps)
     case 0x4c: /* Cherrytrail / Brasswell */
     case 0x4d: /* Avaton / Rangely (Silvermont) */
     case 0x5a: /* Moorefield */
-    case 0x5d:
-    case 0x65:
-    case 0x6e:
-    case 0x75:
+    case 0x5d: /* SoFIA 3G Granite/ES2.1 */
+    case 0x65: /* SoFIA LTE AOSP */
+    case 0x6e: /* Cougar Mountain */
+    case 0x75: /* Lightning Mountain */
         /*
          * Knights processors (which are based on the Silvermont/Airmont
          * microarchitecture) are similarly only affected by the Store Buffer
