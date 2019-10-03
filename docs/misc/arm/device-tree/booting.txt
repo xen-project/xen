@@ -146,7 +146,18 @@ with the following properties:
 
 - vpl011
 
-    An empty property to enable/disable a virtual pl011 for the guest to use.
+    An empty property to enable/disable a virtual pl011 for the guest to
+    use. The virtual pl011 uses SPI number 0 (see GUEST_VPL011_SPI).
+    Please note that the SPI used for the virtual pl011 could clash with the
+    physical SPI of a physical device assigned to the guest.
+
+- nr_spis
+
+    Optional. A 32-bit integer specifying the number of SPIs (Shared
+    Peripheral Interrupts) to allocate for the domain. If nr_spis is
+    missing, the max number of SPIs supported by the physical GIC is
+    used, or GUEST_VPL011_SPI+1 if vpl011 is enabled, whichever is
+    greater.
 
 - #address-cells and #size-cells
 
@@ -226,3 +237,34 @@ chosen {
         };
     };
 };
+
+
+Device Assignment
+=================
+
+Device Assignment (Passthrough) is supported by adding another module,
+alongside the kernel and ramdisk, with the device tree fragment
+corresponding to the device node to assign to the guest.
+
+The dtb sub-node should have the following properties:
+
+- compatible
+
+    "multiboot,device-tree" and "multiboot,module"
+
+- reg
+
+    Specifies the physical address of the device tree binary fragment
+    RAM and its length.
+
+As an example:
+
+        module@0xc000000 {
+            compatible = "multiboot,device-tree", "multiboot,module";
+            reg = <0x0 0xc000000 0xffffff>;
+        };
+
+The DTB fragment is loaded at 0xc000000 in the example above. It should
+follow the convention explained in docs/misc/arm/passthrough.txt. The
+DTB fragment will be added to the guest device tree, so that the guest
+kernel will be able to discover the device.

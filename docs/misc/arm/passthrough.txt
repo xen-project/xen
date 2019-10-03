@@ -80,6 +80,113 @@ SPI numbers start from 32, in this example 80 + 32 = 112.
 See man [xl.cfg] for the iomem format. The reg property is just a pair
 of address, then size numbers, each of them can occupy 1 or 2 cells.
 
+
+Dom0-less Device Passthrough
+============================
+
+The partial device tree for dom0-less guests should have the following
+properties for each node corresponding to a physical device to assign to
+the guest:
+
+- xen,reg
+
+  The xen,reg property is an array of:
+
+    <phys_addr size guest_addr>
+
+  They specify the physical address and size of the device memory
+  ranges together with the corresponding guest address to map them to.
+  The size of `phys_addr' and `guest_addr' is determined by
+  #address-cells, the size of `size' is determined by #size-cells, of
+  the partial device tree.
+  The memory will be mapped as device memory in the guest (Device-nGnRE).
+
+- xen,path
+
+  A string property representing the path in the host device tree to the
+  corresponding device node.
+
+- xen,force-assign-without-iommu
+
+  If xen,force-assign-without-iommu is present, Xen allows to assign a
+  device even if it is not behind an IOMMU. This renders your platform
+  *unsafe* if the device is DMA-capable.
+
+In addition, a special /gic node is expected as a placeholder for the
+full GIC node that will be added by Xen for the guest. /gic can be
+referenced by other properties in the device tree fragment. For
+instance, it can be referenced by interrupt-parent under a device node.
+Xen will take care of replacing the "gic" placeholder node for a
+complete GIC node while retaining all the references correctly. The new
+GIC node created by Xen is a regular interrupt-controller@<unit> node.
+
+    gic: gic {
+        #interrupt-cells = <0x3>;
+        interrupt-controller;
+    };
+
+Note that the #interrupt-cells and interrupt-controller properties are
+not actually required, however, DTC expects them to be present if gic is
+referenced by interrupt-parent or similar.
+
+
+Example
+=======
+
+The following is a real-world example of a device tree fragment to
+assign a network card to a dom0-less guest on Xilinx Ultrascale+ MPSoC:
+
+/dts-v1/;
+
+/ {
+    #address-cells = <2>;
+    #size-cells = <1>;
+
+    gic: gic {
+        #interrupt-cells = <3>;
+        interrupt-controller;
+    };
+
+    passthrough {
+        compatible = "simple-bus";
+        ranges;
+        #address-cells = <2>;
+        #size-cells = <1>;
+
+        misc_clk: misc_clk {
+            #clock-cells = <0>;
+            clock-frequency = <0x7735940>;
+            compatible = "fixed-clock";
+        };
+
+        ethernet@ff0e0000 {
+            compatible = "cdns,zynqmp-gem";
+            status = "okay";
+            reg = <0x0 0xff0e0000 0x1000>;
+            clock-names = "pclk", "hclk", "tx_clk", "rx_clk";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            clocks = <&misc_clk &misc_clk &misc_clk &misc_clk>;
+            phy-mode = "rgmii-id";
+            xlnx,ptp-enet-clock = <0>;
+            local-mac-address = [00 0a 35 00 22 01];
+            interrupt-parent = <&gic>;
+            interrupts = <0 63 0x4 0 63 0x4>;
+            xen,path = "/amba/ethernet@ff0e0000";
+            xen,reg = <0x0 0xff0e0000 0x1000 0x0 0xff0e0000>;
+
+            phy@c {
+                reg = <0xc>;
+                ti,rx-internal-delay = <0x8>;
+                ti,tx-internal-delay = <0xa>;
+                ti,fifo-depth = <0x1>;
+                ti,rxctrl-strap-worka;
+            };
+        };
+    };
+};
+
+
 [arm,gic.txt]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
 [arm,gic-v3.txt]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
 [xl.cfg]: https://xenbits.xen.org/docs/unstable/man/xl.cfg.5.html
