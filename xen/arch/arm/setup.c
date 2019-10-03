@@ -369,6 +369,7 @@ const char * __init boot_module_kind_as_string(bootmodule_kind kind)
     case BOOTMOD_KERNEL:  return "Kernel";
     case BOOTMOD_RAMDISK: return "Ramdisk";
     case BOOTMOD_XSM:     return "XSM";
+    case BOOTMOD_GUEST_DTB:     return "DTB";
     case BOOTMOD_UNKNOWN: return "Unknown";
     default: BUG();
     }

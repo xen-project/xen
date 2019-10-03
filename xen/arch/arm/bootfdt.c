@@ -242,6 +242,8 @@ static void __init process_multiboot_node(const void *fdt, int node,
         kind = BOOTMOD_RAMDISK;
     else if ( fdt_node_check_compatible(fdt, node, "xen,xsm-policy") == 0 )
         kind = BOOTMOD_XSM;
+    else if ( fdt_node_check_compatible(fdt, node, "multiboot,device-tree") == 0 )
+        kind = BOOTMOD_GUEST_DTB;
     else
         kind = BOOTMOD_UNKNOWN;
 
