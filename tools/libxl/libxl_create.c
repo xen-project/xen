@@ -892,6 +892,21 @@ static bool ok_to_default_memkb_in_create(libxl__gc *gc)
      */
 }
 
+static unsigned long libxl__get_required_iommu_memory(unsigned long maxmem_kb)
+{
+    unsigned long iommu_pages = 0, mem_pages = maxmem_kb / 4;
+    unsigned int level;
+
+    /* Assume a 4 level page table with 512 entries per level */
+    for (level = 0; level < 4; level++)
+    {
+        mem_pages = DIV_ROUNDUP(mem_pages, 512);
+        iommu_pages += mem_pages;
+    }
+
+    return iommu_pages * 4;
+}
+
 int libxl__domain_config_setdefault(libxl__gc *gc,
                                     libxl_domain_config *d_config,
                                     uint32_t domid)
@@ -1015,7 +1030,7 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         && ok_to_default_memkb_in_create(gc))
         d_config->b_info.iommu_memkb =
             (d_config->c_info.passthrough == LIBXL_PASSTHROUGH_SYNC_PT)
-            ? libxl_get_required_iommu_memory(d_config->b_info.max_memkb)
+            ? libxl__get_required_iommu_memory(d_config->b_info.max_memkb)
             : 0;
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
