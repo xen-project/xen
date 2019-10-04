@@ -4051,8 +4051,12 @@ x86_emulate(
             /* movsxd */
             if ( ea.type == OP_REG )
                 src.val = *ea.reg;
-            else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off,
-                                       &src.val, 4, ctxt, ops)) )
+            else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off, &src.val,
+                                       (op_bytes == 2 &&
+                                        !(ctxt->cpuid->x86_vendor &
+                                          (X86_VENDOR_AMD | X86_VENDOR_HYGON))
+                                        ? 2 : 4),
+                                       ctxt, ops)) )
                 goto done;
             dst.val = (int32_t)src.val;
         }
