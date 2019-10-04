@@ -637,6 +637,9 @@ struct libxl__ctx {
     LIBXL_LIST_ENTRY(libxl_ctx) sigchld_users_entry;
 
     libxl_version_info version_info;
+
+    bool libxl_domain_need_memory_0x041200_called,
+         libxl_domain_need_memory_called;
 };
 
 /*

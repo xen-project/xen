@@ -1572,19 +1572,8 @@ void parse_config_data(const char *config_source,
         exit(-ERROR_FAIL);
     }
 
-    /* libxl_get_required_shadow_memory() and
-     * libxl_get_required_iommu_memory() must be called after final values
-     * (default or specified) for vcpus and memory are set, because the
-     * calculations depend on those values. */
-    b_info->shadow_memkb = !xlu_cfg_get_long(config, "shadow_memory", &l, 0)
-        ? l * 1024
-        : libxl_get_required_shadow_memory(b_info->max_memkb,
-                                           b_info->max_vcpus);
-
-    /* No IOMMU reservation is needed if passthrough mode is not 'sync_pt' */
-    b_info->iommu_memkb = (c_info->passthrough == LIBXL_PASSTHROUGH_SYNC_PT)
-        ? libxl_get_required_iommu_memory(b_info->max_memkb)
-        : 0;
+    if (!xlu_cfg_get_long(config, "shadow_memory", &l, 0))
+        b_info->shadow_memkb = l * 1024;
 
     xlu_cfg_get_defbool(config, "nomigrate", &b_info->disable_migrate, 0);
 

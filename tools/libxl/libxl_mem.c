@@ -484,6 +484,8 @@ int libxl_domain_need_memory(libxl_ctx *ctx,
     GC_INIT(ctx);
     int rc;
 
+    ctx->libxl_domain_need_memory_called = 1;
+
     rc = libxl__domain_config_setdefault(gc,
                                          d_config,
                                          domid_for_logging);
@@ -506,6 +508,8 @@ int libxl_domain_need_memory_0x041200(libxl_ctx *ctx,
 {
     GC_INIT(ctx);
     int rc;
+
+    ctx->libxl_domain_need_memory_0x041200_called = 1;
 
     libxl_domain_build_info b_info[1];
     libxl_domain_build_info_init(b_info);

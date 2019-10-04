@@ -247,9 +247,14 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     libxl__arch_domain_build_info_setdefault(gc, b_info);
     libxl_defbool_setdefault(&b_info->dm_restrict, false);
 
+    if (b_info->iommu_memkb == LIBXL_MEMKB_DEFAULT)
+        /* Normally defaulted in libxl__domain_create_info_setdefault */
+        b_info->iommu_memkb = 0;
+
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
+            /* Normally defaulted in libxl__domain_create_info_setdefault */
             b_info->shadow_memkb = 0;
         if (b_info->u.hvm.mmio_hole_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->u.hvm.mmio_hole_memkb = 0;
@@ -395,6 +400,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->video_memkb = 0;
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
+            /* Normally defaulted in libxl__domain_create_info_setdefault */
             b_info->shadow_memkb = 0;
         if (b_info->u.pv.slack_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->u.pv.slack_memkb = 0;
@@ -862,6 +868,30 @@ static void domcreate_destruction_cb(libxl__egc *egc,
                                      libxl__domain_destroy_state *dds,
                                      int rc);
 
+static bool ok_to_default_memkb_in_create(libxl__gc *gc)
+{
+    /*
+     * This is a fudge.  We are trying to find whether the caller
+     * calls the old version of libxl_domain_need_memory.  If they do
+     * then, because it only gets the b_info, and because it can't
+     * update the b_info (because it's const), it will base its
+     * calculations on defaulting shadow_memkb and iommu_memkb to 0
+     * In that case we probably shouldn't default them differently
+     * during libxl_domain_create.
+     *
+     * The result is that the behaviour with old callers is the same
+     * as in 4.13: no additional memory is allocated for shadow and
+     * iommu (unless the caller set shadow_memkb, eg from a call to
+     * libxl_get_required_shadow_memory).
+     */
+    return !CTX->libxl_domain_need_memory_0x041200_called ||
+            CTX->libxl_domain_need_memory_called;
+    /*
+     * Treat mixed callers as new callers.  Presumably they know what
+     * they are doing.
+     */
+}
+
 int libxl__domain_config_setdefault(libxl__gc *gc,
                                     libxl_domain_config *d_config,
                                     uint32_t domid)
@@ -973,6 +1003,20 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         LOGD(ERROR, domid, "Unable to set domain create info defaults");
         goto error_out;
     }
+
+    if (d_config->b_info.shadow_memkb == LIBXL_MEMKB_DEFAULT
+        && ok_to_default_memkb_in_create(gc))
+        d_config->b_info.shadow_memkb =
+            libxl_get_required_shadow_memory(d_config->b_info.max_memkb,
+                                             d_config->b_info.max_vcpus);
+
+    /* No IOMMU reservation is needed if passthrough mode is not 'sync_pt' */
+    if (d_config->b_info.iommu_memkb == LIBXL_MEMKB_DEFAULT
+        && ok_to_default_memkb_in_create(gc))
+        d_config->b_info.iommu_memkb =
+            (d_config->c_info.passthrough == LIBXL_PASSTHROUGH_SYNC_PT)
+            ? libxl_get_required_iommu_memory(d_config->b_info.max_memkb)
+            : 0;
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) {
