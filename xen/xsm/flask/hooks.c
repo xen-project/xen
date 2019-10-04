@@ -1296,10 +1296,12 @@ static int flask_assign_device(struct domain *d, uint32_t machine_bdf)
     u32 dsid, rsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
-    u32 dperm = flask_iommu_resource_use_perm(d);
+    u32 dperm;
 
     if ( !d )
         return flask_test_assign_device(machine_bdf);
+
+    dperm = flask_iommu_resource_use_perm(d);
 
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
@@ -1355,10 +1357,12 @@ static int flask_assign_dtdevice(struct domain *d, const char *dtpath)
     u32 dsid, rsid;
     int rc = -EPERM;
     struct avc_audit_data ad;
-    u32 dperm = flask_iommu_resource_use_perm(d);
+    u32 dperm;
 
     if ( !d )
         return flask_test_assign_dtdevice(dtpath);
+
+    dperm = flask_iommu_resource_use_perm(d);
 
     rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
     if ( rc )
