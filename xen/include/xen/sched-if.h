@@ -353,9 +353,6 @@ struct scheduler {
                                     struct xen_sysctl_scheduler_op *);
     void         (*dump_settings)  (const struct scheduler *);
     void         (*dump_cpu_state) (const struct scheduler *, int);
-
-    void         (*tick_suspend)    (const struct scheduler *, unsigned int);
-    void         (*tick_resume)     (const struct scheduler *, unsigned int);
 };
 
 static inline int sched_init(struct scheduler *s)
@@ -385,18 +382,6 @@ static inline void sched_dump_cpu_state(const struct scheduler *s, int cpu)
 {
     if ( s->dump_cpu_state )
         s->dump_cpu_state(s, cpu);
-}
-
-static inline void sched_do_tick_suspend(const struct scheduler *s, int cpu)
-{
-    if ( s->tick_suspend )
-        s->tick_suspend(s, cpu);
-}
-
-static inline void sched_do_tick_resume(const struct scheduler *s, int cpu)
-{
-    if ( s->tick_resume )
-        s->tick_resume(s, cpu);
 }
 
 static inline void *sched_alloc_domdata(const struct scheduler *s,

@@ -1831,6 +1831,7 @@ static void csched_schedule(
 {
     const unsigned int cur_cpu = smp_processor_id();
     const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
+    struct csched_pcpu *spc = CSCHED_PCPU(cur_cpu);
     struct list_head * const runq = RUNQ(sched_cpu);
     struct csched_unit * const scurr = CSCHED_UNIT(unit);
     struct csched_private *prv = CSCHED_PRIV(ops);
@@ -1999,6 +2000,13 @@ out:
                 -1 : tslice);
     unit->next_task = snext->unit;
     snext->unit->migrated = migrated;
+
+    /* Stop credit tick when going to idle, restart it when coming from idle. */
+    if ( !is_idle_unit(unit) && is_idle_unit(unit->next_task) )
+        stop_timer(&spc->ticker);
+    if ( is_idle_unit(unit) && !is_idle_unit(unit->next_task) )
+        set_timer(&spc->ticker, now + MICROSECS(prv->tick_period_us)
+                                - now % MICROSECS(prv->tick_period_us) );
 
     CSCHED_UNIT_CHECK(unit->next_task);
 }
@@ -2237,29 +2245,6 @@ csched_deinit(struct scheduler *ops)
     }
 }
 
-static void csched_tick_suspend(const struct scheduler *ops, unsigned int cpu)
-{
-    struct csched_pcpu *spc;
-
-    spc = CSCHED_PCPU(cpu);
-
-    stop_timer(&spc->ticker);
-}
-
-static void csched_tick_resume(const struct scheduler *ops, unsigned int cpu)
-{
-    struct csched_private *prv;
-    struct csched_pcpu *spc;
-    uint64_t now = NOW();
-
-    spc = CSCHED_PCPU(cpu);
-
-    prv = CSCHED_PRIV(ops);
-
-    set_timer(&spc->ticker, now + MICROSECS(prv->tick_period_us)
-            - now % MICROSECS(prv->tick_period_us) );
-}
-
 static const struct scheduler sched_credit_def = {
     .name           = "SMP Credit Scheduler",
     .opt_name       = "credit",
@@ -2295,9 +2280,6 @@ static const struct scheduler sched_credit_def = {
     .switch_sched   = csched_switch_sched,
     .alloc_domdata  = csched_alloc_domdata,
     .free_domdata   = csched_free_domdata,
-
-    .tick_suspend   = csched_tick_suspend,
-    .tick_resume    = csched_tick_resume,
 };
 
 REGISTER_SCHEDULER(sched_credit_def);

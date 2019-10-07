@@ -724,9 +724,6 @@ static const struct scheduler sched_arinc653_def = {
 
     .dump_settings  = NULL,
     .dump_cpu_state = NULL,
-
-    .tick_suspend   = NULL,
-    .tick_resume    = NULL,
 };
 
 REGISTER_SCHEDULER(sched_arinc653_def);

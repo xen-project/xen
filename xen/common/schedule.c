@@ -2871,8 +2871,6 @@ int schedule_cpu_add(unsigned int cpu, struct cpupool *c)
     /* _Not_ pcpu_schedule_unlock(): schedule_lock has changed! */
     spin_unlock_irqrestore(old_lock, flags);
 
-    sched_do_tick_resume(new_ops, cpu);
-
     sr->granularity = cpupool_get_granularity(c);
     sr->cpupool = c;
     /* The  cpu is added to a pool, trigger it to go pick up some work */
@@ -2942,8 +2940,6 @@ int schedule_cpu_rm(unsigned int cpu)
     ASSERT(sr->cpupool != NULL);
     ASSERT(cpumask_test_cpu(cpu, &cpupool_free_cpus));
     ASSERT(!cpumask_test_cpu(cpu, sr->cpupool->cpu_valid));
-
-    sched_do_tick_suspend(old_ops, cpu);
 
     /* See comment in schedule_cpu_add() regarding lock switching. */
     old_lock = pcpu_schedule_lock_irqsave(cpu, &flags);
@@ -3082,32 +3078,14 @@ void schedule_dump(struct cpupool *c)
 
 void sched_tick_suspend(void)
 {
-    struct scheduler *sched;
-    unsigned int cpu = smp_processor_id();
-
-    rcu_read_lock(&sched_res_rculock);
-
-    sched = get_sched_res(cpu)->scheduler;
-    sched_do_tick_suspend(sched, cpu);
-    rcu_idle_enter(cpu);
+    rcu_idle_enter(smp_processor_id());
     rcu_idle_timer_start();
-
-    rcu_read_unlock(&sched_res_rculock);
 }
 
 void sched_tick_resume(void)
 {
-    struct scheduler *sched;
-    unsigned int cpu = smp_processor_id();
-
-    rcu_read_lock(&sched_res_rculock);
-
     rcu_idle_timer_stop();
-    rcu_idle_exit(cpu);
-    sched = get_sched_res(cpu)->scheduler;
-    sched_do_tick_resume(sched, cpu);
-
-    rcu_read_unlock(&sched_res_rculock);
+    rcu_idle_exit(smp_processor_id());
 }
 
 void wait(void)
