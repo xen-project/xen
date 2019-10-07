@@ -264,10 +264,11 @@ libxl_vkb_backend = Enumeration("vkb_backend", [
     ])
 
 libxl_passthrough = Enumeration("passthrough", [
-    (0, "unknown"),
+    (0, "default"),
     (1, "disabled"),
-    (2, "sync_pt"),
-    (3, "share_pt"),
+    (2, "enabled"), # becomes {sync,share}_pt once defaults are evaluated
+    (3, "sync_pt"),
+    (4, "share_pt"),
     ])
 
 #

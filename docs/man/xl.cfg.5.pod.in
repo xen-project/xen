@@ -660,6 +660,12 @@ in preference. However, the availability of this option is hardware
 specific. If B<xl info> reports B<virt_caps> containing
 B<iommu_hap_pt_share> then this option may be used.
 
+=item B<default>
+
+The default, which chooses between B<disabled> and B<enabled>
+according to whether passthrough devices are enabled in the config
+file.
+
 =back
 
 =back

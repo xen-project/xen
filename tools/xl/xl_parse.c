@@ -1222,7 +1222,6 @@ void parse_config_data(const char *config_source,
     int pci_seize = 0;
     int i, e;
     char *kernel_basename;
-    bool iommu_enabled, iommu_hap_pt_share;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
@@ -1234,8 +1233,6 @@ void parse_config_data(const char *config_source,
         exit(EXIT_FAILURE);
     }
 
-    iommu_enabled = physinfo.cap_hvm_directio;
-    iommu_hap_pt_share = physinfo.cap_iommu_hap_pt_share;
     libxl_physinfo_dispose(&physinfo);
 
     config= xlu_cfg_init(stderr, config_source);
@@ -1509,67 +1506,13 @@ void parse_config_data(const char *config_source,
         }
     }
 
-    if (xlu_cfg_get_string(config, "passthrough", &buf, 0)) {
-        c_info->passthrough =
-            (d_config->num_pcidevs || d_config->num_dtdevs)
-            ? LIBXL_PASSTHROUGH_UNKNOWN : LIBXL_PASSTHROUGH_DISABLED;
-    } else {
-        if (!strcasecmp("enabled", buf))
-            c_info->passthrough = LIBXL_PASSTHROUGH_UNKNOWN;
-        else {
-            libxl_passthrough o;
-
-            e = libxl_passthrough_from_string(buf, &o);
-            if (e || !strcasecmp("unknown", buf)) {
-                fprintf(stderr,
-                        "ERROR: unknown passthrough option '%s'\n",
-                        buf);
-                exit(-ERROR_FAIL);
-            }
-
-            c_info->passthrough = o;
-        }
-    }
-
-    switch (c_info->passthrough) {
-    case LIBXL_PASSTHROUGH_UNKNOWN:
-        /*
-         * Choose a suitable default. libxl would also do this but
-         * choosing here allows the code calculating 'iommu_memkb'
-         * below make an informed decision.
-         */
-        c_info->passthrough =
-            (c_info->type == LIBXL_DOMAIN_TYPE_PV) || !iommu_hap_pt_share
-            ? LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
-        break;
-
-    case LIBXL_PASSTHROUGH_DISABLED:
-        if (d_config->num_pcidevs || d_config->num_dtdevs) {
+    if (!xlu_cfg_get_string(config, "passthrough", &buf, 0)) {
+        if (libxl_passthrough_from_string(buf, &c_info->passthrough)) {
             fprintf(stderr,
-                    "ERROR: passthrough disabled but devices are specified\n");
-            exit(-ERROR_FAIL);
+                    "ERROR: unknown passthrough option '%s'\n",
+                    buf);
+            exit(1);
         }
-        break;
-    case LIBXL_PASSTHROUGH_SHARE_PT:
-        if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
-            fprintf(stderr,
-                    "ERROR: passthrough=\"share_pt\" not valid for PV domain\n");
-            exit(-ERROR_FAIL);
-        } else if (!iommu_hap_pt_share) {
-            fprintf(stderr,
-                    "ERROR: passthrough=\"share_pt\" not supported on this platform\n");
-            exit(-ERROR_FAIL);
-        }
-        break;
-    case LIBXL_PASSTHROUGH_SYNC_PT:
-        break;
-    }
-
-    if ((c_info->passthrough != LIBXL_PASSTHROUGH_DISABLED) &&
-        !iommu_enabled) {
-        fprintf(stderr,
-                "ERROR: passthrough not supported on this platform\n");
-        exit(-ERROR_FAIL);
     }
 
     if (!xlu_cfg_get_long(config, "shadow_memory", &l, 0))

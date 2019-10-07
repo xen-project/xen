@@ -57,18 +57,6 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     if (!c_info->ssidref)
         c_info->ssidref = SECINITSID_DOMU;
 
-    if (info->cap_hvm_directio &&
-        (c_info->passthrough == LIBXL_PASSTHROUGH_UNKNOWN)) {
-        c_info->passthrough = ((c_info->type == LIBXL_DOMAIN_TYPE_PV) ||
-                               !info->cap_iommu_hap_pt_share) ?
-            LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
-    } else if (!info->cap_hvm_directio) {
-        c_info->passthrough = LIBXL_PASSTHROUGH_DISABLED;
-    }
-
-    /* An explicit setting should now have been chosen */
-    assert(c_info->passthrough != LIBXL_PASSTHROUGH_UNKNOWN);
-
     return 0;
 }
 
@@ -591,7 +579,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_config *d_config,
                 libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
         }
 
-        assert(info->passthrough != LIBXL_PASSTHROUGH_UNKNOWN);
+        assert(info->passthrough != LIBXL_PASSTHROUGH_DEFAULT);
         LOG(DETAIL, "passthrough: %s",
             libxl_passthrough_to_string(info->passthrough));
 
@@ -908,6 +896,7 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret;
     bool pod_enabled = false;
+    libxl_domain_create_info *c_info = &d_config->c_info;
 
     libxl_physinfo physinfo;
     ret = libxl_get_physinfo(CTX, &physinfo);
@@ -978,6 +967,34 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         LOGD(ERROR, domid, "Unable to set domain create info defaults");
         goto error_out;
     }
+
+    bool need_pt = d_config->num_pcidevs || d_config->num_dtdevs;
+    if (c_info->passthrough == LIBXL_PASSTHROUGH_DEFAULT) {
+        c_info->passthrough = need_pt
+            ? LIBXL_PASSTHROUGH_ENABLED : LIBXL_PASSTHROUGH_DISABLED;
+    }
+
+    bool iommu_enabled = physinfo.cap_hvm_directio;
+    if (c_info->passthrough != LIBXL_PASSTHROUGH_DISABLED && !iommu_enabled) {
+        LOGD(ERROR, domid,
+             "passthrough not supported on this platform\n");
+        ret = ERROR_INVAL;
+        goto error_out;
+    }
+
+    if (c_info->passthrough == LIBXL_PASSTHROUGH_DISABLED && need_pt) {
+        LOGD(ERROR, domid,
+             "passthrough disabled but devices are specified");
+        ret = ERROR_INVAL;
+        goto error_out;
+    }
+
+    ret = libxl__arch_passthrough_mode_setdefault(gc,domid,d_config,&physinfo);
+    if (ret) goto error_out;
+
+    /* An explicit setting should now have been chosen */
+    assert(c_info->passthrough != LIBXL_PASSTHROUGH_DEFAULT);
+    assert(c_info->passthrough != LIBXL_PASSTHROUGH_ENABLED);
 
     /* If target_memkb is smaller than max_memkb, the subsequent call
      * to libxc when building HVM domain will enable PoD mode.

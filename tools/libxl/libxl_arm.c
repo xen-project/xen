@@ -1191,6 +1191,30 @@ void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
     libxl_domain_build_info_init_type(b_info, LIBXL_DOMAIN_TYPE_PVH);
 }
 
+int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
+                                            uint32_t domid,
+                                            libxl_domain_config *d_config,
+                                            const libxl_physinfo *physinfo)
+{
+    int rc;
+    libxl_domain_create_info *const c_info = &d_config->c_info;
+
+    if (c_info->passthrough == LIBXL_PASSTHROUGH_ENABLED) {
+        c_info->passthrough = LIBXL_PASSTHROUGH_SHARE_PT;
+    }
+
+    if (c_info->passthrough == LIBXL_PASSTHROUGH_SYNC_PT) {
+        LOGD(ERROR, domid,
+             "passthrough=\"sync_pt\" not supported on ARM\n");
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    rc = 0;
+ out:
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C

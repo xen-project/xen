@@ -73,6 +73,12 @@ void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
                                               libxl_domain_build_info *b_info);
 
 _hidden
+int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
+                                            uint32_t domid,
+                                            libxl_domain_config *d_config,
+                                            const libxl_physinfo *physinfo);
+
+_hidden
 int libxl__arch_extra_memory(libxl__gc *gc,
                              const libxl_domain_build_info *info,
                              uint64_t *out);

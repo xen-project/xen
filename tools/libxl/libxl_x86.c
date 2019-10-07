@@ -631,6 +631,47 @@ void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
     libxl_defbool_setdefault(&b_info->acpi, true);
 }
 
+int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
+                                            uint32_t domid,
+                                            libxl_domain_config *d_config,
+                                            const libxl_physinfo *physinfo)
+{
+    int rc;
+    libxl_domain_create_info *const c_info = &d_config->c_info;
+
+    if (c_info->passthrough != LIBXL_PASSTHROUGH_DISABLED &&
+        c_info->type == LIBXL_DOMAIN_TYPE_PVH) {
+        LOGD(ERROR, domid,
+             "passthrough not yet supported for x86 PVH guests\n");
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    const char *whynot_pt_share =
+        c_info->type == LIBXL_DOMAIN_TYPE_PV ? "not valid for PV domain" :
+        !physinfo->cap_iommu_hap_pt_share ? "not supported on this platform" :
+        !libxl_defbool_val(d_config->c_info.hap) ?"only valid for HAP guests":
+        NULL;
+
+    if (c_info->passthrough == LIBXL_PASSTHROUGH_ENABLED) {
+        c_info->passthrough = whynot_pt_share
+            ? LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
+    }
+
+    if (c_info->passthrough == LIBXL_PASSTHROUGH_SHARE_PT && whynot_pt_share) {
+        LOGD(ERROR, domid,
+             "passthrough=\"share_pt\" %s\n",
+             whynot_pt_share);
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    rc = 0;
+ out:
+    return rc;
+}
+
+
 /*
  * Local variables:
  * mode: C
