@@ -2167,7 +2167,12 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     dm_config->c_info.run_hotplug_scripts =
         guest_config->c_info.run_hotplug_scripts;
 
-    ret = libxl__domain_create_info_setdefault(gc, &dm_config->c_info);
+    libxl_physinfo physinfo;
+    ret = libxl_get_physinfo(CTX, &physinfo);
+    if (ret) goto out;
+
+    ret = libxl__domain_create_info_setdefault(gc, &dm_config->c_info,
+                                               &physinfo);
     if (ret) goto out;
     ret = libxl__domain_build_info_setdefault(gc, &dm_config->b_info);
     if (ret) goto out;

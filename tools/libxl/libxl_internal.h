@@ -1447,7 +1447,8 @@ _hidden int libxl__domain_config_setdefault(libxl__gc *gc,
                                             libxl_domain_config *d_config,
                                             uint32_t domid /* logging only */);
 _hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
-                                        libxl_domain_create_info *c_info);
+                                        libxl_domain_create_info *c_info,
+                                        const libxl_physinfo *info);
 _hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info);
 _hidden void libxl__rdm_setdefault(libxl__gc *gc,

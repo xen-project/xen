@@ -28,15 +28,9 @@
 #include <xen-xsm/flask/flask.h>
 
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
-                                         libxl_domain_create_info *c_info)
+                                         libxl_domain_create_info *c_info,
+                                         const libxl_physinfo *info)
 {
-    libxl_physinfo info[1];
-    int rc;
-
-    rc = libxl_get_physinfo(CTX, info);
-    if (rc)
-        return rc;
-
     if (!c_info->type) {
         LOG(ERROR, "domain type unspecified");
         return ERROR_INVAL;
@@ -915,6 +909,10 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
     int ret;
     bool pod_enabled = false;
 
+    libxl_physinfo physinfo;
+    ret = libxl_get_physinfo(CTX, &physinfo);
+    if (ret) goto error_out;
+
     if (d_config->c_info.ssid_label) {
         char *s = d_config->c_info.ssid_label;
         ret = libxl_flask_context_to_sid(ctx, s, strlen(s),
@@ -1013,7 +1011,8 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         goto error_out;
     }
 
-    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
+    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info,
+                                               &physinfo);
     if (ret) {
         LOGD(ERROR, domid, "Unable to set domain create info defaults");
         goto error_out;
