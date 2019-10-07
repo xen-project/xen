@@ -486,7 +486,7 @@ register_t get_default_hcr_flags(void);
  */
 #define SYNCHRONIZE_SERROR(feat)                                  \
     do {                                                          \
-        ASSERT(!cpus_have_cap(feat) || local_abort_is_enabled()); \
+        ASSERT(local_abort_is_enabled());                         \
         asm volatile(ALTERNATIVE("dsb sy; isb",                   \
                                  "nop; nop", feat)                \
                                  : : : "memory");                 \
