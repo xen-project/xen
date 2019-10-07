@@ -30,10 +30,10 @@
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info)
 {
-    libxl_physinfo info;
+    libxl_physinfo info[1];
     int rc;
 
-    rc = libxl_get_physinfo(CTX, &info);
+    rc = libxl_get_physinfo(CTX, info);
     if (rc)
         return rc;
 
@@ -45,11 +45,11 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     libxl__arch_domain_create_info_setdefault(gc, c_info);
 
     if (c_info->type != LIBXL_DOMAIN_TYPE_PV) {
-        if (info.cap_hap)
+        if (info->cap_hap) {
             libxl_defbool_setdefault(&c_info->hap, true);
-        else if (info.cap_shadow)
+        } else if (info->cap_shadow) {
             libxl_defbool_setdefault(&c_info->hap, false);
-        else {
+        } else {
             LOG(ERROR, "neither hap nor shadow paging available");
             return ERROR_INVAL;
         }
@@ -63,12 +63,12 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     if (!c_info->ssidref)
         c_info->ssidref = SECINITSID_DOMU;
 
-    if (info.cap_hvm_directio &&
+    if (info->cap_hvm_directio &&
         (c_info->passthrough == LIBXL_PASSTHROUGH_UNKNOWN)) {
         c_info->passthrough = ((c_info->type == LIBXL_DOMAIN_TYPE_PV) ||
-                               !info.cap_iommu_hap_pt_share) ?
+                               !info->cap_iommu_hap_pt_share) ?
             LIBXL_PASSTHROUGH_SYNC_PT : LIBXL_PASSTHROUGH_SHARE_PT;
-    } else if (!info.cap_hvm_directio) {
+    } else if (!info->cap_hvm_directio) {
         c_info->passthrough = LIBXL_PASSTHROUGH_DISABLED;
     }
 
