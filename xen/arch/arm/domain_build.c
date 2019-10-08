@@ -646,6 +646,8 @@ static int __init make_memory_node(const struct domain *d,
     int res, i;
     int reg_size = addrcells + sizecells;
     int nr_cells = reg_size * mem->nr_banks;
+    /* Placeholder for memory@ + a 64-bit number + \0 */
+    char buf[24];
     __be32 reg[NR_MEM_BANKS * 4 /* Worst case addrcells + sizecells */];
     __be32 *cells;
 
@@ -657,7 +659,8 @@ static int __init make_memory_node(const struct domain *d,
                reg_size, nr_cells);
 
     /* ePAPR 3.4 */
-    res = fdt_begin_node(fdt, "memory");
+    snprintf(buf, sizeof(buf), "memory@%"PRIx64, mem->bank[0].start);
+    res = fdt_begin_node(fdt, buf);
     if ( res )
         return res;
 
