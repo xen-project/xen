@@ -650,6 +650,8 @@ static int __init make_memory_node(const struct domain *d,
     __be32 *cells;
 
     BUG_ON(nr_cells >= ARRAY_SIZE(reg));
+    if ( mem->nr_banks == 0 )
+        return -ENOENT;
 
     dt_dprintk("Create memory node (reg size %d, nr cells %d)\n",
                reg_size, nr_cells);
@@ -1540,10 +1542,13 @@ static int __init handle_node(struct domain *d, struct kernel_info *kinfo,
          * Create a second memory node to store the ranges covering
          * reserved-memory regions.
          */
-        res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
-                               &bootinfo.reserved_mem);
-        if ( res )
-            return res;
+        if ( bootinfo.reserved_mem.nr_banks > 0 )
+        {
+            res = make_memory_node(d, kinfo->fdt, addrcells, sizecells,
+                                   &bootinfo.reserved_mem);
+            if ( res )
+                return res;
+        }
     }
 
     res = fdt_end_node(kinfo->fdt);
