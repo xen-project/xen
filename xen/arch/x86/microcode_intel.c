@@ -319,7 +319,7 @@ static int apply_microcode(const struct microcode_patch *patch)
         return -EIO;
     }
     printk(KERN_INFO "microcode: CPU%d updated from revision "
-           "%#x to %#x, date = %04x-%02x-%02x \n",
+           "%#x to %#x, date = %04x-%02x-%02x\n",
            cpu_num, sig->rev, val[1], mc_intel->hdr.year,
            mc_intel->hdr.month, mc_intel->hdr.day);
     sig->rev = val[1];
