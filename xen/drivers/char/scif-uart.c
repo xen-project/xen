@@ -205,7 +205,7 @@ static int scif_uart_tx_ready(struct serial_port *port)
 
      /* Check number of data bytes stored in TX FIFO */
     cnt = scif_readw(uart, SCIF_SCFDR) >> 8;
-    ASSERT( cnt >= 0 && cnt <= params->fifo_size );
+    ASSERT( cnt <= params->fifo_size );
 
     return (params->fifo_size - cnt);
 }
