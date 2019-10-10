@@ -994,14 +994,10 @@ static unsigned int __init dt_alloc_size(void)
                                              IOMMU_DEV_TABLE_ENTRY_SIZE);
 }
 
-static void __init deallocate_buffer(void *buf, uint32_t sz)
+static void __init deallocate_buffer(void *buf, unsigned long sz)
 {
-    int order = 0;
     if ( buf )
-    {
-        order = get_order_from_bytes(sz);
-        __free_amd_iommu_tables(buf, order);
-    }
+        __free_amd_iommu_tables(buf, get_order_from_bytes(sz));
 }
 
 static void __init deallocate_ring_buffer(struct ring_buffer *ring_buf)
@@ -1012,10 +1008,11 @@ static void __init deallocate_ring_buffer(struct ring_buffer *ring_buf)
     ring_buf->tail = 0;
 }
 
-static void * __init allocate_buffer(uint32_t alloc_size, const char *name)
+static void *__init allocate_buffer(unsigned long alloc_size,
+                                    const char *name, bool clear)
 {
-    void * buffer;
-    int order = get_order_from_bytes(alloc_size);
+    void *buffer;
+    unsigned int order = get_order_from_bytes(alloc_size);
 
     buffer = __alloc_amd_iommu_tables(order);
 
@@ -1025,13 +1022,16 @@ static void * __init allocate_buffer(uint32_t alloc_size, const char *name)
         return NULL;
     }
 
-    memset(buffer, 0, PAGE_SIZE * (1UL << order));
+    if ( clear )
+        memset(buffer, 0, PAGE_SIZE << order);
+
     return buffer;
 }
 
-static void * __init allocate_ring_buffer(struct ring_buffer *ring_buf,
-                                          uint32_t entry_size,
-                                          uint64_t entries, const char *name)
+static void *__init allocate_ring_buffer(struct ring_buffer *ring_buf,
+                                         unsigned int entry_size,
+                                         unsigned long entries,
+                                         const char *name, bool clear)
 {
     ring_buf->head = 0;
     ring_buf->tail = 0;
@@ -1041,7 +1041,8 @@ static void * __init allocate_ring_buffer(struct ring_buffer *ring_buf,
     ring_buf->alloc_size = PAGE_SIZE << get_order_from_bytes(entries *
                                                              entry_size);
     ring_buf->entries = ring_buf->alloc_size / entry_size;
-    ring_buf->buffer = allocate_buffer(ring_buf->alloc_size, name);
+    ring_buf->buffer = allocate_buffer(ring_buf->alloc_size, name, clear);
+
     return ring_buf->buffer;
 }
 
@@ -1050,21 +1051,23 @@ static void * __init allocate_cmd_buffer(struct amd_iommu *iommu)
     /* allocate 'command buffer' in power of 2 increments of 4K */
     return allocate_ring_buffer(&iommu->cmd_buffer, sizeof(cmd_entry_t),
                                 IOMMU_CMD_BUFFER_DEFAULT_ENTRIES,
-                                "Command Buffer");
+                                "Command Buffer", false);
 }
 
 static void * __init allocate_event_log(struct amd_iommu *iommu)
 {
     /* allocate 'event log' in power of 2 increments of 4K */
     return allocate_ring_buffer(&iommu->event_log, sizeof(event_entry_t),
-                                IOMMU_EVENT_LOG_DEFAULT_ENTRIES, "Event Log");
+                                IOMMU_EVENT_LOG_DEFAULT_ENTRIES, "Event Log",
+                                true);
 }
 
 static void * __init allocate_ppr_log(struct amd_iommu *iommu)
 {
     /* allocate 'ppr log' in power of 2 increments of 4K */
     return allocate_ring_buffer(&iommu->ppr_log, sizeof(ppr_entry_t),
-                                IOMMU_PPR_LOG_DEFAULT_ENTRIES, "PPR Log");
+                                IOMMU_PPR_LOG_DEFAULT_ENTRIES, "PPR Log",
+                                true);
 }
 
 /*
@@ -1258,7 +1261,7 @@ static int __init amd_iommu_setup_device_table(
     {
         /* allocate 'device table' on a 4K boundary */
         dt = IVRS_MAPPINGS_DEVTAB(ivrs_mappings) =
-            allocate_buffer(dt_alloc_size(), "Device Table");
+            allocate_buffer(dt_alloc_size(), "Device Table", true);
     }
     if ( !dt )
         return -ENOMEM;
