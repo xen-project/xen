@@ -267,9 +267,9 @@ static void __hwdom_init amd_iommu_hwdom_init(struct domain *d)
     setup_hwdom_pci_devices(d, amd_iommu_add_device);
 }
 
-void amd_iommu_disable_domain_device(struct domain *domain,
-                                     struct amd_iommu *iommu,
-                                     u8 devfn, struct pci_dev *pdev)
+static void amd_iommu_disable_domain_device(const struct domain *domain,
+                                            struct amd_iommu *iommu,
+                                            uint8_t devfn, struct pci_dev *pdev)
 {
     struct amd_iommu_dte *table, *dte;
     unsigned long flags;
@@ -284,9 +284,21 @@ void amd_iommu_disable_domain_device(struct domain *domain,
     spin_lock_irqsave(&iommu->lock, flags);
     if ( dte->tv || dte->v )
     {
+        /* See the comment in amd_iommu_setup_device_table(). */
+        dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_ABORTED;
+        smp_wmb();
+        dte->iv = true;
         dte->tv = false;
-        dte->v = false;
+        dte->gv = false;
         dte->i = false;
+        dte->ex = false;
+        dte->sa = false;
+        dte->se = false;
+        dte->sd = false;
+        dte->sys_mgt = IOMMU_DEV_TABLE_SYS_MGT_DMA_ABORTED;
+        dte->ioctl = IOMMU_DEV_TABLE_IO_CONTROL_ABORTED;
+        smp_wmb();
+        dte->v = true;
 
         amd_iommu_flush_device(iommu, req_id);
 

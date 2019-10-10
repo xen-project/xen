@@ -1259,12 +1259,28 @@ static int __init amd_iommu_setup_device_table(
 
     if ( !dt )
     {
+        unsigned int size = dt_alloc_size();
+
         /* allocate 'device table' on a 4K boundary */
         dt = IVRS_MAPPINGS_DEVTAB(ivrs_mappings) =
-            allocate_buffer(dt_alloc_size(), "Device Table", true);
+            allocate_buffer(size, "Device Table", false);
+        if ( !dt )
+            return -ENOMEM;
+
+        /*
+         * Prefill every DTE such that all kinds of requests will get aborted.
+         * Besides the two bits set to true below this builds upon
+         * IOMMU_DEV_TABLE_SYS_MGT_DMA_ABORTED,
+         * IOMMU_DEV_TABLE_IO_CONTROL_ABORTED, as well as
+         * IOMMU_DEV_TABLE_INT_CONTROL_ABORTED all being zero, and us also
+         * wanting at least TV, GV, I, and EX set to false.
+         */
+        for ( bdf = 0, size /= sizeof(*dt); bdf < size; ++bdf )
+            dt[bdf] = (struct amd_iommu_dte){
+                          .v = true,
+                          .iv = true,
+                      };
     }
-    if ( !dt )
-        return -ENOMEM;
 
     /* Add device table entries */
     for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
