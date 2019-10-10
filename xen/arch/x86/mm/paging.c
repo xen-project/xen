@@ -209,15 +209,15 @@ static int paging_free_log_dirty_bitmap(struct domain *d, int rc)
     return rc;
 }
 
-int paging_log_dirty_enable(struct domain *d, bool_t log_global)
+int paging_log_dirty_enable(struct domain *d, bool log_global)
 {
     int ret;
 
-    if ( is_iommu_enabled(d) && log_global )
+    if ( has_arch_pdevs(d) && log_global )
     {
         /*
          * Refuse to turn on global log-dirty mode
-         * if the domain is using the IOMMU.
+         * if the domain is sharing the P2M with the IOMMU.
          */
         return -EINVAL;
     }
@@ -727,7 +727,7 @@ int paging_domctl(struct domain *d, struct xen_domctl_shadow_op *sc,
             break;
         /* Else fall through... */
     case XEN_DOMCTL_SHADOW_OP_ENABLE_LOGDIRTY:
-        return paging_log_dirty_enable(d, 1);
+        return paging_log_dirty_enable(d, true);
 
     case XEN_DOMCTL_SHADOW_OP_OFF:
         if ( (rc = paging_log_dirty_disable(d, resuming)) != 0 )

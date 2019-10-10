@@ -71,7 +71,7 @@ int hap_track_dirty_vram(struct domain *d,
 
         if ( !paging_mode_log_dirty(d) )
         {
-            rc = paging_log_dirty_enable(d, 0);
+            rc = paging_log_dirty_enable(d, false);
             if ( rc )
                 goto out;
         }
