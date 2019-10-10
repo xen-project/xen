@@ -1249,6 +1249,28 @@ void pci_cleanup_msi(struct pci_dev *pdev)
     msi_free_irqs(pdev);
 }
 
+int pci_reset_msix_state(struct pci_dev *pdev)
+{
+    unsigned int pos = pci_find_cap_offset(pdev->seg, pdev->bus, pdev->sbdf.dev,
+                                           pdev->sbdf.fn, PCI_CAP_ID_MSIX);
+
+    ASSERT(pos);
+    /*
+     * Xen expects the device state to be the after reset one, and hence
+     * host_maskall = guest_maskall = false and all entries should have the
+     * mask bit set. Test that the maskall bit is not set, having it set could
+     * signal that the device hasn't been reset properly.
+     */
+    if ( pci_conf_read16(pdev->sbdf, msix_control_reg(pos)) &
+         PCI_MSIX_FLAGS_MASKALL )
+        return -EBUSY;
+
+    pdev->msix->host_maskall = false;
+    pdev->msix->guest_maskall = false;
+
+    return 0;
+}
+
 int pci_msi_conf_write_intercept(struct pci_dev *pdev, unsigned int reg,
                                  unsigned int size, uint32_t *data)
 {

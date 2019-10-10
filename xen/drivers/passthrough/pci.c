@@ -1505,7 +1505,12 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
     }
 
     if ( pdev->msix )
+    {
+        rc = pci_reset_msix_state(pdev);
+        if ( rc )
+            goto done;
         msixtbl_init(d);
+    }
 
     pdev->fault.count = 0;
 
