@@ -528,9 +528,10 @@ static void __init efi_arch_video_init(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop,
         bpp = set_color(mode_info->PixelInformation.BlueMask, bpp,
                         &vga_console_info.u.vesa_lfb.blue_pos,
                         &vga_console_info.u.vesa_lfb.blue_size);
-        bpp = set_color(mode_info->PixelInformation.ReservedMask, bpp,
-                        &vga_console_info.u.vesa_lfb.rsvd_pos,
-                        &vga_console_info.u.vesa_lfb.rsvd_size);
+        if ( mode_info->PixelInformation.ReservedMask )
+            bpp = set_color(mode_info->PixelInformation.ReservedMask, bpp,
+                            &vga_console_info.u.vesa_lfb.rsvd_pos,
+                            &vga_console_info.u.vesa_lfb.rsvd_size);
         if ( bpp > 0 )
             break;
         /* fall through */
