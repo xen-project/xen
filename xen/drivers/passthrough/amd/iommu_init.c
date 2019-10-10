@@ -39,7 +39,6 @@ unsigned int __read_mostly ivrs_bdf_entries;
 u8 __read_mostly ivhd_type;
 static struct radix_tree_root ivrs_maps;
 LIST_HEAD_READ_MOSTLY(amd_iommu_head);
-struct table_struct device_table;
 bool_t iommuv2_enabled;
 
 static bool iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
@@ -989,6 +988,12 @@ static void disable_iommu(struct amd_iommu *iommu)
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
+static unsigned int __init dt_alloc_size(void)
+{
+    return PAGE_SIZE << get_order_from_bytes(ivrs_bdf_entries *
+                                             IOMMU_DEV_TABLE_ENTRY_SIZE);
+}
+
 static void __init deallocate_buffer(void *buf, uint32_t sz)
 {
     int order = 0;
@@ -997,12 +1002,6 @@ static void __init deallocate_buffer(void *buf, uint32_t sz)
         order = get_order_from_bytes(sz);
         __free_amd_iommu_tables(buf, order);
     }
-}
-
-static void __init deallocate_device_table(struct table_struct *table)
-{
-    deallocate_buffer(table->buffer, table->alloc_size);
-    table->buffer = NULL;
 }
 
 static void __init deallocate_ring_buffer(struct ring_buffer *ring_buf)
@@ -1068,8 +1067,30 @@ static void * __init allocate_ppr_log(struct amd_iommu *iommu)
                                 IOMMU_PPR_LOG_DEFAULT_ENTRIES, "PPR Log");
 }
 
+/*
+ * Within ivrs_mappings[] we allocate an extra array element to store
+ * - segment number,
+ * - device table.
+ */
+#define IVRS_MAPPINGS_SEG(m) (m)[ivrs_bdf_entries].dte_requestor_id
+#define IVRS_MAPPINGS_DEVTAB(m) (m)[ivrs_bdf_entries].intremap_table
+
+/* Gets passed to radix_tree_destroy(), so its param needs to be void *. */
+static void __init free_ivrs_mapping_callback(void *ptr)
+{
+    const struct ivrs_mappings *ivrs_mappings = ptr;
+
+    if ( IVRS_MAPPINGS_DEVTAB(ivrs_mappings) )
+        deallocate_buffer(IVRS_MAPPINGS_DEVTAB(ivrs_mappings),
+                          dt_alloc_size());
+
+    xfree(ptr);
+}
+
 static int __init amd_iommu_init_one(struct amd_iommu *iommu, bool intr)
 {
+    const struct ivrs_mappings *ivrs_mappings;
+
     if ( allocate_cmd_buffer(iommu) == NULL )
         goto error_out;
 
@@ -1082,13 +1103,15 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu, bool intr)
     if ( intr && !set_iommu_interrupt_handler(iommu) )
         goto error_out;
 
-    /* To make sure that device_table.buffer has been successfully allocated */
-    if ( device_table.buffer == NULL )
+    /* Make sure that the device table has been successfully allocated. */
+    ivrs_mappings = get_ivrs_mappings(iommu->seg);
+    if ( !IVRS_MAPPINGS_DEVTAB(ivrs_mappings) )
         goto error_out;
 
-    iommu->dev_table.alloc_size = device_table.alloc_size;
-    iommu->dev_table.entries = device_table.entries;
-    iommu->dev_table.buffer = device_table.buffer;
+    iommu->dev_table.alloc_size = dt_alloc_size();
+    iommu->dev_table.entries = iommu->dev_table.alloc_size /
+                               IOMMU_DEV_TABLE_ENTRY_SIZE;
+    iommu->dev_table.buffer = IVRS_MAPPINGS_DEVTAB(ivrs_mappings);
 
     enable_iommu(iommu);
     printk("AMD-Vi: IOMMU %d Enabled.\n", nr_amd_iommus );
@@ -1135,23 +1158,14 @@ static void __init amd_iommu_init_cleanup(void)
         xfree(iommu);
     }
 
-    /* free device table */
-    deallocate_device_table(&device_table);
-
-    /* free ivrs_mappings[] */
-    radix_tree_destroy(&ivrs_maps, xfree);
+    /* Free ivrs_mappings[] and their device tables. */
+    radix_tree_destroy(&ivrs_maps, free_ivrs_mapping_callback);
 
     iommu_enabled = 0;
     iommu_hwdom_passthrough = false;
     iommu_intremap = 0;
     iommuv2_enabled = 0;
 }
-
-/*
- * We allocate an extra array element to store the segment number
- * (and in the future perhaps other global information).
- */
-#define IVRS_MAPPINGS_SEG(m) m[ivrs_bdf_entries].dte_requestor_id
 
 struct ivrs_mappings *get_ivrs_mappings(u16 seg)
 {
@@ -1235,24 +1249,18 @@ static int __init alloc_ivrs_mappings(u16 seg)
 static int __init amd_iommu_setup_device_table(
     u16 seg, struct ivrs_mappings *ivrs_mappings)
 {
+    struct amd_iommu_dte *dt = IVRS_MAPPINGS_DEVTAB(ivrs_mappings);
     unsigned int bdf;
 
     BUG_ON( (ivrs_bdf_entries == 0) );
 
-    if ( !device_table.buffer )
+    if ( !dt )
     {
         /* allocate 'device table' on a 4K boundary */
-        device_table.alloc_size = PAGE_SIZE <<
-                                  get_order_from_bytes(
-                                  PAGE_ALIGN(ivrs_bdf_entries *
-                                  IOMMU_DEV_TABLE_ENTRY_SIZE));
-        device_table.entries = device_table.alloc_size /
-                               IOMMU_DEV_TABLE_ENTRY_SIZE;
-
-        device_table.buffer = allocate_buffer(device_table.alloc_size,
-                                              "Device Table");
+        dt = IVRS_MAPPINGS_DEVTAB(ivrs_mappings) =
+            allocate_buffer(dt_alloc_size(), "Device Table");
     }
-    if ( !device_table.buffer )
+    if ( !dt )
         return -ENOMEM;
 
     /* Add device table entries */
@@ -1260,12 +1268,10 @@ static int __init amd_iommu_setup_device_table(
     {
         if ( ivrs_mappings[bdf].valid )
         {
-            void *dte;
             const struct pci_dev *pdev = NULL;
 
             /* add device table entry */
-            dte = device_table.buffer + (bdf * IOMMU_DEV_TABLE_ENTRY_SIZE);
-            iommu_dte_add_device_entry(dte, &ivrs_mappings[bdf]);
+            iommu_dte_add_device_entry(&dt[bdf], &ivrs_mappings[bdf]);
 
             if ( iommu_intremap &&
                  ivrs_mappings[bdf].dte_requestor_id == bdf &&
@@ -1308,7 +1314,7 @@ static int __init amd_iommu_setup_device_table(
             }
 
             amd_iommu_set_intremap_table(
-                dte, ivrs_mappings[bdf].intremap_table,
+                &dt[bdf], ivrs_mappings[bdf].intremap_table,
                 ivrs_mappings[bdf].iommu, iommu_intremap);
         }
     }
