@@ -1379,7 +1379,7 @@ static int alloc_l1_table(struct page_info *page)
     {
         if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
         {
-            ret = pv_l1tf_check_l1e(d, pl1e[i]) ? -ERESTART : 0;
+            ret = pv_l1tf_check_l1e(d, pl1e[i]) ? -EINTR : 0;
             if ( ret )
                 goto out;
         }
@@ -1488,7 +1488,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
         {
             if ( !pv_l1tf_check_l2e(d, l2e) )
                 continue;
-            rc = -ERESTART;
+            rc = -EINTR;
         }
         else
             rc = get_page_from_l2e(l2e, pfn, d, partial);
@@ -1575,7 +1575,7 @@ static int alloc_l3_table(struct page_info *page)
         {
             if ( !pv_l1tf_check_l3e(d, l3e) )
                 continue;
-            rc = -ERESTART;
+            rc = -EINTR;
         }
         else
             rc = get_page_from_l3e(l3e, pfn, d, partial);
@@ -1756,7 +1756,7 @@ static int alloc_l4_table(struct page_info *page)
         {
             if ( !pv_l1tf_check_l4e(d, l4e) )
                 continue;
-            rc = -ERESTART;
+            rc = -EINTR;
         }
         else
             rc = get_page_from_l4e(l4e, pfn, d, partial);
