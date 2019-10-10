@@ -793,8 +793,8 @@ static int __init make_cpus_node(const struct domain *d, void *fdt)
     unsigned int cpu;
     const void *compatible = NULL;
     u32 len;
-    /* Placeholder for cpu@ + a 32-bit number + \0 */
-    char buf[15];
+    /* Placeholder for cpu@ + a 32-bit hexadecimal number + \0 */
+    char buf[13];
     u32 clock_frequency;
     bool clock_valid;
     uint64_t mpidr_aff;
@@ -852,11 +852,26 @@ static int __init make_cpus_node(const struct domain *d, void *fdt)
          * the MPIDR's affinity bits. We will use AFF0 and AFF1 when
          * constructing the reg value of the guest at the moment, for it
          * is enough for the current max vcpu number.
+         *
+         * We only deal with AFF{0, 1, 2} stored in bits [23:0] at the
+         * moment.
          */
         mpidr_aff = vcpuid_to_vaffinity(cpu);
+        if ( (mpidr_aff & ~GENMASK_ULL(23, 0)) != 0 )
+        {
+            printk(XENLOG_ERR "Unable to handle MPIDR AFFINITY 0x%"PRIx64"\n",
+                   mpidr_aff);
+            return -EINVAL;
+        }
+
         dt_dprintk("Create cpu@%"PRIx64" (logical CPUID: %d) node\n",
                    mpidr_aff, cpu);
 
+        /*
+         * We use PRIx64 because mpidr_aff is a 64bit integer. However,
+         * only bits [23:0] are used, thus, we are sure it will fit in
+         * buf.
+         */
         snprintf(buf, sizeof(buf), "cpu@%"PRIx64, mpidr_aff);
         res = fdt_begin_node(fdt, buf);
         if ( res )
