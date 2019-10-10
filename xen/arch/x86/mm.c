@@ -1092,8 +1092,43 @@ static int get_page_and_type_from_mfn(
 
     rc = _get_page_type(page, type, preemptible);
 
-    if ( unlikely(rc) && !partial_ref &&
-         (!preemptible || page != current->arch.old_guest_table) )
+    /*
+     * Retain the refcount if:
+     * - page is fully validated (rc == 0)
+     * - page is not validated (rc < 0) but:
+     *   - We came in with a reference (partial_ref)
+     *   - page is partially validated but there's been an error
+     *     (page == current->arch.old_guest_table)
+     *
+     * The partial_ref-on-error clause is worth an explanation.  There
+     * are two scenarios where partial_ref might be true coming in:
+     * - mfn has been partially demoted as type `type`; i.e. has
+     *   PGT_partial set
+     * - mfn has been partially demoted as L(type+1) (i.e., a linear
+     *   page; e.g. we're being called from get_page_from_l2e with
+     *   type == PGT_l1_table, but the mfn is PGT_l2_table)
+     *
+     * If there's an error, in the first case, _get_page_type will
+     * either return -ERESTART, in which case we want to retain the
+     * ref (as the caller will consider it retained), or -EINVAL, in
+     * which case old_guest_table will be set; in both cases, we need
+     * to retain the ref.
+     *
+     * In the second case, if there's an error, _get_page_type() can
+     * *only* return -EINVAL, and *never* set old_guest_table.  In
+     * that case we also want to retain the reference, to allow the
+     * page to continue to be torn down (i.e., PGT_partial cleared)
+     * safely.
+     *
+     * Also note that we shouldn't be able to leave with the reference
+     * count retained unless we succeeded, or the operation was
+     * preemptible.
+     */
+    if ( likely(!rc) || partial_ref )
+        /* nothing */;
+    else if ( page == current->arch.old_guest_table )
+        ASSERT(preemptible);
+    else
         put_page(page);
 
     return rc;
