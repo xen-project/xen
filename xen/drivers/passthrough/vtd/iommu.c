@@ -842,26 +842,26 @@ static int iommu_page_fault_do_one(struct vtd_iommu *iommu, int type,
     case DMA_REMAP:
         printk(XENLOG_G_WARNING VTDPREFIX
                "DMAR:[%s] Request device [%04x:%02x:%02x.%u] "
-               "fault addr %"PRIx64", iommu reg = %p\n",
+               "fault addr %"PRIx64"\n",
                (type ? "DMA Read" : "DMA Write"),
                seg, PCI_BUS(source_id), PCI_SLOT(source_id),
-               PCI_FUNC(source_id), addr, iommu->reg);
+               PCI_FUNC(source_id), addr);
         kind = "DMAR";
         break;
     case INTR_REMAP:
         printk(XENLOG_G_WARNING VTDPREFIX
                "INTR-REMAP: Request device [%04x:%02x:%02x.%u] "
-               "fault index %"PRIx64", iommu reg = %p\n",
+               "fault index %"PRIx64"\n",
                seg, PCI_BUS(source_id), PCI_SLOT(source_id),
-               PCI_FUNC(source_id), addr >> 48, iommu->reg);
+               PCI_FUNC(source_id), addr >> 48);
         kind = "INTR-REMAP";
         break;
     default:
         printk(XENLOG_G_WARNING VTDPREFIX
                "UNKNOWN: Request device [%04x:%02x:%02x.%u] "
-               "fault addr %"PRIx64", iommu reg = %p\n",
+               "fault addr %"PRIx64"\n",
                seg, PCI_BUS(source_id), PCI_SLOT(source_id),
-               PCI_FUNC(source_id), addr, iommu->reg);
+               PCI_FUNC(source_id), addr);
         kind = "UNKNOWN";
         break;
     }
