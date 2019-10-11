@@ -972,6 +972,13 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         goto error_out;
     }
 
+    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info,
+                                               &physinfo);
+    if (ret) {
+        LOGD(ERROR, domid, "Unable to set domain create info defaults");
+        goto error_out;
+    }
+
     /* If target_memkb is smaller than max_memkb, the subsequent call
      * to libxc when building HVM domain will enable PoD mode.
      */
@@ -1008,13 +1015,6 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
         d_config->b_info.num_vnuma_nodes) {
         ret = ERROR_INVAL;
         LOGD(ERROR, domid, "PV vNUMA is not yet supported");
-        goto error_out;
-    }
-
-    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info,
-                                               &physinfo);
-    if (ret) {
-        LOGD(ERROR, domid, "Unable to set domain create info defaults");
         goto error_out;
     }
 
