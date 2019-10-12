@@ -101,3 +101,32 @@ which contains contains one of these two files::
 The ``ucode=scan`` command line option will cause Xen to search through all
 modules to find any CPIO archives, and search the archive for the applicable
 file.  Xen will stop searching at the first match.
+
+
+Run time microcode loading
+--------------------------
+
+.. warning::
+
+   If at all possible, microcode updates should be done by firmware updates,
+   or at boot time.  Not all microcode updates (or parts thereof) can be
+   applied at runtime.
+
+The ``xen-ucode`` utility can be used to initiate a runtime microcode load.
+It will pass the blob to Xen, which will check to see whether the blob is
+correct for the processor, and newer than the running microcode.
+
+If these checks pass, the entire system will be rendezvoused and an update
+will be initiated on all CPUs in parallel.  As with boot time loading,
+diagnostics will be put out onto the console::
+
+  [root@host ~]# xl dmesg | grep microcode
+  (XEN) microcode: CPU0 updated from revision 0x1a to 0x25, date = 2018-04-02
+  (XEN) microcode: CPU2 updated from revision 0x1a to 0x25, date = 2018-04-02
+  (XEN) microcode: CPU4 updated from revision 0x1a to 0x25, date = 2018-04-02
+  (XEN) microcode: CPU6 updated from revision 0x1a to 0x25, date = 2018-04-02
+  (XEN) 4 cores are to update their microcode
+  (XEN) microcode: CPU0 updated from revision 0x25 to 0x27, date = 2019-02-26
+  (XEN) microcode: CPU4 updated from revision 0x25 to 0x27, date = 2019-02-26
+  (XEN) microcode: CPU2 updated from revision 0x25 to 0x27, date = 2019-02-26
+  (XEN) microcode: CPU6 updated from revision 0x25 to 0x27, date = 2019-02-26
