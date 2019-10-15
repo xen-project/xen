@@ -27,7 +27,7 @@ XEN_CPUFEATURE(XEN_SMAP,          X86_SYNTH(11)) /* SMAP gets used by Xen itself
 XEN_CPUFEATURE(LFENCE_DISPATCH,   X86_SYNTH(12)) /* lfence set as Dispatch Serialising */
 XEN_CPUFEATURE(IND_THUNK_LFENCE,  X86_SYNTH(13)) /* Use IND_THUNK_LFENCE */
 XEN_CPUFEATURE(IND_THUNK_JMP,     X86_SYNTH(14)) /* Use IND_THUNK_JMP */
-XEN_CPUFEATURE(SC_L1TF_VULN,      X86_SYNTH(15)) /* L1TF protection required */
+XEN_CPUFEATURE(SC_BRANCH_HARDEN,  X86_SYNTH(15)) /* Conditional Branch Hardening */
 XEN_CPUFEATURE(SC_MSR_PV,         X86_SYNTH(16)) /* MSR_SPEC_CTRL used by Xen for PV */
 XEN_CPUFEATURE(SC_MSR_HVM,        X86_SYNTH(17)) /* MSR_SPEC_CTRL used by Xen for HVM */
 XEN_CPUFEATURE(SC_RSB_PV,         X86_SYNTH(18)) /* RSB overwrite needed for PV */

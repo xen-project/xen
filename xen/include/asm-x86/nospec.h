@@ -10,7 +10,7 @@
 static always_inline bool barrier_nospec_true(void)
 {
 #ifdef CONFIG_SPECULATIVE_HARDEN_BRANCH
-    alternative("", "lfence", X86_FEATURE_SC_L1TF_VULN);
+    alternative("", "lfence", X86_FEATURE_SC_BRANCH_HARDEN);
 #endif
     return true;
 }

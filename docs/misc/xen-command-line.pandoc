@@ -1960,7 +1960,7 @@ By default SSBD will be mitigated at runtime (i.e `ssbd=runtime`).
 ### spec-ctrl (x86)
 > `= List of [ <bool>, xen=<bool>, {pv,hvm,msr-sc,rsb,md-clear}=<bool>,
 >              bti-thunk=retpoline|lfence|jmp, {ibrs,ibpb,ssbd,eager-fpu,
->              l1d-flush,l1tf-barrier}=<bool> ]`
+>              l1d-flush,branch-harden}=<bool> ]`
 
 Controls for speculative execution sidechannel mitigations.  By default, Xen
 will pick the most appropriate mitigations based on compiled in support,
@@ -2032,11 +2032,10 @@ Irrespective of Xen's setting, the feature is virtualised for HVM guests to
 use.  By default, Xen will enable this mitigation on hardware believed to be
 vulnerable to L1TF.
 
-On hardware vulnerable to L1TF, the `l1tf-barrier=` option can be used to force
-or prevent Xen from protecting evaluations inside the hypervisor with a barrier
-instruction to not load potentially secret information into L1 cache.  By
-default, Xen will enable this mitigation on hardware believed to be vulnerable
-to L1TF.
+If Xen is compiled with `CONFIG_SPECULATIVE_HARDEN_BRANCH`, the
+`branch-harden=` boolean can be used to force or prevent Xen from using
+speculation barriers to protect selected conditional branches.  By default,
+Xen will enable this mitigation.
 
 ### sync_console
 > `= <boolean>`
