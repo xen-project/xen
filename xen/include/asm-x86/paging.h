@@ -383,7 +383,7 @@ static inline bool gfn_valid(const struct domain *d, gfn_t gfn)
 }
 
 /* Maxphysaddr supportable by the paging infrastructure. */
-static inline unsigned int paging_max_paddr_bits(const struct domain *d)
+static always_inline unsigned int paging_max_paddr_bits(const struct domain *d)
 {
     unsigned int bits = paging_mode_hap(d) ? hap_paddr_bits : paddr_bits;
 

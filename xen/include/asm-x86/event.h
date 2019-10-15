@@ -20,7 +20,7 @@ static inline int vcpu_event_delivery_is_enabled(struct vcpu *v)
 }
 
 int hvm_local_events_need_delivery(struct vcpu *v);
-static inline int local_events_need_delivery(void)
+static always_inline bool local_events_need_delivery(void)
 {
     struct vcpu *v = current;
 

@@ -1699,7 +1699,7 @@ static void _update_runstate_area(struct vcpu *v)
  * regular per-CPU GDT frame to appear with selectors at the appropriate
  * offset.
  */
-static inline bool need_full_gdt(const struct domain *d)
+static always_inline bool need_full_gdt(const struct domain *d)
 {
     return is_pv_domain(d) && !is_idle_domain(d);
 }

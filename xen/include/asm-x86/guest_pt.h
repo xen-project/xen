@@ -202,7 +202,7 @@ static inline guest_l4e_t guest_l4e_from_gfn(gfn_t gfn, u32 flags)
 
 /* Which pagetable features are supported on this vcpu? */
 
-static inline bool guest_can_use_l2_superpages(const struct vcpu *v)
+static always_inline bool guest_can_use_l2_superpages(const struct vcpu *v)
 {
     /*
      * PV guests use Xen's paging settings.  Being 4-level, 2M
@@ -218,7 +218,7 @@ static inline bool guest_can_use_l2_superpages(const struct vcpu *v)
             (v->arch.hvm.guest_cr[4] & X86_CR4_PSE));
 }
 
-static inline bool guest_can_use_l3_superpages(const struct domain *d)
+static always_inline bool guest_can_use_l3_superpages(const struct domain *d)
 {
     /*
      * There are no control register settings for the hardware pagewalk on the
@@ -252,7 +252,7 @@ static inline bool guest_can_use_pse36(const struct domain *d)
     return paging_mode_hap(d) && cpu_has_pse36;
 }
 
-static inline bool guest_nx_enabled(const struct vcpu *v)
+static always_inline bool guest_nx_enabled(const struct vcpu *v)
 {
     if ( GUEST_PAGING_LEVELS == 2 ) /* NX has no effect witout CR4.PAE. */
         return false;
@@ -261,23 +261,23 @@ static inline bool guest_nx_enabled(const struct vcpu *v)
     return is_pv_vcpu(v) ? cpu_has_nx : hvm_nx_enabled(v);
 }
 
-static inline bool guest_wp_enabled(const struct vcpu *v)
+static always_inline bool guest_wp_enabled(const struct vcpu *v)
 {
     /* PV guests can't control CR0.WP, and it is unconditionally set by Xen. */
     return is_pv_vcpu(v) || hvm_wp_enabled(v);
 }
 
-static inline bool guest_smep_enabled(const struct vcpu *v)
+static always_inline bool guest_smep_enabled(const struct vcpu *v)
 {
     return !is_pv_vcpu(v) && hvm_smep_enabled(v);
 }
 
-static inline bool guest_smap_enabled(const struct vcpu *v)
+static always_inline bool guest_smap_enabled(const struct vcpu *v)
 {
     return !is_pv_vcpu(v) && hvm_smap_enabled(v);
 }
 
-static inline bool guest_pku_enabled(const struct vcpu *v)
+static always_inline bool guest_pku_enabled(const struct vcpu *v)
 {
     return !is_pv_vcpu(v) && hvm_pku_enabled(v);
 }
@@ -285,19 +285,21 @@ static inline bool guest_pku_enabled(const struct vcpu *v)
 /* Helpers for identifying whether guest entries have reserved bits set. */
 
 /* Bits reserved because of maxphysaddr, and (lack of) EFER.NX */
-static inline uint64_t guest_rsvd_bits(const struct vcpu *v)
+static always_inline uint64_t guest_rsvd_bits(const struct vcpu *v)
 {
     return ((PADDR_MASK &
              ~((1ul << v->domain->arch.cpuid->extd.maxphysaddr) - 1)) |
             (guest_nx_enabled(v) ? 0 : put_pte_flags(_PAGE_NX_BIT)));
 }
 
-static inline bool guest_l1e_rsvd_bits(const struct vcpu *v, guest_l1e_t l1e)
+static always_inline bool guest_l1e_rsvd_bits(const struct vcpu *v,
+                                              guest_l1e_t l1e)
 {
     return l1e.l1 & (guest_rsvd_bits(v) | GUEST_L1_PAGETABLE_RSVD);
 }
 
-static inline bool guest_l2e_rsvd_bits(const struct vcpu *v, guest_l2e_t l2e)
+static always_inline bool guest_l2e_rsvd_bits(const struct vcpu *v,
+                                              guest_l2e_t l2e)
 {
     uint64_t rsvd_bits = guest_rsvd_bits(v);
 
@@ -311,7 +313,8 @@ static inline bool guest_l2e_rsvd_bits(const struct vcpu *v, guest_l2e_t l2e)
 }
 
 #if GUEST_PAGING_LEVELS >= 3
-static inline bool guest_l3e_rsvd_bits(const struct vcpu *v, guest_l3e_t l3e)
+static always_inline bool guest_l3e_rsvd_bits(const struct vcpu *v,
+                                              guest_l3e_t l3e)
 {
     return ((l3e.l3 & (guest_rsvd_bits(v) | GUEST_L3_PAGETABLE_RSVD |
                        (guest_can_use_l3_superpages(v->domain) ? 0 : _PAGE_PSE))) ||
@@ -320,7 +323,8 @@ static inline bool guest_l3e_rsvd_bits(const struct vcpu *v, guest_l3e_t l3e)
 }
 
 #if GUEST_PAGING_LEVELS >= 4
-static inline bool guest_l4e_rsvd_bits(const struct vcpu *v, guest_l4e_t l4e)
+static always_inline bool guest_l4e_rsvd_bits(const struct vcpu *v,
+                                              guest_l4e_t l4e)
 {
     return l4e.l4 & (guest_rsvd_bits(v) | GUEST_L4_PAGETABLE_RSVD |
                      ((v->domain->arch.cpuid->x86_vendor == X86_VENDOR_AMD)

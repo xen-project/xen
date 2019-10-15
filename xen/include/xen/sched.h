@@ -968,50 +968,50 @@ void watchdog_domain_destroy(struct domain *d);
 
 #define VM_ASSIST(d, t) (test_bit(VMASST_TYPE_ ## t, &(d)->vm_assist))
 
-static inline bool is_pv_domain(const struct domain *d)
+static always_inline bool is_pv_domain(const struct domain *d)
 {
     return IS_ENABLED(CONFIG_PV) &&
         evaluate_nospec(!(d->options & XEN_DOMCTL_CDF_hvm));
 }
 
-static inline bool is_pv_vcpu(const struct vcpu *v)
+static always_inline bool is_pv_vcpu(const struct vcpu *v)
 {
     return is_pv_domain(v->domain);
 }
 
 #ifdef CONFIG_COMPAT
-static inline bool is_pv_32bit_domain(const struct domain *d)
+static always_inline bool is_pv_32bit_domain(const struct domain *d)
 {
     return is_pv_domain(d) && d->arch.is_32bit_pv;
 }
 
-static inline bool is_pv_32bit_vcpu(const struct vcpu *v)
+static always_inline bool is_pv_32bit_vcpu(const struct vcpu *v)
 {
     return is_pv_32bit_domain(v->domain);
 }
 
-static inline bool is_pv_64bit_domain(const struct domain *d)
+static always_inline bool is_pv_64bit_domain(const struct domain *d)
 {
     return is_pv_domain(d) && !d->arch.is_32bit_pv;
 }
 
-static inline bool is_pv_64bit_vcpu(const struct vcpu *v)
+static always_inline bool is_pv_64bit_vcpu(const struct vcpu *v)
 {
     return is_pv_64bit_domain(v->domain);
 }
 #endif
-static inline bool is_hvm_domain(const struct domain *d)
+static always_inline bool is_hvm_domain(const struct domain *d)
 {
     return IS_ENABLED(CONFIG_HVM) &&
         evaluate_nospec(d->options & XEN_DOMCTL_CDF_hvm);
 }
 
-static inline bool is_hvm_vcpu(const struct vcpu *v)
+static always_inline bool is_hvm_vcpu(const struct vcpu *v)
 {
     return is_hvm_domain(v->domain);
 }
 
-static inline bool hap_enabled(const struct domain *d)
+static always_inline bool hap_enabled(const struct domain *d)
 {
     /* sanitise_domain_config() rejects HAP && !HVM */
     return IS_ENABLED(CONFIG_HVM) &&
@@ -1034,7 +1034,7 @@ static inline bool is_xenstore_domain(const struct domain *d)
     return d->options & XEN_DOMCTL_CDF_xs_domain;
 }
 
-static inline bool is_iommu_enabled(const struct domain *d)
+static always_inline bool is_iommu_enabled(const struct domain *d)
 {
     return evaluate_nospec(d->options & XEN_DOMCTL_CDF_iommu);
 }

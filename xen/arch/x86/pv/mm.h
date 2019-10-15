@@ -88,8 +88,8 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
                   _t ## e_get_intpte(_o), _t ## e_get_intpte(_n),   \
                   (_m), (_v), (_ad))
 
-static inline l1_pgentry_t adjust_guest_l1e(l1_pgentry_t l1e,
-                                            const struct domain *d)
+static always_inline l1_pgentry_t adjust_guest_l1e(l1_pgentry_t l1e,
+                                                   const struct domain *d)
 {
     if ( likely(l1e_get_flags(l1e) & _PAGE_PRESENT) &&
          likely(!is_pv_32bit_domain(d)) )
@@ -120,8 +120,8 @@ static inline l2_pgentry_t adjust_guest_l2e(l2_pgentry_t l2e,
     return l2e;
 }
 
-static inline l3_pgentry_t adjust_guest_l3e(l3_pgentry_t l3e,
-                                            const struct domain *d)
+static always_inline l3_pgentry_t adjust_guest_l3e(l3_pgentry_t l3e,
+                                                   const struct domain *d)
 {
     if ( likely(l3e_get_flags(l3e) & _PAGE_PRESENT) )
         l3e_add_flags(l3e, (likely(!is_pv_32bit_domain(d))
@@ -140,8 +140,8 @@ static inline l3_pgentry_t unadjust_guest_l3e(l3_pgentry_t l3e,
     return l3e;
 }
 
-static inline l4_pgentry_t adjust_guest_l4e(l4_pgentry_t l4e,
-                                            const struct domain *d)
+static always_inline l4_pgentry_t adjust_guest_l4e(l4_pgentry_t l4e,
+                                                   const struct domain *d)
 {
     /*
      * When shadowing an L4 behind the guests back (e.g. for per-pcpu
