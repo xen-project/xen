@@ -480,9 +480,24 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
     const struct dt_property *prop, *status = NULL;
     int res = 0;
     int had_dom0_bootargs = 0;
+    struct dt_device_node *iommu_node;
 
     if ( kinfo->cmdline && kinfo->cmdline[0] )
         bootargs = &kinfo->cmdline[0];
+
+    /*
+     * We always skip the IOMMU device when creating DT for hwdom if there is
+     * an appropriate driver for it in Xen (device_get_class(iommu_node)
+     * returns DEVICE_IOMMU).
+     * We should also skip the IOMMU specific properties of the master device
+     * behind that IOMMU in order to avoid exposing an half complete IOMMU
+     * bindings to hwdom.
+     * Use "iommu_node" as an indicator of the master device which properties
+     * should be skipped.
+     */
+    iommu_node = dt_parse_phandle(node, "iommus", 0);
+    if ( iommu_node && device_get_class(iommu_node) != DEVICE_IOMMU )
+        iommu_node = NULL;
 
     dt_for_each_property_node (node, prop)
     {
@@ -538,6 +553,19 @@ static int __init write_properties(struct domain *d, struct kernel_info *kinfo,
         {
             status = prop;
             continue;
+        }
+
+        if ( iommu_node )
+        {
+            /* Don't expose IOMMU specific properties to hwdom */
+            if ( dt_property_name_is_equal(prop, "iommus") )
+                continue;
+
+            if ( dt_property_name_is_equal(prop, "iommu-map") )
+                continue;
+
+            if ( dt_property_name_is_equal(prop, "iommu-map-mask") )
+                continue;
         }
 
         res = fdt_property(kinfo->fdt, prop->name, prop_data, prop_len);
