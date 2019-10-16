@@ -726,7 +726,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     /* Register Xen's load address as a boot module. */
     xen_bootmodule = add_boot_module(BOOTMOD_XEN,
                              (paddr_t)(uintptr_t)(_start + boot_phys_offset),
-                             (paddr_t)(uintptr_t)(_end - _start + 1), NULL);
+                             (paddr_t)(uintptr_t)(_end - _start), NULL);
     BUG_ON(!xen_bootmodule);
 
     xen_paddr = get_xen_paddr();
