@@ -537,7 +537,6 @@ M:	Jan Beulich <jbeulich@suse.com>
 M:	Julien Grall <julien@xen.org>
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Stefano Stabellini <sstabellini@kernel.org>
-M:	Tim Deegan <tim@xen.org>
 M:	Wei Liu <wl@xen.org>
 L:	xen-devel@lists.xenproject.org
 S:	Supported
