@@ -766,6 +766,7 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
                                             libxl_device_pci *pcidev,
                                             int rebind)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned dom, bus, dev, func;
     char *spath, *driver_path = NULL;
     int rc;
@@ -791,7 +792,7 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
     }
     if ( rc ) {
         LOG(WARN, PCI_BDF" already assigned to pciback", dom, bus, dev, func);
-        return 0;
+        goto quarantine;
     }
 
     /* Check to see if there's already a driver that we need to unbind from */
@@ -822,6 +823,19 @@ static int libxl__device_pci_assignable_add(libxl__gc *gc,
         return ERROR_FAIL;
     }
 
+quarantine:
+    /*
+     * DOMID_IO is just a sentinel domain, without any actual mappings,
+     * so always pass XEN_DOMCTL_DEV_RDM_RELAXED to avoid assignment being
+     * unnecessarily denied.
+     */
+    rc = xc_assign_device(ctx->xch, DOMID_IO, pcidev_encode_bdf(pcidev),
+                          XEN_DOMCTL_DEV_RDM_RELAXED);
+    if ( rc < 0 ) {
+        LOG(ERROR, "failed to quarantine "PCI_BDF, dom, bus, dev, func);
+        return ERROR_FAIL;
+    }
+
     return 0;
 }
 
@@ -829,8 +843,17 @@ static int libxl__device_pci_assignable_remove(libxl__gc *gc,
                                                libxl_device_pci *pcidev,
                                                int rebind)
 {
+    libxl_ctx *ctx = libxl__gc_owner(gc);
     int rc;
     char *driver_path;
+
+    /* De-quarantine */
+    rc = xc_deassign_device(ctx->xch, DOMID_IO, pcidev_encode_bdf(pcidev));
+    if ( rc < 0 ) {
+        LOG(ERROR, "failed to de-quarantine "PCI_BDF, pcidev->domain, pcidev->bus,
+            pcidev->dev, pcidev->func);
+        return ERROR_FAIL;
+    }
 
     /* Unbind from pciback */
     if ( (rc=pciback_dev_is_assigned(gc, pcidev)) < 0 ) {

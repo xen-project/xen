@@ -181,7 +181,7 @@ int iommu_domain_init(struct domain *d, unsigned int opts)
 
     hd->platform_ops = iommu_get_ops();
     ret = hd->platform_ops->init(d);
-    if ( ret )
+    if ( ret || is_system_domain(d) )
         return ret;
 
     if ( is_hardware_domain(d) )
@@ -473,6 +473,10 @@ int __init iommu_setup(void)
     }
     else
     {
+        dom_io->options |= XEN_DOMCTL_CDF_iommu;
+        if ( iommu_domain_init(dom_io, 0) )
+            panic("Could not set up quarantine\n");
+
         printk(" - Dom0 mode: %s\n",
                iommu_hwdom_passthrough ? "Passthrough" :
                iommu_hwdom_strict ? "Strict" : "Relaxed");

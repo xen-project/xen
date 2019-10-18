@@ -95,6 +95,10 @@ static void amd_iommu_setup_domain_device(
     u8 bus = pdev->bus;
     const struct domain_iommu *hd = dom_iommu(domain);
 
+    /* dom_io is used as a sentinel for quarantined devices */
+    if ( domain == dom_io )
+        return;
+
     BUG_ON( !hd->arch.root_table || !hd->arch.paging_mode ||
             !iommu->dev_table.buffer );
 
@@ -276,6 +280,10 @@ static void amd_iommu_disable_domain_device(const struct domain *domain,
     int req_id;
     u8 bus = pdev->bus;
 
+    /* dom_io is used as a sentinel for quarantined devices */
+    if ( domain == dom_io )
+        return;
+
     BUG_ON ( iommu->dev_table.buffer == NULL );
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
     table = iommu->dev_table.buffer;
@@ -373,7 +381,7 @@ static int amd_iommu_assign_device(struct domain *d, u8 devfn,
             ivrs_mappings[req_id].read_permission);
     }
 
-    return reassign_device(hardware_domain, d, devfn, pdev);
+    return reassign_device(pdev->domain, d, devfn, pdev);
 }
 
 static void deallocate_next_page_table(struct page_info *pg, int level)
