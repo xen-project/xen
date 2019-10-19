@@ -7,3 +7,5 @@ Hypervisor documentation
    :maxdepth: 2
 
    code-coverage
+
+   x86/index
