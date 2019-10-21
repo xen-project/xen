@@ -103,14 +103,16 @@ register_t get_default_hcr_flags(void)
 static enum {
     SERRORS_DIVERSE,
     SERRORS_PANIC,
-} serrors_op;
+} serrors_op = SERRORS_DIVERSE;
 
 static int __init parse_serrors_behavior(const char *str)
 {
     if ( !strcmp(str, "panic") )
         serrors_op = SERRORS_PANIC;
-    else
+    else if ( !strcmp(str, "diverse") )
         serrors_op = SERRORS_DIVERSE;
+    else
+        return -EINVAL;
 
     return 0;
 }
