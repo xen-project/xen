@@ -19,13 +19,13 @@
 
 #include <asm/platform.h>
 
-static const char *const brcm_bcm2838_dt_compat[] __initconst =
+static const char *const rpi4_dt_compat[] __initconst =
 {
-    "brcm,bcm2838",
+    "brcm,bcm2711",
     NULL
 };
 
-static const struct dt_device_match brcm_bcm2838_blacklist_dev[] __initconst =
+static const struct dt_device_match rpi4_blacklist_dev[] __initconst =
 {
     /*
      * The aux SPIs share an IRQ and a page with the aux UART.
@@ -40,9 +40,9 @@ static const struct dt_device_match brcm_bcm2838_blacklist_dev[] __initconst =
     { /* sentinel */ },
 };
 
-PLATFORM_START(brcm_bcm2838, "Raspberry Pi 4")
-    .compatible     = brcm_bcm2838_dt_compat,
-    .blacklist_dev  = brcm_bcm2838_blacklist_dev,
+PLATFORM_START(rpi4, "Raspberry Pi 4")
+    .compatible     = rpi4_dt_compat,
+    .blacklist_dev  = rpi4_blacklist_dev,
 PLATFORM_END
 
 /*
