@@ -1203,9 +1203,15 @@ int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
         c_info->passthrough = LIBXL_PASSTHROUGH_SHARE_PT;
     }
 
-    if (c_info->passthrough == LIBXL_PASSTHROUGH_SYNC_PT) {
+    switch (c_info->passthrough) {
+    case LIBXL_PASSTHROUGH_DISABLED:
+    case LIBXL_PASSTHROUGH_SHARE_PT:
+        break;
+
+    default:
         LOGD(ERROR, domid,
-             "passthrough=\"sync_pt\" not supported on ARM\n");
+             "passthrough=\"%s\" not supported on ARM\n",
+             libxl_passthrough_to_string(c_info->passthrough));
         rc = ERROR_INVAL;
         goto out;
     }
