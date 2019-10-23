@@ -386,7 +386,7 @@ config TRACEBUFFER
 	default y
 	---help---
 	  Enable tracing infrastructure and pre-defined tracepoints within Xen.
-	  This will allow live information about Xen’s execution and performance
+	  This will allow live information about Xen's execution and performance
 	  to be collected at run time for debugging or performance analysis.
 	  Memory and execution overhead when not active is minimal.
 
