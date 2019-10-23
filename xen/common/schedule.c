@@ -3102,13 +3102,17 @@ void __init sched_setup_dom0_vcpus(struct domain *d)
     for ( i = 1; i < d->max_vcpus; i++ )
         vcpu_create(d, i);
 
-    for_each_sched_unit ( d, unit )
+    /*
+     * PV-shim: vcpus are pinned 1:1.
+     * Initially only 1 cpu is online, others will be dealt with when
+     * onlining them. This avoids pinning a vcpu to a not yet online cpu here.
+     */
+    if ( pv_shim )
+        sched_set_affinity(d->vcpu[0]->sched_unit,
+                           cpumask_of(0), cpumask_of(0));
+    else
     {
-        unsigned int id = unit->unit_id;
-
-        if ( pv_shim )
-            sched_set_affinity(unit, cpumask_of(id), cpumask_of(id));
-        else
+        for_each_sched_unit ( d, unit )
         {
             if ( !opt_dom0_vcpus_pin && !dom0_affinity_relaxed )
                 sched_set_affinity(unit, &dom0_cpus, NULL);

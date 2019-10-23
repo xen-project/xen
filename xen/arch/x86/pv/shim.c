@@ -837,6 +837,8 @@ long pv_shim_cpu_up(void *data)
                     v->vcpu_id, rc);
             return rc;
         }
+
+        vcpu_set_hard_affinity(v, cpumask_of(v->vcpu_id));
     }
 
     wake = test_and_clear_bit(_VPF_down, &v->pause_flags);
