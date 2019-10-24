@@ -2369,7 +2369,7 @@ static void pi_notification_interrupt(struct cpu_user_regs *regs)
 }
 
 static void __init lbr_tsx_fixup_check(void);
-static void __init bdw_erratum_bdf14_fixup_check(void);
+static void __init bdf93_fixup_check(void);
 
 const struct hvm_function_table * __init start_vmx(void)
 {
@@ -2438,7 +2438,7 @@ const struct hvm_function_table * __init start_vmx(void)
     setup_vmcs_dump();
 
     lbr_tsx_fixup_check();
-    bdw_erratum_bdf14_fixup_check();
+    bdf93_fixup_check();
 
     return &vmx_function_table;
 }
@@ -2722,11 +2722,11 @@ enum
 
 #define LBR_MSRS_INSERTED      (1u << 0)
 #define LBR_FIXUP_TSX          (1u << 1)
-#define LBR_FIXUP_BDF14        (1u << 2)
-#define LBR_FIXUP_MASK         (LBR_FIXUP_TSX | LBR_FIXUP_BDF14)
+#define LBR_FIXUP_BDF93        (1u << 2)
+#define LBR_FIXUP_MASK         (LBR_FIXUP_TSX | LBR_FIXUP_BDF93)
 
 static bool __read_mostly lbr_tsx_fixup_needed;
-static bool __read_mostly bdw_erratum_bdf14_fixup_needed;
+static bool __read_mostly bdf93_fixup_needed;
 static uint32_t __read_mostly lbr_from_start;
 static uint32_t __read_mostly lbr_from_end;
 static uint32_t __read_mostly lbr_lastint_from;
@@ -2763,11 +2763,18 @@ static void __init lbr_tsx_fixup_check(void)
     }
 }
 
-static void __init bdw_erratum_bdf14_fixup_check(void)
+static void __init bdf93_fixup_check(void)
 {
-    /* Broadwell E5-2600 v4 processors need to work around erratum BDF14. */
-    if ( boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 79 )
-        bdw_erratum_bdf14_fixup_needed = true;
+    /*
+     * Broadwell erratum BDF93:
+     *
+     * Reads from MSR_LER_TO_LIP (MSR 1DEH) may return values for bits[63:61]
+     * that are not equal to bit[47].  Attempting to context switch this value
+     * may cause a #GP.  Software should sign extend the MSR.
+     */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+         boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x4f )
+        bdf93_fixup_needed = true;
 }
 
 static int is_last_branch_msr(u32 ecx)
@@ -3128,8 +3135,8 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             v->arch.hvm.vmx.lbr_flags |= LBR_MSRS_INSERTED;
             if ( lbr_tsx_fixup_needed )
                 v->arch.hvm.vmx.lbr_flags |= LBR_FIXUP_TSX;
-            if ( bdw_erratum_bdf14_fixup_needed )
-                v->arch.hvm.vmx.lbr_flags |= LBR_FIXUP_BDF14;
+            if ( bdf93_fixup_needed )
+                v->arch.hvm.vmx.lbr_flags |= LBR_FIXUP_BDF93;
         }
 
         __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
@@ -4148,20 +4155,10 @@ static void sign_extend_msr(struct vcpu *v, u32 msr, int type)
         entry->data = canonicalise_addr(entry->data);
 }
 
-static void bdw_erratum_bdf14_fixup(void)
+static void bdf93_fixup(void)
 {
     struct vcpu *curr = current;
 
-    /*
-     * Occasionally, on certain Broadwell CPUs MSR_IA32_LASTINTTOIP has
-     * been observed to have the top three bits corrupted as though the
-     * MSR is using the LBR_FORMAT_EIP_FLAGS_TSX format. This is
-     * incorrect and causes a vmentry failure -- the MSR should contain
-     * an offset into the current code segment. This is assumed to be
-     * erratum BDF14. Fix up MSR_IA32_LASTINT{FROM,TO}IP by
-     * sign-extending into bits 48:63.
-     */
-    sign_extend_msr(curr, MSR_IA32_LASTINTFROMIP, VMX_MSR_GUEST);
     sign_extend_msr(curr, MSR_IA32_LASTINTTOIP, VMX_MSR_GUEST);
 }
 
@@ -4171,8 +4168,8 @@ static void lbr_fixup(void)
 
     if ( curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_TSX )
         lbr_tsx_fixup();
-    if ( curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_BDF14 )
-        bdw_erratum_bdf14_fixup();
+    if ( curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_BDF93 )
+        bdf93_fixup();
 }
 
 /* Returns false if the vmentry has to be restarted */
