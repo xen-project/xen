@@ -540,3 +540,28 @@ void pci_vtd_quirk(const struct pci_dev *pdev)
         break;
     }
 }
+
+void __init quirk_iommu_caps(struct iommu *iommu)
+{
+    /*
+     * IOMMU Quirks:
+     *
+     * SandyBridge IOMMUs claim support for 2M and 1G superpages, but don't
+     * implement superpages internally.
+     *
+     * There are issues changing the walk length under in-flight DMA, which
+     * has manifested as incompatibility between EPT/IOMMU sharing and the
+     * workaround for CVE-2018-12207 / XSA-304.  Hide the superpages
+     * capabilities in the IOMMU, which will prevent Xen from sharing the EPT
+     * and IOMMU pagetables.
+     *
+     * Detection of SandyBridge unfortunately has to be done by processor
+     * model because the client parts don't expose their IOMMUs as PCI devices
+     * we could match with a Device ID.
+     */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+         boot_cpu_data.x86 == 6 &&
+         (boot_cpu_data.x86_model == 0x2a ||
+          boot_cpu_data.x86_model == 0x2d) )
+        iommu->cap &= ~(0xful << 34);
+}
