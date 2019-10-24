@@ -1145,6 +1145,8 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     iommu->msi.irq = -1; /* No irq assigned yet. */
     iommu->node = NUMA_NO_NODE;
     INIT_LIST_HEAD(&iommu->ats_devices);
+    spin_lock_init(&iommu->lock);
+    spin_lock_init(&iommu->register_lock);
     spin_lock_init(&iommu->intremap.lock);
 
     iommu->drhd = drhd;
@@ -1197,21 +1199,18 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     nr_dom = cap_ndoms(iommu->cap);
     iommu->domid_bitmap = xzalloc_array(unsigned long, BITS_TO_LONGS(nr_dom));
     if ( !iommu->domid_bitmap )
-        return -ENOMEM ;
+        return -ENOMEM;
 
     /*
      * if Caching mode is set, then invalid translations are tagged with
      * domain id 0, Hence reserve bit 0 for it
      */
     if ( cap_caching_mode(iommu->cap) )
-        set_bit(0, iommu->domid_bitmap);
+        __set_bit(0, iommu->domid_bitmap);
 
     iommu->domid_map = xzalloc_array(u16, nr_dom);
     if ( !iommu->domid_map )
-        return -ENOMEM ;
-
-    spin_lock_init(&iommu->lock);
-    spin_lock_init(&iommu->register_lock);
+        return -ENOMEM;
 
     return 0;
 }
@@ -2272,15 +2271,10 @@ static int __init vtd_setup(void)
     {
         iommu = drhd->iommu;
 
-        printk("Intel VT-d iommu %"PRIu32" supported page sizes: 4kB",
-               iommu->index);
-        if (cap_sps_2mb(iommu->cap))
-            printk(", 2MB");
-
-        if (cap_sps_1gb(iommu->cap))
-            printk(", 1GB");
-
-        printk(".\n");
+        printk("Intel VT-d iommu %u supported page sizes: 4kB%s%s\n",
+               iommu->index,
+               cap_sps_2mb(iommu->cap) ? ", 2MB" : "",
+               cap_sps_1gb(iommu->cap) ? ", 1GB" : "");
 
         if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
             iommu_snoop = 0;
