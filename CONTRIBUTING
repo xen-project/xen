@@ -13,7 +13,7 @@ Most of the Xen Project code is licensed under GPLv2, but a number of
 directories are primarily licensed under different licenses.
 
 Most notably:
- - tools/blktap2      : BSD-Modified
+ - tools/libs         : LGPL v2.1
  - tools/libxc        : LGPL v2.1
  - tools/libxl        : LGPL v2.1
  - tools/xl           : LGPL v2.1
