@@ -644,6 +644,105 @@ static struct platform_timesource __initdata plt_xen_timer =
 };
 #endif
 
+#ifdef CONFIG_HYPERV_GUEST
+/************************************************************
+ * HYPER-V REFERENCE TSC
+ */
+#include <asm/guest/hyperv-tlfs.h>
+
+static struct ms_hyperv_tsc_page *hyperv_tsc;
+static struct page_info *hyperv_tsc_page;
+
+static int64_t __init init_hyperv_timer(struct platform_timesource *pts)
+{
+    paddr_t maddr;
+    uint64_t tsc_msr, freq;
+
+    if ( !(ms_hyperv.features & HV_MSR_REFERENCE_TSC_AVAILABLE) ||
+         !(ms_hyperv.features & HV_X64_ACCESS_FREQUENCY_MSRS) )
+        return 0;
+
+    hyperv_tsc_page = alloc_domheap_page(NULL, 0);
+    if ( !hyperv_tsc_page )
+        return 0;
+
+    hyperv_tsc = __map_domain_page_global(hyperv_tsc_page);
+    if ( !hyperv_tsc )
+    {
+        free_domheap_page(hyperv_tsc_page);
+        hyperv_tsc_page = NULL;
+        return 0;
+    }
+
+    maddr = page_to_maddr(hyperv_tsc_page);
+
+    /*
+     * Per Hyper-V TLFS:
+     *   1. Read existing MSR value
+     *   2. Preserve bits [11:1]
+     *   3. Set bits [63:12] to be guest physical address of tsc page
+     *   4. Set enabled bit (0)
+     *   5. Write back new MSR value
+     */
+    rdmsrl(HV_X64_MSR_REFERENCE_TSC, tsc_msr);
+    tsc_msr &= 0xffe;
+    tsc_msr |= maddr | 1 /* enabled */;
+    wrmsrl(HV_X64_MSR_REFERENCE_TSC, tsc_msr);
+
+    /* Get TSC frequency from Hyper-V */
+    rdmsrl(HV_X64_MSR_TSC_FREQUENCY, freq);
+    pts->frequency = freq;
+
+    return freq;
+}
+
+static inline uint64_t read_hyperv_timer(void)
+{
+    uint64_t scale, offset, ret, tsc;
+    uint32_t seq;
+    const struct ms_hyperv_tsc_page *tsc_page = hyperv_tsc;
+
+    do {
+        seq = tsc_page->tsc_sequence;
+
+        /* Seq 0 is special. It means the TSC enlightenment is not
+         * available at the moment. The reference time can only be
+         * obtained from the Reference Counter MSR.
+         */
+        if ( seq == 0 )
+        {
+            rdmsrl(HV_X64_MSR_TIME_REF_COUNT, ret);
+            return ret;
+        }
+
+        /* rdtsc_ordered already contains a load fence */
+        tsc = rdtsc_ordered();
+        scale = tsc_page->tsc_scale;
+        offset = tsc_page->tsc_offset;
+
+        smp_rmb();
+
+    } while ( tsc_page->tsc_sequence != seq );
+
+    /* ret = ((tsc * scale) >> 64) + offset; */
+    asm ( "mul %[scale]; add %[offset], %[ret]"
+          : "+a" (tsc), [ret] "=&d" (ret)
+          : [scale] "rm" (scale), [offset] "rm" (offset) );
+
+    return ret;
+}
+
+static struct platform_timesource __initdata plt_hyperv_timer =
+{
+    .id = "hyperv",
+    .name = "HYPER-V REFERENCE TSC",
+    .read_counter = read_hyperv_timer,
+    .init = init_hyperv_timer,
+    /* See TSC time source for why counter_bits is set to 63 */
+    .counter_bits = 63,
+};
+#endif
+
 /************************************************************
  * GENERIC PLATFORM TIMER INFRASTRUCTURE
  */
@@ -793,6 +892,9 @@ static u64 __init init_platform_timer(void)
     static struct platform_timesource * __initdata plt_timers[] = {
 #ifdef CONFIG_XEN_GUEST
         &plt_xen_timer,
+#endif
+#ifdef CONFIG_HYPERV_GUEST
+        &plt_hyperv_timer,
 #endif
         &plt_hpet, &plt_pmtimer, &plt_pit
     };
