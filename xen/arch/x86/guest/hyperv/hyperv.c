@@ -21,6 +21,9 @@
 #include <xen/init.h>
 
 #include <asm/guest.h>
+#include <asm/guest/hyperv-tlfs.h>
+
+struct ms_hyperv_info __read_mostly ms_hyperv;
 
 static const struct hypervisor_ops ops = {
     .name = "Hyper-V",
@@ -39,6 +42,20 @@ const struct hypervisor_ops *__init hyperv_probe(void)
     cpuid(0x40000001, &eax, &ebx, &ecx, &edx);
     if ( eax != 0x31237648 )    /* Hv#1 */
         return NULL;
+
+    /* Extract more information from Hyper-V */
+    cpuid(HYPERV_CPUID_FEATURES, &eax, &ebx, &ecx, &edx);
+    ms_hyperv.features = eax;
+    ms_hyperv.misc_features = edx;
+
+    ms_hyperv.hints = cpuid_eax(HYPERV_CPUID_ENLIGHTMENT_INFO);
+
+    if ( ms_hyperv.hints & HV_X64_ENLIGHTENED_VMCS_RECOMMENDED )
+        ms_hyperv.nested_features = cpuid_eax(HYPERV_CPUID_NESTED_FEATURES);
+
+    cpuid(HYPERV_CPUID_IMPLEMENT_LIMITS, &eax, &ebx, &ecx, &edx);
+    ms_hyperv.max_vp_index = eax;
+    ms_hyperv.max_lp_index = ebx;
 
     return &ops;
 }

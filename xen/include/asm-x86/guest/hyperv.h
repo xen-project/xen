@@ -21,7 +21,19 @@
 
 #ifdef CONFIG_HYPERV_GUEST
 
+#include <xen/types.h>
+
 #include <asm/guest/hypervisor.h>
+
+struct ms_hyperv_info {
+    uint32_t features;
+    uint32_t misc_features;
+    uint32_t hints;
+    uint32_t nested_features;
+    uint32_t max_vp_index;
+    uint32_t max_lp_index;
+};
+extern struct ms_hyperv_info ms_hyperv;
 
 const struct hypervisor_ops *hyperv_probe(void);
 
