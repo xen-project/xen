@@ -101,6 +101,8 @@ void vtd_ops_postamble_quirk(struct vtd_iommu *iommu);
 int __must_check me_wifi_quirk(struct domain *domain,
                                u8 bus, u8 devfn, int map);
 void pci_vtd_quirk(const struct pci_dev *);
+void quirk_iommu_caps(struct vtd_iommu *iommu);
+
 bool_t platform_supports_intremap(void);
 bool_t platform_supports_x2apic(void);
 
