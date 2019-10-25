@@ -29,9 +29,6 @@
 #undef __ASSEMBLY__
 #endif
 
-/* Using SetVirtualAddressMap() is incompatible with kexec: */
-#undef USE_SET_VIRTUAL_ADDRESS_MAP
-
 #define EFI_REVISION(major, minor) (((major) << 16) | (minor))
 
 #define SMBIOS3_TABLE_GUID \
@@ -1103,9 +1100,6 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
 
     /* Adjust pointers into EFI. */
     efi_ct = (void *)efi_ct + DIRECTMAP_VIRT_START;
-#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
-    efi_rs = (void *)efi_rs + DIRECTMAP_VIRT_START;
-#endif
     efi_memmap = (void *)efi_memmap + DIRECTMAP_VIRT_START;
     efi_fw_vendor = (void *)efi_fw_vendor + DIRECTMAP_VIRT_START;
 }
@@ -1426,7 +1420,6 @@ static int __init parse_efi_param(const char *s)
 }
 custom_param("efi", parse_efi_param);
 
-#ifndef USE_SET_VIRTUAL_ADDRESS_MAP
 static __init void copy_mapping(unsigned long mfn, unsigned long end,
                                 bool (*is_valid)(unsigned long smfn,
                                                  unsigned long emfn))
@@ -1470,7 +1463,6 @@ static bool __init rt_range_valid(unsigned long smfn, unsigned long emfn)
 {
     return true;
 }
-#endif
 
 #define INVALID_VIRTUAL_ADDRESS (0xBAAADUL << \
                                  (EFI_PAGE_SHIFT + BITS_PER_LONG - 32))
@@ -1478,13 +1470,11 @@ static bool __init rt_range_valid(unsigned long smfn, unsigned long emfn)
 void __init efi_init_memory(void)
 {
     unsigned int i;
-#ifndef USE_SET_VIRTUAL_ADDRESS_MAP
     struct rt_extra {
         struct rt_extra *next;
         unsigned long smfn, emfn;
         unsigned int prot;
     } *extra, *extra_head = NULL;
-#endif
 
     free_ebmalloc_unused_mem();
 
@@ -1567,7 +1557,6 @@ void __init efi_init_memory(void)
                 printk(XENLOG_ERR "Could not map MFNs %#lx-%#lx\n",
                        smfn, emfn - 1);
         }
-#ifndef USE_SET_VIRTUAL_ADDRESS_MAP
         else if ( !((desc->PhysicalStart + len - 1) >> (VADDR_BITS - 1)) &&
                   (extra = xmalloc(struct rt_extra)) != NULL )
         {
@@ -1578,12 +1567,8 @@ void __init efi_init_memory(void)
             extra_head = extra;
             desc->VirtualStart = desc->PhysicalStart;
         }
-#endif
         else
         {
-#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
-            /* XXX allocate e.g. down from FIXADDR_START */
-#endif
             printk(XENLOG_ERR "No mapping for MFNs %#lx-%#lx\n",
                    smfn, emfn - 1);
         }
@@ -1595,10 +1580,6 @@ void __init efi_init_memory(void)
         return;
     }
 
-#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
-    efi_rs->SetVirtualAddressMap(efi_memmap_size, efi_mdesc_size,
-                                 mdesc_ver, efi_memmap);
-#else
     /* Set up 1:1 page tables to do runtime calls in "physical" mode. */
     efi_l4_pgtable = alloc_xen_pagetable();
     BUG_ON(!efi_l4_pgtable);
@@ -1684,6 +1665,5 @@ void __init efi_init_memory(void)
     for ( i = l4_table_offset(HYPERVISOR_VIRT_START);
           i < l4_table_offset(DIRECTMAP_VIRT_END); ++i )
         efi_l4_pgtable[i] = idle_pg_table[i];
-#endif
 }
 #endif
