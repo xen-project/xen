@@ -92,6 +92,9 @@ typedef union {
 #define xfree(p) free(p)
 
 #define pci_get_pdev_by_domain(...) &test_pdev
+#define pci_get_ro_map(...) NULL
+
+#define test_bit(...) false
 
 /* Dummy native helpers. Writes are ignored, reads return 1's. */
 #define pci_conf_read8(...)     0xff
