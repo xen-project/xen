@@ -397,7 +397,7 @@ static void amd_xc_cpuid_policy(const struct cpuid_domain_info *info,
     {
     case 0x00000002:
     case 0x00000004:
-        regs[0] = regs[1] = regs[2] = 0;
+        regs[0] = regs[1] = regs[2] = regs[3] = 0;
         break;
 
     case 0x80000000:
@@ -407,11 +407,20 @@ static void amd_xc_cpuid_policy(const struct cpuid_domain_info *info,
 
     case 0x80000008:
         /*
-         * ECX[15:12] is ApicIdCoreSize: ECX[7:0] is NumberOfCores (minus one).
-         * Update to reflect vLAPIC_ID = vCPU_ID * 2.
+         * ECX[15:12] is ApicIdCoreSize.
+         * ECX[7:0] is NumberOfCores (minus one).
+         * Update to reflect vLAPIC_ID = vCPU_ID * 2.  But make sure to avoid
+         * - overflow,
+         * - going out of sync with leaf 1 EBX[23:16],
+         * - incrementing ApicIdCoreSize when it's zero (which changes the
+         *   meaning of bits 7:0).
          */
-        regs[2] = ((regs[2] + (1u << 12)) & 0xf000u) |
-                  ((regs[2] & 0xffu) << 1) | 1u;
+        if ( (regs[2] & 0xffu) < 0x7fu )
+        {
+            if ( (regs[2] & 0xf000u) && (regs[2] & 0xf000u) != 0xf000u )
+                regs[2] = ((regs[2] + 0x1000u) & 0xf000u) | (regs[2] & 0xffu);
+            regs[2] = (regs[2] & 0xf000u) | ((regs[2] & 0x7fu) << 1) | 1u;
+        }
         break;
 
     case 0x8000000a: {
@@ -490,9 +499,13 @@ static void xc_cpuid_hvm_policy(const struct cpuid_domain_info *info,
     case 0x00000001:
         /*
          * EBX[23:16] is Maximum Logical Processors Per Package.
-         * Update to reflect vLAPIC_ID = vCPU_ID * 2.
+         * Update to reflect vLAPIC_ID = vCPU_ID * 2, but make sure to avoid
+         * overflow.
          */
-        regs[1] = (regs[1] & 0x0000ffffu) | ((regs[1] & 0x007f0000u) << 1);
+        if ( !(regs[1] & 0x00800000u) )
+            regs[1] = (regs[1] & 0x0000ffffu) | ((regs[1] & 0x007f0000u) << 1);
+        else
+            regs[1] &= 0x00ffffffu;
 
         regs[2] = info->featureset[featureword_of(X86_FEATURE_SSE3)];
         regs[3] = (info->featureset[featureword_of(X86_FEATURE_FPU)] |
