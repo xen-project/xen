@@ -1060,11 +1060,17 @@ static void __init efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop
         efi_arch_video_init(gop, info_size, mode_info);
 }
 
+#define INVALID_VIRTUAL_ADDRESS (0xBAAADUL << \
+                                 (EFI_PAGE_SHIFT + BITS_PER_LONG - 32))
+
 static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_STATUS status;
     UINTN info_size = 0, map_key;
     bool retry;
+#ifdef CONFIG_EFI_SET_VIRTUAL_ADDRESS_MAP
+    unsigned int i;
+#endif
 
     efi_bs->GetMemoryMap(&info_size, NULL, &map_key,
                          &efi_mdesc_size, &mdesc_ver);
@@ -1097,6 +1103,26 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
 
     if ( EFI_ERROR(status) )
         PrintErrMesg(L"Cannot exit boot services", status);
+
+#ifdef CONFIG_EFI_SET_VIRTUAL_ADDRESS_MAP
+    for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
+    {
+        EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
+
+        if ( desc->Attribute & EFI_MEMORY_RUNTIME )
+            desc->VirtualStart = desc->PhysicalStart;
+        else
+            desc->VirtualStart = INVALID_VIRTUAL_ADDRESS;
+    }
+    status = efi_rs->SetVirtualAddressMap(efi_memmap_size, efi_mdesc_size,
+                                          mdesc_ver, efi_memmap);
+    if ( status != EFI_SUCCESS )
+    {
+        printk(XENLOG_ERR "EFI: SetVirtualAddressMap() failed (%#lx), disabling runtime services\n",
+               status);
+        __clear_bit(EFI_RS, &efi_flags);
+    }
+#endif
 
     /* Adjust pointers into EFI. */
     efi_ct = (void *)efi_ct + DIRECTMAP_VIRT_START;
@@ -1464,8 +1490,6 @@ static bool __init rt_range_valid(unsigned long smfn, unsigned long emfn)
     return true;
 }
 
-#define INVALID_VIRTUAL_ADDRESS (0xBAAADUL << \
-                                 (EFI_PAGE_SHIFT + BITS_PER_LONG - 32))
 
 void __init efi_init_memory(void)
 {
@@ -1580,7 +1604,10 @@ void __init efi_init_memory(void)
         return;
     }
 
-    /* Set up 1:1 page tables to do runtime calls in "physical" mode. */
+    /*
+     * Set up 1:1 page tables for runtime calls. See SetVirtualAddressMap() in
+     * efi_exit_boot().
+     */
     efi_l4_pgtable = alloc_xen_pagetable();
     BUG_ON(!efi_l4_pgtable);
     clear_page(efi_l4_pgtable);

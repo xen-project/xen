@@ -115,6 +115,16 @@ config KEXEC
 
 	  If unsure, say Y.
 
+config EFI_SET_VIRTUAL_ADDRESS_MAP
+    bool "EFI: call SetVirtualAddressMap()" if EXPERT = "y"
+    ---help---
+      Call EFI SetVirtualAddressMap() runtime service to setup memory map for
+      further runtime services. According to UEFI spec, it isn't strictly
+      necessary, but many UEFI implementations misbehave when this call is
+      missing.
+
+      If unsure, say N.
+
 config XENOPROF
 	def_bool y
 	prompt "Xen Oprofile Support" if EXPERT = "y"
