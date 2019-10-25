@@ -492,35 +492,8 @@ static void __enable_x2apic(void)
 
 static void resume_x2apic(void)
 {
-    struct IO_APIC_route_entry **ioapic_entries = NULL;
-
-    ASSERT(x2apic_enabled);
-
-    ioapic_entries = alloc_ioapic_entries();
-    if ( !ioapic_entries )
-    {
-        printk("Allocate ioapic_entries failed\n");
-        goto out;
-    }
-
-    if ( save_IO_APIC_setup(ioapic_entries) )
-    {
-        printk("Saving IO-APIC state failed\n");
-        goto out;
-    }
-
-    mask_8259A();
-    mask_IO_APIC_setup(ioapic_entries);
-
     iommu_enable_x2apic();
     __enable_x2apic();
-
-    restore_IO_APIC_setup(ioapic_entries);
-    unmask_8259A();
-
-out:
-    if ( ioapic_entries )
-        free_ioapic_entries(ioapic_entries);
 }
 
 void setup_local_APIC(void)
