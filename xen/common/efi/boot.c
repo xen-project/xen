@@ -1126,6 +1126,7 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
 
     /* Adjust pointers into EFI. */
     efi_ct = (void *)efi_ct + DIRECTMAP_VIRT_START;
+    efi_rs = (void *)efi_rs + DIRECTMAP_VIRT_START;
     efi_memmap = (void *)efi_memmap + DIRECTMAP_VIRT_START;
     efi_fw_vendor = (void *)efi_fw_vendor + DIRECTMAP_VIRT_START;
 }

@@ -211,12 +211,7 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
         break;
     case XEN_FW_EFI_RT_VERSION:
     {
-        struct efi_rs_state state = efi_rs_enter();
-
-        if ( !state.cr3 )
-            return -EOPNOTSUPP;
         info->version = efi_rs->Hdr.Revision;
-        efi_rs_leave(&state);
         break;
     }
     case XEN_FW_EFI_CONFIG_TABLE:
@@ -618,12 +613,11 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             break;
         }
 
-        state = efi_rs_enter();
-        if ( !state.cr3 || (efi_rs->Hdr.Revision >> 16) < 2 )
-        {
-            efi_rs_leave(&state);
+        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
             return -EOPNOTSUPP;
-        }
+        state = efi_rs_enter();
+        if ( !state.cr3 )
+            return -EOPNOTSUPP;
         status = efi_rs->QueryVariableInfo(
             op->u.query_variable_info.attr,
             &op->u.query_variable_info.max_store_size,
@@ -637,13 +631,8 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         if ( op->misc )
             return -EINVAL;
 
-        state = efi_rs_enter();
-        if ( !state.cr3 || (efi_rs->Hdr.Revision >> 16) < 2 )
-        {
-            efi_rs_leave(&state);
+        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
             return -EOPNOTSUPP;
-        }
-        efi_rs_leave(&state);
         /* XXX fall through for now */
     default:
         return -ENOSYS;
