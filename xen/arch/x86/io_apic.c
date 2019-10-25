@@ -379,7 +379,8 @@ void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
 /*
  * Restore IO APIC entries which was saved in ioapic_entries.
  */
-int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
+int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries,
+                          bool raw)
 {
     int apic, pin;
 
@@ -394,7 +395,7 @@ int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
             return -ENOMEM;
 
         for (pin = 0; pin < nr_ioapic_entries[apic]; pin++)
-	    ioapic_write_entry(apic, pin, 1, ioapic_entries[apic][pin]);
+	    ioapic_write_entry(apic, pin, raw, ioapic_entries[apic][pin]);
     }
 
     return 0;

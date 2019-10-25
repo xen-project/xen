@@ -197,7 +197,8 @@ extern struct IO_APIC_route_entry **alloc_ioapic_entries(void);
 extern void free_ioapic_entries(struct IO_APIC_route_entry **ioapic_entries);
 extern int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries);
 extern void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries);
-extern int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries);
+extern int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries,
+                                 bool raw);
 
 unsigned highest_gsi(void);
 
