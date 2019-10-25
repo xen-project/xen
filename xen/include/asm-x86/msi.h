@@ -92,6 +92,7 @@ extern int __setup_msi_irq(struct irq_desc *, struct msi_desc *,
 extern void teardown_msi_irq(int irq);
 extern int msi_free_vector(struct msi_desc *entry);
 extern int pci_restore_msi_state(struct pci_dev *pdev);
+extern int pci_reset_msix_state(struct pci_dev *pdev);
 
 struct msi_desc {
 	struct msi_attrib {
