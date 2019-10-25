@@ -19,6 +19,7 @@
 
 #include <xen/errno.h>
 #include <xen/acpi.h>
+#include <xen/keyhandler.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/irq.h>
@@ -1460,12 +1461,6 @@ int __init amd_iommu_init(bool xt)
     if ( rc )
         goto error_out;
 
-    /* initialize io-apic interrupt remapping entries */
-    if ( iommu_intremap )
-        rc = amd_iommu_setup_ioapic_remapping();
-    if ( rc )
-        goto error_out;
-
     /* Allocate and initialize device table(s). */
     pci_init = !xt;
     rc = iterate_ivrs_mappings(amd_iommu_setup_device_table);
@@ -1493,6 +1488,10 @@ int __init amd_iommu_init(bool xt)
         if ( rc )
             goto error_out;
     }
+
+    if ( iommu_intremap )
+        register_keyhandler('V', &amd_iommu_dump_intremap_tables,
+                            "dump IOMMU intremap tables", 0);
 
     return 0;
 

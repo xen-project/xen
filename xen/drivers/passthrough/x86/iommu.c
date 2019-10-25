@@ -21,6 +21,7 @@
 #include <xsm/xsm.h>
 
 #include <asm/hvm/io.h>
+#include <asm/io_apic.h>
 #include <asm/setup.h>
 
 const struct iommu_init_ops *__initdata iommu_init_ops;
@@ -28,6 +29,7 @@ struct iommu_ops __read_mostly iommu_ops;
 
 int __init iommu_hardware_setup(void)
 {
+    struct IO_APIC_route_entry **ioapic_entries = NULL;
     int rc;
 
     if ( !iommu_init_ops )
@@ -43,7 +45,37 @@ int __init iommu_hardware_setup(void)
         /* x2apic setup may have previously initialised the struct. */
         ASSERT(iommu_ops.init == iommu_init_ops->ops->init);
 
-    return iommu_init_ops->setup();
+    if ( !x2apic_enabled && iommu_intremap )
+    {
+        /*
+         * If x2APIC is enabled interrupt remapping is already enabled, so
+         * there's no need to mess with the IO-APIC because the remapping
+         * entries are already correctly setup by x2apic_bsp_setup.
+         */
+        ioapic_entries = alloc_ioapic_entries();
+        if ( !ioapic_entries )
+            return -ENOMEM;
+        rc = save_IO_APIC_setup(ioapic_entries);
+        if ( rc )
+        {
+            free_ioapic_entries(ioapic_entries);
+            return rc;
+        }
+
+        mask_8259A();
+        mask_IO_APIC_setup(ioapic_entries);
+    }
+
+    rc = iommu_init_ops->setup();
+
+    if ( ioapic_entries )
+    {
+        restore_IO_APIC_setup(ioapic_entries, rc);
+        unmask_8259A();
+        free_ioapic_entries(ioapic_entries);
+    }
+
+    return rc;
 }
 
 int iommu_enable_x2apic(void)

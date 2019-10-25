@@ -21,7 +21,6 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/io_apic.h>
-#include <xen/keyhandler.h>
 #include <xen/softirq.h>
 
 union irte32 {
@@ -78,8 +77,6 @@ void *shared_intremap_table;
 unsigned long *shared_intremap_inuse;
 static DEFINE_SPINLOCK(shared_intremap_lock);
 unsigned int nr_ioapic_sbdf;
-
-static void dump_intremap_tables(unsigned char key);
 
 #define intremap_page_order(irt) PFN_ORDER(virt_to_page(irt))
 
@@ -350,91 +347,6 @@ static int update_intremap_entry_from_ioapic(
     spin_unlock_irqrestore(lock, flags);
 
     set_rte_index(rte, offset);
-
-    return 0;
-}
-
-int __init amd_iommu_setup_ioapic_remapping(void)
-{
-    struct IO_APIC_route_entry rte;
-    unsigned long flags;
-    union irte_ptr entry;
-    int apic, pin;
-    u8 delivery_mode, dest, vector, dest_mode;
-    u16 seg, bdf, req_id;
-    struct amd_iommu *iommu;
-    spinlock_t *lock;
-    unsigned int offset;
-
-    /* Read ioapic entries and update interrupt remapping table accordingly */
-    for ( apic = 0; apic < nr_ioapics; apic++ )
-    {
-        for ( pin = 0; pin < nr_ioapic_entries[apic]; pin++ )
-        {
-            unsigned int idx;
-
-            rte = __ioapic_read_entry(apic, pin, 1);
-            if ( rte.mask == 1 )
-                continue;
-
-            /* get device id of ioapic devices */
-            idx = ioapic_id_to_index(IO_APIC_ID(apic));
-            if ( idx == MAX_IO_APICS )
-                return -EINVAL;
-
-            bdf = ioapic_sbdf[idx].bdf;
-            seg = ioapic_sbdf[idx].seg;
-            iommu = find_iommu_for_device(seg, bdf);
-            if ( !iommu )
-            {
-                AMD_IOMMU_DEBUG("Fail to find iommu for ioapic "
-                                "device id = %04x:%04x\n", seg, bdf);
-                continue;
-            }
-
-            req_id = get_intremap_requestor_id(iommu->seg, bdf);
-            lock = get_intremap_lock(iommu->seg, req_id);
-
-            delivery_mode = rte.delivery_mode;
-            vector = rte.vector;
-            dest_mode = rte.dest_mode;
-            dest = rte.dest.logical.logical_dest;
-
-            if ( iommu->ctrl.xt_en )
-            {
-                /*
-                 * In x2APIC mode we have no way of discovering the high 24
-                 * bits of the destination of an already enabled interrupt.
-                 * We come here earlier than for xAPIC mode, so no interrupts
-                 * should have been set up before.
-                 */
-                AMD_IOMMU_DEBUG("Unmasked IO-APIC#%u entry %u in x2APIC mode\n",
-                                IO_APIC_ID(apic), pin);
-            }
-
-            spin_lock_irqsave(lock, flags);
-            offset = alloc_intremap_entry(iommu, req_id, 1);
-            BUG_ON(offset >= INTREMAP_MAX_ENTRIES);
-            entry = get_intremap_entry(iommu, req_id, offset);
-            update_intremap_entry(iommu, entry, vector,
-                                  delivery_mode, dest_mode, dest);
-            spin_unlock_irqrestore(lock, flags);
-
-            set_rte_index(&rte, offset);
-            ioapic_sbdf[idx].pin_2_idx[pin] = offset;
-            __ioapic_write_entry(apic, pin, 1, rte);
-
-            if ( iommu->enabled )
-            {
-                spin_lock_irqsave(&iommu->lock, flags);
-                amd_iommu_flush_intremap(iommu, req_id);
-                spin_unlock_irqrestore(&iommu->lock, flags);
-            }
-        }
-    }
-
-    register_keyhandler('V', &dump_intremap_tables,
-                        "dump IOMMU intremap tables", 0);
 
     return 0;
 }
@@ -982,7 +894,7 @@ static int dump_intremap_mapping(const struct amd_iommu *iommu,
     return 0;
 }
 
-static void dump_intremap_tables(unsigned char key)
+void amd_iommu_dump_intremap_tables(unsigned char key)
 {
     if ( !shared_intremap_table )
     {

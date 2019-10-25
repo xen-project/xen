@@ -114,6 +114,7 @@ int amd_iommu_msi_msg_update_ire(
 void amd_iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);
 int amd_setup_hpet_msi(struct msi_desc *msi_desc);
+void amd_iommu_dump_intremap_tables(unsigned char key);
 
 extern struct ioapic_sbdf {
     u16 bdf, seg;
