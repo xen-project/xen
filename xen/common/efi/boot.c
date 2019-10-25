@@ -1049,8 +1049,12 @@ static void __init efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop
     EFI_STATUS status;
     UINTN info_size;
 
-    /* Set graphics mode. */
-    if ( gop_mode < gop->Mode->MaxMode && gop_mode != gop->Mode->Mode )
+    /*
+     * Set graphics mode to a selected one and reset it if we didn't come
+     * directly from EFI loader as video settings might have been already modified.
+     */
+    if ( gop_mode < gop->Mode->MaxMode &&
+         (gop_mode != gop->Mode->Mode || !efi_enabled(EFI_LOADER)) )
         gop->SetMode(gop, gop_mode);
 
     /* Get graphics and frame buffer info. */
