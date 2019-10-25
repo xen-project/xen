@@ -59,7 +59,9 @@ appropriate branch.
 
 Descriptions of section entries:
 
-	M: Mail patches to: FullName <address@domain>
+	M: Maintainer: FullName <address@domain>
+	   Maintainers should be CCed on patches.  At least one of them
+	   needs to approve changes to the covered files.
 	R: Designated reviewer: FullName <address@domain>
 	   Reviewers should be CCed on patches.  However, they do not
 	   have a formal governance role, and are listed here
