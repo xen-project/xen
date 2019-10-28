@@ -2046,6 +2046,25 @@ static int relinquish_memory(
                     goto out;
                 case -ERESTART:
                     page_list_add(page, list);
+                    /*
+                     * PGT_partial holds a type ref and a general ref.
+                     * If we came in with PGT_partial set, then we 1)
+                     * don't need to grab an extra type count, and 2)
+                     * do need to drop the extra page ref we grabbed
+                     * at the top of the loop.  If we didn't come in
+                     * with PGT_partial set, we 1) do need to drab an
+                     * extra type count, but 2) can transfer the page
+                     * ref we grabbed above to it.
+                     *
+                     * Note that we must increment type_info before
+                     * setting PGT_partial.  Theoretically it should
+                     * be safe to drop the page ref before setting
+                     * PGT_partial, but do it afterwards just to be
+                     * extra safe.
+                     */
+                    if ( !(x & PGT_partial) )
+                        page->u.inuse.type_info++;
+                    smp_wmb();
                     page->u.inuse.type_info |= PGT_partial;
                     if ( x & PGT_partial )
                         put_page(page);
