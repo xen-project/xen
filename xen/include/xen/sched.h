@@ -963,10 +963,22 @@ void watchdog_domain_destroy(struct domain *d);
  *    (that is, this would not be suitable for a driver domain)
  *  - There is never a reason to deny the hardware domain access to this
  */
-#define is_hardware_domain(_d) evaluate_nospec((_d) == hardware_domain)
+static always_inline bool is_hardware_domain(const struct domain *d)
+{
+    if ( IS_ENABLED(CONFIG_PV_SHIM_EXCLUSIVE) )
+        return false;
+
+    return evaluate_nospec(d == hardware_domain);
+}
 
 /* This check is for functionality specific to a control domain */
-#define is_control_domain(_d) evaluate_nospec((_d)->is_privileged)
+static always_inline bool is_control_domain(const struct domain *d)
+{
+    if ( IS_ENABLED(CONFIG_PV_SHIM_EXCLUSIVE) )
+        return false;
+
+    return evaluate_nospec(d->is_privileged);
+}
 
 #define VM_ASSIST(d, t) (test_bit(VMASST_TYPE_ ## t, &(d)->vm_assist))
 
