@@ -2141,6 +2141,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     libxl_domain_build_info_init(&dm_config->b_info);
     libxl_domain_build_info_init_type(&dm_config->b_info, LIBXL_DOMAIN_TYPE_PV);
 
+    dm_config->b_info.shadow_memkb = 0;
     dm_config->b_info.max_vcpus = 1;
     dm_config->b_info.max_memkb = 28 * 1024 +
         guest_config->b_info.video_memkb;
@@ -2167,14 +2168,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     dm_config->c_info.run_hotplug_scripts =
         guest_config->c_info.run_hotplug_scripts;
 
-    libxl_physinfo physinfo;
-    ret = libxl_get_physinfo(CTX, &physinfo);
-    if (ret) goto out;
-
-    ret = libxl__domain_create_info_setdefault(gc, &dm_config->c_info,
-                                               &physinfo);
-    if (ret) goto out;
-    ret = libxl__domain_build_info_setdefault(gc, &dm_config->b_info);
+    ret = libxl__domain_config_setdefault(gc, dm_config, guest_domid);
     if (ret) goto out;
 
     if (libxl_defbool_val(guest_config->b_info.u.hvm.vnc.enable)
