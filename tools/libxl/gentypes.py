@@ -461,6 +461,10 @@ def libxl_C_type_parse_json(ty, w, v, indent = "    ", parent = None, discrimina
         s += "        goto out;\n"
         s += "    }\n"
         s += "    for (i=0; (t=libxl__json_array_get(x,i)); i++) {\n"
+        s += libxl_C_type_do_init(ty.elem_type,
+                    lambda by: ("&" if by == idl.PASS_BY_REFERENCE else "")+
+                               ("%s[i]" % v),
+                                  need_zero=False, indent=indent+"    ")
         s += libxl_C_type_parse_json(ty.elem_type, "t", v+"[i]",
                                      indent + "    ", parent)
         s += "    }\n"
