@@ -90,7 +90,7 @@ static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
 	CAMLparam0();
 	CAMLlocalN(args, 4);
 	struct caml_xtl *xtl = (struct caml_xtl*)logger;
-	value *func = caml_named_value(xtl->vmessage_cb) ;
+	const value *func = caml_named_value(xtl->vmessage_cb);
 	char *msg;
 
 	if (func == NULL)
@@ -120,7 +120,7 @@ static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
 	CAMLparam0();
 	CAMLlocalN(args, 5);
 	struct caml_xtl *xtl = (struct caml_xtl*)logger;
-	value *func = caml_named_value(xtl->progress_cb) ;
+	const value *func = caml_named_value(xtl->progress_cb);
 
 	if (func == NULL)
 		caml_raise_sys_error(caml_copy_string("Unable to find callback"));

@@ -75,7 +75,7 @@ static void failwith_xl(int error, char *fname)
 {
 	CAMLparam0();
 	CAMLlocal1(arg);
-	static value *exc = NULL;
+	static const value *exc = NULL;
 
 	/* First time around, lookup by name */
 	if (!exc)
@@ -424,7 +424,7 @@ void async_callback(libxl_ctx *ctx, int rc, void *for_callback)
 	caml_leave_blocking_section();
 	CAMLparam0();
 	CAMLlocal2(error, tmp);
-	static value *func = NULL;
+	static const value *func = NULL;
 	value *p = (value *) for_callback;
 
 	if (func == NULL) {
@@ -1133,7 +1133,7 @@ value stub_libxl_xen_console_read_start(value ctx, value clear)
 
 static void raise_eof(void)
 {
-	static value *exc = NULL;
+	static const value *exc = NULL;
 
 	/* First time around, lookup by name */
 	if (!exc)
@@ -1274,7 +1274,7 @@ int fd_register(void *user, int fd, void **for_app_registration_out,
 	CAMLparam0();
 	CAMLlocalN(args, 4);
 	int ret = 0;
-	static value *func = NULL;
+	static const value *func = NULL;
 	value *p = (value *) user;
 	value *for_app;
 
@@ -1317,7 +1317,7 @@ int fd_modify(void *user, int fd, void **for_app_registration_update,
 	CAMLparam0();
 	CAMLlocalN(args, 4);
 	int ret = 0;
-	static value *func = NULL;
+	static const value *func = NULL;
 	value *p = (value *) user;
 	value *for_app = *for_app_registration_update;
 
@@ -1356,7 +1356,7 @@ void fd_deregister(void *user, int fd, void *for_app_registration)
 	caml_leave_blocking_section();
 	CAMLparam0();
 	CAMLlocalN(args, 3);
-	static value *func = NULL;
+	static const value *func = NULL;
 	value *p = (value *) user;
 	value *for_app = for_app_registration;
 
@@ -1398,7 +1398,7 @@ int timeout_register(void *user, void **for_app_registration_out,
 	CAMLlocal2(sec, usec);
 	CAMLlocalN(args, 4);
 	int ret = 0;
-	static value *func = NULL;
+	static const value *func = NULL;
 	value *p = (value *) user;
 	struct timeout_handles *handles;
 
@@ -1450,7 +1450,7 @@ int timeout_modify(void *user, void **for_app_registration_update,
 	CAMLlocal1(for_app_update);
 	CAMLlocalN(args, 2);
 	int ret = 0;
-	static value *func = NULL;
+	static const value *func = NULL;
 	value *p = (value *) user;
 	struct timeout_handles *handles = *for_app_registration_update;
 
@@ -1566,7 +1566,7 @@ void event_occurs(void *user, libxl_event *event)
 	CAMLparam0();
 	CAMLlocalN(args, 2);
 	struct user_with_ctx *c_user = (struct user_with_ctx *) user;
-	static value *func = NULL;
+	static const value *func = NULL;
 
 	if (func == NULL) {
 		/* First time around, lookup by name */
@@ -1589,7 +1589,7 @@ void disaster(void *user, libxl_event_type type,
 	CAMLparam0();
 	CAMLlocalN(args, 4);
 	struct user_with_ctx *c_user = (struct user_with_ctx *) user;
-	static value *func = NULL;
+	static const value *func = NULL;
 
 	if (func == NULL) {
 		/* First time around, lookup by name */
