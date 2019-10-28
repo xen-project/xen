@@ -74,7 +74,7 @@ void libxl__arch_domain_build_info_setdefault(libxl__gc *gc,
 
 _hidden
 int libxl__arch_passthrough_mode_setdefault(libxl__gc *gc,
-                                            uint32_t domid,
+                                     uint32_t domid /* for logging, only */,
                                             libxl_domain_config *d_config,
                                             const libxl_physinfo *physinfo);
 

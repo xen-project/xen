@@ -891,7 +891,7 @@ static unsigned long libxl__get_required_iommu_memory(unsigned long maxmem_kb)
 
 int libxl__domain_config_setdefault(libxl__gc *gc,
                                     libxl_domain_config *d_config,
-                                    uint32_t domid)
+                                    uint32_t domid /* for logging, only */)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret;
