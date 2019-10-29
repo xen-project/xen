@@ -287,10 +287,10 @@ def libxl_C_type_copy_deprecated(field, v, indent = "    ", vparent = None):
         if field.type.check_default_fn is None:
             raise Exception(
 "Deprecated field %s type doesn't have a default value checker" % field.name)
-        field_val = field.type.pass_arg(v, vparent is None,
-                                        passby=idl.PASS_BY_VALUE)
-        field_ptr = field.type.pass_arg(v, vparent is None,
-                                        passby=idl.PASS_BY_REFERENCE)
+        field_pass = lambda by: field.type.pass_arg(v, vparent is None,
+                                                    passby=by)
+        field_val = field_pass(idl.PASS_BY_VALUE)
+        field_ptr = field_pass(idl.PASS_BY_REFERENCE)
         s+= "if (!%s(&p->%s) && !%s(%s))\n" % (field.type.check_default_fn,
                                                field.deprecated_by,
                                                field.type.check_default_fn,
