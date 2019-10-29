@@ -165,6 +165,19 @@ def libxl_init_members(ty, nesting = 0):
     else:
         return []
     
+def libxl_C_type_do_init(ty, pass_arg, need_zero=True, indent="    "):
+    s=indent
+    if ty.init_val is not None:
+        s+= "%s = %s;\n" % (pass_arg(idl.PASS_BY_VALUE), ty.init_val)
+    elif ty.init_fn is not None:
+        s+= "%s(%s);\n" % (ty.init_fn, pass_arg(idl.PASS_BY_REFERENCE))
+    elif need_zero:
+        ptr = pass_arg(idl.PASS_BY_REFERENCE)
+        s+= "memset(%s, 0, sizeof(*%s));\n" % (ptr, ptr)
+    else:
+        s=""
+    return s
+
 def _libxl_C_type_init(ty, v, indent = "    ", parent = None, subinit=False):
     s = ""
     if isinstance(ty, idl.KeyedUnion):
@@ -309,15 +322,7 @@ def libxl_C_type_copy_deprecated(field, v, indent = "    ", vparent = None):
         if field.type.dispose_fn is not None:
             s+= "    %s(%s);\n" % (field.type.dispose_fn,
                                    field.type.pass_arg(v, vparent is None))
-
-        s+= "    "
-        if field.type.init_val is not None:
-            s+= "%s = %s;\n" % (field_val, field.type.init_val)
-        elif field.type.init_fn is not None:
-            s+= "%s(%s);\n" % (field.type.init_fn, field_ptr)
-        else:
-            s+= "memset(%s, 0, sizeof(*%s));\n" % (field_ptr, field_ptr)
-
+        s+=libxl_C_type_do_init(field.type, field_pass)
         s+= "}\n"
 
     if s != "":
