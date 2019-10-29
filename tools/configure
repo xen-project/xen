@@ -9711,7 +9711,7 @@ fi
 else
 
     cpu=`test -z "$target_cpu" && echo "$host_cpu" || echo "$target_cpu"`
-    case "$cpu" in
+    case "${XEN_COMPILE_ARCH-${XEN_TARGET_ARCH-$cpu}}" in
         x86_64)
            pvshim="y";;
         *) pvshim="n";;
