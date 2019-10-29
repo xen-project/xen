@@ -311,10 +311,10 @@ def libxl_C_type_copy_deprecated(field, v, indent = "    ", vparent = None):
                                    field.type.pass_arg(v, vparent is None))
 
         s+= "    "
-        if field.type.init_fn is not None:
-            s+= "%s(%s);\n" % (field.type.init_fn, field_ptr)
-        elif field.type.init_val is not None:
+        if field.type.init_val is not None:
             s+= "%s = %s;\n" % (field_val, field.type.init_val)
+        elif field.type.init_fn is not None:
+            s+= "%s(%s);\n" % (field.type.init_fn, field_ptr)
         else:
             s+= "memset(%s, 0, sizeof(*%s));\n" % (field_ptr, field_ptr)
 
