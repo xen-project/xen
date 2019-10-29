@@ -683,21 +683,21 @@ static void svm_cpuid_policy_changed(struct vcpu *v)
                       cp->extd.ibpb ? MSR_INTERCEPT_NONE : MSR_INTERCEPT_RW);
 }
 
-static void svm_sync_vmcb(struct vcpu *v, enum vmcb_sync_state new_state)
+void svm_sync_vmcb(struct vcpu *v, enum vmcb_sync_state new_state)
 {
     struct arch_svm_struct *arch_svm = &v->arch.hvm_svm;
 
     if ( new_state == vmcb_needs_vmsave )
     {
         if ( arch_svm->vmcb_sync_state == vmcb_needs_vmload )
-            svm_vmload(arch_svm->vmcb);
+            svm_vmload_pa(arch_svm->vmcb_pa);
 
         arch_svm->vmcb_sync_state = new_state;
     }
     else
     {
         if ( arch_svm->vmcb_sync_state == vmcb_needs_vmsave )
-            svm_vmsave(arch_svm->vmcb);
+            svm_vmsave_pa(arch_svm->vmcb_pa);
 
         if ( arch_svm->vmcb_sync_state != vmcb_needs_vmload )
             arch_svm->vmcb_sync_state = new_state;

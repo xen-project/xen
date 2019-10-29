@@ -22,6 +22,7 @@
 #include <asm/types.h>
 #include <asm/hvm/svm/vmcb.h>
 
+void svm_sync_vmcb(struct vcpu *v, enum vmcb_sync_state new_state);
 void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb);
 bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
                       const struct vcpu *v, bool verbose);
