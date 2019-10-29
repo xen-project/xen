@@ -1071,13 +1071,12 @@ static void __init amd_iommu_init_cleanup(void)
     {
         list_del(&iommu->list);
         if ( iommu->enabled )
-        {
             disable_iommu(iommu);
-            deallocate_ring_buffer(&iommu->cmd_buffer);
-            deallocate_ring_buffer(&iommu->event_log);
-            deallocate_ring_buffer(&iommu->ppr_log);
-            unmap_iommu_mmio_region(iommu);
-        }
+
+        deallocate_ring_buffer(&iommu->cmd_buffer);
+        deallocate_ring_buffer(&iommu->event_log);
+        deallocate_ring_buffer(&iommu->ppr_log);
+        unmap_iommu_mmio_region(iommu);
         xfree(iommu);
     }
 
