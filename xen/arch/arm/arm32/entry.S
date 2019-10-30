@@ -24,7 +24,11 @@
 #define RESTORE_BANKED(mode) \
         RESTORE_ONE_BANKED(SP_##mode) ; RESTORE_ONE_BANKED(LR_##mode) ; RESTORE_ONE_BANKED(SPSR_##mode)
 
-save_guest_regs:
+/*
+ * Actions that needs to be done after entering the hypervisor from the
+ * guest and before the interrupts are unmasked.
+ */
+prepare_context_from_guest:
 #ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
         /*
          * Restore vectors table to the default as it may have been
@@ -115,6 +119,7 @@ abort_guest_exit_end:
 
 skip_check:
         mov pc, lr
+ENDPROC(prepare_context_from_guest)
 
         /*
          * Macro to define a trap entry.
@@ -173,7 +178,7 @@ skip_check:
 
 1:
         /* Trap from the guest */
-        bl      save_guest_regs
+        bl      prepare_context_from_guest
         .if     \guest_iflags != n
         cpsie   \guest_iflags
         .endif
@@ -363,7 +368,7 @@ return_to_hypervisor:
          * HVBAR very late.
          *
          * Default vectors table will be restored on exit (see
-         * save_guest_regs).
+         * prepare_context_from_guest).
          */
         mov r9, #0                      /* vector tables = NULL */
         /*
