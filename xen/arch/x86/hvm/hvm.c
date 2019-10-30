@@ -4685,8 +4685,8 @@ static int do_altp2m_op(
             rc = -EINVAL;
         else
         {
-            gfn_t gfn = _gfn(a.u.mem_access.gfn);
-            unsigned int altp2m_idx = a.u.mem_access.view;
+            gfn_t gfn = _gfn(a.u.suppress_ve.gfn);
+            unsigned int altp2m_idx = a.u.suppress_ve.view;
             bool suppress_ve = a.u.suppress_ve.suppress_ve;
 
             rc = p2m_set_suppress_ve(d, gfn, suppress_ve, altp2m_idx);
