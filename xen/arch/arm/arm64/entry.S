@@ -6,6 +6,24 @@
 #include <asm/smccc.h>
 #include <public/xen.h>
 
+#define IFLAGS_D_BIT    8
+#define IFLAGS_A_BIT    4
+#define IFLAGS_I_BIT    2
+#define IFLAGS_F_BIT    1
+
+/*
+ * Short-hands to define the interrupts (D, A, I, F)
+ *
+ * _ means the interrupt state will not change
+ * X means the state of interrupt X will change
+ *
+ * To be used with msr daif{set, clr} only.
+ *
+ */
+#define IFLAGS__AI_     IFLAGS_A_BIT | IFLAGS_I_BIT
+#define IFLAGS__A__     IFLAGS_A_BIT
+#define IFLAGS___I_     IFLAGS_I_BIT
+
 /*
  * Register aliases.
  */
@@ -343,7 +361,7 @@ guest_sync_slowpath:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
-        msr     daifclr, #6
+        msr     daifclr, #IFLAGS__AI_
         mov     x0, sp
         bl      do_trap_guest_sync
 1:
@@ -359,7 +377,7 @@ guest_irq:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
-        msr     daifclr, #4
+        msr     daifclr, #IFLAGS__A__
         mov     x0, sp
         bl      do_trap_irq
 1:
@@ -371,7 +389,7 @@ guest_fiq_invalid:
 
 guest_error:
         entry   hyp=0, compat=0
-        msr     daifclr, #6
+        msr     daifclr, #IFLAGS__AI_
         mov     x0, sp
         bl      do_trap_guest_serror
         exit    hyp=0, compat=0
@@ -386,7 +404,7 @@ guest_sync_compat:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
-        msr     daifclr, #6
+        msr     daifclr, #IFLAGS__AI_
         mov     x0, sp
         bl      do_trap_guest_sync
 1:
@@ -402,7 +420,7 @@ guest_irq_compat:
         ALTERNATIVE("bl check_pending_vserror; cbnz x0, 1f",
                     "nop; nop",
                     SKIP_SYNCHRONIZE_SERROR_ENTRY_EXIT)
-        msr     daifclr, #4
+        msr     daifclr, #IFLAGS__A__
         mov     x0, sp
         bl      do_trap_irq
 1:
@@ -414,7 +432,7 @@ guest_fiq_invalid_compat:
 
 guest_error_compat:
         entry   hyp=0, compat=1
-        msr     daifclr, #6
+        msr     daifclr, #IFLAGS__AI_
         mov     x0, sp
         bl      do_trap_guest_serror
         exit    hyp=0, compat=1
@@ -425,7 +443,7 @@ ENTRY(return_to_new_vcpu64)
         exit    hyp=0, compat=0
 
 return_from_trap:
-        msr     daifset, #2 /* Mask interrupts */
+        msr     daifset, #IFLAGS___I_ /* Mask interrupts */
 
         ldr     x21, [sp, #UREGS_PC]            /* load ELR */
         ldr     w22, [sp, #UREGS_CPSR]          /* load SPSR */
@@ -476,7 +494,7 @@ check_pending_vserror:
          * SError, the EL2 error exception will happen after PSTATE.A
          * is cleared.
          */
-        msr     daifclr, #4
+        msr     daifclr, #IFLAGS__A__
 
         /*
          * This is our single instruction exception window. A pending
@@ -495,7 +513,7 @@ abort_guest_exit_start:
         .global abort_guest_exit_end
 abort_guest_exit_end:
         /* Mask PSTATE asynchronous abort bit, close the checking window. */
-        msr     daifset, #4
+        msr     daifset, #IFLAGS__A__
 
         /*
          * Compare elr_el2 and the saved value to check whether we are
