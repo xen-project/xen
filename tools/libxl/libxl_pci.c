@@ -2084,6 +2084,8 @@ static void pci_remove_qmp_query_cb(libxl__egc *egc,
 
     if (rc) goto out;
 
+    libxl__ev_qmp_dispose(gc, qmp);
+
     asked_id = GCSPRINTF(PCI_PT_QDEV_ID,
                          pcidev->bus, pcidev->dev, pcidev->func);
 
