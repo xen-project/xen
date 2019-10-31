@@ -88,6 +88,9 @@ struct pci_dev {
 
     nodeid_t node; /* NUMA node */
 
+    /* Device to be quarantined, don't automatically re-assign to dom0 */
+    bool quarantine;
+
     /* Device with errata, ignore the BARs. */
     bool ignore_bars;
 

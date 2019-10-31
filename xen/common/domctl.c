@@ -391,6 +391,16 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     switch ( op->cmd )
     {
+    case XEN_DOMCTL_assign_device:
+    case XEN_DOMCTL_deassign_device:
+        if ( op->domain == DOMID_IO )
+        {
+            d = dom_io;
+            break;
+        }
+        else if ( op->domain == DOMID_INVALID )
+            return -ESRCH;
+        /* fall through */
     case XEN_DOMCTL_test_assign_device:
         if ( op->domain == DOMID_INVALID )
         {
@@ -412,7 +422,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     if ( !domctl_lock_acquire() )
     {
-        if ( d )
+        if ( d && d != dom_io )
             rcu_unlock_domain(d);
         return hypercall_create_continuation(
             __HYPERVISOR_domctl, "h", u_domctl);
@@ -1074,7 +1084,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     domctl_lock_release();
 
  domctl_out_unlock_domonly:
-    if ( d )
+    if ( d && d != dom_io )
         rcu_unlock_domain(d);
 
     if ( copyback && __copy_to_guest(u_domctl, op, 1) )
