@@ -514,6 +514,9 @@ static long pv_shim_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         else
             rc = xen_hypercall_event_channel_op(EVTCHNOP_status, &status);
 
+        if ( !rc && __copy_to_guest(arg, &status, 1) )
+            rc = -EFAULT;
+
         break;
     }
 
