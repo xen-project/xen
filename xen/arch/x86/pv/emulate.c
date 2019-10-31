@@ -31,7 +31,14 @@ int pv_emul_read_descriptor(unsigned int sel, const struct vcpu *v,
 {
     struct desc_struct desc;
 
-    if ( sel < 4)
+    if ( sel < 4 ||
+         /*
+          * Don't apply the GDT limit here, as the selector may be a Xen
+          * provided one. __get_user() will fail (without taking further
+          * action) for ones falling in the gap between guest populated
+          * and Xen ones.
+          */
+         ((sel & 4) && (sel >> 3) >= v->arch.pv_vcpu.ldt_ents) )
         desc.b = desc.a = 0;
     else if ( __get_user(desc, gdt_ldt_desc_ptr(sel)) )
         return 0;
