@@ -225,21 +225,14 @@ void p2m_tlb_flush_sync(struct p2m_domain *p2m)
 static lpae_t *p2m_get_root_pointer(struct p2m_domain *p2m,
                                     gfn_t gfn)
 {
-    unsigned int root_table;
-
-    if ( P2M_ROOT_PAGES == 1 )
-        return __map_domain_page(p2m->root);
+    unsigned long root_table;
 
     /*
-     * Concatenated root-level tables. The table number will be the
-     * offset at the previous level. It is not possible to
-     * concatenate a level-0 root.
+     * While the root table index is the offset from the previous level,
+     * we can't use (P2M_ROOT_LEVEL - 1) because the root level might be
+     * 0. Yet we still want to check if all the unused bits are zeroed.
      */
-    ASSERT(P2M_ROOT_LEVEL > 0);
-
-    root_table = gfn_x(gfn) >> (level_orders[P2M_ROOT_LEVEL - 1]);
-    root_table &= LPAE_ENTRY_MASK;
-
+    root_table = gfn_x(gfn) >> (level_orders[P2M_ROOT_LEVEL] + LPAE_SHIFT);
     if ( root_table >= P2M_ROOT_PAGES )
         return NULL;
 
