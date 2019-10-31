@@ -1984,46 +1984,45 @@ static inline bool needs_ssbd_flip(struct vcpu *v)
              cpu_require_ssbd_mitigation();
 }
 
-static void enter_hypervisor_head(struct cpu_user_regs *regs)
+/*
+ * Actions that needs to be done after entering the hypervisor from the
+ * guest and before we handle any request.
+ */
+void enter_hypervisor_from_guest(void)
 {
-    if ( guest_mode(regs) )
-    {
-        struct vcpu *v = current;
+    struct vcpu *v = current;
 
-        /* If the guest has disabled the workaround, bring it back on. */
-        if ( needs_ssbd_flip(v) )
-            arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
+    /* If the guest has disabled the workaround, bring it back on. */
+    if ( needs_ssbd_flip(v) )
+        arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2_FID, 1, NULL);
 
-        /*
-         * If we pended a virtual abort, preserve it until it gets cleared.
-         * See ARM ARM DDI 0487A.j D1.14.3 (Virtual Interrupts) for details,
-         * but the crucial bit is "On taking a vSError interrupt, HCR_EL2.VSE
-         * (alias of HCR.VA) is cleared to 0."
-         */
-        if ( v->arch.hcr_el2 & HCR_VA )
-            v->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
+    /*
+     * If we pended a virtual abort, preserve it until it gets cleared.
+     * See ARM ARM DDI 0487A.j D1.14.3 (Virtual Interrupts) for details,
+     * but the crucial bit is "On taking a vSError interrupt, HCR_EL2.VSE
+     * (alias of HCR.VA) is cleared to 0."
+     */
+    if ( v->arch.hcr_el2 & HCR_VA )
+        v->arch.hcr_el2 = READ_SYSREG(HCR_EL2);
 
 #ifdef CONFIG_NEW_VGIC
-        /*
-         * We need to update the state of our emulated devices using level
-         * triggered interrupts before syncing back the VGIC state.
-         *
-         * TODO: Investigate whether this is necessary to do on every
-         * trap and how it can be optimised.
-         */
-        vtimer_update_irqs(v);
-        vcpu_update_evtchn_irq(v);
+    /*
+     * We need to update the state of our emulated devices using level
+     * triggered interrupts before syncing back the VGIC state.
+     *
+     * TODO: Investigate whether this is necessary to do on every
+     * trap and how it can be optimised.
+     */
+    vtimer_update_irqs(v);
+    vcpu_update_evtchn_irq(v);
 #endif
 
-        vgic_sync_from_lrs(v);
-    }
+    vgic_sync_from_lrs(v);
 }
 
 void do_trap_guest_sync(struct cpu_user_regs *regs)
 {
     const union hsr hsr = { .bits = regs->hsr };
-
-    enter_hypervisor_head(regs);
 
     switch ( hsr.ec )
     {
@@ -2158,8 +2157,6 @@ void do_trap_hyp_sync(struct cpu_user_regs *regs)
 {
     const union hsr hsr = { .bits = regs->hsr };
 
-    enter_hypervisor_head(regs);
-
     switch ( hsr.ec )
     {
 #ifdef CONFIG_ARM_64
@@ -2196,27 +2193,21 @@ void do_trap_hyp_sync(struct cpu_user_regs *regs)
 
 void do_trap_hyp_serror(struct cpu_user_regs *regs)
 {
-    enter_hypervisor_head(regs);
-
     __do_trap_serror(regs, VABORT_GEN_BY_GUEST(regs));
 }
 
 void do_trap_guest_serror(struct cpu_user_regs *regs)
 {
-    enter_hypervisor_head(regs);
-
     __do_trap_serror(regs, true);
 }
 
 void do_trap_irq(struct cpu_user_regs *regs)
 {
-    enter_hypervisor_head(regs);
     gic_interrupt(regs, 0);
 }
 
 void do_trap_fiq(struct cpu_user_regs *regs)
 {
-    enter_hypervisor_head(regs);
     gic_interrupt(regs, 1);
 }
 
@@ -2259,7 +2250,13 @@ static void check_for_vcpu_work(void)
     local_irq_disable();
 }
 
-void leave_hypervisor_tail(void)
+/*
+ * Actions that needs to be done before entering the guest. This is the
+ * last thing executed before the guest context is fully restored.
+ *
+ * The function will return with IRQ masked.
+ */
+void leave_hypervisor_to_guest(void)
 {
     local_irq_disable();
 

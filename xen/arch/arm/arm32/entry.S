@@ -177,6 +177,9 @@ skip_check:
         .if     \guest_iflags != n
         cpsie   \guest_iflags
         .endif
+
+        bl      enter_hypervisor_from_guest
+
 2:
         /* We are ready to handle the trap, setup the registers and jump. */
         adr     lr, return_from_trap
@@ -332,7 +335,7 @@ ENTRY(return_to_new_vcpu32)
 return_to_guest:
         mov r11, sp
         bic sp, #7 /* Align the stack pointer */
-        bl leave_hypervisor_tail /* Disables interrupts on return */
+        bl leave_hypervisor_to_guest /* Mask IRQ on return */
         mov sp, r11
         RESTORE_ONE_BANKED(SP_usr)
         /* LR_usr is the same physical register as lr and is restored below */
