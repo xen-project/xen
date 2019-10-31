@@ -1580,6 +1580,20 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
             ASSERT(current->arch.old_guest_table == NULL);
             if ( i )
             {
+                /*
+                 * alloc_l1_table() doesn't set old_guest_table; it does
+                 * its own tear-down immediately on failure.  If it
+                 * did we'd need to check it and set partial_flags as we
+                 * do in alloc_l[34]_table().
+                 *
+                 * Note on the use of ASSERT: if it's non-null and
+                 * hasn't been cleaned up yet, it should have
+                 * PGT_partial set; and so the type will be cleaned up
+                 * on domain destruction.  Unfortunately, we would
+                 * leak the general ref held by old_guest_table; but
+                 * leaking a page is less bad than a host crash.
+                 */
+                ASSERT(current->arch.old_guest_table == NULL);
                 page->nr_validated_ptes = i;
                 page->partial_flags = partial_flags;
                 current->arch.old_guest_ptpg = NULL;
@@ -1607,6 +1621,7 @@ static int alloc_l3_table(struct page_info *page)
     unsigned int   i;
     int            rc = 0;
     unsigned int   partial_flags = page->partial_flags;
+    l3_pgentry_t   l3e = l3e_empty();
 
     pl3e = map_domain_page(_mfn(pfn));
 
@@ -1623,7 +1638,7 @@ static int alloc_l3_table(struct page_info *page)
     for ( i = page->nr_validated_ptes; i < L3_PAGETABLE_ENTRIES;
           i++, partial_flags = 0 )
     {
-        l3_pgentry_t l3e = pl3e[i];
+        l3e = pl3e[i];
 
         if ( i > page->nr_validated_ptes && hypercall_preempt_check() )
             rc = -EINTR;
@@ -1675,6 +1690,24 @@ static int alloc_l3_table(struct page_info *page)
         {
             page->nr_validated_ptes = i;
             page->partial_flags = partial_flags;
+            if ( current->arch.old_guest_table )
+            {
+                /*
+                 * We've experienced a validation failure.  If
+                 * old_guest_table is set, "transfer" the general
+                 * reference count to pl3e[nr_validated_ptes] by
+                 * setting PTF_partial_set.
+                 *
+                 * As a precaution, check that old_guest_table is the
+                 * page pointed to by pl3e[nr_validated_ptes].  If
+                 * not, it's safer to leak a type ref on production
+                 * builds.
+                 */
+                if ( current->arch.old_guest_table == l3e_get_page(l3e) )
+                    page->partial_flags = PTF_partial_set;
+                else
+                    ASSERT_UNREACHABLE();
+            }
             current->arch.old_guest_ptpg = NULL;
             current->arch.old_guest_table = page;
         }
@@ -1851,7 +1884,23 @@ static int alloc_l4_table(struct page_info *page)
                 else
                 {
                     if ( current->arch.old_guest_table )
-                        page->nr_validated_ptes++;
+                    {
+                        /*
+                         * We've experienced a validation failure.  If
+                         * old_guest_table is set, "transfer" the general
+                         * reference count to pl3e[nr_validated_ptes] by
+                         * setting PTF_partial_set.
+                         *
+                         * As a precaution, check that old_guest_table is the
+                         * page pointed to by pl4e[nr_validated_ptes].  If
+                         * not, it's safer to leak a type ref on production
+                         * builds.
+                         */
+                        if ( current->arch.old_guest_table == l4e_get_page(l4e) )
+                            page->partial_flags = PTF_partial_set;
+                        else
+                            ASSERT_UNREACHABLE();
+                    }
                     current->arch.old_guest_ptpg = NULL;
                     current->arch.old_guest_table = page;
                 }
