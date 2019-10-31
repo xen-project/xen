@@ -1818,7 +1818,7 @@ enabling more sockets and cores to go into deeper sleep states.
 Set the serial transmit buffer size.
 
 ### serrors (ARM)
-> `= diverse | forward | panic`
+> `= diverse | panic`
 
 > Default: `diverse`
 
@@ -1834,7 +1834,7 @@ on the host will not trigger such SErrors. In this case, the administrator can
 use this parameter to skip categorizing SErrors and reduce the overhead of
 dsb/isb.
 
-We provided the following 3 options to administrators to determine how the
+We provided the following 2 options to administrators to determine how the
 hypervisors handle SErrors:
 
 * `diverse`:
@@ -1845,15 +1845,6 @@ hypervisors handle SErrors:
   1. dsb/isb on all EL1 -> EL2 trap entries to categorize SErrors correctly.
   2. dsb/isb on EL2 -> EL1 return paths to prevent slipping hypervisor
      SErrors to guests.
-
-* `forward`:
-  The hypervisor will not distinguish guest SErrors from hypervisor SErrors.
-  All SErrors will be forwarded to guests, except the SErrors generated when
-  the idle vCPU is running. The idle domain doesn't have the ability to handle
-  SErrors, so we have to crash the whole system when we get SErros with the
-  idle vCPU. This option will avoid most overhead of the dsb/isb, except the
-  dsb/isb in context switch which is used to isolate the SErrors between 2
-  vCPUs.
 
 * `panic`:
   The hypervisor will not distinguish guest SErrors from hypervisor SErrors.
