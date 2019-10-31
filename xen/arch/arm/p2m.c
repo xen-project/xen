@@ -931,7 +931,7 @@ static int __p2m_set_entry(struct p2m_domain *p2m,
         p2m_write_pte(entry, pte, p2m->clean_pte);
 
         p2m->max_mapped_gfn = gfn_max(p2m->max_mapped_gfn,
-                                      gfn_add(sgfn, 1 << page_order));
+                                      gfn_add(sgfn, (1UL << page_order) - 1));
         p2m->lowest_mapped_gfn = gfn_min(p2m->lowest_mapped_gfn, sgfn);
     }
 
@@ -1291,7 +1291,7 @@ int relinquish_p2m_mapping(struct domain *d)
     p2m_write_lock(p2m);
 
     start = p2m->lowest_mapped_gfn;
-    end = p2m->max_mapped_gfn;
+    end = gfn_add(p2m->max_mapped_gfn, 1);
 
     for ( ; gfn_x(start) < gfn_x(end);
           start = gfn_next_boundary(start, order) )
@@ -1356,7 +1356,7 @@ int p2m_cache_flush(struct domain *d, gfn_t start, unsigned long nr)
     p2m_read_lock(p2m);
 
     start = gfn_max(start, p2m->lowest_mapped_gfn);
-    end = gfn_min(end, p2m->max_mapped_gfn);
+    end = gfn_min(end, gfn_add(p2m->max_mapped_gfn, 1));
 
     for ( ; gfn_x(start) < gfn_x(end); start = next_gfn )
     {
