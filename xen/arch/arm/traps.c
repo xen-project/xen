@@ -628,10 +628,17 @@ static void inject_dabt_exception(struct cpu_user_regs *regs,
 #endif
 }
 
-/* Inject a virtual Abort/SError into the guest. */
-static void inject_vabt_exception(struct cpu_user_regs *regs)
+/*
+ * Inject a virtual Abort/SError into the guest.
+ *
+ * This should only be called with 'current'.
+ */
+static void inject_vabt_exception(struct vcpu *v)
 {
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
     const union hsr hsr = { .bits = regs->hsr };
+
+    ASSERT(v == current);
 
     /*
      * SVC/HVC/SMC already have an adjusted PC (See ARM ARM DDI 0487A.j
@@ -655,7 +662,7 @@ static void inject_vabt_exception(struct cpu_user_regs *regs)
         break;
     }
 
-    vcpu_hcr_set_flags(current, HCR_VA);
+    vcpu_hcr_set_flags(v, HCR_VA);
 }
 
 /*
@@ -682,7 +689,7 @@ static void __do_trap_serror(struct cpu_user_regs *regs, bool guest)
      * forwarded to the currently running vCPU.
      */
     if ( serrors_op == SERRORS_DIVERSE && guest )
-            return inject_vabt_exception(regs);
+            return inject_vabt_exception(current);
 
     do_unexpected_trap("SError", regs);
 }
