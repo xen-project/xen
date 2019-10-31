@@ -1097,13 +1097,12 @@ get_page_from_l1e(
 
 /*
  * The following flags are used to specify behavior of various get and
- * put commands.  The first two are also stored in page->partial_flags
- * to indicate the state of the page pointed to by
+ * put commands.  The first is also stored in page->partial_flags to
+ * indicate the state of the page pointed to by
  * page->pte[page->nr_validated_entries].  See the comment in mm.h for
  * more information.
  */
 #define PTF_partial_set           (1 << 0)
-#define PTF_partial_general_ref   (1 << 1)
 #define PTF_preemptible           (1 << 2)
 #define PTF_defer                 (1 << 3)
 #define PTF_retain_ref_on_restart (1 << 4)
@@ -1115,13 +1114,10 @@ static int get_page_and_type_from_mfn(
     struct page_info *page = mfn_to_page(mfn);
     int rc;
     bool preemptible = flags & PTF_preemptible,
-         partial_ref = flags & PTF_partial_general_ref,
          partial_set = flags & PTF_partial_set,
          retain_ref  = flags & PTF_retain_ref_on_restart;
 
-    ASSERT(partial_ref == partial_set);
-
-    if ( likely(!partial_ref) &&
+    if ( likely(!partial_set) &&
          unlikely(!get_page_from_mfn(mfn, d)) )
         return -EINVAL;
 
@@ -1131,14 +1127,14 @@ static int get_page_and_type_from_mfn(
      * Retain the refcount if:
      * - page is fully validated (rc == 0)
      * - page is not validated (rc < 0) but:
-     *   - We came in with a reference (partial_ref)
+     *   - We came in with a reference (partial_set)
      *   - page is partially validated (rc == -ERESTART), and the
      *     caller has asked the ref to be retained in that case
      *   - page is partially validated but there's been an error
      *     (page == current->arch.old_guest_table)
      *
-     * The partial_ref-on-error clause is worth an explanation.  There
-     * are two scenarios where partial_ref might be true coming in:
+     * The partial_set-on-error clause is worth an explanation.  There
+     * are two scenarios where partial_set might be true coming in:
      * - mfn has been partially promoted / demoted as type `type`;
      *   i.e. has PGT_partial set
      * - mfn has been partially demoted as L(type+1) (i.e., a linear
@@ -1161,7 +1157,7 @@ static int get_page_and_type_from_mfn(
      * count retained unless we succeeded, or the operation was
      * preemptible.
      */
-    if ( likely(!rc) || partial_ref )
+    if ( likely(!rc) || partial_set )
         /* nothing */;
     else if ( page == current->arch.old_guest_table ||
               (retain_ref && rc == -ERESTART) )
@@ -1359,13 +1355,7 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn,
         struct page_info *pg = l2e_get_page(l2e);
         struct page_info *ptpg = mfn_to_page(_mfn(pfn));
 
-        if ( (flags & (PTF_partial_set | PTF_partial_general_ref)) ==
-              PTF_partial_set )
-        {
-            /* partial_set should always imply partial_ref */
-            BUG();
-        }
-        else if ( flags & PTF_defer )
+        if ( flags & PTF_defer )
         {
             current->arch.old_guest_ptpg = ptpg;
             current->arch.old_guest_table = pg;
@@ -1405,13 +1395,6 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
 
     pg = l3e_get_page(l3e);
 
-    if ( (flags & (PTF_partial_set | PTF_partial_general_ref)) ==
-         PTF_partial_set )
-    {
-        /* partial_set should always imply partial_ref */
-        BUG();
-    }
-
     if ( flags & PTF_defer )
     {
         current->arch.old_guest_ptpg = mfn_to_page(_mfn(pfn));
@@ -1435,13 +1418,6 @@ static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
          (l4e_get_pfn(l4e) != pfn) )
     {
         struct page_info *pg = l4e_get_page(l4e);
-
-        if ( (flags & (PTF_partial_set | PTF_partial_general_ref)) ==
-              PTF_partial_set )
-        {
-            /* partial_set should always imply partial_ref */
-            BUG();
-        }
 
         if ( flags & PTF_defer )
         {
@@ -1676,7 +1652,7 @@ static int alloc_l3_table(struct page_info *page)
         {
             page->nr_validated_ptes = i;
             /* Set 'set', leave 'general ref' set if this entry was set */
-            page->partial_flags = PTF_partial_set | PTF_partial_general_ref;
+            page->partial_flags = PTF_partial_set;
         }
         else if ( rc == -EINTR && i )
         {
@@ -1859,7 +1835,7 @@ static int alloc_l4_table(struct page_info *page)
         {
             page->nr_validated_ptes = i;
             /* Set 'set', leave 'general ref' set if this entry was set */
-            page->partial_flags = PTF_partial_set | PTF_partial_general_ref;
+            page->partial_flags = PTF_partial_set;
         }
         else if ( rc < 0 )
         {
@@ -1956,7 +1932,7 @@ static int free_l2_table(struct page_info *page)
     else if ( rc == -ERESTART )
     {
         page->nr_validated_ptes = i;
-        page->partial_flags = PTF_partial_set | PTF_partial_general_ref;
+        page->partial_flags = PTF_partial_set;
     }
     else if ( rc == -EINTR && i < L2_PAGETABLE_ENTRIES - 1 )
     {
@@ -2004,7 +1980,7 @@ static int free_l3_table(struct page_info *page)
     if ( rc == -ERESTART )
     {
         page->nr_validated_ptes = i;
-        page->partial_flags = PTF_partial_set | PTF_partial_general_ref;
+        page->partial_flags = PTF_partial_set;
     }
     else if ( rc == -EINTR && i < L3_PAGETABLE_ENTRIES - 1 )
     {
@@ -2035,7 +2011,7 @@ static int free_l4_table(struct page_info *page)
     if ( rc == -ERESTART )
     {
         page->nr_validated_ptes = i;
-        page->partial_flags = PTF_partial_set | PTF_partial_general_ref;
+        page->partial_flags = PTF_partial_set;
     }
     else if ( rc == -EINTR && i < L4_PAGETABLE_ENTRIES - 1 )
     {
