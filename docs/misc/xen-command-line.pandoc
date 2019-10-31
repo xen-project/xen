@@ -1877,7 +1877,6 @@ hypervisors handle SErrors:
   1. dsb/isb on all EL1 -> EL2 trap entries to categorize SErrors correctly.
   2. dsb/isb on EL2 -> EL1 return paths to prevent slipping hypervisor
      SErrors to guests.
-  3. dsb/isb in context switch to isolate SErrors between 2 vCPUs.
 
 * `forward`:
   The hypervisor will not distinguish guest SErrors from hypervisor SErrors.
