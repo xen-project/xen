@@ -51,7 +51,13 @@ static int read_gate_descriptor(unsigned int gate_sel,
     const seg_desc_t *pdesc = gdt_ldt_desc_ptr(gate_sel);
 
     if ( (gate_sel < 4) ||
-         ((gate_sel >= FIRST_RESERVED_GDT_BYTE) && !(gate_sel & 4)) ||
+         /*
+          * We're interested in call gates only, which occupy a single
+          * seg_desc_t for 32-bit and a consecutive pair of them for 64-bit.
+          */
+         ((gate_sel >> 3) + !is_pv_32bit_vcpu(v) >=
+          (gate_sel & 4 ? v->arch.pv.ldt_ents
+                        : v->arch.pv.gdt_ents)) ||
          __get_user(desc, pdesc) )
         return 0;
 
@@ -70,7 +76,7 @@ static int read_gate_descriptor(unsigned int gate_sel,
     if ( !is_pv_32bit_vcpu(v) )
     {
         if ( (*ar & 0x1f00) != 0x0c00 ||
-             (gate_sel >= FIRST_RESERVED_GDT_BYTE - 8 && !(gate_sel & 4)) ||
+             /* Limit check done above already. */
              __get_user(desc, pdesc + 1) ||
              (desc.b & 0x1f00) )
             return 0;
