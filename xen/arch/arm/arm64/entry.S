@@ -381,11 +381,7 @@ guest_fiq_invalid:
         invalid BAD_FIQ
 
 guest_error:
-        entry   hyp=0, compat=0
-        msr     daifclr, #IFLAGS__AI_
-        mov     x0, sp
-        bl      do_trap_guest_serror
-        exit    hyp=0, compat=0
+        guest_vector compat=0, iflags=IFLAGS__AI_, trap=guest_serror
 
 guest_sync_compat:
         guest_vector compat=1, iflags=IFLAGS__AI_, trap=guest_sync
@@ -398,11 +394,7 @@ guest_fiq_invalid_compat:
         invalid BAD_FIQ
 
 guest_error_compat:
-        entry   hyp=0, compat=1
-        msr     daifclr, #IFLAGS__AI_
-        mov     x0, sp
-        bl      do_trap_guest_serror
-        exit    hyp=0, compat=1
+        guest_vector compat=1, iflags=IFLAGS__AI_, trap=guest_serror
 
 ENTRY(return_to_new_vcpu32)
         exit    hyp=0, compat=1
