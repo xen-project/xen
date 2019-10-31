@@ -74,14 +74,15 @@ const hypercall_args_t hypercall_args_table[NR_hypercalls] =
 #undef COMP
 #undef ARGS
 
-#define next_arg(fmt, args) ({                                              \
+#define NEXT_ARG(fmt, args)                                                 \
+({                                                                          \
     unsigned long __arg;                                                    \
     switch ( *(fmt)++ )                                                     \
     {                                                                       \
     case 'i': __arg = (unsigned long)va_arg(args, unsigned int);  break;    \
     case 'l': __arg = (unsigned long)va_arg(args, unsigned long); break;    \
     case 'h': __arg = (unsigned long)va_arg(args, void *);        break;    \
-    default:  __arg = 0; BUG();                                             \
+    default:  goto bad_fmt;                                                 \
     }                                                                       \
     __arg;                                                                  \
 })
@@ -103,7 +104,7 @@ unsigned long hypercall_create_continuation(
     if ( mcs->flags & MCSF_in_multicall )
     {
         for ( i = 0; *p != '\0'; i++ )
-            mcs->call.args[i] = next_arg(p, args);
+            mcs->call.args[i] = NEXT_ARG(p, args);
     }
     else
     {
@@ -115,7 +116,7 @@ unsigned long hypercall_create_continuation(
         {
             for ( i = 0; *p != '\0'; i++ )
             {
-                arg = next_arg(p, args);
+                arg = NEXT_ARG(p, args);
                 switch ( i )
                 {
                 case 0: regs->rdi = arg; break;
@@ -131,7 +132,7 @@ unsigned long hypercall_create_continuation(
         {
             for ( i = 0; *p != '\0'; i++ )
             {
-                arg = next_arg(p, args);
+                arg = NEXT_ARG(p, args);
                 switch ( i )
                 {
                 case 0: regs->rbx = arg; break;
@@ -148,7 +149,15 @@ unsigned long hypercall_create_continuation(
     va_end(args);
 
     return op;
+
+ bad_fmt:
+    gprintk(XENLOG_ERR, "Bad hypercall continuation format '%c'\n", *p);
+    ASSERT_UNREACHABLE();
+    domain_crash(curr->domain);
+    return 0;
 }
+
+#undef NEXT_ARG
 
 int hypercall_xlat_continuation(unsigned int *id, unsigned int nr,
                                 unsigned int mask, ...)
