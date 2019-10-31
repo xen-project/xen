@@ -228,19 +228,34 @@ struct page_info
          * setting the flag must not drop that reference, whereas the instance
          * clearing it will have to.
          *
-         * If @partial_pte is positive then PTE at @nr_validated_ptes+1 has
-         * been partially validated. This implies that the general reference
-         * to the page (acquired from get_page_from_lNe()) would be dropped
-         * (again due to the apparent failure) and hence must be re-acquired
-         * when resuming the validation, but must not be dropped when picking
-         * up the page for invalidation.
+         * If partial_flags & PTF_partial_set is set, then the page at
+         * at @nr_validated_ptes had PGT_partial set as a result of an
+         * operation on the current page.  (That page may or may not
+         * still have PGT_partial set.)
          *
-         * If @partial_pte is negative then PTE at @nr_validated_ptes+1 has
-         * been partially invalidated. This is basically the opposite case of
-         * above, i.e. the general reference to the page was not dropped in
-         * put_page_from_lNe() (due to the apparent failure), and hence it
-         * must be dropped when the put operation is resumed (and completes),
-         * but it must not be acquired if picking up the page for validation.
+         * If PTF_partial_general_ref is set, then the PTE at
+         * @nr_validated_ptef holds a general reference count for the
+         * page.
+         *
+         * This happens:
+         * - During de-validation, if de-validation of the page was
+         *   interrupted
+         * - During validation, if an invalid entry is encountered and
+         *   validation is preemptible
+         * - During validation, if PTF_partial_general_ref was set on
+         *   this entry to begin with (perhaps because we're picking
+         *   up from a partial de-validation).
+         *
+         * When resuming validation, if PTF_partial_general_ref is clear,
+         * then a general reference must be re-acquired; if it is set, no
+         * reference should be acquired.
+         *
+         * When resuming de-validation, if PTF_partial_general_ref is
+         * clear, no reference should be dropped; if it is set, a
+         * reference should be dropped.
+         *
+         * NB that PTF_partial_set and PTF_partial_general_ref are
+         * defined in mm.c, the only place where they are used.
          *
          * The 3rd field, @linear_pt_count, indicates
          * - by a positive value, how many same-level page table entries a page
@@ -251,7 +266,7 @@ struct page_info
         struct {
             u16 nr_validated_ptes:PAGETABLE_ORDER + 1;
             u16 :16 - PAGETABLE_ORDER - 1 - 2;
-            s16 partial_pte:2;
+            u16 partial_flags:2;
             s16 linear_pt_count;
         };
 
