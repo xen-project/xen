@@ -1854,34 +1854,19 @@ Set the serial transmit buffer size.
 
 > Default: `diverse`
 
-This parameter is provided to administrators to determine how the
-hypervisors handle SErrors.
-
-In order to distinguish guest-generated SErrors from hypervisor-generated
-SErrors we have to place SError checking code in every EL1 <-> EL2 paths.
-That will cause overhead on entries and exits due to dsb/isb. However, not all
-platforms need to categorize SErrors. For example, a host that is running with
-trusted guests. The administrator can confirm that all guests that are running
-on the host will not trigger such SErrors. In this case, the administrator can
-use this parameter to skip categorizing SErrors and reduce the overhead of
-dsb/isb.
-
-We provided the following 2 options to administrators to determine how the
-hypervisors handle SErrors:
+This parameter is provided to administrators to determine how the hypervisor
+handles SErrors.
 
 * `diverse`:
-  The hypervisor will distinguish guest SErrors from hypervisor SErrors.
-  The guest generated SErrors will be forwarded to guests, the hypervisor
-  generated SErrors will cause the whole system to crash.
-  It requires:
-  1. dsb/isb on all EL1 -> EL2 trap entries to categorize SErrors correctly.
-  2. dsb/isb on EL2 -> EL1 return paths to prevent slipping hypervisor
-     SErrors to guests.
+  The hypervisor will distinguish guest SErrors from hypervisor SErrors:
+    - The guest generated SErrors will be forwarded to the currently running
+      guest.
+    - The hypervisor generated SErrors will cause the whole system to crash
 
 * `panic`:
-  The hypervisor will not distinguish guest SErrors from hypervisor SErrors.
-  All SErrors will crash the whole system. This option will avoid all overhead
-  of the dsb/isb pairs.
+  All SErrors will cause the whole system to crash. This option should only
+  be used if you trust all your guests and/or they don't have a gadget (e.g.
+  device) to generate SErrors in normal run.
 
 ### shim_mem (x86)
 > `= List of ( min:<size> | max:<size> | <size> )`
