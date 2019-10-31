@@ -1353,10 +1353,11 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn,
         {
             current->arch.old_guest_ptpg = ptpg;
             current->arch.old_guest_table = pg;
+            current->arch.old_guest_table_partial = false;
         }
         else
         {
-            rc = _put_page_type(pg, PTF_preemptible, ptpg);
+            rc = _put_page_type(pg, flags | PTF_preemptible, ptpg);
             if ( likely(!rc) )
                 put_page(pg);
         }
@@ -1379,6 +1380,7 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
         unsigned long mfn = l3e_get_pfn(l3e);
         int writeable = l3e_get_flags(l3e) & _PAGE_RW;
 
+        ASSERT(!(flags & PTF_partial_set));
         ASSERT(!(mfn & ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1)));
         do {
             put_data_page(mfn_to_page(_mfn(mfn)), writeable);
@@ -1391,12 +1393,14 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
 
     if ( flags & PTF_defer )
     {
+        ASSERT(!(flags & PTF_partial_set));
         current->arch.old_guest_ptpg = mfn_to_page(_mfn(pfn));
         current->arch.old_guest_table = pg;
+        current->arch.old_guest_table_partial = false;
         return 0;
     }
 
-    rc = _put_page_type(pg, PTF_preemptible, mfn_to_page(_mfn(pfn)));
+    rc = _put_page_type(pg, flags | PTF_preemptible, mfn_to_page(_mfn(pfn)));
     if ( likely(!rc) )
         put_page(pg);
 
@@ -1415,12 +1419,15 @@ static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
 
         if ( flags & PTF_defer )
         {
+            ASSERT(!(flags & PTF_partial_set));
             current->arch.old_guest_ptpg = mfn_to_page(_mfn(pfn));
             current->arch.old_guest_table = pg;
+            current->arch.old_guest_table_partial = false;
             return 0;
         }
 
-        rc = _put_page_type(pg, PTF_preemptible, mfn_to_page(_mfn(pfn)));
+        rc = _put_page_type(pg, flags | PTF_preemptible,
+                            mfn_to_page(_mfn(pfn)));
         if ( likely(!rc) )
             put_page(pg);
     }
@@ -1525,6 +1532,14 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
 
     pl2e = map_domain_page(_mfn(pfn));
 
+    /*
+     * NB that alloc_l2_table will never set partial_pte on an l2; but
+     * free_l2_table might if a linear_pagetable entry is interrupted
+     * partway through de-validation.  In that circumstance,
+     * get_page_from_l2e() will always return -EINVAL; and we must
+     * retain the type ref by doing the normal partial_flags tracking.
+     */
+
     for ( i = page->nr_validated_ptes; i < L2_PAGETABLE_ENTRIES;
           i++, partial_flags = 0 )
     {
@@ -1579,6 +1594,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
                 page->partial_flags = partial_flags;
                 current->arch.old_guest_ptpg = NULL;
                 current->arch.old_guest_table = page;
+                current->arch.old_guest_table_partial = true;
             }
         }
         if ( rc < 0 )
@@ -1681,12 +1697,16 @@ static int alloc_l3_table(struct page_info *page)
                  * builds.
                  */
                 if ( current->arch.old_guest_table == l3e_get_page(l3e) )
+                {
+                    ASSERT(current->arch.old_guest_table_partial);
                     page->partial_flags = PTF_partial_set;
+                }
                 else
                     ASSERT_UNREACHABLE();
             }
             current->arch.old_guest_ptpg = NULL;
             current->arch.old_guest_table = page;
+            current->arch.old_guest_table_partial = true;
         }
         while ( i-- > 0 )
             pl3e[i] = unadjust_guest_l3e(pl3e[i], d);
@@ -1860,12 +1880,16 @@ static int alloc_l4_table(struct page_info *page)
                          * builds.
                          */
                         if ( current->arch.old_guest_table == l4e_get_page(pl4e[i]) )
+                        {
+                            ASSERT(current->arch.old_guest_table_partial);
                             page->partial_flags = PTF_partial_set;
+                        }
                         else
                             ASSERT_UNREACHABLE();
                     }
                     current->arch.old_guest_ptpg = NULL;
                     current->arch.old_guest_table = page;
+                    current->arch.old_guest_table_partial = true;
                 }
             }
         }
@@ -2782,6 +2806,28 @@ static int _put_page_type(struct page_info *page, unsigned int flags,
         x  = y;
         nx = x - 1;
 
+        /*
+         * Is this expected to do a full reference drop, or only
+         * cleanup partial validation / devalidation?
+         *
+         * If the former, the caller must hold a "full" type ref;
+         * which means the page must be validated.  If the page is
+         * *not* fully validated, continuing would almost certainly
+         * open up a security hole.  An exception to this is during
+         * domain destruction, where PGT_validated can be dropped
+         * without dropping a type ref.
+         *
+         * If the latter, do nothing unless type PGT_partial is set.
+         * If it is set, the type count must be 1.
+         */
+        if ( !(flags & PTF_partial_set) )
+            BUG_ON((x & PGT_partial) ||
+                   !((x & PGT_validated) || page_get_owner(page)->is_dying));
+        else if ( !(x & PGT_partial) )
+            return 0;
+        else
+            BUG_ON((x & PGT_count_mask) != 1);
+
         ASSERT((x & PGT_count_mask) != 0);
 
         switch ( nx & (PGT_locked | PGT_count_mask) )
@@ -3041,17 +3087,34 @@ int put_old_guest_table(struct vcpu *v)
     if ( !v->arch.old_guest_table )
         return 0;
 
-    switch ( rc = _put_page_type(v->arch.old_guest_table, PTF_preemptible,
-                                 v->arch.old_guest_ptpg) )
+    rc = _put_page_type(v->arch.old_guest_table,
+                        PTF_preemptible |
+                        ( v->arch.old_guest_table_partial ?
+                          PTF_partial_set : 0 ),
+                        v->arch.old_guest_ptpg);
+
+    if ( rc == -ERESTART || rc == -EINTR )
     {
-    case -EINTR:
-    case -ERESTART:
+        v->arch.old_guest_table_partial = (rc == -ERESTART);
         return -ERESTART;
-    case 0:
-        put_page(v->arch.old_guest_table);
     }
 
+    /*
+     * It shouldn't be possible for _put_page_type() to return
+     * anything else at the moment; but if it does happen in
+     * production, leaking the type ref is probably the best thing to
+     * do.  Either way, drop the general ref held by old_guest_table.
+     */
+    ASSERT(rc == 0);
+
+    put_page(v->arch.old_guest_table);
     v->arch.old_guest_table = NULL;
+    v->arch.old_guest_ptpg = NULL;
+    /*
+     * Safest default if someone sets old_guest_table without
+     * explicitly setting old_guest_table_partial.
+     */
+    v->arch.old_guest_table_partial = true;
 
     return rc;
 }
@@ -3201,11 +3264,11 @@ int new_guest_cr3(mfn_t mfn)
             switch ( rc = put_page_and_type_preemptible(page) )
             {
             case -EINTR:
-                rc = -ERESTART;
-                /* fallthrough */
             case -ERESTART:
                 curr->arch.old_guest_ptpg = NULL;
                 curr->arch.old_guest_table = page;
+                curr->arch.old_guest_table_partial = (rc == -ERESTART);
+                rc = -ERESTART;
                 break;
             default:
                 BUG_ON(rc);
@@ -3479,6 +3542,7 @@ long do_mmuext_op(
                     {
                         curr->arch.old_guest_ptpg = NULL;
                         curr->arch.old_guest_table = page;
+                        curr->arch.old_guest_table_partial = false;
                     }
                 }
             }
@@ -3513,6 +3577,11 @@ long do_mmuext_op(
             case -ERESTART:
                 curr->arch.old_guest_ptpg = NULL;
                 curr->arch.old_guest_table = page;
+                /*
+                 * EINTR means we still hold the type ref; ERESTART
+                 * means PGT_partial holds the type ref
+                 */
+                curr->arch.old_guest_table_partial = (rc == -ERESTART);
                 rc = 0;
                 break;
             default:
@@ -3581,11 +3650,15 @@ long do_mmuext_op(
                 switch ( rc = put_page_and_type_preemptible(page) )
                 {
                 case -EINTR:
-                    rc = -ERESTART;
-                    /* fallthrough */
                 case -ERESTART:
                     curr->arch.old_guest_ptpg = NULL;
                     curr->arch.old_guest_table = page;
+                    /*
+                     * EINTR means we still hold the type ref;
+                     * ERESTART means PGT_partial holds the ref
+                     */
+                    curr->arch.old_guest_table_partial = (rc == -ERESTART);
+                    rc = -ERESTART;
                     break;
                 default:
                     BUG_ON(rc);
