@@ -69,11 +69,7 @@ static void __init find_xen_leaves(void)
 
 void __init probe_hypervisor(void)
 {
-    if ( xen_guest )
-        return;
-
-    /* Too early to use cpu_has_hypervisor */
-    if ( !(cpuid_ecx(1) & cpufeat_mask(X86_FEATURE_HYPERVISOR)) )
+    if ( xen_guest || !cpu_has_hypervisor )
         return;
 
     find_xen_leaves();

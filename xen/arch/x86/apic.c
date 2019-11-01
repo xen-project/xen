@@ -1156,7 +1156,7 @@ static void __init check_deadline_errata(void)
     const struct x86_cpu_id *m;
     unsigned int rev;
 
-    if ( boot_cpu_has(X86_FEATURE_HYPERVISOR) )
+    if ( cpu_has_hypervisor )
         return;
 
     m = x86_match_cpu(deadline_match);

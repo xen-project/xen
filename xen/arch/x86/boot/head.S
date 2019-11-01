@@ -630,6 +630,10 @@ trampoline_setup:
 
 1:
         /* Interrogate CPU extended features via CPUID. */
+        mov     $1, %eax
+        cpuid
+        mov     %ecx, sym_fs(boot_cpu_data) + CPUINFO_FEATURE_OFFSET(X86_FEATURE_HYPERVISOR)
+
         mov     $0x80000000,%eax
         cpuid
         shld    $16,%eax,%ecx

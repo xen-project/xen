@@ -637,11 +637,13 @@ static void __init efi_arch_handle_module(struct file *file, const CHAR16 *name,
 static void __init efi_arch_cpu(void)
 {
     uint32_t eax = cpuid_eax(0x80000000);
+    uint32_t *caps = boot_cpu_data.x86_capability;
+
+    caps[cpufeat_word(X86_FEATURE_HYPERVISOR)] = cpuid_ecx(1);
 
     if ( (eax >> 16) == 0x8000 && eax > 0x80000000 )
     {
-        boot_cpu_data.x86_capability[cpufeat_word(X86_FEATURE_SYSCALL)]
-            = cpuid_edx(0x80000001);
+        caps[cpufeat_word(X86_FEATURE_SYSCALL)] = cpuid_edx(0x80000001);
 
         if ( cpu_has_nx )
             trampoline_efer |= EFER_NX;
