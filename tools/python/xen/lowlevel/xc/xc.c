@@ -2661,7 +2661,7 @@ PyMODINIT_FUNC initxc(void)
 
 /*
  * Local variables:
- *  c-indent-level: 4
+ *  mode: C
  *  c-basic-offset: 4
  * End:
  */

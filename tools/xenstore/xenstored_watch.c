@@ -247,9 +247,9 @@ void conn_delete_all_watches(struct connection *conn)
 
 /*
  * Local variables:
+ *  mode: C
  *  c-file-style: "linux"
  *  indent-tabs-mode: t
- *  c-indent-level: 8
  *  c-basic-offset: 8
  *  tab-width: 8
  * End:
