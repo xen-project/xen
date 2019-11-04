@@ -177,6 +177,14 @@ hyp_error_invalid:
         entry   hyp=1
         invalid BAD_ERROR
 
+/*
+ * SError received while running in the hypervisor mode.
+ *
+ * Technically, we could unmask the IRQ if it were unmasked in the
+ * interrupted context. However, this require to check the PSTATE. For
+ * simplicity, as SError should be rare and potentially fatal,
+ * all interrupts are kept masked.
+ */
 hyp_error:
         /*
          * Only two possibilities:
@@ -186,7 +194,6 @@ hyp_error:
          * 2) Or we come from anywhere else, and that's a bug: we panic.
          */
         entry   hyp=1
-        msr     daifclr, #2
 
         /*
          * The ELR_EL2 may be modified by an interrupt, so we have to use the
@@ -214,14 +221,28 @@ hyp_error:
         bl      do_trap_guest_error
         exit    hyp=1
 
-/* Traps taken in Current EL with SP_ELx */
+/*
+ * Synchronous exception received while running in the hypervisor mode.
+ *
+ * While the exception can be executed with IRQ unmasked, the interrupt
+ * context may have purposefully masked it. So we want to inherit the
+ * state from the interrupted context.
+ */
 hyp_sync:
         entry   hyp=1
-        msr     daifclr, #2
+
+        /* Inherit IRQ state and keep the other interrupts masked. */
+        mrs     x0, SPSR_el2
+        and     x0, x0, #PSR_IRQ_MASK
+        mov     x1, #(PSR_DBG_MASK | PSR_ABT_MASK | PSR_FIQ_MASK)
+        orr     x0, x0, x1
+        msr     daif, x0
+
         mov     x0, sp
         bl      do_trap_hyp_sync
         exit    hyp=1
 
+/* IRQ received while running in the hypervisor mode. */
 hyp_irq:
         entry   hyp=1
         mov     x0, sp
