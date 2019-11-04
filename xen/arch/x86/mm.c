@@ -1152,7 +1152,7 @@ get_page_from_l2e(
     int rc;
 
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
-        return pv_l1tf_check_l2e(d, l2e) ? -ERESTART : 1;
+        return pv_l1tf_check_l2e(d, l2e) ? -EINTR : 1;
 
     if ( unlikely((l2e_get_flags(l2e) & L2_DISALLOW_MASK)) )
     {
@@ -1188,7 +1188,7 @@ get_page_from_l3e(
     int rc;
 
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        return pv_l1tf_check_l3e(d, l3e) ? -ERESTART : 1;
+        return pv_l1tf_check_l3e(d, l3e) ? -EINTR : 1;
 
     if ( unlikely((l3e_get_flags(l3e) & l3_disallow_mask(d))) )
     {
@@ -1221,7 +1221,7 @@ get_page_from_l4e(
     int rc;
 
     if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
-        return pv_l1tf_check_l4e(d, l4e) ? -ERESTART : 1;
+        return pv_l1tf_check_l4e(d, l4e) ? -EINTR : 1;
 
     if ( unlikely((l4e_get_flags(l4e) & L4_DISALLOW_MASK)) )
     {
@@ -1435,7 +1435,7 @@ static int alloc_l1_table(struct page_info *page)
     {
         if ( !(l1e_get_flags(pl1e[i]) & _PAGE_PRESENT) )
         {
-            ret = pv_l1tf_check_l1e(d, pl1e[i]) ? -ERESTART : 0;
+            ret = pv_l1tf_check_l1e(d, pl1e[i]) ? -EINTR : 0;
             if ( ret )
                 goto out;
         }
