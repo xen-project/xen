@@ -1253,7 +1253,7 @@ get_page_from_l4e(
     return rc;
 }
 
-static int _put_page_type(struct page_info *page, bool preemptible,
+static int _put_page_type(struct page_info *page, unsigned int flags,
                           struct page_info *ptpg);
 
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
@@ -1345,7 +1345,7 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn,
               PTF_partial_set )
         {
             ASSERT(!(flags & PTF_defer));
-            rc = _put_page_type(pg, true, ptpg);
+            rc = _put_page_type(pg, PTF_preemptible, ptpg);
         }
         else if ( flags & PTF_defer )
         {
@@ -1354,7 +1354,7 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn,
         }
         else
         {
-            rc = _put_page_type(pg, true, ptpg);
+            rc = _put_page_type(pg, PTF_preemptible, ptpg);
             if ( likely(!rc) )
                 put_page(pg);
         }
@@ -1391,7 +1391,7 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
          PTF_partial_set )
     {
         ASSERT(!(flags & PTF_defer));
-        return _put_page_type(pg, true, mfn_to_page(_mfn(pfn)));
+        return _put_page_type(pg, PTF_preemptible, mfn_to_page(_mfn(pfn)));
     }
 
     if ( flags & PTF_defer )
@@ -1401,7 +1401,7 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
         return 0;
     }
 
-    rc = _put_page_type(pg, true, mfn_to_page(_mfn(pfn)));
+    rc = _put_page_type(pg, PTF_preemptible, mfn_to_page(_mfn(pfn)));
     if ( likely(!rc) )
         put_page(pg);
 
@@ -1422,7 +1422,7 @@ static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
               PTF_partial_set )
         {
             ASSERT(!(flags & PTF_defer));
-            return _put_page_type(pg, true, mfn_to_page(_mfn(pfn)));
+            return _put_page_type(pg, PTF_preemptible, mfn_to_page(_mfn(pfn)));
         }
 
         if ( flags & PTF_defer )
@@ -1432,7 +1432,7 @@ static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
             return 0;
         }
 
-        rc = _put_page_type(pg, true, mfn_to_page(_mfn(pfn)));
+        rc = _put_page_type(pg, PTF_preemptible, mfn_to_page(_mfn(pfn)));
         if ( likely(!rc) )
             put_page(pg);
     }
@@ -2680,11 +2680,12 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
 }
 
 
-static int _put_page_type(struct page_info *page, bool preemptible,
+static int _put_page_type(struct page_info *page, unsigned int flags,
                           struct page_info *ptpg)
 {
     unsigned long nx, x, y = page->u.inuse.type_info;
     int rc = 0;
+    bool preemptible = flags & PTF_preemptible;
 
     for ( ; ; )
     {
@@ -2884,7 +2885,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
 
             if ( unlikely(iommu_ret) )
             {
-                _put_page_type(page, false, NULL);
+                _put_page_type(page, 0, NULL);
                 rc = iommu_ret;
                 goto out;
             }
@@ -2911,7 +2912,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
 
 void put_page_type(struct page_info *page)
 {
-    int rc = _put_page_type(page, false, NULL);
+    int rc = _put_page_type(page, 0, NULL);
     ASSERT(rc == 0);
     (void)rc;
 }
@@ -2927,7 +2928,7 @@ int get_page_type(struct page_info *page, unsigned long type)
 
 int put_page_type_preemptible(struct page_info *page)
 {
-    return _put_page_type(page, true, NULL);
+    return _put_page_type(page, PTF_preemptible, NULL);
 }
 
 int get_page_type_preemptible(struct page_info *page, unsigned long type)
@@ -2943,7 +2944,7 @@ int put_old_guest_table(struct vcpu *v)
     if ( !v->arch.old_guest_table )
         return 0;
 
-    switch ( rc = _put_page_type(v->arch.old_guest_table, true,
+    switch ( rc = _put_page_type(v->arch.old_guest_table, PTF_preemptible,
                                  v->arch.old_guest_ptpg) )
     {
     case -EINTR:
