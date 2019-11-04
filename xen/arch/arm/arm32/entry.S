@@ -12,27 +12,6 @@
 #define RESTORE_BANKED(mode) \
         RESTORE_ONE_BANKED(SP_##mode) ; RESTORE_ONE_BANKED(LR_##mode) ; RESTORE_ONE_BANKED(SPSR_##mode)
 
-#define SAVE_ALL                                                        \
-        sub sp, #(UREGS_SP_usr - UREGS_sp); /* SP, LR, SPSR, PC */      \
-        push {r0-r12}; /* Save R0-R12 */                                \
-                                                                        \
-        mrs r11, ELR_hyp;               /* ELR_hyp is return address. */\
-        str r11, [sp, #UREGS_pc];                                       \
-                                                                        \
-        str lr, [sp, #UREGS_lr];                                        \
-                                                                        \
-        add r11, sp, #UREGS_kernel_sizeof+4;                            \
-        str r11, [sp, #UREGS_sp];                                       \
-                                                                        \
-        mrc CP32(r11, HSR);             /* Save exception syndrome */   \
-        str r11, [sp, #UREGS_hsr];                                      \
-                                                                        \
-        mrs r11, SPSR_hyp;                                              \
-        str r11, [sp, #UREGS_cpsr];                                     \
-        and r11, #PSR_MODE_MASK;                                        \
-        cmp r11, #PSR_MODE_HYP;                                         \
-        blne save_guest_regs
-
 save_guest_regs:
 #ifdef CONFIG_ARM32_HARDEN_BRANCH_PREDICTOR
         /*
@@ -51,7 +30,7 @@ save_guest_regs:
         ldr r11, =0xffffffff  /* Clobber SP which is only valid for hypervisor frames. */
         str r11, [sp, #UREGS_sp]
         SAVE_ONE_BANKED(SP_usr)
-        /* LR_usr is the same physical register as lr and is saved in SAVE_ALL */
+        /* LR_usr is the same physical register as lr and is saved by the caller */
         SAVE_BANKED(svc)
         SAVE_BANKED(abt)
         SAVE_BANKED(und)
@@ -130,7 +109,28 @@ skip_check:
          * interrupts (Asynchronous Abort, IRQ, FIQ) to unmask.
          */
         .macro vector trap, iflags
-        SAVE_ALL
+        /* Save registers in the stack */
+        sub     sp, #(UREGS_SP_usr - UREGS_sp) /* SP, LR, SPSR, PC */
+        push    {r0-r12}                       /* Save R0-R12 */
+        mrs     r11, ELR_hyp                   /* ELR_hyp is return address */
+        str     r11, [sp, #UREGS_pc]
+
+        str     lr, [sp, #UREGS_lr]
+
+        add     r11, sp, #(UREGS_kernel_sizeof + 4)
+
+        str     r11, [sp, #UREGS_sp]
+
+        mrc     CP32(r11, HSR)                 /* Save exception syndrome */
+        str     r11, [sp, #UREGS_hsr]
+
+        mrs     r11, SPSR_hyp
+        str     r11, [sp, #UREGS_cpsr]
+        and     r11, #PSR_MODE_MASK
+        cmp     r11, #PSR_MODE_HYP
+        blne    save_guest_regs
+
+        /* We are ready to handle the trap, setup the registers and jump. */
         cpsie   \iflags
         adr     lr, return_from_trap
         mov     r0, sp
