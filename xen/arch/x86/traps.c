@@ -1639,7 +1639,14 @@ static int read_descriptor(unsigned int sel,
 {
     struct desc_struct desc;
 
-    if ( sel < 4)
+    if ( sel < 4 ||
+         /*
+          * Don't apply the GDT limit here, as the selector may be a Xen
+          * provided one. __get_user() will fail (without taking further
+          * action) for ones falling in the gap between guest populated
+          * and Xen ones.
+          */
+         ((sel & 4) && (sel >> 3) >= v->arch.pv_vcpu.ldt_ents) )
         desc.b = desc.a = 0;
     else if ( __get_user(desc,
                          (const struct desc_struct *)(!(sel & 4)
@@ -1698,7 +1705,13 @@ static int read_gate_descriptor(unsigned int gate_sel,
         (!(gate_sel & 4) ? GDT_VIRT_START(v) : LDT_VIRT_START(v))
         + (gate_sel >> 3);
     if ( (gate_sel < 4) ||
-         ((gate_sel >= FIRST_RESERVED_GDT_BYTE) && !(gate_sel & 4)) ||
+         /*
+          * We're interested in call gates only, which occupy a single
+          * seg_desc_t for 32-bit and a consecutive pair of them for 64-bit.
+          */
+         ((gate_sel >> 3) + !is_pv_32bit_vcpu(v) >=
+          (gate_sel & 4 ? v->arch.pv_vcpu.ldt_ents
+                        : v->arch.pv_vcpu.gdt_ents)) ||
          __get_user(desc, pdesc) )
         return 0;
 
@@ -1717,7 +1730,7 @@ static int read_gate_descriptor(unsigned int gate_sel,
     if ( !is_pv_32bit_vcpu(v) )
     {
         if ( (*ar & 0x1f00) != 0x0c00 ||
-             (gate_sel >= FIRST_RESERVED_GDT_BYTE - 8 && !(gate_sel & 4)) ||
+             /* Limit check done above already. */
              __get_user(desc, pdesc + 1) ||
              (desc.b & 0x1f00) )
             return 0;
