@@ -1726,7 +1726,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
             if ( i )
             {
                 page->nr_validated_ptes = i;
-                page->partial_flags = 0;
+                page->partial_flags = partial_flags;
                 current->arch.old_guest_ptpg = NULL;
                 current->arch.old_guest_table = page;
             }
@@ -1822,7 +1822,7 @@ static int alloc_l3_table(struct page_info *page)
         if ( i )
         {
             page->nr_validated_ptes = i;
-            page->partial_flags = 0;
+            page->partial_flags = partial_flags;
             current->arch.old_guest_ptpg = NULL;
             current->arch.old_guest_table = page;
         }
@@ -1912,7 +1912,7 @@ static int alloc_l4_table(struct page_info *page)
             if ( i )
             {
                 page->nr_validated_ptes = i;
-                page->partial_flags = 0;
+                page->partial_flags = partial_flags;
                 if ( rc == -EINTR )
                     rc = -ERESTART;
                 else
