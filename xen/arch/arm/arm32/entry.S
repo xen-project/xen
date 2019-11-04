@@ -125,24 +125,28 @@ abort_guest_exit_end:
 skip_check:
         mov pc, lr
 
-/*
- * Macro to define trap entry. The iflags corresponds to the list of
- * interrupts (Asynchronous Abort, IRQ, FIQ) to unmask.
- */
+        /*
+         * Macro to define trap entry. The iflags corresponds to the list of
+         * interrupts (Asynchronous Abort, IRQ, FIQ) to unmask.
+         */
+        .macro vector trap, iflags
+        SAVE_ALL
+        cpsie   \iflags
+        adr     lr, return_from_trap
+        mov     r0, sp
+        /*
+         * Save the stack pointer in r11. It will be restored after the
+         * trap has been handled (see return_from_trap).
+         */
+        mov     r11, sp
+        bic     sp, #7      /* Align the stack pointer (noop on guest trap) */
+        b       do_trap_\trap
+        .endm
+
 #define __DEFINE_TRAP_ENTRY(trap, iflags)                               \
         ALIGN;                                                          \
 trap_##trap:                                                            \
-        SAVE_ALL;                                                       \
-        cpsie iflags;                                                   \
-        adr lr, return_from_trap;                                       \
-        mov r0, sp;                                                     \
-        /*                                                              \
-         * Save the stack pointer in r11. It will be restored after the \
-         * trap has been handled (see return_from_trap).                \
-         */                                                             \
-        mov r11, sp;                                                    \
-        bic sp, #7; /* Align the stack pointer (noop on guest trap) */  \
-        b do_trap_##trap
+        vector trap, iflags
 
 /* Trap handler which unmask IRQ/Abort, keep FIQ masked */
 #define DEFINE_TRAP_ENTRY(trap) __DEFINE_TRAP_ENTRY(trap, ai)
