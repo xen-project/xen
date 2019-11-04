@@ -699,6 +699,18 @@ int map_ldt_shadow_page(unsigned int off)
 
     BUG_ON(unlikely(in_irq()));
 
+    /*
+     * Prior limit checking should guarantee this property.  NB. This is
+     * safe as updates to the LDT can only be made by MMUEXT_SET_LDT to the
+     * current vcpu, and vcpu_reset() will block until this vcpu has been
+     * descheduled before continuing.
+     */
+    if ( unlikely((off >> 3) >= v->arch.pv_vcpu.ldt_ents) )
+    {
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
     if ( is_pv_32bit_domain(d) )
         gva = (u32)gva;
     guest_get_eff_kern_l1e(v, gva, &l1e);
