@@ -329,7 +329,12 @@ mfn_t p2m_get_entry(struct p2m_domain *p2m, gfn_t gfn,
      * the table should always be non-NULL because the gfn is below
      * p2m->max_mapped_gfn and the root table pages are always present.
      */
-    BUG_ON(table == NULL);
+    if ( !table )
+    {
+        ASSERT_UNREACHABLE();
+        level = P2M_ROOT_LEVEL;
+        goto out;
+    }
 
     for ( level = P2M_ROOT_LEVEL; level < 3; level++ )
     {
