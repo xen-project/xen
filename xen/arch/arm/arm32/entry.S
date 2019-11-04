@@ -3,6 +3,17 @@
 #include <asm/alternative.h>
 #include <public/xen.h>
 
+/*
+ * Short-hands to defined the interrupts (A, I, F)
+ *
+ * _ means the interrupt state will not change
+ * X means the state of interrupt X will change
+ *
+ * To be used with msr cpsr_* only
+ */
+#define IFLAGS_AIF      PSR_ABT_MASK | PSR_IRQ_MASK | PSR_FIQ_MASK
+#define IFLAGS_A_F      PSR_ABT_MASK | PSR_FIQ_MASK
+
 #define SAVE_ONE_BANKED(reg)    mrs r11, reg; str r11, [sp, #UREGS_##reg]
 #define RESTORE_ONE_BANKED(reg) ldr r11, [sp, #UREGS_##reg]; msr reg, r11
 
@@ -105,10 +116,18 @@ skip_check:
         mov pc, lr
 
         /*
-         * Macro to define trap entry. The iflags corresponds to the list of
-         * interrupts (Asynchronous Abort, IRQ, FIQ) to unmask.
+         * Macro to define a trap entry.
+         *
+         *  @guest_iflags: Optional list of interrupts to unmask when
+         *      entering from guest context. As this is used with cpsie,
+         *      the letter (a, i, f) should be used.
+         *
+         *  @hyp_iflags: Optional list of interrupts to inherit when
+         *      entering from hypervisor context. Any interrupts not
+         *      listed will be kept unchanged. As this is used with cpsr_*,
+         *      IFLAGS_* short-hands should be used.
          */
-        .macro vector trap, iflags
+        .macro vector trap, guest_iflags=n, hyp_iflags=0
         /* Save registers in the stack */
         sub     sp, #(UREGS_SP_usr - UREGS_sp) /* SP, LR, SPSR, PC */
         push    {r0-r12}                       /* Save R0-R12 */
@@ -126,12 +145,39 @@ skip_check:
 
         mrs     r11, SPSR_hyp
         str     r11, [sp, #UREGS_cpsr]
-        and     r11, #PSR_MODE_MASK
-        cmp     r11, #PSR_MODE_HYP
-        blne    save_guest_regs
 
+        /*
+         * We need to distinguish whether we came from guest or
+         * hypervisor context.
+         */
+        and     r0, r11, #PSR_MODE_MASK
+        cmp     r0, #PSR_MODE_HYP
+
+        bne     1f
+        /*
+         * Trap from the hypervisor
+         *
+         * Inherit the state of the interrupts from the hypervisor
+         * context. For that we need to use SPSR (stored in r11) and
+         * modify CPSR accordingly.
+         *
+         * CPSR = (CPSR & ~hyp_iflags) | (SPSR & hyp_iflags)
+         */
+        mrs     r10, cpsr
+        bic     r10, r10, #\hyp_iflags
+        and     r11, r11, #\hyp_iflags
+        orr     r10, r10, r11
+        msr     cpsr_cx, r10
+        b       2f
+
+1:
+        /* Trap from the guest */
+        bl      save_guest_regs
+        .if     \guest_iflags != n
+        cpsie   \guest_iflags
+        .endif
+2:
         /* We are ready to handle the trap, setup the registers and jump. */
-        cpsie   \iflags
         adr     lr, return_from_trap
         mov     r0, sp
         /*
@@ -142,20 +188,6 @@ skip_check:
         bic     sp, #7      /* Align the stack pointer (noop on guest trap) */
         b       do_trap_\trap
         .endm
-
-#define __DEFINE_TRAP_ENTRY(trap, iflags)                               \
-        ALIGN;                                                          \
-trap_##trap:                                                            \
-        vector trap, iflags
-
-/* Trap handler which unmask IRQ/Abort, keep FIQ masked */
-#define DEFINE_TRAP_ENTRY(trap) __DEFINE_TRAP_ENTRY(trap, ai)
-
-/* Trap handler which unmask Abort, keep IRQ/FIQ masked */
-#define DEFINE_TRAP_ENTRY_NOIRQ(trap) __DEFINE_TRAP_ENTRY(trap, a)
-
-/* Trap handler which unmask IRQ, keep Abort/FIQ masked */
-#define DEFINE_TRAP_ENTRY_NOABORT(trap) __DEFINE_TRAP_ENTRY(trap, i)
 
         .align 5
 GLOBAL(hyp_traps_vector)
@@ -227,14 +259,62 @@ decode_vectors:
 
 #endif /* CONFIG_HARDEN_BRANCH_PREDICTOR */
 
-DEFINE_TRAP_ENTRY(reset)
-DEFINE_TRAP_ENTRY(undefined_instruction)
-DEFINE_TRAP_ENTRY(hypervisor_call)
-DEFINE_TRAP_ENTRY(prefetch_abort)
-DEFINE_TRAP_ENTRY(guest_sync)
-DEFINE_TRAP_ENTRY_NOIRQ(irq)
-DEFINE_TRAP_ENTRY_NOIRQ(fiq)
-DEFINE_TRAP_ENTRY_NOABORT(data_abort)
+/* Vector not used by the Hypervisor. */
+trap_reset:
+        vector reset
+
+/*
+ * Vector only used by the Hypervisor.
+ *
+ * While the exception can be executed with all the interrupts (e.g.
+ * IRQ) unmasked, the interrupted context may have purposefully masked
+ * some of them. So we want to inherit the state from the interrupted
+ * context.
+ */
+trap_undefined_instruction:
+        vector undefined_instruction, hyp_iflags=IFLAGS_AIF
+
+/* We should never reach this trap */
+trap_hypervisor_call:
+        vector hypervisor_call
+
+/*
+ * Vector only used by the hypervisor.
+ *
+ * While the exception can be executed with all the interrupts (e.g.
+ * IRQ) unmasked, the interrupted context may have purposefully masked
+ * some of them. So we want to inherit the state from the interrupted
+ * context.
+ */
+trap_prefetch_abort:
+       vector prefetch_abort, hyp_iflags=IFLAGS_AIF
+
+/*
+ * Vector only used by the hypervisor.
+ *
+ * Data Abort should be rare and most likely fatal. It is best to not
+ * unmask any interrupts to limit the amount of code that can run before
+ * the Data Abort is treated.
+ */
+trap_data_abort:
+        vector data_abort
+
+/* Vector only used by the guest. We can unmask Abort/IRQ. */
+trap_guest_sync:
+        vector guest_sync, guest_iflags=ai
+
+
+/* Vector used by the hypervisor and the guest. */
+trap_irq:
+        vector irq, guest_iflags=a, hyp_iflags=IFLAGS_A_F
+
+/*
+ * Vector used by the hypervisor and the guest.
+ *
+ * FIQ are not meant to happen, so we don't unmask any interrupts.
+ */
+trap_fiq:
+        vector fiq
 
 return_from_trap:
         /*
