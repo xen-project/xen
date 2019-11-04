@@ -1576,13 +1576,8 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
           i++, partial_flags = 0 )
     {
         if ( i > page->nr_validated_ptes && hypercall_preempt_check() )
-        {
-            page->nr_validated_ptes = i;
-            rc = -ERESTART;
-            break;
-        }
-
-        if ( !is_guest_l2_slot(d, type, i) ||
+            rc = -EINTR;
+        else if ( !is_guest_l2_slot(d, type, i) ||
              (rc = get_page_from_l2e(pl2e[i], pfn, d, partial_flags)) > 0 )
             continue;
 
@@ -1647,13 +1642,8 @@ static int alloc_l3_table(struct page_info *page)
           i++, partial_flags = 0 )
     {
         if ( i > page->nr_validated_ptes && hypercall_preempt_check() )
-        {
-            page->nr_validated_ptes = i;
-            rc = -ERESTART;
-            break;
-        }
-
-        if ( is_pv_32bit_domain(d) && (i == 3) )
+            rc = -EINTR;
+        else if ( is_pv_32bit_domain(d) && (i == 3) )
         {
             if ( !(l3e_get_flags(pl3e[i]) & _PAGE_PRESENT) ||
                  (l3e_get_flags(pl3e[i]) & l3_disallow_mask(d)) )
