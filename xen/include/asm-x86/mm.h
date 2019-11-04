@@ -145,7 +145,7 @@ struct page_info
          * operation on the current page.  (That page may or may not
          * still have PGT_partial set.)
          *
-         * If PTF_partial_general_ref is set, then the PTE at
+         * Additionally, if PTF_partial_set is set, then the PTE at
          * @nr_validated_ptef holds a general reference count for the
          * page.
          *
@@ -154,23 +154,20 @@ struct page_info
          *   interrupted
          * - During validation, if an invalid entry is encountered and
          *   validation is preemptible
-         * - During validation, if PTF_partial_general_ref was set on
-         *   this entry to begin with (perhaps because it picked up a
+         * - During validation, if PTF_partial_set was set on this
+         *   entry to begin with (perhaps because it picked up a
          *   previous operation)
          *
-         * When resuming validation, if PTF_partial_general_ref is
-         * clear, then a general reference must be re-acquired; if it
-         * is set, no reference should be acquired.
+         * When resuming validation, if PTF_partial_set is clear, then
+         * a general reference must be re-acquired; if it is set, no
+         * reference should be acquired.
          *
-         * When resuming de-validation, if PTF_partial_general_ref is
-         * clear, no reference should be dropped; if it is set, a
-         * reference should be dropped.
+         * When resuming de-validation, if PTF_partial_set is clear,
+         * no reference should be dropped; if it is set, a reference
+         * should be dropped.
          *
-         * NB at the moment, PTF_partial_set should be set if and only if
-         * PTF_partial_general_ref is set.
-         *
-         * NB that PTF_partial_set and PTF_partial_general_ref are
-         * defined in mm.c, the only place where they are used.
+         * NB that PTF_partial_set is defined in mm.c, the only place
+         * where it is used.
          *
          * The 3rd field, @linear_pt_count, indicates
          * - by a positive value, how many same-level page table entries a page
@@ -180,8 +177,8 @@ struct page_info
          */
         struct {
             u16 nr_validated_ptes:PAGETABLE_ORDER + 1;
-            u16 :16 - PAGETABLE_ORDER - 1 - 2;
-            u16 partial_flags:2;
+            u16 :16 - PAGETABLE_ORDER - 1 - 1;
+            u16 partial_flags:1;
             s16 linear_pt_count;
         };
 
