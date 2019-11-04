@@ -177,24 +177,63 @@ hyp_error_invalid:
         entry   hyp=1
         invalid BAD_ERROR
 
+/*
+ * SError received while running in the hypervisor mode.
+ *
+ * Technically, we could unmask the IRQ if it were unmasked in the
+ * interrupted context. However, this require to check the PSTATE. For
+ * simplicity, as SError should be rare and potentially fatal,
+ * all interrupts are kept masked.
+ */
 hyp_error:
         entry   hyp=1
-        msr     daifclr, #2
         mov     x0, sp
         bl      do_trap_hyp_serror
         exit    hyp=1
 
-/* Traps taken in Current EL with SP_ELx */
+/*
+ * Synchronous exception received while running in the hypervisor mode.
+ *
+ * While the exception could be executed with all the interrupts (e.g.
+ * IRQ) unmasked, the interrupted context may have purposefully masked
+ * some of them. So we want to inherit the state from the interrupted
+ * context.
+ */
 hyp_sync:
         entry   hyp=1
-        msr     daifclr, #6
+
+        /* Inherit interrupts */
+        mrs     x0, SPSR_el2
+        and     x0, x0, #(PSR_DBG_MASK | PSR_ABT_MASK | PSR_IRQ_MASK | PSR_FIQ_MASK)
+        msr     daif, x0
+
         mov     x0, sp
         bl      do_trap_hyp_sync
         exit    hyp=1
 
+/*
+ * IRQ received while running in the hypervisor mode.
+ *
+ * While the exception could be executed with all the interrupts but IRQ
+ * unmasked, the interrupted context may have purposefully masked some
+ * of them. So we want to inherit the state from the interrupt context
+ * and keep IRQ masked.
+ *
+ * XXX: We may want to consider an ordering between interrupts (e.g. if
+ * SError are masked, then IRQ should be masked too). However, this
+ * would require some rework in some paths (e.g. panic, livepatch) to
+ * ensure the ordering is enforced everywhere.
+ */
 hyp_irq:
         entry   hyp=1
-        msr     daifclr, #4
+
+        /* Inherit D, A, F interrupts and keep I masked */
+        mrs     x0, SPSR_el2
+        mov     x1, #(PSR_DBG_MASK | PSR_ABT_MASK | PSR_FIQ_MASK)
+        and     x0, x0, x1
+        orr     x0, x0, #PSR_IRQ_MASK
+        msr     daif, x0
+
         mov     x0, sp
         bl      do_trap_irq
         exit    hyp=1
