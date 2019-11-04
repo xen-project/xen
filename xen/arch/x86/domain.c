@@ -112,7 +112,7 @@ static void play_dead(void)
      * this case, heap corruption or #PF can occur (when heap debugging is
      * enabled). For example, even printk() can involve tasklet scheduling,
      * which touches per-cpu vars.
-     * 
+     *
      * Consider very carefully when adding code to *dead_idle. Most hypervisor
      * subsystems are unsafe to call.
      */
@@ -1837,9 +1837,34 @@ static int relinquish_memory(
             break;
         case -ERESTART:
         case -EINTR:
+            /*
+             * -EINTR means PGT_validated has been re-set; re-set
+             * PGT_pinned again so that it gets picked up next time
+             * around.
+             *
+             * -ERESTART, OTOH, means PGT_partial is set instead.  Put
+             * it back on the list, but don't set PGT_pinned; the
+             * section below will finish off de-validation.  But we do
+             * need to drop the general ref associated with
+             * PGT_pinned, since put_page_and_type_preemptible()
+             * didn't do it.
+             *
+             * NB we can do an ASSERT for PGT_validated, since we
+             * "own" the type ref; but theoretically, the PGT_partial
+             * could be cleared by someone else.
+             */
+            if ( ret == -EINTR )
+            {
+                ASSERT(page->u.inuse.type_info & PGT_validated);
+                set_bit(_PGT_pinned, &page->u.inuse.type_info);
+            }
+            else
+                put_page(page);
+
             ret = -ERESTART;
+
+            /* Put the page back on the list and drop the ref we grabbed above */
             page_list_add(page, list);
-            set_bit(_PGT_pinned, &page->u.inuse.type_info);
             put_page(page);
             goto out;
         default:
@@ -2061,7 +2086,7 @@ void vcpu_kick(struct vcpu *v)
      * pending flag. These values may fluctuate (after all, we hold no
      * locks) but the key insight is that each change will cause
      * evtchn_upcall_pending to be polled.
-     * 
+     *
      * NB2. We save the running flag across the unblock to avoid a needless
      * IPI for domains that we IPI'd to unblock.
      */
