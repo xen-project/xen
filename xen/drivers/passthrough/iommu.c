@@ -208,6 +208,9 @@ void iommu_teardown(struct domain *d)
 {
     const struct domain_iommu *hd = dom_iommu(d);
 
+    if ( d == dom_io )
+        return;
+
     d->need_iommu = 0;
     hd->platform_ops->teardown(d);
     tasklet_schedule(&iommu_pt_cleanup_tasklet);
@@ -216,6 +219,9 @@ void iommu_teardown(struct domain *d)
 int iommu_construct(struct domain *d)
 {
     if ( need_iommu(d) > 0 )
+        return 0;
+
+    if ( d == dom_io )
         return 0;
 
     if ( !iommu_use_hap_pt(d) )
@@ -393,6 +399,9 @@ int __init iommu_setup(void)
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( iommu_enabled )
     {
+        if ( iommu_domain_init(dom_io) )
+            panic("Could not set up quarantine\n");
+
         printk(" - Dom0 mode: %s\n",
                iommu_passthrough ? "Passthrough" :
                iommu_dom0_strict ? "Strict" : "Relaxed");
