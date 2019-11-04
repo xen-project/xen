@@ -2936,7 +2936,7 @@ static void device_model_postconfig_vnc(libxl__egc *egc,
         if (rc) goto out;
     }
 
-    if (vnc && vnc->passwd) {
+    if (vnc && vnc->passwd && vnc->passwd[0]) {
         qmp->callback = device_model_postconfig_vnc_passwd;
         libxl__qmp_param_add_string(gc, &args, "password", vnc->passwd);
         rc = libxl__ev_qmp_send(gc, qmp, "change-vnc-password", args);
