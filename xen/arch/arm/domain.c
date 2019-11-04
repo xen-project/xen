@@ -371,14 +371,15 @@ void sync_vcpu_execstate(struct vcpu *v)
     /* Nothing to do -- no lazy switching */
 }
 
-#define next_arg(fmt, args) ({                                              \
+#define NEXT_ARG(fmt, args)                                                 \
+({                                                                          \
     unsigned long __arg;                                                    \
     switch ( *(fmt)++ )                                                     \
     {                                                                       \
     case 'i': __arg = (unsigned long)va_arg(args, unsigned int);  break;    \
     case 'l': __arg = (unsigned long)va_arg(args, unsigned long); break;    \
     case 'h': __arg = (unsigned long)va_arg(args, void *);        break;    \
-    default:  __arg = 0; BUG();                                             \
+    default:  goto bad_fmt;                                                 \
     }                                                                       \
     __arg;                                                                  \
 })
@@ -393,9 +394,6 @@ unsigned long hypercall_create_continuation(
     unsigned int i;
     va_list args;
 
-    /* All hypercalls take at least one argument */
-    BUG_ON( !p || *p == '\0' );
-
     current->hcall_preempted = true;
 
     va_start(args, format);
@@ -403,7 +401,7 @@ unsigned long hypercall_create_continuation(
     if ( mcs->flags & MCSF_in_multicall )
     {
         for ( i = 0; *p != '\0'; i++ )
-            mcs->call.args[i] = next_arg(p, args);
+            mcs->call.args[i] = NEXT_ARG(p, args);
 
         /* Return value gets written back to mcs->call.result */
         rc = mcs->call.result;
@@ -419,7 +417,7 @@ unsigned long hypercall_create_continuation(
 
             for ( i = 0; *p != '\0'; i++ )
             {
-                arg = next_arg(p, args);
+                arg = NEXT_ARG(p, args);
 
                 switch ( i )
                 {
@@ -442,7 +440,7 @@ unsigned long hypercall_create_continuation(
 
             for ( i = 0; *p != '\0'; i++ )
             {
-                arg = next_arg(p, args);
+                arg = NEXT_ARG(p, args);
 
                 switch ( i )
                 {
@@ -463,7 +461,15 @@ unsigned long hypercall_create_continuation(
     va_end(args);
 
     return rc;
+
+ bad_fmt:
+    gprintk(XENLOG_ERR, "Bad hypercall continuation format '%c'\n", *p);
+    ASSERT_UNREACHABLE();
+    domain_crash(current->domain);
+    return 0;
 }
+
+#undef NEXT_ARG
 
 void startup_cpu_idle_loop(void)
 {
