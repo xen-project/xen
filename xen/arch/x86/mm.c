@@ -295,9 +295,11 @@ void __init arch_init_memory(void)
      * Initialise our DOMID_IO domain.
      * This domain owns I/O pages that are within the range of the page_info
      * array. Mappings occur at the priv of the caller.
+     * Quarantined PCI devices will be associated with this domain.
      */
     dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0, NULL);
     BUG_ON(IS_ERR(dom_io));
+    INIT_LIST_HEAD(&dom_io->arch.pdev_list);
 
     /*
      * Initialise our COW domain.
