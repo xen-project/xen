@@ -1386,9 +1386,15 @@ int arch_set_info_guest(
                     rc = -ERESTART;
                     /* Fallthrough */
                 case -ERESTART:
+                    /*
+                     * NB that we're putting the kernel-mode table
+                     * here, which we've already successfully
+                     * validated above; hence partial = false;
+                     */
                     v->arch.old_guest_ptpg = NULL;
                     v->arch.old_guest_table =
                         pagetable_get_page(v->arch.guest_table);
+                    v->arch.old_guest_table_partial = false;
                     v->arch.guest_table = pagetable_null();
                     break;
                 default:

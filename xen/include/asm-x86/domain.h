@@ -342,7 +342,7 @@ struct arch_domain
 
     struct paging_domain paging;
     struct p2m_domain *p2m;
-    /* To enforce lock ordering in the pod code wrt the 
+    /* To enforce lock ordering in the pod code wrt the
      * page_alloc lock */
     int page_alloc_unlock_level;
 
@@ -576,6 +576,8 @@ struct arch_vcpu
     struct page_info *old_guest_table;  /* partially destructed pagetable */
     struct page_info *old_guest_ptpg;   /* containing page table of the */
                                         /* former, if any */
+    bool old_guest_table_partial;       /* Are we dropping a type ref, or just
+                                         * finishing up a partial de-validation? */
     /* guest_table holds a ref to the page, and also a type-count unless
      * shadow refcounts are in use */
     pagetable_t shadow_table[4];        /* (MFN) shadow(s) of guest */
