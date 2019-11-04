@@ -167,21 +167,24 @@ struct page_info
          * page.
          *
          * This happens:
-         * - During de-validation, if de-validation of the page was
+         * - During validation or de-validation, if the operation was
          *   interrupted
          * - During validation, if an invalid entry is encountered and
          *   validation is preemptible
          * - During validation, if PTF_partial_general_ref was set on
-         *   this entry to begin with (perhaps because we're picking
-         *   up from a partial de-validation).
+         *   this entry to begin with (perhaps because it picked up a
+         *   previous operation)
          *
-         * When resuming validation, if PTF_partial_general_ref is clear,
-         * then a general reference must be re-acquired; if it is set, no
-         * reference should be acquired.
+         * When resuming validation, if PTF_partial_general_ref is
+         * clear, then a general reference must be re-acquired; if it
+         * is set, no reference should be acquired.
          *
          * When resuming de-validation, if PTF_partial_general_ref is
          * clear, no reference should be dropped; if it is set, a
          * reference should be dropped.
+         *
+         * NB at the moment, PTF_partial_set should be set if and only if
+         * PTF_partial_general_ref is set.
          *
          * NB that PTF_partial_set and PTF_partial_general_ref are
          * defined in mm.c, the only place where they are used.
