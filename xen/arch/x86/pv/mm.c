@@ -98,12 +98,16 @@ bool pv_map_ldt_shadow_page(unsigned int offset)
     BUG_ON(unlikely(in_irq()));
 
     /*
-     * Hardware limit checking should guarantee this property.  NB. This is
+     * Prior limit checking should guarantee this property.  NB. This is
      * safe as updates to the LDT can only be made by MMUEXT_SET_LDT to the
      * current vcpu, and vcpu_reset() will block until this vcpu has been
      * descheduled before continuing.
      */
-    ASSERT((offset >> 3) <= curr->arch.pv_vcpu.ldt_ents);
+    if ( unlikely((offset >> 3) >= curr->arch.pv_vcpu.ldt_ents) )
+    {
+        ASSERT_UNREACHABLE();
+        return false;
+    }
 
     if ( is_pv_32bit_domain(currd) )
         linear = (uint32_t)linear;
