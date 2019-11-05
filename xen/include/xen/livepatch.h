@@ -104,6 +104,7 @@ static inline int livepatch_verify_distance(const struct livepatch_func *func)
  * These functions are called around the critical region patching live code,
  * for an architecture to take make appropratie global state adjustments.
  */
+int arch_livepatch_safety_check(void);
 int arch_livepatch_quiesce(void);
 void arch_livepatch_revive(void);
 

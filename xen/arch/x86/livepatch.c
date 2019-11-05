@@ -10,9 +10,49 @@
 #include <xen/vmap.h>
 #include <xen/livepatch_elf.h>
 #include <xen/livepatch.h>
+#include <xen/sched.h>
 
 #include <asm/nmi.h>
 #include <asm/livepatch.h>
+
+static bool has_active_waitqueue(const struct vm_event_domain *ved)
+{
+    /* ved may be xzalloc()'d without INIT_LIST_HEAD() yet. */
+    return (ved && !list_head_is_null(&ved->wq.list) &&
+            !list_empty(&ved->wq.list));
+}
+
+/*
+ * x86's implementation of waitqueue violates the livepatching safey principle
+ * of having unwound every CPUs stack before modifying live content.
+ *
+ * Search through every domain and check that no vCPUs have an active
+ * waitqueue.
+ */
+int arch_livepatch_safety_check(void)
+{
+    struct domain *d;
+
+    for_each_domain ( d )
+    {
+#ifdef CONFIG_MEM_SHARING
+        if ( has_active_waitqueue(d->vm_event_share) )
+            goto fail;
+#endif
+#ifdef CONFIG_MEM_PAGING
+        if ( has_active_waitqueue(d->vm_event_paging) )
+            goto fail;
+#endif
+        if ( has_active_waitqueue(d->vm_event_monitor) )
+            goto fail;
+    }
+
+    return 0;
+
+ fail:
+    printk(XENLOG_ERR LIVEPATCH "%pd found with active waitqueue\n", d);
+    return -EBUSY;
+}
 
 int arch_livepatch_quiesce(void)
 {
