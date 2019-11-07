@@ -26,7 +26,6 @@
 
 #include <xen/lib.h>
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/timer.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
@@ -34,6 +33,8 @@
 #include <xen/list.h>
 #include <xen/guest_access.h>
 #include <public/sysctl.h>
+
+#include "private.h"
 
 /**************************************************************************
  * Private Macros                                                         *

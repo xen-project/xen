@@ -29,9 +29,10 @@
  */
 
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <xen/trace.h>
+
+#include "private.h"
 
 /*
  * null tracing events. Check include/public/trace.h for more details.

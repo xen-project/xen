@@ -23,7 +23,6 @@
 #include <xen/time.h>
 #include <xen/timer.h>
 #include <xen/perfc.h>
-#include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <xen/mm.h>
@@ -37,6 +36,8 @@
 #include <public/sched.h>
 #include <xsm/xsm.h>
 #include <xen/err.h>
+
+#include "private.h"
 
 #ifdef CONFIG_XEN_GUEST
 #include <asm/guest.h>
@@ -1605,6 +1606,194 @@ int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason)
     rcu_read_unlock(&sched_res_rculock);
 
     return ret;
+}
+
+static inline
+int vcpuaffinity_params_invalid(const struct xen_domctl_vcpuaffinity *vcpuaff)
+{
+    return vcpuaff->flags == 0 ||
+           ((vcpuaff->flags & XEN_VCPUAFFINITY_HARD) &&
+            guest_handle_is_null(vcpuaff->cpumap_hard.bitmap)) ||
+           ((vcpuaff->flags & XEN_VCPUAFFINITY_SOFT) &&
+            guest_handle_is_null(vcpuaff->cpumap_soft.bitmap));
+}
+
+int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
+                         struct xen_domctl_vcpuaffinity *vcpuaff)
+{
+    struct vcpu *v;
+    const struct sched_unit *unit;
+    int ret = 0;
+
+    if ( vcpuaff->vcpu >= d->max_vcpus )
+        return -EINVAL;
+
+    if ( (v = d->vcpu[vcpuaff->vcpu]) == NULL )
+        return -ESRCH;
+
+    if ( vcpuaffinity_params_invalid(vcpuaff) )
+        return -EINVAL;
+
+    unit = v->sched_unit;
+
+    if ( cmd == XEN_DOMCTL_setvcpuaffinity )
+    {
+        cpumask_var_t new_affinity, old_affinity;
+        cpumask_t *online = cpupool_domain_master_cpumask(v->domain);
+
+        /*
+         * We want to be able to restore hard affinity if we are trying
+         * setting both and changing soft affinity (which happens later,
+         * when hard affinity has been succesfully chaged already) fails.
+         */
+        if ( !alloc_cpumask_var(&old_affinity) )
+            return -ENOMEM;
+
+        cpumask_copy(old_affinity, unit->cpu_hard_affinity);
+
+        if ( !alloc_cpumask_var(&new_affinity) )
+        {
+            free_cpumask_var(old_affinity);
+            return -ENOMEM;
+        }
+
+        /* Undo a stuck SCHED_pin_override? */
+        if ( vcpuaff->flags & XEN_VCPUAFFINITY_FORCE )
+            vcpu_temporary_affinity(v, NR_CPUS, VCPU_AFFINITY_OVERRIDE);
+
+        ret = 0;
+
+        /*
+         * We both set a new affinity and report back to the caller what
+         * the scheduler will be effectively using.
+         */
+        if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
+        {
+            ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
+                                          &vcpuaff->cpumap_hard, nr_cpu_ids);
+            if ( !ret )
+                ret = vcpu_set_hard_affinity(v, new_affinity);
+            if ( ret )
+                goto setvcpuaffinity_out;
+
+            /*
+             * For hard affinity, what we return is the intersection of
+             * cpupool's online mask and the new hard affinity.
+             */
+            cpumask_and(new_affinity, online, unit->cpu_hard_affinity);
+            ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard, new_affinity);
+        }
+        if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
+        {
+            ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
+                                          &vcpuaff->cpumap_soft, nr_cpu_ids);
+            if ( !ret)
+                ret = vcpu_set_soft_affinity(v, new_affinity);
+            if ( ret )
+            {
+                /*
+                 * Since we're returning error, the caller expects nothing
+                 * happened, so we rollback the changes to hard affinity
+                 * (if any).
+                 */
+                if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
+                    vcpu_set_hard_affinity(v, old_affinity);
+                goto setvcpuaffinity_out;
+            }
+
+            /*
+             * For soft affinity, we return the intersection between the
+             * new soft affinity, the cpupool's online map and the (new)
+             * hard affinity.
+             */
+            cpumask_and(new_affinity, new_affinity, online);
+            cpumask_and(new_affinity, new_affinity, unit->cpu_hard_affinity);
+            ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_soft, new_affinity);
+        }
+
+ setvcpuaffinity_out:
+        free_cpumask_var(new_affinity);
+        free_cpumask_var(old_affinity);
+    }
+    else
+    {
+        if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
+            ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard,
+                                           unit->cpu_hard_affinity);
+        if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
+            ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_soft,
+                                           unit->cpu_soft_affinity);
+    }
+
+    return ret;
+}
+
+void domain_update_node_affinity(struct domain *d)
+{
+    cpumask_var_t dom_cpumask, dom_cpumask_soft;
+    cpumask_t *dom_affinity;
+    const cpumask_t *online;
+    struct sched_unit *unit;
+    unsigned int cpu;
+
+    /* Do we have vcpus already? If not, no need to update node-affinity. */
+    if ( !d->vcpu || !d->vcpu[0] )
+        return;
+
+    if ( !zalloc_cpumask_var(&dom_cpumask) )
+        return;
+    if ( !zalloc_cpumask_var(&dom_cpumask_soft) )
+    {
+        free_cpumask_var(dom_cpumask);
+        return;
+    }
+
+    online = cpupool_domain_master_cpumask(d);
+
+    spin_lock(&d->node_affinity_lock);
+
+    /*
+     * If d->auto_node_affinity is true, let's compute the domain's
+     * node-affinity and update d->node_affinity accordingly. if false,
+     * just leave d->auto_node_affinity alone.
+     */
+    if ( d->auto_node_affinity )
+    {
+        /*
+         * We want the narrowest possible set of pcpus (to get the narowest
+         * possible set of nodes). What we need is the cpumask of where the
+         * domain can run (the union of the hard affinity of all its vcpus),
+         * and the full mask of where it would prefer to run (the union of
+         * the soft affinity of all its various vcpus). Let's build them.
+         */
+        for_each_sched_unit ( d, unit )
+        {
+            cpumask_or(dom_cpumask, dom_cpumask, unit->cpu_hard_affinity);
+            cpumask_or(dom_cpumask_soft, dom_cpumask_soft,
+                       unit->cpu_soft_affinity);
+        }
+        /* Filter out non-online cpus */
+        cpumask_and(dom_cpumask, dom_cpumask, online);
+        ASSERT(!cpumask_empty(dom_cpumask));
+        /* And compute the intersection between hard, online and soft */
+        cpumask_and(dom_cpumask_soft, dom_cpumask_soft, dom_cpumask);
+
+        /*
+         * If not empty, the intersection of hard, soft and online is the
+         * narrowest set we want. If empty, we fall back to hard&online.
+         */
+        dom_affinity = cpumask_empty(dom_cpumask_soft) ?
+                           dom_cpumask : dom_cpumask_soft;
+
+        nodes_clear(d->node_affinity);
+        for_each_cpu ( cpu, dom_affinity )
+            node_set(cpu_to_node(cpu), d->node_affinity);
+    }
+
+    spin_unlock(&d->node_affinity_lock);
+
+    free_cpumask_var(dom_cpumask_soft);
+    free_cpumask_var(dom_cpumask);
 }
 
 typedef long ret_t;

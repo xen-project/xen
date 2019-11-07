@@ -50,6 +50,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 /* A global pointer to the hardware domain (usually DOM0). */
 extern struct domain *hardware_domain;
 
+/* A global pointer to the initial cpupool (POOL0). */
+extern struct cpupool *cpupool0;
+
 #ifdef CONFIG_LATE_HWDOM
 extern domid_t hardware_domid;
 #else
@@ -931,6 +934,8 @@ int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason);
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
 int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity);
 void restore_vcpu_affinity(struct domain *d);
+int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
+                         struct xen_domctl_vcpuaffinity *vcpuaff);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 uint64_t get_cpu_idle_time(unsigned int cpu);
@@ -1068,6 +1073,8 @@ int cpupool_add_domain(struct domain *d, int poolid);
 void cpupool_rm_domain(struct domain *d);
 int cpupool_move_domain(struct domain *d, struct cpupool *c);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
+int cpupool_get_id(const struct domain *d);
+const cpumask_t *cpupool_valid_cpus(const struct cpupool *pool);
 void schedule_dump(struct cpupool *c);
 extern void dump_runq(unsigned char key);
 

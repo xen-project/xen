@@ -11,7 +11,6 @@
 #include <xen/err.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/domain.h>
 #include <xen/event.h>
 #include <xen/grant_table.h>
@@ -65,9 +64,9 @@ static int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
     return err;
 }
 
-static int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
-                                   const struct xenctl_bitmap *xenctl_bitmap,
-                                   unsigned int nbits)
+int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
+                            const struct xenctl_bitmap *xenctl_bitmap,
+                            unsigned int nbits)
 {
     unsigned int guest_bytes, copy_bytes;
     int err = 0;
@@ -200,7 +199,7 @@ void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info)
     info->shared_info_frame = mfn_to_gmfn(d, virt_to_mfn(d->shared_info));
     BUG_ON(SHARED_M2P(info->shared_info_frame));
 
-    info->cpupool = d->cpupool ? d->cpupool->cpupool_id : CPUPOOLID_NONE;
+    info->cpupool = cpupool_get_id(d);
 
     memcpy(info->handle, d->handle, sizeof(xen_domain_handle_t));
 
@@ -232,16 +231,6 @@ void domctl_lock_release(void)
 {
     spin_unlock(&domctl_lock);
     spin_unlock(&current->domain->hypercall_deadlock_mutex);
-}
-
-static inline
-int vcpuaffinity_params_invalid(const struct xen_domctl_vcpuaffinity *vcpuaff)
-{
-    return vcpuaff->flags == 0 ||
-           ((vcpuaff->flags & XEN_VCPUAFFINITY_HARD) &&
-            guest_handle_is_null(vcpuaff->cpumap_hard.bitmap)) ||
-           ((vcpuaff->flags & XEN_VCPUAFFINITY_SOFT) &&
-            guest_handle_is_null(vcpuaff->cpumap_soft.bitmap));
 }
 
 void vnuma_destroy(struct vnuma_info *vnuma)
@@ -608,122 +597,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_setvcpuaffinity:
     case XEN_DOMCTL_getvcpuaffinity:
-    {
-        struct vcpu *v;
-        const struct sched_unit *unit;
-        struct xen_domctl_vcpuaffinity *vcpuaff = &op->u.vcpuaffinity;
-
-        ret = -EINVAL;
-        if ( vcpuaff->vcpu >= d->max_vcpus )
-            break;
-
-        ret = -ESRCH;
-        if ( (v = d->vcpu[vcpuaff->vcpu]) == NULL )
-            break;
-
-        unit = v->sched_unit;
-        ret = -EINVAL;
-        if ( vcpuaffinity_params_invalid(vcpuaff) )
-            break;
-
-        if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
-        {
-            cpumask_var_t new_affinity, old_affinity;
-            cpumask_t *online = cpupool_domain_master_cpumask(v->domain);
-
-            /*
-             * We want to be able to restore hard affinity if we are trying
-             * setting both and changing soft affinity (which happens later,
-             * when hard affinity has been succesfully chaged already) fails.
-             */
-            if ( !alloc_cpumask_var(&old_affinity) )
-            {
-                ret = -ENOMEM;
-                break;
-            }
-            cpumask_copy(old_affinity, unit->cpu_hard_affinity);
-
-            if ( !alloc_cpumask_var(&new_affinity) )
-            {
-                free_cpumask_var(old_affinity);
-                ret = -ENOMEM;
-                break;
-            }
-
-            /* Undo a stuck SCHED_pin_override? */
-            if ( vcpuaff->flags & XEN_VCPUAFFINITY_FORCE )
-                vcpu_temporary_affinity(v, NR_CPUS, VCPU_AFFINITY_OVERRIDE);
-
-            ret = 0;
-
-            /*
-             * We both set a new affinity and report back to the caller what
-             * the scheduler will be effectively using.
-             */
-            if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
-            {
-                ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
-                                              &vcpuaff->cpumap_hard,
-                                              nr_cpu_ids);
-                if ( !ret )
-                    ret = vcpu_set_hard_affinity(v, new_affinity);
-                if ( ret )
-                    goto setvcpuaffinity_out;
-
-                /*
-                 * For hard affinity, what we return is the intersection of
-                 * cpupool's online mask and the new hard affinity.
-                 */
-                cpumask_and(new_affinity, online, unit->cpu_hard_affinity);
-                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard,
-                                               new_affinity);
-            }
-            if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
-            {
-                ret = xenctl_bitmap_to_bitmap(cpumask_bits(new_affinity),
-                                              &vcpuaff->cpumap_soft,
-                                              nr_cpu_ids);
-                if ( !ret)
-                    ret = vcpu_set_soft_affinity(v, new_affinity);
-                if ( ret )
-                {
-                    /*
-                     * Since we're returning error, the caller expects nothing
-                     * happened, so we rollback the changes to hard affinity
-                     * (if any).
-                     */
-                    if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
-                        vcpu_set_hard_affinity(v, old_affinity);
-                    goto setvcpuaffinity_out;
-                }
-
-                /*
-                 * For soft affinity, we return the intersection between the
-                 * new soft affinity, the cpupool's online map and the (new)
-                 * hard affinity.
-                 */
-                cpumask_and(new_affinity, new_affinity, online);
-                cpumask_and(new_affinity, new_affinity,
-                            unit->cpu_hard_affinity);
-                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_soft,
-                                               new_affinity);
-            }
-
- setvcpuaffinity_out:
-            free_cpumask_var(new_affinity);
-            free_cpumask_var(old_affinity);
-        }
-        else
-        {
-            if ( vcpuaff->flags & XEN_VCPUAFFINITY_HARD )
-                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_hard,
-                                               unit->cpu_hard_affinity);
-            if ( vcpuaff->flags & XEN_VCPUAFFINITY_SOFT )
-                ret = cpumask_to_xenctl_bitmap(&vcpuaff->cpumap_soft,
-                                               unit->cpu_soft_affinity);
-        }
+        ret = vcpu_affinity_domctl(d, op->cmd, &op->u.vcpuaffinity);
         break;
-    }
 
     case XEN_DOMCTL_scheduler_op:
         ret = sched_adjust(d, &op->u.scheduler_op);

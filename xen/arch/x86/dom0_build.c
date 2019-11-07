@@ -9,7 +9,6 @@
 #include <xen/libelf.h>
 #include <xen/pfn.h>
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/softirq.h>
 
 #include <asm/amd.h>
@@ -227,9 +226,9 @@ unsigned int __init dom0_max_vcpus(void)
         dom0_nodes = node_online_map;
     for_each_node_mask ( node, dom0_nodes )
         cpumask_or(&dom0_cpus, &dom0_cpus, &node_to_cpumask(node));
-    cpumask_and(&dom0_cpus, &dom0_cpus, cpupool0->cpu_valid);
+    cpumask_and(&dom0_cpus, &dom0_cpus, cpupool_valid_cpus(cpupool0));
     if ( cpumask_empty(&dom0_cpus) )
-        cpumask_copy(&dom0_cpus, cpupool0->cpu_valid);
+        cpumask_copy(&dom0_cpus, cpupool_valid_cpus(cpupool0));
 
     max_vcpus = cpumask_weight(&dom0_cpus);
     if ( opt_dom0_max_vcpus_min > max_vcpus )

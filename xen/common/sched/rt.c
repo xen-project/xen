@@ -20,7 +20,6 @@
 #include <xen/time.h>
 #include <xen/timer.h>
 #include <xen/perfc.h>
-#include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <asm/atomic.h>
 #include <xen/errno.h>
@@ -30,6 +29,8 @@
 #include <xen/trace.h>
 #include <xen/err.h>
 #include <xen/guest_access.h>
+
+#include "private.h"
 
 /*
  * TODO:

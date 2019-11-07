@@ -15,7 +15,6 @@
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/time.h>
-#include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <asm/atomic.h>
 #include <asm/div64.h>
@@ -24,6 +23,7 @@
 #include <xen/trace.h>
 #include <xen/err.h>
 
+#include "private.h"
 
 /*
  * Locking:

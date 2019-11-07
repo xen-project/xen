@@ -16,10 +16,11 @@
 #include <xen/cpumask.h>
 #include <xen/percpu.h>
 #include <xen/sched.h>
-#include <xen/sched-if.h>
 #include <xen/warning.h>
 #include <xen/keyhandler.h>
 #include <xen/cpu.h>
+
+#include "private.h"
 
 #define for_each_cpupool(ptr)    \
     for ((ptr) = &cpupool_list; *(ptr) != NULL; (ptr) = &((*(ptr))->next))
@@ -873,6 +874,16 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     }
 
     return ret;
+}
+
+int cpupool_get_id(const struct domain *d)
+{
+    return d->cpupool ? d->cpupool->cpupool_id : CPUPOOLID_NONE;
+}
+
+const cpumask_t *cpupool_valid_cpus(const struct cpupool *pool)
+{
+    return pool->cpu_valid;
 }
 
 void dump_runq(unsigned char key)

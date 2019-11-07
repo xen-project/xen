@@ -12,9 +12,6 @@
 #include <xen/err.h>
 #include <xen/rcupdate.h>
 
-/* A global pointer to the initial cpupool (POOL0). */
-extern struct cpupool *cpupool0;
-
 /* cpus currently in no cpupool */
 extern cpumask_t cpupool_free_cpus;
 
