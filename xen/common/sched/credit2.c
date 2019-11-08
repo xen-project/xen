@@ -2744,40 +2744,10 @@ static void
 csched2_unit_migrate(
     const struct scheduler *ops, struct sched_unit *unit, unsigned int new_cpu)
 {
-    struct domain *d = unit->domain;
     struct csched2_unit * const svc = csched2_unit(unit);
     struct csched2_runqueue_data *trqd;
     s_time_t now = NOW();
 
-    /*
-     * Being passed a target pCPU which is outside of our cpupool is only
-     * valid if we are shutting down (or doing ACPI suspend), and we are
-     * moving everyone to BSP, no matter whether or not BSP is inside our
-     * cpupool.
-     *
-     * And since there indeed is the chance that it is not part of it, all
-     * we must do is remove _and_ unassign the unit from any runqueue, as
-     * well as updating v->processor with the target, so that the suspend
-     * process can continue.
-     *
-     * It will then be during resume that a new, meaningful, value for
-     * v->processor will be chosen, and during actual domain unpause that
-     * the unit will be assigned to and added to the proper runqueue.
-     */
-    if ( unlikely(!cpumask_test_cpu(new_cpu, cpupool_domain_master_cpumask(d))) )
-    {
-        ASSERT(system_state == SYS_STATE_suspend);
-        if ( unit_on_runq(svc) )
-        {
-            runq_remove(svc);
-            update_load(ops, svc->rqd, NULL, -1, now);
-        }
-        _runq_deassign(svc);
-        sched_set_res(unit, get_sched_res(new_cpu));
-        return;
-    }
-
-    /* If here, new_cpu must be a valid Credit2 pCPU, and in our affinity. */
     ASSERT(cpumask_test_cpu(new_cpu, &csched2_priv(ops)->initialized));
     ASSERT(cpumask_test_cpu(new_cpu, unit->cpu_hard_affinity));
 

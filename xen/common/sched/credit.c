@@ -1690,11 +1690,8 @@ csched_load_balance(struct csched_private *prv, int cpu,
 
     BUG_ON(get_sched_res(cpu) != snext->unit->res);
 
-    /*
-     * If this CPU is going offline, or is not (yet) part of any cpupool
-     * (as it happens, e.g., during cpu bringup), we shouldn't steal work.
-     */
-    if ( unlikely(!cpumask_test_cpu(cpu, online) || c == NULL) )
+    /* If this CPU is going offline, we shouldn't steal work.  */
+    if ( unlikely(!cpumask_test_cpu(cpu, online)) )
         goto out;
 
     if ( snext->pri == CSCHED_PRI_IDLE )
