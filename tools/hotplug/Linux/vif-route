@@ -22,12 +22,16 @@ dir=$(dirname "$0")
 main_ip=$(dom0_ip)
 
 case "${command}" in
+    add)
+        ;&
     online)
         ifconfig ${dev} ${main_ip} netmask 255.255.255.255 up
         echo 1 >/proc/sys/net/ipv4/conf/${dev}/proxy_arp
         ipcmd='add'
         cmdprefix=''
         ;;
+    remove)
+        ;&
     offline)
         do_without_error ifdown ${dev}
         ipcmd='del'
@@ -35,13 +39,23 @@ case "${command}" in
         ;;
 esac
 
-if [ "${ip}" ] ; then
-    # If we've been given a list of IP addresses, then add routes from dom0 to
-    # the guest using those addresses.
-    for addr in ${ip} ; do
-      ${cmdprefix} ip route ${ipcmd} ${addr} dev ${dev} src ${main_ip}
-    done
-fi
+case "${type_if}" in
+    tap)
+	metric=1
+	;;
+    vif)
+	metric=2
+	;;
+    *)
+	fatal "Unrecognised interface type ${type_if}"
+	;;
+esac
+
+# If we've been given a list of IP addresses, then add routes from dom0 to
+# the guest using those addresses.
+for addr in ${ip} ; do
+    ${cmdprefix} ip route ${ipcmd} ${addr} dev ${dev} src ${main_ip} metric ${metric}
+done
 
 handle_iptable
 
@@ -50,5 +64,5 @@ call_hooks vif post
 log debug "Successful vif-route ${command} for ${dev}."
 if [ "${command}" = "online" ]
 then
-  success
+    success
 fi
