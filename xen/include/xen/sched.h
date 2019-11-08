@@ -687,7 +687,6 @@ int  sched_init_vcpu(struct vcpu *v);
 void sched_destroy_vcpu(struct vcpu *v);
 int  sched_init_domain(struct domain *d, int poolid);
 void sched_destroy_domain(struct domain *d);
-int sched_move_domain(struct domain *d, struct cpupool *c);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 long sched_adjust_global(struct xen_sysctl_scheduler_op *);
 int  sched_id(void);
@@ -920,19 +919,10 @@ static inline bool sched_has_urgent_vcpu(void)
     return atomic_read(&this_cpu(sched_urgent_count));
 }
 
-struct scheduler;
-
-struct scheduler *scheduler_get_default(void);
-struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr);
-void scheduler_free(struct scheduler *sched);
-int schedule_cpu_add(unsigned int cpu, struct cpupool *c);
-int schedule_cpu_rm(unsigned int cpu);
 void vcpu_set_periodic_timer(struct vcpu *v, s_time_t value);
-int cpu_disable_scheduler(unsigned int cpu);
 void sched_setup_dom0_vcpus(struct domain *d);
 int vcpu_temporary_affinity(struct vcpu *v, unsigned int cpu, uint8_t reason);
 int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity);
-int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity);
 void restore_vcpu_affinity(struct domain *d);
 int vcpu_affinity_domctl(struct domain *d, uint32_t cmd,
                          struct xen_domctl_vcpuaffinity *vcpuaff);
@@ -1065,17 +1055,10 @@ extern enum cpufreq_controller {
     FREQCTL_none, FREQCTL_dom0_kernel, FREQCTL_xen
 } cpufreq_controller;
 
-#define CPUPOOLID_NONE    -1
-
-struct cpupool *cpupool_get_by_id(int poolid);
-void cpupool_put(struct cpupool *pool);
-int cpupool_add_domain(struct domain *d, int poolid);
-void cpupool_rm_domain(struct domain *d);
 int cpupool_move_domain(struct domain *d, struct cpupool *c);
 int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op);
 int cpupool_get_id(const struct domain *d);
 const cpumask_t *cpupool_valid_cpus(const struct cpupool *pool);
-void schedule_dump(struct cpupool *c);
 extern void dump_runq(unsigned char key);
 
 void arch_do_physinfo(struct xen_sysctl_physinfo *pi);

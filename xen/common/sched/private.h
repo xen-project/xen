@@ -533,6 +533,7 @@ static inline void sched_unit_unpause(const struct sched_unit *unit)
 struct cpupool
 {
     int              cpupool_id;
+#define CPUPOOLID_NONE    (-1)
     unsigned int     n_dom;
     cpumask_var_t    cpu_valid;      /* all cpus assigned to pool */
     cpumask_var_t    res_valid;      /* all scheduling resources of pool */
@@ -618,5 +619,17 @@ affinity_balance_cpumask(const struct sched_unit *unit, int step,
 
 void sched_rm_cpu(unsigned int cpu);
 const cpumask_t *sched_get_opt_cpumask(enum sched_gran opt, unsigned int cpu);
+void schedule_dump(struct cpupool *c);
+struct scheduler *scheduler_get_default(void);
+struct scheduler *scheduler_alloc(unsigned int sched_id, int *perr);
+void scheduler_free(struct scheduler *sched);
+int cpu_disable_scheduler(unsigned int cpu);
+int schedule_cpu_add(unsigned int cpu, struct cpupool *c);
+int schedule_cpu_rm(unsigned int cpu);
+int sched_move_domain(struct domain *d, struct cpupool *c);
+struct cpupool *cpupool_get_by_id(int poolid);
+void cpupool_put(struct cpupool *pool);
+int cpupool_add_domain(struct domain *d, int poolid);
+void cpupool_rm_domain(struct domain *d);
 
 #endif /* __XEN_SCHED_IF_H__ */

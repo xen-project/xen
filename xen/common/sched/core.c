@@ -1346,7 +1346,7 @@ int vcpu_set_hard_affinity(struct vcpu *v, const cpumask_t *affinity)
     return vcpu_set_affinity(v, affinity, v->sched_unit->cpu_hard_affinity);
 }
 
-int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity)
+static int vcpu_set_soft_affinity(struct vcpu *v, const cpumask_t *affinity)
 {
     return vcpu_set_affinity(v, affinity, v->sched_unit->cpu_soft_affinity);
 }
