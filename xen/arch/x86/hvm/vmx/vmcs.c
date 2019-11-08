@@ -95,6 +95,41 @@ static int __init parse_ept_param(const char *s)
 }
 custom_param("ept", parse_ept_param);
 
+static int parse_ept_param_runtime(const char *s)
+{
+    int val;
+
+    if ( !cpu_has_vmx_ept || !hvm_funcs.hap_supported ||
+         !(hvm_funcs.hap_capabilities &
+           (HVM_HAP_SUPERPAGE_2MB | HVM_HAP_SUPERPAGE_1GB)) )
+    {
+        printk("VMX: EPT not available, or not in use - ignoring\n");
+        return 0;
+    }
+
+    if ( (val = parse_boolean("exec-sp", s, NULL)) < 0 )
+        return -EINVAL;
+
+    if ( val != opt_ept_exec_sp )
+    {
+        struct domain *d;
+
+        opt_ept_exec_sp = val;
+
+        rcu_read_lock(&domlist_read_lock);
+        for_each_domain ( d )
+            if ( paging_mode_hap(d) )
+                p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_rw);
+        rcu_read_unlock(&domlist_read_lock);
+    }
+
+    printk("VMX: EPT executable superpages %sabled\n",
+           val ? "en" : "dis");
+
+    return 0;
+}
+custom_runtime_only_param("ept", parse_ept_param_runtime);
+
 /* Dynamic (run-time adjusted) execution control flags. */
 u32 vmx_pin_based_exec_control __read_mostly;
 u32 vmx_cpu_based_exec_control __read_mostly;

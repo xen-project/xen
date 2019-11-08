@@ -959,6 +959,21 @@ introduced with the Nehalem architecture.
     If HVM guest kernels are trusted not to mount a DoS against the system,
     this option can enabled to regain performance.
 
+    This boolean may be modified at runtime using `xl set-parameters
+    ept=[no-]exec-sp` to switch between fast and secure.
+
+    *   When switching from secure to fast, preexisting HVM domains will run
+        at their current performance until they are rebooted; new domains will
+        run without any overhead.
+
+    *   When switching from fast to secure, all HVM domains will immediately
+        suffer a performance penalty.
+
+    **Warning: No guarantee is made that this runtime option will be retained
+      indefinitely, or that it will retain this exact behaviour.  It is
+      intended as an emergency option for people who first chose fast, then
+      change their minds to secure, and wish not to reboot.**
+
 ### extra_guest_irqs
 > `= [<domU number>][,<dom0 number>]`
 
