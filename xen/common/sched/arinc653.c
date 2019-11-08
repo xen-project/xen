@@ -608,7 +608,7 @@ static struct sched_resource *
 a653sched_pick_resource(const struct scheduler *ops,
                         const struct sched_unit *unit)
 {
-    cpumask_t *online;
+    const cpumask_t *online;
     unsigned int cpu;
 
     /*
@@ -639,7 +639,7 @@ a653_switch_sched(struct scheduler *new_ops, unsigned int cpu,
                   void *pdata, void *vdata)
 {
     struct sched_resource *sr = get_sched_res(cpu);
-    arinc653_unit_t *svc = vdata;
+    const arinc653_unit_t *svc = vdata;
 
     ASSERT(!pdata && svc && is_idle_unit(svc->unit));
 

@@ -175,7 +175,7 @@ static inline struct scheduler *dom_scheduler(const struct domain *d)
 
 static inline struct scheduler *unit_scheduler(const struct sched_unit *unit)
 {
-    struct domain *d = unit->domain;
+    const struct domain *d = unit->domain;
 
     if ( likely(d->cpupool != NULL) )
         return d->cpupool->sched;
@@ -202,7 +202,7 @@ static inline struct scheduler *vcpu_scheduler(const struct vcpu *v)
 }
 #define VCPU2ONLINE(_v) cpupool_domain_master_cpumask((_v)->domain)
 
-static inline void trace_runstate_change(struct vcpu *v, int new_state)
+static inline void trace_runstate_change(const struct vcpu *v, int new_state)
 {
     struct { uint32_t vcpu:16, domain:16; } d;
     uint32_t event;
@@ -220,7 +220,7 @@ static inline void trace_runstate_change(struct vcpu *v, int new_state)
     __trace_var(event, 1/*tsc*/, sizeof(d), &d);
 }
 
-static inline void trace_continue_running(struct vcpu *v)
+static inline void trace_continue_running(const struct vcpu *v)
 {
     struct { uint32_t vcpu:16, domain:16; } d;
 
@@ -302,7 +302,8 @@ void sched_guest_idle(void (*idle) (void), unsigned int cpu)
     atomic_dec(&per_cpu(sched_urgent_count, cpu));
 }
 
-void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
+void vcpu_runstate_get(const struct vcpu *v,
+                       struct vcpu_runstate_info *runstate)
 {
     spinlock_t *lock;
     s_time_t delta;
@@ -324,7 +325,7 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
 uint64_t get_cpu_idle_time(unsigned int cpu)
 {
     struct vcpu_runstate_info state = { 0 };
-    struct vcpu *v = idle_vcpu[cpu];
+    const struct vcpu *v = idle_vcpu[cpu];
 
     if ( cpu_online(cpu) && v )
         vcpu_runstate_get(v, &state);
@@ -392,7 +393,7 @@ static void sched_free_unit_mem(struct sched_unit *unit)
 
 static void sched_free_unit(struct sched_unit *unit, struct vcpu *v)
 {
-    struct vcpu *vunit;
+    const struct vcpu *vunit;
     unsigned int cnt = 0;
 
     /* Don't count to be released vcpu, might be not in vcpu list yet. */
@@ -522,7 +523,7 @@ static unsigned int sched_select_initial_cpu(const struct vcpu *v)
 
 int sched_init_vcpu(struct vcpu *v)
 {
-    struct domain *d = v->domain;
+    const struct domain *d = v->domain;
     struct sched_unit *unit;
     unsigned int processor;
 
@@ -913,7 +914,7 @@ static void sched_unit_move_locked(struct sched_unit *unit,
                                    unsigned int new_cpu)
 {
     unsigned int old_cpu = unit->res->master_cpu;
-    struct vcpu *v;
+    const struct vcpu *v;
 
     rcu_read_lock(&sched_res_rculock);
 
@@ -1090,7 +1091,7 @@ static bool sched_check_affinity_broken(const struct sched_unit *unit)
     return false;
 }
 
-static void sched_reset_affinity_broken(struct sched_unit *unit)
+static void sched_reset_affinity_broken(const struct sched_unit *unit)
 {
     struct vcpu *v;
 
@@ -1176,7 +1177,7 @@ void restore_vcpu_affinity(struct domain *d)
 int cpu_disable_scheduler(unsigned int cpu)
 {
     struct domain *d;
-    struct cpupool *c;
+    const struct cpupool *c;
     cpumask_t online_affinity;
     int ret = 0;
 
@@ -1251,8 +1252,8 @@ out:
 static int cpu_disable_scheduler_check(unsigned int cpu)
 {
     struct domain *d;
-    struct vcpu *v;
-    struct cpupool *c;
+    const struct vcpu *v;
+    const struct cpupool *c;
 
     c = get_sched_res(cpu)->cpupool;
     if ( c == NULL )

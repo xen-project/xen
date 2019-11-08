@@ -692,7 +692,7 @@ void smt_idle_mask_clear(unsigned int cpu, cpumask_t *mask)
  */
 static int get_fallback_cpu(struct csched2_unit *svc)
 {
-    struct sched_unit *unit = svc->unit;
+    const struct sched_unit *unit = svc->unit;
     unsigned int bs;
 
     SCHED_STAT_CRANK(need_fallback_cpu);
@@ -774,7 +774,7 @@ static int get_fallback_cpu(struct csched2_unit *svc)
  *
  * FIXME: Do pre-calculated division?
  */
-static void t2c_update(struct csched2_runqueue_data *rqd, s_time_t time,
+static void t2c_update(const struct csched2_runqueue_data *rqd, s_time_t time,
                           struct csched2_unit *svc)
 {
     uint64_t val = time * rqd->max_weight + svc->residual;
@@ -783,7 +783,8 @@ static void t2c_update(struct csched2_runqueue_data *rqd, s_time_t time,
     svc->credit -= val;
 }
 
-static s_time_t c2t(struct csched2_runqueue_data *rqd, s_time_t credit, struct csched2_unit *svc)
+static s_time_t c2t(const struct csched2_runqueue_data *rqd, s_time_t credit,
+                    const struct csched2_unit *svc)
 {
     return credit * svc->weight / rqd->max_weight;
 }
@@ -792,7 +793,7 @@ static s_time_t c2t(struct csched2_runqueue_data *rqd, s_time_t credit, struct c
  * Runqueue related code.
  */
 
-static inline int unit_on_runq(struct csched2_unit *svc)
+static inline int unit_on_runq(const struct csched2_unit *svc)
 {
     return !list_empty(&svc->runq_elem);
 }
@@ -849,9 +850,9 @@ static inline bool same_core(unsigned int cpua, unsigned int cpub)
 }
 
 static unsigned int
-cpu_to_runqueue(struct csched2_private *prv, unsigned int cpu)
+cpu_to_runqueue(const struct csched2_private *prv, unsigned int cpu)
 {
-    struct csched2_runqueue_data *rqd;
+    const struct csched2_runqueue_data *rqd;
     unsigned int rqi;
 
     for ( rqi = 0; rqi < nr_cpu_ids; rqi++ )
@@ -917,7 +918,7 @@ static void update_max_weight(struct csched2_runqueue_data *rqd, int new_weight,
 
         list_for_each( iter, &rqd->svc )
         {
-            struct csched2_unit * svc = list_entry(iter, struct csched2_unit, rqd_elem);
+            const struct csched2_unit * svc = list_entry(iter, struct csched2_unit, rqd_elem);
 
             if ( svc->weight > max_weight )
                 max_weight = svc->weight;
@@ -970,7 +971,7 @@ _runq_assign(struct csched2_unit *svc, struct csched2_runqueue_data *rqd)
 }
 
 static void
-runq_assign(const struct scheduler *ops, struct sched_unit *unit)
+runq_assign(const struct scheduler *ops, const struct sched_unit *unit)
 {
     struct csched2_unit *svc = unit->priv;
 
@@ -997,7 +998,7 @@ _runq_deassign(struct csched2_unit *svc)
 }
 
 static void
-runq_deassign(const struct scheduler *ops, struct sched_unit *unit)
+runq_deassign(const struct scheduler *ops, const struct sched_unit *unit)
 {
     struct csched2_unit *svc = unit->priv;
 
@@ -1203,7 +1204,7 @@ static void
 update_svc_load(const struct scheduler *ops,
                 struct csched2_unit *svc, int change, s_time_t now)
 {
-    struct csched2_private *prv = csched2_priv(ops);
+    const struct csched2_private *prv = csched2_priv(ops);
     s_time_t delta, unit_load;
     unsigned int P, W;
 
@@ -1362,11 +1363,11 @@ static inline bool is_preemptable(const struct csched2_unit *svc,
  * Within the same class, the highest difference of credit.
  */
 static s_time_t tickle_score(const struct scheduler *ops, s_time_t now,
-                             struct csched2_unit *new, unsigned int cpu)
+                             const struct csched2_unit *new, unsigned int cpu)
 {
     struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
     struct csched2_unit * cur = csched2_unit(curr_on_cpu(cpu));
-    struct csched2_private *prv = csched2_priv(ops);
+    const struct csched2_private *prv = csched2_priv(ops);
     s_time_t score;
 
     /*
@@ -1441,7 +1442,7 @@ runq_tickle(const struct scheduler *ops, struct csched2_unit *new, s_time_t now)
     struct sched_unit *unit = new->unit;
     unsigned int bs, cpu = sched_unit_master(unit);
     struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
-    cpumask_t *online = cpupool_domain_master_cpumask(unit->domain);
+    const cpumask_t *online = cpupool_domain_master_cpumask(unit->domain);
     cpumask_t mask;
 
     ASSERT(new->rqd == rqd);
@@ -2005,7 +2006,7 @@ static void replenish_domain_budget(void* data)
 
 #ifndef NDEBUG
 static inline void
-csched2_unit_check(struct sched_unit *unit)
+csched2_unit_check(const struct sched_unit *unit)
 {
     struct csched2_unit * const svc = csched2_unit(unit);
     struct csched2_dom * const sdom = svc->sdom;
@@ -2541,8 +2542,8 @@ static void migrate(const struct scheduler *ops,
  *  - svc is not already flagged to migrate,
  *  - if svc is allowed to run on at least one of the pcpus of rqd.
  */
-static bool unit_is_migrateable(struct csched2_unit *svc,
-                                  struct csched2_runqueue_data *rqd)
+static bool unit_is_migrateable(const struct csched2_unit *svc,
+                                const struct csched2_runqueue_data *rqd)
 {
     struct sched_unit *unit = svc->unit;
     int cpu = sched_unit_master(unit);
@@ -3076,7 +3077,7 @@ csched2_free_domdata(const struct scheduler *ops, void *data)
 static void
 csched2_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
 {
-    struct csched2_unit *svc = unit->priv;
+    const struct csched2_unit *svc = unit->priv;
     struct csched2_dom * const sdom = svc->sdom;
     spinlock_t *lock;
 
@@ -3142,7 +3143,7 @@ csched2_runtime(const struct scheduler *ops, int cpu,
     int rt_credit; /* Proposed runtime measured in credits */
     struct csched2_runqueue_data *rqd = c2rqd(ops, cpu);
     struct list_head *runq = &rqd->runq;
-    struct csched2_private *prv = csched2_priv(ops);
+    const struct csched2_private *prv = csched2_priv(ops);
 
     /*
      * If we're idle, just stay so. Others (or external events)
@@ -3239,7 +3240,7 @@ runq_candidate(struct csched2_runqueue_data *rqd,
                unsigned int *skipped)
 {
     struct list_head *iter, *temp;
-    struct sched_resource *sr = get_sched_res(cpu);
+    const struct sched_resource *sr = get_sched_res(cpu);
     struct csched2_unit *snext = NULL;
     struct csched2_private *prv = csched2_priv(sr->scheduler);
     bool yield = false, soft_aff_preempt = false;
@@ -3603,7 +3604,8 @@ static void csched2_schedule(
 }
 
 static void
-csched2_dump_unit(struct csched2_private *prv, struct csched2_unit *svc)
+csched2_dump_unit(const struct csched2_private *prv,
+                  const struct csched2_unit *svc)
 {
     printk("[%i.%i] flags=%x cpu=%i",
             svc->unit->domain->domain_id,
@@ -3626,8 +3628,8 @@ csched2_dump_unit(struct csched2_private *prv, struct csched2_unit *svc)
 static inline void
 dump_pcpu(const struct scheduler *ops, int cpu)
 {
-    struct csched2_private *prv = csched2_priv(ops);
-    struct csched2_unit *svc;
+    const struct csched2_private *prv = csched2_priv(ops);
+    const struct csched2_unit *svc;
 
     printk("CPU[%02d] runq=%d, sibling={%*pbl}, core={%*pbl}\n",
            cpu, c2r(cpu),
@@ -3695,8 +3697,8 @@ csched2_dump(const struct scheduler *ops)
     loop = 0;
     list_for_each( iter_sdom, &prv->sdom )
     {
-        struct csched2_dom *sdom;
-        struct sched_unit *unit;
+        const struct csched2_dom *sdom;
+        const struct sched_unit *unit;
 
         sdom = list_entry(iter_sdom, struct csched2_dom, sdom_elem);
 
@@ -3737,7 +3739,7 @@ csched2_dump(const struct scheduler *ops)
         printk("RUNQ:\n");
         list_for_each( iter, runq )
         {
-            struct csched2_unit *svc = runq_elem(iter);
+            const struct csched2_unit *svc = runq_elem(iter);
 
             if ( svc )
             {

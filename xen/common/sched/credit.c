@@ -233,7 +233,7 @@ static void csched_tick(void *_cpu);
 static void csched_acct(void *dummy);
 
 static inline int
-__unit_on_runq(struct csched_unit *svc)
+__unit_on_runq(const struct csched_unit *svc)
 {
     return !list_empty(&svc->runq_elem);
 }
@@ -349,11 +349,11 @@ boolean_param("tickle_one_idle_cpu", opt_tickle_one_idle);
 
 DEFINE_PER_CPU(unsigned int, last_tickle_cpu);
 
-static inline void __runq_tickle(struct csched_unit *new)
+static inline void __runq_tickle(const struct csched_unit *new)
 {
     unsigned int cpu = sched_unit_master(new->unit);
-    struct sched_resource *sr = get_sched_res(cpu);
-    struct sched_unit *unit = new->unit;
+    const struct sched_resource *sr = get_sched_res(cpu);
+    const struct sched_unit *unit = new->unit;
     struct csched_unit * const cur = CSCHED_UNIT(curr_on_cpu(cpu));
     struct csched_private *prv = CSCHED_PRIV(sr->scheduler);
     cpumask_t mask, idle_mask, *online;
@@ -509,7 +509,7 @@ static inline void __runq_tickle(struct csched_unit *new)
 static void
 csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
-    struct csched_private *prv = CSCHED_PRIV(ops);
+    const struct csched_private *prv = CSCHED_PRIV(ops);
 
     /*
      * pcpu either points to a valid struct csched_pcpu, or is NULL, if we're
@@ -652,7 +652,7 @@ csched_switch_sched(struct scheduler *new_ops, unsigned int cpu,
 
 #ifndef NDEBUG
 static inline void
-__csched_unit_check(struct sched_unit *unit)
+__csched_unit_check(const struct sched_unit *unit)
 {
     struct csched_unit * const svc = CSCHED_UNIT(unit);
     struct csched_dom * const sdom = svc->sdom;
@@ -700,8 +700,8 @@ __csched_vcpu_is_cache_hot(const struct csched_private *prv,
 
 static inline int
 __csched_unit_is_migrateable(const struct csched_private *prv,
-                             struct sched_unit *unit,
-                             int dest_cpu, cpumask_t *mask)
+                             const struct sched_unit *unit,
+                             int dest_cpu, const cpumask_t *mask)
 {
     const struct csched_unit *svc = CSCHED_UNIT(unit);
     /*
@@ -725,7 +725,7 @@ _csched_cpu_pick(const struct scheduler *ops, const struct sched_unit *unit,
     /* We must always use cpu's scratch space */
     cpumask_t *cpus = cpumask_scratch_cpu(cpu);
     cpumask_t idlers;
-    cpumask_t *online = cpupool_domain_master_cpumask(unit->domain);
+    const cpumask_t *online = cpupool_domain_master_cpumask(unit->domain);
     struct csched_pcpu *spc = NULL;
     int balance_step;
 
@@ -932,7 +932,7 @@ csched_unit_acct(struct csched_private *prv, unsigned int cpu)
 {
     struct sched_unit *currunit = current->sched_unit;
     struct csched_unit * const svc = CSCHED_UNIT(currunit);
-    struct sched_resource *sr = get_sched_res(cpu);
+    const struct sched_resource *sr = get_sched_res(cpu);
     const struct scheduler *ops = sr->scheduler;
 
     ASSERT( sched_unit_master(currunit) == cpu );
@@ -1084,7 +1084,7 @@ csched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched_unit * const svc = CSCHED_UNIT(unit);
     unsigned int cpu = sched_unit_master(unit);
-    struct sched_resource *sr = get_sched_res(cpu);
+    const struct sched_resource *sr = get_sched_res(cpu);
 
     SCHED_STAT_CRANK(unit_sleep);
 
@@ -1577,7 +1577,7 @@ static void
 csched_tick(void *_cpu)
 {
     unsigned int cpu = (unsigned long)_cpu;
-    struct sched_resource *sr = get_sched_res(cpu);
+    const struct sched_resource *sr = get_sched_res(cpu);
     struct csched_pcpu *spc = CSCHED_PCPU(cpu);
     struct csched_private *prv = CSCHED_PRIV(sr->scheduler);
 
@@ -1604,7 +1604,7 @@ csched_tick(void *_cpu)
 static struct csched_unit *
 csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
 {
-    struct sched_resource *sr = get_sched_res(cpu);
+    const struct sched_resource *sr = get_sched_res(cpu);
     const struct csched_private * const prv = CSCHED_PRIV(sr->scheduler);
     const struct csched_pcpu * const peer_pcpu = CSCHED_PCPU(peer_cpu);
     struct csched_unit *speer;
@@ -1681,10 +1681,10 @@ static struct csched_unit *
 csched_load_balance(struct csched_private *prv, int cpu,
     struct csched_unit *snext, bool *stolen)
 {
-    struct cpupool *c = get_sched_res(cpu)->cpupool;
+    const struct cpupool *c = get_sched_res(cpu)->cpupool;
     struct csched_unit *speer;
     cpumask_t workers;
-    cpumask_t *online = c->res_valid;
+    const cpumask_t *online = c->res_valid;
     int peer_cpu, first_cpu, peer_node, bstep;
     int node = cpu_to_node(cpu);
 
@@ -2008,7 +2008,7 @@ out:
 }
 
 static void
-csched_dump_unit(struct csched_unit *svc)
+csched_dump_unit(const struct csched_unit *svc)
 {
     struct csched_dom * const sdom = svc->sdom;
 
@@ -2041,10 +2041,11 @@ csched_dump_unit(struct csched_unit *svc)
 static void
 csched_dump_pcpu(const struct scheduler *ops, int cpu)
 {
-    struct list_head *runq, *iter;
+    const struct list_head *runq;
+    struct list_head *iter;
     struct csched_private *prv = CSCHED_PRIV(ops);
-    struct csched_pcpu *spc;
-    struct csched_unit *svc;
+    const struct csched_pcpu *spc;
+    const struct csched_unit *svc;
     spinlock_t *lock;
     unsigned long flags;
     int loop;
@@ -2132,12 +2133,13 @@ csched_dump(const struct scheduler *ops)
     loop = 0;
     list_for_each( iter_sdom, &prv->active_sdom )
     {
-        struct csched_dom *sdom;
+        const struct csched_dom *sdom;
+
         sdom = list_entry(iter_sdom, struct csched_dom, active_sdom_elem);
 
         list_for_each( iter_svc, &sdom->active_unit )
         {
-            struct csched_unit *svc;
+            const struct csched_unit *svc;
             spinlock_t *lock;
 
             svc = list_entry(iter_svc, struct csched_unit, active_unit_elem);

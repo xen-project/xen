@@ -278,12 +278,12 @@ static void null_free_domdata(const struct scheduler *ops, void *data)
  * So this is not part of any hot path.
  */
 static struct sched_resource *
-pick_res(struct null_private *prv, const struct sched_unit *unit)
+pick_res(const struct null_private *prv, const struct sched_unit *unit)
 {
     unsigned int bs;
     unsigned int cpu = sched_unit_master(unit), new_cpu;
-    cpumask_t *cpus = cpupool_domain_master_cpumask(unit->domain);
-    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
+    const cpumask_t *cpus = cpupool_domain_master_cpumask(unit->domain);
+    const struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
 
     ASSERT(spin_is_locked(get_sched_res(cpu)->schedule_lock));
 
@@ -375,7 +375,7 @@ static void unit_assign(struct null_private *prv, struct sched_unit *unit,
 }
 
 /* Returns true if a cpu was tickled */
-static bool unit_deassign(struct null_private *prv, struct sched_unit *unit)
+static bool unit_deassign(struct null_private *prv, const struct sched_unit *unit)
 {
     unsigned int bs;
     unsigned int cpu = sched_unit_master(unit);
@@ -441,7 +441,7 @@ static spinlock_t *null_switch_sched(struct scheduler *new_ops,
 {
     struct sched_resource *sr = get_sched_res(cpu);
     struct null_private *prv = null_priv(new_ops);
-    struct null_unit *nvc = vdata;
+    const struct null_unit *nvc = vdata;
 
     ASSERT(nvc && is_idle_unit(nvc->unit));
 
@@ -940,7 +940,8 @@ static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
     prev->next_task->migrated = false;
 }
 
-static inline void dump_unit(struct null_private *prv, struct null_unit *nvc)
+static inline void dump_unit(const struct null_private *prv,
+                             const struct null_unit *nvc)
 {
     printk("[%i.%i] pcpu=%d", nvc->unit->domain->domain_id,
             nvc->unit->unit_id, list_empty(&nvc->waitq_elem) ?
@@ -950,8 +951,8 @@ static inline void dump_unit(struct null_private *prv, struct null_unit *nvc)
 static void null_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct null_private *prv = null_priv(ops);
-    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
-    struct null_unit *nvc;
+    const struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
+    const struct null_unit *nvc;
     spinlock_t *lock;
     unsigned long flags;
 

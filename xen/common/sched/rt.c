@@ -352,7 +352,7 @@ static void
 rt_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct rt_private *prv = rt_priv(ops);
-    struct rt_unit *svc;
+    const struct rt_unit *svc;
     unsigned long flags;
 
     spin_lock_irqsave(&prv->lock, flags);
@@ -371,8 +371,8 @@ rt_dump(const struct scheduler *ops)
 {
     struct list_head *runq, *depletedq, *replq, *iter;
     struct rt_private *prv = rt_priv(ops);
-    struct rt_unit *svc;
-    struct rt_dom *sdom;
+    const struct rt_unit *svc;
+    const struct rt_dom *sdom;
     unsigned long flags;
 
     spin_lock_irqsave(&prv->lock, flags);
@@ -408,7 +408,7 @@ rt_dump(const struct scheduler *ops)
     printk("Domain info:\n");
     list_for_each ( iter, &prv->sdom )
     {
-        struct sched_unit *unit;
+        const struct sched_unit *unit;
 
         sdom = list_entry(iter, struct rt_dom, sdom_elem);
         printk("\tdomain: %d\n", sdom->dom->domain_id);
@@ -509,7 +509,7 @@ deadline_queue_insert(struct rt_unit * (*qelem)(struct list_head *),
 
     list_for_each ( iter, queue )
     {
-        struct rt_unit * iter_svc = (*qelem)(iter);
+        const struct rt_unit * iter_svc = (*qelem)(iter);
         if ( compare_unit_priority(svc, iter_svc) > 0 )
             break;
         first = false;
@@ -547,7 +547,7 @@ replq_remove(const struct scheduler *ops, struct rt_unit *svc)
          */
         if ( !list_empty(replq) )
         {
-            struct rt_unit *svc_next = replq_elem(replq->next);
+            const struct rt_unit *svc_next = replq_elem(replq->next);
             set_timer(&prv->repl_timer, svc_next->cur_deadline);
         }
         else
@@ -604,7 +604,7 @@ static void
 replq_reinsert(const struct scheduler *ops, struct rt_unit *svc)
 {
     struct list_head *replq = rt_replq(ops);
-    struct rt_unit *rearm_svc = svc;
+    const struct rt_unit *rearm_svc = svc;
     bool rearm = false;
 
     ASSERT( unit_on_replq(svc) );
@@ -640,7 +640,7 @@ static struct sched_resource *
 rt_res_pick_locked(const struct sched_unit *unit, unsigned int locked_cpu)
 {
     cpumask_t *cpus = cpumask_scratch_cpu(locked_cpu);
-    cpumask_t *online;
+    const cpumask_t *online;
     int cpu;
 
     online = cpupool_domain_master_cpumask(unit->domain);
@@ -1028,7 +1028,7 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask, unsigned int cpu)
     struct rt_unit *svc = NULL;
     struct rt_unit *iter_svc = NULL;
     cpumask_t *cpu_common = cpumask_scratch_cpu(cpu);
-    cpumask_t *online;
+    const cpumask_t *online;
 
     list_for_each ( iter, runq )
     {
@@ -1197,15 +1197,15 @@ rt_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
  * lock is grabbed before calling this function
  */
 static void
-runq_tickle(const struct scheduler *ops, struct rt_unit *new)
+runq_tickle(const struct scheduler *ops, const struct rt_unit *new)
 {
     struct rt_private *prv = rt_priv(ops);
-    struct rt_unit *latest_deadline_unit = NULL; /* lowest priority */
-    struct rt_unit *iter_svc;
-    struct sched_unit *iter_unit;
+    const struct rt_unit *latest_deadline_unit = NULL; /* lowest priority */
+    const struct rt_unit *iter_svc;
+    const struct sched_unit *iter_unit;
     int cpu = 0, cpu_to_tickle = 0;
     cpumask_t *not_tickled = cpumask_scratch_cpu(smp_processor_id());
-    cpumask_t *online;
+    const cpumask_t *online;
 
     if ( new == NULL || is_idle_unit(new->unit) )
         return;
@@ -1379,7 +1379,7 @@ rt_dom_cntl(
 {
     struct rt_private *prv = rt_priv(ops);
     struct rt_unit *svc;
-    struct sched_unit *unit;
+    const struct sched_unit *unit;
     unsigned long flags;
     int rc = 0;
     struct xen_domctl_schedparam_vcpu local_sched;
@@ -1484,7 +1484,7 @@ rt_dom_cntl(
  */
 static void repl_timer_handler(void *data){
     s_time_t now;
-    struct scheduler *ops = data;
+    const struct scheduler *ops = data;
     struct rt_private *prv = rt_priv(ops);
     struct list_head *replq = rt_replq(ops);
     struct list_head *runq = rt_runq(ops);
