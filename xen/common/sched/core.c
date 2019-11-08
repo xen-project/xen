@@ -53,7 +53,7 @@ string_param("sched", opt_sched);
  * scheduler will give preferrence to partially idle package compared to
  * the full idle package, when picking pCPU to schedule vCPU.
  */
-bool_t sched_smt_power_savings = 0;
+bool sched_smt_power_savings;
 boolean_param("sched_smt_power_savings", sched_smt_power_savings);
 
 /* Default scheduling rate limit: 1ms
@@ -574,7 +574,7 @@ int sched_init_vcpu(struct vcpu *v)
     {
         get_sched_res(v->processor)->curr = unit;
         get_sched_res(v->processor)->sched_unit_idle = unit;
-        v->is_running = 1;
+        v->is_running = true;
         unit->is_running = true;
         unit->state_entry_time = NOW();
     }
@@ -983,7 +983,7 @@ static void sched_unit_migrate_finish(struct sched_unit *unit)
     unsigned long flags;
     unsigned int old_cpu, new_cpu;
     spinlock_t *old_lock, *new_lock;
-    bool_t pick_called = 0;
+    bool pick_called = false;
     struct vcpu *v;
 
     /*
@@ -1029,7 +1029,7 @@ static void sched_unit_migrate_finish(struct sched_unit *unit)
             if ( (new_lock == get_sched_res(new_cpu)->schedule_lock) &&
                  cpumask_test_cpu(new_cpu, unit->domain->cpupool->cpu_valid) )
                 break;
-            pick_called = 1;
+            pick_called = true;
         }
         else
         {
@@ -1037,7 +1037,7 @@ static void sched_unit_migrate_finish(struct sched_unit *unit)
              * We do not hold the scheduler lock appropriate for this vCPU.
              * Thus we cannot select a new CPU on this iteration. Try again.
              */
-            pick_called = 0;
+            pick_called = false;
         }
 
         sched_spin_unlock_double(old_lock, new_lock, flags);
@@ -2148,7 +2148,7 @@ static void sched_switch_units(struct sched_resource *sr,
             vcpu_runstate_change(vnext, vnext->new_state, now);
         }
 
-        vnext->is_running = 1;
+        vnext->is_running = true;
 
         if ( is_idle_vcpu(vnext) )
             vnext->sched_unit = next;
@@ -2219,7 +2219,7 @@ static void vcpu_context_saved(struct vcpu *vprev, struct vcpu *vnext)
     smp_wmb();
 
     if ( vprev != vnext )
-        vprev->is_running = 0;
+        vprev->is_running = false;
 }
 
 static void unit_context_saved(struct sched_resource *sr)

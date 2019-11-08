@@ -154,7 +154,7 @@ static struct cpupool *alloc_cpupool_struct(void)
  * the searched id is returned
  * returns NULL if not found.
  */
-static struct cpupool *__cpupool_find_by_id(int id, int exact)
+static struct cpupool *__cpupool_find_by_id(int id, bool exact)
 {
     struct cpupool **q;
 
@@ -169,10 +169,10 @@ static struct cpupool *__cpupool_find_by_id(int id, int exact)
 
 static struct cpupool *cpupool_find_by_id(int poolid)
 {
-    return __cpupool_find_by_id(poolid, 1);
+    return __cpupool_find_by_id(poolid, true);
 }
 
-static struct cpupool *__cpupool_get_by_id(int poolid, int exact)
+static struct cpupool *__cpupool_get_by_id(int poolid, bool exact)
 {
     struct cpupool *c;
     spin_lock(&cpupool_lock);
@@ -185,12 +185,12 @@ static struct cpupool *__cpupool_get_by_id(int poolid, int exact)
 
 struct cpupool *cpupool_get_by_id(int poolid)
 {
-    return __cpupool_get_by_id(poolid, 1);
+    return __cpupool_get_by_id(poolid, true);
 }
 
 static struct cpupool *cpupool_get_next_by_id(int poolid)
 {
-    return __cpupool_get_by_id(poolid, 0);
+    return __cpupool_get_by_id(poolid, false);
 }
 
 void cpupool_put(struct cpupool *pool)

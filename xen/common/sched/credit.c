@@ -245,7 +245,7 @@ __runq_elem(struct list_head *elem)
 }
 
 /* Is the first element of cpu's runq (if any) cpu's idle unit? */
-static inline bool_t is_runq_idle(unsigned int cpu)
+static inline bool is_runq_idle(unsigned int cpu)
 {
     /*
      * We're peeking at cpu's runq, we must hold the proper lock.
@@ -344,7 +344,7 @@ static void burn_credits(struct csched_unit *svc, s_time_t now)
     svc->start_time += (credits * MILLISECS(1)) / CSCHED_CREDITS_PER_MSEC;
 }
 
-static bool_t __read_mostly opt_tickle_one_idle = 1;
+static bool __read_mostly opt_tickle_one_idle = true;
 boolean_param("tickle_one_idle_cpu", opt_tickle_one_idle);
 
 DEFINE_PER_CPU(unsigned int, last_tickle_cpu);
@@ -719,7 +719,7 @@ __csched_unit_is_migrateable(const struct csched_private *prv,
 
 static int
 _csched_cpu_pick(const struct scheduler *ops, const struct sched_unit *unit,
-                 bool_t commit)
+                 bool commit)
 {
     int cpu = sched_unit_master(unit);
     /* We must always use cpu's scratch space */
@@ -871,7 +871,7 @@ csched_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
      * get boosted, which we don't deserve as we are "only" migrating.
      */
     set_bit(CSCHED_FLAG_UNIT_MIGRATING, &svc->flags);
-    return get_sched_res(_csched_cpu_pick(ops, unit, 1));
+    return get_sched_res(_csched_cpu_pick(ops, unit, true));
 }
 
 static inline void
@@ -975,7 +975,7 @@ csched_unit_acct(struct csched_private *prv, unsigned int cpu)
          * migrating it to run elsewhere (see multi-core and multi-thread
          * support in csched_res_pick()).
          */
-        new_cpu = _csched_cpu_pick(ops, currunit, 0);
+        new_cpu = _csched_cpu_pick(ops, currunit, false);
 
         unit_schedule_unlock_irqrestore(lock, flags, currunit);
 
@@ -1108,7 +1108,7 @@ static void
 csched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 {
     struct csched_unit * const svc = CSCHED_UNIT(unit);
-    bool_t migrating;
+    bool migrating;
 
     BUG_ON( is_idle_unit(unit) );
 

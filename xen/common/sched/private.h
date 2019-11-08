@@ -589,7 +589,7 @@ unsigned int cpupool_get_granularity(const struct cpupool *c);
  * * The hard affinity is not a subset of soft affinity
  * * There is an overlap between the soft and hard affinity masks
  */
-static inline int has_soft_affinity(const struct sched_unit *unit)
+static inline bool has_soft_affinity(const struct sched_unit *unit)
 {
     return unit->soft_aff_effective &&
            !cpumask_subset(cpupool_domain_master_cpumask(unit->domain),

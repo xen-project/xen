@@ -560,18 +560,18 @@ static inline bool is_system_domain(const struct domain *d)
  * Use this when you don't have an existing reference to @d. It returns
  * FALSE if @d is being destroyed.
  */
-static always_inline int get_domain(struct domain *d)
+static always_inline bool get_domain(struct domain *d)
 {
     int old, seen = atomic_read(&d->refcnt);
     do
     {
         old = seen;
         if ( unlikely(old & DOMAIN_DESTROYED) )
-            return 0;
+            return false;
         seen = atomic_cmpxchg(&d->refcnt, old, old + 1);
     }
     while ( unlikely(seen != old) );
-    return 1;
+    return true;
 }
 
 /*

@@ -75,7 +75,7 @@ typedef struct arinc653_unit_s
      * arinc653_unit_t pointer. */
     struct sched_unit * unit;
     /* awake holds whether the UNIT has been woken with vcpu_wake() */
-    bool_t              awake;
+    bool                awake;
     /* list holds the linked list information for the list this UNIT
      * is stored in */
     struct list_head    list;
@@ -427,7 +427,7 @@ a653sched_alloc_udata(const struct scheduler *ops, struct sched_unit *unit,
      * will mark the UNIT awake.
      */
     svc->unit = unit;
-    svc->awake = 0;
+    svc->awake = false;
     if ( !is_idle_unit(unit) )
         list_add(&svc->list, &SCHED_PRIV(ops)->unit_list);
     update_schedule_units(ops);
@@ -473,7 +473,7 @@ static void
 a653sched_unit_sleep(const struct scheduler *ops, struct sched_unit *unit)
 {
     if ( AUNIT(unit) != NULL )
-        AUNIT(unit)->awake = 0;
+        AUNIT(unit)->awake = false;
 
     /*
      * If the UNIT being put to sleep is the same one that is currently
@@ -493,7 +493,7 @@ static void
 a653sched_unit_wake(const struct scheduler *ops, struct sched_unit *unit)
 {
     if ( AUNIT(unit) != NULL )
-        AUNIT(unit)->awake = 1;
+        AUNIT(unit)->awake = true;
 
     cpu_raise_softirq(sched_unit_master(unit), SCHEDULE_SOFTIRQ);
 }
