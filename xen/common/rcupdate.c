@@ -459,7 +459,7 @@ int rcu_needs_cpu(int cpu)
  * periodically poke rcu_pedning(), so that it will invoke the callback
  * not too late after the end of the grace period.
  */
-void rcu_idle_timer_start()
+static void rcu_idle_timer_start(void)
 {
     struct rcu_data *rdp = &this_cpu(rcu_data);
 
@@ -475,7 +475,7 @@ void rcu_idle_timer_start()
     rdp->idle_timer_active = true;
 }
 
-void rcu_idle_timer_stop()
+static void rcu_idle_timer_stop(void)
 {
     struct rcu_data *rdp = &this_cpu(rcu_data);
 
@@ -633,10 +633,13 @@ void rcu_idle_enter(unsigned int cpu)
      * Se the comment before cpumask_andnot() in  rcu_start_batch().
      */
     smp_mb();
+
+    rcu_idle_timer_start();
 }
 
 void rcu_idle_exit(unsigned int cpu)
 {
+    rcu_idle_timer_stop();
     ASSERT(cpumask_test_cpu(cpu, &rcu_ctrlblk.idle_cpumask));
     cpumask_clear_cpu(cpu, &rcu_ctrlblk.idle_cpumask);
 }

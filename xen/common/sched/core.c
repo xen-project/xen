@@ -3268,18 +3268,6 @@ void schedule_dump(struct cpupool *c)
     rcu_read_unlock(&sched_res_rculock);
 }
 
-void sched_tick_suspend(void)
-{
-    rcu_idle_enter(smp_processor_id());
-    rcu_idle_timer_start();
-}
-
-void sched_tick_resume(void)
-{
-    rcu_idle_timer_stop();
-    rcu_idle_exit(smp_processor_id());
-}
-
 void wait(void)
 {
     schedule();

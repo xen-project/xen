@@ -599,7 +599,8 @@ void update_idle_stats(struct acpi_processor_power *power,
 
 static void acpi_processor_idle(void)
 {
-    struct acpi_processor_power *power = processor_powers[smp_processor_id()];
+    unsigned int cpu = smp_processor_id();
+    struct acpi_processor_power *power = processor_powers[cpu];
     struct acpi_processor_cx *cx = NULL;
     int next_state;
     uint64_t t1, t2 = 0;
@@ -648,8 +649,8 @@ static void acpi_processor_idle(void)
 
     cpufreq_dbs_timer_suspend();
 
-    sched_tick_suspend();
-    /* sched_tick_suspend() can raise TIMER_SOFTIRQ. Process it now. */
+    rcu_idle_enter(cpu);
+    /* rcu_idle_enter() can raise TIMER_SOFTIRQ. Process it now. */
     process_pending_softirqs();
 
     /*
@@ -658,10 +659,10 @@ static void acpi_processor_idle(void)
      */
     local_irq_disable();
 
-    if ( !cpu_is_haltable(smp_processor_id()) )
+    if ( !cpu_is_haltable(cpu) )
     {
         local_irq_enable();
-        sched_tick_resume();
+        rcu_idle_exit(cpu);
         cpufreq_dbs_timer_resume();
         return;
     }
@@ -786,7 +787,7 @@ static void acpi_processor_idle(void)
         /* Now in C0 */
         power->last_state = &power->states[0];
         local_irq_enable();
-        sched_tick_resume();
+        rcu_idle_exit(cpu);
         cpufreq_dbs_timer_resume();
         return;
     }
@@ -794,7 +795,7 @@ static void acpi_processor_idle(void)
     /* Now in C0 */
     power->last_state = &power->states[0];
 
-    sched_tick_resume();
+    rcu_idle_exit(cpu);
     cpufreq_dbs_timer_resume();
 
     if ( cpuidle_current_governor->reflect )
