@@ -637,21 +637,36 @@ replq_reinsert(const struct scheduler *ops, struct rt_unit *svc)
  * and available resources
  */
 static struct sched_resource *
-rt_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
+rt_res_pick_locked(const struct sched_unit *unit, unsigned int locked_cpu)
 {
-    cpumask_t cpus;
+    cpumask_t *cpus = cpumask_scratch_cpu(locked_cpu);
     cpumask_t *online;
     int cpu;
 
     online = cpupool_domain_master_cpumask(unit->domain);
-    cpumask_and(&cpus, online, unit->cpu_hard_affinity);
+    cpumask_and(cpus, online, unit->cpu_hard_affinity);
 
-    cpu = cpumask_test_cpu(sched_unit_master(unit), &cpus)
+    cpu = cpumask_test_cpu(sched_unit_master(unit), cpus)
             ? sched_unit_master(unit)
-            : cpumask_cycle(sched_unit_master(unit), &cpus);
-    ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
+            : cpumask_cycle(sched_unit_master(unit), cpus);
+    ASSERT( !cpumask_empty(cpus) && cpumask_test_cpu(cpu, cpus) );
 
     return get_sched_res(cpu);
+}
+
+/*
+ * Pick a valid resource for the unit vc
+ * Valid resource of an unit is intesection of unit's affinity
+ * and available resources
+ */
+static struct sched_resource *
+rt_res_pick(const struct scheduler *ops, const struct sched_unit *unit)
+{
+    struct sched_resource *res;
+
+    res = rt_res_pick_locked(unit, unit->res->master_cpu);
+
+    return res;
 }
 
 /*
@@ -886,11 +901,14 @@ rt_unit_insert(const struct scheduler *ops, struct sched_unit *unit)
     struct rt_unit *svc = rt_unit(unit);
     s_time_t now;
     spinlock_t *lock;
+    unsigned int cpu = smp_processor_id();
 
     BUG_ON( is_idle_unit(unit) );
 
     /* This is safe because unit isn't yet being scheduled */
-    sched_set_res(unit, rt_res_pick(ops, unit));
+    lock = pcpu_schedule_lock_irq(cpu);
+    sched_set_res(unit, rt_res_pick_locked(unit, cpu));
+    pcpu_schedule_unlock_irq(lock, cpu);
 
     lock = unit_schedule_lock_irq(unit);
 
@@ -1003,13 +1021,13 @@ burn_budget(const struct scheduler *ops, struct rt_unit *svc, s_time_t now)
  * lock is grabbed before calling this function
  */
 static struct rt_unit *
-runq_pick(const struct scheduler *ops, const cpumask_t *mask)
+runq_pick(const struct scheduler *ops, const cpumask_t *mask, unsigned int cpu)
 {
     struct list_head *runq = rt_runq(ops);
     struct list_head *iter;
     struct rt_unit *svc = NULL;
     struct rt_unit *iter_svc = NULL;
-    cpumask_t cpu_common;
+    cpumask_t *cpu_common = cpumask_scratch_cpu(cpu);
     cpumask_t *online;
 
     list_for_each ( iter, runq )
@@ -1018,9 +1036,9 @@ runq_pick(const struct scheduler *ops, const cpumask_t *mask)
 
         /* mask cpu_hard_affinity & cpupool & mask */
         online = cpupool_domain_master_cpumask(iter_svc->unit->domain);
-        cpumask_and(&cpu_common, online, iter_svc->unit->cpu_hard_affinity);
-        cpumask_and(&cpu_common, mask, &cpu_common);
-        if ( cpumask_empty(&cpu_common) )
+        cpumask_and(cpu_common, online, iter_svc->unit->cpu_hard_affinity);
+        cpumask_and(cpu_common, mask, cpu_common);
+        if ( cpumask_empty(cpu_common) )
             continue;
 
         ASSERT( iter_svc->cur_budget > 0 );
@@ -1092,7 +1110,7 @@ rt_schedule(const struct scheduler *ops, struct sched_unit *currunit,
     }
     else
     {
-        snext = runq_pick(ops, cpumask_of(sched_cpu));
+        snext = runq_pick(ops, cpumask_of(sched_cpu), cur_cpu);
 
         if ( snext == NULL )
             snext = rt_unit(sched_idle_unit(sched_cpu));
@@ -1186,22 +1204,22 @@ runq_tickle(const struct scheduler *ops, struct rt_unit *new)
     struct rt_unit *iter_svc;
     struct sched_unit *iter_unit;
     int cpu = 0, cpu_to_tickle = 0;
-    cpumask_t not_tickled;
+    cpumask_t *not_tickled = cpumask_scratch_cpu(smp_processor_id());
     cpumask_t *online;
 
     if ( new == NULL || is_idle_unit(new->unit) )
         return;
 
     online = cpupool_domain_master_cpumask(new->unit->domain);
-    cpumask_and(&not_tickled, online, new->unit->cpu_hard_affinity);
-    cpumask_andnot(&not_tickled, &not_tickled, &prv->tickled);
+    cpumask_and(not_tickled, online, new->unit->cpu_hard_affinity);
+    cpumask_andnot(not_tickled, not_tickled, &prv->tickled);
 
     /*
      * 1) If there are any idle CPUs, kick one.
      *    For cache benefit,we first search new->cpu.
      *    The same loop also find the one with lowest priority.
      */
-    cpu = cpumask_test_or_cycle(sched_unit_master(new->unit), &not_tickled);
+    cpu = cpumask_test_or_cycle(sched_unit_master(new->unit), not_tickled);
     while ( cpu!= nr_cpu_ids )
     {
         iter_unit = curr_on_cpu(cpu);
@@ -1216,8 +1234,8 @@ runq_tickle(const struct scheduler *ops, struct rt_unit *new)
              compare_unit_priority(iter_svc, latest_deadline_unit) < 0 )
             latest_deadline_unit = iter_svc;
 
-        cpumask_clear_cpu(cpu, &not_tickled);
-        cpu = cpumask_cycle(cpu, &not_tickled);
+        cpumask_clear_cpu(cpu, not_tickled);
+        cpu = cpumask_cycle(cpu, not_tickled);
     }
 
     /* 2) candicate has higher priority, kick out lowest priority unit */
