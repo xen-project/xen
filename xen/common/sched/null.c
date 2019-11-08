@@ -89,7 +89,6 @@ struct null_private {
 struct null_pcpu {
     struct sched_unit *unit;
 };
-DEFINE_PER_CPU(struct null_pcpu, npc);
 
 /*
  * Schedule unit
@@ -159,32 +158,48 @@ static void null_deinit(struct scheduler *ops)
     ops->sched_data = NULL;
 }
 
-static void init_pdata(struct null_private *prv, unsigned int cpu)
+static void init_pdata(struct null_private *prv, struct null_pcpu *npc,
+                       unsigned int cpu)
 {
     /* Mark the pCPU as free, and with no unit assigned */
     cpumask_set_cpu(cpu, &prv->cpus_free);
-    per_cpu(npc, cpu).unit = NULL;
+    npc->unit = NULL;
 }
 
 static void null_init_pdata(const struct scheduler *ops, void *pdata, int cpu)
 {
     struct null_private *prv = null_priv(ops);
 
-    /* alloc_pdata is not implemented, so we want this to be NULL. */
-    ASSERT(!pdata);
+    ASSERT(pdata);
 
-    init_pdata(prv, cpu);
+    init_pdata(prv, pdata, cpu);
 }
 
 static void null_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 {
     struct null_private *prv = null_priv(ops);
+    struct null_pcpu *npc = pcpu;
 
-    /* alloc_pdata not implemented, so this must have stayed NULL */
-    ASSERT(!pcpu);
+    ASSERT(npc);
 
     cpumask_clear_cpu(cpu, &prv->cpus_free);
-    per_cpu(npc, cpu).unit = NULL;
+    npc->unit = NULL;
+}
+
+static void *null_alloc_pdata(const struct scheduler *ops, int cpu)
+{
+    struct null_pcpu *npc;
+
+    npc = xzalloc(struct null_pcpu);
+    if ( npc == NULL )
+        return ERR_PTR(-ENOMEM);
+
+    return npc;
+}
+
+static void null_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
+{
+    xfree(pcpu);
 }
 
 static void *null_alloc_udata(const struct scheduler *ops,
@@ -268,6 +283,7 @@ pick_res(struct null_private *prv, const struct sched_unit *unit)
     unsigned int bs;
     unsigned int cpu = sched_unit_master(unit), new_cpu;
     cpumask_t *cpus = cpupool_domain_master_cpumask(unit->domain);
+    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
 
     ASSERT(spin_is_locked(get_sched_res(cpu)->schedule_lock));
 
@@ -286,8 +302,7 @@ pick_res(struct null_private *prv, const struct sched_unit *unit)
          * don't, so we get to keep in the scratch cpumask what we have just
          * put in it.)
          */
-        if ( likely((per_cpu(npc, cpu).unit == NULL ||
-                     per_cpu(npc, cpu).unit == unit)
+        if ( likely((npc->unit == NULL || npc->unit == unit)
                     && cpumask_test_cpu(cpu, cpumask_scratch_cpu(cpu))) )
         {
             new_cpu = cpu;
@@ -336,9 +351,11 @@ pick_res(struct null_private *prv, const struct sched_unit *unit)
 static void unit_assign(struct null_private *prv, struct sched_unit *unit,
                         unsigned int cpu)
 {
+    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
+
     ASSERT(is_unit_online(unit));
 
-    per_cpu(npc, cpu).unit = unit;
+    npc->unit = unit;
     sched_set_res(unit, get_sched_res(cpu));
     cpumask_clear_cpu(cpu, &prv->cpus_free);
 
@@ -363,12 +380,13 @@ static bool unit_deassign(struct null_private *prv, struct sched_unit *unit)
     unsigned int bs;
     unsigned int cpu = sched_unit_master(unit);
     struct null_unit *wvc;
+    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
 
     ASSERT(list_empty(&null_unit(unit)->waitq_elem));
-    ASSERT(per_cpu(npc, cpu).unit == unit);
+    ASSERT(npc->unit == unit);
     ASSERT(!cpumask_test_cpu(cpu, &prv->cpus_free));
 
-    per_cpu(npc, cpu).unit = NULL;
+    npc->unit = NULL;
     cpumask_set_cpu(cpu, &prv->cpus_free);
 
     dprintk(XENLOG_G_INFO, "%d <-- NULL (%pdv%d)\n", cpu, unit->domain,
@@ -436,7 +454,7 @@ static spinlock_t *null_switch_sched(struct scheduler *new_ops,
      */
     ASSERT(!local_irq_is_enabled());
 
-    init_pdata(prv, cpu);
+    init_pdata(prv, pdata, cpu);
 
     return &sr->_lock;
 }
@@ -446,6 +464,7 @@ static void null_unit_insert(const struct scheduler *ops,
 {
     struct null_private *prv = null_priv(ops);
     struct null_unit *nvc = null_unit(unit);
+    struct null_pcpu *npc;
     unsigned int cpu;
     spinlock_t *lock;
 
@@ -462,6 +481,7 @@ static void null_unit_insert(const struct scheduler *ops,
  retry:
     sched_set_res(unit, pick_res(prv, unit));
     cpu = sched_unit_master(unit);
+    npc = get_sched_res(cpu)->sched_priv;
 
     spin_unlock(lock);
 
@@ -471,7 +491,7 @@ static void null_unit_insert(const struct scheduler *ops,
                 cpupool_domain_master_cpumask(unit->domain));
 
     /* If the pCPU is free, we assign unit to it */
-    if ( likely(per_cpu(npc, cpu).unit == NULL) )
+    if ( likely(npc->unit == NULL) )
     {
         /*
          * Insert is followed by vcpu_wake(), so there's no need to poke
@@ -519,7 +539,10 @@ static void null_unit_remove(const struct scheduler *ops,
     /* If offline, the unit shouldn't be assigned, nor in the waitqueue */
     if ( unlikely(!is_unit_online(unit)) )
     {
-        ASSERT(per_cpu(npc, sched_unit_master(unit)).unit != unit);
+        struct null_pcpu *npc;
+
+        npc = unit->res->sched_priv;
+        ASSERT(npc->unit != unit);
         ASSERT(list_empty(&nvc->waitq_elem));
         goto out;
     }
@@ -548,6 +571,7 @@ static void null_unit_wake(const struct scheduler *ops,
     struct null_private *prv = null_priv(ops);
     struct null_unit *nvc = null_unit(unit);
     unsigned int cpu = sched_unit_master(unit);
+    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
 
     ASSERT(!is_idle_unit(unit));
 
@@ -569,7 +593,7 @@ static void null_unit_wake(const struct scheduler *ops,
     else
         SCHED_STAT_CRANK(unit_wake_not_runnable);
 
-    if ( likely(per_cpu(npc, cpu).unit == unit) )
+    if ( likely(npc->unit == unit) )
     {
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
         return;
@@ -581,7 +605,7 @@ static void null_unit_wake(const struct scheduler *ops,
      * and its previous resource is free (and affinities match), we can just
      * assign the unit to it (we own the proper lock already) and be done.
      */
-    if ( per_cpu(npc, cpu).unit == NULL &&
+    if ( npc->unit == NULL &&
          unit_check_affinity(unit, cpu, BALANCE_HARD_AFFINITY) )
     {
         if ( !has_soft_affinity(unit) ||
@@ -622,6 +646,7 @@ static void null_unit_sleep(const struct scheduler *ops,
 {
     struct null_private *prv = null_priv(ops);
     unsigned int cpu = sched_unit_master(unit);
+    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
     bool tickled = false;
 
     ASSERT(!is_idle_unit(unit));
@@ -640,7 +665,7 @@ static void null_unit_sleep(const struct scheduler *ops,
             list_del_init(&nvc->waitq_elem);
             spin_unlock(&prv->waitq_lock);
         }
-        else if ( per_cpu(npc, cpu).unit == unit )
+        else if ( npc->unit == unit )
             tickled = unit_deassign(prv, unit);
     }
 
@@ -663,6 +688,7 @@ static void null_unit_migrate(const struct scheduler *ops,
 {
     struct null_private *prv = null_priv(ops);
     struct null_unit *nvc = null_unit(unit);
+    struct null_pcpu *npc;
 
     ASSERT(!is_idle_unit(unit));
 
@@ -686,7 +712,8 @@ static void null_unit_migrate(const struct scheduler *ops,
      * If unit is assigned to a pCPU, then such pCPU becomes free, and we
      * should look in the waitqueue if anyone else can be assigned to it.
      */
-    if ( likely(per_cpu(npc, sched_unit_master(unit)).unit == unit) )
+    npc = unit->res->sched_priv;
+    if ( likely(npc->unit == unit) )
     {
         unit_deassign(prv, unit);
         SCHED_STAT_CRANK(migrate_running);
@@ -720,7 +747,8 @@ static void null_unit_migrate(const struct scheduler *ops,
      *
      * In latter, all we can do is to park unit in the waitqueue.
      */
-    if ( per_cpu(npc, new_cpu).unit == NULL &&
+    npc = get_sched_res(new_cpu)->sched_priv;
+    if ( npc->unit == NULL &&
          unit_check_affinity(unit, new_cpu, BALANCE_HARD_AFFINITY) )
     {
         /* unit might have been in the waitqueue, so remove it */
@@ -788,6 +816,7 @@ static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
     unsigned int bs;
     const unsigned int cur_cpu = smp_processor_id();
     const unsigned int sched_cpu = sched_get_resource_cpu(cur_cpu);
+    struct null_pcpu *npc = get_sched_res(sched_cpu)->sched_priv;
     struct null_private *prv = null_priv(ops);
     struct null_unit *wvc;
 
@@ -802,14 +831,14 @@ static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
         } d;
         d.cpu = cur_cpu;
         d.tasklet = tasklet_work_scheduled;
-        if ( per_cpu(npc, sched_cpu).unit == NULL )
+        if ( npc->unit == NULL )
         {
             d.unit = d.dom = -1;
         }
         else
         {
-            d.unit = per_cpu(npc, sched_cpu).unit->unit_id;
-            d.dom = per_cpu(npc, sched_cpu).unit->domain->domain_id;
+            d.unit = npc->unit->unit_id;
+            d.dom = npc->unit->domain->domain_id;
         }
         __trace_var(TRC_SNULL_SCHEDULE, 1, sizeof(d), &d);
     }
@@ -820,7 +849,7 @@ static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
         prev->next_task = sched_idle_unit(sched_cpu);
     }
     else
-        prev->next_task = per_cpu(npc, sched_cpu).unit;
+        prev->next_task = npc->unit;
     prev->next_time = -1;
 
     /*
@@ -921,6 +950,7 @@ static inline void dump_unit(struct null_private *prv, struct null_unit *nvc)
 static void null_dump_pcpu(const struct scheduler *ops, int cpu)
 {
     struct null_private *prv = null_priv(ops);
+    struct null_pcpu *npc = get_sched_res(cpu)->sched_priv;
     struct null_unit *nvc;
     spinlock_t *lock;
     unsigned long flags;
@@ -930,9 +960,8 @@ static void null_dump_pcpu(const struct scheduler *ops, int cpu)
     printk("CPU[%02d] sibling={%*pbl}, core={%*pbl}",
            cpu, CPUMASK_PR(per_cpu(cpu_sibling_mask, cpu)),
            CPUMASK_PR(per_cpu(cpu_core_mask, cpu)));
-    if ( per_cpu(npc, cpu).unit != NULL )
-        printk(", unit=%pdv%d", per_cpu(npc, cpu).unit->domain,
-               per_cpu(npc, cpu).unit->unit_id);
+    if ( npc->unit != NULL )
+        printk(", unit=%pdv%d", npc->unit->domain, npc->unit->unit_id);
     printk("\n");
 
     /* current unit (nothing to say if that's the idle unit) */
@@ -1010,6 +1039,8 @@ static const struct scheduler sched_null_def = {
 
     .init           = null_init,
     .deinit         = null_deinit,
+    .alloc_pdata    = null_alloc_pdata,
+    .free_pdata     = null_free_pdata,
     .init_pdata     = null_init_pdata,
     .switch_sched   = null_switch_sched,
     .deinit_pdata   = null_deinit_pdata,
