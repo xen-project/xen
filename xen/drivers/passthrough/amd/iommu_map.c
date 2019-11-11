@@ -112,7 +112,7 @@ void amd_iommu_set_root_page_table(struct amd_iommu_dte *dte,
     dte->v = valid;
 }
 
-void __init amd_iommu_set_intremap_table(
+void amd_iommu_set_intremap_table(
     struct amd_iommu_dte *dte, const void *ptr,
     const struct amd_iommu *iommu, bool valid)
 {
