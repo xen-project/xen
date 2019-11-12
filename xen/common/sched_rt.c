@@ -774,8 +774,8 @@ rt_deinit_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     if ( prv->repl_timer.cpu == cpu )
     {
-        struct cpupool *c = get_sched_res(cpu)->cpupool;
-        unsigned int new_cpu = cpumask_cycle(cpu, cpupool_online_cpumask(c));
+        cpumask_t *online = get_sched_res(cpu)->cpupool->res_valid;
+        unsigned int new_cpu = cpumask_cycle(cpu, online);
 
         /*
          * Make sure the timer run on one of the cpus that are still available

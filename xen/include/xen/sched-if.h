@@ -545,9 +545,6 @@ struct cpupool
     enum sched_gran  gran;
 };
 
-#define cpupool_online_cpumask(_pool) \
-    (((_pool) == NULL) ? &cpu_online_map : (_pool)->cpu_valid)
-
 static inline cpumask_t *cpupool_domain_master_cpumask(const struct domain *d)
 {
     /*

@@ -1684,12 +1684,11 @@ csched_load_balance(struct csched_private *prv, int cpu,
     struct cpupool *c = get_sched_res(cpu)->cpupool;
     struct csched_unit *speer;
     cpumask_t workers;
-    cpumask_t *online;
+    cpumask_t *online = c->res_valid;
     int peer_cpu, first_cpu, peer_node, bstep;
     int node = cpu_to_node(cpu);
 
     BUG_ON(get_sched_res(cpu) != snext->unit->res);
-    online = cpupool_online_cpumask(c);
 
     /*
      * If this CPU is going offline, or is not (yet) part of any cpupool
