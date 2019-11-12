@@ -568,50 +568,52 @@ static void null_unit_wake(const struct scheduler *ops,
     else
         SCHED_STAT_CRANK(unit_wake_not_runnable);
 
+    if ( likely(per_cpu(npc, cpu).unit == unit) )
+    {
+        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+        return;
+    }
+
     /*
      * If a unit is neither on a pCPU nor in the waitqueue, it means it was
-     * offline, and that it is now coming back being online.
+     * offline, and that it is now coming back being online. If we're lucky,
+     * and its previous resource is free (and affinities match), we can just
+     * assign the unit to it (we own the proper lock already) and be done.
      */
-    if ( unlikely(per_cpu(npc, cpu).unit != unit && list_empty(&nvc->waitq_elem)) )
+    if ( per_cpu(npc, cpu).unit == NULL &&
+         unit_check_affinity(unit, cpu, BALANCE_HARD_AFFINITY) )
     {
-        spin_lock(&prv->waitq_lock);
-        list_add_tail(&nvc->waitq_elem, &prv->waitq);
-        spin_unlock(&prv->waitq_lock);
-
-        cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
-                    cpupool_domain_master_cpumask(unit->domain));
-
-        if ( !cpumask_intersects(&prv->cpus_free, cpumask_scratch_cpu(cpu)) )
+        if ( !has_soft_affinity(unit) ||
+             unit_check_affinity(unit, cpu, BALANCE_SOFT_AFFINITY) )
         {
-            dprintk(XENLOG_G_WARNING, "WARNING: d%dv%d not assigned to any CPU!\n",
-                    unit->domain->domain_id, unit->unit_id);
+            unit_assign(prv, unit, cpu);
+            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
             return;
-        }
-
-        /*
-         * Now we would want to assign the unit to cpu, but we can't, because
-         * we don't have the lock. So, let's do the following:
-         * - try to remove cpu from the list of free cpus, to avoid races with
-         *   other onlining, inserting or migrating operations;
-         * - tickle the cpu, which will pickup work from the waitqueue, and
-         *   assign it to itself;
-         * - if we're racing already, and if there still are free cpus, try
-         *   again.
-         */
-        while ( cpumask_intersects(&prv->cpus_free, cpumask_scratch_cpu(cpu)) )
-        {
-            unsigned int new_cpu = pick_res(prv, unit)->master_cpu;
-
-            if ( test_and_clear_bit(new_cpu, &prv->cpus_free) )
-            {
-                cpu_raise_softirq(new_cpu, SCHEDULE_SOFTIRQ);
-                return;
-            }
         }
     }
 
-    /* Note that we get here only for units assigned to a pCPU */
-    cpu_raise_softirq(sched_unit_master(unit), SCHEDULE_SOFTIRQ);
+    /*
+     * If the resource is not free (or affinities do not match) we need
+     * to assign unit to some other one, but we can't do it here, as:
+     * - we don't own  the proper lock,
+     * - we can't change v->processor under vcpu_wake()'s feet.
+     * So we add it to the waitqueue, and tickle all the free CPUs (if any)
+     * on which unit can run. The first one that schedules will pick it up.
+     */
+    spin_lock(&prv->waitq_lock);
+    list_add_tail(&nvc->waitq_elem, &prv->waitq);
+    spin_unlock(&prv->waitq_lock);
+
+    cpumask_and(cpumask_scratch_cpu(cpu), unit->cpu_hard_affinity,
+                cpupool_domain_master_cpumask(unit->domain));
+    cpumask_and(cpumask_scratch_cpu(cpu), cpumask_scratch_cpu(cpu),
+                &prv->cpus_free);
+
+    if ( cpumask_empty(cpumask_scratch_cpu(cpu)) )
+        dprintk(XENLOG_G_WARNING, "WARNING: d%dv%d not assigned to any CPU!\n",
+                unit->domain->domain_id, unit->unit_id);
+    else
+        cpumask_raise_softirq(cpumask_scratch_cpu(cpu), SCHEDULE_SOFTIRQ);
 }
 
 static void null_unit_sleep(const struct scheduler *ops,
@@ -827,6 +829,8 @@ static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
      */
     if ( unlikely(prev->next_task == NULL) )
     {
+        bool unit_found;
+
         spin_lock(&prv->waitq_lock);
 
         if ( list_empty(&prv->waitq) )
@@ -839,6 +843,7 @@ static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
          * it only in cases where a pcpu has no unit associated (e.g., as
          * said above, the cpu has just joined a cpupool).
          */
+        unit_found = false;
         for_each_affinity_balance_step( bs )
         {
             list_for_each_entry( wvc, &prv->waitq, waitq_elem )
@@ -849,13 +854,45 @@ static void null_schedule(const struct scheduler *ops, struct sched_unit *prev,
 
                 if ( unit_check_affinity(wvc->unit, sched_cpu, bs) )
                 {
-                    unit_assign(prv, wvc->unit, sched_cpu);
-                    list_del_init(&wvc->waitq_elem);
-                    prev->next_task = wvc->unit;
-                    goto unlock;
+                    spinlock_t *lock;
+
+                    unit_found = true;
+
+                    /*
+                     * If the unit in the waitqueue has just come up online,
+                     * we risk racing with vcpu_wake(). To avoid this, sync
+                     * on the spinlock that vcpu_wake() holds, but only with
+                     * trylock, to avoid deadlock).
+                     */
+                    lock = pcpu_schedule_trylock(sched_unit_master(wvc->unit));
+
+                    /*
+                     * We know the vcpu's lock is not this resource's lock. In
+                     * fact, if it were, since this cpu is free, vcpu_wake()
+                     * would have assigned the unit to here directly.
+                     */
+                    ASSERT(lock != get_sched_res(sched_cpu)->schedule_lock);
+
+                    if ( lock ) {
+                        unit_assign(prv, wvc->unit, sched_cpu);
+                        list_del_init(&wvc->waitq_elem);
+                        prev->next_task = wvc->unit;
+                        spin_unlock(lock);
+                        goto unlock;
+                    }
                 }
             }
         }
+        /*
+         * If we did find a unit with suitable affinity in the waitqueue, but
+         * we could not pick it up (due to lock contention), and hence we are
+         * still free, plan for another try. In fact, we don't want such unit
+         * to be stuck in the waitqueue, when there are free cpus where it
+         * could run.
+         */
+        if ( unlikely( unit_found && prev->next_task == NULL &&
+                       !list_empty(&prv->waitq)) )
+            cpu_raise_softirq(cur_cpu, SCHEDULE_SOFTIRQ);
  unlock:
         spin_unlock(&prv->waitq_lock);
 
