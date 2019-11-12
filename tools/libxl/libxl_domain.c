@@ -1998,11 +1998,13 @@ static void retrieve_domain_configuration_end(libxl__egc *egc,
     retrieve_domain_configuration_state *rdcs, int rc)
 {
     STATE_AO_GC(rdcs->qmp.ao);
-    libxl__domain_userdata_lock *lock;
+    libxl__domain_userdata_lock *lock = NULL;
 
     /* Convenience aliases */
     libxl_domain_config *const d_config = rdcs->d_config;
     libxl_domid domid = rdcs->qmp.domid;
+
+    if (rc) goto out;
 
     lock = libxl__lock_domain_userdata(gc, domid);
     if (!lock) {
