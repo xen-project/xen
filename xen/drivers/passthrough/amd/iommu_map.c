@@ -176,7 +176,7 @@ void iommu_dte_set_guest_cr3(struct amd_iommu_dte *dte, uint16_t dom_id,
  * page tables.
  */
 static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
-                              unsigned long pt_mfn[])
+                              unsigned long pt_mfn[], bool map)
 {
     struct amd_iommu_pte *pde, *next_table_vaddr;
     unsigned long  next_table_mfn;
@@ -188,6 +188,13 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     level = hd->arch.paging_mode;
 
     BUG_ON( table == NULL || level < 1 || level > 6 );
+
+    /*
+     * A frame number past what the current page tables can represent can't
+     * possibly have a mapping.
+     */
+    if ( dfn >> (PTE_PER_TABLE_SHIFT * level) )
+        return 0;
 
     next_table_mfn = mfn_x(page_to_mfn(table));
 
@@ -246,6 +253,9 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
         /* Install lower level page table for non-present entries */
         else if ( !pde->pr )
         {
+            if ( !map )
+                return 0;
+
             if ( next_table_mfn == 0 )
             {
                 table = alloc_amd_iommu_pgtable();
@@ -404,7 +414,7 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
         }
     }
 
-    if ( iommu_pde_from_dfn(d, dfn_x(dfn), pt_mfn) || (pt_mfn[1] == 0) )
+    if ( iommu_pde_from_dfn(d, dfn_x(dfn), pt_mfn, true) || (pt_mfn[1] == 0) )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %"PRI_dfn"\n",
@@ -439,24 +449,7 @@ int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
         return 0;
     }
 
-    /* Since HVM domain is initialized with 2 level IO page table,
-     * we might need a deeper page table for lager dfn now */
-    if ( is_hvm_domain(d) )
-    {
-        int rc = update_paging_mode(d, dfn_x(dfn));
-
-        if ( rc )
-        {
-            spin_unlock(&hd->arch.mapping_lock);
-            AMD_IOMMU_DEBUG("Update page mode failed dfn = %"PRI_dfn"\n",
-                            dfn_x(dfn));
-            if ( rc != -EADDRNOTAVAIL )
-                domain_crash(d);
-            return rc;
-        }
-    }
-
-    if ( iommu_pde_from_dfn(d, dfn_x(dfn), pt_mfn) || (pt_mfn[1] == 0) )
+    if ( iommu_pde_from_dfn(d, dfn_x(dfn), pt_mfn, false) )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_DEBUG("Invalid IO pagetable entry dfn = %"PRI_dfn"\n",
@@ -465,8 +458,11 @@ int amd_iommu_unmap_page(struct domain *d, dfn_t dfn,
         return -EFAULT;
     }
 
-    /* mark PTE as 'page not present' */
-    *flush_flags |= clear_iommu_pte_present(pt_mfn[1], dfn_x(dfn));
+    if ( pt_mfn[1] )
+    {
+        /* Mark PTE as 'page not present'. */
+        *flush_flags |= clear_iommu_pte_present(pt_mfn[1], dfn_x(dfn));
+    }
 
     spin_unlock(&hd->arch.mapping_lock);
 
