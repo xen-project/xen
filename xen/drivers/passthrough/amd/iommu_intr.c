@@ -847,10 +847,12 @@ static void dump_intremap_table(const struct amd_iommu *iommu,
                                 union irte_cptr tbl,
                                 const struct ivrs_mappings *ivrs_mapping)
 {
-    unsigned int count, nr = intremap_table_entries(tbl.ptr, iommu);
+    unsigned int count, nr;
 
     if ( !tbl.ptr )
         return;
+
+    nr = intremap_table_entries(tbl.ptr, iommu);
 
     for ( count = 0; count < nr; count++ )
     {
