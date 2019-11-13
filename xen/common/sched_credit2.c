@@ -3658,7 +3658,7 @@ dump_pcpu(const struct scheduler *ops, int cpu)
     struct csched2_private *prv = csched2_priv(ops);
     struct csched2_unit *svc;
 
-    printk("CPU[%02d] runq=%d, sibling=%*pb, core=%*pb\n",
+    printk("CPU[%02d] runq=%d, sibling={%*pbl}, core={%*pbl}\n",
            cpu, c2r(cpu),
            CPUMASK_PR(per_cpu(cpu_sibling_mask, cpu)),
            CPUMASK_PR(per_cpu(cpu_core_mask, cpu)));

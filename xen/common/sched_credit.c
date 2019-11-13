@@ -2065,7 +2065,7 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
     spc = CSCHED_PCPU(cpu);
     runq = &spc->runq;
 
-    printk("CPU[%02d] nr_run=%d, sort=%d, sibling=%*pb, core=%*pb\n",
+    printk("CPU[%02d] nr_run=%d, sort=%d, sibling={%*pbl}, core={%*pbl}\n",
            cpu, spc->nr_runnable, spc->runq_sort_last,
            CPUMASK_PR(per_cpu(cpu_sibling_mask, cpu)),
            CPUMASK_PR(per_cpu(cpu_core_mask, cpu)));

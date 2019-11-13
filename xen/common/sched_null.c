@@ -926,7 +926,7 @@ static void null_dump_pcpu(const struct scheduler *ops, int cpu)
 
     lock = pcpu_schedule_lock_irqsave(cpu, &flags);
 
-    printk("CPU[%02d] sibling=%*pb, core=%*pb",
+    printk("CPU[%02d] sibling={%*pbl}, core={%*pbl}",
            cpu, CPUMASK_PR(per_cpu(cpu_sibling_mask, cpu)),
            CPUMASK_PR(per_cpu(cpu_core_mask, cpu)));
     if ( per_cpu(npc, cpu).unit != NULL )
