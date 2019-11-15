@@ -515,7 +515,7 @@ void libxl__dm_resume(libxl__egc *egc,
     rc = libxl__ev_time_register_rel(dmrs->ao,
                                      &dmrs->time,
                                      dm_resume_timeout,
-                                     LIBXL_DEVICE_MODEL_START_TIMEOUT);
+                                     LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000);
     if (rc) goto out;
 
     switch (libxl__device_model_version_running(gc, domid)) {
