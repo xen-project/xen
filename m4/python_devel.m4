@@ -23,8 +23,15 @@ AS_IF([test x"$pyconfig" = x"no"], [
 ], [
     dnl If python-config is found use it
     CPPFLAGS="$CFLAGS `$PYTHON-config --cflags`"
-    LDFLAGS="$LDFLAGS `$PYTHON-config --ldflags`"
-    LIBS="$LIBS `$PYTHON-config --libs`"
+    dnl We need to use --embed with python 3.8 but not with earlier version so
+    dnl check if it is recognized.
+    python_devel_embed=""
+    if $PYTHON-config --embed >/dev/null 2>/dev/null; then
+      python_devel_embed="--embed"
+    fi
+    LDFLAGS="$LDFLAGS `$PYTHON-config --ldflags $python_devel_embed`"
+    LIBS="$LIBS `$PYTHON-config --libs $python_devel_embed`"
+    unset python_devel_embed
 ])
 
 AC_CHECK_HEADER([Python.h], [],

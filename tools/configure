@@ -7460,8 +7460,13 @@ if test x"$pyconfig" = x"no"; then :
 else
 
         CPPFLAGS="$CFLAGS `$PYTHON-config --cflags`"
-    LDFLAGS="$LDFLAGS `$PYTHON-config --ldflags`"
-    LIBS="$LIBS `$PYTHON-config --libs`"
+            python_devel_embed=""
+    if $PYTHON-config --embed >/dev/null 2>/dev/null; then
+      python_devel_embed="--embed"
+    fi
+    LDFLAGS="$LDFLAGS `$PYTHON-config --ldflags $python_devel_embed`"
+    LIBS="$LIBS `$PYTHON-config --libs $python_devel_embed`"
+    unset python_devel_embed
 
 fi
 
