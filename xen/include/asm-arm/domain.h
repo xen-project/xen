@@ -35,11 +35,11 @@ enum domain_type {
 #define is_domain_direct_mapped(d) ((d) == hardware_domain)
 
 struct vtimer {
-        struct vcpu *v;
-        int irq;
-        struct timer timer;
-        uint32_t ctl;
-        uint64_t cval;
+    struct vcpu *v;
+    int irq;
+    struct timer timer;
+    uint32_t ctl;
+    uint64_t cval;
 };
 
 struct arch_domain
