@@ -933,29 +933,25 @@ static int deassign_device(struct domain *d, uint16_t seg, uint8_t bus,
             break;
         ret = hd->platform_ops->reassign_device(d, target, devfn,
                                                 pci_to_dev(pdev));
-        if ( !ret )
-            continue;
-
-        printk(XENLOG_G_ERR "%pd: deassign %04x:%02x:%02x.%u failed (%d)\n",
-               d, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), ret);
-        return ret;
+        if ( ret )
+            goto out;
     }
 
     devfn = pdev->devfn;
     ret = hd->platform_ops->reassign_device(d, target, devfn,
                                             pci_to_dev(pdev));
     if ( ret )
-    {
-        dprintk(XENLOG_G_ERR,
-                "%pd: deassign device (%04x:%02x:%02x.%u) failed\n",
-                d, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-        return ret;
-    }
+        goto out;
 
     if ( pdev->domain == hardware_domain  )
         pdev->quarantine = false;
 
     pdev->fault.count = 0;
+
+ out:
+    if ( ret )
+        printk(XENLOG_G_ERR "%pd: deassign (%04x:%02x:%02x.%u) failed (%d)\n",
+               d, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), ret);
 
     return ret;
 }
@@ -977,10 +973,7 @@ int pci_release_devices(struct domain *d)
     {
         bus = pdev->bus;
         devfn = pdev->devfn;
-        if ( deassign_device(d, pdev->seg, bus, devfn) )
-            printk("domain %d: deassign device (%04x:%02x:%02x.%u) failed!\n",
-                   d->domain_id, pdev->seg, bus,
-                   PCI_SLOT(devfn), PCI_FUNC(devfn));
+        deassign_device(d, pdev->seg, bus, devfn);
     }
     pcidevs_unlock();
 
@@ -1475,8 +1468,7 @@ static int device_assigned(u16 seg, u8 bus, u8 devfn)
     struct pci_dev *pdev;
     int rc = 0;
 
-    pcidevs_lock();
-
+    ASSERT(pcidevs_locked());
     pdev = pci_get_pdev(seg, bus, devfn);
 
     if ( !pdev )
@@ -1490,11 +1482,10 @@ static int device_assigned(u16 seg, u8 bus, u8 devfn)
               pdev->domain != dom_io )
         rc = -EBUSY;
 
-    pcidevs_unlock();
-
     return rc;
 }
 
+/* Caller should hold the pcidevs_lock */
 static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
 {
     const struct domain_iommu *hd = dom_iommu(d);
@@ -1513,23 +1504,11 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
                   p2m_get_hostp2m(d)->global_logdirty) )
         return -EXDEV;
 
-    if ( !pcidevs_trylock() )
-        return -ERESTART;
-
+    /* device_assigned() should already have cleared the device for assignment */
+    ASSERT(pcidevs_locked());
     pdev = pci_get_pdev(seg, bus, devfn);
-
-    rc = -ENODEV;
-    if ( !pdev )
-        goto done;
-
-    rc = 0;
-    if ( d == pdev->domain )
-        goto done;
-
-    rc = -EBUSY;
-    if ( pdev->domain != hardware_domain &&
-         pdev->domain != dom_io )
-        goto done;
+    ASSERT(pdev && (pdev->domain == hardware_domain ||
+                    pdev->domain == dom_io));
 
     if ( pdev->msix )
     {
@@ -1550,18 +1529,15 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn, u32 flag)
         if ( PCI_SLOT(devfn) != PCI_SLOT(pdev->devfn) )
             break;
         rc = hd->platform_ops->assign_device(d, devfn, pci_to_dev(pdev), flag);
-        if ( rc )
-            printk(XENLOG_G_WARNING "d%d: assign %04x:%02x:%02x.%u failed (%d)\n",
-                   d->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                   rc);
     }
 
  done:
+    if ( rc )
+        printk(XENLOG_G_WARNING "%pd: assign (%04x:%02x:%02x.%u) failed (%d)\n",
+               d, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), rc);
     /* The device is assigned to dom_io so mark it as quarantined */
-    if ( !rc && d == dom_io )
+    else if ( d == dom_io )
         pdev->quarantine = true;
-
-    pcidevs_unlock();
 
     return rc;
 }
@@ -1718,6 +1694,7 @@ int iommu_do_pci_domctl(
         bus = PCI_BUS(machine_sbdf);
         devfn = PCI_DEVFN2(machine_sbdf);
 
+        pcidevs_lock();
         ret = device_assigned(seg, bus, devfn);
         if ( domctl->cmd == XEN_DOMCTL_test_assign_device )
         {
@@ -1730,17 +1707,12 @@ int iommu_do_pci_domctl(
             }
             break;
         }
-        if ( !ret )
+        else if ( !ret )
             ret = assign_device(d, seg, bus, devfn, flags);
+        pcidevs_unlock();
         if ( ret == -ERESTART )
             ret = hypercall_create_continuation(__HYPERVISOR_domctl,
                                                 "h", u_domctl);
-        else if ( ret )
-            printk(XENLOG_G_ERR
-                   "assign %04x:%02x:%02x.%u to dom%d failed (%d)\n",
-                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                   d->domain_id, ret);
-
         break;
 
     case XEN_DOMCTL_deassign_device:
@@ -1772,12 +1744,6 @@ int iommu_do_pci_domctl(
         pcidevs_lock();
         ret = deassign_device(d, seg, bus, devfn);
         pcidevs_unlock();
-        if ( ret )
-            printk(XENLOG_G_ERR
-                   "deassign %04x:%02x:%02x.%u from dom%d failed (%d)\n",
-                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                   d->domain_id, ret);
-
         break;
 
     default:
