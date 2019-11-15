@@ -15,12 +15,11 @@ that they can have an idea what to expect from the Release Manager.
 
 # Xen release cycle
 
-The Xen hypervisor project now releases twice a year, at the beginning of
-June and the beginning of December. The actual release date depends on a lot
-of factors.
+The Xen hypervisor project now releases every 8 months. The actual release date
+depends on a lot of factors.
 
 We can roughly divide one release into two periods. The development period
-and the freeze period. The former is 4 months long and the latter is about 2
+and the freeze period. The former is 6 months long and the latter is about 2
 months long.
 
 During development period, contributors submit patches to be reviewed and
@@ -33,14 +32,6 @@ date" and it is normally two weeks before the "cut-off date".
 During freeze period, the tree is closed for new features. Only bug fixes are
 accepted. This period can be shorter or longer than 2 months. If it ends up
 longer than 2 months, it eats into the next development period.
-
-Here is a conjured up example (use ```cal 2017``` to get an idea):
-
-* Development period: 2017 June 11 - 2017 September 29
-    * the "cut-off date" is 2017 September 29
-    * the "last posting date" is 2017 September 15
-* Freeze period: 2017 October 2 - 2017 December 7
-    * the anticipated release date is 2017 December 7
 
 # The different roles in a Xen release
 
