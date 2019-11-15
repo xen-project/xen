@@ -114,10 +114,20 @@ static void amd_iommu_setup_domain_device(
 
     if ( !dte->v || !dte->tv )
     {
+        const struct ivrs_mappings *ivrs_dev;
+
         /* bind DTE to domain page-tables */
         amd_iommu_set_root_page_table(
             dte, page_to_maddr(hd->arch.root_table), domain->domain_id,
             hd->arch.paging_mode, valid);
+
+        /* Undo what amd_iommu_disable_domain_device() may have done. */
+        ivrs_dev = &get_ivrs_mappings(iommu->seg)[req_id];
+        if ( dte->it_root )
+            dte->int_ctl = IOMMU_DEV_TABLE_INT_CONTROL_TRANSLATED;
+        dte->iv = iommu_intremap;
+        dte->ex = ivrs_dev->dte_allow_exclusion;
+        dte->sys_mgt = MASK_EXTR(ivrs_dev->device_flags, ACPI_IVHD_SYSTEM_MGMT);
 
         if ( pci_ats_device(iommu->seg, bus, pdev->devfn) &&
              iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
