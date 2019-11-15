@@ -77,7 +77,7 @@ struct pending_irq
 #define GIC_IRQ_GUEST_MIGRATING   4
 #define GIC_IRQ_GUEST_PRISTINE_LPI  5
     unsigned long status;
-    struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
+    struct irq_desc *desc; /* only set if the irq corresponds to a physical irq */
     unsigned int irq;
 #define GIC_INVALID_LR         (uint8_t)~0
     uint8_t lr;
