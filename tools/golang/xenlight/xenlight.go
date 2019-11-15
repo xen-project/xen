@@ -1041,7 +1041,7 @@ func (Ctx *Context) DomainShutdown(id Domid) (err error) {
 		return
 	}
 
-	ret := C.libxl_domain_shutdown(Ctx.ctx, C.uint32_t(id))
+	ret := C.libxl_domain_shutdown(Ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
 		err = Error(-ret)
@@ -1056,7 +1056,7 @@ func (Ctx *Context) DomainReboot(id Domid) (err error) {
 		return
 	}
 
-	ret := C.libxl_domain_reboot(Ctx.ctx, C.uint32_t(id))
+	ret := C.libxl_domain_reboot(Ctx.ctx, C.uint32_t(id), nil)
 
 	if ret != 0 {
 		err = Error(-ret)
