@@ -575,25 +575,32 @@ void libxl__update_domain_configuration(libxl__gc *gc,
     dst->b_info.video_memkb = src->b_info.video_memkb;
 }
 
-void libxl__ev_devlock_init(libxl__ev_devlock *lock)
+static void ev_slowlock_init_internal(libxl__ev_slowlock *lock,
+                                      const char *userdata_userid)
 {
     libxl__ev_child_init(&lock->child);
+    lock->userdata_userid = userdata_userid;
     lock->path = NULL;
     lock->fd = -1;
     lock->held = false;
 }
 
-static void ev_lock_prepare_fork(libxl__egc *egc, libxl__ev_devlock *lock);
+void libxl__ev_devlock_init(libxl__ev_slowlock *lock)
+{
+    ev_slowlock_init_internal(lock, "libxl-device-changes-lock");
+}
+
+static void ev_lock_prepare_fork(libxl__egc *egc, libxl__ev_slowlock *lock);
 static void ev_lock_child_callback(libxl__egc *egc, libxl__ev_child *child,
                                    pid_t pid, int status);
 
-void libxl__ev_devlock_lock(libxl__egc *egc, libxl__ev_devlock *lock)
+void libxl__ev_slowlock_lock(libxl__egc *egc, libxl__ev_slowlock *lock)
 {
     STATE_AO_GC(lock->ao);
     const char *lockfile;
 
     lockfile = libxl__userdata_path(gc, lock->domid,
-                                    "libxl-device-changes-lock", "l");
+                                    lock->userdata_userid, "l");
     if (!lockfile) goto out;
     lock->path = libxl__strdup(NOGC, lockfile);
 
@@ -603,7 +610,7 @@ out:
     lock->callback(egc, lock, ERROR_LOCK_FAIL);
 }
 
-static void ev_lock_prepare_fork(libxl__egc *egc, libxl__ev_devlock *lock)
+static void ev_lock_prepare_fork(libxl__egc *egc, libxl__ev_slowlock *lock)
 {
     STATE_AO_GC(lock->ao);
     pid_t pid;
@@ -670,7 +677,7 @@ static void ev_lock_prepare_fork(libxl__egc *egc, libxl__ev_devlock *lock)
     libxl_fd_set_cloexec(CTX, fd, 1);
     return;
 out:
-    libxl__ev_devlock_unlock(gc, lock);
+    libxl__ev_slowlock_unlock(gc, lock);
     lock->callback(egc, lock, ERROR_LOCK_FAIL);
 }
 
@@ -678,7 +685,7 @@ static void ev_lock_child_callback(libxl__egc *egc, libxl__ev_child *child,
                                    pid_t pid, int status)
 {
     EGC_GC;
-    libxl__ev_devlock *lock = CONTAINER_OF(child, *lock, child);
+    libxl__ev_slowlock *lock = CONTAINER_OF(child, *lock, child);
     struct stat stab, fstab;
     int rc = ERROR_LOCK_FAIL;
 
@@ -726,13 +733,14 @@ out:
             rc = ERROR_LOCK_FAIL;
     }
     if (rc) {
-        LOGD(ERROR, domid, "Failed to grab qmp-lock");
-        libxl__ev_devlock_unlock(gc, lock);
+        LOGD(ERROR, domid, "Failed to grab lock for %s",
+             lock->userdata_userid);
+        libxl__ev_slowlock_unlock(gc, lock);
     }
     lock->callback(egc, lock, rc);
 }
 
-void libxl__ev_devlock_unlock(libxl__gc *gc, libxl__ev_devlock *lock)
+void libxl__ev_slowlock_unlock(libxl__gc *gc, libxl__ev_slowlock *lock)
 {
     int r;
 
@@ -754,7 +762,7 @@ void libxl__ev_devlock_unlock(libxl__gc *gc, libxl__ev_devlock *lock)
         close(lock->fd);
     }
     free(lock->path);
-    libxl__ev_devlock_init(lock);
+    ev_slowlock_init_internal(lock, lock->userdata_userid);
 }
 
 /*

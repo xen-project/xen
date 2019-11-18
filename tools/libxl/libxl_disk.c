@@ -648,13 +648,13 @@ typedef struct {
     libxl_domid domid;
     libxl_device_disk *disk;
     libxl_device_disk disk_saved;
-    libxl__ev_devlock qmp_lock;
+    libxl__ev_slowlock qmp_lock;
     int dm_ver;
     libxl__ev_time time;
     libxl__ev_qmp qmp;
 } libxl__cdrom_insert_state;
 
-static void cdrom_insert_lock_acquired(libxl__egc *, libxl__ev_devlock *,
+static void cdrom_insert_lock_acquired(libxl__egc *, libxl__ev_slowlock *,
                                        int rc);
 static void cdrom_insert_ejected(libxl__egc *egc, libxl__ev_qmp *,
                                  const libxl__json_object *, int rc);
@@ -746,13 +746,13 @@ out:
         cdrom_insert_done(egc, cis, rc); /* must be last */
     } else {
         cis->qmp_lock.callback = cdrom_insert_lock_acquired;
-        libxl__ev_devlock_lock(egc, &cis->qmp_lock); /* must be last */
+        libxl__ev_slowlock_lock(egc, &cis->qmp_lock); /* must be last */
     }
     return AO_INPROGRESS;
 }
 
 static void cdrom_insert_lock_acquired(libxl__egc *egc,
-                                       libxl__ev_devlock *lock,
+                                       libxl__ev_slowlock *lock,
                                        int rc)
 {
     libxl__cdrom_insert_state *cis = CONTAINER_OF(lock, *cis, qmp_lock);
@@ -1052,7 +1052,7 @@ static void cdrom_insert_done(libxl__egc *egc,
     libxl__ev_time_deregister(gc, &cis->time);
     libxl__ev_qmp_dispose(gc, &cis->qmp);
     if (cis->qmp.payload_fd >= 0) close(cis->qmp.payload_fd);
-    libxl__ev_devlock_unlock(gc, &cis->qmp_lock);
+    libxl__ev_slowlock_unlock(gc, &cis->qmp_lock);
     libxl_device_disk_dispose(&cis->disk_saved);
     libxl__ao_complete(egc, cis->ao, rc);
 }

@@ -1874,12 +1874,12 @@ typedef struct {
     libxl__ev_qmp qmp;
     libxl__ev_time timeout;
     libxl_domain_config *d_config; /* user pointer */
-    libxl__ev_devlock devlock;
+    libxl__ev_slowlock devlock;
     libxl_bitmap qemuu_cpus;
 } retrieve_domain_configuration_state;
 
 static void retrieve_domain_configuration_lock_acquired(
-    libxl__egc *egc, libxl__ev_devlock *, int rc);
+    libxl__egc *egc, libxl__ev_slowlock *, int rc);
 static void retrieve_domain_configuration_cpu_queried(
     libxl__egc *egc, libxl__ev_qmp *qmp,
     const libxl__json_object *response, int rc);
@@ -1907,12 +1907,12 @@ int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
     rdcs->devlock.ao = ao;
     rdcs->devlock.domid = domid;
     rdcs->devlock.callback = retrieve_domain_configuration_lock_acquired;
-    libxl__ev_devlock_lock(egc, &rdcs->devlock);
+    libxl__ev_slowlock_lock(egc, &rdcs->devlock);
     return AO_INPROGRESS;
 }
 
 static void retrieve_domain_configuration_lock_acquired(
-    libxl__egc *egc, libxl__ev_devlock *devlock, int rc)
+    libxl__egc *egc, libxl__ev_slowlock *devlock, int rc)
 {
     retrieve_domain_configuration_state *rdcs =
         CONTAINER_OF(devlock, *rdcs, devlock);
@@ -2204,7 +2204,7 @@ static void retrieve_domain_configuration_end(libxl__egc *egc,
     }
 
 out:
-    libxl__ev_devlock_unlock(gc, &rdcs->devlock);
+    libxl__ev_slowlock_unlock(gc, &rdcs->devlock);
     if (lock) libxl__unlock_domain_userdata(lock);
     libxl_bitmap_dispose(&rdcs->qemuu_cpus);
     libxl__ev_qmp_dispose(gc, &rdcs->qmp);
