@@ -200,6 +200,7 @@ typedef struct libxl__ev_slowlock libxl__ev_slowlock;
 typedef struct libxl__dm_resume_state libxl__dm_resume_state;
 typedef struct libxl__ao_device libxl__ao_device;
 typedef struct libxl__multidev libxl__multidev;
+typedef struct libxl__ev_immediate libxl__ev_immediate;
 
 typedef struct libxl__domain_create_state libxl__domain_create_state;
 typedef void libxl__domain_create_cb(struct libxl__egc *egc,
@@ -362,6 +363,20 @@ struct libxl__ev_child {
     /* remainder is private for libxl__ev_... */
     LIBXL_LIST_ENTRY(struct libxl__ev_child) entry;
 };
+
+/* libxl__ev_immediate
+ *
+ * Allow to call a non-reentrant callback.
+ *
+ * `callback' will be called immediately as a new event.
+ */
+struct libxl__ev_immediate {
+    /* filled by user */
+    void (*callback)(libxl__egc *, libxl__ev_immediate *);
+    /* private to libxl__ev_immediate */
+    LIBXL_STAILQ_ENTRY(libxl__ev_immediate) entry;
+};
+void libxl__ev_immediate_register(libxl__egc *, libxl__ev_immediate *);
 
 /*
  * Lock for device hotplug, qmp_lock.
@@ -733,6 +748,7 @@ struct libxl__egc {
     struct libxl__event_list occurred_for_callback;
     LIBXL_TAILQ_HEAD(, libxl__ao) aos_for_callback;
     LIBXL_TAILQ_HEAD(, libxl__aop_occurred) aops_for_callback;
+    LIBXL_STAILQ_HEAD(, libxl__ev_immediate) ev_immediates;
 };
 
 struct libxl__aop_occurred {
@@ -2322,6 +2338,7 @@ _hidden libxl_device_model_version libxl__default_device_model(libxl__gc *gc);
         LIBXL_TAILQ_INIT(&(egc).occurred_for_callback); \
         LIBXL_TAILQ_INIT(&(egc).aos_for_callback);      \
         LIBXL_TAILQ_INIT(&(egc).aops_for_callback);     \
+        LIBXL_STAILQ_INIT(&(egc).ev_immediates);        \
     } while(0)
 
 _hidden void libxl__egc_cleanup(libxl__egc *egc);
