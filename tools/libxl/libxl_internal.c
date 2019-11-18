@@ -590,6 +590,11 @@ void libxl__ev_devlock_init(libxl__ev_slowlock *lock)
     ev_slowlock_init_internal(lock, "libxl-device-changes-lock");
 }
 
+void libxl__ev_qmplock_init(libxl__ev_slowlock *lock)
+{
+    ev_slowlock_init_internal(lock, "qmp-socket-lock");
+}
+
 static void ev_lock_prepare_fork(libxl__egc *egc, libxl__ev_slowlock *lock);
 static void ev_lock_child_callback(libxl__egc *egc, libxl__ev_child *child,
                                    pid_t pid, int status);

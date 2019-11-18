@@ -386,6 +386,9 @@ void libxl__ev_immediate_register(libxl__egc *, libxl__ev_immediate *);
  * which may take a significant amount time.
  * It is to be acquired by an ao event callback.
  *
+ * If libxl__ev_devlock is needed, it should be acquired while every
+ * libxl__ev_qmp are Idle for the current domain.
+ *
  * It is to be acquired when adding/removing devices or making changes
  * to them when this is a slow operation and json_lock isn't appropriate.
  *
@@ -426,6 +429,7 @@ struct libxl__ev_slowlock {
     bool held;
 };
 _hidden void libxl__ev_devlock_init(libxl__ev_slowlock *);
+_hidden void libxl__ev_qmplock_init(libxl__ev_slowlock *);
 _hidden void libxl__ev_slowlock_lock(libxl__egc *, libxl__ev_slowlock *);
 _hidden void libxl__ev_slowlock_unlock(libxl__gc *, libxl__ev_slowlock *);
 _hidden void libxl__ev_slowlock_dispose(libxl__gc *, libxl__ev_slowlock *);
@@ -494,6 +498,8 @@ _hidden void libxl__ev_qmp_dispose(libxl__gc *gc, libxl__ev_qmp *ev);
 typedef enum {
     /* initial state */
     qmp_state_disconnected = 1,
+    /* waiting for lock */
+    qmp_state_waiting_lock,
     /* connected to QMP socket, waiting for greeting message */
     qmp_state_connecting,
     /* qmp_capabilities command sent, waiting for reply */
@@ -527,6 +533,9 @@ struct libxl__ev_qmp {
     libxl__carefd *cfd;
     libxl__ev_fd efd;
     libxl__qmp_state state;
+    libxl__ev_slowlock lock;
+    libxl__ev_immediate ei;
+    int rc;
     int id;
     int next_id;        /* next id to use */
     /* receive buffer */

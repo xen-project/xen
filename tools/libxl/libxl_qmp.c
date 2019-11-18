@@ -1082,16 +1082,17 @@ static void dm_state_saved(libxl__egc *egc, libxl__ev_qmp *ev,
 /*
  * Possible internal state compared to qmp_state:
  *
- * qmp_state     External   cfd    efd     id     rx_buf* tx_buf* msg*
- * disconnected   Idle       NULL   Idle    reset  free    free    free
- * connecting     Active     open   IN      reset  used    free    set
- * cap.neg        Active     open   IN|OUT  sent   used    cap_neg set
- * cap.neg        Active     open   IN      sent   used    free    set
- * connected      Connected  open   IN      any    used    free    free
- * waiting_reply  Active     open   IN|OUT  sent   used    free    set
- * waiting_reply  Active     open   IN|OUT  sent   used    user's  free
- * waiting_reply  Active     open   IN      sent   used    free    free
- * broken[1]      none[2]    any    Active  any    any     any     any
+ * qmp_state     External   cfd    efd     id     rx_buf* tx_buf* msg* lock
+ * disconnected   Idle       NULL   Idle    reset  free    free    free Idle
+ * waiting_lock   Active     open   Idle    reset  used    free    set  Active
+ * connecting     Active     open   IN      reset  used    free    set  Acquired
+ * cap.neg        Active     open   IN|OUT  sent   used    cap_neg set  Acquired
+ * cap.neg        Active     open   IN      sent   used    free    set  Acquired
+ * connected      Connected  open   IN      any    used    free    free Acquired
+ * waiting_reply  Active     open   IN|OUT  sent   used    free    set  Acquired
+ * waiting_reply  Active     open   IN|OUT  sent   used    user's  free Acquired
+ * waiting_reply  Active     open   IN      sent   used    free    free Acquired
+ * broken[1]      none[2]    any    Active  any    any     any     any  any
  *
  * [1] When an internal function return an error, it can leave ev_qmp in a
  * `broken` state but only if the caller is another internal function.
@@ -1118,7 +1119,8 @@ static void dm_state_saved(libxl__egc *egc, libxl__ev_qmp *ev,
  *     msg_id           0     id assoctiated with the command in `msg`
  *
  * - Allowed internal state transition:
- * disconnected                     -> connecting
+ * disconnected                     -> waiting_lock
+ * waiting_lock                     -> connecting
  * connection                       -> capability_negotiation
  * capability_negotiation/connected -> waiting_reply
  * waiting_reply                    -> connected
@@ -1153,6 +1155,10 @@ static void qmp_ev_ensure_reading_writing(libxl__gc *gc, libxl__ev_qmp *ev)
 {
     short events = POLLIN;
 
+    if (ev->state == qmp_state_waiting_lock)
+        /* We can't modify the efd yet, as it isn't registered. */
+        return;
+
     if (ev->tx_buf)
         events |= POLLOUT;
     else if ((ev->state == qmp_state_waiting_reply) && ev->msg)
@@ -1168,8 +1174,11 @@ static void qmp_ev_set_state(libxl__gc *gc, libxl__ev_qmp *ev,
     switch (new_state) {
     case qmp_state_disconnected:
         break;
-    case qmp_state_connecting:
+    case qmp_state_waiting_lock:
         assert(ev->state == qmp_state_disconnected);
+        break;
+    case qmp_state_connecting:
+        assert(ev->state == qmp_state_waiting_lock);
         break;
     case qmp_state_capability_negotiation:
         assert(ev->state == qmp_state_connecting);
@@ -1231,20 +1240,22 @@ static int qmp_error_class_to_libxl_error_code(libxl__gc *gc,
 
 /* Setup connection */
 
-static int qmp_ev_connect(libxl__gc *gc, libxl__ev_qmp *ev)
-    /* disconnected -> connecting but with `msg` free
+static void qmp_ev_lock_aquired(libxl__egc *, libxl__ev_slowlock *,
+                                int rc);
+static void lock_error_callback(libxl__egc *, libxl__ev_immediate *);
+
+static int qmp_ev_connect(libxl__egc *egc, libxl__ev_qmp *ev)
+    /* disconnected -> waiting_lock/connecting but with `msg` free
      * on error: broken */
 {
+    EGC_GC;
     int fd;
-    int rc, r;
-    struct sockaddr_un un;
-    const char *qmp_socket_path;
+    int rc;
+
+    /* Convenience aliases */
+    libxl__ev_slowlock *lock = &ev->lock;
 
     assert(ev->state == qmp_state_disconnected);
-
-    qmp_socket_path = libxl__qemu_qmp_path(gc, ev->domid);
-
-    LOGD(DEBUG, ev->domid, "Connecting to %s", qmp_socket_path);
 
     libxl__carefd_begin();
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -1257,6 +1268,36 @@ static int qmp_ev_connect(libxl__gc *gc, libxl__ev_qmp *ev)
     rc = libxl_fd_set_nonblock(CTX, libxl__carefd_fd(ev->cfd), 1);
     if (rc)
         goto out;
+
+    qmp_ev_set_state(gc, ev, qmp_state_waiting_lock);
+
+    lock->ao = ev->ao;
+    lock->domid = ev->domid;
+    lock->callback = qmp_ev_lock_aquired;
+    libxl__ev_slowlock_lock(egc, &ev->lock);
+
+    return 0;
+
+out:
+    return rc;
+}
+
+static void qmp_ev_lock_aquired(libxl__egc *egc, libxl__ev_slowlock *lock,
+                                int rc)
+    /* waiting_lock (with `lock' Acquired) -> connecting
+     * on error: broken */
+{
+    libxl__ev_qmp *ev = CONTAINER_OF(lock, *ev, lock);
+    EGC_GC;
+    const char *qmp_socket_path;
+    struct sockaddr_un un;
+    int r;
+
+    if (rc) goto out;
+
+    qmp_socket_path = libxl__qemu_qmp_path(gc, ev->domid);
+
+    LOGD(DEBUG, ev->domid, "Connecting to %s", qmp_socket_path);
 
     rc = libxl__prepare_sockaddr_un(gc, &un, qmp_socket_path,
                                     "QMP socket");
@@ -1279,10 +1320,33 @@ static int qmp_ev_connect(libxl__gc *gc, libxl__ev_qmp *ev)
 
     qmp_ev_set_state(gc, ev, qmp_state_connecting);
 
-    return 0;
+    return;
 
 out:
-    return rc;
+    /* An error occurred and we need to let the caller know.  At this
+     * point, we can only do so via the callback. Unfortunately, the
+     * callback of libxl__ev_slowlock_lock() might be called synchronously,
+     * but libxl__ev_qmp_send() promise that it will not call the callback
+     * synchronously. So we have to arrange to call the callback
+     * asynchronously. */
+    ev->rc = rc;
+    ev->ei.callback = lock_error_callback;
+    libxl__ev_immediate_register(egc, &ev->ei);
+}
+
+static void lock_error_callback(libxl__egc *egc, libxl__ev_immediate *ei)
+    /* broken -> disconnected */
+{
+    EGC_GC;
+    libxl__ev_qmp *ev = CONTAINER_OF(ei, *ev, ei);
+
+    int rc = ev->rc;
+
+    /* On error, deallocate all private resources */
+    libxl__ev_qmp_dispose(gc, ev);
+
+    /* And tell libxl__ev_qmp user about the error */
+    ev->callback(egc, ev, NULL, rc); /* must be last */
 }
 
 /* QMP FD callbacks */
@@ -1779,11 +1843,14 @@ void libxl__ev_qmp_init(libxl__ev_qmp *ev)
     ev->qemu_version.major = -1;
     ev->qemu_version.minor = -1;
     ev->qemu_version.micro = -1;
+
+    libxl__ev_qmplock_init(&ev->lock);
+    ev->rc = 0;
 }
 
 int libxl__ev_qmp_send(libxl__egc *egc, libxl__ev_qmp *ev,
                        const char *cmd, libxl__json_object *args)
-    /* disconnected -> connecting
+    /* disconnected -> waiting_lock/connecting
      * connected -> waiting_reply (with msg set)
      * on error: disconnected */
 {
@@ -1798,7 +1865,7 @@ int libxl__ev_qmp_send(libxl__egc *egc, libxl__ev_qmp *ev,
 
     /* Connect to QEMU if not already connected */
     if (ev->state == qmp_state_disconnected) {
-        rc = qmp_ev_connect(gc, ev);
+        rc = qmp_ev_connect(egc, ev);
         if (rc)
             goto error;
     }
@@ -1830,6 +1897,7 @@ void libxl__ev_qmp_dispose(libxl__gc *gc, libxl__ev_qmp *ev)
 
     libxl__ev_fd_deregister(gc, &ev->efd);
     libxl__carefd_close(ev->cfd);
+    libxl__ev_slowlock_dispose(gc, &ev->lock);
 
     libxl__ev_qmp_init(ev);
 }
