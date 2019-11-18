@@ -776,7 +776,7 @@ static void cdrom_insert_lock_acquired(libxl__egc *egc,
 
         QMP_PARAMETERS_SPRINTF(&args, "device", "ide-%i", devid);
         cis->qmp.callback = cdrom_insert_ejected;
-        rc = libxl__ev_qmp_send(gc, &cis->qmp, "eject", args);
+        rc = libxl__ev_qmp_send(egc, &cis->qmp, "eject", args);
         if (rc) goto out;
     } else {
         cdrom_insert_ejected(egc, &cis->qmp, NULL, 0); /* must be last */
@@ -884,7 +884,7 @@ static void cdrom_insert_ejected(libxl__egc *egc,
                                libxl_disk_format_to_string(disk->format),
                                disk->pdev_path);
         qmp->callback = cdrom_insert_addfd_cb;
-        rc = libxl__ev_qmp_send(gc, qmp, "add-fd", args);
+        rc = libxl__ev_qmp_send(egc, qmp, "add-fd", args);
         if (rc) goto out;
         has_callback = true;
     } else {
@@ -938,7 +938,7 @@ static void cdrom_insert_addfd_cb(libxl__egc *egc,
     libxl__qmp_param_add_string(gc, &args, "arg",
         libxl__qemu_disk_format_string(disk->format));
     qmp->callback = cdrom_insert_inserted;
-    rc = libxl__ev_qmp_send(gc, qmp, "change", args);
+    rc = libxl__ev_qmp_send(egc, qmp, "change", args);
 out:
     if (rc)
         cdrom_insert_done(egc, cis, rc); /* must be last */

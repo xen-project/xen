@@ -2649,7 +2649,7 @@ retry_transaction:
         dmss->qmp.callback = device_model_qmp_cb;
         dmss->qmp.domid = domid;
         dmss->qmp.payload_fd = -1;
-        rc = libxl__ev_qmp_send(gc, &dmss->qmp, "query-status", NULL);
+        rc = libxl__ev_qmp_send(egc, &dmss->qmp, "query-status", NULL);
         if (rc) goto out_close;
     }
 
@@ -2807,7 +2807,7 @@ static void device_model_spawn_outcome(libxl__egc *egc,
         dmss->qmp.domid = dmss->guest_domid;
         dmss->qmp.payload_fd = -1;
         dmss->qmp.callback = device_model_postconfig_chardev;
-        rc = libxl__ev_qmp_send(gc, &dmss->qmp, "query-chardev", NULL);
+        rc = libxl__ev_qmp_send(egc, &dmss->qmp, "query-chardev", NULL);
         if (rc) goto out;
         return;
     }
@@ -2879,7 +2879,7 @@ static void device_model_postconfig_chardev(libxl__egc *egc,
     }
 
     qmp->callback = device_model_postconfig_vnc;
-    rc = libxl__ev_qmp_send(gc, qmp, "query-vnc", NULL);
+    rc = libxl__ev_qmp_send(egc, qmp, "query-vnc", NULL);
     if (rc) goto out;
     return;
 
@@ -2939,7 +2939,7 @@ static void device_model_postconfig_vnc(libxl__egc *egc,
     if (vnc && vnc->passwd && vnc->passwd[0]) {
         qmp->callback = device_model_postconfig_vnc_passwd;
         libxl__qmp_param_add_string(gc, &args, "password", vnc->passwd);
-        rc = libxl__ev_qmp_send(gc, qmp, "change-vnc-password", args);
+        rc = libxl__ev_qmp_send(egc, qmp, "change-vnc-password", args);
         if (rc) goto out;
         return;
     }

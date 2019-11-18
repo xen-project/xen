@@ -472,7 +472,7 @@ typedef void libxl__ev_qmp_callback(libxl__egc *egc, libxl__ev_qmp *ev,
                                     int rc);
 
 _hidden void libxl__ev_qmp_init(libxl__ev_qmp *ev);
-_hidden int libxl__ev_qmp_send(libxl__gc *gc, libxl__ev_qmp *ev,
+_hidden int libxl__ev_qmp_send(libxl__egc *egc, libxl__ev_qmp *ev,
                                const char *cmd, libxl__json_object *args);
 _hidden void libxl__ev_qmp_dispose(libxl__gc *gc, libxl__ev_qmp *ev);
 

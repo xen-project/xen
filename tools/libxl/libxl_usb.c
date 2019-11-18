@@ -349,9 +349,10 @@ static char *pvusb_get_device_type(libxl_usbctrl_type type)
  * - usb-ehci       (version=2), always 6 ports
  * - nec-usb-xhci   (version=3), up to 15 ports
  */
-static int libxl__device_usbctrl_add_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
+static int libxl__device_usbctrl_add_hvm(libxl__egc *egc, libxl__ev_qmp *qmp,
                                          libxl_device_usbctrl *usbctrl)
 {
+    EGC_GC;
     libxl__json_object *qmp_args = NULL;
 
     switch (usbctrl->version) {
@@ -378,26 +379,28 @@ static int libxl__device_usbctrl_add_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
     libxl__qmp_param_add_string(gc, &qmp_args, "id",
                                 GCSPRINTF("xenusb-%d", usbctrl->devid));
 
-    return libxl__ev_qmp_send(gc, qmp, "device_add", qmp_args);
+    return libxl__ev_qmp_send(egc, qmp, "device_add", qmp_args);
 }
 
 /* Send qmp commands to delete a usb controller in qemu.  */
-static int libxl__device_usbctrl_del_hvm(libxl__gc *gc,
+static int libxl__device_usbctrl_del_hvm(libxl__egc *egc,
                                          libxl__ev_qmp *qmp,
                                          int devid)
 {
+    EGC_GC;
     libxl__json_object *qmp_args = NULL;
 
     libxl__qmp_param_add_string(gc, &qmp_args,
                                 "id", GCSPRINTF("xenusb-%d", devid));
 
-    return libxl__ev_qmp_send(gc, qmp, "device_del", qmp_args);
+    return libxl__ev_qmp_send(egc, qmp, "device_del", qmp_args);
 }
 
 /* Send qmp commands to create a usb device in qemu. */
-static int libxl__device_usbdev_add_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
+static int libxl__device_usbdev_add_hvm(libxl__egc *egc, libxl__ev_qmp *qmp,
                                         libxl_device_usbdev *usbdev)
 {
+    EGC_GC;
     libxl__json_object *qmp_args = NULL;
 
     libxl__qmp_param_add_string(gc, &qmp_args, "id",
@@ -413,20 +416,21 @@ static int libxl__device_usbdev_add_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
     libxl__qmp_param_add_string(gc, &qmp_args, "hostaddr",
         GCSPRINTF("%d", usbdev->u.hostdev.hostaddr));
 
-    return libxl__ev_qmp_send(gc, qmp, "device_add", qmp_args);
+    return libxl__ev_qmp_send(egc, qmp, "device_add", qmp_args);
 }
 
 /* Send qmp commands to delete a usb device in qemu. */
-static int libxl__device_usbdev_del_hvm(libxl__gc *gc, libxl__ev_qmp *qmp,
+static int libxl__device_usbdev_del_hvm(libxl__egc *egc, libxl__ev_qmp *qmp,
                                         libxl_device_usbdev *usbdev)
 {
+    EGC_GC;
     libxl__json_object *qmp_args = NULL;
 
     libxl__qmp_param_add_string(gc, &qmp_args, "id",
         GCSPRINTF("xenusb-%d-%d", usbdev->u.hostdev.hostbus,
                   usbdev->u.hostdev.hostaddr));
 
-    return libxl__ev_qmp_send(gc, qmp, "device_del", qmp_args);
+    return libxl__ev_qmp_send(egc, qmp, "device_del", qmp_args);
 }
 
 static LIBXL_DEFINE_UPDATE_DEVID(usbctrl)
@@ -490,7 +494,7 @@ static void libxl__device_usbctrl_add(libxl__egc *egc, uint32_t domid,
         qmp->domid = domid;
         qmp->payload_fd = -1;
         qmp->callback = device_usbctrl_add_qmp_cb;
-        rc = libxl__device_usbctrl_add_hvm(gc, qmp, usbctrl);
+        rc = libxl__device_usbctrl_add_hvm(egc, qmp, usbctrl);
         if (rc) goto outrm;
         return;
     }
@@ -647,7 +651,7 @@ static void device_usbctrl_usbdevs_removed(libxl__egc *egc,
         qmp->domid = aodev->dev->domid;
         qmp->callback = device_usbctrl_remove_qmp_cb;
         qmp->payload_fd = -1;
-        rc = libxl__device_usbctrl_del_hvm(gc, qmp, aodev->dev->devid);
+        rc = libxl__device_usbctrl_del_hvm(egc, qmp, aodev->dev->devid);
         if (rc) goto out;
         return;
     }
@@ -1797,7 +1801,7 @@ static void libxl__device_usbdev_add(libxl__egc *egc, uint32_t domid,
         aodev->qmp.domid = domid;
         aodev->qmp.callback = device_usbdev_add_qmp_cb;
         aodev->qmp.payload_fd = -1;
-        rc = libxl__device_usbdev_add_hvm(gc, &aodev->qmp, usbdev);
+        rc = libxl__device_usbdev_add_hvm(egc, &aodev->qmp, usbdev);
         if (rc) {
             libxl__device_usbdev_remove_xenstore(gc, domid, usbdev,
                                              LIBXL_USBCTRL_TYPE_DEVICEMODEL);
@@ -1979,7 +1983,7 @@ static void libxl__device_usbdev_remove(libxl__egc *egc, uint32_t domid,
         aodev->qmp.domid = domid;
         aodev->qmp.callback = device_usbdev_remove_qmp_cb;
         aodev->qmp.payload_fd = -1;
-        rc = libxl__device_usbdev_del_hvm(gc, &aodev->qmp, usbdev);
+        rc = libxl__device_usbdev_del_hvm(egc, &aodev->qmp, usbdev);
         if (rc) {
             libxl__device_usbdev_add_xenstore(gc, domid, usbdev,
                                               LIBXL_USBCTRL_TYPE_DEVICEMODEL,

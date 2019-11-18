@@ -924,7 +924,7 @@ int libxl_qemu_monitor_command(libxl_ctx *ctx, uint32_t domid,
     qmcs->qmp.callback = qemu_monitor_command_done;
     qmcs->output = output;
     libxl__qmp_param_add_string(gc, &args, "command-line", command_line);
-    rc = libxl__ev_qmp_send(gc, &qmcs->qmp, "human-monitor-command", args);
+    rc = libxl__ev_qmp_send(egc, &qmcs->qmp, "human-monitor-command", args);
 out:
     if (rc) return AO_CREATE_FAIL(rc);
     return AO_INPROGRESS;
@@ -978,7 +978,7 @@ void libxl__qmp_suspend_save(libxl__egc *egc,
     ev->callback = dm_stopped;
     ev->payload_fd = -1;
 
-    rc = libxl__ev_qmp_send(gc, ev, "stop", NULL);
+    rc = libxl__ev_qmp_send(egc, ev, "stop", NULL);
     if (rc)
         goto error;
 
@@ -1007,7 +1007,7 @@ static void dm_stopped(libxl__egc *egc, libxl__ev_qmp *ev,
     }
 
     ev->callback = dm_state_fd_ready;
-    rc = libxl__ev_qmp_send(gc, ev, "add-fd", NULL);
+    rc = libxl__ev_qmp_send(egc, ev, "add-fd", NULL);
     if (rc)
         goto error;
 
@@ -1052,7 +1052,7 @@ static void dm_state_fd_ready(libxl__egc *egc, libxl__ev_qmp *ev,
     if (qmp_ev_qemu_compare_version(ev, 2, 11, 0) >= 0)
         libxl__qmp_param_add_bool(gc, &args, "live", dsps->live);
     QMP_PARAMETERS_SPRINTF(&args, "filename", "/dev/fdset/%d", fdset);
-    rc = libxl__ev_qmp_send(gc, ev, "xen-save-devices-state", args);
+    rc = libxl__ev_qmp_send(egc, ev, "xen-save-devices-state", args);
     if (rc)
         goto error;
 
@@ -1781,7 +1781,7 @@ void libxl__ev_qmp_init(libxl__ev_qmp *ev)
     ev->qemu_version.micro = -1;
 }
 
-int libxl__ev_qmp_send(libxl__gc *unused_gc, libxl__ev_qmp *ev,
+int libxl__ev_qmp_send(libxl__egc *egc, libxl__ev_qmp *ev,
                        const char *cmd, libxl__json_object *args)
     /* disconnected -> connecting
      * connected -> waiting_reply (with msg set)

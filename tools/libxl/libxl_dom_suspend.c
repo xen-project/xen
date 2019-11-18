@@ -545,7 +545,7 @@ void libxl__dm_resume(libxl__egc *egc,
         qmp->domid = domid;
         qmp->callback = dm_resume_qmp_done;
         qmp->payload_fd = -1;
-        rc = libxl__ev_qmp_send(gc, qmp, "cont", NULL);
+        rc = libxl__ev_qmp_send(egc, qmp, "cont", NULL);
         if (rc) goto out;
         break;
     default:

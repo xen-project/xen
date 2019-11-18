@@ -226,7 +226,7 @@ static void domain_suspend_switch_qemu_xen_logdirty
     qmp->payload_fd = -1;
     qmp->callback = switch_qemu_xen_logdirty_done;
     libxl__qmp_param_add_bool(gc, &args, "enable", enable);
-    rc = libxl__ev_qmp_send(gc, qmp, "xen-set-global-dirty-log", args);
+    rc = libxl__ev_qmp_send(egc, qmp, "xen-set-global-dirty-log", args);
     if (rc) goto out;
 
     return;

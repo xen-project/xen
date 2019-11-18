@@ -1600,7 +1600,7 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid,
                                              LIBXL_QMP_CMD_TIMEOUT * 1000);
             if (rc) goto out;
             qmp->callback = set_vcpuonline_qmp_cpus_queried;
-            rc = libxl__ev_qmp_send(gc, qmp, "query-cpus", NULL);
+            rc = libxl__ev_qmp_send(egc, qmp, "query-cpus", NULL);
             if (rc) goto out;
             return AO_INPROGRESS;
         default:
@@ -1666,7 +1666,7 @@ static void set_vcpuonline_qmp_add_cpu(libxl__egc *egc,
         if (libxl_bitmap_test(map, svos->index)) {
             qmp->callback = set_vcpuonline_qmp_add_cpu;
             libxl__qmp_param_add_integer(gc, &args, "id", svos->index);
-            rc = libxl__ev_qmp_send(gc, qmp, "cpu-add", args);
+            rc = libxl__ev_qmp_send(egc, qmp, "cpu-add", args);
             if (rc) goto out;
             return;
         }
@@ -1740,7 +1740,7 @@ static void domain_s3_resume(libxl__ao *ao, libxl__egc *egc, int domid)
             }
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            rc = libxl__ev_qmp_send(gc, qmp, "system_wakeup", NULL);
+            rc = libxl__ev_qmp_send(egc, qmp, "system_wakeup", NULL);
             if (rc) goto out;
             return;
         default:
@@ -1958,7 +1958,7 @@ static void retrieve_domain_configuration_lock_acquired(
         libxl_bitmap_alloc(CTX, &rdcs->qemuu_cpus,
                            d_config->b_info.max_vcpus);
         rdcs->qmp.callback = retrieve_domain_configuration_cpu_queried;
-        rc = libxl__ev_qmp_send(gc, &rdcs->qmp, "query-cpus", NULL);
+        rc = libxl__ev_qmp_send(egc, &rdcs->qmp, "query-cpus", NULL);
         if (rc) goto out;
         has_callback = true;
     }

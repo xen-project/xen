@@ -1186,7 +1186,7 @@ static void pci_add_qmp_device_add(libxl__egc *egc, pci_add_state *pas)
     qmp->domid = domid;
     qmp->payload_fd = -1;
     qmp->callback = pci_add_qmp_device_add_cb;
-    rc = libxl__ev_qmp_send(gc, qmp, "device_add", args);
+    rc = libxl__ev_qmp_send(egc, qmp, "device_add", args);
     if (rc) goto out;
     return;
 
@@ -1205,7 +1205,7 @@ static void pci_add_qmp_device_add_cb(libxl__egc *egc,
     if (rc) goto out;
 
     qmp->callback = pci_add_qmp_query_pci_cb;
-    rc = libxl__ev_qmp_send(gc, qmp, "query-pci", NULL);
+    rc = libxl__ev_qmp_send(egc, qmp, "query-pci", NULL);
     if (rc) goto out;
     return;
 
@@ -2020,7 +2020,7 @@ static void pci_remove_qmp_device_del(libxl__egc *egc,
     QMP_PARAMETERS_SPRINTF(&args, "id", PCI_PT_QDEV_ID,
                            pcidev->bus, pcidev->dev, pcidev->func);
     prs->qmp.callback = pci_remove_qmp_device_del_cb;
-    rc = libxl__ev_qmp_send(gc, &prs->qmp, "device_del", args);
+    rc = libxl__ev_qmp_send(egc, &prs->qmp, "device_del", args);
     if (rc) goto out;
     return;
 
@@ -2059,7 +2059,7 @@ static void pci_remove_qmp_retry_timer_cb(libxl__egc *egc, libxl__ev_time *ev,
     pci_remove_state *prs = CONTAINER_OF(ev, *prs, retry_timer);
 
     prs->qmp.callback = pci_remove_qmp_query_cb;
-    rc = libxl__ev_qmp_send(gc, &prs->qmp, "query-pci", NULL);
+    rc = libxl__ev_qmp_send(egc, &prs->qmp, "query-pci", NULL);
     if (rc) goto out;
     return;
 
