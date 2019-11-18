@@ -364,6 +364,54 @@ struct libxl__ev_child {
 };
 
 /*
+ * Lock for device hotplug, qmp_lock.
+ *
+ * libxl__ev_devlock implement a lock that is outside of CTX_LOCK in the
+ * lock hierarchy. It can be used when one want to make QMP calls to QEMU,
+ * which may take a significant amount time.
+ * It is to be acquired by an ao event callback.
+ *
+ * It is to be acquired when adding/removing devices or making changes
+ * to them when this is a slow operation and json_lock isn't appropriate.
+ *
+ * Possible states of libxl__ev_devlock:
+ *   Undefined
+ *    Might contain anything.
+ *  Idle
+ *    Struct contents are defined enough to pass to any
+ *    libxl__ev_devlock_* function.
+ *    The struct does not contain references to any allocated private
+ *    resources so can be thrown away.
+ *  Active
+ *    Waiting to get a lock.
+ *    Needs to wait until the callback is called.
+ *  LockAcquired
+ *    libxl__ev_devlock_unlock will need to be called to release the lock
+ *    and the resources of libxl__ev_devlock.
+ *
+ *  libxl__ev_devlock_init: Undefined/Idle -> Idle
+ *  libxl__ev_devlock_lock: Idle -> Active
+ *    May call callback synchronously.
+ *  libxl__ev_devlock_unlock: LockAcquired/Idle -> Idle
+ *  callback:     When called: Active -> LockAcquired (on error: Idle)
+ *    The callback is only called once.
+ */
+struct libxl__ev_devlock {
+    /* filled by user */
+    libxl__ao *ao;
+    libxl_domid domid;
+    void (*callback)(libxl__egc *, libxl__ev_devlock *, int rc);
+    /* private to libxl__ev_devlock* */
+    libxl__ev_child child;
+    char *path; /* path of the lock file itself */
+    int fd;
+    bool held;
+};
+_hidden void libxl__ev_devlock_init(libxl__ev_devlock *);
+_hidden void libxl__ev_devlock_lock(libxl__egc *, libxl__ev_devlock *);
+_hidden void libxl__ev_devlock_unlock(libxl__gc *, libxl__ev_devlock *);
+
+/*
  * QMP asynchronous calls
  *
  * This facility allows a command to be sent to QEMU, and the response
@@ -4688,54 +4736,6 @@ static inline const char *libxl__qemu_qmp_path(libxl__gc *gc, int domid)
 {
     return GCSPRINTF("%s/qmp-libxl-%d", libxl__run_dir_path(), domid);
 }
-
-/*
- * Lock for device hotplug, qmp_lock.
- *
- * libxl__ev_devlock implement a lock that is outside of CTX_LOCK in the
- * lock hierarchy. It can be used when one want to make QMP calls to QEMU,
- * which may take a significant amount time.
- * It is to be acquired by an ao event callback.
- *
- * It is to be acquired when adding/removing devices or making changes
- * to them when this is a slow operation and json_lock isn't appropriate.
- *
- * Possible states of libxl__ev_devlock:
- *   Undefined
- *    Might contain anything.
- *  Idle
- *    Struct contents are defined enough to pass to any
- *    libxl__ev_devlock_* function.
- *    The struct does not contain references to any allocated private
- *    resources so can be thrown away.
- *  Active
- *    Waiting to get a lock.
- *    Needs to wait until the callback is called.
- *  LockAcquired
- *    libxl__ev_devlock_unlock will need to be called to release the lock
- *    and the resources of libxl__ev_devlock.
- *
- *  libxl__ev_devlock_init: Undefined/Idle -> Idle
- *  libxl__ev_devlock_lock: Idle -> Active
- *    May call callback synchronously.
- *  libxl__ev_devlock_unlock: LockAcquired/Idle -> Idle
- *  callback:     When called: Active -> LockAcquired (on error: Idle)
- *    The callback is only called once.
- */
-struct libxl__ev_devlock {
-    /* filled by user */
-    libxl__ao *ao;
-    libxl_domid domid;
-    void (*callback)(libxl__egc *, libxl__ev_devlock *, int rc);
-    /* private to libxl__ev_devlock* */
-    libxl__ev_child child;
-    char *path; /* path of the lock file itself */
-    int fd;
-    bool held;
-};
-_hidden void libxl__ev_devlock_init(libxl__ev_devlock *);
-_hidden void libxl__ev_devlock_lock(libxl__egc *, libxl__ev_devlock *);
-_hidden void libxl__ev_devlock_unlock(libxl__gc *, libxl__ev_devlock *);
 
 /* Send control commands over xenstore and wait for an Ack. */
 _hidden int libxl__domain_pvcontrol(libxl__egc *egc,
