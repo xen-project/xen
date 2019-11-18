@@ -1878,6 +1878,9 @@ void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
     ao->complete = 1;
     ao->rc = rc;
     LIBXL_LIST_REMOVE(ao, inprogress_entry);
+    if (ao->outstanding_killed_child)
+        LOG(DEBUG, "ao %p: .. but waiting for %d fork to exit",
+            ao, ao->outstanding_killed_child);
     libxl__ao_complete_check_progress_reports(egc, ao);
 }
 
@@ -1891,7 +1894,8 @@ static bool ao_work_outstanding(libxl__ao *ao)
      * decrement progress_reports_outstanding, and call
      * libxl__ao_complete_check_progress_reports.
      */
-    return !ao->complete || ao->progress_reports_outstanding;
+    return !ao->complete || ao->progress_reports_outstanding
+        || ao->outstanding_killed_child;
 }
 
 void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)

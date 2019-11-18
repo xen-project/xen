@@ -730,6 +730,7 @@ struct libxl__ao {
     libxl__poller *poller;
     uint32_t domid;
     LIBXL_TAILQ_ENTRY(libxl__ao) entry_for_callback;
+    int outstanding_killed_child;
 };
 
 #define LIBXL_INIT_GC(gc,ctx) do{               \
@@ -1155,9 +1156,14 @@ _hidden int libxl__ctx_evtchn_init(libxl__gc *gc); /* for libxl_ctx_alloc */
  * The parent may signal the child but it must not reap it.  That will
  * be done by the event machinery.
  *
- * It is not possible to "deregister" the child death event source.
- * It will generate exactly one event callback; until then the childw
- * is Active and may not be reused.
+ * The child death event will generate exactly one event callback; until
+ * then the childw is Active and may not be reused.
+ *
+ * libxl__ev_child_kill_deregister: Active -> Idle
+ *   This will transfer ownership of the child process death event from
+ *   `ch' to `ao', thus deregister the callback.
+ *   The `ao' completion will wait until the child have been reaped by the
+ *   event machinery.
  */
 _hidden pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *childw_out,
                                  libxl__ev_child_callback *death);
@@ -1165,6 +1171,9 @@ static inline void libxl__ev_child_init(libxl__ev_child *childw_out)
                 { childw_out->pid = -1; }
 static inline int libxl__ev_child_inuse(const libxl__ev_child *childw_out)
                 { return childw_out->pid >= 0; }
+_hidden void libxl__ev_child_kill_deregister(libxl__ao *ao,
+                                             libxl__ev_child *ch,
+                                             int sig);
 
 /* Useable (only) in the child to once more make the ctx useable for
  * xenstore operations.  logs failure in the form "what: <error

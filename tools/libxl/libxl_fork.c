@@ -678,6 +678,54 @@ int libxl__ev_child_xenstore_reopen(libxl__gc *gc, const char *what) {
     return rc;
 }
 
+typedef struct ev_child_killed {
+    libxl__ao *ao;
+    libxl__ev_child ch;
+} ev_child_killed;
+static void deregistered_child_callback(libxl__egc *, libxl__ev_child *,
+                                        pid_t, int status);
+
+void libxl__ev_child_kill_deregister(libxl__ao *ao, libxl__ev_child *ch,
+                                     int sig)
+{
+    AO_GC;
+
+    if (!libxl__ev_child_inuse(ch))
+        return;
+
+    pid_t pid = ch->pid;
+
+    ev_child_killed *new_ch = GCNEW(new_ch);
+    new_ch->ao = ao;
+    new_ch->ch.pid = pid;
+    new_ch->ch.callback = deregistered_child_callback;
+    LIBXL_LIST_INSERT_HEAD(&CTX->children, &new_ch->ch, entry);
+    ao->outstanding_killed_child++;
+
+    LIBXL_LIST_REMOVE(ch, entry);
+    ch->pid = -1;
+    int r = kill(pid, sig);
+    if (r)
+        LOGED(ERROR, ao->domid,
+              "failed to kill child [%ld] with signal %d",
+             (unsigned long)pid, sig);
+}
+
+static void deregistered_child_callback(libxl__egc *egc,
+                                        libxl__ev_child *ch,
+                                        pid_t pid,
+                                        int status)
+{
+    ev_child_killed *ck = CONTAINER_OF(ch, *ck, ch);
+    EGC_GC;
+
+    libxl_report_child_exitstatus(CTX, XTL_ERROR,
+                                  "killed fork (dying as expected)",
+                                  pid, status);
+    ck->ao->outstanding_killed_child--;
+    libxl__ao_complete_check_progress_reports(egc, ck->ao);
+}
+
 /*
  * Local variables:
  * mode: C
