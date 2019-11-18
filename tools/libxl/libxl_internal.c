@@ -765,6 +765,12 @@ void libxl__ev_slowlock_unlock(libxl__gc *gc, libxl__ev_slowlock *lock)
     ev_slowlock_init_internal(lock, lock->userdata_userid);
 }
 
+void libxl__ev_slowlock_dispose(libxl__gc *gc, libxl__ev_slowlock *lock)
+{
+    libxl__ev_child_kill_deregister(lock->ao, &lock->child, SIGKILL);
+    libxl__ev_slowlock_unlock(gc, lock);
+}
+
 /*
  * Local variables:
  * mode: C

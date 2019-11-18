@@ -393,6 +393,8 @@ struct libxl__ev_child {
  *  libxl__ev_slowlock_lock: Idle -> Active
  *    May call callback synchronously.
  *  libxl__ev_slowlock_unlock: LockAcquired/Idle -> Idle
+ *  libxl__ev_slowlock_dispose: Idle/Active/LockAcquired -> Idle
+ *    The callback will not be called anymore.
  *  callback:     When called: Active -> LockAcquired (on error: Idle)
  *    The callback is only called once.
  */
@@ -411,6 +413,7 @@ struct libxl__ev_slowlock {
 _hidden void libxl__ev_devlock_init(libxl__ev_slowlock *);
 _hidden void libxl__ev_slowlock_lock(libxl__egc *, libxl__ev_slowlock *);
 _hidden void libxl__ev_slowlock_unlock(libxl__gc *, libxl__ev_slowlock *);
+_hidden void libxl__ev_slowlock_dispose(libxl__gc *, libxl__ev_slowlock *);
 
 /*
  * QMP asynchronous calls
