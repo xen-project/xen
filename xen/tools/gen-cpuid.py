@@ -205,9 +205,10 @@ def crunch_numbers(state):
         # than to SSE.
         SSE2: [SSE3, LM, AESNI, PCLMULQDQ, SHA, GFNI],
 
-        # Other SSEn each depend on their predecessor versions.
-        SSE3: [SSSE3],
-        SSSE3: [SSE4_1, SSE4A],
+        # Other SSEn each depend on their predecessor versions.  AMD
+        # Lisbon/Magny-Cours processors implemented SSE4A without SSSE3.
+        SSE3: [SSSE3, SSE4A],
+        SSSE3: [SSE4_1],
         SSE4_1: [SSE4_2],
 
         # AMD specify no relationship between POPCNT and SSE4.2.  Intel
