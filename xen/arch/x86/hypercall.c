@@ -157,6 +157,7 @@ unsigned long hypercall_create_continuation(
     return op;
 
  bad_fmt:
+    va_end(args);
     gprintk(XENLOG_ERR, "Bad hypercall continuation format '%c'\n", *p);
     ASSERT_UNREACHABLE();
     domain_crash(curr->domain);
