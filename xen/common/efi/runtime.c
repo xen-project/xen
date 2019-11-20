@@ -211,6 +211,8 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
         break;
     case XEN_FW_EFI_RT_VERSION:
     {
+        if ( !efi_enabled(EFI_RS) )
+            return -EOPNOTSUPP;
         info->version = efi_rs->Hdr.Revision;
         break;
     }
@@ -613,7 +615,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
             break;
         }
 
-        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
+        if ( !efi_enabled(EFI_RS) || (efi_rs->Hdr.Revision >> 16) < 2 )
             return -EOPNOTSUPP;
         state = efi_rs_enter();
         if ( !state.cr3 )
@@ -631,7 +633,7 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         if ( op->misc )
             return -EINVAL;
 
-        if ( (efi_rs->Hdr.Revision >> 16) < 2 )
+        if ( !efi_enabled(EFI_RS) || (efi_rs->Hdr.Revision >> 16) < 2 )
             return -EOPNOTSUPP;
         /* XXX fall through for now */
     default:
