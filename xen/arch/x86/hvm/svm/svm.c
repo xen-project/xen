@@ -2794,7 +2794,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
          */
         vmcb->eventinj.bytes = 0;
 
-        hvm_task_switch((uint16_t)vmcb->exitinfo1, reason, errcode);
+        hvm_task_switch(vmcb->exitinfo1, reason, errcode, 0);
         break;
     }
 

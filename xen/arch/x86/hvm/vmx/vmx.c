@@ -3962,8 +3962,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             __vmread(IDT_VECTORING_ERROR_CODE, &ecode);
         else
              ecode = -1;
-        regs->rip += inst_len;
-        hvm_task_switch((uint16_t)exit_qualification, reasons[source], ecode);
+
+        hvm_task_switch(exit_qualification, reasons[source], ecode, inst_len);
         break;
     }
     case EXIT_REASON_CPUID:
