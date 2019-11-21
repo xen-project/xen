@@ -31,6 +31,7 @@
 #include <asm/xstate.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vvmx.h>
@@ -97,6 +98,7 @@ custom_param("ept", parse_ept_param);
 
 static int parse_ept_param_runtime(const char *s)
 {
+    struct domain *d;
     int val;
 
     if ( !cpu_has_vmx_ept || !hvm_funcs.hap_supported ||
@@ -110,18 +112,31 @@ static int parse_ept_param_runtime(const char *s)
     if ( (val = parse_boolean("exec-sp", s, NULL)) < 0 )
         return -EINVAL;
 
-    if ( val != opt_ept_exec_sp )
+    opt_ept_exec_sp = val;
+
+    rcu_read_lock(&domlist_read_lock);
+    for_each_domain ( d )
     {
-        struct domain *d;
+        /* PV, or HVM Shadow domain?  Not applicable. */
+        if ( !paging_mode_hap(d) )
+            continue;
 
-        opt_ept_exec_sp = val;
+        /* Hardware domain? Not applicable. */
+        if ( is_hardware_domain(d) )
+            continue;
 
-        rcu_read_lock(&domlist_read_lock);
-        for_each_domain ( d )
-            if ( paging_mode_hap(d) )
-                p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_rw);
-        rcu_read_unlock(&domlist_read_lock);
+        /* Nested Virt?  Broken and exec_sp forced on to avoid livelocks. */
+        if ( nestedhvm_enabled(d) )
+            continue;
+
+        /* Setting already matches?  No need to rebuild the p2m. */
+        if ( d->arch.hvm.vmx.exec_sp == val )
+            continue;
+
+        d->arch.hvm.vmx.exec_sp = val;
+        p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_rw);
     }
+    rcu_read_unlock(&domlist_read_lock);
 
     printk("VMX: EPT executable superpages %sabled\n",
            val ? "en" : "dis");
