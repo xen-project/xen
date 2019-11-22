@@ -2780,14 +2780,17 @@ static int _put_final_page_type(struct page_info *page, unsigned long type,
 {
     int rc = free_page_type(page, type, preemptible);
 
+    if ( ptpg && PGT_type_equal(type, ptpg->u.inuse.type_info) &&
+         (type & PGT_validated) && rc != -EINTR )
+    {
+        /* Any time we begin de-validation of a page, adjust linear counts */
+        dec_linear_uses(page);
+        dec_linear_entries(ptpg);
+    }
+
     /* No need for atomic update of type_info here: noone else updates it. */
     if ( rc == 0 )
     {
-        if ( ptpg && PGT_type_equal(type, ptpg->u.inuse.type_info) )
-        {
-            dec_linear_uses(page);
-            dec_linear_entries(ptpg);
-        }
         ASSERT(!page->linear_pt_count || page_get_owner(page)->is_dying);
         set_tlbflush_timestamp(page);
         smp_wmb();
