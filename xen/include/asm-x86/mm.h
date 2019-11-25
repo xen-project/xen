@@ -295,8 +295,8 @@ struct page_info
 #define is_xen_heap_mfn(mfn) \
     (__mfn_valid(mfn) && is_xen_heap_page(mfn_to_page(_mfn(mfn))))
 #define is_xen_fixed_mfn(mfn)                     \
-    ((((mfn) << PAGE_SHIFT) >= __pa(&_stext)) &&  \
-     (((mfn) << PAGE_SHIFT) <= __pa(&__2M_rwdata_end)))
+    ((((mfn) << PAGE_SHIFT) >= __pa(_stext)) &&  \
+     (((mfn) << PAGE_SHIFT) <= __pa(__2M_rwdata_end - 1)))
 
 #define PRtype_info "016lx"/* should only be used for printk's */
 
