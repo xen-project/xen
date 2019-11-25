@@ -54,12 +54,12 @@ void svm_vmcb_dump(const char *from, const struct vmcb_struct *vmcb)
     printk("tlb_control = %#x vintr = %#"PRIx64" interrupt_shadow = %#"PRIx64"\n",
            vmcb->tlb_control, vmcb_get_vintr(vmcb).bytes,
            vmcb->interrupt_shadow);
-    printk("eventinj %016"PRIx64", valid? %d, ec? %d, type %u, vector %#x\n",
-           vmcb->eventinj.bytes, vmcb->eventinj.fields.v,
-           vmcb->eventinj.fields.ev, vmcb->eventinj.fields.type,
-           vmcb->eventinj.fields.vector);
-    printk("exitcode = %#"PRIx64" exitintinfo = %#"PRIx64"\n",
-           vmcb->exitcode, vmcb->exitintinfo.bytes);
+    printk("event_inj %016"PRIx64", valid? %d, ec? %d, type %u, vector %#x\n",
+           vmcb->event_inj.raw, vmcb->event_inj.v,
+           vmcb->event_inj.ev, vmcb->event_inj.type,
+           vmcb->event_inj.vector);
+    printk("exitcode = %#"PRIx64" exit_int_info = %#"PRIx64"\n",
+           vmcb->exitcode, vmcb->exit_int_info.raw);
     printk("exitinfo1 = %#"PRIx64" exitinfo2 = %#"PRIx64"\n",
            vmcb->exitinfo1, vmcb->exitinfo2);
     printk("np_enable = %#"PRIx64" guest_asid = %#x\n",
@@ -164,9 +164,9 @@ bool svm_vmcb_isvalid(const char *from, const struct vmcb_struct *vmcb,
         PRINTF("GENERAL2_INTERCEPT: VMRUN intercept bit is clear (%#"PRIx32")\n",
                vmcb_get_general2_intercepts(vmcb));
 
-    if ( vmcb->eventinj.fields.resvd1 )
+    if ( vmcb->event_inj.resvd1 )
         PRINTF("eventinj: MBZ bits are set (%#"PRIx64")\n",
-               vmcb->eventinj.bytes);
+               vmcb->event_inj.raw);
 
 #undef PRINTF
     return ret;

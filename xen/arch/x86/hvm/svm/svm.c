@@ -259,12 +259,12 @@ static int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
     c->sysenter_esp = v->arch.hvm.svm.guest_sysenter_esp;
     c->sysenter_eip = v->arch.hvm.svm.guest_sysenter_eip;
 
-    if ( vmcb->eventinj.fields.v &&
-         hvm_event_needs_reinjection(vmcb->eventinj.fields.type,
-                                     vmcb->eventinj.fields.vector) )
+    if ( vmcb->event_inj.v &&
+         hvm_event_needs_reinjection(vmcb->event_inj.type,
+                                     vmcb->event_inj.vector) )
     {
-        c->pending_event = (uint32_t)vmcb->eventinj.bytes;
-        c->error_code = vmcb->eventinj.fields.errorcode;
+        c->pending_event = vmcb->event_inj.raw;
+        c->error_code = vmcb->event_inj.ec;
     }
 
     return 1;
@@ -339,11 +339,11 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     {
         gdprintk(XENLOG_INFO, "Re-injecting %#"PRIx32", %#"PRIx32"\n",
                  c->pending_event, c->error_code);
-        vmcb->eventinj.bytes = c->pending_event;
-        vmcb->eventinj.fields.errorcode = c->error_code;
+        vmcb->event_inj.raw = c->pending_event;
+        vmcb->event_inj.ec = c->error_code;
     }
     else
-        vmcb->eventinj.bytes = 0;
+        vmcb->event_inj.raw = 0;
 
     vmcb->cleanbits.bytes = 0;
     paging_update_paging_modes(v);
@@ -1301,7 +1301,7 @@ static void svm_inject_event(const struct x86_event *event)
 {
     struct vcpu *curr = current;
     struct vmcb_struct *vmcb = curr->arch.hvm.svm.vmcb;
-    eventinj_t eventinj = vmcb->eventinj;
+    intinfo_t eventinj = vmcb->event_inj;
     struct x86_event _event = *event;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
@@ -1342,18 +1342,17 @@ static void svm_inject_event(const struct x86_event *event)
         break;
     }
 
-    if ( unlikely(eventinj.fields.v) &&
-         (eventinj.fields.type == X86_EVENTTYPE_HW_EXCEPTION) )
+    if ( eventinj.v && (eventinj.type == X86_EVENTTYPE_HW_EXCEPTION) )
     {
         _event.vector = hvm_combine_hw_exceptions(
-            eventinj.fields.vector, _event.vector);
+            eventinj.vector, _event.vector);
         if ( _event.vector == TRAP_double_fault )
             _event.error_code = 0;
     }
 
-    eventinj.bytes = 0;
-    eventinj.fields.v = 1;
-    eventinj.fields.vector = _event.vector;
+    eventinj.raw = 0;
+    eventinj.v = true;
+    eventinj.vector = _event.vector;
 
     /*
      * Refer to AMD Vol 2: System Programming, 15.20 Event Injection.
@@ -1373,7 +1372,7 @@ static void svm_inject_event(const struct x86_event *event)
             vmcb->nextrip = regs->rip + _event.insn_len;
         else
             regs->rip += _event.insn_len;
-        eventinj.fields.type = X86_EVENTTYPE_SW_INTERRUPT;
+        eventinj.type = X86_EVENTTYPE_SW_INTERRUPT;
         break;
 
     case X86_EVENTTYPE_PRI_SW_EXCEPTION: /* icebp */
@@ -1385,7 +1384,7 @@ static void svm_inject_event(const struct x86_event *event)
         regs->rip += _event.insn_len;
         if ( cpu_has_svm_nrips )
             vmcb->nextrip = regs->rip;
-        eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        eventinj.type = X86_EVENTTYPE_HW_EXCEPTION;
         break;
 
     case X86_EVENTTYPE_SW_EXCEPTION: /* int3, into */
@@ -1397,13 +1396,13 @@ static void svm_inject_event(const struct x86_event *event)
             vmcb->nextrip = regs->rip + _event.insn_len;
         else
             regs->rip += _event.insn_len;
-        eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
+        eventinj.type = X86_EVENTTYPE_HW_EXCEPTION;
         break;
 
     default:
-        eventinj.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
-        eventinj.fields.ev = (_event.error_code != X86_EVENT_NO_EC);
-        eventinj.fields.errorcode = _event.error_code;
+        eventinj.type = X86_EVENTTYPE_HW_EXCEPTION;
+        eventinj.ev = (_event.error_code != X86_EVENT_NO_EC);
+        eventinj.ec = _event.error_code;
         break;
     }
 
@@ -1417,9 +1416,8 @@ static void svm_inject_event(const struct x86_event *event)
         vmcb->nextrip = (uint32_t)vmcb->nextrip;
     }
 
-    ASSERT(!eventinj.fields.ev ||
-           eventinj.fields.errorcode == (uint16_t)eventinj.fields.errorcode);
-    vmcb->eventinj = eventinj;
+    ASSERT(!eventinj.ev || eventinj.ec == (uint16_t)eventinj.ec);
+    vmcb->event_inj = eventinj;
 
     if ( _event.vector == TRAP_page_fault &&
          _event.type == X86_EVENTTYPE_HW_EXCEPTION )
@@ -1431,7 +1429,7 @@ static void svm_inject_event(const struct x86_event *event)
 
 static bool svm_event_pending(const struct vcpu *v)
 {
-    return v->arch.hvm.svm.vmcb->eventinj.fields.v;
+    return v->arch.hvm.svm.vmcb->event_inj.v;
 }
 
 static void svm_cpu_dead(unsigned int cpu)
@@ -2410,12 +2408,12 @@ static bool svm_get_pending_event(struct vcpu *v, struct x86_event *info)
 {
     const struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
 
-    if ( vmcb->eventinj.fields.v )
+    if ( vmcb->event_inj.v )
         return false;
 
-    info->vector = vmcb->eventinj.fields.vector;
-    info->type = vmcb->eventinj.fields.type;
-    info->error_code = vmcb->eventinj.fields.errorcode;
+    info->vector = vmcb->event_inj.vector;
+    info->type = vmcb->event_inj.type;
+    info->error_code = vmcb->event_inj.ec;
 
     return true;
 }
@@ -2602,10 +2600,10 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     vmcb->cleanbits.bytes = cpu_has_svm_cleanbits ? ~0u : 0u;
 
     /* Event delivery caused this intercept? Queue for redelivery. */
-    if ( unlikely(vmcb->exitintinfo.fields.v) &&
-         hvm_event_needs_reinjection(vmcb->exitintinfo.fields.type,
-                                     vmcb->exitintinfo.fields.vector) )
-        vmcb->eventinj = vmcb->exitintinfo;
+    if ( unlikely(vmcb->exit_int_info.v) &&
+         hvm_event_needs_reinjection(vmcb->exit_int_info.type,
+                                     vmcb->exit_int_info.vector) )
+        vmcb->event_inj = vmcb->exit_int_info;
 
     switch ( exit_reason )
     {
@@ -2765,9 +2763,9 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
          * switches.
          */
         insn_len = -1;
-        if ( vmcb->exitintinfo.fields.v )
+        if ( vmcb->exit_int_info.v )
         {
-            switch ( vmcb->exitintinfo.fields.type )
+            switch ( vmcb->exit_int_info.type )
             {
                 /*
                  * #BP and #OF are from INT3/INTO respectively.  #DB from
@@ -2775,8 +2773,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
                  * semantics.
                  */
             case X86_EVENTTYPE_HW_EXCEPTION:
-                if ( vmcb->exitintinfo.fields.vector == TRAP_int3 ||
-                     vmcb->exitintinfo.fields.vector == TRAP_overflow )
+                if ( vmcb->exit_int_info.vector == TRAP_int3 ||
+                     vmcb->exit_int_info.vector == TRAP_overflow )
                     break;
                 /* Fallthrough */
             case X86_EVENTTYPE_EXT_INTR:
@@ -2789,7 +2787,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
              * The common logic above will have forwarded the vectoring
              * information.  Undo this as we are going to emulate.
              */
-            vmcb->eventinj.bytes = 0;
+            vmcb->event_inj.raw = 0;
         }
 
         /*

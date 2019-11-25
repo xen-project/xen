@@ -340,7 +340,7 @@ static int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
     /* Clear exitintinfo to prevent a fault loop of re-injecting
      * exceptions forever.
      */
-    n1vmcb->exitintinfo.bytes = 0;
+    n1vmcb->exit_int_info.raw = 0;
 
     /* Cleanbits */
     n1vmcb->cleanbits.bytes = 0;
@@ -514,10 +514,10 @@ static int nsvm_vmcb_prepare4vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     n2vmcb->exitcode = ns_vmcb->exitcode;
     n2vmcb->exitinfo1 = ns_vmcb->exitinfo1;
     n2vmcb->exitinfo2 = ns_vmcb->exitinfo2;
-    n2vmcb->exitintinfo = ns_vmcb->exitintinfo;
+    n2vmcb->exit_int_info = ns_vmcb->exit_int_info;
 
     /* Pending Interrupts */
-    n2vmcb->eventinj = ns_vmcb->eventinj;
+    n2vmcb->event_inj = ns_vmcb->event_inj;
 
     /* LBR and other virtualization */
     if (!vcleanbit_set(lbr)) {
@@ -806,13 +806,10 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
 
         switch (exitcode) {
         case VMEXIT_INTR:
-            if ( unlikely(ns_vmcb->eventinj.fields.v)
-                && nv->nv_vmentry_pending
-                && hvm_event_needs_reinjection(ns_vmcb->eventinj.fields.type,
-                    ns_vmcb->eventinj.fields.vector) )
-            {
-                ns_vmcb->exitintinfo.bytes = ns_vmcb->eventinj.bytes;
-            }
+            if ( unlikely(ns_vmcb->event_inj.v) && nv->nv_vmentry_pending &&
+                 hvm_event_needs_reinjection(ns_vmcb->event_inj.type,
+                                             ns_vmcb->event_inj.vector) )
+                ns_vmcb->exit_int_info = ns_vmcb->event_inj;
             break;
         case VMEXIT_EXCEPTION_PF:
             ns_vmcb->_cr2 = ns_vmcb->exitinfo2;
@@ -837,7 +834,7 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     }
 
     ns_vmcb->exitcode = exitcode;
-    ns_vmcb->eventinj.bytes = 0;
+    ns_vmcb->event_inj.raw = 0;
     return 0;
 }
 
@@ -1067,7 +1064,7 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
     ns_vmcb->exitcode = n2vmcb->exitcode;
     ns_vmcb->exitinfo1 = n2vmcb->exitinfo1;
     ns_vmcb->exitinfo2 = n2vmcb->exitinfo2;
-    ns_vmcb->exitintinfo = n2vmcb->exitintinfo;
+    ns_vmcb->exit_int_info = n2vmcb->exit_int_info;
 
     /* Interrupts */
     /* If we emulate a VMRUN/#VMEXIT in the same host #VMEXIT cycle we have
@@ -1077,14 +1074,12 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
      * only happens on a VMRUN instruction intercept which has no valid
      * exitintinfo set.
      */
-    if ( unlikely(n2vmcb->eventinj.fields.v) &&
-         hvm_event_needs_reinjection(n2vmcb->eventinj.fields.type,
-                                     n2vmcb->eventinj.fields.vector) )
-    {
-        ns_vmcb->exitintinfo = n2vmcb->eventinj;
-    }
+    if ( unlikely(n2vmcb->event_inj.v) &&
+         hvm_event_needs_reinjection(n2vmcb->event_inj.type,
+                                     n2vmcb->event_inj.vector) )
+        ns_vmcb->exit_int_info = n2vmcb->event_inj;
 
-    ns_vmcb->eventinj.bytes = 0;
+    ns_vmcb->event_inj.raw = 0;
 
     /* Nested paging mode */
     if (nestedhvm_paging_mode_hap(v)) {
@@ -1249,7 +1244,8 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
         if ( v->arch.hvm.hvm_io.io_req.state != STATE_IOREQ_NONE )
             return hvm_intblk_shadow;
 
-        if ( !nv->nv_vmexit_pending && n2vmcb->exitintinfo.bytes != 0 ) {
+        if ( !nv->nv_vmexit_pending && n2vmcb->exit_int_info.v )
+        {
             /* Give the l2 guest a chance to finish the delivery of
              * the last injected interrupt or exception before we
              * emulate a VMEXIT (e.g. VMEXIT(INTR) ).

@@ -43,15 +43,15 @@ static void svm_inject_nmi(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
     u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
-    eventinj_t event;
+    intinfo_t event;
 
-    event.bytes = 0;
-    event.fields.v = 1;
-    event.fields.type = X86_EVENTTYPE_NMI;
-    event.fields.vector = 2;
+    event.raw = 0;
+    event.v = true;
+    event.type = X86_EVENTTYPE_NMI;
+    event.vector = TRAP_nmi;
 
-    ASSERT(vmcb->eventinj.fields.v == 0);
-    vmcb->eventinj = event;
+    ASSERT(!vmcb->event_inj.v);
+    vmcb->event_inj = event;
 
     /*
      * SVM does not virtualise the NMI mask, so we emulate it by intercepting
@@ -64,15 +64,15 @@ static void svm_inject_nmi(struct vcpu *v)
 static void svm_inject_extint(struct vcpu *v, int vector)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    eventinj_t event;
+    intinfo_t event;
 
-    event.bytes = 0;
-    event.fields.v = 1;
-    event.fields.type = X86_EVENTTYPE_EXT_INTR;
-    event.fields.vector = vector;
+    event.raw = 0;
+    event.v = true;
+    event.type = X86_EVENTTYPE_EXT_INTR;
+    event.vector = vector;
 
-    ASSERT(vmcb->eventinj.fields.v == 0);
-    vmcb->eventinj = event;
+    ASSERT(!vmcb->event_inj.v);
+    vmcb->event_inj = event;
 }
 
 static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
@@ -99,7 +99,7 @@ static void svm_enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     }
 
     HVMTRACE_3D(INTR_WINDOW, intack.vector, intack.source,
-                vmcb->eventinj.fields.v?vmcb->eventinj.fields.vector:-1);
+                vmcb->event_inj.v ? vmcb->event_inj.vector : -1);
 
     /*
      * Create a dummy virtual interrupt to intercept as soon as the
@@ -197,7 +197,7 @@ void svm_intr_assist(void)
          *      have cleared the interrupt out of the IRR.
          * 2. The IRQ is masked.
          */
-        if ( unlikely(vmcb->eventinj.fields.v) || intblk )
+        if ( unlikely(vmcb->event_inj.v) || intblk )
         {
             svm_enable_intr_window(v, intack);
             return;

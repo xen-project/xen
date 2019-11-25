@@ -306,17 +306,17 @@ enum VMEXIT_EXITCODE
 
 typedef union
 {
-    u64 bytes;
     struct
     {
-        u64 vector:    8;
-        u64 type:      3;
-        u64 ev:        1;
-        u64 resvd1:   19;
-        u64 v:         1;
-        u64 errorcode:32;
-    } fields;
-} eventinj_t;
+        uint8_t  vector;
+        uint8_t  type:3;
+        bool     ev:1;
+        uint32_t resvd1:19;
+        bool     v:1;
+        uint32_t ec;
+    };
+    uint64_t raw;
+} intinfo_t;
 
 typedef union
 {
@@ -420,10 +420,10 @@ struct vmcb_struct {
     u64 exitcode;               /* offset 0x70 */
     u64 exitinfo1;              /* offset 0x78 */
     u64 exitinfo2;              /* offset 0x80 */
-    eventinj_t  exitintinfo;    /* offset 0x88 */
+    intinfo_t exit_int_info;    /* offset 0x88 */
     u64 _np_enable;             /* offset 0x90 - cleanbit 4 */
     u64 res08[2];
-    eventinj_t  eventinj;       /* offset 0xA8 */
+    intinfo_t event_inj;        /* offset 0xA8 */
     u64 _h_cr3;                 /* offset 0xB0 - cleanbit 4 */
     virt_ext_t virt_ext;        /* offset 0xB8 */
     vmcbcleanbits_t cleanbits;  /* offset 0xC0 */
