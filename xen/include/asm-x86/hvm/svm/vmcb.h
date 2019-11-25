@@ -406,12 +406,7 @@ struct vmcb_struct {
     u32 _exception_intercepts;  /* offset 0x08 - cleanbit 0 */
     u32 _general1_intercepts;   /* offset 0x0C - cleanbit 0 */
     u32 _general2_intercepts;   /* offset 0x10 - cleanbit 0 */
-    u32 res01;                  /* offset 0x14 */
-    u64 res02;                  /* offset 0x18 */
-    u64 res03;                  /* offset 0x20 */
-    u64 res04;                  /* offset 0x28 */
-    u64 res05;                  /* offset 0x30 */
-    u32 res06;                  /* offset 0x38 */
+    u32 res01[10];
     u16 _pause_filter_thresh;   /* offset 0x3C - cleanbit 0 */
     u16 _pause_filter_count;    /* offset 0x3E - cleanbit 0 */
     u64 _iopm_base_pa;          /* offset 0x40 - cleanbit 1 */

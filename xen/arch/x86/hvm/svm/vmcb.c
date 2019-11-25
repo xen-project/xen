@@ -30,7 +30,7 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/svmdebug.h>
 
-struct vmcb_struct *alloc_vmcb(void) 
+struct vmcb_struct *alloc_vmcb(void)
 {
     struct vmcb_struct *vmcb;
 
@@ -56,18 +56,15 @@ static int construct_vmcb(struct vcpu *v)
     struct svm_vcpu *svm = &v->arch.hvm.svm;
     struct vmcb_struct *vmcb = svm->vmcb;
 
-    /* Build-time check of the size of VMCB AMD structure. */
-    BUILD_BUG_ON(sizeof(*vmcb) != PAGE_SIZE);
-
-    vmcb->_general1_intercepts = 
+    vmcb->_general1_intercepts =
         GENERAL1_INTERCEPT_INTR        | GENERAL1_INTERCEPT_NMI         |
         GENERAL1_INTERCEPT_SMI         | GENERAL1_INTERCEPT_INIT        |
         GENERAL1_INTERCEPT_CPUID       | GENERAL1_INTERCEPT_INVD        |
-        GENERAL1_INTERCEPT_HLT         | GENERAL1_INTERCEPT_INVLPG      | 
+        GENERAL1_INTERCEPT_HLT         | GENERAL1_INTERCEPT_INVLPG      |
         GENERAL1_INTERCEPT_INVLPGA     | GENERAL1_INTERCEPT_IOIO_PROT   |
         GENERAL1_INTERCEPT_MSR_PROT    | GENERAL1_INTERCEPT_SHUTDOWN_EVT|
         GENERAL1_INTERCEPT_TASK_SWITCH;
-    vmcb->_general2_intercepts = 
+    vmcb->_general2_intercepts =
         GENERAL2_INTERCEPT_VMRUN       | GENERAL2_INTERCEPT_VMMCALL     |
         GENERAL2_INTERCEPT_VMLOAD      | GENERAL2_INTERCEPT_VMSAVE      |
         GENERAL2_INTERCEPT_STGI        | GENERAL2_INTERCEPT_CLGI        |
@@ -105,12 +102,6 @@ static int construct_vmcb(struct vcpu *v)
 
     /* Virtualise EFLAGS.IF and LAPIC TPR (CR8). */
     vmcb->_vintr.fields.intr_masking = 1;
-  
-    /* Initialise event injection to no-op. */
-    vmcb->eventinj.bytes = 0;
-
-    /* TSC. */
-    vmcb->_tsc_offset = 0;
 
     /* Don't need to intercept RDTSC if CPU supports TSC rate scaling */
     if ( v->domain->arch.vtsc && !cpu_has_tsc_ratio )
@@ -118,10 +109,6 @@ static int construct_vmcb(struct vcpu *v)
         vmcb->_general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
         vmcb->_general2_intercepts |= GENERAL2_INTERCEPT_RDTSCP;
     }
-
-    /* Guest EFER. */
-    v->arch.hvm.guest_efer = 0;
-    hvm_update_guest_efer(v);
 
     /* Guest segment limits. */
     vmcb->cs.limit = ~0u;
@@ -131,14 +118,6 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->fs.limit = ~0u;
     vmcb->gs.limit = ~0u;
 
-    /* Guest segment bases. */
-    vmcb->cs.base = 0;
-    vmcb->es.base = 0;
-    vmcb->ss.base = 0;
-    vmcb->ds.base = 0;
-    vmcb->fs.base = 0;
-    vmcb->gs.base = 0;
-
     /* Guest segment AR bytes. */
     vmcb->es.attr = 0xc93; /* read/write, accessed */
     vmcb->ss.attr = 0xc93;
@@ -147,29 +126,13 @@ static int construct_vmcb(struct vcpu *v)
     vmcb->gs.attr = 0xc93;
     vmcb->cs.attr = 0xc9b; /* exec/read, accessed */
 
-    /* Guest IDT. */
-    vmcb->idtr.base = 0;
-    vmcb->idtr.limit = 0;
-
-    /* Guest GDT. */
-    vmcb->gdtr.base = 0;
-    vmcb->gdtr.limit = 0;
-
-    /* Guest LDT. */
-    vmcb->ldtr.sel = 0;
-    vmcb->ldtr.base = 0;
-    vmcb->ldtr.limit = 0;
-    vmcb->ldtr.attr = 0;
-
     /* Guest TSS. */
     vmcb->tr.attr = 0x08b; /* 32-bit TSS (busy) */
-    vmcb->tr.base = 0;
     vmcb->tr.limit = 0xff;
 
     v->arch.hvm.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
+    hvm_update_guest_efer(v);
     hvm_update_guest_cr(v, 0);
-
-    v->arch.hvm.guest_cr[4] = 0;
     hvm_update_guest_cr(v, 4);
 
     paging_update_paging_modes(v);
@@ -211,8 +174,6 @@ static int construct_vmcb(struct vcpu *v)
         if ( cpu_has_pause_thresh )
             vmcb->_pause_filter_thresh = SVM_PAUSETHRESH_INIT;
     }
-
-    vmcb->cleanbits.bytes = 0;
 
     return 0;
 }
@@ -268,7 +229,7 @@ static void vmcb_dump(unsigned char ch)
 {
     struct domain *d;
     struct vcpu *v;
-    
+
     printk("*********** VMCB Areas **************\n");
 
     rcu_read_lock(&domlist_read_lock);
@@ -297,18 +258,30 @@ void __init setup_vmcb_dump(void)
 
 static void __init __maybe_unused build_assertions(void)
 {
-    struct segment_register sreg;
+    struct vmcb_struct vmcb;
+
+    /* Build-time check of the VMCB layout. */
+    BUILD_BUG_ON(sizeof(vmcb) != PAGE_SIZE);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), _pause_filter_thresh) != 0x03c);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), _vintr)               != 0x060);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), eventinj)             != 0x0a8);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), es)                   != 0x400);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), _cpl)                 != 0x4cb);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), _cr4)                 != 0x548);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), rsp)                  != 0x5d8);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), rax)                  != 0x5f8);
+    BUILD_BUG_ON(offsetof(typeof(vmcb), _g_pat)               != 0x668);
 
     /* Check struct segment_register against the VMCB segment layout. */
-    BUILD_BUG_ON(sizeof(sreg)       != 16);
-    BUILD_BUG_ON(sizeof(sreg.sel)   != 2);
-    BUILD_BUG_ON(sizeof(sreg.attr)  != 2);
-    BUILD_BUG_ON(sizeof(sreg.limit) != 4);
-    BUILD_BUG_ON(sizeof(sreg.base)  != 8);
-    BUILD_BUG_ON(offsetof(struct segment_register, sel)   != 0);
-    BUILD_BUG_ON(offsetof(struct segment_register, attr)  != 2);
-    BUILD_BUG_ON(offsetof(struct segment_register, limit) != 4);
-    BUILD_BUG_ON(offsetof(struct segment_register, base)  != 8);
+    BUILD_BUG_ON(sizeof(vmcb.es)       != 16);
+    BUILD_BUG_ON(sizeof(vmcb.es.sel)   != 2);
+    BUILD_BUG_ON(sizeof(vmcb.es.attr)  != 2);
+    BUILD_BUG_ON(sizeof(vmcb.es.limit) != 4);
+    BUILD_BUG_ON(sizeof(vmcb.es.base)  != 8);
+    BUILD_BUG_ON(offsetof(typeof(vmcb.es), sel)   != 0);
+    BUILD_BUG_ON(offsetof(typeof(vmcb.es), attr)  != 2);
+    BUILD_BUG_ON(offsetof(typeof(vmcb.es), limit) != 4);
+    BUILD_BUG_ON(offsetof(typeof(vmcb.es), base)  != 8);
 }
 
 /*
