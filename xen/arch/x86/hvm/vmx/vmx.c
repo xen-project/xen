@@ -2755,14 +2755,6 @@ static int vmx_cr_access(cr_access_qual_t qual)
     return X86EMUL_OKAY;
 }
 
-/* This defines the layout of struct lbr_info[] */
-#define LBR_LASTINT_FROM_IDX    0
-#define LBR_LASTINT_TO_IDX      1
-#define LBR_LASTBRANCH_TOS_IDX  2
-#define LBR_LASTBRANCH_FROM_IDX 3
-#define LBR_LASTBRANCH_TO_IDX   4
-#define LBR_LASTBRANCH_INFO     5
-
 static const struct lbr_info {
     u32 base, count;
 } p4_lbr[] = {
@@ -2899,40 +2891,57 @@ enum
 
 static bool __read_mostly lbr_tsx_fixup_needed;
 static bool __read_mostly bdf93_fixup_needed;
-static uint32_t __read_mostly lbr_from_start;
-static uint32_t __read_mostly lbr_from_end;
-static uint32_t __read_mostly lbr_lastint_from;
 
 static void __init lbr_tsx_fixup_check(void)
 {
-    bool tsx_support = cpu_has_hle || cpu_has_rtm;
     uint64_t caps;
     uint32_t lbr_format;
 
-    /* Fixup is needed only when TSX support is disabled ... */
-    if ( tsx_support )
+    /*
+     * HSM182, HSD172, HSE117, BDM127, BDD117, BDF85, BDE105:
+     *
+     * On processors that do not support Intel Transactional Synchronization
+     * Extensions (Intel TSX) (CPUID.07H.EBX bits 4 and 11 are both zero),
+     * writes to MSR_LASTBRANCH_x_FROM_IP (MSR 680H to 68FH) may #GP unless
+     * bits[62:61] are equal to bit[47].
+     *
+     * Software should sign extend the MSRs.
+     *
+     * Experimentally, MSR_LER_FROM_LIP (1DDH) is similarly impacted, so is
+     * fixed up as well.
+     */
+    if ( cpu_has_hle || cpu_has_rtm ||
+         boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
         return;
 
+    switch ( boot_cpu_data.x86_model )
+    {
+    case 0x3c: /* HSM182, HSD172 - 4th gen Core */
+    case 0x3f: /* HSE117 - Xeon E5 v3 */
+    case 0x45: /* HSM182 - 4th gen Core */
+    case 0x46: /* HSM182, HSD172 - 4th gen Core (GT3) */
+    case 0x3d: /* BDM127 - 5th gen Core */
+    case 0x47: /* BDD117 - 5th gen Core (GT3) */
+    case 0x4f: /* BDF85  - Xeon E5-2600 v4 */
+    case 0x56: /* BDE105 - Xeon D-1500 */
+        break;
+    default:
+        return;
+    }
+
+    /*
+     * Fixup is needed only when TSX support is disabled and the address
+     * format of LBR includes TSX bits 61:62
+     */
     if ( !cpu_has_pdcm )
         return;
 
     rdmsrl(MSR_IA32_PERF_CAPABILITIES, caps);
     lbr_format = caps & MSR_IA32_PERF_CAP_LBR_FORMAT;
 
-    /* ... and the address format of LBR includes TSX bits 61:62 */
     if ( lbr_format == LBR_FORMAT_EIP_FLAGS_TSX )
-    {
-        const struct lbr_info *lbr = last_branch_msr_get();
-
-        if ( lbr == NULL )
-            return;
-
-        lbr_lastint_from = lbr[LBR_LASTINT_FROM_IDX].base;
-        lbr_from_start = lbr[LBR_LASTBRANCH_FROM_IDX].base;
-        lbr_from_end = lbr_from_start + lbr[LBR_LASTBRANCH_FROM_IDX].count;
-
         lbr_tsx_fixup_needed = true;
-    }
 }
 
 static void __init bdf93_fixup_check(void)
@@ -4326,8 +4335,12 @@ static void lbr_tsx_fixup(void)
     struct vmx_msr_entry *msr_area = curr->arch.hvm_vmx.msr_area;
     struct vmx_msr_entry *msr;
 
-    if ( (msr = vmx_find_msr(curr, lbr_from_start, VMX_MSR_GUEST)) != NULL )
+    if ( (msr = vmx_find_msr(curr, MSR_P4_LASTBRANCH_0_FROM_LIP,
+                             VMX_MSR_GUEST)) != NULL )
     {
+        const unsigned int lbr_from_end =
+            MSR_P4_LASTBRANCH_0_FROM_LIP + NUM_MSR_P4_LASTBRANCH_FROM_TO;
+
         /*
          * Sign extend into bits 61:62 while preserving bit 63
          * The loop relies on the fact that MSR array is sorted.
@@ -4336,7 +4349,8 @@ static void lbr_tsx_fixup(void)
             msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
     }
 
-    if ( (msr = vmx_find_msr(curr, lbr_lastint_from, VMX_MSR_GUEST)) != NULL )
+    if ( (msr = vmx_find_msr(curr, MSR_IA32_LASTINTFROMIP,
+                             VMX_MSR_GUEST)) != NULL )
         msr->data |= ((LBR_FROM_SIGNEXT_2MSB & msr->data) << 2);
 }
 
