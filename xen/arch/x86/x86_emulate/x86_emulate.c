@@ -3814,10 +3814,12 @@ x86_emulate(
         {
             /*
              * xbegin unconditionally aborts, xabort is unconditionally
-             * a nop.
+             * a nop. It also does not truncate the destination address to
+             * 16 bits when 16-bit operand size is in effect.
              */
             if ( b & 1 )
             {
+                op_bytes = 4;
                 jmp_rel((int32_t)src.val);
                 _regs.r(ax) = 0;
             }
