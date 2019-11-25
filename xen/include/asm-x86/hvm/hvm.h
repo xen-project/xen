@@ -206,7 +206,6 @@ struct hvm_function_table {
                                 bool_t access_w, bool_t access_x);
 
     void (*enable_msr_interception)(struct domain *d, uint32_t msr);
-    void (*set_icebp_interception)(struct domain *d, bool enable);
     bool_t (*is_singlestep_supported)(void);
 
     /* Alternate p2m */
@@ -613,16 +612,6 @@ static inline bool_t hvm_enable_msr_interception(struct domain *d, uint32_t msr)
     }
 
     return 0;
-}
-
-static inline bool hvm_set_icebp_interception(struct domain *d, bool enable)
-{
-    if ( hvm_funcs.set_icebp_interception )
-    {
-        hvm_funcs.set_icebp_interception(d, enable);
-        return true;
-    }
-    return false;
 }
 
 static inline bool_t hvm_is_singlestep_supported(void)

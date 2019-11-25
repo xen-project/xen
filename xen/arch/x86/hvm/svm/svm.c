@@ -173,24 +173,6 @@ static void svm_enable_msr_interception(struct domain *d, uint32_t msr)
         svm_intercept_msr(v, msr, MSR_INTERCEPT_WRITE);
 }
 
-static void svm_set_icebp_interception(struct domain *d, bool enable)
-{
-    const struct vcpu *v;
-
-    for_each_vcpu ( d, v )
-    {
-        struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-        uint32_t intercepts = vmcb_get_general2_intercepts(vmcb);
-
-        if ( enable )
-            intercepts |= GENERAL2_INTERCEPT_ICEBP;
-        else
-            intercepts &= ~GENERAL2_INTERCEPT_ICEBP;
-
-        vmcb_set_general2_intercepts(vmcb, intercepts);
-    }
-}
-
 static void svm_save_dr(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
@@ -2474,7 +2456,6 @@ static struct hvm_function_table __initdata svm_function_table = {
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
     .enable_msr_interception = svm_enable_msr_interception,
-    .set_icebp_interception = svm_set_icebp_interception,
     .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
     .set_descriptor_access_exiting = svm_set_descriptor_access_exiting,
     .get_insn_bytes       = svm_get_insn_bytes,
