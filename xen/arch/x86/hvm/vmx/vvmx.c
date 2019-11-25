@@ -59,9 +59,22 @@ void nvmx_cpu_dead(unsigned int cpu)
 
 int nvmx_vcpu_initialise(struct vcpu *v)
 {
+    struct domain *d = v->domain;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct page_info *pg = alloc_domheap_page(NULL, 0);
+
+    /*
+     * Gross bodge.  The nested p2m logic can't cope with the CVE-2018-12207
+     * workaround of using NX EPT superpages, and livelocks.  Nested HVM isn't
+     * security supported, so disable the workaround until the nested p2m
+     * logic can be improved.
+     */
+    if ( !d->arch.hvm.vmx.exec_sp )
+    {
+        d->arch.hvm.vmx.exec_sp = true;
+        p2m_change_entry_type_global(d, p2m_ram_rw, p2m_ram_rw);
+    }
 
     if ( !pg )
     {

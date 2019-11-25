@@ -63,6 +63,12 @@ struct vmx_domain {
     unsigned long apic_access_mfn;
     /* VMX_DOMAIN_* */
     unsigned int status;
+
+    /*
+     * Domain permitted to use Executable EPT Superpages?  Cleared to work
+     * around CVE-2018-12207 as appropriate.
+     */
+    bool exec_sp;
 };
 
 /*
