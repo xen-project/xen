@@ -1636,14 +1636,14 @@ const struct hvm_function_table * __init start_svm(void)
 
     setup_vmcb_dump();
 
-    svm_feature_flags = (current_cpu_data.extended_cpuid_level >= 0x8000000A ?
-                         cpuid_edx(0x8000000A) : 0);
+    if ( boot_cpu_data.extended_cpuid_level >= 0x8000000a )
+        svm_feature_flags = cpuid_edx(0x8000000a);
 
     printk("SVM: Supported advanced features:\n");
 
     /* DecodeAssists fast paths assume nextrip is valid for fast rIP update. */
     if ( !cpu_has_svm_nrips )
-        clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
+        __clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
 
     if ( cpu_has_tsc_ratio )
         svm_function_table.tsc_scaling.ratio_frac_bits = 32;
