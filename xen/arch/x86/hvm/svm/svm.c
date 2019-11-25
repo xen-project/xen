@@ -2480,8 +2480,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     uint64_t exit_reason;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm.svm.vmcb;
-    eventinj_t eventinj;
-    int inst_len, rc;
+    int insn_len, rc;
     vintr_t intr;
     bool_t vcpu_guestmode = 0;
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -2603,11 +2602,10 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     vmcb->cleanbits.bytes = cpu_has_svm_cleanbits ? ~0u : 0u;
 
     /* Event delivery caused this intercept? Queue for redelivery. */
-    eventinj = vmcb->exitintinfo;
-    if ( unlikely(eventinj.fields.v) &&
-         hvm_event_needs_reinjection(eventinj.fields.type,
-                                     eventinj.fields.vector) )
-        vmcb->eventinj = eventinj;
+    if ( unlikely(vmcb->exitintinfo.fields.v) &&
+         hvm_event_needs_reinjection(vmcb->exitintinfo.fields.type,
+                                     vmcb->exitintinfo.fields.vector) )
+        vmcb->eventinj = vmcb->exitintinfo;
 
     switch ( exit_reason )
     {
@@ -2630,63 +2628,60 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_EXCEPTION_DB:
         if ( !v->domain->debugger_attached )
         {
-            int rc;
             unsigned int trap_type;
 
             if ( likely(exit_reason != VMEXIT_ICEBP) )
             {
                 trap_type = X86_EVENTTYPE_HW_EXCEPTION;
-                inst_len = 0;
+                insn_len = 0;
             }
             else
             {
                 trap_type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
-                inst_len = svm_get_insn_len(v, INSTR_ICEBP);
+                insn_len = svm_get_insn_len(v, INSTR_ICEBP);
 
-                if ( !inst_len )
+                if ( !insn_len )
                     break;
             }
 
             rc = hvm_monitor_debug(regs->rip,
                                    HVM_MONITOR_DEBUG_EXCEPTION,
-                                   trap_type, inst_len);
+                                   trap_type, insn_len);
             if ( rc < 0 )
                 goto unexpected_exit_type;
             if ( !rc )
                 hvm_inject_exception(TRAP_debug,
-                                     trap_type, inst_len, X86_EVENT_NO_EC);
+                                     trap_type, insn_len, X86_EVENT_NO_EC);
         }
         else
             domain_pause_for_debugger();
         break;
 
     case VMEXIT_EXCEPTION_BP:
-        inst_len = svm_get_insn_len(v, INSTR_INT3);
+        insn_len = svm_get_insn_len(v, INSTR_INT3);
 
-        if ( inst_len == 0 )
+        if ( insn_len == 0 )
              break;
 
         if ( v->domain->debugger_attached )
         {
             /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
-            __update_guest_eip(regs, inst_len);
+            __update_guest_eip(regs, insn_len);
             current->arch.gdbsx_vcpu_event = TRAP_int3;
             domain_pause_for_debugger();
         }
         else
         {
-           int rc;
-
            rc = hvm_monitor_debug(regs->rip,
                                   HVM_MONITOR_SOFTWARE_BREAKPOINT,
                                   X86_EVENTTYPE_SW_EXCEPTION,
-                                  inst_len);
+                                  insn_len);
            if ( rc < 0 )
                goto unexpected_exit_type;
            if ( !rc )
                hvm_inject_exception(TRAP_int3,
                                     X86_EVENTTYPE_SW_EXCEPTION,
-                                    inst_len, X86_EVENT_NO_EC);
+                                    insn_len, X86_EVENT_NO_EC);
         }
         break;
 
@@ -2757,7 +2752,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_TASK_SWITCH: {
         enum hvm_task_switch_reason reason;
-        int32_t errcode = -1, insn_len = -1;
+        int32_t errcode = -1;
 
         /*
          * All TASK_SWITCH intercepts have fault-like semantics.  NRIP is
@@ -2769,6 +2764,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
          * to distinguish interrupts/exceptions from instruction based
          * switches.
          */
+        insn_len = -1;
         if ( vmcb->exitintinfo.fields.v )
         {
             switch ( vmcb->exitintinfo.fields.type )
@@ -2818,22 +2814,17 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     }
 
     case VMEXIT_CPUID:
-    {
-        unsigned int inst_len = svm_get_insn_len(v, INSTR_CPUID);
-        int rc = 0;
-
-        if ( inst_len == 0 )
+        if ( (insn_len = svm_get_insn_len(v, INSTR_CPUID)) == 0 )
             break;
 
-        rc = hvm_vmexit_cpuid(regs, inst_len);
+        rc = hvm_vmexit_cpuid(regs, insn_len);
 
         if ( rc < 0 )
             goto unexpected_exit_type;
         if ( !rc )
-            __update_guest_eip(regs, inst_len); /* Safe: CPUID */
-
+            __update_guest_eip(regs, insn_len);
         break;
-    }
+
     case VMEXIT_HLT:
         svm_vmexit_do_hlt(vmcb, regs);
         break;
@@ -2875,20 +2866,20 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             hvm_inject_hw_exception(TRAP_invalid_op, X86_EVENT_NO_EC);
             break;
         }
-        if ( (inst_len = svm_get_insn_len(v, INSTR_INVLPGA)) == 0 )
+        if ( (insn_len = svm_get_insn_len(v, INSTR_INVLPGA)) == 0 )
             break;
         svm_invlpga_intercept(v, regs->rax, regs->ecx);
-        __update_guest_eip(regs, inst_len);
+        __update_guest_eip(regs, insn_len);
         break;
 
     case VMEXIT_VMMCALL:
-        if ( (inst_len = svm_get_insn_len(v, INSTR_VMCALL)) == 0 )
+        if ( (insn_len = svm_get_insn_len(v, INSTR_VMCALL)) == 0 )
             break;
         BUG_ON(vcpu_guestmode);
         HVMTRACE_1D(VMMCALL, regs->eax);
 
         if ( hvm_hypercall(regs) == HVM_HCALL_completed )
-            __update_guest_eip(regs, inst_len);
+            __update_guest_eip(regs, insn_len);
         break;
 
     case VMEXIT_DR0_READ ... VMEXIT_DR7_READ:
@@ -2936,9 +2927,9 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_XSETBV:
         if ( vmcb_get_cpl(vmcb) )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
-        else if ( (inst_len = svm_get_insn_len(v, INSTR_XSETBV)) &&
+        else if ( (insn_len = svm_get_insn_len(v, INSTR_XSETBV)) &&
                   hvm_handle_xsetbv(regs->ecx, msr_fold(regs)) == X86EMUL_OKAY )
-            __update_guest_eip(regs, inst_len);
+            __update_guest_eip(regs, insn_len);
         break;
 
     case VMEXIT_NPF:
