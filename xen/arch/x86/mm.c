@@ -1095,8 +1095,6 @@ get_page_from_l1e(
     return -EBUSY;
 }
 
-#ifdef CONFIG_PV
-
 /*
  * The following flags are used to specify behavior of various get and
  * put commands.  The first is also stored in page->partial_flags to
@@ -1108,6 +1106,8 @@ get_page_from_l1e(
 #define PTF_preemptible           (1 << 2)
 #define PTF_defer                 (1 << 3)
 #define PTF_retain_ref_on_restart (1 << 4)
+
+#ifdef CONFIG_PV
 
 static int get_page_and_type_from_mfn(
     mfn_t mfn, unsigned long type, struct domain *d,
