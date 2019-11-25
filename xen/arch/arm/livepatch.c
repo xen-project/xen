@@ -18,6 +18,11 @@
 
 void *vmap_of_xen_text;
 
+int arch_livepatch_safety_check(void)
+{
+    return 0;
+}
+
 int arch_livepatch_quiesce(void)
 {
     mfn_t text_mfn;
