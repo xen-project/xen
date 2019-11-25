@@ -668,6 +668,8 @@ int domain_vpl011_init(struct domain *d, struct vpl011_init_info *info)
         goto out2;
     }
 
+    vpl011->uartfr = TXFE | RXFE;
+
     spin_lock_init(&vpl011->lock);
 
     register_mmio_handler(d, &vpl011_mmio_handler,
