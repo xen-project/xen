@@ -429,6 +429,8 @@ static void hvm_set_guest_tsc_msr(struct vcpu *v, u64 guest_tsc)
     hvm_set_guest_tsc(v, guest_tsc);
     v->arch.hvm_vcpu.msr_tsc_adjust += v->arch.hvm_vcpu.cache_tsc_offset
                           - tsc_offset;
+    if ( v == current )
+        update_vcpu_system_time(v);
 }
 
 static void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
@@ -437,6 +439,8 @@ static void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
                             - v->arch.hvm_vcpu.msr_tsc_adjust;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset, 0);
     v->arch.hvm_vcpu.msr_tsc_adjust = tsc_adjust;
+    if ( v == current )
+        update_vcpu_system_time(v);
 }
 
 u64 hvm_get_guest_tsc_fixed(struct vcpu *v, uint64_t at_tsc)
