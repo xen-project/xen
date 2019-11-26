@@ -22,11 +22,13 @@ typedef void livepatch_loadcall_t(void);
 typedef void livepatch_unloadcall_t(void);
 
 typedef int livepatch_precall_t(livepatch_payload_t *arg);
+typedef int livepatch_actioncall_t(livepatch_payload_t *arg);
 typedef void livepatch_postcall_t(livepatch_payload_t *arg);
 
 struct livepatch_hooks {
     struct {
         livepatch_precall_t *const *pre;
+        livepatch_actioncall_t *const *action;
         livepatch_postcall_t *const *post;
     } apply, revert;
 };
@@ -91,6 +93,10 @@ struct payload {
     livepatch_precall_t *__attribute__((weak, used)) \
         const livepatch_preapply_data_##_fn __section(".livepatch.hooks.preapply") = _fn;
 
+#define LIVEPATCH_APPLY_HOOK(_fn) \
+    livepatch_actioncall_t *__attribute__((weak, used)) \
+        const livepatch_apply_data_##_fn __section(".livepatch.hooks.apply") = _fn;
+
 #define LIVEPATCH_POSTAPPLY_HOOK(_fn) \
     livepatch_postcall_t *__attribute__((weak, used)) \
         const livepatch_postapply_data_##_fn __section(".livepatch.hooks.postapply") = _fn;
@@ -98,6 +104,10 @@ struct payload {
 #define LIVEPATCH_PREREVERT_HOOK(_fn) \
     livepatch_precall_t *__attribute__((weak, used)) \
         const livepatch_prerevert_data_##_fn __section(".livepatch.hooks.prerevert") = _fn;
+
+#define LIVEPATCH_REVERT_HOOK(_fn) \
+    livepatch_actioncall_t *__attribute__((weak, used)) \
+        const livepatch_revert_data_##_fn __section(".livepatch.hooks.revert") = _fn;
 
 #define LIVEPATCH_POSTREVERT_HOOK(_fn) \
     livepatch_postcall_t *__attribute__((weak, used)) \

@@ -22,6 +22,7 @@ LIVEPATCH_NOP := xen_nop.livepatch
 LIVEPATCH_NO_XEN_BUILDID := xen_no_xen_buildid.livepatch
 LIVEPATCH_PREPOST_HOOKS := xen_prepost_hooks.livepatch
 LIVEPATCH_PREPOST_HOOKS_FAIL := xen_prepost_hooks_fail.livepatch
+LIVEPATCH_ACTION_HOOKS := xen_action_hooks.livepatch
 
 LIVEPATCHES += $(LIVEPATCH)
 LIVEPATCHES += $(LIVEPATCH_BYE)
@@ -30,6 +31,7 @@ LIVEPATCHES += $(LIVEPATCH_NOP)
 LIVEPATCHES += $(LIVEPATCH_NO_XEN_BUILDID)
 LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS)
 LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS_FAIL)
+LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS)
 
 LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
 
@@ -144,6 +146,12 @@ xen_prepost_hooks_fail.o: config.h
 $(LIVEPATCH_PREPOST_HOOKS_FAIL): xen_prepost_hooks_fail.o xen_hello_world_func.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_PREPOST_HOOKS_FAIL) $^
 
+xen_actions_hooks.o: config.h
+
+.PHONY: $(LIVEPATCH_ACTION_HOOKS)
+$(LIVEPATCH_ACTION_HOOKS): xen_action_hooks.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS) $^
+
 .PHONY: livepatch
 livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP) $(LIVEPATCH_NO_XEN_BUILDID) \
-           $(LIVEPATCH_PREPOST_HOOKS) $(LIVEPATCH_PREPOST_HOOKS_FAIL)
+           $(LIVEPATCH_PREPOST_HOOKS) $(LIVEPATCH_PREPOST_HOOKS_FAIL) $(LIVEPATCH_ACTION_HOOKS)

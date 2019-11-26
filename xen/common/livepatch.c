@@ -587,8 +587,11 @@ static int prepare_payload(struct payload *payload,
     LIVEPATCH_ASSIGN_MULTI_HOOK(elf, payload->unload_funcs, payload->n_unload_funcs, ".livepatch.hooks.unload");
 
     LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.pre, ".livepatch.hooks.preapply");
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.action, ".livepatch.hooks.apply");
     LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.post, ".livepatch.hooks.postapply");
+
     LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.pre, ".livepatch.hooks.prerevert");
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.action, ".livepatch.hooks.revert");
     LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.post, ".livepatch.hooks.postrevert");
 
     sec = livepatch_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
@@ -1122,6 +1125,11 @@ static int apply_payload(struct payload *data)
 
     arch_livepatch_revive();
 
+    return 0;
+}
+
+static inline void apply_payload_tail(struct payload *data)
+{
     /*
      * We need RCU variant (which has barriers) in case we crash here.
      * The applied_list is iterated by the trap code.
@@ -1129,7 +1137,7 @@ static int apply_payload(struct payload *data)
     list_add_tail_rcu(&data->applied_list, &applied_list);
     register_virtual_region(&data->region);
 
-    return 0;
+    data->state = LIVEPATCH_STATE_APPLIED;
 }
 
 static int revert_payload(struct payload *data)
@@ -1162,6 +1170,11 @@ static int revert_payload(struct payload *data)
     ASSERT(!local_irq_is_enabled());
 
     arch_livepatch_revive();
+    return 0;
+}
+
+static inline void revert_payload_tail(struct payload *data)
+{
 
     /*
      * We need RCU variant (which has barriers) in case we crash here.
@@ -1171,7 +1184,7 @@ static int revert_payload(struct payload *data)
     unregister_virtual_region(&data->region);
 
     data->reverted = true;
-    return 0;
+    data->state = LIVEPATCH_STATE_CHECKED;
 }
 
 /*
@@ -1191,15 +1204,31 @@ static void livepatch_do_action(void)
     switch ( livepatch_work.cmd )
     {
     case LIVEPATCH_ACTION_APPLY:
-        rc = apply_payload(data);
+        if ( is_hook_enabled(data->hooks.apply.action) )
+        {
+            printk(XENLOG_INFO LIVEPATCH "%s: Calling apply action hook function\n", data->name);
+
+            rc = (*data->hooks.apply.action)(data);
+        }
+        else
+            rc = apply_payload(data);
+
         if ( rc == 0 )
-            data->state = LIVEPATCH_STATE_APPLIED;
+            apply_payload_tail(data);
         break;
 
     case LIVEPATCH_ACTION_REVERT:
-        rc = revert_payload(data);
+        if ( is_hook_enabled(data->hooks.revert.action) )
+        {
+            printk(XENLOG_INFO LIVEPATCH "%s: Calling revert action hook function\n", data->name);
+
+            rc = (*data->hooks.revert.action)(data);
+        }
+        else
+            rc = revert_payload(data);
+
         if ( rc == 0 )
-            data->state = LIVEPATCH_STATE_CHECKED;
+            revert_payload_tail(data);
         break;
 
     case LIVEPATCH_ACTION_REPLACE:
@@ -1210,9 +1239,17 @@ static void livepatch_do_action(void)
          */
         list_for_each_entry_safe_reverse ( other, tmp, &applied_list, applied_list )
         {
-            other->rc = revert_payload(other);
+            if ( is_hook_enabled(other->hooks.revert.action) )
+            {
+                printk(XENLOG_INFO LIVEPATCH "%s: Calling revert action hook function\n", other->name);
+
+                other->rc = (*other->hooks.revert.action)(other);
+            }
+            else
+                other->rc = revert_payload(other);
+
             if ( other->rc == 0 )
-                other->state = LIVEPATCH_STATE_CHECKED;
+                revert_payload_tail(other);
             else
             {
                 rc = -EINVAL;
@@ -1222,9 +1259,17 @@ static void livepatch_do_action(void)
 
         if ( rc == 0 )
         {
-            rc = apply_payload(data);
+            if ( is_hook_enabled(data->hooks.apply.action) )
+            {
+                printk(XENLOG_INFO LIVEPATCH "%s: Calling apply action hook function\n", data->name);
+
+                rc = (*data->hooks.apply.action)(data);
+            }
+            else
+                rc = apply_payload(data);
+
             if ( rc == 0 )
-                data->state = LIVEPATCH_STATE_APPLIED;
+                apply_payload_tail(data);
         }
         break;
 

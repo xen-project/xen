@@ -275,6 +275,7 @@ The payload contains at least three sections:
  * `.livepatch.funcs` - which is an array of livepatch_func structures.
    and/or any of:
  * `.livepatch.hooks.{preapply,postapply,prerevert,postrevert}'
+ * `.livepatch.hooks.{apply,revert}`
    - which are a pointer to a hook function pointer.
 
  * `.livepatch.xen_depends` - which is an ELF Note that describes what Xen
@@ -354,6 +355,14 @@ met.
 
  * `.livepatch.hooks.{preapply,postapply}`
  * `.livepatch.hooks.{prerevert,postrevert}`
+   - which are a pointer to a single hook function pointer.
+
+Finally, it optionally may also contain the address of apply or revert action
+hooks to be called instead of the default apply and revert payload actions
+(while all CPUs are kept in quiescing zone). These hooks do have access to
+payload structure.
+
+ * `.livepatch.hooks.{apply,revert}`
    - which are a pointer to a single hook function pointer.
 
 ### Example of .livepatch.funcs
@@ -468,6 +477,20 @@ Each entry in this array is eight bytes.
 The type definition of the function are as follow:
 
     typedef void livepatch_postcall_t(livepatch_payload_t *arg);
+
+#### .livepatch.hooks.apply and .livepatch.hooks.revert
+
+This section contains a pointer to a single function pointer to be executed
+instead of a default apply (or revert) action function. This is useful to
+replace or augment default behavior of the apply (or revert) action that
+requires all CPUs to be in the quiescing zone.
+This type of hooks do have access to payload structure.
+
+Each entry in this array is eight bytes.
+
+The type definition of the function are as follow:
+
+    typedef int livepatch_actioncall_t(livepatch_payload_t *arg);
 
 ### .livepatch.xen_depends, .livepatch.depends and .note.gnu.build-id
 
