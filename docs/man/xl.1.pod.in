@@ -1589,10 +1589,12 @@ backend driver in domain 0 rather than a real driver.
 =item B<pci-assignable-add> I<BDF>
 
 Make the device at PCI Bus/Device/Function BDF assignable to guests.
-This will bind the device to the pciback driver.  If it is already
-bound to a driver, it will first be unbound, and the original driver
-stored so that it can be re-bound to the same driver later if desired.
-If the device is already bound, it will return success.
+This will bind the device to the pciback driver and assign it to the
+"quarantine domain".  If it is already bound to a driver, it will
+first be unbound, and the original driver stored so that it can be
+re-bound to the same driver later if desired.  If the device is
+already bound, it will assign it to the quarantine domain and return
+success.
 
 CAUTION: This will make the device unusable by Domain 0 until it is
 returned with pci-assignable-remove.  Care should therefore be taken
@@ -1602,11 +1604,22 @@ being used.
 
 =item B<pci-assignable-remove> [I<-r>] I<BDF>
 
-Make the device at PCI Bus/Device/Function BDF not assignable to guests.  This
-will at least unbind the device from pciback.  If the -r option is specified,
-it will also attempt to re-bind the device to its original driver, making it
-usable by Domain 0 again.  If the device is not bound to pciback, it will
-return success.
+Make the device at PCI Bus/Device/Function BDF not assignable to
+guests.  This will at least unbind the device from pciback, and
+re-assign it from the "quarantine domain" back to domain 0.  If the -r
+option is specified, it will also attempt to re-bind the device to its
+original driver, making it usable by Domain 0 again.  If the device is
+not bound to pciback, it will return success.
+
+Note that this functionality will work even for devices which were not
+made assignable by B<pci-assignable-add>.  This can be used to allow
+dom0 to access devices which were automatically quarantined by Xen
+after domain destruction as a result of Xen's B<iommu=quarantine>
+command-line default.
+
+As always, this should only be done if you trust the guest, or are
+confident that the particular device you're re-assigning to dom0 will
+cancel all in-flight DMA on FLR.
 
 =item B<pci-attach> I<domain-id> I<BDF>
 
