@@ -64,14 +64,13 @@ static const char *state2str(unsigned int state)
     return names[state];
 }
 
-/* This value was choosen adhoc. It could be 42 too. */
-#define MAX_LEN 11
 static int list_func(int argc, char *argv[])
 {
-    unsigned int idx, done, left, i;
+    unsigned int nr, done, left, i;
     xen_livepatch_status_t *info = NULL;
     char *name = NULL;
     uint32_t *len = NULL;
+    uint32_t name_total_size, name_off;
     int rc = ENOMEM;
 
     if ( argc )
@@ -79,65 +78,73 @@ static int list_func(int argc, char *argv[])
         show_help();
         return -1;
     }
-    idx = left = 0;
-    info = malloc(sizeof(*info) * MAX_LEN);
+    done = left = 0;
+
+    rc = xc_livepatch_list_get_sizes(xch, &nr, &name_total_size);
+    if ( rc )
+    {
+        rc = errno;
+        fprintf(stderr, "Failed to get list sizes.\n"
+                "Error %d: %s\n",
+                rc, strerror(rc));
+        return rc;
+    }
+
+    if ( nr == 0 )
+    {
+        fprintf(stdout, "Nothing to list\n");
+        return 0;
+    }
+
+    info = malloc(nr * sizeof(*info));
     if ( !info )
         return rc;
-    name = malloc(sizeof(*name) * XEN_LIVEPATCH_NAME_SIZE * MAX_LEN);
+
+    name = malloc(name_total_size * sizeof(*name));
     if ( !name )
+        goto error_name;
+
+    len = malloc(nr * sizeof(*len));
+    if ( !len )
+        goto error_len;
+
+    memset(info, 'A', nr * sizeof(*info));
+    memset(name, 'B', name_total_size * sizeof(*name));
+    memset(len, 'C', nr * sizeof(*len));
+    name_off = 0;
+
+    rc = xc_livepatch_list(xch, nr, 0, info, name, len, name_total_size, &done, &left);
+    if ( rc || done != nr || left > 0)
     {
-        free(info);
-        return rc;
-    }
-    len = malloc(sizeof(*len) * MAX_LEN);
-    if ( !len ) {
-        free(name);
-        free(info);
-        return rc;
+        rc = errno;
+        fprintf(stderr, "Failed to list %d/%d.\n"
+                "Error %d: %s\n",
+                left, nr, rc, strerror(rc));
+        goto error;
     }
 
-    do {
-        done = 0;
-        /* The memset is done to catch errors. */
-        memset(info, 'A', sizeof(*info) * MAX_LEN);
-        memset(name, 'B', sizeof(*name) * MAX_LEN * XEN_LIVEPATCH_NAME_SIZE);
-        memset(len, 'C', sizeof(*len) * MAX_LEN);
-        rc = xc_livepatch_list(xch, MAX_LEN, idx, info, name, len, &done, &left);
-        if ( rc )
-        {
-            rc = errno;
-            fprintf(stderr, "Failed to list %d/%d.\n"
-                            "Error %d: %s\n",
-                    idx, left, rc, strerror(rc));
-            break;
-        }
-        if ( !idx )
-            fprintf(stdout," ID                                     | status\n"
-                           "----------------------------------------+------------\n");
+    fprintf(stdout," ID                                     | status\n"
+                   "----------------------------------------+------------\n");
 
-        for ( i = 0; i < done; i++ )
-        {
-            unsigned int j;
-            uint32_t sz;
-            char *str;
+    for ( i = 0; i < done; i++ )
+    {
+        char *name_str = name + name_off;
 
-            sz = len[i];
-            str = name + (i * XEN_LIVEPATCH_NAME_SIZE);
-            for ( j = sz; j < XEN_LIVEPATCH_NAME_SIZE; j++ )
-                str[j] = '\0';
+        printf("%-40.*s| %s", len[i], name_str, state2str(info[i].state));
+        if ( info[i].rc )
+            printf(" (%d, %s)\n", -info[i].rc, strerror(-info[i].rc));
+        else
+            puts("");
 
-            printf("%-40s| %s", str, state2str(info[i].state));
-            if ( info[i].rc )
-                printf(" (%d, %s)\n", -info[i].rc, strerror(-info[i].rc));
-            else
-                puts("");
-        }
-        idx += done;
-    } while ( left );
+        name_off += len[i];
+    }
 
-    free(name);
-    free(info);
+error:
     free(len);
+error_len:
+    free(name);
+error_name:
+    free(info);
     return rc;
 }
 #undef MAX_LEN

@@ -1159,12 +1159,8 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
     if ( list->nr > 1024 )
         return -E2BIG;
 
-    if ( list->pad )
-        return -EINVAL;
-
     if ( list->nr &&
          (!guest_handle_okay(list->status, list->nr) ||
-          !guest_handle_okay(list->name, XEN_LIVEPATCH_NAME_SIZE * list->nr) ||
           !guest_handle_okay(list->len, list->nr)) )
         return -EINVAL;
 
@@ -1175,23 +1171,35 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
         return -EINVAL;
     }
 
+    list->name_total_size = 0;
     if ( list->nr )
     {
+        uint64_t name_offset = 0;
+
         list_for_each_entry( data, &payload_list, list )
         {
-            uint32_t len;
+            uint32_t name_len;
 
             if ( list->idx > i++ )
                 continue;
 
             status.state = data->state;
             status.rc = data->rc;
-            len = strlen(data->name) + 1;
+
+            name_len = strlen(data->name) + 1;
+            list->name_total_size += name_len;
+
+            if ( !guest_handle_subrange_okay(list->name, name_offset,
+                                             name_offset + name_len - 1) )
+            {
+                rc = -EINVAL;
+                break;
+            }
 
             /* N.B. 'idx' != 'i'. */
-            if ( __copy_to_guest_offset(list->name, idx * XEN_LIVEPATCH_NAME_SIZE,
-                                        data->name, len) ||
-                __copy_to_guest_offset(list->len, idx, &len, 1) ||
+            if ( __copy_to_guest_offset(list->name, name_offset,
+                                        data->name, name_len) ||
+                __copy_to_guest_offset(list->len, idx, &name_len, 1) ||
                 __copy_to_guest_offset(list->status, idx, &status, 1) )
             {
                 rc = -EFAULT;
@@ -1199,9 +1207,17 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
             }
 
             idx++;
+            name_offset += name_len;
 
             if ( (idx >= list->nr) || hypercall_preempt_check() )
                 break;
+        }
+    }
+    else
+    {
+        list_for_each_entry( data, &payload_list, list )
+        {
+            list->name_total_size += strlen(data->name) + 1;
         }
     }
     list->nr = payload_cnt - i; /* Remaining amount. */

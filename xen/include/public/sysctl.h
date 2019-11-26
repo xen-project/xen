@@ -939,10 +939,11 @@ struct xen_sysctl_livepatch_get {
  *
  * If the hypercall returns an positive number, it is the number (up to `nr`)
  * of the payloads returned, along with `nr` updated with the number of remaining
- * payloads, `version` updated (it may be the same across hypercalls. If it
- * varies the data is stale and further calls could fail). The `status`,
- * `name`, and `len`' are updated at their designed index value (`idx`) with
- * the returned value of data.
+ * payloads, `version` updated (it may be the same across hypercalls. If it varies
+ * the data is stale and further calls could fail) and the name_total_size
+ * containing total size of transferred data for the array.
+ * The `status`, `name`, `len` are updated at their designed index value (`idx`)
+ * with the returned value of data.
  *
  * If the hypercall returns E2BIG the `nr` is too big and should be
  * lowered. The upper limit of `nr` is left to the implemention.
@@ -964,12 +965,13 @@ struct xen_sysctl_livepatch_list {
                                                should fill out. Can be zero to get
                                                amount of payloads and version.
                                                OUT: How many payloads left. */
-    uint32_t pad;                           /* IN: Must be zero. */
+    uint32_t name_total_size;               /* OUT: Total size of all transfer names */
     XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough
                                                space allocate for nr of them. */
     XEN_GUEST_HANDLE_64(char) name;         /* OUT: Array of names. Each member
-                                               MUST XEN_LIVEPATCH_NAME_SIZE in size.
-                                               Must have nr of them. */
+                                               may have an arbitrary length up to
+                                               XEN_LIVEPATCH_NAME_SIZE bytes. Must have
+                                               nr of them. */
     XEN_GUEST_HANDLE_64(uint32) len;        /* OUT: Array of lengths of name's.
                                                Must have nr of them. */
 };
