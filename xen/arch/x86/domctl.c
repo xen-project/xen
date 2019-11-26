@@ -425,6 +425,26 @@ long arch_do_domctl(
                 ret = -EFAULT;
                 break;
             }
+
+            /*
+             * Avoid checking for preemption when the `hostp2m' lock isn't
+             * involve, i.e. non-translated guest, and avoid preemption on
+             * the last iteration.
+             */
+            if ( paging_mode_translate(d) &&
+                 likely((i + 1) < num) && hypercall_preempt_check() )
+            {
+                domctl->u.getpageframeinfo3.num = num - i - 1;
+                domctl->u.getpageframeinfo3.array.p =
+                    guest_handle + ((i + 1) * width);
+                if ( __copy_to_guest(u_domctl, domctl, 1) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                return hypercall_create_continuation(__HYPERVISOR_domctl,
+                                                     "h", u_domctl);
+            }
         }
 
         break;
