@@ -53,7 +53,7 @@ static inline bool_t dfn_eq(dfn_t x, dfn_t y)
 }
 
 extern bool_t iommu_enable, iommu_enabled;
-extern bool_t force_iommu, iommu_verbose, iommu_igfx;
+extern bool force_iommu, iommu_quarantine, iommu_verbose, iommu_igfx;
 extern bool_t iommu_snoop, iommu_qinval, iommu_intremap, iommu_intpost;
 
 #if defined(CONFIG_IOMMU_FORCE_PT_SHARE)
