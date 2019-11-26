@@ -1548,7 +1548,8 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         return -ENODEV;
 
     /* De-assignment from dom_io should de-quarantine the device */
-    target = (pdev->quarantine && pdev->domain != dom_io) ?
+    target = ((pdev->quarantine || iommu_quarantine) &&
+              pdev->domain != dom_io) ?
         dom_io : hardware_domain;
 
     while ( pdev->phantom_stride )

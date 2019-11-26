@@ -1196,7 +1196,7 @@ detection of systems known to misbehave upon accesses to that port.
 > Default: `new` unless directed-EOI is supported
 
 ### iommu
-    = List of [ <bool>, verbose, debug, force, required,
+    = List of [ <bool>, verbose, debug, force, required, quarantine,
                 sharept, intremap, intpost, crash-disable,
                 snoop, qinval, igfx, amd-iommu-perdev-intremap,
                 dom0-{passthrough,strict} ]
@@ -1233,6 +1233,12 @@ boolean (e.g. `iommu=no`) can override this and leave the IOMMUs disabled.
 *   The `force` and `required` booleans are synonymous and, when requested,
     will prevent Xen from booting if IOMMUs aren't discovered and enabled
     successfully.
+
+*   The `quarantine` boolean can be used to control Xen's behavior when
+    de-assigning devices from guests.  If enabled (the default), Xen always
+    quarantines such devices; they must be explicitly assigned back to Dom0
+    before they can be used there again.  If disabled, Xen will only
+    quarantine devices the toolstack hass arranged for getting quarantined.
 
 *   The `sharept` boolean controls whether the IOMMU pagetables are shared
     with the CPU-side HAP pagetables, or allocated separately.  Sharing
