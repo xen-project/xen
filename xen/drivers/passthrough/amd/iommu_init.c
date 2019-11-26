@@ -530,6 +530,7 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
         EVENT_STR(INVALID_DEV_REQUEST)
 #undef EVENT_STR
     };
+    const char *code_str = "event";
 
     code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
                                             IOMMU_EVENT_CODE_SHIFT);
@@ -553,6 +554,10 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
                                       IOMMU_EVENT_CODE_SHIFT);
     }
 
+    /* Look up the symbolic name for code. */
+    if ( code <= ARRAY_SIZE(event_str) )
+        code_str = event_str[code - 1];
+
     if ( code == IOMMU_EVENT_IO_PAGE_FAULT )
     {
         device_id = iommu_get_devid_from_event(entry[0]);
@@ -566,7 +571,7 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
         printk(XENLOG_ERR "AMD-Vi: "
                "%s: domain = %d, device id = %#x, "
                "fault address = %#"PRIx64", flags = %#x\n",
-               event_str[code-1], domain_id, device_id, *addr, flags);
+               code_str, domain_id, device_id, *addr, flags);
 
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
             if ( get_dma_requestor_id(iommu->seg, bdf) == device_id )
@@ -574,12 +579,8 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
                                          PCI_DEVFN2(bdf));
     }
     else
-    {
-        AMD_IOMMU_DEBUG("%s %08x %08x %08x %08x\n",
-                        code <= ARRAY_SIZE(event_str) ? event_str[code - 1]
-                                                      : "event",
-                        entry[0], entry[1], entry[2], entry[3]);
-    }
+        printk(XENLOG_ERR "%s %08x %08x %08x %08x\n",
+               code_str, entry[0], entry[1], entry[2], entry[3]);
 
     memset(entry, 0, IOMMU_EVENT_LOG_ENTRY_SIZE);
 }
