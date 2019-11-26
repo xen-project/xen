@@ -123,6 +123,34 @@ void arch_livepatch_post_action(void);
 
 void arch_livepatch_mask(void);
 void arch_livepatch_unmask(void);
+
+static inline void common_livepatch_apply(struct livepatch_func *func)
+{
+    /* If the action has been already executed on this function, do nothing. */
+    if ( func->applied == LIVEPATCH_FUNC_APPLIED )
+    {
+        printk(XENLOG_WARNING LIVEPATCH "%s: %s has been already applied before\n",
+                __func__, func->name);
+        return;
+    }
+
+    arch_livepatch_apply(func);
+    func->applied = LIVEPATCH_FUNC_APPLIED;
+}
+
+static inline void common_livepatch_revert(struct livepatch_func *func)
+{
+    /* If the apply action hasn't been executed on this function, do nothing. */
+    if ( !func->old_addr || func->applied == LIVEPATCH_FUNC_NOT_APPLIED )
+    {
+        printk(XENLOG_WARNING LIVEPATCH "%s: %s has not been applied before\n",
+                __func__, func->name);
+        return;
+    }
+
+    arch_livepatch_revert(func);
+    func->applied = LIVEPATCH_FUNC_NOT_APPLIED;
+}
 #else
 
 /*

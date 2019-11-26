@@ -1182,7 +1182,7 @@ static int apply_payload(struct payload *data)
     ASSERT(!local_irq_is_enabled());
 
     for ( i = 0; i < data->nfuncs; i++ )
-        arch_livepatch_apply(&data->funcs[i]);
+        common_livepatch_apply(&data->funcs[i]);
 
     arch_livepatch_revive();
 
@@ -1216,7 +1216,7 @@ static int revert_payload(struct payload *data)
     }
 
     for ( i = 0; i < data->nfuncs; i++ )
-        arch_livepatch_revert(&data->funcs[i]);
+        common_livepatch_revert(&data->funcs[i]);
 
     /*
      * Since we are running with IRQs disabled and the hooks may call common
@@ -1249,6 +1249,29 @@ static inline void revert_payload_tail(struct payload *data)
 }
 
 /*
+ * Check if an action has applied the same state to all payload's functions consistently.
+ */
+static inline bool was_action_consistent(const struct payload *data, livepatch_func_state_t expected_state)
+{
+    int i;
+
+    for ( i = 0; i < data->nfuncs; i++ )
+    {
+        struct livepatch_func *f = &(data->funcs[i]);
+
+        if ( f->applied != expected_state )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s: Payload has a function: '%s' with inconsistent applied state.\n",
+                   data->name, f->name ?: "noname");
+
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/*
  * This function is executed having all other CPUs with no deep stack (we may
  * have cpu_idle on it) and IRQs disabled.
  */
@@ -1274,6 +1297,9 @@ static void livepatch_do_action(void)
         else
             rc = apply_payload(data);
 
+        if ( !was_action_consistent(data, rc ? LIVEPATCH_FUNC_NOT_APPLIED : LIVEPATCH_FUNC_APPLIED) )
+            panic("livepatch: partially applied payload '%s'!\n", data->name);
+
         if ( rc == 0 )
             apply_payload_tail(data);
         break;
@@ -1287,6 +1313,9 @@ static void livepatch_do_action(void)
         }
         else
             rc = revert_payload(data);
+
+        if ( !was_action_consistent(data, rc ? LIVEPATCH_FUNC_APPLIED : LIVEPATCH_FUNC_NOT_APPLIED) )
+            panic("livepatch: partially reverted payload '%s'!\n", data->name);
 
         if ( rc == 0 )
             revert_payload_tail(data);
@@ -1309,6 +1338,9 @@ static void livepatch_do_action(void)
             else
                 other->rc = revert_payload(other);
 
+            if ( !was_action_consistent(other, rc ? LIVEPATCH_FUNC_APPLIED : LIVEPATCH_FUNC_NOT_APPLIED) )
+                panic("livepatch: partially reverted payload '%s'!\n", other->name);
+
             if ( other->rc == 0 )
                 revert_payload_tail(other);
             else
@@ -1328,6 +1360,9 @@ static void livepatch_do_action(void)
             }
             else
                 rc = apply_payload(data);
+
+            if ( !was_action_consistent(data, rc ? LIVEPATCH_FUNC_NOT_APPLIED : LIVEPATCH_FUNC_APPLIED) )
+                panic("livepatch: partially applied payload '%s'!\n", data->name);
 
             if ( rc == 0 )
                 apply_payload_tail(data);

@@ -24,6 +24,9 @@ LIVEPATCH_PREPOST_HOOKS := xen_prepost_hooks.livepatch
 LIVEPATCH_PREPOST_HOOKS_FAIL := xen_prepost_hooks_fail.livepatch
 LIVEPATCH_ACTION_HOOKS := xen_action_hooks.livepatch
 LIVEPATCH_ACTION_HOOKS_NOFUNC := xen_action_hooks_nofunc.livepatch
+LIVEPATCH_ACTION_HOOKS_MARKER:= xen_action_hooks_marker.livepatch
+LIVEPATCH_ACTION_HOOKS_NOAPPLY:= xen_action_hooks_noapply.livepatch
+LIVEPATCH_ACTION_HOOKS_NOREVERT:= xen_action_hooks_norevert.livepatch
 
 LIVEPATCHES += $(LIVEPATCH)
 LIVEPATCHES += $(LIVEPATCH_BYE)
@@ -34,6 +37,9 @@ LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS)
 LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS_FAIL)
 LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS)
 LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOFUNC)
+LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_MARKER)
+LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOAPPLY)
+LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOREVERT)
 
 LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
 
@@ -158,7 +164,26 @@ $(LIVEPATCH_ACTION_HOOKS): xen_action_hooks.o xen_hello_world_func.o note.o xen_
 $(LIVEPATCH_ACTION_HOOKS_NOFUNC): xen_action_hooks_nofunc.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOFUNC) $^
 
+xen_actions_hooks_marker.o: config.h
+
+.PHONY: $(LIVEPATCH_ACTION_HOOKS_MARKER)
+$(LIVEPATCH_ACTION_HOOKS_MARKER): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_MARKER) $^
+
+xen_actions_hooks_noapply.o: config.h
+
+.PHONY: $(LIVEPATCH_ACTION_HOOKS_NOAPPLY)
+$(LIVEPATCH_ACTION_HOOKS_NOAPPLY): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOAPPLY) $^
+
+xen_actions_hooks_norevert.o: config.h
+
+.PHONY: $(LIVEPATCH_ACTION_HOOKS_NOREVERT)
+$(LIVEPATCH_ACTION_HOOKS_NOREVERT): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOREVERT) $^
+
 .PHONY: livepatch
 livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP) $(LIVEPATCH_NO_XEN_BUILDID) \
            $(LIVEPATCH_PREPOST_HOOKS) $(LIVEPATCH_PREPOST_HOOKS_FAIL) $(LIVEPATCH_ACTION_HOOKS) \
-           $(LIVEPATCH_ACTION_HOOKS_NOFUNC)
+           $(LIVEPATCH_ACTION_HOOKS_NOFUNC) $(LIVEPATCH_ACTION_HOOKS_MARKER) $(LIVEPATCH_ACTION_HOOKS_NOAPPLY) \
+           $(LIVEPATCH_ACTION_HOOKS_NOREVERT)

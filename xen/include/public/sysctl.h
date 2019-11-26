@@ -832,7 +832,7 @@ struct xen_sysctl_cpu_featureset {
  *     If zero exit with success.
  */
 
-#define LIVEPATCH_PAYLOAD_VERSION 1
+#define LIVEPATCH_PAYLOAD_VERSION 2
 /*
  * .livepatch.funcs structure layout defined in the `Payload format`
  * section in the Live Patch design document.
@@ -840,6 +840,11 @@ struct xen_sysctl_cpu_featureset {
  * We guard this with __XEN__ as toolstacks SHOULD not use it.
  */
 #ifdef __XEN__
+typedef enum livepatch_func_state {
+    LIVEPATCH_FUNC_NOT_APPLIED,
+    LIVEPATCH_FUNC_APPLIED
+} livepatch_func_state_t;
+
 struct livepatch_func {
     const char *name;       /* Name of function to be patched. */
     void *new_addr;
@@ -848,6 +853,8 @@ struct livepatch_func {
     uint32_t old_size;
     uint8_t version;        /* MUST be LIVEPATCH_PAYLOAD_VERSION. */
     uint8_t opaque[31];
+    uint8_t applied;
+    uint8_t _pad[7];
 };
 typedef struct livepatch_func livepatch_func_t;
 #endif

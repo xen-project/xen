@@ -1,4 +1,4 @@
-# Xen Live Patching Design v1
+# Xen Live Patching Design v2
 
 ## Rationale
 
@@ -297,10 +297,14 @@ which describe the functions to be patched:
         uint32_t old_size;
         uint8_t version;
         uint8_t opaque[31];
+        /* Added to livepatch payload version 2: */
+        uint8_t applied;
+        uint8_t _pad[7];
     };
 
 The size of the structure is 64 bytes on 64-bit hypervisors. It will be
 52 on 32-bit hypervisors.
+The version 2 of the payload adds additional 8 bytes to the structure size.
 
  * `name` is the symbol name of the old function. Only used if `old_addr` is
    zero, otherwise will be used during dynamic linking (when hypervisor loads
@@ -324,8 +328,14 @@ The size of the structure is 64 bytes on 64-bit hypervisors. It will be
    * If the value of `new_addr` is zero then `new_size` determines how many
     instruction bytes to NOP (up to opaque size modulo smallest platform
     instruction - 1 byte x86 and 4 bytes on ARM).
- * `version` is to be one.
+ * `version` indicates version of the generated payload.
  * `opaque` **MUST** be zero.
+
+The version 2 of the payload adds the following fields to the structure:
+
+  * `applied` tracks function's applied/reverted state. It has a boolean type
+    either LIVEPATCH_FUNC_NOT_APPLIED or LIVEPATCH_FUNC_APPLIED.
+  * `_pad[7]` adds padding to align to 8 bytes.
 
 The size of the `livepatch_func` array is determined from the ELF section
 size.
@@ -378,6 +388,9 @@ A simple example of what a payload file can be:
         uint32_t old_size;
         uint8_t version;
         uint8_t pad[31];
+        /* Added to livepatch payload version 2: */
+        uint8_t applied;
+        uint8_t _pad[7];
     };
 
     /* Our replacement function for xen_extra_version. */
