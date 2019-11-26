@@ -304,7 +304,7 @@ LIVEPATCH
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 M:	Ross Lagerwall <ross.lagerwall@citrix.com>
 S:	Supported
-F:	docs/misc/livepatch.markdown
+F:	docs/misc/livepatch.pandoc
 F:	tools/misc/xen-livepatch.c
 F:	xen/arch/*/livepatch*
 F:	xen/arch/*/*/livepatch*
