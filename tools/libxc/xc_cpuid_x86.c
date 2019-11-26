@@ -616,10 +616,15 @@ int xc_cpuid_apply_policy(xc_interface *xch, uint32_t domid,
              * - going out of sync with leaf 1 EBX[23:16],
              * - incrementing ApicIdCoreSize when it's zero (which changes the
              *   meaning of bits 7:0).
+             *
+             * UPDATE: I addition to avoiding overflow, some
+             * proprietary operating systems have trouble with
+             * apic_id_size values greater than 7.  Limit the value to
+             * 7 for now.
              */
             if ( p->extd.nc < 0x7f )
             {
-                if ( p->extd.apic_id_size != 0 && p->extd.apic_id_size != 0xf )
+                if ( p->extd.apic_id_size != 0 && p->extd.apic_id_size < 0x7 )
                     p->extd.apic_id_size++;
 
                 p->extd.nc = (p->extd.nc << 1) | 1;
