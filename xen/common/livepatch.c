@@ -853,6 +853,23 @@ static int prepare_payload(struct payload *payload,
 #endif
     }
 
+    sec = livepatch_elf_sec_by_name(elf, ".modinfo");
+    if ( sec )
+    {
+        if ( !section_ok(elf, sec, sizeof(*payload->metadata.data)) )
+            return -EINVAL;
+
+        payload->metadata.data = sec->load_addr;
+        payload->metadata.len = sec->sec->sh_size;
+
+        /* The metadata is required to consists of null terminated strings. */
+        if ( payload->metadata.data[payload->metadata.len - 1] != '\0' )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s: Incorrect metadata format detected\n", payload->name);
+            return -EINVAL;
+        }
+    }
+
     return 0;
 }
 
@@ -1201,6 +1218,19 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
  * for XEN_SYSCTL_LIVEPATCH_ACTION operation (see livepatch_action).
  */
 
+static inline void livepatch_display_metadata(const struct livepatch_metadata *metadata)
+{
+    const char *str;
+
+    if ( metadata && metadata->data && metadata->len > 0 )
+    {
+        printk(XENLOG_INFO LIVEPATCH "module metadata:\n");
+        for ( str = metadata->data; str < (metadata->data + metadata->len); str += (strlen(str) + 1) )
+            printk(XENLOG_INFO LIVEPATCH "  %s\n", str);
+    }
+
+}
+
 static int apply_payload(struct payload *data)
 {
     unsigned int i;
@@ -1240,6 +1270,8 @@ static int apply_payload(struct payload *data)
         common_livepatch_apply(&data->funcs[i]);
 
     arch_livepatch_revive();
+
+    livepatch_display_metadata(&data->metadata);
 
     return 0;
 }
@@ -2018,6 +2050,8 @@ static void livepatch_printall(unsigned char key)
         printk(" name=%s state=%s(%d) %p (.data=%p, .rodata=%p) using %u pages.\n",
                data->name, state2str(data->state), data->state, data->text_addr,
                data->rw_addr, data->ro_addr, data->pages);
+
+        livepatch_display_metadata(&data->metadata);
 
         for ( i = 0; i < data->nfuncs; i++ )
         {

@@ -79,8 +79,16 @@ config.h: xen_hello_world_func.o
 xen_hello_world.o: config.h
 
 .PHONY: $(LIVEPATCH)
-$(LIVEPATCH): xen_hello_world_func.o xen_hello_world.o note.o xen_note.o
+$(LIVEPATCH): xen_hello_world_func.o xen_hello_world.o note.o xen_note.o modinfo.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH) $^
+
+.PHONY: modinfo.o
+modinfo.o:
+	(set -e; \
+	 printf "LIVEPATCH_RULEZ\0") > $@.bin
+	$(OBJCOPY) $(OBJCOPY_MAGIC) \
+		   --rename-section=.data=.modinfo,alloc,load,readonly,data,contents -S $@.bin $@
+	#rm -f $@.bin
 
 #
 # This target is only accessible if CONFIG_LIVEPATCH is defined, which

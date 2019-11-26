@@ -33,6 +33,11 @@ struct livepatch_hooks {
     } apply, revert;
 };
 
+struct livepatch_metadata {
+    const char *data; /* Ptr to .modinfo section with ASCII data. */
+    uint32_t len;     /* Length of the metadata section. */
+};
+
 struct payload {
     uint32_t state;                      /* One of the LIVEPATCH_STATE_*. */
     int32_t rc;                          /* 0 or -XEN_EXX. */
@@ -63,6 +68,7 @@ struct payload {
     unsigned int n_load_funcs;           /* Nr of the funcs to load and execute. */
     unsigned int n_unload_funcs;         /* Nr of funcs to call durung unload. */
     char name[XEN_LIVEPATCH_NAME_SIZE];  /* Name of it. */
+    struct livepatch_metadata metadata;  /* Module meta data record */
 };
 
 /*
