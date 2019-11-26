@@ -840,6 +840,19 @@ struct xen_sysctl_cpu_featureset {
  * We guard this with __XEN__ as toolstacks SHOULD not use it.
  */
 #ifdef __XEN__
+#define LIVEPATCH_OPAQUE_SIZE 31
+
+struct livepatch_expectation {
+    uint8_t enabled : 1;
+    uint8_t len : 5;        /* Length of data up to LIVEPATCH_OPAQUE_SIZE
+                               (5 bits is enough for now) */
+    uint8_t rsv : 2;        /* Reserved. Zero value */
+    uint8_t data[LIVEPATCH_OPAQUE_SIZE]; /* Same size as opaque[] buffer of
+                                            struct livepatch_func. This is the
+                                            max number of bytes to be patched */
+};
+typedef struct livepatch_expectation livepatch_expectation_t;
+
 typedef enum livepatch_func_state {
     LIVEPATCH_FUNC_NOT_APPLIED,
     LIVEPATCH_FUNC_APPLIED
@@ -852,9 +865,10 @@ struct livepatch_func {
     uint32_t new_size;
     uint32_t old_size;
     uint8_t version;        /* MUST be LIVEPATCH_PAYLOAD_VERSION. */
-    uint8_t opaque[31];
+    uint8_t opaque[LIVEPATCH_OPAQUE_SIZE];
     uint8_t applied;
     uint8_t _pad[7];
+    livepatch_expectation_t expect;
 };
 typedef struct livepatch_func livepatch_func_t;
 #endif

@@ -308,6 +308,7 @@ xen/include/xen/acm_policy.h
 xen/include/xen/compile.h
 xen/include/xen/lib/x86/cpuid-autogen.h
 xen/test/livepatch/config.h
+xen/test/livepatch/expect_config.h
 xen/test/livepatch/*.livepatch
 xen/tools/kconfig/.tmp_gtkcheck
 xen/tools/kconfig/.tmp_qtcheck

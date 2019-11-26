@@ -300,10 +300,11 @@ which describe the functions to be patched:
         /* Added to livepatch payload version 2: */
         uint8_t applied;
         uint8_t _pad[7];
+        livepatch_expectation_t expect;
     };
 
-The size of the structure is 64 bytes on 64-bit hypervisors. It will be
-52 on 32-bit hypervisors.
+The size of the structure is 104 bytes on 64-bit hypervisors. It will be
+92 on 32-bit hypervisors.
 The version 2 of the payload adds additional 8 bytes to the structure size.
 
  * `name` is the symbol name of the old function. Only used if `old_addr` is
@@ -336,6 +337,28 @@ The version 2 of the payload adds the following fields to the structure:
   * `applied` tracks function's applied/reverted state. It has a boolean type
     either LIVEPATCH_FUNC_NOT_APPLIED or LIVEPATCH_FUNC_APPLIED.
   * `_pad[7]` adds padding to align to 8 bytes.
+  * `expect` is an optional structure containing expected to-be-replaced data
+    (mostly for inline asm patching). The `expect` structure format is:
+
+    struct livepatch_expectation {
+        uint8_t enabled : 1;
+        uint8_t len : 5;
+        uint8_t rsv: 2;
+        uint8_t data[LIVEPATCH_OPAQUE_SIZE]; /* Same size as opaque[] buffer of
+                                            struct livepatch_func. This is the
+                                            max number of bytes to be patched */
+    };
+    typedef struct livepatch_expectation livepatch_expectation_t;
+
+    * `enabled` allows to enable the expectation check for given function.
+      Default state is disabled.
+    * `len` specifies the number of valid bytes in `data` array. 5 bits is
+      enough to specify values up to 32 (of bytes), which is above the array
+      size.
+    * `rsv` reserved bitfields. **MUST** be zero.
+    * `data` contains expected bytes of content to be replaced. Same size as
+      `opaque` buffer of `struct livepatch_func` (max number of bytes to be
+      patched).
 
 The size of the `livepatch_func` array is determined from the ELF section
 size.
@@ -391,6 +414,7 @@ A simple example of what a payload file can be:
         /* Added to livepatch payload version 2: */
         uint8_t applied;
         uint8_t _pad[7];
+        livepatch_expectation_t expect;
     };
 
     /* Our replacement function for xen_extra_version. */
@@ -408,6 +432,13 @@ A simple example of what a payload file can be:
         .old_addr = (void *)0xffff82d08013963c, /* Extracted from xen-syms. */
         .new_size = 13, /* To be be computed by scripts. */
         .old_size = 13, /* -----------""---------------  */
+        /* Added to livepatch payload version 2: */
+        .expect = { /* All fields to be filled manually */
+            .enabled = 1,
+            .len = 5,
+            .rsv = 0,
+            .data = { 0x48, 0x8d, 0x05, 0x33, 0x1C }
+        },
     } __attribute__((__section__(".livepatch.funcs")));
 
 Code must be compiled with `-fPIC`.

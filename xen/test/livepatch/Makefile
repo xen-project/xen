@@ -27,6 +27,8 @@ LIVEPATCH_ACTION_HOOKS_NOFUNC := xen_action_hooks_nofunc.livepatch
 LIVEPATCH_ACTION_HOOKS_MARKER:= xen_action_hooks_marker.livepatch
 LIVEPATCH_ACTION_HOOKS_NOAPPLY:= xen_action_hooks_noapply.livepatch
 LIVEPATCH_ACTION_HOOKS_NOREVERT:= xen_action_hooks_norevert.livepatch
+LIVEPATCH_EXPECTATIONS:= xen_expectations.livepatch
+LIVEPATCH_EXPECTATIONS_FAIL:= xen_expectations_fail.livepatch
 
 LIVEPATCHES += $(LIVEPATCH)
 LIVEPATCHES += $(LIVEPATCH_BYE)
@@ -40,6 +42,8 @@ LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOFUNC)
 LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_MARKER)
 LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOAPPLY)
 LIVEPATCHES += $(LIVEPATCH_ACTION_HOOKS_NOREVERT)
+LIVEPATCHES += $(LIVEPATCH_EXPECTATIONS)
+LIVEPATCHES += $(LIVEPATCH_EXPECTATIONS_FAIL)
 
 LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
 
@@ -54,7 +58,7 @@ uninstall:
 
 .PHONY: clean
 clean::
-	rm -f *.o .*.o.d *.livepatch config.h
+	rm -f *.o .*.o.d *.livepatch config.h expect_config.h
 
 #
 # To compute these values we need the binary files: xen-syms
@@ -182,8 +186,27 @@ xen_actions_hooks_norevert.o: config.h
 $(LIVEPATCH_ACTION_HOOKS_NOREVERT): xen_action_hooks_marker.o xen_hello_world_func.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_ACTION_HOOKS_NOREVERT) $^
 
+EXPECT_BYTES_COUNT := 8
+CODE_GET_EXPECT=$(shell $(OBJDUMP) -d --insn-width=1 $(1) | sed -n -e '/<'$(2)'>:$$/,/^$$/ p' | tail -n +2 | head -n $(EXPECT_BYTES_COUNT) | awk '{$$0=$$2; printf "%s", substr($$0,length-1)}' | sed 's/.\{2\}/0x&,/g' | sed 's/^/{/;s/,$$/}/g')
+.PHONY: expect_config.h
+expect_config.h: EXPECT_BYTES=$(call CODE_GET_EXPECT,$(BASEDIR)/xen-syms,xen_extra_version)
+expect_config.h: xen_expectations.o
+	(set -e; \
+	 echo "#define EXPECT_BYTES $(EXPECT_BYTES)"; \
+         echo "#define EXPECT_BYTES_COUNT $(EXPECT_BYTES_COUNT)") > $@
+
+xen_expectations.o: expect_config.h
+
+.PHONY: $(LIVEPATCH_EXPECTATIONS)
+$(LIVEPATCH_EXPECTATIONS): xen_expectations.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_EXPECTATIONS) $^
+
+.PHONY: $(LIVEPATCH_EXPECTATIONS_FAIL)
+$(LIVEPATCH_EXPECTATIONS_FAIL): xen_expectations_fail.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_EXPECTATIONS_FAIL) $^
+
 .PHONY: livepatch
 livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP) $(LIVEPATCH_NO_XEN_BUILDID) \
            $(LIVEPATCH_PREPOST_HOOKS) $(LIVEPATCH_PREPOST_HOOKS_FAIL) $(LIVEPATCH_ACTION_HOOKS) \
            $(LIVEPATCH_ACTION_HOOKS_NOFUNC) $(LIVEPATCH_ACTION_HOOKS_MARKER) $(LIVEPATCH_ACTION_HOOKS_NOAPPLY) \
-           $(LIVEPATCH_ACTION_HOOKS_NOREVERT)
+           $(LIVEPATCH_ACTION_HOOKS_NOREVERT) $(LIVEPATCH_EXPECTATIONS) $(LIVEPATCH_EXPECTATIONS_FAIL)

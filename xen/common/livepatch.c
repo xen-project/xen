@@ -560,6 +560,61 @@ static int check_patching_sections(const struct livepatch_elf *elf)
     return 0;
 }
 
+static inline int livepatch_verify_expectation_fn(const struct livepatch_func *func)
+{
+    const livepatch_expectation_t *exp = &func->expect;
+
+    /* Ignore disabled expectations. */
+    if ( !exp->enabled )
+        return 0;
+
+    /* There is nothing to expect */
+    if ( !func->old_addr )
+        return -EFAULT;
+
+    if ( exp->len > sizeof(exp->data))
+        return -EOVERFLOW;
+
+    if ( exp->rsv )
+        return -EINVAL;
+
+    /* Incorrect expectation */
+    if ( func->old_size < exp->len )
+        return -ERANGE;
+
+    if ( memcmp(func->old_addr, exp->data, exp->len) )
+    {
+        printk(XENLOG_ERR LIVEPATCH "%s: expectation failed: expected:%*phN, actual:%*phN\n",
+               func->name, exp->len, exp->data, exp->len, func->old_addr);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static inline int livepatch_check_expectations(const struct payload *payload)
+{
+    int i, rc;
+
+    printk(XENLOG_INFO LIVEPATCH "%s: Verifying enabled expectations for all functions\n",
+           payload->name);
+
+    for ( i = 0; i < payload->nfuncs; i++ )
+    {
+        const struct livepatch_func *func = &(payload->funcs[i]);
+
+        rc = livepatch_verify_expectation_fn(func);
+        if ( rc )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s: expectations of %s failed (rc=%d), aborting!\n",
+                   payload->name, func->name ?: "unknown", rc);
+            return rc;
+        }
+    }
+
+    return 0;
+}
+
 /*
  * Lookup specified section and when exists assign its address to a specified hook.
  * Perform section pointer and size validation: single hook sections must contain a
@@ -1352,6 +1407,20 @@ static void livepatch_do_action(void)
 
         if ( rc == 0 )
         {
+            /*
+             * Make sure all expectation requirements are met.
+             * Beware all the payloads are reverted at this point.
+             * If expectations are not met the system is left in a
+             * completely UNPATCHED state!
+             */
+            rc = livepatch_check_expectations(data);
+            if ( rc )
+            {
+                printk(XENLOG_ERR LIVEPATCH "%s: SYSTEM MIGHT BE INSECURE: "
+                       "Replace action has been aborted after reverting ALL payloads!\n", data->name);
+                break;
+            }
+
             if ( is_hook_enabled(data->hooks.apply.action) )
             {
                 printk(XENLOG_INFO LIVEPATCH "%s: Calling apply action hook function\n", data->name);
@@ -1807,6 +1876,11 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
                 if ( rc )
                     break;
             }
+
+            /* Make sure all expectation requirements are met. */
+            rc = livepatch_check_expectations(data);
+            if ( rc )
+                break;
 
             if ( is_hook_enabled(data->hooks.apply.pre) )
             {
