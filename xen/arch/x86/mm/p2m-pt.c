@@ -391,21 +391,22 @@ static int do_recalc(struct p2m_domain *p2m, unsigned long gfn)
                     if ( err )
                     {
                         ASSERT_UNREACHABLE();
-                        goto out;
+                        break;
                     }
                 }
                 remainder -= 1UL << ((level - 1) * PAGETABLE_ORDER);
             }
             smp_wmb();
-            clear_recalc(l1, e);
-            err = p2m->write_p2m_entry(p2m, gfn, pent, e, level + 1);
-            if ( err )
+            if ( !err )
             {
-                ASSERT_UNREACHABLE();
-                goto out;
+                clear_recalc(l1, e);
+                err = p2m->write_p2m_entry(p2m, gfn, pent, e, level + 1);
+                ASSERT(!err);
             }
         }
         unmap_domain_page((void *)((unsigned long)pent & PAGE_MASK));
+        if ( unlikely(err) )
+            goto out;
     }
 
     pent = p2m_find_entry(table, &gfn_remainder, gfn,
