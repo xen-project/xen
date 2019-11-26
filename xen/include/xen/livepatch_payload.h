@@ -21,6 +21,16 @@ typedef struct payload livepatch_payload_t;
 typedef void livepatch_loadcall_t(void);
 typedef void livepatch_unloadcall_t(void);
 
+typedef int livepatch_precall_t(livepatch_payload_t *arg);
+typedef void livepatch_postcall_t(livepatch_payload_t *arg);
+
+struct livepatch_hooks {
+    struct {
+        livepatch_precall_t *const *pre;
+        livepatch_postcall_t *const *post;
+    } apply, revert;
+};
+
 struct payload {
     uint32_t state;                      /* One of the LIVEPATCH_STATE_*. */
     int32_t rc;                          /* 0 or -XEN_EXX. */
@@ -47,6 +57,7 @@ struct payload {
     struct livepatch_build_id xen_dep;   /* ELFNOTE_DESC(.livepatch.xen_depends). */
     livepatch_loadcall_t *const *load_funcs;   /* The array of funcs to call after */
     livepatch_unloadcall_t *const *unload_funcs;/* load and unload of the payload. */
+    struct livepatch_hooks hooks;        /* Pre and post hooks for apply and revert */
     unsigned int n_load_funcs;           /* Nr of the funcs to load and execute. */
     unsigned int n_unload_funcs;         /* Nr of funcs to call durung unload. */
     char name[XEN_LIVEPATCH_NAME_SIZE];  /* Name of it. */
@@ -75,6 +86,22 @@ struct payload {
 #define LIVEPATCH_UNLOAD_HOOK(_fn) \
      livepatch_unloadcall_t *__weak \
         const livepatch_unload_data_##_fn __section(".livepatch.hooks.unload") = _fn;
+
+#define LIVEPATCH_PREAPPLY_HOOK(_fn) \
+    livepatch_precall_t *__attribute__((weak, used)) \
+        const livepatch_preapply_data_##_fn __section(".livepatch.hooks.preapply") = _fn;
+
+#define LIVEPATCH_POSTAPPLY_HOOK(_fn) \
+    livepatch_postcall_t *__attribute__((weak, used)) \
+        const livepatch_postapply_data_##_fn __section(".livepatch.hooks.postapply") = _fn;
+
+#define LIVEPATCH_PREREVERT_HOOK(_fn) \
+    livepatch_precall_t *__attribute__((weak, used)) \
+        const livepatch_prerevert_data_##_fn __section(".livepatch.hooks.prerevert") = _fn;
+
+#define LIVEPATCH_POSTREVERT_HOOK(_fn) \
+    livepatch_postcall_t *__attribute__((weak, used)) \
+        const livepatch_postrevert_data_##_fn __section(".livepatch.hooks.postrevert") = _fn;
 
 #endif /* __XEN_LIVEPATCH_PAYLOAD_H__ */
 

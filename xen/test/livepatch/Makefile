@@ -20,12 +20,16 @@ LIVEPATCH_BYE := xen_bye_world.livepatch
 LIVEPATCH_REPLACE := xen_replace_world.livepatch
 LIVEPATCH_NOP := xen_nop.livepatch
 LIVEPATCH_NO_XEN_BUILDID := xen_no_xen_buildid.livepatch
+LIVEPATCH_PREPOST_HOOKS := xen_prepost_hooks.livepatch
+LIVEPATCH_PREPOST_HOOKS_FAIL := xen_prepost_hooks_fail.livepatch
 
 LIVEPATCHES += $(LIVEPATCH)
 LIVEPATCHES += $(LIVEPATCH_BYE)
 LIVEPATCHES += $(LIVEPATCH_REPLACE)
 LIVEPATCHES += $(LIVEPATCH_NOP)
 LIVEPATCHES += $(LIVEPATCH_NO_XEN_BUILDID)
+LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS)
+LIVEPATCHES += $(LIVEPATCH_PREPOST_HOOKS_FAIL)
 
 LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
 
@@ -128,5 +132,18 @@ xen_no_xen_buildid.o: config.h
 $(LIVEPATCH_NO_XEN_BUILDID): xen_nop.o note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_NO_XEN_BUILDID) $^
 
+xen_prepost_hooks.o: config.h
+
+.PHONY: $(LIVEPATCH_PREPOST_HOOKS)
+$(LIVEPATCH_PREPOST_HOOKS): xen_prepost_hooks.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_PREPOST_HOOKS) $^
+
+xen_prepost_hooks_fail.o: config.h
+
+.PHONY: $(LIVEPATCH_PREPOST_HOOKS_FAIL)
+$(LIVEPATCH_PREPOST_HOOKS_FAIL): xen_prepost_hooks_fail.o xen_hello_world_func.o note.o xen_note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_PREPOST_HOOKS_FAIL) $^
+
 .PHONY: livepatch
-livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP) $(LIVEPATCH_NO_XEN_BUILDID)
+livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP) $(LIVEPATCH_NO_XEN_BUILDID) \
+           $(LIVEPATCH_PREPOST_HOOKS) $(LIVEPATCH_PREPOST_HOOKS_FAIL)

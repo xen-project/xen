@@ -28,6 +28,8 @@
 #include <asm/alternative.h>
 #include <asm/event.h>
 
+#define is_hook_enabled(hook) ({ (hook) && *(hook); })
+
 /*
  * Protects against payload_list operations and also allows only one
  * caller in schedule_work.
@@ -501,6 +503,35 @@ static int check_special_sections(const struct livepatch_elf *elf)
     return 0;
 }
 
+/*
+ * Lookup specified section and when exists assign its address to a specified hook.
+ * Perform section pointer and size validation: single hook sections must contain a
+ * single pointer only.
+ */
+#define LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, hook, section_name) do {                        \
+    const struct livepatch_elf_sec *__sec = livepatch_elf_sec_by_name(elf, section_name); \
+    if ( !__sec )                                                                         \
+        break;                                                                            \
+    if ( !section_ok(elf, __sec, sizeof(*hook)) || __sec->sec->sh_size != sizeof(*hook) ) \
+        return -EINVAL;                                                                   \
+    hook = __sec->load_addr;                                                              \
+} while (0)
+
+/*
+ * Lookup specified section and when exists assign its address to a specified hook.
+ * Perform section pointer and size validation: multi hook sections must contain an
+ * array whose size must be a multiple of the array's items size.
+ */
+#define LIVEPATCH_ASSIGN_MULTI_HOOK(elf, hook, nhooks, section_name) do {                 \
+    const struct livepatch_elf_sec *__sec = livepatch_elf_sec_by_name(elf, section_name); \
+    if ( !__sec )                                                                         \
+        break;                                                                            \
+    if ( !section_ok(elf, __sec, sizeof(*hook)) )                                         \
+        return -EINVAL;                                                                   \
+    hook = __sec->load_addr;                                                              \
+    nhooks = __sec->sec->sh_size / sizeof(*hook);                                         \
+} while (0)
+
 static int prepare_payload(struct payload *payload,
                            struct livepatch_elf *elf)
 {
@@ -552,25 +583,14 @@ static int prepare_payload(struct payload *payload,
             return rc;
     }
 
-    sec = livepatch_elf_sec_by_name(elf, ".livepatch.hooks.load");
-    if ( sec )
-    {
-        if ( !section_ok(elf, sec, sizeof(*payload->load_funcs)) )
-            return -EINVAL;
+    LIVEPATCH_ASSIGN_MULTI_HOOK(elf, payload->load_funcs, payload->n_load_funcs, ".livepatch.hooks.load");
+    LIVEPATCH_ASSIGN_MULTI_HOOK(elf, payload->unload_funcs, payload->n_unload_funcs, ".livepatch.hooks.unload");
 
-        payload->load_funcs = sec->load_addr;
-        payload->n_load_funcs = sec->sec->sh_size / sizeof(*payload->load_funcs);
-    }
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.pre, ".livepatch.hooks.preapply");
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.post, ".livepatch.hooks.postapply");
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.pre, ".livepatch.hooks.prerevert");
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.post, ".livepatch.hooks.postrevert");
 
-    sec = livepatch_elf_sec_by_name(elf, ".livepatch.hooks.unload");
-    if ( sec )
-    {
-        if ( !section_ok(elf, sec, sizeof(*payload->unload_funcs)) )
-            return -EINVAL;
-
-        payload->unload_funcs = sec->load_addr;
-        payload->n_unload_funcs = sec->sec->sh_size / sizeof(*payload->unload_funcs);
-    }
     sec = livepatch_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
     if ( sec )
     {
@@ -1225,6 +1245,39 @@ static bool_t is_work_scheduled(const struct payload *data)
     return livepatch_work.do_work && livepatch_work.data == data;
 }
 
+/*
+ * Check if payload has any of the vetoing, non-atomic hooks assigned.
+ * A vetoing, non-atmic hook may perform an operation that changes the
+ * hypervisor state and may not be guaranteed to succeed. Result of
+ * such operation may be returned and may change the livepatch workflow.
+ * Such hooks may require additional cleanup actions performed by other
+ * hooks. Thus they are not suitable for replace action.
+ */
+static inline bool has_payload_any_vetoing_hooks(const struct payload *payload)
+{
+    return is_hook_enabled(payload->hooks.apply.pre) ||
+           is_hook_enabled(payload->hooks.apply.post) ||
+           is_hook_enabled(payload->hooks.revert.pre) ||
+           is_hook_enabled(payload->hooks.revert.post);
+}
+
+/*
+ * Checks if any of the already applied livepatches has any vetoing,
+ * non-atomic hooks assigned.
+ */
+static inline bool livepatch_applied_have_vetoing_hooks(void)
+{
+    struct payload *p;
+
+    list_for_each_entry ( p, &applied_list, applied_list )
+    {
+        if ( has_payload_any_vetoing_hooks(p) )
+            return true;
+    }
+
+    return false;
+}
+
 static int schedule_work(struct payload *data, uint32_t cmd, uint32_t timeout)
 {
     ASSERT(spin_is_locked(&payload_lock));
@@ -1325,6 +1378,7 @@ void check_for_livepatch_work(void)
     {
         struct payload *p;
         unsigned int cpus;
+        bool action_done = false;
 
         p = livepatch_work.data;
         if ( !get_cpu_maps() )
@@ -1377,6 +1431,7 @@ void check_for_livepatch_work(void)
             livepatch_do_action();
             /* Serialize and flush out the CPU via CPUID instruction (on x86). */
             arch_livepatch_post_action();
+            action_done = true;
             local_irq_restore(flags);
         }
 
@@ -1388,6 +1443,43 @@ void check_for_livepatch_work(void)
 
         /* put_cpu_maps has an barrier(). */
         put_cpu_maps();
+
+        if ( action_done )
+        {
+            switch ( livepatch_work.cmd )
+            {
+            case LIVEPATCH_ACTION_REVERT:
+                if ( is_hook_enabled(p->hooks.revert.post) )
+                {
+                    printk(XENLOG_INFO LIVEPATCH "%s: Calling post-revert hook function with rc=%d\n",
+                           p->name, p->rc);
+
+                    (*p->hooks.revert.post)(p);
+                }
+                break;
+
+            case LIVEPATCH_ACTION_APPLY:
+                if ( is_hook_enabled(p->hooks.apply.post) )
+                {
+                    printk(XENLOG_INFO LIVEPATCH "%s: Calling post-apply hook function with rc=%d\n",
+                           p->name, p->rc);
+
+                    (*p->hooks.apply.post)(p);
+                }
+                break;
+
+            case LIVEPATCH_ACTION_REPLACE:
+                if ( has_payload_any_vetoing_hooks(p) )
+                {
+                    /* It should be impossible to get here since livepatch_action() guards against that. */
+                    panic(LIVEPATCH "%s: REPLACE action is not supported on livepatches with vetoing hooks!\n",
+                            p->name);
+                    ASSERT_UNREACHABLE();
+                }
+            default:
+                break;
+            }
+        }
 
         printk(XENLOG_INFO LIVEPATCH "%s finished %s with rc=%d\n",
                p->name, names[livepatch_work.cmd], p->rc);
@@ -1527,6 +1619,21 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
                 rc = -EBUSY;
                 break;
             }
+
+            if ( is_hook_enabled(data->hooks.revert.pre) )
+            {
+                printk(XENLOG_INFO LIVEPATCH "%s: Calling pre-revert hook function\n", data->name);
+
+                rc = (*data->hooks.revert.pre)(data);
+                if ( rc )
+                {
+                    printk(XENLOG_ERR LIVEPATCH "%s: pre-revert hook failed (rc=%d), aborting!\n",
+                           data->name, rc);
+                    data->rc = rc;
+                    break;
+                }
+            }
+
             data->rc = -EAGAIN;
             rc = schedule_work(data, action->cmd, action->timeout);
         }
@@ -1560,6 +1667,20 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
                     break;
             }
 
+            if ( is_hook_enabled(data->hooks.apply.pre) )
+            {
+                printk(XENLOG_INFO LIVEPATCH "%s: Calling pre-apply hook function\n", data->name);
+
+                rc = (*data->hooks.apply.pre)(data);
+                if ( rc )
+                {
+                    printk(XENLOG_ERR LIVEPATCH "%s: pre-apply hook failed (rc=%d), aborting!\n",
+                           data->name, rc);
+                    data->rc = rc;
+                    break;
+                }
+            }
+
             data->rc = -EAGAIN;
             rc = schedule_work(data, action->cmd, action->timeout);
         }
@@ -1571,6 +1692,30 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
             rc = build_id_dep(data, 1 /* against hypervisor. */);
             if ( rc )
                 break;
+
+            /*
+             * REPLACE action is not supported on livepatches with vetoing hooks.
+             * Vetoing hooks usually perform mutating actions on the system and
+             * typically exist in pairs (pre- hook doing an action and post- hook
+             * undoing the action). Coalescing all hooks from all applied modules
+             * cannot be performed without inspecting potential dependencies between
+             * the mutating hooks and hence cannot be performed automatically by
+             * the replace action. Also, the replace action cannot safely assume a
+             * successful revert of all the module with vetoing hooks. When one
+             * of the hooks fails due to not meeting certain conditions the whole
+             * replace operation must have been reverted with all previous pre- and
+             * post- hooks re-executed (which cannot be guaranteed to succeed).
+             * The simplest response to this complication is disallow replace
+             * action on modules with vetoing hooks.
+             */
+            if ( has_payload_any_vetoing_hooks(data) || livepatch_applied_have_vetoing_hooks() )
+            {
+                printk(XENLOG_ERR LIVEPATCH "%s: REPLACE action is not supported on livepatches with vetoing hooks!\n",
+                       data->name);
+                rc = -EOPNOTSUPP;
+                break;
+            }
+
             data->rc = -EAGAIN;
             rc = schedule_work(data, action->cmd, action->timeout);
         }
