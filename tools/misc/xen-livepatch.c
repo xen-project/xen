@@ -23,18 +23,23 @@ void show_help(void)
 {
     fprintf(stderr,
             "xen-livepatch: live patching tool\n"
-            "Usage: xen-livepatch <command> [args]\n"
+            "Usage: xen-livepatch <command> [args] [command-flags]\n"
             " <name> An unique name of payload. Up to %d characters.\n"
             "Commands:\n"
             "  help                   display this help\n"
             "  upload <name> <file>   upload file <file> with <name> name\n"
             "  list                   list payloads uploaded.\n"
-            "  apply <name>           apply <name> patch.\n"
+            "  apply <name> [flags]   apply <name> patch.\n"
+            "    Supported flags:\n"
+            "      --nodeps           Disable inter-module buildid dependency check.\n"
+            "                         Check only against hypervisor buildid.\n"
             "  revert <name>          revert name <name> patch.\n"
             "  replace <name>         apply <name> patch and revert all others.\n"
             "  unload <name>          unload name <name> patch.\n"
-            "  load  <file>           upload and apply <file>.\n"
-            "                         name is the <file> name\n",
+            "  load <file> [flags]    upload and apply <file> with name as the <file> name\n"
+            "    Supported flags:\n"
+            "      --nodeps           Disable inter-module buildid dependency check.\n"
+            "                         Check only against hypervisor buildid.\n",
             XEN_LIVEPATCH_NAME_SIZE);
 }
 
@@ -225,12 +230,13 @@ static int upload_func(int argc, char *argv[])
     return rc;
 }
 
-/* These MUST match to the 'action_options[]' array slots. */
+/* These MUST match to the 'action_options[]' and 'flag_options[]' array slots. */
 enum {
     ACTION_APPLY = 0,
     ACTION_REVERT = 1,
     ACTION_UNLOAD = 2,
     ACTION_REPLACE = 3,
+    ACTION_NUM
 };
 
 struct {
@@ -238,7 +244,7 @@ struct {
     int expected; /* The state to be in after the function. */
     const char *name;
     const char *verb;
-    int (*function)(xc_interface *xch, char *name, uint32_t timeout);
+    int (*function)(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
 } action_options[] = {
     {   .allow = LIVEPATCH_STATE_CHECKED,
         .expected = LIVEPATCH_STATE_APPLIED,
@@ -266,6 +272,66 @@ struct {
     },
 };
 
+/*
+ * This structure defines supported flag options for actions.
+ * It defines entries for each action and supports up to 32
+ * flags per action.
+ */
+struct {
+    const char *name;
+    const uint32_t flag;
+} flag_options[ACTION_NUM][8 * sizeof(uint32_t)] = {
+    { /* ACTION_APPLY */
+        {   .name = "--nodeps",
+            .flag = LIVEPATCH_ACTION_APPLY_NODEPS,
+        },
+    },
+    { /* ACTION_REVERT */
+    },
+    { /* ACTION_UNLOAD */
+    },
+    { /* ACTION_REPLACE */
+    }
+};
+
+/*
+ * Parse user provided action flags.
+ * This function expects to only receive an array of input parameters being flags.
+ * Expected action is specified via idx paramater (index of flag_options[]).
+ */
+static int get_flags(int argc, char *argv[], unsigned int idx, uint32_t *flags)
+{
+    int i, j;
+
+    if ( !flags || idx >= ARRAY_SIZE(flag_options) )
+        return -1;
+
+    *flags = 0;
+    for ( i = 0; i < argc; i++ )
+    {
+        for ( j = 0; j < ARRAY_SIZE(flag_options[idx]); j++ )
+        {
+            if ( !flag_options[idx][j].name )
+                goto error;
+
+            if ( !strcmp(flag_options[idx][j].name, argv[i]) )
+            {
+                *flags |= flag_options[idx][j].flag;
+                break;
+            }
+        }
+
+        if ( j == ARRAY_SIZE(flag_options[idx]) )
+            goto error;
+    }
+
+    return 0;
+error:
+    fprintf(stderr, "Unsupported flag: %s.\n", argv[i]);
+    errno = EINVAL;
+    return errno;
+}
+
 /* The hypervisor timeout for the live patching operation is 30 msec,
  * but it could take some time for the operation to start, so wait twice
  * that period. */
@@ -291,8 +357,9 @@ int action_func(int argc, char *argv[], unsigned int idx)
     char name[XEN_LIVEPATCH_NAME_SIZE];
     int rc;
     xen_livepatch_status_t status;
+    uint32_t flags;
 
-    if ( argc != 1 )
+    if ( argc < 1 )
     {
         show_help();
         return -1;
@@ -301,7 +368,10 @@ int action_func(int argc, char *argv[], unsigned int idx)
     if ( idx >= ARRAY_SIZE(action_options) )
         return -1;
 
-    if ( get_name(argc, argv, name) )
+    if ( get_name(argc--, argv++, name) )
+        return EINVAL;
+
+    if ( get_flags(argc, argv, idx, &flags) )
         return EINVAL;
 
     /* Check initial status. */
@@ -332,7 +402,7 @@ int action_func(int argc, char *argv[], unsigned int idx)
     if ( action_options[idx].allow & status.state )
     {
         printf("%s %s... ", action_options[idx].verb, name);
-        rc = action_options[idx].function(xch, name, HYPERVISOR_TIMEOUT_NS);
+        rc = action_options[idx].function(xch, name, HYPERVISOR_TIMEOUT_NS, flags);
         if ( rc )
         {
             int saved_errno = errno;
@@ -394,17 +464,23 @@ int action_func(int argc, char *argv[], unsigned int idx)
 
 static int load_func(int argc, char *argv[])
 {
-    int rc;
-    char *new_argv[2];
-    char *path, *name, *lastdot;
+    int i, rc = ENOMEM;
+    char *upload_argv[2];
+    char **apply_argv, *path, *name, *lastdot;
 
-    if ( argc != 1 )
+    if ( argc < 1 )
     {
         show_help();
         return -1;
     }
+
+    /* apply action has <id> [flags] input requirement, which must be constructed */
+    apply_argv = (char **) malloc(argc * sizeof(*apply_argv));
+    if ( !apply_argv )
+        return rc;
+
     /* <file> */
-    new_argv[1] = argv[0];
+    upload_argv[1] = argv[0];
 
     /* Synthesize the <id> */
     path = strdup(argv[0]);
@@ -413,16 +489,23 @@ static int load_func(int argc, char *argv[])
     lastdot = strrchr(name, '.');
     if ( lastdot != NULL )
         *lastdot = '\0';
-    new_argv[0] = name;
+    upload_argv[0] = name;
+    apply_argv[0] = name;
 
-    rc = upload_func(2 /* <id> <file> */, new_argv);
+    /* Fill in all user provided flags */
+    for ( i = 1; i < argc; i++ )
+        apply_argv[i] = argv[i];
+
+    rc = upload_func(2 /* <id> <file> */, upload_argv);
     if ( rc )
-        return rc;
+        goto error;
 
-    rc = action_func(1 /* only <id> */, new_argv, ACTION_APPLY);
+    rc = action_func(argc, apply_argv, ACTION_APPLY);
     if ( rc )
-        action_func(1, new_argv, ACTION_UNLOAD);
+        action_func(1 /* only <id> */, upload_argv, ACTION_UNLOAD);
 
+error:
+    free(apply_argv);
     free(path);
     return rc;
 }

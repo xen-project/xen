@@ -854,7 +854,8 @@ int xc_livepatch_list(xc_interface *xch, unsigned int max, unsigned int start,
 static int _xc_livepatch_action(xc_interface *xch,
                                 char *name,
                                 unsigned int action,
-                                uint32_t timeout)
+                                uint32_t timeout,
+                                uint32_t flags)
 {
     int rc;
     DECLARE_SYSCTL;
@@ -880,6 +881,8 @@ static int _xc_livepatch_action(xc_interface *xch,
     sysctl.u.livepatch.pad = 0;
     sysctl.u.livepatch.u.action.cmd = action;
     sysctl.u.livepatch.u.action.timeout = timeout;
+    sysctl.u.livepatch.u.action.flags = flags;
+    sysctl.u.livepatch.u.action.pad = 0;
 
     sysctl.u.livepatch.u.action.name = def_name;
     set_xen_guest_handle(sysctl.u.livepatch.u.action.name.name, name);
@@ -891,24 +894,24 @@ static int _xc_livepatch_action(xc_interface *xch,
     return rc;
 }
 
-int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags)
 {
-    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_APPLY, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_APPLY, timeout, flags);
 }
 
-int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags)
 {
-    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_REVERT, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_REVERT, timeout, flags);
 }
 
-int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags)
 {
-    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_UNLOAD, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_UNLOAD, timeout, flags);
 }
 
-int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout)
+int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags)
 {
-    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_REPLACE, timeout);
+    return _xc_livepatch_action(xch, name, LIVEPATCH_ACTION_REPLACE, timeout, flags);
 }
 
 /*

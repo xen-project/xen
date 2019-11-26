@@ -1510,6 +1510,9 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
     char n[XEN_LIVEPATCH_NAME_SIZE];
     int rc;
 
+    if ( action->pad )
+        return -EINVAL;
+
     rc = get_name(&action->name, n);
     if ( rc )
         return rc;
@@ -1583,9 +1586,17 @@ static int livepatch_action(struct xen_sysctl_livepatch_action *action)
                 break;
             }
 
-            rc = build_id_dep(data, !!list_empty(&applied_list));
-            if ( rc )
-                break;
+            /*
+             * Check if action is issued with nodeps flags to ignore module
+             * stack dependencies.
+             */
+            if ( !(action->flags & LIVEPATCH_ACTION_APPLY_NODEPS) )
+            {
+                rc = build_id_dep(data, !!list_empty(&applied_list));
+                if ( rc )
+                    break;
+            }
+
             data->rc = -EAGAIN;
             rc = schedule_work(data, action->cmd, action->timeout);
         }

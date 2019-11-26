@@ -659,6 +659,10 @@ The caller provides:
  * `time` The upper bound of time (ns) the cmd should take. Zero means to use
    the hypervisor default. If within the time the operation does not succeed
    the operation would go in error state.
+ * `flags` provides additional parameters for an action:
+  * *LIVEPATCH_ACTION_APPLY_NODEPS* (1) Apply action ignores inter-module
+  buildid dependency. Checks only if module is built for given hypervisor by
+  comparing buildid.
  * `pad` - *MUST* be zero.
 
 The return value will be zero unless the provided fields are incorrect.
@@ -676,6 +680,10 @@ The structure is as follow:
                                                 /* hypervisor default. */
                                                 /* Or upper bound of time (ns) */
                                                 /* for operation to take. */
+        uint32_t flags;                         /* IN: action flags. */
+                                                /* Provide additional parameters */
+                                                /* for an action. */
+        uint32_t pad;                           /* IN: Always zero. */
     };
 
 

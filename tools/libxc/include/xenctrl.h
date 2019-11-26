@@ -2605,11 +2605,12 @@ int xc_livepatch_list(xc_interface *xch, unsigned int max, unsigned int start,
  * to complete them. The `timeout` offers an option to expire the
  * operation if it could not be completed within the specified time
  * (in ns). Value of 0 means let hypervisor decide the best timeout.
+ * The `flags` allows to pass extra parameters to the actions.
  */
-int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout);
-int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout);
-int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout);
-int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout);
+int xc_livepatch_apply(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
+int xc_livepatch_revert(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
+int xc_livepatch_unload(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
+int xc_livepatch_replace(xc_interface *xch, char *name, uint32_t timeout, uint32_t flags);
 
 /*
  * Ensure cache coherency after memory modifications. A call to this function
