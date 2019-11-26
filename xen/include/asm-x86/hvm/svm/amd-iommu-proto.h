@@ -268,9 +268,6 @@ static inline uint32_t iommu_get_addr_hi_from_cmd(uint32_t cmd)
                                   IOMMU_CMD_ADDR_HIGH_SHIFT);
 }
 
-/* access address field from event log entry */
-#define iommu_get_devid_from_event          iommu_get_devid_from_cmd
-
 /* access iommu base addresses field from mmio regs */
 static inline void iommu_set_addr_lo_to_reg(uint32_t *reg, uint32_t addr)
 {

@@ -513,10 +513,7 @@ static hw_irq_controller iommu_x2apic_type = {
 
 static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
-    u16 domain_id, device_id, flags;
-    unsigned int bdf;
     u32 code;
-    u64 *addr;
     int count = 0;
     static const char *const event_str[] = {
 #define EVENT_STR(name) [IOMMU_EVENT_##name - 1] = #name
@@ -560,18 +557,26 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 
     if ( code == IOMMU_EVENT_IO_PAGE_FAULT )
     {
-        device_id = iommu_get_devid_from_event(entry[0]);
-        domain_id = get_field_from_reg_u32(entry[1],
-                                           IOMMU_EVENT_DOMAIN_ID_MASK,
-                                           IOMMU_EVENT_DOMAIN_ID_SHIFT);
-        flags = get_field_from_reg_u32(entry[1],
-                                       IOMMU_EVENT_FLAGS_MASK,
-                                       IOMMU_EVENT_FLAGS_SHIFT);
-        addr= (u64*) (entry + 2);
-        printk(XENLOG_ERR "AMD-Vi: "
-               "%s: domain = %d, device id = %#x, "
-               "fault address = %#"PRIx64", flags = %#x\n",
-               code_str, domain_id, device_id, *addr, flags);
+        unsigned int bdf;
+        unsigned int device_id = MASK_EXTR(entry[0], IOMMU_EVENT_DEVICE_ID_MASK);
+        unsigned int domain_id = MASK_EXTR(entry[1], IOMMU_EVENT_DOMAIN_ID_MASK);
+        unsigned int flags = MASK_EXTR(entry[1], IOMMU_EVENT_FLAGS_MASK);
+        uint64_t addr = *(uint64_t *)(entry + 2);
+
+        printk(XENLOG_ERR "AMD-Vi: %s: %04x:%02x:%02x.%u d%d addr %016"PRIx64
+               " flags %#x%s%s%s%s%s%s%s%s%s%s\n",
+               code_str, iommu->seg, PCI_BUS(device_id), PCI_SLOT(device_id),
+               PCI_FUNC(device_id), domain_id, addr, flags,
+               (flags & 0xe00) ? " ??" : "",
+               (flags & 0x100) ? " TR" : "",
+               (flags & 0x080) ? " RZ" : "",
+               (flags & 0x040) ? " PE" : "",
+               (flags & 0x020) ? " RW" : "",
+               (flags & 0x010) ? " PR" : "",
+               (flags & 0x008) ? " I" : "",
+               (flags & 0x004) ? " US" : "",
+               (flags & 0x002) ? " NX" : "",
+               (flags & 0x001) ? " GN" : "");
 
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
             if ( get_dma_requestor_id(iommu->seg, bdf) == device_id )
