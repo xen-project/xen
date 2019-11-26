@@ -1137,7 +1137,7 @@ detection of systems known to misbehave upon accesses to that port.
 > Default: `new` unless directed-EOI is supported
 
 ### iommu
-> `= List of [ <boolean> | force | required | intremap | intpost | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | igfx | crash-disable | verbose | debug ]`
+> `= List of [ <boolean> | force | required | quarantine | intremap | intpost | qinval | snoop | sharept | dom0-passthrough | dom0-strict | amd-iommu-perdev-intremap | workaround_bios_bug | igfx | crash-disable | verbose | debug ]`
 
 > Sub-options:
 
@@ -1156,6 +1156,15 @@ detection of systems known to misbehave upon accesses to that port.
 
 >> Don't continue booting unless IOMMU support is found and can be initialized
 >> successfully.
+
+> `quarantine`
+
+> Default: `true`
+
+>> Control Xen's behavior when de-assigning devices from guests.  If enabled,
+>> Xen always quarantines such devices; they must be explicitly assigned back
+>> to Dom0 before they can be used there again.  If disabled, Xen will only
+>> quarantine devices the toolstack hass arranged for getting quarantined.
 
 > `intremap`
 

@@ -52,6 +52,7 @@ custom_param("iommu", parse_iommu_param);
 bool_t __initdata iommu_enable = 1;
 bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
+bool __read_mostly iommu_quarantine = true;
 bool_t __hwdom_initdata iommu_dom0_strict;
 bool_t __read_mostly iommu_verbose;
 bool_t __read_mostly iommu_workaround_bios_bug;
@@ -99,6 +100,8 @@ static int __init parse_iommu_param(const char *s)
         else if ( !cmdline_strcmp(s, "force") ||
                   !cmdline_strcmp(s, "required") )
             force_iommu = val;
+        else if ( !cmdline_strcmp(s, "quarantine") )
+            iommu_quarantine = val;
         else if ( !cmdline_strcmp(s, "workaround_bios_bug") )
             iommu_workaround_bios_bug = val;
         else if ( !cmdline_strcmp(s, "igfx") )
