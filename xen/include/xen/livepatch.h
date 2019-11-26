@@ -29,9 +29,10 @@ struct xen_sysctl_livepatch_op;
 /* Convenience define for printk. */
 #define LIVEPATCH             "livepatch: "
 /* ELF payload special section names. */
-#define ELF_LIVEPATCH_FUNC    ".livepatch.funcs"
-#define ELF_LIVEPATCH_DEPENDS ".livepatch.depends"
-#define ELF_BUILD_ID_NOTE      ".note.gnu.build-id"
+#define ELF_LIVEPATCH_FUNC        ".livepatch.funcs"
+#define ELF_LIVEPATCH_DEPENDS     ".livepatch.depends"
+#define ELF_LIVEPATCH_XEN_DEPENDS ".livepatch.xen_depends"
+#define ELF_BUILD_ID_NOTE         ".note.gnu.build-id"
 /* Arbitrary limit for payload size and .bss section size. */
 #define LIVEPATCH_MAX_SIZE     MB(2)
 

@@ -19,11 +19,13 @@ LIVEPATCH := xen_hello_world.livepatch
 LIVEPATCH_BYE := xen_bye_world.livepatch
 LIVEPATCH_REPLACE := xen_replace_world.livepatch
 LIVEPATCH_NOP := xen_nop.livepatch
+LIVEPATCH_NO_XEN_BUILDID := xen_no_xen_buildid.livepatch
 
 LIVEPATCHES += $(LIVEPATCH)
 LIVEPATCHES += $(LIVEPATCH_BYE)
 LIVEPATCHES += $(LIVEPATCH_REPLACE)
 LIVEPATCHES += $(LIVEPATCH_NOP)
+LIVEPATCHES += $(LIVEPATCH_NO_XEN_BUILDID)
 
 LIVEPATCH_DEBUG_DIR ?= $(DEBUG_DIR)/xen-livepatch
 
@@ -59,7 +61,7 @@ config.h: xen_hello_world_func.o
 xen_hello_world.o: config.h
 
 .PHONY: $(LIVEPATCH)
-$(LIVEPATCH): xen_hello_world_func.o xen_hello_world.o note.o
+$(LIVEPATCH): xen_hello_world_func.o xen_hello_world.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH) $^
 
 #
@@ -79,6 +81,17 @@ note.o:
 	rm -f $@.bin
 
 #
+# Append .livepatch.xen_depends section
+# with Xen build-id derived from xen-syms.
+#
+.PHONY: xen_note.o
+xen_note.o:
+	$(OBJCOPY) -O binary --only-section=.note.gnu.build-id $(BASEDIR)/xen-syms $@.bin
+	$(OBJCOPY) $(OBJCOPY_MAGIC) \
+		   --rename-section=.data=.livepatch.xen_depends,alloc,load,readonly,data,contents -S $@.bin $@
+	rm -f $@.bin
+
+#
 # Extract the build-id of the xen_hello_world.livepatch
 # (which xen_bye_world will depend on).
 #
@@ -92,20 +105,28 @@ hello_world_note.o: $(LIVEPATCH)
 xen_bye_world.o: config.h
 
 .PHONY: $(LIVEPATCH_BYE)
-$(LIVEPATCH_BYE): xen_bye_world_func.o xen_bye_world.o hello_world_note.o
+$(LIVEPATCH_BYE): xen_bye_world_func.o xen_bye_world.o hello_world_note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_BYE) $^
 
 xen_replace_world.o: config.h
 
 .PHONY: $(LIVEPATCH_REPLACE)
-$(LIVEPATCH_REPLACE): xen_replace_world_func.o xen_replace_world.o note.o
+$(LIVEPATCH_REPLACE): xen_replace_world_func.o xen_replace_world.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_REPLACE) $^
 
 xen_nop.o: config.h
 
 .PHONY: $(LIVEPATCH_NOP)
-$(LIVEPATCH_NOP): xen_nop.o note.o
+$(LIVEPATCH_NOP): xen_nop.o note.o xen_note.o
 	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_NOP) $^
 
+# This one always fails upon upload, because it deliberately
+# does not have a .livepatch.xen_depends (xen_note.o) section.
+xen_no_xen_buildid.o: config.h
+
+.PHONY: $(LIVEPATCH_NO_XEN_BUILDID)
+$(LIVEPATCH_NO_XEN_BUILDID): xen_nop.o note.o
+	$(LD) $(LDFLAGS) $(build_id_linker) -r -o $(LIVEPATCH_NO_XEN_BUILDID) $^
+
 .PHONY: livepatch
-livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP)
+livepatch: $(LIVEPATCH) $(LIVEPATCH_BYE) $(LIVEPATCH_REPLACE) $(LIVEPATCH_NOP) $(LIVEPATCH_NO_XEN_BUILDID)

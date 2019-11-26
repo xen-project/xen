@@ -270,6 +270,8 @@ like what the Linux kernel module loader does.
 The payload contains at least three sections:
 
  * `.livepatch.funcs` - which is an array of livepatch_func structures.
+ * `.livepatch.xen_depends` - which is an ELF Note that describes what Xen
+    build-id the payload depends on. **MUST** have one.
  * `.livepatch.depends` - which is an ELF Note that describes what the payload
     depends on. **MUST** have one.
  *  `.note.gnu.build-id` - the build-id of this payload. **MUST** have one.
@@ -383,22 +385,29 @@ The type definition of the function are as follow:
     typedef void (*livepatch_loadcall_t)(void);
     typedef void (*livepatch_unloadcall_t)(void);
 
-### .livepatch.depends and .note.gnu.build-id
+### .livepatch.xen_depends, .livepatch.depends and .note.gnu.build-id
 
 To support dependencies checking and safe loading (to load the
 appropiate payload against the right hypervisor) there is a need
 to embbed an build-id dependency.
 
-This is done by the payload containing an section `.livepatch.depends`
-which follows the format of an ELF Note. The contents of this
-(name, and description) are specific to the linker utilized to
-build the hypevisor and payload.
+This is done by the payload containing sections `.livepatch.xen_depends`
+and `.livepatch.depends` which follow the format of an ELF Note.
+The contents of these (name, and description) are specific to the linker
+utilized to build the hypevisor and payload.
 
 If GNU linker is used then the name is `GNU` and the description
 is a NT_GNU_BUILD_ID type ID. The description can be an SHA1
 checksum, MD5 checksum or any unique value.
 
 The size of these structures varies with the `--build-id` linker option.
+
+There are two kinds of build-id dependencies:
+
+ * Xen build-id dependency (.livepatch.xen_depends section)
+ * previous payload build-id dependency (.livepatch.depends section)
+
+See "Live patch interdependencies" for more information.
 
 ## Hypercalls
 
@@ -894,13 +903,16 @@ but is more complex to implement.
 The second option which requires an build-id of the hypervisor
 is implemented in the Xen hypervisor.
 
-Specifically each payload has two build-id ELF notes:
+Specifically each payload has three build-id ELF notes:
  * The build-id of the payload itself (generated via --build-id).
+ * The build-id of the Xen hypervisor it depends on (extracted from the
+   hypervisor during build time).
  * The build-id of the payload it depends on (extracted from the
    the previous payload or hypervisor during build time).
 
-This means that the very first payload depends on the hypervisor
-build-id.
+This means that every payload depends on the hypervisor build-id and on
+the build-id of the previous payload in the stack.
+The very first payload depends on the hypervisor build-id only.
 
 # Not Yet Done
 

@@ -74,6 +74,7 @@ struct payload {
     unsigned int nsyms;                  /* Nr of entries in .strtab and symbols. */
     struct livepatch_build_id id;        /* ELFNOTE_DESC(.note.gnu.build-id) of the payload. */
     struct livepatch_build_id dep;       /* ELFNOTE_DESC(.livepatch.depends). */
+    struct livepatch_build_id xen_dep;   /* ELFNOTE_DESC(.livepatch.xen_depends). */
     livepatch_loadcall_t *const *load_funcs;   /* The array of funcs to call after */
     livepatch_unloadcall_t *const *unload_funcs;/* load and unload of the payload. */
     unsigned int n_load_funcs;           /* Nr of the funcs to load and execute. */
@@ -476,11 +477,34 @@ static bool section_ok(const struct livepatch_elf *elf,
     return true;
 }
 
+static int xen_build_id_dep(const struct payload *payload)
+{
+    const void *id = NULL;
+    unsigned int len = 0;
+    int rc;
+
+    ASSERT(payload->xen_dep.len);
+    ASSERT(payload->xen_dep.p);
+
+    rc = xen_build_id(&id, &len);
+    if ( rc )
+        return rc;
+
+    if ( payload->xen_dep.len != len || memcmp(id, payload->xen_dep.p, len) ) {
+        printk(XENLOG_ERR LIVEPATCH "%s: check against hypervisor build-id failed\n",
+               payload->name);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 static int check_special_sections(const struct livepatch_elf *elf)
 {
     unsigned int i;
     static const char *const names[] = { ELF_LIVEPATCH_FUNC,
                                          ELF_LIVEPATCH_DEPENDS,
+                                         ELF_LIVEPATCH_XEN_DEPENDS,
                                          ELF_BUILD_ID_NOTE};
     DECLARE_BITMAP(found, ARRAY_SIZE(names)) = { 0 };
 
@@ -629,6 +653,22 @@ static int prepare_payload(struct payload *payload,
             return -EINVAL;
 
         if ( !payload->dep.len || !payload->dep.p )
+            return -EINVAL;
+    }
+
+    sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_XEN_DEPENDS);
+    if ( sec )
+    {
+        n = sec->load_addr;
+
+        if ( sec->sec->sh_size <= sizeof(*n) )
+            return -EINVAL;
+
+        if ( xen_build_id_check(n, sec->sec->sh_size,
+                                &payload->xen_dep.p, &payload->xen_dep.len) )
+            return -EINVAL;
+
+        if ( !payload->xen_dep.len || !payload->xen_dep.p )
             return -EINVAL;
     }
 
@@ -879,6 +919,10 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
         goto out;
 
     rc = prepare_payload(payload, &elf);
+    if ( rc )
+        goto out;
+
+    rc = xen_build_id_dep(payload);
     if ( rc )
         goto out;
 
@@ -1663,6 +1707,9 @@ static void livepatch_printall(unsigned char key)
 
         if ( data->dep.len )
             printk("depend-on=%*phN\n", data->dep.len, data->dep.p);
+
+        if ( data->xen_dep.len )
+            printk("depend-on-xen=%*phN\n", data->xen_dep.len, data->xen_dep.p);
     }
 
     spin_unlock(&payload_lock);
