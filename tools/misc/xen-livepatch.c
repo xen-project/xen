@@ -69,8 +69,10 @@ static int list_func(int argc, char *argv[])
     unsigned int nr, done, left, i;
     xen_livepatch_status_t *info = NULL;
     char *name = NULL;
+    char *metadata = NULL;
     uint32_t *len = NULL;
-    uint32_t name_total_size, name_off;
+    uint32_t *metadata_len = NULL;
+    uint32_t name_total_size, metadata_total_size, name_off, metadata_off;
     int rc = ENOMEM;
 
     if ( argc )
@@ -80,7 +82,7 @@ static int list_func(int argc, char *argv[])
     }
     done = left = 0;
 
-    rc = xc_livepatch_list_get_sizes(xch, &nr, &name_total_size);
+    rc = xc_livepatch_list_get_sizes(xch, &nr, &name_total_size, &metadata_total_size);
     if ( rc )
     {
         rc = errno;
@@ -108,12 +110,23 @@ static int list_func(int argc, char *argv[])
     if ( !len )
         goto error_len;
 
+    metadata = malloc(metadata_total_size * sizeof(*metadata) + 1);
+    if ( !metadata )
+        goto error_metadata;
+
+    metadata_len = malloc(nr * sizeof(*metadata_len));
+    if ( !metadata_len )
+        goto error_metadata_len;
+
     memset(info, 'A', nr * sizeof(*info));
     memset(name, 'B', name_total_size * sizeof(*name));
     memset(len, 'C', nr * sizeof(*len));
-    name_off = 0;
+    memset(metadata, 'D', metadata_total_size * sizeof(*metadata) + 1);
+    memset(metadata_len, 'E', nr * sizeof(*metadata_len));
+    name_off = metadata_off = 0;
 
-    rc = xc_livepatch_list(xch, nr, 0, info, name, len, name_total_size, &done, &left);
+    rc = xc_livepatch_list(xch, nr, 0, info, name, len, name_total_size,
+                           metadata, metadata_len, metadata_total_size, &done, &left);
     if ( rc || done != nr || left > 0)
     {
         rc = errno;
@@ -123,23 +136,35 @@ static int list_func(int argc, char *argv[])
         goto error;
     }
 
-    fprintf(stdout," ID                                     | status\n"
-                   "----------------------------------------+------------\n");
+    fprintf(stdout," ID                                     | status     | metadata\n"
+                   "----------------------------------------+------------+---------------\n");
 
     for ( i = 0; i < done; i++ )
     {
+        unsigned int j;
         char *name_str = name + name_off;
+        char *metadata_str = metadata + metadata_off;
 
         printf("%-40.*s| %s", len[i], name_str, state2str(info[i].state));
         if ( info[i].rc )
-            printf(" (%d, %s)\n", -info[i].rc, strerror(-info[i].rc));
+            printf(" (%d, %s)    | ", -info[i].rc, strerror(-info[i].rc));
         else
-            puts("");
+            printf("    | ");
+
+        /* Replace all '\0' with semi-colons. */
+        for ( j = 0; metadata_len[i] && j < metadata_len[i] - 1; j++ )
+            metadata_str[j] = (metadata_str[j] ?: ';');
+        printf("%.*s\n", metadata_len[i], metadata_str);
 
         name_off += len[i];
+        metadata_off += metadata_len[i];
     }
 
 error:
+    free(metadata_len);
+error_metadata_len:
+    free(metadata);
+error_metadata:
     free(len);
 error_len:
     free(name);

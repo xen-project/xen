@@ -663,7 +663,7 @@ int xc_livepatch_get(xc_interface *xch,
 
 /*
  * Get a number of available payloads and get actual total size of
- * the payloads' name array.
+ * the payloads' name and metadata arrays.
  *
  * This functions is typically executed first before the xc_livepatch_list()
  * to obtain the sizes and correctly allocate all necessary data resources.
@@ -674,12 +674,13 @@ int xc_livepatch_get(xc_interface *xch,
  * will contain the hypercall error code value.
  */
 int xc_livepatch_list_get_sizes(xc_interface *xch, unsigned int *nr,
-                                uint32_t *name_total_size)
+                                uint32_t *name_total_size,
+                                uint32_t *metadata_total_size)
 {
     DECLARE_SYSCTL;
     int rc;
 
-    if ( !nr || !name_total_size )
+    if ( !nr || !name_total_size || !metadata_total_size )
     {
         errno = EINVAL;
         return -1;
@@ -695,6 +696,7 @@ int xc_livepatch_list_get_sizes(xc_interface *xch, unsigned int *nr,
 
     *nr = sysctl.u.livepatch.u.list.nr;
     *name_total_size = sysctl.u.livepatch.u.list.name_total_size;
+    *metadata_total_size = sysctl.u.livepatch.u.list.metadata_total_size;
 
     return 0;
 }
@@ -704,6 +706,8 @@ int xc_livepatch_list_get_sizes(xc_interface *xch, unsigned int *nr,
  *   - xen_livepatch_status_t: states and return codes of payloads
  *   - name: names of payloads
  *   - len: lengths of corresponding payloads' names
+ *   - metadata: payloads' metadata
+ *   - metadata_len: lengths of corresponding payloads' metadata
  *
  * However it is complex because it has to deal with the hypervisor
  * returning some of the requested data or data being stale
@@ -716,12 +720,13 @@ int xc_livepatch_list_get_sizes(xc_interface *xch, unsigned int *nr,
  *
  * It is expected that the caller of this function will first issue the
  * xc_livepatch_list_get_sizes() in order to obtain total sizes of names
- * as well as the current number of payload entries.
- * The total sizes are required and supplied via the 'name_total_size'
- * parameter.
+ * and all metadata as well as the current number of payload entries.
+ * The total sizes are required and supplied via the 'name_total_size' and
+ * 'metadata_total_size' parameters.
  *
  * The 'max' is to be provided by the caller with the maximum number of
- * entries that 'info', 'name', 'len' arrays can be filled up with.
+ * entries that 'info', 'name', 'len', 'metadata' and 'metadata_len' arrays
+ * can be filled up with.
  *
  * Each entry in the 'info' array is expected to be of xen_livepatch_status_t
  * structure size.
@@ -729,6 +734,10 @@ int xc_livepatch_list_get_sizes(xc_interface *xch, unsigned int *nr,
  * Each entry in the 'name' array may have an arbitrary size.
  *
  * Each entry in the 'len' array is expected to be of uint32_t size.
+ *
+ * Each entry in the 'metadata' array may have an arbitrary size.
+ *
+ * Each entry in the 'metadata_len' array is expected to be of uint32_t size.
  *
  * The return value is zero if the hypercall completed successfully.
  * Note that the return value is _not_ the amount of entries filled
@@ -744,6 +753,8 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
                       struct xen_livepatch_status *info,
                       char *name, uint32_t *len,
                       const uint32_t name_total_size,
+                      char *metadata, uint32_t *metadata_len,
+                      const uint32_t metadata_total_size,
                       unsigned int *done, unsigned int *left)
 {
     int rc;
@@ -752,13 +763,16 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
     DECLARE_HYPERCALL_BOUNCE(info, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     DECLARE_HYPERCALL_BOUNCE(name, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     DECLARE_HYPERCALL_BOUNCE(len, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(metadata, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+    DECLARE_HYPERCALL_BOUNCE(metadata_len, 0, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
     uint32_t max_batch_sz, nr;
     uint32_t version = 0, retries = 0;
     uint32_t adjust = 0;
-    uint32_t name_off = 0;
-    uint32_t name_sz;
+    uint32_t name_off = 0, metadata_off = 0;
+    uint32_t name_sz, metadata_sz;
 
-    if ( !max || !info || !name || !len || !done || !left )
+    if ( !max || !info || !name || !len ||
+         !metadata || !metadata_len || !done || !left )
     {
         errno = EINVAL;
         return -1;
@@ -777,10 +791,11 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
 
     max_batch_sz = max;
     name_sz = name_total_size;
+    metadata_sz = metadata_total_size;
     *done = 0;
     *left = 0;
     do {
-        uint32_t _name_sz;
+        uint32_t _name_sz, _metadata_sz;
 
         /*
          * The first time we go in this loop our 'max' may be bigger
@@ -803,10 +818,14 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
         HYPERCALL_BOUNCE_SET_SIZE(info, nr * sizeof(*info));
         HYPERCALL_BOUNCE_SET_SIZE(name, name_sz);
         HYPERCALL_BOUNCE_SET_SIZE(len, nr * sizeof(*len));
+        HYPERCALL_BOUNCE_SET_SIZE(metadata, metadata_sz);
+        HYPERCALL_BOUNCE_SET_SIZE(metadata_len, nr * sizeof(*metadata_len));
         /* Move the pointer to proper offset into 'info'. */
         (HYPERCALL_BUFFER(info))->ubuf = info + *done;
         (HYPERCALL_BUFFER(name))->ubuf = name + name_off;
         (HYPERCALL_BUFFER(len))->ubuf = len + *done;
+        (HYPERCALL_BUFFER(metadata))->ubuf = metadata + metadata_off;
+        (HYPERCALL_BUFFER(metadata_len))->ubuf = metadata_len + *done;
         /* Allocate memory. */
         rc = xc_hypercall_bounce_pre(xch, info);
         if ( rc )
@@ -820,9 +839,19 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
         if ( rc )
             break;
 
+        rc = xc_hypercall_bounce_pre(xch, metadata);
+        if ( rc )
+            break;
+
+        rc = xc_hypercall_bounce_pre(xch, metadata_len);
+        if ( rc )
+            break;
+
         set_xen_guest_handle(sysctl.u.livepatch.u.list.status, info);
         set_xen_guest_handle(sysctl.u.livepatch.u.list.name, name);
         set_xen_guest_handle(sysctl.u.livepatch.u.list.len, len);
+        set_xen_guest_handle(sysctl.u.livepatch.u.list.metadata, metadata);
+        set_xen_guest_handle(sysctl.u.livepatch.u.list.metadata_len, metadata_len);
 
         rc = do_sysctl(xch, &sysctl);
         /*
@@ -839,6 +868,8 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
             xc_hypercall_bounce_post(xch, info);
             xc_hypercall_bounce_post(xch, name);
             xc_hypercall_bounce_post(xch, len);
+            xc_hypercall_bounce_post(xch, metadata);
+            xc_hypercall_bounce_post(xch, metadata_len);
             continue;
         }
         else if ( rc < 0 ) /* For all other errors we bail out. */
@@ -863,6 +894,8 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
             xc_hypercall_bounce_post(xch, info);
             xc_hypercall_bounce_post(xch, name);
             xc_hypercall_bounce_post(xch, len);
+            xc_hypercall_bounce_post(xch, metadata);
+            xc_hypercall_bounce_post(xch, metadata_len);
             continue;
         }
 
@@ -875,17 +908,24 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
         }
         *left = sysctl.u.livepatch.u.list.nr; /* Total remaining count. */
         _name_sz = sysctl.u.livepatch.u.list.name_total_size; /* Total received name size. */
+        _metadata_sz = sysctl.u.livepatch.u.list.metadata_total_size; /* Total received metadata size. */
         /* Copy only up 'rc' of data' - we could add 'min(rc,nr) if desired. */
         HYPERCALL_BOUNCE_SET_SIZE(info, (rc * sizeof(*info)));
         HYPERCALL_BOUNCE_SET_SIZE(name, _name_sz);
         HYPERCALL_BOUNCE_SET_SIZE(len, (rc * sizeof(*len)));
+        HYPERCALL_BOUNCE_SET_SIZE(metadata, _metadata_sz);
+        HYPERCALL_BOUNCE_SET_SIZE(metadata_len, (rc * sizeof(*metadata_len)));
         /* Bounce the data and free the bounce buffer. */
         xc_hypercall_bounce_post(xch, info);
         xc_hypercall_bounce_post(xch, name);
         xc_hypercall_bounce_post(xch, len);
+        xc_hypercall_bounce_post(xch, metadata);
+        xc_hypercall_bounce_post(xch, metadata_len);
 
         name_sz -= _name_sz;
         name_off += _name_sz;
+        metadata_sz -= _metadata_sz;
+        metadata_off += _metadata_sz;
 
         /* And update how many elements of info we have copied into. */
         *done += rc;
@@ -898,6 +938,8 @@ int xc_livepatch_list(xc_interface *xch, const unsigned int max,
         xc_hypercall_bounce_post(xch, len);
         xc_hypercall_bounce_post(xch, name);
         xc_hypercall_bounce_post(xch, info);
+        xc_hypercall_bounce_post(xch, metadata);
+        xc_hypercall_bounce_post(xch, metadata_len);
     }
 
     return rc > 0 ? 0 : rc;

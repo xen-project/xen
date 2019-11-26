@@ -1159,9 +1159,13 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
     if ( list->nr > 1024 )
         return -E2BIG;
 
+    if ( list->pad )
+        return -EINVAL;
+
     if ( list->nr &&
          (!guest_handle_okay(list->status, list->nr) ||
-          !guest_handle_okay(list->len, list->nr)) )
+          !guest_handle_okay(list->len, list->nr) ||
+          !guest_handle_okay(list->metadata_len, list->nr)) )
         return -EINVAL;
 
     spin_lock(&payload_lock);
@@ -1172,13 +1176,14 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
     }
 
     list->name_total_size = 0;
+    list->metadata_total_size = 0;
     if ( list->nr )
     {
-        uint64_t name_offset = 0;
+        uint64_t name_offset = 0, metadata_offset = 0;
 
         list_for_each_entry( data, &payload_list, list )
         {
-            uint32_t name_len;
+            uint32_t name_len, metadata_len;
 
             if ( list->idx > i++ )
                 continue;
@@ -1189,8 +1194,13 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
             name_len = strlen(data->name) + 1;
             list->name_total_size += name_len;
 
+            metadata_len = data->metadata.len;
+            list->metadata_total_size += metadata_len;
+
             if ( !guest_handle_subrange_okay(list->name, name_offset,
-                                             name_offset + name_len - 1) )
+                                             name_offset + name_len - 1) ||
+                 !guest_handle_subrange_okay(list->metadata, metadata_offset,
+                                             metadata_offset + metadata_len - 1) )
             {
                 rc = -EINVAL;
                 break;
@@ -1200,7 +1210,10 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
             if ( __copy_to_guest_offset(list->name, name_offset,
                                         data->name, name_len) ||
                 __copy_to_guest_offset(list->len, idx, &name_len, 1) ||
-                __copy_to_guest_offset(list->status, idx, &status, 1) )
+                __copy_to_guest_offset(list->status, idx, &status, 1) ||
+                __copy_to_guest_offset(list->metadata, metadata_offset,
+                                       data->metadata.data, metadata_len) ||
+                __copy_to_guest_offset(list->metadata_len, idx, &metadata_len, 1) )
             {
                 rc = -EFAULT;
                 break;
@@ -1208,6 +1221,7 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
 
             idx++;
             name_offset += name_len;
+            metadata_offset += metadata_len;
 
             if ( (idx >= list->nr) || hypercall_preempt_check() )
                 break;
@@ -1218,6 +1232,7 @@ static int livepatch_list(struct xen_sysctl_livepatch_list *list)
         list_for_each_entry( data, &payload_list, list )
         {
             list->name_total_size += strlen(data->name) + 1;
+            list->metadata_total_size += data->metadata.len;
         }
     }
     list->nr = payload_cnt - i; /* Remaining amount. */

@@ -707,8 +707,8 @@ The structure is as follow:
 
 ### XEN_SYSCTL_LIVEPATCH_LIST (2)
 
-Retrieve an array of abbreviated status and names of payloads that are loaded in the
-hypervisor.
+Retrieve an array of abbreviated status, names and metadata of payloads that are
+loaded in the hypervisor.
 
 The caller provides:
 
@@ -717,11 +717,13 @@ The caller provides:
  * `idx` Index iterator. The index into the hypervisor's payload count. It is
     recommended that on first invocation zero be used so that `nr` (which the
     hypervisor will update with the remaining payload count) be provided.
-    Also the hypervisor will provide `version` with the most current value and
-    calculated total size for all payloads' names.
+    Also the hypervisor will provide `version` with the most current value,
+    calculated total size of all payloads' names and calculated total size of
+    all payload's metadata.
  * `nr` The max number of entries to populate. Can be zero which will result
     in the hypercall being a probing one and return the number of payloads
     (and update the `version`).
+ * `pad` - *MUST* be zero.
  * `status` Virtual address of where to write `struct xen_livepatch_status`
    structures. Caller *MUST* allocate up to `nr` of them.
  * `name` - Virtual address of where to write the unique name of the payloads.
@@ -733,14 +735,23 @@ The caller provides:
  * `len` - Virtual address of where to write the length of each unique name
    of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST* be
    of sizeof(uint32_t) (4 bytes).
+ * `metadata` - Virtual address of where to write the metadata of the payloads.
+   Caller *MUST* allocate enough space to be able to store all received data
+   (i.e. total allocated space *MUST* match the `metadata_total_size` value
+   provided by the hypervisor). Individual payload metadata string can be of
+   arbitrary length. The metadata string format is: key=value\0...key=value\0.
+ * `metadata_len` - Virtual address of where to write the length of each metadata
+   string of the payload. Caller *MUST* allocate up to `nr` of them. Each *MUST*
+   be of sizeof(uint32_t) (4 bytes).
 
 If the hypercall returns an positive number, it is the number (upto `nr`
 provided to the hypercall) of the payloads returned, along with `nr` updated
 with the number of remaining payloads, `version` updated (it may be the same
 across hypercalls - if it varies the data is stale and further calls could
-fail) and the `name_total_size` containing total size of transferred data for
-the array. The `status`, `name`, and `len` are updated at their designed index
-value (`idx`) with the returned value of data.
+fail), `name_total_size` and `metadata_total_size` containing total sizes of
+transferred data for both the arrays.
+The `status`, `name`, `len`, `metadata` and `metadata_len` are updated at their
+designed index value (`idx`) with the returned value of data.
 
 If the hypercall returns -XEN_E2BIG the `nr` is too big and should be
 lowered.
@@ -777,7 +788,9 @@ The structure is as follow:
                                                    should be filled out. Can be zero to get
                                                    amount of payloads and version.
                                                    OUT: How many payloads left. */
+        uint32_t pad;                           /* IN: Must be zero. */
         uint32_t name_total_size;               /* OUT: Total size of all transfer names */
+        uint32_t metadata_total_size;           /* OUT: Total size of all transfer metadata */
         XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough
                                                    space allocate for nr of them. */
         XEN_GUEST_HANDLE_64(char) name;         /* OUT: Array of names. Each member
@@ -786,6 +799,12 @@ The structure is as follow:
                                                    nr of them. */
         XEN_GUEST_HANDLE_64(uint32) len;        /* OUT: Array of lengths of name's.
                                                    Must have nr of them. */
+        XEN_GUEST_HANDLE_64(char) metadata;     /* OUT: Array of metadata strings. Each
+                                                   member may have an arbitrary length.
+                                                   Must have nr of them. */
+        XEN_GUEST_HANDLE_64(uint32) metadata_len;  /* OUT: Array of lengths of metadata's.
+                                                      Must have nr of them. */
+
     };
 
 ### XEN_SYSCTL_LIVEPATCH_ACTION (3)
