@@ -1279,7 +1279,7 @@ static int __init amd_iommu_setup_device_table(
         for ( bdf = 0, size /= sizeof(*dt); bdf < size; ++bdf )
             dt[bdf] = (struct amd_iommu_dte){
                           .v = true,
-                          .iv = true,
+                          .iv = iommu_intremap,
                       };
     }
 
