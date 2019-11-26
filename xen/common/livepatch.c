@@ -467,8 +467,7 @@ static int xen_build_id_dep(const struct payload *payload)
 static int check_special_sections(const struct livepatch_elf *elf)
 {
     unsigned int i;
-    static const char *const names[] = { ELF_LIVEPATCH_FUNC,
-                                         ELF_LIVEPATCH_DEPENDS,
+    static const char *const names[] = { ELF_LIVEPATCH_DEPENDS,
                                          ELF_LIVEPATCH_XEN_DEPENDS,
                                          ELF_BUILD_ID_NOTE};
     DECLARE_BITMAP(found, ARRAY_SIZE(names)) = { 0 };
@@ -498,6 +497,64 @@ static int check_special_sections(const struct livepatch_elf *elf)
                    elf->name, names[i]);
             return -EINVAL;
         }
+    }
+
+    return 0;
+}
+
+static int check_patching_sections(const struct livepatch_elf *elf)
+{
+    unsigned int i;
+    static const char *const names[] = { ELF_LIVEPATCH_FUNC,
+                                         ELF_LIVEPATCH_LOAD_HOOKS,
+                                         ELF_LIVEPATCH_UNLOAD_HOOKS,
+                                         ELF_LIVEPATCH_PREAPPLY_HOOK,
+                                         ELF_LIVEPATCH_APPLY_HOOK,
+                                         ELF_LIVEPATCH_POSTAPPLY_HOOK,
+                                         ELF_LIVEPATCH_PREREVERT_HOOK,
+                                         ELF_LIVEPATCH_REVERT_HOOK,
+                                         ELF_LIVEPATCH_POSTREVERT_HOOK};
+    DECLARE_BITMAP(found, ARRAY_SIZE(names)) = { 0 };
+
+    /*
+     * The patching sections are optional, but at least one
+     * must be present. Otherwise, there is nothing to do.
+     * All the existing sections must not be empty and must
+     * be present at most once.
+     */
+    for ( i = 0; i < ARRAY_SIZE(names); i++ )
+    {
+        const struct livepatch_elf_sec *sec;
+
+        sec = livepatch_elf_sec_by_name(elf, names[i]);
+        if ( !sec )
+        {
+            dprintk(XENLOG_DEBUG, LIVEPATCH "%s: %s is missing\n",
+                    elf->name, names[i]);
+            continue; /* This section is optional */
+        }
+
+        if ( !sec->sec->sh_size )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s: %s is empty\n",
+                   elf->name, names[i]);
+            return -EINVAL;
+        }
+
+        if ( test_and_set_bit(i, found) )
+        {
+            printk(XENLOG_ERR LIVEPATCH "%s: %s was seen more than once\n",
+                   elf->name, names[i]);
+            return -EINVAL;
+        }
+    }
+
+    /* Checking if at least one section is present. */
+    if ( bitmap_empty(found, ARRAY_SIZE(names)) )
+    {
+        printk(XENLOG_ERR LIVEPATCH "%s: Nothing to patch. Aborting...\n",
+               elf->name);
+        return -EINVAL;
     }
 
     return 0;
@@ -542,57 +599,59 @@ static int prepare_payload(struct payload *payload,
     const Elf_Note *n;
 
     sec = livepatch_elf_sec_by_name(elf, ELF_LIVEPATCH_FUNC);
-    ASSERT(sec);
-    if ( !section_ok(elf, sec, sizeof(*payload->funcs)) )
-        return -EINVAL;
-
-    payload->funcs = sec->load_addr;
-    payload->nfuncs = sec->sec->sh_size / sizeof(*payload->funcs);
-
-    for ( i = 0; i < payload->nfuncs; i++ )
+    if ( sec )
     {
-        int rc;
-
-        f = &(payload->funcs[i]);
-
-        if ( f->version != LIVEPATCH_PAYLOAD_VERSION )
-        {
-            printk(XENLOG_ERR LIVEPATCH "%s: Wrong version (%u). Expected %d\n",
-                   elf->name, f->version, LIVEPATCH_PAYLOAD_VERSION);
-            return -EOPNOTSUPP;
-        }
-
-        /* 'old_addr', 'new_addr', 'new_size' can all be zero. */
-        if ( !f->old_size )
-        {
-            printk(XENLOG_ERR LIVEPATCH "%s: Address or size fields are zero\n",
-                   elf->name);
+        if ( !section_ok(elf, sec, sizeof(*payload->funcs)) )
             return -EINVAL;
+
+        payload->funcs = sec->load_addr;
+        payload->nfuncs = sec->sec->sh_size / sizeof(*payload->funcs);
+
+        for ( i = 0; i < payload->nfuncs; i++ )
+        {
+            int rc;
+
+            f = &(payload->funcs[i]);
+
+            if ( f->version != LIVEPATCH_PAYLOAD_VERSION )
+            {
+                printk(XENLOG_ERR LIVEPATCH "%s: Wrong version (%u). Expected %d\n",
+                       elf->name, f->version, LIVEPATCH_PAYLOAD_VERSION);
+                return -EOPNOTSUPP;
+            }
+
+            /* 'old_addr', 'new_addr', 'new_size' can all be zero. */
+            if ( !f->old_size )
+            {
+                printk(XENLOG_ERR LIVEPATCH "%s: Address or size fields are zero\n",
+                       elf->name);
+                return -EINVAL;
+            }
+
+            rc = arch_livepatch_verify_func(f);
+            if ( rc )
+                return rc;
+
+            rc = resolve_old_address(f, elf);
+            if ( rc )
+                return rc;
+
+            rc = livepatch_verify_distance(f);
+            if ( rc )
+                return rc;
         }
-
-        rc = arch_livepatch_verify_func(f);
-        if ( rc )
-            return rc;
-
-        rc = resolve_old_address(f, elf);
-        if ( rc )
-            return rc;
-
-        rc = livepatch_verify_distance(f);
-        if ( rc )
-            return rc;
     }
 
-    LIVEPATCH_ASSIGN_MULTI_HOOK(elf, payload->load_funcs, payload->n_load_funcs, ".livepatch.hooks.load");
-    LIVEPATCH_ASSIGN_MULTI_HOOK(elf, payload->unload_funcs, payload->n_unload_funcs, ".livepatch.hooks.unload");
+    LIVEPATCH_ASSIGN_MULTI_HOOK(elf, payload->load_funcs, payload->n_load_funcs, ELF_LIVEPATCH_LOAD_HOOKS);
+    LIVEPATCH_ASSIGN_MULTI_HOOK(elf, payload->unload_funcs, payload->n_unload_funcs, ELF_LIVEPATCH_UNLOAD_HOOKS);
 
-    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.pre, ".livepatch.hooks.preapply");
-    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.action, ".livepatch.hooks.apply");
-    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.post, ".livepatch.hooks.postapply");
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.pre, ELF_LIVEPATCH_PREAPPLY_HOOK);
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.action, ELF_LIVEPATCH_APPLY_HOOK);
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.apply.post, ELF_LIVEPATCH_POSTAPPLY_HOOK);
 
-    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.pre, ".livepatch.hooks.prerevert");
-    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.action, ".livepatch.hooks.revert");
-    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.post, ".livepatch.hooks.postrevert");
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.pre, ELF_LIVEPATCH_PREREVERT_HOOK);
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.action, ELF_LIVEPATCH_REVERT_HOOK);
+    LIVEPATCH_ASSIGN_SINGLE_HOOK(elf, payload->hooks.revert.post, ELF_LIVEPATCH_POSTREVERT_HOOK);
 
     sec = livepatch_elf_sec_by_name(elf, ELF_BUILD_ID_NOTE);
     if ( sec )
@@ -786,8 +845,6 @@ static int build_symbol_table(struct payload *payload,
     struct livepatch_symbol *symtab;
     char *strtab;
 
-    ASSERT(payload->nfuncs);
-
     /* Recall that section @0 is always NULL. */
     for ( i = 1; i < elf->nsym; i++ )
     {
@@ -901,6 +958,10 @@ static int load_payload_data(struct payload *payload, void *raw, size_t len)
         goto out;
 
     rc = check_special_sections(&elf);
+    if ( rc )
+        goto out;
+
+    rc = check_patching_sections(&elf);
     if ( rc )
         goto out;
 

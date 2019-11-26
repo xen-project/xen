@@ -33,6 +33,14 @@ struct xen_sysctl_livepatch_op;
 #define ELF_LIVEPATCH_DEPENDS     ".livepatch.depends"
 #define ELF_LIVEPATCH_XEN_DEPENDS ".livepatch.xen_depends"
 #define ELF_BUILD_ID_NOTE         ".note.gnu.build-id"
+#define ELF_LIVEPATCH_LOAD_HOOKS      ".livepatch.hooks.load"
+#define ELF_LIVEPATCH_UNLOAD_HOOKS    ".livepatch.hooks.unload"
+#define ELF_LIVEPATCH_PREAPPLY_HOOK   ".livepatch.hooks.preapply"
+#define ELF_LIVEPATCH_APPLY_HOOK      ".livepatch.hooks.apply"
+#define ELF_LIVEPATCH_POSTAPPLY_HOOK  ".livepatch.hooks.postapply"
+#define ELF_LIVEPATCH_PREREVERT_HOOK  ".livepatch.hooks.prerevert"
+#define ELF_LIVEPATCH_REVERT_HOOK     ".livepatch.hooks.revert"
+#define ELF_LIVEPATCH_POSTREVERT_HOOK ".livepatch.hooks.postrevert"
 /* Arbitrary limit for payload size and .bss section size. */
 #define LIVEPATCH_MAX_SIZE     MB(2)
 
