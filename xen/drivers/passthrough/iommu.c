@@ -443,6 +443,23 @@ int iommu_iotlb_flush_all(struct domain *d, unsigned int flush_flags)
     return rc;
 }
 
+static int __init iommu_quarantine_init(void)
+{
+    const struct domain_iommu *hd = dom_iommu(dom_io);
+    int rc;
+
+    dom_io->options |= XEN_DOMCTL_CDF_iommu;
+
+    rc = iommu_domain_init(dom_io, 0);
+    if ( rc )
+        return rc;
+
+    if ( !hd->platform_ops->quarantine_init )
+        return 0;
+
+    return hd->platform_ops->quarantine_init(dom_io);
+}
+
 int __init iommu_setup(void)
 {
     int rc = -ENODEV;
@@ -476,8 +493,7 @@ int __init iommu_setup(void)
     }
     else
     {
-        dom_io->options |= XEN_DOMCTL_CDF_iommu;
-        if ( iommu_domain_init(dom_io, 0) )
+        if ( iommu_quarantine_init() )
             panic("Could not set up quarantine\n");
 
         printk(" - Dom0 mode: %s\n",
