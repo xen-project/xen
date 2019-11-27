@@ -502,6 +502,13 @@ static struct microcode_patch *cpu_request_microcode(const void *buf,
 
     if ( error )
     {
+        /*
+         * -ENODATA here means that the blob was parsed fine but no matching
+         * ucode was found. Don't return it to the caller.
+         */
+        if ( error == -ENODATA )
+            error = 0;
+
         xfree(mc_amd->equiv_cpu_table);
         xfree(mc_amd);
         goto out;

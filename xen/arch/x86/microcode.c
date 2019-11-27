@@ -640,9 +640,29 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
 
     if ( !patch )
     {
+        printk(XENLOG_WARNING "microcode: couldn't find any matching ucode in "
+                              "the provided blob!\n");
         ret = -ENOENT;
         goto put;
     }
+
+    /*
+     * If microcode_cache exists, all CPUs in the system should have at least
+     * that ucode revision.
+     */
+    spin_lock(&microcode_mutex);
+    if ( microcode_cache &&
+         microcode_ops->compare_patch(patch, microcode_cache) != NEW_UCODE )
+    {
+        spin_unlock(&microcode_mutex);
+        printk(XENLOG_WARNING "microcode: couldn't find any newer revision "
+                              "in the provided blob!\n");
+        microcode_free_patch(patch);
+        ret = -ENOENT;
+
+        goto put;
+    }
+    spin_unlock(&microcode_mutex);
 
     if ( microcode_ops->start_update )
     {
