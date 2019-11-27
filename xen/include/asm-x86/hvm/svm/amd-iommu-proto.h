@@ -54,6 +54,9 @@ int amd_iommu_init_late(void);
 int amd_iommu_update_ivrs_mapping_acpi(void);
 int iov_adjust_irq_affinities(void);
 
+int amd_iommu_get_paging_mode(unsigned long entries);
+int amd_iommu_quarantine_init(struct domain *d);
+
 /* mapping functions */
 int __must_check amd_iommu_map_page(struct domain *d, dfn_t dfn,
                                     mfn_t mfn, unsigned int flags,

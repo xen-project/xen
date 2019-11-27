@@ -211,6 +211,7 @@ typedef int iommu_grdm_t(xen_pfn_t start, xen_ulong_t nr, u32 id, void *ctxt);
 struct iommu_ops {
     int (*init)(struct domain *d);
     void (*hwdom_init)(struct domain *d);
+    int (*quarantine_init)(struct domain *d);
     int (*add_device)(u8 devfn, device_t *dev);
     int (*enable_device)(device_t *dev);
     int (*remove_device)(u8 devfn, device_t *dev);
