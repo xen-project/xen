@@ -106,15 +106,9 @@ static void vlapic_clear_irr(int vector, struct vlapic *vlapic)
     vlapic_clear_vector(vector, &vlapic->regs->data[APIC_IRR]);
 }
 
-static void sync_pir_to_irr(struct vcpu *v)
-{
-    if ( hvm_funcs.sync_pir_to_irr )
-        alternative_vcall(hvm_funcs.sync_pir_to_irr, v);
-}
-
 static int vlapic_find_highest_irr(struct vlapic *vlapic)
 {
-    sync_pir_to_irr(vlapic_vcpu(vlapic));
+    vlapic_sync_pir_to_irr(vlapic_vcpu(vlapic));
 
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
 }
@@ -1494,7 +1488,7 @@ static int lapic_save_regs(struct vcpu *v, hvm_domain_context_t *h)
     if ( !has_vlapic(v->domain) )
         return 0;
 
-    sync_pir_to_irr(v);
+    vlapic_sync_pir_to_irr(v);
 
     return hvm_save_entry(LAPIC_REGS, v->vcpu_id, h, vcpu_vlapic(v)->regs);
 }
