@@ -373,8 +373,7 @@ config FAST_SYMBOL_LOOKUP
 
 config ENFORCE_UNIQUE_SYMBOLS
 	bool "Enforce unique symbols"
-	default y
-	depends on LIVEPATCH
+	default LIVEPATCH
 	---help---
 	  Multiple symbols with the same name aren't generally a problem
 	  unless livepatching is to be used.
@@ -387,8 +386,8 @@ config ENFORCE_UNIQUE_SYMBOLS
 	  livepatch build and apply correctly.
 
 config SUPPRESS_DUPLICATE_SYMBOL_WARNINGS
-	bool "Suppress duplicate symbol warnings" if !ENFORCE_UNIQUE_SYMBOLS
-	default y if !ENFORCE_UNIQUE_SYMBOLS
+	bool "Suppress duplicate symbol warnings"
+	depends on !ENFORCE_UNIQUE_SYMBOLS
 	---help---
 	  Multiple symbols with the same name aren't generally a problem
 	  unless Live patching is to be used, so these warnings can be

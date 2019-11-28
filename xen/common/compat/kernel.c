@@ -2,7 +2,7 @@
  * kernel.c
  */
 
-asm(".file \"" __FILE__ "\"");
+EMIT_FILE;
 
 #include <xen/init.h>
 #include <xen/lib.h>

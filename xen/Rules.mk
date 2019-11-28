@@ -194,12 +194,24 @@ FORCE:
 
 .PHONY: clean
 clean:: $(addprefix _clean_, $(subdir-all))
-	rm -f *.o *~ core $(DEPS_RM)
+	rm -f *.o .*.o.tmp *~ core $(DEPS_RM)
 _clean_%/: FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $* clean
 
+SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
+
 %.o: %.c Makefile
+ifeq ($(CONFIG_ENFORCE_UNIQUE_SYMBOLS),y)
+	$(CC) $(CFLAGS) -c $< -o $(@D)/.$(@F).tmp
+ifeq ($(clang),y)
+	$(OBJCOPY) --redefine-sym $<=$(SRCPATH)/$< $(@D)/.$(@F).tmp $@
+else
+	$(OBJCOPY) --redefine-sym $(<F)=$(SRCPATH)/$< $(@D)/.$(@F).tmp $@
+endif
+	rm -f $(@D)/.$(@F).tmp
+else
 	$(CC) $(CFLAGS) -c $< -o $@
+endif
 
 %.o: %.S Makefile
 	$(CC) $(AFLAGS) -c $< -o $@

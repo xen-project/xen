@@ -38,7 +38,7 @@ config FRAME_POINTER
 config COVERAGE
 	bool "Code coverage support"
 	depends on !LIVEPATCH
-	select SUPPRESS_DUPLICATE_SYMBOL_WARNINGS
+	select SUPPRESS_DUPLICATE_SYMBOL_WARNINGS if !ENFORCE_UNIQUE_SYMBOLS
 	---help---
 	  Enable code coverage support.
 

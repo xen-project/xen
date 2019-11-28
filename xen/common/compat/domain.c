@@ -3,7 +3,7 @@
  *
  */
 
-asm(".file \"" __FILE__ "\"");
+EMIT_FILE;
 
 #include <xen/lib.h>
 #include <xen/sched.h>

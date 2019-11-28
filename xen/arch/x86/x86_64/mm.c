@@ -16,7 +16,7 @@
  * with this program; If not, see <http://www.gnu.org/licenses/>.
  */
 
-asm(".file \"" __FILE__ "\"");
+EMIT_FILE;
 
 #include <xen/lib.h>
 #include <xen/init.h>

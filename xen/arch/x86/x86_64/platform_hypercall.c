@@ -2,7 +2,7 @@
  * platform_hypercall.c
  */
 
-asm(".file \"" __FILE__ "\"");
+EMIT_FILE;
 
 #include <xen/lib.h>
 #include <compat/platform.h>

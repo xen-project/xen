@@ -2,7 +2,7 @@
  * compat.c
  */
 
-asm(".file \"" __FILE__ "\"");
+EMIT_FILE;
 
 #include <xen/hypercall.h>
 #include <compat/xen.h>
