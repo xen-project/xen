@@ -113,10 +113,6 @@ void hvm_monitor_descriptor_access(uint64_t exit_info,
         req.u.desc_access.arch.vmx.instr_info = exit_info;
         req.u.desc_access.arch.vmx.exit_qualification = vmx_exit_qualification;
     }
-    else
-    {
-        req.u.desc_access.arch.svm.exitinfo = exit_info;
-    }
 
     monitor_traps(current, true, &req);
 }

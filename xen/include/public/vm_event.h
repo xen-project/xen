@@ -29,7 +29,7 @@
 
 #include "xen.h"
 
-#define VM_EVENT_INTERFACE_VERSION 0x00000005
+#define VM_EVENT_INTERFACE_VERSION 0x00000006
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
@@ -301,10 +301,6 @@ struct vm_event_desc_access {
             uint32_t _pad1;
             uint64_t exit_qualification; /* VMX: VMCS Exit Qualification */
         } vmx;
-        struct {
-            uint64_t exitinfo;           /* SVM: VMCB EXITINFO */
-            uint64_t _pad2;
-        } svm;
     } arch;
     uint8_t descriptor;                  /* VM_EVENT_DESC_* */
     uint8_t is_write;

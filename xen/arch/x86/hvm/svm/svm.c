@@ -2980,29 +2980,26 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_do_pause(regs);
         break;
 
-    case VMEXIT_IDTR_READ:
-    case VMEXIT_IDTR_WRITE:
-        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
-            VM_EVENT_DESC_IDTR, exit_reason == VMEXIT_IDTR_WRITE);
-        break;
+    case VMEXIT_IDTR_READ ... VMEXIT_TR_WRITE:
+    {
+        /*
+         * Consecutive block of 8 exit codes (sadly not aligned).  Top bit
+         * indicates write (vs read), bottom 2 bits map linearly to
+         * VM_EVENT_DESC_* values.
+         */
+#define E2D(e)      ((((e)         - VMEXIT_IDTR_READ) & 3) + 1)
+        bool write = ((exit_reason - VMEXIT_IDTR_READ) & 4);
+        unsigned int desc = E2D(exit_reason);
 
-    case VMEXIT_GDTR_READ:
-    case VMEXIT_GDTR_WRITE:
-        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
-            VM_EVENT_DESC_GDTR, exit_reason == VMEXIT_GDTR_WRITE);
-        break;
+        BUILD_BUG_ON(E2D(VMEXIT_IDTR_READ) != VM_EVENT_DESC_IDTR);
+        BUILD_BUG_ON(E2D(VMEXIT_GDTR_READ) != VM_EVENT_DESC_GDTR);
+        BUILD_BUG_ON(E2D(VMEXIT_LDTR_READ) != VM_EVENT_DESC_LDTR);
+        BUILD_BUG_ON(E2D(VMEXIT_TR_READ)   != VM_EVENT_DESC_TR);
+#undef E2D
 
-    case VMEXIT_LDTR_READ:
-    case VMEXIT_LDTR_WRITE:
-        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
-            VM_EVENT_DESC_LDTR, exit_reason == VMEXIT_LDTR_WRITE);
+        hvm_descriptor_access_intercept(0, 0, desc, write);
         break;
-
-    case VMEXIT_TR_READ:
-    case VMEXIT_TR_WRITE:
-        hvm_descriptor_access_intercept(vmcb->exitintinfo.bytes, 0,
-            VM_EVENT_DESC_TR, exit_reason == VMEXIT_TR_WRITE);
-        break;
+    }
 
     default:
     unexpected_exit_type:
