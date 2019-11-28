@@ -427,7 +427,7 @@ static unsigned int iommu_msi_startup(struct irq_desc *desc)
 static void iommu_msi_end(struct irq_desc *desc, u8 vector)
 {
     iommu_msi_unmask(desc);
-    ack_APIC_irq();
+    end_nonmaskable_irq(desc, vector);
 }
 
 
@@ -460,7 +460,7 @@ static void iommu_maskable_msi_shutdown(struct irq_desc *desc)
  * maskable flavors here, as we want the ACK to be issued in ->end().
  */
 #define iommu_maskable_msi_ack ack_nonmaskable_msi_irq
-#define iommu_maskable_msi_end end_nonmaskable_msi_irq
+#define iommu_maskable_msi_end end_nonmaskable_irq
 
 static hw_irq_controller iommu_maskable_msi_type = {
     .typename = "IOMMU-M-MSI",
@@ -507,7 +507,7 @@ static hw_irq_controller iommu_x2apic_type = {
     .enable       = irq_enable_none,
     .disable      = irq_disable_none,
     .ack          = ack_nonmaskable_msi_irq,
-    .end          = end_nonmaskable_msi_irq,
+    .end          = end_nonmaskable_irq,
     .set_affinity = set_x2apic_affinity,
 };
 

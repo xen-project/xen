@@ -438,6 +438,7 @@ int __init init_irq_data(void)
 }
 
 static void __do_IRQ_guest(int vector);
+static void flush_ready_eoi(void);
 
 static void ack_none(struct irq_desc *desc)
 {
@@ -865,6 +866,7 @@ void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
 }
 
 DEFINE_PER_CPU(unsigned int, irq_count);
+static DEFINE_PER_CPU(bool, check_eoi_deferral);
 
 uint8_t alloc_hipriority_vector(void)
 {
@@ -1008,7 +1010,25 @@ void do_IRQ(struct cpu_user_regs *regs)
 
  out:
     if ( desc->handler->end )
+    {
+        /*
+         * If higher priority vectors still have their EOIs pending, we may
+         * not issue an EOI here, as this would EOI the highest priority one.
+         */
+        if ( cpu_has_pending_apic_eoi() )
+        {
+            this_cpu(check_eoi_deferral) = true;
+            desc->handler->end(desc, vector);
+            this_cpu(check_eoi_deferral) = false;
+
+            spin_unlock(&desc->lock);
+            flush_ready_eoi();
+            goto out_no_unlock;
+        }
+
         desc->handler->end(desc, vector);
+    }
+
  out_no_end:
     spin_unlock(&desc->lock);
  out_no_unlock:
@@ -1161,6 +1181,29 @@ static DEFINE_PER_CPU(struct pending_eoi, pending_eoi[NR_DYNAMIC_VECTORS]);
 bool cpu_has_pending_apic_eoi(void)
 {
     return pending_eoi_sp(this_cpu(pending_eoi)) != 0;
+}
+
+void end_nonmaskable_irq(struct irq_desc *desc, uint8_t vector)
+{
+    struct pending_eoi *peoi = this_cpu(pending_eoi);
+    unsigned int sp = pending_eoi_sp(peoi);
+
+    if ( !this_cpu(check_eoi_deferral) || !sp || peoi[sp - 1].vector < vector )
+    {
+        ack_APIC_irq();
+        return;
+    }
+
+    /* Defer this vector's EOI until all higher ones have been EOI-ed. */
+    pending_eoi_sp(peoi) = sp + 1;
+    do {
+        peoi[sp] = peoi[sp - 1];
+    } while ( --sp && peoi[sp - 1].vector > vector );
+    ASSERT(!sp || peoi[sp - 1].vector < vector);
+
+    peoi[sp].irq = desc->irq;
+    peoi[sp].vector = vector;
+    peoi[sp].ready = 1;
 }
 
 static inline void set_pirq_eoi(struct domain *d, unsigned int irq)

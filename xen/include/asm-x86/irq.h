@@ -188,6 +188,7 @@ void move_masked_irq(struct irq_desc *);
 
 int bind_irq_vector(int irq, int vector, const cpumask_t *);
 
+void end_nonmaskable_irq(struct irq_desc *, uint8_t vector);
 void irq_set_affinity(struct irq_desc *, const cpumask_t *mask);
 
 int init_domain_irq_mapping(struct domain *);

@@ -512,11 +512,6 @@ static void ack_maskable_msi_irq(struct irq_desc *desc)
     ack_APIC_irq(); /* ACKTYPE_NONE */
 }
 
-void end_nonmaskable_msi_irq(struct irq_desc *desc, u8 vector)
-{
-    ack_APIC_irq(); /* ACKTYPE_EOI */
-}
-
 /*
  * IRQ chip for MSI PCI/PCI-X/PCI-Express devices,
  * which implement the MSI or MSI-X capability structure.
@@ -539,7 +534,7 @@ static hw_irq_controller pci_msi_nonmaskable = {
     .enable       = irq_enable_none,
     .disable      = irq_disable_none,
     .ack          = ack_nonmaskable_msi_irq,
-    .end          = end_nonmaskable_msi_irq,
+    .end          = end_nonmaskable_irq,
     .set_affinity = set_msi_affinity
 };
 
