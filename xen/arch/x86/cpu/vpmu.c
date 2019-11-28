@@ -576,11 +576,36 @@ static void vpmu_arch_destroy(struct vcpu *v)
 
          vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
     }
+
+    vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);
+}
+
+static void vpmu_cleanup(struct vcpu *v)
+{
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    void *xenpmu_data;
+
+    spin_lock(&vpmu->vpmu_lock);
+
+    vpmu_arch_destroy(v);
+    xenpmu_data = vpmu->xenpmu_data;
+    vpmu->xenpmu_data = NULL;
+
+    spin_unlock(&vpmu->vpmu_lock);
+
+    if ( xenpmu_data )
+    {
+        mfn_t mfn = domain_page_map_to_mfn(xenpmu_data);
+
+        ASSERT(mfn_valid(mfn));
+        unmap_domain_page_global(xenpmu_data);
+        put_page_and_type(mfn_to_page(mfn));
+    }
 }
 
 void vpmu_destroy(struct vcpu *v)
 {
-    vpmu_arch_destroy(v);
+    vpmu_cleanup(v);
 
     put_vpmu(v);
 }
@@ -639,9 +664,6 @@ static int pvpmu_init(struct domain *d, xen_pmu_params_t *params)
 static void pvpmu_finish(struct domain *d, xen_pmu_params_t *params)
 {
     struct vcpu *v;
-    struct vpmu_struct *vpmu;
-    mfn_t mfn;
-    void *xenpmu_data;
 
     if ( (params->vcpu >= d->max_vcpus) || (d->vcpu[params->vcpu] == NULL) )
         return;
@@ -650,22 +672,7 @@ static void pvpmu_finish(struct domain *d, xen_pmu_params_t *params)
     if ( v != current )
         vcpu_pause(v);
 
-    vpmu = vcpu_vpmu(v);
-    spin_lock(&vpmu->vpmu_lock);
-
-    vpmu_arch_destroy(v);
-    xenpmu_data = vpmu->xenpmu_data;
-    vpmu->xenpmu_data = NULL;
-
-    spin_unlock(&vpmu->vpmu_lock);
-
-    if ( xenpmu_data )
-    {
-        mfn = domain_page_map_to_mfn(xenpmu_data);
-        ASSERT(mfn_valid(mfn));
-        unmap_domain_page_global(xenpmu_data);
-        put_page_and_type(mfn_to_page(mfn));
-    }
+    vpmu_cleanup(v);
 
     if ( v != current )
         vcpu_unpause(v);
