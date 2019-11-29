@@ -148,8 +148,5 @@ RELEASE TARBALL
 
 After a .0 release, update XEN_EXTRAVERSION again (to .1-pre, see above).
 
-update xenbits front page to change references to old stable branch
- into references to new stable branch
-
-Edit website
+Notify release manager of completion
 
