@@ -64,6 +64,7 @@ t=RELEASE-$r
 #      `-unstable$(XEN_VENDORVERSION)'   unstable aka unfrozen staging (or unstable branch, after branching)
 #      `.0$(XEN_VENDORVERSION)'          actual release of Xen X.Y.0 (aka first actual release of Xen X.Y)
 #      `.Z$(XEN_VENDORVERSION)'          actual release of Xen X.Y.Z (stable point realase)
+#      `.Z-pre$(XEN_VENDORVERSION)'      stable branch, after release of Z-1
 #
 #    - turn off debug on stable branches, if not already done
 #           - tools/Rules.mk
@@ -145,6 +146,7 @@ RELEASE TARBALL
 	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.gz
 	#   U oss-xen/release/4.8.0-rc2/xen-4.8.0-rc2.tar.gz.sig
 
+After a .0 release, update XEN_EXTRAVERSION again (to .1-pre, see above).
 
 update xenbits front page to change references to old stable branch
  into references to new stable branch
