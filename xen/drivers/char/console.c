@@ -257,16 +257,14 @@ static void do_dec_thresh(unsigned char key, struct cpu_user_regs *regs)
  * ********************************************************
  */
 
-static void conring_puts(const char *str)
+static void conring_puts(const char *str, size_t len)
 {
-    char c;
-
     ASSERT(spin_is_locked(&console_lock));
 
-    while ( (c = *str++) != '\0' )
-        conring[CONRING_IDX_MASK(conringp++)] = c;
+    while ( len-- )
+        conring[CONRING_IDX_MASK(conringp++)] = *str++;
 
-    if ( (uint32_t)(conringp - conringc) > conring_size )
+    if ( conringp - conringc > conring_size )
         conringc = conringp - conring_size;
 }
 
@@ -562,7 +560,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer,
 
             if ( opt_console_to_ring )
             {
-                conring_puts(kbuf);
+                conring_puts(kbuf, kcount);
                 tasklet_schedule(&notify_dom0_con_ring_tasklet);
             }
 
@@ -687,7 +685,7 @@ static void __putstr(const char *str)
     }
 #endif
 
-    conring_puts(str);
+    conring_puts(str, len);
 
     if ( !console_locks_busted )
         tasklet_schedule(&notify_dom0_con_ring_tasklet);
