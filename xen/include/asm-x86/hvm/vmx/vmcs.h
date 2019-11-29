@@ -79,6 +79,12 @@ struct vmx_domain {
     unsigned int status;
 
     /*
+     * Domain permitted to use Executable EPT Superpages?  Cleared to work
+     * around CVE-2018-12207 as appropriate.
+     */
+    bool exec_sp;
+
+    /*
      * To handle posted interrupts correctly, we need to set the following
      * state:
      *

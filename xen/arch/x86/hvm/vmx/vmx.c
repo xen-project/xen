@@ -229,6 +229,12 @@ static int vmx_domain_initialise(struct domain *d)
 {
     int rc;
 
+    /*
+     * Work around CVE-2018-12207?  The hardware domain is already permitted
+     * to reboot the system, so doesn't need mitigating against DoS's.
+     */
+    d->arch.hvm_domain.vmx.exec_sp = is_hardware_domain(d) || opt_ept_exec_sp;
+
     if ( !has_vlapic(d) )
         return 0;
 
