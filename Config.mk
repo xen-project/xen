@@ -6,6 +6,8 @@ endif
 
 # Convenient variables
 comma   := ,
+open    := (
+close   := )
 squote  := '
 #' Balancing squote, to help syntax highlighting
 empty   :=

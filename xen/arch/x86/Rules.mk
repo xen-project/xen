@@ -81,6 +81,6 @@ $(call as-option-add,CFLAGS,CC,".include \"asm/indirect_thunk_asm.h\"",,\
 # Check whether clang keeps .macro-s between asm()-s:
 # https://bugs.llvm.org/show_bug.cgi?id=36110
 $(call as-option-add,CFLAGS,CC,\
-                     ".macro FOO\n.endm\"); asm volatile (\".macro FOO\n.endm",\
+                     ".macro FOO;.endm"$$(close); asm volatile $$(open)".macro FOO;.endm",\
                      -no-integrated-as)
 endif
