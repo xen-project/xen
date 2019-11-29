@@ -81,13 +81,15 @@ Default: C</var/lock/xl>
 
 Sets the default value for the C<max_grant_frames> domain config value.
 
-Default: C<32> on hosts up to 16TB of memory, C<64> on hosts larger than 16TB
+Default: value of Xen command line B<gnttab_max_frames> parameter (or its
+default value if unspecified).
 
 =item B<max_maptrack_frames=NUMBER>
 
 Sets the default value for the C<max_maptrack_frames> domain config value.
 
-Default: C<1024>
+Default: value of Xen command line B<gnttab_max_maptrack_frames>
+parameter (or its default value if unspecified).
 
 =item B<vif.default.script="PATH">
 

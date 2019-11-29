@@ -84,11 +84,42 @@ struct grant_table {
     struct grant_table_arch arch;
 };
 
-unsigned int __read_mostly opt_max_grant_frames = 64;
-integer_runtime_param("gnttab_max_frames", opt_max_grant_frames);
+static int parse_gnttab_limit(const char *param, const char *arg,
+                              unsigned int *valp)
+{
+    const char *e;
+    unsigned long val;
 
-unsigned int __read_mostly opt_max_maptrack_frames = 1024;
-integer_runtime_param("gnttab_max_maptrack_frames", opt_max_maptrack_frames);
+    val = simple_strtoul(arg, &e, 0);
+    if ( *e )
+        return -EINVAL;
+
+    if ( val > INT_MAX )
+        return -ERANGE;
+
+    *valp = val;
+
+    return 0;
+}
+
+unsigned int __read_mostly opt_max_grant_frames = 64;
+
+static int parse_gnttab_max_frames(const char *arg)
+{
+    return parse_gnttab_limit("gnttab_max_frames", arg,
+                              &opt_max_grant_frames);
+}
+custom_runtime_param("gnttab_max_frames", parse_gnttab_max_frames);
+
+static unsigned int __read_mostly opt_max_maptrack_frames = 1024;
+
+static int parse_gnttab_max_maptrack_frames(const char *arg)
+{
+    return parse_gnttab_limit("gnttab_max_maptrack_frames", arg,
+                              &opt_max_maptrack_frames);
+}
+custom_runtime_param("gnttab_max_maptrack_frames",
+                     parse_gnttab_max_maptrack_frames);
 
 #ifndef GNTTAB_MAX_VERSION
 #define GNTTAB_MAX_VERSION 2
@@ -1837,11 +1868,17 @@ active_alloc_failed:
     return -ENOMEM;
 }
 
-int grant_table_init(struct domain *d, unsigned int max_grant_frames,
-                     unsigned int max_maptrack_frames)
+int grant_table_init(struct domain *d, int max_grant_frames,
+                     int max_maptrack_frames)
 {
     struct grant_table *gt;
     int ret = -ENOMEM;
+
+    /* Default to maximum value if no value was specified */
+    if ( max_grant_frames < 0 )
+        max_grant_frames = opt_max_grant_frames;
+    if ( max_maptrack_frames < 0 )
+        max_maptrack_frames = opt_max_maptrack_frames;
 
     if ( max_grant_frames < INITIAL_NR_GRANT_FRAMES ||
          max_grant_frames > opt_max_grant_frames ||

@@ -82,13 +82,15 @@ struct xen_domctl_createdomain {
     uint32_t iommu_opts;
 
     /*
-     * Various domain limits, which impact the quantity of resources (global
-     * mapping space, xenheap, etc) a guest may consume.
+     * Various domain limits, which impact the quantity of resources
+     * (global mapping space, xenheap, etc) a guest may consume.  For
+     * max_grant_frames and max_maptrack_frames, < 0 means "use the
+     * default maximum value in the hypervisor".
      */
     uint32_t max_vcpus;
     uint32_t max_evtchn_port;
-    uint32_t max_grant_frames;
-    uint32_t max_maptrack_frames;
+    int32_t max_grant_frames;
+    int32_t max_maptrack_frames;
 
     struct xen_arch_domainconfig arch;
 };
