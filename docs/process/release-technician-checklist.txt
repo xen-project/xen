@@ -148,5 +148,13 @@ RELEASE TARBALL
 
 After a .0 release, update XEN_EXTRAVERSION again (to .1-pre, see above).
 
+After a .0 release,
+Update new stable tree's MAINTAINERS to contain correct info for this
+stable branch: usually, copy text from previous
+staging-$ov:MAINTAINERS section "Stable Release Maintenance"
+into new staging-$v, deleting what's there.
+  git cat-file blob origin/staging-$ov:MAINTAINERS >MAINTAINERS
+and review the changes, commiting ONLY THE RELEVANT ONES
+
 Notify release manager of completion
 
