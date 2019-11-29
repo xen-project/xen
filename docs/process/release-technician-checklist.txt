@@ -55,7 +55,7 @@ t=RELEASE-$r
 #   MINIOS_UPSTREAM_REVISION
 * change SUPPORT.md heading version number; -unstable or -rc tag
 *     (empty in stable branches after .0 release).
-*     insert correct version number in release-notes link
+* SUPPORT.md: insert correct version number in release-notes link
 * change xen-unstable xen/Makefile XEN_EXTRAVERSION
 # if main version number has changed (eg 4.7 -> 4.8) rerun ./autogen.sh
 * rerun ./autogen.sh to update version number in configure
