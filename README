@@ -153,8 +153,8 @@ implementations can be found on the wiki's xenstore reference guide [1] and
 the xenstored [2] page. You can choose which xenstore you want to enable as
 default on a system through configure:
 
-	./configure --with-xenstored=xenstored
-	./configure --with-xenstored=oxenstored
+        ./configure --with-xenstored=xenstored
+        ./configure --with-xenstored=oxenstored
 
 By default oxenstored will be used if the ocaml development tools are found.
 If you enable oxenstored the xenstored will still be built and installed,
