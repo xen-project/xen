@@ -268,8 +268,9 @@ int xlu_cfg_replace_string(const XLU_Config *cfg, const char *n,
     return 0;
 }
 
-int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
-                     long *value_r, int dont_warn) {
+int xlu_cfg_get_bounded_long(const XLU_Config *cfg, const char *n,
+                             long min, long max, long *value_r,
+                             int dont_warn) {
     long l;
     XLU_ConfigSetting *set;
     int e;
@@ -303,8 +304,29 @@ int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
                     cfg->config_source, set->lineno, n);
         return EINVAL;
     }
+    if (l < min) {
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d: warning: value `%ld' is smaller than minimum bound '%ld'\n",
+                    cfg->config_source, set->lineno, l, min);
+        return EINVAL;
+    }
+    if (l > max) {
+        if (!dont_warn)
+            fprintf(cfg->report,
+                    "%s:%d: warning: value `%ld' is greater than maximum bound '%ld'\n",
+                    cfg->config_source, set->lineno, l, max);
+        return EINVAL;
+    }
+
     *value_r= l;
     return 0;
+}
+
+int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
+                     long *value_r, int dont_warn) {
+    return xlu_cfg_get_bounded_long(cfg, n, LONG_MIN, LONG_MAX, value_r,
+                                    dont_warn);
 }
 
 int xlu_cfg_get_defbool(const XLU_Config *cfg, const char *n, libxl_defbool *b,

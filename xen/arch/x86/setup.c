@@ -697,8 +697,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     struct xen_domctl_createdomain dom0_cfg = {
         .flags = IS_ENABLED(CONFIG_TBOOT) ? XEN_DOMCTL_CDF_s3_integrity : 0,
         .max_evtchn_port = -1,
-        .max_grant_frames = opt_max_grant_frames,
-        .max_maptrack_frames = opt_max_maptrack_frames,
+        .max_grant_frames = -1,
+        .max_maptrack_frames = -1,
     };
 
     /* Critical region without IDT or TSS.  Any fault is deadly! */

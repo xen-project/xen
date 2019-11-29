@@ -364,8 +364,17 @@
  */
 #define LIBXL_HAVE_BUILDINFO_GRANT_LIMITS 1
 
-#define LIBXL_MAX_GRANT_FRAMES_DEFAULT 32
-#define LIBXL_MAX_MAPTRACK_FRAMES_DEFAULT 1024
+#define LIBXL_MAX_GRANT_DEFAULT (~(uint32_t)0)
+#define LIBXL_MAX_GRANT_FRAMES_DEFAULT 32 /* deprecated */
+#define LIBXL_MAX_MAPTRACK_FRAMES_DEFAULT 1024 /* deprecated */
+/*
+ * LIBXL_HAVE_BUILDINFO_GRANT_DEFAULT indicates that the default
+ * values of max_grant_frames and max_maptrack_frames fields in
+ * libxl_domain_build_info are the special sentinel value
+ * LIBXL_MAX_GRANT_DEFAULT rather than the fixed values above.
+ * This means to use the hypervisor's default.
+ */
+#define LIBXL_HAVE_BUILDINFO_GRANT_DEFAULT 1
 
 /*
  * LIBXL_HAVE_BUILDINFO_* indicates that libxl_domain_build_info has
