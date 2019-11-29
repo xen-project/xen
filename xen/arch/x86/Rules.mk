@@ -74,6 +74,11 @@ ifeq ($(clang),y)
 # Note: Any test which adds -no-integrated-as will cause subsequent tests to
 # succeed, and not trigger further additions.
 
+# Older clang's built-in assembler doesn't understand .skip with labels:
+# https://bugs.llvm.org/show_bug.cgi?id=27369
+$(call as-option-add,CFLAGS,CC,".L0: .L1: .skip (.L1 - .L0)",,\
+                     -no-integrated-as)
+
 # Check whether clang asm()-s support .include.
 $(call as-option-add,CFLAGS,CC,".include \"asm/indirect_thunk_asm.h\"",,\
                      -no-integrated-as)
