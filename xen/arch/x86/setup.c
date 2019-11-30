@@ -700,6 +700,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         .max_grant_frames = -1,
         .max_maptrack_frames = -1,
     };
+    const char *hypervisor_name;
 
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
@@ -763,7 +764,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      * allocing any xenheap structures wanted in lower memory. */
     kexec_early_calculations();
 
-    hypervisor_probe();
+    hypervisor_name = hypervisor_probe();
 
     parse_video_info();
 
@@ -788,6 +789,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     printk("Command line: %s\n", cmdline);
 
     printk("Xen image load base address: %#lx\n", xen_phys_start);
+    if ( hypervisor_name )
+        printk("Running on %s\n", hypervisor_name);
 
 #ifdef CONFIG_VIDEO
     printk("Video information:\n");
@@ -1569,7 +1572,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             max_cpus = nr_cpu_ids;
     }
 
-    if ( xen_guest )
+    if ( hypervisor_name )
         hypervisor_setup();
 
     /* Low mappings were only needed for some BIOS table parsing. */
