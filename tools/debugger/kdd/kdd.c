@@ -613,7 +613,7 @@ static void get_os_info_64(kdd_state *s)
     idt0_addr |= ((buf >> 32) & 0xffff0000);
     idt0_addr |= (buf & 0xffff);
 
-    KDD_LOG(s, "idt0 addr: %p\n", (void *)idt0_addr);
+    KDD_LOG(s, "idt0 addr: 0x%"PRIx64"\n", idt0_addr);
 
     /*
      * get the page start and look for "MZ" file header - we limit the search
@@ -621,7 +621,6 @@ static void get_os_info_64(kdd_state *s)
      */
 
     base = idt0_addr & ~(PAGE_SIZE - 1);
-    KDD_LOG(s, "%p\n", (void *)base);
 
     while (search_limit) {
         uint16_t val;
@@ -638,7 +637,7 @@ static void get_os_info_64(kdd_state *s)
         search_limit -= 1;
     }
 
-    KDD_LOG(s, "base: %p\n", (void *)base);
+    KDD_LOG(s, "base: 0x%"PRIx64"\n", base);
 
     /* found the data section start */
     if (get_pe64_sections(s, base, ".data", &data_base, &data_size))
@@ -689,9 +688,9 @@ static void get_os_info_64(kdd_state *s)
     if (caddr < data_base + data_size) {
         /* if found, set the field and return */
 
-        KDD_LOG(s, "base: %p\n", (void *)base);
-        KDD_LOG(s, "modules list: %p\n", (void *)modptr);
-        KDD_LOG(s, "kddl: %p\n", (void *)kddl);
+        KDD_LOG(s, "base: 0x%"PRIx64"\n", base);
+        KDD_LOG(s, "modules list: 0x%"PRIx64"\n", modptr);
+        KDD_LOG(s, "kddl: 0x%"PRIx64"\n", kddl);
         KDD_LOG(s, "minor version: 0x%hx\n", minor);
 
         s->os.base = base;
