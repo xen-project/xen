@@ -1269,6 +1269,17 @@ static void do_write_psr_msrs(void *data)
         cos_num = props->cos_num;
         ASSERT(info->array_len >= index + cos_num);
 
+        /*
+         * Multiple RDT features may co-exist and their COS_MAX may be
+         * different. So we should prevent one feature to write COS
+         * register which exceeds its COS_MAX.
+         */
+        if ( cos > feat->cos_max )
+        {
+            index += cos_num;
+            continue;
+        }
+
         for ( j = 0; j < cos_num; j++, index++ )
         {
             if ( feat->cos_reg_val[cos * cos_num + j] != info->val[index] )
