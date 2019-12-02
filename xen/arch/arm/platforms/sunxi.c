@@ -119,6 +119,7 @@ static const char * const sunxi_v8_dt_compat[] __initconst =
 {
     "allwinner,sun50i-a64",
     "allwinner,sun50i-h5",
+    "allwinner,sun50i-h6",
     NULL
 };
 
