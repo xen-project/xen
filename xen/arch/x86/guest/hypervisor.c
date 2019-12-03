@@ -22,13 +22,38 @@
 #include <xen/types.h>
 
 #include <asm/cache.h>
-#include <asm/guest/hypervisor.h>
+#include <asm/guest.h>
 
 static const struct hypervisor_ops *__read_mostly ops;
 
 const char *__init hypervisor_probe(void)
 {
+    if ( !cpu_has_hypervisor )
+        return NULL;
+
+    ops = xg_probe();
+    if ( ops )
+        return ops->name;
+
     return NULL;
+}
+
+void __init hypervisor_setup(void)
+{
+    if ( ops && ops->setup )
+        ops->setup();
+}
+
+void hypervisor_ap_setup(void)
+{
+    if ( ops && ops->ap_setup )
+        ops->ap_setup();
+}
+
+void hypervisor_resume(void)
+{
+    if ( ops && ops->resume )
+        ops->resume();
 }
 
 /*

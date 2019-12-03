@@ -67,22 +67,6 @@ static void __init find_xen_leaves(void)
     }
 }
 
-void __init probe_hypervisor(void)
-{
-    if ( xen_guest || !cpu_has_hypervisor )
-        return;
-
-    find_xen_leaves();
-
-    if ( !xen_cpuid_base )
-        return;
-
-    /* Fill the hypercall page. */
-    wrmsrl(cpuid_ebx(xen_cpuid_base + 2), __pa(hypercall_page));
-
-    xen_guest = true;
-}
-
 static void map_shared_info(void)
 {
     mfn_t mfn;
@@ -245,7 +229,7 @@ static void init_evtchn(void)
     }
 }
 
-void __init hypervisor_setup(void)
+static void __init setup(void)
 {
     init_memmap();
 
@@ -273,7 +257,7 @@ void __init hypervisor_setup(void)
     init_evtchn();
 }
 
-void hypervisor_ap_setup(void)
+static void ap_setup(void)
 {
     set_vcpu_id();
     map_vcpuinfo();
@@ -303,7 +287,7 @@ static void ap_resume(void *unused)
     init_evtchn();
 }
 
-void hypervisor_resume(void)
+static void resume(void)
 {
     /* Reset shared info page. */
     map_shared_info();
@@ -324,6 +308,31 @@ void hypervisor_resume(void)
 
     if ( pv_console )
         pv_console_init();
+}
+
+static const struct hypervisor_ops ops = {
+    .name = "Xen",
+    .setup = setup,
+    .ap_setup = ap_setup,
+    .resume = resume,
+};
+
+const struct hypervisor_ops *__init xg_probe(void)
+{
+    if ( xen_guest )
+        return &ops;
+
+    find_xen_leaves();
+
+    if ( !xen_cpuid_base )
+        return NULL;
+
+    /* Fill the hypercall page. */
+    wrmsrl(cpuid_ebx(xen_cpuid_base + 2), __pa(hypercall_page));
+
+    xen_guest = true;
+
+    return &ops;
 }
 
 /*

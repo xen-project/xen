@@ -103,7 +103,7 @@ void __init pvh_init(multiboot_info_t **mbi, module_t **mod)
 {
     convert_pvh_info(mbi, mod);
 
-    probe_hypervisor();
+    hypervisor_probe();
     ASSERT(xen_guest);
 
     get_memory_map();
