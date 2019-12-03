@@ -24,7 +24,8 @@ set +e
 timeout -k 1 10 \
 qemu-system-x86_64 -nographic -kernel binaries/xen \
         -initrd xtf/tests/example/$k \
-        -append "loglvl=all com1=115200,,8n1 console=com1 noreboot $extra" \
+        -append "loglvl=all com1=115200,,8n1 console=com1 noreboot \
+                 console_timestamps=boot $extra" \
         -m 512 -monitor none -serial file:smoke.serial
 set -e
 grep -q 'Test result: SUCCESS' smoke.serial || exit 1
