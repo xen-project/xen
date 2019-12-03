@@ -262,17 +262,22 @@ int p2m_is_logdirty_range(struct p2m_domain *p2m, unsigned long start,
     return 0;
 }
 
+/*
+ * May be called with ot = nt = p2m_ram_rw for its side effect of
+ * recalculating all PTEs in the p2m.
+ */
 void p2m_change_entry_type_global(struct domain *d,
                                   p2m_type_t ot, p2m_type_t nt)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
-    ASSERT(ot != nt);
     ASSERT(p2m_is_changeable(ot) && p2m_is_changeable(nt));
 
     p2m_lock(p2m);
     p2m->change_entry_type_global(p2m, ot, nt);
-    p2m->global_logdirty = (nt == p2m_ram_logdirty);
+    /* Don't allow 'recalculate' operations to change the logdirty state. */
+    if ( ot != nt )
+        p2m->global_logdirty = (nt == p2m_ram_logdirty);
     p2m_unlock(p2m);
 }
 
