@@ -3999,7 +3999,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         else
              ecode = -1;
 
-        hvm_task_switch(exit_qualification, reasons[source], ecode, inst_len);
+        hvm_task_switch(exit_qualification, reasons[source], ecode, inst_len,
+                        0 /* EFLAGS.RF already updated. */);
         break;
     }
     case EXIT_REASON_CPUID:

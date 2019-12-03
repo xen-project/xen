@@ -2812,7 +2812,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( (vmcb->exitinfo2 >> 44) & 1 )
             errcode = (uint32_t)vmcb->exitinfo2;
 
-        hvm_task_switch(vmcb->exitinfo1, reason, errcode, insn_len);
+        hvm_task_switch(vmcb->exitinfo1, reason, errcode, insn_len,
+                        (vmcb->exitinfo2 & (1ul << 48)) ? X86_EFLAGS_RF : 0);
         break;
     }
 

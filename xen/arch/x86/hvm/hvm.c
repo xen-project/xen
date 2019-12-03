@@ -2913,7 +2913,7 @@ void hvm_prepare_vm86_tss(struct vcpu *v, uint32_t base, uint32_t limit)
 
 void hvm_task_switch(
     uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
-    int32_t errcode, unsigned int insn_len)
+    int32_t errcode, unsigned int insn_len, unsigned int extra_eflags)
 {
     struct vcpu *v = current;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
@@ -2988,7 +2988,7 @@ void hvm_task_switch(
         eflags &= ~X86_EFLAGS_NT;
 
     tss.eip    = regs->eip + insn_len;
-    tss.eflags = eflags;
+    tss.eflags = eflags | extra_eflags;
     tss.eax    = regs->eax;
     tss.ecx    = regs->ecx;
     tss.edx    = regs->edx;
