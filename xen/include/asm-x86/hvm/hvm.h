@@ -296,7 +296,7 @@ void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable);
 enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };
 void hvm_task_switch(
     uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
-    int32_t errcode, unsigned int insn_len);
+    int32_t errcode, unsigned int insn_len, unsigned int extra_eflags);
 
 enum hvm_access_type {
     hvm_access_insn_fetch,
