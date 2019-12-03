@@ -2748,10 +2748,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_do_invalidate_cache(regs, exit_reason == VMEXIT_INVD);
         break;
 
-    case VMEXIT_TASK_SWITCH: {
-        enum hvm_task_switch_reason reason;
-        int32_t errcode = -1;
-
+    case VMEXIT_TASK_SWITCH:
         /*
          * All TASK_SWITCH intercepts have fault-like semantics.  NRIP is
          * never provided, even for instruction-induced task switches, but we
@@ -2797,19 +2794,12 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( insn_len < 0 && (insn_len = svm_get_task_switch_insn_len()) == 0 )
             goto crash_or_fault;
 
-        if ( (vmcb->exitinfo2 >> 36) & 1 )
-            reason = TSW_iret;
-        else if ( (vmcb->exitinfo2 >> 38) & 1 )
-            reason = TSW_jmp;
-        else
-            reason = TSW_call_or_int;
-        if ( (vmcb->exitinfo2 >> 44) & 1 )
-            errcode = (uint32_t)vmcb->exitinfo2;
-
-        hvm_task_switch(vmcb->exitinfo1, reason, errcode, insn_len,
-                        (vmcb->exitinfo2 & (1ul << 48)) ? X86_EFLAGS_RF : 0);
+        hvm_task_switch(vmcb->ei.task_switch.sel,
+                        vmcb->ei.task_switch.iret ? TSW_iret :
+                        vmcb->ei.task_switch.jmp  ? TSW_jmp  : TSW_call_or_int,
+                        vmcb->ei.task_switch.ev ? vmcb->ei.task_switch.ec : -1,
+                        insn_len, vmcb->ei.task_switch.rf ? X86_EFLAGS_RF : 0);
         break;
-    }
 
     case VMEXIT_CPUID:
         if ( (insn_len = svm_get_insn_len(v, INSTR_CPUID)) == 0 )

@@ -418,8 +418,28 @@ struct vmcb_struct {
     vintr_t _vintr;             /* offset 0x60 - cleanbit 3 */
     u64 interrupt_shadow;       /* offset 0x68 */
     u64 exitcode;               /* offset 0x70 */
-    u64 exitinfo1;              /* offset 0x78 */
-    u64 exitinfo2;              /* offset 0x80 */
+    union {
+        struct {
+            uint64_t exitinfo1; /* offset 0x78 */
+            uint64_t exitinfo2; /* offset 0x80 */
+        };
+        union {
+            struct {
+                uint16_t sel;
+                uint64_t :48;
+
+                uint32_t ec;
+                uint32_t :4;
+                bool     iret:1;
+                uint32_t :1;
+                bool     jmp:1;
+                uint32_t :5;
+                bool     ev:1;
+                uint32_t :3;
+                bool     rf:1;
+            } task_switch;
+        } ei;
+    };
     intinfo_t exit_int_info;    /* offset 0x88 */
     u64 _np_enable;             /* offset 0x90 - cleanbit 4 */
     u64 res08[2];
