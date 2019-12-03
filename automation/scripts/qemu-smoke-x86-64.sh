@@ -21,7 +21,7 @@ esac
 
 rm -f smoke.serial
 set +e
-timeout -k 1 10 \
+timeout -k 1 30 \
 qemu-system-x86_64 -nographic -kernel binaries/xen \
         -initrd xtf/tests/example/$k \
         -append "loglvl=all com1=115200,,8n1 console=com1 noreboot \
