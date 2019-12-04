@@ -121,11 +121,6 @@ define cc-ver-check-closure
     endif
 endef
 
-# cc-ifversion: Check compiler version and take branch accordingly
-# Usage $(call cc-ifversion,lt,0x040700,string_if_y,string_if_n)
-cc-ifversion = $(shell [ $(call cc-ver,$(CC),$(1),$(2)) = "y" ] \
-				&& echo $(3) || echo $(4))
-
 # Require GCC v4.1+
 check-$(gcc) = $(call cc-ver-check,CC,0x040100,"Xen requires at least gcc-4.1")
 $(eval $(check-y))

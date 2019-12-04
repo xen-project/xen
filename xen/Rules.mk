@@ -2,6 +2,7 @@
 -include $(BASEDIR)/include/config/auto.conf
 
 include $(XEN_ROOT)/Config.mk
+include $(BASEDIR)/scripts/Kbuild.include
 
 
 ifneq ($(origin crash_debug),undefined)

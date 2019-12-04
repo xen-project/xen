@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0
+####
+# kbuild: Generic definitions
+
+# cc-ifversion
+# Usage:  EXTRA_CFLAGS += $(call cc-ifversion, -lt, 0402, -O1)
+cc-ifversion = $(shell [ $(CONFIG_GCC_VERSION)0 $(1) $(2)000 ] && echo $(3) || echo $(4))
