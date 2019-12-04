@@ -3979,7 +3979,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_update_cpu_exec_control(v);
         break;
     case EXIT_REASON_TASK_SWITCH: {
-        static const enum hvm_task_switch_reason reasons[] = {
+        static const uint8_t reasons[] = {
             TSW_call_or_int, TSW_iret, TSW_jmp, TSW_call_or_int
         };
         unsigned int inst_len, source;
