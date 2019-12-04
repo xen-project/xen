@@ -4,8 +4,24 @@
 #
 mainmenu "Xen/$(SRCARCH) $(XEN_FULLVERSION) Configuration"
 
+source "scripts/Kconfig.include"
+
 config BROKEN
 	bool
+
+config CC_IS_GCC
+	def_bool $(success,$(CC) --version | head -n 1 | grep -q gcc)
+
+config GCC_VERSION
+	int
+	default $(shell,$(BASEDIR)/scripts/gcc-version.sh $(CC))
+
+config CC_IS_CLANG
+	def_bool $(success,$(CC) --version | head -n 1 | grep -q clang)
+
+config CLANG_VERSION
+	int
+	default $(shell,$(BASEDIR)/scripts/clang-version.sh $(CC))
 
 source "arch/$(SRCARCH)/Kconfig"
 
