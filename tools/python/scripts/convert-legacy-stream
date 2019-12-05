@@ -257,8 +257,8 @@ def read_pv_extended_info(vm):
 
 
     if so_far != total_length:
-        raise StreamError("Overshot Extended Info size by %d bytes"
-                          % (so_far - total_length,))
+        raise StreamError("Overshot Extended Info size by %d bytes" %
+                          (so_far - total_length, ))
 
 def read_pv_p2m_frames(vm):
     fpp = 4096 / vm.width
@@ -375,8 +375,8 @@ def read_chunks(vm):
         elif marker > 0:
 
             if marker > legacy.MAX_BATCH:
-                raise StreamError("Page batch (%d) exceeded MAX_BATCH (%d)"
-                                  % (marker, legacy.MAX_BATCH))
+                raise StreamError("Page batch (%d) exceeded MAX_BATCH (%d)" %
+                                  (marker, legacy.MAX_BATCH))
             pfns = unpack_ulongs(marker)
 
             # xc_domain_save() leaves many XEN_DOMCTL_PFINFO_XTAB records for
@@ -398,8 +398,8 @@ def read_chunks(vm):
             max_id, = unpack_exact("i")
 
             if max_id > legacy.MAX_VCPU_ID:
-                raise StreamError("Vcpu max_id out of range: %d > %d"
-                                  % (max_id, legacy.MAX_VCPU_ID))
+                raise StreamError("Vcpu max_id out of range: %d > %d" %
+                                  (max_id, legacy.MAX_VCPU_ID))
 
             vm.max_vcpu_id = max_id
             bitmap = unpack_exact("Q" * ((max_id/64) + 1))
@@ -414,8 +414,8 @@ def read_chunks(vm):
                     bit_idx += 1
                     word >>= 1
 
-            info("  Vcpu info: max_id %d, online map %s"
-                 % (vm.max_vcpu_id, vm.online_vcpu_map))
+            info("  Vcpu info: max_id %d, online map %s" %
+                 (vm.max_vcpu_id, vm.online_vcpu_map))
 
         elif marker == legacy.CHUNK_hvm_ident_pt:
             _, ident_pt = unpack_exact("=IQ")
@@ -512,7 +512,7 @@ def read_chunks(vm):
                 [public.HVM_PARAM_NR_IOREQ_SERVER_PAGES, nr_pages])
 
         else:
-            raise StreamError("Unrecognised chunk %d" % (marker,))
+            raise StreamError("Unrecognised chunk %d" % (marker, ))
 
 def read_hvm_tail(vm):
 
@@ -579,7 +579,7 @@ def read_legacy_stream(vm):
 
     try:
         vm.p2m_size, = unpack_ulongs(1)
-        info("P2M Size: 0x%x" % (vm.p2m_size,))
+        info("P2M Size: 0x%x" % (vm.p2m_size, ))
 
         if vm.libxl:
             write_libxl_hdr()

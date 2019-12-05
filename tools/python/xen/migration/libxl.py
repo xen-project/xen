@@ -45,7 +45,7 @@ rec_type_to_str = {
     REC_TYPE_emulator_xenstore_data : "Emulator xenstore data",
     REC_TYPE_emulator_context       : "Emulator context",
     REC_TYPE_checkpoint_end         : "Checkpoint end",
-    REC_TYPE_checkpoint_state       : "Checkpoint state"
+    REC_TYPE_checkpoint_state       : "Checkpoint state",
 }
 
 # emulator_* header
@@ -90,16 +90,16 @@ class VerifyLibxl(VerifyBase):
         ident, version, options = self.unpack_exact(HDR_FORMAT)
 
         if ident != HDR_IDENT:
-            raise StreamError("Bad image id: Expected 0x%x, got 0x%x"
-                              % (HDR_IDENT, ident))
+            raise StreamError("Bad image id: Expected 0x%x, got 0x%x" %
+                              (HDR_IDENT, ident))
 
         if version != HDR_VERSION:
-            raise StreamError("Unknown image version: Expected %d, got %d"
-                              % (HDR_VERSION, version))
+            raise StreamError("Unknown image version: Expected %d, got %d" %
+                              (HDR_VERSION, version))
 
         if options & HDR_OPT_RESZ_MASK:
-            raise StreamError("Reserved bits set in image options field: 0x%x"
-                              % (options & HDR_OPT_RESZ_MASK))
+            raise StreamError("Reserved bits set in image options field: 0x%x" %
+                              (options & HDR_OPT_RESZ_MASK))
 
         if ( (sys.byteorder == "little") and
              ((options & HDR_OPT_BIT_ENDIAN) != HDR_OPT_LE) ):
@@ -121,8 +121,8 @@ class VerifyLibxl(VerifyBase):
         if rtype not in rec_type_to_str:
             raise StreamError("Unrecognised record type %x" % (rtype, ))
 
-        self.info("Libxl Record: %s, length %d"
-                  % (rec_type_to_str[rtype], length))
+        self.info("Libxl Record: %s, length %d" %
+                  (rec_type_to_str[rtype], length))
 
         contentsz = (length + 7) & ~7
         content = self.rdexact(contentsz)
@@ -132,8 +132,9 @@ class VerifyLibxl(VerifyBase):
             raise StreamError("Padding containing non0 bytes found")
 
         if rtype not in record_verifiers:
-            raise RuntimeError("No verification function for libxl record '%s'"
-                               % rec_type_to_str[rtype])
+            raise RuntimeError(
+                "No verification function for libxl record '%s'" %
+                rec_type_to_str[rtype])
         else:
             record_verifiers[rtype](self, content[:length])
 
@@ -162,16 +163,16 @@ class VerifyLibxl(VerifyBase):
         minsz = calcsize(EMULATOR_HEADER_FORMAT)
 
         if len(content) < minsz:
-            raise RecordError("Length must be at least %d bytes, got %d"
-                              % (minsz, len(content)))
+            raise RecordError("Length must be at least %d bytes, got %d" %
+                              (minsz, len(content)))
 
         emu_id, emu_idx = unpack(EMULATOR_HEADER_FORMAT, content[:minsz])
 
         if emu_id not in emulator_id_to_str:
             raise RecordError("Unrecognised emulator id 0x%x" % (emu_id, ))
 
-        self.info("Emulator Xenstore Data (%s, idx %d)"
-                  % (emulator_id_to_str[emu_id], emu_idx))
+        self.info("Emulator Xenstore Data (%s, idx %d)" %
+                  (emulator_id_to_str[emu_id], emu_idx))
 
         # Chop off the emulator header
         content = content[minsz:]
@@ -185,8 +186,8 @@ class VerifyLibxl(VerifyBase):
             parts = content[:-1].split("\x00")
 
             if (len(parts) % 2) != 0:
-                raise RecordError("Expected an even number of strings, got %d"
-                                  % (len(parts), ))
+                raise RecordError("Expected an even number of strings, got %d" %
+                                  (len(parts), ))
 
             for key, val in zip(parts[0::2], parts[1::2]):
                 self.info("  '%s' = '%s'" % (key, val))
@@ -197,8 +198,8 @@ class VerifyLibxl(VerifyBase):
         minsz = calcsize(EMULATOR_HEADER_FORMAT)
 
         if len(content) < minsz:
-            raise RecordError("Length must be at least %d bytes, got %d"
-                              % (minsz, len(content)))
+            raise RecordError("Length must be at least %d bytes, got %d" %
+                              (minsz, len(content)))
 
         emu_id, emu_idx = unpack(EMULATOR_HEADER_FORMAT, content[:minsz])
 

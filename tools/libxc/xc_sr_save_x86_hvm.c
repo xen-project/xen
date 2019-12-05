@@ -11,8 +11,7 @@ static int write_hvm_context(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     int rc, hvm_buf_size;
-    struct xc_sr_record hvm_rec =
-    {
+    struct xc_sr_record hvm_rec = {
         .type = REC_TYPE_HVM_CONTEXT,
     };
 
@@ -134,7 +133,6 @@ static xen_pfn_t x86_hvm_pfn_to_gfn(const struct xc_sr_context *ctx,
 static int x86_hvm_normalise_page(struct xc_sr_context *ctx,
                                   xen_pfn_t type, void **page)
 {
-    /* no-op */
     return 0;
 }
 
@@ -174,19 +172,16 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
 
 static int x86_hvm_start_of_stream(struct xc_sr_context *ctx)
 {
-    /* no-op */
     return 0;
 }
 
 static int x86_hvm_start_of_checkpoint(struct xc_sr_context *ctx)
 {
-    /* no-op */
     return 0;
 }
 
 static int x86_hvm_check_vm_state(struct xc_sr_context *ctx)
 {
-    /* no-op */
     return 0;
 }
 

@@ -80,7 +80,7 @@ static int map_p2m_leaves(struct xc_sr_context *ctx, xen_pfn_t *mfns,
                           size_t n_mfns)
 {
     xc_interface *xch = ctx->xch;
-    unsigned x;
+    unsigned int x;
 
     ctx->x86_pv.p2m = xc_map_foreign_pages(xch, ctx->domid, PROT_READ,
                                            mfns, n_mfns);
@@ -133,7 +133,7 @@ static int map_p2m_tree(struct xc_sr_context *ctx)
      */
     xc_interface *xch = ctx->xch;
     int rc = -1;
-    unsigned x, saved_x, fpp, fll_entries, fl_entries;
+    unsigned int x, saved_x, fpp, fll_entries, fl_entries;
     xen_pfn_t fll_mfn, saved_mfn, max_pfn;
 
     xen_pfn_t *local_fll = NULL;
@@ -260,8 +260,7 @@ static int map_p2m_tree(struct xc_sr_context *ctx)
     /* Map the p2m leaves themselves. */
     rc = map_p2m_leaves(ctx, local_fl, fl_entries);
 
-err:
-
+ err:
     free(local_fl);
     if ( guest_fl )
         munmap(guest_fl, fll_entries * PAGE_SIZE);
@@ -318,7 +317,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
     xen_pfn_t p2m_mfn, mfn, saved_mfn, max_pfn;
     uint64_t *ptes = NULL;
     xen_pfn_t *mfns = NULL;
-    unsigned fpp, n_pages, level, shift, idx_start, idx_end, idx, saved_idx;
+    unsigned int fpp, n_pages, level, shift, idx_start, idx_end, idx, saved_idx;
     int rc = -1;
 
     p2m_mfn = cr3_to_mfn(ctx, p2m_cr3);
@@ -450,7 +449,7 @@ static int map_p2m_list(struct xc_sr_context *ctx, uint64_t p2m_cr3)
     /* Map the p2m leaves themselves. */
     rc = map_p2m_leaves(ctx, mfns, idx_end - idx_start + 1);
 
-err:
+ err:
     free(mfns);
     if ( ptes )
         munmap(ptes, n_pages * PAGE_SIZE);
@@ -483,15 +482,13 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
 {
     xc_interface *xch = ctx->xch;
     xen_pfn_t mfn, pfn;
-    unsigned i, gdt_count;
+    unsigned int i, gdt_count;
     int rc = -1;
     vcpu_guest_context_any_t vcpu;
-    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr =
-    {
+    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr = {
         .vcpu_id = id,
     };
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_X86_PV_VCPU_BASIC,
         .length = sizeof(vhdr),
         .data = &vhdr,
@@ -586,18 +583,15 @@ static int write_one_vcpu_basic(struct xc_sr_context *ctx, uint32_t id)
 static int write_one_vcpu_extended(struct xc_sr_context *ctx, uint32_t id)
 {
     xc_interface *xch = ctx->xch;
-    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr =
-    {
+    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr = {
         .vcpu_id = id,
     };
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_X86_PV_VCPU_EXTENDED,
         .length = sizeof(vhdr),
         .data = &vhdr,
     };
-    struct xen_domctl domctl =
-    {
+    struct xen_domctl domctl = {
         .cmd = XEN_DOMCTL_get_ext_vcpucontext,
         .domain = ctx->domid,
         .u.ext_vcpucontext.vcpu = id,
@@ -626,18 +620,15 @@ static int write_one_vcpu_xsave(struct xc_sr_context *ctx, uint32_t id)
     xc_interface *xch = ctx->xch;
     int rc = -1;
     DECLARE_HYPERCALL_BUFFER(void, buffer);
-    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr =
-    {
+    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr = {
         .vcpu_id = id,
     };
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_X86_PV_VCPU_XSAVE,
         .length = sizeof(vhdr),
         .data = &vhdr,
     };
-    struct xen_domctl domctl =
-    {
+    struct xen_domctl domctl = {
         .cmd = XEN_DOMCTL_getvcpuextstate,
         .domain = ctx->domid,
         .u.vcpuextstate.vcpu = id,
@@ -695,18 +686,15 @@ static int write_one_vcpu_msrs(struct xc_sr_context *ctx, uint32_t id)
     int rc = -1;
     size_t buffersz;
     DECLARE_HYPERCALL_BUFFER(void, buffer);
-    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr =
-    {
+    struct xc_sr_rec_x86_pv_vcpu_hdr vhdr = {
         .vcpu_id = id,
     };
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_X86_PV_VCPU_MSRS,
         .length = sizeof(vhdr),
         .data = &vhdr,
     };
-    struct xen_domctl domctl =
-    {
+    struct xen_domctl domctl = {
         .cmd = XEN_DOMCTL_get_vcpu_msrs,
         .domain = ctx->domid,
         .u.vcpu_msrs.vcpu = id,
@@ -805,17 +793,15 @@ static int write_all_vcpu_information(struct xc_sr_context *ctx)
  */
 static int write_x86_pv_info(struct xc_sr_context *ctx)
 {
-    struct xc_sr_rec_x86_pv_info info =
-        {
-            .guest_width = ctx->x86_pv.width,
-            .pt_levels = ctx->x86_pv.levels,
-        };
-    struct xc_sr_record rec =
-        {
-            .type = REC_TYPE_X86_PV_INFO,
-            .length = sizeof(info),
-            .data = &info
-        };
+    struct xc_sr_rec_x86_pv_info info = {
+        .guest_width = ctx->x86_pv.width,
+        .pt_levels = ctx->x86_pv.levels,
+    };
+    struct xc_sr_record rec = {
+        .type = REC_TYPE_X86_PV_INFO,
+        .length = sizeof(info),
+        .data = &info,
+    };
 
     return write_record(ctx, &rec);
 }
@@ -827,20 +813,17 @@ static int write_x86_pv_info(struct xc_sr_context *ctx)
 static int write_x86_pv_p2m_frames(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    int rc; unsigned i;
+    int rc; unsigned int i;
     size_t datasz = ctx->x86_pv.p2m_frames * sizeof(uint64_t);
     uint64_t *data = NULL;
-    struct xc_sr_rec_x86_pv_p2m_frames hdr =
-        {
-            .start_pfn = 0,
-            .end_pfn = ctx->x86_pv.max_pfn,
-        };
-    struct xc_sr_record rec =
-        {
-            .type = REC_TYPE_X86_PV_P2M_FRAMES,
-            .length = sizeof(hdr),
-            .data = &hdr,
-        };
+    struct xc_sr_rec_x86_pv_p2m_frames hdr = {
+        .end_pfn = ctx->x86_pv.max_pfn,
+    };
+    struct xc_sr_record rec = {
+        .type = REC_TYPE_X86_PV_P2M_FRAMES,
+        .length = sizeof(hdr),
+        .data = &hdr,
+    };
 
     /* No need to translate if sizeof(uint64_t) == sizeof(xen_pfn_t). */
     if ( sizeof(uint64_t) != sizeof(*ctx->x86_pv.p2m_pfns) )
@@ -871,8 +854,7 @@ static int write_x86_pv_p2m_frames(struct xc_sr_context *ctx)
  */
 static int write_shared_info(struct xc_sr_context *ctx)
 {
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_SHARED_INFO,
         .length = PAGE_SIZE,
         .data = ctx->x86_pv.shinfo,
@@ -890,7 +872,7 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
 {
     xc_interface *xch = ctx->xch;
     uint64_t pte;
-    unsigned i, xen_first = -1, xen_last = -1; /* Indices of Xen mappings. */
+    unsigned int i, xen_first = -1, xen_last = -1; /* Indices of Xen mappings. */
 
     type &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
 
@@ -1004,7 +986,6 @@ static int normalise_pagetable(struct xc_sr_context *ctx, const uint64_t *src,
     return 0;
 }
 
-/* save_ops function. */
 static xen_pfn_t x86_pv_pfn_to_gfn(const struct xc_sr_context *ctx,
                                    xen_pfn_t pfn)
 {
@@ -1040,7 +1021,7 @@ static int x86_pv_normalise_page(struct xc_sr_context *ctx, xen_pfn_t type,
     rc = normalise_pagetable(ctx, *page, local_page, type);
     *page = local_page;
 
-  out:
+ out:
     return rc;
 }
 
@@ -1071,9 +1052,6 @@ static int x86_pv_setup(struct xc_sr_context *ctx)
     return 0;
 }
 
-/*
- * save_ops function.  Writes PV header records into the stream.
- */
 static int x86_pv_start_of_stream(struct xc_sr_context *ctx)
 {
     int rc;
@@ -1127,9 +1105,6 @@ static int x86_pv_check_vm_state(struct xc_sr_context *ctx)
     return x86_pv_check_vm_state_p2m_list(ctx);
 }
 
-/*
- * save_ops function.  Cleanup.
- */
 static int x86_pv_cleanup(struct xc_sr_context *ctx)
 {
     free(ctx->x86_pv.p2m_pfns);

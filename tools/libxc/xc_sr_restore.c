@@ -134,13 +134,13 @@ static int pfn_set_populated(struct xc_sr_context *ctx, xen_pfn_t pfn)
  * unpopulated subset.  If types is NULL, no page type checking is performed
  * and all unpopulated pfns are populated.
  */
-int populate_pfns(struct xc_sr_context *ctx, unsigned count,
+int populate_pfns(struct xc_sr_context *ctx, unsigned int count,
                   const xen_pfn_t *original_pfns, const uint32_t *types)
 {
     xc_interface *xch = ctx->xch;
     xen_pfn_t *mfns = malloc(count * sizeof(*mfns)),
         *pfns = malloc(count * sizeof(*pfns));
-    unsigned i, nr_pfns = 0;
+    unsigned int i, nr_pfns = 0;
     int rc = -1;
 
     if ( !mfns || !pfns )
@@ -202,7 +202,7 @@ int populate_pfns(struct xc_sr_context *ctx, unsigned count,
  * stream, populate and record their types, map the relevant subset and copy
  * the data into the guest.
  */
-static int process_page_data(struct xc_sr_context *ctx, unsigned count,
+static int process_page_data(struct xc_sr_context *ctx, unsigned int count,
                              xen_pfn_t *pfns, uint32_t *types, void *page_data)
 {
     xc_interface *xch = ctx->xch;
@@ -210,8 +210,8 @@ static int process_page_data(struct xc_sr_context *ctx, unsigned count,
     int *map_errs = malloc(count * sizeof(*map_errs));
     int rc;
     void *mapping = NULL, *guest_page = NULL;
-    unsigned i,    /* i indexes the pfns from the record. */
-        j,         /* j indexes the subset of pfns we decide to map. */
+    unsigned int i, /* i indexes the pfns from the record. */
+        j,          /* j indexes the subset of pfns we decide to map. */
         nr_pages = 0;
 
     if ( !mfns || !map_errs )
@@ -258,8 +258,8 @@ static int process_page_data(struct xc_sr_context *ctx, unsigned count,
     if ( nr_pages == 0 )
         goto done;
 
-    mapping = guest_page = xenforeignmemory_map(xch->fmem,
-        ctx->domid, PROT_READ | PROT_WRITE,
+    mapping = guest_page = xenforeignmemory_map(
+        xch->fmem, ctx->domid, PROT_READ | PROT_WRITE,
         nr_pages, mfns, map_errs);
     if ( !mapping )
     {
@@ -336,7 +336,7 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 {
     xc_interface *xch = ctx->xch;
     struct xc_sr_rec_page_data_header *pages = rec->data;
-    unsigned i, pages_of_data = 0;
+    unsigned int i, pages_of_data = 0;
     int rc = -1;
 
     xen_pfn_t *pfns = NULL, pfn;
@@ -424,12 +424,11 @@ static int send_checkpoint_dirty_pfn_list(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     int rc = -1;
-    unsigned count, written;
+    unsigned int count, written;
     uint64_t i, *pfns = NULL;
     struct iovec *iov = NULL;
     xc_shadow_op_stats_t stats = { 0, ctx->restore.p2m_size };
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_CHECKPOINT_DIRTY_PFN_LIST,
     };
     DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
@@ -510,7 +509,7 @@ static int handle_checkpoint(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     int rc = 0, ret;
-    unsigned i;
+    unsigned int i;
 
     if ( ctx->stream_type == XC_STREAM_PLAIN )
     {
@@ -587,7 +586,7 @@ static int handle_checkpoint(struct xc_sr_context *ctx)
 
         /* Wait for a new checkpoint */
         ret = ctx->restore.callbacks->wait_checkpoint(
-                                                ctx->restore.callbacks->data);
+            ctx->restore.callbacks->data);
         HANDLE_CALLBACK_RETURN_VALUE(ret);
 
         /* suspend secondary vm */
@@ -608,7 +607,7 @@ static int handle_checkpoint(struct xc_sr_context *ctx)
 static int buffer_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 {
     xc_interface *xch = ctx->xch;
-    unsigned new_alloc_num;
+    unsigned int new_alloc_num;
     struct xc_sr_record *p;
 
     if ( ctx->restore.buffered_rec_num >= ctx->restore.allocated_rec_num )
@@ -675,8 +674,8 @@ static int setup(struct xc_sr_context *ctx)
 
     if ( ctx->stream_type == XC_STREAM_COLO )
     {
-        dirty_bitmap = xc_hypercall_buffer_alloc_pages(xch, dirty_bitmap,
-                                NRPAGES(bitmap_size(ctx->restore.p2m_size)));
+        dirty_bitmap = xc_hypercall_buffer_alloc_pages(
+            xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->restore.p2m_size)));
 
         if ( !dirty_bitmap )
         {
@@ -717,7 +716,7 @@ static int setup(struct xc_sr_context *ctx)
 static void cleanup(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    unsigned i;
+    unsigned int i;
     DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
                                     &ctx->restore.dirty_bitmap_hbuf);
 
@@ -725,10 +724,12 @@ static void cleanup(struct xc_sr_context *ctx)
         free(ctx->restore.buffered_records[i].data);
 
     if ( ctx->stream_type == XC_STREAM_COLO )
-        xc_hypercall_buffer_free_pages(xch, dirty_bitmap,
-                                   NRPAGES(bitmap_size(ctx->restore.p2m_size)));
+        xc_hypercall_buffer_free_pages(
+            xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->restore.p2m_size)));
+
     free(ctx->restore.buffered_records);
     free(ctx->restore.populated_pfns);
+
     if ( ctx->restore.ops.cleanup(ctx) )
         PERROR("Failed to clean up");
 }

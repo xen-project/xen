@@ -10,10 +10,10 @@ xen_pfn_t mfn_to_pfn(struct xc_sr_context *ctx, xen_pfn_t mfn)
 
 bool mfn_in_pseudophysmap(struct xc_sr_context *ctx, xen_pfn_t mfn)
 {
-    return ( (mfn <= ctx->x86_pv.max_mfn) &&
-             (mfn_to_pfn(ctx, mfn) <= ctx->x86_pv.max_pfn) &&
-             (xc_pfn_to_mfn(mfn_to_pfn(ctx, mfn), ctx->x86_pv.p2m,
-                            ctx->x86_pv.width) == mfn) );
+    return ((mfn <= ctx->x86_pv.max_mfn) &&
+            (mfn_to_pfn(ctx, mfn) <= ctx->x86_pv.max_pfn) &&
+            (xc_pfn_to_mfn(mfn_to_pfn(ctx, mfn), ctx->x86_pv.p2m,
+                           ctx->x86_pv.width) == mfn));
 }
 
 void dump_bad_pseudophysmap_entry(struct xc_sr_context *ctx, xen_pfn_t mfn)
@@ -157,7 +157,7 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
     {
         struct xen_machphys_mfn_list xmml = {
             .max_extents = 1,
-            .extent_start = { &ctx->x86_pv.compat_m2p_mfn0 }
+            .extent_start = { &ctx->x86_pv.compat_m2p_mfn0 },
         };
 
         rc = do_memory_op(xch, XENMEM_machphys_compat_mfn_list,
@@ -175,7 +175,7 @@ int x86_pv_map_m2p(struct xc_sr_context *ctx)
     rc = 0;
     DPRINTF("max_mfn %#lx", ctx->x86_pv.max_mfn);
 
-err:
+ err:
     free(entries);
     free(extents_start);
 

@@ -10,20 +10,18 @@ static int write_headers(struct xc_sr_context *ctx, uint16_t guest_type)
 {
     xc_interface *xch = ctx->xch;
     int32_t xen_version = xc_version(xch, XENVER_version, NULL);
-    struct xc_sr_ihdr ihdr =
-        {
-            .marker  = IHDR_MARKER,
-            .id      = htonl(IHDR_ID),
-            .version = htonl(IHDR_VERSION),
-            .options = htons(IHDR_OPT_LITTLE_ENDIAN),
-        };
-    struct xc_sr_dhdr dhdr =
-        {
-            .type       = guest_type,
-            .page_shift = XC_PAGE_SHIFT,
-            .xen_major  = (xen_version >> 16) & 0xffff,
-            .xen_minor  = (xen_version)       & 0xffff,
-        };
+    struct xc_sr_ihdr ihdr = {
+        .marker  = IHDR_MARKER,
+        .id      = htonl(IHDR_ID),
+        .version = htonl(IHDR_VERSION),
+        .options = htons(IHDR_OPT_LITTLE_ENDIAN),
+    };
+    struct xc_sr_dhdr dhdr = {
+        .type       = guest_type,
+        .page_shift = XC_PAGE_SHIFT,
+        .xen_major  = (xen_version >> 16) & 0xffff,
+        .xen_minor  = (xen_version)       & 0xffff,
+    };
 
     if ( xen_version < 0 )
     {
@@ -51,7 +49,7 @@ static int write_headers(struct xc_sr_context *ctx, uint16_t guest_type)
  */
 static int write_end_record(struct xc_sr_context *ctx)
 {
-    struct xc_sr_record end = { REC_TYPE_END, 0, NULL };
+    struct xc_sr_record end = { .type = REC_TYPE_END };
 
     return write_record(ctx, &end);
 }
@@ -61,7 +59,7 @@ static int write_end_record(struct xc_sr_context *ctx)
  */
 static int write_checkpoint_record(struct xc_sr_context *ctx)
 {
-    struct xc_sr_record checkpoint = { REC_TYPE_CHECKPOINT, 0, NULL };
+    struct xc_sr_record checkpoint = { .type = REC_TYPE_CHECKPOINT };
 
     return write_record(ctx, &checkpoint);
 }
@@ -84,14 +82,13 @@ static int write_batch(struct xc_sr_context *ctx)
     void **guest_data = NULL;
     void **local_pages = NULL;
     int *errors = NULL, rc = -1;
-    unsigned i, p, nr_pages = 0, nr_pages_mapped = 0;
-    unsigned nr_pfns = ctx->save.nr_batch_pfns;
+    unsigned int i, p, nr_pages = 0, nr_pages_mapped = 0;
+    unsigned int nr_pfns = ctx->save.nr_batch_pfns;
     void *page, *orig_page;
     uint64_t *rec_pfns = NULL;
     struct iovec *iov = NULL; int iovcnt = 0;
     struct xc_sr_rec_page_data_header hdr = { 0 };
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_PAGE_DATA,
     };
 
@@ -153,8 +150,8 @@ static int write_batch(struct xc_sr_context *ctx)
 
     if ( nr_pages > 0 )
     {
-        guest_mapping = xenforeignmemory_map(xch->fmem,
-            ctx->domid, PROT_READ, nr_pages, mfns, errors);
+        guest_mapping = xenforeignmemory_map(
+            xch->fmem, ctx->domid, PROT_READ, nr_pages, mfns, errors);
         if ( !guest_mapping )
         {
             PERROR("Failed to map guest pages");
@@ -481,7 +478,7 @@ static int update_progress_string(struct xc_sr_context *ctx, char **str)
 static int simple_precopy_policy(struct precopy_stats stats, void *user)
 {
     return ((stats.dirty_count >= 0 &&
-            stats.dirty_count < SPP_TARGET_DIRTY_COUNT) ||
+             stats.dirty_count < SPP_TARGET_DIRTY_COUNT) ||
             stats.iteration >= SPP_MAX_ITERATIONS)
         ? XGS_POLICY_STOP_AND_COPY
         : XGS_POLICY_CONTINUE_PRECOPY;
@@ -511,12 +508,13 @@ static int send_memory_live(struct xc_sr_context *ctx)
     if ( rc )
         goto out;
 
-    ctx->save.stats = (struct precopy_stats)
-        { .dirty_count   = ctx->save.p2m_size };
+    ctx->save.stats = (struct precopy_stats){
+        .dirty_count = ctx->save.p2m_size,
+    };
     policy_stats = &ctx->save.stats;
 
     if ( precopy_policy == NULL )
-         precopy_policy = simple_precopy_policy;
+        precopy_policy = simple_precopy_policy;
 
     bitmap_set(dirty_bitmap, ctx->save.p2m_size);
 
@@ -546,7 +544,7 @@ static int send_memory_live(struct xc_sr_context *ctx)
         policy_decision = precopy_policy(*policy_stats, data);
 
         if ( policy_decision != XGS_POLICY_CONTINUE_PRECOPY )
-           break;
+            break;
 
         if ( xc_shadow_control(
                  xch, ctx->domid, XEN_DOMCTL_SHADOW_OP_CLEAN,
@@ -571,10 +569,10 @@ static int send_memory_live(struct xc_sr_context *ctx)
 static int colo_merge_secondary_dirty_bitmap(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    struct xc_sr_record rec = { 0, 0, NULL };
+    struct xc_sr_record rec;
     uint64_t *pfns = NULL;
     uint64_t pfn;
-    unsigned count, i;
+    unsigned int count, i;
     int rc;
     DECLARE_HYPERCALL_BUFFER_SHADOW(unsigned long, dirty_bitmap,
                                     &ctx->save.dirty_bitmap_hbuf);
@@ -585,14 +583,14 @@ static int colo_merge_secondary_dirty_bitmap(struct xc_sr_context *ctx)
 
     if ( rec.type != REC_TYPE_CHECKPOINT_DIRTY_PFN_LIST )
     {
-        PERROR("Expect dirty bitmap record, but received %u", rec.type );
+        PERROR("Expect dirty bitmap record, but received %u", rec.type);
         rc = -1;
         goto err;
     }
 
     if ( rec.length % sizeof(*pfns) )
     {
-        PERROR("Invalid dirty pfn list record length %u", rec.length );
+        PERROR("Invalid dirty pfn list record length %u", rec.length);
         rc = -1;
         goto err;
     }
@@ -603,7 +601,7 @@ static int colo_merge_secondary_dirty_bitmap(struct xc_sr_context *ctx)
     for ( i = 0; i < count; i++ )
     {
         pfn = pfns[i];
-        if (pfn > ctx->save.p2m_size)
+        if ( pfn > ctx->save.p2m_size )
         {
             PERROR("Invalid pfn 0x%" PRIx64, pfn);
             rc = -1;
@@ -688,11 +686,7 @@ static int verify_frames(struct xc_sr_context *ctx)
     xc_interface *xch = ctx->xch;
     xc_shadow_op_stats_t stats = { 0, ctx->save.p2m_size };
     int rc;
-    struct xc_sr_record rec =
-    {
-        .type = REC_TYPE_VERIFY,
-        .length = 0,
-    };
+    struct xc_sr_record rec = { .type = REC_TYPE_VERIFY };
 
     DPRINTF("Enabling verify mode");
 
@@ -748,7 +742,7 @@ static int send_domain_memory_live(struct xc_sr_context *ctx)
             goto out;
     }
 
-  out:
+ out:
     return rc;
 }
 
@@ -795,7 +789,7 @@ static int setup(struct xc_sr_context *ctx)
         goto err;
 
     dirty_bitmap = xc_hypercall_buffer_alloc_pages(
-                   xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->save.p2m_size)));
+        xch, dirty_bitmap, NRPAGES(bitmap_size(ctx->save.p2m_size)));
     ctx->save.batch_pfns = malloc(MAX_BATCH_SIZE *
                                   sizeof(*ctx->save.batch_pfns));
     ctx->save.deferred_pages = calloc(1, bitmap_size(ctx->save.p2m_size));
@@ -966,7 +960,7 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
 };
 
 int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
-                   uint32_t flags, struct save_callbacks* callbacks,
+                   uint32_t flags, struct save_callbacks *callbacks,
                    xc_stream_type_t stream_type, int recv_fd)
 {
     struct xc_sr_context ctx = {

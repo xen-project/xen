@@ -4,11 +4,10 @@ int write_x86_tsc_info(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     struct xc_sr_rec_x86_tsc_info tsc = {};
-    struct xc_sr_record rec =
-    {
+    struct xc_sr_record rec = {
         .type = REC_TYPE_X86_TSC_INFO,
         .length = sizeof(tsc),
-        .data = &tsc
+        .data = &tsc,
     };
 
     if ( xc_domain_get_tsc_info(xch, ctx->domid, &tsc.mode,

@@ -228,7 +228,7 @@ struct xc_sr_context
             struct precopy_stats stats;
 
             xen_pfn_t *batch_pfns;
-            unsigned nr_batch_pfns;
+            unsigned int nr_batch_pfns;
             unsigned long *deferred_pages;
             unsigned long nr_deferred_pages;
             xc_hypercall_buffer_t dirty_bitmap_hbuf;
@@ -262,8 +262,8 @@ struct xc_sr_context
  */
 #define DEFAULT_BUF_RECORDS 1024
             struct xc_sr_record *buffered_records;
-            unsigned allocated_rec_num;
-            unsigned buffered_rec_num;
+            unsigned int allocated_rec_num;
+            unsigned int buffered_rec_num;
 
             /*
              * Xenstore and Console parameters.
@@ -333,7 +333,7 @@ struct xc_sr_context
                     {
                         struct xc_sr_blob basic, extd, xsave, msr;
                     } *vcpus;
-                    unsigned nr_vcpus;
+                    unsigned int nr_vcpus;
                 } restore;
             };
         } x86_pv;
@@ -418,7 +418,7 @@ int read_record(struct xc_sr_context *ctx, int fd, struct xc_sr_record *rec);
  * x86_pv_localise_page() if we receive pagetables frames ahead of the
  * contents of the frames they point at.
  */
-int populate_pfns(struct xc_sr_context *ctx, unsigned count,
+int populate_pfns(struct xc_sr_context *ctx, unsigned int count,
                   const xen_pfn_t *original_pfns, const uint32_t *types);
 
 #endif

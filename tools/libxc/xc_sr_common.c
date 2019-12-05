@@ -4,7 +4,7 @@
 
 #include <xen-tools/libs.h>
 
-static const char *dhdr_types[] =
+static const char *const dhdr_types[] =
 {
     [DHDR_TYPE_X86_PV]  = "x86 PV",
     [DHDR_TYPE_X86_HVM] = "x86 HVM",
@@ -18,7 +18,7 @@ const char *dhdr_type_to_str(uint32_t type)
     return "Reserved";
 }
 
-static const char *mandatory_rec_types[] =
+static const char *const mandatory_rec_types[] =
 {
     [REC_TYPE_END]                          = "End",
     [REC_TYPE_PAGE_DATA]                    = "Page data",
@@ -58,13 +58,12 @@ int write_split_record(struct xc_sr_context *ctx, struct xc_sr_record *rec,
     xc_interface *xch = ctx->xch;
     typeof(rec->length) combined_length = rec->length + sz;
     size_t record_length = ROUNDUP(combined_length, REC_ALIGN_ORDER);
-    struct iovec parts[] =
-    {
+    struct iovec parts[] = {
         { &rec->type,       sizeof(rec->type) },
         { &combined_length, sizeof(combined_length) },
         { rec->data,        rec->length },
         { buf,              sz },
-        { (void*)zeroes,    record_length - combined_length },
+        { (void *)zeroes,   record_length - combined_length },
     };
 
     if ( record_length > REC_LENGTH_MAX )

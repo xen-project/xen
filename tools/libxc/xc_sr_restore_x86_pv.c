@@ -222,7 +222,7 @@ static int process_start_info(struct xc_sr_context *ctx,
 
     rc = 0;
 
-err:
+ err:
     if ( guest_start_info )
         munmap(guest_start_info, PAGE_SIZE);
 
@@ -238,7 +238,7 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
     xc_interface *xch = ctx->xch;
     vcpu_guest_context_any_t *vcpu = ctx->x86_pv.restore.vcpus[vcpuid].basic.ptr;
     xen_pfn_t pfn, mfn;
-    unsigned i, gdt_count;
+    unsigned int i, gdt_count;
     int rc = -1;
 
     /* Vcpu 0 is special: Convert the suspend record to an mfn. */
@@ -474,7 +474,7 @@ static int update_vcpu_context(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     struct xc_sr_x86_pv_restore_vcpu *vcpu;
-    unsigned i;
+    unsigned int i;
     int rc = 0;
 
     for ( i = 0; i < ctx->x86_pv.restore.nr_vcpus; ++i )
@@ -527,7 +527,7 @@ static int update_guest_p2m(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     xen_pfn_t mfn, pfn, *guest_p2m = NULL;
-    unsigned i;
+    unsigned int i;
     int rc = -1;
 
     for ( i = 0; i < ctx->x86_pv.p2m_frames; ++i )
@@ -562,7 +562,7 @@ static int update_guest_p2m(struct xc_sr_context *ctx)
 
     guest_p2m = xc_map_foreign_pages(xch, ctx->domid, PROT_WRITE,
                                      ctx->x86_pv.p2m_pfns,
-                                     ctx->x86_pv.p2m_frames );
+                                     ctx->x86_pv.p2m_frames);
     if ( !guest_p2m )
     {
         PERROR("Failed to map p2m frames");
@@ -572,6 +572,7 @@ static int update_guest_p2m(struct xc_sr_context *ctx)
     memcpy(guest_p2m, ctx->x86_pv.p2m,
            (ctx->x86_pv.max_pfn + 1) * ctx->x86_pv.width);
     rc = 0;
+
  err:
     if ( guest_p2m )
         munmap(guest_p2m, ctx->x86_pv.p2m_frames * PAGE_SIZE);
@@ -675,7 +676,7 @@ static int handle_x86_pv_p2m_frames(struct xc_sr_context *ctx,
 {
     xc_interface *xch = ctx->xch;
     struct xc_sr_rec_x86_pv_p2m_frames *data = rec->data;
-    unsigned start, end, x, fpp = PAGE_SIZE / ctx->x86_pv.width;
+    unsigned int start, end, x, fpp = PAGE_SIZE / ctx->x86_pv.width;
     int rc;
 
     if ( !ctx->x86_pv.restore.seen_pv_info )
@@ -862,7 +863,7 @@ static int handle_shared_info(struct xc_sr_context *ctx,
                               struct xc_sr_record *rec)
 {
     xc_interface *xch = ctx->xch;
-    unsigned i;
+    unsigned int i;
     int rc = -1;
     shared_info_any_t *guest_shinfo = NULL;
     const shared_info_any_t *old_shinfo = rec->data;
@@ -904,8 +905,8 @@ static int handle_shared_info(struct xc_sr_context *ctx,
     MEMSET_ARRAY_FIELD(guest_shinfo, evtchn_mask, 0xff, ctx->x86_pv.width);
 
     rc = 0;
- err:
 
+ err:
     if ( guest_shinfo )
         munmap(guest_shinfo, PAGE_SIZE);
 
@@ -952,7 +953,7 @@ static int x86_pv_localise_page(struct xc_sr_context *ctx,
     xc_interface *xch = ctx->xch;
     uint64_t *table = page;
     uint64_t pte;
-    unsigned i, to_populate;
+    unsigned int i, to_populate;
     xen_pfn_t pfns[(PAGE_SIZE / sizeof(uint64_t))];
 
     type &= XEN_DOMCTL_PFINFO_LTABTYPE_MASK;
@@ -1134,7 +1135,7 @@ static int x86_pv_cleanup(struct xc_sr_context *ctx)
 
     if ( ctx->x86_pv.restore.vcpus )
     {
-        unsigned i;
+        unsigned int i;
 
         for ( i = 0; i < ctx->x86_pv.restore.nr_vcpus; ++i )
         {

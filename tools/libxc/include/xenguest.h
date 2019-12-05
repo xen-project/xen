@@ -52,10 +52,11 @@ typedef int (*precopy_policy_t)(struct precopy_stats, void *);
 
 /* callbacks provided by xc_domain_save */
 struct save_callbacks {
-    /* Called after expiration of checkpoint interval,
+    /*
+     * Called after expiration of checkpoint interval,
      * to suspend the guest.
      */
-    int (*suspend)(void* data);
+    int (*suspend)(void *data);
 
     /*
      * Called before and after every batch of page data sent during
@@ -79,7 +80,7 @@ struct save_callbacks {
      * xc_domain_save then flushes the output buffer, while the
      *  guest continues to run.
      */
-    int (*postcopy)(void* data);
+    int (*postcopy)(void *data);
 
     /*
      * Called after the memory checkpoint has been flushed
@@ -94,7 +95,7 @@ struct save_callbacks {
      * 0: terminate checkpointing gracefully
      * 1: take another checkpoint
      */
-    int (*checkpoint)(void* data);
+    int (*checkpoint)(void *data);
 
     /*
      * Called after the checkpoint callback.
@@ -103,13 +104,13 @@ struct save_callbacks {
      * 0: terminate checkpointing gracefully
      * 1: take another checkpoint
      */
-    int (*wait_checkpoint)(void* data);
+    int (*wait_checkpoint)(void *data);
 
     /* Enable qemu-dm logging dirty pages to xen */
     int (*switch_qemu_logdirty)(uint32_t domid, unsigned enable, void *data); /* HVM only */
 
     /* to be provided as the last argument to each callback function */
-    void* data;
+    void *data;
 };
 
 /* Type of stream.  Plain, or using a continuous replication protocol? */
@@ -138,22 +139,24 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
 
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {
-    /* Called after a new checkpoint to suspend the guest.
-     */
-    int (*suspend)(void* data);
+    /* Called after a new checkpoint to suspend the guest. */
+    int (*suspend)(void *data);
 
-    /* Called after the secondary vm is ready to resume.
+    /*
+     * Called after the secondary vm is ready to resume.
      * Callback function resumes the guest & the device model,
      * returns to xc_domain_restore.
      */
-    int (*postcopy)(void* data);
+    int (*postcopy)(void *data);
 
-    /* A checkpoint record has been found in the stream.
-     * returns: */
+    /*
+     * A checkpoint record has been found in the stream.
+     * returns:
+     */
 #define XGR_CHECKPOINT_ERROR    0 /* Terminate processing */
 #define XGR_CHECKPOINT_SUCCESS  1 /* Continue reading more data from the stream */
 #define XGR_CHECKPOINT_FAILOVER 2 /* Failover and resume VM */
-    int (*checkpoint)(void* data);
+    int (*checkpoint)(void *data);
 
     /*
      * Called after the checkpoint callback.
@@ -162,7 +165,7 @@ struct restore_callbacks {
      * 0: terminate checkpointing gracefully
      * 1: take another checkpoint
      */
-    int (*wait_checkpoint)(void* data);
+    int (*wait_checkpoint)(void *data);
 
     /*
      * callback to send store gfn and console gfn to xl
@@ -173,7 +176,7 @@ struct restore_callbacks {
                             void *data);
 
     /* to be provided as the last argument to each callback function */
-    void* data;
+    void *data;
 };
 
 /**
