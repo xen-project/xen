@@ -104,7 +104,63 @@ Descriptions of section entries:
 	   xen-maintainers-<version format number of this file>
 
 
-The meaning of nesting:
+	Check-in policy
+	===============
+
+In order for a patch to be checked in, in general, several conditions
+must be met:
+
+1. In order to get a change to a given file committed, it must have
+   the approval of at least one maintainer of that file.
+
+   A patch of course needs Acks from the maintainers of each file that
+   it changes; so a patch which changes xen/arch/x86/traps.c,
+   xen/arch/x86/mm/p2m.c, and xen/arch/x86/mm/shadow/multi.c would
+   require an Ack from each of the three sets of maintainers.
+
+   See below for rules on nested maintainership.
+
+2. It must have appropriate approval from someone other than the
+   submitter.  This can be either:
+
+  a. An Acked-by from a maintainer of the code being touched (a
+     co-maintainer if available, or a more general level maintainer if
+     not available; see the secton on nested maintainership)
+
+  b. A Reviewed-by by anyone of suitable stature in the community
+
+3. Sufficient time must have been given for anyone to respond.  This
+   depends in large part upon the urgency and nature of the patch.
+   For a straightforward uncontroversial patch, a day or two may be
+   sufficient; for a controversial patch, a week or two may be better.
+
+4. There must be no "open" objections.
+
+In a case where one person submits a patch and a maintainer gives an
+Ack, the Ack stands in for both the approval requirement (#1) and the
+Acked-by-non-submitter requirement (#2).
+
+In a case where a maintainer themselves submits a patch, the
+Signed-off-by meets the approval requirement (#1); so a Review
+from anyone in the community suffices for requirement #2.
+
+Before a maintainer checks in their own patch with another community
+member's R-b but no co-maintainer Ack, it is especially important to
+give their co-maintainer opportunity to give feedback, perhaps
+declaring their intention to check it in without their co-maintainers
+ack a day before doing so.
+
+Maintainers may choose to override non-maintainer objections in the
+case that consensus can't be reached.
+
+As always, no policy can cover all possible situations.  In
+exceptional circumstances, committers may commit a patch in absence of
+one or more of the above requirements, if they are reasonably
+confident that the other maintainers will approve of their decision in
+retrospect.
+
+       The meaning of nesting
+       ======================
 
 Many maintainership areas are "nested": for example, there are entries
 for xen/arch/x86 as well as xen/arch/x86/mm, and even
@@ -117,11 +173,6 @@ committed.  So a change to xen/arch/x86/mm/shadow/multi.c requires the
 the Ack of the xen/arch/x86/mm/shadow maintainer for that part of the
 patch, but would not require the Ack of the xen/arch/x86 maintainer or
 the xen/arch/x86/mm maintainer.
-
-(A patch of course needs acks from the maintainers of each file that
-it changes; so a patch which changes xen/arch/x86/traps.c,
-xen/arch/x86/mm/p2m.c, and xen/arch/x86/mm/shadow/multi.c would
-require an Ack from each of the three sets of maintainers.)
 
 2. In unusual circumstances, a more general maintainer's Ack can stand
 in for or even overrule a specific maintainer's Ack.  Unusual
