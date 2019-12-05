@@ -56,6 +56,7 @@ REC_TYPE_x86_pv_vcpu_msrs           = 0x0000000c
 REC_TYPE_verify                     = 0x0000000d
 REC_TYPE_checkpoint                 = 0x0000000e
 REC_TYPE_checkpoint_dirty_pfn_list  = 0x0000000f
+REC_TYPE_static_data_end            = 0x00000010
 
 rec_type_to_str = {
     REC_TYPE_end                        : "End",
@@ -74,6 +75,7 @@ rec_type_to_str = {
     REC_TYPE_verify                     : "Verify",
     REC_TYPE_checkpoint                 : "Checkpoint",
     REC_TYPE_checkpoint_dirty_pfn_list  : "Checkpoint dirty pfn list",
+    REC_TYPE_static_data_end            : "Static data end",
 }
 
 # page_data

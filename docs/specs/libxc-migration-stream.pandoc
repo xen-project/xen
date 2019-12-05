@@ -127,7 +127,7 @@ marker      0xFFFFFFFFFFFFFFFF.
 
 id          0x58454E46 ("XENF" in ASCII).
 
-version     0x00000002.  The version of this specification.
+version     0x00000003.  The version of this specification.
 
 options     bit 0: Endianness.  0 = little-endian, 1 = big-endian.
 
@@ -620,6 +620,21 @@ The count of pfns is: record->length/sizeof(uint64_t).
 
 \clearpage
 
+STATIC_DATA_END
+---------------
+
+A static data end record marks the end of the static state.  I.e. state which
+is invariant of guest execution.
+
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+
+The end record contains no fields; its body_length is 0.
+
+\clearpage
+
+
 Layout
 ======
 
@@ -639,7 +654,9 @@ A typical save record for an x86 PV guest image would look like:
 
 * Image header
 * Domain header
-* X86_PV_INFO record
+* Static data records:
+    * X86_PV_INFO record
+    * STATIC_DATA_END
 * X86_PV_P2M_FRAMES record
 * Many PAGE_DATA records
 * X86_TSC_INFO
@@ -667,6 +684,8 @@ A typical save record for an x86 HVM guest image would look like:
 
 * Image header
 * Domain header
+* Static data records:
+    * STATIC_DATA_END
 * Many PAGE_DATA records
 * X86_TSC_INFO
 * HVM_PARAMS
@@ -675,9 +694,23 @@ A typical save record for an x86 HVM guest image would look like:
 HVM_PARAMS must precede HVM_CONTEXT, as certain parameters can affect
 the validity of architectural state in the context.
 
+Compatibility with older versions
+=================================
+
+v3 compat with v2
+-----------------
+
+A v3 stream is compatible with a v2 stream, but mandates the presense of a
+STATIC_DATA_END record ahead of any memory/register content.  This is to ease
+the introduction of new static configuration records over time.
+
+A v3-compatible reciever interpreting a v2 stream should infer the position of
+STATIC_DATA_END based on finding the first X86_PV_P2M_FRAMES record (for PV
+guests), or PAGE_DATA record (for HVM guests) and behave as if STATIC_DATA_END
+had been sent.
 
 Legacy Images (x86 only)
-========================
+------------------------
 
 Restoring legacy images from older tools shall be handled by
 translating the legacy format image into this new format.

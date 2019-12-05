@@ -36,6 +36,7 @@ static const char *const mandatory_rec_types[] =
     [REC_TYPE_VERIFY]                       = "Verify",
     [REC_TYPE_CHECKPOINT]                   = "Checkpoint",
     [REC_TYPE_CHECKPOINT_DIRTY_PFN_LIST]    = "Checkpoint dirty pfn list",
+    [REC_TYPE_STATIC_DATA_END]              = "Static data end",
 };
 
 const char *rec_type_to_str(uint32_t type)

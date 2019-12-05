@@ -73,6 +73,7 @@ struct xc_sr_rhdr
 #define REC_TYPE_VERIFY                     0x0000000dU
 #define REC_TYPE_CHECKPOINT                 0x0000000eU
 #define REC_TYPE_CHECKPOINT_DIRTY_PFN_LIST  0x0000000fU
+#define REC_TYPE_STATIC_DATA_END            0x00000010U
 
 #define REC_TYPE_OPTIONAL             0x80000000U
 
