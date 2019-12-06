@@ -1401,14 +1401,23 @@ void parse_config_data(const char *config_source,
         !xlu_cfg_get_string (config, "cpus_soft", &buf, 0))
         parse_vcpu_affinity(b_info, cpus, buf, num_cpus, false);
 
-    if (!xlu_cfg_get_long (config, "max_grant_frames", &l, 0))
+    e = xlu_cfg_get_bounded_long (config, "max_grant_frames", 0, INT_MAX,
+                                  &l, 1);
+    if (e == ESRCH) /* not specified */
+        b_info->max_grant_frames = max_grant_frames;
+    else if (!e)
         b_info->max_grant_frames = l;
     else
-        b_info->max_grant_frames = max_grant_frames;
-    if (!xlu_cfg_get_long (config, "max_maptrack_frames", &l, 0))
-        b_info->max_maptrack_frames = l;
-    else if (max_maptrack_frames != -1)
+        exit(1);
+
+    e = xlu_cfg_get_bounded_long (config, "max_maptrack_frames", 0,
+                                  INT_MAX, &l, 1);
+    if (e == ESRCH) /* not specified */
         b_info->max_maptrack_frames = max_maptrack_frames;
+    else if (!e)
+        b_info->max_maptrack_frames = l;
+    else
+        exit(1);
 
     libxl_defbool_set(&b_info->claim_mode, claim_mode);
 

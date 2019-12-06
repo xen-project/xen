@@ -32,11 +32,10 @@
 struct grant_table;
 
 extern unsigned int opt_max_grant_frames;
-extern unsigned int opt_max_maptrack_frames;
 
 /* Create/destroy per-domain grant table context. */
-int grant_table_init(struct domain *d, unsigned int max_grant_frames,
-                     unsigned int max_maptrack_frames);
+int grant_table_init(struct domain *d, int max_grant_frames,
+                     int max_maptrack_frames);
 void grant_table_destroy(
     struct domain *d);
 void grant_table_init_vcpu(struct vcpu *v);

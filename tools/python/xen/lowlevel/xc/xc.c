@@ -127,8 +127,8 @@ static PyObject *pyxc_domain_create(XcObject *self,
         },
         .max_vcpus = 1,
         .max_evtchn_port = -1, /* No limit. */
-        .max_grant_frames = 32,
-        .max_maptrack_frames = 1024,
+        .max_grant_frames = -1,
+        .max_maptrack_frames = -1,
     };
 
     static char *kwd_list[] = { "domid", "ssidref", "handle", "flags",

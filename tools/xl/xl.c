@@ -23,6 +23,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <regex.h>
+#include <limits.h>
 
 #include <libxl.h>
 #include <libxl_utils.h>
@@ -96,7 +97,6 @@ static void parse_global_config(const char *configfile,
     XLU_Config *config;
     int e;
     const char *buf;
-    libxl_physinfo physinfo;
 
     config = xlu_cfg_init(stderr, configfile);
     if (!config) {
@@ -197,17 +197,19 @@ static void parse_global_config(const char *configfile,
     xlu_cfg_replace_string (config, "colo.default.proxyscript",
         &default_colo_proxy_script, 0);
 
-    if (!xlu_cfg_get_long (config, "max_grant_frames", &l, 0))
+    e = xlu_cfg_get_bounded_long (config, "max_grant_frames", 0, INT_MAX,
+                                  &l, 1);
+    if (!e)
         max_grant_frames = l;
-    else {
-        libxl_physinfo_init(&physinfo);
-        max_grant_frames = (libxl_get_physinfo(ctx, &physinfo) != 0 ||
-                            !(physinfo.max_possible_mfn >> 32))
-                           ? 32 : 64;
-        libxl_physinfo_dispose(&physinfo);
-    }
-    if (!xlu_cfg_get_long (config, "max_maptrack_frames", &l, 0))
+    else if (e != ESRCH)
+        exit(1);
+
+    e = xlu_cfg_get_bounded_long (config, "max_maptrack_frames", 0,
+                                  INT_MAX, &l, 1);
+    if (!e)
         max_maptrack_frames = l;
+    else if (e != ESRCH)
+        exit(1);
 
     libxl_cpu_bitmap_alloc(ctx, &global_vm_affinity_mask, 0);
     libxl_cpu_bitmap_alloc(ctx, &global_hvm_affinity_mask, 0);
