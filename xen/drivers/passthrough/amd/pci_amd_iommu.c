@@ -120,10 +120,6 @@ static void amd_iommu_setup_domain_device(
     u8 bus = pdev->bus;
     const struct domain_iommu *hd = dom_iommu(domain);
 
-    /* dom_io is used as a sentinel for quarantined devices */
-    if ( domain == dom_io )
-        return;
-
     BUG_ON( !hd->arch.root_table || !hd->arch.paging_mode ||
             !iommu->dev_table.buffer );
 
@@ -226,7 +222,7 @@ static int __must_check allocate_domain_resources(struct domain_iommu *hd)
     return rc;
 }
 
-static int get_paging_mode(unsigned long entries)
+int amd_iommu_get_paging_mode(unsigned long entries)
 {
     int level = 1;
 
@@ -248,7 +244,8 @@ static int amd_iommu_domain_init(struct domain *d)
 
     /* For pv and dom0, stick with get_paging_mode(max_page)
      * For HVM dom0, use 2 level page table at first */
-    hd->arch.paging_mode = is_hvm_domain(d) ? 2 : get_paging_mode(max_page);
+    hd->arch.paging_mode = is_hvm_domain(d) ?
+        2 : amd_iommu_get_paging_mode(max_page);
     return 0;
 }
 
@@ -280,10 +277,6 @@ void amd_iommu_disable_domain_device(struct domain *domain,
     unsigned long flags;
     int req_id;
     u8 bus = pdev->bus;
-
-    /* dom_io is used as a sentinel for quarantined devices */
-    if ( domain == dom_io )
-        return;
 
     BUG_ON ( iommu->dev_table.buffer == NULL );
     req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(bus, devfn));
@@ -581,6 +574,7 @@ static void amd_dump_p2m_table(struct domain *d)
 static const struct iommu_ops __initconstrel amd_iommu_ops = {
     .init = amd_iommu_domain_init,
     .hwdom_init = amd_iommu_hwdom_init,
+    .quarantine_init = amd_iommu_quarantine_init,
     .add_device = amd_iommu_add_device,
     .remove_device = amd_iommu_remove_device,
     .assign_device  = amd_iommu_assign_device,

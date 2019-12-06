@@ -192,7 +192,7 @@ u64 alloc_pgtable_maddr(struct acpi_drhd_unit *drhd, unsigned long npages)
     nodeid_t node = NUMA_NO_NODE;
     unsigned int i;
 
-    rhsa = drhd_to_rhsa(drhd);
+    rhsa = drhd ? drhd_to_rhsa(drhd) : NULL;
     if ( rhsa )
         node =  pxm_to_node(rhsa->proximity_domain);
 
@@ -1340,10 +1340,6 @@ int domain_context_mapping_one(
     int agaw, rc, ret;
     bool_t flush_dev_iotlb;
 
-    /* dom_io is used as a sentinel for quarantined devices */
-    if ( domain == dom_io )
-        return 0;
-
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
     maddr = bus_to_context_maddr(iommu, bus);
@@ -1579,10 +1575,6 @@ int domain_context_unmap_one(
     int iommu_domid, rc, ret;
     bool_t flush_dev_iotlb;
 
-    /* dom_io is used as a sentinel for quarantined devices */
-    if ( domain == dom_io )
-        return 0;
-
     ASSERT(pcidevs_locked());
     spin_lock(&iommu->lock);
 
@@ -1714,10 +1706,6 @@ static int domain_context_unmap(struct domain *domain, u8 devfn,
         ret = -EINVAL;
         goto out;
     }
-
-    /* dom_io is used as a sentinel for quarantined devices */
-    if ( domain == dom_io )
-        goto out;
 
     /*
      * if no other devices under the same iommu owned by this domain,
@@ -2736,9 +2724,69 @@ static void vtd_dump_p2m_table(struct domain *d)
     vtd_dump_p2m_table_level(hd->arch.pgd_maddr, agaw_to_level(hd->arch.agaw), 0, 0);
 }
 
+static int __init intel_iommu_quarantine_init(struct domain *d)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+    struct dma_pte *parent;
+    unsigned int agaw = width_to_agaw(DEFAULT_DOMAIN_ADDRESS_WIDTH);
+    unsigned int level = agaw_to_level(agaw);
+    int rc;
+
+    if ( hd->arch.pgd_maddr )
+    {
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
+    spin_lock(&hd->arch.mapping_lock);
+
+    hd->arch.pgd_maddr = alloc_pgtable_maddr(NULL, 1);
+    if ( !hd->arch.pgd_maddr )
+        goto out;
+
+    parent = map_vtd_domain_page(hd->arch.pgd_maddr);
+    while ( level )
+    {
+        uint64_t maddr;
+        unsigned int offset;
+
+        /*
+         * The pgtable allocator is fine for the leaf page, as well as
+         * page table pages, and the resulting allocations are always
+         * zeroed.
+         */
+        maddr = alloc_pgtable_maddr(NULL, 1);
+        if ( !maddr )
+            break;
+
+        for ( offset = 0; offset < PTE_NUM; offset++ )
+        {
+            struct dma_pte *pte = &parent[offset];
+
+            dma_set_pte_addr(*pte, maddr);
+            dma_set_pte_readable(*pte);
+        }
+        iommu_flush_cache_page(parent, 1);
+
+        unmap_vtd_domain_page(parent);
+        parent = map_vtd_domain_page(maddr);
+        level--;
+    }
+    unmap_vtd_domain_page(parent);
+
+ out:
+    spin_unlock(&hd->arch.mapping_lock);
+
+    rc = iommu_flush_iotlb_all(d);
+
+    /* Pages leaked in failure case */
+    return level ? -ENOMEM : rc;
+}
+
 const struct iommu_ops __initconstrel intel_iommu_ops = {
     .init = intel_iommu_domain_init,
     .hwdom_init = intel_iommu_hwdom_init,
+    .quarantine_init = intel_iommu_quarantine_init,
     .add_device = intel_iommu_add_device,
     .enable_device = intel_iommu_enable_device,
     .remove_device = intel_iommu_remove_device,
