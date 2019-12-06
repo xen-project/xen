@@ -301,9 +301,6 @@ int arch_monitor_domctl_event(struct domain *d,
         ad->monitor.debug_exception_sync = requested_status ?
                                             mop->u.debug_exception.sync :
                                             0;
-
-        hvm_set_icebp_interception(d, requested_status);
-
         domain_unpause(d);
         break;
     }
