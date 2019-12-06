@@ -1409,9 +1409,9 @@ static int __init parse_efi_param(const char *s)
         }
         else if ( (ss - s) > 5 && !memcmp(s, "attr=", 5) )
         {
-            if ( cmdline_strcmp(s + 5, "uc") )
+            if ( !cmdline_strcmp(s + 5, "uc") )
                 efi_map_uc = true;
-            else if ( cmdline_strcmp(s + 5, "no") )
+            else if ( !cmdline_strcmp(s + 5, "no") )
                 efi_map_uc = false;
             else
                 rc = -EINVAL;
