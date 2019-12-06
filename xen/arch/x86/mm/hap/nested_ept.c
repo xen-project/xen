@@ -54,11 +54,6 @@
 #define NEPT_2M_ENTRY_FLAG (1 << 10)
 #define NEPT_4K_ENTRY_FLAG (1 << 9)
 
-bool_t nept_sp_entry(ept_entry_t e)
-{
-    return !!(e.sp);
-}
-
 static bool_t nept_rsv_bits_check(ept_entry_t e, uint32_t level)
 {
     uint64_t rsv_bits = EPT_MUST_RSV_BITS;
@@ -68,7 +63,7 @@ static bool_t nept_rsv_bits_check(ept_entry_t e, uint32_t level)
     case 1:
         break;
     case 2 ... 3:
-        if ( nept_sp_entry(e) )
+        if ( e.sp )
             rsv_bits |=  ((1ull << (9 * (level - 1))) - 1) << PAGE_SHIFT;
         else
             rsv_bits |= EPTE_EMT_MASK | EPTE_IGMT_MASK;
@@ -181,7 +176,7 @@ nept_walk_tables(struct vcpu *v, unsigned long l2ga, ept_walk_t *gw)
         if ( nept_misconfiguration_check(gw->lxe[lvl], lvl) )
             goto misconfig_err;
 
-        if ( (lvl == 2 || lvl == 3) && nept_sp_entry(gw->lxe[lvl]) )
+        if ( (lvl == 2 || lvl == 3) && gw->lxe[lvl].sp )
         {
             /* Generate a fake l1 table entry so callers don't all
              * have to understand superpages. */
