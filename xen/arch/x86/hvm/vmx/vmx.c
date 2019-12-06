@@ -2778,6 +2778,8 @@ static const struct lbr_info *last_branch_msr_get(void)
         case 0x66:
         /* Goldmont Plus */
         case 0x7a:
+        /* Tremont */
+        case 0x86:
         /* Kaby Lake */
         case 0x8e: case 0x9e:
             return sk_lbr;

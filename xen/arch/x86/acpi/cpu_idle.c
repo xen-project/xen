@@ -238,6 +238,8 @@ static void do_get_hw_residencies(void *arg)
     case 0x5F:
     /* Goldmont Plus */
     case 0x7A:
+    /* Tremont */
+    case 0x86:
         GET_PC2_RES(hw_res->pc2);
         GET_PC3_RES(hw_res->pc3);
         GET_PC6_RES(hw_res->pc6);
