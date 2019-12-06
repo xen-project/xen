@@ -1733,7 +1733,7 @@ static void end_level_ioapic_irq_new(struct irq_desc *desc, u8 vector)
 
     v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
-    ack_APIC_irq();
+    end_nonmaskable_irq(desc, vector);
 
     if ( (desc->status & IRQ_MOVE_PENDING) &&
          !io_apic_level_ack_pending(desc->irq) )

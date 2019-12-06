@@ -251,7 +251,6 @@ void mask_msi_irq(struct irq_desc *);
 void unmask_msi_irq(struct irq_desc *);
 void guest_mask_msi_irq(struct irq_desc *, bool mask);
 void ack_nonmaskable_msi_irq(struct irq_desc *);
-void end_nonmaskable_msi_irq(struct irq_desc *, u8 vector);
 void set_msi_affinity(struct irq_desc *, const cpumask_t *);
 
 #endif /* __ASM_MSI_H */

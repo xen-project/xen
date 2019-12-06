@@ -1083,7 +1083,7 @@ static void dma_msi_ack(struct irq_desc *desc)
 static void dma_msi_end(struct irq_desc *desc, u8 vector)
 {
     dma_msi_unmask(desc);
-    ack_APIC_irq();
+    end_nonmaskable_irq(desc, vector);
 }
 
 static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
