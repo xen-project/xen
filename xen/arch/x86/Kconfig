@@ -164,14 +164,6 @@ endchoice
 config GUEST
 	bool
 
-config HYPERV_GUEST
-	bool "Hyper-V Guest"
-	select GUEST
-	---help---
-	  Support for Xen detecting when it is running under Hyper-V.
-
-	  If unsure, say N.
-
 config XEN_GUEST
 	bool "Xen Guest"
 	select GUEST
@@ -201,8 +193,7 @@ config PV_SHIM
 	  If unsure, say Y.
 
 config PV_SHIM_EXCLUSIVE
-	def_bool n
-	prompt "PV Shim Exclusive"
+	bool "PV Shim Exclusive"
 	depends on PV_SHIM
 	---help---
 	  Build Xen in a way which unconditionally assumes PV_SHIM mode.  This
@@ -210,6 +201,18 @@ config PV_SHIM_EXCLUSIVE
 	  firmware, and will not function correctly in other scenarios.
 
 	  If unsure, say N.
+
+if !PV_SHIM_EXCLUSIVE
+
+config HYPERV_GUEST
+	bool "Hyper-V Guest"
+	select GUEST
+	---help---
+	  Support for Xen detecting when it is running under Hyper-V.
+
+	  If unsure, say N.
+
+endif
 
 config MEM_SHARING
 	bool "Xen memory sharing support" if EXPERT = "y"
