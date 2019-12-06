@@ -51,6 +51,7 @@
 struct vcpu;
 
 unsigned int svm_get_insn_len(struct vcpu *v, unsigned int instr_enc);
+unsigned int svm_get_task_switch_insn_len(void);
 
 #endif /* __ASM_X86_HVM_SVM_EMULATE_H__ */
 
