@@ -386,4 +386,10 @@ static always_inline void stac(void)
 4:  .p2align 2                            ; \
     .popsection
 
+#define ASM_INT(label, val)                 \
+    .p2align 2;                             \
+label: .long (val);                         \
+    .size label, . - label;                 \
+    .type label, @object
+
 #endif /* __X86_ASM_DEFNS_H__ */
