@@ -13,6 +13,11 @@ export XEN_BUILD_TIME	?= $(shell LC_ALL=C date +%T)
 export XEN_BUILD_HOST	?= $(shell hostname)
 export XEN_CONFIG_EXPERT ?= n
 
+# Best effort attempt to find a python interpreter, defaulting to Python 3 if
+# available.  Fall back to just `python` if `which` is nowhere to be found.
+PYTHON_INTERPRETER	:= $(word 1,$(shell which python3 python python2 2>/dev/null) python)
+export PYTHON		?= $(PYTHON_INTERPRETER)
+
 export BASEDIR := $(CURDIR)
 export XEN_ROOT := $(BASEDIR)/..
 
