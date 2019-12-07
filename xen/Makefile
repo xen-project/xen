@@ -176,7 +176,7 @@ include/xen/compile.h: include/xen/compile.h.in .banner
 	    -e 's!@@changeset@@!$(shell tools/scmversion $(XEN_ROOT) || echo "unavailable")!g' \
 	    < include/xen/compile.h.in > $@.new
 	@cat .banner
-	@$(PYTHON) tools/fig-to-oct.py < .banner >> $@.new
+	@sed -rf tools/process-banner.sed < .banner >> $@.new
 	@mv -f $@.new $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
