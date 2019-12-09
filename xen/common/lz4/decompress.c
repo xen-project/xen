@@ -39,6 +39,11 @@
 
 #include "defs.h"
 
+static const uint8_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
+#if LZ4_ARCH64
+static const int8_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
+#endif
+
 #if defined(__XEN__) || defined(__MINIOS__)
 
 static int INIT lz4_uncompress(const unsigned char *source, unsigned char *dest,
@@ -51,10 +56,6 @@ static int INIT lz4_uncompress(const unsigned char *source, unsigned char *dest,
 	BYTE *cpy;
 	unsigned token;
 	size_t length;
-	size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
-#if LZ4_ARCH64
-	size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
-#endif
 
 	while (1) {
 
@@ -109,7 +110,7 @@ static int INIT lz4_uncompress(const unsigned char *source, unsigned char *dest,
 		/* copy repeated sequence */
 		if (unlikely((op - ref) < STEPSIZE)) {
 #if LZ4_ARCH64
-			size_t dec64 = dec64table[op - ref];
+			int dec64 = dec64table[op - ref];
 #else
 			const int dec64 = 0;
 #endif
@@ -174,11 +175,6 @@ static int lz4_uncompress_unknownoutputsize(const unsigned char *source,
 	BYTE *op = (BYTE *) dest;
 	BYTE * const oend = op + maxoutputsize;
 	BYTE *cpy;
-
-	size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
-#if LZ4_ARCH64
-	size_t dec64table[] = {0, 0, 0, -1, 0, 1, 2, 3};
-#endif
 
 	/* Main Loop */
 	while (ip < iend) {
@@ -245,7 +241,7 @@ static int lz4_uncompress_unknownoutputsize(const unsigned char *source,
 		/* copy repeated sequence */
 		if (unlikely((op - ref) < STEPSIZE)) {
 #if LZ4_ARCH64
-			size_t dec64 = dec64table[op - ref];
+			int dec64 = dec64table[op - ref];
 #else
 			const int dec64 = 0;
 #endif
