@@ -168,8 +168,9 @@ def crunch_numbers(state):
     deps = {
         # FPU is taken to mean support for the x87 regisers as well as the
         # instructions.  MMX is documented to alias the %MM registers over the
-        # x87 %ST registers in hardware.
-        FPU: [MMX],
+        # x87 %ST registers in hardware.  Correct restoring of error pointers
+        # of course makes no sense without there being anything to restore.
+        FPU: [MMX, RSTR_FP_ERR_PTRS],
 
         # The PSE36 feature indicates that reserved bits in a PSE superpage
         # may be used as extra physical address bits.
