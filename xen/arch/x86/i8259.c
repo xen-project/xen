@@ -347,9 +347,9 @@ void __init init_IRQ(void)
         if ( irq == 2 ) /* IRQ2 doesn't exist */
             continue;
         desc->handler = &i8259A_irq_type;
-        per_cpu(vector_irq, cpu)[FIRST_LEGACY_VECTOR + irq] = irq;
+        per_cpu(vector_irq, cpu)[LEGACY_VECTOR(irq)] = irq;
         cpumask_copy(desc->arch.cpu_mask, cpumask_of(cpu));
-        desc->arch.vector = FIRST_LEGACY_VECTOR + irq;
+        desc->arch.vector = LEGACY_VECTOR(irq);
     }
     
     per_cpu(vector_irq, cpu)[IRQ0_VECTOR] = 0;
