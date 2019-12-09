@@ -133,3 +133,105 @@ the end of files.  It should be:
  * indent-tabs-mode: nil
  * End:
  */
+
+Handling unexpected conditions
+------------------------------
+
+GUIDELINES:
+
+Passing errors up the stack should be used when the caller is already
+expecting to handle errors, and the state when the error was
+discovered isn’t broken, or isn't too hard to fix.
+
+domain_crash() should be used when passing errors up the stack is too
+difficult, and/or when fixing up state of a guest is impractical, but
+where fixing up the state of Xen will allow Xen to continue running.
+This is particularly appropriate when the guest is exhibiting behavior
+well-behaved guests shouldn't.
+
+BUG_ON() should be used when you can’t pass errors up the stack, and
+either continuing or crashing the guest would likely cause an
+information leak or privilege escalation vulnerability.
+
+ASSERT() IS NOT AN ERROR HANDLING MECHANISM.  ASSERT is a way to move
+detection of a bug earlier in the programming cycle; it is a
+more-noticeable printk.  It should only be added after one of the
+other three error-handling mechanisms has been evaluated for
+reliability and security.
+
+RATIONALE:
+
+It's frequently the case that code is written with the assumption that
+certain conditions can never happen.  There are several possible
+actions programmers can take in these situations:
+
+* Programmers can simply not handle those cases in any way, other than
+perhaps to write a comment documenting what the assumption is.
+
+* Programmers can try to handle the case gracefully -- fixing up
+in-progress state and returning an error to the user.
+
+* Programmers can crash the guest.
+
+* Programmers can use ASSERT(), which will cause the check to be
+executed in DEBUG builds, and cause the hypervisor to crash if it's
+violated
+
+* Programmers can use BUG_ON(), which will cause the check to be
+executed in both DEBUG and non-DEBUG builds, and cause the hypervisor
+to crash if it's violated.
+
+In selecting which response to use, we want to achieve several goals:
+
+- To minimize risk of introducing security vulnerabilities,
+  particularly as the code evolves over time
+
+- To efficiently spend programmer time
+
+- To detect violations of assumptions as early as possible
+
+- To minimize the impact of bugs on production use cases
+
+The guidelines above attempt to balance these:
+
+- When the caller is expecting to handle errors, and there is no
+broken state at the time the unexpected condition is discovered, or
+when fixing the state is straightforward, then fixing up the state and
+returning an error is the most robust thing to do.  However, if the
+caller isn't expecting to handle errors, or if the state is difficult
+to fix, then returning an error may require extensive refactoring,
+which is not a good use of programmer time when they're certain that
+this condition cannot occur.
+
+- BUG_ON() will stop all hypervisor action immediately.  In situations
+where continuing might allow an attacker to escalate privilege, a
+BUG_ON() can change a privilege escalation or information leak into a
+denial-of-service (an improvement).  But in situations where
+continuing (say, returning an error) might be safe, then BUG_ON() can
+change a benign failure into denial-of-service (a degradation).
+
+- domain_crash() is similar to BUG_ON(), but with a more limited
+effect: it stops that domain immediately.  In situations where
+continuing might cause guest or hypervisor corruption, but destroying
+the guest allows the hypervisor to continue, this can change a more
+serious bug into a guest denial-of-service.  But in situations where
+returning an error might be safe, then domain_crash() can change a
+benign failure into a guest denial-of-service.
+
+- ASSERT() will stop the hypervisor during development, but allow
+hypervisor action to continue during production.  In situations where
+continuing will at worst result in a denial-of-service, and at best
+may have little effect other than perhaps quirky behavior, using an
+ASSERT() will allow violation of assumptions to be detected as soon as
+possible, while not causing undue degradation in production
+hypervisors.  However, in situations where continuing could cause
+privilege escalation or information leaks, using an ASSERT() can
+introduce security vulnerabilities.
+
+Note however that domain_crash() has its own traps: callers far up the
+call stack may not realize that the domain is now dying as a result of
+an innocuous-looking operation, particularly if somewhere on the
+callstack between the initial function call and the failure, no error
+is returned.  Using domain_crash() requires careful inspection and
+documentation of the code to make sure all callers at the stack handle
+a newly-dead domain gracefully.
