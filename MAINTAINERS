@@ -428,7 +428,6 @@ L:	xen-devel@lists.xenproject.org
 F:	unmodified_drivers/linux-2.6/
 
 VM EVENT, MEM ACCESS and MONITOR
-M:	Razvan Cojocaru <rcojocaru@bitdefender.com>
 M:	Tamas K Lengyel <tamas@tklengyel.com>
 R:	Alexandru Isaila <aisaila@bitdefender.com>
 R:	Petre Pircalabu <ppircalabu@bitdefender.com>
