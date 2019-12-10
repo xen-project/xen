@@ -1087,6 +1087,19 @@ value settable via Xen tools.
 
 Dom0 is using this value for sizing its maptrack table.
 
+### global-pages (x86)
+> `= <boolean>`
+
+> Default: `true` unless running virtualized on AMD or Hygon hardware
+
+Set whether the PGE bit in CR4 will be enabled for PV guests. This controls the
+usage of global pages, and thus the need to perform tlb flushes by writing to
+CR4.
+
+Note it's disabled by default when running virtualized on AMD or Hygon hardware
+since AMD SVM doesn't support selective trapping of CR4, so global pages are
+not enabled in order to reduce the overhead of TLB flushes.
+
 ### guest_loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 
