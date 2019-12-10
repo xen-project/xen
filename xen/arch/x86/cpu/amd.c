@@ -583,7 +583,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 	 * Older AMD CPUs don't save/load FOP/FIP/FDP unless an FPU exception
 	 * is pending.  Xen works around this at (F)XRSTOR time.
 	 */
-	if (!cpu_has(c, X86_FEATURE_RSTR_FP_ERR_PTRS))
+	if (c == &boot_cpu_data && !cpu_has(c, X86_FEATURE_RSTR_FP_ERR_PTRS))
 		setup_force_cpu_cap(X86_BUG_FPU_PTRS);
 
 	/*
