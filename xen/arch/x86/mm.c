@@ -1600,7 +1600,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
         if ( rc == -EINTR && i )
         {
             page->nr_validated_ptes = i;
-            page->partial_flags = 0;
+            page->partial_flags = partial_flags;;
             rc = -ERESTART;
         }
         else if ( rc < 0 && rc != -EINTR )
@@ -1694,7 +1694,7 @@ static int alloc_l3_table(struct page_info *page)
         else if ( rc == -EINTR && i )
         {
             page->nr_validated_ptes = i;
-            page->partial_flags = 0;
+            page->partial_flags = partial_flags;
             rc = -ERESTART;
         }
         if ( rc < 0 )
@@ -2006,8 +2006,8 @@ static int free_l2_table(struct page_info *page)
     }
     else if ( rc == -EINTR && i < L2_PAGETABLE_ENTRIES - 1 )
     {
-        page->nr_validated_ptes = i + 1;
-        page->partial_flags = 0;
+        page->nr_validated_ptes = i + !(partial_flags & PTF_partial_set);
+        page->partial_flags = partial_flags;
         rc = -ERESTART;
     }
 
@@ -2054,8 +2054,8 @@ static int free_l3_table(struct page_info *page)
     }
     else if ( rc == -EINTR && i < L3_PAGETABLE_ENTRIES - 1 )
     {
-        page->nr_validated_ptes = i + 1;
-        page->partial_flags = 0;
+        page->nr_validated_ptes = i + !(partial_flags & PTF_partial_set);
+        page->partial_flags = partial_flags;
         rc = -ERESTART;
     }
     return rc > 0 ? 0 : rc;
@@ -2085,8 +2085,8 @@ static int free_l4_table(struct page_info *page)
     }
     else if ( rc == -EINTR && i < L4_PAGETABLE_ENTRIES - 1 )
     {
-        page->nr_validated_ptes = i + 1;
-        page->partial_flags = 0;
+        page->nr_validated_ptes = i + !(partial_flags & PTF_partial_set);
+        page->partial_flags = partial_flags;
         rc = -ERESTART;
     }
 
