@@ -18,6 +18,7 @@
 #include <xen/timer.h>
 #include <xen/smp.h>
 #include <xen/irq.h>
+#include <xen/pci_ids.h>
 #include <xen/softirq.h>
 #include <xen/efi.h>
 #include <xen/cpuidle.h>
@@ -364,12 +365,41 @@ static u64 read_hpet_count(void)
     return hpet_read32(HPET_COUNTER);
 }
 
-static s64 __init init_hpet(struct platform_timesource *pts)
+static int64_t __init init_hpet(struct platform_timesource *pts)
 {
-    u64 hpet_rate = hpet_setup(), start;
-    u32 count, target;
+    uint64_t hpet_rate, start;
+    uint32_t count, target;
 
-    if ( hpet_rate == 0 )
+    if ( hpet_address && strcmp(opt_clocksource, pts->id) &&
+         cpuidle_using_deep_cstate() )
+    {
+        if ( pci_conf_read16(0, 0, 0x1f, 0,
+                             PCI_VENDOR_ID) == PCI_VENDOR_ID_INTEL )
+            switch ( pci_conf_read16(0, 0, 0x1f, 0, PCI_DEVICE_ID) )
+            {
+            /* HPET on Bay Trail platforms will halt in deep C states. */
+            case 0x0f1c:
+            /* HPET on Cherry Trail platforms will halt in deep C states. */
+            case 0x229c:
+                hpet_address = 0;
+                break;
+            }
+
+        /*
+         * Some Coffee Lake platforms have a skewed HPET timer once the SoCs
+         * entered PC10.
+         */
+        if ( pci_conf_read16(0, 0, 0, 0,
+                             PCI_VENDOR_ID) == PCI_VENDOR_ID_INTEL &&
+             pci_conf_read16(0, 0, 0, 0,
+                             PCI_DEVICE_ID) == 0x3ec4 )
+            hpet_address = 0;
+
+        if ( !hpet_address )
+            printk("Disabling HPET for being unreliable\n");
+    }
+
+    if ( (hpet_rate = hpet_setup()) == 0 )
         return 0;
 
     pts->frequency = hpet_rate;
