@@ -255,6 +255,14 @@ of using different schedulers and scheduling properties.
 
     Status: Supported
 
+### Core Scheduling
+
+Allows to group virtual cpus into virtual cores which are scheduled on the
+physical cores. This results in never running different guests at the same
+time on the same physical core.
+
+    Status, x86: Experimental
+
 ### Credit Scheduler
 
 A weighted proportional fair share virtual CPU scheduler.
