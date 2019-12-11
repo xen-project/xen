@@ -406,9 +406,6 @@ void vcpu_destroy(struct vcpu *v)
     xfree(v->arch.msr);
     v->arch.msr = NULL;
 
-    if ( !is_idle_domain(v->domain) )
-        vpmu_destroy(v);
-
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);
     else
@@ -1992,12 +1989,17 @@ int domain_relinquish_resources(struct domain *d)
         if ( ret )
             return ret;
 
-        /* Drop the in-use references to page-table bases. */
+        /*
+         * Drop the in-use references to page-table bases and clean
+         * up vPMU instances.
+         */
         for_each_vcpu ( d, v )
         {
             ret = vcpu_destroy_pagetables(v);
             if ( ret )
                 return ret;
+
+            vpmu_destroy(v);
         }
 
         if ( is_pv_domain(d) )
