@@ -3195,8 +3195,8 @@ static int __get_page_type(struct page_info *page, unsigned long type,
         {
             page->nr_validated_ptes = 0;
             page->partial_flags = 0;
+            page->linear_pt_count = 0;
         }
-        page->linear_pt_count = 0;
         rc = alloc_page_type(page, type, preemptible);
     }
 
