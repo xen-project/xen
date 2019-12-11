@@ -764,6 +764,10 @@ void __init noreturn __start_xen(unsigned long mbi_p)
      * allocing any xenheap structures wanted in lower memory. */
     kexec_early_calculations();
 
+    /*
+     * The probing has to be done _before_ initialising console,
+     * otherwise we couldn't set up Xen's PV console correctly.
+     */
     hypervisor_name = hypervisor_probe();
 
     parse_video_info();
