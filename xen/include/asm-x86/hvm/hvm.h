@@ -484,7 +484,7 @@ static inline unsigned int hvm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
 enum hvm_task_switch_reason { TSW_jmp, TSW_iret, TSW_call_or_int };
 void hvm_task_switch(
     uint16_t tss_sel, enum hvm_task_switch_reason taskswitch_reason,
-    int32_t errcode);
+    int32_t errcode, unsigned int insn_len);
 
 enum hvm_access_type {
     hvm_access_insn_fetch,
