@@ -3922,6 +3922,42 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
             __restore_debug_registers(v);
             write_debugreg(6, exit_qualification | DR_STATUS_RESERVED_ONE);
+
+            /*
+             * Work around SingleStep + STI/MovSS VMEntry failures.
+             *
+             * We intercept #DB unconditionally to work around CVE-2015-8104 /
+             * XSA-156 (guest-kernel induced host DoS).
+             *
+             * STI/MovSS shadows block/defer interrupts/exceptions (exact
+             * details are complicated and poorly documented).  Debug
+             * exceptions delayed for any reason are stored in the
+             * PENDING_DBG_EXCEPTIONS field.
+             *
+             * The falling edge of PENDING_DBG causes #DB to be delivered,
+             * resulting in a VMExit, as #DB is intercepted.  The VMCS still
+             * reports blocked-by-STI/MovSS.
+             *
+             * The VMEntry checks when EFLAGS.TF is set don't like a VMCS in
+             * this state.  Despite a #DB queued in VMENTRY_INTR_INFO, the
+             * state is rejected as DR6.BS isn't pending.  Fix this up.
+             */
+            if ( unlikely(regs->eflags & X86_EFLAGS_TF) )
+            {
+                unsigned long int_info;
+
+                __vmread(GUEST_INTERRUPTIBILITY_INFO, &int_info);
+
+                if ( int_info & (VMX_INTR_SHADOW_STI | VMX_INTR_SHADOW_MOV_SS) )
+                {
+                    unsigned long pending_dbg;
+
+                    __vmread(GUEST_PENDING_DBG_EXCEPTIONS, &pending_dbg);
+                    __vmwrite(GUEST_PENDING_DBG_EXCEPTIONS,
+                              pending_dbg | DR_STEP);
+                }
+            }
+
             if ( !v->domain->debugger_attached )
             {
                 unsigned long insn_len = 0;
