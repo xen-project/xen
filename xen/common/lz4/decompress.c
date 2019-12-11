@@ -147,7 +147,7 @@ static int INIT lz4_uncompress(const unsigned char *source, unsigned char *dest,
 				goto _output_error;
 			continue;
 		}
-		if (unlikely((unsigned long)cpy < (unsigned long)op))
+		if (unlikely((unsigned long)cpy < (unsigned long)op - (STEPSIZE - 4)))
 			goto _output_error;
 		LZ4_SECURECOPY(ref, op, cpy);
 		op = cpy; /* correction */
@@ -279,7 +279,7 @@ static int lz4_uncompress_unknownoutputsize(const unsigned char *source,
 				goto _output_error;
 			continue;
 		}
-		if (unlikely((unsigned long)cpy < (unsigned long)op))
+		if (unlikely((unsigned long)cpy < (unsigned long)op - (STEPSIZE - 4)))
 			goto _output_error;
 		LZ4_SECURECOPY(ref, op, cpy);
 		op = cpy; /* correction */
