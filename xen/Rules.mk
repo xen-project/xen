@@ -64,7 +64,7 @@ CFLAGS += -pipe -D__XEN__ -include $(BASEDIR)/include/xen/config.h
 CFLAGS-$(CONFIG_DEBUG_INFO) += -g
 CFLAGS += '-D__OBJECT_FILE__="$@"'
 
-ifneq ($(clang),y)
+ifneq ($(CONFIG_CC_IS_CLANG),y)
 # Clang doesn't understand this command line argument, and doesn't appear to
 # have an suitable alternative.  The resulting compiled binary does function,
 # but has an excessively large symbol table.
@@ -122,7 +122,7 @@ subdir-all := $(subdir-y) $(subdir-n)
 $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -DINIT_SECTIONS_ONLY
 
 ifeq ($(CONFIG_COVERAGE),y)
-ifeq ($(clang),y)
+ifeq ($(CONFIG_CC_IS_CLANG),y)
     COV_FLAGS := -fprofile-instr-generate -fcoverage-mapping
 else
     COV_FLAGS := -fprofile-arcs -ftest-coverage
@@ -139,7 +139,7 @@ endif
 
 ifeq ($(CONFIG_LTO),y)
 CFLAGS += -flto
-LDFLAGS-$(clang) += -plugin LLVMgold.so
+LDFLAGS-$(CONFIG_CC_IS_CLANG) += -plugin LLVMgold.so
 # Would like to handle all object files as bitcode, but objects made from
 # pure asm are in a different format and have to be collected separately.
 # Mirror the directory tree, collecting them as built_in_bin.o.
@@ -193,7 +193,7 @@ SRCPATH := $(patsubst $(BASEDIR)/%,%,$(CURDIR))
 %.o: %.c Makefile
 ifeq ($(CONFIG_ENFORCE_UNIQUE_SYMBOLS),y)
 	$(CC) $(CFLAGS) -c $< -o $(@D)/.$(@F).tmp -MQ $@
-ifeq ($(clang),y)
+ifeq ($(CONFIG_CC_IS_CLANG),y)
 	$(OBJCOPY) --redefine-sym $<=$(SRCPATH)/$< $(@D)/.$(@F).tmp $@
 else
 	$(OBJCOPY) --redefine-sym $(<F)=$(SRCPATH)/$< $(@D)/.$(@F).tmp $@

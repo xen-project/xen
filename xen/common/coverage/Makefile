@@ -1,5 +1,5 @@
 obj-y += coverage.o
-ifneq ($(clang),y)
+ifneq ($(CONFIG_CC_IS_CLANG),y)
 obj-y += gcov_base.o gcov.o
 obj-y += $(call cc-ifversion,-lt,0407, \
 		gcc_3_4.o, $(call cc-ifversion,-lt,0409, \

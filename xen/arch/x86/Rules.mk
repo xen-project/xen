@@ -12,7 +12,7 @@ CFLAGS += '-D__OBJECT_LABEL__=$(subst /,$$,$(subst -,_,$(subst $(BASEDIR)/,,$(CU
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS += -msoft-float
 
-ifeq ($(clang),y)
+ifeq ($(CONFIG_CC_IS_CLANG),y)
 # Note: Any test which adds -no-integrated-as will cause subsequent tests to
 # succeed, and not trigger further additions.
 #
