@@ -370,7 +370,7 @@ static inline unsigned int __scanbit(unsigned long val, unsigned int max)
     const unsigned long *a__ = (addr);                                      \
     unsigned int s__ = (size);                                              \
     unsigned int o__ = (off);                                               \
-    if ( __builtin_constant_p(size) && !s__ )                               \
+    if ( o__ >= s__ )                                                       \
         r__ = s__;                                                          \
     else if ( __builtin_constant_p(size) && s__ <= BITS_PER_LONG )          \
         r__ = o__ + __scanbit(*(const unsigned long *)(a__) >> o__, s__);   \
@@ -402,7 +402,7 @@ static inline unsigned int __scanbit(unsigned long val, unsigned int max)
     const unsigned long *a__ = (addr);                                      \
     unsigned int s__ = (size);                                              \
     unsigned int o__ = (off);                                               \
-    if ( __builtin_constant_p(size) && !s__ )                               \
+    if ( o__ >= s__ )                                                       \
         r__ = s__;                                                          \
     else if ( __builtin_constant_p(size) && s__ <= BITS_PER_LONG )          \
         r__ = o__ + __scanbit(~*(const unsigned long *)(a__) >> o__, s__);  \
