@@ -352,10 +352,15 @@ static void amd_xc_cpuid_policy(xc_interface *xch,
          * - going out of sync with leaf 1 EBX[23:16],
          * - incrementing ApicIdCoreSize when it's zero (which changes the
          *   meaning of bits 7:0).
+         *
+         * UPDATE: In addition to avoiding overflow, some
+         * proprietary operating systems have trouble with
+         * apic_id_size values greater than 7.  Limit the value to
+         * 7 for now.
          */
         if ( (regs[2] & 0xffu) < 0x7fu )
         {
-            if ( (regs[2] & 0xf000u) && (regs[2] & 0xf000u) != 0xf000u )
+            if ( (regs[2] & 0xf000u) && (regs[2] & 0xf000u) < 0x7000u )
                 regs[2] = ((regs[2] + 0x1000u) & 0xf000u) | (regs[2] & 0xffu);
             regs[2] = (regs[2] & 0xf000u) | ((regs[2] & 0x7fu) << 1) | 1u;
         }
