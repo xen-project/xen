@@ -3095,40 +3095,36 @@ int put_old_guest_table(struct vcpu *v)
 int vcpu_destroy_pagetables(struct vcpu *v)
 {
     unsigned long mfn = pagetable_get_pfn(v->arch.guest_table);
-    struct page_info *page;
-    l4_pgentry_t *l4tab = NULL;
+    struct page_info *page = NULL;
     int rc = put_old_guest_table(v);
+    bool put_guest_table_user = false;
 
     if ( rc )
         return rc;
 
+    v->arch.cr3 = 0;
+
+    /*
+     * Get the top-level guest page; either the guest_table itself, for
+     * 64-bit, or the top-level l4 entry for 32-bit.  Either way, remove
+     * the reference to that page.
+     */
     if ( is_pv_32bit_vcpu(v) )
     {
-        l4tab = map_domain_page(_mfn(mfn));
+        l4_pgentry_t *l4tab = map_domain_page(_mfn(mfn));
+
         mfn = l4e_get_pfn(*l4tab);
-    }
-
-    if ( mfn )
-    {
-        page = mfn_to_page(_mfn(mfn));
-        if ( paging_mode_refcounts(v->domain) )
-            put_page(page);
-        else
-            rc = put_page_and_type_preemptible(page);
-    }
-
-    if ( l4tab )
-    {
-        if ( !rc )
-            l4e_write(l4tab, l4e_empty());
+        l4e_write(l4tab, l4e_empty());
         unmap_domain_page(l4tab);
     }
-    else if ( !rc )
+    else
     {
         v->arch.guest_table = pagetable_null();
+        put_guest_table_user = true;
+    }
 
-        /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
-        mfn = pagetable_get_pfn(v->arch.guest_table_user);
+    /* Free that page if non-zero */
+    do {
         if ( mfn )
         {
             page = mfn_to_page(_mfn(mfn));
@@ -3136,18 +3132,41 @@ int vcpu_destroy_pagetables(struct vcpu *v)
                 put_page(page);
             else
                 rc = put_page_and_type_preemptible(page);
+            mfn = 0;
         }
-        if ( !rc )
-            v->arch.guest_table_user = pagetable_null();
-    }
 
-    v->arch.cr3 = 0;
+        if ( !rc && put_guest_table_user )
+        {
+            /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
+            mfn = pagetable_get_pfn(v->arch.guest_table_user);
+            v->arch.guest_table_user = pagetable_null();
+            put_guest_table_user = false;
+        }
+    } while ( mfn );
 
     /*
-     * put_page_and_type_preemptible() is liable to return -EINTR. The
-     * callers of us expect -ERESTART so convert it over.
+     * If a "put" operation was interrupted, finish things off in
+     * put_old_guest_table() when the operation is restarted.
      */
-    return rc != -EINTR ? rc : -ERESTART;
+    switch ( rc )
+    {
+    case -EINTR:
+    case -ERESTART:
+        v->arch.old_guest_ptpg = NULL;
+        v->arch.old_guest_table = page;
+        v->arch.old_guest_table_partial = (rc == -ERESTART);
+        rc = -ERESTART;
+        break;
+    default:
+        /*
+         * Failure to 'put' a page may cause it to leak, but that's
+         * less bad than a crash.
+         */
+        ASSERT(rc == 0);
+        break;
+    }
+
+    return rc;
 }
 
 int new_guest_cr3(mfn_t mfn)
