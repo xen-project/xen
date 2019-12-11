@@ -138,6 +138,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
 #define XEN_DOMCTL_PFINFO_LTAB_MASK (0xfU<<28)
 
 /* XEN_DOMCTL_getpageframeinfo3 */
+/*
+ * Both value `num' and `array' may get modified by the hypercall to allow
+ * preemption.
+ */
 struct xen_domctl_getpageframeinfo3 {
     /* IN variables. */
     uint64_aligned_t num;
