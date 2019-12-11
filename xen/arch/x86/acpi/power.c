@@ -195,7 +195,6 @@ static int enter_state(u32 state)
     unsigned long flags;
     int error;
     struct cpu_info *ci;
-    unsigned long cr4;
 
     if ( (state <= ACPI_STATE_S0) || (state > ACPI_S_STATES_MAX) )
         return -EINVAL;
@@ -270,15 +269,15 @@ static int enter_state(u32 state)
 
     system_state = SYS_STATE_resume;
 
-    /* Restore CR4 and EFER from cached values. */
-    cr4 = read_cr4();
-    write_cr4(cr4 & ~X86_CR4_MCE);
+    /* Restore EFER from cached value. */
     write_efer(read_efer());
 
     device_power_up(SAVED_ALL);
 
     mcheck_init(&boot_cpu_data, false);
-    write_cr4(cr4);
+
+    /* Restore CR4 from cached value, now MCE is set up. */
+    write_cr4(read_cr4());
 
     printk(XENLOG_INFO "Finishing wakeup from ACPI S%d state.\n", state);
 

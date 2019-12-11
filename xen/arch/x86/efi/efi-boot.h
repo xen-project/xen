@@ -242,6 +242,7 @@ static void __init noreturn efi_arch_post_exit_boot(void)
     if ( cpu_has_nx )
         efer |= EFER_NX;
     wrmsrl(MSR_EFER, efer);
+    wrmsrl(MSR_IA32_CR_PAT, XEN_MSR_PAT);
     write_cr0(X86_CR0_PE | X86_CR0_MP | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP |
               X86_CR0_AM | X86_CR0_PG);
     asm volatile ( "mov    %[cr4], %%cr4\n\t"

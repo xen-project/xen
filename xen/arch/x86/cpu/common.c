@@ -790,8 +790,6 @@ void cpu_init(void)
 	if (opt_cpu_info)
 		printk("Initializing CPU#%d\n", cpu);
 
-	wrmsrl(MSR_IA32_CR_PAT, XEN_MSR_PAT);
-
 	/* Install correct page table. */
 	write_ptbase(current);
 

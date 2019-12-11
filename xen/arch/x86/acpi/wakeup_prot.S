@@ -15,8 +15,6 @@ ENTRY(do_suspend_lowlevel)
         mov     %cr0, %rax
         mov     %rax, saved_cr0(%rip)
 
-        call    save_rest_processor_state
-
         /* enter sleep state physically */
         mov     $3, %edi
         call    acpi_enter_sleep_state
@@ -51,7 +49,7 @@ ENTRY(s3_resume)
         lretq
 1:
 
-        call restore_rest_processor_state
+        call    load_system_tables
 
 .Lsuspend_err:
         pop     %r15
