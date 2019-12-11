@@ -23,6 +23,10 @@ config CLANG_VERSION
 	int
 	default $(shell,$(BASEDIR)/scripts/clang-version.sh $(CC))
 
+# -fvisibility=hidden reduces -fpic cost, if it's available
+config CC_HAS_VISIBILITY_ATTRIBUTE
+	def_bool $(cc-option,-fvisibility=hidden)
+
 source "arch/$(SRCARCH)/Kconfig"
 
 config DEFCONFIG_LIST

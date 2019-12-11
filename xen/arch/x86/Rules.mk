@@ -65,11 +65,6 @@ CFLAGS += -mno-red-zone -fpic -fno-asynchronous-unwind-tables
 # SSE setup for variadic function calls.
 CFLAGS += -mno-sse $(call cc-option,$(CC),-mskip-rax-setup)
 
-# -fvisibility=hidden reduces -fpic cost, if it's available
-ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
-CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
-endif
-
 # Compile with thunk-extern, indirect-branch-register if avaiable.
 ifeq ($(CONFIG_INDIRECT_THUNK),y)
 CFLAGS += -mindirect-branch=thunk-extern -mindirect-branch-register

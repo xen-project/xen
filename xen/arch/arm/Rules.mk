@@ -18,10 +18,6 @@ CFLAGS-$(CONFIG_ARM_32) += -mcpu=cortex-a15
 CFLAGS-$(CONFIG_ARM_64) += -mcpu=generic
 CFLAGS-$(CONFIG_ARM_64) += -mgeneral-regs-only # No fp registers etc
 
-ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
-CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
-endif
-
 EARLY_PRINTK := n
 
 ifeq ($(CONFIG_DEBUG),y)
