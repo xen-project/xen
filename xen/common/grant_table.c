@@ -919,8 +919,6 @@ map_grant_ref(
     mfn_t frame;
     struct page_info *pg = NULL;
     int            rc = GNTST_okay;
-    u32            old_pin;
-    u32            act_pin;
     unsigned int   cache_flags, refcnt = 0, typecnt = 0;
     bool           host_map_created = false;
     struct active_grant_entry *act = NULL;
@@ -1024,7 +1022,6 @@ map_grant_ref(
         }
     }
 
-    old_pin = act->pin;
     if ( op->flags & GNTMAP_device_map )
         act->pin += (op->flags & GNTMAP_readonly) ?
             GNTPIN_devr_inc : GNTPIN_devw_inc;
@@ -1033,7 +1030,6 @@ map_grant_ref(
             GNTPIN_hstr_inc : GNTPIN_hstw_inc;
 
     frame = act->frame;
-    act_pin = act->pin;
 
     cache_flags = (shah->flags & (GTF_PAT | GTF_PWT | GTF_PCD) );
 
@@ -1141,27 +1137,22 @@ map_grant_ref(
     if ( need_iommu )
     {
         unsigned int kind;
-        int err = 0;
 
         double_gt_lock(lgt, rgt);
 
-        /* We're not translated, so we know that gmfns and mfns are
-           the same things, so the IOMMU entry is always 1-to-1. */
+        /*
+         * We're not translated, so we know that dfns and mfns are
+         * the same things, so the IOMMU entry is always 1-to-1.
+         */
         kind = mapkind(lgt, rd, frame);
-        if ( (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
-             !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
-        {
-            if ( !(kind & MAPKIND_WRITE) )
-                err = iommu_map_page(ld, mfn_x(frame), mfn_x(frame),
-                                     IOMMUF_readable|IOMMUF_writable);
-        }
-        else if ( act_pin && !old_pin )
-        {
-            if ( !kind )
-                err = iommu_map_page(ld, mfn_x(frame), mfn_x(frame),
-                                     IOMMUF_readable);
-        }
-        if ( err )
+        if ( !(op->flags & GNTMAP_readonly) &&
+             !(kind & MAPKIND_WRITE) )
+            kind = IOMMUF_readable | IOMMUF_writable;
+        else if ( !kind )
+            kind = IOMMUF_readable;
+        else
+            kind = 0;
+        if ( kind && iommu_map_page(ld, mfn_x(frame), mfn_x(frame), kind) )
         {
             double_gt_unlock(lgt, rgt);
             rc = GNTST_general_error;
@@ -1176,7 +1167,7 @@ map_grant_ref(
      * other fields so just ensure the flags field is stored last.
      *
      * However, if gnttab_need_iommu_mapping() then this would race
-     * with a concurrent mapcount() call (on an unmap, for example)
+     * with a concurrent mapkind() call (on an unmap, for example)
      * and a lock is required.
      */
     mt = &maptrack_entry(lgt, handle);
