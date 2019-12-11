@@ -285,100 +285,6 @@ static int iommu_pde_from_dfn(struct domain *d, unsigned long dfn,
     return 0;
 }
 
-static int update_paging_mode(struct domain *d, unsigned long dfn)
-{
-    uint16_t bdf;
-    struct amd_iommu_dte *table, *dte;
-    unsigned int req_id, level, offset;
-    unsigned long flags;
-    struct pci_dev *pdev;
-    struct amd_iommu *iommu = NULL;
-    struct page_info *new_root = NULL;
-    struct page_info *old_root = NULL;
-    struct amd_iommu_pte *new_root_vaddr;
-    unsigned long old_root_mfn;
-    struct domain_iommu *hd = dom_iommu(d);
-
-    if ( dfn == dfn_x(INVALID_DFN) )
-        return -EADDRNOTAVAIL;
-    ASSERT(!(dfn >> DEFAULT_DOMAIN_ADDRESS_WIDTH));
-
-    level = hd->arch.paging_mode;
-    old_root = hd->arch.root_table;
-    offset = dfn >> (PTE_PER_TABLE_SHIFT * (level - 1));
-
-    ASSERT(spin_is_locked(&hd->arch.mapping_lock) && is_hvm_domain(d));
-
-    while ( offset >= PTE_PER_TABLE_SIZE )
-    {
-        /* Allocate and install a new root table.
-         * Only upper I/O page table grows, no need to fix next level bits */
-        new_root = alloc_amd_iommu_pgtable();
-        if ( new_root == NULL )
-        {
-            AMD_IOMMU_DEBUG("%s Cannot allocate I/O page table\n",
-                            __func__);
-            return -ENOMEM;
-        }
-
-        new_root_vaddr = __map_domain_page(new_root);
-        old_root_mfn = mfn_x(page_to_mfn(old_root));
-        set_iommu_pde_present(new_root_vaddr, old_root_mfn, level,
-                              true, true);
-        level++;
-        old_root = new_root;
-        offset >>= PTE_PER_TABLE_SHIFT;
-        unmap_domain_page(new_root_vaddr);
-    }
-
-    if ( new_root != NULL )
-    {
-        hd->arch.paging_mode = level;
-        hd->arch.root_table = new_root;
-
-        if ( !pcidevs_locked() )
-            AMD_IOMMU_DEBUG("%s Try to access pdev_list "
-                            "without aquiring pcidevs_lock.\n", __func__);
-
-        /* Update device table entries using new root table and paging mode */
-        for_each_pdev( d, pdev )
-        {
-            if ( pdev->type == DEV_TYPE_PCI_HOST_BRIDGE )
-                continue;
-
-            bdf = PCI_BDF2(pdev->bus, pdev->devfn);
-            iommu = find_iommu_for_device(pdev->seg, bdf);
-            if ( !iommu )
-            {
-                AMD_IOMMU_DEBUG("%s Fail to find iommu.\n", __func__);
-                return -ENODEV;
-            }
-
-            spin_lock_irqsave(&iommu->lock, flags);
-            do {
-                req_id = get_dma_requestor_id(pdev->seg, bdf);
-                table = iommu->dev_table.buffer;
-                dte = &table[req_id];
-
-                /* valid = 0 only works for dom0 passthrough mode */
-                amd_iommu_set_root_page_table(dte,
-                                              page_to_maddr(hd->arch.root_table),
-                                              d->domain_id,
-                                              hd->arch.paging_mode, 1);
-
-                amd_iommu_flush_device(iommu, req_id);
-                bdf += pdev->phantom_stride;
-            } while ( PCI_DEVFN2(bdf) != pdev->devfn &&
-                      PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
-            spin_unlock_irqrestore(&iommu->lock, flags);
-        }
-
-        /* For safety, invalidate all entries */
-        amd_iommu_flush_all_pages(d);
-    }
-    return 0;
-}
-
 int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
                        unsigned int flags, unsigned int *flush_flags)
 {
@@ -398,20 +304,6 @@ int amd_iommu_map_page(struct domain *d, dfn_t dfn, mfn_t mfn,
                         dfn_x(dfn));
         domain_crash(d);
         return rc;
-    }
-
-    /* Since HVM domain is initialized with 2 level IO page table,
-     * we might need a deeper page table for wider dfn now */
-    if ( is_hvm_domain(d) )
-    {
-        if ( update_paging_mode(d, dfn_x(dfn)) )
-        {
-            spin_unlock(&hd->arch.mapping_lock);
-            AMD_IOMMU_DEBUG("Update page mode failed dfn = %"PRI_dfn"\n",
-                            dfn_x(dfn));
-            domain_crash(d);
-            return -EFAULT;
-        }
     }
 
     if ( iommu_pde_from_dfn(d, dfn_x(dfn), pt_mfn, true) || (pt_mfn[1] == 0) )
