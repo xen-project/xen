@@ -71,11 +71,9 @@ CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
 
 # Compile with thunk-extern, indirect-branch-register if avaiable.
-ifneq ($(call cc-option,$(CC),-mindirect-branch-register,n),n)
+ifeq ($(CONFIG_INDIRECT_THUNK),y)
 CFLAGS += -mindirect-branch=thunk-extern -mindirect-branch-register
-CFLAGS += -DCONFIG_INDIRECT_THUNK
 CFLAGS += -fno-jump-tables
-export CONFIG_INDIRECT_THUNK=y
 endif
 
 # If supported by the compiler, reduce stack alignment to 8 bytes. But allow

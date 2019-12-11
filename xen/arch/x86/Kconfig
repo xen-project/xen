@@ -31,6 +31,9 @@ config ARCH_DEFCONFIG
 	string
 	default "arch/x86/configs/x86_64_defconfig"
 
+config INDIRECT_THUNK
+	def_bool $(cc-option,-mindirect-branch-register)
+
 menu "Architecture Features"
 
 source "arch/Kconfig"
