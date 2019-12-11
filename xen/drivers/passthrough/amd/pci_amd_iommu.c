@@ -251,10 +251,17 @@ static int amd_iommu_domain_init(struct domain *d)
 {
     struct domain_iommu *hd = dom_iommu(d);
 
-    /* For pv and dom0, stick with get_paging_mode(max_page)
-     * For HVM dom0, use 2 level page table at first */
-    hd->arch.paging_mode = is_hvm_domain(d) ?
-        2 : amd_iommu_get_paging_mode(max_page);
+    /*
+     * Choose the number of levels for the IOMMU page tables.
+     * - PV needs 3 or 4, depending on whether there is RAM (including hotplug
+     *   RAM) above the 512G boundary.
+     * - HVM could in principle use 3 or 4 depending on how much guest
+     *   physical address space we give it, but this isn't known yet so use 4
+     *   unilaterally.
+     */
+    hd->arch.paging_mode = is_hvm_domain(d)
+        ? 4 : amd_iommu_get_paging_mode(get_upper_mfn_bound());
+
     return 0;
 }
 
