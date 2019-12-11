@@ -73,7 +73,7 @@ static int construct_vmcb(struct vcpu *v)
         GENERAL2_INTERCEPT_STGI        | GENERAL2_INTERCEPT_CLGI        |
         GENERAL2_INTERCEPT_SKINIT      | GENERAL2_INTERCEPT_MWAIT       |
         GENERAL2_INTERCEPT_WBINVD      | GENERAL2_INTERCEPT_MONITOR     |
-        GENERAL2_INTERCEPT_XSETBV;
+        GENERAL2_INTERCEPT_XSETBV      | GENERAL2_INTERCEPT_ICEBP;
 
     /* Intercept all debug-register writes. */
     vmcb->_dr_intercepts = ~0u;
