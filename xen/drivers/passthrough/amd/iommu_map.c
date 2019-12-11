@@ -457,7 +457,7 @@ static int iommu_merge_pages(struct domain *d, unsigned long pt_mfn,
  * page tables.
  */
 static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn, 
-                              unsigned long pt_mfn[])
+                              unsigned long pt_mfn[], bool map)
 {
     u64 *pde, *next_table_vaddr;
     unsigned long  next_table_mfn;
@@ -470,6 +470,13 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
 
     BUG_ON( table == NULL || level < IOMMU_PAGING_MODE_LEVEL_1 || 
             level > IOMMU_PAGING_MODE_LEVEL_6 );
+
+    /*
+     * A frame number past what the current page tables can represent can't
+     * possibly have a mapping.
+     */
+    if ( pfn >> (PTE_PER_TABLE_SHIFT * level) )
+        return 0;
 
     next_table_mfn = page_to_mfn(table);
 
@@ -531,6 +538,9 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
         /* Install lower level page table for non-present entries */
         else if ( !iommu_is_pte_present((u32*)pde) )
         {
+            if ( !map )
+                return 0;
+
             if ( next_table_mfn == 0 )
             {
                 table = alloc_amd_iommu_pgtable();
@@ -681,7 +691,7 @@ int amd_iommu_map_page(struct domain *d, unsigned long gfn, unsigned long mfn,
         }
     }
 
-    if ( iommu_pde_from_gfn(d, gfn, pt_mfn) || (pt_mfn[1] == 0) )
+    if ( iommu_pde_from_gfn(d, gfn, pt_mfn, true) || (pt_mfn[1] == 0) )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_DEBUG("Invalid IO pagetable entry gfn = %lx\n", gfn);
@@ -756,23 +766,7 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
 
     spin_lock(&hd->arch.mapping_lock);
 
-    /* Since HVM domain is initialized with 2 level IO page table,
-     * we might need a deeper page table for lager gfn now */
-    if ( is_hvm_domain(d) )
-    {
-        int rc = update_paging_mode(d, gfn);
-
-        if ( rc )
-        {
-            spin_unlock(&hd->arch.mapping_lock);
-            AMD_IOMMU_DEBUG("Update page mode failed gfn = %lx\n", gfn);
-            if ( rc != -EADDRNOTAVAIL )
-                domain_crash(d);
-            return rc;
-        }
-    }
-
-    if ( iommu_pde_from_gfn(d, gfn, pt_mfn) || (pt_mfn[1] == 0) )
+    if ( iommu_pde_from_gfn(d, gfn, pt_mfn, false) )
     {
         spin_unlock(&hd->arch.mapping_lock);
         AMD_IOMMU_DEBUG("Invalid IO pagetable entry gfn = %lx\n", gfn);
@@ -780,8 +774,11 @@ int amd_iommu_unmap_page(struct domain *d, unsigned long gfn)
         return -EFAULT;
     }
 
-    /* mark PTE as 'page not present' */
-    clear_iommu_pte_present(pt_mfn[1], gfn);
+    if ( pt_mfn[1] )
+    {
+        /* Mark PTE as 'page not present'. */
+        clear_iommu_pte_present(pt_mfn[1], gfn);
+    }
 
     /* No further merging in amd_iommu_map_page(), as the logic doesn't cope. */
     hd->arch.no_merge = true;
