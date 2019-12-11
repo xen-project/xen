@@ -7403,6 +7403,17 @@ void paging_invlpg(struct vcpu *v, unsigned long va)
         hvm_funcs.invlpg(v, va);
 }
 
+unsigned long get_upper_mfn_bound(void)
+{
+    unsigned long max_mfn;
+
+    max_mfn = mem_hotplug ? PFN_DOWN(mem_hotplug) : max_page;
+#ifndef CONFIG_BIGMEM
+    max_mfn = min(max_mfn, 1UL << 32);
+#endif
+    return min(max_mfn, 1UL << (paddr_bits - PAGE_SHIFT)) - 1;
+}
+
 /*
  * Local variables:
  * mode: C
