@@ -380,6 +380,21 @@ int iommu_iotlb_flush_all(struct domain *d)
     return rc;
 }
 
+static int __init iommu_quarantine_init(void)
+{
+    const struct domain_iommu *hd = dom_iommu(dom_io);
+    int rc;
+
+    rc = iommu_domain_init(dom_io);
+    if ( rc )
+        return rc;
+
+    if ( !hd->platform_ops->quarantine_init )
+        return 0;
+
+    return hd->platform_ops->quarantine_init(dom_io);
+}
+
 int __init iommu_setup(void)
 {
     int rc = -ENODEV;
@@ -413,7 +428,7 @@ int __init iommu_setup(void)
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( iommu_enabled )
     {
-        if ( iommu_domain_init(dom_io) )
+        if ( iommu_quarantine_init() )
             panic("Could not set up quarantine\n");
 
         printk(" - Dom0 mode: %s\n",

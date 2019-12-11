@@ -741,3 +741,65 @@ void amd_iommu_share_p2m(struct domain *d)
                         mfn_x(pgd_mfn));
     }
 }
+
+int __init amd_iommu_quarantine_init(struct domain *d)
+{
+    struct domain_iommu *hd = dom_iommu(d);
+    unsigned long max_gfn =
+        PFN_DOWN((1ul << DEFAULT_DOMAIN_ADDRESS_WIDTH) - 1);
+    unsigned int level = amd_iommu_get_paging_mode(max_gfn);
+    uint64_t *table;
+
+    if ( hd->arch.root_table )
+    {
+        ASSERT_UNREACHABLE();
+        return 0;
+    }
+
+    spin_lock(&hd->arch.mapping_lock);
+
+    hd->arch.root_table = alloc_amd_iommu_pgtable();
+    if ( !hd->arch.root_table )
+        goto out;
+
+    table = __map_domain_page(hd->arch.root_table);
+    while ( level )
+    {
+        struct page_info *pg;
+        unsigned int i;
+
+        /*
+         * The pgtable allocator is fine for the leaf page, as well as
+         * page table pages, and the resulting allocations are always
+         * zeroed.
+         */
+        pg = alloc_amd_iommu_pgtable();
+        if ( !pg )
+            break;
+
+        for ( i = 0; i < PTE_PER_TABLE_SIZE; i++ )
+        {
+            uint32_t *pde = (uint32_t *)&table[i];
+
+            /*
+             * PDEs are essentially a subset of PTEs, so this function
+             * is fine to use even at the leaf.
+             */
+            set_iommu_pde_present(pde, mfn_x(page_to_mfn(pg)), level - 1,
+                                  false, true);
+        }
+
+        unmap_domain_page(table);
+        table = __map_domain_page(pg);
+        level--;
+    }
+    unmap_domain_page(table);
+
+ out:
+    spin_unlock(&hd->arch.mapping_lock);
+
+    amd_iommu_flush_all_pages(d);
+
+    /* Pages leaked in failure case */
+    return level ? -ENOMEM : 0;
+}
