@@ -9,9 +9,8 @@ INITD_DIR        | /etc/rc.d/init.d | /etc/init.d   | /etc/init.d    |
 -----------------+------------------+---------------+----------------+
 
 The existence of these directories are tested at build-time (on the
-build host, via the "setvar_dir" macro in Config.mk) and for some
-scripts at run-time.  If the Red Hat directory exists, it is used;
-otherwise the Debian one is used.
+build host) and for some scripts at run-time.  If the Red Hat
+directory exists, it is used; otherwise the Debian one is used.
 
 The INITD_DIR path can be changed with configure --with-initddir=DIR.
 The CONFIG_LEAF_DIR name can be changed with configure

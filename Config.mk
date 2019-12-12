@@ -68,17 +68,6 @@ DEPS_RM = $(DEPS) $(DEPS_INCLUDE)
 include $(XEN_ROOT)/config/$(XEN_OS).mk
 include $(XEN_ROOT)/config/$(XEN_TARGET_ARCH).mk
 
-# arguments: variable, common path part, path to test, if yes, if no
-define setvar_dir
-  ifndef $(1)
-    ifneq (,$(wildcard $(2)$(3)))
-      $(1) ?= $(2)$(4)
-    else
-      $(1) ?= $(2)$(5)
-    endif
-  endif
-endef
-
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/lib
