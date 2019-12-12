@@ -355,8 +355,8 @@ static inline void *__page_to_virt(const struct page_info *pg)
                     (PAGE_SIZE / (sizeof(*pg) & -sizeof(*pg))));
 }
 
-int free_page_type(struct page_info *page, unsigned long type,
-                   int preemptible);
+int devalidate_page(struct page_info *page, unsigned long type,
+                         int preemptible);
 
 void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d);
 void init_xen_l4_slots(l4_pgentry_t *l4t, mfn_t l4mfn,

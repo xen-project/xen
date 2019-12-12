@@ -587,7 +587,7 @@ const char __section(".bss.page_aligned.const") __aligned(PAGE_SIZE)
 
 
 #ifdef CONFIG_PV
-static int alloc_segdesc_page(struct page_info *page)
+static int validate_segdesc_page(struct page_info *page)
 {
     const struct domain *owner = page_get_owner(page);
     seg_desc_t *descs = __map_domain_page(page);
@@ -1363,7 +1363,7 @@ static int put_page_from_l4e(l4_pgentry_t l4e, mfn_t l4mfn, unsigned int flags)
     return put_pt_page(l4e_get_page(l4e), mfn_to_page(l4mfn), flags);
 }
 
-static int alloc_l1_table(struct page_info *page)
+static int promote_l1_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     l1_pgentry_t  *pl1e;
@@ -1405,7 +1405,7 @@ static int alloc_l1_table(struct page_info *page)
 
  fail:
     gdprintk(XENLOG_WARNING,
-             "Failure %d in alloc_l1_table: slot %#x\n", ret, i);
+             "Failure %d in promote_l1_table: slot %#x\n", ret, i);
  out:
     while ( i-- > 0 )
         put_page_from_l1e(pl1e[i], d);
@@ -1438,7 +1438,7 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
      *  1. Cannot appear in slots != 3 because get_page_type() checks the
      *     PGT_pae_xen_l2 flag, which is asserted iff the L2 appears in slot 3
      *  2. Cannot appear in another page table's L3:
-     *     a. alloc_l3_table() calls this function and this check will fail
+     *     a. promote_l3_table() calls this function and this check will fail
      *     b. mod_l3_entry() disallows updates to slot 3 in an existing table
      */
     page = l3e_get_page(l3e3);
@@ -1454,7 +1454,7 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
     return 1;
 }
 
-static int alloc_l2_table(struct page_info *page, unsigned long type)
+static int promote_l2_table(struct page_info *page, unsigned long type)
 {
     struct domain *d = page_get_owner(page);
     mfn_t         l2mfn = page_to_mfn(page);
@@ -1466,8 +1466,8 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
     pl2e = map_domain_page(l2mfn);
 
     /*
-     * NB that alloc_l2_table will never set partial_pte on an l2; but
-     * free_l2_table might if a linear_pagetable entry is interrupted
+     * NB that promote_l2_table will never set partial_pte on an l2; but
+     * demote_l2_table might if a linear_pagetable entry is interrupted
      * partway through de-validation.  In that circumstance,
      * get_page_from_l2e() will always return -EINVAL; and we must
      * retain the type ref by doing the normal partial_flags tracking.
@@ -1494,7 +1494,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
         /*
          * It shouldn't be possible for get_page_from_l2e to return
          * -ERESTART, since we never call this with PTF_preemptible.
-         * (alloc_l1_table may return -EINTR on an L1TF-vulnerable
+         * (promote_l1_table may return -EINTR on an L1TF-vulnerable
          * entry.)
          *
          * NB that while on a "clean" promotion, we can never get
@@ -1515,12 +1515,12 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
         else if ( rc < 0 && rc != -EINTR )
         {
             gdprintk(XENLOG_WARNING,
-                     "Failure %d in alloc_l2_table: slot %#x\n", rc, i);
+                     "Failure %d in promote_l2_table: slot %#x\n", rc, i);
             ASSERT(current->arch.old_guest_table == NULL);
             if ( i )
             {
                 /*
-                 * alloc_l1_table() doesn't set old_guest_table; it does
+                 * promote_l1_table() doesn't set old_guest_table; it does
                  * its own tear-down immediately on failure.  If it
                  * did we'd need to check it and set partial_flags as we
                  * do in alloc_l[34]_table().
@@ -1553,7 +1553,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
     return rc;
 }
 
-static int alloc_l3_table(struct page_info *page)
+static int promote_l3_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     mfn_t          l3mfn = page_to_mfn(page);
@@ -1626,7 +1626,7 @@ static int alloc_l3_table(struct page_info *page)
     if ( rc < 0 && rc != -ERESTART && rc != -EINTR )
     {
         gdprintk(XENLOG_WARNING,
-                 "Failure %d in alloc_l3_table: slot %#x\n", rc, i);
+                 "Failure %d in promote_l3_table: slot %#x\n", rc, i);
         if ( i )
         {
             page->nr_validated_ptes = i;
@@ -1677,7 +1677,7 @@ void init_xen_pae_l2_slots(l2_pgentry_t *l2t, const struct domain *d)
  * Fill an L4 with Xen entries.
  *
  * This function must write all ROOT_PAGETABLE_PV_XEN_SLOTS, to clobber any
- * values a guest may have left there from alloc_l4_table().
+ * values a guest may have left there from promote_l4_table().
  *
  * l4t and l4mfn are mandatory, but l4mfn doesn't need to be the mfn under
  * *l4t.  All other parameters are optional and will either fill or zero the
@@ -1780,7 +1780,7 @@ void zap_ro_mpt(mfn_t mfn)
 }
 
 #ifdef CONFIG_PV
-static int alloc_l4_table(struct page_info *page)
+static int promote_l4_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     mfn_t          l4mfn = page_to_mfn(page);
@@ -1819,7 +1819,7 @@ static int alloc_l4_table(struct page_info *page)
         {
             if ( rc != -EINTR )
                 gdprintk(XENLOG_WARNING,
-                         "Failure %d in alloc_l4_table: slot %#x\n", rc, i);
+                         "Failure %d in promote_l4_table: slot %#x\n", rc, i);
             if ( i )
             {
                 page->nr_validated_ptes = i;
@@ -1875,7 +1875,7 @@ static int alloc_l4_table(struct page_info *page)
     return rc;
 }
 
-static void free_l1_table(struct page_info *page)
+static void demote_l1_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     l1_pgentry_t *pl1e;
@@ -1890,7 +1890,7 @@ static void free_l1_table(struct page_info *page)
 }
 
 
-static int free_l2_table(struct page_info *page)
+static int demote_l2_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     mfn_t l2mfn = page_to_mfn(page);
@@ -1942,7 +1942,7 @@ static int free_l2_table(struct page_info *page)
     return rc;
 }
 
-static int free_l3_table(struct page_info *page)
+static int demote_l3_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     mfn_t l3mfn = page_to_mfn(page);
@@ -1989,7 +1989,7 @@ static int free_l3_table(struct page_info *page)
     return rc > 0 ? 0 : rc;
 }
 
-static int free_l4_table(struct page_info *page)
+static int demote_l4_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
     mfn_t l4mfn = page_to_mfn(page);
@@ -2589,7 +2589,7 @@ static void get_page_light(struct page_info *page)
     while ( unlikely(y != x) );
 }
 
-static int alloc_page_type(struct page_info *page, unsigned long type,
+static int validate_page(struct page_info *page, unsigned long type,
                            int preemptible)
 {
 #ifdef CONFIG_PV
@@ -2603,25 +2603,25 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
-        rc = alloc_l1_table(page);
+        rc = promote_l1_table(page);
         break;
     case PGT_l2_page_table:
         ASSERT(preemptible);
-        rc = alloc_l2_table(page, type);
+        rc = promote_l2_table(page, type);
         break;
     case PGT_l3_page_table:
         ASSERT(preemptible);
-        rc = alloc_l3_table(page);
+        rc = promote_l3_table(page);
         break;
     case PGT_l4_page_table:
         ASSERT(preemptible);
-        rc = alloc_l4_table(page);
+        rc = promote_l4_table(page);
         break;
     case PGT_seg_desc_page:
-        rc = alloc_segdesc_page(page);
+        rc = validate_segdesc_page(page);
         break;
     default:
-        printk("Bad type in alloc_page_type %lx t=%" PRtype_info " c=%lx\n",
+        printk("Bad type in validate_page %lx t=%" PRtype_info " c=%lx\n",
                type, page->u.inuse.type_info,
                page->count_info);
         rc = -EINVAL;
@@ -2669,7 +2669,7 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
 }
 
 
-int free_page_type(struct page_info *page, unsigned long type,
+int devalidate_page(struct page_info *page, unsigned long type,
                    int preemptible)
 {
 #ifdef CONFIG_PV
@@ -2697,20 +2697,20 @@ int free_page_type(struct page_info *page, unsigned long type,
     switch ( type & PGT_type_mask )
     {
     case PGT_l1_page_table:
-        free_l1_table(page);
+        demote_l1_table(page);
         rc = 0;
         break;
     case PGT_l2_page_table:
         ASSERT(preemptible);
-        rc = free_l2_table(page);
+        rc = demote_l2_table(page);
         break;
     case PGT_l3_page_table:
         ASSERT(preemptible);
-        rc = free_l3_table(page);
+        rc = demote_l3_table(page);
         break;
     case PGT_l4_page_table:
         ASSERT(preemptible);
-        rc = free_l4_table(page);
+        rc = demote_l4_table(page);
         break;
     default:
         gdprintk(XENLOG_WARNING, "type %" PRtype_info " mfn %" PRI_mfn "\n",
@@ -2730,7 +2730,7 @@ int free_page_type(struct page_info *page, unsigned long type,
 static int _put_final_page_type(struct page_info *page, unsigned long type,
                                 bool preemptible, struct page_info *ptpg)
 {
-    int rc = free_page_type(page, type, preemptible);
+    int rc = devalidate_page(page, type, preemptible);
 
     if ( ptpg && PGT_type_equal(type, ptpg->u.inuse.type_info) &&
          (type & PGT_validated) && rc != -EINTR )
@@ -3013,7 +3013,7 @@ static int _get_page_type(struct page_info *page, unsigned long type,
             page->partial_flags = 0;
             page->linear_pt_count = 0;
         }
-        rc = alloc_page_type(page, type, preemptible);
+        rc = validate_page(page, type, preemptible);
     }
 
  out:
