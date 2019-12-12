@@ -289,7 +289,4 @@ QEMU_TRADITIONAL_LOC ?= $(call or,$(wildcard $(QEMU_TRADITIONAL_INTREE)),\
 QEMU_UPSTREAM_LOC ?= $(call or,$(wildcard $(QEMU_UPSTREAM_INTREE)),\
                                $(QEMU_UPSTREAM_URL))
 
-# Short answer -- do not enable this unless you know what you are
-# doing and are prepared for some pain.
-
 CONFIG_TESTS       ?= y
