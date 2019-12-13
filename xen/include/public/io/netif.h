@@ -171,7 +171,7 @@
  * The ability of the backend to use a control ring is advertised by
  * setting:
  *
- * /local/domain/X/backend/<domid>/<vif>/feature-ctrl-ring = "1"
+ * /local/domain/X/backend/vif/<domid>/<vif>/feature-ctrl-ring = "1"
  *
  * The frontend provides a control ring to the backend by setting:
  *
@@ -188,6 +188,20 @@
  * the same as a transmit or receive ring.
  * Note that there is no requirement that responses are issued in the same
  * order as requests.
+ */
+
+/*
+ * Link state
+ * ==========
+ *
+ * The backend can advertise its current link (carrier) state to the
+ * frontend using the /local/domain/X/backend/vif/<domid>/<vif>/carrier
+ * node. If this node is not present, then the frontend should assume that
+ * the link is up (for compatibility with backends that do not implement
+ * this feature). If this node is present, then a value of "0" should be
+ * interpreted by the frontend as the link being down (no carrier) and a
+ * value of "1" should be interpreted as the link being up (carrier
+ * present).
  */
 
 /*
