@@ -681,10 +681,10 @@ boolean_param("pv-linear-pt", opt_pv_linear_pt);
 #define define_get_linear_pagetable(level)                                  \
 static int                                                                  \
 get_##level##_linear_pagetable(                                             \
-    level##_pgentry_t pde, unsigned long pde_pfn, struct domain *d)         \
+    level##_pgentry_t pde, mfn_t pde_mfn, struct domain *d)                 \
 {                                                                           \
     unsigned long x, y;                                                     \
-    unsigned long pfn;                                                      \
+    mfn_t mfn;                                                              \
                                                                             \
     if ( !opt_pv_linear_pt )                                                \
     {                                                                       \
@@ -700,16 +700,16 @@ get_##level##_linear_pagetable(                                             \
         return 0;                                                           \
     }                                                                       \
                                                                             \
-    if ( (pfn = level##e_get_pfn(pde)) != pde_pfn )                         \
+    if ( !mfn_eq(mfn = level##e_get_mfn(pde), pde_mfn) )                    \
     {                                                                       \
-        struct page_info *page, *ptpg = mfn_to_page(_mfn(pde_pfn));         \
+        struct page_info *page, *ptpg = mfn_to_page(pde_mfn);               \
                                                                             \
         /* Make sure the page table belongs to the correct domain. */       \
         if ( unlikely(page_get_owner(ptpg) != d) )                          \
             return 0;                                                       \
                                                                             \
         /* Make sure the mapped frame belongs to the correct domain. */     \
-        page = get_page_from_mfn(_mfn(pfn), d);                             \
+        page = get_page_from_mfn(mfn, d);                                   \
         if ( unlikely(!page) )                                              \
             return 0;                                                       \
                                                                             \
@@ -755,7 +755,7 @@ get_##level##_linear_pagetable(                                             \
 #define define_get_linear_pagetable(level)                              \
 static int                                                              \
 get_##level##_linear_pagetable(                                         \
-        level##_pgentry_t pde, unsigned long pde_pfn, struct domain *d) \
+        level##_pgentry_t pde, mfn_t pde_mfn, struct domain *d)         \
 {                                                                       \
         return 0;                                                       \
 }
@@ -1141,7 +1141,7 @@ static int get_page_and_type_from_mfn(
 define_get_linear_pagetable(l2);
 static int
 get_page_from_l2e(
-    l2_pgentry_t l2e, unsigned long l2mfn, struct domain *d, unsigned int flags)
+    l2_pgentry_t l2e, mfn_t l2mfn, struct domain *d, unsigned int flags)
 {
     unsigned long mfn = l2e_get_pfn(l2e);
     int rc;
@@ -1165,7 +1165,7 @@ get_page_from_l2e(
 define_get_linear_pagetable(l3);
 static int
 get_page_from_l3e(
-    l3_pgentry_t l3e, unsigned long l3mfn, struct domain *d, unsigned int flags)
+    l3_pgentry_t l3e, mfn_t l3mfn, struct domain *d, unsigned int flags)
 {
     int rc;
 
@@ -1189,7 +1189,7 @@ get_page_from_l3e(
 define_get_linear_pagetable(l4);
 static int
 get_page_from_l4e(
-    l4_pgentry_t l4e, unsigned long l4mfn, struct domain *d, unsigned int flags)
+    l4_pgentry_t l4e, mfn_t l4mfn, struct domain *d, unsigned int flags)
 {
     int rc;
 
@@ -1329,10 +1329,9 @@ static int put_data_pages(struct page_info *page, bool writeable, int pt_shift)
  * NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'.
  * Note also that this automatically deals correctly with linear p.t.'s.
  */
-static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long l2mfn,
-                             unsigned int flags)
+static int put_page_from_l2e(l2_pgentry_t l2e, mfn_t l2mfn, unsigned int flags)
 {
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || (l2e_get_pfn(l2e) == l2mfn) )
+    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || mfn_eq(l2e_get_mfn(l2e), l2mfn) )
         return 1;
 
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
@@ -1340,13 +1339,12 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long l2mfn,
                               l2e_get_flags(l2e) & _PAGE_RW,
                               L2_PAGETABLE_SHIFT);
 
-    return put_pt_page(l2e_get_page(l2e), mfn_to_page(_mfn(l2mfn)), flags);
+    return put_pt_page(l2e_get_page(l2e), mfn_to_page(l2mfn), flags);
 }
 
-static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long l3mfn,
-                             unsigned int flags)
+static int put_page_from_l3e(l3_pgentry_t l3e, mfn_t l3mfn, unsigned int flags)
 {
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || (l3e_get_pfn(l3e) == l3mfn) )
+    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || mfn_eq(l3e_get_mfn(l3e), l3mfn) )
         return 1;
 
     if ( unlikely(l3e_get_flags(l3e) & _PAGE_PSE) )
@@ -1354,16 +1352,15 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long l3mfn,
                               l3e_get_flags(l3e) & _PAGE_RW,
                               L3_PAGETABLE_SHIFT);
 
-    return put_pt_page(l3e_get_page(l3e), mfn_to_page(_mfn(l3mfn)), flags);
+    return put_pt_page(l3e_get_page(l3e), mfn_to_page(l3mfn), flags);
 }
 
-static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long l4mfn,
-                             unsigned int flags)
+static int put_page_from_l4e(l4_pgentry_t l4e, mfn_t l4mfn, unsigned int flags)
 {
-    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) || (l4e_get_pfn(l4e) == l4mfn) )
+    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) || mfn_eq(l4e_get_mfn(l4e), l4mfn) )
         return 1;
 
-    return put_pt_page(l4e_get_page(l4e), mfn_to_page(_mfn(l4mfn)), flags);
+    return put_pt_page(l4e_get_page(l4e), mfn_to_page(l4mfn), flags);
 }
 
 static int alloc_l1_table(struct page_info *page)
@@ -1460,13 +1457,13 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
 static int alloc_l2_table(struct page_info *page, unsigned long type)
 {
     struct domain *d = page_get_owner(page);
-    unsigned long  l2mfn = mfn_x(page_to_mfn(page));
+    mfn_t         l2mfn = page_to_mfn(page);
     l2_pgentry_t  *pl2e;
     unsigned int   i;
     int            rc = 0;
     unsigned int   partial_flags = page->partial_flags;
 
-    pl2e = map_domain_page(_mfn(l2mfn));
+    pl2e = map_domain_page(l2mfn);
 
     /*
      * NB that alloc_l2_table will never set partial_pte on an l2; but
@@ -1559,14 +1556,14 @@ static int alloc_l2_table(struct page_info *page, unsigned long type)
 static int alloc_l3_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
-    unsigned long  l3mfn = mfn_x(page_to_mfn(page));
+    mfn_t          l3mfn = page_to_mfn(page);
     l3_pgentry_t  *pl3e;
     unsigned int   i;
     int            rc = 0;
     unsigned int   partial_flags = page->partial_flags;
     l3_pgentry_t   l3e = l3e_empty();
 
-    pl3e = map_domain_page(_mfn(l3mfn));
+    pl3e = map_domain_page(l3mfn);
 
     /*
      * PAE guests allocate full pages, but aren't required to initialize
@@ -1786,8 +1783,8 @@ void zap_ro_mpt(mfn_t mfn)
 static int alloc_l4_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
-    unsigned long  l4mfn = mfn_x(page_to_mfn(page));
-    l4_pgentry_t  *pl4e = map_domain_page(_mfn(l4mfn));
+    mfn_t          l4mfn = page_to_mfn(page);
+    l4_pgentry_t  *pl4e = map_domain_page(l4mfn);
     unsigned int   i;
     int            rc = 0;
     unsigned int   partial_flags = page->partial_flags;
@@ -1869,7 +1866,7 @@ static int alloc_l4_table(struct page_info *page)
 
     if ( !rc )
     {
-        init_xen_l4_slots(pl4e, _mfn(l4mfn),
+        init_xen_l4_slots(pl4e, l4mfn,
                           d, INVALID_MFN, VM_ASSIST(d, m2p_strict));
         atomic_inc(&d->arch.pv.nr_l4_pages);
     }
@@ -1896,13 +1893,13 @@ static void free_l1_table(struct page_info *page)
 static int free_l2_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
-    unsigned long l2mfn = mfn_x(page_to_mfn(page));
+    mfn_t l2mfn = page_to_mfn(page);
     l2_pgentry_t *pl2e;
     int rc = 0;
     unsigned int partial_flags = page->partial_flags,
         i = page->nr_validated_ptes - !(partial_flags & PTF_partial_set);
 
-    pl2e = map_domain_page(_mfn(l2mfn));
+    pl2e = map_domain_page(l2mfn);
 
     for ( ; ; )
     {
@@ -1948,13 +1945,13 @@ static int free_l2_table(struct page_info *page)
 static int free_l3_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
-    unsigned long l3mfn = mfn_x(page_to_mfn(page));
+    mfn_t l3mfn = page_to_mfn(page);
     l3_pgentry_t *pl3e;
     int rc = 0;
     unsigned int partial_flags = page->partial_flags,
         i = page->nr_validated_ptes - !(partial_flags & PTF_partial_set);
 
-    pl3e = map_domain_page(_mfn(l3mfn));
+    pl3e = map_domain_page(l3mfn);
 
     for ( ; ; )
     {
@@ -1995,8 +1992,8 @@ static int free_l3_table(struct page_info *page)
 static int free_l4_table(struct page_info *page)
 {
     struct domain *d = page_get_owner(page);
-    unsigned long l4mfn = mfn_x(page_to_mfn(page));
-    l4_pgentry_t *pl4e = map_domain_page(_mfn(l4mfn));
+    mfn_t l4mfn = page_to_mfn(page);
+    l4_pgentry_t *pl4e = map_domain_page(l4mfn);
     int rc = 0;
     unsigned partial_flags = page->partial_flags,
         i = page->nr_validated_ptes - !(partial_flags & PTF_partial_set);
@@ -2275,7 +2272,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return -EBUSY;
         }
 
-        if ( unlikely((rc = get_page_from_l2e(nl2e, mfn_x(mfn), d, 0)) < 0) )
+        if ( unlikely((rc = get_page_from_l2e(nl2e, mfn, d, 0)) < 0) )
             return rc;
 
         nl2e = adjust_guest_l2e(nl2e, d);
@@ -2294,7 +2291,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         return -EBUSY;
     }
 
-    put_page_from_l2e(ol2e, mfn_x(mfn), PTF_defer);
+    put_page_from_l2e(ol2e, mfn, PTF_defer);
 
     return rc;
 }
@@ -2337,7 +2334,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
             return rc ? 0 : -EFAULT;
         }
 
-        rc = get_page_from_l3e(nl3e, mfn_x(mfn), d, 0);
+        rc = get_page_from_l3e(nl3e, mfn, d, 0);
         if ( unlikely(rc < 0) )
             return rc;
         rc = 0;
@@ -2362,7 +2359,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         if ( !create_pae_xen_mappings(d, pl3e) )
             BUG();
 
-    put_page_from_l3e(ol3e, mfn_x(mfn), PTF_defer);
+    put_page_from_l3e(ol3e, mfn, PTF_defer);
     return rc;
 }
 
@@ -2404,7 +2401,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
             return rc ? 0 : -EFAULT;
         }
 
-        rc = get_page_from_l4e(nl4e, mfn_x(mfn), d, 0);
+        rc = get_page_from_l4e(nl4e, mfn, d, 0);
         if ( unlikely(rc < 0) )
             return rc;
         rc = 0;
@@ -2425,7 +2422,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         return -EFAULT;
     }
 
-    put_page_from_l4e(ol4e, mfn_x(mfn), PTF_defer);
+    put_page_from_l4e(ol4e, mfn, PTF_defer);
     return rc;
 }
 #endif /* CONFIG_PV */
