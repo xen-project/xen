@@ -43,6 +43,9 @@ void restore_rest_processor_state(void)
 {
     load_system_tables();
 
+    /* Restore full CR4 (inc MCE) now that the IDT is in place. */
+    write_cr4(mmu_cr4_features);
+
     /* Recover syscall MSRs */
     wrmsrl(MSR_LSTAR, saved_lstar);
     wrmsrl(MSR_CSTAR, saved_cstar);

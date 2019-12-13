@@ -45,10 +45,6 @@ ENTRY(do_suspend_lowlevel)
 ENTRY(s3_resume)
         lgdt    boot_gdtr(%rip)
 
-        /* mmu_cr4_features contains latest cr4 setting */
-        mov     REF(mmu_cr4_features), GREG(ax)
-        mov     GREG(ax), %cr4
-
         mov     REF(saved_cr0), GREG(ax)
         mov     GREG(ax), %cr0
 
