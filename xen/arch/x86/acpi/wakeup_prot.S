@@ -11,24 +11,14 @@
 #define REF(x)          x(%rip)
 
 ENTRY(do_suspend_lowlevel)
+        push    %rbp
+        push    %rbx
+        push    %r12
+        push    %r13
+        push    %r14
+        push    %r15
 
         SAVE_GREG(sp)
-        SAVE_GREG(ax)
-        SAVE_GREG(bx)
-        SAVE_GREG(cx)
-        SAVE_GREG(dx)
-        SAVE_GREG(bp)
-        SAVE_GREG(si)
-        SAVE_GREG(di)
-
-        SAVE_GREG(8)     # save r8...r15
-        SAVE_GREG(9)
-        SAVE_GREG(10)
-        SAVE_GREG(11)
-        SAVE_GREG(12)
-        SAVE_GREG(13)
-        SAVE_GREG(14)
-        SAVE_GREG(15)
 
         mov     %cr0, GREG(ax)
         mov     GREG(ax), REF(saved_cr0)
@@ -75,22 +65,13 @@ ENTRY(s3_resume)
 
         call restore_rest_processor_state
 
-        LOAD_GREG(bp)
-        LOAD_GREG(ax)
-        LOAD_GREG(bx)
-        LOAD_GREG(cx)
-        LOAD_GREG(dx)
-        LOAD_GREG(si)
-        LOAD_GREG(di)
-        LOAD_GREG(8)     # save r8...r15
-        LOAD_GREG(9)
-        LOAD_GREG(10)
-        LOAD_GREG(11)
-        LOAD_GREG(12)
-        LOAD_GREG(13)
-        LOAD_GREG(14)
-        LOAD_GREG(15)
 .Lsuspend_err:
+        pop     %r15
+        pop     %r14
+        pop     %r13
+        pop     %r12
+        pop     %rbx
+        pop     %rbp
         ret
 
 .data
@@ -101,21 +82,5 @@ GLOBAL(saved_magic)
 
         .align 8
 DECLARE_GREG(sp)
-DECLARE_GREG(bp)
-DECLARE_GREG(ax)
-DECLARE_GREG(bx)
-DECLARE_GREG(cx)
-DECLARE_GREG(dx)
-DECLARE_GREG(si)
-DECLARE_GREG(di)
-
-DECLARE_GREG(8)
-DECLARE_GREG(9)
-DECLARE_GREG(10)
-DECLARE_GREG(11)
-DECLARE_GREG(12)
-DECLARE_GREG(13)
-DECLARE_GREG(14)
-DECLARE_GREG(15)
 
 saved_cr0:      .quad   0
