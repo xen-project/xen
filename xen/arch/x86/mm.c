@@ -1297,6 +1297,28 @@ static void put_data_page(struct page_info *page, bool writeable)
         put_page(page);
 }
 
+static int put_pt_page(struct page_info *pg, struct page_info *ptpg,
+                       unsigned int flags)
+{
+    int rc = 0;
+
+    if ( flags & PTF_defer )
+    {
+        ASSERT(!(flags & PTF_partial_set));
+        current->arch.old_guest_ptpg = ptpg;
+        current->arch.old_guest_table = pg;
+        current->arch.old_guest_table_partial = false;
+    }
+    else
+    {
+        rc = _put_page_type(pg, flags | PTF_preemptible, ptpg);
+        if ( likely(!rc) )
+            put_page(pg);
+    }
+
+    return rc;
+}
+
 /*
  * NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'.
  * Note also that this automatically deals correctly with linear p.t.'s.
@@ -1304,8 +1326,6 @@ static void put_data_page(struct page_info *page, bool writeable)
 static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn,
                              unsigned int flags)
 {
-    int rc = 0;
-
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || (l2e_get_pfn(l2e) == pfn) )
         return 1;
 
@@ -1319,35 +1339,16 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn,
                  ((1UL << (L2_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1)));
         for ( i = 0; i < (1u << PAGETABLE_ORDER); i++, page++ )
             put_data_page(page, writeable);
-    }
-    else
-    {
-        struct page_info *pg = l2e_get_page(l2e);
-        struct page_info *ptpg = mfn_to_page(_mfn(pfn));
 
-        if ( flags & PTF_defer )
-        {
-            current->arch.old_guest_ptpg = ptpg;
-            current->arch.old_guest_table = pg;
-            current->arch.old_guest_table_partial = false;
-        }
-        else
-        {
-            rc = _put_page_type(pg, flags | PTF_preemptible, ptpg);
-            if ( likely(!rc) )
-                put_page(pg);
-        }
+        return 0;
     }
 
-    return rc;
+    return put_pt_page(l2e_get_page(l2e), mfn_to_page(_mfn(pfn)), flags);
 }
 
 static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
                              unsigned int flags)
 {
-    struct page_info *pg;
-    int rc;
-
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || (l3e_get_pfn(l3e) == pfn) )
         return 1;
 
@@ -1365,50 +1366,16 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
         return 0;
     }
 
-    pg = l3e_get_page(l3e);
-
-    if ( flags & PTF_defer )
-    {
-        ASSERT(!(flags & PTF_partial_set));
-        current->arch.old_guest_ptpg = mfn_to_page(_mfn(pfn));
-        current->arch.old_guest_table = pg;
-        current->arch.old_guest_table_partial = false;
-        return 0;
-    }
-
-    rc = _put_page_type(pg, flags | PTF_preemptible, mfn_to_page(_mfn(pfn)));
-    if ( likely(!rc) )
-        put_page(pg);
-
-    return rc;
+    return put_pt_page(l3e_get_page(l3e), mfn_to_page(_mfn(pfn)), flags);
 }
 
 static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
                              unsigned int flags)
 {
-    int rc = 1;
+    if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) || (l4e_get_pfn(l4e) == pfn) )
+        return 1;
 
-    if ( (l4e_get_flags(l4e) & _PAGE_PRESENT) &&
-         (l4e_get_pfn(l4e) != pfn) )
-    {
-        struct page_info *pg = l4e_get_page(l4e);
-
-        if ( flags & PTF_defer )
-        {
-            ASSERT(!(flags & PTF_partial_set));
-            current->arch.old_guest_ptpg = mfn_to_page(_mfn(pfn));
-            current->arch.old_guest_table = pg;
-            current->arch.old_guest_table_partial = false;
-            return 0;
-        }
-
-        rc = _put_page_type(pg, flags | PTF_preemptible,
-                            mfn_to_page(_mfn(pfn)));
-        if ( likely(!rc) )
-            put_page(pg);
-    }
-
-    return rc;
+    return put_pt_page(l4e_get_page(l4e), mfn_to_page(_mfn(pfn)), flags);
 }
 
 static int alloc_l1_table(struct page_info *page)
