@@ -29,16 +29,9 @@ ENTRY(do_suspend_lowlevel)
         SAVE_GREG(13)
         SAVE_GREG(14)
         SAVE_GREG(15)
-        pushfq;
-        popq    SAVED_GREG(flags)
-
-        mov     %ss, REF(saved_ss)
 
         mov     %cr0, GREG(ax)
         mov     GREG(ax), REF(saved_cr0)
-
-        mov     %cr3, GREG(ax)
-        mov     GREG(ax), REF(saved_cr3)
 
         call    save_rest_processor_state
 
@@ -55,6 +48,7 @@ ENTRY(do_suspend_lowlevel)
          *
          * The trampoline re-intercepts here.  State is:
          *  - 64bit mode
+         *  - %cr3 => idle_pg_table[]
          *
          * Everything else, including the stack, needs restoring.
          */
@@ -65,13 +59,11 @@ ENTRY(s3_resume)
         mov     REF(mmu_cr4_features), GREG(ax)
         mov     GREG(ax), %cr4
 
-        mov     REF(saved_cr3), GREG(ax)
-        mov     GREG(ax), %cr3
-
         mov     REF(saved_cr0), GREG(ax)
         mov     GREG(ax), %cr0
 
-        mov     REF(saved_ss), %ss
+        mov     $__HYPERVISOR_DS64, %eax
+        mov     %eax, %ss
         LOAD_GREG(sp)
 
         /* Reload code selector */
@@ -80,8 +72,6 @@ ENTRY(s3_resume)
         pushq   %rax
         lretq
 1:
-        pushq   SAVED_GREG(flags)
-        popfq
 
         call restore_rest_processor_state
 
@@ -109,8 +99,6 @@ ENTRY(s3_resume)
 GLOBAL(saved_magic)
         .long   0x9abcdef0
 
-saved_ss:        .word   0
-
         .align 8
 DECLARE_GREG(sp)
 DECLARE_GREG(bp)
@@ -120,7 +108,6 @@ DECLARE_GREG(cx)
 DECLARE_GREG(dx)
 DECLARE_GREG(si)
 DECLARE_GREG(di)
-DECLARE_GREG(flags)
 
 DECLARE_GREG(8)
 DECLARE_GREG(9)
@@ -132,4 +119,3 @@ DECLARE_GREG(14)
 DECLARE_GREG(15)
 
 saved_cr0:      .quad   0
-saved_cr3:      .quad   0
