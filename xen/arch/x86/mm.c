@@ -1289,14 +1289,6 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
 }
 
 #ifdef CONFIG_PV
-static void put_data_page(struct page_info *page, bool writeable)
-{
-    if ( writeable )
-        put_page_and_type(page);
-    else
-        put_page(page);
-}
-
 static int put_pt_page(struct page_info *pg, struct page_info *ptpg,
                        unsigned int flags)
 {
@@ -1319,6 +1311,20 @@ static int put_pt_page(struct page_info *pg, struct page_info *ptpg,
     return rc;
 }
 
+static int put_data_pages(struct page_info *page, bool writeable, int pt_shift)
+{
+    unsigned int i, count = 1 << (pt_shift - PAGE_SHIFT);
+
+    ASSERT(!(mfn_x(page_to_mfn(page)) & (count - 1)));
+    for ( i = 0; i < count ; i++, page++ )
+        if ( writeable )
+            put_page_and_type(page);
+        else
+            put_page(page);
+
+    return 0;
+}
+
 /*
  * NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'.
  * Note also that this automatically deals correctly with linear p.t.'s.
@@ -1330,18 +1336,9 @@ static int put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn,
         return 1;
 
     if ( l2e_get_flags(l2e) & _PAGE_PSE )
-    {
-        struct page_info *page = l2e_get_page(l2e);
-        bool writeable = l2e_get_flags(l2e) & _PAGE_RW;
-        unsigned int i;
-
-        ASSERT(!(mfn_x(page_to_mfn(page)) &
-                 ((1UL << (L2_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1)));
-        for ( i = 0; i < (1u << PAGETABLE_ORDER); i++, page++ )
-            put_data_page(page, writeable);
-
-        return 0;
-    }
+        return put_data_pages(l2e_get_page(l2e),
+                              l2e_get_flags(l2e) & _PAGE_RW,
+                              L2_PAGETABLE_SHIFT);
 
     return put_pt_page(l2e_get_page(l2e), mfn_to_page(_mfn(pfn)), flags);
 }
@@ -1353,18 +1350,9 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
         return 1;
 
     if ( unlikely(l3e_get_flags(l3e) & _PAGE_PSE) )
-    {
-        unsigned long mfn = l3e_get_pfn(l3e);
-        bool writeable = l3e_get_flags(l3e) & _PAGE_RW;
-
-        ASSERT(!(flags & PTF_partial_set));
-        ASSERT(!(mfn & ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1)));
-        do {
-            put_data_page(mfn_to_page(_mfn(mfn)), writeable);
-        } while ( ++mfn & ((1UL << (L3_PAGETABLE_SHIFT - PAGE_SHIFT)) - 1) );
-
-        return 0;
-    }
+        return put_data_pages(l3e_get_page(l3e),
+                              l3e_get_flags(l3e) & _PAGE_RW,
+                              L3_PAGETABLE_SHIFT);
 
     return put_pt_page(l3e_get_page(l3e), mfn_to_page(_mfn(pfn)), flags);
 }
