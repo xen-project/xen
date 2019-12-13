@@ -2,14 +2,6 @@
         .text
         .code64
 
-#define GREG(x)         %r##x
-#define SAVED_GREG(x)   saved_r##x(%rip)
-#define DECLARE_GREG(x) saved_r##x:     .quad   0
-#define SAVE_GREG(x)    movq GREG(x), SAVED_GREG(x)
-#define LOAD_GREG(x)    movq SAVED_GREG(x), GREG(x)
-
-#define REF(x)          x(%rip)
-
 ENTRY(do_suspend_lowlevel)
         push    %rbp
         push    %rbx
@@ -18,10 +10,10 @@ ENTRY(do_suspend_lowlevel)
         push    %r14
         push    %r15
 
-        SAVE_GREG(sp)
+        mov     %rsp, saved_rsp(%rip)
 
-        mov     %cr0, GREG(ax)
-        mov     GREG(ax), REF(saved_cr0)
+        mov     %cr0, %rax
+        mov     %rax, saved_cr0(%rip)
 
         call    save_rest_processor_state
 
@@ -45,12 +37,12 @@ ENTRY(do_suspend_lowlevel)
 ENTRY(s3_resume)
         lgdt    boot_gdtr(%rip)
 
-        mov     REF(saved_cr0), GREG(ax)
-        mov     GREG(ax), %cr0
+        mov     saved_cr0(%rip), %rax
+        mov     %rax, %cr0
 
         mov     $__HYPERVISOR_DS64, %eax
         mov     %eax, %ss
-        LOAD_GREG(sp)
+        mov     saved_rsp(%rip), %rsp
 
         /* Reload code selector */
         pushq   $__HYPERVISOR_CS
@@ -73,10 +65,8 @@ ENTRY(s3_resume)
 .data
         .align 16
 
+saved_rsp:      .quad   0
+saved_cr0:      .quad   0
+
 GLOBAL(saved_magic)
         .long   0x9abcdef0
-
-        .align 8
-DECLARE_GREG(sp)
-
-saved_cr0:      .quad   0
