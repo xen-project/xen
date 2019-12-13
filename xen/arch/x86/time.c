@@ -2135,13 +2135,6 @@ uint64_t pv_soft_rdtsc(const struct vcpu *v, const struct cpu_user_regs *regs)
 
     spin_lock(&d->arch.vtsc_lock);
 
-#if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
-    if ( guest_kernel_mode(v, regs) )
-        d->arch.vtsc_kerncount++;
-    else
-        d->arch.vtsc_usercount++;
-#endif
-
     if ( (int64_t)(now - d->arch.vtsc_last) > 0 )
         d->arch.vtsc_last = now;
     else
@@ -2318,11 +2311,6 @@ static void dump_softtsc(unsigned char key)
             printk(",khz=%"PRIu32, d->arch.tsc_khz);
         if ( d->arch.incarnation )
             printk(",inc=%"PRIu32, d->arch.incarnation);
-#if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
-        if ( d->arch.vtsc_kerncount | d->arch.vtsc_usercount )
-            printk(",vtsc count: %"PRIu64" kernel,%"PRIu64" user",
-                   d->arch.vtsc_kerncount, d->arch.vtsc_usercount);
-#endif
         printk("\n");
         domcnt++;
     }

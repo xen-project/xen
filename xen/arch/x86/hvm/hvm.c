@@ -3405,37 +3405,9 @@ int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
     return hvm_monitor_cpuid(inst_len, leaf, subleaf);
 }
 
-static uint64_t _hvm_rdtsc_intercept(void)
-{
-    struct vcpu *curr = current;
-#if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
-    struct domain *currd = curr->domain;
-
-    if ( currd->arch.vtsc )
-        switch ( hvm_guest_x86_mode(curr) )
-        {
-        case 8:
-        case 4:
-        case 2:
-            if ( unlikely(hvm_get_cpl(curr)) )
-            {
-        case 1:
-                currd->arch.vtsc_usercount++;
-                break;
-            }
-            /* fall through */
-        case 0:
-            currd->arch.vtsc_kerncount++;
-            break;
-        }
-#endif
-
-    return hvm_get_guest_tsc(curr);
-}
-
 void hvm_rdtsc_intercept(struct cpu_user_regs *regs)
 {
-    msr_split(regs, _hvm_rdtsc_intercept());
+    msr_split(regs, hvm_get_guest_tsc(current));
 
     HVMTRACE_2D(RDTSC, regs->eax, regs->edx);
 }
@@ -3464,7 +3436,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_IA32_TSC:
-        *msr_content = _hvm_rdtsc_intercept();
+        *msr_content = hvm_get_guest_tsc(v);
         break;
 
     case MSR_IA32_TSC_ADJUST:

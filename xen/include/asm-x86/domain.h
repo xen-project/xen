@@ -374,10 +374,6 @@ struct arch_domain
                                      hardware TSC scaling cases */
     uint32_t incarnation;    /* incremented every restore or live migrate
                                 (possibly other cases in the future */
-#if !defined(NDEBUG) || defined(CONFIG_PERF_COUNTERS)
-    uint64_t vtsc_kerncount;
-    uint64_t vtsc_usercount;
-#endif
 
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
     spinlock_t e820_lock;
