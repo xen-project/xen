@@ -151,7 +151,7 @@ wakeup_32:
         .code64
 wakeup_64:
         /* Jump to high mappings and the higher-level wakeup code. */
-        movabs  $__ret_point, %rbx
+        movabs  $s3_resume, %rbx
         jmp     *%rbx
 
 bogus_saved_magic:

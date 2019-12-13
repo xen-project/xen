@@ -42,15 +42,23 @@ ENTRY(do_suspend_lowlevel)
 
         call    save_rest_processor_state
 
-        mov     $3, %rdi
-        xor     %eax, %eax
-
         /* enter sleep state physically */
+        mov     $3, %edi
         call    acpi_enter_sleep_state
-        jmp     __ret_point
 
+        /* It seems we didn't suspend.  Get out of here. */
+        jmp     .Lsuspend_err
 
-ENTRY(__ret_point)
+        /*
+         * do_suspend_lowlevel() is arranged to behave as a regular function
+         * call, even if hardware actually goes to sleep in the middle.
+         *
+         * The trampoline re-intercepts here.  State is:
+         *  - 64bit mode
+         *
+         * Everything else, including the stack, needs restoring.
+         */
+ENTRY(s3_resume)
         lgdt    boot_gdtr(%rip)
 
         /* mmu_cr4_features contains latest cr4 setting */
@@ -92,7 +100,8 @@ ENTRY(__ret_point)
         LOAD_GREG(13)
         LOAD_GREG(14)
         LOAD_GREG(15)
-        ret 
+.Lsuspend_err:
+        ret
 
 .data
         .align 16
