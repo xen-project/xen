@@ -89,6 +89,6 @@ will take a while to take effect:
   ssh osstest.test-lab
   cd branches/for-xen-$v-testing.git
   screen -S $v
-  ./cr-daily-branch --real xen-$v-testing
+  BRANCHES=xen-$v-testing ./cr-for-branches branches -w "./cr-daily-branch --real"
 
 Send message to committers and RM.  Use previous mail as a template.
