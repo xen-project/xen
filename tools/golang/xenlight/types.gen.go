@@ -275,6 +275,183 @@ const (
 	PassthroughSharePt  Passthrough = 4
 )
 
+type IoportRange struct {
+	First  uint32
+	Number uint32
+}
+
+type IomemRange struct {
+	Start  uint64
+	Number uint64
+	Gfn    uint64
+}
+
+type VgaInterfaceInfo struct {
+	Kind VgaInterfaceType
+}
+
+type VncInfo struct {
+	Enable     Defbool
+	Listen     string
+	Passwd     string
+	Display    int
+	Findunused Defbool
+}
+
+type SpiceInfo struct {
+	Enable           Defbool
+	Port             int
+	TlsPort          int
+	Host             string
+	DisableTicketing Defbool
+	Passwd           string
+	AgentMouse       Defbool
+	Vdagent          Defbool
+	ClipboardSharing Defbool
+	Usbredirection   int
+	ImageCompression string
+	StreamingVideo   string
+}
+
+type SdlInfo struct {
+	Enable     Defbool
+	Opengl     Defbool
+	Display    string
+	Xauthority string
+}
+
+type Dominfo struct {
+	Uuid             Uuid
+	Domid            Domid
+	Ssidref          uint32
+	SsidLabel        string
+	Running          bool
+	Blocked          bool
+	Paused           bool
+	Shutdown         bool
+	Dying            bool
+	NeverStop        bool
+	ShutdownReason   ShutdownReason
+	OutstandingMemkb uint64
+	CurrentMemkb     uint64
+	SharedMemkb      uint64
+	PagedMemkb       uint64
+	MaxMemkb         uint64
+	CpuTime          uint64
+	VcpuMaxId        uint32
+	VcpuOnline       uint32
+	Cpupool          uint32
+	DomainType       DomainType
+}
+
+type Cpupoolinfo struct {
+	Poolid   uint32
+	PoolName string
+	Sched    Scheduler
+	NDom     uint32
+	Cpumap   Bitmap
+}
+
+type Channelinfo struct {
+	Backend         string
+	BackendId       uint32
+	Frontend        string
+	FrontendId      uint32
+	Devid           Devid
+	State           int
+	Evtch           int
+	Rref            int
+	Connection      ChannelConnection
+	ConnectionUnion channelinfoConnectionUnion
+}
+
+type channelinfoConnectionUnion interface {
+	ischannelinfoConnectionUnion()
+}
+
+type ChannelinfoConnectionUnionPty struct {
+	Path string
+}
+
+func (x ChannelinfoConnectionUnionPty) ischannelinfoConnectionUnion() {}
+
+type Vminfo struct {
+	Uuid  Uuid
+	Domid Domid
+}
+
+type VersionInfo struct {
+	XenVersionMajor int
+	XenVersionMinor int
+	XenVersionExtra string
+	Compiler        string
+	CompileBy       string
+	CompileDomain   string
+	CompileDate     string
+	Capabilities    string
+	Changeset       string
+	VirtStart       uint64
+	Pagesize        int
+	Commandline     string
+	BuildId         string
+}
+
+type DomainCreateInfo struct {
+	Type              DomainType
+	Hap               Defbool
+	Oos               Defbool
+	Ssidref           uint32
+	SsidLabel         string
+	Name              string
+	Uuid              Uuid
+	Xsdata            KeyValueList
+	Platformdata      KeyValueList
+	Poolid            uint32
+	PoolName          string
+	RunHotplugScripts Defbool
+	DriverDomain      Defbool
+	Passthrough       Passthrough
+}
+
+type DomainRestoreParams struct {
+	CheckpointedStream int
+	StreamVersion      uint32
+	ColoProxyScript    string
+	UserspaceColoProxy Defbool
+}
+
+type SchedParams struct {
+	Vcpuid    int
+	Weight    int
+	Cap       int
+	Period    int
+	Extratime int
+	Budget    int
+}
+
+type VcpuSchedParams struct {
+	Sched Scheduler
+	Vcpus []SchedParams
+}
+
+type DomainSchedParams struct {
+	Sched     Scheduler
+	Weight    int
+	Cap       int
+	Period    int
+	Budget    int
+	Extratime int
+	Slice     int
+	Latency   int
+}
+
+type VnodeInfo struct {
+	Memkb     uint64
+	Distances []uint32
+	Pnode     uint32
+	Vcpus     Bitmap
+}
+
 type GicVersion int
 
 const (
@@ -290,6 +467,11 @@ const (
 	TeeTypeOptee TeeType = 1
 )
 
+type RdmReserve struct {
+	Strategy RdmReserveStrategy
+	Policy   RdmReservePolicy
+}
+
 type Altp2MMode int
 
 const (
@@ -298,6 +480,278 @@ const (
 	Altp2MModeExternal Altp2MMode = 2
 	Altp2MModeLimited  Altp2MMode = 3
 )
+
+type DomainBuildInfo struct {
+	MaxVcpus              int
+	AvailVcpus            Bitmap
+	Cpumap                Bitmap
+	Nodemap               Bitmap
+	VcpuHardAffinity      []Bitmap
+	VcpuSoftAffinity      []Bitmap
+	NumaPlacement         Defbool
+	TscMode               TscMode
+	MaxMemkb              uint64
+	TargetMemkb           uint64
+	VideoMemkb            uint64
+	ShadowMemkb           uint64
+	IommuMemkb            uint64
+	RtcTimeoffset         uint32
+	ExecSsidref           uint32
+	ExecSsidLabel         string
+	Localtime             Defbool
+	DisableMigrate        Defbool
+	Cpuid                 CpuidPolicyList
+	BlkdevStart           string
+	VnumaNodes            []VnodeInfo
+	MaxGrantFrames        uint32
+	MaxMaptrackFrames     uint32
+	DeviceModelVersion    DeviceModelVersion
+	DeviceModelStubdomain Defbool
+	DeviceModel           string
+	DeviceModelSsidref    uint32
+	DeviceModelSsidLabel  string
+	DeviceModelUser       string
+	Extra                 StringList
+	ExtraPv               StringList
+	ExtraHvm              StringList
+	SchedParams           DomainSchedParams
+	Ioports               []IoportRange
+	Irqs                  []uint32
+	Iomem                 []IomemRange
+	ClaimMode             Defbool
+	EventChannels         uint32
+	Kernel                string
+	Cmdline               string
+	Ramdisk               string
+	DeviceTree            string
+	Acpi                  Defbool
+	Bootloader            string
+	BootloaderArgs        StringList
+	TimerMode             TimerMode
+	NestedHvm             Defbool
+	Apic                  Defbool
+	DmRestrict            Defbool
+	Tee                   TeeType
+	Type                  DomainType
+	TypeUnion             domainBuildInfoTypeUnion
+	ArchArm               struct {
+		GicVersion GicVersion
+		Vuart      VuartType
+	}
+	Altp2M Altp2MMode
+}
+
+type domainBuildInfoTypeUnion interface {
+	isdomainBuildInfoTypeUnion()
+}
+
+type DomainBuildInfoTypeUnionHvm struct {
+	Firmware            string
+	Bios                BiosType
+	Pae                 Defbool
+	Apic                Defbool
+	Acpi                Defbool
+	AcpiS3              Defbool
+	AcpiS4              Defbool
+	AcpiLaptopSlate     Defbool
+	Nx                  Defbool
+	Viridian            Defbool
+	ViridianEnable      Bitmap
+	ViridianDisable     Bitmap
+	Timeoffset          string
+	Hpet                Defbool
+	VptAlign            Defbool
+	MmioHoleMemkb       uint64
+	TimerMode           TimerMode
+	NestedHvm           Defbool
+	Altp2M              Defbool
+	SystemFirmware      string
+	SmbiosFirmware      string
+	AcpiFirmware        string
+	Hdtype              Hdtype
+	Nographic           Defbool
+	Vga                 VgaInterfaceInfo
+	Vnc                 VncInfo
+	Keymap              string
+	Sdl                 SdlInfo
+	Spice               SpiceInfo
+	GfxPassthru         Defbool
+	GfxPassthruKind     GfxPassthruKind
+	Serial              string
+	Boot                string
+	Usb                 Defbool
+	Usbversion          int
+	Usbdevice           string
+	VkbDevice           Defbool
+	Soundhw             string
+	XenPlatformPci      Defbool
+	UsbdeviceList       StringList
+	VendorDevice        VendorDevice
+	MsVmGenid           MsVmGenid
+	SerialList          StringList
+	Rdm                 RdmReserve
+	RdmMemBoundaryMemkb uint64
+	McaCaps             uint64
+}
+
+func (x DomainBuildInfoTypeUnionHvm) isdomainBuildInfoTypeUnion() {}
+
+type DomainBuildInfoTypeUnionPv struct {
+	Kernel         string
+	SlackMemkb     uint64
+	Bootloader     string
+	BootloaderArgs StringList
+	Cmdline        string
+	Ramdisk        string
+	Features       string
+	E820Host       Defbool
+}
+
+func (x DomainBuildInfoTypeUnionPv) isdomainBuildInfoTypeUnion() {}
+
+type DomainBuildInfoTypeUnionPvh struct {
+	Pvshim        Defbool
+	PvshimPath    string
+	PvshimCmdline string
+	PvshimExtra   string
+}
+
+func (x DomainBuildInfoTypeUnionPvh) isdomainBuildInfoTypeUnion() {}
+
+type DeviceVfb struct {
+	BackendDomid   Domid
+	BackendDomname string
+	Devid          Devid
+	Vnc            VncInfo
+	Sdl            SdlInfo
+	Keymap         string
+}
+
+type DeviceVkb struct {
+	BackendDomid           Domid
+	BackendDomname         string
+	Devid                  Devid
+	BackendType            VkbBackend
+	UniqueId               string
+	FeatureDisableKeyboard bool
+	FeatureDisablePointer  bool
+	FeatureAbsPointer      bool
+	FeatureRawPointer      bool
+	FeatureMultiTouch      bool
+	Width                  uint32
+	Height                 uint32
+	MultiTouchWidth        uint32
+	MultiTouchHeight       uint32
+	MultiTouchNumContacts  uint32
+}
+
+type DeviceDisk struct {
+	BackendDomid      Domid
+	BackendDomname    string
+	PdevPath          string
+	Vdev              string
+	Backend           DiskBackend
+	Format            DiskFormat
+	Script            string
+	Removable         int
+	Readwrite         int
+	IsCdrom           int
+	DirectIoSafe      bool
+	DiscardEnable     Defbool
+	ColoEnable        Defbool
+	ColoRestoreEnable Defbool
+	ColoHost          string
+	ColoPort          int
+	ColoExport        string
+	ActiveDisk        string
+	HiddenDisk        string
+}
+
+type DeviceNic struct {
+	BackendDomid                   Domid
+	BackendDomname                 string
+	Devid                          Devid
+	Mtu                            int
+	Model                          string
+	Mac                            Mac
+	Ip                             string
+	Bridge                         string
+	Ifname                         string
+	Script                         string
+	Nictype                        NicType
+	RateBytesPerInterval           uint64
+	RateIntervalUsecs              uint32
+	Gatewaydev                     string
+	ColoftForwarddev               string
+	ColoSockMirrorId               string
+	ColoSockMirrorIp               string
+	ColoSockMirrorPort             string
+	ColoSockComparePriInId         string
+	ColoSockComparePriInIp         string
+	ColoSockComparePriInPort       string
+	ColoSockCompareSecInId         string
+	ColoSockCompareSecInIp         string
+	ColoSockCompareSecInPort       string
+	ColoSockCompareNotifyId        string
+	ColoSockCompareNotifyIp        string
+	ColoSockCompareNotifyPort      string
+	ColoSockRedirector0Id          string
+	ColoSockRedirector0Ip          string
+	ColoSockRedirector0Port        string
+	ColoSockRedirector1Id          string
+	ColoSockRedirector1Ip          string
+	ColoSockRedirector1Port        string
+	ColoSockRedirector2Id          string
+	ColoSockRedirector2Ip          string
+	ColoSockRedirector2Port        string
+	ColoFilterMirrorQueue          string
+	ColoFilterMirrorOutdev         string
+	ColoFilterRedirector0Queue     string
+	ColoFilterRedirector0Indev     string
+	ColoFilterRedirector0Outdev    string
+	ColoFilterRedirector1Queue     string
+	ColoFilterRedirector1Indev     string
+	ColoFilterRedirector1Outdev    string
+	ColoComparePriIn               string
+	ColoCompareSecIn               string
+	ColoCompareOut                 string
+	ColoCompareNotifyDev           string
+	ColoSockSecRedirector0Id       string
+	ColoSockSecRedirector0Ip       string
+	ColoSockSecRedirector0Port     string
+	ColoSockSecRedirector1Id       string
+	ColoSockSecRedirector1Ip       string
+	ColoSockSecRedirector1Port     string
+	ColoFilterSecRedirector0Queue  string
+	ColoFilterSecRedirector0Indev  string
+	ColoFilterSecRedirector0Outdev string
+	ColoFilterSecRedirector1Queue  string
+	ColoFilterSecRedirector1Indev  string
+	ColoFilterSecRedirector1Outdev string
+	ColoFilterSecRewriter0Queue    string
+	ColoCheckpointHost             string
+	ColoCheckpointPort             string
+}
+
+type DevicePci struct {
+	Func         byte
+	Dev          byte
+	Bus          byte
+	Domain       int
+	Vdevfn       uint32
+	VfuncMask    uint32
+	Msitranslate bool
+	PowerMgmt    bool
+	Permissive   bool
+	Seize        bool
+	RdmPolicy    RdmReservePolicy
+}
+
+type DeviceRdm struct {
+	Start  uint64
+	Size   uint64
+	Policy RdmReservePolicy
+}
 
 type UsbctrlType int
 
@@ -313,6 +767,92 @@ type UsbdevType int
 const (
 	UsbdevTypeHostdev UsbdevType = 1
 )
+
+type DeviceUsbctrl struct {
+	Type           UsbctrlType
+	Devid          Devid
+	Version        int
+	Ports          int
+	BackendDomid   Domid
+	BackendDomname string
+}
+
+type DeviceUsbdev struct {
+	Ctrl      Devid
+	Port      int
+	Type      UsbdevType
+	TypeUnion deviceUsbdevTypeUnion
+}
+
+type deviceUsbdevTypeUnion interface {
+	isdeviceUsbdevTypeUnion()
+}
+
+type DeviceUsbdevTypeUnionHostdev struct {
+	Hostbus  byte
+	Hostaddr byte
+}
+
+func (x DeviceUsbdevTypeUnionHostdev) isdeviceUsbdevTypeUnion() {}
+
+type DeviceDtdev struct {
+	Path string
+}
+
+type DeviceVtpm struct {
+	BackendDomid   Domid
+	BackendDomname string
+	Devid          Devid
+	Uuid           Uuid
+}
+
+type DeviceP9 struct {
+	BackendDomid   Domid
+	BackendDomname string
+	Tag            string
+	Path           string
+	SecurityModel  string
+	Devid          Devid
+}
+
+type DevicePvcallsif struct {
+	BackendDomid   Domid
+	BackendDomname string
+	Devid          Devid
+}
+
+type DeviceChannel struct {
+	BackendDomid    Domid
+	BackendDomname  string
+	Devid           Devid
+	Name            string
+	Connection      ChannelConnection
+	ConnectionUnion deviceChannelConnectionUnion
+}
+
+type deviceChannelConnectionUnion interface {
+	isdeviceChannelConnectionUnion()
+}
+
+type DeviceChannelConnectionUnionSocket struct {
+	Path string
+}
+
+func (x DeviceChannelConnectionUnionSocket) isdeviceChannelConnectionUnion() {}
+
+type ConnectorParam struct {
+	UniqueId string
+	Width    uint32
+	Height   uint32
+}
+
+type DeviceVdispl struct {
+	BackendDomid   Domid
+	BackendDomname string
+	Devid          Devid
+	BeAlloc        bool
+	Connectors     []ConnectorParam
+}
 
 type VsndPcmFormat int
 
@@ -344,12 +884,243 @@ const (
 	VsndPcmFormatGsm              VsndPcmFormat = 25
 )
 
+type VsndParams struct {
+	SampleRates   []uint32
+	SampleFormats []VsndPcmFormat
+	ChannelsMin   uint32
+	ChannelsMax   uint32
+	BufferSize    uint32
+}
+
 type VsndStreamType int
 
 const (
 	VsndStreamTypeP VsndStreamType = 1
 	VsndStreamTypeC VsndStreamType = 2
 )
+
+type VsndStream struct {
+	UniqueId string
+	Type     VsndStreamType
+	Params   VsndParams
+}
+
+type VsndPcm struct {
+	Name    string
+	Params  VsndParams
+	Streams []VsndStream
+}
+
+type DeviceVsnd struct {
+	BackendDomid   Domid
+	BackendDomname string
+	Devid          Devid
+	ShortName      string
+	LongName       string
+	Params         VsndParams
+	Pcms           []VsndPcm
+}
+
+type DomainConfig struct {
+	CInfo       DomainCreateInfo
+	BInfo       DomainBuildInfo
+	Disks       []DeviceDisk
+	Nics        []DeviceNic
+	Pcidevs     []DevicePci
+	Rdms        []DeviceRdm
+	Dtdevs      []DeviceDtdev
+	Vfbs        []DeviceVfb
+	Vkbs        []DeviceVkb
+	Vtpms       []DeviceVtpm
+	P9S         []DeviceP9
+	Pvcallsifs  []DevicePvcallsif
+	Vdispls     []DeviceVdispl
+	Vsnds       []DeviceVsnd
+	Channels    []DeviceChannel
+	Usbctrls    []DeviceUsbctrl
+	Usbdevs     []DeviceUsbdev
+	OnPoweroff  ActionOnShutdown
+	OnReboot    ActionOnShutdown
+	OnWatchdog  ActionOnShutdown
+	OnCrash     ActionOnShutdown
+	OnSoftReset ActionOnShutdown
+}
+
+type Diskinfo struct {
+	Backend    string
+	BackendId  uint32
+	Frontend   string
+	FrontendId uint32
+	Devid      Devid
+	State      int
+	Evtch      int
+	Rref       int
+}
+
+type Nicinfo struct {
+	Backend    string
+	BackendId  uint32
+	Frontend   string
+	FrontendId uint32
+	Devid      Devid
+	State      int
+	Evtch      int
+	RrefTx     int
+	RrefRx     int
+}
+
+type Vtpminfo struct {
+	Backend    string
+	BackendId  uint32
+	Frontend   string
+	FrontendId uint32
+	Devid      Devid
+	State      int
+	Evtch      int
+	Rref       int
+	Uuid       Uuid
+}
+
+type Usbctrlinfo struct {
+	Type       UsbctrlType
+	Devid      Devid
+	Version    int
+	Ports      int
+	Backend    string
+	BackendId  uint32
+	Frontend   string
+	FrontendId uint32
+	State      int
+	Evtch      int
+	RefUrb     int
+	RefConn    int
+}
+
+type Vcpuinfo struct {
+	Vcpuid     uint32
+	Cpu        uint32
+	Online     bool
+	Blocked    bool
+	Running    bool
+	VcpuTime   uint64
+	Cpumap     Bitmap
+	CpumapSoft Bitmap
+}
+
+type Physinfo struct {
+	ThreadsPerCore     uint32
+	CoresPerSocket     uint32
+	MaxCpuId           uint32
+	NrCpus             uint32
+	CpuKhz             uint32
+	TotalPages         uint64
+	FreePages          uint64
+	ScrubPages         uint64
+	OutstandingPages   uint64
+	SharingFreedPages  uint64
+	SharingUsedFrames  uint64
+	MaxPossibleMfn     uint64
+	NrNodes            uint32
+	HwCap              Hwcap
+	CapHvm             bool
+	CapPv              bool
+	CapHvmDirectio     bool
+	CapHap             bool
+	CapShadow          bool
+	CapIommuHapPtShare bool
+}
+
+type Connectorinfo struct {
+	UniqueId string
+	Width    uint32
+	Height   uint32
+	ReqEvtch int
+	ReqRref  int
+	EvtEvtch int
+	EvtRref  int
+}
+
+type Vdisplinfo struct {
+	Backend    string
+	BackendId  uint32
+	Frontend   string
+	FrontendId uint32
+	Devid      Devid
+	State      int
+	BeAlloc    bool
+	Connectors []Connectorinfo
+}
+
+type Streaminfo struct {
+	ReqEvtch int
+	ReqRref  int
+}
+
+type Pcminfo struct {
+	Streams []Streaminfo
+}
+
+type Vsndinfo struct {
+	Backend    string
+	BackendId  uint32
+	Frontend   string
+	FrontendId uint32
+	Devid      Devid
+	State      int
+	Pcms       []Pcminfo
+}
+
+type Vkbinfo struct {
+	Backend    string
+	BackendId  uint32
+	Frontend   string
+	FrontendId uint32
+	Devid      Devid
+	State      int
+	Evtch      int
+	Rref       int
+}
+
+type Numainfo struct {
+	Size  uint64
+	Free  uint64
+	Dists []uint32
+}
+
+type Cputopology struct {
+	Core   uint32
+	Socket uint32
+	Node   uint32
+}
+
+type Pcitopology struct {
+	Seg   uint16
+	Bus   byte
+	Devfn byte
+	Node  uint32
+}
+
+type SchedCreditParams struct {
+	TsliceMs        int
+	RatelimitUs     int
+	VcpuMigrDelayUs int
+}
+
+type SchedCredit2Params struct {
+	RatelimitUs int
+}
+
+type DomainRemusInfo struct {
+	Interval           int
+	AllowUnsafe        Defbool
+	Blackhole          Defbool
+	Compression        Defbool
+	Netbuf             Defbool
+	Netbufscript       string
+	Diskbuf            Defbool
+	Colo               Defbool
+	UserspaceColoProxy Defbool
+}
 
 type EventType int
 
@@ -360,6 +1131,38 @@ const (
 	EventTypeOperationComplete            EventType = 4
 	EventTypeDomainCreateConsoleAvailable EventType = 5
 )
+
+type Event struct {
+	Link      EvLink
+	Domid     Domid
+	Domuuid   Uuid
+	ForUser   uint64
+	Type      EventType
+	TypeUnion eventTypeUnion
+}
+
+type eventTypeUnion interface {
+	iseventTypeUnion()
+}
+
+type EventTypeUnionDomainShutdown struct {
+	ShutdownReason byte
+}
+
+func (x EventTypeUnionDomainShutdown) iseventTypeUnion() {}
+
+type EventTypeUnionDiskEject struct {
+	Vdev string
+	Disk DeviceDisk
+}
+
+func (x EventTypeUnionDiskEject) iseventTypeUnion() {}
+
+type EventTypeUnionOperationComplete struct {
+	Rc int
+}
+
+func (x EventTypeUnionOperationComplete) iseventTypeUnion() {}
 
 type PsrCmtType int
 
@@ -380,9 +1183,42 @@ const (
 	PsrCbmTypeMbaThrtl  PsrCbmType = 5
 )
 
+type PsrCatInfo struct {
+	Id         uint32
+	CosMax     uint32
+	CbmLen     uint32
+	CdpEnabled bool
+}
+
 type PsrFeatType int
 
 const (
 	PsrFeatTypeCat PsrFeatType = 1
 	PsrFeatTypeMba PsrFeatType = 2
 )
+
+type PsrHwInfo struct {
+	Id        uint32
+	Type      PsrFeatType
+	TypeUnion psrHwInfoTypeUnion
+}
+
+type psrHwInfoTypeUnion interface {
+	ispsrHwInfoTypeUnion()
+}
+
+type PsrHwInfoTypeUnionCat struct {
+	CosMax     uint32
+	CbmLen     uint32
+	CdpEnabled bool
+}
+
+func (x PsrHwInfoTypeUnionCat) ispsrHwInfoTypeUnion() {}
+
+type PsrHwInfoTypeUnionMba struct {
+	CosMax   uint32
+	ThrtlMax uint32
+	Linear   bool
+}
+
+func (x PsrHwInfoTypeUnionMba) ispsrHwInfoTypeUnion() {}

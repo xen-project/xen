@@ -33,7 +33,6 @@ import "C"
 
 import (
 	"fmt"
-	"time"
 	"unsafe"
 )
 
@@ -408,30 +407,6 @@ func (bm *Bitmap) toC() (C.libxl_bitmap, error) {
 	return cbm, nil
 }
 
-/*
- * Types: IDL
- *
- * FIXME: Generate these automatically from the IDL
- */
-
-type Physinfo struct {
-	ThreadsPerCore    uint32
-	CoresPerSocket    uint32
-	MaxCpuId          uint32
-	NrCpus            uint32
-	CpuKhz            uint32
-	TotalPages        uint64
-	FreePages         uint64
-	ScrubPages        uint64
-	OutstandingPages  uint64
-	SharingFreedPages uint64
-	SharingUsedFrames uint64
-	NrNodes           uint32
-	HwCap             Hwcap
-	CapHvm            bool
-	CapHvmDirectio    bool
-}
-
 func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
 
 	physinfo = &Physinfo{}
@@ -452,22 +427,6 @@ func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
 	physinfo.CapHvmDirectio = bool(cphys.cap_hvm_directio)
 
 	return
-}
-
-type VersionInfo struct {
-	XenVersionMajor int
-	XenVersionMinor int
-	XenVersionExtra string
-	Compiler        string
-	CompileBy       string
-	CompileDomain   string
-	CompileDate     string
-	Capabilities    string
-	Changeset       string
-	VirtStart       uint64
-	Pagesize        int
-	Commandline     string
-	BuildId         string
 }
 
 func (cinfo *C.libxl_version_info) toGo() (info *VersionInfo) {
@@ -503,31 +462,6 @@ func (dt DomainType) String() (str string) {
 	return
 }
 
-type Dominfo struct {
-	Uuid      Uuid
-	Domid     Domid
-	Ssidref   uint32
-	SsidLabel string
-	Running   bool
-	Blocked   bool
-	Paused    bool
-	Shutdown  bool
-	Dying     bool
-	NeverStop bool
-
-	ShutdownReason   int32
-	OutstandingMemkb MemKB
-	CurrentMemkb     MemKB
-	SharedMemkb      MemKB
-	PagedMemkb       MemKB
-	MaxMemkb         MemKB
-	CpuTime          time.Duration
-	VcpuMaxId        uint32
-	VcpuOnline       uint32
-	Cpupool          uint32
-	DomainType       int32
-}
-
 func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
 
 	di = &Dominfo{}
@@ -541,17 +475,17 @@ func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
 	di.Shutdown = bool(cdi.shutdown)
 	di.Dying = bool(cdi.dying)
 	di.NeverStop = bool(cdi.never_stop)
-	di.ShutdownReason = int32(cdi.shutdown_reason)
-	di.OutstandingMemkb = MemKB(cdi.outstanding_memkb)
-	di.CurrentMemkb = MemKB(cdi.current_memkb)
-	di.SharedMemkb = MemKB(cdi.shared_memkb)
-	di.PagedMemkb = MemKB(cdi.paged_memkb)
-	di.MaxMemkb = MemKB(cdi.max_memkb)
-	di.CpuTime = time.Duration(cdi.cpu_time)
+	di.ShutdownReason = ShutdownReason(cdi.shutdown_reason)
+	di.OutstandingMemkb = uint64(cdi.outstanding_memkb)
+	di.CurrentMemkb = uint64(cdi.current_memkb)
+	di.SharedMemkb = uint64(cdi.shared_memkb)
+	di.PagedMemkb = uint64(cdi.paged_memkb)
+	di.MaxMemkb = uint64(cdi.max_memkb)
+	di.CpuTime = uint64(cdi.cpu_time)
 	di.VcpuMaxId = uint32(cdi.vcpu_max_id)
 	di.VcpuOnline = uint32(cdi.vcpu_online)
 	di.Cpupool = uint32(cdi.cpupool)
-	di.DomainType = int32(cdi.domain_type)
+	di.DomainType = DomainType(cdi.domain_type)
 
 	return
 }
@@ -587,27 +521,11 @@ func SchedulerFromString(name string) (s Scheduler, err error) {
 	return
 }
 
-// libxl_cpupoolinfo = Struct("cpupoolinfo", [
-//     ("poolid",      uint32),
-//     ("pool_name",   string),
-//     ("sched",       libxl_scheduler),
-//     ("n_dom",       uint32),
-//     ("cpumap",      libxl_bitmap)
-//     ], dir=DIR_OUT)
-
-type CpupoolInfo struct {
-	Poolid      uint32
-	PoolName    string
-	Scheduler   Scheduler
-	DomainCount int
-	Cpumap      Bitmap
-}
-
-func (cci C.libxl_cpupoolinfo) toGo() (gci CpupoolInfo) {
+func (cci C.libxl_cpupoolinfo) toGo() (gci Cpupoolinfo) {
 	gci.Poolid = uint32(cci.poolid)
 	gci.PoolName = C.GoString(cci.pool_name)
-	gci.Scheduler = Scheduler(cci.sched)
-	gci.DomainCount = int(cci.n_dom)
+	gci.Sched = Scheduler(cci.sched)
+	gci.NDom = uint32(cci.n_dom)
 	gci.Cpumap.fromC(&cci.cpumap)
 
 	return
@@ -615,7 +533,7 @@ func (cci C.libxl_cpupoolinfo) toGo() (gci CpupoolInfo) {
 
 // libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool_out);
 // void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nb_pool);
-func (Ctx *Context) ListCpupool() (list []CpupoolInfo) {
+func (Ctx *Context) ListCpupool() (list []Cpupoolinfo) {
 	err := Ctx.CheckOpen()
 	if err != nil {
 		return
@@ -642,7 +560,7 @@ func (Ctx *Context) ListCpupool() (list []CpupoolInfo) {
 }
 
 // int libxl_cpupool_info(libxl_ctx *ctx, libxl_cpupoolinfo *info, uint32_t poolid);
-func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool CpupoolInfo) {
+func (Ctx *Context) CpupoolInfo(Poolid uint32) (pool Cpupoolinfo) {
 	err := Ctx.CheckOpen()
 	if err != nil {
 		return
@@ -872,7 +790,7 @@ func (Ctx *Context) CpupoolMovedomain(Poolid uint32, Id Domid) (err error) {
 //
 // Utility functions
 //
-func (Ctx *Context) CpupoolFindByName(name string) (info CpupoolInfo, found bool) {
+func (Ctx *Context) CpupoolFindByName(name string) (info Cpupoolinfo, found bool) {
 	plist := Ctx.ListCpupool()
 
 	for i := range plist {
@@ -1275,24 +1193,13 @@ func (Ctx *Context) ListDomain() (glist []Dominfo) {
 	return
 }
 
-type Vcpuinfo struct {
-	Vcpuid     uint32
-	Cpu        uint32
-	Online     bool
-	Blocked    bool
-	Running    bool
-	VCpuTime   time.Duration
-	Cpumap     Bitmap
-	CpumapSoft Bitmap
-}
-
 func (cvci C.libxl_vcpuinfo) toGo() (gvci Vcpuinfo) {
 	gvci.Vcpuid = uint32(cvci.vcpuid)
 	gvci.Cpu = uint32(cvci.cpu)
 	gvci.Online = bool(cvci.online)
 	gvci.Blocked = bool(cvci.blocked)
 	gvci.Running = bool(cvci.running)
-	gvci.VCpuTime = time.Duration(cvci.vcpu_time)
+	gvci.VcpuTime = uint64(cvci.vcpu_time)
 	gvci.Cpumap.fromC(&cvci.cpumap)
 	gvci.CpumapSoft.fromC(&cvci.cpumap_soft)
 

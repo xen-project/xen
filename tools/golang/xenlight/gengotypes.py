@@ -32,18 +32,32 @@ def xenlight_golang_generate_types(path = None, types = None, comment = None):
         f.write('package xenlight\n')
 
         for ty in types:
-            f.write(xenlight_golang_type_define(ty))
+            (tdef, extras) = xenlight_golang_type_define(ty)
+
+            f.write(tdef)
             f.write('\n')
+
+            # Append extra types
+            for extra in extras:
+                f.write(extra)
+                f.write('\n')
 
     go_fmt(path)
 
 def xenlight_golang_type_define(ty = None):
-    s = ''
+    """
+    Generate the Go type definition of ty.
 
+    Return a tuple that contains a string with the
+    type definition, and a (potentially empty) list
+    of extra definitions that are associated with
+    this type.
+    """
     if isinstance(ty, idl.Enumeration):
-        s += xenlight_golang_define_enum(ty)
+        return (xenlight_golang_define_enum(ty), [])
 
-    return s
+    elif isinstance(ty, idl.Aggregate):
+        return xenlight_golang_define_struct(ty)
 
 def xenlight_golang_define_enum(ty = None):
     s = ''
@@ -64,6 +78,103 @@ def xenlight_golang_define_enum(ty = None):
     s += ')\n'
 
     return s
+
+def xenlight_golang_define_struct(ty = None, typename = None, nested = False):
+    s = ''
+    extras = []
+    name = ''
+
+    if typename is not None:
+        name = xenlight_golang_fmt_name(typename)
+    else:
+        name = xenlight_golang_fmt_name(ty.typename)
+
+    # Begin struct definition
+    if nested:
+        s += '{} struct {{\n'.format(name)
+    else:
+        s += 'type {} struct {{\n'.format(name)
+
+    # Write struct fields
+    for f in ty.fields:
+        if f.type.typename is not None:
+            if isinstance(f.type, idl.Array):
+                typename = f.type.elem_type.typename
+                typename = xenlight_golang_fmt_name(typename)
+                name     = xenlight_golang_fmt_name(f.name)
+
+                s += '{} []{}\n'.format(name, typename)
+            else:
+                typename = f.type.typename
+                typename = xenlight_golang_fmt_name(typename)
+                name     = xenlight_golang_fmt_name(f.name)
+
+                s += '{} {}\n'.format(name, typename)
+
+        elif isinstance(f.type, idl.Struct):
+            r = xenlight_golang_define_struct(f.type, typename=f.name, nested=True)
+
+            s += r[0]
+            extras.extend(r[1])
+
+        elif isinstance(f.type, idl.KeyedUnion):
+            r = xenlight_golang_define_union(f.type, ty.typename)
+
+            s += r[0]
+            extras.extend(r[1])
+
+        else:
+            raise Exception('type {} not supported'.format(f.type))
+
+    # End struct definition
+    s += '}\n'
+
+    return (s,extras)
+
+def xenlight_golang_define_union(ty = None, structname = ''):
+    """
+    Generate the Go translation of a KeyedUnion.
+
+    Define an unexported interface to be used as
+    the type of the union. Then, define a struct
+    for each field of the union which implements
+    that interface.
+    """
+    s = ''
+    extras = []
+
+    interface_name = '{}_{}_union'.format(structname, ty.keyvar.name)
+    interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
+
+    s += 'type {} interface {{\n'.format(interface_name)
+    s += 'is{}()\n'.format(interface_name)
+    s += '}\n'
+
+    extras.append(s)
+
+    for f in ty.fields:
+        if f.type is None:
+            continue
+
+        # Define struct
+        name = '{}_{}_union_{}'.format(structname, ty.keyvar.name, f.name)
+        r = xenlight_golang_define_struct(f.type, typename=name)
+        extras.append(r[0])
+        extras.extend(r[1])
+
+        # Define function to implement 'union' interface
+        name = xenlight_golang_fmt_name(name)
+        s = 'func (x {}) is{}(){{}}\n'.format(name, interface_name)
+        extras.append(s)
+
+    fname = xenlight_golang_fmt_name(ty.keyvar.name)
+    ftype = xenlight_golang_fmt_name(ty.keyvar.type.typename)
+    s = '{} {}\n'.format(fname, ftype)
+
+    fname = xenlight_golang_fmt_name('{}_union'.format(ty.keyvar.name))
+    s += '{} {}\n'.format(fname, interface_name)
+
+    return (s,extras)
 
 def xenlight_golang_fmt_name(name, exported = True):
     """
