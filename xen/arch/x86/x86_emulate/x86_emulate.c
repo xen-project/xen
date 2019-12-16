@@ -2640,6 +2640,15 @@ x86_decode_twobyte(
         }
         break;
 
+    case 0xb2: /* lss */
+    case 0xb4: /* lfs */
+    case 0xb5: /* lgs */
+        /* REX.W ignored on a vendor-dependent basis. */
+        if ( op_bytes == 8 &&
+             (ctxt->cpuid->x86_vendor & (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+            op_bytes = 4;
+        break;
+
     case 0xb8: /* jmpe / popcnt */
         if ( rep_prefix() )
             ctxt->opcode |= MASK_INSR(vex.pfx, X86EMUL_OPC_PFX_MASK);
