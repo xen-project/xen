@@ -306,20 +306,25 @@ type Context struct {
 	logger *C.xentoollog_logger_stdiostream
 }
 
-type Hwcap []C.uint32_t
+// Hwcap represents a libxl_hwcap.
+type Hwcap [8]uint32
 
-func (chwcap C.libxl_hwcap) toGo() (ghwcap Hwcap) {
-	// Alloc a Go slice for the bytes
-	size := 8
-	ghwcap = make([]C.uint32_t, size)
+func (hwcap *Hwcap) fromC(chwcap *C.libxl_hwcap) error {
+	for i := range *hwcap {
+		hwcap[i] = uint32(chwcap[i])
+	}
 
-	// Make a slice pointing to the C array
-	mapslice := (*[1 << 30]C.uint32_t)(unsafe.Pointer(&chwcap[0]))[:size:size]
+	return nil
+}
 
-	// And copy the C array into the Go array
-	copy(ghwcap, mapslice)
+func (hwcap *Hwcap) toC() (C.libxl_hwcap, error) {
+	var chwcap C.libxl_hwcap
 
-	return
+	for i, v := range hwcap {
+		chwcap[i] = C.uint32_t(v)
+	}
+
+	return chwcap, nil
 }
 
 // KeyValueList represents a libxl_key_value_list.
@@ -442,7 +447,7 @@ func (cphys *C.libxl_physinfo) toGo() (physinfo *Physinfo) {
 	physinfo.SharingFreedPages = uint64(cphys.sharing_freed_pages)
 	physinfo.SharingUsedFrames = uint64(cphys.sharing_used_frames)
 	physinfo.NrNodes = uint32(cphys.nr_nodes)
-	physinfo.HwCap = cphys.hw_cap.toGo()
+	physinfo.HwCap.fromC(&cphys.hw_cap)
 	physinfo.CapHvm = bool(cphys.cap_hvm)
 	physinfo.CapHvmDirectio = bool(cphys.cap_hvm_directio)
 
