@@ -641,40 +641,40 @@ x86 PV Guest
 
 A typical save record for an x86 PV guest image would look like:
 
-1. Image header
-2. Domain header
-3. X86_PV_INFO record
-4. X86_PV_P2M_FRAMES record
-5. Many PAGE_DATA records
-6. TSC_INFO
-7. SHARED_INFO record
-8. VCPU context records for each online VCPU
-    a. X86_PV_VCPU_BASIC record
-    b. X86_PV_VCPU_EXTENDED record
-    c. X86_PV_VCPU_XSAVE record
-    d. X86_PV_VCPU_MSRS record
-9. END record
+* Image header
+* Domain header
+* X86_PV_INFO record
+* X86_PV_P2M_FRAMES record
+* Many PAGE_DATA records
+* TSC_INFO
+* SHARED_INFO record
+* VCPU context records for each online VCPU
+    * X86_PV_VCPU_BASIC record
+    * X86_PV_VCPU_EXTENDED record
+    * X86_PV_VCPU_XSAVE record
+    * X86_PV_VCPU_MSRS record
+* END record
 
 There are some strict ordering requirements.  The following records must
 be present in the following order as each of them depends on information
 present in the preceding ones.
 
-1. X86_PV_INFO record
-2. X86_PV_P2M_FRAMES record
-3. PAGE_DATA records
-4. VCPU records
+* X86_PV_INFO record
+* X86_PV_P2M_FRAMES record
+* PAGE_DATA records
+* VCPU records
 
 x86 HVM Guest
 -------------
 
 A typical save record for an x86 HVM guest image would look like:
 
-1. Image header
-2. Domain header
-3. Many PAGE_DATA records
-4. TSC_INFO
-5. HVM_PARAMS
-6. HVM_CONTEXT
+* Image header
+* Domain header
+* Many PAGE_DATA records
+* TSC_INFO
+* HVM_PARAMS
+* HVM_CONTEXT
 
 HVM_PARAMS must precede HVM_CONTEXT, as certain parameters can affect
 the validity of architectural state in the context.
