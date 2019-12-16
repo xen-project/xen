@@ -253,7 +253,7 @@ struct xc_sr_context
             /* Currently buffering records between a checkpoint */
             bool buffer_all_records;
 
-            /* Whether a STATIC_DATA_END record has been seen. */
+            /* Whether a STATIC_DATA_END record has been seen/inferred. */
             bool seen_static_data_end;
 
 /*
@@ -427,6 +427,9 @@ int read_record(struct xc_sr_context *ctx, int fd, struct xc_sr_record *rec);
  */
 int populate_pfns(struct xc_sr_context *ctx, unsigned int count,
                   const xen_pfn_t *original_pfns, const uint32_t *types);
+
+/* Handle a STATIC_DATA_END record. */
+int handle_static_data_end(struct xc_sr_context *ctx);
 
 #endif
 /*

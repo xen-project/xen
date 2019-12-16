@@ -342,6 +342,31 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
     xen_pfn_t *pfns = NULL, pfn;
     uint32_t *types = NULL, type;
 
+    /*
+     * v2 compatibility only exists for x86 streams.  This is a bit of a
+     * bodge, but it is less bad than duplicating handle_page_data() between
+     * different architectures.
+     */
+#if defined(__i386__) || defined(__x86_64__)
+    /* v2 compat.  Infer the position of STATIC_DATA_END. */
+    if ( ctx->restore.format_version < 3 && !ctx->restore.seen_static_data_end )
+    {
+        rc = handle_static_data_end(ctx);
+        if ( rc )
+        {
+            ERROR("Inferred STATIC_DATA_END record failed");
+            goto err;
+        }
+        rc = -1;
+    }
+
+    if ( !ctx->restore.seen_static_data_end )
+    {
+        ERROR("No STATIC_DATA_END seen");
+        goto err;
+    }
+#endif
+
     if ( rec->length < sizeof(*pages) )
     {
         ERROR("PAGE_DATA record truncated: length %u, min %zu",
@@ -631,7 +656,7 @@ static int buffer_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
     return 0;
 }
 
-static int handle_static_data_end(struct xc_sr_context *ctx)
+int handle_static_data_end(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
     int rc = 0;

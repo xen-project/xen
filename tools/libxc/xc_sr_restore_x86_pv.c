@@ -679,6 +679,23 @@ static int handle_x86_pv_p2m_frames(struct xc_sr_context *ctx,
     unsigned int start, end, x, fpp = PAGE_SIZE / ctx->x86.pv.width;
     int rc;
 
+    /* v2 compat.  Infer the position of STATIC_DATA_END. */
+    if ( ctx->restore.format_version < 3 && !ctx->restore.seen_static_data_end )
+    {
+        rc = handle_static_data_end(ctx);
+        if ( rc )
+        {
+            ERROR("Inferred STATIC_DATA_END record failed");
+            return rc;
+        }
+    }
+
+    if ( !ctx->restore.seen_static_data_end )
+    {
+        ERROR("No STATIC_DATA_END seen");
+        return -1;
+    }
+
     if ( !ctx->x86.pv.restore.seen_pv_info )
     {
         ERROR("Not yet received X86_PV_INFO record");
