@@ -2519,9 +2519,16 @@ x86_decode_onebyte(
         case 6: /* push */
             if ( mode_64bit() && op_bytes == 4 )
                 op_bytes = 8;
-            /* fall through */
+            state->desc = DstNone | SrcMem | Mov;
+            break;
+
         case 3: /* call (far, absolute indirect) */
         case 5: /* jmp (far, absolute indirect) */
+            /* REX.W ignored on a vendor-dependent basis. */
+            if ( op_bytes == 8 &&
+                 (ctxt->cpuid->x86_vendor &
+                  (X86_VENDOR_AMD | X86_VENDOR_HYGON)) )
+                op_bytes = 4;
             state->desc = DstNone | SrcMem | Mov;
             break;
         }
