@@ -235,6 +235,16 @@ func (mvg *MsVmGenid) toC() (C.libxl_ms_vm_genid, error) {
 	return cmvg, nil
 }
 
+// EvLink represents a libxl_ev_link.
+//
+// Represented as an empty struct for now, as there is no
+// apparent need for the internals of this type to be exposed
+// through the Go package.
+type EvLink struct{}
+
+func (el *EvLink) fromC(cel *C.libxl_ev_link) error      { return nil }
+func (el *EvLink) toC() (cel C.libxl_ev_link, err error) { return }
+
 type Context struct {
 	ctx    *C.libxl_ctx
 	logger *C.xentoollog_logger_stdiostream
