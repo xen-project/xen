@@ -7,20 +7,21 @@ GOCODE_DIR ?= $(prefix)/share/gocode/
 GOXL_PKG_DIR = /src/$(XEN_GOCODE_URL)/xenlight/
 GOXL_INSTALL_DIR = $(GOCODE_DIR)$(GOXL_PKG_DIR)
 
-# PKGSOURCES: Files which comprise the distributed source package
-PKGSOURCES = xenlight.go
-
 GO ?= go
 
 .PHONY: all
 all: build
 
 .PHONY: package
-package: $(XEN_GOPATH)$(GOXL_PKG_DIR)$(PKGSOURCES)
+package: $(XEN_GOPATH)$(GOXL_PKG_DIR)
 
-$(XEN_GOPATH)/src/$(XEN_GOCODE_URL)/xenlight/$(PKGSOURCES): $(PKGSOURCES)
+$(XEN_GOPATH)/src/$(XEN_GOCODE_URL)/xenlight/: xenlight.go types.gen.go
 	$(INSTALL_DIR) $(XEN_GOPATH)$(GOXL_PKG_DIR)
-	$(INSTALL_DATA) $(PKGSOURCES) $(XEN_GOPATH)$(GOXL_PKG_DIR)
+	$(INSTALL_DATA) xenlight.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
+	$(INSTALL_DATA) types.gen.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
+
+%.gen.go: gengotypes.py $(XEN_ROOT)/tools/libxl/libxl_types.idl $(XEN_ROOT)/tools/libxl/idl.py
+	XEN_ROOT=$(XEN_ROOT) $(PYTHON) gengotypes.py ../../libxl/libxl_types.idl
 
 # Go will do its own dependency checking, and not actuall go through
 # with the build if none of the input files have changed.
@@ -36,10 +37,11 @@ build: package
 .PHONY: install
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(GOXL_INSTALL_DIR)
-	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)$(PKGSOURCES) $(DESTDIR)$(GOXL_INSTALL_DIR)
+	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)xenlight.go $(DESTDIR)$(GOXL_INSTALL_DIR)
+	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)types.gen.go $(DESTDIR)$(GOXL_INSTALL_DIR)
 
 .PHONY: uninstall
-	rm -f $(addprefix $(DESTDIR)$(GOXL_INSTALL_DIR)/, $(PKGSOURCES))
+	rm -rf $(DESTDIR)$(GOXL_INSTALL_DIR)
 
 .PHONY: clean
 clean:

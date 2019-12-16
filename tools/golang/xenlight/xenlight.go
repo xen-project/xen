@@ -37,77 +37,42 @@ import (
 	"unsafe"
 )
 
-/*
- * Errors
- */
-
-type Error int
-
-const (
-	ErrorNonspecific                  = Error(-C.ERROR_NONSPECIFIC)
-	ErrorVersion                      = Error(-C.ERROR_VERSION)
-	ErrorFail                         = Error(-C.ERROR_FAIL)
-	ErrorNi                           = Error(-C.ERROR_NI)
-	ErrorNomem                        = Error(-C.ERROR_NOMEM)
-	ErrorInval                        = Error(-C.ERROR_INVAL)
-	ErrorBadfail                      = Error(-C.ERROR_BADFAIL)
-	ErrorGuestTimedout                = Error(-C.ERROR_GUEST_TIMEDOUT)
-	ErrorTimedout                     = Error(-C.ERROR_TIMEDOUT)
-	ErrorNoparavirt                   = Error(-C.ERROR_NOPARAVIRT)
-	ErrorNotReady                     = Error(-C.ERROR_NOT_READY)
-	ErrorOseventRegFail               = Error(-C.ERROR_OSEVENT_REG_FAIL)
-	ErrorBufferfull                   = Error(-C.ERROR_BUFFERFULL)
-	ErrorUnknownChild                 = Error(-C.ERROR_UNKNOWN_CHILD)
-	ErrorLockFail                     = Error(-C.ERROR_LOCK_FAIL)
-	ErrorJsonConfigEmpty              = Error(-C.ERROR_JSON_CONFIG_EMPTY)
-	ErrorDeviceExists                 = Error(-C.ERROR_DEVICE_EXISTS)
-	ErrorCheckpointDevopsDoesNotMatch = Error(-C.ERROR_CHECKPOINT_DEVOPS_DOES_NOT_MATCH)
-	ErrorCheckpointDeviceNotSupported = Error(-C.ERROR_CHECKPOINT_DEVICE_NOT_SUPPORTED)
-	ErrorVnumaConfigInvalid           = Error(-C.ERROR_VNUMA_CONFIG_INVALID)
-	ErrorDomainNotfound               = Error(-C.ERROR_DOMAIN_NOTFOUND)
-	ErrorAborted                      = Error(-C.ERROR_ABORTED)
-	ErrorNotfound                     = Error(-C.ERROR_NOTFOUND)
-	ErrorDomainDestroyed              = Error(-C.ERROR_DOMAIN_DESTROYED)
-	ErrorFeatureRemoved               = Error(-C.ERROR_FEATURE_REMOVED)
-)
-
-var errors = [...]string{
-	ErrorNonspecific:                  "Non-specific error",
-	ErrorVersion:                      "Wrong version",
-	ErrorFail:                         "Failed",
-	ErrorNi:                           "Not Implemented",
-	ErrorNomem:                        "No memory",
-	ErrorInval:                        "Invalid argument",
-	ErrorBadfail:                      "Bad Fail",
-	ErrorGuestTimedout:                "Guest timed out",
-	ErrorTimedout:                     "Timed out",
-	ErrorNoparavirt:                   "No Paravirtualization",
-	ErrorNotReady:                     "Not ready",
-	ErrorOseventRegFail:               "OS event registration failed",
-	ErrorBufferfull:                   "Buffer full",
-	ErrorUnknownChild:                 "Unknown child",
-	ErrorLockFail:                     "Lock failed",
-	ErrorJsonConfigEmpty:              "JSON config empty",
-	ErrorDeviceExists:                 "Device exists",
-	ErrorCheckpointDevopsDoesNotMatch: "Checkpoint devops does not match",
-	ErrorCheckpointDeviceNotSupported: "Checkpoint device not supported",
-	ErrorVnumaConfigInvalid:           "VNUMA config invalid",
-	ErrorDomainNotfound:               "Domain not found",
-	ErrorAborted:                      "Aborted",
-	ErrorNotfound:                     "Not found",
-	ErrorDomainDestroyed:              "Domain destroyed",
-	ErrorFeatureRemoved:               "Feature removed",
+var libxlErrors = [...]string{
+	-ErrorNonspecific:                  "Non-specific error",
+	-ErrorVersion:                      "Wrong version",
+	-ErrorFail:                         "Failed",
+	-ErrorNi:                           "Not Implemented",
+	-ErrorNomem:                        "No memory",
+	-ErrorInval:                        "Invalid argument",
+	-ErrorBadfail:                      "Bad Fail",
+	-ErrorGuestTimedout:                "Guest timed out",
+	-ErrorTimedout:                     "Timed out",
+	-ErrorNoparavirt:                   "No Paravirtualization",
+	-ErrorNotReady:                     "Not ready",
+	-ErrorOseventRegFail:               "OS event registration failed",
+	-ErrorBufferfull:                   "Buffer full",
+	-ErrorUnknownChild:                 "Unknown child",
+	-ErrorLockFail:                     "Lock failed",
+	-ErrorJsonConfigEmpty:              "JSON config empty",
+	-ErrorDeviceExists:                 "Device exists",
+	-ErrorCheckpointDevopsDoesNotMatch: "Checkpoint devops does not match",
+	-ErrorCheckpointDeviceNotSupported: "Checkpoint device not supported",
+	-ErrorVnumaConfigInvalid:           "VNUMA config invalid",
+	-ErrorDomainNotfound:               "Domain not found",
+	-ErrorAborted:                      "Aborted",
+	-ErrorNotfound:                     "Not found",
+	-ErrorDomainDestroyed:              "Domain destroyed",
+	-ErrorFeatureRemoved:               "Feature removed",
 }
 
 func (e Error) Error() string {
-	if 0 < int(e) && int(e) < len(errors) {
-		s := errors[e]
+	if 0 < int(e) && int(e) < len(libxlErrors) {
+		s := libxlErrors[e]
 		if s != "" {
 			return s
 		}
 	}
 	return fmt.Sprintf("libxl error: %d", -e)
-
 }
 
 /*
@@ -236,32 +201,12 @@ func (cinfo *C.libxl_version_info) toGo() (info *VersionInfo) {
 	return
 }
 
-type ShutdownReason int32
-
-const (
-	ShutdownReasonUnknown   = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_UNKNOWN)
-	ShutdownReasonPoweroff  = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_POWEROFF)
-	ShutdownReasonReboot    = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_REBOOT)
-	ShutdownReasonSuspend   = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_SUSPEND)
-	ShutdownReasonCrash     = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_CRASH)
-	ShutdownReasonWatchdog  = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_WATCHDOG)
-	ShutdownReasonSoftReset = ShutdownReason(C.LIBXL_SHUTDOWN_REASON_SOFT_RESET)
-)
-
 func (sr ShutdownReason) String() (str string) {
 	cstr := C.libxl_shutdown_reason_to_string(C.libxl_shutdown_reason(sr))
 	str = C.GoString(cstr)
 
 	return
 }
-
-type DomainType int32
-
-const (
-	DomainTypeInvalid = DomainType(C.LIBXL_DOMAIN_TYPE_INVALID)
-	DomainTypeHvm     = DomainType(C.LIBXL_DOMAIN_TYPE_HVM)
-	DomainTypePv      = DomainType(C.LIBXL_DOMAIN_TYPE_PV)
-)
 
 func (dt DomainType) String() (str string) {
 	cstr := C.libxl_domain_type_to_string(C.libxl_domain_type(dt))
@@ -322,27 +267,6 @@ func (cdi *C.libxl_dominfo) toGo() (di *Dominfo) {
 
 	return
 }
-
-// # Consistent with values defined in domctl.h
-// # Except unknown which we have made up
-// libxl_scheduler = Enumeration("scheduler", [
-//     (0, "unknown"),
-//     (4, "sedf"),
-//     (5, "credit"),
-//     (6, "credit2"),
-//     (7, "arinc653"),
-//     (8, "rtds"),
-//     ])
-type Scheduler int
-
-var (
-	SchedulerUnknown  Scheduler = C.LIBXL_SCHEDULER_UNKNOWN
-	SchedulerSedf     Scheduler = C.LIBXL_SCHEDULER_SEDF
-	SchedulerCredit   Scheduler = C.LIBXL_SCHEDULER_CREDIT
-	SchedulerCredit2  Scheduler = C.LIBXL_SCHEDULER_CREDIT2
-	SchedulerArinc653 Scheduler = C.LIBXL_SCHEDULER_ARINC653
-	SchedulerRTDS     Scheduler = C.LIBXL_SCHEDULER_RTDS
-)
 
 // const char *libxl_scheduler_to_string(libxl_scheduler p);
 func (s Scheduler) String() string {
@@ -1140,14 +1064,6 @@ func (Ctx *Context) ListVcpu(id Domid) (glist []Vcpuinfo) {
 
 	return
 }
-
-type ConsoleType int
-
-const (
-	ConsoleTypeUnknown = ConsoleType(C.LIBXL_CONSOLE_TYPE_UNKNOWN)
-	ConsoleTypeSerial  = ConsoleType(C.LIBXL_CONSOLE_TYPE_SERIAL)
-	ConsoleTypePV      = ConsoleType(C.LIBXL_CONSOLE_TYPE_PV)
-)
 
 func (ct ConsoleType) String() (str string) {
 	cstr := C.libxl_console_type_to_string(C.libxl_console_type(ct))
