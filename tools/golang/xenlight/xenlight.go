@@ -85,6 +85,99 @@ type MemKB uint64
 
 type Uuid C.libxl_uuid
 
+// defboolVal represents a defbool value.
+type defboolVal int
+
+const (
+	defboolDefault defboolVal = 0
+	defboolFalse   defboolVal = -1
+	defboolTrue    defboolVal = 1
+)
+
+// Defbool represents a libxl_defbool.
+type Defbool struct {
+	val defboolVal
+}
+
+func (d Defbool) String() string {
+	switch d.val {
+	case defboolDefault:
+		return "<default>"
+	case defboolFalse:
+		return "False"
+	case defboolTrue:
+		return "True"
+	}
+
+	return ""
+}
+
+// Set sets the value of the Defbool.
+func (d *Defbool) Set(b bool) {
+	if b {
+		d.val = defboolTrue
+		return
+	}
+	d.val = defboolFalse
+}
+
+// Unset resets the Defbool to default value.
+func (d *Defbool) Unset() {
+	d.val = defboolDefault
+}
+
+// SetIfDefault sets the value of Defbool only if
+// its current value is default.
+func (d *Defbool) SetIfDefault(b bool) {
+	if d.IsDefault() {
+		d.Set(b)
+	}
+}
+
+// IsDefault returns true if the value of Defbool
+// is default, returns false otherwise.
+func (d *Defbool) IsDefault() bool {
+	return d.val == defboolDefault
+}
+
+// Val returns the boolean value associated with the
+// Defbool value. An error is returned if the value
+// is default.
+func (d *Defbool) Val() (bool, error) {
+	if d.IsDefault() {
+		return false, fmt.Errorf("%v: cannot take value of default defbool", ErrorInval)
+	}
+
+	return (d.val > 0), nil
+}
+
+func (d *Defbool) fromC(c *C.libxl_defbool) error {
+	if C.libxl_defbool_is_default(*c) {
+		d.val = defboolDefault
+		return nil
+	}
+
+	if C.libxl_defbool_val(*c) {
+		d.val = defboolTrue
+		return nil
+	}
+
+	d.val = defboolFalse
+
+	return nil
+}
+
+func (d *Defbool) toC() (C.libxl_defbool, error) {
+	var c C.libxl_defbool
+
+	if !d.IsDefault() {
+		val, _ := d.Val()
+		C.libxl_defbool_set(&c, C.bool(val))
+	}
+
+	return c, nil
+}
+
 type Context struct {
 	ctx    *C.libxl_ctx
 	logger *C.xentoollog_logger_stdiostream
