@@ -139,6 +139,9 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
 
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {
+    /* Called once the STATIC_DATA_END record has been received. */
+    int (*static_data_done)(void *data);
+
     /* Called after a new checkpoint to suspend the guest. */
     int (*suspend)(void *data);
 

@@ -253,6 +253,9 @@ struct xc_sr_context
             /* Currently buffering records between a checkpoint */
             bool buffer_all_records;
 
+            /* Whether a STATIC_DATA_END record has been seen. */
+            bool seen_static_data_end;
+
 /*
  * With Remus/COLO, we buffer the records sent by the primary at checkpoint,
  * in case the primary will fail, we can recover from the last

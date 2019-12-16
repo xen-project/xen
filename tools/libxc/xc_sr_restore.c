@@ -35,9 +35,9 @@ static int read_headers(struct xc_sr_context *ctx)
         return -1;
     }
 
-    if ( ihdr.version != 2 )
+    if ( ihdr.version < 2 || ihdr.version > 3 )
     {
-        ERROR("Invalid Version: Expected 2, Got %d",
+        ERROR("Invalid Version: Expected 2 <= ver <= 3, Got %d",
               ihdr.version);
         return -1;
     }
@@ -631,6 +631,27 @@ static int buffer_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
     return 0;
 }
 
+static int handle_static_data_end(struct xc_sr_context *ctx)
+{
+    xc_interface *xch = ctx->xch;
+    int rc = 0;
+
+    if ( ctx->restore.seen_static_data_end )
+    {
+        ERROR("Multiple STATIC_DATA_END records found");
+        return -1;
+    }
+
+    ctx->restore.seen_static_data_end = true;
+
+    if ( ctx->restore.callbacks->static_data_done &&
+         (rc = ctx->restore.callbacks->static_data_done(
+             ctx->restore.callbacks->data) != 0) )
+        ERROR("static_data_done() callback failed: %d\n", rc);
+
+    return rc;
+}
+
 static int process_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 {
     xc_interface *xch = ctx->xch;
@@ -652,6 +673,10 @@ static int process_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 
     case REC_TYPE_CHECKPOINT:
         rc = handle_checkpoint(ctx);
+        break;
+
+    case REC_TYPE_STATIC_DATA_END:
+        rc = handle_static_data_end(ctx);
         break;
 
     default:
