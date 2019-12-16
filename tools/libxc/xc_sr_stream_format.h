@@ -23,7 +23,6 @@ struct xc_sr_ihdr
 
 #define IHDR_MARKER  0xffffffffffffffffULL
 #define IHDR_ID      0x58454E46U
-#define IHDR_VERSION 2
 
 #define _IHDR_OPT_ENDIAN 0
 #define IHDR_OPT_LITTLE_ENDIAN (0 << _IHDR_OPT_ENDIAN)

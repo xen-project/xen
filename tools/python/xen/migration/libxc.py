@@ -19,7 +19,6 @@ IHDR_FORMAT = "!QIIHHI"
 
 IHDR_MARKER  = 0xffffffffffffffff
 IHDR_IDENT   = 0x58454E46 # "XENF" in ASCII
-IHDR_VERSION = 2
 
 IHDR_OPT_BIT_ENDIAN = 0
 IHDR_OPT_LE = (0 << IHDR_OPT_BIT_ENDIAN)
@@ -113,7 +112,7 @@ HVM_PARAMS_ENTRY_FORMAT   = "QQ"
 HVM_PARAMS_FORMAT         = "II"
 
 class VerifyLibxc(VerifyBase):
-    """ Verify a Libxc v2 stream """
+    """ Verify a Libxc v2 (or later) stream """
 
     def __init__(self, info, read):
         VerifyBase.__init__(self, info, read)
@@ -144,9 +143,9 @@ class VerifyLibxc(VerifyBase):
             raise StreamError("Bad image id: Expected 0x%x, got 0x%x" %
                               (IHDR_IDENT, ident))
 
-        if version != IHDR_VERSION:
-            raise StreamError("Unknown image version: Expected %d, got %d" %
-                              (IHDR_VERSION, version))
+        if version != 2:
+            raise StreamError("Unknown image version: Expected 2, got %d" %
+                              (version, ))
 
         if options & IHDR_OPT_RESZ_MASK:
             raise StreamError("Reserved bits set in image options field: 0x%x" %

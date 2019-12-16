@@ -108,7 +108,7 @@ def main():
 
     parser = OptionParser(usage = "%prog [options]",
                           description =
-                          "Verify a stream according to the v2 spec")
+                          "Verify a stream according to the v2 (or later) spec")
 
     # Optional options
     parser.add_option("-i", "--in", dest = "fin", metavar = "<FD or FILE>",

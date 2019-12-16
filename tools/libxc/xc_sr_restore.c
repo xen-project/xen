@@ -35,10 +35,10 @@ static int read_headers(struct xc_sr_context *ctx)
         return -1;
     }
 
-    if ( ihdr.version != IHDR_VERSION )
+    if ( ihdr.version != 2 )
     {
-        ERROR("Invalid Version: Expected %d, Got %d",
-              IHDR_VERSION, ihdr.version);
+        ERROR("Invalid Version: Expected 2, Got %d",
+              ihdr.version);
         return -1;
     }
 
