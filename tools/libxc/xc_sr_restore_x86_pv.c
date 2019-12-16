@@ -1194,6 +1194,7 @@ struct xc_sr_restore_ops restore_ops_x86_pv =
     .localise_page   = x86_pv_localise_page,
     .setup           = x86_pv_setup,
     .process_record  = x86_pv_process_record,
+    .static_data_complete = x86_static_data_complete,
     .stream_complete = x86_pv_stream_complete,
     .cleanup         = x86_pv_cleanup,
 };

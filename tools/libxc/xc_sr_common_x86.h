@@ -34,6 +34,11 @@ int handle_x86_cpuid_policy(struct xc_sr_context *ctx,
 int handle_x86_msr_policy(struct xc_sr_context *ctx,
                           struct xc_sr_record *rec);
 
+/*
+ * Perform common x86 actions required after the static data has arrived.
+ */
+int x86_static_data_complete(struct xc_sr_context *ctx, unsigned int *missing);
+
 #endif
 /*
  * Local variables:

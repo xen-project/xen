@@ -159,6 +159,15 @@ struct xc_sr_restore_ops
     int (*process_record)(struct xc_sr_context *ctx, struct xc_sr_record *rec);
 
     /**
+     * Perform any actions required after the static data has arrived.  Called
+     * when the STATIC_DATA_COMPLETE record has been recieved/inferred.
+     * 'missing' should be filled in for any data item the higher level
+     * toolstack needs to provide compatiblity for.
+     */
+    int (*static_data_complete)(struct xc_sr_context *ctx,
+                                unsigned int *missing);
+
+    /**
      * Perform any actions required after the stream has been finished. Called
      * after the END record has been received.
      */

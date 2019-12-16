@@ -29,7 +29,7 @@ our @msgs = (
     [ 'srcxA',  "wait_checkpoint", [] ],
     [ 'scxA',   "switch_qemu_logdirty",  [qw(uint32_t domid
                                           unsigned enable)] ],
-    [ 'rcxW',   "static_data_done",      [] ],
+    [ 'rcxW',   "static_data_done",      [qw(unsigned missing)] ],
     [ 'rcx',    "restore_results",       ['xen_pfn_t', 'store_gfn',
                                           'xen_pfn_t', 'console_gfn'] ],
     [ 'srW',    "complete",              [qw(int retval

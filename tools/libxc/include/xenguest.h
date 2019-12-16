@@ -139,8 +139,16 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom,
 
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {
-    /* Called once the STATIC_DATA_END record has been received/inferred. */
-    int (*static_data_done)(void *data);
+    /*
+     * Called once the STATIC_DATA_END record has been received/inferred.
+     *
+     * For compatibility with older streams, provides a list of static data
+     * expected to be found in the stream, which was missing.  A higher level
+     * toolstack is responsible for providing any necessary compatibiltiy.
+     */
+#define XGR_SDD_MISSING_CPUID (1 << 0)
+#define XGR_SDD_MISSING_MSR   (1 << 1)
+    int (*static_data_done)(unsigned int missing, void *data);
 
     /* Called after a new checkpoint to suspend the guest. */
     int (*suspend)(void *data);

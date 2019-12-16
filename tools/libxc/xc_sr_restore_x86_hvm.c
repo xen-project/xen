@@ -258,6 +258,7 @@ struct xc_sr_restore_ops restore_ops_x86_hvm =
     .localise_page   = x86_hvm_localise_page,
     .setup           = x86_hvm_setup,
     .process_record  = x86_hvm_process_record,
+    .static_data_complete = x86_static_data_complete,
     .stream_complete = x86_hvm_stream_complete,
     .cleanup         = x86_hvm_cleanup,
 };

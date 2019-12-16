@@ -659,6 +659,7 @@ static int buffer_record(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 int handle_static_data_end(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
+    unsigned int missing = 0;
     int rc = 0;
 
     if ( ctx->restore.seen_static_data_end )
@@ -669,9 +670,13 @@ int handle_static_data_end(struct xc_sr_context *ctx)
 
     ctx->restore.seen_static_data_end = true;
 
+    rc = ctx->restore.ops.static_data_complete(ctx, &missing);
+    if ( rc )
+        return rc;
+
     if ( ctx->restore.callbacks->static_data_done &&
          (rc = ctx->restore.callbacks->static_data_done(
-             ctx->restore.callbacks->data) != 0) )
+             missing, ctx->restore.callbacks->data) != 0) )
         ERROR("static_data_done() callback failed: %d\n", rc);
 
     return rc;

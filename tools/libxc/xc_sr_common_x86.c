@@ -132,6 +132,14 @@ int handle_x86_msr_policy(struct xc_sr_context *ctx, struct xc_sr_record *rec)
     return rc;
 }
 
+int x86_static_data_complete(struct xc_sr_context *ctx, unsigned int *missing)
+{
+    /* TODO: Become conditional on there being no data in the stream. */
+    *missing = XGR_SDD_MISSING_MSR | XGR_SDD_MISSING_CPUID;
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C
