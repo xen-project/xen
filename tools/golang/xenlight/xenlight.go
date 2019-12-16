@@ -202,6 +202,16 @@ func (chwcap C.libxl_hwcap) toGo() (ghwcap Hwcap) {
 	return
 }
 
+// KeyValueList represents a libxl_key_value_list.
+//
+// Represented as an empty struct for now, as there is no
+// apparent need for this type to be exposed through the
+// Go package.
+type KeyValueList struct{}
+
+func (kvl KeyValueList) fromC(ckvl *C.libxl_key_value_list) error      { return nil }
+func (kvl KeyValueList) toC() (ckvl C.libxl_key_value_list, err error) { return }
+
 // typedef struct {
 //     uint32_t size;          /* number of bytes in map */
 //     uint8_t *map;
