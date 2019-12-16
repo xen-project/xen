@@ -125,8 +125,8 @@ static int __init pge_init(void)
 {
     if ( opt_global_pages == -1 )
         opt_global_pages = !cpu_has_hypervisor ||
-                           (boot_cpu_data.x86_vendor &
-                            (X86_VENDOR_AMD | X86_VENDOR_HYGON));
+                           !(boot_cpu_data.x86_vendor &
+                             (X86_VENDOR_AMD | X86_VENDOR_HYGON));
 
     return 0;
 }
