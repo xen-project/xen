@@ -212,6 +212,35 @@ type KeyValueList struct{}
 func (kvl KeyValueList) fromC(ckvl *C.libxl_key_value_list) error      { return nil }
 func (kvl KeyValueList) toC() (ckvl C.libxl_key_value_list, err error) { return }
 
+// StringList represents a libxl_string_list.
+type StringList []string
+
+func (sl *StringList) fromC(csl *C.libxl_string_list) error {
+	size := int(C.libxl_string_list_length(csl))
+	list := (*[1 << 30]*C.char)(unsafe.Pointer(csl))[:size:size]
+
+	*sl = make([]string, size)
+
+	for i, v := range list {
+		(*sl)[i] = C.GoString(v)
+	}
+
+	return nil
+}
+
+func (sl StringList) toC() (C.libxl_string_list, error) {
+	var char *C.char
+	size := len(sl)
+	csl := (C.libxl_string_list)(C.malloc(C.ulong(size) * C.ulong(unsafe.Sizeof(char))))
+	clist := (*[1 << 30]*C.char)(unsafe.Pointer(csl))[:size:size]
+
+	for i, v := range sl {
+		clist[i] = C.CString(v)
+	}
+
+	return csl, nil
+}
+
 // Bitmap represents a libxl_bitmap.
 //
 // Implement the Go bitmap type such that the underlying data can
