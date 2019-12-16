@@ -81,6 +81,9 @@ func (e Error) Error() string {
 
 type Domid uint32
 
+// Devid is a device ID.
+type Devid int
+
 type MemKB uint64
 
 type Uuid C.libxl_uuid
