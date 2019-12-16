@@ -15,7 +15,7 @@ all: build
 .PHONY: package
 package: $(XEN_GOPATH)$(GOXL_PKG_DIR)
 
-$(XEN_GOPATH)/src/$(XEN_GOCODE_URL)/xenlight/: xenlight.go types.gen.go
+$(XEN_GOPATH)/src/$(XEN_GOCODE_URL)/xenlight/: xenlight.go types.gen.go helpers.gen.go
 	$(INSTALL_DIR) $(XEN_GOPATH)$(GOXL_PKG_DIR)
 	$(INSTALL_DATA) xenlight.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
 	$(INSTALL_DATA) types.gen.go $(XEN_GOPATH)$(GOXL_PKG_DIR)

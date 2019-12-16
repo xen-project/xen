@@ -5,11 +5,28 @@
 //
 package xenlight
 
+import (
+	"errors"
+	"fmt"
+	"unsafe"
+)
+
 /*
 #cgo LDFLAGS: -lxenlight
 #include <stdlib.h>
 #include <libxl.h>
 
+typedef typeof(((struct libxl_channelinfo *)NULL)->u.pty)libxl_channelinfo_connection_union_pty;
+typedef typeof(((struct libxl_domain_build_info *)NULL)->u.hvm)libxl_domain_build_info_type_union_hvm;
+typedef typeof(((struct libxl_domain_build_info *)NULL)->u.pv)libxl_domain_build_info_type_union_pv;
+typedef typeof(((struct libxl_domain_build_info *)NULL)->u.pvh)libxl_domain_build_info_type_union_pvh;
+typedef typeof(((struct libxl_device_usbdev *)NULL)->u.hostdev)libxl_device_usbdev_type_union_hostdev;
+typedef typeof(((struct libxl_device_channel *)NULL)->u.socket)libxl_device_channel_connection_union_socket;
+typedef typeof(((struct libxl_event *)NULL)->u.domain_shutdown)libxl_event_type_union_domain_shutdown;
+typedef typeof(((struct libxl_event *)NULL)->u.disk_eject)libxl_event_type_union_disk_eject;
+typedef typeof(((struct libxl_event *)NULL)->u.operation_complete)libxl_event_type_union_operation_complete;
+typedef typeof(((struct libxl_psr_hw_info *)NULL)->u.cat)libxl_psr_hw_info_type_union_cat;
+typedef typeof(((struct libxl_psr_hw_info *)NULL)->u.mba)libxl_psr_hw_info_type_union_mba;
 */
 import "C"
 
@@ -137,7 +154,28 @@ func (x *Channelinfo) fromC(xc *C.libxl_channelinfo) error {
 	x.State = int(xc.state)
 	x.Evtch = int(xc.evtch)
 	x.Rref = int(xc.rref)
+	x.Connection = ChannelConnection(xc.connection)
+	switch x.Connection {
+	case ChannelConnectionPty:
+		var connectionPty ChannelinfoConnectionUnionPty
+		if err := connectionPty.fromC(xc); err != nil {
+			return err
+		}
+		x.ConnectionUnion = connectionPty
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Connection)
+	}
 
+	return nil
+}
+
+func (x *ChannelinfoConnectionUnionPty) fromC(xc *C.libxl_channelinfo) error {
+	if ChannelConnection(xc.connection) != ChannelConnectionPty {
+		return errors.New("expected union key ChannelConnectionPty")
+	}
+
+	tmp := (*C.libxl_channelinfo_connection_union_pty)(unsafe.Pointer(&xc.u[0]))
+	x.Path = C.GoString(tmp.path)
 	return nil
 }
 
@@ -340,10 +378,178 @@ func (x *DomainBuildInfo) fromC(xc *C.libxl_domain_build_info) error {
 		return err
 	}
 	x.Tee = TeeType(xc.tee)
+	x.Type = DomainType(xc._type)
+	switch x.Type {
+	case DomainTypePv:
+		var typePv DomainBuildInfoTypeUnionPv
+		if err := typePv.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typePv
+	case DomainTypeHvm:
+		var typeHvm DomainBuildInfoTypeUnionHvm
+		if err := typeHvm.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typeHvm
+	case DomainTypePvh:
+		var typePvh DomainBuildInfoTypeUnionPvh
+		if err := typePvh.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typePvh
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 	x.ArchArm.GicVersion = GicVersion(xc.arch_arm.gic_version)
 	x.ArchArm.Vuart = VuartType(xc.arch_arm.vuart)
 	x.Altp2M = Altp2MMode(xc.altp2m)
 
+	return nil
+}
+
+func (x *DomainBuildInfoTypeUnionHvm) fromC(xc *C.libxl_domain_build_info) error {
+	if DomainType(xc._type) != DomainTypeHvm {
+		return errors.New("expected union key DomainTypeHvm")
+	}
+
+	tmp := (*C.libxl_domain_build_info_type_union_hvm)(unsafe.Pointer(&xc.u[0]))
+	x.Firmware = C.GoString(tmp.firmware)
+	x.Bios = BiosType(tmp.bios)
+	if err := x.Pae.fromC(&tmp.pae); err != nil {
+		return err
+	}
+	if err := x.Apic.fromC(&tmp.apic); err != nil {
+		return err
+	}
+	if err := x.Acpi.fromC(&tmp.acpi); err != nil {
+		return err
+	}
+	if err := x.AcpiS3.fromC(&tmp.acpi_s3); err != nil {
+		return err
+	}
+	if err := x.AcpiS4.fromC(&tmp.acpi_s4); err != nil {
+		return err
+	}
+	if err := x.AcpiLaptopSlate.fromC(&tmp.acpi_laptop_slate); err != nil {
+		return err
+	}
+	if err := x.Nx.fromC(&tmp.nx); err != nil {
+		return err
+	}
+	if err := x.Viridian.fromC(&tmp.viridian); err != nil {
+		return err
+	}
+	if err := x.ViridianEnable.fromC(&tmp.viridian_enable); err != nil {
+		return err
+	}
+	if err := x.ViridianDisable.fromC(&tmp.viridian_disable); err != nil {
+		return err
+	}
+	x.Timeoffset = C.GoString(tmp.timeoffset)
+	if err := x.Hpet.fromC(&tmp.hpet); err != nil {
+		return err
+	}
+	if err := x.VptAlign.fromC(&tmp.vpt_align); err != nil {
+		return err
+	}
+	x.MmioHoleMemkb = uint64(tmp.mmio_hole_memkb)
+	x.TimerMode = TimerMode(tmp.timer_mode)
+	if err := x.NestedHvm.fromC(&tmp.nested_hvm); err != nil {
+		return err
+	}
+	if err := x.Altp2M.fromC(&tmp.altp2m); err != nil {
+		return err
+	}
+	x.SystemFirmware = C.GoString(tmp.system_firmware)
+	x.SmbiosFirmware = C.GoString(tmp.smbios_firmware)
+	x.AcpiFirmware = C.GoString(tmp.acpi_firmware)
+	x.Hdtype = Hdtype(tmp.hdtype)
+	if err := x.Nographic.fromC(&tmp.nographic); err != nil {
+		return err
+	}
+	if err := x.Vga.fromC(&tmp.vga); err != nil {
+		return err
+	}
+	if err := x.Vnc.fromC(&tmp.vnc); err != nil {
+		return err
+	}
+	x.Keymap = C.GoString(tmp.keymap)
+	if err := x.Sdl.fromC(&tmp.sdl); err != nil {
+		return err
+	}
+	if err := x.Spice.fromC(&tmp.spice); err != nil {
+		return err
+	}
+	if err := x.GfxPassthru.fromC(&tmp.gfx_passthru); err != nil {
+		return err
+	}
+	x.GfxPassthruKind = GfxPassthruKind(tmp.gfx_passthru_kind)
+	x.Serial = C.GoString(tmp.serial)
+	x.Boot = C.GoString(tmp.boot)
+	if err := x.Usb.fromC(&tmp.usb); err != nil {
+		return err
+	}
+	x.Usbversion = int(tmp.usbversion)
+	x.Usbdevice = C.GoString(tmp.usbdevice)
+	if err := x.VkbDevice.fromC(&tmp.vkb_device); err != nil {
+		return err
+	}
+	x.Soundhw = C.GoString(tmp.soundhw)
+	if err := x.XenPlatformPci.fromC(&tmp.xen_platform_pci); err != nil {
+		return err
+	}
+	if err := x.UsbdeviceList.fromC(&tmp.usbdevice_list); err != nil {
+		return err
+	}
+	x.VendorDevice = VendorDevice(tmp.vendor_device)
+	if err := x.MsVmGenid.fromC(&tmp.ms_vm_genid); err != nil {
+		return err
+	}
+	if err := x.SerialList.fromC(&tmp.serial_list); err != nil {
+		return err
+	}
+	if err := x.Rdm.fromC(&tmp.rdm); err != nil {
+		return err
+	}
+	x.RdmMemBoundaryMemkb = uint64(tmp.rdm_mem_boundary_memkb)
+	x.McaCaps = uint64(tmp.mca_caps)
+	return nil
+}
+
+func (x *DomainBuildInfoTypeUnionPv) fromC(xc *C.libxl_domain_build_info) error {
+	if DomainType(xc._type) != DomainTypePv {
+		return errors.New("expected union key DomainTypePv")
+	}
+
+	tmp := (*C.libxl_domain_build_info_type_union_pv)(unsafe.Pointer(&xc.u[0]))
+	x.Kernel = C.GoString(tmp.kernel)
+	x.SlackMemkb = uint64(tmp.slack_memkb)
+	x.Bootloader = C.GoString(tmp.bootloader)
+	if err := x.BootloaderArgs.fromC(&tmp.bootloader_args); err != nil {
+		return err
+	}
+	x.Cmdline = C.GoString(tmp.cmdline)
+	x.Ramdisk = C.GoString(tmp.ramdisk)
+	x.Features = C.GoString(tmp.features)
+	if err := x.E820Host.fromC(&tmp.e820_host); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (x *DomainBuildInfoTypeUnionPvh) fromC(xc *C.libxl_domain_build_info) error {
+	if DomainType(xc._type) != DomainTypePvh {
+		return errors.New("expected union key DomainTypePvh")
+	}
+
+	tmp := (*C.libxl_domain_build_info_type_union_pvh)(unsafe.Pointer(&xc.u[0]))
+	if err := x.Pvshim.fromC(&tmp.pvshim); err != nil {
+		return err
+	}
+	x.PvshimPath = C.GoString(tmp.pvshim_path)
+	x.PvshimCmdline = C.GoString(tmp.pvshim_cmdline)
+	x.PvshimExtra = C.GoString(tmp.pvshim_extra)
 	return nil
 }
 
@@ -520,7 +726,29 @@ func (x *DeviceUsbctrl) fromC(xc *C.libxl_device_usbctrl) error {
 func (x *DeviceUsbdev) fromC(xc *C.libxl_device_usbdev) error {
 	x.Ctrl = Devid(xc.ctrl)
 	x.Port = int(xc.port)
+	x.Type = UsbdevType(xc._type)
+	switch x.Type {
+	case UsbdevTypeHostdev:
+		var typeHostdev DeviceUsbdevTypeUnionHostdev
+		if err := typeHostdev.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typeHostdev
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 
+	return nil
+}
+
+func (x *DeviceUsbdevTypeUnionHostdev) fromC(xc *C.libxl_device_usbdev) error {
+	if UsbdevType(xc._type) != UsbdevTypeHostdev {
+		return errors.New("expected union key UsbdevTypeHostdev")
+	}
+
+	tmp := (*C.libxl_device_usbdev_type_union_hostdev)(unsafe.Pointer(&xc.u[0]))
+	x.Hostbus = byte(tmp.hostbus)
+	x.Hostaddr = byte(tmp.hostaddr)
 	return nil
 }
 
@@ -565,7 +793,28 @@ func (x *DeviceChannel) fromC(xc *C.libxl_device_channel) error {
 	x.BackendDomname = C.GoString(xc.backend_domname)
 	x.Devid = Devid(xc.devid)
 	x.Name = C.GoString(xc.name)
+	x.Connection = ChannelConnection(xc.connection)
+	switch x.Connection {
+	case ChannelConnectionSocket:
+		var connectionSocket DeviceChannelConnectionUnionSocket
+		if err := connectionSocket.fromC(xc); err != nil {
+			return err
+		}
+		x.ConnectionUnion = connectionSocket
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Connection)
+	}
 
+	return nil
+}
+
+func (x *DeviceChannelConnectionUnionSocket) fromC(xc *C.libxl_device_channel) error {
+	if ChannelConnection(xc.connection) != ChannelConnectionSocket {
+		return errors.New("expected union key ChannelConnectionSocket")
+	}
+
+	tmp := (*C.libxl_device_channel_connection_union_socket)(unsafe.Pointer(&xc.u[0]))
+	x.Path = C.GoString(tmp.path)
 	return nil
 }
 
@@ -881,7 +1130,63 @@ func (x *Event) fromC(xc *C.libxl_event) error {
 		return err
 	}
 	x.ForUser = uint64(xc.for_user)
+	x.Type = EventType(xc._type)
+	switch x.Type {
+	case EventTypeOperationComplete:
+		var typeOperationComplete EventTypeUnionOperationComplete
+		if err := typeOperationComplete.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typeOperationComplete
+	case EventTypeDomainShutdown:
+		var typeDomainShutdown EventTypeUnionDomainShutdown
+		if err := typeDomainShutdown.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typeDomainShutdown
+	case EventTypeDiskEject:
+		var typeDiskEject EventTypeUnionDiskEject
+		if err := typeDiskEject.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typeDiskEject
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 
+	return nil
+}
+
+func (x *EventTypeUnionDomainShutdown) fromC(xc *C.libxl_event) error {
+	if EventType(xc._type) != EventTypeDomainShutdown {
+		return errors.New("expected union key EventTypeDomainShutdown")
+	}
+
+	tmp := (*C.libxl_event_type_union_domain_shutdown)(unsafe.Pointer(&xc.u[0]))
+	x.ShutdownReason = byte(tmp.shutdown_reason)
+	return nil
+}
+
+func (x *EventTypeUnionDiskEject) fromC(xc *C.libxl_event) error {
+	if EventType(xc._type) != EventTypeDiskEject {
+		return errors.New("expected union key EventTypeDiskEject")
+	}
+
+	tmp := (*C.libxl_event_type_union_disk_eject)(unsafe.Pointer(&xc.u[0]))
+	x.Vdev = C.GoString(tmp.vdev)
+	if err := x.Disk.fromC(&tmp.disk); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (x *EventTypeUnionOperationComplete) fromC(xc *C.libxl_event) error {
+	if EventType(xc._type) != EventTypeOperationComplete {
+		return errors.New("expected union key EventTypeOperationComplete")
+	}
+
+	tmp := (*C.libxl_event_type_union_operation_complete)(unsafe.Pointer(&xc.u[0]))
+	x.Rc = int(tmp.rc)
 	return nil
 }
 
@@ -896,6 +1201,47 @@ func (x *PsrCatInfo) fromC(xc *C.libxl_psr_cat_info) error {
 
 func (x *PsrHwInfo) fromC(xc *C.libxl_psr_hw_info) error {
 	x.Id = uint32(xc.id)
+	x.Type = PsrFeatType(xc._type)
+	switch x.Type {
+	case PsrFeatTypeMba:
+		var typeMba PsrHwInfoTypeUnionMba
+		if err := typeMba.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typeMba
+	case PsrFeatTypeCat:
+		var typeCat PsrHwInfoTypeUnionCat
+		if err := typeCat.fromC(xc); err != nil {
+			return err
+		}
+		x.TypeUnion = typeCat
+	default:
+		return fmt.Errorf("invalid union key '%v'", x.Type)
+	}
 
+	return nil
+}
+
+func (x *PsrHwInfoTypeUnionCat) fromC(xc *C.libxl_psr_hw_info) error {
+	if PsrFeatType(xc._type) != PsrFeatTypeCat {
+		return errors.New("expected union key PsrFeatTypeCat")
+	}
+
+	tmp := (*C.libxl_psr_hw_info_type_union_cat)(unsafe.Pointer(&xc.u[0]))
+	x.CosMax = uint32(tmp.cos_max)
+	x.CbmLen = uint32(tmp.cbm_len)
+	x.CdpEnabled = bool(tmp.cdp_enabled)
+	return nil
+}
+
+func (x *PsrHwInfoTypeUnionMba) fromC(xc *C.libxl_psr_hw_info) error {
+	if PsrFeatType(xc._type) != PsrFeatTypeMba {
+		return errors.New("expected union key PsrFeatTypeMba")
+	}
+
+	tmp := (*C.libxl_psr_hw_info_type_union_mba)(unsafe.Pointer(&xc.u[0]))
+	x.CosMax = uint32(tmp.cos_max)
+	x.ThrtlMax = uint32(tmp.thrtl_max)
+	x.Linear = bool(tmp.linear)
 	return nil
 }

@@ -24,6 +24,10 @@ go_keywords = ['type', 'func']
 go_builtin_types = ['bool', 'string', 'int', 'byte',
                     'uint16', 'uint32', 'uint64']
 
+# cgo preamble for xenlight_helpers.go, created during type generation and
+# written later.
+cgo_helpers_preamble = []
+
 def xenlight_golang_generate_types(path = None, types = None, comment = None):
     """
     Generate a .go file (types.gen.go by default)
@@ -124,7 +128,7 @@ def xenlight_golang_define_struct(ty = None, typename = None, nested = False):
             extras.extend(r[1])
 
         elif isinstance(f.type, idl.KeyedUnion):
-            r = xenlight_golang_define_union(f.type, ty.typename)
+            r = xenlight_golang_define_union(f.type, ty.typename, f.name)
 
             s += r[0]
             extras.extend(r[1])
@@ -137,7 +141,7 @@ def xenlight_golang_define_struct(ty = None, typename = None, nested = False):
 
     return (s,extras)
 
-def xenlight_golang_define_union(ty = None, structname = ''):
+def xenlight_golang_define_union(ty = None, struct_name = '', union_name = ''):
     """
     Generate the Go translation of a KeyedUnion.
 
@@ -149,7 +153,7 @@ def xenlight_golang_define_union(ty = None, structname = ''):
     s = ''
     extras = []
 
-    interface_name = '{}_{}_union'.format(structname, ty.keyvar.name)
+    interface_name = '{}_{}_union'.format(struct_name, ty.keyvar.name)
     interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
 
     s += 'type {} interface {{\n'.format(interface_name)
@@ -163,10 +167,17 @@ def xenlight_golang_define_union(ty = None, structname = ''):
             continue
 
         # Define struct
-        name = '{}_{}_union_{}'.format(structname, ty.keyvar.name, f.name)
+        name = '{}_{}_union_{}'.format(struct_name, ty.keyvar.name, f.name)
         r = xenlight_golang_define_struct(f.type, typename=name)
         extras.append(r[0])
         extras.extend(r[1])
+
+        # This typeof trick ensures that the fields used in the cgo struct
+        # used for marshaling are the same as the fields of the union in the
+        # actual C type, and avoids re-defining all of those fields.
+        s = 'typedef typeof(((struct {} *)NULL)->{}.{}){};'
+        s = s.format(struct_name, union_name, f.name, name)
+        cgo_helpers_preamble.append(s)
 
         # Define function to implement 'union' interface
         name = xenlight_golang_fmt_name(name)
@@ -195,6 +206,7 @@ def xenlight_golang_generate_helpers(path = None, types = None, comment = None):
         if comment is not None:
             f.write(comment)
         f.write('package xenlight\n')
+        f.write('import (\n"unsafe"\n"errors"\n"fmt"\n)\n')
 
         # Cgo preamble
         f.write('/*\n')
@@ -203,14 +215,24 @@ def xenlight_golang_generate_helpers(path = None, types = None, comment = None):
         f.write('#include <libxl.h>\n')
         f.write('\n')
 
+        for s in cgo_helpers_preamble:
+            f.write(s)
+            f.write('\n')
+
         f.write('*/\nimport "C"\n')
 
         for ty in types:
             if not isinstance(ty, idl.Struct):
                 continue
 
-            f.write(xenlight_golang_define_from_C(ty))
+            (fdef, extras) = xenlight_golang_define_from_C(ty)
+
+            f.write(fdef)
             f.write('\n')
+
+            for extra in extras:
+                f.write(extra)
+                f.write('\n')
 
     go_fmt(path)
 
@@ -225,6 +247,7 @@ def xenlight_golang_define_from_C(ty = None):
     cname  = ty.typename
 
     body = ''
+    extras = []
 
     for f in ty.fields:
         if f.type.typename is not None:
@@ -240,14 +263,17 @@ def xenlight_golang_define_from_C(ty = None):
                 body += xenlight_golang_convert_from_C(nf,outer_name=f.name)
 
         elif isinstance(f.type, idl.KeyedUnion):
-            pass
+            r = xenlight_golang_union_from_C(f.type, f.name, ty.typename)
+
+            body += r[0]
+            extras.extend(r[1])
 
         else:
             raise Exception('type {} not supported'.format(f.type))
 
-    return func.format(goname, cname, body)
+    return (func.format(goname, cname, body), extras)
 
-def xenlight_golang_convert_from_C(ty = None, outer_name = None):
+def xenlight_golang_convert_from_C(ty = None, outer_name = None, cvarname = None):
     """
     Returns a line of Go code that converts the C type represented
     by ty to its corresponding Go type.
@@ -256,6 +282,10 @@ def xenlight_golang_convert_from_C(ty = None, outer_name = None):
     named outer_name.
     """
     s = ''
+
+    # Use 'xc' as the name for the C variable unless otherwise specified
+    if cvarname is None:
+        cvarname = 'xc'
 
     gotypename = xenlight_golang_fmt_name(ty.type.typename)
     goname     = xenlight_golang_fmt_name(ty.name)
@@ -280,17 +310,94 @@ def xenlight_golang_convert_from_C(ty = None, outer_name = None):
     if not is_castable:
         # If the type is not castable, we need to call its fromC
         # function.
-        s += 'if err := x.{}.fromC(&xc.{});'.format(goname,cname)
+        s += 'if err := x.{}.fromC(&{}.{});'.format(goname,cvarname,cname)
         s += 'err != nil {\n return err \n}\n'
 
     elif gotypename == 'string':
         # Use the cgo helper for converting C strings.
-        s += 'x.{} = C.GoString(xc.{})\n'.format(goname, cname)
+        s += 'x.{} = C.GoString({}.{})\n'.format(goname,cvarname,cname)
 
     else:
-        s += 'x.{} = {}(xc.{})\n'.format(goname, gotypename, cname)
+        s += 'x.{} = {}({}.{})\n'.format(goname,gotypename,cvarname,cname)
 
     return s
+
+def xenlight_golang_union_from_C(ty = None, union_name = '', struct_name = ''):
+    extras = []
+
+    keyname   = ty.keyvar.name
+    gokeyname = xenlight_golang_fmt_name(keyname)
+    keytype   = ty.keyvar.type.typename
+    gokeytype = xenlight_golang_fmt_name(keytype)
+
+    interface_name = '{}_{}_union'.format(struct_name, keyname)
+    interface_name = xenlight_golang_fmt_name(interface_name, exported=False)
+
+    cgo_keyname = keyname
+    if cgo_keyname in go_keywords:
+        cgo_keyname = '_' + cgo_keyname
+
+    cases = {}
+
+    for f in ty.fields:
+        val = '{}_{}'.format(keytype, f.name)
+        val = xenlight_golang_fmt_name(val)
+
+        # Add to list of cases to make for the switch
+        # statement below.
+        if f.type is None:
+            continue
+
+        cases[f.name] = val
+
+        # Define fromC func for 'union' struct.
+        typename   = '{}_{}_union_{}'.format(struct_name,keyname,f.name)
+        gotypename = xenlight_golang_fmt_name(typename)
+
+        # Define the function here. The cases for keyed unions are a little
+        # different.
+        s = 'func (x *{}) fromC(xc *C.{}) error {{\n'.format(gotypename,struct_name)
+        s += 'if {}(xc.{}) != {} {{\n'.format(gokeytype,cgo_keyname,val)
+        err_string = '"expected union key {}"'.format(val)
+        s += 'return errors.New({})\n'.format(err_string)
+        s += '}\n\n'
+        s += 'tmp := (*C.{})(unsafe.Pointer(&xc.{}[0]))\n'.format(typename,union_name)
+
+        for nf in f.type.fields:
+            s += xenlight_golang_convert_from_C(nf,cvarname='tmp')
+
+        s += 'return nil\n'
+        s += '}\n'
+
+        extras.append(s)
+
+    s = 'x.{} = {}(xc.{})\n'.format(gokeyname,gokeytype,cgo_keyname)
+    s += 'switch x.{}{{\n'.format(gokeyname)
+
+    # Create switch statement to determine which 'union element'
+    # to populate in the Go struct.
+    for case_name, case_val in cases.items():
+        s += 'case {}:\n'.format(case_val)
+
+        gotype = '{}_{}_union_{}'.format(struct_name,keyname,case_name)
+        gotype = xenlight_golang_fmt_name(gotype)
+        goname = '{}_{}'.format(keyname,case_name)
+        goname = xenlight_golang_fmt_name(goname,exported=False)
+
+        s += 'var {} {}\n'.format(goname, gotype)
+        s += 'if err := {}.fromC(xc);'.format(goname)
+        s += 'err != nil {\n return err \n}\n'
+
+        field_name = xenlight_golang_fmt_name('{}_union'.format(keyname))
+        s += 'x.{} = {}\n'.format(field_name, goname)
+
+    # End switch statement
+    s += 'default:\n'
+    err_string = '"invalid union key \'%v\'", x.{}'.format(gokeyname)
+    s += 'return fmt.Errorf({})'.format(err_string)
+    s += '}\n'
+
+    return (s,extras)
 
 def xenlight_golang_fmt_name(name, exported = True):
     """
