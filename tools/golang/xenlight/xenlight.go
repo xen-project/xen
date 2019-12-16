@@ -214,6 +214,27 @@ func (mac Mac) toC() (C.libxl_mac, error) {
 	return cmac, nil
 }
 
+// MsVmGenid represents a libxl_ms_vm_genid.
+type MsVmGenid [int(C.LIBXL_MS_VM_GENID_LEN)]byte
+
+func (mvg *MsVmGenid) fromC(cmvg *C.libxl_ms_vm_genid) error {
+	for i := range *mvg {
+		mvg[i] = byte(cmvg.bytes[i])
+	}
+
+	return nil
+}
+
+func (mvg *MsVmGenid) toC() (C.libxl_ms_vm_genid, error) {
+	var cmvg C.libxl_ms_vm_genid
+
+	for i, v := range mvg {
+		cmvg.bytes[i] = C.uint8_t(v)
+	}
+
+	return cmvg, nil
+}
+
 type Context struct {
 	ctx    *C.libxl_ctx
 	logger *C.xentoollog_logger_stdiostream
