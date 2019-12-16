@@ -2830,14 +2830,17 @@ x86_decode(
         case 0x67: /* address-size override */
             ad_bytes = def_ad_bytes ^ (mode_64bit() ? 12 : 6);
             break;
-        case 0x2e: /* CS override */
-            override_seg = x86_seg_cs;
+        case 0x2e: /* CS override / ignored in 64-bit mode */
+            if ( !mode_64bit() )
+                override_seg = x86_seg_cs;
             break;
-        case 0x3e: /* DS override */
-            override_seg = x86_seg_ds;
+        case 0x3e: /* DS override / ignored in 64-bit mode */
+            if ( !mode_64bit() )
+                override_seg = x86_seg_ds;
             break;
-        case 0x26: /* ES override */
-            override_seg = x86_seg_es;
+        case 0x26: /* ES override / ignored in 64-bit mode */
+            if ( !mode_64bit() )
+                override_seg = x86_seg_es;
             break;
         case 0x64: /* FS override */
             override_seg = x86_seg_fs;
@@ -2845,8 +2848,9 @@ x86_decode(
         case 0x65: /* GS override */
             override_seg = x86_seg_gs;
             break;
-        case 0x36: /* SS override */
-            override_seg = x86_seg_ss;
+        case 0x36: /* SS override / ignored in 64-bit mode */
+            if ( !mode_64bit() )
+                override_seg = x86_seg_ss;
             break;
         case 0xf0: /* LOCK */
             lock_prefix = 1;
@@ -2870,10 +2874,6 @@ x86_decode(
         rex_prefix = 0;
     }
  done_prefixes:
-
-    /* %{e,c,s,d}s overrides are ignored in 64bit mode. */
-    if ( mode_64bit() && override_seg < x86_seg_fs )
-        override_seg = x86_seg_none;
 
     if ( rex_prefix & REX_W )
         op_bytes = 8;
