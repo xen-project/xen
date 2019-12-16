@@ -18,6 +18,12 @@ builtin_type_names = {
     idl.uint64.typename: 'uint64',
 }
 
+# Some go keywords that conflict with field names in libxl structs.
+go_keywords = ['type', 'func']
+
+go_builtin_types = ['bool', 'string', 'int', 'byte',
+                    'uint16', 'uint32', 'uint64']
+
 def xenlight_golang_generate_types(path = None, types = None, comment = None):
     """
     Generate a .go file (types.gen.go by default)
@@ -176,6 +182,116 @@ def xenlight_golang_define_union(ty = None, structname = ''):
 
     return (s,extras)
 
+def xenlight_golang_generate_helpers(path = None, types = None, comment = None):
+    """
+    Generate a .go file (helpers.gen.go by default)
+    that contains helper functions for marshaling between
+    C and Go types.
+    """
+    if path is None:
+        path = 'helpers.gen.go'
+
+    with open(path, 'w') as f:
+        if comment is not None:
+            f.write(comment)
+        f.write('package xenlight\n')
+
+        # Cgo preamble
+        f.write('/*\n')
+        f.write('#cgo LDFLAGS: -lxenlight\n')
+        f.write('#include <stdlib.h>\n')
+        f.write('#include <libxl.h>\n')
+        f.write('\n')
+
+        f.write('*/\nimport "C"\n')
+
+        for ty in types:
+            if not isinstance(ty, idl.Struct):
+                continue
+
+            f.write(xenlight_golang_define_from_C(ty))
+            f.write('\n')
+
+    go_fmt(path)
+
+def xenlight_golang_define_from_C(ty = None):
+    """
+    Define the fromC marshaling function for the type
+    represented by ty.
+    """
+    func = 'func (x *{}) fromC(xc *C.{}) error {{\n {} \n return nil}}\n'
+
+    goname = xenlight_golang_fmt_name(ty.typename)
+    cname  = ty.typename
+
+    body = ''
+
+    for f in ty.fields:
+        if f.type.typename is not None:
+            if isinstance(f.type, idl.Array):
+                # TODO
+                continue
+
+            body += xenlight_golang_convert_from_C(f)
+
+        elif isinstance(f.type, idl.Struct):
+            # Go through the fields of the anonymous nested struct.
+            for nf in f.type.fields:
+                body += xenlight_golang_convert_from_C(nf,outer_name=f.name)
+
+        elif isinstance(f.type, idl.KeyedUnion):
+            pass
+
+        else:
+            raise Exception('type {} not supported'.format(f.type))
+
+    return func.format(goname, cname, body)
+
+def xenlight_golang_convert_from_C(ty = None, outer_name = None):
+    """
+    Returns a line of Go code that converts the C type represented
+    by ty to its corresponding Go type.
+
+    If outer_name is set, the type is treated as nested within another field
+    named outer_name.
+    """
+    s = ''
+
+    gotypename = xenlight_golang_fmt_name(ty.type.typename)
+    goname     = xenlight_golang_fmt_name(ty.name)
+    cname      = ty.name
+
+    # In cgo, C names that conflict with Go keywords can be
+    # accessed by prepending an underscore to the name.
+    if cname in go_keywords:
+        cname = '_' + cname
+
+    # If outer_name is set, treat this as nested.
+    if outer_name is not None:
+        goname = '{}.{}'.format(xenlight_golang_fmt_name(outer_name), goname)
+        cname  = '{}.{}'.format(outer_name, cname)
+
+    # Types that satisfy this condition can be easily casted or
+    # converted to a Go builtin type.
+    is_castable = (ty.type.json_parse_type == 'JSON_INTEGER' or
+                   isinstance(ty.type, idl.Enumeration) or
+                   gotypename in go_builtin_types)
+
+    if not is_castable:
+        # If the type is not castable, we need to call its fromC
+        # function.
+        s += 'if err := x.{}.fromC(&xc.{});'.format(goname,cname)
+        s += 'err != nil {\n return err \n}\n'
+
+    elif gotypename == 'string':
+        # Use the cgo helper for converting C strings.
+        s += 'x.{} = C.GoString(xc.{})\n'.format(goname, cname)
+
+    else:
+        s += 'x.{} = {}(xc.{})\n'.format(goname, gotypename, cname)
+
+    return s
+
 def xenlight_golang_fmt_name(name, exported = True):
     """
     Take a given type name and return an
@@ -218,3 +334,5 @@ if __name__ == '__main__':
 
     xenlight_golang_generate_types(types=types,
                                    comment=header_comment)
+    xenlight_golang_generate_helpers(types=types,
+                                     comment=header_comment)

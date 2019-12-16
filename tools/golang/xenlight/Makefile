@@ -19,6 +19,7 @@ $(XEN_GOPATH)/src/$(XEN_GOCODE_URL)/xenlight/: xenlight.go types.gen.go
 	$(INSTALL_DIR) $(XEN_GOPATH)$(GOXL_PKG_DIR)
 	$(INSTALL_DATA) xenlight.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
 	$(INSTALL_DATA) types.gen.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
+	$(INSTALL_DATA) helpers.gen.go $(XEN_GOPATH)$(GOXL_PKG_DIR)
 
 %.gen.go: gengotypes.py $(XEN_ROOT)/tools/libxl/libxl_types.idl $(XEN_ROOT)/tools/libxl/idl.py
 	XEN_ROOT=$(XEN_ROOT) $(PYTHON) gengotypes.py ../../libxl/libxl_types.idl
@@ -39,6 +40,7 @@ install: build
 	$(INSTALL_DIR) $(DESTDIR)$(GOXL_INSTALL_DIR)
 	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)xenlight.go $(DESTDIR)$(GOXL_INSTALL_DIR)
 	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)types.gen.go $(DESTDIR)$(GOXL_INSTALL_DIR)
+	$(INSTALL_DATA) $(XEN_GOPATH)$(GOXL_PKG_DIR)helpers.gen.go $(DESTDIR)$(GOXL_INSTALL_DIR)
 
 .PHONY: uninstall
 	rm -rf $(DESTDIR)$(GOXL_INSTALL_DIR)
