@@ -245,6 +245,31 @@ type EvLink struct{}
 func (el *EvLink) fromC(cel *C.libxl_ev_link) error      { return nil }
 func (el *EvLink) toC() (cel C.libxl_ev_link, err error) { return }
 
+// CpuidPolicyList represents a libxl_cpuid_policy_list.
+//
+// The value of CpuidPolicyList is honored when used as input to libxl. If
+// a struct contains a field of type CpuidPolicyList, that field will be left
+// empty when it is returned from libxl.
+type CpuidPolicyList string
+
+func (cpl CpuidPolicyList) fromC(ccpl *C.libxl_cpuid_policy_list) error { return nil }
+
+func (cpl CpuidPolicyList) toC() (C.libxl_cpuid_policy_list, error) {
+	var ccpl C.libxl_cpuid_policy_list
+
+	s := C.CString(string(cpl))
+	defer C.free(unsafe.Pointer(s))
+
+	ret := C.libxl_cpuid_parse_config(&ccpl, s)
+	if ret != 0 {
+		C.libxl_cpuid_dispose(&ccpl)
+
+		return ccpl, Error(-ret)
+	}
+
+	return ccpl, nil
+}
+
 type Context struct {
 	ctx    *C.libxl_ctx
 	logger *C.xentoollog_logger_stdiostream
