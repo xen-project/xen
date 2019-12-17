@@ -1098,8 +1098,8 @@ static int x86_pv_process_record(struct xc_sr_context *ctx,
     case REC_TYPE_SHARED_INFO:
         return handle_shared_info(ctx, rec);
 
-    case REC_TYPE_TSC_INFO:
-        return handle_tsc_info(ctx, rec);
+    case REC_TYPE_X86_TSC_INFO:
+        return handle_x86_tsc_info(ctx, rec);
 
     default:
         return RECORD_NOT_PROCESSED;

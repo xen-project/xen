@@ -1104,7 +1104,7 @@ static int x86_pv_end_of_checkpoint(struct xc_sr_context *ctx)
 {
     int rc;
 
-    rc = write_tsc_info(ctx);
+    rc = write_x86_tsc_info(ctx);
     if ( rc )
         return rc;
 

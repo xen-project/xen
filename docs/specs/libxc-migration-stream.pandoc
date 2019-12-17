@@ -215,7 +215,7 @@ type         0x00000000: END
 
              0x00000007: SHARED_INFO
 
-             0x00000008: TSC_INFO
+             0x00000008: X86_TSC_INFO
 
              0x00000009: HVM_CONTEXT
 
@@ -460,8 +460,8 @@ shared_info      Contents of the shared info page.  This record
 
 \clearpage
 
-TSC_INFO
---------
+X86_TSC_INFO
+------------
 
 Domain TSC information, as accessed by the
 XEN_DOMCTL_{get,set}tscinfo hypercall sub-ops.
@@ -646,7 +646,7 @@ A typical save record for an x86 PV guest image would look like:
 * X86_PV_INFO record
 * X86_PV_P2M_FRAMES record
 * Many PAGE_DATA records
-* TSC_INFO
+* X86_TSC_INFO
 * SHARED_INFO record
 * VCPU context records for each online VCPU
     * X86_PV_VCPU_BASIC record
@@ -672,7 +672,7 @@ A typical save record for an x86 HVM guest image would look like:
 * Image header
 * Domain header
 * Many PAGE_DATA records
-* TSC_INFO
+* X86_TSC_INFO
 * HVM_PARAMS
 * HVM_CONTEXT
 

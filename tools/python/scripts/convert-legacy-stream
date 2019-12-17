@@ -153,7 +153,7 @@ def write_page_data(pfns, pages):
 
 def write_libxc_tsc_info(mode, khz, nsec, incarn):
     write_record(libxc.REC_TYPE_tsc_info,
-                 pack(libxc.TSC_INFO_FORMAT,
+                 pack(libxc.X86_TSC_INFO_FORMAT,
                       mode, khz, nsec, incarn, 0))
 
 def write_libxc_hvm_params(params):
@@ -435,7 +435,7 @@ def read_chunks(vm):
 
         elif marker == legacy.CHUNK_tsc_info:
             mode, nsec, khz, incarn = unpack_exact("=IQII")
-            info("  TSC_INFO: mode %s, %d ns, %d khz, %d incarn"
+            info("  X86_TSC_INFO: mode %s, %d ns, %d khz, %d incarn"
                  % (mode, nsec, khz, incarn))
             write_libxc_tsc_info(mode, khz, nsec, incarn)
 

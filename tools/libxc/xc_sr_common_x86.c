@@ -1,12 +1,12 @@
 #include "xc_sr_common_x86.h"
 
-int write_tsc_info(struct xc_sr_context *ctx)
+int write_x86_tsc_info(struct xc_sr_context *ctx)
 {
     xc_interface *xch = ctx->xch;
-    struct xc_sr_rec_tsc_info tsc = { 0 };
+    struct xc_sr_rec_x86_tsc_info tsc = {};
     struct xc_sr_record rec =
     {
-        .type = REC_TYPE_TSC_INFO,
+        .type = REC_TYPE_X86_TSC_INFO,
         .length = sizeof(tsc),
         .data = &tsc
     };
@@ -21,14 +21,14 @@ int write_tsc_info(struct xc_sr_context *ctx)
     return write_record(ctx, &rec);
 }
 
-int handle_tsc_info(struct xc_sr_context *ctx, struct xc_sr_record *rec)
+int handle_x86_tsc_info(struct xc_sr_context *ctx, struct xc_sr_record *rec)
 {
     xc_interface *xch = ctx->xch;
-    struct xc_sr_rec_tsc_info *tsc = rec->data;
+    struct xc_sr_rec_x86_tsc_info *tsc = rec->data;
 
     if ( rec->length != sizeof(*tsc) )
     {
-        ERROR("TSC_INFO record wrong size: length %u, expected %zu",
+        ERROR("X86_TSC_INFO record wrong size: length %u, expected %zu",
               rec->length, sizeof(*tsc));
         return -1;
     }

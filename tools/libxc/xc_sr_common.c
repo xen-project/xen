@@ -30,7 +30,7 @@ static const char *mandatory_rec_types[] =
     [REC_TYPE_X86_PV_VCPU_EXTENDED]         = "x86 PV vcpu extended",
     [REC_TYPE_X86_PV_VCPU_XSAVE]            = "x86 PV vcpu xsave",
     [REC_TYPE_SHARED_INFO]                  = "Shared info",
-    [REC_TYPE_TSC_INFO]                     = "TSC info",
+    [REC_TYPE_X86_TSC_INFO]                 = "x86 TSC info",
     [REC_TYPE_HVM_CONTEXT]                  = "HVM context",
     [REC_TYPE_HVM_PARAMS]                   = "HVM params",
     [REC_TYPE_TOOLSTACK]                    = "Toolstack",
@@ -151,7 +151,7 @@ static void __attribute__((unused)) build_assertions(void)
     BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_info)       != 8);
     BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_p2m_frames) != 8);
     BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_pv_vcpu_hdr)   != 8);
-    BUILD_BUG_ON(sizeof(struct xc_sr_rec_tsc_info)          != 24);
+    BUILD_BUG_ON(sizeof(struct xc_sr_rec_x86_tsc_info)      != 24);
     BUILD_BUG_ON(sizeof(struct xc_sr_rec_hvm_params_entry)  != 16);
     BUILD_BUG_ON(sizeof(struct xc_sr_rec_hvm_params)        != 8);
 }

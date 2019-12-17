@@ -171,8 +171,8 @@ static int x86_hvm_process_record(struct xc_sr_context *ctx,
 {
     switch ( rec->type )
     {
-    case REC_TYPE_TSC_INFO:
-        return handle_tsc_info(ctx, rec);
+    case REC_TYPE_X86_TSC_INFO:
+        return handle_x86_tsc_info(ctx, rec);
 
     case REC_TYPE_HVM_CONTEXT:
         return handle_hvm_context(ctx, rec);

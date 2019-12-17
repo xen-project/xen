@@ -23,7 +23,7 @@ class TestLibxc(unittest.TestCase):
                          (libxc.X86_PV_INFO_FORMAT, 8),
                          (libxc.X86_PV_P2M_FRAMES_FORMAT, 8),
                          (libxc.X86_PV_VCPU_HDR_FORMAT, 8),
-                         (libxc.TSC_INFO_FORMAT, 24),
+                         (libxc.X86_TSC_INFO_FORMAT, 24),
                          (libxc.HVM_PARAMS_ENTRY_FORMAT, 16),
                          (libxc.HVM_PARAMS_FORMAT, 8),
                          ):

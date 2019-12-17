@@ -195,7 +195,7 @@ static int x86_hvm_end_of_checkpoint(struct xc_sr_context *ctx)
     int rc;
 
     /* Write the TSC record. */
-    rc = write_tsc_info(ctx);
+    rc = write_x86_tsc_info(ctx);
     if ( rc )
         return rc;
 

@@ -68,7 +68,7 @@ struct xc_sr_rhdr
 #define REC_TYPE_X86_PV_VCPU_EXTENDED       0x00000005U
 #define REC_TYPE_X86_PV_VCPU_XSAVE          0x00000006U
 #define REC_TYPE_SHARED_INFO                0x00000007U
-#define REC_TYPE_TSC_INFO                   0x00000008U
+#define REC_TYPE_X86_TSC_INFO               0x00000008U
 #define REC_TYPE_HVM_CONTEXT                0x00000009U
 #define REC_TYPE_HVM_PARAMS                 0x0000000aU
 #define REC_TYPE_TOOLSTACK                  0x0000000bU
@@ -114,8 +114,8 @@ struct xc_sr_rec_x86_pv_vcpu_hdr
     uint8_t context[0];
 };
 
-/* TSC_INFO */
-struct xc_sr_rec_tsc_info
+/* X86_TSC_INFO */
+struct xc_sr_rec_x86_tsc_info
 {
     uint32_t mode;
     uint32_t khz;
