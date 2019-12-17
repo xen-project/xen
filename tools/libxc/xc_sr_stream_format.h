@@ -43,8 +43,6 @@ struct xc_sr_dhdr
 
 #define DHDR_TYPE_X86_PV  0x00000001U
 #define DHDR_TYPE_X86_HVM 0x00000002U
-#define DHDR_TYPE_X86_PVH 0x00000003U
-#define DHDR_TYPE_ARM     0x00000004U
 
 /*
  * Record Header

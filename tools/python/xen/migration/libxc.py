@@ -32,14 +32,10 @@ DHDR_FORMAT = "IHHII"
 
 DHDR_TYPE_x86_pv  = 0x00000001
 DHDR_TYPE_x86_hvm = 0x00000002
-DHDR_TYPE_x86_pvh = 0x00000003
-DHDR_TYPE_arm     = 0x00000004
 
 dhdr_type_to_str = {
     DHDR_TYPE_x86_pv  : "x86 PV",
     DHDR_TYPE_x86_hvm : "x86 HVM",
-    DHDR_TYPE_x86_pvh : "x86 PVH",
-    DHDR_TYPE_arm     : "ARM",
 }
 
 # Records

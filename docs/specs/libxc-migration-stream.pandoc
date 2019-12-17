@@ -160,11 +160,7 @@ type        0x0000: Reserved.
 
             0x0002: x86 HVM.
 
-            0x0003: x86 PVH.
-
-            0x0004: ARM.
-
-            0x0005 - 0xFFFFFFFF: Reserved.
+            0x0003 - 0xFFFFFFFF: Reserved.
 
 page_shift  Size of a guest page as a power of two.
 

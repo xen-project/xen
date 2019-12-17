@@ -8,8 +8,6 @@ static const char *dhdr_types[] =
 {
     [DHDR_TYPE_X86_PV]  = "x86 PV",
     [DHDR_TYPE_X86_HVM] = "x86 HVM",
-    [DHDR_TYPE_X86_PVH] = "x86 PVH",
-    [DHDR_TYPE_ARM]     = "ARM",
 };
 
 const char *dhdr_type_to_str(uint32_t type)
