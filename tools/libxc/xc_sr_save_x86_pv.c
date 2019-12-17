@@ -1052,13 +1052,14 @@ static int x86_pv_setup(struct xc_sr_context *ctx)
     return 0;
 }
 
+static int x86_pv_static_data(struct xc_sr_context *ctx)
+{
+    return write_x86_pv_info(ctx);
+}
+
 static int x86_pv_start_of_stream(struct xc_sr_context *ctx)
 {
     int rc;
-
-    rc = write_x86_pv_info(ctx);
-    if ( rc )
-        return rc;
 
     /*
      * Ideally should be able to change during migration.  Currently
@@ -1126,6 +1127,7 @@ struct xc_sr_save_ops save_ops_x86_pv =
     .pfn_to_gfn          = x86_pv_pfn_to_gfn,
     .normalise_page      = x86_pv_normalise_page,
     .setup               = x86_pv_setup,
+    .static_data         = x86_pv_static_data,
     .start_of_stream     = x86_pv_start_of_stream,
     .start_of_checkpoint = x86_pv_start_of_checkpoint,
     .end_of_checkpoint   = x86_pv_end_of_checkpoint,

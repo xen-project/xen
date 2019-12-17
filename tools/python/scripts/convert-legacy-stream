@@ -79,7 +79,7 @@ def write_libxc_ihdr():
     stream_write(pack(libxc.IHDR_FORMAT,
                       libxc.IHDR_MARKER,  # Marker
                       libxc.IHDR_IDENT,   # Ident
-                      2,                  # Version
+                      3,                  # Version
                       libxc.IHDR_OPT_LE,  # Options
                       0, 0))              # Reserved
 
@@ -165,6 +165,9 @@ def write_libxc_hvm_params(params):
     write_record(libxc.REC_TYPE_hvm_params,
                  pack(libxc.HVM_PARAMS_FORMAT, len(params) / 2, 0),
                  pack("Q" * len(params), *params))
+
+def write_libxc_static_data_end():
+    write_record(libxc.REC_TYPE_static_data_end)
 
 def write_libxl_end():
     write_record(libxl.REC_TYPE_end)
@@ -590,6 +593,10 @@ def read_legacy_stream(vm):
 
         if pv:
             read_pv_extended_info(vm)
+
+        write_libxc_static_data_end()
+
+        if pv:
             read_pv_p2m_frames(vm)
 
         read_chunks(vm)

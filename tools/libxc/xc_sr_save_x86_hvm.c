@@ -169,6 +169,11 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
     return 0;
 }
 
+static int x86_hvm_static_data(struct xc_sr_context *ctx)
+{
+    return 0;
+}
+
 static int x86_hvm_start_of_stream(struct xc_sr_context *ctx)
 {
     return 0;
@@ -227,6 +232,7 @@ struct xc_sr_save_ops save_ops_x86_hvm =
     .pfn_to_gfn          = x86_hvm_pfn_to_gfn,
     .normalise_page      = x86_hvm_normalise_page,
     .setup               = x86_hvm_setup,
+    .static_data         = x86_hvm_static_data,
     .start_of_stream     = x86_hvm_start_of_stream,
     .start_of_checkpoint = x86_hvm_start_of_checkpoint,
     .end_of_checkpoint   = x86_hvm_end_of_checkpoint,

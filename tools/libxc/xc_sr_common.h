@@ -63,8 +63,14 @@ struct xc_sr_save_ops
     int (*setup)(struct xc_sr_context *ctx);
 
     /**
-     * Send records which need to be at the start of the stream.  This is
-     * called once, after the Image and Domain headers are written.
+     * Send static records at the head of the stream.  This is called once,
+     * after the Image and Domain headers are written.
+     */
+    int (*static_data)(struct xc_sr_context *ctx);
+
+    /**
+     * Send dynamic records which need to be at the start of the stream.  This
+     * is called after the STATIC_DATA_END record is written.
      */
     int (*start_of_stream)(struct xc_sr_context *ctx);
 

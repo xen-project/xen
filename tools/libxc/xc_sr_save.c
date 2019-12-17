@@ -13,7 +13,7 @@ static int write_headers(struct xc_sr_context *ctx, uint16_t guest_type)
     struct xc_sr_ihdr ihdr = {
         .marker  = IHDR_MARKER,
         .id      = htonl(IHDR_ID),
-        .version = htonl(2),
+        .version = htonl(3),
         .options = htons(IHDR_OPT_LITTLE_ENDIAN),
     };
     struct xc_sr_dhdr dhdr = {
@@ -50,6 +50,16 @@ static int write_headers(struct xc_sr_context *ctx, uint16_t guest_type)
 static int write_end_record(struct xc_sr_context *ctx)
 {
     struct xc_sr_record end = { .type = REC_TYPE_END };
+
+    return write_record(ctx, &end);
+}
+
+/*
+ * Writes a STATIC_DATA_END record into the stream.
+ */
+static int write_static_data_end_record(struct xc_sr_context *ctx)
+{
+    struct xc_sr_record end = { .type = REC_TYPE_STATIC_DATA_END };
 
     return write_record(ctx, &end);
 }
@@ -853,6 +863,14 @@ static int save(struct xc_sr_context *ctx, uint16_t guest_type)
     xc_report_progress_single(xch, "Start of stream");
 
     rc = write_headers(ctx, guest_type);
+    if ( rc )
+        goto err;
+
+    rc = ctx->save.ops.static_data(ctx);
+    if ( rc )
+        goto err;
+
+    rc = write_static_data_end_record(ctx);
     if ( rc )
         goto err;
 
