@@ -57,6 +57,8 @@ REC_TYPE_verify                     = 0x0000000d
 REC_TYPE_checkpoint                 = 0x0000000e
 REC_TYPE_checkpoint_dirty_pfn_list  = 0x0000000f
 REC_TYPE_static_data_end            = 0x00000010
+REC_TYPE_x86_cpuid_policy           = 0x00000011
+REC_TYPE_x86_msr_policy             = 0x00000012
 
 rec_type_to_str = {
     REC_TYPE_end                        : "End",
@@ -76,6 +78,8 @@ rec_type_to_str = {
     REC_TYPE_checkpoint                 : "Checkpoint",
     REC_TYPE_checkpoint_dirty_pfn_list  : "Checkpoint dirty pfn list",
     REC_TYPE_static_data_end            : "Static data end",
+    REC_TYPE_x86_cpuid_policy           : "x86 CPUID policy",
+    REC_TYPE_x86_msr_policy             : "x86 MSR policy",
 }
 
 # page_data
@@ -112,6 +116,12 @@ X86_TSC_INFO_FORMAT       = "IIQII"
 # hvm_params
 HVM_PARAMS_ENTRY_FORMAT   = "QQ"
 HVM_PARAMS_FORMAT         = "II"
+
+# x86_cpuid_policy => xen_cpuid_leaf_t[]
+X86_CPUID_POLICY_FORMAT   = "IIIIII"
+
+# x86_msr_policy => xen_msr_entry_t[]
+X86_MSR_POLICY_FORMAT     = "QII"
 
 class VerifyLibxc(VerifyBase):
     """ Verify a Libxc v2 (or later) stream """
@@ -439,6 +449,34 @@ class VerifyLibxc(VerifyBase):
             raise RecordError("Static data end record found in v2 stream")
 
 
+    def verify_record_x86_cpuid_policy(self, content):
+        """ x86 CPUID policy record """
+
+        if self.version < 3:
+            raise RecordError("x86 CPUID policy record found in v2 stream")
+
+        sz = calcsize(X86_CPUID_POLICY_FORMAT)
+        contentsz = len(content)
+
+        if contentsz < sz or (contentsz % sz) != 0:
+            raise RecordError("Record length %u, expected multiple of %u" %
+                              (contentsz, sz))
+
+
+    def verify_record_x86_msr_policy(self, content):
+        """ x86 MSR policy record """
+
+        if self.version < 3:
+            raise RecordError("x86 MSR policy record found in v2 stream")
+
+        sz = calcsize(X86_MSR_POLICY_FORMAT)
+        contentsz = len(content)
+
+        if contentsz < sz or (contentsz % sz) != 0:
+            raise RecordError("Record length %u, expected multiple of %u" %
+                              (contentsz, sz))
+
+
 record_verifiers = {
     REC_TYPE_end:
         VerifyLibxc.verify_record_end,
@@ -483,4 +521,9 @@ record_verifiers = {
 
     REC_TYPE_static_data_end:
         VerifyLibxc.verify_record_static_data_end,
+
+    REC_TYPE_x86_cpuid_policy:
+        VerifyLibxc.verify_record_x86_cpuid_policy,
+    REC_TYPE_x86_msr_policy:
+        VerifyLibxc.verify_record_x86_msr_policy,
     }

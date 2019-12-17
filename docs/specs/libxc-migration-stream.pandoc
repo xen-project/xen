@@ -634,6 +634,46 @@ The end record contains no fields; its body_length is 0.
 
 \clearpage
 
+X86_CPUID_POLICY
+----------------
+
+CPUID policy content, as accessed by the XEN_DOMCTL_{get,set}_cpu_policy
+hypercall sub-ops.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | CPUID_policy                                    |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+------------     ---------------------------------------------------
+CPUID_policy     Array of xen_cpuid_leaf_t[]'s
+--------------------------------------------------------------------
+
+\clearpage
+
+X86_MSR_POLICY
+--------------
+
+MSR policy content, as accessed by the XEN_DOMCTL_{get,set}_cpu_policy
+hypercall sub-ops.
+
+     0     1     2     3     4     5     6     7 octet
+    +-------------------------------------------------+
+    | MSR_policy                                      |
+    ...
+    +-------------------------------------------------+
+
+--------------------------------------------------------------------
+Field            Description
+----------       ---------------------------------------------------
+MSR_policy       Array of xen_msr_entry_t[]'s
+--------------------------------------------------------------------
+
+\clearpage
+
 
 Layout
 ======
@@ -656,6 +696,7 @@ A typical save record for an x86 PV guest image would look like:
 * Domain header
 * Static data records:
     * X86_PV_INFO record
+    * X86_{CPUID,MSR}_POLICY
     * STATIC_DATA_END
 * X86_PV_P2M_FRAMES record
 * Many PAGE_DATA records
@@ -685,6 +726,7 @@ A typical save record for an x86 HVM guest image would look like:
 * Image header
 * Domain header
 * Static data records:
+    * X86_{CPUID,MSR}_POLICY
     * STATIC_DATA_END
 * Many PAGE_DATA records
 * X86_TSC_INFO
