@@ -13,18 +13,10 @@
 
 #include <asm/apic.h>
 #include <asm/event.h>
+#include <asm/guest/hyperv-tlfs.h>
 #include <asm/hvm/support.h>
 
 #include "private.h"
-
-typedef struct _HV_REFERENCE_TSC_PAGE
-{
-    uint32_t TscSequence;
-    uint32_t Reserved1;
-    uint64_t TscScale;
-    int64_t  TscOffset;
-    uint64_t Reserved2[509];
-} HV_REFERENCE_TSC_PAGE, *PHV_REFERENCE_TSC_PAGE;
 
 static void update_reference_tsc(const struct domain *d, bool initialize)
 {
@@ -61,7 +53,7 @@ static void update_reference_tsc(const struct domain *d, bool initialize)
          * violate the spec. and rely on a value of 0 to indicate that this
          * enlightenment should no longer be used.
          */
-        p->TscSequence = 0;
+        p->tsc_sequence = 0;
 
         printk(XENLOG_G_INFO "d%d: VIRIDIAN REFERENCE_TSC: invalidated\n",
                d->domain_id);
@@ -79,15 +71,15 @@ static void update_reference_tsc(const struct domain *d, bool initialize)
      * The offset value is calculated on restore after migration and
      * ensures that Windows will not see a large jump in ReferenceTime.
      */
-    p->TscScale = ((10000ul << 32) / d->arch.tsc_khz) << 32;
-    p->TscOffset = trc->off;
+    p->tsc_scale = ((10000ul << 32) / d->arch.tsc_khz) << 32;
+    p->tsc_offset = trc->off;
     smp_wmb();
 
-    seq = p->TscSequence + 1;
+    seq = p->tsc_sequence + 1;
     if ( seq == 0xFFFFFFFF || seq == 0 ) /* Avoid both 'invalid' values */
         seq = 1;
 
-    p->TscSequence = seq;
+    p->tsc_sequence = seq;
 }
 
 /*
