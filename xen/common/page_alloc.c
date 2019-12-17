@@ -244,9 +244,12 @@ PAGE_LIST_HEAD(page_broken_list);
  */
 mfn_t first_valid_mfn = INVALID_MFN_INITIALIZER;
 
-static struct bootmem_region {
+struct bootmem_region {
     unsigned long s, e; /* MFNs @s through @e-1 inclusive are free */
-} *__initdata bootmem_region_list;
+};
+/* Statically allocate a page for bootmem_region_list. */
+static struct bootmem_region __initdata
+    bootmem_region_list[PAGE_SIZE / sizeof(struct bootmem_region)];
 static unsigned int __initdata nr_bootmem_regions;
 
 struct scrub_region {
@@ -262,9 +265,6 @@ static unsigned long __initdata chunk_size;
 static void __init bootmem_region_add(unsigned long s, unsigned long e)
 {
     unsigned int i;
-
-    if ( (bootmem_region_list == NULL) && (s < e) )
-        bootmem_region_list = mfn_to_virt(s++);
 
     if ( s >= e )
         return;
@@ -1869,7 +1869,6 @@ void __init end_boot_allocator(void)
             init_heap_pages(mfn_to_page(_mfn(r->s)), r->e - r->s);
     }
     nr_bootmem_regions = 0;
-    init_heap_pages(virt_to_page(bootmem_region_list), 1);
 
     if ( !dma_bitsize && (num_online_nodes() > 1) )
         dma_bitsize = arch_get_dma_bitsize();
