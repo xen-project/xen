@@ -970,46 +970,6 @@ int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb)
     return 0;
 }
 
-int xc_dom_update_guest_p2m(struct xc_dom_image *dom)
-{
-    uint32_t *p2m_32;
-    uint64_t *p2m_64;
-    xen_pfn_t i;
-
-    if ( !dom->p2m_guest )
-        return 0;
-
-    switch ( dom->arch_hooks->sizeof_pfn )
-    {
-    case 4:
-        DOMPRINTF("%s: dst 32bit, pages 0x%" PRIpfn "",
-                  __FUNCTION__, dom->p2m_size);
-        p2m_32 = dom->p2m_guest;
-        for ( i = 0; i < dom->p2m_size; i++ )
-            if ( dom->p2m_host[i] != INVALID_PFN )
-                p2m_32[i] = dom->p2m_host[i];
-            else
-                p2m_32[i] = (uint32_t) - 1;
-        break;
-    case 8:
-        DOMPRINTF("%s: dst 64bit, pages 0x%" PRIpfn "",
-                  __FUNCTION__, dom->p2m_size);
-        p2m_64 = dom->p2m_guest;
-        for ( i = 0; i < dom->p2m_size; i++ )
-            if ( dom->p2m_host[i] != INVALID_PFN )
-                p2m_64[i] = dom->p2m_host[i];
-            else
-                p2m_64[i] = (uint64_t) - 1;
-        break;
-    default:
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "sizeof_pfn is invalid (is %d, can be 4 or 8)",
-                     dom->arch_hooks->sizeof_pfn);
-        return -1;
-    }
-    return 0;
-}
-
 static int xc_dom_build_module(struct xc_dom_image *dom, unsigned int mod)
 {
     size_t unziplen, modulelen;

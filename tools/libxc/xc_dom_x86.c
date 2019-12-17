@@ -104,6 +104,9 @@ struct xc_dom_image_x86 {
 #define MAPPING_MAX 2
     struct xc_dom_x86_mapping maps[MAPPING_MAX];
     const struct xc_dom_params *params;
+
+    /* PV: Pointer to the in-guest P2M. */
+    void *p2m_guest;
 };
 
 /* get guest IO ABI protocol */
@@ -296,6 +299,8 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
                                   xen_pfn_t l3pfn,
                                   xen_pfn_t l3mfn)
 {
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
+    uint32_t *p2m_guest = domx86->p2m_guest;
     xen_pfn_t new_l3mfn;
     struct xc_mmu *mmu;
     void *l3tab;
@@ -313,9 +318,7 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
     if ( !new_l3mfn )
         goto out;
 
-    dom->p2m_host[l3pfn] = new_l3mfn;
-    if ( xc_dom_update_guest_p2m(dom) != 0 )
-        goto out;
+    p2m_guest[l3pfn] = dom->p2m_host[l3pfn] = new_l3mfn;
 
     if ( xc_add_mmu_update(dom->xch, mmu,
                            (((unsigned long long)new_l3mfn)
@@ -444,7 +447,17 @@ static int setup_pgtables_pv(struct xc_dom_image *dom)
 static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
 {
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
-    xen_pfn_t l3mfn, l3pfn;
+    uint32_t *p2m_guest = domx86->p2m_guest;
+    xen_pfn_t l3mfn, l3pfn, i;
+
+    /* Copy dom->p2m_host[] into the guest. */
+    for ( i = 0; i < dom->p2m_size; ++i )
+    {
+        if ( dom->p2m_host[i] != INVALID_PFN )
+            p2m_guest[i] = dom->p2m_host[i];
+        else
+            p2m_guest[i] = -1;
+    }
 
     l3pfn = domx86->maps[0].lvls[2].pfn;
     l3mfn = xc_dom_p2m(dom, l3pfn);
@@ -488,6 +501,19 @@ static int alloc_pgtables_x86_64(struct xc_dom_image *dom)
 
 static int setup_pgtables_x86_64(struct xc_dom_image *dom)
 {
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
+    uint64_t *p2m_guest = domx86->p2m_guest;
+    xen_pfn_t i;
+
+    /* Copy dom->p2m_host[] into the guest. */
+    for ( i = 0; i < dom->p2m_size; ++i )
+    {
+        if ( dom->p2m_host[i] != INVALID_PFN )
+            p2m_guest[i] = dom->p2m_host[i];
+        else
+            p2m_guest[i] = -1;
+    }
+
     return setup_pgtables_pv(dom);
 }
 
@@ -495,11 +521,14 @@ static int setup_pgtables_x86_64(struct xc_dom_image *dom)
 
 static int alloc_p2m_list(struct xc_dom_image *dom, size_t p2m_alloc_size)
 {
+    struct xc_dom_image_x86 *domx86 = dom->arch_private;
+
     if ( xc_dom_alloc_segment(dom, &dom->p2m_seg, "phys2mach",
                               0, p2m_alloc_size) )
         return -1;
-    dom->p2m_guest = xc_dom_seg_to_ptr(dom, &dom->p2m_seg);
-    if ( dom->p2m_guest == NULL )
+
+    domx86->p2m_guest = xc_dom_seg_to_ptr(dom, &dom->p2m_seg);
+    if ( domx86->p2m_guest == NULL )
         return -1;
 
     return 0;

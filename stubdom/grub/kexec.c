@@ -320,14 +320,6 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     do_exchange(dom, PHYS_PFN(_boot_target - dom->parms.virt_base),
             virt_to_mfn(&_boot_page));
 
-    /* Make sure the bootstrap page table does not RW-map any of our current
-     * page table frames */
-    if ( (rc = xc_dom_update_guest_p2m(dom))) {
-        printk("xc_dom_update_guest_p2m returned %d\n", rc);
-        errnum = ERR_BOOT_FAILURE;
-        goto out;
-    }
-
     if ( dom->arch_hooks->setup_pgtables )
         if ( (rc = dom->arch_hooks->setup_pgtables(dom))) {
             printk("setup_pgtables returned %d\n", rc);

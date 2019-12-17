@@ -133,7 +133,6 @@ struct xc_dom_image {
      * Note that the input is offset by rambase.
      */
     xen_pfn_t *p2m_host;
-    void *p2m_guest;
 
     /* physical memory
      *
@@ -331,7 +330,6 @@ int xc_dom_devicetree_mem(struct xc_dom_image *dom, const void *mem,
 int xc_dom_parse_image(struct xc_dom_image *dom);
 int xc_dom_set_arch_hooks(struct xc_dom_image *dom);
 int xc_dom_build_image(struct xc_dom_image *dom);
-int xc_dom_update_guest_p2m(struct xc_dom_image *dom);
 
 int xc_dom_boot_xen_init(struct xc_dom_image *dom, xc_interface *xch,
                          uint32_t domid);
