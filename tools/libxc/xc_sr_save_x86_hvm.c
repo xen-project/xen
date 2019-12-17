@@ -171,7 +171,7 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
 
 static int x86_hvm_static_data(struct xc_sr_context *ctx)
 {
-    return 0;
+    return write_x86_cpu_policy_records(ctx);
 }
 
 static int x86_hvm_start_of_stream(struct xc_sr_context *ctx)

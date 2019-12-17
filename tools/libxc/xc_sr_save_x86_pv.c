@@ -1054,7 +1054,17 @@ static int x86_pv_setup(struct xc_sr_context *ctx)
 
 static int x86_pv_static_data(struct xc_sr_context *ctx)
 {
-    return write_x86_pv_info(ctx);
+    int rc;
+
+    rc = write_x86_pv_info(ctx);
+    if ( rc )
+        return rc;
+
+    rc = write_x86_cpu_policy_records(ctx);
+    if ( rc )
+        return rc;
+
+    return 0;
 }
 
 static int x86_pv_start_of_stream(struct xc_sr_context *ctx)

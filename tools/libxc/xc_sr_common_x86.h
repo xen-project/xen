@@ -15,6 +15,12 @@ int write_x86_tsc_info(struct xc_sr_context *ctx);
 int handle_x86_tsc_info(struct xc_sr_context *ctx, struct xc_sr_record *rec);
 
 /*
+ * Obtains a domains CPU Policy from Xen, and writes X86_{CPUID,MSR}_POLICY
+ * records into the stream.
+ */
+int write_x86_cpu_policy_records(struct xc_sr_context *ctx);
+
+/*
  * Parses an X86_CPUID_POLICY record and stashes the content for application
  * when a STATIC_DATA_END record is encountered.
  */
