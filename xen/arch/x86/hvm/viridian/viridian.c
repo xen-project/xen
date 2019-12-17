@@ -10,6 +10,7 @@
 #include <xen/hypercall.h>
 #include <xen/domain_page.h>
 #include <asm/guest_access.h>
+#include <asm/guest/hyperv-tlfs.h>
 #include <asm/paging.h>
 #include <asm/p2m.h>
 #include <asm/apic.h>
@@ -18,22 +19,6 @@
 #include <public/hvm/hvm_op.h>
 
 #include "private.h"
-
-/* Viridian Hypercall Status Codes. */
-#define HV_STATUS_SUCCESS                       0x0000
-#define HV_STATUS_INVALID_HYPERCALL_CODE        0x0002
-#define HV_STATUS_INVALID_PARAMETER             0x0005
-
-/* Viridian Hypercall Codes. */
-#define HvFlushVirtualAddressSpace 0x0002
-#define HvFlushVirtualAddressList  0x0003
-#define HvNotifyLongSpinWait       0x0008
-#define HvSendSyntheticClusterIpi  0x000b
-#define HvGetPartitionId           0x0046
-#define HvExtCallQueryCapabilities 0x8001
-
-/* Viridian Hypercall Flags. */
-#define HV_FLUSH_ALL_PROCESSORS 1
 
 /* Viridian Partition Privilege Flags */
 typedef struct {
@@ -214,7 +199,7 @@ void cpuid_viridian_leaves(const struct vcpu *v, uint32_t leaf,
         /*
          * This value is the recommended number of attempts to try to
          * acquire a spinlock before notifying the hypervisor via the
-         * HvNotifyLongSpinWait hypercall.
+         * HVCALL_NOTIFY_LONG_SPIN_WAIT hypercall.
          */
         res->b = viridian_spinlock_retry_count;
         break;
@@ -583,7 +568,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
 
     switch ( input.call_code )
     {
-    case HvNotifyLongSpinWait:
+    case HVCALL_NOTIFY_LONG_SPIN_WAIT:
         /*
          * See section 14.5.1 of the specification.
          */
@@ -591,8 +576,8 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         status = HV_STATUS_SUCCESS;
         break;
 
-    case HvFlushVirtualAddressSpace:
-    case HvFlushVirtualAddressList:
+    case HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE:
+    case HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST:
     {
         struct {
             uint64_t address_space;
@@ -632,7 +617,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         break;
     }
 
-    case HvSendSyntheticClusterIpi:
+    case HVCALL_SEND_IPI:
     {
         struct vcpu *v;
         uint32_t vector;
@@ -695,7 +680,7 @@ int viridian_hypercall(struct cpu_user_regs *regs)
         gprintk(XENLOG_WARNING, "unimplemented hypercall %04x\n",
                 input.call_code);
         /* Fallthrough. */
-    case HvExtCallQueryCapabilities:
+    case HVCALL_EXT_CALL_QUERY_CAPABILITIES:
         /*
          * This hypercall seems to be erroneously issued by Windows
          * despite EnableExtendedHypercalls not being set in CPUID leaf 2.
