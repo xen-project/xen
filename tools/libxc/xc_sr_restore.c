@@ -36,7 +36,7 @@ static int read_headers(struct xc_sr_context *ctx)
     else if ( ihdr.version != IHDR_VERSION )
     {
         ERROR("Invalid Version: Expected %d, Got %d",
-              ihdr.version, IHDR_VERSION);
+              IHDR_VERSION, ihdr.version);
         return -1;
     }
     else if ( ihdr.options & IHDR_OPT_BIG_ENDIAN )
