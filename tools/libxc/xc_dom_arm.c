@@ -348,9 +348,6 @@ static int populate_guest_memory(struct xc_dom_image *dom,
         }
     }
 
-    for ( pfn = 0; pfn < nr_pfns; pfn++ )
-        dom->p2m_host[pfn] = base_pfn + pfn;
-
 out:
     free(extents);
     return rc < 0 ? rc : 0;
@@ -359,7 +356,6 @@ out:
 static int meminit(struct xc_dom_image *dom)
 {
     int i, rc;
-    xen_pfn_t pfn;
     uint64_t modbase;
 
     uint64_t ramsize = (uint64_t)dom->total_pages << XC_PAGE_SHIFT;
@@ -423,11 +419,6 @@ static int meminit(struct xc_dom_image *dom)
     assert(ramsize == 0); /* Too much RAM is rejected above */
 
     dom->p2m_size = p2m_size;
-    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * p2m_size);
-    if ( dom->p2m_host == NULL )
-        return -EINVAL;
-    for ( pfn = 0; pfn < p2m_size; pfn++ )
-        dom->p2m_host[pfn] = INVALID_PFN;
 
     /* setup initial p2m and allocate guest memory */
     for ( i = 0; i < GUEST_RAM_BANKS && dom->rambank_size[i]; i++ )

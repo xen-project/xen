@@ -318,7 +318,7 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
     if ( !new_l3mfn )
         goto out;
 
-    p2m_guest[l3pfn] = dom->p2m_host[l3pfn] = new_l3mfn;
+    p2m_guest[l3pfn] = dom->pv_p2m[l3pfn] = new_l3mfn;
 
     if ( xc_add_mmu_update(dom->xch, mmu,
                            (((unsigned long long)new_l3mfn)
@@ -450,11 +450,11 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
     uint32_t *p2m_guest = domx86->p2m_guest;
     xen_pfn_t l3mfn, l3pfn, i;
 
-    /* Copy dom->p2m_host[] into the guest. */
+    /* Copy dom->pv_p2m[] into the guest. */
     for ( i = 0; i < dom->p2m_size; ++i )
     {
-        if ( dom->p2m_host[i] != INVALID_PFN )
-            p2m_guest[i] = dom->p2m_host[i];
+        if ( dom->pv_p2m[i] != INVALID_PFN )
+            p2m_guest[i] = dom->pv_p2m[i];
         else
             p2m_guest[i] = -1;
     }
@@ -505,11 +505,11 @@ static int setup_pgtables_x86_64(struct xc_dom_image *dom)
     uint64_t *p2m_guest = domx86->p2m_guest;
     xen_pfn_t i;
 
-    /* Copy dom->p2m_host[] into the guest. */
+    /* Copy dom->pv_p2m[] into the guest. */
     for ( i = 0; i < dom->p2m_size; ++i )
     {
-        if ( dom->p2m_host[i] != INVALID_PFN )
-            p2m_guest[i] = dom->p2m_host[i];
+        if ( dom->pv_p2m[i] != INVALID_PFN )
+            p2m_guest[i] = dom->pv_p2m[i];
         else
             p2m_guest[i] = -1;
     }
@@ -1245,11 +1245,11 @@ static int meminit_pv(struct xc_dom_image *dom)
         return -EINVAL;
     }
 
-    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->p2m_size);
-    if ( dom->p2m_host == NULL )
+    dom->pv_p2m = xc_dom_malloc(dom, sizeof(*dom->pv_p2m) * dom->p2m_size);
+    if ( dom->pv_p2m == NULL )
         return -EINVAL;
     for ( pfn = 0; pfn < dom->p2m_size; pfn++ )
-        dom->p2m_host[pfn] = INVALID_PFN;
+        dom->pv_p2m[pfn] = INVALID_PFN;
 
     /* allocate guest memory */
     for ( i = 0; i < nr_vmemranges; i++ )
@@ -1269,7 +1269,7 @@ static int meminit_pv(struct xc_dom_image *dom)
         pfn_base = vmemranges[i].start >> PAGE_SHIFT;
 
         for ( pfn = pfn_base; pfn < pfn_base+pages; pfn++ )
-            dom->p2m_host[pfn] = pfn;
+            dom->pv_p2m[pfn] = pfn;
 
         pfn_base_idx = pfn_base;
         while ( super_pages ) {
@@ -1279,7 +1279,7 @@ static int meminit_pv(struct xc_dom_image *dom)
             for ( pfn = pfn_base_idx, j = 0;
                   pfn < pfn_base_idx + (count << SUPERPAGE_2MB_SHIFT);
                   pfn += SUPERPAGE_2MB_NR_PFNS, j++ )
-                extents[j] = dom->p2m_host[pfn];
+                extents[j] = dom->pv_p2m[pfn];
             rc = xc_domain_populate_physmap(dom->xch, dom->guest_domid, count,
                                             SUPERPAGE_2MB_SHIFT, memflags,
                                             extents);
@@ -1292,7 +1292,7 @@ static int meminit_pv(struct xc_dom_image *dom)
             {
                 mfn = extents[j];
                 for ( k = 0; k < SUPERPAGE_2MB_NR_PFNS; k++, pfn++ )
-                    dom->p2m_host[pfn] = mfn + k;
+                    dom->pv_p2m[pfn] = mfn + k;
             }
             pfn_base_idx = pfn;
         }
@@ -1301,7 +1301,7 @@ static int meminit_pv(struct xc_dom_image *dom)
         {
             allocsz = min_t(uint64_t, 1024 * 1024, pages - j);
             rc = xc_domain_populate_physmap_exact(dom->xch, dom->guest_domid,
-                     allocsz, 0, memflags, &dom->p2m_host[pfn_base + j]);
+                     allocsz, 0, memflags, &dom->pv_p2m[pfn_base + j]);
 
             if ( rc )
             {
@@ -1428,25 +1428,6 @@ static int meminit_hvm(struct xc_dom_image *dom)
     }
 
     dom->p2m_size = p2m_size;
-    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) *
-                                      dom->p2m_size);
-    if ( dom->p2m_host == NULL )
-    {
-        DOMPRINTF("Could not allocate p2m");
-        goto error_out;
-    }
-
-    for ( i = 0; i < p2m_size; i++ )
-        dom->p2m_host[i] = ((xen_pfn_t)-1);
-    for ( vmemid = 0; vmemid < nr_vmemranges; vmemid++ )
-    {
-        uint64_t pfn;
-
-        for ( pfn = vmemranges[vmemid].start >> PAGE_SHIFT;
-              pfn < vmemranges[vmemid].end >> PAGE_SHIFT;
-              pfn++ )
-            dom->p2m_host[pfn] = pfn;
-    }
 
     /*
      * Try to claim pages for early warning of insufficient memory available.
@@ -1488,14 +1469,16 @@ static int meminit_hvm(struct xc_dom_image *dom)
      * We attempt to allocate 1GB pages if possible. It falls back on 2MB
      * pages if 1GB allocation fails. 4KB pages will be used eventually if
      * both fail.
-     * 
-     * Under 2MB mode, we allocate pages in batches of no more than 8MB to 
-     * ensure that we can be preempted and hence dom0 remains responsive.
      */
     if ( dom->device_model )
     {
+        xen_pfn_t extents[0xa0];
+
+        for ( i = 0; i < ARRAY_SIZE(extents); ++i )
+            extents[i] = i;
+
         rc = xc_domain_populate_physmap_exact(
-            xch, domid, 0xa0, 0, memflags, &dom->p2m_host[0x00]);
+            xch, domid, 0xa0, 0, memflags, extents);
         if ( rc != 0 )
         {
             DOMPRINTF("Could not populate low memory (< 0xA0).\n");
@@ -1538,7 +1521,7 @@ static int meminit_hvm(struct xc_dom_image *dom)
             if ( count > max_pages )
                 count = max_pages;
 
-            cur_pfn = dom->p2m_host[cur_pages];
+            cur_pfn = cur_pages;
 
             /* Take care the corner cases of super page tails */
             if ( ((cur_pfn & (SUPERPAGE_1GB_NR_PFNS-1)) != 0) &&
@@ -1564,8 +1547,7 @@ static int meminit_hvm(struct xc_dom_image *dom)
                 xen_pfn_t sp_extents[nr_extents];
 
                 for ( i = 0; i < nr_extents; i++ )
-                    sp_extents[i] =
-                        dom->p2m_host[cur_pages+(i<<SUPERPAGE_1GB_SHIFT)];
+                    sp_extents[i] = cur_pages + (i << SUPERPAGE_1GB_SHIFT);
 
                 done = xc_domain_populate_physmap(xch, domid, nr_extents,
                                                   SUPERPAGE_1GB_SHIFT,
@@ -1604,8 +1586,7 @@ static int meminit_hvm(struct xc_dom_image *dom)
                     xen_pfn_t sp_extents[nr_extents];
 
                     for ( i = 0; i < nr_extents; i++ )
-                        sp_extents[i] =
-                            dom->p2m_host[cur_pages+(i<<SUPERPAGE_2MB_SHIFT)];
+                        sp_extents[i] = cur_pages + (i << SUPERPAGE_2MB_SHIFT);
 
                     done = xc_domain_populate_physmap(xch, domid, nr_extents,
                                                       SUPERPAGE_2MB_SHIFT,
@@ -1624,8 +1605,13 @@ static int meminit_hvm(struct xc_dom_image *dom)
             /* Fall back to 4kB extents. */
             if ( count != 0 )
             {
+                xen_pfn_t extents[count];
+
+                for ( i = 0; i < count; ++i )
+                    extents[i] = cur_pages + i;
+
                 rc = xc_domain_populate_physmap_exact(
-                    xch, domid, count, 0, new_memflags, &dom->p2m_host[cur_pages]);
+                    xch, domid, count, 0, new_memflags, extents);
                 cur_pages += count;
                 stat_normal_pages += count;
             }
