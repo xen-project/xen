@@ -103,7 +103,7 @@ struct xc_dom_image_x86 {
     unsigned n_mappings;
 #define MAPPING_MAX 2
     struct xc_dom_x86_mapping maps[MAPPING_MAX];
-    struct xc_dom_params *params;
+    const struct xc_dom_params *params;
 };
 
 /* get guest IO ABI protocol */
@@ -235,7 +235,7 @@ static int count_pgtables(struct xc_dom_image *dom, xen_vaddr_t from,
     return 0;
 }
 
-static int alloc_pgtables(struct xc_dom_image *dom)
+static int alloc_pgtables_pv(struct xc_dom_image *dom)
 {
     int pages, extra_pages;
     xen_vaddr_t try_virt_end;
@@ -268,20 +268,20 @@ static int alloc_pgtables(struct xc_dom_image *dom)
 /* ------------------------------------------------------------------------ */
 /* i386 pagetables                                                          */
 
-static struct xc_dom_params x86_32_params = {
-    .levels = PGTBL_LEVELS_I386,
-    .vaddr_mask = bits_to_mask(VIRT_BITS_I386),
-    .lvl_prot[0] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED,
-    .lvl_prot[1] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
-    .lvl_prot[2] = _PAGE_PRESENT,
-};
-
 static int alloc_pgtables_x86_32_pae(struct xc_dom_image *dom)
 {
+    static const struct xc_dom_params x86_32_params = {
+        .levels = PGTBL_LEVELS_I386,
+        .vaddr_mask = bits_to_mask(VIRT_BITS_I386),
+        .lvl_prot[0] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED,
+        .lvl_prot[1] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
+        .lvl_prot[2] = _PAGE_PRESENT,
+    };
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
 
     domx86->params = &x86_32_params;
-    return alloc_pgtables(dom);
+
+    return alloc_pgtables_pv(dom);
 }
 
 #define pfn_to_paddr(pfn) ((xen_paddr_t)(pfn) << PAGE_SHIFT_X86)
@@ -355,7 +355,7 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
     return l3mfn;
 }
 
-static x86_pgentry_t *get_pg_table_x86(struct xc_dom_image *dom, int m, int l)
+static x86_pgentry_t *get_pg_table(struct xc_dom_image *dom, int m, int l)
 {
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
     struct xc_dom_x86_mapping *map;
@@ -371,8 +371,7 @@ static x86_pgentry_t *get_pg_table_x86(struct xc_dom_image *dom, int m, int l)
     return NULL;
 }
 
-static x86_pgentry_t get_pg_prot_x86(struct xc_dom_image *dom, int l,
-                                     xen_pfn_t pfn)
+static x86_pgentry_t get_pg_prot(struct xc_dom_image *dom, int l, xen_pfn_t pfn)
 {
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
     struct xc_dom_x86_mapping *map;
@@ -396,7 +395,7 @@ static x86_pgentry_t get_pg_prot_x86(struct xc_dom_image *dom, int l,
     return prot;
 }
 
-static int setup_pgtables_x86(struct xc_dom_image *dom)
+static int setup_pgtables_pv(struct xc_dom_image *dom)
 {
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
     struct xc_dom_x86_mapping *map1, *map2;
@@ -413,7 +412,7 @@ static int setup_pgtables_x86(struct xc_dom_image *dom)
             map1 = domx86->maps + m1;
             from = map1->lvls[l].from;
             to = map1->lvls[l].to;
-            pg = get_pg_table_x86(dom, m1, l);
+            pg = get_pg_table(dom, m1, l);
             if ( !pg )
                 return -1;
             for ( m2 = 0; m2 < domx86->n_mappings; m2++ )
@@ -433,7 +432,7 @@ static int setup_pgtables_x86(struct xc_dom_image *dom)
                 for ( p = p_s; p <= p_e; p++ )
                 {
                     pg[p] = pfn_to_paddr(xc_dom_p2m(dom, pfn)) |
-                            get_pg_prot_x86(dom, l, pfn);
+                            get_pg_prot(dom, l, pfn);
                     pfn++;
                 }
             }
@@ -464,32 +463,32 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
         }
     }
 
-    return setup_pgtables_x86(dom);
+    return setup_pgtables_pv(dom);
 }
 
 /* ------------------------------------------------------------------------ */
 /* x86_64 pagetables                                                        */
 
-static struct xc_dom_params x86_64_params = {
-    .levels = PGTBL_LEVELS_X86_64,
-    .vaddr_mask = bits_to_mask(VIRT_BITS_X86_64),
-    .lvl_prot[0] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED,
-    .lvl_prot[1] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
-    .lvl_prot[2] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
-    .lvl_prot[3] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
-};
-
 static int alloc_pgtables_x86_64(struct xc_dom_image *dom)
 {
+    const static struct xc_dom_params x86_64_params = {
+        .levels = PGTBL_LEVELS_X86_64,
+        .vaddr_mask = bits_to_mask(VIRT_BITS_X86_64),
+        .lvl_prot[0] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED,
+        .lvl_prot[1] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
+        .lvl_prot[2] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
+        .lvl_prot[3] = _PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER,
+    };
     struct xc_dom_image_x86 *domx86 = dom->arch_private;
 
     domx86->params = &x86_64_params;
-    return alloc_pgtables(dom);
+
+    return alloc_pgtables_pv(dom);
 }
 
 static int setup_pgtables_x86_64(struct xc_dom_image *dom)
 {
-    return setup_pgtables_x86(dom);
+    return setup_pgtables_pv(dom);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1908,9 +1907,6 @@ static struct xc_dom_arch xc_hvm_32 = {
     .sizeof_pfn = 4,
     .alloc_magic_pages = alloc_magic_pages_hvm,
     .alloc_pgtables = alloc_pgtables_hvm,
-    .setup_pgtables = NULL,
-    .start_info = NULL,
-    .shared_info = NULL,
     .vcpu = vcpu_hvm,
     .meminit = meminit_hvm,
     .bootearly = bootearly,
