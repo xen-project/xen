@@ -47,23 +47,6 @@ const char *xc_domain_get_native_protocol(xc_interface *xch,
 }
 
 /* ------------------------------------------------------------------------ */
-/*
- * arm guests are hybrid and start off with paging disabled, therefore no
- * pagetables and nothing to do here.
- */
-static int alloc_pgtables_arm(struct xc_dom_image *dom)
-{
-    DOMPRINTF_CALLED(dom->xch);
-    return 0;
-}
-
-static int setup_pgtables_arm(struct xc_dom_image *dom)
-{
-    DOMPRINTF_CALLED(dom->xch);
-    return 0;
-}
-
-/* ------------------------------------------------------------------------ */
 
 static int alloc_magic_pages(struct xc_dom_image *dom)
 {
@@ -539,8 +522,6 @@ static struct xc_dom_arch xc_dom_32 = {
     .page_shift = PAGE_SHIFT_ARM,
     .sizeof_pfn = 8,
     .alloc_magic_pages = alloc_magic_pages,
-    .alloc_pgtables = alloc_pgtables_arm,
-    .setup_pgtables = setup_pgtables_arm,
     .start_info = start_info_arm,
     .shared_info = shared_info_arm,
     .vcpu = vcpu_arm32,
@@ -555,8 +536,6 @@ static struct xc_dom_arch xc_dom_64 = {
     .page_shift = PAGE_SHIFT_ARM,
     .sizeof_pfn = 8,
     .alloc_magic_pages = alloc_magic_pages,
-    .alloc_pgtables = alloc_pgtables_arm,
-    .setup_pgtables = setup_pgtables_arm,
     .start_info = start_info_arm,
     .shared_info = shared_info_arm,
     .vcpu = vcpu_arm64,

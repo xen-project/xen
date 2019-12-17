@@ -199,9 +199,9 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     /* initial mm setup */
     if ( (rc = xc_dom_update_guest_p2m(dom)) != 0 )
         return rc;
-    if ( dom->arch_hooks->setup_pgtables )
-        if ( (rc = dom->arch_hooks->setup_pgtables(dom)) != 0 )
-            return rc;
+    if ( dom->arch_hooks->setup_pgtables &&
+         (rc = dom->arch_hooks->setup_pgtables(dom)) != 0 )
+        return rc;
 
     /* start info page */
     if ( dom->arch_hooks->start_info )

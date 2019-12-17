@@ -1690,12 +1690,6 @@ static int bootlate_pv(struct xc_dom_image *dom)
     return 0;
 }
 
-static int alloc_pgtables_hvm(struct xc_dom_image *dom)
-{
-    DOMPRINTF("%s: doing nothing", __func__);
-    return 0;
-}
-
 /*
  * The memory layout of the start_info page and the modules, and where the
  * addresses are stored:
@@ -1906,7 +1900,6 @@ static struct xc_dom_arch xc_hvm_32 = {
     .page_shift = PAGE_SHIFT_X86,
     .sizeof_pfn = 4,
     .alloc_magic_pages = alloc_magic_pages_hvm,
-    .alloc_pgtables = alloc_pgtables_hvm,
     .vcpu = vcpu_hvm,
     .meminit = meminit_hvm,
     .bootearly = bootearly,

@@ -1248,7 +1248,8 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         goto err;
     if ( dom->arch_hooks->alloc_magic_pages(dom) != 0 )
         goto err;
-    if ( dom->arch_hooks->alloc_pgtables(dom) != 0 )
+    if ( dom->arch_hooks->alloc_pgtables &&
+         dom->arch_hooks->alloc_pgtables(dom) != 0 )
         goto err;
     if ( dom->alloc_bootstack )
     {

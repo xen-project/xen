@@ -253,8 +253,9 @@ void xc_dom_register_loader(struct xc_dom_loader *loader);
 /* --- arch specific hooks ----------------------------------------- */
 
 struct xc_dom_arch {
-    /* pagetable setup */
     int (*alloc_magic_pages) (struct xc_dom_image * dom);
+
+    /* pagetable setup - x86 PV only */
     int (*alloc_pgtables) (struct xc_dom_image * dom);
     int (*alloc_p2m_list) (struct xc_dom_image * dom);
     int (*setup_pgtables) (struct xc_dom_image * dom);
