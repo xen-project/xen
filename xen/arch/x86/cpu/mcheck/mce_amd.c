@@ -315,6 +315,26 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
     if ( quirkflag == MCEQUIRK_F10_GART )
         mcequirk_amd_apply(quirkflag);
 
+    if ( cpu_has(ci, X86_FEATURE_AMD_PPIN) &&
+         (ci == &boot_cpu_data || ppin_msr) )
+    {
+        uint64_t val;
+
+        rdmsrl(MSR_AMD_PPIN_CTL, val);
+
+        /* If PPIN is disabled, but not locked, try to enable. */
+        if ( !(val & (PPIN_ENABLE | PPIN_LOCKOUT)) )
+        {
+            wrmsr_safe(MSR_PPIN_CTL, val | PPIN_ENABLE);
+            rdmsrl(MSR_AMD_PPIN_CTL, val);
+        }
+
+        if ( (val & (PPIN_ENABLE | PPIN_LOCKOUT)) != PPIN_ENABLE )
+            ppin_msr = 0;
+        else if ( ci == &boot_cpu_data )
+            ppin_msr = MSR_AMD_PPIN;
+    }
+
     x86_mce_callback_register(amd_f10_handler);
     mce_recoverable_register(mc_amd_recoverable_scan);
     mce_register_addrcheck(mc_amd_addrcheck);

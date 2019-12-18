@@ -853,6 +853,43 @@ static void intel_init_mce(void)
     mce_uhandler_num = ARRAY_SIZE(intel_mce_uhandlers);
 }
 
+static void intel_init_ppin(const struct cpuinfo_x86 *c)
+{
+    /*
+     * Even if testing the presence of the MSR would be enough, we don't
+     * want to risk the situation where other models reuse this MSR for
+     * other purposes.
+     */
+    switch ( c->x86_model )
+    {
+        uint64_t val;
+
+    case 0x3e: /* IvyBridge X */
+    case 0x3f: /* Haswell X */
+    case 0x4f: /* Broadwell X */
+    case 0x55: /* Skylake X */
+    case 0x56: /* Broadwell Xeon D */
+    case 0x57: /* Knights Landing */
+    case 0x85: /* Knights Mill */
+
+        if ( (c != &boot_cpu_data && !ppin_msr) ||
+             rdmsr_safe(MSR_PPIN_CTL, val) )
+            return;
+
+        /* If PPIN is disabled, but not locked, try to enable. */
+        if ( !(val & (PPIN_ENABLE | PPIN_LOCKOUT)) )
+        {
+            wrmsr_safe(MSR_PPIN_CTL, val | PPIN_ENABLE);
+            rdmsr_safe(MSR_PPIN_CTL, val);
+        }
+
+        if ( (val & (PPIN_ENABLE | PPIN_LOCKOUT)) != PPIN_ENABLE )
+            ppin_msr = 0;
+        else if ( c == &boot_cpu_data )
+            ppin_msr = MSR_PPIN;
+    }
+}
+
 static void cpu_mcabank_free(unsigned int cpu)
 {
     struct mca_banks *cmci = per_cpu(no_cmci_banks, cpu);
@@ -940,6 +977,8 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp)
     intel_init_cmci(c);
 
     intel_init_thermal(c);
+
+    intel_init_ppin(c);
 
     return mcheck_intel;
 }

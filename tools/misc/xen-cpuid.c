@@ -150,6 +150,8 @@ static const char *const str_e8b[32] =
     /* [ 8] */            [ 9] = "wbnoinvd",
 
     [12] = "ibpb",
+
+    /* [22] */                 [23] = "ppin",
 };
 
 static const char *const str_7d0[32] =

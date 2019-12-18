@@ -45,6 +45,13 @@
 #define MSR_PRED_CMD			0x00000049
 #define PRED_CMD_IBPB			(_AC(1, ULL) << 0)
 
+/* Intel Protected Processor Inventory Number */
+#define MSR_PPIN_CTL			0x0000004e
+#define MSR_PPIN			0x0000004f
+
+#define PPIN_LOCKOUT			(_AC(1, ULL) << 0)
+#define PPIN_ENABLE			(_AC(1, ULL) << 1)
+
 #define MSR_ARCH_CAPABILITIES		0x0000010a
 #define ARCH_CAPS_RDCL_NO		(_AC(1, ULL) << 0)
 #define ARCH_CAPS_IBRS_ALL		(_AC(1, ULL) << 1)
@@ -284,6 +291,10 @@
 /* AMD OS Visible Workaround MSRs */
 #define MSR_AMD_OSVW_ID_LENGTH          0xc0010140
 #define MSR_AMD_OSVW_STATUS             0xc0010141
+
+/* AMD Protected Processor Inventory Number */
+#define MSR_AMD_PPIN_CTL                0xc00102f0
+#define MSR_AMD_PPIN                    0xc00102f1
 
 /* K6 MSRs */
 #define MSR_K6_EFER			0xc0000080

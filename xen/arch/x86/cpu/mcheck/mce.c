@@ -35,6 +35,7 @@ bool __read_mostly mce_broadcast;
 bool is_mc_panic;
 DEFINE_PER_CPU_READ_MOSTLY(unsigned int, nr_mce_banks);
 unsigned int __read_mostly firstbank;
+unsigned int __read_mostly ppin_msr;
 uint8_t __read_mostly cmci_apic_vector;
 
 DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, poll_bankmask);
@@ -999,9 +1000,16 @@ static void do_mc_get_cpu_info(void *v)
     /*
      * This part needs to run on the CPU itself.
      */
-    xcp->mc_nmsrvals = __MC_NMSRS;
+    xcp->mc_nmsrvals = 1;
     xcp->mc_msrvalues[0].reg = MSR_IA32_MCG_CAP;
     rdmsrl(MSR_IA32_MCG_CAP, xcp->mc_msrvalues[0].value);
+
+    if ( ppin_msr && xcp->mc_nmsrvals < ARRAY_SIZE(xcp->mc_msrvalues) )
+    {
+        xcp->mc_msrvalues[xcp->mc_nmsrvals].reg = ppin_msr;
+        rdmsrl(ppin_msr, xcp->mc_msrvalues[xcp->mc_nmsrvals].value);
+        ++xcp->mc_nmsrvals;
+    }
 
     if ( c->cpuid_level >= 1 )
     {

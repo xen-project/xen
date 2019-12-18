@@ -49,6 +49,7 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool bsp);
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
 extern unsigned int firstbank;
+extern unsigned int ppin_msr;
 
 struct mcinfo_extended *intel_get_extended_msrs(
     struct mcinfo_global *mig, struct mc_info *mi);
