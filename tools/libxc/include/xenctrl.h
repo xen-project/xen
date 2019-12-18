@@ -2060,7 +2060,7 @@ int xc_monitor_emulate_each_rep(xc_interface *xch, uint32_t domain_id,
  *
  * Sharing is supported only on the x86 architecture in 64 bit mode, with
  * Hardware-Assisted Paging (i.e. Intel EPT, AMD NPT). Moreover, AMD NPT
- * support is considered experimental. 
+ * support is considered experimental.
 
  * Calls below return ENOSYS if not in the x86_64 architecture.
  * Calls below return ENODEV if the domain does not support HAP.
@@ -2107,13 +2107,13 @@ int xc_memshr_control(xc_interface *xch,
  *  EINVAL or EACCESS if the request is denied by the security policy
  */
 
-int xc_memshr_ring_enable(xc_interface *xch, 
+int xc_memshr_ring_enable(xc_interface *xch,
                           uint32_t domid,
                           uint32_t *port);
 /* Disable the ring for ENOMEM communication.
  * May fail with EINVAL if the ring was not enabled in the first place.
  */
-int xc_memshr_ring_disable(xc_interface *xch, 
+int xc_memshr_ring_disable(xc_interface *xch,
                            uint32_t domid);
 
 /*
@@ -2126,7 +2126,7 @@ int xc_memshr_ring_disable(xc_interface *xch,
 int xc_memshr_domain_resume(xc_interface *xch,
                             uint32_t domid);
 
-/* Select a page for sharing. 
+/* Select a page for sharing.
  *
  * A 64 bit opaque handle will be stored in handle.  The hypervisor ensures
  * that if the page is modified, the handle will be invalidated, and future
@@ -2155,7 +2155,7 @@ int xc_memshr_nominate_gref(xc_interface *xch,
 
 /* The three calls below may fail with
  * 10 (or -XENMEM_SHARING_OP_S_HANDLE_INVALID) if the handle passed as source
- * is invalid.  
+ * is invalid.
  * 9 (or -XENMEM_SHARING_OP_C_HANDLE_INVALID) if the handle passed as client is
  * invalid.
  */
@@ -2168,7 +2168,7 @@ int xc_memshr_nominate_gref(xc_interface *xch,
  *
  * After successful sharing, the client handle becomes invalid. Both <domain,
  * gfn> tuples point to the same mfn with the same handle, the one specified as
- * source. Either 3-tuple can be specified later for further re-sharing. 
+ * source. Either 3-tuple can be specified later for further re-sharing.
  */
 int xc_memshr_share_gfns(xc_interface *xch,
                     uint32_t source_domain,
@@ -2193,7 +2193,7 @@ int xc_memshr_share_grefs(xc_interface *xch,
 /* Allows to add to the guest physmap of the client domain a shared frame
  * directly.
  *
- * May additionally fail with 
+ * May additionally fail with
  *  9 (-XENMEM_SHARING_OP_C_HANDLE_INVALID) if the physmap entry for the gfn is
  *  not suitable.
  *  ENOMEM if internal data structures cannot be allocated.
@@ -2222,7 +2222,7 @@ int xc_memshr_range_share(xc_interface *xch,
                           uint64_t last_gfn);
 
 /* Debug calls: return the number of pages referencing the shared frame backing
- * the input argument. Should be one or greater. 
+ * the input argument. Should be one or greater.
  *
  * May fail with EINVAL if there is no backing shared frame for the input
  * argument.
@@ -2235,9 +2235,9 @@ int xc_memshr_debug_gref(xc_interface *xch,
                          uint32_t domid,
                          grant_ref_t gref);
 
-/* Audits the share subsystem. 
- * 
- * Returns ENOSYS if not supported (may not be compiled into the hypervisor). 
+/* Audits the share subsystem.
+ *
+ * Returns ENOSYS if not supported (may not be compiled into the hypervisor).
  *
  * Returns the number of errors found during auditing otherwise. May be (should
  * be!) zero.
@@ -2273,7 +2273,7 @@ long xc_sharing_freed_pages(xc_interface *xch);
  * should return 1. (And dominfo(d) for each of the two domains should return 1
  * as well).
  *
- * Note that some of these sharing_used_frames may be referenced by 
+ * Note that some of these sharing_used_frames may be referenced by
  * a single domain page, and thus not realize any savings. The same
  * applies to some of the pages counted in dominfo(d)->shr_pages.
  */
