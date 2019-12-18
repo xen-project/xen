@@ -12,58 +12,22 @@
 #include <xen/version.h>
 
 #include <asm/apic.h>
+#include <asm/guest/hyperv-tlfs.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vlapic.h>
 
 #include "private.h"
 
-typedef struct _HV_VIRTUAL_APIC_ASSIST
-{
-    uint32_t no_eoi:1;
-    uint32_t reserved_zero:31;
-} HV_VIRTUAL_APIC_ASSIST;
-
-typedef union _HV_VP_ASSIST_PAGE
-{
-    HV_VIRTUAL_APIC_ASSIST ApicAssist;
-    uint8_t ReservedZBytePadding[PAGE_SIZE];
-} HV_VP_ASSIST_PAGE;
-
-typedef enum HV_MESSAGE_TYPE {
-    HvMessageTypeNone,
-    HvMessageTimerExpired = 0x80000010,
-} HV_MESSAGE_TYPE;
-
-typedef struct HV_MESSAGE_FLAGS {
-    uint8_t MessagePending:1;
-    uint8_t Reserved:7;
-} HV_MESSAGE_FLAGS;
-
-typedef struct HV_MESSAGE_HEADER {
-    HV_MESSAGE_TYPE MessageType;
-    uint16_t Reserved1;
-    HV_MESSAGE_FLAGS MessageFlags;
-    uint8_t PayloadSize;
-    uint64_t Reserved2;
-} HV_MESSAGE_HEADER;
-
-#define HV_MESSAGE_SIZE 256
-#define HV_MESSAGE_MAX_PAYLOAD_QWORD_COUNT 30
-
-typedef struct HV_MESSAGE {
-    HV_MESSAGE_HEADER Header;
-    uint64_t Payload[HV_MESSAGE_MAX_PAYLOAD_QWORD_COUNT];
-} HV_MESSAGE;
 
 void __init __maybe_unused build_assertions(void)
 {
-    BUILD_BUG_ON(sizeof(HV_MESSAGE) != HV_MESSAGE_SIZE);
+    BUILD_BUG_ON(sizeof(struct hv_message) != HV_MESSAGE_SIZE);
 }
 
 void viridian_apic_assist_set(const struct vcpu *v)
 {
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
-    HV_VP_ASSIST_PAGE *ptr = vv->vp_assist.ptr;
+    struct hv_vp_assist_page *ptr = vv->vp_assist.ptr;
 
     if ( !ptr )
         return;
@@ -77,18 +41,18 @@ void viridian_apic_assist_set(const struct vcpu *v)
         domain_crash(v->domain);
 
     vv->apic_assist_pending = true;
-    ptr->ApicAssist.no_eoi = 1;
+    ptr->apic_assist = 1;
 }
 
 bool viridian_apic_assist_completed(const struct vcpu *v)
 {
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
-    HV_VP_ASSIST_PAGE *ptr = vv->vp_assist.ptr;
+    struct hv_vp_assist_page *ptr = vv->vp_assist.ptr;
 
     if ( !ptr )
         return false;
 
-    if ( vv->apic_assist_pending && !ptr->ApicAssist.no_eoi )
+    if ( vv->apic_assist_pending && !ptr->apic_assist )
     {
         /* An EOI has been avoided */
         vv->apic_assist_pending = false;
@@ -101,12 +65,12 @@ bool viridian_apic_assist_completed(const struct vcpu *v)
 void viridian_apic_assist_clear(const struct vcpu *v)
 {
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
-    HV_VP_ASSIST_PAGE *ptr = vv->vp_assist.ptr;
+    struct hv_vp_assist_page *ptr = vv->vp_assist.ptr;
 
     if ( !ptr )
         return;
 
-    ptr->ApicAssist.no_eoi = 0;
+    ptr->apic_assist = 0;
     vv->apic_assist_pending = false;
 }
 
@@ -358,7 +322,7 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
 {
     struct viridian_vcpu *vv = v->arch.hvm.viridian;
     const union viridian_sint_msr *vs = &vv->sint[sintx];
-    HV_MESSAGE *msg = vv->simp.ptr;
+    struct hv_message *msg = vv->simp.ptr;
     struct {
         uint32_t TimerIndex;
         uint32_t Reserved;
@@ -382,19 +346,19 @@ bool viridian_synic_deliver_timer_msg(struct vcpu *v, unsigned int sintx,
 
     msg += sintx;
 
-    if ( msg->Header.MessageType != HvMessageTypeNone )
+    if ( msg->header.message_type != HVMSG_NONE )
     {
-        msg->Header.MessageFlags.MessagePending = 1;
+        msg->header.message_flags.msg_pending = 1;
         __set_bit(sintx, &vv->msg_pending);
         return false;
     }
 
-    msg->Header.MessageType = HvMessageTimerExpired;
-    msg->Header.MessageFlags.MessagePending = 0;
-    msg->Header.PayloadSize = sizeof(payload);
+    msg->header.message_type = HVMSG_TIMER_EXPIRED;
+    msg->header.message_flags.msg_pending = 0;
+    msg->header.payload_size = sizeof(payload);
 
-    BUILD_BUG_ON(sizeof(payload) > sizeof(msg->Payload));
-    memcpy(msg->Payload, &payload, sizeof(payload));
+    BUILD_BUG_ON(sizeof(payload) > sizeof(msg->u.payload));
+    memcpy(msg->u.payload, &payload, sizeof(payload));
 
     if ( !vs->mask )
         vlapic_set_irq(vcpu_vlapic(v), vs->vector, 0);
