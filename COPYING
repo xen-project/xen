@@ -57,7 +57,6 @@ Xen tree, retaining the original license, such as
   - Laurikari License
   - Public Domain
   - ZLIB License
-  - ZPL 2.0
 
 Significant code imports are highlighted in a README.source file
 in the directory into which the file or code snippet was imported.
