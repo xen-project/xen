@@ -76,10 +76,17 @@ function teardown_primary()
 
 function setup_secondary()
 {
-    do_without_error brctl delif $bridge $vifname
-    do_without_error brctl addbr $forwardbr
-    do_without_error brctl addif $forwardbr $vifname
-    do_without_error brctl addif $forwardbr $forwarddev
+    if which brctl >&/dev/null; then
+        do_without_error brctl delif $bridge $vifname
+        do_without_error brctl addbr $forwardbr
+        do_without_error brctl addif $forwardbr $vifname
+        do_without_error brctl addif $forwardbr $forwarddev
+    else
+        do_without_error ip link set $vifname nomaster
+        do_without_error ip link add name $forwardbr type bridge
+        do_without_error ip link set $vifname master $forwardbr
+        do_without_error ip link set $forwarddev master $forwardbr
+    fi
     do_without_error ip link set dev $forwardbr up
     do_without_error modprobe xt_SECCOLO
 
@@ -91,10 +98,17 @@ function setup_secondary()
 
 function teardown_secondary()
 {
-    do_without_error brctl delif $forwardbr $forwarddev
-    do_without_error brctl delif $forwardbr $vifname
-    do_without_error brctl delbr $forwardbr
-    do_without_error brctl addif $bridge $vifname
+    if which brctl >&/dev/null; then
+        do_without_error brctl delif $forwardbr $forwarddev
+        do_without_error brctl delif $forwardbr $vifname
+        do_without_error brctl delbr $forwardbr
+        do_without_error brctl addif $bridge $vifname
+    else
+        do_without_error ip link set $forwarddev nomaster
+        do_without_error ip link set $vifname nomaster
+        do_without_error ip link delete $forwardbr type bridge
+        do_without_error ip link set $vifname master $bridge
+    fi
 
     do_without_error iptables -t mangle -D PREROUTING -m physdev --physdev-in \
         $vifname -j SECCOLO --index $index

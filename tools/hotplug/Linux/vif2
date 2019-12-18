@@ -7,13 +7,21 @@ dir=$(dirname "$0")
 bridge=$(xenstore_read_default "$XENBUS_PATH/bridge" "$bridge")
 if [ -z "$bridge" ]
     then
-    nr_bridges=$(($(brctl show | cut -f 1 | grep -v "^$" | wc -l) - 1))
+    if which brctl >&/dev/null; then
+        nr_bridges=$(($(brctl show | cut -f 1 | grep -v "^$" | wc -l) - 1))
+    else
+        nr_bridges=$(bridge link | wc -l)
+    fi
     if [ "$nr_bridges" != 1 ]
 	then
 	fatal "no bridge specified, and don't know which one to use ($nr_bridges found)"
     fi
-    bridge=$(brctl show | cut -d "
+    if which brctl >&/dev/null; then
+        bridge=$(brctl show | cut -d "
 " -f 2 | cut -f 1)
+    else
+        bridge=$(bridge link | cut -d" " -f6)
+    fi
 fi
 
 command="$1"

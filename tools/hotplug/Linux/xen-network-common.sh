@@ -111,9 +111,13 @@ create_bridge () {
 
     # Don't create the bridge if it already exists.
     if [ ! -e "/sys/class/net/${bridge}/bridge" ]; then
-	brctl addbr ${bridge}
-	brctl stp ${bridge} off
-	brctl setfd ${bridge} 0
+        if which brctl >&/dev/null; then
+            brctl addbr ${bridge}
+            brctl stp ${bridge} off
+            brctl setfd ${bridge} 0
+        else
+            ip link add name ${bridge} type bridge stp_state 0 forward_delay 0
+        fi
     fi
 }
 
@@ -127,7 +131,11 @@ add_to_bridge () {
 	ip link set dev ${dev} up || true
 	return
     fi
-    brctl addif ${bridge} ${dev}
+    if which brctl >&/dev/null; then
+        brctl addif ${bridge} ${dev}
+    else
+        ip link set ${dev} master ${bridge}
+    fi
     ip link set dev ${dev} up
 }
 
