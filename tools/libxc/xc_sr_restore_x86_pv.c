@@ -236,28 +236,25 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
                               unsigned int vcpuid)
 {
     xc_interface *xch = ctx->xch;
-    vcpu_guest_context_any_t vcpu;
+    vcpu_guest_context_any_t *vcpu = ctx->x86_pv.restore.vcpus[vcpuid].basic;
     xen_pfn_t pfn, mfn;
     unsigned i, gdt_count;
     int rc = -1;
 
-    memcpy(&vcpu, ctx->x86_pv.restore.vcpus[vcpuid].basic,
-           ctx->x86_pv.restore.vcpus[vcpuid].basicsz);
-
     /* Vcpu 0 is special: Convert the suspend record to an mfn. */
     if ( vcpuid == 0 )
     {
-        rc = process_start_info(ctx, &vcpu);
+        rc = process_start_info(ctx, vcpu);
         if ( rc )
             return rc;
         rc = -1;
     }
 
-    SET_FIELD(&vcpu, flags,
-              GET_FIELD(&vcpu, flags, ctx->x86_pv.width) | VGCF_online,
+    SET_FIELD(vcpu, flags,
+              GET_FIELD(vcpu, flags, ctx->x86_pv.width) | VGCF_online,
               ctx->x86_pv.width);
 
-    gdt_count = GET_FIELD(&vcpu, gdt_ents, ctx->x86_pv.width);
+    gdt_count = GET_FIELD(vcpu, gdt_ents, ctx->x86_pv.width);
     if ( gdt_count > FIRST_RESERVED_GDT_ENTRY )
     {
         ERROR("GDT entry count (%u) out of range (max %u)",
@@ -270,7 +267,7 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
     /* Convert GDT frames to mfns. */
     for ( i = 0; i < gdt_count; ++i )
     {
-        pfn = GET_FIELD(&vcpu, gdt_frames[i], ctx->x86_pv.width);
+        pfn = GET_FIELD(vcpu, gdt_frames[i], ctx->x86_pv.width);
         if ( pfn > ctx->x86_pv.max_pfn )
         {
             ERROR("GDT frame %u (pfn %#lx) out of range", i, pfn);
@@ -293,11 +290,11 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
             goto err;
         }
 
-        SET_FIELD(&vcpu, gdt_frames[i], mfn, ctx->x86_pv.width);
+        SET_FIELD(vcpu, gdt_frames[i], mfn, ctx->x86_pv.width);
     }
 
     /* Convert CR3 to an mfn. */
-    pfn = cr3_to_mfn(ctx, GET_FIELD(&vcpu, ctrlreg[3], ctx->x86_pv.width));
+    pfn = cr3_to_mfn(ctx, GET_FIELD(vcpu, ctrlreg[3], ctx->x86_pv.width));
     if ( pfn > ctx->x86_pv.max_pfn )
     {
         ERROR("cr3 (pfn %#lx) out of range", pfn);
@@ -323,12 +320,12 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
         goto err;
     }
 
-    SET_FIELD(&vcpu, ctrlreg[3], mfn_to_cr3(ctx, mfn), ctx->x86_pv.width);
+    SET_FIELD(vcpu, ctrlreg[3], mfn_to_cr3(ctx, mfn), ctx->x86_pv.width);
 
     /* 64bit guests: Convert CR1 (guest pagetables) to mfn. */
-    if ( ctx->x86_pv.levels == 4 && (vcpu.x64.ctrlreg[1] & 1) )
+    if ( ctx->x86_pv.levels == 4 && (vcpu->x64.ctrlreg[1] & 1) )
     {
-        pfn = vcpu.x64.ctrlreg[1] >> PAGE_SHIFT;
+        pfn = vcpu->x64.ctrlreg[1] >> PAGE_SHIFT;
 
         if ( pfn > ctx->x86_pv.max_pfn )
         {
@@ -355,10 +352,10 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
             goto err;
         }
 
-        vcpu.x64.ctrlreg[1] = (uint64_t)mfn << PAGE_SHIFT;
+        vcpu->x64.ctrlreg[1] = (uint64_t)mfn << PAGE_SHIFT;
     }
 
-    if ( xc_vcpu_setcontext(xch, ctx->domid, vcpuid, &vcpu) )
+    if ( xc_vcpu_setcontext(xch, ctx->domid, vcpuid, vcpu) )
     {
         PERROR("Failed to set vcpu%u's basic info", vcpuid);
         goto err;
