@@ -128,7 +128,7 @@ class VerifyLibxl(VerifyBase):
         content = self.rdexact(contentsz)
 
         padding = content[length:]
-        if padding != "\x00" * len(padding):
+        if padding != b"\x00" * len(padding):
             raise StreamError("Padding containing non0 bytes found")
 
         if rtype not in record_verifiers:

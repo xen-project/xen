@@ -5,6 +5,8 @@
 Convert a legacy migration stream to a v2 stream.
 """
 
+from __future__ import print_function
+
 import sys
 import os, os.path
 import syslog
@@ -12,6 +14,7 @@ import traceback
 
 from struct import calcsize, unpack, pack
 
+from xen.util import open_file_or_fd as open_file_or_fd
 from xen.migration import legacy, public, libxc, libxl, xl
 
 __version__ = 1
@@ -39,16 +42,16 @@ def info(msg):
             for line in msg.split("\n"):
                 syslog.syslog(syslog.LOG_INFO, line)
         else:
-            print msg
+            print(msg)
 
 def err(msg):
     """Error message, routed to appropriate destination"""
     if log_to_syslog:
         for line in msg.split("\n"):
             syslog.syslog(syslog.LOG_ERR, line)
-    print >> sys.stderr, msg
+    print(msg, file = sys.stderr)
 
-class StreamError(StandardError):
+class StreamError(Exception):
     """Error with the incoming migration stream"""
     pass
 
@@ -70,7 +73,7 @@ class VM(object):
 
         # libxl
         self.libxl = fmt == "libxl"
-        self.emu_xenstore = "" # NUL terminated key&val pairs from "toolstack" records
+        self.emu_xenstore = b"" # NUL terminated key&val pairs from "toolstack" records
 
 def write_libxc_ihdr():
     stream_write(pack(libxc.IHDR_FORMAT,
@@ -102,12 +105,12 @@ def write_libxl_hdr():
                       ))
 
 def write_record(rt, *argl):
-    alldata = ''.join(argl)
+    alldata = b''.join(argl)
     length = len(alldata)
 
     record = pack(libxc.RH_FORMAT, rt, length) + alldata
     plen = (8 - (length & 7)) & 7
-    record += '\x00' * plen
+    record += b'\x00' * plen
 
     stream_write(record)
 
@@ -164,10 +167,10 @@ def write_libxc_hvm_params(params):
                  pack("Q" * len(params), *params))
 
 def write_libxl_end():
-    write_record(libxl.REC_TYPE_end, "")
+    write_record(libxl.REC_TYPE_end)
 
 def write_libxl_libxc_context():
-    write_record(libxl.REC_TYPE_libxc_context, "")
+    write_record(libxl.REC_TYPE_libxc_context)
 
 def write_libxl_emulator_xenstore_data(data):
     write_record(libxl.REC_TYPE_emulator_xenstore_data,
@@ -225,7 +228,7 @@ def read_pv_extended_info(vm):
         so_far += datasz
 
         # Eww, but this is how it is done :(
-        if blkid == "vcpu":
+        if blkid == b"vcpu":
 
             vm.basic_len = datasz
 
@@ -242,10 +245,10 @@ def read_pv_extended_info(vm):
 
             write_libxc_pv_info(vm)
 
-        elif blkid == "extv":
+        elif blkid == b"extv":
             vm.extd = True
 
-        elif blkid == "xcnt":
+        elif blkid == b"xcnt":
             vm.xsave_len, = unpack("I", data[:4])
             info("xcnt sz 0x%x" % (vm.xsave_len, ))
 
@@ -296,7 +299,7 @@ def read_pv_tail(vm):
     info("Got shinfo")
 
     write_record(libxc.REC_TYPE_shared_info, shinfo)
-    write_record(libxc.REC_TYPE_end, "")
+    write_record(libxc.REC_TYPE_end)
 
 
 def read_libxl_toolstack(vm, data):
@@ -336,18 +339,18 @@ def read_libxl_toolstack(vm, data):
         if twidth == 64:
             name = name[:-4]
 
-        if name[-1] != '\x00':
+        if name[-1] != b'\x00':
             raise StreamError("physmap name not NUL terminated")
 
-        root = "physmap/%x" % (phys,)
-        kv = [root + "/start_addr", "%x" % (start, ),
-              root + "/size",       "%x" % (size, ),
-              root + "/name",       name[:-1]]
+        root = b"physmap/%x" % (phys, )
+        kv = [root + b"/start_addr", b"%x" % (start, ),
+              root + b"/size",       b"%x" % (size, ),
+              root + b"/name",       name[:-1]]
 
         for key, val in zip(kv[0::2], kv[1::2]):
-            info("    '%s' = '%s'" % (key, val))
+            info("    '%s' = '%s'" % (key.decode(), val.decode()))
 
-        vm.emu_xenstore += '\x00'.join(kv) + '\x00'
+        vm.emu_xenstore += b'\x00'.join(kv) + b'\x00'
 
 
 def read_chunks(vm):
@@ -524,7 +527,7 @@ def read_hvm_tail(vm):
     blob = rdexact(blobsz)
 
     write_record(libxc.REC_TYPE_hvm_context, blob)
-    write_record(libxc.REC_TYPE_end, "")
+    write_record(libxc.REC_TYPE_end)
 
 
 
@@ -534,7 +537,7 @@ def read_qemu(vm):
     sig, = unpack("21s", rawsig)
     info("Qemu signature: %s" % (sig, ))
 
-    if sig == "DeviceModelRecord0002":
+    if sig == b"DeviceModelRecord0002":
         rawsz = rdexact(4)
         sz, = unpack("I", rawsz)
         qdata = rdexact(sz)
@@ -617,36 +620,6 @@ def read_legacy_stream(vm):
         return 2
     return 0
 
-def open_file_or_fd(val, mode):
-    """
-    If 'val' looks like a decimal integer, open it as an fd.  If not, try to
-    open it as a regular file.
-    """
-
-    fd = -1
-    try:
-        # Does it look like an integer?
-        try:
-            fd = int(val, 10)
-        except ValueError:
-            pass
-
-        # Try to open it...
-        if fd != -1:
-            return os.fdopen(fd, mode, 0)
-        else:
-            return open(val, mode, 0)
-
-    except StandardError, e:
-        if fd != -1:
-            err("Unable to open fd %d: %s: %s" %
-                (fd, e.__class__.__name__, e))
-        else:
-            err("Unable to open file '%s': %s: %s" %
-                (val, e.__class__.__name__, e))
-
-    raise SystemExit(1)
-
 
 def main():
     from optparse import OptionParser
@@ -723,7 +696,7 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except SystemExit, e:
+    except SystemExit as e:
         sys.exit(e.code)
     except KeyboardInterrupt:
         sys.exit(1)

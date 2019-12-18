@@ -7,11 +7,11 @@ Common verification infrastructure for v2 streams
 
 from struct import calcsize, unpack
 
-class StreamError(StandardError):
+class StreamError(Exception):
     """Error with the stream"""
     pass
 
-class RecordError(StandardError):
+class RecordError(Exception):
     """Error with a record in the stream"""
     pass
 

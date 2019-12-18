@@ -14,10 +14,6 @@ from struct import calcsize, unpack
 
 from xen.migration.verify import StreamError, RecordError, VerifyBase
 
-# In Python3 long type have been merged into int, 1L syntax is no longer valid
-if sys.version_info > (3,):
-    long = int
-
 # Image Header
 IHDR_FORMAT = "!QIIHHI"
 
@@ -87,23 +83,23 @@ rec_type_to_str = {
 
 # page_data
 PAGE_DATA_FORMAT             = "II"
-PAGE_DATA_PFN_MASK           = (long(1) << 52) - 1
-PAGE_DATA_PFN_RESZ_MASK      = ((long(1) << 60) - 1) & ~((long(1) << 52) - 1)
+PAGE_DATA_PFN_MASK           = (1 << 52) - 1
+PAGE_DATA_PFN_RESZ_MASK      = ((1 << 60) - 1) & ~((1 << 52) - 1)
 
 # flags from xen/public/domctl.h: XEN_DOMCTL_PFINFO_* shifted by 32 bits
 PAGE_DATA_TYPE_SHIFT         = 60
-PAGE_DATA_TYPE_LTABTYPE_MASK = (long(0x7) << PAGE_DATA_TYPE_SHIFT)
-PAGE_DATA_TYPE_LTAB_MASK     = (long(0xf) << PAGE_DATA_TYPE_SHIFT)
-PAGE_DATA_TYPE_LPINTAB       = (long(0x8) << PAGE_DATA_TYPE_SHIFT) # Pinned pagetable
+PAGE_DATA_TYPE_LTABTYPE_MASK = (0x7 << PAGE_DATA_TYPE_SHIFT)
+PAGE_DATA_TYPE_LTAB_MASK     = (0xf << PAGE_DATA_TYPE_SHIFT)
+PAGE_DATA_TYPE_LPINTAB       = (0x8 << PAGE_DATA_TYPE_SHIFT) # Pinned pagetable
 
-PAGE_DATA_TYPE_NOTAB         = (long(0x0) << PAGE_DATA_TYPE_SHIFT) # Regular page
-PAGE_DATA_TYPE_L1TAB         = (long(0x1) << PAGE_DATA_TYPE_SHIFT) # L1 pagetable
-PAGE_DATA_TYPE_L2TAB         = (long(0x2) << PAGE_DATA_TYPE_SHIFT) # L2 pagetable
-PAGE_DATA_TYPE_L3TAB         = (long(0x3) << PAGE_DATA_TYPE_SHIFT) # L3 pagetable
-PAGE_DATA_TYPE_L4TAB         = (long(0x4) << PAGE_DATA_TYPE_SHIFT) # L4 pagetable
-PAGE_DATA_TYPE_BROKEN        = (long(0xd) << PAGE_DATA_TYPE_SHIFT) # Broken
-PAGE_DATA_TYPE_XALLOC        = (long(0xe) << PAGE_DATA_TYPE_SHIFT) # Allocate-only
-PAGE_DATA_TYPE_XTAB          = (long(0xf) << PAGE_DATA_TYPE_SHIFT) # Invalid
+PAGE_DATA_TYPE_NOTAB         = (0x0 << PAGE_DATA_TYPE_SHIFT) # Regular page
+PAGE_DATA_TYPE_L1TAB         = (0x1 << PAGE_DATA_TYPE_SHIFT) # L1 pagetable
+PAGE_DATA_TYPE_L2TAB         = (0x2 << PAGE_DATA_TYPE_SHIFT) # L2 pagetable
+PAGE_DATA_TYPE_L3TAB         = (0x3 << PAGE_DATA_TYPE_SHIFT) # L3 pagetable
+PAGE_DATA_TYPE_L4TAB         = (0x4 << PAGE_DATA_TYPE_SHIFT) # L4 pagetable
+PAGE_DATA_TYPE_BROKEN        = (0xd << PAGE_DATA_TYPE_SHIFT) # Broken
+PAGE_DATA_TYPE_XALLOC        = (0xe << PAGE_DATA_TYPE_SHIFT) # Allocate-only
+PAGE_DATA_TYPE_XTAB          = (0xf << PAGE_DATA_TYPE_SHIFT) # Invalid
 
 # x86_pv_info
 X86_PV_INFO_FORMAT        = "BBHI"
@@ -223,7 +219,7 @@ class VerifyLibxc(VerifyBase):
             self.squashed_pagedata_records += 1
 
         padding = content[length:]
-        if padding != "\x00" * len(padding):
+        if padding != b"\x00" * len(padding):
             raise StreamError("Padding containing non0 bytes found")
 
         if rtype not in record_verifiers:
