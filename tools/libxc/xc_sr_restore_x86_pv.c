@@ -582,6 +582,21 @@ static int update_guest_p2m(struct xc_sr_context *ctx)
 }
 
 /*
+ * The valid width/pt_levels values in X86_PV_INFO are inextricably linked.
+ * Cross-check the legitimate combinations.
+ */
+static bool valid_x86_pv_info_combination(
+    const struct xc_sr_rec_x86_pv_info *info)
+{
+    switch ( info->guest_width )
+    {
+    case 4:  return info->pt_levels == 3;
+    case 8:  return info->pt_levels == 4;
+    default: return false;
+    }
+}
+
+/*
  * Process an X86_PV_INFO record.
  */
 static int handle_x86_pv_info(struct xc_sr_context *ctx,
@@ -602,29 +617,31 @@ static int handle_x86_pv_info(struct xc_sr_context *ctx,
               rec->length, sizeof(*info));
         return -1;
     }
-    else if ( info->guest_width != 4 &&
-              info->guest_width != 8 )
+
+    if ( !valid_x86_pv_info_combination(info) )
     {
-        ERROR("Unexpected guest width %u, Expected 4 or 8",
-              info->guest_width);
+        ERROR("Invalid X86_PV_INFO combination: width %u, pt_levels %u",
+              info->guest_width, info->pt_levels);
         return -1;
     }
-    else if ( info->guest_width != ctx->x86_pv.width )
-    {
-        int rc;
-        struct xen_domctl domctl;
 
-        /* Try to set address size, domain is always created 64 bit. */
-        memset(&domctl, 0, sizeof(domctl));
-        domctl.domain = ctx->domid;
-        domctl.cmd    = XEN_DOMCTL_set_address_size;
-        domctl.u.address_size.size = info->guest_width * 8;
-        rc = do_domctl(xch, &domctl);
+    /*
+     * PV domains default to native width.  For an incomming compat domain, we
+     * will typically be the first entity to inform Xen.
+     */
+    if ( info->guest_width != ctx->x86_pv.width )
+    {
+        struct xen_domctl domctl = {
+            .domain = ctx->domid,
+            .cmd    = XEN_DOMCTL_set_address_size,
+            .u.address_size.size = info->guest_width * 8,
+        };
+        int rc = do_domctl(xch, &domctl);
+
         if ( rc != 0 )
         {
-            ERROR("Width of guest in stream (%u"
-                  " bits) differs with existing domain (%u bits)",
-                  info->guest_width * 8, ctx->x86_pv.width * 8);
+            ERROR("Failed to update d%d address size to %u",
+                  ctx->domid, info->guest_width * 8);
             return -1;
         }
 
@@ -636,18 +653,14 @@ static int handle_x86_pv_info(struct xc_sr_context *ctx,
             return -1;
         }
     }
-    else if ( info->pt_levels != 3 &&
-              info->pt_levels != 4 )
+
+    /* Sanity check (possibly new) domain settings. */
+    if ( (info->guest_width != ctx->x86_pv.width) ||
+         (info->pt_levels   != ctx->x86_pv.levels) )
     {
-        ERROR("Unexpected guest levels %u, Expected 3 or 4",
-              info->pt_levels);
-        return -1;
-    }
-    else if ( info->pt_levels != ctx->x86_pv.levels )
-    {
-        ERROR("Levels of guest in stream (%u"
-              ") differs with existing domain (%u)",
-              info->pt_levels, ctx->x86_pv.levels);
+        ERROR("X86_PV_INFO width/pt_levels settings %u/%u mismatch with d%d %u/%u",
+              info->guest_width, info->pt_levels, ctx->domid,
+              ctx->x86_pv.width, ctx->x86_pv.levels);
         return -1;
     }
 
