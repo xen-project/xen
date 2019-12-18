@@ -511,8 +511,10 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
     if ( (q & P2M_UNSHARE) && p2m_is_shared(*t) )
     {
         ASSERT(p2m_is_hostp2m(p2m));
-        /* Try to unshare. If we fail, communicate ENOMEM without
-         * sleeping. */
+        /*
+         * Try to unshare. If we fail, communicate ENOMEM without
+         * sleeping.
+         */
         if ( mem_sharing_unshare_page(p2m->domain, gfn_l, 0) < 0 )
             mem_sharing_notify_enomem(p2m->domain, gfn_l, false);
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
@@ -892,15 +894,15 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                               &a, 0, NULL, NULL);
         if ( p2m_is_shared(ot) )
         {
-            /* Do an unshare to cleanly take care of all corner 
-             * cases. */
+            /* Do an unshare to cleanly take care of all corner cases. */
             int rc;
             rc = mem_sharing_unshare_page(p2m->domain,
                                           gfn_x(gfn_add(gfn, i)), 0);
             if ( rc )
             {
                 p2m_unlock(p2m);
-                /* NOTE: Should a guest domain bring this upon itself,
+                /*
+                 * NOTE: Should a guest domain bring this upon itself,
                  * there is not a whole lot we can do. We are buried
                  * deep in locks from most code paths by now. So, fail
                  * the call and don't try to sleep on a wait queue
@@ -909,8 +911,9 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                  * However, all current (changeset 3432abcf9380) code
                  * paths avoid this unsavoury situation. For now.
                  *
-                 * Foreign domains are okay to place an event as they 
-                 * won't go to sleep. */
+                 * Foreign domains are okay to place an event as they
+                 * won't go to sleep.
+                 */
                 (void)mem_sharing_notify_enomem(p2m->domain,
                                                 gfn_x(gfn_add(gfn, i)), false);
                 return rc;
