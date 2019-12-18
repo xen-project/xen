@@ -28,18 +28,21 @@ static int read_headers(struct xc_sr_context *ctx)
         ERROR("Invalid marker: Got 0x%016"PRIx64, ihdr.marker);
         return -1;
     }
-    else if ( ihdr.id != IHDR_ID )
+
+    if ( ihdr.id != IHDR_ID )
     {
         ERROR("Invalid ID: Expected 0x%08x, Got 0x%08x", IHDR_ID, ihdr.id);
         return -1;
     }
-    else if ( ihdr.version != IHDR_VERSION )
+
+    if ( ihdr.version != IHDR_VERSION )
     {
         ERROR("Invalid Version: Expected %d, Got %d",
               IHDR_VERSION, ihdr.version);
         return -1;
     }
-    else if ( ihdr.options & IHDR_OPT_BIG_ENDIAN )
+
+    if ( ihdr.options & IHDR_OPT_BIG_ENDIAN )
     {
         ERROR("Unable to handle big endian streams");
         return -1;
@@ -345,12 +348,14 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
               rec->length, sizeof(*pages));
         goto err;
     }
-    else if ( pages->count < 1 )
+
+    if ( pages->count < 1 )
     {
         ERROR("Expected at least 1 pfn in PAGE_DATA record");
         goto err;
     }
-    else if ( rec->length < sizeof(*pages) + (pages->count * sizeof(uint64_t)) )
+
+    if ( rec->length < sizeof(*pages) + (pages->count * sizeof(uint64_t)) )
     {
         ERROR("PAGE_DATA record (length %u) too short to contain %u"
               " pfns worth of information", rec->length, pages->count);
@@ -383,7 +388,8 @@ static int handle_page_data(struct xc_sr_context *ctx, struct xc_sr_record *rec)
                   type, pfn, i);
             goto err;
         }
-        else if ( type < XEN_DOMCTL_PFINFO_BROKEN )
+
+        if ( type < XEN_DOMCTL_PFINFO_BROKEN )
             /* NOTAB and all L1 through L4 tables (including pinned) should
              * have a page worth of data in the record. */
             pages_of_data++;

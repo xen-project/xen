@@ -142,12 +142,14 @@ static int x86_hvm_setup(struct xc_sr_context *ctx)
               dhdr_type_to_str(ctx->restore.guest_type));
         return -1;
     }
-    else if ( ctx->restore.guest_page_size != PAGE_SIZE )
+
+    if ( ctx->restore.guest_page_size != PAGE_SIZE )
     {
         ERROR("Invalid page size %u for x86_hvm domains",
               ctx->restore.guest_page_size);
         return -1;
     }
+
 #ifdef __i386__
     /* Very large domains (> 1TB) will exhaust virtual address space. */
     if ( ctx->restore.p2m_size > 0x0fffffff )

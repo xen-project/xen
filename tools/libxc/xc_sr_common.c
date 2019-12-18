@@ -102,7 +102,8 @@ int read_record(struct xc_sr_context *ctx, int fd, struct xc_sr_record *rec)
         PERROR("Failed to read Record Header from stream");
         return -1;
     }
-    else if ( rhdr.length > REC_LENGTH_MAX )
+
+    if ( rhdr.length > REC_LENGTH_MAX )
     {
         ERROR("Record (0x%08x, %s) length %#x exceeds max (%#x)", rhdr.type,
               rec_type_to_str(rhdr.type), rhdr.length, REC_LENGTH_MAX);

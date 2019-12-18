@@ -145,7 +145,8 @@ static int process_start_info(struct xc_sr_context *ctx,
         ERROR("Start Info pfn %#lx out of range", pfn);
         goto err;
     }
-    else if ( ctx->x86_pv.restore.pfn_types[pfn] != XEN_DOMCTL_PFINFO_NOTAB )
+
+    if ( ctx->x86_pv.restore.pfn_types[pfn] != XEN_DOMCTL_PFINFO_NOTAB )
     {
         ERROR("Start Info pfn %#lx has bad type %u", pfn,
               (ctx->x86_pv.restore.pfn_types[pfn] >>
@@ -275,8 +276,8 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
             ERROR("GDT frame %u (pfn %#lx) out of range", i, pfn);
             goto err;
         }
-        else if ( (ctx->x86_pv.restore.pfn_types[pfn] !=
-                   XEN_DOMCTL_PFINFO_NOTAB) )
+
+        if ( (ctx->x86_pv.restore.pfn_types[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
         {
             ERROR("GDT frame %u (pfn %#lx) has bad type %u", i, pfn,
                   (ctx->x86_pv.restore.pfn_types[pfn] >>
@@ -302,10 +303,10 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
         ERROR("cr3 (pfn %#lx) out of range", pfn);
         goto err;
     }
-    else if ( (ctx->x86_pv.restore.pfn_types[pfn] &
-                XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
-              (((xen_pfn_t)ctx->x86_pv.levels) <<
-               XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
+
+    if ( (ctx->x86_pv.restore.pfn_types[pfn] &
+          XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
+         (((xen_pfn_t)ctx->x86_pv.levels) << XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
     {
         ERROR("cr3 (pfn %#lx) has bad type %u, expected %u", pfn,
               (ctx->x86_pv.restore.pfn_types[pfn] >>
@@ -334,10 +335,10 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
             ERROR("cr1 (pfn %#lx) out of range", pfn);
             goto err;
         }
-        else if ( (ctx->x86_pv.restore.pfn_types[pfn] &
-                   XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
-                  (((xen_pfn_t)ctx->x86_pv.levels) <<
-                   XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
+
+        if ( (ctx->x86_pv.restore.pfn_types[pfn] &
+              XEN_DOMCTL_PFINFO_LTABTYPE_MASK) !=
+             (((xen_pfn_t)ctx->x86_pv.levels) << XEN_DOMCTL_PFINFO_LTAB_SHIFT) )
         {
             ERROR("cr1 (pfn %#lx) has bad type %u, expected %u", pfn,
                   (ctx->x86_pv.restore.pfn_types[pfn] >>
@@ -542,8 +543,8 @@ static int update_guest_p2m(struct xc_sr_context *ctx)
                   pfn, i);
             goto err;
         }
-        else if ( (ctx->x86_pv.restore.pfn_types[pfn] !=
-                   XEN_DOMCTL_PFINFO_NOTAB) )
+
+        if ( (ctx->x86_pv.restore.pfn_types[pfn] != XEN_DOMCTL_PFINFO_NOTAB) )
         {
             ERROR("pfn (%#lx) for p2m_frame_list[%u] has bad type %u", pfn, i,
                   (ctx->x86_pv.restore.pfn_types[pfn] >>
@@ -692,7 +693,8 @@ static int handle_x86_pv_p2m_frames(struct xc_sr_context *ctx,
               rec->length, sizeof(*data) + sizeof(uint64_t));
         return -1;
     }
-    else if ( data->start_pfn > data->end_pfn )
+
+    if ( data->start_pfn > data->end_pfn )
     {
         ERROR("End pfn in stream (%#x) exceeds Start (%#x)",
               data->end_pfn, data->start_pfn);
@@ -1048,7 +1050,8 @@ static int x86_pv_setup(struct xc_sr_context *ctx)
               dhdr_type_to_str(ctx->restore.guest_type));
         return -1;
     }
-    else if ( ctx->restore.guest_page_size != PAGE_SIZE )
+
+    if ( ctx->restore.guest_page_size != PAGE_SIZE )
     {
         ERROR("Invalid page size %d for x86_pv domains",
               ctx->restore.guest_page_size);
