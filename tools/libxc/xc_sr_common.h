@@ -165,12 +165,37 @@ struct xc_sr_restore_ops
     int (*cleanup)(struct xc_sr_context *ctx);
 };
 
-/* x86 PV per-vcpu storage structure for blobs heading Xen-wards. */
-struct xc_sr_x86_pv_restore_vcpu
+/* Wrapper for blobs of data heading Xen-wards. */
+struct xc_sr_blob
 {
-    void *basic, *extd, *xsave, *msr;
-    size_t basicsz, extdsz, xsavesz, msrsz;
+    void *ptr;
+    size_t size;
 };
+
+/*
+ * Update a blob.  Duplicate src/size, freeing the old blob if necessary.  May
+ * fail due to memory allocation.
+ */
+static inline int update_blob(struct xc_sr_blob *blob,
+                              const void *src, size_t size)
+{
+    void *ptr;
+
+    if ( !src || !size )
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if ( (ptr = malloc(size)) == NULL )
+        return -1;
+
+    free(blob->ptr);
+    blob->ptr = memcpy(ptr, src, size);
+    blob->size = size;
+
+    return 0;
+}
 
 struct xc_sr_context
 {
@@ -306,8 +331,11 @@ struct xc_sr_context
                     /* Types for each page (bounded by max_pfn). */
                     uint32_t *pfn_types;
 
-                    /* Vcpu context blobs. */
-                    struct xc_sr_x86_pv_restore_vcpu *vcpus;
+                    /* x86 PV per-vcpu storage structure for blobs. */
+                    struct xc_sr_x86_pv_restore_vcpu
+                    {
+                        struct xc_sr_blob basic, extd, xsave, msr;
+                    } *vcpus;
                     unsigned nr_vcpus;
                 } restore;
             };
@@ -327,8 +355,7 @@ struct xc_sr_context
                 struct
                 {
                     /* HVM context blob. */
-                    void *context;
-                    size_t contextsz;
+                    struct xc_sr_blob context;
                 } restore;
             };
         } x86_hvm;

@@ -236,7 +236,7 @@ static int process_vcpu_basic(struct xc_sr_context *ctx,
                               unsigned int vcpuid)
 {
     xc_interface *xch = ctx->xch;
-    vcpu_guest_context_any_t *vcpu = ctx->x86_pv.restore.vcpus[vcpuid].basic;
+    vcpu_guest_context_any_t *vcpu = ctx->x86_pv.restore.vcpus[vcpuid].basic.ptr;
     xen_pfn_t pfn, mfn;
     unsigned i, gdt_count;
     int rc = -1;
@@ -380,7 +380,7 @@ static int process_vcpu_extended(struct xc_sr_context *ctx,
 
     domctl.cmd = XEN_DOMCTL_set_ext_vcpucontext;
     domctl.domain = ctx->domid;
-    memcpy(&domctl.u.ext_vcpucontext, vcpu->extd, vcpu->extdsz);
+    memcpy(&domctl.u.ext_vcpucontext, vcpu->extd.ptr, vcpu->extd.size);
 
     if ( xc_domctl(xch, &domctl) != 0 )
     {
@@ -404,21 +404,21 @@ static int process_vcpu_xsave(struct xc_sr_context *ctx,
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER(void, buffer);
 
-    buffer = xc_hypercall_buffer_alloc(xch, buffer, vcpu->xsavesz);
+    buffer = xc_hypercall_buffer_alloc(xch, buffer, vcpu->xsave.size);
     if ( !buffer )
     {
         ERROR("Unable to allocate %zu bytes for xsave hypercall buffer",
-              vcpu->xsavesz);
+              vcpu->xsave.size);
         return -1;
     }
 
     domctl.cmd = XEN_DOMCTL_setvcpuextstate;
     domctl.domain = ctx->domid;
     domctl.u.vcpuextstate.vcpu = vcpuid;
-    domctl.u.vcpuextstate.size = vcpu->xsavesz;
+    domctl.u.vcpuextstate.size = vcpu->xsave.size;
     set_xen_guest_handle(domctl.u.vcpuextstate.buffer, buffer);
 
-    memcpy(buffer, vcpu->xsave, vcpu->xsavesz);
+    memcpy(buffer, vcpu->xsave.ptr, vcpu->xsave.size);
 
     rc = xc_domctl(xch, &domctl);
     if ( rc )
@@ -442,21 +442,21 @@ static int process_vcpu_msrs(struct xc_sr_context *ctx,
     DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER(void, buffer);
 
-    buffer = xc_hypercall_buffer_alloc(xch, buffer, vcpu->msrsz);
+    buffer = xc_hypercall_buffer_alloc(xch, buffer, vcpu->msr.size);
     if ( !buffer )
     {
         ERROR("Unable to allocate %zu bytes for msr hypercall buffer",
-              vcpu->msrsz);
+              vcpu->msr.size);
         return -1;
     }
 
     domctl.cmd = XEN_DOMCTL_set_vcpu_msrs;
     domctl.domain = ctx->domid;
     domctl.u.vcpu_msrs.vcpu = vcpuid;
-    domctl.u.vcpu_msrs.msr_count = vcpu->msrsz / sizeof(xen_domctl_vcpu_msr_t);
+    domctl.u.vcpu_msrs.msr_count = vcpu->msr.size / sizeof(xen_domctl_vcpu_msr_t);
     set_xen_guest_handle(domctl.u.vcpu_msrs.msrs, buffer);
 
-    memcpy(buffer, vcpu->msr, vcpu->msrsz);
+    memcpy(buffer, vcpu->msr.ptr, vcpu->msr.size);
 
     rc = xc_domctl(xch, &domctl);
     if ( rc )
@@ -481,7 +481,7 @@ static int update_vcpu_context(struct xc_sr_context *ctx)
     {
         vcpu = &ctx->x86_pv.restore.vcpus[i];
 
-        if ( vcpu->basic )
+        if ( vcpu->basic.ptr )
         {
             rc = process_vcpu_basic(ctx, i);
             if ( rc )
@@ -493,21 +493,21 @@ static int update_vcpu_context(struct xc_sr_context *ctx)
             return -1;
         }
 
-        if ( vcpu->extd )
+        if ( vcpu->extd.ptr )
         {
             rc = process_vcpu_extended(ctx, i);
             if ( rc )
                 return rc;
         }
 
-        if ( vcpu->xsave )
+        if ( vcpu->xsave.ptr )
         {
             rc = process_vcpu_xsave(ctx, i);
             if ( rc )
                 return rc;
         }
 
-        if ( vcpu->msr )
+        if ( vcpu->msr.ptr )
         {
             rc = process_vcpu_msrs(ctx, i);
             if ( rc )
@@ -737,7 +737,7 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
     struct xc_sr_x86_pv_restore_vcpu *vcpu;
     const char *rec_name;
     size_t blobsz;
-    void *blob;
+    struct xc_sr_blob *blob = NULL;
     int rc = -1;
 
     switch ( rec->type )
@@ -811,6 +811,7 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
                   rec_name, sizeof(*vhdr) + vcpusz, rec->length);
             goto out;
         }
+        blob = &vcpu->basic;
         break;
     }
 
@@ -821,6 +822,7 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
                   rec_name, sizeof(*vhdr) + 128, rec->length);
             goto out;
         }
+        blob = &vcpu->extd;
         break;
 
     case REC_TYPE_X86_PV_VCPU_XSAVE:
@@ -830,6 +832,7 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
                   rec_name, sizeof(*vhdr) + 128, rec->length);
             goto out;
         }
+        blob = &vcpu->xsave;
         break;
 
     case REC_TYPE_X86_PV_VCPU_MSRS:
@@ -839,34 +842,14 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
                   rec_name, blobsz, sizeof(xen_domctl_vcpu_msr_t));
             goto out;
         }
+        blob = &vcpu->msr;
         break;
     }
 
-    /* Allocate memory. */
-    blob = malloc(blobsz);
-    if ( !blob )
-    {
+    rc = update_blob(blob, vhdr->context, blobsz);
+    if ( rc )
         ERROR("Unable to allocate %zu bytes for vcpu%u %s blob",
               blobsz, vhdr->vcpu_id, rec_name);
-        goto out;
-    }
-
-    memcpy(blob, &vhdr->context, blobsz);
-
-    /* Stash sideways for later. */
-    switch ( rec->type )
-    {
-#define RECSTORE(x, y) case REC_TYPE_X86_PV_ ## x: \
-        free(y); (y) = blob; (y ## sz) = blobsz; break
-
-        RECSTORE(VCPU_BASIC,    vcpu->basic);
-        RECSTORE(VCPU_EXTENDED, vcpu->extd);
-        RECSTORE(VCPU_XSAVE,    vcpu->xsave);
-        RECSTORE(VCPU_MSRS,     vcpu->msr);
-#undef RECSTORE
-    }
-
-    rc = 0;
 
  out:
     return rc;
@@ -1158,10 +1141,10 @@ static int x86_pv_cleanup(struct xc_sr_context *ctx)
             struct xc_sr_x86_pv_restore_vcpu *vcpu =
                 &ctx->x86_pv.restore.vcpus[i];
 
-            free(vcpu->basic);
-            free(vcpu->extd);
-            free(vcpu->xsave);
-            free(vcpu->msr);
+            free(vcpu->basic.ptr);
+            free(vcpu->extd.ptr);
+            free(vcpu->xsave.ptr);
+            free(vcpu->msr.ptr);
         }
 
         free(ctx->x86_pv.restore.vcpus);

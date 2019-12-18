@@ -10,21 +10,12 @@ static int handle_hvm_context(struct xc_sr_context *ctx,
                               struct xc_sr_record *rec)
 {
     xc_interface *xch = ctx->xch;
-    void *p;
+    int rc = update_blob(&ctx->x86_hvm.restore.context, rec->data, rec->length);
 
-    p = malloc(rec->length);
-    if ( !p )
-    {
+    if ( rc )
         ERROR("Unable to allocate %u bytes for hvm context", rec->length);
-        return -1;
-    }
 
-    free(ctx->x86_hvm.restore.context);
-
-    ctx->x86_hvm.restore.context = memcpy(p, rec->data, rec->length);
-    ctx->x86_hvm.restore.contextsz = rec->length;
-
-    return 0;
+    return rc;
 }
 
 /*
@@ -210,8 +201,8 @@ static int x86_hvm_stream_complete(struct xc_sr_context *ctx)
     }
 
     rc = xc_domain_hvm_setcontext(xch, ctx->domid,
-                                  ctx->x86_hvm.restore.context,
-                                  ctx->x86_hvm.restore.contextsz);
+                                  ctx->x86_hvm.restore.context.ptr,
+                                  ctx->x86_hvm.restore.context.size);
     if ( rc < 0 )
     {
         PERROR("Unable to restore HVM context");
@@ -234,7 +225,7 @@ static int x86_hvm_stream_complete(struct xc_sr_context *ctx)
 
 static int x86_hvm_cleanup(struct xc_sr_context *ctx)
 {
-    free(ctx->x86_hvm.restore.context);
+    free(ctx->x86_hvm.restore.context.ptr);
 
     return 0;
 }
