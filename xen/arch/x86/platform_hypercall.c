@@ -30,6 +30,7 @@
 #include <asm/mtrr.h>
 #include <asm/io_apic.h>
 #include <asm/setup.h>
+#include "cpu/mcheck/mce.h"
 #include "cpu/mtrr/mtrr.h"
 #include <xsm/xsm.h>
 
@@ -94,6 +95,9 @@ void check_resource_access(struct resource_access *ra)
         switch ( entry->u.cmd )
         {
         case XEN_RESOURCE_OP_MSR_READ:
+            if ( ppin_msr && entry->idx == ppin_msr )
+                break;
+            /* fall through */
         case XEN_RESOURCE_OP_MSR_WRITE:
             if ( entry->idx >> 32 )
                 ret = -EINVAL;
