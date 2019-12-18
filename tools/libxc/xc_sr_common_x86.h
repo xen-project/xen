@@ -14,6 +14,20 @@ int write_x86_tsc_info(struct xc_sr_context *ctx);
  */
 int handle_x86_tsc_info(struct xc_sr_context *ctx, struct xc_sr_record *rec);
 
+/*
+ * Parses an X86_CPUID_POLICY record and stashes the content for application
+ * when a STATIC_DATA_END record is encountered.
+ */
+int handle_x86_cpuid_policy(struct xc_sr_context *ctx,
+                            struct xc_sr_record *rec);
+
+/*
+ * Parses an X86_MSR_POLICY record and stashes the content for application
+ * when a STATIC_DATA_END record is encountered.
+ */
+int handle_x86_msr_policy(struct xc_sr_context *ctx,
+                          struct xc_sr_record *rec);
+
 #endif
 /*
  * Local variables:

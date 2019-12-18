@@ -296,6 +296,16 @@ struct xc_sr_context
     {
         struct /* x86 */
         {
+            /* Common save/restore data. */
+            union
+            {
+                struct
+                {
+                    /* X86_{CPUID,MSR}_DATA blobs for CPU Policy. */
+                    struct xc_sr_blob cpuid, msr;
+                } restore;
+            };
+
             struct /* x86 PV guest. */
             {
                 /* 4 or 8; 32 or 64 bit domain */

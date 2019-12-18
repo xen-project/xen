@@ -1102,6 +1102,12 @@ static int x86_pv_process_record(struct xc_sr_context *ctx,
     case REC_TYPE_X86_TSC_INFO:
         return handle_x86_tsc_info(ctx, rec);
 
+    case REC_TYPE_X86_CPUID_POLICY:
+        return handle_x86_cpuid_policy(ctx, rec);
+
+    case REC_TYPE_X86_MSR_POLICY:
+        return handle_x86_msr_policy(ctx, rec);
+
     default:
         return RECORD_NOT_PROCESSED;
     }
@@ -1172,6 +1178,9 @@ static int x86_pv_cleanup(struct xc_sr_context *ctx)
 
     if ( ctx->x86.pv.m2p )
         munmap(ctx->x86.pv.m2p, ctx->x86.pv.nr_m2p_frames * PAGE_SIZE);
+
+    free(ctx->x86.restore.cpuid.ptr);
+    free(ctx->x86.restore.msr.ptr);
 
     return 0;
 }
