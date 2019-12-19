@@ -426,6 +426,7 @@ return_to_hypervisor:
         add sp, #(UREGS_SP_usr - UREGS_sp); /* SP, LR, SPSR, PC */
         clrex
         eret
+        sb
 
 /*
  * struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next)
