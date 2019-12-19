@@ -2317,6 +2317,19 @@ static int __init init_vcpu_kick_softirq(void)
 }
 __initcall(init_vcpu_kick_softirq);
 
+void domain_pause_for_debugger(void)
+{
+#ifdef CONFIG_CRASH_DEBUG
+    struct vcpu *curr = current;
+    struct domain *d = curr->domain;
+
+    domain_pause_by_systemcontroller_nosync(d);
+
+    /* if gdbsx active, we just need to pause the domain */
+    if ( curr->arch.gdbsx_vcpu_event == 0 )
+        send_global_virq(VIRQ_DEBUGGER);
+#endif
+}
 
 /*
  * Local variables:

@@ -13,7 +13,6 @@ config X86
 	select HAS_EHCI
 	select HAS_EX_TABLE
 	select HAS_FAST_MULTIPLY
-	select HAS_GDBSX
 	select HAS_IOPORTS
 	select HAS_KEXEC
 	select MEM_ACCESS_ALWAYS_ON

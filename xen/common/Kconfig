@@ -57,9 +57,6 @@ config HAS_UBSAN
 config HAS_KEXEC
 	bool
 
-config HAS_GDBSX
-	bool
-
 config HAS_IOPORTS
 	bool
 

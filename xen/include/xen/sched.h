@@ -655,7 +655,6 @@ void domain_destroy(struct domain *d);
 int domain_kill(struct domain *d);
 int domain_shutdown(struct domain *d, u8 reason);
 void domain_resume(struct domain *d);
-void domain_pause_for_debugger(void);
 
 int domain_soft_reset(struct domain *d);
 
