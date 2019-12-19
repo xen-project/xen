@@ -13,4 +13,13 @@
 # error "unknown ARM variant"
 #endif
 
+    /*
+     * Speculative barrier
+     * XXX: Add support for the 'sb' instruction
+     */
+    .macro sb
+    dsb nsh
+    isb
+    .endm
+
 #endif /* __ASM_ARM_MACROS_H */
