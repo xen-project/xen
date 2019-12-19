@@ -92,8 +92,10 @@ static inline bool debugger_trap_entry(
 
 #endif
 
+#ifdef CONFIG_GDBSX
 unsigned int dbg_rw_mem(void * __user addr, void * __user buf,
                         unsigned int len, domid_t domid, bool toaddr,
                         uint64_t pgd3);
+#endif
 
 #endif /* __X86_DEBUGGER_H__ */

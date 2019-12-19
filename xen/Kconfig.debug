@@ -20,6 +20,14 @@ config CRASH_DEBUG
 	  If you want to attach gdb to Xen to debug Xen if it crashes
 	  then say Y.
 
+config GDBSX
+	bool "Guest debugging with gdbsx"
+	depends on X86
+	default y
+	---help---
+	  If you want to enable support for debugging guests from dom0 via
+	  gdbsx then say Y.
+
 config DEBUG_INFO
 	bool "Compile Xen with debug info"
 	default y

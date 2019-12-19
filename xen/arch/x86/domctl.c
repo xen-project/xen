@@ -36,6 +36,7 @@
 #include <asm/psr.h>
 #include <asm/cpuid.h>
 
+#ifdef CONFIG_GDBSX
 static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 {
     void * __user gva = (void *)iop->gva, * __user uva = (void *)iop->uva;
@@ -45,6 +46,7 @@ static int gdbsx_guest_mem_io(domid_t domid, struct xen_domctl_gdbsx_memio *iop)
 
     return iop->remain ? -EFAULT : 0;
 }
+#endif
 
 static void domain_cpu_policy_changed(struct domain *d)
 {
@@ -932,6 +934,7 @@ long arch_do_domctl(
     }
 #endif
 
+#ifdef CONFIG_GDBSX
     case XEN_DOMCTL_gdbsx_guestmemio:
         domctl->u.gdbsx_guest_memio.remain = domctl->u.gdbsx_guest_memio.len;
         ret = gdbsx_guest_mem_io(domctl->domain, &domctl->u.gdbsx_guest_memio);
@@ -996,6 +999,7 @@ long arch_do_domctl(
         copyback = true;
         break;
     }
+#endif
 
     case XEN_DOMCTL_setvcpuextstate:
     case XEN_DOMCTL_getvcpuextstate:
