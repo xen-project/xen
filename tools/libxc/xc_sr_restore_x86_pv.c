@@ -825,6 +825,15 @@ static int handle_x86_pv_vcpu_blob(struct xc_sr_context *ctx,
         break;
 
     case REC_TYPE_X86_PV_VCPU_XSAVE:
+        if ( blobsz < 128 )
+        {
+            ERROR("%s record too short: min %zu, got %u",
+                  rec_name, sizeof(*vhdr) + 128, rec->length);
+            goto out;
+        }
+        break;
+
+    case REC_TYPE_X86_PV_VCPU_MSRS:
         if ( blobsz % sizeof(xen_domctl_vcpu_msr_t) != 0 )
         {
             ERROR("%s record payload size %zu expected to be a multiple of %zu",
